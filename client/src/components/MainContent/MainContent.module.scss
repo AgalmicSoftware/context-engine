@@ -1,0 +1,653 @@
+/* @file MainContent.module.scss */
+
+/* --- MainAreaTabs --- */
+
+@media (min-width: 0px) and (max-width: 319px) {
+  #mainTabsCard {
+    min-height: 100%;
+    background: #00000000;
+  }
+
+  #mainAreaTabs {
+    background: transparent;
+    margin-top: 0px;
+  }
+
+  #mainTabsCardHeader {
+    padding: 15px 5px 15px 5px;
+  }
+
+  #mainAreaCardBody {
+    padding: 0px;
+  }
+}
+
+@media (min-width: 320px) and (max-width: 465px) {
+  #mainTabsCard {
+    min-height: 100%;
+    background: #00000000;
+  }
+
+  #mainAreaTabs {
+    background: transparent;
+    margin-top: 0px;
+  }
+
+  #mainTabsCardHeader {
+    padding: 15px 10px 15px 10px;
+  }
+
+  #mainAreaCardBody {
+    padding: 0px;
+  }
+}
+
+@media (min-width: 466px) and (max-width: 768px) {
+  #mainTabsCard {
+    min-height: 100%;
+    background: #00000000;
+    border-radius: var(--ce-radius-7);
+    background: transparent;
+  }
+
+  #mainAreaTabs {
+    margin-top: 17.5px;
+  }
+
+  #mainTabsCardHeader {
+    padding: 15px 10px 15px 10px;
+  }
+
+  #mainAreaCardBody {
+    padding-left: 10px;
+    padding-right: 10px;
+    padding-top: 0px;
+    padding-bottom: 0px;
+  }
+}
+
+@media (min-width: 769px) and (max-width: 1366px) {
+  #mainTabsCard {
+    min-height: 100%;
+    background: var(--ce-color-bg);
+    border-radius: var(--ce-radius-7);
+    background: var(--ce-color-bg);
+    box-shadow:
+      -6px 6px 12px #0f102a,
+      6px -6px 12px #1f2258;
+  }
+
+  #mainAreaTabs {
+    width: 75%;
+    height: 100%;
+    min-height: 100%;
+    margin-top: 5px;
+    margin-right: 2%;
+  }
+
+  #mainAreaTabsAlt {
+    width: 75%;
+    height: 100%;
+    min-height: 100%;
+    margin-top: 5px;
+    margin-right: 2%;
+  }
+
+  #mainTabsCardHeader {
+    padding: 15px 10px 15px 10px;
+  }
+
+  #mainAreaCardBody {
+    padding: 0px 15px 15px 15px;
+  }
+}
+
+@media (min-width: 1367px) {
+  #mainTabsCard {
+    min-height: 100%;
+    background: var(--ce-color-bg);
+    border-radius: var(--ce-radius-7);
+    background: var(--ce-color-bg);
+    box-shadow:
+      -6px 6px 12px #0f102a,
+      6px -6px 12px #1f2258;
+  }
+
+  #mainAreaTabs {
+    width: 75%;
+    min-height: 100%;
+    margin-top: 7.5px;
+    margin-right: 2%;
+  }
+
+  #mainAreaTabsAlt {
+    flex: 0 0 75%;
+    width: 75%;
+    min-height: 100%;
+    margin-top: 7.5px;
+    margin-right: 2%;
+  }
+
+  #mainTabsCardHeader {
+    padding: 15px 10px 15px 10px;
+  }
+
+  #mainAreaCardBody {
+    min-height: 500px;
+    padding: 0px 25px 25px 25px;
+  }
+}
+
+#mainTabsCard {
+  min-height: 100%;
+  margin-top: 0px;
+}
+
+#navTabIcon { }
+
+#trelloEmbed {
+  display: flex;
+}
+
+/* --- OnboardingWalkthrough --- */
+
+@media (min-width: 0px) and (max-width: 319px) {
+  #onboardingWalkthrough {
+    display: flex;
+    flex-direction: column;
+    padding-right: 0px;
+    padding-left: 0px;
+  }
+
+  #onboardingInfo {
+    justify-content: center;
+    align-items: center;
+  }
+
+  #onboardingTitle {
+    padding-top: 10px;
+    padding-bottom: 10px;
+    font-size: 2em;
+  }
+
+  #onboardingControls {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    background: transparent;
+    min-height: 50px;
+  }
+
+  #openSidebarButton {
+    font-size: 0.85em;
+  }
+
+  .getStartedButton {
+    height: unset !important;
+  }
+
+  #takeSurveyPrompt {
+    margin-bottom: 0px;
+    text-transform: uppercase;
+    font-size: 0.85em;
+    font-weight: 600;
+    color: var(--ce-color-white);
+  }
+
+  #takeSurveyIcon {
+    display: inline-flex;
+    margin-left: 5px;
+    margin-right: 5px;
+    font-size: 45px;
+  }
+
+  #takeSurveyButton {
+    width: 100%;
+    padding-top: 5px;
+    padding-bottom: 5px;
+    text-transform: uppercase;
+    font-weight: 600;
+    font-size: 0.85em;
+    color: #ffffffcf;
+    border: none;
+    background: var(--ce-color-black);
+    justify-self: flex-end;
+    align-items: self-end;
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+  }
+
+  #feedbackPromptText {
+    display: inline-flex;
+  }
+
+  #feedbackPromptDetailText {
+    display: inline-flex;
+  }
+}
+
+@media (min-width: 320px) and (max-width: 465px) {
+  #onboardingWalkthrough {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    padding-right: 0px;
+    padding-left: 0px;
+    min-height: 525px;
+  }
+
+  #onboardingInfo {
+    justify-content: center;
+    align-items: center;
+  }
+
+  #onboardingTitle {
+    padding-top: 10px;
+    padding-bottom: 10px;
+    font-size: 2em;
+  }
+
+  #onboardingControls {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    background: transparent;
+    min-height: 50px;
+  }
+
+  #openSidebarButton {
+    font-size: 0.85em;
+  }
+
+  .getStartedButton {
+    height: unset !important;
+  }
+
+  #takeSurveyPrompt {
+    margin-bottom: 0px;
+    text-transform: uppercase;
+    font-size: 0.85em;
+    font-weight: 600;
+    color: var(--ce-color-white);
+  }
+
+  #takeSurveyIcon {
+    display: inline-flex;
+    margin-left: 5px;
+    margin-right: 5px;
+    font-size: 55px;
+  }
+
+  #takeSurveyButton {
+    width: 100%;
+    padding-top: 5px;
+    padding-bottom: 5px;
+    text-transform: uppercase;
+    font-weight: 600;
+    font-size: 0.85em;
+    color: #000000a6;
+    border: none;
+    background: #07c0f929;
+    justify-self: flex-end;
+    align-items: self-end;
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+  }
+
+  #feedbackPromptText {
+    display: inline-flex;
+  }
+
+  #feedbackPromptDetailText {
+    display: inline-flex;
+  }
+}
+
+@media (min-width: 466px) and (max-width: 768px) {
+  #onboardingWalkthrough {
+    display: flex;
+    flex-direction: column;
+    padding-right: 0px;
+    padding-left: 0px;
+  }
+
+  #onboardingInfo {
+    justify-content: center;
+    align-items: center;
+  }
+
+  #onboardingTitle {
+    padding-top: 20px;
+    padding-bottom: 20px;
+    font-size: 2.5em;
+  }
+
+  #onboardingControls {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    background: transparent;
+    min-height: 75px;
+  }
+
+  #openSidebarButton {
+    font-size: 1.25em;
+  }
+
+  .getStartedButton {
+    height: unset !important;
+  }
+
+  #takeSurveyPrompt {
+    margin-bottom: 0px;
+    text-transform: uppercase;
+    font-size: 0.85em;
+    font-weight: 600;
+    color: var(--ce-color-white);
+  }
+
+  #takeSurveyIcon {
+    display: inline-flex;
+    margin-left: 5px;
+    margin-right: 5px;
+    font-size: 55px;
+  }
+
+  #takeSurveyButton {
+    width: 100%;
+    height: 75px;
+    padding-top: 5px;
+    padding-bottom: 5px;
+    text-transform: uppercase;
+    font-weight: 600;
+    font-size: 1.25em;
+    color: #ffffffcf;
+    border: none;
+    background: var(--ce-color-black);
+    justify-self: flex-end;
+    align-items: self-end;
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+  }
+
+  #feedbackPromptText {
+    display: inline-flex;
+  }
+
+  #feedbackPromptDetailText {
+    display: inline-flex;
+  }
+}
+
+@media (min-width: 769px) and (max-width: 1366px) {
+  #onboardingWalkthrough {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    padding-right: 0px;
+    padding-left: 0px;
+    min-height: 600px;
+  }
+
+  #onboardingInfo {
+    align-items: center;
+  }
+
+  #onboardingTitle {
+    align-self: center;
+    font-weight: 600;
+    color: #ffffff2e;
+    text-transform: uppercase;
+    margin-bottom: 0px;
+    padding-top: 25px;
+    padding-bottom: 15px;
+    font-size: 3em;
+  }
+
+  #onboardingControls {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    background: transparent;
+    min-height: 75px;
+  }
+
+  #takeSurveyButton {
+    height: 80px;
+    padding-top: 5px;
+    padding-bottom: 5px;
+    text-transform: uppercase;
+    font-weight: 600;
+    font-size: 1.75em;
+    color: #ffffffcf;
+    border: none;
+    background: var(--ce-color-black);
+    justify-self: flex-end;
+    align-items: self-end;
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+  }
+
+  #openSidebarButton {
+    font-size: 1.35em;
+  }
+
+  .getStartedButton {
+    height: unset !important;
+  }
+
+  #takeSurveyPrompt {
+    margin-bottom: 0px;
+    text-transform: uppercase;
+    font-size: 0.85em;
+    font-weight: 600;
+    color: var(--ce-color-white);
+  }
+
+  #takeSurveyIcon {
+    display: inline-flex;
+    margin-left: 5px;
+    margin-right: 5px;
+    font-size: 55px;
+  }
+
+  #takeSurveyButton {
+    width: 100%;
+    padding-top: 5px;
+    padding-bottom: 5px;
+    text-transform: uppercase;
+    font-weight: 600;
+    font-size: 1.35em;
+    color: #ffffffcf;
+    border: none;
+    background: var(--ce-color-black);
+    justify-self: flex-end;
+    align-items: self-end;
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+    height: 100px;
+  }
+
+  #feedbackPromptText {
+    display: inline-flex;
+  }
+
+  #feedbackPromptDetailText {
+    display: inline-flex;
+  }
+}
+
+@media (min-width: 1367px) {
+  #onboardingWalkthrough {
+    display: flex;
+    flex-direction: row;
+    padding-right: 0px;
+    padding-left: 0px;
+  }
+
+  #onboardingInfo {
+    width: 100%;
+    align-items: flex-start;
+    justify-content: flex-end;
+  }
+
+  #onboardingTitle {
+    align-self: flex-start;
+    font-weight: 600;
+    color: #ffffff2e;
+    text-transform: uppercase;
+    margin-bottom: 0px;
+    padding-left: 35px;
+    padding-top: 35px;
+    font-size: 4.25em;
+  }
+
+  #onboardingControls {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-self: flex-end;
+    background: transparent;
+    width: 30%;
+    height: 500px;
+  }
+
+  #sidebarOpen {
+    height: 100%;
+  }
+
+  #openSidebarButton {
+    font-size: 1.75em;
+    border-style: solid;
+    border-color: transparent;
+    border-width: 0px;
+    height: 100% !important;
+  }
+
+  .getStartedButton {
+    height: unset !important;
+  }
+
+  #takeSurveyPrompt {
+    margin-bottom: 0px;
+    text-transform: uppercase;
+    font-size: 0.85em;
+    font-weight: 600;
+    color: var(--ce-color-white);
+  }
+
+  #takeSurveyIcon {
+    display: inline-flex;
+    margin-left: 5px;
+    margin-right: 5px;
+    font-size: 80px;
+  }
+
+  #takeSurveyButton {
+    height: 100%;
+    width: 100%;
+    padding-top: 5px;
+    padding-bottom: 5px;
+    text-transform: uppercase;
+    font-weight: 600;
+    font-size: 1.75em;
+    border: none;
+    color: #487dec7a;
+    background: #000000a1;
+    justify-self: flex-end;
+    align-items: self-end;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+  }
+
+  #feedbackPromptText {
+    display: inline-flex;
+  }
+
+  #feedbackPromptDetailText {
+    display: inline-flex;
+  }
+}
+
+.getStartedButton {
+  filter: opacity(1) !important;
+}
+
+#onboardingWalkthrough {
+  display: flex;
+  align-content: center;
+  height: 100%;
+  background: #0a0a0c7d;
+
+  #onboardingTitleArea {
+    display: flex;
+    flex-direction: column;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    align-self: center;
+  }
+
+  #onboardingTitle {
+    font-weight: 700;
+    color: #ffffff8a;
+    text-transform: uppercase;
+    margin-bottom: 0px;
+  }
+
+  #onboardingInfo {
+    display: flex;
+    flex-direction: column;
+    background-size: auto;
+    background-blend-mode: hue;
+    // justify-content: space-between;
+  }
+
+  #onboardingControls {
+    display: flex;
+  }
+
+  #sidebarOpen {
+    width: 100%;
+  }
+
+  #openSidebarButton {
+    width: 100%;
+    height: 100%;
+    cursor: pointer;
+    text-transform: uppercase;
+    font-weight: 600;
+    background: #00000082;
+    border: #00000000 solid 1px;
+    color: #8b909294;
+    filter: opacity(0.3);
+  }
+}
+
+#takeSurveyButton {
+  color: #000000a6;
+  border: none;
+  background: #07c0f929;
+}
+
+#typeformEmbed {
+  height: 0;
+  width: 0;
+}

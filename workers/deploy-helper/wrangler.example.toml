@@ -1,0 +1,29 @@
+# Copy this file to wrangler.toml before deploying your own helper.
+
+name = "ce-deploy-helper"
+main = "worker.js"
+compatibility_date = "2024-09-02"
+compatibility_flags = ["nodejs_compat"]
+
+# Replace with your own Cloudflare account ID before deploy.
+account_id = "YOUR_CLOUDFLARE_ACCOUNT_ID"
+
+kv_namespaces = [
+  { binding = "DEPLOY_HELPER_KV", id = "YOUR_DEPLOY_HELPER_KV_NAMESPACE_ID" },
+]
+
+[vars]
+# Comma- or newline-delimited browser origins allowed to call the helper.
+ALLOWED_ORIGINS = "http://localhost:3000"
+
+# Optional default session worker bundle URL when callers omit bundleUrl.
+WORKER_BUNDLE_URL = "https://github.com/AgalmicSoftware/context-engine/releases/latest/download/sessionCorsWorker.bundle.js"
+
+# Optional compatibility date for session workers deployed by this helper.
+WORKER_COMPATIBILITY_DATE = "2024-09-02"
+
+# Optional default slug used when low-level callers omit sessionSlug.
+DEFAULT_SESSION_SLUG = ""
+
+# Set ADMIN_SECRET separately so it does not live in a committed config file:
+#   npx wrangler secret put ADMIN_SECRET

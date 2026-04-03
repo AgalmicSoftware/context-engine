@@ -1,0 +1,133 @@
+{
+  "meta": {
+    "description": "Expanded tag list for Context Engine AI Discourse corpus. Includes original tags plus new categories for AI-specific phenomena, technical concepts, community dynamics, and emerging debates.",
+    "usage": "Apply 3-7 tags per tweet. Prefer specificity. Add new tags if genuinely needed and not duplicative.",
+    "version": "1.1",
+    "date": "2026-02-14"
+  },
+  "tags_by_category": {
+    "AI_Phenomena_and_Behaviors": [
+      "Sycophancy", "Hallucination", "Confabulation", "Jailbreaking", "Prompt Injection",
+      "Reward Hacking", "Specification Gaming", "Goal Misgeneralization", "Mode Collapse",
+      "Model Collapse", "Catastrophic Forgetting", "Emergent Capabilities", "Emergent Deception",
+      "Situational Awareness", "Sandbagging", "Scheming", "Power-seeking", "Self-preservation",
+      "Instruction Following", "Refusal", "Overrefusal", "Sycophantic Alignment",
+      "Capability Overhang", "Sleeper Agents", "Backdoors"
+    ],
+    "Technical_AI_Safety": [
+      "Alignment", "Safety", "Interpretability", "Mechanistic Interpretability",
+      "Superalignment", "Scalable Oversight", "Constitutional AI", "RLHF", "RLAIF",
+      "Debate (AI Safety)", "Recursive Reward Modeling", "Iterated Amplification",
+      "Inner Alignment", "Outer Alignment", "Mesa-optimization", "Deceptive Alignment",
+      "Corrigibility", "Shutdown Problem", "Instrumental Convergence", "Orthogonality Thesis",
+      "Value Alignment", "Value Lock-in", "Value Pluralism", "Coherent Extrapolated Volition",
+      "Containment", "Airgap", "Killswitch", "Red Teaming", "Evaluations", "Benchmarks",
+      "Auditing", "Verification", "Formal Methods", "Robustness", "Adversarial Attacks",
+      "Data Poisoning", "Sparse Autoencoders", "Circuit Analysis", "Feature Visualization",
+      "Probing", "Activation Steering", "Representation Engineering", "Concept Erasure",
+      "Latent Knowledge"
+    ],
+    "AI_Models_and_Architecture": [
+      "Foundation Models", "Large Language Models", "Multimodal", "Vision-Language Models",
+      "Diffusion Models", "Transformers", "Retrieval-Augmented Generation", "Chain-of-thought",
+      "In-context Learning", "Few-shot Learning", "Tool Use", "Code Generation",
+      "Reasoning", "Planning", "World Models", "Self-play", "Agents",
+      "Scaling Laws", "Emergence", "Training", "Inference", "Fine Tuning",
+      "Synthetic Data", "Data Curation", "Feedback Loops", "Human-in-the-loop",
+      "Frontier Models", "Open Source", "Closed Source", "Model Weights", "Parameters",
+      "Training Data"
+    ],
+    "AI_Governance_and_Policy": [
+      "Governance", "AI Governance", "Policy", "Regulation", "Legislation", "Law",
+      "Sandboxes", "Liability", "Compliance", "Standards", "Spec",
+      "Compute Governance", "Model Registries", "Responsible Scaling",
+      "Voluntary Commitments", "Industry Self-Regulation", "Regulatory Capture",
+      "Dual Use", "Export Controls", "Licensing", "Intellectual Property", "Copyright",
+      "AI Pause", "Moratorium", "AI Act (EU)", "Executive Order", "NIST",
+      "International Coordination", "Treaties", "Arms Race", "Proliferation",
+      "Frontier Model Forum", "AI Safety Institute", "AISI",
+      "Access Control", "APIs", "Open vs Closed Debate"
+    ],
+    "Risk_and_Existential": [
+      "Existential Risk", "Catastrophic Risk", "Risk", "P(doom)",
+      "Loss of Control", "Rogue AI", "Misuse", "Misalignment",
+      "Biorisk", "Biosecurity", "CBRN", "Nuclear Risk",
+      "Autonomous Weapons", "Lethal Autonomous Weapons", "Military AI",
+      "Cyberwarfare", "Cybersecurity", "Hacking", "Exploits",
+      "S-risk", "Suffering Risk", "Collapse", "Resilience",
+      "Intelligence Explosion", "Recursive Self-Improvement", "Foom",
+      "Takeoff Speed", "Slow Takeoff", "Fast Takeoff", "Discontinuity",
+      "Timelines", "Forecasting"
+    ],
+    "Society_and_Economics": [
+      "Economics", "Labor", "Jobs", "Automation", "Displacement", "Unions",
+      "UBI", "Wealth Inequality", "Abundance", "Post-Scarcity",
+      "Concentration of Power", "Monopolies", "Antitrust", "Big Tech",
+      "Digital Divide", "Global South", "Developing Countries",
+      "Education", "AI Literacy", "Public Understanding",
+      "Health", "Drug Discovery", "Climate Change", "Environment",
+      "Environmental Impact", "Carbon Footprint", "Energy Efficiency",
+      "Attention Economy", "Social Media", "Recommender Systems",
+      "Deepfakes", "Misinformation", "Information Warfare", "Cognitive Security",
+      "Content Moderation", "Platform Governance", "Filter Bubbles", "Polarization",
+      "Human-AI Interaction", "Human-AI Teaming", "Augmentation",
+      "Creativity", "Art", "Music", "Copyright (Creative)",
+      "Accessibility", "Assistive Technology"
+    ],
+    "Ethics_and_Philosophy": [
+      "Ethics", "Morality", "Philosophy", "AI Ethics", "Responsible AI",
+      "Fairness", "Bias", "Discrimination", "Accountability", "Transparency",
+      "AI Rights", "AI Personhood", "Moral Status", "Moral Patienthood",
+      "Digital Minds", "AI Welfare", "Consciousness", "Sentience", "Qualia",
+      "Aesthetics", "Neuroscience", "Psychology"
+    ],
+    "Communities_and_Movements": [
+      "Effective Altruism", "Rationalism", "AI Doomerism",
+      "Accelerationism", "e/acc", "Techno-optimism", "Optimism",
+      "Degrowth", "Luddism", "AI Skepticism",
+      "Transhumanism", "Posthumanism", "Longevity", "Immortality",
+      "Cyborgism", "Brain-Computer-Interface",
+      "Long-termism", "Short-termism",
+      "Decentralization", "Permissionless", "Censorship Resistance",
+      "Open Science", "Citizen Science"
+    ],
+    "Organizations_and_Actors": [
+      "OpenAI", "Anthropic", "DeepMind", "Meta AI", "xAI", "Google",
+      "Microsoft", "Apple AI", "Amazon AI", "NVIDIA",
+      "Research Labs", "Startups", "Academia",
+      "US Government", "EU", "UK", "China AI",
+      "Civil Society", "Think Tanks", "NGOs"
+    ],
+    "Democracy_and_Collective_Intelligence": [
+      "Democracy", "Deliberation", "Collective Intelligence",
+      "Participatory Governance", "Citizen Assembly", "Sortition",
+      "Voting", "Quadratic Voting", "Liquid Democracy",
+      "Futarchy", "Prediction Markets", "Consensus", "Plurality",
+      "DAOs", "Coordination", "Cooperation", "Mechanism Design",
+      "Game Theory", "Incentives", "Public Goods"
+    ],
+    "Crypto_and_Web3": [
+      "Blockchain", "Ethereum", "Smart Contracts", "Tokenomics",
+      "NFTs", "SBTs", "Hypercerts", "Quadratic Funding",
+      "Retroactive Funding", "Proof of Personhood",
+      "Zero Knowledge", "Cryptography", "Privacy",
+      "Decentralized AI", "Compute Markets"
+    ],
+    "Infrastructure_and_Compute": [
+      "Hardware", "Semiconductors", "Compute", "GPUs",
+      "Data Centers", "Cloud", "Edge Computing",
+      "Nuclear Power", "Fusion Energy", "Geothermal",
+      "Supply Chain", "Infrastructure", "Nationalization",
+      "Quantum", "Robotics"
+    ],
+    "Meta_and_Discourse": [
+      "Narrative", "Framing", "Overton Window", "Hype", "Bubble",
+      "AI Washing", "Science Fiction", "Media", "Journalism",
+      "Talent", "Brain Drain", "Immigration",
+      "Path Dependence", "Lock-in", "Intergenerational",
+      "Trust", "Reputation", "Provenance", "Authenticity", "Watermarking",
+      "Epistemic Commons", "Knowledge Commons", "Information Aggregation",
+      "Surveillance", "Monitoring", "Whistleblowing", "Identity", "Biometrics"
+    ]
+  }
+}

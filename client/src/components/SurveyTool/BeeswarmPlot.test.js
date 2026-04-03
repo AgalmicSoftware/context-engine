@@ -1,0 +1,105 @@
+import React from 'react';
+import { fireEvent, render, screen } from '@testing-library/react';
+import BeeswarmPlot, { normalizeTooltipVoteBreakdown, resolveTooltipLayout } from './BeeswarmPlot';
+
+describe('BeeswarmPlot', () => {
+  const samplePoint = [
+    {
+      questionId: 'q1',
+      label: 'Prompt one',
+      agrees: 7,
+      disagrees: 2,
+      unsure: 3,
+      total: 12,
+      extremity: 0.15,
+    },
+  ];
+
+  it('keeps a single point idle until hover when the idle summary is disabled, then shows the floating tooltip', () => {
+    render(<BeeswarmPlot points={samplePoint} showIdleSummary={false} />);
+
+    expect(screen.queryByTestId('ce-beeswarm-tooltip')).not.toBeInTheDocument();
+    expect(screen.queryByText('Hover a question to inspect the split.')).not.toBeInTheDocument();
+
+    fireEvent.mouseEnter(screen.getByTestId('ce-beeswarm-point-0'), {
+      clientX: 120,
+      clientY: 90,
+    });
+
+    expect(screen.getByTestId('ce-beeswarm-tooltip')).toBeInTheDocument();
+    expect(screen.getByText('Prompt one')).toBeInTheDocument();
+    const agreeStat = screen.getByTestId('ce-beeswarm-tooltip-agree');
+    const unsureStat = screen.getByTestId('ce-beeswarm-tooltip-unsure');
+    const disagreeStat = screen.getByTestId('ce-beeswarm-tooltip-disagree');
+    expect(agreeStat).toHaveTextContent('Agree 7');
+    expect(unsureStat).toHaveTextContent('Unsure 3');
+    expect(disagreeStat).toHaveTextContent('Disagree 2');
+    expect(agreeStat.compareDocumentPosition(unsureStat) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(unsureStat.compareDocumentPosition(disagreeStat) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByTestId('ce-beeswarm-tooltip-bar')).toBeInTheDocument();
+    const agreeSegment = screen.getByTestId('ce-beeswarm-tooltip-segment-agree');
+    const unsureSegment = screen.getByTestId('ce-beeswarm-tooltip-segment-unsure');
+    const disagreeSegment = screen.getByTestId('ce-beeswarm-tooltip-segment-disagree');
+    expect(agreeSegment).toBeInTheDocument();
+    expect(unsureSegment).toBeInTheDocument();
+    expect(disagreeSegment).toBeInTheDocument();
+    expect(agreeSegment.compareDocumentPosition(unsureSegment) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(unsureSegment.compareDocumentPosition(disagreeSegment) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByTestId('ce-beeswarm-tooltip-total')).toHaveTextContent('Counted 12');
+
+    fireEvent.mouseLeave(screen.getByTestId('ce-beeswarm-plot'));
+
+    expect(screen.queryByTestId('ce-beeswarm-tooltip')).not.toBeInTheDocument();
+  });
+
+  it('normalizes tooltip vote breakdowns so the response bar can render unsure votes', () => {
+    expect(normalizeTooltipVoteBreakdown({
+      agrees: 4,
+      disagrees: 1,
+      unsure: 2,
+      total: 8,
+    })).toEqual({
+      agrees: 4,
+      disagrees: 1,
+      unsure: 3,
+      total: 8,
+    });
+
+    expect(normalizeTooltipVoteBreakdown({
+      agrees: 3,
+      disagrees: 2,
+      total: 0,
+    })).toEqual({
+      agrees: 3,
+      disagrees: 2,
+      unsure: 0,
+      total: 5,
+    });
+  });
+
+  it('repositions right-edge tooltips to the left so the card keeps its full width', () => {
+    expect(resolveTooltipLayout({
+      anchorX: 320,
+      anchorY: 60,
+      wrapperWidth: 360,
+      wrapperHeight: 220,
+      tooltipWidth: 220,
+      tooltipHeight: 120,
+    })).toEqual(expect.objectContaining({
+      horizontal: 'left',
+      vertical: 'bottom',
+    }));
+
+    expect(resolveTooltipLayout({
+      anchorX: 44,
+      anchorY: 196,
+      wrapperWidth: 360,
+      wrapperHeight: 220,
+      tooltipWidth: 220,
+      tooltipHeight: 120,
+    })).toEqual(expect.objectContaining({
+      horizontal: 'right',
+      vertical: 'top',
+    }));
+  });
+});

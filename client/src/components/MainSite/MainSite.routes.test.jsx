@@ -1,0 +1,1118 @@
+import React from 'react';
+import { render, screen } from '@testing-library/react';
+import { MainSite } from './MainSite.jsx';
+import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
+import contractScripts from '../../utilities/web3/contractScripts.js';
+import {
+  getDemoSessionConfigBySlug,
+  getSessionConfigBySlug,
+  normalizeSessionSlug,
+} from '../../utilities/web3/contractScripts.js';
+import { sessionRegistryStore } from '../../utilities/web3/sessionRegistry.js';
+
+const mockAdminPage = jest.fn(() => null);
+const mockSponsorPage = jest.fn(() => null);
+const mockSessionWizard = jest.fn(() => null);
+const mockSurveyPage = jest.fn(() => null);
+const mockSessionDocumentsPage = jest.fn(() => null);
+const mockOnePageSession = jest.fn(() => null);
+const mockSBTPage = jest.fn(() => null);
+const mockSBTsPage = jest.fn(() => null);
+const mockCompareAddresses = jest.fn(() => null);
+const mockTagPage = jest.fn(() => null);
+const mockDebateMap = jest.fn(() => null);
+
+jest.mock('react-redux', () => ({
+  connect: () => (Comp) => Comp,
+}));
+
+jest.mock('../HooksHOC/withWagmiBridge.jsx', () => ({
+  WagmiHooksHOC: (Comp) => Comp,
+}));
+
+jest.mock('../Navbar/Navbar.jsx', () => () => null);
+jest.mock('../MainContent/MainAreaTabs.jsx', () => () => null);
+jest.mock('../Onboarding/OnboardingOverlay.jsx', () => () => null);
+jest.mock('../Footer/Footer.jsx', () => () => null);
+jest.mock('../UserPage/SimUserPage.jsx', () => () => null);
+jest.mock('../Shared/LazyFallback.jsx', () => () => null);
+jest.mock('../E2E/DevE2eNav.jsx', () => () => null);
+jest.mock('../ErrorBoundary/RouteErrorBoundary.jsx', () => ({
+  __esModule: true,
+  default: ({ children }) => children,
+}));
+
+jest.mock('../Admin/AdminPage.jsx', () => {
+  const React = require('react');
+  return {
+    __esModule: true,
+    default: (props) => {
+      mockAdminPage(props);
+      return React.createElement('div', {
+        'data-testid': 'mock-admin-page',
+        'data-initial-registry-chain-id': String(props.initialRegistryChainId ?? ''),
+        'data-initial-session-id': String(props.initialSessionId || ''),
+        'data-network-id': String(props.network?.id || ''),
+      });
+    },
+  };
+});
+
+jest.mock('../Sponsor/SponsorPage.jsx', () => {
+  const React = require('react');
+  return {
+    __esModule: true,
+    default: (props) => {
+      mockSponsorPage(props);
+      return React.createElement('div', {
+        'data-testid': 'mock-sponsor-page',
+        'data-initial-registry-chain-id': String(props.initialRegistryChainId ?? ''),
+        'data-initial-session-id': String(props.initialSessionId || ''),
+        'data-network-id': String(props.network?.id || ''),
+      });
+    },
+  };
+});
+
+jest.mock('../Sessions/SessionWizard.jsx', () => {
+  const React = require('react');
+  return {
+    __esModule: true,
+    default: (props) => {
+      mockSessionWizard(props);
+      return React.createElement('div', {
+        'data-testid': 'mock-session-wizard',
+        'data-active-session-slug': String(props.activeSessionSlug || ''),
+        'data-initial-registry-chain-id': String(props.initialRegistryChainId ?? ''),
+        'data-initial-session-id': String(props.initialSessionId || ''),
+        'data-initial-sponsored-bundle-id': String(props.initialSponsoredBundleId || ''),
+        'data-initial-sponsored-bundle-key': String(props.initialSponsoredBundleKey || ''),
+        'data-network-id': String(props.network?.id || ''),
+      });
+    },
+  };
+});
+
+jest.mock('../SurveyTool/SurveyPage.jsx', () => {
+  const React = require('react');
+  return {
+    __esModule: true,
+    default: (props) => {
+      mockSurveyPage(props);
+      return React.createElement('div', {
+        'data-testid': 'mock-survey-page',
+        'data-active-session-slug': String(props.activeSessionSlug || ''),
+        'data-network-id': String(props.network?.id || ''),
+        'data-survey-id': String(props.surveyID || ''),
+      });
+    },
+  };
+});
+
+jest.mock('../DocumentLibrary/SessionDocumentsPage.jsx', () => {
+  const React = require('react');
+  return {
+    __esModule: true,
+    default: (props) => {
+      mockSessionDocumentsPage(props);
+      return React.createElement('div', {
+        'data-testid': 'mock-session-docs-page',
+        'data-session-id-hex': String(props.sessionIdHex || ''),
+        'data-session-slug': String(props.sessionSlug || ''),
+        'data-session-token': String(props.sessionToken || ''),
+      });
+    },
+  };
+});
+
+jest.mock('../OnePageSession/OnePageSession.jsx', () => {
+  const React = require('react');
+  return {
+    __esModule: true,
+    default: (props) => {
+      mockOnePageSession(props);
+      return React.createElement('div', {
+        'data-testid': 'mock-one-page-demo',
+        'data-session-name': String(props.sessionName || ''),
+        'data-session-slug': String(props.slug || ''),
+      });
+    },
+  };
+});
+
+jest.mock('../SBTs/SBTPage.jsx', () => {
+  const React = require('react');
+  return {
+    __esModule: true,
+    default: (props) => {
+      mockSBTPage(props);
+      return React.createElement('div', {
+        'data-testid': 'mock-sbt-page',
+        'data-session-slug': String(props.sessionSlug || ''),
+        'data-network-id': String(props.network?.id || ''),
+        'data-sbt-address': String(props.SBTAddress || ''),
+      });
+    },
+  };
+});
+
+jest.mock('../SBTs/SBTsList.jsx', () => {
+  const React = require('react');
+  return {
+    __esModule: true,
+    default: (props) => {
+      mockSBTsPage(props);
+      return React.createElement('div', {
+        'data-testid': 'mock-sbts-page',
+        'data-network-id': String(props.network?.id || ''),
+        'data-session-slug': String(props.sessionSlug || ''),
+        'data-all-sessions-mode': String(props.allSessionsMode === true),
+      });
+    },
+  };
+});
+
+jest.mock('../UserPage/CompareAddresses.jsx', () => {
+  const React = require('react');
+  return {
+    __esModule: true,
+    default: (props) => {
+      mockCompareAddresses(props);
+      return React.createElement('div', {
+        'data-testid': 'mock-compare-addresses',
+        'data-first-address': String(props.firstAddress || ''),
+      });
+    },
+  };
+});
+
+jest.mock('../TagPage/TagPage.jsx', () => {
+  const React = require('react');
+  return {
+    __esModule: true,
+    default: (props) => {
+      mockTagPage(props);
+      return React.createElement('div', {
+        'data-testid': 'mock-tag-page',
+        'data-active-session-slug': String(props.activeSessionSlug || ''),
+        'data-network-id': String(props.network?.id || ''),
+        'data-path': String(props.path || ''),
+      });
+    },
+  };
+});
+
+jest.mock('../DebateMap/DebateMap.jsx', () => {
+  const React = require('react');
+  return {
+    __esModule: true,
+    default: (props) => {
+      mockDebateMap(props);
+      return React.createElement('div', {
+        'data-testid': 'mock-debate-map',
+        'data-demo-mode': typeof props.demoMode === 'undefined' ? '' : String(props.demoMode),
+      });
+    },
+  };
+});
+
+jest.mock('../../utilities/web3/contractScripts.js', () => {
+  const contractScripts = {
+    decryptQuestionPayloadInPlace: jest.fn(),
+    getAllSbtAddressesCached: jest.fn(),
+    getQuestionData: jest.fn(),
+    getRelevantBlockWindowForFilter: jest.fn(),
+    getSbtCreationBlockByAddress: jest.fn(),
+    getSbtHistorySummary: jest.fn(),
+    getSbtMintBurnCountsByAddress: jest.fn(),
+    getSbtMetadata: jest.fn(),
+  };
+  return {
+    __esModule: true,
+    default: contractScripts,
+    getAllSessionSlugs: jest.fn(() => []),
+    getDemoSessionConfigBySlug: jest.fn(() => null),
+    getSessionConfigBySlug: jest.fn(() => null),
+    getSessionConfigBySlugOrDefault: jest.fn(() => ({})),
+    getSessionSlugByName: jest.fn(() => ''),
+    getSessionChainId: jest.fn(() => null),
+    getSessionNetwork: jest.fn(() => null),
+    getReadProviderForSession: jest.fn(() => null),
+    normalizeSessionSlug: jest.fn((value = '') => String(value || '').trim().toLowerCase()),
+  };
+});
+
+jest.mock('../../utilities/ui/uiRuntimeStats.js', () => ({
+  __esModule: true,
+  recordCeRuntimeCacheEvent: jest.fn(),
+  shouldAutoStartCeRuntimeStats: jest.fn(() => false),
+  startCeRuntimeStats: jest.fn(),
+  stopCeRuntimeStats: jest.fn(),
+}));
+
+jest.mock('../../utilities/crypto/litProtocol.js', () => ({
+  __esModule: true,
+  createLitHooks: jest.fn(() => ({})),
+  attachLitDevTools: jest.fn(),
+  getGlobalLitHooks: jest.fn(() => null),
+  setGlobalLitHooks: jest.fn(),
+}));
+
+jest.mock('../../utilities/arweave/arweaveUrls.js', () => ({
+  __esModule: true,
+  normalizeArweaveUrl: jest.fn((value = '') => String(value || '').trim()),
+}));
+
+jest.mock('../../utilities/web3/sessionRegistry.js', () => {
+  const readCache = () => {
+    try {
+      return JSON.parse(globalThis.localStorage?.getItem('dg:sessionRegistryCache:v1') || '{}');
+    } catch (_) {
+      return {};
+    }
+  };
+  return {
+    __esModule: true,
+    fetchSessionFromRegistry: jest.fn(),
+    loadGroupRegistryCache: jest.fn(),
+    sessionRegistryStore: {
+      getSessionConfig: jest.fn((slug) => {
+        const cache = readCache();
+        return cache?.sessions?.[slug] || null;
+      }),
+      getSessionConfigById: jest.fn((sessionId) => {
+        const cache = readCache();
+        return cache?.sessionsById?.[sessionId] || null;
+      }),
+      getAllSessionEntries: jest.fn(() => {
+        const cache = readCache();
+        return Object.entries(cache?.sessions || {});
+      }),
+    },
+    sessionRegistryUtils: {
+      formatSessionId: jest.fn((value = '') => String(value || '').trim()),
+      normalizeSessionIdHex: jest.fn((value = '') => String(value || '').trim()),
+    },
+    upsertSessionRegistryCache: jest.fn(),
+  };
+});
+
+const DEFAULT_NETWORK = {
+  id: 84532,
+  chainId: 84532,
+  name: 'Base Sepolia',
+};
+
+const SESSION_ID = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+
+const buildProps = (overrides = {}) => ({
+  fetchSessionState: jest.fn(),
+  fetchAccount: jest.fn(),
+  changeFocusedTab: jest.fn(),
+  toggleLoginModal: jest.fn(),
+  updateLoginInfo: jest.fn(),
+  toggleDemoMode: jest.fn(),
+  demoMode: { tools: false },
+  demoSurfaceMode: true,
+  changeActiveSessionSlug: jest.fn(),
+  network: DEFAULT_NETWORK,
+  ...overrides,
+});
+
+const buildSessionConfig = (overrides = {}) => ({
+  slug: 'edge',
+  sessionName: 'Edge Session',
+  sessionInfo: 'Edge session info',
+  sessionHeader: 'https://example.com/edge-session.png',
+  contracts: {},
+  blockLimits: { start: null, end: null },
+  defaultFeaturedSBTs: [],
+  networkChainId: 84532,
+  __registry: {
+    sessionIdHex: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+  },
+  ...overrides,
+});
+
+const setRoute = (path, search = '') => {
+  window.history.pushState({}, '', `${path}${search}`);
+};
+
+const seedSessionRegistryCache = (sessionConfig) => {
+  localStorage.setItem('dg:sessionRegistryCache:v1', JSON.stringify({
+    ts: Date.now(),
+    chains: {},
+    sessions: {
+      [sessionConfig.slug]: sessionConfig,
+    },
+    groups: {
+      [sessionConfig.slug]: sessionConfig,
+    },
+    sessionsById: {
+      [sessionConfig.__registry.sessionIdHex]: sessionConfig,
+      [SESSION_ID]: sessionConfig,
+    },
+  }));
+};
+
+const syncSessionRegistryStoreMocks = () => {
+  sessionRegistryStore.getSessionConfigById.mockImplementation((sessionId) => {
+    try {
+      const cache = JSON.parse(localStorage.getItem('dg:sessionRegistryCache:v1') || '{}');
+      return cache?.sessionsById?.[sessionId] || null;
+    } catch (_) {
+      return null;
+    }
+  });
+  sessionRegistryStore.getAllSessionEntries.mockImplementation(() => {
+    try {
+      const cache = JSON.parse(localStorage.getItem('dg:sessionRegistryCache:v1') || '{}');
+      return Object.entries(cache?.sessions || {});
+    } catch (_) {
+      return [];
+    }
+  });
+};
+
+const createSubject = ({
+  path = '/',
+  search = '',
+  activeSessionSlug = 'edge',
+  demoSurfaceMode = true,
+  sessionConfig = null,
+} = {}) => {
+  setRoute(path, search);
+  getSessionConfigBySlug.mockImplementation((slug) => {
+    if (!sessionConfig) return null;
+    return slug === sessionConfig.slug ? sessionConfig : null;
+  });
+
+  const subject = new MainSite(buildProps({
+    path,
+    demoSurfaceMode,
+    sessionState: {
+      primarySessionSlug: activeSessionSlug,
+      primarySessionExplicit: true,
+    },
+  }));
+  subject.state = {
+    ...subject.state,
+    isCacheManagerReady: true,
+    cacheHasLoaded: true,
+    isAllCachesReady: true,
+    isSurveyCacheReady: true,
+    isQuestionCacheReady: true,
+    isResponsesCacheReady: true,
+    isSBTCacheReady: true,
+  };
+  subject.setState = jest.fn((next) => {
+    const patch = typeof next === 'function' ? next(subject.state, subject.props) : next;
+    subject.state = { ...subject.state, ...(patch || {}) };
+    return patch;
+  });
+  sessionRegistryStore.getSessionConfigById.mockImplementation((sessionId) => {
+    if (!sessionConfig) return null;
+    if (
+      sessionId === SESSION_ID ||
+      sessionId === sessionConfig.__registry?.sessionIdHex
+    ) {
+      return sessionConfig;
+    }
+    try {
+      const cache = JSON.parse(localStorage.getItem('dg:sessionRegistryCache:v1') || '{}');
+      return cache?.sessionsById?.[sessionId] || null;
+    } catch (_) {
+      return null;
+    }
+  });
+  subject.getActiveSessionSlug = jest.fn(() => activeSessionSlug);
+  subject.getSessionNetwork = jest.fn(() => DEFAULT_NETWORK);
+  subject.getSessionChainId = jest.fn(() => DEFAULT_NETWORK.id);
+  subject.getSessionCfg = jest.fn((slug) => {
+    if (sessionConfig && slug === sessionConfig.slug) return sessionConfig;
+    return sessionConfig || {};
+  });
+  subject.resolveSessionSlugFromPathToken = jest.fn((sessionToken) => {
+    if (!sessionConfig) return String(sessionToken || '').trim();
+    if (
+      sessionToken === SESSION_ID ||
+      sessionToken === sessionConfig.__registry?.sessionIdHex
+    ) {
+      return sessionConfig.slug;
+    }
+    return String(sessionToken || '').trim();
+  });
+  subject.getSessionInfoForGroup = jest.fn((cfg) => cfg?.sessionInfo || 'Edge session info');
+  subject.getSessionNameForGroup = jest.fn((cfg) => cfg?.sessionName || 'Edge Session');
+  subject.getSessionHeaderForGroup = jest.fn((cfg) => cfg?.sessionHeader || 'https://example.com/edge-session.png');
+  subject.refreshSbtData = jest.fn();
+  subject.refreshSurveyResponsesByID = jest.fn();
+  subject.refreshQuestionMetadata = jest.fn();
+  subject.refreshQuestionResponses = jest.fn();
+  subject.scanForSurveyGroup = jest.fn();
+  subject.readFlag = jest.fn(() => false);
+  subject.DG = {
+    read: jest.fn(() => null),
+    write: jest.fn(),
+    remove: jest.fn(),
+  };
+  return subject;
+};
+
+describe('MainSite route render smoke', () => {
+  const originalPublicUrl = process.env.PUBLIC_URL;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    getSessionConfigBySlug.mockImplementation(() => null);
+    normalizeSessionSlug.mockImplementation((value = '') => String(value || '').trim().toLowerCase());
+    localStorage.clear();
+    syncSessionRegistryStoreMocks();
+    if (originalPublicUrl === undefined) {
+      delete process.env.PUBLIC_URL;
+    } else {
+      process.env.PUBLIC_URL = originalPublicUrl;
+    }
+    window.history.replaceState({}, '', '/');
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+    getSessionConfigBySlug.mockImplementation(() => null);
+    normalizeSessionSlug.mockImplementation((value = '') => String(value || '').trim().toLowerCase());
+    localStorage.clear();
+    syncSessionRegistryStoreMocks();
+    if (originalPublicUrl === undefined) {
+      delete process.env.PUBLIC_URL;
+    } else {
+      process.env.PUBLIC_URL = originalPublicUrl;
+    }
+    window.history.replaceState({}, '', '/');
+  });
+
+  it('renders the wizard root for /new, canonicalizes the alias, and forwards query params', async () => {
+    const replaceStateSpy = jest.spyOn(window.history, 'replaceState');
+    const subject = createSubject({
+      path: '/new',
+      search: '?sessionId=edge-session-id&chainId=chain-84532&sponsored=sponsor-tx-id',
+    });
+    window.history.replaceState({}, '', '/new?sessionId=edge-session-id&chainId=chain-84532&sponsored=sponsor-tx-id#k=sponsor-secret');
+
+    render(subject.render());
+
+    expect(await screen.findByTestId(E2E_TESTIDS.PAGE_SESSION_WIZARD_ROOT)).toBeInTheDocument();
+    expect(await screen.findByTestId('mock-session-wizard')).toHaveAttribute('data-active-session-slug', 'edge');
+    expect(screen.getByTestId('mock-session-wizard')).toHaveAttribute('data-initial-session-id', 'edge-session-id');
+    expect(screen.getByTestId('mock-session-wizard')).toHaveAttribute('data-initial-registry-chain-id', '84532');
+    expect(screen.getByTestId('mock-session-wizard')).toHaveAttribute('data-initial-sponsored-bundle-id', 'sponsor-tx-id');
+    expect(screen.getByTestId('mock-session-wizard')).toHaveAttribute('data-initial-sponsored-bundle-key', 'sponsor-secret');
+    expect(screen.getByTestId('mock-session-wizard')).toHaveAttribute('data-network-id', '84532');
+    expect(mockSessionWizard.mock.calls[mockSessionWizard.mock.calls.length - 1][0]?.ensureLightSbtUniverse)
+      .toBe(subject.ensureLightSbtUniverse);
+    expect(replaceStateSpy).toHaveBeenCalledWith(
+      {},
+      '',
+      '/session/new?sessionId=edge-session-id&chainId=chain-84532&sponsored=sponsor-tx-id#k=sponsor-secret'
+    );
+  });
+
+  it('renders the admin root and forwards session query params to AdminPage', async () => {
+    const subject = createSubject({
+      path: '/admin',
+      search: '?sessionID=edge-session-id&chainId=registry-84532',
+    });
+
+    render(subject.render());
+
+    expect(await screen.findByTestId(E2E_TESTIDS.PAGE_ADMIN_ROOT)).toBeInTheDocument();
+    expect(await screen.findByTestId('mock-admin-page')).toHaveAttribute('data-initial-session-id', 'edge-session-id');
+    expect(screen.getByTestId('mock-admin-page')).toHaveAttribute('data-initial-registry-chain-id', '84532');
+    expect(screen.getByTestId('mock-admin-page')).toHaveAttribute('data-network-id', '84532');
+    expect(mockAdminPage.mock.calls[mockAdminPage.mock.calls.length - 1][0]?.ensureLightSbtUniverse)
+      .toBe(subject.ensureLightSbtUniverse);
+  });
+
+  it('keeps PUBLIC_URL when canonicalizing /new to /session/new', async () => {
+    // Synthetic subpath fixture: current deploys use '/', but we intentionally
+    // keep this coverage so optional subpath hosting keeps working.
+    process.env.PUBLIC_URL = '/ce/';
+    const replaceStateSpy = jest.spyOn(window.history, 'replaceState');
+    const subject = createSubject({
+      path: '/new',
+      search: '?sessionId=edge-session-id',
+    });
+    window.history.replaceState({}, '', '/ce/new?sessionId=edge-session-id#k=sponsor-secret');
+
+    render(subject.render());
+
+    expect(await screen.findByTestId(E2E_TESTIDS.PAGE_SESSION_WIZARD_ROOT)).toBeInTheDocument();
+    expect(replaceStateSpy).toHaveBeenCalledWith(
+      {},
+      '',
+      '/ce/session/new?sessionId=edge-session-id#k=sponsor-secret'
+    );
+  });
+
+  it('renders the sponsor root and forwards session query params to SponsorPage', async () => {
+    const subject = createSubject({
+      path: '/sponsor',
+      search: '?sessionID=edge-session-id&chainId=registry-84532',
+    });
+
+    render(subject.render());
+
+    expect(await screen.findByTestId(E2E_TESTIDS.PAGE_SPONSOR_ROOT)).toBeInTheDocument();
+    expect(await screen.findByTestId('mock-sponsor-page')).toHaveAttribute('data-initial-session-id', 'edge-session-id');
+    expect(screen.getByTestId('mock-sponsor-page')).toHaveAttribute('data-initial-registry-chain-id', '84532');
+    expect(screen.getByTestId('mock-sponsor-page')).toHaveAttribute('data-network-id', '84532');
+  });
+
+  it.each([
+    ['/debate', /Debate view is not part of the supported public surface yet\./i],
+  ])('renders the experimental stub for %s without waiting for cache bootstrap', async (path, descriptionMatcher) => {
+    const subject = createSubject({ path });
+    subject.state = {
+      ...subject.state,
+      isCacheManagerReady: false,
+      cacheHasLoaded: false,
+      isAllCachesReady: false,
+      isSurveyCacheReady: false,
+      isQuestionCacheReady: false,
+      isResponsesCacheReady: false,
+      isSBTCacheReady: false,
+    };
+
+    render(subject.render());
+
+    expect(await screen.findByRole('heading', { name: /this feature is in development/i })).toBeInTheDocument();
+    expect(screen.getByText(descriptionMatcher)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /back to home/i })).toHaveAttribute('href', '/');
+  });
+
+  it('renders the tag page route without waiting for cache bootstrap', async () => {
+    const subject = createSubject({ path: '/tag/governance+ai' });
+    subject.state = {
+      ...subject.state,
+      isCacheManagerReady: false,
+      cacheHasLoaded: false,
+      isAllCachesReady: false,
+      isSurveyCacheReady: false,
+      isQuestionCacheReady: false,
+      isResponsesCacheReady: false,
+      isSBTCacheReady: false,
+    };
+
+    render(subject.render());
+
+    expect(await screen.findByTestId('mock-tag-page')).toHaveAttribute('data-path', '/tag/governance+ai');
+    expect(screen.getByTestId('mock-tag-page')).toHaveAttribute('data-active-session-slug', 'edge');
+    expect(screen.getByTestId('mock-tag-page')).toHaveAttribute('data-network-id', '84532');
+  });
+
+  it('renders a clean 404 for unsupported routes without waiting for cache bootstrap', async () => {
+    const path = '/not-a-supported-route';
+    const subject = createSubject({ path });
+    subject.state = {
+      ...subject.state,
+      isCacheManagerReady: false,
+      cacheHasLoaded: false,
+      isAllCachesReady: false,
+      isSurveyCacheReady: false,
+      isQuestionCacheReady: false,
+      isResponsesCacheReady: false,
+      isSBTCacheReady: false,
+    };
+
+    render(subject.render());
+
+    expect(await screen.findByRole('heading', { name: /page not found/i })).toBeInTheDocument();
+    expect(screen.getByText(/not part of the supported public surface/i)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /back to home/i })).toHaveAttribute('href', '/');
+  });
+
+  it.each(['/compare', '/compare/'])('renders the compare route root for %s', async (path) => {
+    const subject = createSubject({ path });
+
+    render(subject.render());
+
+    expect(await screen.findByTestId(E2E_TESTIDS.PAGE_COMPARE_ROOT)).toBeInTheDocument();
+    expect(await screen.findByTestId('mock-compare-addresses')).toHaveAttribute('data-first-address', '');
+  });
+
+  it('switches page roots cleanly when navigating between surveys and questions routes', async () => {
+    const { rerender } = render(createSubject({ path: '/surveys' }).render());
+
+    expect(await screen.findByTestId(E2E_TESTIDS.PAGE_SURVEYS_ROOT)).toBeInTheDocument();
+    expect(await screen.findByTestId('mock-survey-page')).toHaveAttribute('data-active-session-slug', 'edge');
+    expect(screen.getByTestId('mock-survey-page')).toHaveAttribute('data-network-id', '84532');
+    expect(screen.getByTestId('mock-survey-page')).toHaveAttribute('data-survey-id', '');
+
+    rerender(createSubject({ path: '/questions' }).render());
+
+    expect(await screen.findByTestId(E2E_TESTIDS.PAGE_QUESTIONS_ROOT)).toBeInTheDocument();
+    expect(screen.queryByTestId(E2E_TESTIDS.PAGE_SURVEYS_ROOT)).not.toBeInTheDocument();
+  });
+
+  it('keeps an explicit demo-only query session slug for survey route display context after cache bootstrap', async () => {
+    const demoConfig = buildSessionConfig({
+      slug: 'rxc',
+      sessionName: 'Weyl v. Yarvin Debate',
+      __registry: {},
+    });
+    const subject = createSubject({
+      path: '/surveys',
+      search: '?session=DEBATE',
+      activeSessionSlug: 'edge',
+      sessionConfig: null,
+    });
+    getDemoSessionConfigBySlug.mockImplementation((slug) => (
+      slug === 'rxc' ? demoConfig : null
+    ));
+
+    render(subject.render());
+
+    expect(await screen.findByTestId(E2E_TESTIDS.PAGE_SURVEYS_ROOT)).toBeInTheDocument();
+    expect(await screen.findByTestId('mock-survey-page')).toHaveAttribute('data-active-session-slug', 'edge');
+    expect(getDemoSessionConfigBySlug).toHaveBeenCalledWith('DEBATE', { allowDemoFallback: true });
+  });
+
+  it('pins generic question results to the explicit query session slug and scopes refresh callbacks', async () => {
+    const sessionConfig = buildSessionConfig();
+    const subject = createSubject({
+      path: '/questions/results',
+      search: '?session=edge',
+      activeSessionSlug: 'stale',
+      sessionConfig,
+    });
+
+    render(subject.render());
+
+    expect(await screen.findByTestId(E2E_TESTIDS.PAGE_QUESTIONS_ROOT)).toBeInTheDocument();
+    expect(await screen.findByTestId('mock-survey-page')).toHaveAttribute('data-active-session-slug', 'edge');
+    const latestProps = mockSurveyPage.mock.calls[mockSurveyPage.mock.calls.length - 1][0] || {};
+    expect(latestProps.autoOpenResults).toBe(true);
+    expect(latestProps.sessionSlug).toBe('edge');
+    expect(latestProps.sessionSlugPinned).toBe(true);
+
+    latestProps.refreshQuestionResponses(['q1']);
+    expect(subject.refreshQuestionResponses).toHaveBeenCalledWith(['q1'], { slug: 'edge' });
+  });
+
+  it('renders the session docs route with the resolved session config', async () => {
+    const sessionConfig = buildSessionConfig();
+    seedSessionRegistryCache(sessionConfig);
+    const subject = createSubject({
+      path: `/session/${SESSION_ID}/docs`,
+      sessionConfig,
+    });
+
+    render(subject.render());
+
+    expect(await screen.findByTestId(E2E_TESTIDS.PAGE_SESSION_DOCS_ROOT)).toBeInTheDocument();
+    expect(await screen.findByTestId('mock-session-docs-page')).toHaveAttribute('data-session-token', SESSION_ID);
+    expect(screen.getByTestId('mock-session-docs-page')).toHaveAttribute('data-session-slug', 'edge');
+    expect(screen.getByTestId('mock-session-docs-page')).toHaveAttribute(
+      'data-session-id-hex',
+      '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+    );
+  });
+
+  it('renders the session route with resolved session metadata', async () => {
+    const sessionConfig = buildSessionConfig({
+      sessionName: 'Signals Session',
+      sessionInfo: 'Session detail copy',
+      sessionHeader: 'https://example.com/signals-session.png',
+    });
+    seedSessionRegistryCache(sessionConfig);
+    const subject = createSubject({
+      path: `/session/${SESSION_ID}`,
+      sessionConfig,
+    });
+
+    render(subject.render());
+
+    expect(await screen.findByTestId(E2E_TESTIDS.PAGE_SESSION_ROOT)).toBeInTheDocument();
+    expect(await screen.findByTestId('mock-one-page-demo')).toHaveAttribute('data-session-name', 'Signals Session');
+    expect(screen.getByTestId('mock-one-page-demo')).toHaveAttribute('data-session-slug', 'edge');
+    expect(mockOnePageSession.mock.calls[mockOnePageSession.mock.calls.length - 1][0]?.ensureLightSbtDiscovery).toBe(subject.ensureLightSbtDiscovery);
+    expect(mockOnePageSession.mock.calls[mockOnePageSession.mock.calls.length - 1][0]?.ensureLightSbtUniverse).toBe(subject.ensureLightSbtUniverse);
+  });
+
+  it('matches PUBLIC_URL-prefixed session routes when the app is served from a subpath', async () => {
+    // '/ce/' is a representative subpath fixture, not a special production-only
+    // route. It guards the optional PUBLIC_URL deployment mode.
+    process.env.PUBLIC_URL = '/ce/';
+    const sessionConfig = buildSessionConfig({
+      sessionName: 'Signals Session',
+      sessionInfo: 'Session detail copy',
+      sessionHeader: 'https://example.com/signals-session.png',
+    });
+    seedSessionRegistryCache(sessionConfig);
+    const subject = createSubject({
+      path: '/ce/session/edge',
+      sessionConfig,
+    });
+
+    render(subject.render());
+
+    expect(await screen.findByTestId(E2E_TESTIDS.PAGE_SESSION_ROOT)).toBeInTheDocument();
+    expect(await screen.findByTestId('mock-one-page-demo')).toHaveAttribute('data-session-name', 'Signals Session');
+    expect(screen.getByTestId('mock-one-page-demo')).toHaveAttribute('data-session-slug', 'edge');
+  });
+
+  it('renders the session route with explicit demo-session metadata when strict shared config misses', async () => {
+    const demoConfig = buildSessionConfig({
+      slug: 'rxc',
+      sessionName: 'Weyl v. Yarvin Debate',
+      sessionInfo: 'Debate session info',
+      sessionHeader: 'https://example.com/rxc-session.png',
+      __registry: {},
+    });
+    const subject = createSubject({
+      path: '/session/rxc',
+      activeSessionSlug: 'edge',
+      sessionConfig: null,
+    });
+    getDemoSessionConfigBySlug.mockImplementation((slug) => (
+      slug === 'rxc' ? demoConfig : null
+    ));
+
+    render(subject.render());
+
+    expect(await screen.findByTestId(E2E_TESTIDS.PAGE_SESSION_ROOT)).toBeInTheDocument();
+    expect(await screen.findByTestId('mock-one-page-demo')).toHaveAttribute('data-session-name', 'Weyl v. Yarvin Debate');
+    expect(screen.getByTestId('mock-one-page-demo')).toHaveAttribute('data-session-slug', 'rxc');
+    expect(getDemoSessionConfigBySlug).toHaveBeenCalledWith('rxc', { allowDemoFallback: true });
+  });
+
+  it('preserves session question-results subroutes and forwards route-open flags to OnePageSession', async () => {
+    const sessionConfig = buildSessionConfig({
+      sessionName: 'Signals Session',
+    });
+    seedSessionRegistryCache(sessionConfig);
+    const subject = createSubject({
+      path: '/session/edge/questions/results',
+      search: '?session=edge',
+      sessionConfig,
+    });
+
+    render(subject.render());
+
+    expect(await screen.findByTestId(E2E_TESTIDS.PAGE_SESSION_ROOT)).toBeInTheDocument();
+    expect(await screen.findByTestId('mock-one-page-demo')).toHaveAttribute('data-session-name', 'Signals Session');
+    expect(window.location.pathname).toBe('/session/edge/questions/results');
+    const latestProps = mockOnePageSession.mock.calls[mockOnePageSession.mock.calls.length - 1][0] || {};
+    expect(latestProps.routeQuestionsOpen).toBe(true);
+    expect(latestProps.routeAutoOpenResults).toBe(true);
+  });
+
+  it('renders the SBT route with the query session slug hint', async () => {
+    const sbtAddress = '0x00000000000000000000000000000000000000f1';
+    const sessionConfig = buildSessionConfig();
+    const subject = createSubject({
+      path: `/sbt/${sbtAddress}`,
+      search: '?session=edge',
+      activeSessionSlug: 'stale',
+      sessionConfig,
+    });
+    subject.state = {
+      ...subject.state,
+      sbtScanProgressBySlug: {
+        edge: {
+          currentBlock: 1600,
+          latestBlock: 2000,
+        },
+      },
+    };
+
+    render(subject.render());
+
+    expect(await screen.findByTestId(E2E_TESTIDS.PAGE_SBT_ROOT)).toBeInTheDocument();
+    expect(await screen.findByTestId('mock-sbt-page')).toHaveAttribute('data-session-slug', 'edge');
+    expect(screen.getByTestId('mock-sbt-page')).toHaveAttribute('data-network-id', '84532');
+    expect(screen.getByTestId('mock-sbt-page')).toHaveAttribute('data-sbt-address', sbtAddress);
+    const latestProps = mockSBTPage.mock.calls[mockSBTPage.mock.calls.length - 1][0] || {};
+    expect(latestProps.sbtScanProgress).toEqual({
+      currentBlock: 1600,
+      latestBlock: 2000,
+    });
+  });
+
+  it('renders the group alias route with the same SBT detail props', async () => {
+    const sbtAddress = '0x00000000000000000000000000000000000000f4';
+    const sessionConfig = buildSessionConfig();
+    const subject = createSubject({
+      path: `/group/${sbtAddress}`,
+      search: '?session=edge',
+      activeSessionSlug: 'stale',
+      sessionConfig,
+    });
+
+    render(subject.render());
+
+    expect(await screen.findByTestId(E2E_TESTIDS.PAGE_SBT_ROOT)).toBeInTheDocument();
+    expect(await screen.findByTestId('mock-sbt-page')).toHaveAttribute('data-session-slug', 'edge');
+    expect(screen.getByTestId('mock-sbt-page')).toHaveAttribute('data-network-id', '84532');
+    expect(screen.getByTestId('mock-sbt-page')).toHaveAttribute('data-sbt-address', sbtAddress);
+  });
+
+  it('renders the SBT route with a slug resolved from sessionId query params', async () => {
+    const sbtAddress = '0x00000000000000000000000000000000000000f2';
+    const sessionConfig = buildSessionConfig();
+    seedSessionRegistryCache(sessionConfig);
+    const subject = createSubject({
+      path: `/sbt/${sbtAddress}`,
+      search: `?sessionId=${SESSION_ID}`,
+      activeSessionSlug: 'stale',
+      sessionConfig,
+    });
+
+    render(subject.render());
+
+    expect(await screen.findByTestId(E2E_TESTIDS.PAGE_SBT_ROOT)).toBeInTheDocument();
+    expect(await screen.findByTestId('mock-sbt-page')).toHaveAttribute('data-session-slug', 'edge');
+    expect(screen.getByTestId('mock-sbt-page')).toHaveAttribute('data-network-id', '84532');
+    expect(screen.getByTestId('mock-sbt-page')).toHaveAttribute('data-sbt-address', sbtAddress);
+  });
+
+  it('ignores unknown query session hints on the SBT route until bootstrap discovery resolves the owner session', async () => {
+    const sbtAddress = '0x00000000000000000000000000000000000000f3';
+    const sessionConfig = buildSessionConfig();
+    const subject = createSubject({
+      path: `/sbt/${sbtAddress}`,
+      search: '?session=stale-slug',
+      activeSessionSlug: 'edge',
+      sessionConfig,
+    });
+
+    render(subject.render());
+
+    expect(await screen.findByTestId(E2E_TESTIDS.PAGE_SBT_ROOT)).toBeInTheDocument();
+    expect(await screen.findByTestId('mock-sbt-page')).toHaveAttribute('data-session-slug', 'edge');
+  });
+
+  it.each(['/groups', '/groups/'])('renders the group list alias route for %s', async (path) => {
+    const sessionConfig = buildSessionConfig();
+    const subject = createSubject({
+      path,
+      activeSessionSlug: 'edge',
+      sessionConfig,
+    });
+
+    render(subject.render());
+
+    expect(await screen.findByTestId(E2E_TESTIDS.PAGE_SBTS_ROOT)).toBeInTheDocument();
+    expect(await screen.findByTestId('mock-sbts-page')).toHaveAttribute('data-network-id', '84532');
+    expect(screen.getByTestId('mock-sbts-page')).toHaveAttribute('data-all-sessions-mode', 'true');
+    expect(screen.getByTestId('mock-sbts-page')).toHaveAttribute('data-session-slug', '');
+  });
+
+  it.each(['/sbts/edge', '/groups/edge'])('passes the route session slug through for %s', async (path) => {
+    const sessionConfig = buildSessionConfig();
+    const subject = createSubject({
+      path,
+      activeSessionSlug: 'stale',
+      sessionConfig,
+    });
+
+    render(subject.render());
+
+    expect(await screen.findByTestId(E2E_TESTIDS.PAGE_SBTS_ROOT)).toBeInTheDocument();
+    expect(await screen.findByTestId('mock-sbts-page')).toHaveAttribute('data-network-id', '84532');
+    expect(screen.getByTestId('mock-sbts-page')).toHaveAttribute('data-all-sessions-mode', 'false');
+    expect(screen.getByTestId('mock-sbts-page')).toHaveAttribute('data-session-slug', 'edge');
+  });
+
+  it('does not access window directly while rendering atlas and stubbed experimental routes', () => {
+    const debateSubject = createSubject({ path: '/debate' });
+    const atlasSubject = createSubject({ path: '/atlas' });
+    const tagSubject = createSubject({ path: '/tag/governance' });
+    const originalWindow = global.window;
+
+    try {
+      delete global.window;
+      expect(() => debateSubject.render()).not.toThrow();
+      expect(() => atlasSubject.render()).not.toThrow();
+      expect(() => tagSubject.render()).not.toThrow();
+    } finally {
+      global.window = originalWindow;
+    }
+  });
+
+  it('treats the atlas demoSurfaceMode as enabled by default and only disables it when false', async () => {
+    const defaultSubject = createSubject({ path: '/atlas', demoSurfaceMode: null });
+    const { unmount } = render(defaultSubject.render());
+
+    expect(await screen.findByTestId(E2E_TESTIDS.PAGE_ATLAS_ROOT)).toBeInTheDocument();
+    expect(await screen.findByTestId('mock-debate-map')).toHaveAttribute('data-demo-mode', 'true');
+
+    unmount();
+
+    const enabledSubject = createSubject({ path: '/atlas', demoSurfaceMode: true });
+    const enabledRender = render(enabledSubject.render());
+
+    expect(await screen.findByTestId(E2E_TESTIDS.PAGE_ATLAS_ROOT)).toBeInTheDocument();
+    expect(await screen.findByTestId('mock-debate-map')).toHaveAttribute('data-demo-mode', 'true');
+
+    enabledRender.unmount();
+
+    const disabledSubject = createSubject({ path: '/atlas', demoSurfaceMode: false });
+    render(disabledSubject.render());
+
+    expect(await screen.findByTestId(E2E_TESTIDS.PAGE_ATLAS_ROOT)).toBeInTheDocument();
+    expect(await screen.findByTestId('mock-debate-map')).toHaveAttribute('data-demo-mode', 'false');
+  });
+
+  it('still honors atlas demo deep links when demoSurfaceMode is disabled', async () => {
+    const subject = createSubject({ path: '/atlas', search: '?demo=1', demoSurfaceMode: false });
+    render(subject.render());
+
+    expect(await screen.findByTestId(E2E_TESTIDS.PAGE_ATLAS_ROOT)).toBeInTheDocument();
+    expect(await screen.findByTestId('mock-debate-map')).toHaveAttribute('data-demo-mode', 'true');
+  });
+});
+
+describe('MainSite single-SBT counts checkpoints', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    contractScripts.getRelevantBlockWindowForFilter.mockResolvedValue({
+      fromBlock: 100,
+      toBlock: 200,
+    });
+    contractScripts.getSbtCreationBlockByAddress.mockResolvedValue(100);
+    contractScripts.getSbtMetadata.mockResolvedValue({
+      name: 'Badge',
+      tokenURI: 'ar://badge-metadata',
+      image: 'https://example.com/badge.png',
+      mintingEndTime: 0,
+      burnAuth: 0,
+      hasPasswordMint: false,
+      maxTokens: '0',
+      admin: '0x00000000000000000000000000000000000000a2',
+    });
+  });
+
+  it('persists and resumes partial holder scan checkpoints for a single SBT refresh', async () => {
+    const sbtAddress = '0x00000000000000000000000000000000000000f3';
+    const holderAddress = '0x00000000000000000000000000000000000000b1';
+    const sbtLower = sbtAddress.toLowerCase();
+    const subject = createSubject({
+      path: `/sbt/${sbtAddress}`,
+      activeSessionSlug: 'edge',
+    });
+    subject.isSbtHistoryScanEnabled = jest.fn(() => true);
+
+    let cacheState = {
+      '84532': {
+        sbtList: {
+          [sbtLower]: {
+            sbtAddress,
+            sbtInfo: {
+              name: 'Badge',
+              tokenURI: 'ar://badge-metadata',
+              image: 'https://example.com/badge.png',
+              mintingEndTime: 0,
+              burnAuth: 0,
+              hasPasswordMint: false,
+              maxTokens: '0',
+              admin: '0x00000000000000000000000000000000000000a2',
+            },
+            creationBlock: 100,
+          },
+        },
+        lastBlock: 99,
+      },
+    };
+
+    subject.DG.read.mockImplementation((namespace, slug) => {
+      if (namespace === 'sbtCache' && slug === 'edge') {
+        return JSON.parse(JSON.stringify(cacheState));
+      }
+      return null;
+    });
+    subject.DG.write.mockImplementation((namespace, slug, value) => {
+      if (namespace === 'sbtCache' && slug === 'edge') {
+        cacheState = JSON.parse(JSON.stringify(value));
+      }
+      return value;
+    });
+
+    contractScripts.getSbtMintBurnCountsByAddress
+      .mockImplementationOnce(async (...args) => {
+        const opts = args[5] || {};
+        expect(opts.resumeState).toBeUndefined();
+        expect(typeof opts.onCheckpoint).toBe('function');
+        opts.onCheckpoint({
+          phase: 'activity',
+          blockNumber: 149,
+          mintedCountByAddress: {
+            [holderAddress]: 1,
+          },
+          burnedCountByAddress: {},
+          mintedEventCount: 1,
+          burnedEventCount: 0,
+        });
+        return {
+          mintedCountByAddress: {},
+          burnedCountByAddress: {},
+          mintedEventCount: 0,
+          burnedEventCount: 0,
+          ok: false,
+        };
+      })
+      .mockImplementationOnce(async (...args) => {
+        const opts = args[5] || {};
+        expect(opts.resumeState).toMatchObject({
+          phase: 'activity',
+          blockNumber: 149,
+          mintedCountByAddress: {
+            [holderAddress]: 1,
+          },
+        });
+        return {
+          mintedCountByAddress: {
+            [holderAddress]: 1,
+          },
+          burnedCountByAddress: {},
+          mintedEventCount: 1,
+          burnedEventCount: 0,
+          ok: true,
+        };
+      });
+
+    await subject.refreshSbtDataForGroup('edge', sbtAddress, { forceCounts: true });
+
+    const checkpointEntry = cacheState['84532'].sbtList[sbtLower];
+    expect(checkpointEntry.countsLoaded).toBe(false);
+    expect(checkpointEntry.blockNumber).toBeNull();
+    expect(checkpointEntry.mintedCountByAddress).toEqual({});
+    expect(checkpointEntry.countsScanCheckpoint).toMatchObject({
+      phase: 'activity',
+      blockNumber: 149,
+    });
+
+    await subject.refreshSbtDataForGroup('edge', sbtAddress, { forceCounts: true });
+
+    const finalEntry = cacheState['84532'].sbtList[sbtLower];
+    expect(contractScripts.getSbtMintBurnCountsByAddress).toHaveBeenNthCalledWith(
+      2,
+      'none',
+      sbtAddress,
+      100,
+      200,
+      'edge',
+      expect.objectContaining({
+        resumeState: expect.objectContaining({
+          phase: 'activity',
+          blockNumber: 149,
+        }),
+      })
+    );
+    expect(finalEntry.countsLoaded).toBe(true);
+    expect(finalEntry.blockNumber).toBe(200);
+    expect(finalEntry.mintedCountByAddress).toEqual({
+      [holderAddress.toLowerCase()]: 1,
+    });
+    expect(finalEntry.countsScanCheckpoint).toBeNull();
+  });
+});

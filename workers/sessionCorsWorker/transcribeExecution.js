@@ -1,0 +1,75 @@
+import { readTranscribeRequestPayload } from './transcribeRequestNormalization.js';
+
+const OPENAI_TRANSCRIBE_URL = 'https://api.openai.com/v1/audio/transcriptions';
+
+const toTrimmedString = (value, deps) => (
+  deps?.toStr
+    ? deps.toStr(value).trim()
+    : (typeof value === 'string' ? value : value == null ? '' : String(value)).trim()
+);
+
+export const transcribe = async ({
+  request,
+  secrets,
+  baseHeaders,
+  transcribeRequest = null,
+  deps,
+  constants,
+} = {}) => {
+  const json = deps?.json;
+  const normalizedRequest = transcribeRequest || await (deps?.readTranscribeRequestPayload || readTranscribeRequestPayload)({ request });
+  if (!normalizedRequest?.ok) {
+    return json?.({ error: normalizedRequest?.error }, normalizedRequest?.status || 400, baseHeaders);
+  }
+
+  const {
+    provider,
+    requestApiKey,
+    requestRpcUrl,
+    upstreamFormData,
+  } = normalizedRequest.payload || {};
+
+  let targetUrl = constants?.openAiTranscribeUrl || OPENAI_TRANSCRIBE_URL;
+  let key = requestApiKey || toTrimmedString(secrets?.openaiKey, deps);
+  if (provider === 'custom') {
+    targetUrl = requestRpcUrl;
+    if (deps?.isBlockedOutboundUrl?.(targetUrl)) {
+      return json?.({ error: 'Custom transcription URL target is not allowed' }, 403, baseHeaders);
+    }
+    key = requestApiKey;
+  }
+  if (provider !== 'custom' && !key) {
+    return json?.({ error: 'Server misconfigured: openaiKey is missing.' }, 401, baseHeaders);
+  }
+
+  const headers = {};
+  if (key) headers.authorization = `Bearer ${key}`;
+
+  const response = await deps?.safeFetch?.(targetUrl, {
+    method: 'POST',
+    headers,
+    body: upstreamFormData,
+  });
+  if (!(response instanceof Response)) {
+    return json?.({ error: response?.error }, response?.status, baseHeaders);
+  }
+
+  let data = {};
+  try {
+    data = await response.json();
+  } catch {
+    data = {};
+  }
+
+  if (!response.ok) {
+    const message =
+      typeof data?.error === 'string'
+        ? data.error
+        : data?.error?.message ||
+          data?.message ||
+          (response.status === 401 ? 'Unauthorized: invalid API key on server.' : 'Transcription failed.');
+    return json?.({ error: String(message), details: data }, response.status, baseHeaders);
+  }
+
+  return json?.({ text: data?.text || '' }, 200, baseHeaders);
+};

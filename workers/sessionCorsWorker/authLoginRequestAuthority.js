@@ -1,0 +1,138 @@
+export const resolveAuthLoginRequestAuthority = async ({
+  env,
+  request,
+  body,
+  slugHint,
+  baseHeaders,
+  deps,
+} = {}) => {
+  const {
+    address,
+    message,
+    signature,
+  } = deps?.normalizeSignedWorkerRequest?.(body) || {};
+  const slugContext = deps?.resolveWorkerBodySlugContext?.({ body, env, slugHint }) || {
+    ok: false,
+    error: 'Invalid session slug.',
+  };
+  if (!slugContext?.ok) {
+    return {
+      ok: false,
+      response: deps?.json?.({ error: slugContext?.error }, 400, baseHeaders),
+    };
+  }
+  const { envSlug, slugPayload, targetSlug } = slugContext;
+  const explicitSlugProvided = (
+    slugContext?.explicitSlugProvided === true ||
+    !!envSlug ||
+    !!slugPayload?.hasAnySlug
+  );
+
+  if (!address || !deps?.isAddress?.(address)) {
+    return {
+      ok: false,
+      response: deps?.json?.({ error: 'Invalid address.' }, 400, baseHeaders),
+    };
+  }
+  if (!message || !signature) {
+    return {
+      ok: false,
+      response: deps?.json?.({ error: 'Missing message or signature.' }, 400, baseHeaders),
+    };
+  }
+  if (!explicitSlugProvided) {
+    return {
+      ok: false,
+      response: deps?.json?.({ error: deps?.MISSING_SLUG_ERROR }, 400, baseHeaders),
+    };
+  }
+
+  const corsState = await deps?.resolveExistingSessionCors?.({
+    request,
+    env,
+    slug: targetSlug,
+    baseHeaders,
+  });
+  if (!corsState?.ok) {
+    return {
+      ok: false,
+      response: corsState?.response,
+    };
+  }
+  const headers = corsState.headers;
+
+  let recovered;
+  try {
+    recovered = deps?.verifyMessage?.(message, signature);
+  } catch {
+    return {
+      ok: false,
+      response: deps?.json?.({ error: 'Invalid signature.' }, 400, headers),
+    };
+  }
+
+  const recoveredCheck = deps?.validateRecoveredAddressMatchesRequest?.({ recovered, address }) || {};
+  if (!recoveredCheck?.ok) {
+    return {
+      ok: false,
+      response: deps?.json?.({ error: recoveredCheck?.error }, 400, headers),
+    };
+  }
+
+  const siwe = deps?.parseSiweMessage?.(message);
+  const siweCheck = deps?.validateSiwe?.(siwe) || {};
+  if (!siweCheck?.ok) {
+    return {
+      ok: false,
+      response: deps?.json?.({ error: siweCheck?.error }, 400, headers),
+    };
+  }
+
+  const siweAddressCheck = deps?.validateSiweAddressMatchesRequest?.({ siwe, address }) || {};
+  if (!siweAddressCheck?.ok) {
+    return {
+      ok: false,
+      response: deps?.json?.({ error: siweAddressCheck?.error }, 400, headers),
+    };
+  }
+
+  const nonceResult = await deps?.consumeNonce?.(env, targetSlug, address.toLowerCase(), siwe?.nonce);
+  if (!nonceResult?.ok) {
+    return {
+      ok: false,
+      response: deps?.json?.({ error: nonceResult?.error }, 400, headers),
+    };
+  }
+
+  const config = corsState.config;
+  if (!config) {
+    return {
+      ok: false,
+      response: deps?.json?.({ error: deps?.SESSION_CONFIG_NOT_FOUND_ERROR }, 404, headers),
+    };
+  }
+
+  let scopes;
+  try {
+    scopes = await deps?.computeScopesForLogin?.({
+      env,
+      slug: targetSlug,
+      address,
+      config,
+    });
+  } catch (err) {
+    return {
+      ok: false,
+      response: deps?.json?.({ error: err?.message || 'Gate check failed.' }, 403, headers),
+    };
+  }
+
+  return {
+    ok: true,
+    address,
+    config,
+    headers,
+    scopes,
+    targetSlug,
+  };
+};

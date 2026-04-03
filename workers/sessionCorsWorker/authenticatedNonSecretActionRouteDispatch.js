@@ -1,0 +1,50 @@
+export const dispatchAuthenticatedNonSecretActionRoute = async ({
+  action,
+  body,
+  slug,
+  address,
+  env,
+  limit,
+  headers,
+  scopes,
+  deps,
+} = {}) => {
+  const isFetchImageAction = action === 'fetch_image';
+  const isFetchUrlAction = action === 'fetch_url';
+  if (!isFetchImageAction && !isFetchUrlAction) {
+    return { handled: false };
+  }
+
+  const preflight = await deps?.evaluateAuthenticatedRoutePreflight?.({
+    scopes,
+    scope: 'fetch',
+    route: 'fetch',
+    env,
+    slug,
+    address,
+    limit,
+    headers,
+    deps: {
+      checkRateLimit: deps?.checkRateLimit,
+      json: deps?.json,
+    },
+  });
+  if (!preflight?.ok) {
+    return {
+      handled: true,
+      response: preflight?.response,
+    };
+  }
+
+  if (isFetchImageAction) {
+    return {
+      handled: true,
+      response: await deps?.fetchImage?.(body?.url, headers),
+    };
+  }
+
+  return {
+    handled: true,
+    response: await deps?.fetchUrl?.(body?.url, headers),
+  };
+};

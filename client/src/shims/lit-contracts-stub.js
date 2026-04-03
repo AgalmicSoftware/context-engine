@@ -1,0 +1,16 @@
+module.exports = {
+  datil: {},
+  naga: {},
+  nagaDev: {},
+  nagaTest: {},
+  nagaStaging: {},
+  nagaProto: {},
+  develop: {},
+  datilSignatures: {},
+  nagaSignatures: {},
+  nagaDevSignatures: {},
+  nagaTestSignatures: {},
+  nagaStagingSignatures: {},
+  nagaProtoSignatures: {},
+  developSignatures: {},
+};

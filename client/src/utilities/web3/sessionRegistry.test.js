@@ -1,0 +1,1143 @@
+/* eslint-disable import/first */
+
+import { ethers } from 'ethers';
+
+jest.mock('../arweave/arweaveScripts.js', () => ({
+  arweaveScripts: {
+    uploadDataToArweave: jest.fn(),
+  },
+}));
+
+jest.mock('../crypto/cryptography.js', () => ({
+  cryptoUtils: {
+    _getProvider: jest.fn((providerLike) => providerLike || null),
+  },
+}));
+
+import {
+  __sessionRegistryTestUtils,
+  parseSessionRegistryMetadataUri,
+  registerSessionOnChain,
+  setResourceGatesOnChain,
+  sessionRegistryStore,
+  setSessionFieldsOnChain,
+  SESSION_REGISTRY_CACHE_UPDATED_EVENT,
+  updateSessionMetadataOnChain,
+  upsertSessionRegistryCache,
+  uploadSessionMetadata,
+} from './sessionRegistry.js';
+import { arweaveScripts } from '../arweave/arweaveScripts.js';
+import { cryptoUtils } from '../crypto/cryptography.js';
+import { getSessionRegistryAddress } from '../../variables/chains.js';
+import { upsertCachedSessionWorkerConfig } from '../session/sessionWorkerConfigCache.js';
+
+const TEST_SIGNER_ADDRESS = '0x00000000000000000000000000000000000000aa';
+
+const installPublicRpcFeeMocks = ({
+  feeData = {
+    gasPrice: null,
+    maxFeePerGas: ethers.BigNumber.from('3000000000'),
+    maxPriorityFeePerGas: ethers.BigNumber.from('1000000000'),
+  },
+  gasPrice = null,
+} = {}) => {
+  const providerMock = {
+    getFeeData: jest.fn(),
+    getGasPrice: jest.fn(),
+    getTransactionCount: jest.fn().mockResolvedValue(null),
+  };
+  if (feeData instanceof Error) {
+    providerMock.getFeeData.mockRejectedValue(feeData);
+  } else {
+    providerMock.getFeeData.mockResolvedValue(feeData);
+  }
+  if (gasPrice instanceof Error) {
+    providerMock.getGasPrice.mockRejectedValue(gasPrice);
+  } else {
+    providerMock.getGasPrice.mockResolvedValue(gasPrice);
+  }
+  jest.spyOn(ethers.providers, 'JsonRpcProvider').mockImplementation(function MockJsonRpcProvider() {
+    return providerMock;
+  });
+  jest.spyOn(ethers.providers, 'FallbackProvider').mockImplementation(function MockFallbackProvider(configs) {
+    return configs?.[0]?.provider || providerMock;
+  });
+  return providerMock;
+};
+
+const makeWalletProvider = ({
+  txHash = '0xtxhash',
+  sendTxError = null,
+} = {}) => ({
+  request: jest.fn(async ({ method }) => {
+    if (method === 'eth_sendTransaction') {
+      if (sendTxError) throw sendTxError;
+      return txHash;
+    }
+    return null;
+  }),
+});
+
+const installWeb3ProviderMock = ({
+  signer,
+  receipt = { status: 1, transactionHash: '0xtxhash' },
+  network = { chainId: 84532 },
+} = {}) => {
+  const providerMock = {
+    getSigner: () => signer,
+    waitForTransaction: jest.fn().mockResolvedValue(receipt),
+    getNetwork: jest.fn().mockResolvedValue(network),
+  };
+  jest.spyOn(ethers.providers, 'Web3Provider').mockImplementation(function MockWeb3Provider() {
+    return providerMock;
+  });
+  return providerMock;
+};
+
+const makeRegistryWriteContractMock = ({
+  chainId = 84532,
+  txData = '0xdeadbeef',
+  methods = [],
+} = {}) => {
+  const contract = {
+    address: getSessionRegistryAddress(chainId) || '0x1111111111111111111111111111111111111111',
+    interface: {
+      encodeFunctionData: jest.fn(() => txData),
+    },
+    estimateGas: {},
+  };
+  methods.forEach((method) => {
+    contract[method] = jest.fn();
+    contract.estimateGas[method] = jest.fn();
+  });
+  return contract;
+};
+
+const getLatestSendTxParams = (walletProvider) => (
+  walletProvider.request.mock.calls
+    .filter(([payload]) => payload?.method === 'eth_sendTransaction')
+    .at(-1)?.[0]?.params?.[0] || null
+);
+
+describe('sessionRegistry metadata upload', () => {
+  beforeEach(() => {
+    arweaveScripts.uploadDataToArweave.mockReset();
+    arweaveScripts.uploadDataToArweave.mockResolvedValue('example_tx_id');
+  });
+
+  it('strips authoritative gate fields before Arweave upload', async () => {
+    const metadata = {
+      slug: 'demo',
+      sessionName: 'Demo',
+      sponsoredSbtAddress: '0x0000000000000000000000000000000000000001',
+      sponsored: {
+        defaultGateId: 'gate-1',
+        gates: { 'gate-1': { sbtAddresses: ['0x0000000000000000000000000000000000000001'] } },
+      },
+    };
+
+    await uploadSessionMetadata(metadata);
+
+    expect(arweaveScripts.uploadDataToArweave).toHaveBeenCalledTimes(1);
+    const [payload, format] = arweaveScripts.uploadDataToArweave.mock.calls[0];
+    expect(format).toBe('json');
+    expect(payload.sponsored).toBeUndefined();
+    expect(payload.sponsoredSbtAddress).toBeUndefined();
+
+    // Original object is preserved for caller-side state.
+    expect(metadata.sponsored).toBeDefined();
+    expect(metadata.sponsoredSbtAddress).toBeDefined();
+  });
+});
+
+describe('sessionRegistry metadata uri parsing', () => {
+  it('parses base64 data JSON metadata URIs', () => {
+    const payload = {
+      slug: 'codex-ui-refresh-check-27-feb-2026-11-05-am',
+      contracts: { sbtFactory: { address: '0x538A48BC439A36D2A86e63114DCD9c429d2ddEcA', chainId: 84532 } },
+      blockLimits: { start: 38223630, end: null },
+    };
+    const uri = `data:application/json;base64,${Buffer.from(JSON.stringify(payload), 'utf8').toString('base64')}`;
+    expect(parseSessionRegistryMetadataUri(uri)).toEqual(payload);
+  });
+
+  it('parses URL-encoded data JSON metadata URIs', () => {
+    const payload = { slug: 'demo-encoded', networkChainId: 84532 };
+    const uri = `data:application/json,${encodeURIComponent(JSON.stringify(payload))}`;
+    expect(parseSessionRegistryMetadataUri(uri)).toEqual(payload);
+  });
+});
+
+describe('sessionRegistry cache notifications', () => {
+  afterEach(() => {
+    try { localStorage.removeItem('dg:sessionRegistryCache:v1'); } catch (_) {}
+  });
+
+  it('dispatches cache update event after upserting session config', () => {
+    const dispatchSpy = jest.spyOn(window, 'dispatchEvent');
+
+    upsertSessionRegistryCache({
+      config: {
+        slug: 'event-test',
+        __registry: {
+          registryChainId: 84532,
+          sessionIdHex: '0x00000000000000000000000000000001',
+        },
+      },
+    });
+
+    expect(dispatchSpy).toHaveBeenCalled();
+    const eventArg = dispatchSpy.mock.calls[dispatchSpy.mock.calls.length - 1]?.[0];
+    expect(eventArg?.type).toBe(SESSION_REGISTRY_CACHE_UPDATED_EVENT);
+
+    dispatchSpy.mockRestore();
+  });
+});
+
+describe('loadSessionRegistryCache persistence', () => {
+  afterEach(() => {
+    try { localStorage.removeItem('dg:sessionRegistryCache:v1'); } catch (_) {}
+    jest.restoreAllMocks();
+  });
+
+  it('persists __hadLoadErrors when registry RPC loading fails', async () => {
+    const walletProvider = { request: jest.fn() };
+    const contractMock = {
+      getSessionCount: jest.fn().mockRejectedValue(new Error('registry rpc failed')),
+    };
+    jest.spyOn(ethers.providers, 'Web3Provider').mockImplementation(function MockWeb3Provider() {
+      return {
+        getNetwork: jest.fn().mockResolvedValue({ chainId: 84532 }),
+      };
+    });
+    jest.spyOn(ethers, 'Contract').mockImplementation(function MockContract() {
+      return contractMock;
+    });
+
+    const { loadSessionRegistryCache } = jest.requireActual('./sessionRegistry.js');
+    await loadSessionRegistryCache({
+      chainIds: [84532],
+      providerLike: walletProvider,
+      force: true,
+    });
+
+    const persisted = JSON.parse(localStorage.getItem('dg:sessionRegistryCache:v1') || 'null');
+    expect(persisted).toEqual(expect.objectContaining({
+      __hadLoadErrors: true,
+      chains: {},
+      sessions: {},
+      groups: {},
+      sessionsById: {},
+    }));
+    expect(contractMock.getSessionCount).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps same-chain stale entries on refresh errors without reviving other chains', async () => {
+    upsertSessionRegistryCache({
+      config: {
+        slug: 'op-session',
+        sessionName: 'OP Session',
+        networkChainId: 11155420,
+        __registry: {
+          registryChainId: 11155420,
+          sessionIdHex: '0x00000000000000000000000000000011',
+        },
+      },
+    });
+    upsertSessionRegistryCache({
+      config: {
+        slug: 'base-session',
+        sessionName: 'Base Session',
+        networkChainId: 84532,
+        __registry: {
+          registryChainId: 84532,
+          sessionIdHex: '0x00000000000000000000000000000022',
+        },
+      },
+    });
+
+    const walletProvider = { request: jest.fn() };
+    const contractMock = {
+      getSessionCount: jest.fn().mockRejectedValue(new Error('registry rpc failed')),
+    };
+    jest.spyOn(ethers.providers, 'Web3Provider').mockImplementation(function MockWeb3Provider() {
+      return {
+        getNetwork: jest.fn().mockResolvedValue({ chainId: 11155420 }),
+      };
+    });
+    jest.spyOn(ethers, 'Contract').mockImplementation(function MockContract() {
+      return contractMock;
+    });
+
+    const { loadSessionRegistryCache } = jest.requireActual('./sessionRegistry.js');
+    await loadSessionRegistryCache({
+      chainIds: [11155420],
+      providerLike: walletProvider,
+      force: true,
+    });
+
+    const persisted = JSON.parse(localStorage.getItem('dg:sessionRegistryCache:v1') || 'null');
+    expect(Object.keys(persisted.sessions || {})).toEqual(['op-session']);
+    expect(persisted.sessions['op-session']?.__registry?.registryChainId).toBe(11155420);
+    expect(persisted.sessions['base-session']).toBeUndefined();
+    expect(Object.keys(persisted.chains || {})).toEqual(['11155420']);
+    expect(contractMock.getSessionCount).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('sessionRegistryStore worker config overlay', () => {
+  afterEach(() => {
+    try { localStorage.removeItem('dg:sessionRegistryCache:v1'); } catch (_) {}
+    try { localStorage.removeItem('ce:sessionWorkerConfigCache:v1'); } catch (_) {}
+  });
+
+  it('prefers cached worker config over the registry mirror for slug and id lookups', () => {
+    upsertSessionRegistryCache({
+      config: {
+        slug: 'edge',
+        sessionName: 'Edge',
+        corsWorkerUrl: 'https://registry-mirror.example',
+        __registry: {
+          registryChainId: 84532,
+          sessionIdHex: '0x00000000000000000000000000000001',
+        },
+      },
+    });
+    upsertCachedSessionWorkerConfig({
+      slug: 'edge',
+      config: {
+        corsWorkerUrl: 'https://worker-kv-cache.example',
+      },
+    });
+
+    expect(sessionRegistryStore.getSessionConfig('edge')).toEqual(expect.objectContaining({
+      slug: 'edge',
+      corsWorkerUrl: 'https://worker-kv-cache.example',
+    }));
+    expect(sessionRegistryStore.getSessionConfigById('0x00000000000000000000000000000001')).toEqual(expect.objectContaining({
+      slug: 'edge',
+      corsWorkerUrl: 'https://worker-kv-cache.example',
+    }));
+    expect(sessionRegistryStore.getAllSessionEntries()).toEqual([
+      ['edge', expect.objectContaining({
+        slug: 'edge',
+        corsWorkerUrl: 'https://worker-kv-cache.example',
+      })],
+    ]);
+  });
+});
+
+describe('registerSessionOnChain registry address override', () => {
+  it('uses explicit registryAddress when chain defaults are missing', async () => {
+    await expect(registerSessionOnChain({
+      chainId: 8453,
+      registryAddress: '0x1111111111111111111111111111111111111111',
+      slug: 'override-test',
+      sessionId: '0x11111111111111111111111111111111',
+      metadataURI: 'ar://example',
+    })).rejects.toThrow(/SessionRegistry at 0x1111111111111111111111111111111111111111 does not support sessionId\.|Wallet provider not available\./);
+  });
+
+  it('still fails when neither chain default nor override is set', async () => {
+    await expect(registerSessionOnChain({
+      chainId: 8453,
+      slug: 'missing-registry',
+      sessionId: '0x11111111111111111111111111111111',
+      metadataURI: 'ar://example',
+    })).rejects.toThrow('Session registry address not configured for this chain.');
+  });
+});
+
+describe('registerSessionOnChain duplicate guards', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('throws a clear error when the connected wallet is on a different chain than the registry write target', async () => {
+    const walletProvider = { request: jest.fn() };
+    const signer = {
+      provider: {
+        getNetwork: jest.fn().mockResolvedValue({ chainId: 8453 }),
+      },
+    };
+    const contractMock = {
+      sessionIdExists: jest.fn(),
+      createSession: jest.fn(),
+    };
+    cryptoUtils._getProvider.mockReturnValue(walletProvider);
+
+    jest.spyOn(ethers.providers, 'Web3Provider').mockImplementation(function MockWeb3Provider() {
+      return {
+        getSigner: () => signer,
+      };
+    });
+    jest.spyOn(ethers, 'Contract').mockImplementation(function MockContract() {
+      return contractMock;
+    });
+
+    await expect(registerSessionOnChain({
+      providerLike: walletProvider,
+      chainId: 84532,
+      slug: 'wrong-wallet-network',
+      sessionId: '0x11111111111111111111111111111111',
+      metadataURI: 'ar://example',
+    })).rejects.toThrow(
+      'Connected wallet is on Base (8453), but session registry writes require Base Sepolia (84532). Switch the wallet network and retry.'
+    );
+
+    expect(contractMock.sessionIdExists).not.toHaveBeenCalled();
+    expect(contractMock.createSession).not.toHaveBeenCalled();
+  });
+
+  it('throws a clear error before sending when the session id already exists', async () => {
+    const walletProvider = makeWalletProvider();
+    const signer = { provider: null, getAddress: jest.fn().mockResolvedValue(TEST_SIGNER_ADDRESS) };
+    const contractMock = {
+      sessionIdExists: jest.fn().mockResolvedValue(true),
+      createSession: jest.fn(),
+    };
+    cryptoUtils._getProvider.mockReturnValue(walletProvider);
+
+    installWeb3ProviderMock({ signer });
+    jest.spyOn(ethers, 'Contract').mockImplementation(function MockContract() {
+      return contractMock;
+    });
+
+    await expect(registerSessionOnChain({
+      providerLike: walletProvider,
+      chainId: 84532,
+      slug: 'duplicate-id',
+      sessionId: '0x11111111111111111111111111111111',
+      metadataURI: 'ar://example',
+    })).rejects.toThrow('Session ID 11111111-1111-1111-1111-111111111111 is already registered on-chain.');
+
+    expect(contractMock.sessionIdExists).toHaveBeenCalledWith('0x11111111111111111111111111111111');
+    expect(contractMock.createSession).not.toHaveBeenCalled();
+  });
+
+  it('throws a clear error before sending when the slug already exists', async () => {
+    const walletProvider = makeWalletProvider();
+    const signer = { provider: null, getAddress: jest.fn().mockResolvedValue(TEST_SIGNER_ADDRESS) };
+    const contractMock = {
+      sessionIdExists: jest.fn().mockResolvedValue(false),
+      sessionExists: jest.fn().mockResolvedValue(true),
+      createSession: jest.fn(),
+    };
+    cryptoUtils._getProvider.mockReturnValue(walletProvider);
+
+    installWeb3ProviderMock({ signer });
+    jest.spyOn(ethers, 'Contract').mockImplementation(function MockContract() {
+      return contractMock;
+    });
+
+    await expect(registerSessionOnChain({
+      providerLike: walletProvider,
+      chainId: 84532,
+      slug: 'duplicate-slug',
+      sessionId: '0x22222222222222222222222222222222',
+      metadataURI: 'ar://example',
+    })).rejects.toThrow('Session slug "duplicate-slug" is already registered on-chain.');
+
+    expect(contractMock.sessionExists).toHaveBeenCalledWith('duplicate-slug');
+    expect(contractMock.createSession).not.toHaveBeenCalled();
+  });
+
+  it('uses the public read-contract path for duplicate guards instead of mislabeling signer-provider probe failures', async () => {
+    const txHash = '0xcreate';
+    const walletProvider = makeWalletProvider({ txHash });
+    const signer = { provider: null, getAddress: jest.fn().mockResolvedValue(TEST_SIGNER_ADDRESS) };
+    const signerContractMock = makeRegistryWriteContractMock({
+      methods: ['createSession'],
+    });
+    const readContractMock = {
+      SESSION_CREATION_FEE: jest.fn().mockResolvedValue(null),
+      sessionIdExists: jest.fn().mockResolvedValue(false),
+      sessionExists: jest.fn().mockResolvedValue(false),
+    };
+    cryptoUtils._getProvider.mockReturnValue(walletProvider);
+    installPublicRpcFeeMocks();
+
+    const web3ProviderMock = installWeb3ProviderMock({
+      signer,
+      receipt: { status: 1, transactionHash: txHash },
+    });
+    jest.spyOn(ethers, 'Contract').mockImplementation(function MockContract(address, abi, providerOrSigner) {
+      if (providerOrSigner === signer) return signerContractMock;
+      return readContractMock;
+    });
+
+    await expect(registerSessionOnChain({
+      providerLike: walletProvider,
+      chainId: 84532,
+      slug: 'read-path-guard',
+      sessionId: '0x66666666666666666666666666666666',
+      metadataURI: 'ar://example',
+    })).resolves.toEqual(expect.objectContaining({
+      txs: [{ action: 'createSession', hash: '0xcreate' }],
+    }));
+
+    expect(readContractMock.sessionIdExists).toHaveBeenCalledWith('0x66666666666666666666666666666666');
+    expect(readContractMock.sessionExists).toHaveBeenCalledWith('read-path-guard');
+    expect(signerContractMock.createSession).not.toHaveBeenCalled();
+    expect(getLatestSendTxParams(walletProvider)).toEqual(expect.objectContaining({
+      from: TEST_SIGNER_ADDRESS,
+      to: signerContractMock.address,
+      data: '0xdeadbeef',
+      gas: ethers.BigNumber.from('550000').toHexString(),
+      maxFeePerGas: ethers.BigNumber.from('3000000000').toHexString(),
+      maxPriorityFeePerGas: ethers.BigNumber.from('1000000000').toHexString(),
+    }));
+    expect(web3ProviderMock.waitForTransaction).toHaveBeenCalledWith(txHash);
+  });
+});
+
+describe('registerSessionOnChain creation fee overrides', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('includes value override when SESSION_CREATION_FEE getter succeeds', async () => {
+    const txHash = '0xcreatefee';
+    const walletProvider = makeWalletProvider({ txHash });
+    const signer = { provider: null, getAddress: jest.fn().mockResolvedValue(TEST_SIGNER_ADDRESS) };
+    const creationFee = ethers.BigNumber.from('100000000000000');
+    const signerContractMock = makeRegistryWriteContractMock({
+      methods: ['createSession'],
+    });
+    const readContractMock = {
+      SESSION_CREATION_FEE: jest.fn().mockResolvedValue(creationFee),
+      sessionIdExists: jest.fn().mockResolvedValue(false),
+      sessionExists: jest.fn().mockResolvedValue(false),
+    };
+    cryptoUtils._getProvider.mockReturnValue(walletProvider);
+    installPublicRpcFeeMocks();
+
+    const web3ProviderMock = installWeb3ProviderMock({
+      signer,
+      receipt: { status: 1, transactionHash: txHash },
+    });
+    jest.spyOn(ethers, 'Contract').mockImplementation(function MockContract(address, abi, providerOrSigner) {
+      if (providerOrSigner === signer) return signerContractMock;
+      return readContractMock;
+    });
+
+    const result = await registerSessionOnChain({
+      providerLike: walletProvider,
+      chainId: 84532,
+      slug: 'fee-success',
+      sessionId: '0x33333333333333333333333333333333',
+      metadataURI: 'ar://example',
+      encryptedMetadataURI: '',
+    });
+
+    expect(readContractMock.SESSION_CREATION_FEE).toHaveBeenCalled();
+    expect(signerContractMock.createSession).not.toHaveBeenCalled();
+    expect(getLatestSendTxParams(walletProvider)).toEqual(expect.objectContaining({
+      gas: ethers.BigNumber.from('550000').toHexString(),
+      value: creationFee.toHexString(),
+      maxFeePerGas: ethers.BigNumber.from('3000000000').toHexString(),
+      maxPriorityFeePerGas: ethers.BigNumber.from('1000000000').toHexString(),
+    }));
+    expect(web3ProviderMock.waitForTransaction).toHaveBeenCalledWith(txHash);
+    expect(result).toEqual({ txs: [{ action: 'createSession', hash: '0xcreatefee' }] });
+  });
+
+  it('uses public RPC nonce plus static fallback gas for createSession writes by default', async () => {
+    const txHash = '0xcreatenonce';
+    const walletProvider = makeWalletProvider({ txHash });
+    const signer = {
+      provider: {
+        getTransactionCount: jest.fn(),
+      },
+      getAddress: jest.fn().mockResolvedValue(TEST_SIGNER_ADDRESS),
+    };
+    const signerContractMock = makeRegistryWriteContractMock({
+      methods: ['createSession'],
+    });
+    const readContractMock = {
+      SESSION_CREATION_FEE: jest.fn().mockResolvedValue(null),
+      sessionIdExists: jest.fn().mockResolvedValue(false),
+      sessionExists: jest.fn().mockResolvedValue(false),
+    };
+    cryptoUtils._getProvider.mockReturnValue(walletProvider);
+    const publicRpcProviderMock = installPublicRpcFeeMocks();
+    publicRpcProviderMock.getTransactionCount.mockResolvedValue(12);
+
+    installWeb3ProviderMock({
+      signer,
+      receipt: { status: 1, transactionHash: txHash },
+    });
+    jest.spyOn(ethers, 'Contract').mockImplementation(function MockContract(address, abi, providerOrSigner) {
+      if (providerOrSigner === signer) return signerContractMock;
+      return readContractMock;
+    });
+
+    const result = await registerSessionOnChain({
+      providerLike: walletProvider,
+      chainId: 84532,
+      slug: 'fee-nonce-fallback',
+      sessionId: '0x99999999999999999999999999999999',
+      metadataURI: 'ar://example',
+      encryptedMetadataURI: '',
+    });
+
+    expect(signerContractMock.estimateGas.createSession).not.toHaveBeenCalled();
+    expect(publicRpcProviderMock.getTransactionCount).toHaveBeenCalledWith(
+      TEST_SIGNER_ADDRESS,
+      'pending',
+    );
+    expect(signer.provider.getTransactionCount).not.toHaveBeenCalled();
+    expect(signerContractMock.estimateGas.createSession).not.toHaveBeenCalled();
+    expect(getLatestSendTxParams(walletProvider)).toEqual(expect.objectContaining({
+      gas: ethers.BigNumber.from('550000').toHexString(),
+      nonce: ethers.BigNumber.from('12').toHexString(),
+      maxFeePerGas: ethers.BigNumber.from('3000000000').toHexString(),
+      maxPriorityFeePerGas: ethers.BigNumber.from('1000000000').toHexString(),
+    }));
+    expect(result).toEqual({ txs: [{ action: 'createSession', hash: '0xcreatenonce' }] });
+  });
+
+  it('reports the createSession tx hash before the receipt wait resolves', async () => {
+    const txHash = '0xcreatepending';
+    const walletProvider = makeWalletProvider({ txHash });
+    const signer = { provider: null, getAddress: jest.fn().mockResolvedValue(TEST_SIGNER_ADDRESS) };
+    const signerContractMock = makeRegistryWriteContractMock({
+      methods: ['createSession'],
+    });
+    const readContractMock = {
+      SESSION_CREATION_FEE: jest.fn().mockResolvedValue(null),
+      sessionIdExists: jest.fn().mockResolvedValue(false),
+      sessionExists: jest.fn().mockResolvedValue(false),
+    };
+    cryptoUtils._getProvider.mockReturnValue(walletProvider);
+    installPublicRpcFeeMocks();
+
+    let resolveReceipt;
+    const receiptPromise = new Promise((resolve) => {
+      resolveReceipt = resolve;
+    });
+    const web3ProviderMock = installWeb3ProviderMock({ signer });
+    web3ProviderMock.waitForTransaction.mockImplementation(() => receiptPromise);
+
+    jest.spyOn(ethers, 'Contract').mockImplementation(function MockContract(address, abi, providerOrSigner) {
+      if (providerOrSigner === signer) return signerContractMock;
+      return readContractMock;
+    });
+
+    const onTxHash = jest.fn();
+    const pendingResult = registerSessionOnChain({
+      providerLike: walletProvider,
+      chainId: 84532,
+      slug: 'pending-hash',
+      sessionId: '0xabababababababababababababababab',
+      metadataURI: 'ar://example',
+      encryptedMetadataURI: '',
+      onTxHash,
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(onTxHash).toHaveBeenCalledTimes(1);
+    expect(onTxHash).toHaveBeenCalledWith(
+      { action: 'createSession', hash: txHash },
+      [{ action: 'createSession', hash: txHash }],
+    );
+
+    resolveReceipt({ status: 1, transactionHash: txHash });
+
+    await expect(pendingResult).resolves.toEqual({
+      txs: [{ action: 'createSession', hash: txHash }],
+    });
+  });
+
+  it('omits value override when SESSION_CREATION_FEE getter throws CALL_EXCEPTION (legacy registry)', async () => {
+    const txHash = '0xcreatefallback';
+    const walletProvider = makeWalletProvider({ txHash });
+    const signer = { provider: null, getAddress: jest.fn().mockResolvedValue(TEST_SIGNER_ADDRESS) };
+    const callExceptionError = new Error('call revert exception');
+    callExceptionError.code = 'CALL_EXCEPTION';
+    const signerContractMock = makeRegistryWriteContractMock({
+      methods: ['createSession'],
+    });
+    const readContractMock = {
+      SESSION_CREATION_FEE: jest.fn().mockRejectedValue(callExceptionError),
+      sessionIdExists: jest.fn().mockResolvedValue(false),
+      sessionExists: jest.fn().mockResolvedValue(false),
+    };
+    cryptoUtils._getProvider.mockReturnValue(walletProvider);
+    installPublicRpcFeeMocks();
+
+    const web3ProviderMock = installWeb3ProviderMock({
+      signer,
+      receipt: { status: 1, transactionHash: txHash },
+    });
+    jest.spyOn(ethers, 'Contract').mockImplementation(function MockContract(address, abi, providerOrSigner) {
+      if (providerOrSigner === signer) return signerContractMock;
+      return readContractMock;
+    });
+
+    const result = await registerSessionOnChain({
+      providerLike: walletProvider,
+      chainId: 84532,
+      slug: 'fee-fallback',
+      sessionId: '0x44444444444444444444444444444444',
+      metadataURI: 'ar://example',
+      encryptedMetadataURI: '',
+    });
+
+    expect(readContractMock.SESSION_CREATION_FEE).toHaveBeenCalled();
+    expect(signerContractMock.createSession).not.toHaveBeenCalled();
+    expect(getLatestSendTxParams(walletProvider)).toEqual(expect.objectContaining({
+      gas: ethers.BigNumber.from('550000').toHexString(),
+      maxFeePerGas: ethers.BigNumber.from('3000000000').toHexString(),
+      maxPriorityFeePerGas: ethers.BigNumber.from('1000000000').toHexString(),
+    }));
+    expect(getLatestSendTxParams(walletProvider)?.value).toBeUndefined();
+    expect(web3ProviderMock.waitForTransaction).toHaveBeenCalledWith(txHash);
+    expect(result).toEqual({ txs: [{ action: 'createSession', hash: '0xcreatefallback' }] });
+  });
+
+  it('rethrows transient RPC errors from SESSION_CREATION_FEE getter', async () => {
+    const walletProvider = { request: jest.fn() };
+    const signer = { provider: null };
+    const rpcError = new Error('network timeout');
+    rpcError.code = 'SERVER_ERROR';
+    const signerContractMock = {
+      createSession: jest.fn(),
+    };
+    const readContractMock = {
+      SESSION_CREATION_FEE: jest.fn().mockRejectedValue(rpcError),
+      sessionIdExists: jest.fn().mockResolvedValue(false),
+      sessionExists: jest.fn().mockResolvedValue(false),
+    };
+    cryptoUtils._getProvider.mockReturnValue(walletProvider);
+    installPublicRpcFeeMocks();
+
+    jest.spyOn(ethers.providers, 'Web3Provider').mockImplementation(function MockWeb3Provider() {
+      return {
+        getSigner: () => signer,
+      };
+    });
+    jest.spyOn(ethers, 'Contract').mockImplementation(function MockContract(address, abi, providerOrSigner) {
+      if (providerOrSigner === signer) return signerContractMock;
+      return readContractMock;
+    });
+
+    await expect(registerSessionOnChain({
+      providerLike: walletProvider,
+      chainId: 84532,
+      slug: 'fee-rpc-fail',
+      sessionId: '0x55555555555555555555555555555555',
+      metadataURI: 'ar://example',
+      encryptedMetadataURI: '',
+    })).rejects.toThrow('network timeout');
+
+    expect(readContractMock.SESSION_CREATION_FEE).toHaveBeenCalled();
+    expect(signerContractMock.createSession).not.toHaveBeenCalled();
+  });
+
+  it('falls back to a concrete public RPC read when SESSION_CREATION_FEE returns malformed null data through the shared read provider', async () => {
+    const txHash = '0xcreatefee-fallback';
+    const walletProvider = makeWalletProvider({ txHash });
+    const signer = { provider: null, getAddress: jest.fn().mockResolvedValue(TEST_SIGNER_ADDRESS) };
+    const creationFee = ethers.BigNumber.from('100000000000000');
+    const malformedFeeError = new Error('invalid BigNumber value');
+    malformedFeeError.code = 'INVALID_ARGUMENT';
+    const signerContractMock = makeRegistryWriteContractMock({
+      methods: ['createSession'],
+    });
+    const readContractMock = {
+      SESSION_CREATION_FEE: jest.fn().mockRejectedValue(malformedFeeError),
+      sessionIdExists: jest.fn().mockResolvedValue(false),
+      sessionExists: jest.fn().mockResolvedValue(false),
+    };
+    const retryReadContractMock = {
+      SESSION_CREATION_FEE: jest.fn().mockResolvedValue(creationFee),
+    };
+    let nonSignerContractCalls = 0;
+    cryptoUtils._getProvider.mockReturnValue(walletProvider);
+    installPublicRpcFeeMocks();
+
+    installWeb3ProviderMock({
+      signer,
+      receipt: { status: 1, transactionHash: txHash },
+    });
+    jest.spyOn(ethers, 'Contract').mockImplementation(function MockContract(address, abi, providerOrSigner) {
+      if (providerOrSigner === signer) return signerContractMock;
+      nonSignerContractCalls += 1;
+      if (nonSignerContractCalls === 1) return readContractMock;
+      return retryReadContractMock;
+    });
+
+    const result = await registerSessionOnChain({
+      providerLike: walletProvider,
+      chainId: 84532,
+      slug: 'fee-rpc-fallback',
+      sessionId: '0x77777777777777777777777777777777',
+      metadataURI: 'ar://example',
+      encryptedMetadataURI: '',
+    });
+
+    expect(readContractMock.SESSION_CREATION_FEE).toHaveBeenCalledTimes(1);
+    expect(retryReadContractMock.SESSION_CREATION_FEE).toHaveBeenCalledTimes(1);
+    expect(signerContractMock.createSession).not.toHaveBeenCalled();
+    expect(getLatestSendTxParams(walletProvider)).toEqual(expect.objectContaining({
+      value: creationFee.toHexString(),
+      maxFeePerGas: ethers.BigNumber.from('3000000000').toHexString(),
+      maxPriorityFeePerGas: ethers.BigNumber.from('1000000000').toHexString(),
+    }));
+    expect(result).toEqual({ txs: [{ action: 'createSession', hash: '0xcreatefee-fallback' }] });
+  });
+
+  it('retries createSession with public RPC fee overrides when public RPC fee lookup was unavailable before the first send', async () => {
+    const signer = { provider: null, getAddress: jest.fn().mockResolvedValue(TEST_SIGNER_ADDRESS) };
+    const malformedSendError = new Error('invalid BigNumber value (argument="value", value=null, code=INVALID_ARGUMENT, version=bignumber/5.7.0)');
+    malformedSendError.code = 'INVALID_ARGUMENT';
+    const signerContractMock = makeRegistryWriteContractMock({
+      methods: ['createSession'],
+    });
+    const readContractMock = {
+      SESSION_CREATION_FEE: jest.fn().mockResolvedValue(null),
+      sessionIdExists: jest.fn().mockResolvedValue(false),
+      sessionExists: jest.fn().mockResolvedValue(false),
+    };
+    let feePhase = 'initial';
+    let sendAttempts = 0;
+    const walletProvider = {
+      request: jest.fn(async ({ method }) => {
+        if (method === 'eth_sendTransaction') {
+          sendAttempts += 1;
+          if (sendAttempts === 1) {
+            feePhase = 'retry';
+            throw malformedSendError;
+          }
+          return '0xcreatefee-send-retry';
+        }
+        return null;
+      }),
+    };
+    cryptoUtils._getProvider.mockReturnValue(walletProvider);
+
+    installWeb3ProviderMock({
+      signer,
+      receipt: { status: 1, transactionHash: '0xcreatefee-send-retry' },
+    });
+    jest.spyOn(ethers.providers, 'JsonRpcProvider').mockImplementation(function MockJsonRpcProvider() {
+      return {
+        getFeeData: jest.fn().mockImplementation(async () => (
+          feePhase === 'retry'
+            ? {
+                gasPrice: null,
+                maxFeePerGas: ethers.BigNumber.from('3000000000'),
+                maxPriorityFeePerGas: ethers.BigNumber.from('1000000000'),
+              }
+            : { gasPrice: null, maxFeePerGas: null, maxPriorityFeePerGas: null }
+        )),
+        getGasPrice: jest.fn().mockResolvedValue(null),
+      };
+    });
+    jest.spyOn(ethers.providers, 'FallbackProvider').mockImplementation(function MockFallbackProvider(configs) {
+      return configs?.[0]?.provider || {};
+    });
+    jest.spyOn(ethers, 'Contract').mockImplementation(function MockContract(address, abi, providerOrSigner) {
+      if (providerOrSigner === signer) return signerContractMock;
+      return readContractMock;
+    });
+
+    const result = await registerSessionOnChain({
+      providerLike: walletProvider,
+      chainId: 84532,
+      slug: 'fee-send-retry',
+      sessionId: '0x88888888888888888888888888888888',
+      metadataURI: 'ar://example',
+      encryptedMetadataURI: '',
+    });
+
+    const sendCalls = walletProvider.request.mock.calls.filter(
+      ([payload]) => payload?.method === 'eth_sendTransaction'
+    );
+    expect(sendCalls).toHaveLength(2);
+    expect(sendCalls[0][0].params[0]).toEqual(expect.objectContaining({
+      gasPrice: ethers.utils.parseUnits('0.08', 'gwei').toHexString(),
+    }));
+    expect(sendCalls[0][0].params[0].maxFeePerGas).toBeUndefined();
+    expect(sendCalls[0][0].params[0].maxPriorityFeePerGas).toBeUndefined();
+    expect(sendCalls[1][0].params[0]).toEqual(expect.objectContaining({
+      maxFeePerGas: ethers.BigNumber.from('3000000000').toHexString(),
+      maxPriorityFeePerGas: ethers.BigNumber.from('1000000000').toHexString(),
+    }));
+    expect(sendCalls[1][0].params[0].gasPrice).toBeUndefined();
+    expect(result).toEqual({ txs: [{ action: 'createSession', hash: '0xcreatefee-send-retry' }] });
+  });
+
+  it('falls back to the chain default gas price when all fee providers return null values', async () => {
+    const walletProvider = makeWalletProvider({ txHash: '0xcreatefee-default-gas' });
+    const signer = { provider: null, getAddress: jest.fn().mockResolvedValue(TEST_SIGNER_ADDRESS) };
+    const signerContractMock = makeRegistryWriteContractMock({
+      chainId: 11155420,
+      methods: ['createSession'],
+    });
+    const readContractMock = {
+      SESSION_CREATION_FEE: jest.fn().mockResolvedValue(null),
+      sessionIdExists: jest.fn().mockResolvedValue(false),
+      sessionExists: jest.fn().mockResolvedValue(false),
+    };
+    cryptoUtils._getProvider.mockReturnValue(walletProvider);
+
+    installWeb3ProviderMock({
+      signer,
+      receipt: { status: 1, transactionHash: '0xcreatefee-default-gas' },
+    });
+    jest.spyOn(ethers.providers, 'JsonRpcProvider').mockImplementation(function MockJsonRpcProvider() {
+      return {
+        getFeeData: jest.fn().mockResolvedValue({
+          gasPrice: null,
+          maxFeePerGas: null,
+          maxPriorityFeePerGas: null,
+        }),
+        getGasPrice: jest.fn().mockResolvedValue(null),
+      };
+    });
+    jest.spyOn(ethers.providers, 'FallbackProvider').mockImplementation(function MockFallbackProvider(configs) {
+      return configs?.[0]?.provider || {};
+    });
+    jest.spyOn(ethers, 'Contract').mockImplementation(function MockContract(address, abi, providerOrSigner) {
+      if (providerOrSigner === signer) return signerContractMock;
+      return readContractMock;
+    });
+
+    const result = await registerSessionOnChain({
+      providerLike: walletProvider,
+      chainId: 11155420,
+      slug: 'fee-default-gas',
+      sessionId: '0x99999999999999999999999999999999',
+      metadataURI: 'ar://example',
+      encryptedMetadataURI: '',
+    });
+
+    expect(getLatestSendTxParams(walletProvider)).toEqual(expect.objectContaining({
+      gasPrice: ethers.utils.parseUnits('3', 'gwei').toHexString(),
+    }));
+    expect(result).toEqual({ txs: [{ action: 'createSession', hash: '0xcreatefee-default-gas' }] });
+  });
+
+  it('retries setResourceGatesOnChain with public RPC fee overrides when the first send returns invalid BigNumber value=null', async () => {
+    const signerProvider = { getTransactionCount: jest.fn().mockResolvedValue(7) };
+    const signer = {
+      provider: signerProvider,
+      getAddress: jest.fn().mockResolvedValue('0x0000000000000000000000000000000000000001'),
+    };
+    const malformedSendError = new Error('invalid BigNumber value (argument="value", value=null, code=INVALID_ARGUMENT, version=bignumber/5.7.0)');
+    malformedSendError.code = 'INVALID_ARGUMENT';
+    let sendAttempts = 0;
+    const walletProvider = {
+      request: jest.fn(async ({ method }) => {
+        if (method === 'eth_sendTransaction') {
+          sendAttempts += 1;
+          if (sendAttempts === 1) throw malformedSendError;
+          return '0xsetgates-send-retry';
+        }
+        return null;
+      }),
+    };
+    const signerContractMock = makeRegistryWriteContractMock({
+      methods: ['setResourceGates'],
+    });
+    cryptoUtils._getProvider.mockReturnValue(walletProvider);
+    installPublicRpcFeeMocks();
+
+    installWeb3ProviderMock({
+      signer,
+      receipt: { status: 1, transactionHash: '0xsetgates-send-retry' },
+    });
+    jest.spyOn(ethers, 'Contract').mockImplementation(function MockContract(address, abi, providerOrSigner) {
+      if (providerOrSigner === signer) return signerContractMock;
+      throw new Error('Unexpected non-signer contract construction in setResourceGatesOnChain test');
+    });
+
+    const result = await setResourceGatesOnChain({
+      providerLike: walletProvider,
+      chainId: 84532,
+      slug: 'gate-retry',
+      gates: [{
+        resourceKey: 'default',
+        sbtAddresses: ['0x0000000000000000000000000000000000000002'],
+        chainId: 84532,
+        mode: 0,
+        perMemberLimit: 0,
+      }],
+    });
+
+    const sendCalls = walletProvider.request.mock.calls.filter(
+      ([payload]) => payload?.method === 'eth_sendTransaction'
+    );
+    expect(sendCalls).toHaveLength(2);
+    expect(sendCalls[1][0].params[0]).toEqual(expect.objectContaining({
+      maxFeePerGas: ethers.BigNumber.from('3000000000').toHexString(),
+      maxPriorityFeePerGas: ethers.BigNumber.from('1000000000').toHexString(),
+      nonce: ethers.BigNumber.from('7').toHexString(),
+    }));
+    expect(result).toEqual({ ok: true, txs: [{ action: 'setResourceGates', hash: '0xsetgates-send-retry' }] });
+  });
+});
+
+describe('sessionRegistry contract defaults', () => {
+  it('keeps sessionRegistry default and does not inject the removed release-one XP contract into resolved config contracts', () => {
+    const config = __sessionRegistryTestUtils.buildSessionConfigFromRegistry({
+      session: {
+        slug: 'test-7',
+        chainId: 84532,
+        metadataURI: 'ar://tx',
+        encryptedMetadataURI: '',
+        adminAddress: '0x0000000000000000000000000000000000000001',
+        updatedAt: 1,
+        sessionId: '0xb20bcc6d40274759b4a5cd94d949b577',
+        sessionIdHex: '0xb20bcc6d40274759b4a5cd94d949b577',
+      },
+      metadata: {
+        contracts: {
+          surveys: { address: '0x0000000000000000000000000000000000000002', chainId: 84532 },
+        },
+      },
+      gatesByResource: {},
+      fieldsByKey: {},
+      registryChainId: 84532,
+      metadataLoadState: 'loaded',
+    });
+
+    expect(config.contracts.sessionRegistry).toEqual({
+      address: getSessionRegistryAddress(84532),
+      chainId: 84532,
+    });
+    expect(config.contracts.xp).toBeUndefined();
+    expect(config.__registry.metadataLoadState).toBe('loaded');
+    expect(config.__registry.metadataDefaultedContractKeys).toEqual(
+      expect.arrayContaining(['sessionRegistry', 'sbtFactory'])
+    );
+    expect(config.__registry.metadataDefaultedContractKeys).not.toContain('surveys');
+  });
+
+  it('marks synthesized contract defaults when registry metadata could not be loaded', () => {
+    const config = __sessionRegistryTestUtils.buildSessionConfigFromRegistry({
+      session: {
+        slug: 'demo',
+        chainId: 84532,
+        metadataURI: 'ar://missing',
+        encryptedMetadataURI: '',
+        adminAddress: '0x0000000000000000000000000000000000000001',
+        updatedAt: 1,
+        sessionId: '0xb20bcc6d40274759b4a5cd94d949b577',
+        sessionIdHex: '0xb20bcc6d40274759b4a5cd94d949b577',
+      },
+      metadata: null,
+      gatesByResource: {},
+      fieldsByKey: {},
+      registryChainId: 84532,
+      metadataLoadState: 'unavailable',
+    });
+
+    expect(config.__registry.metadataLoadState).toBe('unavailable');
+    expect(config.__registry.metadataDefaultedContractKeys).toEqual(
+      expect.arrayContaining(['surveys', 'sbtFactory', 'sessionRegistry'])
+    );
+  });
+});
+
+describe('sessionRegistry gas buffering', () => {
+  it('applies a 20 percent buffer when estimate exceeds the fallback floor', () => {
+    const gasLimit = __sessionRegistryTestUtils.resolveBufferedGasLimit(
+      ethers.BigNumber.from('600000'),
+      550000,
+    );
+
+    expect(gasLimit.toString()).toBe('720000');
+  });
+
+  it('keeps the fallback floor when buffered estimate is smaller', () => {
+    const gasLimit = __sessionRegistryTestUtils.resolveBufferedGasLimit(
+      ethers.BigNumber.from('200000'),
+      550000,
+    );
+
+    expect(gasLimit.toString()).toBe('550000');
+  });
+});
+
+describe('updateSessionMetadataOnChain gas fallback', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('sends metadata updates with a buffered gas limit', async () => {
+    const txHash = '0xmetadatahash';
+    const walletProvider = makeWalletProvider({ txHash });
+    const signer = { provider: null, getAddress: jest.fn().mockResolvedValue(TEST_SIGNER_ADDRESS) };
+    const contractMock = makeRegistryWriteContractMock({
+      methods: ['updateSessionMetadata'],
+    });
+    cryptoUtils._getProvider.mockReturnValue(walletProvider);
+    installPublicRpcFeeMocks();
+
+    const web3ProviderMock = installWeb3ProviderMock({
+      signer,
+      receipt: { status: 1, transactionHash: txHash },
+    });
+    jest.spyOn(ethers, 'Contract').mockImplementation(function MockContract() {
+      return contractMock;
+    });
+
+    const result = await updateSessionMetadataOnChain({
+      providerLike: walletProvider,
+      chainId: 84532,
+      slug: 'edge',
+      metadataURI: 'ar://new-metadata',
+      encryptedMetadataURI: '',
+    });
+
+    expect(contractMock.estimateGas.updateSessionMetadata).not.toHaveBeenCalled();
+    expect(getLatestSendTxParams(walletProvider)).toEqual(expect.objectContaining({
+      gas: ethers.BigNumber.from('350000').toHexString(),
+    }));
+    expect(web3ProviderMock.waitForTransaction).toHaveBeenCalledWith(txHash);
+    expect(result).toEqual({ ok: true, txHash: '0xmetadatahash' });
+  });
+});
+
+describe('setSessionFieldsOnChain gas fallback', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('falls back to the session-field gas floor when estimation fails', async () => {
+    const walletProvider = makeWalletProvider();
+    const signer = { provider: null, getAddress: jest.fn().mockResolvedValue(TEST_SIGNER_ADDRESS) };
+    const contractMock = makeRegistryWriteContractMock({
+      methods: ['setSessionFields'],
+    });
+    cryptoUtils._getProvider.mockReturnValue(walletProvider);
+    installPublicRpcFeeMocks();
+
+    installWeb3ProviderMock({
+      signer,
+      receipt: { status: 1, transactionHash: '0xtxhash' },
+    });
+    jest.spyOn(ethers, 'Contract').mockImplementation(function MockContract() {
+      return contractMock;
+    });
+
+    const result = await setSessionFieldsOnChain({
+      providerLike: walletProvider,
+      chainId: 84532,
+      slug: 'edge',
+      fields: {
+        corsWorkerUrl: 'https://worker.example',
+      },
+    });
+
+    expect(contractMock.estimateGas.setSessionFields).not.toHaveBeenCalled();
+    expect(getLatestSendTxParams(walletProvider)).toEqual(expect.objectContaining({
+      gas: ethers.BigNumber.from('300000').toHexString(),
+    }));
+    expect(result).toEqual({ ok: true });
+  });
+});

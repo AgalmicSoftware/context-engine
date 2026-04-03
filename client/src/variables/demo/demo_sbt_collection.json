@@ -1,0 +1,371 @@
+{
+  "sbtGroups": [
+    {
+      "name": "Gender",
+      "values": [
+        "Male",
+        "Female",
+        "Non-binary"
+      ]
+    },
+    {
+      "name": "Era",
+      "values": [
+        "Ancient",
+        "Medieval",
+        "Enlightenment",
+        "Industrial",
+        "Modern"
+      ]
+    },
+    {
+      "name": "Country",
+      "values": [
+        "Greece",
+        "France",
+        "USA",
+        "China",
+        "India",
+        "UK",
+        "Germany",
+        "Persia",
+        "Tunisia",
+        "Italy",
+        "Rome",
+        "Macedonia",
+        "South Africa",
+        "Poland",
+        "Venezuela",
+        "Babylonia",
+        "Soviet Union"
+      ]
+    },
+    {
+      "name": "Affiliation",
+      "values": [
+        "Philosopher",
+        "Scientist",
+        "Political Leader",
+        "Artist",
+        "Economist",
+        "Industrialist",
+        "Activist",
+        "Military Leader",
+        "Polymath",
+        "Religious Leader"
+      ]
+    },
+    {
+      "name": "AtlasCategory",
+      "values": [
+        "Supply Chains",
+        "Governance Institutions",
+        "Macro Trends",
+        "Actors/Civil Society"
+      ]
+    }
+  ],
+  "assignments": {
+    "Franklin": {
+      "Gender": "Male",
+      "Era": "Enlightenment",
+      "Country": "USA",
+      "Affiliation": "Polymath",
+      "AtlasCategory": "Governance Institutions"
+    },
+    "FDR": {
+      "Gender": "Male",
+      "Era": "Modern",
+      "Country": "USA",
+      "Affiliation": "Political Leader",
+      "AtlasCategory": "Macro Trends"
+    },
+    "RosaParks": {
+      "Gender": "Female",
+      "Era": "Modern",
+      "Country": "USA",
+      "Affiliation": "Activist",
+      "AtlasCategory": "Actors/Civil Society"
+    },
+    "MLK": {
+      "Gender": "Male",
+      "Era": "Modern",
+      "Country": "USA",
+      "Affiliation": "Activist",
+      "AtlasCategory": "Actors/Civil Society"
+    },
+    "Hamilton": {
+      "Gender": "Male",
+      "Era": "Enlightenment",
+      "Country": "USA",
+      "Affiliation": "Political Leader",
+      "AtlasCategory": "Governance Institutions"
+    },
+    "JFK": {
+      "Gender": "Male",
+      "Era": "Modern",
+      "Country": "USA",
+      "Affiliation": "Political Leader",
+      "AtlasCategory": "Macro Trends"
+    },
+    "LBJ": {
+      "Gender": "Male",
+      "Era": "Modern",
+      "Country": "USA",
+      "Affiliation": "Political Leader",
+      "AtlasCategory": "Governance Institutions"
+    },
+    "Obama": {
+      "Gender": "Male",
+      "Era": "Modern",
+      "Country": "USA",
+      "Affiliation": "Political Leader",
+      "AtlasCategory": "Governance Institutions"
+    },
+    "VannevarBush": {
+      "Gender": "Male",
+      "Era": "Modern",
+      "Country": "USA",
+      "Affiliation": "Scientist",
+      "AtlasCategory": "Governance Institutions"
+    },
+    "Reagan": {
+      "Gender": "Male",
+      "Era": "Modern",
+      "Country": "USA",
+      "Affiliation": "Political Leader",
+      "AtlasCategory": "Macro Trends"
+    },
+    "Lincoln": {
+      "Gender": "Male",
+      "Era": "Industrial",
+      "Country": "USA",
+      "Affiliation": "Political Leader",
+      "AtlasCategory": "Macro Trends"
+    },
+    "Washington": {
+      "Gender": "Male",
+      "Era": "Enlightenment",
+      "Country": "USA",
+      "Affiliation": "Political Leader",
+      "AtlasCategory": "Governance Institutions"
+    },
+    "Jefferson": {
+      "Gender": "Male",
+      "Era": "Enlightenment",
+      "Country": "USA",
+      "Affiliation": "Political Leader",
+      "AtlasCategory": "Governance Institutions"
+    },
+    "vonNeumann": {
+      "Gender": "Male",
+      "Era": "Modern",
+      "Country": "USA",
+      "Affiliation": "Scientist",
+      "AtlasCategory": "Macro Trends"
+    },
+    "HenryFord": {
+      "Gender": "Male",
+      "Era": "Industrial",
+      "Country": "USA",
+      "Affiliation": "Industrialist",
+      "AtlasCategory": "Supply Chains"
+    },
+    "Rockefeller": {
+      "Gender": "Male",
+      "Era": "Industrial",
+      "Country": "USA",
+      "Affiliation": "Industrialist",
+      "AtlasCategory": "Supply Chains"
+    },
+    "AdaLovelace": {
+      "Gender": "Female",
+      "Era": "Industrial",
+      "Country": "UK",
+      "Affiliation": "Scientist",
+      "AtlasCategory": "Supply Chains"
+    },
+    "NikolaTesla": {
+      "Gender": "Male",
+      "Era": "Industrial",
+      "Country": "USA",
+      "Affiliation": "Scientist",
+      "AtlasCategory": "Supply Chains"
+    },
+    "ThomasEdison": {
+      "Gender": "Male",
+      "Era": "Industrial",
+      "Country": "USA",
+      "Affiliation": "Scientist",
+      "AtlasCategory": "Supply Chains"
+    },
+    "Hammurabi": {
+      "Gender": "Male",
+      "Era": "Ancient",
+      "Country": "Babylonia",
+      "Affiliation": "Political Leader",
+      "AtlasCategory": "Governance Institutions"
+    },
+    "EleanorRoosevelt": {
+      "Gender": "Female",
+      "Era": "Modern",
+      "Country": "USA",
+      "Affiliation": "Activist",
+      "AtlasCategory": "Governance Institutions"
+    },
+    "Confucius": {
+      "Gender": "Male",
+      "Era": "Ancient",
+      "Country": "China",
+      "Affiliation": "Philosopher",
+      "AtlasCategory": "Governance Institutions"
+    },
+    "Plato": {
+      "Gender": "Male",
+      "Era": "Ancient",
+      "Country": "Greece",
+      "Affiliation": "Philosopher",
+      "AtlasCategory": "Governance Institutions"
+    },
+    "Hypatia": {
+      "Gender": "Female",
+      "Era": "Ancient",
+      "Country": "Greece",
+      "Affiliation": "Scientist",
+      "AtlasCategory": "Supply Chains"
+    },
+    "IbnKhaldun": {
+      "Gender": "Male",
+      "Era": "Medieval",
+      "Country": "Tunisia",
+      "Affiliation": "Philosopher",
+      "AtlasCategory": "Macro Trends"
+    },
+    "HarrietTubman": {
+      "Gender": "Female",
+      "Era": "Industrial",
+      "Country": "USA",
+      "Affiliation": "Activist",
+      "AtlasCategory": "Actors/Civil Society"
+    },
+    "MarieCurie": {
+      "Gender": "Female",
+      "Era": "Industrial",
+      "Country": "France",
+      "Affiliation": "Scientist",
+      "AtlasCategory": "Supply Chains"
+    },
+    "ThomasPaine": {
+      "Gender": "Male",
+      "Era": "Enlightenment",
+      "Country": "USA",
+      "Affiliation": "Philosopher",
+      "AtlasCategory": "Actors/Civil Society"
+    },
+    "SojournerTruth": {
+      "Gender": "Female",
+      "Era": "Industrial",
+      "Country": "USA",
+      "Affiliation": "Activist",
+      "AtlasCategory": "Actors/Civil Society"
+    },
+    "LeonardodaVinci": {
+      "Gender": "Male",
+      "Era": "Enlightenment",
+      "Country": "Italy",
+      "Affiliation": "Polymath",
+      "AtlasCategory": "Supply Chains"
+    },
+    "AshokaTheGreat": {
+      "Gender": "Male",
+      "Era": "Ancient",
+      "Country": "India",
+      "Affiliation": "Political Leader",
+      "AtlasCategory": "Governance Institutions"
+    },
+    "BuckminsterFuller": {
+      "Gender": "Male",
+      "Era": "Modern",
+      "Country": "USA",
+      "Affiliation": "Polymath",
+      "AtlasCategory": "Macro Trends"
+    },
+    "HannahArendt": {
+      "Gender": "Female",
+      "Era": "Modern",
+      "Country": "Germany",
+      "Affiliation": "Philosopher",
+      "AtlasCategory": "Governance Institutions"
+    },
+    "HedyLamarr": {
+      "Gender": "Female",
+      "Era": "Modern",
+      "Country": "USA",
+      "Affiliation": "Artist",
+      "AtlasCategory": "Supply Chains"
+    },
+    "Sequoyah": {
+      "Gender": "Male",
+      "Era": "Industrial",
+      "Country": "USA",
+      "Affiliation": "Polymath",
+      "AtlasCategory": "Actors/Civil Society"
+    },
+    "ÉmilieDuChâtelet": {
+      "Gender": "Female",
+      "Era": "Enlightenment",
+      "Country": "France",
+      "Affiliation": "Scientist",
+      "AtlasCategory": "Supply Chains"
+    },
+    "NikitaKhrushchev": {
+      "Gender": "Male",
+      "Era": "Modern",
+      "Country": "Soviet Union",
+      "Affiliation": "Political Leader",
+      "AtlasCategory": "Governance Institutions"
+    },
+    "Voltaire": {
+      "Gender": "Male",
+      "Era": "Enlightenment",
+      "Country": "France",
+      "Affiliation": "Philosopher",
+      "AtlasCategory": "Actors/Civil Society"
+    },
+    "FlorenceNightingale": {
+      "Gender": "Female",
+      "Era": "Industrial",
+      "Country": "United Kingdom",
+      "Affiliation": "Healthcare Reformer",
+      "AtlasCategory": "Supply Chains"
+    },
+    "GalileoGalilei": {
+      "Gender": "Male",
+      "Era": "Renaissance",
+      "Country": "Italy",
+      "Affiliation": "Scientist",
+      "AtlasCategory": "Supply Chains"
+    },
+    "RosaParks": {
+      "Gender": "Female",
+      "Era": "Modern",
+      "Country": "USA",
+      "Affiliation": "Activist",
+      "AtlasCategory": "Actors/Civil Society"
+    },
+    "WangariMaathai": {
+      "Gender": "Female",
+      "Era": "Modern",
+      "Country": "Kenya",
+      "Affiliation": "Activist",
+      "AtlasCategory": "Actors/Civil Society"
+    },
+    "Aristotle": {
+      "Gender": "Male",
+      "Era": "Ancient",
+      "Country": "Greece",
+      "Affiliation": "Philosopher",
+      "AtlasCategory": "Governance Institutions"
+    }
+  }
+}

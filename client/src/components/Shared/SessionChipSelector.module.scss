@@ -1,0 +1,167 @@
+.selector {
+  display: grid;
+  gap: 10px;
+}
+
+.chipRow {
+  display: block;
+}
+
+.chip {
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--ce-color-panel-text);
+  padding: 12px 14px;
+  text-align: left;
+  transition: border-color 0.18s ease, background 0.18s ease, transform 0.18s ease;
+}
+
+.chip:hover:not(:disabled) {
+  border-color: rgba(90, 255, 194, 0.55);
+  background: rgba(255, 255, 255, 0.09);
+  transform: translateY(-1px);
+}
+
+.chip:disabled {
+  cursor: default;
+  opacity: 0.56;
+}
+
+.chipSelected {
+  border-color: rgba(90, 255, 194, 0.75);
+  box-shadow: 0 0 0 1px rgba(90, 255, 194, 0.24);
+}
+
+.chipActive {
+  background: rgba(90, 255, 194, 0.12);
+}
+
+.chipLoaded {
+  color: var(--ce-color-panel-text);
+}
+
+.chipUnloaded {
+  color: rgba(244, 247, 255, 0.78);
+}
+
+.chipGeneral {
+  border-style: dashed;
+}
+
+.chipDisabled {
+  pointer-events: none;
+}
+
+.chipTopRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.chipContent {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-weight: 600;
+}
+
+.chipCheck {
+  color: #5affc2;
+  font-weight: 700;
+}
+
+.primaryBadge {
+  margin-left: auto;
+  border-radius: var(--ce-radius-pill);
+  padding: 2px 8px;
+  background: rgba(91, 140, 255, 0.18);
+  color: #dbe7ff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.externalLink {
+  margin-left: auto;
+  color: rgba(244, 247, 255, 0.7);
+  display: inline-flex;
+  align-items: center;
+}
+
+.externalIcon {
+  font-size: 0.8rem;
+}
+
+.metaText {
+  display: block;
+  margin-top: 7px;
+  color: rgba(244, 247, 255, 0.72);
+  font-size: 0.82rem;
+}
+
+.progressWrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.progressTrack {
+  flex: 1;
+  height: 5px;
+  border-radius: var(--ce-radius-pill);
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+
+.progressFill {
+  display: block;
+  width: var(--ce-chip-progress-width, 40%);
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #5affc2 0%, #5b8cff 100%);
+}
+
+.progressFillIndeterminate {
+  width: 35%;
+}
+
+.progressText {
+  color: rgba(244, 247, 255, 0.72);
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.emptyState {
+  color: rgba(244, 247, 255, 0.68);
+  font-size: 0.92rem;
+}
+
+.expandToggle {
+  justify-self: start;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: var(--ce-radius-pill);
+  background: rgba(255, 255, 255, 0.06);
+  color: #f8fbff;
+  font-family: var(--ce-font-mono);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 8px 12px;
+  text-transform: uppercase;
+  transition:
+    border-color 0.18s ease,
+    background 0.18s ease,
+    transform 0.18s ease;
+
+  &:hover,
+  &:focus-visible {
+    border-color: rgba(90, 255, 194, 0.55);
+    background: rgba(255, 255, 255, 0.09);
+    transform: translateY(-1px);
+    outline: none;
+  }
+}

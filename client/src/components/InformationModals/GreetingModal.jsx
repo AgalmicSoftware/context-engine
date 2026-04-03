@@ -1,0 +1,180 @@
+/** @file GreetingModal.jsx */
+import React, { Component } from "react";
+import PropTypes from 'prop-types';
+import { connect } from 'react-redux';
+import { fetchSessionState } from '../../actions/sessionStateActions.js';
+import { createLogger } from '../../utilities/logging';
+
+// CSS and images
+import "assets/css/contextEngine.scss";
+import styles from "./Modals.module.scss";
+import modalImage from "assets/img/rules_modal.png";
+
+// Reactstrap components
+import { Button, Card, CardHeader, CardBody, CardFooter, Form, FormGroup, Label, Modal, Input} from "reactstrap";
+
+// Components
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import { faWindowClose, faCheck, faCheckSquare } from '@fortawesome/free-solid-svg-icons'
+
+const log = createLogger('ui');
+
+class GreetingModal extends Component {
+  state = {
+    rulesModalOpen: false,
+    userOptsOutMetrics: false,
+    emailInput: "",
+  }
+
+  componentDidMount() {
+    this.setState({ rulesModalOpen: this.props.visible });
+  }
+
+  componentWillUnmount() {
+  }
+
+  componentDidUpdate(nextProps) {
+    if (this.props.visible !== nextProps.visible) {
+      this.setState({ rulesModalOpen: this.props.visible });
+    }
+
+
+  }
+
+  optOutChanged = () => {
+    this.setState({ userOptsOutMetrics: !this.state.userOptsOutMetrics });
+
+    if (!this.state.userOptsOutMetrics) {
+    }
+
+    else {
+    }
+  }
+
+  emailInputChange = (e) => {
+    const latestEmail = e.target.value;
+    this.setState({ emailInput: latestEmail });
+  }
+
+  closeRulesModal = () => {
+    this.setState({ rulesModalOpen: false });
+
+    this.props.closeExplainerFunction();
+
+  };
+
+  render() {
+
+    // Explanation modal (only seen on first site-load)
+
+    const modalPicture = modalImage
+
+    const closeModalIcon = this.state.emailInput === "" ? faWindowClose : faCheckSquare;
+
+    const formBottomVisibleID = this.props.optOutAndEmailBottom ? styles.betaInfo : styles.betaInfoInvisible;
+
+    var modalVisibleID = this.props.visible ? styles.rulesModal : styles.invisibleModal;
+
+
+
+    const explainModal =
+    <>
+      <Modal isOpen={this.state.rulesModalOpen} modalClassName="modal-rules transparentModal"
+      id={modalVisibleID}
+      >
+
+      <Card id={styles.rulesModalCard}>
+
+        <CardBody id={styles.rulesModalCardBody}
+                            style={{
+                      backgroundImage: "url(" + modalPicture + ")",
+                      backgroundSize: "contain",
+                      backgroundRepeat: "no-repeat",
+                      backgroundPosition: "center",
+                      }}
+                    >
+
+
+        </CardBody>
+        <div id={formBottomVisibleID}>
+        <FormGroup check id={styles.optOutMetrics}>
+            <Label check id={styles.optOutLabel}>
+              <Input type="radio" name="radio1" checked={this.state.userOptsOutMetrics} id={styles.optOutSelect}
+              onChange={this.optOutChanged}
+              /> {' '}
+
+  <div id={styles.optOutMainText}> Opt out metrics <div id={styles.optOutDetailText}> (tracks UI use) </div> </div>
+            </Label>
+          </FormGroup>
+
+          <CardFooter id={styles.rulesModalFooter}>
+
+                      <div id={styles.exitButton}>
+
+          </div>
+
+
+
+          <div id={styles.emailAndOptOut}>
+
+          <Label id={styles.emailFormLabel}> Get updates
+          </Label>
+          <div id={styles.emailSubjects}>
+
+            <div className={styles.emailSubject}>
+              — Beta Info
+            </div>
+
+            <div className={styles.emailSubject}>
+              — Feature updates
+            </div>
+
+            <div className={styles.emailSubject}>
+              — Launch
+            </div>
+
+
+          </div>
+
+          <FormGroup id={styles.enterEmail}>
+
+          <Input type="email" name="emailInput" onChange={this.emailInputChange} id={styles.emailInput} placeholder="name@example.com" />
+          </FormGroup>
+
+
+
+          </div>
+          </CardFooter>
+        </div>
+
+        <button id={styles.closeExplainerModalButton} aria-label="Close" className="close" data-dismiss="modal" type="button" onClick={this.closeRulesModal}>
+                <FontAwesomeIcon id={styles.closeModalIcon} icon={closeModalIcon} />
+
+          </button>
+
+      </Card>
+
+      </Modal>
+
+
+
+        </>
+
+
+    return explainModal
+  }
+}
+
+GreetingModal.propTypes = {
+  fetchSessionState: PropTypes.func.isRequired,
+  account: PropTypes.string,
+  provider: PropTypes.string,
+};
+
+const mapStateToProps = state => ({
+  account: state.profile.account,
+  provider: state.profile.provider,
+});
+
+
+export default connect(mapStateToProps, { fetchSessionState })(GreetingModal);

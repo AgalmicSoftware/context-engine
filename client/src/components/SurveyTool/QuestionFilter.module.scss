@@ -1,0 +1,658 @@
+/* @file QuestionFilter.module.scss */
+// Variables for futuristic pastel styling
+@use "sass:color";
+
+$pastel-bg: #f0faff; // Light pastel background
+$pastel-bg-hover: #e2f0f7;
+$pastel-highlight: #b8f3ff;
+$pastel-border: #80dfee;
+$pastel-exclude: #ffb8c7;
+$pastel-text: #333;
+$pastel-darker: #91cdd9;
+
+// For better contrast on text with pastel backgrounds:
+$heading-color: #2a2a2a;
+$text-color: #444;
+
+// Additional styling
+.questionFilterInline {
+  margin: 1rem 0;
+  padding: 1rem;
+  background: $pastel-bg;
+  border: 1px solid $pastel-border;
+  border-radius: var(--ce-radius-6);
+  color: $text-color; // --- MODIFICATION START ---
+  max-height: 70vh; // make minified/inline version scrollable on phones  overflow-y: auto;
+  -webkit-overflow-scrolling: touch; // --- MODIFICATION END ---
+
+  @media (max-width: 600px) {
+    padding: 0.75rem;
+  }
+}
+
+.summaryContainer {
+  background: color.adjust($pastel-bg, $lightness: 3%);
+  border: 1px solid $pastel-border;
+  padding: 0.75rem;
+  border-radius: var(--ce-radius-5);
+  margin-bottom: 1rem;
+  .summaryTitle {
+    font-weight: 600;
+    font-size: 1rem;
+    margin-bottom: 0.5rem;
+    color: $heading-color;
+  }
+
+  .noFiltersMsg {
+    font-style: italic;
+    color: #777;
+    font-size: 0.9rem;
+    margin-bottom: 0;
+  }
+}
+
+.filterSummaryContainer {
+  background: color.adjust($pastel-bg, $lightness: 3%);
+  border: 1px solid $pastel-border;
+  padding: 0.75rem;
+  border-radius: var(--ce-radius-5);
+  margin-bottom: 1rem;
+}
+
+.filterSummaryActions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.filterSummaryLabel {
+  font-weight: 600;
+  font-size: 1rem;
+  color: $heading-color;
+  margin-bottom: 0.5rem; // --- MODIFICATION START ---
+  display: flex;
+  justify-content: space-between;
+  align-items: center; // --- MODIFICATION END ---
+}
+
+// --- MODIFICATION START ---
+.filterControlsRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  /* margin-top: 1rem; */
+  padding-top: 0; // border-top: 1px solid #80dfee;
+  margin-bottom: 1rem;
+}
+
+.clearButton {
+  margin-right: 1rem;
+}
+
+.loadFilterContainer {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-grow: 1;
+}
+
+.loadFilterInput {
+  flex-grow: 1;
+  color: var(--ce-color-black) !important;
+}
+
+.loadFilterButton {
+  background: $pastel-highlight;
+  border: 1px solid $pastel-border;
+  color: $heading-color;
+  font-weight: 600;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+
+  &:hover,
+  &:focus {
+    background: color.adjust($pastel-highlight, $lightness: -5%);
+    border-color: color.adjust($pastel-border, $lightness: -5%);
+    color: $heading-color;
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    color: $heading-color;
+  }
+}
+// --- MODIFICATION END ---
+
+.filterSummaryCount {
+  font-size: 0.95rem;
+  color: $heading-color;
+  margin-bottom: 1rem;
+}
+
+.summaryItemsRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.filterBubble {
+  display: inline-flex;
+  align-items: center;
+  background: $pastel-highlight;
+  color: $text-color;
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--ce-radius-4);
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: background 0.2s;
+  &:hover {
+    background: color.adjust($pastel-highlight, $lightness: -3%);
+  }
+}
+
+.removeIcon {
+  margin-left: 6px;
+}
+
+.modalHeaderSummary {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  .modalTitle {
+    margin-bottom: 1rem;
+    font-size: 1.25rem;
+    color: $heading-color;
+  }
+}
+
+.modalHeader {
+  border-bottom: 1px solid $pastel-border;
+  padding: 1.25rem 3.5rem 1.25rem 1.5rem;
+  background: $pastel-bg;
+  position: relative;
+  :global(.modal-title) {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: $heading-color;
+  }
+
+  :global(.close),
+  :global(.btn-close) {
+    background: transparent !important;
+    border: none !important;
+    color: #000 !important;
+    opacity: 1 !important;
+    box-shadow: none !important;
+    position: absolute;
+    top: 50%;
+    right: 16px;
+    transform: translateY(-50%);
+    width: 36px;
+    height: 36px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+  }
+
+  :global(.close) span {
+    color: #000 !important;
+    font-size: 1.8rem;
+    line-height: 1;
+  }
+
+  :global(.btn-close) {
+    filter: none;
+    background-size: 1.5rem 1.5rem;
+  }
+}
+
+.modalBody {
+  padding: 1.5rem;
+  background: $pastel-bg;
+  color: $text-color;
+}
+
+.modalFooter {
+  border-top: 1px solid $pastel-border;
+  padding: 1rem 1.5rem;
+  background: $pastel-bg;
+}
+
+// Collapsible Section Styles
+.filterSection {
+  margin-bottom: 1.5rem;
+  .sectionHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 1rem;
+    background: color.adjust($pastel-bg, $lightness: 3%);
+    border: 1px solid $pastel-border;
+    border-radius: 0.375rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    &:hover {
+      background: $pastel-bg-hover;
+    }
+
+    h3 {
+      margin: 0;
+      font-size: 1rem;
+      font-weight: 500;
+      color: $heading-color;
+      display: flex;
+      align-items: center;
+    }
+
+    .icon {
+      transition: transform 0.2s ease;
+      &.expanded {
+        transform: rotate(180deg);
+      }
+    }
+  }
+
+  .sectionContent {
+    padding: 1rem;
+    border: 1px solid $pastel-border;
+    border-top: none;
+    border-radius: 0 0 0.375rem 0.375rem;
+    background: $pastel-bg;
+    color: $text-color;
+  }
+}
+
+.filterOption {
+  display: flex;
+  align-items: center;
+  padding: 0.5rem 0;
+  color: $text-color;
+  input[type='checkbox'] {
+    margin-right: 0.75rem;
+    cursor: pointer;
+  }
+
+  &:hover {
+    color: $pastel-darker;
+  }
+}
+
+.questionTypeGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.typeButton {
+  appearance: none;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1 1 140px;
+  min-width: 120px;
+  padding: 12px 8px;
+  border-radius: var(--ce-radius-10);
+  border: 1.5px solid rgba(0, 0, 0, 0.1);
+  background: rgba(255, 255, 255, 0.7);
+  color: inherit;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+  font: inherit;
+
+  &:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.9);
+    border-color: rgba(0, 0, 0, 0.2);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--ce-color-accent);
+    outline-offset: 2px;
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+    box-shadow: none;
+  }
+}
+
+.typeButtonActive {
+  border-color: var(--ce-color-accent);
+  background: rgba(77, 255, 164, 0.08);
+  box-shadow: 0 0 8px rgba(77, 255, 164, 0.2);
+}
+
+.typeTitle {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #2a2a2a;
+  text-align: center;
+  margin-bottom: 6px;
+}
+
+.typePreviewRow {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.typePill {
+  font-size: 0.6rem;
+  padding: 2px 8px;
+  border-radius: var(--ce-radius-10);
+  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  color: #555;
+}
+
+.typePillAgree {
+  background: rgba(76, 175, 80, 0.3);
+  color: #2e7d32;
+  border-color: #4caf50;
+}
+
+.typePillDisagree {
+  background: rgba(244, 67, 54, 0.3);
+  color: #c62828;
+  border-color: #f44336;
+}
+
+.typePillUnsure {
+  background: rgba(255, 235, 59, 0.2);
+  color: #f9a825;
+  border-color: #fdd835;
+}
+
+.ratingPreviewWrap {
+  display: flex;
+  align-items: center;
+  position: relative;
+  width: 80%;
+  height: 8px;
+  background: rgba(0, 0, 0, 0.08);
+  border-radius: var(--ce-radius-4);
+  overflow: visible;
+}
+
+.ratingPreviewFill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 60%;
+  height: 100%;
+  background: var(--ce-color-accent);
+  border-radius: var(--ce-radius-4);
+}
+
+.ratingPreviewHandle {
+  position: absolute;
+  left: 60%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid var(--ce-color-accent);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.freeformPreview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 80%;
+  height: 28px;
+  border: 1px dashed rgba(0, 0, 0, 0.15);
+  border-radius: var(--ce-radius-6);
+  font-size: 0.75rem;
+  color: #999;
+}
+
+.aiFilterInputWrap {
+  :global(.audioTextarea),
+  :global([class*='audioTextarea']) {
+    color: #333 !important;
+    background: rgba(0, 0, 0, 0.04) !important;
+    border-color: $pastel-border !important;
+  }
+
+  :global(.audioTextarea)::placeholder,
+  :global([class*='audioTextarea'])::placeholder {
+    color: #999 !important;
+  }
+
+  :global([class*='topControls']) {
+    button {
+      color: #555;
+    }
+  }
+
+  input[type='number'] {
+    color: #333;
+    background: #fff;
+    border: 1px solid $pastel-border;
+  }
+
+  label {
+    color: $heading-color;
+  }
+}
+
+.searchInput {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid $pastel-border;
+  border-radius: 0.375rem;
+  margin-bottom: 1rem;
+  &:focus {
+    outline: none;
+    border-color: $pastel-darker;
+    box-shadow: 0 0 0 2px rgba($pastel-darker, 0.1);
+  }
+}
+
+// Popular Questions Badge
+.popularBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.5rem;
+  background: rgba($pastel-highlight, 0.1);
+  color: $text-color;
+  border-radius: 1rem;
+  font-size: 0.875rem;
+  margin-left: 0.5rem;
+}
+
+.disabledSection {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.disabledText {
+  color: gray;
+  font-style: italic;
+}
+
+#topQuestionsCountInput {
+  min-width: 70px !important;
+  max-width: 70px !important;
+  background: transparent !important;
+  color: $text-color !important;
+  font-size: 1.1em !important;
+  font-weight: 600 !important;
+  margin-left: 10px !important;
+  margin-right: 10px !important;
+  padding: 5px !important;
+}
+
+.loadingContainer {
+  display: flex;
+  align-items: center;
+  margin-top: 1rem;
+  p {
+    margin: 0 0 0 0.75rem;
+    font-size: 0.95rem;
+  }
+}
+
+/* Tag bubble container + clickable #tag style */
+.tagsContainer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.tagBubble {
+  background: #c4ffef;
+  color: $text-color;
+  padding: 0.3rem 0.6rem;
+  border-radius: var(--ce-radius-15);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 0.2s ease;
+  &:hover {
+    background: color.adjust(#c4ffef, $lightness: -5%);
+  }
+}
+
+.tagBubbleSelected {
+  background: color.adjust(#c4ffef, $lightness: -10%);
+  font-weight: 600;
+}
+
+// --- MODIFICATION START ---
+.showMoreTagsButton {
+  padding: 0.25rem 0;
+  font-size: 0.85rem;
+  color: $pastel-darker;
+  text-decoration: none;
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+.clearFilterIcon {
+  color: #e53935; // A material red color  margin-left: 8px;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+  &:hover {
+    transform: scale(1.2);
+  }
+}
+
+/* Small inline count row in inline/results mode */
+.inlineCountRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.inlineCountText {
+  font-size: 0.95rem;
+  color: $heading-color;
+}
+
+.addIcon {
+  margin-left: 8px;
+  cursor: pointer;
+  opacity: 0.5;
+}
+// --- MODIFICATION END ---
+
+/* ===========================================
+ * MOBILE RESPONSIVE STYLES
+ * =========================================== */
+@media (max-width: 768px) {
+  // Reduce padding on main containers to give content more room
+  .questionFilterInline,
+  .modalBody,
+  .modalFooter {
+    padding: 1rem;
+  }
+
+  .modalHeader {
+    padding: 1rem 1.25rem;
+  }
+
+  // Reduce padding inside collapsible sections
+  .filterSection .sectionContent {
+    padding: 0.75rem;
+  }
+
+  // Handle the long filter option labels (e.g., in "Most Popular")
+  .filterOption {
+    // Vertically align the checkbox with the start of the text, not the center of the wrapped block.
+    // This fixes the "scrunched" look.
+    align-items: flex-start; // The `display: flex` is inherited from the desktop styles, which is correct.
+
+    // Allow the text content to wrap nicely on small screens
+    flex-wrap: wrap;
+    row-gap: 8px; // Add some space if it wraps to a new line
+    // Make the number input smaller to fit better
+    #topQuestionsCountInput {
+      min-width: 60px !important;
+      max-width: 60px !important;
+      margin: 0 8px !important;
+      padding: 2px 4px !important;
+      font-size: 1rem !important;
+    }
+  }
+
+  // Ensure tag/filter bubbles don't overflow and can break long words
+  .tagBubble,
+  .filterBubble {
+    word-break: break-word;
+    max-width: 100%;
+  }
+}
+
+@media (min-width: 600px) {
+  .questionTypeGrid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.tooltip {
+  color: $pastel-darker;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+  flex-shrink: 0;
+  line-height: 1;
+  margin: 0 0 0 6px;
+  vertical-align: middle;
+  font-size: 14px;
+  opacity: 0.5;
+}
+
+.tooltipBubble {
+  z-index: 2000;
+
+  :global(.tooltip-inner) {
+    background: var(--ce-color-tooltip-bg) !important;
+    color: var(--ce-color-tooltip-text) !important;
+    border: 1px solid var(--ce-color-tooltip-border) !important;
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.25);
+    padding: 8px 10px;
+    font-size: 0.85rem;
+    line-height: 1.2;
+  }
+
+  :global(.tooltip-arrow::before) {
+    border-top-color: var(--ce-color-tooltip-bg);
+    border-bottom-color: var(--ce-color-tooltip-bg);
+    border-left-color: var(--ce-color-tooltip-bg);
+    border-right-color: var(--ce-color-tooltip-bg);
+  }
+}

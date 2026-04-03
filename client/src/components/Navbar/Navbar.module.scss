@@ -1,0 +1,500 @@
+/* @file Navbar.module.scss */
+
+/* --- Navbar --- */
+
+@media (min-width: 0px) and (max-width: 319px) {
+  #navbarContainer {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 10px;
+    margin-bottom: 0px;
+  }
+
+  #navbarContainerLoggedIn {
+    display: flex;
+    flex-wrap: wrap;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    margin-top: 10px;
+    margin-bottom: 0px;
+  }
+
+  #navbarLogoCol {
+    display: flex;
+    align-content: center;
+    justify-items: center;
+    padding: 0px;
+    width: 40%;
+  }
+
+  #navbarLogoColLoggedIn {
+    display: flex;
+    align-content: center;
+    justify-items: center;
+    padding: 0px;
+  }
+
+  #mainLogo {
+    object-fit: contain;
+    min-height: 75px;
+  }
+
+  #mainLogoLoggedIn {
+    object-fit: contain;
+    max-width: 120px;
+  }
+
+  #navbarSearchCol {
+    display: none;
+  }
+
+  #emptyCol {
+    display: none;
+  }
+
+  #accountSection {
+    padding: 0px;
+  }
+
+  #accountSectionLoggedIn {
+    justify-content: center;
+    width: 100%;
+    padding: 0px;
+  }
+}
+
+@media (min-width: 320px) and (max-width: 465px) {
+  #navbarContainer {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 15px;
+    margin-bottom: 0px;
+  }
+
+  #navbarContainerLoggedIn {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    margin-bottom: 0px;
+    margin-top: 10px;
+  }
+
+  #navbarLogoCol {
+    width: 30%;
+    display: flex;
+    align-content: center;
+    justify-items: center;
+    padding: 0px;
+  }
+
+  #navbarLogoColLoggedIn {
+    display: flex;
+  }
+
+  #mainLogo {
+    object-fit: contain;
+    max-width: 110px;
+  }
+
+  #mainLogoLoggedIn {
+    max-width: 110px;
+    object-fit: contain;
+  }
+
+  #navbarSearchCol {
+    display: none;
+  }
+
+  #emptyCol {
+    display: none;
+  }
+
+  #accountSection {
+    padding: 0px;
+  }
+
+  #accountSectionLoggedIn {
+    display: flex;
+    justify-content: flex-end;
+    width: 70%;
+    padding: 0px;
+  }
+}
+
+@media (min-width: 466px) and (max-width: 768px) {
+  #navbarContainer {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 15px;
+    margin-bottom: 0px;
+  }
+
+  #navbarContainerLoggedIn {
+    display: flex;
+    flex-wrap: wrap;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 20px;
+    margin-bottom: 0px;
+  }
+
+  #navbarLogoCol {
+    width: 30%;
+    display: flex;
+    align-content: center;
+    justify-content: center;
+    padding: 0px;
+  }
+
+  #navbarLogoColLoggedIn {
+    width: 25%;
+    display: flex;
+    align-content: center;
+    justify-items: center;
+    padding-left: 2%;
+    padding: 0px;
+  }
+
+  #mainLogo {
+    object-fit: contain;
+    max-width: 156px;
+    min-height: 75px;
+  }
+
+  #mainLogoLoggedIn {
+    object-fit: contain;
+    max-width: 156px;
+    min-height: 75px;
+  }
+
+  #accountSection {
+    width: 50%;
+    display: flex;
+    flex-direction: row;
+    justify-content: flex-end;
+    object-fit: contain;
+  }
+
+  #accountSectionLoggedIn {
+    display: flex;
+    justify-content: flex-end;
+    width: 70%;
+    padding: 0px;
+  }
+}
+
+@media (min-width: 769px) and (max-width: 1366px) {
+  #navbarContainer {
+    display: flex;
+    flex-wrap: wrap;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 25px;
+    margin-bottom: 20px;
+  }
+
+  #navbarContainerLoggedIn {
+    display: flex;
+    flex-wrap: wrap;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 25px;
+    margin-bottom: 20px;
+  }
+
+  #navbarLogoCol {
+    width: 30%;
+    display: flex;
+    align-content: center;
+    padding-left: 2%;
+    padding: 0px;
+  }
+
+  #mainLogo {
+    max-width: 156px;
+  }
+
+  #mainLogoLoggedIn {
+    object-fit: contain;
+    max-width: 156px;
+    min-height: 75px;
+  }
+
+  #accountSection {
+    display: flex;
+    justify-content: flex-end;
+    width: 30%;
+    padding: 0px;
+  }
+
+  #accountSectionLoggedIn {
+    justify-content: flex-end;
+    width: 63%;
+    padding: 0px;
+  }
+}
+
+@media (min-width: 1367px) {
+  #navbarContainer {
+    display: flex;
+    flex-wrap: wrap;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 25px;
+    margin-bottom: 20px;
+  }
+
+  #navbarContainerLoggedIn {
+    display: flex;
+    flex-wrap: wrap;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 25px;
+    margin-bottom: 20px;
+  }
+
+  #navbarLogoCol {
+    width: 30%;
+    display: flex;
+    align-content: center;
+    justify-items: center;
+    padding-left: 2%;
+    padding: 0px;
+  }
+
+  #navbarLogoColLoggedIn {
+    width: 25%;
+    display: flex;
+    align-content: center;
+    justify-items: center;
+    padding: 0px;
+  }
+
+  #mainLogo {
+    object-fit: contain;
+    max-width: 156px;
+  }
+
+  #mainLogoLoggedIn {
+    object-fit: contain;
+    max-width: 156px;
+  }
+
+  #accountSection {
+    width: 40%;
+    padding: 0px;
+  }
+
+  #accountSectionLoggedIn {
+    width: 45%;
+    padding: 0px;
+  }
+}
+
+#mainLogo {
+  opacity: 0.4;
+  mix-blend-mode: luminosity;
+}
+
+#mainLogoLoggedIn {
+  opacity: 0.4;
+  mix-blend-mode: luminosity;
+}
+
+#accountSection,
+#accountSectionLoggedIn {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-left: auto;
+}
+
+/* --- AccountSection --- */
+
+@media (min-width: 0px) and (max-width: 319px) {
+  #AccountSectionLoggedIn {
+    width: 100%;
+    transform: scale(0.85);
+    display: flex;
+    flex-direction: row-reverse;
+    flex-wrap: wrap-reverse;
+    justify-content: flex-end;
+    align-items: center;
+    border-radius: var(--ce-radius-2);
+    padding: 0px;
+  }
+
+  #AccountHover {
+    width: 75%;
+    justify-content: center;
+    margin-top: 5px;
+    margin-bottom: 5px;
+    margin-left: 5px;
+    margin-right: 5px;
+    margin: 5px;
+  }
+
+  #walletSettingsIcon {
+    font-size: 28px;
+    padding-top: 5px;
+    display: inline;
+  }
+}
+
+@media (min-width: 320px) and (max-width: 465px) {
+  #AccountSectionLoggedIn {
+    transform: scale(0.8);
+    display: flex;
+    flex-direction: column-reverse;
+    align-items: flex-end;
+    justify-content: center;
+    padding-left: 0px;
+  }
+
+  #AccountHover {
+    justify-content: flex-end;
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+
+  #walletSettingsIcon {
+    font-size: 28px;
+    padding-top: 5px;
+    display: inline;
+  }
+}
+
+@media (min-width: 466px) and (max-width: 768px) {
+  #AccountSectionLoggedIn {
+    transform: scale(0.9);
+    display: flex;
+    flex-direction: column-reverse;
+    align-items: flex-end;
+    padding-right: 0;
+    padding: 10px;
+  }
+
+  #AccountHover {
+    padding: 10px;
+  }
+
+  #walletSettingsIcon {
+    font-size: 28px;
+    padding-top: 5px;
+    display: inline;
+  }
+}
+
+@media (min-width: 769px) and (max-width: 1366px) {
+  #AccountSectionLoggedIn {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    border-radius: var(--ce-radius-2);
+    padding: 0px;
+  }
+
+  #AccountHover {
+    padding: 10px;
+  }
+
+  #walletSettingsIcon {
+    font-size: 28px;
+    padding-top: 5px;
+    display: inline;
+  }
+}
+
+@media (min-width: 1367px) {
+  #AccountSectionLoggedIn {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    border-radius: var(--ce-radius-2);
+    padding: 0px;
+  }
+
+  #AccountHover {
+    padding: 10px;
+  }
+
+  #walletSettingsIcon {
+    font-size: 28px;
+    padding-top: 5px;
+    display: inline;
+  }
+}
+
+#AccountHover {
+}
+
+#threeboxAddress {
+  align-self: center;
+  padding-left: 10px;
+}
+
+#walletSettingsButton {
+  background-image: none;
+  background-color: #34467500;
+}
+
+/* --- AccountDisplay --- */
+
+@media (min-width: 0px) and (max-width: 319px) {
+  #addressDisplay {
+    width: 50%;
+  }
+}
+
+@media (min-width: 320px) and (max-width: 465px) {
+}
+
+@media (min-width: 466px) and (max-width: 768px) {
+}
+
+@media (min-width: 769px) and (max-width: 1366px) {
+  #addressDisplay {
+    padding-right: 10px;
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
+}
+
+@media (min-width: 1367px) {
+  #addressDisplay {
+    padding-right: 15px;
+    padding-top: 15px;
+    padding-bottom: 15px;
+  }
+}
+
+#profileHover {
+  display: inline;
+  color: var(--ce-color-white);
+}
+
+#addressDisplay {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.addressButton:hover {
+  transform: scale(0.96);
+  cursor: pointer;
+}

@@ -1,0 +1,41 @@
+/* @file RightSide.module.scss */
+
+#rightSideContainer {
+  display: none;
+}
+
+.rightSideCard {
+  width: 100%;
+  min-height: 100%;
+  border-radius: var(--ce-radius-8);
+  background: var(--ce-color-bg);
+  box-shadow:
+    -5px 5px 10px #10122e,
+    5px -5px 10px #1e2155;
+}
+
+@media (min-width: 769px) and (max-width: 1366px) {
+  #rightSideContainer {
+    flex: 0 0 23%;
+    display: flex;
+    align-self: stretch;
+    margin-top: 5px;
+  }
+
+  .rightSideCard {
+    display: flex;
+  }
+}
+
+@media (min-width: 1367px) {
+  #rightSideContainer {
+    flex: 0 0 23%;
+    display: flex;
+    align-self: stretch;
+    margin-top: 7.5px;
+  }
+
+  .rightSideCard {
+    display: flex;
+  }
+}

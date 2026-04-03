@@ -1,0 +1,306 @@
+@use "scss/variables" as tokens;
+
+$card-bg: tokens.$ce-card-bg;
+$card-border: tokens.$ce-card-border;
+$card-shadow: tokens.$ce-card-shadow;
+$clickable-color: tokens.$ce-clickable;
+$muted-text: tokens.$ce-muted-text;
+
+.bookmarksPage {
+  width: 92%;
+  max-width: 1200px;
+  margin: 2rem auto 3rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  color: var(--ce-color-panel-text);
+  font-family: var(--ce-font-mono);
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  background: $card-bg;
+  border: 1px solid $card-border;
+  border-radius: var(--ce-radius-14);
+  padding: 16px 18px;
+  box-shadow: $card-shadow;
+}
+
+.title {
+  margin: 0;
+  font-size: 1.8rem;
+  color: var(--ce-color-white);
+  letter-spacing: -0.3px;
+}
+
+.subtitle {
+  margin: 0.5rem 0 0;
+  color: $muted-text;
+  max-width: 640px;
+  line-height: 1.5;
+}
+
+.refreshButton {
+  width: 46px;
+  height: 46px;
+  border-radius: var(--ce-radius-10);
+  border: 1px solid rgba(77, 255, 164, 0.35);
+  background: rgba(77, 255, 164, 0.12);
+  color: #e7fff4;
+  font-size: 1.1rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    transform 0.08s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease,
+    background 0.2s ease;
+  box-shadow: 0 10px 20px rgba(6, 10, 24, 0.25);
+}
+
+.refreshButton:hover {
+  transform: translateY(-1px);
+  border-color: rgba(77, 255, 164, 0.6);
+  background: $clickable-color;
+  color: #0b1736;
+  box-shadow: 0 14px 24px rgba(77, 255, 164, 0.25);
+}
+
+.refreshButton:focus-visible {
+  outline: 2px solid rgba(77, 255, 164, 0.45);
+  outline-offset: 2px;
+}
+
+.summaryRow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+  align-items: start;
+}
+
+.summaryCard {
+  background: $card-bg;
+  backdrop-filter: blur(12px);
+  border: 1px solid $card-border;
+  border-radius: var(--ce-radius-10);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  box-shadow: $card-shadow;
+}
+
+.summaryHeader {
+  background: transparent;
+  border: 0;
+  color: inherit;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  cursor: pointer;
+  text-align: left;
+}
+
+.summaryHeaderRight {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.summaryLabel {
+  color: $muted-text;
+  font-size: 0.95rem;
+}
+
+.summaryCount {
+  color: var(--ce-color-panel-text);
+  font-size: 1.35rem;
+  font-weight: 700;
+}
+
+.summaryCaret {
+  color: rgba(244, 247, 255, 0.7);
+}
+
+.summaryBody {
+  display: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  padding-top: 10px;
+}
+
+.summaryBodyOpen {
+  display: block;
+}
+
+.emptyBanner {
+  border: 1px dashed rgba(255, 255, 255, 0.2);
+  background: rgba(0, 0, 0, 0.18);
+  border-radius: var(--ce-radius-10);
+  padding: 12px 16px;
+  color: $muted-text;
+}
+
+.emptyText {
+  color: $muted-text;
+  margin: 0;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.listItem {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid $card-border;
+  border-radius: var(--ce-radius-10);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  transition: border-color 0.2s ease, background 0.2s ease;
+
+  &:hover {
+    border-color: rgba(255, 255, 255, 0.28);
+    background: rgba(0, 0, 0, 0.28);
+  }
+}
+
+.itemRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.itemLink {
+  color: #d8e9ff;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.itemLink:hover,
+.itemLink:focus {
+  color: $clickable-color;
+  text-decoration: underline;
+}
+
+.itemLabel {
+  color: #d9e3f8;
+  font-weight: 600;
+}
+
+.badge {
+  font-size: 0.75rem;
+  padding: 2px 8px;
+  border-radius: var(--ce-radius-pill);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: $muted-text;
+  text-transform: uppercase;
+}
+
+.itemMeta {
+  font-family: var(--ce-font-mono, "SFMono-Regular", Menlo, monospace);
+  font-size: 0.85rem;
+  color: rgba(244, 247, 255, 0.6);
+  word-break: break-all;
+}
+
+.filterChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex: 1;
+}
+
+.filterChip {
+  font-size: 0.78rem;
+  padding: 4px 8px;
+  border-radius: var(--ce-radius-pill);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.06);
+  color: #eef4ff;
+}
+
+.chiptag {
+  border-color: rgba(98, 160, 255, 0.4);
+  color: #b8d6ff;
+}
+
+.chipai {
+  border-color: rgba(255, 183, 77, 0.45);
+  color: #ffd9a8;
+}
+
+.chiptype {
+  border-color: rgba(129, 214, 161, 0.45);
+  color: #bff0d3;
+}
+
+.chipsbt {
+  border-color: rgba(244, 114, 182, 0.45);
+  color: #f6c0dc;
+}
+
+.chiptop {
+  border-color: rgba(250, 204, 21, 0.5);
+  color: #ffe08a;
+}
+
+.filterItemHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.filterCopyButton {
+  border-radius: var(--ce-radius-8);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  color: #d9e3f8;
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease, color 0.2s ease;
+}
+
+.filterCopyButton:hover {
+  border-color: rgba(77, 255, 164, 0.55);
+  background: rgba(77, 255, 164, 0.18);
+  color: #0b1736;
+}
+
+.filterCopyButtonActive {
+  border-color: rgba(77, 255, 164, 0.7);
+  background: rgba(77, 255, 164, 0.28);
+  color: #0b1736;
+}
+
+@media (max-width: 640px) {
+  .bookmarksPage {
+    width: 94%;
+    margin: 1.5rem auto 2.5rem;
+  }
+
+  .title {
+    font-size: 1.6rem;
+  }
+}

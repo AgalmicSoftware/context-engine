@@ -1,0 +1,1460 @@
+[
+  {
+    "id": "0x_pseudo_address_fdr",
+    "name": "Franklin D. Roosevelt",
+    "atlasCategory": "Macro Trends",
+    "bio": "U.S. President who led the New Deal and WWII Allied victory, reshaping the social contract amid crisis.",
+    "data": {
+      "sbts": [
+        {
+          "name": "New Deal Reformer",
+          "category": "Policy",
+          "tier": "Program"
+        }
+      ],
+      "createdQuestions": [
+        {
+          "prompt": "Should an 'AI New Deal' provide universal basic income or jobs to counter AI-driven unemployment?",
+          "tags": [
+            "Economics",
+            "Labor",
+            "Governance"
+          ]
+        }
+      ],
+      "responses": []
+    },
+    "avatar": "TODO_ARWEAVE:franklin-d-roosevelt-avatar"
+  },
+  {
+    "id": "0x_pseudo_address_aurelius",
+    "name": "Marcus Aurelius",
+    "atlasCategory": "Macro Trends",
+    "bio": "Roman Emperor and Stoic philosopher who led through a devastating plague with wisdom and resilience.",
+    "data": {
+      "sbts": [
+        {
+          "name": "Philosopher King",
+          "category": "Leadership",
+          "tier": "Philosophy"
+        }
+      ],
+      "createdQuestions": [
+        {
+          "prompt": "How should leaders balance Stoic rationality with empathy when AI disruptions test societal resilience?",
+          "tags": [
+            "Ethics",
+            "Leadership",
+            "Society"
+          ]
+        }
+      ],
+      "responses": []
+    },
+    "avatar": "TODO_ARWEAVE:marcus-aurelius-avatar"
+  },
+  {
+    "id": "0x_pseudo_address_churchill",
+    "name": "Winston Churchill",
+    "atlasCategory": "Macro Trends",
+    "bio": "British Prime Minister whose defiant leadership rallied a nation against Nazi tyranny in WWII.",
+    "data": {
+      "sbts": [
+        {
+          "name": "Wartime Prime Minister",
+          "category": "Leadership",
+          "tier": "Legend"
+        }
+      ],
+      "createdQuestions": [
+        {
+          "prompt": "Do we need an 'AI Iron Curtain' to guard against adversarial AI use, or does global cooperation offer a better defense?",
+          "tags": [
+            "Geopolitics",
+            "Security",
+            "Cooperation"
+          ]
+        }
+      ],
+      "responses": []
+    },
+    "avatar": "TODO_ARWEAVE:winston-churchill-avatar"
+  },
+  {
+    "id": "0x_pseudo_address_lincoln",
+    "name": "Abraham Lincoln",
+    "atlasCategory": "Macro Trends",
+    "bio": "U.S. President who preserved the Union during the Civil War and issued the Emancipation Proclamation ending slavery.",
+    "data": {
+      "sbts": [
+        {
+          "name": "Great Emancipator",
+          "category": "Leadership",
+          "tier": "Legacy"
+        }
+      ],
+      "createdQuestions": [
+        {
+          "prompt": "Can AI-driven governance help hold a divided nation together, or will algorithmic echo chambers tear at the seams of unity?",
+          "tags": [
+            "Democracy",
+            "Social Cohesion",
+            "Algorithms"
+          ]
+        }
+      ],
+      "responses": []
+    },
+    "avatar": "TODO_ARWEAVE:abraham-lincoln-avatar"
+  },
+  {
+    "id": "0x_pseudo_address_augustus",
+    "name": "Augustus Caesar",
+    "atlasCategory": "Macro Trends",
+    "bio": "First Roman Emperor who ushered in the Pax Romana, stabilizing governance with enduring reforms.",
+    "data": {
+      "sbts": [
+        {
+          "name": "Pax Romana Architect",
+          "category": "Governance",
+          "tier": "Era"
+        }
+      ],
+      "createdQuestions": [
+        {
+          "prompt": "Could a long-term 'AI Pax' — a period of enforced peace through autonomous surveillance and deterrence — truly stabilize the world, or would it undermine liberty?",
+          "tags": [
+            "Peace",
+            "Surveillance",
+            "Governance"
+          ]
+        }
+      ],
+      "responses": []
+    },
+    "avatar": "TODO_ARWEAVE:augustus-caesar-avatar"
+  },
+  {
+    "id": "0x_pseudo_address_alexander_great",
+    "name": "Alexander the Great",
+    "atlasCategory": "Macro Trends",
+    "bio": "Macedonian conqueror whose empire spread Hellenistic culture across three continents in the ancient world.",
+    "data": {
+      "sbts": [
+        {
+          "name": "World Conqueror",
+          "category": "Military",
+          "tier": "Legendary"
+        }
+      ],
+      "createdQuestions": [
+        {
+          "prompt": "Will AI serve as a new vehicle for cultural expansion — a kind of digital Hellenization — or will it reinforce local identities against a global culture?",
+          "tags": [
+            "Culture",
+            "Globalization",
+            "AI"
+          ]
+        }
+      ],
+      "responses": []
+    },
+    "avatar": "TODO_ARWEAVE:alexander-the-great-avatar"
+  },
+  {
+    "id": "0x_pseudo_address_smith",
+    "name": "Adam Smith",
+    "atlasCategory": "Macro Trends",
+    "bio": "Scottish economist whose 'Wealth of Nations' laid the foundations of free-market capitalism.",
+    "data": {
+      "sbts": [
+        {
+          "name": "Wealth of Nations Author",
+          "category": "Intellectual",
+          "tier": "Artifact"
+        }
+      ],
+      "createdQuestions": [
+        {
+          "prompt": "Does the 'invisible hand' still guide markets in an age of AI-driven algorithms, or do we need new interventions to ensure fair competition?",
+          "tags": [
+            "Economics",
+            "Markets",
+            "Algorithms"
+          ]
+        }
+      ],
+      "responses": []
+    },
+    "avatar": "TODO_ARWEAVE:adam-smith-avatar"
+  },
+  {
+    "id": "0x_pseudo_address_einstein",
+    "name": "Albert Einstein",
+    "atlasCategory": "Macro Trends",
+    "bio": "Renowned physicist who revolutionized science and later urged global cooperation to control nuclear weapons.",
+    "data": {
+      "sbts": [
+        {
+          "name": "Relativity Theorist",
+          "category": "Science",
+          "tier": "Nobel"
+        }
+      ],
+      "createdQuestions": [
+        {
+          "prompt": "How can we foster global cooperation to prevent an AI arms race, echoing the calls for international control that followed the nuclear age?",
+          "tags": [
+            "Existential Risk",
+            "Global Governance",
+            "Arms Race"
+          ]
+        }
+      ],
+      "responses": []
+    },
+    "avatar": "TODO_ARWEAVE:albert-einstein-avatar"
+  },
+  {
+    "id": "0x_pseudo_address_carson",
+    "name": "Rachel Carson",
+    "atlasCategory": "Macro Trends",
+    "bio": "Author of Silent Spring, catalyst of the modern environmental movement.",
+    "data": {
+      "sbts": [
+        {
+          "name": "Silent Spring Author",
+          "category": "Intellectual",
+          "tier": "Artifact"
+        }
+      ],
+      "createdQuestions": [
+        {
+          "prompt": "Can AI help us detect and prevent environmental degradation before it's too late, or might unchecked AI development become the new 'DDT' threatening our ecosystem?",
+          "tags": [
+            "Environment",
+            "Sustainability",
+            "AI"
+          ]
+        }
+      ],
+      "responses": []
+    },
+    "avatar": "TODO_ARWEAVE:rachel-carson-avatar"
+  },
+  {
+    "id": "0x_pseudo_address_borlaug",
+    "name": "Norman Borlaug",
+    "atlasCategory": "Macro Trends",
+    "bio": "Father of the Green Revolution who saved millions from famine through agricultural innovation.",
+    "data": {
+      "sbts": [
+        {
+          "name": "Green Revolution Pioneer",
+          "category": "Science",
+          "tier": "Humanitarian"
+        }
+      ],
+      "createdQuestions": [
+        {
+          "prompt": "Will AI in agriculture create another Green Revolution to feed the world sustainably, or will tech-controlled food systems deepen dependence and inequality?",
+          "tags": [
+            "Agriculture",
+            "Food Security",
+            "Inequality"
+          ]
+        }
+      ],
+      "responses": []
+    },
+    "avatar": "TODO_ARWEAVE:norman-borlaug-avatar"
+  },
+  {
+    "id": "0x_pseudo_address_darwin",
+    "name": "Charles Darwin",
+    "atlasCategory": "Macro Trends",
+    "bio": "Naturalist whose theory of evolution upended humanity's view of itself and its place in the world.",
+    "data": {
+      "sbts": [
+        {
+          "name": "Evolutionary Theorist",
+          "category": "Science",
+          "tier": "Theory"
+        }
+      ],
+      "createdQuestions": [
+        {
+          "prompt": "Are we witnessing the evolution of a new digital species in AI, and if so, how should humanity adapt to coexist with or guide this 'natural selection' of intelligence?",
+          "tags": [
+            "Evolution",
+            "AI",
+            "Coexistence"
+          ]
+        }
+      ],
+      "responses": []
+    },
+    "avatar": "TODO_ARWEAVE:charles-darwin-avatar"
+  },
+  {
+    "id": "0x_pseudo_address_elizabeth",
+    "name": "Queen Elizabeth I",
+    "atlasCategory": "Macro Trends",
+    "bio": "Tudor queen whose reign (the Elizabethan Era) fostered exploration, cultural flourishing, and victory over the Spanish Armada.",
+    "data": {
+      "sbts": [
+        {
+          "name": "Golden Age Sovereign",
+          "category": "Leadership",
+          "tier": "Era"
+        }
+      ],
+      "createdQuestions": [
+        {
+          "prompt": "In a modern 'golden age' of AI exploration, how do we ensure this technology encourages cultural flourishing and shared knowledge rather than new forms of conquest and domination?",
+          "tags": [
+            "Innovation",
+            "Culture",
+            "Power"
+          ]
+        }
+      ],
+      "responses": []
+    },
+    "avatar": "TODO_ARWEAVE:queen-elizabeth-i-avatar"
+  },
+  {
+    "id": "0x_pseudo_address_marx",
+    "name": "Karl Marx",
+    "atlasCategory": "Actors/Civil Society",
+    "bio": "Philosopher-economist whose critique of capitalism laid the groundwork for communist ideology.",
+    "data": {
+      "sbts": [
+        {
+          "name": "Communist Manifesto Co-Author",
+          "category": "Intellectual",
+          "tier": "Artifact"
+        }
+      ],
+      "createdQuestions": [
+        {
+          "prompt": "Will AI-driven automation lead to a new class struggle by concentrating wealth in the hands of AI owners, or can it be harnessed to emancipate workers from drudgery?",
+          "tags": [
+            "Labor",
+            "Automation",
+            "Economy"
+          ]
+        }
+      ],
+      "responses": []
+    },
+    "avatar": "TODO_ARWEAVE:karl-marx-avatar"
+  },
+  {
+    "id": "0x_pseudo_address_king_jr",
+    "name": "Martin Luther King Jr.",
+    "atlasCategory": "Actors/Civil Society",
+    "bio": "Civil rights icon who led nonviolent protests to dismantle segregation and champion racial equality.",
+    "data": {
+      "sbts": [
+        {
+          "name": "I Have a Dream Orator",
+          "category": "Activism",
+          "tier": "Speech"
+        }
+      ],
+      "createdQuestions": [
+        {
+          "prompt": "How can we ensure AI systems uphold fairness and do not perpetuate bias, so that all individuals are judged by the \"content of their character\" rather than flawed data?",
+          "tags": [
+            "Bias",
+            "Justice",
+            "Fairness"
+          ]
+        }
+      ],
+      "responses": []
+    },
+    "avatar": "TODO_ARWEAVE:martin-luther-king-jr-avatar"
+  },
+  {
+    "id": "0x_pseudo_address_voltaire",
+    "name": "Voltaire",
+    "atlasCategory": "Actors/Civil Society",
+    "bio": "Enlightenment writer and satirist who championed reason and freedom of thought against tyranny.",
+    "data": {
+      "sbts": [
+        {
+          "name": "Candide Author",
+          "category": "Intellectual",
+          "tier": "Artifact"
+        }
+      ],
+      "createdQuestions": [
+        {
+          "prompt": "Should AI be permitted to question authority and convention, acting as a gadfly in society, or will automated censorship and propaganda snuff out its Enlightenment potential?",
+          "tags": [
+            "Free Speech",
+            "Censorship",
+            "Propaganda"
+          ]
+        }
+      ],
+      "responses": []
+    },
+    "avatar": "TODO_ARWEAVE:voltaire-avatar"
+  },
+  {
+    "id": "0x_pseudo_address_gandhi",
+    "name": "Mahatma Gandhi",
+    "atlasCategory": "Actors/Civil Society",
+    "bio": "Leader of Indian independence who pioneered nonviolent resistance against colonial rule.",
+    "data": {
+      "sbts": [
+        {
+          "name": "Salt March Leader",
+          "category": "Activism",
+          "tier": "Movement"
+        }
+      ],
+      "createdQuestions": [
+        {
+          "prompt": "Can AI be a tool for nonviolent resistance against digital oppression — empowering the masses peacefully — or will it mainly amplify the reach of those already in power?",
+          "tags": [
+            "Nonviolence",
+            "Oppression",
+            "Empowerment"
+          ]
+        }
+      ],
+      "responses": []
+    },
+    "avatar": "TODO_ARWEAVE:mahatma-gandhi-avatar"
+  },
+  {
+    "id": "0x_pseudo_address_mandela",
+    "name": "Nelson Mandela",
+    "atlasCategory": "Actors/Civil Society",
+    "bio": "Anti-apartheid revolutionary who became South Africa's first black president, embodying reconciliation.",
+    "data": {
+      "sbts": [
+        {
+          "name": "Truth and Reconciliation Champion",
+          "category": "Activism",
+          "tier": "Healing"
+        }
+      ],
+      "createdQuestions": [
+        {
+          "prompt": "Could AI help heal historical injustices by identifying and addressing institutional biases, or would reliance on algorithms risk overlooking the human element needed for true reconciliation?",
+          "tags": [
+            "Bias",
+            "Justice",
+            "Reconciliation"
+          ]
+        }
+      ],
+      "responses": []
+    },
+    "avatar": "TODO_ARWEAVE:nelson-mandela-avatar"
+  },
+  {
+    "id": "0x_pseudo_address_anthony",
+    "name": "Susan B. Anthony",
+    "atlasCategory": "Actors/Civil Society",
+    "bio": "Pioneering women's suffrage activist who helped secure the right to vote (19th Amendment).",
+    "data": {
+      "sbts": [
+        {
+          "name": "19th Amendment Catalyst",
+          "category": "Activism",
+          "tier": "Milestone"
+        }
+      ],
+      "createdQuestions": [
+        {
+          "prompt": "Will AI help amplify underrepresented voices and advance gender equality (as suffrage did), or could algorithmic biases set back progress for marginalized groups?",
+          "tags": [
+            "Gender Equality",
+            "Bias",
+            "Representation"
+          ]
+        }
+      ],
+      "responses": []
+    },
+    "avatar": "TODO_ARWEAVE:susan-b-anthony-avatar"
+  },
+  {
+    "id": "0x_pseudo_address_bolivar",
+    "name": "Simón Bolívar",
+    "atlasCategory": "Actors/Civil Society",
+    "bio": "Revolutionary leader known as 'El Libertador' who freed much of South America from Spanish rule.",
+    "data": {
+      "sbts": [
+        {
+          "name": "El Libertador",
+          "category": "Military",
+          "tier": "Title"
+        }
+      ],
+      "createdQuestions": [
+        {
+          "prompt": "Does AI development risk creating a new form of digital imperialism by tech powers, or can smaller nations leverage AI to achieve a new kind of independence in the global landscape?",
+          "tags": [
+            "Sovereignty",
+            "Imperialism",
+            "Technology"
+          ]
+        }
+      ],
+      "responses": []
+    },
+    "avatar": "TODO_ARWEAVE:simon-bolivar-avatar"
+  },
+  {
+    "id": "0x_pseudo_address_locke",
+    "name": "John Locke",
+    "atlasCategory": "Actors/Civil Society",
+    "bio": "Enlightenment philosopher of natural rights and social contract, foundational to liberal democracy.",
+    "data": {
+      "sbts": [
+        {
+          "name": "Two Treatises Author",
+          "category": "Intellectual",
+          "tier": "Artifact"
+        }
+      ],
+      "createdQuestions": [
+        {
+          "prompt": "How do we protect life, liberty, and property in the age of AI? For instance, should individuals have a natural right to control their data against state or corporate surveillance?",
+          "tags": [
+            "Privacy",
+            "Rights",
+            "Surveillance"
+          ]
+        }
+      ],
+      "responses": []
+    },
+    "avatar": "TODO_ARWEAVE:john-locke-avatar"
+  },
+  {
+    "id": "0x_pseudo_address_rousseau",
+    "name": "Jean-Jacques Rousseau",
+    "atlasCategory": "Actors/Civil Society",
+    "bio": "Enlightenment thinker whose 'Social Contract' theory influenced democratic and revolutionary ideals.",
+    "data": {
+      "sbts": [
+        {
+          "name": "Social Contract Author",
+          "category": "Intellectual",
+          "tier": "Artifact"
+        }
+      ],
+      "createdQuestions": [
+        {
+          "prompt": "Could AI-enabled direct democracy (crowdsourced 'general will') create more legitimate governance, or might it be co-opted and become a new form of digital tyranny of the majority?",
+          "tags": [
+            "Democracy",
+            "Collective Intelligence",
+            "Governance"
+          ]
+        }
+      ],
+      "responses": []
+    },
+    "avatar": "TODO_ARWEAVE:jean-jacques-rousseau-avatar"
+  },
+  {
+    "id": "0x_pseudo_address_douglass",
+    "name": "Frederick Douglass",
+    "atlasCategory": "Actors/Civil Society",
+    "bio": "Self-emancipated abolitionist, orator, and influential advisor to Lincoln who became one of the most powerful voices for freedom and equality in American history.",
+    "data": {
+      "sbts": [
+        {
+          "name": "North Star Editor",
+          "category": "Intellectual",
+          "tier": "Artifact"
+        }
+      ],
+      "createdQuestions": [
+        {
+          "prompt": "Can AI amplify the voices of the oppressed and serve as a new 'North Star' for social justice, or will it be used by those in power to reinforce existing inequalities?",
+          "tags": [
+            "Civil Rights",
+            "Voice",
+            "Justice"
+          ]
+        }
+      ],
+      "responses": []
+    },
+    "avatar": "TODO_ARWEAVE:frederick-douglass-avatar"
+  },
+  {
+    "id": "0x_pseudo_address_tutu",
+    "name": "Desmond Tutu",
+    "atlasCategory": "Actors/Civil Society",
+    "bio": "Archbishop and Nobel laureate who helped dismantle apartheid and champion reconciliation.",
+    "data": {
+      "sbts": [
+        {
+          "name": "Nobel Peace Laureate",
+          "category": "Honor",
+          "tier": "Prize"
+        }
+      ],
+      "createdQuestions": [
+        {
+          "prompt": "Should we design AI to prioritize restorative justice (for example, truth-telling algorithms to expose corruption), or are such moral decisions beyond the scope of code?",
+          "tags": [
+            "Justice",
+            "Ethics",
+            "Accountability"
+          ]
+        }
+      ],
+      "responses": []
+    },
+    "avatar": "TODO_ARWEAVE:desmond-tutu-avatar"
+  },
+  {
+    "id": "0x_pseudo_address_walesa",
+    "name": "Lech Wałęsa",
+    "atlasCategory": "Actors/Civil Society",
+    "bio": "Leader of Poland's Solidarity movement and Nobel laureate who helped end Communist rule.",
+    "data": {
+      "sbts": [
+        {
+          "name": "Solidarity Leader",
+          "category": "Activism",
+          "tier": "Movement"
+        }
+      ],
+      "createdQuestions": [
+        {
+          "prompt": "Do tech workers and users need a new \"Digital Solidarity\" movement (a kind of AI trade union) to ensure ethical technology and protect people from algorithmic harms?",
+          "tags": [
+            "Labor",
+            "Solidarity",
+            "Tech Ethics"
+          ]
+        }
+      ],
+      "responses": []
+    },
+    "avatar": "TODO_ARWEAVE:lech-walesa-avatar"
+  },
+  {
+    "id": "0x_pseudo_address_sun",
+    "name": "Sun Yat-sen",
+    "atlasCategory": "Actors/Civil Society",
+    "bio": "Revolutionary statesman known as the father of modern China.",
+    "data": {
+      "sbts": [
+        {
+          "name": "Founder of Republic of China",
+          "category": "Leadership",
+          "tier": "Revolutionary"
+        }
+      ],
+      "createdQuestions": [
+        {
+          "prompt": "Can emerging nations harness AI to achieve technological self-determination (a new \"Three Principles\" for the digital era), or will they inevitably depend on tech superpowers for AI infrastructure?",
+          "tags": [
+            "Nationalism",
+            "Self-Determination",
+            "Technology"
+          ]
+        }
+      ],
+      "responses": []
+    },
+    "avatar": "TODO_ARWEAVE:sun-yat-sen-avatar"
+  },
+  {
+    "id": "0x_pseudo_address_ford",
+    "name": "Henry Ford",
+    "atlasCategory": "Supply Chains",
+    "bio": "Automobile industrialist who pioneered the assembly line and reshaped manufacturing, though his legacy is marred by virulent antisemitism and promotion of antisemitic propaganda.",
+    "data": {
+      "sbts": [
+        {
+          "name": "Assembly Line Innovator",
+          "category": "Industrialist",
+          "tier": "Process"
+        }
+      ],
+      "createdQuestions": [
+        {
+          "prompt": "If AI drives hyper-automation, should society adopt shorter workweeks or universal basic income to distribute the gains, or will market forces naturally adjust as they did in past industrial revolutions?",
+          "tags": [
+            "Automation",
+            "Labor",
+            "Economics"
+          ]
+        }
+      ],
+      "responses": []
+    },
+    "avatar": "TODO_ARWEAVE:henry-ford-avatar"
+  },
+  {
+    "id": "0x_pseudo_address_rockefeller",
+    "name": "John D. Rockefeller",
+    "atlasCategory": "Supply Chains",
+    "bio": "Oil magnate who built Standard Oil into a monopoly, defining the era of industrial resource control.",
+    "data": {
+      "sbts": [
+        {
+          "name": "Standard Oil Founder",
+          "category": "Industrialist",
+          "tier": "Company"
+        }
+      ],
+      "createdQuestions": [
+        {
+          "prompt": "Should today's tech giants controlling data and compute be treated as monopolies and broken up, or do these 'Standard AIs' provide stability and efficiency essential for progress?",
+          "tags": [
+            "Antitrust",
+            "Data",
+            "Compute"
+          ]
+        }
+      ],
+      "responses": []
+    },
+    "avatar": "TODO_ARWEAVE:john-d-rockefeller-avatar"
+  },
+  {
+    "id": "0x_pseudo_address_lovelace",
+    "name": "Ada Lovelace",
+    "atlasCategory": "Supply Chains",
+    "bio": "Mathematician often regarded as the first computer programmer for her work on Charles Babbage's Analytical Engine.",
+    "data": {
+      "sbts": [
+        {
+          "name": "Analytical Engine Visionary",
+          "category": "Intellectual",
+          "tier": "Concept"
+        }
+      ],
+      "createdQuestions": [
+        {
+          "prompt": "Could an AI ever truly create something original and imaginative beyond its programming, or is it forever an analytical engine limited by human-designed algorithms?",
+          "tags": [
+            "AI",
+            "Creativity",
+            "Algorithms"
+          ]
+        }
+      ],
+      "responses": []
+    },
+    "avatar": "TODO_ARWEAVE:ada-lovelace-avatar"
+  },
+  {
+    "id": "0x_pseudo_address_tesla",
+    "name": "Nikola Tesla",
+    "atlasCategory": "Supply Chains",
+    "bio": "Inventor and electrical engineer who pioneered AC power and envisioned global wireless energy.",
+    "data": {
+      "sbts": [
+        {
+          "name": "AC Power Pioneer",
+          "category": "Inventor",
+          "tier": "Innovation"
+        }
+      ],
+      "createdQuestions": [
+        {
+          "prompt": "Should the fruits of AI (data and trained models) be freely available like a public utility, or is proprietary control necessary to drive innovation and investment?",
+          "tags": [
+            "Open Source",
+            "Innovation",
+            "Equity"
+          ]
+        }
+      ],
+      "responses": []
+    },
+    "avatar": "TODO_ARWEAVE:nikola-tesla-avatar"
+  },
+  {
+    "id": "0x_pseudo_address_edison",
+    "name": "Thomas Edison",
+    "atlasCategory": "Supply Chains",
+    "bio": "Prolific inventor and entrepreneur who brought electric light and other innovations to the masses.",
+    "data": {
+      "sbts": [
+        {
+          "name": "Prolific Inventor",
+          "category": "Inventor",
+          "tier": "Record"
+        }
+      ],
+      "createdQuestions": [
+        {
+          "prompt": "Do patent systems and intellectual property laws need reform in the AI era to balance incentivizing invention with sharing knowledge, or will the current system continue to spur Edisonian innovation?",
+          "tags": [
+            "Innovation",
+            "Intellectual Property",
+            "Policy"
+          ]
+        }
+      ],
+      "responses": []
+    },
+    "avatar": "TODO_ARWEAVE:thomas-edison-avatar"
+  },
+  {
+    "id": "0x_pseudo_address_turing",
+    "name": "Alan Turing",
+    "atlasCategory": "Supply Chains",
+    "bio": "Computing pioneer and cryptanalyst who laid theoretical foundations for AI and broke the Enigma code in WWII.",
+    "data": {
+      "sbts": [
+        {
+          "name": "Codebreaker",
+          "category": "Military",
+          "tier": "Cryptography"
+        }
+      ],
+      "createdQuestions": [
+        {
+          "prompt": "As AI agents become indistinguishable from humans in conversation, how do we establish trust and truth in digital interactions? (In other words, what is our new Turing Test for trust?)",
+          "tags": [
+            "Trust",
+            "Authentication",
+            "AI"
+          ]
+        }
+      ],
+      "responses": []
+    },
+    "avatar": "TODO_ARWEAVE:alan-turing-avatar"
+  },
+  {
+    "id": "0x_pseudo_address_carnegie",
+    "name": "Andrew Carnegie",
+    "atlasCategory": "Supply Chains",
+    "bio": "Steel tycoon who built industrial infrastructure and later became a major philanthropist advocating the \"Gospel of Wealth.\"",
+    "data": {
+      "sbts": [
+        {
+          "name": "Gospel of Wealth Philanthropist",
+          "category": "Industrialist",
+          "tier": "Philanthropy"
+        }
+      ],
+      "createdQuestions": [
+        {
+          "prompt": "Should today's AI billionaires reinvest their wealth in social good (a modern \"Gospel of Wealth\" for tech) such as funding AI safety and education, or is it better handled by public institutions?",
+          "tags": [
+            "Philanthropy",
+            "AI Safety",
+            "Economics"
+          ]
+        }
+      ],
+      "responses": []
+    },
+    "avatar": "TODO_ARWEAVE:andrew-carnegie-avatar"
+  },
+  {
+    "id": "0x_pseudo_address_oppenheimer",
+    "name": "J. Robert Oppenheimer",
+    "atlasCategory": "Supply Chains",
+    "bio": "Theoretical physicist who led the Manhattan Project, later reflecting on scientists' moral responsibility for powerful technologies.",
+    "data": {
+      "sbts": [
+        {
+          "name": "Manhattan Project Director",
+          "category": "Science",
+          "tier": "Military"
+        }
+      ],
+      "createdQuestions": [
+        {
+          "prompt": "Should AI researchers adopt an \"Oppenheimer ethic\" and set limits or moratoriums on potentially destructive AI research, or will such self-restraint hinder scientific progress and leave decisions to less conscientious actors?",
+          "tags": [
+            "Scientific Responsibility",
+            "Safety",
+            "Moratorium"
+          ]
+        }
+      ],
+      "responses": []
+    },
+    "avatar": "TODO_ARWEAVE:j-robert-oppenheimer-avatar"
+  },
+  {
+    "id": "0x_pseudo_address_hopper",
+    "name": "Grace Hopper",
+    "atlasCategory": "Supply Chains",
+    "bio": "Computer science pioneer who created the first compiler and influenced the development of COBOL, championing user-friendly programming.",
+    "data": {
+      "sbts": [
+        {
+          "name": "Compiler Pioneer",
+          "category": "Tech",
+          "tier": "Innovation"
+        }
+      ],
+      "createdQuestions": [
+        {
+          "prompt": "If an AI system encounters a \"bug\" in its behavior, how can we effectively debug or trace an issue in a complex neural network? Should AI developers be required to build in transparency and debugging tools for accountability?",
+          "tags": [
+            "Transparency",
+            "Safety",
+            "Accountability"
+          ]
+        }
+      ],
+      "responses": []
+    },
+    "avatar": "TODO_ARWEAVE:grace-hopper-avatar"
+  },
+  {
+    "id": "0x_pseudo_address_bell",
+    "name": "Alexander Graham Bell",
+    "atlasCategory": "Supply Chains",
+    "bio": "Inventor of the telephone, revolutionizing global communication networks.",
+    "data": {
+      "sbts": [
+        {
+          "name": "Telephone Inventor",
+          "category": "Inventor",
+          "tier": "Device"
+        }
+      ],
+      "createdQuestions": [
+        {
+          "prompt": "In an age of AI-mediated communication, will our enhanced connectivity lead to deeper understanding or simply amplify misinformation and noise? How should AI balance connecting people with protecting truth?",
+          "tags": [
+            "Communication",
+            "Misinformation",
+            "AI"
+          ]
+        }
+      ],
+      "responses": []
+    },
+    "avatar": "TODO_ARWEAVE:alexander-graham-bell-avatar"
+  },
+  {
+    "id": "0x_pseudo_address_archimedes",
+    "name": "Archimedes",
+    "atlasCategory": "Supply Chains",
+    "bio": "Ancient mathematician and inventor who devised advanced machines and principles still influential in science.",
+    "data": {
+      "sbts": [
+        {
+          "name": "Eureka Polymath",
+          "category": "Science",
+          "tier": "Legacy"
+        }
+      ],
+      "createdQuestions": [
+        {
+          "prompt": "Should autonomous weapons and AI defenses be deployed in warfare, or would removing human judgment from the \"lever\" of war make conflicts more dangerous and inhumane?",
+          "tags": [
+            "Military AI",
+            "Autonomy",
+            "Ethics"
+          ]
+        }
+      ],
+      "responses": []
+    },
+    "avatar": "TODO_ARWEAVE:archimedes-avatar"
+  },
+  {
+    "id": "0x_pseudo_address_watt",
+    "name": "James Watt",
+    "atlasCategory": "Supply Chains",
+    "bio": "Engineer whose improvements to the steam engine powered the Industrial Revolution.",
+    "data": {
+      "sbts": [
+        {
+          "name": "Steam Engine Improver",
+          "category": "Inventor",
+          "tier": "Industrial"
+        }
+      ],
+      "createdQuestions": [
+        {
+          "prompt": "Given the immense energy demands of modern AI, do we need breakthroughs akin to the steam engine—perhaps in renewable energy or efficient hardware—to sustain AI progress without dire environmental costs?",
+          "tags": [
+            "Energy",
+            "Compute",
+            "Sustainability"
+          ]
+        }
+      ],
+      "responses": []
+    },
+    "avatar": "TODO_ARWEAVE:james-watt-avatar"
+  },
+  {
+    "id": "0x_pseudo_address_hammurabi",
+    "name": "Hammurabi",
+    "atlasCategory": "Governance Institutions",
+    "bio": "Babylonian king renowned for one of the earliest written legal codes ('eye for an eye').",
+    "data": {
+      "sbts": [
+        {
+          "name": "Code of Hammurabi",
+          "category": "Legal",
+          "tier": "Artifact"
+        }
+      ],
+      "createdQuestions": [
+        {
+          "prompt": "Do we need a modern \"Code of AI\" that clearly outlines the liabilities and punishments for AI system failures and misuses, to ensure justice in the era of algorithms?",
+          "tags": [
+            "Law",
+            "Liability",
+            "Justice"
+          ]
+        }
+      ],
+      "responses": []
+    },
+    "avatar": "TODO_ARWEAVE:hammurabi-avatar"
+  },
+  {
+    "id": "0x_pseudo_address_hamilton",
+    "name": "Alexander Hamilton",
+    "atlasCategory": "Governance Institutions",
+    "bio": "Architect of financial systems and centralized federal power.",
+    "data": {
+      "sbts": [
+        {
+          "name": "Federalist Author",
+          "category": "Intellectual",
+          "tier": "Artifact"
+        }
+      ],
+      "createdQuestions": [
+        {
+          "prompt": "Should a central 'Federal AI Reserve' control the rate of compute issuance to stabilize the economy?",
+          "tags": [
+            "Governance",
+            "Compute",
+            "Economics"
+          ]
+        }
+      ],
+      "responses": []
+    },
+    "avatar": "TODO_ARWEAVE:alexander-hamilton-avatar"
+  },
+  {
+    "id": "0x_pseudo_address_eleanor",
+    "name": "Eleanor Roosevelt",
+    "atlasCategory": "Governance Institutions",
+    "bio": "U.S. First Lady turned diplomat who chaired the drafting of the Universal Declaration of Human Rights at the UN.",
+    "data": {
+      "sbts": [
+        {
+          "name": "UDHR Chair",
+          "category": "Diplomacy",
+          "tier": "Document"
+        }
+      ],
+      "createdQuestions": [
+        {
+          "prompt": "Should there be an international \"AI Rights Declaration\" defining protections for humans (and perhaps sentient AI) globally, akin to the Universal Declaration of Human Rights after WWII?",
+          "tags": [
+            "Human Rights",
+            "International Law",
+            "AI Ethics"
+          ]
+        }
+      ],
+      "responses": []
+    },
+    "avatar": "TODO_ARWEAVE:eleanor-roosevelt-avatar"
+  },
+  {
+    "id": "0x_pseudo_address_confucius",
+    "name": "Confucius",
+    "atlasCategory": "Governance Institutions",
+    "bio": "Chinese sage whose teachings on virtue, proper conduct, and good governance shaped East Asian culture for millennia.",
+    "data": {
+      "sbts": [
+        {
+          "name": "Analects of Confucius",
+          "category": "Intellectual",
+          "tier": "Artifact"
+        }
+      ],
+      "createdQuestions": [
+        {
+          "prompt": "Can we imbue AI governance systems with ethical principles (like ren and yi) to ensure benevolence and righteousness, or must morality remain strictly in human hands despite technological governance tools?",
+          "tags": [
+            "Ethics",
+            "Governance",
+            "Morality"
+          ]
+        }
+      ],
+      "responses": []
+    },
+    "avatar": "TODO_ARWEAVE:confucius-avatar"
+  },
+  {
+    "id": "0x_pseudo_address_plato",
+    "name": "Plato",
+    "atlasCategory": "Governance Institutions",
+    "bio": "Ancient Greek philosopher who envisioned an ideal republic led by philosopher-kings for just governance.",
+    "data": {
+      "sbts": [
+        {
+          "name": "Academy Founder",
+          "category": "Intellectual",
+          "tier": "Institution"
+        }
+      ],
+      "createdQuestions": [
+        {
+          "prompt": "Would an all-knowing AI ruler be the ultimate realization of the \"philosopher-king\" ideal — rational and just — or is handing over rule to a machine a recipe for tyranny?",
+          "tags": [
+            "AI Governance",
+            "Philosophy",
+            "Power"
+          ]
+        }
+      ],
+      "responses": []
+    },
+    "avatar": "TODO_ARWEAVE:plato-avatar"
+  },
+  {
+    "id": "0x_pseudo_address_machiavelli",
+    "name": "Niccolò Machiavelli",
+    "atlasCategory": "Governance Institutions",
+    "bio": "Renaissance political theorist whose work 'The Prince' famously advocates pragmatic, sometimes ruthless, methods of power.",
+    "data": {
+      "sbts": [
+        {
+          "name": "The Prince Author",
+          "category": "Intellectual",
+          "tier": "Artifact"
+        }
+      ],
+      "createdQuestions": [
+        {
+          "prompt": "Is it acceptable for leaders to use AI for surveillance and influence to maintain stability and control (a Machiavellian approach), or will such tactics ultimately undermine the consent of the governed in a digital age?",
+          "tags": [
+            "Surveillance",
+            "Power",
+            "Ethics"
+          ]
+        }
+      ],
+      "responses": []
+    },
+    "avatar": "TODO_ARWEAVE:niccolo-machiavelli-avatar"
+  },
+  {
+    "id": "0x_pseudo_address_madison",
+    "name": "James Madison",
+    "atlasCategory": "Governance Institutions",
+    "bio": "American Founding Father dubbed the 'Father of the Constitution' for his key role in drafting the Constitution and Bill of Rights.",
+    "data": {
+      "sbts": [
+        {
+          "name": "Father of Constitution",
+          "category": "Governance",
+          "tier": "Title"
+        }
+      ],
+      "createdQuestions": [
+        {
+          "prompt": "How can we prevent 'factions' and extreme polarization amplified by AI-driven social media? Do we need constitutional safeguards or algorithmic regulation to protect the republic from digital mob rule?",
+          "tags": [
+            "Democracy",
+            "Social Media",
+            "Policy"
+          ]
+        }
+      ],
+      "responses": []
+    },
+    "avatar": "TODO_ARWEAVE:james-madison-avatar"
+  },
+  {
+    "id": "0x_pseudo_address_justinian",
+    "name": "Justinian I",
+    "atlasCategory": "Governance Institutions",
+    "bio": "Byzantine Emperor who ordered the comprehensive codification of Roman laws into the Justinian Code.",
+    "data": {
+      "sbts": [
+        {
+          "name": "Corpus Juris Civilis Compiler",
+          "category": "Legal",
+          "tier": "Artifact"
+        }
+      ],
+      "createdQuestions": [
+        {
+          "prompt": "Should nations collaborate on a unified set of AI regulations (an \"AI Corpus Juris\") to avoid regulatory arbitrage and conflicts, or is it better for each legal system to evolve its own AI laws reflecting local values?",
+          "tags": [
+            "Law",
+            "International Cooperation",
+            "Standards"
+          ]
+        }
+      ],
+      "responses": []
+    },
+    "avatar": "TODO_ARWEAVE:justinian-i-avatar"
+  },
+  {
+    "id": "0x_pseudo_address_napoleon",
+    "name": "Napoleon Bonaparte",
+    "atlasCategory": "Governance Institutions",
+    "bio": "French military leader who crowned himself Emperor and established the Napoleonic Code, spreading modern legal principles across Europe.",
+    "data": {
+      "sbts": [
+        {
+          "name": "Napoleonic Code Architect",
+          "category": "Legal",
+          "tier": "Reform"
+        }
+      ],
+      "createdQuestions": [
+        {
+          "prompt": "Would a single global AI regulatory regime (a \"Napoleonic Code\" for AI) help enforce safety and rights, or would it amount to an overly centralized bureaucracy stifling innovation and sovereignty?",
+          "tags": [
+            "Regulation",
+            "Centralization",
+            "Innovation"
+          ]
+        }
+      ],
+      "responses": []
+    },
+    "avatar": "TODO_ARWEAVE:napoleon-bonaparte-avatar"
+  },
+  {
+    "id": "0x_pseudo_address_cyrus",
+    "name": "Cyrus the Great",
+    "atlasCategory": "Governance Institutions",
+    "bio": "Founder of the Persian Empire famed for his policy of tolerance; the Cyrus Cylinder is often called the first charter of human rights.",
+    "data": {
+      "sbts": [
+        {
+          "name": "Cyrus Cylinder Inscriber",
+          "category": "Governance",
+          "tier": "Artifact"
+        }
+      ],
+      "createdQuestions": [
+        {
+          "prompt": "Should modern AI governance include a principle of tolerance and protection for diverse cultures and values (a \"digital Cyrus Cylinder\") to ensure AI systems respect human rights globally?",
+          "tags": [
+            "Human Rights",
+            "Culture",
+            "AI Policy"
+          ]
+        }
+      ],
+      "responses": []
+    },
+    "avatar": "TODO_ARWEAVE:cyrus-the-great-avatar"
+  },
+  {
+    "id": "0x_pseudo_address_bismarck",
+    "name": "Otto von Bismarck",
+    "atlasCategory": "Governance Institutions",
+    "bio": "Prussian 'Iron Chancellor' who masterminded German unification and pioneered the first modern welfare state through pragmatic Realpolitik.",
+    "data": {
+      "sbts": [
+        {
+          "name": "Iron Chancellor",
+          "category": "Leadership",
+          "tier": "Title"
+        }
+      ],
+      "createdQuestions": [
+        {
+          "prompt": "As AI transforms economies, should governments implement AI-driven social welfare (e.g., automated benefits, retraining programs funded by AI profits) to preempt social instability, or will overreliance on state solutions stifle individual initiative?",
+          "tags": [
+            "Welfare",
+            "Economics",
+            "Policy"
+          ]
+        }
+      ],
+      "responses": []
+    },
+    "avatar": "TODO_ARWEAVE:otto-von-bismarck-avatar"
+  },
+  {
+    "id": "0x_pseudo_address_catherine",
+    "name": "Catherine the Great",
+    "atlasCategory": "Governance Institutions",
+    "bio": "Empress of Russia regarded as an 'enlightened despot' who expanded the empire and attempted progressive reforms inspired by the Enlightenment.",
+    "data": {
+      "sbts": [
+        {
+          "name": "Enlightened Despot",
+          "category": "Leadership",
+          "tier": "Title"
+        }
+      ],
+      "createdQuestions": [
+        {
+          "prompt": "Can authoritarian regimes effectively use AI to benevolently boost social welfare and progress (a modern enlightened despotism), or will lack of transparency and freedom inevitably lead to abuses and stagnation in innovation?",
+          "tags": [
+            "Autocracy",
+            "Progress",
+            "Ethics"
+          ]
+        }
+      ],
+      "responses": []
+    },
+    "avatar": "TODO_ARWEAVE:catherine-the-great-avatar"
+  },
+  {
+    "id": "0x_pseudo_address_nightingale",
+    "name": "Florence Nightingale",
+    "atlasCategory": "Supply Chains",
+    "bio": "Founder of modern nursing and pioneer of statistical graphics who used data visualization to reform military healthcare and save thousands of lives.",
+    "data": {
+      "sbts": [
+        {
+          "name": "Statistical Pioneer",
+          "category": "Science",
+          "tier": "Innovation"
+        }
+      ],
+      "createdQuestions": [
+        {
+          "prompt": "Should AI-driven healthcare decisions be required to show their statistical reasoning in human-readable form, or is accurate outcome prediction sufficient even if the logic is opaque?",
+          "tags": [
+            "Healthcare",
+            "Transparency",
+            "Data"
+          ]
+        }
+      ],
+      "responses": []
+    },
+    "avatar": "TODO_ARWEAVE:florence-nightingale-avatar"
+  },
+  {
+    "id": "0x_pseudo_address_galileo",
+    "name": "Galileo Galilei",
+    "atlasCategory": "Supply Chains",
+    "bio": "Father of modern observational science who challenged institutional dogma with empirical evidence, suffering persecution by the Inquisition for defending heliocentrism.",
+    "data": {
+      "sbts": [
+        {
+          "name": "Stargazer Heretic",
+          "category": "Science",
+          "tier": "Revolution"
+        }
+      ],
+      "createdQuestions": [
+        {
+          "prompt": "When AI reveals truths that contradict powerful institutions or popular belief, should we protect the systems and researchers who surface those findings, or defer to established authority?",
+          "tags": [
+            "Open Science",
+            "Authority",
+            "Truth"
+          ]
+        }
+      ],
+      "responses": []
+    },
+    "avatar": "TODO_ARWEAVE:galileo-galilei-avatar"
+  },
+  {
+    "id": "0x_pseudo_address_parks",
+    "name": "Rosa Parks",
+    "atlasCategory": "Actors/Civil Society",
+    "bio": "Civil rights activist whose refusal to surrender her bus seat became a catalyst for the Montgomery Bus Boycott and the broader movement to dismantle segregation.",
+    "data": {
+      "sbts": [
+        {
+          "name": "Montgomery Catalyst",
+          "category": "Activism",
+          "tier": "Movement"
+        }
+      ],
+      "createdQuestions": [
+        {
+          "prompt": "When AI systems enforce unjust rules — biased hiring algorithms, discriminatory surveillance — do individuals and communities have a right and duty to refuse compliance, even at personal cost?",
+          "tags": [
+            "Civil Disobedience",
+            "Bias",
+            "Justice"
+          ]
+        }
+      ],
+      "responses": []
+    },
+    "avatar": "TODO_ARWEAVE:rosa-parks-avatar"
+  },
+  {
+    "id": "0x_pseudo_address_maathai",
+    "name": "Wangari Maathai",
+    "atlasCategory": "Actors/Civil Society",
+    "bio": "Kenyan environmentalist and Nobel Peace Prize laureate who founded the Green Belt Movement, linking environmental conservation with women's rights and democratic governance.",
+    "data": {
+      "sbts": [
+        {
+          "name": "Green Belt Founder",
+          "category": "Activism",
+          "tier": "Movement"
+        }
+      ],
+      "createdQuestions": [
+        {
+          "prompt": "Can AI help communities protect their natural resources from exploitation by distant corporations and governments, or will it become another tool of extraction that bypasses local knowledge?",
+          "tags": [
+            "Environment",
+            "Community",
+            "Sovereignty"
+          ]
+        }
+      ],
+      "responses": []
+    },
+    "avatar": "TODO_ARWEAVE:wangari-maathai-avatar"
+  },
+  {
+    "id": "0x_pseudo_address_aristotle",
+    "name": "Aristotle",
+    "atlasCategory": "Governance Institutions",
+    "bio": "Ancient Greek philosopher whose empirical method, logic, and political theory shaped Western thought for two millennia.",
+    "data": {
+      "sbts": [
+        {
+          "name": "Lyceum Founder",
+          "category": "Intellectual",
+          "tier": "Philosophy"
+        }
+      ],
+      "createdQuestions": [
+        {
+          "prompt": "Should AI systems be designed to pursue a defined 'good life' for citizens — optimizing for human flourishing — or is it dangerous to encode any single vision of the good into autonomous systems?",
+          "tags": [
+            "Ethics",
+            "Governance",
+            "Philosophy"
+          ]
+        }
+      ],
+      "responses": []
+    },
+    "avatar": "TODO_ARWEAVE:aristotle-avatar"
+  }
+]

@@ -1,0 +1,44 @@
+{
+  "general": {
+    "networkChainId": 11155420,
+    "slug": "",
+    "sessionName": "Context Engine",
+    "sessionInfo": "",
+    "sessionHeaderImg": null,
+    "corsWorkerUrl": "",
+    "defaultTags": "",
+    "questionsGenPrompt": "",
+    "defaultSbtTags": "",
+    "defaultFilterState": null,
+    "defaultFeaturedSBTs": [],
+    "autoFeatureSBTsWithFeaturedSbtTags": false,
+    "HIGHLIGHTED_QUESTION_IDS": [],
+    "BLOCKED_QUESTION_IDS": [],
+    "HIGHLIGHTED_SURVEY_IDS": [],
+    "BLOCKED_SURVEY_IDS": [],
+    "ignored_SBTs_LIST": [],
+    "featured_SBTs_LIST": [],
+    "contracts": {},
+    "blockLimits": {
+      "start": null,
+      "end": null
+    },
+    "ai": {
+      "reasoningEffort": "low",
+      "models": {
+        "fast": {
+          "model": "gpt-4o-mini",
+          "provider": "openai"
+        },
+        "thinking": {
+          "model": "gpt-4o-mini",
+          "provider": "openai"
+        },
+        "transcription": {
+          "provider": "openai",
+          "model": "whisper-1"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,154 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+
+import { resolveTopLevelRouteSelection } from './topLevelRouteSelection.js';
+
+const createRequest = (headers = {}) => ({
+  headers: new Headers(headers),
+});
+
+const createRequestWithHeaderValue = (value) => ({
+  headers: {
+    get: (name) => (name.toLowerCase() === 'authorization' ? value : null),
+  },
+});
+
+test('resolveTopLevelRouteSelection preserves options, auth, and admin route classification', () => {
+  assert.deepEqual(
+    resolveTopLevelRouteSelection({
+      path: '/auth/nonce',
+      method: 'POST',
+      request: createRequest(),
+      deps: { toStr: String },
+    }),
+    { kind: 'auth-nonce' }
+  );
+
+  assert.deepEqual(
+    resolveTopLevelRouteSelection({
+      path: '/auth/login',
+      method: 'POST',
+      request: createRequest(),
+      deps: { toStr: String },
+    }),
+    { kind: 'auth-login' }
+  );
+
+  assert.deepEqual(
+    resolveTopLevelRouteSelection({
+      path: '/admin/ set-config ',
+      method: 'POST',
+      request: createRequest(),
+      deps: { toStr: String },
+    }),
+    { kind: 'admin', action: 'set-config' }
+  );
+
+  assert.deepEqual(
+    resolveTopLevelRouteSelection({
+      path: '/health',
+      method: 'OPTIONS',
+      request: createRequest(),
+      deps: { toStr: String },
+    }),
+    { kind: 'options' }
+  );
+});
+
+test('resolveTopLevelRouteSelection preserves raw authorization-header truthiness for arweave upload handoff', () => {
+  assert.deepEqual(
+    resolveTopLevelRouteSelection({
+      path: '/arweave/upload',
+      method: 'POST',
+      request: createRequest(),
+      deps: { toStr: String },
+    }),
+    { kind: 'arweave-upload', hasAuthorizationHeader: false }
+  );
+
+  assert.deepEqual(
+    resolveTopLevelRouteSelection({
+      path: '/arweave/upload',
+      method: 'POST',
+      request: createRequestWithHeaderValue('   '),
+      deps: { toStr: String },
+    }),
+    { kind: 'arweave-upload', hasAuthorizationHeader: true }
+  );
+});
+
+test('resolveTopLevelRouteSelection routes unauthenticated Lit delegation through bootstrap handling', () => {
+  assert.deepEqual(
+    resolveTopLevelRouteSelection({
+      path: '/lit/payment-delegation',
+      method: 'POST',
+      request: createRequest(),
+      deps: { toStr: String },
+    }),
+    { kind: 'lit-payment-delegation-bootstrap' }
+  );
+
+  assert.deepEqual(
+    resolveTopLevelRouteSelection({
+      path: '/lit/payment-delegation',
+      method: 'POST',
+      request: createRequest({ Authorization: 'Bearer token' }),
+      deps: { toStr: String },
+    }),
+    { kind: 'authenticated' }
+  );
+});
+
+test('resolveTopLevelRouteSelection classifies sponsored bootstrap redeem routes before auth/admin handling', () => {
+  assert.deepEqual(
+    resolveTopLevelRouteSelection({
+      path: '/sponsored/redeem-deploy',
+      method: 'POST',
+      request: createRequest(),
+      deps: { toStr: String },
+    }),
+    { kind: 'sponsored-bootstrap-redeem', action: 'deploy' }
+  );
+
+  assert.deepEqual(
+    resolveTopLevelRouteSelection({
+      path: '/sponsored/redeem-faucet',
+      method: 'POST',
+      request: createRequest({ Authorization: 'Bearer token' }),
+      deps: { toStr: String },
+    }),
+    { kind: 'sponsored-bootstrap-redeem', action: 'faucet' }
+  );
+});
+
+test('resolveTopLevelRouteSelection preserves trimmed authorization behavior for anonymous ai/transcribe classification', () => {
+  assert.deepEqual(
+    resolveTopLevelRouteSelection({
+      path: '/ai',
+      method: 'POST',
+      request: createRequest(),
+      deps: { toStr: String },
+    }),
+    { kind: 'anonymous', anonymousRoute: 'ai' }
+  );
+
+  assert.deepEqual(
+    resolveTopLevelRouteSelection({
+      path: '/transcribe',
+      method: 'POST',
+      request: createRequestWithHeaderValue('   '),
+      deps: { toStr: String },
+    }),
+    { kind: 'anonymous', anonymousRoute: 'transcribe' }
+  );
+
+  assert.deepEqual(
+    resolveTopLevelRouteSelection({
+      path: '/ai',
+      method: 'POST',
+      request: createRequest({ Authorization: 'Bearer token' }),
+      deps: { toStr: String },
+    }),
+    { kind: 'authenticated' }
+  );
+});

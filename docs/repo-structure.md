@@ -1,0 +1,100 @@
+# Repo Structure Contract
+
+This document is the canonical naming and placement contract for the repository.
+Use it for new files, refactors, and cleanup PRs. Legacy exceptions stay listed in the TODO section until deliberately renamed or moved.
+
+## 1. Root Layout
+
+- `client/` holds the React SPA, frontend assets, and frontend-adjacent tests.
+- `workers/` holds Cloudflare Worker source and worker-specific support files.
+- `contracts/` holds Solidity contracts, interfaces, and contract-focused tests.
+- `script/` holds Foundry Solidity deploy scripts. Keep the singular name; it matches Foundry conventions.
+- `scripts/` holds automation, seeding, audits, migration helpers, and E2E entrypoints.
+- `docs/` holds canonical implementation and operations documentation.
+- `TODO/` holds PRDs, planning notes, and unshipped work items.
+- `contextEngine-cc/` holds the local Claude Code companion integration.
+- `test/` holds source-of-truth root Foundry and Node test files when source-adjacent tests are not practical.
+- `tests/` is an index/symlink view over selected test surfaces. Do not assume it is the source of truth.
+- `artifacts/`, `broadcast/`, `cache/`, `dist/`, `out/`, and `tmp/` are generated or runtime output locations and are not canonical homes for new source files.
+- New top-level directories are rare. Reuse an existing root area unless the new code has a clearly separate runtime, deployment surface, or ownership boundary.
+
+## 2. React Component Structure
+
+- Under `client/src/components/`, directories that represent UI features or shared component groups use PascalCase.
+- Keep feature directories concise and let the component filename carry the full screen name when useful; for example, use `client/src/components/About/` with `AboutPage.jsx` inside it.
+- Account/login/settings UI belongs under `client/src/components/Account/`; avoid vague compound legacy directory names for new work.
+- Session creation UI belongs under `client/src/components/Sessions/`; keep `SessionWizard.jsx` and its helper/test modules co-located there.
+- Session page shell UI belongs under `client/src/components/OnePageSession/`; keep `OnePageSession.jsx` and its helper/test modules co-located there.
+- Demo-only route views belong under `client/src/components/DemoViews/`; keep reusable demo subareas grouped there instead of under generic catch-all names.
+- Session doc-library UI belongs under `client/src/components/DocumentLibrary/`; keep `SessionDocumentsPage.jsx` and `DocumentLibraryPanel.jsx` together there.
+- Rendered React component files use PascalCase filenames and the `.jsx` extension.
+- Component-specific styles are co-located as `<ComponentName>.module.scss`.
+- Component-specific tests are co-located beside the source component.
+- Preferred component test naming is `<ComponentName>.test.jsx`.
+- Prefer purpose-led component names over legacy tab-label placeholders; for example, `client/src/components/MainContent/ToolExplorer.jsx` and `OnboardingWalkthrough.jsx` are clearer than generic `*Tab` filenames.
+- Descriptive test qualifiers are allowed before `.test` when needed: `<ComponentName>.render.test.jsx`, `<ComponentName>.routes.test.jsx`.
+- Cross-workflow reusable UI extracted from feature folders belongs under `client/src/components/Shared/` (for example `client/src/components/Shared/AudioInput/` and `client/src/components/Shared/Json/`).
+- Do not create new lowercase component directories under `client/src/components/`.
+- Avoid adding new files directly under `client/src/components/` unless they are true app-shell entry points or app-shell support modules.
+
+## 3. Non-Component Modules
+
+- Utilities, helpers, adapters, config modules, and data loaders use camelCase filenames.
+- This applies under `client/src/utilities/` and to helper-only files that live beside a component.
+- Utility directory buckets are lowercase by domain: `ai/`, `crypto/`, `session/`, `web3/`, etc.
+- Use `.js` or `.mjs` for non-React modules unless the file actually renders JSX.
+- Keep JSON fixtures or static data source-adjacent when they only support one feature.
+
+## 4. Test Naming
+
+- Tests live beside the source they exercise whenever practical.
+- Valid test suffixes are `.test.js`, `.test.jsx`, and `.test.mjs`.
+- Optional middle qualifiers are allowed before `.test`: `.render`, `.cache`, `.proxy`, `.ui`, `.api`, `.module`, `.routes`, `.component`.
+- Use `.test.jsx` for React-rendering and component behavior tests.
+- Use `.test.js` or `.test.mjs` for pure helpers, data modules, Node-only code, and script tests.
+- If a test targets a helper module inside a component folder, the helper may stay camelCase and the test may stay `.test.js`.
+
+## 5. Script Naming
+
+- Files under `scripts/` use kebab-case basenames.
+- Script support files under `scripts/lib/` also use kebab-case.
+- Dotted execution qualifiers are allowed before the final extension: `.ui`, `.api`, `.stub`, `.test`.
+- Avoid camelCase and snake_case in script filenames.
+- Keep script filenames shell-friendly; lowercase kebab-case wins inside `scripts/`.
+
+## 6. Canonical Acronyms
+
+- Canonical acronyms in this repo are `SBT`, `AI`, `RPC`, and `UX`.
+- In PascalCase names, keep the acronym uppercase: `SBTSelector.jsx`, `DebateMap.jsx`.
+- In camelCase module names, a leading acronym may be lowercase to satisfy camelCase, but internal acronym segments stay uppercase: `sbtDisplayNames.js`, `createSBTFormCache.js`, `appRPCSelection.js`.
+- In lowercase-only naming schemes such as kebab-case script filenames, use lowercase segments: `test-sbt-auto-mint.ui.js`, `run-ux-workflows.js`, `rpc-errors.js`.
+- Do not mix title-cased acronym fragments such as `Sbt`, `Ai`, `Rpc`, or `Ux` inside mixed-case filenames.
+
+## 7. Reuse Vs. New Directory
+
+- Reuse an existing feature directory when the new file extends the same user workflow or owner.
+- Reuse an existing utility domain when the module shares the same runtime concern.
+- Create a new directory only when the code introduces a distinct feature surface, a new technical domain, or a folder is becoming too large to navigate comfortably.
+- Do not create a new directory for a single helper if an existing folder already owns that helper.
+- Shared UI still belongs under `client/src/components/` in a PascalCase directory.
+- Cross-cutting non-UI code belongs under `client/src/utilities/<domain>/`.
+
+## TODO: Remaining Naming Violations
+
+- [ ] `client/src/components/SurveyTool/SurveyGenerator/AudioSurveyGenerator.test.js` is a component test that still uses `.test.js` instead of `.test.jsx`.
+- [ ] `client/src/components/CommunityTab/CommunityTab.test.js` is a component test that still uses `.test.js` instead of `.test.jsx`.
+- [ ] `client/src/components/DebateMode/LiveDebateMode.test.js` is a component test that still uses `.test.js` instead of `.test.jsx`.
+- [ ] `client/src/components/SBTs/CreateSBTGroup.test.js` is a component test that still uses `.test.js` instead of `.test.jsx`.
+- [ ] `client/src/components/SBTs/SBTSelector.test.js` is a component test that still uses `.test.js` instead of `.test.jsx`.
+- [ ] `client/src/components/SurveyTool/BeeswarmPlot.test.js` is a component test that still uses `.test.js` instead of `.test.jsx`.
+- [ ] `client/src/components/SurveyTool/QuestionFilter.test.js` is a component test that still uses `.test.js` instead of `.test.jsx`.
+- [ ] `client/src/components/SurveyTool/SingleQuestionResponse.test.js` is a component test that still uses `.test.js` instead of `.test.jsx`.
+- [ ] `client/src/components/SurveyTool/SurveyResults.test.js` is a component test that still uses `.test.js` instead of `.test.jsx`.
+- [ ] `client/src/utilities/sbt/createSbtFormCache.js` uses `Sbt` instead of `SBT` inside a camelCase utility filename.
+- [ ] `client/src/utilities/sbt/createSbtFormCache.test.js` mirrors the same `Sbt` acronym casing issue as the source file.
+- [ ] `client/src/utilities/session/pendingSbtDrafts.js` uses `Sbt` instead of `SBT` inside a camelCase utility filename.
+- [ ] `client/src/utilities/web3/appRpcSelection.js` uses `Rpc` instead of `RPC` inside a camelCase utility filename.
+- [ ] `client/src/utilities/web3/appRpcSelection.test.js` mirrors the same `Rpc` acronym casing issue as the source file.
+- [ ] `scripts/build_external_llm_prompt.py` uses snake_case instead of kebab-case.
+- [ ] `scripts/dev-sessionCorsWorker-local.mjs` contains a camelCase segment instead of pure
+  kebab-case.

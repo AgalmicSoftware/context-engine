@@ -1,0 +1,981 @@
+@use "scss/variables" as tokens;
+
+$page-bg: #171941;
+$page-bg-deep: #0a0e1c;
+$text-color: tokens.$ce-white;
+$muted-text: rgba(244, 247, 255, 0.65);
+$accent: #4dffa4;
+$card-bg: rgba(255, 255, 255, 0.06);
+$card-border: rgba(255, 255, 255, 0.14);
+$card-shadow: 0 6px 22px rgba(0, 0, 0, 0.25);
+$tile-text: #0a0e1c;
+$modal-surface-top: #edf6ff;
+$modal-surface-bottom: #cfe1f7;
+$modal-border: rgba(69, 108, 166, 0.26);
+$modal-shadow: 0 28px 56px rgba(5, 18, 42, 0.34);
+$modal-text: #163054;
+$modal-muted: rgba(22, 48, 84, 0.82);
+
+.aboutPageContainer {
+  position: relative;
+  overflow: hidden;
+  padding: clamp(24px, 5vw, 56px) 20px 56px;
+  color: $text-color;
+  font-family: var(--ce-font-mono);
+}
+
+.pageShell {
+  position: relative;
+  width: min(1120px, 100%);
+  margin: 0 auto;
+  display: grid;
+  gap: 28px;
+}
+
+.section {
+  display: grid;
+  gap: 16px;
+}
+
+.collapsibleSection {
+  margin: 20px 0;
+  padding: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  background: rgba(92, 88, 166, 0.19);
+}
+
+.hero,
+.cardSection,
+.mediaCard,
+.useCaseDetail {
+  border: 1px solid $card-border;
+  border-radius: 20px;
+  background: $card-bg;
+  box-shadow: $card-shadow;
+}
+
+.hero {
+  padding: clamp(28px, 5vw, 48px);
+  gap: 18px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-rows: auto;
+  background:
+    radial-gradient(circle at top right, rgba(77, 255, 164, 0.1), transparent 34%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.04));
+}
+
+.heroText {
+  display: grid;
+  gap: 18px;
+  align-content: start;
+}
+
+.heroVideo {
+  width: clamp(280px, 40vw, 480px);
+  max-width: 100%;
+  align-self: center;
+  justify-self: end;
+}
+
+.eyebrow,
+.mediaLabel,
+.useCaseDetailLabel {
+  margin: 0;
+  color: $muted-text;
+  font-size: 0.76rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.sectionTitle {
+  margin: 0;
+  font-family: var(--ce-font-body);
+  font-size: clamp(1.6rem, 4vw, 2.1rem);
+  line-height: 1;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.mainTitle {
+  margin: 0;
+  font-size: clamp(1.8rem, 4vw, 2.6rem);
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.tagline {
+  margin: 0;
+  max-width: 38rem;
+  color: rgba(244, 247, 255, 0.92);
+  font-size: clamp(1rem, 2vw, 1.18rem);
+  line-height: 1.45;
+}
+
+.heroActions,
+.heroLinks,
+.recognitionStrip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.ctaButton,
+.tertiaryLink,
+.inlineLink,
+.recognitionLink {
+  text-decoration: none;
+  transition:
+    transform 0.18s ease,
+    border-color 0.18s ease,
+    background 0.18s ease,
+    color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.ctaButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 0 20px;
+  border-radius: 999px;
+  font-size: 0.92rem;
+  letter-spacing: 0.02em;
+  border: 1px solid transparent;
+}
+
+.primaryButton {
+  background: $accent;
+  border-color: rgba(77, 255, 164, 0.42);
+  color: $tile-text;
+  box-shadow: 0 16px 32px rgba(77, 255, 164, 0.16);
+
+  &:hover,
+  &:focus {
+    color: $tile-text;
+    transform: translateY(-1px);
+    box-shadow: 0 18px 34px rgba(77, 255, 164, 0.2);
+  }
+}
+
+.tertiaryLink {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(244, 247, 255, 0.9);
+  font-size: 0.82rem;
+
+  &:hover,
+  &:focus {
+    color: $text-color;
+    border-color: rgba(77, 255, 164, 0.34);
+    background: rgba(77, 255, 164, 0.08);
+    transform: translateY(-1px);
+  }
+}
+
+.sectionTitle {
+  color: rgba(244, 247, 255, 0.72);
+}
+
+.toggleHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+
+  .sectionTitle {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+  }
+}
+
+.toggleHeaderAside {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.toggleIcon {
+  min-width: 0.9em;
+  text-align: center;
+  font-size: 3rem;
+  line-height: 0.9;
+  color: rgba(244, 247, 255, 0.72);
+  margin-left: 10px;
+  flex-shrink: 0;
+}
+
+.recognitionSummary {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.recognitionSummaryLogo {
+  width: 30px;
+  height: 30px;
+  border-radius: 10px;
+  flex-shrink: 0;
+  object-fit: contain;
+  padding: 3px;
+  background: linear-gradient(180deg, rgba(10, 16, 34, 0.96), rgba(6, 10, 24, 0.92));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 6px 14px rgba(7, 11, 28, 0.24);
+}
+
+.collapsibleContent {
+  margin-top: 16px;
+  padding-left: 1rem;
+  border-left: 2px solid rgba(255, 255, 255, 0.1);
+  color: rgba(244, 247, 255, 0.8);
+}
+
+.useCaseGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.useCaseTile {
+  border: none;
+  border-radius: 20px;
+  padding: 16px;
+  min-height: 124px;
+  color: $tile-text;
+  font-family: inherit;
+  cursor: pointer;
+  box-shadow:
+    -7px 7px 14px rgba(23, 26, 61, 0.28),
+    7px -7px 14px rgba(255, 255, 255, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    filter 0.18s ease;
+
+  &:hover,
+  &:focus-visible {
+    transform: translateY(-3px);
+    box-shadow:
+      -9px 9px 18px rgba(18, 22, 54, 0.32),
+      9px -9px 18px rgba(255, 255, 255, 0.12),
+      inset 0 1px 0 rgba(255, 255, 255, 0.24);
+    filter: saturate(1.02);
+    outline: none;
+  }
+}
+
+.useCaseTileActive {
+  transform: translateY(-3px);
+  box-shadow:
+    -9px 9px 18px rgba(18, 22, 54, 0.32),
+    9px -9px 18px rgba(255, 255, 255, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.24);
+}
+
+.useCaseTileContent {
+  height: 100%;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 12px;
+}
+
+.useCaseIcon {
+  font-size: 2.5rem;
+  color: var(--usecase-icon-color, #162039);
+  filter: drop-shadow(0 3px 8px rgba(255, 255, 255, 0.14));
+}
+
+.useCaseLabel {
+  font-family: var(--ce-font-body);
+  font-size: 1.08rem;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: 0.03em;
+  color: rgba(14, 20, 39, 0.5);
+}
+
+.useCaseTileMint {
+  --usecase-icon-color: #0e7a53;
+  background: linear-gradient(135deg, #5affc2 0%, #3de8a8 100%);
+}
+
+.useCaseTileBlue {
+  --usecase-icon-color: #2c54bb;
+  background: linear-gradient(135deg, #5b8cff 0%, #4a6fe0 100%);
+}
+
+.useCaseTileOrange {
+  --usecase-icon-color: #a35d18;
+  background: linear-gradient(135deg, #ffb347 0%, #f09030 100%);
+}
+
+.useCaseTilePink {
+  --usecase-icon-color: #a33972;
+  background: linear-gradient(135deg, #ff6bcb 0%, #e050a8 100%);
+}
+
+.useCaseTileGold {
+  --usecase-icon-color: #8f6512;
+  background: linear-gradient(135deg, #ffd166 0%, #f0b830 100%);
+}
+
+.useCaseDetail {
+  padding: 22px 24px;
+  animation: detail-enter 220ms ease;
+}
+
+.useCaseDetailLabel {
+  font-family: var(--ce-font-body);
+}
+
+.useCaseDetailRow {
+  display: flex;
+  gap: 14px;
+  align-items: baseline;
+  margin-bottom: 10px;
+}
+
+.useCaseDetailProblemTag,
+.useCaseDetailSolutionTag {
+  flex-shrink: 0;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.useCaseDetailProblemTag {
+  color: rgba(255, 107, 107, 0.9);
+  border: 1px solid rgba(255, 107, 107, 0.25);
+  background: rgba(255, 107, 107, 0.08);
+}
+
+.useCaseDetailSolutionTag {
+  color: rgba(77, 255, 164, 0.9);
+  border: 1px solid rgba(77, 255, 164, 0.25);
+  background: rgba(77, 255, 164, 0.08);
+}
+
+.useCaseDetailRowText {
+  margin: 0;
+  max-width: 62ch;
+  color: rgba(244, 247, 255, 0.88);
+  font-family: var(--ce-font-body);
+  font-size: 1.12rem;
+  line-height: 1.6;
+}
+
+.cardSection {
+  padding: 22px 24px;
+  display: grid;
+  gap: 18px;
+}
+
+.cardSectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.inlineLink {
+  color: $accent;
+  font-size: 0.86rem;
+
+  &:hover,
+  &:focus {
+    color: $text-color;
+  }
+}
+
+.bulletList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+
+  li {
+    position: relative;
+    padding-left: 1.5rem;
+    margin-bottom: 0.8rem;
+    font-family: var(--ce-font-body);
+    font-size: 1.05rem;
+    line-height: 1.6;
+
+    &::before {
+      content: '—';
+      position: absolute;
+      left: 0;
+      color: #4dffa4;
+      font-weight: 700;
+    }
+  }
+}
+
+.roadmapSubList {
+  list-style: none;
+  margin: 0.75rem 0 0;
+  padding: 0 0 0 1rem;
+
+  li:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.mediaGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.95fr);
+  gap: 14px;
+}
+
+.mediaCard {
+  padding: 18px;
+  display: grid;
+  gap: 14px;
+}
+
+.demoVideo {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  background: rgba(8, 12, 26, 0.88);
+}
+
+.recognitionStrip {
+  justify-content: center;
+  gap: 10px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.recognitionCard {
+  display: grid;
+  gap: 16px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  justify-items: stretch;
+}
+
+.recognitionItem {
+  appearance: none;
+  display: grid;
+  grid-template-columns: 44px minmax(0, auto);
+  align-items: center;
+  justify-items: start;
+  gap: 10px;
+  min-height: 64px;
+  padding: 14px 22px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow: $card-shadow;
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+  font-family: inherit;
+  transition:
+    border-color 0.18s ease,
+    background 0.18s ease,
+    transform 0.18s ease,
+    box-shadow 0.18s ease;
+
+  &:hover,
+  &:focus-visible {
+    border-color: rgba(77, 255, 164, 0.35);
+    background: rgba(77, 255, 164, 0.08);
+    color: inherit;
+    text-decoration: none;
+    transform: translateY(-1px);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
+    outline: none;
+  }
+}
+
+.recognitionLogo,
+.recognitionLogoFallback {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  flex-shrink: 0;
+}
+
+.recognitionLogo {
+  object-fit: contain;
+  background: linear-gradient(180deg, rgba(10, 16, 34, 0.96), rgba(6, 10, 24, 0.92));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 4px;
+}
+
+.recognitionLogoEthereum,
+.recognitionLogoCip,
+.recognitionLogoEdge {
+  background: rgba(235, 244, 255, 0.96);
+  border-color: rgba(94, 126, 178, 0.24);
+}
+
+.recognitionLogoEthereum {
+  padding: 6px;
+}
+
+.recognitionLogoRxc {
+  padding: 3px;
+}
+
+.recognitionLogoPolis {
+  background: rgba(240, 247, 255, 0.98);
+  border-color: rgba(94, 126, 178, 0.18);
+  padding: 0;
+}
+
+.recognitionLogoCip,
+.recognitionLogoEdge {
+  padding: 5px;
+}
+
+.recognitionLogoFallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(77, 255, 164, 0.16);
+  color: $accent;
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.recognitionName {
+  color: rgba(244, 247, 255, 0.95);
+  font-size: 1rem;
+  font-weight: 700;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.recognitionModalDialog {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  max-width: none !important;
+  margin: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  pointer-events: none;
+  z-index: 1050 !important;
+
+  :global(.modal-dialog) {
+    width: min(760px, calc(100vw - 24px));
+    max-width: calc(100vw - 24px);
+    margin: 24px auto;
+    pointer-events: auto;
+  }
+
+  :global(.modal-content) {
+    background: linear-gradient(180deg, $modal-surface-top 0%, $modal-surface-bottom 100%);
+    border: 1px solid $modal-border;
+    color: $modal-text;
+    border-radius: 24px;
+    box-shadow: $modal-shadow;
+    overflow: hidden;
+  }
+}
+
+.recognitionBackdrop {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  background: rgba(3, 5, 18, 0.08) !important;
+  opacity: 1 !important;
+  z-index: 1040 !important;
+}
+
+.recognitionModalHeaderBar {
+  align-items: center;
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid rgba(48, 88, 147, 0.18);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.52), rgba(255, 255, 255, 0.18));
+
+  :global(.modal-title) {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin: 0;
+    display: flex;
+  }
+}
+
+.recognitionModalHeader {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+.recognitionModalLogo {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.76);
+  border: 1px solid rgba(69, 108, 166, 0.2);
+  padding: 4px;
+}
+
+.recognitionModalLogo.recognitionLogoRxc {
+  background: linear-gradient(180deg, rgba(10, 16, 34, 0.98), rgba(6, 10, 24, 0.96));
+  border-color: rgba(51, 89, 148, 0.24);
+  padding: 4px;
+}
+
+.recognitionModalTitle {
+  color: $modal-text;
+  font-size: 1.2rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.recognitionModalBody {
+  padding: 1.3rem 1.5rem 1.5rem;
+}
+
+.recognitionModalCloseButton {
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  margin-left: 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(51, 89, 148, 0.24);
+  background: rgba(255, 255, 255, 0.74);
+  color: $modal-text;
+  box-shadow: 0 10px 22px rgba(31, 63, 110, 0.16);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition:
+    background 0.18s ease,
+    border-color 0.18s ease,
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    color 0.18s ease;
+
+  span {
+    display: inline-block;
+    font-size: 1.75rem;
+    line-height: 1;
+    transform: translateY(-1px);
+  }
+
+  &:hover,
+  &:focus {
+    background: rgba(255, 255, 255, 0.92);
+    border-color: rgba(41, 84, 144, 0.38);
+    color: #0f2442;
+    transform: translateY(-1px);
+    box-shadow: 0 12px 26px rgba(31, 63, 110, 0.22);
+    outline: none;
+  }
+}
+
+.recognitionModalDescription {
+  margin: 0;
+  color: $modal-muted;
+  font-family: var(--ce-font-body);
+  font-size: 1rem;
+  line-height: 1.7;
+}
+
+.recognitionModalImage {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin-top: 1rem;
+  border: 1px solid rgba(69, 108, 166, 0.18);
+  border-radius: 12px;
+  box-shadow: 0 14px 28px rgba(20, 44, 82, 0.16);
+}
+
+.recognitionModalLinks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 1rem;
+}
+
+.recognitionModalLink {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(69, 108, 166, 0.2);
+  background: rgba(255, 255, 255, 0.56);
+  color: $modal-text;
+  font-size: 0.82rem;
+  text-decoration: none;
+  transition:
+    transform 0.18s ease,
+    border-color 0.18s ease,
+    background 0.18s ease,
+    color 0.18s ease,
+    box-shadow 0.18s ease;
+
+  &:hover,
+  &:focus {
+    color: #0f2442;
+    border-color: rgba(41, 84, 144, 0.34);
+    background: rgba(255, 255, 255, 0.8);
+    transform: translateY(-1px);
+    box-shadow: 0 10px 20px rgba(31, 63, 110, 0.16);
+  }
+}
+
+.recognitionLinks {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: $muted-text;
+  font-size: 0.82rem;
+}
+
+.recognitionLink {
+  color: $muted-text;
+
+  &:hover,
+  &:focus {
+    color: $accent;
+  }
+}
+
+.recognitionDot {
+  color: rgba(244, 247, 255, 0.34);
+}
+
+.recognitionIndividuals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+}
+
+.recognitionIndividual {
+  color: rgba(244, 247, 255, 0.86);
+}
+
+.recognitionIndividual a {
+  color: inherit;
+  text-decoration: none;
+
+  &:hover,
+  &:focus {
+    color: $accent;
+  }
+}
+
+@keyframes detail-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (min-width: 1100px) {
+  .useCaseGrid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1024px) {
+  .recognitionStrip {
+    flex-wrap: nowrap;
+    gap: 8px;
+  }
+
+  .recognitionItem {
+    flex: 1 1 0;
+    min-width: 0;
+    grid-template-columns: 44px minmax(0, 1fr);
+    gap: 8px;
+    padding: 12px 14px;
+  }
+
+  .recognitionItemEthereum {
+    flex-grow: 0.9;
+  }
+
+  .recognitionItemRadicalxchange,
+  .recognitionItemEdgePatagonia {
+    flex-grow: 1.15;
+  }
+
+  .recognitionItemPolis {
+    flex-grow: 0.84;
+  }
+
+  .recognitionItemCip {
+    flex-grow: 1.9;
+  }
+
+  .recognitionName {
+    font-size: 0.92rem;
+  }
+}
+
+@media (max-width: 900px) {
+  .mediaGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .aboutPageContainer {
+    padding: 20px 14px 40px;
+  }
+
+  .pageShell {
+    gap: 22px;
+  }
+
+  .hero,
+  .cardSection,
+  .mediaCard,
+  .useCaseDetail {
+    border-radius: 18px;
+  }
+
+  .hero {
+    padding: 20px 16px;
+    grid-template-columns: 1fr;
+  }
+
+  .toggleHeader {
+    gap: 8px;
+  }
+
+  .toggleHeaderAside {
+    gap: 6px;
+  }
+
+  .recognitionSummary {
+    gap: 5px;
+  }
+
+  .recognitionSummaryLogo {
+    width: 24px;
+    height: 24px;
+    border-radius: 8px;
+    padding: 2px;
+  }
+
+  .heroVideo {
+    width: 100%;
+    order: -1;
+  }
+
+  .heroText {
+    gap: 14px;
+  }
+
+  .tagline {
+    max-width: none;
+    font-size: 0.98rem;
+  }
+
+  .heroActions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .heroLinks {
+    gap: 8px;
+  }
+
+  .ctaButton {
+    width: 100%;
+  }
+
+  .tertiaryLink {
+    flex: 1 1 calc(50% - 8px);
+    min-width: 0;
+  }
+
+  .useCaseGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .useCaseTile {
+    min-height: 110px;
+  }
+
+  .mediaGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .recognitionCard {
+    padding: 0;
+  }
+
+  .recognitionStrip {
+    gap: 12px;
+  }
+
+  .recognitionItem {
+    width: 100%;
+    border-radius: 20px;
+    grid-template-columns: 46px minmax(0, 1fr);
+    gap: 14px;
+    padding: 14px 18px;
+  }
+
+  .recognitionName {
+    white-space: normal;
+    line-height: 1.25;
+  }
+
+  .recognitionModalDialog {
+    :global(.modal-dialog) {
+      width: calc(100vw - 20px);
+      max-width: calc(100vw - 20px);
+      margin: 10px auto;
+    }
+  }
+
+  .recognitionModalHeaderBar {
+    padding: 16px 16px 12px;
+  }
+
+  .recognitionModalBody {
+    padding: 1.1rem 1rem 1.2rem;
+  }
+}

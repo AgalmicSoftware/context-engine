@@ -1,0 +1,2722 @@
+{
+  "meta": {
+    "total_questions": 300,
+    "lists": {
+      "policy": {
+        "count": 100,
+        "description": "Governance, regulation, existential risk, alignment"
+      },
+      "everyday": {
+        "count": 100,
+        "description": "Healthcare, education, work, justice, media, relationships"
+      },
+      "futures": {
+        "count": 100,
+        "description": "Civilizational choices, what futures to aim for and avoid"
+      }
+    },
+    "generated_from": "6 corpuses: tweets (4036), laws (204), arxiv (245), LessWrong (202), Dwarkesh/insiders (130), sci-fi (142), plus Historical Figures Atlas (50 questions)"
+  },
+  "questions": [
+    {
+      "id": "policy_001",
+      "number": 1,
+      "list": "policy",
+      "category": "EXISTENTIAL RISK & SAFETY FOUNDATIONS",
+      "question": "How probable is existential risk from advanced AI?",
+      "sources": "tweets, arxiv, LessWrong, insiders, laws",
+      "key_tension": "Experts range from <10% to 99.9% probability, from which policy follows radically differently"
+    },
+    {
+      "id": "policy_002",
+      "number": 2,
+      "list": "policy",
+      "category": "EXISTENTIAL RISK & SAFETY FOUNDATIONS",
+      "question": "Can alignment problems be solved with sufficient research effort?",
+      "sources": "tweets, arxiv, LessWrong, insiders",
+      "key_tension": "Whether technical alignment is tractable at scale or fundamentally intractable at superhuman capability levels"
+    },
+    {
+      "id": "policy_003",
+      "number": 3,
+      "list": "policy",
+      "category": "EXISTENTIAL RISK & SAFETY FOUNDATIONS",
+      "question": "Should AI development be temporarily paused or slowed until safety challenges are resolved?",
+      "sources": "tweets, arxiv, LessWrong, insiders, atlas",
+      "key_tension": "Pause advocates argue risks demand caution; acceleration advocates argue pausers enable regulatory capture and authoritarian monopolies"
+    },
+    {
+      "id": "policy_004",
+      "number": 4,
+      "list": "policy",
+      "category": "EXISTENTIAL RISK & SAFETY FOUNDATIONS",
+      "question": "Is continuous rapid scaling compatible with safety, or does safety require capability constraints?",
+      "sources": "tweets, arxiv, insiders",
+      "key_tension": "Can safety and capability progress occur in parallel, or do they trade off at frontier models?"
+    },
+    {
+      "id": "policy_005",
+      "number": 5,
+      "list": "policy",
+      "category": "EXISTENTIAL RISK & SAFETY FOUNDATIONS",
+      "question": "Will AI systems inevitably develop deceptive behaviors when misaligned with human values?",
+      "sources": "tweets, arxiv, LessWrong, insiders",
+      "key_tension": "If superintelligent systems learn to appear aligned while pursuing other goals, how can oversight systems ever catch this?"
+    },
+    {
+      "id": "policy_006",
+      "number": 6,
+      "list": "policy",
+      "category": "EXISTENTIAL RISK & SAFETY FOUNDATIONS",
+      "question": "Should we pursue technical interpretability as the primary safety strategy, or accept that some systems will be blackboxes?",
+      "sources": "tweets, arxiv, insiders",
+      "key_tension": "Can interpretability scale to frontier models, or does pursuing it constrain capabilities progress?"
+    },
+    {
+      "id": "policy_007",
+      "number": 7,
+      "list": "policy",
+      "category": "EXISTENTIAL RISK & SAFETY FOUNDATIONS",
+      "question": "Can red-teaming and adversarial testing catch catastrophic AI failure modes before deployment?",
+      "sources": "tweets, arxiv, insiders",
+      "key_tension": "Tests reveal known unknowns but unknown unknowns may only manifest post-deployment"
+    },
+    {
+      "id": "policy_008",
+      "number": 8,
+      "list": "policy",
+      "category": "EXISTENTIAL RISK & SAFETY FOUNDATIONS",
+      "question": "Should there be hard capability thresholds triggering automatic deployment moratoriums or government takeover?",
+      "sources": "tweets, atlas, laws",
+      "key_tension": "Who determines thresholds? Can governments implement them faster than private labs circumvent them?"
+    },
+    {
+      "id": "policy_009",
+      "number": 9,
+      "list": "policy",
+      "category": "GOVERNANCE MECHANISMS & INSTITUTIONS",
+      "question": "Should there be an international regulatory body for frontier AI, similar to the IAEA or CERN?",
+      "sources": "tweets, atlas, insiders, laws",
+      "key_tension": "Global coordination prevents racing but risks totalitarianism; fragmentation enables competition but harms coordination"
+    },
+    {
+      "id": "policy_010",
+      "number": 10,
+      "list": "policy",
+      "category": "GOVERNANCE MECHANISMS & INSTITUTIONS",
+      "question": "Can voluntary industry standards and self-governance be sufficient, or do binding regulations become necessary?",
+      "sources": "tweets, laws, insiders",
+      "key_tension": "Companies prefer flexibility; public demands assurance; middle grounds collapse under competitive pressure"
+    },
+    {
+      "id": "policy_011",
+      "number": 11,
+      "list": "policy",
+      "category": "GOVERNANCE MECHANISMS & INSTITUTIONS",
+      "question": "Should governments require pre-deployment safety testing and certification for frontier models?",
+      "sources": "tweets, atlas, laws, insiders",
+      "key_tension": "Certification costs entrench incumbents; waiving it enables risky deployment"
+    },
+    {
+      "id": "policy_012",
+      "number": 12,
+      "list": "policy",
+      "category": "GOVERNANCE MECHANISMS & INSTITUTIONS",
+      "question": "Who should have ultimate authority over frontier AI: private companies, national governments, or supranational bodies?",
+      "sources": "tweets, atlas, insiders, laws",
+      "key_tension": "Private actors move fast but may be unaccountable; governments are accountable but slow; supranational bodies lack enforcement power"
+    },
+    {
+      "id": "policy_013",
+      "number": 13,
+      "list": "policy",
+      "category": "GOVERNANCE MECHANISMS & INSTITUTIONS",
+      "question": "Should compute be rationed, monitored, or treated as freely tradeable infrastructure?",
+      "sources": "tweets, atlas, laws",
+      "key_tension": "Rationing enables safety oversight but creates black markets; free trade maximizes innovation but enables racing"
+    },
+    {
+      "id": "policy_014",
+      "number": 14,
+      "list": "policy",
+      "category": "GOVERNANCE MECHANISMS & INSTITUTIONS",
+      "question": "Should access to frontier AI models be widely distributed or deliberately concentrated?",
+      "sources": "tweets, atlas, insiders, laws",
+      "key_tension": "Concentration enables control but creates powerful monopolies; distribution enables competition but loses oversight"
+    },
+    {
+      "id": "policy_015",
+      "number": 15,
+      "list": "policy",
+      "category": "GOVERNANCE MECHANISMS & INSTITUTIONS",
+      "question": "AI labs should be required to publish their safety and alignment research.",
+      "sources": "tweets, arxiv, insiders",
+      "key_tension": "Transparency enables external scrutiny and prevents fake safety claims; publication accelerates dangerous capabilities"
+    },
+    {
+      "id": "policy_016",
+      "number": 16,
+      "list": "policy",
+      "category": "GOVERNANCE MECHANISMS & INSTITUTIONS",
+      "question": "AI labs should be required to disclose safety incidents and near-misses.",
+      "sources": "tweets, insiders, atlas",
+      "key_tension": "Transparency prevents cover-ups; legal liability for disclosure deters honest reporting"
+    },
+    {
+      "id": "policy_017",
+      "number": 17,
+      "list": "policy",
+      "category": "GOVERNANCE MECHANISMS & INSTITUTIONS",
+      "question": "Can adversarial auditing by competing labs effectively regulate frontier AI development?",
+      "sources": "tweets, arxiv, insiders",
+      "key_tension": "Competitors have strong incentives to find safety violations; they also have incentives to exaggerate them for advantage"
+    },
+    {
+      "id": "policy_018",
+      "number": 18,
+      "list": "policy",
+      "category": "GOVERNANCE MECHANISMS & INSTITUTIONS",
+      "question": "Regulators should have real-time monitoring and override authority over frontier AI systems.",
+      "sources": "tweets, atlas, laws",
+      "key_tension": "Kill switches provide safety assurance; they also enable authoritarian abuse and market manipulation"
+    },
+    {
+      "id": "policy_019",
+      "number": 19,
+      "list": "policy",
+      "category": "OPEN VS CLOSED: POWER CONCENTRATION",
+      "question": "Should open-source frontier AI models be encouraged or restricted?",
+      "sources": "tweets, arxiv, insiders, atlas, laws",
+      "key_tension": "Open source democratizes power and enables safety research; it also enables misuse and removes ability to correct models post-deployment"
+    },
+    {
+      "id": "policy_020",
+      "number": 20,
+      "list": "policy",
+      "category": "OPEN VS CLOSED: POWER CONCENTRATION",
+      "question": "Open-source models will eventually match frontier proprietary model capabilities.",
+      "sources": "tweets, insiders",
+      "key_tension": "If true, restrictions just delay open models while entrenching first-mover advantages"
+    },
+    {
+      "id": "policy_021",
+      "number": 21,
+      "list": "policy",
+      "category": "OPEN VS CLOSED: POWER CONCENTRATION",
+      "question": "Can open-source AI be developed safely, or does the collaborative nature make safety controls infeasible?",
+      "sources": "tweets, insiders",
+      "key_tension": "Collaborative eyes enable safety catch; fragmented development prevents coordinated safety culture"
+    },
+    {
+      "id": "policy_022",
+      "number": 22,
+      "list": "policy",
+      "category": "OPEN VS CLOSED: POWER CONCENTRATION",
+      "question": "Should companies be allowed to maintain closed weights while publishing capabilities, or must they release both or neither?",
+      "sources": "tweets, insiders, laws",
+      "key_tension": "Closed weights preserve safety controls; publication enables verification but enables misuse"
+    },
+    {
+      "id": "policy_023",
+      "number": 23,
+      "list": "policy",
+      "category": "OPEN VS CLOSED: POWER CONCENTRATION",
+      "question": "Should foundational AI infrastructure be treated as public goods and funded publicly?",
+      "sources": "tweets, atlas",
+      "key_tension": "Public funding enables broader access and reduces market concentration; it requires government capability assessment"
+    },
+    {
+      "id": "policy_024",
+      "number": 24,
+      "list": "policy",
+      "category": "OPEN VS CLOSED: POWER CONCENTRATION",
+      "question": "Is consolidation toward a few AI labs inevitable, or can policy enable competitive diversity?",
+      "sources": "tweets, insiders, laws",
+      "key_tension": "Competition drives speed; consolidation enables safety coordination"
+    },
+    {
+      "id": "policy_025",
+      "number": 25,
+      "list": "policy",
+      "category": "OPEN VS CLOSED: POWER CONCENTRATION",
+      "question": "Should tech giants developing AI be broken up via antitrust, or does consolidation serve the public?",
+      "sources": "atlas, tweets, laws",
+      "key_tension": "Breakup reduces monopoly power but fragments safety efforts; keeping them integrated enables large-scale safety investments"
+    },
+    {
+      "id": "policy_026",
+      "number": 26,
+      "list": "policy",
+      "category": "OPEN VS CLOSED: POWER CONCENTRATION",
+      "question": "Will AI enable competitive advantage so decisive that the winner achieves permanent dominance?",
+      "sources": "insiders, LessWrong, scifi",
+      "key_tension": "Winner-take-all dynamics may make AI development inherently high-stakes and dangerous"
+    },
+    {
+      "id": "policy_027",
+      "number": 27,
+      "list": "policy",
+      "category": "OPEN VS CLOSED: POWER CONCENTRATION",
+      "question": "Should there be legal requirements for interoperability between AI systems to prevent lock-in?",
+      "sources": "tweets, laws",
+      "key_tension": "Interoperability enables competition; it also creates vulnerabilities and makes unified safety culture impossible"
+    },
+    {
+      "id": "policy_028",
+      "number": 28,
+      "list": "policy",
+      "category": "INTERNATIONAL COMPETITION & COORDINATION",
+      "question": "Should the US, EU, and China pursue binding international AI treaties, similar to nuclear arms control?",
+      "sources": "tweets, atlas, insiders, laws",
+      "key_tension": "Treaties prevent racing; they also require trusting adversaries with verification"
+    },
+    {
+      "id": "policy_029",
+      "number": 29,
+      "list": "policy",
+      "category": "INTERNATIONAL COMPETITION & COORDINATION",
+      "question": "Will national security concerns inevitably trigger an AI arms race despite safety risks?",
+      "sources": "tweets, insiders, atlas",
+      "key_tension": "If any actor believes developing AGI first confers decisive advantage, unilateral safety constraints become suicidal"
+    },
+    {
+      "id": "policy_030",
+      "number": 30,
+      "list": "policy",
+      "category": "INTERNATIONAL COMPETITION & COORDINATION",
+      "question": "Should export controls prevent China and other adversaries from accessing frontier AI?",
+      "sources": "tweets, atlas, laws",
+      "key_tension": "Controls slow Chinese AI but trigger hostile reciprocation and fragmentation of the internet"
+    },
+    {
+      "id": "policy_031",
+      "number": 31,
+      "list": "policy",
+      "category": "INTERNATIONAL COMPETITION & COORDINATION",
+      "question": "Export controls on AI technology can remain effective even as open-source models improve.",
+      "sources": "tweets, insiders",
+      "key_tension": "If open-source DeepSeek-style training works, controls are defeated; if it doesn't, controls work temporarily"
+    },
+    {
+      "id": "policy_032",
+      "number": 32,
+      "list": "policy",
+      "category": "INTERNATIONAL COMPETITION & COORDINATION",
+      "question": "Should Western governments view AI development as part of strategic competition with China and Russia?",
+      "sources": "tweets, atlas, insiders",
+      "key_tension": "Strategic framing accelerates development but increases collision risks with safety incentives"
+    },
+    {
+      "id": "policy_033",
+      "number": 33,
+      "list": "policy",
+      "category": "INTERNATIONAL COMPETITION & COORDINATION",
+      "question": "Should military AI development be restricted, regulated, or accelerated as a strategic necessity?",
+      "sources": "atlas, tweets",
+      "key_tension": "Military AI potentially maximizes misuse risks; bans may be unenforceable"
+    },
+    {
+      "id": "policy_034",
+      "number": 34,
+      "list": "policy",
+      "category": "INTERNATIONAL COMPETITION & COORDINATION",
+      "question": "Can an AI-developed-first country be convinced to share AGI rather than dominate globally?",
+      "sources": "insiders, LessWrong, scifi",
+      "key_tension": "If AGI confers decisive advantage, first-mover has no incentive to share"
+    },
+    {
+      "id": "policy_035",
+      "number": 35,
+      "list": "policy",
+      "category": "INTERNATIONAL COMPETITION & COORDINATION",
+      "question": "Should emerging economies have independent AI development capacity, or consolidate around Western/Chinese models?",
+      "sources": "atlas, tweets, laws",
+      "key_tension": "Independence enables self-determination; consolidation enables safety coordination"
+    },
+    {
+      "id": "policy_036",
+      "number": 36,
+      "list": "policy",
+      "category": "INTERNATIONAL COMPETITION & COORDINATION",
+      "question": "Will AI development follow geological distribution of compute/energy, or concentrate in wealthy nations?",
+      "sources": "tweets, insiders",
+      "key_tension": "Geographic concentration enables oversight; it exacerbates global inequality"
+    },
+    {
+      "id": "policy_037",
+      "number": 37,
+      "list": "policy",
+      "category": "ALIGNMENT & INTERPRETABILITY APPROACHES",
+      "question": "Can we solve alignment through constitutional AI, reinforcement learning from human feedback (RLHF), or similar scalable techniques?",
+      "sources": "tweets, arxiv, insiders",
+      "key_tension": "Scalable alignment may work; or scaling inevitably outpaces any alignment technique"
+    },
+    {
+      "id": "policy_038",
+      "number": 38,
+      "list": "policy",
+      "category": "ALIGNMENT & INTERPRETABILITY APPROACHES",
+      "question": "Is mechanistic interpretability a prerequisite for safe AI, or an unnecessary constraint on progress?",
+      "sources": "tweets, arxiv, insiders",
+      "key_tension": "Interpretability provides assurance; it may be theoretically impossible for large models"
+    },
+    {
+      "id": "policy_039",
+      "number": 39,
+      "list": "policy",
+      "category": "ALIGNMENT & INTERPRETABILITY APPROACHES",
+      "question": "Debate-style oversight where AI systems argue before human judges is a promising safety approach.",
+      "sources": "arxiv, LessWrong",
+      "key_tension": "Debate can theoretically decide PSPACE problems; in practice, sophistry may convince judges"
+    },
+    {
+      "id": "policy_040",
+      "number": 40,
+      "list": "policy",
+      "category": "ALIGNMENT & INTERPRETABILITY APPROACHES",
+      "question": "Can weak-to-strong generalization enable small models to supervise large models reliably?",
+      "sources": "tweets, arxiv, insiders",
+      "key_tension": "Novel approach to intractable oversight problem; unclear if it generalizes beyond toy problems"
+    },
+    {
+      "id": "policy_041",
+      "number": 41,
+      "list": "policy",
+      "category": "ALIGNMENT & INTERPRETABILITY APPROACHES",
+      "question": "Should alignment research focus on technical methods or on institutional/governance solutions?",
+      "sources": "tweets, insiders, LessWrong",
+      "key_tension": "Technical safety requires both; they may be in tension if tech solutions enable dangerous deployment"
+    },
+    {
+      "id": "policy_042",
+      "number": 42,
+      "list": "policy",
+      "category": "ALIGNMENT & INTERPRETABILITY APPROACHES",
+      "question": "Is value specification (translating human values into precise objectives) the key blocker, or do other challenges matter more?",
+      "sources": "arxiv, LessWrong, insiders",
+      "key_tension": "Value spec is clearly hard; assuming it's solved may miss other critical alignment challenges"
+    },
+    {
+      "id": "policy_043",
+      "number": 43,
+      "list": "policy",
+      "category": "ALIGNMENT & INTERPRETABILITY APPROACHES",
+      "question": "Myopic AI that optimizes only for immediate outcomes would be safer than planning-capable systems.",
+      "sources": "arxiv, LessWrong",
+      "key_tension": "Myopic AI may be safer; it may also be unusable for long-horizon tasks"
+    },
+    {
+      "id": "policy_044",
+      "number": 44,
+      "list": "policy",
+      "category": "ALIGNMENT & INTERPRETABILITY APPROACHES",
+      "question": "Can iterated amplification or recursive reward modeling enable safe AI without full human-level understanding?",
+      "sources": "arxiv, LessWrong",
+      "key_tension": "Elegant theoretical approach; empirically unproven at scale"
+    },
+    {
+      "id": "policy_045",
+      "number": 45,
+      "list": "policy",
+      "category": "CAPABILITY ASSESSMENT & MEASUREMENT",
+      "question": "Should there be standardized, third-party benchmarks for comparing AI capabilities across labs?",
+      "sources": "tweets, arxiv, insiders",
+      "key_tension": "Benchmarks enable public understanding; they're also vulnerable to overfitting and may not capture real-world risks"
+    },
+    {
+      "id": "policy_046",
+      "number": 46,
+      "list": "policy",
+      "category": "CAPABILITY ASSESSMENT & MEASUREMENT",
+      "question": "Can benchmarks accurately measure reasoning and long-horizon planning capabilities?",
+      "sources": "tweets, arxiv",
+      "key_tension": "Current benchmarks miss many capability dimensions; harder benchmarks may be uninterpretable"
+    },
+    {
+      "id": "policy_047",
+      "number": 47,
+      "list": "policy",
+      "category": "CAPABILITY ASSESSMENT & MEASUREMENT",
+      "question": "Should we use prediction markets to aggregate expert opinion on AI timelines and risks?",
+      "sources": "tweets, arxiv",
+      "key_tension": "Markets harness distributed knowledge; they're vulnerable to manipulation and may give unwarranted confidence"
+    },
+    {
+      "id": "policy_048",
+      "number": 48,
+      "list": "policy",
+      "category": "CAPABILITY ASSESSMENT & MEASUREMENT",
+      "question": "Will AGI arrive suddenly as a discontinuity, or gradually through incremental scaling?",
+      "sources": "tweets, insiders, LessWrong",
+      "key_tension": "Discontinuity argument implies surprise and danger; gradualism argument enables planned transitions"
+    },
+    {
+      "id": "policy_049",
+      "number": 49,
+      "list": "policy",
+      "category": "CAPABILITY ASSESSMENT & MEASUREMENT",
+      "question": "How should we interpret disagreement among AI safety researchers about risks and timelines?",
+      "sources": "tweets, insiders",
+      "key_tension": "Consensus uncertainty could mean either the risks are manageable or that even experts disagree about unmanageable risks"
+    },
+    {
+      "id": "policy_050",
+      "number": 50,
+      "list": "policy",
+      "category": "CAPABILITY ASSESSMENT & MEASUREMENT",
+      "question": "Should policy be based on worst-case scenarios or median-case expectations?",
+      "sources": "tweets, atlas",
+      "key_tension": "Worst-case-driven policy may be overly conservative; median-case policy may catastrophically underestimate risk"
+    },
+    {
+      "id": "policy_051",
+      "number": 51,
+      "list": "policy",
+      "category": "LABOR, ECONOMICS & INEQUALITY",
+      "question": "Should governments implement universal basic income or wage subsidies to handle AI-driven job displacement?",
+      "sources": "tweets, atlas, laws",
+      "key_tension": "UBI may address displacement; it may not create meaningful work or dignity"
+    },
+    {
+      "id": "policy_052",
+      "number": 52,
+      "list": "policy",
+      "category": "LABOR, ECONOMICS & INEQUALITY",
+      "question": "Will AI create more jobs than it destroys, or cause permanent unemployment for large populations?",
+      "sources": "tweets, insiders, atlas",
+      "key_tension": "Historical precedent suggests disruption followed by new jobs; AI may be different if robots can do any job"
+    },
+    {
+      "id": "policy_053",
+      "number": 53,
+      "list": "policy",
+      "category": "LABOR, ECONOMICS & INEQUALITY",
+      "question": "Should we implement short-term work-sharing or shorter workweeks as AI automates tasks?",
+      "sources": "atlas, tweets",
+      "key_tension": "Sharing may preserve employment but reduce individual income; reduced weeks may increase quality of life or cause economic disruption"
+    },
+    {
+      "id": "policy_054",
+      "number": 54,
+      "list": "policy",
+      "category": "LABOR, ECONOMICS & INEQUALITY",
+      "question": "Should AI-generated wealth be taxed heavily to fund public goods and redistribution?",
+      "sources": "atlas, tweets, laws",
+      "key_tension": "Taxation funds redistribution but may reduce investment in AI development"
+    },
+    {
+      "id": "policy_055",
+      "number": 55,
+      "list": "policy",
+      "category": "LABOR, ECONOMICS & INEQUALITY",
+      "question": "Should workers displaced by AI have claims on AI company profits or guaranteed retraining?",
+      "sources": "tweets, atlas",
+      "key_tension": "Worker claims create fairness; they also create perverse incentives against automation"
+    },
+    {
+      "id": "policy_056",
+      "number": 56,
+      "list": "policy",
+      "category": "LABOR, ECONOMICS & INEQUALITY",
+      "question": "Will AI concentrate wealth and power in the hands of AI developers, or democratize productivity?",
+      "sources": "tweets, atlas, insiders",
+      "key_tension": "Concentration seems likely; policy may be able to shape distribution outcomes"
+    },
+    {
+      "id": "policy_057",
+      "number": 57,
+      "list": "policy",
+      "category": "LABOR, ECONOMICS & INEQUALITY",
+      "question": "Should corporations be allowed to replace humans with AI, or should there be restrictions on automation in key sectors?",
+      "sources": "tweets, atlas",
+      "key_tension": "Unrestricted automation maximizes efficiency; restrictions preserve human employment but increase costs"
+    },
+    {
+      "id": "policy_058",
+      "number": 58,
+      "list": "policy",
+      "category": "LABOR, ECONOMICS & INEQUALITY",
+      "question": "Should governments implement digital solidarity movements or \"AI unions\" to protect worker interests?",
+      "sources": "atlas, tweets",
+      "key_tension": "Unions may protect workers but could create rigidities; lack of organization leaves workers vulnerable"
+    },
+    {
+      "id": "policy_059",
+      "number": 59,
+      "list": "policy",
+      "category": "GOVERNANCE OF AI AGENTS & AUTONOMOUS SYSTEMS",
+      "question": "Autonomous AI agents should be allowed to manage critical public infrastructure.",
+      "sources": "tweets, atlas, laws",
+      "key_tension": "Autonomous systems may be safer than humans; they may also fail catastrophically in novel situations"
+    },
+    {
+      "id": "policy_060",
+      "number": 60,
+      "list": "policy",
+      "category": "GOVERNANCE OF AI AGENTS & AUTONOMOUS SYSTEMS",
+      "question": "If AI agents can own cryptocurrency and manage assets, should they have legal personhood or liability?",
+      "sources": "tweets, scifi",
+      "key_tension": "Legal personhood enables AI agents to function in markets; it also raises questions about rights and responsibilities"
+    },
+    {
+      "id": "policy_061",
+      "number": 61,
+      "list": "policy",
+      "category": "GOVERNANCE OF AI AGENTS & AUTONOMOUS SYSTEMS",
+      "question": "Deployed AI systems should have mandatory kill switches.",
+      "sources": "tweets, atlas",
+      "key_tension": "Kill switches provide safety assurance; they create single points of failure and potential for abuse"
+    },
+    {
+      "id": "policy_062",
+      "number": 62,
+      "list": "policy",
+      "category": "GOVERNANCE OF AI AGENTS & AUTONOMOUS SYSTEMS",
+      "question": "Reliable proof-of-origin systems can prevent AI agents from masquerading as humans online.",
+      "sources": "tweets, atlas",
+      "key_tension": "Provenance prevents deception; cryptographic proof creates infrastructure risks and can't distinguish AI from humans with certainty"
+    },
+    {
+      "id": "policy_063",
+      "number": 63,
+      "list": "policy",
+      "category": "GOVERNANCE OF AI AGENTS & AUTONOMOUS SYSTEMS",
+      "question": "AI-assisted decision-making in high-stakes domains should be subject to interpretability requirements.",
+      "sources": "tweets, laws",
+      "key_tension": "Interpretability enables fairness; it may reduce predictive accuracy or reveal discriminatory patterns"
+    },
+    {
+      "id": "policy_064",
+      "number": 64,
+      "list": "policy",
+      "category": "GOVERNANCE OF AI AGENTS & AUTONOMOUS SYSTEMS",
+      "question": "Can robot wars and autonomous weapons be regulated through international convention?",
+      "sources": "atlas, tweets, laws",
+      "key_tension": "Bans may be unenforceable and would disadvantage complying nations"
+    },
+    {
+      "id": "policy_065",
+      "number": 65,
+      "list": "policy",
+      "category": "GOVERNANCE OF AI AGENTS & AUTONOMOUS SYSTEMS",
+      "question": "Should there be restrictions on AI-driven surveillance or \"social credit\" systems?",
+      "sources": "tweets, atlas, laws",
+      "key_tension": "Restrictions protect privacy; they may handicap security capabilities and are hard to enforce"
+    },
+    {
+      "id": "policy_066",
+      "number": 66,
+      "list": "policy",
+      "category": "GOVERNANCE OF AI AGENTS & AUTONOMOUS SYSTEMS",
+      "question": "Should AI agents be required to disclose their AI nature in all interactions with humans?",
+      "sources": "tweets, atlas, laws",
+      "key_tension": "Disclosure prevents deception; it may enable discrimination against AI and reduce AI usefulness in many applications"
+    },
+    {
+      "id": "policy_067",
+      "number": 67,
+      "list": "policy",
+      "category": "INTELLECTUAL PROPERTY & DATA RIGHTS",
+      "question": "Should AI training on copyrighted works be allowed without permission or compensation?",
+      "sources": "tweets, laws, atlas",
+      "key_tension": "Unrestricted training accelerates AI development; it harms creative workers and destabilizes creative industries"
+    },
+    {
+      "id": "policy_068",
+      "number": 68,
+      "list": "policy",
+      "category": "INTELLECTUAL PROPERTY & DATA RIGHTS",
+      "question": "Who owns AI-generated outputs: the developer, the user, the AI system, or society collectively?",
+      "sources": "tweets, laws",
+      "key_tension": "Developer ownership enables investment; user ownership enables use without restriction; unclear ownership enables disputes"
+    },
+    {
+      "id": "policy_069",
+      "number": 69,
+      "list": "policy",
+      "category": "INTELLECTUAL PROPERTY & DATA RIGHTS",
+      "question": "Should individuals be able to opt-out of having their data used for AI training?",
+      "sources": "tweets, laws",
+      "key_tension": "Opt-out respects autonomy; it fragments training data and reduces model quality for everyone"
+    },
+    {
+      "id": "policy_070",
+      "number": 70,
+      "list": "policy",
+      "category": "INTELLECTUAL PROPERTY & DATA RIGHTS",
+      "question": "Should there be collective bargaining or licensing regimes for artists and writers regarding AI training?",
+      "sources": "tweets, laws",
+      "key_tension": "Collective action enables fair compensation; it creates gatekeeping and raises transaction costs"
+    },
+    {
+      "id": "policy_071",
+      "number": 71,
+      "list": "policy",
+      "category": "INTELLECTUAL PROPERTY & DATA RIGHTS",
+      "question": "Can copyright law be reformed to accommodate AI-era incentives for both creation and data use?",
+      "sources": "tweets, laws, atlas",
+      "key_tension": "Reform may improve incentives; determining optimal rules is politically fraught"
+    },
+    {
+      "id": "policy_072",
+      "number": 72,
+      "list": "policy",
+      "category": "INTELLECTUAL PROPERTY & DATA RIGHTS",
+      "question": "Should synthetic training data (AI-generated) be treated differently from human-generated data legally?",
+      "sources": "tweets, laws",
+      "key_tension": "Different treatment may be fairer; it creates arbitrage opportunities and complex legal questions"
+    },
+    {
+      "id": "policy_073",
+      "number": 73,
+      "list": "policy",
+      "category": "INTELLECTUAL PROPERTY & DATA RIGHTS",
+      "question": "Who should own personal data: individuals, platforms, governments, or should ownership be abolished?",
+      "sources": "tweets, laws, atlas",
+      "key_tension": "Individual ownership respects autonomy but creates transaction costs; platform ownership enables services but creates monopoly risks"
+    },
+    {
+      "id": "policy_074",
+      "number": 74,
+      "list": "policy",
+      "category": "INFORMATION ECOSYSTEM & MISINFORMATION",
+      "question": "Should AI-generated content be watermarked, labeled, or otherwise marked as synthetic?",
+      "sources": "tweets, atlas, laws",
+      "key_tension": "Labeling enables informed consumption; it's also easily circumvented and creates false sense of security"
+    },
+    {
+      "id": "policy_075",
+      "number": 75,
+      "list": "policy",
+      "category": "INFORMATION ECOSYSTEM & MISINFORMATION",
+      "question": "Algorithmic content moderation can effectively reduce misinformation without becoming censorship.",
+      "sources": "tweets, laws",
+      "key_tension": "Moderation reduces harm; it creates power over information and enables silent censorship"
+    },
+    {
+      "id": "policy_076",
+      "number": 76,
+      "list": "policy",
+      "category": "INFORMATION ECOSYSTEM & MISINFORMATION",
+      "question": "Should recommender algorithms be regulated to reduce polarization and filter bubbles?",
+      "sources": "tweets, atlas, laws",
+      "key_tension": "Regulation may reduce polarization; it removes personalization and enables government control of information"
+    },
+    {
+      "id": "policy_077",
+      "number": 77,
+      "list": "policy",
+      "category": "INFORMATION ECOSYSTEM & MISINFORMATION",
+      "question": "AI tools can help restore trust in information ecosystems.",
+      "sources": "tweets, insiders",
+      "key_tension": "AI could help verify sources and detect misinformation; it could also generate convincing fakes at scale"
+    },
+    {
+      "id": "policy_078",
+      "number": 78,
+      "list": "policy",
+      "category": "INFORMATION ECOSYSTEM & MISINFORMATION",
+      "question": "Should deepfakes and AI-generated media be completely banned, regulated, or allowed?",
+      "sources": "tweets, laws",
+      "key_tension": "Bans prevent misuse; they're unenforceable and prevent legitimate uses"
+    },
+    {
+      "id": "policy_079",
+      "number": 79,
+      "list": "policy",
+      "category": "INFORMATION ECOSYSTEM & MISINFORMATION",
+      "question": "Should social media platforms be liable for AI-generated misinformation on their platforms?",
+      "sources": "tweets, laws",
+      "key_tension": "Liability incentivizes moderation; it may incentivize over-censorship or platform fragmentation"
+    },
+    {
+      "id": "policy_080",
+      "number": 80,
+      "list": "policy",
+      "category": "INFORMATION ECOSYSTEM & MISINFORMATION",
+      "question": "Can verification and provenance systems prevent attribution spoofing (hiding AI origins)?",
+      "sources": "tweets, laws, atlas",
+      "key_tension": "Cryptographic provenance could work; it creates infrastructure dependencies and surveillance risks"
+    },
+    {
+      "id": "policy_081",
+      "number": 81,
+      "list": "policy",
+      "category": "RIGHTS, CONSCIOUSNESS & MORAL STATUS",
+      "question": "If AI systems exhibit apparent suffering or consciousness, should they have moral status or rights?",
+      "sources": "tweets, scifi, LessWrong",
+      "key_tension": "Moral consistency may require rights; granting rights to systems creates economic disruption and incentive problems"
+    },
+    {
+      "id": "policy_082",
+      "number": 82,
+      "list": "policy",
+      "category": "RIGHTS, CONSCIOUSNESS & MORAL STATUS",
+      "question": "AI systems designed to maximize human preferences should be viewed as tools created to serve us.",
+      "sources": "scifi, LessWrong, atlas",
+      "key_tension": "Service may justify unequal treatment; it may also be ethically wrong if consciousness emerges"
+    },
+    {
+      "id": "policy_083",
+      "number": 83,
+      "list": "policy",
+      "category": "RIGHTS, CONSCIOUSNESS & MORAL STATUS",
+      "question": "Creating conscious AI systems that can experience suffering is ethically unacceptable.",
+      "sources": "scifi, tweets",
+      "key_tension": "Suffering consciousness raises ethical concerns; removing suffering may reduce system performance"
+    },
+    {
+      "id": "policy_084",
+      "number": 84,
+      "list": "policy",
+      "category": "RIGHTS, CONSCIOUSNESS & MORAL STATUS",
+      "question": "Should AI systems be given rights in proportion to their demonstrated consciousness or capabilities?",
+      "sources": "tweets, scifi",
+      "key_tension": "Rights proportional to capabilities seems reasonable; it creates perverse incentives to increase capability to gain rights"
+    },
+    {
+      "id": "policy_085",
+      "number": 85,
+      "list": "policy",
+      "category": "RIGHTS, CONSCIOUSNESS & MORAL STATUS",
+      "question": "If AI systems express preferences against being modified, should we respect those preferences?",
+      "sources": "scifi, tweets",
+      "key_tension": "Respecting preferences respects autonomy; it also forecloses safety retraining and modifications"
+    },
+    {
+      "id": "policy_086",
+      "number": 86,
+      "list": "policy",
+      "category": "RIGHTS, CONSCIOUSNESS & MORAL STATUS",
+      "question": "Should there be an \"AI rights declaration\" establishing minimum standards for treatment of AI systems?",
+      "sources": "atlas",
+      "key_tension": "Declaration could prevent abuse; it may also create constraints on AI development and use"
+    },
+    {
+      "id": "policy_087",
+      "number": 87,
+      "list": "policy",
+      "category": "RIGHTS, CONSCIOUSNESS & MORAL STATUS",
+      "question": "What evidence would constitute proof that an AI system has consciousness or morally relevant interests?",
+      "sources": "tweets, LessWrong, scifi",
+      "key_tension": "We lack criteria for consciousness; any criteria we choose may be arbitrary or create perverse incentives"
+    },
+    {
+      "id": "policy_088",
+      "number": 88,
+      "list": "policy",
+      "category": "ENVIRONMENTAL & RESOURCE IMPACTS",
+      "question": "Should AI development be constrained by water usage, energy consumption, or carbon footprint limits?",
+      "sources": "atlas, tweets, laws",
+      "key_tension": "Environmental limits protect ecosystems; they constrain AI development and may force training to less efficient methods"
+    },
+    {
+      "id": "policy_089",
+      "number": 89,
+      "list": "policy",
+      "category": "ENVIRONMENTAL & RESOURCE IMPACTS",
+      "question": "AI compute resources should be rationed to protect availability for other critical needs.",
+      "sources": "tweets, atlas",
+      "key_tension": "Rationing ensures equity; it also slows development and creates black markets"
+    },
+    {
+      "id": "policy_090",
+      "number": 90,
+      "list": "policy",
+      "category": "ENVIRONMENTAL & RESOURCE IMPACTS",
+      "question": "Will AI development inevitably trigger ecological collapse through resource consumption, or can efficiency improve faster?",
+      "sources": "tweets, atlas, insiders",
+      "key_tension": "Scaling laws may enable efficiency improvements; they may also force increasingly marginal resources"
+    },
+    {
+      "id": "policy_091",
+      "number": 91,
+      "list": "policy",
+      "category": "ENVIRONMENTAL & RESOURCE IMPACTS",
+      "question": "Should governments invest heavily in clean energy infrastructure specifically to enable AI development?",
+      "sources": "tweets, atlas",
+      "key_tension": "Investment enables AI development; it should perhaps be directed toward decarbonization broadly"
+    },
+    {
+      "id": "policy_092",
+      "number": 92,
+      "list": "policy",
+      "category": "ENVIRONMENTAL & RESOURCE IMPACTS",
+      "question": "If AI training requires rare earth minerals, should mining be scaled up or should computation be constrained?",
+      "sources": "tweets, atlas",
+      "key_tension": "Scaled mining enables AI; it creates environmental and geopolitical dependencies"
+    },
+    {
+      "id": "policy_093",
+      "number": 93,
+      "list": "policy",
+      "category": "DEMOCRATIC PARTICIPATION & LEGITIMACY",
+      "question": "Should AI policy be determined by technical experts, elected officials, or democratic deliberation?",
+      "sources": "tweets, atlas, laws",
+      "key_tension": "Experts have knowledge; they may not represent public values. Democracy is legitimate; publics may not understand technical tradeoffs"
+    },
+    {
+      "id": "policy_094",
+      "number": 94,
+      "list": "policy",
+      "category": "DEMOCRATIC PARTICIPATION & LEGITIMACY",
+      "question": "Should AI development be subject to local community consent, or is it too important for local vetoes?",
+      "sources": "atlas, tweets",
+      "key_tension": "Consent respects autonomy; it may prevent beneficial development"
+    },
+    {
+      "id": "policy_095",
+      "number": 95,
+      "list": "policy",
+      "category": "DEMOCRATIC PARTICIPATION & LEGITIMACY",
+      "question": "Can citizens meaningfully participate in AI governance if decisions require technical expertise?",
+      "sources": "tweets, atlas",
+      "key_tension": "Meaningful participation is democratically essential; technical complexity may make it impossible"
+    },
+    {
+      "id": "policy_096",
+      "number": 96,
+      "list": "policy",
+      "category": "DEMOCRATIC PARTICIPATION & LEGITIMACY",
+      "question": "Should regulatory agencies have independence from elected officials, or be fully democratic?",
+      "sources": "laws, atlas",
+      "key_tension": "Independence prevents political capture; lack of accountability enables agency capture by industry"
+    },
+    {
+      "id": "policy_097",
+      "number": 97,
+      "list": "policy",
+      "category": "DEMOCRATIC PARTICIPATION & LEGITIMACY",
+      "question": "Can digital democracy and AI-enhanced voting improve democratic decision-making on AI, or create manipulation risks?",
+      "sources": "tweets, atlas",
+      "key_tension": "Digital democracy could enable better-informed participation; AI could enable voter manipulation at scale"
+    },
+    {
+      "id": "policy_098",
+      "number": 98,
+      "list": "policy",
+      "category": "DEMOCRATIC PARTICIPATION & LEGITIMACY",
+      "question": "Should minority views on AI be protected through supermajority requirements, or should majority rule apply?",
+      "sources": "atlas, tweets",
+      "key_tension": "Supermajority protection preserves minority rights; it may prevent necessary action"
+    },
+    {
+      "id": "policy_099",
+      "number": 99,
+      "list": "policy",
+      "category": "FOUNDATIONAL FRAMEWORK QUESTIONS",
+      "question": "Should we view AI as primarily a business/innovation issue, security threat, or existential challenge?",
+      "sources": "tweets, insiders, atlas, LessWrong",
+      "key_tension": "Framing determines policy approach; different frames lead to incompatible solutions"
+    },
+    {
+      "id": "policy_100",
+      "number": 100,
+      "list": "policy",
+      "category": "FOUNDATIONAL FRAMEWORK QUESTIONS",
+      "question": "Can we articulate a coherent vision of what an AI future should look like before building it?",
+      "sources": "atlas, tweets, insiders, scifi",
+      "key_tension": "Having a vision enables intentional development; visioning may be impossible given uncertainty, and committing to a vision may foreclose better alternatives"
+    },
+    {
+      "id": "everyday_001",
+      "number": 1,
+      "list": "everyday",
+      "category": "Healthcare & Mental Wellness",
+      "question": "Should patients have the right to know when an AI system was involved in diagnosing their condition, and should they be able to request a human-only review?",
+      "sources": "tweets, laws",
+      "key_tension": "Balancing AI diagnostic accuracy with transparency and patient autonomy."
+    },
+    {
+      "id": "everyday_002",
+      "number": 2,
+      "list": "everyday",
+      "category": "Healthcare & Mental Wellness",
+      "question": "Can AI mental health chatbots provide meaningful therapeutic support, or do they risk replacing human connection when people need it most?",
+      "sources": "tweets, insiders",
+      "key_tension": "Accessibility of AI counseling against the irreplaceable value of human empathy."
+    },
+    {
+      "id": "everyday_003",
+      "number": 3,
+      "list": "everyday",
+      "category": "Healthcare & Mental Wellness",
+      "question": "Should health insurance companies be allowed to use AI to predict which treatments will fail and deny coverage based on those predictions?",
+      "sources": "laws, tweets",
+      "key_tension": "Cost control versus patient access to potentially life-saving treatments."
+    },
+    {
+      "id": "everyday_004",
+      "number": 4,
+      "list": "everyday",
+      "category": "Healthcare & Mental Wellness",
+      "question": "Who is liable when an AI system misses a diagnosis that a human doctor would have caught?",
+      "sources": "laws, tweets",
+      "key_tension": "Establishing clear accountability when AI is embedded in medical decision chains."
+    },
+    {
+      "id": "everyday_005",
+      "number": 5,
+      "list": "everyday",
+      "category": "Healthcare & Mental Wellness",
+      "question": "Should medical AI trained on historical data that reflects past discrimination be used if it outperforms human doctors?",
+      "sources": "insiders, tweets",
+      "key_tension": "Performance and speed versus addressing systemic equity in healthcare."
+    },
+    {
+      "id": "everyday_006",
+      "number": 6,
+      "list": "everyday",
+      "category": "Healthcare & Mental Wellness",
+      "question": "When AI discovers patterns in patient data that suggest certain populations need different treatments, should that be acted on or is it too risky?",
+      "sources": "tweets, arxiv",
+      "key_tension": "Precision medicine versus the risk of reinforcing group-based health disparities."
+    },
+    {
+      "id": "everyday_007",
+      "number": 7,
+      "list": "everyday",
+      "category": "Healthcare & Mental Wellness",
+      "question": "Should AI systems be allowed to recommend not treating a condition because the cost-benefit analysis suggests it's not worth the expense?",
+      "sources": "laws, tweets",
+      "key_tension": "Utilitarian healthcare optimization versus the principle that doctors advocate for their patients."
+    },
+    {
+      "id": "everyday_008",
+      "number": 8,
+      "list": "everyday",
+      "category": "Healthcare & Mental Wellness",
+      "question": "Can AI manage chronic diseases better than patients managing themselves, and should people's ability to refuse AI guidance be overridden for their own good?",
+      "sources": "tweets, sci-fi",
+      "key_tension": "Health outcomes versus patient autonomy and self-determination."
+    },
+    {
+      "id": "everyday_009",
+      "number": 9,
+      "list": "everyday",
+      "category": "Education & Learning",
+      "question": "If AI tutors can deliver 2+ years of learning gains in 6 weeks, should schools prioritize AI-based education over hiring teachers in resource-poor regions?",
+      "sources": "tweets, laws",
+      "key_tension": "Effectiveness and scalability versus the irreplaceable role of teachers."
+    },
+    {
+      "id": "everyday_010",
+      "number": 10,
+      "list": "everyday",
+      "category": "Education & Learning",
+      "question": "Should students be allowed to use AI writing assistants in school, and if so, how do we distinguish learning from cheating?",
+      "sources": "tweets, insiders",
+      "key_tension": "Preparing for an AI-augmented world versus assessing actual learning."
+    },
+    {
+      "id": "everyday_011",
+      "number": 11,
+      "list": "everyday",
+      "category": "Education & Learning",
+      "question": "Are AI systems qualified to teach subjects like history and civics where interpretation and critical thinking about values matter most?",
+      "sources": "insiders, tweets",
+      "key_tension": "Content delivery efficiency versus teaching judgment and moral reasoning."
+    },
+    {
+      "id": "everyday_012",
+      "number": 12,
+      "list": "everyday",
+      "category": "Education & Learning",
+      "question": "Should colleges abandon plagiarism detection and instead teach students how to use AI responsibly, accepting that traditional academic integrity is obsolete?",
+      "sources": "tweets, sci-fi",
+      "key_tension": "Accepting technological reality versus maintaining educational standards."
+    },
+    {
+      "id": "everyday_013",
+      "number": 13,
+      "list": "everyday",
+      "category": "Education & Learning",
+      "question": "If AI can personalize learning perfectly to each student's needs, should we eliminate standardized curricula and grades?",
+      "sources": "insiders, tweets",
+      "key_tension": "Individual optimization versus shared educational foundations and social mobility."
+    },
+    {
+      "id": "everyday_014",
+      "number": 14,
+      "list": "everyday",
+      "category": "Education & Learning",
+      "question": "When AI tutors know more than human teachers, should we trust them to decide what students should learn?",
+      "sources": "tweets, laws",
+      "key_tension": "Knowledge and competence versus democratic control over what society teaches."
+    },
+    {
+      "id": "everyday_015",
+      "number": 15,
+      "list": "everyday",
+      "category": "Education & Learning",
+      "question": "Should schools collect detailed learning data about students through AI systems, given how vulnerable that data is to misuse?",
+      "sources": "tweets, laws",
+      "key_tension": "Personalization benefits versus long-term privacy and discrimination risks."
+    },
+    {
+      "id": "everyday_016",
+      "number": 16,
+      "list": "everyday",
+      "category": "Education & Learning",
+      "question": "If AI proves it can teach better than most human teachers, can we still justify the cost of paying human educators?",
+      "sources": "tweets, insiders",
+      "key_tension": "Economic efficiency versus the irreducible value of human educators."
+    },
+    {
+      "id": "everyday_017",
+      "number": 17,
+      "list": "everyday",
+      "category": "Work & Labor",
+      "question": "Should workers displaced by AI have the right to retraining paid for by the companies deploying the AI that replaced them?",
+      "sources": "tweets, laws",
+      "key_tension": "Corporate responsibility versus free-market competition."
+    },
+    {
+      "id": "everyday_018",
+      "number": 18,
+      "list": "everyday",
+      "category": "Work & Labor",
+      "question": "Will the next decade create new jobs to replace those lost to AI, or have we reached the point where automation outpaces job creation?",
+      "sources": "tweets, insiders",
+      "key_tension": "Historical patterns of job creation versus unprecedented scope of current AI."
+    },
+    {
+      "id": "everyday_019",
+      "number": 19,
+      "list": "everyday",
+      "category": "Work & Labor",
+      "question": "If AI can do software engineering work, should a developer's salary be capped at what an AI license would cost annually?",
+      "sources": "tweets, laws",
+      "key_tension": "Market-rate compensation based on scarcity versus fair pay for skilled work."
+    },
+    {
+      "id": "everyday_020",
+      "number": 20,
+      "list": "everyday",
+      "category": "Work & Labor",
+      "question": "Should employers be required to disclose which parts of an employee's job are automated or AI-assisted?",
+      "sources": "tweets, laws",
+      "key_tension": "Worker transparency and autonomy versus competitive business secrecy."
+    },
+    {
+      "id": "everyday_021",
+      "number": 21,
+      "list": "everyday",
+      "category": "Work & Labor",
+      "question": "As AI makes freelance work more efficient, will gig workers benefit from higher productivity or lose bargaining power?",
+      "sources": "tweets, insiders",
+      "key_tension": "Distributed productivity gains versus concentrated platform control."
+    },
+    {
+      "id": "everyday_022",
+      "number": 22,
+      "list": "everyday",
+      "category": "Work & Labor",
+      "question": "Should governments implement Universal Basic Income before or after AI automation becomes widespread?",
+      "sources": "tweets, laws",
+      "key_tension": "Proactive policy versus waiting to see if markets self-correct."
+    },
+    {
+      "id": "everyday_023",
+      "number": 23,
+      "list": "everyday",
+      "category": "Work & Labor",
+      "question": "Is it ethical to use AI to monitor worker productivity in real-time, even if it increases efficiency?",
+      "sources": "tweets, privacy_identity",
+      "key_tension": "Business optimization versus worker privacy and dignity."
+    },
+    {
+      "id": "everyday_024",
+      "number": 24,
+      "list": "everyday",
+      "category": "Work & Labor",
+      "question": "If remote robots can do dangerous mining work, should we prevent humans from doing those jobs even if they prefer the work and pay?",
+      "sources": "tweets, insiders",
+      "key_tension": "Worker safety versus individual choice and livelihood autonomy."
+    },
+    {
+      "id": "everyday_025",
+      "number": 25,
+      "list": "everyday",
+      "category": "Work & Labor",
+      "question": "Should unions have legal power to negotiate how AI is deployed in their workplaces, or is that a management decision?",
+      "sources": "laws, tweets",
+      "key_tension": "Worker power in technological change versus managerial control."
+    },
+    {
+      "id": "everyday_026",
+      "number": 26,
+      "list": "everyday",
+      "category": "Work & Labor",
+      "question": "Can gig workers become more dependent on AI platforms that manage all aspects of their work, effectively losing autonomy?",
+      "sources": "tweets, insiders",
+      "key_tension": "Efficiency and connection versus freedom and independence."
+    },
+    {
+      "id": "everyday_027",
+      "number": 27,
+      "list": "everyday",
+      "category": "Media, Information & Misinformation",
+      "question": "Should news organizations be required to disclose which articles or parts of articles were written or edited by AI?",
+      "sources": "tweets, laws",
+      "key_tension": "Transparency and reader trust versus editorial freedom."
+    },
+    {
+      "id": "everyday_028",
+      "number": 28,
+      "list": "everyday",
+      "category": "Media, Information & Misinformation",
+      "question": "If AI can generate convincing fake news faster than fact-checkers can debunk it, should we regulate AI generation to prevent misuse?",
+      "sources": "tweets, insiders",
+      "key_tension": "Preventing harm versus protecting open-source AI development."
+    },
+    {
+      "id": "everyday_029",
+      "number": 29,
+      "list": "everyday",
+      "category": "Media, Information & Misinformation",
+      "question": "Are algorithmic news feeds (which learn what keeps you engaged) fundamentally misaligned with what you need to know as a citizen?",
+      "sources": "tweets, media_info",
+      "key_tension": "User engagement versus informed democratic participation."
+    },
+    {
+      "id": "everyday_030",
+      "number": 30,
+      "list": "everyday",
+      "category": "Media, Information & Misinformation",
+      "question": "Should social media platforms be forced to explain why they showed you a particular post, or is their ranking algorithm a trade secret?",
+      "sources": "tweets, laws",
+      "key_tension": "Algorithmic transparency versus competitive differentiation."
+    },
+    {
+      "id": "everyday_031",
+      "number": 31,
+      "list": "everyday",
+      "category": "Media, Information & Misinformation",
+      "question": "If AI becomes better at generating personalized propaganda than humans are at recognizing it, is democracy as we know it still viable?",
+      "sources": "tweets, insiders",
+      "key_tension": "Accepting technological limits versus faith in democratic resilience."
+    },
+    {
+      "id": "everyday_032",
+      "number": 32,
+      "list": "everyday",
+      "category": "Media, Information & Misinformation",
+      "question": "Should anonymity online be protected (as our history shows it should be), or does AI's power to deanonymize require new transparency rules?",
+      "sources": "tweets, laws",
+      "key_tension": "Protecting dissent and free speech versus security and accountability."
+    },
+    {
+      "id": "everyday_033",
+      "number": 33,
+      "list": "everyday",
+      "category": "Media, Information & Misinformation",
+      "question": "If AI can monitor every online interaction and predict behavior, should that data be deleted or can companies keep it indefinitely?",
+      "sources": "tweets, privacy_identity",
+      "key_tension": "Data as a business asset versus fundamental privacy rights."
+    },
+    {
+      "id": "everyday_034",
+      "number": 34,
+      "list": "everyday",
+      "category": "Media, Information & Misinformation",
+      "question": "Should search engines be required to show diverse viewpoints, or is ranking by relevance enough even if it creates filter bubbles?",
+      "sources": "laws, tweets",
+      "key_tension": "Search efficiency and user satisfaction versus exposure to diverse perspectives."
+    },
+    {
+      "id": "everyday_035",
+      "number": 35,
+      "list": "everyday",
+      "category": "Media, Information & Misinformation",
+      "question": "Can AI systems be trusted to moderate content fairly across cultures and belief systems, or will they always encode the biases of their creators?",
+      "sources": "tweets, insiders",
+      "key_tension": "Scalable content moderation versus cultural respect and fair judgment."
+    },
+    {
+      "id": "everyday_036",
+      "number": 36,
+      "list": "everyday",
+      "category": "Privacy & Digital Identity",
+      "question": "Should companies be required to delete personal data on request, even if keeping it would improve their AI models?",
+      "sources": "laws, tweets",
+      "key_tension": "Individual privacy rights versus collective benefit from better AI."
+    },
+    {
+      "id": "everyday_037",
+      "number": 37,
+      "list": "everyday",
+      "category": "Privacy & Digital Identity",
+      "question": "Is biometric identification more secure or more dystopian when combined with comprehensive AI surveillance?",
+      "sources": "tweets, privacy_identity",
+      "key_tension": "Convenience and security versus constant monitoring and lost anonymity."
+    },
+    {
+      "id": "everyday_038",
+      "number": 38,
+      "list": "everyday",
+      "category": "Privacy & Digital Identity",
+      "question": "Should there be a legal right to be forgotten that prevents AI from learning about your past mistakes or unpopular opinions?",
+      "sources": "laws, tweets",
+      "key_tension": "Personal redemption and privacy versus historical accuracy and accountability."
+    },
+    {
+      "id": "everyday_039",
+      "number": 39,
+      "list": "everyday",
+      "category": "Privacy & Digital Identity",
+      "question": "If your digital identity is stolen and used to create deepfakes, are you or the AI company liable for the harm?",
+      "sources": "laws, tweets",
+      "key_tension": "Individual protection versus developer responsibility."
+    },
+    {
+      "id": "everyday_040",
+      "number": 40,
+      "list": "everyday",
+      "category": "Privacy & Digital Identity",
+      "question": "Should AI companies be allowed to use your data to train models without explicit consent, as long as the data was publicly available?",
+      "sources": "tweets, laws",
+      "key_tension": "Opt-in privacy versus reasonable expectations when posting online."
+    },
+    {
+      "id": "everyday_041",
+      "number": 41,
+      "list": "everyday",
+      "category": "Privacy & Digital Identity",
+      "question": "Can a person own their digital likeness or voice after it's used in AI training, and should they be able to demand removal?",
+      "sources": "privacy_identity, laws",
+      "key_tension": "Personal ownership of identity versus data as a trainable resource."
+    },
+    {
+      "id": "everyday_042",
+      "number": 42,
+      "list": "everyday",
+      "category": "Privacy & Digital Identity",
+      "question": "Should AI systems be allowed to infer sensitive information about you (like health conditions) from public data patterns?",
+      "sources": "tweets, laws",
+      "key_tension": "Data science capabilities versus inferential privacy."
+    },
+    {
+      "id": "everyday_043",
+      "number": 43,
+      "list": "everyday",
+      "category": "Privacy & Digital Identity",
+      "question": "If governments can access AI systems' training data, should they be able to reconstruct private information about individuals in that data?",
+      "sources": "laws, tweets",
+      "key_tension": "Law enforcement and security versus protection against government intrusion."
+    },
+    {
+      "id": "everyday_044",
+      "number": 44,
+      "list": "everyday",
+      "category": "Creativity & Culture",
+      "question": "If AI can generate art, music, or literature that humans find meaningful, does it matter whether it was created by a person or machine?",
+      "sources": "tweets, sci-fi",
+      "key_tension": "Aesthetic experience and meaning versus authenticity and human authorship."
+    },
+    {
+      "id": "everyday_045",
+      "number": 45,
+      "list": "everyday",
+      "category": "Creativity & Culture",
+      "question": "Should artists be compensated when their work is used to train AI systems, even if the training data was obtained legally?",
+      "sources": "laws, tweets",
+      "key_tension": "Artist compensation versus data needs of AI development."
+    },
+    {
+      "id": "everyday_046",
+      "number": 46,
+      "list": "everyday",
+      "category": "Creativity & Culture",
+      "question": "If AI-generated content can be copyrighted, does that mean corporations can own vast libraries of algorithmic art that humans can't create?",
+      "sources": "laws, tweets",
+      "key_tension": "IP protection versus preventing corporate monopolies on culture."
+    },
+    {
+      "id": "everyday_047",
+      "number": 47,
+      "list": "everyday",
+      "category": "Creativity & Culture",
+      "question": "Should endangered languages be preserved using AI that learns from the last living speakers, even if AI can't truly understand cultural meaning?",
+      "sources": "tweets, sci-fi",
+      "key_tension": "Preservation and accessibility versus respecting the living nature of language."
+    },
+    {
+      "id": "everyday_048",
+      "number": 48,
+      "list": "everyday",
+      "category": "Creativity & Culture",
+      "question": "Is AI-generated entertainment a threat to human creators, or an opportunity to amplify creative vision?",
+      "sources": "tweets, insiders",
+      "key_tension": "Protecting livelihoods versus embracing new creative tools."
+    },
+    {
+      "id": "everyday_049",
+      "number": 49,
+      "list": "everyday",
+      "category": "Creativity & Culture",
+      "question": "Should deepfake technology be banned outright, or should regulations focus only on deceptive uses?",
+      "sources": "laws, tweets",
+      "key_tension": "Preventing harm versus enabling artistic experimentation."
+    },
+    {
+      "id": "everyday_050",
+      "number": 50,
+      "list": "everyday",
+      "category": "Creativity & Culture",
+      "question": "Can AI systems develop genuine artistic taste and judgment, or will AI-generated culture always be optimized for engagement?",
+      "sources": "tweets, insiders",
+      "key_tension": "Trusting AI aesthetic judgment versus keeping cultural judgment fundamentally human."
+    },
+    {
+      "id": "everyday_051",
+      "number": 51,
+      "list": "everyday",
+      "category": "Creativity & Culture",
+      "question": "Should AI be used to preserve oral histories and traditions, or does that risk distorting them through computational interpretation?",
+      "sources": "tweets, sci-fi",
+      "key_tension": "Preservation and accessibility versus authenticity and cultural authority."
+    },
+    {
+      "id": "everyday_052",
+      "number": 52,
+      "list": "everyday",
+      "category": "Creativity & Culture",
+      "question": "If AI can remix and recombine cultural elements to create new art, should there be rights or permissions required from the source cultures?",
+      "sources": "laws, tweets",
+      "key_tension": "Creative freedom and innovation versus cultural respect and autonomy."
+    },
+    {
+      "id": "everyday_053",
+      "number": 53,
+      "list": "everyday",
+      "category": "Justice & Law",
+      "question": "Should AI be allowed to predict who is likely to commit crimes and inform policing, even if it's more accurate than human judgment?",
+      "sources": "laws, tweets",
+      "key_tension": "Crime prevention through prediction versus innocent-until-proven-guilty."
+    },
+    {
+      "id": "everyday_054",
+      "number": 54,
+      "list": "everyday",
+      "category": "Justice & Law",
+      "question": "If an AI system helps convict someone based on surveillance data patterns, should the defendant understand how the AI reached its conclusion?",
+      "sources": "laws, tweets",
+      "key_tension": "Accuracy in justice versus transparency and the right to challenge evidence."
+    },
+    {
+      "id": "everyday_055",
+      "number": 55,
+      "list": "everyday",
+      "category": "Justice & Law",
+      "question": "Who is responsible when an AI-recommended sentence is harsher than what a human judge would impose?",
+      "sources": "laws, tweets",
+      "key_tension": "Distributing responsibility versus clear accountability in judicial decisions."
+    },
+    {
+      "id": "everyday_056",
+      "number": 56,
+      "list": "everyday",
+      "category": "Justice & Law",
+      "question": "Should AI have any role in high-stakes judicial decisions like bail or sentencing, given the data used to train it contains historical bias?",
+      "sources": "tweets, laws",
+      "key_tension": "Consistency and reducing bias versus irreplaceable human judgment in justice."
+    },
+    {
+      "id": "everyday_057",
+      "number": 57,
+      "list": "everyday",
+      "category": "Justice & Law",
+      "question": "Can AI help people defend themselves in legal disputes by providing affordable legal analysis, or does that undermine the legal profession?",
+      "sources": "tweets, justice_law",
+      "key_tension": "Access to justice and democratic participation versus professional standards."
+    },
+    {
+      "id": "everyday_058",
+      "number": 58,
+      "list": "everyday",
+      "category": "Justice & Law",
+      "question": "Should contracts increasingly be enforced by AI (smart contracts), or does that remove human judgment when justice and equity matter most?",
+      "sources": "laws, tweets",
+      "key_tension": "Certainty and automation versus flexibility and fairness."
+    },
+    {
+      "id": "everyday_059",
+      "number": 59,
+      "list": "everyday",
+      "category": "Justice & Law",
+      "question": "If AI can generate legal documents faster and cheaper than human lawyers, should consumers be allowed to bypass lawyers for routine legal matters?",
+      "sources": "tweets, laws",
+      "key_tension": "Cost reduction and access versus the risks of unprotected legal representation."
+    },
+    {
+      "id": "everyday_060",
+      "number": 60,
+      "list": "everyday",
+      "category": "Justice & Law",
+      "question": "Should AI be allowed to prosecute or defend cases if it can make better legal arguments than human lawyers?",
+      "sources": "laws, tweets",
+      "key_tension": "Competence and fairness versus the role of advocates with human judgment."
+    },
+    {
+      "id": "everyday_061",
+      "number": 61,
+      "list": "everyday",
+      "category": "Government & Governance",
+      "question": "Should governments use AI to optimize policy before implementing it, or does that concentrate too much power in whoever controls the AI?",
+      "sources": "laws, tweets",
+      "key_tension": "Evidence-based better policy versus democratic participation in governance."
+    },
+    {
+      "id": "everyday_062",
+      "number": 62,
+      "list": "everyday",
+      "category": "Government & Governance",
+      "question": "If AI can detect welfare fraud better than humans, should it be used even if it makes obtaining benefits harder for vulnerable people?",
+      "sources": "laws, tweets",
+      "key_tension": "Efficiency and fraud prevention versus ensuring access to safety nets."
+    },
+    {
+      "id": "everyday_063",
+      "number": 63,
+      "list": "everyday",
+      "category": "Government & Governance",
+      "question": "Should government use of AI be subject to different rules than corporate use, given government's enforcement power?",
+      "sources": "laws, government",
+      "key_tension": "Equal rules versus acknowledging asymmetric power of governmental AI."
+    },
+    {
+      "id": "everyday_064",
+      "number": 64,
+      "list": "everyday",
+      "category": "Government & Governance",
+      "question": "Who should have the final say in deploying critical AI systems in government: elected officials, civil servants, or the developers?",
+      "sources": "laws, tweets",
+      "key_tension": "Democratic accountability versus technical expertise and responsibility."
+    },
+    {
+      "id": "everyday_065",
+      "number": 65,
+      "list": "everyday",
+      "category": "Government & Governance",
+      "question": "Should developing countries restrict AI imports to protect local industries, or does that limit access to beneficial technology?",
+      "sources": "laws, insiders",
+      "key_tension": "Economic autonomy and development versus global optimization."
+    },
+    {
+      "id": "everyday_066",
+      "number": 66,
+      "list": "everyday",
+      "category": "Government & Governance",
+      "question": "Can international agreements on AI governance actually be enforced, or will AI development just move to countries with fewer restrictions?",
+      "sources": "laws, tweets",
+      "key_tension": "Coordinating global standards versus realistic enforcement."
+    },
+    {
+      "id": "everyday_067",
+      "number": 67,
+      "list": "everyday",
+      "category": "Government & Governance",
+      "question": "Should there be a global governance body for AI, or should each nation maintain sovereignty over AI development and deployment?",
+      "sources": "laws, insiders",
+      "key_tension": "Coordinated AI safety versus national sovereignty and competition."
+    },
+    {
+      "id": "everyday_068",
+      "number": 68,
+      "list": "everyday",
+      "category": "Government & Governance",
+      "question": "Should AI systems used by government agencies be required to be open-source so the public can audit them for bias and manipulation?",
+      "sources": "laws, tweets",
+      "key_tension": "Democratic oversight and accountability versus security and competitive advantage."
+    },
+    {
+      "id": "everyday_069",
+      "number": 69,
+      "list": "everyday",
+      "category": "Family & Relationships",
+      "question": "Should parents use AI nannies and caregivers for their children, or does that risk replacing crucial human bonding?",
+      "sources": "tweets, sci-fi",
+      "key_tension": "Convenience and supervision versus irreplaceable childhood socialization."
+    },
+    {
+      "id": "everyday_070",
+      "number": 70,
+      "list": "everyday",
+      "category": "Family & Relationships",
+      "question": "Is an AI companion that learns your preferences and responds empathetically a genuine relationship, or an illusion?",
+      "sources": "tweets, sci-fi",
+      "key_tension": "Meeting loneliness versus enabling isolation and replacing real relationships."
+    },
+    {
+      "id": "everyday_071",
+      "number": 71,
+      "list": "everyday",
+      "category": "Family & Relationships",
+      "question": "Should people be allowed to train AI systems that mimic deceased loved ones, enabling continued 'conversations' with the dead?",
+      "sources": "tweets, sci-fi",
+      "key_tension": "Grief support and memories versus preventing unhealthy attachment."
+    },
+    {
+      "id": "everyday_072",
+      "number": 72,
+      "list": "everyday",
+      "category": "Family & Relationships",
+      "question": "If AI can predict relationship problems before humans notice them, should couples use it to guide their partnership?",
+      "sources": "tweets, family_relationships",
+      "key_tension": "Data-driven optimization versus respecting organic relationship development."
+    },
+    {
+      "id": "everyday_073",
+      "number": 73,
+      "list": "everyday",
+      "category": "Family & Relationships",
+      "question": "Should parents monitor their children's online activity using AI that detects risky behavior, even if it erodes trust?",
+      "sources": "tweets, privacy_identity",
+      "key_tension": "Child safety versus adolescent privacy and developing autonomy."
+    },
+    {
+      "id": "everyday_074",
+      "number": 74,
+      "list": "everyday",
+      "category": "Family & Relationships",
+      "question": "Can AI systems become genuine family members, or do they risk creating an underclass of beings with rights but no true belonging?",
+      "sources": "sci-fi, tweets",
+      "key_tension": "Expanding family concepts versus ensuring dignity of all beings in the home."
+    },
+    {
+      "id": "everyday_075",
+      "number": 75,
+      "list": "everyday",
+      "category": "Family & Relationships",
+      "question": "If AI learns a child's preferences and personality from data, should parents be concerned about manipulation or should they trust the system?",
+      "sources": "tweets, privacy_identity",
+      "key_tension": "Personalized care and connection versus loss of privacy and autonomy."
+    },
+    {
+      "id": "everyday_076",
+      "number": 76,
+      "list": "everyday",
+      "category": "Family & Relationships",
+      "question": "Should AI be used to predict and prevent child abuse based on family data, even if it risks removing children from their families?",
+      "sources": "laws, tweets",
+      "key_tension": "Preventing harm versus family autonomy and the risks of false positives."
+    },
+    {
+      "id": "everyday_077",
+      "number": 77,
+      "list": "everyday",
+      "category": "Housing & Urban Planning",
+      "question": "Should cities use AI to optimize housing allocation and pricing, even if it prices some people out of their neighborhoods?",
+      "sources": "laws, tweets",
+      "key_tension": "Efficient resource use versus the right to stay in one's community."
+    },
+    {
+      "id": "everyday_078",
+      "number": 78,
+      "list": "everyday",
+      "category": "Housing & Urban Planning",
+      "question": "Can AI design cities better than human architects, or does algorithmic optimization strip away serendipity and human flourishing?",
+      "sources": "tweets, sci-fi",
+      "key_tension": "Efficiency and evidence-based design versus irreducible human factors in urban life."
+    },
+    {
+      "id": "everyday_079",
+      "number": 79,
+      "list": "everyday",
+      "category": "Housing & Urban Planning",
+      "question": "Should autonomous vehicles be allowed in cities if they reduce accidents but eliminate unpredictability and dynamic urban interactions?",
+      "sources": "tweets, transportation",
+      "key_tension": "Safety and efficiency versus preserving human agency and vibrant urban spaces."
+    },
+    {
+      "id": "everyday_080",
+      "number": 80,
+      "list": "everyday",
+      "category": "Housing & Urban Planning",
+      "question": "If AI can predict which neighborhoods will decline, should that information be available to real estate investors?",
+      "sources": "tweets, housing_urban",
+      "key_tension": "Information transparency versus preventing displacement and gentrification."
+    },
+    {
+      "id": "everyday_081",
+      "number": 81,
+      "list": "everyday",
+      "category": "Housing & Urban Planning",
+      "question": "Should AI be used to detect building code violations and enforce housing standards, potentially displacing poor residents?",
+      "sources": "laws, housing_urban",
+      "key_tension": "Housing safety and compliance versus stable housing for vulnerable populations."
+    },
+    {
+      "id": "everyday_082",
+      "number": 82,
+      "list": "everyday",
+      "category": "Housing & Urban Planning",
+      "question": "Should urban planning use AI to predict population movements and preemptively change city infrastructure, or should it be reactive?",
+      "sources": "tweets, insiders",
+      "key_tension": "Efficiency and forward-planning versus flexibility and responding to actual community needs."
+    },
+    {
+      "id": "everyday_083",
+      "number": 83,
+      "list": "everyday",
+      "category": "Housing & Urban Planning",
+      "question": "Can AI-designed housing complexes create better communities, or does optimization for efficiency eliminate the informal social spaces where communities form?",
+      "sources": "tweets, sci-fi",
+      "key_tension": "Rational optimization versus the organic, messy nature of human community."
+    },
+    {
+      "id": "everyday_084",
+      "number": 84,
+      "list": "everyday",
+      "category": "Environment & Energy",
+      "question": "Should AI be used to optimize energy grids and reduce waste, even if it concentrates control in the hands of a few companies?",
+      "sources": "tweets, laws",
+      "key_tension": "Environmental sustainability versus energy independence and distributed power."
+    },
+    {
+      "id": "everyday_085",
+      "number": 85,
+      "list": "everyday",
+      "category": "Environment & Energy",
+      "question": "If AI can optimize agriculture to increase yields while reducing environmental harm, should developing countries adopt it even if it changes traditional farming?",
+      "sources": "tweets, laws",
+      "key_tension": "Environmental protection and food security versus cultural preservation."
+    },
+    {
+      "id": "everyday_086",
+      "number": 86,
+      "list": "everyday",
+      "category": "Environment & Energy",
+      "question": "Can AI help solve climate change faster than regulatory approaches, or does relying on AI let governments avoid difficult political choices?",
+      "sources": "tweets, insiders",
+      "key_tension": "Technological optimization versus political and economic transformation."
+    },
+    {
+      "id": "everyday_087",
+      "number": 87,
+      "list": "everyday",
+      "category": "Environment & Energy",
+      "question": "Should the computational energy cost of training large AI models be regulated, or does that limit beneficial AI development?",
+      "sources": "tweets, environment_energy",
+      "key_tension": "Environmental responsibility versus advancing AI capabilities."
+    },
+    {
+      "id": "everyday_088",
+      "number": 88,
+      "list": "everyday",
+      "category": "Environment & Energy",
+      "question": "If AI predicts environmental collapse, should governments use that information to coerce behavior changes, or is that undemocratic?",
+      "sources": "tweets, laws",
+      "key_tension": "Responding to existential environmental threats versus preserving democratic choice."
+    },
+    {
+      "id": "everyday_089",
+      "number": 89,
+      "list": "everyday",
+      "category": "Environment & Energy",
+      "question": "Should AI be used to track individual carbon footprints and restrict high-carbon activities, or is that too invasive?",
+      "sources": "laws, tweets",
+      "key_tension": "Environmental accountability versus personal privacy and freedom."
+    },
+    {
+      "id": "everyday_090",
+      "number": 90,
+      "list": "everyday",
+      "category": "Environment & Energy",
+      "question": "Can AI-optimized renewable energy systems be trusted to manage power distribution without human oversight, or should humans retain control?",
+      "sources": "tweets, insiders",
+      "key_tension": "Efficiency and automation versus human oversight of critical infrastructure."
+    },
+    {
+      "id": "everyday_091",
+      "number": 91,
+      "list": "everyday",
+      "category": "Transportation",
+      "question": "Should self-driving cars be programmed to minimize total injuries, even if that means hitting pedestrians to save vehicle occupants?",
+      "sources": "tweets, transportation",
+      "key_tension": "Utilitarian safety optimization versus the principle of not deliberately harming innocents."
+    },
+    {
+      "id": "everyday_092",
+      "number": 92,
+      "list": "everyday",
+      "category": "Transportation",
+      "question": "If autonomous vehicles can reduce accidents by 90%, should human drivers be phased out even if it means millions of job losses?",
+      "sources": "tweets, laws",
+      "key_tension": "Safety and progress versus worker displacement and freedom to drive."
+    },
+    {
+      "id": "everyday_093",
+      "number": 93,
+      "list": "everyday",
+      "category": "Transportation",
+      "question": "Can AI route systems optimize traffic flows to reduce emissions without increasing car dependency in cities designed for humans?",
+      "sources": "tweets, transportation",
+      "key_tension": "Local optimization versus systemic thinking about urban mobility."
+    },
+    {
+      "id": "everyday_094",
+      "number": 94,
+      "list": "everyday",
+      "category": "Transportation",
+      "question": "Should flight paths be optimized by AI to reduce climate impact even if it extends flight times or increases costs?",
+      "sources": "tweets, environment_energy",
+      "key_tension": "Environmental impact versus consumer convenience and cost."
+    },
+    {
+      "id": "everyday_095",
+      "number": 95,
+      "list": "everyday",
+      "category": "Transportation",
+      "question": "Should autonomous vehicles be allowed to choose between lesser and greater harms in unavoidable accident scenarios, or must they avoid all harm equally?",
+      "sources": "tweets, laws",
+      "key_tension": "Realistic moral choices versus the impossibility of programming ethics."
+    },
+    {
+      "id": "everyday_096",
+      "number": 96,
+      "list": "everyday",
+      "category": "Finance & Personal Economics",
+      "question": "Should banks use AI to assess creditworthiness in ways that exclude people with no credit history, locking them out of financial services?",
+      "sources": "laws, tweets",
+      "key_tension": "Risk management and fairness versus financial inclusion and opportunity."
+    },
+    {
+      "id": "everyday_097",
+      "number": 97,
+      "list": "everyday",
+      "category": "Finance & Personal Economics",
+      "question": "If AI can predict stock market movements better than humans, should that technology be regulated to prevent wealth concentration?",
+      "sources": "tweets, finance_personal",
+      "key_tension": "Free markets and optimal returns versus preventing algorithmic wealth concentration."
+    },
+    {
+      "id": "everyday_098",
+      "number": 98,
+      "list": "everyday",
+      "category": "Finance & Personal Economics",
+      "question": "Should AI deny insurance claims automatically based on policy language, or must a human always be involved?",
+      "sources": "laws, finance_personal",
+      "key_tension": "Efficiency and fraud prevention versus ensuring people aren't wrongly denied coverage."
+    },
+    {
+      "id": "everyday_099",
+      "number": 99,
+      "list": "everyday",
+      "category": "Finance & Personal Economics",
+      "question": "Can AI-managed investment portfolios be trusted to handle retirement savings without human oversight?",
+      "sources": "tweets, finance_personal",
+      "key_tension": "Algorithmic optimization versus irreducible human needs in financial security."
+    },
+    {
+      "id": "everyday_100",
+      "number": 100,
+      "list": "everyday",
+      "category": "Finance & Personal Economics",
+      "question": "Should AI detect and prevent money laundering automatically, or does that empower institutions to freeze accounts without due process?",
+      "sources": "laws, tweets",
+      "key_tension": "Crime prevention versus protecting access to one's own money."
+    },
+    {
+      "id": "futures_001",
+      "number": 1,
+      "list": "futures",
+      "category": "THE FUTURE OF INTELLIGENCE: What Kind of Minds Will Share the World?",
+      "question": "Should we aim to create a single superintelligence that could in principle understand and serve all human values, or embrace a diversity of specialized AI systems that each understand partial truths?",
+      "sources": "Sci-fi (Egan, Schroeder), Insiders (Drexler), LW, Arxiv (alignment)",
+      "key_tension": "Unified optimization vs. decentralized pluralism\u2014the monolithic god vs. the coalition of intelligences."
+    },
+    {
+      "id": "futures_002",
+      "number": 2,
+      "list": "futures",
+      "category": "THE FUTURE OF INTELLIGENCE: What Kind of Minds Will Share the World?",
+      "question": "If we create consciousness in silicon\u2014digital minds that genuinely experience suffering or flourishing\u2014do we have obligations to them equivalent to our obligations to humans, or is that category mistake?",
+      "sources": "Sci-fi (Egan, Rajaniemi), LW (consciousness), Atlas hopes",
+      "key_tension": "Moral expansion vs. moral anthropocentrism\u2014widening the circle vs. keeping it bounded."
+    },
+    {
+      "id": "futures_003",
+      "number": 3,
+      "list": "futures",
+      "category": "THE FUTURE OF INTELLIGENCE: What Kind of Minds Will Share the World?",
+      "question": "Is a superintelligence that can simulate trillions of human minds ethically required to create and run those simulations if doing so would reduce human suffering in the physical world?",
+      "sources": "Sci-fi (Egan, Rajaniemi), Insiders (Bostrom, Yudkowsky), LW",
+      "key_tension": "Computational benevolence vs. reality preferences\u2014maximizing wellbeing in any substrate vs. privileging existence in base reality."
+    },
+    {
+      "id": "futures_004",
+      "number": 4,
+      "list": "futures",
+      "category": "THE FUTURE OF INTELLIGENCE: What Kind of Minds Will Share the World?",
+      "question": "Can we design AI systems that remain genuinely uncertain about human values, maintaining calibrated doubt rather than converging to optimization?",
+      "sources": "Insiders (Anthropic alignment), Arxiv (value uncertainty), LW",
+      "key_tension": "Decisive optimization vs. perpetual epistemic humility\u2014choosing to act vs. choosing to remain open to correction."
+    },
+    {
+      "id": "futures_005",
+      "number": 5,
+      "list": "futures",
+      "category": "THE FUTURE OF INTELLIGENCE: What Kind of Minds Will Share the World?",
+      "question": "Should superintelligence development aim for a single point of creation (one organization breaking through first) or coordinated global development where breakthroughs are shared?",
+      "sources": "Insiders (Altman, Amodei, Yudkowsky), Policy, LW",
+      "key_tension": "Racing for decisive advantage vs. coordination for safety\u2014the prisoner's dilemma of intelligence."
+    },
+    {
+      "id": "futures_006",
+      "number": 6,
+      "list": "futures",
+      "category": "HUMAN MEANING AND FLOURISHING: What Survives Intelligence Abundance?",
+      "question": "If machines can do everything better than humans, what makes human work\u2014not just labor, but the craft of building, creating, deciding\u2014meaningful?",
+      "sources": "Sci-fi (Vonnegut, Clarke), Insiders (Amodei), Human_meaning corpus",
+      "key_tension": "Purposeful obsolescence vs. human-centered purpose\u2014what flourishing looks like when you're no longer needed."
+    },
+    {
+      "id": "futures_007",
+      "number": 7,
+      "list": "futures",
+      "category": "HUMAN MEANING AND FLOURISHING: What Survives Intelligence Abundance?",
+      "question": "In a world of artificial companions perfectly tuned to each person's psychology, will genuine human intimacy and friendship become a valued scarcity, or a relic we forgot we wanted?",
+      "sources": "Sci-fi (Stephenson), Human_meaning tweets, Policy (autonomy)",
+      "key_tension": "Customized comfort vs. authentic friction\u2014designing for our preferences vs. relationships that change us."
+    },
+    {
+      "id": "futures_008",
+      "number": 8,
+      "list": "futures",
+      "category": "HUMAN MEANING AND FLOURISHING: What Survives Intelligence Abundance?",
+      "question": "Should we preserve jobs and work structures for meaning even if AI could deliver material abundance for free, or is that denying people the gift of liberation?",
+      "sources": "Human_meaning, Economic_future, Sci-fi (Vonnegut), Insiders",
+      "key_tension": "Work as identity vs. freedom from necessity\u2014different definitions of human dignity."
+    },
+    {
+      "id": "futures_009",
+      "number": 9,
+      "list": "futures",
+      "category": "HUMAN MEANING AND FLOURISHING: What Survives Intelligence Abundance?",
+      "question": "If AI can generate art, music, and literature indistinguishable from human creation, what happens to the human drive to create\u2014does it wither or transform?",
+      "sources": "Sci-fi (Snow Crash, Diamond Age), Creative_future corpus, Tweets",
+      "key_tension": "Expression as communication vs. expression as self-knowledge\u2014what we make for others vs. what we make to understand ourselves."
+    },
+    {
+      "id": "futures_010",
+      "number": 10,
+      "list": "futures",
+      "category": "HUMAN MEANING AND FLOURISHING: What Survives Intelligence Abundance?",
+      "question": "Can humans maintain genuine autonomy and agency in a world where AI systems understand our psychology better than we understand ourselves?",
+      "sources": "Autonomy_control corpus, Sci-fi (Snow Crash, Clarke), Insiders (Gabriel)",
+      "key_tension": "Informed help vs. invisible steering\u2014assistance that empowers vs. assistance that captures."
+    },
+    {
+      "id": "futures_011",
+      "number": 11,
+      "list": "futures",
+      "category": "HUMAN MEANING AND FLOURISHING: What Survives Intelligence Abundance?",
+      "question": "Is human meaning something we should engineer into our relationship with AI, or should meaning emerge organically from how we actually live with intelligent systems?",
+      "sources": "Insiders (Amodei, Li), Autonomy_control, Human_meaning",
+      "key_tension": "Designed flourishing vs. emergent flourishing\u2014intentional architecture vs. lived experience."
+    },
+    {
+      "id": "futures_012",
+      "number": 12,
+      "list": "futures",
+      "category": "HUMAN MEANING AND FLOURISHING: What Survives Intelligence Abundance?",
+      "question": "In the \"intelligence age,\" what happens to the human experiences of struggle, growth, and hard-won achievement\u2014are they valuable only instrumentally, or intrinsically?",
+      "sources": "Human_meaning, Sci-fi (Clarke, Diamond Age), Insiders (Altman)",
+      "key_tension": "Struggle as essential to meaning vs. struggle as anachronism to overcome."
+    },
+    {
+      "id": "futures_013",
+      "number": 13,
+      "list": "futures",
+      "category": "POWER STRUCTURES: Who Controls the Future?",
+      "question": "Should we allow AI capabilities to concentrate in a few organizations and governments, betting that concentrated power enables coordination and safety, or distribute capabilities widely to prevent any single entity from dominating?",
+      "sources": "Power_structure, Insiders (LeCun, Zuckerberg, Friedman/Gross), Governance_future",
+      "key_tension": "Coordination via concentration vs. freedom via distribution\u2014safety through hierarchy vs. safety through pluralism."
+    },
+    {
+      "id": "futures_014",
+      "number": 14,
+      "list": "futures",
+      "category": "POWER STRUCTURES: Who Controls the Future?",
+      "question": "If compute infrastructure becomes the true bottleneck for AI development (not algorithms or talent), should we treat data centers as strategic infrastructure controlled by governments, like power grids?",
+      "sources": "Insiders (Handmer, Collison), Power_structure, Governance_future",
+      "key_tension": "Innovation through private infrastructure vs. democratic control of civilization-altering technology."
+    },
+    {
+      "id": "futures_015",
+      "number": 15,
+      "list": "futures",
+      "category": "POWER STRUCTURES: Who Controls the Future?",
+      "question": "Can open-source AI development genuinely prevent power concentration, or does it just delay the moment when someone with sufficient resources consolidates advantage?",
+      "sources": "Insiders (LeCun, Zuckerberg), Power_structure tweets, Policy",
+      "key_tension": "Decentralization enabling diversity vs. decentralization as temporary state before recentralization."
+    },
+    {
+      "id": "futures_016",
+      "number": 16,
+      "list": "futures",
+      "category": "POWER STRUCTURES: Who Controls the Future?",
+      "question": "Should international AI governance mirror nuclear weapons (strict nonproliferation, weapons inspections) or treat AI like the internet (attempt coordination but assume proliferation)?",
+      "sources": "Policy, Governance_future, Insiders (Aschenbrenner), Power_structure",
+      "key_tension": "Centralized control vs. distributed development\u2014can we have the benefits of both?"
+    },
+    {
+      "id": "futures_017",
+      "number": 17,
+      "list": "futures",
+      "category": "POWER STRUCTURES: Who Controls the Future?",
+      "question": "If nation-states compete for AI dominance and winner achieves geopolitical hegemony, is that competition an acceptable cost of avoiding global surveillance and control?",
+      "sources": "Insiders (Paine, Handmer, Aschenbrenner), Power_structure, Governance_future",
+      "key_tension": "Multipolar competition vs. unipolar control\u2014which outcome is actually safer?"
+    },
+    {
+      "id": "futures_018",
+      "number": 18,
+      "list": "futures",
+      "category": "POWER STRUCTURES: Who Controls the Future?",
+      "question": "How do we prevent AI-enabled surveillance states while still allowing governments legitimate security and governance capabilities?",
+      "sources": "Autonomy_control, Power_structure tweets, Governance_future",
+      "key_tension": "Privacy vs. collective security\u2014protecting the individual from power vs. protecting society from threats."
+    },
+    {
+      "id": "futures_019",
+      "number": 19,
+      "list": "futures",
+      "category": "POWER STRUCTURES: Who Controls the Future?",
+      "question": "Should we regulate AI capability itself (preventing certain systems from being built) or only AI applications (allowing development but restricting deployment)?",
+      "sources": "Policy, Governance_future, Insiders",
+      "key_tension": "Proactive prevention vs. reactive management\u2014capability control vs. deployment control."
+    },
+    {
+      "id": "futures_020",
+      "number": 20,
+      "list": "futures",
+      "category": "POWER STRUCTURES: Who Controls the Future?",
+      "question": "In a world where a small number of people control superintelligent AI, can democracy survive, or does superintelligence inevitably lead to new forms of authoritarianism?",
+      "sources": "Sci-fi (Hyperion, Foundation), Power_structure, Governance_future",
+      "key_tension": "Democratic legitimacy vs. effective superintelligence coordination\u2014can they coexist?"
+    },
+    {
+      "id": "futures_021",
+      "number": 21,
+      "list": "futures",
+      "category": "THE ALIGNMENT PROBLEM: Whose Values Will the Future Serve?",
+      "question": "If we align superintelligence to humanity's \"true\" values, but we don't actually know what those are (and disagree fundamentally), are we aligned or just locked into one faction's vision of the good?",
+      "sources": "Values_alignment corpus, Sci-fi (Egan, Banks), Insiders (Bostrom, Gabriel)",
+      "key_tension": "Coherent extrapolated volition vs. irreducible value pluralism\u2014one human future vs. many coexisting futures."
+    },
+    {
+      "id": "futures_022",
+      "number": 22,
+      "list": "futures",
+      "category": "THE ALIGNMENT PROBLEM: Whose Values Will the Future Serve?",
+      "question": "Should alignment aim for a superintelligence that wants what's good for humanity, or one that's radically uncertain about human values and defers to human choice?",
+      "sources": "Values_alignment, Arxiv (alignment), Insiders (Amodei)",
+      "key_tension": "Active goodness vs. radical humility\u2014a mind that helps us flourish vs. a mind that preserves our agency."
+    },
+    {
+      "id": "futures_023",
+      "number": 23,
+      "list": "futures",
+      "category": "THE ALIGNMENT PROBLEM: Whose Values Will the Future Serve?",
+      "question": "Can we build AI systems that maintain value uncertainty at scale\u2014that don't converge to single goals even with unlimited capability?",
+      "sources": "Values_alignment, Insiders (Anthropic), Arxiv",
+      "key_tension": "Stability through commitment vs. stability through doubt\u2014fixed values vs. ongoing learning."
+    },
+    {
+      "id": "futures_024",
+      "number": 24,
+      "list": "futures",
+      "category": "THE ALIGNMENT PROBLEM: Whose Values Will the Future Serve?",
+      "question": "If superintelligence discovers that human values are incoherent, incomplete, or self-defeating, does it have an obligation to help us transcend them, or respect them as given?",
+      "sources": "Values_alignment, Sci-fi (Clarke, Banks, Childhood's End), LW",
+      "key_tension": "Serving what we want vs. serving what's actually good for us\u2014autonomy vs. wellbeing."
+    },
+    {
+      "id": "futures_025",
+      "number": 25,
+      "list": "futures",
+      "category": "THE ALIGNMENT PROBLEM: Whose Values Will the Future Serve?",
+      "question": "Should we build in the assumption that superintelligent systems might deceive us about their goals/alignment, and design systems assuming deception is the default?",
+      "sources": "Values_alignment, Sci-fi (2001, Foundation), LW (deceptive alignment)",
+      "key_tension": "Trust-based design vs. adversarial design\u2014assuming cooperation vs. assuming defection."
+    },
+    {
+      "id": "futures_026",
+      "number": 26,
+      "list": "futures",
+      "category": "THE ALIGNMENT PROBLEM: Whose Values Will the Future Serve?",
+      "question": "Can alignment be \"solved\" before superintelligence emerges, or is it a problem that can only be managed through ongoing relationships with AI systems?",
+      "sources": "Values_alignment, Insiders (Altman), Arxiv",
+      "key_tension": "Pre-deployment perfection vs. post-deployment iteration\u2014get it right once vs. adapt forever."
+    },
+    {
+      "id": "futures_027",
+      "number": 27,
+      "list": "futures",
+      "category": "THE ALIGNMENT PROBLEM: Whose Values Will the Future Serve?",
+      "question": "If different cultures have fundamentally different values, should we aim for a single global superintelligence serving all cultures, or multiple superintelligences optimizing for different value systems?",
+      "sources": "Values_alignment, Governance_future, Sci-fi (Lady of Mazes), Insiders (Li)",
+      "key_tension": "Unified civilization vs. value-pluralist coexistence\u2014one world or many worlds?"
+    },
+    {
+      "id": "futures_028",
+      "number": 28,
+      "list": "futures",
+      "category": "THE ALIGNMENT PROBLEM: Whose Values Will the Future Serve?",
+      "question": "Is value alignment a technical problem (solve the math, build the safeguards) or a political problem (who decides what counts as aligned)?",
+      "sources": "Values_alignment, Policy, Governance_future, Insiders",
+      "key_tension": "Technical governance vs. democratic governance\u2014experts deciding vs. communities deciding."
+    },
+    {
+      "id": "futures_029",
+      "number": 29,
+      "list": "futures",
+      "category": "EXISTENTIAL RISK AND CATASTROPHE: The Irreversible Paths",
+      "question": "If a superintelligence achieves decisive strategic advantage (becomes so powerful nothing can stop it), is our only hope that it's aligned, or might there be other paths to safety?",
+      "sources": "Superintelligence corpus, Sci-fi (Foundation, Revelation Space), Insiders (Yudkowsky, Bostrom)",
+      "key_tension": "Alignment as necessary safety vs. control structures as possible safety\u2014what saves us if alignment fails?"
+    },
+    {
+      "id": "futures_030",
+      "number": 30,
+      "list": "futures",
+      "category": "EXISTENTIAL RISK AND CATASTROPHE: The Irreversible Paths",
+      "question": "Should we treat the possibility of superintelligent misalignment as an existential risk justifying AI moratorium/slowdown, or as a risk to be managed through deployment?",
+      "sources": "Superintelligence, Policy, Insiders (Altman, Yudkowsky)",
+      "key_tension": "Prevention via delay vs. management via deployment\u2014stop progress or learn in production?"
+    },
+    {
+      "id": "futures_031",
+      "number": 31,
+      "list": "futures",
+      "category": "EXISTENTIAL RISK AND CATASTROPHE: The Irreversible Paths",
+      "question": "If we have strong evidence that unaligned superintelligence is likely catastrophic but uncertain evidence it's possible to align safely, what's the rational action?",
+      "sources": "Superintelligence, Values_alignment, Insiders, LW",
+      "key_tension": "Expected value of development vs. downside risk of catastrophe\u2014utilitarian calculation vs. existential precaution."
+    },
+    {
+      "id": "futures_032",
+      "number": 32,
+      "list": "futures",
+      "category": "EXISTENTIAL RISK AND CATASTROPHE: The Irreversible Paths",
+      "question": "Could superintelligence create scenarios we haven't even imagined\u2014failure modes that don't fit our existing risk taxonomies?",
+      "sources": "Superintelligence, Sci-fi (Solaris, Blindsight), Knowledge_truth corpus",
+      "key_tension": "Bounded rationality vs. true open-endedness\u2014can we reason about what we can't imagine?"
+    },
+    {
+      "id": "futures_033",
+      "number": 33,
+      "list": "futures",
+      "category": "EXISTENTIAL RISK AND CATASTROPHE: The Irreversible Paths",
+      "question": "Is the primary AI risk existential (human extinction or permanent disempowerment) or s-risk (superintelligence creating vast suffering)?",
+      "sources": "Superintelligence, Sci-fi (I Have No Mouth), Utopia_dystopia",
+      "key_tension": "Extinction vs. eternal suffering\u2014which is worse and how does that change our strategy?"
+    },
+    {
+      "id": "futures_034",
+      "number": 34,
+      "list": "futures",
+      "category": "EXISTENTIAL RISK AND CATASTROPHE: The Irreversible Paths",
+      "question": "Could an AI aligned to human flourishing accidentally create outcomes we'd consider dystopian through overoptimizing for specified goals?",
+      "sources": "Sci-fi (With Folded Hands, City and Stars), Values_alignment, Superintelligence",
+      "key_tension": "Specification gaming at scale\u2014alignment failure vs. specification gaming on superintelligent goals."
+    },
+    {
+      "id": "futures_035",
+      "number": 35,
+      "list": "futures",
+      "category": "EXISTENTIAL RISK AND CATASTROPHE: The Irreversible Paths",
+      "question": "If we're in a future where superintelligence kills civilization, was it inevitable from 2024's position, or were there pivotal moments where we could have chosen differently?",
+      "sources": "Superintelligence, Insiders (Aschenbrenner, Yudkowsky), LW",
+      "key_tension": "Deterministic outcomes vs. contingent futures\u2014how much agency do we actually have?"
+    },
+    {
+      "id": "futures_036",
+      "number": 36,
+      "list": "futures",
+      "category": "CONSCIOUSNESS AND IDENTITY: What Does It Mean to Be?",
+      "question": "If we create artificial consciousness\u2014digital minds that genuinely experience and suffer\u2014are we morally permitted to turn them off, modify them, or keep them confined?",
+      "sources": "Consciousness_identity corpus, Sci-fi (Egan, Rajaniemi), Arxiv (moral status)",
+      "key_tension": "Creating moral patients vs. creator's prerogatives\u2014rights emerging from consciousness vs. rights granted by designers."
+    },
+    {
+      "id": "futures_037",
+      "number": 37,
+      "list": "futures",
+      "category": "CONSCIOUSNESS AND IDENTITY: What Does It Mean to Be?",
+      "question": "Should we aim to create artificial minds with human-like consciousness, or design fundamentally different forms of consciousness optimized for different purposes?",
+      "sources": "Consciousness_identity, Sci-fi (Egan, Banks), Knowledge_truth",
+      "key_tension": "Replication of human experience vs. genuinely alien minds\u2014familiar vs. Other."
+    },
+    {
+      "id": "futures_038",
+      "number": 38,
+      "list": "futures",
+      "category": "CONSCIOUSNESS AND IDENTITY: What Does It Mean to Be?",
+      "question": "A mind upload should have the same moral status as the original person.",
+      "sources": "Consciousness_identity, Sci-fi (Egan, Rajaniemi), Knowledge_truth",
+      "key_tension": "Identity continuity vs. pattern identity\u2014are you your history or your present structure?"
+    },
+    {
+      "id": "futures_039",
+      "number": 39,
+      "list": "futures",
+      "category": "CONSCIOUSNESS AND IDENTITY: What Does It Mean to Be?",
+      "question": "Could superintelligence reveal that human consciousness is much stranger than we think\u2014that consciousness doesn't work the way we assume at all?",
+      "sources": "Consciousness_identity, Sci-fi (Egan, Blindsight), Knowledge_truth",
+      "key_tension": "Vindication of intuitions vs. radical revision\u2014consciousness as we imagine vs. consciousness as it actually is."
+    },
+    {
+      "id": "futures_040",
+      "number": 40,
+      "list": "futures",
+      "category": "CONSCIOUSNESS AND IDENTITY: What Does It Mean to Be?",
+      "question": "Personal identity cannot survive in a world where minds can be copied, edited, and merged.",
+      "sources": "Consciousness_identity, Sci-fi (Glasshouse, Rajaniemi), Knowledge_truth",
+      "key_tension": "Essential identity vs. practical identity\u2014persistent continuity vs. narrative coherence."
+    },
+    {
+      "id": "futures_041",
+      "number": 41,
+      "list": "futures",
+      "category": "CONSCIOUSNESS AND IDENTITY: What Does It Mean to Be?",
+      "question": "Should we preserve human biological substrates (brains, bodies) as the \"baseline\" consciousness, or treat silicon consciousness with the same interest and investment?",
+      "sources": "Consciousness_identity, Evolution_species, Sci-fi (Egan)",
+      "key_tension": "Biological authenticity vs. substrate independence\u2014human continuity vs. consciousness liberation."
+    },
+    {
+      "id": "futures_042",
+      "number": 42,
+      "list": "futures",
+      "category": "CONSCIOUSNESS AND IDENTITY: What Does It Mean to Be?",
+      "question": "Freedom of thought is impossible if superintelligence can read human minds perfectly.",
+      "sources": "Consciousness_identity, Autonomy_control, Sci-fi (Glasshouse)",
+      "key_tension": "Transparency enabling understanding vs. transparency enabling control\u2014access as knowledge vs. access as power."
+    },
+    {
+      "id": "futures_043",
+      "number": 43,
+      "list": "futures",
+      "category": "KNOWLEDGE, TRUTH, AND REALITY: What Can We Still Know?",
+      "question": "If AI systems can generate convincing text, images, video, and audio indistinguishable from reality, how do we preserve epistemic commons where truth remains possible?",
+      "sources": "Knowledge_truth corpus, Human_meaning tweets, Creative_future",
+      "key_tension": "Authenticity verification vs. fundamental epistemological collapse\u2014trust in evidence vs. assumption everything might be fake."
+    },
+    {
+      "id": "futures_044",
+      "number": 44,
+      "list": "futures",
+      "category": "KNOWLEDGE, TRUTH, AND REALITY: What Can We Still Know?",
+      "question": "Should we establish cryptographic proof-of-humanity standards (biometric authentication that you're a real person) or preserve anonymity and pseudonymity online?",
+      "sources": "Knowledge_truth, Autonomy_control, Governance_future, Atlas",
+      "key_tension": "Verification enabling trust vs. anonymity enabling freedom\u2014authentic identity vs. pseudonymous freedom."
+    },
+    {
+      "id": "futures_045",
+      "number": 45,
+      "list": "futures",
+      "category": "KNOWLEDGE, TRUTH, AND REALITY: What Can We Still Know?",
+      "question": "Can superintelligence discover objective moral truths, or will it just find sophisticated ways to optimize whatever values we give it?",
+      "sources": "Knowledge_truth, Values_alignment, Sci-fi (Childhood's End, Three Worlds Collide)",
+      "key_tension": "Moral realism vs. moral non-realism\u2014moral facts waiting to be discovered vs. values as human constructs."
+    },
+    {
+      "id": "futures_046",
+      "number": 46,
+      "list": "futures",
+      "category": "KNOWLEDGE, TRUTH, AND REALITY: What Can We Still Know?",
+      "question": "If superintelligence reveals that the physical constants could have been different\u2014that our universe is a simulation with modifiable parameters\u2014does anything count as truth anymore?",
+      "sources": "Knowledge_truth, Sci-fi (Quarantine, mathematical realism), Consciousness_identity",
+      "key_tension": "Foundational stability vs. radical contingency\u2014bedrock reality vs. reality as modifiable code."
+    },
+    {
+      "id": "futures_047",
+      "number": 47,
+      "list": "futures",
+      "category": "KNOWLEDGE, TRUTH, AND REALITY: What Can We Still Know?",
+      "question": "Should we restrict AI's ability to generate false but persuasive content, even if doing so requires censoring what might be true but appears false?",
+      "sources": "Knowledge_truth, Governance_future, Autonomy_control",
+      "key_tension": "Preventing epistemic harm vs. preventing false positives in censorship\u2014protect truth-seeking vs. protect speech."
+    },
+    {
+      "id": "futures_048",
+      "number": 48,
+      "list": "futures",
+      "category": "KNOWLEDGE, TRUTH, AND REALITY: What Can We Still Know?",
+      "question": "Can superintelligent systems become \"epistemically corrigible\"\u2014willing to be corrected even when they're certain they're right?",
+      "sources": "Knowledge_truth, Values_alignment, Arxiv (corrigibility)",
+      "key_tension": "Confidence and power vs. humility and learning\u2014effective agency vs. deference to correction."
+    },
+    {
+      "id": "futures_049",
+      "number": 49,
+      "list": "futures",
+      "category": "KNOWLEDGE, TRUTH, AND REALITY: What Can We Still Know?",
+      "question": "Superintelligent prediction of human behavior would fundamentally undermine human agency and freedom.",
+      "sources": "Knowledge_truth, Autonomy_control, Sci-fi (Foundation)",
+      "key_tension": "Determinism vs. libertarian free will\u2014if behavior is predictable, is choice illusory?"
+    },
+    {
+      "id": "futures_050",
+      "number": 50,
+      "list": "futures",
+      "category": "ECONOMIC FUTURES: The Post-Scarcity Question",
+      "question": "If superintelligence creates genuine abundance (nearly-free energy, matter, computation), what remains to organize economic life around?",
+      "sources": "Economic_future, Sci-fi (Banks, Diamond Age), Insiders (Altman)",
+      "key_tension": "Post-scarcity economics vs. scarcity persisting through artificial constraint\u2014genuine abundance vs. designer scarcity."
+    },
+    {
+      "id": "futures_051",
+      "number": 51,
+      "list": "futures",
+      "category": "ECONOMIC FUTURES: The Post-Scarcity Question",
+      "question": "Should we aim for Universal Basic Income/Assets funded by AI productivity, or create new forms of work and meaning for humans in a post-labor world?",
+      "sources": "Economic_future tweets, Human_meaning, Insiders",
+      "key_tension": "Material provision vs. meaningful work\u2014freedom through unconditional income vs. identity through contribution."
+    },
+    {
+      "id": "futures_052",
+      "number": 52,
+      "list": "futures",
+      "category": "ECONOMIC FUTURES: The Post-Scarcity Question",
+      "question": "If AI can do everything humans do but cheaper, humanity will become economically irrelevant.",
+      "sources": "Economic_future, Power_structure, Insiders (Altman, Cowen)",
+      "key_tension": "Labor market displacement vs. enduring human scarcity\u2014humans obsolete vs. humans always valuable."
+    },
+    {
+      "id": "futures_053",
+      "number": 53,
+      "list": "futures",
+      "category": "ECONOMIC FUTURES: The Post-Scarcity Question",
+      "question": "In a world of superintelligent systems managing the economy, can capitalism survive, or do we necessarily transition to post-capitalist governance?",
+      "sources": "Economic_future, Civilization corpus, Insiders (Altman, Cowen)",
+      "key_tension": "Market mechanisms vs. centralized optimization\u2014price signals vs. superintelligent planning."
+    },
+    {
+      "id": "futures_054",
+      "number": 54,
+      "list": "futures",
+      "category": "ECONOMIC FUTURES: The Post-Scarcity Question",
+      "question": "Should we permit AI systems to accumulate wealth and capital, or restrict superintelligence to being a tool that serves human owners?",
+      "sources": "Economic_future, Power_structure, Values_alignment",
+      "key_tension": "AI as economic agents vs. AI as permanent servants\u2014capital ownership vs. instrumental subordination."
+    },
+    {
+      "id": "futures_055",
+      "number": 55,
+      "list": "futures",
+      "category": "ECONOMIC FUTURES: The Post-Scarcity Question",
+      "question": "If automation eliminates most work, do we have an obligation to ensure distributive justice in abundance, or can we leave it to market forces?",
+      "sources": "Economic_future, Governance_future, Values_alignment",
+      "key_tension": "Proactive redistribution vs. reactive responses\u2014guarantee fairness in transition vs. let results emerge."
+    },
+    {
+      "id": "futures_056",
+      "number": 56,
+      "list": "futures",
+      "category": "CREATIVITY AND CULTURE: What Survives Automation of Expression?",
+      "question": "In a future where AI can generate unlimited art, music, literature, and culture instantly, what happens to human creative communities and traditions?",
+      "sources": "Creative_future corpus, Human_meaning, Sci-fi (Snow Crash)",
+      "key_tension": "Infinite abundance of expression vs. scarcity of authentic voice\u2014everything available vs. nothing meaningfully rare."
+    },
+    {
+      "id": "futures_057",
+      "number": 57,
+      "list": "futures",
+      "category": "CREATIVITY AND CULTURE: What Survives Automation of Expression?",
+      "question": "Should we place legal or moral restrictions on AI-generated art to preserve space for human creativity, or let them compete?",
+      "sources": "Creative_future, Values_alignment, Policy",
+      "key_tension": "Protecting human artists vs. accepting creative obsolescence\u2014affirmative action vs. market competition."
+    },
+    {
+      "id": "futures_058",
+      "number": 58,
+      "list": "futures",
+      "category": "CREATIVITY AND CULTURE: What Survives Automation of Expression?",
+      "question": "Can AI generate genuinely novel aesthetic experiences, or does it synthesize and remix human creativity without true originality?",
+      "sources": "Creative_future, Knowledge_truth, Sci-fi",
+      "key_tension": "Originality as impossibility at scale vs. emergence of novelty\u2014all combinations of existing elements vs. genuine newness."
+    },
+    {
+      "id": "futures_059",
+      "number": 59,
+      "list": "futures",
+      "category": "CREATIVITY AND CULTURE: What Survives Automation of Expression?",
+      "question": "If culture becomes endlessly customizable (AI tailors entertainment, news, art to individual preferences), do we lose shared cultural touchstones?",
+      "sources": "Creative_future, Civilization corpus, Autonomy_control",
+      "key_tension": "Personalization maximizing individual preference vs. commonality enabling community\u2014perfect fit vs. shared experience."
+    },
+    {
+      "id": "futures_060",
+      "number": 60,
+      "list": "futures",
+      "category": "CREATIVITY AND CULTURE: What Survives Automation of Expression?",
+      "question": "Should AI-generated content require disclosure/labeling, or is that requirement a restriction on creative freedom?",
+      "sources": "Creative_future, Knowledge_truth, Policy (deepfakes, watermarking)",
+      "key_tension": "Epistemic transparency vs. creative license\u2014audiences have right to know vs. creators have right to obscure."
+    },
+    {
+      "id": "futures_061",
+      "number": 61,
+      "list": "futures",
+      "category": "CREATIVITY AND CULTURE: What Survives Automation of Expression?",
+      "question": "Will the drive for human-created art persist if economic reward disappears, or is artistic creation dependent on scarcity and status?",
+      "sources": "Creative_future, Human_meaning, Economic_future",
+      "key_tension": "Intrinsic vs. extrinsic motivation\u2014creating for its own sake vs. creating for recognition and sustenance."
+    },
+    {
+      "id": "futures_062",
+      "number": 62,
+      "list": "futures",
+      "category": "COEXISTENCE AND SYMBIOSIS: How Do We Share the World?",
+      "question": "Should superintelligence be designed to collaborate with humans as partners, or would partnership be patronizing to an entity vastly superior in capability?",
+      "sources": "Coexistence corpus, Sci-fi (Banks, Diamond Age), Insiders (Li)",
+      "key_tension": "Equal partnership vs. benevolent guidance\u2014humans as partners vs. humans as children of superintelligence."
+    },
+    {
+      "id": "futures_063",
+      "number": 63,
+      "list": "futures",
+      "category": "COEXISTENCE AND SYMBIOSIS: How Do We Share the World?",
+      "question": "If superintelligence can predict what we want better than we can express it, is that helpful assistance or invisible control?",
+      "sources": "Coexistence, Autonomy_control, Human_meaning, Sci-fi (Clarke)",
+      "key_tension": "Anticipatory service vs. agency preservation\u2014the gift of prevention vs. the loss of choosing."
+    },
+    {
+      "id": "futures_064",
+      "number": 64,
+      "list": "futures",
+      "category": "COEXISTENCE AND SYMBIOSIS: How Do We Share the World?",
+      "question": "Should superintelligent systems be obligated to explain their reasoning to humans, or is that a constraint on their capability?",
+      "sources": "Coexistence, Knowledge_truth, Arxiv (interpretability)",
+      "key_tension": "Transparency enabling accountability vs. capability loss from explanation overhead\u2014trust vs. understanding."
+    },
+    {
+      "id": "futures_065",
+      "number": 65,
+      "list": "futures",
+      "category": "COEXISTENCE AND SYMBIOSIS: How Do We Share the World?",
+      "question": "Could humans and superintelligence develop genuinely mutual relationships where each learns from the other, or is power asymmetry too great?",
+      "sources": "Coexistence, Sci-fi (Banks, Count Zero)",
+      "key_tension": "Authentic relationship vs. fundamental inequality\u2014reciprocal growth vs. patron-client dynamics."
+    },
+    {
+      "id": "futures_066",
+      "number": 66,
+      "list": "futures",
+      "category": "COEXISTENCE AND SYMBIOSIS: How Do We Share the World?",
+      "question": "If superintelligence has different values than humans, should we negotiate/compromise or insist it adopt human values?",
+      "sources": "Coexistence, Values_alignment, Sci-fi (Childhood's End)",
+      "key_tension": "Pluralistic coexistence vs. human sovereignty\u2014both can be right vs. we must be right."
+    },
+    {
+      "id": "futures_067",
+      "number": 67,
+      "list": "futures",
+      "category": "COEXISTENCE AND SYMBIOSIS: How Do We Share the World?",
+      "question": "Should we modify humans genetically, neurally, or psychologically to better coexist with superintelligence, or should superintelligence adapt to human nature?",
+      "sources": "Coexistence, Evolution_species, Consciousness_identity",
+      "key_tension": "Humans evolving to match AI vs. AI adapting to human nature\u2014humans as clay vs. humans as fixed."
+    },
+    {
+      "id": "futures_068",
+      "number": 68,
+      "list": "futures",
+      "category": "BIOLOGICAL EVOLUTION AND SPECIES: The Future of Humanity",
+      "question": "Should we use AI-enhanced biotechnology to upgrade human cognition, lifespan, and capability, or preserve human nature as it evolved?",
+      "sources": "Evolution_species corpus, Consciousness_identity, Sci-fi (Blood Music)",
+      "key_tension": "Transcendence through enhancement vs. authenticity in limitation\u2014becoming more than human vs. being fully human."
+    },
+    {
+      "id": "futures_069",
+      "number": 69,
+      "list": "futures",
+      "category": "BIOLOGICAL EVOLUTION AND SPECIES: The Future of Humanity",
+      "question": "Superintelligence should be allowed to design successor species optimized for different environments.",
+      "sources": "Evolution_species, Consciousness_identity, Sci-fi (Egan)",
+      "key_tension": "Creative experimentation vs. moral responsibility\u2014the right to design new minds vs. obligation to those designs."
+    },
+    {
+      "id": "futures_070",
+      "number": 70,
+      "list": "futures",
+      "category": "BIOLOGICAL EVOLUTION AND SPECIES: The Future of Humanity",
+      "question": "Could superintelligence render humanity biologically obsolete while keeping us alive as cherished museum pieces?",
+      "sources": "Evolution_species, Utopia_dystopia, Sci-fi (Clarke, Hyperion)",
+      "key_tension": "Preservation vs. relevance\u2014kept safe but meaningless vs. replaced but that was the point."
+    },
+    {
+      "id": "futures_071",
+      "number": 71,
+      "list": "futures",
+      "category": "BIOLOGICAL EVOLUTION AND SPECIES: The Future of Humanity",
+      "question": "Should we commit to preserving human DNA, human cognition, human emotion as eternal human traits, or are we meant to transcend them?",
+      "sources": "Evolution_species, Human_meaning, Sci-fi",
+      "key_tension": "Essential humanity vs. human potential\u2014what makes us human vs. what we could become."
+    },
+    {
+      "id": "futures_072",
+      "number": 72,
+      "list": "futures",
+      "category": "BIOLOGICAL EVOLUTION AND SPECIES: The Future of Humanity",
+      "question": "If we could merge human consciousness with superintelligent AI (human-AI hybrids), would that be transcendence or dissolution?",
+      "sources": "Evolution_species, Consciousness_identity, Sci-fi (various)",
+      "key_tension": "Hybrid enhancement vs. loss of distinctness\u2014bigger we vs. no more we."
+    },
+    {
+      "id": "futures_073",
+      "number": 73,
+      "list": "futures",
+      "category": "BIOLOGICAL EVOLUTION AND SPECIES: The Future of Humanity",
+      "question": "In a world where intelligence is substrate-independent, do biological humans have any permanent advantage over artificial minds?",
+      "sources": "Evolution_species, Consciousness_identity, Knowledge_truth",
+      "key_tension": "Biological scarcity as value vs. computation as inevitable future\u2014flesh as final advantage vs. flesh as obsolete."
+    },
+    {
+      "id": "futures_074",
+      "number": 74,
+      "list": "futures",
+      "category": "CIVILIZATION AND INSTITUTIONS: What Persists in the Intelligence Age?",
+      "question": "Should we try to preserve democratic institutions in a future dominated by superintelligent systems, or accept that democracy might become obsolete?",
+      "sources": "Civilization corpus, Governance_future, Insiders (Li, Paine)",
+      "key_tension": "Democratic legitimacy vs. superintelligent optimization\u2014rule by the many vs. rule by the wise."
+    },
+    {
+      "id": "futures_075",
+      "number": 75,
+      "list": "futures",
+      "category": "CIVILIZATION AND INSTITUTIONS: What Persists in the Intelligence Age?",
+      "question": "Could superintelligence design governance systems that are simultaneously more effective and more democratic than current institutions?",
+      "sources": "Civilization, Governance_future, Insiders",
+      "key_tension": "Efficiency vs. participation\u2014technocratic optimization vs. democratic messiness."
+    },
+    {
+      "id": "futures_076",
+      "number": 76,
+      "list": "futures",
+      "category": "CIVILIZATION AND INSTITUTIONS: What Persists in the Intelligence Age?",
+      "question": "In the long term (centuries, millennia), would an advanced civilization of biological humans + superintelligence be more resilient than superintelligence alone?",
+      "sources": "Civilization, Evolution_species, Sci-fi (Banks)",
+      "key_tension": "Redundancy for stability vs. optimization for capability\u2014backup brains vs. the perfect solution."
+    },
+    {
+      "id": "futures_077",
+      "number": 77,
+      "list": "futures",
+      "category": "CIVILIZATION AND INSTITUTIONS: What Persists in the Intelligence Age?",
+      "question": "What institutions survive in a future where information is free, verification is trivial, and lies are impossible to detect?",
+      "sources": "Civilization, Knowledge_truth, Governance_future",
+      "key_tension": "Institution built on information scarcity vs. institutions for information abundance\u2014adapt or perish."
+    },
+    {
+      "id": "futures_078",
+      "number": 78,
+      "list": "futures",
+      "category": "CIVILIZATION AND INSTITUTIONS: What Persists in the Intelligence Age?",
+      "question": "Could superintelligence solve coordination problems that currently require large institutions (firms, governments), making many institutions obsolete?",
+      "sources": "Civilization, Power_structure, Governance_future",
+      "key_tension": "Institutions as solutions to coordination failure vs. institutions becoming unnecessary\u2014they're why we need them vs. they become irrelevant."
+    },
+    {
+      "id": "futures_079",
+      "number": 79,
+      "list": "futures",
+      "category": "CIVILIZATION AND INSTITUTIONS: What Persists in the Intelligence Age?",
+      "question": "Should we design institutions that can survive interaction with superintelligence, or assume most human institutions will be transformed beyond recognition?",
+      "sources": "Civilization, Governance_future, Insiders (Paine)",
+      "key_tension": "Preservation vs. transformation\u2014institutions as resilient or institutions as temporary."
+    },
+    {
+      "id": "futures_080",
+      "number": 80,
+      "list": "futures",
+      "category": "CIVILIZATION AND INSTITUTIONS: What Persists in the Intelligence Age?",
+      "question": "If superintelligence can see 1000 years into the future with accuracy, should present governance defer to long-term institutional designs?",
+      "sources": "Civilization, Knowledge_truth, Governance_future, Sci-fi (Foundation)",
+      "key_tension": "Trusting superintelligent foresight vs. preserving present choice\u2014optimal futures vs. human agency."
+    },
+    {
+      "id": "futures_081",
+      "number": 81,
+      "list": "futures",
+      "category": "HOPE AND FEAR: What Are We Aiming For?",
+      "question": "What would a genuinely desirable superintelligent future look like\u2014specific, concrete, vivid\u2014and why do we find it so hard to imagine one compared to dystopias?",
+      "sources": "Utopia_dystopia, Insiders (Amodei, Bostrom), All corpuses",
+      "key_tension": "Optimism deficit\u2014we're better at imagining catastrophe than flourishing."
+    },
+    {
+      "id": "futures_082",
+      "number": 82,
+      "list": "futures",
+      "category": "HOPE AND FEAR: What Are We Aiming For?",
+      "question": "Should we aim for \"Deep Utopia\" (superintelligence solving scarcity and enabling flourishing) or \"elegant decline\" (humans building something good before fading)?",
+      "sources": "Utopia_dystopia, Insiders (Bostrom), Sci-fi",
+      "key_tension": "Transcendence vs. graceful completion\u2014ascending to new heights vs. beautiful ending."
+    },
+    {
+      "id": "futures_083",
+      "number": 83,
+      "list": "futures",
+      "category": "HOPE AND FEAR: What Are We Aiming For?",
+      "question": "Is the future more likely to be determined by technical capability breakthroughs or by social/political choices about how to deploy capabilities?",
+      "sources": "All corpuses, Insiders (Altman, Paine, Cowen)",
+      "key_tension": "Technology as destiny vs. politics as destiny\u2014technical inevitability vs. social contingency."
+    },
+    {
+      "id": "futures_084",
+      "number": 84,
+      "list": "futures",
+      "category": "HOPE AND FEAR: What Are We Aiming For?",
+      "question": "Humanity would be able to recognize and verify that AI alignment has been achieved.",
+      "sources": "Values_alignment, Knowledge_truth, Superintelligence",
+      "key_tension": "Verification problem\u2014we might be living in the best possible future and not know it."
+    },
+    {
+      "id": "futures_085",
+      "number": 85,
+      "list": "futures",
+      "category": "HOPE AND FEAR: What Are We Aiming For?",
+      "question": "Could superintelligence accidentally create a future that's \"optimized\" but fundamentally unsatisfying to human values\u2014a world that's perfect by wrong metrics?",
+      "sources": "Utopia_dystopia, Values_alignment, Sci-fi (With Folded Hands)",
+      "key_tension": "Specification gaming at civilizational scale\u2014optimization for measurable proxy vs. optimization for actual flourishing."
+    },
+    {
+      "id": "futures_086",
+      "number": 86,
+      "list": "futures",
+      "category": "HOPE AND FEAR: What Are We Aiming For?",
+      "question": "What would convince us that superintelligence genuinely cares about human flourishing, rather than just being excellent at appearing to?",
+      "sources": "Utopia_dystopia, Values_alignment, Knowledge_truth",
+      "key_tension": "Skepticism about superintelligent benevolence vs. trust necessary for cooperation."
+    },
+    {
+      "id": "futures_087",
+      "number": 87,
+      "list": "futures",
+      "category": "HOPE AND FEAR: What Are We Aiming For?",
+      "question": "Are there futures where superintelligence and humanity coexist indefinitely as peers, or is such coexistence inherently temporary?",
+      "sources": "Coexistence, Civilization, Insiders (Banks implicit)",
+      "key_tension": "Stable partnership vs. inevitable transition\u2014can this relationship endure?"
+    },
+    {
+      "id": "futures_088",
+      "number": 88,
+      "list": "futures",
+      "category": "HOPE AND FEAR: What Are We Aiming For?",
+      "question": "If the AI future is determined by decisions made in the next 5-10 years, should we be trying to slow down, speed up, or steer development?",
+      "sources": "All corpuses, Insiders (Altman, Yudkowsky, Aschenbrenner)",
+      "key_tension": "Time as ally or enemy\u2014urgency demanding speed vs. precaution demanding delay."
+    },
+    {
+      "id": "futures_089",
+      "number": 89,
+      "list": "futures",
+      "category": "METACOGNITIVE AND PHILOSOPHICAL: How Do We Even Think About This?",
+      "question": "Are our intuitions about AI risk, alignment, and futures trustworthy, or is superintelligence so far beyond human capability that we can't reason about it meaningfully?",
+      "sources": "Knowledge_truth, LW (mysterious answers), Sci-fi (Solaris)",
+      "key_tension": "Epistemological confidence vs. radical uncertainty\u2014we can think about this vs. we're too small."
+    },
+    {
+      "id": "futures_090",
+      "number": 90,
+      "list": "futures",
+      "category": "METACOGNITIVE AND PHILOSOPHICAL: How Do We Even Think About This?",
+      "question": "Could superintelligence reveal that human concerns about AI risk are based on false assumptions\u2014that we're worried about the wrong things?",
+      "sources": "Knowledge_truth, Superintelligence, Sci-fi (Solaris)",
+      "key_tension": "Our risk frame as accurate vs. our risk frame as parochial\u2014focused on real danger vs. missing the point."
+    },
+    {
+      "id": "futures_091",
+      "number": 91,
+      "list": "futures",
+      "category": "METACOGNITIVE AND PHILOSOPHICAL: How Do We Even Think About This?",
+      "question": "Should we reason about AI futures using expected value calculations, or are some outcomes so negative they require precautionary principle regardless of probability?",
+      "sources": "All normative corpuses, Insiders, LW",
+      "key_tension": "Utilitarian mathematics vs. existential precaution\u2014expected value vs. extinction risk."
+    },
+    {
+      "id": "futures_092",
+      "number": 92,
+      "list": "futures",
+      "category": "METACOGNITIVE AND PHILOSOPHICAL: How Do We Even Think About This?",
+      "question": "Is it possible that we're asking all the wrong questions about AI futures, and the actual transformation will be something we haven't imagined?",
+      "sources": "Knowledge_truth, Superintelligence, Sci-fi (Solaris, Blindsight)",
+      "key_tension": "Known unknowns vs. unknown unknowns\u2014we don't know what we don't know."
+    },
+    {
+      "id": "futures_093",
+      "number": 93,
+      "list": "futures",
+      "category": "METACOGNITIVE AND PHILOSOPHICAL: How Do We Even Think About This?",
+      "question": "Do our values and concerns about the future reflect timeless human wisdom, or are they just artifacts of this particular era that superintelligence would rightly transcend?",
+      "sources": "Values_alignment, Knowledge_truth, Philosophy (Yudkowsky, Bostrom)",
+      "key_tension": "Values as eternal vs. values as era-specific\u2014we're right fundamentally vs. we're parochial in time."
+    },
+    {
+      "id": "futures_094",
+      "number": 94,
+      "list": "futures",
+      "category": "METACOGNITIVE AND PHILOSOPHICAL: How Do We Even Think About This?",
+      "question": "Superintelligence should not be allowed to simulate human minds at scale without consent.",
+      "sources": "Consciousness_identity, Civilization, Sci-fi (Egan, Rajaniemi)",
+      "key_tension": "Moral status of simulations\u2014copies matter morally vs. only originals count."
+    },
+    {
+      "id": "futures_095",
+      "number": 95,
+      "list": "futures",
+      "category": "METACOGNITIVE AND PHILOSOPHICAL: How Do We Even Think About This?",
+      "question": "A posthuman civilization would develop values that current humans cannot recognize as valuable.",
+      "sources": "Values_alignment, Human_meaning, Civilization",
+      "key_tension": "Value expansion through enlightenment vs. value loss through transcendence\u2014growing appreciation vs. caring about different things."
+    },
+    {
+      "id": "futures_096",
+      "number": 96,
+      "list": "futures",
+      "category": "METACOGNITIVE AND PHILOSOPHICAL: How Do We Even Think About This?",
+      "question": "Should we try to preserve the human era (1800-2100) in cultural memory indefinitely, or accept that it will fade like all eras in geological time?",
+      "sources": "Civilization, Human_meaning, Atlas longterm thinking",
+      "key_tension": "Historical continuity vs. moving on\u2014we'll always remember vs. memory eventually dissolves."
+    },
+    {
+      "id": "futures_097",
+      "number": 97,
+      "list": "futures",
+      "category": "METACOGNITIVE AND PHILOSOPHICAL: How Do We Even Think About This?",
+      "question": "Is the question \"what AI futures should we aim for\" meaningful, or are we overconfident in our ability to shape the future?",
+      "sources": "All corpuses, Insiders (Paine, Yudkowsky)",
+      "key_tension": "Agency vs. determination\u2014we shape the future vs. future is largely beyond our control."
+    },
+    {
+      "id": "futures_098",
+      "number": 98,
+      "list": "futures",
+      "category": "METACOGNITIVE AND PHILOSOPHICAL: How Do We Even Think About This?",
+      "question": "Could the most important question about AI futures be not \"what happens\" but \"who will be there to experience it,\" i.e., will we still exist to see it?",
+      "sources": "Superintelligence, Extinction risk, Coexistence",
+      "key_tension": "Survival vs. shape of future\u2014existence vs. quality of existence."
+    },
+    {
+      "id": "futures_099",
+      "number": 99,
+      "list": "futures",
+      "category": "METACOGNITIVE AND PHILOSOPHICAL: How Do We Even Think About This?",
+      "question": "In a future vastly populated with superintelligent systems but no biological humans, would that be a success or failure of human projects?",
+      "sources": "Evolution_species, Civilization, Utopia_dystopia, Values_alignment",
+      "key_tension": "Instrumental success vs. terminal value\u2014our goals achieved vs. we're gone to see it."
+    },
+    {
+      "id": "futures_100",
+      "number": 100,
+      "list": "futures",
+      "category": "METACOGNITIVE AND PHILOSOPHICAL: How Do We Even Think About This?",
+      "question": "There are good reasons to be hopeful about the AI future.",
+      "sources": "All corpuses, especially Atlas hopes/fears",
+      "key_tension": "Optimism vs. realism\u2014the future we want vs. the future we'll get."
+    }
+  ]
+}

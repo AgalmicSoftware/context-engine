@@ -1,0 +1,1795 @@
+/* eslint-disable import/first */
+import React from 'react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
+import { buildContractViewerContracts } from '../ContractPage/contractViewerUtils.js';
+
+const mockDownloadDataFromArweave = jest.fn();
+const mockDecryptWithPassword = jest.fn();
+const mockUploadDataToArweave = jest.fn();
+const mockRegisterSessionOnChain = jest.fn();
+const mockSessionExists = jest.fn(async () => false);
+const TEST_ADMIN_ADDRESS = '0x00000000000000000000000000000000000000aa';
+const SPONSORED_FAUCET_NOTICE = 'Faucet funding is currently provided by the sponsored bundle. Enter a private key here to override it.';
+const SPONSORED_DEPLOY_NOTICE = 'Deploy access is currently provided by the sponsored bundle. Enter a Cloudflare API token here to override it.';
+const defaultNormalizeWorkerUrl = (value = '') => String(value || '').trim();
+const testWebCrypto = require('crypto').webcrypto;
+const originalCrypto = global.crypto;
+const originalFetch = global.fetch;
+const originalIndexedDbDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'indexedDB');
+const createDefaultFetchMock = () => jest.fn(async (url) => {
+  const normalizedUrl = String(url);
+  if (
+    normalizedUrl === 'test-file-stub' ||
+    normalizedUrl.includes('sessionCorsWorker') ||
+    normalizedUrl.endsWith('.txt')
+  ) {
+    return {
+      ok: true,
+      text: async () => 'export default { fetch() { return new Response("ok"); } };',
+      headers: { get: jest.fn(() => 'application/javascript') },
+    };
+  }
+  return {
+    ok: true,
+    json: async () => ({ ok: true }),
+    text: async () => '',
+    headers: { get: jest.fn(() => 'application/json') },
+  };
+});
+
+jest.setTimeout(20000);
+
+jest.mock('../SBTs/SBTSelector.jsx', () => () => <div data-testid="mock-wizard-sbt-selector" />);
+jest.mock('../SBTs/CreateSBTGroup.jsx', () => () => null);
+jest.mock('../Gates/GateMultiSelectLock.jsx', () => () => <div data-testid="mock-wizard-gate-lock" />);
+jest.mock('../Shared/Json/JsonControls.jsx', () => ({
+  JsonToggleButton: () => null,
+  JsonPanel: () => null,
+  JsonButtonRow: () => null,
+}));
+jest.mock('../ContractPage/contractViewerUtils.js', () => ({
+  buildContractViewerContracts: jest.fn(),
+}));
+
+jest.mock('../../utilities/crypto/litProtocol.js', () => ({
+  buildSbtAccessControlConditions: jest.fn(() => []),
+  createLitHooks: jest.fn(() => ({ saveKey: jest.fn(), getKey: jest.fn(), litNetwork: 'naga-dev' })),
+  resolveLitChain: jest.fn(() => 'baseSepolia'),
+  getGlobalLitHooks: jest.fn(() => null),
+  setGlobalLitHooks: jest.fn(),
+}));
+
+jest.mock('../../utilities/crypto/cryptography.js', () => ({
+  cryptoUtils: {
+    _getProvider: jest.fn(() => ({})),
+    decryptWithPassword: (...args) => mockDecryptWithPassword(...args),
+  },
+}));
+
+jest.mock('../../utilities/arweave/arweaveScripts.js', () => ({
+  arweaveScripts: {
+    uploadDataToArweave: (...args) => mockUploadDataToArweave(...args),
+    downloadDataFromArweave: (...args) => mockDownloadDataFromArweave(...args),
+    buildArweaveGatewayUrl: jest.fn((txId) => `https://arweave.net/${txId}`),
+  },
+}));
+
+jest.mock('../../utilities/session/resourceKeys.js', () => ({
+  getEffectiveArweaveKey: jest.fn(() => ''),
+}));
+
+jest.mock('../../utilities/web3/sessionRegistry.js', () => ({
+  registerSessionOnChain: (...args) => mockRegisterSessionOnChain(...args),
+  sessionRegistryUtils: {
+    normalizeSlug: jest.fn((value = '') => String(value || '').trim().toLowerCase()),
+    formatSessionId: jest.fn((value = '') => String(value || '').trim()),
+    normalizeSessionIdHex: jest.fn((value = '') => String(value || '').trim()),
+    toRegistrySlug: jest.fn((value = '') => String(value || '').trim()),
+    getRegistryContract: jest.fn(() => ({
+      sessionExists: (...args) => mockSessionExists(...args),
+    })),
+  },
+}));
+
+jest.mock('../../utilities/web3/contractScripts.js', () => ({
+  __esModule: true,
+  default: {},
+  getSessionConfigBySlugOrDefault: jest.fn((slug = '') => {
+    const normalized = String(slug || '').trim().toLowerCase();
+    if (normalized && normalized !== 'general') return null;
+    return {
+      slug: '',
+      sessionName: 'Context Engine',
+      networkChainId: 84532,
+      contracts: {
+        sbtFactory: {
+          address: '0x538A48BC439A36D2A86e63114DCD9c429d2ddEcA',
+          chainId: 84532,
+        },
+      },
+      blockLimits: {
+        start: 30297069,
+        end: null,
+      },
+    };
+  }),
+  getDemoSessionConfigBySlug: jest.fn((slug = '') => {
+    const normalized = String(slug || '').trim().toLowerCase();
+    if (normalized && normalized !== 'general') return null;
+    return {
+      slug: '',
+      sessionName: 'Context Engine',
+      networkChainId: 84532,
+      contracts: {
+        sbtFactory: {
+          address: '0x538A48BC439A36D2A86e63114DCD9c429d2ddEcA',
+          chainId: 84532,
+        },
+      },
+      blockLimits: {
+        start: 30297069,
+        end: null,
+      },
+    };
+  }),
+}));
+
+jest.mock('../../utilities/worker/workerAuth.js', () => ({
+  buildSiweMessage: jest.fn(() => 'siwe-message'),
+  buildSignedBootstrapAdminAuth: jest.fn(async ({ slug }) => ({
+    address: '0x00000000000000000000000000000000000000aa',
+    message: 'bootstrap-siwe-message',
+    signature: '0xbootstrap-admin-auth',
+    sessionSlug: slug,
+  })),
+  buildSignedAdminActionAuth: jest.fn(async ({ action, slug, body }) => ({
+    address: '0x00000000000000000000000000000000000000aa',
+    signature: '0xadmin-action-signature',
+    action,
+    slug,
+    bodyHash: '0xadmin-body-hash',
+    nonce: 'wizard-admin-nonce',
+    audience: 'http://localhost',
+    expiration: 4102444800,
+    __body: body,
+  })),
+  normalizeWorkerUrl: jest.fn((value = '') => defaultNormalizeWorkerUrl(value)),
+}));
+
+jest.mock('../../utilities/web3/rpcReadCache.js', () => ({
+  wrapEthersJsonRpcSend: jest.fn((provider) => provider),
+}));
+
+jest.mock('../../variables/appConfig.js', () => {
+  const actual = jest.requireActual('../../variables/appConfig.js');
+  return {
+    ...actual,
+    ENABLE_LIT_SESSION_PAYER_WALLET_INPUT: true,
+  };
+});
+
+import SessionWizard, {
+  __test__resetSessionWizardSponsoredBundleCacheKey,
+  buildSessionWizardPublishPlan,
+  buildSessionWizardPublishStepNumbers,
+  LOCAL_WORKER_BUNDLE_FALLBACK_ASSET_URL,
+  mergeSponsoredBundleDeployForm,
+  mergeSponsoredBundleWorkerSecrets,
+  resolveSponsoredBundleDeployReadiness,
+  resolveSessionWizardDeployBundleMode,
+  resolveSessionWizardDeployBundlePayload,
+  resolveSessionWizardShouldPreferLocalBundledAsset,
+  resolveSessionWizardShouldAutoDeployWorker,
+  loadSessionWizardLocalBundledAssetText,
+  shouldForceSessionWizardManualBundleRetry,
+} from './SessionWizard.jsx';
+import { SPONSORED_BOOTSTRAP_FUNDING_CONTEXT_KEY } from '../../utilities/session/sponsoredBootstrapFunding.js';
+
+const renderSessionWizard = (props = {}) => render(<SessionWizard network={{ id: 84532 }} {...props} />);
+const renderLoggedInSessionWizard = (props = {}) => renderSessionWizard({
+  account: TEST_ADMIN_ADDRESS,
+  loginComplete: true,
+  toggleLoginModal: jest.fn(),
+  ...props,
+});
+const getFieldInputByLabel = (labelText) => (
+  screen.getByText(labelText).parentElement.querySelector('input,textarea,select')
+);
+const getToggleCheckbox = (labelText) => (
+  screen.getByText(labelText).closest('label').querySelector('input[type="checkbox"]')
+);
+const enableAdvancedMode = () => {
+  fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED));
+};
+const openWorkerPanel = () => {
+  fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
+};
+const setControlledInputValue = (input, value) => {
+  const reactPropsKey = Object.keys(input).find((key) => key.startsWith('__reactProps$'));
+  if (reactPropsKey) {
+    act(() => {
+      input[reactPropsKey].onChange({ target: { value } });
+    });
+    return;
+  }
+  fireEvent.change(input, { target: { value } });
+};
+const setCloudflareTokenValue = (value) => {
+  const input = screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN);
+  setControlledInputValue(input, value);
+  return input;
+};
+const expectSponsoredStatus = async (message) => {
+  await waitFor(() => {
+    expect(screen.getByTestId('ce-wizard-sponsored-status')).toHaveTextContent(message);
+  }, { timeout: 10000 });
+};
+const buildDecryptedSponsoredBundle = (overrides = {}) => {
+  const base = {
+    openaiKey: 'sponsored-openai',
+    anthropicKey: 'sponsored-anthropic',
+    openrouterKey: 'sponsored-openrouter',
+    arweaveJwk: '{"kty":"RSA"}',
+    faucetPrivateKey: '0xsponsoredfaucet',
+    customRpcUrl: 'https://sponsored-rpc.example',
+    litPayerPrivateKey: '0x59c6995e998f97a5a0044976f84ce7de5d9d7f17b2f6a6a5f76f8864c8ad88f5',
+    litPayerAddress: '0x3AC823CA9AcDA550244C6fF4927b5e1478E70Ff7',
+    customRpcKey: 'ignore-me',
+    meta: {
+      label: 'Launch Week',
+      createdAt: '2099-03-20T12:00:00.000Z',
+      createdBy: '0xadmin',
+      expiresAt: '2099-03-21T12:00:00.000Z',
+      sourceSessionSlug: 'source-session',
+      sourceWorkerUrl: 'https://source-worker.example',
+    },
+  };
+  return {
+    ...base,
+    ...overrides,
+    meta: {
+      ...base.meta,
+      ...(overrides?.meta || {}),
+    },
+  };
+};
+const configureAdvancedUseUrlDeploy = async ({
+  sessionName = 'Advanced Bundle Retry Session',
+  slug = 'advanced-bundle-retry-session',
+  bundleUrl = 'https://bundles.example.test/sessionCorsWorker.bundle.js',
+  cloudflareToken = 'cf-test-token',
+} = {}) => {
+  enableAdvancedMode();
+  const sessionNameInput = await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+  if (!screen.queryByTestId(E2E_TESTIDS.WIZARD_SLUG)) {
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_METADATA_PANEL_TOGGLE));
+  }
+  fireEvent.change(sessionNameInput, {
+    target: { value: sessionName },
+  });
+  fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SLUG), {
+    target: { value: slug },
+  });
+
+  openWorkerPanel();
+  fireEvent.click(await screen.findByRole('button', { name: 'Use My Own' }));
+
+  const bundleModeUrlInput = screen.getByTestId(E2E_TESTIDS.WIZARD_BUNDLE_MODE_URL);
+  if (!bundleModeUrlInput.checked) {
+    fireEvent.click(bundleModeUrlInput);
+  }
+
+  const bundleUrlInput = screen.getByPlaceholderText(
+    'https://github.com/<org>/<repo>/releases/latest/download/sessionCorsWorker.bundle.js'
+  );
+  setControlledInputValue(bundleUrlInput, bundleUrl);
+  await waitFor(() => {
+    expect(bundleUrlInput).toHaveValue(bundleUrl);
+  });
+  setControlledInputValue(
+    screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_HELPER_URL),
+    'https://deploy-helper.example.test'
+  );
+  await waitFor(() => {
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_HELPER_URL)).toHaveValue(
+      'https://deploy-helper.example.test'
+    );
+  });
+  setCloudflareTokenValue(cloudflareToken);
+  fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_OPENAI_KEY), {
+    target: { value: 'sk-test-openai' },
+  });
+  fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_ARWEAVE_JWK), {
+    target: { value: '{"kty":"RSA","n":"abc"}' },
+  });
+  await waitFor(() => {
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_NAME)).toHaveTextContent(slug);
+  });
+  return {
+    bundleModeUrlInput,
+    bundleUrlInput,
+  };
+};
+
+const seedWizardCache = ({
+  workerSecrets = {},
+  workerSecretsEnabled = true,
+  persistWorkerSecrets = true,
+  draft = {},
+  deployComplete = false,
+  deployWorkerUrl = '',
+} = {}) => {
+  localStorage.setItem('ce:sessionWizardDraft:v1', JSON.stringify({
+    draft: {
+      ai: {
+        models: {
+          fast: { provider: 'openrouter', model: 'test-fast' },
+          thinking: { provider: 'anthropic', model: 'test-thinking' },
+        },
+      },
+      ...draft,
+    },
+    workerSecrets,
+    workerSecretsEnabled,
+    persistWorkerSecrets,
+    deployComplete,
+    deployWorkerUrl,
+  }));
+};
+
+const buildEnvelope = () => JSON.stringify({
+  type: 'contextengine-sponsored-bundle',
+  version: 1,
+  cipher: 'password-aes-gcm',
+  encryptedData: 'encrypted-base64',
+});
+const createDeferred = () => {
+  let resolve;
+  let reject;
+  const promise = new Promise((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+};
+
+const createIndexedDbMock = () => {
+  const stores = new Map();
+  const objectStoreNames = new Set();
+
+  const ensureStore = (name) => {
+    const key = String(name || '');
+    if (!stores.has(key)) stores.set(key, new Map());
+    objectStoreNames.add(key);
+    return stores.get(key);
+  };
+
+  const createRequest = (tx, run) => {
+    const request = {
+      onsuccess: null,
+      onerror: null,
+      result: undefined,
+      error: null,
+    };
+
+    setTimeout(() => {
+      try {
+        request.result = run();
+        if (typeof request.onsuccess === 'function') {
+          request.onsuccess({ target: request });
+        }
+        if (typeof tx.oncomplete === 'function') {
+          tx.oncomplete({ target: tx });
+        }
+      } catch (error) {
+        request.error = error;
+        tx.error = error;
+        if (typeof request.onerror === 'function') {
+          request.onerror({ target: request });
+        }
+        if (typeof tx.onerror === 'function') {
+          tx.onerror({ target: tx });
+        }
+      }
+    }, 0);
+
+    return request;
+  };
+
+  const db = {
+    objectStoreNames: {
+      contains: (name) => objectStoreNames.has(String(name || '')),
+    },
+    createObjectStore: jest.fn((name) => {
+      ensureStore(name);
+      return {};
+    }),
+    close: jest.fn(),
+    transaction: jest.fn((storeName) => {
+      const tx = {
+        oncomplete: null,
+        onerror: null,
+        onabort: null,
+        error: null,
+        objectStore: jest.fn(() => ({
+          get: jest.fn((key) => createRequest(tx, () => ensureStore(storeName).get(key))),
+          put: jest.fn((value, key) => createRequest(tx, () => {
+            ensureStore(storeName).set(key, value);
+            return key;
+          })),
+          delete: jest.fn((key) => createRequest(tx, () => {
+            ensureStore(storeName).delete(key);
+            return undefined;
+          })),
+        })),
+      };
+      return tx;
+    }),
+  };
+
+  return {
+    __stores: stores,
+    open: jest.fn(() => {
+      const request = {
+        onsuccess: null,
+        onerror: null,
+        onupgradeneeded: null,
+        result: null,
+        error: null,
+      };
+
+      setTimeout(() => {
+        request.result = db;
+        if (!objectStoreNames.has('keys') && typeof request.onupgradeneeded === 'function') {
+          request.onupgradeneeded({ target: request });
+        }
+        if (typeof request.onsuccess === 'function') {
+          request.onsuccess({ target: request });
+        }
+      }, 0);
+
+      return request;
+    }),
+  };
+};
+
+describe('SessionWizard sponsored bundle flow', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    __test__resetSessionWizardSponsoredBundleCacheKey();
+    global.crypto = global.crypto?.subtle ? global.crypto : testWebCrypto;
+    global.fetch = createDefaultFetchMock();
+    localStorage.clear();
+    sessionStorage.clear();
+    window.history.replaceState({}, '', '/');
+    Object.defineProperty(globalThis, 'indexedDB', {
+      value: createIndexedDbMock(),
+      configurable: true,
+    });
+    mockDownloadDataFromArweave.mockResolvedValue(buildEnvelope());
+    mockUploadDataToArweave.mockResolvedValue('a'.repeat(43));
+    mockRegisterSessionOnChain.mockResolvedValue({ txs: [] });
+    buildContractViewerContracts.mockImplementation(({ sessionContracts = {} } = {}) => (
+      Object.keys(sessionContracts).map((contractKey) => ({
+        key: contractKey,
+        name:
+          contractKey === 'surveys'
+            ? 'Questions and Surveys'
+            : contractKey === 'sbtFactory'
+              ? 'SBT Factory'
+              : contractKey === 'sessionRegistry'
+                ? 'Session Registry'
+                : contractKey,
+        explainer: `Explainer for ${contractKey}`,
+        sourceFile:
+          contractKey === 'surveys'
+            ? 'Surveys.sol'
+            : contractKey === 'sbtFactory'
+              ? 'SBTFactory.sol'
+              : contractKey === 'sessionRegistry'
+                ? 'SessionRegistry.sol'
+                : 'Contract.sol',
+        source: `contract ${contractKey} {}`,
+        addresses: sessionContracts[contractKey]?.address
+          ? [{
+              address: sessionContracts[contractKey].address,
+              id: sessionContracts[contractKey].chainId || 84532,
+              testnet: true,
+              explorerUrl: `https://example.com/${contractKey}`,
+            }]
+          : [],
+      }))
+    ));
+    mockDecryptWithPassword.mockResolvedValue(buildDecryptedSponsoredBundle());
+  });
+
+  afterAll(() => {
+    global.fetch = originalFetch;
+    global.crypto = originalCrypto;
+    if (originalIndexedDbDescriptor) {
+      Object.defineProperty(globalThis, 'indexedDB', originalIndexedDbDescriptor);
+    } else {
+      delete globalThis.indexedDB;
+    }
+  });
+
+  it('clears cached customRpcKey when a sponsored RPC URL is applied', () => {
+    expect(mergeSponsoredBundleWorkerSecrets({
+      openaiKey: 'cached-openai',
+      arweaveJwk: '{"kty":"cached"}',
+      faucetPrivateKey: '0xcachedfaucet',
+      customRpcKey: 'keep-me',
+    }, {
+      openaiKey: 'sponsored-openai',
+      customRpcUrl: 'https://sponsored-rpc.example',
+      customRpcKey: 'ignore-me',
+    })).toEqual(expect.objectContaining({
+      openaiKey: 'sponsored-openai',
+      arweaveJwk: '{"kty":"cached"}',
+      faucetPrivateKey: '0xcachedfaucet',
+      customRpcUrl: 'https://sponsored-rpc.example',
+      customRpcKey: '',
+    }));
+  });
+
+  it('re-derives the Lit payer address when a sponsored bundle includes a payer key', () => {
+    const litPayerPrivateKey = '0x59c6995e998f97a5a0044976f84ce7de5d9d7f17b2f6a6a5f76f8864c8ad88f5';
+    expect(mergeSponsoredBundleWorkerSecrets({}, {
+      litPayerPrivateKey,
+      litPayerAddress: '0x0000000000000000000000000000000000000001',
+    })).toEqual(expect.objectContaining({
+      litPayerPrivateKey,
+      litPayerAddress: '0x3AC823CA9AcDA550244C6fF4927b5e1478E70Ff7',
+    }));
+  });
+
+  it('leaves the deploy form unchanged because sponsored bundles no longer ship raw deploy credentials', () => {
+    expect(mergeSponsoredBundleDeployForm({
+      apiToken: '',
+      workerName: 'launch-week-worker',
+    }, {
+      deployGrantToken: 'deploy-grant-token',
+      bootstrapWorkerUrl: 'https://source-worker.example',
+      openaiKey: 'sponsored-openai',
+    })).toEqual({
+      apiToken: '',
+      workerName: 'launch-week-worker',
+    });
+  });
+
+  it('treats sponsored auto-deploy as ready only for grant-backed sponsored bundles that can really deploy', () => {
+    const workerAuth = require('../../utilities/worker/workerAuth.js');
+    const originalNormalizeWorkerUrl = workerAuth.normalizeWorkerUrl.getMockImplementation();
+    workerAuth.normalizeWorkerUrl.mockImplementation((value = '') => String(value || '').trim());
+
+    try {
+      expect(resolveSponsoredBundleDeployReadiness({
+        sponsoredBundle: {
+          deployGrantToken: 'deploy-grant-token',
+          bootstrapWorkerUrl: 'https://source-worker.example',
+          openaiKey: 'sponsored-openai',
+        },
+        deployForm: {
+          workerName: 'launch-week-worker-201225',
+          bundleUrl: 'https://github.com/example/repo/releases/latest/download/sessionCorsWorker.bundle.js',
+        },
+        workerSecretsEnabled: true,
+        missingWorkerSecrets: [],
+      })).toEqual(expect.objectContaining({
+        active: true,
+        ready: true,
+        missing: [],
+      }));
+
+      expect(resolveSponsoredBundleDeployReadiness({
+        sponsoredBundle: {
+          deployGrantToken: 'deploy-grant-token',
+          bootstrapWorkerUrl: 'https://source-worker.example',
+          openaiKey: 'sponsored-openai',
+        },
+        deployForm: {
+          workerName: '',
+          bundleUrl: 'https://github.com/example/repo/releases/latest/download/sessionCorsWorker.bundle.js',
+        },
+        workerSecretsEnabled: true,
+        missingWorkerSecrets: [],
+      })).toEqual(expect.objectContaining({
+        active: true,
+        ready: false,
+        missing: ['Worker name'],
+      }));
+
+      expect(resolveSponsoredBundleDeployReadiness({
+        sponsoredBundle: {
+          bootstrapWorkerUrl: 'https://source-worker.example',
+          openaiKey: 'sponsored-openai',
+        },
+        deployForm: {
+          workerName: '',
+          bundleUrl: '',
+        },
+        workerSecretsEnabled: true,
+        missingWorkerSecrets: ['Arweave JWK'],
+      })).toEqual(expect.objectContaining({
+        active: true,
+        ready: false,
+        missing: expect.arrayContaining([
+          'Deploy grant token',
+          'Worker name',
+          'Worker bundle URL',
+          'Arweave JWK',
+        ]),
+      }));
+    } finally {
+      workerAuth.normalizeWorkerUrl.mockImplementation(originalNormalizeWorkerUrl || defaultNormalizeWorkerUrl);
+    }
+  });
+
+  it('treats grant-backed sponsored auto-deploy as ready when the bundle has a bootstrap worker URL and deploy token', () => {
+    const workerAuth = require('../../utilities/worker/workerAuth.js');
+    const originalNormalizeWorkerUrl = workerAuth.normalizeWorkerUrl.getMockImplementation();
+    workerAuth.normalizeWorkerUrl.mockImplementation((value = '') => String(value || '').trim());
+
+    try {
+      expect(resolveSponsoredBundleDeployReadiness({
+        sponsoredBundle: {
+          deployGrantToken: 'deploy-grant-token',
+          bootstrapWorkerUrl: 'https://source-worker.example',
+          openaiKey: 'sponsored-openai',
+          arweaveJwk: '{"kty":"RSA"}',
+        },
+        deployForm: {
+          apiToken: '',
+          workerName: 'launch-week-worker-201225',
+          bundleUrl: 'https://github.com/example/repo/releases/latest/download/sessionCorsWorker.bundle.js',
+        },
+        workerSecretsEnabled: true,
+        missingWorkerSecrets: [],
+      })).toEqual(expect.objectContaining({
+        active: true,
+        ready: true,
+        missing: [],
+      }));
+
+      expect(resolveSponsoredBundleDeployReadiness({
+        sponsoredBundle: {
+          deployGrantToken: 'deploy-grant-token',
+          bootstrapWorkerUrl: '',
+          openaiKey: 'sponsored-openai',
+          arweaveJwk: '{"kty":"RSA"}',
+        },
+        deployForm: {
+          apiToken: '',
+          workerName: 'launch-week-worker-201225',
+          bundleUrl: 'https://github.com/example/repo/releases/latest/download/sessionCorsWorker.bundle.js',
+        },
+        workerSecretsEnabled: true,
+        missingWorkerSecrets: [],
+      })).toEqual(expect.objectContaining({
+        active: true,
+        ready: false,
+        missing: ['Bootstrap worker URL'],
+      }));
+
+      expect(resolveSponsoredBundleDeployReadiness({
+        sponsoredBundle: {
+          deployGrantToken: '',
+          bootstrapWorkerUrl: 'https://source-worker.example',
+          openaiKey: 'sponsored-openai',
+          arweaveJwk: '{"kty":"RSA"}',
+        },
+        deployForm: {
+          apiToken: '',
+          workerName: 'launch-week-worker-201225',
+          bundleUrl: 'https://github.com/example/repo/releases/latest/download/sessionCorsWorker.bundle.js',
+        },
+        workerSecretsEnabled: true,
+        missingWorkerSecrets: [],
+      })).toEqual(expect.objectContaining({
+        active: true,
+        ready: false,
+        missing: ['Deploy grant token'],
+      }));
+    } finally {
+      workerAuth.normalizeWorkerUrl.mockImplementation(originalNormalizeWorkerUrl || defaultNormalizeWorkerUrl);
+    }
+  });
+
+  it('uses the sponsored bundle URL path only for deploy-ready sponsored auto-deploy flows', () => {
+    expect(resolveSessionWizardDeployBundleMode({
+      wizardMode: 'normal',
+      bundleMode: 'url',
+      sponsoredAutoDeployReady: false,
+    })).toBe('upload');
+
+    expect(resolveSessionWizardDeployBundleMode({
+      wizardMode: 'normal',
+      bundleMode: 'upload',
+      sponsoredAutoDeployReady: true,
+    })).toBe('url');
+
+    expect(resolveSessionWizardDeployBundleMode({
+      wizardMode: 'advanced',
+      bundleMode: 'upload',
+      sponsoredAutoDeployReady: true,
+    })).toBe('upload');
+  });
+
+  it('only prefers the local bundled worker asset for normal-mode sponsored auto-deploys when the fallback switch is enabled', () => {
+    expect(resolveSessionWizardShouldPreferLocalBundledAsset({
+      wizardMode: 'normal',
+      effectiveBundleMode: 'url',
+      sponsoredAutoDeployReady: true,
+      forceSponsoredAutoDeploy: false,
+      useLocalFallback: true,
+    })).toBe(true);
+
+    expect(resolveSessionWizardShouldPreferLocalBundledAsset({
+      wizardMode: 'advanced',
+      effectiveBundleMode: 'url',
+      sponsoredAutoDeployReady: true,
+      forceSponsoredAutoDeploy: false,
+      useLocalFallback: true,
+    })).toBe(false);
+
+    expect(resolveSessionWizardShouldPreferLocalBundledAsset({
+      wizardMode: 'normal',
+      effectiveBundleMode: 'url',
+      sponsoredAutoDeployReady: true,
+      forceSponsoredAutoDeploy: false,
+      useLocalFallback: false,
+    })).toBe(false);
+  });
+
+  it('falls back to the local bundled worker asset for sponsored auto-deploys when the release URL is not ready', async () => {
+    const fetchImpl = jest.fn(async () => ({
+      ok: true,
+      text: async () => 'export default { fetch() { return new Response("ok"); } };',
+    }));
+
+    await expect(resolveSessionWizardDeployBundlePayload({
+      effectiveBundleMode: 'url',
+      bundleUrl: 'https://github.com/example/repo/releases/latest/download/sessionCorsWorker.bundle.js',
+      shouldPreferLocalBundledAsset: true,
+      localBundledAssetUrl: LOCAL_WORKER_BUNDLE_FALLBACK_ASSET_URL,
+      fetchImpl,
+    })).resolves.toEqual({
+      bundleText: 'export default { fetch() { return new Response("ok"); } };',
+      bundleUrl: undefined,
+      bundleSource: 'local-asset',
+    });
+    expect(fetchImpl).toHaveBeenCalledWith(LOCAL_WORKER_BUNDLE_FALLBACK_ASSET_URL, { cache: 'no-store' });
+  });
+
+  it('uses a manually selected fallback file when the local bundled asset cannot be read', async () => {
+    const fetchImpl = jest.fn(async () => ({
+      ok: false,
+      status: 404,
+      text: async () => '',
+    }));
+    const fallbackFile = {
+      name: 'sessionCorsWorker.bundle.js',
+      text: async () => 'export default { fetch() { return new Response("manual"); } };',
+    };
+
+    await expect(resolveSessionWizardDeployBundlePayload({
+      effectiveBundleMode: 'url',
+      bundleFile: fallbackFile,
+      bundleUrl: 'https://github.com/example/repo/releases/latest/download/sessionCorsWorker.bundle.js',
+      shouldPreferLocalBundledAsset: true,
+      localBundledAssetUrl: LOCAL_WORKER_BUNDLE_FALLBACK_ASSET_URL,
+      fetchImpl,
+    })).resolves.toEqual({
+      bundleText: 'export default { fetch() { return new Response("manual"); } };',
+      bundleUrl: undefined,
+      bundleSource: 'manual-file',
+    });
+  });
+
+  it('stops the sponsored auto-deploy path from silently falling back to the hosted bundle URL when the local asset is unavailable', async () => {
+    const fetchImpl = jest.fn(async () => ({
+      ok: false,
+      status: 404,
+      text: async () => '',
+    }));
+
+    await expect(resolveSessionWizardDeployBundlePayload({
+      effectiveBundleMode: 'url',
+      bundleUrl: 'https://github.com/example/repo/releases/latest/download/sessionCorsWorker.bundle.js',
+      shouldPreferLocalBundledAsset: true,
+      localBundledAssetUrl: LOCAL_WORKER_BUNDLE_FALLBACK_ASSET_URL,
+      fetchImpl,
+    })).rejects.toThrow('/dist/sessionCorsWorker.bundle.js');
+  });
+
+  it('rejects plain-text fallback responses that are not actual worker bundles', async () => {
+    const fetchImpl = jest.fn(async () => ({
+      ok: true,
+      status: 200,
+      text: async () => 'Not Found',
+      headers: { get: jest.fn(() => 'text/plain') },
+    }));
+
+    await expect(resolveSessionWizardDeployBundlePayload({
+      effectiveBundleMode: 'url',
+      bundleUrl: 'https://github.com/example/repo/releases/latest/download/sessionCorsWorker.bundle.js',
+      shouldPreferLocalBundledAsset: true,
+      localBundledAssetUrl: LOCAL_WORKER_BUNDLE_FALLBACK_ASSET_URL,
+      fetchImpl,
+    })).rejects.toThrow('invalid content');
+  });
+
+  it('rejects webpack-style string wrapper assets instead of treating them as raw worker bytes', async () => {
+    const fetchImpl = jest.fn(async () => ({
+      ok: true,
+      status: 200,
+      text: async () => 'export default "var __create = Object.create;\\nexport default { fetch() {} };"',
+      headers: { get: jest.fn(() => 'application/javascript') },
+    }));
+
+    await expect(loadSessionWizardLocalBundledAssetText({
+      localBundledAssetUrl: LOCAL_WORKER_BUNDLE_FALLBACK_ASSET_URL,
+      fetchImpl,
+    })).rejects.toThrow('string wrapper');
+  });
+
+  it('switches normal-mode sponsored publish into manual bundle retry after the Cloudflare missing-handlers error', () => {
+    expect(shouldForceSessionWizardManualBundleRetry({
+      err: {
+        message: 'The uploaded script has no registered event handlers.',
+      },
+      forceSponsoredAutoDeploy: true,
+      shouldPreferLocalBundledAsset: true,
+      hasBundleFile: false,
+    })).toBe(true);
+
+    expect(shouldForceSessionWizardManualBundleRetry({
+      err: {
+        message: 'The uploaded script has no registered event handlers.',
+      },
+      forceSponsoredAutoDeploy: true,
+      shouldPreferLocalBundledAsset: true,
+      hasBundleFile: true,
+    })).toBe(false);
+
+    expect(shouldForceSessionWizardManualBundleRetry({
+      err: {
+        message: 'Worker deploy failed.',
+      },
+      forceSponsoredAutoDeploy: true,
+      shouldPreferLocalBundledAsset: true,
+      hasBundleFile: false,
+    })).toBe(false);
+  });
+
+  it('only auto-deploys on publish for ready custom-worker sponsored flows that are not already deployed', () => {
+    expect(resolveSessionWizardShouldAutoDeployWorker({
+      workerMode: 'custom',
+      sponsoredAutoDeployReady: true,
+      deployComplete: false,
+    })).toBe(true);
+    expect(resolveSessionWizardShouldAutoDeployWorker({
+      workerMode: 'custom',
+      sponsoredAutoDeployReady: true,
+      deployComplete: true,
+    })).toBe(false);
+    expect(resolveSessionWizardShouldAutoDeployWorker({
+      workerMode: 'default',
+      sponsoredAutoDeployReady: true,
+      deployComplete: false,
+    })).toBe(false);
+  });
+
+  it('plans sponsored publish work to deploy the worker first and skip redundant upload steps when metadata is manual', () => {
+    expect(buildSessionWizardPublishPlan({
+      shouldAutoDeployWorker: true,
+      hasPendingDrafts: true,
+      hasManualMetadata: false,
+    })).toEqual([
+      'deploy-worker',
+      'deploy-sbts',
+      'upload-metadata',
+      'register-session',
+      'done',
+    ]);
+
+    expect(buildSessionWizardPublishPlan({
+      shouldAutoDeployWorker: false,
+      hasPendingDrafts: false,
+      hasManualMetadata: true,
+    })).toEqual([
+      'register-session',
+      'done',
+    ]);
+  });
+
+  it('derives publish step numbers from the rendered publish plan even when upload is skipped', () => {
+    expect(buildSessionWizardPublishStepNumbers({
+      shouldAutoDeployWorker: true,
+      hasPendingDrafts: true,
+      hasManualMetadata: true,
+    })).toEqual({
+      'deploy-worker': 1,
+      'deploy-sbts': 2,
+      'register-session': 3,
+      done: 4,
+    });
+
+    expect(buildSessionWizardPublishStepNumbers({
+      shouldAutoDeployWorker: false,
+      hasPendingDrafts: false,
+      hasManualMetadata: true,
+    })).toEqual({
+      'register-session': 1,
+      done: 2,
+    });
+  });
+
+  it('auto-applies sponsored bundle secrets, re-enables worker secrets, and disables secret persistence', async () => {
+    seedWizardCache({
+      workerSecretsEnabled: false,
+      persistWorkerSecrets: true,
+      workerSecrets: {
+        openaiKey: 'cached-openai',
+        customRpcKey: 'keep-me',
+      },
+    });
+
+    renderSessionWizard({
+      initialSponsoredBundleId: 'sponsor_tx_id',
+      initialSponsoredBundleKey: 'bundle-secret',
+    });
+
+    await expectSponsoredStatus('Sponsored resources applied.');
+
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED));
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
+
+    expect(getFieldInputByLabel('OpenAI key *')).toHaveValue('sponsored-openai');
+    expect(getFieldInputByLabel('Anthropic key *')).toHaveValue('sponsored-anthropic');
+    expect(getFieldInputByLabel('OpenRouter key')).toHaveValue('sponsored-openrouter');
+    expect(getFieldInputByLabel('Arweave JWK *')).toHaveValue('{"kty":"RSA"}');
+    expect(getFieldInputByLabel('Faucet private key')).toHaveValue('0xsponsoredfaucet');
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_PAYER_PRIVATE_KEY)).toHaveValue(
+      '0x59c6995e998f97a5a0044976f84ce7de5d9d7f17b2f6a6a5f76f8864c8ad88f5'
+    );
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_PAYER_ADDRESS)).toHaveValue(
+      '0x3AC823CA9AcDA550244C6fF4927b5e1478E70Ff7'
+    );
+    expect(getFieldInputByLabel('Custom RPC URL')).toHaveValue('https://sponsored-rpc.example');
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN)).toHaveValue('');
+    expect(getToggleCheckbox('Dev: keep secrets on refresh')).not.toBeChecked();
+    expect(getToggleCheckbox('Require users to pay for usage')).not.toBeChecked();
+    expect(JSON.parse(sessionStorage.getItem(SPONSORED_BOOTSTRAP_FUNDING_CONTEXT_KEY) || '{}')).toEqual({
+      sessionSlug: 'source-session',
+      workerUrl: 'https://source-worker.example',
+      targetSessionSlug: '',
+    });
+
+    await waitFor(() => {
+      const cachedRaw = localStorage.getItem('ce:sessionWizardDraft:v1') || '{}';
+      expect(cachedRaw).not.toContain('sponsored-openai');
+      expect(cachedRaw).not.toContain('sponsored-rpc.example');
+      expect(JSON.parse(cachedRaw)).toEqual(expect.objectContaining({
+        persistWorkerSecrets: false,
+        workerSecretsEnabled: true,
+      }));
+    });
+  }, 15000);
+
+  it('keeps the sponsored bootstrap funding target slug aligned with the current draft slug', async () => {
+    renderSessionWizard({
+      initialSponsoredBundleId: 'sponsor_tx_id',
+      initialSponsoredBundleKey: 'bundle-secret',
+    });
+
+    await expectSponsoredStatus('Sponsored resources applied.');
+
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED));
+    fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SLUG), {
+      target: { value: 'fresh-sponsored-target' },
+    });
+
+    await waitFor(() => {
+      expect(JSON.parse(sessionStorage.getItem(SPONSORED_BOOTSTRAP_FUNDING_CONTEXT_KEY) || '{}')).toEqual({
+        sessionSlug: 'source-session',
+        workerUrl: 'https://source-worker.example',
+        targetSessionSlug: 'fresh-sponsored-target',
+      });
+    });
+  }, 15000);
+
+  it('persists faucet grant tokens in the sponsored bootstrap funding context', async () => {
+    mockDecryptWithPassword.mockResolvedValueOnce({
+      openaiKey: 'sponsored-openai',
+      anthropicKey: 'sponsored-anthropic',
+      openrouterKey: 'sponsored-openrouter',
+      arweaveJwk: '{"kty":"RSA"}',
+      faucetGrantToken: 'faucet-grant-token',
+      bootstrapWorkerUrl: 'https://source-worker.example',
+      meta: {
+        label: 'Grant Flow',
+        createdAt: '2099-03-20T12:00:00.000Z',
+        createdBy: '0xadmin',
+        expiresAt: '2099-03-21T12:00:00.000Z',
+        sourceSessionSlug: 'source-session',
+        sourceWorkerUrl: 'https://source-worker.example',
+      },
+    });
+
+    renderSessionWizard({
+      initialSponsoredBundleId: 'sponsor_tx_id',
+      initialSponsoredBundleKey: 'bundle-secret',
+    });
+
+    await expectSponsoredStatus('Sponsored resources applied.');
+
+    expect(JSON.parse(sessionStorage.getItem(SPONSORED_BOOTSTRAP_FUNDING_CONTEXT_KEY) || '{}')).toEqual({
+      sessionSlug: 'source-session',
+      workerUrl: 'https://source-worker.example',
+      targetSessionSlug: '',
+      faucetGrantToken: 'faucet-grant-token',
+    });
+  }, 15000);
+
+  it('clears stale deployed worker state from a previous session when a sponsored bundle is applied', async () => {
+    const previousWorkerUrl = 'https://old-session-worker.example.test';
+    seedWizardCache({
+      deployComplete: true,
+      deployWorkerUrl: previousWorkerUrl,
+      draft: {
+        corsWorkerUrl: previousWorkerUrl,
+      },
+    });
+
+    renderSessionWizard({
+      initialSponsoredBundleId: 'sponsor_tx_id',
+      initialSponsoredBundleKey: 'bundle-secret',
+    });
+
+    await expectSponsoredStatus('Sponsored resources applied.');
+
+    await waitFor(() => {
+      const cachedRaw = localStorage.getItem('ce:sessionWizardDraft:v1') || '{}';
+      expect(JSON.parse(cachedRaw)).toEqual(expect.objectContaining({
+        deployComplete: false,
+        deployWorkerUrl: '',
+        draft: expect.objectContaining({
+          corsWorkerUrl: '',
+        }),
+      }));
+    });
+  }, 15000);
+
+  it('skips the normal-mode worker step once the sponsored auto-deploy path is ready', async () => {
+    renderSessionWizard({
+      initialSponsoredBundleId: 'sponsor_tx_id',
+      initialSponsoredBundleKey: 'bundle-secret',
+    });
+
+    await expectSponsoredStatus('Sponsored resources applied.');
+
+    fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME), {
+      target: { value: 'Sponsored Launch Session' },
+    });
+    fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_SESSION_INFO), {
+      target: { value: 'Deploy this with the sponsored worker.' },
+    });
+
+    const rail = document.querySelector('[aria-label="Normal mode sections"]');
+    expect(rail).not.toBeNull();
+
+    await waitFor(() => {
+      expect(screen.queryByRole('button', { name: /step 3: worker/i })).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /step 3: deploy session/i })).toBeInTheDocument();
+    });
+    expect(rail).toHaveStyle('--session-wizard-card-count: 3');
+  }, 15000);
+
+  it('keeps advanced-mode file upload controls available for sponsored worker testing', async () => {
+    renderSessionWizard({
+      initialSponsoredBundleId: 'sponsor_tx_id',
+      initialSponsoredBundleKey: 'bundle-secret',
+    });
+
+    await expectSponsoredStatus('Sponsored resources applied.');
+
+    fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME), {
+      target: { value: 'Sponsored Launch Session' },
+    });
+    fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_SESSION_INFO), {
+      target: { value: 'Deploy this with the sponsored worker.' },
+    });
+
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED));
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
+
+    expect(await screen.findByText('Worker bundle source')).toBeInTheDocument();
+    expect(screen.getAllByText('Upload file').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Use URL').length).toBeGreaterThan(0);
+  }, 15000);
+
+  it('removes the sponsored bundle hash secret after applying the bundle', async () => {
+    window.history.replaceState(
+      {},
+      '',
+      '/session/new?sponsored=sponsor_tx_id#k=bundle-secret&preview=1'
+    );
+
+    renderSessionWizard({
+      initialSponsoredBundleId: 'sponsor_tx_id',
+      initialSponsoredBundleKey: 'bundle-secret',
+    });
+
+    await expectSponsoredStatus('Sponsored resources applied.');
+    expect(window.location.hash).toBe('#preview=1');
+  });
+
+  it('keeps the prior sponsored status when the parent rerenders after hash scrubbing', async () => {
+    const { rerender } = renderSessionWizard({
+      initialSponsoredBundleId: 'sponsor_tx_id',
+      initialSponsoredBundleKey: 'bundle-secret',
+    });
+
+    await expectSponsoredStatus('Sponsored resources applied.');
+    expect(mockDownloadDataFromArweave).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <SessionWizard
+        network={{ id: 84532 }}
+        initialSponsoredBundleId="sponsor_tx_id"
+        initialSponsoredBundleKey=""
+      />
+    );
+
+    await expectSponsoredStatus('Sponsored resources applied.');
+    expect(mockDownloadDataFromArweave).toHaveBeenCalledTimes(1);
+  });
+
+  it('restores the pre-sponsored secrets and deploy token when the route is no longer sponsored', async () => {
+    seedWizardCache({
+      workerSecretsEnabled: false,
+      persistWorkerSecrets: true,
+      workerSecrets: {
+        openaiKey: 'cached-openai',
+        customRpcKey: 'keep-me',
+      },
+    });
+
+    const { rerender } = renderSessionWizard({
+      initialSponsoredBundleId: 'sponsor_tx_id',
+      initialSponsoredBundleKey: 'bundle-secret',
+    });
+
+    await expectSponsoredStatus('Sponsored resources applied.');
+
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED));
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
+
+    expect(getFieldInputByLabel('OpenAI key *')).toHaveValue('sponsored-openai');
+    expect(getFieldInputByLabel('Custom RPC URL')).toHaveValue('https://sponsored-rpc.example');
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN)).toHaveValue('');
+    expect(getToggleCheckbox('Dev: keep secrets on refresh')).not.toBeChecked();
+    expect(getToggleCheckbox('Require users to pay for usage')).not.toBeChecked();
+
+    rerender(
+      <SessionWizard
+        network={{ id: 84532 }}
+        initialSponsoredBundleId=""
+        initialSponsoredBundleKey=""
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('ce-wizard-sponsored-status')).not.toBeInTheDocument();
+    });
+    expect(sessionStorage.getItem(SPONSORED_BOOTSTRAP_FUNDING_CONTEXT_KEY)).toBeNull();
+    expect(getFieldInputByLabel('OpenAI key *')).toHaveValue('cached-openai');
+    expect(getFieldInputByLabel('Custom RPC URL')).toHaveValue('');
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN)).toHaveValue('');
+    expect(getToggleCheckbox('Dev: keep secrets on refresh')).toBeChecked();
+    expect(getToggleCheckbox('Require users to pay for usage')).toBeChecked();
+  });
+
+  it('restores the latest local deploy and toggle edits after an in-flight sponsored bundle finishes', async () => {
+    const deferredBundle = createDeferred();
+    seedWizardCache({
+      workerSecretsEnabled: true,
+      persistWorkerSecrets: false,
+      workerSecrets: {
+        openaiKey: 'cached-openai',
+      },
+    });
+    mockDownloadDataFromArweave.mockReturnValueOnce(deferredBundle.promise);
+
+    const { rerender } = renderSessionWizard({
+      initialSponsoredBundleId: 'sponsor_tx_id',
+      initialSponsoredBundleKey: 'bundle-secret',
+    });
+
+    await expectSponsoredStatus('Loading sponsored bundle…');
+
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED));
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
+
+    fireEvent.change(getFieldInputByLabel('OpenAI key *'), {
+      target: { value: 'edited-openai' },
+    });
+    fireEvent.click(getToggleCheckbox('Dev: keep secrets on refresh'));
+    fireEvent.click(getToggleCheckbox('Require users to pay for usage'));
+
+    rerender(
+      <SessionWizard
+        network={{ id: 84532 }}
+        account="0x00000000000000000000000000000000000000cc"
+        initialSponsoredBundleId="sponsor_tx_id"
+        initialSponsoredBundleKey="bundle-secret"
+      />
+    );
+
+    await waitFor(() => {
+      expect(getFieldInputByLabel('Admin address')).toHaveValue('0x00000000000000000000000000000000000000cc');
+    });
+
+    rerender(
+      <SessionWizard
+        network={{ id: 84532 }}
+        initialSponsoredBundleId="sponsor_tx_id"
+        initialSponsoredBundleKey="bundle-secret"
+      />
+    );
+
+    expect(getFieldInputByLabel('OpenAI key *')).toHaveValue('edited-openai');
+    expect(getToggleCheckbox('Dev: keep secrets on refresh')).toBeChecked();
+    expect(getToggleCheckbox('Require users to pay for usage')).toBeChecked();
+
+    await act(async () => {
+      deferredBundle.resolve(buildEnvelope());
+      await deferredBundle.promise;
+    });
+
+    await expectSponsoredStatus('Sponsored resources applied.');
+    expect(getFieldInputByLabel('OpenAI key *')).toHaveValue('sponsored-openai');
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN)).toHaveValue('');
+    expect(getFieldInputByLabel('Admin address')).toHaveValue('0x00000000000000000000000000000000000000cc');
+    expect(getToggleCheckbox('Dev: keep secrets on refresh')).not.toBeChecked();
+    expect(getToggleCheckbox('Require users to pay for usage')).not.toBeChecked();
+
+    rerender(
+      <SessionWizard
+        network={{ id: 84532 }}
+        initialSponsoredBundleId=""
+        initialSponsoredBundleKey=""
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('ce-wizard-sponsored-status')).not.toBeInTheDocument();
+    });
+    expect(getFieldInputByLabel('OpenAI key *')).toHaveValue('edited-openai');
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN)).toHaveValue('');
+    expect(getFieldInputByLabel('Admin address')).toHaveValue('0x00000000000000000000000000000000000000cc');
+    expect(getToggleCheckbox('Dev: keep secrets on refresh')).toBeChecked();
+    expect(getToggleCheckbox('Require users to pay for usage')).toBeChecked();
+  });
+
+  it('restores sponsored resources after a real refresh once the hash key is gone', async () => {
+    const firstRender = renderSessionWizard({
+      initialSponsoredBundleId: 'sponsor_tx_id',
+      initialSponsoredBundleKey: 'bundle-secret',
+    });
+
+    await expectSponsoredStatus('Sponsored resources applied.');
+    expect(mockDownloadDataFromArweave).toHaveBeenCalledTimes(1);
+    await waitFor(() => {
+      const cachedRaw = sessionStorage.getItem('ce:sessionWizardSponsoredBundle:v1') || '';
+      const indexedDbStore = globalThis.indexedDB.__stores.get('keys');
+      const cachedKey = indexedDbStore ? Array.from(indexedDbStore.values())[0] : null;
+      expect(cachedRaw).toContain('"ciphertext"');
+      expect(cachedRaw).not.toContain('sponsored-openai');
+      expect(cachedRaw).not.toContain('https://sponsored-rpc.example');
+      expect(sessionStorage.getItem('ce:sessionWizardSponsoredBundle:ek:v1')).toBeNull();
+      expect(cachedKey?.type).toBe('secret');
+    });
+
+    firstRender.unmount();
+    __test__resetSessionWizardSponsoredBundleCacheKey();
+
+    renderSessionWizard({
+      initialSponsoredBundleId: 'sponsor_tx_id',
+      initialSponsoredBundleKey: '',
+    });
+
+    await expectSponsoredStatus('Sponsored resources applied.');
+
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED));
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
+
+    expect(getFieldInputByLabel('OpenAI key *')).toHaveValue('sponsored-openai');
+    expect(getFieldInputByLabel('Custom RPC URL')).toHaveValue('https://sponsored-rpc.example');
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN)).toHaveValue('');
+    expect(mockDownloadDataFromArweave).toHaveBeenCalledTimes(1);
+  });
+
+  it('only clears the current tab key when a sponsored bundle cache entry is removed', async () => {
+    sessionStorage.setItem('ce:sessionWizardSponsoredBundle:tabId:v1', 'tab-a');
+
+    const firstRender = renderSessionWizard({
+      initialSponsoredBundleId: 'sponsor_tx_id',
+      initialSponsoredBundleKey: 'bundle-secret',
+    });
+
+    await expectSponsoredStatus('Sponsored resources applied.');
+
+    const indexedDbStore = globalThis.indexedDB.__stores.get('keys');
+    expect(indexedDbStore?.has('sessionWizardSponsoredBundle:tab-a')).toBe(true);
+    indexedDbStore.set('sessionWizardSponsoredBundle:tab-b', { type: 'secret', tab: 'b' });
+
+    firstRender.unmount();
+    __test__resetSessionWizardSponsoredBundleCacheKey();
+    sessionStorage.clear();
+    sessionStorage.setItem('ce:sessionWizardSponsoredBundle:tabId:v1', 'tab-a');
+    mockDecryptWithPassword.mockResolvedValueOnce({
+      openaiKey: 'sponsored-openai',
+      meta: {
+        label: 'Expired bundle',
+        createdAt: '2000-03-19T12:00:00.000Z',
+        createdBy: '0xadmin',
+        expiresAt: '2000-03-19T12:30:00.000Z',
+      },
+    });
+
+    renderSessionWizard({
+      initialSponsoredBundleId: 'sponsor_tx_id',
+      initialSponsoredBundleKey: 'bundle-secret',
+    });
+
+    await expectSponsoredStatus('Sponsored bundle expired.');
+
+    expect(indexedDbStore?.has('sessionWizardSponsoredBundle:tab-a')).toBe(false);
+    expect(indexedDbStore?.get('sessionWizardSponsoredBundle:tab-b')).toEqual({
+      type: 'secret',
+      tab: 'b',
+    });
+  });
+
+  it('falls back to memory-only sponsored bundle cache storage when IndexedDB is unavailable', async () => {
+    Object.defineProperty(globalThis, 'indexedDB', {
+      value: undefined,
+      configurable: true,
+    });
+    __test__resetSessionWizardSponsoredBundleCacheKey();
+
+    const firstRender = renderSessionWizard({
+      initialSponsoredBundleId: 'sponsor_tx_id',
+      initialSponsoredBundleKey: 'bundle-secret',
+    });
+
+    await expectSponsoredStatus('Sponsored resources applied.');
+    await waitFor(() => {
+      const cachedRaw = sessionStorage.getItem('ce:sessionWizardSponsoredBundle:v1') || '';
+      expect(cachedRaw).toContain('"ciphertext"');
+      expect(sessionStorage.getItem('ce:sessionWizardSponsoredBundle:ek:v1')).toBeNull();
+    });
+
+    firstRender.unmount();
+    __test__resetSessionWizardSponsoredBundleCacheKey();
+
+    renderSessionWizard({
+      initialSponsoredBundleId: 'sponsor_tx_id',
+      initialSponsoredBundleKey: '',
+    });
+
+    await expectSponsoredStatus('Malformed sponsored link.');
+    expect(mockDownloadDataFromArweave).toHaveBeenCalledTimes(1);
+  });
+
+  it('preserves existing worker secrets when the sponsored bundle only provides a subset of fields', async () => {
+    seedWizardCache({
+      workerSecretsEnabled: true,
+      persistWorkerSecrets: true,
+      workerSecrets: {
+        openaiKey: 'cached-openai',
+        arweaveJwk: '{"kty":"cached"}',
+        faucetPrivateKey: '0xcachedfaucet',
+      },
+    });
+    mockDecryptWithPassword.mockResolvedValue({
+      openaiKey: 'sponsored-openai',
+      meta: {
+        label: 'Partial bundle',
+        createdAt: '2099-03-20T12:00:00.000Z',
+        createdBy: '0xadmin',
+        expiresAt: '2099-03-21T12:00:00.000Z',
+      },
+    });
+
+    renderSessionWizard({
+      initialSponsoredBundleId: 'sponsor_tx_id',
+      initialSponsoredBundleKey: 'bundle-secret',
+    });
+
+    await expectSponsoredStatus('Sponsored resources applied.');
+
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED));
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
+
+    expect(getFieldInputByLabel('OpenAI key *')).toHaveValue('sponsored-openai');
+    expect(getFieldInputByLabel('Arweave JWK *')).toHaveValue('{"kty":"cached"}');
+    expect(getFieldInputByLabel('Faucet private key')).toHaveValue('0xcachedfaucet');
+  });
+
+  it('shows advanced faucet provenance for sponsored raw faucet keys and hides it after manual edits', async () => {
+    renderSessionWizard({
+      initialSponsoredBundleId: 'sponsor_tx_id',
+      initialSponsoredBundleKey: 'bundle-secret',
+    });
+
+    await expectSponsoredStatus('Sponsored resources applied.');
+    enableAdvancedMode();
+    openWorkerPanel();
+
+    expect(screen.getByText(SPONSORED_FAUCET_NOTICE)).toBeInTheDocument();
+
+    fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_FAUCET_PRIVATE_KEY), {
+      target: { value: '0xmanualfaucetoverride' },
+    });
+
+    expect(screen.queryByText(SPONSORED_FAUCET_NOTICE)).not.toBeInTheDocument();
+  });
+
+  it('shows advanced faucet provenance when faucet funding comes from a sponsored grant token', async () => {
+    mockDecryptWithPassword.mockResolvedValueOnce(buildDecryptedSponsoredBundle({
+      faucetPrivateKey: '',
+      faucetGrantToken: 'faucet-grant-token',
+    }));
+
+    renderSessionWizard({
+      initialSponsoredBundleId: 'sponsor_tx_id',
+      initialSponsoredBundleKey: 'bundle-secret',
+    });
+
+    await expectSponsoredStatus('Sponsored resources applied.');
+    enableAdvancedMode();
+    openWorkerPanel();
+
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_FAUCET_PRIVATE_KEY)).toHaveValue('');
+    expect(screen.getByText(SPONSORED_FAUCET_NOTICE)).toBeInTheDocument();
+  });
+
+  it('shows advanced deploy provenance with a blank Cloudflare token field and hides it after manual edits', async () => {
+    mockDecryptWithPassword.mockResolvedValueOnce(buildDecryptedSponsoredBundle({
+      deployGrantToken: 'deploy-grant-token',
+    }));
+
+    renderSessionWizard({
+      initialSponsoredBundleId: 'sponsor_tx_id',
+      initialSponsoredBundleKey: 'bundle-secret',
+    });
+
+    await expectSponsoredStatus('Sponsored resources applied.');
+    enableAdvancedMode();
+    openWorkerPanel();
+
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN)).toHaveValue('');
+    expect(screen.getByText(SPONSORED_DEPLOY_NOTICE)).toBeInTheDocument();
+
+    setCloudflareTokenValue('cf-manual-token');
+
+    await waitFor(() => {
+      expect(screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN)).toHaveValue('cf-manual-token');
+    });
+    expect(screen.queryByText(SPONSORED_DEPLOY_NOTICE)).not.toBeInTheDocument();
+  });
+
+  it('keeps advanced provenance notices scoped to the live sponsored bundle state', async () => {
+    mockDecryptWithPassword.mockResolvedValue(buildDecryptedSponsoredBundle({
+      deployGrantToken: 'deploy-grant-token',
+    }));
+
+    const { rerender } = renderSessionWizard({
+      initialSponsoredBundleId: 'sponsor_tx_id',
+      initialSponsoredBundleKey: 'bundle-secret',
+    });
+
+    await expectSponsoredStatus('Sponsored resources applied.');
+    enableAdvancedMode();
+    openWorkerPanel();
+
+    expect(screen.getByText(SPONSORED_FAUCET_NOTICE)).toBeInTheDocument();
+    expect(screen.getByText(SPONSORED_DEPLOY_NOTICE)).toBeInTheDocument();
+
+    rerender(
+      <SessionWizard
+        network={{ id: 84532 }}
+        initialSponsoredBundleId=""
+        initialSponsoredBundleKey=""
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('ce-wizard-sponsored-status')).not.toBeInTheDocument();
+    });
+    expect(screen.queryByText(SPONSORED_FAUCET_NOTICE)).not.toBeInTheDocument();
+    expect(screen.queryByText(SPONSORED_DEPLOY_NOTICE)).not.toBeInTheDocument();
+
+    rerender(
+      <SessionWizard
+        network={{ id: 84532 }}
+        initialSponsoredBundleId="sponsor_tx_id"
+        initialSponsoredBundleKey="bundle-secret"
+      />
+    );
+
+    await expectSponsoredStatus('Sponsored resources applied.');
+    expect(screen.getByText(SPONSORED_FAUCET_NOTICE)).toBeInTheDocument();
+    expect(screen.getByText(SPONSORED_DEPLOY_NOTICE)).toBeInTheDocument();
+  });
+
+  it('retries advanced URL deploys with the local bundled worker bytes when the helper cannot fetch the remote bundle URL', async () => {
+    const workerAuth = require('../../utilities/worker/workerAuth.js');
+    const originalNormalizeWorkerUrl = workerAuth.normalizeWorkerUrl.getMockImplementation();
+    seedWizardCache({
+      draft: {
+        ai: {
+          models: {
+            fast: { provider: 'openai', model: 'gpt-4o-mini' },
+            thinking: { provider: 'openai', model: 'gpt-4.1-mini' },
+          },
+        },
+      },
+    });
+    workerAuth.normalizeWorkerUrl.mockImplementation((value = '') => {
+      const trimmed = String(value || '').trim();
+      return trimmed || 'https://deploy-helper.example.test';
+    });
+    global.fetch = jest.fn(async (url, options = {}) => {
+      const normalizedUrl = String(url);
+      if (normalizedUrl === LOCAL_WORKER_BUNDLE_FALLBACK_ASSET_URL) {
+        return {
+          ok: true,
+          text: async () => 'export default { fetch() { return new Response("local"); } };',
+          headers: { get: jest.fn(() => 'application/javascript') },
+        };
+      }
+      if (normalizedUrl.endsWith('/deploy')) {
+        const payload = JSON.parse(options.body);
+        if (!payload.bundleText) {
+          return {
+            ok: false,
+            status: 502,
+            json: async () => ({ error: 'Failed to fetch bundle: getaddrinfo ENOTFOUND bundles.example.test' }),
+          };
+        }
+        return {
+          ok: true,
+          json: async () => ({
+            ok: true,
+            workerUrl: 'https://deployed.example.test',
+            writesSessionConfig: true,
+            writesSessionSecrets: false,
+          }),
+        };
+      }
+      if (normalizedUrl.endsWith('/auth/nonce')) {
+        return { ok: true, json: async () => ({ nonce: 'wizard-admin-nonce' }) };
+      }
+      if (normalizedUrl.endsWith('/admin/set-secrets')) {
+        return { ok: true, json: async () => ({ ok: true }) };
+      }
+      return { ok: true, json: async () => ({ ok: true }) };
+    });
+
+    try {
+      renderLoggedInSessionWizard();
+      const bundleUrl = 'https://bundles.example.test/sessionCorsWorker.bundle.js';
+      const { bundleModeUrlInput, bundleUrlInput } = await configureAdvancedUseUrlDeploy({ bundleUrl });
+
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_WORKER));
+
+      await waitFor(() => {
+        expect(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_STATUS)).toHaveTextContent('Worker deployed.');
+      });
+
+      const deployCalls = global.fetch.mock.calls.filter(([url]) => String(url).endsWith('/deploy'));
+      expect(deployCalls).toHaveLength(2);
+
+      const firstPayload = JSON.parse(deployCalls[0][1].body);
+      expect(firstPayload.bundleUrl).toBe(bundleUrl);
+      expect(firstPayload.bundleText).toBeUndefined();
+
+      const secondPayload = JSON.parse(deployCalls[1][1].body);
+      expect(secondPayload.bundleUrl).toBeUndefined();
+      expect(secondPayload.bundleText).toBe('export default { fetch() { return new Response("local"); } };');
+
+      expect(global.fetch).toHaveBeenCalledWith(LOCAL_WORKER_BUNDLE_FALLBACK_ASSET_URL, { cache: 'no-store' });
+      expect(bundleModeUrlInput).toBeChecked();
+      expect(bundleUrlInput).toHaveValue(bundleUrl);
+      expect(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_URL)).toHaveValue('https://deployed.example.test');
+    } finally {
+      workerAuth.normalizeWorkerUrl.mockImplementation(originalNormalizeWorkerUrl || defaultNormalizeWorkerUrl);
+    }
+  });
+
+  it('surfaces the local bundled asset failure and stops after one advanced URL deploy attempt when the fallback asset cannot load', async () => {
+    const workerAuth = require('../../utilities/worker/workerAuth.js');
+    const originalNormalizeWorkerUrl = workerAuth.normalizeWorkerUrl.getMockImplementation();
+    seedWizardCache({
+      draft: {
+        ai: {
+          models: {
+            fast: { provider: 'openai', model: 'gpt-4o-mini' },
+            thinking: { provider: 'openai', model: 'gpt-4.1-mini' },
+          },
+        },
+      },
+    });
+    workerAuth.normalizeWorkerUrl.mockImplementation((value = '') => {
+      const trimmed = String(value || '').trim();
+      return trimmed || 'https://deploy-helper.example.test';
+    });
+    global.fetch = jest.fn(async (url, options = {}) => {
+      const normalizedUrl = String(url);
+      if (normalizedUrl === LOCAL_WORKER_BUNDLE_FALLBACK_ASSET_URL) {
+        return {
+          ok: false,
+          status: 404,
+          text: async () => '',
+          headers: { get: jest.fn(() => 'text/plain') },
+        };
+      }
+      if (normalizedUrl.endsWith('/deploy')) {
+        return {
+          ok: false,
+          status: 502,
+          json: async () => ({ error: 'Failed to fetch bundle (404).' }),
+        };
+      }
+      return { ok: true, json: async () => ({ ok: true }) };
+    });
+
+    try {
+      renderLoggedInSessionWizard();
+      const bundleUrl = 'https://bundles.example.test/missing-sessionCorsWorker.bundle.js';
+      const { bundleModeUrlInput, bundleUrlInput } = await configureAdvancedUseUrlDeploy({ bundleUrl });
+
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_WORKER));
+
+      await waitFor(() => {
+        expect(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_STATUS)).toHaveTextContent(
+          'Bundled worker fallback fetch failed (404).'
+        );
+      });
+
+      const deployCalls = global.fetch.mock.calls.filter(([url]) => String(url).endsWith('/deploy'));
+      expect(deployCalls).toHaveLength(1);
+      expect(bundleModeUrlInput).toBeChecked();
+      expect(bundleUrlInput).toHaveValue(bundleUrl);
+    } finally {
+      workerAuth.normalizeWorkerUrl.mockImplementation(originalNormalizeWorkerUrl || defaultNormalizeWorkerUrl);
+    }
+  });
+
+  it('rejects expired bundles without mutating existing worker secret fields', async () => {
+    seedWizardCache({
+      workerSecretsEnabled: false,
+      persistWorkerSecrets: true,
+      workerSecrets: {
+        openaiKey: 'cached-openai',
+      },
+    });
+    mockDecryptWithPassword.mockResolvedValue({
+      openaiKey: 'expired-openai',
+      meta: {
+        label: 'Expired',
+        createdAt: '2000-03-20T11:00:00.000Z',
+        createdBy: '0xadmin',
+        expiresAt: '2000-03-20T11:30:00.000Z',
+      },
+    });
+
+    renderSessionWizard({
+      initialSponsoredBundleId: 'sponsor_tx_id',
+      initialSponsoredBundleKey: 'bundle-secret',
+    });
+
+    await expectSponsoredStatus('Sponsored bundle expired.');
+
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED));
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
+
+    expect(getFieldInputByLabel('OpenAI key *')).toHaveValue('cached-openai');
+    expect(getToggleCheckbox('Dev: keep secrets on refresh')).toBeChecked();
+    expect(getToggleCheckbox('Require users to pay for usage')).toBeChecked();
+  });
+
+  it('removes the sponsored bundle hash secret after a terminal sponsored-bundle failure', async () => {
+    window.history.replaceState(
+      {},
+      '',
+      '/session/new?sponsored=sponsor_tx_id#k=bundle-secret&preview=1'
+    );
+    mockDecryptWithPassword.mockResolvedValue({
+      openaiKey: 'expired-openai',
+      meta: {
+        label: 'Expired',
+        createdAt: '2000-03-20T11:00:00.000Z',
+        createdBy: '0xadmin',
+        expiresAt: '2000-03-20T11:30:00.000Z',
+      },
+    });
+
+    renderSessionWizard({
+      initialSponsoredBundleId: 'sponsor_tx_id',
+      initialSponsoredBundleKey: 'bundle-secret',
+    });
+
+    await expectSponsoredStatus('Sponsored bundle expired.');
+    expect(window.location.hash).toBe('#preview=1');
+  });
+
+  it('rejects malformed envelopes without mutating existing worker secret fields', async () => {
+    seedWizardCache({
+      workerSecrets: {
+        openaiKey: 'cached-openai',
+      },
+    });
+    mockDownloadDataFromArweave.mockResolvedValue(JSON.stringify({
+      type: 'not-a-sponsored-bundle',
+      version: 1,
+      cipher: 'password-aes-gcm',
+      encryptedData: 'encrypted-base64',
+    }));
+
+    renderSessionWizard({
+      initialSponsoredBundleId: 'sponsor_tx_id',
+      initialSponsoredBundleKey: 'bundle-secret',
+    });
+
+    await expectSponsoredStatus('Invalid sponsored bundle.');
+
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED));
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
+
+    expect(getFieldInputByLabel('OpenAI key *')).toHaveValue('cached-openai');
+  });
+
+  it('surfaces malformed sponsored links before any bundle download runs', async () => {
+    renderSessionWizard({
+      initialSponsoredBundleId: 'sponsor_tx_id',
+      initialSponsoredBundleKey: '',
+    });
+
+    await expectSponsoredStatus('Malformed sponsored link.');
+    expect(mockDownloadDataFromArweave).not.toHaveBeenCalled();
+  });
+
+  it('lets the user retry transient sponsored bundle load failures in place', async () => {
+    mockDownloadDataFromArweave
+      .mockRejectedValueOnce(new Error('gateway timeout'))
+      .mockResolvedValueOnce(buildEnvelope());
+
+    renderSessionWizard({
+      initialSponsoredBundleId: 'sponsor_tx_id',
+      initialSponsoredBundleKey: 'bundle-secret',
+    });
+
+    await expectSponsoredStatus('Failed to load sponsored bundle.');
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+
+    await expectSponsoredStatus('Sponsored resources applied.');
+    expect(mockDownloadDataFromArweave).toHaveBeenCalledTimes(2);
+    expect(mockDownloadDataFromArweave.mock.calls[1]).toEqual([
+      'sponsor_tx_id',
+      expect.objectContaining({
+        debugContext: expect.objectContaining({
+          caller: 'SessionWizard.sponsoredBundle',
+          source: 'session_wizard',
+        }),
+        bypassFailureCache: true,
+      }),
+    ]);
+  });
+
+});

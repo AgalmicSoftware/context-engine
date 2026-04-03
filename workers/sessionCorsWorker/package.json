@@ -1,0 +1,21 @@
+{
+  "name": "session-cors-worker",
+  "version": "1.0.0",
+  "description": "Context Engine session CORS worker tooling package; licensing boundary documented in the repo LICENSING.md",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev",
+    "start": "wrangler dev",
+    "tail": "wrangler tail"
+  },
+  "dependencies": {
+    "arweave": "^1.14.4",
+    "ethers": "6.15.0"
+  },
+  "devDependencies": {
+    "wrangler": "^4.33.2"
+  }
+}

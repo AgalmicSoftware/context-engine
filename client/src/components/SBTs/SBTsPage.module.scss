@@ -1,0 +1,94 @@
+.container {
+  justify-content: space-evenly;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.backButton {
+  background: transparent;
+  font-weight: 600;
+  padding: 15px;
+  font-size: 1.5em;
+  color: var(--ce-color-white);
+  text-transform: uppercase;
+  border: var(--ce-color-white) 1px solid;
+  border-radius: var(--ce-radius-10);
+  opacity: 0.5;
+  margin-bottom: 20px;
+}
+
+#showResultsButton {
+  background: transparent;
+  font-weight: 600;
+  padding: 15px;
+  font-size: 1.5em;
+  color: var(--ce-color-white);
+  text-transform: uppercase;
+  border: var(--ce-color-white) 1px solid;
+  border-radius: var(--ce-radius-10);
+  opacity: 0.5;
+  margin-bottom: 20px;
+}
+
+#buttonRow {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-evenly;
+  align-items: center;
+  width: 100%;
+  .button {
+    margin-top: 10px;
+  }
+}
+
+#createGroupPopout {
+  // display:  ;
+}
+
+.sbtGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  justify-content: center;
+  margin-top: 20px;
+  margin-bottom: 20px;
+  @media (max-width: 768px) {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+}
+
+.featuredSection {
+  position: relative;
+  width: 100%;
+}
+
+.featuredSectionSpinner {
+  position: absolute;
+  top: 0;
+  right: 6px;
+  z-index: 1;
+  font-size: 1rem;
+  color: var(--ce-color-accent);
+  opacity: 0.88;
+  pointer-events: none;
+}
+
+.featuredTitle {
+  text-align: center;
+  margin-top: 20px;
+  color: var(--ce-color-white);
+  font-size: 2em;
+  font-weight: 600;
+  text-transform: uppercase;
+  opacity: 0.5;
+}
+
+#loadingIcon {
+  display: block;
+  margin: 20px auto;
+  font-size: 2em;
+  color: var(--ce-color-white);
+}

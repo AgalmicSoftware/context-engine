@@ -1,0 +1,121 @@
+import React from 'react';
+import fs from 'fs';
+import path from 'path';
+import { Provider } from 'react-redux';
+import { createStore } from 'redux';
+import { fireEvent, render, screen } from '@testing-library/react';
+
+import { Navbar } from './Navbar.jsx';
+
+const navbarStylesheet = fs.readFileSync(
+  path.join(__dirname, 'Navbar.module.scss'),
+  'utf8'
+);
+
+jest.mock('./AccountDisplay.jsx', () => ({
+  AccountDisplayTorus: ({ account }) => (
+    <div data-testid="account-display">{account}</div>
+  ),
+}));
+
+jest.mock('../Account/LoginAndSettingsModal.jsx', () => () => <div data-testid="web3-modal" />);
+jest.mock('components/Account/LoginButton.jsx', () => () => <button type="button">Connect Wallet</button>);
+jest.mock('utilities/ui/blockieAvatars.js', () => ({
+  generateBlockieDataUrl: () => '',
+}));
+
+jest.mock('utilities/logging.js', () => ({
+  createLogger: () => ({
+    log: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+  }),
+}));
+
+jest.mock('../../variables/appConfig.js', () => ({
+  ENABLE_CE_LOGO_ANIMATION: false,
+  CE_LOGO_ANIMATION_MODE: 'forward',
+  CE_LOGO_ANIMATION_DURATION_MS_FORWARD: 0,
+  CE_LOGO_ANIMATION_DURATION_MS_PINGPONG: 0,
+}));
+
+describe('Navbar logo navigation', () => {
+  const originalPublicUrl = process.env.PUBLIC_URL;
+
+  const buildStore = (overrides = {}) => createStore((state = {
+    sessionState: {
+      loginModalToggled: false,
+      loginComplete: false,
+      ...overrides.sessionState,
+    },
+    profile: {
+      userImageURL: null,
+      ...overrides.profile,
+    },
+  }) => state);
+
+  const renderNavbar = (props = {}, storeOverrides = {}) => render(
+    <Provider store={buildStore(storeOverrides)}>
+      <Navbar
+        demoMode={{ tools: false }}
+        toggleDemoMode={jest.fn()}
+        loginComplete={false}
+        loginInProgress={false}
+        {...props}
+      />
+    </Provider>
+  );
+
+  beforeEach(() => {
+    process.env.PUBLIC_URL = '/ce-base';
+  });
+
+  afterEach(() => {
+    process.env.PUBLIC_URL = originalPublicUrl;
+    jest.restoreAllMocks();
+  });
+
+  it('prefers router navigation to the configured base url', () => {
+    const navigate = jest.fn();
+
+    renderNavbar({ navigate });
+    fireEvent.click(screen.getByAltText('logo'));
+
+    expect(navigate).toHaveBeenCalledWith('/ce-base');
+  });
+
+  it('falls back to location.assign with the configured base url', () => {
+    const subject = new Navbar({});
+    subject.navigateWithWindow = jest.fn();
+
+    subject.logoClicked();
+
+    expect(subject.navigateWithWindow).toHaveBeenCalledWith('/ce-base');
+  });
+
+  it('renders logged-in account controls without the legacy XP or votes widget', () => {
+    renderNavbar({
+      account: '0x1111111111111111111111111111111111111111',
+      provider: 'wagmi',
+      loginComplete: true,
+    }, {
+      sessionState: { loginComplete: true },
+    });
+
+    expect(screen.getByTestId('account-display')).toHaveTextContent('0x1111111111111111111111111111111111111111');
+    expect(screen.queryByText(/Votes:/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/XP/i)).not.toBeInTheDocument();
+  });
+
+  it('does not render the GitHub link in the navbar', () => {
+    renderNavbar();
+
+    expect(screen.queryByTestId('ce-navbar-link-github')).not.toBeInTheDocument();
+  });
+
+  it('keeps the navbar account controls anchored to the right edge after legacy widget removal', () => {
+    expect(navbarStylesheet).toMatch(
+      /#accountSection,\s*#accountSectionLoggedIn\s*\{[\s\S]*display:\s*flex;[\s\S]*justify-content:\s*flex-end;[\s\S]*margin-left:\s*auto;/
+    );
+  });
+});

@@ -1,0 +1,737 @@
+/* SingleQuestionResponse.module.scss */
+
+/* Container for the question card in "fullscreen" mode */
+.fullscreenQuestionContainer {
+  margin-bottom: 20px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: var(--ce-radius-16); // box-shadow: -7px 7px 14px #171a3d, 7px -7px 14px var(--ce-color-surface-alt);
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.25) !important;
+  font-family: inherit;
+}
+
+/* Container for the question card in "mini" mode */
+.miniQuestionContainer {
+  margin-bottom: 10px;
+  background: #24264d;
+  /* Slightly darker to differentiate mini from fullscreen */
+  border-radius: var(--ce-radius-6);
+  /* Matched 3D shadow effect */
+  box-shadow:
+    -3px 3px 6px #171a3d,
+    3px -3px 6px var(--ce-color-surface-alt);
+  padding: 10px;
+  /* Reserve space and anchor for bottom caret */
+  position: relative;
+  padding-bottom: 0px;
+}
+
+/* Common styling for question card body */
+.questionTitleBody {
+  padding: 24px 28px;
+  position: relative;
+  /* Ensure top-right icon buttons don't overlap text */
+  padding-right: 112px;
+}
+
+.questionTitleBodyNoLinks {
+  padding-right: 28px;
+}
+
+/* Also protect fullscreen/minimized variants explicitly (keeps mini padding from being overridden elsewhere) */
+.fullscreenQuestionContainer .questionTitleBody {
+  padding-right: 112px;
+}
+.fullscreenQuestionContainer .questionTitleBodyNoLinks {
+  padding-right: 28px;
+}
+.miniQuestionContainer .questionTitleBody {
+  padding: 15px;
+  padding-right: 88px;
+}
+.miniQuestionContainer .questionTitleBodyNoLinks {
+  padding-right: 15px;
+}
+
+/* Common styling for question title text */
+.questionTitle {
+  font-family: inherit;
+  font-weight: 600;
+  font-size: 1.25em;
+  line-height: 1.2;
+  letter-spacing: 0;
+  opacity: 0.8;
+  color: var(--ce-color-white);
+  margin-bottom: 10px;
+}
+
+.promptDecryptRow {
+  display: flex;
+  align-items: flex-start;
+}
+
+%decryptCtaOutline {
+  background: transparent !important;
+  border: 1px solid var(--ce-color-accent) !important;
+  color: var(--ce-color-accent) !important;
+  box-shadow: none;
+  transition:
+    background-color 0.18s ease,
+    border-color 0.18s ease,
+    color 0.18s ease,
+    box-shadow 0.18s ease;
+
+  &:hover:not(:disabled),
+  &:focus:not(:disabled) {
+    background: rgba(77, 255, 164, 0.15) !important;
+    border-color: var(--ce-color-accent) !important;
+    color: var(--ce-color-accent) !important;
+    box-shadow: 0 8px 18px rgba(77, 255, 164, 0.22);
+  }
+
+  &:focus {
+    outline: 2px solid rgba(77, 255, 164, 0.28);
+    outline-offset: 2px;
+  }
+
+  &:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    box-shadow: none;
+  }
+}
+
+.maskedPromptActionButton {
+  @extend %decryptCtaOutline;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 16px;
+  border-radius: var(--ce-radius-10);
+  font: inherit;
+  font-weight: 700;
+  text-align: center;
+  margin: 0;
+  cursor: pointer;
+}
+
+.maskedPromptLoading {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.maskedPromptLoadingSpinner {
+  font-size: 0.95em;
+}
+
+/* Additional comments area */
+.additionalCommentsSection {
+  display: flex;
+  flex-direction: column;
+  margin-top: 10px;
+  margin-bottom: 10px;
+}
+
+.additionalCommentsLabel {
+  font-weight: 700;
+  margin-bottom: 8px;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.9rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.additionalCommentsContent {
+  color: var(--ce-color-white) !important;
+  opacity: 0.96;
+  line-height: 1.7;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--ce-radius-12);
+  padding: 16px 18px;
+  font-size: 1.08rem;
+  font-weight: 600;
+}
+
+/* Shared decrypt CTA */
+.decryptCta {
+  @extend %decryptCtaOutline;
+  font-size: 0.98rem;
+  font-weight: 700;
+  text-transform: none;
+  letter-spacing: -0.01em;
+  font-family: var(--ce-font-mono);
+  border-radius: var(--ce-radius-10);
+  padding: 12px 18px;
+  margin-top: 8px;
+}
+
+.compactDecryptCtaStack {
+  display: block;
+  margin-top: 10px;
+  width: 100%;
+}
+
+.compactDecryptCtaStack :global(button) {
+  display: inline-flex;
+}
+
+/* freeform answer style */
+.freeformAnswer {
+  background-color: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--ce-radius-12);
+  padding: 18px 20px;
+  color: var(--ce-color-white);
+  font-size: 1.08rem;
+  line-height: 1.7;
+  font-style: italic;
+  font-weight: 600;
+  margin-bottom: 5px;
+  margin-top: 5px;
+}
+
+/* multi-choice styling */
+.multiChoice {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-left: 10px;
+}
+
+.checkboxOptionText {
+  font-size: 1em;
+  font-weight: 600;
+  color: var(--ce-color-border-light);
+}
+
+/* rating slider */
+.importanceSlider {
+  margin-top: 10px;
+  margin-bottom: 10px;
+  .rangeslider__fill {
+    background: var(--ce-color-success);
+  }
+  .rangeslider__handle {
+    background: var(--ce-color-surface);
+    border: 2px solid var(--ce-color-success);
+  }
+}
+.ratingLabelText {
+  margin-left: 10px;
+  font-weight: 600;
+  color: var(--ce-color-white);
+  font-size: 1.2em;
+  margin-right: 10px;
+}
+.ratingSlider {
+  width: 200px;
+}
+
+/* binary styling */
+.binaryChoice {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-top: 1rem;
+  .radioOptionText {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 0.5rem;
+    font-size: 1rem;
+    color: #ddd;
+    cursor: pointer;
+    padding: 0.5rem 1rem;
+    border-radius: var(--ce-radius-4);
+    transition: font-weight 0.3s ease;
+    &.selected {
+      font-weight: 900;
+      font-style: italic;
+    }
+
+    input[type='radio'] {
+      display: none;
+    }
+
+    &:hover {
+      background-color: var(--ce-color-border);
+    }
+
+    &.agree {
+      background-color: #4caf50;
+      color: var(--ce-color-white);
+      &:before {
+        font-weight: 900;
+        margin-right: 0.5rem;
+      }
+    }
+
+    &.unsure {
+      background-color: #ffeb3b;
+      color: var(--ce-color-border);
+    }
+
+    &.disagree {
+      background-color: #f44336;
+      color: var(--ce-color-white);
+      &:before {
+        font-weight: 900;
+        margin-right: 0.5rem;
+      }
+    }
+
+    .optionIcon {
+      margin-right: 0.5rem;
+    }
+  }
+}
+
+/* importance text style */
+.importanceText {
+  font-size: 0.98rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.86;
+  margin-top: 5px;
+  color: var(--ce-color-white);
+}
+
+/* 
+     MINI MODE ADDITIONS 
+     (Only relevant if props.mode === 'mini')
+  */
+
+.miniHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 5px;
+  /* Transparent header so it blends with the card */
+  background: transparent !important;
+}
+
+.miniQuestionSummary {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+}
+
+.miniPromptAbbrev {
+  font-weight: 600;
+  font-size: 1em;
+  color: #ddd;
+  opacity: 0.9;
+}
+
+.miniExpandButton {
+  /* Ensure no gradient/pill leaks from global button styles */
+  background: transparent !important;
+  background-image: none !important;
+  border: none !important;
+  box-shadow: none !important;
+  color: var(--ce-color-white);
+  opacity: 0.5;
+  font-size: 1.25em;
+  cursor: pointer;
+  /* Move caret to the bottom-right of the mini card */
+  position: absolute;
+  right: 5px;
+  bottom: 10px;
+  z-index: 3;
+  /* Compact, clear hit-area */
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  &:hover {
+    color: #ffe680;
+  }
+}
+
+.miniAnswer {
+  background-color: rgba(255, 255, 255, 0.15);
+  padding: 8px;
+  border-radius: var(--ce-radius-4);
+  color: var(--ce-color-white);
+  font-weight: 600;
+  margin-top: 5px;
+  margin-bottom: 5px;
+}
+
+/* NEW - Read-only Answer Styles */
+.readOnlyBinary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 12px;
+  margin-top: 5px;
+  border-radius: var(--ce-radius-20);
+  /* Pill shape */
+  font-weight: bold;
+  font-size: 0.9em;
+  cursor: default;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  &.agree {
+    background-color: #4caf50;
+    color: var(--ce-color-white);
+  }
+
+  &.unsure {
+    background-color: #ffeb3b;
+    color: var(--ce-color-border);
+  }
+
+  &.disagree {
+    background-color: #f44336;
+    color: var(--ce-color-white);
+  }
+
+  .optionIcon {
+    margin-right: 0.5rem;
+  }
+}
+
+.readOnlyRating {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background-color: rgba(0, 0, 0, 0.3);
+  border-radius: var(--ce-radius-5);
+  padding: 8px 12px;
+  width: min(100%, 260px);
+  max-width: 100%;
+  box-sizing: border-box;
+  cursor: default;
+}
+
+.ratingTrack {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 10px;
+  background-color: rgba(255, 255, 255, 0.14);
+  border-radius: var(--ce-radius-5);
+  overflow: hidden;
+}
+
+.ratingBar {
+  height: 100%;
+  background-color: var(--ce-color-success);
+  border-radius: var(--ce-radius-5);
+}
+
+.ratingValueLabel {
+  flex: 0 0 auto;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--ce-color-white);
+  opacity: 0.7;
+}
+
+.readOnlyMultichoice {
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  .choiceItem {
+    background-color: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: var(--ce-color-white);
+    padding: 6px 12px;
+    border-radius: var(--ce-radius-16);
+    font-size: 0.9em;
+    font-weight: 600;
+  }
+}
+
+/* 
+     Additional detail row for the expanded mini mode 
+  */
+.miniExpandedTopRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.miniIdLabel {
+  font-size: 0.9em;
+  color: var(--ce-color-border-light);
+  font-weight: 600;
+}
+
+.externalLink {
+  color: var(--ce-color-white);
+  opacity: 0.8;
+  transition: opacity 0.2s ease;
+  &:hover {
+    opacity: 1;
+  }
+}
+
+/* 
+     AGGREGATOR MODE ADDITIONS
+  */
+
+/* Container for aggregator content to ensure consistent look/feel. */
+.aggregatorContainer {
+  background-color: var(--ce-color-surface);
+  padding: 15px;
+  border-radius: var(--ce-radius-8);
+  margin-bottom: 10px;
+}
+
+/* White text, larger size, heavier weight for aggregator mode. */
+.aggregatorText {
+  color: var(--ce-color-white);
+  font-size: 1.3em;
+  font-weight: 700;
+}
+
+.aggregatorParagraph {
+  margin-bottom: 0.75em;
+  color: var(--ce-color-white) !important;
+  font-size: 1.15em;
+}
+
+/* In aggregator binary responses, each item. */
+.binaryAggregatorItem {
+  margin-bottom: 0.5em;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.binaryOptionResponse {
+  margin-left: 5px;
+  font-weight: 600;
+  font-size: 1.25em;
+}
+
+/* For aggregator freeform expansions. */
+.freeformAggregatorList {
+  margin-top: 10px;
+}
+
+/* Multi-choice aggregator. */
+.multiChoiceOption {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 5px;
+  color: var(--ce-color-white);
+  font-weight: 700;
+}
+
+.optionLabel {
+  margin-right: 10px;
+}
+
+.optionStats {
+  font-weight: 700;
+  color: var(--ce-color-white);
+}
+
+/* 
+     Mark the selected multi-choice answer 
+  */
+.selected {
+  font-weight: 700;
+}
+
+.encryptedResponseText {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  max-width: 100%;
+  padding: 0.65rem 1rem;
+  border-radius: var(--ce-radius-pill);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.16);
+  color: rgba(255, 255, 255, 0.94) !important;
+  font-size: 1.08rem;
+  font-weight: 600;
+  line-height: 1.6;
+  margin-bottom: 12px;
+}
+
+.cardLinksContainer {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  display: flex;
+  gap: 8px;
+  z-index: 2;
+}
+
+.miniQuestionContainer .cardLinksContainer {
+  top: 10px;
+  right: 10px;
+}
+
+.cardLinkButton {
+  background: none;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 5px;
+  cursor: pointer;
+  opacity: 0.58;
+  color: var(--ce-color-white);
+  font-size: 1rem;
+  transition:
+    opacity 0.2s ease-in-out,
+    color 0.18s ease,
+    transform 0.18s ease;
+  &:hover {
+    opacity: 1;
+    color: var(--ce-color-accent);
+    transform: translateY(-1px);
+  }
+}
+
+.miniQuestionContainer .cardLinkButton {
+  width: auto;
+  height: auto;
+  padding: 5px;
+  opacity: 0.5;
+  font-size: 0.9em;
+}
+
+.bookmarkCardLinkButton {
+  opacity: 0.22;
+}
+
+.bookmarkCardLinkButton:hover,
+.bookmarkCardLinkButton:focus-visible {
+  opacity: 0.7;
+}
+
+.bookmarkCardLinkButtonActive {
+  opacity: 1 !important;
+}
+
+/* === Minimal additions for questionOnly click-through === */
+.clickThrough {
+  cursor: pointer;
+  &:focus {
+    outline: 2px solid rgba(126, 138, 224, 0.7);
+    outline-offset: 2px;
+  }
+}
+
+@media (max-width: 768px) {
+  .questionTitleBody {
+    padding: 18px 18px 20px;
+    padding-right: 64px;
+  }
+
+  .fullscreenQuestionContainer .questionTitleBody,
+  .miniQuestionContainer .questionTitleBody {
+    padding-right: 64px;
+  }
+
+  .questionTitleBodyNoLinks,
+  .fullscreenQuestionContainer .questionTitleBodyNoLinks,
+  .miniQuestionContainer .questionTitleBodyNoLinks {
+    padding-right: 18px;
+  }
+
+  .miniQuestionContainer .questionTitleBody {
+    padding: 15px;
+    padding-right: 64px;
+  }
+
+  .questionTitle {
+    font-size: clamp(1.3rem, 5.2vw, 1.8rem);
+  }
+
+  .freeformAnswer,
+  .additionalCommentsContent,
+  .encryptedResponseText {
+    font-size: 1rem;
+  }
+
+  .cardLinksContainer {
+    top: 12px;
+    right: 12px;
+  }
+
+  .miniQuestionContainer .cardLinksContainer {
+    top: 10px;
+    right: 10px;
+  }
+
+  .cardLinkButton {
+    width: 32px;
+    height: 32px;
+  }
+
+  .miniQuestionContainer .cardLinkButton {
+    width: auto;
+    height: auto;
+    font-size: 0.9em;
+  }
+}
+
+.affordanceStack {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.affordanceBlock {
+  border: 1px dashed rgba(255, 255, 255, 0.12);
+  border-radius: var(--ce-radius-8);
+  padding: 8px;
+}
+
+.answerPillsRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* Visually disabled look, but allows the parent to receive the click */
+.disabledVisual {
+  opacity: 0.6;
+  filter: grayscale(10%);
+  pointer-events: none;
+}
+
+/* For inputs we want to look disabled while letting click-through happen on container */
+.disabledInput {
+  pointer-events: none;
+  opacity: 0.6;
+}
+
+/* Small header row for prompt + open icon */
+.questionHeaderRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.openLinkButton {
+  background: none;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  padding: 4px;
+  line-height: 1;
+  &:focus {
+    outline: 2px solid rgba(126, 138, 224, 0.7);
+    outline-offset: 2px;
+  }
+}

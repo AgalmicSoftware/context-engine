@@ -1,0 +1,400 @@
+/***************************************************
+ * FILE: AudioInput.module.scss
+ ***************************************************/
+
+/* 
+  The ENTIRE AudioInput container, using row-reverse to keep controls
+  to the right of the text input area.
+*/
+.audioInputContainer {
+  display: flex !important;
+  flex-direction: row-reverse !important;
+  width: 100%;
+  margin-top: 10px;
+  align-items: center;
+}
+
+/* The row that holds AI rewrite + encryption */
+.topControls {
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+  @media (max-width: 768px) {
+    flex-direction: row;
+    align-items: center;
+    margin-left: 10px;
+  }
+}
+
+/* The text area + mic row */
+.inputRow {
+  display: flex;
+  flex-direction: row-reverse;
+  align-items: center;
+  width: 100%;
+  @media (max-width: 768px) {
+    display: flex;
+  }
+}
+
+/* Wrapper to allow waveform overlay inside the textarea box */
+.textareaWrap {
+  position: relative;
+  flex: 1 1;
+}
+
+/* The main text area */
+.audioTextarea {
+  width: 100%;
+  font-size: 1.2em;
+  color: grey;
+  padding: 10px;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: var(--ce-radius-4);
+  resize: vertical;
+  min-height: 80px;
+  margin-bottom: 0;
+  box-shadow: none;
+  outline: none;
+}
+
+.audioTextarea::placeholder {
+  opacity: var(--placeholder-opacity, 1);
+  color: inherit;
+}
+
+.audioTextarea:focus,
+.audioTextarea:focus-visible {
+  border-color: rgba(255, 255, 255, 0.2) !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+/* Hide text while recording so the overlay waveform is dominant */
+.textHidden {
+  color: transparent !important;
+  caret-color: transparent !important;
+  &::placeholder {
+    color: transparent !important;
+  }
+}
+
+/* Waveform overlay canvas (inside the textarea area) */
+.waveformOverlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  display: block;
+}
+
+/* Microphone button */
+.microphoneButton {
+  background: transparent;
+  border: none;
+  font-size: 30px;
+  color: grey;
+  padding: 10px;
+  cursor: pointer;
+  border-radius: 10%;
+  margin-left: 5px;
+  opacity: 0.5;
+  transition:
+    color 0.2s ease,
+    opacity 0.2s ease,
+    transform 0.2s ease;
+  &:hover {
+    opacity: 0.85;
+    color: #8a8a8a;
+  }
+
+  &:focus-visible {
+    outline: 2px solid #5e54e5;
+    outline-offset: 2px;
+    border-radius: var(--ce-radius-6);
+  }
+}
+
+/* Red recording state (no pulse) */
+.recording {
+  color: #e11900;
+  opacity: 1;
+}
+
+/* Keep the mic visually pinned at the left edge while live */
+.pinnedLeft {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+}
+
+/* AI rewrite button (icon-only) */
+.aiRewriteButton {
+  background: transparent;
+  border: none;
+  padding: 4px;
+  cursor: pointer;
+  font-size: 1.5em;
+  border-radius: var(--ce-radius-4);
+  margin-bottom: 0px;
+  color: grey;
+  opacity: 0.7;
+  transition:
+    color 0.2s ease,
+    opacity 0.2s ease;
+  &:hover {
+    opacity: 1;
+    color: #8a8a8a;
+  }
+}
+
+/* Back arrow button to revert text */
+.backArrowButton {
+  background: yellow;
+  border: 1px solid #999;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 16px;
+  border-radius: var(--ce-radius-4);
+  margin-bottom: 4px;
+  color: var(--ce-color-border);
+  font-weight: 600;
+  &:hover {
+    background: #ffee66;
+  }
+}
+
+/* Encryption control styling — preserved */
+.encryptOptionButton {
+  display: flex;
+  flex-direction: row-reverse;
+  justify-content: space-evenly;
+  align-items: center;
+  background-color: #00048080;
+  border-top-right-radius: 5px;
+  border-bottom-right-radius: 5px;
+  border-bottom-left-radius: 0px;
+  border-top-left-radius: 0px;
+  cursor: crosshair;
+}
+
+.encryptIcon {
+  font-size: 2em !important;
+  margin-right: 15px;
+  color: var(--ce-color-white);
+  opacity: 0.25;
+}
+
+.inputGroupText {
+  border: 1px solid transparent;
+  border-radius: var(--ce-radius-0);
+  font-size: 1.5em;
+  font-weight: 600;
+  text-transform: uppercase;
+  opacity: 0.5;
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  margin-left: 10px;
+  margin-right: 10px;
+}
+
+.encryptCheckbox {
+  margin-top: 5px;
+  margin-bottom: 5px;
+  transform: scale(1.5);
+  margin-right: 10px;
+}
+
+/* Inline error */
+.errorMessage {
+  color: #b00020;
+  font-size: 0.95rem;
+}
+
+/* (Old separate waveform box styles left intact but unused) */
+.waveformCanvas {
+  display: block;
+  width: 100%;
+  height: 50px;
+  background-color: #c0c0c0;
+  border: 1px solid #b0b0b0;
+  image-rendering: pixelated;
+}
+
+/* Spinner overlay centered inside the textarea during processing */
+.spinnerOverlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 1;
+  /* above the textarea content */
+  font-size: 1.25rem;
+  opacity: 0.9;
+  background: rgba(198, 204, 214, 0.58);
+  border-radius: var(--ce-radius-4);
+}
+
+/* Screen-reader only utility (visually hidden) */
+.srOnly {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0 0 0 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+/* === Appended: glow + small icon sizing for AudioInput === */
+/* === Appended: glow + small icon sizing for AudioInput === */
+@keyframes iconPulseGlow {
+  0% {
+    filter: drop-shadow(0 0 0px rgba(77, 255, 164, 0));
+  }
+  50% {
+    filter: drop-shadow(0 0 8px rgba(77, 255, 164, 0.85)) drop-shadow(0 0 14px rgba(77, 255, 164, 0.55));
+  }
+  100% {
+    filter: drop-shadow(0 0 0px rgba(77, 255, 164, 0));
+  }
+}
+
+.iconGlow {
+  color: var(--ce-color-accent) !important;
+  text-shadow:
+    0 0 6px rgba(77, 255, 164, 0.85),
+    0 0 12px rgba(77, 255, 164, 0.55);
+  filter: drop-shadow(0 0 2px rgba(77, 255, 164, 0.45)); // animation: iconPulseGlow 3.5s ease-in-out infinite;
+}
+
+.smallEncryptIcon {
+  font-size: 1.5em !important;
+  line-height: 1;
+}
+
+/* === Appended: Download dock (below bottom-right of textarea) === */
+.downloadDock {
+  position: absolute;
+  bottom: 15px !important;
+  /* sit at the bottom edge of the wrapper */
+  right: 8px !important;
+  transform: translateY(100%);
+  /* place just below the textarea */
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  z-index: 3;
+  /* above waveform/timer overlays */
+  background: transparent;
+  color: var(--ce-color-white);
+  opacity: 0.4;
+  /* subtle at rest */
+  transition:
+    opacity 0.18s ease,
+    transform 0.18s ease;
+  pointer-events: auto !important;
+  /* override inline to allow hover/focus */
+  user-select: none;
+}
+
+.downloadDock:hover,
+.downloadDock:focus-within {
+  opacity: 0.98;
+  /* 0.9–1.0 on hover/focus */
+}
+
+/* Toggle (download icon) */
+.downloadToggle {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent !important;
+  color: var(--ce-color-white) !important;
+  border: 1px solid rgba(255, 255, 255, 0.32) !important;
+  /* light, not heavy */
+  padding: 4px 8px;
+  border-radius: var(--ce-radius-10);
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    opacity 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+.downloadToggle:hover {
+  opacity: 0.95;
+}
+.downloadToggle:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.98);
+  outline-offset: 2px;
+}
+
+/* Row that holds the .mp3 / .txt buttons */
+.downloadMenu {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  /* wrap on narrow screens */
+  background: transparent;
+  pointer-events: auto;
+  transition:
+    opacity 0.18s ease,
+    transform 0.18s ease;
+}
+
+/* Choice pills (.mp3 / .txt) */
+.downloadChoice {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent !important;
+  color: var(--ce-color-white) !important;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  padding: 2px 8px;
+  border-radius: var(--ce-radius-pill);
+  /* minimal pill */
+  line-height: 1.2;
+  cursor: pointer;
+  transition:
+    opacity 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+.downloadChoice:hover {
+  opacity: 0.95;
+}
+.downloadChoice:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.98);
+  outline-offset: 2px;
+}
+
+/* Disabled state */
+.downloadChoice[disabled],
+.downloadChoice[aria-disabled='true'] {
+  opacity: 0.45 !important;
+  cursor: not-allowed !important;
+  pointer-events: none !important;
+}
+
+/* Tiny adjustments for very narrow screens */
+@media (max-width: 380px) {
+  .downloadMenu {
+    gap: 4px;
+  }
+  .downloadChoice {
+    padding: 2px 6px;
+  }
+}
+
+/* Reserve space when the download dock is visible (prevents clipping) */
+.hasDownloadDock {
+  padding-bottom: 28px;
+  overflow: visible;
+}

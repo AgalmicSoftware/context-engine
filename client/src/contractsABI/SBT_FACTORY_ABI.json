@@ -1,0 +1,381 @@
+[
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "sbtAddress",
+        "type": "address"
+      }
+    ],
+    "name": "SBTCreated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "sbtAddress",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "salt",
+        "type": "bytes32"
+      }
+    ],
+    "name": "SBTCreatedDeterministic",
+    "type": "event"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "string",
+        "name": "name",
+        "type": "string"
+      },
+      {
+        "internalType": "string",
+        "name": "symbol",
+        "type": "string"
+      },
+      {
+        "internalType": "uint256",
+        "name": "limitedNumber",
+        "type": "uint256"
+      },
+      {
+        "internalType": "address",
+        "name": "adminAddress",
+        "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "mintingEndTime",
+        "type": "uint256"
+      },
+      {
+        "internalType": "bool",
+        "name": "hasPasswordMint",
+        "type": "bool"
+      },
+      {
+        "internalType": "enum MySBT.BurnAuth",
+        "name": "burnAuth",
+        "type": "uint8"
+      },
+      {
+        "internalType": "bytes32[]",
+        "name": "hashedPasswords",
+        "type": "bytes32[]"
+      },
+      {
+        "internalType": "string",
+        "name": "tokenURI",
+        "type": "string"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "groupPasswordHash",
+        "type": "bytes32"
+      }
+    ],
+    "name": "createSBT",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "salt",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "string",
+        "name": "name",
+        "type": "string"
+      },
+      {
+        "internalType": "string",
+        "name": "symbol",
+        "type": "string"
+      },
+      {
+        "internalType": "uint256",
+        "name": "limitedNumber",
+        "type": "uint256"
+      },
+      {
+        "internalType": "address",
+        "name": "adminAddress",
+        "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "mintingEndTime",
+        "type": "uint256"
+      },
+      {
+        "internalType": "bool",
+        "name": "hasPasswordMint",
+        "type": "bool"
+      },
+      {
+        "internalType": "enum MySBT.BurnAuth",
+        "name": "burnAuth",
+        "type": "uint8"
+      },
+      {
+        "internalType": "bytes32[]",
+        "name": "hashedPasswords",
+        "type": "bytes32[]"
+      },
+      {
+        "internalType": "string",
+        "name": "tokenURI",
+        "type": "string"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "groupPasswordHash",
+        "type": "bytes32"
+      }
+    ],
+    "name": "createSBTDeterministic",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "salt",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "string",
+        "name": "name",
+        "type": "string"
+      },
+      {
+        "internalType": "string",
+        "name": "symbol",
+        "type": "string"
+      },
+      {
+        "internalType": "uint256",
+        "name": "limitedNumber",
+        "type": "uint256"
+      },
+      {
+        "internalType": "address",
+        "name": "adminAddress",
+        "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "mintingEndTime",
+        "type": "uint256"
+      },
+      {
+        "internalType": "bool",
+        "name": "hasPasswordMint",
+        "type": "bool"
+      },
+      {
+        "internalType": "enum MySBT.BurnAuth",
+        "name": "burnAuth",
+        "type": "uint8"
+      },
+      {
+        "internalType": "bytes32[]",
+        "name": "hashedPasswords",
+        "type": "bytes32[]"
+      },
+      {
+        "internalType": "string",
+        "name": "finalTokenURI",
+        "type": "string"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "finalGroupPasswordHash",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "bool",
+        "name": "initializeGroupPasswordHash",
+        "type": "bool"
+      }
+    ],
+    "name": "createSBTDeterministicConfigured",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "salt",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "string",
+        "name": "name",
+        "type": "string"
+      },
+      {
+        "internalType": "string",
+        "name": "symbol",
+        "type": "string"
+      },
+      {
+        "internalType": "uint256",
+        "name": "limitedNumber",
+        "type": "uint256"
+      },
+      {
+        "internalType": "address",
+        "name": "adminAddress",
+        "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "mintingEndTime",
+        "type": "uint256"
+      },
+      {
+        "internalType": "bool",
+        "name": "hasPasswordMint",
+        "type": "bool"
+      },
+      {
+        "internalType": "enum MySBT.BurnAuth",
+        "name": "burnAuth",
+        "type": "uint8"
+      },
+      {
+        "internalType": "bytes32[]",
+        "name": "hashedPasswords",
+        "type": "bytes32[]"
+      },
+      {
+        "internalType": "bool",
+        "name": "initializeGroupPasswordHash",
+        "type": "bool"
+      }
+    ],
+    "name": "predictConfiguredSBTAddress",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "salt",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "string",
+        "name": "name",
+        "type": "string"
+      },
+      {
+        "internalType": "string",
+        "name": "symbol",
+        "type": "string"
+      },
+      {
+        "internalType": "uint256",
+        "name": "limitedNumber",
+        "type": "uint256"
+      },
+      {
+        "internalType": "address",
+        "name": "adminAddress",
+        "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "mintingEndTime",
+        "type": "uint256"
+      },
+      {
+        "internalType": "bool",
+        "name": "hasPasswordMint",
+        "type": "bool"
+      },
+      {
+        "internalType": "enum MySBT.BurnAuth",
+        "name": "burnAuth",
+        "type": "uint8"
+      },
+      {
+        "internalType": "bytes32[]",
+        "name": "hashedPasswords",
+        "type": "bytes32[]"
+      },
+      {
+        "internalType": "string",
+        "name": "tokenURI",
+        "type": "string"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "groupPasswordHash",
+        "type": "bytes32"
+      }
+    ],
+    "name": "predictSBTAddress",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "sbtCount",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  }
+]

@@ -1,0 +1,155 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+
+import { validateBootstrapAdmin } from './bootstrapAdminValidation.js';
+
+const createDeps = (overrides = {}) => ({
+  toStr: (value) => `${value ?? ''}`,
+  isAddress: (value) => /^0x[a-fA-F0-9]+$/.test(`${value ?? ''}`),
+  normalizeRpcUrlList: (value) => {
+    if (Array.isArray(value)) return value;
+    return value ? [value] : [];
+  },
+  toRegistrySessionSlug: (value) => value,
+  readSessionExistsOnChain: async () => ({ exists: false, rpcUrl: 'https://rpc.example' }),
+  readSessionBySlugOnChain: async () => ({ ok: true, tuple: [] }),
+  ...overrides,
+});
+
+const createBody = (overrides = {}) => ({
+  adminAddress: '0xabc123',
+  config: {
+    adminAddress: '0xabc123',
+  },
+  ...overrides,
+});
+
+test('validateBootstrapAdmin preserves legacy requested-admin match when the worker is not registry-configured', async () => {
+  let sessionCheckCalled = false;
+
+  const result = await validateBootstrapAdmin({
+    env: {},
+    slug: 'session-a',
+    address: '0xAbC123',
+    body: createBody(),
+    deps: createDeps({
+      readSessionExistsOnChain: async () => {
+        sessionCheckCalled = true;
+        return { exists: false };
+      },
+    }),
+  });
+
+  assert.equal(sessionCheckCalled, false);
+  assert.equal(result, true);
+});
+
+test('validateBootstrapAdmin preserves legacy requested-admin match when the slug is not registered on-chain', async () => {
+  let registryReadCalled = false;
+
+  const result = await validateBootstrapAdmin({
+    env: {
+      REGISTRY_ADDRESS: '0x999999',
+      RPC_URL: 'https://rpc.example',
+    },
+    slug: 'session-a',
+    address: '0xAbC123',
+    body: createBody(),
+    deps: createDeps({
+      readSessionExistsOnChain: async (value) => {
+        registryReadCalled = true;
+        assert.deepEqual(value, {
+          registryAddress: '0x999999',
+          registryRpcUrls: ['https://rpc.example'],
+          registrySlug: 'session-a',
+        });
+        return { exists: false, rpcUrl: 'https://rpc.example' };
+      },
+      readSessionBySlugOnChain: async () => {
+        throw new Error('should not load on-chain session tuple');
+      },
+    }),
+  });
+
+  assert.equal(registryReadCalled, true);
+  assert.equal(result, true);
+});
+
+test('validateBootstrapAdmin fails closed when the on-chain session existence check is unavailable', async () => {
+  let registryTupleCalled = false;
+
+  const result = await validateBootstrapAdmin({
+    env: {
+      REGISTRY_ADDRESS: '0x999999',
+      RPC_URL: 'https://rpc.example',
+    },
+    slug: 'session-a',
+    address: '0xAbC123',
+    body: createBody(),
+    deps: createDeps({
+      readSessionExistsOnChain: async () => ({ exists: null, rpcUrl: '' }),
+      readSessionBySlugOnChain: async () => {
+        registryTupleCalled = true;
+        return { ok: true, tuple: [] };
+      },
+    }),
+  });
+
+  assert.equal(registryTupleCalled, false);
+  assert.equal(result, false);
+});
+
+test('validateBootstrapAdmin requires the on-chain admin once the session exists', async () => {
+  const calls = [];
+
+  const result = await validateBootstrapAdmin({
+    env: {
+      REGISTRY_ADDRESS: '0x999999',
+      RPC_URL: ['https://rpc-a.example', 'https://rpc-b.example'],
+    },
+    slug: 'session-a',
+    address: '0xabc123',
+    body: createBody({
+      adminAddress: '0xdeadbeef',
+      config: { adminAddress: '0xdeadbeef' },
+    }),
+    deps: createDeps({
+      readSessionExistsOnChain: async () => ({
+        exists: true,
+        rpcUrl: 'https://rpc-b.example',
+      }),
+      readSessionBySlugOnChain: async (value) => {
+        calls.push(value);
+        return { ok: true, tuple: ['', 0, '', '', '0xabc123'] };
+      },
+    }),
+  });
+
+  assert.deepEqual(calls, [{
+    registryAddress: '0x999999',
+    registryRpcUrls: ['https://rpc-b.example'],
+    registrySlug: 'session-a',
+  }]);
+  assert.equal(result, true);
+});
+
+test('validateBootstrapAdmin fails closed when the on-chain admin lookup errors', async () => {
+  const result = await validateBootstrapAdmin({
+    env: {
+      REGISTRY_ADDRESS: '0x999999',
+      RPC_URL: 'https://rpc.example',
+    },
+    slug: 'session-a',
+    address: '0xabc123',
+    body: createBody(),
+    deps: createDeps({
+      readSessionExistsOnChain: async () => ({
+        exists: true,
+        rpcUrl: 'https://rpc.example',
+      }),
+      readSessionBySlugOnChain: async () => ({ ok: false, error: new Error('rpc failed') }),
+    }),
+  });
+
+  assert.equal(result, false);
+});

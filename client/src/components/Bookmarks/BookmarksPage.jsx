@@ -1,0 +1,666 @@
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faCaretDown, faCaretUp, faCheck, faCopy, faSync } from '@fortawesome/free-solid-svg-icons';
+import { deserializeFilterState, serializeFilterState } from '../../utilities/survey/filterStateUtils.js';
+import { listNamespaceEntriesSync, subscribeCacheUpdates } from '../../utilities/cache/cacheScripts.js';
+import { createCacheUpdateCoalescer } from '../../utilities/cache/cacheUpdateCoalescer.js';
+import { notify } from '../../utilities/ui/notify.js';
+import { sbtBasePath, t } from '../../utilities/ui/terminology.js';
+import styles from './BookmarksPage.module.scss';
+import { createLogger } from '../../utilities/logging.js';
+
+const log = createLogger('BookmarksPage');
+
+
+const emptyData = {
+  users: [],
+  surveys: [],
+  questions: [],
+  sbts: [],
+  filters: [],
+  atlasNodes: []
+};
+
+const toText = (value) => (value == null ? '' : String(value)).trim();
+
+const safeParse = (raw) => {
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch (_) {
+    return null;
+  }
+};
+
+const normalizeList = (value) => {
+  if (!Array.isArray(value)) return [];
+  return value.map(toText).filter(Boolean);
+};
+
+const normalizeFilterEntries = (value) => {
+  if (!Array.isArray(value)) return [];
+  return value.filter((entry) => entry != null && entry !== '');
+};
+
+const uniqBy = (list, keyFn) => {
+  const seen = new Set();
+  const out = [];
+  list.forEach((item) => {
+    const key = keyFn(item);
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+    out.push(item);
+  });
+  return out;
+};
+
+const sortAlpha = (list) => {
+  return [...list].sort((a, b) => String(a).localeCompare(String(b)));
+};
+
+const shortenId = (value, lead = 8, tail = 6) => {
+  const text = toText(value);
+  if (!text) return '';
+  if (text.length <= lead + tail + 3) return text;
+  return `${text.slice(0, lead)}...${text.slice(-tail)}`;
+};
+
+// Keep bookmark survey links session-agnostic unless a survey-specific slug is persisted.
+export const buildSurveyBookmarkHref = (surveyId) => `/survey/${toText(surveyId)}`;
+
+const normalizeUsers = (entries) => {
+  if (!Array.isArray(entries)) return [];
+  const seen = new Set();
+  const out = [];
+  entries.forEach((entry) => {
+    let address = '';
+    let nickname = '';
+    let username = '';
+    let networkId = '';
+    if (typeof entry === 'string') {
+      address = entry;
+    } else if (entry && typeof entry === 'object') {
+      address = entry.address || entry.addressLower || '';
+      nickname = entry.nickname || '';
+      username = entry.username || '';
+      networkId = entry.networkId || '';
+    }
+    address = toText(address);
+    if (!address) return;
+    const key = address.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push({
+      address,
+      nickname: toText(nickname),
+      username: toText(username),
+      networkId: toText(networkId)
+    });
+  });
+  return out;
+};
+
+const userLabel = (user) => {
+  return user.nickname || user.username || shortenId(user.address, 6, 4);
+};
+
+const sectionConfigs = [
+  { key: 'users', label: 'Users', emptyText: 'No user bookmarks yet.' },
+  { key: 'surveys', label: 'Surveys', emptyText: 'No survey bookmarks yet.' },
+  { key: 'questions', label: 'Questions', emptyText: 'No question bookmarks yet.' },
+  { key: 'sbts', label: t('sbts'), emptyText: `No ${t('sbtLower')} bookmarks yet.` },
+  { key: 'filters', label: 'Filters', emptyText: 'No filter bookmarks yet.' },
+  { key: 'atlasNodes', label: 'Atlas Nodes', emptyText: 'No atlas bookmarks yet.' }
+];
+
+const getFilterCopyValue = (filterEntry) => {
+  if (!filterEntry) return '';
+  const raw = filterEntry.raw;
+  if (typeof raw === 'string') {
+    const trimmed = raw.trim();
+    if (!trimmed) return '';
+    if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+      const parsed = safeParse(trimmed);
+      if (parsed && typeof parsed === 'object' && typeof window !== 'undefined') {
+        const encoded = serializeFilterState(parsed);
+        return encoded || trimmed;
+      }
+      return trimmed;
+    }
+    return trimmed;
+  }
+  if (filterEntry.parsed && typeof filterEntry.parsed === 'object') {
+    if (typeof window !== 'undefined') {
+      const encoded = serializeFilterState(filterEntry.parsed);
+      if (encoded) return encoded;
+    }
+    try {
+      return JSON.stringify(filterEntry.parsed);
+    } catch (_) {
+      return String(filterEntry.parsed);
+    }
+  }
+  return '';
+};
+
+const parseFilterEntry = (entry) => {
+  if (entry == null) return null;
+  if (typeof entry === 'string') {
+    const trimmed = entry.trim();
+    if (!trimmed) return null;
+    if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+      const parsed = safeParse(trimmed);
+      if (parsed && typeof parsed === 'object') {
+        return { key: trimmed, raw: entry, parsed };
+      }
+    }
+    if (typeof window !== 'undefined') {
+      return { key: trimmed, raw: entry, parsed: deserializeFilterState(trimmed) };
+    }
+    return { key: trimmed, raw: entry, parsed: {} };
+  }
+  if (typeof entry === 'object') {
+    let key = '';
+    try {
+      key = JSON.stringify(entry);
+    } catch (_) {
+      key = String(entry);
+    }
+    return { key, raw: entry, parsed: entry };
+  }
+  return { key: String(entry), raw: entry, parsed: {} };
+};
+
+export const buildBookmarkPageSourceSignature = ({
+  bookmarkEntries = [],
+  filtersEntries = [],
+  legacyBookmarksRaw = '',
+  atlasNodesRaw = '',
+  getRefId,
+} = {}) => {
+  const resolveRefId = typeof getRefId === 'function'
+    ? getRefId
+    : (value) => {
+      if (!value || typeof value !== 'object') return `p:${String(value)}`;
+      return `o:${Object.keys(value).length}`;
+    };
+  const parts = [
+    `bookmarkEntries:${bookmarkEntries.length}`,
+    `filtersEntries:${filtersEntries.length}`,
+    `legacyRaw:${String(legacyBookmarksRaw || '').length}`,
+    `atlasRaw:${String(atlasNodesRaw || '').length}`,
+  ];
+  bookmarkEntries.forEach((entry, index) => {
+    parts.push(
+      `b:${index}:${String(entry?.key || entry?.slug || '')}:${resolveRefId(entry?.value)}`
+    );
+  });
+  filtersEntries.forEach((entry, index) => {
+    parts.push(
+      `f:${index}:${String(entry?.key || entry?.slug || '')}:${resolveRefId(entry?.value)}`
+    );
+  });
+  if (legacyBookmarksRaw) parts.push(`legacy:${legacyBookmarksRaw}`);
+  if (atlasNodesRaw) parts.push(`atlas:${atlasNodesRaw}`);
+  return parts.join('|');
+};
+
+export const buildBookmarkPageDataSignature = (data = emptyData) => {
+  try {
+    return JSON.stringify(data);
+  } catch (_) {
+    return '';
+  }
+};
+
+export const readManagedBookmarkPageEntries = () => ({
+  bookmarkEntries: listNamespaceEntriesSync('bookmarksCache', { cloneValues: false }),
+  filtersEntries: listNamespaceEntriesSync('filters', { cloneValues: false }),
+});
+
+const buildFilterChips = (filterState) => {
+  if (!filterState || typeof filterState !== 'object') return [];
+  const chips = [];
+
+  const top = filterState.topQuestions;
+  if (top !== null && top !== undefined && String(top).trim() !== '') {
+    chips.push({ type: 'top', label: `Top ${top}` });
+  }
+
+  const types = Array.isArray(filterState.questionTypes) ? filterState.questionTypes : [];
+  types.forEach((qt) => {
+    const label = toText(qt);
+    if (label) chips.push({ type: 'type', label });
+  });
+
+  const tagSet = new Set();
+  const tagSources = [];
+  if (Array.isArray(filterState.selectedTags)) tagSources.push(...filterState.selectedTags);
+  if (Array.isArray(filterState.tags)) tagSources.push(...filterState.tags);
+  if (Array.isArray(filterState.includeTags)) tagSources.push(...filterState.includeTags);
+  if (typeof filterState.tag === 'string') tagSources.push(filterState.tag);
+  tagSources.forEach((tag) => {
+    const value = toText(tag);
+    if (value) tagSet.add(value);
+  });
+  tagSet.forEach((tag) => chips.push({ type: 'tag', label: `#${tag}` }));
+
+  const ai = toText(filterState.aiFilter);
+  if (ai) chips.push({ type: 'ai', label: `AI: ${ai}` });
+
+  const sbtFilter = filterState.sbtFilter || null;
+  const sbtChips = [];
+  const addSbtItems = (prefix, entries) => {
+    if (!Array.isArray(entries)) return;
+    entries.forEach((entry) => {
+      let name = '';
+      let address = '';
+      if (typeof entry === 'string') {
+        address = entry;
+      } else if (entry && typeof entry === 'object') {
+        name = toText(entry.name || entry.label || entry.title);
+        address = toText(entry.address || entry.sbtAddress || entry.id);
+      }
+      const display = name || shortenId(address, 6, 4) || shortenId(entry, 6, 4);
+      if (display) {
+        sbtChips.push({ type: 'sbt', label: `${prefix} ${display}`.trim() });
+      }
+    });
+  };
+
+  if (typeof sbtFilter === 'string') {
+    const label = toText(sbtFilter);
+    if (label) sbtChips.push({ type: 'sbt', label: `${t('sbt')} ${shortenId(label, 6, 4)}` });
+  } else if (sbtFilter && typeof sbtFilter === 'object') {
+    addSbtItems('Creator+', sbtFilter.selectedSBTGroupsCreator);
+    addSbtItems('Creator-', sbtFilter.excludedSBTGroupsCreator);
+    addSbtItems('Responder+', sbtFilter.selectedSBTGroupsResponder);
+    addSbtItems('Responder-', sbtFilter.excludedSBTGroupsResponder);
+    addSbtItems('Include', sbtFilter.selectedSBTGroups);
+    addSbtItems('Exclude', sbtFilter.excludedSBTGroups);
+    addSbtItems(t('sbt'), sbtFilter.addresses);
+  }
+
+  if (filterState.sbtFilterString) {
+    const label = toText(filterState.sbtFilterString);
+    if (label) sbtChips.push({ type: 'sbt', label });
+  }
+
+  chips.push(...sbtChips);
+
+  return chips;
+};
+
+const BookmarksPage = () => {
+  const [data, setData] = useState(emptyData);
+  const [expandedSections, setExpandedSections] = useState(() => (
+    sectionConfigs.reduce((acc, section) => {
+      acc[section.key] = false;
+      return acc;
+    }, {})
+  ));
+  const [copiedFilterKey, setCopiedFilterKey] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
+  const refreshTimeoutRef = useRef(null);
+  const copyTimeoutRef = useRef(null);
+  const cacheRefreshCoalescerRef = useRef(null);
+  const sourceSignatureRef = useRef('');
+  const dataSignatureRef = useRef('');
+  const valueRefMemoRef = useRef({ map: new WeakMap(), nextId: 1 });
+
+  const getValueRefId = useCallback((value) => {
+    if (!value || typeof value !== 'object') return `p:${String(value)}`;
+    const memo = valueRefMemoRef.current;
+    let refId = memo.map.get(value);
+    if (!refId) {
+      refId = `o:${memo.nextId}`;
+      memo.nextId += 1;
+      memo.map.set(value, refId);
+    }
+    return refId;
+  }, []);
+
+  const readBookmarks = useCallback(() => {
+    if (typeof window === 'undefined') {
+      const emptySig = buildBookmarkPageDataSignature(emptyData);
+      if (dataSignatureRef.current !== emptySig) {
+        setData(emptyData);
+        dataSignatureRef.current = emptySig;
+      }
+      sourceSignatureRef.current = '';
+      return;
+    }
+
+    try {
+      const { bookmarkEntries, filtersEntries } = readManagedBookmarkPageEntries();
+      const legacyBookmarksRaw = window.localStorage?.getItem('bookmarks') || '';
+      const atlasNodesRaw = window.localStorage?.getItem('bookmarkedNodes') || '';
+      const sourceSignature = buildBookmarkPageSourceSignature({
+        bookmarkEntries,
+        filtersEntries,
+        legacyBookmarksRaw,
+        atlasNodesRaw,
+        getRefId: getValueRefId,
+      });
+      if (sourceSignatureRef.current && sourceSignatureRef.current === sourceSignature) {
+        return;
+      }
+      sourceSignatureRef.current = sourceSignature;
+
+      const merged = {
+        users: [],
+        surveys: [],
+        questions: [],
+        sbts: [],
+        filters: []
+      };
+
+      const mergeCache = (obj) => {
+        if (!obj || typeof obj !== 'object') return;
+        merged.users.push(...(Array.isArray(obj.users) ? obj.users : []));
+        merged.surveys.push(...normalizeList(obj.surveys));
+        merged.questions.push(...normalizeList(obj.questions));
+        merged.sbts.push(...normalizeList(obj.sbts));
+        merged.filters.push(...normalizeFilterEntries(obj.filters));
+      };
+
+      bookmarkEntries.forEach((entry) => {
+        mergeCache(entry?.value);
+      });
+
+      const normalizedFiltersFromCache = [];
+      filtersEntries.forEach((entry) => {
+        const val = entry?.value;
+        if (!val || typeof val !== 'object') return;
+        normalizedFiltersFromCache.push(...normalizeFilterEntries(val.bookmarkedFilters));
+      });
+
+      const legacySbts = normalizeList(safeParse(legacyBookmarksRaw)?.sbts);
+      const atlasNodes = normalizeList(safeParse(atlasNodesRaw));
+
+      const users = normalizeUsers(merged.users);
+      const sortedUsers = [...users].sort((a, b) => {
+        const labelA = userLabel(a);
+        const labelB = userLabel(b);
+        const labelCmp = labelA.localeCompare(labelB);
+        if (labelCmp !== 0) return labelCmp;
+        return a.address.localeCompare(b.address);
+      });
+
+      const filterEntries = uniqBy(
+        [...merged.filters, ...normalizedFiltersFromCache]
+          .map(parseFilterEntry)
+          .filter(Boolean),
+        (entry) => entry.key
+      );
+
+      const nextData = {
+        users: sortedUsers,
+        surveys: sortAlpha(uniqBy(merged.surveys, (v) => v.toLowerCase())),
+        questions: sortAlpha(uniqBy(merged.questions, (v) => v.toLowerCase())),
+        sbts: sortAlpha(uniqBy([...merged.sbts, ...legacySbts], (v) => v.toLowerCase())),
+        filters: filterEntries,
+        atlasNodes: sortAlpha(uniqBy(atlasNodes, (v) => v))
+      };
+      const nextDataSig = buildBookmarkPageDataSignature(nextData);
+      if (nextDataSig === dataSignatureRef.current) return;
+      dataSignatureRef.current = nextDataSig;
+      setData(nextData);
+    } catch (_) {
+      const emptySig = buildBookmarkPageDataSignature(emptyData);
+      if (dataSignatureRef.current !== emptySig) {
+        setData(emptyData);
+        dataSignatureRef.current = emptySig;
+      }
+      sourceSignatureRef.current = '';
+    }
+  }, [getValueRefId]);
+
+  useEffect(() => {
+    const coalescer = createCacheUpdateCoalescer(readBookmarks);
+    cacheRefreshCoalescerRef.current = coalescer;
+    return () => {
+      coalescer.cancel();
+      if (cacheRefreshCoalescerRef.current === coalescer) {
+        cacheRefreshCoalescerRef.current = null;
+      }
+    };
+  }, [readBookmarks]);
+
+  const scheduleReadBookmarks = useCallback(() => {
+    const coalescer = cacheRefreshCoalescerRef.current;
+    if (coalescer) {
+      coalescer.schedule();
+      return;
+    }
+    readBookmarks();
+  }, [readBookmarks]);
+
+  useEffect(() => {
+    readBookmarks();
+    if (typeof window === 'undefined') return;
+
+    const onStorage = (e) => {
+      if (!e || !e.key) {
+        scheduleReadBookmarks();
+        return;
+      }
+      if (
+        e.key === 'bookmarks' ||
+        e.key === 'bookmarkedNodes'
+      ) {
+        scheduleReadBookmarks();
+      }
+    };
+
+    const onCustom = () => scheduleReadBookmarks();
+    const unsubscribeCache = subscribeCacheUpdates((evt) => {
+      const ns = String(evt?.namespace || '');
+      if (ns === 'bookmarksCache' || ns === 'filters') {
+        scheduleReadBookmarks();
+      }
+    });
+
+    window.addEventListener('storage', onStorage);
+    window.addEventListener('bookmarksCacheUpdated', onCustom);
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener('bookmarksCacheUpdated', onCustom);
+      try { unsubscribeCache(); } catch (e) { log.warn('BookmarksPage: cleanup', e); }
+    };
+  }, [readBookmarks, scheduleReadBookmarks]);
+
+  useEffect(() => {
+    return () => {
+      if (refreshTimeoutRef.current) clearTimeout(refreshTimeoutRef.current);
+      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+    };
+  }, []);
+
+  const totalCount = useMemo(() => {
+    return sectionConfigs.reduce((sum, section) => {
+      const value = Array.isArray(data[section.key]) ? data[section.key].length : 0;
+      return sum + value;
+    }, 0);
+  }, [data]);
+
+  const toggleSection = useCallback((key) => {
+    setExpandedSections((prev) => ({ ...prev, [key]: !prev[key] }));
+  }, []);
+
+  const handleRefresh = useCallback(() => {
+    readBookmarks();
+    setRefreshing(true);
+    if (refreshTimeoutRef.current) clearTimeout(refreshTimeoutRef.current);
+    refreshTimeoutRef.current = setTimeout(() => {
+      setRefreshing(false);
+    }, 700);
+  }, [readBookmarks]);
+
+  const handleCopyFilter = useCallback((filterEntry) => {
+    const value = getFilterCopyValue(filterEntry);
+    if (!value || typeof navigator === 'undefined' || !navigator.clipboard?.writeText) return;
+    navigator.clipboard.writeText(value).then(() => {
+      notify.success('Copied to clipboard');
+      setCopiedFilterKey(filterEntry.key);
+      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+      copyTimeoutRef.current = setTimeout(() => {
+        setCopiedFilterKey('');
+      }, 1200);
+    });
+  }, []);
+
+  return (
+    <div className={styles.bookmarksPage}>
+      <div className={styles.header}>
+        <div>
+          <h1 className={styles.title}>Bookmarks</h1>
+        </div>
+        <button
+          type="button"
+          className={styles.refreshButton}
+          onClick={handleRefresh}
+          aria-label="Refresh bookmarks"
+          title="Refresh bookmarks"
+        >
+          <FontAwesomeIcon icon={faSync} spin={refreshing} />
+        </button>
+      </div>
+
+      <div className={styles.summaryRow}>
+        {sectionConfigs.map((section) => {
+          const count = Array.isArray(data[section.key]) ? data[section.key].length : 0;
+          const isOpen = !!expandedSections[section.key];
+          return (
+            <div key={section.key} className={styles.summaryCard}>
+              <button
+                type="button"
+                className={styles.summaryHeader}
+                onClick={() => toggleSection(section.key)}
+                aria-expanded={isOpen}
+              >
+                <span className={styles.summaryLabel}>{section.label}</span>
+                <span className={styles.summaryHeaderRight}>
+                  <span className={styles.summaryCount}>{count}</span>
+                  <FontAwesomeIcon icon={isOpen ? faCaretUp : faCaretDown} className={styles.summaryCaret} />
+                </span>
+              </button>
+              <div className={`${styles.summaryBody} ${isOpen ? styles.summaryBodyOpen : ''}`}>
+                {count === 0 ? (
+                  <p className={styles.emptyText}>{section.emptyText}</p>
+                ) : (
+                  <ul className={styles.list}>
+                    {section.key === 'users' &&
+                      data.users.map((user) => (
+                        <li key={user.address.toLowerCase()} className={styles.listItem}>
+                          <div className={styles.itemRow}>
+                            <a href={`/u/${user.address}`} className={styles.itemLink}>
+                              {userLabel(user)}
+                            </a>
+                            {user.networkId && <span className={styles.badge}>net {user.networkId}</span>}
+                          </div>
+                          <div className={styles.itemMeta}>{user.address}</div>
+                        </li>
+                      ))}
+                    {section.key === 'surveys' &&
+                      data.surveys.map((surveyId) => (
+                        <li key={surveyId} className={styles.listItem}>
+                          <div className={styles.itemRow}>
+                            <a href={buildSurveyBookmarkHref(surveyId)} className={styles.itemLink}>
+                              {shortenId(surveyId)}
+                            </a>
+                          </div>
+                          <div className={styles.itemMeta}>{surveyId}</div>
+                        </li>
+                      ))}
+                    {section.key === 'questions' &&
+                      data.questions.map((questionId) => (
+                        <li key={questionId} className={styles.listItem}>
+                          <div className={styles.itemRow}>
+                            <a href={`/question/${questionId}`} className={styles.itemLink}>
+                              {shortenId(questionId)}
+                            </a>
+                          </div>
+                          <div className={styles.itemMeta}>{questionId}</div>
+                        </li>
+                      ))}
+                    {section.key === 'sbts' &&
+                      data.sbts.map((sbtAddress) => (
+                        <li key={sbtAddress} className={styles.listItem}>
+                          <div className={styles.itemRow}>
+                            <a href={`${sbtBasePath()}/${sbtAddress}`} className={styles.itemLink}>
+                              {shortenId(sbtAddress, 6, 4)}
+                            </a>
+                          </div>
+                          <div className={styles.itemMeta}>{sbtAddress}</div>
+                        </li>
+                      ))}
+                    {section.key === 'filters' &&
+                      data.filters.map((filterEntry, index) => {
+                        const chips = buildFilterChips(filterEntry.parsed);
+                        const hasChips = chips.length > 0;
+                        const isCopied = copiedFilterKey === filterEntry.key;
+                        return (
+                          <li key={filterEntry.key || `filter-${index}`} className={styles.listItem}>
+                            <div className={styles.filterItemHeader}>
+                              {hasChips ? (
+                                <div className={styles.filterChips}>
+                                  {chips.map((chip, chipIndex) => (
+                                    <span
+                                      key={`${filterEntry.key || index}-${chipIndex}`}
+                                      className={`${styles.filterChip} ${styles[`chip${chip.type}`] || ''}`}
+                                    >
+                                      {chip.label}
+                                    </span>
+                                  ))}
+                                </div>
+                              ) : (
+                                <div className={styles.itemRow}>
+                                  <span className={styles.itemLabel}>Unrecognized filter</span>
+                                </div>
+                              )}
+                              <button
+                                type="button"
+                                className={`${styles.filterCopyButton} ${isCopied ? styles.filterCopyButtonActive : ''}`}
+                                onClick={() => handleCopyFilter(filterEntry)}
+                                aria-label="Copy filter code"
+                                title="Copy filter code"
+                              >
+                                <FontAwesomeIcon icon={isCopied ? faCheck : faCopy} />
+                              </button>
+                            </div>
+                            {typeof filterEntry.raw === 'string' && (
+                              <div className={styles.itemMeta}>{shortenId(filterEntry.raw, 24, 12)}</div>
+                            )}
+                          </li>
+                        );
+                      })}
+                    {section.key === 'atlasNodes' &&
+                      data.atlasNodes.map((nodeId) => (
+                        <li key={nodeId} className={styles.listItem}>
+                          <div className={styles.itemRow}>
+                            <a href={`/atlas/${nodeId}`} className={styles.itemLink}>
+                              {shortenId(nodeId)}
+                            </a>
+                          </div>
+                          <div className={styles.itemMeta}>{nodeId}</div>
+                        </li>
+                      ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {totalCount === 0 && (
+        <div className={styles.emptyBanner}>
+          No bookmarks saved yet. Add a bookmark from any page and it will show up here.
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default BookmarksPage;

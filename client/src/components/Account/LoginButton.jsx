@@ -1,0 +1,55 @@
+/** @file LoginButton.jsx */
+import React, { Component } from 'react';
+import { connect } from 'react-redux';
+import { createLogger } from '../../utilities/logging';
+
+// Reactstrap components
+import { Button } from "reactstrap";
+
+// CSS and icons
+import '../../assets/css/contextEngine.scss'
+import styles from "./Account.module.scss";
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import { faSpinner } from '@fortawesome/free-solid-svg-icons'
+
+const log = createLogger('account');
+
+class LoginButton extends Component {
+
+    openLoginModal = () => {
+        this.props.launchAccountModal()
+      };
+
+    render() {
+        // Busy when Redux shows a user-initiated login in progress
+        const isBusy = !!this.props.loginInProgress;
+
+        return (
+        <div id={styles.navConnectContainer}>
+          <Button
+            color="none"
+            onClick={this.openLoginModal}
+            id={styles.navConnectButton}
+            disabled={isBusy}
+          >
+            <h1 id={styles.loginPromptText}>
+              {isBusy ? <FontAwesomeIcon id={styles.loginIcon} icon={faSpinner} pulse /> : ' LOG IN '}
+            </h1>
+            <h1 id={styles.loginIcons}>
+              {!isBusy && (
+                <>
+                </>
+              )}
+            </h1>
+          </Button>
+        </div>
+        );
+    }
+}
+
+
+const mapStateToProps = (state) => ({
+  loginInProgress: state.sessionState.loginInProgress,
+});
+
+export default connect(mapStateToProps)(LoginButton);

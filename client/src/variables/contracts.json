@@ -1,0 +1,17 @@
+{
+  "sessionRegistryAddresses": {
+    "11155420": "0xDcB1731984E9F75c6a061c38dD8b67d18De4C0c1",
+    "84532": "0xD55Aa8fb29964d034d59B90DFFD23790f7B34B00",
+    "8453": ""
+  },
+  "sessionContractsByChain": {
+    "11155420": {
+      "surveys": "0x59664B9dA510a33F2edB7E14Cf0c2749bf506B8A",
+      "sbtFactory": "0x8CBeE1EE46603b446b499cb32F63fa9860a50478"
+    },
+    "84532": {
+      "surveys": "0xcccb5c1a96b3e10f395e318ae75db24e45bd3808",
+      "sbtFactory": "0x538A48BC439A36D2A86e63114DCD9c429d2ddEcA"
+    }
+  }
+}

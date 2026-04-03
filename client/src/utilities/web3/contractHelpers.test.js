@@ -1,0 +1,790 @@
+import { createContractHelperMethods } from './contractHelpers.js';
+import { defaultStrictAllowDemoFallback } from '../worker/workerSessionResolution.js';
+import { SPONSORED_BOOTSTRAP_FUNDING_CONTEXT_KEY } from '../session/sponsoredBootstrapFunding.js';
+
+describe('contractHelpers sendTestnetFunds', () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+  });
+
+  it('forwards optional faucet proof fields to the authenticated worker request', async () => {
+    const fetchWorkerWithAuth = jest.fn(async () => ({
+      ok: true,
+      json: async () => ({ ok: true, txHash: '0xproof123' }),
+    }));
+    const getCorsProxyUrlOrThrow = jest.fn(async () => 'https://worker.example.com/base/');
+    const helper = createContractHelperMethods({
+      resolveSession: jest.fn(() => ({ slug: 'alpha', networkChainId: 84532 })),
+      latestBlockCache: {},
+      gasPriceCache: {},
+      BLOCK_CACHE_MS: 1000,
+      getReadProviderForGroup: jest.fn(),
+      shouldLog: jest.fn(() => false),
+      rpcLog: jest.fn(),
+      callWithRetry: jest.fn(),
+      MAX_CACHE_SIZE: 50,
+      isLogsRangeTooLargeError: jest.fn(() => false),
+      contractsLog: { warn: jest.fn(), log: jest.fn() },
+      getReadProviderForChain: jest.fn(),
+      normalizeSessionSlug: jest.fn((value) => value),
+      shouldBypassSessionScopeWindow: jest.fn(() => false),
+      getScopeDecisionForSlug: jest.fn(() => null),
+      logScopeWindowSkipOnce: jest.fn(),
+      parsePositiveBlockNumber: jest.fn(() => null),
+      resolveSessionStartFromRegistry: jest.fn(() => null),
+      DEFAULT_CHAIN_ID: 84532,
+      store: {
+        getState: () => ({
+          profile: {
+            account: '0x1111111111111111111111111111111111111111',
+            provider: 'wagmi',
+            network: { id: 84532 },
+          },
+          sessionState: { activeSessionSlug: 'alpha' },
+        }),
+      },
+      getSessionConfigBySlug: jest.fn(() => ({ slug: 'alpha', networkChainId: 84532 })),
+      getCorsProxyUrlOrThrow,
+      fetchWorkerWithAuth,
+    });
+
+    const recipientAddress = '0x1111111111111111111111111111111111111111';
+    const requestOptions = {
+      amountEth: '0.0000001',
+      sbtAddress: '0x2222222222222222222222222222222222222222',
+      hashedPassword: `0x${'ab'.repeat(32)}`,
+      signature: `0x${'cd'.repeat(65)}`,
+    };
+
+    const result = await helper.sendTestnetFunds(recipientAddress, 'alpha', requestOptions);
+    const [workerUrl, init, authContext] = fetchWorkerWithAuth.mock.calls[0];
+    const corsProxyOpts = getCorsProxyUrlOrThrow.mock.calls[0][0];
+
+    expect(getCorsProxyUrlOrThrow).toHaveBeenCalledTimes(1);
+    expect(corsProxyOpts).toEqual(expect.objectContaining({
+      sessionSlug: 'alpha',
+      allowDemoFallback: defaultStrictAllowDemoFallback(),
+    }));
+    expect(workerUrl).toBe('https://worker.example.com/base');
+    expect(JSON.parse(init.body)).toEqual({
+      action: 'request_test_eth',
+      to: recipientAddress,
+      amountEth: '0.0000001',
+      sbtAddress: '0x2222222222222222222222222222222222222222',
+      hashedPassword: `0x${'ab'.repeat(32)}`,
+      signature: `0x${'cd'.repeat(65)}`,
+    });
+    expect(authContext).toEqual(expect.objectContaining({
+      sessionSlug: 'alpha',
+      workerUrl: 'https://worker.example.com/base',
+      allowDemoFallback: defaultStrictAllowDemoFallback(),
+    }));
+    expect(result).toEqual({ ok: true, txHash: '0xproof123' });
+  });
+
+  it('preserves unknown non-general slugs for strict faucet worker resolution', async () => {
+    const fetchWorkerWithAuth = jest.fn(async () => ({
+      ok: true,
+      json: async () => ({ ok: true, txHash: '0xstrict123' }),
+    }));
+    const getCorsProxyUrlOrThrow = jest.fn(async () => 'https://worker.example.com/base/');
+    const helper = createContractHelperMethods({
+      resolveSession: jest.fn(() => ({ slug: '', networkChainId: 84532 })),
+      latestBlockCache: {},
+      gasPriceCache: {},
+      BLOCK_CACHE_MS: 1000,
+      getReadProviderForGroup: jest.fn(),
+      shouldLog: jest.fn(() => false),
+      rpcLog: jest.fn(),
+      callWithRetry: jest.fn(),
+      MAX_CACHE_SIZE: 50,
+      isLogsRangeTooLargeError: jest.fn(() => false),
+      contractsLog: { warn: jest.fn(), log: jest.fn() },
+      getReadProviderForChain: jest.fn(),
+      normalizeSessionSlug: jest.fn((value) => value),
+      shouldBypassSessionScopeWindow: jest.fn(() => false),
+      getScopeDecisionForSlug: jest.fn(() => null),
+      logScopeWindowSkipOnce: jest.fn(),
+      parsePositiveBlockNumber: jest.fn(() => null),
+      resolveSessionStartFromRegistry: jest.fn(() => null),
+      DEFAULT_CHAIN_ID: 84532,
+      store: {
+        getState: () => ({
+          profile: {
+            account: '0x1111111111111111111111111111111111111111',
+            provider: 'wagmi',
+            network: { id: 84532 },
+          },
+          sessionState: { activeSessionSlug: 'missing-session' },
+        }),
+      },
+      getSessionConfigBySlug: jest.fn(() => null),
+      getCorsProxyUrlOrThrow,
+      fetchWorkerWithAuth,
+    });
+
+    const recipientAddress = '0x1111111111111111111111111111111111111111';
+    await helper.sendTestnetFunds(recipientAddress, 'missing-session');
+
+    expect(getCorsProxyUrlOrThrow).toHaveBeenCalledWith(expect.objectContaining({
+      sessionSlug: 'missing-session',
+      sessionConfig: null,
+      allowDemoFallback: defaultStrictAllowDemoFallback(),
+    }));
+    expect(fetchWorkerWithAuth).toHaveBeenCalledWith(
+      'https://worker.example.com/base',
+      expect.any(Object),
+      expect.objectContaining({
+        sessionSlug: 'missing-session',
+        workerUrl: 'https://worker.example.com/base',
+        allowDemoFallback: defaultStrictAllowDemoFallback(),
+      })
+    );
+  });
+
+  it('uses explicit auth context overrides when the live wallet outpaces Redux', async () => {
+    const fetchWorkerWithAuth = jest.fn(async () => ({
+      ok: true,
+      json: async () => ({ ok: true, txHash: '0xcontext123' }),
+    }));
+    const getCorsProxyUrlOrThrow = jest.fn(async () => 'https://worker.example.com/base/');
+    const helper = createContractHelperMethods({
+      resolveSession: jest.fn(() => ({ slug: 'alpha', networkChainId: 84532 })),
+      latestBlockCache: {},
+      gasPriceCache: {},
+      BLOCK_CACHE_MS: 1000,
+      getReadProviderForGroup: jest.fn(),
+      shouldLog: jest.fn(() => false),
+      rpcLog: jest.fn(),
+      callWithRetry: jest.fn(),
+      MAX_CACHE_SIZE: 50,
+      isLogsRangeTooLargeError: jest.fn(() => false),
+      contractsLog: { warn: jest.fn(), log: jest.fn() },
+      getReadProviderForChain: jest.fn(),
+      normalizeSessionSlug: jest.fn((value) => value),
+      shouldBypassSessionScopeWindow: jest.fn(() => false),
+      getScopeDecisionForSlug: jest.fn(() => null),
+      logScopeWindowSkipOnce: jest.fn(),
+      parsePositiveBlockNumber: jest.fn(() => null),
+      resolveSessionStartFromRegistry: jest.fn(() => null),
+      DEFAULT_CHAIN_ID: 84532,
+      store: {
+        getState: () => ({
+          profile: {
+            account: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+            provider: 'wagmi',
+            network: { id: 84532 },
+          },
+          sessionState: { activeSessionSlug: 'alpha' },
+        }),
+      },
+      getSessionConfigBySlug: jest.fn(() => ({ slug: 'alpha', networkChainId: 84532 })),
+      getCorsProxyUrlOrThrow,
+      fetchWorkerWithAuth,
+    });
+
+    const recipientAddress = '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+    await helper.sendTestnetFunds(recipientAddress, 'alpha', {
+      context: {
+        account: recipientAddress,
+        providerLike: 'wagmi',
+        chainId: 84532,
+      },
+    });
+
+    expect(getCorsProxyUrlOrThrow).toHaveBeenCalledWith(expect.objectContaining({
+      context: expect.objectContaining({
+        account: recipientAddress,
+        providerLike: 'wagmi',
+        chainId: 84532,
+      }),
+    }));
+    expect(fetchWorkerWithAuth).toHaveBeenCalledWith(
+      'https://worker.example.com/base',
+      expect.any(Object),
+      expect.objectContaining({
+        context: expect.objectContaining({
+          account: recipientAddress,
+          providerLike: 'wagmi',
+          chainId: 84532,
+        }),
+      })
+    );
+  });
+
+  it('retries testnet funding against the sponsored source session when the requested session is not deployable yet', async () => {
+    sessionStorage.setItem(SPONSORED_BOOTSTRAP_FUNDING_CONTEXT_KEY, JSON.stringify({
+      sessionSlug: 'source-session',
+      workerUrl: 'https://source-worker.example',
+      targetSessionSlug: '',
+    }));
+
+    const fetchWorkerWithAuth = jest.fn(async () => ({
+      ok: true,
+      json: async () => ({ ok: true, txHash: '0xbootstrap123' }),
+    }));
+    const getCorsProxyUrlOrThrow = jest.fn(async () => {
+      throw new Error('Worker URL unavailable for requested session');
+    });
+    const helper = createContractHelperMethods({
+      resolveSession: jest.fn(() => ({ slug: '', networkChainId: 84532 })),
+      latestBlockCache: {},
+      gasPriceCache: {},
+      BLOCK_CACHE_MS: 1000,
+      getReadProviderForGroup: jest.fn(),
+      shouldLog: jest.fn(() => false),
+      rpcLog: jest.fn(),
+      callWithRetry: jest.fn(),
+      MAX_CACHE_SIZE: 50,
+      isLogsRangeTooLargeError: jest.fn(() => false),
+      contractsLog: { warn: jest.fn(), log: jest.fn() },
+      getReadProviderForChain: jest.fn(),
+      normalizeSessionSlug: jest.fn((value) => value),
+      shouldBypassSessionScopeWindow: jest.fn(() => false),
+      getScopeDecisionForSlug: jest.fn(() => null),
+      logScopeWindowSkipOnce: jest.fn(),
+      parsePositiveBlockNumber: jest.fn(() => null),
+      resolveSessionStartFromRegistry: jest.fn(() => null),
+      DEFAULT_CHAIN_ID: 84532,
+      store: {
+        getState: () => ({
+          profile: {
+            account: '0x1111111111111111111111111111111111111111',
+            provider: 'wagmi',
+            network: { id: 84532 },
+          },
+          sessionState: { activeSessionSlug: '' },
+        }),
+      },
+      getSessionConfigBySlug: jest.fn((slug) => (
+        slug === 'source-session'
+          ? { slug: 'source-session', networkChainId: 84532 }
+          : null
+      )),
+      getCorsProxyUrlOrThrow,
+      fetchWorkerWithAuth,
+    });
+
+    const recipientAddress = '0x1111111111111111111111111111111111111111';
+    const result = await helper.sendTestnetFunds(recipientAddress, '');
+
+    expect(getCorsProxyUrlOrThrow).toHaveBeenCalledTimes(1);
+    expect(fetchWorkerWithAuth).toHaveBeenCalledWith(
+      'https://source-worker.example',
+      expect.any(Object),
+      expect.objectContaining({
+        sessionSlug: 'source-session',
+        workerUrl: 'https://source-worker.example',
+        allowDemoFallback: defaultStrictAllowDemoFallback(),
+      })
+    );
+    expect(result).toEqual({ ok: true, txHash: '0xbootstrap123' });
+  });
+
+  it('redeems a one-time sponsored faucet grant before falling back to authenticated source-session funding', async () => {
+    sessionStorage.setItem(SPONSORED_BOOTSTRAP_FUNDING_CONTEXT_KEY, JSON.stringify({
+      sessionSlug: 'source-session',
+      workerUrl: 'https://source-worker.example',
+      targetSessionSlug: '',
+      faucetGrantToken: 'faucet-grant-1',
+    }));
+
+    const fetchWorkerWithAuth = jest.fn(async () => ({
+      ok: true,
+      json: async () => ({ ok: true, txHash: '0xshould-not-be-used' }),
+    }));
+    const fetchImpl = jest.fn(async () => ({
+      ok: true,
+      json: async () => ({ ok: true, txHash: '0xbootstrap-faucet-grant' }),
+    }));
+    const getCorsProxyUrlOrThrow = jest.fn(async () => {
+      throw new Error('Worker URL unavailable for requested session');
+    });
+    const helper = createContractHelperMethods({
+      resolveSession: jest.fn(() => ({ slug: '', networkChainId: 84532 })),
+      latestBlockCache: {},
+      gasPriceCache: {},
+      BLOCK_CACHE_MS: 1000,
+      getReadProviderForGroup: jest.fn(),
+      shouldLog: jest.fn(() => false),
+      rpcLog: jest.fn(),
+      callWithRetry: jest.fn(),
+      MAX_CACHE_SIZE: 50,
+      isLogsRangeTooLargeError: jest.fn(() => false),
+      contractsLog: { warn: jest.fn(), log: jest.fn() },
+      getReadProviderForChain: jest.fn(),
+      normalizeSessionSlug: jest.fn((value) => value),
+      shouldBypassSessionScopeWindow: jest.fn(() => false),
+      getScopeDecisionForSlug: jest.fn(() => null),
+      logScopeWindowSkipOnce: jest.fn(),
+      parsePositiveBlockNumber: jest.fn(() => null),
+      resolveSessionStartFromRegistry: jest.fn(() => null),
+      DEFAULT_CHAIN_ID: 84532,
+      store: {
+        getState: () => ({
+          profile: {
+            account: '0x1111111111111111111111111111111111111111',
+            provider: 'wagmi',
+            network: { id: 84532 },
+          },
+          sessionState: { activeSessionSlug: '' },
+        }),
+      },
+      getSessionConfigBySlug: jest.fn(() => null),
+      getCorsProxyUrlOrThrow,
+      fetchWorkerWithAuth,
+      fetchImpl,
+    });
+
+    const recipientAddress = '0x1111111111111111111111111111111111111111';
+    const result = await helper.sendTestnetFunds(recipientAddress, '');
+
+    expect(fetchImpl).toHaveBeenCalledWith('https://source-worker.example/sponsored/redeem-faucet', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        faucetGrantToken: 'faucet-grant-1',
+        to: recipientAddress,
+      }),
+    });
+    expect(fetchWorkerWithAuth).not.toHaveBeenCalled();
+    expect(result).toEqual({ ok: true, txHash: '0xbootstrap-faucet-grant' });
+  });
+
+  it('does not reuse sponsored bootstrap funding context for a different target session', async () => {
+    sessionStorage.setItem(SPONSORED_BOOTSTRAP_FUNDING_CONTEXT_KEY, JSON.stringify({
+      sessionSlug: 'source-session',
+      workerUrl: 'https://source-worker.example',
+      targetSessionSlug: 'sponsored-target',
+    }));
+
+    const fetchWorkerWithAuth = jest.fn(async () => ({
+      ok: true,
+      json: async () => ({ ok: true, txHash: '0xshould-not-fallback' }),
+    }));
+    const getCorsProxyUrlOrThrow = jest.fn(async () => {
+      throw new Error('Worker URL unavailable for requested session');
+    });
+    const helper = createContractHelperMethods({
+      resolveSession: jest.fn(() => ({ slug: 'different-session', networkChainId: 84532 })),
+      latestBlockCache: {},
+      gasPriceCache: {},
+      BLOCK_CACHE_MS: 1000,
+      getReadProviderForGroup: jest.fn(),
+      shouldLog: jest.fn(() => false),
+      rpcLog: jest.fn(),
+      callWithRetry: jest.fn(),
+      MAX_CACHE_SIZE: 50,
+      isLogsRangeTooLargeError: jest.fn(() => false),
+      contractsLog: { warn: jest.fn(), log: jest.fn() },
+      getReadProviderForChain: jest.fn(),
+      normalizeSessionSlug: jest.fn((value) => value),
+      shouldBypassSessionScopeWindow: jest.fn(() => false),
+      getScopeDecisionForSlug: jest.fn(() => null),
+      logScopeWindowSkipOnce: jest.fn(),
+      parsePositiveBlockNumber: jest.fn(() => null),
+      resolveSessionStartFromRegistry: jest.fn(() => null),
+      DEFAULT_CHAIN_ID: 84532,
+      store: {
+        getState: () => ({
+          profile: {
+            account: '0x1111111111111111111111111111111111111111',
+            provider: 'wagmi',
+            network: { id: 84532 },
+          },
+          sessionState: { activeSessionSlug: 'different-session' },
+        }),
+      },
+      getSessionConfigBySlug: jest.fn(() => ({ slug: 'different-session', networkChainId: 84532 })),
+      getCorsProxyUrlOrThrow,
+      fetchWorkerWithAuth,
+    });
+
+    const recipientAddress = '0x1111111111111111111111111111111111111111';
+    await expect(helper.sendTestnetFunds(recipientAddress, 'different-session')).rejects.toThrow(
+      'Failed to request test ETH: Worker URL unavailable for requested session'
+    );
+
+    expect(fetchWorkerWithAuth).not.toHaveBeenCalled();
+    expect(getCorsProxyUrlOrThrow).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not retry sponsored bootstrap funding on non-deployability worker failures', async () => {
+    sessionStorage.setItem(SPONSORED_BOOTSTRAP_FUNDING_CONTEXT_KEY, JSON.stringify({
+      sessionSlug: 'source-session',
+      workerUrl: 'https://source-worker.example',
+      targetSessionSlug: 'sponsored-target',
+    }));
+
+    const fetchWorkerWithAuth = jest.fn(async () => ({
+      ok: false,
+      status: 429,
+      json: async () => ({ error: 'Too many requests' }),
+    }));
+    const getCorsProxyUrlOrThrow = jest.fn(async () => 'https://target-worker.example');
+    const helper = createContractHelperMethods({
+      resolveSession: jest.fn(() => ({ slug: 'sponsored-target', networkChainId: 84532 })),
+      latestBlockCache: {},
+      gasPriceCache: {},
+      BLOCK_CACHE_MS: 1000,
+      getReadProviderForGroup: jest.fn(),
+      shouldLog: jest.fn(() => false),
+      rpcLog: jest.fn(),
+      callWithRetry: jest.fn(),
+      MAX_CACHE_SIZE: 50,
+      isLogsRangeTooLargeError: jest.fn(() => false),
+      contractsLog: { warn: jest.fn(), log: jest.fn() },
+      getReadProviderForChain: jest.fn(),
+      normalizeSessionSlug: jest.fn((value) => value),
+      shouldBypassSessionScopeWindow: jest.fn(() => false),
+      getScopeDecisionForSlug: jest.fn(() => null),
+      logScopeWindowSkipOnce: jest.fn(),
+      parsePositiveBlockNumber: jest.fn(() => null),
+      resolveSessionStartFromRegistry: jest.fn(() => null),
+      DEFAULT_CHAIN_ID: 84532,
+      store: {
+        getState: () => ({
+          profile: {
+            account: '0x1111111111111111111111111111111111111111',
+            provider: 'wagmi',
+            network: { id: 84532 },
+          },
+          sessionState: { activeSessionSlug: 'sponsored-target' },
+        }),
+      },
+      getSessionConfigBySlug: jest.fn((slug) => (
+        slug === 'sponsored-target'
+          ? { slug: 'sponsored-target', networkChainId: 84532 }
+          : { slug: 'source-session', networkChainId: 84532 }
+      )),
+      getCorsProxyUrlOrThrow,
+      fetchWorkerWithAuth,
+    });
+
+    const recipientAddress = '0x1111111111111111111111111111111111111111';
+    await expect(helper.sendTestnetFunds(recipientAddress, 'sponsored-target')).rejects.toThrow(
+      'Failed to request test ETH: Too many requests'
+    );
+
+    expect(fetchWorkerWithAuth).toHaveBeenCalledTimes(1);
+    expect(fetchWorkerWithAuth).toHaveBeenCalledWith(
+      'https://target-worker.example',
+      expect.any(Object),
+      expect.objectContaining({
+        sessionSlug: 'sponsored-target',
+        workerUrl: 'https://target-worker.example',
+      })
+    );
+  });
+
+  it('preserves faucet failure metadata when the worker rejects a self-funding request', async () => {
+    const fetchWorkerWithAuth = jest.fn(async () => ({
+      ok: false,
+      status: 403,
+      json: async () => ({
+        error: 'Access denied: txGas gate failed for this wallet.',
+        reason: 'txgas-gate-denied',
+        details: [{ rpcUrl: 'masked:https://rpc.example', error: 'down' }],
+      }),
+    }));
+    const getCorsProxyUrlOrThrow = jest.fn(async () => 'https://target-worker.example');
+    const helper = createContractHelperMethods({
+      resolveSession: jest.fn(() => ({ slug: 'sponsored-target', networkChainId: 84532 })),
+      latestBlockCache: {},
+      gasPriceCache: {},
+      BLOCK_CACHE_MS: 1000,
+      getReadProviderForGroup: jest.fn(),
+      shouldLog: jest.fn(() => false),
+      rpcLog: jest.fn(),
+      callWithRetry: jest.fn(),
+      MAX_CACHE_SIZE: 50,
+      isLogsRangeTooLargeError: jest.fn(() => false),
+      contractsLog: { warn: jest.fn(), log: jest.fn() },
+      getReadProviderForChain: jest.fn(),
+      normalizeSessionSlug: jest.fn((value) => value),
+      shouldBypassSessionScopeWindow: jest.fn(() => false),
+      getScopeDecisionForSlug: jest.fn(() => null),
+      logScopeWindowSkipOnce: jest.fn(),
+      parsePositiveBlockNumber: jest.fn(() => null),
+      resolveSessionStartFromRegistry: jest.fn(() => null),
+      DEFAULT_CHAIN_ID: 84532,
+      store: {
+        getState: () => ({
+          profile: {
+            account: '0x1111111111111111111111111111111111111111',
+            provider: 'wagmi',
+            network: { id: 84532 },
+          },
+          sessionState: { activeSessionSlug: 'sponsored-target' },
+        }),
+      },
+      getSessionConfigBySlug: jest.fn(() => ({ slug: 'sponsored-target', networkChainId: 84532 })),
+      getCorsProxyUrlOrThrow,
+      fetchWorkerWithAuth,
+    });
+
+    let failure = null;
+    try {
+      await helper.sendTestnetFunds('0x1111111111111111111111111111111111111111', 'sponsored-target');
+    } catch (error) {
+      failure = error;
+    }
+
+    expect(failure).toBeTruthy();
+    expect(failure.message).toBe('Failed to request test ETH: Access denied: txGas gate failed for this wallet.');
+    expect(failure.status).toBe(403);
+    expect(failure.reason).toBe('txgas-gate-denied');
+    expect(failure.details).toEqual([{ rpcUrl: 'masked:https://rpc.example', error: 'down' }]);
+  });
+
+  it('retries sponsored bootstrap funding when the deployed worker is missing a local faucet key', async () => {
+    sessionStorage.setItem(SPONSORED_BOOTSTRAP_FUNDING_CONTEXT_KEY, JSON.stringify({
+      sessionSlug: 'source-session',
+      workerUrl: 'https://source-worker.example',
+      targetSessionSlug: 'sponsored-target',
+      faucetGrantToken: 'faucet-grant-1',
+    }));
+
+    const fetchWorkerWithAuth = jest.fn(async () => ({
+      ok: false,
+      status: 401,
+      json: async () => ({ error: 'Server misconfigured: faucetPrivateKey is missing.' }),
+    }));
+    const fetchImpl = jest.fn(async () => ({
+      ok: true,
+      json: async () => ({ ok: true, txHash: '0xbootstrap-faucet-grant' }),
+    }));
+    const getCorsProxyUrlOrThrow = jest.fn(async () => 'https://target-worker.example');
+    const helper = createContractHelperMethods({
+      resolveSession: jest.fn(() => ({ slug: 'sponsored-target', networkChainId: 84532 })),
+      latestBlockCache: {},
+      gasPriceCache: {},
+      BLOCK_CACHE_MS: 1000,
+      getReadProviderForGroup: jest.fn(),
+      shouldLog: jest.fn(() => false),
+      rpcLog: jest.fn(),
+      callWithRetry: jest.fn(),
+      MAX_CACHE_SIZE: 50,
+      isLogsRangeTooLargeError: jest.fn(() => false),
+      contractsLog: { warn: jest.fn(), log: jest.fn() },
+      getReadProviderForChain: jest.fn(),
+      normalizeSessionSlug: jest.fn((value) => value),
+      shouldBypassSessionScopeWindow: jest.fn(() => false),
+      getScopeDecisionForSlug: jest.fn(() => null),
+      logScopeWindowSkipOnce: jest.fn(),
+      parsePositiveBlockNumber: jest.fn(() => null),
+      resolveSessionStartFromRegistry: jest.fn(() => null),
+      DEFAULT_CHAIN_ID: 84532,
+      store: {
+        getState: () => ({
+          profile: {
+            account: '0x1111111111111111111111111111111111111111',
+            provider: 'wagmi',
+            network: { id: 84532 },
+          },
+          sessionState: { activeSessionSlug: 'sponsored-target' },
+        }),
+      },
+      getSessionConfigBySlug: jest.fn((slug) => (
+        slug === 'sponsored-target'
+          ? { slug: 'sponsored-target', networkChainId: 84532 }
+          : { slug: 'source-session', networkChainId: 84532 }
+      )),
+      getCorsProxyUrlOrThrow,
+      fetchWorkerWithAuth,
+      fetchImpl,
+    });
+
+    const recipientAddress = '0x1111111111111111111111111111111111111111';
+    const result = await helper.sendTestnetFunds(recipientAddress, 'sponsored-target');
+
+    expect(fetchWorkerWithAuth).toHaveBeenCalledTimes(1);
+    expect(fetchWorkerWithAuth).toHaveBeenCalledWith(
+      'https://target-worker.example',
+      expect.any(Object),
+      expect.objectContaining({
+        sessionSlug: 'sponsored-target',
+        workerUrl: 'https://target-worker.example',
+      })
+    );
+    expect(fetchImpl).toHaveBeenCalledWith('https://source-worker.example/sponsored/redeem-faucet', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        faucetGrantToken: 'faucet-grant-1',
+        to: recipientAddress,
+      }),
+    });
+    expect(JSON.parse(sessionStorage.getItem(SPONSORED_BOOTSTRAP_FUNDING_CONTEXT_KEY) || '{}')).toEqual({
+      sessionSlug: 'source-session',
+      workerUrl: 'https://source-worker.example',
+      targetSessionSlug: 'sponsored-target',
+    });
+    expect(result).toEqual({ ok: true, txHash: '0xbootstrap-faucet-grant' });
+  });
+
+  it('consumes one-time sponsored faucet grants instead of reusing them on later missing-key retries', async () => {
+    sessionStorage.setItem(SPONSORED_BOOTSTRAP_FUNDING_CONTEXT_KEY, JSON.stringify({
+      sessionSlug: 'source-session',
+      workerUrl: 'https://source-worker.example',
+      targetSessionSlug: 'sponsored-target',
+      faucetGrantToken: 'faucet-grant-1',
+    }));
+
+    const fetchWorkerWithAuth = jest.fn()
+      .mockImplementationOnce(async () => ({
+        ok: false,
+        status: 401,
+        json: async () => ({ error: 'Server misconfigured: faucetPrivateKey is missing.' }),
+      }))
+      .mockImplementationOnce(async () => ({
+        ok: false,
+        status: 401,
+        json: async () => ({ error: 'Server misconfigured: faucetPrivateKey is missing.' }),
+      }));
+    const fetchImpl = jest.fn(async () => ({
+      ok: true,
+      json: async () => ({ ok: true, txHash: '0xbootstrap-faucet-grant' }),
+    }));
+    const getCorsProxyUrlOrThrow = jest.fn(async () => 'https://target-worker.example');
+    const helper = createContractHelperMethods({
+      resolveSession: jest.fn(() => ({ slug: 'sponsored-target', networkChainId: 84532 })),
+      latestBlockCache: {},
+      gasPriceCache: {},
+      BLOCK_CACHE_MS: 1000,
+      getReadProviderForGroup: jest.fn(),
+      shouldLog: jest.fn(() => false),
+      rpcLog: jest.fn(),
+      callWithRetry: jest.fn(),
+      MAX_CACHE_SIZE: 50,
+      isLogsRangeTooLargeError: jest.fn(() => false),
+      contractsLog: { warn: jest.fn(), log: jest.fn() },
+      getReadProviderForChain: jest.fn(),
+      normalizeSessionSlug: jest.fn((value) => value),
+      shouldBypassSessionScopeWindow: jest.fn(() => false),
+      getScopeDecisionForSlug: jest.fn(() => null),
+      logScopeWindowSkipOnce: jest.fn(),
+      parsePositiveBlockNumber: jest.fn(() => null),
+      resolveSessionStartFromRegistry: jest.fn(() => null),
+      DEFAULT_CHAIN_ID: 84532,
+      store: {
+        getState: () => ({
+          profile: {
+            account: '0x1111111111111111111111111111111111111111',
+            provider: 'wagmi',
+            network: { id: 84532 },
+          },
+          sessionState: { activeSessionSlug: 'sponsored-target' },
+        }),
+      },
+      getSessionConfigBySlug: jest.fn((slug) => (
+        slug === 'sponsored-target'
+          ? { slug: 'sponsored-target', networkChainId: 84532 }
+          : { slug: 'source-session', networkChainId: 84532 }
+      )),
+      getCorsProxyUrlOrThrow,
+      fetchWorkerWithAuth,
+      fetchImpl,
+    });
+
+    const recipientAddress = '0x1111111111111111111111111111111111111111';
+    const firstResult = await helper.sendTestnetFunds(recipientAddress, 'sponsored-target');
+
+    expect(firstResult).toEqual({ ok: true, txHash: '0xbootstrap-faucet-grant' });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(sessionStorage.getItem(SPONSORED_BOOTSTRAP_FUNDING_CONTEXT_KEY) || '{}')).toEqual({
+      sessionSlug: 'source-session',
+      workerUrl: 'https://source-worker.example',
+      targetSessionSlug: 'sponsored-target',
+    });
+
+    await expect(helper.sendTestnetFunds(recipientAddress, 'sponsored-target')).rejects.toThrow(
+      'Failed to request test ETH: Server misconfigured: faucetPrivateKey is missing.'
+    );
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('contractHelpers session-aware cache keys', () => {
+  const makeReadHelper = () => {
+    const alphaProvider = {
+      getBlockNumber: jest.fn(async () => 101),
+      getGasPrice: jest.fn(async () => '11'),
+      __CE_RPC_META: {
+        providerMode: 'fallback',
+        providerLabel: 'path',
+        preferredUrls: ['https://alpha-rpc.example'],
+      },
+    };
+    const betaProvider = {
+      getBlockNumber: jest.fn(async () => 202),
+      getGasPrice: jest.fn(async () => '22'),
+      __CE_RPC_META: {
+        providerMode: 'fallback',
+        providerLabel: 'path',
+        preferredUrls: ['https://beta-rpc.example'],
+      },
+    };
+    const getReadProviderForGroup = jest.fn((groupKeyOrCfg) => (
+      groupKeyOrCfg === 'beta' ? betaProvider : alphaProvider
+    ));
+    const helper = createContractHelperMethods({
+      resolveSession: jest.fn((groupKeyOrCfg) => ({
+        slug: groupKeyOrCfg || 'general',
+        networkChainId: 84532,
+      })),
+      latestBlockCache: {},
+      gasPriceCache: {},
+      BLOCK_CACHE_MS: 1000,
+      getReadProviderForGroup,
+      shouldLog: jest.fn(() => false),
+      rpcLog: jest.fn(),
+      callWithRetry: jest.fn((fn) => fn()),
+      MAX_CACHE_SIZE: 50,
+      isLogsRangeTooLargeError: jest.fn(() => false),
+      contractsLog: { warn: jest.fn(), log: jest.fn() },
+      getReadProviderForChain: jest.fn(),
+      normalizeSessionSlug: jest.fn((value) => value),
+      shouldBypassSessionScopeWindow: jest.fn(() => false),
+      getScopeDecisionForSlug: jest.fn(() => null),
+      logScopeWindowSkipOnce: jest.fn(),
+      parsePositiveBlockNumber: jest.fn(() => null),
+      resolveSessionStartFromRegistry: jest.fn(() => null),
+      DEFAULT_CHAIN_ID: 84532,
+      store: { getState: () => ({}) },
+      getSessionConfigBySlug: jest.fn(() => null),
+      getCorsProxyUrlOrThrow: jest.fn(),
+      fetchWorkerWithAuth: jest.fn(),
+    });
+    return {
+      helper,
+      alphaProvider,
+      betaProvider,
+      getReadProviderForGroup,
+    };
+  };
+
+  it('does not share latest-block cache across same-chain sessions with different provider scopes', async () => {
+    const { helper, alphaProvider, betaProvider } = makeReadHelper();
+
+    const alphaBlock = await helper.getLatestBlockNumber('none', 'alpha');
+    const betaBlock = await helper.getLatestBlockNumber('none', 'beta');
+
+    expect(alphaBlock).toBe(101);
+    expect(betaBlock).toBe(202);
+    expect(alphaProvider.getBlockNumber).toHaveBeenCalledTimes(1);
+    expect(betaProvider.getBlockNumber).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not share gas-price cache across same-chain sessions with different provider scopes', async () => {
+    const { helper, alphaProvider, betaProvider } = makeReadHelper();
+
+    const alphaGas = await helper.getGasPrice('alpha');
+    const betaGas = await helper.getGasPrice('beta');
+
+    expect(alphaGas).toBe('11');
+    expect(betaGas).toBe('22');
+    expect(alphaProvider.getGasPrice).toHaveBeenCalledTimes(1);
+    expect(betaProvider.getGasPrice).toHaveBeenCalledTimes(1);
+  });
+});

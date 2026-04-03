@@ -1,0 +1,3602 @@
+/* @file Account.module.scss */
+@use "sass:color";
+
+/* --- LoginAndSettingsModal.jsx --- */
+
+@media (min-width: 0px) and (max-width: 319px) {
+  #navConnectContainer {
+    display: flex;
+    flex-direction: row;
+    align-content: center;
+    width: 100%;
+    height: 100%;
+    padding: 0px;
+  }
+
+  #loginIcons {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    align-content: center;
+    margin-top: 0px;
+    transform: scale(0.75);
+    padding-left: 0.75em;
+    padding-right: 0.75em;
+    opacity: 0.15;
+    .img {
+      vertical-align: top;
+      transform: scale (0.65);
+    }
+  }
+
+  #loginIcon {
+    margin-right: 0.25em;
+    margin-left: 0.25em;
+    padding: 0px;
+    transform: scale(0.75);
+    vertical-align: top;
+  }
+
+  #navConnectButton {
+    padding-bottom: 5px;
+    padding-top: 5px;
+    display: flex;
+    justify-content: center;
+    justify-content: center;
+    transform: scale(0.9);
+  }
+
+  #loginPromptText {
+    font-size: 1.75em;
+  }
+
+  #metamaskIcon {
+    margin-left: 0.1em;
+    display: inline;
+  }
+
+  #modalLoginOptions {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    flex-wrap: wrap;
+    padding-left: 5px;
+    padding-right: 5px;
+
+    #torusLoginOption {
+      width: 100%;
+    }
+  }
+
+  #testnetFaucetNotice {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding-top: 5px;
+    padding-bottom: 5px;
+    padding-left: 5px;
+    padding-right: 5px;
+    font-size: 0.9em;
+    color: #236313;
+    #faucetLinkAndDetail {
+      font-size: 1em;
+      align-self: center;
+      padding: 3px;
+    }
+
+    #testETHFaucetLink {
+      align-self: flex-start;
+      padding-top: 10px;
+      padding-bottom: 0px;
+      font-size: 1em;
+    }
+
+    #testnetLinkDetail {
+      font-size: 0.65em;
+    }
+
+    #rpcURLNotice {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-end;
+      padding-top: 5px;
+      padding-bottom: 5px;
+      padding-left: 5px;
+      padding-right: 5px;
+      padding-left: 5px;
+      padding-right: 5px;
+      font-size: 0.75em;
+      margin-bottom: 5px;
+    }
+
+    #rpcURLTitle {
+      align-self: flex-start;
+    }
+
+    #rpcURL {
+      display: flex;
+      flex-direction: row;
+      justify-content: center;
+      font-size: 0.7em;
+    }
+
+    #rpcURLText {
+      width: 80%;
+      flex-direction: row;
+      flex-wrap: wrap;
+      font-weight: 600;
+      color: #146923;
+      margin-bottom: 0;
+      padding-left: 10px;
+      align-self: center;
+      font-size: 1.5em;
+      padding-top: 5px;
+      padding-bottom: 5px;
+      padding-left: 10px;
+      padding-right: 3px;
+    }
+
+    #copyLinkButton {
+      flex-direction: row;
+      padding-right: 10px;
+
+      #copyButtonBeforePress {
+        flex-direction: row;
+        font-size: 2em;
+      }
+
+      #copyButtonAfterPress {
+        flex-direction: row;
+        color: var(--ce-color-black);
+        font-size: 2em;
+      }
+    }
+  }
+
+  #testnetFaucetNoticeSmall {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding-top: 5px;
+    padding-bottom: 5px;
+    padding-left: 5px;
+    padding-right: 5px;
+    font-size: 0.9em;
+    color: #236313;
+    #faucetLinkAndDetail {
+      font-size: 1em;
+      align-self: center;
+      padding: 3px;
+    }
+
+    #testETHFaucetLink {
+      align-self: flex-start;
+      padding-top: 10px;
+      padding-bottom: 0px;
+      font-size: 1em;
+    }
+
+    #testnetLinkDetail {
+      font-size: 0.65em;
+    }
+
+    #rpcURLNotice {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-end;
+      padding-top: 5px;
+      padding-bottom: 5px;
+      padding-left: 5px;
+      padding-right: 5px;
+      padding-left: 5px;
+      padding-right: 5px;
+      font-size: 0.75em;
+      margin-bottom: 5px;
+    }
+
+    #rpcURLTitle {
+      align-self: flex-start;
+    }
+
+    #rpcURL {
+      display: flex;
+      flex-direction: row;
+      justify-content: center;
+      font-size: 0.7em;
+    }
+
+    #rpcURLText {
+      width: 80%;
+      flex-direction: row;
+      flex-wrap: wrap;
+      font-weight: 600;
+      color: #146923;
+      margin-bottom: 0;
+      padding-left: 10px;
+      align-self: center;
+      font-size: 1.5em;
+      padding-top: 5px;
+      padding-bottom: 5px;
+      padding-left: 10px;
+      padding-right: 3px;
+    }
+
+    #copyLinkButton {
+      flex-direction: row;
+      padding-right: 10px;
+
+      #copyButtonBeforePress {
+        flex-direction: row;
+        font-size: 2.5em;
+      }
+
+      #copyButtonAfterPress {
+        flex-direction: row;
+        color: var(--ce-color-black);
+        font-size: 2.5em;
+      }
+    }
+  }
+}
+
+@media (min-width: 320px) and (max-width: 465px) {
+  #navConnectContainer {
+    display: flex;
+    flex-direction: row;
+    align-content: center;
+    width: 100%;
+    height: 100%;
+    padding: 0px;
+  }
+
+  #navConnectButton {
+    padding-bottom: 7.5px;
+    padding-top: 7.5px;
+    display: flex;
+    justify-content: center;
+    justify-content: center;
+    transform: scale(0.9);
+    padding: 5% 2% 5% 2%;
+    min-height: 70px !important;
+  }
+
+  #loginIcons {
+    display: flex;
+    justify-content: center;
+    align-content: center;
+    align-items: center;
+    margin-top: 0px;
+    transform: scale(0.8);
+    padding-left: 1em;
+    padding-right: 1em;
+    opacity: 0.15;
+    .img {
+      vertical-align: top;
+      transform: scale (0.8);
+    }
+  }
+
+  #loginIcon {
+    margin-right: 0.1em;
+    padding: 0px;
+    transform: scale(0.8);
+    vertical-align: top;
+  }
+
+  #loginPromptText {
+    font-size: 1.75em;
+  }
+
+  #metamaskIcon {
+    margin-left: 0.1em;
+    display: inline;
+  }
+
+  #modalLoginOptions {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    flex-wrap: wrap;
+    padding-left: 5px;
+    padding-right: 5px;
+
+    #torusLoginOption {
+      width: 100%;
+    }
+  }
+
+  #testnetFaucetNotice {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding-top: 5px;
+    padding-bottom: 5px;
+    padding-left: 5px;
+    padding-right: 5px;
+    font-size: 0.9em;
+    color: #236313;
+    #faucetLinkAndDetail {
+      font-size: 1em;
+      align-self: center;
+      padding: 5px;
+    }
+
+    #testETHFaucetLink {
+      align-self: flex-start;
+      padding-top: 10px;
+      padding-bottom: 0px;
+      font-size: 1em;
+    }
+
+    #testnetLinkDetail {
+      font-size: 0.7em;
+    }
+
+    #rpcURLNotice {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-end;
+      padding-top: 5px;
+      padding-bottom: 5px;
+      padding-left: 5px;
+      padding-right: 5px;
+      padding-left: 5px;
+      padding-right: 5px;
+      font-size: 0.75em;
+      margin-bottom: 5px;
+    }
+
+    #rpcURLTitle {
+      align-self: flex-start;
+      font-size: 1.25em;
+    }
+
+    #rpcURL {
+      display: flex;
+      flex-direction: row;
+      justify-content: center;
+      font-size: 0.7em;
+    }
+
+    #rpcURLText {
+      width: 80%;
+      flex-direction: row;
+      flex-wrap: wrap;
+      font-weight: 600;
+      color: #146923;
+      margin-bottom: 0;
+      padding-left: 10px;
+      align-self: center;
+      font-size: 1.5em;
+      padding-top: 5px;
+      padding-bottom: 5px;
+      padding-left: 10px;
+      padding-right: 3px;
+    }
+
+    #copyLinkButton {
+      flex-direction: row;
+      padding-right: 10px;
+
+      #copyButtonBeforePress {
+        flex-direction: row;
+        font-size: 3em;
+      }
+
+      #copyButtonAfterPress {
+        flex-direction: row;
+        font-size: 3em;
+      }
+    }
+  }
+
+  #testnetFaucetNoticeSmall {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding-top: 5px;
+    padding-bottom: 5px;
+    padding-left: 5px;
+    padding-right: 5px;
+    font-size: 0.9em;
+    color: #236313;
+    #faucetLinkAndDetail {
+      font-size: 1em;
+      align-self: center;
+      padding: 5px;
+    }
+
+    #testETHFaucetLink {
+      align-self: flex-start;
+      padding-top: 10px;
+      padding-bottom: 0px;
+      font-size: 1em;
+    }
+
+    #testnetLinkDetail {
+      font-size: 0.7em;
+    }
+
+    #rpcURLNotice {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-end;
+      padding-top: 5px;
+      padding-bottom: 5px;
+      padding-left: 5px;
+      padding-right: 5px;
+      padding-left: 5px;
+      padding-right: 5px;
+      font-size: 0.75em;
+      margin-bottom: 5px;
+    }
+
+    #rpcURLTitle {
+      align-self: flex-start;
+      font-size: 1.25em;
+    }
+
+    #rpcURL {
+      display: flex;
+      flex-direction: row;
+      justify-content: center;
+      font-size: 0.7em;
+    }
+
+    #rpcURLText {
+      width: 80%;
+      flex-direction: row;
+      flex-wrap: wrap;
+      font-weight: 600;
+      color: #146923;
+      margin-bottom: 0;
+      padding-left: 10px;
+      align-self: center;
+      font-size: 1.5em;
+      padding-top: 5px;
+      padding-bottom: 5px;
+      padding-left: 10px;
+      padding-right: 3px;
+    }
+
+    #copyLinkButton {
+      flex-direction: row;
+      padding-right: 10px;
+
+      #copyButtonBeforePress {
+        flex-direction: row;
+        font-size: 3em;
+      }
+
+      #copyButtonAfterPress {
+        flex-direction: row;
+        font-size: 3em;
+      }
+    }
+  }
+}
+
+@media (min-width: 466px) and (max-width: 768px) {
+  #navConnectContainer {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    align-content: center;
+    flex-direction: row;
+    height: 100%;
+    padding: 0px;
+  }
+
+  #navConnectButton {
+    display: flex;
+    justify-content: center;
+    padding: 5% 2% 5% 2%;
+    min-height: 80px !important;
+  }
+
+  #loginIcons {
+    display: flex;
+    justify-content: center;
+    align-content: center;
+    align-items: center;
+    margin-top: 5px;
+    transform: scale(0.8);
+    padding-left: 1em;
+    padding-right: 1em;
+    opacity: 0.15;
+    .img {
+      vertical-align: top;
+      transform: scale (0.8);
+    }
+  }
+
+  #loginIcon {
+    margin-right: 0.1em;
+    margin-left: 0.1em;
+    padding: 0px;
+    vertical-align: top;
+  }
+
+  #loginPromptText {
+    font-size: 2em;
+  }
+
+  #metamaskIcon {
+    margin-left: 0.1em;
+    display: inline;
+  }
+
+  #modalLoginOptions {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    flex-wrap: wrap;
+    padding-left: 5%;
+    padding-right: 5%;
+    #torusLoginOption {
+      width: 100%;
+    }
+  }
+
+  #testnetFaucetNotice {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding-top: 5px;
+    padding-bottom: 5px;
+    padding-left: 5px;
+    padding-right: 5px;
+    font-size: 0.9em;
+    color: #236313;
+    #faucetLinkAndDetail {
+      font-size: 1.25em;
+      align-self: center;
+      padding: 10px;
+    }
+
+    #testETHFaucetLink {
+      align-self: flex-start;
+      padding-top: 10px;
+      padding-bottom: 0px;
+      font-size: 1em;
+    }
+
+    #testnetLinkDetail {
+      font-size: 0.75em;
+    }
+
+    #rpcURLNotice {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-end;
+      padding-top: 5px;
+      padding-bottom: 5px;
+      padding-left: 5px;
+      padding-right: 5px;
+      padding-left: 5px;
+      padding-right: 5px;
+      font-size: 0.75em;
+      margin-bottom: 5px;
+    }
+
+    #rpcURLTitle {
+      align-self: flex-start;
+      font-size: 1.5em;
+    }
+
+    #rpcURL {
+      display: flex;
+      flex-direction: row;
+      justify-content: center;
+      font-size: 0.7em;
+    }
+
+    #rpcURLText {
+      width: 80%;
+      flex-direction: row;
+      flex-wrap: wrap;
+      font-weight: 600;
+      color: #146923;
+      margin-bottom: 0;
+      padding-left: 10px;
+      align-self: center;
+      font-size: 1.75em;
+      padding-top: 5px;
+      padding-bottom: 5px;
+      padding-left: 10px;
+      padding-right: 3px;
+    }
+
+    #copyLinkButton {
+      flex-direction: row;
+      padding-right: 10px;
+
+      #copyButtonBeforePress {
+        flex-direction: row;
+        font-size: 3.5em;
+      }
+
+      #copyButtonAfterPress {
+        flex-direction: row;
+        color: var(--ce-color-black);
+        font-size: 3.5em;
+      }
+    }
+  }
+
+  #testnetFaucetNoticeSmall {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding-top: 5px;
+    padding-bottom: 5px;
+    padding-left: 5px;
+    padding-right: 5px;
+    font-size: 0.9em;
+    color: #236313;
+    #faucetLinkAndDetail {
+      font-size: 1.25em;
+      align-self: center;
+      padding: 10px;
+    }
+
+    #testETHFaucetLink {
+      align-self: flex-start;
+      padding-top: 10px;
+      padding-bottom: 0px;
+      font-size: 1em;
+    }
+
+    #testnetLinkDetail {
+      font-size: 0.75em;
+    }
+
+    #rpcURLNotice {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-end;
+      padding-top: 5px;
+      padding-bottom: 5px;
+      padding-left: 5px;
+      padding-right: 5px;
+      padding-left: 5px;
+      padding-right: 5px;
+      font-size: 0.75em;
+      margin-bottom: 5px;
+    }
+
+    #rpcURLTitle {
+      align-self: flex-start;
+      font-size: 1.5em;
+    }
+
+    #rpcURL {
+      display: flex;
+      flex-direction: row;
+      justify-content: center;
+      font-size: 0.7em;
+    }
+
+    #rpcURLText {
+      width: 80%;
+      flex-direction: row;
+      flex-wrap: wrap;
+      font-weight: 600;
+      color: #146923;
+      margin-bottom: 0;
+      padding-left: 10px;
+      align-self: center;
+      font-size: 1.75em;
+      padding-top: 5px;
+      padding-bottom: 5px;
+      padding-left: 10px;
+      padding-right: 3px;
+    }
+
+    #copyLinkButton {
+      flex-direction: row;
+      padding: 10px;
+      #copyButtonBeforePress {
+        flex-direction: row;
+        font-size: 3em;
+      }
+
+      #copyButtonAfterPress {
+        flex-direction: row;
+        color: var(--ce-color-black);
+        font-size: 3em;
+      }
+    }
+  }
+}
+
+@media (min-width: 769px) and (max-width: 1366px) {
+  #navConnectContainer {
+    display: flex;
+    align-content: center;
+    justify-content: flex-end;
+    flex-direction: row;
+    height: 100%;
+    margin-right: 0;
+  }
+
+  #navConnectButton {
+    display: flex;
+    justify-content: center;
+    padding: 4% 0% 4% 0%;
+    min-height: 100px !important;
+  }
+
+  #loginIcons {
+    display: flex;
+    justify-content: center;
+    align-content: center;
+    align-items: center;
+    transform: scale(0.85);
+    padding-left: 1em;
+    padding-right: 1em;
+    opacity: 0.15;
+    .img {
+      vertical-align: top;
+    }
+  }
+
+  #loginIcon {
+    margin-right: 0.15em;
+    margin-left: 0.15em;
+    padding: 0px;
+    vertical-align: top;
+  }
+
+  #loginPromptText {
+    font-size: 2em;
+    padding-bottom: 7.5px;
+  }
+
+  #metamaskIcon {
+    margin-left: 0.1em;
+    display: inline;
+  }
+
+  #modalLoginOptions {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-evenly;
+    align-items: center;
+    padding-left: 20px;
+    padding-right: 20px;
+    #torusLoginOption {
+      width: 50%;
+      height: 100%;
+      margin-left: 20px;
+    }
+
+    #metamaskInstructions {
+      width: 50%;
+      margin-bottom: 0px;
+    }
+  }
+
+  #testnetFaucetNotice {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding-top: 15px;
+    padding-bottom: 15px;
+    padding-left: 10px;
+    padding-right: 10px;
+    margin-top: 15px;
+    font-size: 0.9em;
+    color: #236313;
+    #faucetLinkAndDetail {
+      font-size: 1.5em;
+      align-self: center;
+      padding: 12.5px;
+    }
+
+    #testETHFaucetLink {
+      align-self: flex-start;
+      padding-top: 10px;
+      padding-bottom: 0px;
+      font-size: 1em;
+    }
+
+    #testnetLinkDetail {
+      font-size: 0.85em;
+    }
+
+    #rpcURLNotice {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-end;
+      padding-top: 5px;
+      padding-bottom: 5px;
+      padding-left: 5px;
+      padding-right: 5px;
+      padding-left: 5px;
+      padding-right: 5px;
+      font-size: 0.75em;
+      margin-bottom: 5px;
+    }
+
+    #rpcURLTitle {
+      align-self: flex-start;
+      font-size: 1.75em;
+    }
+
+    #rpcURL {
+      display: flex;
+      flex-direction: row;
+      justify-content: center;
+      font-size: 0.7em;
+    }
+
+    #rpcURLText {
+      width: 80%;
+      flex-direction: row;
+      flex-wrap: wrap;
+      font-weight: 600;
+      color: #146923;
+      margin-bottom: 0;
+      padding-left: 10px;
+      align-self: center;
+      font-size: 2em;
+      padding-top: 5px;
+      padding-bottom: 5px;
+      padding-left: 10px;
+      padding-right: 3px;
+    }
+
+    #copyLinkButton {
+      flex-direction: row;
+      padding: 10px;
+      #copyButtonBeforePress {
+        flex-direction: row;
+        font-size: 3.5em;
+      }
+
+      #copyButtonAfterPress {
+        flex-direction: row;
+        color: var(--ce-color-black);
+        font-size: 2.5em;
+      }
+    }
+  }
+
+  #testnetFaucetNoticeSmall {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding-top: 15px;
+    padding-bottom: 15px;
+    padding-left: 10px;
+    padding-right: 10px;
+    margin-top: 15px;
+    font-size: 0.9em;
+    color: #236313;
+    #faucetLinkAndDetail {
+      font-size: 1.5em;
+      align-self: center;
+      padding: 12.5px;
+    }
+
+    #testETHFaucetLink {
+      align-self: flex-start;
+      padding-top: 10px;
+      padding-bottom: 0px;
+      font-size: 1em;
+    }
+
+    #testnetLinkDetail {
+      font-size: 0.85em;
+    }
+
+    #rpcURLNotice {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-end;
+      padding-top: 5px;
+      padding-bottom: 5px;
+      padding-left: 5px;
+      padding-right: 5px;
+      padding-left: 5px;
+      padding-right: 5px;
+      font-size: 0.75em;
+      margin-bottom: 5px;
+    }
+
+    #rpcURLTitle {
+      align-self: flex-start;
+      font-size: 1.75em;
+    }
+
+    #rpcURL {
+      display: flex;
+      flex-direction: row;
+      justify-content: center;
+      font-size: 0.7em;
+    }
+
+    #rpcURLText {
+      width: 80%;
+      flex-direction: row;
+      flex-wrap: wrap;
+      font-weight: 600;
+      color: #146923;
+      margin-bottom: 0;
+      padding-left: 10px;
+      align-self: center;
+      font-size: 2em;
+      line-height: 1.25;
+      padding-top: 5px;
+      padding-bottom: 5px;
+      padding-left: 10px;
+      padding-right: 10px;
+    }
+
+    #copyLinkButton {
+      flex-direction: row;
+      padding: 10px;
+      #copyButtonBeforePress {
+        flex-direction: row;
+        font-size: 3.5em;
+      }
+
+      #copyButtonAfterPress {
+        flex-direction: row;
+        color: var(--ce-color-black);
+        font-size: 3.5em;
+      }
+    }
+  }
+}
+
+@media (min-width: 1367px) {
+  #navConnectContainer {
+    display: flex;
+    align-content: center;
+    justify-content: flex-end;
+    flex-direction: row;
+    height: 100%;
+  }
+
+  #navConnectButton {
+    min-width: 250px !important;
+    min-height: 100px;
+    display: flex;
+    justify-content: center;
+    justify-content: center;
+    padding: 4% 0% 4% 0%;
+  }
+
+  #loginIcons {
+    display: flex;
+    justify-content: center;
+    align-content: center;
+    align-items: center;
+    margin-top: 0px;
+    transform: scale(0.95);
+    padding-left: 1em;
+    padding-right: 1em;
+    opacity: 0.15;
+    .img {
+      vertical-align: top;
+    }
+  }
+
+  #loginIcon {
+    margin-right: 0.2em;
+    margin-left: 0.2em;
+    padding: 0px;
+    vertical-align: top;
+  }
+
+  #loginPromptText {
+    font-size: 2.5em;
+    padding-bottom: 10px;
+  }
+
+  #metamaskIcon {
+    margin-left: 0.1em;
+    display: inline;
+  }
+
+  #modalLoginOptions {
+    height: 150px;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-evenly;
+    padding-left: 30px;
+    padding-right: 30px;
+    #torusLoginOption {
+      width: 50%;
+      margin-left: 20px;
+    }
+
+    #metamaskInstructions {
+      width: 50%;
+      margin-bottom: 0px;
+      margin-right: 20px;
+    }
+  }
+
+  #testnetFaucetNotice {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding-top: 20px;
+    padding-bottom: 20px;
+    padding-left: 15px;
+    padding-right: 15px;
+    margin-top: 20px;
+    font-size: 1em;
+    color: #236313;
+    #faucetLinkAndDetail {
+      font-size: 1.75em;
+      align-self: center;
+      padding: 15px;
+    }
+
+    #testETHFaucetLink {
+      align-self: flex-start;
+      padding-top: 10px;
+      padding-bottom: 0px;
+      font-size: 1em;
+    }
+
+    #testnetLinkDetail {
+      font-size: 1em;
+    }
+
+    #rpcURLNotice {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-end;
+      padding-top: 5px;
+      padding-bottom: 5px;
+      padding-left: 5px;
+      padding-right: 5px;
+      padding-left: 5px;
+      padding-right: 5px;
+      font-size: 0.75em;
+      margin-bottom: 5px;
+    }
+
+    #rpcURLTitle {
+      align-self: flex-start;
+      font-size: 1.95em;
+    }
+
+    #rpcURL {
+      display: flex;
+      flex-direction: row;
+      justify-content: center;
+      font-size: 0.7em;
+    }
+
+    #rpcURLText {
+      width: 80%;
+      flex-direction: row;
+      flex-wrap: wrap;
+      font-weight: 600;
+      color: #146923;
+      margin-bottom: 0;
+      padding-left: 10px;
+      align-self: center;
+      font-size: 2.5em;
+      line-height: 1.25;
+      padding-top: 5px;
+      padding-bottom: 5px;
+      padding-left: 10px;
+      padding-right: 3px;
+    }
+
+    #copyLinkButton {
+      flex-direction: row;
+      padding: 15px;
+      #copyButtonBeforePress {
+        flex-direction: row;
+        font-size: 4em;
+      }
+
+      #copyButtonAfterPress {
+        flex-direction: row;
+        color: var(--ce-color-black);
+        font-size: 4em;
+      }
+    }
+  }
+
+  #testnetFaucetNoticeSmall {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding-top: 20px;
+    padding-bottom: 20px;
+    padding-left: 15px;
+    padding-right: 15px;
+    margin-top: 20px;
+    font-size: 1em;
+    color: #236313;
+    #faucetLinkAndDetail {
+      font-size: 1.75em;
+      align-self: center;
+      padding: 15px;
+    }
+
+    #testETHFaucetLink {
+      align-self: flex-start;
+      padding-top: 10px;
+      padding-bottom: 0px;
+      font-size: 1em;
+    }
+
+    #testnetLinkDetail {
+      font-size: 1em;
+    }
+
+    #rpcURLNotice {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-end;
+      padding-top: 5px;
+      padding-bottom: 5px;
+      padding-left: 5px;
+      padding-right: 5px;
+      padding-left: 5px;
+      padding-right: 5px;
+      font-size: 0.75em;
+      margin-bottom: 5px;
+    }
+
+    #rpcURLTitle {
+      align-self: flex-start;
+      font-size: 1.95em;
+    }
+
+    #rpcURL {
+      display: flex;
+      flex-direction: row;
+      justify-content: center;
+      font-size: 0.7em;
+    }
+
+    #rpcURLText {
+      width: 80%;
+      flex-direction: row;
+      flex-wrap: wrap;
+      font-weight: 600;
+      color: #146923;
+      margin-bottom: 0;
+      padding-top: 10px;
+      padding-bottom: 10px;
+      padding-left: 10px;
+      padding-right: 10px;
+      align-self: center;
+      font-size: 2.5em;
+      line-height: 1.25;
+    }
+
+    #copyLinkButton {
+      flex-direction: row;
+      padding: 15px;
+      #copyButtonBeforePress {
+        flex-direction: row;
+        font-size: 4em;
+      }
+
+      #copyButtonAfterPress {
+        flex-direction: row;
+        color: var(--ce-color-black);
+        font-size: 4em;
+      }
+    }
+  }
+}
+
+h1 {
+  color: var(--ce-color-white);
+  font-weight: 700;
+}
+
+#navConnectButton {
+  min-width: 200px;
+  min-height: 100px;
+  display: flex;
+  flex-direction: column;
+  justify-items: center;
+  align-items: center;
+  background: #2a63ca !important;
+  box-shadow:
+    -5px 5px 10px #10122e,
+    5px -5px 10px #1e2155 h1 {
+    margin-bottom: 0px;
+    font-weight: 700;
+    opacity: 0.8;
+  }
+}
+
+#navConnectButton:hover.btn.btn-blue {
+  background-color: var(--ce-color-indigo);
+  background: var(--ce-color-indigo);
+}
+
+#loginPromptText {
+  font-weight: 600;
+  color: var(--ce-color-white);
+}
+
+#loginModal { }
+
+#closeModalIcon {
+  font-size: 2em;
+  color: var(--ce-color-white);
+}
+
+#torusInfoModal {
+  display: flex;
+  flex-direction: column;
+}
+
+#torusInfoModalTitle {
+  padding: 5px;
+  color: var(--ce-color-white);
+  font-weight: 600;
+  text-shadow: 2px 2px var(--ce-color-indigo);
+}
+
+#acceptModalInfoButton {
+  color: var(--ce-color-white);
+  border-color: var(--ce-color-white);
+  width: 50%;
+  justify-self: flex-start;
+}
+
+#modalXPicon {
+  display: inline;
+  color: var(--ce-color-white);
+  text-shadow: 2px 2px var(--ce-color-indigo);
+  margin-left: 0.1em;
+}
+
+#betaTesterText {
+  font-weight: 700;
+  background-color: color.adjust(#eeff00, $alpha: -0.5);
+}
+
+#metamaskInstructions {
+  display: flex;
+  flex-direction: column;
+  flex-wrap: wrap;
+  border-radius: var(--ce-radius-5);
+}
+
+#MetamaskRPCText {
+  text-transform: uppercase;
+  font-weight: 600;
+  font-size: 1.5em;
+  margin-bottom: 0px;
+}
+
+#connectMetamaskSteps {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+}
+
+#connectMetamaskStep {
+  font-weight: 600;
+  font-size: 0.85em;
+  margin-bottom: 0px;
+  opacity: 0.75;
+  color: var(--ce-color-info);
+}
+
+#loginModalCard {
+  border-radius: var(--ce-radius-10);
+  max-width: 90vw;
+}
+
+#testnetFaucetNoticeSmall {
+  width: 100%;
+  display: flex;
+  flex-direction: column-reverse;
+  justify-content: space-evenly;
+  border-radius: var(--ce-radius-7);
+  font-weight: 600;
+  margin-bottom: 0px;
+  margin-top: 0px;
+  #testETHFaucetLink {
+    text-transform: uppercase;
+    font-weight: 600;
+    text-decoration: underline;
+    color: var(--ce-color-white);
+  }
+
+  #faucetLinkAndDetail {
+    width: 100%;
+    display: flex;
+    align-self: center;
+    align-items: center;
+    justify-content: center;
+    align-content: center;
+  }
+
+  #faucetButton {
+    width: 100%;
+    color: var(--ce-color-black);
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    justify-items: center;
+    align-items: center;
+    align-content: center;
+    background-color: #f7f1f1d1;
+    text-transform: uppercase;
+    font-weight: 600;
+    padding: 6px;
+    border-radius: 2.5px;
+  }
+
+  #testnetLinkDetail {
+    display: inline;
+    color: #0000004f;
+    text-transform: uppercase;
+    padding-left: 5px;
+    font-weight: 600;
+  }
+
+  #rpcURLNotice {
+    display: flex;
+    background: #e45f4000;
+    color: #ffffffe0;
+  }
+
+  #rpcURLTitle {
+    align-self: flex-start;
+    text-transform: uppercase;
+    color: #ffffff85;
+    padding-bottom: 5px;
+  }
+
+  #rpcURL {
+    height: 100%;
+    width: 100%;
+    display: flex;
+    background: #fb634091;
+    color: #332d2d;
+    font-weight: 600;
+    margin-bottom: 0px;
+  }
+
+  #rpcURLText {
+    display: flex;
+    flex-wrap: wrap;
+    font-weight: 600;
+    color: var(--ce-color-orange);
+    align-self: center;
+    line-height: 1.25;
+  }
+
+  #copyLinkButton {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    background-color: transparent;
+
+    #copyButtonBeforePress {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: #0000007a;
+      background: transparent;
+      border: none;
+    }
+
+    #copyButtonAfterPress {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-weight: 700;
+      text-transform: uppercase;
+      background: transparent;
+      border: none;
+    }
+  }
+}
+
+#testnetFaucetNotice {
+  width: 100%;
+  display: flex;
+  flex-direction: column-reverse;
+  justify-content: space-evenly;
+  border-radius: var(--ce-radius-7);
+  font-weight: 600;
+  margin-bottom: 0px;
+  margin-top: 10px;
+  #testETHFaucetLink {
+    text-transform: uppercase;
+    font-weight: 600;
+    text-decoration: underline;
+    color: var(--ce-color-white);
+  }
+
+  #faucetLinkAndDetail {
+    width: 100%;
+    display: flex;
+    align-self: center;
+    align-items: center;
+    justify-content: center;
+    align-content: center;
+  }
+
+  #faucetButton {
+    width: 100%;
+    color: var(--ce-color-black);
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    justify-items: center;
+    align-items: center;
+    align-content: center;
+    background-color: #f7f1f1d1;
+    text-transform: uppercase;
+    font-weight: 600;
+    padding: 6px;
+    border-radius: 2.5px;
+  }
+
+  #testnetLinkDetail {
+    display: inline;
+    color: #0000004f;
+    text-transform: uppercase;
+    padding-left: 5px;
+    font-weight: 600;
+  }
+
+  #rpcURLNotice {
+    display: flex;
+    background: #e45f4000;
+    color: #ffffffe0;
+  }
+
+  #rpcURLTitle {
+    align-self: flex-start;
+    text-transform: uppercase;
+    color: #ffffff85;
+    padding-bottom: 5px;
+  }
+
+  #rpcURL {
+    width: 100%;
+    display: flex;
+    background: #16b749;
+    color: #332d2d;
+    margin-bottom: 5px;
+    font-weight: 600;
+    margin-bottom: 0px;
+  }
+
+  #rpcURLText {
+    display: flex;
+    flex-wrap: wrap;
+    font-weight: 600;
+    color: #146923;
+    align-self: center;
+    line-height: 1.25;
+  }
+}
+
+#copyLinkButton {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  background-color: transparent;
+
+  #copyButtonBeforePress {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: #0000007a;
+    background: transparent;
+    border: none;
+  }
+
+  #copyButtonAfterPress {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-weight: 700;
+    text-transform: uppercase;
+    background: transparent;
+    border: none;
+  }
+}
+
+#downloadMetamaskLink {
+  display: inline;
+  color: var(--ce-color-orange);
+}
+
+#testETHFaucetLink { }
+
+#web3ModalLoginText {
+  font-weight: 600;
+  font-size: 50px;
+  margin-bottom: 10px;
+  padding-left: 20px;
+}
+
+/* --- MetamaskLoginButton.jsx --- */
+
+@media (min-width: 0px) and (max-width: 319px) {
+  #modalMetamaskButton {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: var(--ce-color-orange);
+    color: var(--ce-color-white);
+
+    #metamaskConnectText {
+      font-size: 1.5em;
+      color: var(--ce-color-white);
+      margin-top: 0.5em;
+      margin-bottom: 0.5em;
+    }
+  }
+
+  #modalMetamaskSmallButton {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    background: #d9791d69;
+    padding: 10px 10px 10px 10px;
+    margin-right: 10px;
+    margin-left: 10px;
+    margin-top: 10px;
+
+    #metamaskConnectText {
+      font-size: 1.25em;
+      color: var(--ce-color-white);
+      margin-left: 10px;
+      margin-top: 0px;
+      margin-bottom: 0px;
+    }
+  }
+
+  #metamaskInstructions {
+    width: 100% !important;
+  }
+}
+
+@media (min-width: 320px) and (max-width: 465px) {
+  #modalMetamaskButton {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: var(--ce-color-orange);
+    color: var(--ce-color-white);
+
+    #metamaskConnectText {
+      font-size: 2em;
+      color: var(--ce-color-white);
+      margin-top: 0.5em;
+    }
+  }
+
+  #modalMetamaskSmallButton {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    background: #d9791d69;
+    padding: 10px 15px 10px 15px;
+    margin-right: 10px;
+    margin-left: 10px;
+    margin-top: 10px;
+
+    #metamaskConnectText {
+      font-size: 1.35em;
+      color: var(--ce-color-white);
+      margin-top: 0px;
+      margin-bottom: 0px;
+      margin-left: 10px;
+    }
+  }
+
+  #metamaskInstructions {
+    width: 100% !important;
+    margin-bottom: 10px;
+  }
+}
+
+@media (min-width: 466px) and (max-width: 768px) {
+  #modalMetamaskButton {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: var(--ce-color-orange);
+    color: var(--ce-color-white);
+
+    #metamaskConnectText {
+      font-size: 2em;
+      color: var(--ce-color-white);
+      margin-top: 0.5em;
+    }
+  }
+
+  #modalMetamaskSmallButton {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-evenly;
+    background: #d9791d69;
+    padding: 15px 15px 15px 15px;
+    margin-right: 15px;
+    margin-left: 15px;
+    margin-top: 15px;
+
+    #metamaskConnectText {
+      font-size: 1.75em;
+      color: var(--ce-color-white);
+      margin-top: 0px;
+      margin-bottom: 0px;
+    }
+  }
+
+  #metamaskInstructions {
+    width: 100% !important;
+    margin-bottom: 15px;
+  }
+}
+
+@media (min-width: 769px) and (max-width: 1366px) {
+  #modalMetamaskButton {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: var(--ce-color-orange);
+    color: var(--ce-color-white);
+
+    #metamaskConnectText {
+      font-size: 2em;
+      color: var(--ce-color-white);
+      margin-top: 0.5em;
+    }
+  }
+
+  #modalMetamaskSmallButton {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    background: #d9791d69;
+    padding: 15px 15px 15px 15px;
+    margin-right: 15px;
+    margin-left: 15px;
+    margin-top: 15px;
+
+    #metamaskConnectText {
+      font-size: 2em;
+      color: var(--ce-color-white);
+      margin-top: 0px;
+      margin-bottom: 0px;
+      padding-left: 10px;
+    }
+  }
+
+  #metamaskInstructions {
+    width: 50%;
+    margin-bottom: 0px;
+    margin-right: 20px;
+  }
+}
+
+@media (min-width: 1367px) {
+  #modalMetamaskButton {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: var(--ce-color-orange);
+    color: var(--ce-color-white);
+  }
+
+  #metamaskConnectText {
+    font-size: 2em;
+    color: var(--ce-color-white);
+    margin-top: 0.5em;
+  }
+
+  #modalMetamaskSmallButton {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    background: #d9791d69;
+    padding: 15px 15px 15px 15px;
+    margin-right: 15px;
+    margin-left: 15px;
+    margin-top: 15px;
+
+    #metamaskConnectText {
+      font-size: 2em;
+      color: var(--ce-color-white);
+      margin-top: 0px;
+      margin-bottom: 0px;
+      padding-left: 10px;
+    }
+  }
+
+  #metamaskInstructions {
+    width: 50%;
+    margin-bottom: 0px;
+  }
+}
+
+#modalMetamaskButton {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+}
+
+#modalMetamaskSmallButton {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  background: var(--ce-color-orange);
+  #metamaskModalIcon {
+    height: 30px;
+    width: 30px;
+  }
+
+  #metamaskConnectText {
+    color: var(--ce-color-white);
+  }
+}
+
+#metamaskModalIcon {
+  margin-left: 5px;
+  margin-right: 5px;
+  margin-top: 10px;
+  margin-bottom: 10px;
+  height: 60px;
+  width: 60px;
+}
+
+/* --- LoginAndSettingsModal.jsx --- */
+
+#verifyingText {
+  color: var(--ce-color-white) !important;
+  opacity: 0.75 !important;
+}
+
+@media (min-width: 320px) and (max-width: 465px) {
+  #accountModalCard {
+    padding: 0px;
+  }
+
+  #accountModalPanel {
+    padding: 0px;
+  }
+
+  #loginNotice {
+    width: 100%;
+  }
+}
+
+@media (min-width: 466px) and (max-width: 768px) {
+  #accountModalCard {
+    padding: 5px;
+    margin-top: 0px;
+  }
+
+  #accountModalPanel {
+    padding: 5px;
+  }
+
+  #loginNotice {
+    width: 100%;
+  }
+}
+
+@media (min-width: 769px) and (max-width: 1366px) {
+  #accountModalPanel {
+    padding: 10px;
+    margin-top: 0px;
+  }
+
+  #loginNotice {
+    width: 100%;
+  }
+}
+
+@media (min-width: 1367px) {
+  #accountModalPanel {
+    padding: 25px;
+  }
+
+  #loginNotice {
+    width: 100%;
+  }
+}
+
+#accountModalPanel {
+  background: #a39ce763;
+  border-radius: var(--ce-radius-15);
+  position: relative;
+  z-index: 3;
+}
+
+.Web3SettingsModalTitle {
+  margin-left: 15px;
+  margin-top: 15px;
+  font-family: var(--ce-font-ui);
+  letter-spacing: 6px;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: #9cafff;
+  font-size: 2.5em;
+  opacity: 0.5;
+}
+
+.Web3SettingsModalSubtitle {
+  padding: 15px 0px 15px 15px;
+  margin-left: 15px;
+  margin-top: 15px;
+  font-family: var(--ce-font-ui);
+  letter-spacing: 6px;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: #9cafff;
+  font-size: 2.5em;
+  opacity: 0.5;
+}
+
+#settingsShortText {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-content: center;
+  font-family: var(--ce-font-mono);
+  font-size: 1.5em;
+}
+
+#loginNotice {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 10px;
+  margin-bottom: 0px;
+  background: #ed1c1ca6;
+  border: solid 3px #fe0635;
+  border-radius: var(--ce-radius-15);
+  font-weight: 525;
+  margin-right: 20px;
+  margin-left: 20px;
+  letter-spacing: normal !important;
+  text-transform: none !important;
+}
+
+#loadingIconContainer {
+  display: flex;
+  flex-direction: row;
+  min-height: 200px;
+  align-items: center;
+  justify-content: center;
+  h3 {
+    color: #1d2951;
+    text-transform: lowercase;
+    font-size: 4em;
+    margin-right: 0.5em;
+    font-weight: 600;
+  }
+
+  #verifyingTXloadingIcon {
+    color: #1d2951;
+    font-size: 5em;
+  }
+}
+
+#metamaskModalPanel {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  div {
+    display: flex;
+    flex-direction: row;
+    button:nth-child(2) {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+  }
+}
+
+#userModalAddress {
+  display: flex;
+  align-items: center;
+  font-size: 1.75rem;
+  margin-left: 15px;
+}
+
+.copyButton {
+  background: none;
+  border: none;
+  color: var(--ce-color-white);
+  cursor: pointer;
+  margin-left: 10px;
+  font-size: 1rem;
+  &:hover,
+  &:focus {
+    outline: none;
+    color: var(--ce-color-info);
+  }
+}
+
+#torusWalletRow {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+}
+
+#settingsFooter {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+#preLoginFooter {
+  padding-top: 0;
+  border-top: none;
+}
+
+.preLoginSettingsShell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+  width: 100%;
+}
+
+.preLoginSettingsTopRow {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  width: 100%;
+}
+
+.preLoginSettingsGear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: var(--ce-radius-pill);
+  background: transparent;
+  color: rgba(244, 247, 255, 0.65);
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition:
+    color 0.2s ease,
+    transform 0.2s ease,
+    background-color 0.2s ease;
+
+  &:hover,
+  &:focus-visible {
+    color: var(--ce-color-accent);
+    background: rgba(255, 255, 255, 0.06);
+    transform: rotate(12deg);
+    outline: none;
+  }
+}
+
+.preLoginSettingsPanel {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(23, 25, 65, 0.92);
+  text-align: left;
+}
+
+.preLoginSettingsSummaryContainer {
+  padding: 0;
+  margin: 0;
+}
+
+.preLoginSettingsConfigPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.preLoginSettingsTitle {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: rgba(229, 231, 235, 0.68);
+}
+
+.preLoginSettingsField {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.preLoginSettingsLabel {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(229, 231, 235, 0.72);
+}
+
+.preLoginSettingsInput {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: var(--ce-radius-10);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.04);
+  color: #f8fbff;
+  font-family: var(--ce-font-mono);
+  font-size: 0.84rem;
+
+  &::placeholder {
+    color: rgba(229, 231, 235, 0.42);
+  }
+
+  &:focus {
+    outline: none;
+    border-color: rgba(77, 255, 164, 0.72);
+    box-shadow: 0 0 0 2px rgba(77, 255, 164, 0.18);
+  }
+}
+
+.preLoginSettingsHint {
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: rgba(229, 231, 235, 0.68);
+}
+
+.preLoginSettingsActions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.networkSwitchButton {
+  background: transparent;
+  font-weight: 600;
+  padding: 15px;
+  font-size: 1.15em;
+  color: var(--ce-color-white);
+  text-transform: uppercase;
+  border: var(--ce-color-white) 1px solid;
+  border-radius: var(--ce-radius-10);
+  opacity: 0.5;
+  transition:
+    opacity 0.3s,
+    color 0.3s;
+  margin: 10px 0;
+
+  &:hover {
+    opacity: 1;
+  }
+
+  &.glow {
+    animation: none;
+    text-shadow: none;
+  }
+}
+
+.networkInfo {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-content: center;
+  flex: 0 1 auto;
+  min-width: 0;
+  font-family: var(--ce-font-mono);
+  font-size: 1.5em;
+}
+
+.networkLabel {
+  color: var(--ce-color-white);
+  font-size: 1em;
+  margin-right: 5px;
+}
+
+.networkValue {
+  font-family: var(--ce-font-mono);
+}
+
+.infoIcon {
+  margin-left: 5px;
+  color: var(--ce-color-white);
+  cursor: pointer;
+  opacity: 0.7;
+  transition: opacity 0.3s;
+  &:hover {
+    opacity: 1;
+  }
+}
+
+.networkTooltip :global(.tooltip) {
+  z-index: 2205 !important;
+}
+
+.settingsContainer {
+  display: flex !important;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  align-items: center;
+  justify-content: space-between;
+  grid-gap: 12px;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 16px;
+  margin-right: 20px;
+  margin-left: 20px;
+}
+
+.settingsRow {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  // justify-content: space-between;
+  justify-content: space-around;
+  align-items: center;
+  gap: 12px;
+  flex: 1 1 100%;
+  width: 100%;
+}
+
+.faucetContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+.faucetActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.faucetActionButton {
+  opacity: 1;
+}
+
+.faucetStatus {
+  max-width: 320px;
+  font-size: 0.76rem;
+  line-height: 1.45;
+  color: rgba(229, 231, 235, 0.86);
+}
+
+.faucetStatusSuccess {
+  color: #a7ffd0;
+}
+
+.faucetStatusError {
+  color: #ffd3d3;
+}
+
+.txLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #9bd0ff;
+  font-size: 0.8rem;
+  text-decoration: none;
+
+  &:hover,
+  &:focus-visible {
+    color: #d4ebff;
+    text-decoration: underline;
+    outline: none;
+  }
+}
+
+.txLinkIcon {
+  font-size: 0.78rem;
+}
+
+.aiSettingsToggleButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+  flex: 0 0 auto;
+  max-width: 100%;
+}
+
+.tooltipsToggleControl {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  max-width: 100%;
+}
+
+.tooltipsToggleButton {
+  justify-content: center;
+}
+
+.tooltipsToggleInfoIcon {
+  margin-left: 0;
+  flex: 0 0 auto;
+}
+
+.settingsSessionSummary {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.settingsSessionRoute {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 6px;
+  border-radius: var(--ce-radius-pill);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(18, 21, 52, 0.58);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.04),
+    0 8px 24px rgba(8, 12, 36, 0.18);
+}
+
+.settingsSessionLabel {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 10px;
+  // background: rgba(120, 156, 228, 0.78);
+  color: #eef4ff;
+  border-radius: 8px;
+  font-family: var(--ce-font-mono);
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  flex: 0 0 auto;
+}
+
+.settingsSessionName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #f8fbff;
+  font-family: var(--ce-font-mono);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.settingsSessionLink {
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  color: rgba(238, 244, 255, 0.86);
+  background: rgba(255, 255, 255, 0.08);
+  transition:
+    background-color 0.18s ease,
+    color 0.18s ease,
+    transform 0.18s ease;
+
+  &:hover,
+  &:focus-visible {
+    color: #f8fbff;
+    background: rgba(120, 156, 228, 0.26);
+    transform: translateY(-1px);
+    outline: none;
+    text-decoration: none;
+  }
+}
+
+.aiSettingsToggleIcon {
+  margin-left: 0;
+  opacity: 0.8;
+}
+
+@media (max-width: 768px) {
+  .settingsRow {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .networkInfo {
+    flex: 0 1 auto;
+    text-align: center;
+  }
+
+  .settingsSessionSummary {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .settingsSessionRoute {
+    justify-content: center;
+  }
+
+  .aiSettingsToggleButton {
+    flex-basis: 100%;
+    width: 100%;
+    justify-content: center;
+  }
+
+  .tooltipsToggleControl {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .tooltipsToggleButton {
+    flex: 1 1 auto;
+  }
+}
+
+.aiSettingsPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+  padding: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 18px;
+  background: rgba(23, 25, 65, 0.92);
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.25);
+}
+
+.supportedResourcesGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 12px;
+}
+
+.supportedResourceCard {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.supportedResourceHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.supportedResourceName {
+  font-size: 1.08rem;
+  font-weight: 700;
+  color: #f8fbff;
+}
+
+.supportedResourceDetail {
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: rgba(229, 231, 235, 0.74);
+}
+
+.supportedResourceSessions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.supportedResourceSessionsLabel {
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(229, 231, 235, 0.6);
+}
+
+.supportedResourcePrimarySession {
+  min-width: 0;
+}
+
+.supportedResourceExtraSessions {
+  padding-top: 2px;
+}
+
+.supportedResourceMoreButton {
+  width: fit-content;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #7bffb6;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: color 0.2s ease, opacity 0.2s ease;
+
+  &:hover,
+  &:focus-visible {
+    color: #a7ffd0;
+    opacity: 1;
+    outline: none;
+  }
+}
+
+.supportedResourceMoreChevron {
+  font-size: 0.9em;
+}
+
+.aiSettingsSummaryStrip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.aiSettingsSummaryCard {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.aiSettingsSummaryLabel {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: rgba(229, 231, 235, 0.68);
+}
+
+.aiSettingsSummaryLabelRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.aiSettingsSummaryInfoIcon {
+  margin-left: 0;
+  font-size: 0.82rem;
+}
+
+.aiSettingsSummaryValue,
+.aiSettingsSummaryValueRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-family: var(--ce-font-mono);
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: #f8fbff;
+}
+
+.aiSettingsSummaryDetail {
+  font-size: 0.76rem;
+  line-height: 1.5;
+  color: rgba(229, 231, 235, 0.72);
+}
+
+.settingsSectionCard {
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(9, 11, 31, 0.32);
+  overflow: hidden;
+}
+
+.settingsSectionToggle {
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border: none;
+  background: transparent;
+  color: #f8fbff;
+  text-align: left;
+}
+
+.settingsSectionTitleGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.settingsSectionTitle {
+  font-family: var(--ce-font-ui);
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.settingsSectionSummary {
+  font-size: 0.78rem;
+  color: rgba(229, 231, 235, 0.72);
+}
+
+.settingsSectionChevron {
+  margin-top: 2px;
+  color: rgba(229, 231, 235, 0.78);
+}
+
+.settingsSectionBody {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 0 16px 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.settingsSectionLead {
+  font-size: 0.82rem;
+  line-height: 1.55;
+  color: rgba(229, 231, 235, 0.78);
+}
+
+.aiSettingsInlineToggle,
+.aiSettingsToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  padding: 7px 11px;
+  border-radius: var(--ce-radius-pill);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.04);
+  color: #f8fbff;
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
+}
+
+.aiSettingsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 12px;
+}
+
+.aiSettingsRow {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: 12px;
+  border-radius: var(--ce-radius-12);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.aiSettingsRowFull {
+  grid-column: 1 / -1;
+}
+
+.aiSettingsLabel {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(229, 231, 235, 0.72);
+}
+
+.aiSettingsInput,
+.aiSettingsSelect,
+.aiSettingsTextarea {
+  width: 100%;
+  background: rgba(7, 10, 28, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #f8fbff;
+  border-radius: var(--ce-radius-10);
+  padding: 9px 11px;
+  font-size: 0.86rem;
+  font-family: var(--ce-font-mono);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+.aiSettingsInput:focus,
+.aiSettingsSelect:focus,
+.aiSettingsTextarea:focus {
+  outline: none;
+  border-color: rgba(77, 255, 164, 0.82);
+  box-shadow: 0 0 0 2px rgba(77, 255, 164, 0.14);
+}
+
+.aiSettingsInput:disabled,
+.aiSettingsSelect:disabled,
+.aiSettingsTextarea:disabled {
+  color: rgba(229, 231, 235, 0.62);
+  background: rgba(7, 10, 28, 0.4);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.aiSettingsTextarea {
+  min-height: 88px;
+  resize: vertical;
+}
+
+.aiPresetSelect {
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.aiSessionDefault {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 14px;
+  border-radius: var(--ce-radius-12);
+  border: 1px solid rgba(77, 255, 164, 0.24);
+  background: rgba(77, 255, 164, 0.08);
+  color: #f8fbff;
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.aiReasoningControl,
+.aiPerTaskSection {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.aiReasoningButtons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.aiReasoningBtn {
+  min-width: 88px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: var(--ce-radius-pill);
+  background: rgba(7, 10, 28, 0.72);
+  color: #f8fbff;
+  padding: 8px 14px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  transition: border-color 0.2s ease, background-color 0.2s ease, color 0.2s ease, opacity 0.2s ease;
+}
+
+.aiReasoningBtn:hover:not(:disabled),
+.aiReasoningBtn:focus-visible:not(:disabled) {
+  border-color: rgba(77, 255, 164, 0.55);
+  outline: none;
+}
+
+.aiReasoningBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.aiReasoningBtnActive {
+  background: var(--ce-color-accent);
+  border-color: var(--ce-color-accent);
+  color: #1f2733;
+}
+
+.aiAdvancedToggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--ce-radius-12);
+  background: rgba(9, 11, 31, 0.36);
+  color: #f8fbff;
+  font-family: var(--ce-font-ui);
+  font-size: 0.84rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-align: left;
+}
+
+.aiPerTaskRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(180px, 220px);
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border-radius: var(--ce-radius-12);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(7, 10, 28, 0.36);
+}
+
+.aiSettingsFooterRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.aiSettingsActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.aiSettingsStatus {
+  font-size: 0.76rem;
+  line-height: 1.5;
+  color: rgba(229, 231, 235, 0.76);
+}
+
+.aiSettingsHint {
+  font-size: 0.74rem;
+  line-height: 1.45;
+  color: rgba(229, 231, 235, 0.64);
+}
+
+.aiSettingsHintStrong {
+  font-size: 0.76rem;
+  color: rgba(229, 231, 235, 0.78);
+}
+
+.sponsorshipGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(235px, 1fr));
+  gap: 12px;
+}
+
+.sponsorshipCard {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  padding: 12px;
+  border-radius: var(--ce-radius-12);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.sponsorshipCardHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.sponsorshipResourceName {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #f8fbff;
+}
+
+.sponsorshipDetail {
+  margin-top: 3px;
+  font-size: 0.76rem;
+  line-height: 1.5;
+  color: rgba(229, 231, 235, 0.68);
+}
+
+.sponsorshipBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sponsorshipMetaLabel {
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(229, 231, 235, 0.6);
+}
+
+.sponsorshipGateText {
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: rgba(248, 251, 255, 0.82);
+}
+
+.sessionPills,
+.aiSettingsScopePills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.sessionPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: var(--ce-radius-pill);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.05);
+  color: #f8fbff;
+  font-size: 0.76rem;
+}
+
+.sessionPillActive {
+  border-color: rgba(77, 255, 164, 0.55);
+  background: rgba(77, 255, 164, 0.12);
+}
+
+.sessionPillMeta {
+  color: rgba(229, 231, 235, 0.62);
+  font-size: 0.7rem;
+}
+
+.aiSponsoredStatus {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  padding: 4px 10px;
+  border-radius: var(--ce-radius-pill);
+  border: 1px solid currentColor;
+  background: rgba(255, 255, 255, 0.04);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 0.65rem;
+}
+
+.aiSponsoredStatusok {
+  color: #7bffb6;
+}
+
+.aiSponsoredStatuswarn {
+  color: #ffcc7b;
+}
+
+.aiSponsoredStatusmuted {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+@media (max-width: 768px) {
+  .aiSettingsPanel {
+    padding: 12px;
+  }
+
+  .settingsSectionToggle {
+    padding: 12px 14px;
+  }
+
+  .settingsSectionBody {
+    padding: 0 14px 14px;
+  }
+
+  .aiSettingsFooterRow {
+    align-items: flex-start;
+  }
+
+  .aiPerTaskRow {
+    grid-template-columns: 1fr;
+  }
+}
+
+.sendTestnetFundsButton {
+  background: transparent;
+  font-weight: 600;
+  padding: 10px;
+  font-size: 1.15em;
+  color: var(--ce-color-white);
+  text-transform: uppercase;
+  border: var(--ce-color-white) 1px solid;
+  border-radius: var(--ce-radius-10);
+  opacity: 0.5;
+}
+
+.networkInfo {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.clearCacheButton {
+  display: flex;
+  justify-self: center;
+  align-self: center;
+  align-content: center;
+  justify-content: center;
+  // Base style for clear cache buttons, primarily for post-login version
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: var(--ce-radius-4);
+  transition:
+    background-color 0.2s ease-in-out,
+    border-color 0.2s ease-in-out,
+    color 0.2s ease-in-out,
+    opacity 0.2s ease-in-out;
+  cursor: pointer;
+  // Default appearance for post-login
+  color: #ffc107;
+  background-color: transparent;
+  border: 1px solid #ffc107;
+  max-width: 200px;
+  opacity: 0.1;
+  &:hover {
+    color: var(--ce-color-dark);
+    background-color: #ffc107;
+    border-color: #e0a800;
+    opacity: 1;
+  }
+
+  &:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+  }
+}
+
+.clearCacheButtonPreLogin {
+  display: flex;
+  justify-self: center;
+  align-self: center;
+  align-content: center;
+  justify-content: center;
+  // Base style for clear cache buttons, primarily for pre-login version
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: var(--ce-radius-4);
+  transition:
+    background-color 0.2s ease-in-out,
+    border-color 0.2s ease-in-out,
+    color 0.2s ease-in-out,
+    opacity 0.2s ease-in-out;
+  cursor: pointer;
+  margin-bottom: 15px;
+  // Default appearance for pre-login
+  color: #ffc107;
+  background-color: transparent;
+  border: 1px solid #ffc107;
+  max-width: 200px;
+  opacity: 0.1;
+  &:hover {
+    color: var(--ce-color-dark);
+    background-color: #ffc107;
+    border-color: #e0a800;
+    opacity: 1;
+  }
+
+  &:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+  }
+}
+
+.accountModalBody {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 2rem;
+  width: 100%;
+  flex-direction: column;
+  position: relative;
+  z-index: 3;
+  // On larger screens, display side-by-side
+  @media (min-width: 769px) {
+    flex-direction: row;
+        flex-wrap: wrap;
+        justify-content: center;
+  }
+}
+
+.accountModalProfileShell {
+  min-width: 0;
+}
+
+.accountModalControls {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  width: 100%;
+  position: relative;
+  z-index: 3;
+  @media (min-width: 769px) {
+    width: auto;
+    flex-shrink: 0;
+  }
+
+  .walletButton,
+  .disconnectButton {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    font-size: 1.25em;
+    font-weight: 600;
+    opacity: 0.8;
+
+    @media (min-width: 769px) {
+      font-size: 1.5em;
+      font-weight: 600;
+      opacity: 0.8;
+    }
+  }
+}
+
+@media (max-width: 600px) {
+  .accountModalBody {
+    align-items: stretch;
+    gap: 1rem;
+    padding: 1rem 0.75rem;
+  }
+
+  .accountModalProfileShell {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: hidden;
+  }
+
+  .accountModalProfileShell > * {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+}
+
+/* --- Torus Widget Iframe --- */
+
+#torusIframe {
+  width: 390px;
+  height: 320px;
+  border: #ffffff00;
+  border-width: 1px;
+  border-radius: var(--ce-radius-20);
+  border-style: solid;
+  display: none;
+}
+
+/* --- LoginAndSettingsModal.jsx (continued) --- */
+
+/// Overrides for wallet-connect modal
+
+#w3a-modal {
+  // Target the main text elements like sign-in, descriptions, and labels
+  .w3ajs-header__title,
+  .w3ajs-header__subtitle,
+  .w3a-group__label,
+  .w3ajs-email-login__info,
+  .w3ajs-footer__text,
+  a {
+    color: var(--ce-color-border) !important;
+  }
+
+  // Target the text inside the social login buttons
+  .w3a-adapter-item button p {
+    color: var(--ce-color-border) !important;
+  }
+
+  // Target the text inside the main continue button
+  .w3ajs-email-login__button span {
+    color: #555 !important;
+  }
+}
+
+.p-ml2 {
+  color: var(--ce-color-black);
+}
+
+.p .ml-2 {
+  color: var(--ce-color-black) !important;
+}
+
+.w3a-parent-container {
+  color: var(--ce-color-black) !important;
+}
+
+.w3a-parent-container .ml-2 {
+  color: var(--ce-color-black) !important;
+}
+
+.w3a-parent-container .ml-2 svg {
+  color: var(--ce-color-black) !important;
+  fill: var(--ce-color-black) !important;
+}
+
+#w3a-modal
+  > div
+  > div.w3a-modal__content.w3ajs-content
+  > div.w3ajs-social-logins.w3a-group
+  > ul
+  > li.col-span-6.w3a-adapter-item
+  > button
+  > p {
+  color: var(--ce-color-black) !important;
+}
+
+.accountWarningContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: left;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: 16px;
+  width: 100%;
+  max-width: 90vw;
+  position: relative;
+  z-index: 3;
+  isolation: isolate;
+}
+
+.accountWarningIconsRow {
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 1.5em;
+  gap: 16px;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.7;
+  color: #cfd3e0;
+  margin-bottom: 12px;
+  max-width: 100%;
+}
+
+.accountWarningIcon {
+  font-size: 28px;
+  line-height: 1;
+  flex: 0 0 auto;
+}
+
+.accountWarningMessage {
+  max-width: 100%;
+  background: rgb(15 12 40 / 46%);
+  border: none;
+  border-radius: var(--ce-radius-10);
+  padding: 14px 16px;
+  margin-bottom: 14px;
+  line-height: 1.45;
+  font-size: 1.25rem;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  color: #e6e9f2;
+  width: 100%;
+  max-width: 560px;
+  box-shadow:
+    0 10px 18px rgba(6, 8, 22, 0.3),
+    inset 0 0 0 1px rgba(120, 140, 190, 0.12);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.accountWarningMessage p {
+  margin: 0 0 8px 0;
+  margin-bottom: 20px;
+  margin-top: 10px;
+}
+
+.accountWarningMessage ul {
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+.accountWarningMessage li {
+  margin: 4px 0;
+  font-weight: 600;
+  margin-bottom: 15px;
+  color: #01a6ff;
+}
+
+/* Link styling inside warning message */
+.accountWarningMessage a {
+  color: #a9c4ff;
+  font-weight: 700;
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+  border-bottom: none;
+  transition:
+    color 0.2s ease,
+    text-decoration 0.2s ease;
+}
+.accountWarningMessage a:hover,
+.accountWarningMessage a:focus {
+  color: #c1d4ff;
+}
+.accountWarningMessage a:focus-visible {
+  outline: 2px dotted currentColor;
+  outline-offset: 2px;
+}
+
+.accountWarningOkButton {
+  min-width: 120px;
+  font-weight: 600;
+  background-color: #05a6ff;
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .accountWarningMessage {
+    background: rgba(12, 16, 40, 0.86);
+  }
+}
+
+/* Narrow breakpoint: tighten paddings/fonts and scale icons down to prevent horizontal scroll */
+@media (max-width: 480px) {
+  #w3a-container {
+    display: unset !important;
+    padding: 0 !important;
+    color: var(--ce-color-black) !important;
+  }
+
+  .w3a-parent-container #w3a-modal {
+    display: unset !important;
+    padding: 0 !important;
+  }
+
+  .accountWarningContainer {
+    padding: 12px;
+    max-width: 90vw;
+  }
+  .accountWarningIcon {
+    font-size: 24px;
+  }
+  .accountWarningMessage {
+    font-size: 1.4em;
+    padding: 12px;
+  }
+}
+
+// For phone-view, we want this to display differently
+
+/* Wallet modal fixes: readable label and mobile centering */
+:global(#w3a-modal .w3a-adapter-item > button p.ml-2),
+:global(#w3a-modal .w3a-adapter-item > button p) {
+  color: #111 !important;
+}
+
+@media (max-width: 480px) {
+  /* Center the wallet modal on small screens */
+  :global(#w3a-modal) {
+    display: flex !important;
+  }
+
+  :global(.w3a-parent-container #w3a-modal) {
+    display: unset !important;
+    padding: 0px !important;
+    margin-top: 150px;
+  }
+}
+
+/* --- Modal Overlap Fix (z-index) --- */
+/* Keep LoginAndSettingsModal above banners */
+:global(.modal-login) {
+  z-index: 2100 !important;
+}
+
+:global(.modal-login .close) {
+  background: transparent;
+  background-color: transparent !important;
+  border: 0;
+  box-shadow: none;
+}
+
+:global(.modal-login .close:hover),
+:global(.modal-login .close:focus) {
+  background: transparent;
+}
+
+:global(.modal.modal-login) .web3ModalDialog {
+  width: 100%;
+  max-width: min(92vw, 920px) !important;
+  height: auto !important;
+  margin: 0.5rem auto !important;
+}
+
+@media (min-width: 576px) {
+  :global(.modal.modal-login) .web3ModalDialog {
+    margin: 1.75rem auto !important;
+  }
+}
+
+.web3ModalContent {
+  width: 100%;
+}
+
+#loginModalCard {
+  position: relative;
+  z-index: 2101;
+  overflow: hidden;
+}
+
+#loginModalCard::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+#loginModalCard::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 20% 0%, rgba(255, 255, 255, 0.08), transparent 55%);
+  z-index: 0;
+  pointer-events: none;
+}
+
+#loginModalCard > * {
+  position: relative;
+  z-index: 1;
+}
+
+.cryptoLoginLink {
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin-top: 8px;
+  display: inline-block;
+  color: #cfd3e0;
+  opacity: 0.5;
+  text-decoration: none;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s ease-in-out;
+  &:hover,
+  &:focus {
+    opacity: 0.7;
+    text-decoration: none;
+  }
+
+  &:active {
+    opacity: 0.85;
+  }
+
+  &:focus-visible {
+    outline: 2px dotted currentColor;
+    outline-offset: 2px;
+  }
+}
+
+/* Hide provider UI and ephemeral wallet iframe only during silent rehydration */
+body.w3a-silent #w3a-modal,
+body.w3a-silent .w3a-modal__backdrop,
+body.w3a-silent iframe[id^='walletIframe-'],
+body.w3a-silent iframe[class^='walletIframe-'] {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+.passkeyButtonContainer {
+  margin-top: 25px;
+  width: 100%;
+  display: flex;
+  flex-direction: row;
+  gap: 20px;
+  justify-content: center;
+  align-items: stretch;
+  position: relative;
+  z-index: 3;
+  /* Mobile optimization: stack if screen is very narrow, otherwise side-by-side */
+  @media (max-width: 350px) {
+    flex-direction: column;
+    align-items: center;
+  }
+}
+
+.passkeyButton {
+  border-radius: var(--ce-radius-20);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  font-weight: 700;
+  font-size: 1.1em;
+  white-space: normal;
+  line-height: 1.2;
+  color: #f2f4ff;
+  border: 1px solid rgba(120, 140, 190, 0.22);
+  transition:
+    transform 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease,
+    opacity 0.2s;
+  box-shadow:
+    -3px 3px 6px rgba(8, 12, 36, 0.62),
+    3px -3px 8px rgba(120, 150, 220, 0.22);
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow:
+      -4px 4px 10px rgba(8, 12, 36, 0.68),
+      4px -4px 12px rgba(120, 140, 190, 0.2);
+    border-color: rgba(140, 170, 220, 0.35);
+    color: #f7f9ff;
+  }
+
+  &:focus,
+  &:focus-visible {
+    outline: 2px solid rgba(140, 170, 220, 0.3);
+    outline-offset: 2px;
+    border-color: rgba(140, 170, 220, 0.35);
+    color: #f7f9ff;
+  }
+
+  &:active {
+    transform: translateY(1px);
+    box-shadow:
+      -1px 1px 4px rgba(8, 12, 36, 0.5),
+      1px -1px 4px rgba(120, 140, 190, 0.15);
+    color: #f7f9ff;
+  }
+}
+
+.passkeyButtonPrimary {
+  background-color: #2b2f55;
+  background-image: linear-gradient(150deg, #2f345e, #1f2344);
+  border-color: rgba(120, 140, 190, 0.22);
+  color: #f2f4ff;
+  box-shadow:
+    -3px 3px 6px rgba(8, 12, 36, 0.62),
+    3px -3px 8px rgba(120, 140, 190, 0.2);
+  &:hover {
+    background-color: #323760;
+    box-shadow:
+      -4px 4px 10px rgba(8, 12, 36, 0.68),
+      4px -4px 12px rgba(120, 140, 190, 0.22);
+    border-color: rgba(140, 170, 220, 0.35);
+    color: #f7f9ff;
+  }
+
+  &:focus,
+  &:active {
+    color: #f7f9ff;
+  }
+}
+
+.passkeyButtonOutline {
+  background-color: rgba(22, 26, 54, 0.6);
+  background-image: linear-gradient(150deg, rgba(36, 42, 84, 0.7), rgba(18, 22, 48, 0.55));
+  border: 1px solid rgba(120, 140, 190, 0.28);
+  color: #f2f4ff;
+  backdrop-filter: blur(5px);
+  &:hover {
+    background-color: rgba(28, 34, 70, 0.72);
+    border-color: rgba(140, 170, 220, 0.4);
+    color: #f7f9ff;
+  }
+
+  &:focus,
+  &:active {
+    color: #f7f9ff;
+  }
+}
+
+.cryptoLoginLink {
+  background: rgba(18, 22, 50, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 30px;
+  padding: 12px 24px;
+  margin: 30px auto 10px auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: #eef1ff;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 1.2rem;
+  cursor: pointer;
+  opacity: 1;
+  transition:
+    transform 0.2s ease-in-out,
+    background-color 0.2s ease-in-out,
+    border-color 0.2s ease-in-out,
+    color 0.2s ease-in-out,
+    opacity 0.2s ease-in-out;
+  width: 100%;
+  max-width: 320px;
+  box-shadow:
+    -3px 3px 6px rgba(8, 12, 36, 0.55),
+    3px -3px 8px rgba(120, 150, 220, 0.25);
+  backdrop-filter: blur(6px);
+  &:hover,
+  &:focus {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.4);
+    color: #f7f9ff;
+    text-decoration: none;
+    transform: translateY(-1px);
+    box-shadow:
+      -5px 5px 10px rgba(8, 12, 36, 0.65),
+      5px -5px 12px rgba(120, 150, 220, 0.3);
+  }
+
+  &:active {
+    transform: translateY(1px);
+    opacity: 0.8;
+    box-shadow:
+      -2px 2px 6px rgba(8, 12, 36, 0.5),
+      2px -2px 6px rgba(120, 150, 220, 0.2);
+  }
+}
+
+.cryptoLoginIcon {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .networkSwitchButton.glow {
+    animation: none !important;
+    text-shadow: none;
+  }
+
+  .networkSwitchButton,
+  .clearCacheButton,
+  .clearCacheButtonPreLogin,
+  .cryptoLoginLink,
+  .accountWarningMessage a,
+  .passkeyButton,
+  .passkeyButtonPrimary,
+  .passkeyButtonOutline {
+    transition-duration: 0.01ms !important;
+  }
+
+  .passkeyButton:hover,
+  .passkeyButton:active,
+  .passkeyButtonPrimary:hover,
+  .passkeyButtonOutline:hover,
+  .cryptoLoginLink:hover,
+  .cryptoLoginLink:active {
+    transform: none !important;
+  }
+}

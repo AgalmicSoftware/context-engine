@@ -1,0 +1,62 @@
+.jsonContainer {
+  margin-top: 8px;
+}
+
+.toggleButton {
+  display: inline-flex;
+  align-items: center;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: rgba(244, 247, 255, 0.8);
+  padding: 6px 12px;
+  border-radius: var(--ce-radius-6);
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-family: var(--ce-font-mono);
+  transition:
+    border-color 0.2s ease,
+    color 0.2s ease;
+
+  &:hover {
+    border-color: rgba(77, 255, 164, 0.4);
+  }
+}
+
+.jsonBody {
+  position: relative;
+  margin-top: 6px;
+}
+
+.copyButton {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: rgba(244, 247, 255, 0.7);
+  padding: 4px 8px;
+  border-radius: var(--ce-radius-4);
+  cursor: pointer;
+  z-index: 1;
+  transition:
+    color 0.2s ease,
+    border-color 0.2s ease;
+
+  &:hover {
+    color: var(--ce-color-accent);
+  }
+}
+
+.jsonPre {
+  margin: 0;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--ce-radius-8);
+  padding: 12px;
+  overflow: auto;
+  font-size: 0.8rem;
+  color: rgba(244, 247, 255, 0.85);
+  white-space: pre-wrap;
+  word-break: break-all;
+  font-family: var(--ce-font-mono);
+}

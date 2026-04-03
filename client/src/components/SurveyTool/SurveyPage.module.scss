@@ -1,0 +1,22 @@
+#bannerImageContainer {
+  margin-left: 20px;
+  margin-right: 20px;
+}
+
+#bannerImage {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  margin-top: 10px;
+  margin-bottom: 10px;
+  opacity: 0.55; // background: linear-gradient(90deg, #5f86f2, #a65ff2, #f25fd0, #f25f61, #f2cb5f, #abf25f, #5ff281, #5ff2f0);
+  // background-blend-mode: initial;
+  // mix-blend-mode: difference;
+  // border: 5px transparent solid;
+  border-radius: var(--ce-radius-15); // mix-blend-mode: saturation;
+  // padding-top: 20px;
+  // padding-bottom: 20px;
+  // padding-left: 20px;
+  // padding-right: 20px;
+}

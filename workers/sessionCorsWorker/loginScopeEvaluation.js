@@ -1,0 +1,62 @@
+import {
+  resolveLoginGateAuthority,
+} from './loginGateAuthority.js';
+
+export const computeLoginScopes = async ({
+  address,
+  config,
+  registryAddress,
+  registryRpcUrls,
+  registrySlug,
+  sessionCheck,
+  resourceKeys,
+  deps,
+} = {}) => {
+  const keys = Array.isArray(resourceKeys) ? resourceKeys : [];
+  const gateResults = await (
+    deps?.resolveLoginGateAuthority || resolveLoginGateAuthority
+  )({
+    address,
+    config,
+    registryAddress,
+    registryRpcUrls,
+    registrySlug,
+    sessionCheck,
+    resourceKeys: keys,
+    deps: {
+      readResourceGateOnChain: deps?.readResourceGateOnChain,
+      resolveRpcUrlListForGate: deps?.resolveRpcUrlListForGate,
+      checkSbtGate: deps?.checkSbtGate,
+      probeRpcUrls: deps?.probeRpcUrls,
+      readRegistryCodeOnChain: deps?.readRegistryCodeOnChain,
+      maskRpcUrl: deps?.maskRpcUrl,
+      toChainId: deps?.toChainId,
+      toStr: deps?.toStr,
+      log: deps?.log,
+    },
+  });
+
+  if (!gateResults.default) {
+    throw new Error('Access denied: default gate failed.');
+  }
+
+  const scopes = {
+    ai: !!gateResults.ai,
+    arweave: !!gateResults.arweave,
+    transcribe: !!gateResults.ai,
+    faucet: !!gateResults.txGas,
+    fetch: !!gateResults.rpc,
+    lit: !!gateResults.lit,
+  };
+
+  const scopeOverrides = config?.scopes && typeof config.scopes === 'object' ? config.scopes : null;
+  if (scopeOverrides) {
+    Object.keys(scopes).forEach((key) => {
+      if (typeof scopeOverrides[key] === 'boolean') {
+        scopes[key] = scopes[key] && scopeOverrides[key];
+      }
+    });
+  }
+
+  return scopes;
+};

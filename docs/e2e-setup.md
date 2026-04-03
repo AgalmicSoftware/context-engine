@@ -1,0 +1,365 @@
+# E2E Workflow Tests (OP Sepolia + Local UI)
+
+The stripped `release-public` OSS copy intentionally omits the repo-level E2E workflow entrypoints under `scripts/test-*.js`, `scripts/test-*.ui.js`, and `scripts/lib/e2e/`. This runbook is for the full dev repo or a restored private pack, not the stripped public release artifact.
+
+This repo now includes an expanded CE E2E runner set for:
+- Session setup
+- SBT create/collect/boundary behavior
+- Session/SBT doc encryption paths
+- Survey encryption authoring/response matrices
+- Gate lifecycle + worker scope matrix checks
+- Full-app navigation smoke coverage
+- Deterministic AI smoke coverage (CompareAddresses + PolisReport)
+- Dev/E2E Agent Mode (JSON-driven actions)
+
+Arweave is public and permanent. Use non-identifying payloads only.
+
+## Prereqs
+
+- Local app at `http://127.0.0.1:3000` (override with `BASE_URL`)
+- Playwright + Chromium (or `PLAYWRIGHT_EXECUTABLE_PATH`)
+- Testnet RPC + funded deterministic wallets for onchain mode
+  - For OP Sepolia reliability, prefer a reliable keyed RPC via `RPC_URL` when available. Public gateways (Pocket/PATH, publicnode, and other anonymous endpoints)
+    are rate-limited and can cause flaky `getLogs`/handshake timeouts (and noisy `[RPC_DEBUG] PATH RPC failed` console output).
+- For Arweave doc flows: `ARWEAVE_JWK_PATH=/abs/path/to/arweave-test.jwk.json`
+  - Generate one locally with `npm run -s arweave:jwk:generate -- --output .keys/arweave-test-wallet.jwk.json`
+  - Copy/paste create + show funding address: `npm run -s arweave:jwk:generate -- --output .keys/arweave-test-wallet.jwk.json && npm run -s arweave:jwk:inspect -- --input .keys/arweave-test-wallet.jwk.json`
+  - Generate a testnet EVM faucet/admin key with `npm run -s evm:key:generate -- --output .keys/faucet-op-sepolia.key`
+  - Show the public address for an existing EVM key with `npm run -s evm:key:address -- --input .keys/deployer-op-sepolia.key`
+  - Print the same prefilled Cloudflare token-request link used by the wizard with `npm run -s cloudflare:token-link -- --slug <session-slug>`
+
+## Recommended Setup
+
+1. `cp .env.e2e.example .env.e2e`
+2. Set at minimum:
+   - `RPC_URL`
+   - `WORKER_URL` (recommended for determinism; runners can fall back to on-chain/global defaults)
+   - `ARWEAVE_JWK_PATH` (required for doc upload/decrypt flows)
+     - Verify the configured key with `npm run -s arweave:jwk:inspect -- --expect-address <known-address>`
+   - For Session Wizard custom-worker flows:
+     - `CLOUDFLARE_API_TOKEN`
+     - `FAUCET_PRIVATE_KEY` or `E2E_FAUCET_PRIVATE_KEY` (optional, for prefilled faucet secret field)
+     - `E2E_OPENAI_KEY` when running real deploy verification with `E2E_AI_MOCK=0`
+   - Ensure the deterministic wallet you use (derived from `PASSKEY_RAW_ID_B64URL`) is funded on the target chain.
+   - For multi-wallet Polis seeding, keep walletA funded; walletB/C/D/E are auto-topped-up by the runner when below threshold.
+3. Run `npm run -s test:e2e` (suite) or any `ai:*` command; the scripts auto-load `.env.e2e.local`, then `.env.e2e`.
+
+Committed E2E scripts do not read fallback secrets from `.e2e-secrets/*`; use env, `.env.e2e.local`, `.env.e2e`, or `E2E_ENV_FILE`.
+
+Optional:
+- `E2E_ENV_FILE=/abs/path/to/custom.env npm run ai:test-survey-authoring:encryption-matrix`
+- `E2E_ENV_DEBUG=1 npm run ai:test-survey-authoring:encryption-matrix`
+
+## Common Env Vars
+
+All new runners accept this common surface:
+- `AI_RUN_TAG`
+- `BASE_URL`
+- `CHAIN_ID`
+- `RPC_URL` (recommended: a reliable keyed endpoint for OP Sepolia)
+- `SESSION_REGISTRY`
+- `SBT_FACTORY`
+- `SESSION_SLUG`
+- `NO_CLEANUP=1` (optional)
+
+Optional RPC controls (UI-only):
+- `E2E_PREFER_PATH_RPC=1` re-enables Pocket-first PATH ordering inside the browser. E2E defaults to disabling this so the UI
+  prefers the configured `RPC_URL`/public fallbacks instead of hitting Pocket gateways first.
+- `E2E_RPC_CACHE_DISABLED=1` disables the client RPC read-cache during the UI run (useful for worst-case RPC demand checks).
+- `E2E_RPC_DEBUG_TRACE=1` captures stack snippets in RPC debug entries (larger reports, slower).
+- `E2E_RPC_LOG_PROVIDER_SUCCESS=1` logs the serving RPC endpoint per successful call.
+- Navigation smoke RPC threshold assertions (enabled by default):
+  - `E2E_RPC_ASSERT_ENABLED=1|0`
+  - `E2E_RPC_ASSERT_MAX_TOTAL` (default `7000`)
+  - `E2E_RPC_ASSERT_MAX_ERRORS` (default `6000`)
+  - `E2E_RPC_ASSERT_MAX_GETLOGS_NETWORK` (default `250`)
+  - `E2E_RPC_ASSERT_MAX_ERROR_RATIO` (default `0.95`)
+- Navigation smoke refresh-resume assertions (disabled by default):
+  - `E2E_NAV_RESUME_ASSERT_ENABLED=1|0`
+  - `E2E_NAV_RESUME_PROGRESS_BLOCKS` (checkpoint advance target before refresh; default `20000`)
+  - `E2E_NAV_RESUME_TIMEOUT_MS` (wait budget for checkpoint advance; default `240000`)
+  - `E2E_NAV_RESUME_POST_RELOAD_WAIT_MS` (post-refresh settle wait; default `12000`)
+  - `E2E_NAV_RESUME_MIN_START_BLOCK_DELTA` (assert resumed start > baseline; default `1`)
+  - `E2E_NAV_RESUME_MAX_SECOND_GETLOGS_NETWORK` (optional absolute cap)
+  - `E2E_NAV_RESUME_MAX_SECOND_GETLOGS_NETWORK_DELTA` (optional cap on second-first delta)
+  - `E2E_NAV_RESUME_MAX_SECOND_GETLOGS_NETWORK_RATIO` (optional cap on second/first ratio)
+  - `E2E_NAV_RESUME_USE_FILTERED_GETLOGS=1|0` (optional; use filtered `eth_getLogs` counts for resume assertions instead of app-wide counts)
+  - `E2E_NAV_RESUME_FILTERED_SUMMARY_KEY` (optional; defaults to `questionDiscoveryGetLogs`)
+
+Dev/E2E UI toggles (seeded into localStorage by Playwright when enabled):
+- `E2E_LIT_MOCK=0` disables Lit network mocking (E2E defaults to mocking Lit for stability; set to `0` to run against real Lit nodes).
+- `E2E_NAV=1` enables the Dev/E2E nav overlay (TestID API-driven links).
+- `E2E_AI_MOCK=1` enables client-side deterministic AI mocks for E2E (no network).
+- `E2E_AGENT_MODE=1` enables Agent Mode (`window.__ceAgent`) for JSON-driven actions.
+- `E2E_ARWEAVE_MOCK=0|1` controls whether Arweave uploads/reads are real or mocked.
+  - Recommended default for `.env.e2e`: set it explicitly
+  - Typical stability default: `1`
+  - Use `0` when you want created sessions/questions to remain inspectable later in a normal browser.
+
+Session slug handoff:
+- Keep one slug across multiple commands with env: `SESSION_SLUG=<slug> npm run -s <command>`
+- Or pass CLI overrides (take precedence over env):
+  - `npm run -s ai:test-gates:any-all -- --session-slug <slug>`
+  - `npm run -s ai:seed-survey:question-types -- --session-slug <slug>`
+  - `npm run -s ai:test-gated-decrypt:all-types -- --session-slug <slug>`
+  - `npm run -s ai:test-doc-library:session -- --session-slug <slug>`
+  - `npm run -s ai:test-doc-library:session:filetypes -- --session-slug <slug>`
+- When not provided, runners generate timestamped slugs that include both `runTag` and a human tag (DD-Mon-YYYY-HH-MM-AM/PM) so it is obvious which runs happened first.
+
+Boundary runner mode:
+- `E2E_CHAIN_MODE=onchain|local` (`onchain` default)
+
+Arweave-required flows:
+- `ARWEAVE_JWK_PATH` is required for doc upload/decrypt flows
+- `ARWEAVE_JWK_PATH` (or `ARWEAVE_JWK_JSON` / `ARWEAVE_JWK`) is also required for session/content-producing manual-follow-up flows when `E2E_ARWEAVE_MOCK=0`, including:
+  - `ai:seed-survey:question-types`
+  - `ai:test-gated-decrypt:all-types`
+  - `ai:test-sbt-metadata-locks`
+  - `ai:test-survey-response:encryption-matrix`
+  - `ai:test-survey-gated-decrypt:any-all`
+
+## Worker URL Resolution + Bootstrap
+
+Runners that need the CORS worker will resolve a base URL in this order:
+1. CLI `--worker-url` (when supported), then env `WORKER_URL`
+2. On-chain `corsWorkerUrl` from the SessionRegistry for the `SESSION_SLUG` (http/https only; non-URL strings are ignored)
+3. Shared global fallback from client config (`CLOUDFLARE_CORS_WORKER_URL` in `client/src/variables/appConfig.js`, used for general/default-session fallback)
+
+Reuse-first behavior:
+- If `WORKER_URL` is set and works, runners will reuse it.
+- If `WORKER_URL` is set but broken, runners will try on-chain/global fallbacks and report which one was selected.
+
+Bootstrap behavior:
+- Runners probe `/auth/nonce` + `/auth/login` for the admin/holder wallet used by the flow.
+- If login fails because the worker is missing per-session config, runners attempt a single best-effort `/admin/set-config` and retry login.
+- If admin endpoints are disabled, the runner proceeds only if login works without bootstrapping.
+- Generated fresh-session runs should not silently borrow worker config from the legacy `ai-browseruse-75209033` slug.
+
+Allow-origins behavior:
+- Default: `WORKER_ALLOW_ORIGINS_MODE=open` (do not set an allowlist)
+- Strict: `WORKER_ALLOW_ORIGINS_MODE=strict` sets an allowlist derived from `BASE_URL` (plus localhost/127 variants)
+
+Playwright launch controls (optional):
+- `PLAYWRIGHT_BROWSER=chromium|firefox|webkit` (or `CE_PLAYWRIGHT_BROWSER`) chooses the browser engine for smoke/debug runs.
+- `PLAYWRIGHT_VIEWPORT=desktop|mobile|tablet|<width>x<height>` (or `CE_PLAYWRIGHT_VIEWPORT`) overrides the default UI viewport across the shared Playwright helper.
+- `PLAYWRIGHT_VIEWPORT_WIDTH` / `PLAYWRIGHT_VIEWPORT_HEIGHT` can override dimensions directly.
+- `PLAYWRIGHT_EXECUTABLE_PATH` explicit browser binary path.
+- `PLAYWRIGHT_HOST_PLATFORM_OVERRIDE` (example: `mac-arm64`) to pin host-platform resolution.
+- `PLAYWRIGHT_LAUNCH_ATTEMPTS`, `PLAYWRIGHT_LAUNCH_TIMEOUT_MS`, `PLAYWRIGHT_LAUNCH_BACKOFF_MS` for retry tuning.
+- `PLAYWRIGHT_LAUNCH_STRATEGY=explicit-only|multi`.
+- `PLAYWRIGHT_ALLOW_FALLBACK=1|0` (overrides strategy default).
+- `PLAYWRIGHT_WS_ENDPOINT` connect-mode endpoint for a shared Chromium server (see `node scripts/start-playwright-server.js`).
+- Default strategy behavior:
+  - macOS arm64: `explicit-only`
+  - other platforms: `multi`
+
+## `.e2e-cache/` (Setup/Assert Split)
+
+Some heavy runners cache setup artifacts in `.e2e-cache/` and reuse them when still valid.
+
+Controls:
+- `E2E_CACHE_DIR` (default: `.e2e-cache`)
+- `E2E_FORCE_SETUP=1` (ignore cache and redo setup)
+- `E2E_NO_CACHE=1` (disable cache reads/writes)
+- `E2E_CACHE_TTL_HOURS` (default: `168`)
+
+Cache validity is conservative (example checks include TTL, chainId/sessionSlug match, required IDs present, and deployed contract code existence).
+
+## Commands
+
+### Suite
+
+- `npm run -s test:e2e` (core suite; Playwright reuse)
+- `npm run -s test:e2e:quick` (alias for the encryption-gates suite)
+- `npm run -s test:e2e:quick:stability` (repeat the quick suite `E2E_STABILITY_RUNS` times; default `3`)
+- The suite runners prefer a shared Chromium server for stability and speed, but if `launchServer` fails on the host they now fall back to normal per-step browser launches instead of aborting before the first step.
+
+Suite flags:
+- `E2E_SUITE_PREFLIGHT_GATES=1 npm run -s test:e2e`
+- `E2E_SUITE_INCLUDE_DOCS=1 npm run -s test:e2e`
+- `E2E_SUITE_INCLUDE_SBT=1 npm run -s test:e2e`
+  - Includes `ai:test-sbt-create:variants`, `ai:test-sbt-metadata-locks`, `ai:test-sbt-collect:variants`, and `ai:test-sbt-contract:boundaries`
+- `E2E_SUITE_INCLUDE_SESSION_SETUP=1 npm run -s test:e2e`
+- `E2E_SUITE_INCLUDE_PROFILE_SBT_MULTI=1 npm run -s test:e2e`
+- `E2E_SUITE_INCLUDE_PROFILE_ACTIVITY_MULTI=1 npm run -s test:e2e`
+- `E2E_SUITE_INCLUDE_ADMIN=1 npm run -s test:e2e`
+- `E2E_SUITE_INCLUDE_AI=1 E2E_AI_MOCK=1 npm run -s test:e2e`
+- `E2E_SUITE_INCLUDE_AGENT=1 E2E_AGENT_MODE=1 E2E_AI_MOCK=1 npm run -s test:e2e`
+- `E2E_SUITE_CONTINUE=1 npm run -s test:e2e` (run all steps, then exit non-zero if any failed)
+
+Navigation is included in the default suite via `scripts/test-navigation-smoke.js`.
+
+### Session Wizard
+
+- `npm run -s ai:test-session-setup:default-worker`
+- `npm run -s ai:test-session-setup:custom-worker-secrets`
+- `npm run -s ai:test-session-setup:custom-worker-no-secrets`
+- `npm run -s ai:test-session-setup:sponsored-inline-sbt`
+
+Session Wizard env contract:
+- `CLOUDFLARE_API_TOKEN` is required for custom-worker deploy-helper flows
+- `FAUCET_PRIVATE_KEY` or `E2E_FAUCET_PRIVATE_KEY` can prefill the faucet secret field
+- `E2E_OPENAI_KEY` is required for real custom-worker deploy verification when `E2E_AI_MOCK=0`
+- In mock mode (`E2E_AI_MOCK=1`, default), the runner uses a placeholder OpenAI key only to satisfy UI validation
+
+`ai:test-session-setup:custom-worker-no-secrets` is intentionally stubbed right now:
+- Flow ID: `CE-E2E-SESSION-SETUP-CUSTOM-NO-SECRETS`
+- Blocker: no deterministic automated funding/provisioning path for BYOK custom worker resources
+- Behavior: exits 0 and returns JSON `{ ok: true, skipped: true, ... }` so it can be left in suites without failing them.
+
+### SBT
+
+- `npm run -s ai:test-sbt-create:variants`
+- `npm run -s ai:test-sbt-metadata-locks`
+- `npm run -s ai:test-sbt-collect:variants`
+- `npm run -s ai:test-sbt-contract:boundaries`
+- `npm run -s ai:test-sbt:onchain:all-functions`
+
+`ai:test-sbt-metadata-locks` covers the PRD 223 metadata-lock workflow:
+- provisions a helper gate SBT for the holder/admin wallet
+- creates a new locked SBT through the real `/sbts/<slug>` Create Group UI
+- smoke-checks the Create Group lock UX (all five lock rows, session-name gate labels, successful mint)
+- asserts the deployed SBT contract `name()` uses the public `CE-SBT-*` placeholder
+- asserts the tokenURI metadata does not leak plaintext `name` / `description` / `tags` / `documentURLs`
+- smoke-checks non-holder masked UX and holder decrypt UX on `/sbt/:address`
+
+Arweave modes for `ai:test-sbt-metadata-locks`:
+- default/stable: `E2E_ARWEAVE_MOCK=1`
+- live/manual follow-up: `E2E_ARWEAVE_MOCK=0 ARWEAVE_JWK_PATH=/abs/path/to/test-jwk.json`
+- live mode also expects a worker that can authenticate and upload for the chosen `SESSION_SLUG` (`WORKER_URL=...`)
+
+### Profile (`/u/:address`)
+
+- `npm run -s ai:test-profile:sbt-multi-session`
+- `npm run -s ai:test-profile:activity-multi-session`
+- Creates fresh sessions and fresh SBT contracts, mints to one deterministic holder, then verifies that `/u/:address` renders all expected SBT names and does not show `No SBTs collected.`.
+- Requires Session Wizard prerequisites (`ARWEAVE_JWK_PATH` or `ARWEAVE_JWK_JSON`/`ARWEAVE_JWK`).
+- Activity scan-mode runner verifies profile deep-scan telemetry for activity-only all-session override (`useAllSessionsActivityScan=true`, `useAllSessionsSbtScan=false`) and multi-session slug fanout for the target address.
+
+### Doc Library
+
+- `npm run -s ai:test-doc-library:session`
+- `npm run -s ai:test-doc-library:session:filetypes`
+- `npm run -s ai:test-doc-library:session:multi-gate`
+- `npm run -s ai:test-doc-library:url-records`
+
+### Survey / Gated Decrypt
+
+- `npm run -s ai:seed-survey:question-types`
+- `SESSION_SLUG=general2 npm run -s ai:seed-polis:binary-multi-wallet`
+- `npm run -s ai:test-gated-decrypt:all-types`
+  - Includes submit-latch regression checks in SurveyTool (full + pile): post-success button stays submitted (not `Submit (N)`), and a second click without edits does not retrigger submit.
+- `npm run -s ai:test-survey-authoring:encryption-matrix`
+- `npm run -s ai:test-survey-response:encryption-matrix`
+- `npm run -s ai:test-survey-gated-decrypt:any-all`
+- `npm run -s ai:test-question-filter:test-4`
+  - Runs deterministic API + UX assertions by default.
+  - API-only (no UI server required): `npm run -s ai:test-question-filter:test-4:api`
+  - UX-only: `npm run -s ai:test-question-filter:test-4:ux`
+
+### Navigation Smoke
+
+- `npm run -s ai:test-nav:smoke`
+- `npm run -s ai:test-nav:smoke:firefox`
+- `npm run -s ai:test-nav:smoke:mobile`
+- Nav smoke now records and asserts RPC demand thresholds from `debug.rpc` so regressions fail deterministically.
+- Optional refresh-resume probe:
+  - enable with `E2E_NAV_RESUME_ASSERT_ENABLED=1`
+  - writes checkpoint/start-block evidence under `debug.rpcResume` (includes
+    `questionsDiscoveryCheckpointBlock`, baseline/resumed start blocks, app-wide per-pass `eth_getLogs` network counts, and filtered per-pass counts from `questionDiscoveryGetLogs`)
+  - use the `E2E_NAV_RESUME_MAX_SECOND_GETLOGS_NETWORK*` envs for capped-call assertions.
+  - set `E2E_NAV_RESUME_USE_FILTERED_GETLOGS=1` to apply those capped-call assertions to filtered counts.
+
+### AI Smoke (Deterministic)
+
+These flows are intended to run with `E2E_AI_MOCK=1` for determinism:
+- `npm run -s ai:test-ai:invocations`
+
+### AI Smoke (Real Provider, Opt-in)
+
+To verify real provider wiring (non-deterministic output, slower, can fail if your worker has no AI secrets):
+- Ensure `WORKER_URL` points at a `sessionCorsWorker` with `scopes.ai=true` and provider keys configured (or set local AI keys in the UI).
+  - See: `docs/session-cors-worker.md`
+- Run without the client-side mock:
+  - `E2E_AI_MOCK=0 npm run -s ai:test-ai:invocations`
+  - `E2E_SUITE_INCLUDE_AI=1 E2E_AI_MOCK=0 npm run -s test:e2e`
+
+### Agent Mode (JSON-driven)
+
+Agent Mode is dev/e2e-only and exposes `window.__ceAgent` when enabled.
+
+Enable it either by:
+- query param `?agent=1` (example: `/agent?agent=1`)
+- or localStorage `ce-agent-enabled=1` (then reload)
+
+Smoke runner:
+- `npm run -s ai:test-agent:interface`
+
+Example JSON actions (works via `/agent` panel or `window.__ceAgent.run(...)`):
+```json
+[
+  { "type": "navigate", "to": "/compare/" },
+  { "type": "fill", "testId": "ce-compare-address-a", "value": "0x0000000000000000000000000000000000000001" },
+  { "type": "fill", "testId": "ce-compare-address-b", "value": "0x0000000000000000000000000000000000000002" },
+  { "type": "click", "testId": "ce-compare-run" },
+  { "type": "assertVisible", "testId": "ce-compare-result" },
+
+  { "type": "invokeAi", "tool": "PolisReport", "params": { "sessionSlug": "ai-browseruse-75209033" } }
+]
+```
+
+### Gate Lifecycle + Worker Scopes
+
+These are intentionally gate-modifying runners you can slot into larger sequences:
+- `npm run -s ai:test-gates:any-all`
+  - creates 2 fresh gate SBTs and verifies `Any` admits both distinct single-gate holders while `All` denies both single-gate holders and admits the wallet holding both.
+- `npm run -s ai:test-gate-revocation:decrypt`
+- `npm run -s ai:test-worker-scopes:matrix`
+
+### Admin (`/admin`)
+
+- `npm run -s ai:test-admin:gate-update` (updates the SessionRegistry default gate on-chain via the `/admin` UI as the admin wallet and asserts it is disabled for a non-admin wallet)
+
+Optional suite preflight:
+- `E2E_SUITE_PREFLIGHT_GATES=1 npm run -s test:e2e`
+  - runs `ai:test-gates:any-all` before the 3-flow encryption-gates suite.
+
+## Artifacts
+
+Each runner writes:
+- JSON report: `artifacts/session-workflows/<flow>-<runTag>.json`
+- Screenshot: `artifacts/screenshots/<flow>-<runTag>.png`
+- Error screenshot (UI failures): `artifacts/screenshots/<flow>-<runTag>-error.png`
+
+The suite runner (`npm run -s test:e2e`) also writes a suite-level report:
+- `artifacts/e2e-suites/e2e-suite-<runTag>.json`
+
+RPC measurement fields:
+- Per-flow JSON reports now include:
+  - `debug.rpc` (scan summary; totals/method counts/getLogs block-range groups)
+  - `debug.rpcByFilter` (optional filtered scan summaries when a flow requests them)
+  - `debug.rpcSnapshot` (raw method/outcome snapshot)
+  - `debug.rpcLegacy` (`window.__RPC_STATS__` high-level counters)
+- Suite report includes:
+  - `steps[].rpc` (per-step extracted summary, when available)
+  - `rpc` (aggregated totals across steps with metrics)
+
+Quick checks:
+- Per flow:
+  - `jq '.debug.rpc.totals, .debug.rpc.methods.eth_getLogs, .debug.rpc.getLogs.uniqueRanges' artifacts/session-workflows/<flow>-<runTag>.json`
+- Suite aggregate:
+  - `jq '.rpc.totals, .rpc.methods.eth_getLogs, .rpc.stepsMissingMetrics' artifacts/e2e-suites/e2e-suite-<runTag>.json`
+
+Standardized report top-level keys:
+- `flowId`
+- `runner`
+- `createdAt`
+- `runTag`
+- `chain`
+- `inputs`
+- `contracts`
+- `wallets`
+- `steps`
+- `assertions`
+- `cleanup`
+- `outputs`

@@ -1,0 +1,603 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+
+import { dispatchAdminRequest } from './adminRequestDispatch.js';
+
+const createJsonStub = () => (body, status, headers) => ({ body, status, headers });
+
+const createSignedBody = (overrides = {}) => ({
+  address: '0xabc',
+  message: 'signed-message',
+  signature: '0xsig',
+  ...overrides,
+});
+
+const createAdminDeps = (overrides = {}) => ({
+  json: createJsonStub(),
+  resolveAdminRequestAuthority: async () => ({
+    ok: true,
+    address: '0xabc',
+    existingConfig: { adminAddress: '0xabc' },
+    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
+    targetSlug: 'session-a',
+  }),
+  mergeWorkerConfigRecords: ({ existingConfig, incomingConfig, slug }) => ({
+    existingConfig,
+    incomingConfig,
+    slug,
+    merged: true,
+  }),
+  mergeWorkerLimitRecords: ({ existingConfig, incomingLimits, slug }) => ({
+    existingConfig,
+    incomingLimits,
+    slug,
+    merged: true,
+  }),
+  putSessionConfig: async () => {},
+  getSessionSecrets: async () => ({ openaiKey: 'sk-existing' }),
+  normalizeSecretValue: (value) => value,
+  putSessionSecrets: async () => {},
+  MISSING_SLUG_ERROR: 'Missing sessionSlug.',
+  ...overrides,
+});
+
+test('dispatchAdminRequest preserves invalid-json failure before signed request handling', async () => {
+  let authorityCalled = false;
+
+  const result = await dispatchAdminRequest({
+    request: {
+      json: async () => {
+        throw new Error('bad json');
+      },
+    },
+    env: { GROUP_KV: {} },
+    baseHeaders: { 'Access-Control-Allow-Origin': '*' },
+    slug: '',
+    action: 'set-config',
+    deps: createAdminDeps({
+      resolveAdminRequestAuthority: async () => {
+        authorityCalled = true;
+        return { ok: true };
+      },
+    }),
+  });
+
+  assert.equal(authorityCalled, false);
+  assert.deepEqual(result, {
+    body: { error: 'Invalid JSON.' },
+    status: 400,
+    headers: { 'Access-Control-Allow-Origin': '*' },
+  });
+});
+
+test('dispatchAdminRequest merges config and persists the result after authority resolution', async () => {
+  const calls = [];
+  const request = {
+    json: async () => createSignedBody({
+      config: { sessionName: 'Updated Session' },
+    }),
+  };
+  const env = { GROUP_KV: {} };
+  const baseHeaders = { 'Access-Control-Allow-Origin': '*' };
+
+  const result = await dispatchAdminRequest({
+    request,
+    env,
+    baseHeaders,
+    slug: 'env-slug',
+    action: 'set-config',
+    deps: createAdminDeps({
+      resolveAdminRequestAuthority: async (value) => {
+        assert.equal(value.request, request);
+        assert.equal(value.env, env);
+        assert.equal(value.body.config.sessionName, 'Updated Session');
+        assert.equal(value.slugHint, 'env-slug');
+        assert.equal(value.action, 'set-config');
+        assert.equal(value.baseHeaders, baseHeaders);
+        return {
+          ok: true,
+          existingConfig: null,
+          headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
+          targetSlug: 'session-a',
+        };
+      },
+      mergeWorkerConfigRecords: ({ existingConfig, incomingConfig, slug }) => {
+        calls.push(['mergeWorkerConfigRecords', existingConfig, incomingConfig, slug]);
+        return { merged: true, slug };
+      },
+      putSessionConfig: async (envArg, slugArg, configArg) => {
+        calls.push(['putSessionConfig', envArg, slugArg, configArg]);
+      },
+    }),
+  });
+
+  assert.deepEqual(calls, [
+    ['mergeWorkerConfigRecords', null, { sessionName: 'Updated Session' }, 'session-a'],
+    ['putSessionConfig', env, 'session-a', { merged: true, slug: 'session-a' }],
+  ]);
+  assert.deepEqual(result, {
+    body: { ok: true },
+    status: 200,
+    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
+  });
+});
+
+test('dispatchAdminRequest seeds bootstrap adminAddress from the top-level body when the first config patch omits it', async () => {
+  const calls = [];
+
+  const result = await dispatchAdminRequest({
+    request: {
+      json: async () => createSignedBody({
+        adminAddress: '0xabc',
+        config: {
+          allowOrigins: ['https://allowed.example'],
+        },
+      }),
+    },
+    env: { GROUP_KV: {} },
+    baseHeaders: { 'Access-Control-Allow-Origin': '*' },
+    slug: '',
+    action: 'set-config',
+    deps: createAdminDeps({
+      resolveAdminRequestAuthority: async () => ({
+        ok: true,
+        existingConfig: null,
+        headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
+        targetSlug: 'session-a',
+      }),
+      isAddress: (value) => value === '0xabc',
+      mergeWorkerConfigRecords: ({ existingConfig, incomingConfig, slug }) => {
+        calls.push(['mergeWorkerConfigRecords', existingConfig, incomingConfig, slug]);
+        return { merged: true, slug, incomingConfig };
+      },
+      putSessionConfig: async (envArg, slugArg, configArg) => {
+        calls.push(['putSessionConfig', envArg, slugArg, configArg]);
+      },
+    }),
+  });
+
+  assert.deepEqual(calls, [
+    ['mergeWorkerConfigRecords', null, {
+      allowOrigins: ['https://allowed.example'],
+      adminAddress: '0xabc',
+    }, 'session-a'],
+    ['putSessionConfig', { GROUP_KV: {} }, 'session-a', {
+      merged: true,
+      slug: 'session-a',
+      incomingConfig: {
+        allowOrigins: ['https://allowed.example'],
+        adminAddress: '0xabc',
+      },
+    }],
+  ]);
+  assert.deepEqual(result, {
+    body: { ok: true },
+    status: 200,
+    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
+  });
+});
+
+test('dispatchAdminRequest filters and normalizes allowed secrets before persisting', async () => {
+  const calls = [];
+
+  const result = await dispatchAdminRequest({
+    request: {
+      json: async () => createSignedBody({
+        secrets: {
+          openaiKey: '  sk-new  ',
+          arweaveJwk: { kty: 'RSA' },
+          litPayerPrivateKey: '  0xlit  ',
+          ignoredSecret: 'skip-me',
+        },
+      }),
+    },
+    env: { GROUP_KV: {} },
+    baseHeaders: { 'Access-Control-Allow-Origin': '*' },
+    slug: '',
+    action: 'set-secrets',
+    deps: createAdminDeps({
+      resolveAdminRequestAuthority: async () => ({
+        ok: true,
+        existingConfig: { adminAddress: '0xabc' },
+        headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
+        targetSlug: 'session-a',
+      }),
+      getSessionSecrets: async () => ({ openaiKey: 'sk-existing', customRpcUrl: 'https://rpc.example' }),
+      normalizeSecretValue: (value) => {
+        calls.push(['normalizeSecretValue', value]);
+        if (typeof value === 'string') return value.trim();
+        return JSON.stringify(value);
+      },
+      putSessionSecrets: async (env, targetSlug, secrets) => {
+        calls.push(['putSessionSecrets', env, targetSlug, secrets]);
+      },
+    }),
+  });
+
+  assert.deepEqual(calls, [
+    ['normalizeSecretValue', '  sk-new  '],
+    ['normalizeSecretValue', { kty: 'RSA' }],
+    ['normalizeSecretValue', '  0xlit  '],
+    ['putSessionSecrets', { GROUP_KV: {} }, 'session-a', {
+      openaiKey: 'sk-new',
+      customRpcUrl: 'https://rpc.example',
+      arweaveJwk: '{"kty":"RSA"}',
+      litPayerPrivateKey: '0xlit',
+    }],
+  ]);
+  assert.deepEqual(result, {
+    body: { ok: true },
+    status: 200,
+    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
+  });
+});
+
+test('dispatchAdminRequest reads Lit payer status via the helper route', async () => {
+  const result = await dispatchAdminRequest({
+    request: {
+      json: async () => createSignedBody({
+        litNetwork: 'naga-test',
+      }),
+    },
+    env: { GROUP_KV: {} },
+    baseHeaders: { 'Access-Control-Allow-Origin': '*' },
+    slug: '',
+    action: 'lit-status',
+    deps: createAdminDeps({
+      getSessionSecrets: async () => ({ litPayerPrivateKey: '0xlit' }),
+      readLitPayerStatus: async (value) => {
+        assert.deepEqual(value, {
+          litNetwork: 'naga-test',
+          litPayerPrivateKey: '0xlit',
+        });
+        return {
+          payerAddress: '0x00000000000000000000000000000000000000bb',
+          ready: true,
+          balance: { totalBalance: '1.0', availableBalance: '0.5' },
+          restriction: null,
+          delegatedUsersCount: 2,
+          litNetwork: 'naga-test',
+        };
+      },
+    }),
+  });
+
+  assert.deepEqual(result, {
+    body: {
+      ok: true,
+      payerAddress: '0x00000000000000000000000000000000000000bb',
+      ready: true,
+      balance: { totalBalance: '1.0', availableBalance: '0.5' },
+      restriction: null,
+      delegatedUsersCount: 2,
+      litNetwork: 'naga-test',
+    },
+    status: 200,
+    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
+  });
+});
+
+test('dispatchAdminRequest issues one-time sponsored deploy and faucet grants', async () => {
+  const kvCalls = [];
+  const env = {
+    DEPLOY_HELPER_ENABLED: '1',
+    GROUP_KV: {
+      put: async (key, value, opts) => {
+        kvCalls.push([key, JSON.parse(value), opts]);
+      },
+    },
+  };
+
+  const result = await dispatchAdminRequest({
+    request: {
+      json: async () => createSignedBody({
+        grantRequest: {
+          bootstrapWorkerUrl: 'https://source-worker.example',
+          expiresAt: '2099-03-21T12:00:00.000Z',
+          deploy: {
+            cloudflareApiToken: 'cf-sponsored-token',
+          },
+          faucet: {
+            faucetPrivateKey: ' 0xfaucet ',
+          },
+        },
+      }),
+    },
+    env,
+    baseHeaders: { 'Access-Control-Allow-Origin': '*' },
+    slug: '',
+    action: 'issue-sponsored-grants',
+    deps: createAdminDeps({
+      resolveAdminRequestAuthority: async () => ({
+        ok: true,
+        existingConfig: {
+          corsWorkerUrl: 'https://source-worker.example',
+          allowOrigins: ['https://allowed.example'],
+          faucet: { amountEth: '0.0002' },
+        },
+        headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
+        targetSlug: 'session-a',
+      }),
+      now: () => Date.parse('2099-03-20T12:00:00.000Z'),
+      normalizeSecretValue: (value) => String(value || '').trim(),
+    }),
+  });
+
+  assert.equal(result.status, 200);
+  assert.equal(result.headers['Access-Control-Allow-Origin'], 'https://allowed.example');
+  assert.equal(result.body.ok, true);
+  assert.equal(typeof result.body.deployGrantToken, 'string');
+  assert.equal(typeof result.body.faucetGrantToken, 'string');
+  assert.equal(result.body.bootstrapWorkerUrl, 'https://source-worker.example');
+  assert.equal(kvCalls.length, 2);
+  assert.deepEqual(kvCalls[0][2], { expirationTtl: 86400 });
+  assert.deepEqual(kvCalls[1][2], { expirationTtl: 86400 });
+  assert.deepEqual(kvCalls[0][1], {
+    type: 'deploy-worker',
+    sourceSessionSlug: 'session-a',
+    sourceConfig: {
+      corsWorkerUrl: 'https://source-worker.example',
+      allowOrigins: ['https://allowed.example'],
+      faucet: { amountEth: '0.0002' },
+    },
+    cloudflareApiToken: 'cf-sponsored-token',
+    issuedAt: '2099-03-20T12:00:00.000Z',
+    expiresAt: '2099-03-21T12:00:00.000Z',
+  });
+  assert.deepEqual(kvCalls[1][1], {
+    type: 'faucet-tx',
+    sourceSessionSlug: 'session-a',
+    sourceConfig: {
+      corsWorkerUrl: 'https://source-worker.example',
+      allowOrigins: ['https://allowed.example'],
+      faucet: { amountEth: '0.0002' },
+    },
+    faucetPrivateKey: '0xfaucet',
+    issuedAt: '2099-03-20T12:00:00.000Z',
+    expiresAt: '2099-03-21T12:00:00.000Z',
+  });
+});
+
+test('dispatchAdminRequest returns a CORS-safe error when sponsored grant persistence throws', async () => {
+  const result = await dispatchAdminRequest({
+    request: {
+      json: async () => createSignedBody({
+        grantRequest: {
+          bootstrapWorkerUrl: 'https://source-worker.example',
+          deploy: {
+            cloudflareApiToken: 'cf-sponsored-token',
+          },
+        },
+      }),
+    },
+    env: {
+      DEPLOY_HELPER_ENABLED: '1',
+      GROUP_KV: {
+        put: async () => {
+          throw new Error('KV write exploded');
+        },
+      },
+    },
+    baseHeaders: { 'Access-Control-Allow-Origin': '*' },
+    slug: '',
+    action: 'issue-sponsored-grants',
+    deps: createAdminDeps({
+      resolveAdminRequestAuthority: async () => ({
+        ok: true,
+        existingConfig: {
+          corsWorkerUrl: 'https://source-worker.example',
+          allowOrigins: ['https://allowed.example'],
+        },
+        headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
+        targetSlug: 'session-a',
+      }),
+    }),
+  });
+
+  assert.deepEqual(result, {
+    body: { error: 'KV write exploded' },
+    status: 500,
+    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
+  });
+});
+
+test('dispatchAdminRequest allows sponsored deploy grants without a standalone helper when embedded deploy-helper is enabled at deploy time', async () => {
+  const kvCalls = [];
+  const env = {
+    DEPLOY_HELPER_ENABLED: '1',
+    GROUP_KV: {
+      put: async (key, value, opts) => {
+        kvCalls.push([key, JSON.parse(value), opts]);
+      },
+    },
+  };
+
+  const result = await dispatchAdminRequest({
+    request: {
+      json: async () => createSignedBody({
+        grantRequest: {
+          bootstrapWorkerUrl: 'https://source-worker.example',
+          deploy: {
+            cloudflareApiToken: 'cf-sponsored-token',
+          },
+        },
+      }),
+    },
+    env,
+    baseHeaders: { 'Access-Control-Allow-Origin': '*' },
+    slug: '',
+    action: 'issue-sponsored-grants',
+    deps: createAdminDeps({
+      resolveAdminRequestAuthority: async () => ({
+        ok: true,
+        existingConfig: {
+          corsWorkerUrl: 'https://source-worker.example',
+          allowOrigins: ['https://allowed.example'],
+        },
+        headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
+        targetSlug: 'session-a',
+      }),
+      now: () => Date.parse('2099-03-20T12:00:00.000Z'),
+    }),
+  });
+
+  assert.equal(result.status, 200);
+  assert.equal(result.body.ok, true);
+  assert.equal(typeof result.body.deployGrantToken, 'string');
+  assert.equal(kvCalls.length, 1);
+  assert.equal(kvCalls[0][1].cloudflareApiToken, 'cf-sponsored-token');
+});
+
+test('dispatchAdminRequest rejects sponsored deploy grants when embedded deploy-helper was disabled at deploy time', async () => {
+  const result = await dispatchAdminRequest({
+    request: {
+      json: async () => createSignedBody({
+        grantRequest: {
+          bootstrapWorkerUrl: 'https://source-worker.example',
+          deploy: {
+            cloudflareApiToken: 'cf-sponsored-token',
+          },
+        },
+      }),
+    },
+    env: {
+      DEPLOY_HELPER_ENABLED: '0',
+      GROUP_KV: {},
+    },
+    baseHeaders: { 'Access-Control-Allow-Origin': '*' },
+    slug: '',
+    action: 'issue-sponsored-grants',
+    deps: createAdminDeps(),
+  });
+
+  assert.deepEqual(result, {
+    body: { error: 'Deploy grants require embedded deploy-helper to be enabled on the sponsoring worker.' },
+    status: 400,
+    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
+  });
+});
+
+test('dispatchAdminRequest ignores unexpected helper/account fields and still stores only the new deploy grant shape', async () => {
+  const kvCalls = [];
+
+  const result = await dispatchAdminRequest({
+    request: {
+      json: async () => createSignedBody({
+        grantRequest: {
+          deployHelperUrl: 'https://ignored-helper.example.workers.dev',
+          bootstrapWorkerUrl: 'https://source-worker.example',
+          deploy: {
+            cloudflareApiToken: 'cf-sponsored-token',
+            cloudflareAccountId: 'ignored-account-id',
+          },
+        },
+      }),
+    },
+    env: {
+      DEPLOY_HELPER_ENABLED: '1',
+      GROUP_KV: {
+        put: async (key, value, opts) => {
+          kvCalls.push([key, JSON.parse(value), opts]);
+        },
+      },
+    },
+    baseHeaders: { 'Access-Control-Allow-Origin': '*' },
+    slug: '',
+    action: 'issue-sponsored-grants',
+    deps: createAdminDeps(),
+  });
+
+  assert.equal(result.status, 200);
+  assert.equal(result.body.ok, true);
+  assert.equal(typeof result.body.deployGrantToken, 'string');
+  assert.equal(kvCalls.length, 1);
+  assert.equal(kvCalls[0][1].cloudflareApiToken, 'cf-sponsored-token');
+  assert.equal(Object.prototype.hasOwnProperty.call(kvCalls[0][1], 'deployHelperUrl'), false);
+  assert.equal(Object.prototype.hasOwnProperty.call(kvCalls[0][1], 'cloudflareAccountId'), false);
+});
+
+test('dispatchAdminRequest merges limits and persists the result for set-limits', async () => {
+  const calls = [];
+
+  const result = await dispatchAdminRequest({
+    request: {
+      json: async () => createSignedBody({
+        limits: {
+          perWalletPerDay: 5,
+          perIpPerHour: 8,
+        },
+      }),
+    },
+    env: { GROUP_KV: {} },
+    baseHeaders: { 'Access-Control-Allow-Origin': '*' },
+    slug: '',
+    action: 'set-limits',
+    deps: createAdminDeps({
+      resolveAdminRequestAuthority: async () => ({
+        ok: true,
+        existingConfig: { adminAddress: '0xabc', limits: { perWalletPerDay: 3 } },
+        headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
+        targetSlug: 'session-a',
+      }),
+      mergeWorkerLimitRecords: ({ existingConfig, incomingLimits, slug }) => {
+        calls.push(['mergeWorkerLimitRecords', existingConfig, incomingLimits, slug]);
+        return { merged: true, slug, incomingLimits };
+      },
+      putSessionConfig: async (env, targetSlug, config) => {
+        calls.push(['putSessionConfig', env, targetSlug, config]);
+      },
+    }),
+  });
+
+  assert.deepEqual(calls, [
+    ['mergeWorkerLimitRecords', { adminAddress: '0xabc', limits: { perWalletPerDay: 3 } }, {
+      perWalletPerDay: 5,
+      perIpPerHour: 8,
+    }, 'session-a'],
+    ['putSessionConfig', { GROUP_KV: {} }, 'session-a', {
+      merged: true,
+      slug: 'session-a',
+      incomingLimits: { perWalletPerDay: 5, perIpPerHour: 8 },
+    }],
+  ]);
+  assert.deepEqual(result, {
+    body: { ok: true },
+    status: 200,
+    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
+  });
+});
+
+test('dispatchAdminRequest returns explicit unknown-action failures after admin verification', async () => {
+  let putCalled = false;
+
+  const result = await dispatchAdminRequest({
+    request: {
+      json: async () => createSignedBody(),
+    },
+    env: { GROUP_KV: {} },
+    baseHeaders: { 'Access-Control-Allow-Origin': '*' },
+    slug: '',
+    action: 'not-a-route',
+    deps: createAdminDeps({
+      resolveAdminRequestAuthority: async () => ({
+        ok: true,
+        existingConfig: { adminAddress: '0xabc' },
+        headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
+        targetSlug: 'session-a',
+      }),
+      putSessionConfig: async () => {
+        putCalled = true;
+      },
+      putSessionSecrets: async () => {
+        putCalled = true;
+      },
+    }),
+  });
+
+  assert.equal(putCalled, false);
+  assert.deepEqual(result, {
+    body: { error: 'Unknown admin action.' },
+    status: 400,
+    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
+  });
+});

@@ -1,0 +1,74 @@
+name: Publish Worker Bundles
+
+on:
+  push:
+    branches:
+      - master
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish-worker-bundles:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            client/package-lock.json
+            workers/sessionCorsWorker/package-lock.json
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Install sessionCorsWorker dependencies
+        run: npm --prefix workers/sessionCorsWorker ci
+
+      - name: Build worker bundles
+        run: npm run worker:bundle
+
+      - name: Verify worker bundles
+        run: npm run verify:worker-bundle
+
+      - name: Compute release metadata
+        id: meta
+        run: |
+          SHORT_SHA="${GITHUB_SHA::7}"
+          RELEASE_STAMP="$(date -u +'%Y-%m-%d %H:%M UTC')"
+          TAG_NAME="worker-bundles-${GITHUB_RUN_NUMBER}-${SHORT_SHA}"
+          RELEASE_NAME="Worker bundles ${GITHUB_RUN_NUMBER} (${SHORT_SHA})"
+          {
+            echo "tag_name=${TAG_NAME}"
+            echo "release_name=${RELEASE_NAME}"
+            echo "release_stamp=${RELEASE_STAMP}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Publish GitHub release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.meta.outputs.tag_name }}
+          name: ${{ steps.meta.outputs.release_name }}
+          body: |
+            Automated worker bundle release for `${{ github.sha }}` on `${{ github.ref_name }}`.
+
+            Published assets:
+            - `sessionCorsWorker.bundle.js`
+            - `deployHelper.bundle.js`
+
+            Generated at: `${{ steps.meta.outputs.release_stamp }}`
+          files: |
+            dist/sessionCorsWorker.bundle.js
+            dist/deployHelper.bundle.js
+          fail_on_unmatched_files: true
+          overwrite_files: true

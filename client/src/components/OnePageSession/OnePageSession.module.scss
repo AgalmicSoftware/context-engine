@@ -1,0 +1,911 @@
+/* @file OnePageSession.module.scss */
+
+.onePageDemoContainer {
+  font-family: var(--ce-font-body);
+  font-size: 1rem;
+  line-height: 1.6;
+  color: #1a1a1a;
+  /* Light overall background (slightly tinted) so it doesn't conflict with main site color */
+  // background-color: rgba(145, 112, 222, 0.08);
+  padding: 20px;
+}
+
+/* Top header/branding area */
+.brandingSection {
+  /* Lighter violet background so logo is visible */
+  background-color: transparent;
+  border: 0px solid #bfa0f4;
+  border-radius: var(--ce-radius-8);
+  padding: 20px;
+  /* FLEX layout: blurb on left, image on right */
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  /* space between left blurb & right image */
+  flex-direction: column;
+  position: relative;
+  z-index: 30;
+}
+
+.titleContainer {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  color: var(--ce-color-white);
+  text-align: center;
+  margin-bottom: 5px !important;
+  position: relative;
+  z-index: 40;
+  transition: opacity 0.4s ease;
+  animation: fadeOutTitle 0.6s ease 5s forwards;
+
+  &:hover,
+  &:focus-within,
+  &:active {
+    animation: none;
+    opacity: 1;
+  }
+}
+
+#brandingSectionTitle {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  font-weight: 600;
+  /* Keep title muted without dimming tooltip children. */
+  color: rgba(255, 255, 255, 0.45);
+  opacity: 0.15;
+  margin-bottom: 0px !important;
+}
+
+.tooltip {
+  position: relative;
+  display: inline-block;
+  cursor: pointer;
+  font-size: 1.4em; // Ensure the container itself sits above standard content if needed,
+  // though the tooltiptext z-index is the critical part.
+  z-index: 1000;
+  opacity: 1;
+  > svg {
+    opacity: 0.1;
+    transition: opacity 0.25s ease;
+  }
+
+  &:hover > svg,
+  &:focus-within > svg {
+    opacity: 0.55;
+  }
+
+  .tooltiptext {
+    visibility: hidden;
+    width: 250px;
+    /* Slightly wider for better readability */
+    background-color: var(--ce-color-tooltip-bg) !important;
+    /* Force solid tooltip background */
+    color: var(--ce-color-tooltip-text) !important;
+    /* Ensure text is readable */
+    text-align: left;
+    border-radius: var(--ce-radius-6);
+    padding: 12px;
+    position: absolute;
+    z-index: 99999 !important;
+    /* Extremely high z-index */
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    /* Center alignment relative to icon */
+    margin-top: 10px;
+    opacity: 0;
+    transition: opacity 0.3s;
+    font-size: 1rem;
+    /* Increased font size */
+    line-height: 1.4;
+    box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.5);
+    /* improved shadow for "floating" effect */
+    pointer-events: none;
+    /* Prevents tooltip from blocking clicks if invisible */
+    /* Arrow/Triangle for the tooltip */
+    &::after {
+      content: '';
+      position: absolute;
+      bottom: 100%;
+      /* At the top of the tooltip */
+      left: 50%;
+      margin-left: -5px;
+      border-width: 5px;
+      border-style: solid;
+      border-color: transparent transparent var(--ce-color-tooltip-bg) transparent;
+    }
+
+    p {
+      margin: 0 0 10px 0;
+      &:last-child {
+        margin-bottom: 0;
+      }
+    }
+
+    /* Mobile Layout Default: Center on screen/icon (Good for Branding Title) */
+    @media only screen and (max-width: 600px) {
+      left: 50%;
+      right: auto;
+      transform: translateX(-50%);
+      text-align: center;
+      width: 280px;
+      max-width: 90vw;
+      &::after {
+        left: 50%;
+        right: auto;
+        margin-left: -5px;
+      }
+    }
+  }
+
+  &:hover .tooltiptext,
+  &:focus-within .tooltiptext {
+    visibility: visible;
+    opacity: 1 !important;
+  }
+}
+
+/* Make the Foresight logo bigger */
+.brandLogo {
+  max-width: 350px;
+  margin-bottom: 0px; // for Edge Logo
+  -webkit-filter: invert(100%);
+  /* Safari/Chrome */
+  filter: invert(100%);
+}
+
+/* Flex item for the text portion */
+.brandText {
+  flex: 1 1 auto;
+  /* allow it to expand */
+  font-size: 1.3rem;
+  line-height: 1.5;
+}
+
+/* Flex item for the header image portion */
+.brandImage {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.headerImage {
+  max-width: 300px;
+  margin-top: 12px;
+  margin-bottom: 0px;
+  mix-blend-mode: luminosity;
+}
+
+.eventBlurb {
+  font-size: 1.25rem;
+  line-height: 1.2;
+  padding: 15px;
+  border-radius: var(--ce-radius-6);
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+
+#blurbText {
+  line-height: 1.6;
+  padding: 20px;
+  font-weight: 500;
+  font-size: 1em;
+  margin: 20px;
+}
+
+/* Each collapsible section wrapper (Questions, Groups, Results) */
+.sectionContainer {
+  margin-bottom: 20px;
+  margin-top: 20px; // background-color: rgba(168, 116, 255, 0.08);
+  background-color: #5c58a630;
+  border: 0px solid #af95db;
+  padding: 20px;
+  border-radius: var(--ce-radius-6);
+}
+
+.sectionHeaderRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+
+.sectionHeader {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 10px;
+  cursor: pointer;
+  font-size: 2rem;
+  margin: 0;
+  font-weight: bold;
+  color: rgba(255, 255, 255, 0.75);
+  flex: 0 1 auto;
+  min-width: 0;
+  line-height: 1.1;
+
+  .tooltip .tooltiptext {
+    @media only screen and (max-width: 600px) {
+      left: auto;
+      right: -10px;
+      transform: none;
+      text-align: left;
+      &::after {
+        left: auto;
+        right: 15px;
+        margin-left: 0;
+      }
+    }
+  }
+}
+
+.sectionHeaderText {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.sectionHeaderTitle {
+  display: block;
+  max-width: 100%;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.sectionHeaderSubtitle {
+  display: block;
+  max-width: 100%;
+  font-size: 0.63em;
+  line-height: 1.12;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.25);
+}
+
+.sectionHeaderTooltip {
+  margin-left: 6px;
+  margin-top: 2px;
+  align-self: flex-start;
+  flex: 0 0 auto;
+}
+
+.sectionHeaderActionsScroller {
+  display: flex;
+  flex: 1 1 320px;
+  justify-content: flex-end;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
+.sectionHeaderActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: nowrap;
+  min-width: max-content;
+}
+
+.resultsModeActionsScroller {
+  min-width: 0;
+}
+
+.resultsModeActions {
+  min-width: max-content;
+}
+
+.sectionHeaderViewModeButton {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 50px;
+  min-width: 138px;
+  padding: 10px 20px;
+  background: linear-gradient(180deg, rgba(82, 78, 149, 0.72) 0%, rgba(50, 46, 102, 0.9) 100%);
+  color: rgba(255, 255, 255, 0.98);
+  font-size: 0.98rem;
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: 0.01em;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 999px;
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow: 0 10px 24px rgba(11, 13, 34, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  transition: transform 0.14s ease, background 0.18s ease, border-color 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
+
+  &:hover,
+  &:focus-visible {
+    background: linear-gradient(180deg, rgba(100, 95, 176, 0.82) 0%, rgba(63, 58, 127, 0.94) 100%);
+    border-color: rgba(255, 255, 255, 0.36);
+    color: var(--ce-color-white);
+    transform: translateY(-1px);
+    box-shadow: 0 14px 30px rgba(12, 14, 38, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    outline: none;
+  }
+}
+
+.sectionHeaderViewModeIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.sectionHeaderViewModeLabel {
+  display: inline-flex;
+  align-items: center;
+}
+
+.sectionHeaderViewModeButtonActive,
+.sectionHeaderViewModeButtonActive:hover,
+.sectionHeaderViewModeButtonActive:focus-visible {
+  background: linear-gradient(135deg, rgba(77, 255, 164, 0.24) 0%, rgba(94, 137, 255, 0.3) 54%, rgba(255, 255, 255, 0.2) 100%);
+  border-color: rgba(77, 255, 164, 0.7);
+  color: var(--ce-color-white);
+  box-shadow: 0 0 0 1px rgba(77, 255, 164, 0.28), 0 16px 32px rgba(10, 18, 44, 0.36), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.18);
+  transform: translateY(-1px);
+}
+
+@media only screen and (max-width: 1024px) {
+  .resultsModeActionsScroller {
+    flex: 1 1 100%;
+    width: 100%;
+    justify-content: flex-start;
+    overflow: visible;
+    padding: 0 10px;
+  }
+
+  .resultsModeActions {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    justify-content: stretch;
+    width: 100%;
+    min-width: 0;
+    gap: 10px;
+  }
+
+  .resultsModeActions .sectionHeaderViewModeButton {
+    width: 100%;
+    min-width: 0;
+    white-space: normal;
+    text-align: center;
+  }
+}
+
+.sectionHeaderActionButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 54px;
+  padding: 12px 20px;
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 1.08rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  border: 1px solid rgba(255, 255, 255, 0.34);
+  border-radius: var(--ce-radius-10);
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(12, 14, 38, 0.18);
+  transition: transform 0.14s ease, background 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+
+  &:hover,
+  &:focus-visible {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.62);
+    color: var(--ce-color-white);
+    transform: translateY(-1px);
+    outline: none;
+  }
+
+  svg {
+    font-size: 0.95em;
+  }
+}
+
+/* The content area inside each collapsible section */
+.miniSectionContent {
+  margin-top: 15px;
+  background: transparent; // border: 1px solid #bfa0f4;
+  padding: 15px;
+  border-radius: var(--ce-radius-4);
+}
+
+.miniSectionContentNoHeader {
+  margin-top: 0;
+  padding-top: 0;
+}
+
+.pileHeaderRow {
+  width: 100%;
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+
+.pileBackContainer {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+}
+
+.pileBackButton {
+  opacity: 0.6;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid rgba(191, 160, 244, 0.8);
+  background: rgba(58, 53, 110, 0.76);
+  color: rgba(255, 255, 255, 0.92);
+  border-radius: var(--ce-radius-pill);
+  padding: 14px 22px;
+  font-size: 1.35rem;
+  line-height: 1;
+  min-height: 58px;
+  min-width: 180px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.12s ease, background 0.18s ease, border-color 0.18s ease;
+  &:hover {
+    transform: translateY(-1px);
+    background: rgba(77, 68, 146, 0.84);
+    border-color: rgba(191, 160, 244, 1);
+  }
+
+  svg {
+    font-size: 1.25em;
+  }
+}
+
+.pileHeaderTitleWrap {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+  color: var(--ce-color-white);
+}
+
+.pileHeaderTitle {
+  opacity: 0.25;
+  margin: 0;
+  font-size: 2rem;
+  line-height: 1.1;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.pileHeaderTooltip {
+  font-size: 1.25rem;
+  > svg {
+    opacity: 0.45;
+  }
+
+  &:hover > svg,
+  &:focus-within > svg {
+    opacity: 0.8;
+  }
+}
+
+/* (Optional) older placeholder classes if needed */
+.surveySection {
+  background: transparent;
+  padding: 15px;
+  margin-bottom: 20px;
+  border-radius: var(--ce-radius-6);
+}
+.groupsSection {
+  background: transparent;
+  border: 1px solid #ddd;
+  padding: 15px;
+  border-radius: var(--ce-radius-6);
+}
+.miniSbtArea {
+  margin-top: 10px;
+  background: rgba(168, 116, 255, 0.05);
+  border: 1px solid #bfa0f4;
+  padding: 10px;
+  border-radius: var(--ce-radius-4);
+}
+
+/* Torus modal classes if still needed */
+.torusModalBackdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+.torusModal {
+  background: var(--ce-color-white);
+  border-radius: var(--ce-radius-8);
+  padding: 20px;
+  width: 320px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  text-align: center;
+  color: #111;
+}
+
+/* --------------------------------------------
+     NEW: Additional classes for "About" collapsible  --------------------------------------------- */
+.aboutContainer {
+  display: flex;
+  flex-direction: column;
+  flex-wrap: wrap;
+  background: #00ff1b80;
+  border-radius: var(--ce-radius-7);
+  margin-right: 15px;
+  margin-left: 15px;
+  padding: 20px;
+  color: var(--ce-color-white);
+  font-size: 1.65em;
+  margin-bottom: 15px;
+  margin-top: 15px;
+  font-weight: 600;
+  border: 1px var(--ce-color-bg) solid;
+  border-radius: var(--ce-radius-5);
+  box-shadow:
+    5px 5px 12px #0f102a,
+    -5px -5px 12px #1f2258;
+}
+
+.aboutHeader {
+  display: flex;
+  flex-direction: row-reverse;
+  align-self: center;
+  opacity: 0.75;
+  font-weight: 600;
+  color: var(--ce-color-white);
+  align-items: center;
+  text-transform: uppercase;
+  font-size: 1.2em;
+}
+
+.aboutContent {
+  font-size: 0.85em;
+  font-weight: 700;
+  color: var(--ce-color-white);
+}
+
+#aboutText {
+  font-weight: 600;
+}
+
+#aboutArrowIcon {
+  font-size: 2em;
+  margin-right: 20px;
+}
+
+/* -------------------------------------------
+     Responsive adjustments for smartphones
+     (example @media query for max-width: 600px)
+  ------------------------------------------- */
+@media only screen and (max-width: 600px) {
+  .onePageDemoContainer {
+    font-size: 1rem;
+    padding: 5px;
+  }
+
+  .brandingSection {
+    flex-direction: column;
+    padding: 10px;
+  }
+
+  #brandingSectionTitle {
+    font-size: 1.4rem;
+  }
+
+  .titleContainer {
+    /* FIXED: Replaced opacity with rgba to fix Z-index stacking context issue on mobile */
+    /* opacity: 0.5; */
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 0.9rem; // TODO: make a different title size for mobile and desktop
+  }
+
+  .brandLogo {
+    max-width: 250px;
+    margin-bottom: 0px; // below if for Edge Logo
+    -webkit-filter: invert(100%);
+    /* Safari/Chrome */
+    filter: invert(100%);
+    opacity: 0.25;
+  }
+
+  .eventBlurb {
+    flex-direction: column-reverse;
+    align-items: center;
+    padding-top: 0px;
+  }
+
+  #blurbText {
+    margin: 20px 0;
+    font-size: 0.95rem;
+    padding: 0;
+  }
+
+  .sectionContainer {
+    padding-left: 0px;
+    padding-right: 0px;
+    border: none;
+  }
+
+  .sectionHeader {
+    font-size: 1.35em;
+    padding-left: 10px;
+  }
+
+  .sectionHeaderText {
+    gap: 4px;
+  }
+
+  .sectionHeaderRow {
+    gap: 12px;
+  }
+
+  .sectionHeaderActionsScroller {
+    width: 100%;
+    justify-content: flex-start;
+    padding-left: 10px;
+  }
+
+  .sectionHeaderActions {
+    justify-content: flex-start;
+  }
+
+  .sectionHeaderViewModeButton {
+    flex: 0 0 auto;
+    min-height: 46px;
+    min-width: 128px;
+    padding: 10px 16px;
+    font-size: 0.92rem;
+    gap: 8px;
+  }
+
+  .sectionHeaderActionButton {
+    min-height: 48px;
+    padding: 11px 16px;
+    font-size: 0.95rem;
+  }
+
+  .pileHeaderRow {
+    gap: 12px;
+  }
+
+  .pileHeaderTitleWrap {
+    width: 100%;
+  }
+
+  .pileHeaderTitle {
+    font-size: 1.35em;
+  }
+
+  .miniSectionContent {
+    padding: 10px;
+  }
+
+  .headerImage {
+    max-width: 250px;
+    margin-top: 8px;
+    margin-bottom: 8px;
+    mix-blend-mode: luminosity;
+  }
+}
+
+/* -------------------------------------------
+     NEW: Additional mid-range (tablet) styling     Adjust so it doesn't mirror the phone layout
+  ------------------------------------------- */
+@media only screen and (min-width: 601px) and (max-width: 1024px) {
+  .onePageDemoContainer {
+    font-size: 1.15rem;
+    padding: 15px 25px;
+  }
+
+  .brandingSection {
+    flex-direction: column;
+    align-items: center;
+    grid-gap: 15px;
+    gap: 0px;
+  }
+
+  .brandLogo {
+    max-width: 280px;
+    margin-bottom: 0px; // for Edge Logo
+    -webkit-filter: invert(100%);
+    /* Safari/Chrome */
+    filter: invert(100%);
+  }
+
+  .eventBlurb {
+    padding: 10px;
+    font-size: 1.1rem;
+    flex-direction: column;
+  }
+
+  #blurbText {
+    margin: 0px;
+    font-size: 1.2rem;
+    padding: 10px;
+  }
+
+  .headerImage {
+    max-width: 200px;
+    margin-top: 10px;
+    margin-bottom: 10px;
+    mix-blend-mode: luminosity;
+  }
+
+  .sectionHeader {
+    font-size: 1.6em;
+  }
+
+  .sectionHeaderActionButton {
+    min-height: 50px;
+    padding: 12px 18px;
+    font-size: 1rem;
+  }
+
+  .sectionHeaderViewModeButton {
+    min-height: 48px;
+    min-width: 132px;
+    padding: 10px 18px;
+    font-size: 0.92rem;
+  }
+
+  .pileHeaderTitle {
+    font-size: 1.6em;
+  }
+
+  .miniSectionContent {
+    padding: 12px;
+  }
+}
+
+.sectionToggleIcon {
+  font-size: 1.5em;
+  margin-right: 10px;
+}
+
+/* ===================================================== */
+/* New: Auto-mint banner container & muted alert styles  */
+/* ===================================================== */
+
+.sbtMintBannerContainer {
+  position: sticky;
+  top: 48px;
+  /* appear below any fixed header */ // z-index: 1999;
+  /* below login modal (set to 2100) */
+  margin-bottom: 12px;
+  z-index: 99;
+}
+
+.sbtMintStatusItem {
+  margin-bottom: 8px;
+  font-size: 1rem;
+  /* slightly larger for readability */
+  font-weight: 700;
+  /* stronger weight per requirements */
+  border-radius: var(--ce-radius-8);
+  border-width: 1px;
+  border-style: solid;
+}
+
+/* Muted variants mapped to Reactstrap/Bootstrap color prop classes */
+:global(.alert-success).sbtMintStatusItem {
+  background-color: #e6f4ea;
+  border-color: #c9e7d1;
+  color: #20643a;
+}
+
+:global(.alert-info).sbtMintStatusItem {
+  background-color: #e8f0fe;
+  border-color: #cdddfc;
+  color: #1f4a89;
+}
+
+:global(.alert-danger).sbtMintStatusItem {
+  background-color: #fdecec;
+  border-color: #f5c2c2;
+  color: #7a2b2b;
+}
+
+:global(.alert-secondary).sbtMintStatusItem {
+  background-color: #f5f7fa;
+  border-color: #dfe5ec;
+  color: #3f4750;
+}
+
+:global(.alert-warning).sbtMintStatusItem {
+  background-color: #fff4d6;
+  border-color: #ffe3a3;
+  color: #6f5300;
+}
+
+#viewAllQuestionsButton {
+  display: inline-block;
+  font-size: 0.9rem;
+  font-weight: 600;
+  padding: 8px 14px;
+  border-radius: var(--ce-radius-4);
+  background-color: transparent;
+  color: rgb(140 134 134);
+  border: 0px solid var(--ce-color-black);
+  cursor: pointer;
+  opacity: 0.75;
+}
+
+/* ===================================================== */
+/* NEW: Globally-scoped close button for Reactstrap Alert */
+/* ===================================================== */
+:global(.sbt-alert-close-btn) {
+  color: #222 !important;
+  font-weight: 600 !important;
+  font-size: 1.6rem !important;
+  line-height: 1 !important;
+  opacity: 1 !important;
+  text-shadow: none !important;
+  min-width: 36px !important;
+  min-height: 36px !important;
+  padding: 6px 10px !important;
+}
+
+@keyframes fadeOutTitle {
+  to {
+    opacity: 0;
+  }
+}
+
+/* Desktop: Groups/Results/Documents side-by-side below Questions */
+.sectionsGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+@media (min-width: 768px) {
+  .sectionsGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-items: start;
+  }
+
+  .sectionsGridTwoUp {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* When a section is expanded (has content showing), give it full width */
+  .sectionsGrid .sectionExpanded {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (min-width: 1367px) {
+  .sectionsGrid {
+    margin-top: 60px;
+  }
+}

@@ -1,0 +1,573 @@
+@use "scss/variables" as tokens;
+
+$page-text-color: tokens.$ce-white;
+$card-bg: tokens.$ce-card-bg;
+$card-border: tokens.$ce-card-border;
+$card-shadow: tokens.$ce-card-shadow;
+
+.page {
+  min-height: 100vh;
+  padding: 20px;
+  color: $page-text-color;
+  font-family: var(--ce-font-mono);
+}
+
+.shell {
+  width: min(980px, 100%);
+  margin: 0 auto;
+}
+
+.header {
+  margin-bottom: 20px;
+}
+
+.headerTopRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.headerLead {
+  min-width: 0;
+}
+
+.headerMeta {
+  display: flex;
+  justify-content: flex-end;
+  flex: 0 0 auto;
+}
+
+.scopeMeta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  position: relative;
+}
+
+.eyebrow {
+  margin: 0 0 10px;
+  color: rgba(244, 247, 255, 0.65);
+  font-size: 0.78rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.title {
+  margin: 0 0 16px;
+  font-size: clamp(2rem, 4vw, 3rem);
+  line-height: 1.05;
+}
+
+.scopeBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  padding: 8px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(244, 247, 255, 0.92);
+  font-size: 0.86rem;
+  text-align: center;
+  white-space: normal;
+}
+
+.headerControls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.sessionSelectorTriggerRow {
+  display: flex;
+  position: relative;
+}
+
+.sessionSelectorTriggerRowOpen {
+  z-index: 32;
+}
+
+.sessionSelectorBackdrop {
+  position: fixed;
+  inset: 0;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  background: rgba(8, 12, 34, 0.58);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  cursor: pointer;
+  z-index: 0;
+}
+
+.sessionSelectorToggle {
+  position: relative;
+  z-index: 1;
+  width: 42px;
+  height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: $page-text-color;
+  cursor: pointer;
+  transition:
+    background 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.sessionSelectorTriggerRowOpen .sessionSelectorToggle {
+  border-color: rgba(77, 255, 164, 0.44);
+  background: rgba(77, 255, 164, 0.12);
+  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.24);
+}
+
+.sessionSelectorPopover {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 2;
+  width: min(540px, calc(100vw - 32px));
+  padding: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 16px;
+  background: rgba(31, 37, 79, 0.98);
+  box-shadow: 0 22px 42px rgba(0, 0, 0, 0.34);
+}
+
+.sessionSelectorPopoverHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.sessionSelectorHint {
+  color: rgba(244, 247, 255, 0.72);
+  font-size: 0.86rem;
+}
+
+.sessionSelectorReset {
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  background: transparent;
+  color: rgba(244, 247, 255, 0.9);
+  padding: 8px 12px;
+  font-family: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+  white-space: nowrap;
+
+  &:hover,
+  &:focus {
+    border-color: rgba(77, 255, 164, 0.34);
+    color: tokens.$ce-clickable;
+  }
+}
+
+.tagRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.tagPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: $page-text-color;
+  font-family: inherit;
+  font-size: 0.88rem;
+  cursor: pointer;
+  transition:
+    background 0.18s ease,
+    border-color 0.18s ease,
+    color 0.18s ease,
+    transform 0.18s ease;
+
+  &:hover,
+  &:focus {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(77, 255, 164, 0.28);
+    color: tokens.$ce-clickable;
+    transform: translateY(-1px);
+  }
+}
+
+.tagPillRemove {
+  color: rgba(244, 247, 255, 0.8);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+}
+
+.tagPicker {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+}
+
+.addTagButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 16px;
+  background: rgba(255, 255, 255, 0.9);
+  color: #111827;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: var(--ce-radius-10);
+  cursor: pointer;
+  font-family: inherit;
+  transition:
+    transform 0.06s ease,
+    box-shadow 0.18s ease,
+    background 0.18s ease;
+
+  &:hover,
+  &:focus {
+    background: #ffffff;
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.22);
+    transform: translateY(-1px);
+  }
+}
+
+.tagPickerPopover {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 5;
+  width: min(320px, 80vw);
+  padding: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: var(--ce-radius-12);
+  background: #20234e;
+  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.28);
+}
+
+.tagPickerTitle {
+  margin-bottom: 12px;
+  color: rgba(244, 247, 255, 0.92);
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.tagPickerEmpty {
+  margin: 0;
+  color: rgba(244, 247, 255, 0.65);
+  font-size: 0.84rem;
+}
+
+.relatedTagsRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+}
+
+.relatedTagsLabel {
+  color: rgba(244, 247, 255, 0.65);
+  font-size: 0.84rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.relatedTagsList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.relatedTagButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 14px;
+  border: 1px dashed rgba(77, 255, 164, 0.32);
+  border-radius: 999px;
+  background: rgba(77, 255, 164, 0.08);
+  color: tokens.$ce-clickable;
+  font-family: inherit;
+  font-size: 0.86rem;
+  cursor: pointer;
+  transition:
+    background 0.18s ease,
+    border-color 0.18s ease,
+    transform 0.18s ease;
+
+  &:hover,
+  &:focus {
+    background: rgba(77, 255, 164, 0.16);
+    border-color: rgba(77, 255, 164, 0.5);
+    transform: translateY(-1px);
+  }
+}
+
+.section {
+  background-color: $card-bg;
+  border: 1px solid $card-border;
+  border-radius: var(--ce-radius-14);
+  padding: 20px;
+  margin-bottom: 20px;
+  box-shadow: $card-shadow;
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: 1.15rem;
+  color: $page-text-color;
+}
+
+.sectionMeta {
+  color: rgba(244, 247, 255, 0.65);
+  font-size: 0.86rem;
+}
+
+.questionList {
+  display: grid;
+  gap: 12px;
+}
+
+.questionCardShell {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+
+  :global(.miniQuestionContainer) {
+    margin-bottom: 0;
+  }
+}
+
+.questionMeta {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 0 12px 0 16px;
+  color: rgba(244, 247, 255, 0.65);
+  font-size: 0.84rem;
+}
+
+.emptyState,
+.placeholderText {
+  margin: 0;
+  color: rgba(244, 247, 255, 0.65);
+}
+
+.comingSoonButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(244, 247, 255, 0.82);
+  font-family: inherit;
+  opacity: 0.75;
+  cursor: not-allowed;
+}
+
+.sbtGroupList {
+  display: grid;
+  gap: 12px;
+}
+
+.sbtGroupCard {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--ce-radius-10);
+  background: rgba(255, 255, 255, 0.04);
+  text-decoration: none;
+  color: inherit;
+  transition:
+    background 0.18s ease,
+    border-color 0.18s ease;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.07);
+    border-color: rgba(77, 255, 164, 0.22);
+  }
+}
+
+.sbtGroupImage {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  object-fit: cover;
+}
+
+.sbtGroupName {
+  color: tokens.$ce-clickable;
+  font-size: 0.92rem;
+}
+
+.sbtGroupTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.sbtGroupTagMini {
+  display: inline-flex;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(244, 247, 255, 0.7);
+  font-size: 0.75rem;
+}
+
+.aiContent {
+  white-space: pre-wrap;
+  color: rgba(244, 247, 255, 0.88);
+  font-size: 0.9rem;
+  line-height: 1.6;
+  padding: 12px 0;
+}
+
+.aiError {
+  color: #ff6b6b;
+  font-size: 0.86rem;
+  margin-bottom: 10px;
+}
+
+.summarizeButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 14px;
+  background: rgba(255, 255, 255, 0.9);
+  color: #111827;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: var(--ce-radius-10);
+  cursor: pointer;
+  font-family: inherit;
+  transition:
+    transform 0.06s ease,
+    box-shadow 0.18s ease,
+    background 0.18s ease;
+
+  &:hover,
+  &:focus {
+    background: #ffffff;
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.22);
+    transform: translateY(-1px);
+  }
+
+  &:disabled {
+    background: rgba(255, 255, 255, 0.24);
+    color: rgba(17, 24, 39, 0.7);
+    box-shadow: none;
+    cursor: not-allowed;
+    transform: none;
+  }
+}
+
+.regenerateButton {
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  background: transparent;
+  color: rgba(244, 247, 255, 0.8);
+  padding: 6px 12px;
+  font-family: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+  margin-top: 10px;
+
+  &:hover {
+    border-color: rgba(77, 255, 164, 0.34);
+    color: tokens.$ce-clickable;
+  }
+}
+
+.aiLoadingText {
+  color: rgba(244, 247, 255, 0.65);
+  font-size: 0.86rem;
+  animation: aiPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes aiPulse {
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aiLoadingText {
+    animation: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .page {
+    padding: 14px;
+  }
+
+  .headerTopRow {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .headerMeta {
+    justify-content: flex-start;
+  }
+
+  .scopeMeta {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .headerControls {
+    align-items: stretch;
+  }
+
+  .sessionSelectorPopover {
+    right: 0;
+    width: min(100vw - 28px, 540px);
+  }
+
+  .tagPicker {
+    width: 100%;
+  }
+
+  .tagPickerPopover {
+    left: 0;
+    right: auto;
+    width: min(100%, 360px);
+  }
+
+  .questionMeta {
+    padding-left: 12px;
+    flex-wrap: wrap;
+  }
+}

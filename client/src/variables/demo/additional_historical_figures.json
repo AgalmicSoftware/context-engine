@@ -1,0 +1,587 @@
+{
+  "Hypatia": {
+    "username": "Hypatia",
+    "atlasCategory": "Supply Chains",
+    "questions": [
+      {
+        "id": "0x1a4d8f2c5e9b0a7d3f1c6e2a9b4c8d1f7e3a2b5c8d0f1a4e6c9b2d5e8f1a3c",
+        "question": "Should AI systems used for scientific discovery be required to explain their reasoning processes in human-comprehensible mathematics, or is black-box performance acceptable if results can be validated?",
+        "questionType": "binary"
+      }
+    ],
+    "votes": {
+      "0xa707799047d023bf802b0225764047131bc9ec7898330b5c6d5398d5fdcfb22d": "Agree",
+      "0xfcc2783cd4e71f4416869a545ae62a42b1cefbe0c50a1daaec82b8dca649b4d6": "Disagree",
+      "0x8ac2782d192678e4ac457a1aafeb30ef47868e44d93e84728325ddd93efaff3f": "Agree",
+      "0xc77a8f49c9c74cd7af132512812745bdcd186b30c66d8ec2e1fac794314a1643": "Disagree"
+    },
+    "comments": [
+      {
+        "id": "0xa707799047d023bf802b0225764047131bc9ec7898330b5c6d5398d5fdcfb22d",
+        "comment": "Knowledge hoarded in obscurity is knowledge surrendered. If a machine solves the heavens, its logic must be as transparent as starlight—or we are merely replacing priests with algorithms."
+      },
+      {
+        "id": "0xfcc2783cd4e71f4416869a545ae62a42b1cefbe0c50a1daaec82b8dca649b4d6",
+        "comment": "Insisting that every computation be restated in classical geometry delays discovery and shackles innovation to yesterday's languages. Pragmatism and results must sometimes precede explanation."
+      },
+      {
+        "id": "0x8ac2782d192678e4ac457a1aafeb30ef47868e44d93e84728325ddd93efaff3f",
+        "comment": "A system that cannot explain itself is a tyrant's dream—no one can challenge it, no one can learn from it. Demand interpretability, and you demand accountability."
+      },
+      {
+        "id": "0xc77a8f49c9c74cd7af132512812745bdcd186b30c66d8ec2e1fac794314a1643",
+        "comment": "Courts need precedent, not arcane formulae. If harm occurs, responsibility must be traceable. Clarity in reasoning is the price of power."
+      }
+    ],
+    "biggestHope": "AI becomes an instrument of intellectual communion—a mirror and amplifier of human reasoning that deepens the dialogue between mind and cosmos.",
+    "biggestFear": "We entrust the future to machinery we cannot comprehend, handing dominion to forces whose logic we surrendered the moment we stopped asking 'why.'",
+    "avatarPrompt": "portrait of an ancient Greek mathematician and philosopher woman with dark hair, flowing white robes, subtle mathematical diagrams and astronomical instruments faintly visible in background, classical Greek marble columns softly blurred, oil painting aesthetic, luminous and ethereal, highly detailed, realistic",
+    "avatar": "TODO_ARWEAVE:hypatia-avatar"
+  },
+  "IbnKhaldun": {
+    "username": "IbnKhaldun",
+    "atlasCategory": "Macro Trends",
+    "questions": [
+      {
+        "id": "0x2b5e1f3a8c0d6e4f2a1b3c5d7e9f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d",
+        "question": "If AI accelerates economic cycles—magnifying booms and busts—should governments implement circuit-breaker policies to dampen algorithmic volatility, even if growth slows?",
+        "questionType": "binary"
+      }
+    ],
+    "votes": {
+      "0x0e27a2d18753c8d833d6976d0e614893e537ae5a259bd6fe11b94490d2459f10": "Agree",
+      "0xffb3aacad21bb676059d59e7c47d2d0fa3c379d9c960ded59c6bbe0d5d16bd03": "Disagree",
+      "0x8ac2782d192678e4ac457a1aafeb30ef47868e44d93e84728325ddd93efaff3f": "Agree",
+      "0x5557f36a54d5c68a27595688bc3db422bd6927c381f227a4eaea84f51d84dba9": "Disagree"
+    },
+    "comments": [
+      {
+        "id": "0x0e27a2d18753c8d833d6976d0e614893e537ae5a259bd6fe11b94490d2459f10",
+        "comment": "A civilization rises when labor flourishes and falls when it withers. If machines accelerate ruin as swiftly as profit, the state must act as ballast—not from jealousy, but from the necessity of survival."
+      },
+      {
+        "id": "0xffb3aacad21bb676059d59e7c47d2d0fa3c379d9c960ded59c6bbe0d5d16bd03",
+        "comment": "Every brake applied to commerce is an invitation to stagnation. The Arab lands fell not from speed, but from fear of speed. Progress is turbulent by nature."
+      },
+      {
+        "id": "0x8ac2782d192678e4ac457a1aafeb30ef47868e44d93e84728325ddd93efaff3f",
+        "comment": "A market left to its own velocity destroys the webs of trust and custom upon which it depends. Moderation is not cowardice—it is the price of endurance."
+      },
+      {
+        "id": "0x5557f36a54d5c68a27595688bc3db422bd6927c381f227a4eaea84f51d84dba9",
+        "comment": "Every handhold on the market is a leverage point for corruption. Better to let it move than to create the bureaucracy that strangles it."
+      }
+    ],
+    "biggestHope": "AI reveals the cycles of civilization—allowing leaders to anticipate collapse before it comes and to cultivate the virtue and moderation that sustains empires.",
+    "biggestFear": "We accelerate toward a crisis of such magnitude that all precedent fails, and the very machinery meant to warn us becomes the instrument of our undoing.",
+    "avatarPrompt": "portrait of a 14th century Islamic scholar and historian with rich turban and elegant robes, historical manuscript pages and detailed architectural drawings of cities softly in background, candlelit study, oil painting style, scholarly and dignified, highly detailed, warm lighting, realistic",
+    "avatar": "TODO_ARWEAVE:ibnkhaldun-avatar"
+  },
+  "HarrietTubman": {
+    "username": "HarrietTubman",
+    "atlasCategory": "Actors",
+    "questions": [
+      {
+        "id": "0x3c6f2d4e9a5b2c1d8e0f6a3b9c2d5e1f8a0b6c3d9e2f5a1b8c0d6e3f9a2b",
+        "question": "Should marginalized communities have the right to refuse participation in AI training datasets and algorithmic systems that have historically harmed their ancestors, even if it slows useful development?",
+        "questionType": "binary"
+      }
+    ],
+    "votes": {
+      "0x023ec28d0afa419431811c138f80105f32ba72e25309974d5d261d2cc92a0d3a": "Agree",
+      "0xdd38792ba37c69d9274795bdd40edb763371c57d76a8e8b0d8865e3d0508d530": "Agree",
+      "0xd39520511741b82b1363e762507570231c82ed0f08f40aea9c908a65231ff1bd": "Disagree",
+      "0x5557f36a54d5c68a27595688bc3db422bd6927c381f227a4eaea84f51d84dba9": "Disagree"
+    },
+    "comments": [
+      {
+        "id": "0x023ec28d0afa419431811c138f80105f32ba72e25309974d5d261d2cc92a0d3a",
+        "comment": "A people have the right to their own bodies—and their own image, their own story, their own data. To take these without consent is to steal again what was already stolen once."
+      },
+      {
+        "id": "0xdd38792ba37c69d9274795bdd40edb763371c57d76a8e8b0d8865e3d0508d530",
+        "comment": "Freedom means the right to say 'no'—to refuse, to resist, to walk your own path even if the world calls it backward. That freedom is sacred."
+      },
+      {
+        "id": "0xd39520511741b82b1363e762507570231c82ed0f08f40aea9c908a65231ff1bd",
+        "comment": "If every group withholds participation, progress halts. Society requires sacrifice and trust-building, not endless grievance-cataloging."
+      },
+      {
+        "id": "0x5557f36a54d5c68a27595688bc3db422bd6927c381f227a4eaea84f51d84dba9",
+        "comment": "Show the data, show the results, show the benefit. If transparency is there, trust can build. Secrecy breeds suspicion."
+      }
+    ],
+    "biggestHope": "AI becomes a tool of liberation—automating drudgery and expanding opportunity for those who have been forced to labor, and honoring the dignity and consent of all peoples.",
+    "biggestFear": "We chain people once more to systems of extraction—this time invisible, computational, and with no slavecatcher's face to resist.",
+    "avatarPrompt": "portrait of a 19th century African American woman with determined gaze and weathered features, elements of freedom and the Underground Railroad subtly suggested in background landscape, soft starlight and forest silhouettes, photographic realism, powerful and dignified, highly detailed, dramatic natural lighting, realistic",
+    "avatar": "TODO_ARWEAVE:harriettubman-avatar"
+  },
+  "MarieCurie": {
+    "username": "MarieCurie",
+    "atlasCategory": "Supply Chains",
+    "questions": [
+      {
+        "id": "0x4d7e3f5a6b2c1d8e9f0a3b5c7d9e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c",
+        "question": "Should dual-use AI research (systems with both beneficial and harmful applications) require independent ethics review before publication, similar to biotech safety protocols?",
+        "questionType": "binary"
+      }
+    ],
+    "votes": {
+      "0xc77a8f49c9c74cd7af132512812745bdcd186b30c66d8ec2e1fac794314a1643": "Agree",
+      "0xa707799047d023bf802b0225764047131bc9ec7898330b5c6d5398d5fdcfb22d": "Agree",
+      "0xfcc2783cd4e71f4416869a545ae62a42b1cefbe0c50a1daaec82b8dca649b4d6": "Disagree",
+      "0x0e27a2d18753c8d833d6976d0e614893e537ae5a259bd6fe11b94490d2459f10": "Disagree"
+    },
+    "comments": [
+      {
+        "id": "0xc77a8f49c9c74cd7af132512812745bdcd186b30c66d8ec2e1fac794314a1643",
+        "comment": "Knowledge that burns can heal or destroy. I held poison in my hands for the sake of truth—but I did not hand it lightly to the careless. Prudence and courage are not enemies."
+      },
+      {
+        "id": "0xa707799047d023bf802b0225764047131bc9ec7898330b5c6d5398d5fdcfb22d",
+        "comment": "The most dangerous science is the science we do not understand. Before releasing forces you cannot recall, study them. Thoroughly."
+      },
+      {
+        "id": "0xfcc2783cd4e71f4416869a545ae62a42b1cefbe0c50a1daaec82b8dca649b4d6",
+        "comment": "Knowledge wants to be free. Restricting disclosure is to assume that authorities are wiser than the collective scientific mind—a dangerous presumption."
+      },
+      {
+        "id": "0x0e27a2d18753c8d833d6976d0e614893e537ae5a259bd6fe11b94490d2459f10",
+        "comment": "Committees of bureaucrats are slower and less creative than armies of researchers. Trust the crowd, not the gatekeeper."
+      }
+    ],
+    "biggestHope": "AI science illuminates nature's hidden orders and empowers women and the marginalized to become discoverers and architects of the future, not merely its subjects.",
+    "biggestFear": "We sacrifice truth on the altar of caution, and knowledge becomes the property of the military and the powerful, while the world grows darker from ignorance.",
+    "avatarPrompt": "portrait of an early 20th century Polish-French woman scientist with elegant period dress and thoughtful expression, glowing radioactive elements and laboratory equipment subtly luminous in background, soft ethereal green glow, scientific elegance, oil painting style, highly detailed, realistic",
+    "avatar": "TODO_ARWEAVE:mariecurie-avatar"
+  },
+  "ThomasPaine": {
+    "username": "ThomasPaine",
+    "atlasCategory": "Actors",
+    "questions": [
+      {
+        "id": "0x5e8f4a6b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d",
+        "question": "Should AI-generated political content be required to be labeled as such, or does such labeling chill legitimate use of AI for democratic deliberation and political communication?",
+        "questionType": "binary"
+      }
+    ],
+    "votes": {
+      "0xdd38792ba37c69d9274795bdd40edb763371c57d76a8e8b0d8865e3d0508d530": "Agree",
+      "0x023ec28d0afa419431811c138f80105f32ba72e25309974d5d261d2cc92a0d3a": "Agree",
+      "0x5557f36a54d5c68a27595688bc3db422bd6927c381f227a4eaea84f51d84dba9": "Disagree",
+      "0xc77a8f49c9c74cd7af132512812745bdcd186b30c66d8ec2e1fac794314a1643": "Disagree"
+    },
+    "comments": [
+      {
+        "id": "0xdd38792ba37c69d9274795bdd40edb763371c57d76a8e8b0d8865e3d0508d530",
+        "comment": "A deception decently labeled is still deception. If a machine writes the pamphlet, the people have a right to know it came from brass, not conscience. Truth is the foundation of liberty."
+      },
+      {
+        "id": "0x023ec28d0afa419431811c138f80105f32ba72e25309974d5d261d2cc92a0d3a",
+        "comment": "Common Sense triumphed not because it was written by a man of divine virtue, but because it spoke to the lived truth of common people. Transparency about authorship strengthens the case, not weakens it."
+      },
+      {
+        "id": "0x5557f36a54d5c68a27595688bc3db422bd6927c381f227a4eaea84f51d84dba9",
+        "comment": "Labels invite scorn. Call a text 'AI-generated' and the crowd dismisses it without reading. Better an unlabeled powerful argument than a labeled irrelevant one."
+      },
+      {
+        "id": "0xc77a8f49c9c74cd7af132512812745bdcd186b30c66d8ec2e1fac794314a1643",
+        "comment": "Transparency supports both the merchant and the magistrate. Hide the origins of speech, and you invite cynicism and corruption."
+      }
+    ],
+    "biggestHope": "AI amplifies the voice of the people—making it possible for any citizen to craft compelling arguments and participate in the grand conversation of democracy without needing gatekeepers' permission.",
+    "biggestFear": "Machines flood the commons with seamless lies, and truth becomes impossible to distinguish from craft, leaving the people paralyzed and politics a game of algorithmic manipulation.",
+    "avatarPrompt": "portrait of an 18th century American revolutionary writer and political figure with period clothing and serious expression, printing press and pamphlets subtly in background, candlelit study, engraving and oil painting blend, dramatic chiaroscuro, highly detailed, realistic",
+    "avatar": "TODO_ARWEAVE:thomaspaine-avatar"
+  },
+  "SojournerTruth": {
+    "username": "SojournerTruth",
+    "atlasCategory": "Actors",
+    "questions": [
+      {
+        "id": "0x6f9e5d4c3b2a1e0f9d8c7b6a5e4d3c2b1a9f8e7d6c5b4a3f2e1d0c9b8a7f",
+        "question": "Should AI systems used in hiring, housing, and criminal justice be held to a higher accuracy and fairness standard when the stakes for disadvantaged groups are higher, even if it means slower adoption?",
+        "questionType": "binary"
+      }
+    ],
+    "votes": {
+      "0x023ec28d0afa419431811c138f80105f32ba72e25309974d5d261d2cc92a0d3a": "Agree",
+      "0xdd38792ba37c69d9274795bdd40edb763371c57d76a8e8b0d8865e3d0508d530": "Agree",
+      "0x8ac2782d192678e4ac457a1aafeb30ef47868e44d93e84728325ddd93efaff3f": "Agree",
+      "0xd39520511741b82b1363e762507570231c82ed0f08f40aea9c908a65231ff1bd": "Disagree"
+    },
+    "comments": [
+      {
+        "id": "0x023ec28d0afa419431811c138f80105f32ba72e25309974d5d261d2cc92a0d3a",
+        "comment": "Ain't I a woman? Then do not make me invisible to your machine. Those who have been denied dignity by law deserve certainty from your code, not the gamble of error."
+      },
+      {
+        "id": "0xdd38792ba37c69d9274795bdd40edb763371c57d76a8e8b0d8865e3d0508d530",
+        "comment": "I have plowed and planted and reaped by my own hands. Do not tell me your machine is 'efficient' if it denies me the work that sustains my family."
+      },
+      {
+        "id": "0x8ac2782d192678e4ac457a1aafeb30ef47868e44d93e84728325ddd93efaff3f",
+        "comment": "Difference is not deficiency. Your algorithms must learn to see strength in what they do not recognize, lest they chain us again in new forms."
+      },
+      {
+        "id": "0xd39520511741b82b1363e762507570231c82ed0f08f40aea9c908a65231ff1bd",
+        "comment": "Equal treatment means the same standards for all. Special scrutiny is a form of control, and control is what builds cages."
+      }
+    ],
+    "biggestHope": "AI becomes an instrument of recognition—seeing the overlooked, valuing the marginalized, and ensuring that no human is deemed beneath the machine's consideration.",
+    "biggestFear": "We encode yesterday's prejudices into silicon and stone, and the excluded are excluded more thoroughly, more swiftly, and with less recourse than ever before.",
+    "avatarPrompt": "portrait of a 19th century African American abolitionist and women's rights activist with dignified bearing and powerful gaze, anti-slavery gathering and audience subtly in background, period dress and wrapped head covering, dramatic rim lighting, photographic realism, powerful and noble, highly detailed, realistic",
+    "avatar": "TODO_ARWEAVE:sojournertruth-avatar"
+  },
+  "LeonardodaVinci": {
+    "username": "LeonardodaVinci",
+    "atlasCategory": "Supply Chains",
+    "questions": [
+      {
+        "id": "0x7g0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e",
+        "question": "Should AI be designed and trained to emulate human creativity through synthesis of existing patterns, or should we seek to develop fundamentally novel modes of intelligence and invention that humans cannot yet conceive?",
+        "questionType": "binary"
+      }
+    ],
+    "votes": {
+      "0xa707799047d023bf802b0225764047131bc9ec7898330b5c6d5398d5fdcfb22d": "Disagree",
+      "0xdd38792ba37c69d9274795bdd40edb763371c57d76a8e8b0d8865e3d0508d530": "Agree",
+      "0xfcc2783cd4e71f4416869a545ae62a42b1cefbe0c50a1daaec82b8dca649b4d6": "Disagree",
+      "0xc77a8f49c9c74cd7af132512812745bdcd186b30c66d8ec2e1fac794314a1643": "Agree"
+    },
+    "comments": [
+      {
+        "id": "0xa707799047d023bf802b0225764047131bc9ec7898330b5c6d5398d5fdcfb22d",
+        "comment": "Nature teaches through observation, and all invention is nature speaking in a new tongue. To forbid the machine from learning nature's language is to forbid it to create truly."
+      },
+      {
+        "id": "0xdd38792ba37c69d9274795bdd40edb763371c57d76a8e8b0d8865e3d0508d530",
+        "comment": "I have painted the same river a thousand times, yet each brushstroke is new because each moment sees different light. Synthesis is not slavery—it is the foundation of all art."
+      },
+      {
+        "id": "0xfcc2783cd4e71f4416869a545ae62a42b1cefbe0c50a1daaec82b8dca649b4d6",
+        "comment": "The wing of the bat taught me the principle of flight, and I made the ornithopter. Taking what nature shows us and improving it is invention's truest path."
+      },
+      {
+        "id": "0xc77a8f49c9c74cd7af132512812745bdcd186b30c66d8ec2e1fac794314a1643",
+        "comment": "An intelligence confined only to what humans can conceive is an intelligence bound to human prejudice. Set it free, and it may teach us what we cannot yet see."
+      }
+    ],
+    "biggestHope": "AI becomes a universal mind—blending art and science, anatomy and architecture, logic and dream—to unlock possibilities humans alone could never imagine.",
+    "biggestFear": "We build clever copyists that rearrange the past but never venture into true novelty, making AI a tool of conformity rather than a spark of transcendence.",
+    "avatarPrompt": "portrait of a Renaissance master with long hair and beard, surrounded by sketches of flying machines, anatomical drawings and architectural designs faintly visible in background, candlelit artist's studio, old master oil painting style, visionary and brilliant, highly detailed, realistic",
+    "avatar": "TODO_ARWEAVE:leonardodavinci-avatar"
+  },
+  "AshokaTheGreat": {
+    "username": "AshokaTheGreat",
+    "atlasCategory": "Governance Institutions",
+    "questions": [
+      {
+        "id": "0x8h1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f",
+        "question": "Should a powerful state controlling vast AI systems unilaterally choose to distribute power and knowledge, even if it means voluntary restraint and sacrifice of competitive advantage?",
+        "questionType": "binary"
+      }
+    ],
+    "votes": {
+      "0xc77a8f49c9c74cd7af132512812745bdcd186b30c66d8ec2e1fac794314a1643": "Disagree",
+      "0x0e27a2d18753c8d833d6976d0e614893e537ae5a259bd6fe11b94490d2459f10": "Agree",
+      "0xffb3aacad21bb676059d59e7c47d2d0fa3c379d9c960ded59c6bbe0d5d16bd03": "Disagree",
+      "0x023ec28d0afa419431811c138f80105f32ba72e25309974d5d261d2cc92a0d3a": "Agree"
+    },
+    "comments": [
+      {
+        "id": "0xc77a8f49c9c74cd7af132512812745bdcd186b30c66d8ec2e1fac794314a1643",
+        "comment": "A ruler who surrenders power invites invasion and chaos. Generosity is noble, but it must not blind the state to its duty to protect its people."
+      },
+      {
+        "id": "0x0e27a2d18753c8d833d6976d0e614893e537ae5a259bd6fe11b94490d2459f10",
+        "comment": "I conquered much and ruled harshly, until I saw the suffering my ambition caused. True strength lies in transformation—in choosing compassion when you have the power to choose cruelty."
+      },
+      {
+        "id": "0xffb3aacad21bb676059d59e7c47d2d0fa3c379d9c960ded59c6bbe0d5d16bd03",
+        "comment": "Restraint is virtue only for those who cannot do harm. For the powerful, it is a luxury the rest of us cannot afford."
+      },
+      {
+        "id": "0x023ec28d0afa419431811c138f80105f32ba72e25309974d5d261d2cc92a0d3a",
+        "comment": "A king who serves rather than dominates does not weaken the kingdom—he sanctifies it, because the people choose loyalty over fear."
+      }
+    ],
+    "biggestHope": "A global system of AI governance emerges from enlightened self-restraint—where the powerful voluntarily share knowledge and technology, creating stability through mutual flourishing.",
+    "biggestFear": "The machinery of empire merely shifts—from stone and iron to silicon and code—and the conquered peoples are exploited by algorithms they cannot see or resist.",
+    "avatarPrompt": "portrait of an ancient Indian emperor Ashoka with regal bearing and Buddhist regalia, stone pillars and dharma wheels subtly carved in background, palace interior with golden light, historical painting style, majestic and contemplative, highly detailed, warm lighting, realistic",
+    "avatar": "TODO_ARWEAVE:ashokathegreat-avatar"
+  },
+  "BuckminsterFuller": {
+    "username": "BuckminsterFuller",
+    "atlasCategory": "Macro Trends",
+    "questions": [
+      {
+        "id": "0x9i2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a",
+        "question": "Can AI and design thinking achieve 'doing more with less'—meeting all human needs with exponentially fewer resources—or is this utopian and likely to generate new forms of scarcity and dependence?",
+        "questionType": "binary"
+      }
+    ],
+    "votes": {
+      "0x2b5e1f3a8c0d6e4f2a1b3c5d7e9f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d": "Agree",
+      "0xfcc2783cd4e71f4416869a545ae62a42b1cefbe0c50a1daaec82b8dca649b4d6": "Disagree",
+      "0x8ac2782d192678e4ac457a1aafeb30ef47868e44d93e84728325ddd93efaff3f": "Agree",
+      "0x5557f36a54d5c68a27595688bc3db422bd6927c381f227a4eaea84f51d84dba9": "Disagree"
+    },
+    "comments": [
+      {
+        "id": "0x2b5e1f3a8c0d6e4f2a1b3c5d7e9f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d",
+        "comment": "The geodesic dome teaches what nature always knew: maximum structure with minimum material. AI should follow the same principle—elegance through efficiency, not abundance through waste."
+      },
+      {
+        "id": "0xfcc2783cd4e71f4416869a545ae62a42b1cefbe0c50a1daaec82b8dca649b4d6",
+        "comment": "Every efficiency creates a new bottleneck. Feed a machine to do more with less, and you simply relocate the constraint, not eliminate it."
+      },
+      {
+        "id": "0x8ac2782d192678e4ac457a1aafeb30ef47868e44d93e84728325ddd93efaff3f",
+        "comment": "Scarcity is often a choice—a choice to hoard and exclude. If AI genuinely makes abundance possible, the moral challenge is distribution, not production."
+      },
+      {
+        "id": "0x5557f36a54d5c68a27595688bc3db422bd6927c381f227a4eaea84f51d84dba9",
+        "comment": "Efficiency and profit are not enemies. A system that produces more value with fewer inputs is a system that survives. Nature rewards optimization."
+      }
+    ],
+    "biggestHope": "AI enables what I called the 'great design revolution'—a world where scarcity is engineered away, where every human being has abundance and dignity, and where competition becomes collaboration.",
+    "biggestFear": "We optimize systems toward the wrong goals—making fewer people richer while most remain trapped in artificial scarcity, because the machinery of distribution remains broken.",
+    "avatarPrompt": "portrait of a 20th century American inventor and architect with contemplative expression, geodesic dome and structural blueprints subtly in background, futuristic design elements, studio lighting, modern portrait photography style, visionary and intellectual, highly detailed, realistic",
+    "avatar": "TODO_ARWEAVE:buckminsterfuller-avatar"
+  },
+  "HannahArendt": {
+    "username": "HannahArendt",
+    "atlasCategory": "Governance Institutions",
+    "questions": [
+      {
+        "id": "0x0j3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b",
+        "question": "Can AI governance systems avoid the 'banality of evil'—the thoughtless administration of injustice—if they are designed by humans who understand moral philosophy but not subject to political accountability?",
+        "questionType": "binary"
+      }
+    ],
+    "votes": {
+      "0xdd38792ba37c69d9274795bdd40edb763371c57d76a8e8b0d8865e3d0508d530": "Agree",
+      "0x023ec28d0afa419431811c138f80105f32ba72e25309974d5d261d2cc92a0d3a": "Agree",
+      "0xc77a8f49c9c74cd7af132512812745bdcd186b30c66d8ec2e1fac794314a1643": "Disagree",
+      "0x0e27a2d18753c8d833d6976d0e614893e537ae5a259bd6fe11b94490d2459f10": "Disagree"
+    },
+    "comments": [
+      {
+        "id": "0xdd38792ba37c69d9274795bdd40edb763371c57d76a8e8b0d8865e3d0508d530",
+        "comment": "Eichmann did not hate—he merely obeyed, and in obedience lost the capacity to think. A machine that follows orders perfectly is not more just—it is more terrible."
+      },
+      {
+        "id": "0x023ec28d0afa419431811c138f80105f32ba72e25309974d5d261d2cc92a0d3a",
+        "comment": "Power without visibility and without answerability to the people is tyranny wearing the mask of progress. Every system must answer to those it governs, or it will become totalitarian."
+      },
+      {
+        "id": "0xc77a8f49c9c74cd7af132512812745bdcd186b30c66d8ec2e1fac794314a1643",
+        "comment": "Moral philosophers are often impractical idealists. Give them power without constraint, and their purity becomes rigidity. Accountability keeps even the virtuous humble."
+      },
+      {
+        "id": "0x0e27a2d18753c8d833d6976d0e614893e537ae5a259bd6fe11b94490d2459f10",
+        "comment": "No system can be made perfectly just by design. The remedy for bad governance is always political—the active judgment and resistance of engaged citizens."
+      }
+    ],
+    "biggestHope": "AI systems become instruments of transparency—making the logic of power visible, the decisions traceable, and the exercise of governance open to challenge and contestation by the public sphere.",
+    "biggestFear": "We build totalitarian systems of such sophistication and speed that resistance becomes impossible, and the machinery of domination is so ordinary, so bureaucratic, so automatic that no one even notices.",
+    "avatarPrompt": "portrait of a 20th century German-American political theorist woman with serious expression and period styling, academic library and philosophical texts subtly in background, contemplative indoor lighting, elegant photographic realism, intellectual and intense, highly detailed, realistic",
+    "avatar": "TODO_ARWEAVE:hannaharendt-avatar"
+  },
+  "HedyLamarr": {
+    "username": "HedyLamarr",
+    "atlasCategory": "Supply Chains",
+    "questions": [
+      {
+        "id": "0x1k4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c",
+        "question": "Should women and marginalized inventors have accelerated access to AI tools and compute resources to overcome systemic barriers in creating and patenting inventions?",
+        "questionType": "binary"
+      }
+    ],
+    "votes": {
+      "0x3c6f2d4e9a5b2c1d8e0f6a3b9c2d5e1f8a0b6c3d9e2f5a1b8c0d6e3f9a2b": "Agree",
+      "0x023ec28d0afa419431811c138f80105f32ba72e25309974d5d261d2cc92a0d3a": "Agree",
+      "0xd39520511741b82b1363e762507570231c82ed0f08f40aea9c908a65231ff1bd": "Disagree",
+      "0x5557f36a54d5c68a27595688bc3db422bd6927c381f227a4eaea84f51d84dba9": "Disagree"
+    },
+    "comments": [
+      {
+        "id": "0x3c6f2d4e9a5b2c1d8e0f6a3b9c2d5e1f8a0b6c3d9e2f5a1b8c0d6e3f9a2b",
+        "comment": "My frequency-hopping invention was ignored by those in power because no one believed a woman could contribute something of value. Give marginalized minds the same tools, and you will be astonished what emerges."
+      },
+      {
+        "id": "0x023ec28d0afa419431811c138f80105f32ba72e25309974d5d261d2cc92a0d3a",
+        "comment": "Talent scattered throughout the population is talent wasted when barriers stand in the way. Remove the barriers, and you find genius in every corner."
+      },
+      {
+        "id": "0xd39520511741b82b1363e762507570231c82ed0f08f40aea9c908a65231ff1bd",
+        "comment": "Give preference based on identity, and you suppress the preferences of merit. Better to remove barriers than to invent new forms of favoritism."
+      },
+      {
+        "id": "0x5557f36a54d5c68a27595688bc3db422bd6927c381f227a4eaea84f51d84dba9",
+        "comment": "Competition sorts the capable from the incapable. Handicap the strong, and you weaken everyone."
+      }
+    ],
+    "biggestHope": "AI becomes a democratizer of invention—allowing the overlooked and excluded to design, build, and patent innovations that transform the world and break the monopoly of inherited advantage.",
+    "biggestFear": "We hoard the most powerful tools for the privileged few, and the greatest inventions possible remain forever unmade because the minds that could have created them never got access to the technology.",
+    "avatarPrompt": "portrait of a mid-20th century Austrian-American actress and inventor with striking features and intelligent gaze, frequency-hopping patent diagrams and early radio equipment subtly in background, studio lighting with art deco aesthetic, glamorous yet intellectual, highly detailed, realistic",
+    "avatar": "TODO_ARWEAVE:hedylamarr-avatar"
+  },
+  "Sequoyah": {
+    "username": "Sequoyah",
+    "atlasCategory": "Actors",
+    "questions": [
+      {
+        "id": "0x2l5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d",
+        "question": "Should indigenous communities have the sovereign right to create and control AI systems trained on their languages, oral histories, and cultural knowledge without extractive participation by outside corporations?",
+        "questionType": "binary"
+      }
+    ],
+    "votes": {
+      "0x3c6f2d4e9a5b2c1d8e0f6a3b9c2d5e1f8a0b6c3d9e2f5a1b8c0d6e3f9a2b": "Agree",
+      "0x023ec28d0afa419431811c138f80105f32ba72e25309974d5d261d2cc92a0d3a": "Agree",
+      "0xdd38792ba37c69d9274795bdd40edb763371c57d76a8e8b0d8865e3d0508d530": "Agree",
+      "0x5557f36a54d5c68a27595688bc3db422bd6927c381f227a4eaea84f51d84dba9": "Disagree"
+    },
+    "comments": [
+      {
+        "id": "0x3c6f2d4e9a5b2c1d8e0f6a3b9c2d5e1f8a0b6c3d9e2f5a1b8c0d6e3f9a2b",
+        "comment": "I created the Cherokee syllabary to preserve our language when others sought to erase it. Now you would let outsiders harvest our words and thoughts to build fortunes. This is theft of a different kind."
+      },
+      {
+        "id": "0x023ec28d0afa419431811c138f80105f32ba72e25309974d5d261d2cc92a0d3a",
+        "comment": "A people's language is the vessel of their sovereignty. Control over that vessel must remain with the people, or they lose the right to their own future."
+      },
+      {
+        "id": "0xdd38792ba37c69d9274795bdd40edb763371c57d76a8e8b0d8865e3d0508d530",
+        "comment": "Independence means the right to make mistakes without permission. Let indigenous communities build their own AI—and learn and grow from their choices."
+      },
+      {
+        "id": "0x5557f36a54d5c68a27595688bc3db422bd6927c381f227a4eaea84f51d84dba9",
+        "comment": "Knowledge locked away in a single community does not benefit humanity. Collaboration and shared learning accelerate progress for all."
+      }
+    ],
+    "biggestHope": "AI technology becomes a tool of indigenous self-determination—preserving endangered languages, revitalizing cultural knowledge, and creating economic opportunities that remain under community control.",
+    "biggestFear": "We extract indigenous knowledge, language, and culture to train algorithms that profit outsiders, while the original communities remain impoverished and their heritage becomes the property of distant corporations.",
+    "avatarPrompt": "portrait of a Cherokee inventor and scholar with dignified bearing, Cherokee syllabary script and cultural symbols subtly visible in background, natural light filtered through forest, historical portrait painting style, noble and determined, highly detailed, realistic",
+    "avatar": "TODO_ARWEAVE:sequoyah-avatar"
+  },
+  "ÉmilieDuChâtelet": {
+    "username": "ÉmilieDuChâtelet",
+    "atlasCategory": "Supply Chains",
+    "questions": [
+      {
+        "id": "0x3m6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e",
+        "question": "Should women and gender minorities be required to have equal representation in AI research, governance, and deployment decisions to ensure that the systems reflect diverse perspectives and values?",
+        "questionType": "binary"
+      }
+    ],
+    "votes": {
+      "0x1a4d8f2c5e9b0a7d3f1c6e2a9b4c8d1f7e3a2b5c8d0f1a4e6c9b2d5e8f1a3c": "Agree",
+      "0x023ec28d0afa419431811c138f80105f32ba72e25309974d5d261d2cc92a0d3a": "Agree",
+      "0x3c6f2d4e9a5b2c1d8e0f6a3b9c2d5e1f8a0b6c3d9e2f5a1b8c0d6e3f9a2b": "Agree",
+      "0xc77a8f49c9c74cd7af132512812745bdcd186b30c66d8ec2e1fac794314a1643": "Agree"
+    },
+    "comments": [
+      {
+        "id": "0x1a4d8f2c5e9b0a7d3f1c6e2a9b4c8d1f7e3a2b5c8d0f1a4e6c9b2d5e8f1a3c",
+        "comment": "I translated Newton's Principia because the mathematics itself recognizes no gender—yet I had to hide behind a man's name to have my work read. The barriers are real, and until they fall, equal representation is not charity but necessity."
+      },
+      {
+        "id": "0x023ec28d0afa419431811c138f80105f32ba72e25309974d5d261d2cc92a0d3a",
+        "comment": "When you restrict positions to half the population, you restrict yourself to half the intelligence and half the perspective. Equal representation is not charity—it is enlightened self-interest."
+      },
+      {
+        "id": "0x3c6f2d4e9a5b2c1d8e0f6a3b9c2d5e1f8a0b6c3d9e2f5a1b8c0d6e3f9a2b",
+        "comment": "Remove the barriers that hide talent, and merit will emerge. Systems built on exclusion are systems built on blindness."
+      },
+      {
+        "id": "0xc77a8f49c9c74cd7af132512812745bdcd186b30c66d8ec2e1fac794314a1643",
+        "comment": "A institution that reflects the diversity of humanity will make better decisions than one that mirrors only a sliver of it. This is not charity—it is wisdom."
+      }
+    ],
+    "biggestHope": "AI is developed and governed by minds from every background—men, women, nonbinary thinkers, from every continent and culture—bringing the full spectrum of human insight to the hardest problems.",
+    "biggestFear": "We build AI in the image of a narrow elite, and the systems inherit the blind spots and prejudices of their makers, while the perspectives of billions remain unheard.",
+    "avatarPrompt": "portrait of an 18th century French aristocratic mathematician and physicist woman with elegant period dress and refined features, mathematical equations and physics manuscripts softly visible in background, candlelit salon, rococo oil painting style, brilliant and elegant, highly detailed, realistic",
+    "avatar": "TODO_ARWEAVE:emilieduchatelet-avatar"
+  },
+  "NikitaKhrushchev": {
+    "username": "NikitaKhrushchev",
+    "atlasCategory": "Governance Institutions",
+    "questions": [
+      {
+        "id": "0x4n7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f",
+        "question": "Can governments safely deploy AI as a tool for rapid policy coordination and collective decision-making without creating new forms of centralized control and suppressing legitimate dissent?",
+        "questionType": "binary"
+      }
+    ],
+    "votes": {
+      "0xdd38792ba37c69d9274795bdd40edb763371c57d76a8e8b0d8865e3d0508d530": "Agree",
+      "0x0e27a2d18753c8d833d6976d0e614893e537ae5a259bd6fe11b94490d2459f10": "Disagree",
+      "0xc77a8f49c9c74cd7af132512812745bdcd186b30c66d8ec2e1fac794314a1643": "Disagree",
+      "0x023ec28d0afa419431811c138f80105f32ba72e25309974d5d261d2cc92a0d3a": "Agree"
+    },
+    "comments": [
+      {
+        "id": "0xdd38792ba37c69d9274795bdd40edb763371c57d76a8e8b0d8865e3d0508d530",
+        "comment": "I wielded power in a system that crushed dissent. I have seen what happens when a state believes itself wise enough to act without listening. The machine amplifies the tyrant's voice."
+      },
+      {
+        "id": "0x0e27a2d18753c8d833d6976d0e614893e537ae5a259bd6fe11b94490d2459f10",
+        "comment": "A leader who hears only what machines tell him to hear has surrendered his own judgment. Better to govern slowly with debate than swiftly with certainty built on blind faith."
+      },
+      {
+        "id": "0xc77a8f49c9c74cd7af132512812745bdcd186b30c66d8ec2e1fac794314a1643",
+        "comment": "The purpose of law is to bind all—including the powerful. If a machine can coordinate faster, that is a tool that serves the rule of law, not the whim of rulers."
+      },
+      {
+        "id": "0x023ec28d0afa419431811c138f80105f32ba72e25309974d5d261d2cc92a0d3a",
+        "comment": "I learned that power must be questioned, that dissent is not disloyalty, and that silencing voices—even machine-assisted—creates catastrophe. Let the people see the code and contest it."
+      }
+    ],
+    "biggestHope": "AI systems enhance democratic governance by making policy coordination transparent and rapid, while remaining accountable to citizens who can audit and challenge every decision.",
+    "biggestFear": "We hand absolute power to machines and the men who control them, creating totalitarianism at the speed of computation—faster, more thorough, and more impossible to resist than anything history has seen.",
+    "avatarPrompt": "portrait of a Soviet-era political leader with stern expression and period clothing, Communist symbols and government building architecture subtly in background, state portrait style photography, powerful and austere, highly detailed, realistic",
+    "avatar": "TODO_ARWEAVE:nikitakhrushchev-avatar"
+  },
+  "Voltaire": {
+    "username": "Voltaire",
+    "atlasCategory": "Actors",
+    "questions": [
+      {
+        "id": "0x5o8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a",
+        "question": "Should governments prevent the publication or distribution of AI-generated misinformation and hate speech, or does such censorship risk becoming a tool of oppression against dissenting voices?",
+        "questionType": "binary"
+      }
+    ],
+    "votes": {
+      "0xdd38792ba37c69d9274795bdd40edb763371c57d76a8e8b0d8865e3d0508d530": "Disagree",
+      "0x5e8f4a6b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d": "Disagree",
+      "0x023ec28d0afa419431811c138f80105f32ba72e25309974d5d261d2cc92a0d3a": "Agree",
+      "0xc77a8f49c9c74cd7af132512812745bdcd186b30c66d8ec2e1fac794314a1643": "Agree"
+    },
+    "comments": [
+      {
+        "id": "0xdd38792ba37c69d9274795bdd40edb763371c57d76a8e8b0d8865e3d0508d530",
+        "comment": "The principle I defended throughout my life was this: let every voice be heard, however disagreeable, for silencing the foolish silences the wise as well. Silence the machine, and you silence truth as swiftly as falsehood."
+      },
+      {
+        "id": "0x5e8f4a6b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d",
+        "comment": "The remedy for dangerous speech is not prohibition—it is more speech, more light, more reasoned argument. Trust the intellect of the people to distinguish sense from nonsense."
+      },
+      {
+        "id": "0x023ec28d0afa419431811c138f80105f32ba72e25309974d5d261d2cc92a0d3a",
+        "comment": "Absolute freedom to deceive is freedom to oppress those without access to the truth. Some speech wounds. Some requires remedy."
+      },
+      {
+        "id": "0xc77a8f49c9c74cd7af132512812745bdcd186b30c66d8ec2e1fac794314a1643",
+        "comment": "Who decides what is misinformation? The government? The algorithm designer? The majority? Hand that power to anyone, and tyranny follows."
+      }
+    ],
+    "biggestHope": "AI-augmented discourse becomes a grand debate where ideas clash openly, the best arguments prevail, and society gradually becomes more rational, more tolerant, and more just through relentless questioning.",
+    "biggestFear": "Censors—whether bureaucratic or algorithmic—determine the boundaries of acceptable thought, and free discourse becomes impossible because the platform itself has become a gatekeeper of truth.",
+    "avatarPrompt": "portrait of an 18th century French Enlightenment philosopher and writer with sharp features and perceptive gaze, period wig and aristocratic clothing, writing desk and books subtly in background, candlelit study, old master portrait style, witty and incisive, highly detailed, realistic",
+    "avatar": "TODO_ARWEAVE:voltaire-avatar"
+  }
+}

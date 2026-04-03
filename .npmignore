@@ -1,0 +1,11 @@
+tests/
+scripts/test-*
+scripts/lib/e2e/
+scripts/run-e2e-*
+scripts/run-ux-*
+scripts/seed-*
+test/
+artifacts/
+**/*.test.js
+**/*.t.sol
+**/*.spec.js

@@ -1,0 +1,201 @@
+/* ---------------------------------------------------- Main.jsx ---------------------------------------------------- */
+
+@media (min-width: 0px) and (max-width: 319px) {
+  #main {
+    display: flex; // flex-direction: column-reverse;
+    flex-direction: column;
+    width: 100%;
+  }
+}
+
+@media (min-width: 320px) and (max-width: 465px) {
+  #main {
+    display: flex; // flex-direction: column-reverse;
+    flex-direction: column;
+    width: 100%;
+  }
+
+  #rulesModal {
+    transform: none;
+    width: 90%;
+    display: flex;
+    margin-top: 35px;
+    #rulesModalCard {
+      justify-content: flex-end;
+      min-height: 500px;
+    }
+
+    #closeModalIcon {
+      font-size: 2em;
+      color: var(--ce-color-white);
+      opacity: 0.3;
+    }
+  }
+}
+
+@media (min-width: 466px) and (max-width: 768px) {
+  #main {
+    display: flex; // flex-direction: column-reverse;
+    flex-direction: column;
+    width: 100%;
+  }
+}
+
+@media (min-width: 769px) and (max-width: 1366px) {
+  #main {
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+    justify-content: flex-end;
+    width: 100%;
+    margin-top: 2%;
+  }
+}
+
+@media (min-width: 1367px) {
+  #main {
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+    justify-content: flex-end;
+    width: 100%;
+  }
+}
+
+#rulesModal {
+  transform: none; // transform: translate(0, 05%);
+  width: 90%;
+  display: flex;
+  flex-direction: row; // align-self: center;
+  margin-top: 35px;
+
+  #rulesModalCard {
+    display: flex;
+    overflow: hidden;
+    background-color: #ffffff00 !important;
+    z-index: 10;
+    border-radius: var(--ce-radius-0);
+    min-height: 500px;
+  }
+
+  #closeModalIcon {
+    font-size: 2em;
+    color: var(--ce-color-white);
+    opacity: 0.3;
+  }
+}
+
+/* ---------------------------------------------------- Main.jsx ---------------------------------------------------- */
+
+.sessionLoadingSkeleton {
+  width: min(100%, 680px);
+  min-height: 50vh;
+  margin: 0 auto;
+  padding: 1.5rem 1rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.9rem;
+}
+
+.sessionLoadingSkeletonSections {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.sessionLoadingSkeletonSection {
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: var(--ce-radius-8);
+  padding: 0.95rem;
+}
+
+.sessionLoadingSkeletonSectionHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.52rem;
+  font-size: 1.5em;
+  margin-bottom: 12px;
+  line-height: 1.2;
+}
+
+.sessionLoadingSkeletonSectionTitle {
+  color: var(--ce-color-white);
+  font-weight: 700;
+}
+
+.sessionLoadingSkeletonSubtitle {
+  opacity: 0.5;
+  color: var(--ce-color-white);
+}
+
+.sessionLoadingSkeletonCaret {
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 6px solid var(--ce-color-white);
+  flex-shrink: 0;
+}
+
+.sessionLoadingSkeletonSectionBars {
+  display: flex;
+  flex-direction: column;
+  gap: 0.56rem;
+}
+
+.sessionLoadingSkeletonBar {
+  height: 12px;
+  border-radius: var(--ce-radius-4);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.sessionLoadingSkeletonTitleBar {
+  height: 16px;
+}
+
+.sessionLoadingSkeletonStatus {
+  color: rgba(244, 247, 255, 0.65);
+}
+
+.sessionLoadingSkeletonStatusTitle {
+  margin: 0;
+  font-size: 1.12rem;
+  color: inherit;
+}
+
+.sessionLoadingSkeletonStatusText {
+  margin: 0.45rem 0 0;
+  color: inherit;
+}
+
+.sessionLoadingSkeletonShimmer {
+  position: relative;
+  overflow: hidden;
+}
+
+.sessionLoadingSkeletonShimmer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.15) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  transform: translateX(-100%);
+  animation: sessionLoadingSkeletonShimmerSweep 1.5s linear infinite;
+}
+
+@keyframes sessionLoadingSkeletonShimmerSweep {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sessionLoadingSkeletonShimmer::after {
+    animation: none;
+  }
+}

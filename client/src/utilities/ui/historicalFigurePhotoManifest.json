@@ -1,0 +1,322 @@
+{
+  "AdaLovelace": {
+    "name": "Ada Lovelace",
+    "src": "TODO_ARWEAVE:ada-lovelace-avatar"
+  },
+  "AdamSmith": {
+    "name": "Adam Smith",
+    "src": "TODO_ARWEAVE:adam-smith-avatar"
+  },
+  "AlanTuring": {
+    "name": "Alan Turing",
+    "src": "TODO_ARWEAVE:alan-turing-avatar"
+  },
+  "AlbertEinstein": {
+    "name": "Albert Einstein",
+    "src": "TODO_ARWEAVE:albert-einstein-avatar"
+  },
+  "AlexanderGrahamBell": {
+    "name": "Alexander Graham Bell",
+    "src": "TODO_ARWEAVE:alexander-graham-bell-avatar"
+  },
+  "AlexanderTheGreat": {
+    "name": "Alexander the Great",
+    "src": "TODO_ARWEAVE:alexander-the-great-avatar"
+  },
+  "AndrewCarnegie": {
+    "name": "Andrew Carnegie",
+    "src": "TODO_ARWEAVE:andrew-carnegie-avatar"
+  },
+  "Archimedes": {
+    "name": "Archimedes",
+    "src": "TODO_ARWEAVE:archimedes-avatar"
+  },
+  "AshokaTheGreat": {
+    "name": "AshokaTheGreat",
+    "src": "TODO_ARWEAVE:ashokathegreat-avatar"
+  },
+  "AugustusCaesar": {
+    "name": "Augustus Caesar",
+    "src": "TODO_ARWEAVE:augustus-caesar-avatar"
+  },
+  "BuckminsterFuller": {
+    "name": "BuckminsterFuller",
+    "src": "TODO_ARWEAVE:buckminsterfuller-avatar"
+  },
+  "CatherineTheGreat": {
+    "name": "Catherine the Great",
+    "src": "TODO_ARWEAVE:catherine-the-great-avatar"
+  },
+  "CharlesDarwin": {
+    "name": "Charles Darwin",
+    "src": "TODO_ARWEAVE:charles-darwin-avatar"
+  },
+  "Confucius": {
+    "name": "Confucius",
+    "src": "TODO_ARWEAVE:confucius-avatar"
+  },
+  "CyrusTheGreat": {
+    "name": "Cyrus the Great",
+    "src": "TODO_ARWEAVE:cyrus-the-great-avatar"
+  },
+  "DesmondTutu": {
+    "name": "Desmond Tutu",
+    "src": "TODO_ARWEAVE:desmond-tutu-avatar"
+  },
+  "EleanorRoosevelt": {
+    "name": "Eleanor Roosevelt",
+    "src": "TODO_ARWEAVE:eleanor-roosevelt-avatar"
+  },
+  "FDR": {
+    "name": "Franklin D. Roosevelt",
+    "src": "TODO_ARWEAVE:franklin-d-roosevelt-avatar"
+  },
+  "Franklin": {
+    "name": "Benjamin Franklin",
+    "src": "TODO_ARWEAVE:benjamin-franklin-avatar"
+  },
+  "FrederickDouglass": {
+    "name": "Frederick Douglass",
+    "src": "TODO_ARWEAVE:frederick-douglass-avatar"
+  },
+  "Fuller": {
+    "name": "Buckminster Fuller",
+    "src": "TODO_ARWEAVE:buckminster-fuller-avatar"
+  },
+  "GraceHopper": {
+    "name": "Grace Hopper",
+    "src": "TODO_ARWEAVE:grace-hopper-avatar"
+  },
+  "Hamilton": {
+    "name": "Alexander Hamilton",
+    "src": "TODO_ARWEAVE:alexander-hamilton-avatar"
+  },
+  "Hammurabi": {
+    "name": "Hammurabi",
+    "src": "TODO_ARWEAVE:hammurabi-avatar"
+  },
+  "HannahArendt": {
+    "name": "HannahArendt",
+    "src": "TODO_ARWEAVE:hannaharendt-avatar"
+  },
+  "HarrietTubman": {
+    "name": "HarrietTubman",
+    "src": "TODO_ARWEAVE:harriettubman-avatar"
+  },
+  "HedyLamarr": {
+    "name": "HedyLamarr",
+    "src": "TODO_ARWEAVE:hedylamarr-avatar"
+  },
+  "HenryFord": {
+    "name": "Henry Ford",
+    "src": "TODO_ARWEAVE:henry-ford-avatar"
+  },
+  "Hypatia": {
+    "name": "Hypatia",
+    "src": "TODO_ARWEAVE:hypatia-avatar"
+  },
+  "IbnKhaldun": {
+    "name": "IbnKhaldun",
+    "src": "TODO_ARWEAVE:ibnkhaldun-avatar"
+  },
+  "JFK": {
+    "name": "John F. Kennedy",
+    "src": "TODO_ARWEAVE:john-f-kennedy-avatar"
+  },
+  "JRobertOppenheimer": {
+    "name": "J. Robert Oppenheimer",
+    "src": "TODO_ARWEAVE:j-robert-oppenheimer-avatar"
+  },
+  "JamesMadison": {
+    "name": "James Madison",
+    "src": "TODO_ARWEAVE:james-madison-avatar"
+  },
+  "JamesWatt": {
+    "name": "James Watt",
+    "src": "TODO_ARWEAVE:james-watt-avatar"
+  },
+  "JeanJacquesRousseau": {
+    "name": "Jean-Jacques Rousseau",
+    "src": "TODO_ARWEAVE:jean-jacques-rousseau-avatar"
+  },
+  "Jefferson": {
+    "name": "Thomas Jefferson",
+    "src": "TODO_ARWEAVE:thomas-jefferson-avatar"
+  },
+  "JohnLocke": {
+    "name": "John Locke",
+    "src": "TODO_ARWEAVE:john-locke-avatar"
+  },
+  "JustinianI": {
+    "name": "Justinian I",
+    "src": "TODO_ARWEAVE:justinian-i-avatar"
+  },
+  "KarlMarx": {
+    "name": "Karl Marx",
+    "src": "TODO_ARWEAVE:karl-marx-avatar"
+  },
+  "LBJ": {
+    "name": "Lyndon B. Johnson",
+    "src": "TODO_ARWEAVE:lyndon-b-johnson-avatar"
+  },
+  "LechWalesa": {
+    "name": "Lech Walesa",
+    "src": "TODO_ARWEAVE:lech-walesa-avatar"
+  },
+  "LeonardodaVinci": {
+    "name": "LeonardodaVinci",
+    "src": "TODO_ARWEAVE:leonardodavinci-avatar"
+  },
+  "Lincoln": {
+    "name": "Abraham Lincoln",
+    "src": "TODO_ARWEAVE:abraham-lincoln-avatar"
+  },
+  "MLK": {
+    "name": "Martin Luther King Jr.",
+    "src": "TODO_ARWEAVE:martin-luther-king-jr-avatar"
+  },
+  "Machiavelli": {
+    "name": "Niccolo Machiavelli",
+    "src": "TODO_ARWEAVE:niccolo-machiavelli-avatar"
+  },
+  "MahatmaGandhi": {
+    "name": "Mahatma Gandhi",
+    "src": "TODO_ARWEAVE:mahatma-gandhi-avatar"
+  },
+  "MarcusAurelius": {
+    "name": "Marcus Aurelius",
+    "src": "TODO_ARWEAVE:marcus-aurelius-avatar"
+  },
+  "MarieCurie": {
+    "name": "MarieCurie",
+    "src": "TODO_ARWEAVE:mariecurie-avatar"
+  },
+  "NapoleonBonaparte": {
+    "name": "Napoleon Bonaparte",
+    "src": "TODO_ARWEAVE:napoleon-bonaparte-avatar"
+  },
+  "NelsonMandela": {
+    "name": "Nelson Mandela",
+    "src": "TODO_ARWEAVE:nelson-mandela-avatar"
+  },
+  "NikitaKhrushchev": {
+    "name": "NikitaKhrushchev",
+    "src": "TODO_ARWEAVE:nikitakhrushchev-avatar"
+  },
+  "NikolaTesla": {
+    "name": "Nikola Tesla",
+    "src": "TODO_ARWEAVE:nikola-tesla-avatar"
+  },
+  "NormanBorlaug": {
+    "name": "Norman Borlaug",
+    "src": "TODO_ARWEAVE:norman-borlaug-avatar"
+  },
+  "Obama": {
+    "name": "Barack Obama",
+    "src": "TODO_ARWEAVE:barack-obama-avatar"
+  },
+  "OttoVonBismarck": {
+    "name": "Otto von Bismarck",
+    "src": "TODO_ARWEAVE:otto-von-bismarck-avatar"
+  },
+  "Plato": {
+    "name": "Plato",
+    "src": "TODO_ARWEAVE:plato-avatar"
+  },
+  "QueenElizabethI": {
+    "name": "Queen Elizabeth I",
+    "src": "TODO_ARWEAVE:queen-elizabeth-i-avatar"
+  },
+  "RachelCarson": {
+    "name": "Rachel Carson",
+    "src": "TODO_ARWEAVE:rachel-carson-avatar"
+  },
+  "Reagan": {
+    "name": "Ronald Reagan",
+    "src": "TODO_ARWEAVE:ronald-reagan-avatar"
+  },
+  "Rockefeller": {
+    "name": "John D. Rockefeller",
+    "src": "TODO_ARWEAVE:john-d-rockefeller-avatar"
+  },
+  "RosaParks": {
+    "name": "Rosa Parks",
+    "src": "TODO_ARWEAVE:rosa-parks-avatar"
+  },
+  "Sequoyah": {
+    "name": "Sequoyah",
+    "src": "TODO_ARWEAVE:sequoyah-avatar"
+  },
+  "SimonBolivar": {
+    "name": "Simon Bolivar",
+    "src": "TODO_ARWEAVE:simon-bolivar-avatar"
+  },
+  "SojournerTruth": {
+    "name": "SojournerTruth",
+    "src": "TODO_ARWEAVE:sojournertruth-avatar"
+  },
+  "SunTzu": {
+    "name": "Sun Tzu",
+    "src": "TODO_ARWEAVE:sun-tzu-avatar"
+  },
+  "SunYatSen": {
+    "name": "Sun Yat-sen",
+    "src": "TODO_ARWEAVE:sun-yat-sen-avatar"
+  },
+  "SusanBAnthony": {
+    "name": "Susan B. Anthony",
+    "src": "TODO_ARWEAVE:susan-b-anthony-avatar"
+  },
+  "ThomasEdison": {
+    "name": "Thomas Edison",
+    "src": "TODO_ARWEAVE:thomas-edison-avatar"
+  },
+  "ThomasPaine": {
+    "name": "ThomasPaine",
+    "src": "TODO_ARWEAVE:thomaspaine-avatar"
+  },
+  "VannevarBush": {
+    "name": "Vannevar Bush",
+    "src": "TODO_ARWEAVE:vannevar-bush-avatar"
+  },
+  "Voltaire": {
+    "name": "Voltaire",
+    "src": "TODO_ARWEAVE:voltaire-avatar"
+  },
+  "Washington": {
+    "name": "George Washington",
+    "src": "TODO_ARWEAVE:george-washington-avatar"
+  },
+  "WinstonChurchill": {
+    "name": "Winston Churchill",
+    "src": "TODO_ARWEAVE:winston-churchill-avatar"
+  },
+  "vonNeumann": {
+    "name": "John von Neumann",
+    "src": "TODO_ARWEAVE:john-von-neumann-avatar"
+  },
+  "ÉmilieDuChâtelet": {
+    "name": "ÉmilieDuChâtelet",
+    "src": "TODO_ARWEAVE:emilieduchatelet-avatar"
+  },
+  "FlorenceNightingale": {
+    "name": "FlorenceNightingale",
+    "src": "TODO_ARWEAVE:florence-nightingale-avatar"
+  },
+  "GalileoGalilei": {
+    "name": "GalileoGalilei",
+    "src": "TODO_ARWEAVE:galileo-galilei-avatar"
+  },
+  "RosaParks": {
+    "name": "RosaParks",
+    "src": "TODO_ARWEAVE:rosa-parks-avatar"
+  },
+  "WangariMaathai": {
+    "name": "WangariMaathai",
+    "src": "TODO_ARWEAVE:wangari-maathai-avatar"
+  },
+  "Aristotle": {
+    "name": "Aristotle",
+    "src": "TODO_ARWEAVE:aristotle-avatar"
+  }
+}

@@ -1,0 +1,1283 @@
+/* @file PolisReport.module.scss */
+
+.polisReportContainer {
+  margin-top: 20px;
+  border: 1px solid #ddd;
+  padding: 10px;
+  position: relative;
+  background: #fafafa;
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: scroll;
+}
+
+.reportInner {
+  background: #fff;
+  padding: 20px;
+}
+
+.reportStyleSelect {
+  padding: 4px 10px;
+  border: 1px solid var(--ce-color-border-light);
+  border-radius: var(--ce-radius-4);
+  background: var(--ce-color-white);
+  color: var(--ce-color-border);
+}
+
+.heading {
+  font-size: 1.4rem;
+  margin-bottom: 10px;
+  color: var(--ce-color-border);
+}
+
+.demoToggleRow {
+  margin-bottom: 8px;
+}
+
+.demoToggleLabel {
+  font-size: 0.9rem;
+  color: #555;
+  cursor: pointer;
+}
+
+.demoToggleCheckbox {
+  margin-right: 5px;
+  cursor: pointer;
+}
+
+.disclaimerBox {
+  border: 1px solid var(--ce-color-border-light);
+  background: #ffffe0;
+  padding: 8px;
+  margin-bottom: 12px;
+  font-size: 0.9rem;
+}
+
+.noData {
+  font-style: italic;
+  color: #666;
+}
+
+.loadingState {
+  width: 100%;
+  min-height: 200px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  color: #7b8193;
+}
+
+.loadingSpinner {
+  color: #7b8193;
+}
+
+.loadingProgressWrap {
+  width: min(360px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid rgba(31, 39, 51, 0.12);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+}
+
+.loadingProgressLabel {
+  color: #1f2733;
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.loadingProgressMeta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: rgba(31, 39, 51, 0.78);
+  font-size: 0.82rem;
+  font-family: var(--ce-font-mono);
+}
+
+.loadingProgressBar {
+  width: 100%;
+  height: 10px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(31, 39, 51, 0.12);
+}
+
+.loadingProgressFill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #4dffa4 0%, #5b8cff 100%);
+  transition: width 180ms ease;
+}
+
+.statsSection {
+  margin-bottom: 20px;
+  padding: 12px;
+  background: var(--ce-color-white);
+  border: var(--ce-color-black) solid 0.5px;
+}
+
+.statsSectionCollapsible {
+  padding: 8px;
+  margin-top: 8px;
+  margin-bottom: 8px;
+}
+
+.statsRow {
+  display: flex;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+
+.statsItem {
+  margin-right: 20px;
+  margin-bottom: 4px;
+}
+
+.statLabel {
+  font-weight: 600;
+  margin-right: 4px;
+  color: var(--ce-color-border); // UPDATED: Ensure label text is always dark.
+}
+
+.statValue {
+  color: var(--ce-color-border);
+}
+
+.filterList > div {
+  margin-left: 20px;
+}
+
+.graphSection {
+  display: flex;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.graphItem {
+  flex: 1 1 50%;
+  max-width: 50%;
+  margin-right: 0;
+  margin-bottom: 20px;
+}
+
+.participantSvg {
+  border: 1px solid #ddd;
+  background: var(--ce-color-white);
+  width: 100%;
+  height: auto; // Maintain aspect ratio
+}
+
+.swarmContainer {
+  position: relative;
+}
+
+.beeswarmSvg {
+  border: 1px solid #ddd;
+  background: var(--ce-color-white);
+  overflow: scroll;
+}
+
+/* Non-hover circle style */
+.beeswarmCircle {
+  fill: steelblue;
+}
+
+/* Hovered circle style */
+.beeswarmCircleHover {
+  fill: #ff9900;
+}
+
+/* Tooltip: a bit wider */
+.beeTooltip {
+  position: absolute;
+  width: 300px;
+  background: var(--ce-color-tooltip-bg);
+  border: 1px solid var(--ce-color-tooltip-border);
+  padding: 10px;
+  font-size: 0.85rem;
+  color: var(--ce-color-tooltip-text);
+  pointer-events: auto;
+  /* CHANGED: allow interaction so hover link is clickable */
+  z-index: 999;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+.tooltipPrompt {
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: var(--ce-color-tooltip-muted);
+  font-size: 0.78rem;
+}
+
+.polisBoxPlotContainer {
+  display: inline-block;
+  margin-left: 10px;
+}
+
+.polisBoxPlotSvg {
+  display: block;
+  border: var(--ce-color-black) solid 0.5px;
+}
+
+/* The .pdfIgnore class is hidden when generating the PDF */
+.pdfIgnore {
+  display: block;
+}
+
+@media print {
+  .pdfIgnore {
+    display: none !important;
+  }
+  /* Hide tooltips in PDF/print */
+  .beeTooltip {
+    display: none !important;
+  }
+}
+
+.sectionCollapse {
+  margin-bottom: 20px;
+}
+
+.sectionHeaderRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: 1.2rem;
+  color: var(--ce-color-border);
+}
+
+#sectionHeader {
+  font-size: 1.4rem;
+  margin-bottom: 10px;
+  color: var(--ce-color-border);
+  font-weight: 600;
+}
+
+/* For color-coding cluster swatches */
+.clusterSwatchSvg {
+  vertical-align: middle;
+}
+
+/* Simple icon for tooltips */
+.tooltipIcon {
+  display: inline-block;
+  margin-left: 4px;
+  color: #555;
+  cursor: help;
+}
+
+/* For half-transparent backgrounds behind each cluster grouping */
+.clusterContainer {
+  position: relative;
+}
+
+.clusterBackgroundRect {
+  fill: rgba(255, 0, 0, 0.2);
+}
+
+.clusterSectionDiv {
+  margin-bottom: 12px;
+}
+
+/* Add a row for the top toggles */
+#settingsRow {
+  margin-bottom: 10px;
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  background: #8080805e;
+  padding: 10px;
+}
+
+/* PDF Mode classes */
+.pdfMode {
+  /* Show/hide pieces specifically for PDF if needed */
+}
+
+/* NEW: When in PDF mode, hide any element marked as pdfIgnore */
+.pdfMode .pdfIgnore {
+  display: none !important;
+}
+
+.pdfMode .showWhenPdf {
+  display: inline;
+}
+
+.showWhenPdf {
+  display: none;
+}
+
+.footnoteRef {
+  margin-left: 0.15em;
+  font-size: 0.7em;
+  line-height: 1;
+  vertical-align: super;
+  color: currentColor;
+  font-weight: 700;
+}
+
+.footnotesSection {
+  display: none;
+  margin-top: 28px;
+  color: inherit;
+}
+
+.pdfMode .footnotesSection {
+  display: block;
+}
+
+.footnotesHeading {
+  margin: 0 0 10px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: inherit;
+}
+
+.footnotesList {
+  margin: 0;
+  padding-left: 20px;
+  color: inherit;
+
+  li {
+    margin-bottom: 8px;
+  }
+}
+
+.pdfFooter {
+  display: none;
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(15, 23, 42, 0.16);
+  align-items: center;
+  gap: 18px;
+  color: inherit;
+}
+
+.pdfMode .pdfFooter {
+  display: flex;
+}
+
+.pdfFooterQr {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: var(--ce-radius-6);
+  background: var(--ce-color-white);
+}
+
+.pdfFooterMeta {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.pdfFooterLabel {
+  margin-bottom: 6px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: inherit;
+}
+
+.pdfFooterLink {
+  font-family: var(--ce-font-mono);
+  font-size: 0.85rem;
+  line-height: 1.45;
+  color: inherit;
+  opacity: 0.75;
+  word-break: break-word;
+}
+
+/* Usually display these, but hide them in pdfMode */
+.hiddenInPdf {
+  display: block;
+}
+
+.pdfMode .hiddenInPdf {
+  display: none !important;
+}
+
+/* Toggle button states */
+.toggleButtonActive {
+  background-color: #03a9f4;
+  color: var(--ce-color-white);
+  border: 1px solid #03a9f4;
+  padding: 4px 8px;
+  cursor: pointer;
+  border-radius: var(--ce-radius-4);
+  font-size: 0.8rem;
+}
+
+.toggleButtonInactive {
+  background-color: #f0f0f0;
+  color: var(--ce-color-border);
+  border: 1px solid #999;
+  padding: 4px 8px;
+  cursor: pointer;
+  border-radius: var(--ce-radius-4);
+  font-size: 0.8rem;
+}
+
+.pdfMode .beeTooltip {
+  display: none !important;
+}
+
+.brandingHeader {
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid #eee;
+  text-align: center; // Center branding elements
+}
+
+.orgHeaderImage {
+  max-width: 200px; // Limit logo size  max-height: 80px; // Limit logo height  margin-bottom: 10px;
+  display: block; // Center image  margin-left: auto;
+  margin-right: auto;
+}
+
+.orgReportTitle {
+  font-size: 1.4rem; // Make org title prominent  color: var(--ce-color-border);
+  margin-bottom: 5px;
+}
+
+.sessionInfo {
+  opacity: 0.5;
+  color: #2429b5;
+  margin-top: 5px;
+  font-size: 1.15em;
+  font-weight: 600;
+}
+
+// UPDATED: Added style for the graph description text
+.graphDescriptionText {
+  font-size: 0.9rem;
+  margin-bottom: 10px;
+  color: var(--ce-color-black); // Ensure text is dark  opacity: 0.5; // Make it semi-transparent as requested
+}
+
+// ADDED: Styles for Bee Swarm scroll buttons layout
+.swarmLayoutContainer {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  flex: 1 1 100%;
+  box-sizing: border-box;
+}
+
+.swarmScrollControls {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  margin-top: 5px;
+}
+
+.scrollButton {
+  background: #f0f0f0;
+  border: 1px solid var(--ce-color-border-light);
+  border-radius: var(--ce-radius-round);
+  width: 30px;
+  height: 30px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s;
+  &:hover {
+    background: #e0e0e0;
+  }
+}
+
+// ADDED: Styles for the cluster number stepper
+.controlGroup {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap; // Allows checkboxes to wrap
+}
+
+.numberInputWrapper {
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--ce-color-border-light);
+  border-radius: var(--ce-radius-4);
+  overflow: hidden;
+}
+
+.clusterNumberInput {
+  width: 50px;
+  height: 28px;
+  text-align: center;
+  border: none;
+  font-size: 1rem;
+  -moz-appearance: textfield;
+  &::-webkit-outer-spin-button,
+  &::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  &:focus {
+    outline: 2px solid #03a9f4;
+    outline-offset: -1px;
+  }
+}
+
+.stepperButton {
+  width: 30px;
+  height: 30px;
+  border: none;
+  background-color: #f7f7f7;
+  cursor: pointer;
+  font-weight: bold;
+  font-size: 1.1rem;
+  line-height: 1;
+  color: #555;
+  transition: background-color 0.2s;
+  &:hover {
+    background-color: #e9e9e9;
+  }
+  &:first-child {
+    border-right: 1px solid var(--ce-color-border-light);
+  }
+  &:last-child {
+    border-left: 1px solid var(--ce-color-border-light);
+  }
+}
+
+/* =========================
+   NEW: AI Cluster Analysis   ========================= */
+
+.analyzeClustersBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background-color: #7063f5;
+  color: var(--ce-color-white);
+  border: 1px solid #5e54e5;
+  border-radius: var(--ce-radius-4);
+  font-weight: 600;
+  cursor: pointer;
+  &:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+  }
+}
+
+.clusterAnalysis {
+  margin-top: 6px;
+  padding: 8px;
+  background: #f8f8ff;
+  border: 1px solid #e4e4ff;
+  border-radius: var(--ce-radius-6);
+}
+
+.clusterAnalysisRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.95rem;
+}
+
+.analysisSpinner {
+  font-size: 1rem;
+}
+
+.elapsedTimer {
+  font-family: var(--ce-font-mono);
+  font-size: 0.9rem;
+  color: #555;
+}
+
+.analysisNote {
+  color: var(--ce-color-border);
+}
+
+.clusterAnalysisText {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.clusterAnalysisShort {
+  font-weight: 700;
+  font-style: italic;
+  color: #222;
+}
+
+.clusterAnalysisLong {
+  color: var(--ce-color-border);
+}
+
+.clusterAnalysisError {
+  color: #b00020;
+  font-weight: 600;
+}
+
+.participantsList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+  width: 100%;
+}
+
+.participantListItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border: 1px solid var(--ce-color-border-light);
+  border-radius: var(--ce-radius-6);
+  background: var(--ce-color-white);
+  max-width: 100%;
+}
+
+.participantIndex {
+  font-weight: 600;
+  min-width: 24px;
+  text-align: right;
+  flex: 0 0 auto;
+}
+
+.participantBlockie {
+  border-radius: var(--ce-radius-4);
+  flex: 0 0 auto;
+}
+
+.participantAddressLink {
+  text-decoration: none;
+  color: var(--ce-color-border);
+  font-family: var(--ce-font-mono);
+  font-size: 1.1rem;
+  display: block;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.participantAddressFull {
+  display: inline;
+}
+
+.participantAddressShort {
+  display: none;
+}
+
+@media (max-width: 480px) {
+  .participantAddressFull {
+    display: none;
+  }
+
+  .participantAddressShort {
+    display: inline;
+  }
+}
+
+/*
+==========================================================================
+   MOBILE RESPONSIVENESS (UPDATED)
+   - These styles apply to screens 768px or narrower.
+==========================================================================
+*/
+@media (max-width: 768px) {
+  /*
+   * 1. Top settings row: Make buttons and controls wrap instead of overflowing.
+   */
+  #settingsRow {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    gap: 10px;
+    > div {
+      margin-right: 0 !important; // Override inline styles from JSX
+    }
+  }
+
+  /*
+   * 2. BeeSwarm chart: Make it horizontally scrollable to address the main request.
+   *    The native scrollbar is hidden because custom scroll buttons are provided.
+   */
+  .swarmContainer {
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none; // For Firefox
+    &::-webkit-scrollbar {
+      display: none; // For Chrome, Safari, etc.
+    }
+  }
+
+  .participantAddressLink {
+    font-size: 0.95rem;
+  }
+
+  .graphItem {
+    flex: 1 1 100%;
+    max-width: 100%;
+    width: 100%;
+  }
+}
+
+/*
+   * 4. Participant Graph controls: Make them wrap compactly.
+   */
+.participantGraphControls {
+  display: flex;
+  flex-wrap: wrap; // Allow control groups to wrap    align-items: center;
+  gap: 15px 20px; // row-gap column-gap    margin-bottom: 15px;
+}
+
+/*
+   * 5. "All Questions" list: Fix formatting to prevent overflow.
+   */
+.questionVoteRow {
+  display: flex;
+  flex-direction: column; // Stack text and box plot vertically    align-items: flex-start; // Align to the left    gap: 8px; // Add space between stacked items
+  > span {
+    margin-right: 0; // Remove margin coupling on small screens
+  }
+}
+// }
+
+/* NEW: force desktop-like width for consistent PDF capture */
+.pdfDesktopWidth {
+  width: 1024px !important;
+  max-width: 1024px !important;
+}
+
+/* =========================
+   Modern Report Theme
+========================= */
+.polisReportModern {
+  background:
+    radial-gradient(900px 600px at 5% 0%, rgba(122, 160, 255, 0.2), transparent 60%),
+    radial-gradient(700px 500px at 95% 8%, rgba(255, 180, 220, 0.18), transparent 55%),
+    #f4f6ff;
+  border: none;
+  border-radius: var(--ce-radius-6);
+  box-shadow: 0 18px 32px rgba(15, 23, 42, 0.1);
+  color: #1f2a44;
+
+  #settingsRow {
+    background: rgba(255, 255, 255, 0.95);
+    border: none;
+    border-radius: var(--ce-radius-6);
+    box-shadow: 0 6px 16px rgba(15, 23, 42, 0.08);
+    justify-content: flex-start;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .heading {
+    font-size: 1.55rem;
+    letter-spacing: 0.2px;
+    color: #1f2a44;
+  }
+
+  .orgReportTitle {
+    color: #1f2a44;
+  }
+
+  .sessionInfo {
+    color: #5a6aa3;
+    opacity: 0.9;
+  }
+
+  .demoToggleLabel {
+    color: #3f4b6b;
+  }
+
+  .reportStyleSelect {
+    background: var(--ce-color-white);
+    color: #1f2a44;
+    border: 1px solid #dbe2f4;
+    box-shadow: 0 4px 10px rgba(15, 23, 42, 0.08);
+  }
+
+  .disclaimerBox {
+    background: #fff8df;
+    border: none;
+    color: #6c5a24;
+    box-shadow: 0 2px 10px rgba(15, 23, 42, 0.08);
+  }
+
+  .noData {
+    color: #6b7280;
+  }
+
+  .statsSection {
+    background: var(--ce-color-white);
+    border: none;
+    border-radius: var(--ce-radius-6);
+    box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
+  }
+
+  .statsSectionCollapsible {
+    border-radius: var(--ce-radius-6);
+  }
+
+  .statLabel,
+  .statValue {
+    color: #2a3556;
+  }
+
+  .graphDescriptionText {
+    color: #4a5a84;
+    opacity: 0.9;
+  }
+
+  .sectionCollapse {
+    background: var(--ce-color-white);
+    border: none;
+    border-radius: var(--ce-radius-6);
+    padding: 12px 14px;
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+    box-sizing: border-box;
+  }
+
+  .sectionHeaderRow {
+    padding-bottom: 8px;
+    border-bottom: 1px solid #edf0fb;
+    margin-bottom: 10px;
+  }
+
+  #sectionHeader {
+    font-weight: 700;
+    color: #1f2a44;
+  }
+
+  .sectionTitle {
+    font-weight: 700;
+    color: #1f2a44;
+  }
+
+  .graphSection {
+    gap: 16px;
+  }
+
+  .graphItem {
+    background: var(--ce-color-white);
+    border: none;
+    border-radius: var(--ce-radius-6);
+    padding: 12px;
+    box-shadow: 0 10px 20px rgba(15, 23, 42, 0.08);
+    box-sizing: border-box;
+  }
+
+  .participantSvg,
+  .beeswarmSvg {
+    border-radius: var(--ce-radius-6);
+    border: none;
+    background: var(--ce-color-white);
+  }
+
+  .participantGraphControls {
+    background: #f6f8ff;
+    border: none;
+    border-radius: var(--ce-radius-6);
+    padding: 10px 12px;
+  }
+
+  .participantsList {
+    gap: 10px;
+  }
+
+  .participantListItem {
+    border: none;
+    background: var(--ce-color-white);
+    box-shadow: 0 6px 14px rgba(15, 23, 42, 0.08);
+  }
+
+  .participantAddressLink {
+    color: #2b3758;
+  }
+
+  .tooltipIcon {
+    color: #5a6aa3;
+  }
+
+  .footnotesSection,
+  .footnotesHeading,
+  .footnotesList,
+  .pdfFooter,
+  .pdfFooterLabel,
+  .pdfFooterLink,
+  .footnoteRef {
+    color: #2a3556;
+  }
+
+  .beeTooltip {
+    background: var(--ce-color-white);
+    border: none;
+    color: #2b3758;
+    box-shadow: 0 12px 24px rgba(15, 23, 42, 0.12);
+  }
+
+  .tooltipPrompt {
+    color: #6b78a6;
+  }
+
+  .scrollButton {
+    background: #eef2ff;
+    border: none;
+    color: #2b3758;
+  }
+
+  .scrollButton:hover {
+    background: #e1e7ff;
+  }
+
+  .polisBoxPlotSvg {
+    border: 1px solid #e4e9f7;
+  }
+
+  .analysisNote {
+    color: #4a5a84;
+  }
+
+  .clusterAnalysis {
+    background: #f6f8ff;
+    border: none;
+  }
+
+  .clusterAnalysisShort {
+    color: #1f2a44;
+  }
+
+  .clusterAnalysisLong {
+    color: #4a5a84;
+  }
+
+  .clusterAnalysisError {
+    color: #c0395c;
+  }
+
+  .toggleButtonActive {
+    background-color: #6a7dff;
+    border: 1px solid #6a7dff;
+  }
+
+  .toggleButtonInactive {
+    background-color: #eef2ff;
+    border: none;
+    color: #4a5a84;
+  }
+
+  .pdfFooter {
+    border-top-color: #dbe2f4;
+  }
+
+  .pdfFooterQr {
+    border-color: #dbe2f4;
+    box-shadow: 0 6px 14px rgba(15, 23, 42, 0.08);
+  }
+
+  .analyzeClustersBtn {
+    background: #7063f5;
+    border: 1px solid #5e54e5;
+    box-shadow: 0 6px 14px rgba(112, 99, 245, 0.25);
+    color: var(--ce-color-white);
+  }
+
+  button {
+    background: #f4f6ff;
+    color: #2b3758;
+    border: none;
+    box-shadow: 0 4px 10px rgba(15, 23, 42, 0.08);
+  }
+
+  button:hover {
+    background: #e9edff;
+  }
+
+  input[type='checkbox'] {
+    accent-color: #6a7dff;
+  }
+}
+
+/* =========================
+   Dark Report Theme
+========================= */
+.polisReportDark {
+  background:
+    radial-gradient(1000px 700px at 5% 0%, rgba(80, 110, 255, 0.18), transparent 60%),
+    radial-gradient(700px 500px at 95% 10%, rgba(120, 90, 200, 0.18), transparent 55%),
+    #0b1020;
+  border: 1px solid #1f2937;
+  border-radius: var(--ce-radius-6);
+  box-shadow: 0 18px 40px rgba(3, 6, 14, 0.6);
+  color: #e5e7eb;
+  color-scheme: dark;
+
+  #settingsRow {
+    background: #0f172a;
+    border: 1px solid #1f2937;
+    border-radius: var(--ce-radius-6);
+    box-shadow: 0 10px 24px rgba(3, 6, 14, 0.55);
+    justify-content: flex-start;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .heading {
+    font-size: 1.55rem;
+    letter-spacing: 0.2px;
+    color: #f3f4f6;
+  }
+
+  .orgReportTitle {
+    color: #f3f4f6;
+  }
+
+  .sessionInfo {
+    color: #9aa4bf;
+    opacity: 0.9;
+  }
+
+  .demoToggleLabel {
+    color: #c1c7db;
+  }
+
+  .reportStyleSelect {
+    background: #111827;
+    color: #e5e7eb;
+    border: 1px solid #2b3446;
+  }
+
+  .disclaimerBox {
+    background: rgba(255, 235, 150, 0.12);
+    border: 1px solid rgba(255, 235, 150, 0.3);
+    color: #f3e7bf;
+  }
+
+  .noData {
+    color: #9aa4bf;
+  }
+
+  .statsSection {
+    background: #0f172a;
+    border: 1px solid #1f2937;
+    border-radius: var(--ce-radius-6);
+    box-shadow: 0 10px 22px rgba(3, 6, 14, 0.55);
+  }
+
+  .statsSectionCollapsible {
+    border-radius: var(--ce-radius-6);
+  }
+
+  .statLabel,
+  .statValue {
+    color: #d1d5db;
+  }
+
+  .graphDescriptionText {
+    color: #c1c7db;
+    opacity: 0.95;
+  }
+
+  .sectionCollapse {
+    background: #0f172a;
+    border: 1px solid #1f2937;
+    border-radius: var(--ce-radius-6);
+    padding: 12px 14px;
+    box-shadow: 0 12px 26px rgba(3, 6, 14, 0.55);
+    box-sizing: border-box;
+  }
+
+  .sectionHeaderRow {
+    padding-bottom: 8px;
+    border-bottom: 1px solid #1f2937;
+    margin-bottom: 10px;
+  }
+
+  #sectionHeader {
+    font-weight: 700;
+    color: #f3f4f6;
+  }
+
+  .sectionTitle {
+    font-weight: 700;
+    color: #f3f4f6;
+  }
+
+  .graphSection {
+    gap: 16px;
+  }
+
+  .graphItem {
+    background: #0f172a;
+    border: 1px solid #1f2937;
+    border-radius: var(--ce-radius-6);
+    padding: 12px;
+    box-shadow: 0 10px 22px rgba(3, 6, 14, 0.55);
+    box-sizing: border-box;
+  }
+
+  .participantSvg,
+  .beeswarmSvg {
+    border-radius: var(--ce-radius-6);
+    border: 1px solid #2b3446;
+    background: #1f2937;
+  }
+
+  .participantSvg text,
+  .beeswarmSvg text {
+    fill: #e5e7eb;
+  }
+
+  .participantSvg line,
+  .beeswarmSvg line {
+    stroke: #9ca3af;
+  }
+
+  .participantGraphControls {
+    background: #111827;
+    border: 1px solid #1f2937;
+    border-radius: var(--ce-radius-6);
+    padding: 10px 12px;
+  }
+
+  .participantsList {
+    gap: 10px;
+  }
+
+  .participantListItem {
+    border: 1px solid #1f2937;
+    background: #111827;
+    box-shadow: 0 6px 14px rgba(3, 6, 14, 0.5);
+  }
+
+  .participantAddressLink {
+    color: #e5e7eb;
+  }
+
+  .tooltipIcon {
+    color: #a5b4fc;
+  }
+
+  .footnotesSection,
+  .footnotesHeading,
+  .footnotesList,
+  .pdfFooter,
+  .pdfFooterLabel,
+  .pdfFooterLink,
+  .footnoteRef {
+    color: #d1d5db;
+  }
+
+  .beeTooltip {
+    background: #111827;
+    border: 1px solid #1f2937;
+    color: #e5e7eb;
+    box-shadow: 0 12px 24px rgba(3, 6, 14, 0.6);
+  }
+
+  .tooltipPrompt {
+    color: #c1c7db;
+  }
+
+  .scrollButton {
+    background: #1f2937;
+    border: 1px solid #2b3446;
+    color: #e5e7eb;
+  }
+
+  .scrollButton:hover {
+    background: #2b3648;
+  }
+
+  .polisBoxPlotSvg {
+    border: 1px solid #2b3446;
+  }
+
+  .analysisNote {
+    color: #c1c7db;
+  }
+
+  .clusterAnalysis {
+    background: #111827;
+    border: 1px solid #1f2937;
+  }
+
+  .clusterAnalysisShort {
+    color: #f3f4f6;
+  }
+
+  .clusterAnalysisLong {
+    color: #c1c7db;
+  }
+
+  .clusterAnalysisError {
+    color: #fca5a5;
+  }
+
+  .toggleButtonActive {
+    background-color: #4f6ef7;
+    border: 1px solid #4f6ef7;
+  }
+
+  .toggleButtonInactive {
+    background-color: #1f2937;
+    border: 1px solid #2b3446;
+    color: #cbd5f5;
+  }
+
+  .pdfFooter {
+    border-top-color: rgba(229, 231, 235, 0.18);
+  }
+
+  .pdfFooterQr {
+    border-color: #2b3446;
+    box-shadow: 0 6px 14px rgba(3, 6, 14, 0.4);
+  }
+
+  .analyzeClustersBtn {
+    background: linear-gradient(135deg, #5b7cff, #4f5fff);
+    border: 1px solid #6b8cff;
+    box-shadow: 0 10px 24px rgba(79, 94, 255, 0.45);
+  }
+
+  button {
+    background: #1f2937;
+    color: #e5e7eb;
+    border: 1px solid #2b3446;
+    box-shadow: 0 8px 18px rgba(3, 6, 14, 0.5);
+  }
+
+  button:hover {
+    background: #2b3648;
+  }
+
+  input[type='checkbox'] {
+    accent-color: #7aa2ff;
+  }
+}
+
+.reportInnerModern {
+  background: rgba(255, 255, 255, 0.95);
+  border: none;
+  border-radius: var(--ce-radius-6);
+  padding: 24px;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+}
+
+.reportInnerDark {
+  background: #0b1120;
+  border: 1px solid #1f2937;
+  border-radius: var(--ce-radius-6);
+  padding: 24px;
+  box-shadow: 0 18px 36px rgba(3, 6, 14, 0.6);
+}

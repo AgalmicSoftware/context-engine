@@ -1,0 +1,124 @@
+# Demo Data Fixtures
+
+This directory contains demo and fixture data for the Context Engine survey platform. These files back demo sessions, historical figure personas, Polis-style analysis, debate visualizations, risk matrix views, and simulated profile pages.
+
+## File Inventory
+
+### Data Files
+
+| File | Purpose |
+| --- | --- |
+| [`all_300_questions.json`](./all_300_questions.json) | Full question bank of roughly 300 survey questions used across demo sessions. Questions are stored in declarative statement form for survey presentation. |
+| [`policy_atlas_council.json`](./policy_atlas_council.json) | Canonical source for roughly 54 historical figure "council members" in the AI Policy Atlas. Entries include `id`, `name`, `bio`, `atlasCategory`, SBT metadata, created questions, and avatar placeholders. Categories include Macro Trends, Supply Chains, Actors/Civil Society, and Governance Institutions. |
+| [`additional_historical_figures.json`](./additional_historical_figures.json) | Supplementary set of 15 figures with richer persona fields such as questions, votes, comments, `biggestHope`, `biggestFear`, and `avatarPrompt`. |
+| [`historical_figure_users.json`](./historical_figure_users.json) | Rich per-figure profile data for roughly 50 figures, including Q&A responses, legislation stances, bios, featured quotes, and highlighted advice. Used heavily by simulated user profile views. |
+| [`historical_figures_merged.json`](./historical_figures_merged.json) | Consolidated superset combining data from the richer figure sources. Used for demographic computation, avatar resolution, and shared profile question lookups. |
+| [`historical_figures_tree_qs_and_votes.json`](./historical_figures_tree_qs_and_votes.json) | Debate-oriented dataset for 66 figures with tree-structured questions, in-character comments, and vote stances. Used by debate tree and political compass views. |
+| [`demo_polis_data.json`](./demo_polis_data.json) | Polis-format clustering dataset with participants, vote arrays, and group assignments. Used by the demo analysis adapter and Polis report surfaces. |
+| [`demo_polis_data_77.json`](./demo_polis_data_77.json) | Newer Polis fixture variant with 77 questions instead of 42. Currently a work-in-progress dataset. |
+| [`demo_sessions.json`](./demo_sessions.json) | Demo session definitions keyed by slug with metadata and worker configuration. Used by session resolution code and worker/cors proxy tests. |
+| [`demo_sbt_collection.json`](./demo_sbt_collection.json) | Sample SBT group metadata with per-figure demographic attributes such as gender, era, country, affiliation, and atlas category. |
+| [`expanded_tag_list.json`](./expanded_tag_list.json) | Taxonomy tag list for survey question classification and topic labeling. |
+| [`risk_matrix_data.json`](./risk_matrix_data.json) | Input data for the debate risk matrix visualization. |
+| [`corpus_sample.json`](./corpus_sample.json) | Sample AI discourse corpus documents used by demo corpus views. |
+| [`debates.json`](./debates.json) | Generated debate entries for Debate HUD and related demo views. |
+
+### JS Modules
+
+| File | Purpose |
+| --- | --- |
+| [`historical_figure_demographics.js`](./historical_figure_demographics.js) | Computes demographic breakdowns from merged historical figure data plus the Polis fixture. Exports `DEMO_ANALYSIS_DEMOGRAPHIC_FIELDS` and the default historical figure lookup object. |
+| [`historical_figure_demographics.test.js`](./historical_figure_demographics.test.js) | Regression coverage for the demographics lookup and fixture completeness. |
+| [`index.js`](./index.js) | Barrel export for the most commonly imported demo datasets and demographics helpers. |
+
+## Primary Consumers
+
+The main consumers of this folder are:
+
+- [`demoAnalysisAdapter.js`](../../utilities/demo/demoAnalysisAdapter.js)
+- [`demoAvatars.js`](../../utilities/ui/demoAvatars.js)
+- [`sessionSourceResolver.js`](../../utilities/session/sessionSourceResolver.js)
+- [`PolisReport.jsx`](../../components/PolisReport/PolisReport.jsx)
+- [`DebateMap.jsx`](../../components/DebateMap/DebateMap.jsx)
+- [`PoliticalCompassView.jsx`](../../components/DemoViews/DebateHUD/PoliticalCompassView.jsx)
+- [`CommunityTab.jsx`](../../components/CommunityTab/CommunityTab.jsx)
+- [`SimUserPage.jsx`](../../components/UserPage/SimUserPage.jsx)
+
+## Conceptual Data Pipeline
+
+This is the logical relationship between the core demo fixtures. It describes how the datasets build on each other; it is not an automated build graph by itself.
+
+```text
+Raw corpus / demo integration package
+  |
+  v
+all_300_questions.json
+  |
+  v
+policy_atlas_council.json
+additional_historical_figures.json
+historical_figure_users.json
+  |
+  v
+historical_figures_merged.json
+  |
+  +--> demo_polis_data.json
+  |
+  +--> historical_figures_tree_qs_and_votes.json
+  |
+  v
+historical_figure_demographics.js
+  |
+  v
+DemoAnalysisAdapter, DebateMap, PolisReport, SimUserPage
+```
+
+## Avatar Resolution Chain
+
+Avatar lookup is assembled across multiple data sources. Figure records provide candidate names and placeholders, then UI utilities resolve the best available image source.
+
+```text
+historical_figures_merged.json
+historical_figure_users.json
+policy_atlas_council.json
+additional_historical_figures.json
+  |
+  v
+utilities/ui/demoAvatars.js
+  |
+  v
+utilities/ui/historicalFigureAvatars.js
+  |
+  +--> utilities/ui/historicalFigurePhotoManifest.json
+  |
+  +--> utilities/ui/historicalFigureLocalPhotoManifest.json
+  |
+  v
+PoliticalCompassView, PolisReport, CommunityTab, SimUserPage
+```
+
+Related files:
+
+- [`demoAvatars.js`](../../utilities/ui/demoAvatars.js)
+- [`historicalFigureAvatars.js`](../../utilities/ui/historicalFigureAvatars.js)
+- [`historicalFigurePhotoManifest.json`](../../utilities/ui/historicalFigurePhotoManifest.json)
+- [`historicalFigureLocalPhotoManifest.json`](../../utilities/ui/historicalFigureLocalPhotoManifest.json)
+
+## Adding a New Historical Figure
+
+To add a new historical figure cleanly, update the datasets that drive the surfaces you care about:
+
+1. Update [`policy_atlas_council.json`](./policy_atlas_council.json) with the new figure's `id`, `name`, `bio`, `atlasCategory`, SBT metadata, question content, and tags.
+2. Update [`historical_figures_tree_qs_and_votes.json`](./historical_figures_tree_qs_and_votes.json) with debate questions, at least several in-character comments, and vote stances.
+3. Update [`historical_figure_demographics.js`](./historical_figure_demographics.js) with the figure's demographics entry, including display name, bio, era, country, gender, affiliation, and atlas category.
+4. Update [`demo_sbt_collection.json`](./demo_sbt_collection.json) with matching demographic attributes.
+5. Update avatar manifests in [`historicalFigurePhotoManifest.json`](../../utilities/ui/historicalFigurePhotoManifest.json) and [`historicalFigureLocalPhotoManifest.json`](../../utilities/ui/historicalFigureLocalPhotoManifest.json).
+6. Optionally update [`additional_historical_figures.json`](./additional_historical_figures.json) when you need richer persona fields such as `biggestHope`, `biggestFear`, or `avatarPrompt`.
+7. Optionally update [`historical_figure_users.json`](./historical_figure_users.json) when the figure needs a full SimUserPage-style profile.
+8. Keep [`historical_figures_merged.json`](./historical_figures_merged.json) in sync with the source datasets if your workflow does not regenerate it automatically.
+
+## Naming And Compatibility Notes
+
+- Most JSON fixtures in this folder use `snake_case`.
+- Most fixture filenames in this folder now follow `snake_case`, including [`demo_polis_data_77.json`](./demo_polis_data_77.json).
+- JS modules in this folder now follow the same `snake_case` filename convention, including [`historical_figure_demographics.js`](./historical_figure_demographics.js).

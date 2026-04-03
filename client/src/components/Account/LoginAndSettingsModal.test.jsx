@@ -1,0 +1,897 @@
+import { ethers } from 'ethers';
+import { LoginAndSettingsModal } from './LoginAndSettingsModal.jsx';
+import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
+import * as portoFunctions from '../../utilities/web3/portoFunctions.js';
+import { checkSponsoredAccess } from '../../utilities/web3/sponsoredAccess.js';
+import contractScripts from '../../utilities/web3/contractScripts.js';
+import {
+  getDemoSessionConfigBySlug,
+  getAllSessionSlugs,
+  getSessionConfigBySlugOrDefault,
+  getProviderLocation,
+} from '../../utilities/web3/contractScripts.js';
+import {
+  getWorkerSessionToken,
+  clearAllWorkerSessionTokens,
+} from '../../utilities/worker/workerAuth.js';
+import * as sessionScanScope from '../../utilities/session/sessionScanScope.js';
+import { baseSepolia, getDefaultHttpRpc } from '../../variables/chains.js';
+
+jest.mock('@rainbow-me/rainbowkit', () => ({
+  ConnectButton: () => null,
+}));
+
+jest.mock('../HooksHOC/withWagmiBridge.jsx', () => ({
+  WagmiHooksHOC: (Comp) => Comp,
+}));
+
+jest.mock('../../utilities/web3/contractScripts.js', () => ({
+  __esModule: true,
+  default: {
+    getProviderLocation: jest.fn(() => ({})),
+    sendTestnetFunds: jest.fn(),
+  },
+  getProviderLocation: jest.fn(() => ({})),
+  getDemoSessionConfigBySlug: jest.fn(() => null),
+  getSessionNetwork: jest.fn(() => ({ id: 84532, chainId: 84532, name: 'Base Sepolia' })),
+  getSessionConfigBySlugOrDefault: jest.fn(() => ({})),
+  getAllSessionSlugs: jest.fn(() => []),
+}));
+
+jest.mock('../../utilities/web3/portoFunctions.js', () => ({
+  getPortoChain: jest.fn(() => null),
+  setPortoChain: jest.fn(),
+  restoreSession: jest.fn(async () => null),
+  logoutPorto: jest.fn(),
+}));
+
+jest.mock('../../utilities/ai/aiSettings.js', () => {
+  const actual = jest.requireActual('../../utilities/ai/aiSettings.js');
+  return {
+    __esModule: true,
+    ...actual,
+    getSessionAiSettings: jest.fn(() => null),
+    getLocalAiSettings: jest.fn(() => ({
+      useLocal: false,
+      providers: {
+        anthropic: { apiKey: '' },
+        openai: { apiKey: '' },
+        custom: { rpcUrl: '' },
+      },
+    })),
+    saveLocalAiSettings: jest.fn(),
+    clearLocalAiSettings: jest.fn(),
+    deriveAiPreset: jest.fn(() => 'gpt-5'),
+    toModelLeaf: jest.fn((m) => String(m || '').toLowerCase().split('/').pop()),
+  };
+});
+
+jest.mock('../../utilities/session/resourceKeys.js', () => ({
+  getLocalSessionResourceKeys: jest.fn(() => ({})),
+  saveLocalResourceKeys: jest.fn(),
+  clearLocalResourceKeys: jest.fn(),
+}));
+
+jest.mock('../../utilities/web3/sponsoredAccess.js', () => ({
+  checkSponsoredAccess: jest.fn(async () => ({ status: 'unknown' })),
+}));
+
+jest.mock('../../utilities/worker/workerAuth.js', () => ({
+  getWorkerSessionToken: jest.fn(async () => null),
+  clearAllWorkerSessionTokens: jest.fn(),
+}));
+
+jest.mock('../../utilities/session/sessionScanScope.js', () => ({
+  normalizeSessionScanScope: jest.fn((value) => value || 'all'),
+  normalizeSessionScanSlugs: jest.fn((value) => value || []),
+  readSessionScanScope: jest.fn(() => 'all'),
+  readSessionScanSlugs: jest.fn(() => []),
+  writeSessionScanScope: jest.fn(),
+  writeSessionScanSlugs: jest.fn(),
+}));
+
+jest.mock('../../utilities/cache/cacheScripts.js', () => ({
+  initCacheManager: jest.fn(async () => undefined),
+  listNamespaceEntriesSync: jest.fn(() => []),
+  removeCache: jest.fn(async () => true),
+}));
+
+const buildProps = (overrides = {}) => ({
+  changeAccount: jest.fn(),
+  toggleLoginModal: jest.fn(),
+  updateLoginInfo: jest.fn(),
+  toggleDemoMode: jest.fn(),
+  changeFocusedTab: jest.fn(),
+  changeActiveSessionSlug: jest.fn(),
+  updateGlobalSessionSelection: jest.fn(),
+  primarySessionExplicit: false,
+  selectedSessionScope: 'active',
+  selectedSessionSlugs: [],
+  demoMode: { tools: false },
+  provider: 'wagmi',
+  loginComplete: false,
+  network: { id: 84532, chainId: 84532, name: 'Base Sepolia' },
+  ...overrides,
+});
+
+const treeHasPropValue = (node, propName, expected) => {
+  if (node == null) return false;
+  if (Array.isArray(node)) return node.some((child) => treeHasPropValue(child, propName, expected));
+  if (typeof node !== 'object') return false;
+  if (node?.props?.[propName] === expected) return true;
+  return treeHasPropValue(node?.props?.children, propName, expected);
+};
+
+const PASSKEY_ADDRESS = '0x1111111111111111111111111111111111111111';
+const WAGMI_ADDRESS = '0x2222222222222222222222222222222222222222';
+const ALT_PASSKEY_ADDRESS = '0x3333333333333333333333333333333333333333';
+
+const mountClassSubject = (subject) => {
+  subject._isMounted = true;
+  subject.setState = (nextState, cb) => {
+    const update = typeof nextState === 'function'
+      ? nextState(subject.state, subject.props)
+      : nextState;
+    subject.state = { ...subject.state, ...(update || {}) };
+    if (typeof cb === 'function') cb();
+  };
+  return subject;
+};
+
+describe('LoginAndSettingsModal cache clearing performance guards', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    localStorage.clear();
+  });
+
+  it('does not update local state after unmount while session restore is pending', async () => {
+    let resolveRestore = null;
+    portoFunctions.restoreSession.mockImplementationOnce(
+      () => new Promise((resolve) => { resolveRestore = resolve; })
+    );
+
+    const subject = new LoginAndSettingsModal(buildProps());
+    const setStateSpy = jest.fn();
+    subject.setState = setStateSpy;
+
+    const mountPromise = subject.componentDidMount();
+    subject.componentWillUnmount();
+
+    resolveRestore(null);
+    await mountPromise;
+
+    expect(portoFunctions.restoreSession).toHaveBeenCalledTimes(1);
+    expect(portoFunctions.restoreSession).toHaveBeenCalledWith({ requireSigner: false });
+    expect(setStateSpy).not.toHaveBeenCalled();
+  });
+
+  it('hydrates Porto login state from stored session metadata on mount without forcing signer restore', async () => {
+    portoFunctions.restoreSession.mockResolvedValueOnce(PASSKEY_ADDRESS);
+    const props = buildProps({
+      provider: 'none',
+    });
+    const subject = mountClassSubject(new LoginAndSettingsModal(props));
+
+    await subject.componentDidMount();
+
+    expect(portoFunctions.restoreSession).toHaveBeenCalledWith({ requireSigner: false });
+    expect(props.changeAccount).toHaveBeenCalledWith(expect.objectContaining({
+      account: PASSKEY_ADDRESS,
+      provider: 'porto_passkey',
+    }));
+    expect(props.updateLoginInfo).toHaveBeenCalledWith({
+      loginInProgress: false,
+      loginComplete: true,
+      provider: 'porto_passkey',
+    });
+  });
+
+  it('does not prefetch worker auth when loginComplete flips true after restore', () => {
+    const prevProps = buildProps({
+      account: PASSKEY_ADDRESS,
+      provider: 'porto_passkey',
+      loginComplete: false,
+    });
+    const nextProps = buildProps({
+      account: PASSKEY_ADDRESS,
+      provider: 'porto_passkey',
+      loginComplete: true,
+    });
+    const subject = mountClassSubject(new LoginAndSettingsModal(nextProps));
+    subject.checkAndSendTestFundsIfNeeded = jest.fn();
+
+    subject.componentDidUpdate(prevProps, subject.state);
+
+    expect(getWorkerSessionToken).not.toHaveBeenCalled();
+  });
+
+  it('adds the target network with a non-PATH RPC URL', async () => {
+    const originalEthereum = window.ethereum;
+    const request = jest.fn().mockResolvedValue(undefined);
+    window.ethereum = { request };
+    try {
+      const subject = mountClassSubject(new LoginAndSettingsModal(buildProps()));
+      subject.getTargetNetwork = jest.fn(() => baseSepolia);
+
+      await subject.addCorrectNetwork();
+
+      expect(request).toHaveBeenCalledWith({
+        method: 'wallet_addEthereumChain',
+        params: [expect.objectContaining({
+          rpcUrls: [getDefaultHttpRpc(84532, { allowPath: false })],
+        })],
+      });
+    } finally {
+      window.ethereum = originalEthereum;
+    }
+  });
+
+  it('does not prefetch worker auth when navigating between sessions', () => {
+    const prevProps = buildProps({
+      account: PASSKEY_ADDRESS,
+      provider: 'porto_passkey',
+      loginComplete: true,
+      activeSessionSlug: 'edge',
+    });
+    const nextProps = buildProps({
+      account: PASSKEY_ADDRESS,
+      provider: 'porto_passkey',
+      loginComplete: true,
+      activeSessionSlug: 'demo',
+    });
+    const subject = mountClassSubject(new LoginAndSettingsModal(nextProps));
+    subject.checkAndSendTestFundsIfNeeded = jest.fn();
+    subject.loadAiSettings = jest.fn();
+    subject.loadResourceKeys = jest.fn();
+    subject.loadSponsoredAccess = jest.fn();
+    subject.syncPortoChain = jest.fn();
+
+    subject.componentDidUpdate(prevProps, subject.state);
+
+    expect(subject.checkAndSendTestFundsIfNeeded).toHaveBeenCalledTimes(1);
+    expect(subject.loadAiSettings).toHaveBeenCalledTimes(1);
+    expect(subject.loadResourceKeys).toHaveBeenCalledTimes(1);
+    expect(subject.loadSponsoredAccess).toHaveBeenCalledTimes(1);
+    expect(subject.syncPortoChain).toHaveBeenCalledTimes(1);
+    expect(getWorkerSessionToken).not.toHaveBeenCalled();
+  });
+
+  it('scans managed cache entries without cloning values and de-duplicates slug clears', async () => {
+    cacheScripts.listNamespaceEntriesSync.mockImplementation((namespace) => {
+      if (namespace === 'questionsCache') {
+        return [
+          { slug: 'edge', value: { heavy: true } },
+          { slug: 'edge', value: { heavy: true } },
+          { slug: '', value: { heavy: true } },
+        ];
+      }
+      return [];
+    });
+
+    const subject = new LoginAndSettingsModal(buildProps());
+    subject.reloadPage = jest.fn();
+
+    await subject.handleClearAllCaches();
+
+    expect(cacheScripts.listNamespaceEntriesSync).toHaveBeenCalledWith(
+      'questionsCache',
+      { cloneValues: false }
+    );
+    const edgeCalls = cacheScripts.removeCache.mock.calls.filter(
+      ([namespace, slug]) => namespace === 'questionsCache' && slug === 'edge'
+    );
+    expect(edgeCalls).toHaveLength(1);
+    expect(cacheScripts.removeCache).toHaveBeenCalledWith('questionsCache', '');
+    expect(subject.reloadPage).toHaveBeenCalledTimes(1);
+  });
+
+  it('deduplicates in-flight cache clear requests', async () => {
+    let resolveInit = null;
+    cacheScripts.initCacheManager.mockImplementation(() => new Promise((resolve) => {
+      resolveInit = resolve;
+    }));
+
+    const subject = new LoginAndSettingsModal(buildProps());
+    subject.reloadPage = jest.fn();
+
+    const first = subject.handleClearAllCaches();
+    const second = subject.handleClearAllCaches();
+    expect(cacheScripts.initCacheManager).toHaveBeenCalledTimes(1);
+
+    resolveInit();
+    await Promise.all([first, second]);
+
+    expect(cacheScripts.initCacheManager).toHaveBeenCalledTimes(1);
+    expect(subject.reloadPage).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders only the current pre-login layout and does not render legacy Torus button ids', () => {
+    const subject = new LoginAndSettingsModal(buildProps({
+      loginComplete: false,
+      loginInProgress: false,
+    }));
+
+    const tree = subject.getModalDisplay();
+
+    expect(treeHasPropValue(tree, 'className', 'accountWarningContainer')).toBe(true);
+    expect(treeHasPropValue(tree, 'className', 'passkeyButtonContainer')).toBe(true);
+    expect(treeHasPropValue(tree, 'className', 'cryptoLoginLink')).toBe(true);
+    expect(treeHasPropValue(tree, 'aria-label', 'Open Crypto Login (RainbowKit)')).toBe(true);
+    expect(treeHasPropValue(tree, 'id', 'inModalTorusButton')).toBe(false);
+    expect(treeHasPropValue(tree, 'id', 'torusButtonContainer')).toBe(false);
+  });
+
+  it('renders the shared overview panel in the pre-login drawer while config stays collapsed by default', () => {
+    const subject = new LoginAndSettingsModal(buildProps({
+      loginComplete: false,
+      loginInProgress: false,
+    }));
+    subject.state = {
+      ...subject.state,
+      preLoginSettingsOpen: true,
+      preLoginConfigOpen: false,
+    };
+
+    const tree = subject.getPreLoginSettingsDisplay();
+
+    expect(treeHasPropValue(tree, 'className', 'aiSettingsPanel')).toBe(true);
+    expect(treeHasPropValue(tree, 'data-testid', 'ce-prelogin-config-panel')).toBe(false);
+  });
+
+  it('sets persistent wagmi disconnect flag on wagmi logout', async () => {
+    const wagmiDisconnect = jest.fn();
+    const subject = new LoginAndSettingsModal(buildProps({
+      provider: 'wagmi',
+      wagmiDisconnect,
+    }));
+
+    await subject.handleLogout();
+
+    expect(wagmiDisconnect).toHaveBeenCalledTimes(1);
+    expect(localStorage.getItem('ce:userDisconnected')).toBe('true');
+  });
+
+  it('persists wagmi disconnect intent even when wagmi disconnect throws', async () => {
+    const wagmiDisconnect = jest.fn(() => {
+      throw new Error('disconnect failed');
+    });
+    const props = buildProps({
+      provider: 'wagmi',
+      wagmiDisconnect,
+    });
+    const subject = new LoginAndSettingsModal(props);
+
+    await expect(subject.handleLogout()).resolves.toBeUndefined();
+    expect(wagmiDisconnect).toHaveBeenCalledTimes(1);
+    expect(localStorage.getItem('ce:userDisconnected')).toBe('true');
+    expect(props.updateLoginInfo).toHaveBeenCalledWith({
+      loginInProgress: false,
+      loginComplete: false,
+      provider: null,
+    });
+    expect(props.changeAccount).toHaveBeenCalledWith({});
+    expect(clearAllWorkerSessionTokens).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not set wagmi disconnect flag when logging out Porto passkey', async () => {
+    const subject = new LoginAndSettingsModal(buildProps({
+      provider: 'porto_passkey',
+      wagmiDisconnect: jest.fn(),
+    }));
+
+    await subject.handleLogout();
+
+    expect(portoFunctions.logoutPorto).toHaveBeenCalledTimes(1);
+    expect(localStorage.getItem('ce:userDisconnected')).toBeNull();
+  });
+
+  it('uses wagmi balance props for faucet checks without Redux balance state', async () => {
+    const subject = mountClassSubject(new LoginAndSettingsModal(buildProps({
+      account: WAGMI_ADDRESS,
+      loginComplete: true,
+      provider: 'wagmi',
+      wagmiBalance: { data: { value: 0n } },
+    })));
+    subject.autoSendTestFunds = jest.fn();
+
+    await subject.checkAndSendTestFundsIfNeeded();
+
+    expect(subject.autoSendTestFunds).toHaveBeenCalledTimes(1);
+    expect(getProviderLocation).not.toHaveBeenCalled();
+    expect(subject.state.autoSendTriggered).toBe(true);
+    expect(subject.state.walletBalanceWei.eq(ethers.BigNumber.from(0))).toBe(true);
+  });
+
+  it('treats equivalent wagmi BigNumber balance snapshots as unchanged', () => {
+    const prevProps = buildProps({
+      account: WAGMI_ADDRESS,
+      loginComplete: true,
+      provider: 'wagmi',
+      wagmiBalance: { data: { value: ethers.BigNumber.from(0) } },
+    });
+    const nextProps = {
+      ...prevProps,
+      wagmiBalance: { data: { value: ethers.BigNumber.from(0) } },
+    };
+    const subject = mountClassSubject(new LoginAndSettingsModal(nextProps));
+    subject.checkAndSendTestFundsIfNeeded = jest.fn();
+
+    subject.componentDidUpdate(prevProps);
+
+    expect(subject.checkAndSendTestFundsIfNeeded).not.toHaveBeenCalled();
+    expect(subject.shouldComponentUpdate({
+      ...nextProps,
+      wagmiBalance: { data: { value: ethers.BigNumber.from(0) } },
+    }, subject.state)).toBe(false);
+  });
+
+  it('uses the live wagmi address for faucet checks before Redux account catches up', async () => {
+    const nextWagmiAddress = '0x4444444444444444444444444444444444444444';
+    const subject = mountClassSubject(new LoginAndSettingsModal(buildProps({
+      account: WAGMI_ADDRESS,
+      loginComplete: true,
+      provider: 'wagmi',
+      wagmiAddress: nextWagmiAddress,
+      wagmiBalance: { data: { value: 0n } },
+    })));
+
+    await subject.checkAndSendTestFundsIfNeeded();
+
+    expect(contractScripts.sendTestnetFunds).toHaveBeenCalledWith(
+      nextWagmiAddress,
+      '',
+      expect.objectContaining({
+        context: expect.objectContaining({
+          account: nextWagmiAddress,
+          providerLike: 'wagmi',
+          chainId: 84532,
+        }),
+      })
+    );
+    expect(subject.state.walletBalanceWei.eq(ethers.BigNumber.from(0))).toBe(true);
+  });
+
+  it('keeps the zero-balance faucet affordance when auto-funding is disabled', async () => {
+    const subject = mountClassSubject(new LoginAndSettingsModal(buildProps({
+      account: WAGMI_ADDRESS,
+      loginComplete: true,
+      provider: 'wagmi',
+      wagmiBalance: { data: { value: 0n } },
+    })));
+    subject.state.autoRequestTestnetFundsEnabled = false;
+
+    await subject.checkAndSendTestFundsIfNeeded();
+
+    expect(contractScripts.sendTestnetFunds).not.toHaveBeenCalled();
+    expect(subject.state.autoSendTriggered).toBe(false);
+    expect(subject.state.walletBalanceWei.eq(ethers.BigNumber.from(0))).toBe(true);
+    expect(treeHasPropValue(subject.getSettingsDisplay(), 'className', 'faucetContainer')).toBe(true);
+  });
+
+  it('keeps the manual faucet affordance visible while the wallet balance is still unknown', () => {
+    const subject = new LoginAndSettingsModal(buildProps({
+      account: WAGMI_ADDRESS,
+      loginComplete: true,
+      provider: 'wagmi',
+      wagmiBalance: { data: { value: null } },
+    }));
+
+    expect(subject.state.walletBalanceWei).toBeNull();
+    expect(treeHasPropValue(subject.getSettingsDisplay(), 'className', 'faucetContainer')).toBe(true);
+  });
+
+  it('keeps the manual faucet affordance visible when passkey balance reads fail', async () => {
+    const getBalance = jest.fn(async () => {
+      throw new Error('rpc timeout');
+    });
+    const providerCtorSpy = jest.spyOn(ethers.providers, 'Web3Provider').mockImplementation(function MockWeb3Provider() {
+      this.getBalance = getBalance;
+    });
+
+    const subject = mountClassSubject(new LoginAndSettingsModal(buildProps({
+      account: PASSKEY_ADDRESS,
+      loginComplete: true,
+      provider: 'porto_passkey',
+    })));
+    subject.autoSendTestFunds = jest.fn();
+
+    await subject.checkAndSendTestFundsIfNeeded();
+
+    expect(subject.state.walletBalanceWei).toBeNull();
+    expect(subject.autoSendTestFunds).not.toHaveBeenCalled();
+    expect(treeHasPropValue(subject.getSettingsDisplay(), 'className', 'faucetContainer')).toBe(true);
+
+    providerCtorSpy.mockRestore();
+  });
+
+  it('triggers passkey faucet checks after a successful balance sync', async () => {
+    const subject = mountClassSubject(new LoginAndSettingsModal(buildProps({
+      account: PASSKEY_ADDRESS,
+      loginComplete: true,
+      provider: 'porto_passkey',
+    })));
+    subject.autoSendTestFunds = jest.fn();
+    subject.syncWalletBalance = jest.fn(async () => ({
+      balance: ethers.BigNumber.from(0),
+      stale: false,
+    }));
+
+    await subject.checkAndSendTestFundsIfNeeded();
+
+    expect(subject.syncWalletBalance).toHaveBeenCalledTimes(1);
+    expect(subject.autoSendTestFunds).toHaveBeenCalledTimes(1);
+  });
+
+  it('stores visible faucet success state for manual settings requests', async () => {
+    contractScripts.sendTestnetFunds.mockResolvedValueOnce({
+      txHash: '0xfeed1234',
+      amountEth: '0.0002',
+    });
+
+    const subject = mountClassSubject(new LoginAndSettingsModal(buildProps({
+      account: WAGMI_ADDRESS,
+      loginComplete: true,
+      provider: 'wagmi',
+      activeSessionSlug: 'edge',
+      wagmiBalance: { data: { value: 0n } },
+    })));
+
+    await subject.handleManualTestFundsRequest();
+
+    expect(contractScripts.sendTestnetFunds).toHaveBeenCalledWith(
+      WAGMI_ADDRESS,
+      'edge',
+      expect.objectContaining({
+        context: expect.objectContaining({
+          account: WAGMI_ADDRESS,
+          providerLike: 'wagmi',
+          chainId: 84532,
+        }),
+      })
+    );
+    expect(subject.state.sentTxHash).toBe('0xfeed1234');
+    expect(subject.state.testFundsStatusTone).toBe('success');
+    expect(subject.state.testFundsStatusMessage).toMatch(/Test gas sent/i);
+  });
+
+  it('stores visible faucet error state for manual settings requests', async () => {
+    const error = new Error('Failed to request test ETH: Token missing faucet scope.');
+    error.status = 403;
+    contractScripts.sendTestnetFunds.mockRejectedValueOnce(error);
+
+    const subject = mountClassSubject(new LoginAndSettingsModal(buildProps({
+      account: WAGMI_ADDRESS,
+      loginComplete: true,
+      provider: 'wagmi',
+      activeSessionSlug: 'edge',
+      wagmiBalance: { data: { value: 0n } },
+    })));
+
+    await subject.handleManualTestFundsRequest();
+
+    expect(subject.state.sentTxHash).toBe('');
+    expect(subject.state.testFundsStatusTone).toBe('error');
+    expect(subject.state.testFundsStatusMessage).toContain('Get test gas failed');
+    expect(subject.state.testFundsStatusMessage).toContain('Token missing faucet scope.');
+  });
+
+  it('ignores stale manual faucet responses after the active session changes', async () => {
+    let resolveFunds = null;
+    contractScripts.sendTestnetFunds.mockImplementationOnce(() => (
+      new Promise((resolve) => { resolveFunds = resolve; })
+    ));
+
+    const subject = mountClassSubject(new LoginAndSettingsModal(buildProps({
+      account: WAGMI_ADDRESS,
+      loginComplete: true,
+      provider: 'wagmi',
+      activeSessionSlug: 'edge',
+      wagmiBalance: { data: { value: 0n } },
+    })));
+    subject.checkAndSendTestFundsIfNeeded = jest.fn();
+    subject.loadAiSettings = jest.fn();
+    subject.loadResourceKeys = jest.fn();
+    subject.loadSponsoredAccess = jest.fn();
+    subject.syncPortoChain = jest.fn();
+
+    const requestPromise = subject.handleManualTestFundsRequest();
+    expect(subject.state.sendingTestFunds).toBe(true);
+
+    const prevProps = subject.props;
+    const prevState = { ...subject.state };
+    subject.props = {
+      ...subject.props,
+      activeSessionSlug: 'demo',
+    };
+
+    subject.componentDidUpdate(prevProps, prevState);
+
+    expect(subject.state.sendingTestFunds).toBe(false);
+    expect(subject.state.sentTxHash).toBe('');
+    expect(subject.state.testFundsStatusMessage).toBe('');
+
+    resolveFunds({
+      txHash: '0xfeed1234',
+      amountEth: '0.0002',
+    });
+    await requestPromise;
+
+    expect(subject.state.sendingTestFunds).toBe(false);
+    expect(subject.state.sentTxHash).toBe('');
+    expect(subject.state.testFundsStatusMessage).toBe('');
+    expect(subject.state.testFundsStatusTone).toBe('');
+  });
+
+  it('ignores stale balance reads after the active wallet changes', async () => {
+    let resolveBalance = null;
+    const subject = mountClassSubject(new LoginAndSettingsModal(buildProps({
+      account: PASSKEY_ADDRESS,
+      loginComplete: true,
+      provider: 'porto_passkey',
+    })));
+    subject.autoSendTestFunds = jest.fn();
+    subject.readWalletBalance = jest.fn(() => new Promise((resolve) => {
+      resolveBalance = resolve;
+    }));
+
+    const pendingCheck = subject.checkAndSendTestFundsIfNeeded();
+    subject.props = buildProps({
+      account: ALT_PASSKEY_ADDRESS,
+      loginComplete: true,
+      provider: 'porto_passkey',
+    });
+    resolveBalance(ethers.BigNumber.from(0));
+    await pendingCheck;
+
+    expect(subject.autoSendTestFunds).not.toHaveBeenCalled();
+    expect(subject.state.walletBalanceWei).toBeNull();
+  });
+
+  it('uses explicit demo-session metadata for non-authoritative session descriptors', () => {
+    getSessionConfigBySlugOrDefault.mockReturnValueOnce(null);
+    getDemoSessionConfigBySlug.mockReturnValueOnce({
+      slug: 'rxc',
+      sessionName: 'Weyl v. Yarvin Debate',
+    });
+
+    const subject = new LoginAndSettingsModal(buildProps({
+      activeSessionSlug: 'rxc',
+    }));
+
+    expect(subject.getSessionDescriptor('rxc')).toEqual(expect.objectContaining({
+      slug: 'rxc',
+      slugLabel: 'rxc',
+      sessionName: 'Weyl v. Yarvin Debate',
+      label: 'Weyl v. Yarvin Debate',
+      description: 'Weyl v. Yarvin Debate (rxc)',
+    }));
+    expect(getDemoSessionConfigBySlug).toHaveBeenCalledWith('rxc', { allowDemoFallback: true });
+  });
+
+  it('includes the logged-in session selector when the settings panel is open', () => {
+    const subject = new LoginAndSettingsModal(buildProps({
+      account: WAGMI_ADDRESS,
+      loginComplete: true,
+      provider: 'wagmi',
+      activeSessionSlug: 'edge',
+    }));
+    subject.state = {
+      ...subject.state,
+      aiSettingsOpen: true,
+      aiSettingsSectionsOpen: {
+        ...subject.state.aiSettingsSectionsOpen,
+        session: true,
+      },
+    };
+
+    expect(treeHasPropValue(subject.getSettingsDisplay(), 'data-testid', 'ce-web3modal-session-select')).toBe(true);
+  });
+
+  it('persists the selected-session scope and list from the settings panel', () => {
+    const props = buildProps({
+      account: WAGMI_ADDRESS,
+      loginComplete: true,
+      provider: 'wagmi',
+      activeSessionSlug: 'edge',
+      selectedSessionScope: 'list',
+      selectedSessionSlugs: ['edge', 'rxc'],
+      updateGlobalSessionSelection: jest.fn(),
+    });
+    const subject = mountClassSubject(new LoginAndSettingsModal(props));
+    subject.state = {
+      ...subject.state,
+      sessionScanScope: 'list',
+      sessionScanSlugs: ['edge', 'rxc'],
+    };
+    subject.getConfiguredSessionScanSlugs = jest.fn(() => ['edge', 'rxc']);
+    subject.getActiveSessionSlug = jest.fn(() => 'edge');
+
+    subject.handleSaveSessionScanSettings();
+
+    const savedSelection = props.updateGlobalSessionSelection.mock.calls[0]?.[0] || {};
+    expect(savedSelection).toEqual(expect.objectContaining({
+      selectedSessionSlugs: ['edge', 'rxc'],
+    }));
+    expect(savedSelection).not.toHaveProperty('primarySessionSlug');
+    expect(subject.state.sessionScanStatus).toBe('Saved.');
+  });
+
+  it('preserves an explicit general primary session while list scope is active', () => {
+    const subject = new LoginAndSettingsModal(buildProps({
+      activeSessionSlug: '',
+      primarySessionExplicit: true,
+      selectedSessionScope: 'list',
+      selectedSessionSlugs: ['', 'edge'],
+    }));
+    subject.state = {
+      ...subject.state,
+      sessionScanScope: 'list',
+      sessionScanSlugs: ['', 'edge'],
+    };
+
+    expect(subject.getActiveSessionSlug()).toBe('');
+  });
+
+  it('allows saving an empty selected-session list from the local draft', () => {
+    sessionScanScope.normalizeSessionScanScope.mockImplementation((value) => value || 'all');
+    const props = buildProps({
+      account: WAGMI_ADDRESS,
+      loginComplete: true,
+      provider: 'wagmi',
+      activeSessionSlug: 'edge',
+      selectedSessionScope: 'list',
+      selectedSessionSlugs: ['edge'],
+      updateGlobalSessionSelection: jest.fn(),
+    });
+    const subject = mountClassSubject(new LoginAndSettingsModal(props));
+    subject.state = {
+      ...subject.state,
+      sessionScanScope: 'list',
+      sessionScanSlugs: [],
+      sessionScanSlugsInput: '',
+    };
+    expect(subject.getConfiguredSessionScanSlugs({
+      sessionScanSlugs: [],
+      sessionScanSlugsInput: '',
+    })).toEqual([]);
+    subject.getConfiguredSessionScanSlugs = jest.fn(() => []);
+    subject.getActiveSessionSlug = jest.fn(() => 'edge');
+
+    subject.handleSaveSessionScanSettings();
+
+    const savedSelection = props.updateGlobalSessionSelection.mock.calls[0]?.[0] || {};
+    expect(savedSelection).toEqual(expect.objectContaining({
+      selectedSessionSlugs: [],
+    }));
+    expect(savedSelection).not.toHaveProperty('primarySessionSlug');
+    expect(subject.state.sessionScanScope).toBe('general');
+    expect(subject.state.sessionScanStatus).toBe('No sessions selected; saved as general mode.');
+  });
+
+  it('derives the list-mode primary session from the first selected session slug', () => {
+    const subject = new LoginAndSettingsModal(buildProps({
+      activeSessionSlug: '',
+    }));
+    subject.getSessionScanScopeValue = jest.fn(() => 'list');
+    subject.getConfiguredSessionScanSlugs = jest.fn(() => ['edge', 'rxc']);
+
+    expect(subject.getListModePrimarySessionSlug({
+      sessionScanScope: 'list',
+      sessionScanSlugs: ['edge', 'rxc'],
+    })).toBe('edge');
+  });
+
+  it('uses demo-session sponsored keys for display-only sponsor session sources', () => {
+    getAllSessionSlugs.mockReturnValue(['edge']);
+    getSessionConfigBySlugOrDefault.mockImplementation((slug) => (
+      String(slug || '') === '' ? {} : null
+    ));
+    getDemoSessionConfigBySlug.mockImplementation((slug) => (
+      String(slug || '') === 'edge'
+        ? {
+          slug: 'edge',
+          sessionName: 'Edge 2025',
+          sponsoredKeys: {
+            ai: { encrypted: true },
+            rpc: { encrypted: true },
+          },
+        }
+        : null
+    ));
+
+    const subject = new LoginAndSettingsModal(buildProps({
+      activeSessionSlug: 'edge',
+    }));
+
+    const sources = subject.getSponsoredSessionSources({ activeSlug: 'edge' });
+
+    expect(sources.byResource.ai).toEqual([
+      expect.objectContaining({
+        slug: 'edge',
+        sessionName: 'Edge 2025',
+        isActive: true,
+        sponsoredKeys: expect.objectContaining({
+          ai: expect.objectContaining({ encrypted: true }),
+        }),
+      }),
+    ]);
+    expect(sources.byResource.rpc).toEqual([
+      expect.objectContaining({
+        slug: 'edge',
+        sessionName: 'Edge 2025',
+        sponsoredKeys: expect.objectContaining({
+          rpc: expect.objectContaining({ encrypted: true }),
+        }),
+      }),
+    ]);
+    expect(getDemoSessionConfigBySlug).toHaveBeenCalledWith('edge', { allowDemoFallback: true });
+  });
+
+  it('uses demo-session sponsored keys for display-only active-session config when strict config is missing', () => {
+    getSessionConfigBySlugOrDefault.mockImplementation((slug) => (
+      String(slug || '') === '' ? {} : null
+    ));
+    getDemoSessionConfigBySlug.mockImplementation((slug) => (
+      String(slug || '') === 'edge'
+        ? {
+          slug: 'edge',
+          sessionName: 'Edge 2025',
+          sponsoredKeys: {
+            ai: { encrypted: true },
+          },
+        }
+        : null
+    ));
+
+    const subject = new LoginAndSettingsModal(buildProps({
+      activeSessionSlug: 'edge',
+    }));
+
+    expect(subject.getDisplaySessionConfig('edge')).toEqual(expect.objectContaining({
+      slug: 'edge',
+      sessionName: 'Edge 2025',
+      sponsoredKeys: expect.objectContaining({
+        ai: expect.objectContaining({ encrypted: true }),
+      }),
+    }));
+    expect(getDemoSessionConfigBySlug).toHaveBeenCalledWith('edge', { allowDemoFallback: true });
+  });
+
+  it('keeps loadSponsoredAccess strict when only a demo-session config exists', async () => {
+    getSessionConfigBySlugOrDefault.mockImplementation((slug) => (
+      String(slug || '') === 'rxc' ? null : {}
+    ));
+    getDemoSessionConfigBySlug.mockImplementation((slug) => (
+      String(slug || '') === 'rxc'
+        ? {
+          slug: 'rxc',
+          sessionName: 'Weyl v. Yarvin Debate',
+          sponsoredKeys: {
+            ai: { encrypted: true },
+          },
+        }
+        : null
+    ));
+    checkSponsoredAccess.mockResolvedValue({ status: 'unknown' });
+
+    const subject = new LoginAndSettingsModal(buildProps({
+      activeSessionSlug: 'rxc',
+      account: '0x00000000000000000000000000000000000000aa',
+    }));
+    subject.setState = jest.fn((patch) => {
+      subject.state = { ...subject.state, ...(patch || {}) };
+    });
+
+    await subject.loadSponsoredAccess();
+
+    expect(checkSponsoredAccess).toHaveBeenCalledTimes(4);
+    checkSponsoredAccess.mock.calls.forEach(([arg]) => {
+      expect(arg).toEqual(expect.objectContaining({
+        sessionSlug: 'rxc',
+        account: '0x00000000000000000000000000000000000000aa',
+      }));
+      expect(arg.sessionConfig).toEqual({});
+    });
+    expect(getDemoSessionConfigBySlug).not.toHaveBeenCalled();
+  });
+});

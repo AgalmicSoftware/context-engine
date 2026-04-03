@@ -1,0 +1,110 @@
+# Documentation Index
+
+Primary product and system specification:
+- `spec.md` (repo root)
+
+Canonical reference set:
+- root docs: `README.md`, `ARCHITECTURE.md`, `AGENTS.md`, `CLAUDE.md`, `spec.md`
+- the `docs/` reference docs listed below
+
+Non-canonical / historical planning material:
+- `TODO/`
+- `TODO/PRDs/`
+- one-off debug prompts or migration notes unless they are explicitly linked below as current reference
+
+Planning docs and PRDs should be added under `TODO/`, not `docs/`.
+
+## How To Keep Docs Updated
+
+When you add or change a feature, update documentation in the same PR:
+- Add or update a doc in `docs/` when the change introduces new workflows, endpoints, config keys, schemas, or operational steps.
+- Update `spec.md` to reflect new capabilities and any new surface area (routes, Worker endpoints, contracts, config keys).
+- Add your new/updated doc link to this index so others can discover it.
+
+## Core Docs
+
+Session, gates, and the Worker:
+- `docs/session-creation-guide.md`: End-to-end setup guide for creating a session from `/new`, including the "what a new session needs" checklist, sponsored bundle handoff, worker deploy paths, on-chain registration, and `/admin` verification.
+- `docs/session-registry.md`: SessionRegistry migration and on-chain gate authority model.
+- `docs/session-cors-worker.md`: Cloudflare `sessionCorsWorker` behavior, endpoints, KV layouts, and wizard flow.
+- `docs/scaling.md`: Public scaling reference covering write-path settlement, indexed reads, private compute modes, and deployment profiles.
+
+Keys and RPCs:
+- `docs/public-client-config.md`: public `REACT_APP_*` client config, fallback behavior, and `.env.example` reference.
+- `docs/resource-keys.md`: Where AI/Arweave/RPC/faucet keys live and the resolution order (local overrides vs worker secrets).
+- `docs/path-rpc.md`: PATH (Pocket) endpoint defaults, client/provider ordering, and legacy PATH override behavior.
+- `docs/rpc-scan-scope.md`: scan-scope flags, profile deep-scan defaults, RPC guardrails, and testing-mode controls.
+
+Encryption:
+- `docs/lit-protocol-information.md`: Lit protocol wiring and current runtime status (v8).
+- `docs/doc-library.md`: Doc Library for Sessions + SBT groups (tag schema, listing queries, encryption UX).
+
+Payload schemas:
+- `docs/arweave-payloads.md`: Example Arweave payload shapes for surveys, questions, and SBT tokenURI JSON.
+
+Local development:
+- `docs/local-chain.md`: Foundry/Anvil local chain setup, deploy flow, and test commands.
+- `docs/run-modes.md`: repo run modes (`core-local`, `local-chain`, `hosted/onchain`).
+- `docs/testing.md`: centralized test commands and runtime requirements across root, client, and E2E flows.
+
+Wallets:
+- `docs/porto-information.md`: Porto passkey wallet wiring and deterministic test wallet workflow.
+
+E2E workflows:
+- `docs/e2e-setup.md`: End-to-end workflow scripts (gates Any/All, doc library filetype encryption/decryption).
+- `docs/e2e-testid-api.md`: Stable `data-testid` hooks used by Playwright runners (TestID API).
+
+## Runtime Telemetry
+
+Opt-in diagnostics API (no production UI surface). Disabled unless explicitly enabled.
+
+- Auto-start flag: set `globalThis.ENABLE_CE_RUNTIME_STATS = true` before app boot.
+- Console API:
+  - `window.__CE_RUNTIME_STATS__.start(opts?)`
+  - `window.__CE_RUNTIME_STATS__.stop()`
+  - `window.__CE_RUNTIME_STATS__.reset()`
+  - `window.__CE_RUNTIME_STATS__.snapshot()`
+  - `window.__CE_RUNTIME_STATS__.status()`
+- Lag triage snippet (run in browser console on the main app page):
+```js
+(() => {
+  window.ENABLE_CE_UI_PERF_STATS = true;
+  window.ENABLE_CE_RUNTIME_STATS = true;
+  window.__CE_DEBUG_COUNTERS__ = true;
+
+  if (!window.__CE_RUNTIME_STATS__) {
+    throw new Error('__CE_RUNTIME_STATS__ not found on window. Open the main app page first, then run again.');
+  }
+
+  window.__CE_UI_PERF__?.reset?.();
+  window.__CE_RUNTIME_STATS__.reset();
+  window.__CE_RUNTIME_STATS__.start({ sampleIntervalMs: 2000 });
+
+  const status = window.__CE_RUNTIME_STATS__.status();
+  console.log('runtime status:', status); // should show running: true, enabledByFlag: true
+})();
+```
+- After reproducing lag for about 10-20 seconds:
+```js
+window.__CE_RUNTIME_STATS__.snapshot()
+```
+- Defaults:
+  - `sampleIntervalMs = 5000`
+  - `retentionMinutes = 30` (ring buffer: `360` samples)
+
+How to interpret top signals:
+- Heap growth: `snapshot().latestSample.memory.heap.usedJSHeapSize` trends up and does not release after idle periods.
+- Main-thread jank/blocking: spikes in `longTasks` and `frame.sinceLast.stalledFrames`.
+- Cache pressure: bursts in `cachePressure.perMinute.questionsCache|surveysCache|sbtCache` alongside nonce/revision churn.
+- Render churn: accelerating `perfCounterDelta` and high-cost labels in `uiPerf`.
+
+## Cache Reference Docs
+
+Shared cache runtime model:
+- `docs/cache/README.md`
+
+Client cache structures (managed via `cacheScripts` with IndexedDB primary backend):
+- `docs/cache/surveys-and-questions-cache-structure.md`
+- `docs/cache/sbts-cache-structure.md`
+- `docs/cache/bookmarks-cache-structure.md`
+- `docs/cache/user-cache-structure.md`
