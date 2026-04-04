@@ -135,8 +135,6 @@ broadcast/
 
 # Private content — present locally for dev, never committed (PRD 372/374)
 /TODO/
-/docs/internal-prds/
-/local-private-version/
 contextEngine-cc/
 CLAUDE.md
 
