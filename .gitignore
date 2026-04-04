@@ -114,12 +114,37 @@ dist/*
 .codex-solc/
 .codex-tmp/
 
-# Private content — tracked during dev, stripped before OSS publication (PRD 372)
-# /TODO/
-# contextEngine-cc/
-# CLAUDE.md
-# .claude/
+# Private content — present locally for dev, never committed (PRD 372/374)
+/TODO/
+contextEngine-cc/
+CLAUDE.md
+
+# E2E test layer (stripped from public release)
+scripts/test-*.js
+scripts/test-*.ui.js
+scripts/lib/e2e/
+scripts/run-e2e-*
+scripts/run-ux-*
+scripts/capture-ux-*
+scripts/build_external_llm_prompt.py
+.env.e2e
+.env.e2e.local
+!.env.e2e.example
+
+# Whitepaper private assets
+Whitepaper/Slides.pdf
+Whitepaper/IdeasMap.md
+whitepaper/Slides.pdf
+whitepaper/IdeasMap.md
+
+# Private test proxies
+client/src/components/MainSite/MainSite.module.test.js
+client/src/utilities/worker/sessionCorsWorker.*.proxy.test.js
+client/src/utilities/web3/contractScripts.*.proxy.test.js
 docs/outreach/
+
+# Public release staging artifact (output of `make release`)
+/release-public/
 
 # Python bytecode (repo includes small workflow builders)
 __pycache__/
