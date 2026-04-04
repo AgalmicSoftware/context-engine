@@ -9,7 +9,6 @@ Context Engine is an early-stage beta release, with core workflows in place and 
 - **Lit Protocol `naga-dev` → `chipotle`/v3 migration**: the current Lit integration still depends on legacy network infrastructure and needs to move onto the supported stack. Lit is currently deploying their next-generation stack.
 - **Frontend modernization**: migrate remaining class components to functional React, upgrade React 17 → 18 with Vite, and consolidate SCSS into a standardized design system.
 - **Worker auth trust-boundary hardening**: browser login to the session worker still needs stricter trusted-origin / SIWE audience binding so off-origin or originless token redemption is not possible.
-- **Passkey wallet architecture**: the current Porto beta wallet still needs a non-recoverable signing-key design; local credential metadata should not be sufficient to reconstruct wallet authority.
 
 
 ## AI Agent Interface
