@@ -35,7 +35,7 @@ npm install
 
 cd client
 nvm use 16
-npm install --legacy-peer-deps
+npm i --force
 npm run dev
 ```
 
