@@ -43,8 +43,11 @@ cd context-engine
 
 nvm use 20
 npm install
-npm --prefix client install
-npm --prefix client run dev
+
+cd client
+nvm use 16
+npm i --force
+npm run dev
 ```
 
 The React app runs on `http://localhost:3000`.
