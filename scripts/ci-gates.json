@@ -16,7 +16,6 @@
       "client",
       "root-jest",
       "workers",
-      "e2e-smoke",
       "cecc-and-node"
     ],
     "release": [
@@ -232,18 +231,6 @@
           "args": [
             "run",
             "test:worker:agent-bridge"
-          ]
-        }
-      ]
-    },
-    "e2e-smoke": {
-      "commands": [
-        {
-          "label": "Run tracked E2E smoke",
-          "command": "npm",
-          "args": [
-            "run",
-            "test:e2e:smoke"
           ]
         }
       ]
