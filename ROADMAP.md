@@ -4,11 +4,11 @@ Context Engine has its core deliberation, SBT, worker, encryption, and deploymen
 
 ## Recently Completed Foundations
 
-- **Public release hygiene**: the public release flow now includes strip/surface checks, PII scanning, branch push allowlisting, and split CI jobs for wiring, workers, contracts, client coverage, and root/node tests.
-- **Session setup entry flow**: new session creation starts with a mode choice before revealing the existing advanced setup flow, and mode presets prefill storage, AI, worker, and chain defaults.
-- **Chipotle runtime cutover**: supported sessions now use worker-mediated Chipotle execution, and new session flows no longer invent legacy hosted Lit defaults.
-- **Client modernization baseline**: the client is on React 18 and TypeScript 5.8, with production component surfaces moved to TSX and a growing set of helper-level tests.
-- **Protected SBT mint modes**: SBT contracts now expose explicit mint modes so protected password, group-signature, and invite-signature flows do not fall through to public `claim()` minting.
+- **Scaling**: the initial on-chain mode may only support hundreds of users per session; scaling to hundreds of thousands will require architectural optimizations and variations which are already planned.
+- **God component decomposition**: `MainSite.jsx`, `SurveyTool.jsx`, and `SessionWizard.jsx` still carry 5,000–15,000+ line responsibilities and need to be split into smaller, more maintainable units.
+- **Lit Protocol `naga-dev` → `chipotle`/v3 migration**: the current Lit integration still depends on legacy network infrastructure and needs to move onto the supported stack. Lit is currently deploying their next-generation stack.
+- **Frontend modernization**: migrate remaining class components to functional React, upgrade React 17 → 18 with Vite, and consolidate SCSS into a standardized design system.
+- **Worker auth trust-boundary hardening**: browser login to the session worker still needs stricter trusted-origin / SIWE audience binding so off-origin or originless token redemption is not possible.
 
 ## Current Engineering Priorities
 
