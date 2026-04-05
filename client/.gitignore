@@ -8,9 +8,6 @@
 # testing
 /coverage
 /.tmp
-/.tmp-build-audit/
-/.tmp-jest-cache/
-/.npm-cache-codex
 
 # production
 /build
