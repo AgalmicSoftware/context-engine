@@ -10,6 +10,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { FormGroup, Label, Input } from 'reactstrap';
 import treeData from '../../variables/demo/debate_map_demo_data.json';
 import historicalData from '../../variables/demo/historical_figures_tree_qs_and_votes.json';
+import loopholeHistoricalCases from '../../variables/demo/loophole_historical_cases.json';
+import loopholeHistoricalFigurePrinciples from '../../variables/demo/loophole_historical_figure_principles.json';
 import styles from './DebateMap.module.scss';
 import { createLogger } from 'utilities/logging.js';
 import {
@@ -123,6 +125,24 @@ const historicalFigureCommentMap = Object.entries(historicalData || {}).reduce((
     : {};
   return acc;
 }, {});
+
+const historicalCaseMap = (Array.isArray(loopholeHistoricalCases) ? loopholeHistoricalCases : []).reduce((acc, entry) => {
+  const issueIds = Array.isArray(entry?.debate_map_issues) ? entry.debate_map_issues : [];
+
+  issueIds.forEach((issueId) => {
+    if (!acc[issueId]) {
+      acc[issueId] = [];
+    }
+    acc[issueId].push(entry);
+  });
+
+  return acc;
+}, {});
+
+const getHistoricalFigurePrinciples = (figureName) => {
+  const principles = loopholeHistoricalFigurePrinciples?.[figureName];
+  return Array.isArray(principles) ? principles.filter(Boolean) : [];
+};
 
 const getHistoricalCompassSpreadY = (name) => (
   ((getNameHash(name) * 37) % 1000) / 999
@@ -250,6 +270,7 @@ const buildAtlasTreeData = (demoMode) => {
     let demoQuestions = [];
     let demoComments = [];
     let demoHistoricalVotes = [];
+    let demoHistoricalCases = [];
 
     if (demoMode) {
       Object.entries(historicalData || {}).forEach(([username, figure]) => {
@@ -278,6 +299,10 @@ const buildAtlasTreeData = (demoMode) => {
           demoComments = demoComments.concat(matchedComments);
         }
       });
+
+      demoHistoricalCases = Array.isArray(historicalCaseMap[node.id])
+        ? historicalCaseMap[node.id]
+        : [];
     }
 
     const currentUp = parseInt(node?.votes?.up || 0, 10) || 0;
@@ -287,6 +312,10 @@ const buildAtlasTreeData = (demoMode) => {
     const mergedHistoricalVotes = [
       ...(Array.isArray(node.historicalVotes) ? node.historicalVotes : []),
       ...demoHistoricalVotes,
+    ];
+    const mergedHistoricalCases = [
+      ...(Array.isArray(node.historicalCases) ? node.historicalCases : []),
+      ...demoHistoricalCases,
     ];
     const children = Array.isArray(node.children)
       ? node.children.map(updateNodeWithHistoricalData)
@@ -314,6 +343,9 @@ const buildAtlasTreeData = (demoMode) => {
 
     if (mergedHistoricalVotes.length > 0) nextNode.historicalVotes = mergedHistoricalVotes;
     else delete nextNode.historicalVotes;
+
+    if (mergedHistoricalCases.length > 0) nextNode.historicalCases = mergedHistoricalCases;
+    else delete nextNode.historicalCases;
 
     return nextNode;
   };
@@ -738,11 +770,15 @@ const Modal = ({
   const [showVoteBreakdown, setShowVoteBreakdown] = useState(false);
   const [compassOpen, setCompassOpen] = useState(true);
   const [argumentsOpen, setArgumentsOpen] = useState(true);
+  const [historicalCasesOpen, setHistoricalCasesOpen] = useState(true);
+  const [expandedHistoricalCaseId, setExpandedHistoricalCaseId] = useState('');
   const [questionsOpen, setQuestionsOpen] = useState(false);
 
   useEffect(() => {
     setCompassOpen(true);
     setArgumentsOpen(false);
+    setHistoricalCasesOpen(true);
+    setExpandedHistoricalCaseId('');
     setQuestionsOpen(false);
   }, [content?.id]);
   
@@ -924,6 +960,8 @@ const Modal = ({
   const hasArguments = Boolean(argumentData);
   const totalArgumentCount = proArguments.length + conArguments.length;
   const questionCount = questions.length;
+  const historicalCases = Array.isArray(content.historicalCases) ? content.historicalCases : [];
+  const historicalCaseCount = historicalCases.length;
   const compassTitle = content?.compass?.xAxis?.label || content?.name || 'Compass';
   
   // Logic for Depth Label and Styling
@@ -1016,6 +1054,180 @@ const Modal = ({
             ))}
           </div>
         )}
+      </div>
+    );
+  };
+
+  const buildHistoricalCaseBrief = (historicalCase) => {
+    const nodeName = String(content?.name || 'this issue').trim();
+    const xAxisLabel = String(content?.compass?.xAxis?.label || '').trim();
+    const yAxisLabel = String(content?.compass?.yAxis?.label || '').trim();
+    const summaryText = String(historicalCase?.summary || '').trim();
+    const authors = Array.isArray(historicalCase?.authors)
+      ? historicalCase.authors.filter(Boolean)
+      : [];
+    const figurePrinciples = authors.map((authorName) => ({
+      name: authorName,
+      principles: getHistoricalFigurePrinciples(authorName),
+    }));
+    const authorText = authors.length > 0 ? authors.join(' and ') : 'the paired historical figures';
+    const normalizedCategory = String(historicalCase?.category || '').trim().toLowerCase();
+    const axisFragments = [xAxisLabel, yAxisLabel].filter(Boolean);
+    const axisText = axisFragments.length > 0
+      ? axisFragments.join(' and ')
+      : nodeName;
+
+    let draftLegalCodeText = `A legislator starting from these principles would try to write a rule for ${nodeName} that is specific enough to draft from and broad enough to survive the next edge case. On this node, that means taking a clear position on ${axisText}.`;
+    let adversarialAttackText = `The adversarial move is to translate the abstract debate into a concrete case where the current rule starts producing consequences its authors may not have intended. ${summaryText}`;
+    let judgeTensionText = `The repo guidance says good principles should be specific enough to draft from, broad enough to create real tension, and honest enough to expose conflict. This case is difficult because ${authorText} bring draftable principles that do not collapse into a single obvious patch once ${nodeName} is under pressure.`;
+    let decisionPromptText = `What ruling would you adopt here, and what precedent would that create for the next version of the code?`;
+
+    if (normalizedCategory.includes('loophole')) {
+      draftLegalCodeText = `A legislator starting from these principles would likely write a strong protective rule around ${nodeName}, then add a narrow operational exception so the system can still function in practice. That draft is the sort of code Loophole is meant to stress-test.`;
+      adversarialAttackText = `This is a Loophole Finder case: the action stays technically inside the rule while violating the moral objective that justified the rule in the first place. ${summaryText}`;
+      judgeTensionText = `The judge's problem is to close the exploit without breaking legitimate use. A patch that simply removes discretion may satisfy one figure's principles while violating the other figure's tolerable exceptions or state-capacity concerns.`;
+      decisionPromptText = `What patch closes the exploit in ${nodeName} without blocking the legitimate use that made the rule attractive in the first place?`;
+    } else if (normalizedCategory.includes('overreach')) {
+      draftLegalCodeText = `A legislator starting from these principles would likely draft a rule that aggressively protects against the obvious abuse tied to ${nodeName}. The danger is that the code becomes too rigid once it meets emergencies, edge cases, or justified discretion.`;
+      adversarialAttackText = `This is an Overreach Finder case: the attack is to show that the current rule forbids conduct many people would still treat as morally acceptable or even required. ${summaryText}`;
+      judgeTensionText = `The judge cannot just carve out a broad exception, because that may reopen the original abuse path. The hard part is writing a narrower refinement that respects both figures' principles without turning the rule into swiss cheese.`;
+      decisionPromptText = `What exception or refinement preserves justified action here without reopening the abuse path that the original rule was trying to close?`;
+    } else if (normalizedCategory.includes('judge')) {
+      draftLegalCodeText = `A legislator starting from these principles would already have some code on the books for ${nodeName}. This case matters because the next revision has to fit the growing precedent set, not start over from clean philosophical premises.`;
+      adversarialAttackText = `This is a precedent-building case: the real stress test is not just whether the present situation is difficult, but whether the next patch will collide with earlier commitments elsewhere in the code. ${summaryText}`;
+      judgeTensionText = `The judge has to preserve coherence across rounds. A patch that looks sensible for this dispute may undermine prior rulings, loosen future enforcement, or quietly privilege one figure's principles as the hidden default for every later case.`;
+      decisionPromptText = `If this becomes binding precedent for ${nodeName}, what future edge cases would it settle well, and which ones might it quietly break?`;
+    } else if (normalizedCategory.includes('escalated')) {
+      draftLegalCodeText = `A legislator starting from these principles could still write real code for ${nodeName}, but the rule would encode a live philosophical disagreement rather than a settled consensus. That is why the case is already in escalation territory.`;
+      adversarialAttackText = `This is an escalated case in the Loophole sense: the system has found a dilemma where any clean answer seems to betray one serious principle in order to preserve another. ${summaryText}`;
+      judgeTensionText = `The judge cannot auto-resolve this without choosing which principle should dominate. That choice belongs to the human because it reveals a genuine fracture in the moral framework rather than a drafting oversight.`;
+      decisionPromptText = `If this becomes binding precedent for ${nodeName}, what future edge cases would it settle well, and which ones might it quietly break?`;
+    }
+
+    return {
+      figurePrinciples,
+      draftLegalCode: draftLegalCodeText,
+      adversarialAttack: adversarialAttackText,
+      judgeTension: judgeTensionText,
+      decisionPrompt: decisionPromptText,
+    };
+  };
+
+  const renderHistoricalCaseCard = (historicalCase, caseIndex) => {
+    if (!historicalCase || typeof historicalCase !== 'object') return null;
+
+    const title = String(historicalCase.title || historicalCase.id || '').trim();
+    if (!title) return null;
+
+    const authors = Array.isArray(historicalCase.authors)
+      ? historicalCase.authors.filter(Boolean)
+      : [];
+    const tagsList = Array.isArray(historicalCase.tags)
+      ? historicalCase.tags.filter(Boolean)
+      : [];
+    const isExpanded = expandedHistoricalCaseId === historicalCase.id;
+    const detailPanelId = `historical-case-${historicalCase.id || caseIndex}`;
+    const brief = buildHistoricalCaseBrief(historicalCase);
+    const metaBits = [
+      historicalCase.category,
+      authors.length > 0 ? authors.join(', ') : '',
+      historicalCase.venue,
+      historicalCase.year,
+    ].filter(Boolean);
+
+    return (
+      <div
+        key={historicalCase.id || `${title}-${caseIndex}`}
+        className={styles.historicalCaseCard}
+      >
+        <div className={styles.historicalCaseHeader}>
+          <div>
+            <div className={styles.historicalCaseTitle}>{title}</div>
+            {metaBits.length > 0 && (
+              <div className={styles.historicalCaseMeta}>
+                {metaBits.join(' • ')}
+              </div>
+            )}
+          </div>
+          <div className={styles.historicalCaseActions}>
+            <button
+              type="button"
+              className={styles.historicalCaseExpandButton}
+              aria-expanded={isExpanded}
+              aria-controls={detailPanelId}
+              onClick={() => setExpandedHistoricalCaseId((currentValue) => (
+                currentValue === historicalCase.id ? '' : historicalCase.id
+              ))}
+            >
+              {isExpanded ? 'Hide brief' : 'View full brief'}
+            </button>
+            {historicalCase.url ? (
+              <a
+                href={historicalCase.url}
+                rel="noopener noreferrer"
+                target="_blank"
+                className={styles.historicalCaseSource}
+              >
+                {historicalCase.source_label || 'Source'}
+              </a>
+            ) : null}
+          </div>
+        </div>
+        {historicalCase.summary ? (
+          <div className={styles.historicalCaseSummary}>
+            {historicalCase.summary}
+          </div>
+        ) : null}
+        {isExpanded && (
+          <div
+            id={detailPanelId}
+            className={styles.historicalCaseDetail}
+          >
+            <div className={styles.historicalCaseDetailBlock}>
+              <div className={styles.historicalCaseDetailLabel}>Moral principles</div>
+              <div className={styles.historicalCasePrinciplesGrid}>
+                {brief.figurePrinciples.map((figureEntry) => (
+                  <div
+                    key={`${historicalCase.id || title}-${figureEntry.name}`}
+                    className={styles.historicalCasePrinciplesCard}
+                  >
+                    <div className={styles.historicalCasePrinciplesName}>{figureEntry.name}</div>
+                    <ul className={styles.historicalCasePrinciplesList}>
+                      {figureEntry.principles.map((principle, principleIndex) => (
+                        <li key={`${figureEntry.name}-${principleIndex}`}>{principle}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className={styles.historicalCaseDetailBlock}>
+              <div className={styles.historicalCaseDetailLabel}>Draft legal code</div>
+              <p>{brief.draftLegalCode}</p>
+            </div>
+            <div className={styles.historicalCaseDetailBlock}>
+              <div className={styles.historicalCaseDetailLabel}>Adversarial attack</div>
+              <p>{brief.adversarialAttack}</p>
+            </div>
+            <div className={styles.historicalCaseDetailBlock}>
+              <div className={styles.historicalCaseDetailLabel}>Judge tension</div>
+              <p>{brief.judgeTension}</p>
+            </div>
+            <div className={styles.historicalCaseDetailBlock}>
+              <div className={styles.historicalCaseDetailLabel}>Decision prompt</div>
+              <p>{brief.decisionPrompt}</p>
+            </div>
+          </div>
+        )}
+        {tagsList.length > 0 ? (
+          <div className={styles.historicalCaseTags}>
+            {tagsList.map((tag, tagIndex) => (
+              <span key={`${historicalCase.id || title}-${tag}-${tagIndex}`}>
+                {tag}
+              </span>
+            ))}
+          </div>
+        ) : null}
       </div>
     );
   };
@@ -1180,6 +1392,31 @@ const Modal = ({
                     ))}
                   </div>
                 </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {historicalCaseCount > 0 && (
+          <div className={styles.collapseSection}>
+            <div
+              className={styles.collapseHeader}
+              onClick={() => setHistoricalCasesOpen(!historicalCasesOpen)}
+              role="button"
+              tabIndex={0}
+              aria-expanded={historicalCasesOpen}
+              onKeyDown={(event) => handleCollapseHeaderKeyDown(event, () => setHistoricalCasesOpen(!historicalCasesOpen))}
+            >
+              <FontAwesomeIcon icon={historicalCasesOpen ? faCaretUp : faCaretDown} style={{ marginRight: 6 }} />
+              <span>Historical Cases</span>
+              {historicalCaseCount ? <span className={styles.collapseCount}>({historicalCaseCount})</span> : null}
+              <span className={styles.collapseToggle}>{historicalCasesOpen ? 'Hide' : 'Show'}</span>
+            </div>
+            {historicalCasesOpen && (
+              <div className={`${styles.collapseContent} ${styles.historicalCasesSection}`}>
+                {historicalCases.map((historicalCase, caseIndex) => (
+                  renderHistoricalCaseCard(historicalCase, caseIndex)
+                ))}
               </div>
             )}
           </div>

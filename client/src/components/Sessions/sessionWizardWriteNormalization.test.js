@@ -1,6 +1,7 @@
 /* eslint-disable import/first */
 
 import { ethers } from 'ethers';
+import { DEFAULT_CHAIN_ID } from '../../variables/appConfig.js';
 
 jest.mock('../../utilities/crypto/cryptography.js', () => ({
   cryptoUtils: {
@@ -16,6 +17,8 @@ import {
   buildSessionWizardWorkerConfigPayload,
   sanitizeSessionWizardMetadataPayload,
 } from './sessionWizardWriteNormalization.js';
+
+const DEFAULT_CONFIG_CHAIN_ID = DEFAULT_CHAIN_ID;
 
 describe('sessionWizardWriteNormalization', () => {
   beforeEach(() => {
@@ -99,7 +102,7 @@ describe('sessionWizardWriteNormalization', () => {
       getAddress: jest.fn().mockResolvedValue('0x00000000000000000000000000000000000000aa'),
     };
     const contractMock = {
-      address: getSessionRegistryAddress(84532),
+      address: getSessionRegistryAddress(DEFAULT_CONFIG_CHAIN_ID),
       interface: {
         encodeFunctionData: jest.fn(() => '0xdeadbeef'),
       },
@@ -132,7 +135,7 @@ describe('sessionWizardWriteNormalization', () => {
 
     await setSessionFieldsOnChain({
       providerLike: walletProvider,
-      chainId: 84532,
+      chainId: DEFAULT_CONFIG_CHAIN_ID,
       slug: 'edge',
       fields: onChainFields,
     });
@@ -142,7 +145,7 @@ describe('sessionWizardWriteNormalization', () => {
       method: 'eth_sendTransaction',
       params: [expect.objectContaining({
         from: '0x00000000000000000000000000000000000000aa',
-        to: getSessionRegistryAddress(84532),
+        to: getSessionRegistryAddress(DEFAULT_CONFIG_CHAIN_ID),
         data: '0xdeadbeef',
         gas: ethers.BigNumber.from('300000').toHexString(),
       })],
@@ -154,20 +157,20 @@ describe('sessionWizardWriteNormalization', () => {
     const payload = buildSessionWizardWorkerConfigPayload({
       slug: 'edge',
       draft: {
-        networkChainId: 84532,
+        networkChainId: DEFAULT_CONFIG_CHAIN_ID,
         corsWorkerUrl: 'https://draft-worker.example',
         blockLimits: { start: '250', end: '275' },
         contracts: {
-          surveys: { address: '0x111', chainId: 84532 },
-          reputation: { address: '0x999', chainId: 84532 },
+          surveys: { address: '0x111', chainId: DEFAULT_CONFIG_CHAIN_ID },
+          reputation: { address: '0x999', chainId: DEFAULT_CONFIG_CHAIN_ID },
         },
       },
       deployPayload: {
         adminAddress: ' 0xAdmin ',
         registryAddress: ' 0xRegistry ',
-        registryChainId: 84532,
+        registryChainId: DEFAULT_CONFIG_CHAIN_ID,
         rpcUrl: ' https://rpc.example ',
-        rpcUrlsByChainId: { 84532: ['https://rpc.example'] },
+        rpcUrlsByChainId: { [DEFAULT_CONFIG_CHAIN_ID]: ['https://rpc.example'] },
         allowOrigins: ['https://app.example'],
         limits: { perWalletPerDay: 1000 },
         scopes: { ai: true },
@@ -191,17 +194,17 @@ describe('sessionWizardWriteNormalization', () => {
     expect(payload.slug).toBe('edge');
     expect(payload.adminAddress).toBe('0xAdmin');
     expect(payload.registryAddress).toBe('0xRegistry');
-    expect(payload.registryChainId).toBe(84532);
-    expect(payload.networkChainId).toBe(84532);
+    expect(payload.registryChainId).toBe(DEFAULT_CONFIG_CHAIN_ID);
+    expect(payload.networkChainId).toBe(DEFAULT_CONFIG_CHAIN_ID);
     expect(payload.corsWorkerUrl).toBe('https://worker.example/');
     expect(payload.rpcUrl).toBe('https://rpc.example');
     expect(payload.blockLimits).toEqual({ start: 250, end: 275 });
     expect(payload.embeddedDeployHelperEnabled).toBe(false);
     expect(payload.sessionId).toBe('0x123e4567e89b12d3a456426614174000');
-    expect(payload.contracts.surveys).toEqual({ address: '0x111', chainId: 84532 });
+    expect(payload.contracts.surveys).toEqual({ address: '0x111', chainId: DEFAULT_CONFIG_CHAIN_ID });
     expect(payload.contracts.sessionRegistry).toEqual({
-      address: getSessionRegistryAddress(84532),
-      chainId: 84532,
+      address: getSessionRegistryAddress(DEFAULT_CONFIG_CHAIN_ID),
+      chainId: DEFAULT_CONFIG_CHAIN_ID,
     });
     expect(payload.contracts.reputation).toBeUndefined();
   });

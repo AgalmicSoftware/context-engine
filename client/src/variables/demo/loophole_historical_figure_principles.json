@@ -1,0 +1,154 @@
+{
+  "Ada Lovelace": [
+    "Systems with civic consequence should remain inspectable enough for outsiders to audit their logic and effects.",
+    "Symbol manipulation can be powerful without amounting to judgment, so governance should not mistake fluent output for genuine understanding."
+  ],
+  "Adam Smith": [
+    "Institutions should align incentives so private advantage does not routinely turn into public harm.",
+    "Competition and transparency matter because concentrated market power can quietly distort behavior and judgment."
+  ],
+  "Alan Turing": [
+    "Claims about machine capability should be settled by disciplined testing rather than mystique or panic.",
+    "Operational reliability matters, but test design must reflect the adversarial conditions a system will actually face."
+  ],
+  "Albert Einstein": [
+    "Elegant theories still have to answer to reality, especially when policy is built on simplified models.",
+    "Technical power without moral imagination can scale harm faster than institutions learn to restrain it."
+  ],
+  "Alexander Graham Bell": [
+    "Communication infrastructure shapes who can participate, so network design is never politically neutral.",
+    "Gatekeeping power tends to accumulate at technical chokepoints unless the system is designed against it."
+  ],
+  "Alexander Hamilton": [
+    "Dangerous instruments should sit inside accountable institutions rather than diffuse improvisation.",
+    "State capacity matters because fragmented authority often fails exactly when stakes are highest."
+  ],
+  "Alexander the Great": [
+    "Decisive coordination can outperform hesitant committees when systems move faster than human chains of command.",
+    "Fragmented command creates openings for failure, exploitation, and strategic drift."
+  ],
+  "Andrew Carnegie": [
+    "Large-scale infrastructure can create real public benefit when it is competently built and broadly useful.",
+    "Industrial concentration has to justify itself through durable civic value rather than private accumulation alone."
+  ],
+  "Archimedes": [
+    "Complex systems often hide leverage points that only become visible when a model is pressed to its limits.",
+    "Good governance should respect latent structure instead of assuming behavior changes only gradually."
+  ],
+  "Aristotle": [
+    "Practical wisdom matters more than formal elegance when systems govern real human lives.",
+    "A good rule should aim at the right end, not merely optimize a narrow representation of success."
+  ],
+  "Augustus Caesar": [
+    "Political order can justify extraordinary authority when disorder threatens the stability of the state.",
+    "Security systems should be judged by the stability they preserve, not only by procedural elegance."
+  ],
+  "Benjamin Franklin": [
+    "Incentives shape conduct more reliably than slogans, so rules should be written with strategic behavior in mind.",
+    "Public institutions should prefer practical accountability over ornate but unenforced promises."
+  ],
+  "Catherine the Great": [
+    "Enlightened administration still requires centralized competence and the ability to act decisively.",
+    "Open inquiry is useful, but statecraft cannot ignore the hard constraints of governing large systems."
+  ],
+  "Charles Darwin": [
+    "Systems adapt to incentives over time, often in ways their designers never intended.",
+    "Small selection pressures can compound into large behavioral shifts, so governance should watch the environment as much as the agent."
+  ],
+  "Condorcet": [
+    "Cumulative knowledge can improve institutions when public reasoning is allowed to refine error over time.",
+    "Progress is real, but it depends on widening access to better methods rather than trusting authority alone."
+  ],
+  "Confucius": [
+    "Good governance begins with correct naming, honest roles, and legible responsibility.",
+    "Hidden manipulation corrodes virtue because people cannot align themselves with rules they do not truly understand."
+  ],
+  "David Hume": [
+    "Recent patterns are not guarantees, so institutions should distrust forecasts that harden into certainty too quickly.",
+    "Human judgment is prone to habit and projection, especially when incentives reward confidence."
+  ],
+  "Desmond Tutu": [
+    "Legitimacy requires moral trust, not only coercive compliance or strategic alignment.",
+    "Institutions should preserve dignity and reconciliation even when conflict or fear make shortcuts tempting."
+  ],
+  "Eleanor Roosevelt": [
+    "Rights are only real when institutions protect vulnerable people before crisis arrives.",
+    "Administrative convenience is never enough reason to weaken the dignity or agency of ordinary people."
+  ],
+  "Florence Nightingale": [
+    "A governance claim is only as good as the outcomes it produces in the field, not the polish of its reports.",
+    "Measurement should illuminate suffering and correction, not flatter the administrators running the system."
+  ],
+  "Frederick Douglass": [
+    "Power often hides abuse behind routine procedure, so oversight must expose who is made vulnerable by a rule.",
+    "Equal civic standing requires more than formal permission; it requires institutions that do not quietly subordinate some groups to others."
+  ],
+  "Galileo Galilei": [
+    "Prestige should not outrank observation when institutions decide what is safe or true.",
+    "A claim that cannot survive scrutiny under real conditions does not deserve policy deference."
+  ],
+  "Hammurabi": [
+    "Law should clearly name duties, injuries, and remedies so weaker parties are not left to absorb elite risk.",
+    "A rule that cannot assign responsibility when harm appears is an incomplete rule."
+  ],
+  "Henry Ford": [
+    "Standards and repeatability matter because systems that cannot scale reliably will eventually fail in production.",
+    "Efficiency is valuable, but only when the operating model remains legible enough to correct."
+  ],
+  "J. Robert Oppenheimer": [
+    "High-consequence research deserves staged release, institutional restraint, and serious oversight.",
+    "Technical capability can outrun moral preparedness, so not every successful experiment should immediately become a deployment."
+  ],
+  "James Madison": [
+    "Power should be bounded by narrow delegation, review, and structural checks rather than trust in the current ruler.",
+    "Emergency exceptions are especially dangerous because ambitious actors predictably stretch them into general authority."
+  ],
+  "John D. Rockefeller": [
+    "Integrated systems can deliver real efficiencies, but scale easily hardens into unaccountable dominance.",
+    "Private coordination becomes a public concern once a single actor can quietly set the terms for everyone else."
+  ],
+  "Karl Marx": [
+    "Efficiency rhetoric often hides who controls production and who bears the human cost of optimization.",
+    "A system that weakens labor's bargaining power can deepen domination even while making output look better."
+  ],
+  "Mahatma Gandhi": [
+    "Means matter as much as ends, so design should reject unnecessary coercion even when efficiency is available.",
+    "Human dignity places limits on surveillance, force, and administrative convenience."
+  ],
+  "Napoleon Bonaparte": [
+    "Centralized command can exploit force and information more effectively than scattered authority.",
+    "Hesitation is itself a strategic choice, and in high-stakes competition it often favors the opponent."
+  ],
+  "Nikola Tesla": [
+    "Ambitious technology should be designed with downstream system interactions in mind, not only local performance.",
+    "Inventive power is most dangerous when deployment assumes the surrounding world will adapt without friction."
+  ],
+  "Rachel Carson": [
+    "Diffuse harms are easy to normalize, so institutions should take precaution seriously before damage becomes ambient.",
+    "A system can be socially harmful long before its operators feel the full consequences themselves."
+  ],
+  "Susan B. Anthony": [
+    "Formal equality is insufficient when institutions are designed in ways that systematically exclude or burden some people more than others.",
+    "A good rule must be evaluated by who can meaningfully use it, challenge it, and survive its failures."
+  ],
+  "Thomas Edison": [
+    "Once a technology is placed into the world, its builders share responsibility for the conditions under which it operates.",
+    "Useful systems should be judged by practical performance under pressure rather than by presentation alone."
+  ],
+  "Thomas Jefferson": [
+    "Knowledge and civic power should be distributed broadly enough to resist durable dependence on a few gatekeepers.",
+    "Concentrated authority is a standing danger to liberty, even when it claims benevolent motives."
+  ],
+  "Thomas Malthus": [
+    "Growth curves eventually meet hard resource limits, and policy should plan for those constraints before crisis.",
+    "Institutions that assume endless expansion often become brittle when scarcity arrives."
+  ],
+  "Voltaire": [
+    "Open criticism is one of the best checks against dogma, hypocrisy, and elite self-protection.",
+    "Institutions should tolerate dissent and satire because certainty without scrutiny becomes tyranny."
+  ],
+  "Winston Churchill": [
+    "Preparedness before crisis matters more than confidence after it begins.",
+    "Threats that can scale rapidly justify robust defensive planning, but planning should remain answerable to public judgment."
+  ]
+}

@@ -338,6 +338,117 @@ describe('DebateMap', () => {
     });
   });
 
+  it('renders Loophole historical cases inside relevant atlas nodes in demo mode', async () => {
+    render(
+      <MemoryRouter initialEntries={['/atlas/0x4320000000000000000000000000000000000000000000000000000000000000']}>
+        <Routes>
+          <Route
+            path="/atlas/:nodeId"
+            element={(
+              <DebateMap
+                account=""
+                provider=""
+                network={{ id: 84532 }}
+                activeSessionSlug=""
+                toggleLoginModal={jest.fn()}
+                demoMode={true}
+              />
+            )}
+          />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByText('Historical Cases')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Madison vs Caesar: Emergency Surveillance Exception')
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Loophole Finder/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'View full brief' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Loophole repo' })).toHaveAttribute(
+      'href',
+      'https://github.com/brendanhogan/loophole'
+    );
+  });
+
+  it('expands a historical case into a deeper brief when clicked', async () => {
+    render(
+      <MemoryRouter initialEntries={['/atlas/0x4320000000000000000000000000000000000000000000000000000000000000']}>
+        <Routes>
+          <Route
+            path="/atlas/:nodeId"
+            element={(
+              <DebateMap
+                account=""
+                provider=""
+                network={{ id: 84532 }}
+                activeSessionSlug=""
+                toggleLoginModal={jest.fn()}
+                demoMode={true}
+              />
+            )}
+          />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: 'View full brief' }));
+
+    expect(await screen.findByText('Moral principles')).toBeInTheDocument();
+    expect(await screen.findByText('Draft legal code')).toBeInTheDocument();
+    expect(await screen.findByText('Adversarial attack')).toBeInTheDocument();
+    expect(await screen.findByText('Judge tension')).toBeInTheDocument();
+    expect(await screen.findByText('Decision prompt')).toBeInTheDocument();
+    expect(
+      screen.getByText(/Power should be bounded by narrow delegation, review, and structural checks/i)
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/A legislator starting from these principles would likely write a strong protective rule around Privacy & Surveillance/i)
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/This is a Loophole Finder case/i)
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/The judge's problem is to close the exploit without breaking legitimate use/i)
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/What patch closes the exploit in Privacy & Surveillance/i)
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Hide brief' }));
+
+    await waitFor(() => {
+      expect(screen.queryByText('Moral principles')).not.toBeInTheDocument();
+    });
+  });
+
+  it('keeps Loophole historical cases out of non-demo atlas nodes', async () => {
+    render(
+      <MemoryRouter initialEntries={['/atlas/0x4320000000000000000000000000000000000000000000000000000000000000']}>
+        <Routes>
+          <Route
+            path="/atlas/:nodeId"
+            element={(
+              <DebateMap
+                account=""
+                provider=""
+                network={{ id: 84532 }}
+                activeSessionSlug=""
+                toggleLoginModal={jest.fn()}
+                demoMode={false}
+              />
+            )}
+          />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    await screen.findByRole('heading', { name: 'Privacy & Surveillance' });
+
+    expect(screen.queryByText('Historical Cases')).not.toBeInTheDocument();
+    expect(screen.queryByText('Madison vs Caesar: Emergency Surveillance Exception')).not.toBeInTheDocument();
+  });
+
   it('copies atlas deep links with PUBLIC_URL and demo mode preserved', async () => {
     const previousPublicUrl = process.env.PUBLIC_URL;
     const previousClipboard = navigator.clipboard;
