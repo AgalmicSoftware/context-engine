@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import PolisReport, {
   applyFilterStateToAggregator,
   buildClusterAnalysisDataKey,
+  buildPolisReportPdfFilename,
   buildPrecomputedDemoClusterState,
   buildRatingMatrixFromDemo,
   formatBlockchainNetworkLabel,
@@ -13,6 +14,7 @@ import PolisReport, {
   PARTICIPANTS_GRAPH_TOOLTIP_TEXT,
   REPORT_DEFAULT_EMBEDDING_LABEL,
   REPORT_DEFAULT_EMBEDDING_TOOLTIP_TEXT,
+  resolveJsPdfConstructor,
   shouldAutoEnablePolisDemoData,
 } from './PolisReport';
 import { getCommentBarData } from '../../utilities/survey/polisMath';
@@ -177,6 +179,28 @@ describe('PolisReport cache read options', () => {
     expect(PARTICIPANTS_GRAPH_TOOLTIP_TEXT).toBe("This diagram opens in UMAP with 3 groups. Switch to SVD/PCA for the PCA view, or Polis Auto for the report's Polis-inspired automatic grouping.");
     expect(REPORT_DEFAULT_EMBEDDING_TOOLTIP_TEXT).toBe("Polis Auto uses Context Engine's Polis-inspired automatic grouping. It keeps the report's PCA-based participant layout and auto-selects opinion groups from that layout. UMAP and SVD/PCA are exploratory views where you can override K manually. This is Polis-inspired analysis inside Context Engine, not an official Polis/Pol.is integration or endorsement.");
     expect(OPINION_GROUPS_TOOLTIP_TEXT).toBe("Leave K on auto to use Polis Auto's automatic grouping, or set K manually when exploring UMAP or SVD/PCA layouts.");
+  });
+
+  it('sanitizes session-derived PDF export filenames', () => {
+    const timestamp = new Date('2026-01-02T03:04:05.006Z');
+
+    expect(buildPolisReportPdfFilename('../Demo <script>alert(1)</script>', timestamp)).toBe(
+      'contextEngine_report_Demo_script_alert_1_script_2026_01_02T03_04_05_006Z.pdf'
+    );
+    expect(buildPolisReportPdfFilename('', timestamp)).toBe(
+      'contextEngine_report_2026_01_02T03_04_05_006Z.pdf'
+    );
+  });
+
+  it('resolves jsPDF constructors across dynamic import module shapes', () => {
+    function LegacyJsPdf() {}
+    function NamedJsPdf() {}
+    function NamespacedJsPdf() {}
+
+    expect(resolveJsPdfConstructor({ default: LegacyJsPdf })).toBe(LegacyJsPdf);
+    expect(resolveJsPdfConstructor({ jsPDF: NamedJsPdf })).toBe(NamedJsPdf);
+    expect(resolveJsPdfConstructor({ default: { jsPDF: NamespacedJsPdf } })).toBe(NamespacedJsPdf);
+    expect(() => resolveJsPdfConstructor({ default: {} })).toThrow('jsPDF constructor is unavailable');
   });
 
   it('formats the live network label with chain id instead of hardcoding a chain name', () => {
@@ -541,6 +565,7 @@ describe('PolisReport demo data defaults', () => {
       statementCoords: [
         { x: 0, y: 0, index: 0 },
       ],
+      commentStats: [],
       clusterAssignments: [0, 0, 1, 1],
       clusterCount: 2,
       repQuestions: {},
@@ -586,6 +611,7 @@ describe('PolisReport demo data defaults', () => {
       statementCoords: [
         { x: 0, y: 0, index: 0 },
       ],
+      commentStats: [],
       clusterAssignments: [0, 0, 1, 1],
       clusterCount: 2,
       repQuestions: {},
@@ -665,6 +691,7 @@ describe('PolisReport demo data defaults', () => {
       statementCoords: [
         { x: 0, y: 0, index: 0 },
       ],
+      commentStats: [],
       clusterAssignments: [0, 0, 1, 1],
       clusterCount: 2,
       repQuestions: {},
@@ -719,6 +746,7 @@ describe('PolisReport demo data defaults', () => {
       statementCoords: [
         { x: 10, y: 0, index: 0 },
       ],
+      commentStats: [],
       clusterAssignments: [0, 0, 1],
       clusterCount: 2,
       repQuestions: {},
@@ -763,6 +791,7 @@ describe('PolisReport demo data defaults', () => {
       statementCoords: [
         { x: 10, y: 0, index: 0 },
       ],
+      commentStats: [],
       clusterAssignments: [0, 0, 1],
       clusterCount: 2,
       repQuestions: {},
@@ -792,6 +821,7 @@ describe('PolisReport demo data defaults', () => {
       },
       participantCoords: [{ x: 0, y: 0, index: 0 }],
       statementCoords: [{ x: 0, y: 0, index: 0 }],
+      commentStats: [],
       clusterAssignments: [0],
       clusterCount: 1,
       repQuestions: { 0: [] },
