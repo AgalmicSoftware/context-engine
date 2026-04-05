@@ -34,8 +34,7 @@ import { upsertCachedSessionWorkerConfig } from '../session/sessionWorkerConfigC
 
 const TEST_SIGNER_ADDRESS = '0x00000000000000000000000000000000000000aa';
 const CONFIGURED_REGISTRY_CHAIN_ID = DEFAULT_CHAIN_ID;
-const CONFIGURED_REGISTRY_CHAIN_NAME =
-  getChainById(CONFIGURED_REGISTRY_CHAIN_ID)?.name || `Chain ${CONFIGURED_REGISTRY_CHAIN_ID}`;
+const CONFIGURED_REGISTRY_CHAIN_NAME = getChainById(CONFIGURED_REGISTRY_CHAIN_ID)?.name || `Chain ${CONFIGURED_REGISTRY_CHAIN_ID}`;
 
 const installPublicRpcFeeMocks = ({
   feeData = {
@@ -701,16 +700,14 @@ describe('registerSessionOnChain duplicate guards', () => {
       return contractMock;
     });
 
-    await expect(
-      registerSessionOnChain({
-        providerLike: walletProvider,
-        chainId: CONFIGURED_REGISTRY_CHAIN_ID,
-        slug: 'wrong-wallet-network',
-        sessionId: '0x11111111111111111111111111111111',
-        metadataURI: 'ar://example',
-      }),
-    ).rejects.toThrow(
-      `Connected wallet is on Base (8453), but session registry writes require ${CONFIGURED_REGISTRY_CHAIN_NAME} (${CONFIGURED_REGISTRY_CHAIN_ID}). Switch the wallet network and retry.`,
+    await expect(registerSessionOnChain({
+      providerLike: walletProvider,
+      chainId: CONFIGURED_REGISTRY_CHAIN_ID,
+      slug: 'wrong-wallet-network',
+      sessionId: '0x11111111111111111111111111111111',
+      metadataURI: 'ar://example',
+    })).rejects.toThrow(
+      `Connected wallet is on Base (8453), but session registry writes require ${CONFIGURED_REGISTRY_CHAIN_NAME} (${CONFIGURED_REGISTRY_CHAIN_ID}). Switch the wallet network and retry.`
     );
 
     expect(contractMock.sessionIdExists).not.toHaveBeenCalled();
@@ -833,15 +830,13 @@ describe('registerSessionOnChain duplicate guards', () => {
       return contractMock;
     });
 
-    await expect(
-      registerSessionOnChain({
-        providerLike: walletProvider,
-        chainId: CONFIGURED_REGISTRY_CHAIN_ID,
-        slug: 'duplicate-id',
-        sessionId: '0x11111111111111111111111111111111',
-        metadataURI: 'ar://example',
-      }),
-    ).rejects.toThrow('Session ID 11111111-1111-1111-1111-111111111111 is already registered on-chain.');
+    await expect(registerSessionOnChain({
+      providerLike: walletProvider,
+      chainId: CONFIGURED_REGISTRY_CHAIN_ID,
+      slug: 'duplicate-id',
+      sessionId: '0x11111111111111111111111111111111',
+      metadataURI: 'ar://example',
+    })).rejects.toThrow('Session ID 11111111-1111-1111-1111-111111111111 is already registered on-chain.');
 
     expect(contractMock.sessionIdExists).toHaveBeenCalledWith('0x11111111111111111111111111111111');
     expect(contractMock.createSession).not.toHaveBeenCalled();
@@ -862,15 +857,13 @@ describe('registerSessionOnChain duplicate guards', () => {
       return contractMock;
     });
 
-    await expect(
-      registerSessionOnChain({
-        providerLike: walletProvider,
-        chainId: CONFIGURED_REGISTRY_CHAIN_ID,
-        slug: 'duplicate-slug',
-        sessionId: '0x22222222222222222222222222222222',
-        metadataURI: 'ar://example',
-      }),
-    ).rejects.toThrow('Session slug "duplicate-slug" is already registered on-chain.');
+    await expect(registerSessionOnChain({
+      providerLike: walletProvider,
+      chainId: CONFIGURED_REGISTRY_CHAIN_ID,
+      slug: 'duplicate-slug',
+      sessionId: '0x22222222222222222222222222222222',
+      metadataURI: 'ar://example',
+    })).rejects.toThrow('Session slug "duplicate-slug" is already registered on-chain.');
 
     expect(contractMock.sessionExists).toHaveBeenCalledWith('duplicate-slug');
     expect(contractMock.createSession).not.toHaveBeenCalled();
@@ -900,19 +893,15 @@ describe('registerSessionOnChain duplicate guards', () => {
       return readContractMock;
     });
 
-    await expect(
-      registerSessionOnChain({
-        providerLike: walletProvider,
-        chainId: CONFIGURED_REGISTRY_CHAIN_ID,
-        slug: 'read-path-guard',
-        sessionId: '0x66666666666666666666666666666666',
-        metadataURI: 'ar://example',
-      }),
-    ).resolves.toEqual(
-      expect.objectContaining({
-        txs: [{ action: 'createSession', hash: '0xcreate' }],
-      }),
-    );
+    await expect(registerSessionOnChain({
+      providerLike: walletProvider,
+      chainId: CONFIGURED_REGISTRY_CHAIN_ID,
+      slug: 'read-path-guard',
+      sessionId: '0x66666666666666666666666666666666',
+      metadataURI: 'ar://example',
+    })).resolves.toEqual(expect.objectContaining({
+      txs: [{ action: 'createSession', hash: '0xcreate' }],
+    }));
 
     expect(readContractMock.sessionIdExists).toHaveBeenCalledWith('0x66666666666666666666666666666666');
     expect(readContractMock.sessionExists).toHaveBeenCalledWith('read-path-guard');
@@ -1238,16 +1227,14 @@ describe('registerSessionOnChain creation fee overrides', () => {
       return readContractMock;
     });
 
-    await expect(
-      registerSessionOnChain({
-        providerLike: walletProvider,
-        chainId: CONFIGURED_REGISTRY_CHAIN_ID,
-        slug: 'fee-rpc-fail',
-        sessionId: '0x55555555555555555555555555555555',
-        metadataURI: 'ar://example',
-        encryptedMetadataURI: '',
-      }),
-    ).rejects.toThrow('network timeout');
+    await expect(registerSessionOnChain({
+      providerLike: walletProvider,
+      chainId: CONFIGURED_REGISTRY_CHAIN_ID,
+      slug: 'fee-rpc-fail',
+      sessionId: '0x55555555555555555555555555555555',
+      metadataURI: 'ar://example',
+      encryptedMetadataURI: '',
+    })).rejects.toThrow('network timeout');
 
     expect(readContractMock.SESSION_CREATION_FEE).toHaveBeenCalled();
     expect(signerContractMock.createSession).not.toHaveBeenCalled();
@@ -1378,11 +1365,9 @@ describe('registerSessionOnChain creation fee overrides', () => {
       ([payload]) => payload?.method === 'eth_sendTransaction',
     );
     expect(sendCalls).toHaveLength(2);
-    expect(sendCalls[0][0].params[0]).toEqual(
-      expect.objectContaining({
-        gasPrice: ethers.utils.parseUnits(getDefaultGasPriceGwei(CONFIGURED_REGISTRY_CHAIN_ID), 'gwei').toHexString(),
-      }),
-    );
+    expect(sendCalls[0][0].params[0]).toEqual(expect.objectContaining({
+      gasPrice: ethers.utils.parseUnits(getDefaultGasPriceGwei(CONFIGURED_REGISTRY_CHAIN_ID), 'gwei').toHexString(),
+    }));
     expect(sendCalls[0][0].params[0].maxFeePerGas).toBeUndefined();
     expect(sendCalls[0][0].params[0].maxPriorityFeePerGas).toBeUndefined();
     expect(sendCalls[1][0].params[0]).toEqual(
@@ -1440,11 +1425,9 @@ describe('registerSessionOnChain creation fee overrides', () => {
       encryptedMetadataURI: '',
     });
 
-    expect(getLatestSendTxParams(walletProvider)).toEqual(
-      expect.objectContaining({
-        gasPrice: ethers.utils.parseUnits(getDefaultGasPriceGwei(CONFIGURED_REGISTRY_CHAIN_ID), 'gwei').toHexString(),
-      }),
-    );
+    expect(getLatestSendTxParams(walletProvider)).toEqual(expect.objectContaining({
+      gasPrice: ethers.utils.parseUnits(getDefaultGasPriceGwei(CONFIGURED_REGISTRY_CHAIN_ID), 'gwei').toHexString(),
+    }));
     expect(result).toEqual({ txs: [{ action: 'createSession', hash: '0xcreatefee-default-gas' }] });
   });
 
@@ -1488,15 +1471,13 @@ describe('registerSessionOnChain creation fee overrides', () => {
       providerLike: walletProvider,
       chainId: CONFIGURED_REGISTRY_CHAIN_ID,
       slug: 'gate-retry',
-      gates: [
-        {
-          resourceKey: 'default',
-          sbtAddresses: ['0x0000000000000000000000000000000000000002'],
-          chainId: CONFIGURED_REGISTRY_CHAIN_ID,
-          mode: 0,
-          perMemberLimit: 0,
-        },
-      ],
+      gates: [{
+        resourceKey: 'default',
+        sbtAddresses: ['0x0000000000000000000000000000000000000002'],
+        chainId: CONFIGURED_REGISTRY_CHAIN_ID,
+        mode: 0,
+        perMemberLimit: 0,
+      }],
     });
 
     const sendCalls = walletProvider.request.mock.calls.filter(
