@@ -1009,16 +1009,11 @@ export default function PolisReport({
     () => getPolisDemoDatasetForSlug(activeReportSlug, { datasetsBySlug: resolvedDemoDataBySlug }),
     [activeReportSlug, resolvedDemoDataBySlug]
   );
-  const shouldDefaultToBuiltInDemoPolis = useMemo(() => {
-    if (activeReportSlug !== 'demo') return false;
-    if (!autoUseDemoData) return false;
-    if (activeDemoData !== DEFAULT_POLIS_DEMO_DATA) return false;
-    return !!buildPrecomputedDemoClusterState(activeDemoData);
-  }, [activeDemoData, activeReportSlug, autoUseDemoData]);
-  const defaultEmbeddingChoice = shouldDefaultToBuiltInDemoPolis ? 'POLIS' : 'UMAP';
-  const defaultManualClusterCount = shouldDefaultToBuiltInDemoPolis
-    ? ''
-    : String(DEFAULT_EXPLORATORY_CLUSTER_COUNT);
+  // Keep the canonical built-in demo aligned with other demo datasets by
+  // starting in the shared exploratory UMAP view instead of special-casing
+  // a first-load Polis Auto mode.
+  const defaultEmbeddingChoice = 'UMAP';
+  const defaultManualClusterCount = String(DEFAULT_EXPLORATORY_CLUSTER_COUNT);
   const currentPathname = typeof window !== 'undefined' && window.location?.pathname
     ? window.location.pathname
     : '';
