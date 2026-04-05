@@ -21,6 +21,8 @@ import { resolveSessionWizardEnabledWorkerSecrets } from './sessionWizardWorkerS
 
 const DEFAULT_CONFIG_CHAIN_ID = DEFAULT_CHAIN_ID;
 
+const DEFAULT_CONFIG_CHAIN_ID = DEFAULT_CHAIN_ID;
+
 describe('sessionWizardWriteNormalization', () => {
   beforeEach(() => {
     const getProviderMock = cryptoUtils._getProvider as jest.Mock;
