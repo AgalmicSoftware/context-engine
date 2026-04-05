@@ -105,6 +105,7 @@ dist/*
 /artifacts/llm-handoff-prompts/
 
 # Local scratch
+/.tmp/
 /tmp/
 /tmp-launch-channel-chrome.js
 
