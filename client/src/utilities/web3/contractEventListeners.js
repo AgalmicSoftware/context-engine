@@ -7,6 +7,7 @@
  */
 
 import { ethers } from 'ethers';
+import { extractChainId } from './chainIdResolution.js';
 
 export function createContractEventListenerMethods(deps) {
   const {
@@ -23,32 +24,9 @@ export function createContractEventListenerMethods(deps) {
     shouldLog,
   } = deps;
 
-  const resolveChainIdForContract = (cfg, contractKey = '') => {
-    const normalizedContractKey = String(contractKey || '').trim();
-    const preferredCandidates = normalizedContractKey === 'sbtFactory'
-      ? [
-          cfg?.contracts?.sbtFactory?.chainId,
-          cfg?.networkChainId,
-          cfg?.contracts?.surveys?.chainId,
-        ]
-      : normalizedContractKey === 'surveys'
-        ? [
-            cfg?.contracts?.surveys?.chainId,
-            cfg?.networkChainId,
-            cfg?.contracts?.sbtFactory?.chainId,
-          ]
-        : [
-            cfg?.networkChainId,
-            cfg?.contracts?.surveys?.chainId,
-            cfg?.contracts?.sbtFactory?.chainId,
-          ];
-    const orderedCandidates = preferredCandidates.concat([0]);
-    for (const candidate of orderedCandidates) {
-      const id = Number(candidate || 0);
-      if (Number.isFinite(id) && id > 0) return Math.floor(id);
-    }
-    return 0;
-  };
+  const resolveChainIdForContract = (cfg, contractKey = '') => (
+    extractChainId(cfg, { contractKey, strict: true })
+  );
 
   const buildProviderScopeKey = (provider, fallbackScope = 'default') => {
     const providerMeta = provider && typeof provider === 'object' ? provider.__CE_RPC_META : null;
