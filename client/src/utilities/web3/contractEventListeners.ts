@@ -65,8 +65,8 @@ export function createContractEventListenerMethods(deps: ContractEventListenerDe
     shouldLog,
   } = deps;
 
-  const resolveChainIdForContract = (cfg: any, contractKey: string = ''): number | null | undefined => (
-    extractChainId(cfg, { contractKey, strict: true } as any) as number | null | undefined
+  const resolveChainIdForContract = (cfg, contractKey = '') => (
+    extractChainId(cfg, { contractKey, strict: true })
   );
 
   const buildProviderScopeKey = (provider: any, fallbackScope: string = 'default'): string => {
