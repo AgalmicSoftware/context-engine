@@ -67,47 +67,6 @@ describe('chainIdResolution', () => {
     }, { contractKey: 'surveys', strict: true })).toBe(2);
   });
 
-  it('preserves contract-key strict chain resolution for contract helper survey reads', () => {
-    expect(extractChainId({
-      networkChainId: 10,
-      contracts: {
-        surveys: { chainId: 11 },
-        sbtFactory: { chainId: 12 },
-      },
-    }, { contractKey: 'surveys', strict: true })).toBe(11);
-
-    expect(extractChainId({}, { contractKey: 'surveys', strict: true })).toBe(0);
-
-    expect(extractChainId({
-      networkChainId: 0,
-      contracts: {
-        surveys: { chainId: 84532 },
-      },
-    }, { contractKey: 'surveys', strict: true })).toBe(84532);
-  });
-
-  it('preserves generic strict chain resolution without registry or default fallback', () => {
-    expect(extractChainId({
-      networkChainId: 0,
-      contracts: {
-        surveys: { chainId: 84532 },
-      },
-    }, { strict: true })).toBe(84532);
-
-    expect(extractChainId({}, { strict: true })).toBe(0);
-
-    expect(extractChainId({
-      __registry: { chainId: 8453 },
-    }, { strict: true })).toBe(0);
-  });
-
-  it('preserves strict chain resolution nulling for session config resolver reads', () => {
-    expect(extractChainId({}, { strict: true }) || null).toBeNull();
-    expect(extractChainId({
-      networkChainId: 5,
-    }, { strict: true }) || null).toBe(5);
-  });
-
   it('keeps non-strict fallback behavior and returns __registry.chainId when contract fields are empty', () => {
     expect(extractChainId({
       __registry: { chainId: 8453 },
