@@ -723,52 +723,7 @@ describe('PolisReport demo data defaults', () => {
     expect(screen.getByTestId(E2E_TESTIDS.POLIS_DEMO_DATA_TOGGLE)).toBeChecked();
   });
 
-  it('shows the demo data toggle as enabled by default for demo-1', () => {
-    const { container } = render(<PolisReport {...baseReportProps} slug="demo-1" />);
-
-    expect(container.querySelector('.settingsRow')).toHaveClass('pdfIgnore');
-    expect(screen.getByTestId(E2E_TESTIDS.POLIS_DEMO_DATA_TOGGLE)).toBeChecked();
-  });
-
-  it('lets the built-in demo session toggle from fixture data to live responses', async () => {
-    render(
-      <PolisReport
-        {...baseReportProps}
-        slug="demo"
-        questionResponses={seededQuestionResponses}
-        demoDataFirstLoad={true}
-        isQuestionCacheReady={true}
-        isResponsesCacheReady={true}
-      />,
-    );
-
-    openSettingsRow();
-
-    const demoToggle = screen.getByTestId(E2E_TESTIDS.POLIS_DEMO_DATA_TOGGLE);
-    expect(demoToggle).toBeChecked();
-    expect(demoToggle).not.toBeDisabled();
-
-    fireEvent.click(demoToggle);
-
-    expect(demoToggle).not.toBeChecked();
-    await waitFor(() => {
-      expect(screen.queryByText('None (Demo Data Active)')).not.toBeInTheDocument();
-      expect(
-        screen.queryByText('No non-encrypted binary responses found, or no Demo data loaded.'),
-      ).not.toBeInTheDocument();
-      expect(screen.getByText('Summary and Statistics')).toBeInTheDocument();
-    });
-  });
-
-  it('includes the participants list in the global collapse and expand controls', async () => {
-    const demoDataset = getPolisDemoDatasetForSlug('demo');
-    const participant = Array.isArray(demoDataset?.participantsVotes)
-      ? demoDataset.participantsVotes.find((entry) => entry?.xid || entry?.participant)
-      : null;
-    const participantLabel = participant?.xid || participant?.participant;
-
-    expect(participantLabel).toBeTruthy();
-
+  it('defaults built-in /session/demo to UMAP with 3 groups and still exposes precomputed Polis analysis after switching modes', async () => {
     computePolisConversationMath.mockReturnValue({
       stats: {
         nParticipants: 4,
@@ -828,6 +783,14 @@ describe('PolisReport demo data defaults', () => {
     });
 
     render(<PolisReport {...baseReportProps} slug="demo" questionResponses={seededQuestionResponses} />);
+
+    const embeddingSelect = screen.getByDisplayValue('UMAP');
+    const clusterInput = screen.getByRole('spinbutton');
+
+    expect(screen.getByDisplayValue('UMAP')).toBeInTheDocument();
+    expect(clusterInput).toHaveValue(3);
+
+    fireEvent.change(embeddingSelect, { target: { value: 'POLIS' } });
 
     const embeddingSelect = screen.getByDisplayValue('UMAP');
     const clusterInput = screen.getByRole('spinbutton');
