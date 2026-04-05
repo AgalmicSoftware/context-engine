@@ -1,16 +1,19 @@
 import fs from 'fs';
 import path from 'path';
 
+import debateMapData from './debate_map_demo_data.json';
 import debates from './debates.json';
-import demoPolisData77 from './demo_polis_data_77.json';
+import demoPolisData from './demo_polis_data.json';
+import loopholeHistoricalCases from './loophole_historical_cases.json';
+import loopholeHistoricalFigurePrinciples from './loophole_historical_figure_principles.json';
 
 describe('demo data fixture cleanup', () => {
-  it('keeps the renamed Polis fixture at the snake_case path', () => {
+  it('keeps the canonical Polis fixture at the snake_case path', () => {
     const demoDir = __dirname;
 
-    expect(fs.existsSync(path.join(demoDir, 'demo_polis_data_77.json'))).toBe(true);
-    expect(fs.existsSync(path.join(demoDir, 'demoPolisData_77.json'))).toBe(false);
-    expect(Object.keys(demoPolisData77)).toEqual([
+    expect(fs.existsSync(path.join(demoDir, 'demo_polis_data.json'))).toBe(true);
+    expect(fs.existsSync(path.join(demoDir, 'demoPolisData.json'))).toBe(false);
+    expect(Object.keys(demoPolisData)).toEqual([
       'comments',
       'participantsVotes',
       'clusterAnalysis',
@@ -18,9 +21,9 @@ describe('demo data fixture cleanup', () => {
       'divisiveStatements',
       'clusterAnalysisVersion',
     ]);
-    expect(demoPolisData77.comments).toHaveLength(77);
-    expect(Array.isArray(demoPolisData77.participantsVotes)).toBe(true);
-    expect(Array.isArray(demoPolisData77.clusterAnalysis)).toBe(true);
+    expect(demoPolisData.comments).toHaveLength(42);
+    expect(Array.isArray(demoPolisData.participantsVotes)).toBe(true);
+    expect(Array.isArray(demoPolisData.clusterAnalysis)).toBe(true);
   });
 
   it('merges the split debate fixtures into a single dataset', () => {
@@ -41,5 +44,41 @@ describe('demo data fixture cleanup', () => {
       'debate_regulation_speed',
       'debate_deceptive_alignment',
     ]);
+  });
+
+  it('covers every atlas leaf node with at least one Loophole historical case', () => {
+    const leafNodeIds = [];
+    const coveredNodeIds = new Set(
+      (Array.isArray(loopholeHistoricalCases) ? loopholeHistoricalCases : []).flatMap((entry) => (
+        Array.isArray(entry?.debate_map_issues) ? entry.debate_map_issues : []
+      ))
+    );
+
+    const visit = (nodes) => {
+      (nodes || []).forEach((node) => {
+        if (Array.isArray(node.children) && node.children.length > 0) {
+          visit(node.children);
+          return;
+        }
+        leafNodeIds.push(node.id);
+      });
+    };
+
+    visit(debateMapData);
+
+    expect(leafNodeIds).toHaveLength(40);
+    expect(leafNodeIds.filter((nodeId) => !coveredNodeIds.has(nodeId))).toEqual([]);
+  });
+
+  it('provides principle lists for every historical figure used in Loophole cases', () => {
+    const caseAuthors = Array.from(new Set(
+      (Array.isArray(loopholeHistoricalCases) ? loopholeHistoricalCases : []).flatMap((entry) => (
+        Array.isArray(entry?.authors) ? entry.authors : []
+      ))
+    )).sort();
+
+    expect(caseAuthors).toHaveLength(38);
+    expect(caseAuthors.filter((authorName) => !Array.isArray(loopholeHistoricalFigurePrinciples?.[authorName]))).toEqual([]);
+    expect(caseAuthors.filter((authorName) => (loopholeHistoricalFigurePrinciples?.[authorName] || []).length < 2)).toEqual([]);
   });
 });

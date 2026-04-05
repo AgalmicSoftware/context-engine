@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faBook,
@@ -12,6 +13,9 @@ import {
 import { faTwitter } from '@fortawesome/free-brands-svg-icons';
 
 import corpusSample from '../../variables/demo/corpus_sample.json';
+import corpusDebateMapLinks from '../../variables/demo/corpus_debate_map_links.json';
+import debateMapData from '../../variables/demo/debate_map_demo_data.json';
+import { readPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
 
 const COLORS = {
   accent: '#4dffa4',
@@ -21,6 +25,28 @@ const COLORS = {
   surface: 'rgba(255,255,255,0.06)',
   text: '#f4f7ff',
 };
+
+const buildPublicRoute = (pathname = '') => {
+  const normalizedPath = String(pathname || '').trim();
+  if (!normalizedPath) return readPublicUrlBasePath() || '/';
+  const basePath = readPublicUrlBasePath();
+  return `${basePath}${normalizedPath}` || normalizedPath;
+};
+
+const buildAtlasIssueIndex = (nodes, parentPath = [], acc = {}) => {
+  (Array.isArray(nodes) ? nodes : []).forEach((node) => {
+    const nextPath = [...parentPath, node.name];
+    acc[node.id] = {
+      id: node.id,
+      label: node.name,
+      pathLabel: nextPath.join(' > '),
+    };
+    buildAtlasIssueIndex(node.children, nextPath, acc);
+  });
+  return acc;
+};
+
+const ATLAS_ISSUE_INDEX = buildAtlasIssueIndex(debateMapData);
 
 const CORPUS_ORDER = [
   'tweets',
@@ -83,6 +109,53 @@ const clampStyle = (lines = 3) => ({
   WebkitLineClamp: lines,
 });
 
+const CARD_STYLE = {
+  background: COLORS.card,
+  border: `1px solid ${COLORS.cardBorder}`,
+  borderRadius: 8,
+  color: COLORS.text,
+  display: 'block',
+  padding: 16,
+};
+
+const EXTERNAL_LINK_STYLE = {
+  alignItems: 'center',
+  background: 'rgba(255,255,255,0.08)',
+  border: `1px solid ${COLORS.cardBorder}`,
+  borderRadius: 999,
+  color: COLORS.text,
+  display: 'inline-flex',
+  flexShrink: 0,
+  fontSize: 12,
+  fontWeight: 600,
+  gap: 6,
+  padding: '8px 12px',
+  textDecoration: 'none',
+};
+
+const DEBATE_MAP_SECTION_STYLE = {
+  background: 'rgba(8, 16, 42, 0.45)',
+  border: '1px solid rgba(77,255,164,0.18)',
+  borderRadius: 10,
+  marginTop: 14,
+  padding: '12px 12px 10px',
+};
+
+const DEBATE_MAP_LINK_STYLE = {
+  alignItems: 'center',
+  background: 'rgba(77,255,164,0.12)',
+  border: '1px solid rgba(77,255,164,0.22)',
+  borderRadius: 999,
+  color: COLORS.text,
+  display: 'inline-flex',
+  fontSize: 12,
+  fontWeight: 600,
+  gap: 6,
+  lineHeight: 1.4,
+  padding: '6px 10px',
+  textDecoration: 'none',
+};
+
 const formatNumber = (value) => (
   Number(value || 0).toLocaleString()
 );
@@ -105,6 +178,75 @@ const formatAuthors = (entry = {}) => {
   if (entry.authors.length === 2) return `${entry.authors[0]}, ${entry.authors[1]}`;
   return `${entry.authors[0]} +${entry.authors.length - 1}`;
 };
+
+const resolveDebateMapIssues = (entry = {}) => {
+  const rawIssues = Array.isArray(entry?.debate_map_issues)
+    ? entry.debate_map_issues
+    : (Array.isArray(entry?.debateMapIssues)
+      ? entry.debateMapIssues
+      : (Array.isArray(entry?.debate_nodes) ? entry.debate_nodes : []));
+
+  const normalizedIssues = [];
+  const seenIssueIds = new Set();
+
+  const pushIssue = (atlasNodeId, labelOverride = '') => {
+    const atlasIssue = ATLAS_ISSUE_INDEX[atlasNodeId];
+    if (!atlasIssue || seenIssueIds.has(atlasIssue.id)) return;
+
+    seenIssueIds.add(atlasIssue.id);
+    normalizedIssues.push({
+      id: atlasIssue.id,
+      href: `${buildPublicRoute(`/atlas/${atlasIssue.id}`)}?demo=1`,
+      label: labelOverride || atlasIssue.label,
+      pathLabel: atlasIssue.pathLabel,
+    });
+  };
+
+  rawIssues.forEach((issueRef) => {
+    if (typeof issueRef === 'string') {
+      if (ATLAS_ISSUE_INDEX[issueRef]) {
+        pushIssue(issueRef);
+        return;
+      }
+
+      const mappedLegacyIssues = Array.isArray(corpusDebateMapLinks?.[issueRef])
+        ? corpusDebateMapLinks[issueRef]
+        : [];
+
+      mappedLegacyIssues.forEach((mappedIssue) => {
+        pushIssue(mappedIssue?.atlasNodeId || mappedIssue?.nodeId || mappedIssue?.id, mappedIssue?.label || '');
+      });
+      return;
+    }
+
+    if (!issueRef || typeof issueRef !== 'object') return;
+
+    pushIssue(
+      issueRef.atlasNodeId || issueRef.nodeId || issueRef.id,
+      issueRef.label || issueRef.name || ''
+    );
+  });
+
+  return normalizedIssues;
+};
+
+const buildCorpusDefinitions = () => (
+  CORPUS_ORDER
+    .map((key) => {
+      const corpus = corpusSample?.corpuses?.[key];
+      if (!corpus) return null;
+      const entries = Array.isArray(corpus.entries) ? corpus.entries : [];
+
+      return {
+        ...corpus,
+        count_full: corpus.count_full,
+        entries,
+        key,
+        tabLabel: TAB_LABELS[key] || corpus.label || key,
+      };
+    })
+    .filter(Boolean)
+);
 
 const getEntryYear = (entry = {}) => {
   if (entry.year) return entry.year;
@@ -164,33 +306,62 @@ const buildNonTweetMeta = (corpusKey, entry = {}) => {
   return bits;
 };
 
+const DebateMapSection = ({ entry }) => {
+  const linkedIssues = resolveDebateMapIssues(entry);
+
+  return (
+    <div style={DEBATE_MAP_SECTION_STYLE}>
+      <div style={{ alignItems: 'center', display: 'flex', gap: 8, marginBottom: 8 }}>
+        <FontAwesomeIcon icon={faLink} style={{ color: COLORS.accent, fontSize: 12 }} />
+        <span style={{ color: COLORS.text, fontSize: 12, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+          Debate Map
+        </span>
+      </div>
+      {linkedIssues.length > 0 ? (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          {linkedIssues.map((issue) => (
+            <Link
+              key={issue.id}
+              to={issue.href}
+              style={DEBATE_MAP_LINK_STYLE}
+              title={issue.pathLabel}
+            >
+              {issue.label}
+            </Link>
+          ))}
+        </div>
+      ) : (
+        <div style={{ color: COLORS.muted, fontSize: 12, lineHeight: 1.5 }}>
+          No linked atlas issues yet.
+        </div>
+      )}
+    </div>
+  );
+};
+
+const ExternalSourceLink = ({ entry, fallbackLabel = 'View source' }) => {
+  if (!entry?.url) return null;
+
+  return (
+    <a
+      href={entry.url}
+      rel="noopener noreferrer"
+      style={EXTERNAL_LINK_STYLE}
+      target="_blank"
+    >
+      <FontAwesomeIcon icon={faLink} />
+      <span>{entry.source_label || fallbackLabel}</span>
+    </a>
+  );
+};
+
 const TweetCard = ({ entry }) => {
   const summaryText = entry.summary || entry.text || '';
   const createdAt = formatDate(entry.created_at);
   const sentimentStyle = getSentimentStyle(entry.sentiment);
-  const CardTag = entry.url ? 'a' : 'div';
-  const cardProps = entry.url
-    ? {
-      href: entry.url,
-      rel: 'noopener noreferrer',
-      target: '_blank',
-    }
-    : {};
 
   return (
-    <CardTag
-      {...cardProps}
-      style={{
-        background: COLORS.card,
-        border: `1px solid ${COLORS.cardBorder}`,
-        borderRadius: 8,
-        color: COLORS.text,
-        cursor: entry.url ? 'pointer' : 'default',
-        display: 'block',
-        padding: 16,
-        textDecoration: 'none',
-      }}
-    >
+    <article style={CARD_STYLE}>
       <div style={{ alignItems: 'flex-start', display: 'flex', gap: 12, justifyContent: 'space-between', marginBottom: 10 }}>
         <div style={{ minWidth: 0 }}>
           <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>
@@ -235,12 +406,17 @@ const TweetCard = ({ entry }) => {
         ))}
       </div>
 
-      <div style={{ alignItems: 'center', color: COLORS.muted, display: 'flex', flexWrap: 'wrap', fontSize: 12, gap: 12 }}>
-        <span>❤ {formatNumber(entry.engagement?.likes)}</span>
-        <span>↺ {formatNumber(entry.engagement?.reposts)}</span>
-        {entry.engagement?.views ? <span>👁 {formatNumber(entry.engagement.views)}</span> : null}
+      <DebateMapSection entry={entry} />
+
+      <div style={{ alignItems: 'center', color: COLORS.muted, display: 'flex', flexWrap: 'wrap', fontSize: 12, gap: 12, justifyContent: 'space-between', marginTop: 14 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
+          <span>❤ {formatNumber(entry.engagement?.likes)}</span>
+          <span>↺ {formatNumber(entry.engagement?.reposts)}</span>
+          {entry.engagement?.views ? <span>👁 {formatNumber(entry.engagement.views)}</span> : null}
+        </div>
+        <ExternalSourceLink entry={entry} fallbackLabel="View post" />
       </div>
-    </CardTag>
+    </article>
   );
 };
 
@@ -248,29 +424,9 @@ const EntryCard = ({ corpusKey, entry }) => {
   const meta = buildNonTweetMeta(corpusKey, entry);
   const summaryText = entry.summary || '';
   const tags = Array.isArray(entry.tags) ? entry.tags : [];
-  const CardTag = entry.url ? 'a' : 'div';
-  const cardProps = entry.url
-    ? {
-      href: entry.url,
-      rel: 'noopener noreferrer',
-      target: '_blank',
-    }
-    : {};
 
   return (
-    <CardTag
-      {...cardProps}
-      style={{
-        background: COLORS.card,
-        border: `1px solid ${COLORS.cardBorder}`,
-        borderRadius: 8,
-        color: 'inherit',
-        cursor: entry.url ? 'pointer' : 'default',
-        display: 'block',
-        padding: 16,
-        textDecoration: 'none',
-      }}
-    >
+    <article style={CARD_STYLE}>
       <div style={{ alignItems: 'flex-start', display: 'flex', gap: 12, justifyContent: 'space-between', marginBottom: 10 }}>
         <div style={{ minWidth: 0 }}>
           <div style={{ color: COLORS.text, fontSize: 15, fontWeight: 700, lineHeight: 1.4, marginBottom: 6 }}>
@@ -308,7 +464,15 @@ const EntryCard = ({ corpusKey, entry }) => {
           </span>
         ))}
       </div>
-    </CardTag>
+
+      <DebateMapSection entry={entry} />
+
+      {entry?.url ? (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 14 }}>
+          <ExternalSourceLink entry={entry} />
+        </div>
+      ) : null}
+    </article>
   );
 };
 
@@ -342,18 +506,7 @@ const EmptyCorpusState = ({ corpus }) => (
 );
 
 const CorpusViewer = () => {
-  const corpusDefinitions = CORPUS_ORDER
-    .map((key) => {
-      const corpus = corpusSample?.corpuses?.[key];
-      if (!corpus) return null;
-      return {
-        ...corpus,
-        entries: Array.isArray(corpus.entries) ? corpus.entries : [],
-        key,
-        tabLabel: TAB_LABELS[key] || corpus.label || key,
-      };
-    })
-    .filter(Boolean);
+  const corpusDefinitions = useMemo(() => buildCorpusDefinitions(), []);
 
   const [activeCorpusKey, setActiveCorpusKey] = useState(corpusDefinitions[0]?.key || 'tweets');
 

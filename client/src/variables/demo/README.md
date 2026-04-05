@@ -15,13 +15,15 @@ This directory contains demo and fixture data for the Context Engine survey plat
 | [`historical_figures_merged.json`](./historical_figures_merged.json) | Consolidated superset combining data from the richer figure sources. Used for demographic computation, avatar resolution, and shared profile question lookups. |
 | [`historical_figures_tree_qs_and_votes.json`](./historical_figures_tree_qs_and_votes.json) | Debate-oriented dataset for 66 figures with tree-structured questions, in-character comments, and vote stances. Used by debate tree and political compass views. |
 | [`demo_polis_data.json`](./demo_polis_data.json) | Polis-format clustering dataset with participants, vote arrays, and group assignments. Used by the demo analysis adapter and Polis report surfaces. |
-| [`demo_polis_data_77.json`](./demo_polis_data_77.json) | Newer Polis fixture variant with 77 questions instead of 42. Currently a work-in-progress dataset. |
 | [`demo_sessions.json`](./demo_sessions.json) | Demo session definitions keyed by slug with metadata and worker configuration. Used by session resolution code and worker/cors proxy tests. |
 | [`demo_sbt_collection.json`](./demo_sbt_collection.json) | Sample SBT group metadata with per-figure demographic attributes such as gender, era, country, affiliation, and atlas category. |
 | [`expanded_tag_list.json`](./expanded_tag_list.json) | Taxonomy tag list for survey question classification and topic labeling. |
 | [`risk_matrix_data.json`](./risk_matrix_data.json) | Input data for the debate risk matrix visualization. |
 | [`corpus_sample.json`](./corpus_sample.json) | Sample AI discourse corpus documents used by demo corpus views. |
+| [`corpus_debate_map_links.json`](./corpus_debate_map_links.json) | Legacy corpus `debate_nodes` to atlas node mapping used to deep-link demo cards into the Debate Map. |
 | [`debates.json`](./debates.json) | Generated debate entries for Debate HUD and related demo views. |
+| [`loophole_historical_figure_principles.json`](./loophole_historical_figure_principles.json) | Per-figure moral principles used to deepen the atlas historical-case briefs in the Loophole-style demo flow. |
+| [`loophole_historical_cases.json`](./loophole_historical_cases.json) | Historical-figure cases inspired by `brendanhogan/loophole`, injected into relevant atlas nodes as a dedicated demo-mode section. |
 
 ### JS Modules
 
@@ -120,5 +122,5 @@ To add a new historical figure cleanly, update the datasets that drive the surfa
 ## Naming And Compatibility Notes
 
 - Most JSON fixtures in this folder use `snake_case`.
-- Most fixture filenames in this folder now follow `snake_case`, including [`demo_polis_data_77.json`](./demo_polis_data_77.json).
+- Most fixture filenames in this folder now follow `snake_case`, including [`demo_polis_data.json`](./demo_polis_data.json).
 - JS modules in this folder now follow the same `snake_case` filename convention, including [`historical_figure_demographics.js`](./historical_figure_demographics.js).

@@ -1857,6 +1857,198 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
       }
     }
 
+    .historicalCasesSection {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding-bottom: 12px;
+    }
+
+    .historicalCaseCard {
+      padding: 14px 16px;
+      border-radius: var(--ce-radius-10);
+      border: 1px solid rgba(77, 255, 164, 0.16);
+      background: linear-gradient(180deg, rgba(77, 255, 164, 0.08) 0%, rgba(15, 23, 42, 0.82) 100%);
+      box-shadow: 0 14px 28px rgba(0, 0, 0, 0.18);
+    }
+
+    .historicalCaseHeader {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 10px;
+    }
+
+    .historicalCaseActions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .historicalCaseTitle {
+      font-size: 1rem;
+      font-weight: 700;
+      line-height: 1.4;
+      color: var(--ce-color-white);
+    }
+
+    .historicalCaseMeta {
+      margin-top: 6px;
+      font-size: 0.76rem;
+      line-height: 1.5;
+      color: rgba(226, 232, 240, 0.72);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .historicalCaseSummary {
+      font-size: 0.95rem;
+      line-height: 1.6;
+      color: rgba(241, 245, 249, 0.92);
+    }
+
+    .historicalCaseExpandButton {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 7px 12px;
+      border-radius: var(--ce-radius-pill);
+      border: 1px solid rgba(77, 255, 164, 0.2);
+      background: rgba(77, 255, 164, 0.08);
+      color: var(--ce-color-accent);
+      font-size: 0.75rem;
+      font-weight: 700;
+      white-space: nowrap;
+      cursor: pointer;
+      transition:
+        background-color 0.2s,
+        border-color 0.2s,
+        color 0.2s,
+        transform 0.2s;
+
+      &:hover {
+        background: rgba(77, 255, 164, 0.16);
+        border-color: rgba(77, 255, 164, 0.34);
+        color: color.adjust($accent-green, $lightness: 8%);
+        transform: translateY(-1px);
+      }
+    }
+
+    .historicalCaseDetail {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 14px;
+      padding-top: 14px;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .historicalCaseDetailBlock {
+      padding: 12px 14px;
+      border-radius: var(--ce-radius-8);
+      background: rgba(15, 23, 42, 0.58);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+
+      p {
+        margin: 0;
+        font-size: 0.92rem;
+        line-height: 1.6;
+        color: rgba(241, 245, 249, 0.92);
+      }
+    }
+
+    .historicalCaseDetailLabel {
+      margin-bottom: 6px;
+      font-size: 0.72rem;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: rgba(77, 255, 164, 0.88);
+    }
+
+    .historicalCasePrinciplesGrid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 10px;
+    }
+
+    .historicalCasePrinciplesCard {
+      padding: 12px;
+      border-radius: var(--ce-radius-8);
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .historicalCasePrinciplesName {
+      margin-bottom: 8px;
+      font-size: 0.84rem;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--ce-color-white);
+    }
+
+    .historicalCasePrinciplesList {
+      margin: 0;
+      padding-left: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+
+      li {
+        color: rgba(241, 245, 249, 0.92);
+        font-size: 0.88rem;
+        line-height: 1.55;
+      }
+    }
+
+    .historicalCaseTags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+
+      span {
+        display: inline-flex;
+        align-items: center;
+        padding: 5px 10px;
+        border-radius: var(--ce-radius-pill);
+        border: 1px solid rgba(77, 255, 164, 0.2);
+        background: rgba(77, 255, 164, 0.1);
+        color: color.adjust($accent-green, $lightness: 6%);
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+      }
+    }
+
+    .historicalCaseSource {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 7px 12px;
+      border-radius: var(--ce-radius-pill);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--ce-color-white);
+      font-size: 0.75rem;
+      font-weight: 700;
+      white-space: nowrap;
+      text-decoration: none;
+      transition:
+        background-color 0.2s,
+        border-color 0.2s,
+        color 0.2s;
+
+      &:hover {
+        background: rgba(77, 255, 164, 0.14);
+        border-color: rgba(77, 255, 164, 0.28);
+        color: var(--ce-color-accent);
+      }
+    }
+
     .compassSection {
       .compassContainer {
         width: 100%;
