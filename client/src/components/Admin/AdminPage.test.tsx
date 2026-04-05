@@ -1,11 +1,10 @@
 /** @file AdminPage.test.tsx */
 import { ethers } from 'ethers';
-import AdminPage, { __adminPageTestUtils } from './AdminPage';
+import AdminPage, { __adminPageTestUtils } from './AdminPage.jsx';
 import { DEFAULT_CHAIN_ID } from '../../variables/appConfig.js';
 import { getDefaultHttpRpc, getSessionRegistryAddress } from '../../variables/chains.js';
 
 const DEFAULT_CONFIG_CHAIN_ID = DEFAULT_CHAIN_ID;
-const adminPageTestUtils = __adminPageTestUtils as any;
 
 describe('AdminPage', () => {
   it('exports a component', () => {
@@ -55,7 +54,7 @@ describe('AdminPage', () => {
     expect(payload.rpcUrlsByChainId).toEqual(
       expect.objectContaining({
         [String(DEFAULT_CONFIG_CHAIN_ID)]: [getDefaultHttpRpc(DEFAULT_CONFIG_CHAIN_ID)],
-      }),
+      })
     );
   });
 
