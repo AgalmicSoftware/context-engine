@@ -8,7 +8,6 @@
 # testing
 /coverage
 /.tmp
-/.npm-cache-codex
 
 # production
 /build
