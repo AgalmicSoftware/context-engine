@@ -356,6 +356,8 @@ export class MainSite extends Component {
   _mounted = false;
   _dgLastWrittenJsonByStorageKey = new Map();
   _sessionFallbackRedirectPath = '';
+  _lastProcessedQuestionIdFromPath = '';
+  _lastProcessedQuestionSlugFromPath = null;
 
   beginSbtLiveProgress = (slugIn, initialPatch = {}) => {
     const slug = normalizeSessionSlug(slugIn || '');
@@ -5399,6 +5401,8 @@ export class MainSite extends Component {
       })();
       const activeSlug = this.getActiveSessionSlug();
       const questionSlug = questionIdFromPath ? this.findGroupSlugForQuestion(questionIdFromPath) : null;
+      this._lastProcessedQuestionIdFromPath = questionIdFromPath;
+      this._lastProcessedQuestionSlugFromPath = questionSlug;
       const slugsToRefresh = Array.from(
         new Set([activeSlug, questionSlug].filter((s) => s !== null && s !== undefined))
       );
@@ -5538,10 +5542,26 @@ export class MainSite extends Component {
     const litReadyBefore = !!(prevState?.litHooks && typeof prevState.litHooks.getKey === 'function');
     const litReadyAfter = !!(this.state.litHooks && typeof this.state.litHooks.getKey === 'function');
     const litReadyChanged = litReadyBefore !== litReadyAfter;
-    const entitlementChanged =
+    const sbtCacheRevisionChanged =
       Number(this.state.sbtCacheRevision || 0) !== Number(prevState?.sbtCacheRevision || 0);
+    const entitlementChanged = sbtCacheRevisionChanged;
+    const readinessSignalsChanged =
+      authOrProviderChanged ||
+      litReadyChanged ||
+      entitlementChanged;
+    const authBecameUnavailable =
+      !!(prevProps.loginComplete && prevProps.account) &&
+      !(this.props.loginComplete && this.props.account);
+
+    if (authBecameUnavailable) {
+      this._lastProcessedQuestionIdFromPath = '';
+      this._lastProcessedQuestionSlugFromPath = null;
+    }
 
     if (this.props.loginComplete && this.props.account) {
+      const prevPath = this.getEffectiveRoutePath(
+        prevProps.path || (typeof window !== 'undefined' ? window.location.pathname : '') || ''
+      );
       const path = this.getEffectiveRoutePath(
         this.props.path || (typeof window !== 'undefined' ? window.location.pathname : '') || ''
       );
@@ -5551,38 +5571,50 @@ export class MainSite extends Component {
         return match && match[1] ? String(match[1]).toLowerCase() : '';
       })();
       const questionSlug = questionIdFromPath ? this.findGroupSlugForQuestion(questionIdFromPath) : null;
-      const slugsToCheck = Array.from(
-        new Set([activeSlug, questionSlug].filter((s) => s !== null && s !== undefined))
-      );
+      const questionSlugChanged = questionSlug !== this._lastProcessedQuestionSlugFromPath;
+      // Regression guard: same-route readiness transitions and slug re-resolution
+      // still need the masked-question refresh scan; only unrelated churn should skip it.
+      const shouldScanQuestionPath =
+        prevPath !== path ||
+        questionIdFromPath !== this._lastProcessedQuestionIdFromPath ||
+        questionSlugChanged ||
+        readinessSignalsChanged;
+      if (shouldScanQuestionPath) {
+        this._lastProcessedQuestionIdFromPath = questionIdFromPath;
+        this._lastProcessedQuestionSlugFromPath = questionSlug;
+        const slugsToCheck = Array.from(
+          new Set([activeSlug, questionSlug].filter((s) => s !== null && s !== undefined))
+        );
 
-      slugsToCheck.forEach((slug) => {
-        const masked = this.hasMaskedQuestionPayloadInCache(slug);
-        const shouldRetry = shouldRetryMaskedQuestionRefresh({
-          masked,
-          prev: {
-            account: prevProps.account,
-            provider: prevProps.provider,
-            loginComplete: prevProps.loginComplete,
-            litHooks: prevState?.litHooks || null,
-            sbtCacheRevision: prevState?.sbtCacheRevision || 0,
-          },
-          next: {
-            account: this.props.account,
-            provider: this.props.provider,
-            loginComplete: this.props.loginComplete,
-            litHooks: this.state.litHooks || null,
-            sbtCacheRevision: this.state.sbtCacheRevision || 0,
-          },
-        }) || (masked && (authOrProviderChanged || litReadyChanged || entitlementChanged));
+        slugsToCheck.forEach((slug) => {
+          const masked = this.hasMaskedQuestionPayloadInCache(slug);
+          const shouldRetry = shouldRetryMaskedQuestionRefresh({
+            masked,
+            prev: {
+              account: prevProps.account,
+              provider: prevProps.provider,
+              loginComplete: prevProps.loginComplete,
+              litHooks: prevState?.litHooks || null,
+              sbtCacheRevision: prevState?.sbtCacheRevision || 0,
+            },
+            next: {
+              account: this.props.account,
+              provider: this.props.provider,
+              loginComplete: this.props.loginComplete,
+              litHooks: this.state.litHooks || null,
+              sbtCacheRevision: this.state.sbtCacheRevision || 0,
+            },
+          }) || (masked && (authOrProviderChanged || litReadyChanged || entitlementChanged));
 
-        if (!shouldRetry) return;
-        this.refreshEncryptedQuestionPayloadsForGroup(slug).catch((err) => {
-          mainSiteLog.warn('refreshEncryptedQuestionPayloadsForGroup failed after readiness change:', {
-            slug,
-            error: err?.message || err,
+          if (!shouldRetry) return;
+          this.refreshEncryptedQuestionPayloadsForGroup(slug).catch((err) => {
+            mainSiteLog.warn('refreshEncryptedQuestionPayloadsForGroup failed after readiness change:', {
+              slug,
+              error: err?.message || err,
+            });
           });
         });
-      });
+      }
     }
 
     // Re-initialize if the *group* chain id changes (independent of wallet)
