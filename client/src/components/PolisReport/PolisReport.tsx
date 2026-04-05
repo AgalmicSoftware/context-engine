@@ -1075,7 +1075,7 @@ export default function PolisReport({
   // Keep the canonical built-in demo aligned with other demo datasets by
   // starting in the shared exploratory UMAP view instead of special-casing
   // a first-load Polis Auto mode.
-  const defaultEmbeddingChoice: string = 'UMAP';
+  const defaultEmbeddingChoice = 'UMAP';
   const defaultManualClusterCount = String(DEFAULT_EXPLORATORY_CLUSTER_COUNT);
   const currentPathname = typeof window !== 'undefined' && window.location?.pathname
     ? window.location.pathname

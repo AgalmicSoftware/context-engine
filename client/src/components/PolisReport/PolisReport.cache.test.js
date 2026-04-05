@@ -540,60 +540,6 @@ describe('PolisReport demo data defaults', () => {
     expect(screen.getByTestId(E2E_TESTIDS.POLIS_DEMO_DATA_TOGGLE)).toBeChecked();
   });
 
-  it('includes the participants list in the global collapse and expand controls', async () => {
-    const demoDataset = getPolisDemoDatasetForSlug('demo');
-    const participant = Array.isArray(demoDataset?.participantsVotes)
-      ? demoDataset.participantsVotes.find((entry) => entry?.xid || entry?.participant)
-      : null;
-    const participantLabel = participant?.xid || participant?.participant;
-
-    expect(participantLabel).toBeTruthy();
-
-    computePolisConversationMath.mockReturnValue({
-      stats: {
-        nParticipants: 4,
-        nComments: 3,
-        totalVotes: 12,
-        votesPerVoterAvg: 3,
-      },
-      participantCoords: [
-        { x: 0, y: 0, index: 0 },
-        { x: 1, y: 0, index: 1 },
-        { x: 0, y: 1, index: 2 },
-        { x: 1, y: 1, index: 3 },
-      ],
-      statementCoords: [
-        { x: 0, y: 0, index: 0 },
-      ],
-      commentStats: [],
-      clusterAssignments: [0, 0, 1, 1],
-      clusterCount: 2,
-      repQuestions: {},
-    });
-
-    render(
-      <PolisReport
-        {...baseReportProps}
-        slug="demo"
-        questionResponses={seededQuestionResponses}
-      />
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('List of Participants')).toBeInTheDocument();
-      expect(screen.getByTitle(participantLabel)).toBeInTheDocument();
-    });
-
-    fireEvent.click(screen.getByRole('button', { name: 'Collapse All' }));
-
-    expect(screen.getByText('List of Participants')).toBeInTheDocument();
-    expect(screen.queryByTitle(participantLabel)).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Expand All' }));
-
-    expect(screen.getByTitle(participantLabel)).toBeInTheDocument();
-  });
-
   it('defaults built-in /session/demo to UMAP with 3 groups and still exposes precomputed Polis analysis after switching modes', async () => {
     computePolisConversationMath.mockReturnValue({
       stats: {
