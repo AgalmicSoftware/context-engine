@@ -7,6 +7,7 @@
  */
 
 import { ethers } from 'ethers';
+import { extractChainId, extractChainIdOrUndefined } from './chainIdResolution.js';
 
 const SBT_READ_PROVIDER_OPTIONS = Object.freeze({ contractKey: 'sbtFactory' });
 
@@ -103,7 +104,7 @@ export function createContractProfileMethods(deps) {
       const slugOrEmpty = (cfg && typeof cfg.slug !== 'undefined') ? cfg.slug : '';
       const gAddrs = getSessionAddresses(cfg);
       const addr = gAddrs.sbtFactory?.address;
-      const chId = gAddrs.sbtFactory?.chainId || cfg?.networkChainId || undefined;
+      const chId = gAddrs.sbtFactory?.chainId || extractChainIdOrUndefined(cfg, { contractKey: 'sbtFactory' });
 
       if (!addr) {
         contractsLog.log('No SBT factory address in group config:', slugOrEmpty);
@@ -246,12 +247,7 @@ export function createContractProfileMethods(deps) {
       }
 
       const cfg = resolveSession(groupKeyOrCfg === undefined ? '' : groupKeyOrCfg);
-      const chId = Number(
-        cfg?.networkChainId ||
-        cfg?.contracts?.sbtFactory?.chainId ||
-        cfg?.contracts?.surveys?.chainId ||
-        0
-      ) || 0;
+      const chId = extractChainId(cfg, SBT_READ_PROVIDER_OPTIONS);
 
       if (shouldLog('rpc', 'log')) {
         rpcLog('RPC Call:', {
@@ -376,12 +372,7 @@ export function createContractProfileMethods(deps) {
       }
 
       const cfg = resolveSession(groupKeyOrCfg === undefined ? '' : groupKeyOrCfg);
-      const chId = Number(
-        cfg?.networkChainId ||
-        cfg?.contracts?.sbtFactory?.chainId ||
-        cfg?.contracts?.surveys?.chainId ||
-        0
-      ) || 0;
+      const chId = extractChainId(cfg, SBT_READ_PROVIDER_OPTIONS);
 
       const fromBlock = options.fromBlock || 0;
       const scopedGroupRef = (options && options.ignoreScope)
