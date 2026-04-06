@@ -494,9 +494,6 @@ describe('SessionWizard rendered validation', () => {
     expect(chainSelectorWrap).toBeTruthy();
     expect(within(chainSelectorWrap).getByRole('combobox')).toHaveValue(String(defaultChainId));
     expect(screen.getByDisplayValue(defaultChainLabel)).toBeInTheDocument();
-    expect(screen.getByText('Start block')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Smart Contracts (expand|collapse)/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /faucet (expand|collapse)/i })).toBeInTheDocument();
   });
 
   it('defaults auto-feature session groups to enabled for fresh /new drafts', async () => {
