@@ -17,6 +17,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { Alert } from 'reactstrap';
 import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
+import { createLitHooks } from '../../utilities/crypto/litProtocol.js';
 import { ethers } from 'ethers';
 
 
@@ -43,6 +44,7 @@ import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { getSbtDisplayName } from '../../utilities/sbt/sbtDisplayNames.js';
 import { isCryptoMode, sbtsListPath, t } from '../../utilities/ui/terminology.js';
 import { PUBLIC_AI_DISCOURSE_CORPUS_URL } from '../../variables/publicRepoMetadata.js';
+import { resolveMainSiteLitSessionConfig } from '../MainSite/litSessionConfig.js';
 import type { RiskMatrixRestoreState } from '../MainContent/RiskMatrix';
 
 const SurveyPage = React.lazy(() => import('../SurveyTool/SurveyPage'));
@@ -621,9 +623,10 @@ class OnePageSession extends Component<any, any> {
     const resolvedAutoFeature = propAutoFeature !== undefined
       ? propAutoFeature
       : resolveAutoFeatureBySessionSlug(baseSessionConfig);
+    const resolvedSlug = slug || baseSessionConfig.slug || '';
     const resolved = {
       ...baseSessionConfig,
-      slug,
+      slug: resolvedSlug,
       sessionName,
       questionsGenPrompt,
       contracts: (contracts && typeof contracts === 'object')
@@ -645,6 +648,43 @@ class OnePageSession extends Component<any, any> {
     };
     this._resolvedSessionConfigMemoValue = resolved;
     return resolved;
+  }
+
+  resolveScopedLitHooks(sessionConfig: any = {}) {
+    if (this.props.litHooks && typeof this.props.litHooks === 'object') {
+      return this.props.litHooks;
+    }
+    const {
+      chainId,
+      litNetwork,
+      litChain,
+      accessControlConditions,
+      userMaxPrice,
+      chipotle,
+    } = resolveMainSiteLitSessionConfig({
+      sessionConfig,
+      networkChainIdFallback: (
+        this.props.networkChainId ||
+        this.props.network?.id ||
+        this.props.network?.chainId ||
+        null
+      ),
+    });
+    if (!chipotle) return null;
+    const sessionSlug = normalizeOnePageSessionSlug(sessionConfig?.slug || this.props.slug || '');
+    return createLitHooks({
+      providerLike: this.props.provider,
+      account: this.props.account,
+      chainId,
+      litChain,
+      litNetwork,
+      userMaxPrice,
+      accessControlConditions: accessControlConditions || undefined,
+      chipotle: {
+        ...chipotle,
+        sessionSlug,
+      },
+    });
   }
 
   componentDidUpdate(prevProps: any, prevState: any) {
@@ -2150,6 +2190,7 @@ class OnePageSession extends Component<any, any> {
       incomingSessionConfig?.polisDemoDataBySlug ||
       resolvedSessionConfig?.polisDemoDataBySlug ||
       null;
+    const scopedLitHooks = this.resolveScopedLitHooks(resolvedSessionConfig);
     const effectiveSlug = resolveEffectiveSlug(this.props) || slug;
     // Only show DebateHUD/CorpusViewer on the generic demo session.
     const isDemoSlug = effectiveSlug === 'demo';
@@ -2222,6 +2263,7 @@ class OnePageSession extends Component<any, any> {
               fontSize: '1.5em'
             }}
             isOpen={!this.state.dismissedLoginBanner}
+            fade={false}
             toggle={this.dismissLoginBanner}
             closeClassName={alertCloseClass}
           >
@@ -2237,6 +2279,7 @@ class OnePageSession extends Component<any, any> {
             color='info'
             className={styles.sbtMintStatusItem}
             isOpen={true}
+            fade={false}
             data-testid={E2E_TESTIDS.SESSION_AUTO_MINT_COUNTDOWN}
             style={{ fontSize: '1.15rem', fontWeight: 600 }}
           >
@@ -2289,6 +2332,7 @@ class OnePageSession extends Component<any, any> {
                   color={color}
                   className={styles.sbtMintStatusItem}
                   isOpen={isOpen}
+                  fade={false}
                   data-testid={E2E_TESTIDS.SESSION_AUTO_MINT_STATUS}
                   data-ce-sbt-address={(addrKey || '').toLowerCase() || undefined}
                   data-ce-status={String(v.status || '').trim().toLowerCase() || undefined}
@@ -2455,6 +2499,7 @@ class OnePageSession extends Component<any, any> {
                 contracts={contracts}
                 blockLimits={blockLimits}
                 networkChainId={networkChainId}
+                litHooks={scopedLitHooks}
               />
             </Suspense>
           )}
@@ -2506,6 +2551,7 @@ class OnePageSession extends Component<any, any> {
                 contracts={contracts}
                 blockLimits={blockLimits}
                 networkChainId={networkChainId}
+                litHooks={scopedLitHooks}
               />
             </Suspense>
 
