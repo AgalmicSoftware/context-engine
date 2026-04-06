@@ -56,6 +56,17 @@ The `/` home route renders `client/src/components/MainContent/MainAreaTabs.jsx`,
 | `ce-page-matrix-root` | `/matrix` | Matrix demo page root | yes |
 | `ce-page-agent-root` | `/agent` (dev-only) | Agent page root | yes |
 
+## DebateMap / Atlas Historical Cases
+
+Component: `client/src/components/DebateMap/DebateMap.jsx`
+
+| `data-testid` | Meaning / When Present | TestID API | Disambiguators |
+| --- | --- | --- | --- |
+| `ce-atlas-historical-case-card` | Historical-case card shown in the atlas modal when demo mode attaches Loophole case data to a leaf node. | yes | `data-ce-case-id` |
+| `ce-atlas-historical-case-expand` | Expand/collapse button for a historical-case brief. | yes | `data-ce-case-id` |
+| `ce-atlas-historical-case-detail` | Expanded brief container with the enriched case sections. | yes | `data-ce-case-id` |
+| `ce-atlas-historical-case-patch-card` | Patch-option card inside the expanded brief. | yes | `data-ce-case-id`, `data-ce-patch-kind` (`best` or `option`) |
+
 ## Wallet Display
 
 | `data-testid` | Component path(s) | Meaning / When Present | TestID API | Disambiguators |

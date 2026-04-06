@@ -47,6 +47,10 @@ const E2E_TESTIDS = Object.freeze({
   PAGE_MATRIX_ROOT: 'ce-page-matrix-root',
   PAGE_AGENT_ROOT: 'ce-page-agent-root',
   PAGE_DEBATE_ROOT: 'ce-page-debate-root',
+  ATLAS_HISTORICAL_CASE_CARD: 'ce-atlas-historical-case-card',
+  ATLAS_HISTORICAL_CASE_EXPAND: 'ce-atlas-historical-case-expand',
+  ATLAS_HISTORICAL_CASE_DETAIL: 'ce-atlas-historical-case-detail',
+  ATLAS_HISTORICAL_CASE_PATCH_CARD: 'ce-atlas-historical-case-patch-card',
 
   // -----------------------------------------
   // AI tools/pages

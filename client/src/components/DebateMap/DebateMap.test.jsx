@@ -1,9 +1,11 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import DebateMap, { AtlasView, buildHistoricalCompassPoints } from './DebateMap.jsx';
+import DebateMap, { AtlasView, buildHistoricalCaseBrief, buildHistoricalCompassPoints } from './DebateMap.jsx';
 import treeData from '../../variables/demo/debate_map_demo_data.json';
 import historicalFigureData from '../../variables/demo/historical_figures_tree_qs_and_votes.json';
+import loopholeHistoricalCases from '../../variables/demo/loophole_historical_cases.json';
+import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { getHistoricalFigureAvatarOrBlockie } from 'utilities/ui/historicalFigureAvatars.js';
 
 jest.setTimeout(30000);
@@ -134,6 +136,47 @@ const getAtlasNodeDiameter = (label) => {
   expect(dotElement).toBeTruthy();
   return parseFloat(dotElement.style.width);
 };
+const privacyAndSurveillanceNodeId = '0x4320000000000000000000000000000000000000000000000000000000000000';
+const deceptiveAlignmentNodeId = '0x1110000000000000000000000000000000000000000000000000000000000000';
+const liabilityFrameworksNodeId = '0x3140000000000000000000000000000000000000000000000000000000000000';
+
+const getHistoricalCaseForNode = (nodeId) => {
+  const matchedCase = (Array.isArray(loopholeHistoricalCases) ? loopholeHistoricalCases : []).find((historicalCase) => (
+    Array.isArray(historicalCase?.debate_map_issues)
+      && historicalCase.debate_map_issues.includes(nodeId)
+  ));
+
+  if (!matchedCase) {
+    throw new Error(`Expected a historical case fixture for node ${nodeId}.`);
+  }
+
+  return matchedCase;
+};
+
+const renderDemoAtlasNode = (nodeId) => render(
+  <MemoryRouter initialEntries={[`/atlas/${nodeId}`]}>
+    <Routes>
+      <Route
+        path="/atlas/:nodeId"
+        element={(
+          <DebateMap
+            account=""
+            provider=""
+            network={{ id: 84532 }}
+            activeSessionSlug=""
+            toggleLoginModal={jest.fn()}
+            demoMode={true}
+          />
+        )}
+      />
+    </Routes>
+  </MemoryRouter>
+);
+
+const openHistoricalCaseBrief = async (nodeId) => {
+  renderDemoAtlasNode(nodeId);
+  fireEvent.click(await screen.findByRole('button', { name: 'View full brief' }));
+};
 
 describe('DebateMap', () => {
   afterEach(() => {
@@ -210,6 +253,86 @@ describe('DebateMap', () => {
     };
 
     visit(treeData);
+  });
+
+  it('normalizes enriched historical-case helpers and preserves template fallback copy', () => {
+    const enrichedBrief = buildHistoricalCaseBrief(
+      {
+        authors: ['Figure Alpha', 'Figure Beta'],
+        category: 'Loophole Finder',
+        draft_legal_code: {
+          articles: [
+            'Art. 7. Emergency powers expire at sunset.',
+          ],
+        },
+        loophole_exploit: {
+          institution: 'Transit hub',
+          actor: 'Director',
+          action: 'Uses a vague emergency memo to expand surveillance.',
+          victims: 'Peaceful protesters',
+          why_legal: 'The rule allows incident-specific intelligence.',
+          why_immoral: 'The exception swallows the principle.',
+        },
+        overreach_variant: {
+          institution: 'Transit hub',
+          actor: 'Watch commander',
+          blocked_action: 'Track identified bombers during a live attack.',
+          who_gets_harmed: 'Commuters',
+          why_illegal: 'Only the director can sign the activation.',
+          why_moral: 'The threat is concrete and immediate.',
+        },
+        concrete_patch_options: [
+          {
+            name: 'Two-track emergency rule',
+            summary: 'Split fast violent-threat use from unrest scenarios.',
+            favored_by: 'both',
+          },
+        ],
+        best_patch: 'Two-track emergency rule',
+        open_question: 'Should protest unrest ever trigger live facial recognition?',
+      },
+      {
+        name: 'Privacy & Surveillance',
+        compass: {
+          xAxis: { label: 'liberty' },
+          yAxis: { label: 'order' },
+        },
+      }
+    );
+
+    expect(enrichedBrief.draftLegalCode).toEqual({
+      articles: [
+        {
+          label: 'Article 7',
+          body: 'Emergency powers expire at sunset.',
+        },
+      ],
+    });
+    expect(enrichedBrief.adversarialAttack.panels).toHaveLength(2);
+    expect(enrichedBrief.patchOptions[0]).toMatchObject({
+      name: 'Two-track emergency rule',
+      favoredBy: ['Figure Alpha', 'Figure Beta'],
+    });
+
+    const fallbackBrief = buildHistoricalCaseBrief(
+      {
+        authors: ['Ada Lovelace', 'Grace Hopper'],
+        category: 'Loophole Finder',
+        summary: 'Template fallback summary.',
+      },
+      {
+        name: 'Privacy & Surveillance',
+        compass: {
+          xAxis: { label: 'Liberty' },
+          yAxis: { label: 'Order' },
+        },
+      }
+    );
+
+    expect(typeof fallbackBrief.draftLegalCode).toBe('string');
+    expect(fallbackBrief.adversarialAttack.fallbackText).toMatch(/Loophole Finder case/i);
+    expect(fallbackBrief.patchOptions).toEqual([]);
+    expect(fallbackBrief.decisionPrompt).toMatch(/What patch closes the exploit in Privacy & Surveillance/i);
   });
 
   it('refreshes the drilled atlas node immediately when the data prop changes', () => {
@@ -338,88 +461,82 @@ describe('DebateMap', () => {
     });
   });
 
-  it('renders Loophole historical cases inside relevant atlas nodes in demo mode', async () => {
-    render(
-      <MemoryRouter initialEntries={['/atlas/0x4320000000000000000000000000000000000000000000000000000000000000']}>
-        <Routes>
-          <Route
-            path="/atlas/:nodeId"
-            element={(
-              <DebateMap
-                account=""
-                provider=""
-                network={{ id: 84532 }}
-                activeSessionSlug=""
-                toggleLoginModal={jest.fn()}
-                demoMode={true}
-              />
-            )}
-          />
-        </Routes>
-      </MemoryRouter>
-    );
+  it('renders enriched Loophole historical cases inside relevant atlas nodes in demo mode', async () => {
+    const privacyCase = getHistoricalCaseForNode(privacyAndSurveillanceNodeId);
+
+    renderDemoAtlasNode(privacyAndSurveillanceNodeId);
 
     expect(await screen.findByText('Historical Cases')).toBeInTheDocument();
-    expect(
-      await screen.findByText('Madison vs Caesar: Emergency Surveillance Exception')
-    ).toBeInTheDocument();
-    expect(screen.getByText(/Loophole Finder/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'View full brief' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Loophole repo' })).toHaveAttribute(
+    expect(await screen.findByText(privacyCase.title)).toBeInTheDocument();
+    expect(screen.getAllByText(/Loophole Finder/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(privacyCase.summary)).toBeInTheDocument();
+    expect(screen.getByTestId(E2E_TESTIDS.ATLAS_HISTORICAL_CASE_EXPAND)).toHaveAttribute(
+      'data-ce-case-id',
+      privacyCase.id
+    );
+    expect(screen.getByRole('link', { name: 'Loophole methodology' })).toHaveAttribute(
       'href',
       'https://github.com/brendanhogan/loophole'
     );
   });
 
-  it('expands a historical case into a deeper brief when clicked', async () => {
-    render(
-      <MemoryRouter initialEntries={['/atlas/0x4320000000000000000000000000000000000000000000000000000000000000']}>
-        <Routes>
-          <Route
-            path="/atlas/:nodeId"
-            element={(
-              <DebateMap
-                account=""
-                provider=""
-                network={{ id: 84532 }}
-                activeSessionSlug=""
-                toggleLoginModal={jest.fn()}
-                demoMode={true}
-              />
-            )}
-          />
-        </Routes>
-      </MemoryRouter>
-    );
+  it('expands Privacy & Surveillance into structured enriched historical-case detail', async () => {
+    const privacyCase = getHistoricalCaseForNode(privacyAndSurveillanceNodeId);
 
-    fireEvent.click(await screen.findByRole('button', { name: 'View full brief' }));
+    await openHistoricalCaseBrief(privacyAndSurveillanceNodeId);
 
     expect(await screen.findByText('Moral principles')).toBeInTheDocument();
-    expect(await screen.findByText('Draft legal code')).toBeInTheDocument();
-    expect(await screen.findByText('Adversarial attack')).toBeInTheDocument();
-    expect(await screen.findByText('Judge tension')).toBeInTheDocument();
-    expect(await screen.findByText('Decision prompt')).toBeInTheDocument();
+    expect(screen.getByText('Draft legal code')).toBeInTheDocument();
+    expect(screen.getByText('Adversarial attack')).toBeInTheDocument();
+    expect(screen.getByText('Why this case is hard')).toBeInTheDocument();
+    expect(screen.getByText('Judge tension')).toBeInTheDocument();
+    expect(screen.getByText('Precedent pressure')).toBeInTheDocument();
+    expect(screen.getByText('Patch options')).toBeInTheDocument();
+    expect(screen.getByText('Why the runner-up fails')).toBeInTheDocument();
+    expect(screen.getByText('Open question')).toBeInTheDocument();
+    expect(screen.getByText('Article 1')).toBeInTheDocument();
     expect(
-      screen.getByText(/Power should be bounded by narrow delegation, review, and structural checks/i)
+      screen.getByText(/A metropolitan port authority may activate live facial-recognition surveillance only during a declared transportation security emergency/i)
     ).toBeInTheDocument();
-    expect(
-      screen.getByText(/A legislator starting from these principles would likely write a strong protective rule around Privacy & Surveillance/i)
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(/This is a Loophole Finder case/i)
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(/The judge's problem is to close the exploit without breaking legitimate use/i)
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(/What patch closes the exploit in Privacy & Surveillance/i)
-    ).toBeInTheDocument();
+    expect(screen.getByText('Loophole exploit')).toBeInTheDocument();
+    expect(screen.getByText('Overreach variant')).toBeInTheDocument();
+    expect(screen.getByText(/Bay City Port Authority central rail terminal/i)).toBeInTheDocument();
+    expect(screen.getByText(/Harbor Metro Station emergency operations center/i)).toBeInTheDocument();
+    expect(screen.getByText(/Should protest-related unrest ever qualify as a facial-recognition emergency trigger/i)).toBeInTheDocument();
+    expect(screen.getByText(/In Re Harbor Terminal Emergency Scan/i)).toBeInTheDocument();
+    expect(screen.queryByText('[object Object]')).not.toBeInTheDocument();
+
+    const bestPatchCard = screen.getAllByTestId(E2E_TESTIDS.ATLAS_HISTORICAL_CASE_PATCH_CARD).find((element) => (
+      element.getAttribute('data-ce-patch-kind') === 'best'
+    ));
+    expect(bestPatchCard).toBeTruthy();
+    expect(within(bestPatchCard).getByText('Best patch')).toBeInTheDocument();
+    expect(within(bestPatchCard).getByText('James Madison')).toBeInTheDocument();
+    expect(within(bestPatchCard).getByText('Augustus Caesar')).toBeInTheDocument();
+    expect(within(bestPatchCard).queryByText('Figure A')).not.toBeInTheDocument();
+    expect(within(bestPatchCard).queryByText('Figure B')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Hide brief' }));
 
     await waitFor(() => {
       expect(screen.queryByText('Moral principles')).not.toBeInTheDocument();
     });
+  });
+
+  it.each([
+    deceptiveAlignmentNodeId,
+    liabilityFrameworksNodeId,
+  ])('renders enriched historical-case detail for node %s without leaking raw objects', async (nodeId) => {
+    const historicalCase = getHistoricalCaseForNode(nodeId);
+
+    await openHistoricalCaseBrief(nodeId);
+
+    expect(await screen.findByText(historicalCase.title)).toBeInTheDocument();
+    expect(screen.getByText(historicalCase.open_question.trim())).toBeInTheDocument();
+    expect(screen.getAllByText(historicalCase.best_patch).length).toBeGreaterThan(0);
+    expect(screen.getByText('Loophole exploit')).toBeInTheDocument();
+    expect(screen.getByText('Overreach variant')).toBeInTheDocument();
+    expect(screen.queryByText('[object Object]')).not.toBeInTheDocument();
   });
 
   it('keeps Loophole historical cases out of non-demo atlas nodes', async () => {
@@ -446,7 +563,7 @@ describe('DebateMap', () => {
     await screen.findByRole('heading', { name: 'Privacy & Surveillance' });
 
     expect(screen.queryByText('Historical Cases')).not.toBeInTheDocument();
-    expect(screen.queryByText('Madison vs Caesar: Emergency Surveillance Exception')).not.toBeInTheDocument();
+    expect(screen.queryByText(getHistoricalCaseForNode(privacyAndSurveillanceNodeId).title)).not.toBeInTheDocument();
   });
 
   it('copies atlas deep links with PUBLIC_URL and demo mode preserved', async () => {
