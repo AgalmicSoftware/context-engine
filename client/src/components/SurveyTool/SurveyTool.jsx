@@ -3057,10 +3057,7 @@ export class SurveyQuestions extends Component {
             sliderMode === 'conviction' ? value : convictionValue,
             sliderMode === 'importance' ? value : importanceValue
           )}
-          <CESlider
-            {...sliderProps}
-            className={[sliderProps.className, styles.convictionSlider].filter(Boolean).join(' ')}
-          />
+          <CESlider {...sliderProps} />
         </>
       )}
     </DeferredCommitSlider>
