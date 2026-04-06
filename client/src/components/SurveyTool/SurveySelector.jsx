@@ -52,7 +52,6 @@ import contractScripts, {
   getSessionSlugByName
 } from '../../utilities/web3/contractScripts.js';
 import { ethers, utils } from 'ethers';
-import Slider from 'react-rangeslider';
 import proposalScripts from 'utilities/proposalScripts.js';
 import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 import { serializeFilterState, deserializeFilterState } from '../../utilities/survey/filterStateUtils.js';

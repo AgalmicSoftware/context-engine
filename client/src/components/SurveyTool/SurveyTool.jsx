@@ -51,7 +51,7 @@ import contractScripts, {
   getSessionSlugByName
 } from '../../utilities/web3/contractScripts.js';
 import { ethers, utils } from 'ethers';
-import Slider from 'react-rangeslider';
+import CESlider from '../Shared/CESlider';
 import proposalScripts from 'utilities/proposalScripts.js';
 import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 import { serializeFilterState, deserializeFilterState } from '../../utilities/survey/filterStateUtils.js';
@@ -2978,8 +2978,7 @@ export class SurveyQuestions extends Component {
     this.persistDraftSafely && this.persistDraftSafely(0);
   };
 
-  // react-rangeslider only fires onChangeComplete for pointer/touch interaction.
-  // Keyboard changes need to persist during onChange to avoid losing draft edits.
+  // Keyboard changes persist during onChange so draft edits are not lost.
   getSliderPersistOptions = (event) => ({
     persistDraft: event?.type === 'keydown',
   });
@@ -3015,7 +3014,7 @@ export class SurveyQuestions extends Component {
       {({ value, sliderProps }) => (
         <>
           <div className={styles.importanceSlider}>
-            <Slider {...sliderProps} />
+            <CESlider {...sliderProps} />
           </div>
           <FormText className={styles.ratingLabelText}>
             {value}
@@ -3058,7 +3057,7 @@ export class SurveyQuestions extends Component {
             sliderMode === 'conviction' ? value : convictionValue,
             sliderMode === 'importance' ? value : importanceValue
           )}
-          <Slider {...sliderProps} />
+          <CESlider {...sliderProps} />
         </>
       )}
     </DeferredCommitSlider>
@@ -9641,7 +9640,7 @@ export class SurveyQuestions extends Component {
                     : (
                       <>
                         {this.renderConvictionImportanceLabel(question.id, convictionValue, importanceValue)}
-                        <Slider
+                        <CESlider
                           min={0}
                           max={10}
                           step={1}
@@ -9779,7 +9778,7 @@ export class SurveyQuestions extends Component {
               : (
                 <>
                   <div className={styles.importanceSlider}>
-                    <Slider
+                    <CESlider
                       min={RATING_MIN}
                       max={RATING_MAX}
                       step={1}
@@ -9880,7 +9879,7 @@ export class SurveyQuestions extends Component {
                     : (
                       <>
                         {this.renderConvictionImportanceLabel(question.id, convictionValue, importanceValue)}
-                        <Slider
+                        <CESlider
                           min={0}
                           max={10}
                           step={1}
@@ -9992,7 +9991,7 @@ export class SurveyQuestions extends Component {
               : (
                 <>
                   <div className={styles.importanceSlider}>
-                    <Slider
+                    <CESlider
                       min={RATING_MIN}
                       max={RATING_MAX}
                       step={1}
@@ -10093,7 +10092,7 @@ export class SurveyQuestions extends Component {
                     : (
                       <>
                         {this.renderConvictionImportanceLabel(question.id, convictionValue, importanceValue)}
-                        <Slider
+                        <CESlider
                           min={0}
                           max={10}
                           step={1}
@@ -15348,7 +15347,7 @@ class PileViewMode extends SurveyQuestions {
           const ratingValue = getNormalizedUiRatingValue(answer.value);
           questionComponent = (
             <div className={styles.ratingContainer}>
-              <Slider
+              <CESlider
                 min={RATING_MIN}
                 max={RATING_MAX}
                 step={1}
@@ -15414,7 +15413,7 @@ class PileViewMode extends SurveyQuestions {
                 {showConviction[question.id] ? (
                   <>
                     {this.renderConvictionImportanceLabel(question.id, convictionValue, importanceValue)}
-                    <Slider
+                    <CESlider
                       min={0}
                       max={10}
                       step={1}
