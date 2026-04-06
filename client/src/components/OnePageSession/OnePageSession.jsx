@@ -2475,7 +2475,7 @@ class OnePageSession extends Component {
                 ) : (
                   <FontAwesomeIcon icon={faCaretDown} className={styles.sectionToggleIcon} />
                 )}
-                {renderSectionHeading('Documents', 'View')}
+                {renderSectionHeading('Context', 'View')}
                 {this.state.showDocuments && (
                   <div
                     className={`${styles.tooltip} ${styles.sectionHeaderTooltip}`}

@@ -70,6 +70,60 @@ describe('demo data fixture cleanup', () => {
     expect(leafNodeIds.filter((nodeId) => !coveredNodeIds.has(nodeId))).toEqual([]);
   });
 
+  it('keeps every Loophole historical case on the enriched schema contract', () => {
+    const requiredExploitFields = [
+      'institution',
+      'actor',
+      'action',
+      'victims',
+      'why_legal',
+      'why_immoral',
+    ];
+    const requiredOverreachFields = [
+      'institution',
+      'actor',
+      'blocked_action',
+      'who_gets_harmed',
+      'why_illegal',
+      'why_moral',
+    ];
+
+    expect(Array.isArray(loopholeHistoricalCases)).toBe(true);
+    expect(loopholeHistoricalCases.length).toBeGreaterThan(0);
+
+    loopholeHistoricalCases.forEach((historicalCase) => {
+      expect(Array.isArray(historicalCase?.draft_legal_code?.articles)).toBe(true);
+      expect(historicalCase.draft_legal_code.articles.length).toBeGreaterThan(0);
+      expect(historicalCase.draft_legal_code.articles.every((article) => typeof article === 'string' && article.trim().length > 0)).toBe(true);
+
+      requiredExploitFields.forEach((fieldName) => {
+        expect(typeof historicalCase?.loophole_exploit?.[fieldName]).toBe('string');
+        expect(historicalCase.loophole_exploit[fieldName].trim().length).toBeGreaterThan(0);
+      });
+
+      requiredOverreachFields.forEach((fieldName) => {
+        expect(typeof historicalCase?.overreach_variant?.[fieldName]).toBe('string');
+        expect(historicalCase.overreach_variant[fieldName].trim().length).toBeGreaterThan(0);
+      });
+
+      expect(Array.isArray(historicalCase?.concrete_patch_options)).toBe(true);
+      expect(historicalCase.concrete_patch_options.length).toBeGreaterThan(0);
+      historicalCase.concrete_patch_options.forEach((patchOption) => {
+        expect(typeof patchOption?.name).toBe('string');
+        expect(patchOption.name.trim().length).toBeGreaterThan(0);
+        expect(typeof patchOption?.summary).toBe('string');
+        expect(patchOption.summary.trim().length).toBeGreaterThan(0);
+        expect(typeof patchOption?.favored_by).toBe('string');
+        expect(patchOption.favored_by.trim().length).toBeGreaterThan(0);
+      });
+
+      expect(typeof historicalCase?.best_patch).toBe('string');
+      expect(historicalCase.best_patch.trim().length).toBeGreaterThan(0);
+      expect(typeof historicalCase?.open_question).toBe('string');
+      expect(historicalCase.open_question.trim().length).toBeGreaterThan(0);
+    });
+  });
+
   it('provides principle lists for every historical figure used in Loophole cases', () => {
     const caseAuthors = Array.from(new Set(
       (Array.isArray(loopholeHistoricalCases) ? loopholeHistoricalCases : []).flatMap((entry) => (
