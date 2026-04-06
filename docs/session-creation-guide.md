@@ -102,7 +102,7 @@ You need OP Sepolia ETH in the connected browser wallet to register the session 
 
 Useful links:
 
-- Optimism faucet directory: <https://docs.optimism.io/app-developers/tools/build/faucets>
+- Optimism faucet directory: <https://docs.optimism.io/app-developers/tools/faucets>
 - Superchain faucet: <https://console.optimism.io/faucet>
 - QuickNode faucet: <https://faucet.quicknode.com/optimism/sepolia>
 - Explorer: <https://optimism-sepolia.blockscout.com/>
