@@ -2525,14 +2525,12 @@ class OnePageSession extends Component {
                 className={`${styles.sectionHeader} ${styles.documentsSectionHeader}`.trim()}
                 data-testid='ce-demo-documents-toggle'
               >
-                <span className={styles.documentsSectionHeaderMain}>
-                  {this.state.showDocuments ? (
-                    <FontAwesomeIcon icon={faCaretUp} className={styles.sectionToggleIcon} />
-                  ) : (
-                    <FontAwesomeIcon icon={faCaretDown} className={styles.sectionToggleIcon} />
-                  )}
-                  {renderSectionHeading('Context', 'View')}
-                </span>
+                {this.state.showDocuments ? (
+                  <FontAwesomeIcon icon={faCaretUp} className={styles.sectionToggleIcon} />
+                ) : (
+                  <FontAwesomeIcon icon={faCaretDown} className={styles.sectionToggleIcon} />
+                )}
+                {renderSectionHeading('Context', 'View')}
                 {this.state.showDocuments && (
                   <span className={`${styles.sectionHeaderMeta} ${styles.documentsSectionHeaderMeta}`.trim()}>
                     <div
