@@ -3057,7 +3057,10 @@ export class SurveyQuestions extends Component {
             sliderMode === 'conviction' ? value : convictionValue,
             sliderMode === 'importance' ? value : importanceValue
           )}
-          <CESlider {...sliderProps} />
+          <CESlider
+            {...sliderProps}
+            className={[sliderProps.className, styles.convictionSlider].filter(Boolean).join(' ')}
+          />
         </>
       )}
     </DeferredCommitSlider>
@@ -9645,6 +9648,7 @@ export class SurveyQuestions extends Component {
                           max={10}
                           step={1}
                           value={activeSliderValue}
+                          className={styles.convictionSlider}
                           tooltip={false}
                           onChange={(value, event) =>
                             this.handleConvictionImportanceChange(
@@ -9884,6 +9888,7 @@ export class SurveyQuestions extends Component {
                           max={10}
                           step={1}
                           value={activeSliderValue}
+                          className={styles.convictionSlider}
                           tooltip={false}
                           onChange={(value, event) =>
                             this.handleConvictionImportanceChange(
@@ -10097,6 +10102,7 @@ export class SurveyQuestions extends Component {
                           max={10}
                           step={1}
                           value={activeSliderValue}
+                          className={styles.convictionSlider}
                           tooltip={false}
                           onChange={(value, event) =>
                             this.handleConvictionImportanceChange(
@@ -15418,6 +15424,7 @@ class PileViewMode extends SurveyQuestions {
                       max={10}
                       step={1}
                       value={activeSliderValue}
+                      className={styles.convictionSlider}
                       tooltip={false}
                       onChange={(value, event) =>
                         this.handleConvictionImportanceChange(
