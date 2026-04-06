@@ -33,13 +33,12 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faBookmark, faLock, faUnlock, faPlus, faMinus, faCaretDown, faCaretUp, faCheck, faTimes, faArrowLeft, faArrowRight, faSpinner, faExpand, faExternalLinkAlt, faFilter, faExclamationCircle, faCog, faMicrophone, faChevronLeft, faChevronRight, faComment, faQuestionCircle, faBullhorn, faRobot } from '@fortawesome/free-solid-svg-icons';
 
 import AudioInput from '../Shared/AudioInput/AudioInput';
-import CreateQuestionsAndSurveys from './CreateQuestionsAndSurveys';
-import SurveyResults from './SurveyResults';
 import QuestionFilter from './QuestionFilter';
 import PileHologramAssistant from './PileHologramAssistant';
 import QuestionTagDropdown from './QuestionTagDropdown';
 import SingleQuestionResponse from './SingleQuestionResponse';
 import { JsonButtonRow, JsonIconButton, JsonPanel, JsonToggleButton } from '../Shared/Json/JsonControls';
+import LazyFallback from '../Shared/LazyFallback';
 import SessionChipSelector from '../Shared/SessionChipSelector';
 import { getQuestionTagDisplayList } from '../../utilities/survey/questionTags.js';
 
@@ -263,6 +262,9 @@ export const SURVEY_SELECTOR_HEADER_SUBMIT_SPINNER_STYLE: React.CSSProperties = 
   marginLeft: 8,
 };
 
+export const LazyCreateQuestionsAndSurveys = React.lazy(() => import('./CreateQuestionsAndSurveys'));
+export const LazySurveyResults = React.lazy(() => import('./SurveyResults'));
+
 export const resolveSurveySelectorFilterButtonStyle = (isFilterActive: unknown): React.CSSProperties => (
   isFilterActive
     ? {
@@ -291,6 +293,27 @@ export const buildSurveySelectorDropdownItemClassName = (
 export const buildSurveySelectorHeaderSubmitButtonClassName = (
   styleMap: Record<string, string>
 ) => [styleMap.headerSubmitButton, styleMap.submitGlow].filter(Boolean).join(' ');
+
+const buildSurveySelectorFilterUrl = ({
+  pathname = '',
+  search = '',
+  hash = '',
+  serializedState = '',
+}: {
+  pathname?: string;
+  search?: string;
+  hash?: string;
+  serializedState?: string;
+}): string => {
+  const params = new URLSearchParams(String(search || ''));
+  if (serializedState) {
+    params.set('filter', serializedState);
+  } else {
+    params.delete('filter');
+  }
+  const query = params.toString();
+  return `${String(pathname || '')}${query ? `?${query}` : ''}${String(hash || '')}`;
+};
 
 type SurveySelectorRecord = Record<string, unknown>;
 type SurveySelectorNetworkLike = SurveySelectorRecord & {
@@ -436,7 +459,9 @@ type SurveySelectorQuestionCountSnapshot = {
   count: number;
   encryptedCount: number;
 };
-type SurveyQuestionsComponentType = React.ComponentType<SurveySelectorRecord>;
+type SurveyQuestionsComponentType =
+  | React.ComponentType<SurveySelectorRecord>
+  | React.LazyExoticComponent<React.ComponentType<SurveySelectorRecord>>;
 type SurveyQuestionsComponentHost = {
   SurveyQuestionsComponent?: SurveyQuestionsComponentType;
 };
@@ -841,8 +866,7 @@ export class SurveySelector extends Component<any, any> {
     }
   };
 
-
-	  handleFilteredQuestionsWithState = (_filteredQuestions: unknown, filterState: unknown): void => {
+  handleFilteredQuestionsWithState = (_filteredQuestions: unknown, filterState: unknown): void => {
     const nextFilterState = normalizeSurveyToolFilterState(filterState);
     const serializedState = serializeSurveyToolFilterState(nextFilterState);
     if (serializedState !== this._filterStateSig) {
@@ -850,22 +874,19 @@ export class SurveySelector extends Component<any, any> {
       this.setState(buildSurveySelectorFilterStatePatch(nextFilterState));
     }
 
-	    // Update URL query params strictly (without forcing /results path)
-	    // This ensures list filtering preserves the current view mode in the URL.
-	    const currentPath = window.location.pathname;
-	    let newUrl = currentPath;
-
-	    if (serializedState) {
-	      newUrl += `?filter=${serializedState}`;
-	    }
-
-	    if (!this.props.preventUrlChange) {
-        const currentUrl = `${window.location.pathname}${window.location.search || ''}`;
-        if (currentUrl !== newUrl) {
-	        window.history.replaceState({}, '', newUrl);
-        }
-	    }
-	  };
+    if (!this.props.preventUrlChange && typeof window !== 'undefined') {
+      const newUrl = buildSurveySelectorFilterUrl({
+        pathname: window.location.pathname || '',
+        search: window.location.search || '',
+        hash: window.location.hash || '',
+        serializedState,
+      });
+      const currentUrl = `${window.location.pathname}${window.location.search || ''}${window.location.hash || ''}`;
+      if (currentUrl !== newUrl) {
+        window.history.replaceState({}, '', newUrl);
+      }
+    }
+  };
 
 
 		  async fetchSurveys() {
@@ -1561,103 +1582,109 @@ export class SurveySelector extends Component<any, any> {
 
         {/* Create survey */}
         {createSurveyMode && (
-          <CreateQuestionsAndSurveys
-            {...this.props}
-            toggleLoginModal={this.props.toggleLoginModal}
-            expanded={createSurveyMode}
-            surveys={surveys}
-            surveyIndex={selectedSurveyIndex}
-            cache={this.props.cache}
-            updateCache={this.props.updateCache}
-            sessionConfig={sessionConfig}
-            sessionName={this.props.sessionName}
-          />
+          <React.Suspense fallback={<LazyFallback label="Loading Question Authoring..." minHeight="160px" />}>
+            <LazyCreateQuestionsAndSurveys
+              {...this.props}
+              toggleLoginModal={this.props.toggleLoginModal}
+              expanded={createSurveyMode}
+              surveys={surveys}
+              surveyIndex={selectedSurveyIndex}
+              cache={this.props.cache}
+              updateCache={this.props.updateCache}
+              sessionConfig={sessionConfig}
+              sessionName={this.props.sessionName}
+            />
+          </React.Suspense>
         )}
 
         {/* Survey / questions views */}
         {viewMode !== 'questions' && selectedSurvey && SurveyQuestionsComponent && (
-          <SurveyQuestionsComponent
-            ref={this.surveyQuestionsRef}
-            useHeaderSubmit={true}
-            onPendingStatsChange={this.handlePendingStatsChange}
-            displayAnswerMode={this.props.displayAnswerMode}
-            viewAddress={this.props.viewAddress}
-            account={this.props.account}
-            network={this.props.network}
-            provider={this.props.provider}
-            lit={this.props.lit}
-            litHooks={this.props.litHooks}
-            toggleLoginModal={this.props.toggleLoginModal}
-            surveys={surveys}
-            loginComplete={this.props.loginComplete}
-            pubKey={this.state.pubKey}
-            updatePubKey={this.handlePubKeyUpdate}
-            surveyIndex={this.state.selectedSurveyIndex}
-            surveyId={selectedSurvey.id}
-            cache={this.props.cache}
-            updateCache={this.props.updateCache}
-            refreshSurveyResponsesByID={this.props.refreshSurveyResponsesByID}
-            refreshQuestionMetadata={this.props.refreshQuestionMetadata}
-            refreshQuestionResponses={this.props.refreshQuestionResponses}
-            defaultTags={this.props.defaultTags}
-            defaultFeaturedSBTs={this.props.defaultFeaturedSBTs}
-            isQuestionCacheReady={this.props.isQuestionCacheReady}
-            isResponsesCacheReady={this.props.isResponsesCacheReady}
-            isSurveyCacheReady={this.props.isSurveyCacheReady}
-            questionsCacheNonce={this.props.questionsCacheNonce}
-            questionResponsesNonce={this.props.questionResponsesNonce}
-            ensureQuestionCached={this.props.ensureQuestionCached}
-            computeSubmitLabel={this.props.computeSubmitLabel}
-            cacheInitializationError={this.props.cacheInitializationError}
-            questionScanProgress={this.props.questionScanProgress}
-            hideEmbeddedDebugUi={this.props.hideEmbeddedDebugUi}
-            sessionSlug={this.props.sessionSlug}
-          />
+          <React.Suspense fallback={<LazyFallback label="Loading Questions..." minHeight="160px" />}>
+            <SurveyQuestionsComponent
+              ref={this.surveyQuestionsRef}
+              useHeaderSubmit={true}
+              onPendingStatsChange={this.handlePendingStatsChange}
+              displayAnswerMode={this.props.displayAnswerMode}
+              viewAddress={this.props.viewAddress}
+              account={this.props.account}
+              network={this.props.network}
+              provider={this.props.provider}
+              lit={this.props.lit}
+              litHooks={this.props.litHooks}
+              toggleLoginModal={this.props.toggleLoginModal}
+              surveys={surveys}
+              loginComplete={this.props.loginComplete}
+              pubKey={this.state.pubKey}
+              updatePubKey={this.handlePubKeyUpdate}
+              surveyIndex={this.state.selectedSurveyIndex}
+              surveyId={selectedSurvey.id}
+              cache={this.props.cache}
+              updateCache={this.props.updateCache}
+              refreshSurveyResponsesByID={this.props.refreshSurveyResponsesByID}
+              refreshQuestionMetadata={this.props.refreshQuestionMetadata}
+              refreshQuestionResponses={this.props.refreshQuestionResponses}
+              defaultTags={this.props.defaultTags}
+              defaultFeaturedSBTs={this.props.defaultFeaturedSBTs}
+              isQuestionCacheReady={this.props.isQuestionCacheReady}
+              isResponsesCacheReady={this.props.isResponsesCacheReady}
+              isSurveyCacheReady={this.props.isSurveyCacheReady}
+              questionsCacheNonce={this.props.questionsCacheNonce}
+              questionResponsesNonce={this.props.questionResponsesNonce}
+              ensureQuestionCached={this.props.ensureQuestionCached}
+              computeSubmitLabel={this.props.computeSubmitLabel}
+              cacheInitializationError={this.props.cacheInitializationError}
+              questionScanProgress={this.props.questionScanProgress}
+              hideEmbeddedDebugUi={this.props.hideEmbeddedDebugUi}
+              sessionSlug={this.props.sessionSlug}
+            />
+          </React.Suspense>
         )}
 
         {showResults && (
-          <SurveyResults
-            isOpen={showResults}
-            onClose={this.closeShowResults}
-            provider={this.props.provider}
-            network={this.props.network}
-            networkChainId={this.props.networkChainId}
-            lit={this.props.lit}
-            litHooks={this.props.litHooks}
-            sbtCacheRevision={this.props.sbtCacheRevision}
-            surveyId={viewMode === 'questions' ? null : selectedSurvey?.id}
-            cache={this.props.cache}
-            updateCache={this.props.updateCache}
-            viewMode={viewMode}
-            filterState={this.state.filterState}
-            questionResponsesNonce={this.props.questionResponsesNonce}
-            questionsCacheNonce={this.props.questionsCacheNonce}
-            refreshSurveyResponsesByID={this.props.refreshSurveyResponsesByID}
-            refreshQuestionMetadata={this.props.refreshQuestionMetadata}
-            refreshQuestionResponses={this.props.refreshQuestionResponses}
-            defaultFeaturedSBTs={this.props.defaultFeaturedSBTs}
-            defaultTags={this.props.defaultTags}
-            sessionInfo={this.props.sessionInfo}
-            sessionName={this.props.sessionName}
-            isQuestionCacheReady={this.props.isQuestionCacheReady}
-            isResponsesCacheReady={this.props.isResponsesCacheReady}
-            isSBTCacheReady={this.props.isSBTCacheReady}
-            isSurveyCacheReady={this.props.isSurveyCacheReady}
-            // Props for URL updates
-	            currentSurveyIdForUrl={surveyForUrl}
-	            currentViewModeForUrl={this.state.viewMode}
-	            onFilterStateChangeForUrlUpdate={this.handleFilterChangeForUrl}
-	            // Props for unified count
-	            filteredQuestionsCount={this.state.filteredQuestionCount}
-	            onCountUpdate={this.handleFilteredQuestionCountUpdate}
-            onFilterChange={this.props.onFilterChange}
-            preventUrlChange={this.props.preventUrlChange}
-            sessionSlug={this.props.sessionSlug}
-            activeSessionSlug={getActiveSessionSlugFromProps(this.props)}
-            // Do not drop the pin at the results layer; otherwise /session pages
-            // silently fan out to broader scan scope when opening results.
-            sessionSlugPinned={this.props.sessionSlugPinned}
-          />
+          <React.Suspense fallback={<LazyFallback label="Loading Results..." minHeight="160px" />}>
+            <LazySurveyResults
+              isOpen={showResults}
+              onClose={this.closeShowResults}
+              provider={this.props.provider}
+              network={this.props.network}
+              networkChainId={this.props.networkChainId}
+              lit={this.props.lit}
+              litHooks={this.props.litHooks}
+              sbtCacheRevision={this.props.sbtCacheRevision}
+              surveyId={viewMode === 'questions' ? null : selectedSurvey?.id}
+              cache={this.props.cache}
+              updateCache={this.props.updateCache}
+              viewMode={viewMode}
+              filterState={this.state.filterState}
+              questionResponsesNonce={this.props.questionResponsesNonce}
+              questionsCacheNonce={this.props.questionsCacheNonce}
+              refreshSurveyResponsesByID={this.props.refreshSurveyResponsesByID}
+              refreshQuestionMetadata={this.props.refreshQuestionMetadata}
+              refreshQuestionResponses={this.props.refreshQuestionResponses}
+              defaultFeaturedSBTs={this.props.defaultFeaturedSBTs}
+              defaultTags={this.props.defaultTags}
+              sessionInfo={this.props.sessionInfo}
+              sessionName={this.props.sessionName}
+              isQuestionCacheReady={this.props.isQuestionCacheReady}
+              isResponsesCacheReady={this.props.isResponsesCacheReady}
+              isSBTCacheReady={this.props.isSBTCacheReady}
+              isSurveyCacheReady={this.props.isSurveyCacheReady}
+              // Props for URL updates
+              currentSurveyIdForUrl={surveyForUrl}
+              currentViewModeForUrl={this.state.viewMode}
+              onFilterStateChangeForUrlUpdate={this.handleFilterChangeForUrl}
+              // Props for unified count
+              filteredQuestionsCount={this.state.filteredQuestionCount}
+              onCountUpdate={this.handleFilteredQuestionCountUpdate}
+              onFilterChange={this.props.onFilterChange}
+              preventUrlChange={this.props.preventUrlChange}
+              sessionSlug={this.props.sessionSlug}
+              activeSessionSlug={getActiveSessionSlugFromProps(this.props)}
+              // Do not drop the pin at the results layer; otherwise /session pages
+              // silently fan out to broader scan scope when opening results.
+              sessionSlugPinned={this.props.sessionSlugPinned}
+            />
+          </React.Suspense>
         )}
 
 
@@ -1994,38 +2021,40 @@ export class QuestionsDashboard extends Component<any, any> {
             <p>Applying filter...</p>
           </div>
         ) : SurveyQuestionsComponent ? (
-          <SurveyQuestionsComponent
-            ref={this.props.surveyQuestionsRef}
-            account={this.props.account}
-            provider={this.props.provider}
-            lit={this.props.lit}
-            litHooks={this.props.litHooks}
-            toggleLoginModal={this.props.toggleLoginModal}
-            loginComplete={this.props.loginComplete}
-            cache={this.props.cache}
-            updateCache={this.props.updateCache}
-            questionPool={filteredQuestions}
-            isStandalone={true}
-            useHeaderSubmit={this.props.useHeaderSubmit}
-            pubKey={this.props.pubKey}
-            updatePubKey={this.props.updatePubKey}
-            network={this.props.network}
-            activeSessionSlug={getActiveSessionSlugFromProps(this.props)}
-            sessionSlug={this.props.sessionSlug}
-            refreshSurveyResponsesByID={this.props.refreshSurveyResponsesByID}
-            refreshQuestionMetadata={this.props.refreshQuestionMetadata}
-            refreshQuestionResponses={this.props.refreshQuestionResponses}
-            defaultFeaturedSBTs={this.props.defaultFeaturedSBTs}
-            isQuestionCacheReady={this.props.isQuestionCacheReady}
-            isResponsesCacheReady={this.props.isResponsesCacheReady}
-            isSurveyCacheReady={this.props.isSurveyCacheReady}
-            isSBTCacheReady={this.props.isSBTCacheReady}
-            ensureQuestionCached={this.props.ensureQuestionCached}
-            computeSubmitLabel={this.props.computeSubmitLabel}
-            onPendingStatsChange={this.props.onPendingStatsChange}
-            questionScanProgress={this.props.questionScanProgress}
-            hideEmbeddedDebugUi={this.props.hideEmbeddedDebugUi}
-          />
+          <React.Suspense fallback={<LazyFallback label="Loading Questions..." minHeight="160px" />}>
+            <SurveyQuestionsComponent
+              ref={this.props.surveyQuestionsRef}
+              account={this.props.account}
+              provider={this.props.provider}
+              lit={this.props.lit}
+              litHooks={this.props.litHooks}
+              toggleLoginModal={this.props.toggleLoginModal}
+              loginComplete={this.props.loginComplete}
+              cache={this.props.cache}
+              updateCache={this.props.updateCache}
+              questionPool={filteredQuestions}
+              isStandalone={true}
+              useHeaderSubmit={this.props.useHeaderSubmit}
+              pubKey={this.props.pubKey}
+              updatePubKey={this.props.updatePubKey}
+              network={this.props.network}
+              activeSessionSlug={getActiveSessionSlugFromProps(this.props)}
+              sessionSlug={this.props.sessionSlug}
+              refreshSurveyResponsesByID={this.props.refreshSurveyResponsesByID}
+              refreshQuestionMetadata={this.props.refreshQuestionMetadata}
+              refreshQuestionResponses={this.props.refreshQuestionResponses}
+              defaultFeaturedSBTs={this.props.defaultFeaturedSBTs}
+              isQuestionCacheReady={this.props.isQuestionCacheReady}
+              isResponsesCacheReady={this.props.isResponsesCacheReady}
+              isSurveyCacheReady={this.props.isSurveyCacheReady}
+              isSBTCacheReady={this.props.isSBTCacheReady}
+              ensureQuestionCached={this.props.ensureQuestionCached}
+              computeSubmitLabel={this.props.computeSubmitLabel}
+              onPendingStatsChange={this.props.onPendingStatsChange}
+              questionScanProgress={this.props.questionScanProgress}
+              hideEmbeddedDebugUi={this.props.hideEmbeddedDebugUi}
+            />
+          </React.Suspense>
         ) : null}
       </div>
     );
