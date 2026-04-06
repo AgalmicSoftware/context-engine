@@ -52,7 +52,7 @@ import contractScripts, {
 } from '../../utilities/web3/contractScripts.js';
 import { ethers, utils } from 'ethers';
 import CESlider from '../Shared/CESlider';
-import { getShortenedAddress } from 'utilities/ui/displayHelpers.js';
+import proposalScripts from 'utilities/proposalScripts.js';
 import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 import { serializeFilterState, deserializeFilterState } from '../../utilities/survey/filterStateUtils.js';
 import { ENABLE_IMPORTANCE_SLIDER_TOGGLE } from '../../variables/appConfig.js';
@@ -2883,10 +2883,7 @@ export class SurveyQuestions extends Component {
             sliderMode === 'conviction' ? value : convictionValue,
             sliderMode === 'importance' ? value : importanceValue
           )}
-          <CESlider
-            {...sliderProps}
-            className={[sliderProps.className, styles.convictionSlider].filter(Boolean).join(' ')}
-          />
+          <CESlider {...sliderProps} />
         </>
       )}
     </DeferredCommitSlider>
