@@ -56,15 +56,12 @@ The `/` home route renders `client/src/components/MainContent/MainAreaTabs.tsx`,
 | `ce-page-matrix-root` | `/matrix` | Matrix demo page root | yes |
 | `ce-page-agent-root` | `/agent` (dev-only) | Agent page root | yes |
 
-## DebateMap / Atlas
+## DebateMap / Atlas Historical Cases
 
-Component: `client/src/components/DebateMap/DebateMap.tsx`
+Component: `client/src/components/DebateMap/DebateMap.jsx`
 
 | `data-testid` | Meaning / When Present | TestID API | Disambiguators |
 | --- | --- | --- | --- |
-| `ce-debate-view-mode` | Primary DebateMap mode button for `Circles`, `Atlas`, `Tree`, or `List`. | yes | `data-ce-view-mode` (`circles`, `atlas`, `tree`, `list`) |
-| `ce-atlas-node` | Clickable atlas node in either orbital or packed layout. | yes | `data-ce-node-id`, `data-ce-node-layout` (`orbital` or `packed`) |
-| `ce-atlas-title-action` | Clickable packed-view root title that opens the current drilled node. | yes | `data-ce-node-id` |
 | `ce-atlas-historical-case-card` | Historical-case card shown in the atlas modal when demo mode attaches Loophole case data to a leaf node. | yes | `data-ce-case-id` |
 | `ce-atlas-historical-case-expand` | Expand/collapse button for a historical-case brief. | yes | `data-ce-case-id` |
 | `ce-atlas-historical-case-detail` | Expanded brief container with the enriched case sections. | yes | `data-ce-case-id` |
