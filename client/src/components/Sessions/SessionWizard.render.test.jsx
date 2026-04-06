@@ -434,10 +434,13 @@ describe('SessionWizard rendered validation', () => {
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
     enableAdvancedMode();
 
+    const defaultChainId = require('../../variables/appConfig.js').DEFAULT_CHAIN_ID;
+    const defaultChain = require('../../variables/chains.js').getChainById(defaultChainId);
+    const defaultChainLabel = `${defaultChain?.name || `Chain ${defaultChainId}`} (${defaultChainId})`;
     const chainSelectorWrap = screen.getByText('Network:').parentElement;
     expect(chainSelectorWrap).toBeTruthy();
-    expect(within(chainSelectorWrap).getByRole('combobox')).toHaveValue('11155420');
-    expect(screen.getByDisplayValue('OP Sepolia (11155420)')).toBeInTheDocument();
+    expect(within(chainSelectorWrap).getByRole('combobox')).toHaveValue(String(defaultChainId));
+    expect(screen.getByDisplayValue(defaultChainLabel)).toBeInTheDocument();
   });
 
   it('defaults auto-feature session groups to enabled for fresh /new drafts', async () => {
