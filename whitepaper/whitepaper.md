@@ -184,7 +184,11 @@ Ohlhaver, P. (2025, January 2). *Community Currencies: The Price Of Attention An
 
 RadicalxChange Foundation. (n.d.-a). "Social Identity." *RadicalxChange Wiki.* https://www.radicalxchange.org/wiki/social-identity/
 
-RadicalxChange Foundation. (n.d.-b). "Data Dignity." *RadicalxChange Wiki.* https://www.radicalxchange.org/wiki/data-dignity/
+RadicalxChange Foundation. (n.d.). "Social Identity." *RadicalxChange Wiki.* https://www.radicalxchange.org/wiki/social-identity/
+
+Owocki, K. (2026, March 5). "Collective Intelligence Infrastructure: Protocols for Thinking Together." *Gitcoin.* https://gitcoin.co/research/collective-intelligence-protocols-for-thinking-together
+
+Ohlhaver, P., Weyl, E. G., & Buterin, V. (2022, May 10). *Decentralized Society: Finding Web3's Soul.* SSRN. https://doi.org/10.2139/ssrn.4105763
 
 Shi, W., Bhagia, A., Farhat, K., Muennighoff, N., Walsh, P., Morrison, J., Schwenk, D., Longpre, S., Poznanski, J., Ettinger, A., Liu, D., Li, M., Groeneveld, D., Lewis, M., Yih, W., Soldaini, L., Lo, K., Smith, N. A., Zettlemoyer, L., Koh, P. W., Hajishirzi, H., Farhadi, A., & Min, S. (2025). "FlexOlmo: Open Language Models for Flexible Data Use." *arXiv:2507.07024.* https://arxiv.org/abs/2507.07024
 
