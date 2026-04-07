@@ -721,16 +721,23 @@
   width: 100%;
 }
 
-.mapFrameShell {
-  display: grid;
-  border: 1px solid #e0e6ef;
-  border-radius: 14px;
-  overflow: hidden;
-  background: linear-gradient(180deg, rgba(248, 250, 252, 0.98) 0%, rgba(244, 247, 251, 0.96) 100%);
+.mapFrameCompact {
+  align-items: center;
+  display: flex;
+  justify-content: center;
+  margin-top: 0;
+  padding: 0.2rem 0 0.1rem;
+
+  :global(svg) {
+    height: auto;
+    width: min(100%, 420px);
+  }
 }
 
-.mapFrameViewport {
-  min-height: 320px;
+.modalBackdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.4);
   display: flex;
   align-items: center;
   justify-content: center;

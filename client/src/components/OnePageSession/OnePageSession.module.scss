@@ -860,9 +860,27 @@
   gap: 10px;
 }
 
-.documentsSectionHeader {
-  width: 100%;
-  justify-content: flex-start;
+.sectionHeaderLink {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  color: var(--ce-color-white);
+  display: inline-flex;
+  gap: 6px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1;
+  margin-top: 1px;
+  padding: 7px 10px;
+  text-decoration: none;
+
+  &:hover,
+  &:focus-visible {
+    color: var(--ce-color-white);
+    border-color: rgba(255, 255, 255, 0.32);
+    outline: none;
+  }
 }
 
 .sectionHeaderActionsScroller {

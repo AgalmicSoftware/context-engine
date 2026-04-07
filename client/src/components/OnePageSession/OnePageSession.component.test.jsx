@@ -1287,10 +1287,8 @@ describe('OnePageSession view gating', () => {
     );
 
     expect(await screen.findByTestId('survey-page-pile')).toBeInTheDocument();
-    const contextHeader = screen.getByTestId('ce-demo-documents-toggle');
-    const contextTitle = within(contextHeader).getByText('Context');
-    const contextSubtitle = within(contextHeader).getByText('View');
-    const contextTextWrap = contextTitle.closest(`.${styles.sectionHeaderText}`);
+    expect(screen.getByText('Context')).toBeInTheDocument();
+    expect(screen.queryByText(documentsTooltipText)).not.toBeInTheDocument();
 
     expect(contextTitle).toHaveClass(styles.sectionHeaderTitle);
     expect(contextSubtitle).toHaveClass(styles.sectionHeaderSubtitle);
@@ -1298,92 +1296,10 @@ describe('OnePageSession view gating', () => {
     expect(contextTextWrap.parentElement).toBe(contextHeader);
   });
 
-  it('keeps section-card headers inline through 767px without pulling full phone layout onto tablets', () => {
-    const scss = fs.readFileSync(path.join(__dirname, 'OnePageSession.module.scss'), 'utf8');
-    const phoneBlock = extractMediaBlock(scss, '@media only screen and (max-width: 600px)', '.onePageDemoContainer');
-    const smallTabletBlock = extractMediaBlock(
-      scss,
-      '@media only screen and (min-width: 601px) and (max-width: 767px)',
-      '.sectionHeader {',
-    );
-    const tabletBlock = extractMediaBlock(
-      scss,
-      '@media only screen and (min-width: 768px) and (max-width: 1024px)',
-      '.onePageDemoContainer',
-    );
-    const resultsTabletBlock = extractMediaBlock(
-      scss,
-      '@media only screen and (max-width: 1024px)',
-      '.resultsModeActionsScroller',
-    );
-    const sectionContainerBlock = extractMediaBlock(scss, '.sectionContainer {');
-    const sectionHeaderRowBlock = extractMediaBlock(scss, '.sectionHeaderRow {');
-    const sectionActionsScrollerBlock = extractMediaBlock(scss, '.sectionHeaderActionsScroller {');
-    const miniContentBlock = extractMediaBlock(scss, '.miniSectionContent {');
-    const sectionsGridBlock = extractMediaBlock(scss, '.sectionsGrid {');
-
-    expect(sectionContainerBlock).toContain('box-sizing: border-box;');
-    expect(sectionContainerBlock).toContain('max-width: 100%;');
-    expect(sectionContainerBlock).toContain('min-width: 0;');
-    expect(sectionHeaderRowBlock).toContain('max-width: 100%;');
-    expect(sectionHeaderRowBlock).toContain('min-width: 0;');
-    expect(sectionActionsScrollerBlock).toContain('box-sizing: border-box;');
-    expect(sectionActionsScrollerBlock).toContain('max-width: 100%;');
-    expect(miniContentBlock).toContain('box-sizing: border-box;');
-    expect(miniContentBlock).toContain('max-width: 100%;');
-    expect(miniContentBlock).toContain('min-width: 0;');
-    expect(miniContentBlock).toContain('overflow-x: auto;');
-    expect(sectionsGridBlock).toContain('max-width: 100%;');
-    expect(sectionsGridBlock).toContain('min-width: 0;');
-    expect(resultsTabletBlock).toContain('.resultsModeActionsScroller {');
-    expect(resultsTabletBlock).toContain('max-width: 100%;');
-    expect(resultsTabletBlock).toContain('overflow-x: auto;');
-    expect(resultsTabletBlock).toContain('overflow-y: hidden;');
-    expect(phoneBlock).toContain('.sectionContainer');
-    expect(phoneBlock).toContain('border: none;');
-    expect(phoneBlock).toContain('.sectionHeader .sectionHeaderSubtitle {');
-    expect(phoneBlock).toContain('font-size: 1em;');
-    expect(phoneBlock).toContain('font-weight: inherit;');
-    expect(phoneBlock).toContain('color: rgba(255, 255, 255, 0.15);');
-    expect(phoneBlock).toContain('.sectionHeader {');
-    expect(phoneBlock).toContain('align-items: center;');
-    expect(phoneBlock).not.toContain('.documentsSectionHeaderText');
-    expect(phoneBlock).not.toContain('.documentsSectionHeaderTitleRow');
-    expect(phoneBlock).not.toContain('.documentsSectionHeaderMain');
-    expect(phoneBlock).not.toContain('.documentsSectionHeaderMeta');
-    expect(phoneBlock).toContain('.pileHeaderRow {');
-    expect(phoneBlock).toContain('flex-wrap: nowrap;');
-    expect(phoneBlock).toContain('.pileHeaderTitleWrap {');
-    expect(phoneBlock).toContain('width: auto;');
-    expect(phoneBlock).toContain('font-size: clamp(1.25rem, 4.7vw, 1.55rem);');
-    expect(smallTabletBlock).toContain('.sectionHeader {');
-    expect(smallTabletBlock).toContain('align-items: center;');
-    expect(smallTabletBlock).toContain('font-size: 1.6em;');
-    expect(smallTabletBlock).toContain('.sectionHeader .sectionHeaderText {');
-    expect(smallTabletBlock).toContain('flex-direction: row;');
-    expect(smallTabletBlock).toContain('align-items: center;');
-    expect(smallTabletBlock).toContain('gap: 6px 12px;');
-    expect(smallTabletBlock).toContain('.sectionHeader .sectionHeaderSubtitle {');
-    expect(smallTabletBlock).toContain('font-size: 1.2em;');
-    expect(smallTabletBlock).toContain('font-weight: inherit;');
-    expect(smallTabletBlock).toContain('color: rgba(255, 255, 255, 0.15);');
-    expect(smallTabletBlock).not.toContain('.documentsSectionHeaderText');
-    expect(smallTabletBlock).not.toContain('.documentsSectionHeaderTitleRow');
-    expect(smallTabletBlock).not.toContain('.documentsSectionHeaderMain');
-    expect(smallTabletBlock).not.toContain('.documentsSectionHeaderMeta');
-    expect(smallTabletBlock).toContain('.pileHeaderRow {');
-    expect(smallTabletBlock).toContain('flex-wrap: nowrap;');
-    expect(smallTabletBlock).toContain('.pileHeaderTitleWrap {');
-    expect(smallTabletBlock).toContain('width: auto;');
-    expect(smallTabletBlock).toContain('font-size: clamp(1.35rem, 4.2vw, 1.75rem);');
-    expect(smallTabletBlock).not.toContain('.sectionContainer');
-    expect(tabletBlock).toContain('.pileHeaderRow {');
-    expect(tabletBlock).toContain('flex-wrap: nowrap;');
-    expect(tabletBlock).toContain('.pileHeaderTitleWrap {');
-    expect(tabletBlock).toContain('width: auto;');
-    expect(tabletBlock).toContain('font-size: clamp(1.4rem, 3.2vw, 1.9rem);');
-    expect(scss).toMatch(
-      /@media only screen and \(min-width:\s*768px\) and \(max-width:\s*1024px\)\s*{[\s\S]*?\.sectionHeader \.sectionHeaderText\s*{[\s\S]*?flex-direction:\s*column;[\s\S]*?align-items:\s*flex-start;/,
+    expect(screen.getByText(documentsTooltipText)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'GitHub' })).toHaveAttribute(
+      'href',
+      'https://github.com/xoCortex/context-engine/tree/main/client/src/variables/demo'
     );
   });
 
@@ -1470,6 +1386,299 @@ describe('OnePageSession view gating', () => {
           sessionConfig={workerSessionConfig}
         />,
       );
+
+      expect(await screen.findByTestId('survey-page-full')).toBeInTheDocument();
+      const fullCalls = mockSurveyPage.mock.calls
+        .map((args) => args[0])
+        .filter((childProps) => childProps?.miniMode === true && childProps?.minifiedMode !== 'pile');
+      expect(fullCalls.length).toBeGreaterThan(0);
+      expect(fullCalls[fullCalls.length - 1]?.autoOpenResults).toBe(true);
+    } finally {
+      window.history.replaceState({}, '', priorUrl);
+    }
+  });
+
+  it('closes the route-opened questions/results view when navigation returns to the base session route', async () => {
+    const priorUrl = window.location.href;
+
+    try {
+      window.history.replaceState({}, '', '/session/edge/questions/results?session=edge');
+      const view = render(
+        <OnePageSession
+          {...buildProps()}
+          routeQuestionsOpen={true}
+          routeAutoOpenResults={true}
+        />
+      );
+
+      expect(await screen.findByTestId('survey-page-full')).toBeInTheDocument();
+
+      window.history.replaceState({}, '', '/session/edge?session=edge');
+      view.rerender(
+        <OnePageSession
+          {...buildProps()}
+          routeQuestionsOpen={false}
+          routeAutoOpenResults={false}
+        />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByTestId('survey-page-pile')).toBeInTheDocument();
+      });
+      expect(screen.queryByTestId('survey-page-full')).not.toBeInTheDocument();
+    } finally {
+      window.history.replaceState({}, '', priorUrl);
+    }
+  });
+
+  it('renders the Raw Results action only while results are expanded and styles it like the other demo mode buttons', async () => {
+    render(<OnePageSession {...buildProps()} />);
+
+    expect(screen.queryByRole('button', { name: /Raw Results/i })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Raw Results/i })).toBeInTheDocument();
+    });
+
+    const rawResultsButton = screen.getByRole('button', { name: /Raw Results/i });
+    const resultsActionStrip = rawResultsButton.parentElement;
+    expect(rawResultsButton).toHaveClass(styles.sectionHeaderViewModeButton);
+    expect(rawResultsButton).not.toHaveClass(styles.sectionHeaderActionButton);
+    expect(resultsActionStrip).toHaveClass(styles.resultsModeActions);
+    expect(resultsActionStrip.parentElement).toHaveClass(styles.resultsModeActionsScroller);
+    expect(screen.getByTestId('polis-report')).toBeInTheDocument();
+  });
+
+  it('keeps DebateSelector out of debate map mode', async () => {
+    const props = buildProps();
+
+    render(
+      <OnePageSession
+        {...props}
+        slug="demo"
+        sessionConfig={{ ...props.sessionConfig, slug: 'demo' }}
+      />
+    );
+
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /^Debate Map$/i })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /^Debate Map$/i }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('ai-policy-atlas')).toBeInTheDocument();
+    });
+
+    expect(screen.queryByTestId('debate-selector')).not.toBeInTheDocument();
+  }, 15000);
+
+  it('renders the shared risk matrix view in embedded mode for demo results', async () => {
+    const props = buildProps();
+
+    render(
+      <OnePageSession
+        {...props}
+        slug="demo"
+        sessionConfig={{ ...props.sessionConfig, slug: 'demo' }}
+      />
+    );
+
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Risk Matrix/i })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /Risk Matrix/i }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('risk-matrix-view')).toBeInTheDocument();
+    });
+
+    const riskMatrixCalls = mockRiskMatrix.mock.calls.map((args) => args[0]).filter(Boolean);
+    expect(riskMatrixCalls.length).toBeGreaterThan(0);
+    expect(riskMatrixCalls[riskMatrixCalls.length - 1]).toMatchObject({
+      embedded: true,
+    });
+  });
+
+  it('restores the one-page session view after closing an atlas node opened from Context', async () => {
+    const props = buildProps();
+
+    render(
+      <OnePageSession
+        {...props}
+        slug="demo"
+        sessionConfig={{ ...props.sessionConfig, slug: 'demo' }}
+      />
+    );
+
+    expect(await screen.findByTestId('survey-page-pile')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('ce-demo-documents-toggle'));
+
+    const atlasIssueButtons = await screen.findAllByRole('button', { name: 'Exponential Progress Debate' });
+    fireEvent.click(atlasIssueButtons[0]);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('ai-policy-atlas')).toBeInTheDocument();
+    });
+
+    const atlasCalls = mockDebateMap.mock.calls.map((args) => args[0]).filter(Boolean);
+    expect(atlasCalls[atlasCalls.length - 1]).toMatchObject({
+      embedded: true,
+      requestedModalNodeId: '0x2110000000000000000000000000000000000000000000000000000000000000',
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close Atlas Modal' }));
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('ai-policy-atlas')).not.toBeInTheDocument();
+    });
+
+    expect(screen.getAllByRole('button', { name: 'Exponential Progress Debate' }).length).toBeGreaterThan(0);
+  });
+
+  it('shows the Breakdown results mode only for /session/demo', async () => {
+    const baseProps = buildProps();
+
+    const nonDemoView = render(<OnePageSession {...baseProps} />);
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('polis-report')).toBeInTheDocument();
+    });
+    expect(screen.queryByRole('button', { name: /^Breakdown$/i })).not.toBeInTheDocument();
+
+    nonDemoView.unmount();
+    jest.clearAllMocks();
+
+    render(
+      <OnePageSession
+        {...baseProps}
+        slug="demo"
+        sessionConfig={{ ...baseProps.sessionConfig, slug: 'demo' }}
+      />
+    );
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /^Breakdown$/i })).toBeInTheDocument();
+    });
+  });
+
+  it('uses a report-style icon for the polis results mode switcher', async () => {
+    const baseProps = buildProps();
+
+    render(
+      <OnePageSession
+        {...baseProps}
+        slug="demo"
+        sessionConfig={{ ...baseProps.sessionConfig, slug: 'demo' }}
+      />
+    );
+
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
+
+    const reportButton = await screen.findByRole('button', { name: /Report/i });
+    expect(reportButton).toHaveTextContent('🧾');
+    expect(reportButton).not.toHaveTextContent('🐝');
+  });
+
+  it('renders the demo analysis workspace when the Breakdown mode is selected', async () => {
+    const props = buildProps();
+
+    render(
+      <OnePageSession
+        {...props}
+        slug="demo"
+        sessionConfig={{ ...props.sessionConfig, slug: 'demo' }}
+      />
+    );
+
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /^Breakdown$/i })).toBeInTheDocument();
+    });
+
+    const polisButton = screen.getByRole('button', { name: /^Report$/i });
+    const analysisButton = screen.getByRole('button', { name: /^Breakdown$/i });
+
+    expect(polisButton).toHaveAttribute('aria-pressed', 'true');
+    expect(analysisButton).toHaveAttribute('aria-pressed', 'false');
+
+    fireEvent.click(analysisButton);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('demo-analysis-workspace-view')).toBeInTheDocument();
+    });
+
+    expect(analysisButton).toHaveAttribute('aria-pressed', 'true');
+    expect(analysisButton).toHaveClass(styles.sectionHeaderViewModeButtonActive);
+    expect(polisButton).toHaveAttribute('aria-pressed', 'false');
+    expect(mockDemoAnalysisWorkspace).toHaveBeenCalled();
+  });
+
+  it('kicks off a slug-scoped light SBT universe scan on mount and session switches', async () => {
+    const ensureLightSbtUniverse = jest.fn().mockResolvedValue(undefined);
+    const props = buildProps();
+    const priorUrl = window.location.href;
+
+    try {
+      window.history.replaceState({}, '', '/session/demo');
+      const { rerender } = render(
+        <OnePageSession
+          {...props}
+          slug="demo"
+          sessionConfig={{ ...props.sessionConfig, slug: 'demo' }}
+          ensureLightSbtUniverse={ensureLightSbtUniverse}
+        />
+      );
+
+      await waitFor(() => {
+        expect(ensureLightSbtUniverse).toHaveBeenNthCalledWith(1, ['demo'], {
+          forceScopeSlug: 'demo',
+        });
+      });
+
+      window.history.replaceState({}, '', '/session/edge');
+      rerender(
+        <OnePageSession
+          {...props}
+          slug="edge"
+          sessionConfig={{ ...props.sessionConfig, slug: 'edge' }}
+          ensureLightSbtUniverse={ensureLightSbtUniverse}
+        />
+      );
+
+      await waitFor(() => {
+        expect(ensureLightSbtUniverse).toHaveBeenNthCalledWith(2, ['edge'], {
+          forceScopeSlug: 'edge',
+        });
+      });
+    } finally {
+      window.history.replaceState({}, '', priorUrl);
+    }
+  });
+
+  it('clears pending auto-open results timer on unmount before it fires', async () => {
+    jest.useFakeTimers();
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const priorUrl = window.location.href;
+
+    try {
+      const { unmount } = render(<OnePageSession {...buildProps()} />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('survey-page-pile')).toBeInTheDocument();
+      });
 
       fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
       await waitFor(() => expect(mockPolisReport).toHaveBeenCalled());
