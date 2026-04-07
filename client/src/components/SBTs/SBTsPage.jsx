@@ -24,7 +24,7 @@ import { getSbtDisplayName } from '../../utilities/sbt/sbtDisplayNames.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { readSessionScanScope, readSessionScanSlugs } from '../../utilities/session/sessionScanScope.js';
 import proposalScripts from '../../utilities/proposalScripts.js';
-import { sbtsListPath, t } from '../../utilities/ui/terminology.js';
+import { isCryptoMode, sbtsListPath, t } from '../../utilities/ui/terminology.js';
 import defaultSbtImage from '../../assets/img/ce_circuit_logo.png';
 
 const sbtLog = createLogger('sbt');
@@ -538,6 +538,7 @@ export class SBTsPage extends Component {
     );
     const showCreateGroupBeforeFeatured = effectiveShowCreateGroup && showCreateGroupAboveFeatured;
     const showCreateGroupAfterFeatured = effectiveShowCreateGroup && !showCreateGroupBeforeFeatured;
+    const showMiniSbtAddress = isCryptoMode();
 
     return (
       <div>
@@ -603,7 +604,9 @@ export class SBTsPage extends Component {
                           />
                         </div>
                         <p id={sbtPageStyles.miniSbtName}>{sbtName}</p>
-                        <p id={sbtPageStyles.miniSbtAddress}>{shortenedAddress}</p>
+                        {showMiniSbtAddress ? (
+                          <p id={sbtPageStyles.miniSbtAddress}>{shortenedAddress}</p>
+                        ) : null}
                       </a>
                     );
                   }

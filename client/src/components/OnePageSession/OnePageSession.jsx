@@ -2500,17 +2500,19 @@ class OnePageSession extends Component {
             <div className={styles.sectionHeaderRow}>
               <h2
                 onClick={this.toggleDocuments}
-                className={styles.sectionHeader}
+                className={`${styles.sectionHeader} ${styles.documentsSectionHeader}`.trim()}
                 data-testid='ce-demo-documents-toggle'
               >
-                {this.state.showDocuments ? (
-                  <FontAwesomeIcon icon={faCaretUp} className={styles.sectionToggleIcon} />
-                ) : (
-                  <FontAwesomeIcon icon={faCaretDown} className={styles.sectionToggleIcon} />
-                )}
-                {renderSectionHeading('Context', 'View')}
+                <span className={styles.documentsSectionHeaderMain}>
+                  {this.state.showDocuments ? (
+                    <FontAwesomeIcon icon={faCaretUp} className={styles.sectionToggleIcon} />
+                  ) : (
+                    <FontAwesomeIcon icon={faCaretDown} className={styles.sectionToggleIcon} />
+                  )}
+                  {renderSectionHeading('Context', 'View')}
+                </span>
                 {this.state.showDocuments && (
-                  <div className={styles.sectionHeaderMeta}>
+                  <span className={`${styles.sectionHeaderMeta} ${styles.documentsSectionHeaderMeta}`.trim()}>
                     <div
                       className={`${styles.tooltip} ${styles.sectionHeaderTooltip}`}
                       onClick={(e) => e.stopPropagation()}
@@ -2530,7 +2532,7 @@ class OnePageSession extends Component {
                       <FontAwesomeIcon icon={faExternalLinkAlt} />
                       <span>GitHub</span>
                     </a>
-                  </div>
+                  </span>
                 )}
               </h2>
             </div>

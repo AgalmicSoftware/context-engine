@@ -286,6 +286,25 @@
   gap: 10px;
 }
 
+.documentsSectionHeader {
+  width: 100%;
+  justify-content: space-between;
+}
+
+.documentsSectionHeaderMain {
+  align-items: flex-start;
+  display: inline-flex;
+  gap: 10px;
+  min-width: 0;
+}
+
+.documentsSectionHeaderMeta {
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+  margin-left: auto;
+  min-width: 0;
+}
+
 .sectionHeaderLink {
   align-items: center;
   background: rgba(255, 255, 255, 0.08);
@@ -685,16 +704,52 @@
   }
 
   .sectionHeader {
-    font-size: 1.35em;
+    font-size: 1.6em;
     padding-left: 10px;
   }
 
-  .sectionHeaderText {
-    gap: 4px;
+  .sectionHeader .sectionHeaderText {
+    flex-direction: row;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 6px 12px;
+  }
+
+  .sectionHeader .sectionHeaderSubtitle {
+    font-size: 0.68em;
+    line-height: 1;
+    color: rgba(244, 247, 255, 0.58);
   }
 
   .sectionHeaderRow {
     gap: 12px;
+  }
+
+  .documentsSectionHeader {
+    gap: 10px;
+  }
+
+  .documentsSectionHeaderMain {
+    flex: 1 1 220px;
+  }
+
+  .documentsSectionHeaderMeta {
+    align-items: center;
+    gap: 8px;
+  }
+
+  .documentsSectionHeaderMeta .sectionHeaderTooltip {
+    align-items: center;
+    display: inline-flex;
+    margin-left: 0;
+    margin-top: 0;
+    min-height: 40px;
+  }
+
+  .documentsSectionHeaderMeta .sectionHeaderLink {
+    font-size: 0.78rem;
+    min-height: 40px;
+    padding: 8px 11px;
   }
 
   .sectionHeaderActionsScroller {
@@ -746,10 +801,62 @@
   }
 }
 
+/* Keep smaller tablets on the inline header layout without pulling in the full phone chrome. */
+@media only screen and (min-width: 601px) and (max-width: 767px) {
+  .sectionHeader {
+    font-size: 1.6em;
+    padding-left: 10px;
+  }
+
+  .sectionHeader .sectionHeaderText {
+    flex-direction: row;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 6px 12px;
+  }
+
+  .sectionHeader .sectionHeaderSubtitle {
+    font-size: 0.68em;
+    line-height: 1;
+    color: rgba(244, 247, 255, 0.58);
+  }
+
+  .sectionHeaderRow {
+    gap: 12px;
+  }
+
+  .documentsSectionHeader {
+    gap: 10px;
+  }
+
+  .documentsSectionHeaderMain {
+    flex: 1 1 220px;
+  }
+
+  .documentsSectionHeaderMeta {
+    align-items: center;
+    gap: 8px;
+  }
+
+  .documentsSectionHeaderMeta .sectionHeaderTooltip {
+    align-items: center;
+    display: inline-flex;
+    margin-left: 0;
+    margin-top: 0;
+    min-height: 40px;
+  }
+
+  .documentsSectionHeaderMeta .sectionHeaderLink {
+    font-size: 0.78rem;
+    min-height: 40px;
+    padding: 8px 11px;
+  }
+}
+
 /* -------------------------------------------
      NEW: Additional mid-range (tablet) styling     Adjust so it doesn't mirror the phone layout
   ------------------------------------------- */
-@media only screen and (min-width: 601px) and (max-width: 1024px) {
+@media only screen and (min-width: 768px) and (max-width: 1024px) {
   .onePageDemoContainer {
     font-size: 1.15rem;
     padding: 15px 25px;
@@ -791,6 +898,12 @@
 
   .sectionHeader {
     font-size: 1.6em;
+  }
+
+  .sectionHeader .sectionHeaderText {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
   }
 
   .sectionHeaderActionButton {

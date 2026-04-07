@@ -601,6 +601,8 @@
 
 .mapFrame {
   margin-top: -0.5rem;
+  overflow: hidden;
+  width: 100%;
 }
 
 .mapFrameCompact {
@@ -662,6 +664,15 @@
   .panel,
   .modalCard {
     padding: 0.9rem;
+  }
+
+  .mapFrameCompact {
+    padding-top: 0.35rem;
+  }
+
+  .mapFrameCompact :global(svg) {
+    max-width: 100%;
+    width: 100%;
   }
 
   .breakdownBarRow {
