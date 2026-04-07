@@ -3,11 +3,20 @@ import { Button, FormGroup, Input, Label } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faClipboard, faLock, faLockOpen, faPen } from '@fortawesome/free-solid-svg-icons';
 import styles from '../Admin/AdminPage.module.scss';
-import CEDateTimeInput from '../Shared/CEDateTimeInput';
-import { USE_ONCHAIN_SESSION_REGISTRY } from '../../variables/appConfig.js';
-import { sessionRegistryReadsPort } from '../../domains/sessions/registry/sessionRegistryReadPorts.js';
-import { sponsoredBundlePort } from '../../domains/storage/sponsoredBundlePorts.js';
-import { adminWorkerPorts } from '../../domains/worker/adminWorkerPorts.js';
+import CEDateTimeInput from '../Shared/CEDateTimeInput.jsx';
+import {
+  USE_ONCHAIN_SESSION_REGISTRY,
+} from '../../variables/appConfig.js';
+import { corsProxyUtils } from '../../utilities/worker/corsProxy.js';
+import { buildSignedAdminActionAuth, buildSignedBootstrapAdminAuth } from '../../utilities/worker/workerAuth.js';
+import {
+  fetchSessionFromRegistry,
+  loadSessionRegistryCache,
+  SESSION_REGISTRY_CACHE_UPDATED_EVENT,
+  sessionRegistryStore,
+  sessionRegistryUtils,
+  upsertSessionRegistryCache,
+} from '../../utilities/web3/sessionRegistry.js';
 import {
   getUsableSessionWorkerUrl,
   hasUsableSessionWorkerConfig,
