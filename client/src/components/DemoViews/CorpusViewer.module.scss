@@ -7,27 +7,18 @@ $text: #f4f7ff;
 
 .container {
   background: $surface;
-  box-sizing: border-box;
   border: 1px solid $card-border;
   border-radius: var(--ce-radius-12);
   color: $text;
-  max-width: 100%;
-  overflow: hidden;
   padding: 16px;
-  width: 100%;
 }
 
 .tabBar {
-  box-sizing: border-box;
   display: flex;
-  gap: 8px;
-  margin-bottom: 10px;
-  max-width: 100%;
+  gap: 4px;
+  margin-bottom: 16px;
   overflow-x: auto;
-  scroll-padding-inline: 4px;
-  scroll-snap-type: x proximity;
-  -webkit-overflow-scrolling: touch;
-  padding-bottom: 10px;
+  padding-bottom: 4px;
   border-bottom: 1px solid $card-border;
 }
 
@@ -41,10 +32,9 @@ $text: #f4f7ff;
   cursor: pointer;
   display: inline-flex;
   flex-shrink: 0;
-  gap: 10px;
+  gap: 8px;
   opacity: 0.55;
-  padding: 14px 18px 16px;
-  scroll-snap-align: start;
+  padding: 10px 14px 12px;
   transition: opacity 0.15s ease, background 0.15s ease;
 }
 
@@ -61,8 +51,7 @@ $text: #f4f7ff;
 
 .tabIcon {
   color: $muted;
-  display: inline-flex;
-  font-size: 24px;
+  font-size: 16px;
 }
 
 .tabIconActive {
@@ -70,27 +59,14 @@ $text: #f4f7ff;
 }
 
 .tabLabel {
-  font-size: 20px;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  line-height: 1;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
   white-space: nowrap;
 }
 
 .sectionBlock {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  justify-content: flex-start;
-  margin-bottom: 14px;
-  padding-left: 4px;
-}
-
-.sectionActionRow {
-  align-items: center;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+  margin-bottom: 12px;
 }
 
 .sectionHeader {
@@ -106,22 +82,11 @@ $text: #f4f7ff;
 }
 
 .githubLink {
-  appearance: none;
   align-items: center;
-  background: rgba(255, 255, 255, 0.08);
-  box-sizing: border-box;
-  border: 1px solid $card-border;
-  border-radius: var(--ce-radius-pill);
-  color: $text;
-  cursor: pointer;
+  color: $muted;
   display: inline-flex;
-  font: inherit;
   font-size: 12px;
-  font-weight: 600;
   gap: 6px;
-  letter-spacing: -0.01em;
-  max-width: 100%;
-  padding: 8px 12px;
   text-decoration: none;
   transition: color 0.15s ease;
 }
@@ -134,295 +99,46 @@ $text: #f4f7ff;
   font-size: 12px;
 }
 
-.loadCorpusButton:disabled {
-  cursor: default;
-  opacity: 0.72;
-}
-
-.loadCorpusButton:disabled:hover {
-  color: $text;
-}
-
-.sectionMeta {
-  color: $muted;
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 1.5;
-}
-
-.sectionError {
-  color: #ffb347;
-  font-size: 12px;
-  line-height: 1.5;
-}
-
-.policyMapLens {
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 14px;
-  margin-bottom: 0;
-  padding: 4px 4px 0;
-}
-
-.policySplitLayout {
-  display: grid;
-  gap: 16px;
-}
-
-.policyListColumn,
-.policyMapColumn {
-  min-width: 0;
-}
-
-.policyListHeader {
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin-bottom: 12px;
-  padding: 14px 16px;
-}
-
-.policyListEyebrow {
-  color: $muted;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  margin-bottom: 4px;
-  text-transform: uppercase;
-}
-
-.policyListTitle {
-  color: $text;
-  font-size: 18px;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-}
-
-.policyEntriesList {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.policyMapPanel {
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 14px;
-  padding: 10px 10px 12px;
-}
-
-.policyMapAssistiveText {
-  color: $muted;
-  font-size: 11px;
-  line-height: 1.45;
-  margin-top: 6px;
-}
-
-.policyMapHeader {
-  margin-bottom: 12px;
-}
-
-.policyMapTitle {
-  color: $text;
-  font-size: 18px;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-}
-
-.policyMapSubtitle {
-  color: $muted;
-  font-size: 13px;
-  line-height: 1.5;
-  margin-top: 6px;
-}
-
-.policyMapLegend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
-.policyLegendItem {
-  align-items: center;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: var(--ce-radius-pill);
-  color: $text;
-  display: inline-flex;
-  font-size: 11px;
-  font-weight: 600;
-  gap: 6px;
-  padding: 5px 10px;
-}
-
-.policyLegendSwatch {
-  border-radius: 999px;
-  display: inline-flex;
-  height: 10px;
-  width: 10px;
-}
-
-.policyLegendSwatchLive {
-  background: rgba(77,255,164,0.9);
-}
-
-.policyLegendSwatchProposed {
-  background: rgba(255,179,71,0.9);
-}
-
-.policyLegendSwatchMixed {
-  background: rgba(122,140,255,0.9);
-}
-
 .scrollArea {
-  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   gap: 12px;
   max-height: 560px;
-  max-width: 100%;
-  min-width: 0;
   overflow-y: auto;
   padding-right: 4px;
-  width: 100%;
-}
-
-.entriesCollection {
-  box-sizing: border-box;
-  display: grid;
-  gap: 12px;
-  max-width: 100%;
-  min-width: 0;
-  width: 100%;
-}
-
-.entriesCollectionHalf {
-  grid-template-columns: 1fr;
-}
-
-.tweetPreviewControl {
-  align-items: center;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: var(--ce-radius-8);
-  box-sizing: border-box;
-  color: $text;
-  display: flex;
-  gap: 10px;
-  justify-content: space-between;
-  max-width: 100%;
-  padding: 10px 12px;
-  width: 100%;
-}
-
-.tweetPreviewCount {
-  color: $muted;
-  font-size: 12px;
-  font-weight: 700;
-  line-height: 1.35;
-  min-width: 0;
-}
-
-.tweetPreviewButton {
-  appearance: none;
-  background: rgba(77, 255, 164, 0.12);
-  border: 1px solid rgba(77, 255, 164, 0.32);
-  border-radius: var(--ce-radius-pill);
-  color: $accent;
-  cursor: pointer;
-  flex: 0 0 auto;
-  font: inherit;
-  font-size: 13px;
-  font-weight: 800;
-  line-height: 1.2;
-  padding: 8px 12px;
-  transition:
-    background 0.18s ease,
-    border-color 0.18s ease,
-    color 0.18s ease;
-}
-
-.tweetPreviewButton:hover {
-  background: rgba(77, 255, 164, 0.18);
-  border-color: rgba(77, 255, 164, 0.48);
-  color: #b7ffd9;
-}
-
-.tweetPreviewButton:focus-visible {
-  outline: 2px solid rgba(77, 255, 164, 0.5);
-  outline-offset: 2px;
 }
 
 .card {
   background: $card;
   border: 1px solid $card-border;
-  box-sizing: border-box;
   border-radius: var(--ce-radius-8);
   color: $text;
   display: block;
-  min-width: 0;
   padding: 16px;
-  width: 100%;
 }
 
 .tweetCard {
-  background: linear-gradient(180deg, #ffffff 0%, #f8fbfd 100%);
-  border-color: #dce7ee;
-  border-radius: 18px;
-  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
-  color: #0f1419;
+  background: rgba(21, 32, 43, 0.97);
+  border-color: rgba(56, 68, 77, 0.6);
+  border-radius: 16px;
   padding: 16px 18px;
 }
 
 .insiderCard {
-  background: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
-  border-color: #dbe6ef;
+  background: linear-gradient(180deg, rgba(24, 33, 56, 0.94) 0%, rgba(18, 25, 43, 0.94) 100%);
+  border-color: rgba(77, 255, 164, 0.18);
   border-radius: 12px;
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
-  color: #22303c;
 }
 
 .arxivCard {
-  background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
-  border-color: #d9e2ea;
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
-  color: #2f3437;
+  background: rgba(18, 25, 46, 0.92);
+  border-color: rgba(122, 140, 255, 0.2);
 }
 
 .metrCard {
-  background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
-  border-color: #d9e2ea;
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
-  color: #2f3437;
-}
-
-.metrSourceCard {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-bottom: 12px;
-  padding: 12px 14px;
-}
-
-.metrSourceEyebrow {
-  color: rgba(244, 247, 255, 0.72);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.metrSourceMeta {
-  color: $muted;
-  font-size: 12px;
-  line-height: 1.5;
+  background: linear-gradient(180deg, rgba(18, 28, 49, 0.96) 0%, rgba(15, 22, 37, 0.96) 100%);
+  border-color: rgba(77, 255, 164, 0.16);
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.25);
 }
 
 .chartBlock {
@@ -514,10 +230,7 @@ $text: #f4f7ff;
   display: inline-flex;
   font-size: 11px;
   line-height: 1.4;
-  max-width: 100%;
   padding: 2px 8px;
-  white-space: normal;
-  word-break: break-word;
 }
 
 .pillButton {
@@ -543,12 +256,9 @@ $text: #f4f7ff;
 }
 
 .pillRow {
-  box-sizing: border-box;
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  max-width: 100%;
-  min-width: 0;
 }
 
 .tweetTags {
@@ -558,7 +268,6 @@ $text: #f4f7ff;
 .tweetAvatar {
   align-items: center;
   background: linear-gradient(135deg, #1d9bf0 0%, #1a73c7 100%);
-  box-shadow: 0 8px 18px rgba(29, 155, 240, 0.18);
   border-radius: 50%;
   color: #fff;
   display: inline-flex;
@@ -596,13 +305,13 @@ $text: #f4f7ff;
 }
 
 .tweetHandle {
-  color: #657786;
+  color: rgba(139, 152, 165, 0.85);
   font-size: 14px;
   font-weight: 400;
 }
 
 .tweetName {
-  color: #0f1419;
+  color: $text;
   font-size: 15px;
   font-weight: 700;
 }
@@ -613,7 +322,7 @@ $text: #f4f7ff;
 }
 
 .tweetBody {
-  color: #0f1419;
+  color: $text;
   font-size: 15px;
   line-height: 1.55;
   margin-bottom: 12px;
@@ -645,7 +354,7 @@ $text: #f4f7ff;
 
 .tweetEngagementIcon {
   align-items: center;
-  color: #657786;
+  color: rgba(139, 152, 165, 0.85);
   display: inline-flex;
   font-size: 13px;
   gap: 6px;
@@ -657,7 +366,7 @@ $text: #f4f7ff;
 }
 
 .tweetDate {
-  color: #657786;
+  color: rgba(139, 152, 165, 0.85);
   font-size: 13px;
   margin-left: auto;
   padding-top: 2px;
@@ -708,7 +417,6 @@ $text: #f4f7ff;
   gap: 12px;
   justify-content: space-between;
   margin-bottom: 10px;
-  min-width: 0;
 }
 
 .entryHeaderContent {
@@ -718,65 +426,20 @@ $text: #f4f7ff;
 
 .tweetEngagement {
   align-items: center;
-  box-sizing: border-box;
-  border-top: 1px solid #e6ecf0;
+  border-top: 1px solid rgba(56, 68, 77, 0.4);
   display: flex;
   flex-wrap: wrap;
   font-size: 13px;
   gap: 16px;
   justify-content: space-between;
   margin-top: 12px;
-  max-width: 100%;
   padding-top: 12px;
-  width: 100%;
-}
-
-.cardFooter {
-  align-items: flex-start;
-  box-sizing: border-box;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  justify-content: space-between;
-  margin-top: 12px;
-  max-width: 100%;
-  width: 100%;
-}
-
-.cardFooterLinks {
-  align-items: center;
-  box-sizing: border-box;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  justify-content: flex-end;
-  max-width: 100%;
-  min-width: 0;
-  width: 100%;
-}
-
-.tweetActionRow {
-  align-items: center;
-  justify-content: flex-start;
-}
-
-.tweetActionRow .externalLink {
-  margin-left: auto;
-}
-
-.cardFooter:empty,
-.cardFooterLinks:empty {
-  display: none;
-  margin-top: 0;
 }
 
 .engagementRow {
-  box-sizing: border-box;
   display: flex;
   flex-wrap: wrap;
   gap: 20px;
-  max-width: 100%;
-  min-width: 0;
 }
 
 .entryTitle {
@@ -787,121 +450,24 @@ $text: #f4f7ff;
   margin-bottom: 6px;
 }
 
-.tweetCard .pill {
-  background: rgba(29, 155, 240, 0.1);
-  color: #1d9bf0;
-}
-
-.tweetCard .pillButton:hover {
-  background: rgba(29, 155, 240, 0.18);
-  color: #0f78b8;
-}
-
-.tweetCard .debateMapLabel,
-.tweetCard .debateMapEmpty {
-  color: #536471;
-}
-
-.tweetCard .debateMapIcon {
-  color: #1d9bf0;
-}
-
-.tweetCard .debateMapLink,
-.tweetCard .externalLink {
-  background: #f5f8fa;
-  border-color: #dce7ee;
-  color: #1d9bf0;
-}
-
-.tweetCard .sentimentNeutral {
-  background: #eef3f6;
-  color: #536471;
-}
-
-.tweetCard .sentimentOptimistic {
-  background: rgba(77, 255, 164, 0.12);
-  color: #0a9f5c;
-}
-
-.tweetCard .sentimentSkeptical {
-  background: rgba(255, 179, 71, 0.16);
-  color: #b86a00;
-}
-
-.tweetCard .sentimentAlarmist {
-  background: rgba(255, 107, 203, 0.14);
-  color: #c93b85;
-}
-
-.arxivCard .entrySummary {
-  color: #4b5563;
-}
-
-.metrCard .entryTitle {
-  color: #2f3437;
-}
-
-.metrCard .entryMeta {
-  color: #5f6b78;
-}
-
-.metrCard .entrySummary {
-  color: #4b5563;
-}
-
-.metrCard .pill {
-  background: rgba(33, 117, 189, 0.08);
-  color: #1b6fb8;
-}
-
-.metrCard .pillButton:hover {
-  background: rgba(33, 117, 189, 0.14);
-  color: #135793;
-}
-
-.metrCard .debateMapLink,
-.metrCard .externalLink,
-.metrCard .externalIconLink {
-  background: #f7fafc;
-  border-color: #d9e2ea;
-  color: #1b6fb8;
-}
-
-.arxivCard .pill {
-  background: rgba(33, 117, 189, 0.1);
-  color: #1b6fb8;
-}
-
-.arxivCard .pillButton:hover {
-  background: rgba(33, 117, 189, 0.16);
-  color: #135793;
-}
-
-.arxivCard .debateMapLink,
-.arxivCard .externalLink {
-  background: #f7fafc;
-  border-color: #d9e2ea;
-  color: #1b6fb8;
-}
-
 .insiderName {
-  color: #1d2733;
-  font-size: 18px;
+  color: $text;
+  font-size: 15px;
   font-weight: 700;
   line-height: 1.3;
   margin-bottom: 4px;
 }
 
 .insiderRole {
-  color: #536471;
-  font-size: 16px;
+  color: $muted;
+  font-size: 14px;
   line-height: 1.5;
   margin-bottom: 4px;
 }
 
 .insiderInterviewer {
-  color: #657786;
-  font-size: 15px;
+  color: $muted;
+  font-size: 13px;
   font-style: italic;
   line-height: 1.5;
 }
@@ -918,7 +484,7 @@ $text: #f4f7ff;
 .insiderExpandBtn {
   background: transparent;
   border: none;
-  color: #1d9bf0;
+  color: $accent;
   cursor: pointer;
   font-size: 13px;
   font-weight: 600;
@@ -927,18 +493,18 @@ $text: #f4f7ff;
 }
 
 .insiderExpandBtn:hover {
-  color: #0f78b8;
+  color: #8dffca;
 }
 
 .insiderExpandBtn:focus-visible {
-  color: #0f78b8;
-  outline: 2px solid rgba(29, 155, 240, 0.25);
+  color: #8dffca;
+  outline: 2px solid rgba(77, 255, 164, 0.35);
   outline-offset: 4px;
 }
 
 .insiderDetails {
-  background: rgba(29, 155, 240, 0.04);
-  border-top: 1px solid #dbe6ef;
+  background: rgba(255, 255, 255, 0.03);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -946,48 +512,18 @@ $text: #f4f7ff;
   padding-top: 12px;
 }
 
-.insiderCard .entrySummary {
-  color: #334155;
-  font-size: 17px;
-  line-height: 1.72;
-}
-
-.insiderCard .entryMeta {
-  color: #536471;
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.insiderCard .pill {
-  background: rgba(29, 155, 240, 0.1);
-  color: #1d9bf0;
-  font-size: 12px;
-}
-
-.insiderCard .pillButton:hover {
-  background: rgba(29, 155, 240, 0.16);
-  color: #0f78b8;
-}
-
-.insiderCard .debateMapLink,
-.insiderCard .externalLink {
-  background: #f7fafc;
-  border-color: #dbe6ef;
-  color: #1d9bf0;
-}
-
 .arxivMetaTop {
   align-items: center;
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
 .arxivId {
-  color: #1b6fb8;
-  font-size: 16px;
-  font-weight: 500;
+  color: rgba(244, 247, 255, 0.56);
+  font-family: var(--ce-font-mono, SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace);
+  font-size: 12px;
 }
 
 .arxivCategory {
@@ -1016,41 +552,36 @@ $text: #f4f7ff;
 }
 
 .arxivTitle {
-  color: #2f3437;
-  font-size: 18px;
-  font-weight: 600;
-  line-height: 1.28;
+  color: $text;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.4;
   margin-bottom: 8px;
 }
 
 .arxivMetaRow {
   align-items: baseline;
   display: flex;
-  flex-wrap: wrap;
   gap: 6px;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
   min-width: 0;
-}
-
-.arxivMetaLabel {
-  color: #2f3437;
-  font-size: 13px;
-  font-weight: 700;
 }
 
 .arxivAuthors {
-  color: #1b6fb8;
+  color: $muted;
   flex: 1 1 auto;
   font-size: 13px;
   min-width: 0;
-  line-height: 1.45;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .arxivDate {
-  color: #444f59;
+  color: $muted;
   flex-shrink: 0;
   font-size: 12px;
-  font-weight: 600;
   white-space: nowrap;
 }
 
@@ -1069,86 +600,6 @@ $text: #f4f7ff;
   font-size: 14px;
   line-height: 1.6;
   margin-bottom: 12px;
-}
-
-.entryInsightBlock {
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
-  margin-bottom: 12px;
-  padding: 10px 12px;
-}
-
-.entryInsightLabel {
-  color: $text;
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  margin-bottom: 6px;
-  text-transform: uppercase;
-}
-
-.entryInsightText {
-  color: rgba(244, 247, 255, 0.82);
-  font-size: 13px;
-  line-height: 1.6;
-}
-
-.entrySupportMeta {
-  color: rgba(244, 247, 255, 0.62);
-  display: grid;
-  font-size: 12px;
-  gap: 4px;
-  line-height: 1.5;
-  margin-bottom: 12px;
-}
-
-.arxivCard .entryInsightBlock,
-.metrCard .entryInsightBlock,
-.insiderCard .entryInsightBlock,
-.tweetCard .entryInsightBlock {
-  background: rgba(15, 23, 42, 0.03);
-  border-color: rgba(15, 23, 42, 0.08);
-}
-
-.arxivCard .entryInsightLabel,
-.metrCard .entryInsightLabel,
-.insiderCard .entryInsightLabel,
-.tweetCard .entryInsightLabel {
-  color: #2f3437;
-}
-
-.arxivCard .entryInsightText,
-.metrCard .entryInsightText,
-.insiderCard .entryInsightText,
-.tweetCard .entryInsightText,
-.arxivCard .entrySupportMeta,
-.metrCard .entrySupportMeta,
-.insiderCard .entrySupportMeta,
-.tweetCard .entrySupportMeta {
-  color: #536471;
-}
-
-.entryMediaBlock {
-  border-radius: 16px;
-  margin-bottom: 12px;
-  overflow: hidden;
-}
-
-.entryMediaLink {
-  display: block;
-}
-
-.entryMediaImage {
-  display: block;
-  height: auto;
-  max-width: 100%;
-  width: 50%;
-}
-
-.metrCard .entryMediaImage {
-  margin-left: auto;
-  margin-right: auto;
 }
 
 .entrySourceRow {
@@ -1197,6 +648,53 @@ $text: #f4f7ff;
   padding: 12px 12px 10px;
 }
 
+.tagModal {
+  max-width: min(1180px, calc(100vw - 32px));
+  margin: 24px auto;
+}
+
+.tagModal :global(.modal-content) {
+  background:
+    radial-gradient(circle at top right, rgba(77, 255, 164, 0.08), transparent 32%),
+    linear-gradient(180deg, rgba(12, 18, 34, 0.98), rgba(8, 12, 24, 0.98));
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 18px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+  color: $text;
+  overflow: hidden;
+}
+
+.tagModal :global(.modal-header) {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  color: $text;
+  padding: 18px 20px;
+}
+
+.tagModal :global(.modal-title) {
+  color: $text;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.tagModal :global(.modal-body) {
+  background: transparent;
+  padding: 20px;
+}
+
+.tagModal :global(.close) {
+  color: $text;
+  opacity: 0.72;
+  text-shadow: none;
+}
+
+.tagModal :global(.close:hover),
+.tagModal :global(.close:focus) {
+  color: $accent;
+  opacity: 1;
+}
+
 .debateMapHeader {
   align-items: center;
   display: flex;
@@ -1223,53 +721,19 @@ $text: #f4f7ff;
   gap: 8px;
 }
 
-.debateMapFooter {
-  box-sizing: border-box;
-  max-width: 100%;
-  min-width: 0;
-  width: 100%;
-}
-
-.debateMapFooterLinks {
-  align-items: center;
-  box-sizing: border-box;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  max-width: 100%;
-  min-width: 0;
-  width: 100%;
-}
-
 .debateMapLink {
   align-items: center;
-  background: rgba(255, 255, 255, 0.04);
-  box-sizing: border-box;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(77, 255, 164, 0.12);
+  border: 1px solid rgba(77, 255, 164, 0.22);
   border-radius: var(--ce-radius-pill);
-  color: $muted;
+  color: $text;
   display: inline-flex;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   gap: 6px;
   line-height: 1.4;
-  max-width: 100%;
-  min-width: 0;
-  padding: 5px 9px;
+  padding: 6px 10px;
   text-decoration: none;
-  white-space: normal;
-}
-
-.debateMapIcon {
-  flex-shrink: 0;
-  font-size: 0.8rem;
-}
-
-.debateMapLinkButton {
-  appearance: none;
-  cursor: pointer;
-  font: inherit;
-  text-align: left;
 }
 
 .debateMapEmpty {
@@ -1281,7 +745,6 @@ $text: #f4f7ff;
 .externalLink {
   align-items: center;
   background: rgba(255, 255, 255, 0.08);
-  box-sizing: border-box;
   border: 1px solid $card-border;
   border-radius: var(--ce-radius-pill);
   color: $text;
@@ -1290,346 +753,6 @@ $text: #f4f7ff;
   font-size: 12px;
   font-weight: 600;
   gap: 6px;
-  max-width: 100%;
-  min-height: 40px;
-  min-width: 0;
   padding: 8px 12px;
   text-decoration: none;
-  white-space: normal;
-}
-
-.externalIconLink {
-  align-items: center;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid $card-border;
-  border-radius: 999px;
-  color: $text;
-  display: inline-flex;
-  flex-shrink: 0;
-  height: 40px;
-  justify-content: center;
-  text-decoration: none;
-  width: 40px;
-}
-
-.externalIconLink:hover {
-  border-color: rgba(255, 255, 255, 0.22);
-  color: $accent;
-}
-
-@media (min-width: 980px) {
-  .entriesCollectionHalf {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .policySplitLayout {
-    align-items: start;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  }
-
-  .policyMapPanel {
-    position: sticky;
-    top: 0;
-  }
-}
-
-@media (max-width: 720px) {
-  .container {
-    border-radius: var(--ce-radius-12);
-    padding: 10px;
-  }
-
-  .tabBar {
-    display: grid;
-    gap: 10px;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    margin-bottom: 12px;
-    overflow: visible;
-    padding-inline: 0;
-    padding-bottom: 8px;
-    scroll-snap-type: none;
-  }
-
-  .tabButton {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 8px;
-    max-width: none;
-    min-height: 104px;
-    min-width: 0;
-    padding: 12px 12px 13px;
-    width: 100%;
-  }
-
-  .tabIcon {
-    font-size: 28px;
-  }
-
-  .tabLabel {
-    font-size: 18px;
-    line-height: 1.18;
-    white-space: normal;
-  }
-
-  .githubLink {
-    font-size: 12px;
-    justify-content: center;
-    width: 100%;
-  }
-
-  .githubLinkIcon {
-    font-size: 12px;
-  }
-
-  .scrollArea {
-    gap: 14px;
-    max-height: none;
-    overflow: visible;
-    padding-right: 0;
-  }
-
-  .policySplitLayout {
-    gap: 10px;
-  }
-
-  .policyMapColumn {
-    order: -1;
-  }
-
-  .policyListColumn {
-    order: 1;
-  }
-
-  .policyListHeader,
-  .policyMapPanel {
-    padding: 8px;
-  }
-
-  .policyMapLens {
-    padding: 0;
-  }
-
-  .card,
-  .tweetCard {
-    border-radius: 16px;
-    padding: 13px;
-    width: 100%;
-  }
-
-  .entryHeader {
-    flex-direction: column;
-    gap: 10px;
-  }
-
-  .tweetCard .tweetAuthorRow {
-    align-items: start;
-    display: grid;
-    gap: 10px;
-    grid-template-columns: 44px minmax(0, 1fr);
-  }
-
-  .tweetAuthorMeta,
-  .entryHeaderContent {
-    min-width: 0;
-  }
-
-  .tweetCard .tweetAvatar {
-    grid-row: 1 / span 2;
-  }
-
-  .tweetCard .tweetAuthorMeta,
-  .tweetCard .tweetAuthorNames {
-    min-width: 0;
-  }
-
-  .tweetCard .tweetAuthorNames {
-    gap: 4px 6px;
-  }
-
-  .tweetDate {
-    grid-column: 2;
-    margin-left: 0;
-    padding-top: 0;
-    text-align: left;
-    white-space: normal;
-    width: auto;
-  }
-
-  .tweetBody,
-  .entrySummary {
-    font-size: 15px;
-    line-height: 1.65;
-  }
-
-  .entryTitle,
-  .arxivTitle,
-  .insiderName,
-  .insiderRole,
-  .insiderInterviewer,
-  .entryMeta,
-  .entrySummary,
-  .arxivAuthors,
-  .arxivDate,
-  .tweetName,
-  .tweetHandle,
-  .tweetDate {
-    overflow-wrap: anywhere;
-  }
-
-  .entryMeta,
-  .arxivAuthors,
-  .arxivDate {
-    font-size: 13px;
-    line-height: 1.5;
-  }
-
-  .arxivMetaRow {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 4px;
-  }
-
-  .arxivDate {
-    white-space: normal;
-  }
-
-  .entryMediaBlock {
-    margin-bottom: 14px;
-    width: 100%;
-  }
-
-  .entryMediaImage {
-    width: 100%;
-  }
-
-  .metrCard .entryMediaImage {
-    width: 100%;
-  }
-
-  .pill {
-    font-size: 12px;
-    line-height: 1.45;
-    padding: 4px 10px;
-  }
-
-  .pillRow {
-    gap: 8px;
-    width: 100%;
-  }
-
-  .tweetEngagement {
-    align-items: stretch;
-    gap: 12px;
-  }
-
-  .engagementRow {
-    gap: 12px;
-    justify-content: space-between;
-    width: 100%;
-  }
-
-  .cardFooter,
-  .cardFooterLinks,
-  .debateMapFooter,
-  .debateMapFooterLinks {
-    align-items: stretch;
-    justify-content: flex-start;
-    width: 100%;
-  }
-
-  .cardFooter {
-    flex-direction: column;
-    gap: 10px;
-  }
-
-  .cardFooterLinks,
-  .debateMapFooterLinks {
-    gap: 10px;
-  }
-
-  .tweetActionRow {
-    align-items: stretch;
-  }
-
-  .tweetActionRow .externalLink {
-    margin-left: 0;
-  }
-
-  .tweetPreviewControl {
-    margin-top: 2px;
-  }
-
-  .debateMapLink,
-  .externalLink {
-    align-items: flex-start;
-    flex: 1 1 100%;
-    justify-content: flex-start;
-    min-height: 42px;
-    overflow-wrap: anywhere;
-    padding: 9px 12px;
-    width: 100%;
-  }
-
-  .externalLink span {
-    min-width: 0;
-  }
-}
-
-@media (max-width: 480px) {
-  .container {
-    padding: 8px;
-  }
-
-  .tabBar {
-    gap: 8px;
-  }
-
-  .tabButton {
-    min-height: 96px;
-    padding: 11px 10px 12px;
-  }
-
-  .tabIcon {
-    font-size: 26px;
-  }
-
-  .tabLabel {
-    font-size: 17px;
-    line-height: 1.16;
-  }
-
-  .policyListTitle,
-  .policyMapTitle {
-    font-size: 16px;
-  }
-
-  .card,
-  .tweetCard {
-    padding: 12px;
-  }
-
-  .tweetCard .tweetAuthorRow {
-    grid-template-columns: 40px minmax(0, 1fr);
-  }
-
-  .tweetAvatar {
-    flex-basis: 40px;
-    font-size: 16px;
-    height: 40px;
-    width: 40px;
-  }
-
-  .externalIconLink {
-    height: 40px;
-    width: 40px;
-  }
-
-  .tweetPreviewControl {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .tweetPreviewButton {
-    width: 100%;
-  }
 }
