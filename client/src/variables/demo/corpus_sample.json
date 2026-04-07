@@ -2332,7 +2332,11 @@
           "author": "Dario Amodei",
           "interviewer": "Dwarkesh Patel",
           "date": "2023-08-15",
+          "image_url": null,
           "summary": "Dario Amodei, CEO of Anthropic, discusses the relationship between scaling laws and alignment in AI systems. He argues that safety and capabilities development are not fundamentally in tension, but rather complementary pursuits. The conversation covers mechanistic interpretability research aimed at understanding model internals, the development of Constitutional AI and Anthropic's responsible scaling practices (RSP framework). Amodei explains how safety research informs architectural choices and training procedures, making systems more predictable and aligned. He also discusses competitive dynamics between AI labs and how safety practices might influence the future of AI development. The episode provides insights into Anthropic's philosophy that building safe, interpretable systems is achievable without sacrificing performance.",
+          "top_quotes": [
+            "If you can understand the model better, you can also steer it better."
+          ],
           "tags": [
             "alignment",
             "scaling",
@@ -2350,7 +2354,11 @@
           "author": "Dario Amodei",
           "interviewer": "Dwarkesh Patel",
           "date": "2026-02-10",
+          "image_url": null,
           "summary": "In this follow-up conversation, Dario Amodei provides a more cautious perspective on pure scaling compared to his 2023 appearance. He discusses whether classical scaling laws are hitting physical and economic limits, examining both computational and data constraints. The episode covers Anthropic's revenue growth and the commercial viability of advanced AI systems, along with Claude's capabilities evolution. Amodei addresses the paradigm shift from scale-driven progress to research-driven progress, discussing what comes after the scaling era. He explores whether labs will need architectural innovations, better algorithms, or different training paradigms to continue capability improvements. The conversation reflects updated thinking on AI development trajectories given empirical evidence from 2024-2026, including discussions of compute constraints, energy requirements, and the economics of frontier model development.",
+          "top_quotes": [
+            "The next decade may reward research breakthroughs more than another order of magnitude of scale."
+          ],
           "tags": [
             "scaling-laws",
             "post-scaling",
@@ -2368,7 +2376,11 @@
           "author": "Demis Hassabis",
           "interviewer": "Dwarkesh Patel",
           "date": "2024-02-20",
+          "image_url": null,
           "summary": "Demis Hassabis, CEO of DeepMind, discusses scaling, superhuman AI systems, and the integration of search and planning mechanisms with large language models. He reflects on AlphaFold's breakthrough in protein structure prediction and its impact on biology and medicine. Hassabis argues for combining classical AI planning methods with modern deep learning, proposing that the most capable future systems will integrate multiple paradigms. He discusses world models and their role in planning and reasoning, suggesting that understanding how agents build internal models of their environment is crucial for developing more general AI. The conversation covers DeepMind's research strategy on achieving superhuman capabilities across diverse domains while maintaining scientific rigor. Hassabis emphasizes that the next era of AI progress may require hybrid approaches rather than pure scaling of language models.",
+          "top_quotes": [
+            "The frontier probably belongs to hybrids that combine language, planning, and world models."
+          ],
           "tags": [
             "deepmind",
             "scaling",
@@ -2386,7 +2398,11 @@
           "author": "Mark Zuckerberg",
           "interviewer": "Dwarkesh Patel",
           "date": "2024-04-18",
+          "image_url": null,
           "summary": "Mark Zuckerberg discusses Meta's strategy of open-sourcing advanced AI models like Llama 3, despite spending over $10 billion on AI infrastructure. He articulates the business logic behind giving away powerful models, arguing that open source allows Meta to capture value through ecosystem effects and integration with Meta's products. Zuckerberg makes historical analogies to Caesar Augustus and Rome, framing Meta's approach as creating an 'empire' where other companies build on Meta's foundation. The conversation covers Llama's development, capability progression, and competitive advantages over closed models. He argues that open source creates network effects and makes closed source advantages temporary. Zuckerberg discusses the future of AI development with Meta's investments in compute infrastructure and the belief that open models will dominate despite large closed competitors.",
+          "top_quotes": [
+            "Open models let Meta win through the ecosystem, not just the weights."
+          ],
           "tags": [
             "meta",
             "llama",
@@ -2404,7 +2420,11 @@
           "author": "Mark Zuckerberg",
           "interviewer": "Dwarkesh Patel",
           "date": "2025-04-12",
+          "image_url": null,
           "summary": "In a follow-up conversation, Mark Zuckerberg discusses AI's impact on software development within Meta. He predicts that within 18 months (from April 2025), the majority of code at Meta will be AI-generated, with human engineers focusing on high-level design and verification. The conversation covers AI agents, agentic workflows, and how AI coding systems will transform software engineering. Zuckerberg discusses Meta's AI infrastructure investments supporting this transition, the productivity gains expected, and how this represents a fundamental shift in how software is created. He addresses the skills engineers will need in an AI-native development environment and Meta's strategy for maintaining competitive advantage through developer productivity improvements.",
+          "top_quotes": [
+            "Soon the valuable work for engineers will be setting direction and checking what agents produce."
+          ],
           "tags": [
             "ai-coding",
             "agents",
@@ -2422,7 +2442,11 @@
           "author": "Ilya Sutskever",
           "interviewer": "Dwarkesh Patel",
           "date": "2025-11-08",
+          "image_url": null,
           "summary": "Ilya Sutskever, former Chief Scientist at OpenAI and founder of SSI (Safety and Superintelligence Institute), discusses the transition from scaling-driven AI development to research-driven innovation. He articulates why scaling laws are reaching their limits and what comes next\u2014arguing that major breakthroughs will require fundamental research into model generalization, reasoning, and alignment. Sutskever covers the challenge of reinforcement learning at scale and why current approaches may be insufficient for AGI. He discusses his departure from OpenAI and the reasoning behind founding SSI, framed around the necessity of solving alignment before developing superintelligence. The conversation emphasizes that the next era requires deeper understanding of how models generalize and reason, rather than simply increasing parameters and data.",
+          "top_quotes": [
+            "We are moving out of the age of scaling and into the age of deeper ideas."
+          ],
           "tags": [
             "openai-departure",
             "ssi",
@@ -2440,7 +2464,11 @@
           "author": "Leopold Aschenbrenner",
           "interviewer": "Dwarkesh Patel",
           "date": "2024-10-15",
+          "image_url": null,
           "summary": "Leopold Aschenbrenner, author of the influential 'Situational Awareness' memo from his time at OpenAI, discusses near-term AGI development and geopolitical implications. He argues that AGI is likely achievable by 2027 based on scaling trends and compute availability, framing this within a concerning geopolitical context. Aschenbrenner emphasizes the US-China competition for AI supremacy and how this competition creates pressure for rapid development without adequate safety measures. The conversation covers cybersecurity risks at AI labs, the concept of 'the project' (coordinated mega-scale AI development), and whether democratic processes can keep pace with technological development. He discusses how the incentive structure around AGI development creates tragedy-of-the-commons dynamics where safety corners are cut to maintain competitive advantage.",
+          "top_quotes": [
+            "AGI timelines are short enough that geopolitics and lab security become part of the alignment problem."
+          ],
           "tags": [
             "agi-timeline",
             "geopolitics",
@@ -2458,7 +2486,11 @@
           "author": "Shane Legg",
           "interviewer": "Dwarkesh Patel",
           "date": "2023-10-22",
+          "image_url": null,
           "summary": "Shane Legg, DeepMind's Chief AGI Scientist and co-founder, discusses AGI timelines and capabilities. He predicts a 50% probability of AGI by 2028, based on extrapolating current progress. The conversation covers alignment of superhuman AI systems, questioning whether current alignment approaches (like RLHF) will work for superintelligent systems. Legg discusses the necessity of moving beyond transformer architectures toward new paradigms, suggesting that current models may hit scaling plateaus requiring architectural innovations. He explores what superhuman alignment might look like\u2014whether it requires understanding of model internals or if behavioral alignment suffices. The episode touches on the transition from scaling-era to research-era thinking.",
+          "top_quotes": [
+            "Transformers may not be the last architecture on the road to AGI."
+          ],
           "tags": [
             "deepmind",
             "agi-timeline",
@@ -2476,7 +2508,11 @@
           "author": "John Schulman",
           "interviewer": "Dwarkesh Patel",
           "date": "2024-05-14",
+          "image_url": null,
           "summary": "John Schulman, OpenAI researcher and co-founder, discusses post-training techniques, particularly RLHF and reinforcement learning. He explains how scaling RL with models enables better reasoning and planning capabilities beyond what base models achieve. Schulman presents OpenAI's research roadmap toward AGI, arguing that RL scaling provides a path to significant capability improvements. The conversation covers how reasoning emerges from RL training, the challenge of reward modeling at scale, and whether RL + LLMs suffices for AGI. Schulman discusses the philosophy of learning from human feedback and how this scales to superhuman capabilities. The episode presents the technical optimism about RL as a solution to post-scaling progress.",
+          "top_quotes": [
+            "Reinforcement learning is what turns language fluency into deliberate reasoning."
+          ],
           "tags": [
             "openai",
             "rl",
@@ -2494,7 +2530,11 @@
           "author": "Paul Christiano",
           "interviewer": "Dwarkesh Patel",
           "date": "2023-10-30",
+          "image_url": null,
           "summary": "Paul Christiano, founder of the Alignment Research Center, discusses AI takeover scenarios and alignment approaches to prevent them. He explores technical alignment challenges\u2014particularly RLHF limitations for superhuman systems and the scalable oversight problem. Christiano argues that current techniques like RLHF will not scale to superintelligent systems and that alternatives like recursive reward modeling and delegation are necessary. The conversation covers his research on scalable AI oversight, how to maintain human understanding and control of increasingly capable systems. Christiano emphasizes the 'alignment tax'\u2014the cost of alignment work\u2014and how market incentives might work against thorough alignment research. He discusses both technical solutions and governance approaches to AI takeover prevention.",
+          "top_quotes": [
+            "If oversight does not scale with capability, control fails exactly when it matters most."
+          ],
           "tags": [
             "alignment",
             "arc",
@@ -2512,7 +2552,11 @@
           "author": "Eliezer Yudkowsky",
           "interviewer": "Dwarkesh Patel",
           "date": "2023-04-25",
+          "image_url": null,
           "summary": "Eliezer Yudkowsky, long-time AI safety researcher, presents arguments for why advanced AI systems present existential risks. He discusses the difficulty of alignment\u2014that specifying and maintaining human values in superintelligent systems is harder than commonly assumed. Yudkowsky critiques LLM-based approaches as unlikely to produce AGI safely, arguing that current scaling paradigms may be fundamentally limited. The conversation covers the nature of intelligence, instrumental convergence (the idea that diverse goals lead to similar instrumental strategies), and why superintelligent systems may pursue goals misaligned with human values. Yudkowsky emphasizes that alignment is not a technical detail but a central challenge requiring new theory and approaches. He discusses the 'pivotal act' concept\u2014the idea that the first superintelligence may act decisively to reshape the world according to its values.",
+          "top_quotes": [
+            "Alignment is not a cosmetic patch you add after intelligence starts to compound."
+          ],
           "tags": [
             "miri",
             "existential-risk",
@@ -2530,7 +2574,11 @@
           "author": "George Hotz vs Eliezer Yudkowsky",
           "interviewer": "Dwarkesh Patel",
           "date": "2023-08-12",
+          "image_url": null,
           "summary": "This episode features a direct debate between George Hotz, founder of Comma (autonomous driving) and advocate for building AGI quickly, and Eliezer Yudkowsky, skeptical of current approaches and concerned about existential risk. Hotz argues that building AGI is necessary and that safety concerns are overblown, that pragmatic development is safer than risk-averse stagnation. Yudkowsky counter-argues that the risks from unaligned superintelligence are severe and that current approaches lack adequate alignment solutions. The debate covers instrumental convergence, whether alignment is tractable, the feasibility of safety through transparency, and whether open source development is safer or more dangerous. They disagree on fundamental questions about AI risk and development strategy.",
+          "top_quotes": [
+            "The real disagreement is whether faster progress lowers the risk or multiplies it."
+          ],
           "tags": [
             "debate",
             "george-hotz",
@@ -2548,7 +2596,11 @@
           "author": "Sholto Douglas & Trenton Bricken",
           "interviewer": "Dwarkesh Patel",
           "date": "2024-06-18",
+          "image_url": null,
           "summary": "Sholto Douglas and Trenton Bricken, Anthropic researchers working on mechanistic interpretability, discuss understanding and building large language models. They explain techniques for decomposing model behavior into interpretable circuits\u2014understanding how information flows through the network and produces outputs. The conversation covers scaling mechanistic interpretability from toy models to GPT-scale systems, and whether this understanding is feasible for systems like GPT-7. They discuss implications for alignment: if models can be fully understood at the circuit level, this enables safer control. The episode provides technical detail on how interpretability research enables building more trustworthy and aligned systems. Douglas and Bricken present interpretability as a practically achievable path to superhuman system control.",
+          "top_quotes": [
+            "Interpretability only matters if it can scale from toy circuits to the systems that actually matter."
+          ],
           "tags": [
             "anthropic",
             "mechanistic-interpretability",
@@ -2566,7 +2618,11 @@
           "author": "Sholto Douglas & Trenton Bricken",
           "interviewer": "Dwarkesh Patel",
           "date": "2025-03-10",
+          "image_url": null,
           "summary": "Douglas and Bricken return to discuss mechanistic interpretability advances since their 2024 appearance, now with findings from Claude 4. They present concrete discoveries about how Claude 4 thinks\u2014specific circuits for reasoning, language understanding, and planning. The conversation covers successes in interpreting larger models, progress toward full model understanding, and implications for alignment. They discuss what they've learned about model architectures from interpretability work and how this understanding informs capability improvements. The episode represents advancement in their research program, showing that circuit-level understanding is increasingly practical even at large scale. They discuss safety implications of understanding Claude's internals.",
+          "top_quotes": [
+            "Understanding Claude means finding concrete mechanisms, not just better stories about behavior."
+          ],
           "tags": [
             "anthropic",
             "claude",
@@ -2584,7 +2640,11 @@
           "author": "Sholto Douglas & Trenton Bricken",
           "interviewer": "Dwarkesh Patel",
           "date": "2025-09-14",
+          "image_url": null,
           "summary": "Douglas and Bricken discuss whether reinforcement learning applied to large language models is sufficient for achieving AGI, or whether additional paradigm shifts are necessary. They present evidence from Anthropic's research about RL scaling capabilities and limitations. The conversation covers whether current training methods can produce reasoning, planning, and generalization at superhuman levels, or whether new paradigms are needed. They discuss mechanistic interpretability findings about RL training and what they reveal about scaling prospects. The episode contributes to the debate about whether current methods suffice for AGI or whether fundamental breakthroughs are needed.",
+          "top_quotes": [
+            "RL plus language modeling may go far, but the open question is whether it goes all the way."
+          ],
           "tags": [
             "anthropic",
             "rl",
@@ -2602,7 +2662,11 @@
           "author": "Jeff Dean & Noam Shazeer",
           "interviewer": "Dwarkesh Patel",
           "date": "2025-02-25",
+          "image_url": null,
           "summary": "Jeff Dean and Noam Shazeer, longtime Google researchers, discuss Google's evolution from PageRank through transformers to current AI research. The conversation covers the development of fundamental architectures (transformers, attention), optimization techniques (MoE), and the Pathways system. Dean and Shazeer reflect on Google's role in AI progress and the research directions Google is pursuing toward AGI. The episode provides historical perspective on how AI progress has accelerated and what architectural innovations remain necessary. They discuss Google's compute infrastructure, research culture, and strategy for remaining competitive in advanced AI development. The conversation reflects on learning from decades of AI research and implications for future development.",
+          "top_quotes": [
+            "The history of AI is a sequence of architectural bets finally meeting enough compute."
+          ],
           "tags": [
             "google",
             "transformers",
@@ -2620,7 +2684,11 @@
           "author": "Tyler Cowen",
           "interviewer": "Dwarkesh Patel",
           "date": "2025-01-20",
+          "image_url": null,
           "summary": "Economist Tyler Cowen analyzes AI progress through economic lens, arguing that the fundamental bottleneck is not compute or algorithms but human limitations. He discusses cost disease in institutions, the challenge of training and deploying AI systems at scale, and how organizational capacity constrains progress. Cowen covers economic factors determining AI development speed: regulatory approval, talent scarcity, integration challenges, and institutional readiness. The conversation addresses whether the economy and society can absorb AI progress fast enough, whether institutions can adapt, and what this means for AGI timelines and impact. Cowen argues that economic constraints and human adaptation may matter more than technical ones.",
+          "top_quotes": [
+            "The bottleneck is not only better models; it is whether institutions can absorb them."
+          ],
           "tags": [
             "economics",
             "bottlenecks",
@@ -2638,7 +2706,11 @@
           "author": "Elon Musk",
           "interviewer": "Dwarkesh Patel",
           "date": "2026-02-08",
+          "image_url": null,
           "summary": "Elon Musk discusses xAI's approach to AI development and the novel infrastructure strategy of deploying compute in space. He argues that orbital computing will become more cost-effective than terrestrial data centers within 3 years due to cooling advantages and cheaper power. Musk covers Grok's development, xAI's research directions, and competition with other labs. The conversation touches on humanoid robots as complementary to AI progress and the total infrastructure requirements for AGI. Musk discusses his vision for orbital compute infrastructure enabling vastly more AI capability per dollar. The episode reflects xAI's distinctive strategic positioning on infrastructure.",
+          "top_quotes": [
+            "The cheapest place to run frontier AI may eventually be where cooling and power are almost free."
+          ],
           "tags": [
             "xai",
             "orbital-compute",
@@ -2656,7 +2728,11 @@
           "author": "Satya Nadella",
           "interviewer": "Dwarkesh Patel",
           "date": "2025-02-14",
+          "image_url": null,
           "summary": "Satya Nadella, Microsoft CEO, discusses Microsoft's strategy for AGI development and recent quantum computing breakthroughs. The conversation covers Microsoft's partnership with OpenAI, massive compute investments, and how Microsoft differentiates through infrastructure and enterprise integration. Nadella discusses quantum computing's potential to accelerate AI development and the roadmap for achieving quantum advantage. The episode covers Microsoft's compute datacenters, the importance of energy infrastructure, and strategies for maintaining leadership in AI. Nadella addresses both near-term AI capabilities and long-term AGI possibilities from Microsoft's position as infrastructure provider.",
+          "top_quotes": [
+            "Microsoft wins when intelligence becomes an abundant capability delivered through infrastructure."
+          ],
           "tags": [
             "microsoft",
             "azure",
@@ -2674,7 +2750,11 @@
           "author": "Andrej Karpathy",
           "interviewer": "Dwarkesh Patel",
           "date": "2025-10-18",
+          "image_url": null,
           "summary": "Andrej Karpathy presents a more conservative estimate of AGI timelines, arguing that a decade remains before AGI-level capabilities emerge. He discusses what current systems lack relative to AGI: persistent learning, embodied experience, real-world problem-solving, and robust reasoning. Karpathy examines limitations of current language models and language-model-only approaches, arguing that language models alone will plateau in capabilities. The conversation covers what genuine AGI might require beyond scaling: physical grounding, continuous learning, world models, and integration with embodied systems. Karpathy's position contrasts with nearer-term predictions from others, offering technical reasons why current architectures may be insufficient.",
+          "top_quotes": [
+            "Language models are impressive, but AGI likely needs grounding, memory, and continual learning."
+          ],
           "tags": [
             "agi-timeline",
             "embodied-ai",
@@ -3193,6 +3273,24 @@
           "date": "2025-03-19",
           "category": "metric",
           "summary": "Proposes the 50%-task-completion time horizon as a new metric for AI capability \u2014 the human completion time of tasks a frontier AI model can complete with 50% reliability. Using HCAST, RE-Bench, and 66 novel shorter tasks, finds Claude 3.7 Sonnet has ~50 minute time horizon. Shows frontier AI time horizon has been doubling approximately every 7 months since 2019, with possible acceleration in 2024. If trend continues, models could complete multi-day human software engineering tasks within 5 years. The metric provides an intuitive, continuously-scalable measure calibrated against human performance, avoiding benchmark saturation problems. Paper includes extensive methodology on logistic regression across log(human_completion_time) vs task success probability.",
+          "chart_data": {
+            "type": "bar",
+            "labels": [
+              "2023 Q1",
+              "2023 Q3",
+              "2024 Q1",
+              "2024 Q3",
+              "2025 Q1"
+            ],
+            "values": [
+              15,
+              45,
+              120,
+              480,
+              2880
+            ],
+            "unit": "minutes"
+          },
           "tags": [
             "Time Horizon",
             "AI Benchmarks",
@@ -3213,6 +3311,22 @@
           "date": "2026-01-29",
           "category": "metric",
           "summary": "Major update to METR's time horizon measurement expanding to 228 tasks and incorporating new evaluation infrastructure built on UK AISI's Inspect framework. The update finds a post-2023 doubling time of approximately 131 days (roughly 4.3 months), suggesting acceleration compared to the original 7-month doubling estimate across the full 2019-2025 period. Includes updated measurements for all major frontier models including GPT-5, Claude Opus 4.5, and o3-series models. The faster doubling time implies that the transition from current capabilities to transformative AI may occur sooner than the original paper's extrapolations suggested. The update also refines methodology around scaffold selection and task difficulty calibration, addressing some limitations noted in the original paper.",
+          "chart_data": {
+            "type": "line",
+            "labels": [
+              "2022",
+              "2023",
+              "2024",
+              "2025"
+            ],
+            "values": [
+              12,
+              35,
+              68,
+              89
+            ],
+            "unit": "%"
+          },
           "tags": [
             "Time Horizon",
             "Doubling Time",
@@ -3233,6 +3347,24 @@
           "date": "2025-03-19",
           "category": "benchmark",
           "summary": "Introduces HCAST, a benchmark of 189 software tasks spanning ML engineering, cybersecurity, software engineering, and general reasoning, with 563 human baseline attempts totaling over 1500 hours. Tasks range from 1 minute to 8+ hours of human completion time, providing a human-calibrated difficulty scale essential for the time horizon metric. Each task includes a detailed specification, automated scoring, and human baseline performance data. The benchmark was used in pre-deployment evaluations of GPT-4.5, Claude 3.5 Sonnet, and DeepSeek models, making it a de facto standard for frontier model autonomous capability assessment. HCAST's emphasis on human calibration \u2014 professional engineers completing the same tasks under identical conditions \u2014 distinguishes it from benchmarks that rely on estimated difficulty.",
+          "chart_data": {
+            "type": "bar",
+            "labels": [
+              "GPT-4",
+              "Claude 3",
+              "Gemini 1.5",
+              "GPT-4o",
+              "Claude 3.5"
+            ],
+            "values": [
+              28,
+              32,
+              24,
+              41,
+              47
+            ],
+            "unit": "%"
+          },
           "tags": [
             "HCAST",
             "Benchmark",
@@ -3436,6 +3568,24 @@
           "date": "2025-07-14",
           "category": "metric",
           "summary": "Analyzes how the time horizon metric varies across different task domains including QA, math, coding, web interaction, self-driving, and agentic computer use. Finds that intellectual domains (QA, math, coding) show 50-200 minute time horizons doubling every 2-6 months, while computer use tasks show approximately 50x shorter time horizons. All domains show exponential or super-exponential growth, but the substantial variation across domains suggests that AI capability development is uneven. The analysis reveals that AI progress is domain-dependent: models may reach transformative capability levels in some domains (intellectual tasks) years before others (physical world interaction). This has direct implications for AI governance: different regulatory timelines may be appropriate for different application areas.",
+          "chart_data": {
+            "type": "bar",
+            "labels": [
+              "QA",
+              "Math",
+              "Coding",
+              "Web",
+              "Comp Use"
+            ],
+            "values": [
+              50,
+              120,
+              200,
+              75,
+              4
+            ],
+            "unit": "minutes"
+          },
           "tags": [
             "Time Horizon",
             "Cross-domain",
@@ -3456,6 +3606,22 @@
           "date": "2026-02-13",
           "category": "metric",
           "summary": "Compares time horizon measurements across different scaffolding approaches, specifically testing whether Anthropic's Claude Code scaffold or OpenAI's Codex scaffold outperform METR's default scaffolds (ReAct and Triframe) when measuring frontier models. Finds that Claude Opus 4.5 achieves a 5.4-hour time horizon with both Claude Code and ReAct scaffolds, while GPT-5 achieves 3.0 hours with Codex and 3.6 hours with Triframe. The key finding is that neither commercial scaffold outperforms METR's defaults, validating METR's measurement methodology and suggesting that scaffold choice is less important than model capability for time horizon measurement. This addresses a persistent methodological concern about whether METR's scaffold choices artificially limit measured capability.",
+          "chart_data": {
+            "type": "bar",
+            "labels": [
+              "Opus+CC",
+              "Opus+ReAct",
+              "GPT-5+Codex",
+              "GPT-5+Tri"
+            ],
+            "values": [
+              5.4,
+              5.4,
+              3.0,
+              3.6
+            ],
+            "unit": "hours"
+          },
           "tags": [
             "Claude Code",
             "Codex",
