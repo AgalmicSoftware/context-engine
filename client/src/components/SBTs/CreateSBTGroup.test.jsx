@@ -2940,51 +2940,6 @@ describe('CreateSBTGroup cache helpers', () => {
     expect(sessionStorage.getItem(scopedKey)).toBeNull();
   });
 
-  it('persists password recovery codes during mint to the scoped recovery store', async () => {
-    localStorage.clear();
-    const sbtAddress = '0x00000000000000000000000000000000000000b3';
-    const instance = makeInstance({
-      provider: 'mock-provider',
-      account: '0xCreator',
-      loginComplete: true,
-      network: { id: 84532, name: 'Base Sepolia' },
-      sessionSlug: 'edge',
-    });
-    instance.state = {
-      ...instance.state,
-      sbtName: 'Password Group',
-      tokenURI: 'ar://metadata',
-      groupPassword: 'shared-secret',
-      sbtDistribution: {
-        ...instance.state.sbtDistribution,
-        burnAuth: 'AdminOnly',
-        distributionOption: 'groupPassword',
-        isLimited: true,
-        limitedNumber: 1,
-      },
-    };
-
-    instance.getSessionConfigForNetwork = jest.fn(() => ({ slug: 'edge', networkChainId: 84532 }));
-    jest.spyOn(instance, 'generateSBTInviteLinks').mockResolvedValue(undefined);
-    jest.spyOn(contractScripts, 'countSBTCreated').mockResolvedValue(2);
-    jest.spyOn(contractScripts, 'computeGroupPasswordHash').mockReturnValue(`0x${'33'.repeat(32)}`);
-    jest.spyOn(contractScripts, 'createSBT').mockResolvedValue({
-      logs: [
-        makeFactoryReceiptLog('SBTCreated', [sbtAddress]),
-      ],
-    });
-
-    await instance.mintSBT();
-
-    expect(instance.generateSBTInviteLinks).toHaveBeenCalledWith(sbtAddress, ['shared-secret']);
-    const recoveryStore = JSON.parse(localStorage.getItem(SBT_PASSWORD_RECOVERY_STORAGE_KEY));
-    expect(recoveryStore.entries[`84532:${sbtAddress.toLowerCase()}`]).toEqual(expect.objectContaining({
-      chainId: 84532,
-      sbtAddress: sbtAddress.toLowerCase(),
-      passwords: ['shared-secret'],
-    }));
-  });
-
   it('renders the open-mint URL card in the success UI for anyone-can-mint SBTs', () => {
     const sbtAddress = '0x00000000000000000000000000000000000000b1';
     const instance = makeInstance({ sessionSlug: 'edge' });

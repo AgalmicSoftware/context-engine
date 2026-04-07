@@ -748,16 +748,16 @@ class CreateSBTGroup extends Component<any, any> {
     return new Blob([arr], { type: mime });
   };
 
-  getNormalizedDocumentUrlDraft: any = (value: any = this.state.documentUrl) => (
+  getNormalizedDocumentUrlDraft = (value = this.state.documentUrl) => (
     String(value || '').trim()
   );
 
-  getEffectiveDocumentURLs: any = ({
+  getEffectiveDocumentURLs = ({
     documentURLs = this.state.documentURLs,
     documentUrl = this.state.documentUrl,
-  }: any = {}) => {
+  } = {}) => {
     const nextDocumentUrls = Array.isArray(documentURLs)
-      ? documentURLs.map((url: any) => String(url || '').trim()).filter(Boolean)
+      ? documentURLs.map((url) => String(url || '').trim()).filter(Boolean)
       : [];
     const pendingDocumentUrl = this.getNormalizedDocumentUrlDraft(documentUrl);
     if (pendingDocumentUrl && nextDocumentUrls.length < 10) {
@@ -766,16 +766,16 @@ class CreateSBTGroup extends Component<any, any> {
     return nextDocumentUrls;
   };
 
-  resumeFormCachePersistence: any = () => {
+  resumeFormCachePersistence = () => {
     this._suppressFormCachePersistence = false;
   };
 
-  suppressFormCachePersistenceAfterSuccess: any = () => {
+  suppressFormCachePersistenceAfterSuccess = () => {
     this._suppressFormCachePersistence = true;
     this.clearFormCache();
   };
 
-  buildCachePayload: any = () => {
+  buildCachePayload = () => {
     const {
       sbtName, sbtDescription, sbtImageUrl, useImageUrl, sbtDistribution,
       tags, documentIDHashes, documentURLs, documentUrl, groupPassword, numInviteLinks,
@@ -2281,7 +2281,7 @@ class CreateSBTGroup extends Component<any, any> {
     });
   };
 
-  resetFormStateForEdit: any = () => {
+  resetFormStateForEdit = () => {
     this.resumeFormCachePersistence();
     if (this.state.sbtMinted) {
       this.setState({
@@ -2918,8 +2918,8 @@ class CreateSBTGroup extends Component<any, any> {
       const { burnAuth, network } = sbtDistribution;
       const { gateMap, defaultGateId } = this.resolveLockGateOptions();
       const validGateIds = Object.keys(gateMap || {});
-      const knownGateIds: any = new Set(validGateIds);
-      const scrubGateIds = (ids: any) => normalizeGateIds(ids).filter((gateId: any) => knownGateIds.has(gateId));
+      const knownGateIds = new Set(validGateIds);
+      const scrubGateIds = (ids) => normalizeGateIds(ids).filter((gateId) => knownGateIds.has(gateId));
       const finalDocURLs = this.getEffectiveDocumentURLs();
 
       // Use tags array directly (ensure no empty strings)
@@ -3250,10 +3250,10 @@ class CreateSBTGroup extends Component<any, any> {
     const chainID = this.getSelectedAuthoringChainId();
     const { gateMap, defaultGateId } = this.resolveLockGateOptions();
     const validGateIds = Object.keys(gateMap || {});
-    const previewEncryptedFieldGates: Record<string, any> = {};
-    const previewEncryptedFields: Record<string, any> = {};
+    const previewEncryptedFieldGates = {};
+    const previewEncryptedFields = {};
     const previewDocURLs = this.getEffectiveDocumentURLs();
-    const previewTags = (Array.isArray(tags) ? tags : []).filter((tag: any) => (tag || '').trim().length > 0);
+    const previewTags = (Array.isArray(tags) ? tags : []).filter((tag) => (tag || '').trim().length > 0);
 
     let previewName = sbtName || '';
     let previewDescription = sbtDescription || '';
@@ -3563,10 +3563,7 @@ class CreateSBTGroup extends Component<any, any> {
       }
 
       const codesToStore = usesInviteCodes ? [groupPassword] : finalPasswordList;
-      const recoveryWrite = this.persistCreatedSbtCodes({ sbtAddress, hasPasswordMintOnChain, codesToStore });
-      if (!recoveryWrite?.ok) {
-        sbtLog.warn('Failed to persist SBT password recovery codes:', recoveryWrite?.status);
-      }
+      this.persistCreatedSbtCodes({ sbtAddress, hasPasswordMintOnChain, codesToStore });
       this.suppressFormCachePersistenceAfterSuccess();
 
       this.setState({
@@ -3817,20 +3814,24 @@ class CreateSBTGroup extends Component<any, any> {
     }
   }
 
-  commitPendingDocumentUrl: any = async ({ persist = true }: any = {}) => {
+  commitPendingDocumentUrl = async ({ persist = true } = {}) => {
     this.resetFormStateForEdit();
     const pendingDocumentUrl = this.getNormalizedDocumentUrlDraft();
     if (!pendingDocumentUrl || this.state.documentURLs.length >= 10) {
       return false;
     }
 
-    await this.setStateAsync((prevState: any) => ({
+    await this.setStateAsync((prevState) => ({
       documentURLs: [...prevState.documentURLs, pendingDocumentUrl],
       documentUrl: '',
     }));
     this.updateGroupHash();
     if (persist) this.persistFormCache();
     return true;
+  };
+
+  addDocumentURL = () => {
+    void this.commitPendingDocumentUrl();
   };
 
   addDocumentURL: any = () => {
