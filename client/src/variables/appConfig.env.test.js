@@ -19,6 +19,9 @@ const ENV_KEYS = [
   'REACT_APP_SERVER',
   'REACT_APP_ARWEAVE_GATEWAY_URL',
   'REACT_APP_CE_ARWEAVE_DIRECT_TO_AR_IO',
+  'REACT_APP_CE_ARWEAVE_PREFLIGHT_SESSION_METADATA',
+  'REACT_APP_CE_ARWEAVE_PREFLIGHT_SBT_METADATA',
+  'REACT_APP_CE_ARWEAVE_PREFLIGHT_RESPONSE_PAYLOADS',
   'REACT_APP_DEFAULT_CHAIN_ID',
   'REACT_APP_TESTNET_AUTO_SEND_THRESHOLD_ETH',
   'REACT_APP_CE_SHARED_WORKER_URL',
@@ -55,6 +58,9 @@ const RUNTIME_GLOBAL_KEYS = [
   'CE_SESSION_SCAN_RESOLVE_DEMO_SESSION_ALIASES',
   'CE_ARWEAVE_DIRECT_TO_AR_IO',
   'CE_ARWEAVE_AR_IO_URL',
+  'CE_ARWEAVE_PREFLIGHT_SESSION_METADATA',
+  'CE_ARWEAVE_PREFLIGHT_SBT_METADATA',
+  'CE_ARWEAVE_PREFLIGHT_RESPONSE_PAYLOADS',
 ];
 
 const ORIGINAL_ENV = ENV_KEYS.reduce((acc, key) => {
@@ -121,6 +127,9 @@ describe('appConfig env-backed config', () => {
     process.env.REACT_APP_SERVER = 'https://api.example.test';
     process.env.REACT_APP_ARWEAVE_GATEWAY_URL = 'https://gateway.example.test';
     process.env.REACT_APP_CE_ARWEAVE_DIRECT_TO_AR_IO = 'false';
+    process.env.REACT_APP_CE_ARWEAVE_PREFLIGHT_SESSION_METADATA = 'true';
+    process.env.REACT_APP_CE_ARWEAVE_PREFLIGHT_SBT_METADATA = 'true';
+    process.env.REACT_APP_CE_ARWEAVE_PREFLIGHT_RESPONSE_PAYLOADS = 'false';
     process.env.REACT_APP_DEFAULT_CHAIN_ID = '31337';
     process.env.REACT_APP_TESTNET_AUTO_SEND_THRESHOLD_ETH = '0.005';
     process.env.REACT_APP_CE_SHARED_WORKER_URL = 'https://shared.example.test/';
@@ -150,6 +159,9 @@ describe('appConfig env-backed config', () => {
       expect(config.SERVER).toBe('https://api.example.test');
       expect(config.ARWEAVE_GATEWAY_URL).toBe('https://gateway.example.test');
       expect(config.CE_ARWEAVE_DIRECT_TO_AR_IO).toBe(false);
+      expect(config.CE_ARWEAVE_PREFLIGHT_SESSION_METADATA).toBe(true);
+      expect(config.CE_ARWEAVE_PREFLIGHT_SBT_METADATA).toBe(true);
+      expect(config.CE_ARWEAVE_PREFLIGHT_RESPONSE_PAYLOADS).toBe(false);
       expect(config.DEFAULT_CHAIN_ID).toBe(31337);
       expect(config.TESTNET_AUTO_SEND_THRESHOLD_ETH).toBe('0.005');
       expect(config.CLOUDFLARE_CORS_WORKER_URL).toBe('https://shared.example.test/');
@@ -174,7 +186,10 @@ describe('appConfig env-backed config', () => {
 
       expect(config.DEFAULT_CHAIN_ID).toBe(11155420);
       expect(config.CE_SESSION_SCAN_SCOPE).toBe('list');
-      expect(config.CE_SESSION_SCAN_SLUGS).toEqual([]);
+      expect(config.CE_SESSION_SCAN_SLUGS).toEqual(['demo']);
+      expect(config.CE_ARWEAVE_PREFLIGHT_SESSION_METADATA).toBe(false);
+      expect(config.CE_ARWEAVE_PREFLIGHT_SBT_METADATA).toBe(false);
+      expect(config.CE_ARWEAVE_PREFLIGHT_RESPONSE_PAYLOADS).toBe(true);
     });
   });
 });
