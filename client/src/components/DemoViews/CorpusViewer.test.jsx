@@ -94,6 +94,16 @@ describe('CorpusViewer', () => {
     expect(screen.queryByRole('link', { name: 'Exponential Progress Debate' })).not.toBeInTheDocument();
   });
 
+  it('hides the standalone GitHub corpus link when embedded in another header', () => {
+    render(
+      <MemoryRouter>
+        <CorpusViewer showGithubLink={false} />
+      </MemoryRouter>
+    );
+
+    expect(screen.queryByRole('link', { name: /Full corpus on GitHub/i })).not.toBeInTheDocument();
+  });
+
   it('renders arxiv entries with the arxiv-specific card layout', () => {
     render(
       <MemoryRouter>

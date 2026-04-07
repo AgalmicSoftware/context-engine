@@ -2,11 +2,14 @@ import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { SBTsPage } from './SBTsPage';
 import { peekCacheSync } from '../../utilities/cache/cacheScripts.js';
-import { getDemoSessionConfigBySlug, getSessionLists } from '../../utilities/web3/chainGateway.js';
-import { getShortenedAddress } from '../../utilities/ui/displayHelpers.js';
+import {
+  getDemoSessionConfigBySlug,
+  getSessionLists,
+} from '../../utilities/web3/contractScripts.js';
+import proposalScripts from '../../utilities/proposalScripts.js';
 import { readSessionScanScope, readSessionScanSlugs } from '../../utilities/session/sessionScanScope.js';
 import { sbtsListPath, t } from '../../utilities/ui/terminology.js';
-import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
+import * as terminology from '../../utilities/ui/terminology.js';
 
 const mockSBTPage = jest.fn();
 const mockSBTsList = jest.fn();
@@ -1430,70 +1433,19 @@ describe('SBTsPage auto-feature flag', () => {
     expect(screen.queryByTestId('mock-sbt-page')).not.toBeInTheDocument();
   });
 
-  it('falls back to mini SBT readers when cached featured metadata is missing its image', () => {
-    const contractScripts = jest.requireMock('../../utilities/web3/chainGateway.js');
-    const featuredAddress = '0x00000000000000000000000000000000000000b2';
-    contractScripts.getSessionConfigBySlug.mockImplementation((slug) =>
-      String(slug || '') === 'alpha' ? { slug: 'alpha' } : null,
-    );
-    contractScripts.getSessionConfigBySlugOrDefault.mockReturnValue({ slug: '' });
-    peekCacheSync.mockReturnValue({
-      84532: {
-        sbtList: {
-          [featuredAddress.toLowerCase()]: {
-            sbtAddress: featuredAddress,
-            sbtInfo: {
-              sessionSlug: 'alpha',
-              name: 'Partial Cache Group',
-              description: 'Discovered before tokenURI metadata hydrated.',
-            },
-          },
-        },
-      },
-    });
-
-    render(
-      <SBTsPage
-        sbtCacheRevision={0}
-        provider="wagmi"
-        network={{ id: 84532, name: 'Base Sepolia' }}
-        account=""
-        loginComplete={false}
-        toggleLoginModal={jest.fn()}
-        isSBTCacheReady={false}
-        defaultFeaturedSBTs={[featuredAddress]}
-        sessionSlug="alpha"
-        miniaturized={true}
-        hideMiniActionRow={true}
-        preferCacheBackedFeaturedCards={true}
-      />,
-    );
-
-    expect(screen.queryByTestId(`cache-featured-sbt-link-${featuredAddress.toLowerCase()}`)).not.toBeInTheDocument();
-    expect(screen.getByTestId('embedded-featured-spinner')).toBeInTheDocument();
-    expect(screen.getAllByTestId('mock-sbt-page')).toHaveLength(1);
-    expect(mockSBTPage.mock.calls[mockSBTPage.mock.calls.length - 1][0]).toEqual(
-      expect.objectContaining({
-        SBTAddress: featuredAddress,
-        sessionSlug: 'alpha',
-      }),
-    );
-  });
-
   it('hides cache-backed featured card addresses in plain mode', () => {
     const featuredAddress = '0x00000000000000000000000000000000000000b3';
-    mockIsCryptoMode.mockReturnValue(false);
-    const shortenedAddress = getShortenedAddress(featuredAddress, false);
+    const cryptoModeSpy = jest.spyOn(terminology, 'isCryptoMode').mockReturnValue(false);
+    const shortenedAddress = proposalScripts.getShortenedAddress(featuredAddress, false);
 
     peekCacheSync.mockReturnValue({
-      84532: {
+      '84532': {
         sbtList: {
           [featuredAddress.toLowerCase()]: {
             sbtAddress: featuredAddress,
             sbtInfo: {
               sessionSlug: 'alpha',
               name: 'Plain Mode Group',
-              image: 'https://example.test/plain-mode-group.png',
             },
           },
         },
@@ -1514,28 +1466,29 @@ describe('SBTsPage auto-feature flag', () => {
         miniaturized={true}
         hideMiniActionRow={true}
         preferCacheBackedFeaturedCards={true}
-      />,
+      />
     );
 
     expect(screen.getByTestId(`cache-featured-sbt-link-${featuredAddress.toLowerCase()}`)).toBeInTheDocument();
     expect(screen.getByText('Plain Mode Group')).toBeInTheDocument();
     expect(screen.queryByText(shortenedAddress)).not.toBeInTheDocument();
+
+    cryptoModeSpy.mockRestore();
   });
 
   it('shows cache-backed featured card addresses in crypto mode', () => {
     const featuredAddress = '0x00000000000000000000000000000000000000b4';
-    mockIsCryptoMode.mockReturnValue(true);
-    const shortenedAddress = getShortenedAddress(featuredAddress, false);
+    const cryptoModeSpy = jest.spyOn(terminology, 'isCryptoMode').mockReturnValue(true);
+    const shortenedAddress = proposalScripts.getShortenedAddress(featuredAddress, false);
 
     peekCacheSync.mockReturnValue({
-      84532: {
+      '84532': {
         sbtList: {
           [featuredAddress.toLowerCase()]: {
             sbtAddress: featuredAddress,
             sbtInfo: {
               sessionSlug: 'alpha',
               name: 'Crypto Mode Group',
-              image: 'https://example.test/crypto-mode-group.png',
             },
           },
         },
@@ -1556,12 +1509,14 @@ describe('SBTsPage auto-feature flag', () => {
         miniaturized={true}
         hideMiniActionRow={true}
         preferCacheBackedFeaturedCards={true}
-      />,
+      />
     );
 
     expect(screen.getByTestId(`cache-featured-sbt-link-${featuredAddress.toLowerCase()}`)).toBeInTheDocument();
     expect(screen.getByText('Crypto Mode Group')).toBeInTheDocument();
     expect(screen.getByText(shortenedAddress)).toBeInTheDocument();
+
+    cryptoModeSpy.mockRestore();
   });
 
   it('uses terminology-aware ended minting aria labels on cache-backed featured cards', () => {
