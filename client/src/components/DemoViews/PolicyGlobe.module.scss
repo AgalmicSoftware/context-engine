@@ -259,6 +259,23 @@
     width: 168px;
   }
 
+  .filterRow {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  .filterButton {
+    justify-content: center;
+    min-height: 42px;
+    min-width: 0;
+    padding: 8px 10px;
+  }
+
+  .policyTitleRow {
+    align-items: flex-start;
+  }
+
   .policyBadgeRow {
     align-items: flex-start;
   }
