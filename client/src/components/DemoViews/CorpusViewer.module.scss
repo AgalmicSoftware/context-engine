@@ -1,0 +1,758 @@
+$accent: #4dffa4;
+$card: rgba(255, 255, 255, 0.04);
+$card-border: rgba(255, 255, 255, 0.08);
+$muted: rgba(244, 247, 255, 0.65);
+$surface: rgba(255, 255, 255, 0.06);
+$text: #f4f7ff;
+
+.container {
+  background: $surface;
+  border: 1px solid $card-border;
+  border-radius: var(--ce-radius-12);
+  color: $text;
+  padding: 16px;
+}
+
+.tabBar {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 16px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  border-bottom: 1px solid $card-border;
+}
+
+.tabButton {
+  align-items: center;
+  background: transparent;
+  border: none;
+  border-bottom: 3px solid transparent;
+  border-radius: var(--ce-radius-8) var(--ce-radius-8) 0 0;
+  color: $text;
+  cursor: pointer;
+  display: inline-flex;
+  flex-shrink: 0;
+  gap: 8px;
+  opacity: 0.55;
+  padding: 10px 14px 12px;
+  transition: opacity 0.15s ease, background 0.15s ease;
+}
+
+.tabButton:hover {
+  background: rgba(255, 255, 255, 0.04);
+  opacity: 0.85;
+}
+
+.tabButtonActive {
+  background: rgba(77, 255, 164, 0.06);
+  border-bottom-color: $accent;
+  opacity: 1;
+}
+
+.tabIcon {
+  color: $muted;
+  font-size: 16px;
+}
+
+.tabIconActive {
+  color: $accent;
+}
+
+.tabLabel {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+.sectionBlock {
+  margin-bottom: 12px;
+}
+
+.sectionHeader {
+  display: none;
+}
+
+.sectionIcon {
+  display: none;
+}
+
+.corpusLabel {
+  display: none;
+}
+
+.githubLink {
+  align-items: center;
+  color: $muted;
+  display: inline-flex;
+  font-size: 12px;
+  gap: 6px;
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+.githubLink:hover {
+  color: $accent;
+}
+
+.githubLinkIcon {
+  font-size: 12px;
+}
+
+.scrollArea {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 560px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.card {
+  background: $card;
+  border: 1px solid $card-border;
+  border-radius: var(--ce-radius-8);
+  color: $text;
+  display: block;
+  padding: 16px;
+}
+
+.tweetCard {
+  background: rgba(21, 32, 43, 0.97);
+  border-color: rgba(56, 68, 77, 0.6);
+  border-radius: 16px;
+  padding: 16px 18px;
+}
+
+.insiderCard {
+  background: linear-gradient(180deg, rgba(24, 33, 56, 0.94) 0%, rgba(18, 25, 43, 0.94) 100%);
+  border-color: rgba(77, 255, 164, 0.18);
+  border-radius: 12px;
+}
+
+.arxivCard {
+  background: rgba(18, 25, 46, 0.92);
+  border-color: rgba(122, 140, 255, 0.2);
+}
+
+.metrCard {
+  background: linear-gradient(180deg, rgba(18, 28, 49, 0.96) 0%, rgba(15, 22, 37, 0.96) 100%);
+  border-color: rgba(77, 255, 164, 0.16);
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.25);
+}
+
+.chartBlock {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 12px;
+}
+
+.chartContainer {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 4px;
+  max-height: 120px;
+}
+
+.chartTitle {
+  color: $muted;
+  font-size: 12px;
+  line-height: 1;
+  margin-bottom: 8px;
+}
+
+.barChart {
+  align-items: flex-end;
+  display: flex;
+  gap: 4px;
+  height: 100px;
+}
+
+.chartSlot {
+  align-items: flex-end;
+  display: flex;
+  flex: 1 1 0;
+  min-width: 24px;
+}
+
+.bar {
+  background: linear-gradient(180deg, rgba(77, 255, 164, 0.96) 0%, rgba(27, 191, 128, 0.88) 100%);
+  border-radius: 10px 10px 0 0;
+  min-width: 24px;
+  transition: height 0.24s ease;
+  width: 100%;
+}
+
+.chartLabels {
+  display: flex;
+  gap: 4px;
+}
+
+.barLabel {
+  color: $muted;
+  flex: 1 1 0;
+  font-size: 10px;
+  line-height: 1.2;
+  min-width: 24px;
+  text-align: center;
+}
+
+.lineChart {
+  height: 100px;
+  width: 100%;
+}
+
+.lineChart svg {
+  display: block;
+  height: 100%;
+  overflow: visible;
+  width: 100%;
+}
+
+.linePath {
+  fill: rgba(77, 255, 164, 0.12);
+  stroke: $accent;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2.5;
+}
+
+.linePoint {
+  fill: $accent;
+  stroke: rgba(15, 22, 37, 0.95);
+  stroke-width: 1.5;
+}
+
+.pill {
+  background: rgba(77, 255, 164, 0.1);
+  border-radius: var(--ce-radius-12);
+  color: $accent;
+  display: inline-flex;
+  font-size: 11px;
+  line-height: 1.4;
+  padding: 2px 8px;
+}
+
+.pillButton {
+  appearance: none;
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+  transition:
+    background 0.18s ease,
+    color 0.18s ease,
+    transform 0.18s ease;
+}
+
+.pillButton:hover {
+  background: rgba(77, 255, 164, 0.18);
+  color: #b7ffd9;
+  transform: translateY(-1px);
+}
+
+.pillButton:focus-visible {
+  outline: 2px solid rgba(77, 255, 164, 0.4);
+  outline-offset: 2px;
+}
+
+.pillRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tweetTags {
+  margin-bottom: 12px;
+}
+
+.tweetAvatar {
+  align-items: center;
+  background: linear-gradient(135deg, #1d9bf0 0%, #1a73c7 100%);
+  border-radius: 50%;
+  color: #fff;
+  display: inline-flex;
+  flex: 0 0 48px;
+  font-size: 18px;
+  font-weight: 700;
+  height: 48px;
+  justify-content: center;
+  width: 48px;
+}
+
+// Hidden until better portrait display is designed
+.insiderPortrait {
+  display: none;
+}
+
+.tweetAuthorRow {
+  align-items: flex-start;
+  display: flex;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.tweetAuthorMeta {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.tweetAuthorNames {
+  align-items: baseline;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+.tweetHandle {
+  color: rgba(139, 152, 165, 0.85);
+  font-size: 14px;
+  font-weight: 400;
+}
+
+.tweetName {
+  color: $text;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.tweetSeparator {
+  color: rgba(139, 152, 165, 0.5);
+  font-size: 13px;
+}
+
+.tweetBody {
+  color: $text;
+  font-size: 15px;
+  line-height: 1.55;
+  margin-bottom: 12px;
+  overflow: hidden;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.tweetBodyClamped {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 6;
+}
+
+.tweetReadMore {
+  background: none;
+  border: none;
+  color: #1d9bf0;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 8px;
+  padding: 0;
+}
+
+.tweetReadMore:hover {
+  text-decoration: underline;
+}
+
+.tweetEngagementIcon {
+  align-items: center;
+  color: rgba(139, 152, 165, 0.85);
+  display: inline-flex;
+  font-size: 13px;
+  gap: 6px;
+  transition: color 0.15s ease;
+}
+
+.tweetEngagementIcon:hover {
+  color: #1d9bf0;
+}
+
+.tweetDate {
+  color: rgba(139, 152, 165, 0.85);
+  font-size: 13px;
+  margin-left: auto;
+  padding-top: 2px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.clamp3 {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+
+.sentimentBadge {
+  border-radius: var(--ce-radius-pill);
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  text-transform: capitalize;
+}
+
+.sentimentOptimistic {
+  background: rgba(77, 255, 164, 0.14);
+  color: $accent;
+}
+
+.sentimentSkeptical {
+  background: rgba(255, 179, 71, 0.14);
+  color: #ffb347;
+}
+
+.sentimentAlarmist {
+  background: rgba(255, 107, 203, 0.14);
+  color: #ff6bcb;
+}
+
+.sentimentNeutral {
+  background: rgba(255, 255, 255, 0.1);
+  color: $muted;
+}
+
+.entryHeader {
+  align-items: flex-start;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.entryHeaderContent {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.tweetEngagement {
+  align-items: center;
+  border-top: 1px solid rgba(56, 68, 77, 0.4);
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 13px;
+  gap: 16px;
+  justify-content: space-between;
+  margin-top: 12px;
+  padding-top: 12px;
+}
+
+.engagementRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.entryTitle {
+  color: $text;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.4;
+  margin-bottom: 6px;
+}
+
+.insiderName {
+  color: $text;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.3;
+  margin-bottom: 4px;
+}
+
+.insiderRole {
+  color: $muted;
+  font-size: 14px;
+  line-height: 1.5;
+  margin-bottom: 4px;
+}
+
+.insiderInterviewer {
+  color: $muted;
+  font-size: 13px;
+  font-style: italic;
+  line-height: 1.5;
+}
+
+// Hidden until better display is designed
+.insiderQuote {
+  display: none;
+}
+
+.insiderQuoteMark {
+  display: none;
+}
+
+.insiderExpandBtn {
+  background: transparent;
+  border: none;
+  color: $accent;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  margin-top: 14px;
+  padding: 0;
+}
+
+.insiderExpandBtn:hover {
+  color: #8dffca;
+}
+
+.insiderExpandBtn:focus-visible {
+  color: #8dffca;
+  outline: 2px solid rgba(77, 255, 164, 0.35);
+  outline-offset: 4px;
+}
+
+.insiderDetails {
+  background: rgba(255, 255, 255, 0.03);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+  padding-top: 12px;
+}
+
+.arxivMetaTop {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.arxivId {
+  color: rgba(244, 247, 255, 0.56);
+  font-family: var(--ce-font-mono, SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace);
+  font-size: 12px;
+}
+
+.arxivCategory {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: var(--ce-radius-pill);
+  color: rgba(244, 247, 255, 0.72);
+  display: inline-flex;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.3;
+  padding: 3px 8px;
+}
+
+.arxivCategory[data-category='cs.AI'] {
+  background: rgba(91, 140, 255, 0.16);
+  border-color: rgba(91, 140, 255, 0.32);
+  color: #a8c0ff;
+}
+
+.arxivCategory[data-category='cs.LG'] {
+  background: rgba(182, 104, 255, 0.16);
+  border-color: rgba(182, 104, 255, 0.32);
+  color: #ddb2ff;
+}
+
+.arxivTitle {
+  color: $text;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.4;
+  margin-bottom: 8px;
+}
+
+.arxivMetaRow {
+  align-items: baseline;
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+  min-width: 0;
+}
+
+.arxivAuthors {
+  color: $muted;
+  flex: 1 1 auto;
+  font-size: 13px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.arxivDate {
+  color: $muted;
+  flex-shrink: 0;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.entryMeta {
+  color: $muted;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.jurisdictionBadge {
+  flex-shrink: 0;
+}
+
+.entrySummary {
+  color: $muted;
+  font-size: 14px;
+  line-height: 1.6;
+  margin-bottom: 12px;
+}
+
+.entrySourceRow {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 14px;
+}
+
+.emptyState {
+  align-items: center;
+  background: $card;
+  border: 1px dashed $card-border;
+  border-radius: var(--ce-radius-8);
+  color: $muted;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  justify-content: center;
+  min-height: 220px;
+  padding: 24px;
+  text-align: center;
+}
+
+.emptyStateIcon {
+  color: $accent;
+  font-size: 20px;
+}
+
+.emptyStateTitle {
+  color: $text;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.emptyStateText {
+  font-size: 13px;
+  line-height: 1.6;
+  max-width: 420px;
+}
+
+.debateMapSection {
+  background: rgba(8, 16, 42, 0.45);
+  border: 1px solid rgba(77, 255, 164, 0.18);
+  border-radius: 10px;
+  margin-top: 14px;
+  padding: 12px 12px 10px;
+}
+
+.tagModal {
+  max-width: min(1180px, calc(100vw - 32px));
+  margin: 24px auto;
+}
+
+.tagModal :global(.modal-content) {
+  background:
+    radial-gradient(circle at top right, rgba(77, 255, 164, 0.08), transparent 32%),
+    linear-gradient(180deg, rgba(12, 18, 34, 0.98), rgba(8, 12, 24, 0.98));
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 18px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+  color: $text;
+  overflow: hidden;
+}
+
+.tagModal :global(.modal-header) {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  color: $text;
+  padding: 18px 20px;
+}
+
+.tagModal :global(.modal-title) {
+  color: $text;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.tagModal :global(.modal-body) {
+  background: transparent;
+  padding: 20px;
+}
+
+.tagModal :global(.close) {
+  color: $text;
+  opacity: 0.72;
+  text-shadow: none;
+}
+
+.tagModal :global(.close:hover),
+.tagModal :global(.close:focus) {
+  color: $accent;
+  opacity: 1;
+}
+
+.debateMapHeader {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.debateMapIcon {
+  color: $accent;
+  font-size: 12px;
+}
+
+.debateMapLabel {
+  color: $text;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.debateMapLinks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.debateMapLink {
+  align-items: center;
+  background: rgba(77, 255, 164, 0.12);
+  border: 1px solid rgba(77, 255, 164, 0.22);
+  border-radius: var(--ce-radius-pill);
+  color: $text;
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 600;
+  gap: 6px;
+  line-height: 1.4;
+  padding: 6px 10px;
+  text-decoration: none;
+}
+
+.debateMapEmpty {
+  color: $muted;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.externalLink {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid $card-border;
+  border-radius: var(--ce-radius-pill);
+  color: $text;
+  display: inline-flex;
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 600;
+  gap: 6px;
+  padding: 8px 12px;
+  text-decoration: none;
+}

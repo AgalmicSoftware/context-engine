@@ -377,6 +377,10 @@ export const TagPageView = ({
   network = null,
   questionResponsesNonce = 0,
   sessionState = {},
+  selectedTagsOverride = null,
+  onSelectedTagsChange = null,
+  emptyQuestionsText = 'No questions found.',
+  embedded = false,
 }) => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -430,10 +434,19 @@ export const TagPageView = ({
     setSessionSelectorOpen(false);
   }, [location.pathname, location.search]);
 
-  const selectedTags = useMemo(
+  const routeSelectedTags = useMemo(
     () => parseTagPath(location.pathname),
     [location.pathname]
   );
+  const hasSelectedTagsOverride = selectedTagsOverride !== null && typeof selectedTagsOverride !== 'undefined';
+  const selectedTags = useMemo(() => {
+    if (!hasSelectedTagsOverride) return routeSelectedTags;
+
+    const overrideTags = Array.isArray(selectedTagsOverride)
+      ? selectedTagsOverride
+      : [selectedTagsOverride];
+    return getQuestionTagDisplayList(overrideTags);
+  }, [hasSelectedTagsOverride, routeSelectedTags, selectedTagsOverride]);
   const normalizedSelectedTags = useMemo(
     () => normalizeTagList(selectedTags),
     [selectedTags]
@@ -608,7 +621,14 @@ export const TagPageView = ({
       return false;
     }
 
-    navigate(`${buildTagPagePath([...selectedTags, displayTag])}${location.search || ''}`);
+    const nextTags = [...selectedTags, displayTag];
+    if (hasSelectedTagsOverride) {
+      if (typeof onSelectedTagsChange === 'function') {
+        onSelectedTagsChange(nextTags);
+      }
+    } else {
+      navigate(`${buildTagPagePath(nextTags)}${location.search || ''}`);
+    }
     setTagPickerOpen(false);
     return true;
   };
@@ -619,6 +639,13 @@ export const TagPageView = ({
       const normalizedCurrent = normalizeTagList([tag])[0];
       return normalizedCurrent !== normalizedTarget;
     });
+
+    if (hasSelectedTagsOverride) {
+      if (typeof onSelectedTagsChange === 'function') {
+        onSelectedTagsChange(remainingTags);
+      }
+      return;
+    }
 
     navigate(`${buildTagPagePath(remainingTags)}${location.search || ''}`);
   };
@@ -681,8 +708,8 @@ export const TagPageView = ({
   };
 
   return (
-    <div className={styles.page}>
-      <div className={styles.shell}>
+    <div className={[styles.page, embedded ? styles.pageEmbedded : ''].filter(Boolean).join(' ')}>
+      <div className={[styles.shell, embedded ? styles.shellEmbedded : ''].filter(Boolean).join(' ')}>
         <header className={styles.header}>
           <div className={styles.headerTopRow}>
             <div className={styles.headerLead}>
@@ -865,7 +892,7 @@ export const TagPageView = ({
               Loading questions...
             </p>
           ) : (
-            <p className={styles.emptyState}>No questions found.</p>
+            <p className={styles.emptyState}>{emptyQuestionsText}</p>
           )}
         </section>
 

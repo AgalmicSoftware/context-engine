@@ -69,10 +69,15 @@ const renderTagPage = ({
   entry = '/tag/governance',
   isQuestionCacheReady = true,
   sessionState = {},
+  tagPageProps = {},
 } = {}) => render(
   <Provider store={createTagPageStore(sessionState)}>
     <MemoryRouter initialEntries={[entry]}>
-      <TagPage questionResponsesNonce={0} isQuestionCacheReady={isQuestionCacheReady} />
+      <TagPage
+        questionResponsesNonce={0}
+        isQuestionCacheReady={isQuestionCacheReady}
+        {...tagPageProps}
+      />
     </MemoryRouter>
   </Provider>
 );
@@ -138,6 +143,22 @@ describe('TagPage', () => {
 
     expect(screen.getByRole('button', { name: /remove governance tag/i })).toHaveTextContent('#governance');
     expect(screen.getByRole('button', { name: /remove AI Policy tag/i })).toHaveTextContent('#AI Policy');
+  });
+
+  it('supports an embedded tag selection override with a custom empty question state', () => {
+    mockListNamespaceEntriesSync.mockImplementation(() => []);
+
+    renderTagPage({
+      entry: '/demo/corpus-viewer',
+      tagPageProps: {
+        embedded: true,
+        emptyQuestionsText: 'No questions tagged AI Governance in this session yet.',
+        selectedTagsOverride: ['AI Governance'],
+      },
+    });
+
+    expect(screen.getByRole('button', { name: /remove AI Governance tag/i })).toHaveTextContent('#AI Governance');
+    expect(screen.getByText('No questions tagged AI Governance in this session yet.')).toBeInTheDocument();
   });
 
   it('only offers comparison tags that co-occur with the current result set', () => {
