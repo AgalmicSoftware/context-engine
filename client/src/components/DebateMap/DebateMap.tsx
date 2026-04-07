@@ -8,6 +8,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { FormGroup, Label, Input } from 'reactstrap';
+import { hierarchy as d3Hierarchy, pack as d3Pack } from 'd3';
 import treeData from '../../variables/demo/debate_map_demo_data.json';
 import historicalData from '../../variables/demo/historical_figures_tree_qs_and_votes.json';
 import loopholeHistoricalCases from '../../variables/demo/loophole_historical_cases.json';
@@ -23,8 +24,6 @@ import { buildPublicRoute, readSafeInternalReturnTo } from 'utilities/ui/publicU
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { notify } from '../../utilities/ui/notify.js';
 import { buildTagHref } from '../SurveyTool/QuestionTagDropdown';
-
-const { hierarchy: d3Hierarchy, pack: d3Pack } = require('d3');
 
 const StandalonePoliticalCompass = React.lazy(() => (
   import('../DemoViews/DebateHUD/PoliticalCompassView').then((module) => ({
@@ -1487,7 +1486,6 @@ const OrbitalAtlasView = ({
       : { min: 0, max: 0 };
 
     return { nodes, links, disagreementRange };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data, atlasRoot, dimensions.w]);
 
   // Mouse/Touch Handlers
@@ -2894,7 +2892,6 @@ const DebateMap = ({
     const path = window.location.pathname;
     const match = path.match(/\/atlas\/(0x[a-fA-F0-9]+)/);
     return match ? match[1] : null;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paramNodeId]);
 
   // Reset handled flag when the URL ID changes

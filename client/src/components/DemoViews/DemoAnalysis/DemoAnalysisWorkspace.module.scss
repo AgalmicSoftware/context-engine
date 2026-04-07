@@ -711,6 +711,19 @@
   }
 }
 
+.mapFrameCompact {
+  align-items: center;
+  display: flex;
+  justify-content: center;
+  margin-top: 0;
+  padding: 0.2rem 0 0.1rem;
+
+  :global(svg) {
+    height: auto;
+    width: min(100%, 420px);
+  }
+}
+
 .modalBackdrop {
   position: fixed;
   inset: 0;

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 
 import styles from './CorpusViewer.module.scss';
 import { DebateMapSection, ExternalSourceLink } from './TweetCard.jsx';
@@ -62,15 +62,12 @@ const buildLeadQuote = (entry = {}) => {
   return quotes[0] || '';
 };
 
-const InsiderCard = ({ entry, onTagClick }) => {
-  const [isExpanded, setIsExpanded] = useState(false);
-
+const InsiderCard = ({ entry, onTagClick, onAtlasIssueOpen }) => {
   const intervieweeName = entry.author || entry.title || 'Unknown interviewee';
   const interviewDate = formatInterviewDate(entry.date);
   const roleCompany = buildRoleCompany(entry);
   const leadQuote = buildLeadQuote(entry);
   const tags = Array.isArray(entry.tags) ? entry.tags : [];
-  const detailsId = entry.id ? `${entry.id}-details` : undefined;
 
   return (
     <article className={`${styles.card} ${styles.insiderCard}`}>
@@ -119,35 +116,26 @@ const InsiderCard = ({ entry, onTagClick }) => {
         </div>
       ) : null}
 
-      <DebateMapSection entry={entry} />
-
-      <button
-        type="button"
-        className={styles.insiderExpandBtn}
-        onClick={() => setIsExpanded((expanded) => !expanded)}
-        aria-expanded={isExpanded}
-        aria-controls={detailsId}
-      >
-        {isExpanded ? 'Less info' : 'More info'}
-      </button>
-
-      {isExpanded ? (
-        <div id={detailsId} className={styles.insiderDetails}>
-          <div className={styles.entrySummary}>
-            {entry.summary || 'No summary available for this interview yet.'}
-          </div>
-          {interviewDate ? (
-            <div className={styles.entryMeta}>
-              Interview date: {interviewDate}
-            </div>
-          ) : null}
-          {entry?.url ? (
-            <div className={styles.entrySourceRow}>
-              <ExternalSourceLink entry={entry} fallbackLabel="View interview" />
-            </div>
-          ) : null}
+      <div className={styles.insiderDetails}>
+        <div className={styles.entrySummary}>
+          {entry.summary || 'No summary available for this interview yet.'}
         </div>
-      ) : null}
+        {interviewDate ? (
+          <div className={styles.entryMeta}>
+            Interview date: {interviewDate}
+          </div>
+        ) : null}
+        {(entry?.url || (Array.isArray(entry?.debate_map_issues) && entry.debate_map_issues.length > 0)) ? (
+          <div className={styles.cardFooter}>
+            <DebateMapSection entry={entry} onAtlasIssueOpen={onAtlasIssueOpen} />
+            {entry?.url ? (
+              <div className={styles.cardFooterLinks}>
+                <ExternalSourceLink entry={entry} fallbackLabel="View interview" />
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
     </article>
   );
 };
