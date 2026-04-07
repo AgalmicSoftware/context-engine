@@ -29,7 +29,6 @@ import { getEffectiveArweaveKey } from '../../utilities/session/resourceKeys.js'
 import { toStr } from '../../utilities/shared/primitives.js';
 import { fetchImageFromURL } from '../../utilities/ui/imageScripts.js'
 import { readPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
-import DatePicker from 'react-datepicker';
 import styles from './CreateSBTGroup.module.scss';
 import { QRCodeSVG } from 'qrcode.react';
 import {
@@ -40,6 +39,7 @@ import {
 import { JsonButtonRow, JsonPanel, JsonToggleButton } from '../Shared/Json/JsonControls';
 import JsonDisplay from '../Shared/Json/JsonDisplay.jsx';
 import CETooltip from '../Shared/CETooltip';
+import CEDateTimeInput from '../Shared/CEDateTimeInput.jsx';
 import GateMultiSelectLock from '../Gates/GateMultiSelectLock';
 import { resolveSessionContractRef } from '../../utilities/session/sessionNaming.js';
 
@@ -4321,7 +4321,7 @@ class CreateSBTGroup extends Component {
 
                   {sbtDistribution.isTimeLimited && (
                     <div className={styles.timeLimitedOptions}>
-                      <DatePicker
+                      <CEDateTimeInput
                         selected={sbtDistribution.mintingEndTime}
                         onChange={this.handleMintingEndTimeChange}
                         showTimeSelect

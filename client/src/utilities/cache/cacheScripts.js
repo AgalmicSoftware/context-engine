@@ -1,6 +1,6 @@
 /**
  * @module cacheScripts
- * @description IndexedDB cache CRUD via idb-keyval — namespace-scoped read/write/subscribe
+ * @description IndexedDB cache CRUD via a small private key-value helper — namespace-scoped read/write/subscribe
  *              with BroadcastChannel cross-tab sync and optimistic writes.
  *
  * Key exports: readCache, writeCache, writeCacheOptimistic, updateCacheAtomic, peekCacheSync, listNamespaceEntriesSync, subscribeCacheUpdates
@@ -11,7 +11,7 @@ import {
   entries as idbEntries,
   get as idbGet,
   set as idbSet,
-} from 'idb-keyval';
+} from './cacheScripts.idb.impl.js';
 import { createLogger } from '../logging.js';
 
 const cacheLog = createLogger('cacheScripts');

@@ -1,4 +1,4 @@
-import { act, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { ethers } from 'ethers';
 import fs from 'fs';
 import path from 'path';
@@ -1322,6 +1322,37 @@ describe('CreateSBTGroup cache helpers', () => {
 
     expect(screen.getByTestId(E2E_TESTIDS.SBT_CREATE_PREDICTED_ADDRESS)).toHaveTextContent('Pending admin account…');
     expect(screen.queryByText('Connect a wallet to preview the address.')).not.toBeInTheDocument();
+  });
+
+  it('renders the time-limited mint input as a native datetime field and updates the end time', () => {
+    const instance = makeInstance({
+      network: { id: 84532, name: 'Base Sepolia' },
+      sessionSlug: 'test',
+    });
+    instance.state = {
+      ...instance.state,
+      mintOptionsCollapsed: false,
+      sbtDistribution: {
+        ...instance.state.sbtDistribution,
+        isTimeLimited: true,
+        mintingEndTime: new Date('2026-04-06T12:30:00'),
+      },
+    };
+
+    const { container } = render(instance.render());
+
+    const input = container.querySelector('input[type="datetime-local"]');
+    expect(input).toBeInTheDocument();
+    expect(input).toHaveValue('2026-04-06T12:30');
+
+    fireEvent.change(input, { target: { value: '2026-04-06T13:45' } });
+
+    expect(instance.state.sbtDistribution.mintingEndTime).toBeInstanceOf(Date);
+    expect(instance.state.sbtDistribution.mintingEndTime.getFullYear()).toBe(2026);
+    expect(instance.state.sbtDistribution.mintingEndTime.getMonth()).toBe(3);
+    expect(instance.state.sbtDistribution.mintingEndTime.getDate()).toBe(6);
+    expect(instance.state.sbtDistribution.mintingEndTime.getHours()).toBe(13);
+    expect(instance.state.sbtDistribution.mintingEndTime.getMinutes()).toBe(45);
   });
 
   it('syncs the connected account into the admin defaults when login finishes later', () => {
