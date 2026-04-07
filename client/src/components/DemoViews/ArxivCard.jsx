@@ -76,11 +76,9 @@ const formatEntryDate = (entry = {}) => {
   return null;
 };
 
-const ArxivCard = ({ entry, onTagClick, onAtlasIssueOpen }) => {
+const ArxivCard = ({ entry, onTagClick }) => {
   const arxivId = extractArxivId(entry?.url);
-  const authorLabel = Array.isArray(entry?.authors) && entry.authors.length > 0
-    ? entry.authors.join(', ')
-    : formatCompactAuthors(entry);
+  const authorLabel = formatCompactAuthors(entry);
   const dateLabel = formatEntryDate(entry);
   const summaryText = entry?.summary || entry?.abstract || '';
   const tags = Array.isArray(entry?.tags) ? entry.tags : [];
@@ -93,7 +91,7 @@ const ArxivCard = ({ entry, onTagClick, onAtlasIssueOpen }) => {
             <div className={styles.arxivMetaTop}>
               {arxivId ? (
                 <span className={styles.arxivId}>
-                  arXiv:{arxivId}
+                  [{arxivId}]
                 </span>
               ) : null}
               {entry?.category ? (
@@ -114,16 +112,13 @@ const ArxivCard = ({ entry, onTagClick, onAtlasIssueOpen }) => {
           {(authorLabel || dateLabel) ? (
             <div className={styles.arxivMetaRow}>
               {authorLabel ? (
-                <>
-                  <span className={styles.arxivMetaLabel}>Authors:</span>
-                  <span className={styles.arxivAuthors} title={authorLabel}>
-                    {authorLabel}
-                  </span>
-                </>
+                <span className={styles.arxivAuthors} title={authorLabel}>
+                  {authorLabel}
+                </span>
               ) : null}
               {dateLabel ? (
                 <span className={styles.arxivDate}>
-                  Submitted {dateLabel}
+                  {authorLabel ? `· ${dateLabel}` : dateLabel}
                 </span>
               ) : null}
             </div>
@@ -152,14 +147,13 @@ const ArxivCard = ({ entry, onTagClick, onAtlasIssueOpen }) => {
         </div>
       ) : null}
 
-      <div className={styles.cardFooter}>
-        <DebateMapSection entry={entry} onAtlasIssueOpen={onAtlasIssueOpen} />
-        {entry?.url ? (
-          <div className={styles.cardFooterLinks}>
-            <ExternalSourceLink entry={entry} fallbackLabel={arxivId ? 'View paper' : 'View source'} />
-          </div>
-        ) : null}
-      </div>
+      <DebateMapSection entry={entry} />
+
+      {entry?.url ? (
+        <div className={styles.entrySourceRow}>
+          <ExternalSourceLink entry={entry} fallbackLabel={arxivId ? 'View paper' : 'View source'} />
+        </div>
+      ) : null}
     </article>
   );
 };

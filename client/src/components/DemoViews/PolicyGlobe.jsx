@@ -5,30 +5,14 @@ import styles from './PolicyGlobe.module.scss';
 export const POLICY_FILTERS = {
   live: 'live',
   proposed: 'proposed',
-  inactive: 'inactive',
   all: 'all',
 };
 
 const FILTER_OPTIONS = [
   { id: POLICY_FILTERS.live, label: 'Live' },
   { id: POLICY_FILTERS.proposed, label: 'Proposed' },
-  { id: POLICY_FILTERS.inactive, label: 'Inactive' },
   { id: POLICY_FILTERS.all, label: 'All' },
 ];
-
-const FILTER_STYLE_CLASS_BY_ID = {
-  [POLICY_FILTERS.live]: styles.filterButtonLiveOption,
-  [POLICY_FILTERS.proposed]: styles.filterButtonProposedOption,
-  [POLICY_FILTERS.inactive]: styles.filterButtonInactiveOption,
-  [POLICY_FILTERS.all]: styles.filterButtonAllOption,
-};
-
-const FILTER_SWATCH_CLASS_BY_ID = {
-  [POLICY_FILTERS.live]: styles.filterSwatchLive,
-  [POLICY_FILTERS.proposed]: styles.filterSwatchProposed,
-  [POLICY_FILTERS.inactive]: styles.filterSwatchInactive,
-  [POLICY_FILTERS.all]: styles.filterSwatchAll,
-};
 
 const LIVE_STATUS_MATCHERS = [
   'live',
@@ -50,18 +34,9 @@ const PROPOSED_STATUS_MATCHERS = [
   'pending',
   'draft',
   'bill',
-  'committee',
   'consultation',
   'under review',
   'planned',
-];
-
-const INACTIVE_STATUS_MATCHERS = [
-  'vetoed',
-  'withdrawn',
-  'rejected',
-  'failed',
-  'expired',
 ];
 
 const JURISDICTION_RULES = [
@@ -162,7 +137,6 @@ const GLOBE_COORDINATES = {
 };
 
 const normalizeText = (value = '') => String(value).trim().toLowerCase();
-const normalizePolicyStatus = (value = '') => normalizeText(value).replace(/[_-]+/g, ' ');
 
 const matchesPattern = (value, patterns = []) => patterns.some((pattern) => pattern.test(value));
 
@@ -171,8 +145,6 @@ const getJurisdictionRule = (jurisdiction = '') => {
   return JURISDICTION_RULES.find((rule) => matchesPattern(normalizedJurisdiction, rule.patterns))
     || { anchor: 'international', flag: '🌐' };
 };
-
-export const getPolicyJurisdictionAnchor = (jurisdiction = '') => getJurisdictionRule(jurisdiction).anchor;
 
 const getPolicyTimestamp = (entry = {}) => {
   const datedValue = entry.date_enacted || entry.date || entry.created_at || entry.updated_at || entry.year;
@@ -196,11 +168,7 @@ const getPolicyTimestamp = (entry = {}) => {
 };
 
 export const getPolicyStatusGroup = (entry = {}) => {
-  const normalizedStatus = normalizePolicyStatus(entry.status);
-
-  if (INACTIVE_STATUS_MATCHERS.some((status) => normalizedStatus.includes(status))) {
-    return POLICY_FILTERS.inactive;
-  }
+  const normalizedStatus = normalizeText(entry.status);
 
   if (PROPOSED_STATUS_MATCHERS.some((status) => normalizedStatus.includes(status))) {
     return POLICY_FILTERS.proposed;
@@ -220,8 +188,7 @@ const getPolicySortRank = (entry = {}) => {
 
   if (statusGroup === POLICY_FILTERS.live) return 0;
   if (statusGroup === POLICY_FILTERS.proposed) return 1;
-  if (statusGroup === POLICY_FILTERS.inactive) return 2;
-  return 3;
+  return 2;
 };
 
 const formatStatusLabel = (status = '') => {
@@ -240,18 +207,6 @@ export const getPolicyStatusLabel = (entry = {}) => {
 
   if (normalizedStatus) return normalizedStatus;
   return getPolicyStatusGroup(entry) === POLICY_FILTERS.proposed ? 'Proposed' : 'Live';
-};
-
-const getPolicyDotOffset = (statusGroup) => {
-  if (statusGroup === POLICY_FILTERS.proposed) return { x: 8, y: 6 };
-  if (statusGroup === POLICY_FILTERS.inactive) return { x: -8, y: 6 };
-  return { x: 0, y: 0 };
-};
-
-const getPolicyGroupTitle = (statusGroup) => {
-  if (statusGroup === POLICY_FILTERS.proposed) return 'Proposed / Pending';
-  if (statusGroup === POLICY_FILTERS.inactive) return 'Inactive / Blocked';
-  return 'Live / Enacted';
 };
 
 export const getJurisdictionFlag = (jurisdiction = '') => getJurisdictionRule(jurisdiction).flag;
@@ -275,7 +230,7 @@ const buildGlobeDots = (entries = []) => {
     const statusGroup = getPolicyStatusGroup(entry);
     const jurisdictionRule = getJurisdictionRule(entry.jurisdiction);
     const baseCoordinates = GLOBE_COORDINATES[jurisdictionRule.anchor] || GLOBE_COORDINATES.international;
-    const positionOffset = getPolicyDotOffset(statusGroup);
+    const positionOffset = statusGroup === POLICY_FILTERS.proposed ? { x: 8, y: 6 } : { x: 0, y: 0 };
     const dotKey = `${jurisdictionRule.anchor}-${statusGroup}`;
     const label = entry.jurisdiction || 'International';
 
@@ -296,7 +251,7 @@ const buildGlobeDots = (entries = []) => {
 
   return Array.from(dotsByKey.values()).map((dot) => ({
     ...dot,
-    title: `${Array.from(new Set(dot.labels)).join(', ')} • ${getPolicyGroupTitle(dot.group)}`,
+    title: `${Array.from(new Set(dot.labels)).join(', ')} • ${dot.group === POLICY_FILTERS.proposed ? 'Proposed / Pending' : 'Live / Enacted'}`,
   }));
 };
 
@@ -312,31 +267,26 @@ const PolicyGlobe = ({ entries = [], children }) => {
 
   const globeDots = useMemo(() => buildGlobeDots(filteredEntries), [filteredEntries]);
 
-  const FilterControlsElement = (
-    <div className={styles.filterRow} data-testid="ce-policy-filter-row" role="group" aria-label="Policy status filter">
-      {FILTER_OPTIONS.map((option) => {
-        const isActive = option.id === filterStatus;
-
-        return (
-          <button
-            key={option.id}
-            type="button"
-            aria-pressed={isActive}
-            data-testid={`ce-policy-filter-${option.id}`}
-            className={`${styles.filterButton} ${FILTER_STYLE_CLASS_BY_ID[option.id] || ''} ${isActive ? styles.filterButtonActive : ''}`.trim()}
-            onClick={() => setFilterStatus(option.id)}
-          >
-            <span className={`${styles.filterSwatch} ${FILTER_SWATCH_CLASS_BY_ID[option.id] || ''}`.trim()} aria-hidden="true" />
-            <span>{option.label}</span>
-          </button>
-        );
-      })}
-    </div>
-  );
-
   const GlobeElement = (
     <section className={styles.globeWrapper} data-testid="ce-policy-globe" aria-label="Policy status globe">
-      {FilterControlsElement}
+      <div className={styles.filterRow} data-testid="ce-policy-filter-row" role="group" aria-label="Policy status filter">
+        {FILTER_OPTIONS.map((option) => {
+          const isActive = option.id === filterStatus;
+
+          return (
+            <button
+              key={option.id}
+              type="button"
+              aria-pressed={isActive}
+              data-testid={`ce-policy-filter-${option.id}`}
+              className={`${styles.filterButton} ${isActive ? styles.filterButtonActive : ''}`.trim()}
+              onClick={() => setFilterStatus(option.id)}
+            >
+              {option.label}
+            </button>
+          );
+        })}
+      </div>
 
       <div className={styles.globe} aria-hidden="true">
         <span className={`${styles.globeRing} ${styles.globeRingMeridian}`.trim()} />
@@ -347,13 +297,7 @@ const PolicyGlobe = ({ entries = [], children }) => {
         {globeDots.map((dot) => (
           <span
             key={dot.key}
-            className={`${styles.dot} ${
-              dot.group === POLICY_FILTERS.proposed
-                ? styles.dotAmber
-                : dot.group === POLICY_FILTERS.inactive
-                  ? styles.dotRose
-                  : styles.dotGreen
-            }`.trim()}
+            className={`${styles.dot} ${dot.group === POLICY_FILTERS.proposed ? styles.dotAmber : styles.dotGreen}`.trim()}
             style={{ transform: `translate(-50%, -50%) translate(${dot.x}px, ${dot.y}px)` }}
             title={dot.title}
           />
@@ -363,13 +307,7 @@ const PolicyGlobe = ({ entries = [], children }) => {
   );
 
   if (typeof children === 'function') {
-    return children({
-      filteredEntries,
-      filterStatus,
-      setFilterStatus,
-      GlobeElement,
-      FilterControlsElement,
-    });
+    return children({ filteredEntries, filterStatus, setFilterStatus, GlobeElement });
   }
 
   return GlobeElement;
