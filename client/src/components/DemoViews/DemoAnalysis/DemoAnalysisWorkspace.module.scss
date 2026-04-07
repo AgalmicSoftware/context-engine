@@ -712,7 +712,7 @@
 }
 
 .mapFrame {
-  margin-top: 0;
+  margin-top: -0.5rem;
   overflow: hidden;
   width: 100%;
 }
@@ -802,33 +802,16 @@
   }
 
   .mapFrameCompact {
-    padding-top: 0;
+    padding-top: 0.35rem;
   }
 
   .mapFrameCompact :global(svg) {
-    max-width: none;
+    max-width: 100%;
     width: 100%;
   }
 
-  .selectorLayout {
-    grid-template-columns: 1fr;
-  }
-
-  .mapFrameViewport {
-    min-height: 240px;
-    padding-left: 0.5rem;
-    padding-right: 0.5rem;
-  }
-
-  .breakdownDatasetHeader {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 0.25rem;
-  }
-}
-
-@media (min-width: 1280px) {
-  .selectorLayout {
-    grid-template-columns: repeat(6, minmax(0, 1fr));
+  .breakdownBarRow {
+    grid-template-columns: 72px minmax(0, 1fr) 44px;
+    gap: 0.5rem;
   }
 }

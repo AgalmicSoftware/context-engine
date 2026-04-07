@@ -14,34 +14,14 @@
     nav {
       width: 100%;
       ul {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        justify-content: stretch;
+        display: flex;
+        justify-content: center;
         align-items: center;
-        gap: 4px;
+        flex-wrap: wrap;
         width: 100%;
-        li {
-          min-width: 0;
-          width: 100%;
-        }
-        li .footerLink {
-          align-items: center;
-          display: flex;
-          font-size: clamp(0.9rem, 5.4vw, 1.08rem);
-          font-weight: 700;
-          justify-content: center;
-          letter-spacing: 0;
-          margin-left: 0;
-          margin-right: 0;
-          min-height: 42px;
-          padding: 8px 4px;
-          text-align: center;
-          white-space: nowrap;
-          width: 100%;
-        }
       }
     }
-    .copyright {
+    #copyright {
       text-align: center;
       line-height: 1.5;
       font-family: inherit;
@@ -63,34 +43,14 @@
     nav {
       width: 100%;
       ul {
-        display: grid;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-        justify-content: stretch;
+        display: flex;
+        justify-content: center;
         align-items: center;
-        gap: 4px;
+        flex-wrap: wrap;
         width: 100%;
-        li {
-          min-width: 0;
-          width: 100%;
-        }
-        li .footerLink {
-          align-items: center;
-          display: flex;
-          font-size: clamp(0.86rem, 3.05vw, 1.08rem);
-          font-weight: 700;
-          justify-content: center;
-          letter-spacing: 0;
-          margin-left: 0;
-          margin-right: 0;
-          min-height: 44px;
-          padding: 8px 2px;
-          text-align: center;
-          white-space: nowrap;
-          width: 100%;
-        }
       }
     }
-    .copyright {
+    #copyright {
       text-align: center;
       line-height: 1.5;
       font-family: inherit;
@@ -112,34 +72,14 @@
     nav {
       width: 100%;
       ul {
-        display: grid;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-        justify-content: stretch;
+        display: flex;
+        justify-content: center;
         align-items: center;
-        gap: 6px;
+        flex-wrap: wrap;
         width: 100%;
-        li {
-          min-width: 0;
-          width: 100%;
-        }
-        li .footerLink {
-          align-items: center;
-          display: flex;
-          font-size: clamp(1rem, 2.4vw, 1.22rem);
-          font-weight: 700;
-          justify-content: center;
-          letter-spacing: 0;
-          margin-left: 0;
-          margin-right: 0;
-          min-height: 46px;
-          padding: 8px 4px;
-          text-align: center;
-          white-space: nowrap;
-          width: 100%;
-        }
       }
     }
-    .copyright {
+    #copyright {
       text-align: center;
       line-height: 1.5;
       font-family: inherit;

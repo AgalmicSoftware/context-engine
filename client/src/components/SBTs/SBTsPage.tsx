@@ -22,12 +22,8 @@ import { hasCachedCreateSbtForm } from '../../utilities/sbt/sbtCreateFormCache.j
 import { getSbtDisplayName } from '../../utilities/sbt/sbtDisplayNames.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { readSessionScanScope, readSessionScanSlugs } from '../../utilities/session/sessionScanScope.js';
-import { getShortenedAddress } from '../../utilities/ui/displayHelpers.js';
+import proposalScripts from '../../utilities/proposalScripts.js';
 import { isCryptoMode, sbtsListPath, t } from '../../utilities/ui/terminology.js';
-import {
-  buildPublicRoute,
-  stripPublicUrlBasePath,
-} from '../../utilities/ui/publicUrl.js';
 import defaultSbtImage from '../../assets/img/ce_circuit_logo.png';
 import {
   asSBTsPageFeaturedProgress as asFeaturedProgress,
@@ -727,9 +723,9 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
                             className={sbtPageStyles.sbtImage}
                           />
                         </div>
-                        <p className={sbtPageStyles.miniSbtName}>{sbtName}</p>
+                        <p id={sbtPageStyles.miniSbtName}>{sbtName}</p>
                         {showMiniSbtAddress ? (
-                          <p className={sbtPageStyles.miniSbtAddress}>{shortenedAddress}</p>
+                          <p id={sbtPageStyles.miniSbtAddress}>{shortenedAddress}</p>
                         ) : null}
                       </a>
                     );
