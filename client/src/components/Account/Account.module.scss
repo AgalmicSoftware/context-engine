@@ -1966,7 +1966,7 @@ h1 {
 #settingsFooter {
   display: flex;
   flex-direction: row;
-  justify-content: space-between;
+  justify-content: center;
   align-items: center;
   margin-bottom: 10px;
 }
@@ -2344,6 +2344,12 @@ h1 {
   opacity: 0.8;
 }
 
+@media (min-width: 769px) {
+  .settingsRow {
+    justify-content: center;
+  }
+}
+
 @media (max-width: 768px) {
   .settingsRow {
     flex-wrap: wrap;
@@ -2396,6 +2402,12 @@ h1 {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
   gap: 12px;
+}
+
+@media (min-width: 1024px) {
+  .supportedResourcesGrid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
 
 .supportedResourceCard {
