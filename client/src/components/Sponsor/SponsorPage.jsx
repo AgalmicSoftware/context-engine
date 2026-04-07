@@ -1,9 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import DatePicker from 'react-datepicker';
 import { Button, FormGroup, Input, Label } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faClipboard, faLock, faLockOpen, faPen } from '@fortawesome/free-solid-svg-icons';
 import styles from '../Admin/AdminPage.module.scss';
+import CEDateTimeInput from '../Shared/CEDateTimeInput.jsx';
 import {
   USE_ONCHAIN_SESSION_REGISTRY,
 } from '../../variables/appConfig.js';
@@ -994,7 +994,8 @@ const SponsorPage = ({
           </FormGroup>
           <FormGroup>
             <Label>Expiry</Label>
-            <DatePicker
+            <CEDateTimeInput
+              data-testid="ce-sponsor-expiry-input"
               selected={expiresAt}
               onChange={(date) => setExpiresAt(date)}
               minDate={new Date()}

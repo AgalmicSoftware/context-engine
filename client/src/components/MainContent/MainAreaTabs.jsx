@@ -1,7 +1,6 @@
 /** @file MainAreaTabs.jsx */
 
 import React, { Component, Suspense } from "react";
-import classnames from "classnames";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faCog, faGlobe, faPlay, faTools } from "@fortawesome/free-solid-svg-icons";
 import { createLogger } from '../../utilities/logging';
@@ -90,6 +89,7 @@ class MainAreaTabs extends Component {
   };
 
   render() {
+    const activeClassName = (isActive) => (isActive ? 'active' : '');
     return (
       <div id={styles.mainAreaTabsAlt}>
                 <Card id={styles.mainTabsCard}>
@@ -97,9 +97,7 @@ class MainAreaTabs extends Component {
                 <Nav className="nav-tabs-info" role="tablist" tabs>
                   <NavItem>
                     <NavLink
-                      className={classnames({
-                        active: this.props.focusedTab === MAIN_AREA_TABS.LATEST
-                      })}
+                      className={activeClassName(this.props.focusedTab === MAIN_AREA_TABS.LATEST)}
                       onClick={() => this.changeTabs(MAIN_AREA_TABS.LATEST)}
                     >
                       <FontAwesomeIcon icon={faPlay} id={styles.navTabIcon} />
@@ -108,9 +106,7 @@ class MainAreaTabs extends Component {
                   </NavItem>
                   <NavItem>
                     <NavLink
-                      className={classnames({
-                        active: this.props.focusedTab === MAIN_AREA_TABS.COMMUNITY
-                      })}
+                      className={activeClassName(this.props.focusedTab === MAIN_AREA_TABS.COMMUNITY)}
                       onClick={() => this.changeTabs(MAIN_AREA_TABS.COMMUNITY)}
                     >
                       <FontAwesomeIcon icon={faGlobe} id={styles.navTabIcon} />
@@ -119,9 +115,7 @@ class MainAreaTabs extends Component {
                   </NavItem>
                   <NavItem>
                     <NavLink
-                      className={classnames({
-                        active: this.props.focusedTab === MAIN_AREA_TABS.TOOLS
-                      })}
+                      className={activeClassName(this.props.focusedTab === MAIN_AREA_TABS.TOOLS)}
                       onClick={() => this.changeTabs(MAIN_AREA_TABS.TOOLS)}
                     >
                       <FontAwesomeIcon icon={faTools} id={styles.navTabIcon} />
@@ -130,9 +124,7 @@ class MainAreaTabs extends Component {
                   </NavItem>
                   <NavItem>
                     <NavLink
-                      className={classnames({
-                        active: this.props.focusedTab === MAIN_AREA_TABS.WELCOME
-                      })}
+                      className={activeClassName(this.props.focusedTab === MAIN_AREA_TABS.WELCOME)}
                       onClick={() => this.changeTabs(MAIN_AREA_TABS.WELCOME)}
                     >
                       <FontAwesomeIcon icon={faCog} id={styles.navTabIcon} />

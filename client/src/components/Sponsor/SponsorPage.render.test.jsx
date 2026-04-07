@@ -84,37 +84,6 @@ jest.mock('../../utilities/ui/notify.js', () => ({
   },
 }));
 
-jest.mock('react-datepicker', () => {
-  const React = require('react');
-  return function MockDatePicker({
-    selected,
-    onChange,
-    placeholderText,
-    className,
-    minDate,
-  }) {
-    const value = selected instanceof Date && Number.isFinite(selected.getTime())
-      ? selected.toISOString()
-      : '';
-    const minDateValue = minDate instanceof Date && Number.isFinite(minDate.getTime())
-      ? minDate.toISOString()
-      : '';
-    return (
-      <input
-        data-testid="ce-sponsor-expiry-input"
-        placeholder={placeholderText}
-        className={className}
-        value={value}
-        data-min-date={minDateValue}
-        onChange={(event) => {
-          const nextValue = String(event.target.value || '').trim();
-          onChange?.(nextValue ? new Date(nextValue) : null);
-        }}
-      />
-    );
-  };
-});
-
 const SponsorPage = require('./SponsorPage.jsx').default;
 
 const renderSponsorPage = ({
@@ -228,7 +197,7 @@ describe('SponsorPage', () => {
     expect(getFieldInputByLabel('Custom RPC URL')).toBeInTheDocument();
     expect(getFieldInputByLabel('Cloudflare API token')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('No expiry')).toBeInTheDocument();
-    expect(screen.getByTestId('ce-sponsor-expiry-input').dataset.minDate).toMatch(/\d{4}-\d{2}-\d{2}T/);
+    expect(screen.getByTestId('ce-sponsor-expiry-input')).toHaveAttribute('min', expect.stringMatching(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/));
     expect(screen.getByText('Issue one-time deploy grants through the selected sponsoring session worker instead of writing raw deploy credentials into the bundle.')).toBeInTheDocument();
     expect(screen.getByText('Uses sponsoring worker: https://worker.example')).toBeInTheDocument();
     expect(getToggleCheckbox('Dev: keep secrets on refresh')).toBeChecked();
@@ -818,7 +787,7 @@ describe('SponsorPage', () => {
       target: { value: 'sk-live-openai' },
     });
     fireEvent.change(screen.getByTestId('ce-sponsor-expiry-input'), {
-      target: { value: '2000-01-01T00:00:00.000Z' },
+      target: { value: '2000-01-01T00:00' },
     });
 
     fireEvent.click(screen.getByRole('button', { name: 'Create sponsored URL' }));

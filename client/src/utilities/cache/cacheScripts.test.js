@@ -131,7 +131,7 @@ const loadCacheScripts = ({
     ),
   };
 
-  jest.doMock('idb-keyval', () => ({
+  jest.doMock('./cacheScripts.idb.impl.js', () => ({
     createStore: idb.createStore,
     get: idb.get,
     set: idb.set,

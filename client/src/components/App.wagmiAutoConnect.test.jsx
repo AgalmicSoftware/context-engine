@@ -34,8 +34,9 @@ const mockAppDependencies = () => {
   }));
 
   jest.doMock('@rainbow-me/rainbowkit/styles.css', () => ({}));
-  jest.doMock('react-hot-toast', () => ({
-    Toaster: (props) => {
+  jest.doMock('./Shared/CEToaster.jsx', () => ({
+    __esModule: true,
+    default: (props) => {
       mockToaster(props);
       return null;
     },
@@ -184,7 +185,7 @@ describe('App wagmi auto-connect persistence', () => {
     expect(mainSiteElement.props.firstVisit).toBe(true);
   });
 
-  it('passes the shared toast theme to the app toaster', () => {
+  it('passes the shared toast theme to the app toast host', () => {
     const { toastTheme } = require('../utilities/ui/toastTheme.js');
     const { default: App } = loadAppModule();
 
