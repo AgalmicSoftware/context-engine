@@ -1,15 +1,16 @@
-import {
-  SBTPage,
-  ethers,
-  contractScripts,
-  contractScriptsModule,
-  cacheScripts,
-  render,
-  createSubject,
-  treeIncludesText,
-  createReadCachePayload,
-  setupSBTPageTestLifecycle,
-} from './SBTPage.testUtils';
+import SBTPage from './SBTPage.jsx';
+import styles from './SBTPage.module.scss';
+import { ethers } from 'ethers';
+import contractScripts from '../../utilities/web3/contractScripts.js';
+import * as contractScriptsModule from '../../utilities/web3/contractScripts.js';
+import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
+import proposalScripts from '../../utilities/proposalScripts.js';
+import defaultSbtImage from '../../assets/img/ce_circuit_logo.png';
+import { cryptoUtils } from 'utilities/crypto/cryptography.js';
+import { litStorage } from 'utilities/crypto/litProtocol.js';
+import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
+import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
+import * as terminology from '../../utilities/ui/terminology.js';
 
 describe('SBTPage session routing and holder loading', () => {
   setupSBTPageTestLifecycle();
@@ -201,5 +202,2628 @@ describe('SBTPage session routing and holder loading', () => {
     const tree = subject.render();
     expect(treeIncludesText(tree, '~2')).toBe(true);
     expect(treeIncludesText(tree, 'No holders found.')).toBe(false);
+  });
+
+  it('coalesces overlapping loadSBTInfo calls and queues a single forced rerun', async () => {
+    jest.useFakeTimers();
+    try {
+      const sbtAddress = '0x00000000000000000000000000000000000000a1';
+      const sbtLower = sbtAddress.toLowerCase();
+      const cacheEntry = {
+        '84532': {
+          sbtList: {
+            [sbtLower]: {
+              sbtAddress,
+              sbtInfo: {
+                tokenURI: 'ar://HLDsCm3ALbbgjVTCPVLhU8aF9taAdKyD1DyB7A8zkaXM',
+                mintingEndTime: 0,
+                burnAuth: 0,
+                hasPasswordMint: false,
+                maxTokens: '0',
+                admin: '0x00000000000000000000000000000000000000a2',
+                chainID: 84532,
+              },
+              mintedAddresses: ['0x00000000000000000000000000000000000000b1'],
+              burnedAddresses: [],
+              countsLoaded: true,
+              blockNumber: 1234,
+            },
+          },
+          lastBlock: 1234,
+        },
+      };
+
+      let resolveFirstRead;
+      const firstRead = new Promise((resolve) => { resolveFirstRead = resolve; });
+      const readSpy = jest.spyOn(cacheScripts, 'readCache')
+        .mockImplementationOnce(() => firstRead)
+        .mockResolvedValue(cacheEntry);
+      const groupPasswordSpy = jest.spyOn(contractScripts, 'getGroupPasswordHash')
+        .mockResolvedValue(ethers.constants.HashZero);
+      jest.spyOn(contractScripts, 'getMintedTokens').mockResolvedValue('1');
+
+      const subject = createSubject({
+        SBTAddress: sbtAddress,
+        sessionSlug: 'edge',
+        account: '0x00000000000000000000000000000000000000a2',
+      });
+      subject.state = {
+        ...subject.state,
+        network: { id: 84532, name: 'Base Sepolia' },
+      };
+
+      const firstRun = subject.loadSBTInfo(false);
+      await Promise.resolve();
+      await subject.loadSBTInfo(true);
+
+      expect(subject._loadSbtInfoPendingForce).toBe(true);
+      expect(readSpy).toHaveBeenCalledTimes(1);
+
+      resolveFirstRead(cacheEntry);
+      await firstRun;
+
+      jest.runOnlyPendingTimers();
+      await Promise.resolve();
+
+      expect(readSpy.mock.calls.length).toBeGreaterThanOrEqual(2);
+      expect(groupPasswordSpy).toHaveBeenCalled();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('hydrates direct SBT metadata during loadSBTInfo when central refresh is unavailable', async () => {
+    const sbtAddress = '0x00000000000000000000000000000000000000a1';
+    const sbtLower = sbtAddress.toLowerCase();
+    const adminAddress = '0x00000000000000000000000000000000000000a2';
+
+    jest.spyOn(cacheScripts, 'readCache').mockResolvedValue({
+      '84532': {
+        sbtList: {
+          [sbtLower]: {
+            sbtAddress,
+            sbtInfo: null,
+            mintedAddresses: [],
+            burnedAddresses: [],
+            countsLoaded: false,
+          },
+        },
+      },
+    });
+    jest.spyOn(cacheScripts, 'listNamespaceEntriesSync').mockReturnValue([]);
+    jest.spyOn(contractScripts, 'getSbtMetadata').mockResolvedValue({
+      name: 'Name Only SBT',
+      contractName: 'Name Only SBT',
+      symbol: 'CE-SBT-38',
+      tokenURI: 'ar://kcejtnnZ1GhyhjFfPAiLeX3Jaw0dXwhNnkCZ0zB1EuE',
+      mintingEndTime: 0,
+      burnAuth: 0,
+      hasPasswordMint: false,
+      maxTokens: '0',
+      admin: adminAddress,
+      chainID: 84532,
+    });
+    jest.spyOn(contractScripts, 'getGroupPasswordHash').mockResolvedValue(ethers.constants.HashZero);
+    jest.spyOn(contractScripts, 'getMintedTokens').mockResolvedValue(null);
+    jest.spyOn(contractScripts, 'getSbtHistorySummary').mockResolvedValue(null);
+    const contractCtorSpy = jest.spyOn(ethers, 'Contract').mockImplementation(() => ({
+      maxTokens: jest.fn().mockResolvedValue(ethers.BigNumber.from(0)),
+      collectionBurnAuth: jest.fn().mockResolvedValue(0),
+      mintingEndTime: jest.fn().mockResolvedValue(ethers.BigNumber.from(0)),
+      hasPasswordMint: jest.fn().mockResolvedValue(false),
+      admin: jest.fn().mockResolvedValue(adminAddress),
+      owner: jest.fn().mockResolvedValue(adminAddress),
+    }));
+
+    const subject = createSubject({
+      SBTAddress: sbtAddress,
+      sessionSlug: 'edge',
+      account: adminAddress,
+    });
+    subject.state = {
+      ...subject.state,
+      network: { id: 84532, name: 'Base Sepolia' },
+    };
+
+    await subject.loadSBTInfo(false);
+
+    expect(contractScripts.getSbtMetadata).toHaveBeenCalledWith(
+      'none',
+      sbtAddress,
+      expect.objectContaining({
+        slug: 'edge',
+        networkChainId: 84532,
+      })
+    );
+    expect(subject.state.sbtInfo).toEqual(expect.objectContaining({
+      name: 'Name Only SBT',
+      symbol: 'CE-SBT-38',
+      tokenURI: 'ar://kcejtnnZ1GhyhjFfPAiLeX3Jaw0dXwhNnkCZ0zB1EuE',
+      admin: adminAddress,
+      chainID: 84532,
+    }));
+    contractCtorSpy.mockRestore();
+  });
+
+  it('commits core SBT metadata before holder hydration finishes on cold loads', async () => {
+    const sbtAddress = '0x00000000000000000000000000000000000000a1';
+    const sbtLower = sbtAddress.toLowerCase();
+    const cacheEntry = {
+      '84532': {
+        sbtList: {
+          [sbtLower]: {
+            sbtAddress,
+            sbtInfo: {
+              name: 'Cold Load Badge',
+              tokenURI: 'ar://HLDsCm3ALbbgjVTCPVLhU8aF9taAdKyD1DyB7A8zkaXM',
+              image: 'https://example.com/badge.png',
+              mintingEndTime: 0,
+              burnAuth: 0,
+              hasPasswordMint: false,
+              maxTokens: '0',
+              admin: '0x00000000000000000000000000000000000000a2',
+              chainID: 84532,
+            },
+            mintedAddresses: [],
+            burnedAddresses: [],
+            countsLoaded: false,
+            blockNumber: 1234,
+          },
+        },
+      },
+    };
+    const groupHashDeferred = createDeferred();
+
+    jest.spyOn(cacheScripts, 'readCache').mockResolvedValue(cacheEntry);
+    jest.spyOn(contractScripts, 'getGroupPasswordHash').mockImplementation(() => groupHashDeferred.promise);
+    jest.spyOn(contractScripts, 'getMintedTokens').mockResolvedValue('0');
+
+    const subject = createSubject({
+      SBTAddress: sbtAddress,
+      sessionSlug: 'edge',
+    });
+    subject.state = {
+      ...subject.state,
+      network: { id: 84532, name: 'Base Sepolia' },
+    };
+
+    const loadPromise = subject.loadSBTInfo(false);
+    await flushPromises();
+    await Promise.resolve();
+
+    expect(subject.state.sbtInfo).toEqual(expect.objectContaining({
+      name: 'Cold Load Badge',
+      tokenURI: 'ar://HLDsCm3ALbbgjVTCPVLhU8aF9taAdKyD1DyB7A8zkaXM',
+    }));
+    expect(subject.state.loadingMintersBurners).toBe(true);
+    expect(treeIncludesText(subject.render(), 'Loading SBT Details')).toBe(false);
+
+    groupHashDeferred.resolve(ethers.constants.HashZero);
+    await loadPromise;
+  });
+
+  it('uses direct metadata reads instead of a duplicate parent-owned refresh during cold hydration', async () => {
+    const sbtAddress = '0x00000000000000000000000000000000000000a1';
+    const sbtLower = sbtAddress.toLowerCase();
+    const adminAddress = '0x00000000000000000000000000000000000000a2';
+    const refreshSpy = jest.fn().mockResolvedValue(undefined);
+
+    jest.spyOn(cacheScripts, 'readCache').mockResolvedValue({
+      '84532': {
+        sbtList: {
+          [sbtLower]: {
+            sbtAddress,
+            sbtInfo: null,
+            mintedAddresses: [],
+            burnedAddresses: [],
+            countsLoaded: false,
+          },
+        },
+      },
+    });
+    jest.spyOn(cacheScripts, 'listNamespaceEntriesSync').mockReturnValue([]);
+    jest.spyOn(contractScripts, 'getSbtMetadata').mockResolvedValue({
+      name: 'Hydrated Without Duplicate Refresh',
+      contractName: 'Hydrated Without Duplicate Refresh',
+      symbol: 'CE-SBT-99',
+      tokenURI: 'ar://kcejtnnZ1GhyhjFfPAiLeX3Jaw0dXwhNnkCZ0zB1EuE',
+      mintingEndTime: 0,
+      burnAuth: 0,
+      hasPasswordMint: false,
+      maxTokens: '0',
+      admin: adminAddress,
+      chainID: 84532,
+    });
+    jest.spyOn(contractScripts, 'getGroupPasswordHash').mockResolvedValue(ethers.constants.HashZero);
+    jest.spyOn(contractScripts, 'getMintedTokens').mockResolvedValue(null);
+    const contractCtorSpy = jest.spyOn(ethers, 'Contract').mockImplementation(() => ({
+      maxTokens: jest.fn().mockResolvedValue(ethers.BigNumber.from(0)),
+      collectionBurnAuth: jest.fn().mockResolvedValue(0),
+      mintingEndTime: jest.fn().mockResolvedValue(ethers.BigNumber.from(0)),
+      hasPasswordMint: jest.fn().mockResolvedValue(false),
+      admin: jest.fn().mockResolvedValue(adminAddress),
+      owner: jest.fn().mockResolvedValue(adminAddress),
+    }));
+
+    const subject = createSubject({
+      SBTAddress: sbtAddress,
+      sessionSlug: 'edge',
+      account: adminAddress,
+      refreshSbtData: refreshSpy,
+      isSBTCacheReady: false,
+    });
+    subject.state = {
+      ...subject.state,
+      network: { id: 84532, name: 'Base Sepolia' },
+    };
+
+    await subject.loadSBTInfo(false);
+
+    expect(refreshSpy).not.toHaveBeenCalled();
+    expect(contractScripts.getSbtMetadata).toHaveBeenCalled();
+    expect(subject.state.sbtInfo).toEqual(expect.objectContaining({
+      name: 'Hydrated Without Duplicate Refresh',
+      symbol: 'CE-SBT-99',
+    }));
+    contractCtorSpy.mockRestore();
+  });
+
+  it('coalesces overlapping non-forced loadSBTInfo calls and queues a rerun', async () => {
+    jest.useFakeTimers();
+    try {
+      const sbtAddress = '0x00000000000000000000000000000000000000a1';
+      const sbtLower = sbtAddress.toLowerCase();
+      const cacheEntry = {
+        '84532': {
+          sbtList: {
+            [sbtLower]: {
+              sbtAddress,
+              sbtInfo: {
+                tokenURI: 'ar://HLDsCm3ALbbgjVTCPVLhU8aF9taAdKyD1DyB7A8zkaXM',
+                mintingEndTime: 0,
+                burnAuth: 0,
+                hasPasswordMint: false,
+                maxTokens: '0',
+                admin: '0x00000000000000000000000000000000000000a2',
+                chainID: 84532,
+              },
+              mintedAddresses: ['0x00000000000000000000000000000000000000b1'],
+              burnedAddresses: [],
+              countsLoaded: true,
+              blockNumber: 1234,
+            },
+          },
+          lastBlock: 1234,
+        },
+      };
+
+      let resolveFirstRead;
+      const firstRead = new Promise((resolve) => { resolveFirstRead = resolve; });
+      const readSpy = jest.spyOn(cacheScripts, 'readCache')
+        .mockImplementationOnce(() => firstRead)
+        .mockResolvedValue(cacheEntry);
+      const groupPasswordSpy = jest.spyOn(contractScripts, 'getGroupPasswordHash')
+        .mockResolvedValue(ethers.constants.HashZero);
+      jest.spyOn(contractScripts, 'getMintedTokens').mockResolvedValue('1');
+
+      const subject = createSubject({
+        SBTAddress: sbtAddress,
+        sessionSlug: 'edge',
+        account: '0x00000000000000000000000000000000000000a2',
+      });
+      subject.state = {
+        ...subject.state,
+        network: { id: 84532, name: 'Base Sepolia' },
+      };
+
+      const firstRun = subject.loadSBTInfo(false);
+      await Promise.resolve();
+      await subject.loadSBTInfo(false);
+
+      expect(subject._loadSbtInfoPending).toBe(true);
+      expect(subject._loadSbtInfoPendingForce).toBe(false);
+      expect(readSpy).toHaveBeenCalledTimes(1);
+
+      resolveFirstRead(cacheEntry);
+      await firstRun;
+
+      jest.runOnlyPendingTimers();
+      await Promise.resolve();
+
+      expect(readSpy.mock.calls.length).toBeGreaterThanOrEqual(2);
+      expect(groupPasswordSpy).toHaveBeenCalled();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('keeps the explicit session slug pinned while using cached cross-group metadata as a display fallback', async () => {
+    const sbtAddress = '0x00000000000000000000000000000000000000b1';
+    const sbtLower = sbtAddress.toLowerCase();
+    const ownerAddress = '0x00000000000000000000000000000000000000c1';
+    const alphaCache = {
+      '84532': {
+        sbtList: {},
+        lastBlock: 1200,
+      },
+    };
+    const betaCache = {
+      '84532': {
+        sbtList: {
+          [sbtLower]: {
+            sbtAddress,
+            slug: 'beta',
+            sbtInfo: {
+              tokenURI: 'ar://HLDsCm3ALbbgjVTCPVLhU8aF9taAdKyD1DyB7A8zkaXM',
+              image: 'https://example.com/beta-badge.png',
+              mintingEndTime: 0,
+              burnAuth: 0,
+              hasPasswordMint: false,
+              maxTokens: '0',
+              admin: '0x00000000000000000000000000000000000000a2',
+              chainID: 84532,
+            },
+            mintedAddresses: [ownerAddress],
+            burnedAddresses: [],
+            countsLoaded: true,
+            blockNumber: 1234,
+          },
+        },
+        lastBlock: 1234,
+      },
+    };
+
+    jest.spyOn(cacheScripts, 'readCache').mockImplementation(async (_namespace, slug) => {
+      if (slug === 'alpha') return alphaCache;
+      if (slug === 'beta') return betaCache;
+      return {};
+    });
+    jest.spyOn(cacheScripts, 'listNamespaceEntriesSync').mockReturnValue([
+      { slug: 'alpha', value: alphaCache },
+      { slug: 'beta', value: betaCache },
+    ]);
+    jest.spyOn(contractScripts, 'getGroupPasswordHash').mockResolvedValue(ethers.constants.HashZero);
+
+    const subject = createSubject({
+      SBTAddress: sbtAddress,
+      sessionSlug: 'alpha',
+      account: ownerAddress,
+    });
+    subject.state = {
+      ...subject.state,
+      network: { id: 84532, name: 'Base Sepolia' },
+    };
+
+    await subject.loadSBTInfo(false);
+
+    expect(cacheScripts.readCache).toHaveBeenNthCalledWith(1, 'sbtCache', 'alpha');
+    expect(cacheScripts.readCache).toHaveBeenCalledTimes(1);
+    expect(subject.state.resolvedSessionSlug).toBe('alpha');
+    expect(subject.state.sbtInfo).toEqual(expect.objectContaining({
+      image: 'https://example.com/beta-badge.png',
+      chainID: 84532,
+    }));
+    expect(subject.state.userHasSBT).toBe(false);
+  });
+
+  it('decrypts encrypted description, tags, and document URLs from cached SBT metadata', async () => {
+    const sbtAddress = '0x00000000000000000000000000000000000000a1';
+    const sbtLower = sbtAddress.toLowerCase();
+    const account = '0x00000000000000000000000000000000000000b1';
+    const cacheEntry = {
+      '84532': {
+        sbtList: {
+          [sbtLower]: {
+            sbtAddress,
+            sbtInfo: {
+              name: 'Badge',
+              tokenURI: 'ar://HLDsCm3ALbbgjVTCPVLhU8aF9taAdKyD1DyB7A8zkaXM',
+              image: 'https://example.com/badge.png',
+              description: '',
+              descriptionEncrypted: 'desc-envelope',
+              descriptionAccess: { type: 'sbt', gateIds: ['gate-description'], chainId: 84532 },
+              tags: [],
+              tagsEncrypted: 'tags-envelope',
+              tagsAccess: { type: 'sbt', gateIds: ['gate-tags'], chainId: 84532 },
+              documentURLs: [],
+              documentURLsEncrypted: 'docs-envelope',
+              documentURLsAccess: { type: 'sbt', gateIds: ['gate-docs'], chainId: 84532 },
+              mintingEndTime: 0,
+              burnAuth: 0,
+              hasPasswordMint: false,
+              maxTokens: '0',
+              admin: '0x00000000000000000000000000000000000000a2',
+              chainID: 84532,
+            },
+            mintedAddresses: [account],
+            burnedAddresses: [],
+            countsLoaded: true,
+            blockNumber: 1234,
+          },
+        },
+        lastBlock: 1234,
+      },
+    };
+
+    jest.spyOn(cacheScripts, 'readCache').mockResolvedValue(cacheEntry);
+    jest.spyOn(contractScripts, 'getGroupPasswordHash').mockResolvedValue(ethers.constants.HashZero);
+    const decryptSpy = jest.spyOn(cryptoUtils, 'decryptEnvelopeValue')
+      .mockImplementation(async (envelope) => {
+        if (envelope === 'desc-envelope') return 'Private description';
+        if (envelope === 'tags-envelope') return ['alpha', 'beta'];
+        if (envelope === 'docs-envelope') return ['https://doc.test/private'];
+        return null;
+      });
+    window.__litHooks = { getKey: jest.fn() };
+
+    const subject = createSubject({
+      SBTAddress: sbtAddress,
+      sessionSlug: 'edge',
+      account,
+    });
+    subject.state = {
+      ...subject.state,
+      network: { id: 84532, name: 'Base Sepolia' },
+    };
+
+    await subject.loadSBTInfo(false);
+
+    expect(decryptSpy).toHaveBeenCalledTimes(3);
+    expect(subject.state.sbtInfo).toEqual(expect.objectContaining({
+      description: 'Private description',
+      descriptionDecrypted: true,
+      tags: ['alpha', 'beta'],
+      tagsDecrypted: true,
+      documentURLs: ['https://doc.test/private'],
+      documentURLsDecrypted: true,
+    }));
+  });
+
+  it('decrypts locked name, description, tags, document URLs, and uploaded image from encryptedFields metadata', async () => {
+    const sbtAddress = '0x00000000000000000000000000000000000000a9';
+    const sbtLower = sbtAddress.toLowerCase();
+    const account = '0x00000000000000000000000000000000000000b9';
+    const cacheEntry = {
+      '84532': {
+        sbtList: {
+          [sbtLower]: {
+            sbtAddress,
+            sbtInfo: {
+              name: '',
+              image: '',
+              description: '',
+              tags: [],
+              documentURLs: [],
+              encryptedFields: {
+                name: 'name-envelope',
+                description: 'desc-envelope',
+                tags: 'tags-envelope',
+                documentURLs: 'docs-envelope',
+                image: {
+                  storage: 'lit-arweave',
+                  txId: 'img-tx',
+                },
+              },
+              encryption: {
+                enabled: true,
+                status: 'lit-v1',
+                targets: {
+                  name: true,
+                  description: true,
+                  tags: true,
+                  documentURLs: true,
+                  image: true,
+                },
+              },
+              mintingEndTime: 0,
+              burnAuth: 0,
+              hasPasswordMint: false,
+              maxTokens: '0',
+              admin: '0x00000000000000000000000000000000000000a2',
+              chainID: 84532,
+            },
+            mintedAddresses: [account],
+            burnedAddresses: [],
+            countsLoaded: true,
+            blockNumber: 1234,
+          },
+        },
+        lastBlock: 1234,
+      },
+    };
+
+    jest.spyOn(cacheScripts, 'readCache').mockResolvedValue(cacheEntry);
+    jest.spyOn(contractScripts, 'getGroupPasswordHash').mockResolvedValue(ethers.constants.HashZero);
+    const decryptSpy = jest.spyOn(cryptoUtils, 'decryptEnvelopeValue')
+      .mockImplementation(async (envelope) => {
+        if (envelope === 'name-envelope') return 'Private Badge';
+        if (envelope === 'desc-envelope') return 'Private description';
+        if (envelope === 'tags-envelope') return ['alpha', 'beta'];
+        if (envelope === 'docs-envelope') return ['https://doc.test/private'];
+        return null;
+      });
+    const downloadSpy = jest.spyOn(litStorage, 'downloadEncryptedArweaveData').mockResolvedValue({
+      payload: { encoding: 'base64', data: 'aW1hZ2U=', mime: 'image/png', name: 'badge.png' },
+      txId: 'img-tx',
+      url: 'lit-ar://img-tx',
+    });
+    const decodeBlobSpy = jest.spyOn(litStorage, 'decodeLitPayloadToBlob').mockReturnValue(new Blob(['image'], { type: 'image/png' }));
+    const objectUrlMock = mockObjectUrlApis('blob:locked-image');
+    window.__litHooks = { getKey: jest.fn() };
+
+    const subject = createSubject({
+      SBTAddress: sbtAddress,
+      sessionSlug: 'edge',
+      account,
+    });
+    subject.state = {
+      ...subject.state,
+      network: { id: 84532, name: 'Base Sepolia' },
+    };
+
+    await subject.loadSBTInfo(false);
+
+    expect(decryptSpy).toHaveBeenCalledTimes(4);
+    expect(downloadSpy).toHaveBeenCalledTimes(1);
+    expect(decodeBlobSpy).toHaveBeenCalledTimes(1);
+    expect(objectUrlMock.createObjectURL).toHaveBeenCalledTimes(1);
+    expect(subject.state.sbtInfo).toEqual(expect.objectContaining({
+      name: 'Private Badge',
+      nameDecrypted: true,
+      description: 'Private description',
+      descriptionDecrypted: true,
+      tags: ['alpha', 'beta'],
+      tagsDecrypted: true,
+      documentURLs: ['https://doc.test/private'],
+      documentURLsDecrypted: true,
+      image: 'blob:locked-image',
+      imageDecrypted: true,
+    }));
+    objectUrlMock.restore();
+  });
+
+  it('does not rehydrate metadata when a locked image is intentionally blank', async () => {
+    const sbtAddress = '0x00000000000000000000000000000000000000ac';
+    const sbtLower = sbtAddress.toLowerCase();
+    const refreshSpy = jest.fn();
+    const cacheEntry = {
+      '84532': {
+        sbtList: {
+          [sbtLower]: {
+            sbtAddress,
+            sbtInfo: {
+              name: '',
+              contractName: 'CE-SBT-12',
+              nameLocked: true,
+              tokenURI: 'ar://HLDsCm3ALbbgjVTCPVLhU8aF9taAdKyD1DyB7A8zkaXM',
+              image: '',
+              imageLocked: true,
+              encryptedFields: {
+                image: {
+                  storage: 'lit-arweave',
+                  txId: 'img-tx',
+                },
+              },
+              mintingEndTime: 0,
+              burnAuth: 0,
+              hasPasswordMint: false,
+              maxTokens: '0',
+              admin: '0x00000000000000000000000000000000000000a2',
+              chainID: 84532,
+            },
+            mintedAddresses: ['0x00000000000000000000000000000000000000b1'],
+            burnedAddresses: [],
+            countsLoaded: true,
+            blockNumber: 1234,
+          },
+        },
+        lastBlock: 1234,
+      },
+    };
+
+    jest.spyOn(cacheScripts, 'readCache').mockResolvedValue(cacheEntry);
+    jest.spyOn(contractScripts, 'getGroupPasswordHash').mockResolvedValue(ethers.constants.HashZero);
+
+    const subject = createSubject({
+      SBTAddress: sbtAddress,
+      sessionSlug: 'edge',
+      refreshSbtData: refreshSpy,
+    });
+    subject.state = {
+      ...subject.state,
+      network: { id: 84532, name: 'Base Sepolia' },
+    };
+
+    await subject.loadSBTInfo(false);
+
+    expect(refreshSpy).not.toHaveBeenCalled();
+    expect(subject.state.sbtInfo).toEqual(expect.objectContaining({
+      image: '',
+      imageLocked: true,
+    }));
+  });
+
+  it('retries encrypted name and image decrypt after the wallet connects', async () => {
+    const sbtAddress = '0x00000000000000000000000000000000000000aa';
+    const sbtLower = sbtAddress.toLowerCase();
+    const account = '0x00000000000000000000000000000000000000ba';
+    const cacheEntry = {
+      '84532': {
+        sbtList: {
+          [sbtLower]: {
+            sbtAddress,
+            sbtInfo: {
+              name: '',
+              image: '',
+              encryptedFields: {
+                name: 'name-envelope',
+                image: {
+                  storage: 'lit-arweave',
+                  txId: 'img-tx',
+                },
+              },
+              encryption: {
+                enabled: true,
+                status: 'lit-v1',
+                targets: { name: true, image: true },
+              },
+              mintingEndTime: 0,
+              burnAuth: 0,
+              hasPasswordMint: false,
+              maxTokens: '0',
+              admin: '0x00000000000000000000000000000000000000a2',
+              chainID: 84532,
+            },
+            mintedAddresses: [account],
+            burnedAddresses: [],
+            countsLoaded: true,
+            blockNumber: 1234,
+          },
+        },
+        lastBlock: 1234,
+      },
+    };
+
+    jest.spyOn(cacheScripts, 'readCache').mockResolvedValue(cacheEntry);
+    jest.spyOn(contractScripts, 'getGroupPasswordHash').mockResolvedValue(ethers.constants.HashZero);
+    const decryptSpy = jest.spyOn(cryptoUtils, 'decryptEnvelopeValue').mockResolvedValue('Private Badge');
+    const downloadSpy = jest.spyOn(litStorage, 'downloadEncryptedArweaveData').mockResolvedValue({
+      payload: { encoding: 'base64', data: 'aW1hZ2U=', mime: 'image/png', name: 'badge.png' },
+      txId: 'img-tx',
+      url: 'lit-ar://img-tx',
+    });
+    jest.spyOn(litStorage, 'decodeLitPayloadToBlob').mockReturnValue(new Blob(['image'], { type: 'image/png' }));
+    const objectUrlMock = mockObjectUrlApis('blob:locked-image-after-connect');
+    window.__litHooks = { getKey: jest.fn() };
+
+    const subject = createSubject({
+      SBTAddress: sbtAddress,
+      sessionSlug: 'edge',
+    });
+    subject.state = {
+      ...subject.state,
+      network: { id: 84532, name: 'Base Sepolia' },
+    };
+
+    await subject.loadSBTInfo(true);
+
+    expect(decryptSpy).not.toHaveBeenCalled();
+    expect(downloadSpy).not.toHaveBeenCalled();
+
+    subject.props = {
+      ...subject.props,
+      account,
+    };
+
+    await subject.loadSBTInfo(true);
+
+    expect(decryptSpy).toHaveBeenCalledTimes(1);
+    expect(downloadSpy).toHaveBeenCalledTimes(1);
+    expect(objectUrlMock.createObjectURL).toHaveBeenCalledTimes(1);
+    expect(subject.state.sbtInfo).toEqual(expect.objectContaining({
+      name: 'Private Badge',
+      nameDecrypted: true,
+      image: 'blob:locked-image-after-connect',
+      imageDecrypted: true,
+    }));
+    objectUrlMock.restore();
+  });
+
+  it('retries encrypted metadata decrypt after the wallet connects', async () => {
+    const sbtAddress = '0x00000000000000000000000000000000000000a1';
+    const sbtLower = sbtAddress.toLowerCase();
+    const account = '0x00000000000000000000000000000000000000b1';
+    const cacheEntry = {
+      '84532': {
+        sbtList: {
+          [sbtLower]: {
+            sbtAddress,
+            sbtInfo: {
+              name: 'Badge',
+              tokenURI: 'ar://HLDsCm3ALbbgjVTCPVLhU8aF9taAdKyD1DyB7A8zkaXM',
+              image: 'https://example.com/badge.png',
+              description: '',
+              descriptionEncrypted: 'desc-envelope',
+              descriptionAccess: { type: 'sbt', gateIds: ['gate-description'], chainId: 84532 },
+              mintingEndTime: 0,
+              burnAuth: 0,
+              hasPasswordMint: false,
+              maxTokens: '0',
+              admin: '0x00000000000000000000000000000000000000a2',
+              chainID: 84532,
+            },
+            mintedAddresses: [account],
+            burnedAddresses: [],
+            countsLoaded: true,
+            blockNumber: 1234,
+          },
+        },
+        lastBlock: 1234,
+      },
+    };
+
+    jest.spyOn(cacheScripts, 'readCache').mockResolvedValue(cacheEntry);
+    jest.spyOn(contractScripts, 'getGroupPasswordHash').mockResolvedValue(ethers.constants.HashZero);
+    const decryptSpy = jest.spyOn(cryptoUtils, 'decryptEnvelopeValue').mockResolvedValue('Private description');
+    window.__litHooks = { getKey: jest.fn() };
+
+    const subject = createSubject({
+      SBTAddress: sbtAddress,
+      sessionSlug: 'edge',
+    });
+    subject.state = {
+      ...subject.state,
+      network: { id: 84532, name: 'Base Sepolia' },
+    };
+
+    await subject.loadSBTInfo(true);
+
+    expect(decryptSpy).not.toHaveBeenCalled();
+
+    subject.props = {
+      ...subject.props,
+      account,
+    };
+
+    await subject.loadSBTInfo(true);
+
+    expect(decryptSpy).toHaveBeenCalledTimes(1);
+    expect(subject.state.sbtInfo).toEqual(expect.objectContaining({
+      description: 'Private description',
+      descriptionDecrypted: true,
+    }));
+  });
+
+  it('retries encrypted metadata decrypt when the active account changes', async () => {
+    const sbtAddress = '0x00000000000000000000000000000000000000a1';
+    const sbtLower = sbtAddress.toLowerCase();
+    const accountA = '0x00000000000000000000000000000000000000b1';
+    const accountB = '0x00000000000000000000000000000000000000b2';
+    const cacheEntry = {
+      '84532': {
+        sbtList: {
+          [sbtLower]: {
+            sbtAddress,
+            sbtInfo: {
+              name: 'Badge',
+              tokenURI: 'ar://HLDsCm3ALbbgjVTCPVLhU8aF9taAdKyD1DyB7A8zkaXM',
+              image: 'https://example.com/badge.png',
+              description: '',
+              descriptionEncrypted: 'desc-envelope',
+              descriptionAccess: { type: 'sbt', gateIds: ['gate-description'], chainId: 84532 },
+              mintingEndTime: 0,
+              burnAuth: 0,
+              hasPasswordMint: false,
+              maxTokens: '0',
+              admin: '0x00000000000000000000000000000000000000a2',
+              chainID: 84532,
+            },
+            mintedAddresses: [accountA],
+            burnedAddresses: [],
+            countsLoaded: true,
+            blockNumber: 1234,
+          },
+        },
+        lastBlock: 1234,
+      },
+    };
+
+    jest.spyOn(cacheScripts, 'readCache').mockResolvedValue(cacheEntry);
+    jest.spyOn(contractScripts, 'getGroupPasswordHash').mockResolvedValue(ethers.constants.HashZero);
+    const decryptSpy = jest.spyOn(cryptoUtils, 'decryptEnvelopeValue')
+      .mockImplementation(async (_envelope, options = {}) => (
+        options.account === accountB ? 'Private description' : null
+      ));
+    window.__litHooks = { getKey: jest.fn() };
+
+    const subject = createSubject({
+      SBTAddress: sbtAddress,
+      sessionSlug: 'edge',
+      account: accountA,
+    });
+    subject.state = {
+      ...subject.state,
+      network: { id: 84532, name: 'Base Sepolia' },
+    };
+
+    await subject.loadSBTInfo(true);
+
+    expect(decryptSpy).toHaveBeenCalledTimes(1);
+    expect(subject.state.sbtInfo.description || '').toBe('');
+    expect(subject.state.sbtInfo.descriptionDecrypted).not.toBe(true);
+
+    subject.props = {
+      ...subject.props,
+      account: accountB,
+    };
+
+    await subject.loadSBTInfo(true);
+
+    expect(decryptSpy).toHaveBeenCalledTimes(2);
+    expect(decryptSpy.mock.calls.map((call) => call[1]?.account)).toEqual([accountA, accountB]);
+    expect(subject.state.sbtInfo).toEqual(expect.objectContaining({
+      description: 'Private description',
+      descriptionDecrypted: true,
+    }));
+  });
+
+  it('retries encrypted name and uploaded image decrypt when the active account changes', async () => {
+    const sbtAddress = '0x00000000000000000000000000000000000000ab';
+    const sbtLower = sbtAddress.toLowerCase();
+    const accountA = '0x00000000000000000000000000000000000000bb';
+    const accountB = '0x00000000000000000000000000000000000000bc';
+    const cacheEntry = {
+      '84532': {
+        sbtList: {
+          [sbtLower]: {
+            sbtAddress,
+            sbtInfo: {
+              name: '',
+              image: '',
+              encryptedFields: {
+                name: 'name-envelope',
+                image: {
+                  storage: 'lit-arweave',
+                  txId: 'img-tx',
+                },
+              },
+              encryption: {
+                enabled: true,
+                status: 'lit-v1',
+                targets: { name: true, image: true },
+              },
+              mintingEndTime: 0,
+              burnAuth: 0,
+              hasPasswordMint: false,
+              maxTokens: '0',
+              admin: '0x00000000000000000000000000000000000000a2',
+              chainID: 84532,
+            },
+            mintedAddresses: [accountA],
+            burnedAddresses: [],
+            countsLoaded: true,
+            blockNumber: 1234,
+          },
+        },
+        lastBlock: 1234,
+      },
+    };
+
+    jest.spyOn(cacheScripts, 'readCache').mockResolvedValue(cacheEntry);
+    jest.spyOn(contractScripts, 'getGroupPasswordHash').mockResolvedValue(ethers.constants.HashZero);
+    const decryptSpy = jest.spyOn(cryptoUtils, 'decryptEnvelopeValue')
+      .mockImplementation(async (_envelope, options = {}) => (
+        options.account === accountB ? 'Private Badge' : null
+      ));
+    const downloadSpy = jest.spyOn(litStorage, 'downloadEncryptedArweaveData')
+      .mockImplementation(async (_opts = {}) => {
+        if (_opts.account !== accountB) throw new Error('not authorized');
+        return {
+          payload: { encoding: 'base64', data: 'aW1hZ2U=', mime: 'image/png', name: 'badge.png' },
+          txId: 'img-tx',
+          url: 'lit-ar://img-tx',
+        };
+      });
+    jest.spyOn(litStorage, 'decodeLitPayloadToBlob').mockReturnValue(new Blob(['image'], { type: 'image/png' }));
+    const objectUrlMock = mockObjectUrlApis('blob:locked-image-after-account-switch');
+    window.__litHooks = { getKey: jest.fn() };
+
+    const subject = createSubject({
+      SBTAddress: sbtAddress,
+      sessionSlug: 'edge',
+      account: accountA,
+    });
+    subject.state = {
+      ...subject.state,
+      network: { id: 84532, name: 'Base Sepolia' },
+    };
+
+    await subject.loadSBTInfo(true);
+
+    expect(decryptSpy).toHaveBeenCalledTimes(1);
+    expect(subject.state.sbtInfo.name || '').toBe('');
+    expect(subject.state.sbtInfo.nameDecrypted).not.toBe(true);
+
+    subject.props = {
+      ...subject.props,
+      account: accountB,
+    };
+
+    await subject.loadSBTInfo(true);
+
+    expect(decryptSpy).toHaveBeenCalledTimes(2);
+    expect(downloadSpy).toHaveBeenCalledTimes(2);
+    expect(objectUrlMock.createObjectURL).toHaveBeenCalledTimes(1);
+    expect(subject.state.sbtInfo).toEqual(expect.objectContaining({
+      name: 'Private Badge',
+      nameDecrypted: true,
+      image: 'blob:locked-image-after-account-switch',
+      imageDecrypted: true,
+    }));
+    objectUrlMock.restore();
+  });
+
+  it('ignores stale holder state from an in-flight load after account changes', async () => {
+    jest.useFakeTimers();
+    try {
+      const sbtAddress = '0x00000000000000000000000000000000000000a1';
+      const sbtLower = sbtAddress.toLowerCase();
+      const ownerA = '0x00000000000000000000000000000000000000b1';
+      const ownerB = '0x00000000000000000000000000000000000000b2';
+      const cacheEntry = {
+        '84532': {
+          sbtList: {
+            [sbtLower]: {
+              sbtAddress,
+              sbtInfo: {
+                tokenURI: 'ar://HLDsCm3ALbbgjVTCPVLhU8aF9taAdKyD1DyB7A8zkaXM',
+                image: 'https://example.com/badge.png',
+                mintingEndTime: 0,
+                burnAuth: 0,
+                hasPasswordMint: false,
+                maxTokens: '0',
+                admin: '0x00000000000000000000000000000000000000a2',
+                chainID: 84532,
+              },
+              mintedAddresses: [ownerA],
+              burnedAddresses: [],
+              countsLoaded: true,
+              blockNumber: 1234,
+            },
+          },
+          lastBlock: 1234,
+        },
+      };
+
+      let resolveFirstRead;
+      const firstRead = new Promise((resolve) => { resolveFirstRead = resolve; });
+      const readSpy = jest.spyOn(cacheScripts, 'readCache')
+        .mockImplementationOnce(() => firstRead)
+        .mockResolvedValue(cacheEntry);
+      jest.spyOn(contractScripts, 'getGroupPasswordHash').mockResolvedValue(ethers.constants.HashZero);
+
+      const subject = createSubject({
+        SBTAddress: sbtAddress,
+        sessionSlug: 'edge',
+        account: ownerA,
+        sbtCacheRevision: 0,
+      });
+      subject.state = {
+        ...subject.state,
+        network: { id: 84532, name: 'Base Sepolia' },
+        userHasSBT: false,
+      };
+
+      const firstRun = subject.loadSBTInfo(false);
+      await Promise.resolve();
+
+      subject.props = {
+        ...subject.props,
+        account: ownerB,
+        sbtCacheRevision: 1,
+      };
+      await subject.loadSBTInfo(false);
+
+      resolveFirstRead(cacheEntry);
+      await firstRun;
+
+      expect(subject.state.userHasSBT).toBe(false);
+
+      jest.runOnlyPendingTimers();
+      await Promise.resolve();
+
+      expect(readSpy.mock.calls.length).toBeGreaterThanOrEqual(2);
+      expect(subject.state.userHasSBT).toBe(false);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('returns no holder lookups when minted count is zero', async () => {
+    const ownerSpy = jest.spyOn(contractScripts, 'getOwnerByTokenId').mockResolvedValue(
+      '0x00000000000000000000000000000000000000b1'
+    );
+    const subject = createSubject();
+
+    const holders = await subject.fetchHolderAddressesByTokenOwnership(
+      '0x00000000000000000000000000000000000000a1',
+      'edge',
+      0
+    );
+
+    expect(ownerSpy).not.toHaveBeenCalled();
+    expect(holders).toEqual([]);
+  });
+
+  it('batches ownerOf fallback lookups instead of probing strictly one-by-one', async () => {
+    const pending = new Map();
+    const ownerAddress = '0x00000000000000000000000000000000000000b1';
+    const ownerSpy = jest.spyOn(contractScripts, 'getOwnerByTokenId')
+      .mockImplementation(async (_providerName, _sbtAddress, tokenId) => {
+        const id = Number(tokenId);
+        if (id >= 1 && id <= 10) {
+          return new Promise((resolve) => {
+            pending.set(id, resolve);
+          });
+        }
+        return ownerAddress;
+      });
+    const subject = createSubject();
+
+    const runPromise = subject.fetchHolderAddressesByTokenOwnership(
+      '0x00000000000000000000000000000000000000a1',
+      'edge',
+      12
+    );
+    await Promise.resolve();
+
+    expect(ownerSpy).toHaveBeenCalledTimes(10);
+    expect(ownerSpy.mock.calls.slice(0, 10).map((call) => Number(call[2]))).toEqual(
+      [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    );
+
+    pending.forEach((resolve) => resolve(ownerAddress));
+    const holders = await runPromise;
+
+    expect(ownerSpy.mock.calls.map((call) => Number(call[2]))).toEqual(
+      [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 0]
+    );
+    expect(holders).toEqual([ownerAddress.toLowerCase()]);
+  });
+
+  it('returns ownerOf fallback holders in deterministic sorted order', async () => {
+    const pending = new Map();
+    const ownerA = '0x00000000000000000000000000000000000000b1';
+    const ownerB = '0x00000000000000000000000000000000000000b2';
+    const ownerC = '0x00000000000000000000000000000000000000b3';
+    const ownerSpy = jest.spyOn(contractScripts, 'getOwnerByTokenId')
+      .mockImplementation(async (_providerName, _sbtAddress, tokenId) => {
+        const id = Number(tokenId);
+        if (id === 0) return null;
+        return new Promise((resolve) => {
+          pending.set(id, resolve);
+        });
+      });
+    const subject = createSubject();
+
+    const runPromise = subject.fetchHolderAddressesByTokenOwnership(
+      '0x00000000000000000000000000000000000000a1',
+      'edge',
+      3
+    );
+    await Promise.resolve();
+    expect(ownerSpy).toHaveBeenCalledTimes(3);
+
+    pending.get(3)(ownerC);
+    pending.get(1)(ownerA);
+    pending.get(2)(ownerB);
+    const holders = await runPromise;
+
+    expect(ownerSpy.mock.calls.map((call) => Number(call[2]))).toEqual([1, 2, 3, 0]);
+    expect(holders).toEqual([ownerA.toLowerCase(), ownerB.toLowerCase(), ownerC.toLowerCase()]);
+  });
+
+  it('falls back to ownerOf holder discovery when minted count exists but event counts are empty', async () => {
+    const sbtAddress = '0x00000000000000000000000000000000000000a1';
+    const sbtLower = sbtAddress.toLowerCase();
+    const ownerA = '0x00000000000000000000000000000000000000b1';
+    const ownerB = '0x00000000000000000000000000000000000000b2';
+    const cacheEntry = {
+      '84532': {
+        sbtList: {
+          [sbtLower]: {
+            sbtAddress,
+            sbtInfo: {
+              tokenURI: 'ar://HLDsCm3ALbbgjVTCPVLhU8aF9taAdKyD1DyB7A8zkaXM',
+              mintingEndTime: 0,
+              burnAuth: 0,
+              hasPasswordMint: false,
+              maxTokens: '0',
+              admin: '0x00000000000000000000000000000000000000a2',
+              chainID: 84532,
+            },
+            mintedAddresses: [],
+            burnedAddresses: [],
+            countsLoaded: false,
+            blockNumber: 1234,
+          },
+        },
+        lastBlock: 1234,
+      },
+    };
+
+    jest.spyOn(cacheScripts, 'readCache').mockResolvedValue(cacheEntry);
+    jest.spyOn(contractScripts, 'getGroupPasswordHash').mockResolvedValue(ethers.constants.HashZero);
+    jest.spyOn(contractScripts, 'getMintedTokens').mockResolvedValue('2');
+    const ownerSpy = jest.spyOn(contractScripts, 'getOwnerByTokenId')
+      .mockImplementation(async (_providerName, _sbtAddress, tokenId) => {
+        if (Number(tokenId) === 0) return null;
+        if (Number(tokenId) === 1) return ownerA;
+        if (Number(tokenId) === 2) return ownerB;
+        return null;
+      });
+
+    const subject = createSubject({
+      SBTAddress: sbtAddress,
+      sessionSlug: 'edge',
+      account: ownerA,
+    });
+    subject.state = {
+      ...subject.state,
+      network: { id: 84532, name: 'Base Sepolia' },
+    };
+
+    await subject.loadSBTInfo(true);
+
+    expect(ownerSpy).toHaveBeenCalledTimes(3);
+    expect(ownerSpy.mock.calls.map((call) => Number(call[2]))).toEqual([1, 2, 0]);
+    expect(subject.state.countsLoaded).toBe(true);
+    expect(subject.state.mintedAddresses).toEqual([ownerA.toLowerCase(), ownerB.toLowerCase()]);
+    expect(subject.state.burnedAddresses).toEqual([]);
+    expect(subject.state.userHasSBT).toBe(true);
+  });
+
+  it('uses historySummary.totalMinted instead of currentHolderCount for sparse ownerOf fallback probes', async () => {
+    const sbtAddress = '0x00000000000000000000000000000000000000a1';
+    const sbtLower = sbtAddress.toLowerCase();
+    const ownerA = '0x00000000000000000000000000000000000000b1';
+    const cacheEntry = {
+      '84532': {
+        sbtList: {
+          [sbtLower]: {
+            sbtAddress,
+            sbtInfo: {
+              tokenURI: 'ar://HLDsCm3ALbbgjVTCPVLhU8aF9taAdKyD1DyB7A8zkaXM',
+              mintingEndTime: 0,
+              burnAuth: 0,
+              hasPasswordMint: false,
+              maxTokens: '0',
+              admin: '0x00000000000000000000000000000000000000a2',
+              chainID: 84532,
+            },
+            mintedAddresses: [],
+            burnedAddresses: [],
+            countsLoaded: false,
+            blockNumber: 1234,
+          },
+        },
+        lastBlock: 1234,
+      },
+    };
+
+    jest.spyOn(cacheScripts, 'readCache').mockResolvedValue(cacheEntry);
+    const summarySpy = jest.spyOn(contractScripts, 'getSbtHistorySummary').mockResolvedValue({
+      totalMinted: '5',
+      totalBurned: '4',
+      activeSupply: '1',
+      currentHolderCount: '1',
+      historicalHolderCount: '1',
+    });
+    const mintedSpy = jest.spyOn(contractScripts, 'getMintedTokens').mockResolvedValue('1');
+    jest.spyOn(contractScripts, 'getGroupPasswordHash').mockResolvedValue(ethers.constants.HashZero);
+    const ownerSpy = jest.spyOn(contractScripts, 'getOwnerByTokenId')
+      .mockImplementation(async (_providerName, _sbtAddress, tokenId) => {
+        if (Number(tokenId) === 5) return ownerA;
+        return null;
+      });
+
+    const subject = createSubject({
+      SBTAddress: sbtAddress,
+      sessionSlug: 'edge',
+      account: ownerA,
+    });
+    subject.state = {
+      ...subject.state,
+      network: { id: 84532, name: 'Base Sepolia' },
+    };
+
+    await subject.loadSBTInfo(true);
+
+    expect(summarySpy).toHaveBeenCalledTimes(1);
+    expect(mintedSpy).not.toHaveBeenCalled();
+    expect(ownerSpy.mock.calls.map((call) => Number(call[2]))).toEqual([1, 2, 3, 4, 5, 0]);
+    expect(subject.state.countsLoaded).toBe(true);
+    expect(subject.state.mintedAddresses).toEqual([ownerA.toLowerCase()]);
+    expect(subject.state.burnedAddresses).toEqual([]);
+    expect(subject.state.userHasSBT).toBe(true);
+  });
+
+  it('overrides stale cached burnAuth metadata with collectionBurnAuth from chain', async () => {
+    const sbtAddress = '0x00000000000000000000000000000000000000a1';
+    const sbtLower = sbtAddress.toLowerCase();
+    const holder = '0x00000000000000000000000000000000000000b1';
+    const cacheEntry = {
+      '84532': {
+        sbtList: {
+          [sbtLower]: {
+            sbtAddress,
+            sbtInfo: {
+              tokenURI: 'ar://HLDsCm3ALbbgjVTCPVLhU8aF9taAdKyD1DyB7A8zkaXM',
+              image: 'https://example.com/badge.png',
+              mintingEndTime: 0,
+              burnAuth: 0,
+              burnAuthNeedsOnChainRefresh: true,
+              hasPasswordMint: false,
+              maxTokens: '0',
+              admin: '0x00000000000000000000000000000000000000a2',
+              chainID: 84532,
+            },
+            mintedAddresses: [holder.toLowerCase()],
+            burnedAddresses: [],
+            countsLoaded: true,
+            blockNumber: 1234,
+          },
+        },
+        lastBlock: 1234,
+      },
+    };
+
+    jest.spyOn(cacheScripts, 'readCache').mockResolvedValue(cacheEntry);
+    jest.spyOn(contractScripts, 'getGroupPasswordHash').mockResolvedValue(ethers.constants.HashZero);
+    jest.spyOn(contractScripts, 'getMintedTokens').mockResolvedValue('0');
+    jest.spyOn(contractScripts, 'getReadProviderForGroup').mockReturnValue({});
+    const contractSpy = jest.spyOn(ethers, 'Contract').mockImplementation(() => ({
+      collectionBurnAuth: jest.fn().mockResolvedValue(2),
+    }));
+
+    const subject = createSubject({
+      SBTAddress: sbtAddress,
+      sessionSlug: 'edge',
+    });
+    subject.state = {
+      ...subject.state,
+      network: { id: 84532, name: 'Base Sepolia' },
+    };
+
+    await subject.loadSBTInfo(false);
+
+    expect(contractSpy).toHaveBeenCalled();
+    expect(subject.state.sbtInfo.burnAuth).toBe(2);
+    expect(subject.state.sbtInfo.burnAuthVerifiedOnChain).toBe(true);
+    expect(subject.state.sbtInfo.burnAuthNeedsOnChainRefresh).toBeUndefined();
+  });
+
+  it('keeps fully hydrated cached burnAuth values on the fast path unless refresh is explicitly requested', async () => {
+    const sbtAddress = '0x00000000000000000000000000000000000000a3';
+    const sbtLower = sbtAddress.toLowerCase();
+    const holder = '0x00000000000000000000000000000000000000b3';
+    const cacheEntry = {
+      '84532': {
+        sbtList: {
+          [sbtLower]: {
+            sbtAddress,
+            sbtInfo: {
+              tokenURI: 'ar://HLDsCm3ALbbgjVTCPVLhU8aF9taAdKyD1DyB7A8zkaXM',
+              image: 'https://example.com/badge.png',
+              mintingEndTime: 0,
+              burnAuth: 0,
+              hasPasswordMint: false,
+              maxTokens: '0',
+              admin: '0x00000000000000000000000000000000000000a2',
+              chainID: 84532,
+            },
+            mintedAddresses: [holder.toLowerCase()],
+            burnedAddresses: [],
+            countsLoaded: true,
+            blockNumber: 1234,
+          },
+        },
+        lastBlock: 1234,
+      },
+    };
+
+    jest.spyOn(cacheScripts, 'readCache').mockResolvedValue(cacheEntry);
+    jest.spyOn(contractScripts, 'getGroupPasswordHash').mockResolvedValue(ethers.constants.HashZero);
+    const contractSpy = jest.spyOn(ethers, 'Contract');
+
+    const subject = createSubject({
+      SBTAddress: sbtAddress,
+      sessionSlug: 'edge',
+    });
+    subject.state = {
+      ...subject.state,
+      network: { id: 84532, name: 'Base Sepolia' },
+    };
+
+    await subject.loadSBTInfo(false);
+
+    expect(contractSpy).not.toHaveBeenCalled();
+    expect(subject.state.sbtInfo.burnAuth).toBe(0);
+    expect(subject.state.sbtInfo.burnAuthVerifiedOnChain).toBeUndefined();
+  });
+
+  it('reconstructs current holder state from cached count maps for reburn/remint cases', async () => {
+    const sbtAddress = '0x00000000000000000000000000000000000000a1';
+    const sbtLower = sbtAddress.toLowerCase();
+    const holder = '0x00000000000000000000000000000000000000b1';
+    const holderLower = holder.toLowerCase();
+    const cacheEntry = {
+      '84532': {
+        sbtList: {
+          [sbtLower]: {
+            sbtAddress,
+            sbtInfo: {
+              tokenURI: 'ar://HLDsCm3ALbbgjVTCPVLhU8aF9taAdKyD1DyB7A8zkaXM',
+              mintingEndTime: 0,
+              burnAuth: 0,
+              hasPasswordMint: false,
+              maxTokens: '0',
+              admin: '0x00000000000000000000000000000000000000a2',
+              chainID: 84532,
+            },
+            mintedAddresses: [holderLower],
+            burnedAddresses: [holderLower],
+            mintedCountByAddress: { [holderLower]: 2 },
+            burnedCountByAddress: { [holderLower]: 1 },
+            countsLoaded: true,
+            blockNumber: 1234,
+          },
+        },
+        lastBlock: 1234,
+      },
+    };
+
+    jest.spyOn(cacheScripts, 'readCache').mockResolvedValue(cacheEntry);
+    jest.spyOn(contractScripts, 'getGroupPasswordHash').mockResolvedValue(ethers.constants.HashZero);
+
+    const subject = createSubject({
+      SBTAddress: sbtAddress,
+      sessionSlug: 'edge',
+      account: holder,
+    });
+    subject.state = {
+      ...subject.state,
+      network: { id: 84532, name: 'Base Sepolia' },
+    };
+
+    await subject.loadSBTInfo(true);
+
+    expect(subject.state.countsLoaded).toBe(true);
+    expect(subject.state.mintedAddresses).toEqual([holderLower, holderLower]);
+    expect(subject.state.burnedAddresses).toEqual([holderLower]);
+    expect(subject.state.userHasSBT).toBe(true);
+    expect(subject.getMemoizedNetHoldersList(subject.state.mintedAddresses, subject.state.burnedAddresses)).toEqual([holderLower]);
+  });
+
+  it('probes tokenId 0 after one-based ids for zero-based multi-token contracts', async () => {
+    const ownerA = '0x00000000000000000000000000000000000000b1';
+    const ownerB = '0x00000000000000000000000000000000000000b2';
+    const ownerSpy = jest.spyOn(contractScripts, 'getOwnerByTokenId')
+      .mockImplementation(async (_providerName, _sbtAddress, tokenId) => {
+        if (Number(tokenId) === 1) return ownerA;
+        if (Number(tokenId) === 2) return ownerA;
+        if (Number(tokenId) === 0) return ownerB;
+        return null;
+      });
+    const subject = createSubject();
+
+    const holders = await subject.fetchHolderAddressesByTokenOwnership(
+      '0x00000000000000000000000000000000000000a1',
+      'edge',
+      2
+    );
+
+    expect(ownerSpy.mock.calls.map((call) => Number(call[2]))).toEqual([1, 2, 0]);
+    expect(holders).toEqual([ownerA.toLowerCase(), ownerB.toLowerCase()]);
+  });
+
+  it('falls back to ownerOf tokenId 0 when first mint uses zero-based ids', async () => {
+    const sbtAddress = '0x00000000000000000000000000000000000000a1';
+    const sbtLower = sbtAddress.toLowerCase();
+    const ownerA = '0x00000000000000000000000000000000000000b1';
+    const cacheEntry = {
+      '84532': {
+        sbtList: {
+          [sbtLower]: {
+            sbtAddress,
+            sbtInfo: {
+              tokenURI: 'ar://HLDsCm3ALbbgjVTCPVLhU8aF9taAdKyD1DyB7A8zkaXM',
+              mintingEndTime: 0,
+              burnAuth: 0,
+              hasPasswordMint: false,
+              maxTokens: '0',
+              admin: '0x00000000000000000000000000000000000000a2',
+              chainID: 84532,
+            },
+            mintedAddresses: [],
+            burnedAddresses: [],
+            countsLoaded: false,
+            blockNumber: 1234,
+          },
+        },
+        lastBlock: 1234,
+      },
+    };
+
+    jest.spyOn(cacheScripts, 'readCache').mockResolvedValue(cacheEntry);
+    jest.spyOn(contractScripts, 'getGroupPasswordHash').mockResolvedValue(ethers.constants.HashZero);
+    jest.spyOn(contractScripts, 'getMintedTokens').mockResolvedValue('1');
+    const ownerSpy = jest.spyOn(contractScripts, 'getOwnerByTokenId')
+      .mockImplementation(async (_providerName, _sbtAddress, tokenId) => {
+        if (Number(tokenId) === 0) return ownerA;
+        return null;
+      });
+
+    const subject = createSubject({
+      SBTAddress: sbtAddress,
+      sessionSlug: 'edge',
+      account: ownerA,
+    });
+    subject.state = {
+      ...subject.state,
+      network: { id: 84532, name: 'Base Sepolia' },
+    };
+
+    await subject.loadSBTInfo(true);
+
+    expect(ownerSpy).toHaveBeenCalledTimes(2);
+    expect(ownerSpy.mock.calls.map((call) => Number(call[2]))).toEqual([1, 0]);
+    expect(subject.state.countsLoaded).toBe(true);
+    expect(subject.state.mintedAddresses).toEqual([ownerA.toLowerCase()]);
+    expect(subject.state.burnedAddresses).toEqual([]);
+    expect(subject.state.userHasSBT).toBe(true);
+  });
+
+  it('preserves mintedTokensOverride after refresh when refreshed holder lists are incomplete', async () => {
+    const sbtAddress = '0x00000000000000000000000000000000000000a1';
+    const sbtLower = sbtAddress.toLowerCase();
+    const ownerA = '0x00000000000000000000000000000000000000b1';
+    const initialEntry = {
+      '84532': {
+        sbtList: {
+          [sbtLower]: {
+            sbtAddress,
+            sbtInfo: {
+              tokenURI: 'ar://HLDsCm3ALbbgjVTCPVLhU8aF9taAdKyD1DyB7A8zkaXM',
+              image: 'https://example.com/badge.png',
+              mintingEndTime: 0,
+              burnAuth: 0,
+              hasPasswordMint: false,
+              maxTokens: '0',
+              admin: '0x00000000000000000000000000000000000000a2',
+              chainID: 84532,
+            },
+            mintedAddresses: [],
+            burnedAddresses: [],
+            countsLoaded: false,
+            blockNumber: 1234,
+          },
+        },
+        lastBlock: 1234,
+      },
+    };
+    const refreshedEntry = {
+      '84532': {
+        sbtList: {
+          [sbtLower]: {
+            sbtAddress,
+            sbtInfo: {
+              tokenURI: 'ar://HLDsCm3ALbbgjVTCPVLhU8aF9taAdKyD1DyB7A8zkaXM',
+              image: 'https://example.com/badge.png',
+              mintingEndTime: 0,
+              burnAuth: 0,
+              hasPasswordMint: false,
+              maxTokens: '0',
+              admin: '0x00000000000000000000000000000000000000a2',
+              chainID: 84532,
+            },
+            mintedAddresses: [ownerA],
+            burnedAddresses: [],
+            countsLoaded: true,
+            blockNumber: 1250,
+          },
+        },
+        lastBlock: 1250,
+      },
+    };
+
+    const readSpy = jest.spyOn(cacheScripts, 'readCache')
+      .mockResolvedValueOnce(initialEntry)
+      .mockResolvedValueOnce(refreshedEntry);
+    const refreshSpy = jest.fn().mockResolvedValue(undefined);
+    jest.spyOn(contractScripts, 'getGroupPasswordHash').mockResolvedValue(ethers.constants.HashZero);
+    jest.spyOn(contractScripts, 'getMintedTokens').mockResolvedValue('7');
+
+    const subject = createSubject({
+      SBTAddress: sbtAddress,
+      sessionSlug: 'edge',
+      account: ownerA,
+      refreshSbtData: refreshSpy,
+    });
+    subject.state = {
+      ...subject.state,
+      network: { id: 84532, name: 'Base Sepolia' },
+    };
+
+    await subject.loadSBTInfo(true);
+
+    expect(readSpy).toHaveBeenCalledTimes(2);
+    expect(refreshSpy).toHaveBeenCalledTimes(1);
+    expect(subject.state.countsLoaded).toBe(true);
+    expect(subject.state.mintedAddresses).toEqual([ownerA.toLowerCase()]);
+    expect(subject.state.mintedTokensOverride).toBe('7');
+  });
+
+  it('does not preserve stale holders when holders meta key changes', async () => {
+    const sbtAddress = '0x00000000000000000000000000000000000000a1';
+    const sbtLower = sbtAddress.toLowerCase();
+    const ownerA = '0x00000000000000000000000000000000000000b1';
+    const emptyCountsLoadedEntry = {
+      '84532': {
+        sbtList: {
+          [sbtLower]: {
+            sbtAddress,
+            sbtInfo: {
+              tokenURI: 'ar://HLDsCm3ALbbgjVTCPVLhU8aF9taAdKyD1DyB7A8zkaXM',
+              image: 'https://example.com/badge.png',
+              mintingEndTime: 0,
+              burnAuth: 0,
+              hasPasswordMint: false,
+              maxTokens: '0',
+              admin: '0x00000000000000000000000000000000000000a2',
+              chainID: 84532,
+            },
+            mintedAddresses: [],
+            burnedAddresses: [],
+            countsLoaded: true,
+            blockNumber: 1234,
+          },
+        },
+        lastBlock: 1234,
+      },
+    };
+
+    jest.spyOn(cacheScripts, 'readCache').mockResolvedValue(emptyCountsLoadedEntry);
+    jest.spyOn(contractScripts, 'getGroupPasswordHash').mockResolvedValue(ethers.constants.HashZero);
+    jest.spyOn(contractScripts, 'getMintedTokens').mockResolvedValue('0');
+
+    const subject = createSubject({
+      SBTAddress: sbtAddress,
+      sessionSlug: 'edge',
+      account: ownerA,
+    });
+    subject.state = {
+      ...subject.state,
+      network: { id: 84532, name: 'Base Sepolia' },
+      mintedAddresses: [ownerA.toLowerCase()],
+      burnedAddresses: [],
+      countsLoaded: true,
+      holdersMetaKey: '84532:previous',
+      userHasSBT: true,
+    };
+
+    await subject.loadSBTInfo(true);
+
+    expect(subject.state.mintedAddresses).toEqual([]);
+    expect(subject.state.burnedAddresses).toEqual([]);
+    expect(subject.state.countsLoaded).toBe(true);
+    expect(subject.state.userHasSBT).toBe(false);
+  });
+
+  it('preserves previously visible holders after same-key empty refresh snapshot without new burns', async () => {
+    const sbtAddress = '0x00000000000000000000000000000000000000a1';
+    const sbtLower = sbtAddress.toLowerCase();
+    const ownerA = '0x00000000000000000000000000000000000000b1';
+    const initialEntry = createReadCachePayload({
+      sbtAddress,
+      mintedAddresses: [],
+      burnedAddresses: [],
+      countsLoaded: false,
+      blockNumber: 1234,
+    });
+    const refreshedEntry = createReadCachePayload({
+      sbtAddress,
+      mintedAddresses: [],
+      burnedAddresses: [],
+      countsLoaded: true,
+      blockNumber: 1250,
+      lastBlock: 1250,
+    });
+
+    const readSpy = jest.spyOn(cacheScripts, 'readCache')
+      .mockResolvedValueOnce(initialEntry)
+      .mockResolvedValueOnce(refreshedEntry);
+    const refreshSpy = jest.fn().mockResolvedValue(undefined);
+    jest.spyOn(contractScripts, 'getGroupPasswordHash').mockResolvedValue(ethers.constants.HashZero);
+    jest.spyOn(contractScripts, 'getMintedTokens').mockResolvedValue('2');
+    const ownerSpy = jest.spyOn(contractScripts, 'getOwnerByTokenId').mockResolvedValue(null);
+
+    const subject = createSubject({
+      SBTAddress: sbtAddress,
+      sessionSlug: 'edge',
+      account: ownerA,
+      refreshSbtData: refreshSpy,
+    });
+    subject.state = {
+      ...subject.state,
+      network: { id: 84532, name: 'Base Sepolia' },
+      mintedAddresses: [ownerA.toLowerCase()],
+      burnedAddresses: [],
+      countsLoaded: true,
+      filteredMintedUsers: [ownerA.toLowerCase()],
+      filteredMintedUsersSignature: subject.buildAddressListSignature([ownerA.toLowerCase()]),
+      showModal: true,
+      mintingAddressesFilterInitialized: true,
+      holdersMetaKey: `edge:84532:${sbtLower}`,
+      userHasSBT: true,
+    };
+
+    await subject.loadSBTInfo(true);
+
+    expect(readSpy).toHaveBeenCalledTimes(2);
+    expect(refreshSpy).toHaveBeenCalledTimes(1);
+    expect(ownerSpy.mock.calls.map((call) => Number(call[2]))).toEqual([1, 2, 0]);
+    expect(subject.state.mintedAddresses).toEqual([ownerA.toLowerCase()]);
+    expect(subject.state.burnedAddresses).toEqual([]);
+    expect(subject.state.countsLoaded).toBe(true);
+    expect(subject.state.userHasSBT).toBe(true);
+    expect(subject.state.filteredMintedUsers).toEqual([ownerA.toLowerCase()]);
+  });
+
+  it('clears only the holder whose burn count increases during a same-key empty refresh', async () => {
+    const sbtAddress = '0x00000000000000000000000000000000000000a1';
+    const ownerA = '0x00000000000000000000000000000000000000b1';
+    const ownerB = '0x00000000000000000000000000000000000000b2';
+    const initialEntry = createReadCachePayload({
+      sbtAddress,
+      mintedAddresses: [],
+      burnedAddresses: [],
+      countsLoaded: false,
+      blockNumber: 1234,
+    });
+    const refreshedEntry = createReadCachePayload({
+      sbtAddress,
+      mintedAddresses: [],
+      burnedAddresses: [ownerA],
+      countsLoaded: true,
+      blockNumber: 1250,
+      lastBlock: 1250,
+    });
+
+    jest.spyOn(cacheScripts, 'readCache')
+      .mockResolvedValueOnce(initialEntry)
+      .mockResolvedValueOnce(refreshedEntry);
+    const refreshSpy = jest.fn().mockResolvedValue(undefined);
+    jest.spyOn(contractScripts, 'getGroupPasswordHash').mockResolvedValue(ethers.constants.HashZero);
+    jest.spyOn(contractScripts, 'getMintedTokens').mockResolvedValue('2');
+
+    const subject = createSubject({
+      SBTAddress: sbtAddress,
+      sessionSlug: 'edge',
+      account: ownerA,
+      refreshSbtData: refreshSpy,
+    });
+    subject.state = {
+      ...subject.state,
+      network: { id: 84532, name: 'Base Sepolia' },
+      mintedAddresses: [ownerA.toLowerCase(), ownerB.toLowerCase()],
+      burnedAddresses: [],
+      countsLoaded: true,
+      filteredMintedUsers: [ownerA.toLowerCase(), ownerB.toLowerCase()],
+      filteredMintedUsersSignature: subject.buildAddressListSignature([ownerA.toLowerCase(), ownerB.toLowerCase()]),
+      showModal: true,
+      mintingAddressesFilterInitialized: true,
+      holdersMetaKey: `edge:84532:${sbtAddress.toLowerCase()}`,
+      userHasSBT: true,
+    };
+
+    await subject.loadSBTInfo(true);
+
+    expect(refreshSpy).toHaveBeenCalledTimes(1);
+    expect(subject.state.mintedAddresses).toEqual([ownerA.toLowerCase(), ownerB.toLowerCase()]);
+    expect(subject.state.burnedAddresses).toEqual([ownerA.toLowerCase()]);
+    expect(subject.getMemoizedNetHoldersList(subject.state.mintedAddresses, subject.state.burnedAddresses)).toEqual([ownerB.toLowerCase()]);
+    expect(subject.state.filteredMintedUsers).toEqual([ownerB.toLowerCase()]);
+    expect(subject.state.userHasSBT).toBe(false);
+  });
+
+  it('clears visible holder rows immediately on local burn success', () => {
+    const ownerA = '0x00000000000000000000000000000000000000b1';
+    const ownerB = '0x00000000000000000000000000000000000000b2';
+    const subject = createSubject({
+      account: ownerA,
+    });
+    subject.state = {
+      ...subject.state,
+      mintedAddresses: [ownerA.toLowerCase(), ownerB.toLowerCase()],
+      burnedAddresses: [],
+      filteredMintedUsers: [ownerA.toLowerCase(), ownerB.toLowerCase()],
+      filteredMintedUsersSignature: subject.buildAddressListSignature([ownerA.toLowerCase(), ownerB.toLowerCase()]),
+      showModal: true,
+      mintingAddressesFilterInitialized: true,
+      userHasSBT: true,
+    };
+
+    subject.applyLocalBurnSuccess(ownerA.toLowerCase());
+
+    expect(subject.state.burnedAddresses).toEqual([ownerA.toLowerCase()]);
+    expect(subject.state.filteredMintedUsers).toEqual([ownerB.toLowerCase()]);
+    expect(subject.state.userHasSBT).toBe(false);
+  });
+
+  it('replaces preserved holder rows when a resolved non-empty refresh snapshot arrives', async () => {
+    const sbtAddress = '0x00000000000000000000000000000000000000a1';
+    const ownerA = '0x00000000000000000000000000000000000000b1';
+    const ownerB = '0x00000000000000000000000000000000000000b2';
+    const initialEntry = createReadCachePayload({
+      sbtAddress,
+      mintedAddresses: [],
+      burnedAddresses: [],
+      countsLoaded: false,
+      blockNumber: 1234,
+    });
+    const refreshedEntry = createReadCachePayload({
+      sbtAddress,
+      mintedAddresses: [ownerB],
+      burnedAddresses: [],
+      countsLoaded: true,
+      blockNumber: 1250,
+      lastBlock: 1250,
+    });
+
+    jest.spyOn(cacheScripts, 'readCache')
+      .mockResolvedValueOnce(initialEntry)
+      .mockResolvedValueOnce(refreshedEntry);
+    const refreshSpy = jest.fn().mockResolvedValue(undefined);
+    jest.spyOn(contractScripts, 'getGroupPasswordHash').mockResolvedValue(ethers.constants.HashZero);
+    jest.spyOn(contractScripts, 'getMintedTokens').mockResolvedValue('1');
+
+    const subject = createSubject({
+      SBTAddress: sbtAddress,
+      sessionSlug: 'edge',
+      account: ownerA,
+      refreshSbtData: refreshSpy,
+    });
+    subject.state = {
+      ...subject.state,
+      network: { id: 84532, name: 'Base Sepolia' },
+      mintedAddresses: [ownerA.toLowerCase()],
+      burnedAddresses: [],
+      countsLoaded: true,
+      filteredMintedUsers: [ownerA.toLowerCase()],
+      filteredMintedUsersSignature: subject.buildAddressListSignature([ownerA.toLowerCase()]),
+      showModal: true,
+      mintingAddressesFilterInitialized: true,
+      holdersMetaKey: `edge:84532:${sbtAddress.toLowerCase()}`,
+      userHasSBT: true,
+    };
+
+    await subject.loadSBTInfo(true);
+
+    expect(refreshSpy).toHaveBeenCalledTimes(1);
+    expect(subject.state.mintedAddresses).toEqual([ownerB.toLowerCase()]);
+    expect(subject.state.burnedAddresses).toEqual([]);
+    expect(subject.state.filteredMintedUsers).toEqual([ownerB.toLowerCase()]);
+    expect(subject.state.userHasSBT).toBe(false);
+  });
+
+  it('shows net holder count when burns create a holder gap', () => {
+    const subject = createSubject({
+      SBTAddress: '0x00000000000000000000000000000000000000a1',
+    });
+    subject.state = {
+      ...subject.state,
+      sbtInfo: {
+        name: 'Badge',
+        tokenURI: 'ar://HLDsCm3ALbbgjVTCPVLhU8aF9taAdKyD1DyB7A8zkaXM',
+        image: 'https://example.com/badge.png',
+        mintingEndTime: 0,
+        burnAuth: 0,
+        maxTokens: '0',
+        admin: '0x00000000000000000000000000000000000000a2',
+      },
+      mintedAddresses: [
+        '0x00000000000000000000000000000000000000b1',
+        '0x00000000000000000000000000000000000000b2',
+        '0x00000000000000000000000000000000000000b3',
+        '0x00000000000000000000000000000000000000b4',
+        '0x00000000000000000000000000000000000000b5',
+        '0x00000000000000000000000000000000000000b6',
+        '0x00000000000000000000000000000000000000b7',
+      ],
+      burnedAddresses: [
+        '0x00000000000000000000000000000000000000b6',
+        '0x00000000000000000000000000000000000000b7',
+      ],
+      countsLoaded: true,
+      mintedTokensOverride: '7',
+      showModal: true,
+      loadingMintersBurners: false,
+    };
+
+    const tree = subject.render();
+    const modalCount = findElementInTree(
+      tree,
+      (element) => element?.props?.className === styles.modalTitleCount
+    );
+    expect(modalCount).toBeTruthy();
+    expect(flattenText(modalCount)).toBe('(5)');
+  });
+
+  it('shows approximate holder count from mintedTokens override even after local loading flags clear', () => {
+    const subject = createSubject({
+      SBTAddress: '0x00000000000000000000000000000000000000a1',
+    });
+    subject.state = {
+      ...subject.state,
+      sbtInfo: {
+        name: 'Badge',
+        tokenURI: 'ar://HLDsCm3ALbbgjVTCPVLhU8aF9taAdKyD1DyB7A8zkaXM',
+        image: 'https://example.com/badge.png',
+        mintingEndTime: 0,
+        burnAuth: 0,
+        maxTokens: '0',
+        admin: '0x00000000000000000000000000000000000000a2',
+      },
+      mintedAddresses: [],
+      burnedAddresses: [],
+      countsLoaded: true,
+      mintedTokensOverride: '1',
+      showModal: true,
+      loadingMintersBurners: false,
+    };
+
+    const tree = subject.render();
+    expect(treeIncludesText(tree, '~1')).toBe(true);
+    expect(treeIncludesText(tree, 'No holders found.')).toBe(false);
+  });
+
+  it('shows net holder count from mint history when override is absent', () => {
+    const subject = createSubject({
+      SBTAddress: '0x00000000000000000000000000000000000000a1',
+    });
+    subject.state = {
+      ...subject.state,
+      sbtInfo: {
+        name: 'Badge',
+        tokenURI: 'ar://HLDsCm3ALbbgjVTCPVLhU8aF9taAdKyD1DyB7A8zkaXM',
+        image: 'https://example.com/badge.png',
+        mintingEndTime: 0,
+        burnAuth: 0,
+        maxTokens: '0',
+        admin: '0x00000000000000000000000000000000000000a2',
+      },
+      mintedAddresses: [
+        '0x00000000000000000000000000000000000000b1',
+        '0x00000000000000000000000000000000000000b2',
+        '0x00000000000000000000000000000000000000b3',
+        '0x00000000000000000000000000000000000000b4',
+      ],
+      burnedAddresses: [
+        '0x00000000000000000000000000000000000000b3',
+      ],
+      countsLoaded: true,
+      mintedTokensOverride: null,
+      showModal: true,
+      loadingMintersBurners: false,
+    };
+
+    const tree = subject.render();
+    const modalCount = findElementInTree(
+      tree,
+      (element) => element?.props?.className === styles.modalTitleCount
+    );
+    expect(modalCount).toBeTruthy();
+    expect(flattenText(modalCount)).toBe('(3)');
+  });
+
+  it('shows zero holders when all tokens are burned', () => {
+    const subject = createSubject({
+      SBTAddress: '0x00000000000000000000000000000000000000a1',
+    });
+    subject.state = {
+      ...subject.state,
+      sbtInfo: {
+        name: 'Badge',
+        tokenURI: 'ar://HLDsCm3ALbbgjVTCPVLhU8aF9taAdKyD1DyB7A8zkaXM',
+        image: 'https://example.com/badge.png',
+        mintingEndTime: 0,
+        burnAuth: 0,
+        maxTokens: '0',
+        admin: '0x00000000000000000000000000000000000000a2',
+      },
+      mintedAddresses: [
+        '0x00000000000000000000000000000000000000b1',
+        '0x00000000000000000000000000000000000000b2',
+      ],
+      burnedAddresses: [
+        '0x00000000000000000000000000000000000000b1',
+        '0x00000000000000000000000000000000000000b2',
+      ],
+      countsLoaded: true,
+      mintedTokensOverride: null,
+      showModal: true,
+      loadingMintersBurners: false,
+    };
+
+    const tree = subject.render();
+    const modalCount = findElementInTree(
+      tree,
+      (element) => element?.props?.className === styles.modalTitleCount
+    );
+    expect(modalCount).toBeTruthy();
+    expect(flattenText(modalCount)).toBe('(0)');
+  });
+
+  it.each(['NaN', 'bad string'])(
+    'sanitizes malformed mintedTokensOverride values before persisting (%s)',
+    async (malformedOverride) => {
+      const sbtAddress = '0x00000000000000000000000000000000000000a1';
+      const sbtLower = sbtAddress.toLowerCase();
+      const cacheEntry = {
+        '84532': {
+          sbtList: {
+            [sbtLower]: {
+              sbtAddress,
+              sbtInfo: {
+                tokenURI: 'ar://HLDsCm3ALbbgjVTCPVLhU8aF9taAdKyD1DyB7A8zkaXM',
+                mintingEndTime: 0,
+                burnAuth: 0,
+                hasPasswordMint: false,
+                maxTokens: '0',
+                admin: '0x00000000000000000000000000000000000000a2',
+                chainID: 84532,
+              },
+              mintedAddresses: [],
+              burnedAddresses: [],
+              countsLoaded: false,
+              blockNumber: 1234,
+            },
+          },
+          lastBlock: 1234,
+        },
+      };
+
+      jest.spyOn(cacheScripts, 'readCache').mockResolvedValue(cacheEntry);
+      jest.spyOn(contractScripts, 'getGroupPasswordHash').mockResolvedValue(ethers.constants.HashZero);
+      jest.spyOn(contractScripts, 'getMintedTokens').mockResolvedValue(malformedOverride);
+      const ownerSpy = jest.spyOn(contractScripts, 'getOwnerByTokenId').mockResolvedValue(null);
+      const subject = createSubject({
+        SBTAddress: sbtAddress,
+        sessionSlug: 'edge',
+      });
+      subject.state = {
+        ...subject.state,
+        network: { id: 84532, name: 'Base Sepolia' },
+      };
+
+      await subject.loadSBTInfo(false);
+
+      expect(subject.state.mintedTokensOverride).toBeNull();
+      expect(ownerSpy).not.toHaveBeenCalled();
+    }
+  );
+
+  it('writes bookmark updates to managed cache and legacy localStorage', () => {
+    jest.useFakeTimers();
+    const peekSpy = jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue({ sbts: [] });
+    const writeSpy = jest.spyOn(cacheScripts, 'writeCache').mockResolvedValue(true);
+    const subject = createSubject({
+      SBTAddress: '0xAbC0000000000000000000000000000000000000',
+      activeSessionSlug: 'edge',
+    });
+
+    subject.bookmarkSBT();
+    jest.runOnlyPendingTimers();
+
+    expect(peekSpy).toHaveBeenCalledWith('bookmarksCache', 'edge', { clone: false });
+    expect(writeSpy).toHaveBeenCalledWith(
+      'bookmarksCache',
+      'edge',
+      expect.objectContaining({
+        sbts: expect.arrayContaining(['0xabc0000000000000000000000000000000000000']),
+      })
+    );
+    expect(JSON.parse(localStorage.getItem('bookmarks'))?.sbts || []).toContain('0xAbC0000000000000000000000000000000000000');
+    jest.useRealTimers();
+  });
+
+  it('coalesces repeated sbtDetails writes when payload is unchanged', () => {
+    jest.useFakeTimers();
+    const setSpy = jest.spyOn(Storage.prototype, 'setItem');
+    const subject = createSubject({
+      SBTAddress: '0xdef0000000000000000000000000000000000000',
+    });
+    subject.state = {
+      ...subject.state,
+      sbtInfo: { name: 'Badge', creator: '0xabc' },
+    };
+
+    subject.storeSBTDetails();
+    subject.storeSBTDetails();
+    jest.runOnlyPendingTimers();
+
+    expect(setSpy.mock.calls.filter((call) => call[0] === 'sbtDetails')).toHaveLength(1);
+    setSpy.mockRestore();
+    jest.useRealTimers();
+  });
+
+  it('retains queued transaction hashes when multiple writes happen before flush', () => {
+    jest.useFakeTimers();
+    const subject = createSubject({ account: '0xABC' });
+
+    subject.cacheTransactionHash('0xtx1');
+    subject.cacheTransactionHash('0xtx2');
+    jest.runOnlyPendingTimers();
+
+    const txCache = JSON.parse(localStorage.getItem('transactions') || '{}');
+    expect(txCache['0xabc']).toEqual(['0xtx1', '0xtx2']);
+    jest.useRealTimers();
+  });
+
+  it('opens mini-card navigation when click originates from the card itself', () => {
+    const { cardNode, sbtAddress } = renderMiniCardNode();
+    const openSpy = jest.spyOn(window, 'open').mockImplementation(() => null);
+    const preventDefault = jest.fn();
+    const stopPropagation = jest.fn();
+    const cardTarget = { closest: jest.fn(() => cardTarget) };
+
+    cardNode.props.onClick({
+      target: cardTarget,
+      currentTarget: cardTarget,
+      preventDefault,
+      stopPropagation,
+    });
+
+    expect(openSpy).toHaveBeenCalledWith(
+      `${window.location.origin}${buildSbtDetailPath(sbtAddress)}`,
+      '_blank',
+      'noopener,noreferrer'
+    );
+    expect(preventDefault).toHaveBeenCalledTimes(1);
+    expect(stopPropagation).toHaveBeenCalledTimes(1);
+    openSpy.mockRestore();
+  });
+
+  it('hides the mini-card address in plain mode', () => {
+    const cryptoModeSpy = jest.spyOn(terminology, 'isCryptoMode').mockReturnValue(false);
+    const { cardNode } = renderMiniCardNode();
+
+    expect(findElementInTree(cardNode, (element) => element?.props?.id === styles.miniSbtAddress)).toBeNull();
+
+    cryptoModeSpy.mockRestore();
+  });
+
+  it('shows the mini-card address in crypto mode', () => {
+    const cryptoModeSpy = jest.spyOn(terminology, 'isCryptoMode').mockReturnValue(true);
+    const { cardNode, sbtAddress } = renderMiniCardNode();
+    const addressNode = findElementInTree(cardNode, (element) => element?.props?.id === styles.miniSbtAddress);
+
+    expect(addressNode).not.toBeNull();
+    expect(flattenText(addressNode)).toContain(proposalScripts.getShortenedAddress(sbtAddress, false));
+
+    cryptoModeSpy.mockRestore();
+  });
+
+  it('includes the resolved session slug in mini-card navigation when one is available', () => {
+    const { cardNode, sbtAddress } = renderMiniCardNode({ sessionSlug: 'edge-private' });
+    const openSpy = jest.spyOn(window, 'open').mockImplementation(() => null);
+    const preventDefault = jest.fn();
+    const stopPropagation = jest.fn();
+    const cardTarget = { closest: jest.fn(() => cardTarget) };
+
+    cardNode.props.onClick({
+      target: cardTarget,
+      currentTarget: cardTarget,
+      preventDefault,
+      stopPropagation,
+    });
+
+    expect(openSpy).toHaveBeenCalledWith(
+      `${window.location.origin}${buildSbtDetailPath(sbtAddress, 'edge-private')}`,
+      '_blank',
+      'noopener,noreferrer'
+    );
+    expect(preventDefault).toHaveBeenCalledTimes(1);
+    expect(stopPropagation).toHaveBeenCalledTimes(1);
+    openSpy.mockRestore();
+  });
+
+  it('ignores mini-card click and Enter key events from nested interactive elements', () => {
+    const { cardNode } = renderMiniCardNode();
+    const openSpy = jest.spyOn(window, 'open').mockImplementation(() => null);
+    const preventDefault = jest.fn();
+    const nestedInteractive = {};
+    const nestedTarget = { closest: jest.fn(() => nestedInteractive) };
+    const currentTarget = {};
+
+    cardNode.props.onClick({
+      target: nestedTarget,
+      currentTarget,
+      preventDefault,
+      stopPropagation: jest.fn(),
+    });
+    cardNode.props.onKeyDown({
+      key: 'Enter',
+      target: nestedTarget,
+      currentTarget,
+      preventDefault,
+    });
+
+    expect(openSpy).not.toHaveBeenCalled();
+    expect(preventDefault).not.toHaveBeenCalled();
+    openSpy.mockRestore();
+  });
+
+  it('fails password mint pre-validation before startClaim when the claim code is invalid', async () => {
+    const sbtAddress = '0x00000000000000000000000000000000000000d1';
+    const account = '0x00000000000000000000000000000000000000d2';
+    const subject = createSubject({
+      SBTAddress: sbtAddress,
+      account,
+      loginComplete: true,
+      sessionSlug: 'edge',
+    });
+    subject.state = {
+      ...subject.state,
+      sbtInfo: { hasPasswordMint: true },
+      manualPasswordInput: 'invalid-code',
+      mintStep: 0,
+    };
+
+    const isPasswordValidSpy = jest.spyOn(contractScripts, 'isPasswordValid').mockResolvedValue(false);
+    const startClaimSpy = jest.spyOn(contractScripts, 'startClaim').mockResolvedValue({ transactionHash: '0xstart' });
+
+    await subject.handleMint(false);
+
+    expect(isPasswordValidSpy).toHaveBeenCalledWith(
+      'mock',
+      sbtAddress,
+      ethers.utils.keccak256(ethers.utils.toUtf8Bytes('invalid-code')),
+      'edge'
+    );
+    expect(startClaimSpy).not.toHaveBeenCalled();
+    expect(subject.state.error).toBe('Invalid password.');
+    expect(subject.state.mintingStatus).toBe('failure');
+  });
+
+  it('starts the password claim after pre-validation succeeds', async () => {
+    const sbtAddress = '0x00000000000000000000000000000000000000e1';
+    const account = '0x00000000000000000000000000000000000000e2';
+    const subject = createSubject({
+      SBTAddress: sbtAddress,
+      account,
+      sessionSlug: 'edge',
+    });
+    subject.state = {
+      ...subject.state,
+      sbtInfo: { hasPasswordMint: true },
+      manualPasswordInput: 'valid-code',
+      mintStep: 0,
+    };
+    subject.startClaimCountdown = jest.fn();
+    subject.cacheTransactionHash = jest.fn();
+
+    jest.spyOn(contractScripts, 'isPasswordValid').mockResolvedValue(true);
+    const startClaimSpy = jest.spyOn(contractScripts, 'startClaim').mockResolvedValue({ transactionHash: '0xstart' });
+
+    await subject.handleMint(false);
+
+    expect(startClaimSpy).toHaveBeenCalledWith(
+      'mock',
+      sbtAddress,
+      ethers.utils.solidityKeccak256(['string', 'address'], ['valid-code', account])
+    );
+    expect(subject.state.mintStep).toBe(1);
+    expect(subject.state.mintingStatus).toBe('idle');
+    expect(subject.startClaimCountdown).toHaveBeenCalledTimes(1);
+    expect(subject.cacheTransactionHash).toHaveBeenCalledWith('0xstart');
+  });
+
+  it('uses the zero wallet scope for invite generation when the on-chain hash was created predeploy', async () => {
+    const sbtAddress = '0x00000000000000000000000000000000000000f1';
+    const password = 'shared-secret';
+    const subject = createSubject({
+      SBTAddress: sbtAddress,
+      account: '0x00000000000000000000000000000000000000f2',
+      sessionSlug: 'edge',
+    });
+    subject.state = {
+      ...subject.state,
+      sbtInfo: { maxTokens: '5' },
+      groupPasswordHash: cryptoUtils.computeGroupPasswordHash({ password, sbtAddress: '' }),
+    };
+    subject.claimWithInvitePayload = jest.fn().mockResolvedValue({ ok: true });
+
+    jest.spyOn(contractScripts, 'getMintedTokens').mockResolvedValue('0');
+    const inviteSpy = jest.spyOn(contractScripts, 'generateInvitePayloads').mockResolvedValue([
+      { nonce: '1', signature: '0xinvite' },
+    ]);
+
+    await subject.claimWithGroupPassword(password);
+
+    expect(inviteSpy).toHaveBeenCalledWith({
+      password,
+      sbtAddress,
+      nonces: ['1'],
+      walletScopeSbtAddress: '',
+    });
+  });
+
+  it('uses the zero wallet scope for manual group-signature mint when the on-chain hash was created predeploy', async () => {
+    const sbtAddress = '0x00000000000000000000000000000000000000f3';
+    const account = '0x00000000000000000000000000000000000000f4';
+    const password = 'shared-secret';
+    const subject = createSubject({
+      SBTAddress: sbtAddress,
+      account,
+      sessionSlug: 'edge',
+    });
+    subject.state = {
+      ...subject.state,
+      groupPasswordInput: password,
+    };
+    subject.loadSBTInfo = jest.fn().mockResolvedValue(undefined);
+    subject.applyLocalMintSuccess = jest.fn();
+    subject.refreshSbtDataWithSlug = jest.fn();
+    subject.clearAutoMintUrlIntent = jest.fn();
+
+    jest.spyOn(contractScripts, 'getGroupPasswordHash').mockResolvedValue(
+      cryptoUtils.computeGroupPasswordHash({ password, sbtAddress: '' })
+    );
+    const signSpy = jest
+      .spyOn(contractScripts, 'signGroupMintAuthorization')
+      .mockResolvedValue('0xsignature');
+    jest.spyOn(contractScripts, 'mintWithGroupSignature').mockResolvedValue({ transactionHash: '0xtx' });
+
+    await subject.mintUnlimitedWithGroupPassword();
+
+    expect(signSpy).toHaveBeenCalledWith({
+      password,
+      sbtAddress,
+      userAddress: account,
+      walletScopeSbtAddress: '',
+    });
+  });
+
+  it('routes public auto-mint URLs to the dedicated public mint helper', async () => {
+    const sbtAddress = '0x0000000000000000000000000000000000000101';
+    const previousHref = window.location.href;
+    window.history.replaceState({}, '', `${buildSbtDetailPath(sbtAddress)}?sbt=${encodeURIComponent(sbtAddress)}&auto=1`);
+
+    try {
+      const subject = createSubject({
+        SBTAddress: sbtAddress,
+        loginComplete: true,
+      });
+      subject.state = {
+        ...subject.state,
+        userHasSBT: false,
+        mintingStatus: 'idle',
+      };
+      const publicMintSpy = jest.spyOn(subject, 'autoMintPublicIfAllowed').mockResolvedValue(true);
+
+      await subject.handleUrlAutoMintIntent();
+      await flushPromises();
+
+      expect(publicMintSpy).toHaveBeenCalledWith(sbtAddress);
+    } finally {
+      window.history.replaceState({}, '', previousHref);
+    }
+  });
+
+  it('defers prop-driven auto-mint on mount until sbtInfo is loaded', async () => {
+    const sbtAddress = '0x0000000000000000000000000000000000000105';
+    const subject = createSubject({
+      SBTAddress: sbtAddress,
+      autoMintingMode: true,
+      sbtMintPassword: 'claim-code',
+    });
+    subject.state = {
+      ...subject.state,
+      sbtInfo: null,
+      userHasSBT: false,
+      mintingStatus: 'idle',
+    };
+
+    jest.spyOn(subject, 'loadSBTInfo').mockResolvedValue(undefined);
+    jest.spyOn(subject, 'startMintingEndCountdown').mockImplementation(() => {});
+    jest.spyOn(subject, 'checkForMintPassword').mockImplementation(() => {});
+    jest.spyOn(subject, 'fetchRelevantInfo').mockImplementation(() => {});
+    jest.spyOn(subject, 'loadCachedPasswords').mockImplementation(() => {});
+    jest.spyOn(subject, 'handleUrlAutoMintIntent').mockResolvedValue(false);
+    const handleMintSpy = jest.spyOn(subject, 'handleMint').mockResolvedValue(undefined);
+
+    subject.componentDidMount();
+    await flushPromises();
+
+    expect(handleMintSpy).not.toHaveBeenCalled();
+  });
+
+  it('retries prop-driven auto-mint during updates once sbtInfo is available', () => {
+    const subject = createSubject({
+      autoMintingMode: true,
+      sbtMintPassword: 'claim-code',
+    });
+    subject.state = {
+      ...subject.state,
+      sbtInfo: null,
+      userHasSBT: false,
+      mintingStatus: 'idle',
+    };
+    const handleMintSpy = jest.spyOn(subject, 'handleMint').mockResolvedValue(undefined);
+
+    subject.componentDidUpdate(subject.props, {
+      ...subject.state,
+      mintingStatus: 'pending',
+    });
+    expect(handleMintSpy).not.toHaveBeenCalled();
+
+    const prevState = { ...subject.state };
+    subject.state = {
+      ...subject.state,
+      sbtInfo: { hasPasswordMint: true },
+    };
+
+    subject.componentDidUpdate(subject.props, prevState);
+
+    expect(handleMintSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('routes invite auto-mint URLs to invite claiming on the dedicated page', async () => {
+    const sbtAddress = '0x0000000000000000000000000000000000000102';
+    const previousHref = window.location.href;
+    window.history.replaceState(
+      {},
+      '',
+      `${buildSbtDetailPath(sbtAddress)}?sbt=${encodeURIComponent(sbtAddress)}&auto=1&inv=invite-token`
+    );
+
+    try {
+      const subject = createSubject({
+        SBTAddress: sbtAddress,
+        loginComplete: true,
+      });
+      subject.state = {
+        ...subject.state,
+        userHasSBT: false,
+        mintingStatus: 'idle',
+      };
+      const inviteSpy = jest.spyOn(subject, 'claimWithInviteCode').mockResolvedValue(undefined);
+
+      await subject.handleUrlAutoMintIntent();
+      await flushPromises();
+
+      expect(subject.state.groupPasswordInput).toBe('invite-token');
+      expect(inviteSpy).toHaveBeenCalledWith('invite-token', sbtAddress);
+    } finally {
+      window.history.replaceState({}, '', previousHref);
+    }
+  });
+
+  it('routes claim-code auto-mint URLs to the password claim helper even without an on-chain group password hash', async () => {
+    const sbtAddress = '0x0000000000000000000000000000000000000103';
+    const previousHref = window.location.href;
+    window.history.replaceState(
+      {},
+      '',
+      `${buildSbtDetailPath(sbtAddress)}?sbt=${encodeURIComponent(sbtAddress)}&auto=1&gp=claim-code`
+    );
+
+    try {
+      const subject = createSubject({
+        SBTAddress: sbtAddress,
+        loginComplete: true,
+      });
+      subject.state = {
+        ...subject.state,
+        sbtInfo: { hasPasswordMint: true },
+        userHasSBT: false,
+        mintingStatus: 'idle',
+      };
+      const claimSpy = jest.spyOn(subject, 'claimWithGroupPassword').mockResolvedValue(undefined);
+
+      await subject.handleUrlAutoMintIntent();
+      await flushPromises();
+
+      expect(subject.state.groupPasswordInput).toBe('claim-code');
+      expect(claimSpy).toHaveBeenCalledWith('claim-code', sbtAddress);
+    } finally {
+      window.history.replaceState({}, '', previousHref);
+    }
+  });
+
+  it('routes unlimited group-password auto-mint URLs to the signature-mint helper', async () => {
+    const sbtAddress = '0x0000000000000000000000000000000000000104';
+    const previousHref = window.location.href;
+    window.history.replaceState(
+      {},
+      '',
+      `${buildSbtDetailPath(sbtAddress)}?sbt=${encodeURIComponent(sbtAddress)}&auto=1&gp=shared-secret`
+    );
+
+    try {
+      const subject = createSubject({
+        SBTAddress: sbtAddress,
+        loginComplete: true,
+      });
+      subject.state = {
+        ...subject.state,
+        sbtInfo: { hasPasswordMint: false },
+        userHasSBT: false,
+        mintingStatus: 'idle',
+      };
+      jest
+        .spyOn(contractScripts, 'getGroupPasswordHash')
+        .mockResolvedValue('0x1111111111111111111111111111111111111111111111111111111111111111');
+      const mintSpy = jest.spyOn(subject, 'mintUnlimitedWithGroupPassword').mockResolvedValue(undefined);
+
+      await subject.handleUrlAutoMintIntent();
+      await flushPromises();
+
+      expect(subject.state.groupPasswordInput).toBe('shared-secret');
+      expect(mintSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      window.history.replaceState({}, '', previousHref);
+    }
+  });
+
+  it('renders the admin open-mint URL card for eligible public SBTs', () => {
+    const account = '0x00000000000000000000000000000000000000a2';
+    const sbtAddress = '0x00000000000000000000000000000000000000a1';
+    const subject = createSubject({
+      SBTAddress: sbtAddress,
+      account,
+      sessionSlug: 'edge',
+    });
+
+    subject.state = {
+      ...subject.state,
+      sbtInfo: {
+        name: 'Open Badge',
+        image: 'https://example.com/badge.png',
+        mintingEndTime: 0,
+        burnAuth: 0,
+        hasPasswordMint: false,
+        maxTokens: '0',
+        admin: account,
+        chainID: 84532,
+      },
+      userIsSbtAdmin: true,
+      showAdminSection: true,
+      hasInviteMint: false,
+      hasGroupPasswordMint: false,
+      groupPasswordHash: ethers.constants.HashZero,
+    };
+
+    const tree = subject.render();
+    const cardNode = findElementInTree(
+      tree,
+      (element) => element?.props?.['data-testid'] === E2E_TESTIDS.SBT_PAGE_OPEN_MINT_URL
+    );
+
+    expect(cardNode).not.toBeNull();
+    expect(flattenText(cardNode)).toContain('URL Where Anyone Can Join');
+    expect(flattenText(cardNode)).toContain('http://localhost/session/edge?sbt=');
+  });
+
+  it('prepends PUBLIC_URL when building the admin open-mint URL', () => {
+    const previousPublicUrl = process.env.PUBLIC_URL;
+    process.env.PUBLIC_URL = '/ce/';
+
+    try {
+      const sbtAddress = '0x00000000000000000000000000000000000000a1';
+      const subject = createSubject({
+        SBTAddress: sbtAddress,
+        sessionSlug: 'edge',
+      });
+
+      subject.state = {
+        ...subject.state,
+        sbtInfo: {
+          name: 'Open Badge',
+          image: 'https://example.com/badge.png',
+          mintingEndTime: 0,
+          burnAuth: 0,
+          hasPasswordMint: false,
+          maxTokens: '0',
+          admin: '0x00000000000000000000000000000000000000a2',
+          chainID: 84532,
+        },
+        hasInviteMint: false,
+        hasGroupPasswordMint: false,
+        groupPasswordHash: ethers.constants.HashZero,
+      };
+
+      expect(subject.getOpenMintAutoJoinUrl()).toBe(
+        `http://localhost/ce/session/edge?sbt=${encodeURIComponent(sbtAddress)}&auto=1`
+      );
+    } finally {
+      if (previousPublicUrl === undefined) delete process.env.PUBLIC_URL;
+      else process.env.PUBLIC_URL = previousPublicUrl;
+    }
+  });
+
+  it('canonicalizes reserved session aliases when building the admin open-mint URL', () => {
+    const sbtAddress = '0x00000000000000000000000000000000000000a1';
+
+    const buildEligibleSubject = (sessionSlug) => {
+      const subject = createSubject({
+        SBTAddress: sbtAddress,
+        sessionSlug,
+      });
+      subject.state = {
+        ...subject.state,
+        sbtInfo: {
+          name: 'Open Badge',
+          image: 'https://example.com/badge.png',
+          mintingEndTime: 0,
+          burnAuth: 0,
+          hasPasswordMint: false,
+          maxTokens: '0',
+          admin: '0x00000000000000000000000000000000000000a2',
+          chainID: 84532,
+        },
+        hasInviteMint: false,
+        hasGroupPasswordMint: false,
+        groupPasswordHash: ethers.constants.HashZero,
+      };
+      return subject;
+    };
+
+    expect(buildEligibleSubject('general').getOpenMintAutoJoinUrl()).toBe(
+      `http://localhost/session?sbt=${encodeURIComponent(sbtAddress)}&auto=1`
+    );
+    expect(buildEligibleSubject('debate').getOpenMintAutoJoinUrl()).toBe(
+      `http://localhost/session/debate?sbt=${encodeURIComponent(sbtAddress)}&auto=1`
+    );
+  });
+
+  it('hides the admin open-mint URL card when the SBT has an on-chain group password hash', () => {
+    const account = '0x00000000000000000000000000000000000000a2';
+    const sbtAddress = '0x00000000000000000000000000000000000000a1';
+    const password = 'shared-secret';
+    const subject = createSubject({
+      SBTAddress: sbtAddress,
+      account,
+      sessionSlug: 'edge',
+    });
+
+    subject.state = {
+      ...subject.state,
+      sbtInfo: {
+        name: 'Private Badge',
+        image: 'https://example.com/badge.png',
+        mintingEndTime: 0,
+        burnAuth: 0,
+        hasPasswordMint: false,
+        maxTokens: '0',
+        admin: account,
+        chainID: 84532,
+      },
+      userIsSbtAdmin: true,
+      showAdminSection: true,
+      hasInviteMint: false,
+      hasGroupPasswordMint: false,
+      groupPasswordHash: cryptoUtils.computeGroupPasswordHash({ password, sbtAddress: '' }),
+    };
+
+    const tree = subject.render();
+    const cardNode = findElementInTree(
+      tree,
+      (element) => element?.props?.['data-testid'] === E2E_TESTIDS.SBT_PAGE_OPEN_MINT_URL
+    );
+
+    expect(cardNode).toBeNull();
   });
 });

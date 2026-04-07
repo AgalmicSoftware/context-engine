@@ -659,56 +659,9 @@
 }
 
 .mapFrame {
-  margin-top: 0;
+  margin-top: -0.5rem;
   overflow: hidden;
   width: 100%;
-}
-
-.mapFrameShell {
-  display: grid;
-  border: 1px solid #e0e6ef;
-  border-radius: 14px;
-  overflow: hidden;
-  background:
-    linear-gradient(180deg, rgba(248, 250, 252, 0.98) 0%, rgba(244, 247, 251, 0.96) 100%);
-}
-
-.mapFrameViewport {
-  min-height: 320px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0.75rem 0.75rem 0.25rem;
-}
-
-.mapFrameViewportEmpty {
-  min-height: 280px;
-  padding: 1.5rem;
-  text-align: center;
-}
-
-.mapViewportHint {
-  margin: 0;
-  max-width: 34rem;
-  color: #5f6b7a;
-  font-size: 1rem;
-  line-height: 1.55;
-}
-
-.mapFrameCompact {
-  align-items: center;
-  display: flex;
-  justify-content: center;
-  margin-top: 0;
-  width: 100%;
-  padding: 0;
-
-  :global(svg) {
-    display: block;
-    height: auto;
-    max-width: none;
-    width: 100%;
-  }
 }
 
 .mapFrameCompact {
@@ -851,22 +804,12 @@
   }
 
   .mapFrameCompact {
-    padding-top: 0;
+    padding-top: 0.35rem;
   }
 
   .mapFrameCompact :global(svg) {
-    max-width: none;
+    max-width: 100%;
     width: 100%;
-  }
-
-  .selectorLayout {
-    grid-template-columns: 1fr;
-  }
-
-  .mapFrameViewport {
-    min-height: 240px;
-    padding-left: 0.5rem;
-    padding-right: 0.5rem;
   }
 
   .breakdownBarRow {

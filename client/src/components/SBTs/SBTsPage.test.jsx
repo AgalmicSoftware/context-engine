@@ -6,9 +6,10 @@ import {
   getDemoSessionConfigBySlug,
   getSessionLists,
 } from '../../utilities/web3/contractScripts.js';
-import { getShortenedAddress } from '../../utilities/ui/displayHelpers.js';
+import proposalScripts from '../../utilities/proposalScripts.js';
 import { readSessionScanScope, readSessionScanSlugs } from '../../utilities/session/sessionScanScope.js';
 import { sbtsListPath, t } from '../../utilities/ui/terminology.js';
+import * as terminology from '../../utilities/ui/terminology.js';
 
 const mockSBTPage = jest.fn();
 const mockIsCryptoMode = jest.fn(() => true);
@@ -702,8 +703,8 @@ describe('SBTsPage auto-feature flag', () => {
 
   it('hides cache-backed featured card addresses in plain mode', () => {
     const featuredAddress = '0x00000000000000000000000000000000000000b3';
-    mockIsCryptoMode.mockReturnValue(false);
-    const shortenedAddress = getShortenedAddress(featuredAddress, false);
+    const cryptoModeSpy = jest.spyOn(terminology, 'isCryptoMode').mockReturnValue(false);
+    const shortenedAddress = proposalScripts.getShortenedAddress(featuredAddress, false);
 
     peekCacheSync.mockReturnValue({
       '84532': {
@@ -739,12 +740,14 @@ describe('SBTsPage auto-feature flag', () => {
     expect(screen.getByTestId(`cache-featured-sbt-link-${featuredAddress.toLowerCase()}`)).toBeInTheDocument();
     expect(screen.getByText('Plain Mode Group')).toBeInTheDocument();
     expect(screen.queryByText(shortenedAddress)).not.toBeInTheDocument();
+
+    cryptoModeSpy.mockRestore();
   });
 
   it('shows cache-backed featured card addresses in crypto mode', () => {
     const featuredAddress = '0x00000000000000000000000000000000000000b4';
-    mockIsCryptoMode.mockReturnValue(true);
-    const shortenedAddress = getShortenedAddress(featuredAddress, false);
+    const cryptoModeSpy = jest.spyOn(terminology, 'isCryptoMode').mockReturnValue(true);
+    const shortenedAddress = proposalScripts.getShortenedAddress(featuredAddress, false);
 
     peekCacheSync.mockReturnValue({
       '84532': {
@@ -780,6 +783,8 @@ describe('SBTsPage auto-feature flag', () => {
     expect(screen.getByTestId(`cache-featured-sbt-link-${featuredAddress.toLowerCase()}`)).toBeInTheDocument();
     expect(screen.getByText('Crypto Mode Group')).toBeInTheDocument();
     expect(screen.getByText(shortenedAddress)).toBeInTheDocument();
+
+    cryptoModeSpy.mockRestore();
   });
 
   it('uses terminology-aware ended minting aria labels on cache-backed featured cards', () => {

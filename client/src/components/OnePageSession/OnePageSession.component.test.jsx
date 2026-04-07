@@ -22,13 +22,6 @@ const mockDebateMap = jest.fn();
 const mockRiskMatrix = jest.fn();
 const mockDebateSelector = jest.fn();
 const mockDemoAnalysisWorkspace = jest.fn();
-const originalFetch = global.fetch;
-const fullCrossCorpusPayload = JSON.parse(
-  fs.readFileSync(
-    path.join(__dirname, '../../../../ai-discourse-corpus/corpuses/cross-corpus-debates.json'),
-    'utf8'
-  )
-);
 
 const extractMediaBlock = (scss, query, requiredSnippet = '') => {
   let searchFrom = 0;
@@ -63,7 +56,7 @@ const extractMediaBlock = (scss, query, requiredSnippet = '') => {
   return null;
 };
 
-jest.mock('../SurveyTool/SurveyPage', () => (props) => {
+jest.mock('../SurveyTool/SurveyPage.jsx', () => (props) => {
   mockSurveyPage(props);
   if (props.minifiedMode === 'pile') {
     return (
@@ -550,6 +543,25 @@ describe('OnePageSession view gating', () => {
     const scss = fs.readFileSync(path.join(__dirname, 'OnePageSession.module.scss'), 'utf8');
     const phoneBlock = extractMediaBlock(scss, '@media only screen and (max-width: 600px)', '.onePageDemoContainer');
     const smallTabletBlock = extractMediaBlock(scss, '@media only screen and (min-width: 601px) and (max-width: 767px)', '.sectionHeader {');
+
+    expect(phoneBlock).toContain('.sectionContainer');
+    expect(phoneBlock).toContain('border: none;');
+    expect(smallTabletBlock).toContain('.sectionHeader {');
+    expect(smallTabletBlock).toContain('font-size: 1.6em;');
+    expect(smallTabletBlock).toContain('.sectionHeader .sectionHeaderText {');
+    expect(smallTabletBlock).toContain('flex-direction: row;');
+    expect(smallTabletBlock).toContain('align-items: baseline;');
+    expect(smallTabletBlock).toContain('gap: 6px 12px;');
+    expect(smallTabletBlock).toContain('.sectionHeader .sectionHeaderSubtitle {');
+    expect(smallTabletBlock).toContain('font-size: 0.68em;');
+    expect(smallTabletBlock).toContain('color: rgba(244, 247, 255, 0.58);');
+    expect(smallTabletBlock).not.toContain('.sectionContainer');
+    expect(scss).toMatch(/@media only screen and \(min-width:\s*768px\) and \(max-width:\s*1024px\)\s*{[\s\S]*?\.sectionHeader \.sectionHeaderText\s*{[\s\S]*?flex-direction:\s*column;[\s\S]*?align-items:\s*flex-start;/);
+  });
+
+  it('shows the demo Documents tooltip copy only when the section is expanded', async () => {
+    const props = buildProps();
+    const documentsTooltipText = 'This corpus is evolving into a conversational layer for the session: you’ll be able to chat with the material, have it surface and pose relevant questions, and connect those prompts fluidly with responses.';
 
     render(
       <OnePageSession

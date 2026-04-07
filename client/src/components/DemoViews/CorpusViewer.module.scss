@@ -10,6 +10,7 @@ $text: #f4f7ff;
   border: 1px solid $card-border;
   border-radius: var(--ce-radius-12);
   color: $text;
+  overflow: hidden;
   padding: 16px;
 }
 
@@ -18,6 +19,9 @@ $text: #f4f7ff;
   gap: 8px;
   margin-bottom: 10px;
   overflow-x: auto;
+  scroll-padding-inline: 4px;
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
   padding-bottom: 10px;
   border-bottom: 1px solid $card-border;
 }
@@ -35,6 +39,7 @@ $text: #f4f7ff;
   gap: 10px;
   opacity: 0.55;
   padding: 14px 18px 16px;
+  scroll-snap-align: start;
   transition: opacity 0.15s ease, background 0.15s ease;
 }
 
@@ -97,6 +102,7 @@ $text: #f4f7ff;
   font-weight: 600;
   gap: 6px;
   letter-spacing: -0.01em;
+  max-width: 100%;
   padding: 8px 12px;
   text-decoration: none;
   transition: color 0.15s ease;
@@ -237,6 +243,7 @@ $text: #f4f7ff;
   flex-direction: column;
   gap: 12px;
   max-height: 560px;
+  min-width: 0;
   overflow-y: auto;
   padding-right: 4px;
 }
@@ -256,6 +263,7 @@ $text: #f4f7ff;
   border-radius: var(--ce-radius-8);
   color: $text;
   display: block;
+  min-width: 0;
   padding: 16px;
 }
 
@@ -591,6 +599,7 @@ $text: #f4f7ff;
   gap: 12px;
   justify-content: space-between;
   margin-bottom: 10px;
+  min-width: 0;
 }
 
 .entryHeaderContent {
@@ -611,7 +620,7 @@ $text: #f4f7ff;
 }
 
 .cardFooter {
-  align-items: center;
+  align-items: flex-start;
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
@@ -625,6 +634,7 @@ $text: #f4f7ff;
   flex-wrap: wrap;
   gap: 8px;
   justify-content: flex-end;
+  min-width: 0;
 }
 
 .cardFooter:empty,
@@ -716,7 +726,7 @@ $text: #f4f7ff;
 
 .insiderName {
   color: #1d2733;
-  font-size: 15px;
+  font-size: 18px;
   font-weight: 700;
   line-height: 1.3;
   margin-bottom: 4px;
@@ -724,14 +734,14 @@ $text: #f4f7ff;
 
 .insiderRole {
   color: #536471;
-  font-size: 14px;
+  font-size: 16px;
   line-height: 1.5;
   margin-bottom: 4px;
 }
 
 .insiderInterviewer {
   color: #657786;
-  font-size: 13px;
+  font-size: 15px;
   font-style: italic;
   line-height: 1.5;
 }
@@ -774,6 +784,36 @@ $text: #f4f7ff;
   gap: 10px;
   margin-top: 12px;
   padding-top: 12px;
+}
+
+.insiderCard .entrySummary {
+  color: #334155;
+  font-size: 17px;
+  line-height: 1.72;
+}
+
+.insiderCard .entryMeta {
+  color: #536471;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.insiderCard .pill {
+  background: rgba(29, 155, 240, 0.1);
+  color: #1d9bf0;
+  font-size: 12px;
+}
+
+.insiderCard .pillButton:hover {
+  background: rgba(29, 155, 240, 0.16);
+  color: #0f78b8;
+}
+
+.insiderCard .debateMapLink,
+.insiderCard .externalLink {
+  background: #f7fafc;
+  border-color: #dbe6ef;
+  color: #1d9bf0;
 }
 
 .arxivMetaTop {
@@ -884,6 +924,7 @@ $text: #f4f7ff;
 .entryMediaImage {
   display: block;
   height: auto;
+  max-width: 100%;
   width: 50%;
 }
 
@@ -1020,6 +1061,7 @@ $text: #f4f7ff;
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  min-width: 0;
 }
 
 .debateMapLink {
@@ -1033,8 +1075,11 @@ $text: #f4f7ff;
   font-weight: 600;
   gap: 6px;
   line-height: 1.4;
+  max-width: 100%;
+  min-width: 0;
   padding: 5px 9px;
   text-decoration: none;
+  white-space: normal;
 }
 
 .debateMapLinkButton {
@@ -1061,8 +1106,12 @@ $text: #f4f7ff;
   font-size: 12px;
   font-weight: 600;
   gap: 6px;
+  max-width: 100%;
+  min-height: 40px;
+  min-width: 0;
   padding: 8px 12px;
   text-decoration: none;
+  white-space: normal;
 }
 
 .externalIconLink {
@@ -1072,6 +1121,7 @@ $text: #f4f7ff;
   border-radius: 999px;
   color: $text;
   display: inline-flex;
+  flex-shrink: 0;
   height: 40px;
   justify-content: center;
   text-decoration: none;
@@ -1100,9 +1150,24 @@ $text: #f4f7ff;
 }
 
 @media (max-width: 720px) {
+  .container {
+    border-radius: var(--ce-radius-10);
+    padding: 12px;
+  }
+
+  .tabBar {
+    gap: 10px;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+  }
+
   .tabButton {
-    gap: 8px;
-    padding: 12px 14px 14px;
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+    max-width: 144px;
+    min-width: 112px;
+    padding: 12px 12px 14px;
   }
 
   .tabIcon {
@@ -1110,14 +1175,148 @@ $text: #f4f7ff;
   }
 
   .tabLabel {
-    font-size: 17px;
+    font-size: 14px;
+    line-height: 1.25;
+    white-space: normal;
   }
 
   .githubLink {
     font-size: 12px;
+    justify-content: center;
+    width: 100%;
   }
 
   .githubLinkIcon {
     font-size: 12px;
+  }
+
+  .scrollArea {
+    gap: 14px;
+    max-height: none;
+    overflow: visible;
+    padding-right: 0;
+  }
+
+  .policySplitLayout {
+    gap: 14px;
+  }
+
+  .policyListHeader,
+  .policyMapPanel {
+    padding: 12px;
+  }
+
+  .policyMapLens {
+    padding: 8px 8px 2px;
+  }
+
+  .card,
+  .tweetCard {
+    border-radius: 16px;
+    padding: 14px;
+  }
+
+  .entryHeader {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .tweetAuthorRow {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .tweetAuthorMeta,
+  .entryHeaderContent {
+    min-width: 0;
+  }
+
+  .tweetDate {
+    margin-left: 58px;
+    padding-top: 0;
+    text-align: left;
+    white-space: normal;
+    width: calc(100% - 58px);
+  }
+
+  .tweetBody,
+  .entrySummary {
+    font-size: 15px;
+    line-height: 1.65;
+  }
+
+  .entryMeta,
+  .arxivAuthors,
+  .arxivDate {
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .arxivMetaRow {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .entryMediaBlock {
+    margin-bottom: 14px;
+  }
+
+  .entryMediaImage {
+    width: 100%;
+  }
+
+  .metrCard .entryMediaImage {
+    width: 100%;
+  }
+
+  .pill {
+    font-size: 12px;
+    line-height: 1.45;
+    padding: 4px 10px;
+  }
+
+  .cardFooter,
+  .cardFooterLinks,
+  .debateMapFooterLinks {
+    align-items: stretch;
+    justify-content: flex-start;
+    width: 100%;
+  }
+
+  .debateMapLink,
+  .externalLink {
+    min-height: 42px;
+    padding: 8px 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .tabButton {
+    max-width: 132px;
+    min-width: 106px;
+    padding: 11px 11px 13px;
+  }
+
+  .policyListTitle,
+  .policyMapTitle {
+    font-size: 16px;
+  }
+
+  .tweetAvatar {
+    flex-basis: 44px;
+    font-size: 17px;
+    height: 44px;
+    width: 44px;
+  }
+
+  .tweetDate {
+    margin-left: 54px;
+    width: calc(100% - 54px);
+  }
+
+  .externalIconLink {
+    height: 42px;
+    width: 42px;
   }
 }
