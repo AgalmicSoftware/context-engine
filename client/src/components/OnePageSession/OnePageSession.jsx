@@ -4,6 +4,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faCaretDown, 
   faCaretUp, 
+  faExternalLinkAlt,
   faQuestionCircle, 
   faSpinner, 
   faCheck, 
@@ -54,6 +55,7 @@ const demoLog = createLogger('demo');
 const ONE_PAGE_DEMO_PERF_SCOPE = 'onePageDemo';
 const AGGREGATOR_PARSE_MEMO_MAX = 3000;
 const SBT_TOOLTIP_LABEL = isCryptoMode() ? 'Soulbound tokens (SBTs)' : `${t('sbtFull')}s`;
+const DEMO_CORPUS_GITHUB_URL = 'https://github.com/xoCortex/context-engine/tree/main/client/src/variables/demo';
 
 const isPerfCountersEnabled = () => {
   try {
@@ -352,6 +354,8 @@ class OnePageSession extends Component {
       showEmbeddedCreateGroup,
       // Removed obsolete 'About' state variables
       autoOpenResults: routeUiState.autoOpenResults,
+      embeddedAtlasNodeId: null,
+      embeddedAtlasReturnState: null,
       aggregatorData: {},
       disclaimersActive: true,
       filterState: initialFilterState,
@@ -403,6 +407,8 @@ class OnePageSession extends Component {
     // binds
     this.handleOpenResults = this.handleOpenResults.bind(this);
     this.handleResultsModalClose = this.handleResultsModalClose.bind(this);
+    this.handleCorpusAtlasIssueOpen = this.handleCorpusAtlasIssueOpen.bind(this);
+    this.handleEmbeddedAtlasModalClose = this.handleEmbeddedAtlasModalClose.bind(this);
     this.resetDemoURL = this.resetDemoURL.bind(this);
     this.toggleQuestions = this.toggleQuestions.bind(this);
     this.toggleGroups = this.toggleGroups.bind(this);
@@ -1835,6 +1841,33 @@ class OnePageSession extends Component {
     this.setState({ autoOpenResults: false }, () => this.resetDemoURL());
   }
 
+  handleCorpusAtlasIssueOpen(nodeId) {
+    const normalizedNodeId = String(nodeId || '').trim();
+    if (!normalizedNodeId) return;
+
+    this.setState((prevState) => ({
+      embeddedAtlasNodeId: normalizedNodeId,
+      embeddedAtlasReturnState: prevState.embeddedAtlasReturnState || {
+        showResults: prevState.showResults,
+        resultsViewMode: prevState.resultsViewMode,
+      },
+      showResults: true,
+      resultsViewMode: 'debateAtlas',
+    }));
+  }
+
+  handleEmbeddedAtlasModalClose() {
+    this.setState((prevState) => {
+      const returnState = prevState.embeddedAtlasReturnState;
+      return {
+        embeddedAtlasNodeId: null,
+        embeddedAtlasReturnState: null,
+        showResults: returnState ? returnState.showResults : prevState.showResults,
+        resultsViewMode: returnState?.resultsViewMode || prevState.resultsViewMode,
+      };
+    });
+  }
+
 
 
   resetDemoURL() {
@@ -2477,14 +2510,26 @@ class OnePageSession extends Component {
                 )}
                 {renderSectionHeading('Context', 'View')}
                 {this.state.showDocuments && (
-                  <div
-                    className={`${styles.tooltip} ${styles.sectionHeaderTooltip}`}
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <FontAwesomeIcon icon={faQuestionCircle} />
-                    <span className={styles.tooltiptext}>
-                      {documentsSectionTooltip}
-                    </span>
+                  <div className={styles.sectionHeaderMeta}>
+                    <div
+                      className={`${styles.tooltip} ${styles.sectionHeaderTooltip}`}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <FontAwesomeIcon icon={faQuestionCircle} />
+                      <span className={styles.tooltiptext}>
+                        {documentsSectionTooltip}
+                      </span>
+                    </div>
+                    <a
+                      href={DEMO_CORPUS_GITHUB_URL}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={styles.sectionHeaderLink}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <FontAwesomeIcon icon={faExternalLinkAlt} />
+                      <span>GitHub</span>
+                    </a>
                   </div>
                 )}
               </h2>
@@ -2492,7 +2537,7 @@ class OnePageSession extends Component {
               {this.state.showDocuments && (
                 <div className={styles.miniSectionContent}>
                   <Suspense fallback={<LazyFallback label="Loading Corpus..." minHeight="20vh" />}>
-                    <CorpusViewer />
+                    <CorpusViewer onAtlasIssueOpen={this.handleCorpusAtlasIssueOpen} showGithubLink={false} />
                   </Suspense>
                 </div>
               )}
@@ -2610,6 +2655,8 @@ class OnePageSession extends Component {
                           toggleLoginModal={this.props.toggleLoginModal}
                           demoMode={true}
                           embedded={true}
+                          requestedModalNodeId={this.state.embeddedAtlasNodeId}
+                          onModalClose={this.state.embeddedAtlasReturnState ? this.handleEmbeddedAtlasModalClose : null}
                         />
                       </div>
                     </Suspense>
