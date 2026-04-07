@@ -217,6 +217,20 @@ SPA fallback concept, but their redirect config syntax differs.
   - Controls GraphQL tx-existence precheck for survey/question response payload reads.
   - Default `true` keeps the existing conservative response-payload behavior unless a deployment intentionally disables it.
 
+## Arweave Read Policy Toggles
+
+- `REACT_APP_CE_ARWEAVE_PREFLIGHT_SESSION_METADATA=false`
+  - Controls GraphQL tx-existence precheck for session metadata reads.
+  - Default `false` keeps session metadata gateway-first so fresh uploads can display before GraphQL indexing catches up.
+
+- `REACT_APP_CE_ARWEAVE_PREFLIGHT_SBT_METADATA=false`
+  - Controls GraphQL tx-existence precheck for SBT tokenURI metadata reads.
+  - Default `false` keeps SBT metadata gateway-first for initial display parity with session metadata.
+
+- `REACT_APP_CE_ARWEAVE_PREFLIGHT_RESPONSE_PAYLOADS=true`
+  - Controls GraphQL tx-existence precheck for survey/question response payload reads.
+  - Default `true` keeps the existing conservative response-payload behavior unless a deployment intentionally disables it.
+
 ## Profile Scan Fanout Toggles
 
 - `REACT_APP_CE_SESSION_SCAN_SCOPE=list`

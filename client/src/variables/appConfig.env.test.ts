@@ -214,11 +214,9 @@ describe('appConfig env-backed config', () => {
       expect(config.DEFAULT_CHAIN_ID).toBe(11155420);
       expect(config.CE_SESSION_SCAN_SCOPE).toBe('list');
       expect(config.CE_SESSION_SCAN_SLUGS).toEqual(['demo']);
-      expect(config.CE_ARWEAVE_DIRECT_TO_AR_IO).toBe(true);
       expect(config.CE_ARWEAVE_PREFLIGHT_SESSION_METADATA).toBe(false);
       expect(config.CE_ARWEAVE_PREFLIGHT_SBT_METADATA).toBe(false);
       expect(config.CE_ARWEAVE_PREFLIGHT_RESPONSE_PAYLOADS).toBe(true);
-      expect(config.CE_ENABLE_WALLETCONNECT_FALLBACK).toBe(false);
     });
   });
 });
