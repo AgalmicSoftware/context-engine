@@ -1,4 +1,6 @@
 /** @file OnePageSession.component.test.jsx */
+import fs from 'fs';
+import path from 'path';
 import React from 'react';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { ethers } from 'ethers';
@@ -19,6 +21,40 @@ const mockDebateMap = jest.fn();
 const mockRiskMatrix = jest.fn();
 const mockDebateSelector = jest.fn();
 const mockDemoAnalysisWorkspace = jest.fn();
+
+const extractMediaBlock = (scss, query, requiredSnippet = '') => {
+  let searchFrom = 0;
+
+  while (searchFrom < scss.length) {
+    const queryIndex = scss.indexOf(query, searchFrom);
+    if (queryIndex === -1) {
+      return null;
+    }
+
+    const blockStart = scss.indexOf('{', queryIndex);
+    if (blockStart === -1) {
+      return null;
+    }
+
+    let depth = 0;
+    for (let index = blockStart; index < scss.length; index += 1) {
+      const char = scss[index];
+      if (char === '{') depth += 1;
+      if (char === '}') depth -= 1;
+      if (depth === 0) {
+        const block = scss.slice(queryIndex, index + 1);
+        if (!requiredSnippet || block.includes(requiredSnippet)) {
+          return block;
+        }
+        searchFrom = queryIndex + query.length;
+        break;
+      }
+    }
+  }
+
+  return null;
+};
+
 jest.mock('../SurveyTool/SurveyPage.jsx', () => (props) => {
   mockSurveyPage(props);
   if (props.minifiedMode === 'pile') {
@@ -360,7 +396,7 @@ describe('OnePageSession view gating', () => {
     expect(screen.queryByText('Documents')).not.toBeInTheDocument();
   });
 
-  it('renders stacked title and subtitle text for section headers', async () => {
+  it('renders title and subtitle text for section headers', async () => {
     render(<OnePageSession {...buildProps()} />);
 
     expect(await screen.findByTestId('survey-page-pile')).toBeInTheDocument();
@@ -372,6 +408,26 @@ describe('OnePageSession view gating', () => {
     const fullHeader = await screen.findByTestId(E2E_TESTIDS.SESSION_QUESTIONS_FULL_HEADER);
     expect(within(fullHeader).getByText('Questions')).toHaveClass(styles.sectionHeaderTitle);
     expect(within(fullHeader).getByText('Answer or Add')).toHaveClass(styles.sectionHeaderSubtitle);
+  });
+
+  it('keeps section-card headers inline through 767px without pulling full phone layout onto tablets', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'OnePageSession.module.scss'), 'utf8');
+    const phoneBlock = extractMediaBlock(scss, '@media only screen and (max-width: 600px)', '.onePageDemoContainer');
+    const smallTabletBlock = extractMediaBlock(scss, '@media only screen and (min-width: 601px) and (max-width: 767px)', '.sectionHeader {');
+
+    expect(phoneBlock).toContain('.sectionContainer');
+    expect(phoneBlock).toContain('border: none;');
+    expect(smallTabletBlock).toContain('.sectionHeader {');
+    expect(smallTabletBlock).toContain('font-size: 1.6em;');
+    expect(smallTabletBlock).toContain('.sectionHeader .sectionHeaderText {');
+    expect(smallTabletBlock).toContain('flex-direction: row;');
+    expect(smallTabletBlock).toContain('align-items: baseline;');
+    expect(smallTabletBlock).toContain('gap: 6px 12px;');
+    expect(smallTabletBlock).toContain('.sectionHeader .sectionHeaderSubtitle {');
+    expect(smallTabletBlock).toContain('font-size: 0.68em;');
+    expect(smallTabletBlock).toContain('color: rgba(244, 247, 255, 0.58);');
+    expect(smallTabletBlock).not.toContain('.sectionContainer');
+    expect(scss).toMatch(/@media only screen and \(min-width:\s*768px\) and \(max-width:\s*1024px\)\s*{[\s\S]*?\.sectionHeader \.sectionHeaderText\s*{[\s\S]*?flex-direction:\s*column;[\s\S]*?align-items:\s*flex-start;/);
   });
 
   it('shows the demo Documents tooltip copy only when the section is expanded', async () => {
