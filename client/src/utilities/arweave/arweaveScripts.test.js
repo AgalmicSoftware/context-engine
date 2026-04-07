@@ -509,7 +509,7 @@ describe('arweaveScripts.downloadDataFromArweave', () => {
     });
 
     expect(global.fetch).toHaveBeenCalledTimes(1);
-    expect(String(global.fetch.mock.calls[0]?.[0] || '')).toBe(PERMAGATE_GRAPHQL_URL);
+    expect(String(global.fetch.mock.calls[0]?.[0] || '')).toBe('https://permagate.io/graphql');
   });
 
   it('skips graphql precheck by default for sbt metadata reads and goes straight to the gateway', async () => {
@@ -551,7 +551,7 @@ describe('arweaveScripts.downloadDataFromArweave', () => {
     expect(String(global.fetch.mock.calls[0]?.[0] || '')).not.toContain('/graphql');
   });
 
-  it('prefers healthy GraphQL endpoints before legacy gateway prechecks', async () => {
+  it('prefers healthy GraphQL endpoints before legacy arweave.net prechecks', async () => {
     globalThis.CE_ARWEAVE_PREFLIGHT_SBT_METADATA = true;
     global.fetch.mockResolvedValueOnce(jsonResp(200, {
       data: { transactions: { edges: [] } },
@@ -1099,7 +1099,7 @@ describe('arweaveScripts.downloadDataFromArweave', () => {
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
-  it('default routing stays on AR.IO only when direct-to-AR.IO mode is enabled', async () => {
+  it('default routing stays on ar.io only when direct-to-ar.io mode is enabled', async () => {
     globalThis.CE_ARWEAVE_DIRECT_TO_AR_IO = true;
     globalThis.CE_ARWEAVE_AR_IO_URL = TEST_AR_IO_GATEWAY;
     globalThis.CE_ARWEAVE_GATEWAY_URL = TEST_ARWEAVE_GATEWAY;
