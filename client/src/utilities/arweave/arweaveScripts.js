@@ -12,10 +12,16 @@ import { getCorsProxyUrlOrThrow, resolveCorsProxyUrl } from '../worker/corsProxy
 import { fetchWorkerWithAuth } from '../worker/workerAuth.js';
 import { defaultStrictAllowDemoFallback } from '../worker/workerSessionResolution.js';
 import { normalizeBaseUrl } from '../urlUtils.js';
+import { getCacheBackendDiagnostics } from '../cache/cacheScripts.js';
 import { readSessionScanSlugs } from '../session/sessionScanScope.js';
 import { readSponsoredBootstrapFundingContext } from '../session/sponsoredBootstrapFunding.js';
 import { getSharedFallbackWorkerUrl } from '../session/sessionWorkerAvailability.js';
 import { createLogger } from '../logging';
+import {
+  CE_ARWEAVE_PREFLIGHT_RESPONSE_PAYLOADS,
+  CE_ARWEAVE_PREFLIGHT_SBT_METADATA,
+  CE_ARWEAVE_PREFLIGHT_SESSION_METADATA,
+} from '../../variables/appConfig.js';
 import {
   DEFAULT_ARWEAVE_LINK_GATEWAY,
   getDefaultArweaveGateways,
@@ -805,17 +811,51 @@ const getAvailableGatewaysForAttempt = (gateways = []) => {
   return available.length ? available : ordered;
 };
 
+const buildFetchTimeoutError = (url, timeoutMs, cause = null) => {
+  const err = new Error(`Arweave fetch timed out after ${timeoutMs}ms`);
+  err.name = 'AbortError';
+  err.code = 'ETIMEDOUT';
+  err.url = String(url || '');
+  err.timeoutMs = Number(timeoutMs || 0) || 0;
+  if (cause) {
+    try { err.cause = cause; } catch (_) {}
+  }
+  return err;
+};
+
 const fetchWithTimeout = async (url, options = {}, timeoutMs = ARWEAVE_GRAPHQL_TIMEOUT_MS) => {
   const timeout = Math.max(100, Number(timeoutMs || ARWEAVE_GRAPHQL_TIMEOUT_MS));
+  let timer = null;
   if (typeof AbortController === 'undefined') {
-    return await fetch(url, options);
+    const fetchPromise = Promise.resolve(fetch(url, options));
+    const timeoutPromise = new Promise((_, reject) => {
+      timer = setTimeout(() => {
+        reject(buildFetchTimeoutError(url, timeout));
+      }, timeout);
+    });
+    try {
+      return await Promise.race([fetchPromise, timeoutPromise]);
+    } finally {
+      clearTimeout(timer);
+    }
   }
   const ctrl = new AbortController();
-  const timer = setTimeout(() => {
-    try { ctrl.abort(); } catch (e) { log.warn('arweaveScripts: cleanup', e); }
-  }, timeout);
+  let didTimeout = false;
+  const fetchPromise = Promise.resolve(fetch(url, { ...(options || {}), signal: ctrl.signal }));
+  const timeoutPromise = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      didTimeout = true;
+      try { ctrl.abort(); } catch (e) { log.warn('arweaveScripts: cleanup', e); }
+      reject(buildFetchTimeoutError(url, timeout));
+    }, timeout);
+  });
   try {
-    return await fetch(url, { ...(options || {}), signal: ctrl.signal });
+    return await Promise.race([fetchPromise, timeoutPromise]);
+  } catch (error) {
+    if (didTimeout && error?.name === 'AbortError' && !Number.isFinite(Number(error?.timeoutMs || 0))) {
+      throw buildFetchTimeoutError(url, timeout, error);
+    }
+    throw error;
   } finally {
     clearTimeout(timer);
   }
@@ -1100,6 +1140,52 @@ const shouldStopOnFirstNotFound = (opts = {}) => (
   opts?.stopOnFirst404 === true || opts?.shortCircuitNotFound === true
 );
 
+const readBoolish = (raw, defaultVal = false) => {
+  if (typeof raw === 'boolean') return raw;
+  const value = String(raw == null ? '' : raw).trim().toLowerCase();
+  if (value === '1' || value === 'true' || value === 'yes' || value === 'on') return true;
+  if (value === '0' || value === 'false' || value === 'no' || value === 'off') return false;
+  return defaultVal;
+};
+
+const readGlobalBool = (key, defaultVal = false) => {
+  try {
+    if (typeof globalThis !== 'undefined' && typeof globalThis[key] !== 'undefined') {
+      return readBoolish(globalThis[key], defaultVal);
+    }
+  } catch (e) { void e; /* fallback: runtime override lookup. */ }
+  return defaultVal;
+};
+
+const readArweaveRuntimeDiagnostics = () => {
+  let userAgent = null;
+  let viewportWidth = null;
+  let viewportHeight = null;
+  let devicePixelRatio = null;
+  try {
+    if (typeof navigator !== 'undefined' && navigator?.userAgent) {
+      userAgent = String(navigator.userAgent);
+    }
+  } catch (e) { void e; /* fallback: runtime override lookup. */ }
+  try {
+    if (typeof window !== 'undefined') {
+      viewportWidth = Number(window.innerWidth || 0) || null;
+      viewportHeight = Number(window.innerHeight || 0) || null;
+      devicePixelRatio = Number(window.devicePixelRatio || 0) || null;
+    }
+  } catch (e) { void e; /* fallback: runtime override lookup. */ }
+
+  const cacheBackend = getCacheBackendDiagnostics();
+  return {
+    cacheBackend: String(cacheBackend?.persistentBackend || 'unknown'),
+    cacheBackendProbeState: String(cacheBackend?.probeState || 'unprobed'),
+    userAgent,
+    viewportWidth,
+    viewportHeight,
+    devicePixelRatio,
+  };
+};
+
 const isResponsePayloadCategory = (debugContext = null) => {
   const category = String(debugContext?.category || '').trim().toLowerCase();
   return (
@@ -1108,17 +1194,63 @@ const isResponsePayloadCategory = (debugContext = null) => {
   );
 };
 
-const shouldPreflightTxExistence = (opts = {}, debugContext = null) => {
-  if (opts?.disableExistencePrecheck === true) return false;
-  if (opts?.preflightTxExistence === false) return false;
-  if (opts?.preflightTxExistence === true) return true;
+const isDisplayCriticalMetadataCategory = (debugContext = null) => {
   const category = String(debugContext?.category || '').trim().toLowerCase();
   return (
     category === 'session_registry_metadata' ||
     category === 'sbt_metadata' ||
-    category === 'question_response_payload' ||
-    category === 'survey_response_payload'
+    category === 'question_metadata' ||
+    category === 'survey_metadata'
   );
+};
+
+const resolvePreflightTxExistenceDecision = (opts = {}, debugContext = null) => {
+  if (opts?.disableExistencePrecheck === true) {
+    return { enabled: false, source: 'opts:disableExistencePrecheck' };
+  }
+  if (opts?.preflightTxExistence === false) {
+    return { enabled: false, source: 'opts:preflightTxExistence=false' };
+  }
+  if (opts?.preflightTxExistence === true) {
+    return { enabled: true, source: 'opts:preflightTxExistence=true' };
+  }
+  const category = String(debugContext?.category || '').trim().toLowerCase();
+  if (category === 'session_registry_metadata') {
+    return {
+      enabled: readGlobalBool(
+        'CE_ARWEAVE_PREFLIGHT_SESSION_METADATA',
+        !!CE_ARWEAVE_PREFLIGHT_SESSION_METADATA
+      ),
+      source: 'config:session_metadata',
+    };
+  }
+  if (category === 'sbt_metadata') {
+    return {
+      enabled: readGlobalBool(
+        'CE_ARWEAVE_PREFLIGHT_SBT_METADATA',
+        !!CE_ARWEAVE_PREFLIGHT_SBT_METADATA
+      ),
+      source: 'config:sbt_metadata',
+    };
+  }
+  if (isResponsePayloadCategory(debugContext)) {
+    return {
+      enabled: readGlobalBool(
+        'CE_ARWEAVE_PREFLIGHT_RESPONSE_PAYLOADS',
+        !!CE_ARWEAVE_PREFLIGHT_RESPONSE_PAYLOADS
+      ),
+      source: 'config:response_payloads',
+    };
+  }
+  return { enabled: false, source: 'default:skip' };
+};
+
+const shouldUseShortNotFoundCooldown = (debugContext = null) => {
+  if (isResponsePayloadCategory(debugContext)) return true;
+  if (!isDisplayCriticalMetadataCategory(debugContext)) return false;
+  const category = String(debugContext?.category || '').trim().toLowerCase();
+  if (category === 'question_metadata' || category === 'survey_metadata') return true;
+  return resolvePreflightTxExistenceDecision({}, debugContext).enabled === false;
 };
 
 const shouldLogArweaveFetchDebug = (opts = {}, debugContext = null) => {
@@ -1169,6 +1301,7 @@ const setTxExistenceCacheEntry = (txId, exists) => {
 const checkArweaveTxExistsViaGraphql = async (txId, opts = {}, debugContext = null) => {
   const normalizedTxId = String(txId || '').trim();
   if (!normalizedTxId) return null;
+  const runtimeDiagnostics = readArweaveRuntimeDiagnostics();
   registerArweaveTxContext(normalizedTxId, {
     category: String(debugContext?.category || '').trim().toLowerCase() || 'unknown',
     caller: String(debugContext?.caller || debugContext?.fn || '').trim(),
@@ -1233,6 +1366,7 @@ const checkArweaveTxExistsViaGraphql = async (txId, opts = {}, debugContext = nu
           txId: normalizedTxId,
           exists,
           endpoint,
+          ...runtimeDiagnostics,
           ...(debugContext || {}),
         }, opts, debugContext);
         return exists;
@@ -1273,7 +1407,9 @@ const computeFailureRetryAtMs = ({
   const now = Date.now();
   const safeAttempts = Math.max(1, Number(attempts || 1));
   if (status === 404 || kind === 'not_found') {
-    if (isResponsePayloadCategory(debugContext)) {
+    // Gateway-first metadata misses are usually propagation lag, so use a
+    // short retry window instead of hiding the asset for the full metadata TTL.
+    if (shouldUseShortNotFoundCooldown(debugContext)) {
       return now + ARWEAVE_FAILURE_RESPONSE_NOT_FOUND_RETRY_MS;
     }
     return now + ARWEAVE_FAILURE_NOT_FOUND_RETRY_MS;
@@ -1930,7 +2066,9 @@ async function downloadDataFromArweave(txID, opts = {}) {
     const bypassFailureCache = cacheBypass || !!opts?.bypassFailureCache;
     const debugContext = normalizeArweaveDebugContext(opts?.debugContext);
     const stopOnFirst404 = shouldStopOnFirstNotFound(opts, debugContext);
-    const preflightTxExistence = shouldPreflightTxExistence(opts, debugContext);
+    const preflightDecision = resolvePreflightTxExistenceDecision(opts, debugContext);
+    const preflightTxExistence = preflightDecision.enabled;
+    const runtimeDiagnostics = readArweaveRuntimeDiagnostics();
     const inFlightKey = normalizedTxId;
     registerArweaveTxContext(normalizedTxId, {
       category: String(debugContext?.category || '').trim().toLowerCase() || 'unknown',
@@ -1938,6 +2076,14 @@ async function downloadDataFromArweave(txID, opts = {}) {
       source: 'gateway_fetch',
     });
     ensureArweaveResourceErrorListener();
+    logArweaveFetchDebug('debug', '[arweave] preflight-decision', {
+      txId: normalizedTxId,
+      enabled: preflightTxExistence,
+      source: preflightDecision.source,
+      shortCircuitNotFound: stopOnFirst404,
+      ...runtimeDiagnostics,
+      ...(debugContext || {}),
+    }, opts, debugContext);
 
     if (!cacheBypass) {
       const cached = getArweaveTextCacheEntry(normalizedTxId);
@@ -1960,6 +2106,8 @@ async function downloadDataFromArweave(txID, opts = {}) {
           kind: cooldownErr.kind,
           attempts: Number(failureEntry.attempts || 0),
           nextRetryAtMs: Number(failureEntry.nextRetryAtMs || 0),
+          shortCircuitedByFailureCache: true,
+          ...runtimeDiagnostics,
           ...(debugContext || {}),
         }, opts, debugContext);
         throw cooldownErr;
@@ -2022,6 +2170,7 @@ async function downloadDataFromArweave(txID, opts = {}) {
                 gateway: arIoOnlyResult.gateway,
                 resolvedUrl: arIoOnlyResult.resolvedUrl,
                 attempt,
+                ...runtimeDiagnostics,
                 ...(debugContext || {}),
               }, opts, debugContext);
               if (!cacheBypass) setArweaveTextCacheEntry(normalizedTxId, arIoOnlyResult.text);
@@ -2122,6 +2271,15 @@ async function downloadDataFromArweave(txID, opts = {}) {
                       continue;
                     }
                     markGatewaySuccess(gateway);
+                    logArweaveFetchDebug('log', '[arweave] gateway hit', {
+                      txId: normalizedTxId,
+                      gateway,
+                      route,
+                      resolvedUrl: url,
+                      attempt,
+                      ...runtimeDiagnostics,
+                      ...(debugContext || {}),
+                    }, opts, debugContext);
                     if (!cacheBypass) setArweaveTextCacheEntry(normalizedTxId, text);
                     if (!bypassFailureCache) clearFailureCacheEntry(normalizedTxId);
                     return text;
@@ -2246,6 +2404,7 @@ async function downloadDataFromArweave(txID, opts = {}) {
               route: wayfinderResult.route,
               gateway: wayfinderResult.gateway,
               resolvedUrl: wayfinderResult.resolvedUrl,
+              ...runtimeDiagnostics,
               ...(debugContext || {}),
             }, opts, debugContext);
             if (!cacheBypass) setArweaveTextCacheEntry(normalizedTxId, wayfinderResult.text);
@@ -2359,6 +2518,8 @@ export const arweaveScripts = {
     const normalizedTxId = normalizeArweaveUploadId(txId);
     if (!normalizedTxId) return null;
     const debugContext = normalizeArweaveDebugContext(opts?.debugContext);
+    const preflightDecision = resolvePreflightTxExistenceDecision(opts, debugContext);
+    if (!preflightDecision.enabled) return null;
     return await checkArweaveTxExistsViaGraphql(normalizedTxId, opts, debugContext);
   },
   readArweaveWalletBalance: async (jwk, opts = {}) => {

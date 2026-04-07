@@ -193,6 +193,9 @@ describe('arweaveScripts.downloadDataFromArweave', () => {
     try { delete globalThis.CE_ARWEAVE_GATEWAY_URL; } catch (_) {}
     try { delete globalThis.CE_ARWEAVE_AR_IO_URL; } catch (_) {}
     try { delete globalThis.CE_ARWEAVE_DIRECT_TO_AR_IO; } catch (_) {}
+    try { delete globalThis.CE_ARWEAVE_PREFLIGHT_SESSION_METADATA; } catch (_) {}
+    try { delete globalThis.CE_ARWEAVE_PREFLIGHT_SBT_METADATA; } catch (_) {}
+    try { delete globalThis.CE_ARWEAVE_PREFLIGHT_RESPONSE_PAYLOADS; } catch (_) {}
   });
 
   it('returns text and reuses in-memory cache', async () => {
@@ -464,7 +467,89 @@ describe('arweaveScripts.downloadDataFromArweave', () => {
     expect(calledUrl).not.toContain('/graphql');
   });
 
+  it('skips graphql precheck by default for session metadata reads and goes straight to the gateway', async () => {
+    global.fetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: async () => '{"session":"ok"}',
+    });
+
+    const text = await arweaveScripts.downloadDataFromArweave('session-meta-no-preflight', {
+      gateways: [TEST_ARWEAVE_GATEWAY],
+      retries: 0,
+      bypassCache: true,
+      debugContext: { category: 'session_registry_metadata' },
+    });
+
+    expect(text).toBe('{"session":"ok"}');
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(String(global.fetch.mock.calls[0]?.[0] || '')).not.toContain('/graphql');
+  });
+
+  it('honors runtime overrides that enable session-metadata GraphQL precheck', async () => {
+    globalThis.CE_ARWEAVE_PREFLIGHT_SESSION_METADATA = true;
+    global.fetch.mockResolvedValueOnce(jsonResp(200, {
+      data: { transactions: { edges: [] } },
+    }));
+
+    await expect(
+      arweaveScripts.downloadDataFromArweave('session-meta-with-preflight', {
+        gateways: [TEST_ARWEAVE_GATEWAY],
+        retries: 0,
+        bypassCache: true,
+        debugContext: { category: 'session_registry_metadata' },
+      })
+    ).rejects.toMatchObject({
+      name: 'ArweaveFetchError',
+      status: 404,
+      kind: 'not_found',
+    });
+
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(String(global.fetch.mock.calls[0]?.[0] || '')).toBe('https://permagate.io/graphql');
+  });
+
+  it('skips graphql precheck by default for sbt metadata reads and goes straight to the gateway', async () => {
+    global.fetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: async () => '{"name":"badge"}',
+    });
+
+    const text = await arweaveScripts.downloadDataFromArweave('sbt-meta-no-preflight', {
+      gateways: [TEST_ARWEAVE_GATEWAY],
+      retries: 0,
+      bypassCache: true,
+      debugContext: { category: 'sbt_metadata' },
+    });
+
+    expect(text).toBe('{"name":"badge"}');
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(String(global.fetch.mock.calls[0]?.[0] || '')).not.toContain('/graphql');
+  });
+
+  it('honors runtime overrides that disable response-payload GraphQL precheck', async () => {
+    globalThis.CE_ARWEAVE_PREFLIGHT_RESPONSE_PAYLOADS = false;
+    global.fetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: async () => '{"response":"ok"}',
+    });
+
+    const text = await arweaveScripts.downloadDataFromArweave('response-meta-no-preflight', {
+      gateways: [TEST_ARWEAVE_GATEWAY],
+      retries: 0,
+      bypassCache: true,
+      debugContext: { category: 'survey_response_payload' },
+    });
+
+    expect(text).toBe('{"response":"ok"}');
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(String(global.fetch.mock.calls[0]?.[0] || '')).not.toContain('/graphql');
+  });
+
   it('prefers healthy GraphQL endpoints before legacy arweave.net prechecks', async () => {
+    globalThis.CE_ARWEAVE_PREFLIGHT_SBT_METADATA = true;
     global.fetch.mockResolvedValueOnce(jsonResp(200, {
       data: { transactions: { edges: [] } },
     }));
@@ -487,6 +572,7 @@ describe('arweaveScripts.downloadDataFromArweave', () => {
   });
 
   it('falls back to secondary GraphQL endpoints when the primary precheck is unhealthy', async () => {
+    globalThis.CE_ARWEAVE_PREFLIGHT_SBT_METADATA = true;
     global.fetch
       .mockResolvedValueOnce({
         ok: false,
@@ -959,6 +1045,55 @@ describe('arweaveScripts.downloadDataFromArweave', () => {
     expect(remainingMs).toBeGreaterThan(1000);
     expect(remainingMs).toBeLessThan(60 * 1000);
     expect(global.fetch).toHaveBeenCalledTimes(3);
+  });
+
+  it('uses short not-found cooldowns for gateway-first session metadata categories', async () => {
+    global.fetch.mockResolvedValue({
+      ok: false,
+      status: 404,
+      text: async () => '',
+    });
+
+    const txId = 'missing-session-metadata-cooldown';
+    await expect(
+      arweaveScripts.downloadDataFromArweave(txId, {
+        gateways: [TEST_ARWEAVE_GATEWAY],
+        retries: 0,
+        debugContext: { category: 'session_registry_metadata' },
+      })
+    ).rejects.toMatchObject({
+      name: 'ArweaveFetchError',
+      status: 404,
+      kind: 'not_found',
+    });
+
+    let cooldownErr = null;
+    try {
+      await arweaveScripts.downloadDataFromArweave(txId, {
+        gateways: [TEST_ARWEAVE_GATEWAY],
+        retries: 0,
+        debugContext: { category: 'session_registry_metadata' },
+      });
+    } catch (err) {
+      cooldownErr = err;
+    }
+
+    expect(cooldownErr).toBeTruthy();
+    const remainingMs = Number(cooldownErr?.nextRetryAtMs || 0) - Date.now();
+    expect(remainingMs).toBeGreaterThan(1000);
+    expect(remainingMs).toBeLessThan(60 * 1000);
+    expect(global.fetch).toHaveBeenCalledTimes(3);
+  });
+
+  it('skips GraphQL existence checks when SBT metadata preflight is disabled', async () => {
+    globalThis.CE_ARWEAVE_PREFLIGHT_SBT_METADATA = false;
+
+    const exists = await arweaveScripts.checkTxExists('sbt-image-no-preflight', {
+      debugContext: { category: 'sbt_metadata' },
+    });
+
+    expect(exists).toBeNull();
+    expect(global.fetch).not.toHaveBeenCalled();
   });
 
   it('default routing stays on ar.io only when direct-to-ar.io mode is enabled', async () => {

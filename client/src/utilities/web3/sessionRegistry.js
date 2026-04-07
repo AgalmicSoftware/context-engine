@@ -23,6 +23,7 @@ import {
   getSessionRegistryChainIds,
 } from '../../variables/chains.js';
 import { arweaveScripts } from '../arweave/arweaveScripts.js';
+import { getCacheBackendDiagnostics } from '../cache/cacheScripts.js';
 import { litStorage } from '../crypto/litProtocol.js';
 import { cryptoUtils } from '../crypto/cryptography.js';
 import { normalizeSessionNaming, stripAuthoritativeSessionGateFields } from '../session/sessionMetadata.js';
@@ -823,12 +824,19 @@ const fetchMetadataFromArweave = async (uri, opts = {}) => {
   };
   let text = '';
   try {
-    text = await arweaveScripts.downloadDataFromArweave(txId, { debugContext });
+    text = await arweaveScripts.downloadDataFromArweave(txId, {
+      debugContext,
+    });
   } catch (err) {
     if (typeof window !== 'undefined') {
+      const cacheBackend = getCacheBackendDiagnostics();
       surveysLog.warn('[sessionRegistry] metadata fetch failed', {
         txId,
         error: err?.message || String(err),
+        slug: debugContext.slug || null,
+        chainId: debugContext.chainId || null,
+        cacheBackend: cacheBackend?.persistentBackend || 'unknown',
+        cacheBackendProbeState: cacheBackend?.probeState || 'unprobed',
       });
     }
     return null;
@@ -2166,6 +2174,7 @@ export const sessionRegistryUtils = {
 export const __sessionRegistryTestUtils = {
   buildSessionConfigFromRegistry,
   extractRpcFeeOverrides,
+  fetchMetadataFromArweave,
   hasExplicitTxFeeOverrides,
   isMalformedProviderValueError,
   resolveRpcTxFeeOverrides,

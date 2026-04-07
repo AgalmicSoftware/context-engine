@@ -907,6 +907,22 @@ export const listNamespaceEntriesSync = (namespace, options = {}) => {
   }));
 };
 
+export const getCacheBackendDiagnostics = () => {
+  const probeState = backendReadyPromise
+    ? (didHydrateMirror ? 'ready' : 'probing')
+    : 'unprobed';
+  const persistentBackend = probeState === 'unprobed'
+    ? 'unknown'
+    : (idbAvailable ? 'indexeddb' : 'localstorage');
+  return {
+    persistentBackend,
+    probeState,
+    idbAvailable: !!idbAvailable,
+    didHydrateMirror: !!didHydrateMirror,
+    recoveryInFlight: !!idbRecoveryPromise,
+  };
+};
+
 export const subscribeCacheUpdates = (handler) => {
   if (typeof handler !== 'function') return () => {};
   subscribers.add(handler);

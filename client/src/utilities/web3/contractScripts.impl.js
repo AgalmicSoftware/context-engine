@@ -1264,6 +1264,16 @@ const buildFailureModeTag = (opts = {}) => (
   opts && opts.throwOnFailure ? 'strict' : 'soft'
 );
 
+const buildArweaveReadModeTag = (opts = {}) => {
+  const retries = Number.isFinite(Number(opts?.arweaveRetries))
+    ? Math.max(0, Number(opts.arweaveRetries))
+    : 'default';
+  const gatewayTimeoutMs = Number.isFinite(Number(opts?.arweaveGatewayTimeoutMs))
+    ? Math.max(300, Number(opts.arweaveGatewayTimeoutMs))
+    : 'default';
+  return `arweave|retries:${retries}|timeout:${gatewayTimeoutMs}`;
+};
+
 const contractHelperDeps = {
   resolveSession,
   latestBlockCache,
@@ -3236,7 +3246,8 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
     const { baseKey } = resolveReadContext(groupKeyOrCfg);
     const modeTag = buildDecryptModeTag(opts);
     const failureModeTag = buildFailureModeTag(opts);
-    const inflightKey = `${baseKey}|${qId}|${modeTag}|${failureModeTag}`;
+    const arweaveReadModeTag = buildArweaveReadModeTag(opts);
+    const inflightKey = `${baseKey}|${qId}|${modeTag}|${failureModeTag}|${arweaveReadModeTag}`;
     const forceArweaveFetch = !!(opts && opts.forceArweaveFetch === true);
     try {
       const result = await runInFlightCoalesced(
@@ -3267,6 +3278,12 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
               forceRetry: forceArweaveFetch,
               cacheBypass: forceArweaveFetch,
               bypassFailureCache: forceArweaveFetch,
+              ...(Number.isFinite(Number(opts?.arweaveRetries))
+                ? { retries: Math.max(0, Number(opts.arweaveRetries)) }
+                : {}),
+              ...(Number.isFinite(Number(opts?.arweaveGatewayTimeoutMs))
+                ? { gatewayTimeoutMs: Math.max(300, Number(opts.arweaveGatewayTimeoutMs)) }
+                : {}),
               debugContext: buildArweaveDebugContext(groupKeyOrCfg, 'question_metadata', {
                 fn: 'getQuestionData',
                 questionId: qId,

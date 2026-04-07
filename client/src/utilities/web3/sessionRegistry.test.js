@@ -6,6 +6,7 @@ import { DEFAULT_CHAIN_ID } from '../../variables/appConfig.js';
 jest.mock('../arweave/arweaveScripts.js', () => ({
   arweaveScripts: {
     uploadDataToArweave: jest.fn(),
+    downloadDataFromArweave: jest.fn(),
   },
 }));
 
@@ -126,6 +127,7 @@ describe('sessionRegistry metadata upload', () => {
   beforeEach(() => {
     arweaveScripts.uploadDataToArweave.mockReset();
     arweaveScripts.uploadDataToArweave.mockResolvedValue('example_tx_id');
+    arweaveScripts.downloadDataFromArweave.mockReset();
   });
 
   it('strips authoritative gate fields before Arweave upload', async () => {
@@ -150,6 +152,44 @@ describe('sessionRegistry metadata upload', () => {
     // Original object is preserved for caller-side state.
     expect(metadata.sponsored).toBeDefined();
     expect(metadata.sponsoredSbtAddress).toBeDefined();
+  });
+});
+
+describe('sessionRegistry metadata reads', () => {
+  beforeEach(() => {
+    arweaveScripts.downloadDataFromArweave.mockReset();
+  });
+
+  it('leaves session metadata preflight policy to the arweave resolver', async () => {
+    const txId = 'YWNXjJUfKtOUN56pL_U4HxTv2dYfZORfBFAtZpc7q5g';
+    arweaveScripts.downloadDataFromArweave.mockResolvedValue(JSON.stringify({
+      slug: 'edge',
+      sessionName: 'Edge',
+    }));
+
+    const metadata = await __sessionRegistryTestUtils.fetchMetadataFromArweave(`ar://${txId}`, {
+      caller: 'unit-test',
+      slug: 'edge',
+      chainId: 84532,
+    });
+
+    expect(metadata).toEqual({
+      slug: 'edge',
+      sessionName: 'Edge',
+    });
+    const [, arweaveOpts] = arweaveScripts.downloadDataFromArweave.mock.calls[0];
+    expect(arweaveScripts.downloadDataFromArweave).toHaveBeenCalledTimes(1);
+    expect(arweaveScripts.downloadDataFromArweave).toHaveBeenCalledWith(txId, expect.any(Object));
+    expect(arweaveOpts).toEqual(expect.objectContaining({
+      debugContext: expect.objectContaining({
+        category: 'session_registry_metadata',
+        caller: 'unit-test',
+        slug: 'edge',
+        chainId: 84532,
+      }),
+    }));
+    expect(arweaveOpts).not.toHaveProperty('disableExistencePrecheck');
+    expect(arweaveOpts).not.toHaveProperty('preflightTxExistence');
   });
 });
 
