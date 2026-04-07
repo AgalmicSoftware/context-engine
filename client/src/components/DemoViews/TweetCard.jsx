@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
@@ -120,20 +120,26 @@ const getAvatarLetter = (handle = '') => {
 
 const formatCount = (value) => Number(value || 0).toLocaleString();
 
-export const DebateMapSection = ({ entry }) => {
+export const DebateMapSection = ({ entry, onAtlasIssueOpen }) => {
   const linkedIssues = resolveDebateMapIssues(entry);
 
+  if (linkedIssues.length === 0) return null;
+
   return (
-    <div className={styles.debateMapSection}>
-      <div className={styles.debateMapHeader}>
-        <FontAwesomeIcon className={styles.debateMapIcon} icon={faLink} />
-        <span className={styles.debateMapLabel}>
-          Debate Map
-        </span>
-      </div>
-      {linkedIssues.length > 0 ? (
-        <div className={styles.debateMapLinks}>
-          {linkedIssues.map((issue) => (
+    <div className={styles.debateMapFooter}>
+      <div className={styles.debateMapFooterLinks}>
+        {linkedIssues.map((issue) => (
+          onAtlasIssueOpen ? (
+            <button
+              key={issue.id}
+              type="button"
+              className={`${styles.debateMapLink} ${styles.debateMapLinkButton}`}
+              title={issue.pathLabel}
+              onClick={() => onAtlasIssueOpen(issue.id)}
+            >
+              {issue.label}
+            </button>
+          ) : (
             <Link
               key={issue.id}
               to={issue.href}
@@ -142,13 +148,9 @@ export const DebateMapSection = ({ entry }) => {
             >
               {issue.label}
             </Link>
-          ))}
-        </div>
-      ) : (
-        <div className={styles.debateMapEmpty}>
-          No linked atlas issues yet.
-        </div>
-      )}
+          )
+        ))}
+      </div>
     </div>
   );
 };
@@ -169,8 +171,11 @@ export const ExternalSourceLink = ({ entry, fallbackLabel = 'View source' }) => 
   );
 };
 
-const TweetCard = ({ entry, onTagClick }) => {
+const TweetCard = ({ entry, onTagClick, onAtlasIssueOpen }) => {
+  const [expanded, setExpanded] = useState(false);
   const summaryText = entry.text || entry.summary || '';
+  const shouldTruncate = summaryText.length > 280 && !expanded;
+  const displayText = shouldTruncate ? `${summaryText.slice(0, 280)}…` : summaryText;
   const createdAt = formatDate(entry.created_at);
   const normalizedSentiment = String(entry.sentiment || '').toLowerCase();
   const sentimentClassName = normalizedSentiment.includes('optim')
@@ -210,9 +215,18 @@ const TweetCard = ({ entry, onTagClick }) => {
         </div>
       </div>
 
-      <div className={styles.tweetBody}>
-        {summaryText}
+      <div className={`${styles.tweetBody} ${shouldTruncate ? styles.tweetBodyClamped : ''}`.trim()}>
+        {displayText}
       </div>
+      {summaryText.length > 280 ? (
+        <button
+          type="button"
+          className={styles.tweetReadMore}
+          onClick={() => setExpanded((value) => !value)}
+        >
+          {expanded ? 'Show less' : 'Show more'}
+        </button>
+      ) : null}
 
       {showMetadataRow ? (
         <div className={`${styles.pillRow} ${styles.tweetTags}`}>
@@ -234,8 +248,6 @@ const TweetCard = ({ entry, onTagClick }) => {
         </div>
       ) : null}
 
-      <DebateMapSection entry={entry} />
-
       <div className={styles.tweetEngagement}>
         <div className={styles.engagementRow}>
           <span className={styles.tweetEngagementIcon}>
@@ -251,7 +263,10 @@ const TweetCard = ({ entry, onTagClick }) => {
             <span>{formatCount(entry.engagement?.views)}</span>
           </span>
         </div>
-        <ExternalSourceLink entry={entry} fallbackLabel="View post" />
+        <div className={styles.cardFooterLinks}>
+          <DebateMapSection entry={entry} onAtlasIssueOpen={onAtlasIssueOpen} />
+          <ExternalSourceLink entry={entry} fallbackLabel="View post" />
+        </div>
       </div>
     </article>
   );

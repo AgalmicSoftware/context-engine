@@ -25,6 +25,8 @@ describe('InsiderCard', () => {
 
     expect(screen.getByRole('button', { name: 'alignment' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'scaling' })).toBeInTheDocument();
+    expect(screen.getByText('A short test summary.')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'View interview' })).toHaveAttribute('href', 'https://example.com/interview');
 
     fireEvent.click(screen.getByRole('button', { name: 'scaling' }));
     expect(onTagClick).toHaveBeenCalledWith('scaling');

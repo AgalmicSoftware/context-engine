@@ -2851,8 +2851,7 @@ const DebateMap = ({
   embedded = false,
   requestedModalNodeId = null,
   onModalClose = null,
-  atlasLayoutMode = ATLAS_LAYOUT_MODES.PACKED,
-}: DebateMapProps) => {
+}) => {
   const externalDemoEnabled = externalDemoMode && typeof externalDemoMode === 'object'
     ? !!externalDemoMode.tools
     : !!externalDemoMode;
@@ -2913,19 +2912,9 @@ const DebateMap = ({
   }, [initialDemoEnabled]);
 
   useEffect(() => {
-    setVisualMode(getInitialDebateVisualMode(atlasLayoutMode));
-  }, [atlasLayoutMode]);
-
-  useEffect(() => {
     if (!requestedModalNodeId) return;
     setModalNodeId(String(requestedModalNodeId).trim() || null);
   }, [requestedModalNodeId]);
-
-  const modalReturnTo = useMemo(() => {
-    if (embedded || typeof window === 'undefined') return '';
-    const params = new URLSearchParams(location.search || '');
-    return readSafeInternalReturnTo(params.get('returnTo') || '', window);
-  }, [embedded, location.search]);
 
   const selectedCategory = useMemo(() => (
     selectedCategoryId ? findAtlasNodeById(treeDataState, selectedCategoryId) : null
@@ -2955,19 +2944,13 @@ const DebateMap = ({
     }
   }, [effectiveNodeId, treeDataState]);
 
-  const handleNodeClick = useCallback((node: DebateNode) => setModalNodeId(String(node?.id || '').trim() || null), []);
+  const handleNodeClick = useCallback((node) => setModalNodeId(node?.id || null), []);
   const closeModal = useCallback(() => {
     setModalNodeId(null);
-    if (typeof onModalClose === 'function') {
-      onModalClose();
-      return;
-    }
-    if (modalReturnTo) {
-      navigate(modalReturnTo, { replace: true });
-    }
-  }, [modalReturnTo, navigate, onModalClose]);
-
-  const handleBookmark = useCallback((id: string) => {
+    onModalClose?.();
+  }, [onModalClose]);
+  
+  const handleBookmark = useCallback((id) => {
     setBookmarkedNodes(prev => {
       const next = prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id];
       localStorage.setItem('bookmarkedNodes', JSON.stringify(next));

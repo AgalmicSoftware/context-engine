@@ -110,18 +110,21 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  justify-content: center;
+  justify-content: flex-start;
 }
 
 .filterButton {
+  align-items: center;
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: var(--ce-radius-pill);
   color: rgba(244, 247, 255, 0.88);
   cursor: pointer;
+  display: inline-flex;
   font-family: var(--ce-font-mono, SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace);
   font-size: 12px;
   font-weight: 700;
+  gap: 8px;
   letter-spacing: 0.02em;
   min-width: 76px;
   padding: 7px 12px;
@@ -144,6 +147,38 @@
   background: rgba(77, 255, 164, 0.14);
   border-color: rgba(77, 255, 164, 0.36);
   color: #4dffa4;
+}
+
+.filterButtonLiveOption {
+  border-color: rgba(77, 255, 164, 0.24);
+}
+
+.filterButtonProposedOption {
+  border-color: rgba(255, 179, 71, 0.24);
+}
+
+.filterButtonAllOption {
+  border-color: rgba(226, 232, 255, 0.16);
+}
+
+.filterSwatch {
+  border-radius: 999px;
+  display: inline-flex;
+  flex: 0 0 10px;
+  height: 10px;
+  width: 10px;
+}
+
+.filterSwatchLive {
+  background: rgba(77, 255, 164, 0.9);
+}
+
+.filterSwatchProposed {
+  background: rgba(255, 179, 71, 0.9);
+}
+
+.filterSwatchAll {
+  background: rgba(122, 140, 255, 0.9);
 }
 
 .policyCard {

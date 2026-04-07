@@ -36,8 +36,32 @@ describe('TweetCard', () => {
     expect(screen.getByRole('button', { name: 'Open Source' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Risk' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'View post' })).toHaveAttribute('href', 'https://example.com/post');
+    expect(screen.queryByText('No linked atlas issues yet.')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Risk' }));
     expect(onTagClick).toHaveBeenCalledWith('Risk');
+  });
+
+  it('truncates long tweet text until expanded', () => {
+    const longText = `${'A'.repeat(280)} This trailing sentence only appears after expansion.`;
+
+    render(
+      <MemoryRouter>
+        <TweetCard
+          entry={{
+            author: 'longform',
+            text: longText,
+          }}
+        />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByRole('button', { name: 'Show more' })).toBeInTheDocument();
+    expect(screen.queryByText(/This trailing sentence only appears after expansion\./)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show more' }));
+
+    expect(screen.getByText(longText)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Show less' })).toBeInTheDocument();
   });
 });

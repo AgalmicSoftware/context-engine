@@ -14,6 +14,18 @@ const FILTER_OPTIONS = [
   { id: POLICY_FILTERS.all, label: 'All' },
 ];
 
+const FILTER_STYLE_CLASS_BY_ID = {
+  [POLICY_FILTERS.live]: styles.filterButtonLiveOption,
+  [POLICY_FILTERS.proposed]: styles.filterButtonProposedOption,
+  [POLICY_FILTERS.all]: styles.filterButtonAllOption,
+};
+
+const FILTER_SWATCH_CLASS_BY_ID = {
+  [POLICY_FILTERS.live]: styles.filterSwatchLive,
+  [POLICY_FILTERS.proposed]: styles.filterSwatchProposed,
+  [POLICY_FILTERS.all]: styles.filterSwatchAll,
+};
+
 const LIVE_STATUS_MATCHERS = [
   'live',
   'enacted',
@@ -146,6 +158,8 @@ const getJurisdictionRule = (jurisdiction = '') => {
     || { anchor: 'international', flag: '🌐' };
 };
 
+export const getPolicyJurisdictionAnchor = (jurisdiction = '') => getJurisdictionRule(jurisdiction).anchor;
+
 const getPolicyTimestamp = (entry = {}) => {
   const datedValue = entry.date_enacted || entry.date || entry.created_at || entry.updated_at || entry.year;
 
@@ -267,26 +281,31 @@ const PolicyGlobe = ({ entries = [], children }) => {
 
   const globeDots = useMemo(() => buildGlobeDots(filteredEntries), [filteredEntries]);
 
+  const FilterControlsElement = (
+    <div className={styles.filterRow} data-testid="ce-policy-filter-row" role="group" aria-label="Policy status filter">
+      {FILTER_OPTIONS.map((option) => {
+        const isActive = option.id === filterStatus;
+
+        return (
+          <button
+            key={option.id}
+            type="button"
+            aria-pressed={isActive}
+            data-testid={`ce-policy-filter-${option.id}`}
+            className={`${styles.filterButton} ${FILTER_STYLE_CLASS_BY_ID[option.id] || ''} ${isActive ? styles.filterButtonActive : ''}`.trim()}
+            onClick={() => setFilterStatus(option.id)}
+          >
+            <span className={`${styles.filterSwatch} ${FILTER_SWATCH_CLASS_BY_ID[option.id] || ''}`.trim()} aria-hidden="true" />
+            <span>{option.label}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+
   const GlobeElement = (
     <section className={styles.globeWrapper} data-testid="ce-policy-globe" aria-label="Policy status globe">
-      <div className={styles.filterRow} data-testid="ce-policy-filter-row" role="group" aria-label="Policy status filter">
-        {FILTER_OPTIONS.map((option) => {
-          const isActive = option.id === filterStatus;
-
-          return (
-            <button
-              key={option.id}
-              type="button"
-              aria-pressed={isActive}
-              data-testid={`ce-policy-filter-${option.id}`}
-              className={`${styles.filterButton} ${isActive ? styles.filterButtonActive : ''}`.trim()}
-              onClick={() => setFilterStatus(option.id)}
-            >
-              {option.label}
-            </button>
-          );
-        })}
-      </div>
+      {FilterControlsElement}
 
       <div className={styles.globe} aria-hidden="true">
         <span className={`${styles.globeRing} ${styles.globeRingMeridian}`.trim()} />
@@ -307,7 +326,13 @@ const PolicyGlobe = ({ entries = [], children }) => {
   );
 
   if (typeof children === 'function') {
-    return children({ filteredEntries, filterStatus, setFilterStatus, GlobeElement });
+    return children({
+      filteredEntries,
+      filterStatus,
+      setFilterStatus,
+      GlobeElement,
+      FilterControlsElement,
+    });
   }
 
   return GlobeElement;
