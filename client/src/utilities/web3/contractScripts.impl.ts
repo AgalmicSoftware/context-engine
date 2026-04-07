@@ -1459,7 +1459,7 @@ const buildFailureModeTag = (opts: any = {}) => (
   opts && opts.throwOnFailure ? 'strict' : 'soft'
 );
 
-const buildArweaveReadModeTag = (opts: any = {}) => {
+const buildArweaveReadModeTag = (opts = {}) => {
   const retries = Number.isFinite(Number(opts?.arweaveRetries))
     ? Math.max(0, Number(opts.arweaveRetries))
     : 'default';
@@ -1469,7 +1469,7 @@ const buildArweaveReadModeTag = (opts: any = {}) => {
   return `arweave|retries:${retries}|timeout:${gatewayTimeoutMs}`;
 };
 
-const contractHelperDeps: any = {
+const contractHelperDeps = {
   resolveSession,
   latestBlockCache,
   gasPriceCache,
@@ -3607,6 +3607,7 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
     const modeTag = buildDecryptModeTag(opts);
     const failureModeTag = buildFailureModeTag(opts);
     const arweaveReadModeTag = buildArweaveReadModeTag(opts);
+    const inflightKey = `${baseKey}|${qId}|${modeTag}|${failureModeTag}|${arweaveReadModeTag}`;
     const forceArweaveFetch = !!(opts && opts.forceArweaveFetch === true);
     const inflightKey = `${baseKey}|${qId}|${modeTag}|${failureModeTag}|${arweaveReadModeTag}|force:${forceArweaveFetch ? '1' : '0'}`;
     try {

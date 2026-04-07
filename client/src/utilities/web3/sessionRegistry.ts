@@ -1008,7 +1008,7 @@ const fetchMetadataFromArweave = async (uri: unknown, opts: AnyRecord = {}) => {
       const cacheBackend = getCacheBackendDiagnostics();
       surveysLog.warn('[sessionRegistry] metadata fetch failed', {
         txId,
-        error: error?.message || String(err),
+        error: err?.message || String(err),
         slug: debugContext.slug || null,
         chainId: debugContext.chainId || null,
         cacheBackend: cacheBackend?.persistentBackend || 'unknown',

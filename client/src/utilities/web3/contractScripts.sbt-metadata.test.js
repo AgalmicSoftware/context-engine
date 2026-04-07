@@ -553,7 +553,7 @@ describe('contractScripts.getSbtMetadata tokenURI parsing', () => {
     expect(arweaveSpy).toHaveBeenCalledTimes(1);
   });
 
-  it('uses gateway fanout for display-critical SBT tokenURI metadata', async () => {
+  it('leaves SBT tokenURI preflight policy to the arweave resolver', async () => {
     const rawTxId = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
     const stub = baseContractStub(rawTxId);
     stub.name.mockResolvedValue('Gateway First SBT');
@@ -579,21 +579,15 @@ describe('contractScripts.getSbtMetadata tokenURI parsing', () => {
     expect(arweaveSpy).toHaveBeenCalledTimes(1);
     expect(arweaveSpy).toHaveBeenCalledWith(rawTxId, expect.any(Object));
     expect(arweaveOpts).toEqual(expect.objectContaining({
-      bypassFailureCache: true,
-      directToArIo: false,
       debugContext: expect.objectContaining({
         category: 'sbt_metadata',
       }),
-      gateways: expect.arrayContaining([
-        'https://ar-io.dev',
-        'https://arweave.net',
-      ]),
     }));
     expect(arweaveOpts).not.toHaveProperty('disableExistencePrecheck');
     expect(arweaveOpts).not.toHaveProperty('preflightTxExistence');
   });
 
-  it('keeps Arweave-backed SBT images visible without blocking on image preflight', async () => {
+  it('keeps Arweave-backed SBT images visible when metadata preflight is gateway-first', async () => {
     globalThis.CE_ARWEAVE_PREFLIGHT_SBT_METADATA = false;
     const rawTxId = 'BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB';
     const imageTxId = 'CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC';
@@ -618,9 +612,14 @@ describe('contractScripts.getSbtMetadata tokenURI parsing', () => {
     expect(meta).toEqual(expect.objectContaining({
       name: 'Gateway First Image SBT',
       contractName: 'Gateway First Image SBT',
-      image: `https://arweave.net/${imageTxId}`,
+      image: expect.stringContaining(imageTxId),
     }));
-    expect(checkTxExistsSpy).not.toHaveBeenCalled();
+    expect(checkTxExistsSpy).toHaveBeenCalledWith(imageTxId, expect.objectContaining({
+      debugContext: expect.objectContaining({
+        category: 'sbt_metadata',
+        field: 'image',
+      }),
+    }));
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 });
