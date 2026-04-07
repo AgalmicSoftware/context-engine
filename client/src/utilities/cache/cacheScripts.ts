@@ -1066,9 +1066,13 @@ export const listNamespaceEntriesSync = <TValue = CacheLegacyNode>(
   }));
 };
 
-export const getCacheBackendDiagnostics = (): CacheBackendDiagnostics => {
-  const probeState = backendReadyPromise ? (didHydrateMirror ? 'ready' : 'probing') : 'unprobed';
-  const persistentBackend = probeState === 'unprobed' ? 'unknown' : idbAvailable ? 'indexeddb' : 'localstorage';
+export const getCacheBackendDiagnostics = () => {
+  const probeState = backendReadyPromise
+    ? (didHydrateMirror ? 'ready' : 'probing')
+    : 'unprobed';
+  const persistentBackend = probeState === 'unprobed'
+    ? 'unknown'
+    : (idbAvailable ? 'indexeddb' : 'localstorage');
   return {
     persistentBackend,
     probeState,
@@ -1078,7 +1082,7 @@ export const getCacheBackendDiagnostics = (): CacheBackendDiagnostics => {
   };
 };
 
-export const subscribeCacheUpdates = (handler: CacheUpdateHandler): (() => void) => {
+export const subscribeCacheUpdates = (handler) => {
   if (typeof handler !== 'function') return () => {};
   subscribers.add(handler);
   return () => {

@@ -23,7 +23,7 @@ import {
   getSessionRegistryAddress,
   getSessionRegistryChainIds,
 } from '../../variables/chains.js';
-import { arweaveClient } from '../arweave/arweaveClient.js';
+import { arweaveScripts } from '../arweave/arweaveScripts.js';
 import { getCacheBackendDiagnostics } from '../cache/cacheScripts.js';
 import { litStorage } from '../crypto/litProtocol.js';
 import { cryptoUtils } from '../crypto/cryptography.js';
@@ -1003,7 +1003,7 @@ const fetchMetadataFromArweave = async (uri: unknown, opts: AnyRecord = {}) => {
   };
   let text = '';
   try {
-    text = await arweaveClient.downloadDataFromArweave(txId, {
+    text = await arweaveScripts.downloadDataFromArweave(txId, {
       debugContext,
     });
   } catch (err) {
@@ -1012,7 +1012,7 @@ const fetchMetadataFromArweave = async (uri: unknown, opts: AnyRecord = {}) => {
       const cacheBackend = getCacheBackendDiagnostics();
       surveysLog.warn('[sessionRegistry] metadata fetch failed', {
         txId,
-        error: error?.message || String(err),
+        error: err?.message || String(err),
         slug: debugContext.slug || null,
         chainId: debugContext.chainId || null,
         cacheBackend: cacheBackend?.persistentBackend || 'unknown',

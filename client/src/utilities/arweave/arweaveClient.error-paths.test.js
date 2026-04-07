@@ -70,12 +70,8 @@ describe('error paths', () => {
   afterEach(() => {
     jest.clearAllMocks();
     jest.useRealTimers();
-    try {
-      delete globalThis.CE_ARWEAVE_DIRECT_TO_AR_IO;
-    } catch (_) {}
-    try {
-      delete globalThis.__CE_ARWEAVE_UPLOAD_FALLBACK__;
-    } catch (_) {}
+    try { delete globalThis.CE_ARWEAVE_DIRECT_TO_AR_IO; } catch (_) {}
+    try { delete globalThis.__CE_ARWEAVE_UPLOAD_FALLBACK__; } catch (_) {}
   });
 
   it('throws on upload network failures without returning a partial tx id', async () => {
@@ -146,7 +142,7 @@ describe('error paths', () => {
       return new Promise(() => {});
     });
 
-    const pending = arweaveClient.downloadDataFromArweave(TX_ID_TIMEOUT, {
+    const pending = arweaveScripts.downloadDataFromArweave(TX_ID_TIMEOUT, {
       gateways: [TEST_AR_IO_GATEWAY],
       retries: 0,
       bypassCache: true,
