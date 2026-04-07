@@ -64,6 +64,7 @@ describe('CreateSBTGroup cache helpers', () => {
     instance.state.useImageUrl = true;
     instance.state.tags = ['tag1', 'tag2'];
     instance.state.documentURLs = ['https://doc.test'];
+    instance.state.documentUrl = 'https://doc.test/pending';
     instance.state.metadataLockGateIds = {
       ...instance.state.metadataLockGateIds,
       description: ['gate-description'],
@@ -79,6 +80,7 @@ describe('CreateSBTGroup cache helpers', () => {
     expect(payload.sbtName).toBe('Alpha');
     expect(payload.tags).toEqual(['tag1', 'tag2']);
     expect(payload.documentURLs).toEqual(['https://doc.test']);
+    expect(payload.documentUrl).toBe('https://doc.test/pending');
     expect(payload.metadataLockGateIds).toEqual(expect.objectContaining({
       description: ['gate-description'],
     }));
@@ -147,6 +149,33 @@ describe('CreateSBTGroup cache helpers', () => {
     }));
     expect(instance.state.sbtDistribution.mintingEndTime).toBeInstanceOf(Date);
     expect(instance.state.tokenInfoCollapsed).toBe(false);
+    expect(instance.updateGroupHash).toHaveBeenCalled();
+  });
+
+  it('loadFormCache restores a pending document URL draft and expands the authoring sections', () => {
+    const instance = makeInstance({ network: { id: 84532, name: 'Base Sepolia' }, sessionSlug: 'test' });
+    instance.updateGroupHash = jest.fn();
+
+    sessionStorage.setItem(
+      getScopedCreateSbtFormCacheKey('test'),
+      JSON.stringify({
+        sbtName: 'Cached',
+        documentUrl: 'https://doc.test/pending',
+        _sessionSlug: 'test',
+        sbtDistribution: {
+          network: 84532,
+        },
+      })
+    );
+
+    const loaded = instance.loadFormCache();
+
+    expect(loaded).toBe(true);
+    expect(instance.state.documentURLs).toEqual([]);
+    expect(instance.state.documentUrl).toBe('https://doc.test/pending');
+    expect(instance.state.tokenInfoCollapsed).toBe(false);
+    expect(instance.state.mintOptionsCollapsed).toBe(false);
+    expect(instance.state.distributionOptionsCollapsed).toBe(false);
     expect(instance.updateGroupHash).toHaveBeenCalled();
   });
 
@@ -618,6 +647,69 @@ describe('CreateSBTGroup cache helpers', () => {
     expect(result).toEqual(expect.objectContaining({
       tokenURI: '',
       metadataUploadStatus: 'pending-upload',
+    }));
+  });
+
+  it('auto-commits a pending document URL when submit saves a deferred draft', async () => {
+    const onSaveDraft = jest.fn(async () => {});
+    const instance = makeInstance({
+      account: '0x1111111111111111111111111111111111111111',
+      network: { id: 84532, name: 'Base Sepolia' },
+      provider: 'mock-provider',
+      sessionSlug: 'publish-later',
+      deferredDeploy: true,
+      attemptImmediateDeferredUpload: false,
+      onSaveDraft,
+    });
+    instance.getSessionConfigForNetwork = jest.fn(() => ({
+      slug: 'publish-later',
+      networkChainId: 84532,
+    }));
+    instance.resolvePredictableDeployPlan = jest.fn(async ({ tokenURI }) => ({
+      predictedAddress: '0x1111111111111111111111111111111111111111',
+      displayName: 'Deferred Group',
+      contractName: 'Deferred Group',
+      symbol: 'CE-SBT-DEFER',
+      create2Salt: 'draft/test',
+      limitedNumber: 0,
+      adminAddress: '0x1111111111111111111111111111111111111111',
+      mintingEndTimeUnix: 0,
+      hasPasswordMintOnChain: false,
+      burnAuthEnum: 0,
+      hashedPasswords: [],
+      tokenURI,
+      finalGroupPasswordHash: ethers.constants.HashZero,
+      createOptions: { useConfiguredDeterministic: true, initializeGroupPasswordHash: false },
+      distributionOption: 'anyoneCanMint',
+      passwordList: [],
+      groupPassword: '',
+      usesInviteCodes: false,
+    }));
+    instance.state = {
+      ...instance.state,
+      sbtName: 'Deferred Group',
+      documentUrl: 'https://doc.test/pending',
+      sbtDistribution: {
+        ...instance.state.sbtDistribution,
+        burnAuth: 'AdminOnly',
+        network: { name: 'Base Sepolia' },
+      },
+    };
+
+    jest.spyOn(resourceKeys, 'getEffectiveArweaveKey').mockResolvedValue({});
+
+    await instance.handleMintClick();
+
+    expect(instance.state.documentURLs).toEqual(['https://doc.test/pending']);
+    expect(instance.state.documentUrl).toBe('');
+    expect(onSaveDraft).toHaveBeenCalledWith(expect.objectContaining({
+      authoringPayload: expect.objectContaining({
+        documentURLs: ['https://doc.test/pending'],
+        documentUrl: '',
+      }),
+      metadataPreview: expect.objectContaining({
+        documentURLs: ['https://doc.test/pending'],
+      }),
     }));
   });
 
@@ -2199,6 +2291,50 @@ describe('CreateSBTGroup cache helpers', () => {
 
     expect(instance.state.autoJoinUrl).toBe(`http://localhost/session/edge?sbt=${encodeURIComponent(sbtAddress)}&auto=1`);
     expect(instance.state.shareableUrl).toBe(instance.state.autoJoinUrl);
+  });
+
+  it('clears and suppresses draft cache persistence after a successful mint', async () => {
+    const sbtAddress = '0x00000000000000000000000000000000000000b2';
+    const instance = makeInstance({
+      provider: 'mock-provider',
+      account: '0xCreator',
+      loginComplete: true,
+      network: { id: 84532, name: 'Base Sepolia' },
+      sessionSlug: 'edge',
+    });
+    instance.state = {
+      ...instance.state,
+      sbtName: 'Open Group',
+      sbtDescription: 'Cached before mint',
+      tokenURI: 'ar://metadata',
+      sbtDistribution: {
+        ...instance.state.sbtDistribution,
+        burnAuth: 'AdminOnly',
+        distributionOption: 'anyoneCanMint',
+      },
+    };
+    instance.getSessionConfigForNetwork = jest.fn(() => ({ slug: 'edge', networkChainId: 84532 }));
+    instance.schedulePredictedAddressRefresh = jest.fn();
+
+    const scopedKey = getScopedCreateSbtFormCacheKey('edge');
+    instance.persistFormCache();
+    expect(sessionStorage.getItem(scopedKey)).toContain('"Open Group"');
+
+    const prevProps = instance.props;
+    const prevState = { ...instance.state };
+    jest.spyOn(contractScripts, 'countSBTCreated').mockResolvedValue(2);
+    jest.spyOn(contractScripts, 'createSBT').mockResolvedValue({
+      events: [{ event: 'SBTCreated', args: { sbtAddress } }],
+    });
+
+    await instance.mintSBT();
+
+    expect(sessionStorage.getItem(scopedKey)).toBeNull();
+    expect(instance._suppressFormCachePersistence).toBe(true);
+
+    instance.componentDidUpdate(prevProps, prevState);
+
+    expect(sessionStorage.getItem(scopedKey)).toBeNull();
   });
 
   it('renders the open-mint URL card in the success UI for anyone-can-mint SBTs', () => {

@@ -85,6 +85,10 @@ describe('createSbtFormCache helpers', () => {
     expect(hasMeaningfulCreateSbtFormPayload({ tags: ['alpha'] })).toBe(false);
     expect(hasMeaningfulCreateSbtFormPayload({
       sbtName: 'Alpha',
+      documentUrl: 'https://example.com/pending-doc.pdf',
+    })).toBe(true);
+    expect(hasMeaningfulCreateSbtFormPayload({
+      sbtName: 'Alpha',
       documentURLs: ['https://example.com/doc.pdf'],
     })).toBe(true);
     expect(hasMeaningfulCreateSbtFormPayload({
