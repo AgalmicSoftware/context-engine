@@ -708,6 +708,7 @@ class CreateSBTGroup extends Component {
     this._predictAddressRequestSeq = 0;
     this._predictedAddressShapeSignature = '';
     this._autoCreate2SaltForGroupPassword = false;
+    this._suppressFormCachePersistence = false;
   }
 
   /* =========================
@@ -732,10 +733,37 @@ class CreateSBTGroup extends Component {
     return new Blob([arr], { type: mime });
   };
 
+  getNormalizedDocumentUrlDraft = (value = this.state.documentUrl) => (
+    String(value || '').trim()
+  );
+
+  getEffectiveDocumentURLs = ({
+    documentURLs = this.state.documentURLs,
+    documentUrl = this.state.documentUrl,
+  } = {}) => {
+    const nextDocumentUrls = Array.isArray(documentURLs)
+      ? documentURLs.map((url) => String(url || '').trim()).filter(Boolean)
+      : [];
+    const pendingDocumentUrl = this.getNormalizedDocumentUrlDraft(documentUrl);
+    if (pendingDocumentUrl && nextDocumentUrls.length < 10) {
+      nextDocumentUrls.push(pendingDocumentUrl);
+    }
+    return nextDocumentUrls;
+  };
+
+  resumeFormCachePersistence = () => {
+    this._suppressFormCachePersistence = false;
+  };
+
+  suppressFormCachePersistenceAfterSuccess = () => {
+    this._suppressFormCachePersistence = true;
+    this.clearFormCache();
+  };
+
   buildCachePayload = () => {
     const {
       sbtName, sbtDescription, sbtImageUrl, useImageUrl, sbtDistribution,
-      tags, documentIDHashes, documentURLs, groupPassword, numInviteLinks,
+      tags, documentIDHashes, documentURLs, documentUrl, groupPassword, numInviteLinks,
       exportFormat, metadataLockGateIds, create2Salt, predictableAddressEnabled,
       deferredCreate2Salt, autoAppliedDefaultTags, dismissedDefaultTags
     } = this.state;
@@ -758,6 +786,7 @@ class CreateSBTGroup extends Component {
       tags, // Array is safely JSON serialized
       documentIDHashes,
       documentURLs,
+      documentUrl: this.getNormalizedDocumentUrlDraft(documentUrl),
       groupPassword,
       metadataLockGateIds: normalizeMetadataLockGateIds(metadataLockGateIds),
       predictableAddressEnabled: !!predictableAddressEnabled,
@@ -782,6 +811,10 @@ class CreateSBTGroup extends Component {
   persistFormCache = () => {
     try {
       if (typeof window === 'undefined' || !window.sessionStorage) return;
+      if (this._suppressFormCachePersistence) {
+        ++this._cacheWriteSeq;
+        return;
+      }
       const payload = this.buildCachePayload();
       const imageFile = this.state.sbtImageFile;
       const scopedCacheKey = this.getScopedFormCacheKey();
@@ -915,6 +948,7 @@ class CreateSBTGroup extends Component {
       tags: restoredTags,
       documentIDHashes: parsed.documentIDHashes || '',
       documentURLs: Array.isArray(parsed.documentURLs) ? parsed.documentURLs : [],
+      documentUrl: this.getNormalizedDocumentUrlDraft(parsed.documentUrl),
       groupPassword: parsed.groupPassword || '',
       metadataLockGateIds: METADATA_LOCK_FIELDS.reduce((acc, fieldKey) => {
         acc[fieldKey] = this.normalizeSelectedGateIds(restoredMetadataLockGateIds[fieldKey], validGateIds);
@@ -993,6 +1027,7 @@ class CreateSBTGroup extends Component {
     try {
       if (typeof window === 'undefined' || !window.sessionStorage) return;
 
+      ++this._cacheWriteSeq;
       sessionStorage.removeItem(FORM_CACHE_KEY);
       sessionStorage.removeItem(this.getScopedFormCacheKey());
 
@@ -2185,6 +2220,7 @@ class CreateSBTGroup extends Component {
 
   resetForm = () => {
     const nextAuthoringChain = this.getAuthoringChainState();
+    this.resumeFormCachePersistence();
     this.clearFormCache();
     this._autoCreate2SaltForGroupPassword = false;
 
@@ -2213,6 +2249,7 @@ class CreateSBTGroup extends Component {
       autoAppliedDefaultTags: [],
       dismissedDefaultTags: [],
       documentURLs: [],
+      documentUrl: '',
       groupPassword: '',
       openLockKey: '',
       metadataLockGateIds: createEmptyMetadataLockGateIds(),
@@ -2241,6 +2278,7 @@ class CreateSBTGroup extends Component {
   };
 
   resetFormStateForEdit = () => {
+    this.resumeFormCachePersistence();
     if (this.state.sbtMinted) {
       this.setState({
         sbtMinted: false,
@@ -2463,6 +2501,7 @@ class CreateSBTGroup extends Component {
       sbtDistribution,
       tags,
       documentURLs,
+      documentUrl,
       metadataLockGateIds,
     } = this.state;
     const groupData = {
@@ -2472,7 +2511,7 @@ class CreateSBTGroup extends Component {
       sbtImageUrl,
       sbtDistribution,
       tags,
-      documentURLs,
+      documentURLs: this.getEffectiveDocumentURLs({ documentURLs, documentUrl }),
       metadataLockGateIds: normalizeMetadataLockGateIds(metadataLockGateIds),
     };
 
@@ -2754,8 +2793,6 @@ class CreateSBTGroup extends Component {
         sbtDistribution,
         tags,
         documentIDHashes,
-        documentURLs,
-        documentUrl, // Pending input
         metadataLockGateIds,
         useImageUrl,
         sbtImageFile,
@@ -2766,12 +2803,7 @@ class CreateSBTGroup extends Component {
       const validGateIds = Object.keys(gateMap || {});
       const knownGateIds = new Set(validGateIds);
       const scrubGateIds = (ids) => normalizeGateIds(ids).filter((gateId) => knownGateIds.has(gateId));
-
-      // UX Improvement: Capture pending document URL if valid
-      let finalDocURLs = [...documentURLs];
-      if (documentUrl && documentUrl.trim().length > 0) {
-        finalDocURLs.push(documentUrl.trim());
-      }
+      const finalDocURLs = this.getEffectiveDocumentURLs();
 
       // Use tags array directly (ensure no empty strings)
       const tokenTags = tags.filter(t => t.trim().length > 0);
@@ -2993,6 +3025,7 @@ class CreateSBTGroup extends Component {
     if (typeof this.props.onSaveDraft !== 'function') {
       throw new Error('Session draft save is unavailable.');
     }
+    await this.commitPendingDocumentUrl();
     const draftPayload = await this.buildDeferredDraftPayload();
     await this.props.onSaveDraft(draftPayload);
     this.clearFormCache();
@@ -3024,14 +3057,7 @@ class CreateSBTGroup extends Component {
     docIDHashesArray = (this.state.documentIDHashes || '').trim().length > 0
       ? this.state.documentIDHashes.split(',').map((hash) => hash.trim()).filter(Boolean)
       : [],
-    finalDocURLs = [
-      ...(Array.isArray(this.state.documentURLs) ? this.state.documentURLs : []),
-      ...(
-        this.state.documentUrl && this.state.documentUrl.trim().length > 0
-          ? [this.state.documentUrl.trim()]
-          : []
-      ),
-    ],
+    finalDocURLs = this.getEffectiveDocumentURLs(),
     burnAuth = this.state.sbtDistribution.burnAuth,
     networkName = this.getSelectedAuthoringChain()?.name || this.state.sbtDistribution.network?.name,
     chainID = this.getSelectedAuthoringChainId(),
@@ -3091,8 +3117,6 @@ class CreateSBTGroup extends Component {
       sbtDescription,
       sbtImageUrl,
       tags,
-      documentURLs,
-      documentUrl,
       metadataLockGateIds,
       useImageUrl,
       sbtImageFile,
@@ -3102,14 +3126,7 @@ class CreateSBTGroup extends Component {
     const validGateIds = Object.keys(gateMap || {});
     const previewEncryptedFieldGates = {};
     const previewEncryptedFields = {};
-    const previewDocURLs = [
-      ...(Array.isArray(documentURLs) ? documentURLs : []),
-      ...(
-        documentUrl && documentUrl.trim().length > 0
-          ? [documentUrl.trim()]
-          : []
-      ),
-    ];
+    const previewDocURLs = this.getEffectiveDocumentURLs();
     const previewTags = (Array.isArray(tags) ? tags : []).filter((tag) => (tag || '').trim().length > 0);
 
     let previewName = sbtName || '';
@@ -3421,6 +3438,7 @@ class CreateSBTGroup extends Component {
       // Persist plaintext codes for creator (export/admin tools)
       const codesToStore = usesInviteCodes ? [groupPassword] : finalPasswordList;
       this.persistCreatedSbtCodes({ sbtAddress, hasPasswordMintOnChain, codesToStore });
+      this.suppressFormCachePersistenceAfterSuccess();
 
       this.setState({
         sbtMinted: true,
@@ -3455,8 +3473,6 @@ class CreateSBTGroup extends Component {
         await this.generateSBTInviteLinks(sbtAddress);
       }
 
-      // ✅ Clear cached form after a successful mint
-      this.clearFormCache();
     } catch (error) {
       sbtLog.error('[CreateSBTGroup] Mint failed:', error);
       this.setState({ mintingFailed: true, startedMinting: false, currentStep: 0, error: error?.message || `${t('minting')} failed.` });
@@ -3566,6 +3582,8 @@ class CreateSBTGroup extends Component {
     // Block re-entry if flow already started
     if (this.state.currentStep > 0) return;
 
+    await this.commitPendingDocumentUrl();
+
     // Validation: require a name
     const sbtNameTrimmed = (this.state.sbtName || '').trim();
     if (!sbtNameTrimmed) {
@@ -3658,15 +3676,24 @@ class CreateSBTGroup extends Component {
     }
   }
 
-  addDocumentURL = () => {
+  commitPendingDocumentUrl = async ({ persist = true } = {}) => {
     this.resetFormStateForEdit();
-    const { documentUrl, documentURLs } = this.state;
-    if (documentUrl.trim() !== '' && documentURLs.length < 10) {
-      this.setState((prevState) => ({
-        documentURLs: [...prevState.documentURLs, prevState.documentUrl.trim()],
-        documentUrl: ''
-      }), () => { this.updateGroupHash(); this.persistFormCache(); });
+    const pendingDocumentUrl = this.getNormalizedDocumentUrlDraft();
+    if (!pendingDocumentUrl || this.state.documentURLs.length >= 10) {
+      return false;
     }
+
+    await this.setStateAsync((prevState) => ({
+      documentURLs: [...prevState.documentURLs, pendingDocumentUrl],
+      documentUrl: '',
+    }));
+    this.updateGroupHash();
+    if (persist) this.persistFormCache();
+    return true;
+  };
+
+  addDocumentURL = () => {
+    void this.commitPendingDocumentUrl();
   };
 
   handleDocUrlKeyDown = (event) => {
@@ -3986,6 +4013,7 @@ class CreateSBTGroup extends Component {
       (sbtDescription && sbtDescription.trim().length > 0) ||
       sbtImageFile ||
       (sbtImageUrl && sbtImageUrl.trim().length > 0) ||
+      this.getNormalizedDocumentUrlDraft(documentUrl).length > 0 ||
       documentURLs.length > 0 ||
       nameSelectedGateIds.length > 0 ||
       descriptionSelectedGateIds.length > 0 ||
