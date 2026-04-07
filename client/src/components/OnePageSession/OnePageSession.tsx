@@ -1,15 +1,14 @@
 /** @file OnePageSession.tsx */
 import React, { Component, Suspense } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-  faCaretDown,
-  faCaretUp,
-  faDownload,
+import { 
+  faCaretDown, 
+  faCaretUp, 
   faExternalLinkAlt,
-  faQuestionCircle,
-  faSpinner,
-  faCheck,
-  faTimes,
+  faQuestionCircle, 
+  faSpinner, 
+  faCheck, 
+  faTimes, 
   faImage,
   faArrowLeft,
   faExpand,
@@ -73,51 +72,7 @@ const DemoAnalysisWorkspace = React.lazy(() => import('../DemoViews/DemoAnalysis
 const demoLog = createLogger('demo');
 const ONE_PAGE_DEMO_PERF_SCOPE = 'onePageDemo';
 const SBT_TOOLTIP_LABEL = isCryptoMode() ? 'Soulbound tokens (SBTs)' : `${t('sbtFull')}s`;
-const DEMO_CORPUS_GITHUB_URL = PUBLIC_AI_DISCOURSE_CORPUS_URL;
-const DEFAULT_CORPUS_VIEWER_LOAD_STATE = Object.freeze({
-  activeCorpusKey: 'cross_corpus',
-  activeCorpusLabel: 'Cross-Corpus',
-  loadStatus: 'idle',
-  loadButtonLabel: 'Load full corpus',
-  disableLoadButton: false,
-  error: '',
-});
-type UnknownRecord = Record<string, unknown>;
-
-const toUnknownRecord = (value: unknown): UnknownRecord => (
-  value && typeof value === 'object' && !Array.isArray(value)
-    ? value as UnknownRecord
-    : {}
-);
-
-const globalState: any = globalThis as any;
-const contractScriptsAny: any = contractScripts as any;
-const DebateMapAny: any = DebateMap;
-
-const getErrorMessage = (error: any, fallback = 'Unknown error') => (
-  error && typeof error === 'object' && typeof error.message === 'string'
-    ? error.message
-    : fallback
-);
-
-const resolveAutoFeatureBySessionSlug = (metadata: any) => (
-  metadata?.autoFeatureSBTsBySessionSlug !== undefined
-    ? metadata.autoFeatureSBTsBySessionSlug
-    : metadata?.autoFeatureSBTsWithFeaturedSbtTags
-);
-
-const isTelegramOnlySessionConfig = (metadata: unknown) => {
-  const config = toUnknownRecord(metadata);
-  const telegramConfig = toUnknownRecord(config.telegram);
-  return (
-    config.telegramOnly === true ||
-    config.telegram_only === true ||
-    config.sessionMode === 'telegram_only' ||
-    config.telegramMode === 'telegram_only' ||
-    telegramConfig.only === true ||
-    telegramConfig.mode === 'telegram_only'
-  );
-};
+const DEMO_CORPUS_GITHUB_URL = 'https://github.com/xoCortex/context-engine/tree/main/client/src/variables/demo';
 
 const isPerfCountersEnabled = () => {
   try {
@@ -395,7 +350,6 @@ class OnePageSession extends Component<any, any> {
       autoOpenResults: routeUiState.autoOpenResults,
       embeddedAtlasNodeId: null,
       embeddedAtlasReturnState: null,
-      riskMatrixRestoreState: null,
       aggregatorData: {},
       disclaimersActive: true,
       filterState: initialFilterState,
@@ -452,7 +406,6 @@ class OnePageSession extends Component<any, any> {
     this.handleResultsModalClose = this.handleResultsModalClose.bind(this);
     this.handleCorpusAtlasIssueOpen = this.handleCorpusAtlasIssueOpen.bind(this);
     this.handleEmbeddedAtlasModalClose = this.handleEmbeddedAtlasModalClose.bind(this);
-    this.handleRiskMatrixRestoreApplied = this.handleRiskMatrixRestoreApplied.bind(this);
     this.resetDemoURL = this.resetDemoURL.bind(this);
     this.toggleQuestions = this.toggleQuestions.bind(this);
     this.toggleGroups = this.toggleGroups.bind(this);
@@ -1983,72 +1936,31 @@ class OnePageSession extends Component<any, any> {
     this.setState({ autoOpenResults: false }, () => this.resetDemoURL());
   }
 
-  handleCorpusAtlasIssueOpen(nodeId: any, riskMatrixRestoreState: RiskMatrixRestoreState | null = null) {
+  handleCorpusAtlasIssueOpen(nodeId) {
     const normalizedNodeId = String(nodeId || '').trim();
     if (!normalizedNodeId) return;
 
-    this.setState((prevState: Readonly<OnePageSession['state']>) => ({
+    this.setState((prevState) => ({
       embeddedAtlasNodeId: normalizedNodeId,
       embeddedAtlasReturnState: prevState.embeddedAtlasReturnState || {
         showResults: prevState.showResults,
         resultsViewMode: prevState.resultsViewMode,
-        riskMatrixRestoreState: riskMatrixRestoreState || null,
       },
       showResults: true,
       resultsViewMode: 'debateAtlas',
     }));
   }
 
-  handleCorpusViewerLoadStateChange(nextLoadState: any = DEFAULT_CORPUS_VIEWER_LOAD_STATE) {
-    this.setState((previousState: Readonly<OnePageSession['state']>) => {
-      const currentLoadState = previousState.corpusViewerLoadState || DEFAULT_CORPUS_VIEWER_LOAD_STATE;
-      const resolvedNextState = {
-        ...DEFAULT_CORPUS_VIEWER_LOAD_STATE,
-        ...(nextLoadState || {}),
-      };
-
-      if (
-        currentLoadState.activeCorpusKey === resolvedNextState.activeCorpusKey
-        && currentLoadState.activeCorpusLabel === resolvedNextState.activeCorpusLabel
-        && currentLoadState.loadStatus === resolvedNextState.loadStatus
-        && currentLoadState.loadButtonLabel === resolvedNextState.loadButtonLabel
-        && currentLoadState.disableLoadButton === resolvedNextState.disableLoadButton
-        && currentLoadState.error === resolvedNextState.error
-      ) {
-        return null;
-      }
-
-      return {
-        corpusViewerLoadState: resolvedNextState,
-      };
-    });
-  }
-
-  handleLoadFullCorpusClick(event: any) {
-    if (event?.stopPropagation) event.stopPropagation();
-    this.setState((previousState: Readonly<OnePageSession['state']>) => ({
-      corpusViewerLoadRequestNonce: Number(previousState.corpusViewerLoadRequestNonce || 0) + 1,
-    }));
-  }
-
   handleEmbeddedAtlasModalClose() {
-    this.setState((prevState: Readonly<OnePageSession['state']>) => {
+    this.setState((prevState) => {
       const returnState = prevState.embeddedAtlasReturnState;
       return {
         embeddedAtlasNodeId: null,
         embeddedAtlasReturnState: null,
-        riskMatrixRestoreState: returnState?.resultsViewMode === 'riskMatrix'
-          ? (returnState?.riskMatrixRestoreState || null)
-          : null,
         showResults: returnState ? returnState.showResults : prevState.showResults,
         resultsViewMode: returnState?.resultsViewMode || prevState.resultsViewMode,
       };
     });
-  }
-
-  handleRiskMatrixRestoreApplied() {
-    if (!this.state.riskMatrixRestoreState) return;
-    this.setState({ riskMatrixRestoreState: null });
   }
 
 
@@ -2775,14 +2687,26 @@ class OnePageSession extends Component<any, any> {
                 )}
                 {renderSectionHeading('Context', 'View')}
                 {this.state.showDocuments && (
-                  <div
-                    className={`${styles.tooltip} ${styles.sectionHeaderTooltip}`}
-                    onClick={(e: any) => e.stopPropagation()}
-                  >
-                    <FontAwesomeIcon icon={faQuestionCircle} />
-                    <span className={styles.tooltiptext}>
-                      {documentsSectionTooltip}
-                    </span>
+                  <div className={styles.sectionHeaderMeta}>
+                    <div
+                      className={`${styles.tooltip} ${styles.sectionHeaderTooltip}`}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <FontAwesomeIcon icon={faQuestionCircle} />
+                      <span className={styles.tooltiptext}>
+                        {documentsSectionTooltip}
+                      </span>
+                    </div>
+                    <a
+                      href={DEMO_CORPUS_GITHUB_URL}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={styles.sectionHeaderLink}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <FontAwesomeIcon icon={faExternalLinkAlt} />
+                      <span>GitHub</span>
+                    </a>
                   </div>
                 )}
               </h2>
@@ -2816,12 +2740,7 @@ class OnePageSession extends Component<any, any> {
               {this.state.showDocuments && (
                 <div className={styles.miniSectionContent}>
                   <Suspense fallback={<LazyFallback label="Loading Corpus..." minHeight="20vh" />}>
-                    <CorpusViewer
-                      onAtlasIssueOpen={this.handleCorpusAtlasIssueOpen}
-                      showGithubLink={false}
-                      externalLoadRequestNonce={this.state.corpusViewerLoadRequestNonce}
-                      onExternalLoadStateChange={this.handleCorpusViewerLoadStateChange}
-                    />
+                    <CorpusViewer onAtlasIssueOpen={this.handleCorpusAtlasIssueOpen} showGithubLink={false} />
                   </Suspense>
                 </div>
               )}
@@ -2945,7 +2864,7 @@ class OnePageSession extends Component<any, any> {
                           embedded={true}
                           requestedModalNodeId={this.state.embeddedAtlasNodeId}
                           onModalClose={this.state.embeddedAtlasReturnState ? this.handleEmbeddedAtlasModalClose : null}
-	                        />
+                        />
                       </div>
                     </Suspense>
                   )}

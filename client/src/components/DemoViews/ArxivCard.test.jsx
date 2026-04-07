@@ -23,11 +23,12 @@ describe('ArxivCard', () => {
       </MemoryRouter>
     );
 
-    expect(screen.getByText('[2403.12345]')).toBeInTheDocument();
+    expect(screen.getByText('arXiv:2403.12345')).toBeInTheDocument();
     expect(screen.getByText('cs.AI')).toBeInTheDocument();
     expect(screen.getByText('Toward Interpretable Safety Cases')).toBeInTheDocument();
-    expect(screen.getByText('Amodei, Olah et al.')).toBeInTheDocument();
-    expect(screen.getByText('· 15 Mar 2024')).toBeInTheDocument();
+    expect(screen.getByText('Authors:')).toBeInTheDocument();
+    expect(screen.getByText('Dario Amodei, Chris Olah, Tom Brown')).toBeInTheDocument();
+    expect(screen.getByText('Submitted 15 Mar 2024')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'alignment' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'mechanistic interpretability' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'View paper' })).toHaveAttribute(
