@@ -319,37 +319,6 @@
   gap: 10px;
 }
 
-.documentsSectionHeader {
-  width: 100%;
-  justify-content: flex-start;
-}
-
-.documentsSectionHeaderMain {
-  align-items: flex-start;
-  display: inline-flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  min-width: 0;
-}
-
-.documentsSectionHeaderText {
-  gap: 4px;
-}
-
-.documentsSectionHeaderTitleRow {
-  align-items: flex-start;
-  display: inline-flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  max-width: 100%;
-}
-
-.documentsSectionHeaderMeta {
-  flex: 0 0 auto;
-  flex-wrap: nowrap;
-  min-width: 0;
-}
-
 .sectionHeaderLink {
   align-items: center;
   background: rgba(255, 255, 255, 0.08);

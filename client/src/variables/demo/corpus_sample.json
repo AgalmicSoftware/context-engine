@@ -3603,6 +3603,7 @@
         {
           "id": "metr_time_horizon_1_1_2026",
           "url": "https://metr.org/blog/2026-01-29-time-horizon-1-1/",
+          "image_url": "https://metr.org/assets/images/measuring-ai-ability-to-complete-long-tasks/time-horizon-swe.png",
           "title": "Time Horizon 1.1",
           "authors": [
             "METR"
@@ -3638,6 +3639,7 @@
         {
           "id": "metr_hcast_2025",
           "url": "https://metr.org/blog/2025-03-19-hcast/",
+          "image_url": "https://metr.org/assets/images/measuring-ai-ability-to-complete-long-tasks/model-success-rate.png",
           "title": "HCAST: Human-Calibrated Autonomy Software Tasks",
           "authors": [
             "Beth Barnes",
