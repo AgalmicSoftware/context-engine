@@ -3,7 +3,7 @@ import { Button, FormGroup, Input, Label } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faClipboard, faLock, faLockOpen, faPen } from '@fortawesome/free-solid-svg-icons';
 import styles from '../Admin/AdminPage.module.scss';
-import CEDateTimeInput from '../Shared/CEDateTimeInput';
+import CEDateTimeInput from '../Shared/CEDateTimeInput.jsx';
 import {
   USE_ONCHAIN_SESSION_REGISTRY,
 } from '../../variables/appConfig.js';

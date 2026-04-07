@@ -120,7 +120,7 @@ class MainAreaTabs extends Component<MainAreaTabsProps, MainAreaTabsState> {
   };
 
   render() {
-    const activeClassName = (isActive: boolean) => (isActive ? 'active' : '');
+    const activeClassName = (isActive) => (isActive ? 'active' : '');
     return (
       <div id={styles.mainAreaTabsAlt}>
                 <Card id={styles.mainTabsCard}>
