@@ -10,15 +10,16 @@ import {
   faLink,
   faMicrophone,
 } from '@fortawesome/free-solid-svg-icons';
-import { faTwitter } from '@fortawesome/free-brands-svg-icons';
+import { faGithub, faTwitter } from '@fortawesome/free-brands-svg-icons';
 
 import corpusSample from '../../variables/demo/corpus_sample.json';
 import styles from './CorpusViewer.module.scss';
 import ArxivCard from './ArxivCard.jsx';
 import InsiderCard from './InsiderCard.jsx';
-import MetrChart from './MetrChart.jsx';
 import TagModal from '../TagPage/TagModal.jsx';
+import WorldResultsMap from './DemoAnalysis/WorldResultsMap.jsx';
 import PolicyGlobe, {
+  getPolicyJurisdictionAnchor,
   getJurisdictionFlag,
   getPolicyStatusGroup,
   getPolicyStatusLabel,
@@ -61,13 +62,88 @@ const ICON_FALLBACKS = {
 const TAB_LABELS = {
   tweets: 'Tweets',
   ai_laws_policy: 'Laws & Policy',
-  arxiv_ai_safety: 'Safety Papers',
+  arxiv_ai_safety: 'Papers',
   lesswrong_posts: 'LessWrong',
   dwarkesh_lab_insiders: 'Insider Interviews',
   ai_scifi_books: 'Sci-Fi',
-  metr_evals_metrics: 'METR Metrics',
+  metr_evals_metrics: 'Metrics',
   cross_corpus: 'Cross-Corpus',
 };
+
+const POLICY_ANCHOR_TO_ISO_A3 = Object.freeze({
+  africa: ['ZAF', 'EGY', 'NGA', 'KEN', 'ETH'],
+  asean: ['IDN', 'MYS', 'PHL', 'SGP', 'THA', 'VNM'],
+  australia: ['AUS'],
+  brazil: ['BRA'],
+  canada: ['CAN'],
+  china: ['CHN'],
+  eu: ['FRA', 'DEU', 'ITA', 'POL', 'ESP', 'NLD', 'BEL', 'IRL', 'AUT', 'SWE', 'DNK', 'FIN', 'GRC', 'PRT', 'ROU', 'CZE', 'HUN'],
+  india: ['IND'],
+  japan: ['JPN'],
+  southKorea: ['KOR'],
+  uk: ['GBR'],
+  us: ['USA'],
+});
+
+const mergePolicyMapStatus = (currentStatus = '', nextStatus = '') => {
+  if (!currentStatus) return nextStatus;
+  if (!nextStatus || currentStatus === nextStatus) return currentStatus;
+  return 'mixed';
+};
+
+const buildPolicyMapState = (entries = []) => {
+  const mapData = {};
+  let globalStatus = '';
+
+  (Array.isArray(entries) ? entries : []).forEach((entry) => {
+    const statusGroup = getPolicyStatusGroup(entry);
+    const anchor = getPolicyJurisdictionAnchor(entry?.jurisdiction);
+
+    if (anchor === 'international') {
+      globalStatus = mergePolicyMapStatus(globalStatus, statusGroup);
+      return;
+    }
+
+    (POLICY_ANCHOR_TO_ISO_A3[anchor] || []).forEach((isoCode) => {
+      mapData[isoCode] = mergePolicyMapStatus(mapData[isoCode], statusGroup);
+    });
+  });
+
+  return { globalStatus, mapData };
+};
+
+const getPolicyMapFill = (status = '', isFallback = false) => {
+  switch (status) {
+    case 'live':
+      return isFallback ? 'rgba(77,255,164,0.16)' : 'rgba(77,255,164,0.56)';
+    case 'proposed':
+      return isFallback ? 'rgba(255,179,71,0.16)' : 'rgba(255,179,71,0.56)';
+    case 'mixed':
+      return isFallback ? 'rgba(122,140,255,0.16)' : 'rgba(122,140,255,0.52)';
+    default:
+      return 'rgba(226,232,255,0.06)';
+  }
+};
+
+const buildPolicyMapSubtitle = ({ filterStatus, filteredEntries, globalStatus }) => {
+  const count = Array.isArray(filteredEntries) ? filteredEntries.length : 0;
+
+  if (count === 0) {
+    return filterStatus === 'all'
+      ? 'No policy entries are loaded for this corpus yet.'
+      : `No ${filterStatus} policy entries are active in this corpus slice.`;
+  }
+
+  if (globalStatus) {
+    return `${count} ${filterStatus === 'all' ? 'policy entries' : `${filterStatus} entries`} selected. International frameworks add a broader global glow.`;
+  }
+
+  return `${count} ${filterStatus === 'all' ? 'policy entries' : `${filterStatus} entries`} selected. Highlighted regions reflect the filtered laws.`;
+};
+
+const shouldUseHalfWidthGrid = (corpusKey = '') => (
+  corpusKey === 'tweets' || corpusKey === 'arxiv_ai_safety'
+);
 
 const formatAuthors = (entry = {}) => {
   if (entry.author) return entry.author;
@@ -126,17 +202,22 @@ const buildNonTweetMeta = (corpusKey, entry = {}) => {
   return bits;
 };
 
-const EntryCard = ({ corpusKey, entry, onTagClick }) => {
+const EntryCard = ({ corpusKey, entry, onTagClick, onAtlasIssueOpen }) => {
   const isPolicyCorpus = corpusKey === 'ai_laws_policy';
+  const isMetrCorpus = corpusKey === 'metr_evals_metrics';
   const meta = buildNonTweetMeta(corpusKey, entry);
   const summaryText = entry.summary || '';
   const tags = Array.isArray(entry.tags) ? entry.tags : [];
   const policyStatusGroup = isPolicyCorpus ? getPolicyStatusGroup(entry) : null;
   const policyFlag = isPolicyCorpus ? getJurisdictionFlag(entry.jurisdiction) : null;
   const policyStatusLabel = isPolicyCorpus ? getPolicyStatusLabel(entry) : null;
+  const sourceLabel = isMetrCorpus ? 'Open full report' : 'View source';
+  const cardClassName = `${styles.card} ${
+    isPolicyCorpus ? policyStyles.policyCard : isMetrCorpus ? styles.metrCard : ''
+  }`.trim();
 
   return (
-    <article className={`${styles.card} ${isPolicyCorpus ? policyStyles.policyCard : ''}`.trim()}>
+    <article className={cardClassName}>
       <div className={styles.entryHeader}>
         <div className={styles.entryHeaderContent}>
           {isPolicyCorpus ? (
@@ -177,6 +258,35 @@ const EntryCard = ({ corpusKey, entry, onTagClick }) => {
         ) : null}
       </div>
 
+      {entry?.image_url ? (
+        <div className={styles.entryMediaBlock}>
+          {entry?.url ? (
+            <a
+              href={entry.url}
+              rel="noopener noreferrer"
+              target="_blank"
+              className={styles.entryMediaLink}
+            >
+              <img
+                src={entry.image_url}
+                alt={entry.title || 'Explorer preview'}
+                className={styles.entryMediaImage}
+                loading="lazy"
+                referrerPolicy="no-referrer"
+              />
+            </a>
+          ) : (
+            <img
+              src={entry.image_url}
+              alt={entry.title || 'Explorer preview'}
+              className={styles.entryMediaImage}
+              loading="lazy"
+              referrerPolicy="no-referrer"
+            />
+          )}
+        </div>
+      ) : null}
+
       <div
         className={`${styles.entrySummary} ${styles.clamp3}`}
       >
@@ -196,13 +306,27 @@ const EntryCard = ({ corpusKey, entry, onTagClick }) => {
         ))}
       </div>
 
-      <DebateMapSection entry={entry} />
-
-      {entry?.url ? (
-        <div className={styles.entrySourceRow}>
-          <ExternalSourceLink entry={entry} />
-        </div>
-      ) : null}
+      <div className={styles.cardFooter}>
+        <DebateMapSection entry={entry} onAtlasIssueOpen={onAtlasIssueOpen} />
+        {entry?.url ? (
+          <div className={styles.cardFooterLinks}>
+            {isMetrCorpus ? (
+              <a
+                href={entry.url}
+                rel="noopener noreferrer"
+                target="_blank"
+                className={styles.externalIconLink}
+                aria-label={sourceLabel}
+                title={sourceLabel}
+              >
+                <FontAwesomeIcon icon={faExternalLinkAlt} />
+              </a>
+            ) : (
+              <ExternalSourceLink entry={entry} fallbackLabel={sourceLabel} />
+            )}
+          </div>
+        ) : null}
+      </div>
     </article>
   );
 };
@@ -221,7 +345,7 @@ const EmptyCorpusState = ({ corpus, title, text }) => (
   </div>
 );
 
-const CorpusViewer = () => {
+const CorpusViewer = ({ onAtlasIssueOpen = null, showGithubLink = true }) => {
   const corpusDefinitions = useMemo(() => buildCorpusDefinitions(), []);
 
   const [activeCorpusKey, setActiveCorpusKey] = useState(corpusDefinitions[0]?.key || 'tweets');
@@ -235,17 +359,27 @@ const CorpusViewer = () => {
     entries.filter(Boolean).map((entry, index) => {
       const key = entry.id || entry.url || `${activeCorpus.key}-${index}`;
       return activeCorpus.key === 'tweets' ? (
-        <TweetCard key={key} entry={entry} onTagClick={setActiveTag} />
+        <TweetCard key={key} entry={entry} onTagClick={setActiveTag} onAtlasIssueOpen={onAtlasIssueOpen} />
       ) : activeCorpus.key === 'arxiv_ai_safety' ? (
-        <ArxivCard key={key} entry={entry} onTagClick={setActiveTag} />
+        <ArxivCard key={key} entry={entry} onTagClick={setActiveTag} onAtlasIssueOpen={onAtlasIssueOpen} />
       ) : activeCorpus.key === 'dwarkesh_lab_insiders' ? (
-        <InsiderCard key={key} entry={entry} onTagClick={setActiveTag} />
-      ) : activeCorpus.key === 'metr_evals_metrics' ? (
-        <MetrChart key={key} entry={entry} onTagClick={setActiveTag} />
+        <InsiderCard key={key} entry={entry} onTagClick={setActiveTag} onAtlasIssueOpen={onAtlasIssueOpen} />
       ) : (
-        <EntryCard key={key} corpusKey={activeCorpus.key} entry={entry} onTagClick={setActiveTag} />
+        <EntryCard
+          key={key}
+          corpusKey={activeCorpus.key}
+          entry={entry}
+          onTagClick={setActiveTag}
+          onAtlasIssueOpen={onAtlasIssueOpen}
+        />
       );
     })
+  );
+
+  const renderEntriesCollection = (entries) => (
+    <div className={`${styles.entriesCollection} ${shouldUseHalfWidthGrid(activeCorpus.key) ? styles.entriesCollectionHalf : ''}`.trim()}>
+      {renderEntries(entries)}
+    </div>
   );
 
   return (
@@ -273,52 +407,81 @@ const CorpusViewer = () => {
         })}
       </div>
 
-      <div className={styles.sectionBlock}>
-        <div className={styles.sectionHeader}>
-          <span className={styles.sectionIcon}>
-            {renderCorpusIcon(activeCorpus.icon)}
-          </span>
-          <div className={styles.corpusLabel}>
-            {activeCorpus.label}
-          </div>
+      {showGithubLink ? (
+        <div className={styles.sectionBlock}>
+          <a
+            href="https://github.com/xoCortex/context-engine/tree/main/client/src/variables/demo"
+            target="_blank"
+            rel="noopener noreferrer"
+            className={styles.githubLink}
+          >
+            <FontAwesomeIcon className={styles.githubLinkIcon} icon={faGithub} />
+            <span>Full corpus on GitHub</span>
+          </a>
         </div>
-        <a
-          href="https://github.com/xoCortex/context-engine/tree/main/client/src/variables/demo"
-          target="_blank"
-          rel="noopener noreferrer"
-          className={styles.githubLink}
-        >
-          <FontAwesomeIcon className={styles.githubLinkIcon} icon={faExternalLinkAlt} />
-          <span>Full corpus on GitHub</span>
-        </a>
-      </div>
+      ) : null}
 
       <div className={styles.scrollArea}>
         {activeCorpus.key === 'ai_laws_policy' ? (
           <PolicyGlobe entries={activeCorpus.entries}>
-            {({ filteredEntries, filterStatus, GlobeElement }) => (
-              <>
-                {GlobeElement}
-                {filteredEntries.length === 0 ? (
-                  <EmptyCorpusState
-                    corpus={activeCorpus}
-                    title="No matching policy entries"
-                    text={
-                      filterStatus === 'all'
-                        ? 'No policy entries are loaded for this demo corpus yet.'
-                        : `No ${filterStatus} policy entries match the current filter.`
-                    }
-                  />
-                ) : (
-                  renderEntries(filteredEntries)
-                )}
-              </>
+            {({ filteredEntries, filterStatus, FilterControlsElement }) => (
+              <div className={styles.policySplitLayout} data-testid="ce-policy-split-layout">
+                <div className={styles.policyListColumn}>
+                  <div className={styles.policyListHeader}>
+                    <div>
+                      <div className={styles.policyListEyebrow}>Filter By</div>
+                      <div className={styles.policyListTitle}>AI laws & policy</div>
+                    </div>
+                    {FilterControlsElement}
+                  </div>
+                  {filteredEntries.length === 0 ? (
+                    <EmptyCorpusState
+                      corpus={activeCorpus}
+                      title="No matching policy entries"
+                      text={
+                        filterStatus === 'all'
+                          ? 'No policy entries are loaded for this demo corpus yet.'
+                          : `No ${filterStatus} policy entries match the current filter.`
+                      }
+                    />
+                  ) : (
+                    <div className={styles.policyEntriesList}>
+                      {renderEntriesCollection(filteredEntries)}
+                    </div>
+                  )}
+                </div>
+
+                <aside className={styles.policyMapColumn}>
+                  {(() => {
+                    const { globalStatus, mapData } = buildPolicyMapState(filteredEntries);
+
+                    return (
+                      <div className={styles.policyMapPanel}>
+                        <div className={styles.policyMapLens}>
+                          <WorldResultsMap
+                            data={mapData}
+                            colorScale={(regionStatus) => getPolicyMapFill(regionStatus || globalStatus, !regionStatus)}
+                            compact
+                          />
+                        </div>
+                        <div className={styles.policyMapAssistiveText}>
+                          {buildPolicyMapSubtitle({
+                            filterStatus,
+                            filteredEntries,
+                            globalStatus,
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </aside>
+              </div>
             )}
           </PolicyGlobe>
         ) : activeCorpus.entries.length === 0 ? (
           <EmptyCorpusState corpus={activeCorpus} />
         ) : (
-          renderEntries(activeCorpus.entries)
+          renderEntriesCollection(activeCorpus.entries)
         )}
       </div>
 

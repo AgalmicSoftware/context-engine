@@ -639,6 +639,35 @@ describe('DebateMap', () => {
     expect(mockNavigate).toHaveBeenCalledWith('/tag/AI%20Safety?session=edge');
   });
 
+  it('opens a requested atlas node modal and notifies the parent when it closes', async () => {
+    const onModalClose = jest.fn();
+
+    render(
+      <MemoryRouter>
+        <DebateMap
+          account=""
+          provider=""
+          network={{ id: 84532 }}
+          activeSessionSlug=""
+          toggleLoginModal={jest.fn()}
+          embedded={true}
+          demoMode={true}
+          requestedModalNodeId="0x1110000000000000000000000000000000000000000000000000000000000000"
+          onModalClose={onModalClose}
+        />
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByTitle('Copy Deep Link URL')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTitle('Close'));
+
+    await waitFor(() => {
+      expect(screen.queryByTitle('Copy Deep Link URL')).not.toBeInTheDocument();
+    });
+    expect(onModalClose).toHaveBeenCalledTimes(1);
+  });
+
   it('adds the embedded wrapper modifier only when embedded mode is enabled', () => {
     const baseProps = {
       account: '',

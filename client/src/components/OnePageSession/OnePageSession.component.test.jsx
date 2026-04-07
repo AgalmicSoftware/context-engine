@@ -49,7 +49,16 @@ jest.mock('../DebateMap/DebateMap', () => ({
   __esModule: true,
   default: (props) => {
     mockDebateMap(props);
-    return <div data-testid="ai-policy-atlas">AI Policy Atlas</div>;
+    return (
+      <div data-testid="ai-policy-atlas">
+        AI Policy Atlas
+        {props.onModalClose ? (
+          <button type="button" onClick={props.onModalClose}>
+            Close Atlas Modal
+          </button>
+        ) : null}
+      </div>
+    );
   },
 }));
 jest.mock('../MainContent/RiskMatrix', () => ({
@@ -378,12 +387,16 @@ describe('OnePageSession view gating', () => {
     );
 
     expect(await screen.findByTestId('survey-page-pile')).toBeInTheDocument();
-    expect(screen.getByText('Documents')).toBeInTheDocument();
+    expect(screen.getByText('Context')).toBeInTheDocument();
     expect(screen.queryByText(documentsTooltipText)).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId('ce-demo-documents-toggle'));
 
     expect(screen.getByText(documentsTooltipText)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'GitHub' })).toHaveAttribute(
+      'href',
+      'https://github.com/xoCortex/context-engine/tree/main/client/src/variables/demo'
+    );
   });
 
   it('shows groups header actions only while expanded and drives embedded create state from the header', async () => {
@@ -766,6 +779,43 @@ describe('OnePageSession view gating', () => {
     expect(riskMatrixCalls[riskMatrixCalls.length - 1]).toMatchObject({
       embedded: true,
     });
+  });
+
+  it('restores the one-page session view after closing an atlas node opened from Context', async () => {
+    const props = buildProps();
+
+    render(
+      <OnePageSession
+        {...props}
+        slug="demo"
+        sessionConfig={{ ...props.sessionConfig, slug: 'demo' }}
+      />
+    );
+
+    expect(await screen.findByTestId('survey-page-pile')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('ce-demo-documents-toggle'));
+
+    const atlasIssueButtons = await screen.findAllByRole('button', { name: 'Exponential Progress Debate' });
+    fireEvent.click(atlasIssueButtons[0]);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('ai-policy-atlas')).toBeInTheDocument();
+    });
+
+    const atlasCalls = mockDebateMap.mock.calls.map((args) => args[0]).filter(Boolean);
+    expect(atlasCalls[atlasCalls.length - 1]).toMatchObject({
+      embedded: true,
+      requestedModalNodeId: '0x2110000000000000000000000000000000000000000000000000000000000000',
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close Atlas Modal' }));
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('ai-policy-atlas')).not.toBeInTheDocument();
+    });
+
+    expect(screen.getAllByRole('button', { name: 'Exponential Progress Debate' }).length).toBeGreaterThan(0);
   });
 
   it('shows the Breakdown results mode only for /session/demo', async () => {

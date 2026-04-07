@@ -1965,6 +1965,8 @@ const DebateMap = ({
   activeSessionSlug = '',
   demoMode: externalDemoMode = false,
   embedded = false,
+  requestedModalNodeId = null,
+  onModalClose = null,
 }) => {
   const externalDemoEnabled = externalDemoMode && typeof externalDemoMode === 'object'
     ? !!externalDemoMode.tools
@@ -2027,6 +2029,11 @@ const DebateMap = ({
     setDemoMode(initialDemoEnabled);
   }, [initialDemoEnabled]);
 
+  useEffect(() => {
+    if (!requestedModalNodeId) return;
+    setModalNodeId(String(requestedModalNodeId).trim() || null);
+  }, [requestedModalNodeId]);
+
   const selectedCategory = useMemo(() => (
     selectedCategoryId ? findAtlasNodeById(treeDataState, selectedCategoryId) : null
   ), [selectedCategoryId, treeDataState]);
@@ -2056,7 +2063,10 @@ const DebateMap = ({
   }, [effectiveNodeId, treeDataState]);
 
   const handleNodeClick = useCallback((node) => setModalNodeId(node?.id || null), []);
-  const closeModal = useCallback(() => setModalNodeId(null), []);
+  const closeModal = useCallback(() => {
+    setModalNodeId(null);
+    onModalClose?.();
+  }, [onModalClose]);
   
   const handleBookmark = useCallback((id) => {
     setBookmarkedNodes(prev => {
