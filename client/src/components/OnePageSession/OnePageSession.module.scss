@@ -311,25 +311,6 @@
   gap: 10px;
 }
 
-.documentsSectionHeader {
-  width: 100%;
-  justify-content: space-between;
-}
-
-.documentsSectionHeaderMain {
-  align-items: flex-start;
-  display: inline-flex;
-  gap: 10px;
-  min-width: 0;
-}
-
-.documentsSectionHeaderMeta {
-  flex: 0 0 auto;
-  flex-wrap: nowrap;
-  margin-left: auto;
-  min-width: 0;
-}
-
 .sectionHeaderLink {
   align-items: center;
   background: rgba(255, 255, 255, 0.08);

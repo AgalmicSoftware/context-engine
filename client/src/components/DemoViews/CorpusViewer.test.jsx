@@ -17,6 +17,25 @@ jest.mock('../TagPage/TagPage.jsx', () => ({
   },
 }));
 
+jest.mock('react-simple-maps', () => ({
+  ComposableMap: ({ children }) => <div data-testid="mock-composable-map">{children}</div>,
+  Geographies: ({ children }) => children({
+    geographies: [
+      { rsmKey: 'usa', properties: { name: 'United States of America' } },
+      { rsmKey: 'gbr', properties: { name: 'United Kingdom' } },
+      { rsmKey: 'ind', properties: { name: 'India' } },
+      { rsmKey: 'chn', properties: { name: 'China' } },
+    ],
+  }),
+  Geography: ({ children, geography }) => (
+    <div data-testid={`mock-geo-${geography.properties.name}`}>
+      {children}
+    </div>
+  ),
+  Sphere: () => null,
+  Graticule: () => null,
+}));
+
 import CorpusViewer from './CorpusViewer.jsx';
 import PolicyGlobe from './PolicyGlobe.jsx';
 
@@ -51,11 +70,28 @@ describe('CorpusViewer', () => {
     const tweetCard = issueLink.closest('article');
 
     expect(tweetCard).toBeTruthy();
-    expect(within(tweetCard).getByText('Debate Map')).toBeInTheDocument();
+    expect(within(tweetCard).getByRole('link', { name: 'Exponential Progress Debate' })).toBeInTheDocument();
     expect(issueLink).toHaveAttribute(
       'href',
       '/atlas/0x2110000000000000000000000000000000000000000000000000000000000000?demo=1'
     );
+  });
+
+  it('routes atlas issue clicks through the session callback when provided', () => {
+    const onAtlasIssueOpen = jest.fn();
+
+    render(
+      <MemoryRouter>
+        <CorpusViewer onAtlasIssueOpen={onAtlasIssueOpen} />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Exponential Progress Debate' })[0]);
+
+    expect(onAtlasIssueOpen).toHaveBeenCalledWith(
+      '0x2110000000000000000000000000000000000000000000000000000000000000'
+    );
+    expect(screen.queryByRole('link', { name: 'Exponential Progress Debate' })).not.toBeInTheDocument();
   });
 
   it('renders arxiv entries with the arxiv-specific card layout', () => {
@@ -65,12 +101,12 @@ describe('CorpusViewer', () => {
       </MemoryRouter>
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Safety Papers' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Papers' }));
 
     const title = screen.getByText('Language Models are Few-Shot Learners');
     const arxivCard = title.closest('article');
 
-    expect(screen.getByText('[2005.14165]')).toBeInTheDocument();
+    expect(screen.getByText('arXiv:2005.14165')).toBeInTheDocument();
     expect(arxivCard).toBeTruthy();
     expect(within(arxivCard).getByRole('link', { name: 'View paper' })).toHaveAttribute(
       'href',
@@ -124,19 +160,63 @@ describe('CorpusViewer', () => {
     ]);
   });
 
-  it('renders the policy globe on the Laws & Policy tab', () => {
+  it('renders the policy filter row and lightweight world map on the Laws & Policy tab', () => {
     render(
       <MemoryRouter>
         <CorpusViewer />
       </MemoryRouter>
     );
 
+    expect(screen.getByRole('button', { name: 'Insider Interviews' })).toBeInTheDocument();
+
     fireEvent.click(screen.getByRole('button', { name: 'Laws & Policy' }));
 
-    expect(screen.getByTestId('ce-policy-globe')).toBeInTheDocument();
+    expect(screen.getByTestId('ce-policy-split-layout')).toBeInTheDocument();
+    expect(screen.getByTestId('demo-analysis-world-map')).toBeInTheDocument();
+    expect(screen.getAllByText(/ASEAN Guide on AI Governance and Ethics/i).length).toBeGreaterThan(0);
     expect(
       within(screen.getByTestId('ce-policy-filter-row')).getByRole('button', { name: 'All' })
     ).toHaveAttribute('aria-pressed', 'true');
+
+    fireEvent.click(within(screen.getByTestId('ce-policy-filter-row')).getByRole('button', { name: 'Proposed' }));
+
+    expect(screen.getByText('No proposed policy entries match the current filter.')).toBeInTheDocument();
+    expect(screen.getByTestId('demo-analysis-world-map')).toBeInTheDocument();
+  });
+
+  it('renders insider interview cards when the Insider Interviews tab is selected', () => {
+    render(
+      <MemoryRouter>
+        <CorpusViewer />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Insider Interviews' }));
+
+    expect(screen.getAllByText(/Interview date:/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('link', { name: 'View interview' }).length).toBeGreaterThan(0);
+  });
+
+  it('renders METR entries with linked chart preview images when available', () => {
+    render(
+      <MemoryRouter>
+        <CorpusViewer />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Metrics' }));
+
+    const previewImage = screen.getByAltText('Measuring AI Ability to Complete Long Tasks');
+    const metrCard = previewImage.closest('article');
+
+    expect(previewImage).toHaveAttribute(
+      'src',
+      'https://metr.org/assets/images/measuring-ai-ability-to-complete-long-tasks/models-are-succeeding-at-increasingly-long-tasks.png'
+    );
+    expect(within(metrCard).getByRole('link', { name: 'Open full report' })).toHaveAttribute(
+      'href',
+      'https://metr.org/blog/2025-03-19-measuring-ai-ability-to-complete-long-tasks/'
+    );
   });
 
   it('opens the tag modal with the clicked tweet tag as TagPage filter context', () => {

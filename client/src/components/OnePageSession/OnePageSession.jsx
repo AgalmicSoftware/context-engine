@@ -1,14 +1,14 @@
 /** @file OnePageSession.jsx */
 import React, { Component, Suspense } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-  faCaretDown,
-  faCaretUp,
+import { 
+  faCaretDown, 
+  faCaretUp, 
   faExternalLinkAlt,
-  faQuestionCircle,
-  faSpinner,
-  faCheck,
-  faTimes,
+  faQuestionCircle, 
+  faSpinner, 
+  faCheck, 
+  faTimes, 
   faImage,
   faArrowLeft,
   faExpand,
@@ -56,7 +56,7 @@ const demoLog = createLogger('demo');
 const ONE_PAGE_DEMO_PERF_SCOPE = 'onePageDemo';
 const AGGREGATOR_PARSE_MEMO_MAX = 3000;
 const SBT_TOOLTIP_LABEL = isCryptoMode() ? 'Soulbound tokens (SBTs)' : `${t('sbtFull')}s`;
-const DEMO_CORPUS_GITHUB_URL = PUBLIC_AI_DISCOURSE_CORPUS_URL;
+const DEMO_CORPUS_GITHUB_URL = 'https://github.com/xoCortex/context-engine/tree/main/client/src/variables/demo';
 
 const isPerfCountersEnabled = () => {
   try {
@@ -2532,7 +2532,7 @@ class OnePageSession extends Component {
                 )}
                 {renderSectionHeading('Context', 'View')}
                 {this.state.showDocuments && (
-                  <span className={`${styles.sectionHeaderMeta} ${styles.documentsSectionHeaderMeta}`.trim()}>
+                  <div className={styles.sectionHeaderMeta}>
                     <div
                       className={`${styles.tooltip} ${styles.sectionHeaderTooltip}`}
                       onClick={(e) => e.stopPropagation()}
@@ -2552,7 +2552,7 @@ class OnePageSession extends Component {
                       <FontAwesomeIcon icon={faExternalLinkAlt} />
                       <span>GitHub</span>
                     </a>
-                  </span>
+                  </div>
                 )}
               </h2>
             </div>

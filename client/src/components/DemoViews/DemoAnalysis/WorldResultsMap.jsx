@@ -126,8 +126,8 @@ const WorldResultsMap = ({
 
   const renderMap = () => (
     <ComposableMap
-      projectionConfig={{ rotate: [-10, 0, 0], scale: compact ? 147 : 147 }}
-      style={{ display: 'block', width: '100%', height: 'auto' }}
+      projectionConfig={{ rotate: [-10, 0, 0], scale: compact ? 112 : 147 }}
+      style={{ width: '100%', height: 'auto' }}
     >
       {compact ? null : <Sphere stroke="#E4E5E6" strokeWidth={0.5} />}
       {compact ? null : <Graticule stroke="#E4E5E6" strokeWidth={0.5} />}
@@ -176,17 +176,6 @@ const WorldResultsMap = ({
         })}
       </Geographies>
     </ComposableMap>
-  );
-
-  const renderSelectedQuestion = () => (
-    question ? (
-      <div className={styles.mapSelectedQuestionPanel}>
-        <span className={styles.mapSelectedQuestionLabel}>Selected question</span>
-        <p className={styles.mapSelectedQuestionText} data-testid="demo-analysis-selected-question">
-          {question.text}
-        </p>
-      </div>
-    ) : null
   );
 
   if (isLightweightMode) {
@@ -261,13 +250,8 @@ const WorldResultsMap = ({
         ))}
       </div>
 
-      <div className={styles.mapFrameShell}>
-        <div className={styles.mapFrameViewport}>
-          <div className={styles.mapFrame}>
-            {renderMap()}
-          </div>
-        </div>
-        {renderSelectedQuestion()}
+      <div className={styles.mapFrame}>
+        {renderMap()}
       </div>
     </section>
   );
