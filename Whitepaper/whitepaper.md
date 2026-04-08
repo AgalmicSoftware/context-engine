@@ -4,11 +4,11 @@
 
 *v0.1.0 (2026) — agalmic.eth*
 
-For detailed technical documentation, see [`spec.md`](../spec.md) and [`docs/`](../docs/README.md).
+For technical documentation, see [`spec.md`](../spec.md) and [`docs/`](../docs/README.md).
 
 ---
 
-keywords: sensemaking, deliberation, collective intelligence, discourse, debate, ethereum, coasean bargaining, cryptography, programmable cryptography, decentralized networks, agi, social infrastructure, ai policy, community currencies, coordination, negotiation, voting
+keywords: sensemaking, deliberation, collective intelligence, discourse, debate, ethereum, coasean bargaining, cryptography, programmable cryptography, decentralized networks, agi, social infrastructure, ai policy, community currencies, coordination, negotiation, voting, democracy, zk, homomorphic encryption
 
 ---
 
@@ -38,8 +38,6 @@ This infrastructure would act as a stepping stone towards a more compelling inte
 
 To the extent that this approach is useful for AI policy debate, it could also apply to policy debate at smaller scales and within various organizations.
 
----
-
 ## 2. Building on Existing Tools
 
 The current SOTA for this type of large-group discourse software is Pol.is, which showed through vTaiwan (g0v, 2014; Computational Democracy Project, n.d.) that debate in large groups can be improved by collecting and analyzing simple Agree / Unsure / Disagree responses, clarifying areas of both consensus and difference.
@@ -55,37 +53,25 @@ Context Engine extends the pioneering approach of Pol.is in the following ways:
 
 Although Context Engine is an Ethereum application, users do not need to know anything about cryptocurrency to use it
 
----
-
 ## 3. What Context Engine is Today
 
 Context Engine is a web application, a set of smart contracts (EVM), and supporting infrastructure for AI inference, storage, access gating, and encryption. It is meant to be easily redeployable by various groups with no programming experience.
 
 - **Sessions** include questions, responses, documents, access gates, and configuration, and new Sessions  can be created from the web application (at [/new](https://contextengine.xyz/new)).
-- **The deliberation surface** supports binary, rating, multiple-choice, and freeform questions, with optional conviction weighting and comments.
-- **Access control** uses soulbound tokens (non-transferrable NFTs), with support for gated participation, encrypted fields, and sponsored resources (RPC, AI, Tx Costs, Arweave Storage, Lit Encryption).
-- **Memory** lives in durable records: responses and documents on Arweave, built-in report views, exports, and address-based comparison tools.
+- **Surveys and Questions** supports binary, rating, multiple-choice, and freeform questions (with the ability to add new question types as needed), with optional conviction weighting and comments.
+- **Access control** uses soulbound tokens (non-transferrable NFTs), with support for gated participation, encrypted fields, and sponsored resources (RPC, AI, EVM tx Costs, Arweave Storage, Lit Encryption).
+- **Storage**: responses and documents stored on Arweave
 - **AI** is already used for question generation, transcription, cluster summaries, result analysis, and comparison of user positions across wallets.
-- **Demonstration datasets** are shipped in the repo as well, including a policy-mapping demo built around simulated historical figures. The point of that material is not to replace live communities, but to show how the same stack can host a legible, replayable map before being pointed at real groups.
+- **Demonstration datasets** are shipped in the repo as well, including one built around simulated historical figures. The results of this can be seen at [/demo](https://contextengine.xyz/session/demo)
 
 The same product can also be deployed more privately and scalably (as circumstances demand), with local storage, POA blockchain, local encryption backends, and self-hosted workers when data cannot leave an organization.
 
 ### Session Capacity and Scaling
 
-A session is currently expected to support hundreds to low thousands of concurrent participants. For larger deployments, batched or async settlement, private PoA chains, read-path caching, and application-specific rollups are directions to explore — each step increasing throughput by one to two orders of magnitude. See [`docs/scaling.md`](../docs/scaling.md).
+A session is currently expected to support hundreds to low thousands of concurrent participants. For larger-scale deployments, batched or async settlement, private PoA chains, read-path caching, and application-specific rollups are directions to explore — each step increasing throughput by one to two orders of magnitude. See [`docs/scaling.md`](../docs/scaling.md).
 
-
----
 
 ## 4. Use Cases Beyond AI Discourse
-
-### Events and Conferences
-
-Live events generate high-bandwidth discussions which often don't persist or survive in any records – even events which record presentations have no way of capturing resulting discussions, and this valuable data is left to be remembered or forgotten by participants.
-
-Conferences, retreats, and pop-up events could instead produce a map of its opinion space, allowing viewers (public or participants only) to see which ideas had broad support, which were polarizing, how different sub-groups responded (filtered by SBTs).
-
-Recurring or related communities can add or reference the same map, compare changes over time, and build continuity between gatherings instead of starting over each cycle. Such maps would not only be useful after an event, but also before and during – helping to steer discourse towards the most productive or interesting areas, and creating raw material which can later be rendered as compelling multimedia artifacts. This deliberation data could also be used for AI training and/or generate revenue for the event or group by making this conditionally available to outside viewers.
 
 
 ### Companies and Organizations
@@ -114,11 +100,19 @@ Context Engine points towards several directions:
 
 Quantified measures of group membership, attention, and exchange are a related direction, especially work on community currencies and attention (see PCARE; Ohlhaver, 2025). Recent open-source Mixture-of-Experts architectures overlap with this vision of community-owned models, involving the training, governing, and licensing of separable parts of a model (see FlexOlmo; Shi et al., 2025).
 
+### Events and Conferences
+
+Live events generate high-bandwidth discussions which often don't persist or survive in any records – even events which record presentations have no way of capturing resulting discussions, and this valuable data is left to be remembered or forgotten by participants.
+
+Conferences, retreats, and pop-up events could instead produce a map of its opinion space, allowing viewers (public or participants only) to see which ideas had broad support, which were polarizing, how different sub-groups responded (filtered by SBTs).
+
+Recurring or related communities can add or reference the same map, compare changes over time, and build continuity between gatherings instead of starting over each cycle. Such maps would not only be useful after an event, but also before and during – helping to steer discourse towards the most productive or interesting areas, and creating raw material which can later be rendered as compelling multimedia artifacts. This deliberation data could also be used for AI training and/or generate revenue for the event or group by making this conditionally available to outside viewers.
+
 #### A note on "Groups"
 
-Groups are not only formal organizations or informal pre-existing communities. With zkTLS proofs, a group can be defined by any shared attribute or verifiable condition: web activity, student status, demographics, attendance of an event, shared beliefs, media consumption, purchase history, and more.
+Groups are not only formal organizations or informal pre-existing communities. With zkTLS proofs, a group can be defined by any shared attribute or verifiable condition: web activity, student status, demographics, attendance of an event, shared beliefs, media consumption, purchase history, financial proofs, and more.
 
-This relates to the Plurality view that individuals are intersections of many groups. Programmable cryptography makes these group definitions expressible in code, and further privacy developments will allow people to prove membership in one group without exposing every other affiliation.
+This relates to the Plurality view that individuals are intersections of many groups. Programmable cryptography makes these group definitions expressible in code, and future versions of this toolkit will allow people to prove membership in one group without exposing every other affiliation.
 
 
 ### Cities and Public Institutions
@@ -126,8 +120,6 @@ This relates to the Plurality view that individuals are intersections of many gr
 In some science fiction stories, it is possible for inhabitants to talk directly to a city. We now have the technical foundation to move in that direction, and early deployments in places such as Bowling Green, Kentucky, suggest there is demand for city-scale discourse and priority setting (Jigsaw, n.d.). Recent "broad listening" experiments in electoral settings, including the Tokyo governor race, also point in this direction (Henderson, 2025).
 
 A standing session accumulates input between formal decision points: more nuanced than a poll, more durable than a hearing (and easier to attend). Views can be filtered by community-issued attestations, or by privacy-preserving "proof of ZIP," so officials can see how different constituencies respond to the same questions without violating privacy. AI summarization makes large response sets legible without discarding the underlying record.
-
----
 
 ## 5. Future Directions
 
@@ -156,14 +148,10 @@ A standing session accumulates input between formal decision points: more nuance
 
 - **zkTLS**: for (privacy-preserving) group formation / actions / filtering – plural groups based on age, occupation, location, interests, web and real-world activity, shared incentives, etc.
 
-
-
 - **AI Whistleblowing Toolkit**: prove you have @aiLab.com email address using ZK → Make claims (potentially encrypted or conditionally timelocked)
 
 - **Post-quantum Cryptography**: Transition cryptographic functionalities to post-quantum versions
 
-
----
 
 ## 6. Closing Thoughts
 
@@ -175,8 +163,6 @@ Programmable cryptography seems like an underexplored toolkit for AI safety and 
 
 Context Engine recognizes and builds on the pioneering work of those involved with RadicalxChange, Pol.is, vTaiwan, g0v, TalkToTheCity, Loophole, the Plurality Book, 0xPARC, Zuzalu, Edge City, MetaGov, PCARE, and many other related efforts. The author also gratefully acknowledges the AI programming assistance that finally made this effort tractable.
 
-
----
 
 ## References
 
@@ -213,8 +199,6 @@ Posner, E. A., & Weyl, E. G. (2018). *Radical Markets: Uprooting Capitalism and 
 RadicalxChange Foundation. (n.d.-a). "Social Identity." *RadicalxChange Wiki.* https://www.radicalxchange.org/wiki/social-identity/
 
 RadicalxChange Foundation. (n.d.-b). "Data Dignity." *RadicalxChange Wiki.* https://www.radicalxchange.org/wiki/data-dignity/
-
-Owocki, K. (2026, March 5). "Collective Intelligence Infrastructure: Protocols for Thinking Together." *Gitcoin.* https://gitcoin.co/research/collective-intelligence-protocols-for-thinking-together
 
 Owocki, K. (2026, March 5). "Collective Intelligence Infrastructure: Protocols for Thinking Together." *Gitcoin.* https://gitcoin.co/research/collective-intelligence-protocols-for-thinking-together
 
