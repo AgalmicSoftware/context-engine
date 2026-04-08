@@ -2741,16 +2741,18 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
     const canUseSessionStorage = isCloudflareStorageResource(cfg, STORAGE_RESOURCE_KEYS.SURVEYS)
       || isCloudflareStorageResource(cfg, STORAGE_RESOURCE_KEYS.QUESTIONS);
     if (ARWEAVE_ACTIVE || canUseSessionStorage) {
-      // Safety net: inject sessionName if caller omitted it
+      // Safety net: inject sessionName/sessionSlug if caller omitted it
       const _sessionName = String((cfg?.sessionName || cfg?.slug || '') || '');
+      const _sessionSlug = resolveStorageSessionSlug(groupKeyOrCfg, cfg);
+      const _sessionMetadataOptions = _sessionSlug ? { sessionSlug: _sessionSlug } : {};
       const surveyDataToUpload = normalizeSessionNameFields({
         ...(surveyData || {}),
-      }, _sessionName, {});
+      }, _sessionName, _sessionMetadataOptions);
 
       const qArrayToUpload = (Array.isArray(questionDataArray) ? questionDataArray : []).map((q) => (
         normalizeSessionNameFields({
           ...(q || {}),
-        }, _sessionName, {})
+        }, _sessionName, _sessionMetadataOptions)
       ));
 
       validateNoLockedPlaintextInPayload(surveyDataToUpload, {
@@ -2907,12 +2909,14 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
 
     const canUseSessionStorage = isCloudflareStorageResource(cfg, STORAGE_RESOURCE_KEYS.QUESTIONS);
     if (ARWEAVE_ACTIVE || canUseSessionStorage) {
-      // Safety net: inject sessionName if caller omitted it
+      // Safety net: inject sessionName/sessionSlug if caller omitted it
       const _sessionName = String((cfg?.sessionName || cfg?.slug || '') || '');
+      const _sessionSlug = resolveStorageSessionSlug(groupKeyOrCfg, cfg);
+      const _sessionMetadataOptions = _sessionSlug ? { sessionSlug: _sessionSlug } : {};
       const qArrayToUpload = (Array.isArray(questionDataArray) ? questionDataArray : []).map((q) => (
         normalizeSessionNameFields({
           ...(q || {}),
-        }, _sessionName, {})
+        }, _sessionName, _sessionMetadataOptions)
       ));
 
       qArrayToUpload.forEach((questionData, index) => {

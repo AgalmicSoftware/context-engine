@@ -24,8 +24,7 @@ import {
   ModalFooter,
   Collapse,
   Alert,
-  Table,
-  Progress
+  Table
 } from 'reactstrap';
 
 
@@ -48,9 +47,7 @@ import {
   faExternalLinkAlt,
   faFilter,
   faExclamationCircle,
-  faSyncAlt,
-  faComments,
-  faLock
+  faComments
 } from '@fortawesome/free-solid-svg-icons';
 
 import contractScripts, {
@@ -136,6 +133,18 @@ import {
   readSessionScanScope,
   readSessionScanSlugs,
 } from '../../utilities/session/sessionScanScope.js';
+import {
+  SurveyResultsLockedResponsesBanner,
+  SurveyResultsLockedResponsesToggle,
+} from './SurveyResultsLockedResponsesPanel';
+import {
+  SurveyResultsFreeformAggregatorSummary,
+  SurveyResultsMultichoiceAggregatorSummary,
+} from './SurveyResultsAggregatorSummaries';
+import {
+  renderSurveyResultsFilterSummary,
+  renderSurveyResultsSyncStatusPanel,
+} from './SurveyResultsPanels';
 
 export {
   countQuestionModeResponses,
@@ -1361,6 +1370,7 @@ class SurveyResults extends Component<any, any> {
       search: (typeof window !== 'undefined' && window.location?.search) || '',
       sessionSlug: props.sessionSlug,
       activeSessionSlug: props.activeSessionSlug,
+      sessionSlugPinned: props.sessionSlugPinned,
       viewMode,
       readSessionScanScope: readSessionScanScope as () => unknown,
       readSessionScanSlugs: readSessionScanSlugs as () => unknown,
@@ -3827,41 +3837,7 @@ buildMultichoiceSummaryModel = (
 
 renderFreeformAggregatorSummary = (responses: unknown = []): React.ReactNode => {
   const summary = this.buildFreeformSummaryModel(responses);
-  const panelClassName = buildSurveyResultsAggregatorPanelClassName(styles);
-  if (summary.totalResponses === 0 && summary.encryptedCount === 0 && summary.blankCount === 0) {
-    return (
-      <div className={panelClassName}>
-        <p className={styles.surveyResultsAggregatorParagraph}>No freeform responses available.</p>
-      </div>
-    );
-  }
-
-  const parts = [`${summary.totalResponses} total responses.`];
-  if (summary.encryptedCount > 0) {
-    parts.push(`${summary.encryptedCount} encrypted responses not shown.`);
-  }
-  if (summary.blankCount > 0) {
-    parts.push(`${summary.blankCount} blank not shown.`);
-  }
-
-  return (
-    <div className={panelClassName}>
-      <p className={styles.surveyResultsAggregatorParagraph}>{parts.join(' ')}</p>
-      {summary.displayedResponses.map((item, index) => (
-        <div
-          key={`freeform-${item.responder || ''}-${index}`}
-          className={styles.surveyResultsFreeformAnswer}
-        >
-          {typeof item.value === 'string' ? item.value : JSON.stringify(item.value)}
-          {item.additional && (
-            <div className={styles.surveyResultsFreeformAdditionalComment}>
-              <em>Comment:</em> {item.additional}
-            </div>
-          )}
-        </div>
-      ))}
-    </div>
-  );
+  return SurveyResultsFreeformAggregatorSummary({ summary });
 };
 
 renderMultichoiceAggregatorSummary = (
@@ -3869,46 +3845,7 @@ renderMultichoiceAggregatorSummary = (
   question: SurveyResultsRecord | null = null
 ): React.ReactNode => {
   const summary = this.buildMultichoiceSummaryModel(responses, question);
-  const panelClassName = buildSurveyResultsAggregatorPanelClassName(styles);
-  if (summary.options.length === 0) {
-    return (
-      <div className={panelClassName}>
-        <p className={styles.surveyResultsAggregatorParagraph}>
-          No multichoice options are defined for this question.
-        </p>
-      </div>
-    );
-  }
-
-  if (summary.totalResponders === 0) {
-    return (
-      <div className={panelClassName}>
-        <p className={styles.surveyResultsAggregatorParagraph}>No multichoice responses available.</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className={panelClassName}>
-      <p className={styles.surveyResultsAggregatorParagraph}>
-        {summary.totalResponders} total responders to this multichoice question.
-      </p>
-      {summary.options.map((option) => {
-        const percent = ((option.count / summary.totalResponders) * 100).toFixed(2);
-        return (
-          <div
-            key={option.key}
-            className={buildSurveyResultsMultichoiceOptionClassName(styles)}
-          >
-            <span className={styles.surveyResultsMultichoiceOptionLabel}>{option.label}</span>
-            <span className={styles.surveyResultsMultichoiceOptionStats}>
-              {option.count} ({percent}%)
-            </span>
-          </div>
-        );
-      })}
-    </div>
-  );
+  return SurveyResultsMultichoiceAggregatorSummary({ summary });
 };
 
 getSurveyResultsResponseCardProps = (): SurveyResultsResponseCardClassNames => ({
@@ -4361,103 +4298,22 @@ toggleLockedResponseDetails = (): void => {
 renderLockedResponsesToggle = (
   lockedModel: SurveyResultsLockedResponsesModel | null = null
 ): React.ReactNode => {
-  const lockedCount = Number(lockedModel?.lockedCount || 0);
-  if (lockedCount <= 0) return null;
-
-  const isOpen = !!this.state.lockedResponseDetailsOpen;
-  const lockedLabel = `${lockedCount} locked response${lockedCount === 1 ? '' : 's'}`;
-
-  return (
-    <button
-      type="button"
-      className={[
-        styles.lockedSummaryToggle,
-        isOpen ? styles.lockedSummaryToggleOpen : '',
-      ].filter(Boolean).join(' ')}
-      onClick={this.toggleLockedResponseDetails}
-      aria-expanded={isOpen}
-      aria-controls="ce-results-locked-details"
-      aria-label={`${isOpen ? 'Hide' : 'Show'} ${lockedLabel}`}
-      title={lockedLabel}
-      data-testid="ce-results-locked-toggle"
-    >
-      <span className={styles.lockedSummaryCount}>{lockedCount}</span>
-      <FontAwesomeIcon icon={faLock} className={styles.lockedSummaryIcon} />
-    </button>
-  );
+  return SurveyResultsLockedResponsesToggle({
+    isOpen: !!this.state.lockedResponseDetailsOpen,
+    lockedModel,
+    onToggleDetails: this.toggleLockedResponseDetails,
+  });
 };
 
 renderLockedResponsesBanner = (
   lockedModel: SurveyResultsLockedResponsesModel | null = null
 ): React.ReactNode => {
-  const lockedCount = Number(lockedModel?.lockedCount || 0);
-  if (lockedCount <= 0) return null;
-
-  const gateDetails = Array.isArray(lockedModel?.gateDetails) ? lockedModel.gateDetails : [];
-  const isOpen = !!this.state.lockedResponseDetailsOpen;
-  if (!isOpen) return null;
-
-  return (
-    <div
-      id="ce-results-locked-details"
-      className={styles.lockedBanner}
-      data-testid="ce-results-locked-banner"
-    >
-      <div className={styles.lockedBannerTop}>
-        <div className={styles.lockedBannerCopy}>
-          <div className={styles.lockedBannerTitleRow}>
-            <FontAwesomeIcon icon={faLock} className={styles.lockedBannerIcon} />
-            <h3 className={styles.lockedBannerHeadline}>
-              {lockedCount} Locked Responses
-            </h3>
-          </div>
-          <p className={styles.lockedBannerSubtext}>
-            Encrypted responses are present in this result set.
-          </p>
-        </div>
-        <Button
-          type="button"
-          className={styles.lockedBannerDecryptButton}
-          onClick={this.handleDecryptLockedResponses}
-          data-testid="ce-results-decrypt-btn"
-          disabled={this.state.lockedResponsesDecrypting}
-        >
-          {this.state.lockedResponsesDecrypting && (
-            <FontAwesomeIcon icon={faSpinner} spin className={styles.lockedBannerButtonSpinner} />
-          )}
-          Decrypt
-        </Button>
-      </div>
-
-      <div className={styles.lockedBannerDetails}>
-        {gateDetails.length > 0 && (
-          <>
-            <p className={styles.lockedBannerGateIntro}>
-              {`Required ${gateDetails.length === 1 ? t('sbt') : t('sbts')} for decryption`}
-            </p>
-            <div className={styles.lockedBannerGateList}>
-              {gateDetails.map((detail: SurveyResultsLockedGateDetail) => (
-                <a
-                  key={detail.address}
-                  href={detail.href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={styles.lockedBannerGateLink}
-                >
-                  {detail.label}
-                </a>
-              ))}
-            </div>
-          </>
-        )}
-        {lockedModel?.hasGenericGateMessage && gateDetails.length === 0 && (
-          <p className={styles.lockedBannerGenericMessage}>
-            {`Locked responses require an eligible ${t('sbtLower')}. Connect an eligible ${t('walletLower')} to decrypt.`}
-          </p>
-        )}
-      </div>
-    </div>
-  );
+  return SurveyResultsLockedResponsesBanner({
+    decrypting: !!this.state.lockedResponsesDecrypting,
+    isOpen: !!this.state.lockedResponseDetailsOpen,
+    lockedModel,
+    onDecrypt: this.handleDecryptLockedResponses,
+  });
 };
 
 
@@ -5163,7 +5019,6 @@ const normalizedFilteredResponsesCount = Math.min(
 
 // Compact sync status display
 let syncStatusText = '';
-let syncStatusIcon = faSpinner;
 let isSyncingOrLoading = true;
 
 if (showQuestionSpinner || showResponseSpinner) {
@@ -5241,97 +5096,31 @@ return (
       </div>
       <div className={styles.modalHeaderControls}>
         {this.renderLockedResponsesToggle(lockedResponsesModel)}
-        <div className={styles.syncStatusContainer}>
-          <button
-            type="button"
-            className={styles.syncStatus__simple}
-            onClick={() =>
-              this.setState((prevState: SurveyResultsRecord) => buildSurveyResultsBooleanTogglePatch({
-                prevState,
-                stateKey: 'syncDetailsOpen',
-              }))
-            }
-            aria-expanded={!!this.state.syncDetailsOpen}
-            aria-label="Toggle sync details"
-          >
-            {isSynced ? (
-              <span className={styles.syncStatus__indicator_synced}></span>
-            ) : (
-              <FontAwesomeIcon icon={syncStatusIcon} spin={isSyncingOrLoading} />
-            )}
-            <span>
-              {syncStatusText}
-              {showLongSyncNotice}
-            </span>
-          </button>
-          {!isSynced && (
-            <button
-              type="button"
-              className={styles.syncStatus__quickRefresh}
-              onClick={() => this.handleManualRefresh()}
-              title="Refresh Now"
-              aria-label="Refresh sync data"
-            >
-              <FontAwesomeIcon icon={faSyncAlt} />
-            </button>
-          )}
-          <div
-            className={styles.syncStatus__details}
-            style={resolveSurveyResultsSyncDetailsStyle(this.state.syncDetailsOpen)}
-          >
-            <div className={styles.miniBarContainer}>
-              {viewMode === 'questions' && (
-                <div className={styles.miniBarLine}>
-                  <div className={styles.miniBarLabel}>Questions:</div>
-                  {showQuestionSpinner ? (
-                    <>
-                      <FontAwesomeIcon icon={faSpinner} spin style={SURVEY_RESULTS_MINI_BAR_SPINNER_STYLE} />
-                      <div className={styles.miniBarFraction}>Loading...</div>
-                    </>
-                  ) : (
-                    <>
-                      <Progress
-                        value={questionProgress}
-                        color={questionColor}
-                        style={SURVEY_RESULTS_MINI_PROGRESS_STYLE}
-                        className={styles.miniProgress}
-                      />
-                      <div className={styles.miniBarFraction}>{questionBarText}</div>
-                    </>
-                  )}
-                </div>
-              )}
-
-              <div className={styles.miniBarLine}>
-                <div className={styles.miniBarLabel}>Responses:</div>
-                {showResponseSpinner ? (
-                  <>
-                    <FontAwesomeIcon icon={faSpinner} spin style={SURVEY_RESULTS_MINI_BAR_SPINNER_STYLE} />
-                    <div className={styles.miniBarFraction}>Loading...</div>
-                  </>
-                ) : (
-                  <>
-                    <Progress
-                      value={responseProgress}
-                      color={responseColor}
-                      style={SURVEY_RESULTS_MINI_PROGRESS_STYLE}
-                      className={styles.miniProgress}
-                    />
-                    <div className={styles.miniBarFraction}>{responseBarText}</div>
-                  </>
-                )}
-              </div>
-            </div>
-            <div
-              className={styles.syncStatus__refreshAction}
-              onClick={() => this.handleManualRefresh()}
-              title="Refresh Data from Cache/Chain"
-            >
-              <FontAwesomeIcon icon={faSyncAlt} />
-              <span>Refresh Now</span>
-            </div>
-          </div>
-        </div>
+        {renderSurveyResultsSyncStatusPanel({
+          isSynced,
+          isSyncingOrLoading,
+          syncStatusText,
+          showLongSyncNotice,
+          syncDetailsOpen: !!this.state.syncDetailsOpen,
+          syncDetailsStyle: resolveSurveyResultsSyncDetailsStyle(this.state.syncDetailsOpen),
+          onToggleSyncDetails: () =>
+            this.setState((prevState: SurveyResultsRecord) => buildSurveyResultsBooleanTogglePatch({
+              prevState,
+              stateKey: 'syncDetailsOpen',
+            })),
+          onManualRefresh: () => this.handleManualRefresh(),
+          viewMode,
+          showQuestionSpinner,
+          questionProgress,
+          questionColor,
+          questionBarText,
+          showResponseSpinner,
+          responseProgress,
+          responseColor,
+          responseBarText,
+          miniBarSpinnerStyle: SURVEY_RESULTS_MINI_BAR_SPINNER_STYLE,
+          miniProgressStyle: SURVEY_RESULTS_MINI_PROGRESS_STYLE,
+        })}
         {isDemoQuestionResults && (
           <div
             className={styles.demoResultsViewNav}
@@ -5372,7 +5161,7 @@ return (
       ) : (
         <>
       {alertMessage && !filterLoading && (
-        <Alert color="info" className={styles.alertMessage}>
+        <Alert color="info" className={styles.alertMessage} fade={false}>
           {alertMessage}
         </Alert>
       )}
@@ -5485,27 +5274,14 @@ return (
         </Card>
       )}
 
-      <div className={styles.filterSummaryBox}>
-        <p className={styles.filterSummaryText}>
-          Questions: <strong>{displayedTotalQuestionsCount}</strong> ‎  Filtered:{' '}
-          <strong>
-            {filterLoading || !areSummaryCountsHydrated ? (
-              <FontAwesomeIcon icon={faSpinner} spin />
-            ) : (
-              normalizedFilteredQuestionsCount
-            )}
-          </strong>
-          <br />
-          Responses: <strong>{displayedTotalResponsesCount}</strong> ‎  Filtered:{' '}
-          <strong>
-            {filterLoading || !areSummaryCountsHydrated ? (
-              <FontAwesomeIcon icon={faSpinner} spin />
-            ) : (
-              normalizedFilteredResponsesCount
-            )}
-          </strong>
-        </p>
-      </div>
+      {renderSurveyResultsFilterSummary({
+        displayedTotalQuestionsCount,
+        displayedTotalResponsesCount,
+        normalizedFilteredQuestionsCount,
+        normalizedFilteredResponsesCount,
+        filterLoading,
+        areSummaryCountsHydrated,
+      })}
 
 
       {/* The area with SBTFilter / QuestionFilter toggles previously (export + filter) */}
