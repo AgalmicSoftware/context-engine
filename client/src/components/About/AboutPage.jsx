@@ -318,8 +318,8 @@ const AboutPage = () => {
           {showPresent && (
             <div className={styles.collapsibleContent}>
               <ul className={styles.bulletList}>
-                <li>Sessions: Create and publish sessions through the Session Wizard, including sponsored-session links and sponsored worker-backed setup flows.</li>
-                <li>Questions: Multi-format survey creation and responses (binary, rating, multichoice, freeform), stored permanently on Arweave with hashes in smart contracts. Includes CSV exports, built-in clustering reports, and PDF exports.</li>
+                <li>Sessions: Create and publish sessions, including sponsored-session links for easy onboarding</li>
+                <li>Questions: Multi-format survey creation and responses (binary, rating, multichoice, freeform), stored permanently on Arweave with hashes in smart contracts. Includes reports and CSV and PDF exports.</li>
                 <li>Groups: Deploy soulbound tokens (non-transferable credentials) for gating survey access. Filter and encrypt responses by group membership via Lit Protocol.</li>
                 <li>AI Tools: Generate survey questions from URLs, documents, and audio transcripts. AI-assisted analysis and opinion clustering.</li>
               </ul>
