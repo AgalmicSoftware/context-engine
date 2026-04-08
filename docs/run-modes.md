@@ -12,16 +12,16 @@ or on-chain.
 
 Frontend development and local client work only.
 
-- Use the React client without chain, worker, or Arweave dependencies.
-- Client workflows support Node.js `^20.19.0` or `>=22.12.0` with npm
-  `^10.0.0`; Node 16/npm 9 are no longer supported.
-- Install client dependencies with plain `npm install`; strict peer resolution
-  is the normal install contract.
+- Use the React client without chain, worker, or Arweave dependencies
+- Client workflows use Node.js 16.14.2 and npm 9.2.0
+- Install client dependencies with `npm i --force` for now until the current
+  install conflict is fixed
+- Typical start command:
 
 ```bash
 cd client
-nvm use 20
-npm install
+nvm use 16
+npm i --force
 npm run dev
 ```
 

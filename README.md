@@ -10,7 +10,7 @@
 
 Context Engine is a toolkit for AI-enhanced deliberation, decision-making, and negotiation in large groups. It supports public and private questions and responses, AI-assisted input and analysis, permanent records, and cryptographic access control. It allows for no-code deployment of [Soulbound Tokens](https://www.radicalxchange.org/wiki/social-identity/) for Groups. Designed for use cases such as public discourse, organizational decision-making, and preference-related dataset creation.
 
-## Architecture At A Glance
+Context Engine is a toolkit for AI-enhanced deliberation and sensemaking in large groups. It supports public and private questions and responses, AI-assisted input and analysis, permanent records, and cryptographic access control. It allows for no-code deployment of [Soulbound Tokens for Groups](https://www.radicalxchange.org/wiki/social-identity/). Designed for use cases such as public discourse, organizational decision-making, and preference-related dataset creation.
 
 <p align="center">
   <img src="client/src/assets/img/readme-architecture-deployment-modes.png" alt="Context Engine deployment diagram showing Web App and AI Agent access to shared sessions across Hosted and Fast, Trustless and Slower, and planned Company-Operated infrastructure modes." />
@@ -34,6 +34,9 @@ Context Engine separates how the web app is hosted from how each session establi
 
 - Root scripts, worker bundling, contract tooling, and client workflows: Node.js 20.19+ or 22.12+ with npm 10
 - Foundry (`forge` / `anvil`) for local-chain and root contract test workflows
+
+For client dependency installs, use `npm i --force` for now until the current
+install conflict is fixed.
 
 ### Clone and Install
 

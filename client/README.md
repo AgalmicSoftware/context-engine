@@ -6,16 +6,15 @@ other user-facing web3 interactions.
 
 ## Setup
 
-Current client workflows support Node.js `^20.19.0` or `>=22.12.0` with
-npm `^10.0.0`. Node 16/npm 9 are no longer supported for client work.
+Current client workflows use Node.js `16.14.2` and npm `9.2.0`.
 
-Install client dependencies with plain `npm install`. The lockfile is expected
-to resolve under npm's normal strict peer behavior.
+Install client dependencies with `npm i --force` for now. This is a temporary
+workaround until the current install conflict is fixed.
 
 ```bash
 cd client
-nvm use 20
-npm install
+nvm use 16
+npm i --force
 npm run dev
 ```
 
