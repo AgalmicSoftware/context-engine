@@ -1,14 +1,14 @@
 /** @file OnePageSession.jsx */
 import React, { Component, Suspense } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { 
-  faCaretDown, 
-  faCaretUp, 
+import {
+  faCaretDown,
+  faCaretUp,
   faExternalLinkAlt,
-  faQuestionCircle, 
-  faSpinner, 
-  faCheck, 
-  faTimes, 
+  faQuestionCircle,
+  faSpinner,
+  faCheck,
+  faTimes,
   faImage,
   faArrowLeft,
   faExpand,

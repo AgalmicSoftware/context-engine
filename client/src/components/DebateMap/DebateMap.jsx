@@ -2067,7 +2067,7 @@ const DebateMap = ({
     setModalNodeId(null);
     onModalClose?.();
   }, [onModalClose]);
-  
+
   const handleBookmark = useCallback((id) => {
     setBookmarkedNodes(prev => {
       const next = prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id];

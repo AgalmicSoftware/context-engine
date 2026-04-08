@@ -13362,7 +13362,6 @@ class PileViewMode extends SurveyQuestions {
     this._loadAndSortDebounceTimer = null;
     this._lastLoadAndSortResultSignature = '';
     this._lastInitializeResponseSig = '';
-    this._lastNotifiedPileSubmitRailVisible = null;
 
     // Ref for auto-scrolling to Create section
     this.createSectionRef = React.createRef();
@@ -16049,7 +16048,7 @@ class PileViewMode extends SurveyQuestions {
           <div className={styles.pileFullControls} ref={this.createSectionRef}>
             <CreateSurvey
               {...this.props}
-              hideSurveyQuestionToggleUntilAuthoring={true}
+              forceQuestionsMode={true}
             />
           </div>
         )}
