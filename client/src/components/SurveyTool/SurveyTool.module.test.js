@@ -310,10 +310,308 @@ describe('SurveyTool module', () => {
           conviction: 2,
         },
         {
-          questionId: 'Q1',
-          decryptedStateSlice: {
-            answers: { q1: { value: 'clear answer' } },
-            additionalComments: { q1: { value: 'clear notes' } },
+          answers: { q1: { value: '14', encrypted: false } },
+          additionalComments: {},
+          importance: {},
+          conviction: {},
+        },
+      ],
+    };
+
+    tree = subject.renderActiveQuestion(question);
+    slider = findElement(tree, (node) => (
+      node?.props?.min === 0 &&
+      node?.props?.max === 10 &&
+      node?.props?.step === 1 &&
+      node?.props?.value !== undefined &&
+      typeof node?.props?.onChange === 'function'
+    ));
+    expect(slider).not.toBeNull();
+    expect(slider.props.value).toBe(10);
+    expect(treeHasText(tree, '10')).toBe(true);
+
+    subject.state = {
+      ...subject.state,
+      surveysResponseState: [
+        {
+          answers: { q1: { value: 'abc', encrypted: false } },
+          additionalComments: {},
+          importance: {},
+          conviction: {},
+        },
+      ],
+    };
+
+    tree = subject.renderActiveQuestion(question);
+    slider = findElement(tree, (node) => (
+      node?.props?.min === 0 &&
+      node?.props?.max === 10 &&
+      node?.props?.step === 1 &&
+      node?.props?.value !== undefined &&
+      typeof node?.props?.onChange === 'function'
+    ));
+    expect(slider).not.toBeNull();
+    expect(slider.props.value).toBe(0);
+    expect(nodeHasClassName(slider, styles.ratingSlider)).toBe(true);
+    expect(treeHasText(tree, '0')).toBe(true);
+  });
+
+  it('renders pile additional comments without the extra header and keeps the lock beside the field', () => {
+    const shell = new SurveyTool({
+      minifiedMode: 'pile',
+      network: { id: 84532 },
+      networkChainId: 84532,
+      account: '',
+      questionResponsesNonce: 5,
+      onFilterChange: jest.fn(),
+    });
+    const pileElement = shell.render();
+    const PileViewModeClass = pileElement.type;
+    const subject = new PileViewModeClass(pileElement.props);
+    const question = { id: 'q1', type: 'freeform', prompt: 'Prompt' };
+
+    subject.renderPromptWithManualDecrypt = jest.fn(() => 'Prompt');
+    subject.isQuestionLockedForResponse = jest.fn(() => false);
+    subject.resolveQuestionGateOption = jest.fn(() => null);
+    subject.resolveFieldEncryptionAudience = jest.fn(() => 'self');
+    subject.state = {
+      ...subject.state,
+      showComments: { q1: true },
+      showConviction: {},
+      surveysResponseState: [
+        {
+          answers: { q1: { value: '', encrypted: false } },
+          additionalComments: { q1: { value: '', encrypted: false, encryptionAudience: 'self' } },
+          importance: {},
+          conviction: {},
+        },
+      ],
+    };
+
+    const tree = subject.renderActiveQuestion(question);
+    const inlineRow = findNodeByClassName(tree, styles.additionalCommentsInlineRow);
+    const rowChildren = getElementChildren(inlineRow);
+    const inputNode = findElement(
+      rowChildren[0],
+      (node) => node?.props?.dataTestId === E2E_TESTIDS.SURVEY_ADDITIONAL_INPUT
+    );
+
+    expect(inlineRow).not.toBeNull();
+    expect(findNodeByClassName(tree, styles.additionalCommentsHeader)).toBeNull();
+    expect(treeHasText(tree, 'Additional comments')).toBe(false);
+    expect(rowChildren).toHaveLength(2);
+    expect(nodeHasClassName(rowChildren[0], styles.additionalCommentsInputWrap)).toBe(true);
+    expect(nodeHasClassName(rowChildren[1], styles.additionalCommentsLockSlot)).toBe(true);
+    expect(inputNode).not.toBeNull();
+    expect(inputNode.props.placeholder).toBe('Additional comments...');
+    expect(treeHasDataTestId(rowChildren[1], E2E_TESTIDS.SURVEY_ADDITIONAL_LOCK)).toBe(true);
+  });
+
+  it('does not call getPendingEditStats during PileViewMode.render', () => {
+    const shell = new SurveyTool({
+      minifiedMode: 'pile',
+      network: { id: 84532 },
+      networkChainId: 84532,
+      account: '',
+      questionResponsesNonce: 5,
+      onFilterChange: jest.fn(),
+    });
+    const pileElement = shell.render();
+    const PileViewModeClass = pileElement.type;
+    const subject = new PileViewModeClass(pileElement.props);
+
+    subject.getPendingEditStats = jest.fn(() => ({ total: 7, encrypted: 2 }));
+    subject.state = {
+      ...subject.state,
+      loading: true,
+      pileQuestions: [],
+      allQuestionsForFilter: [],
+      filterState: {},
+      modifiedCount: 2,
+      encryptedModifiedCount: 1,
+      submittedSinceLastEdit: false,
+      submissionComplete: false,
+    };
+
+    subject.render();
+
+    expect(subject.getPendingEditStats).not.toHaveBeenCalled();
+  });
+
+  it('keeps the pile action container neutral while only the filter button gets the active class', () => {
+    const shell = new SurveyTool({
+      minifiedMode: 'pile',
+      network: { id: 84532 },
+      networkChainId: 84532,
+      account: '',
+      questionResponsesNonce: 5,
+      onFilterChange: jest.fn(),
+      onViewAllClick: jest.fn(),
+    });
+    const pileElement = shell.render();
+    const PileViewModeClass = pileElement.type;
+    const subject = new PileViewModeClass(pileElement.props);
+    const visibleList = [{ id: 'q1', type: 'freeform', prompt: 'Q1' }];
+
+    subject.renderActiveQuestion = jest.fn(() => null);
+    subject.isMaskedPromptText = jest.fn(() => false);
+    subject.state = {
+      ...subject.state,
+      loading: false,
+      pileQuestions: visibleList,
+      allQuestionsForFilter: visibleList,
+      activePileIndex: 0,
+      filterState: {},
+      isFilterActive: true,
+      showCreate: false,
+      filterModalOpen: false,
+      submissionComplete: false,
+      autoDecryptEnabled: false,
+      autoDecryptAttempted: {},
+      decryptingByKey: {},
+    };
+
+    const tree = subject.render();
+    const actionsNode = findNodeByClassName(tree, 'pileActions');
+    const filterButton = findElement(tree, (node) => node?.props?.['data-testid'] === E2E_TESTIDS.SURVEY_FILTER_TOGGLE);
+    const createButton = findElement(tree, (node) => node?.props?.['data-testid'] === E2E_TESTIDS.SURVEY_CREATE_TOGGLE_PILE);
+    const viewAllButton = findElement(tree, (node) => node?.props?.['data-testid'] === E2E_TESTIDS.SURVEY_VIEW_ALL);
+
+    expect(actionsNode).not.toBeNull();
+    expect(nodeHasClassName(actionsNode, 'pileActionsActive')).toBe(false);
+    expect(filterButton).not.toBeNull();
+    expect(nodeHasClassName(filterButton, 'actionButton')).toBe(true);
+    expect(nodeHasClassName(filterButton, 'actionButtonActive')).toBe(true);
+    expect(filterButton.props.style).toEqual(expect.objectContaining({
+      color: '#4cd964',
+      borderColor: '#4cd964',
+      opacity: 0.75,
+    }));
+    expect(createButton).not.toBeNull();
+    expect(nodeHasClassName(createButton, 'actionButton')).toBe(true);
+    expect(nodeHasClassName(createButton, 'actionButtonActive')).toBe(false);
+    expect(viewAllButton).not.toBeNull();
+    expect(nodeHasClassName(viewAllButton, 'actionButton')).toBe(true);
+    expect(nodeHasClassName(viewAllButton, 'actionButtonActive')).toBe(false);
+  });
+
+  it('renders the pile mini spinner as a sibling of the controls stack during background refresh', () => {
+    const shell = new SurveyTool({
+      minifiedMode: 'pile',
+      network: { id: 84532 },
+      networkChainId: 84532,
+      account: '',
+      questionResponsesNonce: 5,
+      onFilterChange: jest.fn(),
+      onViewAllClick: jest.fn(),
+    });
+    const pileElement = shell.render();
+    const PileViewModeClass = pileElement.type;
+    const subject = new PileViewModeClass(pileElement.props);
+    const visibleList = [{ id: 'q1', type: 'freeform', prompt: 'Q1' }];
+
+    subject.renderActiveQuestion = jest.fn(() => null);
+    subject.isMaskedPromptText = jest.fn(() => false);
+    subject.state = {
+      ...subject.state,
+      loading: true,
+      pileQuestions: visibleList,
+      allQuestionsForFilter: visibleList,
+      activePileIndex: 0,
+      filterState: {},
+      isFilterActive: false,
+      showCreate: false,
+      filterModalOpen: false,
+      submissionComplete: false,
+      autoDecryptEnabled: false,
+      autoDecryptAttempted: {},
+      decryptingByKey: {},
+      isHydratingPriorResponses: false,
+    };
+
+    const tree = subject.render();
+    const interactionNode = findNodeByClassName(tree, 'pileInteractionUnit');
+    const controlsNode = findNodeByClassName(tree, 'pileControls');
+    const spinnerNode = findNodeByClassName(tree, 'miniSpinnerWrapper');
+    const interactionChildClasses = getElementChildren(interactionNode).map((child) => child?.props?.className);
+
+    expect(interactionNode).not.toBeNull();
+    expect(controlsNode).not.toBeNull();
+    expect(spinnerNode).not.toBeNull();
+    expect(interactionChildClasses).toEqual(expect.arrayContaining([
+      'miniSpinnerWrapper',
+      'pileCardContainer',
+      'pileControls',
+    ]));
+    expect(findNodeByClassName(controlsNode?.props?.children, 'miniSpinnerWrapper')).toBeNull();
+  });
+
+  it('passes the delayed pile-entry mode toggle prop into the pile create panel', () => {
+    const shell = new SurveyTool({
+      minifiedMode: 'pile',
+      network: { id: 84532 },
+      networkChainId: 84532,
+      account: '',
+      questionResponsesNonce: 5,
+      onFilterChange: jest.fn(),
+    });
+    const pileElement = shell.render();
+    const PileViewModeClass = pileElement.type;
+    const subject = new PileViewModeClass(pileElement.props);
+
+    subject.state = {
+      ...subject.state,
+      loading: false,
+      pileQuestions: [],
+      allQuestionsForFilter: [],
+      activePileIndex: 0,
+      filterState: {},
+      isFilterActive: false,
+      showCreate: true,
+      filterModalOpen: false,
+      submissionComplete: false,
+      autoDecryptEnabled: false,
+      autoDecryptAttempted: {},
+      decryptingByKey: {},
+    };
+
+    const tree = subject.render();
+    const createSurveyNode = findElement(
+      tree,
+      (node) => node?.props?.hideSurveyQuestionToggleUntilAuthoring === true
+    );
+
+    expect(createSurveyNode).not.toBeNull();
+  });
+
+  it('keeps masked visibility memo hot when alternating stable pool references', () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+    });
+    const poolA = [{ id: 'qa', prompt: 'A', promptDecrypted: false }];
+    const poolB = [{ id: 'qb', prompt: 'B', promptDecrypted: false }];
+    subject.isMaskedPromptText = jest.fn(() => false);
+
+    const firstA = subject.getMemoizedMaskedQuestionVisibility(poolA, false);
+    const firstB = subject.getMemoizedMaskedQuestionVisibility(poolB, false);
+    const secondA = subject.getMemoizedMaskedQuestionVisibility(poolA, false);
+
+    expect(firstA).toBe(secondA);
+    expect(firstB).not.toBe(firstA);
+    expect(subject.isMaskedPromptText).toHaveBeenCalledTimes(2);
+  });
+
+  it('reuses current pile signature path on repeated identical filters', () => {
+    jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace) => {
+      if (namespace === 'questionsCache') {
+        return {
+          '84532': {
+            questionResponses: {},
           },
           decryptedImportance: 7,
           decryptedConviction: 9,
