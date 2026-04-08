@@ -1,4 +1,3 @@
-import demoPolisData from './demo_polis_data.json';
 import historicalFiguresMerged from './historical_figures_merged.json';
 import additionalHistoricalFigures from './additional_historical_figures.json';
 import historicalFigureUsers from './historical_figure_users.json';
@@ -550,9 +549,14 @@ const buildCanonicalEntry = (xid = '') => {
   return null;
 };
 
+const DEMO_PARTICIPANT_XIDS = Object.freeze(
+  (Array.isArray(historicalFigureUsers) ? historicalFigureUsers : [])
+    .map((figure) => String(figure?.username || '').trim())
+    .filter(Boolean)
+);
+
 const HISTORICAL_FIGURE_DEMOGRAPHICS = Object.freeze(
-  (Array.isArray(demoPolisData?.participantsVotes) ? demoPolisData.participantsVotes : []).reduce((acc, participant) => {
-    const xid = String(participant?.xid || '').trim();
+  DEMO_PARTICIPANT_XIDS.reduce((acc, xid) => {
     if (!xid || acc[xid]) {
       return acc;
     }

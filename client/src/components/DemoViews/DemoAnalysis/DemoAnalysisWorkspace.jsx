@@ -1,9 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import demoPolisData from '../../../variables/demo/demo_polis_data.json';
+import demoAnalysisData from '../../../variables/demo/demo_analysis_data.json';
 import historicalFigureDemographics from '../../../variables/demo/historical_figure_demographics.js';
-import buildDemoAnalysisData, {
-  getHighestParticipationQuestion,
-} from '../../../utilities/demo/demoAnalysisAdapter.js';
+import buildDemoAnalysisData from '../../../utilities/demo/demoAnalysisAdapter.js';
 import {
   buildComparisonGroup,
   buildIndicatorHeatmapData,
@@ -20,7 +18,7 @@ import WorldResultsMap from './WorldResultsMap.jsx';
 import styles from './DemoAnalysisWorkspace.module.scss';
 
 const DemoAnalysisWorkspace = ({
-  demoData = demoPolisData,
+  demoData = demoAnalysisData,
   metadataByXid = historicalFigureDemographics,
 }) => {
   const analysisData = useMemo(
@@ -38,12 +36,16 @@ const DemoAnalysisWorkspace = ({
   const [drilldownQuestionId, setDrilldownQuestionId] = useState('');
 
   useEffect(() => {
-    if (selectedQuestionId && questionMap.has(selectedQuestionId)) return;
-    const defaultQuestion = getHighestParticipationQuestion(analysisData.questions);
-    if (defaultQuestion?.id) {
-      setSelectedQuestionId(defaultQuestion.id);
+    if (selectedQuestionId && !questionMap.has(selectedQuestionId)) {
+      setSelectedQuestionId('');
     }
-  }, [analysisData.questions, questionMap, selectedQuestionId]);
+  }, [questionMap, selectedQuestionId]);
+
+  useEffect(() => {
+    if (drilldownQuestionId && !questionMap.has(drilldownQuestionId)) {
+      setDrilldownQuestionId('');
+    }
+  }, [drilldownQuestionId, questionMap]);
 
   const comparisonGroups = useMemo(
     () => selectedSegmentKeys.map((segmentKey) => buildComparisonGroup(segmentKey)),

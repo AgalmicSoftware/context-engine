@@ -1,7 +1,10 @@
-import demoPolisData from '../../variables/demo/demo_polis_data.json';
 import historicalFigureDemographics from '../../variables/demo/historical_figure_demographics.js';
 
 export const DEMO_ANALYSIS_RESPONSE_OPTIONS = Object.freeze(['Agree', 'Unsure', 'Disagree']);
+const EMPTY_DEMO_ANALYSIS_SOURCE = Object.freeze({
+  comments: [],
+  participantsVotes: [],
+});
 
 export const DEMO_ANALYSIS_DEMOGRAPHIC_DIMENSIONS = Object.freeze([
   { label: 'Era', field: 'eraBucket' },
@@ -140,7 +143,7 @@ const buildDemographicSummary = (participantsVotes = [], metadataByXid = {}) => 
 };
 
 export const buildDemoAnalysisData = (
-  sourceData = demoPolisData,
+  sourceData = EMPTY_DEMO_ANALYSIS_SOURCE,
   metadataByXid = historicalFigureDemographics
 ) => {
   const comments = Array.isArray(sourceData?.comments) ? sourceData.comments : [];

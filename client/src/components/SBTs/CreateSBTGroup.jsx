@@ -4536,7 +4536,7 @@ class CreateSBTGroup extends Component {
                       </span>
                     </span>
                     <CETooltip placement="right" target="create2SaltTooltip" className={styles.tooltipBubble}>
-                      {`Use deterministic deployment so the ${t('sbt')} address is known before on-chain creation. Session drafts keep this on automatically.`}
+                      {`Use deterministic deployment so the ${t('sbt')} address is known before on-chain creation.`}
                     </CETooltip>
                   </label>
                   {predictableAddressActive && (

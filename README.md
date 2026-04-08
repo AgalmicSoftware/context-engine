@@ -52,18 +52,18 @@ For testing, run modes, and deeper setup:
 - Multiple question types: freeform, multiple choice, binary, and rating scales
 - Optional encryption responses and results
 - Decentralized and permanent storage of responses
-- Statistical analysis and visualization
-- Export results as `.json` and `.csv`
+- Statistical / AI analysis and visualization of results
+- Export results as `.json`, `.csv`, `.pdf`
 
 ### SBT-Gated Groups
 - No-code creation of Soulbound tokens ([SBTs](https://www.radicalxchange.org/wiki/social-identity/)) for groups
-- Public minting, password-protected minting, and auto-claim URLs
-- Role-based burn authorization
-- Session and resource gating based on SBT ownership
+- Public minting, password-protected minting, time-limited minting, limited-number minting, and auto-claim URLs
+- Role-based burn authorization (admin, minter, both, neither)
+- Session and resource gating based on SBT ownership (encrypted titles, information, docURLs, tags)
 
 ### AI-Assisted Tooling
-- Voice-to-text 
-- Question generation from URL or text input
+- Voice-to-text input
+- Question generation from file, URL, or text input
 - Summaries and analysis of survey results and response clusters
 - OpenAI, Anthropic, OpenRouter, and custom provider paths 
 
