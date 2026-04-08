@@ -659,9 +659,64 @@
 }
 
 .mapFrame {
-  margin-top: -0.5rem;
+  margin-top: 0;
   overflow: hidden;
   width: 100%;
+}
+
+.mapFrameShell {
+  display: grid;
+  border: 1px solid #e0e6ef;
+  border-radius: 14px;
+  overflow: hidden;
+  background:
+    linear-gradient(180deg, rgba(248, 250, 252, 0.98) 0%, rgba(244, 247, 251, 0.96) 100%);
+}
+
+.mapFrameViewport {
+  min-height: 320px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem 0.75rem 0.25rem;
+}
+
+.mapFrameViewportEmpty {
+  min-height: 280px;
+  padding: 1.5rem;
+  text-align: center;
+}
+
+.mapViewportHint {
+  margin: 0;
+  max-width: 34rem;
+  color: #5f6b7a;
+  font-size: 1rem;
+  line-height: 1.55;
+}
+
+.mapSelectedQuestionPanel {
+  display: grid;
+  gap: 0.45rem;
+  border-top: 1px solid #d7dde5;
+  background: rgba(248, 249, 252, 0.98);
+  padding: 0.95rem 1rem 1.05rem;
+}
+
+.mapSelectedQuestionLabel {
+  color: #495057;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.mapSelectedQuestionText {
+  margin: 0;
+  color: #212529;
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.45;
 }
 
 .mapFrameCompact {
@@ -810,6 +865,16 @@
   .mapFrameCompact :global(svg) {
     max-width: 100%;
     width: 100%;
+  }
+
+  .selectorLayout {
+    grid-template-columns: 1fr;
+  }
+
+  .mapFrameViewport {
+    min-height: 240px;
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
   }
 
   .breakdownBarRow {

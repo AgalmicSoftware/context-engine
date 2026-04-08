@@ -214,6 +214,17 @@ const WorldResultsMap = ({
     </ComposableMap>
   );
 
+  const renderSelectedQuestion = () => (
+    question ? (
+      <div className={styles.mapSelectedQuestionPanel}>
+        <span className={styles.mapSelectedQuestionLabel}>Selected question</span>
+        <p className={styles.mapSelectedQuestionText} data-testid="demo-analysis-selected-question">
+          {question.text}
+        </p>
+      </div>
+    ) : null
+  );
+
   if (isLightweightMode) {
     return (
       <div
@@ -262,6 +273,7 @@ const WorldResultsMap = ({
           <div className={`${styles.mapFrameViewport} ${styles.mapFrameViewportEmpty}`}>
             <p className={styles.mapViewportHint}>No country-segment data is available for this question.</p>
           </div>
+          {renderSelectedQuestion()}
         </div>
       </section>
     );
@@ -291,6 +303,7 @@ const WorldResultsMap = ({
             {renderMap()}
           </div>
         </div>
+        {renderSelectedQuestion()}
       </div>
     </section>
   );

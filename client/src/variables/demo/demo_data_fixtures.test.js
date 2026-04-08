@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 
 import debateMapData from './debate_map_demo_data.json';
+import demoAnalysisData from './demo_analysis_data.json';
 import debates from './debates.json';
 import demoPolisData from './demo_polis_data.json';
 import loopholeHistoricalCases from './loophole_historical_cases.json';
@@ -24,6 +25,18 @@ describe('demo data fixture cleanup', () => {
     expect(demoPolisData.comments).toHaveLength(42);
     expect(Array.isArray(demoPolisData.participantsVotes)).toBe(true);
     expect(Array.isArray(demoPolisData.clusterAnalysis)).toBe(true);
+  });
+
+  it('keeps the dedicated breakdown analysis fixture separate from the canonical Polis demo fixture', () => {
+    const demoDir = __dirname;
+
+    expect(fs.existsSync(path.join(demoDir, 'demo_analysis_data.json'))).toBe(true);
+    expect(Object.keys(demoAnalysisData)).toEqual([
+      'comments',
+      'participantsVotes',
+    ]);
+    expect(demoAnalysisData.comments).toHaveLength(demoPolisData.comments.length);
+    expect(demoAnalysisData.participantsVotes).toHaveLength(demoPolisData.participantsVotes.length);
   });
 
   it('merges the split debate fixtures into a single dataset', () => {
