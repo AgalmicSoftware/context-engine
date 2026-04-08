@@ -6,6 +6,7 @@ jest.mock('./arweaveScripts.js', () => ({
 
 import {
   buildArweaveGatewayUrlCandidates,
+  getDefaultArweaveGateways,
   getPreferredArweaveGateway,
   isArweaveTxId,
   normalizeArweaveUrl,
@@ -49,6 +50,16 @@ describe('arweaveUrls helpers', () => {
     expect(normalizeArweaveUrl(`https://nknrqljpprb2ncdidz57t6g5o346sreaimrxm7qp3ybzitf7bvya.arweave.net/${txId}`)).toBe(`https://ar-io.dev/${txId}`);
     expect(normalizeArweaveUrl('assets/img/ce_header.webp')).toBe('assets/img/ce_header.webp');
     expect(normalizeArweaveUrl('https://example.com/foo.png')).toBe('https://example.com/foo.png');
+  });
+
+  it('defaults to ar.io-first gateway fanout unless direct-to-ar.io mode is explicitly enabled', () => {
+    expect(getDefaultArweaveGateways()).toEqual([
+      'https://ar-io.dev',
+      'https://arweave.net',
+      'https://gateway.irys.xyz',
+      'https://permagate.io',
+      'https://g8way.io',
+    ]);
   });
 
   it('uses ar.io when direct-to-ar.io mode is enabled for user-facing links', () => {
