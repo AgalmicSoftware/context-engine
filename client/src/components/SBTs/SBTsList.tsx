@@ -12,12 +12,26 @@ import contractScripts, {
 } from '../../utilities/web3/contractScripts.js';
 import styles from './SBTsList.module.scss';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faSpinner, faSync, faTrash, faPlus, faLock, faCog, faChevronUp, faChevronDown, faExternalLinkAlt, faCaretUp, faCaretDown } from '@fortawesome/free-solid-svg-icons';
+import { faSpinner, faSync, faTrash, faPlus, faCog, faChevronUp, faChevronDown } from '@fortawesome/free-solid-svg-icons';
 import { Button } from 'reactstrap';
 import SBTPage from './SBTPage';
 import CreateGroup from './CreateSBTGroup';
 import TagModal from '../TagPage/TagModal';
 import SessionChipSelector from '../Shared/SessionChipSelector';
+import SbtListSessionUniverseSummary from './SbtListSessionUniverseSummary';
+import {
+  SbtListDetailsPanel,
+  SbtListMetaRow,
+} from './SbtListCardChrome';
+import {
+  SbtListCompactLinkCard,
+  SbtListStandardCard,
+} from './SbtListDisplayCards';
+import {
+  SbtListInitialLoader,
+  SbtListSectionLoadingHint,
+  SbtListSectionTitle,
+} from './SbtListSectionChrome';
 import { ethers } from 'ethers';
 import { createLogger } from '../../utilities/logging.js';
 import {
@@ -57,23 +71,22 @@ import {
   buildSbtListFilterContainerClassName,
   buildSbtListFilterLabelClassName,
   buildSbtListInteractiveMiniCardModel,
-  buildSbtListLoadingGroupStatusClassName,
-  buildSbtListLoadingProgressFillClassName,
   buildSbtListMetaRowModel,
   buildSbtListMiniSettingsButtonClassName,
   buildSbtListRenderItemKey,
   buildSbtListRenderBuckets,
   buildSbtListRootClassName,
+  buildSbtListSessionChipStateBySlug,
+  buildSbtListSessionLoadingStatus,
+  buildSbtListSessionProgressSnapshot,
   buildSbtListSessionUniversePanelClassName,
   coerceSbtMintEndSeconds,
   dedupeNormalizedSbtListSlugs,
   getSbtCardDetails,
   getVisibleSbtListSessionSlugsFromEntries,
   mergeSbtListsByAddress,
-  hasSbtListAuthoritativeSessionSlug,
   hasSbtListExplicitNoSessionAssociation,
   hasSbtListMissingOrEmptySessionSlug,
-  hasSbtListOwn,
   isModifiedSbtListPointerNavigation,
   isSbtListManagedDgCacheName,
   normalizeSbtListAddressLower,
@@ -84,12 +97,14 @@ import {
   readSbtListSyncBarResearchBlockStep,
   readSbtListCacheMetaSnapshot,
   readStoredSbtListModeSelectedSessionSlugs,
+  resolveSbtListConcreteSessionBindingSlug,
   resolveSbtListActionableSessionSlugs,
   resolveSbtListChipSelectedSessionSlugs,
   resolveSbtListClampedSelectedSessionSlugs,
   resolveSbtListDefaultSelectedSessionSlugs,
   resolveSbtListDisplayedSessionUniverseSlugs,
   resolveSbtListHiddenRegistrySessionSlugs,
+  resolveSbtListItemSessionSlug,
   resolveSbtListHeaderBlocksLeftStyle,
   resolveSbtListHeaderSpinnerWrapStyle,
   resolveSbtListRemainingHiddenRegistrySessionSlugs,
@@ -98,7 +113,6 @@ import {
   resolveSbtListSectionSessionSlugs,
   resolveSbtListSessionUniverseSnapshotUpdate,
   resolveSbtListCreateGroupInitialVisibility,
-  resolveSbtListLoadingProgressFillStyle,
   resolveSbtListRelativeImageStyle,
   SBT_LIST_MODE_SELECTION_STORAGE_KEY,
   SBT_LIST_NO_SESSION_UNIVERSE_SLUG,
@@ -248,6 +262,11 @@ type SbtListInitDeps = {
   sessionUniverseRegistryPending: boolean;
   sbtCacheRevision: number;
 };
+type SbtListFetchSBTs = (
+  forceRefresh?: boolean,
+  showLoadingIndicator?: boolean,
+  slugOverride?: unknown
+) => Promise<void>;
 type SbtListChipProgressMeta = UnknownRecord & {
   lastModeChangeAtMs?: number;
   pendingVisible?: boolean;
@@ -853,6 +872,9 @@ const SBTsList = ({
     sessionUniverseRegistryPending: false,
     sbtCacheRevision: Number(sbtCacheRevision || 0),
   });
+  const ensureLightSbtDiscoveryRef = useRef<SBTsListProps['ensureLightSbtDiscovery']>(ensureLightSbtDiscovery);
+  ensureLightSbtDiscoveryRef.current = ensureLightSbtDiscovery;
+  const fetchSBTsRef = useRef<SbtListFetchSBTs | null>(null);
 
   const clearRefreshSafetyTimeout = useCallback(() => {
     if (refreshSafetyTimeoutRef.current) {
@@ -1195,97 +1217,16 @@ const SBTsList = ({
   }, [hasResolvableSessionWorker]);
 
   const resolveConcreteSessionBindingSlug = useCallback((sbt: SbtListItem | null | undefined): string | null => {
-    const sbtInfo = isRecord(sbt?.sbtInfo) ? sbt.sbtInfo : {};
-
-    if (hasSbtListAuthoritativeSessionSlug(sbtInfo)) {
-      return normalizeSessionSlug(sbtInfo?.sessionSlug || '');
-    }
-    if (hasSbtListAuthoritativeSessionSlug(sbt)) {
-      return normalizeSessionSlug(sbt?.sessionSlug || '');
-    }
-
-    const legacySlugRaw = sbtInfo?.slug;
-    if (legacySlugRaw != null && String(legacySlugRaw).trim() !== '') {
-      return normalizeSessionSlug(legacySlugRaw);
-    }
-
-    const hasInferredSessionSlug = (
-      (hasSbtListOwn(sbtInfo, 'sessionSlug') && sbtInfo?.sessionSlugExplicit === false) ||
-      (hasSbtListOwn(sbt, 'sessionSlug') && sbt?.sessionSlugExplicit === false)
-    );
-    if (hasInferredSessionSlug) return null;
-
-    const legacySessionName = String(
-      sbtInfo?.sessionName ??
-      sbt?.sessionName ??
-      ''
-    ).trim();
-    if (!legacySessionName) return null;
-
-    const mappedSlug = getSessionSlugByName(legacySessionName);
-    if (mappedSlug == null) return null;
-    return normalizeSessionSlug(mappedSlug);
+    return resolveSbtListConcreteSessionBindingSlug(sbt, { getSessionSlugByName });
   }, []);
 
   const resolveSbtSessionSlug = useCallback((sbt: SbtListItem | null | undefined): string => {
-    const sbtInfo = isRecord(sbt?.sbtInfo) ? sbt.sbtInfo : {};
-    const sourceSlug = normalizeSessionSlug(
-      sbt?.__sourceSessionSlug ?? sbt?.slug ?? sbt?.sessionSlug ?? ''
-    );
-    if (allSessionsMode && hasSbtListExplicitNoSessionAssociation(sbt)) {
-      return SBT_LIST_NO_SESSION_UNIVERSE_SLUG;
-    }
-    const hasMetadataSessionSlug = (
-      hasSbtListOwn(sbtInfo, 'sessionSlug') ||
-      hasSbtListOwn(sbt, 'sessionSlug')
-    );
-    const metadataSessionSlug = hasMetadataSessionSlug
-      ? normalizeSessionSlug(sbtInfo?.sessionSlug ?? sbt?.sessionSlug ?? '')
-      : null;
-    const hasAuthoritativeMetadataSessionSlug = (
-      hasSbtListAuthoritativeSessionSlug(sbtInfo) || hasSbtListAuthoritativeSessionSlug(sbt)
-    );
-
-    if (allSessionsMode && isListModeScopeEnabled) {
-      const concreteBindingSlug = resolveConcreteSessionBindingSlug(sbt);
-      if (concreteBindingSlug != null) {
-        return concreteBindingSlug === ''
-          ? SBT_LIST_NO_SESSION_UNIVERSE_SLUG
-          : concreteBindingSlug;
-      }
-      if (hasSbtListMissingOrEmptySessionSlug(sbt)) {
-        return SBT_LIST_NO_SESSION_UNIVERSE_SLUG;
-      }
-      return SBT_LIST_NO_SESSION_UNIVERSE_SLUG;
-    }
-    if (hasSbtListAuthoritativeSessionSlug(sbtInfo)) {
-      return normalizeSessionSlug(sbtInfo?.sessionSlug || '');
-    }
-    if (hasSbtListAuthoritativeSessionSlug(sbt)) {
-      return normalizeSessionSlug(sbt?.sessionSlug || '');
-    }
-    if (
-      metadataSessionSlug != null &&
-      metadataSessionSlug !== sourceSlug &&
-      !hasAuthoritativeMetadataSessionSlug &&
-      sourceSlug
-    ) {
-      // Inferred metadata slugs should not override the source bucket slug.
-      return sourceSlug;
-    }
-
-    // Legacy cache migration fallback for pre-sessionSlug entries.
-    const legacyRaw = (
-      sbtInfo?.sessionSlug ??
-      sbtInfo?.slug ??
-      sbt?.sessionSlug ??
-      sbt?.slug
-    );
-    if (legacyRaw != null && String(legacyRaw).trim() !== '') {
-      return normalizeSessionSlug(legacyRaw);
-    }
-    if (allSessionsMode) return SBT_LIST_NO_SESSION_UNIVERSE_SLUG;
-    return normalizeSessionSlug(listSlug || '');
+    return resolveSbtListItemSessionSlug(sbt, {
+      allSessionsMode,
+      isListModeScopeEnabled,
+      listSlug,
+      resolveConcreteSessionBindingSlug,
+    });
   }, [allSessionsMode, isListModeScopeEnabled, listSlug, resolveConcreteSessionBindingSlug]);
 
   const collectLinkedScopedSbtEntries = useCallback((
@@ -1529,9 +1470,6 @@ const SBTsList = ({
 
     const cfg = getDisplaySessionConfig(slug) as SbtSessionDisplayConfig | null;
     const cacheMeta = readSbtCacheMeta(slug);
-    const lastBlock = Number(cacheMeta?.lastBlock || 0);
-    const sbtCount = Number(cacheMeta?.sbtCount || 0);
-    const hasCache = lastBlock > 0 || sbtCount > 0;
     const scanProgressBySlug = (
       sbtScanProgressBySlug &&
       typeof sbtScanProgressBySlug === 'object'
@@ -1544,76 +1482,20 @@ const SBTsList = ({
     const bridgedLiveProgress = !liveProgressFromProps
       ? recentLiveProgressBySlugRef.current[slug] || null
       : null;
-    const bridgedAgeMs = bridgedLiveProgress
-      ? Math.max(0, recentLiveProgressNowMs - Number(bridgedLiveProgress.updatedAtMs || 0))
-      : Number.POSITIVE_INFINITY;
-    const bridgedRemainingBlocks = Math.max(
-      0,
-      Number(bridgedLiveProgress?.latestBlock || 0) - Number(bridgedLiveProgress?.currentBlock || 0)
-    );
-    // Regression guard: when MainSite clears live progress right after a finished scan,
-    // the list can briefly fall back to the stale cache watermark and appear to restart.
-    // Keep the last live block only during this short post-scan cache handoff window.
-    const liveProgress = liveProgressFromProps || (
-      !scanInProgressRaw &&
-      !deferredRaw &&
-      bridgedLiveProgress &&
-      bridgedAgeMs <= SBT_LIVE_PROGRESS_BRIDGE_MS &&
-      bridgedRemainingBlocks <= SBT_LIVE_PROGRESS_BRIDGE_TAIL_BLOCKS &&
-      Number(bridgedLiveProgress.currentBlock || 0) > lastBlock
-        ? bridgedLiveProgress
-        : null
-    );
-    const liveCurrentCandidate = Number(liveProgress?.currentBlock || 0);
-    const liveCurrentBlock = Number.isFinite(liveCurrentCandidate) && liveCurrentCandidate > 0
-      ? liveCurrentCandidate
-      : null;
-    const liveLatestCandidate = Number(liveProgress?.latestBlock || 0);
-    const liveLatestBlock = Number.isFinite(liveLatestCandidate) && liveLatestCandidate > 0
-      ? liveLatestCandidate
-      : null;
-    const startRaw = Number(cfg?.blockLimits?.start);
-    const startBlock = Number.isFinite(startRaw) && startRaw > 0 ? startRaw : null;
-    const latestCandidate = Math.max(
-      Number(latestBlockBySlug[slug] || 0),
-      Number(liveLatestBlock || 0)
-    );
-    const latestForGroup = Number.isFinite(latestCandidate) && latestCandidate > 0
-      ? latestCandidate
-      : null;
-    const hasLatest = latestForGroup != null && latestForGroup > 0 && startBlock != null;
-    const currentBlockBaseline = liveCurrentBlock != null
-      ? Math.max(lastBlock, liveCurrentBlock)
-      : lastBlock;
-    const displayCurrentBlock = hasLatest
-      ? Math.max(Number(startBlock || 0), currentBlockBaseline)
-      : currentBlockBaseline;
-    const remainingBlocks = hasLatest ? Math.max(0, latestForGroup - displayCurrentBlock) : null;
-    const scanFlagNeedsAttention = !hasCache || !hasLatest || Number(remainingBlocks || 0) > 0;
-
-    // Regression guard: all-sessions chips only do light discovery here.
-    // Route-owned deferred/full-scan flags can linger, so only treat them as active
-    // while the session cache is still missing or behind its known latest block.
-    const useRawScanFlags = !allSessionsMode || scanFlagNeedsAttention;
-
-    return {
-      slug,
-      cfg,
+    return buildSbtListSessionProgressSnapshot({
+      allSessionsMode,
+      bridgeMs: SBT_LIVE_PROGRESS_BRIDGE_MS,
+      bridgeTailBlocks: SBT_LIVE_PROGRESS_BRIDGE_TAIL_BLOCKS,
+      bridgedLiveProgress,
       cacheMeta,
-      lastBlock,
-      sbtCount,
-      hasCache,
-      liveProgress,
-      liveCurrentBlock,
-      liveLatestBlock,
-      startBlock,
-      latestForGroup,
-      hasLatest,
-      displayCurrentBlock,
-      remainingBlocks,
-      scanInProgress: scanInProgressRaw && useRawScanFlags,
-      deferred: deferredRaw && useRawScanFlags,
-    };
+      cfg: cfg as UnknownRecord | null,
+      deferredRaw,
+      latestBlock: latestBlockBySlug[slug],
+      liveProgressFromProps,
+      recentLiveProgressNowMs,
+      scanInProgressRaw,
+      slug,
+    }) as SbtSessionProgressSnapshot;
   }, [
     allSessionsMode,
     getDisplaySessionConfig,
@@ -1634,70 +1516,14 @@ const SBTsList = ({
 
     const snapshot = getSessionProgressSnapshot(slug);
     if (!snapshot) return null;
-    const {
-      cfg,
-      lastBlock,
-      hasCache,
-      startBlock,
-      latestForGroup,
-      hasLatest,
-      displayCurrentBlock,
-      remainingBlocks,
-      scanInProgress,
-      deferred,
-    } = snapshot;
-    const sessionLabel = cfg?.sessionName || (slug || 'General');
-    const slugLabel = slug || 'general';
-    const displayName =
-      sessionLabel && sessionLabel.toLowerCase() !== slugLabel.toLowerCase()
-        ? `${sessionLabel} (${slugLabel})`
-        : sessionLabel;
-    const numericLatestForGroup = Number(latestForGroup || 0);
-    const numericStartBlock = Number(startBlock || 0);
-    const numericRemainingBlocks = Number(remainingBlocks || 0);
-    const totalBlocks = hasLatest ? Math.max(1, numericLatestForGroup - numericStartBlock + 1) : null;
-    const scannedBlocks = hasLatest
-      ? Math.max(0, Math.min(totalBlocks || 0, displayCurrentBlock - numericStartBlock + 1))
-      : 0;
-    const progressPct = hasLatest
-      ? Math.max(0, Math.min(100, Math.round((scannedBlocks / (totalBlocks || 1)) * 100)))
-      : 0;
-    const progressText = hasLatest
-      ? (numericRemainingBlocks === 0
-        ? `In Sync (Current: ${formatBlockCount(displayCurrentBlock)} / Latest: ${formatBlockCount(numericLatestForGroup)})`
-        : `Remaining Blocks: ${formatBlockCount(numericRemainingBlocks)} (Current: ${formatBlockCount(displayCurrentBlock)} / Latest: ${formatBlockCount(numericLatestForGroup)})`)
-      : `Loading latest block... (Current: ${formatBlockCount(displayCurrentBlock)})`;
-    const chipRemainingText = hasLatest
-      ? (numericRemainingBlocks > 0
-        ? `${formatBlockCount(numericRemainingBlocks)} remaining`
-        : 'Synced')
-      : 'Syncing';
-    const chipBlockProgressText = hasLatest
-      ? `${formatBlockCount(displayCurrentBlock)} / ${formatBlockCount(latestForGroup)}`
-      : `Current ${formatBlockCount(displayCurrentBlock)}`;
-    const statusLabel = scanInProgress ? 'Scanning' : deferred ? 'Queued' : 'Loading';
-    const shouldShow = alwaysShow || forceShow || (allSessionsMode
-      ? (scanInProgress || deferred || (!hasCache && loading))
-      : true);
-
-    if (!shouldShow) return null;
-    return {
-      slug,
-      slugLabel,
-      displayName,
-      statusLabel,
-      progressText,
-      chipRemainingText,
-      chipBlockProgressText,
-      progressPct,
-      hasLatest,
-      latestForGroup,
-      lastBlock,
-      displayCurrentBlock,
-      remainingBlocks,
-      scanInProgress,
-      deferred
-    };
+    return buildSbtListSessionLoadingStatus({
+      allSessionsMode,
+      alwaysShow,
+      forceShow,
+      formatBlockCount,
+      loading,
+      snapshot,
+    });
   }, [
     allSessionsMode,
     getSessionProgressSnapshot,
@@ -1750,38 +1576,17 @@ const SBTsList = ({
   ]);
 
   const sessionChipStateBySlug = useMemo(() => {
-    if (!allSessionsMode) return {};
-    const out: SbtSessionChipStateBySlug = {};
-    displayedSessionUniverseSlugs.forEach((slugRaw) => {
-      const slug = normalizeSessionSlug(slugRaw || '');
-      if (isSbtListSyntheticNoSessionSlug(slug)) {
-        const hasLoadedOnce = Object.values(sessionHasLoadedOnceBySlug).some(Boolean);
-        const anySessionLoading = Object.values(sessionLoadStateBySlug).some((state) => state === 'loading');
-        const hasCards = hasNoSessionCards;
-        const isLoading = refreshing || (!hasCards && (!hasLoadedOnce || anySessionLoading));
-        const isLoaded = hasCards || (hasLoadedOnce && !isLoading);
-        out[slug] = { isLoaded, isLoading, hasLoadedOnce, hasCards };
-        return;
-      }
-      const cacheMeta = readSbtCacheMeta(slug);
-      const snapshot = getSessionProgressSnapshot(slug);
-      const hasCacheSnapshot = cacheMeta != null;
-      const hasLoadedOnce = !!sessionHasLoadedOnceBySlug[slug];
-      const hasCards = Array.isArray(sbtListBySlug[slug]) && sbtListBySlug[slug].length > 0;
-      const loadState = sessionLoadStateBySlug[slug] || 'idle';
-      const scanInProgress = !!snapshot?.scanInProgress;
-      const deferred = !!snapshot?.deferred;
-      const isLoading = (
-        loadState === 'loading' ||
-        scanInProgress ||
-        deferred ||
-        refreshing ||
-        (!hasCacheSnapshot && !hasLoadedOnce)
-      );
-      const isLoaded = (hasLoadedOnce || hasCacheSnapshot) && !scanInProgress && !deferred && loadState !== 'loading';
-      out[slug] = { isLoaded, isLoading, hasLoadedOnce, hasCards };
-    });
-    return out;
+    return buildSbtListSessionChipStateBySlug({
+      allSessionsMode,
+      displayedSessionUniverseSlugs,
+      getSessionProgressSnapshot,
+      hasNoSessionCards,
+      readSbtCacheMeta,
+      refreshing,
+      sbtListBySlug,
+      sessionHasLoadedOnceBySlug,
+      sessionLoadStateBySlug,
+    }) as SbtSessionChipStateBySlug;
   }, [
     allSessionsMode,
     displayedSessionUniverseSlugs,
@@ -2109,17 +1914,21 @@ const SBTsList = ({
 
         try {
           // Let MainSite own tokenURI hydration during light discovery
-          if (shouldShowLoaderForThisRun && typeof ensureLightSbtDiscovery === 'function') {
+          const runLightDiscovery = ensureLightSbtDiscoveryRef.current;
+          if (shouldShowLoaderForThisRun && typeof runLightDiscovery === 'function') {
             await Promise.all(targets.map(async (slug: string) => {
               try {
-                await ensureLightSbtDiscovery(
+                await runLightDiscovery(
                   slug,
                   allSessionsMode ? { force: true, forceScopeSlug: slug } : undefined
                 );
               } catch (e) { sbtLog.warn('SBTsList: fallback', e); }
             }));
           }
-          await Promise.all(targets.map((slug: string) => fetchSBTs(false, false, slug)));
+          const runFetchSBTs = fetchSBTsRef.current;
+          if (typeof runFetchSBTs === 'function') {
+            await Promise.all(targets.map((slug: string) => runFetchSBTs(false, false, slug)));
+          }
         } finally {
           if (shouldShowLoaderForThisRun && isMounted.current) setLoading(false);
         }
@@ -2143,7 +1952,6 @@ const SBTsList = ({
     return () => {
       isMounted.current = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     listSlug,
     allSessionsMode,
@@ -2346,6 +2154,7 @@ const SBTsList = ({
     onRequestSbtCacheRefresh,
     updateSessionCacheMeta,
   ]);
+  fetchSBTsRef.current = fetchSBTs;
 
   // Derived helpers / rendering utils
 
@@ -2799,58 +2608,10 @@ const SBTsList = ({
 
   if (showInitialLoader) {
     return (
-      <div className={styles.initialLoader}>
-        <div className={styles.loadingHeader}>
-          <FontAwesomeIcon icon={faSpinner} spin className={styles.loadingSpinner} />
-          <div className={styles.loadingTitle}>{`Loading ${t('sbts')}`}</div>
-        </div>
-        {loadingSessionStatuses.length > 0 && (
-          <div className={styles.loadingGroupList}>
-            {loadingSessionStatuses.map((group: SbtSessionLoadingStatus) => (
-              <div key={group.slug} className={styles.loadingGroupRow}>
-                <div className={styles.loadingGroupHeader}>
-                  <span className={styles.loadingGroupName}>{group.displayName}</span>
-                  <span
-                    className={buildSbtListLoadingGroupStatusClassName({
-                      activeClassName: styles.loadingStatusActive,
-                      baseClassName: styles.loadingGroupStatus,
-                      pendingClassName: styles.loadingStatusPending,
-                      scanInProgress: group.scanInProgress,
-                    })}
-                  >
-                    {group.statusLabel}
-                  </span>
-                </div>
-                <div className={styles.loadingGroupMeta}>
-                  {group.progressText}
-                  {!group.hasLatest && (
-                    <FontAwesomeIcon icon={faSpinner} spin className={styles.loadingGroupSpinner} />
-                  )}
-                </div>
-                <div
-                  className={styles.loadingProgressBar}
-                  role="progressbar"
-                  aria-valuenow={group.hasLatest ? group.progressPct : 0}
-                  aria-valuemin={0}
-                  aria-valuemax={100}
-                >
-                  <div
-                    className={buildSbtListLoadingProgressFillClassName({
-                      baseClassName: styles.loadingProgressFill,
-                      hasLatest: group.hasLatest,
-                      indeterminateClassName: styles.loadingProgressIndeterminate,
-                    })}
-                    style={resolveSbtListLoadingProgressFillStyle({
-                      hasLatest: group.hasLatest,
-                      progressPct: group.progressPct,
-                    })}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+      <SbtListInitialLoader
+        loadingLabel={`Loading ${t('sbts')}`}
+        loadingSessionStatuses={loadingSessionStatuses}
+      />
     );
   }
 
@@ -2905,32 +2666,13 @@ const SBTsList = ({
   const renderSbtDetailsPanel = (
     details: SbtCardDetails | null | undefined,
     detailsId: string
-  ): React.ReactNode => {
-    if (!details?.hasDetails) return null;
-    return (
-      <div id={detailsId} className={styles.sbtDetailsPanel}>
-        {details.documentUrls.length > 0 && (
-          <div className={styles.sbtDetailsSection}>
-            <span className={styles.sbtDetailsHeading}>Documents</span>
-            <div className={styles.sbtDocumentList}>
-              {details.documentUrls.map((documentUrl) => (
-                <a
-                  key={documentUrl.href}
-                  className={styles.sbtDocumentLink}
-                  href={documentUrl.href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  title={documentUrl.label}
-                >
-                  {documentUrl.label}
-                </a>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  };
+  ): React.ReactNode => (
+    <SbtListDetailsPanel
+      details={details}
+      detailsId={detailsId}
+      styles={styles}
+    />
+  );
 
   const handleTagChipClick = (
     event: SbtListPointerEventLike,
@@ -2956,51 +2698,15 @@ const SBTsList = ({
       sbt,
     });
     if (!model) return null;
-    const {
-      hasDetailsToggle,
-      hasTags,
-      isExpanded,
-      sbtAddressLower,
-      tags,
-    } = model;
-    const metaRowClassName = [
-      styles.sbtMetaRow,
-      hasTags ? styles.sbtMetaRowWithTags : styles.sbtMetaRowToggleOnly,
-    ].filter(Boolean).join(' ');
-
     return (
-      <div className={metaRowClassName}>
-        {hasTags && (
-          <div className={styles.sbtTagList}>
-            {tags.map((tag) => (
-              <button
-                key={tag}
-                type="button"
-                className={styles.sbtTagChip}
-                aria-label={`Open tag explorer for ${tag}`}
-                onClick={(event) => handleTagChipClick(event, tag)}
-              >
-                #{tag}
-              </button>
-            ))}
-          </div>
-        )}
-        {hasDetailsToggle && (
-          <button
-            type="button"
-            className={styles.sbtDetailsToggle}
-            aria-controls={detailsId}
-            aria-expanded={isExpanded}
-            aria-label={`${isExpanded ? 'Hide' : 'Show'} details for ${buttonLabel}`}
-            onClick={() => toggleExpandedSbt(sbt?.sbtAddress)}
-          >
-            <FontAwesomeIcon
-              icon={isExpanded ? faCaretUp : faCaretDown}
-              className={styles.sbtDetailsToggleIcon}
-            />
-          </button>
-        )}
-      </div>
+      <SbtListMetaRow
+        buttonLabel={buttonLabel}
+        detailsId={detailsId}
+        model={model}
+        onTagClick={handleTagChipClick}
+        onToggleDetails={() => toggleExpandedSbt(sbt?.sbtAddress)}
+        styles={styles}
+      />
     );
   };
 
@@ -3019,39 +2725,22 @@ const SBTsList = ({
       unnamedLabel: t('sbt'),
     });
     if (!model) return null;
-    const {
-      description,
-      imageSrc,
-      key,
-      locked,
-      name,
-      sbtAddress,
-      sessionSlug,
-    } = model;
     const compactCardClassName = [
       styles.sbtItem,
       miniaturized && viewMode === 'modal' ? styles.modalMiniSbtItem : '',
     ].filter(Boolean).join(' ');
 
     return (
-      <a
-        key={key}
+      <SbtListCompactLinkCard
+        key={model.key}
         className={compactCardClassName}
-        href={buildSbtHref(sbtAddress, sessionSlug)}
-        onClick={(event) => handleSbtLinkClick(event, sbtAddress, sessionSlug)}
-      >
-        <div className={styles.sbtImage} style={resolveSbtListRelativeImageStyle()}>
-          {/* {locked && <FontAwesomeIcon icon={faLock} className={styles.inlineLock} />} */}
-          {imageSrc && <img src={imageSrc} alt={`${t('sbt')} Thumbnail`} />}
-        </div>
-        <div className={styles.sbtInfo}>
-          <p className={styles.sbtName}>
-            {name}
-            {locked && <FontAwesomeIcon icon={faLock} className={styles.lockIcon} />}
-          </p>
-          <p className={styles.sbtDescription}>{description || 'No description.'}</p>
-        </div>
-      </a>
+        href={buildSbtHref(model.sbtAddress, model.sessionSlug)}
+        imageStyle={resolveSbtListRelativeImageStyle()}
+        model={model}
+        onClick={(event) => handleSbtLinkClick(event, model.sbtAddress, model.sessionSlug)}
+        sbtLabel={t('sbt')}
+        styles={styles}
+      />
     );
   };
 
@@ -3171,26 +2860,18 @@ const SBTsList = ({
   };
 
   const renderSectionTitle = (label: React.ReactNode, spinnerId: string): React.ReactNode => (
-    <div className={styles.sectionTitleRow}>
-      <h2 className={styles.sectionTitle}>{label}</h2>
-      {sectionHeaderSpinnerVisible && (
-        <FontAwesomeIcon
-          icon={faSpinner}
-          spin
-          className={styles.sectionCornerSpinner}
-          data-testid={spinnerId}
-        />
-      )}
-    </div>
+    <SbtListSectionTitle
+      label={label}
+      showSpinner={sectionHeaderSpinnerVisible}
+      spinnerId={spinnerId}
+    />
   );
 
   const renderSectionLoadingHint = () => (
-    <div className={styles.sectionLoadingHint}>
-      <span>Loading…</span>
-      {!allSessionsMode && typeof blocksLeft === 'number' && (
-        <span className={styles.sectionLoadingBlocks}>Blocks left: {blocksLeft}</span>
-      )}
-    </div>
+    <SbtListSectionLoadingHint
+      allSessionsMode={allSessionsMode}
+      blocksLeft={typeof blocksLeft === 'number' ? blocksLeft : null}
+    />
   );
 
   const renderSBTButton = (sbt: SbtListItem | null | undefined): React.ReactNode => {
@@ -3204,9 +2885,6 @@ const SBTsList = ({
     });
     if (!model) return null;
     const {
-      description,
-      imageSrc,
-      locked,
       name,
       sbtAddress,
       sbtAddressLower,
@@ -3225,34 +2903,23 @@ const SBTsList = ({
     }
 
     return (
-      <article
-        key={`${sessionSlug}|${sbtAddress}`}
-        className={buildSbtListExpandedCardShellClassName({
+      <SbtListStandardCard
+        key={model.key}
+        href={buildSbtHref(sbtAddress, sessionSlug)}
+        imageStyle={resolveSbtListRelativeImageStyle()}
+        isExpanded={isExpanded}
+        metaRow={renderSbtMetaRow(resolvedSbt, details, detailsId, name || resolvedSbt.sbtAddress || t('sbt'))}
+        detailsPanel={renderSbtDetailsPanel(details, detailsId)}
+        model={model}
+        onClick={(event) => handleSbtLinkClick(event, sbtAddress, sessionSlug)}
+        sbtLabel={t('sbt')}
+        shellClassName={buildSbtListExpandedCardShellClassName({
           baseClassName: styles.standardCardShell,
           expandedClassName: styles.standardCardShellExpanded,
           isExpanded,
         })}
-      >
-        <a
-          className={styles.standardCardBodyLink}
-          href={buildSbtHref(sbtAddress, sessionSlug)}
-          onClick={(event) => handleSbtLinkClick(event, sbtAddress, sessionSlug)}
-        >
-          <div className={styles.standardCardImage} style={resolveSbtListRelativeImageStyle()}>
-            {/* {locked && <FontAwesomeIcon icon={faLock} className={styles.inlineLock} />} */}
-            {imageSrc && <img src={imageSrc} alt={`${t('sbt')} Thumbnail`} />}
-          </div>
-          <div className={styles.standardCardInfo}>
-            <p className={styles.standardCardName}>
-              {name}
-              {locked && <FontAwesomeIcon icon={faLock} className={styles.lockIcon} />}
-            </p>
-            <p className={styles.standardCardDescription}>{description || 'No description.'}</p>
-          </div>
-        </a>
-        {renderSbtMetaRow(resolvedSbt, details, detailsId, name || resolvedSbt.sbtAddress || t('sbt'))}
-        {isExpanded && renderSbtDetailsPanel(details, detailsId)}
-      </article>
+        styles={styles}
+      />
     );
   };
 
@@ -3314,76 +2981,16 @@ const SBTsList = ({
     const collapsedSummarySlugs = isListModeScopeEnabled
       ? selectedSessionUniverseSlugs
       : [normalizeSessionSlug(listSlug || '')];
-    const collapsedSummaryPreview = collapsedSummarySlugs.slice(0, 4);
-    const collapsedSummaryOverflow = Math.max(0, collapsedSummarySlugs.length - collapsedSummaryPreview.length);
     const renderCollapsedSummary = (testId: string): React.ReactNode => (
-      <div
-        className={styles.sessionUniverseCollapsedSummary}
-        data-testid={testId}
-      >
-        <span className={styles.sessionUniverseCollapsedLabel}>
-          Selected ({collapsedSummarySlugs.length})
-        </span>
-        <div className={styles.sessionUniverseCollapsedChips}>
-          {collapsedSummaryPreview.map((slugRaw: string) => {
-            const normalized = normalizeSessionSlug(slugRaw || '');
-            const sessionLabel = labelForSessionSlug(normalized);
-            const isLoading = !!chipProgressVisibilityBySlug[normalized];
-            const chipLoadingStatus = chipLoadingStatusBySlug[normalized] || null;
-            const showCollapsedProgress = chipLoadingStatus != null && isLoading;
-            const sessionRouteHref = buildSessionRouteHref(normalized);
-            const collapsedChipClass = [
-              styles.sessionUniverseCollapsedChip,
-              isLoading ? styles.sessionUniverseCollapsedChipLoading : styles.sessionUniverseCollapsedChipLoaded,
-            ].filter(Boolean).join(' ');
-            return (
-              <span
-                key={`collapsed-${normalized || 'general'}`}
-                className={collapsedChipClass}
-                data-testid={`session-collapsed-chip-${normalized || 'general'}`}
-                data-session-loading={isLoading ? 'true' : 'false'}
-                title={showCollapsedProgress ? chipLoadingStatus.progressText : undefined}
-              >
-                <span className={styles.sessionUniverseCollapsedChipBody}>
-                  <span className={styles.sessionUniverseCollapsedChipName}>
-                    {sessionLabel}
-                  </span>
-                  {showCollapsedProgress && (
-                    <span
-                      className={styles.sessionUniverseCollapsedChipProgress}
-                      data-testid={`session-collapsed-chip-progress-${normalized || 'general'}`}
-                    >
-                      {chipLoadingStatus.chipBlockProgressText}
-                    </span>
-                  )}
-                </span>
-                {sessionRouteHref && (
-                  <button
-                    type="button"
-                    className={styles.sessionUniverseCollapsedChipOpen}
-                    data-testid={`session-collapsed-chip-open-${normalized || 'general'}`}
-                    aria-label={`Open session ${sessionLabel} in new tab`}
-                    title={`Open session ${sessionLabel} in new tab`}
-                    onClick={(event) => handleOpenSessionChip(normalized, event)}
-                  >
-                    <FontAwesomeIcon icon={faExternalLinkAlt} />
-                  </button>
-                )}
-              </span>
-            );
-          })}
-          {!collapsedSummaryPreview.length && (
-            <span className={styles.sessionUniverseCollapsedOverflow}>
-              No sessions selected
-            </span>
-          )}
-          {collapsedSummaryOverflow > 0 && (
-            <span className={styles.sessionUniverseCollapsedOverflow}>
-              +{collapsedSummaryOverflow} more
-            </span>
-          )}
-        </div>
-      </div>
+      <SbtListSessionUniverseSummary
+        testId={testId}
+        summarySlugs={collapsedSummarySlugs}
+        chipProgressVisibilityBySlug={chipProgressVisibilityBySlug}
+        chipLoadingStatusBySlug={chipLoadingStatusBySlug}
+        labelForSessionSlug={labelForSessionSlug}
+        buildSessionRouteHref={buildSessionRouteHref}
+        onOpenSessionChip={handleOpenSessionChip}
+      />
     );
 
     const renderHeaderActions = ({ isOpen }: SbtListHeaderActionsArgs): React.ReactNode => (
