@@ -2019,6 +2019,7 @@ class CommunityTab extends Component<any, any> {
               // this below value is probably not passed-in, but should be
               isSBTCacheReady={this.props.isSBTCacheReady}
               sbtCacheRevision={this.props.sbtCacheRevision}
+
             />
             {loadingFilter ? (
               <div className={styles.loadingContainer}>

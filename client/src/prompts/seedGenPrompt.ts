@@ -64,8 +64,9 @@ Format your output as a valid JSON object with the following structure:
   "questions": [
     {
       "prompt": "The question or statement text",
-      "questionType": "binary",
-      "tags": ["tag1", "tag2"],
+      "questionType": "binary" | "rating" | "freeform" | "multichoice",
+      "options": ["Option 1", "Option 2", "Option 3"], // Only for multichoice questions
+      "tags": ["tag1", "tag2"],                        // Array of relevant tags
       "answer": {
         "value": "",
         "encrypted": false,

@@ -125,9 +125,9 @@ export function serializeFilterState(filterStateObj: FilterStateRecord | null | 
 
     // Convert to Base64URL format
     const base64UrlString = base64String
-      .replace(/\+/g, '-') // Replace '+' with '-'
-      .replace(/\//g, '_') // Replace '/' with '_'
-      .replace(/=+$/, ''); // Remove trailing '=' padding
+      .replace(/\+/g, '-')  // Replace '+' with '-'
+      .replace(/\//g, '_')  // Replace '/' with '_'
+      .replace(/=+$/, '');   // Remove trailing '=' padding
 
     return base64UrlString;
   } catch (error) {
@@ -145,10 +145,10 @@ export function serializeFilterState(filterStateObj: FilterStateRecord | null | 
  */
 export function deserializeFilterState(base64UrlString: string | null | undefined): SurveyFilterState {
   // Create a new instance of the default state for fallback, ensuring arrays are new instances.
-  const newDefaultStateInstance: SurveyFilterState = {
+  const newDefaultStateInstance = {
     ...defaultEmptyFilterState,
     questionTypes: [...defaultEmptyFilterState.questionTypes],
-    selectedTags: [...defaultEmptyFilterState.selectedTags],
+    selectedTags: [...defaultEmptyFilterState.selectedTags]
   };
 
   if (base64UrlString === null || base64UrlString === undefined || base64UrlString.trim() === '') {
@@ -158,8 +158,8 @@ export function deserializeFilterState(base64UrlString: string | null | undefine
   try {
     // Convert Base64URL back to standard Base64
     let base64String = base64UrlString
-      .replace(/-/g, '+') // Replace '-' with '+'
-      .replace(/_/g, '/'); // Replace '_' with '/'
+      .replace(/-/g, '+')  // Replace '-' with '+'
+      .replace(/_/g, '/');  // Replace '_' with '/'
 
     // Add Base64 padding if necessary. Standard Base64 decoders might require it.
     // The length of a Base64 string (sans padding) must be a multiple of 4 when padded.

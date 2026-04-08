@@ -78,7 +78,13 @@ class OnboardingWalkthrough extends Component<OnboardingWalkthroughProps, Onboar
     } else {
       return <button className={styles.openSidebarButton}></button>;
     }
-  };
+    else {
+      return (
+        <button id={styles.openSidebarButton}>
+        </button>
+      );
+    }
+  }
 
   getRightButton = () => {
     if (this.state.arrowIndex < this.state.numSlides - 1) {
@@ -94,7 +100,8 @@ class OnboardingWalkthrough extends Component<OnboardingWalkthroughProps, Onboar
         </button>
       );
     }
-  };
+  }
+
 
   render() {
     const onboardingHeadline = this.getOnboardingHeadline();

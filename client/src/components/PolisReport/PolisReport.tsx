@@ -109,8 +109,886 @@ export {
 } from './polisReportRuntime';
 
 const surveyLog = createLogger('surveys');
-export const getPolisDemoDatasetForSlug = (...args: Parameters<typeof getPolisDemoDatasetForSlugRuntime>) =>
-  getPolisDemoDatasetForSlugRuntime(...args);
+
+
+
+
+/**************************************************************
+ * Helper: parse JSON safely
+ **************************************************************/
+function safeJsonParse(str) {
+  if (!str) return null;
+  try {
+    return JSON.parse(str);
+  } catch (e) {
+    return null;
+  }
+}
+
+const DEFAULT_POLIS_DEMO_DATA = demoData;
+const DEFAULT_EXPLORATORY_CLUSTER_COUNT = 3;
+const POLIS_DEMO_CLUSTER_ANALYSIS_VERSION = 2;
+// Regression guard: this built-in `demo` mapping is the original `/session/demo`
+// behavior. Before per-slug Polis fixtures existed, that route always used the
+// shared `demo_polis_data.json`; future demo pages should extend via `demoDataBySlug`.
+const BUILT_IN_POLIS_DEMO_DATASETS_BY_SLUG = Object.freeze({
+  demo: DEFAULT_POLIS_DEMO_DATA,
+});
+
+function buildPolisDemoDatasetsBySlug(demoDataBySlug = null) {
+  const out = { ...BUILT_IN_POLIS_DEMO_DATASETS_BY_SLUG };
+  if (!demoDataBySlug || typeof demoDataBySlug !== 'object' || Array.isArray(demoDataBySlug)) {
+    return out;
+  }
+  Object.entries(demoDataBySlug).forEach(([rawSlug, value]) => {
+    const slug = normalizeSessionSlug(rawSlug);
+    if (!slug || !value || typeof value !== 'object') return;
+    out[slug] = value;
+  });
+  return out;
+}
+
+function resolvePolisDemoDatasetsBySlug(options = {}) {
+  if (options?.datasetsBySlug && typeof options.datasetsBySlug === 'object' && !Array.isArray(options.datasetsBySlug)) {
+    return options.datasetsBySlug;
+  }
+  return buildPolisDemoDatasetsBySlug(options?.demoDataBySlug);
+}
+
+const dedupePolisReadSlugs = (values = []) => {
+  const seen = new Set();
+  const out = [];
+  (Array.isArray(values) ? values : []).forEach((value) => {
+    const normalized = normalizeSessionSlug(value);
+    if (seen.has(normalized)) return;
+    seen.add(normalized);
+    out.push(normalized);
+  });
+  return out;
+};
+
+const resolvePolisReadSlugs = (baseSlug = '') => {
+  const normalizedBaseSlug = normalizeSessionSlug(baseSlug);
+  let isSessionRoute = false;
+  try {
+    const pathname = (typeof window !== 'undefined' && window.location?.pathname) || '';
+    isSessionRoute = pathname.startsWith('/session/');
+  } catch (e) { void e; /* fallback: route scope detection. */ }
+  if (!isSessionRoute) {
+    return [normalizedBaseSlug];
+  }
+
+  const scopeMode = String(readSessionScanScope() || '').trim().toLowerCase();
+  if (scopeMode === 'list') {
+    return dedupePolisReadSlugs([normalizedBaseSlug, ...readSessionScanSlugs()]);
+  }
+  if (scopeMode === 'all') {
+    return dedupePolisReadSlugs([normalizedBaseSlug, ...getAllSessionSlugs()]);
+  }
+  return [normalizedBaseSlug];
+};
+
+const POLIS_DEMO_AUTOLOAD_SLUG_SET = new Set(
+  Array.isArray(POLIS_DEMO_DATA_AUTOLOAD_SLUGS)
+    ? POLIS_DEMO_DATA_AUTOLOAD_SLUGS.map((slug) => normalizeSessionSlug(slug))
+    : []
+);
+
+export function getPolisHistoricalParticipantAvatar(displayName = '', fallbackSeed = '') {
+  const normalizedDisplayName = String(displayName || '').trim();
+  if (!normalizedDisplayName) return '';
+  return getHistoricalFigureAvatarOrBlockie(normalizedDisplayName, {
+    preferBlockie: false,
+    fallbackSeed: normalizedDisplayName || fallbackSeed,
+  });
+}
+
+export function getPolisHistoricalParticipantBlockie(displayName = '', fallbackSeed = '') {
+  const normalizedDisplayName = String(displayName || '').trim();
+  if (!normalizedDisplayName) return generateBlockieDataUrl(String(fallbackSeed || '').toLowerCase(), 8, 4);
+  return getHistoricalFigureBlockie(normalizedDisplayName, {
+    fallbackSeed: normalizedDisplayName || fallbackSeed,
+  });
+}
+
+const SUPERSCRIPT_DIGITS = Object.freeze({
+  0: '⁰',
+  1: '¹',
+  2: '²',
+  3: '³',
+  4: '⁴',
+  5: '⁵',
+  6: '⁶',
+  7: '⁷',
+  8: '⁸',
+  9: '⁹',
+});
+
+function formatSuperscriptNumber(value) {
+  return String(value ?? '')
+    .split('')
+    .map((char) => SUPERSCRIPT_DIGITS[char] || char)
+    .join('');
+}
+
+export function hasPolisDemoDatasetForSlug(slugIn = '', options = {}) {
+  const datasetsBySlug = resolvePolisDemoDatasetsBySlug(options);
+  const slug = normalizeSessionSlug(slugIn);
+  if (!slug) return false;
+  return Object.prototype.hasOwnProperty.call(datasetsBySlug, slug);
+}
+
+export function getPolisDemoDatasetForSlug(slugIn = '', options = {}) {
+  const datasetsBySlug = resolvePolisDemoDatasetsBySlug(options);
+  const allowFallback = options?.allowFallback !== false;
+  const slug = normalizeSessionSlug(slugIn);
+  if (slug && Object.prototype.hasOwnProperty.call(datasetsBySlug, slug)) return datasetsBySlug[slug];
+  return allowFallback ? DEFAULT_POLIS_DEMO_DATA : null;
+}
+
+export function shouldAutoEnablePolisDemoData(input = {}) {
+  const slug = normalizeSessionSlug(input?.slug ?? input?.sessionSlug ?? '');
+  if (input?.demoDataFirstLoad) {
+    return slug === 'demo' || hasPolisDemoDatasetForSlug(slug, input);
+  }
+  return POLIS_DEMO_AUTOLOAD_SLUG_SET.has(slug) && hasPolisDemoDatasetForSlug(slug, input);
+}
+
+/**************************************************************
+ * Helper: applyFilterStateToAggregator
+ * Filters the aggregator BEFORE building the rating matrix.
+ * - questionResponses: { [qId]: Array<{ responder, questionId, response }> }
+ * - network: chain object (uses network.id to read caches)
+ * - filterState: QuestionFilter state from parent (see types in prompt)
+ *
+ * Returns a pruned aggregator with only filtered question IDs and
+ * per-question filtered response arrays.
+ *
+ * Notes:
+ *  - If caches are missing/partial, we skip that filter step gracefully.
+ *  - We DO NOT read demo mode here; caller bypasses filtering when demo is on.
+ **************************************************************/
+export function applyFilterStateToAggregator(questionResponses, network, filterState, sessionSlug) {
+  if (!questionResponses || typeof questionResponses !== 'object') return {};
+
+  const netId = network?.id != null ? String(network.id) : null;
+
+  // Resolve group slug (optional param -> URL path fallback)
+  const resolveSlug = () => {
+    if (typeof sessionSlug === 'string') {
+      return canonicalizeLegacySessionAlias(sessionSlug);
+    }
+    try {
+      const p =
+        (typeof window !== 'undefined' && window.location && window.location.pathname) ?
+          window.location.pathname : '';
+      if (p.startsWith('/session/')) {
+        const s = (p.split('/').filter(Boolean)[1] || '').trim();
+        if (!s) return '';
+        return canonicalizeLegacySessionAlias(s);
+      }
+    } catch (e) { surveyLog.warn('PolisReport: fallback', e); }
+    return ''; // default to general
+  };
+  const slug = resolveSlug();
+  const readSlugs = resolvePolisReadSlugs(slug);
+
+  // Safe cache reads (group-aware dg:* keys)
+  const qMap = {};
+  const sbtList = {};
+  readSlugs.forEach((readSlug) => {
+    const qParsed = peekCacheSync('questionsCache', readSlug, { clone: false });
+    const sParsed = peekCacheSync('sbtCache', readSlug, { clone: false });
+    const qCache = qParsed || null;
+    const sCache = sParsed || null;
+    const scopedQuestions = (
+      netId && qCache && qCache[netId] && qCache[netId].questions
+    ) ? qCache[netId].questions : {};
+    const scopedSbtList = (
+      netId && sCache && sCache[netId] && sCache[netId].sbtList
+    ) ? sCache[netId].sbtList : {};
+
+    Object.keys(scopedQuestions).forEach((questionId) => {
+      const lowerQuestionId = String(questionId || '').toLowerCase();
+      if (!lowerQuestionId || Object.prototype.hasOwnProperty.call(qMap, lowerQuestionId)) return;
+      qMap[lowerQuestionId] = scopedQuestions[questionId];
+    });
+    Object.assign(sbtList, scopedSbtList);
+  });
+
+  // ---- Build combined tag set (lowercased) ----
+  const combinedTagSet = new Set();
+  if (Array.isArray(filterState?.selectedTags)) {
+    filterState.selectedTags
+      .map(t => String(t).trim().toLowerCase())
+      .filter(Boolean)
+      .forEach(t => combinedTagSet.add(t));
+  }
+  // ---- NEW: accept additional tag filter shapes (comma-strings or arrays) ----
+  if (typeof filterState?.tag === 'string' && filterState.tag.trim() !== '') {
+    filterState.tag
+      .split(',')
+      .map(t => t.trim().toLowerCase())
+      .filter(Boolean)
+      .forEach(t => combinedTagSet.add(t));
+  }
+  if (Array.isArray(filterState?.tags)) {
+    filterState.tags
+      .map(t => String(t).trim().toLowerCase())
+      .filter(Boolean)
+      .forEach(t => combinedTagSet.add(t));
+  }
+  if (typeof filterState?.tags === 'string' && filterState.tags.trim() !== '') {
+    filterState.tags
+      .split(',')
+      .map(t => t.trim().toLowerCase())
+      .filter(Boolean)
+      .forEach(t => combinedTagSet.add(t));
+  }
+  if (Array.isArray(filterState?.includeTags)) {
+    filterState.includeTags
+      .map(t => String(t).trim().toLowerCase())
+      .filter(Boolean)
+      .forEach(t => combinedTagSet.add(t));
+  }
+  if (typeof filterState?.includeTags === 'string' && filterState.includeTags.trim() !== '') {
+    filterState.includeTags
+      .split(',')
+      .map(t => t.trim().toLowerCase())
+      .filter(Boolean)
+      .forEach(t => combinedTagSet.add(t));
+  }
+
+  // ---- Question types set (lowercased) ----
+  const typesSet = new Set(
+    Array.isArray(filterState?.questionTypes)
+      ? filterState.questionTypes.map(s => String(s).toLowerCase())
+      : []
+  );
+
+  // ---- SBT helpers ----
+  const sbtFilter = filterState?.sbtFilter || null;
+  const toLowerAddr = (x) => (x && x.address ? String(x.address).toLowerCase() : '').trim();
+  const normalizeAddressCountMap = (value = null) => {
+    const out = {};
+    Object.entries(value || {}).forEach(([addrRaw, countRaw]) => {
+      const addr = String(addrRaw || '').toLowerCase().trim();
+      if (!addr) return;
+      const count = Math.max(0, Math.floor(Number(countRaw || 0)));
+      if (count <= 0) return;
+      out[addr] = count;
+    });
+    return out;
+  };
+
+  function isAddrInSbt(sbtAddrLower, personLower) {
+    if (!sbtAddrLower || !personLower) return false;
+    const entry = sbtList[sbtAddrLower];
+    if (!entry) return false;
+    const checkpointBackedPartialCounts =
+      entry?.countsLoaded !== true &&
+      !!entry?.countsScanCheckpoint &&
+      typeof entry.countsScanCheckpoint === 'object';
+    const mintedCountMap = normalizeAddressCountMap(entry.mintedCountByAddress);
+    const burnedCountMap = normalizeAddressCountMap(entry.burnedCountByAddress);
+    if (!checkpointBackedPartialCounts && (Object.keys(mintedCountMap).length > 0 || Object.keys(burnedCountMap).length > 0)) {
+      return Number(mintedCountMap[personLower] || 0) > Number(burnedCountMap[personLower] || 0);
+    }
+    if (checkpointBackedPartialCounts) return false;
+    const minted = Array.isArray(entry.mintedAddresses) ? entry.mintedAddresses : [];
+    const burned = Array.isArray(entry.burnedAddresses) ? entry.burnedAddresses : [];
+    const inMinted = minted.includes(personLower);
+    const inBurned = burned.includes(personLower);
+    return inMinted && !inBurned;
+  }
+
+  function isMemberOfAny(personLower, groupListLower) {
+    if (!personLower || !Array.isArray(groupListLower) || groupListLower.length === 0) return false;
+    for (const g of groupListLower) {
+      if (!g) continue;
+      if (isAddrInSbt(g, personLower)) return true;
+    }
+    return false;
+  }
+
+  // Responder SBT lists (new + legacy)
+  const incResponderGroupsLower = [
+    ...(Array.isArray(sbtFilter?.selectedSBTGroupsResponder) ? sbtFilter.selectedSBTGroupsResponder : []),
+    ...(Array.isArray(sbtFilter?.selectedSBTGroups) ? sbtFilter.selectedSBTGroups : []),
+  ]
+    .map(toLowerAddr)
+    .filter(Boolean);
+
+  const excResponderGroupsLower = [
+    ...(Array.isArray(sbtFilter?.excludedSBTGroupsResponder) ? sbtFilter.excludedSBTGroupsResponder : []),
+    ...(Array.isArray(sbtFilter?.excludedSBTGroups) ? sbtFilter.excludedSBTGroups : []),
+  ]
+    .map(toLowerAddr)
+    .filter(Boolean);
+
+  // Creator SBT lists (new only)
+  const incCreatorGroupsLower = Array.isArray(sbtFilter?.selectedSBTGroupsCreator)
+    ? sbtFilter.selectedSBTGroupsCreator.map(toLowerAddr).filter(Boolean)
+    : [];
+  const excCreatorGroupsLower = Array.isArray(sbtFilter?.excludedSBTGroupsCreator)
+    ? sbtFilter.excludedSBTGroupsCreator.map(toLowerAddr).filter(Boolean)
+    : [];
+
+  // --- Build filtered aggregator ---
+  let filteredAgg = {};
+
+  Object.entries(questionResponses).forEach(([qId, arr]) => {
+    const qIdLower = String(qId || '').toLowerCase();
+
+    // Question metadata (may be missing)
+    const qMeta = qMap[qIdLower] || null;
+    const qTagsLower = Array.isArray(qMeta?.tags) ? qMeta.tags.map(t => String(t).toLowerCase()) : null;
+    const qTypeLower = qMeta?.type ? String(qMeta.type).toLowerCase() : null;
+    const creatorLower = qMeta?.creator ? String(qMeta.creator).toLowerCase() : null;
+
+    // 1) Tags: if we have tags in cache AND combined set is non-empty, require intersection.
+    if (combinedTagSet.size > 0 && Array.isArray(qTagsLower) && qTagsLower.length > 0) {
+      const hasAny = qTagsLower.some(t => combinedTagSet.has(t));
+      if (!hasAny) return; // skip this question
+    }
+    // If tags missing from cache, skip gating (graceful).
+
+    // 2) Types: if provided AND we know the type, require it to match; if unknown type, skip gating.
+    if (typesSet.size > 0 && qTypeLower && !typesSet.has(qTypeLower)) {
+      return;
+    }
+
+    // 3) Creator SBT rules: gate entire question
+    if (incCreatorGroupsLower.length > 0) {
+      // If creator unknown, skip gating (do NOT drop due to cache miss).
+      if (creatorLower) {
+        const ok = isMemberOfAny(creatorLower, incCreatorGroupsLower);
+        if (!ok) return;
+      }
+    }
+    if (excCreatorGroupsLower.length > 0) {
+      if (creatorLower) {
+        const bad = isMemberOfAny(creatorLower, excCreatorGroupsLower);
+        if (bad) return;
+      }
+    }
+
+    // 4) Responder SBT rules: filter per-response
+    const nextArr = [];
+    const originalArr = Array.isArray(arr) ? arr : [];
+    for (const respObj of originalArr) {
+      const responderLower = respObj?.responder ? String(respObj.responder).toLowerCase() : '';
+      if (!responderLower) continue;
+
+      // Inclusion lists (union): if present, responder must be in at least one
+      if (incResponderGroupsLower.length > 0) {
+        if (!isMemberOfAny(responderLower, incResponderGroupsLower)) {
+          continue;
+        }
+      }
+      // Exclusion lists (union): drop if responder is in any excluded group
+      if (excResponderGroupsLower.length > 0) {
+        if (isMemberOfAny(responderLower, excResponderGroupsLower)) {
+          continue;
+        }
+      }
+      nextArr.push(respObj);
+    }
+
+    if (nextArr.length > 0) {
+      filteredAgg[qId] = nextArr;
+    }
+  });
+
+  // 5) Top questions (after the above)
+  const top = filterState?.topQuestions;
+  const topCount = Number(top?.count || 0);
+  const topBy =
+    top?.by === 'responses'
+      ? 'responses'
+      : (top?.by === 'conviction' || top?.by === 'importance' ? 'importance' : null);
+
+  if (topBy && topCount > 0) {
+    const scored = Object.entries(filteredAgg).map(([qId, arr]) => {
+      let score = 0;
+      for (const r of arr) {
+        const parsed = safeJsonParse(r?.response);
+        if (!parsed) continue;
+        // We only consider binary answers here to align with rating-matrix & spec
+        if (parsed.type !== 'binary') continue;
+        if (parsed?.answer?.encrypted) continue;
+
+        if (topBy === 'responses') {
+          const v = parsed?.answer?.value;
+          if (v === 'Agree' || v === 'Disagree' || v === 'Unsure') {
+            score += 1;
+          }
+        } else {
+          const imp = Number(parsed?.conviction ?? parsed?.importance ?? 0);
+          if (!Number.isNaN(imp)) score += imp;
+        }
+      }
+      return { qId, score };
+    });
+
+    // Sort descending by score
+    scored.sort((a, b) => b.score - a.score);
+
+    const keep = scored.slice(0, Math.min(topCount, scored.length)).map(s => s.qId);
+    const keepSet = new Set(keep);
+
+    const limited = {};
+    Object.keys(filteredAgg).forEach((qid) => {
+      if (keepSet.has(qid)) limited[qid] = filteredAgg[qid];
+    });
+    filteredAgg = limited;
+  }
+
+  // onlyVerifiedHumans: If true but no SBT constraints exist, no-op per spec.
+  // (If there is already an SBT include list for humans, it's already applied above.)
+
+  return filteredAgg;
+}
+
+
+/***************************************************************
+ * PolisBoxPlot
+ * Distinguishes:
+ *   - green (Agree => 1)
+ *   - yellow (Unsure => 0)
+ *   - red (Disagree => -1)
+ *
+ * NOTE: Non-answers (null/undefined) are ignored in both counts
+ * and width calculations; no "white" segment is rendered.
+ ***************************************************************/
+function PolisBoxPlot({ votes }) {
+  // Keep only concrete answers
+  const concreteVotes = Array.isArray(votes)
+    ? votes.filter(v => v === 1 || v === 0 || v === -1)
+    : [];
+
+  const totalConcrete = concreteVotes.length;
+
+  const agrees = concreteVotes.filter(v => v === 1).length;
+  const disagrees = concreteVotes.filter(v => v === -1).length;
+  const unsures = concreteVotes.filter(v => v === 0).length;
+
+  // Dimensions for the mini bar
+  const svgWidth = 200;
+  const svgHeight = 30;
+
+  // Avoid division by zero; if no concrete votes, render only the frame
+  const denom = totalConcrete > 0 ? totalConcrete : 1;
+
+  // Convert counts to pixel widths using only concrete answers
+  const fractionAgree = (agrees / denom) * svgWidth;
+  const fractionUnsure = (unsures / denom) * svgWidth;
+  const fractionDisagree = (disagrees / denom) * svgWidth;
+
+  let currentX = 0;
+
+  return (
+    <div className={styles.polisBoxPlotContainer}>
+      <svg width={svgWidth} height={svgHeight} className={styles.polisBoxPlotSvg}>
+        <rect
+          x={0}
+          y={0}
+          width={svgWidth}
+          height={svgHeight}
+          fill="none"
+          stroke="#000"
+          strokeWidth={1}
+        />
+
+        {/* Only draw segments if there's at least one concrete answer */}
+        {totalConcrete > 0 && (
+          <>
+            <rect
+              x={currentX}
+              y={0}
+              width={fractionAgree}
+              height={svgHeight}
+              fill="green"
+            />
+            {fractionAgree > 0 && (currentX += fractionAgree)}
+
+            <rect
+              x={currentX}
+              y={0}
+              width={fractionUnsure}
+              height={svgHeight}
+              fill="yellow"
+            />
+            {fractionUnsure > 0 && (currentX += fractionUnsure)}
+
+            <rect
+              x={currentX}
+              y={0}
+              width={fractionDisagree}
+              height={svgHeight}
+              fill="red"
+            />
+          </>
+        )}
+      </svg>
+    </div>
+  );
+}
+
+function PolisQuestionHoverCard({ label, prompt, votes = [], metaLabel = '' }) {
+  const concreteVotes = Array.isArray(votes)
+    ? votes.filter((v) => v === 1 || v === 0 || v === -1)
+    : [];
+
+  const agrees = concreteVotes.filter((v) => v === 1).length;
+  const disagrees = concreteVotes.filter((v) => v === -1).length;
+  const unsures = concreteVotes.filter((v) => v === 0).length;
+
+  return (
+    <div>
+      <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>
+        {label ? `${label}: ` : ''}{prompt || '(No prompt)'}
+      </div>
+      {metaLabel ? (
+        <div style={{ fontSize: '0.78rem', marginBottom: '6px', opacity: 0.85 }}>
+          {metaLabel}
+        </div>
+      ) : null}
+      {concreteVotes.length === 0 ? (
+        <div style={{ fontSize: '0.85rem', opacity: 0.8 }}>
+          No responses in this comparison.
+        </div>
+      ) : (
+        <div className={styles.questionVoteRow}>
+          <span style={{ fontSize: '0.85rem', marginRight: '8px' }}>
+            <strong>Agree:</strong> {agrees} /{' '}
+            <strong>Disagree:</strong> {disagrees} /{' '}
+            <strong>Unsure:</strong> {unsures}
+          </span>
+          <PolisBoxPlot votes={concreteVotes} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+/***************************************************************
+ * Build rating matrix from real or from the included demo
+ *
+ * We only consider question responses of type 'binary'.
+ *   That means we only parse if r.response has { type: 'binary' } and answer { value: 'Agree' | 'Disagree' | 'Unsure' }
+ ***************************************************************/
+function buildRatingMatrixFromRealData(realQR) {
+  if (!realQR || typeof realQR !== 'object') {
+    return { matrix: null, responders: [], questions: [], promptsMap: {} };
+  }
+
+  // Collect binary questions deterministically and gather prompts
+  const participantsSet = new Set();
+  const binaryQuestions = []; // [{ qId, prompt }]
+  const promptsMap = {};
+
+  Object.entries(realQR).forEach(([qId, arr]) => {
+    if (!Array.isArray(arr) || arr.length === 0) return;
+
+    // Find the first parsed response with a declared type to decide if it's binary
+    let firstType = null;
+    let firstPrompt = null;
+    for (const r of arr) {
+      const parsed = safeJsonParse(r?.response);
+      if (parsed && typeof parsed === 'object' && parsed.type) {
+        firstType = parsed.type;
+        firstPrompt = parsed.prompt || '(No prompt)';
+        break;
+      }
+    }
+    if (firstType !== 'binary') return; // we only include binary questions
+
+    binaryQuestions.push({ qId, prompt: firstPrompt || '(No prompt)' });
+    promptsMap[qId] = firstPrompt || '(No prompt)';
+
+    // Gather participants who answered this (binary) question
+    for (const r of arr) {
+      if (r?.responder) {
+        participantsSet.add(String(r.responder).toLowerCase());
+      }
+    }
+  });
+
+  // No usable questions or participants => bail out
+  if (binaryQuestions.length === 0 || participantsSet.size === 0) {
+    return { matrix: null, responders: [], questions: [], promptsMap: {} };
+  }
+
+  // Deterministic ordering
+  const questionsSorted = binaryQuestions
+    .map(({ qId }) => qId)
+    .sort((a, b) => String(a).localeCompare(String(b)));
+
+  const respondersSorted = Array.from(participantsSet).sort((a, b) =>
+    String(a).localeCompare(String(b))
+  );
+
+  // Build index maps
+  const questionIndexMap = {};
+  questionsSorted.forEach((qId, idx) => {
+    questionIndexMap[qId] = idx;
+  });
+
+  const participantIndexMap = {};
+  respondersSorted.forEach((addr, idx) => {
+    participantIndexMap[addr] = idx;
+  });
+
+  // Initialize matrix [nQuestions x nParticipants] with nulls
+  const numQ = questionsSorted.length;
+  const numP = respondersSorted.length;
+  const matrix = Array.from({ length: numQ }, () => Array(numP).fill(null));
+
+  // Fill matrix with -1 / 0 / 1 for Disagree / Unsure / Agree
+  questionsSorted.forEach((qId) => {
+    const rowIndex = questionIndexMap[qId];
+    const arr = realQR[qId] || [];
+    for (const r of arr) {
+      const parsed = safeJsonParse(r?.response);
+      if (!parsed || parsed.type !== 'binary') continue;
+      if (parsed?.answer?.encrypted) continue;
+
+      const ans = parsed?.answer?.value;
+      let val = null;
+      if (ans === 'Agree') val = 1;
+      else if (ans === 'Disagree') val = -1;
+      else if (ans === 'Unsure') val = 0;
+
+      const pIdx = participantIndexMap[String(r?.responder || '').toLowerCase()];
+      if (pIdx !== undefined) {
+        matrix[rowIndex][pIdx] = val;
+      }
+    }
+  });
+
+  return {
+    matrix,
+    responders: respondersSorted,
+    questions: questionsSorted,
+    promptsMap
+  };
+}
+
+export function buildRatingMatrixFromDemo(demoDataSource = DEFAULT_POLIS_DEMO_DATA) {
+  const commentsArr = demoDataSource?.comments || [];
+  const participantsArr = demoDataSource?.participantsVotes || [];
+
+  if (!commentsArr.length || !participantsArr.length) {
+    return { matrix: null, responders: [], questions: [], promptsMap: {}, displayNamesMap: {} };
+  }
+
+  const binaryComments = commentsArr.filter((c) => {
+    const t = String(c?.type || '').trim().toLowerCase();
+    return !t || t === 'binary';
+  });
+  const binaryOriginalIndices = [];
+  commentsArr.forEach((c, i) => {
+    const t = String(c?.type || '').trim().toLowerCase();
+    if (!t || t === 'binary') binaryOriginalIndices.push(i);
+  });
+
+  const promptsMap = {};
+  const questionList = [];
+  binaryComments.forEach((comment) => {
+    questionList.push(comment.commentId);
+    promptsMap[comment.commentId] = comment.commentBody || '(No prompt)';
+  });
+
+  const participantsSet = new Set();
+  participantsArr.forEach((p) => {
+    participantsSet.add(p.participant);
+  });
+
+  const participantArray = Array.from(participantsSet);
+  const participantIndexMap = {};
+  participantArray.forEach((addr, i) => {
+    participantIndexMap[addr] = i;
+  });
+
+  // Build display names map from xid field (e.g. historical figure usernames)
+  const displayNamesMap = {};
+  participantsArr.forEach((p) => {
+    if (p.xid && p.participant) {
+      displayNamesMap[p.participant] = p.xid;
+    }
+  });
+
+  const numC = binaryComments.length;
+  const numP = participantArray.length;
+  const matrix = [];
+  for (let i = 0; i < numC; i++) {
+    matrix.push(new Array(numP).fill(null));
+  }
+
+  participantsArr.forEach((p) => {
+    const pIdx = participantIndexMap[p.participant];
+    if (pIdx === undefined) return;
+    const vs = p.votes || {};
+    binaryOriginalIndices.forEach((origIdx, filteredIdx) => {
+      const val = vs[String(origIdx)];
+      if (val !== undefined && filteredIdx < numC) {
+        matrix[filteredIdx][pIdx] = val;
+      }
+    });
+  });
+
+  return {
+    matrix,
+    responders: participantArray,
+    questions: questionList,
+    promptsMap,
+    displayNamesMap
+  };
+}
+
+export function buildPrecomputedDemoClusterState(demoDataSource = DEFAULT_POLIS_DEMO_DATA) {
+  if (Number(demoDataSource?.clusterAnalysisVersion) !== POLIS_DEMO_CLUSTER_ANALYSIS_VERSION) {
+    return null;
+  }
+  const clusterAnalysis = Array.isArray(demoDataSource?.clusterAnalysis)
+    ? demoDataSource.clusterAnalysis
+    : [];
+  const participantsArr = Array.isArray(demoDataSource?.participantsVotes)
+    ? demoDataSource.participantsVotes
+    : [];
+
+  if (!clusterAnalysis.length || !participantsArr.length) return null;
+
+  const participantOrder = [];
+  const participantGroupIdByAddress = {};
+  participantsArr.forEach((participant) => {
+    const address = String(participant?.participant || '').trim();
+    const groupId = Number(participant?.groupId);
+    if (!address || !Number.isInteger(groupId)) return;
+    if (Object.prototype.hasOwnProperty.call(participantGroupIdByAddress, address)) return;
+    participantGroupIdByAddress[address] = groupId;
+    participantOrder.push(address);
+  });
+
+  const uniqueGroupIds = Array.from(
+    new Set(
+      participantOrder
+        .map((address) => participantGroupIdByAddress[address])
+        .filter((groupId) => Number.isInteger(groupId))
+    )
+  ).sort((a, b) => a - b);
+
+  if (!uniqueGroupIds.length || uniqueGroupIds.length !== clusterAnalysis.length) return null;
+
+  const clusterIndexByGroupId = new Map(uniqueGroupIds.map((groupId, index) => [groupId, index]));
+  const clusterAssignments = participantOrder.map((address) => clusterIndexByGroupId.get(participantGroupIdByAddress[address]));
+  if (clusterAssignments.some((clusterIndex) => !Number.isInteger(clusterIndex))) return null;
+
+  const repQuestions = {};
+  const clusterCollapseState = {};
+  const analysisCacheByClusterIndex = {};
+
+  clusterAnalysis.forEach((cluster, clusterIndex) => {
+    const topStatements = Array.isArray(cluster?.topStatements) ? cluster.topStatements : [];
+    repQuestions[clusterIndex] = topStatements
+      .map((statement) => {
+        const questionIndex = Number(statement?.questionIndex);
+        if (!Number.isInteger(questionIndex) || questionIndex < 0) return null;
+        const differenceFromData = Number(statement?.differenceScore);
+        const clusterAgreeRate = Number(statement?.cluster?.agreeRate);
+        const overallAgreeRate = Number(statement?.overall?.agreeRate);
+        const difference = Number.isFinite(differenceFromData)
+          ? differenceFromData
+          : +(Math.abs(clusterAgreeRate - overallAgreeRate).toFixed(1));
+
+        return {
+          label: String(statement?.label || `#${questionIndex + 1}`),
+          questionIndex,
+          prompt: String(statement?.prompt || ''),
+          difference,
+        };
+      })
+      .filter(Boolean);
+
+    clusterCollapseState[clusterIndex] = true;
+
+    const participantCount = Number(cluster?.participantCount);
+    const topLabels = repQuestions[clusterIndex].map((statement) => statement.label);
+    const details = [];
+    if (Number.isFinite(participantCount) && participantCount > 0) {
+      details.push(`${participantCount} demo participants.`);
+    }
+    if (topLabels.length) {
+      details.push(`Most distinctive questions: ${topLabels.join(', ')}.`);
+    }
+
+    analysisCacheByClusterIndex[clusterIndex] = {
+      name: String(cluster?.clusterLabel || `Cluster ${clusterIndex}`),
+      short: String(cluster?.characteristics || '').trim(),
+      long: details.join(' ').trim(),
+    };
+  });
+
+  return {
+    clusterCount: uniqueGroupIds.length,
+    clusterAssignments,
+    repQuestions,
+    clusterCollapseState,
+    analysisCacheByClusterIndex,
+  };
+}
+
+export function getRenderableParticipantList(responders = [], displayNames = {}) {
+  const isEth = (value) => typeof value === 'string' && /^0x[0-9a-fA-F]{40}$/.test(value);
+  const hasDisplayNames = !!(displayNames && Object.keys(displayNames).length > 0);
+  const unique = Array.from(new Set(Array.isArray(responders) ? responders : [])).filter((addr) => {
+    const displayName = displayNames?.[addr];
+    return !!displayName || isEth(addr);
+  });
+
+  if (!hasDisplayNames) {
+    unique.sort();
+  }
+
+  return unique;
+}
+
+export function formatBlockchainNetworkLabel(network = null, fallbackChainId = null) {
+  const networkChainId = Number(
+    network?.id ??
+    network?.chainId ??
+    network?.networkChainId ??
+    0
+  ) || 0;
+  const chainId = Number(fallbackChainId ?? networkChainId ?? 0) || 0;
+  const chain = chainId ? getChainById(chainId) : null;
+  const shouldUseWalletName = !!networkChainId && networkChainId === chainId;
+  const name = shouldUseWalletName
+    ? String(network?.name || '').trim() || String(chain?.name || '').trim()
+    : String(chain?.name || '').trim() || String(network?.name || '').trim();
+  if (name && chainId) return `${name} (${chainId})`;
+  if (name) return name;
+  if (chainId) return `Chain ${chainId}`;
+  return 'Unknown';
+}
+
+function getLastBlock() {
+
+  return "20608649";
+}
+
+function getUTCDataTimestamp() {
+
+  const now = new Date();
+  return now.toISOString().replace('T', ' ').split('.')[0] + ' UTC';
+}
+
+export const REPORT_DEFAULT_EMBEDDING_LABEL = 'Polis Auto';
+export const PARTICIPANTS_GRAPH_TOOLTIP_TEXT = `This diagram opens in UMAP with 3 groups. Switch to SVD/PCA for the PCA view, or ${REPORT_DEFAULT_EMBEDDING_LABEL} for the report's Polis-inspired automatic grouping.`;
+export const REPORT_DEFAULT_EMBEDDING_TOOLTIP_TEXT = "Polis Auto uses Context Engine's Polis-inspired automatic grouping. It keeps the report's PCA-based participant layout and auto-selects opinion groups from that layout. UMAP and SVD/PCA are exploratory views where you can override K manually. This is Polis-inspired analysis inside Context Engine, not an official Polis/Pol.is integration or endorsement.";
+export const OPINION_GROUPS_TOOLTIP_TEXT = "Leave K on auto to use Polis Auto's automatic grouping, or set K manually when exploring UMAP or SVD/PCA layouts.";
 
 /***************************************************************
  * The main PolisReport component
@@ -372,7 +1250,7 @@ export default function PolisReport({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Local state for toggling PDF link in the heading
-  const [isPdfModeActive, setIsPdfModeActive] = useState<boolean>(false);
+  const [isPdfModeActive, setIsPdfModeActive] = useState(false);
 
   // ADDED: Ref and state for Bee Swarm scroller buttons
   const swarmContainerRef = useRef<HTMLDivElement | null>(null);

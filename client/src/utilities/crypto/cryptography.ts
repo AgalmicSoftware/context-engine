@@ -648,15 +648,11 @@ const getProviderKind = (providerLike: ProviderLike): ProviderKind => {
       if (s === 'web3auth') return 'web3auth';
       return 'wagmi';
     }
-    const providerRecord = isRecord(providerLike) ? providerLike : null;
-    const p = ((providerRecord && providerRecord.provider) ||
-      providerLike ||
-      (typeof window !== 'undefined' ? window.ethereum : null)) as
-      (UnknownRecord & { provider?: UnknownRecord }) | null;
+    const p = (providerLike && providerLike.provider) || providerLike || (typeof window !== 'undefined' ? window.ethereum : null);
 
-    // Check for the embedded passkey provider first (must come before other checks).
-    if (p && p.isPasskeyEoa === true) {
-      return 'passkey-eoa';
+    // Check for Porto provider first (must come before other checks)
+    if (p && p.isPorto === true) {
+      return 'porto';
     }
 
     // Keep Web3Auth detection; it is cheap and enables quick re-enable.
@@ -681,31 +677,26 @@ const getProviderKind = (providerLike: ProviderLike): ProviderKind => {
 /**
  * Normalize to an EIP-1193 provider (best effort).
  */
-const _getProvider = (providerLike: ProviderLike): Eip1193Provider => {
-  const providerRecord = isRecord(providerLike) ? providerLike : null;
-  const candidate = ((providerRecord && providerRecord.provider) || providerLike) as
-    (UnknownRecord & { provider?: unknown; request?: Eip1193Provider['request']; isPasskeyEoa?: boolean }) | null;
+const _getProvider = (providerLike) => {
+  const candidate = (providerLike && providerLike.provider) || providerLike;
 
-  // Check for embedded passkey provider first.
-  if (candidate && candidate.isPasskeyEoa === true && typeof candidate.request === 'function') {
-    return candidate as Eip1193Provider;
+  // Check for Porto provider first - return directly if it has isPorto flag and request method
+  if (candidate && candidate.isPorto === true && typeof candidate.request === 'function') {
+    return candidate;
   }
 
-  if (candidate && typeof candidate.request === 'function') return candidate as Eip1193Provider;
-  if (candidate && isRecord(candidate.provider) && typeof candidate.provider.request === 'function') {
-    return candidate.provider as Eip1193Provider;
-  }
+  if (candidate && typeof candidate.request === 'function') return candidate;
+  if (candidate && candidate.provider && typeof candidate.provider.request === 'function') return candidate.provider;
 
   if (typeof providerLike === 'string') {
     const s = providerLike.trim().toLowerCase();
 
-    // Handle embedded passkey provider strings. Prefer the seeded window global
-    // when a signing client is already warm, but synthesize the lazy provider on
-    // demand so post-login auth flows can still trigger a passkey assertion only
-    // when signing.
-    if (s === 'passkey_eoa' || s === 'passkey-eoa') {
-      if (typeof window !== 'undefined' && window.__passkeyEoaProvider && window.__passkeyEoaProvider.isPasskeyEoa) {
-        return window.__passkeyEoaProvider;
+    // Handle Porto provider string. Prefer the seeded window global when a signing
+    // client is already warm, but synthesize the lazy mock provider on demand so
+    // post-login auth flows can still trigger a passkey assertion only when signing.
+    if (s === 'porto_passkey' || s === 'porto') {
+      if (typeof window !== 'undefined' && window.__portoMockProvider && window.__portoMockProvider.isPorto) {
+        return window.__portoMockProvider;
       }
       try {
         const globalBuildPasskeyProvider =
