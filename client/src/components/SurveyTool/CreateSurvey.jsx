@@ -3012,6 +3012,20 @@ class CreateSurvey extends Component {
       openLockKey
     } = this.state;
     const safeDocumentUrls = sanitizeDocumentUrls(documentURLs);
+    const hasAuthoredDraftContent = (
+      questions.length > 0 ||
+      title.trim() !== '' ||
+      safeDocumentUrls.length > 0 ||
+      surveyAddedSuccessfully ||
+      questionsAddedSuccessfully
+    );
+    // Pile entry starts in AI mode, so hide the survey/questions switch until
+    // the user either starts manual authoring or generation produces content.
+    const showModeToggle = (
+      !this.props.hideSurveyQuestionToggleUntilAuthoring ||
+      !showAutoTool ||
+      hasAuthoredDraftContent
+    );
 
     const surveyIDForDisplay = lastSubmittedSurveyId || this.state.surveyHash;
     const sessionConfig = this.getSessionConfig();
@@ -3694,24 +3708,26 @@ class CreateSurvey extends Component {
       >
         {/* Header: Survey/Questions toggle + single context-aware mode switch */}
         <div className={styles.modeHeader}>
-          <div className={styles.modeToggle}>
-            <Label className={styles.toggleLabel}> Survey</Label>
-            <div
-              className={styles.toggleSwitch}
-              onClick={this.toggleStandaloneQuestion}
-            >
+          {showModeToggle && (
+            <div className={styles.modeToggle}>
+              <Label className={styles.toggleLabel}> Survey</Label>
               <div
-                className={styles.toggleKnob}
-                style={{
-                  left: isStandaloneQuestion ? '31px' : '1px',
-                  backgroundColor: isStandaloneQuestion ? '#4caf50' : '#fff',
-                }}
-              />
+                className={styles.toggleSwitch}
+                onClick={this.toggleStandaloneQuestion}
+              >
+                <div
+                  className={styles.toggleKnob}
+                  style={{
+                    left: isStandaloneQuestion ? '31px' : '1px',
+                    backgroundColor: isStandaloneQuestion ? '#4caf50' : '#fff',
+                  }}
+                />
+              </div>
+              <Label className={styles.toggleLabel} style={{ marginLeft: '10px' }}>
+                Questions
+              </Label>
             </div>
-            <Label className={styles.toggleLabel} style={{ marginLeft: '10px' }}>
-              Questions
-            </Label>
-          </div>
+          )}
 
           {!this.props.miniaturized && !this.props.preformedQuestions && (
             <Button

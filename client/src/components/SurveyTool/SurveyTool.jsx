@@ -16001,7 +16001,7 @@ class PileViewMode extends SurveyQuestions {
           <div className={styles.pileFullControls} ref={this.createSectionRef}>
             <CreateSurvey
               {...this.props}
-              forceQuestionsMode={true}
+              hideSurveyQuestionToggleUntilAuthoring={true}
             />
           </div>
         )}

@@ -10778,6 +10778,44 @@ describe('SurveyTool module', () => {
     expect(findNodeByClassName(controlsNode?.props?.children, 'miniSpinnerWrapper')).toBeNull();
   });
 
+  it('passes the delayed pile-entry mode toggle prop into the pile create panel', () => {
+    const shell = new SurveyTool({
+      minifiedMode: 'pile',
+      network: { id: 84532 },
+      networkChainId: 84532,
+      account: '',
+      questionResponsesNonce: 5,
+      onFilterChange: jest.fn(),
+    });
+    const pileElement = shell.render();
+    const PileViewModeClass = pileElement.type;
+    const subject = new PileViewModeClass(pileElement.props);
+
+    subject.state = {
+      ...subject.state,
+      loading: false,
+      pileQuestions: [],
+      allQuestionsForFilter: [],
+      activePileIndex: 0,
+      filterState: {},
+      isFilterActive: false,
+      showCreate: true,
+      filterModalOpen: false,
+      submissionComplete: false,
+      autoDecryptEnabled: false,
+      autoDecryptAttempted: {},
+      decryptingByKey: {},
+    };
+
+    const tree = subject.render();
+    const createSurveyNode = findElement(
+      tree,
+      (node) => node?.props?.hideSurveyQuestionToggleUntilAuthoring === true
+    );
+
+    expect(createSurveyNode).not.toBeNull();
+  });
+
   it('keeps masked visibility memo hot when alternating stable pool references', () => {
     const subject = new SurveyQuestions({
       singleQuestionMode: false,
