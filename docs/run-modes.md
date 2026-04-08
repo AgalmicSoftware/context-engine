@@ -19,6 +19,25 @@ npm install
 npm run dev
 ```
 
+Vite is the canonical client dev/build path:
+
+```bash
+cd client
+npm run dev
+npm run build
+npm run preview:vite
+```
+
+The Vite production build writes to `client/build/`, which is also what
+`npm start` serves.
+
+Client unit tests run through standalone Jest:
+
+```bash
+cd client
+npm test -- --watchAll=false
+```
+
 ## `local-chain`
 
 Local blockchain development with Anvil and Foundry.
