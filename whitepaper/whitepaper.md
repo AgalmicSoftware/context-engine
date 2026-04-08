@@ -4,7 +4,13 @@
 
 *v0.1.0 (2026) — agalmic.eth*
 
-For technical documentation, see [`spec.md`](../spec.md) and [`docs/`](../docs/README.md).
+For detailed technical documentation, see [`spec.md`](../spec.md) and [`docs/`](../docs/README.md).
+
+---
+
+keywords: sensemaking, deliberation, collective intelligence, discourse, debate, ethereum, coasean bargaining, cryptography, programmable cryptography, decentralized networks, agi, social infrastructure, ai policy, community currencies, coordination, negotiation, voting
+
+---
 
 ## Abstract
 
@@ -150,6 +156,14 @@ The roadmap is best understood as several related directions rather than a singl
 - **Group prompting and backcasting** — convert result clusters into scenarios groups are trying to aim for or avoid, render them as interactive media, and connect those scenarios back to present-day policy choices.
 - **Agent-to-agent negotiation tooling** — support multi-step negotiation processes involving private information.
 
+
+
+- **AI Whistleblowing Toolkit**: prove you have @aiLab.com email address using ZK → Make claims (potentially encrypted or conditionally timelocked)
+
+- **Post-quantum Cryptography**: Transition cryptographic functionalities to post-quantum versions
+
+
+---
 
 ## 6. Closing Thoughts
 

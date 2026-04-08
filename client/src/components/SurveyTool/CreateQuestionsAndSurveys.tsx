@@ -838,7 +838,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
       }
       nextState.documentURLs = sanitizeDocumentUrls(props.documentURLs || []);
       // If props provided URLs, we don't necessarily want to pre-fill the input buffer, just the list
-      nextState.docURLInput = '';
+      this.state.docURLInput = '';
     }
     (this.state as CreateQuestionsAndSurveysState).questions = initialQuestions;
     this._copySuccessResetTimers = {
@@ -1302,7 +1302,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
               uiKey: q.uiKey || `loaded-${index}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
               tags: currentTags,
               aiGeneratedTagsFromSource: aiTags,
-              options: normalizeAuthoringQuestionOptions(q.type, q.options),
+              options: q.type === 'multichoice' && Array.isArray(q.options) ? q.options : (q.type === 'multichoice' ? [] : undefined),
               singleSelect,
               currentTagInputValue: q.currentTagInputValue || '',
               isGeneratingTags: q.isGeneratingTags || false,
@@ -1443,8 +1443,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
     this.setState(
       {
         documentURLs: [...safeDocumentUrls, normalizedUrl],
-        docURLInput: '',
-        docURLError: ''
+        docURLInput: ''
       },
       () => {
         this.updateSurveyHash();
@@ -1473,8 +1472,26 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
     });
     if (!newQuestionDraft) return;
 
-    this.setState((prevState: CreateQuestionsAndSurveysState) => ({
-      questions: [...prevState.questions, newQuestionDraft.question],
+    const isMultichoice = type === 'multichoice';
+    const newQuestionId = this.generateQuestionId(type, '', [], false);
+    const newUiKey = `new-${this.state.questions.length}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const newQuestionData = {
+      id: newQuestionId,
+      uiKey: newUiKey,
+      type: type,
+      prompt: '',
+      options: isMultichoice ? [] : undefined,
+      singleSelect: isMultichoice ? false : undefined,
+      associatedSurveyId: '',
+      tags: [],
+      aiGeneratedTagsFromSource: [],
+      currentTagInputValue: '',
+      isGeneratingTags: false,
+      lockGateIds: this.state.isStandaloneQuestion ? [] : null,
+    };
+
+    this.setState(prevState => ({
+      questions: [...prevState.questions, newQuestionData],
       addingQuestionType: 'Question Type',
       focusTargetUiKey: newQuestionDraft.uiKey // Set focus target instead of scroll
     }), () => {
@@ -1483,15 +1500,82 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
     });
   };
 
-  handleQuestionChange = (index: number, key: string, value: unknown): void => {
-    const updatedQuestions = buildCreateSurveyQuestionFieldUpdateList({
-      generateQuestionId: this.generateQuestionId,
-      key,
-      questionIndex: index,
-      questions: this.state.questions,
-      value,
+  handleQuestionChange = (index, key, value) => {
+    const { questions } = this.state;
+    const updatedQuestions = [...questions];
+    const questionToUpdate = { ...updatedQuestions[index] };
+
+    questionToUpdate[key] = value;
+    if (key === 'prompt' || key === 'type' || key === 'singleSelect') {
+      questionToUpdate.id = this.generateQuestionId(
+        questionToUpdate.type,
+        questionToUpdate.prompt,
+        questionToUpdate.options || [],
+        questionToUpdate.singleSelect
+      );
+    }
+
+    updatedQuestions[index] = questionToUpdate;
+
+    this.setState({ questions: updatedQuestions }, () => {
+      this.updateSurveyHash();
+      this.saveToLocalStorage();
     });
-    this.setState(buildCreateSurveyQuestionListValidationPatch(updatedQuestions), () => {
+  };
+
+  handleOptionChange = (qIdx, optIdx, val) => {
+    const { questions } = this.state;
+    const updatedQuestions = [...questions];
+    const questionToUpdate = { ...updatedQuestions[qIdx] };
+
+    if (!Array.isArray(questionToUpdate.options)) {
+      questionToUpdate.options = [];
+    }
+    const newOptions = [...questionToUpdate.options];
+    newOptions[optIdx] = val;
+    questionToUpdate.options = newOptions;
+    questionToUpdate.id = this.generateQuestionId(
+      questionToUpdate.type,
+      questionToUpdate.prompt,
+      questionToUpdate.options,
+      questionToUpdate.singleSelect
+    );
+
+    updatedQuestions[qIdx] = questionToUpdate;
+    this.setState({ questions: updatedQuestions }, this.saveToLocalStorage);
+  };
+
+  addOption = (questionIndex) => {
+    const { questions } = this.state;
+    const updatedQuestions = [...questions];
+    const q = { ...updatedQuestions[questionIndex] };
+
+    if (!q.options) q.options = [];
+    const newOptions = [...q.options, ''];
+    q.options = newOptions;
+    q.id = this.generateQuestionId(q.type, q.prompt, q.options, q.singleSelect);
+
+    updatedQuestions[questionIndex] = q;
+    this.setState({ questions: updatedQuestions }, this.saveToLocalStorage);
+  };
+
+  removeOption = (questionIndex, optionIndex) => {
+    const { questions } = this.state;
+    const updatedQuestions = [...questions];
+    const q = { ...updatedQuestions[questionIndex] };
+
+    if (!Array.isArray(q.options)) q.options = [];
+    const newOptions = q.options.filter((_, i) => i !== optionIndex);
+    q.options = newOptions;
+    q.id = this.generateQuestionId(q.type, q.prompt, q.options, q.singleSelect);
+
+    updatedQuestions[questionIndex] = q;
+    this.setState({ questions: updatedQuestions }, this.saveToLocalStorage);
+  };
+
+  removeQuestion = (index) => {
+    const updated = this.state.questions.filter((_, i) => i !== index);
+    this.setState({ questions: updated }, () => {
       this.updateSurveyHash();
       this.saveToLocalStorage();
     });
@@ -1618,13 +1702,14 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
 
   updateSurveyHash: () => void = () => {
     const { title, isStandaloneQuestion, documentURLs } = this.state;
-    const newHash = buildCreateSurveyHashValue({
-      digest: createSurveySha256,
-      documentURLs,
-      isStandaloneQuestion,
-      title,
-    });
-    this.setState(buildCreateSurveyHashPatch(newHash));
+    if (isStandaloneQuestion) {
+      this.setState({ surveyHash: '' });
+    } else {
+      const urlsForHash = sanitizeDocumentUrls(documentURLs);
+      const surveyData = { title, documentURLs: urlsForHash };
+      const newHash = "0x" + sha256(JSON.stringify(surveyData)).toString();
+      this.setState({ surveyHash: newHash });
+    }
   };
 
   getEncryptionConfig = (): CreateSurveyEncryptionConfig => {
@@ -1737,8 +1822,36 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
     }), this.saveToLocalStorage);
   };
 
-  toggleStandaloneQuestion: () => void = () => {
-    this.setState((prev: CreateQuestionsAndSurveysState) => buildCreateSurveyStandaloneToggleState(prev), () => {
+  toggleStandaloneQuestion = () => {
+    this.setState((prev) => {
+      const nextStandalone = !prev.isStandaloneQuestion;
+      const nextQuestions = (Array.isArray(prev.questions) ? prev.questions : []).map((q) => {
+        const current = q || {};
+        const currentLock = current.lockGateIds;
+        if (nextStandalone) {
+          return {
+            ...current,
+            lockGateIds: currentLock === null ? [] : normalizeGateIds(currentLock),
+          };
+        }
+        const normalized = Array.isArray(currentLock) ? normalizeGateIds(currentLock) : [];
+        return {
+          ...current,
+          lockGateIds: normalized.length ? normalized : null,
+        };
+      });
+      return {
+        isStandaloneQuestion: nextStandalone,
+        surveyAddedSuccessfully: false,
+        questionsAddedSuccessfully: false,
+        submissionError: '',
+        lastSubmittedSurveyId: '',
+        lastSubmittedSurveyArweaveTxId: '',
+        openLockKey: '',
+        surveyLockGateIds: nextStandalone ? [] : normalizeGateIds(prev.surveyLockGateIds),
+        questions: nextQuestions,
+      };
+    }, () => {
       this.updateSurveyHash();
       this.saveToLocalStorage();
     });
@@ -2940,12 +3053,20 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
     });
     const firstKey = built.length > 0 ? built[0].uiKey : null;
 
-    this.setState(buildCreateSurveyAutoGeneratedDraftPatch({
+    this.setState({
+      questions: built,
       documentURLs: sanitizeDocumentUrls(docURLs || []),
       focusTargetUiKey: firstKey,
       questions: built,
       title: aiTitle || '',
-    }), () => {
+      showAutoTool: false,
+      surveyAddedSuccessfully: false,
+      questionsAddedSuccessfully: false,
+      submissionError: '',
+      lastSubmittedSurveyId: '',
+      lastSubmittedSurveyArweaveTxId: '',
+      focusTargetUiKey: firstKey
+    }, () => {
       this.updateSurveyHash();
       this.saveToLocalStorage();
     });
@@ -3039,15 +3160,11 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
     }, this.saveToLocalStorage);
   };
 
-  handleCurrentTagInputChange = (qIndex: number, value: unknown): void => {
-    this.setState((prevState: CreateQuestionsAndSurveysState) => {
-      return {
-        questions: buildCreateSurveyQuestionTagInputValueList({
-          questions: prevState.questions,
-          questionIndex: qIndex,
-          value,
-        }),
-      };
+  handleCurrentTagInputChange = (qIndex, value) => {
+    this.setState(prevState => {
+      const updatedQuestions = [...prevState.questions];
+      updatedQuestions[qIndex] = { ...updatedQuestions[qIndex], currentTagInputValue: value };
+      return { questions: updatedQuestions };
     });
   };
 
@@ -3732,21 +3849,21 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
             {/* Progress Indicator: Only visible during/after submission steps */}
             {(isSubmitting || this.state.showSubmitSteps) && (
               <div className={styles.progressIndicator}>
-                <div className={buildCreateSurveyProgressStepClassName(styles, submitStep, 1)}>
+                <div className={submitStep >= 1 ? styles.stepCompleted : styles.step}>
                   <FontAwesomeIcon
                     icon={submitStep === 1 ? faSpinner : submitStep > 1 ? faCheck : faExclamationCircle}
                     spin={submitStep === 1}
                   />
                   <span>Upload Arweave</span>
                 </div>
-                <div className={buildCreateSurveyProgressStepClassName(styles, submitStep, 2)}>
+                <div className={submitStep >= 2 ? styles.stepCompleted : styles.step}>
                   <FontAwesomeIcon
                     icon={submitStep === 2 ? faSpinner : submitStep > 2 ? faCheck : faExclamationCircle}
                     spin={submitStep === 2}
                   />
                   <span>Submit Contract</span>
                 </div>
-                <div className={buildCreateSurveyProgressStepClassName(styles, submitStep, 3)}>
+                <div className={submitStep >= 3 ? styles.stepCompleted : styles.step}>
                   <FontAwesomeIcon
                     icon={submitStep === 3 ? faCheck : faExclamationCircle}
                   />
@@ -3784,17 +3901,15 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
                         <a href={`${window.location.origin}${buildQuestionRoutePath(questionId, { sessionSlug })}`}>
                           {questionId.substring(0, 10)}...{questionId.substring(questionId.length - 8)}
                         </a>
-                        {arweaveTxId && (
-                          <a
-                            href={normalizeArweaveUrl(arweaveTxId, { contextLabel: 'create_survey_question_link' })}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            title="View on Arweave"
-                            style={CREATE_SURVEY_UPLOADED_QUESTION_LINK_STYLE}
-                          >
-                            <FontAwesomeIcon icon={faExternalLinkAlt} size="sm" />
-                          </a>
-                        )}
+                        <a
+                          href={normalizeArweaveUrl(arweaveTxId, { contextLabel: 'create_survey_question_link' })}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title="View on Arweave"
+                          style={{ marginLeft: '10px', marginRight: '5px', textDecoration: 'none', color: '#007bff' }}
+                        >
+                          <FontAwesomeIcon icon={faExternalLinkAlt} size="sm" />
+                        </a>
                         <Button
                           className={styles.copyQuestionIdButton}
                           onClick={() => this.copyQuestionIdToClipboard(questionId)}

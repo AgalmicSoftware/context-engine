@@ -1688,7 +1688,10 @@ class SurveyResults extends Component<any, any> {
       initialViewMode = 'survey';
     }
 
-    this.setState(buildSurveyResultsViewStatePatch(initialViewMode, initialSurveyId), () => {
+    this.setState({
+      viewMode: initialViewMode,
+      surveyId: initialSurveyId
+    }, () => {
       this.handleUrlBasedView();
 
       if (this.props.isOpen) {
@@ -1792,6 +1795,7 @@ class SurveyResults extends Component<any, any> {
       }
     }
   }
+
 
 
   componentDidUpdate(prevProps: SurveyResultsRecord, prevState: SurveyResultsRecord): void {
@@ -2209,7 +2213,7 @@ class SurveyResults extends Component<any, any> {
     const surveyMatch = path.match(surveyResultsRegex);
 
     const questionResultsRegex = /^\/questions\/results/;
-    const questionMatch = path.match(questionResultsRegex);
+    let questionMatch = path.match(questionResultsRegex);
 
     if (surveyMatch) {
         newViewMode = "survey";
@@ -3183,9 +3187,9 @@ switch (exportType) {
     return;
 }
 
-if (!fileContent || !fileContent.trim()) {
+if (!csvContent || !csvContent.trim() || csvContent.split('\n').length < 2) {
   if (!this.state.alertMessage) {
-    this.setState(buildSurveyResultsAlertMessagePatch('No data available to download for this export type.'));
+    this.setState({ alertMessage: 'No data available to download for this export type.' });
   }
   return;
 }
@@ -5104,24 +5108,57 @@ return (
             aria-label="Demo results views"
             data-testid="ce-surveyresults-demo-view-nav"
           >
-            {demoResultsViewOptions.map((option: SurveyResultsDemoViewOption) => {
-              const isActiveView = demoResultsViewMode === option.key;
-              return (
-                <button
-                  key={option.key}
-                  type="button"
-                  className={[
-                    styles.demoResultsViewButton,
-                    isActiveView ? styles.demoResultsViewButtonActive : '',
-                  ].filter(Boolean).join(' ')}
-                  aria-pressed={isActiveView}
-                  data-testid={`ce-surveyresults-demo-view-${option.key}`}
-                  onClick={() => this.handleDemoResultsViewSelect(option.key)}
-                >
-                  {option.label}
-                </button>
-              );
-            })}
+            <div className={styles.miniBarContainer}>
+              {viewMode === 'questions' && (
+                <div className={styles.miniBarLine}>
+                  <div className={styles.miniBarLabel}>Questions:</div>
+                  {showQuestionSpinner ? (
+                    <>
+                      <FontAwesomeIcon icon={faSpinner} spin style={{ marginRight: '6px' }} />
+                      <div className={styles.miniBarFraction}>Loading...</div>
+                    </>
+                  ) : (
+                    <>
+                      <Progress
+                        value={questionProgress}
+                        color={questionColor}
+                        style={{ minWidth: '100px' }}
+                        className={styles.miniProgress}
+                      />
+                      <div className={styles.miniBarFraction}>{questionBarText}</div>
+                    </>
+                  )}
+                </div>
+              )}
+
+              <div className={styles.miniBarLine}>
+                <div className={styles.miniBarLabel}>Responses:</div>
+                {showResponseSpinner ? (
+                  <>
+                    <FontAwesomeIcon icon={faSpinner} spin style={{ marginRight: '6px' }} />
+                    <div className={styles.miniBarFraction}>Loading...</div>
+                  </>
+                ) : (
+                  <>
+                    <Progress
+                      value={responseProgress}
+                      color={responseColor}
+                      style={{ minWidth: '100px' }}
+                      className={styles.miniProgress}
+                    />
+                    <div className={styles.miniBarFraction}>{responseBarText}</div>
+                  </>
+                )}
+              </div>
+            </div>
+            <div
+              className={styles.syncStatus__refreshAction}
+              onClick={() => this.handleManualRefresh()}
+              title="Refresh Data from Cache/Chain"
+            >
+              <FontAwesomeIcon icon={faSyncAlt} />
+              <span>Refresh Now</span>
+            </div>
           </div>
         )}
       </div>

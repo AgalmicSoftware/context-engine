@@ -222,7 +222,7 @@ class MainAreaTabs extends Component<MainAreaTabsProps, MainAreaTabsState> {
                         <OnboardingWalkthrough
                           changeTabFunction={(newTab: number) => this.changeTabs(newTab)}
                           //
-                          toggleDemoMode={(demoModeOn: boolean) => this.props.toggleDemoMode(demoModeOn)}
+                          toggleDemoMode={(demoModeOn) => this.props.toggleDemoMode(demoModeOn)}
                           demoMode={this.props.demoMode}
                         />
                       </Suspense>

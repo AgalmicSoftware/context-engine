@@ -1,14 +1,14 @@
 /** @file OnePageSession.tsx */
 import React, { Component, Suspense } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { 
-  faCaretDown, 
-  faCaretUp, 
+import {
+  faCaretDown,
+  faCaretUp,
   faExternalLinkAlt,
-  faQuestionCircle, 
-  faSpinner, 
-  faCheck, 
-  faTimes, 
+  faQuestionCircle,
+  faSpinner,
+  faCheck,
+  faTimes,
   faImage,
   faArrowLeft,
   faExpand,
@@ -1776,8 +1776,8 @@ class OnePageSession extends Component<any, any> {
         } else {
           updateStatus(sbtKey, { status: 'info', name: 'Skipped (unknown path)' });
         }
-	      } catch (e: any) {
-	        const msg = (getErrorMessage(e, String(e || '')) || String(e || '')).toLowerCase();
+      } catch (e) {
+        const msg = (e.message || e.toString() || '').toLowerCase();
 
         if (msg.includes("already owns") || msg.includes("already joined") || msg.includes("user already has")) {
            // Graceful handling of "already owned" revert
