@@ -262,7 +262,7 @@ export const ARWEAVE_GATEWAY_URL = readPublicEnv(
 // Override at runtime with `window.CE_ARWEAVE_DIRECT_TO_AR_IO`.
 export const CE_ARWEAVE_DIRECT_TO_AR_IO = readPublicBoolEnv(
   'REACT_APP_CE_ARWEAVE_DIRECT_TO_AR_IO',
-  true
+  false
 );
 // Default ar.io gateway base when troubleshooting mode is enabled.
 // Override at runtime with `window.CE_ARWEAVE_AR_IO_URL`.
