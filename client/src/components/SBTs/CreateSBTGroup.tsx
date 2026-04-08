@@ -23,7 +23,6 @@ import {
 import { ethers } from 'ethers';
 import { arweaveScripts } from '../../utilities/arweave/arweaveScripts.js';
 import { normalizeArweaveUrl, parseArweaveTxId } from '../../utilities/arweave/arweaveUrls.js';
-import { validateNoLockedPlaintextInPayload } from '../../utilities/arweave/noLeakPayloads.js';
 import contractScripts, { getSessionConfigBySlugOrDefault, normalizeSessionSlug } from '../../utilities/web3/contractScripts.js';
 import { getEffectiveArweaveKey } from '../../utilities/session/resourceKeys.js';
 import { toStr } from '../../utilities/shared/primitives.js';
@@ -41,7 +40,7 @@ import JsonDisplay from '../Shared/Json/JsonDisplay';
 import CETooltip from '../Shared/CETooltip';
 import CEDateTimeInput from '../Shared/CEDateTimeInput.jsx';
 import GateMultiSelectLock from '../Gates/GateMultiSelectLock';
-import CompactImageChooser from '../Shared/CompactImageChooser';
+import CompactImageChooser from '../Shared/CompactImageChooser.jsx';
 import { readCompactImageClipboard } from '../Shared/compactImageClipboard.js';
 import { resolveSessionContractRef } from '../../utilities/session/sessionNaming.js';
 
@@ -2418,9 +2417,125 @@ class CreateSBTGroup extends Component<any, any> {
   };
 
 
-  handleImageUpload: any = (event: any) => {
+  handleImageUpload = (event) => {
     const file = event.target.files[0];
     this.applySelectedImageFile(file);
+  };
+
+  applySelectedImageFile = (file, {
+    useImageUrl = false,
+    statusText = '',
+    statusTone = 'default',
+  } = {}) => {
+    if (file && file.size > 10 * 1024 * 1024) {
+      sbtLog.error("Image too large (>10MB)");
+      if (statusText) {
+        this.setState({
+          imageChooserStatusText: statusText,
+          imageChooserStatusTone: statusTone,
+        });
+      }
+      return false;
+    }
+    this.resetFormStateForEdit();
+    this.setState(
+      {
+        useImageUrl: !!useImageUrl,
+        sbtImageFile: file,
+        sbtImageUrl: '',
+        imageLoadError: false,
+        imageChooserStatusText: statusText,
+        imageChooserStatusTone: statusText ? statusTone : 'default',
+        lockedImageAsset: null,
+      },
+      () => { this.updateGroupHash(); this.persistFormCache(); }
+    );
+    return true;
+  };
+
+  getFetchableImageUrl = (value) => {
+    const normalizedValue = normalizeArweaveUrl(String(value || '').trim());
+    if (!normalizedValue) return '';
+    try {
+      const urlObj = new URL(normalizedValue);
+      return (urlObj.protocol === 'http:' || urlObj.protocol === 'https:') ? normalizedValue : '';
+    } catch (_) {
+      return '';
+    }
+  };
+
+  getCanonicalMetadataImageUrl = (value) => {
+    const trimmedValue = String(value || '').trim();
+    if (!trimmedValue) return '';
+    const txId = parseArweaveTxId(trimmedValue);
+    if (txId && txId === trimmedValue) {
+      return `ar://${txId}`;
+    }
+    return trimmedValue;
+  };
+
+  handlePasteImage = async () => {
+    const clipboardResult = await readCompactImageClipboard({
+      fileNamePrefix: 'clipboard-sbt-image',
+    });
+
+    if (clipboardResult?.kind === 'file' && clipboardResult.file) {
+      const applied = this.applySelectedImageFile(clipboardResult.file, {
+        useImageUrl: false,
+      });
+      if (!applied) {
+        this.setState({
+          imageChooserStatusText: 'Image too large (>10MB)',
+          imageChooserStatusTone: 'error',
+        });
+      }
+      return;
+    }
+
+    if (clipboardResult?.kind === 'text') {
+      const pastedUrl = String(clipboardResult.text || '').trim();
+      const fetchableUrl = this.getFetchableImageUrl(pastedUrl);
+      if (!fetchableUrl) {
+        this.setState({
+          imageChooserStatusText: clipboardResult?.error || 'Clipboard does not contain a supported image or URL.',
+          imageChooserStatusTone: 'error',
+        });
+        return;
+      }
+
+      this.setState({
+        imageChooserStatusText: 'Loading preview...',
+        imageChooserStatusTone: 'loading',
+      });
+
+      try {
+        const file = await fetchImageFromURL(fetchableUrl);
+        this.resetFormStateForEdit();
+        await this.setStateAsync({
+          useImageUrl: true,
+          sbtImageUrl: pastedUrl,
+          sbtImageFile: file,
+          imageLoadError: false,
+          imageChooserStatusText: '',
+          imageChooserStatusTone: 'default',
+          lockedImageAsset: null,
+        });
+        this.updateGroupHash();
+        this.persistFormCache();
+      } catch (error) {
+        sbtLog.error("Failed to fetch pasted image via worker:", error);
+        this.setState({
+          imageChooserStatusText: error?.message || 'Image preview unavailable.',
+          imageChooserStatusTone: 'error',
+        });
+      }
+      return;
+    }
+
+    this.setState({
+      imageChooserStatusText: clipboardResult?.error || 'Clipboard does not contain a supported image or URL.',
+      imageChooserStatusTone: 'error',
+    });
   };
 
   applySelectedImageFile: any = (file: any, {
@@ -4148,7 +4263,7 @@ class CreateSBTGroup extends Component<any, any> {
         : showImagePreviewError
           ? 'error'
           : 'default';
-    const renderFieldLock = (lockKey: any, fieldKey: any, selectedGateIds: any) => (
+    const renderFieldLock = (lockKey, fieldKey, selectedGateIds) => (
       <GateMultiSelectLock
         gateOptions={gateOptions}
         selectedGateIds={selectedGateIds}
@@ -4286,7 +4401,7 @@ class CreateSBTGroup extends Component<any, any> {
                       onPaste={this.handlePasteImage}
                       onUploadClick={this.openImageUploadPicker}
                       onFileChange={this.handleImageUpload}
-                      fileInputRef={(fileInput: any) => { this.fileInput = fileInput; }}
+                      fileInputRef={(fileInput) => { this.fileInput = fileInput; }}
                       fileInputTestId={E2E_TESTIDS.SBT_CREATE_IMAGE_FILE_INPUT}
                       pasteButtonTestId={E2E_TESTIDS.SBT_CREATE_IMAGE_PASTE}
                       urlInputTestId={E2E_TESTIDS.SBT_CREATE_IMAGE_URL_INPUT}

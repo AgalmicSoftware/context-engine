@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { ethers } from 'ethers';
 import fs from 'fs';
 import path from 'path';
@@ -15,10 +15,7 @@ import { normalizeArweaveUrl } from '../../utilities/arweave/arweaveUrls.js';
 import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { getSessionContractsForChain, getSessionRegistryChains } from '../../variables/chains.js';
-import { getScopedCreateSbtFormCacheKey } from '../../utilities/sbt/sbtCreateFormCache.js';
-import {
-  SBT_PASSWORD_RECOVERY_STORAGE_KEY,
-} from '../../utilities/sbt/sbtPasswordRecoveryStore.js';
+import { getScopedCreateSbtFormCacheKey } from '../../utilities/sbt/createSbtFormCache.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { t } from '../../utilities/ui/terminology.js';
 

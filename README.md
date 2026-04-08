@@ -21,10 +21,8 @@ Context Engine is a toolkit for AI-enhanced deliberation and sensemaking in larg
 - Client workflows: Node.js 16.14.2 and npm 9.2.0
 - Foundry (`forge` / `anvil`) for local-chain and root contract test workflows
 
-The client install contract is tracked via `client/.npmrc`
-(`legacy-peer-deps=true`), so no manual CLI flag is needed even though
-`react-scripts@4.0.3`'s optional TypeScript peer still conflicts with
-`@lit-protocol/contracts@0.9.1`'s strict peer requirement.
+For client dependency installs, use `npm i --force` for now until the current
+install conflict is fixed.
 
 ### Clone and Install
 
