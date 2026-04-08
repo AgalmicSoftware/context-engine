@@ -65,8 +65,8 @@ For testing, run modes, and deeper setup:
 
 ### Survey and Response Management
 - Multiple question types: freeform, multiple choice, binary, and rating scales
-- Optional encryption of responses and results
-- Optional decentralized and permanent response storage in the public Arweave-backed profile
+- Optional encryption responses and results
+- Decentralized and permanent storage of responses
 - Statistical / AI analysis and visualization of results
 - Export results as `.json`, `.csv`, `.pdf`
 
