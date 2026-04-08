@@ -68,10 +68,9 @@ the current wallet, client Survey contract reads use the session-sponsored
 `rpcUrl` / `rpcUrlsByChainId` before anonymous defaults. Restricted sponsored
 RPC still fails closed to the normal fallback stack until the wallet grant is
 verified.
-Session publish/deploy does not mirror uploaded sponsored Custom RPC URLs into
-`rpcUrl`; those values remain worker runtime secrets. Browser-visible `rpcUrl`
-mirrors are reserved for explicit session path RPC values that are safe for
-client question and SBT reads.
+Session publish/deploy keeps uploaded Custom RPC worker secrets out of public
+registry fields. If browser reads need a sponsored RPC, configure an explicit
+browser-visible session `rpcUrl` / `rpcUrlsByChainId` value.
 
 Multi-tx flow:
 - `createSession(slug, sessionId, chainId, ...)` creates the session.
@@ -171,7 +170,7 @@ Notes:
   - a normal URL (`https://...`),
   - `ar://<txId>`,
   - or a bare Arweave txId (`<txId>`, 43-char base64url).
-  The client normalizes `ar://` and bare txIds to the preferred Arweave gateway via `normalizeArweaveUrl` (`client/src/utilities/arweaveUrls.js`):
+  The client normalizes `ar://` and bare txIds to the preferred Arweave gateway via `normalizeArweaveUrl` (`client/src/utilities/arweave/arweaveUrls.js`):
   `CE_ARWEAVE_AR_IO_URL` / `https://ar-io.dev` while `CE_ARWEAVE_DIRECT_TO_AR_IO` is enabled, which is the default. Arweave reads stay on that AR.IO gateway for their retry budget instead of fanning out to legacy gateways. Set `CE_ARWEAVE_DIRECT_TO_AR_IO=false` only when a deployment intentionally wants fallback fanout through `ARWEAVE_GATEWAY_URL`, `https://arweave.net`, Irys, Permagate, and alternate raw/tx-data routes.
   Runtime overrides: `window.CE_ARWEAVE_GATEWAY_URL`, `window.CE_ARWEAVE_DIRECT_TO_AR_IO`, `window.CE_ARWEAVE_AR_IO_URL`.
   If you see console noise like `Failed to load resource ... (<txId>, line 0)`, check the Network tab for the request URL:
