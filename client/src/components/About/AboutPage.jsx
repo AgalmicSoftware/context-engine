@@ -25,7 +25,6 @@ import {
   GLOBAL_SESSION_SELECTION_UPDATED_EVENT,
   readStoredGlobalSessionSelection,
 } from '../../utilities/session/globalSessionState.js';
-import { buildPublicRoute } from '../MainSite/urlUtils.js';
 
 const HEADER_LINKS = [
   { url: PUBLIC_WHITEPAPER_URL, text: 'Whitepaper', testId: 'ce-about-link-whitepaper' },
@@ -38,7 +37,7 @@ const RECOGNITION_GROUPS = [
     itemClassName: 'recognitionItemEthereum',
     logoClassName: 'recognitionLogoEthereum',
     description:
-      'Context Engine uses a passkey Ethereum wallet model rather than email for accounts. In the whitepaper, Ethereum matters as the cryptographic base that natively supports proof-of-human credentials, digital group membership tokens, access gates, and durable on-chain references, while decentralized protocols add censorship-resistance and data permanence. Although the app runs on Ethereum infrastructure, users do not need to know anything about cryptocurrency to use it.',
+      'Context Engine uses a passkey Ethereum wallet model rather than email. In the whitepaper, Ethereum matters as the cryptographic base that natively supports proof-of-human credentials, digital group membership tokens, access gates, and durable on-chain references, while decentralized protocols add censorship-resistance and data permanence. Although the app runs on Ethereum infrastructure, users do not need to know anything about cryptocurrency to use it.',
     links: [
       { url: 'https://ethereum.org/', text: 'Ethereum.org' },
       { url: 'https://ethereum.org/en/what-is-ethereum/', text: 'What is Ethereum?' },
@@ -62,7 +61,7 @@ const RECOGNITION_GROUPS = [
     itemClassName: 'recognitionItemPolis',
     logoClassName: 'recognitionLogoPolis',
     description:
-      'Pol.is is the current SOTA for large-group discourse software, especially its vTaiwan demonstration that simple Agree / Unsure / Disagree inputs can clarify both consensus and persistent difference. Context Engine builds on that pioneering approach with more question types, optional privacy, AI-native workflows, and permanent public storage.',
+      'In the whitepaper, Pol.is is treated as the current SOTA for large-group discourse software, especially its vTaiwan demonstration that simple Agree / Unsure / Disagree inputs can clarify both consensus and persistent difference. Context Engine builds on that pioneering approach with more question types, optional privacy, AI-native workflows, and permanent public storage.',
     links: [
       { url: 'https://pol.is/', text: 'Official Website' },
     ],
@@ -85,7 +84,7 @@ const RECOGNITION_GROUPS = [
     itemClassName: 'recognitionItemEdgePatagonia',
     logoClassName: 'recognitionLogoEdge',
     description:
-      'Residencies like the d/acc residency at Edge Patagonia (sponsored by Protocol Labs) created room to prototype tools for resilient technology, coordination, and governance in live community settings.',
+      'Edge City appears in the whitepaper’s closing acknowledgments as part of the broader ecosystem of experiments that helped shape the project. Residencies like Edge Patagonia created room to prototype tools for resilient technology, coordination, and governance in live community settings rather than only in theory.',
     links: [
       { url: 'https://www.edgecity.live/patagonia', text: 'Edge City' },
     ],
@@ -117,7 +116,7 @@ const USE_CASES = [
       'Organizations often preserve decisions without preserving the assumptions, tradeoffs, and confidence behind them.',
     solutionTitle: 'Private Forecasting',
     detail:
-      'Record predictions, assumptions, and confidence before outcomes are known, with timestamped entries that can remain encrypted until revealed or proven privately (and in the future, evaluated while still encrypted).',
+      'Record predictions, assumptions, and confidence before outcomes are known, with timestamped entries that can remain encrypted until review.',
   },
   {
     slug: 'cities',
@@ -256,13 +255,7 @@ const AboutPage = () => {
                 to={demoSessionPath}
                 className={`${styles.ctaButton} ${styles.primaryButton} ${styles.heroPrimaryButton}`}
               >
-                Demo
-              </Link>
-              <Link
-                to={buildPublicRoute('/new')}
-                className={`${styles.ctaButton} ${styles.secondaryButton} ${styles.heroPrimaryButton}`}
-              >
-                New Session
+                Explore Demo
               </Link>
             </div>
 
@@ -351,11 +344,37 @@ const AboutPage = () => {
           </div>
           {showPresent && (
             <div className={styles.collapsibleContent}>
-              <ul className={styles.bulletList}>
-                <li>Sessions: Create and publish sessions, including sponsored-session links for easy onboarding</li>
-                <li>Questions: Multi-format survey creation and responses (binary, rating, multichoice, freeform), stored permanently on Arweave with hashes in smart contracts. Includes reports and CSV and PDF exports.</li>
-                <li>Groups: Deploy soulbound tokens (non-transferable credentials) for gating survey access. Filter and encrypt responses by group membership via Lit Protocol.</li>
-                <li>AI Tools: Generate survey questions from URLs, documents, and audio transcripts. AI-assisted analysis and opinion clustering.</li>
+              <ul className={styles.featureList}>
+                <li className={styles.featureItem}>
+                  <span className={styles.featureLabel}>Sessions:</span>
+                  <span className={styles.featureText}>
+                    Include questions, responses, documents, access gates, and configuration, and new sessions can be created from the web application.
+                  </span>
+                </li>
+                <li className={styles.featureItem}>
+                  <span className={styles.featureLabel}>Questions:</span>
+                  <span className={styles.featureText}>
+                    Supports binary, rating, multiple-choice, and freeform questions, with optional conviction weighting and comments.
+                  </span>
+                </li>
+                <li className={styles.featureItem}>
+                  <span className={styles.featureLabel}>Access Control:</span>
+                  <span className={styles.featureText}>
+                    Uses soulbound tokens for gated participation, encrypted fields, and sponsored resources like RPC, AI, transaction costs, Arweave storage, and Lit encryption.
+                  </span>
+                </li>
+                <li className={styles.featureItem}>
+                  <span className={styles.featureLabel}>Storage:</span>
+                  <span className={styles.featureText}>
+                    Lives in durable records, with responses and documents on Arweave plus built-in report views, exports, and address-based comparison tools.
+                  </span>
+                </li>
+                <li className={styles.featureItem}>
+                  <span className={styles.featureLabel}>AI:</span>
+                  <span className={styles.featureText}>
+                    Already supports question generation, transcription, cluster summaries, result analysis, and comparison of user positions across wallets.
+                  </span>
+                </li>
               </ul>
             </div>
           )}

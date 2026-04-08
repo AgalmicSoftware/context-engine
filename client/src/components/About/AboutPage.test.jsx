@@ -31,8 +31,7 @@ describe('AboutPage', () => {
     renderAboutPage();
 
     const hero = screen.getByTestId('ce-about-hero');
-    const demoLink = within(hero).getByRole('link', { name: /^Demo$/i });
-    const newSessionLink = within(hero).getByRole('link', { name: /New Session/i });
+    const demoLink = screen.getByRole('link', { name: /Explore Demo/i });
 
     expect(hero).toBeInTheDocument();
     expect(demoLink).toHaveAttribute(
