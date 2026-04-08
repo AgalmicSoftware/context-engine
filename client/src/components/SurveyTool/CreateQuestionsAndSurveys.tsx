@@ -3360,8 +3360,6 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
     } = this.state;
     const docUrlErrorId = 'ce-create-doc-url-error';
     const safeDocumentUrls = sanitizeDocumentUrls(documentURLs);
-    const renderedQuestions = questions as CreateSurveyRenderedQuestion[];
-    const uploadedQuestionEntries = uploadedQuestions as CreateSurveyUploadedQuestionEntry[];
     const hasAuthoredDraftContent = (
       questions.length > 0 ||
       title.trim() !== '' ||
@@ -4084,10 +4082,13 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
               >
                 <div
                   className={styles.toggleKnob}
-                  style={resolveCreateSurveyToggleKnobStyle(isStandaloneQuestion)}
+                  style={{
+                    left: isStandaloneQuestion ? '31px' : '1px',
+                    backgroundColor: isStandaloneQuestion ? '#4caf50' : '#fff',
+                  }}
                 />
               </div>
-              <Label className={styles.toggleLabel} style={CREATE_SURVEY_TRAILING_TOGGLE_LABEL_STYLE}>
+              <Label className={styles.toggleLabel} style={{ marginLeft: '10px' }}>
                 Questions
               </Label>
             </div>
