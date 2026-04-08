@@ -825,17 +825,24 @@ const SBTsList = ({
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [revisionSyncPending, setRevisionSyncPending] = useState<boolean>(false);
 
-  const [excludePasswordLocked, setExcludePasswordLocked] = useState<boolean>(false);
-  const [showCreateGroup, setShowCreateGroup] = useState<boolean>(() => (
-    resolveSbtListCreateGroupInitialVisibility({
-      hasCachedCreateSbtForm: hasCachedCreateSbtFormReader,
-      listSlug,
-    })
-  ));
-  const [showAdminButtons, setShowAdminButtons] = useState<boolean>(false);
-  const [showLocalSessionSettings, setShowLocalSessionSettings] = useState<boolean>(false);
-  const [expandedSbtAddresses, setExpandedSbtAddresses] = useState<Set<string>>(() => new Set());
-  const [isUniverseCollapsed, setIsUniverseCollapsed] = useState<boolean>(() => readSbtListUniverseCollapsedState());
+  const [excludePasswordLocked, setExcludePasswordLocked] = useState(false);
+  // initialize Create Group panel open based on cache presence (idempotent: only initial)
+  const [showCreateGroup, setShowCreateGroup] = useState(() => hasCachedCreateSbtForm({
+    sessionSlug: listSlug,
+    migrateLegacyToSessionKey: true,
+    clearInvalid: true,
+  }));
+  const [showAdminButtons, setShowAdminButtons] = useState(false);
+  const [showLocalSessionSettings, setShowLocalSessionSettings] = useState(false);
+  const [expandedSbtAddresses, setExpandedSbtAddresses] = useState(() => new Set());
+  const [isUniverseCollapsed, setIsUniverseCollapsed] = useState(() => {
+    try {
+      if (typeof window === 'undefined' || !window.localStorage) return false;
+      return window.localStorage.getItem('dg:sbtUniverseCollapsed') === 'true';
+    } catch (_) {
+      return false;
+    }
+  });
 
   /** tracks addresses with a non-zero on-chain groupPasswordHash (unlimited group-password mint) */
   const [groupPasswordMap, setGroupPasswordMap] = useState<SbtListGroupPasswordMap>({});
@@ -906,9 +913,8 @@ const SBTsList = ({
     ? showAdminButtons
     : showLocalSessionSettings;
   const sessionSelectorPanelId = 'session-selector-panel';
-  const hideSessionUniverseSummary = miniaturized && viewMode === 'modal' && communityTabCompactSettings;
 
-  const clearChipProgressVisibilityTimeout = useCallback((slugIn: unknown): void => {
+  const clearChipProgressVisibilityTimeout = useCallback((slugIn) => {
     const slug = normalizeSessionSlug(slugIn || '');
     const meta = chipProgressVisibilityMetaRef.current[slug];
     if (!meta?.timerId) return;
@@ -2981,19 +2987,63 @@ const SBTsList = ({
     const collapsedSummarySlugs = isListModeScopeEnabled
       ? selectedSessionUniverseSlugs
       : [normalizeSessionSlug(listSlug || '')];
-    const renderCollapsedSummary = (testId: string): React.ReactNode => (
-      <SbtListSessionUniverseSummary
-        testId={testId}
-        summarySlugs={collapsedSummarySlugs}
-        chipProgressVisibilityBySlug={chipProgressVisibilityBySlug}
-        chipLoadingStatusBySlug={chipLoadingStatusBySlug}
-        labelForSessionSlug={labelForSessionSlug}
-        buildSessionRouteHref={buildSessionRouteHref}
-        onOpenSessionChip={handleOpenSessionChip}
-      />
+    const collapsedSummaryPreview = collapsedSummarySlugs.slice(0, 4);
+    const collapsedSummaryOverflow = Math.max(0, collapsedSummarySlugs.length - collapsedSummaryPreview.length);
+    const renderCollapsedSummary = (testId) => (
+      <div
+        className={styles.sessionUniverseCollapsedSummary}
+        data-testid={testId}
+      >
+        <span className={styles.sessionUniverseCollapsedLabel}>
+          Selected ({collapsedSummarySlugs.length})
+        </span>
+        <div className={styles.sessionUniverseCollapsedChips}>
+          {collapsedSummaryPreview.map((slugRaw) => {
+            const normalized = normalizeSessionSlug(slugRaw || '');
+            const isLoading = !!chipProgressVisibilityBySlug[normalized];
+            const chipLoadingStatus = chipLoadingStatusBySlug[normalized] || null;
+            const showCollapsedProgress = chipLoadingStatus != null && isLoading;
+            const collapsedChipClass = [
+              styles.sessionUniverseCollapsedChip,
+              isLoading ? styles.sessionUniverseCollapsedChipLoading : styles.sessionUniverseCollapsedChipLoaded,
+            ].filter(Boolean).join(' ');
+            return (
+              <span
+                key={`collapsed-${normalized || 'general'}`}
+                className={collapsedChipClass}
+                data-testid={`session-collapsed-chip-${normalized || 'general'}`}
+                data-session-loading={isLoading ? 'true' : 'false'}
+                title={showCollapsedProgress ? chipLoadingStatus.progressText : undefined}
+              >
+                <span className={styles.sessionUniverseCollapsedChipName}>
+                  {labelForSessionSlug(normalized)}
+                </span>
+                {showCollapsedProgress && (
+                  <span
+                    className={styles.sessionUniverseCollapsedChipProgress}
+                    data-testid={`session-collapsed-chip-progress-${normalized || 'general'}`}
+                  >
+                    {chipLoadingStatus.chipBlockProgressText}
+                  </span>
+                )}
+              </span>
+            );
+          })}
+          {!collapsedSummaryPreview.length && (
+            <span className={styles.sessionUniverseCollapsedOverflow}>
+              No sessions selected
+            </span>
+          )}
+          {collapsedSummaryOverflow > 0 && (
+            <span className={styles.sessionUniverseCollapsedOverflow}>
+              +{collapsedSummaryOverflow} more
+            </span>
+          )}
+        </div>
+      </div>
     );
 
-    const renderHeaderActions = ({ isOpen }: SbtListHeaderActionsArgs): React.ReactNode => (
+    const renderHeaderActions = ({ isOpen }) => (
       <div className={styles.sessionUniverseHeaderActions}>
         {showUniverseSpinner && (
           <FontAwesomeIcon
@@ -3033,18 +3083,12 @@ const SBTsList = ({
 
     if (!isSessionSelectorOpen) {
       return (
-        <div
-          className={buildSbtListSessionUniversePanelClassName({
-            baseClassName: styles.sessionUniversePanel,
-            closedClassName: styles.sessionUniversePanelClosed,
-            isClosed: true,
-          })}
-        >
+        <div className={`${styles.sessionUniversePanel} ${styles.sessionUniversePanelClosed}`}>
           <div className={styles.sessionUniverseHeader}>
             <span>Sessions</span>
             {renderHeaderActions({ isOpen: false })}
           </div>
-          {!hideSessionUniverseSummary && renderCollapsedSummary('session-selector-summary')}
+          {renderCollapsedSummary('session-selector-summary')}
         </div>
       );
     }
@@ -3059,7 +3103,7 @@ const SBTsList = ({
           <span>Sessions</span>
           {renderHeaderActions({ isOpen: true })}
         </div>
-        {!hideSessionUniverseSummary && isUniverseCollapsed && renderCollapsedSummary('session-universe-collapsed-summary')}
+        {isUniverseCollapsed && renderCollapsedSummary('session-universe-collapsed-summary')}
         {!isUniverseCollapsed && (
           <div className={styles.sessionUniverseChips}>
             <SessionChipSelector
@@ -3218,12 +3262,9 @@ const SBTsList = ({
               <div className={styles.filterContainer}>
                 <div className={styles.filterRow}>
                   <label
-                    className={buildSbtListFilterLabelClassName({
-                      activeClassName: styles.filterLabelActive,
-                      baseClassName: styles.filterLabel,
-                      isActive: excludePasswordLocked,
-                      toggleClassName: styles.filterLabelToggle,
-                    })}
+                    className={`${styles.filterLabel} ${styles.filterLabelToggle} ${
+                      excludePasswordLocked ? styles.filterLabelActive : ''
+                    }`}
                   >
                     <input
                       type="checkbox"
