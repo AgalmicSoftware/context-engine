@@ -396,7 +396,7 @@ class CreateQuestionsAndSurveys extends Component<any, any> {
       }
       nextState.documentURLs = sanitizeDocumentUrls(props.documentURLs || []);
       // If props provided URLs, we don't necessarily want to pre-fill the input buffer, just the list
-      nextState.docURLInput = '';
+      this.state.docURLInput = '';
     }
     (this.state as any).questions = initialQuestions;
     this._cacheWatchTimer = null;
@@ -1087,8 +1087,7 @@ class CreateQuestionsAndSurveys extends Component<any, any> {
     this.setState(
       {
         documentURLs: [...safeDocumentUrls, normalizedUrl],
-        docURLInput: '',
-        docURLError: ''
+        docURLInput: ''
       },
       () => {
         this.updateSurveyHash();
@@ -1157,7 +1156,7 @@ class CreateQuestionsAndSurveys extends Component<any, any> {
 
     updatedQuestions[index] = questionToUpdate;
 
-    this.setState({ questions: updatedQuestions, formValidationError: '' }, () => {
+    this.setState({ questions: updatedQuestions }, () => {
       this.updateSurveyHash();
       this.saveToLocalStorage();
     });
@@ -1205,7 +1204,7 @@ class CreateQuestionsAndSurveys extends Component<any, any> {
     const q = { ...updatedQuestions[questionIndex] };
 
     if (!Array.isArray(q.options)) q.options = [];
-    const newOptions = q.options.filter((_: any, i: any) => i !== optionIndex);
+    const newOptions = q.options.filter((_, i) => i !== optionIndex);
     q.options = newOptions;
     q.id = this.generateQuestionId(q.type, q.prompt, q.options, q.singleSelect);
 

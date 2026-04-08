@@ -1483,6 +1483,7 @@ class SurveyResults extends Component<any, any> {
   }
 
 
+
   componentDidUpdate(prevProps: any, prevState: any) {
     const refreshReasons: any = new Set();
     const pendingStatePatch: Record<string, any> = {};
@@ -2904,7 +2905,7 @@ switch (exportType) {
     return;
 }
 
-if (!fileContent || !fileContent.trim()) {
+if (!csvContent || !csvContent.trim() || csvContent.split('\n').length < 2) {
   if (!this.state.alertMessage) {
     this.setState({ alertMessage: 'No data available to download for this export type.' });
   }

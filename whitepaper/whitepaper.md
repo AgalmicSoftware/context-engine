@@ -4,7 +4,7 @@
 
 *v0.1.0 (2026) — agalmic.eth*
 
-For technical documentation, see [`spec.md`](../spec.md) and [`docs/`](../docs/README.md).
+For detailed technical documentation, see [`spec.md`](../spec.md) and [`docs/`](../docs/README.md).
 
 ---
 
@@ -152,6 +152,8 @@ A standing session accumulates input between formal decision points: more nuance
 
 - **Post-quantum Cryptography**: Transition cryptographic functionalities to post-quantum versions
 
+
+---
 
 ## 6. Closing Thoughts
 

@@ -1095,7 +1095,7 @@ class QuestionFilter extends React.Component<any, any> {
     }
 
     const slug = resolveFilterStorageSlug(this.props);
-    let bookmarksCacheObject: Record<string, any> = {};
+    let bookmarksCacheObject = {};
 
     try {
       const parsedCache = peekCacheSync('filters', slug, { clone: false });
@@ -1120,32 +1120,26 @@ class QuestionFilter extends React.Component<any, any> {
       bookmarksCacheObject.bookmarkedFilters.push(currentFilterString);
     }
 
-	    const writeResult: any = writeCache('filters', slug, bookmarksCacheObject as any);
-	    const handleSuccess = (ok: any) => {
-	      if (!ok) {
-	        questionFilterLog.warn('Failed to persist bookmarked filter state');
-	        return;
-	      }
-	      this.setState({ filterBookmarkedFeedback: true }, () => {
-	        this.checkIfCurrentFilterIsBookmarked();
-	      });
+    void writeCache('filters', slug, bookmarksCacheObject)
+      .then((ok) => {
+        if (!ok) {
+          questionFilterLog.warn('Failed to persist bookmarked filter state');
+          return;
+        }
+        this.setState({ filterBookmarkedFeedback: true }, () => {
+          this.checkIfCurrentFilterIsBookmarked();
+        });
 
-	      clearTimeout(this.bookmarkFeedbackTimeout);
-	      this.bookmarkFeedbackTimeout = setTimeout(() => {
-	        if (this._isMounted) {
-	          this.setState({ filterBookmarkedFeedback: false });
-	        }
-	      }, 2000);
-	    };
-	    if (writeResult && typeof writeResult.then === 'function') {
-	      void writeResult
-	        .then(handleSuccess)
-	        .catch((e: any) => {
-	          questionFilterLog.error("Error saving bookmarksCache to local cache:", e);
-	        });
-	    } else {
-	      handleSuccess(writeResult);
-	    }
+        clearTimeout(this.bookmarkFeedbackTimeout);
+        this.bookmarkFeedbackTimeout = setTimeout(() => {
+          if (this._isMounted) {
+            this.setState({ filterBookmarkedFeedback: false });
+          }
+        }, 2000);
+      })
+      .catch((e) => {
+        questionFilterLog.error("Error saving bookmarksCache to local cache:", e);
+      });
   };
 
   // ----------------------------------------------------------------------------------
@@ -2527,7 +2521,7 @@ handleLoadFilter: any = () => {
         throw new Error("Invalid filter string.");
       }
 
-      const newState: Record<string, any> = {};
+      const newState = {};
       // Map deserialized state to component's state structure
       if (deserializedState.questionTypes) {
         newState.selectedTypes = deserializedState.questionTypes;

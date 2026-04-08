@@ -2876,6 +2876,7 @@ class CreateSBTGroup extends Component<any, any> {
   };
 
 
+
   generateRandomString: any = (length: any) => {
     const bytes = Math.ceil(length / 2);
     let arr;
@@ -4065,7 +4066,7 @@ class CreateSBTGroup extends Component<any, any> {
     const highResQrId = `${qrId}_high_res`;
 
     // Robust hiding style: keeps element in render tree so XMLSerializer captures dimensions correctly
-    const hiddenStyle: React.CSSProperties = {
+    const hiddenStyle = {
       position: 'absolute',
       opacity: 0,
       pointerEvents: 'none',
