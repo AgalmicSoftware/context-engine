@@ -70,13 +70,13 @@ const treeHasText = (node: TreeNode, text: string): boolean => {
   return treeHasText(node?.props?.children, text);
 };
 
-const nodeHasClassName = (node: TreeNode, className: string): boolean => {
+const nodeHasClassName = (node, className) => {
   const raw = node?.props?.className;
   if (!raw) return false;
   return String(raw).split(/\s+/).includes(className);
 };
 
-describe('CreateQuestionsAndSurveys managed cache reads', () => {
+describe('CreateSurvey managed cache reads', () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
