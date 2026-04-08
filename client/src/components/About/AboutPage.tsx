@@ -437,37 +437,11 @@ const AboutPage = () => {
           </div>
           {showPresent && (
             <div className={styles.collapsibleContent}>
-              <ul className={styles.featureList}>
-                <li className={styles.featureItem}>
-                  <span className={styles.featureLabel}>Sessions:</span>
-                  <span className={styles.featureText}>
-                    Include questions, responses, documents, access gates, and configuration, and new sessions can be created from the web application.
-                  </span>
-                </li>
-                <li className={styles.featureItem}>
-                  <span className={styles.featureLabel}>Questions:</span>
-                  <span className={styles.featureText}>
-                    Supports binary, rating, multiple-choice, and freeform questions, with optional conviction weighting and comments.
-                  </span>
-                </li>
-                <li className={styles.featureItem}>
-                  <span className={styles.featureLabel}>Access Control:</span>
-                  <span className={styles.featureText}>
-                    Uses soulbound tokens for gated participation, encrypted fields, and sponsored resources like RPC, AI, transaction costs, Arweave storage, and Lit encryption.
-                  </span>
-                </li>
-                <li className={styles.featureItem}>
-                  <span className={styles.featureLabel}>Storage:</span>
-                  <span className={styles.featureText}>
-                    Lives in durable records, with responses and documents on Arweave plus built-in report views, exports, and address-based comparison tools.
-                  </span>
-                </li>
-                <li className={styles.featureItem}>
-                  <span className={styles.featureLabel}>AI:</span>
-                  <span className={styles.featureText}>
-                    Already supports question generation, transcription, cluster summaries, result analysis, and comparison of user positions across wallets.
-                  </span>
-                </li>
+              <ul className={styles.bulletList}>
+                <li>Sessions: Create and publish sessions, including sponsored-session links for easy onboarding</li>
+                <li>Questions: Multi-format survey creation and responses (binary, rating, multichoice, freeform), stored permanently on Arweave with hashes in smart contracts. Includes reports and CSV and PDF exports.</li>
+                <li>Groups: Deploy soulbound tokens (non-transferable credentials) for gating survey access. Filter and encrypt responses by group membership via Lit Protocol.</li>
+                <li>AI Tools: Generate survey questions from URLs, documents, and audio transcripts. AI-assisted analysis and opinion clustering.</li>
               </ul>
             </div>
           )}

@@ -8,14 +8,13 @@ other user-facing web3 interactions.
 
 Current client workflows use Node.js `16.14.2` and npm `9.2.0`.
 
-Install client dependencies with `npm install`; the `--legacy-peer-deps`
-contract is carried automatically via `client/.npmrc` for the remaining
-peer-sensitive web3 and UI dependencies.
+Install client dependencies with `npm i --force` for now. This is a temporary
+workaround until the current install conflict is fixed.
 
 ```bash
 cd client
 nvm use 16
-npm install
+npm i --force
 npm run dev
 ```
 
