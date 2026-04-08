@@ -65,12 +65,20 @@ const setMultiSelectValues = (testId, values) => {
 };
 
 describe('DemoAnalysisWorkspace', () => {
-  it('updates the report, chart, map, and heatmap when demographics are selected', async () => {
+  it('starts with empty map and question breakdown states until a question is selected', () => {
+    render(<DemoAnalysisWorkspace />);
+
+    expect(screen.getByTestId('demo-analysis-world-map')).toHaveTextContent(/choose a comparison suggestion/i);
+    expect(screen.getByTestId('demo-analysis-question-breakdown')).toHaveTextContent(/select a question to inspect/i);
+    expect(screen.queryByTestId('demo-analysis-selected-question')).not.toBeInTheDocument();
+  });
+
+  it('updates the report and heatmap when demographics are selected while keeping the map unselected', async () => {
     render(<DemoAnalysisWorkspace />);
 
     expect(screen.getByTestId('demo-analysis-empty-state')).toBeInTheDocument();
     expect(screen.getByText(/Overall Topic Heatmap/i)).toBeInTheDocument();
-    expect(screen.getByText(/Showing all country segments/i)).toBeInTheDocument();
+    expect(screen.getByTestId('demo-analysis-world-map')).toHaveTextContent(/choose a comparison suggestion/i);
 
     setMultiSelectValues('demo-analysis-select-era', ['Modern', 'Industrial']);
 
@@ -81,25 +89,29 @@ describe('DemoAnalysisWorkspace', () => {
 
     expect(screen.queryByTestId('demo-analysis-empty-state')).not.toBeInTheDocument();
     expect(screen.getByText(/Era: Modern Topic Heatmap/i)).toBeInTheDocument();
-    expect(screen.getByText(/Showing all country segments/i)).toBeInTheDocument();
+    expect(screen.getByTestId('demo-analysis-world-map')).toHaveTextContent(/choose a comparison suggestion/i);
     expect(screen.getAllByText('Era: Modern').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Era: Industrial').length).toBeGreaterThan(0);
     expect(screen.getByRole('button', { name: /Show .* More Tags/i })).toBeInTheDocument();
   });
 
-  it('focuses the map only when country groups are selected', async () => {
+  it('focuses the map only when country groups are selected after a question is chosen', async () => {
     render(<DemoAnalysisWorkspace />);
 
     setMultiSelectValues('demo-analysis-select-country', ['United States', 'United Kingdom']);
+    fireEvent.click(screen.getByLabelText(/Auto-select strongest correlation/i));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('demo-analysis-selected-question')).toBeInTheDocument();
+    });
 
     expect(screen.getByText(/Country focus:/i)).toBeInTheDocument();
   });
 
-  it('applies a suggestion pair and question when a suggestion is clicked', async () => {
+  it('applies a suggestion pair and populates the map and breakdown when a suggestion is clicked', async () => {
     render(<DemoAnalysisWorkspace />);
 
     const firstSuggestion = await screen.findByTestId('demo-analysis-suggestion-0');
-    const previousQuestion = screen.getByTestId('demo-analysis-selected-question').textContent;
     const suggestionQuestionText = firstSuggestion.children[1]?.textContent || '';
 
     fireEvent.click(firstSuggestion);
@@ -108,8 +120,9 @@ describe('DemoAnalysisWorkspace', () => {
       expect(screen.queryByTestId('demo-analysis-empty-state')).not.toBeInTheDocument();
     });
 
-    expect(screen.getByTestId('demo-analysis-selected-question').textContent).not.toBe(previousQuestion);
+    expect(screen.getByTestId('demo-analysis-selected-question').textContent).toBe(suggestionQuestionText);
     expect(suggestionQuestionText).toBeTruthy();
+    expect(screen.getByTestId('demo-analysis-question-breakdown')).toHaveTextContent(/overall/i);
     expect(screen.getByTestId('demo-analysis-report-summary').textContent).toMatch(/:/);
   });
 
@@ -123,6 +136,20 @@ describe('DemoAnalysisWorkspace', () => {
     });
 
     expect(screen.getByTestId('demo-analysis-selected-question').textContent).toBeTruthy();
+  });
+
+  it('keeps auto-select usable after only one demographic segment is chosen', async () => {
+    render(<DemoAnalysisWorkspace />);
+
+    setMultiSelectValues('demo-analysis-select-era', ['Modern']);
+    fireEvent.click(screen.getByLabelText(/Auto-select strongest correlation/i));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('demo-analysis-selected-question')).toBeInTheDocument();
+    });
+
+    expect(screen.queryByTestId('demo-analysis-empty-state')).not.toBeInTheDocument();
+    expect(screen.getByTestId('demo-analysis-report-summary')).toHaveTextContent('Era: Modern');
   });
 
   it('shows the empty comparison state until at least two groups are selected', () => {

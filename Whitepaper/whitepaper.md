@@ -42,7 +42,7 @@ To the extent that this approach is useful for AI policy debate, it could also a
 
 ## 2. Building on Existing Tools
 
-The current SOTA for this type of large-group discourse software is Pol.is, which showed in Taiwan (Computational Democracy Project, n.d.) that debate in large groups can be improved by collecting and analyzing simple Agree / Unsure / Disagree responses, clarifying areas of both consensus and difference.
+The current SOTA for this type of large-group discourse software is Pol.is, which showed through vTaiwan (g0v, 2014; Computational Democracy Project, n.d.) that debate in large groups can be improved by collecting and analyzing simple Agree / Unsure / Disagree responses, clarifying areas of both consensus and difference.
 
 Context Engine extends the pioneering approach of Pol.is in the following ways:
 
@@ -61,7 +61,7 @@ Although Context Engine is an Ethereum application, users do not need to know an
 
 Context Engine is a web application, a set of smart contracts (EVM), and supporting infrastructure for AI inference, storage, access gating, and encryption. It is meant to be easily redeployable by various groups with no programming experience.
 
-- **Sessions** include questions, responses, documents, access gates, and configuration, and new Sessions can be created from the web application.
+- **Sessions** include questions, responses, documents, access gates, and configuration, and new Sessions  can be created from the web application (at [/new](https://contextengine.xyz/new)).
 - **The deliberation surface** supports binary, rating, multiple-choice, and freeform questions, with optional conviction weighting and comments.
 - **Access control** uses soulbound tokens (non-transferrable NFTs), with support for gated participation, encrypted fields, and sponsored resources (RPC, AI, Tx Costs, Arweave Storage, Lit Encryption).
 - **Memory** lives in durable records: responses and documents on Arweave, built-in report views, exports, and address-based comparison tools.
@@ -173,7 +173,7 @@ A longer-term goal is cryptographic diplomacy: incentive-compatible programmatic
 
 Programmable cryptography seems like an underexplored toolkit for AI safety and alignment efforts (0xPARC, 2023). It is also worth taking storytelling seriously as a coordination tool and alignment strategy – What would a news broadcast look like from the good timeline, and would seeing that broadcast help us navigate towards it?
 
-Context Engine recognizes and builds on the pioneering work of those involved with RadicalxChange, Pol.is, TalkToTheCity, the Plurality Book, 0xPARC, Zuzalu, Edge City, MetaGov, PCARE, and many other related efforts. The author also gratefully acknowledges the AI programming assistance that finally made this effort tractable.
+Context Engine recognizes and builds on the pioneering work of those involved with RadicalxChange, Pol.is, vTaiwan, g0v, TalkToTheCity, the Plurality Book, 0xPARC, Zuzalu, Edge City, MetaGov, PCARE, and many other related efforts. The author also gratefully acknowledges the AI programming assistance that finally made this effort tractable.
 
 
 ---
@@ -191,6 +191,8 @@ Buterin, V., Hitzig, Z., & Weyl, E. G. (2019). "A Flexible Design for Funding Pu
 Computational Democracy Project. (n.d.). *Polis.* https://compdemocracy.org/polis/
 
 EigenLayer. (n.d.). "AVS Developer Guide." *EigenLayer Docs.* https://docs.eigencloud.xyz/eigenlayer/developers/concepts/avs-developer-guide
+
+g0v. (2014). *vTaiwan: An Open Consultation Process for National Issues.* https://info.vtaiwan.tw/
 
 Griffin, C. (2024, May 30). "The AI Policy Atlas." *AI Policy Perspectives.* https://www.aipolicyperspectives.com/p/the-ai-policy-atlas
 
