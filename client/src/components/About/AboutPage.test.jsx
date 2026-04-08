@@ -24,9 +24,10 @@ describe('AboutPage', () => {
     renderAboutPage();
 
     const hero = screen.getByTestId('ce-about-hero');
+    const demoLink = screen.getByRole('link', { name: /Explore Demo/i });
 
     expect(hero).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Explore Demo/i })).toHaveAttribute(
+    expect(demoLink).toHaveAttribute(
       'href',
       getAboutDemoSessionPath()
     );
@@ -35,18 +36,14 @@ describe('AboutPage', () => {
       'href',
       'https://github.com/AgalmicSoftware/context-engine/blob/main/Whitepaper/whitepaper.md'
     );
-    expect(within(hero).getByTestId('ce-about-link-github')).toBeVisible();
+    expect(within(hero).getByLabelText(/view context engine on github/i)).toBeVisible();
     expect(within(hero).getByTestId('ce-about-link-github')).toHaveAttribute(
       'href',
       'https://github.com/AgalmicSoftware/context-engine'
     );
     expect(within(hero).queryByTestId('ce-about-link-contributing')).not.toBeInTheDocument();
     expect(within(hero).queryByTestId('ce-about-link-license')).not.toBeInTheDocument();
-    expect(within(hero).getByTestId('ce-about-link-slides')).toBeVisible();
-    expect(within(hero).getByTestId('ce-about-link-slides')).toHaveAttribute(
-      'href',
-      'https://docs.google.com/presentation/d/1fFExDsGNpy13SE3TOw9ogasi5BcxXOQwKaXf96mBL-8/edit?usp=sharing'
-    );
+    expect(within(hero).queryByTestId('ce-about-link-slides')).not.toBeInTheDocument();
     expect(within(hero).getByRole('link', { name: /Email/i })).toHaveAttribute(
       'href',
       'mailto:contextengine@protonmail.com'
@@ -65,18 +62,28 @@ describe('AboutPage', () => {
   it('shows one use-case detail panel at a time', () => {
     renderAboutPage();
 
-    expect(screen.queryByText(/structured public map of AI questions/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/durable public map/i)).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId('ce-about-usecase-ai-discourse'));
 
-    expect(screen.getByText(/structured public map of AI questions/i)).toBeInTheDocument();
+    expect(within(screen.getByRole('article')).getByText(/^for ai discourse$/i)).toBeInTheDocument();
+    expect(screen.getByText(/low-dimensional debate/i)).toBeInTheDocument();
+    expect(screen.getByText(/durable public map/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/public ai discourse gets flattened into slogans like "accelerate" vs\. "pause,"/i)
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/create a structured public map of ai questions, preferences, and predictions in durable form/i)
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/how ce helps/i)).not.toBeInTheDocument();
     expect(screen.getByTestId('ce-about-usecase-ai-discourse')).toHaveAttribute('aria-pressed', 'true');
 
     fireEvent.click(screen.getByTestId('ce-about-usecase-corporate'));
 
-    expect(screen.queryByText(/structured public map of AI questions/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/durable public map/i)).not.toBeInTheDocument();
+    expect(within(screen.getByRole('article')).getByText(/^for companies$/i)).toBeInTheDocument();
     expect(
-      screen.getByText(/make private predictions, retroactively recognize the strongest predictors/i)
+      screen.getByText(/record predictions, assumptions, and confidence before outcomes are known/i)
     ).toBeInTheDocument();
     expect(screen.getByTestId('ce-about-usecase-corporate')).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByTestId('ce-about-usecase-ai-discourse')).toHaveAttribute('aria-pressed', 'false');
@@ -84,26 +91,26 @@ describe('AboutPage', () => {
     fireEvent.click(screen.getByTestId('ce-about-usecase-cities'));
 
     expect(
-      screen.getByText(/more nuanced than a poll and more durable than a hearing/i)
+      screen.getByText(/gather input that is more nuanced than a poll and more durable than a hearing/i)
     ).toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId('ce-about-usecase-conferences'));
 
     expect(
-      screen.getByText(/events, including conferences and pop-up cities/i)
+      screen.getByText(/leave with a durable map of consensus, subgroup differences, and unresolved questions/i)
     ).toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId('ce-about-usecase-digital-groups'));
 
     expect(
-      screen.getByText(/monetize tacit and local data in a privacy-preserving, attributable, and revocable way/i)
+      screen.getByText(/train representative ai models, and keep community data attributable, licensable, and revocable/i)
     ).toBeInTheDocument();
   });
 
-  it('renames current functionalities and merges milestones plus future items into one roadmap toggle', () => {
+  it('renames functionality and merges milestones plus future items into one roadmap toggle', () => {
     renderAboutPage();
 
-    const currentToggle = screen.getByRole('button', { name: /current functionalities/i });
+    const currentToggle = screen.getByRole('button', { name: /functionality/i });
     const roadmapToggle = screen.getByRole('button', { name: /roadmap/i });
 
     expect(currentToggle).toBeInTheDocument();
@@ -115,24 +122,43 @@ describe('AboutPage', () => {
 
     fireEvent.click(currentToggle);
 
+    expect(screen.getByText(/^Sessions:$/i)).toBeInTheDocument();
     expect(
-      screen.getByText(/create and publish sessions through the session wizard/i)
+      screen.getByText(/include questions, responses, documents, access gates, and configuration/i)
     ).toBeInTheDocument();
-    expect(screen.getByText(/sponsored-session links/i)).toBeInTheDocument();
+    expect(screen.getByText(/^Questions:$/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/supports binary, rating, multiple-choice, and freeform questions/i)
+    ).toBeInTheDocument();
+    expect(screen.getByText(/^Storage:$/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/responses and documents on arweave plus built-in report views, exports, and address-based comparison tools/i)
+    ).toBeInTheDocument();
 
     fireEvent.click(roadmapToggle);
 
-    expect(screen.getByText(/stage 1: upgraded decentralized pol\.is/i)).toBeInTheDocument();
+    expect(screen.getByText(/^Stage 1:$/i)).toBeInTheDocument();
+    expect(screen.getByText(/^Complete$/i)).toBeInTheDocument();
     expect(
-      screen.getByText(/zero-knowledge proofs for encrypted predictions and retroactive evaluation/i)
+      screen.getByText(/current platform: an upgraded decentralized pol\.is with more question types, optional privacy, ai-native inputs/i)
     ).toBeInTheDocument();
-    expect(screen.getByText(/fhe for private computation on encrypted group data/i)).toBeInTheDocument();
-    expect(screen.getByText(/privacy-preserving proof-of-unique-human filtering/i)).toBeInTheDocument();
+    expect(screen.getByText(/^Stage 2:$/i)).toBeInTheDocument();
+    expect(screen.getByText(/deployment and interface upgrades/i)).toBeInTheDocument();
     expect(
-      screen.getByText(/ai agents that learn group preferences and represent communities in governance/i)
+      screen.getByText(/agent-first ux so an agent can interface with a session in natural language/i)
+    ).toBeInTheDocument();
+    expect(screen.getByText(/^Stage 3:$/i)).toBeInTheDocument();
+    expect(screen.getByText(/stronger privacy and resilience/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/unlinkable per-response and per-sbt accounts, zero-knowledge and fhe aggregation/i)
+    ).toBeInTheDocument();
+    expect(screen.getByText(/zktls group formation and post-quantum cryptography/i)).toBeInTheDocument();
+    expect(screen.getByText(/^Stage 4\+:$/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/group prompting, multimedia worldbuilding, and backcasting from clusters to scenarios/i)
     ).toBeInTheDocument();
     expect(
-      screen.getByText(/data labor tools for groups to monetize preference data revokably/i)
+      screen.getByText(/agent-to-agent negotiation tooling for multi-step private processes/i)
     ).toBeInTheDocument();
   });
 
@@ -174,19 +200,31 @@ describe('AboutPage', () => {
     })).toBe('/session/demo');
   });
 
-  it('shows the updated RadicalxChange governance description in the recognition modal', async () => {
+  it.each([
+    [
+      'ce-about-recognition-ethereum',
+      /passkey ethereum wallet model rather than email/i,
+      /users do not need to know anything about cryptocurrency to use it/i,
+    ],
+    [
+      'ce-about-recognition-radicalxchange',
+      /social identity, plural governance, and group-owned value/i,
+      /retaining ownership over the preference data and value they create/i,
+    ],
+    [
+      'ce-about-recognition-pol-is',
+      /current sota for large-group discourse software/i,
+      /vtaiwan demonstration/i,
+    ],
+  ])('shows updated whitepaper-derived copy in the %s recognition modal', async (testId, firstCopy, secondCopy) => {
     renderAboutPage();
 
-    fireEvent.click(screen.getByTestId('ce-about-recognition-radicalxchange'));
+    fireEvent.click(screen.getByTestId(testId));
 
     const dialog = screen.getByRole('dialog');
 
-    expect(
-      screen.getByText(/quadratic voting, plural governance, and large-group coordination/i)
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(/auditable inputs for pluralist decision-making/i)
-    ).toBeInTheDocument();
+    expect(screen.getByText(firstCopy)).toBeInTheDocument();
+    expect(screen.getByText(secondCopy)).toBeInTheDocument();
     expect(
       within(dialog).getByRole('button', { name: /close recognition details/i })
     ).toBeVisible();
@@ -204,12 +242,17 @@ describe('AboutPage', () => {
     expect(scss).toMatch(/\.sectionTitle\s*{[\s\S]*?font-family:\s*var\(--ce-font-body\);[\s\S]*?font-size:\s*clamp\(1\.6rem,\s*4vw,\s*2\.1rem\);[\s\S]*?color:\s*rgba\(255,\s*255,\s*255,\s*0\.5\);/);
     expect(scss).not.toMatch(/&:hover\s+\.sectionTitle\s*{[\s\S]*?#4dffa4;/);
     expect(scss).toMatch(/\.useCaseLabel\s*{[\s\S]*?font-family:\s*var\(--ce-font-body\);[\s\S]*?color:\s*rgba\(14,\s*20,\s*39,\s*0\.5\);/);
+    expect(scss).toMatch(/\.featureLabel\s*{[\s\S]*?font-size:\s*clamp\(1\.08rem,\s*1\.6vw,\s*1\.22rem\);[\s\S]*?font-weight:\s*700;/);
+    expect(scss).toMatch(/\.featureItem\s*{[\s\S]*?border-radius:\s*16px;[\s\S]*?background:\s*rgba\(255,\s*255,\s*255,\s*0\.05\);/);
+    expect(scss).toMatch(/\.featureStatusComplete\s*{[\s\S]*?text-transform:\s*uppercase;/);
+    expect(scss).toMatch(/\.heroPrimaryButton\s*{[\s\S]*?font-size:\s*1\.14rem;[\s\S]*?font-weight:\s*700;/);
   });
 
   it('keeps mobile recognition rows aligned and stacks the use-case grid on small screens', () => {
     const scss = fs.readFileSync(path.join(__dirname, 'AboutPage.module.scss'), 'utf8');
 
     expect(scss).toMatch(/@media \(max-width:\s*640px\)\s*{[\s\S]*?\.useCaseGrid\s*{[\s\S]*?grid-template-columns:\s*1fr;/);
+    expect(scss).toMatch(/@media \(max-width:\s*640px\)\s*{[\s\S]*?\.useCaseDetailRow\s*{[\s\S]*?flex-direction:\s*column;/);
     expect(scss).toMatch(/@media \(max-width:\s*640px\)\s*{[\s\S]*?\.recognitionItem\s*{[\s\S]*?grid-template-columns:\s*46px minmax\(0,\s*1fr\);/);
     expect(scss).toMatch(/\.recognitionModalLogo\.recognitionLogoRxc\s*{[\s\S]*?background:\s*linear-gradient/);
   });
