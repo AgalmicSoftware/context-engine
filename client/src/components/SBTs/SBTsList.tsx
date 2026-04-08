@@ -946,10 +946,10 @@ const SBTsList = ({
     migrateLegacyToSessionKey: true,
     clearInvalid: true,
   }));
-  const [showAdminButtons, setShowAdminButtons] = useState<any>(false);
-  const [showLocalSessionSettings, setShowLocalSessionSettings] = useState<any>(false);
-  const [expandedSbtAddresses, setExpandedSbtAddresses] = useState<any>(() => new Set());
-  const [isUniverseCollapsed, setIsUniverseCollapsed] = useState<any>(() => {
+  const [showAdminButtons, setShowAdminButtons] = useState(false);
+  const [showLocalSessionSettings, setShowLocalSessionSettings] = useState(false);
+  const [expandedSbtAddresses, setExpandedSbtAddresses] = useState(() => new Set());
+  const [isUniverseCollapsed, setIsUniverseCollapsed] = useState(() => {
     try {
       if (typeof window === 'undefined' || !window.localStorage) return false;
       return window.localStorage.getItem('dg:sbtUniverseCollapsed') === 'true';
@@ -1024,9 +1024,8 @@ const SBTsList = ({
     ? showAdminButtons
     : showLocalSessionSettings;
   const sessionSelectorPanelId = 'session-selector-panel';
-  const hideSessionUniverseSummary = miniaturized && viewMode === 'modal' && communityTabCompactSettings;
 
-  const clearChipProgressVisibilityTimeout = useCallback((slugIn: any) => {
+  const clearChipProgressVisibilityTimeout = useCallback((slugIn) => {
     const slug = normalizeSessionSlug(slugIn || '');
     const meta = chipProgressVisibilityMetaRef.current[slug];
     if (!meta?.timerId) return;
@@ -3436,7 +3435,7 @@ const SBTsList = ({
       : [normalizeSessionSlug(listSlug || '')];
     const collapsedSummaryPreview = collapsedSummarySlugs.slice(0, 4);
     const collapsedSummaryOverflow = Math.max(0, collapsedSummarySlugs.length - collapsedSummaryPreview.length);
-    const renderCollapsedSummary = (testId: any) => (
+    const renderCollapsedSummary = (testId) => (
       <div
         className={styles.sessionUniverseCollapsedSummary}
         data-testid={testId}
@@ -3445,13 +3444,11 @@ const SBTsList = ({
           Selected ({collapsedSummarySlugs.length})
         </span>
         <div className={styles.sessionUniverseCollapsedChips}>
-          {collapsedSummaryPreview.map((slugRaw: any) => {
+          {collapsedSummaryPreview.map((slugRaw) => {
             const normalized = normalizeSessionSlug(slugRaw || '');
-            const sessionLabel = labelForSessionSlug(normalized);
             const isLoading = !!chipProgressVisibilityBySlug[normalized];
             const chipLoadingStatus = chipLoadingStatusBySlug[normalized] || null;
             const showCollapsedProgress = chipLoadingStatus != null && isLoading;
-            const sessionRouteHref = buildSessionRouteHref(normalized);
             const collapsedChipClass = [
               styles.sessionUniverseCollapsedChip,
               isLoading ? styles.sessionUniverseCollapsedChipLoading : styles.sessionUniverseCollapsedChipLoaded,
@@ -3464,30 +3461,16 @@ const SBTsList = ({
                 data-session-loading={isLoading ? 'true' : 'false'}
                 title={showCollapsedProgress ? chipLoadingStatus.progressText : undefined}
               >
-                <span className={styles.sessionUniverseCollapsedChipBody}>
-                  <span className={styles.sessionUniverseCollapsedChipName}>
-                    {sessionLabel}
-                  </span>
-                  {showCollapsedProgress && (
-                    <span
-                      className={styles.sessionUniverseCollapsedChipProgress}
-                      data-testid={`session-collapsed-chip-progress-${normalized || 'general'}`}
-                    >
-                      {chipLoadingStatus.chipBlockProgressText}
-                    </span>
-                  )}
+                <span className={styles.sessionUniverseCollapsedChipName}>
+                  {labelForSessionSlug(normalized)}
                 </span>
-                {sessionRouteHref && (
-                  <button
-                    type="button"
-                    className={styles.sessionUniverseCollapsedChipOpen}
-                    data-testid={`session-collapsed-chip-open-${normalized || 'general'}`}
-                    aria-label={`Open session ${sessionLabel} in new tab`}
-                    title={`Open session ${sessionLabel} in new tab`}
-                    onClick={(event: any) => handleOpenSessionChip(normalized, event)}
+                {showCollapsedProgress && (
+                  <span
+                    className={styles.sessionUniverseCollapsedChipProgress}
+                    data-testid={`session-collapsed-chip-progress-${normalized || 'general'}`}
                   >
-                    <FontAwesomeIcon icon={faExternalLinkAlt} />
-                  </button>
+                    {chipLoadingStatus.chipBlockProgressText}
+                  </span>
                 )}
               </span>
             );
@@ -3506,7 +3489,7 @@ const SBTsList = ({
       </div>
     );
 
-    const renderHeaderActions = ({ isOpen }: any) => (
+    const renderHeaderActions = ({ isOpen }) => (
       <div className={styles.sessionUniverseHeaderActions}>
         {showUniverseSpinner && (
           <FontAwesomeIcon
@@ -3524,7 +3507,7 @@ const SBTsList = ({
             aria-controls={sessionSelectorPanelId}
             aria-expanded={isOpen}
             data-testid="session-selector-toggle"
-            onClick={() => setShowLocalSessionSettings((prev: any) => !prev)}
+            onClick={() => setShowLocalSessionSettings((prev) => !prev)}
           >
             <FontAwesomeIcon icon={faCog} />
           </button>
@@ -3535,7 +3518,7 @@ const SBTsList = ({
             className={styles.sessionUniverseToggle}
             aria-label={isUniverseCollapsed ? 'Expand session universe' : 'Collapse session universe'}
             aria-expanded={!isUniverseCollapsed}
-            onClick={() => setIsUniverseCollapsed((prev: any) => !prev)}
+            onClick={() => setIsUniverseCollapsed((prev) => !prev)}
           >
             <FontAwesomeIcon icon={isUniverseCollapsed ? faChevronDown : faChevronUp} />
             <span>{isUniverseCollapsed ? 'Expand' : 'Collapse'}</span>
@@ -3551,7 +3534,7 @@ const SBTsList = ({
             <span>Sessions</span>
             {renderHeaderActions({ isOpen: false })}
           </div>
-          {!hideSessionUniverseSummary && renderCollapsedSummary('session-selector-summary')}
+          {renderCollapsedSummary('session-selector-summary')}
         </div>
       );
     }
@@ -3566,7 +3549,7 @@ const SBTsList = ({
           <span>Sessions</span>
           {renderHeaderActions({ isOpen: true })}
         </div>
-        {!hideSessionUniverseSummary && isUniverseCollapsed && renderCollapsedSummary('session-universe-collapsed-summary')}
+        {isUniverseCollapsed && renderCollapsedSummary('session-universe-collapsed-summary')}
         {!isUniverseCollapsed && (
           <div className={styles.sessionUniverseChips}>
             <SessionChipSelector

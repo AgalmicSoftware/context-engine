@@ -5509,10 +5509,7 @@ describe('SBTsList per-session loader countdown', () => {
     });
     expect(ensureLightSbtUniverse).not.toHaveBeenCalled();
 
-    await waitFor(() => expect(screen.getByRole('button', { name: /Refresh/i })).toBeEnabled());
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /Refresh/i }));
-    });
+    fireEvent.click(screen.getByRole('button', { name: /Refresh/i }));
 
     await waitFor(() => {
       expect(refreshSessionUniverseRegistryCache).toHaveBeenCalledTimes(1);
@@ -5810,10 +5807,7 @@ describe('SBTsList per-session loader countdown', () => {
       expect(screen.getByTestId('session-chip-beta')).toBeInTheDocument();
     });
 
-    await waitFor(() => expect(screen.getByRole('button', { name: /Clear Cache/i })).toBeEnabled());
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /Clear Cache/i }));
-    });
+    fireEvent.click(screen.getByRole('button', { name: /Clear Cache/i }));
 
     await waitFor(() => {
       expect(mockRemoveCache).toHaveBeenCalledWith('sbtCache', 'alpha');
