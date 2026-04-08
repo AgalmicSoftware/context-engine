@@ -1,8 +1,8 @@
 /** @file DebateMap.jsx */
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { 
-  faThumbsUp, faChevronRight, faBookmark, faTimes, faComment, faLink, faCheck, 
+import {
+  faThumbsUp, faChevronRight, faBookmark, faTimes, faComment, faLink, faCheck,
   faPlus, faNetworkWired, faArrowLeft, faFire, faSitemap, faCaretDown, faCaretUp,
   faArrowUp, faArrowDown, faList
 } from '@fortawesome/free-solid-svg-icons';
@@ -668,11 +668,11 @@ export const AtlasView = ({ data, onNodeClick }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [startPan, setStartPan] = useState({ x: 0, y: 0 });
   const [hoveredNodeId, setHoveredNodeId] = useState(null);
-  
+
   // Drill-down State
   const [atlasRootId, setAtlasRootId] = useState(null); // null = global root
   const [atlasHistoryIds, setAtlasHistoryIds] = useState([]); // Stack
-  
+
   const [showActiveDebates, setShowActiveDebates] = useState(false);
 
   const atlasRoot = useMemo(() => (
@@ -685,7 +685,7 @@ export const AtlasView = ({ data, onNodeClick }) => {
         w: containerRef.current.offsetWidth,
         h: containerRef.current.offsetHeight
       });
-      
+
       const handleResize = () => {
          if(containerRef.current) {
             setDimensions({
@@ -718,8 +718,8 @@ export const AtlasView = ({ data, onNodeClick }) => {
     // 3. Cluster Parent Click: Drill Down
     setAtlasHistoryIds((prev) => [...prev, atlasRootId]);
     setAtlasRootId(node.id);
-    setOffset({ x: 0, y: 0 }); 
-    setShowActiveDebates(false); 
+    setOffset({ x: 0, y: 0 });
+    setShowActiveDebates(false);
   };
 
   const handleBack = (e) => {
@@ -749,13 +749,13 @@ export const AtlasView = ({ data, onNodeClick }) => {
   const layout = useMemo(() => {
     const nodes = [];
     const links = [];
-    
+
     // The "Virtual Root" is the global center point.
     const centerNode = atlasRoot ? atlasRoot : { id: 'virtual-root', name: 'AI Policy Atlas', children: data, depth: -1 };
-    
-    nodes.push({ 
-      ...centerNode, 
-      x: 0, y: 0, 
+
+    nodes.push({
+      ...centerNode,
+      x: 0, y: 0,
       isCenter: true,
       depthClass: 'depthCenter',
       heat: calculateHeat(centerNode),
@@ -764,51 +764,51 @@ export const AtlasView = ({ data, onNodeClick }) => {
 
     if (!centerNode.children) return { nodes, links };
 
-    const isMobile = dimensions.w < 768; 
-    
+    const isMobile = dimensions.w < 768;
+
     // LAYOUT CONFIGURATION
     // Fixed: Reduced desktop drill-down radius from 380 to 250 to prevent over-spreading
-    const initialRadius = atlasRoot 
-        ? (isMobile ? 160 : 250) 
-        : (isMobile ? 110 : 150); 
+    const initialRadius = atlasRoot
+        ? (isMobile ? 160 : 250)
+        : (isMobile ? 110 : 150);
 
     const processRing = (parent, parentX, parentY, startAngle, endAngle, level) => {
        if (!parent.children || parent.children.length === 0) return;
-       
+
        const count = parent.children.length;
-       
+
        let availableAngle = endAngle - startAngle;
        let currentStartAngle = startAngle;
 
        if (level === 1) {
-           availableAngle = Math.PI * 2; 
+           availableAngle = Math.PI * 2;
            currentStartAngle = 0;
-       } 
-       
+       }
+
        const angleStep = availableAngle / count;
 
        parent.children.forEach((child, i) => {
           let nodeX, nodeY, myAngle;
 
           if (level === 1) {
-             myAngle = currentStartAngle + (i * angleStep) + (angleStep/2) - (Math.PI/2); 
+             myAngle = currentStartAngle + (i * angleStep) + (angleStep/2) - (Math.PI/2);
              nodeX = Math.cos(myAngle) * initialRadius;
              nodeY = Math.sin(myAngle) * initialRadius;
           } else {
              const angleFromParent = Math.atan2(parentY, parentX);
-             let wedgeSize = (Math.PI * 0.8) / (level * 0.8); 
-             
+             let wedgeSize = (Math.PI * 0.8) / (level * 0.8);
+
              if (atlasRoot && !isMobile) {
-                 wedgeSize = Math.PI / 1.5; 
+                 wedgeSize = Math.PI / 1.5;
              }
 
              const wedgeStart = angleFromParent - (wedgeSize / 2);
-             const wedgeStep = wedgeSize / (count + 1); 
+             const wedgeStep = wedgeSize / (count + 1);
 
              myAngle = wedgeStart + (wedgeStep * (i + 1));
-             
-             const dist = isMobile ? 60 + (30/level) : 120; 
-             
+
+             const dist = isMobile ? 60 + (30/level) : 120;
+
              nodeX = parentX + Math.cos(myAngle) * dist;
              nodeY = parentY + Math.sin(myAngle) * dist;
           }
@@ -817,7 +817,7 @@ export const AtlasView = ({ data, onNodeClick }) => {
 
           const newNode = {
             ...child,
-            x: nodeX, 
+            x: nodeX,
             y: nodeY,
             depth: visualDepth,
             depthClass: `depth${Math.max(0, Math.min(visualDepth, 3))}`,
@@ -827,9 +827,9 @@ export const AtlasView = ({ data, onNodeClick }) => {
           nodes.push(newNode);
 
           if (parent.id !== 'virtual-root') {
-              links.push({ 
-                  source: { x: parentX, y: parentY }, 
-                  target: { x: nodeX, y: nodeY } 
+              links.push({
+                  source: { x: parentX, y: parentY },
+                  target: { x: nodeX, y: nodeY }
               });
           }
 
@@ -880,8 +880,8 @@ export const AtlasView = ({ data, onNodeClick }) => {
   const isMobile = dimensions.w < 768;
 
   return (
-    <div 
-      ref={containerRef} 
+    <div
+      ref={containerRef}
       className={styles.atlasViewContainer}
       onMouseDown={onMouseDown}
       onMouseMove={onMouseMove}
@@ -898,8 +898,8 @@ export const AtlasView = ({ data, onNodeClick }) => {
       )}
 
       {!atlasRoot && (
-        <button 
-          className={styles.hotDebatesBtn} 
+        <button
+          className={styles.hotDebatesBtn}
           onClick={() => setShowActiveDebates(!showActiveDebates)}
         >
           <FontAwesomeIcon icon={faFire} /> Top Debates
@@ -932,29 +932,29 @@ export const AtlasView = ({ data, onNodeClick }) => {
         if (node.id === 'virtual-root') return null;
 
         const totalSize = calculateAtlasNodeSize(node, isMobile, layout.disagreementRange);
-        
+
         const isHovered = hoveredNodeId === node.id;
 
         return (
-          <div 
+          <div
             key={i}
             className={`${styles.atlasNode} ${styles[node.depthClass]} ${isHovered ? styles.hovered : ''}`}
-            style={{ 
-                left: cx + node.x, 
+            style={{
+                left: cx + node.x,
                 top: cy + node.y,
-                zIndex: isHovered ? 200 : (node.isCenter ? 100 : undefined) 
+                zIndex: isHovered ? 200 : (node.isCenter ? 100 : undefined)
             }}
             onClick={(e) => { e.stopPropagation(); handleAtlasNodeClick(node); }}
             onMouseEnter={() => setHoveredNodeId(node.id)}
             onMouseLeave={() => setHoveredNodeId(null)}
           >
-            <div 
+            <div
               className={`${styles.nodeDot} ${node.heat > 10 ? styles.hot : ''}`}
               style={{ width: `${totalSize}px`, height: `${totalSize}px` }}
             >
                {(node.depth === 0 || node.isCenter) && <FontAwesomeIcon icon={faNetworkWired} />}
             </div>
-            
+
             <div className={`${styles.nodeLabel} ${(node.depth === 0 || node.isCenter) ? styles.alwaysVisible : ''}`}>
                 {node.name}
             </div>
@@ -976,16 +976,16 @@ const FlatNode = ({ node, parentPath = [], onNodeClick, onBookmark, bookmarkedNo
       <div className={styles.pathContainer}>
         {parentPath.map((p, index) => (
           <React.Fragment key={p.id}>
-             <button 
+             <button
                className={`${styles.pathButton} ${styles[`depth${index}`]}`}
-               onClick={() => onNodeClick(p)} 
+               onClick={() => onNodeClick(p)}
              >
                {p.name}
              </button>
              <FontAwesomeIcon icon={faChevronRight} className={styles.pathSeparator} />
           </React.Fragment>
         ))}
-        <button 
+        <button
            className={`${styles.pathButton} ${styles[`depth${parentPath.length}`]}`}
            onClick={() => onNodeClick(node)}
         >
@@ -996,10 +996,10 @@ const FlatNode = ({ node, parentPath = [], onNodeClick, onBookmark, bookmarkedNo
       <div className={styles.metaInfo}>
         <span className={styles.upvotes}><FontAwesomeIcon icon={faThumbsUp} /> {netUpvotes}</span>
         <span className={styles.comments}><FontAwesomeIcon icon={faComment} /> {commentCount}</span>
-        <FontAwesomeIcon 
-          icon={faBookmark} 
-          className={`${styles.bookmark} ${isBookmarked ? styles.bookmarked : ''}`} 
-          onClick={(e) => { e.stopPropagation(); onBookmark(node.id); }} 
+        <FontAwesomeIcon
+          icon={faBookmark}
+          className={`${styles.bookmark} ${isBookmarked ? styles.bookmarked : ''}`}
+          onClick={(e) => { e.stopPropagation(); onBookmark(node.id); }}
         />
         <FontAwesomeIcon icon={faChevronRight} className={styles.expandIcon} onClick={() => onNodeClick(node)} />
       </div>
@@ -1033,7 +1033,7 @@ const Modal = ({
     setExpandedHistoricalCaseId('');
     setQuestionsOpen(false);
   }, [content?.id]);
-  
+
   const getUserAvatar = (username) => (
     getHistoricalFigureAvatarOrBlockie(username, {
       preferBlockie: false,
@@ -1215,15 +1215,15 @@ const Modal = ({
   const historicalCases = Array.isArray(content.historicalCases) ? content.historicalCases : [];
   const historicalCaseCount = historicalCases.length;
   const compassTitle = content?.compass?.xAxis?.label || content?.name || 'Compass';
-  
+
   // Logic for Depth Label and Styling
   const depthLabels = ["Category", "Sub-Category", "Topic", "Instance"];
   const depthIndex = content.depth !== undefined ? content.depth : (content.parentPath ? content.parentPath.length : 0);
   const depthLabel = depthLabels[Math.min(depthIndex, 3)] || "Node";
   const depthClass = `depth${Math.min(depthIndex, 3)}`; // used for color mapping
 
-  const tags = ["AI Safety", "Policy"]; 
-  
+  const tags = ["AI Safety", "Policy"];
+
   // Calculate Counts from Content
   const upVotes = parseInt(content.votes?.up || 0);
   const downVotes = parseInt(content.votes?.down || 0);
@@ -1575,7 +1575,7 @@ const Modal = ({
   return (
     <div className={styles.modalOverlay} onClick={onClose}>
       <div className={styles.modalContent} onClick={e => e.stopPropagation()}>
-        
+
         {/* --- HEADER --- */}
         <div className={styles.modalHeader}>
           {/* Left: Title + Link Button */}
@@ -1590,22 +1590,22 @@ const Modal = ({
           <div className={styles.headerVoteSection}>
             {activeVoteType === null ? (
                 <div className={styles.voteDisplay}>
-                   <div 
-                      className={`${styles.voteArrow} ${styles.up}`} 
+                   <div
+                      className={`${styles.voteArrow} ${styles.up}`}
                       onClick={() => setActiveVoteType('up')}
                       title="Cast Upvotes"
                    >
                      <FontAwesomeIcon icon={faArrowUp} />
                    </div>
 
-                   <div 
+                   <div
                       className={styles.netScoreContainer}
                       onMouseEnter={() => setShowVoteBreakdown(true)}
                       onMouseLeave={() => setShowVoteBreakdown(false)}
                       onClick={() => setShowVoteBreakdown(!showVoteBreakdown)}
                    >
                       <span className={styles.netScoreValue}>{netVotes}</span>
-                      
+
                       {/* Hover Breakdown Tooltip */}
                       <div className={`${styles.voteBreakdown} ${showVoteBreakdown ? styles.visible : ''}`}>
                           <span className={styles.breakdownUp}>+{upVotes}</span>
@@ -1614,8 +1614,8 @@ const Modal = ({
                       </div>
                    </div>
 
-                   <div 
-                      className={`${styles.voteArrow} ${styles.down}`} 
+                   <div
+                      className={`${styles.voteArrow} ${styles.down}`}
                       onClick={() => setActiveVoteType('down')}
                       title="Cast Downvotes"
                    >
@@ -1624,12 +1624,12 @@ const Modal = ({
                 </div>
             ) : (
                 <div className={`${styles.voteInputContainer} ${activeVoteType === 'up' ? styles.isUp : styles.isDown}`}>
-                    <input 
-                      type="number" 
+                    <input
+                      type="number"
                       autoFocus
                       className={styles.voteInput}
-                      value={voteCount} 
-                      onChange={(e) => setVoteCount(e.target.value)} 
+                      value={voteCount}
+                      onChange={(e) => setVoteCount(e.target.value)}
                       placeholder="#"
                       min="0"
                       onKeyDown={(e) => e.key === 'Enter' && handleCastVotes()}
@@ -1637,8 +1637,8 @@ const Modal = ({
                     <button className={styles.confirmBtn} onClick={handleCastVotes}>
                         <FontAwesomeIcon icon={faCheck} />
                     </button>
-                    <button 
-                      className={styles.cancelBtn} 
+                    <button
+                      className={styles.cancelBtn}
                       onClick={() => { setActiveVoteType(null); setVoteCount(""); }}
                     >
                       <FontAwesomeIcon icon={faTimes} />
@@ -1661,12 +1661,12 @@ const Modal = ({
           <span className={`${styles.depthTag} ${styles[depthClass]}`}>
             {depthLabel}
           </span>
-          
+
           {/* Generic Tags */}
           {tags.map((t, i) => (
-             <button 
-                key={i} 
-                className={`${styles.tag} ${styles.clickable}`} 
+             <button
+                key={i}
+                className={`${styles.tag} ${styles.clickable}`}
                 onClick={() => onTagClick && onTagClick(t)}
                 title={`Go to ${t}`}
              >
@@ -1835,7 +1835,7 @@ const Modal = ({
 const SuggestNodeModal = ({ isOpen, onClose, parentNode, parentPath = [], onSubmit }) => {
   const [title, setTitle] = useState("");
   const handleSubmit = () => { onSubmit(parentNode, title); setTitle(""); onClose(); };
-  
+
   if (!isOpen) return null;
   const lineage = [...parentPath, parentNode].filter(Boolean);
 
@@ -1846,7 +1846,7 @@ const SuggestNodeModal = ({ isOpen, onClose, parentNode, parentPath = [], onSubm
           <h2 className={styles.modalTitle}>Suggest New Topic</h2>
           <div className={styles.closeIcon} onClick={onClose}><FontAwesomeIcon icon={faTimes} /></div>
         </div>
-        
+
         <div className={styles.lineageDisplay}>
             <span className={styles.lineageLabel}>Path:</span>
             {lineage.map((node, i) => (
@@ -1859,13 +1859,13 @@ const SuggestNodeModal = ({ isOpen, onClose, parentNode, parentPath = [], onSubm
         <div className={styles.suggestNodeContent}>
           <FormGroup>
             <Label for="nodeTitle">New Topic Title</Label>
-            <Input 
+            <Input
                 id="nodeTitle"
-                type="text" 
-                value={title} 
-                onChange={(e) => setTitle(e.target.value)} 
-                placeholder="e.g. AI Liability Standards..." 
-                autoFocus 
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="e.g. AI Liability Standards..."
+                autoFocus
                 className={styles.glassInput}
             />
           </FormGroup>
@@ -1885,13 +1885,13 @@ const TreeNode = ({ node, depth = 0, parentPath = [], onNodeClick, onBookmark, b
   const hasChildren = node.children && node.children.length > 0;
   const netUpvotes = calculateNetUpvotes(node.votes);
   const isBookmarked = bookmarkedNodes.includes(node.id);
-  
+
   return (
     <div className={styles.orgNodeWrapper}>
-      <div 
+      <div
         className={`
-          ${styles.orgCard} 
-          ${styles[`depth${Math.min(depth, 3)}`]} 
+          ${styles.orgCard}
+          ${styles[`depth${Math.min(depth, 3)}`]}
           ${hasChildren ? styles.hasChildren : ''}
           ${isCollapsed ? styles.collapsed : ''}
         `}
@@ -1902,15 +1902,15 @@ const TreeNode = ({ node, depth = 0, parentPath = [], onNodeClick, onBookmark, b
          </div>
          <div className={styles.cardStats}>
              <span><FontAwesomeIcon icon={faThumbsUp} /> {netUpvotes}</span>
-             <FontAwesomeIcon 
-               icon={faBookmark} 
-               className={`${styles.bookmark} ${isBookmarked ? styles.bookmarked : ''}`} 
-               onClick={(e) => { e.stopPropagation(); onBookmark(node.id); }} 
+             <FontAwesomeIcon
+               icon={faBookmark}
+               className={`${styles.bookmark} ${isBookmarked ? styles.bookmarked : ''}`}
+               onClick={(e) => { e.stopPropagation(); onBookmark(node.id); }}
              />
          </div>
-         
-         <div 
-           className={styles.suggestBtn} 
+
+         <div
+           className={styles.suggestBtn}
            onClick={(e) => { e.stopPropagation(); onSuggestNode(node, parentPath); }}
            title="Suggest sub-topic"
          >
@@ -1918,7 +1918,7 @@ const TreeNode = ({ node, depth = 0, parentPath = [], onNodeClick, onBookmark, b
          </div>
 
          {hasChildren && (
-            <div 
+            <div
               className={styles.collapseBtn}
               onClick={(e) => { e.stopPropagation(); setIsCollapsed(!isCollapsed); }}
               title={isCollapsed ? "Expand Branch" : "Collapse Branch"}
@@ -1932,15 +1932,15 @@ const TreeNode = ({ node, depth = 0, parentPath = [], onNodeClick, onBookmark, b
         <div className={styles.orgChildrenContainer}>
            <div className={styles.orgChildrenRow}>
               {[...node.children].sort((a, b) => calculateNetUpvotes(b.votes) - calculateNetUpvotes(a.votes)).map((child, i) => (
-                <TreeNode 
-                  key={i} 
-                  node={child} 
-                  depth={depth + 1} 
+                <TreeNode
+                  key={i}
+                  node={child}
+                  depth={depth + 1}
                   parentPath={[...parentPath, node]}
-                  onNodeClick={onNodeClick} 
-                  onBookmark={onBookmark} 
-                  bookmarkedNodes={bookmarkedNodes} 
-                  onSuggestNode={onSuggestNode} 
+                  onNodeClick={onNodeClick}
+                  onBookmark={onBookmark}
+                  bookmarkedNodes={bookmarkedNodes}
+                  onSuggestNode={onSuggestNode}
                 />
               ))}
            </div>
@@ -1983,18 +1983,18 @@ const DebateMap = ({
   const [treeDataState, setTreeDataState] = useState(() => buildAtlasTreeData(initialDemoEnabled));
   const [nodeTypeFilter, setNodeTypeFilter] = useState('all');
   const [copied, setCopied] = useState(false);
-  
+
   // Suggest Modal State
   const [suggestNodeModalOpen, setSuggestNodeModalOpen] = useState(false);
   const [suggestNodeParent, setSuggestNodeParent] = useState(null);
   const [suggestNodePath, setSuggestNodePath] = useState([]);
-  
+
   // Drag-to-Scroll State for Tree View
   const treeContainerRef = useRef(null);
   const [treeIsDragging, setTreeIsDragging] = useState(false);
   const [treeStartX, setTreeStartX] = useState(0);
   const [treeScrollLeft, setTreeScrollLeft] = useState(0);
-  
+
   // Ref to track if we've already handled the deep link for the current ID
   const hasHandledDeepLink = useRef(false);
 
@@ -2067,7 +2067,7 @@ const DebateMap = ({
     setModalNodeId(null);
     onModalClose?.();
   }, [onModalClose]);
-  
+
   const handleBookmark = useCallback((id) => {
     setBookmarkedNodes(prev => {
       const next = prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id];
@@ -2113,16 +2113,16 @@ const DebateMap = ({
     });
   }, []);
 
-  const handleSuggestNode = useCallback((parent, path = []) => { 
-      setSuggestNodeParent(parent); 
+  const handleSuggestNode = useCallback((parent, path = []) => {
+      setSuggestNodeParent(parent);
       setSuggestNodePath(path);
-      setSuggestNodeModalOpen(true); 
+      setSuggestNodeModalOpen(true);
   }, []);
-  
-  const handleSubmitSuggestedNode = useCallback((parent, title) => { 
-      uiLog.log("Suggestion submitted for", parent.name, ":", title); 
+
+  const handleSubmitSuggestedNode = useCallback((parent, title) => {
+      uiLog.log("Suggestion submitted for", parent.name, ":", title);
   }, []);
-  
+
   const handleCategoryClick = (cat) => setSelectedCategoryId(cat?.id || null);
 
   const flattenTree = useCallback((node, parentPath = []) => {
@@ -2152,15 +2152,15 @@ const DebateMap = ({
     setTreeStartX(e.pageX - treeContainerRef.current.offsetLeft);
     setTreeScrollLeft(treeContainerRef.current.scrollLeft);
   };
-  
+
   const onTreeMouseLeave = () => {
     setTreeIsDragging(false);
   };
-  
+
   const onTreeMouseUp = () => {
     setTreeIsDragging(false);
   };
-  
+
   const onTreeMouseMove = (e) => {
     if (!treeIsDragging || !treeContainerRef.current) return;
     e.preventDefault();
@@ -2220,7 +2220,7 @@ const DebateMap = ({
              )}
              <label><input type="checkbox" checked={demoMode} onChange={e => setDemoMode(e.target.checked)} /> Demo Mode</label>
           </div>
-          
+
           {/* UPDATED: Only show Filters in LIST mode */}
           {visualMode === 'list' && (
              <div className={styles.filterGroup}>
@@ -2252,7 +2252,7 @@ const DebateMap = ({
            ) : visualMode === 'atlas' ? (
              <AtlasView data={treeDataState} onNodeClick={handleNodeClick} />
            ) : (
-             <div 
+             <div
                className={styles.orgChartContainer}
                ref={treeContainerRef}
                onMouseDown={onTreeMouseDown}
@@ -2263,14 +2263,14 @@ const DebateMap = ({
              >
                 {selectedCategory ? (
                    <div className={styles.orgChartRoot}>
-                     <TreeNode 
-                        node={selectedCategory} 
-                        depth={0} 
+                     <TreeNode
+                        node={selectedCategory}
+                        depth={0}
                         parentPath={[]}
-                        onNodeClick={handleNodeClick} 
-                        onBookmark={handleBookmark} 
-                        bookmarkedNodes={bookmarkedNodes} 
-                        onSuggestNode={handleSuggestNode} 
+                        onNodeClick={handleNodeClick}
+                        onBookmark={handleBookmark}
+                        bookmarkedNodes={bookmarkedNodes}
+                        onSuggestNode={handleSuggestNode}
                      />
                    </div>
                 ) : (
@@ -2280,21 +2280,21 @@ const DebateMap = ({
            )}
         </div>
 
-        <Modal 
-            isOpen={!!modalContent} 
-            onClose={closeModal} 
-            content={modalContent} 
-            onVote={handleVote} 
-            onCopy={copyToClipboard} 
-            copied={copied} 
+        <Modal
+            isOpen={!!modalContent}
+            onClose={closeModal}
+            content={modalContent}
+            onVote={handleVote}
+            onCopy={copyToClipboard}
+            copied={copied}
             onTagClick={handleTagClick}
         />
-        <SuggestNodeModal 
-            isOpen={suggestNodeModalOpen} 
-            onClose={() => setSuggestNodeModalOpen(false)} 
-            parentNode={suggestNodeParent} 
+        <SuggestNodeModal
+            isOpen={suggestNodeModalOpen}
+            onClose={() => setSuggestNodeModalOpen(false)}
+            parentNode={suggestNodeParent}
             parentPath={suggestNodePath}
-            onSubmit={handleSubmitSuggestedNode} 
+            onSubmit={handleSubmitSuggestedNode}
         />
       </div>
     </div>

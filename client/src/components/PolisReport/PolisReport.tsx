@@ -1527,7 +1527,7 @@ export default function PolisReport({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Local state for toggling PDF link in the heading
-  const [isPdfModeActive, setIsPdfModeActive] = useState<boolean>(false);
+  const [isPdfModeActive, setIsPdfModeActive] = useState(false);
 
   // ADDED: Ref and state for Bee Swarm scroller buttons
   const swarmContainerRef = useRef<HTMLDivElement | null>(null);

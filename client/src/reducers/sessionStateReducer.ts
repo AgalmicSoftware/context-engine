@@ -187,8 +187,8 @@ export default function sessionStateReducer(state: SessionState = getInitialStat
           if (!isRecord(action.payload)) return state;
           return {
             ...state,
-            ...(hasOwn(action.payload, 'loginInProgress') ? { loginInProgress: action.payload.loginInProgress as SessionState['loginInProgress'] } : {}),
-            ...(hasOwn(action.payload, 'loginComplete') ? { loginComplete: action.payload.loginComplete as SessionState['loginComplete'] } : {}),
+            ...(hasOwn(action.payload, 'loginInProgress') ? { loginInProgress: action.payload.loginInProgress } : {}),
+            ...(hasOwn(action.payload, 'loginComplete') ? { loginComplete: action.payload.loginComplete } : {}),
         };
       case TOGGLE_DEMO_MODE:
         if (!hasOwn(action, 'payload') || action.payload === undefined) return state;

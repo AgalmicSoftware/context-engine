@@ -2007,9 +2007,9 @@ const contractScripts: any = {
     address: SurveyContract.address, fromBlock: fromBlockNum, toBlock: toBlockNum
   });
   const rawLogs = await fetchLogsSmartWithProvider(provider, responseSubmittedEventTopic, fromBlockNum, toBlockNum);
-  const surveyResponseEvents = rawLogs.map((log: any) => SURVEYS_INTERFACE.parseLog(log));
+  const surveyResponseEvents = rawLogs.map(log => SURVEYS_INTERFACE.parseLog(log));
 
-  var surveyIDs = surveyResponseEvents.map((event: any) => event.args.surveyId);
+  var surveyIDs = surveyResponseEvents.map(event => event.args.surveyId);
   return surveyIDs;
 },
 
@@ -2041,9 +2041,9 @@ const contractScripts: any = {
     address: contract.address, fromBlock, toBlock
   });
   const rawLogs = await fetchLogsSmartWithProvider(provider, responsesSubmittedEventFilter, fromBlock, toBlock);
-  const events = rawLogs.map((log: any) => SURVEYS_INTERFACE.parseLog(log));
+  const events = rawLogs.map(log => SURVEYS_INTERFACE.parseLog(log));
 
-  const surveyResponses: any = {};
+  const surveyResponses = {};
   for (const event of events) {
     const responder = event.args.responder.toLowerCase();
     const surveyId = event.args.surveyId.toLowerCase();
@@ -5407,19 +5407,31 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
 
   // SBT Functionality Ends -----------------------------
 
-  getProviderLocation: function(providerName: any) {
-    const win: any = typeof window !== 'undefined' ? window : {};
-    const resolved = resolveSignerProvider({
-      providerName,
-      injectedProvider: win.ethereum,
-      web3AuthProvider: win.web3authProvider,
-      portoProviderFactory: () => portoFunctions.createPortoProviderMock(),
-      // Compatibility wrapper: preserve the old unknown-provider injected fallback
-      // until call sites explicitly opt into stricter signer-provider resolution.
-      allowInjectedSignerFallback: true,
-    });
-    if (resolved.ok) return resolved.provider;
-    throw new Error(resolved.error || `Could not determine provider for "${providerName}".`);
+  getProviderLocation: function(providerName) {
+    switch(providerName) {
+      case "porto_passkey":
+        // Delegate to Porto sidecar mock provider
+        return portoFunctions.createPortoProviderMock();
+
+      // Keep Web3Auth branch for easy re-enable; it is safe without a provider.
+      case "web3auth":
+        if (window.web3authProvider) {
+          return window.web3authProvider;
+        } else {
+          throw new Error('Selected wallet provider is not available. Log in or reconnect your wallet first.');
+        }
+      case "wagmi":
+        if (window.ethereum) { // A more reliable check for injected provider
+          return window.ethereum;
+        } else {
+          throw new Error('Connected wallet provider not found or invalid (window.ethereum missing).');
+        }
+      case "none":
+         throw new Error('Read-only provider is not allowed for transactions. Connect a wallet first.');
+      default:
+        if (window.ethereum) return window.ethereum;
+        throw new Error(`Could not determine provider for "${providerName}".`);
+    }
   },
 
   decimalEighteen,

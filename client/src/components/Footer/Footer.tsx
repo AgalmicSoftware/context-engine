@@ -74,7 +74,7 @@ class Footer extends React.Component<FooterProps> {
                     href="/contributors"
                     target=""
                     onClick={this.clickedContributorsLink}
-                    className={styles.footerLink}
+                    id={styles.footerLink}
                     >
                     CONTRIBUTORS
                   </NavLink>

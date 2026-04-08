@@ -637,12 +637,7 @@ const getProviderKind = (providerLike: ProviderLike): ProviderKind => {
       if (s === 'web3auth') return 'web3auth';
       return 'wagmi';
     }
-    const providerRecord = isRecord(providerLike) ? providerLike : null;
-    const p = (
-      (providerRecord && providerRecord.provider) ||
-      providerLike ||
-      (typeof window !== 'undefined' ? window.ethereum : null)
-    ) as (UnknownRecord & { provider?: UnknownRecord }) | null;
+    const p = (providerLike && providerLike.provider) || providerLike || (typeof window !== 'undefined' ? window.ethereum : null);
 
     // Check for Porto provider first (must come before other checks)
     if (p && p.isPorto === true) {
@@ -669,10 +664,8 @@ const getProviderKind = (providerLike: ProviderLike): ProviderKind => {
 /**
  * Normalize to an EIP-1193 provider (best effort).
  */
-const _getProvider = (providerLike: ProviderLike): Eip1193Provider => {
-  const providerRecord = isRecord(providerLike) ? providerLike : null;
-  const candidate = ((providerRecord && providerRecord.provider) || providerLike) as
-    (UnknownRecord & { provider?: unknown; request?: Eip1193Provider['request']; isPorto?: boolean }) | null;
+const _getProvider = (providerLike) => {
+  const candidate = (providerLike && providerLike.provider) || providerLike;
 
   // Check for Porto provider first - return directly if it has isPorto flag and request method
   if (candidate && candidate.isPorto === true && typeof candidate.request === 'function') {
@@ -683,6 +676,9 @@ const _getProvider = (providerLike: ProviderLike): Eip1193Provider => {
   if (candidate && isRecord(candidate.provider) && typeof candidate.provider.request === 'function') {
     return candidate.provider as Eip1193Provider;
   }
+
+  if (candidate && typeof candidate.request === 'function') return candidate;
+  if (candidate && candidate.provider && typeof candidate.provider.request === 'function') return candidate.provider;
 
   if (typeof providerLike === 'string') {
     const s = providerLike.trim().toLowerCase();
