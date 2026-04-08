@@ -51,7 +51,7 @@ class MainAreaTabs extends Component {
     mountedTabs: {},
   };
 
-  componentDidMount() { 
+  componentDidMount() {
     this.setState((prevState) => ({
       currentTabTitle: getTabTitle(this.props.focusedTab),
       currentTabIndex: this.props.focusedTab,
@@ -141,7 +141,7 @@ class MainAreaTabs extends Component {
                   <TabPane tabId={"link" + MAIN_AREA_TABS.COMMUNITY}>
                     {this.state.mountedTabs[MAIN_AREA_TABS.COMMUNITY] ? (
                       <Suspense fallback={<LazyFallback label="Loading..." />}>
-                        <CommunityTab 
+                        <CommunityTab
                           demoMode={this.props.demoMode}
                           provider={this.props.provider}
                           network={this.props.network}
@@ -169,7 +169,7 @@ class MainAreaTabs extends Component {
                         <ToolExplorer
                           toggleLoginModal={(loginModalIsOpen) => this.props.toggleLoginModal(loginModalIsOpen)}
                           //
-                          account={this.props.account} 
+                          account={this.props.account}
                           provider={this.props.provider}
                           activeSessionSlug={this.props.activeSessionSlug}
                           network={this.props.network}
@@ -180,7 +180,7 @@ class MainAreaTabs extends Component {
                           isQuestionCacheReady={this.props.isQuestionCacheReady}
                           isSurveyCacheReady={this.props.isSurveyCacheReady}
                           isSBTCacheReady={this.props.isSBTCacheReady}
-                        /> 
+                        />
                       </Suspense>
                     ) : null}
                   </TabPane>
@@ -190,9 +190,9 @@ class MainAreaTabs extends Component {
                         <OnboardingWalkthrough
                           changeTabFunction={(newTab) => this.changeTabs(newTab)}
                           //
-                          toggleDemoMode={(demoModeOn) => this.props.toggleDemoMode(demoModeOn)} 
+                          toggleDemoMode={(demoModeOn) => this.props.toggleDemoMode(demoModeOn)}
                           demoMode={this.props.demoMode}
-                        /> 
+                        />
                       </Suspense>
                     ) : null}
                   </TabPane>

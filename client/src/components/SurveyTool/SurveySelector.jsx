@@ -236,13 +236,13 @@ export class SurveySelector extends Component {
     this.state = {
       surveys: [],
       selectedSurveyIndex: null,
-      pubKey: '', 
+      pubKey: '',
       createSurveyMode: false,
       demoMode: false,
       showResults: this.props.autoOpenResults || false,
       loading: true,
       filterModalOpen: false,
-      viewMode: 'questions', 
+      viewMode: 'questions',
       selectedTypes: [],
       filteredQuestionCount: 0,
       encryptedQuestionCount: 0,
@@ -702,7 +702,7 @@ export class SurveySelector extends Component {
         { surveys: userSubmittedSurveys, loading: false },
         this.updateSelectedSurvey
       );
-    } 
+    }
 
   updateSelectedSurvey = () => {
     // Skip if user just clicked a survey and URL push hasn't fired yet

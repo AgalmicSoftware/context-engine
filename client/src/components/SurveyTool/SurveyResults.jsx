@@ -1204,7 +1204,7 @@ class SurveyResults extends Component {
     this._unsubscribeCacheUpdates = subscribeCacheUpdates(this.handleManagedCacheUpdate);
     window.addEventListener('popstate', this.handleUrlChange);
     document.addEventListener('visibilitychange', this.handleDocumentVisibilityChange);
-    
+
     // Determine initial viewMode and surveyId for state
     let initialViewMode = this.props.viewMode || 'questions';
     let initialSurveyId = this.props.surveyId || '';
@@ -1212,7 +1212,7 @@ class SurveyResults extends Component {
     if (initialSurveyId) {
       initialViewMode = 'survey';
     }
-    
+
     this.setState({
       viewMode: initialViewMode,
       surveyId: initialSurveyId
@@ -1238,7 +1238,7 @@ class SurveyResults extends Component {
               this.state.viewMode === 'questions'
                 ? '/questions/results'
                 : (this.state.surveyId ? `/survey/${this.state.surveyId}/results` : '/questions/results');
-            
+
             // Apply prefix
             path = applyExistingGroupPrefix(path);
 
@@ -1304,7 +1304,7 @@ class SurveyResults extends Component {
     window.removeEventListener('popstate', this.handleUrlChange);
     document.removeEventListener('visibilitychange', this.handleDocumentVisibilityChange);
     this.stopLocalStoragePolling();
-  
+
     // If unmounting while still open, remove "/results" from the URL
     if (this.props.isOpen) {
       const currentPath = window.location.pathname;
@@ -1324,7 +1324,7 @@ class SurveyResults extends Component {
       }
     }
   }
-  
+
 
   componentDidUpdate(prevProps, prevState) {
     const refreshReasons = new Set();
@@ -1634,7 +1634,7 @@ class SurveyResults extends Component {
 
     const questionResultsRegex = /^\/questions\/results/;
     let questionMatch = path.match(questionResultsRegex);
-    
+
     if (surveyMatch) {
         newViewMode = "survey";
         newSurveyId = surveyMatch[1]; // surveyID from URL
@@ -1644,14 +1644,14 @@ class SurveyResults extends Component {
     }
     // If neither matches, it might be a base path like /survey/ID or /questions
     // In that case, we don't necessarily change the mode here, as componentDidMount/Update handles props.
-  
+
     if (this.state.viewMode !== newViewMode || this.state.surveyId !== newSurveyId) {
       this.setState({ viewMode: newViewMode, surveyId: newSurveyId }, () => {
         this.queueResultsRefresh('url-view-change');
       });
     }
   };
-  
+
 
   // -----------------------------------------
   // LOCAL STORAGE POLLING
@@ -1995,7 +1995,7 @@ if (this.state.viewMode === 'survey') {
 
   async fetchSurveyModeResponses() {
     const currentSurveyID = this.state.surveyId ? this.state.surveyId.toLowerCase() : null;
-    
+
     // Use the robust slug resolver to ensure we read the correct cache
     const slug = this.getEffectiveSlug();
     const netIdStr = String(this.props.network?.id ?? this.props.networkChainId ?? '');
@@ -2115,7 +2115,7 @@ if (this.state.viewMode === 'survey') {
     );
 
     const totalQCount = Object.keys(finalAggregator).length;
-    
+
     // Retrieve title from the correct group cache
     let foundTitle = '';
     let foundDocURLs = [];
@@ -2514,7 +2514,7 @@ switch (exportType) {
 }
 
 if (!csvContent || !csvContent.trim() || csvContent.split('\n').length < 2) {
-  if (!this.state.alertMessage) { 
+  if (!this.state.alertMessage) {
     this.setState({ alertMessage: 'No data available to download for this export type.' });
   }
   return;
@@ -4505,7 +4505,7 @@ return (
                   )}
                 </div>
               )}
-    
+
               <div className={styles.miniBarLine}>
                 <div className={styles.miniBarLabel}>Responses:</div>
                 {showResponseSpinner ? (
@@ -4526,8 +4526,8 @@ return (
                 )}
               </div>
             </div>
-            <div 
-              className={styles.syncStatus__refreshAction} 
+            <div
+              className={styles.syncStatus__refreshAction}
               onClick={() => this.handleManualRefresh()}
               title="Refresh Data from Cache/Chain"
             >
@@ -4683,7 +4683,7 @@ return (
 
       {/* The area with SBTFilter / QuestionFilter toggles previously (export + filter) */}
       <div className={styles.exportAndFilterContainer}>
-        
+
         <div className={styles.filterBox}>
           {viewMode === 'survey' && surveyViewMode === 'individuals' && (
             <Label className={styles.filterBoxLabel}>
@@ -4750,7 +4750,7 @@ return (
               <FontAwesomeIcon icon={faTimes} />
             </span>
           )}
-        </Button> 
+        </Button>
 
 <QuestionFilter
   ref={this.questionFilterRef}

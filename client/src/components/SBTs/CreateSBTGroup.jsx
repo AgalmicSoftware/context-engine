@@ -681,7 +681,7 @@ class CreateSBTGroup extends Component {
       arweaveTxId: '',
       shareableUrl: '',
       error: '',
-      autoJoinUrl: '', 
+      autoJoinUrl: '',
 
       openLockKey: '',
       metadataLockGateIds: createEmptyMetadataLockGateIds(),
@@ -2674,7 +2674,7 @@ class CreateSBTGroup extends Component {
   handleAddTag = () => {
     const val = (this.state.currentTagInput || '').trim();
     if (!val) return;
-    
+
     // Prevent duplicates
     if (this.state.tags.includes(val)) {
       this.setState({ currentTagInput: '' });
@@ -2760,7 +2760,7 @@ class CreateSBTGroup extends Component {
     }
     return Array.from(nonces);
   };
-  
+
 
   generateRandomString = (length) => {
     const bytes = Math.ceil(length / 2);
@@ -3596,7 +3596,7 @@ class CreateSBTGroup extends Component {
       sbtLog.error('[CreateSBTGroup] Mint failed:', error);
       this.setState({ mintingFailed: true, startedMinting: false, currentStep: 0, error: error?.message || `${t('minting')} failed.` });
     }
-  } 
+  }
 
 
   async generateSBTInviteLinks(sbtAddress, listOverride = null) {
@@ -3836,12 +3836,12 @@ class CreateSBTGroup extends Component {
     return new Promise((resolve, reject) => {
       const svg = document.getElementById(elementId);
       if (!svg) return reject(new Error("QR Code not found"));
-      
+
       const svgData = new XMLSerializer().serializeToString(svg);
       const canvas = document.createElement("canvas");
       const ctx = canvas.getContext("2d");
       const img = new Image();
-      
+
       // Add white background for PNG transparency safety
       img.onload = () => {
         canvas.width = img.width;
@@ -3853,7 +3853,7 @@ class CreateSBTGroup extends Component {
            resolve(blob);
         }, "image/png");
       };
-      
+
       img.src = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svgData)));
     });
   }
@@ -3919,19 +3919,19 @@ class CreateSBTGroup extends Component {
     const { copiedLinkIndex, sbtAddress } = this.state;
     const copyKeyUrl = `url_${qrId}`;
     const copyKeyImg = `img_${qrId}`;
-    
+
     // Derive ID for the hidden high-res QR code
     const highResQrId = `${qrId}_high_res`;
 
     // Robust hiding style: keeps element in render tree so XMLSerializer captures dimensions correctly
     const hiddenStyle = {
-      position: 'absolute', 
-      opacity: 0, 
-      pointerEvents: 'none', 
-      zIndex: -1, 
-      width: '1px', 
-      height: '1px', 
-      overflow: 'hidden' 
+      position: 'absolute',
+      opacity: 0,
+      pointerEvents: 'none',
+      zIndex: -1,
+      width: '1px',
+      height: '1px',
+      overflow: 'hidden'
     };
 
     return (
@@ -3942,11 +3942,11 @@ class CreateSBTGroup extends Component {
             {title}
             {tooltipText && (
               <>
-                <FontAwesomeIcon 
-                  icon={faQuestionCircle} 
-                  className={styles.tooltip} 
-                  id={`tt_${qrId}`} 
-                  style={{ opacity: 0.5, marginLeft: '8px', fontSize: '0.8em' }} 
+                <FontAwesomeIcon
+                  icon={faQuestionCircle}
+                  className={styles.tooltip}
+                  id={`tt_${qrId}`}
+                  style={{ opacity: 0.5, marginLeft: '8px', fontSize: '0.8em' }}
                 />
                 <CETooltip placement="right" target={`tt_${qrId}`} className={styles.tooltipBubble}>
                   {tooltipText}
@@ -3957,9 +3957,9 @@ class CreateSBTGroup extends Component {
 
           <div className={styles.urlContainer}>
             <span className={styles.urlText} title={url}>{url}</span>
-            <button 
-              onClick={() => this.copyToClipboard(url, copyKeyUrl)} 
-              className={styles.copyButton} 
+            <button
+              onClick={() => this.copyToClipboard(url, copyKeyUrl)}
+              className={styles.copyButton}
               title="Copy URL"
             >
               <FontAwesomeIcon icon={copiedLinkIndex === copyKeyUrl ? faCheck : faCopy} />
@@ -3971,39 +3971,39 @@ class CreateSBTGroup extends Component {
         <div className={styles.rightCol}>
           <div className={styles.qrCodeContainer}>
             {/* Visible Small QR (64px) */}
-            <QRCodeSVG 
-              id={qrId} 
-              value={url} 
-              size={64} 
-              bgColor={"#ffffff"} 
-              fgColor={"#000000"} 
-              level="L" 
-              includeMargin={false} 
+            <QRCodeSVG
+              id={qrId}
+              value={url}
+              size={64}
+              bgColor={"#ffffff"}
+              fgColor={"#000000"}
+              level="L"
+              includeMargin={false}
             />
             {/* Hidden High-Res QR (1024px) for Copy/Download */}
             <div style={hiddenStyle}>
-              <QRCodeSVG 
-                id={highResQrId} 
-                value={url} 
-                size={1024} 
-                bgColor={"#ffffff"} 
-                fgColor={"#000000"} 
-                level="L" 
-                includeMargin={true} 
+              <QRCodeSVG
+                id={highResQrId}
+                value={url}
+                size={1024}
+                bgColor={"#ffffff"}
+                fgColor={"#000000"}
+                level="L"
+                includeMargin={true}
               />
             </div>
           </div>
           <div className={styles.qrActionsColumn}>
-            <button 
-              className={styles.qrActionButton} 
-              onClick={() => this.copyQRImage(highResQrId, copyKeyImg)} 
+            <button
+              className={styles.qrActionButton}
+              onClick={() => this.copyQRImage(highResQrId, copyKeyImg)}
               title="Copy QR Image to Clipboard"
             >
               <FontAwesomeIcon icon={copiedLinkIndex === copyKeyImg ? faCheck : faClipboard} />
             </button>
-            <button 
-              className={styles.qrActionButton} 
-              onClick={() => this.downloadQR(highResQrId, `ContextEngine_Sbt_${sbtAddress}_${fileSuffix}.png`)} 
+            <button
+              className={styles.qrActionButton}
+              onClick={() => this.downloadQR(highResQrId, `ContextEngine_Sbt_${sbtAddress}_${fileSuffix}.png`)}
               title="Download QR Code"
             >
               <FontAwesomeIcon icon={faDownload} />
@@ -4142,7 +4142,7 @@ class CreateSBTGroup extends Component {
     );
 
     // Calculate dirty state for "Clear" button visibility
-    const isDirty = 
+    const isDirty =
       (sbtName && sbtName.trim().length > 0) ||
       (sbtDescription && sbtDescription.trim().length > 0) ||
       sbtImageFile ||
@@ -4174,7 +4174,7 @@ class CreateSBTGroup extends Component {
               Learn More
             </a>
           </CETooltip>
-          
+
           {isDirty && !sbtMinted && (
              <button onClick={this.resetForm} className={styles.clearFormButton} title="Clear all fields and reset to defaults">
                <FontAwesomeIcon icon={faEraser} /> Clear
@@ -4371,7 +4371,7 @@ class CreateSBTGroup extends Component {
           {this.renderCollapsibleHeader(`${t('mint')} Options`, 'mintOptionsCollapsed')}
           {!mintOptionsCollapsed && (
             <div className={styles.sbtTokenOptions}>
-              
+
               {/* Top Row: Limited & Time-Limited Cards */}
               <div className={styles.optionsGrid}>
                 {/* 1. Limited Tokens Card */}
@@ -4389,7 +4389,7 @@ class CreateSBTGroup extends Component {
                       {`Specify the maximum number of ${t('sbts')} that can be ${t('mintedLower')}.`}
                     </CETooltip>
                   </label>
-                  
+
                   {sbtDistribution.isLimited && (
                     <div className={styles.optionBody}>
                       <input
@@ -4652,10 +4652,10 @@ class CreateSBTGroup extends Component {
              createActionLabel}
             {mintingFailed && currentStep > 0 && <FontAwesomeIcon icon={faExclamationCircle} style={{ marginLeft: '10px', color: 'red' }} />}
           </button>
-          
+
           {sbtMinted && (
-             <button 
-               onClick={this.resetForm} 
+             <button
+               onClick={this.resetForm}
                className={styles.startFreshBtn}
                title="Reset form to start fresh"
              >
@@ -4790,7 +4790,7 @@ class CreateSBTGroup extends Component {
                 includeMargin={true}
               />
             </div>
-            
+
             {/* Visual QR Blocks: "Auto-Join" only. "Page Link" block is removed. */}
             {openMintAutoJoinUrl && (
                 <>

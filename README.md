@@ -65,7 +65,7 @@ For testing, run modes, and deeper setup:
 - Voice-to-text input
 - Question generation from file, URL, or text input
 - Summaries and analysis of survey results and response clusters
-- OpenAI, Anthropic, OpenRouter, and custom provider paths 
+- OpenAI, Anthropic, OpenRouter, and custom provider paths
 
 
 ## AI Discourse Corpus

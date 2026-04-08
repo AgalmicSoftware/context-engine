@@ -294,7 +294,7 @@ export class MainSite extends Component {
     questionResponsesNonce: 0,
     sessionRegistryRevision: 0,
     questionScanProgress: null,
-    
+
     // Scan state tracking
     isScanningForGroup: null, // ID currently being scanned
     scanFailedFor: null,      // ID confirmed not found in any group
@@ -1920,7 +1920,7 @@ export class MainSite extends Component {
     const getCachedSurveySlug = (slug) => {
       const cfg = this.getSessionCfg(slug);
       // 1. Config list
-      if (Array.isArray(cfg?.HIGHLIGHTED_SURVEY_IDS) && 
+      if (Array.isArray(cfg?.HIGHLIGHTED_SURVEY_IDS) &&
           cfg.HIGHLIGHTED_SURVEY_IDS.some(id => String(id).toLowerCase() === sid)) {
         return slug;
       }
@@ -3382,12 +3382,12 @@ export class MainSite extends Component {
     if (!sid) return;
     if (this.state.isScanningForGroup === sid || this.state.scanFailedFor === sid) return;
     if (this._surveyGroupScanInFlight.has(sid)) return;
-    
+
     // 2. Check if already exists in CURRENT active cache (optimization)
     const currentSlug = this.getSessionSlugFromState();
     const currentChainId = String(this.getSessionChainId(currentSlug));
     const currentCache = this.DG.read('surveysCache', currentSlug, { clone: false });
-    
+
     if (currentCache?.[currentChainId]?.surveys?.[sid]) {
       mainSiteLog.log(`[MainSite] Survey ${sid} already exists in current group (${currentSlug}).`);
       return;
@@ -3484,7 +3484,7 @@ export class MainSite extends Component {
             'getSurveyHash',
             slug
           );
-          
+
           if (hash && hash !== ethers.constants.HashZero) {
             mainSiteLog.log(`[MainSite] DeepLink: Match found in session '${slug}'. Fetching full data...`);
 
@@ -5791,11 +5791,11 @@ export class MainSite extends Component {
 
   handleDeepLinkScan = () => {
     const fullPath = this.props.path || (typeof window !== 'undefined' ? window.location.pathname : '') || '';
-    
+
     // Extract Survey ID from /survey/:id or /survey/:id/results
     let surveyID = null;
     const validSurveyIdRe = /^0x[0-9a-fA-F]{64}$/;
-    
+
     const parts = fullPath.split("?")[0].split("/").filter(Boolean);
     // Check for ["survey", "0x..."]
     if (parts[0] === "survey" && parts[1] && validSurveyIdRe.test(parts[1])) {
@@ -5813,13 +5813,13 @@ export class MainSite extends Component {
     const currentSlug = this.getSessionSlugFromState();
     const cache = this.DG.read('surveysCache', currentSlug, { clone: false });
     const netKey = String(this.getSessionChainId(currentSlug));
-    
+
     // Check Cache
     const inCache = !!cache?.[netKey]?.surveys?.[surveyID];
-    
+
     // Check Config (Highlighted list)
     const cfg = this.getSessionCfg(currentSlug);
-    const inConfig = Array.isArray(cfg?.HIGHLIGHTED_SURVEY_IDS) && 
+    const inConfig = Array.isArray(cfg?.HIGHLIGHTED_SURVEY_IDS) &&
                      cfg.HIGHLIGHTED_SURVEY_IDS.some(id => String(id).toLowerCase() === surveyID);
 
     // 3. If missing in current context, trigger the cross-group scan
@@ -5834,7 +5834,7 @@ export class MainSite extends Component {
   manageAutoHashPersistence = () => {
     try {
       if (typeof window === 'undefined') return;
-      
+
       const slug = this.getActiveSessionSlug() || '';
       // Note: MainSite uses this.DG helper usually, but raw sessionStorage is fine here for migration/compat
       // We stick to the naming convention: dg:autoHash:<slug>
@@ -7304,7 +7304,7 @@ export class MainSite extends Component {
         if (window.ENABLE_RPC_DEBUG_LOGGING === true) {
           mainSiteLog.log('[RPC_DEBUG_TRIGGER] MainSite: refreshSbtData sentinel => full SBT rescan', { slug });
         }
-        
+
         await this.initializeSbtCacheForGroup(slug, { mode: 'full' });
         this.startSbtEventListenerForGroup(slug);
       } catch (e) {
@@ -8648,7 +8648,7 @@ export class MainSite extends Component {
         }
 
         this.DG.write('surveysCache', slug, surveysCache);
-        
+
         // Write user cache
         if (userCacheModified) {
           this.DG.write('userCache', slug, userCache);
@@ -9720,7 +9720,7 @@ export class MainSite extends Component {
       ...newQIDsForDiscovery,
       ...cachedQuestionRefreshIds,
     ]));
-    
+
     if (newQIDsForDiscovery.length > 0) {
       mainSiteLog.log(
         `initializeQuestionCacheForGroup: discovered ${newQIDsForDiscovery.length} unique question IDs total.`
@@ -10599,7 +10599,7 @@ export class MainSite extends Component {
         }
         return userCache[lower][networkID].data;
       };
-  
+
       // Merge partialAgg deterministically
       Object.keys(partialAgg).forEach((qId) => {
         if (!currentQR[qId]) currentQR[qId] = {};

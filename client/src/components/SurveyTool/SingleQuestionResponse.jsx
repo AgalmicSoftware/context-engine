@@ -672,7 +672,7 @@ class SingleQuestionResponse extends Component {
       responderAddress,
       questionOnly
     } = this.props;
-    
+
     // Redirect for mini/profile views
     if (mode === 'mini' || questionOnly) {
       const rAddr = responderAddress || null;

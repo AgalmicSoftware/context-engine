@@ -151,7 +151,7 @@ export default function sessionStateReducer(state = getInitialState(), action) {
             ...state,
             ...(hasOwn(action.payload, 'loginInProgress') ? { loginInProgress: action.payload.loginInProgress } : {}),
             ...(hasOwn(action.payload, 'loginComplete') ? { loginComplete: action.payload.loginComplete } : {}),
-        }; 
+        };
       case TOGGLE_DEMO_MODE:
         if (!hasOwn(action, 'payload') || action.payload === undefined) return state;
         if (typeof action.payload === 'boolean') {
