@@ -1,14 +1,14 @@
 /** @file OnePageSession.jsx */
 import React, { Component, Suspense } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { 
-  faCaretDown, 
-  faCaretUp, 
+import {
+  faCaretDown,
+  faCaretUp,
   faExternalLinkAlt,
-  faQuestionCircle, 
-  faSpinner, 
-  faCheck, 
-  faTimes, 
+  faQuestionCircle,
+  faSpinner,
+  faCheck,
+  faTimes,
   faImage,
   faArrowLeft,
   faExpand,
@@ -951,14 +951,14 @@ class OnePageSession extends Component {
       * ======================= */
     async prefetchTargetNames(targets) {
       const slug = resolveEffectiveSlug(this.props);
-      
+
       // 1. Try to read from cache first to save RPC calls
       let cachedNames = {};
       let cachedImages = {};
       try {
         const parsed = peekCacheSync('sbtCache', slug, { clone: false });
         if (parsed && typeof parsed === 'object') {
-          
+
           // Determine network key if available, else null
           const netId = this.props.network?.id || this.props.networkChainId;
           const netKey = netId ? String(netId) : null;
@@ -985,7 +985,7 @@ class OnePageSession extends Component {
           if (netKey && parsed[netKey]) {
             getNameFromNet(netKey);
           }
-          
+
           // B. Iterate ALL keys to find any missing names.
           // This ensures we find the SBT name even if the wallet isn't connected yet
           // or if the cached data resides under a different chain ID key.
@@ -1114,8 +1114,8 @@ class OnePageSession extends Component {
     const addIfAuto = (sbt, gp, inv, localAutoFlag) => {
       if (!sbt) return; // Only sbt is strictly required now
       if (!/^0x[0-9a-fA-F]{40}$/.test(sbt)) return;
-      
-      // If neither global 'auto=1' nor local 'autoN=1' is set, 
+
+      // If neither global 'auto=1' nor local 'autoN=1' is set,
       // we do NOT add it to the OnePageSession execution queue.
       // (It will still be picked up by SBTPage for pre-filling).
       if (!globalAuto && localAutoFlag !== '1') return;
@@ -1421,11 +1421,11 @@ class OnePageSession extends Component {
               // Must have tokenURI to be considered a valid hit for minting flows
               if (entry?.sbtInfo && entry.sbtInfo.tokenURI) {
                 sbtInfo = entry.sbtInfo;
-                break; 
+                break;
               }
             }
           } catch (e) { demoLog.warn('OnePageSession: fallback', e); }
-          
+
           if (sbtInfo) break; // Found it, stop scanning slugs
         }
 
@@ -1717,7 +1717,7 @@ class OnePageSession extends Component {
         }
       } catch (e) {
         const msg = (e.message || e.toString() || '').toLowerCase();
-        
+
         if (msg.includes("already owns") || msg.includes("already joined") || msg.includes("user already has")) {
            // Graceful handling of "already owned" revert
            this.consumeAutoMintAttempt(sbtAddr, userAddr);
@@ -2164,7 +2164,7 @@ class OnePageSession extends Component {
                 v.error &&
                 /max(imum)?\s*(tokens?\s*)?mint|supply\s*exhaust|mint.*expir|period.*end|group\s*limit/i.test(v.error)
               );
-              
+
               // Map status to icon
               let statusIcon = null;
               if (v.status === 'pending') statusIcon = <FontAwesomeIcon icon={faSpinner} spin />;
@@ -2199,13 +2199,13 @@ class OnePageSession extends Component {
                         </a>
                       </span>
                       {sbtImage && (
-                        <button 
+                        <button
                           onClick={() => this.toggleStatusImagePreview(addrKey)}
                           style={{
-                             background: 'none', 
-                             border: 'none', 
-                             cursor: 'pointer', 
-                             opacity: 0.7, 
+                             background: 'none',
+                             border: 'none',
+                             cursor: 'pointer',
+                             opacity: 0.7,
                              marginLeft: '5px',
                              padding: '0 5px'
                           }}
@@ -2232,7 +2232,7 @@ class OnePageSession extends Component {
                       )}
                     </div>
                   </div>
-                  
+
                   {v.error && <div style={{ fontSize: '0.9em', marginTop: '4px', marginLeft: '26px', fontWeight: 400 }}>{v.error}</div>}
 
                   {v.status === 'failed' && !isTerminalError && (
@@ -2246,13 +2246,13 @@ class OnePageSession extends Component {
                       </button>
                     </div>
                   )}
-                  
+
                   {isExpanded && sbtImage && (
                     <div style={{ marginTop: '10px', marginLeft: '26px' }}>
-                      <img 
-                        src={sbtImage} 
+                      <img
+                        src={sbtImage}
                         alt={`${t('sbt')} Preview`}
-                        style={{ maxHeight: '100px', borderRadius: '4px', border: '1px solid rgba(0,0,0,0.1)' }} 
+                        style={{ maxHeight: '100px', borderRadius: '4px', border: '1px solid rgba(0,0,0,0.1)' }}
                       />
                     </div>
                   )}

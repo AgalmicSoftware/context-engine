@@ -512,7 +512,7 @@ export function applyFilterStateToAggregator(questionResponses, network, filterS
  *   - green (Agree => 1)
  *   - yellow (Unsure => 0)
  *   - red (Disagree => -1)
- * 
+ *
  * NOTE: Non-answers (null/undefined) are ignored in both counts
  * and width calculations; no "white" segment is rendered.
  ***************************************************************/
@@ -1191,7 +1191,7 @@ export default function PolisReport({
 
   // Local state for toggling PDF link in the heading
   const [isPdfModeActive, setIsPdfModeActive] = useState(false);
-  
+
   // ADDED: Ref and state for Bee Swarm scroller buttons
   const swarmContainerRef = useRef(null);
   const [isSwarmScrollable, setIsSwarmScrollable] = useState(false);
@@ -2969,7 +2969,7 @@ export default function PolisReport({
             activeFilterElements.push(<div key="sbt-a-ex"><strong>Exclude:</strong> {renderSBTList(sbtFilter.excludedSBTGroups)}</div>);
         }
     }
-    
+
     // Handle the old `sbtFilterString` for basic backward compatibility if `filterState` is simple
     if (activeFilterElements.length === 0 && sbtFilterString) {
         return <span>{sbtFilterString}</span>;
@@ -3442,7 +3442,7 @@ export default function PolisReport({
                         </button>
                       </div>
                     </div>
-                    
+
                     <div className={styles.controlGroup} style={{ flexBasis: '100%' }}>
                       <label style={{ cursor: 'pointer' }}>
                         <input

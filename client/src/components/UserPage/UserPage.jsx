@@ -100,7 +100,7 @@ class UserPage extends Component {
       },
       copied: false,
       collapseOpen: false,
-      username: '', 
+      username: '',
       usernameError: '',
       isEditingUsername: false, // NEW: state for username edit mode
       bookmarked: false,
@@ -120,7 +120,7 @@ class UserPage extends Component {
       analysisHistoricalFigure: '',
       analysisHistoricalReasoning: '',
       showFullProfileModal: false,
-      isSimulated: false, 
+      isSimulated: false,
       // Default: Questions tab
       selectedTab: 'questions',
       expandedSurveyResponses: {},
@@ -1317,7 +1317,7 @@ class UserPage extends Component {
       // ---------------------------------------------------------
       this.startProfileDeepScan('mount');
     });
-  } 
+  }
 
 
   componentWillUnmount() {
@@ -1414,7 +1414,7 @@ class UserPage extends Component {
           this.loadDataFromCache();     // Load all data from cache for the new context
           this.checkIfBookmarked();     // Check bookmark status for the new context
           this.loadNicknameFromCache(); // NEW: prefill nickname for the new context
-          
+
           // ---------------------------------------------------------
           // NEW: Trigger Deep Search if address changed
           // ---------------------------------------------------------
@@ -3683,14 +3683,14 @@ class UserPage extends Component {
     }
   }
 
-  setUsername = () => { 
-    const newUsernameToSet = this.state.username; 
+  setUsername = () => {
+    const newUsernameToSet = this.state.username;
     const { account, viewAddress, network } = this.props;
 
     if (account && viewAddress && account.toLowerCase() === viewAddress.toLowerCase()) {
       if (this._isMounted) {
         // Optimistically update and close edit mode
-        this.setState({ username: newUsernameToSet, usernameError: '', isEditingUsername: false }); 
+        this.setState({ username: newUsernameToSet, usernameError: '', isEditingUsername: false });
         if (network?.id) {
           const networkID = network.id.toString();
           try {
@@ -4271,7 +4271,7 @@ class UserPage extends Component {
       userStats,
       copied,
       collapseOpen,
-      username, 
+      username,
       usernameError,
       bookmarked,
       sbtList,
@@ -4288,7 +4288,7 @@ class UserPage extends Component {
       analysisHistoricalFigure,
       analysisHistoricalReasoning,
       showFullProfileModal,
-      isSimulated, 
+      isSimulated,
       selectedTab,
       expandedSurveyResponses,
       expandedSurveysCreated,
@@ -4305,8 +4305,8 @@ class UserPage extends Component {
       isDeepScanning,
     } = this.state;
 
-    const { minimized, account, viewAddress: propViewAddress, provider, network, loginComplete } = this.props; 
-    
+    const { minimized, account, viewAddress: propViewAddress, provider, network, loginComplete } = this.props;
+
     // === Compute display label with nickname priority (scoped strictly to current viewAddress) ===
     const currentLower = String(propViewAddress || '').toLowerCase();
     let cachedNicknameForThis = '';
@@ -4433,10 +4433,10 @@ class UserPage extends Component {
     const isOwner = account && propViewAddress && account.toLowerCase() === String(propViewAddress).toLowerCase();
     const notOwnPage = !isOwner;
     const hasNickForThis = Boolean(cachedNicknameForThis || pendingForThis);
-    
+
     // Always show pen if it's not own page, so users can add a nickname even if none exists yet
     const showPen = !minimized && notOwnPage && !this.state.isEditingNickname;
-    
+
     // Show username pen if owner, not minimized, and not currently editing
     const showUsernamePen = !minimized && isOwner && !this.state.isEditingUsername;
 
@@ -4492,7 +4492,7 @@ class UserPage extends Component {
                     This is a simulated user whose answers are generated based on documents.
                   </CETooltip>
                 )}
-                {!isSimulated && propViewAddress && ( 
+                {!isSimulated && propViewAddress && (
                   <button onClick={this.copyToClipboard} className={styles.copyButton}>
                     <FontAwesomeIcon icon={faCheck} style={{ display: copied ? 'inline' : 'none' }} />
                     <FontAwesomeIcon icon={faCopy} style={{ display: copied ? 'none' : 'inline' }} />
@@ -4524,11 +4524,11 @@ class UserPage extends Component {
                   </button>
                 )}
               </h1>
-              
+
               {/* My Bookmarks Link (Owner Only) - Moved here from headerActionsRight */}
               {isOwner && !minimized && (
-                <a 
-                  href="/bookmarks" 
+                <a
+                  href="/bookmarks"
                   className={`${styles.bookmarksLink} ${styles.bookmarksLinkInline}`}
                   style={{ marginLeft: '12px' }}
                 >
@@ -4547,7 +4547,7 @@ class UserPage extends Component {
                     onKeyDown={this.handleNicknameKeyDown}
                     placeholder="set nickname"
                     aria-label="Set nickname"
-                    // BUG FIX: Removed el.select() from render cycle. 
+                    // BUG FIX: Removed el.select() from render cycle.
                     // Focus/select is handled once in onPenClick.
                     ref={(el) => { if (el && this.state.isEditingNickname) { /* just render ref */ } }}
                     autoFocus
@@ -5004,8 +5004,8 @@ class UserPage extends Component {
                         return (
                           <div key={index} className={styles.questionWrapper}>
                             <SingleQuestionResponse
-                              question={question} 
-                              response={userResp} 
+                              question={question}
+                              response={userResp}
                               isOwnResponse={false}
                               mode="mini"
                               showImportance={true}
@@ -5107,12 +5107,12 @@ class UserPage extends Component {
                     {sbtList.map((sbtItem, index) => (
                       <SBTPage
                         key={index}
-                        SBTAddress={sbtItem.sbtInfo.sbtAddress} 
+                        SBTAddress={sbtItem.sbtInfo.sbtAddress}
                         account={account}
-                        provider={provider} 
+                        provider={provider}
                         network={network}
                         miniaturized={true}
-                        loginComplete={loginComplete} 
+                        loginComplete={loginComplete}
                         /* Use readiness passed from MainSite to control child spinners */
                         isSBTCacheReady={this.props.isSBTCacheReady}
                         /* NEW: mini cards are metadata-only, avoid any chain scans/persistence */
@@ -5154,7 +5154,7 @@ class UserPage extends Component {
             {/* Close “X” is intentionally hidden via CSS; do not delete this feature. */}
             <div className={styles.modalTitleRow}>
               {analysisName || 'User Analysis'}
-              {/* DO NOT DELETE THIS SECTION - button we will be used in the future 
+              {/* DO NOT DELETE THIS SECTION - button we will be used in the future
               <button
                 type="button"
                 className={styles.refreshIconButton}
@@ -5263,7 +5263,7 @@ class UserPage extends Component {
                 ))
               )}
             </div>
-            {!minimized && propViewAddress && explorerUrl && ( 
+            {!minimized && propViewAddress && explorerUrl && (
               <div className={styles.modalActions}>
                 {account && propViewAddress && account.toLowerCase() === propViewAddress.toLowerCase() && (
                   <a href="/bookmarks" className={styles.bookmarksLink}>

@@ -655,7 +655,7 @@ export class SBTsPage extends Component {
                 </div>
               )}
             </div>
-            
+
             {showCreateGroupAfterFeatured && renderCreateGroupPanel()}
         </div>
 

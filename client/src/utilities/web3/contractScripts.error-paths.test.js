@@ -283,7 +283,7 @@ describe('error paths', () => {
       .mockResolvedValueOnce(QUESTION_TX_ID);
 
     const submitSpy = jest.spyOn(contractScripts, 'submitResponses');
-    
+
     await expect(
       submitResponses(
         'wagmi',

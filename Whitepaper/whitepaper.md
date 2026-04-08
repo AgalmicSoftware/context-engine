@@ -4,7 +4,7 @@
 
 *v0.1.0 (2026) — agalmic.eth*
 
-For detailed technical documentation, see [`spec.md`](../spec.md) and [`docs/`](../docs/README.md).*
+For detailed technical documentation, see [`spec.md`](../spec.md) and [`docs/`](../docs/README.md).
 
 ---
 
@@ -165,7 +165,7 @@ A standing session accumulates input between formal decision points: more nuance
 
 ---
 
-## 5. Closing Thoughts
+## 6. Closing Thoughts
 
 Context Engine represents a step toward a world of automated debate and coalition building, as well as large-scale Coasean bargaining (Krier, 2025). It is our belief that the world needs better interfaces for negotiation, preference discovery, and coordination between and within groups.
 

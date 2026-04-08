@@ -741,26 +741,26 @@ function approximateSVD2(A, randomSeed = null) {
 
 /***************************************************************
  * computeQuestionDivisiveness
- * 
+ *
  * For each comment-row of ratingMatrix, we only count participants
  * who have either 1 (Agree) or -1 (Disagree).  We skip participants
  * with 0 (Unsure) or null/undefined (No response) in that row.
- * 
+ *
  * Let agrees = # of participants that had value 1
  *     disagrees = # of participants that had value -1
  *     total = agrees + disagrees
- * 
+ *
  * If total > 0, define probAgree = (agrees / total).
  * Then the “Pol.is style” divisiveness is:
  *    divisiveness = 1 - 2 * | probAgree - 0.5 |
- * This yields 0 for unanimous (all or none agrees), 
- * up to 1 for a perfect 50/50 split. 
- * 
+ * This yields 0 for unanimous (all or none agrees),
+ * up to 1 for a perfect 50/50 split.
+ *
  ***************************************************************/
 export function computeQuestionDivisiveness(ratingMatrix) {
     const [nComments, nParticipants] = matrixShape(ratingMatrix);
     const results = [];
-  
+
     for (let c = 0; c < nComments; c++) {
       let agrees = 0;
       let disagrees = 0;
@@ -786,6 +786,6 @@ export function computeQuestionDivisiveness(ratingMatrix) {
         divisiveness,
       });
     }
-  
+
     return results;
   }

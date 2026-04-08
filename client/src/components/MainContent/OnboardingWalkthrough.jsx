@@ -46,7 +46,7 @@ class OnboardingWalkthrough extends Component {
 
   getOnboardingHeadline = () => {
     const title = getWelcomeSlide(this.state.arrowIndex)?.title || '';
-  
+
     return title ? (
       <div id={styles.onboardingInfo}>
         <div id={styles.onboardingTitleArea}>
@@ -55,7 +55,7 @@ class OnboardingWalkthrough extends Component {
       </div>
     ) : null;
   };
-  
+
   getLeftButton = () => {
     if (this.state.arrowIndex > 0) {
       return (
@@ -71,7 +71,7 @@ class OnboardingWalkthrough extends Component {
       );
     }
   }
-  
+
   getRightButton = () => {
     if (this.state.arrowIndex < this.state.numSlides - 1) {
       return (
@@ -87,7 +87,7 @@ class OnboardingWalkthrough extends Component {
       );
     }
   }
-     
+
 
   render() {
 

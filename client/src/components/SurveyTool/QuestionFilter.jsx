@@ -1046,16 +1046,16 @@ class QuestionFilter extends React.Component {
 
   handleBookmarkCurrentFilter = () => {
     if (!this._isMounted) return;
-  
+
     const currentFilterString = serializeFilterState(this.buildFilterState());
     if (!currentFilterString) {
       // Don't bookmark an empty/default filter
       return;
     }
-  
+
     const slug = resolveFilterStorageSlug(this.props);
     let bookmarksCacheObject = {};
-  
+
     try {
       const parsedCache = peekCacheSync('filters', slug, { clone: false });
       bookmarksCacheObject = (typeof parsedCache === 'object' && parsedCache !== null)
@@ -1064,7 +1064,7 @@ class QuestionFilter extends React.Component {
     } catch (e) {
       questionFilterLog.error("Error parsing bookmarksCache from localStorage, resetting.", e);
     }
-  
+
     // Canonical field for persisted filter bookmarks.
     if (!Array.isArray(bookmarksCacheObject.bookmarkedFilters)) {
       bookmarksCacheObject.bookmarkedFilters = (
@@ -1073,12 +1073,12 @@ class QuestionFilter extends React.Component {
     } else {
       bookmarksCacheObject.bookmarkedFilters = [...bookmarksCacheObject.bookmarkedFilters];
     }
-  
+
     // Prevent duplicates
     if (!bookmarksCacheObject.bookmarkedFilters.includes(currentFilterString)) {
       bookmarksCacheObject.bookmarkedFilters.push(currentFilterString);
     }
-  
+
     void writeCache('filters', slug, bookmarksCacheObject)
       .then((ok) => {
         if (!ok) {
@@ -1088,7 +1088,7 @@ class QuestionFilter extends React.Component {
         this.setState({ filterBookmarkedFeedback: true }, () => {
           this.checkIfCurrentFilterIsBookmarked();
         });
-  
+
         clearTimeout(this.bookmarkFeedbackTimeout);
         this.bookmarkFeedbackTimeout = setTimeout(() => {
           if (this._isMounted) {
@@ -1875,7 +1875,7 @@ class QuestionFilter extends React.Component {
       }
     );
 
-    const filterStateForCallback = this.buildFilterState(); 
+    const filterStateForCallback = this.buildFilterState();
     filterStateForCallback.sbtFilter = newSbtFilterLocalState;
 
     if (Object.keys(filteredResponsesByQuestion).length > 0) {
@@ -2231,11 +2231,11 @@ class QuestionFilter extends React.Component {
 
     const isTopQuestionsDefault = filterStateToTest.topQuestions === null;
     const isQuestionTypesDefault = Array.isArray(filterStateToTest.questionTypes) && filterStateToTest.questionTypes.length === 0;
-    
+
     const sbtFilter = filterStateToTest.sbtFilter;
     let isSbtFilterDefault = sbtFilter === null;
     if (sbtFilter && typeof sbtFilter === 'object') {
-        const allSbtListsEmpty = 
+        const allSbtListsEmpty =
             (!sbtFilter.selectedSBTGroupsCreator || sbtFilter.selectedSBTGroupsCreator.length === 0) &&
             (!sbtFilter.excludedSBTGroupsCreator || sbtFilter.excludedSBTGroupsCreator.length === 0) &&
             (!sbtFilter.selectedSBTGroupsResponder || sbtFilter.selectedSBTGroupsResponder.length === 0) &&
@@ -2243,9 +2243,9 @@ class QuestionFilter extends React.Component {
             (!sbtFilter.selectedSBTGroups || sbtFilter.selectedSBTGroups.length === 0) &&
             (!sbtFilter.excludedSBTGroups || sbtFilter.excludedSBTGroups.length === 0);
         if (allSbtListsEmpty) {
-            isSbtFilterDefault = true; 
+            isSbtFilterDefault = true;
         } else {
-            isSbtFilterDefault = false; 
+            isSbtFilterDefault = false;
         }
     }
 
@@ -2294,7 +2294,7 @@ class QuestionFilter extends React.Component {
     }
 
     const serializedState = serializeFilterState(currentAppliedFilterState);
-    if (!serializedState) { 
+    if (!serializedState) {
         questionFilterLog.error("Failed to serialize non-default filter state.");
         return;
     }
@@ -2404,7 +2404,7 @@ class QuestionFilter extends React.Component {
           this.props.toggleFilterModal();
         }
         // After reverting pending states, re-apply filters to reflect the actual current state
-        this.handleApplyFilters(true); 
+        this.handleApplyFilters(true);
       }
     );
   };
@@ -2446,7 +2446,7 @@ handleLoadFilter = () => {
     if (!input) return;
 
     let filterString = input;
-    
+
     // 1. Try to extract from full URL (query param style)
     try {
       if (input.includes('?')) {
@@ -2460,7 +2460,7 @@ handleLoadFilter = () => {
         const parts = input.split('/results/');
         if (parts.length > 1) {
           // take the part after results/, remove any query params that might follow
-          filterString = parts[1].split('?')[0]; 
+          filterString = parts[1].split('?')[0];
         }
       }
     } catch (e) {
@@ -2472,7 +2472,7 @@ handleLoadFilter = () => {
       if (!deserializedState) {
         throw new Error("Invalid filter string.");
       }
-      
+
       const newState = {};
       // Map deserialized state to component's state structure
       if (deserializedState.questionTypes) {
@@ -2896,7 +2896,7 @@ handleLoadFilter = () => {
             cursor: isDefault || this.state.copiedUrlSuccess ? 'not-allowed' : 'pointer',
             color: this.state.copiedUrlSuccess ? 'green' : (isDefault ? '#cccccc' : '#6c757d'),
             fontSize: '1.1em',
-            marginRight: '15px' 
+            marginRight: '15px'
           }}
           title={isDefault ? "No custom filters to copy" : (this.state.copiedUrlSuccess ? "URL Copied!" : "Copy Filter URL")}
         />
@@ -3259,8 +3259,8 @@ handleLoadFilter = () => {
                 externalSBTFilterState={sbtFilterLocalState}
                 defaultFeaturedSBTs={this.props.defaultFeaturedSBTs} // Pass the prop down
                 //
-                isQuestionCacheReady={this.props.isQuestionCacheReady} 
-                isSurveyCacheReady={this.props.isSurveyCacheReady}   
+                isQuestionCacheReady={this.props.isQuestionCacheReady}
+                isSurveyCacheReady={this.props.isSurveyCacheReady}
                 isSBTCacheReady={this.props.isSBTCacheReady}
                 sbtCacheRevision={this.props.sbtCacheRevision}
               />
@@ -3381,7 +3381,7 @@ handleLoadFilter = () => {
             {this.renderFilterActionsIcons()}
           </div>
         </div>
-        
+
         <div className={styles.summaryItemsRow}>
           {summaryItems.map((item, idx) => (
             <div key={idx} className={styles.filterBubble} onClick={item.onRemove}>
