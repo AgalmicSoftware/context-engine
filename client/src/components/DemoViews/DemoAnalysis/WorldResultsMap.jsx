@@ -178,6 +178,17 @@ const WorldResultsMap = ({
     </ComposableMap>
   );
 
+  const renderSelectedQuestion = () => (
+    question ? (
+      <div className={styles.mapSelectedQuestionPanel}>
+        <span className={styles.mapSelectedQuestionLabel}>Selected question</span>
+        <p className={styles.mapSelectedQuestionText} data-testid="demo-analysis-selected-question">
+          {question.text}
+        </p>
+      </div>
+    ) : null
+  );
+
   if (isLightweightMode) {
     return (
       <div
@@ -250,8 +261,13 @@ const WorldResultsMap = ({
         ))}
       </div>
 
-      <div className={styles.mapFrame}>
-        {renderMap()}
+      <div className={styles.mapFrameShell}>
+        <div className={styles.mapFrameViewport}>
+          <div className={styles.mapFrame}>
+            {renderMap()}
+          </div>
+        </div>
+        {renderSelectedQuestion()}
       </div>
     </section>
   );

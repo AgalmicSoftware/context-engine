@@ -73,10 +73,11 @@ describe('DemoAnalysisWorkspace', () => {
     expect(screen.queryByTestId('demo-analysis-selected-question')).not.toBeInTheDocument();
   });
 
-  it('updates the report when demographics are selected while keeping the map unselected', async () => {
+  it('updates the report and heatmap when demographics are selected while keeping the map unselected', async () => {
     render(<DemoAnalysisWorkspace />);
 
     expect(screen.getByTestId('demo-analysis-empty-state')).toBeInTheDocument();
+    expect(screen.getByText(/Overall Topic Heatmap/i)).toBeInTheDocument();
     expect(screen.getByTestId('demo-analysis-world-map')).toHaveTextContent(/choose a comparison suggestion/i);
 
     setMultiSelectValues('demo-analysis-select-era', ['Modern', 'Industrial']);
@@ -87,6 +88,7 @@ describe('DemoAnalysisWorkspace', () => {
     });
 
     expect(screen.queryByTestId('demo-analysis-empty-state')).not.toBeInTheDocument();
+    expect(screen.getByText(/Era: Modern Topic Heatmap/i)).toBeInTheDocument();
     expect(screen.getByTestId('demo-analysis-world-map')).toHaveTextContent(/choose a comparison suggestion/i);
     expect(screen.getAllByText('Era: Modern').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Era: Industrial').length).toBeGreaterThan(0);

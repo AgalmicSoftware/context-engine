@@ -58,9 +58,9 @@ Although Context Engine is an Ethereum application, users do not need to know an
 Context Engine is a web application, a set of smart contracts (EVM), and supporting infrastructure for AI inference, storage, access gating, and encryption. It is meant to be easily redeployable by various groups with no programming experience.
 
 - **Sessions** include questions, responses, documents, access gates, and configuration, and new Sessions  can be created from the web application (at [/new](https://contextengine.xyz/new)).
-- **Surveys and Questions** supports binary, rating, multiple-choice, and freeform questions (with the ability to add new question types as needed), with optional conviction weighting and comments.
-- **Access control** uses soulbound tokens (non-transferrable NFTs), with support for gated participation, encrypted fields, and sponsored resources (RPC, AI, EVM tx Costs, Arweave Storage, Lit Encryption).
-- **Storage**: responses and documents stored on Arweave
+- **The deliberation surface** supports binary, rating, multiple-choice, and freeform questions, with optional conviction weighting and comments.
+- **Access control** uses soulbound tokens (non-transferrable NFTs), with support for gated participation, encrypted fields, and sponsored resources (RPC, AI, Tx Costs, Arweave Storage, Lit Encryption).
+- **Memory** lives in durable records: responses and documents on Arweave, built-in report views, exports, and address-based comparison tools.
 - **AI** is already used for question generation, transcription, cluster summaries, result analysis, and comparison of user positions across wallets.
 - **Demonstration datasets** are shipped in the repo as well, including one built around simulated historical figures. The results of this can be seen at [/demo](https://contextengine.xyz/session/demo)
 
@@ -161,7 +161,7 @@ A longer-term goal is cryptographic diplomacy: incentive-compatible programmatic
 
 Programmable cryptography seems like an underexplored toolkit for AI safety and alignment efforts (0xPARC, 2023). It is also worth taking storytelling seriously as a coordination tool and alignment strategy – What would a news broadcast look like from the good timeline, and would seeing that broadcast help us navigate towards it?
 
-Context Engine recognizes and builds on the pioneering work of those involved with RadicalxChange, Pol.is, vTaiwan, g0v, TalkToTheCity, Loophole, the Plurality Book, 0xPARC, Zuzalu, Edge City, MetaGov, PCARE, and many other related efforts. The author also gratefully acknowledges the AI programming assistance that finally made this effort tractable.
+Context Engine recognizes and builds on the pioneering work of those involved with RadicalxChange, Pol.is, vTaiwan, g0v, TalkToTheCity, the Plurality Book, 0xPARC, Zuzalu, Edge City, MetaGov, PCARE, and many other related efforts. The author also gratefully acknowledges the AI programming assistance that finally made this effort tractable.
 
 
 ## References
