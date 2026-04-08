@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faGithub } from '@fortawesome/free-brands-svg-icons';
 import { Modal, ModalBody, ModalHeader } from 'reactstrap';
 import {
   faCaretDown,
@@ -25,12 +26,8 @@ import {
   readStoredGlobalSessionSelection,
 } from '../../utilities/session/globalSessionState.js';
 
-const SLIDES_URL = 'https://docs.google.com/presentation/d/1fFExDsGNpy13SE3TOw9ogasi5BcxXOQwKaXf96mBL-8/edit?usp=sharing';
-
 const HEADER_LINKS = [
   { url: PUBLIC_WHITEPAPER_URL, text: 'Whitepaper', testId: 'ce-about-link-whitepaper' },
-  { url: PUBLIC_REPO_URL, text: 'GitHub', testId: 'ce-about-link-github' },
-  { url: SLIDES_URL, text: 'Slides', testId: 'ce-about-link-slides' },
 ];
 
 const RECOGNITION_GROUPS = [
@@ -40,7 +37,7 @@ const RECOGNITION_GROUPS = [
     itemClassName: 'recognitionItemEthereum',
     logoClassName: 'recognitionLogoEthereum',
     description:
-      'Context Engine is built on Ethereum — the decentralized, open-source blockchain that powers the smart contracts, SBT credentials, and on-chain session registry at the core of the platform. Ethereum provides the trustless infrastructure that makes token-gated surveys, verifiable group membership, and encrypted response storage possible without a central authority.',
+      'Context Engine uses a passkey Ethereum wallet model rather than email. In the whitepaper, Ethereum matters as the cryptographic base that natively supports proof-of-human credentials, digital group membership tokens, access gates, and durable on-chain references, while decentralized protocols add censorship-resistance and data permanence. Although the app runs on Ethereum infrastructure, users do not need to know anything about cryptocurrency to use it.',
     links: [
       { url: 'https://ethereum.org/', text: 'Ethereum.org' },
       { url: 'https://ethereum.org/en/what-is-ethereum/', text: 'What is Ethereum?' },
@@ -52,7 +49,7 @@ const RECOGNITION_GROUPS = [
     itemClassName: 'recognitionItemRadicalxchange',
     logoClassName: 'recognitionLogoRxc',
     description:
-      'RadicalxChange is a research and organizing ecosystem focused on quadratic voting, plural governance, and large-group coordination without winner-take-all collapse. Context Engine overlaps with that governance agenda by mapping where groups agree, where minority views persist, and how communities can build auditable inputs for pluralist decision-making before everything gets flattened into a binary vote.',
+      'The whitepaper explicitly leans on RadicalxChange ideas around social identity, plural governance, and group-owned value. Context Engine uses SBT-style credentials issued by disparate communities for filtering and encryption, and points toward digital groups retaining ownership over the preference data and value they create instead of surrendering it to platforms.',
     links: [
       { url: 'https://www.radicalxchange.org/', text: 'Official Website' },
       { url: 'https://twitter.com/RadxChange', text: 'Twitter / X' },
@@ -64,7 +61,7 @@ const RECOGNITION_GROUPS = [
     itemClassName: 'recognitionItemPolis',
     logoClassName: 'recognitionLogoPolis',
     description:
-      'Pol.is is a pioneering conversation platform for large-group opinion mapping, designed to surface both consensus and persistent disagreement in complex public discourse.',
+      'In the whitepaper, Pol.is is treated as the current SOTA for large-group discourse software, especially its vTaiwan demonstration that simple Agree / Unsure / Disagree inputs can clarify both consensus and persistent difference. Context Engine builds on that pioneering approach with more question types, optional privacy, AI-native workflows, and permanent public storage.',
     links: [
       { url: 'https://pol.is/', text: 'Official Website' },
     ],
@@ -76,7 +73,7 @@ const RECOGNITION_GROUPS = [
     logoClassName: 'recognitionLogoCip',
     image: cipPhoto,
     description:
-      'The Collective Intelligence Project (CIP) develops frameworks and tools for scalable collective decision-making on transformative technology.',
+      'The whitepaper frames Context Engine as social infrastructure for the AI transition: a toolkit for collective intelligence, large-group deliberation, and coordination under information overload. That places the project in close conversation with CIP’s work on scalable collective decision-making for transformative technology.',
     links: [
       { url: 'https://cip.org/', text: 'CIP Website' },
     ],
@@ -87,7 +84,7 @@ const RECOGNITION_GROUPS = [
     itemClassName: 'recognitionItemEdgePatagonia',
     logoClassName: 'recognitionLogoEdge',
     description:
-      'Edge Patagonia hosted a d/acc residency backed by Protocol Labs, bringing builders and researchers together to prototype tools for resilient technology, governance, and collective coordination.',
+      'Edge City appears in the whitepaper’s closing acknowledgments as part of the broader ecosystem of experiments that helped shape the project. Residencies like Edge Patagonia created room to prototype tools for resilient technology, coordination, and governance in live community settings rather than only in theory.',
     links: [
       { url: 'https://www.edgecity.live/patagonia', text: 'Edge City' },
     ],
@@ -102,50 +99,60 @@ const USE_CASES = [
     label: 'For AI Discourse',
     icon: faBrain,
     tone: 'mint',
+    problemTitle: 'Low-Dimensional Debate',
     problem:
-      'Public AI discourse is low-dimensional. It collapses into slogans like "accelerate" vs. "pause" even when the real questions are about deployment, liability, labor, surveillance, and public goods.',
+      'Public AI discourse gets flattened into slogans like "accelerate" vs. "pause," while harder questions on labor, surveillance, liability, and public goods stay under-specified.',
+    solutionTitle: 'Durable Public Map',
     detail:
-      'Build a structured public map of AI questions, record positions and predictions in durable form, and make disagreement legible enough that leaders in industry and government cannot hide behind vague camp labels.',
+      'Create a structured public map of AI questions, preferences, and predictions in durable form so disagreement stays legible over time.',
   },
   {
     slug: 'corporate',
     label: 'For Companies',
     icon: faBuilding,
     tone: 'blue',
+    problemTitle: 'Lost Decision Context',
     problem:
-      'Internal signal gets flattened by hierarchy, fragmented tools, and meetings that preserve decisions without preserving why people disagreed.',
+      'Organizations often preserve decisions without preserving the assumptions, tradeoffs, and confidence behind them.',
+    solutionTitle: 'Private Forecasting',
     detail:
-      'Companies and organizations can surface honest internal signal inside gated spaces, make private predictions, retroactively recognize the strongest predictors, compare perspectives across teams, and preserve decision context over time.',
+      'Record predictions, assumptions, and confidence before outcomes are known, with timestamped entries that can remain encrypted until review.',
   },
   {
     slug: 'cities',
     label: 'For Cities',
     icon: faCity,
     tone: 'orange',
+    problemTitle: 'Shallow Civic Input',
     problem:
-      'Hearings and polls rarely capture the texture of public disagreement, so cities end up with shallow input on complex civic questions.',
+      'Polls and hearings rarely capture the texture of public disagreement on complex civic questions.',
+    solutionTitle: 'Standing Public Record',
     detail:
-      'Cities and policy groups can gather input more nuanced than a poll and more durable than a hearing, with responses that can be public or encrypted and preserved in a durable record.',
+      'Gather input that is more nuanced than a poll and more durable than a hearing, with responses that can be filtered across constituencies.',
   },
   {
     slug: 'conferences',
     label: 'For Events',
     icon: faChalkboardTeacher,
     tone: 'pink',
+    problemTitle: 'Signal That Vanishes',
     problem:
-      'Conferences and pop-up communities generate intense discussion, but the shared signal usually disappears as soon as the event ends.',
+      'High-bandwidth event discussion usually disappears once the gathering ends.',
+    solutionTitle: 'Persistent Opinion Map',
     detail:
-      'Events, including conferences and pop-up cities, can leave with an artifact of where the group stood — opinion space mapped, sub-group differences surfaced, unresolved questions identified — and that artifact keeps growing instead of vanishing when the event ends.',
+      'Leave with a durable map of consensus, subgroup differences, and unresolved questions that can keep growing between gatherings.',
   },
   {
     slug: 'digital-groups',
     label: 'For Groups',
     icon: faUsers,
     tone: 'gold',
+    problemTitle: 'Platform-Owned Group Data',
     problem:
-      'Digital communities rarely own the preference data, membership boundaries, or AI systems built from what they collectively know.',
+      'Online communities rarely own the preference data, membership boundaries, or AI systems built from what they collectively know.',
+    solutionTitle: 'Representative Models',
     detail:
-      'Digital communities can codify fluid values and membership, train AI models to represent them, and monetize tacit and local data in a privacy-preserving, attributable, and revocable way.',
+      'Codify group preferences over time, train representative AI models, and keep community data attributable, licensable, and revocable.',
   },
 ];
 
@@ -225,13 +232,29 @@ const AboutPage = () => {
       <div className={styles.pageShell}>
         <section className={styles.hero} data-testid="ce-about-hero">
           <div className={styles.heroText}>
-            <h1 className={styles.mainTitle}>Context Engine</h1>
+            <div className={styles.titleRow}>
+              <h1 className={styles.mainTitle}>Context Engine</h1>
+              <a
+                href={PUBLIC_REPO_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={styles.titleRepoLink}
+                data-testid="ce-about-link-github"
+                aria-label="View Context Engine on GitHub"
+                title="View Context Engine on GitHub"
+              >
+                <FontAwesomeIcon icon={faGithub} />
+              </a>
+            </div>
             <p className={styles.tagline}>
               An open-source toolkit for large-group deliberation and sensemaking. Built to help us navigate the AI transition.
             </p>
 
             <div className={styles.heroActions}>
-              <Link to={demoSessionPath} className={`${styles.ctaButton} ${styles.primaryButton}`}>
+              <Link
+                to={demoSessionPath}
+                className={`${styles.ctaButton} ${styles.primaryButton} ${styles.heroPrimaryButton}`}
+              >
                 Explore Demo
               </Link>
             </div>
@@ -286,14 +309,18 @@ const AboutPage = () => {
           </div>
 
           {activeUseCaseConfig && (
-            <article className={styles.useCaseDetail} aria-live="polite">
-              <p className={styles.useCaseDetailLabel}>{activeUseCaseConfig.label}</p>
+            <article className={styles.useCaseDetail} aria-live="polite" aria-atomic="true">
+              <p className={styles.srOnly}>{activeUseCaseConfig.label}</p>
               <div className={styles.useCaseDetailRow}>
-                <span className={styles.useCaseDetailProblemTag}>Problem</span>
+                <span className={styles.useCaseDetailProblemTag}>
+                  {activeUseCaseConfig.problemTitle}
+                </span>
                 <p className={styles.useCaseDetailRowText}>{activeUseCaseConfig.problem}</p>
               </div>
               <div className={styles.useCaseDetailRow}>
-                <span className={styles.useCaseDetailSolutionTag}>How CE helps</span>
+                <span className={styles.useCaseDetailSolutionTag}>
+                  {activeUseCaseConfig.solutionTitle}
+                </span>
                 <p className={styles.useCaseDetailRowText}>{activeUseCaseConfig.detail}</p>
               </div>
             </article>
@@ -309,7 +336,7 @@ const AboutPage = () => {
             tabIndex={0}
             aria-expanded={showPresent}
           >
-            <h2 className={styles.sectionTitle}>Current Functionalities</h2>
+            <h2 className={styles.sectionTitle}>Functionality</h2>
             <FontAwesomeIcon
               icon={showPresent ? faCaretUp : faCaretDown}
               className={styles.toggleIcon}
@@ -317,11 +344,37 @@ const AboutPage = () => {
           </div>
           {showPresent && (
             <div className={styles.collapsibleContent}>
-              <ul className={styles.bulletList}>
-                <li>Sessions: Create and publish sessions, including sponsored-session links for easy onboarding</li>
-                <li>Questions: Multi-format survey creation and responses (binary, rating, multichoice, freeform), stored permanently on Arweave with hashes in smart contracts. Includes reports and CSV and PDF exports.</li>
-                <li>Groups: Deploy soulbound tokens (non-transferable credentials) for gating survey access. Filter and encrypt responses by group membership via Lit Protocol.</li>
-                <li>AI Tools: Generate survey questions from URLs, documents, and audio transcripts. AI-assisted analysis and opinion clustering.</li>
+              <ul className={styles.featureList}>
+                <li className={styles.featureItem}>
+                  <span className={styles.featureLabel}>Sessions:</span>
+                  <span className={styles.featureText}>
+                    Include questions, responses, documents, access gates, and configuration, and new sessions can be created from the web application.
+                  </span>
+                </li>
+                <li className={styles.featureItem}>
+                  <span className={styles.featureLabel}>Questions:</span>
+                  <span className={styles.featureText}>
+                    Supports binary, rating, multiple-choice, and freeform questions, with optional conviction weighting and comments.
+                  </span>
+                </li>
+                <li className={styles.featureItem}>
+                  <span className={styles.featureLabel}>Access Control:</span>
+                  <span className={styles.featureText}>
+                    Uses soulbound tokens for gated participation, encrypted fields, and sponsored resources like RPC, AI, transaction costs, Arweave storage, and Lit encryption.
+                  </span>
+                </li>
+                <li className={styles.featureItem}>
+                  <span className={styles.featureLabel}>Storage:</span>
+                  <span className={styles.featureText}>
+                    Lives in durable records, with responses and documents on Arweave plus built-in report views, exports, and address-based comparison tools.
+                  </span>
+                </li>
+                <li className={styles.featureItem}>
+                  <span className={styles.featureLabel}>AI:</span>
+                  <span className={styles.featureText}>
+                    Already supports question generation, transcription, cluster summaries, result analysis, and comparison of user positions across wallets.
+                  </span>
+                </li>
               </ul>
             </div>
           )}
@@ -344,23 +397,51 @@ const AboutPage = () => {
           </div>
           {showRoadmap && (
             <div className={styles.collapsibleContent}>
-              <ul className={styles.bulletList}>
-                <li>✅ Stage 1: Upgraded decentralized Pol.is — large-group deliberation with permanent storage</li>
-                <li>Stage 2: Public trial for AI safety discourse database</li>
-                <li>
-                  Stage 3: Advanced cryptography
+              <ul className={styles.featureList}>
+                <li className={styles.featureItem}>
+                  <div className={styles.featureHeader}>
+                    <span className={styles.featureLabel}>Stage 1:</span>
+                    <span className={styles.featureStatusComplete}>Complete</span>
+                  </div>
+                  <span className={styles.featureText}>
+                    Current platform: an upgraded decentralized Pol.is with more question types, optional privacy, AI-native inputs, permanent public storage, and a passkey Ethereum wallet model.
+                  </span>
+                </li>
+                <li className={styles.featureItem}>
+                  <span className={styles.featureLabel}>Stage 2:</span>
+                  <span className={styles.featureText}>
+                    Deployment and interface upgrades.
+                  </span>
                   <ul className={styles.roadmapSubList}>
-                    <li>Zero-knowledge proofs for encrypted predictions and retroactive evaluation</li>
-                    <li>FHE for private computation on encrypted group data</li>
-                    <li>Threshold encryption for private group data sharing</li>
-                    <li>Privacy-preserving proof-of-unique-human filtering</li>
+                    <li className={styles.roadmapSubItem}>Ease of deployment through turnkey bundles for Arweave, Lit, gas, and AI credits</li>
+                    <li className={styles.roadmapSubItem}>Agent-first UX so an agent can interface with a session in natural language</li>
+                    <li className={styles.roadmapSubItem}>Voice-only mode across languages</li>
+                    <li className={styles.roadmapSubItem}>Better document and context integration with knowledge maps and richer debate-tree style flows</li>
                   </ul>
                 </li>
-                <li>
-                  Stage 4+: Collaborative worldbuilding, data labor, AI governance agents
+                <li className={styles.featureItem}>
+                  <span className={styles.featureLabel}>Stage 3:</span>
+                  <span className={styles.featureText}>
+                    Stronger privacy and resilience.
+                  </span>
                   <ul className={styles.roadmapSubList}>
-                    <li>AI agents that learn group preferences and represent communities in governance</li>
-                    <li>Data labor tools for groups to monetize preference data revokably</li>
+                    <li className={styles.roadmapSubItem}>Unlinkable per-response and per-SBT accounts, zero-knowledge and FHE aggregation, and proofs on encrypted response properties</li>
+                    <li className={styles.roadmapSubItem}>Increased censorship-resistance and walkaway resilience via ENS-hosted frontends and stronger decentralized services</li>
+                    <li className={styles.roadmapSubItem}>More storage options, including IPFS and configurable centralized storage</li>
+                    <li className={styles.roadmapSubItem}>zkTLS group formation and post-quantum cryptography</li>
+                  </ul>
+                </li>
+                <li className={styles.featureItem}>
+                  <span className={styles.featureLabel}>Stage 4+:</span>
+                  <span className={styles.featureText}>
+                    Collective intelligence, representation, and negotiation.
+                  </span>
+                  <ul className={styles.roadmapSubList}>
+                    <li className={styles.roadmapSubItem}>Quadratic voting for questions, priorities, and representative figures in automated debate</li>
+                    <li className={styles.roadmapSubItem}>AI models that represent group preferences and earn from invocations</li>
+                    <li className={styles.roadmapSubItem}>Group prompting, multimedia worldbuilding, and backcasting from clusters to scenarios</li>
+                    <li className={styles.roadmapSubItem}>Agent-to-agent negotiation tooling for multi-step private processes</li>
+                    <li className={styles.roadmapSubItem}>AI whistleblowing flows using zero-knowledge proofs and conditional timelocks</li>
                   </ul>
                 </li>
               </ul>
