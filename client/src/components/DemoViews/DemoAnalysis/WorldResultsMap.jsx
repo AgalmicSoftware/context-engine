@@ -178,6 +178,17 @@ const WorldResultsMap = ({
     </ComposableMap>
   );
 
+  const renderSelectedQuestion = () => (
+    question ? (
+      <div className={styles.mapSelectedQuestionPanel}>
+        <span className={styles.mapSelectedQuestionLabel}>Selected question</span>
+        <p className={styles.mapSelectedQuestionText} data-testid="demo-analysis-selected-question">
+          {question.text}
+        </p>
+      </div>
+    ) : null
+  );
+
   if (isLightweightMode) {
     return (
       <div
@@ -192,18 +203,42 @@ const WorldResultsMap = ({
 
   if (!question) {
     return (
-      <section className={`${styles.panel} ${styles.mapPanel}`}>
-        <h3 className={styles.panelTitle}>World Results Map</h3>
-        <p className={styles.emptyHint}>Select a question to view the country map.</p>
+      <section
+        className={`${styles.panel} ${styles.mapPanel}`}
+        data-testid="demo-analysis-world-map"
+      >
+        <div className={styles.panelHeader}>
+          <h3 className={styles.panelTitle}>World Results Map</h3>
+        </div>
+        <div className={styles.mapFrameShell}>
+          <div className={`${styles.mapFrameViewport} ${styles.mapFrameViewportEmpty}`}>
+            <p className={styles.mapViewportHint}>
+              Choose a comparison suggestion or inspect a question below to load the country map.
+            </p>
+          </div>
+        </div>
       </section>
     );
   }
 
   if (!processedData.hasAnyData) {
     return (
-      <section className={`${styles.panel} ${styles.mapPanel}`}>
-        <h3 className={styles.panelTitle}>World Results Map</h3>
-        <p className={styles.emptyHint}>No country-segment data is available for this question.</p>
+      <section
+        className={`${styles.panel} ${styles.mapPanel}`}
+        data-testid="demo-analysis-world-map"
+      >
+        <div className={styles.panelHeader}>
+          <div>
+            <h3 className={styles.panelTitle}>World Results Map</h3>
+            <p className={styles.panelMeta}>{buildFocusedCountriesSummary(focusedCountries)}</p>
+          </div>
+        </div>
+        <div className={styles.mapFrameShell}>
+          <div className={`${styles.mapFrameViewport} ${styles.mapFrameViewportEmpty}`}>
+            <p className={styles.mapViewportHint}>No country-segment data is available for this question.</p>
+          </div>
+          {renderSelectedQuestion()}
+        </div>
       </section>
     );
   }
@@ -226,8 +261,13 @@ const WorldResultsMap = ({
         ))}
       </div>
 
-      <div className={styles.mapFrame}>
-        {renderMap()}
+      <div className={styles.mapFrameShell}>
+        <div className={styles.mapFrameViewport}>
+          <div className={styles.mapFrame}>
+            {renderMap()}
+          </div>
+        </div>
+        {renderSelectedQuestion()}
       </div>
     </section>
   );

@@ -353,8 +353,8 @@ export const findMostDivergentPairs = ({
   }, []);
 
   const responseMap = buildResponsesByQuestionResponse(flatResponses);
-  const pairResults: DivergentPairResult[] = [];
-  const allowedSet = new Set<string>((Array.isArray(allowedSegmentKeys) ? allowedSegmentKeys : []).filter(Boolean));
+  const pairResults = [];
+  const allowedSet = new Set((Array.isArray(allowedSegmentKeys) ? allowedSegmentKeys : []).filter(Boolean));
   const allowPairsTouchingSingleSegment = allowedSet.size === 1;
 
   for (let leftIndex = 0; leftIndex < allSegmentKeys.length; leftIndex += 1) {
