@@ -18,12 +18,11 @@ import {
   faBookmark,
   faQrcode,
   faTimes,
-  faUpload,
   faEraser
 } from '@fortawesome/free-solid-svg-icons';
 import { ethers } from 'ethers';
 import { arweaveScripts } from '../../utilities/arweave/arweaveScripts.js';
-import { normalizeArweaveUrl } from '../../utilities/arweave/arweaveUrls.js';
+import { normalizeArweaveUrl, parseArweaveTxId } from '../../utilities/arweave/arweaveUrls.js';
 import contractScripts, { getSessionConfigBySlugOrDefault, normalizeSessionSlug } from '../../utilities/web3/contractScripts.js';
 import { getEffectiveArweaveKey } from '../../utilities/session/resourceKeys.js';
 import { toStr } from '../../utilities/shared/primitives.js';
@@ -41,6 +40,8 @@ import JsonDisplay from '../Shared/Json/JsonDisplay.jsx';
 import CETooltip from '../Shared/CETooltip';
 import CEDateTimeInput from '../Shared/CEDateTimeInput.jsx';
 import GateMultiSelectLock from '../Gates/GateMultiSelectLock';
+import CompactImageChooser from '../Shared/CompactImageChooser.jsx';
+import { readCompactImageClipboard } from '../Shared/compactImageClipboard.js';
 import { resolveSessionContractRef } from '../../utilities/session/sessionNaming.js';
 
 import { cryptoUtils }  from '../../utilities/crypto/cryptography.js';
@@ -671,6 +672,8 @@ class CreateSBTGroup extends Component {
       documentUrl: '',
       showTagsInput: false,
       imageLoadError: false,
+      imageChooserStatusText: '',
+      imageChooserStatusTone: 'default',
       documentURLs: [],
       startedMinting: false,
       // Group password
@@ -2271,7 +2274,9 @@ class CreateSBTGroup extends Component {
       tokenUriUploaded: false,
       tokenURI: '',
       showJson: false,
-      showTagsInput: false
+      showTagsInput: false,
+      imageChooserStatusText: '',
+      imageChooserStatusTone: 'default',
     }, () => {
       this.updateGroupHash();
     });
@@ -2379,6 +2384,9 @@ class CreateSBTGroup extends Component {
       this.setState({
         [name]: value,
         ...(name === 'sbtImageUrl' ? { lockedImageAsset: null } : {}),
+        ...(name === 'sbtImageUrl'
+          ? { imageChooserStatusText: '', imageChooserStatusTone: 'default' }
+          : {}),
       }, () => {
         this.updateGroupHash();
         this.persistFormCache();
@@ -2387,17 +2395,11 @@ class CreateSBTGroup extends Component {
       if (name === 'sbtImageUrl') {
         this.setState({ imageLoadError: false }, async () => {
           const trimmedUrl = this.state.sbtImageUrl.trim();
-          let isValidUrl = false;
-          try {
-            const urlObj = new URL(trimmedUrl);
-            if (urlObj.protocol === 'http:' || urlObj.protocol === 'https:') {
-              isValidUrl = true;
-            }
-          } catch (e) { sbtLog.warn('CreateSBTGroup: fallback', e); }
+          const fetchableUrl = this.getFetchableImageUrl(trimmedUrl);
 
-          if (trimmedUrl !== '' && isValidUrl) {
+          if (trimmedUrl !== '' && fetchableUrl) {
             try {
-              const file = await fetchImageFromURL(this.state.sbtImageUrl);
+              const file = await fetchImageFromURL(fetchableUrl);
               this.setState({ sbtImageFile: file, imageLoadError: false, lockedImageAsset: null }, () => {
                 this.updateGroupHash();
                 this.persistFormCache();
@@ -2418,16 +2420,124 @@ class CreateSBTGroup extends Component {
 
 
   handleImageUpload = (event) => {
-    this.resetFormStateForEdit();
     const file = event.target.files[0];
+    this.applySelectedImageFile(file);
+  };
+
+  applySelectedImageFile = (file, {
+    useImageUrl = false,
+    statusText = '',
+    statusTone = 'default',
+  } = {}) => {
     if (file && file.size > 10 * 1024 * 1024) {
       sbtLog.error("Image too large (>10MB)");
-      return;
+      if (statusText) {
+        this.setState({
+          imageChooserStatusText: statusText,
+          imageChooserStatusTone: statusTone,
+        });
+      }
+      return false;
     }
+    this.resetFormStateForEdit();
     this.setState(
-      { sbtImageFile: file, sbtImageUrl: '', imageLoadError: false, lockedImageAsset: null },
+      {
+        useImageUrl: !!useImageUrl,
+        sbtImageFile: file,
+        sbtImageUrl: '',
+        imageLoadError: false,
+        imageChooserStatusText: statusText,
+        imageChooserStatusTone: statusText ? statusTone : 'default',
+        lockedImageAsset: null,
+      },
       () => { this.updateGroupHash(); this.persistFormCache(); }
     );
+    return true;
+  };
+
+  getFetchableImageUrl = (value) => {
+    const normalizedValue = normalizeArweaveUrl(String(value || '').trim());
+    if (!normalizedValue) return '';
+    try {
+      const urlObj = new URL(normalizedValue);
+      return (urlObj.protocol === 'http:' || urlObj.protocol === 'https:') ? normalizedValue : '';
+    } catch (_) {
+      return '';
+    }
+  };
+
+  getCanonicalMetadataImageUrl = (value) => {
+    const trimmedValue = String(value || '').trim();
+    if (!trimmedValue) return '';
+    const txId = parseArweaveTxId(trimmedValue);
+    if (txId && txId === trimmedValue) {
+      return `ar://${txId}`;
+    }
+    return trimmedValue;
+  };
+
+  handlePasteImage = async () => {
+    const clipboardResult = await readCompactImageClipboard({
+      fileNamePrefix: 'clipboard-sbt-image',
+    });
+
+    if (clipboardResult?.kind === 'file' && clipboardResult.file) {
+      const applied = this.applySelectedImageFile(clipboardResult.file, {
+        useImageUrl: false,
+      });
+      if (!applied) {
+        this.setState({
+          imageChooserStatusText: 'Image too large (>10MB)',
+          imageChooserStatusTone: 'error',
+        });
+      }
+      return;
+    }
+
+    if (clipboardResult?.kind === 'text') {
+      const pastedUrl = String(clipboardResult.text || '').trim();
+      const fetchableUrl = this.getFetchableImageUrl(pastedUrl);
+      if (!fetchableUrl) {
+        this.setState({
+          imageChooserStatusText: clipboardResult?.error || 'Clipboard does not contain a supported image or URL.',
+          imageChooserStatusTone: 'error',
+        });
+        return;
+      }
+
+      this.setState({
+        imageChooserStatusText: 'Loading preview...',
+        imageChooserStatusTone: 'loading',
+      });
+
+      try {
+        const file = await fetchImageFromURL(fetchableUrl);
+        this.resetFormStateForEdit();
+        await this.setStateAsync({
+          useImageUrl: true,
+          sbtImageUrl: pastedUrl,
+          sbtImageFile: file,
+          imageLoadError: false,
+          imageChooserStatusText: '',
+          imageChooserStatusTone: 'default',
+          lockedImageAsset: null,
+        });
+        this.updateGroupHash();
+        this.persistFormCache();
+      } catch (error) {
+        sbtLog.error("Failed to fetch pasted image via worker:", error);
+        this.setState({
+          imageChooserStatusText: error?.message || 'Image preview unavailable.',
+          imageChooserStatusTone: 'error',
+        });
+      }
+      return;
+    }
+
+    this.setState({
+      imageChooserStatusText: clipboardResult?.error || 'Clipboard does not contain a supported image or URL.',
+      imageChooserStatusTone: 'error',
+    });
   };
 
   toggleImageUploadMethod = () => {
@@ -2441,6 +2551,8 @@ class CreateSBTGroup extends Component {
       sbtImageFile: null,
       sbtImageUrl: '',
       imageLoadError: false,
+      imageChooserStatusText: '',
+      imageChooserStatusTone: 'default',
       lockedImageAsset: null,
     }), () => {
       this.updateGroupHash();
@@ -2454,6 +2566,10 @@ class CreateSBTGroup extends Component {
       this.setImageUploadMethod(false, () => this.fileInput?.click());
       return;
     }
+    this.setState({
+      imageChooserStatusText: '',
+      imageChooserStatusTone: 'default',
+    });
     this.fileInput?.click();
   };
 
@@ -2463,6 +2579,8 @@ class CreateSBTGroup extends Component {
       sbtImageFile: null,
       sbtImageUrl: '',
       imageLoadError: false,
+      imageChooserStatusText: '',
+      imageChooserStatusTone: 'default',
       useImageUrl: false,
       lockedImageAsset: null,
     }, () => { this.updateGroupHash(); this.persistFormCache(); });
@@ -2820,10 +2938,10 @@ class CreateSBTGroup extends Component {
         return selectedGateIds;
       };
       const imageSourceValue = (() => {
-        const explicit = String(sbtImageUrl || '').trim();
+        const explicit = this.getCanonicalMetadataImageUrl(sbtImageUrl);
         if (useImageUrl && explicit) return explicit;
         if (explicit) return explicit;
-        return DEFAULT_SBT_IMAGE_ARWEAVE_TX;
+        return this.getCanonicalMetadataImageUrl(DEFAULT_SBT_IMAGE_ARWEAVE_TX);
       })();
 
       let finalImageUrl = imageSourceValue;
@@ -3133,7 +3251,8 @@ class CreateSBTGroup extends Component {
     let previewDescription = sbtDescription || '';
     let previewTagList = previewTags;
     let previewDocumentList = previewDocURLs;
-    let previewImage = (sbtImageUrl || '').trim() || DEFAULT_SBT_IMAGE_ARWEAVE_TX;
+    let previewImage = this.getCanonicalMetadataImageUrl(sbtImageUrl)
+      || this.getCanonicalMetadataImageUrl(DEFAULT_SBT_IMAGE_ARWEAVE_TX);
     const normalizedLockMap = normalizeMetadataLockGateIds(metadataLockGateIds);
 
     const registerPreviewField = (fieldKey, selectedGateIds) => {
@@ -3603,9 +3722,10 @@ class CreateSBTGroup extends Component {
     // Proceed
     this.setState({ startedMinting: true, mintingFailed: false, error: '' });
 
-    if (this.state.useImageUrl && this.state.sbtImageUrl && !this.state.sbtImageFile) {
+    const fetchableImageUrl = this.getFetchableImageUrl(this.state.sbtImageUrl);
+    if (this.state.useImageUrl && fetchableImageUrl && !this.state.sbtImageFile) {
       try {
-        const file = await fetchImageFromURL(this.state.sbtImageUrl);
+        const file = await fetchImageFromURL(fetchableImageUrl);
         // Await state update so sbtImageFile is set before uploadImageToArweave reads it
         await new Promise(resolve => {
           this.setState({ sbtImageFile: file, imageLoadError: false }, () => {
@@ -3925,6 +4045,8 @@ class CreateSBTGroup extends Component {
       documentUrl,
       showTagsInput,
       imageLoadError,
+      imageChooserStatusText,
+      imageChooserStatusTone,
       documentURLs,
       startedMinting,
       groupPassword,
@@ -3982,11 +4104,23 @@ class CreateSBTGroup extends Component {
     const docsSelectedGateIds = this.normalizeSelectedGateIds(normalizedMetadataLocks.documentURLs, validGateIds);
     const imageSelectedGateIds = this.normalizeSelectedGateIds(normalizedMetadataLocks.image, validGateIds);
     const trimmedImageUrl = String(sbtImageUrl || '').trim();
-    const imagePreviewSrc = sbtImageFile && !imageLoadError ? URL.createObjectURL(sbtImageFile) : '';
-    const hasImagePreview = !!imagePreviewSrc;
+    const hasImagePreview = !!(sbtImageFile && !imageLoadError);
     const hasPendingImagePreview = useImageUrl && trimmedImageUrl.length > 0 && !hasImagePreview && !imageLoadError;
-    const showImageResetControl = hasImagePreview || trimmedImageUrl.length > 0 || imageLoadError;
     const showImagePreviewError = useImageUrl && trimmedImageUrl.length > 0 && imageLoadError;
+    const effectiveImageStatusText = imageChooserStatusText || (
+      hasPendingImagePreview
+        ? 'Loading preview...'
+        : showImagePreviewError
+          ? 'Image preview unavailable.'
+          : ''
+    );
+    const effectiveImageStatusTone = imageChooserStatusText
+      ? imageChooserStatusTone
+      : hasPendingImagePreview
+        ? 'loading'
+        : showImagePreviewError
+          ? 'error'
+          : 'default';
     const renderFieldLock = (lockKey, fieldKey, selectedGateIds) => (
       <GateMultiSelectLock
         gateOptions={gateOptions}
@@ -4115,94 +4249,33 @@ class CreateSBTGroup extends Component {
                         {renderFieldLock('image', 'image', imageSelectedGateIds)}
                       </div>
                     </div>
-                    <div className={styles.imageUploadBody}>
-                      <div className={styles.imageUploadControls}>
-                        <div className={styles.compactImageModeRow}>
-                          <button
-                            type="button"
-                            className={`${styles.compactImageModeButton} ${useImageUrl ? styles.compactImageModeButtonActive : ''}`}
-                            onClick={() => this.setImageUploadMethod(true)}
-                            aria-pressed={useImageUrl}
-                          >
-                            URL
-                          </button>
-                          <button
-                            type="button"
-                            className={`${styles.compactImageUploadButton} ${!useImageUrl ? styles.compactImageModeButtonActive : ''}`}
-                            onClick={this.openImageUploadPicker}
-                            aria-label="Upload image"
-                            title="Upload image"
-                          >
-                            <FontAwesomeIcon icon={faUpload} />
-                          </button>
-                          <input
-                            type="file"
-                            accept="image/*"
-                            onChange={this.handleImageUpload}
-                            style={{ display: 'none' }}
-                            ref={(fileInput) => (this.fileInput = fileInput)}
-                            data-testid={E2E_TESTIDS.SBT_CREATE_IMAGE_FILE_INPUT}
-                          />
-                          {!useImageUrl && sbtImageFile && (
-                            <span className={styles.selectedFile}>
-                              {sbtImageFile.name}
-                            </span>
-                          )}
-                        </div>
-
-                        {useImageUrl && (
-                          <div className={styles.fileUploadContainer}>
-                            <input
-                              type="text"
-                              name="sbtImageUrl"
-                              value={sbtImageUrl}
-                              onChange={this.handleInputChange}
-                              placeholder="Paste image URL"
-                              aria-label="Image URL"
-                              data-testid={E2E_TESTIDS.SBT_CREATE_IMAGE_URL_INPUT}
-                            />
-                          </div>
-                        )}
-
-                        {hasPendingImagePreview && (
-                          <div className={styles.imageUploadStatusText}>
-                            <FontAwesomeIcon icon={faSpinner} spin />
-                            <span>Loading preview...</span>
-                          </div>
-                        )}
-
-                        {showImagePreviewError && (
-                          <div className={styles.imageUploadErrorText}>
-                            <FontAwesomeIcon icon={faExclamationCircle} />
-                            <span>Image preview unavailable.</span>
-                          </div>
-                        )}
-
-                        {imageSelectedGateIds.length > 0 && (
-                          <div className={`${styles.fieldHelpText} ${styles.compactImageHelpText}`}>
-                            URL mode encrypts the image URL. Upload mode encrypts the image bytes into a Lit-Arweave asset.
-                          </div>
-                        )}
-                        {hasImagePreview && (
-                          <div
-                            className={`${styles.imagePreviewSurface} ${styles.imagePreviewSurfaceCompact} ${styles.imagePreviewSurfaceFilled}`}
-                          >
-                            <img src={imagePreviewSrc} alt="SBT artwork preview" />
-                            {showImageResetControl && (
-                              <button
-                                type="button"
-                                onClick={this.resetImage}
-                                className={styles.imagePreviewClearButton}
-                                aria-label="Remove image"
-                                title="Remove image"
-                              >
-                                <FontAwesomeIcon icon={faTimes} />
-                              </button>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
+                    <CompactImageChooser
+                      isUrlMode={useImageUrl}
+                      isUploadMode={!useImageUrl}
+                      showUrlInput={useImageUrl}
+                      urlValue={sbtImageUrl}
+                      urlInputName="sbtImageUrl"
+                      onUrlChange={this.handleInputChange}
+                      onToggleUrlMode={() => this.setImageUploadMethod(true)}
+                      onPaste={this.handlePasteImage}
+                      onUploadClick={this.openImageUploadPicker}
+                      onFileChange={this.handleImageUpload}
+                      fileInputRef={(fileInput) => { this.fileInput = fileInput; }}
+                      fileInputTestId={E2E_TESTIDS.SBT_CREATE_IMAGE_FILE_INPUT}
+                      pasteButtonTestId={E2E_TESTIDS.SBT_CREATE_IMAGE_PASTE}
+                      urlInputTestId={E2E_TESTIDS.SBT_CREATE_IMAGE_URL_INPUT}
+                      urlPlaceholder="Paste image URL"
+                      urlInputAriaLabel="Image URL"
+                      selectedFileLabel={!useImageUrl && sbtImageFile ? sbtImageFile.name : ''}
+                      previewFile={hasImagePreview ? sbtImageFile : null}
+                      previewAlt="SBT artwork preview"
+                      onClear={this.resetImage}
+                      statusText={effectiveImageStatusText}
+                      statusTone={effectiveImageStatusTone}
+                      helpText={imageSelectedGateIds.length > 0
+                        ? 'URL mode encrypts the image URL. Upload mode encrypts the image bytes into a Lit-Arweave asset.'
+                        : ''}
+                    />
                   </div>
                 </div>
               </div>

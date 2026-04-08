@@ -93,6 +93,7 @@ The navbar-mounted account/login/settings surface that owns the shared modal liv
 | `ce-wizard-mode-advanced` | `client/src/components/Sessions/SessionWizard.jsx` | Wizard mode toggle button for Advanced mode. | yes |  |
 | `ce-wizard-metadata-panel-toggle` | `client/src/components/Sessions/SessionWizard.jsx` | Collapsible panel toggle for the advanced-mode "Session Information" section. | yes |  |
 | `ce-wizard-session-header-url-toggle` | `client/src/components/Sessions/SessionWizard.jsx` | Compact Image field `URL` toggle used in Normal mode to reveal the header URL input. | yes |  |
+| `ce-wizard-session-header-paste` | `client/src/components/Sessions/SessionWizard.jsx` | Compact Image field `Paste` button used in Normal mode to pull an image blob or URL from the clipboard. | yes |  |
 | `ce-wizard-worker-mode-toggle` | `client/src/components/Sessions/SessionWizard.jsx` | Wrapper around the default/custom worker mode pills in the worker panel. | yes |  |
 | `ce-wizard-worker-mode-button` | `client/src/components/Sessions/SessionWizard.jsx` | Individual worker mode pill button. | yes | `data-ce-worker-mode` (`default` or `custom`) |
 | `ce-wizard-worker-panel-toggle` | `client/src/components/Sessions/SessionWizard.jsx` | Collapsible panel toggle for "Worker deployment & secrets". | yes |  |
@@ -244,6 +245,7 @@ Agent page UI: `client/src/components/Agent/AgentPage.jsx`
 | `ce-sbt-create-name-input` | `client/src/components/SBTs/CreateSBTGroup.jsx` | SBT name input in the Create Group form. | yes |  |
 | `ce-sbt-create-description-input` | `client/src/components/SBTs/CreateSBTGroup.jsx` | SBT description textarea in the Create Group form. | yes |  |
 | `ce-sbt-create-image-file-input` | `client/src/components/SBTs/CreateSBTGroup.jsx` | Hidden file input used for image upload mode. | yes |  |
+| `ce-sbt-create-image-paste` | `client/src/components/SBTs/CreateSBTGroup.jsx` | Compact Image field `Paste` button used to pull an SBT image blob or URL from the clipboard. | yes |  |
 | `ce-sbt-create-image-url-input` | `client/src/components/SBTs/CreateSBTGroup.jsx` | URL input used when image URL mode is selected. | yes |  |
 | `ce-sbt-create-doc-url-input` | `client/src/components/SBTs/CreateSBTGroup.jsx` | Pending document URL input. | yes |  |
 | `ce-sbt-create-doc-url-add` | `client/src/components/SBTs/CreateSBTGroup.jsx` | Button that appends the pending document URL to the list. | yes |  |
