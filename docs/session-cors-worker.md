@@ -170,8 +170,7 @@ Admin test panel:
 - The Session Admin page includes a Worker Tests panel to hit `/health`, run a basic AI call,
   upload a tiny JSON payload to Arweave, and record a short AudioInput transcription.
   Arweave and faucet test results include clickable tx links for quick verification.
-  Arweave links use the preferred gateway (`ARWEAVE_GATEWAY_URL`, now `https://ar-io.dev`, with `https://arweave.net` next in the fallback list; when `CE_ARWEAVE_DIRECT_TO_AR_IO` is enabled, the client uses `CE_ARWEAVE_AR_IO_URL` for links and Arweave read retries without fanning out to legacy gateways; runtime overrides: `window.CE_ARWEAVE_GATEWAY_URL`, `window.CE_ARWEAVE_DIRECT_TO_AR_IO`, `window.CE_ARWEAVE_AR_IO_URL`).
-  This ar.io-only behavior is currently intentional for dev because the legacy gateways have been unreliable; the intended long-term behavior is ar.io-first with fallback fanout once those gateways stabilize.
+  Arweave links use the preferred gateway (`ARWEAVE_GATEWAY_URL`, now `https://ar-io.dev`, with `https://arweave.net` next in the fallback list). By default, reads stay ar.io-first but still fan out across the fallback gateways when the primary route is flaky. When `CE_ARWEAVE_DIRECT_TO_AR_IO` is enabled, the client switches into explicit ar.io-only troubleshooting mode and uses `CE_ARWEAVE_AR_IO_URL` for links and Arweave read retries without fanning out to legacy gateways. Runtime overrides: `window.CE_ARWEAVE_GATEWAY_URL`, `window.CE_ARWEAVE_DIRECT_TO_AR_IO`, `window.CE_ARWEAVE_AR_IO_URL`.
   Run these while signed in as a user who holds the sponsored SBT to confirm gating + secrets are wired correctly.
 - If tests fail with a browser network error like `Load failed` / `Failed to fetch`, the worker is often
   rejecting the browser origin via `allowOrigins` (CORS allowlist).

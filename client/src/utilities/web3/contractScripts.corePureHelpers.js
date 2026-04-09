@@ -3,8 +3,6 @@
  * @description Internal pure constants and helper functions shared by contractScripts internals.
  */
 
-import { DEFAULT_CHAIN_ID } from '../../variables/appConfig.js';
-
 // SBT detail pages can render from on-chain fields alone, so tokenURI metadata
 // reads must fail soft instead of keeping the whole view in a spinner.
 export const SBT_TOKENURI_METADATA_TIMEOUT_MS = 4000;
@@ -66,34 +64,4 @@ export const GAS_FALLBACKS = Object.freeze({
   burn: 500_000,
 });
 
-export function extractChainId(cfg, options = null) {
-  const contractKey = String(options?.contractKey || '').trim();
-  const preferredCandidates = contractKey === 'sbtFactory'
-    ? [
-        cfg?.contracts?.sbtFactory?.chainId,
-        cfg?.networkChainId,
-        cfg?.contracts?.surveys?.chainId,
-      ]
-    : contractKey === 'surveys'
-      ? [
-          cfg?.contracts?.surveys?.chainId,
-          cfg?.networkChainId,
-          cfg?.contracts?.sbtFactory?.chainId,
-        ]
-      : [
-          cfg?.networkChainId,
-          cfg?.contracts?.surveys?.chainId,
-          cfg?.contracts?.sbtFactory?.chainId,
-        ];
-
-  const orderedCandidates = preferredCandidates.concat([
-    cfg?.__registry?.chainId,
-    DEFAULT_CHAIN_ID,
-    0,
-  ]);
-  for (const candidate of orderedCandidates) {
-    const id = Number(candidate || 0);
-    if (Number.isFinite(id) && id > 0) return Math.floor(id);
-  }
-  return 0;
-}
+export { extractChainId } from './chainIdResolution.js';

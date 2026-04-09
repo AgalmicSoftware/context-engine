@@ -16,6 +16,7 @@ This corpus is maintained as part of [Context Engine](https://github.com/Agalmic
 | `enriched-tweets.json` | 4036 | Enriched social-media discourse with summaries, tags, relevance signals, and linked context. |
 | `lesswrong-posts-corpus.json` | 202 | Influential LessWrong, Alignment Forum, EA Forum, and related AI safety/rationalist writing. |
 | `metr-evals-metrics-corpus.json` | 86 | METR publications, benchmarks, evaluation reports, and measurement-oriented policy material. |
+| `loophole-cases` | 40 | AI policy loophole-finding cases generated via the methodology from [brendanhogan/loophole](https://github.com/brendanhogan/loophole). Explores regulatory edge cases through adversarial scenario generation. |
 
 ## Format
 

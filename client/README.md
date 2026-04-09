@@ -4,6 +4,20 @@ This directory contains the React single-page application for Context Engine.
 It is the browser frontend for session setup, surveys, gating, SBT flows, and
 other user-facing web3 interactions.
 
+## Setup
+
+Current client workflows use Node.js `16.14.2` and npm `9.2.0`.
+
+Install client dependencies with `npm i --force` for now. This is a temporary
+workaround until the current install conflict is fixed.
+
+```bash
+cd client
+nvm use 16
+npm i --force
+npm run dev
+```
+
 ## Commands
 
 Run these from `client/`:

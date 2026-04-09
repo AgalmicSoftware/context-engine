@@ -18,8 +18,8 @@ const UserStats = ({ userStats, collapseOpen, toggleCollapse }) => {
   return (
     <div className={styles.stats}>
       {Object.entries(userStats).map(([key, value]) => (
-        <div 
-          key={key} 
+        <div
+          key={key}
           className={styles.statItem}
           onClick={() => toggleCollapse(key)}
         >

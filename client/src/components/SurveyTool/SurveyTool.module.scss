@@ -1523,6 +1523,10 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   margin-bottom: 5px;
 }
 
+.convictionSlider {
+  margin-left: 5px;
+}
+
 // Tooltip styling (general utility)
 .tooltip {
   position: relative;
@@ -2286,7 +2290,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
 //
 
- 
+
 
 .cardLinksContainer {
   display: flex;
@@ -2510,11 +2514,30 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
 /* Container for Card + Controls Side-by-Side */
 .pileInteractionUnit {
+  --pile-desktop-submit-rail-offset: 64px;
+  --pile-desktop-submit-rail-padding: 24px;
+  --pile-desktop-rail-gap: 24px;
+  --pile-current-submit-rail-offset: 0px;
+  --pile-current-submit-rail-padding: 0px;
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
   width: auto;
+  padding-top: var(--pile-current-submit-rail-padding);
+}
+
+.pileInteractionUnitWithSubmitRail {
+  --pile-current-submit-rail-offset: var(--pile-desktop-submit-rail-offset);
+  --pile-current-submit-rail-padding: var(--pile-desktop-submit-rail-padding);
+}
+
+@media (min-width: 769px) {
+  .pileInteractionUnitWithSubmitRail .pileCardInner,
+  .pileInteractionUnitWithSubmitRail .pileHologramPanel,
+  .pileInteractionUnitWithSubmitRail .pileEmptyState {
+    margin-top: 12px;
+  }
 }
 
 /* Card Stack Container */
@@ -2601,28 +2624,32 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
 /* --- Controls Container (Nav + Actions) --- */
 .pileControls {
-  display: grid;
-  /* DESKTOP DEFAULT: Control rail + submit CTA side-by-side */
-  grid-template-columns: auto auto;
-  grid-template-rows: auto auto;
-  grid-template-areas:
-    'nav submit'
-    'actions submit';
   position: absolute;
-  /* Start the rail outside the card so nothing overlaps the question content */
-  left: calc(100% + 24px);
-  /* Center Vertically relative to the pile wrapper */
-  top: 50%;
-  transform: translateY(-50%);
-  column-gap: 26px;
-  row-gap: 1.25rem;
+  top: var(--pile-current-submit-rail-offset);
+  right: 0;
+  bottom: 0;
+  left: 0;
   z-index: 10;
   pointer-events: none;
-  /* Let clicks pass through gaps */
+  width: 100%;
+  overflow: visible;
+}
+
+.pileControls > .pileActions,
+.pileControls > .pileNav {
+  position: absolute;
+  left: calc(100% + var(--pile-desktop-rail-gap));
   width: max-content;
-  max-height: none;
-  align-items: center;
-  justify-items: center;
+}
+
+.pileControls > .pileActions {
+  top: 50%;
+  transform: translateY(0.625rem);
+}
+
+.pileControls > .pileNav {
+  top: 50%;
+  transform: translateY(calc(-100% - 0.625rem));
 }
 
 /* --- Navigation Group (Arrows + Counter) --- */
@@ -2735,7 +2762,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 .miniSpinnerWrapper {
     opacity: 0.5;
     position: absolute;
-    top: -30px;
+    top: calc(var(--pile-current-submit-rail-offset) - 30px);
     right: -75px;
     z-index: 2;
     display: flex;
@@ -2752,7 +2779,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
 .pileHologramToggle {
   position: absolute;
-  top: 6px;
+  top: calc(var(--pile-current-submit-rail-offset) + 6px);
   right: 16px;
   width: 42px;
   height: 42px;
@@ -3042,39 +3069,64 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 .pileFooter {
   display: flex;
   align-items: center;
-  justify-content: flex-start;
-  grid-area: submit;
-  order: 3;
+  justify-content: center;
   margin-top: 0;
-  width: auto;
+  width: min(550px, 90vw);
   pointer-events: auto;
   min-height: 0;
-  gap: 14px;
-  position: static;
-  transform: none;
-  justify-self: start;
-  align-self: center;
+  gap: 0;
+  position: absolute;
+  top: calc(-1 * var(--pile-desktop-submit-rail-offset));
+  left: 50%;
+  transform: translateX(-50%);
+  overflow: visible;
 }
 
-@media (min-width: 769px) and (max-width: 1366px) {
-  .pileWrapper {
-    margin-bottom: 128px;
+.pileFooterHidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.pileFooter .pileIconButton,
+.pileFooter .pileSubmitLink {
+  position: absolute;
+  top: 50%;
+  left: calc(100% + 12px);
+  transform: translateY(-50%);
+}
+
+@media (min-width: 1367px) {
+  .pileInteractionUnit {
+    --pile-current-submit-rail-offset: 0px;
+    --pile-current-submit-rail-padding: 0px;
+  }
+
+  .pileControls {
+    top: 0;
+  }
+
+  .miniSpinnerWrapper {
+    top: 0;
+  }
+
+  .pileHologramToggle {
+    top: 36px;
   }
 
   .pileFooter {
-    /* Keep nav/actions on the side rail, but re-anchor the submit cluster below the card. */
-    grid-area: auto;
-    position: absolute;
-    top: calc(50% + 280px);
-    left: -299px;
-    width: max-content;
-    justify-content: center;
-    transform: translate(-50%, -50%);
+    top: -72px;
+    right: 32px;
+    left: 0;
+    width: auto;
+    transform: none;
   }
 
-  .pileFooter .pileSubmitButton {
-    margin-top: 5px;
+  .pileFooter .pileIconButton,
+  .pileFooter .pileSubmitLink {
+    left: calc(100% + 8px);
   }
+
 }
 
 /* ------------------------------------------- */
@@ -3164,13 +3216,27 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     flex-direction: column;
     /* Stack card then controls */
     width: 100%;
+    --pile-current-submit-rail-offset: 0px;
+    --pile-current-submit-rail-padding: 0px;
   }
 
   .pileControls {
     position: static;
+    top: auto;
+    right: auto;
+    bottom: auto;
+    left: auto;
     transform: none;
     display: flex;
     justify-content: space-between;
+  }
+
+  .pileControls > .pileActions,
+  .pileControls > .pileNav {
+    position: static;
+    top: auto;
+    left: auto;
+    transform: none;
   }
 
   .pileWrapper {
@@ -3214,10 +3280,26 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     margin-top: 10px;
   }
 
+  .miniSpinnerWrapper {
+    top: -30px;
+  }
+
   .pileFooter {
     position: static;
+    top: auto;
+    left: auto;
+    width: auto;
     transform: none;
     justify-content: center;
+    gap: 14px;
+  }
+
+  .pileFooter .pileIconButton,
+  .pileFooter .pileSubmitLink {
+    position: static;
+    top: auto;
+    left: auto;
+    transform: none;
   }
 }
 
@@ -3286,6 +3368,11 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 }
 
 @media (max-width: 480px) {
+  .pileInteractionUnit {
+    --pile-current-submit-rail-offset: 0px;
+    --pile-current-submit-rail-padding: 0px;
+  }
+
   .pileControls {
     position: static;
     transform: none;
@@ -3298,6 +3385,14 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     padding: 0 10px;
     gap: 18px 12px;
     max-height: none;
+  }
+
+  .miniSpinnerWrapper {
+    top: -30px;
+  }
+
+  .pileHologramToggle {
+    top: 14px;
   }
 
   .pileActions {
@@ -3318,21 +3413,35 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   }
 
   .pileFooter {
-    order: 3;
-    flex: 0 0 100%;
-    width: 100%;
+    position: absolute;
+    top: -60px;
+    right: 20px;
+    left: 10px;
+    flex: 0 0 auto;
+    width: auto;
     justify-content: center;
     min-height: 0;
-    gap: 14px;
+    gap: 10px;
+    transform: none;
   }
 
   .pileFooter .pileSubmitButton {
+    flex: 1 1 auto;
     width: auto;
-    max-width: min(300px, 100%);
-    min-height: 0;
-    padding: 12px 24px;
+    max-width: none;
+    min-height: 54px;
+    padding: 11px 18px;
     font-size: 1rem;
-    border-radius: var(--ce-radius-8);
+    border-radius: var(--ce-radius-16);
+  }
+
+  .pileFooter .pileIconButton,
+  .pileFooter .pileSubmitLink {
+    position: static;
+    top: auto;
+    left: auto;
+    transform: none;
+    flex: 0 0 auto;
   }
 
   .pileNavArrow {
@@ -3547,7 +3656,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     opacity 0.2s ease;
   white-space: nowrap;
   max-width: 300px;
-  overflow: hidden;
+  overflow: visible;
   &:hover {
     background-color: var(--ce-color-indigo) !important;
     border-color: var(--ce-color-indigo) !important;
@@ -3557,12 +3666,137 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 }
 
 .pileFooter .pileSubmitButton {
-  width: 220px;
+  position: relative;
+  isolation: isolate;
+  z-index: 0;
+  width: 100%;
   max-width: none;
-  min-height: 78px;
-  padding: 16px 28px;
-  font-size: 1.25rem;
-  border-radius: var(--ce-radius-12);
+  min-height: 60px;
+  padding: 14px 28px;
+  font-size: 1.15rem;
+  border-radius: var(--ce-radius-16);
+  box-shadow:
+    0 14px 30px rgba(7, 14, 38, 0.34),
+    0 0 0 1px rgba(120, 154, 255, 0.18);
+}
+
+.pileSubmitButtonContent {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.pileSubmitButtonLabel {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pileSubmitButtonTrail {
+  display: none;
+  align-items: center;
+  gap: 1px;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.pileSubmitButtonTrailIcon {
+  font-size: 0.82em;
+}
+
+.pileSubmitButtonTrailIcon:nth-child(1) {
+  opacity: 0.46;
+}
+
+.pileSubmitButtonTrailIcon:nth-child(2) {
+  opacity: 0.7;
+}
+
+.pileSubmitButtonTrailIcon:nth-child(3) {
+  opacity: 0.96;
+}
+
+.pileSubmitSuccessBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  color: var(--ce-color-white);
+  background:
+    radial-gradient(circle at 30% 28%, rgba(255, 255, 255, 0.26), rgba(255, 255, 255, 0.03) 48%),
+    linear-gradient(135deg, #59d77d 0%, #39b963 100%);
+  box-shadow:
+    0 14px 30px rgba(6, 44, 18, 0.28),
+    0 0 0 1px rgba(255, 255, 255, 0.18);
+  animation: pileSubmitSuccessPop 220ms ease-out;
+}
+
+.pileSubmitSuccessIcon {
+  font-size: 1.35rem;
+}
+
+@media (min-width: 1367px), (max-width: 480px) {
+  .pileSubmitButtonTrail {
+    display: inline-flex;
+  }
+}
+
+@media (min-width: 769px), (max-width: 480px) {
+  .pileFooter .pileSubmitButton.submitGlow::before {
+    position: absolute;
+    content: '';
+    background: linear-gradient(90deg, #fff 40%, transparent 40%);
+    top: -5px;
+    bottom: -5px;
+    left: -5px;
+    right: -5px;
+    z-index: 2;
+    border-radius: calc(var(--ce-radius-16) + 5px);
+    background-size: 200% 4px;
+    background-repeat: no-repeat;
+    filter: drop-shadow(0 0 8px #fff);
+    pointer-events: none;
+  }
+
+  .pileFooter .pileSubmitButton.submitGlow::before {
+    background-position: 80% 0;
+    animation: beforeLineAnim 5.4s linear infinite;
+  }
+}
+
+@keyframes beforeLineAnim {
+  45%,
+  50% {
+    background-position: -100% 0;
+  }
+
+  45% {
+    transform: scale(1);
+  }
+
+  50%,
+  95% {
+    transform: scale(1, -1);
+  }
+
+  95% {
+    background-position: 80% 0;
+  }
+}
+
+@keyframes pileSubmitSuccessPop {
+  0% {
+    opacity: 0;
+    transform: scale(0.86);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 @media (max-width: 768px) {
@@ -3578,7 +3812,20 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
 @media (max-width: 480px) {
   .pileFooter .pileSubmitButton {
-    max-width: min(300px, 100%);
+    width: 100%;
+    max-width: none;
+    min-height: 54px;
+    padding: 11px 18px;
+    border-radius: var(--ce-radius-16);
+  }
+
+  .pileSubmitSuccessBadge {
+    width: 54px;
+    height: 54px;
+  }
+
+  .pileSubmitSuccessIcon {
+    font-size: 1.2rem;
   }
 }
 
@@ -3900,6 +4147,8 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .pileSubmitSuccessBadge,
+  .pileFooter .pileSubmitButton.submitGlow::before,
   .submitGlow,
   .scanningIndicator {
     -webkit-animation: none !important;

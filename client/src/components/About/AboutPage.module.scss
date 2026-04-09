@@ -80,13 +80,24 @@ $modal-muted: rgba(22, 48, 84, 0.82);
 }
 
 .eyebrow,
-.mediaLabel,
-.useCaseDetailLabel {
+.mediaLabel {
   margin: 0;
   color: $muted-text;
   font-size: 0.76rem;
   letter-spacing: 0.14em;
   text-transform: uppercase;
+}
+
+.srOnly {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0 0 0 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
 }
 
 .sectionTitle {
@@ -104,6 +115,43 @@ $modal-muted: rgba(22, 48, 84, 0.82);
   font-size: clamp(1.8rem, 4vw, 2.6rem);
   line-height: 1;
   letter-spacing: -0.02em;
+}
+
+.titleRow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.titleRepoLink {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(244, 247, 255, 0.92);
+  font-size: 1.45rem;
+  text-decoration: none;
+  box-shadow: 0 10px 22px rgba(8, 12, 28, 0.2);
+  transition:
+    transform 0.18s ease,
+    border-color 0.18s ease,
+    background 0.18s ease,
+    color 0.18s ease,
+    box-shadow 0.18s ease;
+
+  &:hover,
+  &:focus {
+    color: $text-color;
+    border-color: rgba(77, 255, 164, 0.34);
+    background: rgba(77, 255, 164, 0.1);
+    transform: translateY(-1px);
+    box-shadow: 0 12px 26px rgba(8, 12, 28, 0.24);
+  }
 }
 
 .tagline {
@@ -159,6 +207,14 @@ $modal-muted: rgba(22, 48, 84, 0.82);
     transform: translateY(-1px);
     box-shadow: 0 18px 34px rgba(77, 255, 164, 0.2);
   }
+}
+
+.heroPrimaryButton {
+  min-height: 54px;
+  padding: 0 28px;
+  font-size: 1.14rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
 }
 
 .tertiaryLink {
@@ -304,7 +360,7 @@ $modal-muted: rgba(22, 48, 84, 0.82);
 
 .useCaseLabel {
   font-family: var(--ce-font-body);
-  font-size: 1.08rem;
+  font-size: 1.6rem;
   font-weight: 600;
   line-height: 1.2;
   letter-spacing: 0.03em;
@@ -341,48 +397,50 @@ $modal-muted: rgba(22, 48, 84, 0.82);
   animation: detail-enter 220ms ease;
 }
 
-.useCaseDetailLabel {
-  font-family: var(--ce-font-body);
-}
-
 .useCaseDetailRow {
   display: flex;
   gap: 14px;
-  align-items: baseline;
-  margin-bottom: 10px;
+  align-items: flex-start;
+  margin-bottom: 14px;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
 }
 
 .useCaseDetailProblemTag,
 .useCaseDetailSolutionTag {
   flex-shrink: 0;
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.1em;
+  min-width: 210px;
+  font-size: 0.96rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
-  padding: 4px 10px;
-  border-radius: 6px;
-  white-space: nowrap;
+  line-height: 1.2;
+  padding: 10px 14px;
+  border-radius: 12px;
+  white-space: normal;
 }
 
 .useCaseDetailProblemTag {
-  color: rgba(255, 107, 107, 0.9);
-  border: 1px solid rgba(255, 107, 107, 0.25);
-  background: rgba(255, 107, 107, 0.08);
+  color: rgba(255, 190, 190, 0.98);
+  border: 1px solid rgba(255, 107, 107, 0.38);
+  background: rgba(255, 107, 107, 0.14);
 }
 
 .useCaseDetailSolutionTag {
-  color: rgba(77, 255, 164, 0.9);
-  border: 1px solid rgba(77, 255, 164, 0.25);
-  background: rgba(77, 255, 164, 0.08);
+  color: rgba(184, 255, 221, 0.98);
+  border: 1px solid rgba(77, 255, 164, 0.38);
+  background: rgba(77, 255, 164, 0.14);
 }
 
 .useCaseDetailRowText {
   margin: 0;
   max-width: 62ch;
-  color: rgba(244, 247, 255, 0.88);
+  color: rgba(244, 247, 255, 0.94);
   font-family: var(--ce-font-body);
   font-size: 1.12rem;
-  line-height: 1.6;
+  line-height: 1.65;
 }
 
 .cardSection {
@@ -432,13 +490,109 @@ $modal-muted: rgba(22, 48, 84, 0.82);
   }
 }
 
+.featureList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 14px;
+}
+
+.featureItem {
+  position: relative;
+  padding: 18px 18px 18px 22px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: $card-shadow;
+
+  &::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 16px;
+    bottom: 16px;
+    width: 4px;
+    border-radius: 999px;
+    background: $accent;
+  }
+}
+
+.featureLabel {
+  display: block;
+  margin: 0 0 8px;
+  color: rgba(244, 247, 255, 0.98);
+  font-family: var(--ce-font-body);
+  font-size: clamp(1.08rem, 1.6vw, 1.22rem);
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.featureHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+
+  .featureLabel {
+    margin: 0;
+  }
+}
+
+.featureStatusComplete {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.36rem 0.72rem;
+  border-radius: 999px;
+  border: 1px solid rgba(77, 255, 164, 0.34);
+  background: rgba(77, 255, 164, 0.12);
+  color: rgba(184, 255, 221, 0.98);
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+
+  &::before {
+    content: '\2713';
+    font-size: 0.9em;
+    line-height: 1;
+  }
+}
+
+.featureText {
+  display: block;
+  color: rgba(244, 247, 255, 0.84);
+  font-family: var(--ce-font-body);
+  font-size: 1rem;
+  line-height: 1.65;
+}
+
 .roadmapSubList {
   list-style: none;
-  margin: 0.75rem 0 0;
-  padding: 0 0 0 1rem;
+  margin: 0.9rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.7rem;
+}
 
-  li:last-child {
-    margin-bottom: 0;
+.roadmapSubItem {
+  position: relative;
+  padding-left: 1.2rem;
+  color: rgba(244, 247, 255, 0.78);
+  font-family: var(--ce-font-body);
+  font-size: 0.98rem;
+  line-height: 1.55;
+
+  &::before {
+    content: '•';
+    position: absolute;
+    left: 0;
+    top: 0;
+    color: $accent;
+    font-weight: 700;
   }
 }
 
@@ -907,6 +1061,16 @@ $modal-muted: rgba(22, 48, 84, 0.82);
     gap: 14px;
   }
 
+  .titleRow {
+    gap: 10px;
+  }
+
+  .titleRepoLink {
+    width: 42px;
+    height: 42px;
+    font-size: 1.28rem;
+  }
+
   .tagline {
     max-width: none;
     font-size: 0.98rem;
@@ -925,6 +1089,11 @@ $modal-muted: rgba(22, 48, 84, 0.82);
     width: 100%;
   }
 
+  .heroPrimaryButton {
+    min-height: 52px;
+    font-size: 1.08rem;
+  }
+
   .tertiaryLink {
     flex: 1 1 calc(50% - 8px);
     min-width: 0;
@@ -936,6 +1105,38 @@ $modal-muted: rgba(22, 48, 84, 0.82);
 
   .useCaseTile {
     min-height: 110px;
+  }
+
+  .featureItem {
+    padding: 16px 14px 16px 18px;
+  }
+
+  .featureLabel {
+    font-size: 1.02rem;
+  }
+
+  .featureStatusComplete {
+    font-size: 0.72rem;
+  }
+
+  .featureText {
+    font-size: 0.96rem;
+  }
+
+  .useCaseDetail {
+    padding: 20px 16px;
+  }
+
+  .useCaseDetailRow {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .useCaseDetailProblemTag,
+  .useCaseDetailSolutionTag {
+    min-width: 0;
+    width: 100%;
+    font-size: 0.92rem;
   }
 
   .mediaGrid {

@@ -44,6 +44,7 @@ import { hasUsableSessionWorkerConfig } from '../../utilities/session/sessionWor
 import { hasCachedCreateSbtForm } from '../../utilities/sbt/createSbtFormCache.js';
 import { getSbtDescriptionText, getSbtDisplayName } from '../../utilities/sbt/sbtDisplayNames.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
+import { readPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
 import {
   filterSessionUniverseEntriesByDemoVisibility,
   getCustomDemoSessionEntries,
@@ -941,6 +942,7 @@ const SBTsList = ({
     clearInvalid: true,
   }));
   const [showAdminButtons, setShowAdminButtons] = useState(false);
+  const [showLocalSessionSettings, setShowLocalSessionSettings] = useState(false);
   const [expandedSbtAddresses, setExpandedSbtAddresses] = useState(() => new Set());
   const [isUniverseCollapsed, setIsUniverseCollapsed] = useState(() => {
     try {
@@ -1007,6 +1009,17 @@ const SBTsList = ({
       recentLiveProgressTimeoutRef.current = null;
     }
   }, []);
+
+  const usesTopLevelSessionSettingsSurface = allSessionsMode && (
+    (!miniaturized && !embeddedMode) ||
+    (miniaturized && viewMode === 'modal' && communityTabCompactSettings)
+  );
+  const usesFallbackSessionSettingsToggle = allSessionsMode && !usesTopLevelSessionSettingsSurface;
+  const isSessionSelectorOpen = usesTopLevelSessionSettingsSurface
+    ? showAdminButtons
+    : showLocalSessionSettings;
+  const sessionSelectorPanelId = 'session-selector-panel';
+  const hideSessionUniverseSummary = miniaturized && viewMode === 'modal' && communityTabCompactSettings;
 
   const clearChipProgressVisibilityTimeout = useCallback((slugIn) => {
     const slug = normalizeSessionSlug(slugIn || '');
@@ -3338,6 +3351,12 @@ const SBTsList = ({
 
   const renderSessionUniverseSelector = () => {
     if (!allSessionsMode) return null;
+    const publicBasePath = readPublicUrlBasePath();
+    const withPublicBasePath = (pathIn) => {
+      const normalizedPath = String(pathIn || '').trim();
+      if (!normalizedPath) return publicBasePath || '/';
+      return `${publicBasePath}${normalizedPath.startsWith('/') ? normalizedPath : `/${normalizedPath}`}` || normalizedPath;
+    };
     const buildSessionRouteHref = (slugRaw) => {
       const normalized = normalizeSessionSlug(slugRaw || '');
       if (isSyntheticNoSessionSlug(normalized)) return '';
@@ -3349,12 +3368,15 @@ const SBTsList = ({
         cfg?.sessionIdHex ||
         ''
       ).trim();
-      if (routeToken) return `/session/${encodeURIComponent(routeToken)}`;
-      if (!normalized) return '/session';
-      return `/session/${encodeURIComponent(normalized)}`;
+      if (routeToken) return withPublicBasePath(`/session/${encodeURIComponent(routeToken)}`);
+      if (!normalized) return withPublicBasePath('/session');
+      return withPublicBasePath(`/session/${encodeURIComponent(normalized)}`);
     };
 
-    const handleOpenSessionChip = (slugRaw, event) => {
+    const handleOpenSessionChip = (slugRaw, optionOrEvent, maybeEvent) => {
+      const event = maybeEvent && typeof maybeEvent === 'object'
+        ? maybeEvent
+        : optionOrEvent;
       if (event?.stopPropagation) event.stopPropagation();
       if (event?.preventDefault) event.preventDefault();
       const href = buildSessionRouteHref(slugRaw);
@@ -3381,80 +3403,137 @@ const SBTsList = ({
       : [normalizeSessionSlug(listSlug || '')];
     const collapsedSummaryPreview = collapsedSummarySlugs.slice(0, 4);
     const collapsedSummaryOverflow = Math.max(0, collapsedSummarySlugs.length - collapsedSummaryPreview.length);
+    const renderCollapsedSummary = (testId) => (
+      <div
+        className={styles.sessionUniverseCollapsedSummary}
+        data-testid={testId}
+      >
+        <span className={styles.sessionUniverseCollapsedLabel}>
+          Selected ({collapsedSummarySlugs.length})
+        </span>
+        <div className={styles.sessionUniverseCollapsedChips}>
+          {collapsedSummaryPreview.map((slugRaw) => {
+            const normalized = normalizeSessionSlug(slugRaw || '');
+            const sessionLabel = labelForSessionSlug(normalized);
+            const isLoading = !!chipProgressVisibilityBySlug[normalized];
+            const chipLoadingStatus = chipLoadingStatusBySlug[normalized] || null;
+            const showCollapsedProgress = chipLoadingStatus != null && isLoading;
+            const sessionRouteHref = buildSessionRouteHref(normalized);
+            const collapsedChipClass = [
+              styles.sessionUniverseCollapsedChip,
+              isLoading ? styles.sessionUniverseCollapsedChipLoading : styles.sessionUniverseCollapsedChipLoaded,
+            ].filter(Boolean).join(' ');
+            return (
+              <span
+                key={`collapsed-${normalized || 'general'}`}
+                className={collapsedChipClass}
+                data-testid={`session-collapsed-chip-${normalized || 'general'}`}
+                data-session-loading={isLoading ? 'true' : 'false'}
+                title={showCollapsedProgress ? chipLoadingStatus.progressText : undefined}
+              >
+                <span className={styles.sessionUniverseCollapsedChipBody}>
+                  <span className={styles.sessionUniverseCollapsedChipName}>
+                    {sessionLabel}
+                  </span>
+                  {showCollapsedProgress && (
+                    <span
+                      className={styles.sessionUniverseCollapsedChipProgress}
+                      data-testid={`session-collapsed-chip-progress-${normalized || 'general'}`}
+                    >
+                      {chipLoadingStatus.chipBlockProgressText}
+                    </span>
+                  )}
+                </span>
+                {sessionRouteHref && (
+                  <button
+                    type="button"
+                    className={styles.sessionUniverseCollapsedChipOpen}
+                    data-testid={`session-collapsed-chip-open-${normalized || 'general'}`}
+                    aria-label={`Open session ${sessionLabel} in new tab`}
+                    title={`Open session ${sessionLabel} in new tab`}
+                    onClick={(event) => handleOpenSessionChip(normalized, event)}
+                  >
+                    <FontAwesomeIcon icon={faExternalLinkAlt} />
+                  </button>
+                )}
+              </span>
+            );
+          })}
+          {!collapsedSummaryPreview.length && (
+            <span className={styles.sessionUniverseCollapsedOverflow}>
+              No sessions selected
+            </span>
+          )}
+          {collapsedSummaryOverflow > 0 && (
+            <span className={styles.sessionUniverseCollapsedOverflow}>
+              +{collapsedSummaryOverflow} more
+            </span>
+          )}
+        </div>
+      </div>
+    );
+
+    const renderHeaderActions = ({ isOpen }) => (
+      <div className={styles.sessionUniverseHeaderActions}>
+        {showUniverseSpinner && (
+          <FontAwesomeIcon
+            icon={faSpinner}
+            spin
+            className={styles.sessionUniverseSpinner}
+            data-testid="session-universe-spinner"
+          />
+        )}
+        {usesFallbackSessionSettingsToggle && (
+          <button
+            type="button"
+            className={styles.sessionUniverseSettingsButton}
+            aria-label={isOpen ? 'Hide session selector' : 'Show session selector'}
+            aria-controls={sessionSelectorPanelId}
+            aria-expanded={isOpen}
+            data-testid="session-selector-toggle"
+            onClick={() => setShowLocalSessionSettings((prev) => !prev)}
+          >
+            <FontAwesomeIcon icon={faCog} />
+          </button>
+        )}
+        {isOpen && (
+          <button
+            type="button"
+            className={styles.sessionUniverseToggle}
+            aria-label={isUniverseCollapsed ? 'Expand session universe' : 'Collapse session universe'}
+            aria-expanded={!isUniverseCollapsed}
+            onClick={() => setIsUniverseCollapsed((prev) => !prev)}
+          >
+            <FontAwesomeIcon icon={isUniverseCollapsed ? faChevronDown : faChevronUp} />
+            <span>{isUniverseCollapsed ? 'Expand' : 'Collapse'}</span>
+          </button>
+        )}
+      </div>
+    );
+
+    if (!isSessionSelectorOpen) {
+      return (
+        <div className={`${styles.sessionUniversePanel} ${styles.sessionUniversePanelClosed}`}>
+          <div className={styles.sessionUniverseHeader}>
+            <span>Sessions</span>
+            {renderHeaderActions({ isOpen: false })}
+          </div>
+          {!hideSessionUniverseSummary && renderCollapsedSummary('session-selector-summary')}
+        </div>
+      );
+    }
+
     return (
-      <div className={styles.sessionUniversePanel}>
+      <div
+        className={styles.sessionUniversePanel}
+        data-testid="session-selector-panel"
+        id={sessionSelectorPanelId}
+      >
         <div className={styles.sessionUniverseHeader}>
           <span>Sessions</span>
-          <div className={styles.sessionUniverseHeaderActions}>
-            {showUniverseSpinner && (
-              <FontAwesomeIcon
-                icon={faSpinner}
-                spin
-                className={styles.sessionUniverseSpinner}
-                data-testid="session-universe-spinner"
-              />
-            )}
-            <button
-              type="button"
-              className={styles.sessionUniverseToggle}
-              aria-label={isUniverseCollapsed ? 'Expand session universe' : 'Collapse session universe'}
-              aria-expanded={!isUniverseCollapsed}
-              onClick={() => setIsUniverseCollapsed((prev) => !prev)}
-            >
-              <FontAwesomeIcon icon={isUniverseCollapsed ? faChevronDown : faChevronUp} />
-              <span>{isUniverseCollapsed ? 'Expand' : 'Collapse'}</span>
-            </button>
-          </div>
+          {renderHeaderActions({ isOpen: true })}
         </div>
-        {isUniverseCollapsed && (
-          <div
-            className={styles.sessionUniverseCollapsedSummary}
-            data-testid="session-universe-collapsed-summary"
-          >
-            <span className={styles.sessionUniverseCollapsedLabel}>
-              Selected ({collapsedSummarySlugs.length})
-            </span>
-            <div className={styles.sessionUniverseCollapsedChips}>
-              {collapsedSummaryPreview.map((slugRaw) => {
-                const normalized = normalizeSessionSlug(slugRaw || '');
-                const chipState = sessionChipStateBySlug[normalized] || {};
-                const isLoading = !!chipProgressVisibilityBySlug[normalized];
-                const chipLoadingStatus = chipLoadingStatusBySlug[normalized] || null;
-                const showCollapsedProgress = chipLoadingStatus != null && isLoading;
-                const collapsedChipClass = [
-                  styles.sessionUniverseCollapsedChip,
-                  isLoading ? styles.sessionUniverseCollapsedChipLoading : styles.sessionUniverseCollapsedChipLoaded,
-                ].filter(Boolean).join(' ');
-                return (
-                  <span
-                    key={`collapsed-${normalized || 'general'}`}
-                    className={collapsedChipClass}
-                    data-testid={`session-collapsed-chip-${normalized || 'general'}`}
-                    data-session-loading={isLoading ? 'true' : 'false'}
-                    title={showCollapsedProgress ? chipLoadingStatus.progressText : undefined}
-                  >
-                    <span className={styles.sessionUniverseCollapsedChipName}>
-                      {labelForSessionSlug(normalized)}
-                    </span>
-                    {showCollapsedProgress && (
-                      <span
-                        className={styles.sessionUniverseCollapsedChipProgress}
-                        data-testid={`session-collapsed-chip-progress-${normalized || 'general'}`}
-                      >
-                        {chipLoadingStatus.chipBlockProgressText}
-                      </span>
-                    )}
-                  </span>
-                );
-              })}
-              {collapsedSummaryOverflow > 0 && (
-                <span className={styles.sessionUniverseCollapsedOverflow}>
-                  +{collapsedSummaryOverflow} more
-                </span>
-              )}
-            </div>
-          </div>
-        )}
+        {!hideSessionUniverseSummary && isUniverseCollapsed && renderCollapsedSummary('session-universe-collapsed-summary')}
         {!isUniverseCollapsed && (
           <div className={styles.sessionUniverseChips}>
             <SessionChipSelector
@@ -3591,29 +3670,34 @@ const SBTsList = ({
                       {`No Password ${t('sbts')}`}
                     </label>
                   </div>
+                  {allSessionsMode && renderSessionUniverseSelector()}
                 </div>
               )}
             </>
           ) : (
-            <div className={styles.filterContainer}>
-              <div className={styles.filterRow}>
-                <label
-                  className={`${styles.filterLabel} ${styles.filterLabelToggle} ${
-                    excludePasswordLocked ? styles.filterLabelActive : ''
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={excludePasswordLocked}
-                    onChange={() => setExcludePasswordLocked(!excludePasswordLocked)}
-                  />
-                  {`Exclude Password-Locked ${t('sbts')}`}
-                </label>
+            <>
+              <div className={styles.filterContainer}>
+                <div className={styles.filterRow}>
+                  <label
+                    className={`${styles.filterLabel} ${styles.filterLabelToggle} ${
+                      excludePasswordLocked ? styles.filterLabelActive : ''
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={excludePasswordLocked}
+                      onChange={() => setExcludePasswordLocked(!excludePasswordLocked)}
+                    />
+                    {`Exclude Password-Locked ${t('sbts')}`}
+                  </label>
+                </div>
               </div>
-            </div>
+              {allSessionsMode && renderSessionUniverseSelector()}
+            </>
           )
         )}
-        {renderSessionUniverseSelector()}
+        {allSessionsMode && !showCommunityTabCompactSettings && !isModal && renderSessionUniverseSelector()}
+        {allSessionsMode && showCommunityTabCompactSettings && !showAdminButtons && renderSessionUniverseSelector()}
 
         {renderSectionTitle(`Featured ${t('sbts')}`, 'section-spinner-featured')}
         {miniFeatured.length > 0 ? (
@@ -3709,43 +3793,46 @@ const SBTsList = ({
 
       {showAdminButtons && (
         <div className={styles.adminButtonsContainer}>
-          <label className={styles.filterLabel}>
-            <input
-              type="checkbox"
-              checked={excludePasswordLocked}
-              onChange={() => setExcludePasswordLocked(!excludePasswordLocked)}
-            />
-            {`Exclude Password-Locked ${t('sbts')}`}
-          </label>
-          <Button
-            className={styles.refreshButton}
-            onClick={handleRefresh}
-            disabled={refreshing || loading}
-          >
-            <FontAwesomeIcon icon={faSync} spin={refreshing} />
-            {' '}Refresh
-            {refreshButtonBusy && (
-              <>
-                {' '}
-                <FontAwesomeIcon
-                  icon={faSpinner}
-                  spin
-                  data-testid="sbt-refresh-busy-spinner"
-                />
-              </>
-            )}
-          </Button>
-          <Button
-            className={styles.clearCacheButton}
-            onClick={handleClearCache}
-            disabled={refreshing || loading}
-          >
-            <FontAwesomeIcon icon={faTrash} /> Clear Cache
-          </Button>
+          <div className={styles.adminControlsRow}>
+            <label className={styles.filterLabel}>
+              <input
+                type="checkbox"
+                checked={excludePasswordLocked}
+                onChange={() => setExcludePasswordLocked(!excludePasswordLocked)}
+              />
+              {`Exclude Password-Locked ${t('sbts')}`}
+            </label>
+            <Button
+              className={styles.refreshButton}
+              onClick={handleRefresh}
+              disabled={refreshing || loading}
+            >
+              <FontAwesomeIcon icon={faSync} spin={refreshing} />
+              {' '}Refresh
+              {refreshButtonBusy && (
+                <>
+                  {' '}
+                  <FontAwesomeIcon
+                    icon={faSpinner}
+                    spin
+                    data-testid="sbt-refresh-busy-spinner"
+                  />
+                </>
+              )}
+            </Button>
+            <Button
+              className={styles.clearCacheButton}
+              onClick={handleClearCache}
+              disabled={refreshing || loading}
+            >
+              <FontAwesomeIcon icon={faTrash} /> Clear Cache
+            </Button>
+          </div>
+          {allSessionsMode && renderSessionUniverseSelector()}
         </div>
       )}
 
-      {renderSessionUniverseSelector()}
+      {allSessionsMode && !showAdminButtons && renderSessionUniverseSelector()}
 
       {/* If embeddedMode is true, the parent handles the "Featured" section; suppress it here */}
       {!embeddedMode && (

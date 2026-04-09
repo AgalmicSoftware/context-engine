@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 
 const { ethers } = require('ethers');
+const { loadClientDefaults } = require('./lib/e2e/network-defaults.js');
 const { getPublicRpcUrls } = require('../client/src/variables/rpcDefaults.js');
 
-const DEFAULT_RPC_URL = getPublicRpcUrls(11155420)[0] || '';
+const DEFAULT_CHAIN_ID = Number(loadClientDefaults()?.defaultChainId || 0);
+const DEFAULT_RPC_URL = getPublicRpcUrls(DEFAULT_CHAIN_ID)[0] || '';
 const DEFAULT_PASSKEY_RAW_ID_B64URL = 'AQIDBAUGBwgJCgsMDQ4PEA';
 
 const toBool = (value) => {

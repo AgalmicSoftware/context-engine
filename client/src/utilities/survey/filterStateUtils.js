@@ -44,7 +44,7 @@ const defaultEmptyFilterState = {
 function isEffectivelyEmpty(filterStateObj) {
   // This function assumes filterStateObj is a non-null, actual object,
   // as serializeFilterState handles null/undefined checks before calling this.
-  
+
   if (Object.keys(filterStateObj).length === 0) {
     return true; // An empty object {} is effectively empty.
   }
@@ -77,7 +77,7 @@ function isEffectivelyEmpty(filterStateObj) {
       return false; // Found an extraneous key not in defaultEmptyFilterState
     }
   }
-  
+
   return true;
 }
 
@@ -99,18 +99,18 @@ export function serializeFilterState(filterStateObj) {
 
   try {
     const jsonString = JSON.stringify(filterStateObj);
-    
+
     // Standard pattern for UTF-8 safety with btoa:
     // 1. encodeURIComponent to handle multi-byte UTF-8 characters into %xx sequences.
     // 2. unescape to convert %xx sequences into single-byte characters that btoa can process.
     const base64String = window.btoa(unescape(encodeURIComponent(jsonString)));
-    
+
     // Convert to Base64URL format
     const base64UrlString = base64String
       .replace(/\+/g, '-')  // Replace '+' with '-'
       .replace(/\//g, '_')  // Replace '/' with '_'
       .replace(/=+$/, '');   // Remove trailing '=' padding
-      
+
     return base64UrlString;
   } catch (error) {
     cacheLog.error("Error serializing filter state:", error);
@@ -127,10 +127,10 @@ export function serializeFilterState(filterStateObj) {
  */
 export function deserializeFilterState(base64UrlString) {
   // Create a new instance of the default state for fallback, ensuring arrays are new instances.
-  const newDefaultStateInstance = { 
-    ...defaultEmptyFilterState, 
-    questionTypes: [...defaultEmptyFilterState.questionTypes], 
-    selectedTags: [...defaultEmptyFilterState.selectedTags] 
+  const newDefaultStateInstance = {
+    ...defaultEmptyFilterState,
+    questionTypes: [...defaultEmptyFilterState.questionTypes],
+    selectedTags: [...defaultEmptyFilterState.selectedTags]
   };
 
   if (base64UrlString === null || base64UrlString === undefined || base64UrlString.trim() === '') {
@@ -142,7 +142,7 @@ export function deserializeFilterState(base64UrlString) {
     let base64String = base64UrlString
       .replace(/-/g, '+')  // Replace '-' with '+'
       .replace(/_/g, '/');  // Replace '_' with '/'
-    
+
     // Add Base64 padding if necessary. Standard Base64 decoders might require it.
     // The length of a Base64 string (sans padding) must be a multiple of 4 when padded.
     const paddingLength = base64String.length % 4;
@@ -197,7 +197,7 @@ export function deserializeFilterState(base64UrlString) {
           }
           : defaultEmptyFilterState.responseStatus,
     };
-    
+
     // Ensure no extraneous keys are carried over if not part of defaultEmptyFilterState
     for (const key in finalState) {
         if (!defaultEmptyFilterState.hasOwnProperty(key)) {

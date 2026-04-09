@@ -2,7 +2,7 @@
 
 import React, { Component } from 'react';
 import { Card, CardBody, Button } from 'reactstrap';
-import Slider from 'react-rangeslider';
+import CESlider from '../Shared/CESlider';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faSpinner,
@@ -672,7 +672,7 @@ class SingleQuestionResponse extends Component {
       responderAddress,
       questionOnly
     } = this.props;
-    
+
     // Redirect for mini/profile views
     if (mode === 'mini' || questionOnly) {
       const rAddr = responderAddress || null;
@@ -1017,7 +1017,7 @@ class SingleQuestionResponse extends Component {
     } else if (type === 'rating') {
       affordance = (
         <div className={styles.readOnlyRating} aria-hidden="true">
-          <Slider min={0} max={10} value={5} tooltip={false} disabled />
+          <CESlider min={0} max={10} value={5} tooltip={false} disabled />
         </div>
       );
     } else if (type === 'freeform') {
@@ -1407,7 +1407,7 @@ class SingleQuestionResponse extends Component {
               {showImportance && !isAnswerEncrypted && !isAdditionalEncrypted && normalizedConviction !== null && (
                 <div className={styles.importanceSlider}>
                   <h6 className={styles.importanceText}>Conviction: {normalizedConviction}</h6>
-                  <Slider
+                  <CESlider
                     min={RATING_MIN}
                     max={RATING_MAX}
                     step={1}

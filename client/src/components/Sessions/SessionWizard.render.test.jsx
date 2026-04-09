@@ -434,10 +434,13 @@ describe('SessionWizard rendered validation', () => {
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
     enableAdvancedMode();
 
+    const defaultChainId = require('../../variables/appConfig.js').DEFAULT_CHAIN_ID;
+    const defaultChain = require('../../variables/chains.js').getChainById(defaultChainId);
+    const defaultChainLabel = `${defaultChain?.name || `Chain ${defaultChainId}`} (${defaultChainId})`;
     const chainSelectorWrap = screen.getByText('Network:').parentElement;
     expect(chainSelectorWrap).toBeTruthy();
-    expect(within(chainSelectorWrap).getByRole('combobox')).toHaveValue('11155420');
-    expect(screen.getByDisplayValue('OP Sepolia (11155420)')).toBeInTheDocument();
+    expect(within(chainSelectorWrap).getByRole('combobox')).toHaveValue(String(defaultChainId));
+    expect(screen.getByDisplayValue(defaultChainLabel)).toBeInTheDocument();
   });
 
   it('defaults auto-feature session groups to enabled for fresh /new drafts', async () => {
@@ -468,7 +471,7 @@ describe('SessionWizard rendered validation', () => {
     expect(imageBar.querySelector('svg[data-icon="question-circle"]')).toBeNull();
     expect(within(imageBar).queryByTestId('mock-wizard-gate-lock')).not.toBeInTheDocument();
     expect(within(imageBar).getByTestId(E2E_TESTIDS.WIZARD_SESSION_HEADER_URL_TOGGLE)).toBeInTheDocument();
-    expect(within(imageBar).getByRole('button', { name: 'Paste' })).toBeInTheDocument();
+    expect(within(imageBar).getByTestId(E2E_TESTIDS.WIZARD_SESSION_HEADER_PASTE)).toBeInTheDocument();
     expect(within(imageBar).getByRole('button', { name: 'Upload image' })).toBeInTheDocument();
   });
 
@@ -495,7 +498,7 @@ describe('SessionWizard rendered validation', () => {
       expect(screen.queryByRole('button', { name: 'Expand session header image' })).not.toBeInTheDocument();
 
       await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: 'Paste' }));
+        fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_SESSION_HEADER_PASTE));
       });
 
       await waitFor(() => {
@@ -519,6 +522,49 @@ describe('SessionWizard rendered validation', () => {
         expect(screen.queryByRole('button', { name: 'Remove session header image' })).not.toBeInTheDocument();
         expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_SESSION_HEADER_URL)).not.toBeInTheDocument();
       });
+    } finally {
+      Object.defineProperty(navigator, 'clipboard', {
+        configurable: true,
+        value: originalClipboard,
+      });
+    }
+  });
+
+  it('accepts supported relative asset paths from the clipboard for session headers', async () => {
+    const originalClipboard = navigator.clipboard;
+    const read = jest.fn().mockResolvedValue([]);
+    const readText = jest.fn().mockResolvedValue('assets/img/header.webp');
+
+    try {
+      localStorage.setItem('ce:sessionWizardDraft:v1', JSON.stringify({
+        draft: {
+          sessionHeader: '',
+        },
+      }));
+      Object.defineProperty(navigator, 'clipboard', {
+        configurable: true,
+        value: { read, readText },
+      });
+
+      renderSessionWizard();
+
+      await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+
+      await act(async () => {
+        fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_SESSION_HEADER_PASTE));
+      });
+
+      await waitFor(() => {
+        expect(read).toHaveBeenCalledTimes(1);
+        expect(readText).toHaveBeenCalledTimes(1);
+      });
+      expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_HEADER_URL)).toHaveValue(
+        'assets/img/header.webp'
+      );
+      expect(screen.queryByText('Clipboard does not contain a supported image or URL.')).not.toBeInTheDocument();
+
+      const previewImage = await screen.findByRole('img', { name: 'Session header preview' });
+      expect(previewImage).toHaveAttribute('src', 'assets/img/header.webp');
     } finally {
       Object.defineProperty(navigator, 'clipboard', {
         configurable: true,
@@ -606,7 +652,7 @@ describe('SessionWizard rendered validation', () => {
 
       await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
       await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: 'Paste' }));
+        fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_SESSION_HEADER_PASTE));
       });
 
       await waitFor(() => {

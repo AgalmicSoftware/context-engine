@@ -40,7 +40,7 @@ import {
 } from '../../utilities/sbt/sbtDisplayNames.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
-import { sbtBasePath, sbtsListPath, t } from '../../utilities/ui/terminology.js';
+import { isCryptoMode, sbtBasePath, sbtsListPath, t } from '../../utilities/ui/terminology.js';
 import CETooltip from '../Shared/CETooltip';
 
 const sbtLog = createLogger('sbt');
@@ -1528,7 +1528,7 @@ class SBTPage extends Component {
       this.setState(prevState => ({ showFullImage: !prevState.showFullImage }));
     }
   };
-  
+
   async attemptMintWithPasswordList(passwordList) {
     try {
       if (!Array.isArray(passwordList) || passwordList.length === 0) return;
@@ -1807,7 +1807,7 @@ class SBTPage extends Component {
         </a>
       </>
     );
-  };  
+  };
 
   getOpenMintAutoJoinUrl = (addressOverride = null) => {
     const sbtAddress = String(addressOverride || resolveSbtAddress(this.props.SBTAddress) || '').trim();
@@ -4299,6 +4299,7 @@ renderMintButton() {
       }
 
       const sbtName = sbtNameText;
+      const showMiniSbtAddress = isCryptoMode();
       const now = Math.floor(Date.now() / 1000);
       const isMintingActive = (sbtInfo.mintingEndTime === 0 || sbtInfo.mintingEndTime > now);
       const mintStatusId = `mintStatus-${(sbtAddressForDisplay || '').toLowerCase()}`;
@@ -4545,7 +4546,9 @@ renderMintButton() {
             />
           </div>
           <p id={styles.miniSbtName}>{sbtName}</p>
-          <p id={styles.miniSbtAddress}>{proposalScripts.getShortenedAddress(sbtAddressForDisplay, false)}</p>
+          {showMiniSbtAddress ? (
+            <p id={styles.miniSbtAddress}>{proposalScripts.getShortenedAddress(sbtAddressForDisplay, false)}</p>
+          ) : null}
           {miniMintArea}
         </div>
       );
@@ -4684,7 +4687,7 @@ renderMintButton() {
     const creatorAddress = sbtInfo?.creator || adminAddress || sbtInfo?.deployer || sbtInfo?.admin_ || '';
 
     const isInitialLoading = !countsReady && effectiveLoading;
-    
+
     // 2. Refreshing: If we have data (netMinted > 0) AND we are loading, show Data + Small Spinner.
     const isRefreshing = (!isInitialLoading) && effectiveLoading;
     const rawRemainingBlocksCount = hasScanProgress
@@ -4904,7 +4907,7 @@ renderMintButton() {
                             <FontAwesomeIcon icon={faSpinner} spin />
                           </span>
                         )}
-                        
+
                         <button onClick={this.openMintedModal} className={styles.expandButton}>
                           <FontAwesomeIcon icon={faUser} />
                         </button>

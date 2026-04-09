@@ -37,7 +37,10 @@ const QuestionBreakdownChart = ({
 
   if (!question) {
     return (
-      <section className={`${styles.panel} ${styles.chartPanel}`}>
+      <section
+        className={`${styles.panel} ${styles.chartPanel}`}
+        data-testid="demo-analysis-question-breakdown"
+      >
         <h3 className={styles.panelTitle}>Question Breakdown</h3>
         <p className={styles.emptyHint}>Select a question to inspect its response breakdown.</p>
       </section>
@@ -47,10 +50,7 @@ const QuestionBreakdownChart = ({
   return (
     <section className={`${styles.panel} ${styles.chartPanel}`} data-testid="demo-analysis-question-breakdown">
       <div className={styles.panelHeader}>
-        <div>
-          <h3 className={styles.panelTitle}>Question Breakdown</h3>
-          <p className={styles.panelMeta} data-testid="demo-analysis-selected-question">{question.text}</p>
-        </div>
+        <h3 className={styles.panelTitle}>Question Breakdown</h3>
         <button type="button" className={styles.clearButton} onClick={() => onOpenDrilldown(question.id)}>
           Details
         </button>

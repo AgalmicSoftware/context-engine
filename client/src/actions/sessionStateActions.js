@@ -24,7 +24,7 @@ export const fetchSessionState = () => dispatch => {
     var currPrimarySessionExplicit = store.getState().sessionState.primarySessionExplicit;
     var currSelectedSessionScope = store.getState().sessionState.selectedSessionScope;
     var currSelectedSessionSlugs = store.getState().sessionState.selectedSessionSlugs;
-  
+
     const sessionInfo = {
       focusedTab: currFocusedTab,
       loginModalToggled: currLoginModalToggle,
@@ -33,8 +33,8 @@ export const fetchSessionState = () => dispatch => {
       primarySessionExplicit: currPrimarySessionExplicit,
       selectedSessionScope: currSelectedSessionScope,
       selectedSessionSlugs: currSelectedSessionSlugs,
-    }; 
-  
+    };
+
     dispatch({
       type: FETCH_SESSION_STATE,
       payload: sessionInfo,

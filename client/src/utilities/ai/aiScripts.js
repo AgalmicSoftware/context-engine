@@ -607,7 +607,7 @@ function readFileContent(file) {
  * Iterates through the list of additional sources (files/URLs),
  * fetches or reads their content, and returns a single concatenated string
  * with delimiters.
- * 
+ *
  * @param {Array<{type: 'url'|'file', value: string|File, name: string}>} sources
  * @returns {Promise<string>}
  */

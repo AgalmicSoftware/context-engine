@@ -331,12 +331,12 @@ const getProviderKind = (providerLike) => {
       return 'wagmi';
     }
     const p = (providerLike && providerLike.provider) || providerLike || (typeof window !== 'undefined' ? window.ethereum : null);
-    
+
     // Check for Porto provider first (must come before other checks)
     if (p && p.isPorto === true) {
       return 'porto';
     }
-    
+
     // Keep Web3Auth detection; it is cheap and enables quick re-enable.
     if (
       p &&
@@ -359,18 +359,18 @@ const getProviderKind = (providerLike) => {
  */
 const _getProvider = (providerLike) => {
   const candidate = (providerLike && providerLike.provider) || providerLike;
-  
+
   // Check for Porto provider first - return directly if it has isPorto flag and request method
   if (candidate && candidate.isPorto === true && typeof candidate.request === 'function') {
     return candidate;
   }
-  
+
   if (candidate && typeof candidate.request === 'function') return candidate;
   if (candidate && candidate.provider && typeof candidate.provider.request === 'function') return candidate.provider;
 
   if (typeof providerLike === 'string') {
     const s = providerLike.trim().toLowerCase();
-    
+
     // Handle Porto provider string. Prefer the seeded window global when a signing
     // client is already warm, but synthesize the lazy mock provider on demand so
     // post-login auth flows can still trigger a passkey assertion only when signing.
@@ -400,7 +400,7 @@ const _getProvider = (providerLike) => {
       }
       throw new Error('Porto provider not initialized. Please authenticate with Passkey first.');
     }
-    
+
     // Keep Web3Auth path for easy re-enable; no overhead without provider.
     if (s === 'web3auth') {
       if (window.web3authProvider) return window.web3authProvider;
@@ -909,7 +909,7 @@ const getContextBytes = (contextHex) => hexToBytes(contextHex);
 /**
  * HKDF KEK derivation for wrapping (EIP-712 signature → HKDF).
  * IKM := SHA-256(signature)
- * salt := 'surveytool:v1'        
+ * salt := 'surveytool:v1'
  * info := contextBytes (32 bytes)
  */
 const deriveKekFromSig = async (signatureHex, contextBytes) => {

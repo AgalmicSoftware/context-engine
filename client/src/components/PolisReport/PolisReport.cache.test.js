@@ -521,7 +521,7 @@ describe('PolisReport demo data defaults', () => {
     expect(screen.getByTestId(E2E_TESTIDS.POLIS_DEMO_DATA_TOGGLE)).toBeChecked();
   });
 
-  it('defaults built-in /session/demo to Polis Auto with the precomputed cluster count', async () => {
+  it('defaults built-in /session/demo to UMAP with 3 groups and still exposes precomputed Polis analysis after switching modes', async () => {
     computePolisConversationMath.mockReturnValue({
       stats: {
         nParticipants: 4,
@@ -550,6 +550,14 @@ describe('PolisReport demo data defaults', () => {
         questionResponses={seededQuestionResponses}
       />
     );
+
+    const embeddingSelect = screen.getByDisplayValue('UMAP');
+    const clusterInput = screen.getByRole('spinbutton');
+
+    expect(screen.getByDisplayValue('UMAP')).toBeInTheDocument();
+    expect(clusterInput).toHaveValue(3);
+
+    fireEvent.change(embeddingSelect, { target: { value: 'POLIS' } });
 
     expect(screen.getByDisplayValue(REPORT_DEFAULT_EMBEDDING_LABEL)).toBeInTheDocument();
     await waitFor(() => {

@@ -1,8 +1,8 @@
 /** @file DebateMap.jsx */
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { 
-  faThumbsUp, faChevronRight, faBookmark, faTimes, faComment, faLink, faCheck, 
+import {
+  faThumbsUp, faChevronRight, faBookmark, faTimes, faComment, faLink, faCheck,
   faPlus, faNetworkWired, faArrowLeft, faFire, faSitemap, faCaretDown, faCaretUp,
   faArrowUp, faArrowDown, faList
 } from '@fortawesome/free-solid-svg-icons';
@@ -10,12 +10,15 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { FormGroup, Label, Input } from 'reactstrap';
 import treeData from '../../variables/demo/debate_map_demo_data.json';
 import historicalData from '../../variables/demo/historical_figures_tree_qs_and_votes.json';
+import loopholeHistoricalCases from '../../variables/demo/loophole_historical_cases.json';
+import loopholeHistoricalFigurePrinciples from '../../variables/demo/loophole_historical_figure_principles.json';
 import styles from './DebateMap.module.scss';
 import { createLogger } from 'utilities/logging.js';
 import {
   getHistoricalFigureAvatarOrBlockie,
   getHistoricalFigureBlockie,
 } from 'utilities/ui/historicalFigureAvatars.js';
+import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { notify } from '../../utilities/ui/notify.js';
 import { buildTagHref } from '../SurveyTool/QuestionTagDropdown.jsx';
 
@@ -123,6 +126,275 @@ const historicalFigureCommentMap = Object.entries(historicalData || {}).reduce((
     : {};
   return acc;
 }, {});
+
+const historicalCaseMap = (Array.isArray(loopholeHistoricalCases) ? loopholeHistoricalCases : []).reduce((acc, entry) => {
+  const issueIds = Array.isArray(entry?.debate_map_issues) ? entry.debate_map_issues : [];
+
+  issueIds.forEach((issueId) => {
+    if (!acc[issueId]) {
+      acc[issueId] = [];
+    }
+    acc[issueId].push(entry);
+  });
+
+  return acc;
+}, {});
+
+const getHistoricalFigurePrinciples = (figureName) => {
+  const principles = loopholeHistoricalFigurePrinciples?.[figureName];
+  return Array.isArray(principles) ? principles.filter(Boolean) : [];
+};
+
+const normalizeHistoricalCaseText = (value) => {
+  if (typeof value === 'string') return value.trim();
+  if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+  if (Array.isArray(value)) {
+    return value
+      .map((entry) => normalizeHistoricalCaseText(entry))
+      .filter(Boolean)
+      .join(', ');
+  }
+  return '';
+};
+
+const normalizeHistoricalCaseTextList = (values) => (
+  Array.isArray(values)
+    ? values
+      .map((value) => normalizeHistoricalCaseText(value))
+      .filter(Boolean)
+    : []
+);
+
+const buildHistoricalCaseFieldRows = (source, fields) => {
+  if (!source || typeof source !== 'object') return [];
+
+  return fields.reduce((rows, field) => {
+    const value = normalizeHistoricalCaseText(source?.[field.key]);
+    if (!value) return rows;
+    return rows.concat({ label: field.label, value });
+  }, []);
+};
+
+const normalizeHistoricalDraftArticles = (draftLegalCode) => {
+  const rawArticles = Array.isArray(draftLegalCode?.articles)
+    ? draftLegalCode.articles
+    : [];
+
+  return rawArticles.reduce((articles, article, articleIndex) => {
+    const fallbackLabel = `Article ${articleIndex + 1}`;
+    let body = '';
+    let label = '';
+
+    if (article && typeof article === 'object' && !Array.isArray(article)) {
+      label = normalizeHistoricalCaseText(
+        article.label || article.title || article.article
+      );
+      body = normalizeHistoricalCaseText(
+        article.body || article.text || article.content || article.summary
+      );
+    } else {
+      body = normalizeHistoricalCaseText(article);
+    }
+
+    if (!body) return articles;
+
+    if (!label) {
+      const labelMatch = body.match(/^(Article|Art\.?)\s*([A-Za-z0-9]+)[\s.:_-]*(.*)$/i);
+      if (labelMatch) {
+        label = `Article ${labelMatch[2]}`;
+        body = normalizeHistoricalCaseText(labelMatch[3]) || body;
+      }
+    }
+
+    return articles.concat({
+      label: label || fallbackLabel,
+      body,
+    });
+  }, []);
+};
+
+const resolveHistoricalPatchFigureLabel = (rawValue, authors) => {
+  const normalizedValue = normalizeHistoricalCaseText(rawValue);
+  const normalizedKey = normalizedValue.toLowerCase();
+
+  if (!normalizedKey) return [];
+  if (normalizedKey === 'both' || normalizedKey === 'figure a + figure b') {
+    return normalizeHistoricalCaseTextList(authors);
+  }
+  if (normalizedKey === 'figure a') {
+    return [normalizeHistoricalCaseText(authors?.[0]) || 'Figure A'];
+  }
+  if (normalizedKey === 'figure b') {
+    return [normalizeHistoricalCaseText(authors?.[1]) || 'Figure B'];
+  }
+
+  return [normalizedValue];
+};
+
+const normalizeHistoricalPatchFavoredBy = (favoredBy, authors) => {
+  const favoredValues = Array.isArray(favoredBy)
+    ? favoredBy
+    : [favoredBy];
+
+  const rawTokens = favoredValues
+    .flatMap((value) => {
+      const normalizedValue = normalizeHistoricalCaseText(value);
+      if (!normalizedValue) return [];
+      if (/^\s*(figure a|figure b|both)\s*$/i.test(normalizedValue)) {
+        return [normalizedValue];
+      }
+      return normalizedValue.split(/\s*(?:,|\/|&|\band\b)\s*/i).filter(Boolean);
+    });
+
+  return Array.from(new Set(
+    rawTokens
+      .flatMap((token) => resolveHistoricalPatchFigureLabel(token, authors))
+      .filter(Boolean)
+  ));
+};
+
+const normalizeHistoricalPatchOptions = (patchOptions, authors) => (
+  Array.isArray(patchOptions)
+    ? patchOptions.reduce((normalizedPatches, patch, patchIndex) => {
+      if (!patch || typeof patch !== 'object') return normalizedPatches;
+
+      const name = normalizeHistoricalCaseText(patch.name);
+      const summary = normalizeHistoricalCaseText(patch.summary);
+      const favoredBy = normalizeHistoricalPatchFavoredBy(patch.favored_by, authors);
+
+      if (!name && !summary && favoredBy.length === 0) {
+        return normalizedPatches;
+      }
+
+      return normalizedPatches.concat({
+        id: name || `patch-${patchIndex}`,
+        name: name || `Patch option ${patchIndex + 1}`,
+        summary,
+        favoredBy,
+      });
+    }, [])
+    : []
+);
+
+const buildHistoricalCasePanel = (title, tone, source, fields) => {
+  const rows = buildHistoricalCaseFieldRows(source, fields);
+  if (rows.length === 0) return null;
+
+  return {
+    title,
+    tone,
+    rows,
+  };
+};
+
+export const buildHistoricalCaseBrief = (historicalCase, content = {}) => {
+  const nodeName = String(content?.name || 'this issue').trim();
+  const xAxisLabel = String(content?.compass?.xAxis?.label || '').trim();
+  const yAxisLabel = String(content?.compass?.yAxis?.label || '').trim();
+  const summaryText = String(historicalCase?.summary || '').trim();
+  const authors = normalizeHistoricalCaseTextList(historicalCase?.authors);
+
+  const inlinePrinciples = historicalCase?.principles_by_figure || {};
+  const figurePrinciples = authors.map((authorName) => {
+    const inlinePrinciplesList = normalizeHistoricalCaseTextList(inlinePrinciples?.[authorName]);
+    return {
+      name: authorName,
+      principles: inlinePrinciplesList.length > 0
+        ? inlinePrinciplesList
+        : normalizeHistoricalCaseTextList(getHistoricalFigurePrinciples(authorName)),
+    };
+  });
+
+  const authorText = authors.length > 0 ? authors.join(' and ') : 'the paired historical figures';
+  const normalizedCategory = String(historicalCase?.category || '').trim().toLowerCase();
+  const axisFragments = [xAxisLabel, yAxisLabel].filter(Boolean);
+  const axisText = axisFragments.length > 0
+    ? axisFragments.join(' and ')
+    : nodeName;
+
+  const draftArticles = normalizeHistoricalDraftArticles(historicalCase?.draft_legal_code);
+  const attackPanels = [
+    buildHistoricalCasePanel(
+      'Loophole exploit',
+      'primary',
+      historicalCase?.loophole_exploit,
+      [
+        { key: 'institution', label: 'Institution' },
+        { key: 'actor', label: 'Actor' },
+        { key: 'action', label: 'Action' },
+        { key: 'victims', label: 'Victims' },
+        { key: 'why_legal', label: 'Why legal' },
+        { key: 'why_immoral', label: 'Why immoral' },
+      ]
+    ),
+    buildHistoricalCasePanel(
+      'Overreach variant',
+      'secondary',
+      historicalCase?.overreach_variant,
+      [
+        { key: 'institution', label: 'Institution' },
+        { key: 'actor', label: 'Actor' },
+        { key: 'blocked_action', label: 'Blocked action' },
+        { key: 'who_gets_harmed', label: 'Who gets harmed' },
+        { key: 'why_illegal', label: 'Why illegal' },
+        { key: 'why_moral', label: 'Why moral' },
+      ]
+    ),
+  ].filter(Boolean);
+
+  const richJudgeTension = normalizeHistoricalCaseText(historicalCase?.judge_tension);
+  const richWhyHard = normalizeHistoricalCaseText(historicalCase?.why_the_case_is_hard);
+  const richBestPatch = normalizeHistoricalCaseText(historicalCase?.best_patch);
+  const richWhyOtherFails = normalizeHistoricalCaseText(historicalCase?.why_other_patch_fails);
+  const richOpenQuestion = normalizeHistoricalCaseText(historicalCase?.open_question);
+
+  let draftLegalCodeText = `A legislator starting from these principles would try to write a rule for ${nodeName} that is specific enough to draft from and broad enough to survive the next edge case. On this node, that means taking a clear position on ${axisText}.`;
+  let adversarialAttackText = `The adversarial move is to translate the abstract debate into a concrete case where the current rule starts producing consequences its authors may not have intended. ${summaryText}`;
+  let judgeTensionText = `The repo guidance says good principles should be specific enough to draft from, broad enough to create real tension, and honest enough to expose conflict. This case is difficult because ${authorText} bring draftable principles that do not collapse into a single obvious patch once ${nodeName} is under pressure.`;
+  let decisionPromptText = `What ruling would you adopt here, and what precedent would that create for the next version of the code?`;
+
+  if (normalizedCategory.includes('loophole')) {
+    draftLegalCodeText = `A legislator starting from these principles would likely write a strong protective rule around ${nodeName}, then add a narrow operational exception so the system can still function in practice. That draft is the sort of code Loophole is meant to stress-test.`;
+    adversarialAttackText = `This is a Loophole Finder case: the action stays technically inside the rule while violating the moral objective that justified the rule in the first place. ${summaryText}`;
+    judgeTensionText = `The judge's problem is to close the exploit without breaking legitimate use. A patch that simply removes discretion may satisfy one figure's principles while violating the other figure's tolerable exceptions or state-capacity concerns.`;
+    decisionPromptText = `What patch closes the exploit in ${nodeName} without blocking the legitimate use that made the rule attractive in the first place?`;
+  } else if (normalizedCategory.includes('overreach')) {
+    draftLegalCodeText = `A legislator starting from these principles would likely draft a rule that aggressively protects against the obvious abuse tied to ${nodeName}. The danger is that the code becomes too rigid once it meets emergencies, edge cases, or justified discretion.`;
+    adversarialAttackText = `This is an Overreach Finder case: the attack is to show that the current rule forbids conduct many people would still treat as morally acceptable or even required. ${summaryText}`;
+    judgeTensionText = `The judge cannot just carve out a broad exception, because that may reopen the original abuse path. The hard part is writing a narrower refinement that respects both figures' principles without turning the rule into swiss cheese.`;
+    decisionPromptText = `What exception or refinement preserves justified action here without reopening the abuse path that the original rule was trying to close?`;
+  } else if (normalizedCategory.includes('judge')) {
+    draftLegalCodeText = `A legislator starting from these principles would already have some code on the books for ${nodeName}. This case matters because the next revision has to fit the growing precedent set, not start over from clean philosophical premises.`;
+    adversarialAttackText = `This is a precedent-building case: the real stress test is not just whether the present situation is difficult, but whether the next patch will collide with earlier commitments elsewhere in the code. ${summaryText}`;
+    judgeTensionText = `The judge has to preserve coherence across rounds. A patch that looks sensible for this dispute may undermine prior rulings, loosen future enforcement, or quietly privilege one figure's principles as the hidden default for every later case.`;
+    decisionPromptText = `If this becomes binding precedent for ${nodeName}, what future edge cases would it settle well, and which ones might it quietly break?`;
+  } else if (normalizedCategory.includes('escalated')) {
+    draftLegalCodeText = `A legislator starting from these principles could still write real code for ${nodeName}, but the rule would encode a live philosophical disagreement rather than a settled consensus. That is why the case is already in escalation territory.`;
+    adversarialAttackText = `This is an escalated case in the Loophole sense: the system has found a dilemma where any clean answer seems to betray one serious principle in order to preserve another. ${summaryText}`;
+    judgeTensionText = `The judge cannot auto-resolve this without choosing which principle should dominate. That choice belongs to the human because it reveals a genuine fracture in the moral framework rather than a drafting oversight.`;
+    decisionPromptText = `If this becomes binding precedent for ${nodeName}, what future edge cases would it settle well, and which ones might it quietly break?`;
+  }
+
+  return {
+    figurePrinciples,
+    draftLegalCode: draftArticles.length > 0
+      ? { articles: draftArticles }
+      : draftLegalCodeText,
+    adversarialAttack: attackPanels.length > 0
+      ? { panels: attackPanels, fallbackText: null }
+      : { panels: [], fallbackText: adversarialAttackText },
+    judgeTension: richJudgeTension || judgeTensionText,
+    whyHard: richWhyHard || null,
+    decisionPrompt: richOpenQuestion || decisionPromptText,
+    patchOptions: normalizeHistoricalPatchOptions(historicalCase?.concrete_patch_options, authors),
+    bestPatch: richBestPatch || null,
+    whyOtherFails: richWhyOtherFails || null,
+    precedentPressure: buildHistoricalCaseFieldRows(historicalCase?.precedent_pressure, [
+      { key: 'prior_ruling', label: 'Prior ruling' },
+      { key: 'future_case_at_risk', label: 'Future case at risk' },
+    ]),
+  };
+};
 
 const getHistoricalCompassSpreadY = (name) => (
   ((getNameHash(name) * 37) % 1000) / 999
@@ -250,6 +522,7 @@ const buildAtlasTreeData = (demoMode) => {
     let demoQuestions = [];
     let demoComments = [];
     let demoHistoricalVotes = [];
+    let demoHistoricalCases = [];
 
     if (demoMode) {
       Object.entries(historicalData || {}).forEach(([username, figure]) => {
@@ -278,6 +551,10 @@ const buildAtlasTreeData = (demoMode) => {
           demoComments = demoComments.concat(matchedComments);
         }
       });
+
+      demoHistoricalCases = Array.isArray(historicalCaseMap[node.id])
+        ? historicalCaseMap[node.id]
+        : [];
     }
 
     const currentUp = parseInt(node?.votes?.up || 0, 10) || 0;
@@ -287,6 +564,10 @@ const buildAtlasTreeData = (demoMode) => {
     const mergedHistoricalVotes = [
       ...(Array.isArray(node.historicalVotes) ? node.historicalVotes : []),
       ...demoHistoricalVotes,
+    ];
+    const mergedHistoricalCases = [
+      ...(Array.isArray(node.historicalCases) ? node.historicalCases : []),
+      ...demoHistoricalCases,
     ];
     const children = Array.isArray(node.children)
       ? node.children.map(updateNodeWithHistoricalData)
@@ -314,6 +595,9 @@ const buildAtlasTreeData = (demoMode) => {
 
     if (mergedHistoricalVotes.length > 0) nextNode.historicalVotes = mergedHistoricalVotes;
     else delete nextNode.historicalVotes;
+
+    if (mergedHistoricalCases.length > 0) nextNode.historicalCases = mergedHistoricalCases;
+    else delete nextNode.historicalCases;
 
     return nextNode;
   };
@@ -384,11 +668,11 @@ export const AtlasView = ({ data, onNodeClick }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [startPan, setStartPan] = useState({ x: 0, y: 0 });
   const [hoveredNodeId, setHoveredNodeId] = useState(null);
-  
+
   // Drill-down State
   const [atlasRootId, setAtlasRootId] = useState(null); // null = global root
   const [atlasHistoryIds, setAtlasHistoryIds] = useState([]); // Stack
-  
+
   const [showActiveDebates, setShowActiveDebates] = useState(false);
 
   const atlasRoot = useMemo(() => (
@@ -401,7 +685,7 @@ export const AtlasView = ({ data, onNodeClick }) => {
         w: containerRef.current.offsetWidth,
         h: containerRef.current.offsetHeight
       });
-      
+
       const handleResize = () => {
          if(containerRef.current) {
             setDimensions({
@@ -434,8 +718,8 @@ export const AtlasView = ({ data, onNodeClick }) => {
     // 3. Cluster Parent Click: Drill Down
     setAtlasHistoryIds((prev) => [...prev, atlasRootId]);
     setAtlasRootId(node.id);
-    setOffset({ x: 0, y: 0 }); 
-    setShowActiveDebates(false); 
+    setOffset({ x: 0, y: 0 });
+    setShowActiveDebates(false);
   };
 
   const handleBack = (e) => {
@@ -465,13 +749,13 @@ export const AtlasView = ({ data, onNodeClick }) => {
   const layout = useMemo(() => {
     const nodes = [];
     const links = [];
-    
+
     // The "Virtual Root" is the global center point.
     const centerNode = atlasRoot ? atlasRoot : { id: 'virtual-root', name: 'AI Policy Atlas', children: data, depth: -1 };
-    
-    nodes.push({ 
-      ...centerNode, 
-      x: 0, y: 0, 
+
+    nodes.push({
+      ...centerNode,
+      x: 0, y: 0,
       isCenter: true,
       depthClass: 'depthCenter',
       heat: calculateHeat(centerNode),
@@ -480,51 +764,51 @@ export const AtlasView = ({ data, onNodeClick }) => {
 
     if (!centerNode.children) return { nodes, links };
 
-    const isMobile = dimensions.w < 768; 
-    
+    const isMobile = dimensions.w < 768;
+
     // LAYOUT CONFIGURATION
     // Fixed: Reduced desktop drill-down radius from 380 to 250 to prevent over-spreading
-    const initialRadius = atlasRoot 
-        ? (isMobile ? 160 : 250) 
-        : (isMobile ? 110 : 150); 
+    const initialRadius = atlasRoot
+        ? (isMobile ? 160 : 250)
+        : (isMobile ? 110 : 150);
 
     const processRing = (parent, parentX, parentY, startAngle, endAngle, level) => {
        if (!parent.children || parent.children.length === 0) return;
-       
+
        const count = parent.children.length;
-       
+
        let availableAngle = endAngle - startAngle;
        let currentStartAngle = startAngle;
 
        if (level === 1) {
-           availableAngle = Math.PI * 2; 
+           availableAngle = Math.PI * 2;
            currentStartAngle = 0;
-       } 
-       
+       }
+
        const angleStep = availableAngle / count;
 
        parent.children.forEach((child, i) => {
           let nodeX, nodeY, myAngle;
 
           if (level === 1) {
-             myAngle = currentStartAngle + (i * angleStep) + (angleStep/2) - (Math.PI/2); 
+             myAngle = currentStartAngle + (i * angleStep) + (angleStep/2) - (Math.PI/2);
              nodeX = Math.cos(myAngle) * initialRadius;
              nodeY = Math.sin(myAngle) * initialRadius;
           } else {
              const angleFromParent = Math.atan2(parentY, parentX);
-             let wedgeSize = (Math.PI * 0.8) / (level * 0.8); 
-             
+             let wedgeSize = (Math.PI * 0.8) / (level * 0.8);
+
              if (atlasRoot && !isMobile) {
-                 wedgeSize = Math.PI / 1.5; 
+                 wedgeSize = Math.PI / 1.5;
              }
 
              const wedgeStart = angleFromParent - (wedgeSize / 2);
-             const wedgeStep = wedgeSize / (count + 1); 
+             const wedgeStep = wedgeSize / (count + 1);
 
              myAngle = wedgeStart + (wedgeStep * (i + 1));
-             
-             const dist = isMobile ? 60 + (30/level) : 120; 
-             
+
+             const dist = isMobile ? 60 + (30/level) : 120;
+
              nodeX = parentX + Math.cos(myAngle) * dist;
              nodeY = parentY + Math.sin(myAngle) * dist;
           }
@@ -533,7 +817,7 @@ export const AtlasView = ({ data, onNodeClick }) => {
 
           const newNode = {
             ...child,
-            x: nodeX, 
+            x: nodeX,
             y: nodeY,
             depth: visualDepth,
             depthClass: `depth${Math.max(0, Math.min(visualDepth, 3))}`,
@@ -543,9 +827,9 @@ export const AtlasView = ({ data, onNodeClick }) => {
           nodes.push(newNode);
 
           if (parent.id !== 'virtual-root') {
-              links.push({ 
-                  source: { x: parentX, y: parentY }, 
-                  target: { x: nodeX, y: nodeY } 
+              links.push({
+                  source: { x: parentX, y: parentY },
+                  target: { x: nodeX, y: nodeY }
               });
           }
 
@@ -596,8 +880,8 @@ export const AtlasView = ({ data, onNodeClick }) => {
   const isMobile = dimensions.w < 768;
 
   return (
-    <div 
-      ref={containerRef} 
+    <div
+      ref={containerRef}
       className={styles.atlasViewContainer}
       onMouseDown={onMouseDown}
       onMouseMove={onMouseMove}
@@ -614,8 +898,8 @@ export const AtlasView = ({ data, onNodeClick }) => {
       )}
 
       {!atlasRoot && (
-        <button 
-          className={styles.hotDebatesBtn} 
+        <button
+          className={styles.hotDebatesBtn}
           onClick={() => setShowActiveDebates(!showActiveDebates)}
         >
           <FontAwesomeIcon icon={faFire} /> Top Debates
@@ -648,29 +932,29 @@ export const AtlasView = ({ data, onNodeClick }) => {
         if (node.id === 'virtual-root') return null;
 
         const totalSize = calculateAtlasNodeSize(node, isMobile, layout.disagreementRange);
-        
+
         const isHovered = hoveredNodeId === node.id;
 
         return (
-          <div 
+          <div
             key={i}
             className={`${styles.atlasNode} ${styles[node.depthClass]} ${isHovered ? styles.hovered : ''}`}
-            style={{ 
-                left: cx + node.x, 
+            style={{
+                left: cx + node.x,
                 top: cy + node.y,
-                zIndex: isHovered ? 200 : (node.isCenter ? 100 : undefined) 
+                zIndex: isHovered ? 200 : (node.isCenter ? 100 : undefined)
             }}
             onClick={(e) => { e.stopPropagation(); handleAtlasNodeClick(node); }}
             onMouseEnter={() => setHoveredNodeId(node.id)}
             onMouseLeave={() => setHoveredNodeId(null)}
           >
-            <div 
+            <div
               className={`${styles.nodeDot} ${node.heat > 10 ? styles.hot : ''}`}
               style={{ width: `${totalSize}px`, height: `${totalSize}px` }}
             >
                {(node.depth === 0 || node.isCenter) && <FontAwesomeIcon icon={faNetworkWired} />}
             </div>
-            
+
             <div className={`${styles.nodeLabel} ${(node.depth === 0 || node.isCenter) ? styles.alwaysVisible : ''}`}>
                 {node.name}
             </div>
@@ -692,16 +976,16 @@ const FlatNode = ({ node, parentPath = [], onNodeClick, onBookmark, bookmarkedNo
       <div className={styles.pathContainer}>
         {parentPath.map((p, index) => (
           <React.Fragment key={p.id}>
-             <button 
+             <button
                className={`${styles.pathButton} ${styles[`depth${index}`]}`}
-               onClick={() => onNodeClick(p)} 
+               onClick={() => onNodeClick(p)}
              >
                {p.name}
              </button>
              <FontAwesomeIcon icon={faChevronRight} className={styles.pathSeparator} />
           </React.Fragment>
         ))}
-        <button 
+        <button
            className={`${styles.pathButton} ${styles[`depth${parentPath.length}`]}`}
            onClick={() => onNodeClick(node)}
         >
@@ -712,10 +996,10 @@ const FlatNode = ({ node, parentPath = [], onNodeClick, onBookmark, bookmarkedNo
       <div className={styles.metaInfo}>
         <span className={styles.upvotes}><FontAwesomeIcon icon={faThumbsUp} /> {netUpvotes}</span>
         <span className={styles.comments}><FontAwesomeIcon icon={faComment} /> {commentCount}</span>
-        <FontAwesomeIcon 
-          icon={faBookmark} 
-          className={`${styles.bookmark} ${isBookmarked ? styles.bookmarked : ''}`} 
-          onClick={(e) => { e.stopPropagation(); onBookmark(node.id); }} 
+        <FontAwesomeIcon
+          icon={faBookmark}
+          className={`${styles.bookmark} ${isBookmarked ? styles.bookmarked : ''}`}
+          onClick={(e) => { e.stopPropagation(); onBookmark(node.id); }}
         />
         <FontAwesomeIcon icon={faChevronRight} className={styles.expandIcon} onClick={() => onNodeClick(node)} />
       </div>
@@ -738,14 +1022,18 @@ const Modal = ({
   const [showVoteBreakdown, setShowVoteBreakdown] = useState(false);
   const [compassOpen, setCompassOpen] = useState(true);
   const [argumentsOpen, setArgumentsOpen] = useState(true);
+  const [historicalCasesOpen, setHistoricalCasesOpen] = useState(true);
+  const [expandedHistoricalCaseId, setExpandedHistoricalCaseId] = useState('');
   const [questionsOpen, setQuestionsOpen] = useState(false);
 
   useEffect(() => {
     setCompassOpen(true);
     setArgumentsOpen(false);
+    setHistoricalCasesOpen(true);
+    setExpandedHistoricalCaseId('');
     setQuestionsOpen(false);
   }, [content?.id]);
-  
+
   const getUserAvatar = (username) => (
     getHistoricalFigureAvatarOrBlockie(username, {
       preferBlockie: false,
@@ -924,16 +1212,18 @@ const Modal = ({
   const hasArguments = Boolean(argumentData);
   const totalArgumentCount = proArguments.length + conArguments.length;
   const questionCount = questions.length;
+  const historicalCases = Array.isArray(content.historicalCases) ? content.historicalCases : [];
+  const historicalCaseCount = historicalCases.length;
   const compassTitle = content?.compass?.xAxis?.label || content?.name || 'Compass';
-  
+
   // Logic for Depth Label and Styling
   const depthLabels = ["Category", "Sub-Category", "Topic", "Instance"];
   const depthIndex = content.depth !== undefined ? content.depth : (content.parentPath ? content.parentPath.length : 0);
   const depthLabel = depthLabels[Math.min(depthIndex, 3)] || "Node";
   const depthClass = `depth${Math.min(depthIndex, 3)}`; // used for color mapping
 
-  const tags = ["AI Safety", "Policy"]; 
-  
+  const tags = ["AI Safety", "Policy"];
+
   // Calculate Counts from Content
   const upVotes = parseInt(content.votes?.up || 0);
   const downVotes = parseInt(content.votes?.down || 0);
@@ -1020,10 +1310,272 @@ const Modal = ({
     );
   };
 
+  const renderHistoricalCaseFieldRows = (rows = []) => {
+    if (!Array.isArray(rows) || rows.length === 0) return null;
+
+    return (
+      <div className={styles.historicalCaseFactList}>
+        {rows.map((row, rowIndex) => (
+          <div
+            key={`${row.label}-${rowIndex}`}
+            className={styles.historicalCaseFactRow}
+          >
+            <div className={styles.historicalCaseFactLabel}>{row.label}</div>
+            <div className={styles.historicalCaseFactValue}>{row.value}</div>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  const renderHistoricalCaseCard = (historicalCase, caseIndex) => {
+    if (!historicalCase || typeof historicalCase !== 'object') return null;
+
+    const title = String(historicalCase.title || historicalCase.id || '').trim();
+    if (!title) return null;
+
+    const authors = normalizeHistoricalCaseTextList(historicalCase.authors);
+    const tagsList = Array.isArray(historicalCase.tags)
+      ? historicalCase.tags.filter(Boolean)
+      : [];
+    const caseKey = historicalCase.id || `${title}-${caseIndex}`;
+    const isExpanded = expandedHistoricalCaseId === caseKey;
+    const detailPanelId = `historical-case-${caseKey}`;
+    const brief = buildHistoricalCaseBrief(historicalCase, content);
+    const metaBits = [
+      historicalCase.category,
+      authors.length > 0 ? authors.join(', ') : '',
+      historicalCase.venue,
+      historicalCase.year,
+    ].filter(Boolean);
+    const normalizedBestPatch = String(brief.bestPatch || '').trim().toLowerCase();
+    const hasBestPatchCard = Boolean(normalizedBestPatch)
+      && brief.patchOptions.some((patch) => String(patch?.name || '').trim().toLowerCase() === normalizedBestPatch);
+
+    return (
+      <div
+        key={caseKey}
+        className={styles.historicalCaseCard}
+        data-testid={E2E_TESTIDS.ATLAS_HISTORICAL_CASE_CARD}
+        data-ce-case-id={caseKey}
+      >
+        <div className={styles.historicalCaseHeader}>
+          <div>
+            <div className={styles.historicalCaseTitle}>{title}</div>
+            {metaBits.length > 0 && (
+              <div className={styles.historicalCaseMeta}>
+                {metaBits.join(' • ')}
+              </div>
+            )}
+          </div>
+          <div className={styles.historicalCaseActions}>
+            <button
+              type="button"
+              className={styles.historicalCaseExpandButton}
+              aria-expanded={isExpanded}
+              aria-controls={detailPanelId}
+              data-testid={E2E_TESTIDS.ATLAS_HISTORICAL_CASE_EXPAND}
+              data-ce-case-id={caseKey}
+              onClick={() => setExpandedHistoricalCaseId((currentValue) => (
+                currentValue === caseKey ? '' : caseKey
+              ))}
+            >
+              {isExpanded ? 'Hide brief' : 'View full brief'}
+            </button>
+            {historicalCase.url ? (
+              <a
+                href={historicalCase.url}
+                rel="noopener noreferrer"
+                target="_blank"
+                className={styles.historicalCaseSource}
+              >
+                {historicalCase.source_label || 'Source'}
+              </a>
+            ) : null}
+          </div>
+        </div>
+        {historicalCase.summary ? (
+          <div className={styles.historicalCaseSummary}>
+            {historicalCase.summary}
+          </div>
+        ) : null}
+        {isExpanded && (
+          <div
+            id={detailPanelId}
+            className={styles.historicalCaseDetail}
+            data-testid={E2E_TESTIDS.ATLAS_HISTORICAL_CASE_DETAIL}
+            data-ce-case-id={caseKey}
+          >
+            <div className={styles.historicalCaseDetailBlock}>
+              <div className={styles.historicalCaseDetailLabel}>Moral principles</div>
+              {brief.figurePrinciples.length > 0 ? (
+                <div className={styles.historicalCasePrinciplesGrid}>
+                  {brief.figurePrinciples.map((figureEntry) => (
+                    <div
+                      key={`${caseKey}-${figureEntry.name}`}
+                      className={styles.historicalCasePrinciplesCard}
+                    >
+                      <div className={styles.historicalCasePrinciplesName}>{figureEntry.name}</div>
+                      {figureEntry.principles.length > 0 ? (
+                        <ul className={styles.historicalCasePrinciplesList}>
+                          {figureEntry.principles.map((principle, principleIndex) => (
+                            <li key={`${figureEntry.name}-${principleIndex}`}>{principle}</li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className={styles.historicalCaseEmptyText}>
+                          No figure-specific principles were attached to this case.
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className={styles.historicalCaseEmptyText}>
+                  No figure-specific principles were attached to this case.
+                </p>
+              )}
+            </div>
+            <div className={styles.historicalCaseDetailBlock}>
+              <div className={styles.historicalCaseDetailLabel}>Draft legal code</div>
+              {brief.draftLegalCode && typeof brief.draftLegalCode === 'object' && Array.isArray(brief.draftLegalCode.articles) ? (
+                <div className={styles.historicalCaseArticleList}>
+                  {brief.draftLegalCode.articles.map((article, articleIndex) => (
+                    <div
+                      key={`${caseKey}-article-${articleIndex}`}
+                      className={styles.historicalCaseArticleItem}
+                    >
+                      <div className={styles.historicalCaseArticleLabel}>{article.label}</div>
+                      <div className={styles.historicalCaseArticleBody}>{article.body}</div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p>{typeof brief.draftLegalCode === 'string' ? brief.draftLegalCode : ''}</p>
+              )}
+            </div>
+            <div className={styles.historicalCaseDetailBlock}>
+              <div className={styles.historicalCaseDetailLabel}>Adversarial attack</div>
+              {brief.adversarialAttack?.panels?.length > 0 ? (
+                <div className={styles.historicalCaseExploitGrid}>
+                  {brief.adversarialAttack.panels.map((panel) => (
+                    <div
+                      key={`${caseKey}-${panel.title}`}
+                      className={`${styles.historicalCaseExploitSection} ${
+                        panel.tone === 'secondary'
+                          ? styles.historicalCaseExploitSecondary
+                          : styles.historicalCaseExploitPrimary
+                      }`}
+                    >
+                      <div className={styles.historicalCaseExploitHeading}>{panel.title}</div>
+                      {renderHistoricalCaseFieldRows(panel.rows)}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p>{brief.adversarialAttack?.fallbackText || ''}</p>
+              )}
+            </div>
+            {brief.whyHard ? (
+              <div className={`${styles.historicalCaseDetailBlock} ${styles.historicalCaseInsightBlock}`}>
+                <div className={styles.historicalCaseDetailLabel}>Why this case is hard</div>
+                <p>{brief.whyHard}</p>
+              </div>
+            ) : null}
+            <div className={styles.historicalCaseDetailBlock}>
+              <div className={styles.historicalCaseDetailLabel}>Judge tension</div>
+              <p>{brief.judgeTension}</p>
+            </div>
+            {brief.precedentPressure.length > 0 ? (
+              <div className={`${styles.historicalCaseDetailBlock} ${styles.historicalCasePrecedentBlock}`}>
+                <div className={styles.historicalCaseDetailLabel}>Precedent pressure</div>
+                {renderHistoricalCaseFieldRows(brief.precedentPressure)}
+              </div>
+            ) : null}
+            {brief.patchOptions.length > 0 ? (
+              <div className={`${styles.historicalCaseDetailBlock} ${styles.historicalCasePatchOptionsBlock}`}>
+                <div className={styles.historicalCaseSectionHeader}>
+                  <div className={styles.historicalCaseDetailLabel}>Patch options</div>
+                  {brief.bestPatch ? (
+                    <div className={styles.historicalCaseBestPatchPill}>
+                      Best patch: {brief.bestPatch}
+                    </div>
+                  ) : null}
+                </div>
+                <div className={styles.historicalCasePatchGrid}>
+                  {brief.patchOptions.map((patch, patchIndex) => (
+                    <div
+                      key={`${patch.id}-${patchIndex}`}
+                      className={`${styles.historicalCasePatchCard} ${
+                        normalizedBestPatch && patch.name.trim().toLowerCase() === normalizedBestPatch
+                          ? styles.historicalCasePatchCardBest
+                          : ''
+                      }`}
+                      data-testid={E2E_TESTIDS.ATLAS_HISTORICAL_CASE_PATCH_CARD}
+                      data-ce-case-id={caseKey}
+                      data-ce-patch-kind={
+                        normalizedBestPatch && patch.name.trim().toLowerCase() === normalizedBestPatch
+                          ? 'best'
+                          : 'option'
+                      }
+                    >
+                      {normalizedBestPatch && patch.name.trim().toLowerCase() === normalizedBestPatch ? (
+                        <div className={styles.historicalCasePatchBadge}>Best patch</div>
+                      ) : null}
+                      <div className={styles.historicalCasePatchName}>{patch.name}</div>
+                      {patch.summary ? <p>{patch.summary}</p> : null}
+                      {patch.favoredBy.length > 0 ? (
+                        <div className={styles.historicalCasePatchFavoredBy}>
+                          <span>Favored by</span>
+                          <div className={styles.historicalCasePatchFavoredByList}>
+                            {patch.favoredBy.map((favoredByEntry, favoredByIndex) => (
+                              <span key={`${patch.id}-favored-${favoredByIndex}`}>
+                                {favoredByEntry}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+            {brief.bestPatch && !hasBestPatchCard ? (
+              <div className={styles.historicalCaseDetailBlock}>
+                <div className={styles.historicalCaseDetailLabel}>Best patch</div>
+                <p>{brief.bestPatch}</p>
+              </div>
+            ) : null}
+            {brief.whyOtherFails ? (
+              <div className={styles.historicalCaseDetailBlock}>
+                <div className={styles.historicalCaseDetailLabel}>Why the runner-up fails</div>
+                <p>{brief.whyOtherFails}</p>
+              </div>
+            ) : null}
+            <div className={`${styles.historicalCaseDetailBlock} ${styles.historicalCaseDecisionBlock}`}>
+              <div className={styles.historicalCaseDetailLabel}>Open question</div>
+              <p>{brief.decisionPrompt}</p>
+            </div>
+          </div>
+        )}
+        {tagsList.length > 0 ? (
+          <div className={styles.historicalCaseTags}>
+            {tagsList.map((tag, tagIndex) => (
+              <span key={`${historicalCase.id || title}-${tag}-${tagIndex}`}>
+                {tag}
+              </span>
+            ))}
+          </div>
+        ) : null}
+      </div>
+    );
+  };
+
   return (
     <div className={styles.modalOverlay} onClick={onClose}>
       <div className={styles.modalContent} onClick={e => e.stopPropagation()}>
-        
+
         {/* --- HEADER --- */}
         <div className={styles.modalHeader}>
           {/* Left: Title + Link Button */}
@@ -1038,22 +1590,22 @@ const Modal = ({
           <div className={styles.headerVoteSection}>
             {activeVoteType === null ? (
                 <div className={styles.voteDisplay}>
-                   <div 
-                      className={`${styles.voteArrow} ${styles.up}`} 
+                   <div
+                      className={`${styles.voteArrow} ${styles.up}`}
                       onClick={() => setActiveVoteType('up')}
                       title="Cast Upvotes"
                    >
                      <FontAwesomeIcon icon={faArrowUp} />
                    </div>
 
-                   <div 
+                   <div
                       className={styles.netScoreContainer}
                       onMouseEnter={() => setShowVoteBreakdown(true)}
                       onMouseLeave={() => setShowVoteBreakdown(false)}
                       onClick={() => setShowVoteBreakdown(!showVoteBreakdown)}
                    >
                       <span className={styles.netScoreValue}>{netVotes}</span>
-                      
+
                       {/* Hover Breakdown Tooltip */}
                       <div className={`${styles.voteBreakdown} ${showVoteBreakdown ? styles.visible : ''}`}>
                           <span className={styles.breakdownUp}>+{upVotes}</span>
@@ -1062,8 +1614,8 @@ const Modal = ({
                       </div>
                    </div>
 
-                   <div 
-                      className={`${styles.voteArrow} ${styles.down}`} 
+                   <div
+                      className={`${styles.voteArrow} ${styles.down}`}
                       onClick={() => setActiveVoteType('down')}
                       title="Cast Downvotes"
                    >
@@ -1072,12 +1624,12 @@ const Modal = ({
                 </div>
             ) : (
                 <div className={`${styles.voteInputContainer} ${activeVoteType === 'up' ? styles.isUp : styles.isDown}`}>
-                    <input 
-                      type="number" 
+                    <input
+                      type="number"
                       autoFocus
                       className={styles.voteInput}
-                      value={voteCount} 
-                      onChange={(e) => setVoteCount(e.target.value)} 
+                      value={voteCount}
+                      onChange={(e) => setVoteCount(e.target.value)}
                       placeholder="#"
                       min="0"
                       onKeyDown={(e) => e.key === 'Enter' && handleCastVotes()}
@@ -1085,8 +1637,8 @@ const Modal = ({
                     <button className={styles.confirmBtn} onClick={handleCastVotes}>
                         <FontAwesomeIcon icon={faCheck} />
                     </button>
-                    <button 
-                      className={styles.cancelBtn} 
+                    <button
+                      className={styles.cancelBtn}
                       onClick={() => { setActiveVoteType(null); setVoteCount(""); }}
                     >
                       <FontAwesomeIcon icon={faTimes} />
@@ -1109,12 +1661,12 @@ const Modal = ({
           <span className={`${styles.depthTag} ${styles[depthClass]}`}>
             {depthLabel}
           </span>
-          
+
           {/* Generic Tags */}
           {tags.map((t, i) => (
-             <button 
-                key={i} 
-                className={`${styles.tag} ${styles.clickable}`} 
+             <button
+                key={i}
+                className={`${styles.tag} ${styles.clickable}`}
                 onClick={() => onTagClick && onTagClick(t)}
                 title={`Go to ${t}`}
              >
@@ -1180,6 +1732,31 @@ const Modal = ({
                     ))}
                   </div>
                 </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {historicalCaseCount > 0 && (
+          <div className={styles.collapseSection}>
+            <div
+              className={styles.collapseHeader}
+              onClick={() => setHistoricalCasesOpen(!historicalCasesOpen)}
+              role="button"
+              tabIndex={0}
+              aria-expanded={historicalCasesOpen}
+              onKeyDown={(event) => handleCollapseHeaderKeyDown(event, () => setHistoricalCasesOpen(!historicalCasesOpen))}
+            >
+              <FontAwesomeIcon icon={historicalCasesOpen ? faCaretUp : faCaretDown} style={{ marginRight: 6 }} />
+              <span>Historical Cases</span>
+              {historicalCaseCount ? <span className={styles.collapseCount}>({historicalCaseCount})</span> : null}
+              <span className={styles.collapseToggle}>{historicalCasesOpen ? 'Hide' : 'Show'}</span>
+            </div>
+            {historicalCasesOpen && (
+              <div className={`${styles.collapseContent} ${styles.historicalCasesSection}`}>
+                {historicalCases.map((historicalCase, caseIndex) => (
+                  renderHistoricalCaseCard(historicalCase, caseIndex)
+                ))}
               </div>
             )}
           </div>
@@ -1258,7 +1835,7 @@ const Modal = ({
 const SuggestNodeModal = ({ isOpen, onClose, parentNode, parentPath = [], onSubmit }) => {
   const [title, setTitle] = useState("");
   const handleSubmit = () => { onSubmit(parentNode, title); setTitle(""); onClose(); };
-  
+
   if (!isOpen) return null;
   const lineage = [...parentPath, parentNode].filter(Boolean);
 
@@ -1269,7 +1846,7 @@ const SuggestNodeModal = ({ isOpen, onClose, parentNode, parentPath = [], onSubm
           <h2 className={styles.modalTitle}>Suggest New Topic</h2>
           <div className={styles.closeIcon} onClick={onClose}><FontAwesomeIcon icon={faTimes} /></div>
         </div>
-        
+
         <div className={styles.lineageDisplay}>
             <span className={styles.lineageLabel}>Path:</span>
             {lineage.map((node, i) => (
@@ -1282,13 +1859,13 @@ const SuggestNodeModal = ({ isOpen, onClose, parentNode, parentPath = [], onSubm
         <div className={styles.suggestNodeContent}>
           <FormGroup>
             <Label for="nodeTitle">New Topic Title</Label>
-            <Input 
+            <Input
                 id="nodeTitle"
-                type="text" 
-                value={title} 
-                onChange={(e) => setTitle(e.target.value)} 
-                placeholder="e.g. AI Liability Standards..." 
-                autoFocus 
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="e.g. AI Liability Standards..."
+                autoFocus
                 className={styles.glassInput}
             />
           </FormGroup>
@@ -1308,13 +1885,13 @@ const TreeNode = ({ node, depth = 0, parentPath = [], onNodeClick, onBookmark, b
   const hasChildren = node.children && node.children.length > 0;
   const netUpvotes = calculateNetUpvotes(node.votes);
   const isBookmarked = bookmarkedNodes.includes(node.id);
-  
+
   return (
     <div className={styles.orgNodeWrapper}>
-      <div 
+      <div
         className={`
-          ${styles.orgCard} 
-          ${styles[`depth${Math.min(depth, 3)}`]} 
+          ${styles.orgCard}
+          ${styles[`depth${Math.min(depth, 3)}`]}
           ${hasChildren ? styles.hasChildren : ''}
           ${isCollapsed ? styles.collapsed : ''}
         `}
@@ -1325,15 +1902,15 @@ const TreeNode = ({ node, depth = 0, parentPath = [], onNodeClick, onBookmark, b
          </div>
          <div className={styles.cardStats}>
              <span><FontAwesomeIcon icon={faThumbsUp} /> {netUpvotes}</span>
-             <FontAwesomeIcon 
-               icon={faBookmark} 
-               className={`${styles.bookmark} ${isBookmarked ? styles.bookmarked : ''}`} 
-               onClick={(e) => { e.stopPropagation(); onBookmark(node.id); }} 
+             <FontAwesomeIcon
+               icon={faBookmark}
+               className={`${styles.bookmark} ${isBookmarked ? styles.bookmarked : ''}`}
+               onClick={(e) => { e.stopPropagation(); onBookmark(node.id); }}
              />
          </div>
-         
-         <div 
-           className={styles.suggestBtn} 
+
+         <div
+           className={styles.suggestBtn}
            onClick={(e) => { e.stopPropagation(); onSuggestNode(node, parentPath); }}
            title="Suggest sub-topic"
          >
@@ -1341,7 +1918,7 @@ const TreeNode = ({ node, depth = 0, parentPath = [], onNodeClick, onBookmark, b
          </div>
 
          {hasChildren && (
-            <div 
+            <div
               className={styles.collapseBtn}
               onClick={(e) => { e.stopPropagation(); setIsCollapsed(!isCollapsed); }}
               title={isCollapsed ? "Expand Branch" : "Collapse Branch"}
@@ -1355,15 +1932,15 @@ const TreeNode = ({ node, depth = 0, parentPath = [], onNodeClick, onBookmark, b
         <div className={styles.orgChildrenContainer}>
            <div className={styles.orgChildrenRow}>
               {[...node.children].sort((a, b) => calculateNetUpvotes(b.votes) - calculateNetUpvotes(a.votes)).map((child, i) => (
-                <TreeNode 
-                  key={i} 
-                  node={child} 
-                  depth={depth + 1} 
+                <TreeNode
+                  key={i}
+                  node={child}
+                  depth={depth + 1}
                   parentPath={[...parentPath, node]}
-                  onNodeClick={onNodeClick} 
-                  onBookmark={onBookmark} 
-                  bookmarkedNodes={bookmarkedNodes} 
-                  onSuggestNode={onSuggestNode} 
+                  onNodeClick={onNodeClick}
+                  onBookmark={onBookmark}
+                  bookmarkedNodes={bookmarkedNodes}
+                  onSuggestNode={onSuggestNode}
                 />
               ))}
            </div>
@@ -1388,6 +1965,8 @@ const DebateMap = ({
   activeSessionSlug = '',
   demoMode: externalDemoMode = false,
   embedded = false,
+  requestedModalNodeId = null,
+  onModalClose = null,
 }) => {
   const externalDemoEnabled = externalDemoMode && typeof externalDemoMode === 'object'
     ? !!externalDemoMode.tools
@@ -1404,18 +1983,18 @@ const DebateMap = ({
   const [treeDataState, setTreeDataState] = useState(() => buildAtlasTreeData(initialDemoEnabled));
   const [nodeTypeFilter, setNodeTypeFilter] = useState('all');
   const [copied, setCopied] = useState(false);
-  
+
   // Suggest Modal State
   const [suggestNodeModalOpen, setSuggestNodeModalOpen] = useState(false);
   const [suggestNodeParent, setSuggestNodeParent] = useState(null);
   const [suggestNodePath, setSuggestNodePath] = useState([]);
-  
+
   // Drag-to-Scroll State for Tree View
   const treeContainerRef = useRef(null);
   const [treeIsDragging, setTreeIsDragging] = useState(false);
   const [treeStartX, setTreeStartX] = useState(0);
   const [treeScrollLeft, setTreeScrollLeft] = useState(0);
-  
+
   // Ref to track if we've already handled the deep link for the current ID
   const hasHandledDeepLink = useRef(false);
 
@@ -1450,6 +2029,11 @@ const DebateMap = ({
     setDemoMode(initialDemoEnabled);
   }, [initialDemoEnabled]);
 
+  useEffect(() => {
+    if (!requestedModalNodeId) return;
+    setModalNodeId(String(requestedModalNodeId).trim() || null);
+  }, [requestedModalNodeId]);
+
   const selectedCategory = useMemo(() => (
     selectedCategoryId ? findAtlasNodeById(treeDataState, selectedCategoryId) : null
   ), [selectedCategoryId, treeDataState]);
@@ -1479,8 +2063,11 @@ const DebateMap = ({
   }, [effectiveNodeId, treeDataState]);
 
   const handleNodeClick = useCallback((node) => setModalNodeId(node?.id || null), []);
-  const closeModal = useCallback(() => setModalNodeId(null), []);
-  
+  const closeModal = useCallback(() => {
+    setModalNodeId(null);
+    onModalClose?.();
+  }, [onModalClose]);
+
   const handleBookmark = useCallback((id) => {
     setBookmarkedNodes(prev => {
       const next = prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id];
@@ -1526,16 +2113,16 @@ const DebateMap = ({
     });
   }, []);
 
-  const handleSuggestNode = useCallback((parent, path = []) => { 
-      setSuggestNodeParent(parent); 
+  const handleSuggestNode = useCallback((parent, path = []) => {
+      setSuggestNodeParent(parent);
       setSuggestNodePath(path);
-      setSuggestNodeModalOpen(true); 
+      setSuggestNodeModalOpen(true);
   }, []);
-  
-  const handleSubmitSuggestedNode = useCallback((parent, title) => { 
-      uiLog.log("Suggestion submitted for", parent.name, ":", title); 
+
+  const handleSubmitSuggestedNode = useCallback((parent, title) => {
+      uiLog.log("Suggestion submitted for", parent.name, ":", title);
   }, []);
-  
+
   const handleCategoryClick = (cat) => setSelectedCategoryId(cat?.id || null);
 
   const flattenTree = useCallback((node, parentPath = []) => {
@@ -1565,15 +2152,15 @@ const DebateMap = ({
     setTreeStartX(e.pageX - treeContainerRef.current.offsetLeft);
     setTreeScrollLeft(treeContainerRef.current.scrollLeft);
   };
-  
+
   const onTreeMouseLeave = () => {
     setTreeIsDragging(false);
   };
-  
+
   const onTreeMouseUp = () => {
     setTreeIsDragging(false);
   };
-  
+
   const onTreeMouseMove = (e) => {
     if (!treeIsDragging || !treeContainerRef.current) return;
     e.preventDefault();
@@ -1633,7 +2220,7 @@ const DebateMap = ({
              )}
              <label><input type="checkbox" checked={demoMode} onChange={e => setDemoMode(e.target.checked)} /> Demo Mode</label>
           </div>
-          
+
           {/* UPDATED: Only show Filters in LIST mode */}
           {visualMode === 'list' && (
              <div className={styles.filterGroup}>
@@ -1665,7 +2252,7 @@ const DebateMap = ({
            ) : visualMode === 'atlas' ? (
              <AtlasView data={treeDataState} onNodeClick={handleNodeClick} />
            ) : (
-             <div 
+             <div
                className={styles.orgChartContainer}
                ref={treeContainerRef}
                onMouseDown={onTreeMouseDown}
@@ -1676,14 +2263,14 @@ const DebateMap = ({
              >
                 {selectedCategory ? (
                    <div className={styles.orgChartRoot}>
-                     <TreeNode 
-                        node={selectedCategory} 
-                        depth={0} 
+                     <TreeNode
+                        node={selectedCategory}
+                        depth={0}
                         parentPath={[]}
-                        onNodeClick={handleNodeClick} 
-                        onBookmark={handleBookmark} 
-                        bookmarkedNodes={bookmarkedNodes} 
-                        onSuggestNode={handleSuggestNode} 
+                        onNodeClick={handleNodeClick}
+                        onBookmark={handleBookmark}
+                        bookmarkedNodes={bookmarkedNodes}
+                        onSuggestNode={handleSuggestNode}
                      />
                    </div>
                 ) : (
@@ -1693,21 +2280,21 @@ const DebateMap = ({
            )}
         </div>
 
-        <Modal 
-            isOpen={!!modalContent} 
-            onClose={closeModal} 
-            content={modalContent} 
-            onVote={handleVote} 
-            onCopy={copyToClipboard} 
-            copied={copied} 
+        <Modal
+            isOpen={!!modalContent}
+            onClose={closeModal}
+            content={modalContent}
+            onVote={handleVote}
+            onCopy={copyToClipboard}
+            copied={copied}
             onTagClick={handleTagClick}
         />
-        <SuggestNodeModal 
-            isOpen={suggestNodeModalOpen} 
-            onClose={() => setSuggestNodeModalOpen(false)} 
-            parentNode={suggestNodeParent} 
+        <SuggestNodeModal
+            isOpen={suggestNodeModalOpen}
+            onClose={() => setSuggestNodeModalOpen(false)}
+            parentNode={suggestNodeParent}
             parentPath={suggestNodePath}
-            onSubmit={handleSubmitSuggestedNode} 
+            onSubmit={handleSubmitSuggestedNode}
         />
       </div>
     </div>

@@ -6,8 +6,10 @@ import {
   getDemoSessionConfigBySlug,
   getSessionLists,
 } from '../../utilities/web3/contractScripts.js';
+import proposalScripts from '../../utilities/proposalScripts.js';
 import { readSessionScanScope, readSessionScanSlugs } from '../../utilities/session/sessionScanScope.js';
 import { sbtsListPath, t } from '../../utilities/ui/terminology.js';
+import * as terminology from '../../utilities/ui/terminology.js';
 
 const mockSBTPage = jest.fn();
 
@@ -661,6 +663,92 @@ describe('SBTsPage auto-feature flag', () => {
     expect(screen.getByLabelText(`${t('minting')} Live`)).toBeInTheDocument();
     expect(screen.queryByTestId('embedded-featured-spinner')).not.toBeInTheDocument();
     expect(screen.queryByTestId('mock-sbt-page')).not.toBeInTheDocument();
+  });
+
+  it('hides cache-backed featured card addresses in plain mode', () => {
+    const featuredAddress = '0x00000000000000000000000000000000000000b3';
+    const cryptoModeSpy = jest.spyOn(terminology, 'isCryptoMode').mockReturnValue(false);
+    const shortenedAddress = proposalScripts.getShortenedAddress(featuredAddress, false);
+
+    peekCacheSync.mockReturnValue({
+      '84532': {
+        sbtList: {
+          [featuredAddress.toLowerCase()]: {
+            sbtAddress: featuredAddress,
+            sbtInfo: {
+              sessionSlug: 'alpha',
+              name: 'Plain Mode Group',
+            },
+          },
+        },
+      },
+    });
+
+    render(
+      <SBTsPage
+        sbtCacheRevision={0}
+        provider="wagmi"
+        network={{ id: 84532, name: 'Base Sepolia' }}
+        account=""
+        loginComplete={false}
+        toggleLoginModal={jest.fn()}
+        isSBTCacheReady={false}
+        defaultFeaturedSBTs={[featuredAddress]}
+        sessionSlug="alpha"
+        miniaturized={true}
+        hideMiniActionRow={true}
+        preferCacheBackedFeaturedCards={true}
+      />
+    );
+
+    expect(screen.getByTestId(`cache-featured-sbt-link-${featuredAddress.toLowerCase()}`)).toBeInTheDocument();
+    expect(screen.getByText('Plain Mode Group')).toBeInTheDocument();
+    expect(screen.queryByText(shortenedAddress)).not.toBeInTheDocument();
+
+    cryptoModeSpy.mockRestore();
+  });
+
+  it('shows cache-backed featured card addresses in crypto mode', () => {
+    const featuredAddress = '0x00000000000000000000000000000000000000b4';
+    const cryptoModeSpy = jest.spyOn(terminology, 'isCryptoMode').mockReturnValue(true);
+    const shortenedAddress = proposalScripts.getShortenedAddress(featuredAddress, false);
+
+    peekCacheSync.mockReturnValue({
+      '84532': {
+        sbtList: {
+          [featuredAddress.toLowerCase()]: {
+            sbtAddress: featuredAddress,
+            sbtInfo: {
+              sessionSlug: 'alpha',
+              name: 'Crypto Mode Group',
+            },
+          },
+        },
+      },
+    });
+
+    render(
+      <SBTsPage
+        sbtCacheRevision={0}
+        provider="wagmi"
+        network={{ id: 84532, name: 'Base Sepolia' }}
+        account=""
+        loginComplete={false}
+        toggleLoginModal={jest.fn()}
+        isSBTCacheReady={false}
+        defaultFeaturedSBTs={[featuredAddress]}
+        sessionSlug="alpha"
+        miniaturized={true}
+        hideMiniActionRow={true}
+        preferCacheBackedFeaturedCards={true}
+      />
+    );
+
+    expect(screen.getByTestId(`cache-featured-sbt-link-${featuredAddress.toLowerCase()}`)).toBeInTheDocument();
+    expect(screen.getByText('Crypto Mode Group')).toBeInTheDocument();
+    expect(screen.getByText(shortenedAddress)).toBeInTheDocument();
+
+    cryptoModeSpy.mockRestore();
   });
 
   it('uses terminology-aware ended minting aria labels on cache-backed featured cards', () => {

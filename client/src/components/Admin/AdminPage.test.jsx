@@ -1,7 +1,10 @@
 /** @file AdminPage.test.jsx */
 import { ethers } from 'ethers';
 import AdminPage, { __adminPageTestUtils } from './AdminPage.jsx';
+import { DEFAULT_CHAIN_ID } from '../../variables/appConfig.js';
 import { getDefaultHttpRpc, getSessionRegistryAddress } from '../../variables/chains.js';
+
+const DEFAULT_CONFIG_CHAIN_ID = DEFAULT_CHAIN_ID;
 
 describe('AdminPage', () => {
   it('exports a component', () => {
@@ -30,21 +33,21 @@ describe('AdminPage', () => {
     const payload = __adminPageTestUtils.buildWorkerSessionConfigPayload({
       sessionConfig: {
         slug: 'test-3',
-        networkChainId: 84532,
+        networkChainId: DEFAULT_CONFIG_CHAIN_ID,
         __registry: {
-          chainId: 84532,
+          chainId: DEFAULT_CONFIG_CHAIN_ID,
           adminAddress: '0x7384f81c5505Cb11F69607e3b293AD7AAf1b1119',
         },
       },
       account: '0x7384f81c5505Cb11F69607e3b293AD7AAf1b1119',
-      fallbackChainId: 84532,
+      fallbackChainId: DEFAULT_CONFIG_CHAIN_ID,
     });
 
-    expect(payload.registryAddress).toBe(getSessionRegistryAddress(84532));
-    expect(payload.rpcUrl).toBe(getDefaultHttpRpc(84532));
+    expect(payload.registryAddress).toBe(getSessionRegistryAddress(DEFAULT_CONFIG_CHAIN_ID));
+    expect(payload.rpcUrl).toBe(getDefaultHttpRpc(DEFAULT_CONFIG_CHAIN_ID));
     expect(payload.rpcUrlsByChainId).toEqual(
       expect.objectContaining({
-        '84532': [getDefaultHttpRpc(84532)],
+        [String(DEFAULT_CONFIG_CHAIN_ID)]: [getDefaultHttpRpc(DEFAULT_CONFIG_CHAIN_ID)],
       })
     );
   });

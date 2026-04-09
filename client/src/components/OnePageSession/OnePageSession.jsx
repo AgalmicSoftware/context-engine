@@ -1,13 +1,14 @@
 /** @file OnePageSession.jsx */
 import React, { Component, Suspense } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { 
-  faCaretDown, 
-  faCaretUp, 
-  faQuestionCircle, 
-  faSpinner, 
-  faCheck, 
-  faTimes, 
+import {
+  faCaretDown,
+  faCaretUp,
+  faExternalLinkAlt,
+  faQuestionCircle,
+  faSpinner,
+  faCheck,
+  faTimes,
   faImage,
   faArrowLeft,
   faExpand,
@@ -54,6 +55,7 @@ const demoLog = createLogger('demo');
 const ONE_PAGE_DEMO_PERF_SCOPE = 'onePageDemo';
 const AGGREGATOR_PARSE_MEMO_MAX = 3000;
 const SBT_TOOLTIP_LABEL = isCryptoMode() ? 'Soulbound tokens (SBTs)' : `${t('sbtFull')}s`;
+const DEMO_CORPUS_GITHUB_URL = 'https://github.com/xoCortex/context-engine/tree/main/client/src/variables/demo';
 
 const isPerfCountersEnabled = () => {
   try {
@@ -352,9 +354,12 @@ class OnePageSession extends Component {
       showEmbeddedCreateGroup,
       // Removed obsolete 'About' state variables
       autoOpenResults: routeUiState.autoOpenResults,
+      embeddedAtlasNodeId: null,
+      embeddedAtlasReturnState: null,
       aggregatorData: {},
       disclaimersActive: true,
       filterState: initialFilterState,
+      pileSubmitRailVisible: false,
 
       // Legacy (limited) group password flow state
       // Auto-mint
@@ -403,6 +408,8 @@ class OnePageSession extends Component {
     // binds
     this.handleOpenResults = this.handleOpenResults.bind(this);
     this.handleResultsModalClose = this.handleResultsModalClose.bind(this);
+    this.handleCorpusAtlasIssueOpen = this.handleCorpusAtlasIssueOpen.bind(this);
+    this.handleEmbeddedAtlasModalClose = this.handleEmbeddedAtlasModalClose.bind(this);
     this.resetDemoURL = this.resetDemoURL.bind(this);
     this.toggleQuestions = this.toggleQuestions.bind(this);
     this.toggleGroups = this.toggleGroups.bind(this);
@@ -411,6 +418,7 @@ class OnePageSession extends Component {
     this.toggleResults = this.toggleResults.bind(this);
     this.toggleDocuments = this.toggleDocuments.bind(this);
     this.handleGroupsViewAll = this.handleGroupsViewAll.bind(this);
+    this.handlePileSubmitRailVisibilityChange = this.handlePileSubmitRailVisibilityChange.bind(this);
     // Removed toggleResultsAbout bind
     this.buildAggregator = this.buildAggregator.bind(this);
 
@@ -945,14 +953,14 @@ class OnePageSession extends Component {
       * ======================= */
     async prefetchTargetNames(targets) {
       const slug = resolveEffectiveSlug(this.props);
-      
+
       // 1. Try to read from cache first to save RPC calls
       let cachedNames = {};
       let cachedImages = {};
       try {
         const parsed = peekCacheSync('sbtCache', slug, { clone: false });
         if (parsed && typeof parsed === 'object') {
-          
+
           // Determine network key if available, else null
           const netId = this.props.network?.id || this.props.networkChainId;
           const netKey = netId ? String(netId) : null;
@@ -979,7 +987,7 @@ class OnePageSession extends Component {
           if (netKey && parsed[netKey]) {
             getNameFromNet(netKey);
           }
-          
+
           // B. Iterate ALL keys to find any missing names.
           // This ensures we find the SBT name even if the wallet isn't connected yet
           // or if the cached data resides under a different chain ID key.
@@ -1108,8 +1116,8 @@ class OnePageSession extends Component {
     const addIfAuto = (sbt, gp, inv, localAutoFlag) => {
       if (!sbt) return; // Only sbt is strictly required now
       if (!/^0x[0-9a-fA-F]{40}$/.test(sbt)) return;
-      
-      // If neither global 'auto=1' nor local 'autoN=1' is set, 
+
+      // If neither global 'auto=1' nor local 'autoN=1' is set,
       // we do NOT add it to the OnePageSession execution queue.
       // (It will still be picked up by SBTPage for pre-filling).
       if (!globalAuto && localAutoFlag !== '1') return;
@@ -1415,11 +1423,11 @@ class OnePageSession extends Component {
               // Must have tokenURI to be considered a valid hit for minting flows
               if (entry?.sbtInfo && entry.sbtInfo.tokenURI) {
                 sbtInfo = entry.sbtInfo;
-                break; 
+                break;
               }
             }
           } catch (e) { demoLog.warn('OnePageSession: fallback', e); }
-          
+
           if (sbtInfo) break; // Found it, stop scanning slugs
         }
 
@@ -1711,7 +1719,7 @@ class OnePageSession extends Component {
         }
       } catch (e) {
         const msg = (e.message || e.toString() || '').toLowerCase();
-        
+
         if (msg.includes("already owns") || msg.includes("already joined") || msg.includes("user already has")) {
            // Graceful handling of "already owned" revert
            this.consumeAutoMintAttempt(sbtAddr, userAddr);
@@ -1835,6 +1843,33 @@ class OnePageSession extends Component {
     this.setState({ autoOpenResults: false }, () => this.resetDemoURL());
   }
 
+  handleCorpusAtlasIssueOpen(nodeId) {
+    const normalizedNodeId = String(nodeId || '').trim();
+    if (!normalizedNodeId) return;
+
+    this.setState((prevState) => ({
+      embeddedAtlasNodeId: normalizedNodeId,
+      embeddedAtlasReturnState: prevState.embeddedAtlasReturnState || {
+        showResults: prevState.showResults,
+        resultsViewMode: prevState.resultsViewMode,
+      },
+      showResults: true,
+      resultsViewMode: 'debateAtlas',
+    }));
+  }
+
+  handleEmbeddedAtlasModalClose() {
+    this.setState((prevState) => {
+      const returnState = prevState.embeddedAtlasReturnState;
+      return {
+        embeddedAtlasNodeId: null,
+        embeddedAtlasReturnState: null,
+        showResults: returnState ? returnState.showResults : prevState.showResults,
+        resultsViewMode: returnState?.resultsViewMode || prevState.resultsViewMode,
+      };
+    });
+  }
+
 
 
   resetDemoURL() {
@@ -1918,6 +1953,15 @@ class OnePageSession extends Component {
       event.stopPropagation();
     }
     this.navigateToInternalPath(sbtsListPath());
+  }
+
+  handlePileSubmitRailVisibilityChange(visible) {
+    const nextVisible = !!visible;
+    this.setState((prevState) => (
+      prevState.pileSubmitRailVisible === nextVisible
+        ? null
+        : { pileSubmitRailVisible: nextVisible }
+    ));
   }
 
   toggleGroupsAbout() {
@@ -2061,6 +2105,15 @@ class OnePageSession extends Component {
     );
     const questionsSectionTooltip = 'Survey and question platform allowing detailed responses, advanced question formats, preference weighing, and group filtering.';
     const documentsSectionTooltip = 'This corpus is evolving into a conversational layer for the session: you’ll be able to chat with the material, have it surface and pose relevant questions, and connect those prompts fluidly with responses.';
+    const pileSubmitRailActive = !this.state.showQuestions && this.state.pileSubmitRailVisible;
+    const brandingSectionClassName = [
+      styles.brandingSection,
+      pileSubmitRailActive ? styles.brandingSectionWithPileSubmitRail : '',
+    ].filter(Boolean).join(' ');
+    const titleContainerClassName = [
+      styles.titleContainer,
+      pileSubmitRailActive ? styles.titleContainerWithPileSubmitRail : '',
+    ].filter(Boolean).join(' ');
 
     return (
       <div className={styles.onePageDemoContainer}>
@@ -2131,7 +2184,7 @@ class OnePageSession extends Component {
                 v.error &&
                 /max(imum)?\s*(tokens?\s*)?mint|supply\s*exhaust|mint.*expir|period.*end|group\s*limit/i.test(v.error)
               );
-              
+
               // Map status to icon
               let statusIcon = null;
               if (v.status === 'pending') statusIcon = <FontAwesomeIcon icon={faSpinner} spin />;
@@ -2166,13 +2219,13 @@ class OnePageSession extends Component {
                         </a>
                       </span>
                       {sbtImage && (
-                        <button 
+                        <button
                           onClick={() => this.toggleStatusImagePreview(addrKey)}
                           style={{
-                             background: 'none', 
-                             border: 'none', 
-                             cursor: 'pointer', 
-                             opacity: 0.7, 
+                             background: 'none',
+                             border: 'none',
+                             cursor: 'pointer',
+                             opacity: 0.7,
                              marginLeft: '5px',
                              padding: '0 5px'
                           }}
@@ -2199,7 +2252,7 @@ class OnePageSession extends Component {
                       )}
                     </div>
                   </div>
-                  
+
                   {v.error && <div style={{ fontSize: '0.9em', marginTop: '4px', marginLeft: '26px', fontWeight: 400 }}>{v.error}</div>}
 
                   {v.status === 'failed' && !isTerminalError && (
@@ -2213,13 +2266,13 @@ class OnePageSession extends Component {
                       </button>
                     </div>
                   )}
-                  
+
                   {isExpanded && sbtImage && (
                     <div style={{ marginTop: '10px', marginLeft: '26px' }}>
-                      <img 
-                        src={sbtImage} 
+                      <img
+                        src={sbtImage}
                         alt={`${t('sbt')} Preview`}
-                        style={{ maxHeight: '100px', borderRadius: '4px', border: '1px solid rgba(0,0,0,0.1)' }} 
+                        style={{ maxHeight: '100px', borderRadius: '4px', border: '1px solid rgba(0,0,0,0.1)' }}
                       />
                     </div>
                   )}
@@ -2230,8 +2283,8 @@ class OnePageSession extends Component {
         )}
 
         {/* Branding/header */}
-        <div className={styles.brandingSection}>
-          <div className={styles.titleContainer}>
+        <div className={brandingSectionClassName}>
+          <div className={titleContainerClassName}>
             <h2 id={styles.brandingSectionTitle}>{titleText}</h2>
             <div className={styles.tooltip} tabIndex={0} aria-label="Session info">
               <FontAwesomeIcon icon={faQuestionCircle} />
@@ -2297,6 +2350,7 @@ class OnePageSession extends Component {
                 defaultFilterState={defaultFilterState}
                 defaultFeaturedSBTs={defaultFeaturedSBTs}
                 onFilterChange={this.handleFilterChange}
+                onPileSubmitRailVisibilityChange={this.handlePileSubmitRailVisibilityChange}
                 filterState={this.state.filterState}
                 onViewAllClick={this.handleViewAllQuestionsClick}
                 hideSessionSelector={true}
@@ -2467,32 +2521,46 @@ class OnePageSession extends Component {
             <div className={styles.sectionHeaderRow}>
               <h2
                 onClick={this.toggleDocuments}
-                className={styles.sectionHeader}
+                className={`${styles.sectionHeader} ${styles.documentsSectionHeader}`.trim()}
                 data-testid='ce-demo-documents-toggle'
               >
-                {this.state.showDocuments ? (
-                  <FontAwesomeIcon icon={faCaretUp} className={styles.sectionToggleIcon} />
-                ) : (
-                  <FontAwesomeIcon icon={faCaretDown} className={styles.sectionToggleIcon} />
-                )}
-                {renderSectionHeading('Documents', 'View')}
+                <span className={styles.documentsSectionHeaderMain}>
+                  {this.state.showDocuments ? (
+                    <FontAwesomeIcon icon={faCaretUp} className={styles.sectionToggleIcon} />
+                  ) : (
+                    <FontAwesomeIcon icon={faCaretDown} className={styles.sectionToggleIcon} />
+                  )}
+                  {renderSectionHeading('Context', 'View')}
+                </span>
                 {this.state.showDocuments && (
-                  <div
-                    className={`${styles.tooltip} ${styles.sectionHeaderTooltip}`}
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <FontAwesomeIcon icon={faQuestionCircle} />
-                    <span className={styles.tooltiptext}>
-                      {documentsSectionTooltip}
-                    </span>
-                  </div>
+                  <span className={`${styles.sectionHeaderMeta} ${styles.documentsSectionHeaderMeta}`.trim()}>
+                    <div
+                      className={`${styles.tooltip} ${styles.sectionHeaderTooltip}`}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <FontAwesomeIcon icon={faQuestionCircle} />
+                      <span className={styles.tooltiptext}>
+                        {documentsSectionTooltip}
+                      </span>
+                    </div>
+                    <a
+                      href={DEMO_CORPUS_GITHUB_URL}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={styles.sectionHeaderLink}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <FontAwesomeIcon icon={faExternalLinkAlt} />
+                      <span>GitHub</span>
+                    </a>
+                  </span>
                 )}
               </h2>
             </div>
               {this.state.showDocuments && (
                 <div className={styles.miniSectionContent}>
                   <Suspense fallback={<LazyFallback label="Loading Corpus..." minHeight="20vh" />}>
-                    <CorpusViewer />
+                    <CorpusViewer onAtlasIssueOpen={this.handleCorpusAtlasIssueOpen} showGithubLink={false} />
                   </Suspense>
                 </div>
               )}
@@ -2610,6 +2678,8 @@ class OnePageSession extends Component {
                           toggleLoginModal={this.props.toggleLoginModal}
                           demoMode={true}
                           embedded={true}
+                          requestedModalNodeId={this.state.embeddedAtlasNodeId}
+                          onModalClose={this.state.embeddedAtlasReturnState ? this.handleEmbeddedAtlasModalClose : null}
                         />
                       </div>
                     </Suspense>

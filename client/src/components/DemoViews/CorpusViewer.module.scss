@@ -1,0 +1,1322 @@
+$accent: #4dffa4;
+$card: rgba(255, 255, 255, 0.04);
+$card-border: rgba(255, 255, 255, 0.08);
+$muted: rgba(244, 247, 255, 0.65);
+$surface: rgba(255, 255, 255, 0.06);
+$text: #f4f7ff;
+
+.container {
+  background: $surface;
+  border: 1px solid $card-border;
+  border-radius: var(--ce-radius-12);
+  color: $text;
+  overflow: hidden;
+  padding: 16px;
+}
+
+.tabBar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+  overflow-x: auto;
+  scroll-padding-inline: 4px;
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 10px;
+  border-bottom: 1px solid $card-border;
+}
+
+.tabButton {
+  align-items: center;
+  background: transparent;
+  border: none;
+  border-bottom: 3px solid transparent;
+  border-radius: var(--ce-radius-8) var(--ce-radius-8) 0 0;
+  color: $text;
+  cursor: pointer;
+  display: inline-flex;
+  flex-shrink: 0;
+  gap: 10px;
+  opacity: 0.55;
+  padding: 14px 18px 16px;
+  scroll-snap-align: start;
+  transition: opacity 0.15s ease, background 0.15s ease;
+}
+
+.tabButton:hover {
+  background: rgba(255, 255, 255, 0.04);
+  opacity: 0.85;
+}
+
+.tabButtonActive {
+  background: rgba(77, 255, 164, 0.06);
+  border-bottom-color: $accent;
+  opacity: 1;
+}
+
+.tabIcon {
+  color: $muted;
+  display: inline-flex;
+  font-size: 20px;
+}
+
+.tabIconActive {
+  color: $accent;
+}
+
+.tabLabel {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.sectionBlock {
+  display: flex;
+  justify-content: flex-start;
+  margin-bottom: 14px;
+  padding-left: 4px;
+}
+
+.sectionHeader {
+  display: none;
+}
+
+.sectionIcon {
+  display: none;
+}
+
+.corpusLabel {
+  display: none;
+}
+
+.githubLink {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid $card-border;
+  border-radius: var(--ce-radius-pill);
+  color: $text;
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 600;
+  gap: 6px;
+  letter-spacing: -0.01em;
+  max-width: 100%;
+  padding: 8px 12px;
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+.githubLink:hover {
+  color: $accent;
+}
+
+.githubLinkIcon {
+  font-size: 12px;
+}
+
+.policyMapLens {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  margin-bottom: 0;
+  padding: 10px 12px 4px;
+}
+
+.policySplitLayout {
+  display: grid;
+  gap: 16px;
+}
+
+.policyListColumn,
+.policyMapColumn {
+  min-width: 0;
+}
+
+.policyListHeader {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding: 14px 16px;
+}
+
+.policyListEyebrow {
+  color: $muted;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+}
+
+.policyListTitle {
+  color: $text;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.policyEntriesList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.policyMapPanel {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 14px 16px 16px;
+}
+
+.policyMapAssistiveText {
+  color: $muted;
+  font-size: 11px;
+  line-height: 1.45;
+  margin-top: 8px;
+}
+
+.policyMapHeader {
+  margin-bottom: 12px;
+}
+
+.policyMapTitle {
+  color: $text;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.policyMapSubtitle {
+  color: $muted;
+  font-size: 13px;
+  line-height: 1.5;
+  margin-top: 6px;
+}
+
+.policyMapLegend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.policyLegendItem {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--ce-radius-pill);
+  color: $text;
+  display: inline-flex;
+  font-size: 11px;
+  font-weight: 600;
+  gap: 6px;
+  padding: 5px 10px;
+}
+
+.policyLegendSwatch {
+  border-radius: 999px;
+  display: inline-flex;
+  height: 10px;
+  width: 10px;
+}
+
+.policyLegendSwatchLive {
+  background: rgba(77,255,164,0.9);
+}
+
+.policyLegendSwatchProposed {
+  background: rgba(255,179,71,0.9);
+}
+
+.policyLegendSwatchMixed {
+  background: rgba(122,140,255,0.9);
+}
+
+.scrollArea {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 560px;
+  min-width: 0;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.entriesCollection {
+  display: grid;
+  gap: 12px;
+}
+
+.entriesCollectionHalf {
+  grid-template-columns: 1fr;
+}
+
+.card {
+  background: $card;
+  border: 1px solid $card-border;
+  border-radius: var(--ce-radius-8);
+  color: $text;
+  display: block;
+  min-width: 0;
+  padding: 16px;
+}
+
+.tweetCard {
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbfd 100%);
+  border-color: #dce7ee;
+  border-radius: 18px;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
+  color: #0f1419;
+  padding: 16px 18px;
+}
+
+.insiderCard {
+  background: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
+  border-color: #dbe6ef;
+  border-radius: 12px;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+  color: #22303c;
+}
+
+.arxivCard {
+  background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+  border-color: #d9e2ea;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+  color: #2f3437;
+}
+
+.metrCard {
+  background: linear-gradient(180deg, rgba(18, 28, 49, 0.96) 0%, rgba(15, 22, 37, 0.96) 100%);
+  border-color: rgba(77, 255, 164, 0.16);
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.25);
+}
+
+.metrSourceCard {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding: 12px 14px;
+}
+
+.metrSourceEyebrow {
+  color: rgba(244, 247, 255, 0.72);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.metrSourceMeta {
+  color: $muted;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.chartBlock {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 12px;
+}
+
+.chartContainer {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 4px;
+  max-height: 120px;
+}
+
+.chartTitle {
+  color: $muted;
+  font-size: 12px;
+  line-height: 1;
+  margin-bottom: 8px;
+}
+
+.barChart {
+  align-items: flex-end;
+  display: flex;
+  gap: 4px;
+  height: 100px;
+}
+
+.chartSlot {
+  align-items: flex-end;
+  display: flex;
+  flex: 1 1 0;
+  min-width: 24px;
+}
+
+.bar {
+  background: linear-gradient(180deg, rgba(77, 255, 164, 0.96) 0%, rgba(27, 191, 128, 0.88) 100%);
+  border-radius: 10px 10px 0 0;
+  min-width: 24px;
+  transition: height 0.24s ease;
+  width: 100%;
+}
+
+.chartLabels {
+  display: flex;
+  gap: 4px;
+}
+
+.barLabel {
+  color: $muted;
+  flex: 1 1 0;
+  font-size: 10px;
+  line-height: 1.2;
+  min-width: 24px;
+  text-align: center;
+}
+
+.lineChart {
+  height: 100px;
+  width: 100%;
+}
+
+.lineChart svg {
+  display: block;
+  height: 100%;
+  overflow: visible;
+  width: 100%;
+}
+
+.linePath {
+  fill: rgba(77, 255, 164, 0.12);
+  stroke: $accent;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2.5;
+}
+
+.linePoint {
+  fill: $accent;
+  stroke: rgba(15, 22, 37, 0.95);
+  stroke-width: 1.5;
+}
+
+.pill {
+  background: rgba(77, 255, 164, 0.1);
+  border-radius: var(--ce-radius-12);
+  color: $accent;
+  display: inline-flex;
+  font-size: 11px;
+  line-height: 1.4;
+  padding: 2px 8px;
+}
+
+.pillButton {
+  appearance: none;
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+  transition:
+    background 0.18s ease,
+    color 0.18s ease,
+    transform 0.18s ease;
+}
+
+.pillButton:hover {
+  background: rgba(77, 255, 164, 0.18);
+  color: #b7ffd9;
+  transform: translateY(-1px);
+}
+
+.pillButton:focus-visible {
+  outline: 2px solid rgba(77, 255, 164, 0.4);
+  outline-offset: 2px;
+}
+
+.pillRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tweetTags {
+  margin-bottom: 12px;
+}
+
+.tweetAvatar {
+  align-items: center;
+  background: linear-gradient(135deg, #1d9bf0 0%, #1a73c7 100%);
+  box-shadow: 0 8px 18px rgba(29, 155, 240, 0.18);
+  border-radius: 50%;
+  color: #fff;
+  display: inline-flex;
+  flex: 0 0 48px;
+  font-size: 18px;
+  font-weight: 700;
+  height: 48px;
+  justify-content: center;
+  width: 48px;
+}
+
+// Hidden until better portrait display is designed
+.insiderPortrait {
+  display: none;
+}
+
+.tweetAuthorRow {
+  align-items: flex-start;
+  display: flex;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.tweetAuthorMeta {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.tweetAuthorNames {
+  align-items: baseline;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+.tweetHandle {
+  color: #657786;
+  font-size: 14px;
+  font-weight: 400;
+}
+
+.tweetName {
+  color: #0f1419;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.tweetSeparator {
+  color: rgba(139, 152, 165, 0.5);
+  font-size: 13px;
+}
+
+.tweetBody {
+  color: #0f1419;
+  font-size: 15px;
+  line-height: 1.55;
+  margin-bottom: 12px;
+  overflow: hidden;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.tweetBodyClamped {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 6;
+}
+
+.tweetReadMore {
+  background: none;
+  border: none;
+  color: #1d9bf0;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 8px;
+  padding: 0;
+}
+
+.tweetReadMore:hover {
+  text-decoration: underline;
+}
+
+.tweetEngagementIcon {
+  align-items: center;
+  color: #657786;
+  display: inline-flex;
+  font-size: 13px;
+  gap: 6px;
+  transition: color 0.15s ease;
+}
+
+.tweetEngagementIcon:hover {
+  color: #1d9bf0;
+}
+
+.tweetDate {
+  color: #657786;
+  font-size: 13px;
+  margin-left: auto;
+  padding-top: 2px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.clamp3 {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+
+.sentimentBadge {
+  border-radius: var(--ce-radius-pill);
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  text-transform: capitalize;
+}
+
+.sentimentOptimistic {
+  background: rgba(77, 255, 164, 0.14);
+  color: $accent;
+}
+
+.sentimentSkeptical {
+  background: rgba(255, 179, 71, 0.14);
+  color: #ffb347;
+}
+
+.sentimentAlarmist {
+  background: rgba(255, 107, 203, 0.14);
+  color: #ff6bcb;
+}
+
+.sentimentNeutral {
+  background: rgba(255, 255, 255, 0.1);
+  color: $muted;
+}
+
+.entryHeader {
+  align-items: flex-start;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  min-width: 0;
+}
+
+.entryHeaderContent {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.tweetEngagement {
+  align-items: center;
+  border-top: 1px solid #e6ecf0;
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 13px;
+  gap: 16px;
+  justify-content: space-between;
+  margin-top: 12px;
+  padding-top: 12px;
+}
+
+.cardFooter {
+  align-items: flex-start;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: space-between;
+  margin-top: 12px;
+}
+
+.cardFooterLinks {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.cardFooter:empty,
+.cardFooterLinks:empty {
+  display: none;
+  margin-top: 0;
+}
+
+.engagementRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.entryTitle {
+  color: $text;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.4;
+  margin-bottom: 6px;
+}
+
+.tweetCard .pill {
+  background: rgba(29, 155, 240, 0.1);
+  color: #1d9bf0;
+}
+
+.tweetCard .pillButton:hover {
+  background: rgba(29, 155, 240, 0.18);
+  color: #0f78b8;
+}
+
+.tweetCard .debateMapLabel,
+.tweetCard .debateMapEmpty {
+  color: #536471;
+}
+
+.tweetCard .debateMapIcon {
+  color: #1d9bf0;
+}
+
+.tweetCard .debateMapLink,
+.tweetCard .externalLink {
+  background: #f5f8fa;
+  border-color: #dce7ee;
+  color: #1d9bf0;
+}
+
+.tweetCard .sentimentNeutral {
+  background: #eef3f6;
+  color: #536471;
+}
+
+.tweetCard .sentimentOptimistic {
+  background: rgba(77, 255, 164, 0.12);
+  color: #0a9f5c;
+}
+
+.tweetCard .sentimentSkeptical {
+  background: rgba(255, 179, 71, 0.16);
+  color: #b86a00;
+}
+
+.tweetCard .sentimentAlarmist {
+  background: rgba(255, 107, 203, 0.14);
+  color: #c93b85;
+}
+
+.arxivCard .entrySummary {
+  color: #4b5563;
+}
+
+.arxivCard .pill {
+  background: rgba(33, 117, 189, 0.1);
+  color: #1b6fb8;
+}
+
+.arxivCard .pillButton:hover {
+  background: rgba(33, 117, 189, 0.16);
+  color: #135793;
+}
+
+.arxivCard .debateMapLink,
+.arxivCard .externalLink {
+  background: #f7fafc;
+  border-color: #d9e2ea;
+  color: #1b6fb8;
+}
+
+.insiderName {
+  color: #1d2733;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.3;
+  margin-bottom: 4px;
+}
+
+.insiderRole {
+  color: #536471;
+  font-size: 16px;
+  line-height: 1.5;
+  margin-bottom: 4px;
+}
+
+.insiderInterviewer {
+  color: #657786;
+  font-size: 15px;
+  font-style: italic;
+  line-height: 1.5;
+}
+
+// Hidden until better display is designed
+.insiderQuote {
+  display: none;
+}
+
+.insiderQuoteMark {
+  display: none;
+}
+
+.insiderExpandBtn {
+  background: transparent;
+  border: none;
+  color: #1d9bf0;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  margin-top: 14px;
+  padding: 0;
+}
+
+.insiderExpandBtn:hover {
+  color: #0f78b8;
+}
+
+.insiderExpandBtn:focus-visible {
+  color: #0f78b8;
+  outline: 2px solid rgba(29, 155, 240, 0.25);
+  outline-offset: 4px;
+}
+
+.insiderDetails {
+  background: rgba(29, 155, 240, 0.04);
+  border-top: 1px solid #dbe6ef;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+  padding-top: 12px;
+}
+
+.insiderCard .entrySummary {
+  color: #334155;
+  font-size: 17px;
+  line-height: 1.72;
+}
+
+.insiderCard .entryMeta {
+  color: #536471;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.insiderCard .pill {
+  background: rgba(29, 155, 240, 0.1);
+  color: #1d9bf0;
+  font-size: 12px;
+}
+
+.insiderCard .pillButton:hover {
+  background: rgba(29, 155, 240, 0.16);
+  color: #0f78b8;
+}
+
+.insiderCard .debateMapLink,
+.insiderCard .externalLink {
+  background: #f7fafc;
+  border-color: #dbe6ef;
+  color: #1d9bf0;
+}
+
+.arxivMetaTop {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.arxivId {
+  color: #1b6fb8;
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.arxivCategory {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: var(--ce-radius-pill);
+  color: rgba(244, 247, 255, 0.72);
+  display: inline-flex;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.3;
+  padding: 3px 8px;
+}
+
+.arxivCategory[data-category='cs.AI'] {
+  background: rgba(91, 140, 255, 0.16);
+  border-color: rgba(91, 140, 255, 0.32);
+  color: #a8c0ff;
+}
+
+.arxivCategory[data-category='cs.LG'] {
+  background: rgba(182, 104, 255, 0.16);
+  border-color: rgba(182, 104, 255, 0.32);
+  color: #ddb2ff;
+}
+
+.arxivTitle {
+  color: #2f3437;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.28;
+  margin-bottom: 8px;
+}
+
+.arxivMetaRow {
+  align-items: baseline;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+  min-width: 0;
+}
+
+.arxivMetaLabel {
+  color: #2f3437;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.arxivAuthors {
+  color: #1b6fb8;
+  flex: 1 1 auto;
+  font-size: 13px;
+  min-width: 0;
+  line-height: 1.45;
+}
+
+.arxivDate {
+  color: #444f59;
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.entryMeta {
+  color: $muted;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.jurisdictionBadge {
+  flex-shrink: 0;
+}
+
+.entrySummary {
+  color: $muted;
+  font-size: 14px;
+  line-height: 1.6;
+  margin-bottom: 12px;
+}
+
+.entryMediaBlock {
+  border-radius: 16px;
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+
+.entryMediaLink {
+  display: block;
+}
+
+.entryMediaImage {
+  display: block;
+  height: auto;
+  max-width: 100%;
+  width: 50%;
+}
+
+.metrCard .entryMediaImage {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.entrySourceRow {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 14px;
+}
+
+.emptyState {
+  align-items: center;
+  background: $card;
+  border: 1px dashed $card-border;
+  border-radius: var(--ce-radius-8);
+  color: $muted;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  justify-content: center;
+  min-height: 220px;
+  padding: 24px;
+  text-align: center;
+}
+
+.emptyStateIcon {
+  color: $accent;
+  font-size: 20px;
+}
+
+.emptyStateTitle {
+  color: $text;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.emptyStateText {
+  font-size: 13px;
+  line-height: 1.6;
+  max-width: 420px;
+}
+
+.debateMapSection {
+  background: rgba(8, 16, 42, 0.45);
+  border: 1px solid rgba(77, 255, 164, 0.18);
+  border-radius: 10px;
+  margin-top: 14px;
+  padding: 12px 12px 10px;
+}
+
+.tagModal {
+  max-width: min(1180px, calc(100vw - 32px));
+  margin: 24px auto;
+}
+
+.tagModal :global(.modal-content) {
+  background:
+    radial-gradient(circle at top right, rgba(77, 255, 164, 0.08), transparent 32%),
+    linear-gradient(180deg, rgba(12, 18, 34, 0.98), rgba(8, 12, 24, 0.98));
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 18px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+  color: $text;
+  overflow: hidden;
+}
+
+.tagModal :global(.modal-header) {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  color: $text;
+  padding: 18px 20px;
+}
+
+.tagModal :global(.modal-title) {
+  color: $text;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.tagModal :global(.modal-body) {
+  background: transparent;
+  padding: 20px;
+}
+
+.tagModal :global(.close) {
+  color: $text;
+  opacity: 0.72;
+  text-shadow: none;
+}
+
+.tagModal :global(.close:hover),
+.tagModal :global(.close:focus) {
+  color: $accent;
+  opacity: 1;
+}
+
+.debateMapHeader {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.debateMapIcon {
+  color: $accent;
+  font-size: 12px;
+}
+
+.debateMapLabel {
+  color: $text;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.debateMapLinks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.debateMapFooter {
+  min-width: 0;
+}
+
+.debateMapFooterLinks {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+.debateMapLink {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--ce-radius-pill);
+  color: $muted;
+  display: inline-flex;
+  font-size: 11px;
+  font-weight: 600;
+  gap: 6px;
+  line-height: 1.4;
+  max-width: 100%;
+  min-width: 0;
+  padding: 5px 9px;
+  text-decoration: none;
+  white-space: normal;
+}
+
+.debateMapLinkButton {
+  appearance: none;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.debateMapEmpty {
+  color: $muted;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.externalLink {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid $card-border;
+  border-radius: var(--ce-radius-pill);
+  color: $text;
+  display: inline-flex;
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 600;
+  gap: 6px;
+  max-width: 100%;
+  min-height: 40px;
+  min-width: 0;
+  padding: 8px 12px;
+  text-decoration: none;
+  white-space: normal;
+}
+
+.externalIconLink {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid $card-border;
+  border-radius: 999px;
+  color: $text;
+  display: inline-flex;
+  flex-shrink: 0;
+  height: 40px;
+  justify-content: center;
+  text-decoration: none;
+  width: 40px;
+}
+
+.externalIconLink:hover {
+  border-color: rgba(255, 255, 255, 0.22);
+  color: $accent;
+}
+
+@media (min-width: 980px) {
+  .entriesCollectionHalf {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .policySplitLayout {
+    align-items: start;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .policyMapPanel {
+    position: sticky;
+    top: 0;
+  }
+}
+
+@media (max-width: 720px) {
+  .container {
+    border-radius: var(--ce-radius-10);
+    padding: 12px;
+  }
+
+  .tabBar {
+    gap: 10px;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+  }
+
+  .tabButton {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+    max-width: 144px;
+    min-width: 112px;
+    padding: 12px 12px 14px;
+  }
+
+  .tabIcon {
+    font-size: 18px;
+  }
+
+  .tabLabel {
+    font-size: 14px;
+    line-height: 1.25;
+    white-space: normal;
+  }
+
+  .githubLink {
+    font-size: 12px;
+    justify-content: center;
+    width: 100%;
+  }
+
+  .githubLinkIcon {
+    font-size: 12px;
+  }
+
+  .scrollArea {
+    gap: 14px;
+    max-height: none;
+    overflow: visible;
+    padding-right: 0;
+  }
+
+  .policySplitLayout {
+    gap: 14px;
+  }
+
+  .policyListHeader,
+  .policyMapPanel {
+    padding: 12px;
+  }
+
+  .policyMapLens {
+    padding: 8px 8px 2px;
+  }
+
+  .card,
+  .tweetCard {
+    border-radius: 16px;
+    padding: 14px;
+  }
+
+  .entryHeader {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .tweetAuthorRow {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .tweetAuthorMeta,
+  .entryHeaderContent {
+    min-width: 0;
+  }
+
+  .tweetDate {
+    margin-left: 58px;
+    padding-top: 0;
+    text-align: left;
+    white-space: normal;
+    width: calc(100% - 58px);
+  }
+
+  .tweetBody,
+  .entrySummary {
+    font-size: 15px;
+    line-height: 1.65;
+  }
+
+  .entryMeta,
+  .arxivAuthors,
+  .arxivDate {
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .arxivMetaRow {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .entryMediaBlock {
+    margin-bottom: 14px;
+  }
+
+  .entryMediaImage {
+    width: 100%;
+  }
+
+  .metrCard .entryMediaImage {
+    width: 100%;
+  }
+
+  .pill {
+    font-size: 12px;
+    line-height: 1.45;
+    padding: 4px 10px;
+  }
+
+  .cardFooter,
+  .cardFooterLinks,
+  .debateMapFooterLinks {
+    align-items: stretch;
+    justify-content: flex-start;
+    width: 100%;
+  }
+
+  .debateMapLink,
+  .externalLink {
+    min-height: 42px;
+    padding: 8px 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .tabButton {
+    max-width: 132px;
+    min-width: 106px;
+    padding: 11px 11px 13px;
+  }
+
+  .policyListTitle,
+  .policyMapTitle {
+    font-size: 16px;
+  }
+
+  .tweetAvatar {
+    flex-basis: 44px;
+    font-size: 17px;
+    height: 44px;
+    width: 44px;
+  }
+
+  .tweetDate {
+    margin-left: 54px;
+    width: calc(100% - 54px);
+  }
+
+  .externalIconLink {
+    height: 42px;
+    width: 42px;
+  }
+}

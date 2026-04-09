@@ -12,6 +12,7 @@ import {
   clearSponsoredBootstrapFaucetGrantToken,
   readSponsoredBootstrapFundingContext,
 } from '../session/sponsoredBootstrapFunding.js';
+import { extractChainId } from './chainIdResolution.js';
 
 const normalizeFundingErrorMessage = (error) => (
   String(error?.message || error || '').trim().toLowerCase()
@@ -403,7 +404,7 @@ export function createContractHelperMethods(deps) {
             '[blockLimits] Recovered missing blockLimits.start from SessionRegistry.SessionCreated.',
             {
               slug: slugLabel,
-              chainId: Number(cfg?.networkChainId || DEFAULT_CHAIN_ID || 0) || null,
+              chainId: extractChainId(cfg) || null,
               start: fallbackStart,
             }
           );

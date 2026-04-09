@@ -1,7 +1,6 @@
 /** @file MainAreaTabs.jsx */
 
 import React, { Component, Suspense } from "react";
-import classnames from "classnames";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faCog, faGlobe, faPlay, faTools } from "@fortawesome/free-solid-svg-icons";
 import { createLogger } from '../../utilities/logging';
@@ -52,7 +51,7 @@ class MainAreaTabs extends Component {
     mountedTabs: {},
   };
 
-  componentDidMount() { 
+  componentDidMount() {
     this.setState((prevState) => ({
       currentTabTitle: getTabTitle(this.props.focusedTab),
       currentTabIndex: this.props.focusedTab,
@@ -90,6 +89,7 @@ class MainAreaTabs extends Component {
   };
 
   render() {
+    const activeClassName = (isActive) => (isActive ? 'active' : '');
     return (
       <div id={styles.mainAreaTabsAlt}>
                 <Card id={styles.mainTabsCard}>
@@ -97,9 +97,7 @@ class MainAreaTabs extends Component {
                 <Nav className="nav-tabs-info" role="tablist" tabs>
                   <NavItem>
                     <NavLink
-                      className={classnames({
-                        active: this.props.focusedTab === MAIN_AREA_TABS.LATEST
-                      })}
+                      className={activeClassName(this.props.focusedTab === MAIN_AREA_TABS.LATEST)}
                       onClick={() => this.changeTabs(MAIN_AREA_TABS.LATEST)}
                     >
                       <FontAwesomeIcon icon={faPlay} id={styles.navTabIcon} />
@@ -108,9 +106,7 @@ class MainAreaTabs extends Component {
                   </NavItem>
                   <NavItem>
                     <NavLink
-                      className={classnames({
-                        active: this.props.focusedTab === MAIN_AREA_TABS.COMMUNITY
-                      })}
+                      className={activeClassName(this.props.focusedTab === MAIN_AREA_TABS.COMMUNITY)}
                       onClick={() => this.changeTabs(MAIN_AREA_TABS.COMMUNITY)}
                     >
                       <FontAwesomeIcon icon={faGlobe} id={styles.navTabIcon} />
@@ -119,9 +115,7 @@ class MainAreaTabs extends Component {
                   </NavItem>
                   <NavItem>
                     <NavLink
-                      className={classnames({
-                        active: this.props.focusedTab === MAIN_AREA_TABS.TOOLS
-                      })}
+                      className={activeClassName(this.props.focusedTab === MAIN_AREA_TABS.TOOLS)}
                       onClick={() => this.changeTabs(MAIN_AREA_TABS.TOOLS)}
                     >
                       <FontAwesomeIcon icon={faTools} id={styles.navTabIcon} />
@@ -130,9 +124,7 @@ class MainAreaTabs extends Component {
                   </NavItem>
                   <NavItem>
                     <NavLink
-                      className={classnames({
-                        active: this.props.focusedTab === MAIN_AREA_TABS.WELCOME
-                      })}
+                      className={activeClassName(this.props.focusedTab === MAIN_AREA_TABS.WELCOME)}
                       onClick={() => this.changeTabs(MAIN_AREA_TABS.WELCOME)}
                     >
                       <FontAwesomeIcon icon={faCog} id={styles.navTabIcon} />
@@ -149,7 +141,7 @@ class MainAreaTabs extends Component {
                   <TabPane tabId={"link" + MAIN_AREA_TABS.COMMUNITY}>
                     {this.state.mountedTabs[MAIN_AREA_TABS.COMMUNITY] ? (
                       <Suspense fallback={<LazyFallback label="Loading..." />}>
-                        <CommunityTab 
+                        <CommunityTab
                           demoMode={this.props.demoMode}
                           provider={this.props.provider}
                           network={this.props.network}
@@ -177,7 +169,7 @@ class MainAreaTabs extends Component {
                         <ToolExplorer
                           toggleLoginModal={(loginModalIsOpen) => this.props.toggleLoginModal(loginModalIsOpen)}
                           //
-                          account={this.props.account} 
+                          account={this.props.account}
                           provider={this.props.provider}
                           activeSessionSlug={this.props.activeSessionSlug}
                           network={this.props.network}
@@ -188,7 +180,7 @@ class MainAreaTabs extends Component {
                           isQuestionCacheReady={this.props.isQuestionCacheReady}
                           isSurveyCacheReady={this.props.isSurveyCacheReady}
                           isSBTCacheReady={this.props.isSBTCacheReady}
-                        /> 
+                        />
                       </Suspense>
                     ) : null}
                   </TabPane>
@@ -198,9 +190,9 @@ class MainAreaTabs extends Component {
                         <OnboardingWalkthrough
                           changeTabFunction={(newTab) => this.changeTabs(newTab)}
                           //
-                          toggleDemoMode={(demoModeOn) => this.props.toggleDemoMode(demoModeOn)} 
+                          toggleDemoMode={(demoModeOn) => this.props.toggleDemoMode(demoModeOn)}
                           demoMode={this.props.demoMode}
-                        /> 
+                        />
                       </Suspense>
                     ) : null}
                   </TabPane>

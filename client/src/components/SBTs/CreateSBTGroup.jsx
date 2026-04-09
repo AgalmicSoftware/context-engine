@@ -18,18 +18,16 @@ import {
   faBookmark,
   faQrcode,
   faTimes,
-  faUpload,
   faEraser
 } from '@fortawesome/free-solid-svg-icons';
 import { ethers } from 'ethers';
 import { arweaveScripts } from '../../utilities/arweave/arweaveScripts.js';
-import { normalizeArweaveUrl } from '../../utilities/arweave/arweaveUrls.js';
+import { normalizeArweaveUrl, parseArweaveTxId } from '../../utilities/arweave/arweaveUrls.js';
 import contractScripts, { getSessionConfigBySlugOrDefault, normalizeSessionSlug } from '../../utilities/web3/contractScripts.js';
 import { getEffectiveArweaveKey } from '../../utilities/session/resourceKeys.js';
 import { toStr } from '../../utilities/shared/primitives.js';
 import { fetchImageFromURL } from '../../utilities/ui/imageScripts.js'
 import { readPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
-import DatePicker from 'react-datepicker';
 import styles from './CreateSBTGroup.module.scss';
 import { QRCodeSVG } from 'qrcode.react';
 import {
@@ -40,7 +38,10 @@ import {
 import { JsonButtonRow, JsonPanel, JsonToggleButton } from '../Shared/Json/JsonControls';
 import JsonDisplay from '../Shared/Json/JsonDisplay.jsx';
 import CETooltip from '../Shared/CETooltip';
+import CEDateTimeInput from '../Shared/CEDateTimeInput.jsx';
 import GateMultiSelectLock from '../Gates/GateMultiSelectLock';
+import CompactImageChooser from '../Shared/CompactImageChooser.jsx';
+import { readCompactImageClipboard } from '../Shared/compactImageClipboard.js';
 import { resolveSessionContractRef } from '../../utilities/session/sessionNaming.js';
 
 import { cryptoUtils }  from '../../utilities/crypto/cryptography.js';
@@ -671,6 +672,8 @@ class CreateSBTGroup extends Component {
       documentUrl: '',
       showTagsInput: false,
       imageLoadError: false,
+      imageChooserStatusText: '',
+      imageChooserStatusTone: 'default',
       documentURLs: [],
       startedMinting: false,
       // Group password
@@ -678,7 +681,7 @@ class CreateSBTGroup extends Component {
       arweaveTxId: '',
       shareableUrl: '',
       error: '',
-      autoJoinUrl: '', 
+      autoJoinUrl: '',
 
       openLockKey: '',
       metadataLockGateIds: createEmptyMetadataLockGateIds(),
@@ -708,6 +711,7 @@ class CreateSBTGroup extends Component {
     this._predictAddressRequestSeq = 0;
     this._predictedAddressShapeSignature = '';
     this._autoCreate2SaltForGroupPassword = false;
+    this._suppressFormCachePersistence = false;
   }
 
   /* =========================
@@ -732,10 +736,37 @@ class CreateSBTGroup extends Component {
     return new Blob([arr], { type: mime });
   };
 
+  getNormalizedDocumentUrlDraft = (value = this.state.documentUrl) => (
+    String(value || '').trim()
+  );
+
+  getEffectiveDocumentURLs = ({
+    documentURLs = this.state.documentURLs,
+    documentUrl = this.state.documentUrl,
+  } = {}) => {
+    const nextDocumentUrls = Array.isArray(documentURLs)
+      ? documentURLs.map((url) => String(url || '').trim()).filter(Boolean)
+      : [];
+    const pendingDocumentUrl = this.getNormalizedDocumentUrlDraft(documentUrl);
+    if (pendingDocumentUrl && nextDocumentUrls.length < 10) {
+      nextDocumentUrls.push(pendingDocumentUrl);
+    }
+    return nextDocumentUrls;
+  };
+
+  resumeFormCachePersistence = () => {
+    this._suppressFormCachePersistence = false;
+  };
+
+  suppressFormCachePersistenceAfterSuccess = () => {
+    this._suppressFormCachePersistence = true;
+    this.clearFormCache();
+  };
+
   buildCachePayload = () => {
     const {
       sbtName, sbtDescription, sbtImageUrl, useImageUrl, sbtDistribution,
-      tags, documentIDHashes, documentURLs, groupPassword, numInviteLinks,
+      tags, documentIDHashes, documentURLs, documentUrl, groupPassword, numInviteLinks,
       exportFormat, metadataLockGateIds, create2Salt, predictableAddressEnabled,
       deferredCreate2Salt, autoAppliedDefaultTags, dismissedDefaultTags
     } = this.state;
@@ -758,6 +789,7 @@ class CreateSBTGroup extends Component {
       tags, // Array is safely JSON serialized
       documentIDHashes,
       documentURLs,
+      documentUrl: this.getNormalizedDocumentUrlDraft(documentUrl),
       groupPassword,
       metadataLockGateIds: normalizeMetadataLockGateIds(metadataLockGateIds),
       predictableAddressEnabled: !!predictableAddressEnabled,
@@ -782,6 +814,10 @@ class CreateSBTGroup extends Component {
   persistFormCache = () => {
     try {
       if (typeof window === 'undefined' || !window.sessionStorage) return;
+      if (this._suppressFormCachePersistence) {
+        ++this._cacheWriteSeq;
+        return;
+      }
       const payload = this.buildCachePayload();
       const imageFile = this.state.sbtImageFile;
       const scopedCacheKey = this.getScopedFormCacheKey();
@@ -915,6 +951,7 @@ class CreateSBTGroup extends Component {
       tags: restoredTags,
       documentIDHashes: parsed.documentIDHashes || '',
       documentURLs: Array.isArray(parsed.documentURLs) ? parsed.documentURLs : [],
+      documentUrl: this.getNormalizedDocumentUrlDraft(parsed.documentUrl),
       groupPassword: parsed.groupPassword || '',
       metadataLockGateIds: METADATA_LOCK_FIELDS.reduce((acc, fieldKey) => {
         acc[fieldKey] = this.normalizeSelectedGateIds(restoredMetadataLockGateIds[fieldKey], validGateIds);
@@ -993,6 +1030,7 @@ class CreateSBTGroup extends Component {
     try {
       if (typeof window === 'undefined' || !window.sessionStorage) return;
 
+      ++this._cacheWriteSeq;
       sessionStorage.removeItem(FORM_CACHE_KEY);
       sessionStorage.removeItem(this.getScopedFormCacheKey());
 
@@ -2185,6 +2223,7 @@ class CreateSBTGroup extends Component {
 
   resetForm = () => {
     const nextAuthoringChain = this.getAuthoringChainState();
+    this.resumeFormCachePersistence();
     this.clearFormCache();
     this._autoCreate2SaltForGroupPassword = false;
 
@@ -2213,6 +2252,7 @@ class CreateSBTGroup extends Component {
       autoAppliedDefaultTags: [],
       dismissedDefaultTags: [],
       documentURLs: [],
+      documentUrl: '',
       groupPassword: '',
       openLockKey: '',
       metadataLockGateIds: createEmptyMetadataLockGateIds(),
@@ -2234,13 +2274,16 @@ class CreateSBTGroup extends Component {
       tokenUriUploaded: false,
       tokenURI: '',
       showJson: false,
-      showTagsInput: false
+      showTagsInput: false,
+      imageChooserStatusText: '',
+      imageChooserStatusTone: 'default',
     }, () => {
       this.updateGroupHash();
     });
   };
 
   resetFormStateForEdit = () => {
+    this.resumeFormCachePersistence();
     if (this.state.sbtMinted) {
       this.setState({
         sbtMinted: false,
@@ -2341,6 +2384,9 @@ class CreateSBTGroup extends Component {
       this.setState({
         [name]: value,
         ...(name === 'sbtImageUrl' ? { lockedImageAsset: null } : {}),
+        ...(name === 'sbtImageUrl'
+          ? { imageChooserStatusText: '', imageChooserStatusTone: 'default' }
+          : {}),
       }, () => {
         this.updateGroupHash();
         this.persistFormCache();
@@ -2349,17 +2395,11 @@ class CreateSBTGroup extends Component {
       if (name === 'sbtImageUrl') {
         this.setState({ imageLoadError: false }, async () => {
           const trimmedUrl = this.state.sbtImageUrl.trim();
-          let isValidUrl = false;
-          try {
-            const urlObj = new URL(trimmedUrl);
-            if (urlObj.protocol === 'http:' || urlObj.protocol === 'https:') {
-              isValidUrl = true;
-            }
-          } catch (e) { sbtLog.warn('CreateSBTGroup: fallback', e); }
+          const fetchableUrl = this.getFetchableImageUrl(trimmedUrl);
 
-          if (trimmedUrl !== '' && isValidUrl) {
+          if (trimmedUrl !== '' && fetchableUrl) {
             try {
-              const file = await fetchImageFromURL(this.state.sbtImageUrl);
+              const file = await fetchImageFromURL(fetchableUrl);
               this.setState({ sbtImageFile: file, imageLoadError: false, lockedImageAsset: null }, () => {
                 this.updateGroupHash();
                 this.persistFormCache();
@@ -2380,16 +2420,124 @@ class CreateSBTGroup extends Component {
 
 
   handleImageUpload = (event) => {
-    this.resetFormStateForEdit();
     const file = event.target.files[0];
+    this.applySelectedImageFile(file);
+  };
+
+  applySelectedImageFile = (file, {
+    useImageUrl = false,
+    statusText = '',
+    statusTone = 'default',
+  } = {}) => {
     if (file && file.size > 10 * 1024 * 1024) {
       sbtLog.error("Image too large (>10MB)");
-      return;
+      if (statusText) {
+        this.setState({
+          imageChooserStatusText: statusText,
+          imageChooserStatusTone: statusTone,
+        });
+      }
+      return false;
     }
+    this.resetFormStateForEdit();
     this.setState(
-      { sbtImageFile: file, sbtImageUrl: '', imageLoadError: false, lockedImageAsset: null },
+      {
+        useImageUrl: !!useImageUrl,
+        sbtImageFile: file,
+        sbtImageUrl: '',
+        imageLoadError: false,
+        imageChooserStatusText: statusText,
+        imageChooserStatusTone: statusText ? statusTone : 'default',
+        lockedImageAsset: null,
+      },
       () => { this.updateGroupHash(); this.persistFormCache(); }
     );
+    return true;
+  };
+
+  getFetchableImageUrl = (value) => {
+    const normalizedValue = normalizeArweaveUrl(String(value || '').trim());
+    if (!normalizedValue) return '';
+    try {
+      const urlObj = new URL(normalizedValue);
+      return (urlObj.protocol === 'http:' || urlObj.protocol === 'https:') ? normalizedValue : '';
+    } catch (_) {
+      return '';
+    }
+  };
+
+  getCanonicalMetadataImageUrl = (value) => {
+    const trimmedValue = String(value || '').trim();
+    if (!trimmedValue) return '';
+    const txId = parseArweaveTxId(trimmedValue);
+    if (txId && txId === trimmedValue) {
+      return `ar://${txId}`;
+    }
+    return trimmedValue;
+  };
+
+  handlePasteImage = async () => {
+    const clipboardResult = await readCompactImageClipboard({
+      fileNamePrefix: 'clipboard-sbt-image',
+    });
+
+    if (clipboardResult?.kind === 'file' && clipboardResult.file) {
+      const applied = this.applySelectedImageFile(clipboardResult.file, {
+        useImageUrl: false,
+      });
+      if (!applied) {
+        this.setState({
+          imageChooserStatusText: 'Image too large (>10MB)',
+          imageChooserStatusTone: 'error',
+        });
+      }
+      return;
+    }
+
+    if (clipboardResult?.kind === 'text') {
+      const pastedUrl = String(clipboardResult.text || '').trim();
+      const fetchableUrl = this.getFetchableImageUrl(pastedUrl);
+      if (!fetchableUrl) {
+        this.setState({
+          imageChooserStatusText: clipboardResult?.error || 'Clipboard does not contain a supported image or URL.',
+          imageChooserStatusTone: 'error',
+        });
+        return;
+      }
+
+      this.setState({
+        imageChooserStatusText: 'Loading preview...',
+        imageChooserStatusTone: 'loading',
+      });
+
+      try {
+        const file = await fetchImageFromURL(fetchableUrl);
+        this.resetFormStateForEdit();
+        await this.setStateAsync({
+          useImageUrl: true,
+          sbtImageUrl: pastedUrl,
+          sbtImageFile: file,
+          imageLoadError: false,
+          imageChooserStatusText: '',
+          imageChooserStatusTone: 'default',
+          lockedImageAsset: null,
+        });
+        this.updateGroupHash();
+        this.persistFormCache();
+      } catch (error) {
+        sbtLog.error("Failed to fetch pasted image via worker:", error);
+        this.setState({
+          imageChooserStatusText: error?.message || 'Image preview unavailable.',
+          imageChooserStatusTone: 'error',
+        });
+      }
+      return;
+    }
+
+    this.setState({
+      imageChooserStatusText: clipboardResult?.error || 'Clipboard does not contain a supported image or URL.',
+      imageChooserStatusTone: 'error',
+    });
   };
 
   toggleImageUploadMethod = () => {
@@ -2403,6 +2551,8 @@ class CreateSBTGroup extends Component {
       sbtImageFile: null,
       sbtImageUrl: '',
       imageLoadError: false,
+      imageChooserStatusText: '',
+      imageChooserStatusTone: 'default',
       lockedImageAsset: null,
     }), () => {
       this.updateGroupHash();
@@ -2416,6 +2566,10 @@ class CreateSBTGroup extends Component {
       this.setImageUploadMethod(false, () => this.fileInput?.click());
       return;
     }
+    this.setState({
+      imageChooserStatusText: '',
+      imageChooserStatusTone: 'default',
+    });
     this.fileInput?.click();
   };
 
@@ -2425,6 +2579,8 @@ class CreateSBTGroup extends Component {
       sbtImageFile: null,
       sbtImageUrl: '',
       imageLoadError: false,
+      imageChooserStatusText: '',
+      imageChooserStatusTone: 'default',
       useImageUrl: false,
       lockedImageAsset: null,
     }, () => { this.updateGroupHash(); this.persistFormCache(); });
@@ -2463,6 +2619,7 @@ class CreateSBTGroup extends Component {
       sbtDistribution,
       tags,
       documentURLs,
+      documentUrl,
       metadataLockGateIds,
     } = this.state;
     const groupData = {
@@ -2472,7 +2629,7 @@ class CreateSBTGroup extends Component {
       sbtImageUrl,
       sbtDistribution,
       tags,
-      documentURLs,
+      documentURLs: this.getEffectiveDocumentURLs({ documentURLs, documentUrl }),
       metadataLockGateIds: normalizeMetadataLockGateIds(metadataLockGateIds),
     };
 
@@ -2517,7 +2674,7 @@ class CreateSBTGroup extends Component {
   handleAddTag = () => {
     const val = (this.state.currentTagInput || '').trim();
     if (!val) return;
-    
+
     // Prevent duplicates
     if (this.state.tags.includes(val)) {
       this.setState({ currentTagInput: '' });
@@ -2603,7 +2760,7 @@ class CreateSBTGroup extends Component {
     }
     return Array.from(nonces);
   };
-  
+
 
   generateRandomString = (length) => {
     const bytes = Math.ceil(length / 2);
@@ -2754,8 +2911,6 @@ class CreateSBTGroup extends Component {
         sbtDistribution,
         tags,
         documentIDHashes,
-        documentURLs,
-        documentUrl, // Pending input
         metadataLockGateIds,
         useImageUrl,
         sbtImageFile,
@@ -2766,12 +2921,7 @@ class CreateSBTGroup extends Component {
       const validGateIds = Object.keys(gateMap || {});
       const knownGateIds = new Set(validGateIds);
       const scrubGateIds = (ids) => normalizeGateIds(ids).filter((gateId) => knownGateIds.has(gateId));
-
-      // UX Improvement: Capture pending document URL if valid
-      let finalDocURLs = [...documentURLs];
-      if (documentUrl && documentUrl.trim().length > 0) {
-        finalDocURLs.push(documentUrl.trim());
-      }
+      const finalDocURLs = this.getEffectiveDocumentURLs();
 
       // Use tags array directly (ensure no empty strings)
       const tokenTags = tags.filter(t => t.trim().length > 0);
@@ -2788,10 +2938,10 @@ class CreateSBTGroup extends Component {
         return selectedGateIds;
       };
       const imageSourceValue = (() => {
-        const explicit = String(sbtImageUrl || '').trim();
+        const explicit = this.getCanonicalMetadataImageUrl(sbtImageUrl);
         if (useImageUrl && explicit) return explicit;
         if (explicit) return explicit;
-        return DEFAULT_SBT_IMAGE_ARWEAVE_TX;
+        return this.getCanonicalMetadataImageUrl(DEFAULT_SBT_IMAGE_ARWEAVE_TX);
       })();
 
       let finalImageUrl = imageSourceValue;
@@ -2993,6 +3143,7 @@ class CreateSBTGroup extends Component {
     if (typeof this.props.onSaveDraft !== 'function') {
       throw new Error('Session draft save is unavailable.');
     }
+    await this.commitPendingDocumentUrl();
     const draftPayload = await this.buildDeferredDraftPayload();
     await this.props.onSaveDraft(draftPayload);
     this.clearFormCache();
@@ -3024,14 +3175,7 @@ class CreateSBTGroup extends Component {
     docIDHashesArray = (this.state.documentIDHashes || '').trim().length > 0
       ? this.state.documentIDHashes.split(',').map((hash) => hash.trim()).filter(Boolean)
       : [],
-    finalDocURLs = [
-      ...(Array.isArray(this.state.documentURLs) ? this.state.documentURLs : []),
-      ...(
-        this.state.documentUrl && this.state.documentUrl.trim().length > 0
-          ? [this.state.documentUrl.trim()]
-          : []
-      ),
-    ],
+    finalDocURLs = this.getEffectiveDocumentURLs(),
     burnAuth = this.state.sbtDistribution.burnAuth,
     networkName = this.getSelectedAuthoringChain()?.name || this.state.sbtDistribution.network?.name,
     chainID = this.getSelectedAuthoringChainId(),
@@ -3091,8 +3235,6 @@ class CreateSBTGroup extends Component {
       sbtDescription,
       sbtImageUrl,
       tags,
-      documentURLs,
-      documentUrl,
       metadataLockGateIds,
       useImageUrl,
       sbtImageFile,
@@ -3102,21 +3244,15 @@ class CreateSBTGroup extends Component {
     const validGateIds = Object.keys(gateMap || {});
     const previewEncryptedFieldGates = {};
     const previewEncryptedFields = {};
-    const previewDocURLs = [
-      ...(Array.isArray(documentURLs) ? documentURLs : []),
-      ...(
-        documentUrl && documentUrl.trim().length > 0
-          ? [documentUrl.trim()]
-          : []
-      ),
-    ];
+    const previewDocURLs = this.getEffectiveDocumentURLs();
     const previewTags = (Array.isArray(tags) ? tags : []).filter((tag) => (tag || '').trim().length > 0);
 
     let previewName = sbtName || '';
     let previewDescription = sbtDescription || '';
     let previewTagList = previewTags;
     let previewDocumentList = previewDocURLs;
-    let previewImage = (sbtImageUrl || '').trim() || DEFAULT_SBT_IMAGE_ARWEAVE_TX;
+    let previewImage = this.getCanonicalMetadataImageUrl(sbtImageUrl)
+      || this.getCanonicalMetadataImageUrl(DEFAULT_SBT_IMAGE_ARWEAVE_TX);
     const normalizedLockMap = normalizeMetadataLockGateIds(metadataLockGateIds);
 
     const registerPreviewField = (fieldKey, selectedGateIds) => {
@@ -3421,6 +3557,7 @@ class CreateSBTGroup extends Component {
       // Persist plaintext codes for creator (export/admin tools)
       const codesToStore = usesInviteCodes ? [groupPassword] : finalPasswordList;
       this.persistCreatedSbtCodes({ sbtAddress, hasPasswordMintOnChain, codesToStore });
+      this.suppressFormCachePersistenceAfterSuccess();
 
       this.setState({
         sbtMinted: true,
@@ -3455,13 +3592,11 @@ class CreateSBTGroup extends Component {
         await this.generateSBTInviteLinks(sbtAddress);
       }
 
-      // ✅ Clear cached form after a successful mint
-      this.clearFormCache();
     } catch (error) {
       sbtLog.error('[CreateSBTGroup] Mint failed:', error);
       this.setState({ mintingFailed: true, startedMinting: false, currentStep: 0, error: error?.message || `${t('minting')} failed.` });
     }
-  } 
+  }
 
 
   async generateSBTInviteLinks(sbtAddress, listOverride = null) {
@@ -3566,6 +3701,8 @@ class CreateSBTGroup extends Component {
     // Block re-entry if flow already started
     if (this.state.currentStep > 0) return;
 
+    await this.commitPendingDocumentUrl();
+
     // Validation: require a name
     const sbtNameTrimmed = (this.state.sbtName || '').trim();
     if (!sbtNameTrimmed) {
@@ -3585,9 +3722,10 @@ class CreateSBTGroup extends Component {
     // Proceed
     this.setState({ startedMinting: true, mintingFailed: false, error: '' });
 
-    if (this.state.useImageUrl && this.state.sbtImageUrl && !this.state.sbtImageFile) {
+    const fetchableImageUrl = this.getFetchableImageUrl(this.state.sbtImageUrl);
+    if (this.state.useImageUrl && fetchableImageUrl && !this.state.sbtImageFile) {
       try {
-        const file = await fetchImageFromURL(this.state.sbtImageUrl);
+        const file = await fetchImageFromURL(fetchableImageUrl);
         // Await state update so sbtImageFile is set before uploadImageToArweave reads it
         await new Promise(resolve => {
           this.setState({ sbtImageFile: file, imageLoadError: false }, () => {
@@ -3658,15 +3796,24 @@ class CreateSBTGroup extends Component {
     }
   }
 
-  addDocumentURL = () => {
+  commitPendingDocumentUrl = async ({ persist = true } = {}) => {
     this.resetFormStateForEdit();
-    const { documentUrl, documentURLs } = this.state;
-    if (documentUrl.trim() !== '' && documentURLs.length < 10) {
-      this.setState((prevState) => ({
-        documentURLs: [...prevState.documentURLs, prevState.documentUrl.trim()],
-        documentUrl: ''
-      }), () => { this.updateGroupHash(); this.persistFormCache(); });
+    const pendingDocumentUrl = this.getNormalizedDocumentUrlDraft();
+    if (!pendingDocumentUrl || this.state.documentURLs.length >= 10) {
+      return false;
     }
+
+    await this.setStateAsync((prevState) => ({
+      documentURLs: [...prevState.documentURLs, pendingDocumentUrl],
+      documentUrl: '',
+    }));
+    this.updateGroupHash();
+    if (persist) this.persistFormCache();
+    return true;
+  };
+
+  addDocumentURL = () => {
+    void this.commitPendingDocumentUrl();
   };
 
   handleDocUrlKeyDown = (event) => {
@@ -3689,12 +3836,12 @@ class CreateSBTGroup extends Component {
     return new Promise((resolve, reject) => {
       const svg = document.getElementById(elementId);
       if (!svg) return reject(new Error("QR Code not found"));
-      
+
       const svgData = new XMLSerializer().serializeToString(svg);
       const canvas = document.createElement("canvas");
       const ctx = canvas.getContext("2d");
       const img = new Image();
-      
+
       // Add white background for PNG transparency safety
       img.onload = () => {
         canvas.width = img.width;
@@ -3706,7 +3853,7 @@ class CreateSBTGroup extends Component {
            resolve(blob);
         }, "image/png");
       };
-      
+
       img.src = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svgData)));
     });
   }
@@ -3772,19 +3919,19 @@ class CreateSBTGroup extends Component {
     const { copiedLinkIndex, sbtAddress } = this.state;
     const copyKeyUrl = `url_${qrId}`;
     const copyKeyImg = `img_${qrId}`;
-    
+
     // Derive ID for the hidden high-res QR code
     const highResQrId = `${qrId}_high_res`;
 
     // Robust hiding style: keeps element in render tree so XMLSerializer captures dimensions correctly
     const hiddenStyle = {
-      position: 'absolute', 
-      opacity: 0, 
-      pointerEvents: 'none', 
-      zIndex: -1, 
-      width: '1px', 
-      height: '1px', 
-      overflow: 'hidden' 
+      position: 'absolute',
+      opacity: 0,
+      pointerEvents: 'none',
+      zIndex: -1,
+      width: '1px',
+      height: '1px',
+      overflow: 'hidden'
     };
 
     return (
@@ -3795,11 +3942,11 @@ class CreateSBTGroup extends Component {
             {title}
             {tooltipText && (
               <>
-                <FontAwesomeIcon 
-                  icon={faQuestionCircle} 
-                  className={styles.tooltip} 
-                  id={`tt_${qrId}`} 
-                  style={{ opacity: 0.5, marginLeft: '8px', fontSize: '0.8em' }} 
+                <FontAwesomeIcon
+                  icon={faQuestionCircle}
+                  className={styles.tooltip}
+                  id={`tt_${qrId}`}
+                  style={{ opacity: 0.5, marginLeft: '8px', fontSize: '0.8em' }}
                 />
                 <CETooltip placement="right" target={`tt_${qrId}`} className={styles.tooltipBubble}>
                   {tooltipText}
@@ -3810,9 +3957,9 @@ class CreateSBTGroup extends Component {
 
           <div className={styles.urlContainer}>
             <span className={styles.urlText} title={url}>{url}</span>
-            <button 
-              onClick={() => this.copyToClipboard(url, copyKeyUrl)} 
-              className={styles.copyButton} 
+            <button
+              onClick={() => this.copyToClipboard(url, copyKeyUrl)}
+              className={styles.copyButton}
               title="Copy URL"
             >
               <FontAwesomeIcon icon={copiedLinkIndex === copyKeyUrl ? faCheck : faCopy} />
@@ -3824,39 +3971,39 @@ class CreateSBTGroup extends Component {
         <div className={styles.rightCol}>
           <div className={styles.qrCodeContainer}>
             {/* Visible Small QR (64px) */}
-            <QRCodeSVG 
-              id={qrId} 
-              value={url} 
-              size={64} 
-              bgColor={"#ffffff"} 
-              fgColor={"#000000"} 
-              level="L" 
-              includeMargin={false} 
+            <QRCodeSVG
+              id={qrId}
+              value={url}
+              size={64}
+              bgColor={"#ffffff"}
+              fgColor={"#000000"}
+              level="L"
+              includeMargin={false}
             />
             {/* Hidden High-Res QR (1024px) for Copy/Download */}
             <div style={hiddenStyle}>
-              <QRCodeSVG 
-                id={highResQrId} 
-                value={url} 
-                size={1024} 
-                bgColor={"#ffffff"} 
-                fgColor={"#000000"} 
-                level="L" 
-                includeMargin={true} 
+              <QRCodeSVG
+                id={highResQrId}
+                value={url}
+                size={1024}
+                bgColor={"#ffffff"}
+                fgColor={"#000000"}
+                level="L"
+                includeMargin={true}
               />
             </div>
           </div>
           <div className={styles.qrActionsColumn}>
-            <button 
-              className={styles.qrActionButton} 
-              onClick={() => this.copyQRImage(highResQrId, copyKeyImg)} 
+            <button
+              className={styles.qrActionButton}
+              onClick={() => this.copyQRImage(highResQrId, copyKeyImg)}
               title="Copy QR Image to Clipboard"
             >
               <FontAwesomeIcon icon={copiedLinkIndex === copyKeyImg ? faCheck : faClipboard} />
             </button>
-            <button 
-              className={styles.qrActionButton} 
-              onClick={() => this.downloadQR(highResQrId, `ContextEngine_Sbt_${sbtAddress}_${fileSuffix}.png`)} 
+            <button
+              className={styles.qrActionButton}
+              onClick={() => this.downloadQR(highResQrId, `ContextEngine_Sbt_${sbtAddress}_${fileSuffix}.png`)}
               title="Download QR Code"
             >
               <FontAwesomeIcon icon={faDownload} />
@@ -3898,6 +4045,8 @@ class CreateSBTGroup extends Component {
       documentUrl,
       showTagsInput,
       imageLoadError,
+      imageChooserStatusText,
+      imageChooserStatusTone,
       documentURLs,
       startedMinting,
       groupPassword,
@@ -3955,11 +4104,23 @@ class CreateSBTGroup extends Component {
     const docsSelectedGateIds = this.normalizeSelectedGateIds(normalizedMetadataLocks.documentURLs, validGateIds);
     const imageSelectedGateIds = this.normalizeSelectedGateIds(normalizedMetadataLocks.image, validGateIds);
     const trimmedImageUrl = String(sbtImageUrl || '').trim();
-    const imagePreviewSrc = sbtImageFile && !imageLoadError ? URL.createObjectURL(sbtImageFile) : '';
-    const hasImagePreview = !!imagePreviewSrc;
+    const hasImagePreview = !!(sbtImageFile && !imageLoadError);
     const hasPendingImagePreview = useImageUrl && trimmedImageUrl.length > 0 && !hasImagePreview && !imageLoadError;
-    const showImageResetControl = hasImagePreview || trimmedImageUrl.length > 0 || imageLoadError;
     const showImagePreviewError = useImageUrl && trimmedImageUrl.length > 0 && imageLoadError;
+    const effectiveImageStatusText = imageChooserStatusText || (
+      hasPendingImagePreview
+        ? 'Loading preview...'
+        : showImagePreviewError
+          ? 'Image preview unavailable.'
+          : ''
+    );
+    const effectiveImageStatusTone = imageChooserStatusText
+      ? imageChooserStatusTone
+      : hasPendingImagePreview
+        ? 'loading'
+        : showImagePreviewError
+          ? 'error'
+          : 'default';
     const renderFieldLock = (lockKey, fieldKey, selectedGateIds) => (
       <GateMultiSelectLock
         gateOptions={gateOptions}
@@ -3981,11 +4142,12 @@ class CreateSBTGroup extends Component {
     );
 
     // Calculate dirty state for "Clear" button visibility
-    const isDirty = 
+    const isDirty =
       (sbtName && sbtName.trim().length > 0) ||
       (sbtDescription && sbtDescription.trim().length > 0) ||
       sbtImageFile ||
       (sbtImageUrl && sbtImageUrl.trim().length > 0) ||
+      this.getNormalizedDocumentUrlDraft(documentUrl).length > 0 ||
       documentURLs.length > 0 ||
       nameSelectedGateIds.length > 0 ||
       descriptionSelectedGateIds.length > 0 ||
@@ -4012,7 +4174,7 @@ class CreateSBTGroup extends Component {
               Learn More
             </a>
           </CETooltip>
-          
+
           {isDirty && !sbtMinted && (
              <button onClick={this.resetForm} className={styles.clearFormButton} title="Clear all fields and reset to defaults">
                <FontAwesomeIcon icon={faEraser} /> Clear
@@ -4087,94 +4249,33 @@ class CreateSBTGroup extends Component {
                         {renderFieldLock('image', 'image', imageSelectedGateIds)}
                       </div>
                     </div>
-                    <div className={styles.imageUploadBody}>
-                      <div className={styles.imageUploadControls}>
-                        <div className={styles.compactImageModeRow}>
-                          <button
-                            type="button"
-                            className={`${styles.compactImageModeButton} ${useImageUrl ? styles.compactImageModeButtonActive : ''}`}
-                            onClick={() => this.setImageUploadMethod(true)}
-                            aria-pressed={useImageUrl}
-                          >
-                            URL
-                          </button>
-                          <button
-                            type="button"
-                            className={`${styles.compactImageUploadButton} ${!useImageUrl ? styles.compactImageModeButtonActive : ''}`}
-                            onClick={this.openImageUploadPicker}
-                            aria-label="Upload image"
-                            title="Upload image"
-                          >
-                            <FontAwesomeIcon icon={faUpload} />
-                          </button>
-                          <input
-                            type="file"
-                            accept="image/*"
-                            onChange={this.handleImageUpload}
-                            style={{ display: 'none' }}
-                            ref={(fileInput) => (this.fileInput = fileInput)}
-                            data-testid={E2E_TESTIDS.SBT_CREATE_IMAGE_FILE_INPUT}
-                          />
-                          {!useImageUrl && sbtImageFile && (
-                            <span className={styles.selectedFile}>
-                              {sbtImageFile.name}
-                            </span>
-                          )}
-                        </div>
-
-                        {useImageUrl && (
-                          <div className={styles.fileUploadContainer}>
-                            <input
-                              type="text"
-                              name="sbtImageUrl"
-                              value={sbtImageUrl}
-                              onChange={this.handleInputChange}
-                              placeholder="Paste image URL"
-                              aria-label="Image URL"
-                              data-testid={E2E_TESTIDS.SBT_CREATE_IMAGE_URL_INPUT}
-                            />
-                          </div>
-                        )}
-
-                        {hasPendingImagePreview && (
-                          <div className={styles.imageUploadStatusText}>
-                            <FontAwesomeIcon icon={faSpinner} spin />
-                            <span>Loading preview...</span>
-                          </div>
-                        )}
-
-                        {showImagePreviewError && (
-                          <div className={styles.imageUploadErrorText}>
-                            <FontAwesomeIcon icon={faExclamationCircle} />
-                            <span>Image preview unavailable.</span>
-                          </div>
-                        )}
-
-                        {imageSelectedGateIds.length > 0 && (
-                          <div className={`${styles.fieldHelpText} ${styles.compactImageHelpText}`}>
-                            URL mode encrypts the image URL. Upload mode encrypts the image bytes into a Lit-Arweave asset.
-                          </div>
-                        )}
-                        {hasImagePreview && (
-                          <div
-                            className={`${styles.imagePreviewSurface} ${styles.imagePreviewSurfaceCompact} ${styles.imagePreviewSurfaceFilled}`}
-                          >
-                            <img src={imagePreviewSrc} alt="SBT artwork preview" />
-                            {showImageResetControl && (
-                              <button
-                                type="button"
-                                onClick={this.resetImage}
-                                className={styles.imagePreviewClearButton}
-                                aria-label="Remove image"
-                                title="Remove image"
-                              >
-                                <FontAwesomeIcon icon={faTimes} />
-                              </button>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
+                    <CompactImageChooser
+                      isUrlMode={useImageUrl}
+                      isUploadMode={!useImageUrl}
+                      showUrlInput={useImageUrl}
+                      urlValue={sbtImageUrl}
+                      urlInputName="sbtImageUrl"
+                      onUrlChange={this.handleInputChange}
+                      onToggleUrlMode={() => this.setImageUploadMethod(true)}
+                      onPaste={this.handlePasteImage}
+                      onUploadClick={this.openImageUploadPicker}
+                      onFileChange={this.handleImageUpload}
+                      fileInputRef={(fileInput) => { this.fileInput = fileInput; }}
+                      fileInputTestId={E2E_TESTIDS.SBT_CREATE_IMAGE_FILE_INPUT}
+                      pasteButtonTestId={E2E_TESTIDS.SBT_CREATE_IMAGE_PASTE}
+                      urlInputTestId={E2E_TESTIDS.SBT_CREATE_IMAGE_URL_INPUT}
+                      urlPlaceholder="Paste image URL"
+                      urlInputAriaLabel="Image URL"
+                      selectedFileLabel={!useImageUrl && sbtImageFile ? sbtImageFile.name : ''}
+                      previewFile={hasImagePreview ? sbtImageFile : null}
+                      previewAlt="SBT artwork preview"
+                      onClear={this.resetImage}
+                      statusText={effectiveImageStatusText}
+                      statusTone={effectiveImageStatusTone}
+                      helpText={imageSelectedGateIds.length > 0
+                        ? 'URL mode encrypts the image URL. Upload mode encrypts the image bytes into a Lit-Arweave asset.'
+                        : ''}
+                    />
                   </div>
                 </div>
               </div>
@@ -4270,7 +4371,7 @@ class CreateSBTGroup extends Component {
           {this.renderCollapsibleHeader(`${t('mint')} Options`, 'mintOptionsCollapsed')}
           {!mintOptionsCollapsed && (
             <div className={styles.sbtTokenOptions}>
-              
+
               {/* Top Row: Limited & Time-Limited Cards */}
               <div className={styles.optionsGrid}>
                 {/* 1. Limited Tokens Card */}
@@ -4288,7 +4389,7 @@ class CreateSBTGroup extends Component {
                       {`Specify the maximum number of ${t('sbts')} that can be ${t('mintedLower')}.`}
                     </CETooltip>
                   </label>
-                  
+
                   {sbtDistribution.isLimited && (
                     <div className={styles.optionBody}>
                       <input
@@ -4321,7 +4422,7 @@ class CreateSBTGroup extends Component {
 
                   {sbtDistribution.isTimeLimited && (
                     <div className={styles.timeLimitedOptions}>
-                      <DatePicker
+                      <CEDateTimeInput
                         selected={sbtDistribution.mintingEndTime}
                         onChange={this.handleMintingEndTimeChange}
                         showTimeSelect
@@ -4435,7 +4536,7 @@ class CreateSBTGroup extends Component {
                       </span>
                     </span>
                     <CETooltip placement="right" target="create2SaltTooltip" className={styles.tooltipBubble}>
-                      {`Use deterministic deployment so the ${t('sbt')} address is known before on-chain creation. Session drafts keep this on automatically.`}
+                      {`Use deterministic deployment so the ${t('sbt')} address is known before on-chain creation.`}
                     </CETooltip>
                   </label>
                   {predictableAddressActive && (
@@ -4551,10 +4652,10 @@ class CreateSBTGroup extends Component {
              createActionLabel}
             {mintingFailed && currentStep > 0 && <FontAwesomeIcon icon={faExclamationCircle} style={{ marginLeft: '10px', color: 'red' }} />}
           </button>
-          
+
           {sbtMinted && (
-             <button 
-               onClick={this.resetForm} 
+             <button
+               onClick={this.resetForm}
                className={styles.startFreshBtn}
                title="Reset form to start fresh"
              >
@@ -4689,7 +4790,7 @@ class CreateSBTGroup extends Component {
                 includeMargin={true}
               />
             </div>
-            
+
             {/* Visual QR Blocks: "Auto-Join" only. "Page Link" block is removed. */}
             {openMintAutoJoinUrl && (
                 <>

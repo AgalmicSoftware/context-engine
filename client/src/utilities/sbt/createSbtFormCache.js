@@ -79,6 +79,7 @@ export const hasMeaningfulCreateSbtFormPayload = (parsed) => {
     hasNonEmptyText(parsed.sbtImageUrl) ||
     hasNonEmptyText(parsed._imageDataUrl) ||
     hasTagDraft(parsed.tags) ||
+    hasNonEmptyText(parsed.documentUrl) ||
     hasNonEmptyList(parsed.documentURLs) ||
     hasNonEmptyText(parsed.documentIDHashes) ||
     hasNonEmptyText(parsed.groupPassword) ||

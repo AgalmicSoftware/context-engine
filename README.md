@@ -3,13 +3,13 @@
 ![License: CPAL-1.0](https://img.shields.io/badge/License-CPAL--1.0-blue.svg)
 
 <p align="center">
-  <img src="docs/assets/readme-header.png" alt="Context Engine interface showing a survey card with Agree, Unsure, and Disagree options." />
+  <img src="client/src/assets/img/readme-header.png" alt="Context Engine interface showing a survey card with Agree, Unsure, and Disagree options." />
 </p>
 
 **Live demo:** [contextengine.xyz](https://contextengine.xyz)
 
 
-Context Engine is a toolkit for AI-enhanced deliberation and sensemaking in large groups. It supports public and private questions and responses, AI-assisted input and analysis, permanent records, and cryptographic access control. It allows for no-code deployment of [SBT Groups](https://www.radicalxchange.org/wiki/social-identity/). Designed for use cases such as public discourse, organizational decision-making, and preference-related dataset creation.
+Context Engine is a toolkit for AI-enhanced deliberation and sensemaking in large groups. It supports public and private questions and responses, AI-assisted input and analysis, permanent records, and cryptographic access control. It allows for no-code deployment of [Soulbound Tokens for Groups](https://www.radicalxchange.org/wiki/social-identity/). Designed for use cases such as public discourse, organizational decision-making, and preference-related dataset creation.
 
 
 
@@ -20,6 +20,9 @@ Context Engine is a toolkit for AI-enhanced deliberation and sensemaking in larg
 - Root scripts, worker bundling, and contract tooling: Node.js 20+
 - Client workflows: Node.js 16.14.2 and npm 9.2.0
 - Foundry (`forge` / `anvil`) for local-chain and root contract test workflows
+
+For client dependency installs, use `npm i --force` for now until the current
+install conflict is fixed.
 
 ### Clone and Install
 
@@ -32,7 +35,7 @@ npm install
 
 cd client
 nvm use 16
-npm install
+npm i --force
 npm run dev
 ```
 
@@ -49,20 +52,20 @@ For testing, run modes, and deeper setup:
 - Multiple question types: freeform, multiple choice, binary, and rating scales
 - Optional encryption responses and results
 - Decentralized and permanent storage of responses
-- Statistical analysis and visualization
-- Export results as `.json` and `.csv`
+- Statistical / AI analysis and visualization of results
+- Export results as `.json`, `.csv`, `.pdf`
 
 ### SBT-Gated Groups
 - No-code creation of Soulbound tokens ([SBTs](https://www.radicalxchange.org/wiki/social-identity/)) for groups
-- Public minting, password-protected minting, and auto-claim URLs
-- Role-based burn authorization
-- Session and resource gating based on SBT ownership
+- Public minting, password-protected minting, time-limited minting, limited-number minting, and auto-claim URLs
+- Role-based burn authorization (admin, minter, both, neither)
+- Session and resource gating based on SBT ownership (encrypted titles, information, docURLs, tags)
 
 ### AI-Assisted Tooling
-- Voice-to-text 
-- Question generation from URL or text input
+- Voice-to-text input
+- Question generation from file, URL, or text input
 - Summaries and analysis of survey results and response clusters
-- OpenAI, Anthropic, OpenRouter, and custom provider paths 
+- OpenAI, Anthropic, OpenRouter, and custom provider paths
 
 
 ## AI Discourse Corpus

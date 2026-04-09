@@ -20,7 +20,7 @@ const QUICK_CHIP_GATE_COLORS = ['#5affc2', '#5b8cff', '#ffb347', '#ff6bcb', '#ff
 
 /**
  * Helper to unify an aggregator or a question array with all known questions from questionsCache,
- * so zero-response or standalone questions won't get dropped. 
+ * so zero-response or standalone questions won't get dropped.
  * The logic is used when mode indicates question-based filtering.
  */
 const readQuestionsCacheBySlug = (slug) => peekCacheSync('questionsCache', slug || '', { clone: false }) || {};
@@ -1592,7 +1592,7 @@ class SBTFilter extends React.Component {
         this.setFilterLoading(false);
       }
     }
-  };  
+  };
 
   // Handlers for adding/removing SBT “include” or “exclude”
   handleAddSBTIncludeCreator = (sbtObject) => {
@@ -1805,7 +1805,7 @@ class SBTFilter extends React.Component {
               this.props.buttonSurface === 'light' ? styles.filterButtonOnLight : undefined
             }
           >
-            {buttonText} <FontAwesomeIcon icon={faFilter} id={styles.filterButtonIcon} /> 
+            {buttonText} <FontAwesomeIcon icon={faFilter} id={styles.filterButtonIcon} />
           </Button>
         )}
 

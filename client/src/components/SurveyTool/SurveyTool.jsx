@@ -51,7 +51,7 @@ import contractScripts, {
   getSessionSlugByName
 } from '../../utilities/web3/contractScripts.js';
 import { ethers, utils } from 'ethers';
-import Slider from 'react-rangeslider';
+import CESlider from '../Shared/CESlider';
 import proposalScripts from 'utilities/proposalScripts.js';
 import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 import { serializeFilterState, deserializeFilterState } from '../../utilities/survey/filterStateUtils.js';
@@ -395,14 +395,14 @@ class SurveyTool extends Component {
       latestBlockNumber: 0,
       events: [],
       showResultsModal: this.props.autoOpenResults || false,
-      pubKey: '', 
+      pubKey: '',
       questionsCacheNonce: 0,
       loading: false,
       hydratedFilterState: urlFilterState, // Store the consumed state
     };
 
     this.surveyQuestionsRef = React.createRef();
-    
+
     // updateCache (group-aware; per-group surveysCache; numeric to string migration)
     this.updateCache = (updater, cb) => {
       if (typeof updater !== 'function') {
@@ -594,7 +594,7 @@ class SurveyTool extends Component {
     if (this.props.singleQuestionMode) {
       return null;
     }
-    
+
     // 1. Resolve Context
     // MainSite has already done the heavy lifting. We trust the resolved session slug
     // (via resolveEffectiveSlug) is the correct context for this surveyID.
@@ -634,7 +634,7 @@ class SurveyTool extends Component {
       surveyLog.log(`[SurveyTool] Cache miss. Fetching from chain for ${effectiveSlug}...`);
       try {
           surveyData = await contractScripts.getSurveyDataById(resolvedProps.provider, loweredSurveyID, effectiveSlug);
-          
+
           if (surveyData) {
             // Normalize
             surveyData.surveyID = loweredSurveyID;
@@ -646,7 +646,7 @@ class SurveyTool extends Component {
             const cacheToUpdate = ensureSurveysNet(await readSurveysCacheAsync(effectiveSlug), netIdStr);
             if (!cacheToUpdate[netIdStr]) cacheToUpdate[netIdStr] = { surveys: {}, surveysLatestBlock: 0, surveyResponses: {} };
             if (!cacheToUpdate[netIdStr].surveys) cacheToUpdate[netIdStr].surveys = {};
-            
+
             cacheToUpdate[netIdStr].surveys[loweredSurveyID] = surveyData;
             await writeSurveysCache(effectiveSlug, cacheToUpdate);
           }
@@ -769,7 +769,7 @@ class SurveyTool extends Component {
     if (!questionsCache[netIdStr].questions[qIdLower]) {
       // Not in cache, determine where to fetch from
       let fetchSlug = currentSlug;
-      
+
       // 1. Prefer explicit session name if provided
       const sessionNameHint = ctx.sessionName;
       if (sessionNameHint) {
@@ -777,8 +777,8 @@ class SurveyTool extends Component {
         if (mapped !== null) fetchSlug = mapped;
       } else {
         // 2. Resolve based on ID/context
-        fetchSlug = resolveSlugForIds({ 
-           questionId: qIdLower, 
+        fetchSlug = resolveSlugForIds({
+           questionId: qIdLower,
            props: resolvedProps,
            network: resolvedProps.network
         });
@@ -823,7 +823,7 @@ class SurveyTool extends Component {
         questionData.id = qIdLower; // Ensure id is lowercase
         if (!questionData.creator) questionData.creator = ""; // Ensure creator string exists
         if (!questionData.tags) questionData.tags = []; // Ensure tags array exists
-        
+
         // Write to the CURRENT effective cache so SurveySelector sees it loaded.
         // Use an atomic merge because direct /survey/:id loads fetch many question ids in parallel.
         const persistedCache = await updateCacheAtomic('questionsCache', currentSlug, (current) => {
@@ -836,7 +836,7 @@ class SurveyTool extends Component {
         });
         const persisted = !!persistedCache;
         surveyLog.log(`SurveyTool: Question ${qIdLower} fetched and cached in ${currentSlug}.`);
-        
+
         // cacheHasLoaded is owned by MainSite persistent-state verification.
         if (!persisted) {
           surveyLog.warn('SurveyTool: question cache persist failed while ensuring question cached', {
@@ -2083,10 +2083,10 @@ export class SurveyQuestions extends Component {
               submissionComplete: false,
               submittedSinceLastEdit: updateSubmittedSinceLastEdit(this.state.submittedSinceLastEdit, 'reset'),
             });
-            
+
             // 1. Apply Draft (Anon answers) onto Empty
-            this.rehydrateDraftForRenderedIds(); 
-            
+            this.rehydrateDraftForRenderedIds();
+
             // 2. Fetch Chain (Merges Chain into Draft)
             const pendingBootstrapRetryAttempt = this.props.singleQuestionMode
               ? this.getPendingSingleQuestionBootstrapRetryAttempt(this.props.questionID)
@@ -2302,7 +2302,7 @@ export class SurveyQuestions extends Component {
               submissionComplete: false,
               submittedSinceLastEdit: updateSubmittedSinceLastEdit(this.state.submittedSinceLastEdit, 'reset'),
             });
-            // Standalone mode typically relies on local cache or props, 
+            // Standalone mode typically relies on local cache or props,
             // but we should also rerun cache/prior-response hydration when auth becomes ready.
             this.rehydrateDraftForRenderedIds();
             this.rehydrateLocalCacheAnswersForRenderedIds();
@@ -2978,8 +2978,7 @@ export class SurveyQuestions extends Component {
     this.persistDraftSafely && this.persistDraftSafely(0);
   };
 
-  // react-rangeslider only fires onChangeComplete for pointer/touch interaction.
-  // Keyboard changes need to persist during onChange to avoid losing draft edits.
+  // Keyboard changes persist during onChange so draft edits are not lost.
   getSliderPersistOptions = (event) => ({
     persistDraft: event?.type === 'keydown',
   });
@@ -3015,7 +3014,7 @@ export class SurveyQuestions extends Component {
       {({ value, sliderProps }) => (
         <>
           <div className={styles.importanceSlider}>
-            <Slider {...sliderProps} />
+            <CESlider {...sliderProps} />
           </div>
           <FormText className={styles.ratingLabelText}>
             {value}
@@ -3058,24 +3057,27 @@ export class SurveyQuestions extends Component {
             sliderMode === 'conviction' ? value : convictionValue,
             sliderMode === 'importance' ? value : importanceValue
           )}
-          <Slider {...sliderProps} />
+          <CESlider
+            {...sliderProps}
+            className={[sliderProps.className, styles.convictionSlider].filter(Boolean).join(' ')}
+          />
         </>
       )}
     </DeferredCommitSlider>
   );
 
 /**
-   * Checks if the incoming 'latest' data from chain/cache matches the 
+   * Checks if the incoming 'latest' data from chain/cache matches the
    * current 'editBaseline' (what we just submitted).
    * used to determine if we can safely turn off 'submissionComplete' flag.
    */
   areResponsesConsistent = (latest, surveyIndex) => {
     if (!latest || !this.state.editBaseline) return false;
-    
+
     // We only care about the rendered questions
     const renderedIds = this.getCurrentRenderedQuestionIds();
     const baseline = this.state.editBaseline;
-    
+
     // Convert latest (server format) to a slice-like structure for comparison
     // or simply compare values directly using helper
     const latestSlice = this.buildSliceFromUserAnswers(latest);
@@ -3113,12 +3115,12 @@ export class SurveyQuestions extends Component {
           (typeof latestRespObj.convictionEncrypted === 'string' && latestRespObj.convictionEncrypted)
         )
       );
-      
+
       // If baseline has a value, chain MUST have that value (or newer)
       // We use valuesEqual to handle arrays/numbers normalization
       if (!this.valuesEqual(baseAns?.value, chainAns?.value)) return false;
       if (!this.valuesEqual(baseAdd?.value, chainAdd?.value)) return false;
-      
+
       // Check importance equality if it exists in baseline
       if (baseline.importance && Object.prototype.hasOwnProperty.call(baseline.importance, qid)) {
         const baseImp = Number(baseline.importance[qid]);
@@ -3145,7 +3147,7 @@ export class SurveyQuestions extends Component {
         }
       }
     }
-    
+
     return true;
   };
 
@@ -4810,7 +4812,7 @@ export class SurveyQuestions extends Component {
         this.updateJsonPreview && this.updateJsonPreview();
       });
     } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
-  };  
+  };
 
 
   // Reset live form state on account changes (before loading new account data)
@@ -5011,7 +5013,7 @@ export class SurveyQuestions extends Component {
     } catch (e) {
       surveyLog.warn('[SurveyQuestions] handleRevertPendingChanges failed:', e);
     }
-  };  
+  };
 
 
   // Build baseline/live slice from server response.
@@ -6031,7 +6033,7 @@ export class SurveyQuestions extends Component {
             surveyData.questionIDs = [];
           surveyData.surveyID = surveyIdLower;
           surveyData.id       = surveyIdLower;
-          
+
           let currentGlobalSurveysCache = readSurveysCache(effectiveSlug);
           if (!currentGlobalSurveysCache || typeof currentGlobalSurveysCache !== 'object') {
             currentGlobalSurveysCache = {};
@@ -7283,7 +7285,7 @@ export class SurveyQuestions extends Component {
                   const hasEncrypted =
                     !!latest.answer?.encryptedPortion || !!latest.additional?.encryptedPortion ||
                     !!latest.answer?.encrypted || !!latest.additional?.encrypted;
-                  
+
                   safeSetState({
                     userHasResponse: true,
                     userResponseEncrypted: !!hasEncrypted,
@@ -7294,7 +7296,7 @@ export class SurveyQuestions extends Component {
                } else {
                   surveyLog.log("Result: Stale. Chain data stale. Staying optimistic.");
                }
-            } 
+            }
             // Normal Path
             else if (latest && !this.state.startFresh && !this.state.suppressPrefill) {
               const hasEncrypted =
@@ -8218,7 +8220,7 @@ export class SurveyQuestions extends Component {
         let nextBaseline = prevState.editBaseline
             ? this.deepClone(prevState.editBaseline)
             : this.deepClone(baselineSlice || { answers: {}, importance: {}, conviction: {}, additionalComments: {} });
-        
+
         // Ensure structure
         if (!nextBaseline.answers) nextBaseline.answers = {};
         if (!nextBaseline.additionalComments) nextBaseline.additionalComments = {};
@@ -8752,7 +8754,7 @@ export class SurveyQuestions extends Component {
     }
   };
 
-  
+
   prepareJsonAndHash = (surveyIndex, responderAddress, overrideState = null) => {
     surveyIndex = this.props.isStandalone || this.props.singleQuestionMode ? 0 : surveyIndex;
 
@@ -9056,7 +9058,7 @@ export class SurveyQuestions extends Component {
             }
             return rawResponse;
         }
-        
+
         if (rawResponse && Array.isArray(rawResponse.responses)) {
             const baseConviction = getConvictionFromResponse(rawResponse);
             const baseImportance = getImportanceFromResponse(rawResponse);
@@ -9076,7 +9078,7 @@ export class SurveyQuestions extends Component {
             }
             return processed;
         }
-        
+
         return rawResponse;
     }
 
@@ -9098,7 +9100,7 @@ export class SurveyQuestions extends Component {
 
     if (Array.isArray(surveyDetails.questionIDs) && Array.isArray(this.state.questionPool)) {
         const questionMap = new Map(this.state.questionPool.map(q => [q.id.toLowerCase(), q]));
-        
+
         surveyDetails.questions = surveyDetails.questionIDs.map(id => {
             const questionData = questionMap.get(id.toLowerCase());
             return questionData || { id: id, error: "Question details not found in pool" };
@@ -9641,11 +9643,12 @@ export class SurveyQuestions extends Component {
                     : (
                       <>
                         {this.renderConvictionImportanceLabel(question.id, convictionValue, importanceValue)}
-                        <Slider
+                        <CESlider
                           min={0}
                           max={10}
                           step={1}
                           value={activeSliderValue}
+                          className={styles.convictionSlider}
                           tooltip={false}
                           onChange={(value, event) =>
                             this.handleConvictionImportanceChange(
@@ -9779,7 +9782,7 @@ export class SurveyQuestions extends Component {
               : (
                 <>
                   <div className={styles.importanceSlider}>
-                    <Slider
+                    <CESlider
                       min={RATING_MIN}
                       max={RATING_MAX}
                       step={1}
@@ -9880,11 +9883,12 @@ export class SurveyQuestions extends Component {
                     : (
                       <>
                         {this.renderConvictionImportanceLabel(question.id, convictionValue, importanceValue)}
-                        <Slider
+                        <CESlider
                           min={0}
                           max={10}
                           step={1}
                           value={activeSliderValue}
+                          className={styles.convictionSlider}
                           tooltip={false}
                           onChange={(value, event) =>
                             this.handleConvictionImportanceChange(
@@ -9920,9 +9924,9 @@ export class SurveyQuestions extends Component {
                 {/* Manual decrypt chip hidden when auto-decrypt is enabled */}
                 {!this.state.autoDecryptEnabled && (
                   <div className={styles.decryptChip}>
-                    <Button 
-                      onClick={() => this.handleDecryptQuestionAnswer(question.id, 'additional')} 
-                      id={styles.decryptQuestionButton} 
+                    <Button
+                      onClick={() => this.handleDecryptQuestionAnswer(question.id, 'additional')}
+                      id={styles.decryptQuestionButton}
                       disabled={this.state.isDecrypting || !allowDecryptAdditional}
                       title={!allowDecryptAdditional ? decryptTooltip : undefined}
                     >
@@ -9992,7 +9996,7 @@ export class SurveyQuestions extends Component {
               : (
                 <>
                   <div className={styles.importanceSlider}>
-                    <Slider
+                    <CESlider
                       min={RATING_MIN}
                       max={RATING_MAX}
                       step={1}
@@ -10093,11 +10097,12 @@ export class SurveyQuestions extends Component {
                     : (
                       <>
                         {this.renderConvictionImportanceLabel(question.id, convictionValue, importanceValue)}
-                        <Slider
+                        <CESlider
                           min={0}
                           max={10}
                           step={1}
                           value={activeSliderValue}
+                          className={styles.convictionSlider}
                           tooltip={false}
                           onChange={(value, event) =>
                             this.handleConvictionImportanceChange(
@@ -11767,9 +11772,9 @@ export class SurveyQuestions extends Component {
       }
 
       this.setState({ currentStep: 2 });
-      
+
       // Await the receipt to ensure transaction is confirmed before optimistic update
-      const receipt = await this.submitSurveyResponse(); 
+      const receipt = await this.submitSurveyResponse();
       surveyLog.log("Submission receipt received", receipt?.blockNumber || 'unknown block');
 
       // Success path
@@ -11782,8 +11787,8 @@ export class SurveyQuestions extends Component {
 
       // 2. Clear drafts for changed QIDs
       surveyLog.log("Clearing drafts for QIDs:", Array.from(changedQids));
-      try { 
-        Array.from(changedQids).forEach((qid) => this.clearDraftFor && this.clearDraftFor(String(qid))); 
+      try {
+        Array.from(changedQids).forEach((qid) => this.clearDraftFor && this.clearDraftFor(String(qid)));
       } catch (_) {
         if (this.props.singleQuestionMode && this.props.questionID) {
           this.clearDraftFor(this.props.questionID.toLowerCase());
@@ -11820,7 +11825,7 @@ export class SurveyQuestions extends Component {
 
       // 4. UPDATE BASELINE & OPTIMISTIC STATE
       surveyLog.log("Setting new Baseline");
-      
+
       // Ensure surveysResponseState and editBaseline are mathematically identical
       // We clone activeSlice (which holds the final encrypted/plaintext state)
       const finalSlice = this.deepClone(activeSlice);
@@ -11831,7 +11836,7 @@ export class SurveyQuestions extends Component {
       nextSurveysResponseState[surveyIndex] = finalSlice;
 
       const optimisticUserAnswers = this.prepareJsonAndHash(surveyIndex);
-      
+
       // Check encryption status from the new baseline
       const hasEncrypted = Object.values(nextBaseline.answers || {}).some(a => !!a.encrypted) ||
                            Object.values(nextBaseline.additionalComments || {}).some(a => !!a.encrypted);
@@ -11847,11 +11852,11 @@ export class SurveyQuestions extends Component {
         currentStep: 3,
         suppressPrefill: false,
         responseUrl,
-        
+
         // Force UI state and baseline to match exactly
         surveysResponseState: nextSurveysResponseState,
-        editBaseline: nextBaseline, 
-        
+        editBaseline: nextBaseline,
+
         userAnswers: optimisticUserAnswers,
         userHasResponse: true,
         userResponseEncrypted: hasEncrypted,
@@ -11897,12 +11902,12 @@ export class SurveyQuestions extends Component {
     } catch (error) {
       surveyLog.error('Failed to submit survey:', error);
       this._submitGuard = false;
-      this.setState({ 
-        isSubmitting: false, 
-        submitProgress: 0, 
-        submissionComplete: false, 
+      this.setState({
+        isSubmitting: false,
+        submitProgress: 0,
+        submissionComplete: false,
         submittedSinceLastEdit: updateSubmittedSinceLastEdit(this.state.submittedSinceLastEdit, 'submit_error'),
-        submissionError: error.message || 'Submission failed.' 
+        submissionError: error.message || 'Submission failed.'
       });
     }
   };
@@ -12439,7 +12444,7 @@ export class SurveyQuestions extends Component {
     }
 
     throw new Error('No transaction was sent.');
-  };  
+  };
 
   writeSubmittedResponsesToLocalCaches = async ({
     receipt = null,
@@ -12686,7 +12691,7 @@ export class SurveyQuestions extends Component {
             return this.renderQuestionAnswer(question, response, index, isOwnResponse);
           } else {
             surveyLog.warn(`Question not found in pool for response ID: ${response.questionID}`);
-             return null; 
+             return null;
           }
         })}
       </>
@@ -13357,7 +13362,8 @@ class PileViewMode extends SurveyQuestions {
     this._loadAndSortDebounceTimer = null;
     this._lastLoadAndSortResultSignature = '';
     this._lastInitializeResponseSig = '';
-    
+    this._lastNotifiedPileSubmitRailVisible = null;
+
     // Ref for auto-scrolling to Create section
     this.createSectionRef = React.createRef();
   }
@@ -13823,6 +13829,7 @@ class PileViewMode extends SurveyQuestions {
     this.syncCurrentPileQuestionsSignature(this.state.pileQuestions);
     this.loadAndSortQuestions();
     this.syncLoadingElapsedTimer();
+    this.notifyPileSubmitRailVisibility();
     // Start long-loading timer
     this.loadingTimeout = setTimeout(() => {
       if (this.state.loading || !this.props.isQuestionCacheReady) {
@@ -13844,6 +13851,7 @@ class PileViewMode extends SurveyQuestions {
     const pendingStats = diffInputsChanged
       ? ((typeof this.getPendingEditStats === 'function' && this.getPendingEditStats()) || this.getPendingStatsSnapshot())
       : this.getPendingStatsSnapshot();
+    this.notifyPileSubmitRailVisibility();
     this.emitPendingStats(pendingStats);
     if (diffInputsChanged) {
       this.recalculateEditStats && this.recalculateEditStats(pendingStats);
@@ -13870,9 +13878,9 @@ class PileViewMode extends SurveyQuestions {
       // If context changes, we must reset optimistic flags and reload immediately
       // We do this regardless of edits because the context (wallet/chain) invalidates the current session
       this.setState(
-        { 
-          loading: true, 
-          pileQuestions: [], 
+        {
+          loading: true,
+          pileQuestions: [],
           activePileIndex: 0,
           submissionComplete: false, // Reset on context change
           submittedSinceLastEdit: updateSubmittedSinceLastEdit(this.state.submittedSinceLastEdit, 'reset'),
@@ -13888,7 +13896,7 @@ class PileViewMode extends SurveyQuestions {
             this.loadAndSortQuestions();
         }
       );
-      
+
       // Always reset auto-decrypt on context change
       this._autoDecQueue = [];
       this._autoDecProcessing = false;
@@ -13902,11 +13910,11 @@ class PileViewMode extends SurveyQuestions {
     }
 
     // 2. Handle Cache Updates
-    const cacheReadyTick = 
+    const cacheReadyTick =
       (prevProps.isQuestionCacheReady !== this.props.isQuestionCacheReady && this.props.isQuestionCacheReady) ||
       (prevProps.isResponsesCacheReady !== this.props.isResponsesCacheReady && this.props.isResponsesCacheReady);
     const cacheJustBecameReady = !prevProps.isResponsesCacheReady && this.props.isResponsesCacheReady;
-    
+
     const nonceTick = prevProps.questionsCacheNonce !== this.props.questionsCacheNonce;
     const responseNonceTick =
       prevProps.questionResponsesNonce !== this.props.questionResponsesNonce;
@@ -13999,6 +14007,11 @@ class PileViewMode extends SurveyQuestions {
 
 
   componentWillUnmount() {
+    try {
+      if (typeof this.props.onPileSubmitRailVisibilityChange === 'function') {
+        this.props.onPileSubmitRailVisibilityChange(false);
+      }
+    } catch (e) { surveyLog.warn('SurveyTool: callback', e); }
     if (this._pileSubmitTimer) {
       clearTimeout(this._pileSubmitTimer);
       this._pileSubmitTimer = null;
@@ -14177,7 +14190,7 @@ class PileViewMode extends SurveyQuestions {
     for (const qid of renderedIds) {
       const qidLower = (qid || '').toLowerCase();
       const raw = qRespMap[qidLower]?.[acctLower];
-      
+
       // Parse cache entry
       let cacheEntry = null;
       try { cacheEntry = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch { cacheEntry = null; }
@@ -14203,8 +14216,8 @@ class PileViewMode extends SurveyQuestions {
          const cacheVal = cacheEntry?.answer?.value;
          // Use parent's valuesEqual for robust comparison (arrays, numbers)
          if (!this.valuesEqual(baseAns.value, cacheVal)) {
-           isConsistent = false; 
-           break; 
+           isConsistent = false;
+           break;
          }
       }
 
@@ -15125,7 +15138,7 @@ class PileViewMode extends SurveyQuestions {
           try { this.props.onFilterChange(this.state.filterState); } catch (e) { surveyLog.warn('SurveyTool: callback', e); }
         }
         // Ensure state is initialized and hydrated for the new set of filtered questions.
-        // This ensures 'editBaseline' is established (preventing ghost counts) 
+        // This ensures 'editBaseline' is established (preventing ghost counts)
         // and answers are prefilled (fixing the "does not prefill" issue).
         this.initializeResponseState(() => {
             this.rehydrateLocalCacheAnswersForRenderedIds(() => {
@@ -15147,6 +15160,27 @@ class PileViewMode extends SurveyQuestions {
     });
   };
 
+
+  getIsPileSubmitRailVisible = () => {
+    const pendingStats = this.getPendingStatsSnapshot?.() || { total: 0 };
+    return !!(
+      this.state.isSubmitting ||
+      Number(pendingStats.total || 0) > 0 ||
+      this.state.submittedSinceLastEdit ||
+      this.state.submissionComplete
+    );
+  };
+
+  notifyPileSubmitRailVisibility = () => {
+    const nextVisible = this.getIsPileSubmitRailVisible();
+    if (this._lastNotifiedPileSubmitRailVisible === nextVisible) return;
+    this._lastNotifiedPileSubmitRailVisible = nextVisible;
+    try {
+      if (typeof this.props.onPileSubmitRailVisibilityChange === 'function') {
+        this.props.onPileSubmitRailVisibilityChange(nextVisible);
+      }
+    } catch (e) { surveyLog.warn('SurveyTool: callback', e); }
+  };
 
   renderActiveQuestion = (question) => {
     const { surveysResponseState, showComments, showConviction } = this.state;
@@ -15348,7 +15382,7 @@ class PileViewMode extends SurveyQuestions {
           const ratingValue = getNormalizedUiRatingValue(answer.value);
           questionComponent = (
             <div className={styles.ratingContainer}>
-              <Slider
+              <CESlider
                 min={RATING_MIN}
                 max={RATING_MAX}
                 step={1}
@@ -15414,11 +15448,12 @@ class PileViewMode extends SurveyQuestions {
                 {showConviction[question.id] ? (
                   <>
                     {this.renderConvictionImportanceLabel(question.id, convictionValue, importanceValue)}
-                    <Slider
+                    <CESlider
                       min={0}
                       max={10}
                       step={1}
                       value={activeSliderValue}
+                      className={styles.convictionSlider}
                       tooltip={false}
                       onChange={(value, event) =>
                         this.handleConvictionImportanceChange(
@@ -15673,10 +15708,15 @@ class PileViewMode extends SurveyQuestions {
     const pileSubmitLabel = (this.props.computeSubmitLabel || computeSubmitLabel)(this, {
       pendingStats: _pileStats,
     });
+    const hasPendingPileChanges = _pileStats.total > 0;
     const pileSubmittedStateActive = !!(this.state.submittedSinceLastEdit || this.state.submissionComplete);
-    const finalSubmitText = pileSubmittedStateActive
-      ? 'Submitted'
-      : (this.state.pileSubmitTempText || pileSubmitLabel);
+    const showPileSubmitSuccessBadge = pileSubmittedStateActive && !this.state.isSubmitting;
+    const shouldHidePileSubmitButton = (
+      !hasPendingPileChanges &&
+      !this.state.isSubmitting &&
+      !pileSubmittedStateActive
+    );
+    const finalSubmitText = this.state.pileSubmitTempText || pileSubmitLabel;
 
     const handleSubmitClick = async () => {
       if (!this.props.loginComplete) {
@@ -15703,7 +15743,7 @@ class PileViewMode extends SurveyQuestions {
       await this.encryptAndUpload();
     };
 
-    const accountLower = (this.props.account || '').toLowerCase();
+    const pileTopRailVisible = this.state.isSubmitting || _pileStats.total > 0 || pileSubmittedStateActive;
 
     const activeGreen = '#4cd964';
     const filterButtonStyle = isFilterActive
@@ -15808,22 +15848,46 @@ class PileViewMode extends SurveyQuestions {
       </div>
     );
 
-    const footerControls = (
-      <div className={styles.pileFooter}>
-        <Button
-          onClick={handleSubmitClick}
-          data-testid={E2E_TESTIDS.SURVEY_SUBMIT}
-          className={`${styles.pileSubmitButton}${_pileStats.total > 0 ? ` ${styles.submitGlow}` : ''}${_pileStats.total === 0 ? ` ${styles.pileSubmitButtonInactive}` : ''}`}
-          disabled={this.state.isSubmitting || activePromptMasked}
-        >
-          {this.state.isSubmitting ? (
-            <FontAwesomeIcon icon={faSpinner} spin />
-          ) : (
-            finalSubmitText
-          )}
-        </Button>
+    const pileInteractionUnitClassName = [
+      styles.pileInteractionUnit,
+      pileTopRailVisible ? styles.pileInteractionUnitWithSubmitRail : '',
+    ].filter(Boolean).join(' ');
 
-        {_pileStats.total > 0 && !this.state.isSubmitting && !pileSubmittedStateActive && (
+    const footerControls = (
+      <div className={`${styles.pileFooter}${pileTopRailVisible ? '' : ` ${styles.pileFooterHidden}`}`}>
+        {showPileSubmitSuccessBadge ? (
+          <div
+            className={styles.pileSubmitSuccessBadge}
+            data-testid={E2E_TESTIDS.SURVEY_SUBMITTED_INDICATOR}
+            role="status"
+            aria-label="Submitted"
+            title="Submitted"
+          >
+            <FontAwesomeIcon icon={faCheck} className={styles.pileSubmitSuccessIcon} />
+          </div>
+        ) : (
+          <Button
+            onClick={handleSubmitClick}
+            data-testid={E2E_TESTIDS.SURVEY_SUBMIT}
+            className={`${styles.pileSubmitButton}${hasPendingPileChanges ? ` ${styles.submitGlow}` : ''}${shouldHidePileSubmitButton ? ` ${styles.pileSubmitButtonInactive}` : ''}`}
+            disabled={this.state.isSubmitting || activePromptMasked}
+          >
+            {this.state.isSubmitting ? (
+              <FontAwesomeIcon icon={faSpinner} spin />
+            ) : (
+              <span className={styles.pileSubmitButtonContent}>
+                <span className={styles.pileSubmitButtonLabel}>{finalSubmitText}</span>
+                <span className={styles.pileSubmitButtonTrail} aria-hidden="true">
+                  <FontAwesomeIcon icon={faChevronRight} className={styles.pileSubmitButtonTrailIcon} />
+                  <FontAwesomeIcon icon={faChevronRight} className={styles.pileSubmitButtonTrailIcon} />
+                  <FontAwesomeIcon icon={faChevronRight} className={styles.pileSubmitButtonTrailIcon} />
+                </span>
+              </span>
+            )}
+          </Button>
+        )}
+
+        {hasPendingPileChanges && !this.state.isSubmitting && !pileSubmittedStateActive && (
           <button
             type="button"
             className={styles.pileIconButton}
@@ -15834,23 +15898,13 @@ class PileViewMode extends SurveyQuestions {
             <FontAwesomeIcon icon={faTimes} />
           </button>
         )}
-
-        {pileSubmittedStateActive && accountLower && (
-          <a
-            href={`/u/${accountLower}`}
-            className={styles.pileSubmitLink}
-            title="Open your profile"
-          >
-            <FontAwesomeIcon icon={faCheck} />
-          </a>
-        )}
       </div>
     );
 
     return (
       <div className={styles.pileViewContainer}>
         <div className={styles.pileWrapper}>
-          <div className={styles.pileInteractionUnit}>
+          <div className={pileInteractionUnitClassName}>
             {SHOW_PILE_HOLOGRAM_TOGGLE && (
               <button
                 type="button"
@@ -15993,9 +16047,9 @@ class PileViewMode extends SurveyQuestions {
 
         {!showHologramAssistant && showCreate && (
           <div className={styles.pileFullControls} ref={this.createSectionRef}>
-            <CreateSurvey 
-              {...this.props} 
-              forceQuestionsMode={true}
+            <CreateSurvey
+              {...this.props}
+              hideSurveyQuestionToggleUntilAuthoring={true}
             />
           </div>
         )}

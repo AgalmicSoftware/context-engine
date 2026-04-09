@@ -1,3 +1,5 @@
+import fs from 'fs';
+import path from 'path';
 import React from 'react';
 import { Provider } from 'react-redux';
 import { createStore } from 'redux';
@@ -24,6 +26,7 @@ const renderFooter = () => render(
     <Footer />
   </Provider>
 );
+const footerStylesheet = fs.readFileSync(path.join(__dirname, 'Footer.module.scss'), 'utf8');
 
 describe('Footer', () => {
   it('renders the CPAL attribution text with a separate GitHub icon link', () => {
@@ -42,5 +45,19 @@ describe('Footer', () => {
     expect(githubLink).toHaveAttribute('rel', 'noopener noreferrer');
     expect(screen.queryByTestId('ce-footer-cpal-link')).not.toBeInTheDocument();
     expect(screen.queryByTestId('ce-footer-agalmic-link')).not.toBeInTheDocument();
-  }); 
+  });
+
+  it('centers the footer nav list across the mobile breakpoints', () => {
+    [
+      { minWidth: 0, maxWidth: 319 },
+      { minWidth: 320, maxWidth: 465 },
+      { minWidth: 466, maxWidth: 768 },
+    ].forEach(({ minWidth, maxWidth }) => {
+      const breakpointRule = new RegExp(
+        `@media \\(min-width: ${minWidth}px\\) and \\(max-width: ${maxWidth}px\\) \\{[\\s\\S]*?#footer \\{[\\s\\S]*?nav \\{[\\s\\S]*?width: 100%;[\\s\\S]*?ul \\{[\\s\\S]*?display: flex;[\\s\\S]*?justify-content: center;[\\s\\S]*?align-items: center;[\\s\\S]*?flex-wrap: wrap;[\\s\\S]*?width: 100%;`,
+      );
+
+      expect(footerStylesheet).toMatch(breakpointRule);
+    });
+  });
 });
