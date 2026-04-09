@@ -1765,13 +1765,19 @@ describe('CreateSBTGroup cache helpers', () => {
     expect(scss).toMatch(/\.tagsContainer\s*{[\s\S]*?padding:\s*0;[\s\S]*?background:\s*transparent;[\s\S]*?border:\s*none;/);
   });
 
-  it('adds a narrow-panel stack for mobile create-sbt fields', () => {
+  it('adds a narrow-panel stack while keeping lock controls inline on narrow and mobile views', () => {
     const scssPath = path.join(__dirname, 'CreateSBTGroup.module.scss');
     const scss = fs.readFileSync(scssPath, 'utf8');
 
     expect(scss).toMatch(/#createGroupExpanded\s*{[\s\S]*?container-type:\s*inline-size;[\s\S]*?container-name:\s*create-sbt-panel;/);
     expect(scss).toMatch(/@mixin\s+tokenInfoNarrowLayout\s*{[\s\S]*?\.tokenInfoTopGrid,[\s\S]*?grid-template-columns:\s*1fr;/);
-    expect(scss).toMatch(/@mixin\s+tokenInfoNarrowLayout\s*{[\s\S]*?#addDocUrlSection\s*>\s*\.addDocUrlActionButton\s*{[\s\S]*?width:\s*100%;/);
+    expect(scss).toMatch(/@mixin\s+tokenInfoNarrowLayout\s*{[\s\S]*?\.fieldLockRow\s*{[\s\S]*?flex-direction:\s*row;[\s\S]*?align-items:\s*flex-start;/);
+    expect(scss).toMatch(/@mixin\s+tokenInfoNarrowLayout\s*{[\s\S]*?\.imageUploadHeader\s*{[\s\S]*?flex-direction:\s*row;[\s\S]*?align-items:\s*center;/);
+    expect(scss).toMatch(/@mixin\s+tokenInfoNarrowLayout\s*{[\s\S]*?\.tagsInlineRow\s*{[\s\S]*?flex-direction:\s*row;[\s\S]*?align-items:\s*center;/);
+    expect(scss).toMatch(/@mixin\s+tokenInfoNarrowLayout\s*{[\s\S]*?#addDocUrlSection\s*{[\s\S]*?flex-wrap:\s*wrap;[\s\S]*?>\s*\.inlineFieldLockControl\s*{[\s\S]*?order:\s*2;/);
+    expect(scss).not.toMatch(/@mixin\s+tokenInfoNarrowLayout\s*{[\s\S]*?\.fieldLockRow,\s*\.imageUploadHeader,\s*\.tagsInlineRow,\s*#addDocUrlSection\s*{[\s\S]*?flex-direction:\s*column;/);
+    expect(scss).toMatch(/@media\s*\(max-width:\s*600px\)\s*{[\s\S]*?#addDocUrlSection\s*{[\s\S]*?>\s*\.inlineFieldLockControl\s*{[\s\S]*?order:\s*2;/);
+    expect(scss).toMatch(/@media\s*\(max-width:\s*600px\)\s*{[\s\S]*?#addDocUrlSection\s*{[\s\S]*?>\s*\.addDocUrlActionButton\s*{[\s\S]*?order:\s*3;[\s\S]*?width:\s*100%;/);
     expect(scss).toMatch(/@container\s+create-sbt-panel\s*\(max-width:\s*820px\)\s*{\s*@include\s+tokenInfoNarrowLayout;/);
   });
 

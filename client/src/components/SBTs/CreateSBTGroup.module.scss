@@ -1642,18 +1642,53 @@ $placeholder-color: rgba(255, 255, 255, 0.5);
       gap: 14px;
     }
 
-    .fieldLockRow,
-    .imageUploadHeader,
-    .tagsInlineRow,
-    #addDocUrlSection {
-      flex-direction: column;
-      align-items: stretch;
+    .fieldLockRow {
+      flex-direction: row;
+      align-items: flex-start;
     }
 
-    .fieldLockControl,
-    .inlineFieldLockControl {
+    .imageUploadHeader {
+      flex-direction: row;
+      align-items: center;
+    }
+
+    .tagsInlineRow {
+      flex-direction: row;
+      align-items: center;
+      flex-wrap: nowrap;
+    }
+
+    #addDocUrlSection {
+      flex-direction: row;
+      align-items: center;
+      flex-wrap: wrap;
+
+      input {
+        flex: 1 1 220px;
+        min-width: 0;
+      }
+
+      > .inlineFieldLockControl {
+        order: 2;
+        flex: 0 0 auto;
+      }
+
+      > .addDocUrlActionButton {
+        order: 3;
+        width: auto;
+        flex: 0 0 54px;
+      }
+    }
+
+    .fieldLockControl {
       min-height: 0;
       align-self: flex-start;
+    }
+
+    .imageUploadHeader .fieldLockControl,
+    .inlineFieldLockControl {
+      min-height: 0;
+      align-self: center;
     }
 
     .lockableTextarea {
@@ -1668,19 +1703,15 @@ $placeholder-color: rgba(255, 255, 255, 0.5);
       align-items: stretch;
     }
 
-    #addDocUrlSection > .addDocUrlActionButton {
-      width: 100%;
-      flex-basis: auto;
-    }
-
     .selectedFile {
       white-space: normal;
       overflow-wrap: anywhere;
     }
 
     .tagInputGroup {
-      width: 100%;
-      flex: 1 1 100%;
+      width: auto;
+      flex: 1 1 auto;
+      min-width: 0;
       max-width: none;
     }
   }
@@ -1879,9 +1910,25 @@ $placeholder-color: rgba(255, 255, 255, 0.5);
     max-width: none;
   }
 
-  #addDocUrlSection > .addDocUrlActionButton {
-    width: 100%;
-    flex-basis: auto;
+  #addDocUrlSection {
+    flex-wrap: wrap;
+
+    > input {
+      order: 1;
+      flex: 1 1 0;
+      min-width: 0;
+    }
+
+    > .inlineFieldLockControl {
+      order: 2;
+      flex: 0 0 auto;
+    }
+
+    > .addDocUrlActionButton {
+      order: 3;
+      width: 100%;
+      flex: 1 0 100%;
+    }
   }
 
   .docUrlList li {
