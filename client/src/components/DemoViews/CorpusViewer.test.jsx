@@ -124,6 +124,27 @@ describe('CorpusViewer', () => {
     );
   });
 
+  it('keeps curated paper entries in featured-first order on the Papers tab', () => {
+    render(
+      <MemoryRouter>
+        <CorpusViewer />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Papers' }));
+
+    const firstFeaturedTitle = screen.getByText('Language Models are Few-Shot Learners');
+    const secondFeaturedTitle = screen.getByText('GPT-4 Technical Report');
+    const thirdFeaturedTitle = screen.getByText('Attention Is All You Need');
+
+    expect(
+      firstFeaturedTitle.compareDocumentPosition(secondFeaturedTitle) & window.Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    expect(
+      secondFeaturedTitle.compareDocumentPosition(thirdFeaturedTitle) & window.Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+  });
+
   it('sorts policy entries with live items first and filters them by status', () => {
     renderPolicyGlobeHarness([
       {
@@ -141,6 +162,20 @@ describe('CorpusViewer', () => {
         date: '2025-01-15',
       },
       {
+        id: 'california-vetoed',
+        title: 'California SB 1047',
+        jurisdiction: 'California, United States',
+        status: 'vetoed',
+        date: '2024-09-29',
+      },
+      {
+        id: 'brazil-committee',
+        title: 'Brazil AI Bill',
+        jurisdiction: 'Brazil',
+        status: 'in_committee',
+        date: '2025-03-17',
+      },
+      {
         id: 'eu-live',
         title: 'EU AI Act',
         jurisdiction: 'EU',
@@ -153,13 +188,17 @@ describe('CorpusViewer', () => {
     expect(screen.getAllByRole('listitem').map((item) => item.textContent)).toEqual([
       'EU AI Act',
       'US Executive Order',
+      'Brazil AI Bill',
       'UK Draft Bill',
+      'California SB 1047',
     ]);
 
     fireEvent.click(screen.getByRole('button', { name: 'Proposed' }));
 
     expect(screen.getAllByRole('listitem').map((item) => item.textContent)).toEqual([
+      'Brazil AI Bill',
       'UK Draft Bill',
+      'California SB 1047',
     ]);
 
     fireEvent.click(screen.getByRole('button', { name: 'Live' }));
@@ -190,7 +229,8 @@ describe('CorpusViewer', () => {
 
     fireEvent.click(within(screen.getByTestId('ce-policy-filter-row')).getByRole('button', { name: 'Proposed' }));
 
-    expect(screen.getByText('No proposed policy entries match the current filter.')).toBeInTheDocument();
+    expect(screen.getByText(/Safe and Secure Innovation for Frontier AI/i)).toBeInTheDocument();
+    expect(screen.getByText(/Brazil AI Bill/i)).toBeInTheDocument();
     expect(screen.getByTestId('demo-analysis-world-map')).toBeInTheDocument();
   });
 
@@ -205,6 +245,31 @@ describe('CorpusViewer', () => {
 
     expect(screen.getAllByText(/Interview date:/i).length).toBeGreaterThan(0);
     expect(screen.getAllByRole('link', { name: 'View interview' }).length).toBeGreaterThan(0);
+  });
+
+  it('keeps curated insider interview links as absolute external URLs', () => {
+    render(
+      <MemoryRouter>
+        <CorpusViewer />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Insider Interviews' }));
+
+    const ai2027Card = screen.getByText('Daniel Kokotajlo & Scott Alexander').closest('article');
+    const interviewLinks = screen.getAllByRole('link', { name: 'View interview' });
+
+    expect(ai2027Card).toBeTruthy();
+    expect(within(ai2027Card).getByRole('link', { name: 'View interview' })).toHaveAttribute(
+      'href',
+      'https://www.dwarkesh.com/p/scott-daniel'
+    );
+    expect(interviewLinks.map((link) => link.getAttribute('href'))).toEqual(
+      expect.arrayContaining([
+        'https://www.dwarkesh.com/p/scott-daniel',
+        'https://www.dwarkesh.com/p/satya-nadella-2',
+      ])
+    );
   });
 
   it('renders METR entries with linked chart preview images when available', () => {

@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 
+import corpusSample from './corpus_sample.json';
 import debateMapData from './debate_map_demo_data.json';
 import demoAnalysisData from './demo_analysis_data.json';
 import debates from './debates.json';
@@ -57,6 +58,69 @@ describe('demo data fixture cleanup', () => {
       'debate_regulation_speed',
       'debate_deceptive_alignment',
     ]);
+  });
+
+  it('keeps the client demo corpus sample curated around featured-first entries on visible tabs', () => {
+    const expectedVisibleCounts = {
+      tweets: 25,
+      ai_laws_policy: 20,
+      arxiv_ai_safety: 20,
+      dwarkesh_lab_insiders: 20,
+      ai_scifi_books: 20,
+      metr_evals_metrics: 15,
+    };
+    const expectedFeaturedLeads = {
+      tweets: [
+        'https://x.com/jburnmurdoch/status/1689189112710885376',
+        'https://x.com/Gregory_C_Allen/status/1898040379611504983',
+        'https://x.com/PalisadeAI/status/1926084635903025621',
+      ],
+      ai_laws_policy: [
+        'eu_ai_act',
+        'eu_gdpr_article_22',
+        'council_of_europe_ai_convention',
+      ],
+      arxiv_ai_safety: [
+        'gpt3_language_models_few_shot',
+        'gpt4_technical_report',
+        'attention_all_you_need_vaswani_2017',
+      ],
+      dwarkesh_lab_insiders: [
+        'amodei_dario_dwarkesh_2026_scaling',
+        'amodei_dario_dwarkesh_2023_scaling',
+        'hassabis_demis_dwarkesh_2024_superhuman',
+      ],
+      ai_scifi_books: [
+        'shelley_frankenstein',
+        'butler_erewhon',
+        'forster_machine_stops',
+      ],
+      metr_evals_metrics: [
+        'metr_time_horizon_paper_2025',
+        'metr_reward_hacking_2025',
+        'metr_developer_productivity_rct_2025',
+      ],
+    };
+
+    Object.entries(expectedVisibleCounts).forEach(([corpusKey, expectedCount]) => {
+      const entries = corpusSample?.corpuses?.[corpusKey]?.entries;
+
+      expect(Array.isArray(entries)).toBe(true);
+      expect(entries).toHaveLength(expectedCount);
+      expect(entries.length).toBeGreaterThan(0);
+    });
+
+    expect(corpusSample.corpuses.tweets.entries.slice(0, 3).map((entry) => entry.url)).toEqual(
+      expectedFeaturedLeads.tweets
+    );
+
+    Object.entries(expectedFeaturedLeads)
+      .filter(([corpusKey]) => corpusKey !== 'tweets')
+      .forEach(([corpusKey, expectedIds]) => {
+        expect(corpusSample.corpuses[corpusKey].entries.slice(0, expectedIds.length).map((entry) => entry.id)).toEqual(
+          expectedIds
+        );
+      });
   });
 
   it('covers every atlas leaf node with at least one Loophole historical case', () => {
