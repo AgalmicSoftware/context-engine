@@ -163,7 +163,7 @@ A longer-term goal is cryptographic diplomacy: incentive-compatible programmatic
 
 Programmable cryptography seems like an underexplored toolkit for AI safety and alignment efforts (0xPARC, 2023). It is also worth taking storytelling seriously as a coordination tool and alignment strategy – What would a news broadcast look like from the good timeline, and would seeing that broadcast help us navigate towards it?
 
-Context Engine recognizes and builds on the pioneering work of those involved with RadicalxChange, Pol.is, vTaiwan, g0v, TalkToTheCity, the Plurality Book, 0xPARC, Zuzalu, Edge City, MetaGov, PCARE, and many other related efforts. The author also gratefully acknowledges the AI programming assistance that finally made this effort tractable.
+Context Engine recognizes and builds on the pioneering work of those involved with RadicalxChange, Pol.is, vTaiwan, g0v, TalkToTheCity, Loophole, the Plurality Book, 0xPARC, Zuzalu, Edge City, MetaGov, PCARE, and many other related efforts. The author also gratefully acknowledges the AI programming assistance that finally made this effort tractable.
 
 
 ## References
@@ -201,8 +201,6 @@ Posner, E. A., & Weyl, E. G. (2018). *Radical Markets: Uprooting Capitalism and 
 RadicalxChange Foundation. (n.d.-a). "Social Identity." *RadicalxChange Wiki.* https://www.radicalxchange.org/wiki/social-identity/
 
 RadicalxChange Foundation. (n.d.-b). "Data Dignity." *RadicalxChange Wiki.* https://www.radicalxchange.org/wiki/data-dignity/
-
-Owocki, K. (2026, March 5). "Collective Intelligence Infrastructure: Protocols for Thinking Together." *Gitcoin.* https://gitcoin.co/research/collective-intelligence-protocols-for-thinking-together
 
 Owocki, K. (2026, March 5). "Collective Intelligence Infrastructure: Protocols for Thinking Together." *Gitcoin.* https://gitcoin.co/research/collective-intelligence-protocols-for-thinking-together
 
