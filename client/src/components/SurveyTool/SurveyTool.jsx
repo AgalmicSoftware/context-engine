@@ -13362,6 +13362,7 @@ class PileViewMode extends SurveyQuestions {
     this._loadAndSortDebounceTimer = null;
     this._lastLoadAndSortResultSignature = '';
     this._lastInitializeResponseSig = '';
+    this._lastNotifiedPileSubmitRailVisible = null;
 
     // Ref for auto-scrolling to Create section
     this.createSectionRef = React.createRef();
@@ -13828,6 +13829,7 @@ class PileViewMode extends SurveyQuestions {
     this.syncCurrentPileQuestionsSignature(this.state.pileQuestions);
     this.loadAndSortQuestions();
     this.syncLoadingElapsedTimer();
+    this.notifyPileSubmitRailVisibility();
     // Start long-loading timer
     this.loadingTimeout = setTimeout(() => {
       if (this.state.loading || !this.props.isQuestionCacheReady) {
@@ -13849,6 +13851,7 @@ class PileViewMode extends SurveyQuestions {
     const pendingStats = diffInputsChanged
       ? ((typeof this.getPendingEditStats === 'function' && this.getPendingEditStats()) || this.getPendingStatsSnapshot())
       : this.getPendingStatsSnapshot();
+    this.notifyPileSubmitRailVisibility();
     this.emitPendingStats(pendingStats);
     if (diffInputsChanged) {
       this.recalculateEditStats && this.recalculateEditStats(pendingStats);
@@ -14004,6 +14007,11 @@ class PileViewMode extends SurveyQuestions {
 
 
   componentWillUnmount() {
+    try {
+      if (typeof this.props.onPileSubmitRailVisibilityChange === 'function') {
+        this.props.onPileSubmitRailVisibilityChange(false);
+      }
+    } catch (e) { surveyLog.warn('SurveyTool: callback', e); }
     if (this._pileSubmitTimer) {
       clearTimeout(this._pileSubmitTimer);
       this._pileSubmitTimer = null;
@@ -15153,6 +15161,27 @@ class PileViewMode extends SurveyQuestions {
   };
 
 
+  getIsPileSubmitRailVisible = () => {
+    const pendingStats = this.getPendingStatsSnapshot?.() || { total: 0 };
+    return !!(
+      this.state.isSubmitting ||
+      Number(pendingStats.total || 0) > 0 ||
+      this.state.submittedSinceLastEdit ||
+      this.state.submissionComplete
+    );
+  };
+
+  notifyPileSubmitRailVisibility = () => {
+    const nextVisible = this.getIsPileSubmitRailVisible();
+    if (this._lastNotifiedPileSubmitRailVisible === nextVisible) return;
+    this._lastNotifiedPileSubmitRailVisible = nextVisible;
+    try {
+      if (typeof this.props.onPileSubmitRailVisibilityChange === 'function') {
+        this.props.onPileSubmitRailVisibilityChange(nextVisible);
+      }
+    } catch (e) { surveyLog.warn('SurveyTool: callback', e); }
+  };
+
   renderActiveQuestion = (question) => {
     const { surveysResponseState, showComments, showConviction } = this.state;
     const slice = surveysResponseState[0] || {
@@ -15679,10 +15708,15 @@ class PileViewMode extends SurveyQuestions {
     const pileSubmitLabel = (this.props.computeSubmitLabel || computeSubmitLabel)(this, {
       pendingStats: _pileStats,
     });
+    const hasPendingPileChanges = _pileStats.total > 0;
     const pileSubmittedStateActive = !!(this.state.submittedSinceLastEdit || this.state.submissionComplete);
-    const finalSubmitText = pileSubmittedStateActive
-      ? 'Submitted'
-      : (this.state.pileSubmitTempText || pileSubmitLabel);
+    const showPileSubmitSuccessBadge = pileSubmittedStateActive && !this.state.isSubmitting;
+    const shouldHidePileSubmitButton = (
+      !hasPendingPileChanges &&
+      !this.state.isSubmitting &&
+      !pileSubmittedStateActive
+    );
+    const finalSubmitText = this.state.pileSubmitTempText || pileSubmitLabel;
 
     const handleSubmitClick = async () => {
       if (!this.props.loginComplete) {
@@ -15709,7 +15743,7 @@ class PileViewMode extends SurveyQuestions {
       await this.encryptAndUpload();
     };
 
-    const accountLower = (this.props.account || '').toLowerCase();
+    const pileTopRailVisible = this.state.isSubmitting || _pileStats.total > 0 || pileSubmittedStateActive;
 
     const activeGreen = '#4cd964';
     const filterButtonStyle = isFilterActive
@@ -15814,22 +15848,46 @@ class PileViewMode extends SurveyQuestions {
       </div>
     );
 
-    const footerControls = (
-      <div className={styles.pileFooter}>
-        <Button
-          onClick={handleSubmitClick}
-          data-testid={E2E_TESTIDS.SURVEY_SUBMIT}
-          className={`${styles.pileSubmitButton}${_pileStats.total > 0 ? ` ${styles.submitGlow}` : ''}${_pileStats.total === 0 ? ` ${styles.pileSubmitButtonInactive}` : ''}`}
-          disabled={this.state.isSubmitting || activePromptMasked}
-        >
-          {this.state.isSubmitting ? (
-            <FontAwesomeIcon icon={faSpinner} spin />
-          ) : (
-            finalSubmitText
-          )}
-        </Button>
+    const pileInteractionUnitClassName = [
+      styles.pileInteractionUnit,
+      pileTopRailVisible ? styles.pileInteractionUnitWithSubmitRail : '',
+    ].filter(Boolean).join(' ');
 
-        {_pileStats.total > 0 && !this.state.isSubmitting && !pileSubmittedStateActive && (
+    const footerControls = (
+      <div className={`${styles.pileFooter}${pileTopRailVisible ? '' : ` ${styles.pileFooterHidden}`}`}>
+        {showPileSubmitSuccessBadge ? (
+          <div
+            className={styles.pileSubmitSuccessBadge}
+            data-testid={E2E_TESTIDS.SURVEY_SUBMITTED_INDICATOR}
+            role="status"
+            aria-label="Submitted"
+            title="Submitted"
+          >
+            <FontAwesomeIcon icon={faCheck} className={styles.pileSubmitSuccessIcon} />
+          </div>
+        ) : (
+          <Button
+            onClick={handleSubmitClick}
+            data-testid={E2E_TESTIDS.SURVEY_SUBMIT}
+            className={`${styles.pileSubmitButton}${hasPendingPileChanges ? ` ${styles.submitGlow}` : ''}${shouldHidePileSubmitButton ? ` ${styles.pileSubmitButtonInactive}` : ''}`}
+            disabled={this.state.isSubmitting || activePromptMasked}
+          >
+            {this.state.isSubmitting ? (
+              <FontAwesomeIcon icon={faSpinner} spin />
+            ) : (
+              <span className={styles.pileSubmitButtonContent}>
+                <span className={styles.pileSubmitButtonLabel}>{finalSubmitText}</span>
+                <span className={styles.pileSubmitButtonTrail} aria-hidden="true">
+                  <FontAwesomeIcon icon={faChevronRight} className={styles.pileSubmitButtonTrailIcon} />
+                  <FontAwesomeIcon icon={faChevronRight} className={styles.pileSubmitButtonTrailIcon} />
+                  <FontAwesomeIcon icon={faChevronRight} className={styles.pileSubmitButtonTrailIcon} />
+                </span>
+              </span>
+            )}
+          </Button>
+        )}
+
+        {hasPendingPileChanges && !this.state.isSubmitting && !pileSubmittedStateActive && (
           <button
             type="button"
             className={styles.pileIconButton}
@@ -15840,23 +15898,13 @@ class PileViewMode extends SurveyQuestions {
             <FontAwesomeIcon icon={faTimes} />
           </button>
         )}
-
-        {pileSubmittedStateActive && accountLower && (
-          <a
-            href={`/u/${accountLower}`}
-            className={styles.pileSubmitLink}
-            title="Open your profile"
-          >
-            <FontAwesomeIcon icon={faCheck} />
-          </a>
-        )}
       </div>
     );
 
     return (
       <div className={styles.pileViewContainer}>
         <div className={styles.pileWrapper}>
-          <div className={styles.pileInteractionUnit}>
+          <div className={pileInteractionUnitClassName}>
             {SHOW_PILE_HOLOGRAM_TOGGLE && (
               <button
                 type="button"
