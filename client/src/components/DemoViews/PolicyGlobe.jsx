@@ -46,9 +46,11 @@ const PROPOSED_STATUS_MATCHERS = [
   'pending',
   'draft',
   'bill',
+  'committee',
   'consultation',
   'under review',
   'planned',
+  'vetoed',
 ];
 
 const JURISDICTION_RULES = [
@@ -149,6 +151,7 @@ const GLOBE_COORDINATES = {
 };
 
 const normalizeText = (value = '') => String(value).trim().toLowerCase();
+const normalizePolicyStatus = (value = '') => normalizeText(value).replace(/[_-]+/g, ' ');
 
 const matchesPattern = (value, patterns = []) => patterns.some((pattern) => pattern.test(value));
 
@@ -182,7 +185,7 @@ const getPolicyTimestamp = (entry = {}) => {
 };
 
 export const getPolicyStatusGroup = (entry = {}) => {
-  const normalizedStatus = normalizeText(entry.status);
+  const normalizedStatus = normalizePolicyStatus(entry.status);
 
   if (PROPOSED_STATUS_MATCHERS.some((status) => normalizedStatus.includes(status))) {
     return POLICY_FILTERS.proposed;
