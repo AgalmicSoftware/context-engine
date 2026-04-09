@@ -473,15 +473,35 @@ describe('OnePageSession view gating', () => {
 
     expect(phoneBlock).toContain('.sectionContainer');
     expect(phoneBlock).toContain('border: none;');
+    expect(phoneBlock).toContain('.sectionHeader .sectionHeaderSubtitle {');
+    expect(phoneBlock).toContain('font-size: 1em;');
+    expect(phoneBlock).toContain('font-weight: inherit;');
+    expect(phoneBlock).toContain('color: rgba(255, 255, 255, 0.15);');
+    expect(phoneBlock).toContain('.sectionHeader {');
+    expect(phoneBlock).toContain('align-items: center;');
+    expect(phoneBlock).toContain('.documentsSectionHeaderMeta .sectionHeaderTooltip > svg {');
+    expect(phoneBlock).toContain('opacity: 0.6;');
+    expect(phoneBlock).toContain('.documentsSectionHeaderMeta .sectionHeaderTooltip {');
+    expect(phoneBlock).toContain('justify-content: center;');
+    expect(phoneBlock).toContain('min-height: 44px;');
+    expect(phoneBlock).toContain('min-width: 44px;');
     expect(smallTabletBlock).toContain('.sectionHeader {');
+    expect(smallTabletBlock).toContain('align-items: center;');
     expect(smallTabletBlock).toContain('font-size: 1.6em;');
     expect(smallTabletBlock).toContain('.sectionHeader .sectionHeaderText {');
     expect(smallTabletBlock).toContain('flex-direction: row;');
-    expect(smallTabletBlock).toContain('align-items: baseline;');
+    expect(smallTabletBlock).toContain('align-items: center;');
     expect(smallTabletBlock).toContain('gap: 6px 12px;');
     expect(smallTabletBlock).toContain('.sectionHeader .sectionHeaderSubtitle {');
-    expect(smallTabletBlock).toContain('font-size: 0.68em;');
-    expect(smallTabletBlock).toContain('color: rgba(244, 247, 255, 0.58);');
+    expect(smallTabletBlock).toContain('font-size: 1.2em;');
+    expect(smallTabletBlock).toContain('font-weight: inherit;');
+    expect(smallTabletBlock).toContain('color: rgba(255, 255, 255, 0.15);');
+    expect(smallTabletBlock).toContain('.documentsSectionHeaderMeta .sectionHeaderTooltip {');
+    expect(smallTabletBlock).toContain('justify-content: center;');
+    expect(smallTabletBlock).toContain('min-height: 44px;');
+    expect(smallTabletBlock).toContain('min-width: 44px;');
+    expect(smallTabletBlock).toContain('.documentsSectionHeaderMeta .sectionHeaderTooltip > svg {');
+    expect(smallTabletBlock).toContain('opacity: 0.6;');
     expect(smallTabletBlock).not.toContain('.sectionContainer');
     expect(scss).toMatch(/@media only screen and \(min-width:\s*768px\) and \(max-width:\s*1024px\)\s*{[\s\S]*?\.sectionHeader \.sectionHeaderText\s*{[\s\S]*?flex-direction:\s*column;[\s\S]*?align-items:\s*flex-start;/);
   });
@@ -507,7 +527,7 @@ describe('OnePageSession view gating', () => {
     expect(screen.getByText(documentsTooltipText)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'GitHub' })).toHaveAttribute(
       'href',
-      'https://github.com/xoCortex/context-engine/tree/main/client/src/variables/demo'
+      'https://github.com/AgalmicSoftware/context-engine/tree/main/ai-discourse-corpus'
     );
   });
 
