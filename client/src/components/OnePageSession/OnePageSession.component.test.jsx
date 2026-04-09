@@ -232,7 +232,7 @@ describe('OnePageSession view gating', () => {
     expect(screen.queryByTestId('survey-page-full')).not.toBeInTheDocument();
   });
 
-  it('uses the title container slot to keep the pile submit rail off the header title', async () => {
+  it('uses the title container slot to reserve pile submit rail space when the embedded pile signals visibility', async () => {
     render(<OnePageSession {...buildProps()} />);
 
     expect(await screen.findByTestId('survey-page-pile')).toBeInTheDocument();
@@ -257,37 +257,21 @@ describe('OnePageSession view gating', () => {
     expect(titleContainer).not.toHaveClass(styles.titleContainerWithPileSubmitRail);
   });
 
-  it('applies pile submit rail title offsets only on pile top-rail breakpoints', () => {
+  it('limits the pile submit rail title offset to phone widths where the rail is absolute', () => {
     const scss = fs.readFileSync(path.join(__dirname, 'OnePageSession.module.scss'), 'utf8');
     const phoneRailBlock = extractMediaBlock(
       scss,
       '@media only screen and (max-width: 480px)',
       '.titleContainerWithPileSubmitRail'
     );
-    const desktopRailBlock = extractMediaBlock(
-      scss,
-      '@media only screen and (min-width: 769px) and (max-width: 1366px)',
-      '.titleContainerWithPileSubmitRail'
-    );
-    const widescreenRailBlock = extractMediaBlock(
-      scss,
-      '@media only screen and (min-width: 1367px)',
-      '.titleContainerWithPileSubmitRail'
-    );
     const tabletRailBlock = extractMediaBlock(
       scss,
-      '@media only screen and (min-width: 481px) and (max-width: 768px)',
+      '@media only screen and (max-width: 600px)',
       '.titleContainerWithPileSubmitRail'
     );
 
-    expect(scss).toContain('.brandingSectionWithPileSubmitRail');
-    expect(scss).toContain('.titleContainerWithPileSubmitRail');
     expect(phoneRailBlock).toContain('.titleContainerWithPileSubmitRail');
-    expect(phoneRailBlock).toContain('transform: translateY(-40px);');
-    expect(desktopRailBlock).toContain('.titleContainerWithPileSubmitRail');
-    expect(desktopRailBlock).toContain('transform: translateY(-40px);');
-    expect(widescreenRailBlock).toContain('.titleContainerWithPileSubmitRail');
-    expect(widescreenRailBlock).toContain('transform: translateY(-52px);');
+    expect(phoneRailBlock).toContain('transform: translateY(-44px);');
     expect(tabletRailBlock).toBeNull();
   });
 

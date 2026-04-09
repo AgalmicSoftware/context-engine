@@ -1024,6 +1024,7 @@ const SBTsList = ({
     ? showAdminButtons
     : showLocalSessionSettings;
   const sessionSelectorPanelId = 'session-selector-panel';
+  const hideSessionUniverseSummary = miniaturized && viewMode === 'modal' && communityTabCompactSettings;
 
   const clearChipProgressVisibilityTimeout = useCallback((slugIn) => {
     const slug = normalizeSessionSlug(slugIn || '');
@@ -3384,12 +3385,12 @@ const SBTsList = ({
   const renderSessionUniverseSelector = () => {
     if (!allSessionsMode) return null;
     const publicBasePath = readPublicUrlBasePath();
-    const withPublicBasePath = (pathIn: any) => {
+    const withPublicBasePath = (pathIn) => {
       const normalizedPath = String(pathIn || '').trim();
       if (!normalizedPath) return publicBasePath || '/';
       return `${publicBasePath}${normalizedPath.startsWith('/') ? normalizedPath : `/${normalizedPath}`}` || normalizedPath;
     };
-    const buildSessionRouteHref = (slugRaw: any) => {
+    const buildSessionRouteHref = (slugRaw) => {
       const normalized = normalizeSessionSlug(slugRaw || '');
       if (isSyntheticNoSessionSlug(normalized)) return '';
       const cfg = getDisplaySessionConfig(normalized);
@@ -3405,7 +3406,7 @@ const SBTsList = ({
       return withPublicBasePath(`/session/${encodeURIComponent(normalized)}`);
     };
 
-    const handleOpenSessionChip = (slugRaw: any, optionOrEvent: any = null, maybeEvent: any = null) => {
+    const handleOpenSessionChip = (slugRaw, optionOrEvent, maybeEvent) => {
       const event = maybeEvent && typeof maybeEvent === 'object'
         ? maybeEvent
         : optionOrEvent;
@@ -3446,9 +3447,11 @@ const SBTsList = ({
         <div className={styles.sessionUniverseCollapsedChips}>
           {collapsedSummaryPreview.map((slugRaw) => {
             const normalized = normalizeSessionSlug(slugRaw || '');
+            const sessionLabel = labelForSessionSlug(normalized);
             const isLoading = !!chipProgressVisibilityBySlug[normalized];
             const chipLoadingStatus = chipLoadingStatusBySlug[normalized] || null;
             const showCollapsedProgress = chipLoadingStatus != null && isLoading;
+            const sessionRouteHref = buildSessionRouteHref(normalized);
             const collapsedChipClass = [
               styles.sessionUniverseCollapsedChip,
               isLoading ? styles.sessionUniverseCollapsedChipLoading : styles.sessionUniverseCollapsedChipLoaded,
@@ -3461,16 +3464,30 @@ const SBTsList = ({
                 data-session-loading={isLoading ? 'true' : 'false'}
                 title={showCollapsedProgress ? chipLoadingStatus.progressText : undefined}
               >
-                <span className={styles.sessionUniverseCollapsedChipName}>
-                  {labelForSessionSlug(normalized)}
-                </span>
-                {showCollapsedProgress && (
-                  <span
-                    className={styles.sessionUniverseCollapsedChipProgress}
-                    data-testid={`session-collapsed-chip-progress-${normalized || 'general'}`}
-                  >
-                    {chipLoadingStatus.chipBlockProgressText}
+                <span className={styles.sessionUniverseCollapsedChipBody}>
+                  <span className={styles.sessionUniverseCollapsedChipName}>
+                    {sessionLabel}
                   </span>
+                  {showCollapsedProgress && (
+                    <span
+                      className={styles.sessionUniverseCollapsedChipProgress}
+                      data-testid={`session-collapsed-chip-progress-${normalized || 'general'}`}
+                    >
+                      {chipLoadingStatus.chipBlockProgressText}
+                    </span>
+                  )}
+                </span>
+                {sessionRouteHref && (
+                  <button
+                    type="button"
+                    className={styles.sessionUniverseCollapsedChipOpen}
+                    data-testid={`session-collapsed-chip-open-${normalized || 'general'}`}
+                    aria-label={`Open session ${sessionLabel} in new tab`}
+                    title={`Open session ${sessionLabel} in new tab`}
+                    onClick={(event) => handleOpenSessionChip(normalized, event)}
+                  >
+                    <FontAwesomeIcon icon={faExternalLinkAlt} />
+                  </button>
                 )}
               </span>
             );
@@ -3534,7 +3551,7 @@ const SBTsList = ({
             <span>Sessions</span>
             {renderHeaderActions({ isOpen: false })}
           </div>
-          {renderCollapsedSummary('session-selector-summary')}
+          {!hideSessionUniverseSummary && renderCollapsedSummary('session-selector-summary')}
         </div>
       );
     }
@@ -3549,7 +3566,7 @@ const SBTsList = ({
           <span>Sessions</span>
           {renderHeaderActions({ isOpen: true })}
         </div>
-        {isUniverseCollapsed && renderCollapsedSummary('session-universe-collapsed-summary')}
+        {!hideSessionUniverseSummary && isUniverseCollapsed && renderCollapsedSummary('session-universe-collapsed-summary')}
         {!isUniverseCollapsed && (
           <div className={styles.sessionUniverseChips}>
             <SessionChipSelector

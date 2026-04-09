@@ -1970,9 +1970,9 @@ class OnePageSession extends Component<any, any> {
     this.navigateToInternalPath(sbtsListPath());
   }
 
-  handlePileSubmitRailVisibilityChange(visible: any) {
+  handlePileSubmitRailVisibilityChange(visible) {
     const nextVisible = !!visible;
-    this.setState((prevState: any) => (
+    this.setState((prevState) => (
       prevState.pileSubmitRailVisible === nextVisible
         ? null
         : { pileSubmitRailVisible: nextVisible }

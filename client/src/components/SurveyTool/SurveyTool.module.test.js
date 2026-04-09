@@ -201,6 +201,133 @@ describe('SurveyTool module', () => {
     expect(subject.resolveSessionChainId('edge')).toBe(84532);
   });
 
+  it('keeps existing-response light-panel CTAs on dark text for readability', () => {
+    const scssPath = path.join(__dirname, 'SurveyTool.module.scss');
+    const scss = fs.readFileSync(scssPath, 'utf8');
+
+    expect(scss).toMatch(/#startFreshButton\s*{[^}]*color:\s*#1f2733;/);
+    expect(scss).toMatch(/#exitEditingButton\s*{[^}]*color:\s*#1f2733;/);
+    expect(scss).toMatch(/#exitEditingButton[\s\S]*?&:disabled\s*{[^}]*color:\s*rgba\(31,\s*39,\s*51,\s*0\.5\);/);
+    expect(scss).not.toMatch(/#startFreshButton\s*{[^}]*color:\s*var\(--ce-color-white\);/);
+    expect(scss).not.toMatch(/#exitEditingButton\s*{[^}]*color:\s*var\(--ce-color-white\);/);
+  });
+
+  it('removes the old SurveyTool session selector overlay styles', () => {
+    const scssPath = path.join(__dirname, 'SurveyTool.module.scss');
+    const scss = fs.readFileSync(scssPath, 'utf8');
+
+    expect(scss).toMatch(/#surveysRow\s*{[\s\S]*z-index:\s*20;/);
+    expect(scss).not.toMatch(/\.sessionSelectorTriggerRow\s*{/);
+    expect(scss).not.toMatch(/\.sessionSelectorBackdrop\s*{/);
+    expect(scss).not.toMatch(/\.sessionSelectorPopover\s*{/);
+    expect(scss).not.toMatch(/\.surveySelectorRowSessionSelectorOpen\s*{/);
+  });
+
+  it('keeps the locked-question decrypt CTA readable on the light banner', () => {
+    const scssPath = path.join(__dirname, 'SurveyTool.module.scss');
+    const scss = fs.readFileSync(scssPath, 'utf8');
+
+    expect(scss).toMatch(/%decryptCtaOutlineOnLight\s*{[\s\S]*?color:\s*#1f2733\s*!important;/);
+    expect(scss).toMatch(/%decryptCtaOutlineOnLight\s*{[\s\S]*?&:hover:not\(:disabled\),[\s\S]*?color:\s*#111722\s*!important;/);
+    expect(scss).toMatch(/%decryptCtaOutlineOnLight\s*{[\s\S]*?&:disabled\s*{[\s\S]*?color:\s*rgba\(31,\s*39,\s*51,\s*0\.52\)\s*!important;/);
+    expect(scss).toMatch(/\.lockedQuestionsDecryptButton\s*{\s*@extend\s+%decryptCtaOutlineOnLight;/);
+    expect(scss).not.toMatch(/\.lockedQuestionsDecryptButton\s*{\s*@extend\s+%decryptCtaOutline;/);
+  });
+
+  it('keeps the questions selector encrypted badge aligned with the title copy', () => {
+    const scssPath = path.join(__dirname, 'SurveyTool.module.scss');
+    const scss = fs.readFileSync(scssPath, 'utf8');
+
+    expect(scss).toMatch(/\.questionSelectorSummary\s*{[\s\S]*?display:\s*inline-flex;[\s\S]*?align-items:\s*center;/);
+    expect(scss).toMatch(/\.questionSelectorEncryptedBadge\s*{[\s\S]*?display:\s*inline-flex;[\s\S]*?align-items:\s*center;/);
+    expect(scss).toMatch(/\.questionSelectorSpinner\s*{[\s\S]*?display:\s*inline-flex;[\s\S]*?align-items:\s*center;/);
+  });
+
+  it('keeps the additional-comments lock inline with the input field', () => {
+    const scssPath = path.join(__dirname, 'SurveyTool.module.scss');
+    const scss = fs.readFileSync(scssPath, 'utf8');
+
+    expect(scss).toMatch(/\.additionalCommentsInlineRow\s*{[\s\S]*?display:\s*flex;[\s\S]*?align-items:\s*flex-start;[\s\S]*?width:\s*100%;/);
+    expect(scss).toMatch(/\.additionalCommentsInputWrap\s*{[\s\S]*?flex:\s*1 1 auto;[\s\S]*?min-width:\s*0;/);
+    expect(scss).toMatch(/\.additionalCommentsLockSlot\s*{[\s\S]*?display:\s*flex;[\s\S]*?padding-top:\s*10px;/);
+  });
+
+  it('keeps the pile lock popover readable without inheriting the footer icon opacity', () => {
+    const scssPath = path.join(__dirname, 'SurveyTool.module.scss');
+    const scss = fs.readFileSync(scssPath, 'utf8');
+    const pileCardIconsBlock = scss.match(/\.pileCardIcons\s*{[^}]*}/)?.[0] || '';
+
+    expect(pileCardIconsBlock).not.toMatch(/opacity\s*:/);
+    expect(scss).toMatch(/\.pileLockButtonMenuOpen\s*{[\s\S]*?background:\s*rgba\(5,\s*10,\s*24,\s*0\.78\);/);
+    expect(scss).toMatch(/\.pileLockAudiencePopover\s*{[\s\S]*?background:\s*rgba\(11,\s*15,\s*28,\s*0\.8\);/);
+    expect(scss).toMatch(/\.pileLockAudiencePopover\s*{[\s\S]*?opacity:\s*0\.8;/);
+  });
+
+  it('keeps the single-question submit button stacked below the card', () => {
+    const scssPath = path.join(__dirname, 'SurveyTool.module.scss');
+    const scss = fs.readFileSync(scssPath, 'utf8');
+
+    expect(scss).toMatch(/#surveyFooter\.singleQuestionSubmitFooter\s*{[\s\S]*?position:\s*static;[\s\S]*?align-self:\s*center;[\s\S]*?width:\s*min\(360px,\s*100%\);[\s\S]*?margin:\s*18px auto 0;[\s\S]*?display:\s*flex;/);
+    expect(scss).toMatch(/#submitSurveyButton\.singleQuestionSubmitButton\s*{[\s\S]*?width:\s*100%;[\s\S]*?height:\s*auto;[\s\S]*?min-height:\s*72px;[\s\S]*?font-family:\s*var\(--ce-font-body\);[\s\S]*?font-size:\s*1\.4rem;[\s\S]*?background-color:\s*rgba\(42,\s*99,\s*202,\s*0\.5\) !important;/);
+    expect(scss).toMatch(/\.singleQuestionSubmitButtonContent\s*{[\s\S]*?display:\s*flex;[\s\S]*?width:\s*100%;/);
+    expect(scss).toMatch(/\.singleQuestionSubmitButtonIcon\s*{[\s\S]*?font-size:\s*1\.5em;/);
+    expect(scss).toMatch(/@media \(max-width: 768px\)\s*{[\s\S]*?#surveyFooter\.singleQuestionSubmitFooter\s*{[\s\S]*?width:\s*100%;[\s\S]*?flex-direction:\s*column;/);
+    expect(scss).toMatch(/@media \(max-width: 768px\)\s*{[\s\S]*?#submitSurveyButton\.singleQuestionSubmitButton\s*{[\s\S]*?width:\s*100%;[\s\S]*?max-width:\s*none;[\s\S]*?opacity:\s*1;/);
+  });
+
+  it('keeps pile submit controls responsive across desktop, medium-desktop, medium, and small breakpoints', () => {
+    const scssPath = path.join(__dirname, 'SurveyTool.module.scss');
+    const scss = fs.readFileSync(scssPath, 'utf8');
+
+    expect(scss).toMatch(/\.pileWrapper\s*{[\s\S]*?margin-bottom:\s*38px;/);
+    expect(scss).toMatch(/\.pileInteractionUnit\s*{[\s\S]*?--pile-desktop-submit-rail-offset:\s*64px;[\s\S]*?--pile-current-submit-rail-offset:\s*0px;[\s\S]*?--pile-current-submit-rail-padding:\s*0px;[\s\S]*?padding-top:\s*var\(--pile-current-submit-rail-padding\);/);
+    expect(scss).toMatch(/\.pileInteractionUnitWithSubmitRail\s*{[\s\S]*?--pile-current-submit-rail-offset:\s*var\(--pile-desktop-submit-rail-offset\);[\s\S]*?--pile-current-submit-rail-padding:\s*var\(--pile-desktop-submit-rail-offset\);/);
+    expect(scss).toMatch(/\.pileControls\s*{[\s\S]*?position:\s*absolute;[\s\S]*?top:\s*var\(--pile-current-submit-rail-offset\);[\s\S]*?right:\s*0;[\s\S]*?bottom:\s*0;[\s\S]*?left:\s*0;[\s\S]*?width:\s*100%;/);
+    expect(scss).not.toMatch(/grid-template-areas:\s*[\s\S]*?'nav submit'[\s\S]*?'actions submit'/);
+    expect(scss).toMatch(/\.pileControls > \.pileActions,\s*\.pileControls > \.pileNav\s*{[\s\S]*?position:\s*absolute;[\s\S]*?left:\s*calc\(100% \+ var\(--pile-desktop-rail-gap\)\);/);
+    expect(scss).toMatch(/\.pileControls > \.pileActions\s*{[\s\S]*?top:\s*50%;[\s\S]*?transform:\s*translateY\(0\.625rem\);/);
+    expect(scss).toMatch(/\.pileControls > \.pileNav\s*{[\s\S]*?top:\s*50%;[\s\S]*?transform:\s*translateY\(calc\(-100% - 0\.625rem\)\);/);
+    expect(scss).toMatch(/\.pileFooter\s*{[\s\S]*?justify-content:\s*center;[\s\S]*?width:\s*min\(550px,\s*90vw\);[\s\S]*?position:\s*absolute;[\s\S]*?top:\s*calc\(-1 \* var\(--pile-desktop-submit-rail-offset\)\);[\s\S]*?left:\s*50%;[\s\S]*?transform:\s*translateX\(-50%\);/);
+    expect(scss).toMatch(/\.pileFooterHidden\s*{[\s\S]*?opacity:\s*0;[\s\S]*?visibility:\s*hidden;[\s\S]*?pointer-events:\s*none;/);
+    expect(scss).toMatch(/\.pileFooter\s+\.pileSubmitButton\s*{[\s\S]*?width:\s*100%;[\s\S]*?min-height:\s*60px;[\s\S]*?font-size:\s*1\.15rem;/);
+    expect(scss).toMatch(/\.pileSubmitSuccessBadge\s*{[\s\S]*?display:\s*inline-flex;[\s\S]*?width:\s*60px;[\s\S]*?height:\s*60px;[\s\S]*?border-radius:\s*50%;/);
+    expect(scss).toMatch(/\.pileSubmitButtonTrail\s*{[\s\S]*?display:\s*none;/);
+    expect(scss).toMatch(/@media \(min-width: 1367px\)\s*{[\s\S]*?\.pileInteractionUnit\s*{[\s\S]*?--pile-current-submit-rail-offset:\s*0px;[\s\S]*?--pile-current-submit-rail-padding:\s*0px;/);
+    expect(scss).toMatch(/@media \(min-width: 1367px\)\s*{[\s\S]*?\.pileControls\s*{[\s\S]*?top:\s*0;/);
+    expect(scss).toMatch(/@media \(min-width: 1367px\)\s*{[\s\S]*?\.pileFooter\s*{[\s\S]*?top:\s*-72px;[\s\S]*?right:\s*32px;[\s\S]*?left:\s*0;[\s\S]*?width:\s*auto;[\s\S]*?transform:\s*none;/);
+    expect(scss).toMatch(/@media \(max-width: 768px\)\s*{[\s\S]*?\.pileWrapper\s*{[\s\S]*?margin-bottom:\s*0;/);
+    expect(scss).toMatch(/@media \(max-width: 768px\)\s*{[\s\S]*?\.pileInteractionUnit\s*{[\s\S]*?--pile-current-submit-rail-offset:\s*0px;[\s\S]*?--pile-current-submit-rail-padding:\s*0px;/);
+    expect(scss).toMatch(/@media \(max-width: 768px\)\s*{[\s\S]*?\.pileControls\s*{[\s\S]*?position:\s*static;[\s\S]*?transform:\s*none;[\s\S]*?display:\s*flex;[\s\S]*?justify-content:\s*space-between;/);
+    expect(scss).toMatch(/@media \(max-width: 768px\)\s*{[\s\S]*?\.pileControls > \.pileActions,\s*\.pileControls > \.pileNav\s*{[\s\S]*?position:\s*static;[\s\S]*?transform:\s*none;/);
+    expect(scss).toMatch(/@media \(max-width: 768px\)\s*{[\s\S]*?\.pileFooter\s*{[\s\S]*?position:\s*static;[\s\S]*?transform:\s*none;[\s\S]*?justify-content:\s*center;/);
+    expect(scss).toMatch(/@media \(min-width: 481px\) and \(max-width: 768px\)\s*{[\s\S]*?\.pileControls\s*{[\s\S]*?align-items:\s*center;[\s\S]*?width:\s*100%;[\s\S]*?margin-top:\s*35px;[\s\S]*?gap:\s*18px;/);
+    expect(scss).toMatch(/@media \(min-width: 481px\) and \(max-width: 768px\)\s*{[\s\S]*?\.pileActions\s*{[\s\S]*?order:\s*1;/);
+    expect(scss).toMatch(/@media \(min-width: 481px\) and \(max-width: 768px\)\s*{[\s\S]*?\.pileFooter\s*{[\s\S]*?order:\s*2;[\s\S]*?width:\s*auto;[\s\S]*?gap:\s*14px;/);
+    expect(scss).toMatch(/@media \(min-width: 481px\) and \(max-width: 768px\)\s*{[\s\S]*?\.pileNav\s*{[\s\S]*?order:\s*3;/);
+    expect(scss).toMatch(/@media \(min-width: 481px\) and \(max-width: 768px\)\s*{[\s\S]*?\.pileFooter\s+\.pileSubmitButton\s*{[\s\S]*?font-size:\s*1rem;/);
+    expect(scss).toMatch(/@media \(max-width: 480px\)\s*{[\s\S]*?\.pileControls\s*{[\s\S]*?flex-wrap:\s*wrap;[\s\S]*?justify-content:\s*space-between;/);
+    expect(scss).toMatch(/@media \(max-width: 480px\)\s*{[\s\S]*?\.pileInteractionUnit\s*{[\s\S]*?--pile-current-submit-rail-offset:\s*0px;[\s\S]*?--pile-current-submit-rail-padding:\s*0px;/);
+    expect(scss).toMatch(/@media \(max-width: 480px\)\s*{[\s\S]*?\.pileFooter\s*{[\s\S]*?position:\s*absolute;[\s\S]*?top:\s*-60px;[\s\S]*?right:\s*20px;[\s\S]*?left:\s*10px;[\s\S]*?width:\s*auto;[\s\S]*?transform:\s*none;/);
+    expect(scss).toMatch(/@media \(max-width: 480px\)\s*{[\s\S]*?\.pileFooter\s*{[\s\S]*?gap:\s*10px;/);
+    expect(scss).toMatch(/@media \(max-width: 480px\)\s*{[\s\S]*?\.pileFooter\s+\.pileSubmitButton\s*{[\s\S]*?flex:\s*1 1 auto;[\s\S]*?width:\s*auto;/);
+    expect(scss).toMatch(/@media \(max-width: 480px\)\s*{[\s\S]*?\.pileFooter\s+\.pileSubmitButton\s*{[\s\S]*?width:\s*100%;[\s\S]*?max-width:\s*none;[\s\S]*?min-height:\s*54px;[\s\S]*?font-size:\s*1rem;[\s\S]*?border-radius:\s*var\(--ce-radius-16\);/);
+    expect(scss).toMatch(/@media \(max-width: 480px\)\s*{[\s\S]*?\.pileFooter\s+\.pileIconButton,\s*[\s\S]*?\.pileFooter\s+\.pileSubmitLink\s*{[\s\S]*?position:\s*static;[\s\S]*?transform:\s*none;[\s\S]*?flex:\s*0 0 auto;/);
+    expect(scss).toMatch(/@media \(max-width: 480px\)\s*{[\s\S]*?\.pileSubmitSuccessBadge\s*{[\s\S]*?width:\s*54px;[\s\S]*?height:\s*54px;/);
+    expect(scss).toMatch(/@media \(min-width: 1367px\), \(max-width: 480px\)\s*{[\s\S]*?\.pileSubmitButtonTrail\s*{[\s\S]*?display:\s*inline-flex;/);
+  });
+
+  it('ports the recovered animLine border motion onto desktop and smallest-breakpoint pile submit rails', () => {
+    const scssPath = path.join(__dirname, 'SurveyTool.module.scss');
+    const scss = fs.readFileSync(scssPath, 'utf8');
+
+    expect(scss).toMatch(/@media \(min-width: 769px\), \(max-width: 480px\)\s*{[\s\S]*?\.pileFooter\s+\.pileSubmitButton\.submitGlow::before\s*{[\s\S]*?background:\s*linear-gradient\(90deg,\s*#fff 40%,\s*transparent 40%\);[\s\S]*?background-size:\s*200% 4px;[\s\S]*?filter:\s*drop-shadow\(0 0 8px #fff\);/);
+    expect(scss).toMatch(/@keyframes beforeLineAnim\s*{[\s\S]*?45%,\s*50%\s*{[\s\S]*?background-position:\s*-100% 0;[\s\S]*?}[\s\S]*?50%,\s*95%\s*{[\s\S]*?transform:\s*scale\(1,\s*-1\);/);
+    expect(scss).toMatch(/@media \(min-width: 769px\), \(max-width: 480px\)\s*{[\s\S]*?\.pileFooter\s+\.pileSubmitButton\.submitGlow::before\s*{[\s\S]*?animation:\s*beforeLineAnim 5\.4s linear infinite;/);
+    expect(scss).not.toMatch(/pileSubmitRailAfterLineAnim/);
+    expect(scss).not.toMatch(/\.pileFooter\s+\.pileSubmitButton\.submitGlow::after/);
+    expect(scss).toMatch(/@media \(prefers-reduced-motion: reduce\)\s*{[\s\S]*?\.pileFooter\s+\.pileSubmitButton\.submitGlow::before,\s*[\s\S]*?animation:\s*none !important;/);
+  });
+
   it('renders triple trailing arrows inside the pile submit button', () => {
     const shell = new SurveyTool({
       minifiedMode: 'pile',
@@ -209,6 +336,198 @@ describe('SurveyTool module', () => {
       account: '',
       questionResponsesNonce: 5,
       onFilterChange: jest.fn(),
+    });
+    const pileElement = shell.render();
+    const PileViewModeClass = pileElement.type;
+    const subject = new PileViewModeClass(pileElement.props);
+    const visibleList = [{ id: 'q1', type: 'freeform', prompt: 'Q1' }];
+
+    subject.isMaskedPromptText = jest.fn(() => false);
+    subject.getPendingStatsSnapshot = jest.fn(() => ({ total: 1, encrypted: 0 }));
+    subject.state = {
+      ...subject.state,
+      loading: false,
+      pileQuestions: visibleList,
+      allQuestionsForFilter: visibleList,
+      activePileIndex: 0,
+      filterState: {},
+      isFilterActive: false,
+      showCreate: false,
+      filterModalOpen: false,
+      submissionComplete: false,
+      autoDecryptEnabled: false,
+      autoDecryptAttempted: {},
+      decryptingByKey: {},
+      isHydratingPriorResponses: false,
+    };
+
+    const tree = subject.render();
+    const submitButton = findElement(
+      tree,
+      (node) => node?.props?.['data-testid'] === E2E_TESTIDS.SURVEY_SUBMIT
+    );
+    const submitContent = findNodeByClassName(submitButton?.props?.children, 'pileSubmitButtonContent');
+    const submitTrail = findNodeByClassName(submitButton?.props?.children, 'pileSubmitButtonTrail');
+    const submitTrailChildren = getElementChildren(submitTrail);
+
+    expect(submitButton).not.toBeNull();
+    expect(submitContent).not.toBeNull();
+    expect(submitTrail).not.toBeNull();
+    expect(submitTrailChildren).toHaveLength(3);
+  });
+
+  it('hides the pile submit rail when no rail is visible', () => {
+    const shell = new SurveyTool({
+      minifiedMode: 'pile',
+      network: { id: 84532 },
+      networkChainId: 84532,
+      account: '',
+      questionResponsesNonce: 5,
+      onFilterChange: jest.fn(),
+    });
+    const pileElement = shell.render();
+    const PileViewModeClass = pileElement.type;
+    const subject = new PileViewModeClass(pileElement.props);
+    const visibleList = [{ id: 'q1', type: 'freeform', prompt: 'Q1' }];
+
+    subject.isMaskedPromptText = jest.fn(() => false);
+    subject.getPendingStatsSnapshot = jest.fn(() => ({ total: 0, encrypted: 0 }));
+    subject.state = {
+      ...subject.state,
+      loading: false,
+      pileQuestions: visibleList,
+      allQuestionsForFilter: visibleList,
+      activePileIndex: 0,
+      filterState: {},
+      isFilterActive: false,
+      showCreate: false,
+      filterModalOpen: false,
+      submissionComplete: false,
+      submittedSinceLastEdit: false,
+      isSubmitting: false,
+      autoDecryptEnabled: false,
+      autoDecryptAttempted: {},
+      decryptingByKey: {},
+      isHydratingPriorResponses: false,
+    };
+
+    const tree = subject.render();
+    const hiddenFooter = findNodeByClassName(tree, 'pileFooterHidden');
+
+    expect(hiddenFooter).not.toBeNull();
+  });
+
+  it('only reserves the pile submit rail offset when the rail is visible', () => {
+    const shell = new SurveyTool({
+      minifiedMode: 'pile',
+      network: { id: 84532 },
+      networkChainId: 84532,
+      account: '',
+      questionResponsesNonce: 5,
+      onFilterChange: jest.fn(),
+    });
+    const pileElement = shell.render();
+    const PileViewModeClass = pileElement.type;
+    const subject = new PileViewModeClass(pileElement.props);
+    const visibleList = [{ id: 'q1', type: 'freeform', prompt: 'Q1' }];
+
+    subject.isMaskedPromptText = jest.fn(() => false);
+    subject.getPendingStatsSnapshot = jest.fn(() => ({ total: 0, encrypted: 0 }));
+    subject.state = {
+      ...subject.state,
+      loading: false,
+      pileQuestions: visibleList,
+      allQuestionsForFilter: visibleList,
+      activePileIndex: 0,
+      filterState: {},
+      isFilterActive: false,
+      showCreate: false,
+      filterModalOpen: false,
+      submissionComplete: false,
+      submittedSinceLastEdit: false,
+      isSubmitting: false,
+      autoDecryptEnabled: false,
+      autoDecryptAttempted: {},
+      decryptingByKey: {},
+      isHydratingPriorResponses: false,
+    };
+
+    let tree = subject.render();
+    let interactionUnit = findNodeByClassName(tree, 'pileInteractionUnit');
+
+    expect(interactionUnit).not.toBeNull();
+    expect(nodeHasClassName(interactionUnit, 'pileInteractionUnitWithSubmitRail')).toBe(false);
+
+    subject.getPendingStatsSnapshot.mockReturnValue({ total: 1, encrypted: 0 });
+
+    tree = subject.render();
+    interactionUnit = findNodeByClassName(tree, 'pileInteractionUnit');
+
+    expect(interactionUnit).not.toBeNull();
+    expect(nodeHasClassName(interactionUnit, 'pileInteractionUnitWithSubmitRail')).toBe(true);
+  });
+
+  it('replaces the pile submit button with a centered success checkmark after submit', () => {
+    const shell = new SurveyTool({
+      minifiedMode: 'pile',
+      network: { id: 84532 },
+      networkChainId: 84532,
+      account: '0x1111111111111111111111111111111111111111',
+      questionResponsesNonce: 5,
+      onFilterChange: jest.fn(),
+    });
+    const pileElement = shell.render();
+    const PileViewModeClass = pileElement.type;
+    const subject = new PileViewModeClass(pileElement.props);
+    const visibleList = [{ id: 'q1', type: 'freeform', prompt: 'Q1' }];
+
+    subject.isMaskedPromptText = jest.fn(() => false);
+    subject.getPendingStatsSnapshot = jest.fn(() => ({ total: 0, encrypted: 0 }));
+    subject.state = {
+      ...subject.state,
+      loading: false,
+      pileQuestions: visibleList,
+      allQuestionsForFilter: visibleList,
+      activePileIndex: 0,
+      filterState: {},
+      isFilterActive: false,
+      showCreate: false,
+      filterModalOpen: false,
+      submissionComplete: true,
+      submittedSinceLastEdit: true,
+      isSubmitting: false,
+      autoDecryptEnabled: false,
+      autoDecryptAttempted: {},
+      decryptingByKey: {},
+      isHydratingPriorResponses: false,
+    };
+
+    const tree = subject.render();
+    const submitButton = findElement(
+      tree,
+      (node) => node?.props?.['data-testid'] === E2E_TESTIDS.SURVEY_SUBMIT
+    );
+    const successBadge = findNodeByClassName(tree, 'pileSubmitSuccessBadge');
+    const successIcon = findNodeByClassName(tree, 'pileSubmitSuccessIcon');
+    const hiddenFooter = findNodeByClassName(tree, 'pileFooterHidden');
+
+    expect(submitButton).toBeNull();
+    expect(successBadge).not.toBeNull();
+    expect(successBadge?.props?.['data-testid']).toBe(E2E_TESTIDS.SURVEY_SUBMITTED_INDICATOR);
+    expect(successBadge?.props?.role).toBe('status');
+    expect(successBadge?.props?.['aria-label']).toBe('Submitted');
+    expect(successIcon).not.toBeNull();
+    expect(hiddenFooter).toBeNull();
+  });
+
+  it('keeps pile action opacity scoped to buttons and anchors the mini spinner outside the controls stack', () => {
+    const scssPath = path.join(__dirname, 'SurveyTool.module.scss');
+    const scss = fs.readFileSync(scssPath, 'utf8');
+    const pileActionsBlocks = scss.match(/\.pileActions\s*{[^}]*}/g) || [];
+
+    expect(pileActionsBlocks.length).toBeGreaterThanOrEqual(2);
+    pileActionsBlocks.forEach((block) => {
+      expect(block).not.toMatch(/opacity\s*:/);
     });
     const pileElement = shell.render();
     const PileViewModeClass = pileElement.type;
@@ -9215,44 +9534,6 @@ describe('SurveyTool module', () => {
     expect(findNodeByClassName(controlsNode?.props?.children, 'miniSpinnerWrapper')).toBeNull();
     expect(findNodeByClassName(actionsNode?.props?.children, 'miniSpinnerWrapper')).toBeNull();
     expect(findNodeByClassName(navNode?.props?.children, 'miniSpinnerWrapper')).toBeNull();
-  });
-
-  it('passes the delayed pile-entry mode toggle prop into the pile create panel', () => {
-    const shell = new SurveyTool({
-      minifiedMode: 'pile',
-      network: { id: 84532 },
-      networkChainId: 84532,
-      account: '',
-      questionResponsesNonce: 5,
-      onFilterChange: jest.fn(),
-    });
-    const pileElement = shell.render();
-    const PileViewModeClass = pileElement.type;
-    const subject = new PileViewModeClass(pileElement.props);
-
-    subject.state = {
-      ...subject.state,
-      loading: false,
-      pileQuestions: [],
-      allQuestionsForFilter: [],
-      activePileIndex: 0,
-      filterState: {},
-      isFilterActive: false,
-      showCreate: true,
-      filterModalOpen: false,
-      submissionComplete: false,
-      autoDecryptEnabled: false,
-      autoDecryptAttempted: {},
-      decryptingByKey: {},
-    };
-
-    const tree = subject.render();
-    const createSurveyNode = findElement(
-      tree,
-      (node) => node?.props?.hideSurveyQuestionToggleUntilAuthoring === true
-    );
-
-    expect(createSurveyNode).not.toBeNull();
   });
 
   it('passes the delayed pile-entry mode toggle prop into the pile create panel', () => {

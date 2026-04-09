@@ -13203,6 +13203,7 @@ class PileViewMode extends SurveyQuestions {
     this._loadAndSortDebounceTimer = null;
     this._lastLoadAndSortResultSignature = '';
     this._lastInitializeResponseSig = '';
+    this._lastNotifiedPileSubmitRailVisible = null;
 
     // Ref for auto-scrolling to Create section
     this.createSectionRef = React.createRef();
@@ -15021,6 +15022,27 @@ class PileViewMode extends SurveyQuestions {
     } catch (e) { surveyLog.warn('SurveyTool: callback', e); }
   };
 
+  getIsPileSubmitRailVisible = () => {
+    const pendingStats = this.getPendingStatsSnapshot?.() || { total: 0 };
+    return !!(
+      this.state.isSubmitting ||
+      Number(pendingStats.total || 0) > 0 ||
+      this.state.submittedSinceLastEdit ||
+      this.state.submissionComplete
+    );
+  };
+
+  notifyPileSubmitRailVisibility = () => {
+    const nextVisible = this.getIsPileSubmitRailVisible();
+    if (this._lastNotifiedPileSubmitRailVisible === nextVisible) return;
+    this._lastNotifiedPileSubmitRailVisible = nextVisible;
+    try {
+      if (typeof this.props.onPileSubmitRailVisibilityChange === 'function') {
+        this.props.onPileSubmitRailVisibilityChange(nextVisible);
+      }
+    } catch (e) { surveyLog.warn('SurveyTool: callback', e); }
+  };
+
   renderActiveQuestion = (question) => {
     const { surveysResponseState, showComments, showConviction } = this.state;
     const slice = surveysResponseState[0] || {
@@ -15556,14 +15578,6 @@ class PileViewMode extends SurveyQuestions {
       !pileSubmittedStateActive
     );
     const finalSubmitText = this.state.pileSubmitTempText || pileSubmitLabel;
-    const pileSubmitResponderAddress = String(this.props.account || '').trim();
-    const pileSubmitResponderAddressLower =
-      pileSubmitResponderAddress && utils.isAddress(pileSubmitResponderAddress)
-        ? pileSubmitResponderAddress.toLowerCase()
-        : '';
-    const pileSubmitResponderHref = pileSubmitResponderAddressLower
-      ? `/u/${pileSubmitResponderAddressLower}`
-      : '';
 
     const handleSubmitClick = async () => {
       if (!this.props.loginComplete) {
@@ -15695,30 +15709,23 @@ class PileViewMode extends SurveyQuestions {
       </div>
     );
 
+    const pileInteractionUnitClassName = [
+      styles.pileInteractionUnit,
+      pileTopRailVisible ? styles.pileInteractionUnitWithSubmitRail : '',
+    ].filter(Boolean).join(' ');
+
     const footerControls = (
       <div className={`${styles.pileFooter}${pileTopRailVisible ? '' : ` ${styles.pileFooterHidden}`}`}>
         {showPileSubmitSuccessBadge ? (
-          pileSubmitResponderHref ? (
-            <a
-              href={pileSubmitResponderHref}
-              className={styles.pileSubmitSuccessBadge}
-              data-testid={E2E_TESTIDS.SURVEY_SUBMITTED_INDICATOR}
-              aria-label="View your submitted responses"
-              title="View your submitted responses"
-            >
-              <FontAwesomeIcon icon={faCheck} className={styles.pileSubmitSuccessIcon} />
-            </a>
-          ) : (
-            <div
-              className={styles.pileSubmitSuccessBadge}
-              data-testid={E2E_TESTIDS.SURVEY_SUBMITTED_INDICATOR}
-              role="status"
-              aria-label="Submitted"
-              title="Submitted"
-            >
-              <FontAwesomeIcon icon={faCheck} className={styles.pileSubmitSuccessIcon} />
-            </div>
-          )
+          <div
+            className={styles.pileSubmitSuccessBadge}
+            data-testid={E2E_TESTIDS.SURVEY_SUBMITTED_INDICATOR}
+            role="status"
+            aria-label="Submitted"
+            title="Submitted"
+          >
+            <FontAwesomeIcon icon={faCheck} className={styles.pileSubmitSuccessIcon} />
+          </div>
         ) : (
           <Button
             onClick={handleSubmitClick}
@@ -15758,7 +15765,7 @@ class PileViewMode extends SurveyQuestions {
     return (
       <div className={styles.pileViewContainer}>
         <div className={styles.pileWrapper}>
-          <div className={styles.pileInteractionUnit}>
+          <div className={pileInteractionUnitClassName}>
             {SHOW_PILE_HOLOGRAM_TOGGLE && (
               <button
                 type="button"
