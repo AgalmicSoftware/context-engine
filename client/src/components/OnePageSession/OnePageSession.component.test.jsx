@@ -237,77 +237,11 @@ describe('OnePageSession view gating', () => {
     expect(screen.queryByTestId('survey-page-full')).not.toBeInTheDocument();
   });
 
-  it('does not crash when the route hydrates before a network object is available', async () => {
-    const { rerender } = render(<OnePageSession {...buildProps()} network={null} />);
-
-    expect(await screen.findByTestId('survey-page-pile')).toBeInTheDocument();
-
-    rerender(
-      <OnePageSession
-        {...buildProps()}
-        network={null}
-        questionResponsesNonce={1}
-      />
-    );
-
-    expect(screen.getByTestId('survey-page-pile')).toBeInTheDocument();
-  });
-
-  it('shows a Telegram-only notice instead of the web session UI', async () => {
-    render(<OnePageSession
-      {...buildProps()}
-      sessionConfig={{
-        ...buildProps().sessionConfig,
-        telegramOnly: true,
-        sessionMode: 'telegram_only',
-      }}
-    />);
-
-    expect(await screen.findByTestId(E2E_TESTIDS.SESSION_TELEGRAM_ONLY_NOTICE)).toHaveTextContent(
-      /Telegram-only session/i
-    );
-    expect(screen.queryByTestId('survey-page-pile')).not.toBeInTheDocument();
-    expect(mockSurveyPage).not.toHaveBeenCalled();
-  });
-
-  it('derives scoped Chipotle Lit hooks for embedded survey pages from session config', async () => {
-    render(<OnePageSession
-      {...buildProps()}
-      account="0x1E9a72A127dAB666fd47dFAFAe15CCd9e08505eE"
-      loginComplete={true}
-      sessionConfig={{
-        ...buildProps().sessionConfig,
-        slug: 'chipotle-session',
-        corsWorkerUrl: 'https://worker.example.test',
-        __registry: {
-          gateAuthority: 'onchain',
-          gatesByResource: {
-            default: {
-              lookupStatus: 'ok',
-              sbtAddresses: ['0x0000000000000000000000000000000000000001'],
-              chainId: 11155420,
-              mode: 'any',
-            },
-          },
-        },
-      }}
-    />);
-
-    expect(await screen.findByTestId('survey-page-pile')).toBeInTheDocument();
-    const pileProps = mockSurveyPage.mock.calls.find(([props]) => props?.minifiedMode === 'pile')?.[0];
-
-    expect(pileProps?.litHooks).toEqual(expect.objectContaining({
-      saveKey: expect.any(Function),
-      getKey: expect.any(Function),
-      litNetwork: 'chipotle',
-    }));
-  });
-
-  it('uses the title container slot to keep the pile submit rail off the header title', async () => {
+  it('uses the title container slot to reserve pile submit rail space when the embedded pile signals visibility', async () => {
     render(<OnePageSession {...buildProps()} />);
 
     expect(await screen.findByTestId('survey-page-pile')).toBeInTheDocument();
-    const titleHeading = document.querySelector(`.${styles.brandingSectionTitle}`);
+    const titleHeading = document.getElementById(styles.brandingSectionTitle);
     const titleContainer = titleHeading?.closest(`.${styles.titleContainer}`);
     const latestSurveyPageProps = mockSurveyPage.mock.calls[mockSurveyPage.mock.calls.length - 1]?.[0];
 
@@ -328,38 +262,21 @@ describe('OnePageSession view gating', () => {
     expect(titleContainer).not.toHaveClass(styles.titleContainerWithPileSubmitRail);
   });
 
-  it('keeps phone pile titles unshifted while preserving top-rail title offsets elsewhere', () => {
+  it('limits the pile submit rail title offset to phone widths where the rail is absolute', () => {
     const scss = fs.readFileSync(path.join(__dirname, 'OnePageSession.module.scss'), 'utf8');
     const phoneRailBlock = extractMediaBlock(
       scss,
       '@media only screen and (max-width: 480px)',
       '.titleContainerWithPileSubmitRail'
     );
-    const desktopRailBlock = extractMediaBlock(
-      scss,
-      '@media only screen and (min-width: 769px) and (max-width: 1366px)',
-      '.titleContainerWithPileSubmitRail'
-    );
-    const widescreenRailBlock = extractMediaBlock(
-      scss,
-      '@media only screen and (min-width: 1367px)',
-      '.titleContainerWithPileSubmitRail'
-    );
     const tabletRailBlock = extractMediaBlock(
       scss,
-      '@media only screen and (min-width: 481px) and (max-width: 768px)',
+      '@media only screen and (max-width: 600px)',
       '.titleContainerWithPileSubmitRail'
     );
 
-    expect(scss).toContain('.brandingSectionWithPileSubmitRail');
-    expect(scss).toContain('.titleContainerWithPileSubmitRail');
     expect(phoneRailBlock).toContain('.titleContainerWithPileSubmitRail');
-    expect(phoneRailBlock).toContain('transform: none;');
-    expect(phoneRailBlock).not.toContain('transform: translateY(-40px);');
-    expect(desktopRailBlock).toContain('.titleContainerWithPileSubmitRail');
-    expect(desktopRailBlock).toContain('transform: translateY(-40px);');
-    expect(widescreenRailBlock).toContain('.titleContainerWithPileSubmitRail');
-    expect(widescreenRailBlock).toContain('transform: translateY(-52px);');
+    expect(phoneRailBlock).toContain('transform: translateY(-44px);');
     expect(tabletRailBlock).toBeNull();
   });
 

@@ -354,8 +354,6 @@ class OnePageSession extends Component<any, any> {
       disclaimersActive: true,
       filterState: initialFilterState,
       pileSubmitRailVisible: false,
-      corpusViewerLoadRequestNonce: 0,
-      corpusViewerLoadState: DEFAULT_CORPUS_VIEWER_LOAD_STATE,
 
       // Legacy (limited) group password flow state
       // Auto-mint
@@ -2048,9 +2046,9 @@ class OnePageSession extends Component<any, any> {
     this.navigateToInternalPath(sbtsListPath());
   }
 
-  handlePileSubmitRailVisibilityChange(visible: any) {
+  handlePileSubmitRailVisibilityChange(visible) {
     const nextVisible = !!visible;
-    this.setState((prevState: Readonly<OnePageSession['state']>) => (
+    this.setState((prevState) => (
       prevState.pileSubmitRailVisible === nextVisible
         ? null
         : { pileSubmitRailVisible: nextVisible }
@@ -2225,10 +2223,7 @@ class OnePageSession extends Component<any, any> {
       renderSectionHeading('Questions', 'Answer or Add')
     );
     const questionsSectionTooltip = 'Survey and question platform allowing detailed responses, advanced question formats, preference weighing, and group filtering.';
-    const documentsSectionTooltip = 'Allows the conversation to be enriched by data, and the formats can change per-session';
-    const corpusViewerLoadState = this.state.corpusViewerLoadState || DEFAULT_CORPUS_VIEWER_LOAD_STATE;
-    const loadFullCorpusButtonLabel = corpusViewerLoadState.loadButtonLabel || DEFAULT_CORPUS_VIEWER_LOAD_STATE.loadButtonLabel;
-    const disableLoadFullCorpusButton = !!corpusViewerLoadState.disableLoadButton;
+    const documentsSectionTooltip = 'This corpus is evolving into a conversational layer for the session: you’ll be able to chat with the material, have it surface and pose relevant questions, and connect those prompts fluidly with responses.';
     const pileSubmitRailActive = !this.state.showQuestions && this.state.pileSubmitRailVisible;
     const brandingSectionClassName = [
       styles.brandingSection,
@@ -2238,30 +2233,6 @@ class OnePageSession extends Component<any, any> {
       styles.titleContainer,
       pileSubmitRailActive ? styles.titleContainerWithPileSubmitRail : '',
     ].filter(Boolean).join(' ');
-    const telegramOnlySession = isTelegramOnlySessionConfig(resolvedSessionConfig);
-
-    if (telegramOnlySession) {
-      return (
-        <div className={styles.onePageDemoContainer}>
-          <div className={styles.telegramOnlyShell}>
-            <div className={titleContainerClassName}>
-              <h2 className={styles.brandingSectionTitle}>{titleText}</h2>
-            </div>
-            <Alert
-              color="info"
-              className={styles.telegramOnlyNotice}
-              data-testid={E2E_TESTIDS.SESSION_TELEGRAM_ONLY_NOTICE}
-              fade={false}
-            >
-              <strong>Telegram-only session</strong>
-              <span>
-                This session is configured for Telegram bot and Mini App participation. Open it from the Telegram bot to answer questions or view Telegram-only results.
-              </span>
-            </Alert>
-          </div>
-        </div>
-      );
-    }
 
     return (
       <div className={styles.onePageDemoContainer}>
@@ -2436,7 +2407,7 @@ class OnePageSession extends Component<any, any> {
         {/* Branding/header */}
         <div className={brandingSectionClassName}>
           <div className={titleContainerClassName}>
-            <h2 className={styles.brandingSectionTitle}>{titleText}</h2>
+            <h2 id={styles.brandingSectionTitle}>{titleText}</h2>
             <div className={styles.tooltip} tabIndex={0} aria-label="Session info">
               <FontAwesomeIcon icon={faQuestionCircle} />
               <span className={styles.tooltiptext}>
