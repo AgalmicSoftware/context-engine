@@ -32,7 +32,7 @@ We don't yet have a time-efficient and intuitive "map" of AI questions, which al
 
 - Can be public and/or encrypted (for trusted groups and/or future evaluation) as appropriate
 - Are stored permanently, in a standard format AI can summarize / aggregate / evaluate / operate on
-- Can be filtered / encrypted by attestations, proof-of-human credentials, and/or SBTs (non-transferrable tokens; RadicalxChange Foundation, n.d.) issued by disparate communities
+- Can be filtered / encrypted by attestations, proof-of-human credentials, and/or SBTs (non-transferrable tokens; RadicalxChange Foundation, n.d.-a) issued by disparate communities
 
 This infrastructure would act as a stepping stone towards a more compelling interface which allows us to visualize (in multimedia formats) futures that we want to aim for and avoid, to explore positive and negative scenarios via large-scale group prompting, and to judge whether these scenarios follow from present-day policy proposals.
 
@@ -102,7 +102,7 @@ Organizations can run a local version of the decentralized stack described above
 
 Many online communities have norms, values, and tacit knowledge in forms that cannot be easily read by outsiders and/or AI systems: chat logs, moderation histories, ongoing discussions, and informal relationships.
 
-Not every group should aim to formalize itself for outside interaction, but those which generate value through traffic, attention, and interpretation could begin to retain ownership over the data and value they create (RadicalxChange Foundation, n.d.).
+Not every group should aim to formalize itself for outside interaction, but those which generate value through traffic, attention, and interpretation could begin to retain ownership over the data and value they create (RadicalxChange Foundation, n.d.-b; Posner & Weyl, 2018).
 
 Context Engine points towards several directions:
 
@@ -173,7 +173,7 @@ A longer-term goal is cryptographic diplomacy: incentive-compatible programmatic
 
 Programmable cryptography seems like an underexplored toolkit for AI safety and alignment efforts (0xPARC, 2023). It is also worth taking storytelling seriously as a coordination tool and alignment strategy – What would a news broadcast look like from the good timeline, and would seeing that broadcast help us navigate towards it?
 
-Context Engine recognizes and builds on the pioneering work of those involved with RadicalxChange, Pol.is, vTaiwan, g0v, TalkToTheCity, the Plurality Book, 0xPARC, Zuzalu, Edge City, MetaGov, PCARE, and many other related efforts. The author also gratefully acknowledges the AI programming assistance that finally made this effort tractable.
+Context Engine recognizes and builds on the pioneering work of those involved with RadicalxChange, Pol.is, vTaiwan, g0v, TalkToTheCity, Loophole, the Plurality Book, 0xPARC, Zuzalu, Edge City, MetaGov, PCARE, and many other related efforts. The author also gratefully acknowledges the AI programming assistance that finally made this effort tractable.
 
 
 ---
@@ -200,6 +200,8 @@ Griffith, V. (2019, April 8). "Ethereum is game-changing technology, literally."
 
 Henderson, J. (2025, February 7). "The Art of Broad Listening." *Combinations.* https://www.combinationsmag.com/the-art-of-broad-listening/
 
+Hogan, B. (n.d.). *Loophole: AI Policy Loophole Finder.* GitHub. https://github.com/brendanhogan/loophole
+
 Jigsaw. (n.d.). "Reimagining the Town Hall Meeting." *Jigsaw.* https://jigsaw.google/our-work/reimagining-the-town-hall-meeting/
 
 Krier, S. (2025). "Coasean Bargaining at Scale." *Cosmos Institute.* https://blog.cosmos-institute.org/p/coasean-bargaining-at-scale
@@ -208,7 +210,9 @@ Ohlhaver, P. (2025, January 2). *Community Currencies: The Price Of Attention An
 
 Posner, E. A., & Weyl, E. G. (2018). *Radical Markets: Uprooting Capitalism and Democracy for a Just Society.* Princeton University Press.
 
-RadicalxChange Foundation. (n.d.). "Social Identity." *RadicalxChange Wiki.* https://www.radicalxchange.org/wiki/social-identity/
+RadicalxChange Foundation. (n.d.-a). "Social Identity." *RadicalxChange Wiki.* https://www.radicalxchange.org/wiki/social-identity/
+
+RadicalxChange Foundation. (n.d.-b). "Data Dignity." *RadicalxChange Wiki.* https://www.radicalxchange.org/wiki/data-dignity/
 
 Owocki, K. (2026, March 5). "Collective Intelligence Infrastructure: Protocols for Thinking Together." *Gitcoin.* https://gitcoin.co/research/collective-intelligence-protocols-for-thinking-together
 
