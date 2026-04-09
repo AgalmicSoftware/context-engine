@@ -428,9 +428,7 @@ $filter-pill-active-border: rgba(0, 255, 157, 0.6);
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition:
-    color 0.18s ease,
-    transform 0.18s ease;
+  transition: color 0.18s ease, transform 0.18s ease;
 
   &:hover,
   &:focus-visible {
