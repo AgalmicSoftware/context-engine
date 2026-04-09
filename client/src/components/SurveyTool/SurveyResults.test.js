@@ -5,6 +5,7 @@ import ConnectedSurveyResults, {
   countQuestionModeResponses,
   hasAnyCountableSurveyAnswer,
 } from './SurveyResults.jsx';
+import styles from './SurveyResults.module.scss';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import * as contractScriptsModule from '../../utilities/web3/contractScripts.js';
 import * as sbtDisplayNameUtils from '../../utilities/sbt/sbtDisplayNames.js';
@@ -24,7 +25,11 @@ jest.mock('../PolisReport/PolisReport', () => (props) => {
   mockPolisReport(props);
   return null;
 });
-jest.mock('./SingleQuestionResponse', () => () => null);
+const mockSingleQuestionResponse = jest.fn(() => null);
+jest.mock('./SingleQuestionResponse', () => (props) => {
+  mockSingleQuestionResponse(props);
+  return null;
+});
 
 const SurveyResults = ConnectedSurveyResults.WrappedComponent;
 
@@ -79,6 +84,12 @@ const normalizeChildren = (children) => {
   if (Array.isArray(children)) return children.filter(Boolean);
   return [children].filter(Boolean);
 };
+
+beforeEach(() => {
+  mockSbtFilter.mockClear();
+  mockPolisReport.mockClear();
+  mockSingleQuestionResponse.mockClear();
+});
 
 const treeHasText = (node, text) => {
   if (node == null) return false;
@@ -1226,6 +1237,412 @@ describe('SurveyResults freeform aggregator summary', () => {
   });
 });
 
+describe('SurveyResults survey-mode dedupe', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('keeps only the latest answer per responder/question when hydrating survey-mode state', async () => {
+    const surveyId = 'survey-dedupe-1';
+    const responder = '0x1111111111111111111111111111111111111111';
+    const networkId = '84532';
+    const surveysCache = {
+      [networkId]: {
+        surveys: {
+          [surveyId]: {
+            title: 'Deduped Survey',
+            questionIDs: ['q1', 'q2'],
+          },
+        },
+        surveysLatestBlock: 7,
+        surveyResponsesLatestBlock: {
+          [surveyId]: 9,
+        },
+        surveyResponses: {
+          [surveyId]: {
+            [responder]: {
+              timeStamp: '2025-01-01T00:00:00.000Z',
+              responses: [
+                {
+                  questionId: 'q1',
+                  timeStamp: '2024-01-01T00:00:00.000Z',
+                  answer: { value: 'Old answer' },
+                },
+                {
+                  questionID: 'q1',
+                  timeStamp: '2025-01-01T00:00:00.000Z',
+                  answer: { value: 'Latest answer' },
+                },
+                {
+                  questionID: 'q2',
+                  timeStamp: '2025-01-02T00:00:00.000Z',
+                  answer: { value: 'Second question answer' },
+                },
+              ],
+            },
+          },
+        },
+      },
+    };
+
+    const subject = attachStateHarness(createSubject({
+      network: { id: Number(networkId) },
+      isQuestionCacheReady: true,
+    }));
+
+    subject.state = {
+      ...subject.state,
+      viewMode: 'survey',
+      surveyId,
+    };
+    subject.getEffectiveSlug = jest.fn(() => 'session-slug');
+    subject.getNetworkQuestionsForCurrentContext = jest.fn(() => ({
+      q1: { type: 'freeform' },
+      q2: { type: 'freeform' },
+    }));
+    subject.parseResponse = jest.fn((response) => response);
+
+    jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace) => {
+      if (namespace === 'surveysCache') return surveysCache;
+      return {};
+    });
+    jest.spyOn(cacheScripts, 'readCache').mockResolvedValue({});
+
+    await subject.fetchSurveyModeResponses();
+
+    expect(subject.state.responses).toHaveLength(1);
+    expect(subject.state.responses[0].response.responses).toHaveLength(2);
+    expect(subject.state.responses[0].response.responses[0]).toEqual(expect.objectContaining({
+      questionID: 'q1',
+      answer: expect.objectContaining({ value: 'Latest answer' }),
+    }));
+    expect(subject.state.aggregateQuestionResponses.q1).toHaveLength(1);
+    expect(subject.state.aggregateQuestionResponses.q1[0].response.answer.value).toBe('Latest answer');
+    expect(subject.state.aggregateQuestionResponses.q2).toHaveLength(1);
+  });
+
+  it('preserves the first-seen question order when duplicate rows are interleaved', async () => {
+    const surveyId = 'survey-dedupe-order';
+    const responder = '0x1111111111111111111111111111111111111111';
+    const networkId = '84532';
+    const surveysCache = {
+      [networkId]: {
+        surveys: {
+          [surveyId]: {
+            title: 'Deduped Survey Order',
+            questionIDs: ['q1', 'q2'],
+          },
+        },
+        surveysLatestBlock: 7,
+        surveyResponsesLatestBlock: {
+          [surveyId]: 9,
+        },
+        surveyResponses: {
+          [surveyId]: {
+            [responder]: {
+              timeStamp: '2025-01-01T00:00:00.000Z',
+              responses: [
+                {
+                  questionId: 'q1',
+                  timeStamp: '2024-01-01T00:00:00.000Z',
+                  answer: { value: 'Old first answer' },
+                },
+                {
+                  questionID: 'q2',
+                  timeStamp: '2024-01-02T00:00:00.000Z',
+                  answer: { value: 'Second question answer' },
+                },
+                {
+                  questionID: 'q1',
+                  timeStamp: '2025-01-01T00:00:00.000Z',
+                  answer: { value: 'Latest first answer' },
+                },
+              ],
+            },
+          },
+        },
+      },
+    };
+
+    const subject = attachStateHarness(createSubject({
+      network: { id: Number(networkId) },
+      isQuestionCacheReady: true,
+    }));
+
+    subject.state = {
+      ...subject.state,
+      viewMode: 'survey',
+      surveyId,
+    };
+    subject.getEffectiveSlug = jest.fn(() => 'session-slug');
+    subject.getNetworkQuestionsForCurrentContext = jest.fn(() => ({
+      q1: { type: 'freeform' },
+      q2: { type: 'freeform' },
+    }));
+    subject.parseResponse = jest.fn((response) => response);
+
+    jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace) => {
+      if (namespace === 'surveysCache') return surveysCache;
+      return {};
+    });
+    jest.spyOn(cacheScripts, 'readCache').mockResolvedValue({});
+
+    await subject.fetchSurveyModeResponses();
+
+    expect(subject.state.responses).toHaveLength(1);
+    expect(
+      subject.state.responses[0].response.responses.map((row) => row.questionID || row.questionId)
+    ).toEqual(['q1', 'q2']);
+    expect(subject.state.responses[0].response.responses[0]).toEqual(expect.objectContaining({
+      questionID: 'q1',
+      answer: expect.objectContaining({ value: 'Latest first answer' }),
+    }));
+  });
+
+  it('preserves passthrough row order when duplicate question rows are collapsed around them', async () => {
+    const surveyId = 'survey-dedupe-passthrough-order';
+    const responder = '0x1111111111111111111111111111111111111111';
+    const networkId = '84532';
+    const surveysCache = {
+      [networkId]: {
+        surveys: {
+          [surveyId]: {
+            title: 'Deduped Survey Passthrough Order',
+            questionIDs: ['q1', 'q2'],
+          },
+        },
+        surveysLatestBlock: 7,
+        surveyResponsesLatestBlock: {
+          [surveyId]: 9,
+        },
+        surveyResponses: {
+          [surveyId]: {
+            [responder]: {
+              timeStamp: '2025-01-01T00:00:00.000Z',
+              responses: [
+                {
+                  questionId: 'q1',
+                  timeStamp: '2024-01-01T00:00:00.000Z',
+                  answer: { value: 'Old first answer' },
+                },
+                {
+                  kind: 'legacyMeta',
+                  note: 'Keep this row between the deduped answers',
+                },
+                {
+                  questionID: 'q1',
+                  timeStamp: '2025-01-01T00:00:00.000Z',
+                  answer: { value: 'Latest first answer' },
+                },
+                {
+                  questionID: 'q2',
+                  timeStamp: '2025-01-02T00:00:00.000Z',
+                  answer: { value: 'Second question answer' },
+                },
+              ],
+            },
+          },
+        },
+      },
+    };
+
+    const subject = attachStateHarness(createSubject({
+      network: { id: Number(networkId) },
+      isQuestionCacheReady: true,
+    }));
+
+    subject.state = {
+      ...subject.state,
+      viewMode: 'survey',
+      surveyId,
+    };
+    subject.getEffectiveSlug = jest.fn(() => 'session-slug');
+    subject.getNetworkQuestionsForCurrentContext = jest.fn(() => ({
+      q1: { type: 'freeform' },
+      q2: { type: 'freeform' },
+    }));
+    subject.parseResponse = jest.fn((response) => response);
+
+    jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace) => {
+      if (namespace === 'surveysCache') return surveysCache;
+      return {};
+    });
+    jest.spyOn(cacheScripts, 'readCache').mockResolvedValue({});
+
+    await subject.fetchSurveyModeResponses();
+
+    expect(subject.state.responses).toHaveLength(1);
+    expect(
+      subject.state.responses[0].response.responses.map(
+        (row) => row.questionID || row.questionId || row.kind
+      )
+    ).toEqual(['q1', 'legacyMeta', 'q2']);
+    expect(subject.state.responses[0].response.responses[0]).toEqual(expect.objectContaining({
+      questionID: 'q1',
+      answer: expect.objectContaining({ value: 'Latest first answer' }),
+    }));
+    expect(subject.state.responses[0].response.responses[1]).toEqual(expect.objectContaining({
+      kind: 'legacyMeta',
+      note: 'Keep this row between the deduped answers',
+    }));
+  });
+
+  it('prefers a newer payload timestamp when the edited answer row has no timestamp', async () => {
+    const surveyId = 'survey-dedupe-payload-timestamp';
+    const responder = '0x1111111111111111111111111111111111111111';
+    const networkId = '84532';
+    const surveysCache = {
+      [networkId]: {
+        surveys: {
+          [surveyId]: {
+            title: 'Payload Timestamp Dedupe Survey',
+            questionIDs: ['q1'],
+          },
+        },
+        surveysLatestBlock: 7,
+        surveyResponsesLatestBlock: {
+          [surveyId]: 9,
+        },
+        surveyResponses: {
+          [surveyId]: {
+            [responder]: {
+              timeStamp: '2025-01-01T00:00:00.000Z',
+              responses: [
+                {
+                  questionId: 'q1',
+                  timeStamp: '2024-01-01T00:00:00.000Z',
+                  answer: { value: 'Old answer' },
+                },
+                {
+                  questionID: 'q1',
+                  answer: { value: 'Latest answer' },
+                },
+              ],
+            },
+          },
+        },
+      },
+    };
+
+    const subject = attachStateHarness(createSubject({
+      network: { id: Number(networkId) },
+      isQuestionCacheReady: true,
+    }));
+
+    subject.state = {
+      ...subject.state,
+      viewMode: 'survey',
+      surveyId,
+    };
+    subject.getEffectiveSlug = jest.fn(() => 'session-slug');
+    subject.getNetworkQuestionsForCurrentContext = jest.fn(() => ({
+      q1: { type: 'freeform' },
+    }));
+    subject.parseResponse = jest.fn((response) => response);
+
+    jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace) => {
+      if (namespace === 'surveysCache') return surveysCache;
+      return {};
+    });
+    jest.spyOn(cacheScripts, 'readCache').mockResolvedValue({});
+
+    await subject.fetchSurveyModeResponses();
+
+    expect(subject.state.responses).toHaveLength(1);
+    expect(subject.state.responses[0].response.responses).toEqual([
+      expect.objectContaining({
+        questionID: 'q1',
+        answer: expect.objectContaining({ value: 'Latest answer' }),
+      }),
+    ]);
+    expect(subject.state.aggregateQuestionResponses.q1).toEqual([
+      expect.objectContaining({
+        response: expect.objectContaining({
+          answer: expect.objectContaining({ value: 'Latest answer' }),
+        }),
+      }),
+    ]);
+  });
+
+  it('prefers a newer payload timestamp when the edited answer row keeps a stale row timestamp', async () => {
+    const surveyId = 'survey-dedupe-stale-entry-timestamp';
+    const responder = '0x1111111111111111111111111111111111111111';
+    const networkId = '84532';
+    const surveysCache = {
+      [networkId]: {
+        surveys: {
+          [surveyId]: {
+            title: 'Payload Wins Over Stale Entry Timestamp',
+            questionIDs: ['q1'],
+          },
+        },
+        surveysLatestBlock: 7,
+        surveyResponsesLatestBlock: {
+          [surveyId]: 9,
+        },
+        surveyResponses: {
+          [surveyId]: {
+            [responder]: {
+              timeStamp: '2025-02-01T00:00:00.000Z',
+              responses: [
+                {
+                  questionId: 'q1',
+                  timeStamp: '2025-01-15T00:00:00.000Z',
+                  answer: { value: 'Old answer' },
+                },
+                {
+                  questionID: 'q1',
+                  timeStamp: '2024-01-01T00:00:00.000Z',
+                  answer: { value: 'Latest answer' },
+                },
+              ],
+            },
+          },
+        },
+      },
+    };
+
+    const subject = attachStateHarness(createSubject({
+      network: { id: Number(networkId) },
+      isQuestionCacheReady: true,
+    }));
+
+    subject.state = {
+      ...subject.state,
+      viewMode: 'survey',
+      surveyId,
+    };
+    subject.getEffectiveSlug = jest.fn(() => 'session-slug');
+    subject.getNetworkQuestionsForCurrentContext = jest.fn(() => ({
+      q1: { type: 'freeform' },
+    }));
+    subject.parseResponse = jest.fn((response) => response);
+
+    jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace) => {
+      if (namespace === 'surveysCache') return surveysCache;
+      return {};
+    });
+    jest.spyOn(cacheScripts, 'readCache').mockResolvedValue({});
+
+    await subject.fetchSurveyModeResponses();
+
+    expect(subject.state.responses).toHaveLength(1);
+    expect(subject.state.responses[0].response.responses).toEqual([
+      expect.objectContaining({
+        questionID: 'q1',
+        answer: expect.objectContaining({ value: 'Latest answer' }),
+      }),
+    ]);
+    expect(subject.state.aggregateQuestionResponses.q1).toEqual([
+      expect.objectContaining({
+        response: expect.objectContaining({
+          answer: expect.objectContaining({ value: 'Latest answer' }),
+        }),
+      }),
+    ]);
+  });
+});
+
 describe('SurveyResults multichoice aggregator summary', () => {
   it('renders the empty multichoice state inside the SurveyResults-only aggregator panel', () => {
     const subject = createSubject();
@@ -1314,6 +1731,92 @@ describe('SurveyResults multichoice aggregator summary', () => {
     expect(markup).toContain('1 total responders to this multichoice question.');
     expect(markup).toContain('Alpha');
     expect(markup).toContain('Beta');
+  });
+
+  it('shows the deduped latest-responder count in the question card header', () => {
+    const subject = createSubject();
+    subject.state = {
+      ...subject.state,
+      activeQuestionToggles: { q1: true },
+      surveyId: 'survey-1',
+    };
+
+    const tree = subject.renderQuestionSummary(
+      'q1',
+      [
+        {
+          responder: '0xaaa',
+          timestamp: 1,
+          response: { type: 'multichoice', answer: { value: ['Alpha'] } },
+        },
+        {
+          responder: '0xaaa',
+          timestamp: 2,
+          response: { type: 'multichoice', answer: { value: ['Alpha', 'Beta'] } },
+        },
+      ],
+      {
+        q1: {
+          id: 'q1',
+          prompt: 'Pick some options',
+          type: 'multichoice',
+          options: ['Alpha', 'Beta'],
+        },
+      }
+    );
+
+    const countNode = findElement(
+      tree,
+      (element) => element?.props?.id === styles.responseCountNumber
+    );
+
+    expect(countNode?.props?.children).toBe(1);
+  });
+});
+
+describe('SurveyResults question table counts', () => {
+  it('dedupes the question-table response count by responder before sorting/display', () => {
+    const subject = createSubject();
+    subject.state = {
+      ...subject.state,
+      questionIdSortBy: 'responses',
+      questionIdSortAsc: true,
+    };
+
+    const entries = subject.getMemoizedQuestionTableEntries(
+      {
+        q1: [
+          {
+            responder: '0xaaa',
+            timestamp: 1,
+            response: { answer: { value: 'Old answer' } },
+          },
+          {
+            responder: '0xaaa',
+            timestamp: 2,
+            response: { answer: { value: 'Latest answer' } },
+          },
+          {
+            responder: '0xbbb',
+            timestamp: 1,
+            response: { answer: { value: 'Other responder' } },
+          },
+        ],
+      },
+      {
+        q1: {
+          prompt: 'Question one',
+          type: 'freeform',
+        },
+      }
+    );
+
+    expect(entries).toEqual([
+      expect.objectContaining({
+        questionId: 'q1',
+        responsesCount: 2,
+      }),
+    ]);
   });
 });
 
@@ -1559,6 +2062,107 @@ describe('SurveyResults survey/response links', () => {
       (element) => element?.type === 'a' && element?.props?.href === `/u/${encodeURIComponent(responder)}`
     );
     expect(responderLink).toBeTruthy();
+  });
+
+  it('renders only the latest answer row in expanded survey individual view for duplicate question updates', async () => {
+    const surveyId = 'survey-individual-dedupe';
+    const responder = '0x1111111111111111111111111111111111111111';
+    const networkId = '84532';
+    const surveysCache = {
+      [networkId]: {
+        surveys: {
+          [surveyId]: {
+            title: 'Individual Dedupe Survey',
+            questionIDs: ['q1'],
+          },
+        },
+        surveysLatestBlock: 4,
+        surveyResponsesLatestBlock: {
+          [surveyId]: 5,
+        },
+        surveyResponses: {
+          [surveyId]: {
+            [responder]: {
+              timeStamp: '2025-01-01T00:00:00.000Z',
+              responses: [
+                {
+                  questionId: 'q1',
+                  timeStamp: '2024-01-01T00:00:00.000Z',
+                  answer: { value: 'Old answer' },
+                },
+                {
+                  questionID: 'q1',
+                  timeStamp: '2025-01-01T00:00:00.000Z',
+                  answer: { value: 'Latest answer' },
+                },
+              ],
+            },
+          },
+        },
+      },
+    };
+
+    const subject = attachStateHarness(createSubject({
+      isOpen: true,
+      viewMode: 'survey',
+      filterState: {},
+      isResponsesCacheReady: true,
+      isQuestionCacheReady: true,
+      isSBTCacheReady: true,
+      network: { id: Number(networkId) },
+    }));
+
+    subject.state = {
+      ...subject.state,
+      viewMode: 'survey',
+      surveyId,
+      surveyViewMode: 'individuals',
+      activeToggles: { 0: true },
+    };
+    subject.getEffectiveSlug = jest.fn(() => 'session-slug');
+    subject.getNetworkQuestionsForCurrentContext = jest.fn(() => ({
+      q1: {
+        id: 'q1',
+        prompt: 'Question one',
+        type: 'freeform',
+      },
+    }));
+    subject.getScopedQuestionNetworkDataSync = jest.fn(() => ({
+      questions: {
+        q1: {
+          id: 'q1',
+          prompt: 'Question one',
+          type: 'freeform',
+        },
+      },
+      questionResponses: {},
+      questionsLatestBlock: 0,
+      questionResponsesLatestBlock: 0,
+    }));
+    subject.parseResponse = jest.fn((response) => response);
+
+    jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace) => {
+      if (namespace === 'surveysCache') return surveysCache;
+      return {};
+    });
+    jest.spyOn(cacheScripts, 'readCache').mockResolvedValue({});
+
+    await subject.fetchSurveyModeResponses();
+    const singleResponseNodes = collectTreeNodes(
+      subject.render(),
+      (element) => (
+        typeof element?.type === 'function' &&
+        element?.props?.aggregatorResponseMode === false
+      )
+    );
+
+    expect(singleResponseNodes).toHaveLength(1);
+    expect(singleResponseNodes[0].props).toEqual(expect.objectContaining({
+      response: expect.objectContaining({
+        questionID: 'q1',
+        answer: expect.objectContaining({ value: 'Latest answer' }),
+      }),
+    }));
   });
 
   it('renders survey document URL links in the modal header when available', () => {
