@@ -5788,6 +5788,44 @@ describe('SBTsList per-session loader countdown', () => {
     expect(position & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
+  it('hides the session summary when the CommunityTab mini modal session universe is collapsed', async () => {
+    render(
+      <SBTsList
+        provider="mock"
+        network={{ id: 84532, name: 'Base Sepolia' }}
+        account=""
+        sessionSlug=""
+        loginComplete
+        miniaturized
+        viewMode="modal"
+        communityTabCompactSettings
+        toggleLoginModal={jest.fn()}
+        sbtCacheRevision={0}
+        onRequestSbtCacheRefresh={jest.fn()}
+        isSBTCacheReady={false}
+        refreshSbtData={jest.fn()}
+        latestBlockNumber={0}
+        allSessionsMode
+        ensureLightSbtDiscovery={jest.fn()}
+      />
+    );
+
+    const settingsButton = await screen.findByRole('button', { name: /Group list settings/i });
+    fireEvent.click(settingsButton);
+
+    await screen.findByTestId('session-selector-panel');
+    expect(screen.queryByTestId('session-selector-summary')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /Collapse session universe/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Expand session universe/i })).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId('session-universe-collapsed-summary')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('session-collapsed-chip-alpha')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('session-collapsed-chip-beta')).not.toBeInTheDocument();
+  });
+
   it('shows selected sessions in collapsed session universe summary', async () => {
     mockReadSessionScanScope.mockReturnValue('list');
     mockReadSessionScanSlugs.mockReturnValue(['alpha', 'beta']);
@@ -5826,6 +5864,169 @@ describe('SBTsList per-session loader countdown', () => {
     expect(screen.getByTestId('session-collapsed-chip-beta')).toBeInTheDocument();
     expect(screen.getByTestId('session-collapsed-chip-progress-alpha')).toHaveTextContent('1,050 / 1,100');
     expect(screen.getByTestId('session-collapsed-chip-progress-beta')).toHaveTextContent('2,060 / 2,200');
+  });
+
+  it('renders closed-summary session link icons and opens the session without revealing the selector', async () => {
+    mockReadSessionScanScope.mockReturnValue('list');
+    mockReadSessionScanSlugs.mockReturnValue(['alpha', 'beta']);
+    const openSpy = jest.spyOn(window, 'open').mockImplementation(() => null);
+
+    render(
+      <SBTsList
+        provider="mock"
+        network={{ id: 84532, name: 'Base Sepolia' }}
+        account=""
+        sessionSlug=""
+        loginComplete
+        miniaturized={false}
+        toggleLoginModal={jest.fn()}
+        sbtCacheRevision={0}
+        onRequestSbtCacheRefresh={jest.fn()}
+        isSBTCacheReady={false}
+        refreshSbtData={jest.fn()}
+        latestBlockNumber={0}
+        allSessionsMode
+        embeddedMode
+        ensureLightSbtDiscovery={jest.fn()}
+      />
+    );
+
+    const closedSummary = await screen.findByTestId('session-selector-summary');
+    expect(closedSummary).toBeInTheDocument();
+    expect(screen.queryByTestId('session-selector-panel')).not.toBeInTheDocument();
+    expect(screen.getByTestId('session-collapsed-chip-open-alpha')).toBeInTheDocument();
+    expect(screen.getByTestId('session-collapsed-chip-open-beta')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('session-collapsed-chip-open-beta'));
+
+    expect(openSpy).toHaveBeenCalledWith('/session/beta', '_blank', 'noopener,noreferrer');
+    expect(screen.queryByTestId('session-selector-panel')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Show session selector/i })).toBeInTheDocument();
+    openSpy.mockRestore();
+  });
+
+  it('prepends PUBLIC_URL when opening a collapsed-summary session link', async () => {
+    mockReadSessionScanScope.mockReturnValue('list');
+    mockReadSessionScanSlugs.mockReturnValue(['alpha', 'beta']);
+    const previousPublicUrl = process.env.PUBLIC_URL;
+    process.env.PUBLIC_URL = '/ce/';
+    const openSpy = jest.spyOn(window, 'open').mockImplementation(() => null);
+
+    try {
+      render(
+        <SBTsList
+          provider="mock"
+          network={{ id: 84532, name: 'Base Sepolia' }}
+          account=""
+          sessionSlug=""
+          loginComplete
+          miniaturized={false}
+          toggleLoginModal={jest.fn()}
+          sbtCacheRevision={0}
+          onRequestSbtCacheRefresh={jest.fn()}
+          isSBTCacheReady={false}
+          refreshSbtData={jest.fn()}
+          latestBlockNumber={0}
+          allSessionsMode
+          embeddedMode
+          ensureLightSbtDiscovery={jest.fn()}
+        />
+      );
+
+      await screen.findByTestId('session-selector-summary');
+      fireEvent.click(screen.getByTestId('session-collapsed-chip-open-beta'));
+
+      expect(openSpy).toHaveBeenCalledWith('/ce/session/beta', '_blank', 'noopener,noreferrer');
+    } finally {
+      openSpy.mockRestore();
+      if (previousPublicUrl === undefined) delete process.env.PUBLIC_URL;
+      else process.env.PUBLIC_URL = previousPublicUrl;
+    }
+  });
+
+  it('opens in-panel collapsed summary session links without expanding the section', async () => {
+    mockReadSessionScanScope.mockReturnValue('list');
+    mockReadSessionScanSlugs.mockReturnValue(['alpha', 'beta']);
+    const openSpy = jest.spyOn(window, 'open').mockImplementation(() => null);
+
+    render(
+      <SBTsList
+        provider="mock"
+        network={{ id: 84532, name: 'Base Sepolia' }}
+        account=""
+        sessionSlug=""
+        loginComplete
+        miniaturized={false}
+        toggleLoginModal={jest.fn()}
+        sbtCacheRevision={0}
+        onRequestSbtCacheRefresh={jest.fn()}
+        isSBTCacheReady={false}
+        refreshSbtData={jest.fn()}
+        latestBlockNumber={0}
+        allSessionsMode
+        embeddedMode
+        ensureLightSbtDiscovery={jest.fn()}
+      />
+    );
+
+    await openSessionSelector();
+    fireEvent.click(screen.getByRole('button', { name: /Collapse session universe/i }));
+
+    const collapsedSummary = await screen.findByTestId('session-universe-collapsed-summary');
+    expect(collapsedSummary).toBeInTheDocument();
+    expect(screen.getByTestId('session-collapsed-chip-open-alpha')).toBeInTheDocument();
+    expect(screen.getByTestId('session-collapsed-chip-open-beta')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('session-collapsed-chip-open-alpha'));
+
+    expect(openSpy).toHaveBeenCalledWith('/session/alpha', '_blank', 'noopener,noreferrer');
+    expect(screen.getByTestId('session-universe-collapsed-summary')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Expand session universe/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Alpha' })).not.toBeInTheDocument();
+    openSpy.mockRestore();
+  });
+
+  it('keeps the closed-summary general session link canonical as /session', async () => {
+    mockReadSessionScanScope.mockReturnValue('list');
+    mockReadSessionScanSlugs.mockReturnValue(['']);
+    mockGetAllSessionEntries.mockReturnValue([
+      ['general', { slug: '' }],
+      ['alpha', { slug: 'alpha' }],
+    ]);
+    mockSessionRegistryGetAllSessionEntries.mockReturnValue([
+      ['general', { slug: '' }],
+      ['alpha', { slug: 'alpha' }],
+    ]);
+    const openSpy = jest.spyOn(window, 'open').mockImplementation(() => null);
+
+    render(
+      <SBTsList
+        provider="mock"
+        network={{ id: 84532, name: 'Base Sepolia' }}
+        account=""
+        sessionSlug=""
+        loginComplete
+        miniaturized={false}
+        toggleLoginModal={jest.fn()}
+        sbtCacheRevision={0}
+        onRequestSbtCacheRefresh={jest.fn()}
+        isSBTCacheReady={false}
+        refreshSbtData={jest.fn()}
+        latestBlockNumber={0}
+        allSessionsMode
+        embeddedMode
+        ensureLightSbtDiscovery={jest.fn()}
+      />
+    );
+
+    const closedSummary = await screen.findByTestId('session-selector-summary');
+    expect(closedSummary).toBeInTheDocument();
+    expect(screen.getByTestId('session-collapsed-chip-general')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('session-collapsed-chip-open-general'));
+
+    expect(openSpy).toHaveBeenCalledWith('/session', '_blank', 'noopener,noreferrer');
+    openSpy.mockRestore();
   });
 
   it('allows collapsing and expanding the universe chips section', async () => {

@@ -3128,15 +3128,21 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
 /* Container for Card + Controls Side-by-Side */
 .pileInteractionUnit {
-  --pile-desktop-submit-rail-offset: 42px;
+  --pile-desktop-submit-rail-offset: 64px;
   --pile-desktop-rail-gap: 24px;
-  --pile-card-width: min(550px, 90vw);
+  --pile-current-submit-rail-offset: 0px;
+  --pile-current-submit-rail-padding: 0px;
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
-  width: var(--pile-card-width);
-  max-width: 90vw;
+  width: auto;
+  padding-top: var(--pile-current-submit-rail-padding);
+}
+
+.pileInteractionUnitWithSubmitRail {
+  --pile-current-submit-rail-offset: var(--pile-desktop-submit-rail-offset);
+  --pile-current-submit-rail-padding: var(--pile-desktop-submit-rail-offset);
 }
 
 /* Card Stack Container */
@@ -3224,7 +3230,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 /* --- Controls Container (Nav + Actions) --- */
 .pileControls {
   position: absolute;
-  top: 0;
+  top: var(--pile-current-submit-rail-offset);
   right: 0;
   bottom: 0;
   left: 0;
@@ -3361,7 +3367,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 .miniSpinnerWrapper {
     opacity: 0.5;
     position: absolute;
-    top: -30px;
+    top: calc(var(--pile-current-submit-rail-offset) - 30px);
     right: -75px;
     z-index: 2;
     display: flex;
@@ -3378,7 +3384,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
 .pileHologramToggle {
   position: absolute;
-  top: 6px;
+  top: calc(var(--pile-current-submit-rail-offset) + 6px);
   right: 16px;
   width: 42px;
   height: 42px;
@@ -3696,6 +3702,15 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 }
 
 @media (min-width: 1367px) {
+  .pileInteractionUnit {
+    --pile-current-submit-rail-offset: 0px;
+    --pile-current-submit-rail-padding: 0px;
+  }
+
+  .pileControls {
+    top: 0;
+  }
+
   .miniSpinnerWrapper {
     top: 0;
   }
@@ -3705,7 +3720,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   }
 
   .pileFooter {
-    top: -50px;
+    top: -72px;
     right: 32px;
     left: 0;
     width: auto;
@@ -3805,8 +3820,9 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   .pileInteractionUnit {
     flex-direction: column;
     /* Stack card then controls */
-    width: var(--pile-card-width);
-    max-width: 90vw;
+    width: 100%;
+    --pile-current-submit-rail-offset: 0px;
+    --pile-current-submit-rail-padding: 0px;
   }
 
   .pileControls {
@@ -3963,6 +3979,11 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 }
 
 @media (max-width: 480px) {
+  .pileInteractionUnit {
+    --pile-current-submit-rail-offset: 0px;
+    --pile-current-submit-rail-padding: 0px;
+  }
+
   .pileControls {
     position: static;
     transform: none;
@@ -4004,7 +4025,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
   .pileFooter {
     position: absolute;
-    top: -52px;
+    top: -60px;
     right: 20px;
     left: 10px;
     flex: 0 0 auto;
@@ -4228,19 +4249,30 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 }
 
 .pileSubmitButton {
-  @include finalSubmitCta.final-submit-cta-shell(
-    $padding: 12px 24px,
-    $min-height: 0,
-    $font-size: 1rem,
-    $border-radius: var(--ce-radius-8),
-    $box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1),
-    $hover-box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15)
-  );
-  & {
-    --pile-submit-button-radius: var(--ce-radius-8);
-    white-space: nowrap;
-    max-width: 300px;
-    overflow: visible;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  background-color: #2a63ca !important;
+  background-image: none !important;
+  border: 1px solid #2a63ca !important;
+  border-radius: var(--ce-radius-8);
+  padding: 12px 24px;
+  font-size: 1rem;
+  font-weight: bold;
+  color: var(--ce-color-white);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  transition:
+    transform 0.2s ease,
+    opacity 0.2s ease;
+  white-space: nowrap;
+  max-width: 300px;
+  overflow: visible;
+  &:hover {
+    background-color: var(--ce-color-indigo) !important;
+    border-color: var(--ce-color-indigo) !important;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
   }
 }
 
@@ -4248,7 +4280,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   position: relative;
   isolation: isolate;
   z-index: 0;
-  --pile-submit-button-radius: var(--ce-radius-16);
   width: 100%;
   max-width: none;
   min-height: 60px;
@@ -4258,18 +4289,14 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   box-shadow:
     0 14px 30px rgba(7, 14, 38, 0.34),
     0 0 0 1px rgba(120, 154, 255, 0.18);
-
-  &:hover:not(:disabled),
-  &:focus:not(:disabled) {
-    box-shadow:
-      0 18px 36px rgba(7, 14, 38, 0.4),
-      0 0 0 1px rgba(120, 154, 255, 0.24);
-  }
 }
 
 .pileSubmitButtonContent {
-  @include finalSubmitCta.final-submit-cta-content($gap: 12px);
-  text-transform: uppercase;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
 }
 
 .pileSubmitButtonLabel {
@@ -4309,7 +4336,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   height: 60px;
   border-radius: 50%;
   color: var(--ce-color-white);
-  text-decoration: none;
   background:
     radial-gradient(circle at 30% 28%, rgba(255, 255, 255, 0.26), rgba(255, 255, 255, 0.03) 48%),
     linear-gradient(135deg, #59d77d 0%, #39b963 100%);
@@ -4317,48 +4343,39 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     0 14px 30px rgba(6, 44, 18, 0.28),
     0 0 0 1px rgba(255, 255, 255, 0.18);
   animation: pileSubmitSuccessPop 220ms ease-out;
-
-  &:hover,
-  &:focus {
-    color: var(--ce-color-white);
-    text-decoration: none;
-  }
-
-  &:focus-visible {
-    outline: 2px solid rgba(255, 255, 255, 0.86);
-    outline-offset: 3px;
-  }
 }
 
 .pileSubmitSuccessIcon {
   font-size: 1.35rem;
 }
 
-@media (min-width: 769px), (max-width: 480px) {
+@media (min-width: 1367px), (max-width: 480px) {
   .pileSubmitButtonTrail {
     display: inline-flex;
   }
 }
 
-.pileFooter .pileSubmitButton.submitGlow::before {
-  position: absolute;
-  content: '';
-  background: linear-gradient(90deg, #fff 40%, transparent 40%);
-  top: -5px;
-  bottom: -5px;
-  left: -5px;
-  right: -5px;
-  z-index: 2;
-  border-radius: calc(var(--pile-submit-button-radius) + 5px);
-  background-size: 200% 4px;
-  background-repeat: no-repeat;
-  filter: drop-shadow(0 0 8px #fff);
-  pointer-events: none;
-}
+@media (min-width: 769px), (max-width: 480px) {
+  .pileFooter .pileSubmitButton.submitGlow::before {
+    position: absolute;
+    content: '';
+    background: linear-gradient(90deg, #fff 40%, transparent 40%);
+    top: -5px;
+    bottom: -5px;
+    left: -5px;
+    right: -5px;
+    z-index: 2;
+    border-radius: calc(var(--ce-radius-16) + 5px);
+    background-size: 200% 4px;
+    background-repeat: no-repeat;
+    filter: drop-shadow(0 0 8px #fff);
+    pointer-events: none;
+  }
 
-.pileFooter .pileSubmitButton.submitGlow::before {
-  background-position: 80% 0;
-  animation: beforeLineAnim 5.4s linear infinite;
+  .pileFooter .pileSubmitButton.submitGlow::before {
+    background-position: 80% 0;
+    animation: beforeLineAnim 5.4s linear infinite;
+  }
 }
 
 @keyframes beforeLineAnim {
@@ -4407,7 +4424,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
 @media (max-width: 480px) {
   .pileFooter .pileSubmitButton {
-    --pile-submit-button-radius: var(--ce-radius-16);
     width: 100%;
     max-width: none;
     min-height: 54px;
@@ -4745,7 +4761,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 @media (prefers-reduced-motion: reduce) {
   .pileSubmitSuccessBadge,
   .pileFooter .pileSubmitButton.submitGlow::before,
-  .headerSubmitButton.submitGlow::before,
   .submitGlow,
   .scanningIndicator {
     -webkit-animation: none !important;

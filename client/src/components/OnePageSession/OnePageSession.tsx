@@ -366,8 +366,6 @@ class OnePageSession extends Component<any, any> {
       disclaimersActive: true,
       filterState: initialFilterState,
       pileSubmitRailVisible: false,
-      corpusViewerLoadRequestNonce: 0,
-      corpusViewerLoadState: DEFAULT_CORPUS_VIEWER_LOAD_STATE,
 
       // Legacy (limited) group password flow state
       // Auto-mint
@@ -2014,9 +2012,9 @@ class OnePageSession extends Component<any, any> {
     this.navigateToInternalPath(sbtsListPath());
   }
 
-  handlePileSubmitRailVisibilityChange(visible: any) {
+  handlePileSubmitRailVisibilityChange(visible) {
     const nextVisible = !!visible;
-    this.setState((prevState: any) => (
+    this.setState((prevState) => (
       prevState.pileSubmitRailVisible === nextVisible
         ? null
         : { pileSubmitRailVisible: nextVisible }
@@ -2166,10 +2164,7 @@ class OnePageSession extends Component<any, any> {
       renderSectionHeading('Questions', 'Answer or Add')
     );
     const questionsSectionTooltip = 'Survey and question platform allowing detailed responses, advanced question formats, preference weighing, and group filtering.';
-    const documentsSectionTooltip = 'Allows the conversation to be enriched by data, and the formats can change per-session';
-    const corpusViewerLoadState = this.state.corpusViewerLoadState || DEFAULT_CORPUS_VIEWER_LOAD_STATE;
-    const loadFullCorpusButtonLabel = corpusViewerLoadState.loadButtonLabel || DEFAULT_CORPUS_VIEWER_LOAD_STATE.loadButtonLabel;
-    const disableLoadFullCorpusButton = !!corpusViewerLoadState.disableLoadButton;
+    const documentsSectionTooltip = 'This corpus is evolving into a conversational layer for the session: you’ll be able to chat with the material, have it surface and pose relevant questions, and connect those prompts fluidly with responses.';
     const pileSubmitRailActive = !this.state.showQuestions && this.state.pileSubmitRailVisible;
     const brandingSectionClassName = [
       styles.brandingSection,
