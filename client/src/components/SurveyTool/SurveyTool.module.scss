@@ -3153,6 +3153,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 /* Container for Card + Controls Side-by-Side */
 .pileInteractionUnit {
   --pile-desktop-submit-rail-offset: 64px;
+  --pile-desktop-submit-rail-padding: 24px;
   --pile-desktop-rail-gap: 24px;
   --pile-current-submit-rail-offset: 0px;
   --pile-current-submit-rail-padding: 0px;
@@ -3166,7 +3167,15 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
 .pileInteractionUnitWithSubmitRail {
   --pile-current-submit-rail-offset: var(--pile-desktop-submit-rail-offset);
-  --pile-current-submit-rail-padding: var(--pile-desktop-submit-rail-offset);
+  --pile-current-submit-rail-padding: var(--pile-desktop-submit-rail-padding);
+}
+
+@media (min-width: 769px) {
+  .pileInteractionUnitWithSubmitRail .pileCardInner,
+  .pileInteractionUnitWithSubmitRail .pileHologramPanel,
+  .pileInteractionUnitWithSubmitRail .pileEmptyState {
+    margin-top: 12px;
+  }
 }
 
 /* Card Stack Container */
