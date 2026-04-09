@@ -359,6 +359,7 @@ class OnePageSession extends Component {
       aggregatorData: {},
       disclaimersActive: true,
       filterState: initialFilterState,
+      pileSubmitRailVisible: false,
 
       // Legacy (limited) group password flow state
       // Auto-mint
@@ -417,6 +418,7 @@ class OnePageSession extends Component {
     this.toggleResults = this.toggleResults.bind(this);
     this.toggleDocuments = this.toggleDocuments.bind(this);
     this.handleGroupsViewAll = this.handleGroupsViewAll.bind(this);
+    this.handlePileSubmitRailVisibilityChange = this.handlePileSubmitRailVisibilityChange.bind(this);
     // Removed toggleResultsAbout bind
     this.buildAggregator = this.buildAggregator.bind(this);
 
@@ -1953,6 +1955,15 @@ class OnePageSession extends Component {
     this.navigateToInternalPath(sbtsListPath());
   }
 
+  handlePileSubmitRailVisibilityChange(visible) {
+    const nextVisible = !!visible;
+    this.setState((prevState) => (
+      prevState.pileSubmitRailVisible === nextVisible
+        ? null
+        : { pileSubmitRailVisible: nextVisible }
+    ));
+  }
+
   toggleGroupsAbout() {
     this.setState((prevState) => ({ showGroupsAbout: !prevState.showGroupsAbout }));
   }
@@ -2094,6 +2105,15 @@ class OnePageSession extends Component {
     );
     const questionsSectionTooltip = 'Survey and question platform allowing detailed responses, advanced question formats, preference weighing, and group filtering.';
     const documentsSectionTooltip = 'This corpus is evolving into a conversational layer for the session: you’ll be able to chat with the material, have it surface and pose relevant questions, and connect those prompts fluidly with responses.';
+    const pileSubmitRailActive = !this.state.showQuestions && this.state.pileSubmitRailVisible;
+    const brandingSectionClassName = [
+      styles.brandingSection,
+      pileSubmitRailActive ? styles.brandingSectionWithPileSubmitRail : '',
+    ].filter(Boolean).join(' ');
+    const titleContainerClassName = [
+      styles.titleContainer,
+      pileSubmitRailActive ? styles.titleContainerWithPileSubmitRail : '',
+    ].filter(Boolean).join(' ');
 
     return (
       <div className={styles.onePageDemoContainer}>
@@ -2263,8 +2283,8 @@ class OnePageSession extends Component {
         )}
 
         {/* Branding/header */}
-        <div className={styles.brandingSection}>
-          <div className={styles.titleContainer}>
+        <div className={brandingSectionClassName}>
+          <div className={titleContainerClassName}>
             <h2 id={styles.brandingSectionTitle}>{titleText}</h2>
             <div className={styles.tooltip} tabIndex={0} aria-label="Session info">
               <FontAwesomeIcon icon={faQuestionCircle} />
@@ -2330,6 +2350,7 @@ class OnePageSession extends Component {
                 defaultFilterState={defaultFilterState}
                 defaultFeaturedSBTs={defaultFeaturedSBTs}
                 onFilterChange={this.handleFilterChange}
+                onPileSubmitRailVisibilityChange={this.handlePileSubmitRailVisibilityChange}
                 filterState={this.state.filterState}
                 onViewAllClick={this.handleViewAllQuestionsClick}
                 hideSessionSelector={true}

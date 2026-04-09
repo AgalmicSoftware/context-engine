@@ -49,6 +49,29 @@
   }
 }
 
+.brandingSectionWithPileSubmitRail {
+  overflow: visible;
+}
+
+.titleContainerWithPileSubmitRail {
+  position: relative;
+  z-index: 41;
+}
+
+@media only screen and (max-width: 480px) {
+  .titleContainerWithPileSubmitRail {
+    margin-bottom: 5px !important;
+    transform: translateY(-44px);
+  }
+}
+
+@media only screen and (min-width: 1367px) {
+  .titleContainerWithPileSubmitRail {
+    margin-bottom: 5px !important;
+    transform: translateY(-52px);
+  }
+}
+
 #brandingSectionTitle {
   display: flex;
   flex-direction: row;

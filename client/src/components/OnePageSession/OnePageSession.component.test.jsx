@@ -199,6 +199,49 @@ describe('OnePageSession view gating', () => {
     expect(screen.queryByTestId('survey-page-full')).not.toBeInTheDocument();
   });
 
+  it('uses the title container slot to reserve pile submit rail space when the embedded pile signals visibility', async () => {
+    render(<OnePageSession {...buildProps()} />);
+
+    expect(await screen.findByTestId('survey-page-pile')).toBeInTheDocument();
+    const titleHeading = document.getElementById(styles.brandingSectionTitle);
+    const titleContainer = titleHeading?.closest(`.${styles.titleContainer}`);
+    const latestSurveyPageProps = mockSurveyPage.mock.calls[mockSurveyPage.mock.calls.length - 1]?.[0];
+
+    expect(titleHeading).not.toBeNull();
+    expect(titleContainer).not.toBeNull();
+    expect(titleContainer).not.toHaveClass(styles.titleContainerWithPileSubmitRail);
+
+    act(() => {
+      latestSurveyPageProps.onPileSubmitRailVisibilityChange(true);
+    });
+
+    expect(titleContainer).toHaveClass(styles.titleContainerWithPileSubmitRail);
+
+    act(() => {
+      latestSurveyPageProps.onPileSubmitRailVisibilityChange(false);
+    });
+
+    expect(titleContainer).not.toHaveClass(styles.titleContainerWithPileSubmitRail);
+  });
+
+  it('limits the pile submit rail title offset to phone widths where the rail is absolute', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'OnePageSession.module.scss'), 'utf8');
+    const phoneRailBlock = extractMediaBlock(
+      scss,
+      '@media only screen and (max-width: 480px)',
+      '.titleContainerWithPileSubmitRail'
+    );
+    const tabletRailBlock = extractMediaBlock(
+      scss,
+      '@media only screen and (max-width: 600px)',
+      '.titleContainerWithPileSubmitRail'
+    );
+
+    expect(phoneRailBlock).toContain('.titleContainerWithPileSubmitRail');
+    expect(phoneRailBlock).toContain('transform: translateY(-44px);');
+    expect(tabletRailBlock).toBeNull();
+  });
+
   it('passes hideEmbeddedDebugUi only to embedded full SurveyPage mode', async () => {
     render(<OnePageSession {...buildProps()} />);
 
