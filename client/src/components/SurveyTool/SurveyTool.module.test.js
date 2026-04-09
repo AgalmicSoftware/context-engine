@@ -293,8 +293,9 @@ describe('SurveyTool module', () => {
     const scss = fs.readFileSync(scssPath, 'utf8');
 
     expect(scss).toMatch(/\.pileWrapper\s*{[\s\S]*?margin-bottom:\s*38px;/);
-    expect(scss).toMatch(/\.pileInteractionUnit\s*{[\s\S]*?--pile-desktop-submit-rail-offset:\s*64px;[\s\S]*?--pile-current-submit-rail-offset:\s*0px;[\s\S]*?--pile-current-submit-rail-padding:\s*0px;[\s\S]*?padding-top:\s*var\(--pile-current-submit-rail-padding\);/);
-    expect(scss).toMatch(/\.pileInteractionUnitWithSubmitRail\s*{[\s\S]*?--pile-current-submit-rail-offset:\s*var\(--pile-desktop-submit-rail-offset\);[\s\S]*?--pile-current-submit-rail-padding:\s*var\(--pile-desktop-submit-rail-offset\);/);
+    expect(scss).toMatch(/\.pileInteractionUnit\s*{[\s\S]*?--pile-desktop-submit-rail-offset:\s*64px;[\s\S]*?--pile-desktop-submit-rail-padding:\s*24px;[\s\S]*?--pile-current-submit-rail-offset:\s*0px;[\s\S]*?--pile-current-submit-rail-padding:\s*0px;[\s\S]*?padding-top:\s*var\(--pile-current-submit-rail-padding\);/);
+    expect(scss).toMatch(/\.pileInteractionUnitWithSubmitRail\s*{[\s\S]*?--pile-current-submit-rail-offset:\s*var\(--pile-desktop-submit-rail-offset\);[\s\S]*?--pile-current-submit-rail-padding:\s*var\(--pile-desktop-submit-rail-padding\);/);
+    expect(scss).toMatch(/@media \(min-width: 769px\)\s*{[\s\S]*?\.pileInteractionUnitWithSubmitRail \.pileCardInner,\s*\.pileInteractionUnitWithSubmitRail \.pileHologramPanel,\s*\.pileInteractionUnitWithSubmitRail \.pileEmptyState\s*{[\s\S]*?margin-top:\s*12px;/);
     expect(scss).toMatch(/\.pileControls\s*{[\s\S]*?position:\s*absolute;[\s\S]*?top:\s*var\(--pile-current-submit-rail-offset\);[\s\S]*?right:\s*0;[\s\S]*?bottom:\s*0;[\s\S]*?left:\s*0;[\s\S]*?width:\s*100%;/);
     expect(scss).not.toMatch(/grid-template-areas:\s*[\s\S]*?'nav submit'[\s\S]*?'actions submit'/);
     expect(scss).toMatch(/\.pileControls > \.pileActions,\s*\.pileControls > \.pileNav\s*{[\s\S]*?position:\s*absolute;[\s\S]*?left:\s*calc\(100% \+ var\(--pile-desktop-rail-gap\)\);/);
