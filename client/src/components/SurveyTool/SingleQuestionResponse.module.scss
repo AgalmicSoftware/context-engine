@@ -299,8 +299,8 @@
   color: var(--ce-color-white);
 }
 
-/* 
-     MINI MODE ADDITIONS 
+/*
+     MINI MODE ADDITIONS
      (Only relevant if props.mode === 'mini')
   */
 
@@ -450,8 +450,8 @@
   }
 }
 
-/* 
-     Additional detail row for the expanded mini mode 
+/*
+     Additional detail row for the expanded mini mode
   */
 .miniExpandedTopRow {
   display: flex;
@@ -475,7 +475,7 @@
   }
 }
 
-/* 
+/*
      AGGREGATOR MODE ADDITIONS
   */
 
@@ -537,8 +537,8 @@
   color: var(--ce-color-white);
 }
 
-/* 
-     Mark the selected multi-choice answer 
+/*
+     Mark the selected multi-choice answer
   */
 .selected {
   font-weight: 700;

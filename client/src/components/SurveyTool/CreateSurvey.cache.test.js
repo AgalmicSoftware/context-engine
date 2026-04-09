@@ -63,6 +63,12 @@ const treeHasText = (node, text) => {
   return treeHasText(node?.props?.children, text);
 };
 
+const nodeHasClassName = (node, className) => {
+  const raw = node?.props?.className;
+  if (!raw) return false;
+  return String(raw).split(/\s+/).includes(className);
+};
+
 describe('CreateSurvey managed cache reads', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -1220,6 +1226,55 @@ describe('CreateSurvey managed cache reads', () => {
 
     expect(treeHasText(tree, 'Survey')).toBe(true);
     expect(treeHasText(tree, 'Questions')).toBe(true);
+  });
+
+  it('hides the survey/questions toggle on untouched pile-entry auto mode while keeping the manual switch visible', () => {
+    const instance = makeInstance({ hideSurveyQuestionToggleUntilAuthoring: true });
+
+    const tree = instance.render();
+    const modeToggles = collectTreeNodes(tree, (node) => nodeHasClassName(node, 'modeToggle'));
+    const modeSwitches = collectTreeNodes(
+      tree,
+      (node) => node?.props?.['data-testid'] === 'ce-create-mode-switch'
+    );
+
+    expect(modeToggles).toHaveLength(0);
+    expect(modeSwitches).toHaveLength(1);
+    expect(treeHasText(modeSwitches[0], 'Manual')).toBe(true);
+  });
+
+  it('shows the survey/questions toggle after switching pile entry into manual mode', () => {
+    const instance = makeInstance({ hideSurveyQuestionToggleUntilAuthoring: true });
+    instance.state = { ...instance.state, showAutoTool: false };
+
+    const tree = instance.render();
+    const modeToggles = collectTreeNodes(tree, (node) => nodeHasClassName(node, 'modeToggle'));
+
+    expect(modeToggles).toHaveLength(1);
+    expect(treeHasText(modeToggles[0], 'Survey')).toBe(true);
+    expect(treeHasText(modeToggles[0], 'Questions')).toBe(true);
+  });
+
+  it('shows the survey/questions toggle after AI generation loads authored draft content for pile entry', () => {
+    const instance = makeInstance({ hideSurveyQuestionToggleUntilAuthoring: true });
+    instance.clearUnfinishedSurveyDraft = jest.fn();
+    instance.updateSurveyHash = jest.fn();
+    instance.saveToLocalStorage = jest.fn();
+
+    instance.handleAutoQuestionsGenerated(
+      [{ type: 'freeform', prompt: 'What should happen next?', tags: [] }],
+      [],
+      ''
+    );
+
+    const tree = instance.render();
+    const modeToggles = collectTreeNodes(tree, (node) => nodeHasClassName(node, 'modeToggle'));
+
+    expect(instance.state.showAutoTool).toBe(false);
+    expect(instance.state.questions).toHaveLength(1);
+    expect(modeToggles).toHaveLength(1);
+    expect(treeHasText(modeToggles[0], 'Survey')).toBe(true);
+    expect(treeHasText(modeToggles[0], 'Questions')).toBe(true);
   });
 
   it('renders labeled manual and AI mode switch text instead of icon-only toggle', () => {

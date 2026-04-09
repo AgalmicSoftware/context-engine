@@ -1,10 +1,12 @@
 /* eslint-disable import/first */
 
 import { ethers } from 'ethers';
+import { DEFAULT_CHAIN_ID } from '../../variables/appConfig.js';
 
 jest.mock('../arweave/arweaveScripts.js', () => ({
   arweaveScripts: {
     uploadDataToArweave: jest.fn(),
+    downloadDataFromArweave: jest.fn(),
   },
 }));
 
@@ -28,10 +30,12 @@ import {
 } from './sessionRegistry.js';
 import { arweaveScripts } from '../arweave/arweaveScripts.js';
 import { cryptoUtils } from '../crypto/cryptography.js';
-import { getSessionRegistryAddress } from '../../variables/chains.js';
+import { getChainById, getDefaultGasPriceGwei, getSessionRegistryAddress } from '../../variables/chains.js';
 import { upsertCachedSessionWorkerConfig } from '../session/sessionWorkerConfigCache.js';
 
 const TEST_SIGNER_ADDRESS = '0x00000000000000000000000000000000000000aa';
+const CONFIGURED_REGISTRY_CHAIN_ID = DEFAULT_CHAIN_ID;
+const CONFIGURED_REGISTRY_CHAIN_NAME = getChainById(CONFIGURED_REGISTRY_CHAIN_ID)?.name || `Chain ${CONFIGURED_REGISTRY_CHAIN_ID}`;
 
 const installPublicRpcFeeMocks = ({
   feeData = {
@@ -81,7 +85,7 @@ const makeWalletProvider = ({
 const installWeb3ProviderMock = ({
   signer,
   receipt = { status: 1, transactionHash: '0xtxhash' },
-  network = { chainId: 84532 },
+  network = { chainId: CONFIGURED_REGISTRY_CHAIN_ID },
 } = {}) => {
   const providerMock = {
     getSigner: () => signer,
@@ -95,7 +99,7 @@ const installWeb3ProviderMock = ({
 };
 
 const makeRegistryWriteContractMock = ({
-  chainId = 84532,
+  chainId = CONFIGURED_REGISTRY_CHAIN_ID,
   txData = '0xdeadbeef',
   methods = [],
 } = {}) => {
@@ -123,6 +127,7 @@ describe('sessionRegistry metadata upload', () => {
   beforeEach(() => {
     arweaveScripts.uploadDataToArweave.mockReset();
     arweaveScripts.uploadDataToArweave.mockResolvedValue('example_tx_id');
+    arweaveScripts.downloadDataFromArweave.mockReset();
   });
 
   it('strips authoritative gate fields before Arweave upload', async () => {
@@ -147,6 +152,44 @@ describe('sessionRegistry metadata upload', () => {
     // Original object is preserved for caller-side state.
     expect(metadata.sponsored).toBeDefined();
     expect(metadata.sponsoredSbtAddress).toBeDefined();
+  });
+});
+
+describe('sessionRegistry metadata reads', () => {
+  beforeEach(() => {
+    arweaveScripts.downloadDataFromArweave.mockReset();
+  });
+
+  it('leaves session metadata preflight policy to the arweave resolver', async () => {
+    const txId = 'YWNXjJUfKtOUN56pL_U4HxTv2dYfZORfBFAtZpc7q5g';
+    arweaveScripts.downloadDataFromArweave.mockResolvedValue(JSON.stringify({
+      slug: 'edge',
+      sessionName: 'Edge',
+    }));
+
+    const metadata = await __sessionRegistryTestUtils.fetchMetadataFromArweave(`ar://${txId}`, {
+      caller: 'unit-test',
+      slug: 'edge',
+      chainId: 84532,
+    });
+
+    expect(metadata).toEqual({
+      slug: 'edge',
+      sessionName: 'Edge',
+    });
+    const [, arweaveOpts] = arweaveScripts.downloadDataFromArweave.mock.calls[0];
+    expect(arweaveScripts.downloadDataFromArweave).toHaveBeenCalledTimes(1);
+    expect(arweaveScripts.downloadDataFromArweave).toHaveBeenCalledWith(txId, expect.any(Object));
+    expect(arweaveOpts).toEqual(expect.objectContaining({
+      debugContext: expect.objectContaining({
+        category: 'session_registry_metadata',
+        caller: 'unit-test',
+        slug: 'edge',
+        chainId: 84532,
+      }),
+    }));
+    expect(arweaveOpts).not.toHaveProperty('disableExistencePrecheck');
+    expect(arweaveOpts).not.toHaveProperty('preflightTxExistence');
   });
 });
 
@@ -207,7 +250,7 @@ describe('loadSessionRegistryCache persistence', () => {
     };
     jest.spyOn(ethers.providers, 'Web3Provider').mockImplementation(function MockWeb3Provider() {
       return {
-        getNetwork: jest.fn().mockResolvedValue({ chainId: 84532 }),
+        getNetwork: jest.fn().mockResolvedValue({ chainId: CONFIGURED_REGISTRY_CHAIN_ID }),
       };
     });
     jest.spyOn(ethers, 'Contract').mockImplementation(function MockContract() {
@@ -216,7 +259,7 @@ describe('loadSessionRegistryCache persistence', () => {
 
     const { loadSessionRegistryCache } = jest.requireActual('./sessionRegistry.js');
     await loadSessionRegistryCache({
-      chainIds: [84532],
+      chainIds: [CONFIGURED_REGISTRY_CHAIN_ID],
       providerLike: walletProvider,
       force: true,
     });
@@ -237,9 +280,9 @@ describe('loadSessionRegistryCache persistence', () => {
       config: {
         slug: 'op-session',
         sessionName: 'OP Session',
-        networkChainId: 11155420,
+        networkChainId: CONFIGURED_REGISTRY_CHAIN_ID,
         __registry: {
-          registryChainId: 11155420,
+          registryChainId: CONFIGURED_REGISTRY_CHAIN_ID,
           sessionIdHex: '0x00000000000000000000000000000011',
         },
       },
@@ -262,7 +305,7 @@ describe('loadSessionRegistryCache persistence', () => {
     };
     jest.spyOn(ethers.providers, 'Web3Provider').mockImplementation(function MockWeb3Provider() {
       return {
-        getNetwork: jest.fn().mockResolvedValue({ chainId: 11155420 }),
+        getNetwork: jest.fn().mockResolvedValue({ chainId: CONFIGURED_REGISTRY_CHAIN_ID }),
       };
     });
     jest.spyOn(ethers, 'Contract').mockImplementation(function MockContract() {
@@ -271,16 +314,16 @@ describe('loadSessionRegistryCache persistence', () => {
 
     const { loadSessionRegistryCache } = jest.requireActual('./sessionRegistry.js');
     await loadSessionRegistryCache({
-      chainIds: [11155420],
+      chainIds: [CONFIGURED_REGISTRY_CHAIN_ID],
       providerLike: walletProvider,
       force: true,
     });
 
     const persisted = JSON.parse(localStorage.getItem('dg:sessionRegistryCache:v1') || 'null');
     expect(Object.keys(persisted.sessions || {})).toEqual(['op-session']);
-    expect(persisted.sessions['op-session']?.__registry?.registryChainId).toBe(11155420);
+    expect(persisted.sessions['op-session']?.__registry?.registryChainId).toBe(CONFIGURED_REGISTRY_CHAIN_ID);
     expect(persisted.sessions['base-session']).toBeUndefined();
-    expect(Object.keys(persisted.chains || {})).toEqual(['11155420']);
+    expect(Object.keys(persisted.chains || {})).toEqual([String(CONFIGURED_REGISTRY_CHAIN_ID)]);
     expect(contractMock.getSessionCount).toHaveBeenCalledTimes(1);
   });
 });
@@ -377,12 +420,12 @@ describe('registerSessionOnChain duplicate guards', () => {
 
     await expect(registerSessionOnChain({
       providerLike: walletProvider,
-      chainId: 84532,
+      chainId: CONFIGURED_REGISTRY_CHAIN_ID,
       slug: 'wrong-wallet-network',
       sessionId: '0x11111111111111111111111111111111',
       metadataURI: 'ar://example',
     })).rejects.toThrow(
-      'Connected wallet is on Base (8453), but session registry writes require Base Sepolia (84532). Switch the wallet network and retry.'
+      `Connected wallet is on Base (8453), but session registry writes require ${CONFIGURED_REGISTRY_CHAIN_NAME} (${CONFIGURED_REGISTRY_CHAIN_ID}). Switch the wallet network and retry.`
     );
 
     expect(contractMock.sessionIdExists).not.toHaveBeenCalled();
@@ -405,7 +448,7 @@ describe('registerSessionOnChain duplicate guards', () => {
 
     await expect(registerSessionOnChain({
       providerLike: walletProvider,
-      chainId: 84532,
+      chainId: CONFIGURED_REGISTRY_CHAIN_ID,
       slug: 'duplicate-id',
       sessionId: '0x11111111111111111111111111111111',
       metadataURI: 'ar://example',
@@ -432,7 +475,7 @@ describe('registerSessionOnChain duplicate guards', () => {
 
     await expect(registerSessionOnChain({
       providerLike: walletProvider,
-      chainId: 84532,
+      chainId: CONFIGURED_REGISTRY_CHAIN_ID,
       slug: 'duplicate-slug',
       sessionId: '0x22222222222222222222222222222222',
       metadataURI: 'ar://example',
@@ -468,7 +511,7 @@ describe('registerSessionOnChain duplicate guards', () => {
 
     await expect(registerSessionOnChain({
       providerLike: walletProvider,
-      chainId: 84532,
+      chainId: CONFIGURED_REGISTRY_CHAIN_ID,
       slug: 'read-path-guard',
       sessionId: '0x66666666666666666666666666666666',
       metadataURI: 'ar://example',
@@ -523,7 +566,7 @@ describe('registerSessionOnChain creation fee overrides', () => {
 
     const result = await registerSessionOnChain({
       providerLike: walletProvider,
-      chainId: 84532,
+      chainId: CONFIGURED_REGISTRY_CHAIN_ID,
       slug: 'fee-success',
       sessionId: '0x33333333333333333333333333333333',
       metadataURI: 'ar://example',
@@ -574,7 +617,7 @@ describe('registerSessionOnChain creation fee overrides', () => {
 
     const result = await registerSessionOnChain({
       providerLike: walletProvider,
-      chainId: 84532,
+      chainId: CONFIGURED_REGISTRY_CHAIN_ID,
       slug: 'fee-nonce-fallback',
       sessionId: '0x99999999999999999999999999999999',
       metadataURI: 'ar://example',
@@ -627,7 +670,7 @@ describe('registerSessionOnChain creation fee overrides', () => {
     const onTxHash = jest.fn();
     const pendingResult = registerSessionOnChain({
       providerLike: walletProvider,
-      chainId: 84532,
+      chainId: CONFIGURED_REGISTRY_CHAIN_ID,
       slug: 'pending-hash',
       sessionId: '0xabababababababababababababababab',
       metadataURI: 'ar://example',
@@ -678,7 +721,7 @@ describe('registerSessionOnChain creation fee overrides', () => {
 
     const result = await registerSessionOnChain({
       providerLike: walletProvider,
-      chainId: 84532,
+      chainId: CONFIGURED_REGISTRY_CHAIN_ID,
       slug: 'fee-fallback',
       sessionId: '0x44444444444444444444444444444444',
       metadataURI: 'ar://example',
@@ -725,7 +768,7 @@ describe('registerSessionOnChain creation fee overrides', () => {
 
     await expect(registerSessionOnChain({
       providerLike: walletProvider,
-      chainId: 84532,
+      chainId: CONFIGURED_REGISTRY_CHAIN_ID,
       slug: 'fee-rpc-fail',
       sessionId: '0x55555555555555555555555555555555',
       metadataURI: 'ar://example',
@@ -771,7 +814,7 @@ describe('registerSessionOnChain creation fee overrides', () => {
 
     const result = await registerSessionOnChain({
       providerLike: walletProvider,
-      chainId: 84532,
+      chainId: CONFIGURED_REGISTRY_CHAIN_ID,
       slug: 'fee-rpc-fallback',
       sessionId: '0x77777777777777777777777777777777',
       metadataURI: 'ar://example',
@@ -846,7 +889,7 @@ describe('registerSessionOnChain creation fee overrides', () => {
 
     const result = await registerSessionOnChain({
       providerLike: walletProvider,
-      chainId: 84532,
+      chainId: CONFIGURED_REGISTRY_CHAIN_ID,
       slug: 'fee-send-retry',
       sessionId: '0x88888888888888888888888888888888',
       metadataURI: 'ar://example',
@@ -858,7 +901,7 @@ describe('registerSessionOnChain creation fee overrides', () => {
     );
     expect(sendCalls).toHaveLength(2);
     expect(sendCalls[0][0].params[0]).toEqual(expect.objectContaining({
-      gasPrice: ethers.utils.parseUnits('0.08', 'gwei').toHexString(),
+      gasPrice: ethers.utils.parseUnits(getDefaultGasPriceGwei(CONFIGURED_REGISTRY_CHAIN_ID), 'gwei').toHexString(),
     }));
     expect(sendCalls[0][0].params[0].maxFeePerGas).toBeUndefined();
     expect(sendCalls[0][0].params[0].maxPriorityFeePerGas).toBeUndefined();
@@ -874,7 +917,7 @@ describe('registerSessionOnChain creation fee overrides', () => {
     const walletProvider = makeWalletProvider({ txHash: '0xcreatefee-default-gas' });
     const signer = { provider: null, getAddress: jest.fn().mockResolvedValue(TEST_SIGNER_ADDRESS) };
     const signerContractMock = makeRegistryWriteContractMock({
-      chainId: 11155420,
+      chainId: CONFIGURED_REGISTRY_CHAIN_ID,
       methods: ['createSession'],
     });
     const readContractMock = {
@@ -908,7 +951,7 @@ describe('registerSessionOnChain creation fee overrides', () => {
 
     const result = await registerSessionOnChain({
       providerLike: walletProvider,
-      chainId: 11155420,
+      chainId: CONFIGURED_REGISTRY_CHAIN_ID,
       slug: 'fee-default-gas',
       sessionId: '0x99999999999999999999999999999999',
       metadataURI: 'ar://example',
@@ -916,7 +959,7 @@ describe('registerSessionOnChain creation fee overrides', () => {
     });
 
     expect(getLatestSendTxParams(walletProvider)).toEqual(expect.objectContaining({
-      gasPrice: ethers.utils.parseUnits('3', 'gwei').toHexString(),
+      gasPrice: ethers.utils.parseUnits(getDefaultGasPriceGwei(CONFIGURED_REGISTRY_CHAIN_ID), 'gwei').toHexString(),
     }));
     expect(result).toEqual({ txs: [{ action: 'createSession', hash: '0xcreatefee-default-gas' }] });
   });
@@ -957,12 +1000,12 @@ describe('registerSessionOnChain creation fee overrides', () => {
 
     const result = await setResourceGatesOnChain({
       providerLike: walletProvider,
-      chainId: 84532,
+      chainId: CONFIGURED_REGISTRY_CHAIN_ID,
       slug: 'gate-retry',
       gates: [{
         resourceKey: 'default',
         sbtAddresses: ['0x0000000000000000000000000000000000000002'],
-        chainId: 84532,
+        chainId: CONFIGURED_REGISTRY_CHAIN_ID,
         mode: 0,
         perMemberLimit: 0,
       }],
@@ -986,7 +1029,7 @@ describe('sessionRegistry contract defaults', () => {
     const config = __sessionRegistryTestUtils.buildSessionConfigFromRegistry({
       session: {
         slug: 'test-7',
-        chainId: 84532,
+        chainId: CONFIGURED_REGISTRY_CHAIN_ID,
         metadataURI: 'ar://tx',
         encryptedMetadataURI: '',
         adminAddress: '0x0000000000000000000000000000000000000001',
@@ -996,18 +1039,18 @@ describe('sessionRegistry contract defaults', () => {
       },
       metadata: {
         contracts: {
-          surveys: { address: '0x0000000000000000000000000000000000000002', chainId: 84532 },
+          surveys: { address: '0x0000000000000000000000000000000000000002', chainId: CONFIGURED_REGISTRY_CHAIN_ID },
         },
       },
       gatesByResource: {},
       fieldsByKey: {},
-      registryChainId: 84532,
+      registryChainId: CONFIGURED_REGISTRY_CHAIN_ID,
       metadataLoadState: 'loaded',
     });
 
     expect(config.contracts.sessionRegistry).toEqual({
-      address: getSessionRegistryAddress(84532),
-      chainId: 84532,
+      address: getSessionRegistryAddress(CONFIGURED_REGISTRY_CHAIN_ID),
+      chainId: CONFIGURED_REGISTRY_CHAIN_ID,
     });
     expect(config.contracts.xp).toBeUndefined();
     expect(config.__registry.metadataLoadState).toBe('loaded');
@@ -1021,7 +1064,7 @@ describe('sessionRegistry contract defaults', () => {
     const config = __sessionRegistryTestUtils.buildSessionConfigFromRegistry({
       session: {
         slug: 'demo',
-        chainId: 84532,
+        chainId: CONFIGURED_REGISTRY_CHAIN_ID,
         metadataURI: 'ar://missing',
         encryptedMetadataURI: '',
         adminAddress: '0x0000000000000000000000000000000000000001',
@@ -1032,7 +1075,7 @@ describe('sessionRegistry contract defaults', () => {
       metadata: null,
       gatesByResource: {},
       fieldsByKey: {},
-      registryChainId: 84532,
+      registryChainId: CONFIGURED_REGISTRY_CHAIN_ID,
       metadataLoadState: 'unavailable',
     });
 
@@ -1088,7 +1131,7 @@ describe('updateSessionMetadataOnChain gas fallback', () => {
 
     const result = await updateSessionMetadataOnChain({
       providerLike: walletProvider,
-      chainId: 84532,
+      chainId: CONFIGURED_REGISTRY_CHAIN_ID,
       slug: 'edge',
       metadataURI: 'ar://new-metadata',
       encryptedMetadataURI: '',
@@ -1127,7 +1170,7 @@ describe('setSessionFieldsOnChain gas fallback', () => {
 
     const result = await setSessionFieldsOnChain({
       providerLike: walletProvider,
-      chainId: 84532,
+      chainId: CONFIGURED_REGISTRY_CHAIN_ID,
       slug: 'edge',
       fields: {
         corsWorkerUrl: 'https://worker.example',

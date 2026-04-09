@@ -13,26 +13,6 @@
   flex-direction: column;
   gap: 8px;
   color: var(--retro-ink);
-  background-color: var(--retro-blue-100);
-  background-image:
-    radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.9), transparent 45%),
-    repeating-linear-gradient(
-      0deg,
-      rgba(89, 139, 184, 0.12),
-      rgba(89, 139, 184, 0.12) 1px,
-      transparent 1px,
-      transparent 22px
-    ),
-    repeating-linear-gradient(
-      90deg,
-      rgba(89, 139, 184, 0.12),
-      rgba(89, 139, 184, 0.12) 1px,
-      transparent 1px,
-      transparent 22px
-    );
-  border: 2px solid var(--retro-blue-300);
-  border-radius: var(--ce-radius-14);
-  box-shadow: 6px 6px 0 rgba(120, 160, 190, 0.4);
 
   @media (max-width: 640px) {
     padding: 16px;

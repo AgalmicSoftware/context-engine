@@ -12,9 +12,18 @@ $card-shadow: tokens.$ce-card-shadow;
   font-family: var(--ce-font-mono);
 }
 
+.pageEmbedded {
+  min-height: auto;
+  padding: 0;
+}
+
 .shell {
   width: min(980px, 100%);
   margin: 0 auto;
+}
+
+.shellEmbedded {
+  width: 100%;
 }
 
 .header {

@@ -2,11 +2,11 @@
 import React from "react";
 import { BrowserRouter, Routes, Route, Link } from 'react-router-dom'
 import { Provider } from 'react-redux';
-import { Toaster } from 'react-hot-toast';
 import store from '../store.js';
 import { SERVER } from '../variables/appConfig.js';
 import { installCeAgent } from '../utilities/ceAgent.js';
 import { createLogger } from '../utilities/logging';
+import CEToaster from './Shared/CEToaster.jsx';
 
 import "assets/css/contextEngine.scss";
 
@@ -173,7 +173,7 @@ class App extends React.Component {
           <RainbowKitProvider chains={chains}>
             <Provider store={store}>
             <AppErrorBoundary>
-            <Toaster
+            <CEToaster
               position='bottom-right'
               toastOptions={{ style: toastTheme }}
             />

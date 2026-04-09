@@ -1,4 +1,6 @@
 /** @file OnePageSession.component.test.jsx */
+import fs from 'fs';
+import path from 'path';
 import React from 'react';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { ethers } from 'ethers';
@@ -19,6 +21,40 @@ const mockDebateMap = jest.fn();
 const mockRiskMatrix = jest.fn();
 const mockDebateSelector = jest.fn();
 const mockDemoAnalysisWorkspace = jest.fn();
+
+const extractMediaBlock = (scss, query, requiredSnippet = '') => {
+  let searchFrom = 0;
+
+  while (searchFrom < scss.length) {
+    const queryIndex = scss.indexOf(query, searchFrom);
+    if (queryIndex === -1) {
+      return null;
+    }
+
+    const blockStart = scss.indexOf('{', queryIndex);
+    if (blockStart === -1) {
+      return null;
+    }
+
+    let depth = 0;
+    for (let index = blockStart; index < scss.length; index += 1) {
+      const char = scss[index];
+      if (char === '{') depth += 1;
+      if (char === '}') depth -= 1;
+      if (depth === 0) {
+        const block = scss.slice(queryIndex, index + 1);
+        if (!requiredSnippet || block.includes(requiredSnippet)) {
+          return block;
+        }
+        searchFrom = queryIndex + query.length;
+        break;
+      }
+    }
+  }
+
+  return null;
+};
+
 jest.mock('../SurveyTool/SurveyPage.jsx', () => (props) => {
   mockSurveyPage(props);
   if (props.minifiedMode === 'pile') {
@@ -49,7 +85,16 @@ jest.mock('../DebateMap/DebateMap', () => ({
   __esModule: true,
   default: (props) => {
     mockDebateMap(props);
-    return <div data-testid="ai-policy-atlas">AI Policy Atlas</div>;
+    return (
+      <div data-testid="ai-policy-atlas">
+        AI Policy Atlas
+        {props.onModalClose ? (
+          <button type="button" onClick={props.onModalClose}>
+            Close Atlas Modal
+          </button>
+        ) : null}
+      </div>
+    );
   },
 }));
 jest.mock('../MainContent/RiskMatrix', () => ({
@@ -152,6 +197,62 @@ describe('OnePageSession view gating', () => {
       expect(screen.getByTestId('survey-page-pile')).toBeInTheDocument();
     });
     expect(screen.queryByTestId('survey-page-full')).not.toBeInTheDocument();
+  });
+
+  it('uses the title container slot to reserve pile submit rail space when the embedded pile signals visibility', async () => {
+    render(<OnePageSession {...buildProps()} />);
+
+    expect(await screen.findByTestId('survey-page-pile')).toBeInTheDocument();
+    const titleHeading = document.getElementById(styles.brandingSectionTitle);
+    const titleContainer = titleHeading?.closest(`.${styles.titleContainer}`);
+    const latestSurveyPageProps = mockSurveyPage.mock.calls[mockSurveyPage.mock.calls.length - 1]?.[0];
+
+    expect(titleHeading).not.toBeNull();
+    expect(titleContainer).not.toBeNull();
+    expect(titleContainer).not.toHaveClass(styles.titleContainerWithPileSubmitRail);
+
+    act(() => {
+      latestSurveyPageProps.onPileSubmitRailVisibilityChange(true);
+    });
+
+    expect(titleContainer).toHaveClass(styles.titleContainerWithPileSubmitRail);
+
+    act(() => {
+      latestSurveyPageProps.onPileSubmitRailVisibilityChange(false);
+    });
+
+    expect(titleContainer).not.toHaveClass(styles.titleContainerWithPileSubmitRail);
+  });
+
+  it('applies pile submit rail title offsets only on phone and widescreen layouts', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'OnePageSession.module.scss'), 'utf8');
+    const phoneRailBlock = extractMediaBlock(
+      scss,
+      '@media only screen and (max-width: 480px)',
+      '.titleContainerWithPileSubmitRail'
+    );
+    const desktopRailBlock = extractMediaBlock(
+      scss,
+      '@media only screen and (min-width: 769px) and (max-width: 1366px)',
+      '.titleContainerWithPileSubmitRail'
+    );
+    const widescreenRailBlock = extractMediaBlock(
+      scss,
+      '@media only screen and (min-width: 1367px)',
+      '.titleContainerWithPileSubmitRail'
+    );
+    const tabletRailBlock = extractMediaBlock(
+      scss,
+      '@media only screen and (max-width: 600px)',
+      '.titleContainerWithPileSubmitRail'
+    );
+
+    expect(phoneRailBlock).toContain('.titleContainerWithPileSubmitRail');
+    expect(phoneRailBlock).toContain('transform: translateY(-44px);');
+    expect(desktopRailBlock).toBeNull();
+    expect(widescreenRailBlock).toContain('.titleContainerWithPileSubmitRail');
+    expect(widescreenRailBlock).toContain('transform: translateY(-80px);');
+    expect(tabletRailBlock).toBeNull();
   });
 
   it('passes hideEmbeddedDebugUi only to embedded full SurveyPage mode', async () => {
@@ -351,7 +452,7 @@ describe('OnePageSession view gating', () => {
     expect(screen.queryByText('Documents')).not.toBeInTheDocument();
   });
 
-  it('renders stacked title and subtitle text for section headers', async () => {
+  it('renders title and subtitle text for section headers', async () => {
     render(<OnePageSession {...buildProps()} />);
 
     expect(await screen.findByTestId('survey-page-pile')).toBeInTheDocument();
@@ -363,6 +464,26 @@ describe('OnePageSession view gating', () => {
     const fullHeader = await screen.findByTestId(E2E_TESTIDS.SESSION_QUESTIONS_FULL_HEADER);
     expect(within(fullHeader).getByText('Questions')).toHaveClass(styles.sectionHeaderTitle);
     expect(within(fullHeader).getByText('Answer or Add')).toHaveClass(styles.sectionHeaderSubtitle);
+  });
+
+  it('keeps section-card headers inline through 767px without pulling full phone layout onto tablets', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'OnePageSession.module.scss'), 'utf8');
+    const phoneBlock = extractMediaBlock(scss, '@media only screen and (max-width: 600px)', '.onePageDemoContainer');
+    const smallTabletBlock = extractMediaBlock(scss, '@media only screen and (min-width: 601px) and (max-width: 767px)', '.sectionHeader {');
+
+    expect(phoneBlock).toContain('.sectionContainer');
+    expect(phoneBlock).toContain('border: none;');
+    expect(smallTabletBlock).toContain('.sectionHeader {');
+    expect(smallTabletBlock).toContain('font-size: 1.6em;');
+    expect(smallTabletBlock).toContain('.sectionHeader .sectionHeaderText {');
+    expect(smallTabletBlock).toContain('flex-direction: row;');
+    expect(smallTabletBlock).toContain('align-items: baseline;');
+    expect(smallTabletBlock).toContain('gap: 6px 12px;');
+    expect(smallTabletBlock).toContain('.sectionHeader .sectionHeaderSubtitle {');
+    expect(smallTabletBlock).toContain('font-size: 0.68em;');
+    expect(smallTabletBlock).toContain('color: rgba(244, 247, 255, 0.58);');
+    expect(smallTabletBlock).not.toContain('.sectionContainer');
+    expect(scss).toMatch(/@media only screen and \(min-width:\s*768px\) and \(max-width:\s*1024px\)\s*{[\s\S]*?\.sectionHeader \.sectionHeaderText\s*{[\s\S]*?flex-direction:\s*column;[\s\S]*?align-items:\s*flex-start;/);
   });
 
   it('shows the demo Documents tooltip copy only when the section is expanded', async () => {
@@ -378,12 +499,16 @@ describe('OnePageSession view gating', () => {
     );
 
     expect(await screen.findByTestId('survey-page-pile')).toBeInTheDocument();
-    expect(screen.getByText('Documents')).toBeInTheDocument();
+    expect(screen.getByText('Context')).toBeInTheDocument();
     expect(screen.queryByText(documentsTooltipText)).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId('ce-demo-documents-toggle'));
 
     expect(screen.getByText(documentsTooltipText)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'GitHub' })).toHaveAttribute(
+      'href',
+      'https://github.com/xoCortex/context-engine/tree/main/client/src/variables/demo'
+    );
   });
 
   it('shows groups header actions only while expanded and drives embedded create state from the header', async () => {
@@ -766,6 +891,43 @@ describe('OnePageSession view gating', () => {
     expect(riskMatrixCalls[riskMatrixCalls.length - 1]).toMatchObject({
       embedded: true,
     });
+  });
+
+  it('restores the one-page session view after closing an atlas node opened from Context', async () => {
+    const props = buildProps();
+
+    render(
+      <OnePageSession
+        {...props}
+        slug="demo"
+        sessionConfig={{ ...props.sessionConfig, slug: 'demo' }}
+      />
+    );
+
+    expect(await screen.findByTestId('survey-page-pile')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('ce-demo-documents-toggle'));
+
+    const atlasIssueButtons = await screen.findAllByRole('button', { name: 'Exponential Progress Debate' });
+    fireEvent.click(atlasIssueButtons[0]);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('ai-policy-atlas')).toBeInTheDocument();
+    });
+
+    const atlasCalls = mockDebateMap.mock.calls.map((args) => args[0]).filter(Boolean);
+    expect(atlasCalls[atlasCalls.length - 1]).toMatchObject({
+      embedded: true,
+      requestedModalNodeId: '0x2110000000000000000000000000000000000000000000000000000000000000',
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close Atlas Modal' }));
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('ai-policy-atlas')).not.toBeInTheDocument();
+    });
+
+    expect(screen.getAllByRole('button', { name: 'Exponential Progress Debate' }).length).toBeGreaterThan(0);
   });
 
   it('shows the Breakdown results mode only for /session/demo', async () => {

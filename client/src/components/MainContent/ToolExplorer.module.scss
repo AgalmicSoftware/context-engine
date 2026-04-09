@@ -309,23 +309,7 @@
   font-size: 16px;
 }
 
-@media (min-width: 0px) and (max-width: 319px) {
-  .square {
-    padding: 75px;
-  }
-}
-
-@media (min-width: 320px) and (max-width: 465px) {
-  .square {
-    padding: 75px;
-  }
-}
-
 @media (min-width: 466px) and (max-width: 768px) {
-  .square {
-    padding: 75px;
-  }
-
   .headerActionButton {
     font-size: 1.02rem;
     min-height: 50px;
@@ -364,6 +348,27 @@
 @media (max-width: 640px) {
   .explorerContainerSparse {
     min-height: 0;
+  }
+
+  .explorerCol {
+    padding-top: 6px;
+    padding-bottom: 6px;
+  }
+
+  .square,
+  .explorerColSparse .square {
+    height: clamp(124px, 19vh, 156px);
+    padding: 0;
+    padding-bottom: 0;
+    overflow: hidden;
+  }
+
+  .backgroundImage {
+    background-position: center;
+  }
+
+  .squareText {
+    font-size: 1.45rem;
   }
 
   .expandedHeaderRow {

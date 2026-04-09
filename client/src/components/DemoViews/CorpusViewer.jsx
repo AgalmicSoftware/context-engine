@@ -1,36 +1,40 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faBook,
   faBrain,
   faChartBar,
+  faExternalLinkAlt,
   faFileAlt,
   faGavel,
   faLink,
   faMicrophone,
 } from '@fortawesome/free-solid-svg-icons';
-import { faTwitter } from '@fortawesome/free-brands-svg-icons';
+import { faGithub, faTwitter } from '@fortawesome/free-brands-svg-icons';
 
 import corpusSample from '../../variables/demo/corpus_sample.json';
+import styles from './CorpusViewer.module.scss';
+import ArxivCard from './ArxivCard.jsx';
+import InsiderCard from './InsiderCard.jsx';
+import TagModal from '../TagPage/TagModal.jsx';
+import WorldResultsMap from './DemoAnalysis/WorldResultsMap.jsx';
+import PolicyGlobe, {
+  getPolicyJurisdictionAnchor,
+  getJurisdictionFlag,
+  getPolicyStatusGroup,
+  getPolicyStatusLabel,
+} from './PolicyGlobe.jsx';
+import policyStyles from './PolicyGlobe.module.scss';
+import TweetCard, { DebateMapSection, ExternalSourceLink } from './TweetCard.jsx';
 
-const COLORS = {
-  accent: '#4dffa4',
-  card: 'rgba(255,255,255,0.04)',
-  cardBorder: 'rgba(255,255,255,0.08)',
-  muted: 'rgba(244,247,255,0.65)',
-  surface: 'rgba(255,255,255,0.06)',
-  text: '#f4f7ff',
-};
-
+// Hidden tabs — restore by adding 'cross_corpus' or 'lesswrong_posts' back to this array
 const CORPUS_ORDER = [
   'tweets',
   'ai_laws_policy',
   'arxiv_ai_safety',
-  'lesswrong_posts',
   'dwarkesh_lab_insiders',
   'ai_scifi_books',
   'metr_evals_metrics',
-  'cross_corpus',
 ];
 
 const ICONS = {
@@ -58,45 +62,88 @@ const ICON_FALLBACKS = {
 const TAB_LABELS = {
   tweets: 'Tweets',
   ai_laws_policy: 'Laws & Policy',
-  arxiv_ai_safety: 'Safety Papers',
+  arxiv_ai_safety: 'Papers',
   lesswrong_posts: 'LessWrong',
   dwarkesh_lab_insiders: 'Insider Interviews',
   ai_scifi_books: 'Sci-Fi',
-  metr_evals_metrics: 'METR Metrics',
+  metr_evals_metrics: 'Metrics',
   cross_corpus: 'Cross-Corpus',
 };
 
-const PILL_STYLE = {
-  background: 'rgba(77,255,164,0.1)',
-  borderRadius: 12,
-  color: COLORS.accent,
-  display: 'inline-flex',
-  fontSize: 11,
-  lineHeight: 1.4,
-  padding: '2px 8px',
-};
-
-const clampStyle = (lines = 3) => ({
-  display: '-webkit-box',
-  overflow: 'hidden',
-  WebkitBoxOrient: 'vertical',
-  WebkitLineClamp: lines,
+const POLICY_ANCHOR_TO_ISO_A3 = Object.freeze({
+  africa: ['ZAF', 'EGY', 'NGA', 'KEN', 'ETH'],
+  asean: ['IDN', 'MYS', 'PHL', 'SGP', 'THA', 'VNM'],
+  australia: ['AUS'],
+  brazil: ['BRA'],
+  canada: ['CAN'],
+  china: ['CHN'],
+  eu: ['FRA', 'DEU', 'ITA', 'POL', 'ESP', 'NLD', 'BEL', 'IRL', 'AUT', 'SWE', 'DNK', 'FIN', 'GRC', 'PRT', 'ROU', 'CZE', 'HUN'],
+  india: ['IND'],
+  japan: ['JPN'],
+  southKorea: ['KOR'],
+  uk: ['GBR'],
+  us: ['USA'],
 });
 
-const formatNumber = (value) => (
-  Number(value || 0).toLocaleString()
-);
-
-const formatDate = (value) => {
-  if (!value) return null;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-  return date.toLocaleDateString(undefined, {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  });
+const mergePolicyMapStatus = (currentStatus = '', nextStatus = '') => {
+  if (!currentStatus) return nextStatus;
+  if (!nextStatus || currentStatus === nextStatus) return currentStatus;
+  return 'mixed';
 };
+
+const buildPolicyMapState = (entries = []) => {
+  const mapData = {};
+  let globalStatus = '';
+
+  (Array.isArray(entries) ? entries : []).forEach((entry) => {
+    const statusGroup = getPolicyStatusGroup(entry);
+    const anchor = getPolicyJurisdictionAnchor(entry?.jurisdiction);
+
+    if (anchor === 'international') {
+      globalStatus = mergePolicyMapStatus(globalStatus, statusGroup);
+      return;
+    }
+
+    (POLICY_ANCHOR_TO_ISO_A3[anchor] || []).forEach((isoCode) => {
+      mapData[isoCode] = mergePolicyMapStatus(mapData[isoCode], statusGroup);
+    });
+  });
+
+  return { globalStatus, mapData };
+};
+
+const getPolicyMapFill = (status = '', isFallback = false) => {
+  switch (status) {
+    case 'live':
+      return isFallback ? 'rgba(77,255,164,0.16)' : 'rgba(77,255,164,0.56)';
+    case 'proposed':
+      return isFallback ? 'rgba(255,179,71,0.16)' : 'rgba(255,179,71,0.56)';
+    case 'mixed':
+      return isFallback ? 'rgba(122,140,255,0.16)' : 'rgba(122,140,255,0.52)';
+    default:
+      return 'rgba(226,232,255,0.06)';
+  }
+};
+
+const buildPolicyMapSubtitle = ({ filterStatus, filteredEntries, globalStatus }) => {
+  const count = Array.isArray(filteredEntries) ? filteredEntries.length : 0;
+
+  if (count === 0) {
+    return filterStatus === 'all'
+      ? 'No policy entries are loaded for this corpus yet.'
+      : `No ${filterStatus} policy entries are active in this corpus slice.`;
+  }
+
+  if (globalStatus) {
+    return `${count} ${filterStatus === 'all' ? 'policy entries' : `${filterStatus} entries`} selected. International frameworks add a broader global glow.`;
+  }
+
+  return `${count} ${filterStatus === 'all' ? 'policy entries' : `${filterStatus} entries`} selected. Highlighted regions reflect the filtered laws.`;
+};
+
+const shouldUseHalfWidthGrid = (corpusKey = '') => (
+  corpusKey === 'tweets' || corpusKey === 'arxiv_ai_safety'
+);
 
 const formatAuthors = (entry = {}) => {
   if (entry.author) return entry.author;
@@ -105,6 +152,24 @@ const formatAuthors = (entry = {}) => {
   if (entry.authors.length === 2) return `${entry.authors[0]}, ${entry.authors[1]}`;
   return `${entry.authors[0]} +${entry.authors.length - 1}`;
 };
+
+const buildCorpusDefinitions = () => (
+  CORPUS_ORDER
+    .map((key) => {
+      const corpus = corpusSample?.corpuses?.[key];
+      if (!corpus) return null;
+      const entries = Array.isArray(corpus.entries) ? corpus.entries : [];
+
+      return {
+        ...corpus,
+        count_full: corpus.count_full,
+        entries,
+        key,
+        tabLabel: TAB_LABELS[key] || corpus.label || key,
+      };
+    })
+    .filter(Boolean)
+);
 
 const getEntryYear = (entry = {}) => {
   if (entry.year) return entry.year;
@@ -122,32 +187,6 @@ const renderCorpusIcon = (iconKey) => {
   return <span>{ICON_FALLBACKS[iconKey] || '•'}</span>;
 };
 
-const getSentimentStyle = (sentiment = '') => {
-  const normalized = String(sentiment || '').toLowerCase();
-  if (normalized.includes('optim')) {
-    return {
-      background: 'rgba(77,255,164,0.14)',
-      color: COLORS.accent,
-    };
-  }
-  if (normalized.includes('skept') || normalized.includes('caut')) {
-    return {
-      background: 'rgba(255,179,71,0.14)',
-      color: '#ffb347',
-    };
-  }
-  if (normalized.includes('alarm') || normalized.includes('concern') || normalized.includes('doom')) {
-    return {
-      background: 'rgba(255,107,203,0.14)',
-      color: '#ff6bcb',
-    };
-  }
-  return {
-    background: 'rgba(255,255,255,0.1)',
-    color: COLORS.muted,
-  };
-};
-
 const buildNonTweetMeta = (corpusKey, entry = {}) => {
   const bits = [];
   const authorText = formatAuthors(entry);
@@ -159,228 +198,193 @@ const buildNonTweetMeta = (corpusKey, entry = {}) => {
   if (entry.venue) bits.push(entry.venue);
   if (entry.interviewer) bits.push(`with ${entry.interviewer}`);
   if (entry.category) bits.push(entry.category);
-  if (corpusKey === 'ai_laws_policy' && entry.status) bits.push(entry.status);
 
   return bits;
 };
 
-const TweetCard = ({ entry }) => {
-  const summaryText = entry.summary || entry.text || '';
-  const createdAt = formatDate(entry.created_at);
-  const sentimentStyle = getSentimentStyle(entry.sentiment);
-  const CardTag = entry.url ? 'a' : 'div';
-  const cardProps = entry.url
-    ? {
-      href: entry.url,
-      rel: 'noopener noreferrer',
-      target: '_blank',
-    }
-    : {};
-
-  return (
-    <CardTag
-      {...cardProps}
-      style={{
-        background: COLORS.card,
-        border: `1px solid ${COLORS.cardBorder}`,
-        borderRadius: 8,
-        color: COLORS.text,
-        cursor: entry.url ? 'pointer' : 'default',
-        display: 'block',
-        padding: 16,
-        textDecoration: 'none',
-      }}
-    >
-      <div style={{ alignItems: 'flex-start', display: 'flex', gap: 12, justifyContent: 'space-between', marginBottom: 10 }}>
-        <div style={{ minWidth: 0 }}>
-          <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>
-            {entry.author || 'Unknown author'}
-          </div>
-          <div style={{ color: COLORS.muted, fontSize: 12 }}>
-            {createdAt || 'Undated post'}
-          </div>
-        </div>
-        <span
-          style={{
-            ...sentimentStyle,
-            borderRadius: 999,
-            flexShrink: 0,
-            fontSize: 11,
-            fontWeight: 600,
-            padding: '4px 10px',
-            textTransform: 'capitalize',
-          }}
-        >
-          {entry.sentiment || 'mixed'}
-        </span>
-      </div>
-
-      <div
-        style={{
-          ...clampStyle(8),
-          color: COLORS.text,
-          fontSize: 14,
-          lineHeight: 1.55,
-          marginBottom: 12,
-        }}
-      >
-        {summaryText}
-      </div>
-
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
-        {(entry.tags || []).slice(0, 5).map((tag) => (
-          <span key={tag} style={PILL_STYLE}>
-            {tag}
-          </span>
-        ))}
-      </div>
-
-      <div style={{ alignItems: 'center', color: COLORS.muted, display: 'flex', flexWrap: 'wrap', fontSize: 12, gap: 12 }}>
-        <span>❤ {formatNumber(entry.engagement?.likes)}</span>
-        <span>↺ {formatNumber(entry.engagement?.reposts)}</span>
-        {entry.engagement?.views ? <span>👁 {formatNumber(entry.engagement.views)}</span> : null}
-      </div>
-    </CardTag>
-  );
-};
-
-const EntryCard = ({ corpusKey, entry }) => {
+const EntryCard = ({ corpusKey, entry, onTagClick, onAtlasIssueOpen }) => {
+  const isPolicyCorpus = corpusKey === 'ai_laws_policy';
+  const isMetrCorpus = corpusKey === 'metr_evals_metrics';
   const meta = buildNonTweetMeta(corpusKey, entry);
   const summaryText = entry.summary || '';
   const tags = Array.isArray(entry.tags) ? entry.tags : [];
-  const CardTag = entry.url ? 'a' : 'div';
-  const cardProps = entry.url
-    ? {
-      href: entry.url,
-      rel: 'noopener noreferrer',
-      target: '_blank',
-    }
-    : {};
+  const policyStatusGroup = isPolicyCorpus ? getPolicyStatusGroup(entry) : null;
+  const policyFlag = isPolicyCorpus ? getJurisdictionFlag(entry.jurisdiction) : null;
+  const policyStatusLabel = isPolicyCorpus ? getPolicyStatusLabel(entry) : null;
+  const sourceLabel = isMetrCorpus ? 'Open full report' : 'View source';
+  const cardClassName = `${styles.card} ${
+    isPolicyCorpus ? policyStyles.policyCard : isMetrCorpus ? styles.metrCard : ''
+  }`.trim();
 
   return (
-    <CardTag
-      {...cardProps}
-      style={{
-        background: COLORS.card,
-        border: `1px solid ${COLORS.cardBorder}`,
-        borderRadius: 8,
-        color: 'inherit',
-        cursor: entry.url ? 'pointer' : 'default',
-        display: 'block',
-        padding: 16,
-        textDecoration: 'none',
-      }}
-    >
-      <div style={{ alignItems: 'flex-start', display: 'flex', gap: 12, justifyContent: 'space-between', marginBottom: 10 }}>
-        <div style={{ minWidth: 0 }}>
-          <div style={{ color: COLORS.text, fontSize: 15, fontWeight: 700, lineHeight: 1.4, marginBottom: 6 }}>
-            {entry.title || entry.id || 'Untitled entry'}
-          </div>
+    <article className={cardClassName}>
+      <div className={styles.entryHeader}>
+        <div className={styles.entryHeaderContent}>
+          {isPolicyCorpus ? (
+            <div className={policyStyles.policyTitleRow}>
+              <span className={policyStyles.jurisdictionFlag} aria-hidden="true">
+                {policyFlag}
+              </span>
+              <div className={styles.entryTitle}>
+                {entry.title || entry.id || 'Untitled entry'}
+              </div>
+            </div>
+          ) : (
+            <div className={styles.entryTitle}>
+              {entry.title || entry.id || 'Untitled entry'}
+            </div>
+          )}
           {meta.length > 0 && (
-            <div style={{ color: COLORS.muted, fontSize: 12, lineHeight: 1.45 }}>
+            <div className={styles.entryMeta}>
               {meta.join(' • ')}
             </div>
           )}
         </div>
-        {corpusKey === 'ai_laws_policy' && entry.jurisdiction ? (
-          <span style={{ ...PILL_STYLE, flexShrink: 0 }}>
-            {entry.jurisdiction}
-          </span>
+        {isPolicyCorpus ? (
+          <div className={policyStyles.policyBadgeRow}>
+            <span
+              className={`${policyStyles.statusBadge} ${
+                policyStatusGroup === 'proposed' ? policyStyles.statusProposed : policyStyles.statusLive
+              }`.trim()}
+            >
+              {policyStatusLabel}
+            </span>
+            {entry.jurisdiction ? (
+              <span className={`${styles.pill} ${styles.jurisdictionBadge}`}>
+                {entry.jurisdiction}
+              </span>
+            ) : null}
+          </div>
         ) : null}
       </div>
 
+      {entry?.image_url ? (
+        <div className={styles.entryMediaBlock}>
+          {entry?.url ? (
+            <a
+              href={entry.url}
+              rel="noopener noreferrer"
+              target="_blank"
+              className={styles.entryMediaLink}
+            >
+              <img
+                src={entry.image_url}
+                alt={entry.title || 'Explorer preview'}
+                className={styles.entryMediaImage}
+                loading="lazy"
+                referrerPolicy="no-referrer"
+              />
+            </a>
+          ) : (
+            <img
+              src={entry.image_url}
+              alt={entry.title || 'Explorer preview'}
+              className={styles.entryMediaImage}
+              loading="lazy"
+              referrerPolicy="no-referrer"
+            />
+          )}
+        </div>
+      ) : null}
+
       <div
-        style={{
-          ...clampStyle(3),
-          color: COLORS.muted,
-          fontSize: 14,
-          lineHeight: 1.6,
-          marginBottom: 12,
-        }}
+        className={`${styles.entrySummary} ${styles.clamp3}`}
       >
         {summaryText}
       </div>
 
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+      <div className={styles.pillRow}>
         {tags.slice(0, 6).map((tag) => (
-          <span key={tag} style={PILL_STYLE}>
+          <button
+            key={tag}
+            type="button"
+            className={`${styles.pill} ${styles.pillButton}`}
+            onClick={() => onTagClick?.(tag)}
+          >
             {tag}
-          </span>
+          </button>
         ))}
       </div>
-    </CardTag>
+
+      <div className={styles.cardFooter}>
+        <DebateMapSection entry={entry} onAtlasIssueOpen={onAtlasIssueOpen} />
+        {entry?.url ? (
+          <div className={styles.cardFooterLinks}>
+            {isMetrCorpus ? (
+              <a
+                href={entry.url}
+                rel="noopener noreferrer"
+                target="_blank"
+                className={styles.externalIconLink}
+                aria-label={sourceLabel}
+                title={sourceLabel}
+              >
+                <FontAwesomeIcon icon={faExternalLinkAlt} />
+              </a>
+            ) : (
+              <ExternalSourceLink entry={entry} fallbackLabel={sourceLabel} />
+            )}
+          </div>
+        ) : null}
+      </div>
+    </article>
   );
 };
 
-const EmptyCorpusState = ({ corpus }) => (
-  <div
-    style={{
-      alignItems: 'center',
-      background: COLORS.card,
-      border: `1px dashed ${COLORS.cardBorder}`,
-      borderRadius: 8,
-      color: COLORS.muted,
-      display: 'flex',
-      flexDirection: 'column',
-      gap: 10,
-      justifyContent: 'center',
-      minHeight: 220,
-      padding: 24,
-      textAlign: 'center',
-    }}
-  >
-    <div style={{ color: COLORS.accent, fontSize: 20 }}>
+const EmptyCorpusState = ({ corpus, title, text }) => (
+  <div className={styles.emptyState}>
+    <div className={styles.emptyStateIcon}>
       {renderCorpusIcon(corpus.icon)}
     </div>
-    <div style={{ color: COLORS.text, fontSize: 15, fontWeight: 700 }}>
-      {corpus.label}
+    <div className={styles.emptyStateTitle}>
+      {title || corpus.label}
     </div>
-    <div style={{ fontSize: 13, lineHeight: 1.6, maxWidth: 420 }}>
-      No demo entries are loaded for this tab yet. The tab is wired and ready for cross-corpus debate material.
+    <div className={styles.emptyStateText}>
+      {text || 'No demo entries are loaded for this tab yet. The tab is wired and ready for cross-corpus debate material.'}
     </div>
   </div>
 );
 
-const CorpusViewer = () => {
-  const corpusDefinitions = CORPUS_ORDER
-    .map((key) => {
-      const corpus = corpusSample?.corpuses?.[key];
-      if (!corpus) return null;
-      return {
-        ...corpus,
-        entries: Array.isArray(corpus.entries) ? corpus.entries : [],
-        key,
-        tabLabel: TAB_LABELS[key] || corpus.label || key,
-      };
-    })
-    .filter(Boolean);
+const CorpusViewer = ({ onAtlasIssueOpen = null, showGithubLink = true }) => {
+  const corpusDefinitions = useMemo(() => buildCorpusDefinitions(), []);
 
   const [activeCorpusKey, setActiveCorpusKey] = useState(corpusDefinitions[0]?.key || 'tweets');
+  const [activeTag, setActiveTag] = useState(null);
 
   const activeCorpus = corpusDefinitions.find((corpus) => corpus.key === activeCorpusKey) || corpusDefinitions[0];
 
   if (!activeCorpus) return null;
 
+  const renderEntries = (entries) => (
+    entries.filter(Boolean).map((entry, index) => {
+      const key = entry.id || entry.url || `${activeCorpus.key}-${index}`;
+      return activeCorpus.key === 'tweets' ? (
+        <TweetCard key={key} entry={entry} onTagClick={setActiveTag} onAtlasIssueOpen={onAtlasIssueOpen} />
+      ) : activeCorpus.key === 'arxiv_ai_safety' ? (
+        <ArxivCard key={key} entry={entry} onTagClick={setActiveTag} onAtlasIssueOpen={onAtlasIssueOpen} />
+      ) : activeCorpus.key === 'dwarkesh_lab_insiders' ? (
+        <InsiderCard key={key} entry={entry} onTagClick={setActiveTag} onAtlasIssueOpen={onAtlasIssueOpen} />
+      ) : (
+        <EntryCard
+          key={key}
+          corpusKey={activeCorpus.key}
+          entry={entry}
+          onTagClick={setActiveTag}
+          onAtlasIssueOpen={onAtlasIssueOpen}
+        />
+      );
+    })
+  );
+
+  const renderEntriesCollection = (entries) => (
+    <div className={`${styles.entriesCollection} ${shouldUseHalfWidthGrid(activeCorpus.key) ? styles.entriesCollectionHalf : ''}`.trim()}>
+      {renderEntries(entries)}
+    </div>
+  );
+
   return (
-    <div
-      style={{
-        background: COLORS.surface,
-        border: `1px solid ${COLORS.cardBorder}`,
-        borderRadius: 12,
-        color: COLORS.text,
-        padding: 16,
-      }}
-    >
-      <div
-        style={{
-          borderBottom: `1px solid ${COLORS.cardBorder}`,
-          display: 'flex',
-          gap: 8,
-          marginBottom: 16,
-          overflowX: 'auto',
-          paddingBottom: 2,
-        }}
-      >
+    <div className={styles.container}>
+      <div className={styles.tabBar}>
         {corpusDefinitions.map((corpus) => {
           const isActive = corpus.key === activeCorpus.key;
 
@@ -388,69 +392,104 @@ const CorpusViewer = () => {
             <button
               key={corpus.key}
               type="button"
+              aria-pressed={isActive}
               onClick={() => setActiveCorpusKey(corpus.key)}
-              style={{
-                alignItems: 'center',
-                background: 'transparent',
-                border: 'none',
-                borderBottom: isActive ? `2px solid ${COLORS.accent}` : '2px solid transparent',
-                color: COLORS.text,
-                cursor: 'pointer',
-                display: 'inline-flex',
-                flexShrink: 0,
-                gap: 8,
-                opacity: isActive ? 1 : 0.72,
-                padding: '8px 4px 10px',
-              }}
+              className={`${styles.tabButton} ${isActive ? styles.tabButtonActive : ''}`.trim()}
             >
-              <span style={{ color: isActive ? COLORS.accent : COLORS.muted, fontSize: 14 }}>
+              <span className={`${styles.tabIcon} ${isActive ? styles.tabIconActive : ''}`.trim()}>
                 {renderCorpusIcon(corpus.icon)}
               </span>
-              <span style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap' }}>
-                {`${corpus.tabLabel} (${formatNumber(corpus.entries.length)} of ${formatNumber(corpus.count_full)})`}
+              <span className={styles.tabLabel}>
+                {corpus.tabLabel}
               </span>
             </button>
           );
         })}
       </div>
 
-      <div style={{ marginBottom: 16 }}>
-        <div style={{ alignItems: 'center', display: 'flex', gap: 10, marginBottom: 6 }}>
-          <span style={{ color: COLORS.accent, fontSize: 16 }}>
-            {renderCorpusIcon(activeCorpus.icon)}
-          </span>
-          <div style={{ color: COLORS.text, fontSize: 18, fontWeight: 700 }}>
-            {activeCorpus.label}
-          </div>
+      {showGithubLink ? (
+        <div className={styles.sectionBlock}>
+          <a
+            href="https://github.com/xoCortex/context-engine/tree/main/client/src/variables/demo"
+            target="_blank"
+            rel="noopener noreferrer"
+            className={styles.githubLink}
+          >
+            <FontAwesomeIcon className={styles.githubLinkIcon} icon={faGithub} />
+            <span>Full corpus on GitHub</span>
+          </a>
         </div>
-        <div style={{ color: COLORS.muted, fontSize: 13, lineHeight: 1.5 }}>
-          Showing {formatNumber(activeCorpus.entries.length)} sampled entries from a corpus of {formatNumber(activeCorpus.count_full)}.
-        </div>
-      </div>
+      ) : null}
 
-      <div
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 12,
-          maxHeight: 560,
-          overflowY: 'auto',
-          paddingRight: 4,
-        }}
-      >
-        {activeCorpus.entries.length === 0 ? (
+      <div className={styles.scrollArea}>
+        {activeCorpus.key === 'ai_laws_policy' ? (
+          <PolicyGlobe entries={activeCorpus.entries}>
+            {({ filteredEntries, filterStatus, FilterControlsElement }) => (
+              <div className={styles.policySplitLayout} data-testid="ce-policy-split-layout">
+                <div className={styles.policyListColumn}>
+                  <div className={styles.policyListHeader}>
+                    <div>
+                      <div className={styles.policyListEyebrow}>Filter By</div>
+                      <div className={styles.policyListTitle}>AI laws & policy</div>
+                    </div>
+                    {FilterControlsElement}
+                  </div>
+                  {filteredEntries.length === 0 ? (
+                    <EmptyCorpusState
+                      corpus={activeCorpus}
+                      title="No matching policy entries"
+                      text={
+                        filterStatus === 'all'
+                          ? 'No policy entries are loaded for this demo corpus yet.'
+                          : `No ${filterStatus} policy entries match the current filter.`
+                      }
+                    />
+                  ) : (
+                    <div className={styles.policyEntriesList}>
+                      {renderEntriesCollection(filteredEntries)}
+                    </div>
+                  )}
+                </div>
+
+                <aside className={styles.policyMapColumn}>
+                  {(() => {
+                    const { globalStatus, mapData } = buildPolicyMapState(filteredEntries);
+
+                    return (
+                      <div className={styles.policyMapPanel}>
+                        <div className={styles.policyMapLens}>
+                          <WorldResultsMap
+                            data={mapData}
+                            colorScale={(regionStatus) => getPolicyMapFill(regionStatus || globalStatus, !regionStatus)}
+                            compact
+                          />
+                        </div>
+                        <div className={styles.policyMapAssistiveText}>
+                          {buildPolicyMapSubtitle({
+                            filterStatus,
+                            filteredEntries,
+                            globalStatus,
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </aside>
+              </div>
+            )}
+          </PolicyGlobe>
+        ) : activeCorpus.entries.length === 0 ? (
           <EmptyCorpusState corpus={activeCorpus} />
         ) : (
-          activeCorpus.entries.map((entry, index) => {
-            const key = entry.id || entry.url || `${activeCorpus.key}-${index}`;
-            return activeCorpus.key === 'tweets' ? (
-              <TweetCard key={key} entry={entry} />
-            ) : (
-              <EntryCard key={key} corpusKey={activeCorpus.key} entry={entry} />
-            );
-          })
+          renderEntriesCollection(activeCorpus.entries)
         )}
       </div>
+
+      <TagModal
+        isOpen={!!activeTag}
+        toggle={() => setActiveTag(null)}
+        activeTag={activeTag}
+      />
     </div>
   );
 };

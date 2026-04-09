@@ -1,3 +1,4 @@
+import { DEFAULT_CHAIN_ID } from '../../variables/appConfig.js';
 import { getSessionContractsForChain, getSessionRegistryAddress } from '../../variables/chains.js';
 import {
   getSessionWizardContractDefaults,
@@ -6,19 +7,21 @@ import {
   sanitizeSessionWizardContracts,
 } from './sessionWizardContracts.js';
 
+const DEFAULT_CONFIG_CHAIN_ID = DEFAULT_CHAIN_ID;
+
 describe('sessionWizardContracts', () => {
   test('defaults include session registry address from chains config', () => {
-    const chainContracts = getSessionContractsForChain(84532);
-    const defaults = getSessionWizardContractDefaults(84532);
+    const chainContracts = getSessionContractsForChain(DEFAULT_CONFIG_CHAIN_ID);
+    const defaults = getSessionWizardContractDefaults(DEFAULT_CONFIG_CHAIN_ID);
 
     expect(defaults.surveys).toBe(chainContracts.surveys);
     expect(defaults.sbtFactory).toBe(chainContracts.sbtFactory);
-    expect(defaults.sessionRegistry).toBe(getSessionRegistryAddress(84532));
+    expect(defaults.sessionRegistry).toBe(getSessionRegistryAddress(DEFAULT_CONFIG_CHAIN_ID));
   });
 
   test('defaults omit session registry when chains config has none', () => {
-    const defaults = getSessionWizardContractDefaults(8453);
-    expect(defaults.sessionRegistry).toBeUndefined();
+    const defaults = getSessionWizardContractDefaults(84532);
+    expect(defaults).toEqual({});
   });
 
   test('visible contract keys include session registry row', () => {
@@ -30,15 +33,15 @@ describe('sessionWizardContracts', () => {
   });
 
   test('registry resolver prefers manual contract address over chain default', () => {
-    expect(resolveSessionWizardRegistryAddress(84532, {
+    expect(resolveSessionWizardRegistryAddress(DEFAULT_CONFIG_CHAIN_ID, {
       sessionRegistry: { address: '0xabc' },
     })).toBe('0xabc');
   });
 
   test('registry resolver falls back to chain default when manual value is empty', () => {
-    expect(resolveSessionWizardRegistryAddress(84532, {
+    expect(resolveSessionWizardRegistryAddress(DEFAULT_CONFIG_CHAIN_ID, {
       sessionRegistry: { address: '' },
-    })).toBe(getSessionRegistryAddress(84532));
+    })).toBe(getSessionRegistryAddress(DEFAULT_CONFIG_CHAIN_ID));
   });
 
   test('sanitize keeps visible contracts and drops hidden entries', () => {

@@ -29,6 +29,7 @@ jest.mock('../logging', () => ({
 const TX_ID_404 = 'C'.repeat(43);
 const TX_ID_TIMEOUT = 'D'.repeat(43);
 const TEST_ARWEAVE_GATEWAY = 'https://arweave.example.test';
+const TEST_AR_IO_GATEWAY = 'https://unit.ar-io.dev';
 
 const jsonResp = (status, payload = {}) => {
   const textBody = JSON.stringify(payload);
@@ -66,6 +67,7 @@ describe('error paths', () => {
 
   afterEach(() => {
     jest.clearAllMocks();
+    jest.useRealTimers();
     try { delete globalThis.CE_ARWEAVE_DIRECT_TO_AR_IO; } catch (_) {}
     try { delete globalThis.__CE_ARWEAVE_UPLOAD_FALLBACK__; } catch (_) {}
   });
@@ -129,6 +131,30 @@ describe('error paths', () => {
       retryable: true,
       txId: TX_ID_TIMEOUT,
     });
+  });
+
+  it('forces hung gateway fetches to reject on timeout even if the fetch promise never settles', async () => {
+    let capturedSignal = null;
+    global.fetch.mockImplementation((_url, options = {}) => {
+      capturedSignal = options?.signal || null;
+      return new Promise(() => {});
+    });
+
+    const pending = arweaveScripts.downloadDataFromArweave(TX_ID_TIMEOUT, {
+      gateways: [TEST_AR_IO_GATEWAY],
+      retries: 0,
+      bypassCache: true,
+      disableExistencePrecheck: true,
+      gatewayTimeoutMs: 50,
+    });
+
+    await expect(pending).rejects.toMatchObject({
+      name: 'ArweaveFetchError',
+      kind: 'network',
+      retryable: true,
+      txId: TX_ID_TIMEOUT,
+    });
+    expect(capturedSignal?.aborted).toBe(true);
   });
 
   it('treats malformed upload responses as controlled failures', async () => {

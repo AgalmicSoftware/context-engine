@@ -1,4 +1,4 @@
-import { act, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { ethers } from 'ethers';
 import fs from 'fs';
 import path from 'path';
@@ -8,10 +8,12 @@ import contractScripts from '../../utilities/web3/contractScripts.js';
 import { getDemoSessionConfigBySlug } from '../../utilities/web3/contractScripts.js';
 import { arweaveScripts } from '../../utilities/arweave/arweaveScripts.js';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
+import * as imageScripts from '../../utilities/ui/imageScripts.js';
 import * as resourceKeys from '../../utilities/session/resourceKeys.js';
+import { normalizeArweaveUrl } from '../../utilities/arweave/arweaveUrls.js';
 import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
-import { getSessionContractsForChain } from '../../variables/chains.js';
+import { getSessionContractsForChain, getSessionRegistryChains } from '../../variables/chains.js';
 import { getScopedCreateSbtFormCacheKey } from '../../utilities/sbt/createSbtFormCache.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { t } from '../../utilities/ui/terminology.js';
@@ -64,6 +66,7 @@ describe('CreateSBTGroup cache helpers', () => {
     instance.state.useImageUrl = true;
     instance.state.tags = ['tag1', 'tag2'];
     instance.state.documentURLs = ['https://doc.test'];
+    instance.state.documentUrl = 'https://doc.test/pending';
     instance.state.metadataLockGateIds = {
       ...instance.state.metadataLockGateIds,
       description: ['gate-description'],
@@ -79,6 +82,7 @@ describe('CreateSBTGroup cache helpers', () => {
     expect(payload.sbtName).toBe('Alpha');
     expect(payload.tags).toEqual(['tag1', 'tag2']);
     expect(payload.documentURLs).toEqual(['https://doc.test']);
+    expect(payload.documentUrl).toBe('https://doc.test/pending');
     expect(payload.metadataLockGateIds).toEqual(expect.objectContaining({
       description: ['gate-description'],
     }));
@@ -147,6 +151,33 @@ describe('CreateSBTGroup cache helpers', () => {
     }));
     expect(instance.state.sbtDistribution.mintingEndTime).toBeInstanceOf(Date);
     expect(instance.state.tokenInfoCollapsed).toBe(false);
+    expect(instance.updateGroupHash).toHaveBeenCalled();
+  });
+
+  it('loadFormCache restores a pending document URL draft and expands the authoring sections', () => {
+    const instance = makeInstance({ network: { id: 84532, name: 'Base Sepolia' }, sessionSlug: 'test' });
+    instance.updateGroupHash = jest.fn();
+
+    sessionStorage.setItem(
+      getScopedCreateSbtFormCacheKey('test'),
+      JSON.stringify({
+        sbtName: 'Cached',
+        documentUrl: 'https://doc.test/pending',
+        _sessionSlug: 'test',
+        sbtDistribution: {
+          network: 84532,
+        },
+      })
+    );
+
+    const loaded = instance.loadFormCache();
+
+    expect(loaded).toBe(true);
+    expect(instance.state.documentURLs).toEqual([]);
+    expect(instance.state.documentUrl).toBe('https://doc.test/pending');
+    expect(instance.state.tokenInfoCollapsed).toBe(false);
+    expect(instance.state.mintOptionsCollapsed).toBe(false);
+    expect(instance.state.distributionOptionsCollapsed).toBe(false);
     expect(instance.updateGroupHash).toHaveBeenCalled();
   });
 
@@ -408,6 +439,44 @@ describe('CreateSBTGroup cache helpers', () => {
     expect(instance.state.currentStep).toBe(3);
   });
 
+  it('canonicalizes bare Arweave image txids before metadata upload and preview serialization', async () => {
+    const instance = makeInstance({
+      account: '0xCreator',
+      network: { id: 84532, name: 'Base Sepolia' },
+      provider: 'mock-provider',
+      sessionSlug: 'test',
+    });
+    const rawImageTxId = 'c'.repeat(43);
+    instance.getSessionConfigForNetwork = jest.fn(() => ({ slug: 'test', networkChainId: 84532 }));
+    instance.state = {
+      ...instance.state,
+      sbtName: 'Alpha',
+      sbtDescription: 'Private details',
+      sbtImageUrl: rawImageTxId,
+      useImageUrl: true,
+      sbtDistribution: {
+        ...instance.state.sbtDistribution,
+        burnAuth: 'AdminOnly',
+        network: { name: 'Base Sepolia' },
+      },
+    };
+
+    const preview = instance.buildMetadataPreview();
+    expect(preview.image).toBe(`ar://${rawImageTxId}`);
+
+    jest.spyOn(resourceKeys, 'getEffectiveArweaveKey').mockResolvedValue({ arweaveJwk: 'test-jwk' });
+    const uploadSpy = jest.spyOn(arweaveScripts, 'uploadDataToArweave').mockImplementation(async (data) => {
+      const parsed = JSON.parse(data);
+      expect(parsed.image).toBe(`ar://${rawImageTxId}`);
+      return 'test-token-uri';
+    });
+
+    await instance.uploadTokenUriToArweave();
+
+    expect(uploadSpy).toHaveBeenCalled();
+    expect(instance.state.tokenURI).toBe('test-token-uri');
+  });
+
   it('passes the session wizard Arweave JWK override through deferred uploads for fallback handling', async () => {
     const signAdminAction = jest.fn(async () => ({
       address: '0xCreator',
@@ -618,6 +687,69 @@ describe('CreateSBTGroup cache helpers', () => {
     expect(result).toEqual(expect.objectContaining({
       tokenURI: '',
       metadataUploadStatus: 'pending-upload',
+    }));
+  });
+
+  it('auto-commits a pending document URL when submit saves a deferred draft', async () => {
+    const onSaveDraft = jest.fn(async () => {});
+    const instance = makeInstance({
+      account: '0x1111111111111111111111111111111111111111',
+      network: { id: 84532, name: 'Base Sepolia' },
+      provider: 'mock-provider',
+      sessionSlug: 'publish-later',
+      deferredDeploy: true,
+      attemptImmediateDeferredUpload: false,
+      onSaveDraft,
+    });
+    instance.getSessionConfigForNetwork = jest.fn(() => ({
+      slug: 'publish-later',
+      networkChainId: 84532,
+    }));
+    instance.resolvePredictableDeployPlan = jest.fn(async ({ tokenURI }) => ({
+      predictedAddress: '0x1111111111111111111111111111111111111111',
+      displayName: 'Deferred Group',
+      contractName: 'Deferred Group',
+      symbol: 'CE-SBT-DEFER',
+      create2Salt: 'draft/test',
+      limitedNumber: 0,
+      adminAddress: '0x1111111111111111111111111111111111111111',
+      mintingEndTimeUnix: 0,
+      hasPasswordMintOnChain: false,
+      burnAuthEnum: 0,
+      hashedPasswords: [],
+      tokenURI,
+      finalGroupPasswordHash: ethers.constants.HashZero,
+      createOptions: { useConfiguredDeterministic: true, initializeGroupPasswordHash: false },
+      distributionOption: 'anyoneCanMint',
+      passwordList: [],
+      groupPassword: '',
+      usesInviteCodes: false,
+    }));
+    instance.state = {
+      ...instance.state,
+      sbtName: 'Deferred Group',
+      documentUrl: 'https://doc.test/pending',
+      sbtDistribution: {
+        ...instance.state.sbtDistribution,
+        burnAuth: 'AdminOnly',
+        network: { name: 'Base Sepolia' },
+      },
+    };
+
+    jest.spyOn(resourceKeys, 'getEffectiveArweaveKey').mockResolvedValue({});
+
+    await instance.handleMintClick();
+
+    expect(instance.state.documentURLs).toEqual(['https://doc.test/pending']);
+    expect(instance.state.documentUrl).toBe('');
+    expect(onSaveDraft).toHaveBeenCalledWith(expect.objectContaining({
+      authoringPayload: expect.objectContaining({
+        documentURLs: ['https://doc.test/pending'],
+        documentUrl: '',
+      }),
+      metadataPreview: expect.objectContaining({
+        documentURLs: ['https://doc.test/pending'],
+      }),
     }));
   });
 
@@ -971,11 +1103,13 @@ describe('CreateSBTGroup cache helpers', () => {
   });
 
   it('limits the network dropdown to session-registry authoring chains and defaults to the session chain', () => {
+    const authoringChain = getSessionRegistryChains().find((chain) => getSessionContractsForChain(chain.id)?.sbtFactory);
+    expect(authoringChain).toBeTruthy();
     const instance = makeInstance({
       network: { id: 1, name: 'Ethereum Mainnet' },
       sessionConfigOverride: {
         slug: 'test',
-        networkChainId: 84532,
+        networkChainId: authoringChain.id,
       },
     });
     instance.state = {
@@ -990,18 +1124,21 @@ describe('CreateSBTGroup cache helpers', () => {
     const networkSelect = within(networkRow).getByRole('combobox');
     const options = within(networkSelect).getAllByRole('option').map((option) => option.textContent);
 
-    expect(networkSelect).toHaveValue('84532');
-    expect(options).toContain('Base Sepolia (84532)');
+    expect(networkSelect).toHaveValue(String(authoringChain.id));
+    expect(options).toContain(`${authoringChain.name} (${authoringChain.id})`);
     expect(options.some((option) => /\(1\)$/.test(option || ''))).toBe(false);
-    expect(options).not.toContain('Base (8453)');
+    expect(options).not.toContain('Ethereum Mainnet (1)');
   });
 
   it('keeps the resolved session config on the authoring chain instead of the wallet chain', () => {
+    const authoringChain = getSessionRegistryChains().find((chain) => getSessionContractsForChain(chain.id)?.sbtFactory);
+    expect(authoringChain).toBeTruthy();
+    const sessionContracts = getSessionContractsForChain(authoringChain.id);
     const instance = makeInstance({
       network: { id: 1, name: 'Ethereum Mainnet' },
       sessionConfigOverride: {
         slug: 'test',
-        networkChainId: 84532,
+        networkChainId: authoringChain.id,
       },
     });
 
@@ -1009,12 +1146,12 @@ describe('CreateSBTGroup cache helpers', () => {
 
     expect(resolved).toEqual(expect.objectContaining({
       slug: 'test',
-      networkChainId: 84532,
-      sbtFactoryAddress: '0x538A48BC439A36D2A86e63114DCD9c429d2ddEcA',
+      networkChainId: authoringChain.id,
+      sbtFactoryAddress: sessionContracts.sbtFactory,
     }));
     expect(resolved.contracts.sbtFactory).toEqual(expect.objectContaining({
-      address: '0x538A48BC439A36D2A86e63114DCD9c429d2ddEcA',
-      chainId: 84532,
+      address: sessionContracts.sbtFactory,
+      chainId: authoringChain.id,
     }));
   });
 
@@ -1226,13 +1363,398 @@ describe('CreateSBTGroup cache helpers', () => {
     expect(screen.queryByText(/^Document URLs$/)).not.toBeInTheDocument();
     expect(screen.queryByText(/^Tags$/)).not.toBeInTheDocument();
     expect(within(imageRow).getByRole('button', { name: /^URL$/i })).toBeInTheDocument();
+    expect(within(imageRow).getByTestId(E2E_TESTIDS.SBT_CREATE_IMAGE_PASTE)).toBeInTheDocument();
     expect(within(imageRow).getByRole('button', { name: /Upload image/i })).toBeInTheDocument();
     expect(screen.getByLabelText('Document URL')).toBeInTheDocument();
     expect(screen.getByLabelText('Add tag')).toBeInTheDocument();
-    expect(imageRow.querySelector(`.${styles.imageUploadBody}`)).toBeInTheDocument();
-    expect(imageRow.querySelector(`.${styles.imagePreviewSurface}`)).not.toBeInTheDocument();
+    expect(screen.queryByRole('img', { name: 'SBT artwork preview' })).not.toBeInTheDocument();
     expect(docsRow.querySelector(`.${styles.inlineFieldLockControl}`)).toBeInTheDocument();
     expect(tagsRow.querySelector(`.${styles.tagsInlineRow}`)).toBeInTheDocument();
+  });
+
+  it('pastes an image blob into upload mode and shows the compact preview with the file name', async () => {
+    const originalClipboard = navigator.clipboard;
+    const originalCreateObjectURL = URL.createObjectURL;
+    const originalRevokeObjectURL = URL.revokeObjectURL;
+    const clipboardBlob = new Blob(['clipboard-image'], { type: 'image/png' });
+    const instance = makeInstance({
+      network: { id: 84532, name: 'Base Sepolia' },
+      sessionSlug: 'test',
+    });
+    instance.state.tokenInfoCollapsed = false;
+    URL.createObjectURL = jest.fn(() => 'blob:sbt-clipboard-preview');
+    URL.revokeObjectURL = jest.fn();
+
+    try {
+      Object.defineProperty(navigator, 'clipboard', {
+        configurable: true,
+        value: {
+          read: jest.fn().mockResolvedValue([{
+            types: ['image/png'],
+            getType: jest.fn().mockResolvedValue(clipboardBlob),
+          }]),
+          readText: jest.fn().mockResolvedValue(''),
+        },
+      });
+
+      const view = render(instance.render());
+
+      await act(async () => {
+        await instance.handlePasteImage();
+      });
+
+      view.rerender(instance.render());
+
+      expect(instance.state.useImageUrl).toBe(false);
+      expect(instance.state.sbtImageFile?.name).toBe('clipboard-sbt-image.png');
+      expect(screen.getByText('clipboard-sbt-image.png')).toBeInTheDocument();
+      expect(screen.queryByText('Image too large (>10MB)')).not.toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByRole('img', { name: 'SBT artwork preview' })).toHaveAttribute(
+          'src',
+          'blob:sbt-clipboard-preview'
+        );
+      });
+    } finally {
+      Object.defineProperty(navigator, 'clipboard', {
+        configurable: true,
+        value: originalClipboard,
+      });
+      URL.createObjectURL = originalCreateObjectURL;
+      URL.revokeObjectURL = originalRevokeObjectURL;
+    }
+  });
+
+  it('pastes an image URL through the existing CreateSBT image-url flow', async () => {
+    const originalClipboard = navigator.clipboard;
+    const instance = makeInstance({
+      network: { id: 84532, name: 'Base Sepolia' },
+      sessionSlug: 'test',
+    });
+    instance.state.tokenInfoCollapsed = false;
+    const fetchedFile = new File(['remote-image'], 'remote.png', { type: 'image/png' });
+    const fetchImageSpy = jest.spyOn(imageScripts, 'fetchImageFromURL').mockResolvedValue(fetchedFile);
+
+    try {
+      Object.defineProperty(navigator, 'clipboard', {
+        configurable: true,
+        value: {
+          read: jest.fn().mockResolvedValue([]),
+          readText: jest.fn().mockResolvedValue('https://example.com/sbt-image.png'),
+        },
+      });
+
+      const view = render(instance.render());
+
+      await act(async () => {
+        await instance.handlePasteImage();
+      });
+
+      await waitFor(() => {
+        expect(fetchImageSpy).toHaveBeenCalledWith('https://example.com/sbt-image.png');
+        expect(instance.state.sbtImageFile).toBe(fetchedFile);
+      });
+
+      view.rerender(instance.render());
+
+      expect(instance.state.useImageUrl).toBe(true);
+      expect(instance.state.sbtImageUrl).toBe('https://example.com/sbt-image.png');
+      expect(screen.getByTestId(E2E_TESTIDS.SBT_CREATE_IMAGE_URL_INPUT)).toHaveValue(
+        'https://example.com/sbt-image.png'
+      );
+    } finally {
+      Object.defineProperty(navigator, 'clipboard', {
+        configurable: true,
+        value: originalClipboard,
+      });
+    }
+  });
+
+  it('re-fetches pasted Arweave refs when the image URL field is edited later', async () => {
+    const instance = makeInstance({
+      network: { id: 84532, name: 'Base Sepolia' },
+      sessionSlug: 'test',
+    });
+    const arweaveRef = `ar://${'a'.repeat(43)}`;
+    const normalizedArweaveUrl = normalizeArweaveUrl(arweaveRef);
+    const fetchedFile = new File(['remote-image'], 'remote.png', { type: 'image/png' });
+    const fetchImageSpy = jest.spyOn(imageScripts, 'fetchImageFromURL').mockResolvedValue(fetchedFile);
+    instance.state.tokenInfoCollapsed = false;
+    instance.state.useImageUrl = true;
+
+    const view = render(instance.render());
+
+    await act(async () => {
+      instance.handleInputChange({
+        target: {
+          name: 'sbtImageUrl',
+          type: 'text',
+          value: arweaveRef,
+        },
+      });
+    });
+
+    await waitFor(() => {
+      expect(fetchImageSpy).toHaveBeenCalledWith(normalizedArweaveUrl);
+      expect(instance.state.sbtImageFile).toBe(fetchedFile);
+    });
+
+    view.rerender(instance.render());
+
+    expect(instance.state.sbtImageUrl).toBe(arweaveRef);
+    expect(screen.getByTestId(E2E_TESTIDS.SBT_CREATE_IMAGE_URL_INPUT)).toHaveValue(arweaveRef);
+  });
+
+  it('re-fetches missing preview bytes from Arweave refs before minting', async () => {
+    const instance = makeInstance({
+      account: '0x1111111111111111111111111111111111111111',
+      loginComplete: true,
+      network: { id: 84532, name: 'Base Sepolia' },
+      sessionSlug: 'test',
+      toggleLoginModal: jest.fn(),
+    });
+    const arweaveRef = `ar://${'b'.repeat(43)}`;
+    const normalizedArweaveUrl = normalizeArweaveUrl(arweaveRef);
+    const fetchedFile = new File(['remote-image'], 'remote.png', { type: 'image/png' });
+    const fetchImageSpy = jest.spyOn(imageScripts, 'fetchImageFromURL').mockResolvedValue(fetchedFile);
+    instance.commitPendingDocumentUrl = jest.fn(async () => false);
+    instance.uploadImageToArweave = jest.fn(async () => null);
+    instance.uploadTokenUriToArweave = jest.fn(async () => null);
+    instance.mintSBT = jest.fn(async () => null);
+    instance.state.sbtName = 'Arweave Group';
+    instance.state.useImageUrl = true;
+    instance.state.sbtImageUrl = arweaveRef;
+    instance.state.sbtImageFile = null;
+
+    await act(async () => {
+      await instance.handleMintClick();
+    });
+
+    expect(fetchImageSpy).toHaveBeenCalledWith(normalizedArweaveUrl);
+    expect(instance.state.sbtImageFile).toBe(fetchedFile);
+    expect(instance.uploadImageToArweave).toHaveBeenCalledTimes(1);
+    expect(instance.uploadTokenUriToArweave).toHaveBeenCalledTimes(1);
+    expect(instance.mintSBT).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the existing uploaded image when a pasted clipboard image blob is too large', async () => {
+    const originalClipboard = navigator.clipboard;
+    const originalCreateObjectURL = URL.createObjectURL;
+    const originalRevokeObjectURL = URL.revokeObjectURL;
+    const existingFile = new File(['existing-image'], 'existing.png', { type: 'image/png' });
+    const oversizedBlob = new Blob([new Uint8Array((10 * 1024 * 1024) + 1)], { type: 'image/png' });
+    const instance = makeInstance({
+      network: { id: 84532, name: 'Base Sepolia' },
+      sessionSlug: 'test',
+    });
+    instance.state.tokenInfoCollapsed = false;
+    instance.state.sbtImageFile = existingFile;
+    instance.state.useImageUrl = false;
+    instance.state.sbtMinted = true;
+    instance.state.sbtAddress = '0x9999999999999999999999999999999999999999';
+    instance.state.currentStep = 4;
+    instance.state.shareableUrl = 'https://contextengine.xyz/sbt/0x9999';
+    instance.state.autoJoinUrl = 'https://contextengine.xyz/session/test?sbt=0x9999&auto=1';
+    instance.state.imageUploaded = true;
+    instance.state.tokenUriUploaded = true;
+    URL.createObjectURL = jest.fn(() => 'blob:existing-sbt-preview');
+    URL.revokeObjectURL = jest.fn();
+
+    try {
+      Object.defineProperty(navigator, 'clipboard', {
+        configurable: true,
+        value: {
+          read: jest.fn().mockResolvedValue([{
+            types: ['image/png'],
+            getType: jest.fn().mockResolvedValue(oversizedBlob),
+          }]),
+          readText: jest.fn().mockResolvedValue(''),
+        },
+      });
+
+      const view = render(instance.render());
+
+      await act(async () => {
+        await instance.handlePasteImage();
+      });
+
+      view.rerender(instance.render());
+
+      expect(instance.state.useImageUrl).toBe(false);
+      expect(instance.state.sbtImageFile).toBe(existingFile);
+      expect(screen.getByText('existing.png')).toBeInTheDocument();
+      expect(screen.getByRole('img', { name: 'SBT artwork preview' })).toHaveAttribute(
+        'src',
+        'blob:existing-sbt-preview'
+      );
+      expect(screen.getByText('Image too large (>10MB)')).toBeInTheDocument();
+      expect(instance.state.sbtMinted).toBe(true);
+      expect(instance.state.sbtAddress).toBe('0x9999999999999999999999999999999999999999');
+      expect(instance.state.currentStep).toBe(4);
+      expect(instance.state.shareableUrl).toBe('https://contextengine.xyz/sbt/0x9999');
+      expect(instance.state.autoJoinUrl).toBe('https://contextengine.xyz/session/test?sbt=0x9999&auto=1');
+      expect(instance.state.imageUploaded).toBe(true);
+      expect(instance.state.tokenUriUploaded).toBe(true);
+    } finally {
+      Object.defineProperty(navigator, 'clipboard', {
+        configurable: true,
+        value: originalClipboard,
+      });
+      URL.createObjectURL = originalCreateObjectURL;
+      URL.revokeObjectURL = originalRevokeObjectURL;
+    }
+  });
+
+  it('keeps the existing uploaded image when a pasted image URL fails validation', async () => {
+    const originalClipboard = navigator.clipboard;
+    const originalCreateObjectURL = URL.createObjectURL;
+    const originalRevokeObjectURL = URL.revokeObjectURL;
+    const existingFile = new File(['existing-image'], 'existing.png', { type: 'image/png' });
+    const instance = makeInstance({
+      network: { id: 84532, name: 'Base Sepolia' },
+      sessionSlug: 'test',
+    });
+    instance.state.tokenInfoCollapsed = false;
+    instance.state.sbtImageFile = existingFile;
+    instance.state.useImageUrl = false;
+    URL.createObjectURL = jest.fn(() => 'blob:existing-sbt-preview');
+    URL.revokeObjectURL = jest.fn();
+    const fetchImageSpy = jest.spyOn(imageScripts, 'fetchImageFromURL').mockRejectedValue(
+      new Error('Invalid image type')
+    );
+
+    try {
+      Object.defineProperty(navigator, 'clipboard', {
+        configurable: true,
+        value: {
+          read: jest.fn().mockResolvedValue([]),
+          readText: jest.fn().mockResolvedValue('https://example.com/not-an-image'),
+        },
+      });
+
+      const view = render(instance.render());
+
+      await act(async () => {
+        await instance.handlePasteImage();
+      });
+
+      view.rerender(instance.render());
+
+      expect(fetchImageSpy).toHaveBeenCalledWith('https://example.com/not-an-image');
+      expect(instance.state.useImageUrl).toBe(false);
+      expect(instance.state.sbtImageFile).toBe(existingFile);
+      expect(screen.queryByTestId(E2E_TESTIDS.SBT_CREATE_IMAGE_URL_INPUT)).not.toBeInTheDocument();
+      expect(screen.getByText('existing.png')).toBeInTheDocument();
+      expect(screen.getByRole('img', { name: 'SBT artwork preview' })).toHaveAttribute(
+        'src',
+        'blob:existing-sbt-preview'
+      );
+      expect(screen.getByText('Invalid image type')).toBeInTheDocument();
+    } finally {
+      Object.defineProperty(navigator, 'clipboard', {
+        configurable: true,
+        value: originalClipboard,
+      });
+      URL.createObjectURL = originalCreateObjectURL;
+      URL.revokeObjectURL = originalRevokeObjectURL;
+      fetchImageSpy.mockRestore();
+    }
+  });
+
+  it('shows inline clipboard errors for unavailable and unsupported image paste states', async () => {
+    const originalClipboard = navigator.clipboard;
+    const instance = makeInstance({
+      network: { id: 84532, name: 'Base Sepolia' },
+      sessionSlug: 'test',
+    });
+    instance.state.tokenInfoCollapsed = false;
+    const view = render(instance.render());
+
+    try {
+      Object.defineProperty(navigator, 'clipboard', {
+        configurable: true,
+        value: undefined,
+      });
+
+      await act(async () => {
+        await instance.handlePasteImage();
+      });
+
+      view.rerender(instance.render());
+
+      expect(screen.getByText('Clipboard does not contain a supported image or URL.')).toBeInTheDocument();
+
+      Object.defineProperty(navigator, 'clipboard', {
+        configurable: true,
+        value: {
+          read: jest.fn().mockResolvedValue([]),
+          readText: jest.fn().mockResolvedValue(''),
+        },
+      });
+
+      await act(async () => {
+        await instance.handlePasteImage();
+      });
+
+      view.rerender(instance.render());
+
+      expect(screen.getByText('Clipboard does not contain a supported image or URL.')).toBeInTheDocument();
+    } finally {
+      Object.defineProperty(navigator, 'clipboard', {
+        configurable: true,
+        value: originalClipboard,
+      });
+    }
+  });
+
+  it('keeps the existing uploaded image when pasted clipboard text is not a supported URL', async () => {
+    const originalClipboard = navigator.clipboard;
+    const originalCreateObjectURL = URL.createObjectURL;
+    const originalRevokeObjectURL = URL.revokeObjectURL;
+    const existingFile = new File(['existing-image'], 'existing.png', { type: 'image/png' });
+    const instance = makeInstance({
+      network: { id: 84532, name: 'Base Sepolia' },
+      sessionSlug: 'test',
+    });
+    instance.state.tokenInfoCollapsed = false;
+    instance.state.sbtImageFile = existingFile;
+    instance.state.useImageUrl = false;
+    URL.createObjectURL = jest.fn(() => 'blob:existing-sbt-preview');
+    URL.revokeObjectURL = jest.fn();
+
+    try {
+      Object.defineProperty(navigator, 'clipboard', {
+        configurable: true,
+        value: {
+          read: jest.fn().mockResolvedValue([]),
+          readText: jest.fn().mockResolvedValue('copied wallet address'),
+        },
+      });
+
+      const view = render(instance.render());
+
+      await act(async () => {
+        await instance.handlePasteImage();
+      });
+
+      view.rerender(instance.render());
+
+      expect(instance.state.useImageUrl).toBe(false);
+      expect(instance.state.sbtImageFile).toBe(existingFile);
+      expect(screen.getByText('existing.png')).toBeInTheDocument();
+      expect(screen.getByRole('img', { name: 'SBT artwork preview' })).toHaveAttribute(
+        'src',
+        'blob:existing-sbt-preview'
+      );
+      expect(screen.getByText('Clipboard does not contain a supported image or URL.')).toBeInTheDocument();
+    } finally {
+      Object.defineProperty(navigator, 'clipboard', {
+        configurable: true,
+        value: originalClipboard,
+      });
+      URL.createObjectURL = originalCreateObjectURL;
+      URL.revokeObjectURL = originalRevokeObjectURL;
+    }
   });
 
   it('keeps docs and tags rows visually flat without extra nested card backgrounds', () => {
@@ -1243,13 +1765,19 @@ describe('CreateSBTGroup cache helpers', () => {
     expect(scss).toMatch(/\.tagsContainer\s*{[\s\S]*?padding:\s*0;[\s\S]*?background:\s*transparent;[\s\S]*?border:\s*none;/);
   });
 
-  it('adds a narrow-panel stack for mobile create-sbt fields', () => {
+  it('adds a narrow-panel stack while keeping lock controls inline on narrow and mobile views', () => {
     const scssPath = path.join(__dirname, 'CreateSBTGroup.module.scss');
     const scss = fs.readFileSync(scssPath, 'utf8');
 
     expect(scss).toMatch(/#createGroupExpanded\s*{[\s\S]*?container-type:\s*inline-size;[\s\S]*?container-name:\s*create-sbt-panel;/);
     expect(scss).toMatch(/@mixin\s+tokenInfoNarrowLayout\s*{[\s\S]*?\.tokenInfoTopGrid,[\s\S]*?grid-template-columns:\s*1fr;/);
-    expect(scss).toMatch(/@mixin\s+tokenInfoNarrowLayout\s*{[\s\S]*?#addDocUrlSection\s*>\s*\.addDocUrlActionButton\s*{[\s\S]*?width:\s*100%;/);
+    expect(scss).toMatch(/@mixin\s+tokenInfoNarrowLayout\s*{[\s\S]*?\.fieldLockRow\s*{[\s\S]*?flex-direction:\s*row;[\s\S]*?align-items:\s*flex-start;/);
+    expect(scss).toMatch(/@mixin\s+tokenInfoNarrowLayout\s*{[\s\S]*?\.imageUploadHeader\s*{[\s\S]*?flex-direction:\s*row;[\s\S]*?align-items:\s*center;/);
+    expect(scss).toMatch(/@mixin\s+tokenInfoNarrowLayout\s*{[\s\S]*?\.tagsInlineRow\s*{[\s\S]*?flex-direction:\s*row;[\s\S]*?align-items:\s*center;/);
+    expect(scss).toMatch(/@mixin\s+tokenInfoNarrowLayout\s*{[\s\S]*?#addDocUrlSection\s*{[\s\S]*?flex-wrap:\s*wrap;[\s\S]*?>\s*\.inlineFieldLockControl\s*{[\s\S]*?order:\s*2;/);
+    expect(scss).not.toMatch(/@mixin\s+tokenInfoNarrowLayout\s*{[\s\S]*?\.fieldLockRow,\s*\.imageUploadHeader,\s*\.tagsInlineRow,\s*#addDocUrlSection\s*{[\s\S]*?flex-direction:\s*column;/);
+    expect(scss).toMatch(/@media\s*\(max-width:\s*600px\)\s*{[\s\S]*?#addDocUrlSection\s*{[\s\S]*?>\s*\.inlineFieldLockControl\s*{[\s\S]*?order:\s*2;/);
+    expect(scss).toMatch(/@media\s*\(max-width:\s*600px\)\s*{[\s\S]*?#addDocUrlSection\s*{[\s\S]*?>\s*\.addDocUrlActionButton\s*{[\s\S]*?order:\s*3;[\s\S]*?width:\s*100%;/);
     expect(scss).toMatch(/@container\s+create-sbt-panel\s*\(max-width:\s*820px\)\s*{\s*@include\s+tokenInfoNarrowLayout;/);
   });
 
@@ -1322,6 +1850,37 @@ describe('CreateSBTGroup cache helpers', () => {
 
     expect(screen.getByTestId(E2E_TESTIDS.SBT_CREATE_PREDICTED_ADDRESS)).toHaveTextContent('Pending admin account…');
     expect(screen.queryByText('Connect a wallet to preview the address.')).not.toBeInTheDocument();
+  });
+
+  it('renders the time-limited mint input as a native datetime field and updates the end time', () => {
+    const instance = makeInstance({
+      network: { id: 84532, name: 'Base Sepolia' },
+      sessionSlug: 'test',
+    });
+    instance.state = {
+      ...instance.state,
+      mintOptionsCollapsed: false,
+      sbtDistribution: {
+        ...instance.state.sbtDistribution,
+        isTimeLimited: true,
+        mintingEndTime: new Date('2026-04-06T12:30:00'),
+      },
+    };
+
+    const { container } = render(instance.render());
+
+    const input = container.querySelector('input[type="datetime-local"]');
+    expect(input).toBeInTheDocument();
+    expect(input).toHaveValue('2026-04-06T12:30');
+
+    fireEvent.change(input, { target: { value: '2026-04-06T13:45' } });
+
+    expect(instance.state.sbtDistribution.mintingEndTime).toBeInstanceOf(Date);
+    expect(instance.state.sbtDistribution.mintingEndTime.getFullYear()).toBe(2026);
+    expect(instance.state.sbtDistribution.mintingEndTime.getMonth()).toBe(3);
+    expect(instance.state.sbtDistribution.mintingEndTime.getDate()).toBe(6);
+    expect(instance.state.sbtDistribution.mintingEndTime.getHours()).toBe(13);
+    expect(instance.state.sbtDistribution.mintingEndTime.getMinutes()).toBe(45);
   });
 
   it('syncs the connected account into the admin defaults when login finishes later', () => {
@@ -2168,6 +2727,50 @@ describe('CreateSBTGroup cache helpers', () => {
 
     expect(instance.state.autoJoinUrl).toBe(`http://localhost/session/edge?sbt=${encodeURIComponent(sbtAddress)}&auto=1`);
     expect(instance.state.shareableUrl).toBe(instance.state.autoJoinUrl);
+  });
+
+  it('clears and suppresses draft cache persistence after a successful mint', async () => {
+    const sbtAddress = '0x00000000000000000000000000000000000000b2';
+    const instance = makeInstance({
+      provider: 'mock-provider',
+      account: '0xCreator',
+      loginComplete: true,
+      network: { id: 84532, name: 'Base Sepolia' },
+      sessionSlug: 'edge',
+    });
+    instance.state = {
+      ...instance.state,
+      sbtName: 'Open Group',
+      sbtDescription: 'Cached before mint',
+      tokenURI: 'ar://metadata',
+      sbtDistribution: {
+        ...instance.state.sbtDistribution,
+        burnAuth: 'AdminOnly',
+        distributionOption: 'anyoneCanMint',
+      },
+    };
+    instance.getSessionConfigForNetwork = jest.fn(() => ({ slug: 'edge', networkChainId: 84532 }));
+    instance.schedulePredictedAddressRefresh = jest.fn();
+
+    const scopedKey = getScopedCreateSbtFormCacheKey('edge');
+    instance.persistFormCache();
+    expect(sessionStorage.getItem(scopedKey)).toContain('"Open Group"');
+
+    const prevProps = instance.props;
+    const prevState = { ...instance.state };
+    jest.spyOn(contractScripts, 'countSBTCreated').mockResolvedValue(2);
+    jest.spyOn(contractScripts, 'createSBT').mockResolvedValue({
+      events: [{ event: 'SBTCreated', args: { sbtAddress } }],
+    });
+
+    await instance.mintSBT();
+
+    expect(sessionStorage.getItem(scopedKey)).toBeNull();
+    expect(instance._suppressFormCachePersistence).toBe(true);
+
+    instance.componentDidUpdate(prevProps, prevState);
+
+    expect(sessionStorage.getItem(scopedKey)).toBeNull();
   });
 
   it('renders the open-mint URL card in the success UI for anyone-can-mint SBTs', () => {

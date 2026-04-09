@@ -1264,6 +1264,16 @@ const buildFailureModeTag = (opts = {}) => (
   opts && opts.throwOnFailure ? 'strict' : 'soft'
 );
 
+const buildArweaveReadModeTag = (opts = {}) => {
+  const retries = Number.isFinite(Number(opts?.arweaveRetries))
+    ? Math.max(0, Number(opts.arweaveRetries))
+    : 'default';
+  const gatewayTimeoutMs = Number.isFinite(Number(opts?.arweaveGatewayTimeoutMs))
+    ? Math.max(300, Number(opts.arweaveGatewayTimeoutMs))
+    : 'default';
+  return `arweave|retries:${retries}|timeout:${gatewayTimeoutMs}`;
+};
+
 const contractHelperDeps = {
   resolveSession,
   latestBlockCache,
@@ -1460,7 +1470,7 @@ const contractScripts = {
       if (onPartialData) onPartialData([], resolvedFromBlock);
       return [];
     }
-    
+
     try {
       rpcLog('getAllQuestionIDsChunkedWithCallback: Fetching logs:', {
         contractAddress: contract.address, fromBlock: resolvedFromBlock, toBlock: resolvedToBlockNum
@@ -1535,7 +1545,7 @@ const contractScripts = {
       if (onPartialData) {
         onPartialData(finalQIDs, resolvedToBlockNum);
       }
-      
+
       return finalQIDs;
     } catch(error) {
       contractsLog.error("getAllQuestionIDsChunkedWithCallback failed:", error);
@@ -1802,7 +1812,7 @@ const contractScripts = {
   });
   const rawLogs = await fetchLogsSmartWithProvider(provider, responseSubmittedEventTopic, fromBlockNum, toBlockNum);
   const surveyResponseEvents = rawLogs.map(log => SURVEYS_INTERFACE.parseLog(log));
-  
+
   var surveyIDs = surveyResponseEvents.map(event => event.args.surveyId);
   return surveyIDs;
 },
@@ -1836,7 +1846,7 @@ const contractScripts = {
   });
   const rawLogs = await fetchLogsSmartWithProvider(provider, responsesSubmittedEventFilter, fromBlock, toBlock);
   const events = rawLogs.map(log => SURVEYS_INTERFACE.parseLog(log));
-  
+
   const surveyResponses = {};
   for (const event of events) {
     const responder = event.args.responder.toLowerCase();
@@ -2273,7 +2283,7 @@ const contractScripts = {
             }
         }
     });
-    
+
     // Return array of objects: { surveyId, creationBlock }
     return Array.from(surveyMap.entries()).map(([sid, bn]) => ({ surveyId: sid, creationBlock: bn }));
   },
@@ -3236,7 +3246,8 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
     const { baseKey } = resolveReadContext(groupKeyOrCfg);
     const modeTag = buildDecryptModeTag(opts);
     const failureModeTag = buildFailureModeTag(opts);
-    const inflightKey = `${baseKey}|${qId}|${modeTag}|${failureModeTag}`;
+    const arweaveReadModeTag = buildArweaveReadModeTag(opts);
+    const inflightKey = `${baseKey}|${qId}|${modeTag}|${failureModeTag}|${arweaveReadModeTag}`;
     const forceArweaveFetch = !!(opts && opts.forceArweaveFetch === true);
     try {
       const result = await runInFlightCoalesced(
@@ -3267,6 +3278,12 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
               forceRetry: forceArweaveFetch,
               cacheBypass: forceArweaveFetch,
               bypassFailureCache: forceArweaveFetch,
+              ...(Number.isFinite(Number(opts?.arweaveRetries))
+                ? { retries: Math.max(0, Number(opts.arweaveRetries)) }
+                : {}),
+              ...(Number.isFinite(Number(opts?.arweaveGatewayTimeoutMs))
+                ? { gatewayTimeoutMs: Math.max(300, Number(opts.arweaveGatewayTimeoutMs)) }
+                : {}),
               debugContext: buildArweaveDebugContext(groupKeyOrCfg, 'question_metadata', {
                 fn: 'getQuestionData',
                 questionId: qId,
@@ -4024,7 +4041,7 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
 
       const sbt = new ethers.Contract(sbtAddress, CUSTOM_SBT_ABI, provider);
 
-      // OPTIMIZATION: Removed redundant provider.getNetwork() call. 
+      // OPTIMIZATION: Removed redundant provider.getNetwork() call.
       // We already know 'chId' from the config used to create the provider.
       const [name, symbol, admin, tokenURI_raw] = await Promise.all([
         callWithRetry(() => sbt.name(),   'SBT.name').catch(() => null),
@@ -4969,15 +4986,15 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
         } else {
           throw new Error('Selected wallet provider is not available. Log in or reconnect your wallet first.');
         }
-      case "wagmi": 
+      case "wagmi":
         if (window.ethereum) { // A more reliable check for injected provider
           return window.ethereum;
         } else {
           throw new Error('Connected wallet provider not found or invalid (window.ethereum missing).');
         }
-      case "none": 
+      case "none":
          throw new Error('Read-only provider is not allowed for transactions. Connect a wallet first.');
-      default: 
+      default:
         if (window.ethereum) return window.ethereum;
         throw new Error(`Could not determine provider for "${providerName}".`);
     }

@@ -47,6 +47,10 @@ const E2E_TESTIDS = Object.freeze({
   PAGE_MATRIX_ROOT: 'ce-page-matrix-root',
   PAGE_AGENT_ROOT: 'ce-page-agent-root',
   PAGE_DEBATE_ROOT: 'ce-page-debate-root',
+  ATLAS_HISTORICAL_CASE_CARD: 'ce-atlas-historical-case-card',
+  ATLAS_HISTORICAL_CASE_EXPAND: 'ce-atlas-historical-case-expand',
+  ATLAS_HISTORICAL_CASE_DETAIL: 'ce-atlas-historical-case-detail',
+  ATLAS_HISTORICAL_CASE_PATCH_CARD: 'ce-atlas-historical-case-patch-card',
 
   // -----------------------------------------
   // AI tools/pages
@@ -93,6 +97,7 @@ const E2E_TESTIDS = Object.freeze({
   WIZARD_SESSION_INFO: 'ce-wizard-session-info',
   WIZARD_SESSION_HEADER_INLINE_BAR: 'ce-wizard-session-header-inline-bar',
   WIZARD_SESSION_HEADER_URL_TOGGLE: 'ce-wizard-session-header-url-toggle',
+  WIZARD_SESSION_HEADER_PASTE: 'ce-wizard-session-header-paste',
   WIZARD_SESSION_HEADER_URL: 'ce-wizard-session-header-url',
   WIZARD_SLUG: 'ce-wizard-slug',
   WIZARD_SLUG_AVAILABLE: 'ce-wizard-slug-available',
@@ -263,6 +268,7 @@ const E2E_TESTIDS = Object.freeze({
   SBT_CREATE_DOCS_LOCK_ROW: 'ce-sbt-create-docs-lock-row',
   SBT_CREATE_TAGS_LOCK_ROW: 'ce-sbt-create-tags-lock-row',
   SBT_CREATE_IMAGE_FILE_INPUT: 'ce-sbt-create-image-file-input',
+  SBT_CREATE_IMAGE_PASTE: 'ce-sbt-create-image-paste',
   SBT_CREATE_IMAGE_URL_INPUT: 'ce-sbt-create-image-url-input',
   SBT_CREATE_DOC_URL_INPUT: 'ce-sbt-create-doc-url-input',
   SBT_CREATE_DOC_URL_ADD: 'ce-sbt-create-doc-url-add',

@@ -21,6 +21,10 @@ Arweave payload reads are now cache-first in the client:
   - in-flight request dedupe per `txId`.
 - `contractScripts` stores per-session payload text cache in `questionsCache` under:
   - `arweaveTxCache[txId] = { text, savedAtMs }`
+- Display-critical metadata reads are gateway-first by default:
+  - session metadata and SBT metadata skip the GraphQL tx-existence precheck unless a deployment explicitly re-enables it
+  - question and survey metadata already use explicit no-precheck/gateway-first reads
+  - response payload precheck remains configurable separately
 - Concurrent reads for the same tx id are coalesced before hitting gateways.
 - Doc library fallback blob reads no longer force `cache: 'no-store'`.
 

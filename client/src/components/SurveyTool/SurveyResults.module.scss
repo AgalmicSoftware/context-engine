@@ -1,7 +1,7 @@
 /* SurveyResults.module.scss */
 
 /* --------------------------------------
-   Basic modal & container styling 
+   Basic modal & container styling
 --------------------------------------- */
 .modalBody {
   display: flex;
@@ -171,7 +171,7 @@
 }
 
 /* --------------------------------------
- Loading & Alert styling 
+ Loading & Alert styling
 --------------------------------------- */
 .loadingContainer {
   text-align: center;
@@ -193,7 +193,7 @@
 }
 
 /* --------------------------------------
- Filter / Search UI 
+ Filter / Search UI
 --------------------------------------- */
 .filterContainer {
   display: flex;
@@ -305,7 +305,7 @@
 }
 
 /* --------------------------------------
- Table or list of responses 
+ Table or list of responses
 --------------------------------------- */
 .responseList {
   margin-top: 1rem;
@@ -786,8 +786,8 @@
   }
 }
 
-/* 
-Updated questionIdTable styling with 
+/*
+Updated questionIdTable styling with
 grey background, white text, bigger icons, etc.
 */
 .questionIdTableWrapper {
@@ -873,7 +873,7 @@ grey background, white text, bigger icons, etc.
 }
 
 /* --------------------------------------
- Export / Download / CSV section 
+ Export / Download / CSV section
 --------------------------------------- */
 .exportContainer {
   display: flex;
@@ -965,7 +965,7 @@ grey background, white text, bigger icons, etc.
 }
 
 /* --------------------------------------
- Show / Hide Results Buttons 
+ Show / Hide Results Buttons
 --------------------------------------- */
 #filterButton,
 #showResultsButton {
@@ -994,7 +994,7 @@ grey background, white text, bigger icons, etc.
 }
 
 /* --------------------------------------
- Sizing & layout for the encryption / uploading text 
+ Sizing & layout for the encryption / uploading text
 --------------------------------------- */
 #uploadingEncryptingText {
   display: flex;
@@ -1005,7 +1005,7 @@ grey background, white text, bigger icons, etc.
 }
 
 /* --------------------------------------
- Reused button styles 
+ Reused button styles
 --------------------------------------- */
 .createSurveyButton {
   width: 100%;
@@ -1042,7 +1042,7 @@ grey background, white text, bigger icons, etc.
 }
 
 /* --------------------------------------
- Survey submission progress bars 
+ Survey submission progress bars
 --------------------------------------- */
 .progressBarContainer {
   margin-top: 20px;
@@ -1058,7 +1058,7 @@ grey background, white text, bigger icons, etc.
 }
 
 /* --------------------------------------
- Survey submission confirmation 
+ Survey submission confirmation
 --------------------------------------- */
 .surveySubmissionConfirmation {
   margin-top: 30px;
@@ -1119,7 +1119,7 @@ grey background, white text, bigger icons, etc.
 }
 
 /* --------------------------------------
- Handling multiple responses 
+ Handling multiple responses
 --------------------------------------- */
 .multipleResponsesContainer {
   margin-top: 30px;
@@ -1216,7 +1216,7 @@ grey background, white text, bigger icons, etc.
 }
 
 /* --------------------------------------
- Existing user response notice 
+ Existing user response notice
 --------------------------------------- */
 .userResponseNotice {
   margin-bottom: 20px;
@@ -1297,7 +1297,7 @@ grey background, white text, bigger icons, etc.
 }
 
 /* --------------------------------------
- Misc. binary / rating / freeform styling 
+ Misc. binary / rating / freeform styling
 --------------------------------------- */
 .freeformAnswer {
   font-style: italic;
@@ -1381,7 +1381,7 @@ grey background, white text, bigger icons, etc.
 }
 
 /* --------------------------------------
- (Optional) Mini-Create-Survey references 
+ (Optional) Mini-Create-Survey references
 --------------------------------------- */
 #miniCreateSurveyLabel {
   font-weight: 600;

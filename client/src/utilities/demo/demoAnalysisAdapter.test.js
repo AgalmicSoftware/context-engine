@@ -1,3 +1,6 @@
+import fs from 'fs';
+import path from 'path';
+
 import demoPolisData from '../../variables/demo/demo_polis_data.json';
 import historicalFigureDemographics from '../../variables/demo/historical_figure_demographics.js';
 import buildDemoAnalysisData, {
@@ -80,5 +83,11 @@ describe('demoAnalysisAdapter', () => {
     expect(tagNames).toContain('arXiv');
     expect(tagNames).toContain('LessWrong');
     expect(tagIds).not.toContain('ai-daily-integration');
+  });
+
+  it('keeps the adapter free of a baked-in demo polis fixture import', () => {
+    const adapterSource = fs.readFileSync(path.join(__dirname, 'demoAnalysisAdapter.js'), 'utf8');
+
+    expect(adapterSource).not.toMatch(/demo_polis_data\.json/);
   });
 });

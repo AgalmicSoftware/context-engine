@@ -54,7 +54,7 @@ class SurveyComponent extends Component {
               isResponsesCacheReady={this.props.isResponsesCacheReady}
               cacheHasLoaded={this.props.cacheHasLoaded}
 
-              scanForSurveyGroup={this.props.scanForSurveyGroup} 
+              scanForSurveyGroup={this.props.scanForSurveyGroup}
 
 
               /* ---- reactivity nonce ---- */

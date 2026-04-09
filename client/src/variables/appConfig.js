@@ -279,13 +279,27 @@ export const ARWEAVE_GATEWAY_URL = readPublicEnv(
 // Override at runtime with `window.CE_ARWEAVE_DIRECT_TO_AR_IO`.
 export const CE_ARWEAVE_DIRECT_TO_AR_IO = readPublicBoolEnv(
   'REACT_APP_CE_ARWEAVE_DIRECT_TO_AR_IO',
-  true
+  false
 );
 // Default ar.io gateway base when troubleshooting mode is enabled.
 // Override at runtime with `window.CE_ARWEAVE_AR_IO_URL`.
 export const CE_ARWEAVE_AR_IO_URL = readPublicEnv(
   'REACT_APP_CE_ARWEAVE_AR_IO_URL',
   'https://ar-io.dev'
+);
+// Display-critical metadata should prefer gateway readability over GraphQL visibility.
+// Response payloads keep the existing conservative preflight default unless a caller overrides it.
+export const CE_ARWEAVE_PREFLIGHT_SESSION_METADATA = readPublicBoolEnv(
+  'REACT_APP_CE_ARWEAVE_PREFLIGHT_SESSION_METADATA',
+  false
+);
+export const CE_ARWEAVE_PREFLIGHT_SBT_METADATA = readPublicBoolEnv(
+  'REACT_APP_CE_ARWEAVE_PREFLIGHT_SBT_METADATA',
+  false
+);
+export const CE_ARWEAVE_PREFLIGHT_RESPONSE_PAYLOADS = readPublicBoolEnv(
+  'REACT_APP_CE_ARWEAVE_PREFLIGHT_RESPONSE_PAYLOADS',
+  true
 );
 // ****************************************** BLOCKCHAIN CONFIG ****************************************** //
 // Canonical default chain id for wallet/network fallbacks across the app.

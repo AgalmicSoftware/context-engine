@@ -414,8 +414,8 @@ function createWebAuthnViemAccount(credentialId, publicKey, signerAccount, optio
   } = options;
 
   return toAccount({
-    address: publicKey, 
-    
+    address: publicKey,
+
     async signMessage({ message }) {
       if (requireUserVerification) {
         await promptForPasskey(credentialId);
@@ -468,8 +468,8 @@ function _initViemClient() {
   // Regression guard (HIGH-01): restore must re-run WebAuthn before persisted
   // key material is usable, and the raw private-key string must not outlive client init.
   const account = createWebAuthnViemAccount(
-      currentSession.credentialId, 
-      currentSession.address, 
+      currentSession.credentialId,
+      currentSession.address,
       signerAccount,
       {
         requireUserVerification: !sessionKeyEnabled,
@@ -579,7 +579,7 @@ export async function authenticatePorto() {
       displayName: uniqueName,
     },
     pubKeyCredParams: [{ alg: -7, type: "public-key" }], // ES256
-    authenticatorSelection: { 
+    authenticatorSelection: {
       authenticatorAttachment: "platform",
       residentKey: 'required',      // Force creation of a discoverable credential (Resident Key)
       requireResidentKey: true,     // Backward compatibility
@@ -591,7 +591,7 @@ export async function authenticatePorto() {
 
   try {
     const credential = await navigator.credentials.create({ publicKey: createOptions });
-    
+
     // Derive the private key and address deterministically from the rawId bytes
     // This ensures the address we show the user is the same one that signs the tx
     const rawIdBytes = new Uint8Array(credential.rawId);
@@ -627,7 +627,7 @@ export async function loginWithPorto() {
   const challenge = new Uint8Array(32);
   window.crypto.getRandomValues(challenge);
 
-  // Request an assertion (Sign In). 
+  // Request an assertion (Sign In).
   // We do not pass 'allowCredentials' to let the browser show a list of discoverable credentials (resident keys)
   // or allow the user to select their passkey.
   const getOptions = {
@@ -1019,7 +1019,7 @@ export const createPortoProviderMock = () => {
   return {
     isPorto: true,
     isMetaMask: false,
-    
+
     // EIP-1193 request method
     request: async ({ method, params }) => {
       switch (method) {
@@ -1027,10 +1027,10 @@ export const createPortoProviderMock = () => {
         case 'eth_accounts':
           const addr = getPortoAddress();
           return addr ? [addr] : [];
-        
+
         case 'eth_chainId':
           return portoChainIdHex;
-        
+
         case 'net_version':
           return portoChainIdDec;
 
@@ -1063,10 +1063,10 @@ export const createPortoProviderMock = () => {
             await restoreSession({ requireSigner: true });
           }
           if (!viemWalletClient) throw new Error("Porto client not initialized. Please authenticate first.");
-          
+
           // params[0] is the address (from), params[1] is the typed data (JSON string or object)
           let typedData = typeof params[1] === 'string' ? JSON.parse(params[1]) : params[1];
-          
+
           // Sanitization: Viem throws if 'EIP712Domain' is present in 'types'
           // We must remove it, as Viem infers it from the 'domain' property
           if (typedData.types && typedData.types.EIP712Domain) {
@@ -1117,14 +1117,14 @@ export const createPortoProviderMock = () => {
                throw err;
              }
           }
-          
+
           // Fallback to app's read provider if Viem not ready (e.g. read-only before auth)
           const readProvider = contractScripts.getReadProviderForGroup('');
           // FallbackProvider in ethers v5 might not expose .send, so we check safely
           if(readProvider && typeof readProvider.send === 'function') {
              return await readProvider.send(method, params || []);
           }
-          
+
           portoLog.warn(`PortoMock: Could not handle ${method} (no client/provider available)`);
           return null;
 
@@ -1141,9 +1141,9 @@ export const createPortoProviderMock = () => {
           throw new Error(`PortoMock: Method ${method} not implemented`);
       }
     },
-    
+
     // Stub event listeners to prevent Ethers errors
-    on: (event, handler) => {}, 
+    on: (event, handler) => {},
     removeListener: (event, handler) => {},
     enable: async () => {
         const addr = getPortoAddress();

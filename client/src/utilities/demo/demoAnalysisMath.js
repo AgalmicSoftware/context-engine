@@ -205,13 +205,21 @@ export const findMostDivergentPairs = ({
   const responseMap = buildResponsesByQuestionResponse(flatResponses);
   const pairResults = [];
   const allowedSet = new Set((Array.isArray(allowedSegmentKeys) ? allowedSegmentKeys : []).filter(Boolean));
+  const allowPairsTouchingSingleSegment = allowedSet.size === 1;
 
   for (let leftIndex = 0; leftIndex < allSegmentKeys.length; leftIndex += 1) {
     for (let rightIndex = leftIndex + 1; rightIndex < allSegmentKeys.length; rightIndex += 1) {
       const leftSegment = allSegmentKeys[leftIndex];
       const rightSegment = allSegmentKeys[rightIndex];
-      if (allowedSet.size > 0 && (!allowedSet.has(leftSegment) || !allowedSet.has(rightSegment))) {
-        continue;
+      if (allowedSet.size > 0) {
+        const leftAllowed = allowedSet.has(leftSegment);
+        const rightAllowed = allowedSet.has(rightSegment);
+        if (
+          (allowPairsTouchingSingleSegment && !leftAllowed && !rightAllowed) ||
+          (!allowPairsTouchingSingleSegment && (!leftAllowed || !rightAllowed))
+        ) {
+          continue;
+        }
       }
 
       let bestResult = null;

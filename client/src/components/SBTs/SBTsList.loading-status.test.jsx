@@ -225,6 +225,24 @@ const setupGroupMocks = () => {
   });
 };
 
+const SESSION_SELECTOR_PANEL_TEST_ID = 'session-selector-panel';
+const SESSION_SELECTOR_TOGGLE_TEST_ID = 'session-selector-toggle';
+
+const openSessionSelector = async () => {
+  if (screen.queryByTestId(SESSION_SELECTOR_PANEL_TEST_ID)) {
+    return screen.getByTestId(SESSION_SELECTOR_PANEL_TEST_ID);
+  }
+
+  const settingsButton = screen.queryByRole('button', { name: /Group list settings/i });
+  if (settingsButton) {
+    fireEvent.click(settingsButton);
+  } else {
+    fireEvent.click(await screen.findByTestId(SESSION_SELECTOR_TOGGLE_TEST_ID));
+  }
+
+  return screen.findByTestId(SESSION_SELECTOR_PANEL_TEST_ID);
+};
+
 describe('SBTsList per-session loader countdown', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -273,6 +291,7 @@ describe('SBTsList per-session loader countdown', () => {
       />
     );
 
+    await openSessionSelector();
     await waitFor(() => {
       expect(screen.getByTestId('session-chip-beta')).toHaveAttribute('data-session-selected', 'true');
     });
@@ -312,6 +331,7 @@ describe('SBTsList per-session loader countdown', () => {
       />
     );
 
+    await openSessionSelector();
     await waitFor(() => {
       expect(screen.getByTestId('session-chip-beta')).toHaveAttribute('data-session-selected', 'true');
     });
@@ -442,6 +462,10 @@ describe('SBTsList per-session loader countdown', () => {
 
     await waitFor(() => {
       expect(screen.getByText(/^Sessions$/i)).toBeInTheDocument();
+    });
+
+    await openSessionSelector();
+    await waitFor(() => {
       expect(screen.getByRole('button', { name: 'Alpha' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Beta' })).toBeInTheDocument();
     });
@@ -487,8 +511,10 @@ describe('SBTsList per-session loader countdown', () => {
 
       await waitFor(() => {
         expect(screen.getByText(/^Sessions$/i)).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: 'Alpha' })).toBeInTheDocument();
       });
+
+      await openSessionSelector();
+      expect(screen.getByRole('button', { name: 'Alpha' })).toBeInTheDocument();
 
       expect(screen.getByText(/Collecting Live/i)).toBeInTheDocument();
     } finally {
@@ -1024,9 +1050,10 @@ describe('SBTsList per-session loader countdown', () => {
       />
     );
 
-      expect(screen.queryByText(/Loading Groups/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Loading Groups/i)).not.toBeInTheDocument();
     expect(screen.getByText(/^Sessions$/i)).toBeInTheDocument();
     expect(screen.getByTestId('session-universe-spinner')).toBeInTheDocument();
+    await openSessionSelector();
     expect(screen.getByRole('button', { name: /alpha/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /beta/i })).toBeInTheDocument();
   });
@@ -1062,6 +1089,7 @@ describe('SBTsList per-session loader countdown', () => {
       />
     );
 
+    await openSessionSelector();
     await waitFor(() => {
       expect(screen.getByRole('button', { name: 'General' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Alpha' })).toBeInTheDocument();
@@ -1103,6 +1131,7 @@ describe('SBTsList per-session loader countdown', () => {
       />
     );
 
+    await openSessionSelector();
     await waitFor(() => {
       expect(screen.getByRole('button', { name: 'Alpha' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Beta' })).toBeInTheDocument();
@@ -1140,6 +1169,7 @@ describe('SBTsList per-session loader countdown', () => {
       />
     );
 
+    await openSessionSelector();
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /context-engine/i })).toBeInTheDocument();
     });
@@ -1169,6 +1199,7 @@ describe('SBTsList per-session loader countdown', () => {
       />
     );
 
+    await openSessionSelector();
     await waitFor(() => {
       expect(screen.getByRole('button', { name: 'Alpha' })).toBeInTheDocument();
     });
@@ -1204,8 +1235,10 @@ describe('SBTsList per-session loader countdown', () => {
 
     await waitFor(() => {
       expect(screen.getByText(/^Sessions$/i)).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Alpha' })).toBeInTheDocument();
     });
+
+    await openSessionSelector();
+    expect(screen.getByRole('button', { name: 'Alpha' })).toBeInTheDocument();
 
     expect(screen.queryByText(/Loading Groups/i)).not.toBeInTheDocument();
     expect(screen.getByTestId('session-universe-spinner')).toBeInTheDocument();
@@ -1530,6 +1563,7 @@ describe('SBTsList per-session loader countdown', () => {
       />
     );
 
+    await openSessionSelector();
     const generalChip = await screen.findByTestId('session-chip-general');
     expect(screen.getByRole('button', { name: 'General' })).toBeInTheDocument();
     expect(generalChip).toHaveClass('chipGeneral');
@@ -1565,6 +1599,7 @@ describe('SBTsList per-session loader countdown', () => {
       />
     );
 
+    await openSessionSelector();
     const alphaChip = await screen.findByTestId('session-chip-alpha');
     const betaChip = await screen.findByTestId('session-chip-beta');
     expect(alphaChip).toHaveAttribute('data-session-loaded', 'true');
@@ -1597,6 +1632,7 @@ describe('SBTsList per-session loader countdown', () => {
       />
     );
 
+    await openSessionSelector();
     await waitFor(() => {
       expect(screen.getByTestId('session-chip-progress-wrap-alpha')).toBeInTheDocument();
     });
@@ -1649,6 +1685,7 @@ describe('SBTsList per-session loader countdown', () => {
       />
     );
 
+    await openSessionSelector();
     await waitFor(() => {
       expect(screen.getByTestId('session-chip-progress-text-alpha')).toHaveTextContent(
         /^15 remaining$/
@@ -1691,6 +1728,7 @@ describe('SBTsList per-session loader countdown', () => {
       />
     );
 
+    await openSessionSelector();
     await waitFor(() => {
       expect(screen.getByTestId('session-chip-progress-text-alpha')).toHaveTextContent(
         /^15 remaining$/
@@ -1757,6 +1795,7 @@ describe('SBTsList per-session loader countdown', () => {
       />
     );
 
+    await openSessionSelector();
     expect(screen.queryByTestId('session-chip-progress-text-alpha')).not.toBeInTheDocument();
 
     rerender(
@@ -1814,6 +1853,7 @@ describe('SBTsList per-session loader countdown', () => {
       />
     );
 
+    await openSessionSelector();
     await waitFor(() => {
       expect(screen.getByTestId('session-chip-progress-wrap-alpha')).toBeInTheDocument();
     });
@@ -1880,6 +1920,7 @@ describe('SBTsList per-session loader countdown', () => {
       />
     );
 
+    await openSessionSelector();
     await waitFor(() => {
       expect(screen.getByTestId('session-chip-progress-text-alpha')).toHaveTextContent(
         /^100 remaining$/
@@ -1935,12 +1976,12 @@ describe('SBTsList per-session loader countdown', () => {
       />
     );
 
+    await openSessionSelector();
     await waitFor(() => {
       expect(screen.getByTestId('session-chip-progress-text-alpha')).toHaveTextContent(/^100 remaining$/);
     });
     expect(forcedLatestCallCount).toBe(0);
 
-    fireEvent.click(screen.getByRole('button', { name: /Group list settings/i }));
     fireEvent.click(screen.getByRole('button', { name: /Refresh/i }));
 
     await waitFor(() => {
@@ -1988,6 +2029,7 @@ describe('SBTsList per-session loader countdown', () => {
       />
     );
 
+    await openSessionSelector();
     await waitFor(() => {
       expect(screen.getByTestId('session-chip-progress-wrap-alpha')).toBeInTheDocument();
     });
@@ -2040,6 +2082,7 @@ describe('SBTsList per-session loader countdown', () => {
       />
     );
 
+    await openSessionSelector();
     await waitFor(() => {
       expect(mockGetRelevantBlockWindowForFilter).toHaveBeenCalledTimes(1);
     });
@@ -2150,6 +2193,7 @@ describe('SBTsList per-session loader countdown', () => {
       expect(screen.getByText('Alpha Meta Synced Badge')).toBeInTheDocument();
     });
 
+    await openSessionSelector();
     await waitFor(() => {
       expect(screen.getByTestId('session-chip-alpha')).toHaveAttribute('data-session-loaded', 'true');
     });
@@ -2259,6 +2303,7 @@ describe('SBTsList per-session loader countdown', () => {
       expect(screen.getByText('Alpha Synced Badge')).toBeInTheDocument();
     });
 
+    await openSessionSelector();
     expect(screen.getByTestId('session-chip-progress-wrap-alpha')).toBeInTheDocument();
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 5200));
@@ -2326,6 +2371,7 @@ describe('SBTsList per-session loader countdown', () => {
       />
     );
 
+    await openSessionSelector();
     const chip = await screen.findByTestId('session-chip-test-4');
     await waitFor(() => {
       expect(chip).toHaveAttribute('data-session-loaded', 'true');
@@ -2395,6 +2441,7 @@ describe('SBTsList per-session loader countdown', () => {
       />
     );
 
+    await openSessionSelector();
     await waitFor(() => {
       expect(screen.getByTestId('session-chip-progress-wrap-test-4')).toBeInTheDocument();
     });
@@ -2458,6 +2505,7 @@ describe('SBTsList per-session loader countdown', () => {
       />
     );
 
+    await openSessionSelector();
     await waitFor(() => {
       expect(screen.getByTestId('session-chip-progress-wrap-edge')).toBeInTheDocument();
     });
@@ -2498,6 +2546,7 @@ describe('SBTsList per-session loader countdown', () => {
       />
     );
 
+    await openSessionSelector();
     expect(await screen.findByRole('button', { name: 'Alpha' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Beta' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Show More Sessions \(\d+\)/i })).toBeInTheDocument();
@@ -2532,6 +2581,7 @@ describe('SBTsList per-session loader countdown', () => {
       />
     );
 
+    await openSessionSelector();
     expect(await screen.findByRole('button', { name: 'Alpha' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Beta' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Show More Sessions \(\d+\)/i })).toBeInTheDocument();
@@ -2567,6 +2617,7 @@ describe('SBTsList per-session loader countdown', () => {
       />
     );
 
+    await openSessionSelector();
     fireEvent.click(await screen.findByRole('button', { name: /Show More Sessions \(\d+\)/i }));
 
     await waitFor(() => {
@@ -2617,6 +2668,7 @@ describe('SBTsList per-session loader countdown', () => {
       );
     });
 
+    await openSessionSelector();
     fireEvent.click(await screen.findByRole('button', { name: /Show More Sessions \(\d+\)/i }));
 
     await waitFor(() => {
@@ -2662,6 +2714,7 @@ describe('SBTsList per-session loader countdown', () => {
       />
     );
 
+    await openSessionSelector();
     const alphaChip = await screen.findByTestId('session-chip-alpha');
     const betaChip = await screen.findByTestId('session-chip-beta');
     expect(alphaChip).toHaveAttribute('data-session-selected', 'true');
@@ -2699,6 +2752,7 @@ describe('SBTsList per-session loader countdown', () => {
       />
     );
 
+    await openSessionSelector();
     const alphaChip = await screen.findByTestId('session-chip-alpha');
     const betaChip = await screen.findByTestId('session-chip-beta');
     expect(alphaChip).toHaveAttribute('data-session-selected', 'false');
@@ -2731,6 +2785,7 @@ describe('SBTsList per-session loader countdown', () => {
       />
     );
 
+    await openSessionSelector();
     const alphaChip = await screen.findByTestId('session-chip-alpha');
     const betaChip = await screen.findByTestId('session-chip-beta');
     expect(alphaChip).toHaveAttribute('data-session-selected', 'true');
@@ -2781,6 +2836,7 @@ describe('SBTsList per-session loader countdown', () => {
       />
     );
 
+    await openSessionSelector();
     const generalChip = await screen.findByTestId('session-chip-general');
     expect(generalChip).toHaveTextContent('General');
 
@@ -2837,6 +2893,7 @@ describe('SBTsList per-session loader countdown', () => {
       />
     );
 
+    await openSessionSelector();
     const edgeChip = await screen.findByTestId('session-chip-edge');
     expect(edgeChip).toHaveTextContent('Edge 2025');
 
@@ -2934,6 +2991,7 @@ describe('SBTsList per-session loader countdown', () => {
     });
     expect(screen.queryByText('Beta Selected Badge')).not.toBeInTheDocument();
 
+    await openSessionSelector();
     fireEvent.click(await screen.findByRole('button', { name: /Show More Sessions \(\d+\)/i }));
 
     const betaChip = await screen.findByTestId('session-chip-beta');
@@ -3012,6 +3070,7 @@ describe('SBTsList per-session loader countdown', () => {
       />
     );
 
+    await openSessionSelector();
     const noSessionChip = await screen.findByTestId('session-chip-__no_session__');
     expect(noSessionChip).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'No Session' })).toBeInTheDocument();
@@ -3093,6 +3152,7 @@ describe('SBTsList per-session loader countdown', () => {
     });
     expect(screen.queryByText('Unassigned Badge')).not.toBeInTheDocument();
 
+    await openSessionSelector();
     const noSessionChip = await screen.findByTestId('session-chip-__no_session__');
     fireEvent.click(noSessionChip);
 
@@ -3181,6 +3241,7 @@ describe('SBTsList per-session loader countdown', () => {
     });
     expect(screen.queryByText('No Session Missing Slug Badge')).not.toBeInTheDocument();
 
+    await openSessionSelector();
     const noSessionChip = await screen.findByTestId('session-chip-__no_session__');
     fireEvent.click(noSessionChip);
 
@@ -5228,6 +5289,7 @@ describe('SBTsList per-session loader countdown', () => {
       />
     );
 
+    await openSessionSelector();
     await waitFor(() => {
       expect(screen.getByRole('button', { name: 'Alpha' })).toBeInTheDocument();
       expect(screen.getByTestId('section-spinner-live')).toBeInTheDocument();
@@ -5366,12 +5428,12 @@ describe('SBTsList per-session loader countdown', () => {
       />
     );
 
+    await openSessionSelector();
     await waitFor(() => {
       expect(screen.getByRole('button', { name: 'Alpha' })).toBeInTheDocument();
     });
     expect(ensureLightSbtUniverse).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByRole('button', { name: /Group list settings/i }));
     fireEvent.click(screen.getByRole('button', { name: /Refresh/i }));
 
     await waitFor(() => {
@@ -5429,6 +5491,7 @@ describe('SBTsList per-session loader countdown', () => {
       await Promise.resolve();
     });
 
+    await openSessionSelector();
     await waitFor(() => {
       expect(screen.getByTestId('session-chip-alpha')).toBeInTheDocument();
     });
@@ -5575,6 +5638,7 @@ describe('SBTsList per-session loader countdown', () => {
       />
     );
 
+    await openSessionSelector();
     await waitFor(() => {
       expect(screen.getByTestId('session-chip-alpha')).toBeInTheDocument();
     });
@@ -5662,12 +5726,12 @@ describe('SBTsList per-session loader countdown', () => {
       />
     );
 
+    await openSessionSelector();
     await waitFor(() => {
       expect(screen.getByTestId('session-chip-alpha')).toBeInTheDocument();
       expect(screen.getByTestId('session-chip-beta')).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole('button', { name: /Group list settings/i }));
     fireEvent.click(screen.getByRole('button', { name: /Clear Cache/i }));
 
     await waitFor(() => {
@@ -5739,12 +5803,46 @@ describe('SBTsList per-session loader countdown', () => {
     );
 
     const settingsButton = await screen.findByRole('button', { name: /Group list settings/i });
+    expect(screen.queryByTestId('session-selector-panel')).not.toBeInTheDocument();
     fireEvent.click(settingsButton);
 
     const settingsLabel = await screen.findByText(/Exclude Password-Locked Groups/i);
+    const universePanel = await screen.findByTestId('session-selector-panel');
     const universeLabel = screen.getByText(/^Sessions$/i);
     const position = settingsLabel.compareDocumentPosition(universeLabel);
     expect(position & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(universePanel).toBeInTheDocument();
+  });
+
+  it('uses a local Sessions cog in embedded all-groups view to reveal the selector inline', async () => {
+    render(
+      <SBTsList
+        provider="mock"
+        network={{ id: 84532, name: 'Base Sepolia' }}
+        account=""
+        sessionSlug=""
+        loginComplete
+        miniaturized={false}
+        toggleLoginModal={jest.fn()}
+        sbtCacheRevision={0}
+        onRequestSbtCacheRefresh={jest.fn()}
+        isSBTCacheReady={false}
+        refreshSbtData={jest.fn()}
+        latestBlockNumber={0}
+        allSessionsMode
+        embeddedMode
+        ensureLightSbtDiscovery={jest.fn()}
+      />
+    );
+
+    expect(screen.queryByRole('button', { name: /Group list settings/i })).not.toBeInTheDocument();
+    expect(screen.getByTestId('session-selector-toggle')).toHaveAttribute('aria-label', 'Show session selector');
+    expect(screen.queryByTestId('session-selector-panel')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('session-selector-toggle'));
+
+    expect(await screen.findByTestId('session-selector-panel')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Alpha' })).toBeInTheDocument();
   });
 
   it('keeps the legacy password filter visible by default in modal mini mode unless CommunityTab opts into compact settings', async () => {
@@ -5770,6 +5868,13 @@ describe('SBTsList per-session loader countdown', () => {
 
     expect(await screen.findByText(/Exclude Password-Locked Groups/i)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Group list settings/i })).not.toBeInTheDocument();
+    expect(screen.getByTestId('session-selector-toggle')).toHaveAttribute('aria-label', 'Show session selector');
+    expect(screen.queryByTestId('session-selector-panel')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('session-selector-toggle'));
+
+    expect(await screen.findByTestId('session-selector-panel')).toBeInTheDocument();
+    expect(screen.getByText(/Exclude Password-Locked Groups/i)).toBeInTheDocument();
   });
 
   it('renders a compact settings cog only for the CommunityTab mini modal path', async () => {
@@ -5797,10 +5902,13 @@ describe('SBTsList per-session loader countdown', () => {
     const settingsButton = await screen.findByRole('button', { name: /Group list settings/i });
     expect(screen.queryByText(/Exclude Password-Locked Groups/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/^No Password Groups$/i)).not.toBeInTheDocument();
+    expect(screen.queryByTestId('session-selector-toggle')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('session-selector-panel')).not.toBeInTheDocument();
 
     fireEvent.click(settingsButton);
 
     expect(screen.getByText(/^No Password Groups$/i)).toBeInTheDocument();
+    expect(screen.getByTestId('session-selector-panel')).toBeInTheDocument();
     expect(settingsButton).toHaveAttribute('aria-expanded', 'true');
   });
 
@@ -5833,6 +5941,44 @@ describe('SBTsList per-session loader countdown', () => {
     expect(position & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
+  it('hides the session summary when the CommunityTab mini modal session universe is collapsed', async () => {
+    render(
+      <SBTsList
+        provider="mock"
+        network={{ id: 84532, name: 'Base Sepolia' }}
+        account=""
+        sessionSlug=""
+        loginComplete
+        miniaturized
+        viewMode="modal"
+        communityTabCompactSettings
+        toggleLoginModal={jest.fn()}
+        sbtCacheRevision={0}
+        onRequestSbtCacheRefresh={jest.fn()}
+        isSBTCacheReady={false}
+        refreshSbtData={jest.fn()}
+        latestBlockNumber={0}
+        allSessionsMode
+        ensureLightSbtDiscovery={jest.fn()}
+      />
+    );
+
+    const settingsButton = await screen.findByRole('button', { name: /Group list settings/i });
+    fireEvent.click(settingsButton);
+
+    await screen.findByTestId('session-selector-panel');
+    expect(screen.queryByTestId('session-selector-summary')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /Collapse session universe/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Expand session universe/i })).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId('session-universe-collapsed-summary')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('session-collapsed-chip-alpha')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('session-collapsed-chip-beta')).not.toBeInTheDocument();
+  });
+
   it('shows selected sessions in collapsed session universe summary', async () => {
     mockReadSessionScanScope.mockReturnValue('list');
     mockReadSessionScanSlugs.mockReturnValue(['alpha', 'beta']);
@@ -5857,6 +6003,7 @@ describe('SBTsList per-session loader countdown', () => {
       />
     );
 
+    await openSessionSelector();
     await waitFor(() => {
       expect(screen.getByTestId('session-chip-alpha')).toBeInTheDocument();
       expect(screen.getByTestId('session-chip-beta')).toBeInTheDocument();
@@ -5870,6 +6017,169 @@ describe('SBTsList per-session loader countdown', () => {
     expect(screen.getByTestId('session-collapsed-chip-beta')).toBeInTheDocument();
     expect(screen.getByTestId('session-collapsed-chip-progress-alpha')).toHaveTextContent('1,050 / 1,100');
     expect(screen.getByTestId('session-collapsed-chip-progress-beta')).toHaveTextContent('2,060 / 2,200');
+  });
+
+  it('renders closed-summary session link icons and opens the session without revealing the selector', async () => {
+    mockReadSessionScanScope.mockReturnValue('list');
+    mockReadSessionScanSlugs.mockReturnValue(['alpha', 'beta']);
+    const openSpy = jest.spyOn(window, 'open').mockImplementation(() => null);
+
+    render(
+      <SBTsList
+        provider="mock"
+        network={{ id: 84532, name: 'Base Sepolia' }}
+        account=""
+        sessionSlug=""
+        loginComplete
+        miniaturized={false}
+        toggleLoginModal={jest.fn()}
+        sbtCacheRevision={0}
+        onRequestSbtCacheRefresh={jest.fn()}
+        isSBTCacheReady={false}
+        refreshSbtData={jest.fn()}
+        latestBlockNumber={0}
+        allSessionsMode
+        embeddedMode
+        ensureLightSbtDiscovery={jest.fn()}
+      />
+    );
+
+    const closedSummary = await screen.findByTestId('session-selector-summary');
+    expect(closedSummary).toBeInTheDocument();
+    expect(screen.queryByTestId('session-selector-panel')).not.toBeInTheDocument();
+    expect(screen.getByTestId('session-collapsed-chip-open-alpha')).toBeInTheDocument();
+    expect(screen.getByTestId('session-collapsed-chip-open-beta')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('session-collapsed-chip-open-beta'));
+
+    expect(openSpy).toHaveBeenCalledWith('/session/beta', '_blank', 'noopener,noreferrer');
+    expect(screen.queryByTestId('session-selector-panel')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Show session selector/i })).toBeInTheDocument();
+    openSpy.mockRestore();
+  });
+
+  it('prepends PUBLIC_URL when opening a collapsed-summary session link', async () => {
+    mockReadSessionScanScope.mockReturnValue('list');
+    mockReadSessionScanSlugs.mockReturnValue(['alpha', 'beta']);
+    const previousPublicUrl = process.env.PUBLIC_URL;
+    process.env.PUBLIC_URL = '/ce/';
+    const openSpy = jest.spyOn(window, 'open').mockImplementation(() => null);
+
+    try {
+      render(
+        <SBTsList
+          provider="mock"
+          network={{ id: 84532, name: 'Base Sepolia' }}
+          account=""
+          sessionSlug=""
+          loginComplete
+          miniaturized={false}
+          toggleLoginModal={jest.fn()}
+          sbtCacheRevision={0}
+          onRequestSbtCacheRefresh={jest.fn()}
+          isSBTCacheReady={false}
+          refreshSbtData={jest.fn()}
+          latestBlockNumber={0}
+          allSessionsMode
+          embeddedMode
+          ensureLightSbtDiscovery={jest.fn()}
+        />
+      );
+
+      await screen.findByTestId('session-selector-summary');
+      fireEvent.click(screen.getByTestId('session-collapsed-chip-open-beta'));
+
+      expect(openSpy).toHaveBeenCalledWith('/ce/session/beta', '_blank', 'noopener,noreferrer');
+    } finally {
+      openSpy.mockRestore();
+      if (previousPublicUrl === undefined) delete process.env.PUBLIC_URL;
+      else process.env.PUBLIC_URL = previousPublicUrl;
+    }
+  });
+
+  it('opens in-panel collapsed summary session links without expanding the section', async () => {
+    mockReadSessionScanScope.mockReturnValue('list');
+    mockReadSessionScanSlugs.mockReturnValue(['alpha', 'beta']);
+    const openSpy = jest.spyOn(window, 'open').mockImplementation(() => null);
+
+    render(
+      <SBTsList
+        provider="mock"
+        network={{ id: 84532, name: 'Base Sepolia' }}
+        account=""
+        sessionSlug=""
+        loginComplete
+        miniaturized={false}
+        toggleLoginModal={jest.fn()}
+        sbtCacheRevision={0}
+        onRequestSbtCacheRefresh={jest.fn()}
+        isSBTCacheReady={false}
+        refreshSbtData={jest.fn()}
+        latestBlockNumber={0}
+        allSessionsMode
+        embeddedMode
+        ensureLightSbtDiscovery={jest.fn()}
+      />
+    );
+
+    await openSessionSelector();
+    fireEvent.click(screen.getByRole('button', { name: /Collapse session universe/i }));
+
+    const collapsedSummary = await screen.findByTestId('session-universe-collapsed-summary');
+    expect(collapsedSummary).toBeInTheDocument();
+    expect(screen.getByTestId('session-collapsed-chip-open-alpha')).toBeInTheDocument();
+    expect(screen.getByTestId('session-collapsed-chip-open-beta')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('session-collapsed-chip-open-alpha'));
+
+    expect(openSpy).toHaveBeenCalledWith('/session/alpha', '_blank', 'noopener,noreferrer');
+    expect(screen.getByTestId('session-universe-collapsed-summary')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Expand session universe/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Alpha' })).not.toBeInTheDocument();
+    openSpy.mockRestore();
+  });
+
+  it('keeps the closed-summary general session link canonical as /session', async () => {
+    mockReadSessionScanScope.mockReturnValue('list');
+    mockReadSessionScanSlugs.mockReturnValue(['']);
+    mockGetAllSessionEntries.mockReturnValue([
+      ['general', { slug: '' }],
+      ['alpha', { slug: 'alpha' }],
+    ]);
+    mockSessionRegistryGetAllSessionEntries.mockReturnValue([
+      ['general', { slug: '' }],
+      ['alpha', { slug: 'alpha' }],
+    ]);
+    const openSpy = jest.spyOn(window, 'open').mockImplementation(() => null);
+
+    render(
+      <SBTsList
+        provider="mock"
+        network={{ id: 84532, name: 'Base Sepolia' }}
+        account=""
+        sessionSlug=""
+        loginComplete
+        miniaturized={false}
+        toggleLoginModal={jest.fn()}
+        sbtCacheRevision={0}
+        onRequestSbtCacheRefresh={jest.fn()}
+        isSBTCacheReady={false}
+        refreshSbtData={jest.fn()}
+        latestBlockNumber={0}
+        allSessionsMode
+        embeddedMode
+        ensureLightSbtDiscovery={jest.fn()}
+      />
+    );
+
+    const closedSummary = await screen.findByTestId('session-selector-summary');
+    expect(closedSummary).toBeInTheDocument();
+    expect(screen.getByTestId('session-collapsed-chip-general')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('session-collapsed-chip-open-general'));
+
+    expect(openSpy).toHaveBeenCalledWith('/session', '_blank', 'noopener,noreferrer');
+    openSpy.mockRestore();
   });
 
   it('allows collapsing and expanding the universe chips section', async () => {
@@ -5893,6 +6203,7 @@ describe('SBTsList per-session loader countdown', () => {
       />
     );
 
+    await openSessionSelector();
     await waitFor(() => {
       expect(screen.getByRole('button', { name: 'Alpha' })).toBeInTheDocument();
     });
@@ -5971,6 +6282,7 @@ describe('SBTsList per-session loader countdown', () => {
       />
     );
 
+    await openSessionSelector();
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /alpha/i })).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: /gamma/i })).not.toBeInTheDocument();

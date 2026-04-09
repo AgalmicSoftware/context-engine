@@ -9,7 +9,9 @@ import styles from './SessionWizard.module.scss';
 import SBTSelector from '../SBTs/SBTSelector.jsx';
 import CreateSBTGroup, { finalizeDeferredCreateSbtDraftUpload } from '../SBTs/CreateSBTGroup.jsx';
 import GateMultiSelectLock from '../Gates/GateMultiSelectLock.jsx';
+import CompactImageChooser from '../Shared/CompactImageChooser.jsx';
 import { JsonToggleButton, JsonPanel, JsonButtonRow } from '../Shared/Json/JsonControls.jsx';
+import { readCompactImageClipboard } from '../Shared/compactImageClipboard.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import {
   buildSbtAccessControlConditions,
@@ -2917,6 +2919,7 @@ const SessionWizard = ({
   const [sessionHeaderPreviewUrl, setSessionHeaderPreviewUrl] = useState('');
   const [sessionHeaderPreviewModalOpen, setSessionHeaderPreviewModalOpen] = useState(false);
   const [sessionHeaderUploadStatus, setSessionHeaderUploadStatus] = useState('');
+  const [sessionHeaderUploadStatusTone, setSessionHeaderUploadStatusTone] = useState('default');
   const [showPromptPreview, setShowPromptPreview] = useState(false);
   const [metadataObjectCollapsed, setMetadataObjectCollapsed] = useState({ contracts: true, faucet: true, ai: true, lit: true });
   const [collapsedSections, setCollapsedSections] = useState(() => ({
@@ -2929,6 +2932,10 @@ const SessionWizard = ({
     () => getSessionWizardWorkerResourceKeys({ litPayerWalletInputEnabled }),
     [litPayerWalletInputEnabled]
   );
+  const setSessionHeaderStatus = useCallback((text = '', tone = 'default') => {
+    setSessionHeaderUploadStatus(text);
+    setSessionHeaderUploadStatusTone(text ? tone : 'default');
+  }, []);
   useEffect(() => {
     if (wizardMode === 'advanced') return;
     setCollapsedSections((prev) => {
@@ -3617,62 +3624,28 @@ const SessionWizard = ({
   }, [sessionHeaderPreviewSrc]);
 
   const handlePasteSessionHeaderFromClipboard = async () => {
-    if (typeof navigator === 'undefined' || !navigator.clipboard) {
-      setSessionHeaderUploadStatus('Clipboard paste unavailable in this browser.');
+    const clipboardResult = await readCompactImageClipboard({
+      fileNamePrefix: 'clipboard-session-header',
+    });
+
+    if (clipboardResult?.kind === 'file' && clipboardResult.file) {
+      setSessionHeaderMode('upload');
+      setCompactSessionHeaderMode('idle');
+      setSessionHeaderFile(clipboardResult.file);
+      setSessionHeaderStatus('');
       return;
     }
-    if (typeof navigator.clipboard.read === 'function') {
-      try {
-        const items = await navigator.clipboard.read();
-        for (const item of Array.isArray(items) ? items : []) {
-          const imageType = (Array.isArray(item?.types) ? item.types : [])
-            .map((type) => toStr(type).trim().toLowerCase())
-            .find((type) => !!SESSION_HEADER_IMAGE_MIME_TO_EXT[type]);
-          if (!imageType || typeof item?.getType !== 'function') continue;
-          const blob = await item.getType(imageType);
-          if (!(blob instanceof Blob)) continue;
-          const format = resolveSessionHeaderImageFormat(blob);
-          if (!format) continue;
-          const fileName = `clipboard-session-header.${format}`;
-          const file = typeof File !== 'undefined'
-            ? new File([blob], fileName, { type: blob.type || imageType })
-            : blob;
-          if (typeof File === 'undefined' && file && typeof file === 'object') {
-            try {
-              Object.defineProperty(file, 'name', {
-                configurable: true,
-                value: fileName,
-              });
-            } catch (_) {}
-          }
-          setSessionHeaderMode('upload');
-          setCompactSessionHeaderMode('idle');
-          setSessionHeaderFile(file);
-          setSessionHeaderUploadStatus('');
-          return;
-        }
-      } catch (_) {
-        // Fall through to text clipboard support below.
-      }
-    }
-    if (!navigator.clipboard?.readText) {
-      setSessionHeaderUploadStatus('Clipboard does not contain a supported image or URL.');
-      return;
-    }
-    try {
-      const raw = toStr(await navigator.clipboard.readText()).trim();
+
+    if (clipboardResult?.kind === 'text') {
       setSessionHeaderMode('url');
       setCompactSessionHeaderMode('url');
       setSessionHeaderFile(null);
-      if (!raw) {
-        setSessionHeaderUploadStatus('Clipboard is empty.');
-        return;
-      }
-      updateDraftValue(['sessionHeader'], raw);
-      setSessionHeaderUploadStatus('');
-    } catch {
-      setSessionHeaderUploadStatus('Clipboard paste failed. Paste into the URL field instead.');
+      updateDraftValue(['sessionHeader'], clipboardResult.text);
+      setSessionHeaderStatus('');
+      return;
     }
+
+    setSessionHeaderStatus(clipboardResult?.error || 'Clipboard does not contain a supported image or URL.', 'error');
   };
 
   const handleClearSessionHeaderPreview = () => {
@@ -3681,7 +3654,7 @@ const SessionWizard = ({
     setCompactSessionHeaderMode('idle');
     setSessionHeaderFile(null);
     updateDraftValue(['sessionHeader'], '');
-    setSessionHeaderUploadStatus('');
+    setSessionHeaderStatus('');
   };
 
   const defaultSponsoredGateId = draft?.sponsored?.defaultGateId;
@@ -4497,55 +4470,51 @@ const SessionWizard = ({
 
   function renderCompactSessionHeaderField() {
     return (
-      <div className={styles.compactSessionHeaderField}>
-        <div className={styles.compactSessionHeaderModes}>
-          <button
-            type="button"
-            className={`${styles.compactSessionHeaderModeButton} ${compactSessionHeaderMode === 'url' ? styles.compactSessionHeaderModeButtonActive : ''}`}
-            onClick={() => {
-              setCompactSessionHeaderMode((prev) => (prev === 'url' ? 'idle' : 'url'));
-              setSessionHeaderMode('url');
-              setSessionHeaderFile(null);
-              setSessionHeaderUploadStatus('');
-            }}
-            data-testid={E2E_TESTIDS.WIZARD_SESSION_HEADER_URL_TOGGLE}
-          >
-            URL
-          </button>
-          <button
-            type="button"
-            className={styles.compactSessionHeaderModeButton}
-            onClick={handlePasteSessionHeaderFromClipboard}
-          >
-            Paste
-          </button>
-          <button
-            type="button"
-            className={`${styles.compactSessionHeaderUploadButton} ${sessionHeaderMode === 'upload' ? styles.compactSessionHeaderModeButtonActive : ''}`}
-            onClick={() => {
-              setCompactSessionHeaderMode('idle');
-              setSessionHeaderMode('upload');
-              setSessionHeaderUploadStatus('');
-              if (compactSessionHeaderInputRef.current) {
-                compactSessionHeaderInputRef.current.click();
-              }
-            }}
-            aria-label="Upload image"
-          >
-            <FontAwesomeIcon icon={faUpload} />
-          </button>
-        </div>
-        <Input
-          innerRef={compactSessionHeaderInputRef}
-          className={styles.compactSessionHeaderHiddenInput}
-          type="file"
-          accept="image/*"
-          onChange={(e) => {
-            setSessionHeaderMode('upload');
-            setSessionHeaderFile(e.target.files?.[0] || null);
-          }}
-        />
-      </div>
+      <CompactImageChooser
+        className={styles.compactSessionHeaderStandalone}
+        rootTestId={E2E_TESTIDS.WIZARD_SESSION_HEADER_INLINE_BAR}
+        urlButtonTestId={E2E_TESTIDS.WIZARD_SESSION_HEADER_URL_TOGGLE}
+        pasteButtonTestId={E2E_TESTIDS.WIZARD_SESSION_HEADER_PASTE}
+        urlInputTestId={E2E_TESTIDS.WIZARD_SESSION_HEADER_URL}
+        isUrlMode={compactSessionHeaderMode === 'url'}
+        isUploadMode={sessionHeaderMode === 'upload'}
+        showUrlInput={compactSessionHeaderMode === 'url'}
+        urlValue={draft?.sessionHeader == null ? '' : draft.sessionHeader}
+        onUrlChange={(event) => {
+          updateDraftValue(['sessionHeader'], event.target.value);
+          setSessionHeaderStatus('');
+        }}
+        onToggleUrlMode={() => {
+          setCompactSessionHeaderMode((prev) => (prev === 'url' ? 'idle' : 'url'));
+          setSessionHeaderMode('url');
+          setSessionHeaderFile(null);
+          setSessionHeaderStatus('');
+        }}
+        onPaste={handlePasteSessionHeaderFromClipboard}
+        onUploadClick={() => {
+          setCompactSessionHeaderMode('idle');
+          setSessionHeaderMode('upload');
+          setSessionHeaderStatus('');
+          if (compactSessionHeaderInputRef.current) {
+            compactSessionHeaderInputRef.current.click();
+          }
+        }}
+        onFileChange={(event) => {
+          setSessionHeaderMode('upload');
+          setSessionHeaderFile(event.target.files?.[0] || null);
+          setSessionHeaderStatus('');
+        }}
+        fileInputRef={compactSessionHeaderInputRef}
+        previewSrc={sessionHeaderPreviewSrc}
+        previewAlt="Session header preview"
+        onClear={handleClearSessionHeaderPreview}
+        enablePreviewExpand={true}
+        expandedPreviewAlt="Expanded session header preview"
+        statusText={sessionHeaderUploadStatus}
+        statusTone={sessionHeaderUploadStatusTone}
+        expandAriaLabel="Expand session header image"
+        clearAriaLabel="Remove session header image"
+      />
     );
   }
 
@@ -5265,7 +5234,6 @@ const SessionWizard = ({
     }
     if (isSessionHeaderField) {
       if (isNormalMode) {
-        const shouldRenderCompactSessionHeaderExpandedRow = compactSessionHeaderMode === 'url' || !!toStr(sessionHeaderPreviewSrc).trim();
         return (
           <FormGroup key={keyString} className={styles.fieldGroup}>
             <div className={styles.fieldHeader}>
@@ -5310,28 +5278,7 @@ const SessionWizard = ({
                 )}
               </div>
             </div>
-            <div
-              className={styles.compactSessionHeaderStandalone}
-              data-testid={E2E_TESTIDS.WIZARD_SESSION_HEADER_INLINE_BAR}
-            >
-              <div className={styles.compactSessionHeaderControlsRow}>
-                {renderCompactSessionHeaderField()}
-              </div>
-              {shouldRenderCompactSessionHeaderExpandedRow && (
-                <div className={styles.compactSessionHeaderExpandedRow}>
-                  {compactSessionHeaderMode === 'url' && (
-                    <Input
-                      value={draft?.sessionHeader == null ? '' : draft.sessionHeader}
-                      onChange={(e) => updateDraftValue(['sessionHeader'], e.target.value)}
-                      placeholder="https://..."
-                      data-testid={E2E_TESTIDS.WIZARD_SESSION_HEADER_URL}
-                    />
-                  )}
-                  {renderSessionHeaderPreviewSurface({ compact: true })}
-                </div>
-              )}
-              {sessionHeaderUploadStatus && <div className={styles.helperText}>{sessionHeaderUploadStatus}</div>}
-            </div>
+            {renderCompactSessionHeaderField()}
           </FormGroup>
         );
       }
@@ -5398,7 +5345,7 @@ const SessionWizard = ({
                   onChange={() => {
                     setSessionHeaderMode('url');
                     setSessionHeaderFile(null);
-                    setSessionHeaderUploadStatus('');
+                    setSessionHeaderStatus('');
                   }}
                 />
                 Use URL
@@ -5410,7 +5357,7 @@ const SessionWizard = ({
                   checked={sessionHeaderMode === 'upload'}
                   onChange={() => {
                     setSessionHeaderMode('upload');
-                    setSessionHeaderUploadStatus('');
+                    setSessionHeaderStatus('');
                   }}
                 />
                 Upload file
@@ -5873,7 +5820,7 @@ const SessionWizard = ({
     }
     if (sessionHeaderMode === 'upload') {
       if (sessionHeaderFile) {
-        setSessionHeaderUploadStatus('Uploading header image…');
+        setSessionHeaderStatus('Uploading header image…', 'loading');
         const format = resolveSessionHeaderImageFormat(sessionHeaderFile);
         if (!format) {
           throw new Error('Unsupported header image format. Use png, jpg, jpeg, or gif.');
@@ -5931,12 +5878,12 @@ const SessionWizard = ({
           ts: new Date().toISOString(),
         });
         metadata.sessionHeader = `ar://${headerTxId}`;
-        setSessionHeaderUploadStatus('Header image uploaded.');
+        setSessionHeaderStatus('Header image uploaded.');
       } else {
         metadata.sessionHeader = '';
       }
     } else {
-      setSessionHeaderUploadStatus('');
+      setSessionHeaderStatus('');
     }
     const normalizedBlockLimits = normalizeBlockLimitsForConfig(metadata.blockLimits, latestChainBlock);
     if (normalizedBlockLimits) {

@@ -1,5 +1,5 @@
-import toast from 'react-hot-toast';
 import { createLogger } from '../logging';
+import { showToast } from './toastBus.js';
 
 const log = createLogger('notify');
 
@@ -9,21 +9,21 @@ export const notify = {
   success(msg) {
     const message = normalizeMessage(msg);
     log.info(message);
-    return toast.success(message);
+    return showToast(message, { kind: 'success' });
   },
   error(msg, duration = 6000) {
     const message = normalizeMessage(msg);
     log.error(message);
-    return toast.error(message, { duration });
+    return showToast(message, { kind: 'error', duration });
   },
   warn(msg, icon = '⚠️') {
     const message = normalizeMessage(msg);
     log.warn(message);
-    return toast(message, { icon });
+    return showToast(message, { kind: 'warn', icon });
   },
   info(msg) {
     const message = normalizeMessage(msg);
     log.info(message);
-    return toast(message, { icon: 'ℹ️' });
+    return showToast(message, { kind: 'info', icon: 'ℹ️' });
   },
 };

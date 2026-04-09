@@ -147,7 +147,7 @@ export default function AudioSurveyGenerator({
   loginComplete,
   toggleLoginModal,
   minified = false,
-  defaultTags, 
+  defaultTags,
   onQuestionsGenerated,
   hideEncryption = true,
   sessionConfig,
@@ -165,11 +165,11 @@ export default function AudioSurveyGenerator({
   // Input States
   const [pastedText, setPastedText] = useState('');
   const [textEncrypted, setTextEncrypted] = useState(false);
-  
+
   // Audio specific
   const [audioFile, setAudioFile] = useState(null);
   const [isTranscribing, setIsTranscribing] = useState(false);
-  
+
   // AI Prompt Panel State
   const [showAIPrompt, setShowAIPrompt] = useState(false);
   const [aiPromptText, setAiPromptText] = useState('');
@@ -194,7 +194,7 @@ export default function AudioSurveyGenerator({
   const [statementsToUpload, setStatementsToUpload] = useState([]);
   const [prefilledAnswers, setPrefilledAnswers] = useState([]);
   const [showCreateSurvey, setShowCreateSurvey] = useState(false);
-  const [documentURLs, setDocumentURLs] = useState([]); 
+  const [documentURLs, setDocumentURLs] = useState([]);
 
   // AUDIO summary-first flow state
   const [summaryMd, setSummaryMd] = useState('');
@@ -209,10 +209,10 @@ export default function AudioSurveyGenerator({
   const [showDemoCorpusView, setShowDemoCorpusView] = useState(demoSurfaceEnabled);
 
   // Multi-source State
-  const [additionalSources, setAdditionalSources] = useState([]); 
+  const [additionalSources, setAdditionalSources] = useState([]);
   const [additionalUrlInput, setAdditionalUrlInput] = useState('');
   const additionalFileInputRef = useRef(null);
-  const uploadAudioInputRef = useRef(null); 
+  const uploadAudioInputRef = useRef(null);
   const [saveExtraSourcesToDocLibrary, setSaveExtraSourcesToDocLibrary] = useState(false);
   const [saveDocAudience, setSaveDocAudience] = useState('self');
   const [showSaveDocAudienceMenu, setShowSaveDocAudienceMenu] = useState(false);
@@ -464,7 +464,7 @@ export default function AudioSurveyGenerator({
         returnedCount: parsed.questions.length,
       });
     }
-    return parsed;     
+    return parsed;
   }
 
   async function handleUploadSummaryAndCreateQuestions() {
@@ -788,7 +788,7 @@ export default function AudioSurveyGenerator({
 
           content = (transcript || '').trim();
           if (content.length < 50) throw new Error('Transcription too short.');
-      } 
+      }
       else if (pastedText && pastedText.trim().length > 0) {
         content = pastedText.trim();
         if (isSingleHttpUrlInput(content)) {
@@ -846,7 +846,7 @@ export default function AudioSurveyGenerator({
         });
         if (abortedRef.current) return;
         setSummaryMd((md || '').trim());
-        
+
         sourceForQuestions = md;
 
         // B. Upload to Arweave (if toggled)
@@ -865,10 +865,10 @@ export default function AudioSurveyGenerator({
                context: { account, providerLike: provider, chainId: network?.id },
              });
              if (abortedRef.current) return;
-             
+
              setSummaryArweaveTxId(txId || '');
              setSummaryDocURL(url || '');
-             
+
              if (url) {
                finalDocUrls.unshift(url);
              }
@@ -919,7 +919,7 @@ export default function AudioSurveyGenerator({
           miniaturized={minified}
           preformedQuestions={statementsToUpload}
           preformedSurvey={preformedSurvey}
-          prefilledAnswers={prefilledAnswers} 
+          prefilledAnswers={prefilledAnswers}
           account={account}
           loginComplete={loginComplete}
           sessionConfig={resolvedSessionConfig}
@@ -928,7 +928,7 @@ export default function AudioSurveyGenerator({
           provider={provider}
           network={network}
           toggleLoginModal={toggleLoginModal}
-          defaultTags={defaultTags} 
+          defaultTags={defaultTags}
           documentURLs={documentURLs}
           onUploadComplete={(surveyHash) => {
             setShowCreateSurvey(false);
@@ -937,7 +937,7 @@ export default function AudioSurveyGenerator({
             setDocumentURLs([]);
             setPastedText('');
             setAudioFile(null);
-            if (surveyHash) { 
+            if (surveyHash) {
                 alert(`Upload complete! Survey ID: ${surveyHash}`);
             } else {
                 alert(`Upload complete! Questions added.`);
@@ -1148,7 +1148,7 @@ export default function AudioSurveyGenerator({
             <AudioInput
               placeholder={transcriptMode ? "Speak to capture transcript or Paste Text..." : "Speak or type text here..."}
               recordingDisabled={transcriptMode}
-              longFormMode={transcriptMode} 
+              longFormMode={transcriptMode}
               showRecorderControlsInTextbox={transcriptMode}
               showRecordingTimerInTextbox={transcriptMode}
               enableDownloads={transcriptMode}
@@ -1167,15 +1167,15 @@ export default function AudioSurveyGenerator({
 
           <div className={styles.additionalContextSection}>
             {/* <h4 className={styles.contextHeader}>Additional Context (URL / File)</h4> */}
-            
+
             {additionalSources.length > 0 && (
               <ul className={styles.sourceList}>
                 {additionalSources.map((item, idx) => (
                   <li key={idx} className={styles.sourceItem}>
                     <span className={styles.sourceTypeLabel}>[{item.type}]</span>
                     <span className={styles.sourceName}>{item.name}</span>
-                    <button 
-                      type="button" 
+                    <button
+                      type="button"
                       onClick={() => removeAdditionalSource(idx)}
                       className={styles.removeSourceBtn}
                     >
@@ -1271,8 +1271,8 @@ export default function AudioSurveyGenerator({
                   className={styles.urlInputField}
                   // Removed bsSize="sm" to match default height
                 />
-                <button 
-                  type="button" 
+                <button
+                  type="button"
                   className={styles.internalUrlAddBtn}
                   onClick={addAdditionalUrl}
                   disabled={!additionalUrlInput.trim()}
@@ -1291,9 +1291,9 @@ export default function AudioSurveyGenerator({
                   accept=".pdf, .md, .txt, .csv, .ppt, .pptx, .json"
                   onChange={handleAdditionalFileUpload}
                 />
-                <Button 
-                  type="button" 
-                  color="secondary" 
+                <Button
+                  type="button"
+                  color="secondary"
                   outline
                   className={styles.compactBtn}
                   onClick={() => additionalFileInputRef.current && additionalFileInputRef.current.click()}
@@ -1306,14 +1306,14 @@ export default function AudioSurveyGenerator({
               </div>
 
               {/* Transcript Mode Toggle */}
-              <div 
+              <div
                 className={`${styles.transcriptToggleBtn} ${transcriptMode ? styles.active : ''}`}
                 onClick={handleTranscriptModeToggle}
                 title="Enable Transcript Mode (Summary + Arweave Upload)"
                 data-testid="transcript-mode-toggle"
               >
-                <FontAwesomeIcon 
-                  icon={transcriptMode ? faCheckSquare : faSquare} 
+                <FontAwesomeIcon
+                  icon={transcriptMode ? faCheckSquare : faSquare}
                   className={styles.checkboxIcon}
                 />
                 <span>Transcript</span>
@@ -1393,9 +1393,9 @@ export default function AudioSurveyGenerator({
 
         <div className={styles.formSection}>
           <h3 className={styles.sectionTitle}>Question Types</h3>
-          
+
           <div className={styles.questionTypeGrid}>
-            <div 
+            <div
               className={`${styles.typeButton} ${questionTypes.binary ? styles.active : ''}`}
               onClick={() => toggleQuestionType('binary')}
             >
@@ -1407,7 +1407,7 @@ export default function AudioSurveyGenerator({
               </div>
             </div>
 
-            <div 
+            <div
               className={`${styles.typeButton} ${questionTypes.multichoice ? styles.active : ''}`}
               onClick={() => toggleQuestionType('multichoice')}
             >
@@ -1419,7 +1419,7 @@ export default function AudioSurveyGenerator({
               </div>
             </div>
 
-            <div 
+            <div
               className={`${styles.typeButton} ${questionTypes.rating ? styles.active : ''}`}
               onClick={() => toggleQuestionType('rating')}
             >
@@ -1430,7 +1430,7 @@ export default function AudioSurveyGenerator({
               </div>
             </div>
 
-            <div 
+            <div
               className={`${styles.typeButton} ${questionTypes.freeform ? styles.active : ''}`}
               onClick={() => toggleQuestionType('freeform')}
             >

@@ -296,7 +296,7 @@ class CreateSurvey extends Component {
     super(props);
     this.state = {
       title: '',
-      questions: [], 
+      questions: [],
       addingQuestionType: 'Question Type',
       surveySubmitted: false,
       surveyHash: '',
@@ -311,10 +311,10 @@ class CreateSurvey extends Component {
       submissionError: '',
       copySurveyIdSuccess: false,
       copySurveyLinkSuccess: false,
-      lastSubmittedSurveyId: '', 
+      lastSubmittedSurveyId: '',
       lastSubmittedSurveyArweaveTxId: '',
 
-      showAutoTool: true,    
+      showAutoTool: true,
       documentURLs: sanitizeDocumentUrls(props.documentURLs || []),
       autoPopulateAiTags: true,
 
@@ -365,7 +365,7 @@ class CreateSurvey extends Component {
           aiGeneratedTagsFromSource: [...aiTags],
           options: q.type === 'multichoice' && Array.isArray(q.options) ? q.options : (q.type === 'multichoice' ? [] : undefined),
           singleSelect,
-          currentTagInputValue: '', 
+          currentTagInputValue: '',
           isGeneratingTags: false,
         };
       });
@@ -378,7 +378,7 @@ class CreateSurvey extends Component {
       }
       this.state.documentURLs = sanitizeDocumentUrls(props.documentURLs || []);
       // If props provided URLs, we don't necessarily want to pre-fill the input buffer, just the list
-      this.state.docURLInput = ''; 
+      this.state.docURLInput = '';
     }
     this.state.questions = initialQuestions;
     this._cacheWatchTimer = null;
@@ -908,9 +908,9 @@ class CreateSurvey extends Component {
     if (savedSurvey) {
       try {
         const parsedSurvey = JSON.parse(savedSurvey);
-        const autoPopulateState = typeof parsedSurvey.autoPopulateAiTags === 'boolean' 
-          ? parsedSurvey.autoPopulateAiTags 
-          : true; 
+        const autoPopulateState = typeof parsedSurvey.autoPopulateAiTags === 'boolean'
+          ? parsedSurvey.autoPopulateAiTags
+          : true;
 
         // Drop legacy encryption toggles from older drafts.
         delete parsedSurvey.encryptSurvey;
@@ -937,10 +937,10 @@ class CreateSurvey extends Component {
               id: q.id || this.generateQuestionId(q.type, q.prompt, q.options, singleSelect),
               uiKey: q.uiKey || `loaded-${index}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
               tags: currentTags,
-              aiGeneratedTagsFromSource: aiTags, 
+              aiGeneratedTagsFromSource: aiTags,
               options: q.type === 'multichoice' && Array.isArray(q.options) ? q.options : (q.type === 'multichoice' ? [] : undefined),
               singleSelect,
-              currentTagInputValue: q.currentTagInputValue || '', 
+              currentTagInputValue: q.currentTagInputValue || '',
               isGeneratingTags: q.isGeneratingTags || false,
               lockGateIds: isStandalone
                 ? normalizeGateIds(q.lockGateIds)
@@ -952,7 +952,7 @@ class CreateSurvey extends Component {
             };
           });
         }
-        
+
         // Ensure clean UI state (do not restore progress indicators or success states)
         delete parsedSurvey.isSubmitting;
         delete parsedSurvey.progress;
@@ -1063,9 +1063,9 @@ class CreateSurvey extends Component {
     }
 
     this.setState(
-      { 
+      {
         documentURLs: [...safeDocumentUrls, normalizedUrl],
-        docURLInput: '' 
+        docURLInput: ''
       },
       () => {
         this.updateSurveyHash();
@@ -1093,16 +1093,16 @@ class CreateSurvey extends Component {
     const newQuestionId = this.generateQuestionId(type, '', [], false);
     const newUiKey = `new-${this.state.questions.length}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const newQuestionData = {
-      id: newQuestionId, 
-      uiKey: newUiKey,   
+      id: newQuestionId,
+      uiKey: newUiKey,
       type: type,
       prompt: '',
       options: isMultichoice ? [] : undefined,
       singleSelect: isMultichoice ? false : undefined,
       associatedSurveyId: '',
       tags: [],
-      aiGeneratedTagsFromSource: [], 
-      currentTagInputValue: '', 
+      aiGeneratedTagsFromSource: [],
+      currentTagInputValue: '',
       isGeneratingTags: false,
       lockGateIds: this.state.isStandaloneQuestion ? [] : null,
     };
@@ -1120,7 +1120,7 @@ class CreateSurvey extends Component {
   handleQuestionChange = (index, key, value) => {
     const { questions } = this.state;
     const updatedQuestions = [...questions];
-    const questionToUpdate = { ...updatedQuestions[index] }; 
+    const questionToUpdate = { ...updatedQuestions[index] };
 
     questionToUpdate[key] = value;
     if (key === 'prompt' || key === 'type' || key === 'singleSelect') {
@@ -1131,11 +1131,11 @@ class CreateSurvey extends Component {
         questionToUpdate.singleSelect
       );
     }
-    
+
     updatedQuestions[index] = questionToUpdate;
 
     this.setState({ questions: updatedQuestions }, () => {
-      this.updateSurveyHash(); 
+      this.updateSurveyHash();
       this.saveToLocalStorage();
     });
   };
@@ -1143,7 +1143,7 @@ class CreateSurvey extends Component {
   handleOptionChange = (qIdx, optIdx, val) => {
     const { questions } = this.state;
     const updatedQuestions = [...questions];
-    const questionToUpdate = { ...updatedQuestions[qIdx] }; 
+    const questionToUpdate = { ...updatedQuestions[qIdx] };
 
     if (!Array.isArray(questionToUpdate.options)) {
       questionToUpdate.options = [];
@@ -1157,7 +1157,7 @@ class CreateSurvey extends Component {
       questionToUpdate.options,
       questionToUpdate.singleSelect
     );
-    
+
     updatedQuestions[qIdx] = questionToUpdate;
     this.setState({ questions: updatedQuestions }, this.saveToLocalStorage);
   };
@@ -1165,13 +1165,13 @@ class CreateSurvey extends Component {
   addOption = (questionIndex) => {
     const { questions } = this.state;
     const updatedQuestions = [...questions];
-    const q = { ...updatedQuestions[questionIndex] }; 
+    const q = { ...updatedQuestions[questionIndex] };
 
-    if (!q.options) q.options = []; 
+    if (!q.options) q.options = [];
     const newOptions = [...q.options, ''];
     q.options = newOptions;
     q.id = this.generateQuestionId(q.type, q.prompt, q.options, q.singleSelect);
-    
+
     updatedQuestions[questionIndex] = q;
     this.setState({ questions: updatedQuestions }, this.saveToLocalStorage);
   };
@@ -1179,13 +1179,13 @@ class CreateSurvey extends Component {
   removeOption = (questionIndex, optionIndex) => {
     const { questions } = this.state;
     const updatedQuestions = [...questions];
-    const q = { ...updatedQuestions[questionIndex] }; 
+    const q = { ...updatedQuestions[questionIndex] };
 
-    if (!Array.isArray(q.options)) q.options = []; 
+    if (!Array.isArray(q.options)) q.options = [];
     const newOptions = q.options.filter((_, i) => i !== optionIndex);
     q.options = newOptions;
     q.id = this.generateQuestionId(q.type, q.prompt, q.options, q.singleSelect);
-     
+
     updatedQuestions[questionIndex] = q;
     this.setState({ questions: updatedQuestions }, this.saveToLocalStorage);
   };
@@ -1277,10 +1277,10 @@ class CreateSurvey extends Component {
   updateSurveyHash = () => {
     const { title, isStandaloneQuestion, documentURLs } = this.state;
     if (isStandaloneQuestion) {
-      this.setState({ surveyHash: '' }); 
+      this.setState({ surveyHash: '' });
     } else {
       const urlsForHash = sanitizeDocumentUrls(documentURLs);
-      const surveyData = { title, documentURLs: urlsForHash }; 
+      const surveyData = { title, documentURLs: urlsForHash };
       const newHash = "0x" + sha256(JSON.stringify(surveyData)).toString();
       this.setState({ surveyHash: newHash });
     }
@@ -1419,7 +1419,7 @@ class CreateSurvey extends Component {
         questions: nextQuestions,
       };
     }, () => {
-      this.updateSurveyHash(); 
+      this.updateSurveyHash();
       this.saveToLocalStorage();
     });
   };
@@ -2700,7 +2700,7 @@ class CreateSurvey extends Component {
     });
     const firstKey = built.length > 0 ? built[0].uiKey : null;
 
-    this.setState({ 
+    this.setState({
       questions: built,
       documentURLs: sanitizeDocumentUrls(docURLs || []),
       // Only set buffer if needed, usually we just want the list
@@ -2708,7 +2708,7 @@ class CreateSurvey extends Component {
       isStandaloneQuestion: !aiTitle,
       title: aiTitle || '',
       showAutoTool: false,
-      surveyAddedSuccessfully: false, 
+      surveyAddedSuccessfully: false,
       questionsAddedSuccessfully: false,
       submissionError: '',
       lastSubmittedSurveyId: '',
@@ -2725,7 +2725,7 @@ class CreateSurvey extends Component {
       const newAutoPopulateState = !prevState.autoPopulateAiTags;
       const updatedQuestions = prevState.questions.map(q => {
         let newTags = normalizeTagList(q.tags);
-        if (newAutoPopulateState) { 
+        if (newAutoPopulateState) {
           const sourceTags = normalizeTagList(q.aiGeneratedTagsFromSource);
           const currentTagSet = new Set(newTags);
           sourceTags.forEach(tag => {
@@ -2812,12 +2812,12 @@ class CreateSurvey extends Component {
       const updatedQuestions = [...prevState.questions];
       updatedQuestions[qIndex] = { ...updatedQuestions[qIndex], currentTagInputValue: value };
       return { questions: updatedQuestions };
-    }); 
+    });
   };
 
   handleTagInputKeyDown = (qIndex, event) => {
     if (event.key === 'Enter' || event.key === ',') {
-      event.preventDefault(); 
+      event.preventDefault();
       this.processTagInput(qIndex);
     }
   };
@@ -3012,6 +3012,20 @@ class CreateSurvey extends Component {
       openLockKey
     } = this.state;
     const safeDocumentUrls = sanitizeDocumentUrls(documentURLs);
+    const hasAuthoredDraftContent = (
+      questions.length > 0 ||
+      title.trim() !== '' ||
+      safeDocumentUrls.length > 0 ||
+      surveyAddedSuccessfully ||
+      questionsAddedSuccessfully
+    );
+    // Pile entry starts in AI mode, so hide the survey/questions switch until
+    // the user either starts manual authoring or generation produces content.
+    const showModeToggle = (
+      !this.props.hideSurveyQuestionToggleUntilAuthoring ||
+      !showAutoTool ||
+      hasAuthoredDraftContent
+    );
 
     const surveyIDForDisplay = lastSubmittedSurveyId || this.state.surveyHash;
     const sessionConfig = this.getSessionConfig();
@@ -3061,7 +3075,7 @@ class CreateSurvey extends Component {
       };
     } else {
       jsonData = {
-        surveyID: this.state.surveyHash, 
+        surveyID: this.state.surveyHash,
         title: title,
         documentURLs: safeDocumentUrls,
         questions: questions.map(q => ({
@@ -3292,7 +3306,7 @@ class CreateSurvey extends Component {
                   </Button>
                 </div>
               </div>
-              
+
               {/* Ref attached to the prompt textarea for auto-focus */}
               <Input
                 innerRef={el => { this._promptRefs[question.uiKey] = el; }}
@@ -3369,7 +3383,7 @@ class CreateSurvey extends Component {
                         />
                       </span>
                     ))}
-                    
+
                     {/* Updated Tag Input UX */}
 	                    <div className={styles.tagInputGroup}>
 	                      <Input
@@ -3384,8 +3398,8 @@ class CreateSurvey extends Component {
 
 	                      {/* Checkmark: Only visible when user is typing */}
 	                      {(question.currentTagInputValue || '').trim() !== '' && (
-	                        <button 
-	                          type="button" 
+	                        <button
+	                          type="button"
                           className={styles.addTagButton}
                           data-testid={E2E_TESTIDS.CREATE_QUESTION_ADD_TAG}
                           onClick={() => this.processTagInput(qIndex)}
@@ -3471,22 +3485,22 @@ class CreateSurvey extends Component {
             {(isSubmitting || this.state.showSubmitSteps) && (
               <div className={styles.progressIndicator}>
                 <div className={submitStep >= 1 ? styles.stepCompleted : styles.step}>
-                  <FontAwesomeIcon 
-                    icon={submitStep === 1 ? faSpinner : submitStep > 1 ? faCheck : faExclamationCircle} 
-                    spin={submitStep === 1} 
+                  <FontAwesomeIcon
+                    icon={submitStep === 1 ? faSpinner : submitStep > 1 ? faCheck : faExclamationCircle}
+                    spin={submitStep === 1}
                   />
                   <span>Upload Arweave</span>
                 </div>
                 <div className={submitStep >= 2 ? styles.stepCompleted : styles.step}>
-                  <FontAwesomeIcon 
-                    icon={submitStep === 2 ? faSpinner : submitStep > 2 ? faCheck : faExclamationCircle} 
-                    spin={submitStep === 2} 
+                  <FontAwesomeIcon
+                    icon={submitStep === 2 ? faSpinner : submitStep > 2 ? faCheck : faExclamationCircle}
+                    spin={submitStep === 2}
                   />
                   <span>Submit Contract</span>
                 </div>
                 <div className={submitStep >= 3 ? styles.stepCompleted : styles.step}>
-                  <FontAwesomeIcon 
-                    icon={submitStep === 3 ? faCheck : faExclamationCircle} 
+                  <FontAwesomeIcon
+                    icon={submitStep === 3 ? faCheck : faExclamationCircle}
                   />
                   <span>Done</span>
                 </div>
@@ -3522,7 +3536,7 @@ class CreateSurvey extends Component {
                         </a>
                         <a
                           href={normalizeArweaveUrl(arweaveTxId, { contextLabel: 'create_survey_question_link' })}
-                          target="_blank" 
+                          target="_blank"
                           rel="noopener noreferrer"
                           title="View on Arweave"
                           style={{ marginLeft: '10px', marginRight: '5px', textDecoration: 'none', color: '#007bff' }}
@@ -3694,24 +3708,26 @@ class CreateSurvey extends Component {
       >
         {/* Header: Survey/Questions toggle + single context-aware mode switch */}
         <div className={styles.modeHeader}>
-          <div className={styles.modeToggle}>
-            <Label className={styles.toggleLabel}> Survey</Label>
-            <div
-              className={styles.toggleSwitch}
-              onClick={this.toggleStandaloneQuestion}
-            >
+          {showModeToggle && (
+            <div className={styles.modeToggle}>
+              <Label className={styles.toggleLabel}> Survey</Label>
               <div
-                className={styles.toggleKnob}
-                style={{
-                  left: isStandaloneQuestion ? '31px' : '1px',
-                  backgroundColor: isStandaloneQuestion ? '#4caf50' : '#fff',
-                }}
-              />
+                className={styles.toggleSwitch}
+                onClick={this.toggleStandaloneQuestion}
+              >
+                <div
+                  className={styles.toggleKnob}
+                  style={{
+                    left: isStandaloneQuestion ? '31px' : '1px',
+                    backgroundColor: isStandaloneQuestion ? '#4caf50' : '#fff',
+                  }}
+                />
+              </div>
+              <Label className={styles.toggleLabel} style={{ marginLeft: '10px' }}>
+                Questions
+              </Label>
             </div>
-            <Label className={styles.toggleLabel} style={{ marginLeft: '10px' }}>
-              Questions
-            </Label>
-          </div>
+          )}
 
           {!this.props.miniaturized && !this.props.preformedQuestions && (
             <Button

@@ -10,6 +10,7 @@ describe('contractScripts.getSbtMetadata tokenURI parsing', () => {
   let contractSpy;
   let fetchSpy;
   let arweaveSpy;
+  let checkTxExistsSpy;
   let originalFetch;
   const flushAsync = async (passes = 5) => {
     for (let i = 0; i < passes; i += 1) {
@@ -42,11 +43,14 @@ describe('contractScripts.getSbtMetadata tokenURI parsing', () => {
     if (contractSpy) contractSpy.mockRestore();
     if (fetchSpy) fetchSpy.mockRestore();
     if (arweaveSpy) arweaveSpy.mockRestore();
+    if (checkTxExistsSpy) checkTxExistsSpy.mockRestore();
     contractSpy = null;
     fetchSpy = null;
     arweaveSpy = null;
+    checkTxExistsSpy = null;
     jest.useRealTimers();
     global.fetch = originalFetch;
+    try { delete globalThis.CE_ARWEAVE_PREFLIGHT_SBT_METADATA; } catch (_) {}
   });
 
   it('uses extensionless direct-image tokenURI as renderable image when response content-type is image/*', async () => {
@@ -456,5 +460,75 @@ describe('contractScripts.getSbtMetadata tokenURI parsing', () => {
     }));
     expect(meta?.tokenURI || '').toContain(rawTxId);
     expect(arweaveSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves SBT tokenURI preflight policy to the arweave resolver', async () => {
+    const rawTxId = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
+    const stub = baseContractStub(rawTxId);
+    stub.name.mockResolvedValue('Gateway First SBT');
+    contractSpy = jest.spyOn(ethers, 'Contract').mockImplementation(() => stub);
+    arweaveSpy = jest.spyOn(arweaveScripts, 'downloadDataFromArweave').mockResolvedValue(
+      JSON.stringify({
+        name: 'Gateway First SBT',
+        image: 'https://example.com/assets/gateway-first.png',
+      })
+    );
+
+    const meta = await contractScripts.getSbtMetadata('none', sbtAddress, {
+      slug: 'edge',
+      networkChainId: 84532,
+      contracts: {},
+    });
+
+    expect(meta).toEqual(expect.objectContaining({
+      name: 'Gateway First SBT',
+      contractName: 'Gateway First SBT',
+    }));
+    const [, arweaveOpts] = arweaveSpy.mock.calls[0];
+    expect(arweaveSpy).toHaveBeenCalledTimes(1);
+    expect(arweaveSpy).toHaveBeenCalledWith(rawTxId, expect.any(Object));
+    expect(arweaveOpts).toEqual(expect.objectContaining({
+      debugContext: expect.objectContaining({
+        category: 'sbt_metadata',
+      }),
+    }));
+    expect(arweaveOpts).not.toHaveProperty('disableExistencePrecheck');
+    expect(arweaveOpts).not.toHaveProperty('preflightTxExistence');
+  });
+
+  it('keeps Arweave-backed SBT images visible when metadata preflight is gateway-first', async () => {
+    globalThis.CE_ARWEAVE_PREFLIGHT_SBT_METADATA = false;
+    const rawTxId = 'BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB';
+    const imageTxId = 'CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC';
+    const stub = baseContractStub(rawTxId);
+    stub.name.mockResolvedValue('Gateway First Image SBT');
+    contractSpy = jest.spyOn(ethers, 'Contract').mockImplementation(() => stub);
+    fetchSpy = jest.spyOn(global, 'fetch');
+    checkTxExistsSpy = jest.spyOn(arweaveScripts, 'checkTxExists');
+    arweaveSpy = jest.spyOn(arweaveScripts, 'downloadDataFromArweave').mockResolvedValue(
+      JSON.stringify({
+        name: 'Gateway First Image SBT',
+        image: `ar://${imageTxId}`,
+      })
+    );
+
+    const meta = await contractScripts.getSbtMetadata('none', sbtAddress, {
+      slug: 'edge',
+      networkChainId: 84532,
+      contracts: {},
+    });
+
+    expect(meta).toEqual(expect.objectContaining({
+      name: 'Gateway First Image SBT',
+      contractName: 'Gateway First Image SBT',
+      image: expect.stringContaining(imageTxId),
+    }));
+    expect(checkTxExistsSpy).toHaveBeenCalledWith(imageTxId, expect.objectContaining({
+      debugContext: expect.objectContaining({
+        category: 'sbt_metadata',
+        field: 'image',
+      }),
+    }));
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 });

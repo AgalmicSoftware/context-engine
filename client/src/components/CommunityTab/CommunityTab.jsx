@@ -1901,10 +1901,10 @@ class CommunityTab extends Component {
               setFilterLoading={(isLoading) => this.setState({ loadingFilter: isLoading })} // Pass loading state setter
               autoExpand={false} // Changed this to false to allow internal button toggle
               expandToSbtHolders={true}
-              
+
               // this below value is probably not passed-in, but should be
               isSBTCacheReady={this.props.isSBTCacheReady}
-              sbtCacheRevision={this.props.sbtCacheRevision}     
+              sbtCacheRevision={this.props.sbtCacheRevision}
 
             />
             {loadingFilter ? (
@@ -2041,7 +2041,14 @@ class CommunityTab extends Component {
           {this.renderQuestionSwarm()}
         </div>
 
-        <Modal isOpen={showModal} toggle={this.toggleModal} className={styles.modal} size="lg">
+        <Modal
+          isOpen={showModal}
+          toggle={this.toggleModal}
+          className={styles.modal}
+          size="lg"
+          centered
+          scrollable
+        >
           <ModalHeader toggle={this.toggleModal} className={styles.modalHeader}>
             {modalTitle}
           </ModalHeader>
