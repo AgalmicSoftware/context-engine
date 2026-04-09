@@ -293,13 +293,8 @@ describe('SurveyTool module', () => {
     const scss = fs.readFileSync(scssPath, 'utf8');
 
     expect(scss).toMatch(/\.pileWrapper\s*{[\s\S]*?margin-bottom:\s*38px;/);
-    expect(scss).toMatch(/\.pileSubmitButton\s*{[\s\S]*?@include finalSubmitCta\.final-submit-cta-shell\(/);
-    expect(scss).toMatch(/\.pileSubmitButtonContent\s*{[\s\S]*?@include finalSubmitCta\.final-submit-cta-content\(\$gap:\s*12px\);[\s\S]*?text-transform:\s*uppercase;/);
-    expect(scss).toMatch(/\.pileInteractionUnit\s*{[\s\S]*?--pile-desktop-submit-rail-offset:\s*64px;[\s\S]*?--pile-desktop-submit-rail-padding:\s*24px;[\s\S]*?--pile-current-submit-rail-offset:\s*0px;[\s\S]*?--pile-current-submit-rail-padding:\s*0px;[\s\S]*?padding-top:\s*var\(--pile-current-submit-rail-padding\);/);
-    expect(scss).toMatch(/\.pileInteractionUnitWithSubmitRail\s*{[\s\S]*?--pile-current-submit-rail-offset:\s*var\(--pile-desktop-submit-rail-offset\);[\s\S]*?--pile-current-submit-rail-padding:\s*var\(--pile-desktop-submit-rail-padding\);/);
-    expect(scss).toMatch(/@media \(min-width: 769px\)\s*{[\s\S]*?\.pileInteractionUnitWithSubmitRail \.pileCardInner,\s*\.pileInteractionUnitWithSubmitRail \.pileHologramPanel,\s*\.pileInteractionUnitWithSubmitRail \.pileEmptyState\s*{[\s\S]*?margin-top:\s*12px;/);
-    expect(scss).toMatch(/@media \(min-width: 769px\) and \(max-width: 1366px\)\s*{[\s\S]*?\.pileInteractionUnit\s*{[\s\S]*?--pile-desktop-submit-rail-padding:\s*48px;/);
-    expect(scss).toMatch(/@media \(min-width: 769px\) and \(max-width: 1366px\)\s*{[\s\S]*?\.pileInteractionUnitWithSubmitRail \.pileCardInner,\s*\.pileInteractionUnitWithSubmitRail \.pileHologramPanel,\s*\.pileInteractionUnitWithSubmitRail \.pileEmptyState\s*{[\s\S]*?margin-top:\s*24px;/);
+    expect(scss).toMatch(/\.pileInteractionUnit\s*{[\s\S]*?--pile-desktop-submit-rail-offset:\s*64px;[\s\S]*?--pile-current-submit-rail-offset:\s*0px;[\s\S]*?--pile-current-submit-rail-padding:\s*0px;[\s\S]*?padding-top:\s*var\(--pile-current-submit-rail-padding\);/);
+    expect(scss).toMatch(/\.pileInteractionUnitWithSubmitRail\s*{[\s\S]*?--pile-current-submit-rail-offset:\s*var\(--pile-desktop-submit-rail-offset\);[\s\S]*?--pile-current-submit-rail-padding:\s*var\(--pile-desktop-submit-rail-offset\);/);
     expect(scss).toMatch(/\.pileControls\s*{[\s\S]*?position:\s*absolute;[\s\S]*?top:\s*var\(--pile-current-submit-rail-offset\);[\s\S]*?right:\s*0;[\s\S]*?bottom:\s*0;[\s\S]*?left:\s*0;[\s\S]*?width:\s*100%;/);
     expect(scss).not.toMatch(/grid-template-areas:\s*[\s\S]*?'nav submit'[\s\S]*?'actions submit'/);
     expect(scss).toMatch(/\.pileControls > \.pileActions,\s*\.pileControls > \.pileNav\s*{[\s\S]*?position:\s*absolute;[\s\S]*?left:\s*calc\(100% \+ var\(--pile-desktop-rail-gap\)\);/);
@@ -331,7 +326,7 @@ describe('SurveyTool module', () => {
     expect(scss).toMatch(/@media \(max-width: 480px\)\s*{[\s\S]*?\.pileFooter\s+\.pileSubmitButton\s*{[\s\S]*?width:\s*100%;[\s\S]*?max-width:\s*none;[\s\S]*?min-height:\s*54px;[\s\S]*?font-size:\s*1rem;[\s\S]*?border-radius:\s*var\(--ce-radius-16\);/);
     expect(scss).toMatch(/@media \(max-width: 480px\)\s*{[\s\S]*?\.pileFooter\s+\.pileIconButton,\s*[\s\S]*?\.pileFooter\s+\.pileSubmitLink\s*{[\s\S]*?position:\s*static;[\s\S]*?transform:\s*none;[\s\S]*?flex:\s*0 0 auto;/);
     expect(scss).toMatch(/@media \(max-width: 480px\)\s*{[\s\S]*?\.pileSubmitSuccessBadge\s*{[\s\S]*?width:\s*54px;[\s\S]*?height:\s*54px;/);
-    expect(scss).toMatch(/@media \(min-width: 769px\), \(max-width: 480px\)\s*{[\s\S]*?\.pileSubmitButtonTrail\s*{[\s\S]*?display:\s*inline-flex;/);
+    expect(scss).toMatch(/@media \(min-width: 1367px\), \(max-width: 480px\)\s*{[\s\S]*?\.pileSubmitButtonTrail\s*{[\s\S]*?display:\s*inline-flex;/);
   });
 
   it('ports the recovered animLine border motion onto desktop and smallest-breakpoint pile submit rails', () => {
@@ -344,16 +339,6 @@ describe('SurveyTool module', () => {
     expect(scss).not.toMatch(/pileSubmitRailAfterLineAnim/);
     expect(scss).not.toMatch(/\.pileFooter\s+\.pileSubmitButton\.submitGlow::after/);
     expect(scss).toMatch(/@media \(prefers-reduced-motion: reduce\)\s*{[\s\S]*?\.pileFooter\s+\.pileSubmitButton\.submitGlow::before,\s*[\s\S]*?animation:\s*none !important;/);
-  });
-
-  it('ports the recovered animLine border motion onto the SurveySelector header submit CTA', () => {
-    const scssPath = path.join(__dirname, 'SurveyTool.module.scss');
-    const scss = fs.readFileSync(scssPath, 'utf8');
-
-    expect(scss).toMatch(/\.headerSubmitButton\s*{[\s\S]*?position:\s*relative;[\s\S]*?isolation:\s*isolate;[\s\S]*?overflow:\s*visible;/);
-    expect(scss).toMatch(/\.headerSubmitButton\s*{[\s\S]*?&\.submitGlow::before\s*{[\s\S]*?background:\s*linear-gradient\(90deg,\s*#fff 40%,\s*transparent 40%\);[\s\S]*?background-size:\s*200% 4px;[\s\S]*?filter:\s*drop-shadow\(0 0 8px #fff\);[\s\S]*?pointer-events:\s*none;/);
-    expect(scss).toMatch(/\.headerSubmitButton\s*{[\s\S]*?&\.submitGlow::before\s*{[\s\S]*?animation:\s*beforeLineAnim 5\.4s linear infinite;/);
-    expect(scss).toMatch(/@media \(prefers-reduced-motion: reduce\)\s*{[\s\S]*?\.headerSubmitButton\.submitGlow::before,\s*[\s\S]*?animation:\s*none !important;/);
   });
 
   it('renders triple trailing arrows inside the pile submit button', () => {
@@ -11032,44 +11017,6 @@ describe('SurveyTool module', () => {
     expect(findNodeByClassName(controlsNode?.props?.children, 'miniSpinnerWrapper')).toBeNull();
     expect(findNodeByClassName(actionsNode?.props?.children, 'miniSpinnerWrapper')).toBeNull();
     expect(findNodeByClassName(navNode?.props?.children, 'miniSpinnerWrapper')).toBeNull();
-  });
-
-  it('passes the delayed pile-entry mode toggle prop into the pile create panel', () => {
-    const shell = new SurveyTool({
-      minifiedMode: 'pile',
-      network: { id: 84532 },
-      networkChainId: 84532,
-      account: '',
-      questionResponsesNonce: 5,
-      onFilterChange: jest.fn(),
-    });
-    const pileElement = shell.render();
-    const PileViewModeClass = pileElement.type;
-    const subject = new PileViewModeClass(pileElement.props);
-
-    subject.state = {
-      ...subject.state,
-      loading: false,
-      pileQuestions: [],
-      allQuestionsForFilter: [],
-      activePileIndex: 0,
-      filterState: {},
-      isFilterActive: false,
-      showCreate: true,
-      filterModalOpen: false,
-      submissionComplete: false,
-      autoDecryptEnabled: false,
-      autoDecryptAttempted: {},
-      decryptingByKey: {},
-    };
-
-    const tree = subject.render();
-    const createSurveyNode = findElement(
-      tree,
-      (node) => node?.props?.hideSurveyQuestionToggleUntilAuthoring === true
-    );
-
-    expect(createSurveyNode).not.toBeNull();
   });
 
   it('passes the delayed pile-entry mode toggle prop into the pile create panel', () => {

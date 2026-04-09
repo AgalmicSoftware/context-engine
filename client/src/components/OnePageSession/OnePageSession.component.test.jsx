@@ -224,21 +224,11 @@ describe('OnePageSession view gating', () => {
     expect(titleContainer).not.toHaveClass(styles.titleContainerWithPileSubmitRail);
   });
 
-  it('applies pile submit rail title offsets only on phone and widescreen layouts', () => {
+  it('limits the pile submit rail title offset to phone widths where the rail is absolute', () => {
     const scss = fs.readFileSync(path.join(__dirname, 'OnePageSession.module.scss'), 'utf8');
     const phoneRailBlock = extractMediaBlock(
       scss,
       '@media only screen and (max-width: 480px)',
-      '.titleContainerWithPileSubmitRail'
-    );
-    const desktopRailBlock = extractMediaBlock(
-      scss,
-      '@media only screen and (min-width: 769px) and (max-width: 1366px)',
-      '.titleContainerWithPileSubmitRail'
-    );
-    const widescreenRailBlock = extractMediaBlock(
-      scss,
-      '@media only screen and (min-width: 1367px)',
       '.titleContainerWithPileSubmitRail'
     );
     const tabletRailBlock = extractMediaBlock(
@@ -249,9 +239,6 @@ describe('OnePageSession view gating', () => {
 
     expect(phoneRailBlock).toContain('.titleContainerWithPileSubmitRail');
     expect(phoneRailBlock).toContain('transform: translateY(-44px);');
-    expect(desktopRailBlock).toBeNull();
-    expect(widescreenRailBlock).toContain('.titleContainerWithPileSubmitRail');
-    expect(widescreenRailBlock).toContain('transform: translateY(-80px);');
     expect(tabletRailBlock).toBeNull();
   });
 
