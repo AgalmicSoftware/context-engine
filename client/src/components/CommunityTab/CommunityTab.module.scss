@@ -364,7 +364,12 @@
 .modal {
   max-width: 800px;
   margin: 30px auto;
+
   :global(.modal-content) {
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100vh - 2rem);
+    overflow: hidden;
     background: var(--ce-color-white);
     border-radius: var(--ce-radius-12);
     box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
@@ -400,13 +405,16 @@
   }
 
   :global(.modal-body) {
+    flex: 1 1 auto;
+    min-height: 0;
     padding: 30px;
+    overflow-y: auto;
+
     .userList {
       display: flex;
       flex-direction: column;
       gap: 12px;
-      max-height: 70vh;
-      overflow-y: auto;
+
       .userItem {
         display: flex;
         align-items: center;
@@ -420,6 +428,14 @@
         }
       }
     }
+  }
+}
+
+@media (max-width: 768px) {
+  .modal {
+    width: calc(100vw - 1.5rem);
+    max-width: calc(100vw - 1.5rem);
+    margin: 0.75rem auto;
   }
 }
 

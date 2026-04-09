@@ -358,6 +358,27 @@ describe('CommunityTab helpers', () => {
     expect(hideUsersNode.props.checked).toBe(false);
   });
 
+  it('renders the community modal as centered and scrollable when open', () => {
+    const instance = new CommunityTab({ activeSessionSlug: 'demo' });
+    instance.state = {
+      ...instance.state,
+      showModal: true,
+      modalType: 'surveys',
+      modalTitle: 'Surveys',
+    };
+
+    const tree = instance.render();
+    const [modalNode] = collectTreeNodes(tree, (node) => (
+      node?.props?.isOpen === true &&
+      node?.props?.size === 'lg' &&
+      node?.props?.toggle === instance.toggleModal
+    ));
+
+    expect(modalNode).toBeTruthy();
+    expect(modalNode.props.centered).toBe(true);
+    expect(modalNode.props.scrollable).toBe(true);
+  });
+
   it('omits the leaderboard and statistics section headings for a minimal community layout', () => {
     const instance = new CommunityTab({ activeSessionSlug: 'demo' });
     const tree = instance.render();
