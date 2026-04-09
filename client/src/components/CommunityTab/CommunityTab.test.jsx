@@ -380,11 +380,11 @@ describe('CommunityTab helpers', () => {
     };
 
     const tree = instance.render();
-    const [modalNode] = collectTreeNodes(
-      tree,
-      (node) =>
-        node?.props?.isOpen === true && node?.props?.size === 'lg' && node?.props?.toggle === instance.toggleModal,
-    );
+    const [modalNode] = collectTreeNodes(tree, (node) => (
+      node?.props?.isOpen === true &&
+      node?.props?.size === 'lg' &&
+      node?.props?.toggle === instance.toggleModal
+    ));
 
     expect(modalNode).toBeTruthy();
     expect(modalNode.props.centered).toBe(true);

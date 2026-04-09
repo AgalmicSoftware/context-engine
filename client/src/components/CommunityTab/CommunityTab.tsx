@@ -2144,7 +2144,14 @@ class CommunityTab extends Component<any, any> {
           {this.renderQuestionSwarm()}
         </div>
 
-        <Modal isOpen={showModal} toggle={this.toggleModal} className={styles.modal} size="lg" centered scrollable>
+        <Modal
+          isOpen={showModal}
+          toggle={this.toggleModal}
+          className={styles.modal}
+          size="lg"
+          centered
+          scrollable
+        >
           <ModalHeader toggle={this.toggleModal} className={styles.modalHeader}>
             {modalTitle}
           </ModalHeader>
