@@ -181,12 +181,94 @@ import {
 } from './SessionWizard.sponsoredBundleFixtures.testUtils';
 
 const renderSessionWizard = (props = {}) => render(<SessionWizard network={{ id: 84532 }} {...props} />);
-const renderLoggedInSessionWizard = (props = {}) =>
-  renderSessionWizard({
-    account: TEST_ADMIN_ADDRESS,
-    loginComplete: true,
-    toggleLoginModal: jest.fn(),
-    ...props,
+const renderLoggedInSessionWizard = (props = {}) => renderSessionWizard({
+  account: TEST_ADMIN_ADDRESS,
+  loginComplete: true,
+  toggleLoginModal: jest.fn(),
+  ...props,
+});
+const getFieldInputByLabel = (labelText) => (
+  screen.getByText(labelText).parentElement.querySelector('input,textarea,select')
+);
+const getToggleCheckbox = (labelText) => (
+  screen.getByText(labelText).closest('label').querySelector('input[type="checkbox"]')
+);
+const enableAdvancedMode = () => {
+  fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED));
+};
+const openWorkerPanel = () => {
+  fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
+};
+const setControlledInputValue = (input, value) => {
+  const reactPropsKey = Object.keys(input).find((key) => key.startsWith('__reactProps$'));
+  if (reactPropsKey) {
+    act(() => {
+      input[reactPropsKey].onChange({ target: { value } });
+    });
+    return;
+  }
+  fireEvent.change(input, { target: { value } });
+};
+const setCloudflareTokenValue = (value) => {
+  const input = screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN);
+  setControlledInputValue(input, value);
+  return input;
+};
+const expectSponsoredStatus = async (message) => {
+  await waitFor(() => {
+    if (message instanceof RegExp) {
+      expect(screen.getByTestId('ce-wizard-sponsored-status')).toHaveTextContent(message);
+      return;
+    }
+    if (message === 'Sponsored resources applied.') {
+      expect(screen.getByTestId('ce-wizard-sponsored-status')).toHaveTextContent(/^Sponsored resources applied:/i);
+      return;
+    }
+    expect(screen.getByTestId('ce-wizard-sponsored-status')).toHaveTextContent(message);
+  }, { timeout: 10000 });
+};
+const buildDecryptedSponsoredBundle = (overrides = {}) => {
+  const base = {
+    openaiKey: 'sponsored-openai',
+    anthropicKey: 'sponsored-anthropic',
+    openrouterKey: 'sponsored-openrouter',
+    arweaveJwk: '{"kty":"RSA"}',
+    faucetPrivateKey: '0xsponsoredfaucet',
+    customRpcUrl: 'https://sponsored-rpc.example',
+    litPayerPrivateKey: '0x59c6995e998f97a5a0044976f84ce7de5d9d7f17b2f6a6a5f76f8864c8ad88f5',
+    litPayerAddress: '0x3AC823CA9AcDA550244C6fF4927b5e1478E70Ff7',
+    customRpcKey: 'ignore-me',
+    meta: {
+      label: 'Launch Week',
+      createdAt: '2099-03-20T12:00:00.000Z',
+      createdBy: '0xadmin',
+      expiresAt: '2099-03-21T12:00:00.000Z',
+      sourceSessionSlug: 'source-session',
+      sourceWorkerUrl: 'https://source-worker.example',
+    },
+  };
+  return {
+    ...base,
+    ...overrides,
+    meta: {
+      ...base.meta,
+      ...(overrides?.meta || {}),
+    },
+  };
+};
+const configureAdvancedUseUrlDeploy = async ({
+  sessionName = 'Advanced Bundle Retry Session',
+  slug = 'advanced-bundle-retry-session',
+  bundleUrl = 'https://bundles.example.test/sessionCorsWorker.bundle.js',
+  cloudflareToken = 'cf-test-token',
+} = {}) => {
+  enableAdvancedMode();
+  const sessionNameInput = await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+  if (!screen.queryByTestId(E2E_TESTIDS.WIZARD_SLUG)) {
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_METADATA_PANEL_TOGGLE));
+  }
+  fireEvent.change(sessionNameInput, {
+    target: { value: sessionName },
   });
 
 describe('SessionWizard sponsored bundle flow', () => {

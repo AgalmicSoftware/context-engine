@@ -24,36 +24,7 @@ import {
   GLOBAL_SESSION_SELECTION_UPDATED_EVENT,
   readStoredGlobalSessionSelection,
 } from '../../utilities/session/globalSessionState.js';
-import { getPrimaryDemoSessionSlug } from '../../utilities/session/demoSessionSlugs.js';
 import { buildPublicRoute } from '../MainSite/urlUtils.js';
-
-type RecognitionLink = {
-  url: string;
-  text: string;
-};
-
-type RecognitionGroup = {
-  name: string;
-  description: string;
-  links: RecognitionLink[];
-  logo?: string;
-  itemClassName?: string;
-  logoClassName?: string;
-  image?: string;
-};
-
-type RecognitionIndividual = {
-  name: string;
-  url?: string;
-};
-
-type RoadmapSection = {
-  category: string;
-  items: {
-    status: 'complete' | 'planned';
-    text: string;
-  }[];
-};
 
 const HEADER_LINKS = [
   { url: PUBLIC_WHITEPAPER_URL, text: 'Whitepaper', testId: 'ce-about-link-whitepaper', external: true },
@@ -68,7 +39,7 @@ const RECOGNITION_GROUPS: RecognitionGroup[] = [
     itemClassName: 'recognitionItemEthereum',
     logoClassName: 'recognitionLogoEthereum',
     description:
-      'Context Engine uses a passkey Ethereum wallet model rather than email for accounts. Ethereum provides the cryptographic foundation for proof-of-human and attestation-based access, SBT-style membership, gated encryption, and durable on-chain references, while decentralized infrastructure adds censorship-resistance and data permanence. Users do not need any crypto expertise to use it.',
+      'Context Engine uses a passkey Ethereum wallet model rather than email for accounts. In the whitepaper, Ethereum matters as the cryptographic base that natively supports proof-of-human credentials, digital group membership tokens, access gates, and durable on-chain references, while decentralized protocols add censorship-resistance and data permanence. Although the app runs on Ethereum infrastructure, users do not need to know anything about cryptocurrency to use it.',
     links: [
       { url: 'https://ethereum.org/', text: 'Ethereum.org' },
       { url: 'https://ethereum.org/en/what-is-ethereum/', text: 'What is Ethereum?' },
@@ -92,8 +63,10 @@ const RECOGNITION_GROUPS: RecognitionGroup[] = [
     itemClassName: 'recognitionItemPolis',
     logoClassName: 'recognitionLogoPolis',
     description:
-      'Pol.is showed how large-group discourse software can clarify both consensus and persistent difference, especially in vTaiwan where simple Agree / Unsure / Disagree inputs helped structure public reasoning. Context Engine builds on that approach with more question types, optional privacy, AI-native workflows, and permanent public storage.',
-    links: [{ url: 'https://pol.is/', text: 'Official Website' }],
+      'Pol.is is the current SOTA for large-group discourse software, especially its vTaiwan demonstration that simple Agree / Unsure / Disagree inputs can clarify both consensus and persistent difference. Context Engine builds on that pioneering approach with more question types, optional privacy, AI-native workflows, and permanent public storage.',
+    links: [
+      { url: 'https://pol.is/', text: 'Official Website' },
+    ],
   },
   {
     name: 'Collective Intelligence Project',
@@ -111,8 +84,10 @@ const RECOGNITION_GROUPS: RecognitionGroup[] = [
     itemClassName: 'recognitionItemEdgePatagonia',
     logoClassName: 'recognitionLogoEdge',
     description:
-      'Residencies like the d/acc residency at Edge Patagonia, sponsored by Protocol Labs, created space to prototype tools for resilient technology, coordination, and governance in live community settings.',
-    links: [{ url: 'https://www.edgecity.live/patagonia', text: 'Edge City' }],
+      'Residencies like the d/acc residency at Edge Patagonia (sponsored by Protocol Labs) created room to prototype tools for resilient technology, coordination, and governance in live community settings.',
+    links: [
+      { url: 'https://www.edgecity.live/patagonia', text: 'Edge City' },
+    ],
   },
 ];
 
