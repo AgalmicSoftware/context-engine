@@ -1,3 +1,5 @@
+import fs from 'fs';
+import path from 'path';
 import React from 'react';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
@@ -39,6 +41,39 @@ jest.mock('react-simple-maps', () => ({
 import CorpusViewer from './CorpusViewer.jsx';
 import PolicyGlobe from './PolicyGlobe.jsx';
 
+const extractMediaBlock = (scss, query, requiredSnippet = '') => {
+  let searchFrom = 0;
+
+  while (searchFrom < scss.length) {
+    const queryIndex = scss.indexOf(query, searchFrom);
+    if (queryIndex === -1) {
+      return null;
+    }
+
+    const blockStart = scss.indexOf('{', queryIndex);
+    if (blockStart === -1) {
+      return null;
+    }
+
+    let depth = 0;
+    for (let index = blockStart; index < scss.length; index += 1) {
+      const char = scss[index];
+      if (char === '{') depth += 1;
+      if (char === '}') depth -= 1;
+      if (depth === 0) {
+        const block = scss.slice(queryIndex, index + 1);
+        if (!requiredSnippet || block.includes(requiredSnippet)) {
+          return block;
+        }
+        searchFrom = queryIndex + query.length;
+        break;
+      }
+    }
+  }
+
+  return null;
+};
+
 const renderPolicyGlobeHarness = (entries) => render(
   <PolicyGlobe entries={entries}>
     {({ filteredEntries, GlobeElement }) => (
@@ -57,6 +92,40 @@ const renderPolicyGlobeHarness = (entries) => render(
 describe('CorpusViewer', () => {
   beforeEach(() => {
     mockTagPage.mockClear();
+  });
+
+  it('keeps the mobile tab strip, card metadata, and action rows viewport-safe', () => {
+    const corpusScss = fs.readFileSync(path.join(__dirname, 'CorpusViewer.module.scss'), 'utf8');
+    const mobileBlock = extractMediaBlock(corpusScss, '@media (max-width: 720px)', '.container {');
+    const phoneBlock = extractMediaBlock(corpusScss, '@media (max-width: 480px)', '.container {');
+    const policyScss = fs.readFileSync(path.join(__dirname, 'PolicyGlobe.module.scss'), 'utf8');
+    const policyMobileBlock = extractMediaBlock(policyScss, '@media (max-width: 640px)', '.filterButton {');
+
+    expect(mobileBlock).toContain('.tabButton {');
+    expect(mobileBlock).toContain('max-width: 132px;');
+    expect(mobileBlock).toContain('min-width: 104px;');
+    expect(mobileBlock).toContain('.tweetCard .tweetAuthorRow {');
+    expect(mobileBlock).toContain('display: grid;');
+    expect(mobileBlock).toContain('grid-template-columns: 44px minmax(0, 1fr);');
+    expect(mobileBlock).toContain('.tweetDate {');
+    expect(mobileBlock).toContain('grid-column: 2;');
+    expect(mobileBlock).toContain('.cardFooter {');
+    expect(mobileBlock).toContain('flex-direction: column;');
+    expect(mobileBlock).toContain('.debateMapLink,');
+    expect(mobileBlock).toContain('overflow-wrap: anywhere;');
+    expect(mobileBlock).toContain('.externalLink span {');
+    expect(mobileBlock).toContain('.pillRow {');
+    expect(mobileBlock).toContain('width: 100%;');
+
+    expect(phoneBlock).toContain('.tabButton {');
+    expect(phoneBlock).toContain('max-width: 118px;');
+    expect(phoneBlock).toContain('min-width: 96px;');
+    expect(phoneBlock).toContain('.tweetCard .tweetAuthorRow {');
+    expect(phoneBlock).toContain('grid-template-columns: 40px minmax(0, 1fr);');
+
+    expect(policyMobileBlock).toContain('.filterButton {');
+    expect(policyMobileBlock).toContain('font-size: 11px;');
+    expect(policyMobileBlock).toContain('white-space: normal;');
   });
 
   it('maps legacy tweet debate tags into atlas issue links', () => {
@@ -198,7 +267,6 @@ describe('CorpusViewer', () => {
     expect(screen.getAllByRole('listitem').map((item) => item.textContent)).toEqual([
       'Brazil AI Bill',
       'UK Draft Bill',
-      'California SB 1047',
     ]);
 
     fireEvent.click(screen.getByRole('button', { name: 'Live' }));
@@ -206,6 +274,14 @@ describe('CorpusViewer', () => {
     expect(screen.getAllByRole('listitem').map((item) => item.textContent)).toEqual([
       'EU AI Act',
       'US Executive Order',
+    ]);
+
+    expect(screen.queryByText('California SB 1047')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Inactive' }));
+
+    expect(screen.getAllByRole('listitem').map((item) => item.textContent)).toEqual([
+      'California SB 1047',
     ]);
   });
 
@@ -229,9 +305,14 @@ describe('CorpusViewer', () => {
 
     fireEvent.click(within(screen.getByTestId('ce-policy-filter-row')).getByRole('button', { name: 'Proposed' }));
 
-    expect(screen.getByText(/Safe and Secure Innovation for Frontier AI/i)).toBeInTheDocument();
     expect(screen.getByText(/Brazil AI Bill/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Safe and Secure Innovation for Frontier AI/i)).not.toBeInTheDocument();
     expect(screen.getByTestId('demo-analysis-world-map')).toBeInTheDocument();
+
+    fireEvent.click(within(screen.getByTestId('ce-policy-filter-row')).getByRole('button', { name: 'Inactive' }));
+
+    expect(screen.getByText(/Safe and Secure Innovation for Frontier AI/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Brazil AI Bill/i)).not.toBeInTheDocument();
   });
 
   it('renders insider interview cards when the Insider Interviews tab is selected', () => {
