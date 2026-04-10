@@ -21,6 +21,7 @@ import WorldResultsMap from './DemoAnalysis/WorldResultsMap.jsx';
 import PolicyGlobe, {
   getPolicyJurisdictionAnchor,
   getJurisdictionFlag,
+  POLICY_FILTERS,
   getPolicyStatusGroup,
   getPolicyStatusLabel,
 } from './PolicyGlobe.jsx';
@@ -118,6 +119,8 @@ const getPolicyMapFill = (status = '', isFallback = false) => {
       return isFallback ? 'rgba(77,255,164,0.16)' : 'rgba(77,255,164,0.56)';
     case 'proposed':
       return isFallback ? 'rgba(255,179,71,0.16)' : 'rgba(255,179,71,0.56)';
+    case 'inactive':
+      return isFallback ? 'rgba(255,122,158,0.16)' : 'rgba(255,122,158,0.52)';
     case 'mixed':
       return isFallback ? 'rgba(122,140,255,0.16)' : 'rgba(122,140,255,0.52)';
     default:
@@ -211,6 +214,11 @@ const EntryCard = ({ corpusKey, entry, onTagClick, onAtlasIssueOpen }) => {
   const policyStatusGroup = isPolicyCorpus ? getPolicyStatusGroup(entry) : null;
   const policyFlag = isPolicyCorpus ? getJurisdictionFlag(entry.jurisdiction) : null;
   const policyStatusLabel = isPolicyCorpus ? getPolicyStatusLabel(entry) : null;
+  const policyStatusBadgeClassName = policyStatusGroup === POLICY_FILTERS.proposed
+    ? policyStyles.statusProposed
+    : policyStatusGroup === POLICY_FILTERS.inactive
+      ? policyStyles.statusInactive
+      : policyStyles.statusLive;
   const sourceLabel = isMetrCorpus ? 'Open full report' : 'View source';
   const cardClassName = `${styles.card} ${
     isPolicyCorpus ? policyStyles.policyCard : isMetrCorpus ? styles.metrCard : ''
@@ -243,9 +251,7 @@ const EntryCard = ({ corpusKey, entry, onTagClick, onAtlasIssueOpen }) => {
         {isPolicyCorpus ? (
           <div className={policyStyles.policyBadgeRow}>
             <span
-              className={`${policyStyles.statusBadge} ${
-                policyStatusGroup === 'proposed' ? policyStyles.statusProposed : policyStyles.statusLive
-              }`.trim()}
+              className={`${policyStyles.statusBadge} ${policyStatusBadgeClassName}`.trim()}
             >
               {policyStatusLabel}
             </span>

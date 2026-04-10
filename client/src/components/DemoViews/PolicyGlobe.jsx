@@ -5,24 +5,28 @@ import styles from './PolicyGlobe.module.scss';
 export const POLICY_FILTERS = {
   live: 'live',
   proposed: 'proposed',
+  inactive: 'inactive',
   all: 'all',
 };
 
 const FILTER_OPTIONS = [
   { id: POLICY_FILTERS.live, label: 'Live' },
   { id: POLICY_FILTERS.proposed, label: 'Proposed' },
+  { id: POLICY_FILTERS.inactive, label: 'Inactive' },
   { id: POLICY_FILTERS.all, label: 'All' },
 ];
 
 const FILTER_STYLE_CLASS_BY_ID = {
   [POLICY_FILTERS.live]: styles.filterButtonLiveOption,
   [POLICY_FILTERS.proposed]: styles.filterButtonProposedOption,
+  [POLICY_FILTERS.inactive]: styles.filterButtonInactiveOption,
   [POLICY_FILTERS.all]: styles.filterButtonAllOption,
 };
 
 const FILTER_SWATCH_CLASS_BY_ID = {
   [POLICY_FILTERS.live]: styles.filterSwatchLive,
   [POLICY_FILTERS.proposed]: styles.filterSwatchProposed,
+  [POLICY_FILTERS.inactive]: styles.filterSwatchInactive,
   [POLICY_FILTERS.all]: styles.filterSwatchAll,
 };
 
@@ -50,7 +54,14 @@ const PROPOSED_STATUS_MATCHERS = [
   'consultation',
   'under review',
   'planned',
+];
+
+const INACTIVE_STATUS_MATCHERS = [
   'vetoed',
+  'withdrawn',
+  'rejected',
+  'failed',
+  'expired',
 ];
 
 const JURISDICTION_RULES = [
@@ -187,6 +198,10 @@ const getPolicyTimestamp = (entry = {}) => {
 export const getPolicyStatusGroup = (entry = {}) => {
   const normalizedStatus = normalizePolicyStatus(entry.status);
 
+  if (INACTIVE_STATUS_MATCHERS.some((status) => normalizedStatus.includes(status))) {
+    return POLICY_FILTERS.inactive;
+  }
+
   if (PROPOSED_STATUS_MATCHERS.some((status) => normalizedStatus.includes(status))) {
     return POLICY_FILTERS.proposed;
   }
@@ -205,7 +220,8 @@ const getPolicySortRank = (entry = {}) => {
 
   if (statusGroup === POLICY_FILTERS.live) return 0;
   if (statusGroup === POLICY_FILTERS.proposed) return 1;
-  return 2;
+  if (statusGroup === POLICY_FILTERS.inactive) return 2;
+  return 3;
 };
 
 const formatStatusLabel = (status = '') => {
@@ -224,6 +240,18 @@ export const getPolicyStatusLabel = (entry = {}) => {
 
   if (normalizedStatus) return normalizedStatus;
   return getPolicyStatusGroup(entry) === POLICY_FILTERS.proposed ? 'Proposed' : 'Live';
+};
+
+const getPolicyDotOffset = (statusGroup) => {
+  if (statusGroup === POLICY_FILTERS.proposed) return { x: 8, y: 6 };
+  if (statusGroup === POLICY_FILTERS.inactive) return { x: -8, y: 6 };
+  return { x: 0, y: 0 };
+};
+
+const getPolicyGroupTitle = (statusGroup) => {
+  if (statusGroup === POLICY_FILTERS.proposed) return 'Proposed / Pending';
+  if (statusGroup === POLICY_FILTERS.inactive) return 'Inactive / Blocked';
+  return 'Live / Enacted';
 };
 
 export const getJurisdictionFlag = (jurisdiction = '') => getJurisdictionRule(jurisdiction).flag;
@@ -247,7 +275,7 @@ const buildGlobeDots = (entries = []) => {
     const statusGroup = getPolicyStatusGroup(entry);
     const jurisdictionRule = getJurisdictionRule(entry.jurisdiction);
     const baseCoordinates = GLOBE_COORDINATES[jurisdictionRule.anchor] || GLOBE_COORDINATES.international;
-    const positionOffset = statusGroup === POLICY_FILTERS.proposed ? { x: 8, y: 6 } : { x: 0, y: 0 };
+    const positionOffset = getPolicyDotOffset(statusGroup);
     const dotKey = `${jurisdictionRule.anchor}-${statusGroup}`;
     const label = entry.jurisdiction || 'International';
 
@@ -268,7 +296,7 @@ const buildGlobeDots = (entries = []) => {
 
   return Array.from(dotsByKey.values()).map((dot) => ({
     ...dot,
-    title: `${Array.from(new Set(dot.labels)).join(', ')} • ${dot.group === POLICY_FILTERS.proposed ? 'Proposed / Pending' : 'Live / Enacted'}`,
+    title: `${Array.from(new Set(dot.labels)).join(', ')} • ${getPolicyGroupTitle(dot.group)}`,
   }));
 };
 
@@ -319,7 +347,13 @@ const PolicyGlobe = ({ entries = [], children }) => {
         {globeDots.map((dot) => (
           <span
             key={dot.key}
-            className={`${styles.dot} ${dot.group === POLICY_FILTERS.proposed ? styles.dotAmber : styles.dotGreen}`.trim()}
+            className={`${styles.dot} ${
+              dot.group === POLICY_FILTERS.proposed
+                ? styles.dotAmber
+                : dot.group === POLICY_FILTERS.inactive
+                  ? styles.dotRose
+                  : styles.dotGreen
+            }`.trim()}
             style={{ transform: `translate(-50%, -50%) translate(${dot.x}px, ${dot.y}px)` }}
             title={dot.title}
           />

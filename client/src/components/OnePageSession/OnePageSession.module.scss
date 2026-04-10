@@ -749,30 +749,74 @@
   }
 
   .documentsSectionHeader {
+    align-items: stretch;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.03) 100%),
+      rgba(23, 25, 65, 0.92);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: var(--ce-radius-10);
+    box-shadow: 0 6px 22px rgba(0, 0, 0, 0.25);
     gap: 10px;
+    padding: 14px 14px 12px;
   }
 
   .documentsSectionHeaderMain {
-    flex: 1 1 220px;
+    align-items: flex-start;
+    flex: 1 1 100%;
+    width: 100%;
+  }
+
+  .documentsSectionHeader .sectionHeaderText {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .documentsSectionHeader .sectionHeaderTitle {
+    color: rgba(255, 255, 255, 0.92);
+    line-height: 1.05;
+  }
+
+  .documentsSectionHeader .sectionHeaderSubtitle {
+    color: rgba(244, 247, 255, 0.62);
+    font-size: 0.62em;
+    line-height: 1.18;
   }
 
   .documentsSectionHeaderMeta {
-    align-items: center;
-    gap: 8px;
+    align-items: stretch;
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+    display: grid;
+    flex: 1 1 100%;
+    gap: 10px;
+    grid-template-columns: 44px minmax(0, 1fr);
+    margin-left: 0;
+    padding-top: 10px;
+    width: 100%;
   }
 
   .documentsSectionHeaderMeta .sectionHeaderTooltip {
     align-items: center;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: var(--ce-radius-pill);
     display: inline-flex;
-    margin-left: 0;
-    margin-top: 0;
-    min-height: 40px;
+    justify-content: center;
+    margin: 0;
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  .documentsSectionHeaderMeta .sectionHeaderTooltip > svg {
+    opacity: 0.6;
   }
 
   .documentsSectionHeaderMeta .sectionHeaderLink {
-    font-size: 0.78rem;
-    min-height: 40px;
-    padding: 8px 11px;
+    font-size: 0.82rem;
+    justify-content: center;
+    min-height: 44px;
+    padding: 10px 14px;
+    width: 100%;
   }
 
   .sectionHeaderActionsScroller {
@@ -849,30 +893,74 @@
   }
 
   .documentsSectionHeader {
+    align-items: stretch;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.03) 100%),
+      rgba(23, 25, 65, 0.92);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: var(--ce-radius-10);
+    box-shadow: 0 6px 22px rgba(0, 0, 0, 0.25);
     gap: 10px;
+    padding: 14px 14px 12px;
   }
 
   .documentsSectionHeaderMain {
-    flex: 1 1 220px;
+    align-items: flex-start;
+    flex: 1 1 100%;
+    width: 100%;
+  }
+
+  .documentsSectionHeader .sectionHeaderText {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .documentsSectionHeader .sectionHeaderTitle {
+    color: rgba(255, 255, 255, 0.92);
+    line-height: 1.05;
+  }
+
+  .documentsSectionHeader .sectionHeaderSubtitle {
+    color: rgba(244, 247, 255, 0.62);
+    font-size: 0.62em;
+    line-height: 1.18;
   }
 
   .documentsSectionHeaderMeta {
-    align-items: center;
-    gap: 8px;
+    align-items: stretch;
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+    display: grid;
+    flex: 1 1 100%;
+    gap: 10px;
+    grid-template-columns: 44px minmax(0, 1fr);
+    margin-left: 0;
+    padding-top: 10px;
+    width: 100%;
   }
 
   .documentsSectionHeaderMeta .sectionHeaderTooltip {
     align-items: center;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: var(--ce-radius-pill);
     display: inline-flex;
-    margin-left: 0;
-    margin-top: 0;
-    min-height: 40px;
+    justify-content: center;
+    margin: 0;
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  .documentsSectionHeaderMeta .sectionHeaderTooltip > svg {
+    opacity: 0.6;
   }
 
   .documentsSectionHeaderMeta .sectionHeaderLink {
-    font-size: 0.78rem;
-    min-height: 40px;
-    padding: 8px 11px;
+    font-size: 0.82rem;
+    justify-content: center;
+    min-height: 44px;
+    padding: 10px 14px;
+    width: 100%;
   }
 }
 
