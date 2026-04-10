@@ -29,8 +29,8 @@ npm run ai:seed-survey:question-types            # seed question type data
 - Frontend logging is off by default. In the browser console, run `window.CE_LOGGING.enabled = true`, then `window.CE_LOGGING_HELP()` for categories and usage.
 
 ## Stack
-- React 18 SPA (Vite, mix of class + functional components)
-- Solidity on OP Sepolia (chain 11155420) by default; Base Sepolia (84532) should continue to work for legacy/dev compatibility but is best-effort, not actively supported
+- React 17 SPA (CRA, mix of class + functional components)
+- Solidity on OP Sepolia (chain 11155420) by default; Base Sepolia (84532) remains supported for legacy/dev compatibility
 - Cloudflare Workers (`sessionCorsWorker`) — CORS proxy, encryption, gating
 - Arweave (metadata/payloads and most uploaded images); some token/image reads still accept IPFS URLs
 - Lit Protocol v3 (SBT-gated field encryption via access control conditions on configured EVM chains)

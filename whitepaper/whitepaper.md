@@ -4,11 +4,11 @@
 
 *v0.1.0 (2026) — agalmic.eth*
 
-For detailed technical documentation, see [`spec.md`](../spec.md) and [`docs/`](../docs/README.md).
+For technical documentation, see [`spec.md`](../spec.md) and [`docs/`](../docs/README.md).
 
 ---
 
-keywords: sensemaking, deliberation, collective intelligence, discourse, debate, ethereum, coasean bargaining, cryptography, programmable cryptography, decentralized networks, agi, social infrastructure, ai policy, community currencies, coordination, negotiation, voting
+keywords: sensemaking, deliberation, collective intelligence, discourse, debate, ethereum, coasean bargaining, cryptography, programmable cryptography, decentralized networks, agi, social infrastructure, ai policy, community currencies, coordination, negotiation, voting, zk, homomorphic encryption, proofs
 
 ---
 
