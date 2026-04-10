@@ -255,6 +255,41 @@ mkdir -p "$STAGING_ROOT"
   tar -xf -
 )
 
+STRIP_PATTERNS=(
+  "contextEngine-cc"
+  "TODO"
+  "CLAUDE.md"
+  ".claude"
+  ".codex"
+  # Hold back the full repo-level E2E workflow layer from the public OSS copy for now.
+  "scripts/test-*.js"
+  "scripts/test-*.ui.js"
+  "scripts/lib/e2e"
+  "scripts/run-e2e-*"
+  "scripts/run-ux-*"
+  "scripts/capture-ux-*"
+  "scripts/build_external_llm_prompt.py"
+  ".env.e2e*"
+  "artifacts"
+  "tests/artifacts"
+  "Demo Integration Package"
+  "whitepaper/Slides.pdf"
+  "whitepaper/IdeasMap.md"
+  "client/src/components/MainSite/MainSite.module.test.js"
+  "client/src/utilities/worker/sessionCorsWorker.*.proxy.test.js"
+  "client/src/utilities/web3/contractScripts.*.proxy.test.js"
+)
+
+STRIP_ASSERT_ABSENT=(
+  "CLAUDE.md"
+  ".claude"
+  "scripts/test-*.js"
+  "scripts/test-*.ui.js"
+  "scripts/lib/e2e"
+  "whitepaper/Slides.pdf"
+  "whitepaper/IdeasMap.md"
+)
+
 (
   cd "$STAGING_ROOT"
   shopt -s dotglob nullglob
