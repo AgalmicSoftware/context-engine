@@ -75,6 +75,16 @@ Arweave, auth, and `/health` requests accept the new origin.
 - Summaries and analysis of survey results and response clusters
 - OpenAI, Anthropic, OpenRouter, and custom provider paths
 
+### User and Deployer UX: Passkey sign-on UX  
+- Users log in with a simple Passkey / Biometric flow (native pin, fingerprint, or faceID on phones) 
+- Login flow generates or handles an Ethereum account, which can be used easily with cryptography features
+   - Users do not need to know anything about Ethereum or crypto (or take any additional steps) to use the app
+
+
+### Deployer UX: Sponsored Bundles
+- Deployers can use and set up sponsored bundles of API keys (for storage, EVM transactions, encryption network, AI API) 
+  - Senstive and organiztional deployments can plug in existing AI Keys, and use local or custom options for storage, encryption, and EVM network functionalities
+
 
 ## AI Discourse Corpus
 
