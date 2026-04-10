@@ -23,6 +23,7 @@ const {
   getPathRpcUrl,
   getPublicRpcUrls,
 } = require('../client/src/variables/rpcDefaults.js');
+const { resolveChainDefaults } = require('./lib/e2e/network-defaults');
 const { resolveSeedPasskeyRawId } = require('./lib/e2e/passkey-env');
 const {
   launchBrowserWithRetry,
@@ -65,19 +66,53 @@ const dedupeRpcUrls = (...lists) => {
   });
   return merged;
 };
-const BROWSER_UNSAFE_RPC_TARGETS = new Set(
-  dedupeRpcUrls(
-    getPublicRpcUrls(84532),
-    getPublicRpcUrls(8453),
-    getFaucetFallbackRpcUrls(84532),
-    getFaucetFallbackRpcUrls(8453),
-  ).filter((url) => /base\.org$/i.test(url))
-);
-const BASE_SEPOLIA_RPC_REWRITE_SOURCES = Object.freeze(dedupeRpcUrls(
-  getPublicRpcUrls(84532),
-  getPathRpcUrl(84532),
-  getFaucetFallbackRpcUrls(84532),
-));
+const parseRpcRewriteSources = (raw) => String(raw || '')
+  .split(',')
+  .map((value) => normalizeRpcUrl(value))
+  .filter(Boolean);
+const isBrowserUnsafeRpcTarget = (value) => {
+  const normalized = normalizeRpcUrl(value);
+  if (!normalized) return false;
+  try {
+    return new URL(normalized).hostname.toLowerCase().endsWith('base.org');
+  } catch (_) {
+    return false;
+  }
+};
+const resolveRpcRewriteConfig = ({ env = process.env } = {}) => {
+  const chainContext = resolveChainDefaults({ env });
+  const chainId = Number(chainContext?.chainId || 0) || 0;
+  const rpcUrlOverride = normalizeRpcUrl(env.RPC_URL || '');
+  const preferPathRpc = toBool(env.E2E_PREFER_PATH_RPC);
+  const forceUnsafeRpcRewrite = toBool(env.FORCE_BROWSER_RPC_REWRITE);
+  const rewriteTargets = String(env.RPC_REWRITE_FROM || '').trim()
+    ? parseRpcRewriteSources(env.RPC_REWRITE_FROM)
+    : dedupeRpcUrls(
+        getPublicRpcUrls(chainId),
+        getPathRpcUrl(chainId),
+        getFaucetFallbackRpcUrls(chainId),
+      );
+  const browserUnsafeRpcTargets = dedupeRpcUrls(rewriteTargets)
+    .filter((url) => isBrowserUnsafeRpcTarget(url));
+  const unsafeTargetSet = new Set(browserUnsafeRpcTargets.map((url) => url.toLowerCase()));
+  const rpcRewriteTarget = (
+    rpcUrlOverride
+    && !forceUnsafeRpcRewrite
+    && unsafeTargetSet.has(rpcUrlOverride.toLowerCase())
+  )
+    ? ''
+    : rpcUrlOverride;
+
+  return {
+    chainId,
+    preferPathRpc,
+    forceUnsafeRpcRewrite,
+    rpcUrlOverride,
+    rpcRewriteTarget,
+    rewriteTargets,
+    browserUnsafeRpcTargets,
+  };
+};
 
 const settleWithTimeout = async (fn, timeoutMs) => {
   if (typeof fn !== 'function') return null;
@@ -237,34 +272,24 @@ async function main() {
     || (browserName === 'chromium' ? resolvePlaywrightExecutablePath() : '');
   const launchAttempts = Math.max(1, Number.parseInt(String(process.env.PLAYWRIGHT_LAUNCH_ATTEMPTS || '3').trim(), 10) || 3);
   const launchTimeoutMs = Math.max(5000, Number.parseInt(String(process.env.PLAYWRIGHT_LAUNCH_TIMEOUT_MS || '60000').trim(), 10) || 60000);
-  const rpcUrlOverride = String(process.env.RPC_URL || '').trim().replace(/\/+$/, '');
-  // Base Sepolia E2E is sensitive to public RPC flakiness (Pocket/PATH, publicnode, base.org). Prefer a paid RPC
-  // via RPC_URL to avoid rate limits/timeouts. Until CE ships a dedicated test RPC, E2E defaults to disabling PATH-first
-  // ordering unless E2E_PREFER_PATH_RPC=1 is explicitly set.
-  const preferPathRpc = toBool(process.env.E2E_PREFER_PATH_RPC);
-  const forceUnsafeRpcRewrite = toBool(process.env.FORCE_BROWSER_RPC_REWRITE);
-  const rpcRewriteTarget = (
-    rpcUrlOverride
-    && !forceUnsafeRpcRewrite
-    && BROWSER_UNSAFE_RPC_TARGETS.has(rpcUrlOverride.toLowerCase())
-  )
-    ? ''
-    : rpcUrlOverride;
-  const rewriteFromRaw = String(
-    process.env.RPC_REWRITE_FROM
-      || BASE_SEPOLIA_RPC_REWRITE_SOURCES.join(','),
-  ).trim();
-  const rewriteTargets = rewriteFromRaw
-    .split(',')
-    .map((v) => String(v || '').trim().replace(/\/+$/, ''))
-    .filter(Boolean);
+  // Keep PATH-first ordering disabled by default for browser E2E unless E2E_PREFER_PATH_RPC=1.
+  // Also skip rewrite-to-browser when RPC_URL points at a browser-hostile Base-hosted endpoint unless forced.
+  const {
+    chainId: rpcRewriteChainId,
+    preferPathRpc,
+    rpcUrlOverride,
+    rpcRewriteTarget,
+    rewriteTargets,
+    browserUnsafeRpcTargets,
+  } = resolveRpcRewriteConfig({ env: process.env });
   const rewriteMatchers = rpcRewriteTarget
     ? rewriteTargets.map((from) => ({ from, re: new RegExp(`^${escapeRegex(from)}(?:/|\\?|$)`, 'i') }))
     : [];
   if (rpcUrlOverride && !rpcRewriteTarget) {
     log('rpc rewrite disabled (browser-unsafe target); set FORCE_BROWSER_RPC_REWRITE=1 to override', {
+      chainId: rpcRewriteChainId,
       target: rpcUrlOverride,
-      unsafeTargets: Array.from(BROWSER_UNSAFE_RPC_TARGETS),
+      unsafeTargets: browserUnsafeRpcTargets,
     });
   }
   if (!executablePath) {
@@ -285,6 +310,7 @@ async function main() {
     ignoredLegacyPasskeyEnv: !!passkeySelection.ignoredLegacy,
     sessionSlug: sessionSlug || null,
     arweaveLocalKeySeeded: !!arweaveJwkJson,
+    rpcRewriteChainId,
     rpcRewriteEnabled: !!(rpcRewriteTarget && rewriteMatchers.length),
   });
 
@@ -1001,7 +1027,15 @@ async function main() {
   }
 }
 
-main().catch((err) => {
-  console.error(err && err.stack ? err.stack : err);
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch((err) => {
+    console.error(err && err.stack ? err.stack : err);
+    process.exit(1);
+  });
+}
+
+module.exports = {
+  dedupeRpcUrls,
+  normalizeRpcUrl,
+  resolveRpcRewriteConfig,
+};
