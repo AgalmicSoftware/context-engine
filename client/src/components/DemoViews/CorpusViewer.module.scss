@@ -260,11 +260,13 @@ $text: #f4f7ff;
 .card {
   background: $card;
   border: 1px solid $card-border;
+  box-sizing: border-box;
   border-radius: var(--ce-radius-8);
   color: $text;
   display: block;
   min-width: 0;
   padding: 16px;
+  width: 100%;
 }
 
 .tweetCard {
@@ -411,7 +413,10 @@ $text: #f4f7ff;
   display: inline-flex;
   font-size: 11px;
   line-height: 1.4;
+  max-width: 100%;
   padding: 2px 8px;
+  white-space: normal;
+  word-break: break-word;
 }
 
 .pillButton {
@@ -1151,23 +1156,24 @@ $text: #f4f7ff;
 
 @media (max-width: 720px) {
   .container {
-    border-radius: var(--ce-radius-10);
-    padding: 12px;
+    border-radius: var(--ce-radius-12);
+    padding: 10px;
   }
 
   .tabBar {
-    gap: 10px;
+    gap: 8px;
     margin-bottom: 12px;
+    padding-inline: 2px;
     padding-bottom: 8px;
   }
 
   .tabButton {
     align-items: flex-start;
     flex-direction: column;
-    gap: 10px;
-    max-width: 144px;
-    min-width: 112px;
-    padding: 12px 12px 14px;
+    gap: 8px;
+    max-width: 132px;
+    min-width: 104px;
+    padding: 11px 10px 12px;
   }
 
   .tabIcon {
@@ -1175,8 +1181,8 @@ $text: #f4f7ff;
   }
 
   .tabLabel {
-    font-size: 14px;
-    line-height: 1.25;
+    font-size: 13px;
+    line-height: 1.2;
     white-space: normal;
   }
 
@@ -1213,7 +1219,8 @@ $text: #f4f7ff;
   .card,
   .tweetCard {
     border-radius: 16px;
-    padding: 14px;
+    padding: 13px;
+    width: 100%;
   }
 
   .entryHeader {
@@ -1221,9 +1228,11 @@ $text: #f4f7ff;
     gap: 10px;
   }
 
-  .tweetAuthorRow {
-    flex-wrap: wrap;
+  .tweetCard .tweetAuthorRow {
+    align-items: start;
+    display: grid;
     gap: 10px;
+    grid-template-columns: 44px minmax(0, 1fr);
   }
 
   .tweetAuthorMeta,
@@ -1231,18 +1240,47 @@ $text: #f4f7ff;
     min-width: 0;
   }
 
+  .tweetCard .tweetAvatar {
+    grid-row: 1 / span 2;
+  }
+
+  .tweetCard .tweetAuthorMeta,
+  .tweetCard .tweetAuthorNames {
+    min-width: 0;
+  }
+
+  .tweetCard .tweetAuthorNames {
+    gap: 4px 6px;
+  }
+
   .tweetDate {
-    margin-left: 58px;
+    grid-column: 2;
+    margin-left: 0;
     padding-top: 0;
     text-align: left;
     white-space: normal;
-    width: calc(100% - 58px);
+    width: auto;
   }
 
   .tweetBody,
   .entrySummary {
     font-size: 15px;
     line-height: 1.65;
+  }
+
+  .entryTitle,
+  .arxivTitle,
+  .insiderName,
+  .insiderRole,
+  .insiderInterviewer,
+  .entryMeta,
+  .entrySummary,
+  .arxivAuthors,
+  .arxivDate,
+  .tweetName,
+  .tweetHandle,
+  .tweetDate {
+    overflow-wrap: anywhere;
   }
 
   .entryMeta,
@@ -1258,8 +1296,13 @@ $text: #f4f7ff;
     gap: 4px;
   }
 
+  .arxivDate {
+    white-space: normal;
+  }
+
   .entryMediaBlock {
     margin-bottom: 14px;
+    width: 100%;
   }
 
   .entryMediaImage {
@@ -1276,26 +1319,71 @@ $text: #f4f7ff;
     padding: 4px 10px;
   }
 
+  .pillRow {
+    gap: 8px;
+    width: 100%;
+  }
+
+  .tweetEngagement {
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .engagementRow {
+    gap: 12px;
+    justify-content: space-between;
+    width: 100%;
+  }
+
   .cardFooter,
   .cardFooterLinks,
+  .debateMapFooter,
   .debateMapFooterLinks {
     align-items: stretch;
     justify-content: flex-start;
     width: 100%;
   }
 
+  .cardFooter {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .cardFooterLinks,
+  .debateMapFooterLinks {
+    gap: 10px;
+  }
+
   .debateMapLink,
   .externalLink {
+    align-items: flex-start;
+    flex: 1 1 100%;
+    justify-content: flex-start;
     min-height: 42px;
-    padding: 8px 12px;
+    overflow-wrap: anywhere;
+    padding: 9px 12px;
+    width: 100%;
+  }
+
+  .externalLink span {
+    min-width: 0;
   }
 }
 
 @media (max-width: 480px) {
+  .container {
+    padding: 8px;
+  }
+
   .tabButton {
-    max-width: 132px;
-    min-width: 106px;
-    padding: 11px 11px 13px;
+    max-width: 118px;
+    min-width: 96px;
+    padding: 10px 10px 11px;
+  }
+
+  .tabLabel {
+    font-size: 12px;
+    line-height: 1.18;
   }
 
   .policyListTitle,
@@ -1303,20 +1391,24 @@ $text: #f4f7ff;
     font-size: 16px;
   }
 
-  .tweetAvatar {
-    flex-basis: 44px;
-    font-size: 17px;
-    height: 44px;
-    width: 44px;
+  .card,
+  .tweetCard {
+    padding: 12px;
   }
 
-  .tweetDate {
-    margin-left: 54px;
-    width: calc(100% - 54px);
+  .tweetCard .tweetAuthorRow {
+    grid-template-columns: 40px minmax(0, 1fr);
+  }
+
+  .tweetAvatar {
+    flex-basis: 40px;
+    font-size: 16px;
+    height: 40px;
+    width: 40px;
   }
 
   .externalIconLink {
-    height: 42px;
-    width: 42px;
+    height: 40px;
+    width: 40px;
   }
 }
