@@ -178,6 +178,274 @@ const renderLoggedInSessionWizard = (props = {}) => renderSessionWizard({
   toggleLoginModal: jest.fn(),
   ...props,
 });
+const getFieldInputByLabel = (labelText) => (
+  screen.getByText(labelText).parentElement.querySelector('input,textarea,select')
+);
+const getToggleCheckbox = (labelText) => (
+  screen.getByText(labelText).closest('label').querySelector('input[type="checkbox"]')
+);
+const enableAdvancedMode = () => {
+  fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED));
+};
+const openWorkerPanel = () => {
+  fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
+};
+const setControlledInputValue = (input, value) => {
+  const reactPropsKey = Object.keys(input).find((key) => key.startsWith('__reactProps$'));
+  if (reactPropsKey) {
+    act(() => {
+      input[reactPropsKey].onChange({ target: { value } });
+    });
+    return;
+  }
+  fireEvent.change(input, { target: { value } });
+};
+const setCloudflareTokenValue = (value) => {
+  const input = screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN);
+  setControlledInputValue(input, value);
+  return input;
+};
+const expectSponsoredStatus = async (message) => {
+  await waitFor(() => {
+    if (message instanceof RegExp) {
+      expect(screen.getByTestId('ce-wizard-sponsored-status')).toHaveTextContent(message);
+      return;
+    }
+    if (message === 'Sponsored resources applied.') {
+      expect(screen.getByTestId('ce-wizard-sponsored-status')).toHaveTextContent(/^Sponsored resources applied:/i);
+      return;
+    }
+    expect(screen.getByTestId('ce-wizard-sponsored-status')).toHaveTextContent(message);
+  }, { timeout: 10000 });
+};
+const buildDecryptedSponsoredBundle = (overrides = {}) => {
+  const base = {
+    openaiKey: 'sponsored-openai',
+    anthropicKey: 'sponsored-anthropic',
+    openrouterKey: 'sponsored-openrouter',
+    arweaveJwk: '{"kty":"RSA"}',
+    faucetPrivateKey: '0xsponsoredfaucet',
+    customRpcUrl: 'https://sponsored-rpc.example',
+    litPayerPrivateKey: '0x59c6995e998f97a5a0044976f84ce7de5d9d7f17b2f6a6a5f76f8864c8ad88f5',
+    litPayerAddress: '0x3AC823CA9AcDA550244C6fF4927b5e1478E70Ff7',
+    customRpcKey: 'ignore-me',
+    meta: {
+      label: 'Launch Week',
+      createdAt: '2099-03-20T12:00:00.000Z',
+      createdBy: '0xadmin',
+      expiresAt: '2099-03-21T12:00:00.000Z',
+      sourceSessionSlug: 'source-session',
+      sourceWorkerUrl: 'https://source-worker.example',
+    },
+  };
+  return {
+    ...base,
+    ...overrides,
+    meta: {
+      ...base.meta,
+      ...(overrides?.meta || {}),
+    },
+  };
+};
+const configureAdvancedUseUrlDeploy = async ({
+  sessionName = 'Advanced Bundle Retry Session',
+  slug = 'advanced-bundle-retry-session',
+  bundleUrl = 'https://bundles.example.test/sessionCorsWorker.bundle.js',
+  cloudflareToken = 'cf-test-token',
+} = {}) => {
+  enableAdvancedMode();
+  const sessionNameInput = await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+  if (!screen.queryByTestId(E2E_TESTIDS.WIZARD_SLUG)) {
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_METADATA_PANEL_TOGGLE));
+  }
+  fireEvent.change(sessionNameInput, {
+    target: { value: sessionName },
+  });
+  fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SLUG), {
+    target: { value: slug },
+  });
+
+  openWorkerPanel();
+  fireEvent.click(await screen.findByRole('button', { name: 'Use My Own' }));
+
+  const bundleModeUrlInput = screen.getByTestId(E2E_TESTIDS.WIZARD_BUNDLE_MODE_URL);
+  if (!bundleModeUrlInput.checked) {
+    fireEvent.click(bundleModeUrlInput);
+  }
+
+  const bundleUrlInput = screen.getByPlaceholderText(
+    'https://github.com/<org>/<repo>/releases/latest/download/sessionCorsWorker.bundle.js'
+  );
+  setControlledInputValue(bundleUrlInput, bundleUrl);
+  await waitFor(() => {
+    expect(bundleUrlInput).toHaveValue(bundleUrl);
+  });
+  setControlledInputValue(
+    screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_HELPER_URL),
+    'https://deploy-helper.example.test'
+  );
+  await waitFor(() => {
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_HELPER_URL)).toHaveValue(
+      'https://deploy-helper.example.test'
+    );
+  });
+  setCloudflareTokenValue(cloudflareToken);
+  fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_OPENAI_KEY), {
+    target: { value: 'sk-test-openai' },
+  });
+  fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_ARWEAVE_JWK), {
+    target: { value: '{"kty":"RSA","n":"abc"}' },
+  });
+  await waitFor(() => {
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_NAME)).toHaveTextContent(slug);
+  });
+  return {
+    bundleModeUrlInput,
+    bundleUrlInput,
+  };
+};
+
+const seedWizardCache = ({
+  workerSecrets = {},
+  workerSecretsEnabled = true,
+  persistWorkerSecrets = true,
+  draft = {},
+  deployComplete = false,
+  deployWorkerUrl = '',
+} = {}) => {
+  localStorage.setItem('ce:sessionWizardDraft:v1', JSON.stringify({
+    draft: {
+      ai: {
+        models: {
+          fast: { provider: 'openrouter', model: 'test-fast' },
+          thinking: { provider: 'anthropic', model: 'test-thinking' },
+        },
+      },
+      ...draft,
+    },
+    workerSecrets,
+    workerSecretsEnabled,
+    persistWorkerSecrets,
+    deployComplete,
+    deployWorkerUrl,
+  }));
+};
+
+const buildEnvelope = () => JSON.stringify({
+  type: 'contextengine-sponsored-bundle',
+  version: 1,
+  cipher: 'password-aes-gcm',
+  encryptedData: 'encrypted-base64',
+});
+const createDeferred = () => {
+  let resolve;
+  let reject;
+  const promise = new Promise((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+};
+
+const createIndexedDbMock = () => {
+  const stores = new Map();
+  const objectStoreNames = new Set();
+
+  const ensureStore = (name) => {
+    const key = String(name || '');
+    if (!stores.has(key)) stores.set(key, new Map());
+    objectStoreNames.add(key);
+    return stores.get(key);
+  };
+
+  const createRequest = (tx, run) => {
+    const request = {
+      onsuccess: null,
+      onerror: null,
+      result: undefined,
+      error: null,
+    };
+
+    setTimeout(() => {
+      try {
+        request.result = run();
+        if (typeof request.onsuccess === 'function') {
+          request.onsuccess({ target: request });
+        }
+        if (typeof tx.oncomplete === 'function') {
+          tx.oncomplete({ target: tx });
+        }
+      } catch (error) {
+        request.error = error;
+        tx.error = error;
+        if (typeof request.onerror === 'function') {
+          request.onerror({ target: request });
+        }
+        if (typeof tx.onerror === 'function') {
+          tx.onerror({ target: tx });
+        }
+      }
+    }, 0);
+
+    return request;
+  };
+
+  const db = {
+    objectStoreNames: {
+      contains: (name) => objectStoreNames.has(String(name || '')),
+    },
+    createObjectStore: jest.fn((name) => {
+      ensureStore(name);
+      return {};
+    }),
+    close: jest.fn(),
+    transaction: jest.fn((storeName) => {
+      const tx = {
+        oncomplete: null,
+        onerror: null,
+        onabort: null,
+        error: null,
+        objectStore: jest.fn(() => ({
+          get: jest.fn((key) => createRequest(tx, () => ensureStore(storeName).get(key))),
+          put: jest.fn((value, key) => createRequest(tx, () => {
+            ensureStore(storeName).set(key, value);
+            return key;
+          })),
+          delete: jest.fn((key) => createRequest(tx, () => {
+            ensureStore(storeName).delete(key);
+            return undefined;
+          })),
+        })),
+      };
+      return tx;
+    }),
+  };
+
+  return {
+    __stores: stores,
+    open: jest.fn(() => {
+      const request = {
+        onsuccess: null,
+        onerror: null,
+        onupgradeneeded: null,
+        result: null,
+        error: null,
+      };
+
+      setTimeout(() => {
+        request.result = db;
+        if (!objectStoreNames.has('keys') && typeof request.onupgradeneeded === 'function') {
+          request.onupgradeneeded({ target: request });
+        }
+        if (typeof request.onsuccess === 'function') {
+          request.onsuccess({ target: request });
+        }
+      }, 0);
+
+      return request;
+    }),
+  };
+};
 
 describe('SessionWizard sponsored bundle flow', () => {
   beforeEach(() => {

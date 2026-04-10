@@ -28,8 +28,8 @@ const mockDecryptWithPassword = jest.fn();
 const mockPendingSbtAddress = ethers.utils.getAddress('0x5fbdb2315678afecb367f032d93f642f64180aa3');
 const mockSecondPendingSbtAddress = ethers.utils.getAddress('0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512');
 const mockReplacementSbtAddress = ethers.utils.getAddress('0x8ba1f109551bd432803012645ac136ddd64dba72');
-const mockTestAdminAddress = '0x00000000000000000000000000000000000000aa';
-const TEST_ADMIN_ADDRESS = mockTestAdminAddress;
+const TEST_ADMIN_ADDRESS = '0x00000000000000000000000000000000000000aa';
+const NEW_SESSION_BANNER_DISMISSED_KEY = 'ce_new_session_banner_dismissed';
 const ORIGINAL_PUBLIC_URL = process.env.PUBLIC_URL;
 const mockSelectorSourceFactory = '0x538A48BC439A36D2A86e63114DCD9c429d2ddEcA';
 const mockSelectorSourceStartBlock = 30297069;
@@ -42,7 +42,6 @@ const buildMockSponsoredBundleEnvelope = () => JSON.stringify({
 const buildMockSponsoredBundle = () => ({
   openaiKey: 'sponsored-openai',
   arweaveJwk: '{"kty":"RSA","n":"sponsored"}',
-  litAccountApiKey: 'sponsored-lit-account-key',
   faucetGrantToken: 'sponsored-faucet-grant',
   deployGrantToken: 'sponsored-deploy-grant',
   meta: {
@@ -51,7 +50,7 @@ const buildMockSponsoredBundle = () => ({
     createdBy: '0xadmin',
     expiresAt: '2099-03-21T12:00:00.000Z',
     sourceSessionSlug: 'source-session',
-    sourceWorkerUrl: 'https://source-worker.example.test',
+    sourceWorkerUrl: 'https://source-worker.example',
   },
 });
 const buildMockPendingSbtDraft = ({
@@ -187,7 +186,7 @@ jest.mock('../../utilities/arweave/arweaveScripts.js', () => ({
   arweaveScripts: {
     uploadDataToArweave: jest.fn(),
     downloadDataFromArweave: (...args) => mockDownloadDataFromArweave(...args),
-    buildArweaveGatewayUrl: jest.fn((txId) => `https://arweave.example.test/${txId}`),
+    buildArweaveGatewayUrl: jest.fn((txId) => `https://arweave.net/${txId}`),
   },
 }));
 
@@ -450,6 +449,214 @@ describe('SessionWizard rendered validation', () => {
     expect(chainSelectorWrap).toBeTruthy();
     expect(within(chainSelectorWrap).getByRole('combobox')).toHaveValue(String(defaultChainId));
     expect(screen.getByDisplayValue(defaultChainLabel)).toBeInTheDocument();
+  });
+
+  it.each(['/new', '/session/new'])(
+    'shows the new-session requirements banner on %s',
+    async (pathname) => {
+      window.history.replaceState({}, '', pathname);
+
+      renderSessionWizard();
+
+      await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+      expect(screen.getByRole('heading', { name: /to create a session you'll need:/i })).toBeInTheDocument();
+    }
+  );
+
+  it('shows the new-session requirements banner on PUBLIC_URL-prefixed new-session routes', async () => {
+    process.env.PUBLIC_URL = '/ce/';
+    window.history.replaceState({}, '', '/ce/session/new');
+
+    renderSessionWizard();
+
+    await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    expect(screen.getByRole('heading', { name: /to create a session you'll need:/i })).toBeInTheDocument();
+  });
+
+  it('renders the new-session requirements copy and contact link on /session/new', async () => {
+    window.history.replaceState({}, '', '/session/new');
+
+    renderSessionWizard({ network: null });
+
+    await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+
+    expect(screen.getByText('An AI API key (OpenAI, Anthropic, or OpenRouter)')).toBeInTheDocument();
+    expect(screen.getByText('An Arweave wallet (JWK) for permanent storage')).toBeInTheDocument();
+    expect(screen.getByText('OP Sepolia ETH for on-chain registration')).toBeInTheDocument();
+    expect(screen.getByText('(Optional) A faucet private key for sponsoring user gas')).toBeInTheDocument();
+    expect(screen.getByText('A turnkey tool for bundling these resources is in development.')).toBeInTheDocument();
+    expect(
+      screen.getByText(/in the meantime, you can get a sponsored session url by contacting/i)
+    ).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'contextengine@protonmail.com' })).toHaveAttribute(
+      'href',
+      'mailto:contextengine@protonmail.com'
+    );
+  });
+
+  it('updates the new-session requirements chain label when the selected deploy chain changes', async () => {
+    window.history.replaceState({}, '', '/session/new');
+
+    renderSessionWizard({ network: null });
+
+    await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    expect(screen.getByText('OP Sepolia ETH for on-chain registration')).toBeInTheDocument();
+
+    enableAdvancedMode();
+
+    const chainSelectorWrap = screen.getByText('Network:').parentElement;
+    expect(chainSelectorWrap).toBeTruthy();
+    fireEvent.change(within(chainSelectorWrap).getByRole('combobox'), {
+      target: { value: '31337' },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Anvil ETH for on-chain registration')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('OP Sepolia ETH for on-chain registration')).not.toBeInTheDocument();
+  });
+
+  it('does not show the new-session requirements banner when a sponsored bundle covers setup requirements', async () => {
+    window.history.replaceState({}, '', '/session/new?sponsored=sponsor-tx-id#k=sponsor-secret');
+
+    renderSessionWizard({
+      initialSponsoredBundleId: 'sponsor-tx-id',
+      initialSponsoredBundleKey: 'sponsor-secret',
+    });
+
+    await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_SPONSORED_STATUS)).toHaveTextContent(
+      'Sponsored resources applied: OpenAI key, Arweave wallet, faucet funding, deploy access.'
+    );
+    expect(screen.queryByRole('heading', { name: /to create a session you'll need:/i })).not.toBeInTheDocument();
+  });
+
+  it('keeps the new-session requirements banner visible when sponsored setup is missing deploy access', async () => {
+    window.history.replaceState({}, '', '/session/new?sponsored=sponsor-tx-id#k=sponsor-secret');
+    const sponsoredBundleWithoutDeployAccess = buildMockSponsoredBundle();
+    delete sponsoredBundleWithoutDeployAccess.deployGrantToken;
+    mockDecryptWithPassword.mockResolvedValueOnce(sponsoredBundleWithoutDeployAccess);
+
+    renderSessionWizard({
+      initialSponsoredBundleId: 'sponsor-tx-id',
+      initialSponsoredBundleKey: 'sponsor-secret',
+    });
+
+    await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_SPONSORED_STATUS)).toHaveTextContent(
+      'Sponsored resources applied: OpenAI key, Arweave wallet, faucet funding.'
+    );
+    expect(screen.getByRole('heading', { name: /to create a session you'll need:/i })).toBeInTheDocument();
+  });
+
+  it('keeps the new-session requirements banner visible for partial sponsored bundles', async () => {
+    window.history.replaceState({}, '', '/session/new?sponsored=sponsor-tx-id#k=sponsor-secret');
+    mockDecryptWithPassword.mockResolvedValueOnce({
+      openaiKey: 'sponsored-openai',
+      meta: {
+        label: 'Partial bundle',
+        createdAt: '2099-03-20T12:00:00.000Z',
+        createdBy: '0xadmin',
+        expiresAt: '2099-03-21T12:00:00.000Z',
+        sourceSessionSlug: 'source-session',
+        sourceWorkerUrl: 'https://source-worker.example',
+      },
+    });
+
+    renderSessionWizard({
+      initialSponsoredBundleId: 'sponsor-tx-id',
+      initialSponsoredBundleKey: 'sponsor-secret',
+    });
+
+    await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_SPONSORED_STATUS)).toHaveTextContent(
+      'Sponsored resources applied: OpenAI key.'
+    );
+    expect(screen.getByRole('heading', { name: /to create a session you'll need:/i })).toBeInTheDocument();
+  });
+
+  it('shows the new-session requirements banner again when a sponsored link falls back to manual setup', async () => {
+    window.history.replaceState({}, '', '/session/new?sponsored=sponsor-tx-id');
+
+    renderSessionWizard({
+      initialSponsoredBundleId: 'sponsor-tx-id',
+      initialSponsoredBundleKey: '',
+    });
+
+    await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_SPONSORED_STATUS)).toHaveTextContent(
+      'Malformed sponsored link.'
+    );
+    expect(screen.getByRole('heading', { name: /to create a session you'll need:/i })).toBeInTheDocument();
+  });
+
+  it('dismisses the new-session requirements banner and keeps it hidden after remount', async () => {
+    window.history.replaceState({}, '', '/session/new');
+
+    const firstRender = renderSessionWizard();
+
+    await screen.findByRole('heading', { name: /to create a session you'll need:/i });
+
+    fireEvent.click(screen.getByRole('button', { name: /dismiss session setup requirements/i }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole('heading', { name: /to create a session you'll need:/i })).not.toBeInTheDocument();
+    });
+    expect(localStorage.getItem(NEW_SESSION_BANNER_DISMISSED_KEY)).toBe('true');
+
+    firstRender.unmount();
+    renderSessionWizard();
+
+    await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    expect(screen.queryByRole('heading', { name: /to create a session you'll need:/i })).not.toBeInTheDocument();
+  });
+
+  it('shows the requirements banner for manual sponsored fallback even after plain /new was dismissed', async () => {
+    window.history.replaceState({}, '', '/session/new');
+
+    const firstRender = renderSessionWizard();
+
+    await screen.findByRole('heading', { name: /to create a session you'll need:/i });
+    fireEvent.click(screen.getByRole('button', { name: /dismiss session setup requirements/i }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole('heading', { name: /to create a session you'll need:/i })).not.toBeInTheDocument();
+    });
+    expect(localStorage.getItem(NEW_SESSION_BANNER_DISMISSED_KEY)).toBe('true');
+
+    firstRender.unmount();
+    window.history.replaceState({}, '', '/session/new?sponsored=sponsor-tx-id#k=sponsor-secret');
+    mockDecryptWithPassword.mockResolvedValueOnce({
+      openaiKey: 'sponsored-openai',
+      meta: {
+        label: 'Partial bundle',
+        createdAt: '2099-03-20T12:00:00.000Z',
+        createdBy: '0xadmin',
+        expiresAt: '2099-03-21T12:00:00.000Z',
+        sourceSessionSlug: 'source-session',
+        sourceWorkerUrl: 'https://source-worker.example',
+      },
+    });
+
+    renderSessionWizard({
+      initialSponsoredBundleId: 'sponsor-tx-id',
+      initialSponsoredBundleKey: 'sponsor-secret',
+    });
+
+    await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_SPONSORED_STATUS)).toHaveTextContent(
+      'Sponsored resources applied: OpenAI key.'
+    );
+    expect(screen.getByRole('heading', { name: /to create a session you'll need:/i })).toBeInTheDocument();
+  });
+
+  it('does not show the new-session requirements banner outside the new-session routes', async () => {
+    window.history.replaceState({}, '', '/');
+
+    renderSessionWizard();
+
+    await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    expect(screen.queryByRole('heading', { name: /to create a session you'll need:/i })).not.toBeInTheDocument();
   });
 
   it('defaults auto-feature session groups to enabled for fresh /new drafts', async () => {
