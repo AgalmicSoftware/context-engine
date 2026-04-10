@@ -27,7 +27,7 @@ npm run ai:seed-survey:question-types            # seed question type data
 
 ## Stack
 - React 17 SPA (CRA, mix of class + functional components)
-- Solidity on Base Sepolia (chain 84532)
+- Solidity on OP Sepolia (chain 11155420) by default; Base Sepolia (84532) remains supported for legacy/dev compatibility
 - Cloudflare Workers (`sessionCorsWorker`) — CORS proxy, encryption, gating
 - Arweave (metadata/payloads and most uploaded images); some token/image reads still accept IPFS URLs
 - Lit Protocol (SBT-gated field encryption via access control conditions)
@@ -83,7 +83,7 @@ npm run ai:seed-survey:question-types            # seed question type data
 | [`TODO/README.md`](TODO/README.md) | Public roadmap |
 
 ## Conventions
-- Default testnet: Base Sepolia (`84532`)
+- Default testnet: OP Sepolia (`11155420`)
 - Test IDs: `data-testid="ce-<area>-<control>"`
 - Playwright selectors: prefer `getByTestId()` > `getByRole()` > `getByLabel()` > CSS
 - Tooltip pattern: `<FontAwesomeIcon icon={faQuestionCircle}/>` + `<UncontrolledTooltip>` (reactstrap)
