@@ -148,6 +148,7 @@ STRIP_PATTERNS=(
   "scripts/build_external_llm_prompt.py"
   ".env.e2e*"
   "artifacts"
+  "tests/artifacts"
   "Demo Integration Package"
   "whitepaper/Slides.pdf"
   "whitepaper/IdeasMap.md"
