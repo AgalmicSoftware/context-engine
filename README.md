@@ -65,7 +65,7 @@ For testing, run modes, and deeper setup:
 
 ### Survey and Response Management
 - Multiple question types: freeform, multiple choice, binary, and rating scales
-- Optional encryption responses and results
+- Optional encryption of responses and results
 - Decentralized and permanent storage of responses
 - Statistical / AI analysis and visualization of results
 - Export results as `.json`, `.csv`, `.pdf`
@@ -82,16 +82,16 @@ For testing, run modes, and deeper setup:
 - Summaries and analysis of survey results and response clusters
 - OpenAI, Anthropic, OpenRouter, and custom provider paths
 
-### User and Deployer UX: Passkey Sign-On
+### User and Deployer UX: Passkey sign-on UX  
+- Users log in with a simple Passkey / Biometric flow (native pin, fingerprint, or faceID on phones) 
+- Login flow generates or handles an Ethereum account, which can be used easily with cryptography features
+   - Users do not need to know anything about Ethereum or crypto (or take any additional steps) to use the app
 
-- Users log in with a simple passkey / biometric flow (native PIN, fingerprint, or Face ID on phones)
-- Login supplies a signing account for session identity; EVM-backed profiles can also use it as a chain account
-- Hosted & Fast does not submit an EVM transaction, and its users do not need Ethereum, a wallet balance, or gas
 
 ### Deployer UX: Sponsored Bundles
+- Deployers can use and set up sponsored bundles of API keys (for storage, EVM transactions, encryption network, AI API) 
+  - Senstive and organiztional deployments can plug in existing AI Keys, and use local or custom options for storage, encryption, and EVM network functionalities
 
-- Setup requirements follow the selected profile: the default Cloudflare profile needs only a Cloudflare deploy token and one AI-provider key
-- Sponsored bundles and advanced configuration can supply Arweave, EVM/RPC, Lit, or other credentials only when the selected decentralized or encrypted profile needs them; planned company-operated adapters will connect internal services instead
 
 ## AI Discourse Corpus
 
