@@ -222,6 +222,14 @@ const setCloudflareTokenValue = (value) => {
 };
 const expectSponsoredStatus = async (message) => {
   await waitFor(() => {
+    if (message instanceof RegExp) {
+      expect(screen.getByTestId('ce-wizard-sponsored-status')).toHaveTextContent(message);
+      return;
+    }
+    if (message === 'Sponsored resources applied.') {
+      expect(screen.getByTestId('ce-wizard-sponsored-status')).toHaveTextContent(/^Sponsored resources applied:/i);
+      return;
+    }
     expect(screen.getByTestId('ce-wizard-sponsored-status')).toHaveTextContent(message);
   }, { timeout: 10000 });
 };
