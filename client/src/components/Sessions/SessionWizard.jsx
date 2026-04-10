@@ -132,6 +132,7 @@ import {
   WIZARD_CONTRACT_MODAL_TESTID,
 } from '../ContractPage/contractMetadata.js';
 import { buildContractViewerContracts } from '../ContractPage/contractViewerUtils.js';
+import { normalizeRoutePath as normalizeMainSiteRoutePath } from '../MainSite/routePathHelpers.js';
 
 const { getPathRpcUrl } = rpcDefaults;
 const log = createLogger('general');
@@ -242,6 +243,31 @@ export const resolveSponsoredBundleDeployReadiness = ({
     ready: hasAppliedSponsoredBundle && missing.length === 0,
     missing,
   };
+};
+const buildSponsoredBundleAppliedStatusMessage = (sponsoredBundle = {}) => {
+  const normalizedBundle = normalizeSparseSponsoredBundlePayload(sponsoredBundle);
+  const appliedLabels = [];
+  if (toStr(normalizedBundle?.openaiKey).trim()) appliedLabels.push('OpenAI key');
+  if (toStr(normalizedBundle?.anthropicKey).trim()) appliedLabels.push('Anthropic key');
+  if (toStr(normalizedBundle?.openrouterKey).trim()) appliedLabels.push('OpenRouter key');
+  if (toStr(normalizedBundle?.arweaveJwk).trim()) appliedLabels.push('Arweave wallet');
+  if (
+    toStr(normalizedBundle?.faucetPrivateKey).trim() ||
+    toStr(normalizedBundle?.faucetGrantToken).trim()
+  ) {
+    appliedLabels.push('faucet funding');
+  }
+  if (toStr(normalizedBundle?.customRpcUrl).trim()) appliedLabels.push('RPC URL');
+  if (
+    toStr(normalizedBundle?.litPayerPrivateKey).trim() ||
+    toStr(normalizedBundle?.litPayerAddress).trim()
+  ) {
+    appliedLabels.push('Lit payer wallet');
+  }
+  if (toStr(normalizedBundle?.deployGrantToken).trim()) appliedLabels.push('deploy access');
+  return appliedLabels.length
+    ? `Sponsored resources applied: ${appliedLabels.join(', ')}.`
+    : 'Sponsored resources applied.';
 };
 const resolveSponsoredBundleAdvancedFieldNotices = ({
   sponsoredBundle = {},
@@ -1271,6 +1297,7 @@ const SESSION_WIZARD_CACHE_KEY = 'ce:sessionWizardDraft:v1';
 const SESSION_WIZARD_PENDING_SBT_DRAFTS_KEY = 'ce:sessionWizardPendingSbtDrafts:v1';
 const SESSION_WIZARD_SPONSORED_BUNDLE_CACHE_KEY = 'ce:sessionWizardSponsoredBundle:v1';
 const SESSION_WIZARD_SPONSORED_BUNDLE_TAB_ID_KEY = 'ce:sessionWizardSponsoredBundle:tabId:v1';
+const SESSION_WIZARD_NEW_SESSION_BANNER_DISMISSED_KEY = 'ce_new_session_banner_dismissed';
 const SESSION_WIZARD_SPONSORED_BUNDLE_KEY_DB_NAME = 'ce-sponsored-bundle-keys';
 const SESSION_WIZARD_SPONSORED_BUNDLE_KEY_DB_VERSION = 1;
 const SESSION_WIZARD_SPONSORED_BUNDLE_KEY_DB_STORE = 'keys';
@@ -1278,6 +1305,7 @@ const SESSION_WIZARD_SPONSORED_BUNDLE_KEY_DB_ENTRY_PREFIX = 'sessionWizardSponso
 let sessionWizardSponsoredBundleCacheKeyPromise = null;
 let sessionWizardSponsoredBundleKeyDbPromise = null;
 let sessionWizardSponsoredBundleKeyDbUnavailable = false;
+const SESSION_WIZARD_NEW_SESSION_PATHNAMES = new Set(['/new', '/session/new']);
 
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
@@ -1306,6 +1334,45 @@ const generateSessionWizardSponsoredBundleTabId = () => {
     return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
   }
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+};
+
+const normalizeSessionWizardPathname = (pathname = '') => {
+  const normalized = normalizeMainSiteRoutePath(toStr(pathname).trim());
+  return normalized || '/';
+};
+
+const isNewSessionWizardPathname = (pathname = '') => (
+  SESSION_WIZARD_NEW_SESSION_PATHNAMES.has(normalizeSessionWizardPathname(pathname))
+);
+
+const readSessionWizardNewSessionBannerDismissed = () => {
+  if (typeof window === 'undefined') return false;
+  try {
+    return toStr(localStorage.getItem(SESSION_WIZARD_NEW_SESSION_BANNER_DISMISSED_KEY)).trim().toLowerCase() === 'true';
+  } catch (_) {
+    return false;
+  }
+};
+
+const writeSessionWizardNewSessionBannerDismissed = () => {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(SESSION_WIZARD_NEW_SESSION_BANNER_DISMISSED_KEY, 'true');
+  } catch (_) {}
+};
+const buildSessionWizardNewSessionBannerDismissalContextKey = ({
+  pathname = '',
+  sponsoredBundleId = '',
+  sponsoredBundleKey = '',
+} = {}) => {
+  const normalizedPathname = normalizeSessionWizardPathname(pathname);
+  if (!isNewSessionWizardPathname(normalizedPathname)) return '';
+  const bundleId = toStr(sponsoredBundleId).trim();
+  const bundleKey = toStr(sponsoredBundleKey).trim();
+  if (bundleId || bundleKey) {
+    return `${normalizedPathname}::sponsored::${bundleId || '__missing_bundle__'}::${bundleKey ? 'with-key' : 'without-key'}`;
+  }
+  return `${normalizedPathname}::plain`;
 };
 
 const getSessionWizardSponsoredBundleTabId = () => {
@@ -2588,6 +2655,10 @@ const SessionWizard = ({
   }));
   const [sponsoredBundleStatus, setSponsoredBundleStatus] = useState(null);
   const [sponsoredBundleRetryNonce, setSponsoredBundleRetryNonce] = useState(0);
+  const [persistedNewSessionBannerDismissed, setPersistedNewSessionBannerDismissed] = useState(() => (
+    readSessionWizardNewSessionBannerDismissed()
+  ));
+  const [newSessionBannerDismissedContext, setNewSessionBannerDismissedContext] = useState('');
   const [workerSecrets, setWorkerSecrets] = useState(() => {
     const cached = cachedWizard?.workerSecrets;
     return sanitizeSessionWizardWorkerSecretsForLitMode(cached, { litPayerWalletInputEnabled });
@@ -2962,6 +3033,26 @@ const SessionWizard = ({
   }, [registryChainId, draft?.contracts]);
   const registryChainName = useMemo(() => getChainName(registryChainId), [registryChainId]);
   const registryChainOptions = useMemo(() => getSessionRegistryChains(), []);
+  const newSessionFundingChain = useMemo(() => {
+    const chainId = Number(
+      registryChainId ||
+      DEFAULT_CHAIN_ID ||
+      0
+    ) || 0;
+    const chain = getChainById(chainId);
+    if (chain) return chain;
+    if (!chainId) return null;
+    return {
+      id: chainId,
+      name: getChainName(chainId) || `Chain ${chainId}`,
+      nativeCurrency: { symbol: 'ETH' },
+    };
+  }, [registryChainId]);
+  const newSessionFundingRequirementLabel = useMemo(() => {
+    const chainName = toStr(newSessionFundingChain?.name).trim();
+    const chainSymbol = toStr(newSessionFundingChain?.nativeCurrency?.symbol).trim() || 'ETH';
+    return `${chainName || 'Selected network'} ${chainSymbol} for on-chain registration`;
+  }, [newSessionFundingChain]);
 
   const buildWorkerName = (rawName) => {
     const base = toStr(rawName)
@@ -3020,7 +3111,11 @@ const SessionWizard = ({
           return;
         }
         applySponsoredBundleOverrides(cachedSponsoredBundle, activeApplyKey, bundleId);
-        setSponsoredBundleStatus({ tone: 'success', message: 'Sponsored resources applied.', retryable: false });
+        setSponsoredBundleStatus({
+          tone: 'success',
+          message: buildSponsoredBundleAppliedStatusMessage(cachedSponsoredBundle),
+          retryable: false,
+        });
         return;
       }
       if (!bundleKey && sponsoredBundleTerminalTxIdRef.current === bundleId) return;
@@ -3050,7 +3145,11 @@ const SessionWizard = ({
         await writeSessionWizardSponsoredBundleCache(bundleId, result.bundle);
         if (cancelled) return;
         scrubSponsoredBundleHashSecret();
-        setSponsoredBundleStatus({ tone: 'success', message: 'Sponsored resources applied.', retryable: false });
+        setSponsoredBundleStatus({
+          tone: 'success',
+          message: buildSponsoredBundleAppliedStatusMessage(result.bundle),
+          retryable: false,
+        });
       } catch (error) {
         if (cancelled) return;
         restoreSponsoredBundleOverrides();
@@ -7661,6 +7760,60 @@ const SessionWizard = ({
     hasManualSponsoredBundleFallbackFile
   );
   const canUseSponsoredAutoDeployNow = shouldUseSponsoredAutoDeployFlow && sponsoredLocalBundledAssetAvailable;
+  const currentSessionWizardPathname = (
+    typeof window === 'undefined' || !window.location ? '' : window.location.pathname
+  );
+  const isNewSessionWizardRoute = isNewSessionWizardPathname(
+    currentSessionWizardPathname
+  );
+  const newSessionBannerDismissalContextKey = buildSessionWizardNewSessionBannerDismissalContextKey({
+    pathname: currentSessionWizardPathname,
+    sponsoredBundleId: initialSponsoredBundleId,
+    sponsoredBundleKey: initialSponsoredBundleKey,
+  });
+  const currentWorkerSecrets = getCurrentWorkerSecrets();
+  const normalizedAppliedSponsoredBundle = normalizeSparseSponsoredBundlePayload(
+    sponsoredBundleAppliedBundleRef.current
+  );
+  const sponsoredBundleStatusTone = toStr(sponsoredBundleStatus?.tone).trim().toLowerCase();
+  const hasNewSessionAiRequirementCovered = !!(
+    toStr(currentWorkerSecrets?.openaiKey).trim() ||
+    toStr(currentWorkerSecrets?.anthropicKey).trim() ||
+    toStr(currentWorkerSecrets?.openrouterKey).trim()
+  );
+  const hasNewSessionArweaveRequirementCovered = !!toStr(currentWorkerSecrets?.arweaveJwk).trim();
+  const hasNewSessionFundingRequirementCovered = !!(
+    toStr(currentWorkerSecrets?.faucetPrivateKey).trim() ||
+    toStr(normalizedAppliedSponsoredBundle?.faucetGrantToken).trim()
+  );
+  const hasNewSessionDeployRequirementCovered = !!toStr(
+    normalizedAppliedSponsoredBundle?.deployGrantToken
+  ).trim();
+  const sponsoredBundleCoversNewSessionRequirements = (
+    sponsoredBundleStatusTone === 'success' &&
+    hasNewSessionAiRequirementCovered &&
+    hasNewSessionArweaveRequirementCovered &&
+    hasNewSessionFundingRequirementCovered &&
+    hasNewSessionDeployRequirementCovered
+  );
+  // Sponsored links should suppress the generic requirements banner while
+  // preload is in flight, or after success when the applied bundle covers the
+  // publish prerequisites. Faucet-only bundles still leave /new in manual setup
+  // mode because Publish needs sponsored deploy access as well.
+  const sponsoredBundleOwnsNewSessionEntryFlow = hasSponsoredBundleLink && (
+    !sponsoredBundleStatus ||
+    sponsoredBundleStatusTone === 'info' ||
+    sponsoredBundleCoversNewSessionRequirements
+  );
+  const isNewSessionBannerDismissedForCurrentContext = (
+    !!newSessionBannerDismissalContextKey &&
+    newSessionBannerDismissedContext === newSessionBannerDismissalContextKey
+  );
+  const shouldRespectPersistedNewSessionBannerDismissal = !hasSponsoredBundleLink;
+  const showNewSessionRequirementsBanner = isNewSessionWizardRoute &&
+    !isNewSessionBannerDismissedForCurrentContext &&
+    !(shouldRespectPersistedNewSessionBannerDismissal && persistedNewSessionBannerDismissed) &&
+    !sponsoredBundleOwnsNewSessionEntryFlow;
   const showNormalModeWorkerStep = !(
     sponsoredAutoDeployState.active &&
     toStr(workerMode).trim() !== 'default'
@@ -7921,6 +8074,15 @@ const SessionWizard = ({
       </button>
     </div>
   );
+  const handleDismissNewSessionRequirementsBanner = useCallback(() => {
+    if (newSessionBannerDismissalContextKey) {
+      setNewSessionBannerDismissedContext(newSessionBannerDismissalContextKey);
+    }
+    if (!hasSponsoredBundleLink) {
+      setPersistedNewSessionBannerDismissed(true);
+      writeSessionWizardNewSessionBannerDismissed();
+    }
+  }, [hasSponsoredBundleLink, newSessionBannerDismissalContextKey]);
 
   return (
     <div className={styles.groupWizard}>
@@ -7998,6 +8160,46 @@ const SessionWizard = ({
           )}
         </div>
       </header>
+
+      {showNewSessionRequirementsBanner ? (
+        <section className={styles.newSessionBanner} aria-labelledby="new-session-requirements-title">
+          <div className={styles.newSessionBannerHeader}>
+            <h2 id="new-session-requirements-title" className={styles.newSessionBannerTitle}>
+              To create a session you&apos;ll need:
+            </h2>
+            <button
+              type="button"
+              className={`${styles.iconButton} ${styles.newSessionBannerDismissButton}`}
+              aria-label="Dismiss session setup requirements"
+              title="Dismiss session setup requirements"
+              onClick={handleDismissNewSessionRequirementsBanner}
+            >
+              <FontAwesomeIcon icon={faTimes} />
+            </button>
+          </div>
+          <div className={styles.newSessionBannerBody}>
+            <ul className={styles.newSessionBannerList}>
+              <li>An AI API key (OpenAI, Anthropic, or OpenRouter)</li>
+              <li>An Arweave wallet (JWK) for permanent storage</li>
+              <li>{newSessionFundingRequirementLabel}</li>
+              <li>(Optional) A faucet private key for sponsoring user gas</li>
+            </ul>
+            <p className={styles.newSessionBannerCopy}>
+              A turnkey tool for bundling these resources is in development.
+            </p>
+            <p className={styles.newSessionBannerCopy}>
+              In the meantime, you can get a sponsored session URL by contacting{' '}
+              <a
+                href="mailto:contextengine@protonmail.com"
+                className={styles.newSessionBannerLink}
+              >
+                contextengine@protonmail.com
+              </a>
+              .
+            </p>
+          </div>
+        </section>
+      ) : null}
 
       {sponsoredBundleStatus ? (
         <div
