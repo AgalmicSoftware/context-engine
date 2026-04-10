@@ -122,6 +122,9 @@ Environment variables supported by `ai:test-gates:any-all`:
 Environment variables supported by `ai:seed-survey:question-types`:
 
 - `BASE_URL` (default: `http://127.0.0.1:3000`)
+- `CHAIN` / `CHAIN_ID` (optional shared chain selector; defaults to the app default chain, currently OP Sepolia `11155420`)
+- `RPC_URL` (optional browser rewrite target / preferred RPC override for the resolved chain)
+- `RPC_REWRITE_FROM` (optional advanced comma-separated override for rewrite sources; otherwise derived from the resolved chain's public, PATH, and faucet fallback RPC defaults)
 - `AI_RUN_TAG` / `RUN_TAG` (optional explicit run tag; default is timestamp)
 - `PASSKEY_RAW_ID_B64URL` (optional deterministic rawId source, default fixture value)
 - `PLAYWRIGHT_CORE_PATH` (optional override for resolving the Playwright module)
