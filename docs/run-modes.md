@@ -8,14 +8,14 @@ Frontend development and local client work only.
 
 - Use the React client without chain, worker, or Arweave dependencies
 - Client workflows use Node.js 16.14.2 and npm 9.2.0
-- Install client dependencies with `npm i --force` for now until the current
-  install conflict is fixed
+- Install client dependencies with `npm install --legacy-peer-deps` for now
+  until the current install conflict is fixed
 - Typical start command:
 
 ```bash
 cd client
 nvm use 16
-npm i --force
+npm install --legacy-peer-deps
 npm run dev
 ```
 
