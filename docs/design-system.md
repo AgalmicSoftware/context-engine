@@ -41,7 +41,7 @@ Shared shadow:
 | Token | Value | Usage |
 | --- | --- | --- |
 | `--ce-font-body` / `$ce-font-body` | `'Poppins', sans-serif` | general body copy |
-| `--ce-font-mono` / `$ce-font-mono` | `'Share Tech Mono', 'Courier New', monospace` | ids, metadata, code-like UI |
+| `--ce-font-mono` / `$ce-font-mono` | `ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace` | ids, metadata, code-like UI |
 | `--ce-font-button` / `$ce-font-button` | `'Poppins', sans-serif` | interactive controls |
 | `$ce-font-button-weight` | `600` | default button emphasis |
 
@@ -115,6 +115,20 @@ Pill action / status chip:
   font-family: var(--ce-font-mono);
 }
 ```
+
+Final submit / create CTA:
+
+```scss
+.ctaButton {
+  @include finalSubmitCta.final-submit-cta-shell();
+}
+
+.ctaButtonContent {
+  @include finalSubmitCta.final-submit-cta-content();
+}
+```
+
+Use this shared blue CTA family for actual end-of-flow create and submit actions such as survey submission, survey creation, and SBT creation. Keep launcher/open-panel buttons on their existing primary or secondary treatments instead of reusing this pattern.
 
 ## Usage Rules
 

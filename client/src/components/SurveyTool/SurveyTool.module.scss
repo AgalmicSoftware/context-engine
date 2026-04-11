@@ -1,3 +1,5 @@
+@use "scss/finalSubmitCta" as finalSubmitCta;
+
 /* NEW - Color variables for dropdown items */
 $questions-item-bg: var(--ce-color-success-soft); // Light green
 $survey-item-bg: var(--ce-color-warning-soft); // Light yellow
@@ -442,65 +444,32 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 }
 
 #submitSurveyButton {
-  // font-size: 2em;
-  font-size: 1.75em;
-  background: #2a63ca;
-  font-weight: 600;
+  @include finalSubmitCta.final-submit-cta-shell(
+    $padding: 12px 20px,
+    $min-height: 56px,
+    $font-size: 1.75em,
+    $font-weight: 600,
+    $border-radius: var(--ce-radius-10),
+    $letter-spacing: 0.03em,
+    $box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18),
+    $hover-box-shadow: 0 10px 28px rgba(0, 0, 0, 0.24)
+  );
   text-transform: uppercase;
-  border: #2a63ca 1px solid;
   opacity: 1;
-  color: var(--ce-color-white) !important;
-  &:hover,
-  &:focus {
-    background: var(--ce-color-indigo);
-    border-color: var(--ce-color-indigo);
-  }
 }
 
 #submitSurveyButton.singleQuestionSubmitButton {
-  display: flex;
-  align-items: center;
-  justify-content: center;
   width: 100%;
   height: auto;
   min-height: 72px;
-  box-sizing: border-box;
-  max-width: 100%;
   padding: 18px 24px;
-  font-family: var(--ce-font-body);
   font-size: 1.4rem;
-  font-weight: bold;
-  text-transform: none;
-  line-height: 1.12;
-  letter-spacing: 0;
-  text-align: center;
-  white-space: normal;
-  background-color: rgba(42, 99, 202, 0.5) !important;
-  background-image: none !important;
-  border: 1px solid rgba(42, 99, 202, 0.72) !important;
   border-radius: var(--ce-radius-12);
-  color: var(--ce-color-white) !important;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
-  transition:
-    transform 0.2s ease,
-    opacity 0.2s ease,
-    box-shadow 0.2s ease;
-
-  &:hover,
-  &:focus {
-    background-color: rgba(94, 114, 228, 0.72) !important;
-    border-color: rgba(94, 114, 228, 0.9) !important;
-    transform: translateY(-2px);
-    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
-  }
 }
 
 .singleQuestionSubmitButtonContent {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  gap: 14px;
+  @include finalSubmitCta.final-submit-cta-content($gap: 14px);
+  text-transform: uppercase;
 }
 
 .singleQuestionSubmitButtonLabel {
@@ -3650,31 +3619,17 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 }
 
 .pileSubmitButton {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  justify-content: center;
-  background-color: #2a63ca !important;
-  background-image: none !important;
-  border: 1px solid #2a63ca !important;
-  border-radius: var(--ce-radius-8);
-  padding: 12px 24px;
-  font-size: 1rem;
-  font-weight: bold;
-  color: var(--ce-color-white);
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  transition:
-    transform 0.2s ease,
-    opacity 0.2s ease;
+  @include finalSubmitCta.final-submit-cta-shell(
+    $padding: 12px 24px,
+    $min-height: 0,
+    $font-size: 1rem,
+    $border-radius: var(--ce-radius-8),
+    $box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1),
+    $hover-box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15)
+  );
   white-space: nowrap;
   max-width: 300px;
   overflow: visible;
-  &:hover {
-    background-color: var(--ce-color-indigo) !important;
-    border-color: var(--ce-color-indigo) !important;
-    transform: translateY(-2px);
-    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
-  }
 }
 
 .pileFooter .pileSubmitButton {
@@ -3690,14 +3645,18 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   box-shadow:
     0 14px 30px rgba(7, 14, 38, 0.34),
     0 0 0 1px rgba(120, 154, 255, 0.18);
+
+  &:hover:not(:disabled),
+  &:focus:not(:disabled) {
+    box-shadow:
+      0 18px 36px rgba(7, 14, 38, 0.4),
+      0 0 0 1px rgba(120, 154, 255, 0.24);
+  }
 }
 
 .pileSubmitButtonContent {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  width: 100%;
+  @include finalSubmitCta.final-submit-cta-content($gap: 12px);
+  text-transform: uppercase;
 }
 
 .pileSubmitButtonLabel {
