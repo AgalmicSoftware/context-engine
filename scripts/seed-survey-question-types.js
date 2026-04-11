@@ -92,7 +92,7 @@ const resolveRpcRewriteConfig = ({ env = process.env } = {}) => {
         getPathRpcUrl(chainId),
         getFaucetFallbackRpcUrls(chainId),
       );
-  const browserUnsafeRpcTargets = dedupeRpcUrls(rewriteTargets)
+  const browserUnsafeRpcTargets = dedupeRpcUrls(rewriteTargets, rpcUrlOverride)
     .filter((url) => isBrowserUnsafeRpcTarget(url));
   const unsafeTargetSet = new Set(browserUnsafeRpcTargets.map((url) => url.toLowerCase()));
   const rpcRewriteTarget = (
