@@ -531,7 +531,7 @@ describe('OnePageSession view gating', () => {
     expect(screen.getByText(documentsTooltipText)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'GitHub' })).toHaveAttribute(
       'href',
-      'https://github.com/xoCortex/context-engine/tree/main/client/src/variables/demo'
+      'https://github.com/AgalmicSoftware/context-engine/tree/main/ai-discourse-corpus'
     );
   });
 
