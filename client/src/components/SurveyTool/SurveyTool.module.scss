@@ -2540,6 +2540,18 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   }
 }
 
+@media (min-width: 769px) and (max-width: 1366px) {
+  .pileInteractionUnit {
+    --pile-desktop-submit-rail-padding: 48px;
+  }
+
+  .pileInteractionUnitWithSubmitRail .pileCardInner,
+  .pileInteractionUnitWithSubmitRail .pileHologramPanel,
+  .pileInteractionUnitWithSubmitRail .pileEmptyState {
+    margin-top: 24px;
+  }
+}
+
 /* Card Stack Container */
 .pileCardContainer {
   width: 550px;
@@ -3738,7 +3750,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   font-size: 1.35rem;
 }
 
-@media (min-width: 1367px), (max-width: 480px) {
+@media (min-width: 769px), (max-width: 480px) {
   .pileSubmitButtonTrail {
     display: inline-flex;
   }
