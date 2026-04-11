@@ -51,14 +51,6 @@ import { getSbtDisplayName } from '../../utilities/sbt/sbtDisplayNames.js';
 import { isDemoSessionSlug } from '../../utilities/session/demoSessionSlugs.js';
 import { isCryptoMode, sbtsListPath, t } from '../../utilities/ui/terminology.js';
 import { PUBLIC_AI_DISCOURSE_CORPUS_URL } from '../../variables/publicRepoMetadata.js';
-import { resolveMainSiteLitSessionConfig } from '../MainSite/litSessionConfig.js';
-import type { RiskMatrixRestoreState } from '../MainContent/RiskMatrix';
-import {
-  buildAggregatorFromLocalCache,
-  computeAggregatorDataSignature,
-  computeAggregatorQuestionMetadataSignature,
-  computeAggregatorSourceSnapshotSignature,
-} from './onePageSessionAggregator';
 
 const SurveyPage = React.lazy(() => import('../SurveyTool/SurveyPage'));
 const MemoSurveyPage = React.memo((props: any) => <SurveyPage {...props} />);
@@ -72,7 +64,7 @@ const DemoAnalysisWorkspace = React.lazy(() => import('../DemoViews/DemoAnalysis
 const demoLog = createLogger('demo');
 const ONE_PAGE_DEMO_PERF_SCOPE = 'onePageDemo';
 const SBT_TOOLTIP_LABEL = isCryptoMode() ? 'Soulbound tokens (SBTs)' : `${t('sbtFull')}s`;
-const DEMO_CORPUS_GITHUB_URL = 'https://github.com/xoCortex/context-engine/tree/main/client/src/variables/demo';
+const DEMO_CORPUS_GITHUB_URL = PUBLIC_AI_DISCOURSE_CORPUS_URL;
 
 const isPerfCountersEnabled = () => {
   try {
