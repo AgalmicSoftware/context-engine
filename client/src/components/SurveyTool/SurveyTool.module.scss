@@ -4749,6 +4749,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 @media (prefers-reduced-motion: reduce) {
   .pileSubmitSuccessBadge,
   .pileFooter .pileSubmitButton.submitGlow::before,
+  .headerSubmitButton.submitGlow::before,
   .submitGlow,
   .scanningIndicator {
     -webkit-animation: none !important;

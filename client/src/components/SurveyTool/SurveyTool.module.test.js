@@ -243,6 +243,16 @@ describe('SurveyTool module', () => {
     expect(scss).toMatch(/@media \(prefers-reduced-motion: reduce\)\s*{[\s\S]*?\.pileFooter\s+\.pileSubmitButton\.submitGlow::before,\s*[\s\S]*?animation:\s*none !important;/);
   });
 
+  it('ports the recovered animLine border motion onto the SurveySelector header submit CTA', () => {
+    const scssPath = path.join(__dirname, 'SurveyTool.module.scss');
+    const scss = fs.readFileSync(scssPath, 'utf8');
+
+    expect(scss).toMatch(/\.headerSubmitButton\s*{[\s\S]*?position:\s*relative;[\s\S]*?isolation:\s*isolate;[\s\S]*?overflow:\s*visible;/);
+    expect(scss).toMatch(/\.headerSubmitButton\s*{[\s\S]*?&\.submitGlow::before\s*{[\s\S]*?background:\s*linear-gradient\(90deg,\s*#fff 40%,\s*transparent 40%\);[\s\S]*?background-size:\s*200% 4px;[\s\S]*?filter:\s*drop-shadow\(0 0 8px #fff\);[\s\S]*?pointer-events:\s*none;/);
+    expect(scss).toMatch(/\.headerSubmitButton\s*{[\s\S]*?&\.submitGlow::before\s*{[\s\S]*?animation:\s*beforeLineAnim 5\.4s linear infinite;/);
+    expect(scss).toMatch(/@media \(prefers-reduced-motion: reduce\)\s*{[\s\S]*?\.headerSubmitButton\.submitGlow::before,\s*[\s\S]*?animation:\s*none !important;/);
+  });
+
   it('renders triple trailing arrows inside the pile submit button', () => {
     const shell = new SurveyTool({
       minifiedMode: 'pile',
@@ -5300,6 +5310,1972 @@ describe('SurveyTool module', () => {
       singleQuestionMode: false,
       isStandalone: false,
       surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+    });
+
+    const deferred = createDeferred();
+    const runner = jest.fn(() => deferred.promise);
+
+    const first = subject.runDedupedDecryptTask('task-key', runner);
+    const second = subject.runDedupedDecryptTask('task-key', runner);
+    await Promise.resolve();
+
+    expect(second).toBe(first);
+    expect(runner).toHaveBeenCalledTimes(1);
+
+    deferred.resolve(true);
+    await first;
+
+    await subject.runDedupedDecryptTask('task-key', runner);
+    expect(runner).toHaveBeenCalledTimes(2);
+  });
+
+  it('skips auto-decrypt requeue for unchanged masked payloads after a failed attempt', () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+    });
+
+    const maskedAnswer = {
+      value: '*',
+      encrypted: true,
+      encryptedPortion: 'enc-1',
+    };
+    const maskedSig = subject.buildAutoDecryptMaskedFieldSignature(maskedAnswer);
+
+    subject.state = {
+      ...subject.state,
+      autoDecryptEnabled: true,
+      submissionError: '',
+      showComments: {},
+      autoDecryptAttempted: {},
+      decryptingByKey: {},
+      surveysResponseState: [
+        { answers: { q1: maskedAnswer }, additionalComments: {} },
+      ],
+    };
+    subject.getCurrentRenderedQuestionIds = jest.fn(() => ['q1']);
+    subject.processAutoDecryptQueue = jest.fn();
+    subject._autoDecryptMaskedAttemptSignature = { 'q1:answer': maskedSig };
+
+    subject.maybeAutoDecryptVisibleFields();
+    expect(subject._autoDecQueue).toHaveLength(0);
+    expect(subject.processAutoDecryptQueue).not.toHaveBeenCalled();
+
+    subject.state = {
+      ...subject.state,
+      surveysResponseState: [
+        {
+          answers: {
+            q1: {
+              ...maskedAnswer,
+              encryptedPortion: 'enc-2',
+            },
+          },
+          additionalComments: {},
+        },
+      ],
+    };
+
+    subject.maybeAutoDecryptVisibleFields();
+    expect(subject._autoDecQueue).toHaveLength(1);
+    expect(subject._autoDecQueue[0]).toMatchObject({ qid: 'q1', field: 'answer' });
+    expect(subject.processAutoDecryptQueue).toHaveBeenCalledTimes(1);
+  });
+
+  it('suppresses duplicate SurveyResults filter commit callbacks for no-op patches', () => {
+    const SurveyResults = ConnectedSurveyResults.WrappedComponent;
+    const onFilterChange = jest.fn();
+    const onUrlUpdate = jest.fn();
+    const subject = new SurveyResults({
+      onFilterChange,
+      onFilterStateChangeForUrlUpdate: onUrlUpdate,
+      isQuestionCacheReady: true,
+    });
+
+    subject.setState = jest.fn((next, cb) => {
+      const patch = typeof next === 'function' ? next(subject.state, subject.props) : next;
+      subject.state = { ...subject.state, ...(patch || {}) };
+      if (typeof cb === 'function') cb();
+      return patch;
+    });
+
+    subject.commitResultsFilterState(
+      { filteredQuestionsCount: subject.state.filteredQuestionsCount },
+      {}
+    );
+    expect(subject.setState).not.toHaveBeenCalled();
+    expect(onFilterChange).not.toHaveBeenCalled();
+    expect(onUrlUpdate).not.toHaveBeenCalled();
+
+    subject.commitResultsFilterState(
+      { filteredQuestionsCount: 3 },
+      { questionTypes: ['binary'] }
+    );
+    expect(onFilterChange).toHaveBeenCalledTimes(1);
+    expect(onUrlUpdate).toHaveBeenCalledTimes(1);
+
+    subject.commitResultsFilterState(
+      { filteredQuestionsCount: 3 },
+      { questionTypes: ['binary'] }
+    );
+    expect(onFilterChange).toHaveBeenCalledTimes(1);
+    expect(onUrlUpdate).toHaveBeenCalledTimes(1);
+  });
+
+  it('re-notifies URL filter state when results modal reopens with unchanged filters', () => {
+    const SurveyResults = ConnectedSurveyResults.WrappedComponent;
+    const onFilterChange = jest.fn();
+    const onUrlUpdate = jest.fn();
+    const filterState = { questionTypes: ['binary'] };
+    const subject = new SurveyResults({
+      onFilterChange,
+      onFilterStateChangeForUrlUpdate: onUrlUpdate,
+      isQuestionCacheReady: true,
+      isResponsesCacheReady: true,
+      isOpen: true,
+      filterState,
+      preventUrlChange: true,
+    });
+
+    subject.setState = jest.fn((next, cb) => {
+      const patch = typeof next === 'function' ? next(subject.state, subject.props) : next;
+      subject.state = { ...subject.state, ...(patch || {}) };
+      if (typeof cb === 'function') cb();
+      return patch;
+    });
+    subject.resetLocalStoragePollingBackoff = jest.fn();
+    subject.updateLocalStoragePollingState = jest.fn();
+    subject.queueResultsRefresh = jest.fn();
+
+    subject.notifyFilterStateCommitted(filterState);
+    expect(onUrlUpdate).toHaveBeenCalledTimes(1);
+
+    const prevProps = { ...subject.props, isOpen: false, filterState };
+    subject.props = { ...subject.props, isOpen: true, filterState };
+
+    subject.componentDidUpdate(prevProps, subject.state);
+
+    expect(onUrlUpdate).toHaveBeenCalledTimes(2);
+  });
+
+  it('coalesces modal-open state writes for filter sync and count updates', () => {
+    const SurveyResults = ConnectedSurveyResults.WrappedComponent;
+    const subject = new SurveyResults({
+      onFilterStateChangeForUrlUpdate: jest.fn(),
+      filteredQuestionsCount: 3,
+      filterState: { questionTypes: ['binary'] },
+      isQuestionCacheReady: true,
+      isResponsesCacheReady: true,
+      isOpen: true,
+      preventUrlChange: true,
+    });
+    subject.state = {
+      ...subject.state,
+      filteredQuestionsCount: 1,
+      filterState: { questionTypes: ['rating'] },
+      viewMode: 'questions',
+      surveyId: '',
+    };
+    subject.setState = jest.fn((next, cb) => {
+      const patch = typeof next === 'function' ? next(subject.state, subject.props) : next;
+      subject.state = { ...subject.state, ...(patch || {}) };
+      if (typeof cb === 'function') cb();
+      return patch;
+    });
+    subject.resetLocalStoragePollingBackoff = jest.fn();
+    subject.updateLocalStoragePollingState = jest.fn();
+    subject.updateParentWithCurrentFiltersForUrl = jest.fn();
+    subject.queueResultsRefresh = jest.fn();
+
+    const prevProps = {
+      ...subject.props,
+      isOpen: false,
+      filteredQuestionsCount: 1,
+      filterState: { questionTypes: ['rating'] },
+      isQuestionCacheReady: true,
+      isResponsesCacheReady: true,
+    };
+
+    subject.componentDidUpdate(prevProps, subject.state);
+
+    expect(subject.setState).toHaveBeenCalledTimes(1);
+    expect(subject.setState.mock.calls[0][0]).toMatchObject({
+      filteredQuestionsCount: 3,
+      filterState: { questionTypes: ['binary'] },
+    });
+    expect(subject.updateParentWithCurrentFiltersForUrl).toHaveBeenCalledTimes(1);
+    expect(subject.queueResultsRefresh).toHaveBeenCalledTimes(1);
+    expect(subject.queueResultsRefresh.mock.calls[0][0]).toContain('modal-open');
+  });
+
+  it('queues one combined refresh when modal-open and cache-ready reasons arrive together', () => {
+    const SurveyResults = ConnectedSurveyResults.WrappedComponent;
+    const subject = new SurveyResults({
+      filterState: {},
+      isQuestionCacheReady: true,
+      isResponsesCacheReady: true,
+      isOpen: true,
+      preventUrlChange: true,
+    });
+    subject.state = {
+      ...subject.state,
+      viewMode: 'questions',
+      surveyId: '',
+    };
+    subject.resetLocalStoragePollingBackoff = jest.fn();
+    subject.updateLocalStoragePollingState = jest.fn();
+    subject.updateParentWithCurrentFiltersForUrl = jest.fn();
+    subject.queueResultsRefresh = jest.fn();
+    subject.setState = jest.fn((next, cb) => {
+      const patch = typeof next === 'function' ? next(subject.state, subject.props) : next;
+      subject.state = { ...subject.state, ...(patch || {}) };
+      if (typeof cb === 'function') cb();
+      return patch;
+    });
+
+    const prevProps = {
+      ...subject.props,
+      isOpen: false,
+      isQuestionCacheReady: false,
+      isResponsesCacheReady: false,
+      filterState: {},
+    };
+
+    subject.componentDidUpdate(prevProps, subject.state);
+
+    expect(subject.queueResultsRefresh).toHaveBeenCalledTimes(1);
+    const reason = subject.queueResultsRefresh.mock.calls[0][0];
+    expect(reason).toContain('modal-open');
+    expect(reason).toContain('cache-ready');
+    expect(reason).toContain('responses-cache-ready');
+  });
+
+  it('reuses stable fallback question objects per question and mode', () => {
+    const SurveyResults = ConnectedSurveyResults.WrappedComponent;
+    const subject = new SurveyResults({});
+
+    const summaryA = subject.getStableFallbackQuestion('q-missing', 'summary');
+    const summaryB = subject.getStableFallbackQuestion('q-missing', 'summary');
+    const individualA = subject.getStableFallbackQuestion('q-missing', 'individual');
+    const individualB = subject.getStableFallbackQuestion('q-missing', 'individual');
+
+    expect(summaryA).toBe(summaryB);
+    expect(summaryA).toEqual({ id: 'q-missing', prompt: 'Unknown question' });
+    expect(individualA).toBe(individualB);
+    expect(individualA).toEqual({
+      id: 'q-missing',
+      creator: '',
+      type: '',
+      prompt: '',
+    });
+    expect(individualA).not.toBe(summaryA);
+  });
+
+  it('coalesces SurveySelector auto-open and filter-state sync into one state patch', () => {
+    const subject = new SurveySelector({
+      autoOpenResults: true,
+      filterState: { questionTypes: ['rating'] },
+      isQuestionCacheReady: true,
+      isSurveyCacheReady: true,
+      singleQuestionMode: false,
+      network: { id: 84532 },
+      activeSessionSlug: 'edge',
+      activeSessionSlug: 'edge',
+      questionsCacheNonce: 4,
+    });
+    subject.fetchSurveys = jest.fn();
+    subject.computeFilteredQuestionCount = jest.fn();
+    subject.state = {
+      ...subject.state,
+      showResults: false,
+      filterState: { questionTypes: ['binary'] },
+      showLongLoading: false,
+      loading: false,
+    };
+    subject._filterStateSig = '';
+    subject.setState = jest.fn((next, cb) => {
+      const patch = typeof next === 'function' ? next(subject.state, subject.props) : next;
+      subject.state = { ...subject.state, ...(patch || {}) };
+      if (typeof cb === 'function') cb();
+      return patch;
+    });
+
+    const prevProps = {
+      ...subject.props,
+      autoOpenResults: false,
+      filterState: { questionTypes: ['binary'] },
+      questionsCacheNonce: 4,
+    };
+
+    subject.componentDidUpdate(prevProps, subject.state);
+
+    expect(subject.setState).toHaveBeenCalledTimes(1);
+    const patch = subject.setState.mock.calls[0][0];
+    expect(patch).toMatchObject({ showResults: true });
+    expect(patch.filterState).toEqual(
+      normalizeSurveyToolFilterState({ questionTypes: ['rating'] })
+    );
+  });
+
+  it('does not read SurveySelector survey list from a borrowed general network when the slug is unresolved', async () => {
+    const generalCfg = {
+      slug: '',
+      networkChainId: 84532,
+    };
+    const strictLookup = (slug) => (
+      String(slug || '').trim().toLowerCase() === ''
+        ? generalCfg
+        : null
+    );
+    jest.spyOn(contractScriptsModule, 'getSessionConfigBySlug').mockImplementation(strictLookup);
+    jest.spyOn(contractScriptsModule, 'getSessionConfigBySlugOrDefault').mockImplementation((slug) => (
+      strictLookup(slug) || generalCfg
+    ));
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    const readCacheSpy = jest.spyOn(cacheScripts, 'readCache').mockImplementation(async (namespace) => {
+      if (namespace === 'surveysCache') {
+        return {
+          '84532': {
+            surveys: {
+              '0xsurvey': {
+                id: '0xsurvey',
+                surveyID: '0xsurvey',
+                title: 'Borrowed Survey',
+                questionIDs: ['q1'],
+              },
+            },
+          },
+        };
+      }
+      return null;
+    });
+
+    const subject = new SurveySelector({
+      autoOpenResults: false,
+      filterState: {},
+      isQuestionCacheReady: true,
+      isSurveyCacheReady: true,
+      singleQuestionMode: false,
+      sessionSlug: 'missing-session-slug',
+      activeSessionSlug: '',
+    });
+    subject.updateSelectedSurvey = jest.fn();
+    subject.state = {
+      ...subject.state,
+      surveys: [{ id: 'stale-survey', title: 'Stale Survey', questionIDs: ['q1'] }],
+      showLongLoading: false,
+      loading: false,
+    };
+    syncClassSetState(subject);
+    readCacheSpy.mockClear();
+
+    await subject.fetchSurveys();
+
+    expect(readCacheSpy).not.toHaveBeenCalled();
+    expect(subject.state.surveys).toEqual([]);
+    expect(subject.state.loading).toBe(false);
+    expect(subject.updateSelectedSurvey).not.toHaveBeenCalled();
+  });
+
+  it('ignores semantically unchanged external filter props after a local clear so header clear does not snap back', () => {
+    const activeFilter = { responseStatus: { responded: true, notResponded: false } };
+    const subject = new SurveySelector({
+      autoOpenResults: false,
+      filterState: activeFilter,
+      isQuestionCacheReady: true,
+      isSurveyCacheReady: true,
+      singleQuestionMode: false,
+      network: { id: 84532 },
+      activeSessionSlug: 'edge',
+      questionsCacheNonce: 4,
+      questionResponsesNonce: 2,
+    });
+    subject.fetchSurveys = jest.fn();
+    subject.computeFilteredQuestionCount = jest.fn();
+    subject.state = {
+      ...subject.state,
+      showResults: false,
+      showLongLoading: false,
+      loading: false,
+      filterState: {},
+    };
+    subject._filterStateSig = '';
+    subject.setState = jest.fn((next, cb) => {
+      const patch = typeof next === 'function' ? next(subject.state, subject.props) : next;
+      subject.state = { ...subject.state, ...(patch || {}) };
+      if (typeof cb === 'function') cb();
+      return patch;
+    });
+
+    const prevProps = {
+      ...subject.props,
+      filterState: { responseStatus: { responded: true, notResponded: false } },
+    };
+    subject.props = {
+      ...subject.props,
+      filterState: { responseStatus: { responded: true, notResponded: false } },
+    };
+
+    subject.componentDidUpdate(prevProps, subject.state);
+
+    expect(subject.setState).not.toHaveBeenCalled();
+    expect(subject.state.filterState).toEqual({});
+    expect(subject._filterStateSig).toBe('');
+  });
+
+  it('forces SurveySelector results closed via closeShowResults when currently open', () => {
+    const subject = new SurveySelector({
+      autoOpenResults: false,
+      filterState: {},
+      isQuestionCacheReady: true,
+      isSurveyCacheReady: true,
+      singleQuestionMode: false,
+      network: { id: 84532 },
+      activeSessionSlug: 'edge',
+      questionsCacheNonce: 4,
+      preventUrlChange: true,
+    });
+    subject.fetchSurveys = jest.fn();
+    subject.computeFilteredQuestionCount = jest.fn();
+    subject.state = {
+      ...subject.state,
+      showResults: true,
+      viewMode: 'questions',
+    };
+    subject.setState = jest.fn((next, cb) => {
+      const patch = typeof next === 'function' ? next(subject.state, subject.props) : next;
+      subject.state = { ...subject.state, ...(patch || {}) };
+      if (typeof cb === 'function') cb();
+      return patch;
+    });
+
+    subject.closeShowResults();
+
+    expect(subject.setState).toHaveBeenCalledTimes(1);
+    expect(subject.setState).toHaveBeenCalledWith({ showResults: false });
+    expect(subject.state.showResults).toBe(false);
+  });
+
+  it('appends session query when SurveySelector pushes survey URLs', () => {
+    const priorUrl = window.location.href;
+    const pushStateSpy = jest.spyOn(window.history, 'pushState');
+    try {
+      window.history.replaceState({}, '', '/surveys');
+      const subject = new SurveySelector({
+        autoOpenResults: false,
+        filterState: {},
+        isQuestionCacheReady: true,
+        isSurveyCacheReady: true,
+        singleQuestionMode: false,
+        network: { id: 84532 },
+        activeSessionSlug: 'edge',
+        preventUrlChange: false,
+      });
+
+      subject.updateURL('0xABC');
+
+      expect(pushStateSpy).toHaveBeenLastCalledWith({}, '', '/survey/0xabc?session=edge');
+    } finally {
+      window.history.replaceState({}, '', priorUrl);
+    }
+  });
+
+  it('canonicalizes reserved session aliases when SurveySelector pushes survey URLs', () => {
+    const priorUrl = window.location.href;
+    const pushStateSpy = jest.spyOn(window.history, 'pushState');
+    try {
+      window.history.replaceState({}, '', '/surveys');
+
+      const debateSubject = new SurveySelector({
+        autoOpenResults: false,
+        filterState: {},
+        isQuestionCacheReady: true,
+        isSurveyCacheReady: true,
+        singleQuestionMode: false,
+        network: { id: 84532 },
+        activeSessionSlug: 'DEBATE',
+        preventUrlChange: false,
+      });
+      debateSubject.updateURL('0xABC');
+      expect(pushStateSpy).toHaveBeenLastCalledWith({}, '', '/survey/0xabc?session=DEBATE');
+
+      const generalSubject = new SurveySelector({
+        autoOpenResults: false,
+        filterState: {},
+        isQuestionCacheReady: true,
+        isSurveyCacheReady: true,
+        singleQuestionMode: false,
+        network: { id: 84532 },
+        activeSessionSlug: 'general',
+        preventUrlChange: false,
+      });
+      generalSubject.updateURL('0xABC');
+      expect(pushStateSpy).toHaveBeenLastCalledWith({}, '', '/survey/0xabc');
+    } finally {
+      window.history.replaceState({}, '', priorUrl);
+    }
+  });
+
+  it('no-ops SurveySelector closeShowResults when results are already closed', () => {
+    const priorUrl = window.location.href;
+    window.history.replaceState({}, '', '/questions/results');
+    const pathnameBefore = window.location.pathname;
+    const pushStateSpy = jest.spyOn(window.history, 'pushState');
+    try {
+      const subject = new SurveySelector({
+        autoOpenResults: false,
+        filterState: {},
+        isQuestionCacheReady: true,
+        isSurveyCacheReady: true,
+        singleQuestionMode: false,
+        network: { id: 84532 },
+        activeSessionSlug: 'edge',
+        questionsCacheNonce: 4,
+        preventUrlChange: false,
+      });
+      subject.fetchSurveys = jest.fn();
+      subject.computeFilteredQuestionCount = jest.fn();
+      subject.state = {
+        ...subject.state,
+        showResults: false,
+        viewMode: 'questions',
+      };
+      subject.setState = jest.fn((next, cb) => {
+        const patch = typeof next === 'function' ? next(subject.state, subject.props) : next;
+        subject.state = { ...subject.state, ...(patch || {}) };
+        if (typeof cb === 'function') cb();
+        return patch;
+      });
+
+      subject.closeShowResults();
+
+      expect(subject.state.showResults).toBe(false);
+      expect(subject.setState).not.toHaveBeenCalled();
+      expect(pushStateSpy).not.toHaveBeenCalled();
+      expect(window.location.pathname).toBe(pathnameBefore);
+    } finally {
+      window.history.replaceState({}, '', priorUrl);
+    }
+  });
+
+  it('canonicalizes reserved session aliases in SurveySelector survey results URLs', () => {
+    const priorUrl = window.location.href;
+    const pushStateSpy = jest.spyOn(window.history, 'pushState');
+    try {
+      window.history.replaceState({}, '', '/surveys');
+
+      const buildSubject = (activeSessionSlug) => {
+        const subject = new SurveySelector({
+          autoOpenResults: false,
+          filterState: {},
+          isQuestionCacheReady: true,
+          isSurveyCacheReady: true,
+          singleQuestionMode: false,
+          network: { id: 84532 },
+          activeSessionSlug,
+          preventUrlChange: false,
+        });
+        subject.state = {
+          ...subject.state,
+          showResults: false,
+          viewMode: 'survey',
+          selectedSurveyIndex: 0,
+          surveys: [{ id: '0xABC', title: 'Alias Survey' }],
+        };
+        subject.setState = jest.fn((next, cb) => {
+          const patch = typeof next === 'function' ? next(subject.state, subject.props) : next;
+          subject.state = { ...subject.state, ...(patch || {}) };
+          if (typeof cb === 'function') cb();
+          return patch;
+        });
+        return subject;
+      };
+
+      const debateSubject = buildSubject('DEBATE');
+      debateSubject.toggleShowResults();
+      expect(pushStateSpy).toHaveBeenLastCalledWith({}, '', '/survey/0xabc/results?session=DEBATE');
+      debateSubject.closeShowResults();
+      expect(pushStateSpy).toHaveBeenLastCalledWith({}, '', '/survey/0xabc?session=DEBATE');
+
+      const generalSubject = buildSubject('general');
+      generalSubject.toggleShowResults();
+      expect(pushStateSpy).toHaveBeenLastCalledWith({}, '', '/survey/0xabc/results');
+      generalSubject.closeShowResults();
+      expect(pushStateSpy).toHaveBeenLastCalledWith({}, '', '/survey/0xabc');
+    } finally {
+      window.history.replaceState({}, '', priorUrl);
+    }
+  });
+
+  it('uses query-pinned question results URLs instead of session-prefixed hardcoded routes', () => {
+    const priorUrl = window.location.href;
+    const pushStateSpy = jest.spyOn(window.history, 'pushState');
+    try {
+      window.history.replaceState({}, '', '/session/rxc');
+
+      const subject = new SurveySelector({
+        autoOpenResults: false,
+        filterState: {},
+        isQuestionCacheReady: true,
+        isSurveyCacheReady: true,
+        singleQuestionMode: false,
+        network: { id: 84532 },
+        activeSessionSlug: 'rxc',
+        preventUrlChange: false,
+      });
+      subject.state = {
+        ...subject.state,
+        showResults: false,
+        viewMode: 'questions',
+      };
+      subject.setState = jest.fn((next, cb) => {
+        const patch = typeof next === 'function' ? next(subject.state, subject.props) : next;
+        subject.state = { ...subject.state, ...(patch || {}) };
+        if (typeof cb === 'function') cb();
+        return patch;
+      });
+
+      subject.toggleShowResults();
+      expect(pushStateSpy).toHaveBeenLastCalledWith({}, '', '/questions/results?session=rxc');
+
+      subject.closeShowResults();
+      expect(pushStateSpy).toHaveBeenLastCalledWith({}, '', '/questions?session=rxc');
+    } finally {
+      window.history.replaceState({}, '', priorUrl);
+    }
+  });
+
+  it('auto-opens SurveySelector results when ?results=true is present', () => {
+    const priorUrl = window.location.href;
+    window.history.replaceState({}, '', '/surveys?results=true');
+    try {
+      const subject = new SurveySelector({
+        autoOpenResults: false,
+        filterState: {},
+        isQuestionCacheReady: true,
+        isSurveyCacheReady: true,
+        singleQuestionMode: false,
+        network: { id: 84532 },
+        activeSessionSlug: 'edge',
+        questionsCacheNonce: 4,
+      });
+      subject.fetchSurveys = jest.fn();
+      subject.computeFilteredQuestionCount = jest.fn();
+      subject.state = {
+        ...subject.state,
+        showResults: false,
+      };
+      subject.setState = jest.fn((next, cb) => {
+        const patch = typeof next === 'function' ? next(subject.state, subject.props) : next;
+        subject.state = { ...subject.state, ...(patch || {}) };
+        if (typeof cb === 'function') cb();
+        return patch;
+      });
+
+      subject.componentDidMount();
+
+      expect(subject.state.showResults).toBe(true);
+      expect(subject.setState).toHaveBeenCalledTimes(1);
+      expect(subject.setState).toHaveBeenCalledWith(expect.objectContaining({ showResults: true }));
+      subject.componentWillUnmount();
+    } finally {
+      window.history.replaceState({}, '', priorUrl);
+    }
+  });
+
+  it('keeps SurveySelector showLongLoading clear semantics when cache is ready and loading is false', () => {
+    const priorUrl = window.location.href;
+    window.history.replaceState({}, '', '/surveys');
+    try {
+      const subject = new SurveySelector({
+        autoOpenResults: false,
+        filterState: {},
+        isQuestionCacheReady: false,
+        isSurveyCacheReady: true,
+        singleQuestionMode: false,
+        network: { id: 84532 },
+        activeSessionSlug: 'edge',
+        activeSessionSlug: 'edge',
+        questionsCacheNonce: 4,
+      });
+      subject.fetchSurveys = jest.fn();
+      subject.computeFilteredQuestionCount = jest.fn();
+      subject.state = {
+        ...subject.state,
+        showLongLoading: true,
+        loading: false,
+      };
+      subject._filterStateSig = '';
+      subject.setState = jest.fn((next, cb) => {
+        const patch = typeof next === 'function' ? next(subject.state, subject.props) : next;
+        subject.state = { ...subject.state, ...(patch || {}) };
+        if (typeof cb === 'function') cb();
+        return patch;
+      });
+
+      const prevProps = {
+        ...subject.props,
+        filterState: subject.props.filterState,
+        questionsCacheNonce: subject.props.questionsCacheNonce,
+      };
+
+      subject.componentDidUpdate(prevProps, subject.state);
+
+      expect(subject.setState).toHaveBeenCalledTimes(1);
+      expect(subject.setState.mock.calls[0][0]).toEqual({ showLongLoading: false });
+    } finally {
+      window.history.replaceState({}, '', priorUrl);
+    }
+  });
+
+  it('reloads QuestionsDashboard when questionResponsesNonce ticks', () => {
+    const subject = new QuestionsDashboard({
+      activeSessionSlug: 'edge',
+      activeSessionSlug: 'edge',
+      network: { id: 84532 },
+      isQuestionCacheReady: true,
+      questionsCacheNonce: 4,
+      questionResponsesNonce: 8,
+      questionScanProgress: null,
+    });
+    subject.loadQuestions = jest.fn();
+
+    const prevProps = {
+      ...subject.props,
+      questionResponsesNonce: 7,
+    };
+
+    subject.componentDidUpdate(prevProps);
+
+    expect(subject.loadQuestions).toHaveBeenCalledTimes(1);
+  });
+
+  it('reloads QuestionsDashboard when scoped hydration progress advances', () => {
+    const subject = new QuestionsDashboard({
+      activeSessionSlug: 'edge',
+      activeSessionSlug: 'edge',
+      network: { id: 84532 },
+      isQuestionCacheReady: true,
+      questionsCacheNonce: 4,
+      questionResponsesNonce: 8,
+      questionScanProgress: {
+        slug: 'edge',
+        phase: 'hydrate',
+        discoveredQuestions: 5,
+        hydratedQuestions: 3,
+      },
+    });
+    subject.loadQuestions = jest.fn();
+
+    const prevProps = {
+      ...subject.props,
+      questionScanProgress: {
+        slug: 'edge',
+        phase: 'hydrate',
+        discoveredQuestions: 5,
+        hydratedQuestions: 2,
+      },
+    };
+
+    subject.componentDidUpdate(prevProps);
+
+    expect(subject.loadQuestions).toHaveBeenCalledTimes(1);
+  });
+
+  it('aggregates QuestionsDashboard questions across list scope with dedupe, blocklists, and session slugs', () => {
+    jest.spyOn(sessionScanScope, 'readSessionScanScope').mockReturnValue('list');
+    jest.spyOn(sessionScanScope, 'readSessionScanSlugs').mockReturnValue(['edge', 'alpha', 'beta']);
+    const strictLookup = (slug) => {
+      if (slug === 'edge') return { networkChainId: 84532, BLOCKED_QUESTION_IDS: ['qblockedprimary'] };
+      if (slug === 'alpha') return { networkChainId: 84532, BLOCKED_QUESTION_IDS: ['qblockedalpha'] };
+      if (slug === 'beta') return { networkChainId: 84532, BLOCKED_QUESTION_IDS: [] };
+      return { networkChainId: 84532, BLOCKED_QUESTION_IDS: [] };
+    };
+    jest.spyOn(contractScriptsModule, 'getSessionConfigBySlug').mockImplementation(strictLookup);
+    jest.spyOn(contractScriptsModule, 'getSessionConfigBySlugOrDefault').mockImplementation(strictLookup);
+
+    const questionCachesBySlug = {
+      edge: {
+        '84532': {
+          questions: {
+            q1: { prompt: 'Primary 1' },
+            QDup: { prompt: 'Primary duplicate winner' },
+            qBlockedPrimary: { prompt: 'Blocked primary' },
+          },
+          questionResponses: {},
+        },
+      },
+      alpha: {
+        '84532': {
+          questions: {
+            q2: { prompt: 'Alpha 2' },
+            qdup: { prompt: 'Alpha duplicate loser' },
+            qBlockedAlpha: { prompt: 'Blocked alpha' },
+          },
+          questionResponses: {},
+        },
+      },
+      beta: {
+        '84532': {
+          questions: {
+            q3: { prompt: 'Beta 3' },
+          },
+          questionResponses: {},
+        },
+      },
+    };
+    const peekSpy = jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace, slug) => {
+      if (namespace !== 'questionsCache') return {};
+      return questionCachesBySlug[slug] || {};
+    });
+
+    const subject = new QuestionsDashboard({
+      activeSessionSlug: 'edge',
+      network: { id: 84532 },
+      onFilteredQuestionCountUpdate: jest.fn(),
+    });
+    subject.setState = jest.fn((next, cb) => {
+      const patch = typeof next === 'function' ? next(subject.state, subject.props) : next;
+      subject.state = { ...subject.state, ...(patch || {}) };
+      if (typeof cb === 'function') cb();
+      return patch;
+    });
+
+    subject.loadQuestions();
+
+    const idsLower = subject.state.questions.map((q) => String(q.id).toLowerCase());
+    expect(idsLower).toEqual(expect.arrayContaining(['q1', 'qdup', 'q2', 'q3']));
+    expect(subject.state.questions).toHaveLength(4);
+    expect(idsLower).not.toContain('qblockedprimary');
+    expect(idsLower).not.toContain('qblockedalpha');
+    expect(idsLower.filter((id) => id === 'qdup')).toHaveLength(1);
+
+    const byIdLower = new Map(
+      subject.state.questions.map((q) => [String(q.id).toLowerCase(), q])
+    );
+    expect(byIdLower.get('q1')?.sessionSlug).toBe('edge');
+    expect(byIdLower.get('qdup')?.sessionSlug).toBe('edge');
+    expect(byIdLower.get('q2')?.sessionSlug).toBe('alpha');
+    expect(byIdLower.get('q3')?.sessionSlug).toBe('beta');
+
+    expect(peekSpy).toHaveBeenCalledWith('questionsCache', 'edge', { clone: false });
+    expect(peekSpy).toHaveBeenCalledWith('questionsCache', 'alpha', { clone: false });
+    expect(peekSpy).toHaveBeenCalledWith('questionsCache', 'beta', { clone: false });
+  });
+
+  it('aggregates QuestionsDashboard questions across all scope using getAllSessionSlugs', () => {
+    jest.spyOn(sessionScanScope, 'readSessionScanScope').mockReturnValue('all');
+    const readScopeSlugsSpy = jest.spyOn(sessionScanScope, 'readSessionScanSlugs').mockReturnValue(['ignored']);
+    const allSlugsSpy = jest.spyOn(contractScriptsModule, 'getAllSessionSlugs').mockReturnValue(['edge', 'gamma', 'delta']);
+    const strictLookup = (slug) => {
+      if (slug === 'edge') return { networkChainId: 84532, BLOCKED_QUESTION_IDS: [] };
+      if (slug === 'gamma') return { networkChainId: 84532, BLOCKED_QUESTION_IDS: [] };
+      if (slug === 'delta') return { networkChainId: 84532, BLOCKED_QUESTION_IDS: ['qblockeddelta'] };
+      return { networkChainId: 84532, BLOCKED_QUESTION_IDS: [] };
+    };
+    jest.spyOn(contractScriptsModule, 'getSessionConfigBySlug').mockImplementation(strictLookup);
+    jest.spyOn(contractScriptsModule, 'getSessionConfigBySlugOrDefault').mockImplementation(strictLookup);
+
+    const questionCachesBySlug = {
+      edge: {
+        '84532': {
+          questions: {
+            q1: { prompt: 'Edge 1' },
+          },
+          questionResponses: {},
+        },
+      },
+      gamma: {
+        '84532': {
+          questions: {
+            Q1: { prompt: 'Gamma duplicate loser' },
+            q2: { prompt: 'Gamma 2' },
+          },
+          questionResponses: {},
+        },
+      },
+      delta: {
+        '84532': {
+          questions: {
+            q3: { prompt: 'Delta 3' },
+            qBlockedDelta: { prompt: 'Blocked delta' },
+          },
+          questionResponses: {},
+        },
+      },
+    };
+    jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace, slug) => {
+      if (namespace !== 'questionsCache') return {};
+      return questionCachesBySlug[slug] || {};
+    });
+
+    const subject = new QuestionsDashboard({
+      activeSessionSlug: 'edge',
+      network: { id: 84532 },
+      onFilteredQuestionCountUpdate: jest.fn(),
+    });
+    subject.setState = jest.fn((next, cb) => {
+      const patch = typeof next === 'function' ? next(subject.state, subject.props) : next;
+      subject.state = { ...subject.state, ...(patch || {}) };
+      if (typeof cb === 'function') cb();
+      return patch;
+    });
+
+    subject.loadQuestions();
+
+    const idsLower = subject.state.questions.map((q) => String(q.id).toLowerCase());
+    expect(subject.state.questions).toHaveLength(3);
+    expect(idsLower).toEqual(expect.arrayContaining(['q1', 'q2', 'q3']));
+    expect(idsLower).not.toContain('qblockeddelta');
+    expect(idsLower.filter((id) => id === 'q1')).toHaveLength(1);
+
+    const byIdLower = new Map(
+      subject.state.questions.map((q) => [String(q.id).toLowerCase(), q])
+    );
+    expect(byIdLower.get('q1')?.sessionSlug).toBe('edge');
+    expect(byIdLower.get('q2')?.sessionSlug).toBe('gamma');
+    expect(byIdLower.get('q3')?.sessionSlug).toBe('delta');
+
+    expect(allSlugsSpy).toHaveBeenCalledTimes(1);
+    expect(readScopeSlugsSpy).not.toHaveBeenCalled();
+  });
+
+  it('keeps QuestionsDashboard session-local on /session routes even when list scope includes other slugs', () => {
+    const priorUrl = window.location.href;
+    window.history.replaceState({}, '', '/session/edge');
+    try {
+      jest.spyOn(sessionScanScope, 'readSessionScanScope').mockReturnValue('list');
+      const readScopeSlugsSpy = jest.spyOn(sessionScanScope, 'readSessionScanSlugs').mockReturnValue(['edge', 'alpha', 'beta']);
+      const strictLookup = (slug) => {
+        if (slug === 'edge') return { networkChainId: 84532, BLOCKED_QUESTION_IDS: [] };
+        if (slug === 'alpha') return { networkChainId: 84532, BLOCKED_QUESTION_IDS: [] };
+        if (slug === 'beta') return { networkChainId: 84532, BLOCKED_QUESTION_IDS: [] };
+        return { networkChainId: 84532, BLOCKED_QUESTION_IDS: [] };
+      };
+      jest.spyOn(contractScriptsModule, 'getSessionConfigBySlug').mockImplementation(strictLookup);
+      jest.spyOn(contractScriptsModule, 'getSessionConfigBySlugOrDefault').mockImplementation(strictLookup);
+
+      const questionCachesBySlug = {
+        edge: {
+          '84532': {
+            questions: {
+              q1: { prompt: 'Edge 1' },
+            },
+            questionResponses: {},
+          },
+        },
+        alpha: {
+          '84532': {
+            questions: {
+              q2: { prompt: 'Alpha 2' },
+            },
+            questionResponses: {},
+          },
+        },
+        beta: {
+          '84532': {
+            questions: {
+              q3: { prompt: 'Beta 3' },
+            },
+            questionResponses: {},
+          },
+        },
+      };
+      const peekSpy = jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace, slug) => {
+        if (namespace !== 'questionsCache') return {};
+        return questionCachesBySlug[slug] || {};
+      });
+
+      const subject = new QuestionsDashboard({
+        activeSessionSlug: 'edge',
+        network: { id: 84532 },
+        onFilteredQuestionCountUpdate: jest.fn(),
+      });
+      subject.setState = jest.fn((next, cb) => {
+        const patch = typeof next === 'function' ? next(subject.state, subject.props) : next;
+        subject.state = { ...subject.state, ...(patch || {}) };
+        if (typeof cb === 'function') cb();
+        return patch;
+      });
+
+      subject.loadQuestions();
+
+      const idsLower = subject.state.questions.map((q) => String(q.id).toLowerCase());
+      expect(idsLower).toEqual(['q1']);
+      expect(peekSpy).toHaveBeenCalledWith('questionsCache', 'edge', { clone: false });
+      expect(peekSpy).not.toHaveBeenCalledWith('questionsCache', 'alpha', { clone: false });
+      expect(peekSpy).not.toHaveBeenCalledWith('questionsCache', 'beta', { clone: false });
+      expect(readScopeSlugsSpy).not.toHaveBeenCalled();
+    } finally {
+      window.history.replaceState({}, '', priorUrl);
+    }
+  });
+
+  it('aggregates QuestionsDashboard questions across list scope on bare /questions routes when the base session is unresolved', () => {
+    const priorUrl = window.location.href;
+    window.history.replaceState({}, '', '/questions');
+    try {
+      jest.spyOn(sessionScanScope, 'readSessionScanScope').mockReturnValue('list');
+      const readScopeSlugsSpy = jest.spyOn(sessionScanScope, 'readSessionScanSlugs').mockReturnValue(['alpha', 'beta']);
+      const strictLookup = (slug) => {
+        if (slug === 'alpha') return { slug: 'alpha', networkChainId: 84532, BLOCKED_QUESTION_IDS: [] };
+        if (slug === 'beta') return { slug: 'beta', networkChainId: 84532, BLOCKED_QUESTION_IDS: [] };
+        return null;
+      };
+      jest.spyOn(contractScriptsModule, 'getSessionConfigBySlug').mockImplementation(strictLookup);
+      jest.spyOn(contractScriptsModule, 'getSessionConfigBySlugOrDefault').mockImplementation(strictLookup);
+
+      const questionCachesBySlug = {
+        alpha: {
+          '84532': {
+            questions: {
+              q1: { prompt: 'Alpha 1' },
+            },
+            questionResponses: {},
+          },
+        },
+        beta: {
+          '84532': {
+            questions: {
+              q2: { prompt: 'Beta 2' },
+            },
+            questionResponses: {},
+          },
+        },
+      };
+      const peekSpy = jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace, slug) => {
+        if (namespace !== 'questionsCache') return {};
+        return questionCachesBySlug[slug] || {};
+      });
+
+      const subject = new QuestionsDashboard({
+        activeSessionSlug: '',
+        network: null,
+        onFilteredQuestionCountUpdate: jest.fn(),
+      });
+      subject.setState = jest.fn((next, cb) => {
+        const patch = typeof next === 'function' ? next(subject.state, subject.props) : next;
+        subject.state = { ...subject.state, ...(patch || {}) };
+        if (typeof cb === 'function') cb();
+        return patch;
+      });
+
+      subject.loadQuestions();
+
+      const idsLower = subject.state.questions.map((q) => String(q.id).toLowerCase());
+      expect(idsLower).toEqual(['q1', 'q2']);
+      expect(peekSpy).toHaveBeenCalledWith('questionsCache', '', { clone: false });
+      expect(peekSpy).toHaveBeenCalledWith('questionsCache', 'alpha', { clone: false });
+      expect(peekSpy).toHaveBeenCalledWith('questionsCache', 'beta', { clone: false });
+      expect(readScopeSlugsSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      window.history.replaceState({}, '', priorUrl);
+    }
+  });
+
+  it('refreshes QuestionsDashboard filtered questions and count when the inherited base session changes inside the same list scope', () => {
+    const priorUrl = window.location.href;
+    window.history.replaceState({}, '', '/questions');
+    try {
+      jest.spyOn(sessionScanScope, 'readSessionScanScope').mockReturnValue('list');
+      jest.spyOn(sessionScanScope, 'readSessionScanSlugs').mockReturnValue(['demo', 'alpha']);
+      const strictLookup = (slug) => {
+        if (slug === 'demo') return { slug: 'demo', networkChainId: 84532, BLOCKED_QUESTION_IDS: [] };
+        if (slug === 'alpha') return { slug: 'alpha', networkChainId: 84532, BLOCKED_QUESTION_IDS: [] };
+        return null;
+      };
+      jest.spyOn(contractScriptsModule, 'getSessionConfigBySlug').mockImplementation(strictLookup);
+      jest.spyOn(contractScriptsModule, 'getSessionConfigBySlugOrDefault').mockImplementation(strictLookup);
+
+      const questionCachesBySlug = {
+        demo: {
+          '84532': {
+            questions: {
+              qDemo: { id: 'qDemo', prompt: 'Demo 1' },
+            },
+            questionResponses: {},
+          },
+        },
+        alpha: {
+          '84532': {
+            questions: {
+              qAlpha: { id: 'qAlpha', prompt: 'Alpha 1' },
+            },
+            questionResponses: {},
+          },
+        },
+      };
+      jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace, slug) => {
+        if (namespace !== 'questionsCache') return {};
+        return questionCachesBySlug[slug] || {};
+      });
+
+      const onFilteredQuestionCountUpdate = jest.fn();
+      const subject = new QuestionsDashboard({
+        activeSessionSlug: 'demo',
+        network: { id: 84532 },
+        onFilteredQuestionCountUpdate,
+      });
+      subject.setState = jest.fn((next, cb) => {
+        const patch = typeof next === 'function' ? next(subject.state, subject.props) : next;
+        subject.state = { ...subject.state, ...(patch || {}) };
+        if (typeof cb === 'function') cb();
+        return patch;
+      });
+
+      subject.loadQuestions();
+      expect(subject.state.filteredQuestions.map((q) => String(q.id))).toEqual(['qDemo', 'qAlpha']);
+
+      onFilteredQuestionCountUpdate.mockClear();
+      subject.props = {
+        ...subject.props,
+        activeSessionSlug: 'alpha',
+      };
+
+      subject.loadQuestions();
+
+      expect(subject.state.filteredQuestions.map((q) => String(q.id))).toEqual(['qAlpha', 'qDemo']);
+      expect(onFilteredQuestionCountUpdate).toHaveBeenCalledWith(2, 0);
+    } finally {
+      window.history.replaceState({}, '', priorUrl);
+    }
+  });
+
+  it('keeps QuestionsDashboard session-local on query-pinned survey routes even when list scope includes other slugs', () => {
+    const priorUrl = window.location.href;
+    window.history.replaceState({}, '', '/survey/0xsurvey?session=edge');
+    try {
+      jest.spyOn(sessionScanScope, 'readSessionScanScope').mockReturnValue('list');
+      const readScopeSlugsSpy = jest.spyOn(sessionScanScope, 'readSessionScanSlugs').mockReturnValue(['edge', 'alpha', 'beta']);
+      jest.spyOn(contractScriptsModule, 'getSessionConfigBySlugOrDefault').mockImplementation((slug) => {
+        if (slug === 'edge') return { networkChainId: 84532, BLOCKED_QUESTION_IDS: [] };
+        if (slug === 'alpha') return { networkChainId: 84532, BLOCKED_QUESTION_IDS: [] };
+        if (slug === 'beta') return { networkChainId: 84532, BLOCKED_QUESTION_IDS: [] };
+        return { networkChainId: 84532, BLOCKED_QUESTION_IDS: [] };
+      });
+
+      const questionCachesBySlug = {
+        edge: {
+          '84532': {
+            questions: {
+              q1: { prompt: 'Edge 1' },
+            },
+            questionResponses: {},
+          },
+        },
+        alpha: {
+          '84532': {
+            questions: {
+              q2: { prompt: 'Alpha 2' },
+            },
+            questionResponses: {},
+          },
+        },
+        beta: {
+          '84532': {
+            questions: {
+              q3: { prompt: 'Beta 3' },
+            },
+            questionResponses: {},
+          },
+        },
+      };
+      const peekSpy = jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace, slug) => {
+        if (namespace !== 'questionsCache') return {};
+        return questionCachesBySlug[slug] || {};
+      });
+
+      const subject = new QuestionsDashboard({
+        activeSessionSlug: 'edge',
+        sessionSlug: 'edge',
+        network: { id: 84532 },
+        onFilteredQuestionCountUpdate: jest.fn(),
+      });
+      subject.setState = jest.fn((next, cb) => {
+        const patch = typeof next === 'function' ? next(subject.state, subject.props) : next;
+        subject.state = { ...subject.state, ...(patch || {}) };
+        if (typeof cb === 'function') cb();
+        return patch;
+      });
+
+      subject.loadQuestions();
+
+      const idsLower = subject.state.questions.map((q) => String(q.id).toLowerCase());
+      expect(idsLower).toEqual(['q1']);
+      expect(peekSpy).toHaveBeenCalledWith('questionsCache', 'edge', { clone: false });
+      expect(peekSpy).not.toHaveBeenCalledWith('questionsCache', 'alpha', { clone: false });
+      expect(peekSpy).not.toHaveBeenCalledWith('questionsCache', 'beta', { clone: false });
+      expect(readScopeSlugsSpy).not.toHaveBeenCalled();
+    } finally {
+      window.history.replaceState({}, '', priorUrl);
+    }
+  });
+
+  it('keeps pile warm-seed questions session-local on /session routes even when list scope includes other slugs', () => {
+    const priorUrl = window.location.href;
+    window.history.replaceState({}, '', '/session/edge');
+    try {
+      jest.spyOn(sessionScanScope, 'readSessionScanScope').mockReturnValue('list');
+      jest.spyOn(sessionScanScope, 'readSessionScanSlugs').mockReturnValue(['edge', 'alpha', 'beta']);
+      const strictLookup = (slug) => {
+        if (slug === 'edge') return { networkChainId: 84532, BLOCKED_QUESTION_IDS: [] };
+        if (slug === 'alpha') return { networkChainId: 84532, BLOCKED_QUESTION_IDS: ['qblockedalpha'] };
+        if (slug === 'beta') return { networkChainId: 84532, BLOCKED_QUESTION_IDS: [] };
+        return { networkChainId: 84532, BLOCKED_QUESTION_IDS: [] };
+      };
+      jest.spyOn(contractScriptsModule, 'getSessionConfigBySlug').mockImplementation(strictLookup);
+      jest.spyOn(contractScriptsModule, 'getSessionConfigBySlugOrDefault').mockImplementation(strictLookup);
+
+      const questionCachesBySlug = {
+        edge: {
+          '84532': {
+            questions: {
+              q1: { id: 'q1', prompt: 'Edge 1' },
+            },
+            questionResponses: {},
+          },
+        },
+        alpha: {
+          '84532': {
+            questions: {
+              q2: { id: 'q2', prompt: 'Alpha 2' },
+              qBlockedAlpha: { id: 'qBlockedAlpha', prompt: 'Blocked alpha' },
+            },
+            questionResponses: {},
+          },
+        },
+        beta: {
+          '84532': {
+            questions: {
+              q3: { id: 'q3', prompt: 'Beta 3' },
+            },
+            questionResponses: {},
+          },
+        },
+      };
+      const peekSpy = jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace, slug) => {
+        if (namespace !== 'questionsCache') return {};
+        return questionCachesBySlug[slug] || {};
+      });
+
+      const shell = new SurveyTool({
+        minifiedMode: 'pile',
+        network: { id: 84532 },
+        networkChainId: 84532,
+        account: '',
+        sessionSlug: 'edge',
+        activeSessionSlug: 'edge',
+        isQuestionCacheReady: true,
+        questionResponsesNonce: 1,
+        questionsCacheNonce: 1,
+        onFilterChange: jest.fn(),
+      });
+      const pileElement = shell.render();
+      const PileViewModeClass = pileElement.type;
+      const subject = new PileViewModeClass(pileElement.props);
+
+      const idsLower = subject.state.pileQuestions.map((q) => String(q.id).toLowerCase());
+      expect(idsLower).toEqual(['q1']);
+      expect(subject.state.allQuestionsForFilter.map((q) => String(q.id).toLowerCase())).toEqual(['q1']);
+      const byIdLower = new Map(
+        subject.state.pileQuestions.map((q) => [String(q.id).toLowerCase(), q])
+      );
+      expect(byIdLower.get('q1')?.sessionSlug).toBe('edge');
+      expect(byIdLower.has('q2')).toBe(false);
+      expect(byIdLower.has('q3')).toBe(false);
+      expect(idsLower).not.toContain('qblockedalpha');
+      expect(peekSpy).toHaveBeenCalledWith('questionsCache', 'edge', { clone: false });
+      expect(peekSpy).not.toHaveBeenCalledWith('questionsCache', 'alpha', { clone: false });
+      expect(peekSpy).not.toHaveBeenCalledWith('questionsCache', 'beta', { clone: false });
+    } finally {
+      window.history.replaceState({}, '', priorUrl);
+    }
+  });
+
+  it('keeps pile question loads session-local on /session routes even when list scope includes other slugs', async () => {
+    const priorUrl = window.location.href;
+    window.history.replaceState({}, '', '/session/edge');
+    try {
+      jest.spyOn(sessionScanScope, 'readSessionScanScope').mockReturnValue('list');
+      jest.spyOn(sessionScanScope, 'readSessionScanSlugs').mockReturnValue(['edge', 'alpha', 'beta']);
+      const strictLookup = (slug) => {
+        if (slug === 'edge') return { networkChainId: 84532, BLOCKED_QUESTION_IDS: [] };
+        if (slug === 'alpha') return { networkChainId: 84532, BLOCKED_QUESTION_IDS: [] };
+        if (slug === 'beta') return { networkChainId: 84532, BLOCKED_QUESTION_IDS: [] };
+        return { networkChainId: 84532, BLOCKED_QUESTION_IDS: [] };
+      };
+      jest.spyOn(contractScriptsModule, 'getSessionConfigBySlug').mockImplementation(strictLookup);
+      jest.spyOn(contractScriptsModule, 'getSessionConfigBySlugOrDefault').mockImplementation(strictLookup);
+
+      const questionCachesBySlug = {
+        edge: {
+          '84532': {
+            questions: {
+              q1: { id: 'q1', prompt: 'Edge 1', type: 'freeform' },
+            },
+            questionResponses: {},
+          },
+        },
+        alpha: {
+          '84532': {
+            questions: {
+              q2: { id: 'q2', prompt: 'Alpha 2', type: 'freeform' },
+            },
+            questionResponses: {
+              q2: {
+                '0xabc': { answer: { value: 'yes', encrypted: false }, additional: { value: '', encrypted: false } },
+              },
+            },
+          },
+        },
+        beta: {
+          '84532': {
+            questions: {
+              q3: { id: 'q3', prompt: 'Beta 3', type: 'freeform' },
+            },
+            questionResponses: {},
+          },
+        },
+      };
+      const readSpy = jest.spyOn(cacheScripts, 'readCache').mockImplementation(async (namespace, slug) => {
+        if (namespace !== 'questionsCache') return {};
+        return questionCachesBySlug[slug] || {};
+      });
+      jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace, slug) => {
+        if (namespace !== 'questionsCache') return {};
+        return questionCachesBySlug[slug] || {};
+      });
+
+      const shell = new SurveyTool({
+        minifiedMode: 'pile',
+        network: { id: 84532 },
+        networkChainId: 84532,
+        account: '0xAbC',
+        sessionSlug: 'edge',
+        activeSessionSlug: 'edge',
+        isQuestionCacheReady: true,
+        questionResponsesNonce: 5,
+        questionsCacheNonce: 1,
+        onFilterChange: jest.fn(),
+      });
+      const pileElement = shell.render();
+      const PileViewModeClass = pileElement.type;
+      const subject = new PileViewModeClass(pileElement.props);
+
+      subject.state = {
+        ...subject.state,
+        loading: true,
+        pileQuestions: [],
+        allQuestionsForFilter: [],
+        activePileIndex: 0,
+        filterState: {},
+        isFilterActive: false,
+        submissionComplete: false,
+        autoDecryptEnabled: false,
+        autoDecryptAttempted: {},
+        decryptingByKey: {},
+      };
+      subject.setState = jest.fn((update, cb) => {
+        const patch = typeof update === 'function' ? update(subject.state, subject.props) : update;
+        if (patch && typeof patch === 'object') {
+          subject.state = { ...subject.state, ...patch };
+        }
+        if (typeof cb === 'function') cb();
+        return patch;
+      });
+      subject.initializeResponseState = jest.fn((cb) => {
+        if (typeof cb === 'function') cb();
+      });
+      subject.rehydrateLocalCacheAnswersForRenderedIds = jest.fn((cb) => {
+        if (typeof cb === 'function') cb();
+      });
+      subject.rehydrateDraftForRenderedIds = jest.fn();
+
+      await subject.loadAndSortQuestions();
+
+      expect(subject.state.pileQuestions.map((q) => String(q.id).toLowerCase())).toEqual(['q1']);
+      expect(subject.state.allQuestionsForFilter.map((q) => String(q.id).toLowerCase())).toEqual(['q1']);
+      expect(subject.getPileFilterQuestionResponses()).toEqual({});
+      const byIdLower = new Map(
+        subject.state.pileQuestions.map((q) => [String(q.id).toLowerCase(), q])
+      );
+      expect(byIdLower.has('q2')).toBe(false);
+      const tree = subject.render();
+      const questionFilterNode = findElement(
+        tree,
+        (node) =>
+          node?.props?.onFilter === subject.handleFilter &&
+          node?.props?.currentViewModeForUrl === 'questions'
+      );
+      expect(questionFilterNode?.props?.storageKeyPrefix).toBe('dg:filters:edge');
+      expect(readSpy).toHaveBeenCalledWith('questionsCache', 'edge');
+      expect(readSpy).not.toHaveBeenCalledWith('questionsCache', 'alpha');
+      expect(readSpy).not.toHaveBeenCalledWith('questionsCache', 'beta');
+    } finally {
+      window.history.replaceState({}, '', priorUrl);
+    }
+  });
+
+  it('forwards hideEmbeddedDebugUi from QuestionsDashboard to standalone SurveyQuestions', () => {
+    const subject = new QuestionsDashboard({
+      hideEmbeddedDebugUi: true,
+      account: '0xabc',
+      network: { id: 84532 },
+      provider: {},
+      loginComplete: true,
+      onPendingStatsChange: jest.fn(),
+      questionFilterRef: { current: null },
+      activeSessionSlug: 'edge',
+      activeSessionSlug: 'edge',
+    });
+    subject.state = {
+      ...subject.state,
+      filterLoading: false,
+      questions: [{ id: 'q1', type: 'freeform', prompt: 'Q1' }],
+      filteredQuestions: [{ id: 'q1', type: 'freeform', prompt: 'Q1' }],
+    };
+
+    const tree = subject.render();
+    const surveyQuestionsNode = findFirstNodeByType(tree, SurveyQuestions);
+
+    expect(surveyQuestionsNode).toBeTruthy();
+    expect(surveyQuestionsNode?.props?.hideEmbeddedDebugUi).toBe(true);
+  });
+
+  it('recomputes SurveySelector question count on questionResponsesNonce tick', () => {
+    const subject = new SurveySelector({
+      autoOpenResults: false,
+      filterState: {},
+      isQuestionCacheReady: true,
+      isSurveyCacheReady: true,
+      singleQuestionMode: false,
+      network: { id: 84532 },
+      activeSessionSlug: 'edge',
+      activeSessionSlug: 'edge',
+      questionsCacheNonce: 4,
+      questionResponsesNonce: 2,
+    });
+    subject.fetchSurveys = jest.fn();
+    subject.computeFilteredQuestionCount = jest.fn();
+    subject.state = {
+      ...subject.state,
+      showLongLoading: false,
+      loading: false,
+    };
+
+    const prevProps = {
+      ...subject.props,
+      questionResponsesNonce: 1,
+    };
+
+    subject.componentDidUpdate(prevProps, subject.state);
+
+    expect(subject.computeFilteredQuestionCount).toHaveBeenCalledTimes(1);
+  });
+
+  it('recomputes SurveySelector question count when only networkChainId changes', () => {
+    const subject = new SurveySelector({
+      autoOpenResults: false,
+      filterState: {},
+      isQuestionCacheReady: true,
+      isSurveyCacheReady: true,
+      singleQuestionMode: false,
+      networkChainId: 84532,
+      activeSessionSlug: 'edge',
+      questionsCacheNonce: 4,
+      questionResponsesNonce: 2,
+    });
+    subject.fetchSurveys = jest.fn();
+    subject.computeFilteredQuestionCount = jest.fn();
+    subject.clearStickyQuestionCountSnapshot = jest.fn();
+    subject.state = {
+      ...subject.state,
+      showLongLoading: false,
+      loading: false,
+    };
+
+    const prevProps = {
+      ...subject.props,
+      networkChainId: 84531,
+    };
+
+    subject.componentDidUpdate(prevProps, subject.state);
+
+    expect(subject.clearStickyQuestionCountSnapshot).toHaveBeenCalledTimes(1);
+    expect(subject.fetchSurveys).toHaveBeenCalledTimes(1);
+    expect(subject.computeFilteredQuestionCount).toHaveBeenCalledTimes(1);
+  });
+
+  it('passes the session chain through when SurveySelector opens SurveyResults', () => {
+    const subject = new SurveySelector({
+      autoOpenResults: false,
+      filterState: {},
+      isQuestionCacheReady: true,
+      isSurveyCacheReady: true,
+      singleQuestionMode: false,
+      network: { id: 84532 },
+      networkChainId: 11155420,
+      activeSessionSlug: 'edge',
+    });
+    subject.state = {
+      ...subject.state,
+      loading: false,
+      viewMode: 'questions',
+      showResults: true,
+      showLongLoading: false,
+    };
+
+    const tree = subject.render();
+    const resultsNode = findElement(tree, (candidate) => candidate?.type === ConnectedSurveyResults);
+
+    expect(resultsNode).toBeTruthy();
+    expect(resultsNode.props.networkChainId).toBe(11155420);
+  });
+
+  it('renders SurveySelector selected-survey doc link when document URLs exist', () => {
+    const subject = new SurveySelector({
+      autoOpenResults: false,
+      filterState: {},
+      isQuestionCacheReady: true,
+      isSurveyCacheReady: true,
+      singleQuestionMode: false,
+      network: { id: 84532 },
+      activeSessionSlug: 'edge',
+    });
+    subject.state = {
+      ...subject.state,
+      loading: false,
+      viewMode: 'survey',
+      showLongLoading: false,
+      surveys: [
+        {
+          id: 'survey-with-docs',
+          title: 'Survey with docs',
+          documentURLs: [
+            'https://example.com/docs/one',
+            'https://example.com/docs/two',
+          ],
+        },
+      ],
+      selectedSurveyIndex: 0,
+    };
+    subject.getParsedQuestionsCacheForRender = jest.fn(() => ({}));
+    subject.areSurveySpecificQuestionsLoaded = jest.fn(() => true);
+
+    const tree = subject.render();
+    const docLink = findElement(
+      tree,
+      (element) => element?.type === 'a' && element?.props?.href === 'https://example.com/docs/one'
+    );
+
+    expect(docLink).toBeTruthy();
+    expect(docLink?.props?.title).toBe('2 documents');
+  });
+
+  it('renders SurveySelector dropdown survey-entry doc link when document URLs exist', () => {
+    const subject = new SurveySelector({
+      autoOpenResults: false,
+      filterState: {},
+      isQuestionCacheReady: true,
+      isSurveyCacheReady: true,
+      singleQuestionMode: false,
+      network: { id: 84532 },
+      activeSessionSlug: 'edge',
+    });
+    subject.state = {
+      ...subject.state,
+      loading: false,
+      viewMode: 'survey',
+      showLongLoading: false,
+      surveys: [
+        {
+          id: 'survey-with-docs',
+          title: 'Survey with docs',
+          documentURLs: [
+            'https://example.com/docs/one',
+            'https://example.com/docs/two',
+          ],
+        },
+      ],
+      selectedSurveyIndex: null,
+    };
+    subject.getParsedQuestionsCacheForRender = jest.fn(() => ({}));
+    subject.areSurveySpecificQuestionsLoaded = jest.fn(() => true);
+
+    const tree = subject.render();
+    const docLink = findElement(
+      tree,
+      (element) => (
+        element?.type === 'a' &&
+        element?.props?.href === 'https://example.com/docs/one' &&
+        nodeHasClassName(element, 'surveyItemDocLink')
+      )
+    );
+
+    expect(docLink).toBeTruthy();
+    expect(docLink?.props?.title).toBe('2 documents');
+  });
+
+  it('shows the questions selector encrypted count only while the dropdown is open', () => {
+    const subject = new SurveySelector({
+      autoOpenResults: false,
+      filterState: {},
+      isQuestionCacheReady: true,
+      isSurveyCacheReady: true,
+      singleQuestionMode: false,
+      network: { id: 84532 },
+      activeSessionSlug: 'edge',
+    });
+    subject.state = {
+      ...subject.state,
+      loading: false,
+      viewMode: 'questions',
+      filteredQuestionCount: 12,
+      encryptedQuestionCount: 1,
+      showLongLoading: false,
+      selectorDropdownOpen: false,
+    };
+    syncClassSetState(subject);
+    subject.getParsedQuestionsCacheForRender = jest.fn(() => ({}));
+    subject.handleFilteredQuestionCountUpdate(12, 1);
+
+    const closedTree = subject.render();
+    const questionToggle = findElement(
+      closedTree,
+      (element) => element?.props?.['data-testid'] === E2E_TESTIDS.SURVEY_QUESTIONS_TOGGLE
+    );
+    const closedEncryptedCountBadge = findElement(
+      closedTree,
+      (element) => element?.props?.['data-testid'] === E2E_TESTIDS.SURVEY_QUESTIONS_ENCRYPTED_COUNT
+    );
+
+    expect(questionToggle).toBeTruthy();
+    expect(closedEncryptedCountBadge).toBeNull();
+
+    subject.state = {
+      ...subject.state,
+      selectorDropdownOpen: true,
+    };
+
+    const openTree = subject.render();
+    const openEncryptedCountBadge = findElement(
+      openTree,
+      (element) => element?.props?.['data-testid'] === E2E_TESTIDS.SURVEY_QUESTIONS_ENCRYPTED_COUNT
+    );
+
+    expect(openEncryptedCountBadge).toBeTruthy();
+    expect(openEncryptedCountBadge?.props?.['data-ce-encrypted-question-count']).toBe('1');
+    expect(treeHasText(openEncryptedCountBadge, '1')).toBe(true);
+  });
+
+  it('keeps the last valid questions selector count visible while same-session loading is active', () => {
+    const subject = new SurveySelector({
+      autoOpenResults: false,
+      filterState: {},
+      isQuestionCacheReady: true,
+      isSurveyCacheReady: true,
+      singleQuestionMode: false,
+      network: { id: 84532 },
+      activeSessionSlug: 'edge',
+    });
+    syncClassSetState(subject);
+    subject.getParsedQuestionsCacheForRender = jest.fn(() => ({}));
+    subject.state = {
+      ...subject.state,
+      loading: false,
+      viewMode: 'questions',
+      filteredQuestionCount: 12,
+      encryptedQuestionCount: 1,
+      showLongLoading: false,
+      selectorDropdownOpen: false,
+    };
+
+    subject.handleFilteredQuestionCountUpdate(12, 1);
+
+    subject.props = {
+      ...subject.props,
+      isQuestionCacheReady: false,
+    };
+    subject.state = {
+      ...subject.state,
+      loading: true,
+      filteredQuestionCount: 0,
+      encryptedQuestionCount: 0,
+      showLongLoading: true,
+    };
+
+    const tree = subject.render();
+    const questionToggle = findElement(
+      tree,
+      (element) => element?.props?.['data-testid'] === E2E_TESTIDS.SURVEY_QUESTIONS_TOGGLE
+    );
+    const questionToggleCount = findElement(
+      questionToggle,
+      (element) => nodeHasClassName(element, styles.questionSelectorCount)
+    );
+    const loadingSpinner = findElement(
+      questionToggle,
+      (element) => element?.props?.icon?.iconName === 'spinner'
+    );
+
+    expect(questionToggle).toBeTruthy();
+    expect(questionToggleCount).toBeTruthy();
+    expect(loadingSpinner).toBeTruthy();
+    expect(treeHasText(questionToggle, 'Loading...')).toBe(true);
+    expect(renderToStaticMarkup(questionToggleCount)).toContain('(12)');
+    expect(renderToStaticMarkup(questionToggleCount)).not.toContain('(0)');
+  });
+
+  it('shows an immediate Loading label for the questions selector while question cache bootstrap is still pending', () => {
+    const subject = new SurveySelector({
+      autoOpenResults: false,
+      filterState: {},
+      isQuestionCacheReady: false,
+      isSurveyCacheReady: true,
+      singleQuestionMode: false,
+      network: { id: 84532 },
+      activeSessionSlug: 'edge',
+    });
+    syncClassSetState(subject);
+    subject.getParsedQuestionsCacheForRender = jest.fn(() => ({}));
+    subject.state = {
+      ...subject.state,
+      loading: false,
+      viewMode: 'questions',
+      filteredQuestionCount: 0,
+      encryptedQuestionCount: 0,
+      showLongLoading: false,
+      selectorDropdownOpen: false,
+    };
+
+    const tree = subject.render();
+    const questionToggle = findElement(
+      tree,
+      (element) => element?.props?.['data-testid'] === E2E_TESTIDS.SURVEY_QUESTIONS_TOGGLE
+    );
+
+    expect(questionToggle).toBeTruthy();
+    expect(treeHasText(questionToggle, 'Loading...')).toBe(true);
+  });
+
+  it('keeps the open questions dropdown row aligned to the sticky count and encrypted badge while loading', () => {
+    const subject = new SurveySelector({
+      autoOpenResults: false,
+      filterState: {},
+      isQuestionCacheReady: true,
+      isSurveyCacheReady: true,
+      singleQuestionMode: false,
+      network: { id: 84532 },
+      activeSessionSlug: 'edge',
+    });
+    syncClassSetState(subject);
+    subject.getParsedQuestionsCacheForRender = jest.fn(() => ({}));
+    subject.state = {
+      ...subject.state,
+      loading: false,
+      viewMode: 'questions',
+      filteredQuestionCount: 12,
+      encryptedQuestionCount: 1,
+      showLongLoading: false,
+      selectorDropdownOpen: true,
+    };
+
+    subject.handleFilteredQuestionCountUpdate(12, 1);
+
+    subject.props = {
+      ...subject.props,
+      isQuestionCacheReady: false,
+    };
+    subject.state = {
+      ...subject.state,
+      loading: false,
+      filteredQuestionCount: 0,
+      encryptedQuestionCount: 0,
+      selectorDropdownOpen: true,
+    };
+
+    const tree = subject.render();
+    const encryptedCountBadge = findElement(
+      tree,
+      (element) => element?.props?.['data-testid'] === E2E_TESTIDS.SURVEY_QUESTIONS_ENCRYPTED_COUNT
+    );
+    const loadingSpinnerCount = countElements(
+      tree,
+      (element) => element?.props?.icon?.iconName === 'spinner'
+    );
+    const stickyCountNodeTotal = countElements(
+      tree,
+      (element) => (
+        nodeHasClassName(element, styles.questionSelectorCount) &&
+        renderToStaticMarkup(element).includes('(12)')
+      )
+    );
+
+    expect(loadingSpinnerCount).toBeGreaterThanOrEqual(2);
+    expect(stickyCountNodeTotal).toBeGreaterThanOrEqual(2);
+    expect(encryptedCountBadge).toBeTruthy();
+    expect(encryptedCountBadge?.props?.['data-ce-encrypted-question-count']).toBe('1');
+    expect(treeHasText(encryptedCountBadge, '1')).toBe(true);
+  });
+
+  it('does not reuse the sticky questions selector count after a session switch', () => {
+    const subject = new SurveySelector({
+      autoOpenResults: false,
+      filterState: {},
+      isQuestionCacheReady: true,
+      isSurveyCacheReady: true,
+      singleQuestionMode: false,
+      network: { id: 84532 },
+      activeSessionSlug: 'edge',
+    });
+    syncClassSetState(subject);
+    subject.fetchSurveys = jest.fn();
+    subject.computeFilteredQuestionCount = jest.fn();
+    subject.getParsedQuestionsCacheForRender = jest.fn(() => ({}));
+    subject.state = {
+      ...subject.state,
+      loading: false,
+      viewMode: 'questions',
+      filteredQuestionCount: 12,
+      encryptedQuestionCount: 1,
+      showLongLoading: false,
+      selectorDropdownOpen: false,
+    };
+
+    subject.handleFilteredQuestionCountUpdate(12, 1);
+
+    const prevProps = { ...subject.props };
+    subject.props = {
+      ...subject.props,
+      activeSessionSlug: 'alpha',
+      isQuestionCacheReady: false,
+    };
+    subject.state = {
+      ...subject.state,
+      loading: true,
+      filteredQuestionCount: 0,
+      encryptedQuestionCount: 0,
+      showLongLoading: true,
+    };
+
+    subject.componentDidUpdate(prevProps, subject.state);
+
+    const tree = subject.render();
+    const questionToggle = findElement(
+      tree,
+      (element) => element?.props?.['data-testid'] === E2E_TESTIDS.SURVEY_QUESTIONS_TOGGLE
+    );
+    const questionToggleCount = findElement(
+      questionToggle,
+      (element) => nodeHasClassName(element, styles.questionSelectorCount)
+    );
+    const encryptedCountBadge = findElement(
+      tree,
+      (element) => element?.props?.['data-testid'] === E2E_TESTIDS.SURVEY_QUESTIONS_ENCRYPTED_COUNT
+    );
+
+    expect(questionToggle).toBeTruthy();
+    expect(questionToggleCount).toBeTruthy();
+    expect(renderToStaticMarkup(questionToggleCount)).not.toContain('(12)');
+    expect(renderToStaticMarkup(questionToggleCount)).toContain('(0)');
+    expect(encryptedCountBadge).toBeNull();
+  });
+
+  it('does not render the SurveySelector header progress bar during background scanning', () => {
+    const subject = new SurveySelector({
+      autoOpenResults: false,
+      filterState: {},
+      isQuestionCacheReady: false,
+      isSurveyCacheReady: true,
+      singleQuestionMode: false,
+      network: { id: 84532 },
+      activeSessionSlug: 'edge',
+      questionsCacheNonce: 4,
+      account: '0xabc',
+      questionScanProgress: {
+        slug: 'edge',
+        phase: 'scan',
+        totalBlocks: 100,
+        remainingBlocks: 40,
+        scannedBlocks: 60,
+      },
+    });
+    subject.state = {
+      ...subject.state,
+      loading: false,
+      viewMode: 'questions',
+      showLongLoading: false,
+    };
+
+    const tree = subject.render();
+
+    expect(treeHasText(tree, 'Scanning...')).toBe(false);
+    expect(treeHasText(tree, 'blocks left')).toBe(false);
+    expect(treeHasText(tree, 'items left')).toBe(false);
+    expect(treeHasText(tree, '60 / 100')).toBe(false);
+  });
+
+  it('renders the SurveySelector header submit CTA with submitGlow when pending edits exist', () => {
+    const subject = new SurveySelector({
+      autoOpenResults: false,
+      filterState: {},
+      isQuestionCacheReady: true,
+      isSurveyCacheReady: true,
+      singleQuestionMode: false,
+      network: { id: 84532 },
+      activeSessionSlug: 'edge',
+    });
+    syncClassSetState(subject);
+    subject.state = {
+      ...subject.state,
+      loading: false,
+      viewMode: 'questions',
+      showLongLoading: false,
+      pendingSubmitStats: {
+        total: 2,
+        encrypted: 1,
+        submittedSinceLastEdit: false,
+        isSubmitting: false,
+      },
+    };
+
+    const tree = subject.render();
+    const headerSubmitButton = findElement(
+      tree,
+      (element) => element?.props?.['data-testid'] === E2E_TESTIDS.SURVEY_SUBMIT
+    );
+
+    expect(headerSubmitButton).toBeTruthy();
+    expect(nodeHasClassName(headerSubmitButton, styles.headerSubmitButton)).toBe(true);
+    expect(nodeHasClassName(headerSubmitButton, styles.submitGlow)).toBe(true);
+  });
+
+  it('formats capped question scan progress against the requested total range', () => {
+    const display = buildQuestionScanProgressDisplay({
+      totalBlocks: 50000,
+      requestedTotalBlocks: 234000,
+      wasCapped: true,
+      scannedBlocks: 50000,
+      remainingBlocks: 184000,
+    });
+
+    expect(display.metaLeftText).toBe('184,000 blocks left');
+    expect(display.metaRightText).toBe('50,000 / 234,000');
+    expect(display.percentComplete).toBe(21);
+  });
+
+  it('renders capped pile loading progress with the requested total block count', () => {
+    const shell = new SurveyTool({
+      minifiedMode: 'pile',
+      network: { id: 84532 },
+      networkChainId: 84532,
       account: '',
       loginComplete: false,
       network: { id: 84532 },
