@@ -26,6 +26,7 @@ import PolicyGlobe, {
 } from './PolicyGlobe.jsx';
 import policyStyles from './PolicyGlobe.module.scss';
 import TweetCard, { DebateMapSection, ExternalSourceLink } from './TweetCard.jsx';
+import { PUBLIC_AI_DISCOURSE_CORPUS_URL } from '../../variables/publicRepoMetadata.js';
 
 // Hidden tabs — restore by adding 'cross_corpus' or 'lesswrong_posts' back to this array
 const CORPUS_ORDER = [
@@ -410,7 +411,7 @@ const CorpusViewer = ({ onAtlasIssueOpen = null, showGithubLink = true }) => {
       {showGithubLink ? (
         <div className={styles.sectionBlock}>
           <a
-            href="https://github.com/xoCortex/context-engine/tree/main/client/src/variables/demo"
+            href={PUBLIC_AI_DISCOURSE_CORPUS_URL}
             target="_blank"
             rel="noopener noreferrer"
             className={styles.githubLink}
