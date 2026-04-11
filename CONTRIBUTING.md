@@ -14,7 +14,7 @@ Be constructive in issues and PRs.
 4. Install root dependencies:
    `npm install`
 5. Install client dependencies:
-   `cd client && npm install`
+   `cd client && npm install --legacy-peer-deps`
 
 The local React dev server runs with:
 
@@ -57,7 +57,6 @@ Before opening a PR, run the smallest relevant test set for your change. `npm te
 - Use JavaScript and React; do not introduce TypeScript as part of routine contribution work.
 - Follow the existing SCSS module pattern for component styling.
 - Use `data-testid="ce-<area>-<control>"` for new stable UI hooks.
-- Keep `ethers` on v5; do not upgrade the repo to v6.
 
 ## Good First Issues
 
@@ -70,4 +69,5 @@ Before opening a PR, run the smallest relevant test set for your change. `npm te
 
 - App shell and route/runtime orchestration map: [docs/MainSite.MAP.md](docs/MainSite.MAP.md)
 - Survey/question runtime map: [docs/SurveyTool.MAP.md](docs/SurveyTool.MAP.md)
+- Session creation/runtime map: [docs/SessionWizard.MAP.md](docs/SessionWizard.MAP.md)
 - Encryption and SBT gates: sensitive fields can be encrypted behind Lit access-control conditions, and SBT ownership is the unlock condition for gated reads. Avoid exposing gated plaintext in docs, screenshots, logs, or fixtures.
