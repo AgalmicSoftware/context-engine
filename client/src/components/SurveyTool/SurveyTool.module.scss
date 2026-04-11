@@ -1663,10 +1663,35 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  position: relative;
+  isolation: isolate;
+  overflow: visible;
+  z-index: 0;
   transition:
     transform 0.2s ease,
     background-color 0.2s ease,
     border-color 0.2s ease;
+  > * {
+    position: relative;
+    z-index: 1;
+  }
+  &.submitGlow::before {
+    position: absolute;
+    content: '';
+    background: linear-gradient(90deg, #fff 40%, transparent 40%);
+    top: -5px;
+    bottom: -5px;
+    left: -5px;
+    right: -5px;
+    z-index: 2;
+    border-radius: calc(var(--ce-radius-10) + 5px);
+    background-size: 200% 4px;
+    background-repeat: no-repeat;
+    filter: drop-shadow(0 0 8px #fff);
+    background-position: 80% 0;
+    animation: beforeLineAnim 5.4s linear infinite;
+    pointer-events: none;
+  }
   &:hover {
     background-color: var(--ce-color-indigo);
     border-color: var(--ce-color-indigo);
@@ -1677,6 +1702,10 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     cursor: not-allowed;
     animation: none;
     transform: none;
+  }
+  &:disabled::before {
+    content: none;
+    animation: none;
   }
 }
 
@@ -4120,6 +4149,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 @media (prefers-reduced-motion: reduce) {
   .pileSubmitSuccessBadge,
   .pileFooter .pileSubmitButton.submitGlow::before,
+  .headerSubmitButton.submitGlow::before,
   .submitGlow,
   .scanningIndicator {
     -webkit-animation: none !important;
