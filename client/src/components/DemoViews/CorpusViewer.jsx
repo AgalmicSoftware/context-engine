@@ -128,22 +128,6 @@ const getPolicyMapFill = (status = '', isFallback = false) => {
   }
 };
 
-const buildPolicyMapSubtitle = ({ filterStatus, filteredEntries, globalStatus }) => {
-  const count = Array.isArray(filteredEntries) ? filteredEntries.length : 0;
-
-  if (count === 0) {
-    return filterStatus === 'all'
-      ? 'No policy entries are loaded for this corpus yet.'
-      : `No ${filterStatus} policy entries are active in this corpus slice.`;
-  }
-
-  if (globalStatus) {
-    return `${count} ${filterStatus === 'all' ? 'policy entries' : `${filterStatus} entries`} selected. International frameworks add a broader global glow.`;
-  }
-
-  return `${count} ${filterStatus === 'all' ? 'policy entries' : `${filterStatus} entries`} selected. Highlighted regions reflect the filtered laws.`;
-};
-
 const shouldUseHalfWidthGrid = (corpusKey = '') => (
   corpusKey === 'tweets' || corpusKey === 'arxiv_ai_safety'
 );
@@ -156,17 +140,46 @@ const formatAuthors = (entry = {}) => {
   return `${entry.authors[0]} +${entry.authors.length - 1}`;
 };
 
+const buildInsiderAuthorKey = (entry = {}) => (
+  String(entry.author || entry.title || entry.id || '').trim().toLowerCase()
+);
+
+const diversifyInsiderEntries = (entries = []) => {
+  const remainingEntries = Array.isArray(entries) ? [...entries] : [];
+  const orderedEntries = [];
+  let lastAuthorKey = '';
+
+  while (remainingEntries.length > 0) {
+    let nextIndex = -1;
+    for (let index = 0; index < remainingEntries.length; index += 1) {
+      if (buildInsiderAuthorKey(remainingEntries[index]) !== lastAuthorKey) {
+        nextIndex = index;
+        break;
+      }
+    }
+    const safeIndex = nextIndex >= 0 ? nextIndex : 0;
+    const [nextEntry] = remainingEntries.splice(safeIndex, 1);
+    orderedEntries.push(nextEntry);
+    lastAuthorKey = buildInsiderAuthorKey(nextEntry);
+  }
+
+  return orderedEntries;
+};
+
 const buildCorpusDefinitions = () => (
   CORPUS_ORDER
     .map((key) => {
       const corpus = corpusSample?.corpuses?.[key];
       if (!corpus) return null;
       const entries = Array.isArray(corpus.entries) ? corpus.entries : [];
+      const orderedEntries = key === 'dwarkesh_lab_insiders'
+        ? diversifyInsiderEntries(entries)
+        : entries;
 
       return {
         ...corpus,
         count_full: corpus.count_full,
-        entries,
+        entries: orderedEntries,
         key,
         tabLabel: TAB_LABELS[key] || corpus.label || key,
       };
@@ -469,13 +482,6 @@ const CorpusViewer = ({ onAtlasIssueOpen = null, showGithubLink = true }) => {
                             colorScale={(regionStatus) => getPolicyMapFill(regionStatus || globalStatus, !regionStatus)}
                             compact
                           />
-                        </div>
-                        <div className={styles.policyMapAssistiveText}>
-                          {buildPolicyMapSubtitle({
-                            filterStatus,
-                            filteredEntries,
-                            globalStatus,
-                          })}
                         </div>
                       </div>
                     );

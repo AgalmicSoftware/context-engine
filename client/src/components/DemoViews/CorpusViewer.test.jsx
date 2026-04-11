@@ -100,10 +100,34 @@ describe('CorpusViewer', () => {
     const phoneBlock = extractMediaBlock(corpusScss, '@media (max-width: 480px)', '.container {');
     const policyScss = fs.readFileSync(path.join(__dirname, 'PolicyGlobe.module.scss'), 'utf8');
     const policyMobileBlock = extractMediaBlock(policyScss, '@media (max-width: 640px)', '.filterButton {');
+    const mapScss = fs.readFileSync(
+      path.join(__dirname, 'DemoAnalysis', 'DemoAnalysisWorkspace.module.scss'),
+      'utf8'
+    );
+    const mapJsx = fs.readFileSync(
+      path.join(__dirname, 'DemoAnalysis', 'WorldResultsMap.jsx'),
+      'utf8'
+    );
+    const compactMapMobileBlock = extractMediaBlock(mapScss, '@media (max-width: 640px)', '.panel,');
 
     expect(mobileBlock).toContain('.tabButton {');
-    expect(mobileBlock).toContain('max-width: 132px;');
-    expect(mobileBlock).toContain('min-width: 104px;');
+    expect(mobileBlock).toContain('.tabBar {');
+    expect(mobileBlock).toContain('display: grid;');
+    expect(mobileBlock).toContain('grid-template-columns: repeat(2, minmax(0, 1fr));');
+    expect(mobileBlock).toContain('overflow: visible;');
+    expect(mobileBlock).toContain('max-width: none;');
+    expect(mobileBlock).toContain('min-width: 0;');
+    expect(mobileBlock).toContain('width: 100%;');
+    expect(mobileBlock).toContain('.tabIcon {');
+    expect(mobileBlock).toContain('font-size: 28px;');
+    expect(mobileBlock).toContain('.policyMapColumn {');
+    expect(mobileBlock).toContain('order: -1;');
+    expect(mobileBlock).toContain('.policyListColumn {');
+    expect(mobileBlock).toContain('order: 1;');
+    expect(mobileBlock).toContain('.policySplitLayout {');
+    expect(mobileBlock).toContain('gap: 10px;');
+    expect(mobileBlock).toContain('.policyMapLens {');
+    expect(mobileBlock).toContain('padding: 0;');
     expect(mobileBlock).toContain('.tweetCard .tweetAuthorRow {');
     expect(mobileBlock).toContain('display: grid;');
     expect(mobileBlock).toContain('grid-template-columns: 44px minmax(0, 1fr);');
@@ -118,14 +142,31 @@ describe('CorpusViewer', () => {
     expect(mobileBlock).toContain('width: 100%;');
 
     expect(phoneBlock).toContain('.tabButton {');
-    expect(phoneBlock).toContain('max-width: 118px;');
-    expect(phoneBlock).toContain('min-width: 96px;');
+    expect(phoneBlock).toContain('.tabBar {');
+    expect(phoneBlock).toContain('gap: 8px;');
+    expect(phoneBlock).toContain('min-height: 78px;');
+    expect(phoneBlock).toContain('.tabIcon {');
+    expect(phoneBlock).toContain('font-size: 26px;');
     expect(phoneBlock).toContain('.tweetCard .tweetAuthorRow {');
     expect(phoneBlock).toContain('grid-template-columns: 40px minmax(0, 1fr);');
 
     expect(policyMobileBlock).toContain('.filterButton {');
     expect(policyMobileBlock).toContain('font-size: 11px;');
     expect(policyMobileBlock).toContain('white-space: normal;');
+    expect(corpusScss).toMatch(/\.tabIcon\s*{[\s\S]*?font-size:\s*24px;/);
+    expect(corpusScss).toMatch(/\.container\s*{[\s\S]*?box-sizing:\s*border-box;[\s\S]*?max-width:\s*100%;[\s\S]*?width:\s*100%;/);
+    expect(corpusScss).toMatch(/\.policyMapLens\s*{[\s\S]*?padding:\s*4px 4px 0;/);
+    expect(corpusScss).toMatch(/\.policyMapPanel\s*{[\s\S]*?padding:\s*10px 10px 12px;/);
+    expect(corpusScss).toMatch(/\.debateMapLink\s*{[\s\S]*?box-sizing:\s*border-box;/);
+    expect(corpusScss).toMatch(/\.externalLink\s*{[\s\S]*?box-sizing:\s*border-box;/);
+    expect(corpusScss).toMatch(/\.cardFooterLinks\s*{[\s\S]*?width:\s*100%;/);
+    expect(mapScss).toMatch(/\.mapFrameCompact\s*{[\s\S]*?width:\s*100%;[\s\S]*?padding:\s*0;/);
+    expect(mapScss).toMatch(/\.mapFrameCompact\s*{[\s\S]*?:global\(svg\)\s*{[\s\S]*?display:\s*block;[\s\S]*?max-width:\s*none;[\s\S]*?width:\s*100%;/);
+    expect(compactMapMobileBlock).toContain('.mapFrameCompact {');
+    expect(compactMapMobileBlock).toContain('padding-top: 0;');
+    expect(compactMapMobileBlock).toContain('.mapFrameCompact :global(svg) {');
+    expect(compactMapMobileBlock).toContain('max-width: none;');
+    expect(mapJsx).toMatch(/projectionConfig=\{\{\s*rotate:\s*\[-10,\s*0,\s*0\],\s*scale:\s*compact \? 147 : 147\s*\}\}/);
   });
 
   it('maps legacy tweet debate tags into atlas issue links', () => {
@@ -326,6 +367,22 @@ describe('CorpusViewer', () => {
 
     expect(screen.getAllByText(/Interview date:/i).length).toBeGreaterThan(0);
     expect(screen.getAllByRole('link', { name: 'View interview' }).length).toBeGreaterThan(0);
+  });
+
+  it('keeps the first insider interview slots diversified when the same guest has multiple entries', () => {
+    const { container } = render(
+      <MemoryRouter>
+        <CorpusViewer />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Insider Interviews' }));
+
+    const insiderCards = Array.from(container.querySelectorAll('article'));
+
+    expect(insiderCards[0]?.textContent).toContain('Dario Amodei');
+    expect(insiderCards[1]?.textContent).toContain('Demis Hassabis');
+    expect(insiderCards[2]?.textContent).toContain('Dario Amodei');
   });
 
   it('keeps curated insider interview links as absolute external URLs', () => {
