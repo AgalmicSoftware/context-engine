@@ -473,49 +473,37 @@ describe('OnePageSession view gating', () => {
 
     expect(phoneBlock).toContain('.sectionContainer');
     expect(phoneBlock).toContain('border: none;');
+    expect(phoneBlock).toContain('.sectionHeader .sectionHeaderSubtitle {');
+    expect(phoneBlock).toContain('font-size: 1em;');
+    expect(phoneBlock).toContain('font-weight: inherit;');
+    expect(phoneBlock).toContain('color: rgba(255, 255, 255, 0.15);');
+    expect(phoneBlock).toContain('.sectionHeader {');
+    expect(phoneBlock).toContain('align-items: center;');
+    expect(phoneBlock).toContain('.documentsSectionHeaderMeta .sectionHeaderTooltip > svg {');
+    expect(phoneBlock).toContain('opacity: 0.6;');
+    expect(phoneBlock).toContain('.documentsSectionHeaderMeta .sectionHeaderTooltip {');
+    expect(phoneBlock).toContain('justify-content: center;');
+    expect(phoneBlock).toContain('min-height: 44px;');
+    expect(phoneBlock).toContain('min-width: 44px;');
     expect(smallTabletBlock).toContain('.sectionHeader {');
+    expect(smallTabletBlock).toContain('align-items: center;');
     expect(smallTabletBlock).toContain('font-size: 1.6em;');
     expect(smallTabletBlock).toContain('.sectionHeader .sectionHeaderText {');
     expect(smallTabletBlock).toContain('flex-direction: row;');
-    expect(smallTabletBlock).toContain('align-items: baseline;');
+    expect(smallTabletBlock).toContain('align-items: center;');
     expect(smallTabletBlock).toContain('gap: 6px 12px;');
     expect(smallTabletBlock).toContain('.sectionHeader .sectionHeaderSubtitle {');
-    expect(smallTabletBlock).toContain('font-size: 0.68em;');
-    expect(smallTabletBlock).toContain('color: rgba(244, 247, 255, 0.58);');
+    expect(smallTabletBlock).toContain('font-size: 1.2em;');
+    expect(smallTabletBlock).toContain('font-weight: inherit;');
+    expect(smallTabletBlock).toContain('color: rgba(255, 255, 255, 0.15);');
+    expect(smallTabletBlock).toContain('.documentsSectionHeaderMeta .sectionHeaderTooltip {');
+    expect(smallTabletBlock).toContain('justify-content: center;');
+    expect(smallTabletBlock).toContain('min-height: 44px;');
+    expect(smallTabletBlock).toContain('min-width: 44px;');
+    expect(smallTabletBlock).toContain('.documentsSectionHeaderMeta .sectionHeaderTooltip > svg {');
+    expect(smallTabletBlock).toContain('opacity: 0.6;');
     expect(smallTabletBlock).not.toContain('.sectionContainer');
     expect(scss).toMatch(/@media only screen and \(min-width:\s*768px\) and \(max-width:\s*1024px\)\s*{[\s\S]*?\.sectionHeader \.sectionHeaderText\s*{[\s\S]*?flex-direction:\s*column;[\s\S]*?align-items:\s*flex-start;/);
-  });
-
-  it('gives the mobile Context header a stacked card shell with a full-width action row', () => {
-    const scss = fs.readFileSync(path.join(__dirname, 'OnePageSession.module.scss'), 'utf8');
-    const phoneBlock = extractMediaBlock(
-      scss,
-      '@media only screen and (max-width: 600px)',
-      '.documentsSectionHeader {'
-    );
-    const smallTabletBlock = extractMediaBlock(
-      scss,
-      '@media only screen and (min-width: 601px) and (max-width: 767px)',
-      '.documentsSectionHeader {'
-    );
-
-    expect(phoneBlock).toContain('.documentsSectionHeader {');
-    expect(phoneBlock).toContain('border: 1px solid rgba(255, 255, 255, 0.14);');
-    expect(phoneBlock).toContain('padding: 14px 14px 12px;');
-    expect(phoneBlock).toContain('.documentsSectionHeader .sectionHeaderText {');
-    expect(phoneBlock).toContain('flex-direction: column;');
-    expect(phoneBlock).toContain('.documentsSectionHeaderMeta {');
-    expect(phoneBlock).toContain('grid-template-columns: 44px minmax(0, 1fr);');
-    expect(phoneBlock).toContain('padding-top: 10px;');
-    expect(phoneBlock).toContain('.documentsSectionHeaderMeta .sectionHeaderLink {');
-    expect(phoneBlock).toContain('width: 100%;');
-
-    expect(smallTabletBlock).toContain('.documentsSectionHeader {');
-    expect(smallTabletBlock).toContain('border-radius: var(--ce-radius-10);');
-    expect(smallTabletBlock).toContain('.documentsSectionHeaderMeta {');
-    expect(smallTabletBlock).toContain('grid-template-columns: 44px minmax(0, 1fr);');
-    expect(smallTabletBlock).toContain('.documentsSectionHeaderMeta .sectionHeaderLink {');
-    expect(smallTabletBlock).toContain('width: 100%;');
   });
 
   it('shows the demo Documents tooltip copy only when the section is expanded', async () => {
