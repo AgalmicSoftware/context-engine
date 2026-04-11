@@ -4643,14 +4643,17 @@ class CreateSBTGroup extends Component {
             onClick={this.handleMintClick}
             disabled={sbtMinted || startedMinting}
             data-testid={E2E_TESTIDS.SBT_CREATE_SUBMIT}
+            className={styles.primaryCreateButton}
           >
-            {sbtMinted ? `${t('minted')}!` :
-             currentStep === 0 ? createActionLabel :
-             currentStep === 1 ? 'Uploading Image...' :
-             currentStep === 2 ? 'Uploading URI...' :
-             currentStep === 3 ? (deferredDeployMode ? 'Saving Draft...' : `${t('minting')}...`) :
-             createActionLabel}
-            {mintingFailed && currentStep > 0 && <FontAwesomeIcon icon={faExclamationCircle} style={{ marginLeft: '10px', color: 'red' }} />}
+            <span className={styles.primaryCreateButtonContent}>
+              {sbtMinted ? `${t('minted')}!` :
+               currentStep === 0 ? createActionLabel :
+               currentStep === 1 ? 'Uploading Image...' :
+               currentStep === 2 ? 'Uploading URI...' :
+               currentStep === 3 ? (deferredDeployMode ? 'Saving Draft...' : `${t('minting')}...`) :
+               createActionLabel}
+              {mintingFailed && currentStep > 0 && <FontAwesomeIcon icon={faExclamationCircle} style={{ color: 'red' }} />}
+            </span>
           </button>
 
           {sbtMinted && (

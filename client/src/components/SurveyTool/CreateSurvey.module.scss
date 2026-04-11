@@ -1,4 +1,5 @@
 @use "sass:color";
+@use "scss/finalSubmitCta" as finalSubmitCta;
 @use "scss/variables" as tokens;
 
 /* --- Variables (Matching SBTPage) --- */
@@ -364,36 +365,19 @@ $user-page-background: tokens.$ce-panel-bg;
 
 .createSurveyButton,
 #submitNewSurveyButton {
+  @include finalSubmitCta.final-submit-cta-shell(
+    $padding: 16px 24px,
+    $min-height: 72px,
+    $font-size: 1.35rem,
+    $border-radius: var(--ce-radius-12),
+    $box-shadow: 0 12px 30px rgba(7, 14, 38, 0.32),
+    $hover-box-shadow: 0 16px 36px rgba(7, 14, 38, 0.4)
+  );
   width: 100%;
   margin-top: 20px;
-  background-color: transparent !important;
-  background: #0066ff7f !important;
-  color: $clickable-color;
-  border: transparent;
-  padding: 10px;
-  font-size: 1.75em;
-  font-weight: 600;
-  text-transform: uppercase;
   position: relative;
   /* for progress fill */
   overflow: hidden;
-  /* hide progress overflow */
-  border-radius: var(--ce-radius-8);
-  transition:
-    background-color 0.2s,
-    border-color 0.2s,
-    color 0.2s;
-  &:hover {
-    background-color: rgba(77, 255, 164, 0.1);
-    box-shadow: 0 0 15px rgba(77, 255, 164, 0.2);
-  }
-
-  &:disabled {
-    border-color: var(--ce-color-text-muted);
-    color: #888;
-    cursor: not-allowed;
-    box-shadow: none;
-  }
 }
 
 .submitSurveyBtn {
@@ -414,12 +398,14 @@ $user-page-background: tokens.$ce-panel-bg;
   pointer-events: none;
 }
 .buttonContent {
+  @include finalSubmitCta.final-submit-cta-content($gap: 10px);
   border: none;
   background-color: transparent;
   background: transparent;
   color: var(--ce-color-white);
   position: relative;
   z-index: 1;
+  text-transform: uppercase;
 }
 
 /* Small helper text shown when the button is in error state */
@@ -428,11 +414,12 @@ $user-page-background: tokens.$ce-panel-bg;
   font-weight: 700;
   opacity: 0.85;
   margin-left: 4px;
+  text-transform: none;
 }
 
 /* High-visibility style while submitting */
 .submittingButton {
-  background-color: rgba(13, 110, 253, 0.2) !important;
+  background-color: rgba(13, 110, 253, 0.9) !important;
   border-color: #0d6efd !important;
   color: var(--ce-color-white) !important;
 }
@@ -701,8 +688,8 @@ $user-page-background: tokens.$ce-panel-bg;
 }
 
 .errorButton {
-  background-color: #dc3545;
-  border-color: #dc3545;
+  background-color: #dc3545 !important;
+  border-color: #dc3545 !important;
   color: var(--ce-color-white);
 }
 
