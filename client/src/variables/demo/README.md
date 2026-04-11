@@ -24,7 +24,7 @@ This directory contains demo and fixture data for the Context Engine survey plat
 | [`corpus_debate_map_links.json`](./corpus_debate_map_links.json) | Legacy corpus `debate_nodes` to atlas node mapping used to deep-link demo cards into the Debate Map. |
 | [`debates.json`](./debates.json) | Generated debate entries for Debate HUD and related demo views. |
 | [`loophole_historical_figure_principles.json`](./loophole_historical_figure_principles.json) | Per-figure moral principles used to deepen the atlas historical-case briefs in the Loophole-style demo flow. |
-| [`loophole_historical_cases.json`](./loophole_historical_cases.json) | Historical-figure cases inspired by `brendanhogan/loophole`, injected into relevant atlas nodes as a dedicated demo-mode section. |
+| [`loophole_historical_cases.json`](./loophole_historical_cases.json) | Historical-figure cases inspired by `brendanhogan/loophole`, injected into relevant atlas nodes as a dedicated demo-mode section and mirrored into [`ai-discourse-corpus/corpuses/loophole-historical-cases.json`](../../../../ai-discourse-corpus/corpuses/loophole-historical-cases.json). |
 
 ### JS Modules
 
