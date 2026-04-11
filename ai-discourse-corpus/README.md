@@ -16,11 +16,13 @@ This corpus is maintained as part of [Context Engine](https://github.com/Agalmic
 | `enriched-tweets.json` | 4036 | Enriched social-media discourse with summaries, tags, relevance signals, and linked context. |
 | `lesswrong-posts-corpus.json` | 202 | Influential LessWrong, Alignment Forum, EA Forum, and related AI safety/rationalist writing. |
 | `metr-evals-metrics-corpus.json` | 86 | METR publications, benchmarks, evaluation reports, and measurement-oriented policy material. |
-| `loophole-cases` | 40 | AI policy loophole-finding cases generated via the methodology from [brendanhogan/loophole](https://github.com/brendanhogan/loophole). Explores regulatory edge cases through adversarial scenario generation. |
+| `loophole-historical-cases.json` | 40 | Mirrored copy of Context Engine's Loophole historical-case dataset, generated via the methodology from [brendanhogan/loophole](https://github.com/brendanhogan/loophole). Explores regulatory edge cases through adversarial scenario generation. |
 
 ## Format
 
 Each sub-corpus is a JSON file containing an array of entries or a top-level object with metadata plus an entries array. Entry schema varies by source but generally includes: title/text, author/source, URL, tags, and metadata.
+
+The Loophole mirror in [`corpuses/loophole-historical-cases.json`](./corpuses/loophole-historical-cases.json) is intentionally duplicated from [`client/src/variables/demo/loophole_historical_cases.json`](../client/src/variables/demo/loophole_historical_cases.json) so the corpus package and demo runtime stay aligned. Each case preserves its `source_label` and `url`, including citation of the upstream [brendanhogan/loophole](https://github.com/brendanhogan/loophole) repo.
 
 ## Usage
 
