@@ -8,6 +8,7 @@
   /* Light overall background (slightly tinted) so it doesn't conflict with main site color */
   // background-color: rgba(145, 112, 222, 0.08);
   padding: 20px;
+  padding-top: 0px !important;
 }
 
 /* Top header/branding area */
@@ -17,7 +18,7 @@
   border: 0px solid #bfa0f4;
   border-radius: var(--ce-radius-8);
   // padding: 20px;
-  padding: 0px;
+  padding: 0px !important;
   /* FLEX layout: blurb on left, image on right */
   display: flex;
   align-items: center;
@@ -687,6 +688,7 @@
   .brandingSection {
     flex-direction: column;
     padding: 10px;
+    padding-top: 0px !important;
   }
 
   #brandingSectionTitle {
@@ -900,6 +902,7 @@
   .onePageDemoContainer {
     font-size: 1.15rem;
     padding: 15px 25px;
+    padding-top: 0px;
   }
 
   .brandingSection {
