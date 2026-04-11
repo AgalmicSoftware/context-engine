@@ -104,6 +104,19 @@ describe('CorpusViewer', () => {
     expect(screen.queryByRole('link', { name: /Full corpus on GitHub/i })).not.toBeInTheDocument();
   });
 
+  it('renders the standalone GitHub corpus link against the canonical public repo', () => {
+    render(
+      <MemoryRouter>
+        <CorpusViewer />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByRole('link', { name: /Full corpus on GitHub/i })).toHaveAttribute(
+      'href',
+      'https://github.com/AgalmicSoftware/context-engine/tree/main/ai-discourse-corpus'
+    );
+  });
+
   it('renders arxiv entries with the arxiv-specific card layout', () => {
     render(
       <MemoryRouter>
