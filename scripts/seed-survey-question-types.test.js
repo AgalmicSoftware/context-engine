@@ -67,3 +67,18 @@ test('resolveRpcRewriteConfig honors RPC_REWRITE_FROM overrides exactly', () => 
     'https://rpc-two.example',
   ]);
 });
+
+test('resolveRpcRewriteConfig still blocks browser-unsafe RPC_URL overrides when RPC_REWRITE_FROM is customized', () => {
+  const result = resolveRpcRewriteConfig({
+    env: {
+      CHAIN_ID: '84532',
+      RPC_URL: 'https://sepolia.base.org',
+      RPC_REWRITE_FROM: 'https://rpc-one.example',
+    },
+  });
+
+  assert.equal(result.chainId, 84532);
+  assert.deepEqual(result.rewriteTargets, ['https://rpc-one.example']);
+  assert.ok(result.browserUnsafeRpcTargets.includes('https://sepolia.base.org'));
+  assert.equal(result.rpcRewriteTarget, '');
+});
