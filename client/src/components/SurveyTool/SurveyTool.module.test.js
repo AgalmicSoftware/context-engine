@@ -170,11 +170,16 @@ describe('SurveyTool module', () => {
 
   it('keeps the single-question submit button stacked below the card', () => {
     const scssPath = path.join(__dirname, 'SurveyTool.module.scss');
+    const sharedCtaPath = path.join(__dirname, '../../scss/_finalSubmitCta.scss');
     const scss = fs.readFileSync(scssPath, 'utf8');
+    const sharedCta = fs.readFileSync(sharedCtaPath, 'utf8');
 
     expect(scss).toMatch(/#surveyFooter\.singleQuestionSubmitFooter\s*{[\s\S]*?position:\s*static;[\s\S]*?align-self:\s*center;[\s\S]*?width:\s*min\(360px,\s*100%\);[\s\S]*?margin:\s*18px auto 0;[\s\S]*?display:\s*flex;/);
-    expect(scss).toMatch(/#submitSurveyButton\.singleQuestionSubmitButton\s*{[\s\S]*?width:\s*100%;[\s\S]*?height:\s*auto;[\s\S]*?min-height:\s*72px;[\s\S]*?font-family:\s*var\(--ce-font-body\);[\s\S]*?font-size:\s*1\.4rem;[\s\S]*?background-color:\s*rgba\(42,\s*99,\s*202,\s*0\.5\) !important;/);
-    expect(scss).toMatch(/\.singleQuestionSubmitButtonContent\s*{[\s\S]*?display:\s*flex;[\s\S]*?width:\s*100%;/);
+    expect(sharedCta).toMatch(/@mixin final-submit-cta-shell\s*\([\s\S]*?font-family:\s*var\(--ce-font-body\);[\s\S]*?background-color:\s*#2a63ca !important;[\s\S]*?border:\s*1px solid #2a63ca !important;[\s\S]*?background-color:\s*var\(--ce-color-indigo\) !important;[\s\S]*?transform:\s*translateY\(-2px\);[\s\S]*?&:disabled\s*{[\s\S]*?color:\s*rgba\(255,\s*255,\s*255,\s*0\.78\) !important;/);
+    expect(sharedCta).toMatch(/@mixin final-submit-cta-content\(\$gap: 12px\)\s*{[\s\S]*?display:\s*inline-flex;[\s\S]*?width:\s*100%;[\s\S]*?text-transform:\s*uppercase;/);
+    expect(scss).toMatch(/#submitSurveyButton\s*{[\s\S]*?@include finalSubmitCta\.final-submit-cta-shell\(/);
+    expect(scss).toMatch(/#submitSurveyButton\.singleQuestionSubmitButton\s*{[\s\S]*?width:\s*100%;[\s\S]*?height:\s*auto;[\s\S]*?min-height:\s*72px;[\s\S]*?font-size:\s*1\.4rem;[\s\S]*?border-radius:\s*var\(--ce-radius-12\);/);
+    expect(scss).toMatch(/\.singleQuestionSubmitButtonContent\s*{[\s\S]*?@include finalSubmitCta\.final-submit-cta-content\(\$gap:\s*14px\);[\s\S]*?text-transform:\s*uppercase;/);
     expect(scss).toMatch(/\.singleQuestionSubmitButtonIcon\s*{[\s\S]*?font-size:\s*1\.5em;/);
     expect(scss).toMatch(/@media \(max-width: 768px\)\s*{[\s\S]*?#surveyFooter\.singleQuestionSubmitFooter\s*{[\s\S]*?width:\s*100%;[\s\S]*?flex-direction:\s*column;/);
     expect(scss).toMatch(/@media \(max-width: 768px\)\s*{[\s\S]*?#submitSurveyButton\.singleQuestionSubmitButton\s*{[\s\S]*?width:\s*100%;[\s\S]*?max-width:\s*none;[\s\S]*?opacity:\s*1;/);
@@ -185,8 +190,13 @@ describe('SurveyTool module', () => {
     const scss = fs.readFileSync(scssPath, 'utf8');
 
     expect(scss).toMatch(/\.pileWrapper\s*{[\s\S]*?margin-bottom:\s*38px;/);
-    expect(scss).toMatch(/\.pileInteractionUnit\s*{[\s\S]*?--pile-desktop-submit-rail-offset:\s*64px;[\s\S]*?--pile-current-submit-rail-offset:\s*0px;[\s\S]*?--pile-current-submit-rail-padding:\s*0px;[\s\S]*?padding-top:\s*var\(--pile-current-submit-rail-padding\);/);
-    expect(scss).toMatch(/\.pileInteractionUnitWithSubmitRail\s*{[\s\S]*?--pile-current-submit-rail-offset:\s*var\(--pile-desktop-submit-rail-offset\);[\s\S]*?--pile-current-submit-rail-padding:\s*var\(--pile-desktop-submit-rail-offset\);/);
+    expect(scss).toMatch(/\.pileSubmitButton\s*{[\s\S]*?@include finalSubmitCta\.final-submit-cta-shell\(/);
+    expect(scss).toMatch(/\.pileSubmitButtonContent\s*{[\s\S]*?@include finalSubmitCta\.final-submit-cta-content\(\$gap:\s*12px\);[\s\S]*?text-transform:\s*uppercase;/);
+    expect(scss).toMatch(/\.pileInteractionUnit\s*{[\s\S]*?--pile-desktop-submit-rail-offset:\s*64px;[\s\S]*?--pile-desktop-submit-rail-padding:\s*24px;[\s\S]*?--pile-current-submit-rail-offset:\s*0px;[\s\S]*?--pile-current-submit-rail-padding:\s*0px;[\s\S]*?padding-top:\s*var\(--pile-current-submit-rail-padding\);/);
+    expect(scss).toMatch(/\.pileInteractionUnitWithSubmitRail\s*{[\s\S]*?--pile-current-submit-rail-offset:\s*var\(--pile-desktop-submit-rail-offset\);[\s\S]*?--pile-current-submit-rail-padding:\s*var\(--pile-desktop-submit-rail-padding\);/);
+    expect(scss).toMatch(/@media \(min-width: 769px\)\s*{[\s\S]*?\.pileInteractionUnitWithSubmitRail \.pileCardInner,\s*\.pileInteractionUnitWithSubmitRail \.pileHologramPanel,\s*\.pileInteractionUnitWithSubmitRail \.pileEmptyState\s*{[\s\S]*?margin-top:\s*12px;/);
+    expect(scss).toMatch(/@media \(min-width: 769px\) and \(max-width: 1366px\)\s*{[\s\S]*?\.pileInteractionUnit\s*{[\s\S]*?--pile-desktop-submit-rail-padding:\s*48px;/);
+    expect(scss).toMatch(/@media \(min-width: 769px\) and \(max-width: 1366px\)\s*{[\s\S]*?\.pileInteractionUnitWithSubmitRail \.pileCardInner,\s*\.pileInteractionUnitWithSubmitRail \.pileHologramPanel,\s*\.pileInteractionUnitWithSubmitRail \.pileEmptyState\s*{[\s\S]*?margin-top:\s*24px;/);
     expect(scss).toMatch(/\.pileControls\s*{[\s\S]*?position:\s*absolute;[\s\S]*?top:\s*var\(--pile-current-submit-rail-offset\);[\s\S]*?right:\s*0;[\s\S]*?bottom:\s*0;[\s\S]*?left:\s*0;[\s\S]*?width:\s*100%;/);
     expect(scss).not.toMatch(/grid-template-areas:\s*[\s\S]*?'nav submit'[\s\S]*?'actions submit'/);
     expect(scss).toMatch(/\.pileControls > \.pileActions,\s*\.pileControls > \.pileNav\s*{[\s\S]*?position:\s*absolute;[\s\S]*?left:\s*calc\(100% \+ var\(--pile-desktop-rail-gap\)\);/);
