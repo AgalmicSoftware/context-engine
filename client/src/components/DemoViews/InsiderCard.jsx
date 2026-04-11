@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 
 import styles from './CorpusViewer.module.scss';
 import { DebateMapSection, ExternalSourceLink } from './TweetCard.jsx';
@@ -62,12 +62,20 @@ const buildLeadQuote = (entry = {}) => {
   return quotes[0] || '';
 };
 
+const INSIDER_SUMMARY_PREVIEW_LENGTH = 300;
+
 const InsiderCard = ({ entry, onTagClick, onAtlasIssueOpen }) => {
+  const [expanded, setExpanded] = useState(false);
   const intervieweeName = entry.author || entry.title || 'Unknown interviewee';
   const interviewDate = formatInterviewDate(entry.date);
   const roleCompany = buildRoleCompany(entry);
   const leadQuote = buildLeadQuote(entry);
   const tags = Array.isArray(entry.tags) ? entry.tags : [];
+  const summaryText = entry.summary || 'No summary available for this interview yet.';
+  const shouldClampSummary = summaryText.length > INSIDER_SUMMARY_PREVIEW_LENGTH;
+  const visibleSummary = shouldClampSummary && !expanded
+    ? `${summaryText.slice(0, INSIDER_SUMMARY_PREVIEW_LENGTH)}…`
+    : summaryText;
 
   return (
     <article className={`${styles.card} ${styles.insiderCard}`}>
@@ -118,8 +126,17 @@ const InsiderCard = ({ entry, onTagClick, onAtlasIssueOpen }) => {
 
       <div className={styles.insiderDetails}>
         <div className={styles.entrySummary}>
-          {entry.summary || 'No summary available for this interview yet.'}
+          {visibleSummary}
         </div>
+        {shouldClampSummary ? (
+          <button
+            type="button"
+            className={styles.insiderExpandBtn}
+            onClick={() => setExpanded((value) => !value)}
+          >
+            {expanded ? 'Collapse' : 'Expand'}
+          </button>
+        ) : null}
         {interviewDate ? (
           <div className={styles.entryMeta}>
             Interview date: {interviewDate}

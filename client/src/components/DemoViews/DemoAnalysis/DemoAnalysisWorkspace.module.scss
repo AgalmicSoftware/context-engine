@@ -777,11 +777,14 @@
   display: flex;
   justify-content: center;
   margin-top: 0;
-  padding: 0.2rem 0 0.1rem;
+  width: 100%;
+  padding: 0;
 
   :global(svg) {
+    display: block;
     height: auto;
-    width: min(100%, 420px);
+    max-width: none;
+    width: 100%;
   }
 }
 
@@ -857,11 +860,11 @@
   }
 
   .mapFrameCompact {
-    padding-top: 0.35rem;
+    padding-top: 0;
   }
 
   .mapFrameCompact :global(svg) {
-    max-width: 100%;
+    max-width: none;
     width: 100%;
   }
 
