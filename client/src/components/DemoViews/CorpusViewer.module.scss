@@ -7,17 +7,22 @@ $text: #f4f7ff;
 
 .container {
   background: $surface;
+  box-sizing: border-box;
   border: 1px solid $card-border;
   border-radius: var(--ce-radius-12);
   color: $text;
+  max-width: 100%;
   overflow: hidden;
   padding: 16px;
+  width: 100%;
 }
 
 .tabBar {
+  box-sizing: border-box;
   display: flex;
   gap: 8px;
   margin-bottom: 10px;
+  max-width: 100%;
   overflow-x: auto;
   scroll-padding-inline: 4px;
   scroll-snap-type: x proximity;
@@ -57,7 +62,7 @@ $text: #f4f7ff;
 .tabIcon {
   color: $muted;
   display: inline-flex;
-  font-size: 20px;
+  font-size: 24px;
 }
 
 .tabIconActive {
@@ -94,6 +99,7 @@ $text: #f4f7ff;
 .githubLink {
   align-items: center;
   background: rgba(255, 255, 255, 0.08);
+  box-sizing: border-box;
   border: 1px solid $card-border;
   border-radius: var(--ce-radius-pill);
   color: $text;
@@ -121,7 +127,7 @@ $text: #f4f7ff;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 14px;
   margin-bottom: 0;
-  padding: 10px 12px 4px;
+  padding: 4px 4px 0;
 }
 
 .policySplitLayout {
@@ -171,14 +177,14 @@ $text: #f4f7ff;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 14px;
-  padding: 14px 16px 16px;
+  padding: 10px 10px 12px;
 }
 
 .policyMapAssistiveText {
   color: $muted;
   font-size: 11px;
   line-height: 1.45;
-  margin-top: 8px;
+  margin-top: 6px;
 }
 
 .policyMapHeader {
@@ -239,18 +245,25 @@ $text: #f4f7ff;
 }
 
 .scrollArea {
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   gap: 12px;
   max-height: 560px;
+  max-width: 100%;
   min-width: 0;
   overflow-y: auto;
   padding-right: 4px;
+  width: 100%;
 }
 
 .entriesCollection {
+  box-sizing: border-box;
   display: grid;
   gap: 12px;
+  max-width: 100%;
+  min-width: 0;
+  width: 100%;
 }
 
 .entriesCollectionHalf {
@@ -442,9 +455,12 @@ $text: #f4f7ff;
 }
 
 .pillRow {
+  box-sizing: border-box;
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .tweetTags {
@@ -614,6 +630,7 @@ $text: #f4f7ff;
 
 .tweetEngagement {
   align-items: center;
+  box-sizing: border-box;
   border-top: 1px solid #e6ecf0;
   display: flex;
   flex-wrap: wrap;
@@ -621,25 +638,33 @@ $text: #f4f7ff;
   gap: 16px;
   justify-content: space-between;
   margin-top: 12px;
+  max-width: 100%;
   padding-top: 12px;
+  width: 100%;
 }
 
 .cardFooter {
   align-items: flex-start;
+  box-sizing: border-box;
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
   justify-content: space-between;
   margin-top: 12px;
+  max-width: 100%;
+  width: 100%;
 }
 
 .cardFooterLinks {
   align-items: center;
+  box-sizing: border-box;
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   justify-content: flex-end;
+  max-width: 100%;
   min-width: 0;
+  width: 100%;
 }
 
 .cardFooter:empty,
@@ -649,9 +674,12 @@ $text: #f4f7ff;
 }
 
 .engagementRow {
+  box-sizing: border-box;
   display: flex;
   flex-wrap: wrap;
   gap: 20px;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .entryTitle {
@@ -1058,20 +1086,27 @@ $text: #f4f7ff;
 }
 
 .debateMapFooter {
+  box-sizing: border-box;
+  max-width: 100%;
   min-width: 0;
+  width: 100%;
 }
 
 .debateMapFooterLinks {
   align-items: center;
+  box-sizing: border-box;
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  max-width: 100%;
   min-width: 0;
+  width: 100%;
 }
 
 .debateMapLink {
   align-items: center;
   background: rgba(255, 255, 255, 0.04);
+  box-sizing: border-box;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: var(--ce-radius-pill);
   color: $muted;
@@ -1103,6 +1138,7 @@ $text: #f4f7ff;
 .externalLink {
   align-items: center;
   background: rgba(255, 255, 255, 0.08);
+  box-sizing: border-box;
   border: 1px solid $card-border;
   border-radius: var(--ce-radius-pill);
   color: $text;
@@ -1161,28 +1197,34 @@ $text: #f4f7ff;
   }
 
   .tabBar {
-    gap: 8px;
+    display: grid;
+    gap: 10px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     margin-bottom: 12px;
-    padding-inline: 2px;
+    overflow: visible;
+    padding-inline: 0;
     padding-bottom: 8px;
+    scroll-snap-type: none;
   }
 
   .tabButton {
     align-items: flex-start;
     flex-direction: column;
     gap: 8px;
-    max-width: 132px;
-    min-width: 104px;
-    padding: 11px 10px 12px;
+    max-width: none;
+    min-height: 84px;
+    min-width: 0;
+    padding: 12px 12px 13px;
+    width: 100%;
   }
 
   .tabIcon {
-    font-size: 18px;
+    font-size: 28px;
   }
 
   .tabLabel {
-    font-size: 13px;
-    line-height: 1.2;
+    font-size: 14px;
+    line-height: 1.22;
     white-space: normal;
   }
 
@@ -1204,16 +1246,24 @@ $text: #f4f7ff;
   }
 
   .policySplitLayout {
-    gap: 14px;
+    gap: 10px;
+  }
+
+  .policyMapColumn {
+    order: -1;
+  }
+
+  .policyListColumn {
+    order: 1;
   }
 
   .policyListHeader,
   .policyMapPanel {
-    padding: 12px;
+    padding: 8px;
   }
 
   .policyMapLens {
-    padding: 8px 8px 2px;
+    padding: 0;
   }
 
   .card,
@@ -1375,14 +1425,21 @@ $text: #f4f7ff;
     padding: 8px;
   }
 
+  .tabBar {
+    gap: 8px;
+  }
+
   .tabButton {
-    max-width: 118px;
-    min-width: 96px;
-    padding: 10px 10px 11px;
+    min-height: 78px;
+    padding: 11px 10px 12px;
+  }
+
+  .tabIcon {
+    font-size: 26px;
   }
 
   .tabLabel {
-    font-size: 12px;
+    font-size: 13px;
     line-height: 1.18;
   }
 
