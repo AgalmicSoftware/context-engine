@@ -43,6 +43,8 @@ typings/
 .npm
 .npm-cache/
 **/.npm-cache/
+.npm-cache-client*/
+**/.npm-cache-client*/
 
 # Optional eslint cache
 .eslintcache
