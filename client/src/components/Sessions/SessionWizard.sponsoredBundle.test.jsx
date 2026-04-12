@@ -181,8 +181,10 @@ import SessionWizard, {
   resolveSessionWizardDeployBundleMode,
   resolveSessionWizardDeployBundlePayload,
   resolveSessionWizardShouldAutoDeployWorker,
+  loadSessionWizardLocalBundledAssetText,
   shouldForceSessionWizardNormalModeManualBundleRetry,
-} from './SessionWizard';
+  shouldForceSessionWizardManualBundleRetry,
+} from './SessionWizard.jsx';
 import { SPONSORED_BOOTSTRAP_FUNDING_CONTEXT_KEY } from '../../utilities/session/sponsoredBootstrapFunding.js';
 
 const renderSessionWizard = (props = {}) => render(<SessionWizard network={{ id: 84532 }} {...props} />);
@@ -633,7 +635,7 @@ describe('SessionWizard sponsored bundle flow', () => {
         wizardMode: 'normal',
         sponsoredBundle: {
           deployGrantToken: 'deploy-grant-token',
-          bootstrapWorkerUrl: 'https://source-worker.example.test',
+          bootstrapWorkerUrl: 'https://source-worker.example',
           openaiKey: 'sponsored-openai',
         },
         deployForm: {
@@ -746,24 +748,6 @@ describe('SessionWizard sponsored bundle flow', () => {
       bundleMode: 'url',
       sponsoredAutoDeployReady: false,
       forceManualBundleFile: true,
-      hasBundleFile: false,
-    })).toBe('url');
-
-    expect(resolveSessionWizardDeployBundleMode({
-      wizardMode: 'normal',
-      bundleMode: 'url',
-      sponsoredAutoDeployReady: true,
-      forceSponsoredAutoDeploy: true,
-      forceManualBundleFile: true,
-      hasBundleFile: false,
-    })).toBe('url');
-
-    expect(resolveSessionWizardDeployBundleMode({
-      wizardMode: 'normal',
-      bundleMode: 'url',
-      sponsoredAutoDeployReady: false,
-      forceManualBundleFile: true,
-      hasBundleFile: true,
     })).toBe('upload');
 
     expect(resolveSessionWizardDeployBundleMode({
@@ -772,26 +756,39 @@ describe('SessionWizard sponsored bundle flow', () => {
       sponsoredAutoDeployReady: true,
       forceSponsoredAutoDeploy: true,
       forceManualBundleFile: true,
-      hasBundleFile: true,
-    })).toBe('upload');
-
-    expect(resolveSessionWizardDeployBundleMode({
-      wizardMode: 'normal',
-      bundleMode: 'upload',
-      bundleUrl: '',
-      sponsoredAutoDeployReady: false,
-      normalModeBundleUrlOverride: 'https://assets.example.test/manual-sessionCorsWorker.bundle.js',
-      normalModeDefaultBundleUrl: '',
     })).toBe('url');
+  });
 
-    expect(resolveSessionWizardDeployBundleMode({
+  it('offers manual normal-mode bundle retry after a release-asset fetch failure', () => {
+    expect(shouldForceSessionWizardNormalModeManualBundleRetry({
+      err: {
+        message: 'Worker deploy failed.',
+        responseError: 'Failed to fetch bundle (404).',
+      },
       wizardMode: 'normal',
-      bundleMode: 'upload',
-      bundleUrl: '',
-      sponsoredAutoDeployReady: false,
+      effectiveBundleMode: 'url',
+      hasBundleFile: false,
+    })).toBe(true);
+
+    expect(shouldForceSessionWizardNormalModeManualBundleRetry({
+      err: {
+        message: 'Worker deploy failed.',
+        responseError: 'Failed to fetch bundle (404).',
+      },
+      wizardMode: 'normal',
+      effectiveBundleMode: 'url',
       hasBundleFile: true,
-      normalModeDefaultBundleUrl: '',
-    })).toBe('upload');
+    })).toBe(false);
+
+    expect(shouldForceSessionWizardNormalModeManualBundleRetry({
+      err: {
+        message: 'Worker deploy failed.',
+        responseError: 'Failed to fetch bundle (404).',
+      },
+      wizardMode: 'advanced',
+      effectiveBundleMode: 'url',
+      hasBundleFile: false,
+    })).toBe(false);
   });
 
   it('offers manual normal-mode bundle retry after a release-asset fetch failure', () => {
