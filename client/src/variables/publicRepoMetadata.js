@@ -6,6 +6,9 @@ export const PUBLIC_SECURITY_EMAIL = 'agalmicsoftware@protonmail.com';
 export const PUBLIC_REPO_URL = `https://github.com/${PUBLIC_GITHUB_ORG}/${PUBLIC_GITHUB_REPO}`;
 export const PUBLIC_REPO_ISSUES_URL = `${PUBLIC_REPO_URL}/issues`;
 export const PUBLIC_REPO_NEW_ISSUE_URL = `${PUBLIC_REPO_ISSUES_URL}/new`;
+export const buildPublicRepoLatestReleaseAssetUrl = (filename = '') => (
+  filename ? `${PUBLIC_REPO_URL}/releases/latest/download/${String(filename).replace(/^\/+/, '')}` : ''
+);
 export const buildPublicRepoBlobUrl = (pathname = '') => (
   pathname ? `${PUBLIC_REPO_URL}/blob/${PUBLIC_GITHUB_BRANCH}/${String(pathname).replace(/^\/+/, '')}` : ''
 );

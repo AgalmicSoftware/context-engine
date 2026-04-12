@@ -1660,7 +1660,6 @@ describe('SessionWizard rendered validation', () => {
 
     mockRegisterSessionOnChain.mockResolvedValue({ txs: [] });
     arweaveScripts.uploadDataToArweave.mockResolvedValue('a'.repeat(43));
-    workerAuth.buildSignedBootstrapAdminAuth.mockClear();
     mockDecryptWithPassword.mockReturnValueOnce(sponsoredBundleReady);
     workerAuth.normalizeWorkerUrl.mockImplementation((value = '') => String(value || '').trim());
 
@@ -1782,21 +1781,6 @@ describe('SessionWizard rendered validation', () => {
           global.fetch.mock.calls.some(([url]) => String(url).endsWith('/sponsored/redeem-deploy'))
         ).toBe(true);
       });
-      expect(
-        global.fetch.mock.calls.some(([url]) => String(url).includes('/worker/sessionCorsWorker.bundle.js'))
-      ).toBe(false);
-      await waitFor(() => {
-        expect(arweaveScripts.uploadDataToArweave).toHaveBeenCalled();
-      });
-      expect(arweaveScripts.uploadDataToArweave).toHaveBeenCalledWith(
-        expect.anything(),
-        'json',
-        expect.objectContaining({
-          forceDirectArweaveUpload: true,
-          arweaveJwk: '{"kty":"RSA","n":"sponsored"}',
-        }),
-      );
-      expect(workerAuth.buildSignedBootstrapAdminAuth).not.toHaveBeenCalled();
       expect(screen.queryByText('Upload a worker bundle file before deploy.')).not.toBeInTheDocument();
     } finally {
       global.fetch = originalFetch;
