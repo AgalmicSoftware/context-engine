@@ -3364,8 +3364,7 @@ h1 {
   z-index: 2100 !important;
 }
 
-:global(.modal-login .close),
-:global(.modal-login .btn-close) {
+:global(.modal-login .close) {
   position: absolute;
   top: 1rem;
   right: 1rem;
