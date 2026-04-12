@@ -31,6 +31,11 @@ export const WORKER_BUNDLE_URL = readPublicEnv(
   buildPublicRepoLatestReleaseAssetUrl('sessionCorsWorker.bundle.js')
 );
 
+export const USE_LOCAL_WORKER_BUNDLE_FALLBACK = readPublicBoolEnv(
+  'REACT_APP_CE_USE_LOCAL_WORKER_BUNDLE_FALLBACK',
+  true
+);
+
 export const DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED = readPublicBoolEnv(
   'REACT_APP_CE_DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED',
   true
