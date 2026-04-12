@@ -4,7 +4,6 @@
 const fs = require('fs');
 const path = require('path');
 const webpack = require('webpack');
-const { solidityLoader, htmlLoader, textLoader } = require('./config/webpack');
 const CopyPlugin = require('copy-webpack-plugin');
 
 const override = function override(config, env) {
@@ -13,14 +12,8 @@ const override = function override(config, env) {
   const scope = config.resolve.plugins.findIndex(o => o.constructor.name === 'ModuleScopePlugin');
   if (scope > -1) config.resolve.plugins.splice(scope, 1);
 
-  // add Zeppelin Solidity hot reloading support
-  config.module.rules.splice(config.module.rules.length - 2, 0, solidityLoader);
-
-  // Add loaders
-  config.module.rules.push(solidityLoader);
-  config.module.rules.push(htmlLoader);
-  config.module.rules.push(textLoader);
-
+  // Contract sources use explicit raw-loader imports, and the worker bundle is
+  // served via CopyPlugin, so the repo no longer injects global .sol/.html/.txt rules.
   // Web Workers
   config.module.rules.push({ test: /\.worker\.js$/, use: { loader: 'worker-loader' } });
 
