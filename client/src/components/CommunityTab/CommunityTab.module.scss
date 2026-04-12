@@ -281,35 +281,49 @@
 
 .modal {
   .modalHeader {
+    position: relative;
     background-color: #0083d9cc !important;
     color: var(--ce-color-white) !important;
     border-bottom: 1px solid #dee2e6;
     font-size: 1.25em;
-    h5 {
+    padding: 20px 4.25rem 20px 30px;
+
+    h5,
+    :global(.modal-title) {
       font-size: 1.25em;
       color: var(--ce-color-white) !important;
       font-weight: 600;
-    }
-
-    button {
-      color: var(--ce-color-white);
-      font-size: 1.5em;
-      background-color: transparent;
-      border: none;
-      opacity: 0.9;
-      padding: 6px 10px;
-      &:hover {
-        opacity: 1;
-      }
+      margin: 0;
     }
 
     :global(.close),
     :global(.btn-close) {
+      position: absolute;
+      top: 1rem;
+      right: 1rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 2rem;
+      height: 2rem;
+      margin: 0;
+      padding: 0;
       color: var(--ce-color-white);
-      opacity: 0.9;
+      opacity: 0.5;
       text-shadow: none;
       background: transparent;
       border: none;
+      box-shadow: none;
+      line-height: 1;
+      transition: opacity 0.2s ease;
+    }
+
+    :global(.close):hover,
+    :global(.close):focus,
+    :global(.btn-close):hover,
+    :global(.btn-close):focus {
+      background: transparent;
+      opacity: 0.8;
     }
 
     :global(.close) span {
@@ -373,35 +387,6 @@
     background: var(--ce-color-white);
     border-radius: var(--ce-radius-12);
     box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
-  }
-
-  :global(.modal-header) {
-    background: var(--ce-color-surface-light);
-    border-top-left-radius: 12px;
-    border-top-right-radius: 12px;
-    padding: 20px 30px;
-    .modal-title {
-      font-size: 24px;
-      font-weight: 600;
-      color: #1a1a1a;
-    }
-
-    :global(.close),
-    :global(.btn-close) {
-      color: var(--ce-color-white);
-      opacity: 0.9;
-      text-shadow: none;
-      background: transparent;
-      border: none;
-    }
-
-    :global(.close) span {
-      color: var(--ce-color-white);
-    }
-
-    :global(.btn-close) {
-      filter: invert(1);
-    }
   }
 
   :global(.modal-body) {

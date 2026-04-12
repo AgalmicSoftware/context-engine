@@ -11,4 +11,11 @@ describe('Account.module.scss modal account layout guards', () => {
     expect(scss).not.toMatch(/:global\([^)]*userPage/i);
     expect(scss).not.toMatch(/:global\([^)]*userInfo/i);
   });
+
+  it('anchors the account modal close button in the card header corner', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'Account.module.scss'), 'utf8');
+
+    expect(scss).toMatch(/#loginModalCard\s*{[\s\S]*?:global\(\.card-header\)\s*{[\s\S]*?position:\s*relative;[\s\S]*?padding-right:\s*4\.25rem;/);
+    expect(scss).toMatch(/:global\(\.modal-login \.close\)\s*{[\s\S]*?position:\s*absolute;[\s\S]*?top:\s*1rem;[\s\S]*?right:\s*1rem;[\s\S]*?background:\s*transparent;[\s\S]*?opacity:\s*0\.5;/);
+  });
 });
