@@ -5,6 +5,7 @@
 // All public deployment URLs below remain env-overridable via REACT_APP_CE_* variables.
 
 import { readPublicBoolEnv, readPublicEnv } from './publicEnv.js';
+import { buildPublicRepoLatestReleaseAssetUrl } from './publicRepoMetadata.js';
 
 const EMPTY_PUBLIC_DEPLOYMENT_ENDPOINT = '';
 const DEFAULT_PROJECT_DEPLOY_HELPER_URL = 'https://ce-deploy-helper.agalmic.workers.dev/';
@@ -27,7 +28,7 @@ export const HEALTHCHECK_WORKER_URL = readPublicEnv(
 
 export const WORKER_BUNDLE_URL = readPublicEnv(
   'REACT_APP_CE_WORKER_BUNDLE_URL',
-  'https://github.com/AgalmicSoftware/context-engine/releases/latest/download/sessionCorsWorker.bundle.js'
+  buildPublicRepoLatestReleaseAssetUrl('sessionCorsWorker.bundle.js')
 );
 
 export const USE_LOCAL_WORKER_BUNDLE_FALLBACK = readPublicBoolEnv(
