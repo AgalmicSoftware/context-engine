@@ -285,6 +285,14 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     });
   });
 
+  it('keeps a single accessible close button in the full auth modal shell', async () => {
+    render(<LoginAndSettingsModal {...buildProps()} />);
+
+    await waitFor(() => {
+      expect(screen.getAllByRole('button', { name: 'Close' })).toHaveLength(1);
+    });
+  });
+
   it('shows the old network-style active session row up top and keeps network details out of the collapsed row in plain mode', () => {
     const subject = buildWrongNetworkSubject();
 
