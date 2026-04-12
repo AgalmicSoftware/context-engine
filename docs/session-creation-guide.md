@@ -654,16 +654,12 @@ This is the default path exposed in `/new`.
 
 High-level flow:
 
-1. Generate the setup values in the Worker step.
-2. Copy the session slug, public admin address, `TOKEN_HMAC_SECRET`, and
-   `CE_STORAGE_ENVELOPE_KEK` with the adjacent copy controls.
-3. Open the immutable Cloudflare deployment package, paste those values into
-   Cloudflare, and complete the dashboard deployment.
-4. Return to the still-open Context Engine tab and paste the resulting
-   `workers.dev` URL.
-5. Select `Verify Session Worker`. Context Engine checks Worker reachability,
-   the current browser origin/CORS policy, canonical config readback, and the
-   returned session identity before enabling deployment completion.
+1. Enter the Cloudflare API token and worker name
+2. Enter worker secrets in the wizard. Normal mode automatically uses the GitHub-hosted `sessionCorsWorker.bundle.js` release asset for deploy-helper requests.
+3. Click `Deploy worker`
+4. Wait for the helper to create/update the worker and return the `workers.dev` URL
+5. If the helper cannot fetch the release asset, upload `dist/sessionCorsWorker.bundle.js` when the manual retry field appears
+6. Confirm that the worker URL is now filled in before publishing metadata
 
 The runtime secrets remain in the current tab and Cloudflare's encrypted
 Worker-secret store. They are not placed in the deployment URL, logs, analytics
