@@ -182,6 +182,7 @@ import SessionWizard, {
   resolveSessionWizardShouldPreferLocalBundledAsset,
   resolveSessionWizardShouldAutoDeployWorker,
   loadSessionWizardLocalBundledAssetText,
+  shouldForceSessionWizardNormalModeManualBundleRetry,
   shouldForceSessionWizardManualBundleRetry,
 } from './SessionWizard.jsx';
 import { SPONSORED_BOOTSTRAP_FUNDING_CONTEXT_KEY } from '../../utilities/session/sponsoredBootstrapFunding.js';
@@ -629,6 +630,25 @@ describe('SessionWizard sponsored bundle flow', () => {
           'Arweave JWK',
         ]),
       }));
+
+      expect(resolveSponsoredBundleDeployReadiness({
+        wizardMode: 'normal',
+        sponsoredBundle: {
+          deployGrantToken: 'deploy-grant-token',
+          bootstrapWorkerUrl: 'https://source-worker.example',
+          openaiKey: 'sponsored-openai',
+        },
+        deployForm: {
+          workerName: 'launch-week-worker',
+          bundleUrl: '',
+        },
+        workerSecretsEnabled: true,
+        missingWorkerSecrets: [],
+      })).toEqual(expect.objectContaining({
+        active: true,
+        ready: true,
+        missing: [],
+      }));
     } finally {
       workerAuth.normalizeWorkerUrl.mockImplementation(originalNormalizeWorkerUrl || defaultNormalizeWorkerUrl);
     }
@@ -709,7 +729,7 @@ describe('SessionWizard sponsored bundle flow', () => {
       wizardMode: 'normal',
       bundleMode: 'url',
       sponsoredAutoDeployReady: false,
-    })).toBe('upload');
+    })).toBe('url');
 
     expect(resolveSessionWizardDeployBundleMode({
       wizardMode: 'normal',
@@ -722,6 +742,53 @@ describe('SessionWizard sponsored bundle flow', () => {
       bundleMode: 'upload',
       sponsoredAutoDeployReady: true,
     })).toBe('upload');
+
+    expect(resolveSessionWizardDeployBundleMode({
+      wizardMode: 'normal',
+      bundleMode: 'url',
+      sponsoredAutoDeployReady: false,
+      forceManualBundleFile: true,
+    })).toBe('upload');
+
+    expect(resolveSessionWizardDeployBundleMode({
+      wizardMode: 'normal',
+      bundleMode: 'url',
+      sponsoredAutoDeployReady: true,
+      forceSponsoredAutoDeploy: true,
+      forceManualBundleFile: true,
+    })).toBe('url');
+  });
+
+  it('offers manual normal-mode bundle retry after a release-asset fetch failure', () => {
+    expect(shouldForceSessionWizardNormalModeManualBundleRetry({
+      err: {
+        message: 'Worker deploy failed.',
+        responseError: 'Failed to fetch bundle (404).',
+      },
+      wizardMode: 'normal',
+      effectiveBundleMode: 'url',
+      hasBundleFile: false,
+    })).toBe(true);
+
+    expect(shouldForceSessionWizardNormalModeManualBundleRetry({
+      err: {
+        message: 'Worker deploy failed.',
+        responseError: 'Failed to fetch bundle (404).',
+      },
+      wizardMode: 'normal',
+      effectiveBundleMode: 'url',
+      hasBundleFile: true,
+    })).toBe(false);
+
+    expect(shouldForceSessionWizardNormalModeManualBundleRetry({
+      err: {
+        message: 'Worker deploy failed.',
+        responseError: 'Failed to fetch bundle (404).',
+      },
+      wizardMode: 'advanced',
+      effectiveBundleMode: 'url',
+      hasBundleFile: false,
+    })).toBe(false);
   });
 
   it('only prefers the local bundled worker asset for normal-mode sponsored auto-deploys when the fallback switch is enabled', () => {

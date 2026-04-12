@@ -162,6 +162,9 @@ const resolveLocalWorkerBundleFallbackAssetUrl = () => {
 export const LOCAL_WORKER_BUNDLE_FALLBACK_ASSET_URL = resolveLocalWorkerBundleFallbackAssetUrl();
 const LOCAL_WORKER_BUNDLE_FALLBACK_PICKER_HELP =
   `Automatic bundled worker fetch failed. Choose ${LOCAL_WORKER_BUNDLE_FALLBACK_FILE_PATH} to continue.`;
+const NORMAL_MODE_MANUAL_BUNDLE_RETRY_MESSAGE = (
+  `Choose ${LOCAL_WORKER_BUNDLE_FALLBACK_FILE_PATH} to retry this worker deploy.`
+);
 export const isMissingSessionSlug = (slug) => toStr(slug).trim() === '';
 export const INVALID_SESSION_SLUG_FORMAT_ERROR =
   'Session slugs must use lowercase letters, numbers, "_" or "-".';
@@ -215,7 +218,18 @@ const resolveSponsoredBundleBootstrapWorkerUrl = (bundle = {}) => normalizeWorke
   bundle?.meta?.sourceWorkerUrl ||
   ''
 ).trim());
+const resolveSessionWizardBundleUrlForMode = ({
+  wizardMode = 'advanced',
+  bundleUrl = '',
+} = {}) => {
+  const normalizedBundleUrl = toStr(bundleUrl).trim();
+  if (wizardMode !== 'normal') return normalizedBundleUrl;
+  // Regression guard: normal mode promises the configured release asset, so a
+  // stale advanced-mode override must not leak into its read-only deploy path.
+  return toStr(CLOUDFLARE_WORKER_BUNDLE_URL).trim() || normalizedBundleUrl;
+};
 export const resolveSponsoredBundleDeployReadiness = ({
+  wizardMode = 'advanced',
   sponsoredBundle = {},
   deployForm = {},
   workerSecretsEnabled = true,
@@ -224,7 +238,10 @@ export const resolveSponsoredBundleDeployReadiness = ({
   const normalizedBundle = normalizeSparseSponsoredBundlePayload(sponsoredBundle);
   const hasAppliedSponsoredBundle = hasSponsoredBundleFields(normalizedBundle);
   const workerName = toStr(deployForm?.workerName || '').trim();
-  const bundleUrl = toStr(deployForm?.bundleUrl || '').trim();
+  const bundleUrl = resolveSessionWizardBundleUrlForMode({
+    wizardMode,
+    bundleUrl: deployForm?.bundleUrl,
+  });
   const bootstrapWorkerUrl = resolveSponsoredBundleBootstrapWorkerUrl(normalizedBundle);
   const deployGrantToken = toStr(normalizedBundle?.deployGrantToken || '').trim();
   const normalizedMissingWorkerSecrets = Array.isArray(missingWorkerSecrets)
@@ -395,13 +412,18 @@ export const resolveSessionWizardDeployBundleMode = ({
   wizardMode = 'normal',
   bundleMode = 'upload',
   sponsoredAutoDeployReady = false,
+  forceSponsoredAutoDeploy = false,
+  forceManualBundleFile = false,
 } = {}) => (
-  (wizardMode === 'normal' && sponsoredAutoDeployReady)
+  (wizardMode === 'normal' && forceSponsoredAutoDeploy)
     ? 'url'
-    : (
-      wizardMode === 'normal' &&
-      !NORMAL_MODE_SHARED_HOSTED_WORKER_ENABLED
-    ) ? 'upload' : bundleMode
+    : (wizardMode === 'normal' && forceManualBundleFile)
+      ? 'upload'
+      : (wizardMode === 'normal' && sponsoredAutoDeployReady)
+      ? 'url'
+      : (wizardMode === 'normal')
+        ? (toStr(CLOUDFLARE_WORKER_BUNDLE_URL).trim() ? 'url' : 'upload')
+        : bundleMode
 );
 export const resolveSessionWizardShouldAutoDeployWorker = ({
   workerMode = 'default',
@@ -689,15 +711,27 @@ const SPONSORED_MANUAL_BUNDLE_RETRY_MESSAGE = (
 );
 const isSessionWizardRemoteBundleUrlFetchFailure = ({
   err,
-  wizardMode = 'normal',
   effectiveBundleMode = 'upload',
 } = {}) => {
-  if (wizardMode !== 'advanced' || effectiveBundleMode !== 'url') {
+  if (effectiveBundleMode !== 'url') {
     return false;
   }
   const combined = `${toStr(err?.message).trim()} ${toStr(err?.responseError).trim()}`.toLowerCase();
   return combined.includes(DEPLOY_HELPER_BUNDLE_FETCH_ERROR);
 };
+export const shouldForceSessionWizardNormalModeManualBundleRetry = ({
+  err,
+  wizardMode = 'normal',
+  effectiveBundleMode = 'upload',
+  hasBundleFile = false,
+} = {}) => (
+  wizardMode === 'normal' &&
+  !hasBundleFile &&
+  isSessionWizardRemoteBundleUrlFetchFailure({
+    err,
+    effectiveBundleMode,
+  })
+);
 export const shouldForceSessionWizardManualBundleRetry = ({
   err,
   forceSponsoredAutoDeploy = false,
@@ -724,6 +758,9 @@ const normalizeDeployErrorMessage = ({ err, helperBase } = {}) => {
   }
   if (lowered.includes('origin not allowed')) {
     return buildDeployHelperCorsMessage(helperBase, raw);
+  }
+  if (lowered.includes(DEPLOY_HELPER_BUNDLE_FETCH_ERROR) || responseLower.includes(DEPLOY_HELPER_BUNDLE_FETCH_ERROR)) {
+    return raw || responseError;
   }
   if (lowered.includes('failed to fetch') || lowered.includes('networkerror')) {
     const helper = toStr(helperBase).trim() || 'deploy-helper';
@@ -2634,6 +2671,7 @@ const SessionWizard = ({
   });
   const [bundleMode, setBundleMode] = useState(() => (toStr(CLOUDFLARE_WORKER_BUNDLE_URL) ? 'url' : 'upload'));
   const [bundleFile, setBundleFile] = useState(null);
+  const [forceManualBundleFile, setForceManualBundleFile] = useState(false);
   const [forceManualSponsoredBundleFile, setForceManualSponsoredBundleFile] = useState(false);
   const [localBundledWorkerAsset, setLocalBundledWorkerAsset] = useState({
     status: 'idle',
@@ -6402,6 +6440,7 @@ const SessionWizard = ({
       const hasManualMetadata = Boolean(normalizeArweaveUri(manualMetadataUrl));
       const currentWorkerSecrets = getCurrentWorkerSecrets();
       const sponsoredAutoDeployState = resolveSponsoredBundleDeployReadiness({
+        wizardMode,
         sponsoredBundle: sponsoredBundleAppliedBundleRef.current,
         deployForm: deployFormRef.current,
         workerSecretsEnabled: workerSecretsEnabledRef.current,
@@ -6986,6 +7025,7 @@ const SessionWizard = ({
     let helperBase = '';
     const forceSponsoredAutoDeploy = options?.forceSponsoredAutoDeploy === true;
     let shouldPreferLocalBundledAssetOnError = false;
+    let effectiveBundleMode = 'upload';
     try {
       const currentDeployForm = (
         deployFormRef.current &&
@@ -7035,12 +7075,13 @@ const SessionWizard = ({
           throw new Error(`Missing required secrets before deploy: ${missing.join(', ')}`);
         }
       }
-      // Regression guard: sponsored links can preload a deploy-ready bundle URL,
-      // but normal mode otherwise stays upload-only. Only flip back to URL mode
-      // when the sponsored flow is fully ready, or Publish will fail invisibly.
+      // Regression guard: deploy-ready sponsored links still force the URL path
+      // in normal mode, while manual retry can temporarily switch normal mode
+      // back to upload after a remote bundle fetch failure.
       const sponsoredAutoDeployReady = (
         workerMode !== 'default' &&
         resolveSponsoredBundleDeployReadiness({
+          wizardMode,
           sponsoredBundle: sponsoredBundleAppliedBundleRef.current,
           deployForm: currentDeployForm,
           workerSecretsEnabled,
@@ -7049,10 +7090,12 @@ const SessionWizard = ({
             : [],
         }).ready
       );
-      const effectiveBundleMode = resolveSessionWizardDeployBundleMode({
+      effectiveBundleMode = resolveSessionWizardDeployBundleMode({
         wizardMode,
         bundleMode,
         sponsoredAutoDeployReady: forceSponsoredAutoDeploy || sponsoredAutoDeployReady,
+        forceSponsoredAutoDeploy,
+        forceManualBundleFile,
       });
       if (effectiveBundleMode === 'upload' && !bundleFile) {
         throw new Error(
@@ -7061,7 +7104,10 @@ const SessionWizard = ({
             : 'Upload a worker bundle file or switch to bundle URL.'
         );
       }
-      const requestedBundleUrl = toStr(currentDeployForm.bundleUrl).trim();
+      const requestedBundleUrl = resolveSessionWizardBundleUrlForMode({
+        wizardMode,
+        bundleUrl: currentDeployForm.bundleUrl,
+      });
       const shouldPreferLocalBundledAsset = resolveSessionWizardShouldPreferLocalBundledAsset({
         wizardMode,
         effectiveBundleMode,
@@ -7169,7 +7215,10 @@ const SessionWizard = ({
       try {
         ({ deployStatusCode, data } = await submitDeployPayload(payload));
       } catch (err) {
-        if (!isSessionWizardRemoteBundleUrlFetchFailure({ err, wizardMode, effectiveBundleMode })) {
+        if (!isSessionWizardRemoteBundleUrlFetchFailure({ err, effectiveBundleMode })) {
+          throw err;
+        }
+        if (wizardMode !== 'advanced') {
           throw err;
         }
         // Keep advanced URL mode intact in the UI, but retry once with the same
@@ -7337,6 +7386,10 @@ const SessionWizard = ({
         configSyncStatus.warning,
       ));
       setDeployComplete(isDeployVerified);
+      // Manual bundle uploads are one-off retries; clear the cached file so
+      // later URL-mode deploys and sponsored publish flows don't reuse stale bytes.
+      setForceManualBundleFile(false);
+      setBundleFile(null);
       clearCachedWorkerSecretsAfterDeploy();
       return {
         ok: true,
@@ -7344,6 +7397,14 @@ const SessionWizard = ({
         deployComplete: isDeployVerified,
       };
     } catch (err) {
+      if (shouldForceSessionWizardNormalModeManualBundleRetry({
+        err,
+        wizardMode,
+        effectiveBundleMode,
+        hasBundleFile: !!bundleFile,
+      })) {
+        setForceManualBundleFile(true);
+      }
       if (shouldForceSessionWizardManualBundleRetry({
         err,
         forceSponsoredAutoDeploy,
@@ -7700,10 +7761,15 @@ const SessionWizard = ({
           ? 'custom worker URL changed after deploy (re-deploy to verify)'
           : 'custom worker URL (not verified in this run)';
   const sponsoredAutoDeployState = resolveSponsoredBundleDeployReadiness({
+    wizardMode,
     sponsoredBundle: sponsoredBundleAppliedBundleRef.current,
     deployForm,
     workerSecretsEnabled,
     missingWorkerSecrets: workerSecretsEnabled ? getMissingWorkerSecretsForDeploy() : [],
+  });
+  const normalModeBundleUrl = resolveSessionWizardBundleUrlForMode({
+    wizardMode: 'normal',
+    bundleUrl: deployForm.bundleUrl,
   });
   const {
     showSponsoredFaucetNotice,
@@ -8754,21 +8820,41 @@ const SessionWizard = ({
                     </FormGroup>
                   )}
                   {isNormalMode ? (
-                    <FormGroup>
-                      <Label>Upload bundle file</Label>
-                      <Input
-                        type="file"
-                        accept=".js,.mjs"
-                        data-testid={E2E_TESTIDS.WIZARD_BUNDLE_FILE_INPUT}
-                        onChange={(e) => {
-                          const file = e.target.files && e.target.files[0];
-                          setBundleFile(file || null);
-                        }}
-                      />
-                      <div className={styles.helperText}>
-                        Upload the worker bundle directly for now. The hosted git asset path is planned separately.
-                      </div>
-                    </FormGroup>
+                    <>
+                      <FormGroup>
+                        <Label>Worker bundle URL (release asset)</Label>
+                        <Input
+                          value={normalModeBundleUrl}
+                          readOnly
+                          data-testid={E2E_TESTIDS.WIZARD_BUNDLE_URL}
+                        />
+                        <div className={styles.helperText}>
+                          Normal mode deploys use the GitHub-hosted worker bundle automatically.
+                        </div>
+                      </FormGroup>
+                      {forceManualBundleFile && (
+                        <FormGroup>
+                          <Label>Upload bundle file</Label>
+                          <Input
+                            type="file"
+                            accept=".js,.mjs"
+                            data-testid={E2E_TESTIDS.WIZARD_BUNDLE_FILE_INPUT}
+                            onChange={(e) => {
+                              const file = e.target.files && e.target.files[0];
+                              setBundleFile(file || null);
+                            }}
+                          />
+                          <div className={styles.helperText}>
+                            {NORMAL_MODE_MANUAL_BUNDLE_RETRY_MESSAGE}
+                          </div>
+                          {bundleFile && (
+                            <div className={styles.helperText}>
+                              Using {bundleFile.name || LOCAL_WORKER_BUNDLE_FALLBACK_FILE_PATH} for this deploy.
+                            </div>
+                          )}
+                        </FormGroup>
+                      )}
+                    </>
                   ) : bundleMode === 'url' ? (
                     <FormGroup>
                       <Label className={styles.fieldLabelRow}>
@@ -8784,6 +8870,7 @@ const SessionWizard = ({
                       <Input
                         value={deployForm.bundleUrl}
                         placeholder="https://github.com/<org>/<repo>/releases/latest/download/sessionCorsWorker.bundle.js"
+                        data-testid={E2E_TESTIDS.WIZARD_BUNDLE_URL}
                         onChange={(e) => setDeployForm((prev) => ({ ...prev, bundleUrl: e.target.value }))}
                       />
                     </FormGroup>

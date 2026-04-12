@@ -127,6 +127,7 @@ const E2E_TESTIDS = Object.freeze({
   WIZARD_BUNDLE_MODE_UPLOAD: 'ce-wizard-bundle-mode-upload',
   WIZARD_BUNDLE_MODE_URL: 'ce-wizard-bundle-mode-url',
   WIZARD_BUNDLE_FILE_INPUT: 'ce-wizard-bundle-file-input',
+  WIZARD_BUNDLE_URL: 'ce-wizard-bundle-url',
   WIZARD_WORKER_NAME: 'ce-wizard-worker-name',
   WIZARD_DEPLOY_WORKER: 'ce-wizard-deploy-worker',
   WIZARD_DEPLOY_STATUS: 'ce-wizard-deploy-status',
