@@ -40,7 +40,7 @@ If you deploy via the Group Wizard and a deploy-helper:
    - The first-party wizard no longer asks for Cloudflare account ID; the deploy-helper resolves it from the API token.
 2) Fill worker secrets in the wizard (OpenAI key, Arweave JWK, RPC URL, Anthropic key only if any selected AI model uses Anthropic, and optional OpenRouter key) and then click "Deploy worker".
    - Normal mode now points deploy-helper requests at the GitHub release bundle URL automatically instead of asking for a local upload first.
-   - If the helper cannot fetch that release asset, the Worker step keeps the GitHub URL as the default path and reveals one-off retry overrides: paste a direct bundle URL or upload `dist/sessionCorsWorker.bundle.js` if you want to override the hosted URL.
+   - If the helper cannot fetch that release asset, the Worker step reveals a manual upload retry and points to `dist/sessionCorsWorker.bundle.js` as the local fallback file.
    - The in-wizard deployment panel links to the GitHub worker source, deploy-helper source, and worker docs instead of shipping mirrored source snapshots inside the client bundle.
 3) The deploy-helper uses the Workers API to fetch or create the account subdomain,
    enables the script’s workers.dev subdomain, and returns:
@@ -129,11 +129,13 @@ If you deploy via the Group Wizard and a deploy-helper:
   - and `getMissingWorkerSecretsForDeploy(...)` is empty for the current session config.
 - Sponsored deploy grants now keep only the Cloudflare API token plus the source worker bootstrap context on the sponsoring worker; the encrypted bundle itself carries only the resulting `deployGrantToken` and bootstrap worker URL. Grants do not snapshot account ID or a standalone helper URL.
 - For grant-backed sponsored deploys, the browser posts to the sponsoring `sessionCorsWorker` `/sponsored/redeem-deploy` route, and that source worker must have embedded deploy enabled from its deploy-time `DEPLOY_HELPER_ENABLED` binding. `/sponsor` no longer writes a standalone deploy-helper fallback URL into the bundle or grant.
-  - In that deploy-ready state, Publish deploys the worker first, then uploads metadata and registers on-chain. Both the regular normal-mode worker step and the sponsored publish path default to the hosted GitHub release asset URL.
+  - In that deploy-ready state, Publish deploys the worker first, then uploads metadata and registers on-chain. The regular normal-mode worker step now defaults to the hosted GitHub release asset URL, while the sponsored publish path still auto-fetches a raw static copy of the known-good local dist bundle from `/worker/sessionCorsWorker.bundle.js`.
+  - `client/config-overrides.js` copies `dist/sessionCorsWorker.bundle.js` into the client build as `/worker/sessionCorsWorker.bundle.js`, so the browser fetch path uses the same bytes as the working manual upload baseline instead of the webpack-managed `.txt` import pipeline.
+  - When that raw local asset is available, Publish uses its `bundleText` directly without asking the admin to upload a file.
 
 - The worker KV config now keeps a mirrored `embeddedDeployHelperEnabled` boolean so the frontend can reopen the wizard with the current deploy-time toggle state, but runtime behavior still comes from the worker's `DEPLOY_HELPER_ENABLED` binding.
-  - If the hosted release-asset fetch fails, the normal-mode worker step or sponsored normal-mode Publish panel keeps the GitHub release asset URL as the default path and offers either a manual bundle URL override or `nvm use 20 && npm run worker:bundle` plus `/dist/sessionCorsWorker.bundle.js` as an optional local upload override.
-  - `dist/sessionCorsWorker.bundle.js` remains a generated local/manual fallback bundle for upload retries, but the client build no longer serves `/worker/sessionCorsWorker.bundle.js`.
+  - If that automatic local asset fetch fails, the normal-mode Publish panel surfaces the fetch error and exposes the known-good manual fallback file (`/dist/sessionCorsWorker.bundle.js`) for retry.
+  - For ordinary normal-mode worker deploys, the same `dist/sessionCorsWorker.bundle.js` path is now exposed only after a remote release-asset fetch failure.
   - Advanced mode still keeps `Use URL` as the default path and preserves the manual `Upload file` override for testing.
   - Scoped Chipotle identifiers and `litUsageApiKey` already flow end-to-end for worker-mediated Lit execution.
   - Authority-bundle bootstrap now centers on `litAccountApiKey` rather than payer-wallet delegation.

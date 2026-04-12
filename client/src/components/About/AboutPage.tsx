@@ -125,7 +125,7 @@ const USE_CASES = [
       'Organizations often preserve decisions without preserving the assumptions, tradeoffs, and confidence behind them.',
     solutionTitle: 'Private Forecasting',
     detail:
-      'Record predictions, assumptions, and confidence before outcomes are known, with timestamped entries that can remain encrypted until review.',
+      'Record predictions, assumptions, and confidence before outcomes are known, with timestamped entries that can remain encrypted until revealed or proven privately (and in the future, evaluated while still encrypted).',
   },
   {
     slug: 'cities',
