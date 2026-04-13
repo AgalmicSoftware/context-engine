@@ -59,6 +59,7 @@ const PolisReport = React.lazy(() => import('../PolisReport/PolisReport'));
 const DebateMap = React.lazy(() => import('../DebateMap/DebateMap'));
 const CorpusViewer = lazyWithRetry(() => import('../DemoViews/CorpusViewer'));
 const RiskMatrix = React.lazy(() => import('../MainContent/RiskMatrix'));
+const DemoAnalysisWorkspace = React.lazy(() => import('../DemoViews/DemoAnalysis/DemoAnalysisWorkspace.jsx'));
 
 const demoLog = createLogger('demo');
 const ONE_PAGE_DEMO_PERF_SCOPE = 'onePageDemo';
@@ -2180,6 +2181,7 @@ class OnePageSession extends Component<any, any> {
       { key: 'polis', label: 'Report', icon: '🧾' },
       ...(isDemoSlug
         ? [
+            { key: 'analysis', label: 'Breakdown', icon: '📊' },
             { key: 'debateAtlas', label: 'Debate Map', icon: '🗺️' },
             { key: 'analysis', label: 'Breakdown', icon: '📊' },
             { key: 'riskMatrix', label: 'Risk Matrix', icon: '⚠️' },
@@ -2808,6 +2810,11 @@ class OnePageSession extends Component<any, any> {
                         blockLimits={blockLimits}
                         networkChainId={networkChainId}
                       />
+                    </Suspense>
+                  )}
+                  {isDemoSlug && resultsViewMode === 'analysis' && (
+                    <Suspense fallback={<LazyFallback label="Loading Analysis..." minHeight="30vh" />}>
+                      <DemoAnalysisWorkspace />
                     </Suspense>
                   )}
                   {isDemoSlug && resultsViewMode === 'debateAtlas' && (
