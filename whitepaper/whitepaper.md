@@ -8,7 +8,7 @@ For technical documentation, see [`spec.md`](../spec.md) and [`docs/`](../docs/R
 
 ---
 
-keywords: sensemaking, deliberation, collective intelligence, discourse, debate, ethereum, coasean bargaining, cryptography, programmable cryptography, decentralized networks, agi, social infrastructure, ai policy, community currencies, coordination, negotiation, voting, zk, homomorphic encryption, proofs
+keywords: sensemaking, deliberation, collective intelligence, discourse, debate, ethereum, coasean bargaining, cryptography, programmable cryptography, decentralized networks, agi, social infrastructure, ai policy, community currencies, coordination, negotiation, voting, democracy, zk, homomorphic encryption
 
 ---
 
@@ -58,9 +58,9 @@ Although Context Engine is an Ethereum application, users do not need to know an
 Context Engine is a web application, a set of smart contracts (EVM), and supporting infrastructure for AI inference, storage, access gating, and encryption. It is meant to be easily redeployable by various groups with no programming experience.
 
 - **Sessions** include questions, responses, documents, access gates, and configuration, and new Sessions  can be created from the web application (at [/new](https://contextengine.xyz/new)).
-- **The deliberation surface** supports binary, rating, multiple-choice, and freeform questions, with optional conviction weighting and comments.
-- **Access control** uses soulbound tokens (non-transferrable NFTs), with support for gated participation, encrypted fields, and sponsored resources (RPC, AI, Tx Costs, Arweave Storage, Lit Encryption).
-- **Memory** lives in durable records: responses and documents on Arweave, built-in report views, exports, and address-based comparison tools.
+- **Surveys and Questions** supports binary, rating, multiple-choice, and freeform questions (with the ability to add new question types as needed), with optional conviction weighting and comments.
+- **Access control** uses soulbound tokens (non-transferrable NFTs), with support for gated participation, encrypted fields, and sponsored resources (RPC, AI, EVM tx Costs, Arweave Storage, Lit Encryption).
+- **Storage**: responses and documents stored on Arweave
 - **AI** is already used for question generation, transcription, cluster summaries, result analysis, and comparison of user positions across wallets.
 - **Demonstration datasets** are shipped in the repo as well, including one built around simulated historical figures. The results of this can be seen at [/demo](https://contextengine.xyz/session/demo)
 
@@ -114,7 +114,7 @@ Recurring or related communities can add or reference the same map, compare chan
 
 Groups are not only formal organizations or informal pre-existing communities. With zkTLS proofs, a group can be defined by any shared attribute or verifiable condition: web activity, student status, demographics, attendance of an event, shared beliefs, media consumption, purchase history, financial proofs, and more.
 
-This relates to the Plurality view that individuals are intersections of many groups (Weyl, Tang, & the Plurality Community, 2023). Programmable cryptography makes these group definitions expressible in code, and future versions of this toolkit will allow people to prove membership in one group without exposing every other affiliation.
+This relates to the Plurality view that individuals are intersections of many groups. Programmable cryptography makes these group definitions expressible in code, and future versions of this toolkit will allow people to prove membership in one group without exposing every other affiliation.
 
 
 ### Cities and Public Institutions
@@ -156,14 +156,10 @@ The roadmap is best understood as several related directions rather than a singl
 - **Group prompting and backcasting** — convert result clusters into scenarios groups are trying to aim for or avoid, render them as interactive media, and connect those scenarios back to present-day policy choices.
 - **Agent-to-agent negotiation tooling** — support multi-step negotiation processes involving private information.
 
-
-
 - **AI Whistleblowing Toolkit**: prove you have @aiLab.com email address using ZK → Make claims (potentially encrypted or conditionally timelocked)
 
 - **Post-quantum Cryptography**: Transition cryptographic functionalities to post-quantum versions
 
-
----
 
 ## 6. Closing Thoughts
 
