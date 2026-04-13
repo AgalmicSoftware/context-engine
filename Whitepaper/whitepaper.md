@@ -166,7 +166,7 @@ Context Engine recognizes and builds on the pioneering work of those involved wi
 
 ## References
 
-Handa, K., Stern, M., Huang, S., Hong, J., Durmus, E., McCain, M., Yun, G., Alt, A. J., Millar, T., Tamkin, A., Leibrock, J., Ritchie, S., & Ganguli, D. (2025, December 4). "Introducing Anthropic Interviewer: What 1,250 professionals told us about working with AI." *Anthropic.* https://anthropic.com/research/anthropic-interviewer
+Huang, S., Carter, S., Eaton, J., Pollack, S., Callender, D., III, Makagiansar, N., Gonzalez, M., Carr, S., Hong, J., Handa, K., McCain, M., Millar, T., Julapalli, M., Yun, G., Alt, A. J., Larsson, C., Leibrock, J., Gallivan, M., Sumers, T., Durmus, E., Kearney, M., Shen, J. H., Clark, J., Stern, M., & Ganguli, D. (2026, March 18). "What 81,000 People Want from AI." *Anthropic.* https://anthropic.com/features/81k-interviews
 
 Buterin, V. (2023, November 27). "My techno-optimism." *vitalik.eth.limo.* https://vitalik.eth.limo/general/2023/11/27/techno_optimism.html
 
