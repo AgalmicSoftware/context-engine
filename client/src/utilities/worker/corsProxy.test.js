@@ -5,20 +5,23 @@ import { resolveCorsProxyUrl } from './corsProxy.js';
 import { upsertCachedSessionWorkerConfig } from '../session/sessionWorkerConfigCache.js';
 
 describe('corsProxy fallback policy', () => {
+  const expectedSharedFallbackWorkerUrl = CLOUDFLARE_CORS_WORKER_URL.replace(/\/+$/, '');
+
   beforeEach(() => {
     try { localStorage.removeItem('dg:sessionRegistryCache:v1'); } catch (_) {}
     try { localStorage.removeItem('ce:sessionWorkerConfigCache:v1'); } catch (_) {}
   });
 
-  it('allows shared fallback for general session when no worker URL is configured', async () => {
+  it('uses shared fallback for general session when no worker URL is configured', async () => {
     const resolved = await resolveCorsProxyUrl({
       sessionSlug: '',
       sessionConfig: { slug: '', corsWorkerUrl: '' },
     });
 
-    expect(CLOUDFLARE_CORS_WORKER_URL).toBe('');
-    expect(resolved.status).toBe('missing');
-    expect(resolved.url).toBe('');
+    expect(CLOUDFLARE_CORS_WORKER_URL).toBeTruthy();
+    expect(resolved.status).toBe('fallback');
+    expect(resolved.source).toBe('default');
+    expect(resolved.url).toBe(expectedSharedFallbackWorkerUrl);
   });
 
   it('treats "general" alias as default session for shared fallback', async () => {
@@ -27,8 +30,9 @@ describe('corsProxy fallback policy', () => {
       sessionConfig: { slug: 'general', corsWorkerUrl: '' },
     });
 
-    expect(resolved.status).toBe('missing');
-    expect(resolved.url).toBe('');
+    expect(resolved.status).toBe('fallback');
+    expect(resolved.source).toBe('default');
+    expect(resolved.url).toBe(expectedSharedFallbackWorkerUrl);
   });
 
   it('treats canonicalized general aliases as the default session for shared fallback', async () => {
@@ -37,28 +41,30 @@ describe('corsProxy fallback policy', () => {
       sessionConfig: { slug: ' GeNeRal!!! ', corsWorkerUrl: '' },
     });
 
-    expect(resolved.status).toBe('missing');
-    expect(resolved.url).toBe('');
+    expect(resolved.status).toBe('fallback');
+    expect(resolved.source).toBe('default');
+    expect(resolved.url).toBe(expectedSharedFallbackWorkerUrl);
   });
 
-  it('does not inject a appConfig fallback worker for the default session when none is configured', async () => {
+  it('injects the appConfig fallback worker for the default session when configured', async () => {
     const resolved = await resolveCorsProxyUrl({
       sessionSlug: '',
     });
 
-    expect(resolved.status).toBe('missing');
-    expect(resolved.url).toBe('');
+    expect(resolved.status).toBe('fallback');
+    expect(resolved.source).toBe('default');
+    expect(resolved.url).toBe(expectedSharedFallbackWorkerUrl);
   });
 
-  it('uses explicit demoSessions.general worker config for the default session in on-chain mode', async () => {
+  it('uses the shared fallback for demoSessions.general when no session worker URL is configured', async () => {
     const resolved = await resolveCorsProxyUrl({
       sessionSlug: '',
       sessionConfig: demoSessions.general,
     });
 
-    expect(resolved.status).toBe('missing');
-    expect(resolved.source).toBe('missing');
-    expect(resolved.url).toBe('');
+    expect(resolved.status).toBe('fallback');
+    expect(resolved.source).toBe('default');
+    expect(resolved.url).toBe(expectedSharedFallbackWorkerUrl);
   });
 
   it('suppresses shared fallback for non-general slugs with missing worker URL', async () => {

@@ -306,7 +306,7 @@ describe('deploy-helper worker', () => {
     expect(response.headers.get('Access-Control-Allow-Origin')).toBe('https://kv.example');
   });
 
-  it('falls back to the shared worker default origins when no env or KV override is configured', async () => {
+  it('falls back to the localhost-only default origins when no env or KV override is configured', async () => {
     const response = await deployHelperWorker.fetch(makeJsonRequest('/admin/origins', null, {
       method: 'GET',
       headers: {
@@ -319,16 +319,7 @@ describe('deploy-helper worker', () => {
 
     expect(response.status).toBe(200);
     expect(payload).toEqual({
-      origins: [
-        'https://contextengine.xyz',
-        'https://www.contextengine.xyz',
-        'http://localhost:3000',
-        'http://127.0.0.1:3000',
-        'http://localhost:3001',
-        'http://127.0.0.1:3001',
-        'http://localhost:7391',
-        'http://127.0.0.1:7391',
-      ],
+      origins: ['http://localhost:3000'],
       source: 'default',
     });
   });
