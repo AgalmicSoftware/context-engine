@@ -91,77 +91,6 @@ while IFS= read -r pattern; do
   STRIP_ASSERT_ABSENT+=("$pattern")
 done < <(ce_public_release_strip_assert_absent_patterns)
 
-MANIFEST_EXCLUDE_PATTERNS=()
-while IFS= read -r pattern; do
-  MANIFEST_EXCLUDE_PATTERNS+=("$pattern")
-done < <(ce_public_release_manifest_exclude_patterns)
-
-path_matches_manifest_exclude() {
-  local relative_path="$1"
-  local pattern
-
-  for pattern in "${MANIFEST_EXCLUDE_PATTERNS[@]}"; do
-    case "$pattern" in
-      *'*'*|*'?'*|*'['*)
-        if [[ "$relative_path" == $pattern ]]; then
-          return 0
-        fi
-        ;;
-      *)
-        if [[ "$relative_path" == "$pattern" || "$relative_path" == "$pattern/"* ]]; then
-          return 0
-        fi
-        ;;
-    esac
-  done
-
-  return 1
-}
-
-verify_private_planning_paths_absent() {
-  local findings
-
-  findings=$(
-    cd "$STAGING_ROOT"
-    find . -path './.git' -prune -o -print |
-      sed 's#^\./##' |
-      grep -Ei '(^|/)TODO(/|$)|(^|/)[^/]*prds?[^/]*(/|$)' || true
-  )
-
-  if [ -n "$findings" ]; then
-    printf 'Private planning paths are still visible in public release copy:\n%s\n' "$findings" >&2
-    return 1
-  fi
-
-  return 0
-}
-
-scrub_public_package_json() {
-  local package_json="$STAGING_ROOT/package.json"
-
-  if [ ! -f "$package_json" ]; then
-    return 0
-  fi
-
-  if ! command -v node >/dev/null 2>&1; then
-    printf 'node is required to scrub public package.json metadata.\n' >&2
-    return 1
-  fi
-
-  node - "$package_json" <<'NODE'
-const fs = require('node:fs');
-
-const packageJsonPath = process.argv[2];
-const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
-
-if (packageJson.scripts && typeof packageJson.scripts === 'object') {
-  delete packageJson.scripts['test:worker:agent-bridge'];
-}
-
-fs.writeFileSync(packageJsonPath, `${JSON.stringify(packageJson, null, 2)}\n`);
-NODE
-}
-
 if [ "$OUTPUT_ABS" = "$REPO_ROOT" ]; then
   printf 'Refusing to overwrite the repo root.\n' >&2
   exit 1
@@ -253,41 +182,6 @@ mkdir -p "$STAGING_ROOT"
 ) | (
   cd "$STAGING_ROOT"
   tar -xf -
-)
-
-STRIP_PATTERNS=(
-  "contextEngine-cc"
-  "TODO"
-  "CLAUDE.md"
-  ".claude"
-  ".codex"
-  # Hold back the full repo-level E2E workflow layer from the public OSS copy for now.
-  "scripts/test-*.js"
-  "scripts/test-*.ui.js"
-  "scripts/lib/e2e"
-  "scripts/run-e2e-*"
-  "scripts/run-ux-*"
-  "scripts/capture-ux-*"
-  "scripts/build_external_llm_prompt.py"
-  ".env.e2e*"
-  "artifacts"
-  "tests/artifacts"
-  "Demo Integration Package"
-  "whitepaper/Slides.pdf"
-  "whitepaper/IdeasMap.md"
-  "client/src/components/MainSite/MainSite.module.test.js"
-  "client/src/utilities/worker/sessionCorsWorker.*.proxy.test.js"
-  "client/src/utilities/web3/contractScripts.*.proxy.test.js"
-)
-
-STRIP_ASSERT_ABSENT=(
-  "CLAUDE.md"
-  ".claude"
-  "scripts/test-*.js"
-  "scripts/test-*.ui.js"
-  "scripts/lib/e2e"
-  "whitepaper/Slides.pdf"
-  "whitepaper/IdeasMap.md"
 )
 
 (

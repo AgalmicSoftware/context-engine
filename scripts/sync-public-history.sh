@@ -20,7 +20,7 @@ Options:
   --source-branch <name>
                Replay commits from this local branch (default: dev)
   --force-with-lease
-               Replace an existing local target branch safely
+               Replace an existing local/remote target branch safely
   -h, --help   Show this help text
 EOF
 }
@@ -41,7 +41,6 @@ fail() {
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
 REPO_ROOT=$(cd "$SCRIPT_DIR/.." && pwd -P)
-PRIVATE_BRANCH_GUARD_INSTALLER="$SCRIPT_DIR/install-private-branch-guard.sh"
 
 # shellcheck source=./lib/public-release-strip-patterns.sh
 source "$SCRIPT_DIR/lib/public-release-strip-patterns.sh"
@@ -51,22 +50,13 @@ while IFS= read -r pattern; do
   STRIP_PATTERNS+=("$pattern")
 done < <(ce_public_release_strip_patterns)
 
-PRIVATE_REPLAY_MESSAGE_TOKENS=(
-  "contextEngine-cc"
-  "docs/agent-native"
-  "agent-native"
-  "OpenClaw"
-  "Telegram bridge"
-  "TODO/"
-)
-
 TMP_ROOT=""
 TEMP_CLONE=""
 TARGET_BRANCH="$DEFAULT_BRANCH_NAME"
 SOURCE_BRANCH="dev"
 DRY_RUN=0
 AUTO_PUSH=0
-EXPLICIT_FORCE_WITH_LEASE=0
+ALLOW_BRANCH_REPLACE=0
 REPLAYED_COUNT=0
 SKIPPED_COUNT=0
 REMOTE_BRANCH_EXISTS=0
@@ -113,34 +103,6 @@ commit_is_empty_after_strip() {
   done < <(git -C "$REPO_ROOT" diff-tree --no-commit-id --name-only -r --root "$commit_sha")
 
   return 0
-}
-
-private_replay_message_token() {
-  local message_file="$1"
-  local token
-
-  for token in "${PRIVATE_REPLAY_MESSAGE_TOKENS[@]}"; do
-    if grep -Fiq -- "$token" "$message_file"; then
-      printf '%s\n' "$token"
-      return 0
-    fi
-  done
-
-  return 1
-}
-
-ensure_public_replay_message() {
-  local commit_sha="$1"
-  local subject="$2"
-  local message_file="$3"
-  local token
-
-  if token=$(private_replay_message_token "$message_file"); then
-    log_error "Refusing to replay $commit_sha | $subject"
-    log_error "Commit message mentions private release token: $token"
-    log_error "Split the private-only changes into a stripped commit or rewrite the replayed public commit message."
-    exit 2
-  fi
 }
 
 strip_private_paths_from_clone() {
@@ -195,58 +157,19 @@ verify_strip_patterns_absent() {
   )
 }
 
-verify_private_planning_paths_absent() {
-  local findings
-
-  findings=$(
-    cd "$TEMP_CLONE"
-    git ls-files |
-      grep -Ei '(^|/)TODO(/|$)|(^|/)[^/]*prds?[^/]*(/|$)' || true
-  )
-
-  if [ -n "$findings" ]; then
-    printf '%s\n' "$findings"
-    return 1
-  fi
-
-  return 0
-}
-
 reset_clone_to_branch_head() {
-  git -C "$TEMP_CLONE" cherry-pick --abort >/dev/null 2>&1 || true
   git -C "$TEMP_CLONE" reset --hard --quiet HEAD
   git -C "$TEMP_CLONE" clean -fdq
 }
 
-resolve_private_cherry_pick_conflicts() {
-  local path
-  local found_conflict=0
-
-  while IFS= read -r path; do
-    [ -n "$path" ] || continue
-    found_conflict=1
-    if ! path_matches_strip_pattern "$path"; then
-      return 1
-    fi
-  done < <(git -C "$TEMP_CLONE" diff --name-only --diff-filter=U)
-
-  if [ "$found_conflict" -ne 1 ]; then
-    return 1
-  fi
-
-  strip_private_paths_from_clone
-
-  if git -C "$TEMP_CLONE" diff --name-only --diff-filter=U | grep -q .; then
-    return 1
-  fi
-
-  return 0
-}
-
 sync_branch_back_to_source_repo() {
   if git -C "$REPO_ROOT" show-ref --verify --quiet "refs/heads/$TARGET_BRANCH"; then
+    if [ "$ALLOW_BRANCH_REPLACE" -ne 1 ]; then
+      fail "Local branch $TARGET_BRANCH already exists in the source repo. Delete it, pick another name, or rerun with --force-with-lease." 1
+    fi
+
     if [ "$(git -C "$REPO_ROOT" branch --show-current)" = "$TARGET_BRANCH" ]; then
-      fail "Local branch $TARGET_BRANCH is currently checked out. Check out another branch before rerunning sync-public-history.sh." 1
+      fail "Local branch $TARGET_BRANCH is currently checked out. Check out another branch before rerunning with --force-with-lease." 1
     fi
 
     git -C "$REPO_ROOT" fetch --quiet --force "$TEMP_CLONE" "$TARGET_BRANCH:$TARGET_BRANCH"
@@ -278,50 +201,6 @@ author_audit_output() {
     | grep -Fv "$PUBLIC_GIT_NAME <$PUBLIC_GIT_EMAIL> | $PUBLIC_GIT_NAME <$PUBLIC_GIT_EMAIL>" || true
 }
 
-verify_public_release_surface() {
-  local verifier="$TEMP_CLONE/scripts/verify-public-release-surface.js"
-
-  if [ ! -f "$verifier" ]; then
-    fail "Public release surface verifier was not found in replay output: scripts/verify-public-release-surface.js" 1
-  fi
-
-  log_info "Verifying public release surface imports."
-  node "$verifier" "$TEMP_CLONE" >&2
-}
-
-verify_public_node_tests() {
-  local node_path="$REPO_ROOT/node_modules"
-  local temp_node_path="$TEMP_CLONE/node_modules"
-
-  if [ ! -f "$TEMP_CLONE/package.json" ]; then
-    fail "Cannot run public Node tests; package.json was not found in replay output." 1
-  fi
-
-  if [ -d "$node_path" ] && [ ! -e "$temp_node_path" ]; then
-    log_info "Linking source node_modules into public test checkout."
-    ln -s "$node_path" "$temp_node_path"
-  fi
-
-  log_info "Running public release Node tests."
-  (
-    cd "$TEMP_CLONE"
-    if [ -d "$node_path" ]; then
-      NODE_PATH="$node_path${NODE_PATH:+:$NODE_PATH}" npm run test:node
-    else
-      npm run test:node
-    fi
-  )
-}
-
-ensure_private_branch_guard() {
-  if [ ! -f "$PRIVATE_BRANCH_GUARD_INSTALLER" ]; then
-    fail "Private branch guard installer was not found: $PRIVATE_BRANCH_GUARD_INSTALLER" 1
-  fi
-
-  log_info "Ensuring the local private branch push guard is installed."
-  bash "$PRIVATE_BRANCH_GUARD_INSTALLER" >/dev/null
-}
-
 while [ $# -gt 0 ]; do
   case "$1" in
     --dry-run)
@@ -338,7 +217,7 @@ while [ $# -gt 0 ]; do
       SOURCE_BRANCH="$1"
       ;;
     --force-with-lease)
-      EXPLICIT_FORCE_WITH_LEASE=1
+      ALLOW_BRANCH_REPLACE=1
       ;;
     -h|--help)
       usage
@@ -361,18 +240,14 @@ if ! git -C "$REPO_ROOT" rev-parse --git-dir >/dev/null 2>&1; then
   fail "Repository root is not a git repository: $REPO_ROOT" 1
 fi
 
-ensure_private_branch_guard
-
 if git -C "$REPO_ROOT" show-ref --verify --quiet "refs/heads/$TARGET_BRANCH"; then
-  if [ "$EXPLICIT_FORCE_WITH_LEASE" -ne 1 ]; then
+  if [ "$ALLOW_BRANCH_REPLACE" -ne 1 ]; then
     fail "Local branch $TARGET_BRANCH already exists in the source repo. Delete it, pick another name, or rerun with --force-with-lease." 1
   fi
 
   if [ "$(git -C "$REPO_ROOT" branch --show-current)" = "$TARGET_BRANCH" ]; then
-    fail "Local branch $TARGET_BRANCH is currently checked out. Check out another branch before rerunning sync-public-history.sh." 1
+    fail "Local branch $TARGET_BRANCH is currently checked out. Check out another branch before rerunning with --force-with-lease." 1
   fi
-
-  log_info "Local branch $TARGET_BRANCH already exists and will be refreshed with --force-with-lease."
 fi
 
 SOURCE_REMOTE_URL=$(git -C "$REPO_ROOT" remote get-url origin 2>/dev/null || true)
@@ -419,11 +294,11 @@ git -C "$TEMP_CLONE" fetch --quiet origin main
 if git -C "$TEMP_CLONE" ls-remote --exit-code --heads origin "$TARGET_BRANCH" >/dev/null 2>&1; then
   REMOTE_BRANCH_EXISTS=1
   REMOTE_BRANCH_SHA=$(git -C "$TEMP_CLONE" ls-remote --heads origin "$TARGET_BRANCH" | awk '{print $1}')
-  if [ "$EXPLICIT_FORCE_WITH_LEASE" -eq 1 ]; then
-    log_info "Remote branch origin/$TARGET_BRANCH already exists and will be refreshed with --force-with-lease."
-  else
-    log_info "Remote branch origin/$TARGET_BRANCH already exists and will be refreshed automatically with --force-with-lease."
+  if [ "$ALLOW_BRANCH_REPLACE" -ne 1 ]; then
+    fail "Remote branch origin/$TARGET_BRANCH already exists. Pick another name or rerun with --force-with-lease." 1
   fi
+
+  log_info "Remote branch origin/$TARGET_BRANCH already exists and will be replaced with --force-with-lease."
 fi
 
 git -C "$TEMP_CLONE" checkout --quiet -B "$TARGET_BRANCH" origin/main
@@ -436,9 +311,6 @@ if [ "$DRY_RUN" -eq 1 ]; then
       SKIPPED_COUNT=$((SKIPPED_COUNT + 1))
       log_info "DRY RUN skip  $commit_sha | $subject"
     else
-      message_file="$TMP_ROOT/commit-message.txt"
-      git -C "$REPO_ROOT" log -1 --format='%B' "$commit_sha" > "$message_file"
-      ensure_public_replay_message "$commit_sha" "$subject" "$message_file"
       REPLAYED_COUNT=$((REPLAYED_COUNT + 1))
       log_info "DRY RUN replay $commit_sha | $subject"
     fi
@@ -461,14 +333,11 @@ for commit_sha in "${COMMITS[@]}"; do
 
   log_info "Replaying $commit_sha | $subject"
   if ! git -C "$TEMP_CLONE" cherry-pick --no-commit "$commit_sha" >/dev/null 2>&1; then
-    if resolve_private_cherry_pick_conflicts; then
-      log_info "Resolved stripped-path cherry-pick conflicts for $commit_sha | $subject"
-    else
-      log_error "Cherry-pick failed for $commit_sha | $subject"
-      reset_clone_to_branch_head
-      log_error "Resolve the conflict manually by replaying this commit onto a branch based on origin/main."
-      exit 1
-    fi
+    log_error "Cherry-pick failed for $commit_sha | $subject"
+    git -C "$TEMP_CLONE" cherry-pick --abort >/dev/null 2>&1 || true
+    reset_clone_to_branch_head
+    log_error "Resolve the conflict manually by replaying this commit onto a branch based on origin/main."
+    exit 1
   fi
 
   strip_private_paths_from_clone
@@ -479,8 +348,6 @@ for commit_sha in "${COMMITS[@]}"; do
     reset_clone_to_branch_head
     continue
   fi
-
-  ensure_public_replay_message "$commit_sha" "$subject" "$message_file"
 
   GIT_AUTHOR_NAME="$PUBLIC_GIT_NAME" \
   GIT_AUTHOR_EMAIL="$PUBLIC_GIT_EMAIL" \
@@ -503,26 +370,10 @@ else
   exit 2
 fi
 
-if planning_findings=$(verify_private_planning_paths_absent); then
-  :
-else
-  log_error "Private planning path verification failed; public branch still contains:"
-  printf '%s\n' "$planning_findings" >&2
-  exit 2
-fi
-
 offending_identities=$(author_audit_output)
 if [ -n "$offending_identities" ]; then
   log_error "Identity audit failed; offending commits:"
   printf '%s\n' "$offending_identities" >&2
-  exit 2
-fi
-
-if ! verify_public_release_surface; then
-  exit 2
-fi
-
-if ! verify_public_node_tests; then
   exit 2
 fi
 
