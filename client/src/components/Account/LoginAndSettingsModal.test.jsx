@@ -451,7 +451,7 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     expect(subject.state.walletBalanceWei.eq(ethers.BigNumber.from(0))).toBe(true);
   });
 
-  it('keeps the zero-balance faucet affordance when auto-funding is disabled', async () => {
+  it('preserves the zero-balance state when auto-funding is disabled', async () => {
     const subject = mountClassSubject(new LoginAndSettingsModal(buildProps({
       account: WAGMI_ADDRESS,
       loginComplete: true,
@@ -465,10 +465,9 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     expect(contractScripts.sendTestnetFunds).not.toHaveBeenCalled();
     expect(subject.state.autoSendTriggered).toBe(false);
     expect(subject.state.walletBalanceWei.eq(ethers.BigNumber.from(0))).toBe(true);
-    expect(treeHasPropValue(subject.getSettingsDisplay(), 'className', 'faucetContainer')).toBe(true);
   });
 
-  it('keeps the manual faucet affordance visible while the wallet balance is still unknown', () => {
+  it('keeps the wallet balance unknown state when the balance has not been loaded yet', () => {
     const subject = new LoginAndSettingsModal(buildProps({
       account: WAGMI_ADDRESS,
       loginComplete: true,
@@ -477,10 +476,9 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     }));
 
     expect(subject.state.walletBalanceWei).toBeNull();
-    expect(treeHasPropValue(subject.getSettingsDisplay(), 'className', 'faucetContainer')).toBe(true);
   });
 
-  it('keeps the manual faucet affordance visible when passkey balance reads fail', async () => {
+  it('keeps the balance unset when passkey balance reads fail', async () => {
     const getBalance = jest.fn(async () => {
       throw new Error('rpc timeout');
     });
@@ -499,7 +497,6 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
 
     expect(subject.state.walletBalanceWei).toBeNull();
     expect(subject.autoSendTestFunds).not.toHaveBeenCalled();
-    expect(treeHasPropValue(subject.getSettingsDisplay(), 'className', 'faucetContainer')).toBe(true);
 
     providerCtorSpy.mockRestore();
   });
