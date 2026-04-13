@@ -3,7 +3,7 @@
 ## Quick commands
 ```bash
 # Client (from client/)
-cd client && npm install          # install client dependencies
+cd client && npm install --legacy-peer-deps  # install client dependencies
 npm run dev                       # dev server (port 3000, hot reload)
 
 # Worker bundle (from repo root; use Node 20 for root scripts)
@@ -21,13 +21,14 @@ npm run ai:seed-survey:question-types            # seed question type data
 - Run frontend package commands from `client/`.
 - Root worker/test scripts are standardized on Node `^20.0.0` (`nvm use 20`).
 - The frontend package itself still supports Node `^16.14.2`, npm `9.2.0` (`nvm use 16`) when you are working only inside `client/`.
+- Fresh `client/` installs still require `npm install --legacy-peer-deps` because the current React Scripts / Lit / ethers peer graph does not resolve cleanly with plain npm install.
 - `npm run dev` is the hot-reload frontend dev server; `npm start` serves the existing production build from `build/`.
 - Useful frontend scripts: `npm test`, `CI=true npm test -- --watchAll=false`, `npm run lint`, `npm run build`, `npm run analyze`.
 - Frontend logging is off by default. In the browser console, run `window.CE_LOGGING.enabled = true`, then `window.CE_LOGGING_HELP()` for categories and usage.
 
 ## Stack
 - React 17 SPA (CRA, mix of class + functional components)
-- Solidity on Base Sepolia (chain 84532)
+- Solidity on OP Sepolia (chain 11155420) by default; Base Sepolia (84532) remains supported for legacy/dev compatibility
 - Cloudflare Workers (`sessionCorsWorker`) — CORS proxy, encryption, gating
 - Arweave (metadata/payloads and most uploaded images); some token/image reads still accept IPFS URLs
 - Lit Protocol (SBT-gated field encryption via access control conditions)
@@ -83,7 +84,7 @@ npm run ai:seed-survey:question-types            # seed question type data
 | [`TODO/README.md`](TODO/README.md) | Public roadmap |
 
 ## Conventions
-- Default testnet: Base Sepolia (`84532`)
+- Default testnet: OP Sepolia (`11155420`)
 - Test IDs: `data-testid="ce-<area>-<control>"`
 - Playwright selectors: prefer `getByTestId()` > `getByRole()` > `getByLabel()` > CSS
 - Tooltip pattern: `<FontAwesomeIcon icon={faQuestionCircle}/>` + `<UncontrolledTooltip>` (reactstrap)

@@ -6,6 +6,7 @@ import * as sessionScanScopeUtils from '../../utilities/session/sessionScanScope
 import * as cacheScriptsUtils from '../../utilities/cache/cacheScripts.js';
 import { GLOBAL_SESSION_SELECTION_UPDATED_EVENT } from '../../utilities/session/globalSessionState.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
+import { DEFAULT_CHAIN_ID } from '../../variables/appConfig.js';
 
 const makeInstance = (props = {}) => {
   const instance = new SBTSelector({
@@ -160,7 +161,7 @@ describe('SBTSelector targeted hydration', () => {
         slug: 'legacyEdge',
         __unresolved: true,
       }));
-      expect(instance.getSessionNetworkId('legacyEdge')).toBe(84532);
+      expect(instance.getSessionNetworkId('legacyEdge')).toBe(DEFAULT_CHAIN_ID);
       expect(demoSpy).not.toHaveBeenCalled();
     } finally {
       demoSpy.mockRestore();
@@ -2102,7 +2103,7 @@ describe('SBTSelector targeted hydration', () => {
       sessionConfig: {},
     });
     try {
-      expect(instance.getSessionNetworkId('new-slug-not-yet-published')).toBe(84532);
+      expect(instance.getSessionNetworkId('new-slug-not-yet-published')).toBe(DEFAULT_CHAIN_ID);
     } finally {
       chainSpy.mockRestore();
     }
@@ -2192,7 +2193,7 @@ describe('SBTSelector targeted hydration', () => {
         'none',
         expect.objectContaining({
           slug: 'rxc',
-          networkChainId: 84532,
+          networkChainId: DEFAULT_CHAIN_ID,
         }),
         expect.objectContaining({
           onDiscoveredAddresses: expect.any(Function),

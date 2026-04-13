@@ -3332,15 +3332,33 @@ h1 {
 }
 
 :global(.modal-login .close) {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  margin: 0;
+  padding: 0;
   background: transparent;
   background-color: transparent !important;
   border: 0;
   box-shadow: none;
+  color: var(--ce-color-white);
+  text-shadow: none;
+  opacity: 0.5;
+  line-height: 1;
+  transition: opacity 0.2s ease;
 }
 
 :global(.modal-login .close:hover),
 :global(.modal-login .close:focus) {
   background: transparent;
+  background-color: transparent !important;
+  opacity: 0.8;
 }
 
 :global(.modal.modal-login) .web3ModalDialog {
@@ -3364,6 +3382,11 @@ h1 {
   position: relative;
   z-index: 2101;
   overflow: hidden;
+
+  :global(.card-header) {
+    position: relative;
+    padding-right: 4.25rem;
+  }
 }
 
 #loginModalCard::before {

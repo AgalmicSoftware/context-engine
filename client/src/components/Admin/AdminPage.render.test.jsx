@@ -4,6 +4,7 @@ import { ethers } from 'ethers';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { getCachedSessionWorkerConfig } from '../../utilities/session/sessionWorkerConfigCache.js';
+import { CLOUDFLARE_CORS_WORKER_URL } from '../../variables/appConfig.js';
 import styles from './AdminPage.module.scss';
 
 const ADMIN_ADDRESS = '0x00000000000000000000000000000000000000aa';
@@ -926,7 +927,7 @@ describe('AdminPage rendered interactions', () => {
     });
   });
 
-  it('leaves the worker hero card empty for the general session when no shared default fallback is configured', async () => {
+  it('prefills the worker hero card with the shared fallback for the general session', async () => {
     let resolveWorkerLookup;
     mockResolveCorsProxyUrl.mockImplementation(() => new Promise((resolve) => {
       resolveWorkerLookup = resolve;
@@ -940,7 +941,7 @@ describe('AdminPage rendered interactions', () => {
     renderAdminPage();
 
     const workerInput = await screen.findByPlaceholderText('https://<worker-name>.<account-subdomain>.workers.dev/');
-    expect(workerInput).toHaveValue('');
+    expect(workerInput).toHaveValue(CLOUDFLARE_CORS_WORKER_URL);
     expect(screen.getByRole('link', { name: 'Open session' })).toHaveAttribute('href', 'http://localhost/session');
 
     const metadataPanel = screen.getByText('Session metadata').closest('section');
@@ -1132,7 +1133,7 @@ describe('AdminPage rendered interactions', () => {
     expect(within(metadataPanel).getByRole('button', { name: 'Copy raw metadata JSON' })).toBeInTheDocument();
   });
 
-  it('saves advanced metadata fields and syncs worker config from the updated metadata payload', async () => {
+  it('saves advanced metadata fields from the updated metadata payload', async () => {
     const currentBlockSpy = jest
       .spyOn(ethers.providers.JsonRpcProvider.prototype, 'getBlockNumber')
       .mockResolvedValue(12345678);
@@ -1222,32 +1223,8 @@ describe('AdminPage rendered interactions', () => {
         }),
       }), expect.any(Object));
 
-      const workerConfigCall = global.fetch.mock.calls.find(([url]) => String(url).endsWith('/admin/set-config'));
-      expect(workerConfigCall).toBeTruthy();
-      const workerPayload = JSON.parse(workerConfigCall[1].body);
-      expect(workerPayload).toEqual(expect.objectContaining({
-        action: 'set-config',
-        slug: 'edge',
-        sessionSlug: 'edge',
-        adminAddress: ADMIN_ADDRESS,
-      }));
-      expect(workerPayload.config).toEqual(expect.objectContaining({
-        adminAddress: ADMIN_ADDRESS,
-        registryAddress: expect.any(String),
-        blockLimits: { start: 100, end: null },
-        faucet: expect.objectContaining({
-          amountEth: '0.0002',
-          balanceThresholdEth: '0.001',
-        }),
-        contracts: {
-          surveys: {
-            address: '0x00000000000000000000000000000000000000f1',
-            chainId: 84532,
-          },
-        },
-      }));
       await waitFor(() => {
-        expect(screen.getByText(/Worker config synced\./)).toBeInTheDocument();
+        expect(screen.getByText(/Session metadata updated\./)).toBeInTheDocument();
       });
     } finally {
       currentBlockSpy.mockRestore();

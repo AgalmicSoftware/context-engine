@@ -2145,6 +2145,80 @@ $muted-text: tokens.$ce-muted-text;
   color: $muted-text;
 }
 
+.newSessionBanner {
+  margin-bottom: 18px;
+  padding: 14px 16px;
+  border: 1px solid rgba(77, 255, 164, 0.24);
+  border-radius: 14px;
+  background:
+    linear-gradient(180deg, rgba(77, 255, 164, 0.08), rgba(255, 255, 255, 0.04)),
+    rgba(255, 255, 255, 0.03);
+  color: rgba(244, 247, 255, 0.92);
+  box-shadow: $card-shadow;
+}
+
+.newSessionBannerHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.newSessionBannerTitle {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.35;
+  color: var(--ce-color-white);
+}
+
+.newSessionBannerDismissButton {
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  border-radius: var(--ce-radius-pill);
+
+  &:focus-visible {
+    outline: none;
+    border-color: rgba(77, 255, 164, 0.42);
+    box-shadow: 0 0 0 2px rgba(77, 255, 164, 0.18);
+  }
+}
+
+.newSessionBannerBody {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.newSessionBannerList {
+  margin: 0;
+  padding-left: 1.2rem;
+  display: grid;
+  gap: 6px;
+
+  li {
+    line-height: 1.5;
+    color: rgba(244, 247, 255, 0.9);
+  }
+}
+
+.newSessionBannerCopy {
+  margin: 0;
+  line-height: 1.55;
+  color: rgba(244, 247, 255, 0.78);
+}
+
+.newSessionBannerLink {
+  color: $clickable-color;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+
+  &:hover,
+  &:focus-visible {
+    color: var(--ce-color-white);
+  }
+}
+
 .sponsoredBundleStatus {
   margin-bottom: 18px;
   padding: 10px 14px;
@@ -2526,6 +2600,23 @@ $muted-text: tokens.$ce-muted-text;
 }
 
 @media (max-width: 760px) {
+  .newSessionBanner {
+    padding: 13px 14px;
+  }
+
+  .newSessionBannerHeader {
+    gap: 10px;
+  }
+
+  .newSessionBannerBody {
+    gap: 8px;
+  }
+
+  .newSessionBannerList {
+    padding-left: 1.1rem;
+    gap: 5px;
+  }
+
   .publishProgressHeader {
     align-items: flex-start;
     flex-direction: column;

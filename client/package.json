@@ -1,7 +1,7 @@
 {
   "name": "client",
   "version": "0.1.0",
-  "description": "Context Engine — community survey platform with SBT-gated encryption on Base",
+  "description": "Context Engine — React client for sessions, surveys, and SBT-gated encryption",
   "author": "Context Engine Contributors",
   "license": "CPAL-1.0",
   "repository": {

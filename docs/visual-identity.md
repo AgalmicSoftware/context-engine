@@ -111,7 +111,7 @@ Use `UserPage` as the default for new page-level UI. Pull in `MemeMatch` and `Up
 
 | Role | Font |
 | --- | --- |
-| stats, IDs, addresses, compact metadata | `var(--ce-font-mono)` = `'Share Tech Mono', 'Courier New', monospace` |
+| stats, IDs, addresses, compact metadata | `var(--ce-font-mono)` = `ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace` |
 | regular body copy | inherit parent/body font; global token is `var(--ce-font-body)` = `'Poppins', sans-serif` |
 
 ### Weight patterns
@@ -291,6 +291,7 @@ Use grid when two columns need equal visual weight, then collapse to one column 
 
 - Hover/focus on links and icons: switch to `#4dffa4`
 - Hover on buttons/cards: slight lift with `translateY(-1px)` or `translateY(-2px)`
+- Final submit/create CTAs use the shared `#2a63ca` surface, indigo hover, uppercase body-font labels, and the same lift-on-hover motion.
 - Focus: visible outline, usually `2px solid rgba(99, 102, 241, 0.45)`
 - Disabled: `opacity: 0.7` and `cursor: not-allowed`
 
@@ -353,6 +354,7 @@ Use this only for featured cards, not for every panel.
 Current state:
 - Flat/shared surfaces already use tokens such as `--ce-color-surface` and `--ce-color-surface-alt`.
 - There is no shared `--ce-gradient-*` token yet, so copy exact gradients when matching existing featured-card UI.
+- Final submit/create CTAs are a separate shared pattern: `var(--ce-font-body)`, uppercase inner content, blue `#2a63ca` surface, indigo hover, and a subtle lift-on-hover treatment.
 
 ## 9. Existing CSS Custom Properties Used By These Files
 
@@ -361,7 +363,7 @@ Current state:
 | Property | Value |
 | --- | --- |
 | `--ce-font-body` | `'Poppins', sans-serif` |
-| `--ce-font-mono` | `'Share Tech Mono', 'Courier New', monospace` |
+| `--ce-font-mono` | `ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace` |
 
 ### Colors
 

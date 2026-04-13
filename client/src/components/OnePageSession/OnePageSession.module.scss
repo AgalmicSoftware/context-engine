@@ -8,6 +8,7 @@
   /* Light overall background (slightly tinted) so it doesn't conflict with main site color */
   // background-color: rgba(145, 112, 222, 0.08);
   padding: 20px;
+  padding-top: 0px !important;
 }
 
 /* Top header/branding area */
@@ -16,7 +17,8 @@
   background-color: transparent;
   border: 0px solid #bfa0f4;
   border-radius: var(--ce-radius-8);
-  padding: 20px;
+  // padding: 20px;
+  padding: 0px !important;
   /* FLEX layout: blurb on left, image on right */
   display: flex;
   align-items: center;
@@ -686,6 +688,7 @@
   .brandingSection {
     flex-direction: column;
     padding: 10px;
+    padding-top: 0px !important;
   }
 
   #brandingSectionTitle {
@@ -727,21 +730,23 @@
   }
 
   .sectionHeader {
+    align-items: center;
     font-size: 1.6em;
     padding-left: 10px;
   }
 
   .sectionHeader .sectionHeaderText {
     flex-direction: row;
-    align-items: baseline;
+    align-items: center;
     flex-wrap: wrap;
     gap: 6px 12px;
   }
 
   .sectionHeader .sectionHeaderSubtitle {
-    font-size: 0.68em;
+    font-size: 1em;
+    font-weight: inherit;
     line-height: 1;
-    color: rgba(244, 247, 255, 0.58);
+    color: rgba(255, 255, 255, 0.15);
   }
 
   .sectionHeaderRow {
@@ -763,10 +768,16 @@
 
   .documentsSectionHeaderMeta .sectionHeaderTooltip {
     align-items: center;
+    justify-content: center;
     display: inline-flex;
+    min-height: 44px;
+    min-width: 44px;
     margin-left: 0;
     margin-top: 0;
-    min-height: 40px;
+  }
+
+  .documentsSectionHeaderMeta .sectionHeaderTooltip > svg {
+    opacity: 0.6;
   }
 
   .documentsSectionHeaderMeta .sectionHeaderLink {
@@ -827,21 +838,23 @@
 /* Keep smaller tablets on the inline header layout without pulling in the full phone chrome. */
 @media only screen and (min-width: 601px) and (max-width: 767px) {
   .sectionHeader {
+    align-items: center;
     font-size: 1.6em;
     padding-left: 10px;
   }
 
   .sectionHeader .sectionHeaderText {
     flex-direction: row;
-    align-items: baseline;
+    align-items: center;
     flex-wrap: wrap;
     gap: 6px 12px;
   }
 
   .sectionHeader .sectionHeaderSubtitle {
-    font-size: 0.68em;
+    font-size: 1.2em;
+    font-weight: inherit;
     line-height: 1;
-    color: rgba(244, 247, 255, 0.58);
+    color: rgba(255, 255, 255, 0.15);
   }
 
   .sectionHeaderRow {
@@ -863,10 +876,16 @@
 
   .documentsSectionHeaderMeta .sectionHeaderTooltip {
     align-items: center;
+    justify-content: center;
     display: inline-flex;
+    min-height: 44px;
+    min-width: 44px;
     margin-left: 0;
     margin-top: 0;
-    min-height: 40px;
+  }
+
+  .documentsSectionHeaderMeta .sectionHeaderTooltip > svg {
+    opacity: 0.6;
   }
 
   .documentsSectionHeaderMeta .sectionHeaderLink {
@@ -883,6 +902,7 @@
   .onePageDemoContainer {
     font-size: 1.15rem;
     padding: 15px 25px;
+    padding-top: 0px;
   }
 
   .brandingSection {

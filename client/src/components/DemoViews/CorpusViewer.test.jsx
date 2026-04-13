@@ -1,3 +1,5 @@
+import fs from 'fs';
+import path from 'path';
 import React from 'react';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
@@ -39,6 +41,39 @@ jest.mock('react-simple-maps', () => ({
 import CorpusViewer from './CorpusViewer.jsx';
 import PolicyGlobe from './PolicyGlobe.jsx';
 
+const extractMediaBlock = (scss, query, requiredSnippet = '') => {
+  let searchFrom = 0;
+
+  while (searchFrom < scss.length) {
+    const queryIndex = scss.indexOf(query, searchFrom);
+    if (queryIndex === -1) {
+      return null;
+    }
+
+    const blockStart = scss.indexOf('{', queryIndex);
+    if (blockStart === -1) {
+      return null;
+    }
+
+    let depth = 0;
+    for (let index = blockStart; index < scss.length; index += 1) {
+      const char = scss[index];
+      if (char === '{') depth += 1;
+      if (char === '}') depth -= 1;
+      if (depth === 0) {
+        const block = scss.slice(queryIndex, index + 1);
+        if (!requiredSnippet || block.includes(requiredSnippet)) {
+          return block;
+        }
+        searchFrom = queryIndex + query.length;
+        break;
+      }
+    }
+  }
+
+  return null;
+};
+
 const renderPolicyGlobeHarness = (entries) => render(
   <PolicyGlobe entries={entries}>
     {({ filteredEntries, GlobeElement }) => (
@@ -57,6 +92,81 @@ const renderPolicyGlobeHarness = (entries) => render(
 describe('CorpusViewer', () => {
   beforeEach(() => {
     mockTagPage.mockClear();
+  });
+
+  it('keeps the mobile tab strip, card metadata, and action rows viewport-safe', () => {
+    const corpusScss = fs.readFileSync(path.join(__dirname, 'CorpusViewer.module.scss'), 'utf8');
+    const mobileBlock = extractMediaBlock(corpusScss, '@media (max-width: 720px)', '.container {');
+    const phoneBlock = extractMediaBlock(corpusScss, '@media (max-width: 480px)', '.container {');
+    const policyScss = fs.readFileSync(path.join(__dirname, 'PolicyGlobe.module.scss'), 'utf8');
+    const policyMobileBlock = extractMediaBlock(policyScss, '@media (max-width: 640px)', '.filterButton {');
+    const mapScss = fs.readFileSync(
+      path.join(__dirname, 'DemoAnalysis', 'DemoAnalysisWorkspace.module.scss'),
+      'utf8'
+    );
+    const mapJsx = fs.readFileSync(
+      path.join(__dirname, 'DemoAnalysis', 'WorldResultsMap.jsx'),
+      'utf8'
+    );
+    const compactMapMobileBlock = extractMediaBlock(mapScss, '@media (max-width: 640px)', '.panel,');
+
+    expect(mobileBlock).toContain('.tabButton {');
+    expect(mobileBlock).toContain('.tabBar {');
+    expect(mobileBlock).toContain('display: grid;');
+    expect(mobileBlock).toContain('grid-template-columns: repeat(2, minmax(0, 1fr));');
+    expect(mobileBlock).toContain('overflow: visible;');
+    expect(mobileBlock).toContain('max-width: none;');
+    expect(mobileBlock).toContain('min-width: 0;');
+    expect(mobileBlock).toContain('width: 100%;');
+    expect(mobileBlock).toContain('.tabIcon {');
+    expect(mobileBlock).toContain('font-size: 28px;');
+    expect(mobileBlock).toContain('.policyMapColumn {');
+    expect(mobileBlock).toContain('order: -1;');
+    expect(mobileBlock).toContain('.policyListColumn {');
+    expect(mobileBlock).toContain('order: 1;');
+    expect(mobileBlock).toContain('.policySplitLayout {');
+    expect(mobileBlock).toContain('gap: 10px;');
+    expect(mobileBlock).toContain('.policyMapLens {');
+    expect(mobileBlock).toContain('padding: 0;');
+    expect(mobileBlock).toContain('.tweetCard .tweetAuthorRow {');
+    expect(mobileBlock).toContain('display: grid;');
+    expect(mobileBlock).toContain('grid-template-columns: 44px minmax(0, 1fr);');
+    expect(mobileBlock).toContain('.tweetDate {');
+    expect(mobileBlock).toContain('grid-column: 2;');
+    expect(mobileBlock).toContain('.cardFooter {');
+    expect(mobileBlock).toContain('flex-direction: column;');
+    expect(mobileBlock).toContain('.debateMapLink,');
+    expect(mobileBlock).toContain('overflow-wrap: anywhere;');
+    expect(mobileBlock).toContain('.externalLink span {');
+    expect(mobileBlock).toContain('.pillRow {');
+    expect(mobileBlock).toContain('width: 100%;');
+
+    expect(phoneBlock).toContain('.tabButton {');
+    expect(phoneBlock).toContain('.tabBar {');
+    expect(phoneBlock).toContain('gap: 8px;');
+    expect(phoneBlock).toContain('min-height: 78px;');
+    expect(phoneBlock).toContain('.tabIcon {');
+    expect(phoneBlock).toContain('font-size: 26px;');
+    expect(phoneBlock).toContain('.tweetCard .tweetAuthorRow {');
+    expect(phoneBlock).toContain('grid-template-columns: 40px minmax(0, 1fr);');
+
+    expect(policyMobileBlock).toContain('.filterButton {');
+    expect(policyMobileBlock).toContain('font-size: 11px;');
+    expect(policyMobileBlock).toContain('white-space: normal;');
+    expect(corpusScss).toMatch(/\.tabIcon\s*{[\s\S]*?font-size:\s*24px;/);
+    expect(corpusScss).toMatch(/\.container\s*{[\s\S]*?box-sizing:\s*border-box;[\s\S]*?max-width:\s*100%;[\s\S]*?width:\s*100%;/);
+    expect(corpusScss).toMatch(/\.policyMapLens\s*{[\s\S]*?padding:\s*4px 4px 0;/);
+    expect(corpusScss).toMatch(/\.policyMapPanel\s*{[\s\S]*?padding:\s*10px 10px 12px;/);
+    expect(corpusScss).toMatch(/\.debateMapLink\s*{[\s\S]*?box-sizing:\s*border-box;/);
+    expect(corpusScss).toMatch(/\.externalLink\s*{[\s\S]*?box-sizing:\s*border-box;/);
+    expect(corpusScss).toMatch(/\.cardFooterLinks\s*{[\s\S]*?width:\s*100%;/);
+    expect(mapScss).toMatch(/\.mapFrameCompact\s*{[\s\S]*?width:\s*100%;[\s\S]*?padding:\s*0;/);
+    expect(mapScss).toMatch(/\.mapFrameCompact\s*{[\s\S]*?:global\(svg\)\s*{[\s\S]*?display:\s*block;[\s\S]*?max-width:\s*none;[\s\S]*?width:\s*100%;/);
+    expect(compactMapMobileBlock).toContain('.mapFrameCompact {');
+    expect(compactMapMobileBlock).toContain('padding-top: 0;');
+    expect(compactMapMobileBlock).toContain('.mapFrameCompact :global(svg) {');
+    expect(compactMapMobileBlock).toContain('max-width: none;');
+    expect(mapJsx).toMatch(/projectionConfig=\{\{\s*rotate:\s*\[-10,\s*0,\s*0\],\s*scale:\s*compact \? 147 : 147\s*\}\}/);
   });
 
   it('maps legacy tweet debate tags into atlas issue links', () => {
@@ -102,6 +212,19 @@ describe('CorpusViewer', () => {
     );
 
     expect(screen.queryByRole('link', { name: /Full corpus on GitHub/i })).not.toBeInTheDocument();
+  });
+
+  it('renders the standalone GitHub corpus link against the canonical public repo', () => {
+    render(
+      <MemoryRouter>
+        <CorpusViewer />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByRole('link', { name: /Full corpus on GitHub/i })).toHaveAttribute(
+      'href',
+      'https://github.com/AgalmicSoftware/context-engine/tree/main/ai-discourse-corpus'
+    );
   });
 
   it('renders arxiv entries with the arxiv-specific card layout', () => {
@@ -198,7 +321,6 @@ describe('CorpusViewer', () => {
     expect(screen.getAllByRole('listitem').map((item) => item.textContent)).toEqual([
       'Brazil AI Bill',
       'UK Draft Bill',
-      'California SB 1047',
     ]);
 
     fireEvent.click(screen.getByRole('button', { name: 'Live' }));
@@ -206,6 +328,14 @@ describe('CorpusViewer', () => {
     expect(screen.getAllByRole('listitem').map((item) => item.textContent)).toEqual([
       'EU AI Act',
       'US Executive Order',
+    ]);
+
+    expect(screen.queryByText('California SB 1047')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Inactive' }));
+
+    expect(screen.getAllByRole('listitem').map((item) => item.textContent)).toEqual([
+      'California SB 1047',
     ]);
   });
 
@@ -229,9 +359,14 @@ describe('CorpusViewer', () => {
 
     fireEvent.click(within(screen.getByTestId('ce-policy-filter-row')).getByRole('button', { name: 'Proposed' }));
 
-    expect(screen.getByText(/Safe and Secure Innovation for Frontier AI/i)).toBeInTheDocument();
     expect(screen.getByText(/Brazil AI Bill/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Safe and Secure Innovation for Frontier AI/i)).not.toBeInTheDocument();
     expect(screen.getByTestId('demo-analysis-world-map')).toBeInTheDocument();
+
+    fireEvent.click(within(screen.getByTestId('ce-policy-filter-row')).getByRole('button', { name: 'Inactive' }));
+
+    expect(screen.getByText(/Safe and Secure Innovation for Frontier AI/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Brazil AI Bill/i)).not.toBeInTheDocument();
   });
 
   it('renders insider interview cards when the Insider Interviews tab is selected', () => {
@@ -245,6 +380,22 @@ describe('CorpusViewer', () => {
 
     expect(screen.getAllByText(/Interview date:/i).length).toBeGreaterThan(0);
     expect(screen.getAllByRole('link', { name: 'View interview' }).length).toBeGreaterThan(0);
+  });
+
+  it('keeps the first insider interview slots diversified when the same guest has multiple entries', () => {
+    const { container } = render(
+      <MemoryRouter>
+        <CorpusViewer />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Insider Interviews' }));
+
+    const insiderCards = Array.from(container.querySelectorAll('article'));
+
+    expect(insiderCards[0]?.textContent).toContain('Dario Amodei');
+    expect(insiderCards[1]?.textContent).toContain('Demis Hassabis');
+    expect(insiderCards[2]?.textContent).toContain('Dario Amodei');
   });
 
   it('keeps curated insider interview links as absolute external URLs', () => {

@@ -12,6 +12,7 @@ test('evaluateSbtMetadataLocksUiResult passes when all holder decrypt flags are 
   const result = evaluateSbtMetadataLocksUiResult({
     holderNameDecrypted: true,
     holderDescriptionDecrypted: true,
+    holderDocUrlDecrypted: true,
     holderImageDecrypted: true,
   });
 
@@ -20,6 +21,7 @@ test('evaluateSbtMetadataLocksUiResult passes when all holder decrypt flags are 
   assert.deepEqual(result.got, {
     holderNameDecrypted: true,
     holderDescriptionDecrypted: true,
+    holderDocUrlDecrypted: true,
     holderImageDecrypted: true,
   });
 });
@@ -28,6 +30,7 @@ test('evaluateSbtMetadataLocksUiResult reports any missing holder decrypt eviden
   const result = evaluateSbtMetadataLocksUiResult({
     holderNameDecrypted: false,
     holderDescriptionDecrypted: true,
+    holderDocUrlDecrypted: true,
     holderImageDecrypted: false,
   });
 
@@ -39,6 +42,7 @@ test('evaluateSbtMetadataLocksUiResult reports any missing holder decrypt eviden
   assert.deepEqual(result.got, {
     holderNameDecrypted: false,
     holderDescriptionDecrypted: true,
+    holderDocUrlDecrypted: true,
     holderImageDecrypted: false,
   });
 });

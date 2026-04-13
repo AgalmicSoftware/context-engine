@@ -18,4 +18,13 @@ describe('CommunityTab module styles', () => {
     expect(scss).toMatch(/\.modal\s*{[\s\S]*?:global\(\.modal-body\)\s*{[\s\S]*?flex:\s*1 1 auto;[\s\S]*?min-height:\s*0;[\s\S]*?overflow-y:\s*auto;/);
     expect(scss).toMatch(/@media \(max-width: 768px\)\s*{[\s\S]*?\.modal\s*{[\s\S]*?width:\s*calc\(100vw - 1\.5rem\);[\s\S]*?max-width:\s*calc\(100vw - 1\.5rem\);[\s\S]*?margin:\s*0\.75rem auto;/);
   });
+
+  it('anchors the community groups modal close button in the top-right corner', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'CommunityTab.module.scss'), 'utf8');
+
+    expect(scss).toMatch(/\.modal\s*{[\s\S]*?\.modalHeader\s*{[\s\S]*?position:\s*relative;[\s\S]*?padding:\s*20px 4\.25rem 20px 30px;/);
+    expect(scss).toMatch(/:global\(\.close\),[\s\S]*?:global\(\.btn-close\)\s*{[\s\S]*?position:\s*absolute;[\s\S]*?top:\s*1rem;[\s\S]*?right:\s*1rem;/);
+    expect(scss).toMatch(/:global\(\.close\),[\s\S]*?:global\(\.btn-close\)\s*{[\s\S]*?opacity:\s*0\.5;[\s\S]*?background:\s*transparent;/);
+    expect(scss).not.toMatch(/:global\(\.modal-header\)\s*{[\s\S]*?:global\(\.close\)/);
+  });
 });

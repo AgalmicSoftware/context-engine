@@ -10,30 +10,45 @@ import {
 } from './sessionWorkerAvailability.js';
 
 describe('sessionWorkerAvailability', () => {
+  const expectedSharedFallbackWorkerUrl = CLOUDFLARE_CORS_WORKER_URL.replace(/\/+$/, '');
+
   beforeEach(() => {
     localStorage.clear();
   });
 
-  it('does not treat the default/general session as worker-backed when no shared fallback is configured', () => {
-    expect(hasUsableSessionWorkerConfig({ slug: '' })).toBe(false);
-    expect(hasUsableSessionWorkerConfig({ slug: 'general' })).toBe(false);
+  it('treats the default/general session as worker-backed when a shared fallback is configured', () => {
+    expect(hasUsableSessionWorkerConfig({ slug: '' })).toBe(true);
+    expect(hasUsableSessionWorkerConfig({ slug: 'general' })).toBe(true);
   });
 
-  it('exposes an empty shared fallback worker URL by default', () => {
-    expect(CLOUDFLARE_CORS_WORKER_URL).toBe('');
-    expect(getSharedFallbackWorkerUrl()).toBe('');
+  it('exposes the configured shared fallback worker URL by default', () => {
+    expect(CLOUDFLARE_CORS_WORKER_URL).toBeTruthy();
+    expect(getSharedFallbackWorkerUrl()).toBe(expectedSharedFallbackWorkerUrl);
   });
 
-  it('returns no shared fallback URL for the default/general session when none is configured', () => {
+  it('returns the shared fallback URL for the default/general session when fallback is allowed', () => {
     expect(getUsableSessionWorkerUrl({
       slug: '',
       sessionConfig: { slug: '', corsWorkerUrl: '' },
       allowSharedFallback: true,
-    })).toBe('');
+    })).toBe(expectedSharedFallbackWorkerUrl);
     expect(getUsableSessionWorkerUrl({
       slug: 'general',
       sessionConfig: { slug: 'general', corsWorkerUrl: '' },
       allowSharedFallback: true,
+    })).toBe(expectedSharedFallbackWorkerUrl);
+  });
+
+  it('still returns no shared fallback URL for the default/general session when fallback is disabled', () => {
+    expect(getUsableSessionWorkerUrl({
+      slug: '',
+      sessionConfig: { slug: '', corsWorkerUrl: '' },
+      allowSharedFallback: false,
+    })).toBe('');
+    expect(getUsableSessionWorkerUrl({
+      slug: 'general',
+      sessionConfig: { slug: 'general', corsWorkerUrl: '' },
+      allowSharedFallback: false,
     })).toBe('');
   });
 

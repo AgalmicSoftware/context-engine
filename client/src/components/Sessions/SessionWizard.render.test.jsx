@@ -21,12 +21,36 @@ const mockUpsertSessionRegistryCache = jest.fn();
 const mockSessionExists = jest.fn(async () => false);
 const mockCreateSBT = jest.fn();
 const mockFinalizeDeferredCreateSbtDraftUpload = jest.fn();
+const mockDownloadDataFromArweave = jest.fn();
+const mockDecryptWithPassword = jest.fn();
 const mockPendingSbtAddress = ethers.utils.getAddress('0x5fbdb2315678afecb367f032d93f642f64180aa3');
 const mockSecondPendingSbtAddress = ethers.utils.getAddress('0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512');
 const mockReplacementSbtAddress = ethers.utils.getAddress('0x8ba1f109551bd432803012645ac136ddd64dba72');
 const TEST_ADMIN_ADDRESS = '0x00000000000000000000000000000000000000aa';
+const NEW_SESSION_BANNER_DISMISSED_KEY = 'ce_new_session_banner_dismissed';
+const ORIGINAL_PUBLIC_URL = process.env.PUBLIC_URL;
 const mockSelectorSourceFactory = '0x538A48BC439A36D2A86e63114DCD9c429d2ddEcA';
 const mockSelectorSourceStartBlock = 30297069;
+const buildMockSponsoredBundleEnvelope = () => JSON.stringify({
+  type: 'contextengine-sponsored-bundle',
+  version: 1,
+  cipher: 'password-aes-gcm',
+  encryptedData: 'encrypted-base64',
+});
+const buildMockSponsoredBundle = () => ({
+  openaiKey: 'sponsored-openai',
+  arweaveJwk: '{"kty":"RSA","n":"sponsored"}',
+  faucetGrantToken: 'sponsored-faucet-grant',
+  deployGrantToken: 'sponsored-deploy-grant',
+  meta: {
+    label: 'Launch Week',
+    createdAt: '2099-03-20T12:00:00.000Z',
+    createdBy: '0xadmin',
+    expiresAt: '2099-03-21T12:00:00.000Z',
+    sourceSessionSlug: 'source-session',
+    sourceWorkerUrl: 'https://source-worker.example',
+  },
+});
 const buildMockPendingSbtDraft = ({
   predictedAddress = mockPendingSbtAddress,
   displayName = 'Pending SBT',
@@ -152,13 +176,14 @@ jest.mock('../../utilities/crypto/litProtocol.js', () => ({
 jest.mock('../../utilities/crypto/cryptography.js', () => ({
   cryptoUtils: {
     _getProvider: jest.fn(() => ({})),
+    decryptWithPassword: (...args) => mockDecryptWithPassword(...args),
   },
 }));
 
 jest.mock('../../utilities/arweave/arweaveScripts.js', () => ({
   arweaveScripts: {
     uploadDataToArweave: jest.fn(),
-    downloadDataFromArweave: jest.fn(),
+    downloadDataFromArweave: (...args) => mockDownloadDataFromArweave(...args),
     buildArweaveGatewayUrl: jest.fn((txId) => `https://arweave.net/${txId}`),
   },
 }));
@@ -362,6 +387,16 @@ describe('SessionWizard rendered validation', () => {
     mockCreateSbtDraftQueue = [];
     mockCreateSBT.mockReset();
     mockFinalizeDeferredCreateSbtDraftUpload.mockReset();
+    mockDownloadDataFromArweave.mockReset();
+    mockDecryptWithPassword.mockReset();
+    mockDownloadDataFromArweave.mockResolvedValue(buildMockSponsoredBundleEnvelope());
+    mockDecryptWithPassword.mockResolvedValue(buildMockSponsoredBundle());
+    if (typeof ORIGINAL_PUBLIC_URL === 'undefined') {
+      delete process.env.PUBLIC_URL;
+    } else {
+      process.env.PUBLIC_URL = ORIGINAL_PUBLIC_URL;
+    }
+    window.history.replaceState({}, '', '/');
     localStorage.clear();
     sessionStorage.clear();
     buildContractViewerContracts.mockImplementation(({ sessionContracts = {} } = {}) => (
@@ -441,6 +476,214 @@ describe('SessionWizard rendered validation', () => {
     expect(chainSelectorWrap).toBeTruthy();
     expect(within(chainSelectorWrap).getByRole('combobox')).toHaveValue(String(defaultChainId));
     expect(screen.getByDisplayValue(defaultChainLabel)).toBeInTheDocument();
+  });
+
+  it.each(['/new', '/session/new'])(
+    'shows the new-session requirements banner on %s',
+    async (pathname) => {
+      window.history.replaceState({}, '', pathname);
+
+      renderSessionWizard();
+
+      await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+      expect(screen.getByRole('heading', { name: /to create a session you'll need:/i })).toBeInTheDocument();
+    }
+  );
+
+  it('shows the new-session requirements banner on PUBLIC_URL-prefixed new-session routes', async () => {
+    process.env.PUBLIC_URL = '/ce/';
+    window.history.replaceState({}, '', '/ce/session/new');
+
+    renderSessionWizard();
+
+    await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    expect(screen.getByRole('heading', { name: /to create a session you'll need:/i })).toBeInTheDocument();
+  });
+
+  it('renders the new-session requirements copy and contact link on /session/new', async () => {
+    window.history.replaceState({}, '', '/session/new');
+
+    renderSessionWizard({ network: null });
+
+    await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+
+    expect(screen.getByText('An AI API key (OpenAI, Anthropic, or OpenRouter)')).toBeInTheDocument();
+    expect(screen.getByText('An Arweave wallet (JWK) for permanent storage')).toBeInTheDocument();
+    expect(screen.getByText('OP Sepolia ETH for on-chain registration')).toBeInTheDocument();
+    expect(screen.getByText('(Optional) A faucet private key for sponsoring user gas')).toBeInTheDocument();
+    expect(screen.getByText('A turnkey tool for bundling these resources is in development.')).toBeInTheDocument();
+    expect(
+      screen.getByText(/in the meantime, you can get a sponsored session url by contacting/i)
+    ).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'contextengine@protonmail.com' })).toHaveAttribute(
+      'href',
+      'mailto:contextengine@protonmail.com'
+    );
+  });
+
+  it('updates the new-session requirements chain label when the selected deploy chain changes', async () => {
+    window.history.replaceState({}, '', '/session/new');
+
+    renderSessionWizard({ network: null });
+
+    await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    expect(screen.getByText('OP Sepolia ETH for on-chain registration')).toBeInTheDocument();
+
+    enableAdvancedMode();
+
+    const chainSelectorWrap = screen.getByText('Network:').parentElement;
+    expect(chainSelectorWrap).toBeTruthy();
+    fireEvent.change(within(chainSelectorWrap).getByRole('combobox'), {
+      target: { value: '31337' },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Anvil ETH for on-chain registration')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('OP Sepolia ETH for on-chain registration')).not.toBeInTheDocument();
+  });
+
+  it('does not show the new-session requirements banner when a sponsored bundle covers setup requirements', async () => {
+    window.history.replaceState({}, '', '/session/new?sponsored=sponsor-tx-id#k=sponsor-secret');
+
+    renderSessionWizard({
+      initialSponsoredBundleId: 'sponsor-tx-id',
+      initialSponsoredBundleKey: 'sponsor-secret',
+    });
+
+    await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_SPONSORED_STATUS)).toHaveTextContent(
+      'Sponsored resources applied: OpenAI key, Arweave wallet, faucet funding, deploy access.'
+    );
+    expect(screen.queryByRole('heading', { name: /to create a session you'll need:/i })).not.toBeInTheDocument();
+  });
+
+  it('keeps the new-session requirements banner visible when sponsored setup is missing deploy access', async () => {
+    window.history.replaceState({}, '', '/session/new?sponsored=sponsor-tx-id#k=sponsor-secret');
+    const sponsoredBundleWithoutDeployAccess = buildMockSponsoredBundle();
+    delete sponsoredBundleWithoutDeployAccess.deployGrantToken;
+    mockDecryptWithPassword.mockResolvedValueOnce(sponsoredBundleWithoutDeployAccess);
+
+    renderSessionWizard({
+      initialSponsoredBundleId: 'sponsor-tx-id',
+      initialSponsoredBundleKey: 'sponsor-secret',
+    });
+
+    await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_SPONSORED_STATUS)).toHaveTextContent(
+      'Sponsored resources applied: OpenAI key, Arweave wallet, faucet funding.'
+    );
+    expect(screen.getByRole('heading', { name: /to create a session you'll need:/i })).toBeInTheDocument();
+  });
+
+  it('keeps the new-session requirements banner visible for partial sponsored bundles', async () => {
+    window.history.replaceState({}, '', '/session/new?sponsored=sponsor-tx-id#k=sponsor-secret');
+    mockDecryptWithPassword.mockResolvedValueOnce({
+      openaiKey: 'sponsored-openai',
+      meta: {
+        label: 'Partial bundle',
+        createdAt: '2099-03-20T12:00:00.000Z',
+        createdBy: '0xadmin',
+        expiresAt: '2099-03-21T12:00:00.000Z',
+        sourceSessionSlug: 'source-session',
+        sourceWorkerUrl: 'https://source-worker.example',
+      },
+    });
+
+    renderSessionWizard({
+      initialSponsoredBundleId: 'sponsor-tx-id',
+      initialSponsoredBundleKey: 'sponsor-secret',
+    });
+
+    await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_SPONSORED_STATUS)).toHaveTextContent(
+      'Sponsored resources applied: OpenAI key.'
+    );
+    expect(screen.getByRole('heading', { name: /to create a session you'll need:/i })).toBeInTheDocument();
+  });
+
+  it('shows the new-session requirements banner again when a sponsored link falls back to manual setup', async () => {
+    window.history.replaceState({}, '', '/session/new?sponsored=sponsor-tx-id');
+
+    renderSessionWizard({
+      initialSponsoredBundleId: 'sponsor-tx-id',
+      initialSponsoredBundleKey: '',
+    });
+
+    await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_SPONSORED_STATUS)).toHaveTextContent(
+      'Malformed sponsored link.'
+    );
+    expect(screen.getByRole('heading', { name: /to create a session you'll need:/i })).toBeInTheDocument();
+  });
+
+  it('dismisses the new-session requirements banner and keeps it hidden after remount', async () => {
+    window.history.replaceState({}, '', '/session/new');
+
+    const firstRender = renderSessionWizard();
+
+    await screen.findByRole('heading', { name: /to create a session you'll need:/i });
+
+    fireEvent.click(screen.getByRole('button', { name: /dismiss session setup requirements/i }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole('heading', { name: /to create a session you'll need:/i })).not.toBeInTheDocument();
+    });
+    expect(localStorage.getItem(NEW_SESSION_BANNER_DISMISSED_KEY)).toBe('true');
+
+    firstRender.unmount();
+    renderSessionWizard();
+
+    await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    expect(screen.queryByRole('heading', { name: /to create a session you'll need:/i })).not.toBeInTheDocument();
+  });
+
+  it('shows the requirements banner for manual sponsored fallback even after plain /new was dismissed', async () => {
+    window.history.replaceState({}, '', '/session/new');
+
+    const firstRender = renderSessionWizard();
+
+    await screen.findByRole('heading', { name: /to create a session you'll need:/i });
+    fireEvent.click(screen.getByRole('button', { name: /dismiss session setup requirements/i }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole('heading', { name: /to create a session you'll need:/i })).not.toBeInTheDocument();
+    });
+    expect(localStorage.getItem(NEW_SESSION_BANNER_DISMISSED_KEY)).toBe('true');
+
+    firstRender.unmount();
+    window.history.replaceState({}, '', '/session/new?sponsored=sponsor-tx-id#k=sponsor-secret');
+    mockDecryptWithPassword.mockResolvedValueOnce({
+      openaiKey: 'sponsored-openai',
+      meta: {
+        label: 'Partial bundle',
+        createdAt: '2099-03-20T12:00:00.000Z',
+        createdBy: '0xadmin',
+        expiresAt: '2099-03-21T12:00:00.000Z',
+        sourceSessionSlug: 'source-session',
+        sourceWorkerUrl: 'https://source-worker.example',
+      },
+    });
+
+    renderSessionWizard({
+      initialSponsoredBundleId: 'sponsor-tx-id',
+      initialSponsoredBundleKey: 'sponsor-secret',
+    });
+
+    await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_SPONSORED_STATUS)).toHaveTextContent(
+      'Sponsored resources applied: OpenAI key.'
+    );
+    expect(screen.getByRole('heading', { name: /to create a session you'll need:/i })).toBeInTheDocument();
+  });
+
+  it('does not show the new-session requirements banner outside the new-session routes', async () => {
+    window.history.replaceState({}, '', '/');
+
+    renderSessionWizard();
+
+    await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    expect(screen.queryByRole('heading', { name: /to create a session you'll need:/i })).not.toBeInTheDocument();
   });
 
   it('defaults auto-feature session groups to enabled for fresh /new drafts', async () => {
@@ -762,7 +1005,9 @@ describe('SessionWizard rendered validation', () => {
     );
   });
 
-  it('keeps the normal-mode worker step focused on bring-your-own worker setup', async () => {
+  it('keeps the normal-mode worker step focused on bring-your-own worker setup while defaulting to the release bundle URL', async () => {
+    const { WORKER_BUNDLE_URL } = require('../../variables/publicDeploymentConfig.js');
+
     renderSessionWizard();
 
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
@@ -770,7 +1015,7 @@ describe('SessionWizard rendered validation', () => {
 
     expect(await screen.findByText('Bring your own worker')).toBeInTheDocument();
     expect(await screen.findByText('Cloudflare API token')).toBeInTheDocument();
-    expect(screen.getByText('Upload bundle file')).toBeInTheDocument();
+    expect(screen.queryByText('Upload bundle file')).not.toBeInTheDocument();
     expect(screen.queryByText('Using Default Worker')).not.toBeInTheDocument();
     expect(screen.queryByText('Use My Own')).not.toBeInTheDocument();
     expect(screen.queryByText('Most sessions can stay on the shared default worker. Only switch to your own worker if you want to manage the infrastructure yourself.')).not.toBeInTheDocument();
@@ -782,14 +1027,110 @@ describe('SessionWizard rendered validation', () => {
     expect(screen.queryByText('Resource gates (on-chain)')).not.toBeInTheDocument();
     expect(screen.queryByText('Worker code (unbundled, copy + paste)')).not.toBeInTheDocument();
     expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_WORKER_URL)).not.toBeInTheDocument();
+    expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_BUNDLE_FILE_INPUT)).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Reset to default' })).not.toBeInTheDocument();
     expect(screen.getByText('Worker URL appears here after a successful custom worker deploy.')).toBeInTheDocument();
     expect(screen.getByText('Deploy-helper URL')).toBeInTheDocument();
-    expect(screen.queryByText('Worker bundle URL (release asset)')).not.toBeInTheDocument();
+    expect(screen.getByText('Worker bundle URL (release asset)')).toBeInTheDocument();
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_BUNDLE_URL)).toHaveValue(WORKER_BUNDLE_URL);
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_BUNDLE_URL)).toHaveAttribute('readonly');
+    expect(screen.getByText('Normal mode deploys use the GitHub-hosted worker bundle automatically.')).toBeInTheDocument();
     expect(screen.queryByText('Worker name')).not.toBeInTheDocument();
     expect(screen.queryByText('Passing a Cloudflare API token to a deploy-helper requires trust.')).not.toBeInTheDocument();
     expect(screen.queryByText('Worker code (unbundled, copy + paste)')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Reset to default' })).not.toBeInTheDocument();
+  });
+
+  it('defaults advanced custom-worker deploys to the configured release bundle URL', async () => {
+    const { WORKER_BUNDLE_URL } = require('../../variables/publicDeploymentConfig.js');
+
+    renderSessionWizard();
+
+    await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    enableAdvancedMode();
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
+    fireEvent.click(await screen.findByRole('button', { name: 'Use My Own' }));
+
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_BUNDLE_MODE_URL)).toBeChecked();
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_BUNDLE_MODE_UPLOAD)).not.toBeChecked();
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_BUNDLE_URL)).toHaveValue(WORKER_BUNDLE_URL);
+  });
+
+  it('restores the configured release bundle URL after returning from advanced mode to normal mode', async () => {
+    const originalFetch = global.fetch;
+    const { WORKER_BUNDLE_URL } = require('../../variables/publicDeploymentConfig.js');
+    const workerAuth = require('../../utilities/worker/workerAuth.js');
+    const originalNormalizeWorkerUrl = workerAuth.normalizeWorkerUrl.getMockImplementation();
+    workerAuth.normalizeWorkerUrl.mockImplementation((value = '') => String(value || '').trim());
+    global.fetch = jest.fn(async (url) => {
+      const normalizedUrl = String(url);
+      if (normalizedUrl.endsWith('/deploy')) {
+        return {
+          ok: true,
+          json: async () => ({
+            ok: true,
+            workerUrl: 'https://deployed.example.test',
+            writesSessionConfig: true,
+            writesSessionSecrets: false,
+          }),
+        };
+      }
+      if (normalizedUrl.endsWith('/auth/nonce')) {
+        return { ok: true, json: async () => ({ nonce: 'wizard-admin-nonce' }) };
+      }
+      return { ok: true, json: async () => ({ ok: true }) };
+    });
+
+    try {
+      renderLoggedInSessionWizard();
+
+      fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME), {
+        target: { value: 'Normal Mode Bundle Reset' },
+      });
+
+      enableAdvancedMode();
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
+      fireEvent.click(await screen.findByRole('button', { name: 'Use My Own' }));
+
+      const advancedBundleUrlInput = screen.getByTestId(E2E_TESTIDS.WIZARD_BUNDLE_URL);
+      fireEvent.change(advancedBundleUrlInput, {
+        target: { value: 'https://bundles.example.test/custom-sessionCorsWorker.bundle.js' },
+      });
+      await waitFor(() => {
+        expect(advancedBundleUrlInput).toHaveValue('https://bundles.example.test/custom-sessionCorsWorker.bundle.js');
+      });
+
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_NORMAL));
+      selectNormalModeCard('Worker');
+
+      expect(screen.getByTestId(E2E_TESTIDS.WIZARD_BUNDLE_URL)).toHaveValue(WORKER_BUNDLE_URL);
+      expect(screen.getByTestId(E2E_TESTIDS.WIZARD_BUNDLE_URL)).toHaveAttribute('readonly');
+
+      const cloudflareTokenInput = screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN);
+      const reactPropsKey = Object.keys(cloudflareTokenInput).find((key) => key.startsWith('__reactProps$'));
+      act(() => {
+        cloudflareTokenInput[reactPropsKey].onChange({ target: { value: 'cf-test-token' } });
+      });
+      fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_OPENAI_KEY), {
+        target: { value: 'sk-normal-mode-reset' },
+      });
+      fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_ARWEAVE_JWK), {
+        target: { value: '{"kty":"RSA","n":"normal-reset"}' },
+      });
+
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_WORKER));
+
+      await waitFor(() => {
+        expect(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_STATUS)).toHaveTextContent('Worker deployed.');
+      });
+      const deployCall = global.fetch.mock.calls.find(([url]) => String(url).endsWith('/deploy'));
+      const deployPayload = JSON.parse(deployCall[1].body);
+      expect(deployPayload.bundleUrl).toBe(WORKER_BUNDLE_URL);
+      expect(deployPayload.bundleUrl).not.toBe('https://bundles.example.test/custom-sessionCorsWorker.bundle.js');
+    } finally {
+      global.fetch = originalFetch;
+      workerAuth.normalizeWorkerUrl.mockImplementation(originalNormalizeWorkerUrl);
+    }
   });
 
   it('keeps the embedded deploy-helper toggle out of Step 1 in normal /new mode', async () => {
@@ -812,6 +1153,317 @@ describe('SessionWizard rendered validation', () => {
 
     fireEvent.click(embeddedToggle);
     expect(embeddedToggle).not.toBeChecked();
+  });
+
+  it('reveals the manual bundle upload fallback in normal mode after a release-asset deploy failure', async () => {
+    const originalFetch = global.fetch;
+    const { WORKER_BUNDLE_URL } = require('../../variables/publicDeploymentConfig.js');
+    const workerAuth = require('../../utilities/worker/workerAuth.js');
+    const originalNormalizeWorkerUrl = workerAuth.normalizeWorkerUrl.getMockImplementation();
+    workerAuth.normalizeWorkerUrl.mockImplementation((value = '') => String(value || '').trim());
+    global.fetch = jest.fn(async (url, options = {}) => {
+      const normalizedUrl = String(url);
+      if (normalizedUrl.endsWith('/deploy')) {
+        const payload = JSON.parse(options.body);
+        expect(payload.bundleUrl).toBe(WORKER_BUNDLE_URL);
+        expect(payload.bundleText).toBeUndefined();
+        return {
+          ok: false,
+          status: 502,
+          json: async () => ({ error: 'Failed to fetch bundle (404).' }),
+        };
+      }
+      return { ok: true, json: async () => ({ ok: true }) };
+    });
+
+    try {
+      renderLoggedInSessionWizard();
+
+      fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME), {
+        target: { value: 'Normal Mode Release Bundle Retry' },
+      });
+
+      selectNormalModeCard('Worker');
+      expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_BUNDLE_FILE_INPUT)).not.toBeInTheDocument();
+
+      const cloudflareTokenInput = screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN);
+      const reactPropsKey = Object.keys(cloudflareTokenInput).find((key) => key.startsWith('__reactProps$'));
+      act(() => {
+        cloudflareTokenInput[reactPropsKey].onChange({ target: { value: 'cf-test-token' } });
+      });
+      fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_OPENAI_KEY), {
+        target: { value: 'sk-normal-mode-failure' },
+      });
+      fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_ARWEAVE_JWK), {
+        target: { value: '{"kty":"RSA","n":"normal-failure"}' },
+      });
+
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_WORKER));
+
+      await waitFor(() => {
+        expect(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_STATUS)).toHaveTextContent('Failed to fetch bundle (404).');
+      });
+      expect(screen.getByTestId(E2E_TESTIDS.WIZARD_BUNDLE_FILE_INPUT)).toBeInTheDocument();
+      expect(screen.getByText('Choose /dist/sessionCorsWorker.bundle.js to retry this worker deploy.')).toBeInTheDocument();
+    } finally {
+      global.fetch = originalFetch;
+      workerAuth.normalizeWorkerUrl.mockImplementation(originalNormalizeWorkerUrl);
+    }
+  });
+
+  it('clears the one-off manual bundle retry after a successful normal-mode fallback deploy', async () => {
+    const originalFetch = global.fetch;
+    const { WORKER_BUNDLE_URL } = require('../../variables/publicDeploymentConfig.js');
+    const workerAuth = require('../../utilities/worker/workerAuth.js');
+    const originalNormalizeWorkerUrl = workerAuth.normalizeWorkerUrl.getMockImplementation();
+    const bundleFile = {
+      name: 'sessionCorsWorker.bundle.js',
+      type: 'text/javascript',
+      text: async () => 'export default { async fetch() { return new Response("ok"); } };',
+    };
+    let deployCallCount = 0;
+
+    workerAuth.normalizeWorkerUrl.mockImplementation((value = '') => String(value || '').trim());
+    global.fetch = jest.fn(async (url, options = {}) => {
+      const normalizedUrl = String(url);
+      if (normalizedUrl.endsWith('/deploy')) {
+        deployCallCount += 1;
+        const payload = JSON.parse(options.body);
+        if (deployCallCount === 2) {
+          expect(payload.bundleUrl).toBeUndefined();
+          expect(payload.bundleText).toContain('new Response("ok")');
+          return {
+            ok: true,
+            json: async () => ({
+              ok: true,
+              workerUrl: 'https://deployed.example.test',
+              writesSessionConfig: true,
+              writesSessionSecrets: false,
+            }),
+          };
+        }
+        expect(payload.bundleUrl).toBe(WORKER_BUNDLE_URL);
+        expect(payload.bundleText).toBeUndefined();
+        return {
+          ok: false,
+          status: 502,
+          json: async () => ({ error: 'Failed to fetch bundle (404).' }),
+        };
+      }
+      if (normalizedUrl.endsWith('/auth/nonce')) {
+        return { ok: true, json: async () => ({ nonce: 'wizard-admin-nonce' }) };
+      }
+      return { ok: true, json: async () => ({ ok: true }) };
+    });
+
+    try {
+      renderLoggedInSessionWizard();
+
+      fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME), {
+        target: { value: 'Normal Mode Retry Reset' },
+      });
+
+      selectNormalModeCard('Worker');
+
+      const cloudflareTokenInput = screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN);
+      const reactPropsKey = Object.keys(cloudflareTokenInput).find((key) => key.startsWith('__reactProps$'));
+      act(() => {
+        cloudflareTokenInput[reactPropsKey].onChange({ target: { value: 'cf-test-token' } });
+      });
+      fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_OPENAI_KEY), {
+        target: { value: 'sk-normal-mode-retry-reset' },
+      });
+      fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_ARWEAVE_JWK), {
+        target: { value: '{"kty":"RSA","n":"normal-retry-reset"}' },
+      });
+
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_WORKER));
+
+      await waitFor(() => {
+        expect(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_STATUS)).toHaveTextContent('Failed to fetch bundle (404).');
+      });
+      fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_BUNDLE_FILE_INPUT), {
+        target: { files: [bundleFile] },
+      });
+
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_WORKER));
+
+      await waitFor(() => {
+        expect(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_STATUS)).toHaveTextContent('Worker deployed.');
+      });
+      expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_BUNDLE_FILE_INPUT)).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_WORKER));
+
+      await waitFor(() => {
+        expect(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_STATUS)).toHaveTextContent('Failed to fetch bundle (404).');
+      });
+      expect(screen.getByTestId(E2E_TESTIDS.WIZARD_BUNDLE_FILE_INPUT)).toBeInTheDocument();
+      expect(deployCallCount).toBe(3);
+    } finally {
+      global.fetch = originalFetch;
+      workerAuth.normalizeWorkerUrl.mockImplementation(originalNormalizeWorkerUrl);
+    }
+  });
+
+  it('keeps sponsored publish auto-deploy on the local bundle path after a prior normal-mode fetch failure', async () => {
+    const originalFetch = global.fetch;
+    const { WORKER_BUNDLE_URL } = require('../../variables/publicDeploymentConfig.js');
+    const { arweaveScripts } = require('../../utilities/arweave/arweaveScripts.js');
+    const workerAuth = require('../../utilities/worker/workerAuth.js');
+    const originalUploadDataToArweave = arweaveScripts.uploadDataToArweave.getMockImplementation();
+    const originalRegisterSessionOnChain = mockRegisterSessionOnChain.getMockImplementation();
+    const originalNormalizeWorkerUrl = workerAuth.normalizeWorkerUrl.getMockImplementation();
+    const localSponsoredBundleText = 'export default { async fetch() { return new Response("sponsored-ok"); } };';
+    let resolveSponsoredBundle;
+    const sponsoredBundleReady = new Promise((resolve) => {
+      resolveSponsoredBundle = resolve;
+    });
+
+    mockRegisterSessionOnChain.mockResolvedValue({ txs: [] });
+    arweaveScripts.uploadDataToArweave.mockResolvedValue('a'.repeat(43));
+    mockDecryptWithPassword.mockReturnValueOnce(sponsoredBundleReady);
+    workerAuth.normalizeWorkerUrl.mockImplementation((value = '') => String(value || '').trim());
+
+    global.fetch = jest.fn(async (url, options = {}) => {
+      const normalizedUrl = String(url);
+      if (normalizedUrl.endsWith('/deploy')) {
+        const payload = JSON.parse(options.body);
+        expect(payload.bundleUrl).toBe(WORKER_BUNDLE_URL);
+        expect(payload.bundleText).toBeUndefined();
+        return {
+          ok: false,
+          status: 502,
+          json: async () => ({ error: 'Failed to fetch bundle (404).' }),
+        };
+      }
+      if (normalizedUrl.includes('/worker/sessionCorsWorker.bundle.js')) {
+        return {
+          ok: true,
+          status: 200,
+          text: async () => localSponsoredBundleText,
+          headers: {
+            get: (name) => (String(name || '').toLowerCase() === 'content-type' ? 'text/javascript' : ''),
+          },
+        };
+      }
+      if (normalizedUrl.endsWith('/sponsored/redeem-deploy')) {
+        const payload = JSON.parse(options.body);
+        expect(payload.deployPayload.bundleUrl).toBeUndefined();
+        expect(payload.deployPayload.bundleText).toContain('sponsored-ok');
+        return {
+          ok: true,
+          json: async () => ({
+            ok: true,
+            workerUrl: 'https://sponsored-deployed.example.test',
+            writesSessionConfig: true,
+            writesSessionSecrets: false,
+          }),
+        };
+      }
+      if (normalizedUrl.endsWith('/auth/nonce')) {
+        return { ok: true, json: async () => ({ nonce: 'wizard-admin-nonce' }) };
+      }
+      if (normalizedUrl.endsWith('/admin/set-config') || normalizedUrl.endsWith('/admin/set-secrets')) {
+        return { ok: true, json: async () => ({ ok: true }) };
+      }
+      return { ok: true, json: async () => ({ ok: true }) };
+    });
+
+    try {
+      window.history.replaceState({}, '', '/session/new?sponsored=sponsor-tx-id#k=sponsor-secret');
+      localStorage.setItem('ce:sessionWizardDraft:v1', JSON.stringify({
+        draft: {
+          networkChainId: 84532,
+          blockLimits: {
+            start: mockSelectorSourceStartBlock,
+            end: null,
+          },
+          contracts: {
+            sbtFactory: {
+              address: mockSelectorSourceFactory,
+              chainId: 84532,
+            },
+          },
+          __registry: {
+            chainId: 84532,
+            registryChainId: 84532,
+          },
+        },
+      }));
+      renderLoggedInSessionWizard({
+        initialSponsoredBundleId: 'sponsor-tx-id',
+        initialSponsoredBundleKey: 'sponsor-secret',
+      });
+
+      fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME), {
+        target: { value: 'Sponsored Publish Retry Session' },
+      });
+
+      selectNormalModeCard('Worker');
+
+      const cloudflareTokenInput = screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN);
+      const reactPropsKey = Object.keys(cloudflareTokenInput).find((key) => key.startsWith('__reactProps$'));
+      act(() => {
+        cloudflareTokenInput[reactPropsKey].onChange({ target: { value: 'cf-test-token' } });
+      });
+      fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_OPENAI_KEY), {
+        target: { value: 'sk-sponsored-normal-failure' },
+      });
+      fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_ARWEAVE_JWK), {
+        target: { value: '{"kty":"RSA","n":"sponsored-normal-failure"}' },
+      });
+
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_WORKER));
+
+      await waitFor(() => {
+        expect(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_STATUS)).toHaveTextContent('Failed to fetch bundle (404).');
+      });
+      expect(screen.getByTestId(E2E_TESTIDS.WIZARD_BUNDLE_FILE_INPUT)).toBeInTheDocument();
+
+      await act(async () => {
+        resolveSponsoredBundle(buildMockSponsoredBundle());
+        await sponsoredBundleReady;
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SPONSORED_STATUS)).toHaveTextContent(
+          'Sponsored resources applied: OpenAI key, Arweave wallet, faucet funding, deploy access.'
+        );
+      });
+
+      selectNormalModeCard('Deploy Session');
+
+      const publishButton = await screen.findByTestId(E2E_TESTIDS.WIZARD_PUBLISH);
+      await waitFor(() => {
+        expect(publishButton).not.toBeDisabled();
+      });
+
+      fireEvent.click(publishButton);
+
+      await waitFor(() => {
+        expect(
+          global.fetch.mock.calls.some(([url]) => String(url).includes('/worker/sessionCorsWorker.bundle.js'))
+        ).toBe(true);
+        expect(
+          global.fetch.mock.calls.some(([url]) => String(url).endsWith('/sponsored/redeem-deploy'))
+        ).toBe(true);
+      });
+      expect(screen.queryByText('Upload a worker bundle file before deploy.')).not.toBeInTheDocument();
+    } finally {
+      global.fetch = originalFetch;
+      if (originalUploadDataToArweave) {
+        arweaveScripts.uploadDataToArweave.mockImplementation(originalUploadDataToArweave);
+      } else {
+        arweaveScripts.uploadDataToArweave.mockReset();
+      }
+      if (originalRegisterSessionOnChain) {
+        mockRegisterSessionOnChain.mockImplementation(originalRegisterSessionOnChain);
+      } else {
+        mockRegisterSessionOnChain.mockReset();
+      }
+      workerAuth.normalizeWorkerUrl.mockImplementation(originalNormalizeWorkerUrl);
+    }
   });
 
   it('keeps the privacy panel usable in advanced mode after queuing an SBT draft in normal mode', async () => {
@@ -1003,13 +1655,9 @@ describe('SessionWizard rendered validation', () => {
 
   it('keeps the verified worker URL and publish readiness after a normal-mode deploy in /new', async () => {
     const originalFetch = global.fetch;
+    const { WORKER_BUNDLE_URL } = require('../../variables/publicDeploymentConfig.js');
     const workerAuth = require('../../utilities/worker/workerAuth.js');
     const originalNormalizeWorkerUrl = workerAuth.normalizeWorkerUrl.getMockImplementation();
-    const bundleFile = {
-      name: 'sessionCorsWorker.bundle.js',
-      type: 'text/javascript',
-      text: async () => 'export default { async fetch() { return new Response("ok"); } };',
-    };
     workerAuth.normalizeWorkerUrl.mockImplementation((value = '') => {
       const trimmed = String(value || '').trim();
       return trimmed;
@@ -1042,10 +1690,7 @@ describe('SessionWizard rendered validation', () => {
       });
 
       selectNormalModeCard('Worker');
-
-      fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_BUNDLE_FILE_INPUT), {
-        target: { files: [bundleFile] },
-      });
+      expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_BUNDLE_FILE_INPUT)).not.toBeInTheDocument();
 
       expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_DEPLOY_HELPER_URL)).not.toBeInTheDocument();
 
@@ -1067,6 +1712,10 @@ describe('SessionWizard rendered validation', () => {
       await waitFor(() => {
         expect(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_STATUS)).toHaveTextContent('Worker deployed.');
       });
+      const deployCall = global.fetch.mock.calls.find(([url]) => String(url).endsWith('/deploy'));
+      const deployPayload = JSON.parse(deployCall[1].body);
+      expect(deployPayload.bundleUrl).toBe(WORKER_BUNDLE_URL);
+      expect(deployPayload.bundleText).toBeUndefined();
       expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_WORKER_URL)).toHaveValue(
         'https://deployed.example.test'
       );
@@ -1092,13 +1741,9 @@ describe('SessionWizard rendered validation', () => {
 
   it('surfaces workers.dev activation details after deploy-helper succeeds', async () => {
     const originalFetch = global.fetch;
+    const { WORKER_BUNDLE_URL } = require('../../variables/publicDeploymentConfig.js');
     const workerAuth = require('../../utilities/worker/workerAuth.js');
     const originalNormalizeWorkerUrl = workerAuth.normalizeWorkerUrl.getMockImplementation();
-    const bundleFile = {
-      name: 'sessionCorsWorker.bundle.js',
-      type: 'text/javascript',
-      text: async () => 'export default { async fetch() { return new Response("ok"); } };',
-    };
     workerAuth.normalizeWorkerUrl.mockImplementation((value = '') => String(value || '').trim());
     global.fetch = jest.fn(async (url) => {
       const normalizedUrl = String(url);
@@ -1131,10 +1776,7 @@ describe('SessionWizard rendered validation', () => {
       });
 
       selectNormalModeCard('Worker');
-
-      fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_BUNDLE_FILE_INPUT), {
-        target: { files: [bundleFile] },
-      });
+      expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_BUNDLE_FILE_INPUT)).not.toBeInTheDocument();
       expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_DEPLOY_HELPER_URL)).not.toBeInTheDocument();
 
       const cloudflareTokenInput = screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN);
@@ -1156,6 +1798,10 @@ describe('SessionWizard rendered validation', () => {
           'Worker deployed. workers.dev status: account active (tenant-subdomain); script enabled.'
         );
       });
+      const deployCall = global.fetch.mock.calls.find(([url]) => String(url).endsWith('/deploy'));
+      const deployPayload = JSON.parse(deployCall[1].body);
+      expect(deployPayload.bundleUrl).toBe(WORKER_BUNDLE_URL);
+      expect(deployPayload.bundleText).toBeUndefined();
       expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_WORKER_URL)).toHaveValue(
         'https://deployed.example.test'
       );

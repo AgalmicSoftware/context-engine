@@ -67,8 +67,12 @@ describe('publicDeploymentConfig', () => {
   it('keeps the default worker bundle pointed at a JavaScript asset', () => {
     jest.isolateModules(() => {
       const config = require('./publicDeploymentConfig.js');
+      const { buildPublicRepoLatestReleaseAssetUrl } = require('./publicRepoMetadata.js');
 
       expect(config.WORKER_BUNDLE_URL).toContain('.js');
+      expect(config.WORKER_BUNDLE_URL).toBe(
+        buildPublicRepoLatestReleaseAssetUrl('sessionCorsWorker.bundle.js')
+      );
     });
   });
 

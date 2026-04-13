@@ -21,11 +21,13 @@ import WorldResultsMap from './DemoAnalysis/WorldResultsMap.jsx';
 import PolicyGlobe, {
   getPolicyJurisdictionAnchor,
   getJurisdictionFlag,
+  POLICY_FILTERS,
   getPolicyStatusGroup,
   getPolicyStatusLabel,
 } from './PolicyGlobe.jsx';
 import policyStyles from './PolicyGlobe.module.scss';
 import TweetCard, { DebateMapSection, ExternalSourceLink } from './TweetCard.jsx';
+import { PUBLIC_AI_DISCOURSE_CORPUS_URL } from '../../variables/publicRepoMetadata.js';
 
 // Hidden tabs — restore by adding 'cross_corpus' or 'lesswrong_posts' back to this array
 const CORPUS_ORDER = [
@@ -118,27 +120,13 @@ const getPolicyMapFill = (status = '', isFallback = false) => {
       return isFallback ? 'rgba(77,255,164,0.16)' : 'rgba(77,255,164,0.56)';
     case 'proposed':
       return isFallback ? 'rgba(255,179,71,0.16)' : 'rgba(255,179,71,0.56)';
+    case 'inactive':
+      return isFallback ? 'rgba(255,122,158,0.16)' : 'rgba(255,122,158,0.52)';
     case 'mixed':
       return isFallback ? 'rgba(122,140,255,0.16)' : 'rgba(122,140,255,0.52)';
     default:
       return 'rgba(226,232,255,0.06)';
   }
-};
-
-const buildPolicyMapSubtitle = ({ filterStatus, filteredEntries, globalStatus }) => {
-  const count = Array.isArray(filteredEntries) ? filteredEntries.length : 0;
-
-  if (count === 0) {
-    return filterStatus === 'all'
-      ? 'No policy entries are loaded for this corpus yet.'
-      : `No ${filterStatus} policy entries are active in this corpus slice.`;
-  }
-
-  if (globalStatus) {
-    return `${count} ${filterStatus === 'all' ? 'policy entries' : `${filterStatus} entries`} selected. International frameworks add a broader global glow.`;
-  }
-
-  return `${count} ${filterStatus === 'all' ? 'policy entries' : `${filterStatus} entries`} selected. Highlighted regions reflect the filtered laws.`;
 };
 
 const shouldUseHalfWidthGrid = (corpusKey = '') => (
@@ -153,17 +141,46 @@ const formatAuthors = (entry = {}) => {
   return `${entry.authors[0]} +${entry.authors.length - 1}`;
 };
 
+const buildInsiderAuthorKey = (entry = {}) => (
+  String(entry.author || entry.title || entry.id || '').trim().toLowerCase()
+);
+
+const diversifyInsiderEntries = (entries = []) => {
+  const remainingEntries = Array.isArray(entries) ? [...entries] : [];
+  const orderedEntries = [];
+  let lastAuthorKey = '';
+
+  while (remainingEntries.length > 0) {
+    let nextIndex = -1;
+    for (let index = 0; index < remainingEntries.length; index += 1) {
+      if (buildInsiderAuthorKey(remainingEntries[index]) !== lastAuthorKey) {
+        nextIndex = index;
+        break;
+      }
+    }
+    const safeIndex = nextIndex >= 0 ? nextIndex : 0;
+    const [nextEntry] = remainingEntries.splice(safeIndex, 1);
+    orderedEntries.push(nextEntry);
+    lastAuthorKey = buildInsiderAuthorKey(nextEntry);
+  }
+
+  return orderedEntries;
+};
+
 const buildCorpusDefinitions = () => (
   CORPUS_ORDER
     .map((key) => {
       const corpus = corpusSample?.corpuses?.[key];
       if (!corpus) return null;
       const entries = Array.isArray(corpus.entries) ? corpus.entries : [];
+      const orderedEntries = key === 'dwarkesh_lab_insiders'
+        ? diversifyInsiderEntries(entries)
+        : entries;
 
       return {
         ...corpus,
         count_full: corpus.count_full,
-        entries,
+        entries: orderedEntries,
         key,
         tabLabel: TAB_LABELS[key] || corpus.label || key,
       };
@@ -211,6 +228,11 @@ const EntryCard = ({ corpusKey, entry, onTagClick, onAtlasIssueOpen }) => {
   const policyStatusGroup = isPolicyCorpus ? getPolicyStatusGroup(entry) : null;
   const policyFlag = isPolicyCorpus ? getJurisdictionFlag(entry.jurisdiction) : null;
   const policyStatusLabel = isPolicyCorpus ? getPolicyStatusLabel(entry) : null;
+  const policyStatusBadgeClassName = policyStatusGroup === POLICY_FILTERS.proposed
+    ? policyStyles.statusProposed
+    : policyStatusGroup === POLICY_FILTERS.inactive
+      ? policyStyles.statusInactive
+      : policyStyles.statusLive;
   const sourceLabel = isMetrCorpus ? 'Open full report' : 'View source';
   const cardClassName = `${styles.card} ${
     isPolicyCorpus ? policyStyles.policyCard : isMetrCorpus ? styles.metrCard : ''
@@ -243,9 +265,7 @@ const EntryCard = ({ corpusKey, entry, onTagClick, onAtlasIssueOpen }) => {
         {isPolicyCorpus ? (
           <div className={policyStyles.policyBadgeRow}>
             <span
-              className={`${policyStyles.statusBadge} ${
-                policyStatusGroup === 'proposed' ? policyStyles.statusProposed : policyStyles.statusLive
-              }`.trim()}
+              className={`${policyStyles.statusBadge} ${policyStatusBadgeClassName}`.trim()}
             >
               {policyStatusLabel}
             </span>
@@ -410,7 +430,7 @@ const CorpusViewer = ({ onAtlasIssueOpen = null, showGithubLink = true }) => {
       {showGithubLink ? (
         <div className={styles.sectionBlock}>
           <a
-            href="https://github.com/xoCortex/context-engine/tree/main/client/src/variables/demo"
+            href={PUBLIC_AI_DISCOURSE_CORPUS_URL}
             target="_blank"
             rel="noopener noreferrer"
             className={styles.githubLink}
@@ -463,13 +483,6 @@ const CorpusViewer = ({ onAtlasIssueOpen = null, showGithubLink = true }) => {
                             colorScale={(regionStatus) => getPolicyMapFill(regionStatus || globalStatus, !regionStatus)}
                             compact
                           />
-                        </div>
-                        <div className={styles.policyMapAssistiveText}>
-                          {buildPolicyMapSubtitle({
-                            filterStatus,
-                            filteredEntries,
-                            globalStatus,
-                          })}
                         </div>
                       </div>
                     );

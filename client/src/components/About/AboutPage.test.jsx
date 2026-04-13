@@ -9,7 +9,14 @@ import AboutPage, {
   getConfiguredRecognitionIndividuals,
 } from './AboutPage.jsx';
 
+const ORIGINAL_PUBLIC_URL = process.env.PUBLIC_URL;
+
 beforeEach(() => {
+  if (typeof ORIGINAL_PUBLIC_URL === 'undefined') {
+    delete process.env.PUBLIC_URL;
+  } else {
+    process.env.PUBLIC_URL = ORIGINAL_PUBLIC_URL;
+  }
   window.localStorage.clear();
 });
 
@@ -24,13 +31,15 @@ describe('AboutPage', () => {
     renderAboutPage();
 
     const hero = screen.getByTestId('ce-about-hero');
-    const demoLink = screen.getByRole('link', { name: /Explore Demo/i });
+    const demoLink = within(hero).getByRole('link', { name: /^Demo$/i });
+    const newSessionLink = within(hero).getByRole('link', { name: /New Session/i });
 
     expect(hero).toBeInTheDocument();
     expect(demoLink).toHaveAttribute(
       'href',
       getAboutDemoSessionPath()
     );
+    expect(newSessionLink).toHaveAttribute('href', '/new');
     expect(within(hero).getByTestId('ce-about-link-whitepaper')).toBeVisible();
     expect(within(hero).getByTestId('ce-about-link-whitepaper')).toHaveAttribute(
       'href',
@@ -56,7 +65,15 @@ describe('AboutPage', () => {
 
     renderAboutPage();
 
-    expect(screen.getByRole('link', { name: /Explore Demo/i })).toHaveAttribute('href', '/session/edge');
+    expect(screen.getByRole('link', { name: /^Demo$/i })).toHaveAttribute('href', '/session/edge');
+  });
+
+  it('prepends PUBLIC_URL to the new-session CTA for subpath deployments', () => {
+    process.env.PUBLIC_URL = '/ce/';
+
+    renderAboutPage();
+
+    expect(screen.getByRole('link', { name: /New Session/i })).toHaveAttribute('href', '/ce/new');
   });
 
   it('shows one use-case detail panel at a time', () => {

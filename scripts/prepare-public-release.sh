@@ -78,6 +78,19 @@ SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
 REPO_ROOT=$(cd "$SCRIPT_DIR/.." && pwd -P)
 OUTPUT_ABS=$(abs_path "$OUTPUT_DIR")
 
+# shellcheck source=./lib/public-release-strip-patterns.sh
+source "$SCRIPT_DIR/lib/public-release-strip-patterns.sh"
+
+STRIP_PATTERNS=()
+while IFS= read -r pattern; do
+  STRIP_PATTERNS+=("$pattern")
+done < <(ce_public_release_strip_patterns)
+
+STRIP_ASSERT_ABSENT=()
+while IFS= read -r pattern; do
+  STRIP_ASSERT_ABSENT+=("$pattern")
+done < <(ce_public_release_strip_assert_absent_patterns)
+
 if [ "$OUTPUT_ABS" = "$REPO_ROOT" ]; then
   printf 'Refusing to overwrite the repo root.\n' >&2
   exit 1
@@ -130,40 +143,6 @@ mkdir -p "$STAGING_ROOT"
 ) | (
   cd "$STAGING_ROOT"
   tar -xf -
-)
-
-STRIP_PATTERNS=(
-  "contextEngine-cc"
-  "TODO"
-  "CLAUDE.md"
-  ".claude"
-  ".codex"
-  # Hold back the full repo-level E2E workflow layer from the public OSS copy for now.
-  "scripts/test-*.js"
-  "scripts/test-*.ui.js"
-  "scripts/lib/e2e"
-  "scripts/run-e2e-*"
-  "scripts/run-ux-*"
-  "scripts/capture-ux-*"
-  "scripts/build_external_llm_prompt.py"
-  ".env.e2e*"
-  "artifacts"
-  "Demo Integration Package"
-  "whitepaper/Slides.pdf"
-  "whitepaper/IdeasMap.md"
-  "client/src/components/MainSite/MainSite.module.test.js"
-  "client/src/utilities/worker/sessionCorsWorker.*.proxy.test.js"
-  "client/src/utilities/web3/contractScripts.*.proxy.test.js"
-)
-
-STRIP_ASSERT_ABSENT=(
-  "CLAUDE.md"
-  ".claude"
-  "scripts/test-*.js"
-  "scripts/test-*.ui.js"
-  "scripts/lib/e2e"
-  "whitepaper/Slides.pdf"
-  "whitepaper/IdeasMap.md"
 )
 
 (

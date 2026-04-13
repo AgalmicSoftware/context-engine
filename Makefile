@@ -1,4 +1,4 @@
-.PHONY: release release-clean
+.PHONY: release release-clean sync-public sync-public-push
 
 RELEASE_DIR ?= ./release-public
 
@@ -10,3 +10,11 @@ release:
 ## Remove the release artifact.
 release-clean:
 	rm -rf $(RELEASE_DIR)
+
+## Replay dev commits onto public main as a per-commit public branch.
+sync-public:
+	bash scripts/sync-public-history.sh
+
+## Replay dev commits onto public main and push the branch to origin.
+sync-public-push:
+	bash scripts/sync-public-history.sh --push

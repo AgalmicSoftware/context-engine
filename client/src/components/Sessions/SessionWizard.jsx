@@ -132,6 +132,7 @@ import {
   WIZARD_CONTRACT_MODAL_TESTID,
 } from '../ContractPage/contractMetadata.js';
 import { buildContractViewerContracts } from '../ContractPage/contractViewerUtils.js';
+import { normalizeRoutePath as normalizeMainSiteRoutePath } from '../MainSite/routePathHelpers.js';
 
 const { getPathRpcUrl } = rpcDefaults;
 const log = createLogger('general');
@@ -161,6 +162,9 @@ const resolveLocalWorkerBundleFallbackAssetUrl = () => {
 export const LOCAL_WORKER_BUNDLE_FALLBACK_ASSET_URL = resolveLocalWorkerBundleFallbackAssetUrl();
 const LOCAL_WORKER_BUNDLE_FALLBACK_PICKER_HELP =
   `Automatic bundled worker fetch failed. Choose ${LOCAL_WORKER_BUNDLE_FALLBACK_FILE_PATH} to continue.`;
+const NORMAL_MODE_MANUAL_BUNDLE_RETRY_MESSAGE = (
+  `Choose ${LOCAL_WORKER_BUNDLE_FALLBACK_FILE_PATH} to retry this worker deploy.`
+);
 export const isMissingSessionSlug = (slug) => toStr(slug).trim() === '';
 export const INVALID_SESSION_SLUG_FORMAT_ERROR =
   'Session slugs must use lowercase letters, numbers, "_" or "-".';
@@ -214,7 +218,18 @@ const resolveSponsoredBundleBootstrapWorkerUrl = (bundle = {}) => normalizeWorke
   bundle?.meta?.sourceWorkerUrl ||
   ''
 ).trim());
+const resolveSessionWizardBundleUrlForMode = ({
+  wizardMode = 'advanced',
+  bundleUrl = '',
+} = {}) => {
+  const normalizedBundleUrl = toStr(bundleUrl).trim();
+  if (wizardMode !== 'normal') return normalizedBundleUrl;
+  // Regression guard: normal mode promises the configured release asset, so a
+  // stale advanced-mode override must not leak into its read-only deploy path.
+  return toStr(CLOUDFLARE_WORKER_BUNDLE_URL).trim() || normalizedBundleUrl;
+};
 export const resolveSponsoredBundleDeployReadiness = ({
+  wizardMode = 'advanced',
   sponsoredBundle = {},
   deployForm = {},
   workerSecretsEnabled = true,
@@ -223,7 +238,10 @@ export const resolveSponsoredBundleDeployReadiness = ({
   const normalizedBundle = normalizeSparseSponsoredBundlePayload(sponsoredBundle);
   const hasAppliedSponsoredBundle = hasSponsoredBundleFields(normalizedBundle);
   const workerName = toStr(deployForm?.workerName || '').trim();
-  const bundleUrl = toStr(deployForm?.bundleUrl || '').trim();
+  const bundleUrl = resolveSessionWizardBundleUrlForMode({
+    wizardMode,
+    bundleUrl: deployForm?.bundleUrl,
+  });
   const bootstrapWorkerUrl = resolveSponsoredBundleBootstrapWorkerUrl(normalizedBundle);
   const deployGrantToken = toStr(normalizedBundle?.deployGrantToken || '').trim();
   const normalizedMissingWorkerSecrets = Array.isArray(missingWorkerSecrets)
@@ -242,6 +260,31 @@ export const resolveSponsoredBundleDeployReadiness = ({
     ready: hasAppliedSponsoredBundle && missing.length === 0,
     missing,
   };
+};
+const buildSponsoredBundleAppliedStatusMessage = (sponsoredBundle = {}) => {
+  const normalizedBundle = normalizeSparseSponsoredBundlePayload(sponsoredBundle);
+  const appliedLabels = [];
+  if (toStr(normalizedBundle?.openaiKey).trim()) appliedLabels.push('OpenAI key');
+  if (toStr(normalizedBundle?.anthropicKey).trim()) appliedLabels.push('Anthropic key');
+  if (toStr(normalizedBundle?.openrouterKey).trim()) appliedLabels.push('OpenRouter key');
+  if (toStr(normalizedBundle?.arweaveJwk).trim()) appliedLabels.push('Arweave wallet');
+  if (
+    toStr(normalizedBundle?.faucetPrivateKey).trim() ||
+    toStr(normalizedBundle?.faucetGrantToken).trim()
+  ) {
+    appliedLabels.push('faucet funding');
+  }
+  if (toStr(normalizedBundle?.customRpcUrl).trim()) appliedLabels.push('RPC URL');
+  if (
+    toStr(normalizedBundle?.litPayerPrivateKey).trim() ||
+    toStr(normalizedBundle?.litPayerAddress).trim()
+  ) {
+    appliedLabels.push('Lit payer wallet');
+  }
+  if (toStr(normalizedBundle?.deployGrantToken).trim()) appliedLabels.push('deploy access');
+  return appliedLabels.length
+    ? `Sponsored resources applied: ${appliedLabels.join(', ')}.`
+    : 'Sponsored resources applied.';
 };
 const resolveSponsoredBundleAdvancedFieldNotices = ({
   sponsoredBundle = {},
@@ -369,13 +412,18 @@ export const resolveSessionWizardDeployBundleMode = ({
   wizardMode = 'normal',
   bundleMode = 'upload',
   sponsoredAutoDeployReady = false,
+  forceSponsoredAutoDeploy = false,
+  forceManualBundleFile = false,
 } = {}) => (
-  (wizardMode === 'normal' && sponsoredAutoDeployReady)
+  (wizardMode === 'normal' && forceSponsoredAutoDeploy)
     ? 'url'
-    : (
-      wizardMode === 'normal' &&
-      !NORMAL_MODE_SHARED_HOSTED_WORKER_ENABLED
-    ) ? 'upload' : bundleMode
+    : (wizardMode === 'normal' && forceManualBundleFile)
+      ? 'upload'
+      : (wizardMode === 'normal' && sponsoredAutoDeployReady)
+      ? 'url'
+      : (wizardMode === 'normal')
+        ? (toStr(CLOUDFLARE_WORKER_BUNDLE_URL).trim() ? 'url' : 'upload')
+        : bundleMode
 );
 export const resolveSessionWizardShouldAutoDeployWorker = ({
   workerMode = 'default',
@@ -663,15 +711,27 @@ const SPONSORED_MANUAL_BUNDLE_RETRY_MESSAGE = (
 );
 const isSessionWizardRemoteBundleUrlFetchFailure = ({
   err,
-  wizardMode = 'normal',
   effectiveBundleMode = 'upload',
 } = {}) => {
-  if (wizardMode !== 'advanced' || effectiveBundleMode !== 'url') {
+  if (effectiveBundleMode !== 'url') {
     return false;
   }
   const combined = `${toStr(err?.message).trim()} ${toStr(err?.responseError).trim()}`.toLowerCase();
   return combined.includes(DEPLOY_HELPER_BUNDLE_FETCH_ERROR);
 };
+export const shouldForceSessionWizardNormalModeManualBundleRetry = ({
+  err,
+  wizardMode = 'normal',
+  effectiveBundleMode = 'upload',
+  hasBundleFile = false,
+} = {}) => (
+  wizardMode === 'normal' &&
+  !hasBundleFile &&
+  isSessionWizardRemoteBundleUrlFetchFailure({
+    err,
+    effectiveBundleMode,
+  })
+);
 export const shouldForceSessionWizardManualBundleRetry = ({
   err,
   forceSponsoredAutoDeploy = false,
@@ -698,6 +758,9 @@ const normalizeDeployErrorMessage = ({ err, helperBase } = {}) => {
   }
   if (lowered.includes('origin not allowed')) {
     return buildDeployHelperCorsMessage(helperBase, raw);
+  }
+  if (lowered.includes(DEPLOY_HELPER_BUNDLE_FETCH_ERROR) || responseLower.includes(DEPLOY_HELPER_BUNDLE_FETCH_ERROR)) {
+    return raw || responseError;
   }
   if (lowered.includes('failed to fetch') || lowered.includes('networkerror')) {
     const helper = toStr(helperBase).trim() || 'deploy-helper';
@@ -1271,6 +1334,7 @@ const SESSION_WIZARD_CACHE_KEY = 'ce:sessionWizardDraft:v1';
 const SESSION_WIZARD_PENDING_SBT_DRAFTS_KEY = 'ce:sessionWizardPendingSbtDrafts:v1';
 const SESSION_WIZARD_SPONSORED_BUNDLE_CACHE_KEY = 'ce:sessionWizardSponsoredBundle:v1';
 const SESSION_WIZARD_SPONSORED_BUNDLE_TAB_ID_KEY = 'ce:sessionWizardSponsoredBundle:tabId:v1';
+const SESSION_WIZARD_NEW_SESSION_BANNER_DISMISSED_KEY = 'ce_new_session_banner_dismissed';
 const SESSION_WIZARD_SPONSORED_BUNDLE_KEY_DB_NAME = 'ce-sponsored-bundle-keys';
 const SESSION_WIZARD_SPONSORED_BUNDLE_KEY_DB_VERSION = 1;
 const SESSION_WIZARD_SPONSORED_BUNDLE_KEY_DB_STORE = 'keys';
@@ -1278,6 +1342,7 @@ const SESSION_WIZARD_SPONSORED_BUNDLE_KEY_DB_ENTRY_PREFIX = 'sessionWizardSponso
 let sessionWizardSponsoredBundleCacheKeyPromise = null;
 let sessionWizardSponsoredBundleKeyDbPromise = null;
 let sessionWizardSponsoredBundleKeyDbUnavailable = false;
+const SESSION_WIZARD_NEW_SESSION_PATHNAMES = new Set(['/new', '/session/new']);
 
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
@@ -1306,6 +1371,45 @@ const generateSessionWizardSponsoredBundleTabId = () => {
     return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
   }
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+};
+
+const normalizeSessionWizardPathname = (pathname = '') => {
+  const normalized = normalizeMainSiteRoutePath(toStr(pathname).trim());
+  return normalized || '/';
+};
+
+const isNewSessionWizardPathname = (pathname = '') => (
+  SESSION_WIZARD_NEW_SESSION_PATHNAMES.has(normalizeSessionWizardPathname(pathname))
+);
+
+const readSessionWizardNewSessionBannerDismissed = () => {
+  if (typeof window === 'undefined') return false;
+  try {
+    return toStr(localStorage.getItem(SESSION_WIZARD_NEW_SESSION_BANNER_DISMISSED_KEY)).trim().toLowerCase() === 'true';
+  } catch (_) {
+    return false;
+  }
+};
+
+const writeSessionWizardNewSessionBannerDismissed = () => {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(SESSION_WIZARD_NEW_SESSION_BANNER_DISMISSED_KEY, 'true');
+  } catch (_) {}
+};
+const buildSessionWizardNewSessionBannerDismissalContextKey = ({
+  pathname = '',
+  sponsoredBundleId = '',
+  sponsoredBundleKey = '',
+} = {}) => {
+  const normalizedPathname = normalizeSessionWizardPathname(pathname);
+  if (!isNewSessionWizardPathname(normalizedPathname)) return '';
+  const bundleId = toStr(sponsoredBundleId).trim();
+  const bundleKey = toStr(sponsoredBundleKey).trim();
+  if (bundleId || bundleKey) {
+    return `${normalizedPathname}::sponsored::${bundleId || '__missing_bundle__'}::${bundleKey ? 'with-key' : 'without-key'}`;
+  }
+  return `${normalizedPathname}::plain`;
 };
 
 const getSessionWizardSponsoredBundleTabId = () => {
@@ -2567,6 +2671,7 @@ const SessionWizard = ({
   });
   const [bundleMode, setBundleMode] = useState(() => (toStr(CLOUDFLARE_WORKER_BUNDLE_URL) ? 'url' : 'upload'));
   const [bundleFile, setBundleFile] = useState(null);
+  const [forceManualBundleFile, setForceManualBundleFile] = useState(false);
   const [forceManualSponsoredBundleFile, setForceManualSponsoredBundleFile] = useState(false);
   const [localBundledWorkerAsset, setLocalBundledWorkerAsset] = useState({
     status: 'idle',
@@ -2588,6 +2693,10 @@ const SessionWizard = ({
   }));
   const [sponsoredBundleStatus, setSponsoredBundleStatus] = useState(null);
   const [sponsoredBundleRetryNonce, setSponsoredBundleRetryNonce] = useState(0);
+  const [persistedNewSessionBannerDismissed, setPersistedNewSessionBannerDismissed] = useState(() => (
+    readSessionWizardNewSessionBannerDismissed()
+  ));
+  const [newSessionBannerDismissedContext, setNewSessionBannerDismissedContext] = useState('');
   const [workerSecrets, setWorkerSecrets] = useState(() => {
     const cached = cachedWizard?.workerSecrets;
     return sanitizeSessionWizardWorkerSecretsForLitMode(cached, { litPayerWalletInputEnabled });
@@ -2962,6 +3071,26 @@ const SessionWizard = ({
   }, [registryChainId, draft?.contracts]);
   const registryChainName = useMemo(() => getChainName(registryChainId), [registryChainId]);
   const registryChainOptions = useMemo(() => getSessionRegistryChains(), []);
+  const newSessionFundingChain = useMemo(() => {
+    const chainId = Number(
+      registryChainId ||
+      DEFAULT_CHAIN_ID ||
+      0
+    ) || 0;
+    const chain = getChainById(chainId);
+    if (chain) return chain;
+    if (!chainId) return null;
+    return {
+      id: chainId,
+      name: getChainName(chainId) || `Chain ${chainId}`,
+      nativeCurrency: { symbol: 'ETH' },
+    };
+  }, [registryChainId]);
+  const newSessionFundingRequirementLabel = useMemo(() => {
+    const chainName = toStr(newSessionFundingChain?.name).trim();
+    const chainSymbol = toStr(newSessionFundingChain?.nativeCurrency?.symbol).trim() || 'ETH';
+    return `${chainName || 'Selected network'} ${chainSymbol} for on-chain registration`;
+  }, [newSessionFundingChain]);
 
   const buildWorkerName = (rawName) => {
     const base = toStr(rawName)
@@ -3020,7 +3149,11 @@ const SessionWizard = ({
           return;
         }
         applySponsoredBundleOverrides(cachedSponsoredBundle, activeApplyKey, bundleId);
-        setSponsoredBundleStatus({ tone: 'success', message: 'Sponsored resources applied.', retryable: false });
+        setSponsoredBundleStatus({
+          tone: 'success',
+          message: buildSponsoredBundleAppliedStatusMessage(cachedSponsoredBundle),
+          retryable: false,
+        });
         return;
       }
       if (!bundleKey && sponsoredBundleTerminalTxIdRef.current === bundleId) return;
@@ -3050,7 +3183,11 @@ const SessionWizard = ({
         await writeSessionWizardSponsoredBundleCache(bundleId, result.bundle);
         if (cancelled) return;
         scrubSponsoredBundleHashSecret();
-        setSponsoredBundleStatus({ tone: 'success', message: 'Sponsored resources applied.', retryable: false });
+        setSponsoredBundleStatus({
+          tone: 'success',
+          message: buildSponsoredBundleAppliedStatusMessage(result.bundle),
+          retryable: false,
+        });
       } catch (error) {
         if (cancelled) return;
         restoreSponsoredBundleOverrides();
@@ -6303,6 +6440,7 @@ const SessionWizard = ({
       const hasManualMetadata = Boolean(normalizeArweaveUri(manualMetadataUrl));
       const currentWorkerSecrets = getCurrentWorkerSecrets();
       const sponsoredAutoDeployState = resolveSponsoredBundleDeployReadiness({
+        wizardMode,
         sponsoredBundle: sponsoredBundleAppliedBundleRef.current,
         deployForm: deployFormRef.current,
         workerSecretsEnabled: workerSecretsEnabledRef.current,
@@ -6887,6 +7025,7 @@ const SessionWizard = ({
     let helperBase = '';
     const forceSponsoredAutoDeploy = options?.forceSponsoredAutoDeploy === true;
     let shouldPreferLocalBundledAssetOnError = false;
+    let effectiveBundleMode = 'upload';
     try {
       const currentDeployForm = (
         deployFormRef.current &&
@@ -6936,12 +7075,13 @@ const SessionWizard = ({
           throw new Error(`Missing required secrets before deploy: ${missing.join(', ')}`);
         }
       }
-      // Regression guard: sponsored links can preload a deploy-ready bundle URL,
-      // but normal mode otherwise stays upload-only. Only flip back to URL mode
-      // when the sponsored flow is fully ready, or Publish will fail invisibly.
+      // Regression guard: deploy-ready sponsored links still force the URL path
+      // in normal mode, while manual retry can temporarily switch normal mode
+      // back to upload after a remote bundle fetch failure.
       const sponsoredAutoDeployReady = (
         workerMode !== 'default' &&
         resolveSponsoredBundleDeployReadiness({
+          wizardMode,
           sponsoredBundle: sponsoredBundleAppliedBundleRef.current,
           deployForm: currentDeployForm,
           workerSecretsEnabled,
@@ -6950,10 +7090,12 @@ const SessionWizard = ({
             : [],
         }).ready
       );
-      const effectiveBundleMode = resolveSessionWizardDeployBundleMode({
+      effectiveBundleMode = resolveSessionWizardDeployBundleMode({
         wizardMode,
         bundleMode,
         sponsoredAutoDeployReady: forceSponsoredAutoDeploy || sponsoredAutoDeployReady,
+        forceSponsoredAutoDeploy,
+        forceManualBundleFile,
       });
       if (effectiveBundleMode === 'upload' && !bundleFile) {
         throw new Error(
@@ -6962,7 +7104,10 @@ const SessionWizard = ({
             : 'Upload a worker bundle file or switch to bundle URL.'
         );
       }
-      const requestedBundleUrl = toStr(currentDeployForm.bundleUrl).trim();
+      const requestedBundleUrl = resolveSessionWizardBundleUrlForMode({
+        wizardMode,
+        bundleUrl: currentDeployForm.bundleUrl,
+      });
       const shouldPreferLocalBundledAsset = resolveSessionWizardShouldPreferLocalBundledAsset({
         wizardMode,
         effectiveBundleMode,
@@ -7070,7 +7215,10 @@ const SessionWizard = ({
       try {
         ({ deployStatusCode, data } = await submitDeployPayload(payload));
       } catch (err) {
-        if (!isSessionWizardRemoteBundleUrlFetchFailure({ err, wizardMode, effectiveBundleMode })) {
+        if (!isSessionWizardRemoteBundleUrlFetchFailure({ err, effectiveBundleMode })) {
+          throw err;
+        }
+        if (wizardMode !== 'advanced') {
           throw err;
         }
         // Keep advanced URL mode intact in the UI, but retry once with the same
@@ -7238,6 +7386,10 @@ const SessionWizard = ({
         configSyncStatus.warning,
       ));
       setDeployComplete(isDeployVerified);
+      // Manual bundle uploads are one-off retries; clear the cached file so
+      // later URL-mode deploys and sponsored publish flows don't reuse stale bytes.
+      setForceManualBundleFile(false);
+      setBundleFile(null);
       clearCachedWorkerSecretsAfterDeploy();
       return {
         ok: true,
@@ -7245,6 +7397,14 @@ const SessionWizard = ({
         deployComplete: isDeployVerified,
       };
     } catch (err) {
+      if (shouldForceSessionWizardNormalModeManualBundleRetry({
+        err,
+        wizardMode,
+        effectiveBundleMode,
+        hasBundleFile: !!bundleFile,
+      })) {
+        setForceManualBundleFile(true);
+      }
       if (shouldForceSessionWizardManualBundleRetry({
         err,
         forceSponsoredAutoDeploy,
@@ -7601,10 +7761,15 @@ const SessionWizard = ({
           ? 'custom worker URL changed after deploy (re-deploy to verify)'
           : 'custom worker URL (not verified in this run)';
   const sponsoredAutoDeployState = resolveSponsoredBundleDeployReadiness({
+    wizardMode,
     sponsoredBundle: sponsoredBundleAppliedBundleRef.current,
     deployForm,
     workerSecretsEnabled,
     missingWorkerSecrets: workerSecretsEnabled ? getMissingWorkerSecretsForDeploy() : [],
+  });
+  const normalModeBundleUrl = resolveSessionWizardBundleUrlForMode({
+    wizardMode: 'normal',
+    bundleUrl: deployForm.bundleUrl,
   });
   const {
     showSponsoredFaucetNotice,
@@ -7661,6 +7826,60 @@ const SessionWizard = ({
     hasManualSponsoredBundleFallbackFile
   );
   const canUseSponsoredAutoDeployNow = shouldUseSponsoredAutoDeployFlow && sponsoredLocalBundledAssetAvailable;
+  const currentSessionWizardPathname = (
+    typeof window === 'undefined' || !window.location ? '' : window.location.pathname
+  );
+  const isNewSessionWizardRoute = isNewSessionWizardPathname(
+    currentSessionWizardPathname
+  );
+  const newSessionBannerDismissalContextKey = buildSessionWizardNewSessionBannerDismissalContextKey({
+    pathname: currentSessionWizardPathname,
+    sponsoredBundleId: initialSponsoredBundleId,
+    sponsoredBundleKey: initialSponsoredBundleKey,
+  });
+  const currentWorkerSecrets = getCurrentWorkerSecrets();
+  const normalizedAppliedSponsoredBundle = normalizeSparseSponsoredBundlePayload(
+    sponsoredBundleAppliedBundleRef.current
+  );
+  const sponsoredBundleStatusTone = toStr(sponsoredBundleStatus?.tone).trim().toLowerCase();
+  const hasNewSessionAiRequirementCovered = !!(
+    toStr(currentWorkerSecrets?.openaiKey).trim() ||
+    toStr(currentWorkerSecrets?.anthropicKey).trim() ||
+    toStr(currentWorkerSecrets?.openrouterKey).trim()
+  );
+  const hasNewSessionArweaveRequirementCovered = !!toStr(currentWorkerSecrets?.arweaveJwk).trim();
+  const hasNewSessionFundingRequirementCovered = !!(
+    toStr(currentWorkerSecrets?.faucetPrivateKey).trim() ||
+    toStr(normalizedAppliedSponsoredBundle?.faucetGrantToken).trim()
+  );
+  const hasNewSessionDeployRequirementCovered = !!toStr(
+    normalizedAppliedSponsoredBundle?.deployGrantToken
+  ).trim();
+  const sponsoredBundleCoversNewSessionRequirements = (
+    sponsoredBundleStatusTone === 'success' &&
+    hasNewSessionAiRequirementCovered &&
+    hasNewSessionArweaveRequirementCovered &&
+    hasNewSessionFundingRequirementCovered &&
+    hasNewSessionDeployRequirementCovered
+  );
+  // Sponsored links should suppress the generic requirements banner while
+  // preload is in flight, or after success when the applied bundle covers the
+  // publish prerequisites. Faucet-only bundles still leave /new in manual setup
+  // mode because Publish needs sponsored deploy access as well.
+  const sponsoredBundleOwnsNewSessionEntryFlow = hasSponsoredBundleLink && (
+    !sponsoredBundleStatus ||
+    sponsoredBundleStatusTone === 'info' ||
+    sponsoredBundleCoversNewSessionRequirements
+  );
+  const isNewSessionBannerDismissedForCurrentContext = (
+    !!newSessionBannerDismissalContextKey &&
+    newSessionBannerDismissedContext === newSessionBannerDismissalContextKey
+  );
+  const shouldRespectPersistedNewSessionBannerDismissal = !hasSponsoredBundleLink;
+  const showNewSessionRequirementsBanner = isNewSessionWizardRoute &&
+    !isNewSessionBannerDismissedForCurrentContext &&
+    !(shouldRespectPersistedNewSessionBannerDismissal && persistedNewSessionBannerDismissed) &&
+    !sponsoredBundleOwnsNewSessionEntryFlow;
   const showNormalModeWorkerStep = !(
     sponsoredAutoDeployState.active &&
     toStr(workerMode).trim() !== 'default'
@@ -7921,6 +8140,15 @@ const SessionWizard = ({
       </button>
     </div>
   );
+  const handleDismissNewSessionRequirementsBanner = useCallback(() => {
+    if (newSessionBannerDismissalContextKey) {
+      setNewSessionBannerDismissedContext(newSessionBannerDismissalContextKey);
+    }
+    if (!hasSponsoredBundleLink) {
+      setPersistedNewSessionBannerDismissed(true);
+      writeSessionWizardNewSessionBannerDismissed();
+    }
+  }, [hasSponsoredBundleLink, newSessionBannerDismissalContextKey]);
 
   return (
     <div className={styles.groupWizard}>
@@ -7998,6 +8226,46 @@ const SessionWizard = ({
           )}
         </div>
       </header>
+
+      {showNewSessionRequirementsBanner ? (
+        <section className={styles.newSessionBanner} aria-labelledby="new-session-requirements-title">
+          <div className={styles.newSessionBannerHeader}>
+            <h2 id="new-session-requirements-title" className={styles.newSessionBannerTitle}>
+              To create a session you&apos;ll need:
+            </h2>
+            <button
+              type="button"
+              className={`${styles.iconButton} ${styles.newSessionBannerDismissButton}`}
+              aria-label="Dismiss session setup requirements"
+              title="Dismiss session setup requirements"
+              onClick={handleDismissNewSessionRequirementsBanner}
+            >
+              <FontAwesomeIcon icon={faTimes} />
+            </button>
+          </div>
+          <div className={styles.newSessionBannerBody}>
+            <ul className={styles.newSessionBannerList}>
+              <li>An AI API key (OpenAI, Anthropic, or OpenRouter)</li>
+              <li>An Arweave wallet (JWK) for permanent storage</li>
+              <li>{newSessionFundingRequirementLabel}</li>
+              <li>(Optional) A faucet private key for sponsoring user gas</li>
+            </ul>
+            <p className={styles.newSessionBannerCopy}>
+              A turnkey tool for bundling these resources is in development.
+            </p>
+            <p className={styles.newSessionBannerCopy}>
+              In the meantime, you can get a sponsored session URL by contacting{' '}
+              <a
+                href="mailto:contextengine@protonmail.com"
+                className={styles.newSessionBannerLink}
+              >
+                contextengine@protonmail.com
+              </a>
+              .
+            </p>
+          </div>
+        </section>
+      ) : null}
 
       {sponsoredBundleStatus ? (
         <div
@@ -8552,21 +8820,41 @@ const SessionWizard = ({
                     </FormGroup>
                   )}
                   {isNormalMode ? (
-                    <FormGroup>
-                      <Label>Upload bundle file</Label>
-                      <Input
-                        type="file"
-                        accept=".js,.mjs"
-                        data-testid={E2E_TESTIDS.WIZARD_BUNDLE_FILE_INPUT}
-                        onChange={(e) => {
-                          const file = e.target.files && e.target.files[0];
-                          setBundleFile(file || null);
-                        }}
-                      />
-                      <div className={styles.helperText}>
-                        Upload the worker bundle directly for now. The hosted git asset path is planned separately.
-                      </div>
-                    </FormGroup>
+                    <>
+                      <FormGroup>
+                        <Label>Worker bundle URL (release asset)</Label>
+                        <Input
+                          value={normalModeBundleUrl}
+                          readOnly
+                          data-testid={E2E_TESTIDS.WIZARD_BUNDLE_URL}
+                        />
+                        <div className={styles.helperText}>
+                          Normal mode deploys use the GitHub-hosted worker bundle automatically.
+                        </div>
+                      </FormGroup>
+                      {forceManualBundleFile && (
+                        <FormGroup>
+                          <Label>Upload bundle file</Label>
+                          <Input
+                            type="file"
+                            accept=".js,.mjs"
+                            data-testid={E2E_TESTIDS.WIZARD_BUNDLE_FILE_INPUT}
+                            onChange={(e) => {
+                              const file = e.target.files && e.target.files[0];
+                              setBundleFile(file || null);
+                            }}
+                          />
+                          <div className={styles.helperText}>
+                            {NORMAL_MODE_MANUAL_BUNDLE_RETRY_MESSAGE}
+                          </div>
+                          {bundleFile && (
+                            <div className={styles.helperText}>
+                              Using {bundleFile.name || LOCAL_WORKER_BUNDLE_FALLBACK_FILE_PATH} for this deploy.
+                            </div>
+                          )}
+                        </FormGroup>
+                      )}
+                    </>
                   ) : bundleMode === 'url' ? (
                     <FormGroup>
                       <Label className={styles.fieldLabelRow}>
@@ -8582,6 +8870,7 @@ const SessionWizard = ({
                       <Input
                         value={deployForm.bundleUrl}
                         placeholder="https://github.com/<org>/<repo>/releases/latest/download/sessionCorsWorker.bundle.js"
+                        data-testid={E2E_TESTIDS.WIZARD_BUNDLE_URL}
                         onChange={(e) => setDeployForm((prev) => ({ ...prev, bundleUrl: e.target.value }))}
                       />
                     </FormGroup>

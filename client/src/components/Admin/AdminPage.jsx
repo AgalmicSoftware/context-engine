@@ -2719,21 +2719,30 @@ const AdminPage = ({
       upsertSessionRegistryCache({ config: nextConfig });
       setSessions(sessionRegistryStore.getAllSessionEntries() || []);
       setMetadataDraftTouched(false);
-      const txUrl = buildTxExplorerUrl(registryResult?.txHash, relevantRegistryChainId);
-      const baseSuccessStatus = txUrl ? `Session metadata updated. ${txUrl}` : 'Session metadata updated.';
-      let workerSyncSuffix = '';
-      try {
-        if (typeof fetch === 'function' && normalizeWorkerUrl(selectedConfigWorkerUrl)) {
-          setMetadataUpdateStatus('Syncing worker config…');
-          await ensureWorkerSessionConfig({
-            sessionConfigOverride: nextConfig,
-            action: 'set-config',
-            workerUrl: selectedConfigWorkerUrl,
-          });
-          workerSyncSuffix = ' Worker config synced.';
-        } else {
-          workerSyncSuffix = ' Worker config sync skipped (worker URL missing).';
-        }
+	      const txUrl = buildTxExplorerUrl(registryResult?.txHash, relevantRegistryChainId);
+	      const baseSuccessStatus = txUrl ? `Session metadata updated. ${txUrl}` : 'Session metadata updated.';
+	      let workerSyncSuffix = '';
+	      try {
+	        const metadataSyncWorkerUrl = normalizeWorkerUrl(
+	          getUsableSessionWorkerUrl({
+	            slug: selectedSlug,
+	            sessionConfig: nextConfig,
+	            allowSharedFallback: true,
+	          }) ||
+	          baseWorkerUrl ||
+	          selectedConfigWorkerUrl
+	        );
+	        if (typeof fetch === 'function' && metadataSyncWorkerUrl) {
+	          setMetadataUpdateStatus('Syncing worker config…');
+	          await ensureWorkerSessionConfig({
+	            sessionConfigOverride: nextConfig,
+	            action: 'set-config',
+	            workerUrl: metadataSyncWorkerUrl,
+	          });
+	          workerSyncSuffix = ' Worker config synced.';
+	        } else {
+	          workerSyncSuffix = ' Worker config sync skipped (worker URL missing).';
+	        }
       } catch (syncError) {
         workerSyncSuffix = ` Worker config sync failed: ${syncError?.message || 'unknown error'}`;
       }

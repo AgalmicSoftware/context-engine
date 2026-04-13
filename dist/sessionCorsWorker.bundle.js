@@ -27819,8 +27819,8 @@ var require_lib2 = __commonJS({
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.ethers = void 0;
     var tslib_1 = (init_tslib_es6(), __toCommonJS(tslib_es6_exports));
-    var ethers2 = tslib_1.__importStar(require_ethers());
-    exports.ethers = ethers2;
+    var ethers3 = tslib_1.__importStar(require_ethers());
+    exports.ethers = ethers3;
     tslib_1.__exportStar(require_ethers(), exports);
   }
 });
@@ -60171,6 +60171,46 @@ var dispatchAuthenticatedRouteEntryWithWorkerDeps = async ({
 
 // workers/sessionCorsWorker/adminRequestAuthority.js
 var toTrimmedString6 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
+var resolveEthersCompat2 = (loadedModule) => loadedModule?.ethers || loadedModule?.default?.ethers || loadedModule?.default || loadedModule || null;
+var ethers2 = resolveEthersCompat2(lib_exports);
+var getEthersFn3 = (...candidates) => candidates.find((fn) => typeof fn === "function") || null;
+var getEthersUtils3 = () => ethers2?.utils || lib_exports?.utils || lib_exports?.ethers?.utils || lib_exports?.default?.utils || lib_exports?.default?.ethers?.utils || null;
+var getTypedDataEncoder = () => ethers2?.TypedDataEncoder || lib_exports?.TypedDataEncoder || lib_exports?.ethers?.TypedDataEncoder || lib_exports?.default?.TypedDataEncoder || lib_exports?.default?.ethers?.TypedDataEncoder || getEthersUtils3()?._TypedDataEncoder || null;
+var hashTypedData = (domain, types, message) => {
+  const encoder3 = getTypedDataEncoder();
+  if (typeof encoder3?.hash !== "function") {
+    throw new Error("TypedDataEncoder.hash unavailable.");
+  }
+  return encoder3.hash(domain, types, message);
+};
+var recoverAddressCompat = (...args) => {
+  const recoverFn = getEthersFn3(
+    getEthersUtils3()?.recoverAddress,
+    ethers2?.recoverAddress,
+    lib_exports?.recoverAddress,
+    lib_exports?.ethers?.recoverAddress,
+    lib_exports?.default?.recoverAddress,
+    lib_exports?.default?.ethers?.recoverAddress
+  );
+  if (!recoverFn) {
+    throw new Error("recoverAddress unavailable.");
+  }
+  return recoverFn(...args);
+};
+var verifyTypedDataCompat = (...args) => {
+  const verifyFn = getEthersFn3(
+    getEthersUtils3()?.verifyTypedData,
+    ethers2?.verifyTypedData,
+    lib_exports?.verifyTypedData,
+    lib_exports?.ethers?.verifyTypedData,
+    lib_exports?.default?.verifyTypedData,
+    lib_exports?.default?.ethers?.verifyTypedData
+  );
+  if (!verifyFn) {
+    throw new Error("verifyTypedData unavailable.");
+  }
+  return verifyFn(...args);
+};
 var normalizeAddressLower2 = (value) => toTrimmedString6(value).toLowerCase();
 var normalizeUnixSeconds = (value, deps) => {
   const raw = Number(
@@ -60209,16 +60249,16 @@ var verifyAdminActionSignature = ({
         signature
       );
     } else {
-      const digest = TypedDataEncoder.hash(
+      const digest = hashTypedData(
         typedData.domain,
         ADMIN_ACTION_TYPES,
         typedData.message
       );
-      recovered = recoverAddress(digest, signature);
+      recovered = recoverAddressCompat(digest, signature);
     }
   } catch {
     try {
-      recovered = verifyTypedData(
+      recovered = verifyTypedDataCompat(
         typedData.domain,
         ADMIN_ACTION_TYPES,
         typedData.message,

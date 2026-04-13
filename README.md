@@ -21,8 +21,8 @@ Context Engine is a toolkit for AI-enhanced deliberation and sensemaking in larg
 - Client workflows: Node.js 16.14.2 and npm 9.2.0
 - Foundry (`forge` / `anvil`) for local-chain and root contract test workflows
 
-For client dependency installs, use `npm i --force` for now until the current
-install conflict is fixed.
+For client dependency installs, use `npm install --legacy-peer-deps` for now
+until the current peer dependency conflict is fixed.
 
 ### Clone and Install
 
@@ -35,7 +35,7 @@ npm install
 
 cd client
 nvm use 16
-npm i --force
+npm install --legacy-peer-deps
 npm run dev
 ```
 
@@ -50,7 +50,7 @@ For testing, run modes, and deeper setup:
 
 ### Survey and Response Management
 - Multiple question types: freeform, multiple choice, binary, and rating scales
-- Optional encryption responses and results
+- Optional encryption of responses and results
 - Decentralized and permanent storage of responses
 - Statistical / AI analysis and visualization of results
 - Export results as `.json`, `.csv`, `.pdf`
@@ -67,6 +67,16 @@ For testing, run modes, and deeper setup:
 - Summaries and analysis of survey results and response clusters
 - OpenAI, Anthropic, OpenRouter, and custom provider paths
 
+### User and Deployer UX: Passkey sign-on UX  
+- Users log in with a simple Passkey / Biometric flow (native pin, fingerprint, or faceID on phones) 
+- Login flow generates or handles an Ethereum account, which can be used easily with cryptography features
+   - Users do not need to know anything about Ethereum or crypto (or take any additional steps) to use the app
+
+
+### Deployer UX: Sponsored Bundles
+- Deployers can use and set up sponsored bundles of API keys (for storage, EVM transactions, encryption network, AI API) 
+  - Senstive and organiztional deployments can plug in existing AI Keys, and use local or custom options for storage, encryption, and EVM network functionalities
+
 
 ## AI Discourse Corpus
 
@@ -81,11 +91,11 @@ The default public deployment supports hundreds to low thousands of concurrent p
 - Project framing: [Whitepaper/whitepaper.md](Whitepaper/whitepaper.md)
 - System design, data flows, and file map: [ARCHITECTURE.md](ARCHITECTURE.md)
 - Docs index: [docs/README.md](docs/README.md)
+- User guide / end-to-end session setup: [docs/session-creation-guide.md](docs/session-creation-guide.md)
 - Testing guide: [docs/testing.md](docs/testing.md)
 - Run modes: [docs/run-modes.md](docs/run-modes.md)
 - Public client config and current defaults: [docs/public-client-config.md](docs/public-client-config.md)
 - PATH / RPC behavior: [docs/path-rpc.md](docs/path-rpc.md)
-- Session creation, worker setup, and Arweave JWK workflow: [docs/session-creation-guide.md](docs/session-creation-guide.md)
 - Cloudflare worker docs: [docs/session-cors-worker.md](docs/session-cors-worker.md)
 - Session registry and gate model: [docs/session-registry.md](docs/session-registry.md)
 - Scaling reference: [docs/scaling.md](docs/scaling.md)

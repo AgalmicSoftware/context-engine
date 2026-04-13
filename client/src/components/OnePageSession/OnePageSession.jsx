@@ -41,6 +41,7 @@ import { hasCachedCreateSbtForm as hasCachedCreateSbtFormCache } from '../../uti
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { getSbtDisplayName } from '../../utilities/sbt/sbtDisplayNames.js';
 import { isCryptoMode, sbtsListPath, t } from '../../utilities/ui/terminology.js';
+import { PUBLIC_AI_DISCOURSE_CORPUS_URL } from '../../variables/publicRepoMetadata.js';
 
 const SurveyPage = React.lazy(() => import('../SurveyTool/SurveyPage.jsx'));
 const MemoSurveyPage = React.memo((props) => <SurveyPage {...props} />);
@@ -55,7 +56,7 @@ const demoLog = createLogger('demo');
 const ONE_PAGE_DEMO_PERF_SCOPE = 'onePageDemo';
 const AGGREGATOR_PARSE_MEMO_MAX = 3000;
 const SBT_TOOLTIP_LABEL = isCryptoMode() ? 'Soulbound tokens (SBTs)' : `${t('sbtFull')}s`;
-const DEMO_CORPUS_GITHUB_URL = 'https://github.com/xoCortex/context-engine/tree/main/client/src/variables/demo';
+const DEMO_CORPUS_GITHUB_URL = PUBLIC_AI_DISCOURSE_CORPUS_URL;
 
 const isPerfCountersEnabled = () => {
   try {

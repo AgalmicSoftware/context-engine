@@ -159,7 +159,7 @@ Decrypt:  Client ──▸ Lit SDK decrypt(payload) ──▸ Lit nodes verify S
 ## Corpus Data
 
 - `ai-discourse-corpus/` is a tracked top-level dataset with reusable JSON sub-corpuses covering AI policy, safety research, technical evaluations, science fiction, debates, practitioner interviews, and enriched social-media discourse.
-- The corpus is kept outside the gitignored local `Demo Integration Package/` so it can be versioned and reused independently of the client demo runtime.
+- The corpus is kept outside the client so it can be versioned and reused independently of the client demo runtime.
 
 ## Key File Map
 

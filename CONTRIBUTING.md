@@ -14,7 +14,7 @@ Be constructive in issues and PRs.
 4. Install root dependencies:
    `npm install`
 5. Install client dependencies:
-   `cd client && npm install`
+   `cd client && npm install --legacy-peer-deps`
 
 The local React dev server runs with:
 
@@ -24,7 +24,7 @@ Repo-level scripts and CI target Node 20 because the root test flow uses Node's 
 Install Foundry as well if you plan to run the root test gate (`npm test`), since it includes Solidity suites via `forge test`. Setup instructions live in [docs/local-chain.md](docs/local-chain.md).
 
 If you need public client environment overrides, use [`client/.env.example`](client/.env.example). Root-level script and E2E variables are documented in [`.env.example`](.env.example).
-Base Sepolia remains the active on-chain default for now. The repo is preparing for an Optimism Sepolia switch, but contributors should not flip local defaults unless the specific workflow they are testing already has OP Sepolia addresses and worker support wired in.
+OP Sepolia is the active/default OSS chain. Base Sepolia remains supported for legacy/dev compatibility, but only use chain `84532` when the workflow you are testing explicitly targets it or depends on its deployed addresses.
 Worker, Arweave, and on-chain E2E flows may also require a funded test wallet, an Arweave JWK, and Cloudflare credentials depending on the path under test.
 
 ## Running Tests
@@ -57,7 +57,6 @@ Before opening a PR, run the smallest relevant test set for your change. `npm te
 - Use JavaScript and React; do not introduce TypeScript as part of routine contribution work.
 - Follow the existing SCSS module pattern for component styling.
 - Use `data-testid="ce-<area>-<control>"` for new stable UI hooks.
-- Keep `ethers` on v5; do not upgrade the repo to v6.
 
 ## Good First Issues
 
@@ -70,4 +69,5 @@ Before opening a PR, run the smallest relevant test set for your change. `npm te
 
 - App shell and route/runtime orchestration map: [docs/MainSite.MAP.md](docs/MainSite.MAP.md)
 - Survey/question runtime map: [docs/SurveyTool.MAP.md](docs/SurveyTool.MAP.md)
+- Session creation/runtime map: [docs/SessionWizard.MAP.md](docs/SessionWizard.MAP.md)
 - Encryption and SBT gates: sensitive fields can be encrypted behind Lit access-control conditions, and SBT ownership is the unlock condition for gated reads. Avoid exposing gated plaintext in docs, screenshots, logs, or fixtures.

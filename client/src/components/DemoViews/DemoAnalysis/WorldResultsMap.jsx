@@ -126,8 +126,8 @@ const WorldResultsMap = ({
 
   const renderMap = () => (
     <ComposableMap
-      projectionConfig={{ rotate: [-10, 0, 0], scale: compact ? 112 : 147 }}
-      style={{ width: '100%', height: 'auto' }}
+      projectionConfig={{ rotate: [-10, 0, 0], scale: compact ? 147 : 147 }}
+      style={{ display: 'block', width: '100%', height: 'auto' }}
     >
       {compact ? null : <Sphere stroke="#E4E5E6" strokeWidth={0.5} />}
       {compact ? null : <Graticule stroke="#E4E5E6" strokeWidth={0.5} />}
