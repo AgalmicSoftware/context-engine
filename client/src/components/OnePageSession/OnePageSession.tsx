@@ -59,7 +59,6 @@ const PolisReport = React.lazy(() => import('../PolisReport/PolisReport'));
 const DebateMap = React.lazy(() => import('../DebateMap/DebateMap'));
 const CorpusViewer = lazyWithRetry(() => import('../DemoViews/CorpusViewer'));
 const RiskMatrix = React.lazy(() => import('../MainContent/RiskMatrix'));
-const DemoAnalysisWorkspace = React.lazy(() => import('../DemoViews/DemoAnalysis/DemoAnalysisWorkspace'));
 
 const demoLog = createLogger('demo');
 const ONE_PAGE_DEMO_PERF_SCOPE = 'onePageDemo';
@@ -2809,11 +2808,6 @@ class OnePageSession extends Component<any, any> {
                         blockLimits={blockLimits}
                         networkChainId={networkChainId}
                       />
-                    </Suspense>
-                  )}
-                  {isDemoSlug && resultsViewMode === 'analysis' && (
-                    <Suspense fallback={<LazyFallback label="Loading Analysis..." minHeight="30vh" />}>
-                      <DemoAnalysisWorkspace sessionSlug={slug} />
                     </Suspense>
                   )}
                   {isDemoSlug && resultsViewMode === 'debateAtlas' && (

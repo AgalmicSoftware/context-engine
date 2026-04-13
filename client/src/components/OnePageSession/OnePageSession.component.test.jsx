@@ -22,7 +22,6 @@ const mockSBTsPage = jest.fn();
 const mockDebateMap = jest.fn();
 const mockRiskMatrix = jest.fn();
 const mockDebateSelector = jest.fn();
-const mockDemoAnalysisWorkspace = jest.fn();
 
 const extractMediaBlock = (scss, query, requiredSnippet = '') => {
   let searchFrom = 0;
@@ -136,13 +135,6 @@ jest.mock('../MainContent/RiskMatrix', () => ({
         ) : null}
       </div>
     );
-  },
-}));
-jest.mock('../DemoViews/DemoAnalysis/DemoAnalysisWorkspace', () => ({
-  __esModule: true,
-  default: (props) => {
-    mockDemoAnalysisWorkspace(props);
-    return <div data-testid="demo-analysis-workspace-view">Demo Analysis</div>;
   },
 }));
 jest.mock('../DemoViews/DebateHUD/DebateSelector', () => (props) => {
@@ -1349,32 +1341,23 @@ describe('OnePageSession view gating', () => {
     expect(screen.getAllByRole('button', { name: 'Exponential Progress Debate' }).length).toBeGreaterThan(0);
   });
 
-  it('shows the Breakdown results mode only for /session/demo', async () => {
-    const baseProps = buildProps();
-
-    const nonDemoView = render(<OnePageSession {...baseProps} />);
-    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
-
-    await waitFor(() => {
-      expect(screen.getByTestId('polis-report')).toBeInTheDocument();
-    });
-    expect(screen.queryByRole('button', { name: /^Breakdown$/i })).not.toBeInTheDocument();
-
-    nonDemoView.unmount();
-    jest.clearAllMocks();
+  it('does not show the Breakdown results mode on /session/demo', async () => {
+    const props = buildProps();
 
     render(
       <OnePageSession
-        {...baseProps}
+        {...props}
         slug="demo"
-        sessionConfig={{ ...baseProps.sessionConfig, slug: 'demo' }}
+        sessionConfig={{ ...props.sessionConfig, slug: 'demo' }}
       />
     );
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /^Breakdown$/i })).toBeInTheDocument();
+      expect(screen.getByTestId('polis-report')).toBeInTheDocument();
     });
+
+    expect(screen.queryByRole('button', { name: /^Breakdown$/i })).not.toBeInTheDocument();
   });
 
   it('uses a report-style icon for the polis results mode switcher', async () => {
@@ -1393,41 +1376,6 @@ describe('OnePageSession view gating', () => {
     const reportButton = await screen.findByRole('button', { name: /Report/i });
     expect(reportButton).toHaveTextContent('🧾');
     expect(reportButton).not.toHaveTextContent('🐝');
-  });
-
-  it('renders the demo analysis workspace when the Breakdown mode is selected', async () => {
-    const props = buildProps();
-
-    render(
-      <OnePageSession
-        {...props}
-        slug="demo"
-        sessionConfig={{ ...props.sessionConfig, slug: 'demo' }}
-      />
-    );
-
-    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
-
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: /^Breakdown$/i })).toBeInTheDocument();
-    });
-
-    const polisButton = screen.getByRole('button', { name: /^Report$/i });
-    const analysisButton = screen.getByRole('button', { name: /^Breakdown$/i });
-
-    expect(polisButton).toHaveAttribute('aria-pressed', 'true');
-    expect(analysisButton).toHaveAttribute('aria-pressed', 'false');
-
-    fireEvent.click(analysisButton);
-
-    await waitFor(() => {
-      expect(screen.getByTestId('demo-analysis-workspace-view')).toBeInTheDocument();
-    });
-
-    expect(analysisButton).toHaveAttribute('aria-pressed', 'true');
-    expect(analysisButton).toHaveClass(styles.sectionHeaderViewModeButtonActive);
-    expect(polisButton).toHaveAttribute('aria-pressed', 'false');
-    expect(mockDemoAnalysisWorkspace).toHaveBeenCalled();
   });
 
   it('kicks off a slug-scoped light SBT universe scan on mount and session switches', async () => {
