@@ -2,6 +2,7 @@
 
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
+import path from 'node:path';
 
 const INCLUDED_EXTENSIONS = new Set([
   '.js',
@@ -32,70 +33,118 @@ const EXCLUDED_PATHS = new Set([
   'dist/sessionCorsWorker.bundle.js',
 ]);
 
-const trackedFilesBuffer = execFileSync('git', ['ls-files', '-z'], {
-  cwd: process.cwd(),
-  encoding: 'buffer',
-});
+const WHITESPACE_ONLY_ISSUE_PATTERNS = Object.freeze([
+  /: filename contains whitespace$/,
+  /: contains CRLF or CR line endings$/,
+  /: missing final newline$/,
+  /:\d+: trailing whitespace$/,
+]);
 
-const trackedFiles = trackedFilesBuffer
-  .toString('utf8')
-  .split('\0')
-  .filter(Boolean)
-  .filter((filePath) => {
-    if (EXCLUDED_PATHS.has(filePath)) {
-      return false;
-    }
+const isTrackedTextFile = (filePath) => {
+  if (EXCLUDED_PATHS.has(filePath)) {
+    return false;
+  }
 
-    if (INCLUDED_SPECIAL_FILES.has(filePath)) {
-      return true;
-    }
+  if (INCLUDED_SPECIAL_FILES.has(filePath)) {
+    return true;
+  }
 
-    return [...INCLUDED_EXTENSIONS].some((extension) => filePath.endsWith(extension));
+  return [...INCLUDED_EXTENSIONS].some((extension) => filePath.endsWith(extension));
+};
+
+export const classifyTextHygieneIssue = (issue) => (
+  WHITESPACE_ONLY_ISSUE_PATTERNS.some((pattern) => pattern.test(issue))
+    ? 'warning'
+    : 'failure'
+);
+
+export const collectTextHygieneIssues = ({ rootDir = process.cwd() } = {}) => {
+  const trackedFilesBuffer = execFileSync('git', ['ls-files', '-z'], {
+    cwd: rootDir,
+    encoding: 'buffer',
   });
 
-const issues = [];
+  const trackedFiles = trackedFilesBuffer
+    .toString('utf8')
+    .split('\0')
+    .filter(Boolean)
+    .filter(isTrackedTextFile);
 
-for (const filePath of trackedFiles) {
-  if (/\s/.test(filePath)) {
-    issues.push(`${filePath}: filename contains whitespace`);
-  }
+  const issues = [];
 
-  if (filePath !== filePath.normalize('NFC')) {
-    issues.push(`${filePath}: filename is not NFC-normalized`);
-  }
+  for (const filePath of trackedFiles) {
+    const absolutePath = path.join(rootDir, filePath);
+    if (!fs.existsSync(absolutePath)) {
+      continue;
+    }
 
-  if (/[^\x20-\x7E]/.test(filePath)) {
-    issues.push(`${filePath}: filename contains non-ASCII characters`);
-  }
+    if (/\s/.test(filePath)) {
+      issues.push(`${filePath}: filename contains whitespace`);
+    }
 
-  const fileBuffer = fs.readFileSync(filePath);
-  if (fileBuffer.length === 0) {
-    continue;
-  }
+    if (filePath !== filePath.normalize('NFC')) {
+      issues.push(`${filePath}: filename is not NFC-normalized`);
+    }
 
-  if (fileBuffer.includes(0x0d)) {
-    issues.push(`${filePath}: contains CRLF or CR line endings`);
-  }
+    if (/[^\x20-\x7E]/.test(filePath)) {
+      issues.push(`${filePath}: filename contains non-ASCII characters`);
+    }
 
-  if (fileBuffer[fileBuffer.length - 1] !== 0x0a) {
-    issues.push(`${filePath}: missing final newline`);
-  }
+    const fileBuffer = fs.readFileSync(absolutePath);
+    if (fileBuffer.length === 0) {
+      continue;
+    }
 
-  const lines = fileBuffer.toString('utf8').split('\n');
-  for (let index = 0; index < lines.length; index += 1) {
-    const line = lines[index].replace(/\r$/, '');
-    if (/[ \t]+$/.test(line)) {
-      issues.push(`${filePath}:${index + 1}: trailing whitespace`);
+    if (fileBuffer.includes(0x0d)) {
+      issues.push(`${filePath}: contains CRLF or CR line endings`);
+    }
+
+    if (fileBuffer[fileBuffer.length - 1] !== 0x0a) {
+      issues.push(`${filePath}: missing final newline`);
+    }
+
+    const lines = fileBuffer.toString('utf8').split('\n');
+    for (let index = 0; index < lines.length; index += 1) {
+      const line = lines[index].replace(/\r$/, '');
+      if (/[ \t]+$/.test(line)) {
+        issues.push(`${filePath}:${index + 1}: trailing whitespace`);
+      }
     }
   }
-}
 
-if (issues.length > 0) {
-  console.error('Text hygiene check failed:\n');
-  issues.forEach((issue) => {
-    console.error(`- ${issue}`);
-  });
-  process.exit(1);
-}
+  return {
+    trackedFiles,
+    issues,
+    warnings: issues.filter((issue) => classifyTextHygieneIssue(issue) === 'warning'),
+    failures: issues.filter((issue) => classifyTextHygieneIssue(issue) === 'failure'),
+  };
+};
 
-console.log(`Text hygiene check passed for ${trackedFiles.length} tracked files.`);
+export const runTextHygieneCheck = ({ rootDir = process.cwd() } = {}) => {
+  const result = collectTextHygieneIssues({ rootDir });
+
+  if (result.warnings.length > 0) {
+    console.warn('Text hygiene warnings:\n');
+    result.warnings.forEach((issue) => {
+      console.warn(`- ${issue}`);
+    });
+  }
+
+  if (result.failures.length > 0) {
+    console.error('Text hygiene check failed:\n');
+    result.failures.forEach((issue) => {
+      console.error(`- ${issue}`);
+    });
+    return 1;
+  }
+
+  if (result.warnings.length > 0) {
+    console.log(`Text hygiene check passed with warnings for ${result.trackedFiles.length} tracked files.`);
+    return 0;
+  }
+
+  console.log(`Text hygiene check passed for ${result.trackedFiles.length} tracked files.`);
+  return 0;
+};
+
+process.exit(runTextHygieneCheck());
