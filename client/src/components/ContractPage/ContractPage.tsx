@@ -161,7 +161,7 @@ export const ContractPage = ({ activeSessionSlug, reduxActiveSessionSlug }: Cont
   });
   const photoAnalysisPromptDisplay = buildPhotoAnalysisPrompt('<SourceFilename>');
 
-  const promptItems = useMemo<PromptItem[]>(() => ([
+  const promptItems = useMemo(() => ([
     { id: 'seedGen', title: 'Question Generation', file: 'seedGenPrompt.js', content: seedGenPrompt },
     { id: 'questionSelection', title: 'Question Selection', file: 'questionSelectionPrompt.js', content: questionSelectionPrompt },
     { id: 'audioSummary', title: 'Audio Summary', file: 'audioSummaryPrompt.js', content: audioSummaryPrompt },
