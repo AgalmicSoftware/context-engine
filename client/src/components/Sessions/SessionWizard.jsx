@@ -27,6 +27,7 @@ import {
 } from '../../utilities/crypto/litPayerWallet.js';
 import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 import { arweaveScripts } from '../../utilities/arweave/arweaveScripts.js';
+import { resolvePublishArweaveUploadOptions } from '../../utilities/arweave/publishUploadAuth.js';
 import {
   hasSponsoredBundleFields,
   isSponsoredBundleExpired,
@@ -5973,33 +5974,28 @@ const SessionWizard = ({
         }
         const headerRequestId = `arw_header_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
         const baseUrl = normalizeWorkerAuthUrl(toStr(workerUrlOverride).trim()) || resolveWorkerBaseUrl();
+        const uploadAuthOptions = await buildSessionWizardPublishArweaveUploadOptions({
+          arweaveJwk,
+          workerUrl: baseUrl,
+          sessionSlug: metadata.slug,
+          authAccount,
+        });
         log.info('[arweave][ui] header upload start', {
           requestId: headerRequestId,
-          workerUrl: arweaveJwk ? null : baseUrl,
+          workerUrl: uploadAuthOptions.forceDirectArweaveUpload ? null : uploadAuthOptions.workerUrl || null,
           sessionSlug: metadata.slug || '',
           adminAddress: null,
-          hasJwk: !!arweaveJwk,
+          hasJwk: !!uploadAuthOptions.arweaveJwk,
           ts: new Date().toISOString(),
         });
         let headerTxId;
         try {
-          const auth = arweaveJwk ? null : await signBootstrapAdminAction({
-            statement: 'Admin request: bootstrap arweave upload',
-            targetSlug: metadata.slug,
-            workerUrl: baseUrl,
-            accountOverride: authAccount,
-          });
           headerTxId = await arweaveScripts.uploadDataToArweave(sessionHeaderFile, format, {
             sessionConfig: metadata,
             sessionSlug: metadata.slug || '',
             context: { account: authAccount, providerLike: provider, chainId: metadata.networkChainId || registryChainId },
             requestId: headerRequestId,
-            ...(arweaveJwk ? { forceDirectArweaveUpload: true } : {
-              workerUrl: baseUrl,
-              skipAuth: true,
-              adminAuth: auth,
-            }),
-            ...(arweaveJwk ? { arweaveJwk } : {}),
+            ...uploadAuthOptions,
           });
         } catch (err) {
           log.error('[arweave][ui] header upload error', {
@@ -6080,31 +6076,26 @@ const SessionWizard = ({
       }
       uploadRequestId = `arw_meta_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
       const baseUrl = normalizeWorkerAuthUrl(toStr(workerUrlOverride).trim()) || resolveWorkerBaseUrl();
+      const uploadAuthOptions = await buildSessionWizardPublishArweaveUploadOptions({
+        arweaveJwk,
+        workerUrl: baseUrl,
+        sessionSlug: draft.slug,
+        authAccount,
+      });
       log.info('[arweave][ui] metadata upload start', {
         requestId: uploadRequestId,
-        workerUrl: arweaveJwk ? null : baseUrl,
+        workerUrl: uploadAuthOptions.forceDirectArweaveUpload ? null : uploadAuthOptions.workerUrl || null,
         sessionSlug: draft.slug || '',
         adminAddress: null,
-        hasJwk: !!arweaveJwk,
+        hasJwk: !!uploadAuthOptions.arweaveJwk,
         ts: new Date().toISOString(),
-      });
-      const auth = arweaveJwk ? null : await signBootstrapAdminAction({
-        statement: 'Admin request: bootstrap arweave upload',
-        targetSlug: draft.slug,
-        workerUrl: baseUrl,
-        accountOverride: authAccount,
       });
       const txId = await arweaveScripts.uploadDataToArweave(metadata, 'json', {
         sessionConfig: draft,
         sessionSlug: draft.slug || '',
         context: { account: authAccount, providerLike: provider, chainId: draft.networkChainId || registryChainId },
         requestId: uploadRequestId,
-        ...(arweaveJwk ? { forceDirectArweaveUpload: true } : {
-          workerUrl: baseUrl,
-          skipAuth: true,
-          adminAuth: auth,
-        }),
-        ...(arweaveJwk ? { arweaveJwk } : {}),
+        ...uploadAuthOptions,
       });
       log.info('[arweave][ui] metadata upload success', {
         requestId: uploadRequestId,
@@ -6975,6 +6966,32 @@ const SessionWizard = ({
       },
     });
   };
+
+  const buildSessionWizardPublishArweaveUploadOptions = async ({
+    arweaveJwk = '',
+    workerUrl = '',
+    sessionSlug = '',
+    authAccount = '',
+  } = {}) => (
+    // Regression guard: keep session metadata/header uploads on the same
+    // sponsored-JWK path as deferred SBT finalization so /new publish does not
+    // fix only one Arweave leg and regress the next.
+    resolvePublishArweaveUploadOptions({
+      arweaveJwk,
+      workerUrl,
+      preferDirectArweaveUpload: !!toStr(arweaveJwk).trim(),
+      allowDirectFallbackOnBootstrapFailure: false,
+      requireAdminAuthWithoutJwk: true,
+      buildAdminAuth: ({ workerUrl: resolvedWorkerUrl }) => (
+        signBootstrapAdminAction({
+          statement: 'Admin request: bootstrap arweave upload',
+          targetSlug: sessionSlug,
+          workerUrl: resolvedWorkerUrl,
+          accountOverride: authAccount,
+        })
+      ),
+    })
+  );
 
   const signTypedAdminAction = async ({ action = 'set-config', body = {}, targetSlug, workerUrl, accountOverride = '' }) => {
     const baseUrl = normalizeWorkerUrl(workerUrl || resolveWorkerBaseUrl());
