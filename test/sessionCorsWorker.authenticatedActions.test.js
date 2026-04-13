@@ -235,7 +235,7 @@ describe('sessionCorsWorker authenticated fetch/faucet actions', () => {
     expect(payload?.error).toBe('Token missing fetch scope.');
   });
 
-  it('rejects request_test_eth when the token lacks faucet scope', async () => {
+  it('rejects third-party request_test_eth transfers when the token lacks faucet scope', async () => {
     const sessionSlug = 'faucet-no-scope';
     const env = createWorkerEnv({
       sessionSlug,
@@ -255,7 +255,7 @@ describe('sessionCorsWorker authenticated fetch/faucet actions', () => {
       makeActionRequest({
         token,
         sessionSlug,
-        body: { action: 'request_test_eth', address: wallet.address },
+        body: { action: 'request_test_eth', address: faucetWallet.address },
       }),
       env,
       {}

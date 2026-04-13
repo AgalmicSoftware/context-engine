@@ -1,4 +1,4 @@
-import { TypedDataEncoder, recoverAddress, verifyTypedData } from 'ethers';
+import * as ethersModule from 'ethers';
 
 import {
   buildAdminActionBodyHash as buildAdminActionBodyHashBoundary,
@@ -16,6 +16,75 @@ const toTrimmedString = (value) => (
       ? ''
       : String(value).trim()
 );
+
+const resolveEthersCompat = (loadedModule) => (
+  loadedModule?.ethers ||
+  loadedModule?.default?.ethers ||
+  loadedModule?.default ||
+  loadedModule ||
+  null
+);
+
+const ethers = resolveEthersCompat(ethersModule);
+
+const getEthersFn = (...candidates) => candidates.find((fn) => typeof fn === 'function') || null;
+
+const getEthersUtils = () => (
+  ethers?.utils ||
+  ethersModule?.utils ||
+  ethersModule?.ethers?.utils ||
+  ethersModule?.default?.utils ||
+  ethersModule?.default?.ethers?.utils ||
+  null
+);
+
+const getTypedDataEncoder = () => (
+  ethers?.TypedDataEncoder ||
+  ethersModule?.TypedDataEncoder ||
+  ethersModule?.ethers?.TypedDataEncoder ||
+  ethersModule?.default?.TypedDataEncoder ||
+  ethersModule?.default?.ethers?.TypedDataEncoder ||
+  getEthersUtils()?._TypedDataEncoder ||
+  null
+);
+
+const hashTypedData = (domain, types, message) => {
+  const encoder = getTypedDataEncoder();
+  if (typeof encoder?.hash !== 'function') {
+    throw new Error('TypedDataEncoder.hash unavailable.');
+  }
+  return encoder.hash(domain, types, message);
+};
+
+const recoverAddressCompat = (...args) => {
+  const recoverFn = getEthersFn(
+    getEthersUtils()?.recoverAddress,
+    ethers?.recoverAddress,
+    ethersModule?.recoverAddress,
+    ethersModule?.ethers?.recoverAddress,
+    ethersModule?.default?.recoverAddress,
+    ethersModule?.default?.ethers?.recoverAddress,
+  );
+  if (!recoverFn) {
+    throw new Error('recoverAddress unavailable.');
+  }
+  return recoverFn(...args);
+};
+
+const verifyTypedDataCompat = (...args) => {
+  const verifyFn = getEthersFn(
+    getEthersUtils()?.verifyTypedData,
+    ethers?.verifyTypedData,
+    ethersModule?.verifyTypedData,
+    ethersModule?.ethers?.verifyTypedData,
+    ethersModule?.default?.verifyTypedData,
+    ethersModule?.default?.ethers?.verifyTypedData,
+  );
+  if (!verifyFn) {
+    throw new Error('verifyTypedData unavailable.');
+  }
+  return verifyFn(...args);
+};
 
 const normalizeAddressLower = (value) => toTrimmedString(value).toLowerCase();
 
@@ -65,16 +134,16 @@ export const verifyAdminActionSignature = ({
         signature,
       );
     } else {
-      const digest = TypedDataEncoder.hash(
+      const digest = hashTypedData(
         typedData.domain,
         ADMIN_ACTION_TYPES,
         typedData.message,
       );
-      recovered = recoverAddress(digest, signature);
+      recovered = recoverAddressCompat(digest, signature);
     }
   } catch {
     try {
-      recovered = verifyTypedData(
+      recovered = verifyTypedDataCompat(
         typedData.domain,
         ADMIN_ACTION_TYPES,
         typedData.message,
