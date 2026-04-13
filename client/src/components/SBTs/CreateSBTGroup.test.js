@@ -510,8 +510,8 @@ describe('CreateSBTGroup cache helpers', () => {
       expect(opts.arweaveJwk).toBe('{"kty":"RSA"}');
       expect(opts.sessionSlug).toBe('local-test');
       expect(opts.skipAuth).toBe(true);
-      expect(opts.forceDirectArweaveUpload).toBeUndefined();
-      expect(opts.adminAuth).toBeUndefined();
+      expect(opts.forceDirectArweaveUpload).toBe(false);
+      expect(opts.adminAuth).toBeNull();
       return 'test-token-uri';
     });
 
@@ -523,6 +523,107 @@ describe('CreateSBTGroup cache helpers', () => {
     expect(instance.state.tokenURI).toBe('test-token-uri');
     uploadSpy.mockRestore();
     resourceSpy.mockRestore();
+  });
+
+  it('falls back to direct image upload when worker bootstrap auth fetch fails and a wizard JWK is available', async () => {
+    const signAdminAction = jest.fn(async () => {
+      throw new TypeError('Failed to fetch');
+    });
+    const instance = makeInstance({
+      account: '0xCreator',
+      loginComplete: true,
+      network: { id: 31337, name: 'Anvil' },
+      provider: 'mock-provider',
+      sessionSlug: '',
+      deferredDeploy: true,
+      arweaveJwkOverride: '{"kty":"RSA"}',
+      signAdminAction,
+    });
+    instance.getSessionConfigForNetwork = jest.fn(() => ({
+      slug: 'local-test',
+      networkChainId: 31337,
+      corsWorkerUrl: 'https://draft-upload.example.test',
+    }));
+    instance.state = {
+      ...instance.state,
+      useImageUrl: false,
+      sbtImageFile: new File([new Uint8Array([1, 2, 3])], 'badge.png', { type: 'image/png' }),
+      sbtDistribution: {
+        ...instance.state.sbtDistribution,
+        burnAuth: 'AdminOnly',
+        network: { name: 'Anvil' },
+      },
+    };
+
+    const uploadSpy = jest.spyOn(arweaveScripts, 'uploadDataToArweave').mockImplementation(async (_data, _format, opts = {}) => {
+      expect(opts.forceDirectArweaveUpload).toBe(true);
+      expect(opts.arweaveJwk).toBe('{"kty":"RSA"}');
+      expect(opts.skipAuth).toBe(true);
+      expect(opts.adminAuth).toBeNull();
+      return 'test-image-uri';
+    });
+
+    const result = await instance.uploadImageToArweave();
+
+    expect(signAdminAction).toHaveBeenCalledWith({
+      statement: 'Admin request: bootstrap arweave upload',
+      targetSlug: 'local-test',
+      workerUrl: 'https://draft-upload.example.test',
+    });
+    expect(result).toEqual(expect.objectContaining({
+      imageUploaded: true,
+      sbtImageUrl: 'test-image-uri',
+    }));
+    expect(instance.state.sbtImageUrl).toBe('test-image-uri');
+    uploadSpy.mockRestore();
+  });
+
+  it('falls back to direct tokenURI upload when worker bootstrap auth fetch fails and a wizard JWK is available', async () => {
+    const signAdminAction = jest.fn(async () => {
+      throw new TypeError('Failed to fetch');
+    });
+    const instance = makeInstance({
+      account: '0xCreator',
+      network: { id: 31337, name: 'Anvil' },
+      provider: 'mock-provider',
+      sessionSlug: '',
+      deferredDeploy: true,
+      arweaveJwkOverride: '{"kty":"RSA"}',
+      signAdminAction,
+    });
+    instance.getSessionConfigForNetwork = jest.fn(() => ({
+      slug: 'local-test',
+      networkChainId: 31337,
+      corsWorkerUrl: 'https://draft-upload.example.test',
+    }));
+    instance.state = {
+      ...instance.state,
+      sbtName: 'Local Draft',
+      sbtDescription: 'Uploads with fallback',
+      sbtDistribution: {
+        ...instance.state.sbtDistribution,
+        burnAuth: 'AdminOnly',
+        network: { name: 'Anvil' },
+      },
+    };
+
+    const uploadSpy = jest.spyOn(arweaveScripts, 'uploadDataToArweave').mockImplementation(async (_data, _format, opts = {}) => {
+      expect(opts.forceDirectArweaveUpload).toBe(true);
+      expect(opts.arweaveJwk).toBe('{"kty":"RSA"}');
+      expect(opts.skipAuth).toBe(true);
+      expect(opts.adminAuth).toBeNull();
+      return 'test-token-uri';
+    });
+
+    await instance.uploadTokenUriToArweave();
+
+    expect(signAdminAction).toHaveBeenCalledWith({
+      statement: 'Admin request: bootstrap arweave upload',
+      targetSlug: 'local-test',
+      workerUrl: 'https://draft-upload.example.test',
+    });
+    expect(instance.state.tokenURI).toBe('test-token-uri');
+    uploadSpy.mockRestore();
   });
 
   it('requires a session slug before deferred draft metadata uploads', async () => {
@@ -854,6 +955,9 @@ describe('CreateSBTGroup cache helpers', () => {
         providerLike: 'mock-provider',
         chainId: 31337,
       },
+      forceDirectArweaveUpload: false,
+      arweaveJwk: '{"kty":"RSA"}',
+      workerUrl: 'https://draft-upload.example.test',
       skipAuth: true,
       adminAuth: {
         address: '0xCreator',
@@ -899,7 +1003,10 @@ describe('CreateSBTGroup cache helpers', () => {
         providerLike: 'mock-provider',
         chainId: 31337,
       },
+      arweaveJwk: '{"kty":"RSA"}',
+      workerUrl: 'https://draft-upload.example.test',
       skipAuth: true,
+      adminAuth: null,
       forceDirectArweaveUpload: true,
     });
     expect(signAdminAction).not.toHaveBeenCalled();
