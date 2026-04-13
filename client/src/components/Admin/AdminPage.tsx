@@ -2118,8 +2118,8 @@ const AdminPage = ({
 	        } else {
 	          workerSyncSuffix = ' Worker config sync skipped (worker URL missing).';
 	        }
-      } catch (syncError: any) {
-        workerSyncSuffix = ` Worker config sync failed: ${getErrorMessage(syncError, 'unknown error')}`;
+      } catch (syncError) {
+        workerSyncSuffix = ` Worker config sync failed: ${syncError?.message || 'unknown error'}`;
       }
       setMetadataUpdateStatus(`${baseSuccessStatus}${workerSyncSuffix}`);
     } catch (err: any) {

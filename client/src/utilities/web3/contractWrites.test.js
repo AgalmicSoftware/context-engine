@@ -135,9 +135,6 @@ describe('contractWrites gas override fallbacks', () => {
       interface: {
         encodeFunctionData: jest.fn().mockReturnValue('0xdeadbeef'),
       },
-      callStatic: {
-        mintThing: jest.fn().mockRejectedValue(new Error('Max tokens reached')),
-      },
     };
 
     await expect(sendContractWriteViaProvider({
