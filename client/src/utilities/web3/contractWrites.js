@@ -22,6 +22,53 @@ const logBroadcastCallbackFailure = (method, error) => {
   );
 };
 
+const resolveReceiptRevertMessage = async ({
+  contract,
+  method,
+  args,
+  txOverrides,
+  from,
+  ethersProvider,
+  txParams,
+  receipt,
+  fallbackMessage,
+} = {}) => {
+  const staticCall = contract?.callStatic?.[method];
+  if (typeof staticCall === 'function') {
+    try {
+      await staticCall(...(Array.isArray(args) ? args : []), {
+        ...(txOverrides && typeof txOverrides === 'object' ? txOverrides : {}),
+        from,
+      });
+      return fallbackMessage;
+    } catch (error) {
+      const reason = extractEstimateErrorMessage(error).trim();
+      if (reason) {
+        return reason;
+      }
+    }
+  }
+
+  if (!ethersProvider || typeof ethersProvider.call !== 'function') {
+    return fallbackMessage;
+  }
+
+  const callTx = {
+    from: txParams?.from,
+    to: txParams?.to,
+    data: txParams?.data,
+    ...(txParams?.value != null ? { value: txParams.value } : {}),
+  };
+
+  try {
+    await ethersProvider.call(callTx, receipt?.blockNumber ?? 'latest');
+    return fallbackMessage;
+  } catch (error) {
+    const reason = extractEstimateErrorMessage(error).trim();
+    return reason || fallbackMessage;
+  }
+};
+
 const resolveTxGasOverrides = async ({
   contract,
   method,
@@ -154,7 +201,18 @@ const sendContractWriteViaProvider = async ({
 
   const receipt = await ethersProvider.waitForTransaction(txHash);
   if (!receipt || (receipt.status !== undefined && receipt.status !== 1)) {
-    throw new Error(revertMessage);
+    const resolvedRevertMessage = await resolveReceiptRevertMessage({
+      contract,
+      method,
+      args,
+      txOverrides,
+      from,
+      ethersProvider,
+      txParams,
+      receipt,
+      fallbackMessage: revertMessage,
+    });
+    throw new Error(resolvedRevertMessage);
   }
   return { txHash, receipt };
 };

@@ -36,6 +36,9 @@ describe('contractWrites gas override fallbacks', () => {
       interface: {
         encodeFunctionData: jest.fn().mockReturnValue('0xdeadbeef'),
       },
+      callStatic: {
+        mintThing: jest.fn().mockRejectedValue(new Error('Max tokens reached')),
+      },
     };
 
     const result = await sendContractWriteViaProvider({
@@ -113,6 +116,40 @@ describe('contractWrites gas override fallbacks', () => {
     expect(result).toEqual({
       txHash: '0xtxhash',
       receipt: { status: 1, transactionHash: '0xtxhash' },
+    });
+  });
+
+  it('surfaces the recovered revert reason when the on-chain receipt fails', async () => {
+    const signingProvider = {
+      request: jest.fn().mockResolvedValue('0xtxhash'),
+    };
+    const ethersProvider = {
+      waitForTransaction: jest.fn().mockResolvedValue({ status: 0, blockNumber: 123, transactionHash: '0xtxhash' }),
+      call: jest.fn().mockRejectedValue(new Error('Max tokens reached')),
+    };
+    const signer = {
+      getAddress: jest.fn().mockResolvedValue('0x00000000000000000000000000000000000000aa'),
+    };
+    const contract = {
+      address: '0x00000000000000000000000000000000000000bb',
+      interface: {
+        encodeFunctionData: jest.fn().mockReturnValue('0xdeadbeef'),
+      },
+    };
+
+    await expect(sendContractWriteViaProvider({
+      signingProvider,
+      ethersProvider,
+      signer,
+      contract,
+      method: 'mintThing',
+      args: ['value'],
+      revertMessage: 'mintThing transaction reverted on-chain.',
+    })).rejects.toThrow('Max tokens reached');
+
+    expect(ethersProvider.call).not.toHaveBeenCalled();
+    expect(contract.callStatic.mintThing).toHaveBeenCalledWith('value', {
+      from: '0x00000000000000000000000000000000000000aa',
     });
   });
 });

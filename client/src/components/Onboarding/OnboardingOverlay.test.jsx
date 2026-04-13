@@ -43,7 +43,7 @@ describe('OnboardingOverlay', () => {
 
     expect(screen.getByTestId('ce-onboarding-step-3')).toBeInTheDocument();
     expect(screen.getByText('Goals')).toBeInTheDocument();
-    expect(screen.getByText(/Creating open-source templates/i)).toBeInTheDocument();
+    expect(screen.getByText(/Open-source templates/i)).toBeInTheDocument();
   });
 
   it('marks onboarding complete when the final slide is accepted', async () => {
