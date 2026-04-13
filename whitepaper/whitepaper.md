@@ -174,6 +174,12 @@ Context Engine recognizes and builds on the pioneering work of those involved wi
 
 ## References
 
+Huang, S., Carter, S., Eaton, J., Pollack, S., Callender, D., III, Makagiansar, N., Gonzalez, M., Carr, S., Hong, J., Handa, K., McCain, M., Millar, T., Julapalli, M., Yun, G., Alt, A. J., Larsson, C., Leibrock, J., Gallivan, M., Sumers, T., Durmus, E., Kearney, M., Shen, J. H., Clark, J., Stern, M., & Ganguli, D. (2026, March 18). "What 81,000 People Want from AI." *Anthropic.* https://anthropic.com/features/81k-interviews
+
+Buterin, V. (2023, November 27). "My techno-optimism." *vitalik.eth.limo.* https://vitalik.eth.limo/general/2023/11/27/techno_optimism.html
+
+Buterin, V., Hitzig, Z., & Weyl, E. G. (2019). "A Flexible Design for Funding Public Goods." *Management Science*, 65(11), 5171–5187. https://doi.org/10.1287/mnsc.2019.3337
+
 0xPARC. (2023). "Programmable Cryptography (Part 1)." *0xPARC.* https://0xparc.org/writings/programmable-cryptography-1
 
 Computational Democracy Project. (n.d.). *Polis.* https://compdemocracy.org/polis/
