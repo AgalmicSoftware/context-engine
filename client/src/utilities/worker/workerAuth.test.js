@@ -420,6 +420,25 @@ describe('workerAuth bootstrap admin signing', () => {
     });
   });
 
+  it('normalizes bootstrap auth fetch reachability errors with an allowOrigins hint', async () => {
+    global.fetch = jest.fn(async () => {
+      throw new TypeError('Failed to fetch');
+    });
+
+    await expect(buildSignedBootstrapAdminAuth({
+      slug: 'edge',
+      workerUrl: 'https://worker.example/auth/login',
+      context: {
+        account: TEST_ADDRESS,
+        providerLike: 'wagmi',
+        chainId: 84532,
+      },
+      statement: 'Admin request: bootstrap arweave upload',
+    })).rejects.toThrow(
+      'Failed to reach worker auth endpoint (https://worker.example/auth/nonce). Check worker URL and allowOrigins includes http://localhost:3000.'
+    );
+  });
+
   it('fails cleanly without prompting wallet connect when no authorized account is available', async () => {
     const mockStore = require('../../store.js').default;
     mockStore.getState.mockReturnValue({

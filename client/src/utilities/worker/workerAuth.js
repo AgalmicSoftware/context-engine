@@ -357,6 +357,49 @@ const normalizeOrigin = (value) => {
   }
 };
 
+const WORKER_AUTH_FETCH_ERROR_PATTERNS = [
+  'failed to fetch',
+  'network request failed',
+  'networkerror',
+  'load failed',
+  'fetch failed',
+];
+
+const isWorkerAuthFetchReachabilityError = (error) => {
+  const message = toStr(error?.message || error).trim().toLowerCase();
+  if (!message || message.includes('failed to reach worker auth endpoint')) return false;
+  return WORKER_AUTH_FETCH_ERROR_PATTERNS.some((pattern) => message.includes(pattern));
+};
+
+const buildWorkerAuthReachabilityMessage = (endpoint) => {
+  const normalizedEndpoint = toStr(endpoint).trim();
+  const browserOrigin = (() => {
+    try {
+      if (typeof window !== 'undefined') return normalizeOrigin(window.location?.origin);
+    } catch (_) {}
+    return '';
+  })();
+  const allowOriginsHint = browserOrigin
+    ? ` Check worker URL and allowOrigins includes ${browserOrigin}.`
+    : '';
+  return `Failed to reach worker auth endpoint (${normalizedEndpoint}).${allowOriginsHint}`;
+};
+
+const normalizeWorkerAuthFetchError = (error, endpoint) => {
+  if (!isWorkerAuthFetchReachabilityError(error)) return error;
+  const normalized = new Error(buildWorkerAuthReachabilityMessage(endpoint));
+  try { normalized.cause = error; } catch (_) {}
+  return normalized;
+};
+
+const fetchWorkerAuthEndpoint = async (endpoint, init) => {
+  try {
+    return await fetch(endpoint, init);
+  } catch (error) {
+    throw normalizeWorkerAuthFetchError(error, endpoint);
+  }
+};
+
 const resolveAdminActionAudience = (workerUrl) => {
   const browserOrigin = (() => {
     try {
@@ -407,7 +450,8 @@ export const buildSignedAdminActionAuth = async ({
 
   let nonce = toStr(providedNonce).trim();
   if (!nonce) {
-    const nonceResp = await fetch(`${resolvedWorkerUrl}/auth/nonce`, {
+    const nonceEndpoint = `${resolvedWorkerUrl}/auth/nonce`;
+    const nonceResp = await fetchWorkerAuthEndpoint(nonceEndpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ address, sessionSlug: targetSlug, adminAction: true }),
@@ -490,7 +534,8 @@ export const buildSignedBootstrapAdminAuth = async ({
   const targetSlug = normalizeSessionSlug(slug);
   let nonce = toStr(providedNonce).trim();
   if (!nonce) {
-    const nonceResp = await fetch(`${resolvedWorkerUrl}/auth/nonce`, {
+    const nonceEndpoint = `${resolvedWorkerUrl}/auth/nonce`;
+    const nonceResp = await fetchWorkerAuthEndpoint(nonceEndpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ address, sessionSlug: targetSlug, adminAction: true }),
