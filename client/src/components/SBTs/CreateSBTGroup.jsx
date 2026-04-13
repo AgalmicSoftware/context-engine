@@ -22,6 +22,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { ethers } from 'ethers';
 import { arweaveScripts } from '../../utilities/arweave/arweaveScripts.js';
+import { resolvePublishArweaveUploadOptions, isPublishUploadBootstrapReachabilityError } from '../../utilities/arweave/publishUploadAuth.js';
 import { normalizeArweaveUrl, parseArweaveTxId } from '../../utilities/arweave/arweaveUrls.js';
 import contractScripts, { getSessionConfigBySlugOrDefault, normalizeSessionSlug } from '../../utilities/web3/contractScripts.js';
 import { getEffectiveArweaveKey } from '../../utilities/session/resourceKeys.js';
@@ -135,6 +136,7 @@ const shouldFallbackDeferredDraftUpload = (error) => {
   const message = toStr(error?.message || error).trim().toLowerCase();
   if (!message) return false;
   return (
+    isPublishUploadBootstrapReachabilityError(error) ||
     message.includes('worker url is missing') ||
     message.includes('connect a wallet to authenticate with the worker') ||
     message.includes('connect a wallet to sign admin requests') ||
@@ -1218,20 +1220,25 @@ class CreateSBTGroup extends Component {
   buildArweaveUploadRequestOptions = async () => {
     const baseOptions = this.getArweaveUploadRequestOptions();
     if (!this.shouldSkipArweaveWorkerAuth()) return baseOptions;
-    if (this.props.preferDirectArweaveUpload === true) {
-      return {
-        ...baseOptions,
-        forceDirectArweaveUpload: true,
-      };
-    }
     const workerUrl = this.getResolvedArweaveUploadWorkerUrl();
-    if (!workerUrl) return baseOptions;
+    const arweaveJwk = toStr(this.props.arweaveJwkOverride).trim();
 
-    // Regression guard: only attach bootstrap auth when we have a real worker
-    // to receive it. Workerless JWK uploads fall back to direct Arweave upload.
     return {
       ...baseOptions,
-      adminAuth: await this.getArweaveUploadBootstrapAuth({ workerUrl }),
+      // Regression guard: deferred /new publish should still finish when a
+      // just-deployed worker cannot serve bootstrap auth yet but the sponsored
+      // Arweave JWK is already available in wizard state.
+      ...(await resolvePublishArweaveUploadOptions({
+        arweaveJwk,
+        workerUrl,
+        preferDirectArweaveUpload: this.props.preferDirectArweaveUpload === true,
+        allowDirectFallbackOnBootstrapFailure: true,
+        requireAdminAuthWithoutJwk: false,
+        missingAdminAuthMessage: 'Arweave bootstrap signing is unavailable for this draft upload.',
+        buildAdminAuth: ({ workerUrl: resolvedWorkerUrl }) => this.getArweaveUploadBootstrapAuth({
+          workerUrl: resolvedWorkerUrl,
+        }),
+      })),
     };
   };
 
