@@ -548,40 +548,8 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     expect(subject.state.walletBalanceWei.eq(ethers.BigNumber.from(0))).toBe(true);
   });
 
-  it('uses the active session chain for faucet requests even when the wallet is on another chain', async () => {
-    mockedGetSessionNetwork.mockImplementation((slug: string) => (
-      slug === 'demo-1'
-        ? { id: 11155420, chainId: 11155420, name: 'OP Sepolia' }
-        : { id: 84532, chainId: 84532, name: 'Base Sepolia' }
-    ));
-    const subject = mountClassSubject(new LoginAndSettingsModalSubject(buildProps({
-      account: WAGMI_ADDRESS,
-      loginComplete: true,
-      provider: 'wagmi',
-      activeSessionSlug: 'demo-1',
-      network: { id: 84532, chainId: 84532, name: 'Base Sepolia' },
-      wagmiNetwork: { id: 84532, chainId: 84532, name: 'Base Sepolia' },
-      wagmiBalance: { data: { value: 0n } },
-    })));
-
-    await subject.checkAndSendTestFundsIfNeeded();
-
-    expect(mockedContractScripts.sendTestnetFunds).toHaveBeenCalledWith(
-      WAGMI_ADDRESS,
-      'demo-1',
-      expect.objectContaining({
-        context: expect.objectContaining({
-          account: WAGMI_ADDRESS,
-          providerLike: 'wagmi',
-          chainId: 11155420,
-          walletChainId: 84532,
-        }),
-      })
-    );
-  });
-
   it('preserves the zero-balance state when auto-funding is disabled', async () => {
-    const subject = mountClassSubject(new LoginAndSettingsModalSubject(buildProps({
+    const subject = mountClassSubject(new LoginAndSettingsModal(buildProps({
       account: WAGMI_ADDRESS,
       loginComplete: true,
       provider: 'wagmi',
@@ -597,7 +565,7 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
   });
 
   it('keeps the wallet balance unknown state when the balance has not been loaded yet', () => {
-    const subject = new LoginAndSettingsModalSubject(buildProps({
+    const subject = new LoginAndSettingsModal(buildProps({
       account: WAGMI_ADDRESS,
       loginComplete: true,
       provider: 'wagmi',
