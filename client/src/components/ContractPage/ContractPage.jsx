@@ -124,7 +124,7 @@ export const ContractPage = ({ activeSessionSlug, reduxActiveSessionSlug }) => {
   });
 
   const promptItems = useMemo(() => ([
-    { id: 'seedGen', title: 'Seed Generation', file: 'seedGenPrompt.js', content: seedGenPrompt },
+    { id: 'seedGen', title: 'Question Generation', file: 'seedGenPrompt.js', content: seedGenPrompt },
     { id: 'questionSelection', title: 'Question Selection', file: 'questionSelectionPrompt.js', content: questionSelectionPrompt },
     { id: 'audioSummary', title: 'Audio Summary', file: 'audioSummaryPrompt.js', content: audioSummaryPrompt },
     { id: 'compareToolkit', title: 'Compare Toolkit', file: 'compareToolkitPrompt.js', content: compareToolkitPromptDisplay },
