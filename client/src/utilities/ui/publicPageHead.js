@@ -1,20 +1,12 @@
 import { readPublicUrlBasePath } from './publicUrl.js';
-import { PUBLIC_REPO_URL } from '../../variables/publicRepoMetadata.js';
 
 export const DEFAULT_PUBLIC_PAGE_TITLE =
   'Context Engine | AI-Assisted Deliberation, Surveys, and SBT-Gated Access';
 
 export const DEFAULT_PUBLIC_PAGE_DESCRIPTION =
-  'Context Engine is a toolkit for AI-enhanced deliberation and sensemaking in large groups, with public and private participation, permanent records, and cryptographic access control.';
+  'Context Engine helps groups run structured surveys, AI-assisted analysis, and public or private participation workflows with durable records and optional SBT-gated encryption.';
 
 export const DEFAULT_PUBLIC_PAGE_IMAGE = 'https://contextengine.xyz/android-chrome-512x512.png';
-export const DEFAULT_PUBLIC_SITE_NAME = 'Context Engine';
-export const DEFAULT_PUBLIC_SITE_URL = 'https://contextengine.xyz/';
-
-const PUBLIC_ORGANIZATION_ID = `${DEFAULT_PUBLIC_SITE_URL}#organization`;
-const PUBLIC_WEBSITE_ID = `${DEFAULT_PUBLIC_SITE_URL}#website`;
-const STRUCTURED_DATA_SELECTOR =
-  'script[type="application/ld+json"][data-ce-structured-data="public-page"]';
 
 const toStr = (value) => String(value ?? '').trim();
 
@@ -32,12 +24,6 @@ const ensureHeadNode = (selector, tagName, attrs = {}) => {
 const setMetaContent = (selector, attrs, content) => {
   const node = ensureHeadNode(selector, 'meta', attrs);
   node.setAttribute('content', content);
-  return node;
-};
-
-const setStructuredDataContent = (selector, attrs, content) => {
-  const node = ensureHeadNode(selector, 'script', attrs);
-  node.textContent = content;
   return node;
 };
 
@@ -133,40 +119,6 @@ export const buildCanonicalPublicUrl = (
   return origin ? `${origin}${pathname}${search}` : `${pathname}${search}`;
 };
 
-const buildPublicPageStructuredData = ({
-  title = DEFAULT_PUBLIC_PAGE_TITLE,
-  description = DEFAULT_PUBLIC_PAGE_DESCRIPTION,
-  canonicalUrl = DEFAULT_PUBLIC_SITE_URL,
-} = {}) => ({
-  '@context': 'https://schema.org',
-  '@graph': [
-    {
-      '@type': 'Organization',
-      '@id': PUBLIC_ORGANIZATION_ID,
-      name: DEFAULT_PUBLIC_SITE_NAME,
-      url: DEFAULT_PUBLIC_SITE_URL,
-      sameAs: [PUBLIC_REPO_URL],
-    },
-    {
-      '@type': 'WebSite',
-      '@id': PUBLIC_WEBSITE_ID,
-      url: DEFAULT_PUBLIC_SITE_URL,
-      name: DEFAULT_PUBLIC_SITE_NAME,
-      description: DEFAULT_PUBLIC_PAGE_DESCRIPTION,
-      publisher: { '@id': PUBLIC_ORGANIZATION_ID },
-    },
-    {
-      '@type': 'WebPage',
-      '@id': `${canonicalUrl}#webpage`,
-      url: canonicalUrl,
-      name: title,
-      description,
-      isPartOf: { '@id': PUBLIC_WEBSITE_ID },
-      about: { '@id': PUBLIC_ORGANIZATION_ID },
-    },
-  ],
-});
-
 export const syncPublicPageHead = ({
   location = (typeof window !== 'undefined' ? window.location : undefined),
   title = DEFAULT_PUBLIC_PAGE_TITLE,
@@ -207,21 +159,6 @@ export const syncPublicPageHead = ({
     const canonicalNode = ensureHeadNode('link[rel="canonical"]', 'link', { rel: 'canonical' });
     canonicalNode.setAttribute('href', resolvedCanonicalUrl);
   }
-
-  setStructuredDataContent(
-    STRUCTURED_DATA_SELECTOR,
-    {
-      type: 'application/ld+json',
-      'data-ce-structured-data': 'public-page',
-    },
-    JSON.stringify(
-      buildPublicPageStructuredData({
-        title: resolvedTitle,
-        description: resolvedDescription,
-        canonicalUrl: resolvedCanonicalUrl || DEFAULT_PUBLIC_SITE_URL,
-      })
-    )
-  );
 
   return {
     title: resolvedTitle,

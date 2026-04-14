@@ -6,6 +6,7 @@ import store from '../store.js';
 import { SERVER } from '../variables/appConfig.js';
 import { installCeAgent } from '../utilities/ceAgent.js';
 import { createLogger } from '../utilities/logging';
+import { syncPublicPageHead } from '../utilities/ui/publicPageHead.js';
 import CEToaster from './Shared/CEToaster.jsx';
 
 import "assets/css/contextEngine.scss";
