@@ -1865,7 +1865,7 @@ describe('SessionWizard rendered validation', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Create Group' }));
 
-    expect(toggleLoginModal).toHaveBeenCalledWith(true);
+    expect(toggleLoginModal).toHaveBeenNthCalledWith(1, true);
     expect(screen.queryByTestId('mock-create-sbt-group')).not.toBeInTheDocument();
 
     view.rerender(
@@ -1877,6 +1877,9 @@ describe('SessionWizard rendered validation', () => {
       />
     );
 
+    await waitFor(() => {
+      expect(toggleLoginModal).toHaveBeenNthCalledWith(2, false);
+    });
     expect(await screen.findByTestId('mock-create-sbt-group')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Save pending SBT' }));
 
