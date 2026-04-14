@@ -23,9 +23,8 @@ const mockReadColdLoadOnboardingState = jest.fn((_storage?: Storage) => ({
 }));
 const mockStoreDispatch = jest.fn();
 const mockSyncPublicPageHead = jest.fn();
-const mockToaster = jest.fn((_props?: any) => null);
-let routeProps: any[] = [];
-let mockWalletConnectFallbackEnabled = false;
+const mockToaster = jest.fn(() => null);
+let routeProps = [];
 
 type WalletGroup = {
   wallets?: Array<{
@@ -178,22 +177,6 @@ describe('App wagmi auto-connect persistence', () => {
     sessionStorage.clear();
     window.history.replaceState({}, '', '/');
     routeProps = [];
-    mockWalletConnectFallbackEnabled = false;
-    mockConnectorsForWallets.mockReturnValue([]);
-    mockMetaMaskWalletCreateConnector.mockReturnValue({
-      connector: { id: 'walletConnect-fallback' },
-    });
-    mockMetaMaskWallet.mockImplementation(() => ({
-      id: 'metaMask',
-      name: 'MetaMask',
-      iconUrl: 'metamask-icon',
-      iconBackground: '#fff',
-      createConnector: mockMetaMaskWalletCreateConnector,
-    }));
-    mockMetaMaskConnector.mockImplementation((options: unknown) => ({
-      id: 'metaMask-injected',
-      options,
-    }));
     mockSyncPublicPageHead.mockReset();
     mockReadColdLoadOnboardingState.mockReturnValue({
       firstVisit: true,
