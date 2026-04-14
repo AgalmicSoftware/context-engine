@@ -6,6 +6,7 @@ import store from '../store.js';
 import { SERVER } from '../variables/appConfig.js';
 import { installCeAgent } from '../utilities/ceAgent.js';
 import { createLogger } from '../utilities/logging';
+import { syncPublicPageHead } from '../utilities/ui/publicPageHead.js';
 import CEToaster from './Shared/CEToaster.jsx';
 
 import "assets/css/contextEngine.scss";
@@ -110,6 +111,83 @@ const wagmiClient = createClient({
 var socket;
 var firstVisit;
 var _coldLoadSnapshot;
+const APP_HISTORY_SYNC_EVENT = 'ce:app-history-sync';
+let historySyncListenerCount = 0;
+let restoreHistorySyncBridge = null;
+let patchedPushState = null;
+let patchedReplaceState = null;
+
+const dispatchAppHistorySync = () => {
+  if (typeof window === 'undefined' || typeof window.dispatchEvent !== 'function') return;
+  window.dispatchEvent(new window.Event(APP_HISTORY_SYNC_EVENT));
+};
+
+const ensureHistorySyncBridge = () => {
+  if (typeof window === 'undefined' || !window.history || restoreHistorySyncBridge) return;
+
+  const originalPushState = window.history.pushState;
+  const originalReplaceState = window.history.replaceState;
+
+  patchedPushState = function patchedPushStateWrapper(...args) {
+    const result = originalPushState.apply(this, args);
+    dispatchAppHistorySync();
+    return result;
+  };
+
+  patchedReplaceState = function patchedReplaceStateWrapper(...args) {
+    const result = originalReplaceState.apply(this, args);
+    dispatchAppHistorySync();
+    return result;
+  };
+
+  window.history.pushState = patchedPushState;
+  window.history.replaceState = patchedReplaceState;
+  restoreHistorySyncBridge = () => {
+    if (window.history.pushState === patchedPushState) {
+      window.history.pushState = originalPushState;
+    }
+    if (window.history.replaceState === patchedReplaceState) {
+      window.history.replaceState = originalReplaceState;
+    }
+    patchedPushState = null;
+    patchedReplaceState = null;
+    restoreHistorySyncBridge = null;
+  };
+};
+
+const subscribeToHistorySync = (onChange) => {
+  if (typeof window === 'undefined' || typeof window.addEventListener !== 'function') {
+    return () => {};
+  }
+
+  ensureHistorySyncBridge();
+
+  const listener = () => {
+    try {
+      onChange();
+    } catch (e) {
+      log.warn('App: fallback', e);
+    }
+  };
+
+  historySyncListenerCount += 1;
+  window.addEventListener(APP_HISTORY_SYNC_EVENT, listener);
+  window.addEventListener('popstate', listener);
+
+  return () => {
+    window.removeEventListener(APP_HISTORY_SYNC_EVENT, listener);
+    window.removeEventListener('popstate', listener);
+    historySyncListenerCount = Math.max(0, historySyncListenerCount - 1);
+    if (historySyncListenerCount === 0) {
+      try {
+        restoreHistorySyncBridge?.();
+      } catch (e) {
+        log.warn('App: cleanup', e);
+      }
+    }
+  };
+};
+
 try {
   _coldLoadSnapshot = readColdLoadOnboardingState(window.localStorage);
   firstVisit = _coldLoadSnapshot.firstVisit;
@@ -129,6 +207,26 @@ class App extends React.Component {
     matchesAddress: "",
   };
 
+  _lastSyncedRouteHeadKey = null;
+
+  readRouteHeadKey = () => {
+    if (typeof window !== 'undefined' && window.location) {
+      return `${window.location.pathname || ''}${window.location.search || ''}`;
+    }
+    return `${this.props.location?.pathname || ''}${this.props.location?.search || ''}`;
+  };
+
+  syncRouteHead = () => {
+    try {
+      const nextKey = this.readRouteHeadKey();
+      if (nextKey === this._lastSyncedRouteHeadKey) return;
+      syncPublicPageHead();
+      this._lastSyncedRouteHeadKey = nextKey;
+    } catch (e) {
+      log.warn('App: fallback', e);
+    }
+  };
+
   componentDidMount() {
     document.body.classList.add("index-page");
     const { serverEndpoint } = this.state;
@@ -139,13 +237,28 @@ class App extends React.Component {
 
     // Dev/E2E-only agent interface (gated; no-op unless enabled).
     try { installCeAgent(); } catch (e) { log.warn('App: fallback', e); }
+    // React Router updates do not cover direct history.replaceState/pushState calls,
+    // so bridge the History API back into the same head-sync path.
+    this.unsubscribeHistorySync = subscribeToHistorySync(this.syncRouteHead);
+    this.syncRouteHead();
 
   }
 
-  componentDidUpdate() {
+  componentDidUpdate(prevProps) {
+    if (
+      prevProps.location?.pathname !== this.props.location?.pathname ||
+      prevProps.location?.search !== this.props.location?.search
+    ) {
+      this.syncRouteHead();
+    }
   }
 
   componentWillUnmount() {
+    try {
+      this.unsubscribeHistorySync?.();
+    } catch (e) {
+      log.warn('App: cleanup', e);
+    }
     document.body.classList.remove("index-page");
   }
 
