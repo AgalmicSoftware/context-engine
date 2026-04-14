@@ -30,3 +30,18 @@ test('client HTML shell leaves route-specific canonical metadata to runtime head
     /<link\s+rel="canonical"\s+href="https:\/\/contextengine\.xyz\/"\s*\/?>/
   );
 });
+
+test('client HTML shell seeds structured data with the public GitHub repository', () => {
+  const html = readText('client/public/index.html');
+
+  assert.match(html, /application\/ld\+json/);
+  assert.match(html, /"sameAs":\s*\["https:\/\/github\.com\/AgalmicSoftware\/context-engine"\]/);
+  assert.doesNotMatch(html, /"@type":\s*"WebPage"/);
+});
+
+test('client HTML shell description stays aligned with the README framing', () => {
+  const html = readText('client/public/index.html');
+
+  assert.match(html, /AI-enhanced deliberation and sensemaking in large groups/);
+  assert.match(html, /cryptographic access control/);
+});
