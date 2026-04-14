@@ -1411,6 +1411,7 @@ export default function PolisReport({
     setParticipantsGraphOpen(false);
     setAllQuestionsOpen(false);
     setStatsOpen(false);
+    setParticipantsListOpen(false);
 
     const newObj = {};
     Object.keys(activeRepQuestions || {}).forEach((c) => { newObj[c] = false; });
@@ -1422,6 +1423,7 @@ export default function PolisReport({
     setParticipantsGraphOpen(true);
     setAllQuestionsOpen(true);
     setStatsOpen(true);
+    setParticipantsListOpen(true);
 
     const newObj = {};
     Object.keys(activeRepQuestions || {}).forEach((c) => { newObj[c] = true; });
