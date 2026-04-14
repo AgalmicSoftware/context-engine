@@ -1,9 +1,11 @@
 import {
   DEFAULT_PUBLIC_PAGE_DESCRIPTION,
   DEFAULT_PUBLIC_PAGE_TITLE,
+  DEFAULT_PUBLIC_SITE_URL,
   buildCanonicalPublicUrl,
   syncPublicPageHead,
 } from './publicPageHead.js';
+import { PUBLIC_REPO_URL } from '../../variables/publicRepoMetadata.js';
 
 describe('publicPageHead', () => {
   beforeEach(() => {
@@ -125,10 +127,42 @@ describe('publicPageHead', () => {
     );
   });
 
+  it('publishes structured data with the GitHub repo in sameAs', () => {
+    syncPublicPageHead({
+      location: new URL('https://contextengine.xyz/about?ref=welcome'),
+    });
+
+    const structuredDataNode = document.head.querySelector(
+      'script[type="application/ld+json"][data-ce-structured-data="public-page"]'
+    );
+    expect(structuredDataNode).not.toBeNull();
+
+    const structuredData = JSON.parse(structuredDataNode?.textContent || '{}');
+    const graph = Array.isArray(structuredData['@graph']) ? structuredData['@graph'] : [];
+    const organization = graph.find((entry) => entry?.['@type'] === 'Organization');
+    const webPage = graph.find((entry) => entry?.['@type'] === 'WebPage');
+
+    expect(organization).toEqual(
+      expect.objectContaining({
+        '@id': `${DEFAULT_PUBLIC_SITE_URL}#organization`,
+        url: DEFAULT_PUBLIC_SITE_URL,
+        sameAs: [PUBLIC_REPO_URL],
+      })
+    );
+    expect(webPage).toEqual(
+      expect.objectContaining({
+        url: 'https://contextengine.xyz/about',
+        name: DEFAULT_PUBLIC_PAGE_TITLE,
+        description: DEFAULT_PUBLIC_PAGE_DESCRIPTION,
+      })
+    );
+  });
+
   it('updates existing head tags in place when the route changes', () => {
     document.head.innerHTML = `
       <link rel="canonical" href="https://contextengine.xyz/" />
       <meta property="og:url" content="https://contextengine.xyz/" />
+      <script type="application/ld+json" data-ce-structured-data="public-page">{}</script>
     `;
 
     syncPublicPageHead({
@@ -140,11 +174,23 @@ describe('publicPageHead', () => {
 
     expect(document.head.querySelectorAll('link[rel="canonical"]')).toHaveLength(1);
     expect(document.head.querySelectorAll('meta[property="og:url"]')).toHaveLength(1);
+    expect(
+      document.head.querySelectorAll(
+        'script[type="application/ld+json"][data-ce-structured-data="public-page"]'
+      )
+    ).toHaveLength(1);
     expect(document.head.querySelector('link[rel="canonical"]')?.getAttribute('href')).toBe(
       'https://contextengine.xyz/session/demo'
     );
     expect(document.head.querySelector('meta[property="og:url"]')?.getAttribute('content')).toBe(
       'https://contextengine.xyz/session/demo'
     );
+    const structuredData = JSON.parse(
+      document.head.querySelector(
+        'script[type="application/ld+json"][data-ce-structured-data="public-page"]'
+      )?.textContent || '{}'
+    );
+    const webPage = structuredData['@graph']?.find?.((entry) => entry?.['@type'] === 'WebPage');
+    expect(webPage?.url).toBe('https://contextengine.xyz/session/demo');
   });
 });
