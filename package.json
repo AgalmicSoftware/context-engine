@@ -11,7 +11,7 @@
   "bugs": {
     "url": "https://github.com/AgalmicSoftware/context-engine/issues"
   },
-  "homepage": "https://github.com/AgalmicSoftware/context-engine",
+  "homepage": "https://contextengine.xyz/",
   "private": true,
   "scripts": {
     "chain:start": "anvil --silent --port 8545 --chain-id 31337 --mnemonic \"test test test test test test test test test test test junk\"",

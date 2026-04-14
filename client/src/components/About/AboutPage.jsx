@@ -248,7 +248,7 @@ const AboutPage = () => {
               </a>
             </div>
             <p className={styles.tagline}>
-              An open-source toolkit for large-group deliberation and sensemaking. Built to help us navigate the AI transition.
+              An open-source toolkit for large-group deliberation, sensemaking, and negotiation 
             </p>
 
             <div className={styles.heroActions}>
