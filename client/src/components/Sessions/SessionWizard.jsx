@@ -4036,6 +4036,7 @@ const SessionWizard = ({
 
   useEffect(() => {
     if (!toStr(account).trim() || !pendingCreateSbtLaunch) return;
+    if (typeof toggleLoginModal === 'function') toggleLoginModal(false);
     openCreateSbtModal(pendingCreateSbtLaunch);
     setPendingCreateSbtLaunch(null);
   // eslint-disable-next-line react-hooks/exhaustive-deps
