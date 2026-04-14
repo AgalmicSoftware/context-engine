@@ -2,17 +2,17 @@
 
 ![License: CPAL-1.0](https://img.shields.io/badge/License-CPAL--1.0-blue.svg)
 
+Context Engine is an open-source toolkit for structured group deliberation, AI-assisted survey workflows, and access-controlled community infrastructure. It helps teams, researchers, public-interest projects, and online communities collect questions and responses, analyze patterns with AI, and publish durable records while supporting both open participation and gated or private flows.
+
+The project combines a React client, onchain session and SBT primitives, a Cloudflare Worker for auth and encryption support, and Arweave-backed content flows. In practice, that means you can create sessions, run surveys, gate access with soulbound group credentials, onboard users with passkeys, support sponsored bundles, and move from raw responses to summaries, clusters, and exports without stitching together a separate stack. It supports public and encrypted questions, AI-assisted generation and analysis, permanent storage, and no-code [Soulbound Token for Groups](https://www.radicalxchange.org/wiki/social-identity/) setup for use cases such as public discourse, organizational decision-making, and preference-oriented dataset creation. The public app is designed to reduce wallet friction so participants can contribute through familiar web UX while deployers retain stronger provenance, privacy, and access-control options when they need them.
+
+- Live site: [contextengine.xyz](https://contextengine.xyz)
+- Architecture: [ARCHITECTURE.md](ARCHITECTURE.md)
+- Changelog: [CHANGELOG.md](CHANGELOG.md)
+
 <p align="center">
   <img src="client/src/assets/img/readme-header.png" alt="Context Engine interface showing a survey card with Agree, Unsure, and Disagree options." />
 </p>
-
-**Live demo:** [contextengine.xyz](https://contextengine.xyz)
-
-
-Context Engine is a toolkit for AI-enhanced deliberation and sensemaking in large groups. It supports public and private questions and responses, AI-assisted input and analysis, permanent records, and cryptographic access control. It allows for no-code deployment of [Soulbound Tokens for Groups](https://www.radicalxchange.org/wiki/social-identity/). Designed for use cases such as public discourse, organizational decision-making, and preference-related dataset creation.
-
-
-
 
 ## Quick Start
 
@@ -107,4 +107,4 @@ This repo is intentionally multi-license. The main client/app OSS surface in `cl
 
 ## Roadmap
 
-Known limitations and future development directions live in [ROADMAP.md](ROADMAP.md).
+Known limitations and future development directions are listed in [ROADMAP.md](ROADMAP.md).
