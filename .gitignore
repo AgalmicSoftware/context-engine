@@ -96,10 +96,7 @@ broadcast/
 .DS_Store
 **/.DS_Store
 
-dist/*
-!dist/
-!dist/sessionCorsWorker.bundle.js
-!dist/deployHelper.bundle.js
+/dist/
 
 # Test/e2e artifacts
 /artifacts/*

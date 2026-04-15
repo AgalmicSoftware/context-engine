@@ -1,5 +1,5 @@
 import React from 'react';
-import { cleanup, render } from '@testing-library/react';
+import { act, cleanup, render } from '@testing-library/react';
 
 const mockCreateClient = jest.fn(() => ({}));
 const mockReadColdLoadOnboardingState = jest.fn(() => ({
@@ -7,6 +7,7 @@ const mockReadColdLoadOnboardingState = jest.fn(() => ({
   shouldStartOnboarding: false,
 }));
 const mockStoreDispatch = jest.fn();
+const mockSyncPublicPageHead = jest.fn();
 const mockToaster = jest.fn(() => null);
 let routeProps = [];
 
@@ -56,6 +57,9 @@ const mockAppDependencies = () => {
       warn: jest.fn(),
       error: jest.fn(),
     }),
+  }));
+  jest.doMock('../utilities/ui/publicPageHead.js', () => ({
+    syncPublicPageHead: mockSyncPublicPageHead,
   }));
 
   jest.doMock('./HooksHOC/withRouterBridge.jsx', () => ({
@@ -140,7 +144,9 @@ describe('App wagmi auto-connect persistence', () => {
     jest.clearAllMocks();
     localStorage.clear();
     sessionStorage.clear();
+    window.history.replaceState({}, '', '/');
     routeProps = [];
+    mockSyncPublicPageHead.mockReset();
     mockReadColdLoadOnboardingState.mockReturnValue({
       firstVisit: true,
       shouldStartOnboarding: false,
@@ -206,6 +212,71 @@ describe('App wagmi auto-connect persistence', () => {
         },
       })
     );
+  });
+
+  it('syncs the public page head on mount', () => {
+    const { default: App } = loadAppModule();
+    window.history.replaceState({}, '', '/session/demo?tab=overview');
+
+    render(
+      <App
+        params={{}}
+        location={{ search: '?tab=overview', pathname: '/session/demo' }}
+        navigate={jest.fn()}
+      />
+    );
+
+    expect(mockSyncPublicPageHead).toHaveBeenCalledTimes(1);
+    expect(mockSyncPublicPageHead).toHaveBeenCalledWith();
+  });
+
+  it('re-syncs the public page head when the route changes', () => {
+    const { default: App } = loadAppModule();
+    const navigate = jest.fn();
+    const { rerender } = render(
+      <App
+        params={{}}
+        location={{ search: '', pathname: '/' }}
+        navigate={navigate}
+      />
+    );
+
+    expect(mockSyncPublicPageHead).toHaveBeenCalledTimes(1);
+    act(() => {
+      window.history.replaceState({}, '', '/session/demo?view=results');
+    });
+
+    rerender(
+      <App
+        params={{}}
+        location={{ search: '?view=results', pathname: '/session/demo' }}
+        navigate={navigate}
+      />
+    );
+
+    expect(mockSyncPublicPageHead).toHaveBeenCalledTimes(2);
+    expect(mockSyncPublicPageHead).toHaveBeenLastCalledWith();
+  });
+
+  it('re-syncs the public page head after history.replaceState canonicalizes the URL', () => {
+    const { default: App } = loadAppModule();
+
+    render(
+      <App
+        params={{}}
+        location={{ search: '', pathname: '/' }}
+        navigate={jest.fn()}
+      />
+    );
+
+    expect(mockSyncPublicPageHead).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      window.history.replaceState({}, '', '/session/edge?session=edge');
+    });
+
+    expect(mockSyncPublicPageHead).toHaveBeenCalledTimes(2);
+    expect(mockSyncPublicPageHead).toHaveBeenLastCalledWith();
   });
 
   it('reuses the cold-load onboarding snapshot on mount', () => {
