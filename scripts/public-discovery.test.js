@@ -21,7 +21,7 @@ const readmeUrl =
 const architectureUrl =
   'https://raw.githubusercontent.com/AgalmicSoftware/context-engine/main/ARCHITECTURE.md';
 const whitepaperUrl =
-  'https://raw.githubusercontent.com/AgalmicSoftware/context-engine/main/whitepaper/whitepaper.md';
+  'https://raw.githubusercontent.com/AgalmicSoftware/context-engine/main/Whitepaper/whitepaper.md';
 const discoverabilityUrl = 'https://contextengine.xyz/discoverability.html';
 const llmsUrl = 'https://contextengine.xyz/llms.txt';
 const rawHtmlDiscoveryUrls = Object.freeze([
@@ -37,38 +37,8 @@ test('index.html exposes crawlable repo discovery links in raw HTML', () => {
   assert.match(indexHtml, /<noscript>/);
   assert.match(indexHtml, toUrlMatcher(repoUrl));
   assert.match(indexHtml, toUrlMatcher(repoSourceUrl));
-});
-
-test('index.html uses deployment-relative discovery asset links for the active PUBLIC_URL', () => {
-  assert.match(
-    indexHtml,
-    /<link rel="alternate" href="%PUBLIC_URL%\/discoverability\.html" title="Context Engine static summary" \/>/
-  );
-  assert.match(
-    indexHtml,
-    /<link rel="alternate" type="text\/plain" href="%PUBLIC_URL%\/llms\.txt" title="Context Engine llms\.txt" \/>/
-  );
-  assert.match(
-    indexHtml,
-    /<a href="%PUBLIC_URL%\/discoverability\.html">Context Engine static summary<\/a>/
-  );
-  assert.match(indexHtml, /<a href="%PUBLIC_URL%\/llms\.txt">Context Engine llms\.txt<\/a>/);
-  assert.doesNotMatch(
-    indexHtml,
-    /<link rel="alternate" href="https:\/\/contextengine\.xyz\/discoverability\.html"/
-  );
-  assert.doesNotMatch(
-    indexHtml,
-    /<link rel="alternate" type="text\/plain" href="https:\/\/contextengine\.xyz\/llms\.txt"/
-  );
-  assert.doesNotMatch(
-    indexHtml,
-    /<a href="https:\/\/contextengine\.xyz\/discoverability\.html">https:\/\/contextengine\.xyz\/discoverability\.html<\/a>/
-  );
-  assert.doesNotMatch(
-    indexHtml,
-    /<a href="https:\/\/contextengine\.xyz\/llms\.txt">https:\/\/contextengine\.xyz\/llms\.txt<\/a>/
-  );
+  assert.match(indexHtml, toUrlMatcher(discoverabilityUrl));
+  assert.match(indexHtml, toUrlMatcher(llmsUrl));
 });
 
 test('discoverability assets point to the latest GitHub branch documents', () => {

@@ -13,6 +13,7 @@
       name="description"
       content="Context Engine helps groups run structured surveys, AI-assisted analysis, and public or private participation workflows with durable records and optional SBT-gated encryption."
     />
+    <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1" />
     <meta property="og:type" content="website" />
     <meta
       property="og:title"
@@ -33,6 +34,38 @@
       content="Context Engine helps groups run structured surveys, AI-assisted analysis, and public or private participation workflows with durable records and optional SBT-gated encryption."
     />
     <meta name="twitter:image" content="https://contextengine.xyz/android-chrome-512x512.png" />
+    <link rel="alternate" href="https://contextengine.xyz/discoverability.html" title="Context Engine static summary" />
+    <link rel="alternate" type="text/plain" href="https://contextengine.xyz/llms.txt" title="Context Engine llms.txt" />
+    <script type="application/ld+json" data-ce-structured-data="public-page">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "Organization",
+            "@id": "https://contextengine.xyz/#organization",
+            "name": "Context Engine",
+            "url": "https://contextengine.xyz/",
+            "sameAs": ["https://github.com/AgalmicSoftware/context-engine"]
+          },
+          {
+            "@type": "WebSite",
+            "@id": "https://contextengine.xyz/#website",
+            "url": "https://contextengine.xyz/",
+            "name": "Context Engine",
+            "description": "Context Engine is a toolkit for AI-enhanced deliberation and sensemaking in large groups, with public and private participation, permanent records, and cryptographic access control.",
+            "publisher": { "@id": "https://contextengine.xyz/#organization" }
+          },
+          {
+            "@type": "SoftwareSourceCode",
+            "@id": "https://contextengine.xyz/#source",
+            "name": "Context Engine",
+            "description": "Context Engine is an open-source toolkit for AI-enhanced deliberation, surveys, SBT-gated access control, and permanent records.",
+            "codeRepository": "https://github.com/AgalmicSoftware/context-engine",
+            "url": "https://github.com/AgalmicSoftware/context-engine/tree/main"
+          }
+        ]
+      }
+    </script>
     <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
 
     <!--     Fonts and icons     -->
@@ -71,11 +104,11 @@
         </p>
         <p>
           Static summary page:
-          <a href="%PUBLIC_URL%/discoverability.html">Context Engine static summary</a>
+          <a href="https://contextengine.xyz/discoverability.html">https://contextengine.xyz/discoverability.html</a>
         </p>
         <p>
           LLM summary:
-          <a href="%PUBLIC_URL%/llms.txt">Context Engine llms.txt</a>
+          <a href="https://contextengine.xyz/llms.txt">https://contextengine.xyz/llms.txt</a>
         </p>
         <p>
           JavaScript is required to run the interactive app, but these links are
