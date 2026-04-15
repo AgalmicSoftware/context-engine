@@ -29,10 +29,6 @@ const INCLUDED_SPECIAL_FILES = new Set([
   '.gitignore',
 ]);
 
-const EXCLUDED_PATHS = new Set([
-  'dist/sessionCorsWorker.bundle.js',
-]);
-
 const WHITESPACE_ONLY_ISSUE_PATTERNS = Object.freeze([
   /: filename contains whitespace$/,
   /: contains CRLF or CR line endings$/,
@@ -41,10 +37,6 @@ const WHITESPACE_ONLY_ISSUE_PATTERNS = Object.freeze([
 ]);
 
 const isTrackedTextFile = (filePath) => {
-  if (EXCLUDED_PATHS.has(filePath)) {
-    return false;
-  }
-
   if (INCLUDED_SPECIAL_FILES.has(filePath)) {
     return true;
   }

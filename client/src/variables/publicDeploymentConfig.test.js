@@ -3,7 +3,6 @@ const ENV_KEYS = [
   'REACT_APP_CE_DEPLOY_HELPER_URL',
   'REACT_APP_CE_HEALTHCHECK_WORKER_URL',
   'REACT_APP_CE_WORKER_BUNDLE_URL',
-  'REACT_APP_CE_USE_LOCAL_WORKER_BUNDLE_FALLBACK',
   'REACT_APP_CE_DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED',
 ];
 
@@ -49,7 +48,6 @@ describe('publicDeploymentConfig', () => {
       expect(typeof config.DEPLOY_HELPER_URL).toBe('string');
       expect(typeof config.HEALTHCHECK_WORKER_URL).toBe('string');
       expect(typeof config.WORKER_BUNDLE_URL).toBe('string');
-      expect(typeof config.USE_LOCAL_WORKER_BUNDLE_FALLBACK).toBe('boolean');
       expect(typeof config.DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED).toBe('boolean');
     });
   });
@@ -81,7 +79,6 @@ describe('publicDeploymentConfig', () => {
     process.env.REACT_APP_CE_DEPLOY_HELPER_URL = 'https://deploy-helper.example.test';
     process.env.REACT_APP_CE_HEALTHCHECK_WORKER_URL = 'https://healthcheck.example.test/';
     process.env.REACT_APP_CE_WORKER_BUNDLE_URL = 'https://assets.example.com/sessionCorsWorker.bundle.js';
-    process.env.REACT_APP_CE_USE_LOCAL_WORKER_BUNDLE_FALLBACK = 'false';
     process.env.REACT_APP_CE_DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED = 'false';
 
     jest.isolateModules(() => {
@@ -91,7 +88,6 @@ describe('publicDeploymentConfig', () => {
       expect(config.DEPLOY_HELPER_URL).toBe(process.env.REACT_APP_CE_DEPLOY_HELPER_URL);
       expect(config.HEALTHCHECK_WORKER_URL).toBe(process.env.REACT_APP_CE_HEALTHCHECK_WORKER_URL);
       expect(config.WORKER_BUNDLE_URL).toBe(process.env.REACT_APP_CE_WORKER_BUNDLE_URL);
-      expect(config.USE_LOCAL_WORKER_BUNDLE_FALLBACK).toBe(false);
       expect(config.DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED).toBe(false);
     });
   });
