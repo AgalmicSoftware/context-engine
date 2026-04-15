@@ -28,27 +28,17 @@ const INCLUDED_SPECIAL_FILES = new Set([
   '.gitignore',
 ]);
 
-const EXCLUDED_PATHS = new Set([
-  'dist/sessionCorsWorker.bundle.js',
+const WHITESPACE_ONLY_ISSUE_PATTERNS = Object.freeze([
+  /: filename contains whitespace$/,
+  /: contains CRLF or CR line endings$/,
+  /: missing final newline$/,
+  /:\d+: trailing whitespace$/,
 ]);
 
-const trackedFilesBuffer = execFileSync('git', ['ls-files', '-z'], {
-  cwd: process.cwd(),
-  encoding: 'buffer',
-});
-
-const trackedFiles = trackedFilesBuffer
-  .toString('utf8')
-  .split('\0')
-  .filter(Boolean)
-  .filter((filePath) => {
-    if (EXCLUDED_PATHS.has(filePath)) {
-      return false;
-    }
-
-    if (INCLUDED_SPECIAL_FILES.has(filePath)) {
-      return true;
-    }
+const isTrackedTextFile = (filePath) => {
+  if (INCLUDED_SPECIAL_FILES.has(filePath)) {
+    return true;
+  }
 
     return [...INCLUDED_EXTENSIONS].some((extension) => filePath.endsWith(extension));
   });
