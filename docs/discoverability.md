@@ -6,15 +6,19 @@ and AI tools, plus the fastest post-deploy crawl steps.
 
 ## Static Crawl Assets
 
-- `client/public/index.html`
+- `client/index.html`
   - Includes root description/robots metadata, repo-linked JSON-LD seeded
     without route-specific canonical tags, and a `noscript` block with
     plain-text project summary plus direct links to the canonical GitHub repo,
     the live `main` branch source tree, `discoverability.html`, and `llms.txt`.
 - `client/public/discoverability.html`
   - Static HTML summary page with direct links to the live app, repo, latest
+    `main` branch source tree, README, AI agent bootstrap doc,
+    `contextEngine-cc` README, architecture, and whitepaper.
 - `client/public/llms.txt`
   - Plain-text summary for AI tools with the canonical repo plus latest-branch
+    document URLs, including the AI agent bootstrap doc and
+    `contextEngine-cc` README.
 - `client/public/robots.txt`
   - Allows crawling and points bots to the sitemap.
 - `client/public/sitemap.xml`
@@ -28,7 +32,7 @@ Current discovery source tree URL:
 
 If the default public branch changes, update:
 
-1. `client/public/index.html`
+1. `client/index.html`
 2. `client/public/discoverability.html`
 3. `client/public/llms.txt`
 4. `client/src/variables/publicRepoMetadata.js`
