@@ -6,19 +6,17 @@ and AI tools, plus the fastest post-deploy crawl steps.
 
 ## Static Crawl Assets
 
-- `client/index.html`
+- `client/public/index.html`
   - Includes root description/robots metadata, repo-linked JSON-LD seeded
     without route-specific canonical tags, and a `noscript` block with
     plain-text project summary plus direct links to the canonical GitHub repo,
     the live `main` branch source tree, `discoverability.html`, and `llms.txt`.
 - `client/public/discoverability.html`
   - Static HTML summary page with direct links to the live app, repo, latest
-    `main` branch source tree, README, AI agent bootstrap doc,
-    `contextEngine-cc` README, architecture, and whitepaper.
+    `main` branch source tree, README, architecture, and whitepaper.
 - `client/public/llms.txt`
   - Plain-text summary for AI tools with the canonical repo plus latest-branch
-    document URLs, including the AI agent bootstrap doc and
-    `contextEngine-cc` README.
+    document URLs.
 - `client/public/robots.txt`
   - Allows crawling and points bots to the sitemap.
 - `client/public/sitemap.xml`
@@ -32,7 +30,7 @@ Current discovery source tree URL:
 
 If the default public branch changes, update:
 
-1. `client/index.html`
+1. `client/public/index.html`
 2. `client/public/discoverability.html`
 3. `client/public/llms.txt`
 4. `client/src/variables/publicRepoMetadata.js`
@@ -59,18 +57,3 @@ Public crawlability helps web search and future discovery, but it does not force
 an immediate refresh of every AI cache. If a Claude Project GitHub integration
 is connected, use its manual sync control as well. When exact freshness matters,
 paste the live `main` branch link or the relevant raw document URL directly.
-
-## Runtime vs canonical URLs
-
-Canonical production-site discovery URLs stay fixed at:
-
-- `https://contextengine.xyz/discoverability.html`
-- `https://contextengine.xyz/llms.txt`
-
-Use those canonical URLs when an external reference explicitly needs to point at
-the production site.
-
-Deployment-relative discovery asset URLs are emitted by `syncPublicPageHead()`
-at runtime for the current deployment origin plus the configured `PUBLIC_URL`
-base path. On `https://contextengine.xyz/` they match the canonical URLs. On
-preview hosts or subpath deployments, they resolve to that deployment instead.

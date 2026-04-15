@@ -1,5 +1,10 @@
 import { readPublicUrlBasePath } from './publicUrl.js';
-import { PUBLIC_REPO_URL } from '../../variables/publicRepoMetadata.js';
+import {
+  PUBLIC_DISCOVERABILITY_URL,
+  PUBLIC_LLMS_URL,
+  PUBLIC_REPO_SOURCE_URL,
+  PUBLIC_REPO_URL,
+} from '../../variables/publicRepoMetadata.js';
 
 export const DEFAULT_PUBLIC_PAGE_TITLE =
   'Context Engine | AI-Assisted Deliberation, Surveys, and SBT-Gated Access';
@@ -12,6 +17,7 @@ export const DEFAULT_PUBLIC_SITE_NAME = 'Context Engine';
 export const DEFAULT_PUBLIC_SITE_URL = 'https://contextengine.xyz/';
 
 const PUBLIC_ORGANIZATION_ID = `${DEFAULT_PUBLIC_SITE_URL}#organization`;
+const PUBLIC_SOURCE_CODE_ID = `${DEFAULT_PUBLIC_SITE_URL}#source`;
 const PUBLIC_WEBSITE_ID = `${DEFAULT_PUBLIC_SITE_URL}#website`;
 const STRUCTURED_DATA_SELECTOR =
   'script[type="application/ld+json"][data-ce-structured-data="public-page"]';
@@ -156,6 +162,14 @@ const buildPublicPageStructuredData = ({
       publisher: { '@id': PUBLIC_ORGANIZATION_ID },
     },
     {
+      '@type': 'SoftwareSourceCode',
+      '@id': PUBLIC_SOURCE_CODE_ID,
+      name: DEFAULT_PUBLIC_SITE_NAME,
+      description: DEFAULT_PUBLIC_PAGE_DESCRIPTION,
+      codeRepository: PUBLIC_REPO_URL,
+      url: PUBLIC_REPO_SOURCE_URL,
+    },
+    {
       '@type': 'WebPage',
       '@id': `${canonicalUrl}#webpage`,
       url: canonicalUrl,
@@ -163,6 +177,12 @@ const buildPublicPageStructuredData = ({
       description,
       isPartOf: { '@id': PUBLIC_WEBSITE_ID },
       about: { '@id': PUBLIC_ORGANIZATION_ID },
+      significantLink: [
+        PUBLIC_REPO_URL,
+        PUBLIC_REPO_SOURCE_URL,
+        PUBLIC_DISCOVERABILITY_URL,
+        PUBLIC_LLMS_URL,
+      ],
     },
   ],
 });
