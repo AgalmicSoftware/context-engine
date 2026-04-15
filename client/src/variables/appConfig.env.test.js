@@ -25,7 +25,6 @@ const ENV_KEYS = [
   'REACT_APP_DEFAULT_CHAIN_ID',
   'REACT_APP_TESTNET_AUTO_SEND_THRESHOLD_ETH',
   'REACT_APP_CE_SHARED_WORKER_URL',
-  'REACT_APP_CE_USE_LOCAL_WORKER_BUNDLE_FALLBACK',
   'REACT_APP_CE_DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED',
 ];
 
@@ -133,7 +132,6 @@ describe('appConfig env-backed config', () => {
     process.env.REACT_APP_DEFAULT_CHAIN_ID = '31337';
     process.env.REACT_APP_TESTNET_AUTO_SEND_THRESHOLD_ETH = '0.005';
     process.env.REACT_APP_CE_SHARED_WORKER_URL = 'https://shared.example.test/';
-    process.env.REACT_APP_CE_USE_LOCAL_WORKER_BUNDLE_FALLBACK = 'false';
     process.env.REACT_APP_CE_DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED = 'false';
 
     jest.isolateModules(() => {
@@ -165,7 +163,6 @@ describe('appConfig env-backed config', () => {
       expect(config.DEFAULT_CHAIN_ID).toBe(31337);
       expect(config.TESTNET_AUTO_SEND_THRESHOLD_ETH).toBe('0.005');
       expect(config.CLOUDFLARE_CORS_WORKER_URL).toBe('https://shared.example.test/');
-      expect(config.CE_USE_LOCAL_WORKER_BUNDLE_FALLBACK).toBe(false);
       expect(config.CE_DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED).toBe(false);
     });
   });
