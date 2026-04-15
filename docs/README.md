@@ -60,6 +60,9 @@ E2E workflows:
 - `docs/e2e-setup.md`: End-to-end workflow scripts (gates Any/All, doc library filetype encryption/decryption).
 - `docs/e2e-testid-api.md`: Stable `data-testid` hooks used by Playwright runners (TestID API).
 
+Public discovery:
+- `docs/discoverability.md`: Static crawl assets, live GitHub branch links, and the Google Search Console checklist.
+
 ## Runtime Telemetry
 
 Opt-in diagnostics API (no production UI surface). Disabled unless explicitly enabled.

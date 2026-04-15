@@ -5,7 +5,12 @@ import {
   buildCanonicalPublicUrl,
   syncPublicPageHead,
 } from './publicPageHead.js';
-import { PUBLIC_REPO_URL } from '../../variables/publicRepoMetadata.js';
+import {
+  PUBLIC_DISCOVERABILITY_URL,
+  PUBLIC_LLMS_URL,
+  PUBLIC_REPO_SOURCE_URL,
+  PUBLIC_REPO_URL,
+} from '../../variables/publicRepoMetadata.js';
 
 describe('publicPageHead', () => {
   beforeEach(() => {
@@ -140,6 +145,7 @@ describe('publicPageHead', () => {
     const structuredData = JSON.parse(structuredDataNode?.textContent || '{}');
     const graph = Array.isArray(structuredData['@graph']) ? structuredData['@graph'] : [];
     const organization = graph.find((entry) => entry?.['@type'] === 'Organization');
+    const sourceCode = graph.find((entry) => entry?.['@type'] === 'SoftwareSourceCode');
     const webPage = graph.find((entry) => entry?.['@type'] === 'WebPage');
 
     expect(organization).toEqual(
@@ -149,11 +155,24 @@ describe('publicPageHead', () => {
         sameAs: [PUBLIC_REPO_URL],
       })
     );
+    expect(sourceCode).toEqual(
+      expect.objectContaining({
+        '@id': `${DEFAULT_PUBLIC_SITE_URL}#source`,
+        codeRepository: PUBLIC_REPO_URL,
+        url: PUBLIC_REPO_SOURCE_URL,
+      })
+    );
     expect(webPage).toEqual(
       expect.objectContaining({
         url: 'https://contextengine.xyz/about',
         name: DEFAULT_PUBLIC_PAGE_TITLE,
         description: DEFAULT_PUBLIC_PAGE_DESCRIPTION,
+        significantLink: [
+          PUBLIC_REPO_URL,
+          PUBLIC_REPO_SOURCE_URL,
+          PUBLIC_DISCOVERABILITY_URL,
+          PUBLIC_LLMS_URL,
+        ],
       })
     );
   });
