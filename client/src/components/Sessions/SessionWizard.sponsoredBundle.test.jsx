@@ -149,17 +149,15 @@ import SessionWizard, {
   __test__resetSessionWizardSponsoredBundleCacheKey,
   buildSessionWizardPublishPlan,
   buildSessionWizardPublishStepNumbers,
-  LOCAL_WORKER_BUNDLE_FALLBACK_ASSET_URL,
   mergeSponsoredBundleDeployForm,
+  resolveSessionWizardBundleUrlForMode,
   mergeSponsoredBundleWorkerSecrets,
   resolveSponsoredBundleDeployReadiness,
+  resolveSessionWizardSponsoredAutoDeployReadiness,
   resolveSessionWizardDeployBundleMode,
   resolveSessionWizardDeployBundlePayload,
-  resolveSessionWizardShouldPreferLocalBundledAsset,
   resolveSessionWizardShouldAutoDeployWorker,
-  loadSessionWizardLocalBundledAssetText,
   shouldForceSessionWizardNormalModeManualBundleRetry,
-  shouldForceSessionWizardManualBundleRetry,
 } from './SessionWizard.jsx';
 import { SPONSORED_BOOTSTRAP_FUNDING_CONTEXT_KEY } from '../../utilities/session/sponsoredBootstrapFunding.js';
 import {
@@ -714,6 +712,24 @@ describe('SessionWizard sponsored bundle flow', () => {
       bundleMode: 'url',
       sponsoredAutoDeployReady: false,
       forceManualBundleFile: true,
+      hasBundleFile: false,
+    })).toBe('url');
+
+    expect(resolveSessionWizardDeployBundleMode({
+      wizardMode: 'normal',
+      bundleMode: 'url',
+      sponsoredAutoDeployReady: true,
+      forceSponsoredAutoDeploy: true,
+      forceManualBundleFile: true,
+      hasBundleFile: false,
+    })).toBe('url');
+
+    expect(resolveSessionWizardDeployBundleMode({
+      wizardMode: 'normal',
+      bundleMode: 'url',
+      sponsoredAutoDeployReady: false,
+      forceManualBundleFile: true,
+      hasBundleFile: true,
     })).toBe('upload');
 
     expect(resolveSessionWizardDeployBundleMode({
@@ -722,7 +738,26 @@ describe('SessionWizard sponsored bundle flow', () => {
       sponsoredAutoDeployReady: true,
       forceSponsoredAutoDeploy: true,
       forceManualBundleFile: true,
+      hasBundleFile: true,
+    })).toBe('upload');
+
+    expect(resolveSessionWizardDeployBundleMode({
+      wizardMode: 'normal',
+      bundleMode: 'upload',
+      bundleUrl: '',
+      sponsoredAutoDeployReady: false,
+      normalModeBundleUrlOverride: 'https://assets.example.test/manual-sessionCorsWorker.bundle.js',
+      normalModeDefaultBundleUrl: '',
     })).toBe('url');
+
+    expect(resolveSessionWizardDeployBundleMode({
+      wizardMode: 'normal',
+      bundleMode: 'upload',
+      bundleUrl: '',
+      sponsoredAutoDeployReady: false,
+      hasBundleFile: true,
+      normalModeDefaultBundleUrl: '',
+    })).toBe('upload');
   });
 
   it('offers manual normal-mode bundle retry after a release-asset fetch failure', () => {
@@ -755,153 +790,175 @@ describe('SessionWizard sponsored bundle flow', () => {
       effectiveBundleMode: 'url',
       hasBundleFile: false,
     })).toBe(false);
-  });
 
-  it('only prefers the local bundled worker asset for normal-mode sponsored auto-deploys when the fallback switch is enabled', () => {
-    expect(resolveSessionWizardShouldPreferLocalBundledAsset({
+    expect(shouldForceSessionWizardNormalModeManualBundleRetry({
+      err: {
+        message: 'Worker deploy failed.',
+        responseError: 'The uploaded script has no registered event handlers.',
+        responseBundleDiagnostics: {
+          source: 'remote-url',
+          length: 216,
+          hasAnyExport: true,
+          hasExportDefault: false,
+          hasNamedDefaultExport: false,
+          hasFetchHandler: false,
+          hasServiceWorkerFetch: false,
+        },
+      },
       wizardMode: 'normal',
       effectiveBundleMode: 'url',
-      sponsoredAutoDeployReady: true,
-      forceSponsoredAutoDeploy: false,
-      useLocalFallback: true,
+      hasBundleFile: false,
     })).toBe(true);
 
-    expect(resolveSessionWizardShouldPreferLocalBundledAsset({
-      wizardMode: 'advanced',
-      effectiveBundleMode: 'url',
-      sponsoredAutoDeployReady: true,
-      forceSponsoredAutoDeploy: false,
-      useLocalFallback: true,
-    })).toBe(false);
-
-    expect(resolveSessionWizardShouldPreferLocalBundledAsset({
+    expect(shouldForceSessionWizardNormalModeManualBundleRetry({
+      err: {
+        message: 'Worker deploy failed.',
+        responseError: 'The uploaded script has no registered event handlers.',
+      },
       wizardMode: 'normal',
       effectiveBundleMode: 'url',
-      sponsoredAutoDeployReady: true,
-      forceSponsoredAutoDeploy: false,
-      useLocalFallback: false,
+      hasBundleFile: false,
     })).toBe(false);
   });
 
-  it('falls back to the local bundled worker asset for sponsored auto-deploys when the release URL is not ready', async () => {
-    const fetchImpl = jest.fn(async () => ({
-      ok: true,
-      text: async () => 'export default { fetch() { return new Response("ok"); } };',
-    }));
+  it('keeps the shared sponsored auto-deploy readiness helper override-aware when the default hosted bundle URL is blank', () => {
+    const workerAuth = require('../../utilities/worker/workerAuth.js');
+    const originalNormalizeWorkerUrl = workerAuth.normalizeWorkerUrl.getMockImplementation();
+    workerAuth.normalizeWorkerUrl.mockImplementation((value = '') => String(value || '').trim());
+
+    try {
+      const baseArgs = {
+        wizardMode: 'normal',
+        sponsoredBundle: buildDecryptedSponsoredBundle({
+          deployGrantToken: 'deploy-grant-token',
+        }),
+        deployForm: {
+          workerName: 'launch-week-worker',
+          bundleUrl: '',
+        },
+        workerSecretsEnabled: true,
+        currentWorkerSecrets: {
+          openaiKey: 'sponsored-openai',
+          arweaveJwk: '{"kty":"RSA"}',
+        },
+        getMissingWorkerSecretsForDeploy: () => [],
+        normalModeDefaultBundleUrl: '',
+      };
+
+      expect(resolveSessionWizardSponsoredAutoDeployReadiness({
+        ...baseArgs,
+        normalModeBundleUrlOverride: 'https://assets.example.test/sessionCorsWorker.bundle.js',
+      })).toEqual(expect.objectContaining({
+        active: true,
+        ready: true,
+        missing: [],
+      }));
+
+      expect(resolveSessionWizardSponsoredAutoDeployReadiness(baseArgs)).toEqual(expect.objectContaining({
+        active: true,
+        ready: false,
+        missing: ['Worker bundle URL'],
+      }));
+    } finally {
+      workerAuth.normalizeWorkerUrl.mockImplementation(originalNormalizeWorkerUrl || defaultNormalizeWorkerUrl);
+    }
+  });
+
+  it('treats a selected bundle file as satisfying sponsored auto-deploy readiness when the normal-mode hosted bundle URL is blank', () => {
+    const workerAuth = require('../../utilities/worker/workerAuth.js');
+    const originalNormalizeWorkerUrl = workerAuth.normalizeWorkerUrl.getMockImplementation();
+    workerAuth.normalizeWorkerUrl.mockImplementation((value = '') => String(value || '').trim());
+
+    try {
+      expect(resolveSessionWizardSponsoredAutoDeployReadiness({
+        wizardMode: 'normal',
+        sponsoredBundle: buildDecryptedSponsoredBundle({
+          deployGrantToken: 'deploy-grant-token',
+        }),
+        deployForm: {
+          workerName: 'launch-week-worker',
+          bundleUrl: '',
+        },
+        workerSecretsEnabled: true,
+        currentWorkerSecrets: {
+          openaiKey: 'sponsored-openai',
+          arweaveJwk: '{"kty":"RSA"}',
+        },
+        getMissingWorkerSecretsForDeploy: () => [],
+        hasBundleFile: true,
+        normalModeDefaultBundleUrl: '',
+      })).toEqual(expect.objectContaining({
+        active: true,
+        ready: true,
+        missing: [],
+      }));
+    } finally {
+      workerAuth.normalizeWorkerUrl.mockImplementation(originalNormalizeWorkerUrl || defaultNormalizeWorkerUrl);
+    }
+  });
+
+  it('drops stale advanced-mode bundle URLs from normal-mode deploy payload resolution when the hosted default is blank', async () => {
+    const staleAdvancedBundleUrl = 'https://assets.example.test/stale-advanced-sessionCorsWorker.bundle.js';
+    const normalModeOverrideUrl = 'https://assets.example.test/manual-normal-sessionCorsWorker.bundle.js';
+
+    expect(resolveSessionWizardBundleUrlForMode({
+      wizardMode: 'advanced',
+      bundleUrl: staleAdvancedBundleUrl,
+      normalModeDefaultBundleUrl: '',
+    })).toBe(staleAdvancedBundleUrl);
+
+    expect(resolveSessionWizardBundleUrlForMode({
+      wizardMode: 'normal',
+      bundleUrl: staleAdvancedBundleUrl,
+      normalModeDefaultBundleUrl: '',
+    })).toBe('');
 
     await expect(resolveSessionWizardDeployBundlePayload({
       effectiveBundleMode: 'url',
-      bundleUrl: 'https://github.com/example/repo/releases/latest/download/sessionCorsWorker.bundle.js',
-      shouldPreferLocalBundledAsset: true,
-      localBundledAssetUrl: LOCAL_WORKER_BUNDLE_FALLBACK_ASSET_URL,
-      fetchImpl,
+      bundleUrl: resolveSessionWizardBundleUrlForMode({
+        wizardMode: 'normal',
+        bundleUrl: staleAdvancedBundleUrl,
+        normalModeDefaultBundleUrl: '',
+      }),
     })).resolves.toEqual({
-      bundleText: 'export default { fetch() { return new Response("ok"); } };',
+      bundleText: '',
       bundleUrl: undefined,
-      bundleSource: 'local-asset',
+      bundleSource: 'url-missing',
     });
-    expect(fetchImpl).toHaveBeenCalledWith(LOCAL_WORKER_BUNDLE_FALLBACK_ASSET_URL, { cache: 'no-store' });
+
+    expect(resolveSessionWizardBundleUrlForMode({
+      wizardMode: 'normal',
+      bundleUrl: staleAdvancedBundleUrl,
+      normalModeBundleUrlOverride: normalModeOverrideUrl,
+      normalModeDefaultBundleUrl: '',
+    })).toBe(normalModeOverrideUrl);
   });
 
-  it('uses a manually selected fallback file when the local bundled asset cannot be read', async () => {
-    const fetchImpl = jest.fn(async () => ({
-      ok: false,
-      status: 404,
-      text: async () => '',
-    }));
+  it('keeps sponsored auto-deploys on the hosted release URL until a manual retry is required', async () => {
+    await expect(resolveSessionWizardDeployBundlePayload({
+      effectiveBundleMode: 'url',
+      bundleUrl: 'https://github.com/example/repo/releases/latest/download/sessionCorsWorker.bundle.js',
+    })).resolves.toEqual({
+      bundleText: '',
+      bundleUrl: 'https://github.com/example/repo/releases/latest/download/sessionCorsWorker.bundle.js',
+      bundleSource: 'url',
+    });
+  });
+
+  it('uses a manually selected fallback file after a hosted bundle fetch failure', async () => {
     const fallbackFile = {
       name: 'sessionCorsWorker.bundle.js',
       text: async () => 'export default { fetch() { return new Response("manual"); } };',
     };
 
     await expect(resolveSessionWizardDeployBundlePayload({
-      effectiveBundleMode: 'url',
+      effectiveBundleMode: 'upload',
       bundleFile: fallbackFile,
-      bundleUrl: 'https://github.com/example/repo/releases/latest/download/sessionCorsWorker.bundle.js',
-      shouldPreferLocalBundledAsset: true,
-      localBundledAssetUrl: LOCAL_WORKER_BUNDLE_FALLBACK_ASSET_URL,
-      fetchImpl,
     })).resolves.toEqual({
       bundleText: 'export default { fetch() { return new Response("manual"); } };',
       bundleUrl: undefined,
-      bundleSource: 'manual-file',
+      bundleSource: 'upload',
     });
-  });
-
-  it('stops the sponsored auto-deploy path from silently falling back to the hosted bundle URL when the local asset is unavailable', async () => {
-    const fetchImpl = jest.fn(async () => ({
-      ok: false,
-      status: 404,
-      text: async () => '',
-    }));
-
-    await expect(resolveSessionWizardDeployBundlePayload({
-      effectiveBundleMode: 'url',
-      bundleUrl: 'https://github.com/example/repo/releases/latest/download/sessionCorsWorker.bundle.js',
-      shouldPreferLocalBundledAsset: true,
-      localBundledAssetUrl: LOCAL_WORKER_BUNDLE_FALLBACK_ASSET_URL,
-      fetchImpl,
-    })).rejects.toThrow('/dist/sessionCorsWorker.bundle.js');
-  });
-
-  it('rejects plain-text fallback responses that are not actual worker bundles', async () => {
-    const fetchImpl = jest.fn(async () => ({
-      ok: true,
-      status: 200,
-      text: async () => 'Not Found',
-      headers: { get: jest.fn(() => 'text/plain') },
-    }));
-
-    await expect(resolveSessionWizardDeployBundlePayload({
-      effectiveBundleMode: 'url',
-      bundleUrl: 'https://github.com/example/repo/releases/latest/download/sessionCorsWorker.bundle.js',
-      shouldPreferLocalBundledAsset: true,
-      localBundledAssetUrl: LOCAL_WORKER_BUNDLE_FALLBACK_ASSET_URL,
-      fetchImpl,
-    })).rejects.toThrow('invalid content');
-  });
-
-  it('rejects webpack-style string wrapper assets instead of treating them as raw worker bytes', async () => {
-    const fetchImpl = jest.fn(async () => ({
-      ok: true,
-      status: 200,
-      text: async () => 'export default "var __create = Object.create;\\nexport default { fetch() {} };"',
-      headers: { get: jest.fn(() => 'application/javascript') },
-    }));
-
-    await expect(loadSessionWizardLocalBundledAssetText({
-      localBundledAssetUrl: LOCAL_WORKER_BUNDLE_FALLBACK_ASSET_URL,
-      fetchImpl,
-    })).rejects.toThrow('string wrapper');
-  });
-
-  it('switches normal-mode sponsored publish into manual bundle retry after the Cloudflare missing-handlers error', () => {
-    expect(shouldForceSessionWizardManualBundleRetry({
-      err: {
-        message: 'The uploaded script has no registered event handlers.',
-      },
-      forceSponsoredAutoDeploy: true,
-      shouldPreferLocalBundledAsset: true,
-      hasBundleFile: false,
-    })).toBe(true);
-
-    expect(shouldForceSessionWizardManualBundleRetry({
-      err: {
-        message: 'The uploaded script has no registered event handlers.',
-      },
-      forceSponsoredAutoDeploy: true,
-      shouldPreferLocalBundledAsset: true,
-      hasBundleFile: true,
-    })).toBe(false);
-
-    expect(shouldForceSessionWizardManualBundleRetry({
-      err: {
-        message: 'Worker deploy failed.',
-      },
-      forceSponsoredAutoDeploy: true,
-      shouldPreferLocalBundledAsset: true,
-      hasBundleFile: false,
-    })).toBe(false);
   });
 
   it('only auto-deploys on publish for ready custom-worker sponsored flows that are not already deployed', () => {

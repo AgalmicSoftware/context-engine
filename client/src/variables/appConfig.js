@@ -1,4 +1,18 @@
-import { initializeRuntimeConfig } from '../utilities/session/runtimeConfig';
+//  this file: GLOBAL VARIABLE(S) and settings USED BY FRONT-END
+//  contains: env-backed deploy/runtime config plus semantic UI constants
+import {
+  readPublicBoolEnv,
+  readPublicEnv,
+  readPublicIntEnv,
+  readPublicListEnv,
+} from './publicEnv.js';
+import {
+  DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED,
+  DEFAULT_SHARED_WORKER_URL,
+  DEPLOY_HELPER_URL,
+  HEALTHCHECK_WORKER_URL,
+  WORKER_BUNDLE_URL,
+} from './publicDeploymentConfig.js';
 
 export * from './appConfig.ts';
 
@@ -316,7 +330,6 @@ export const CLOUDFLARE_CORS_WORKER_URL = readPublicEnv(
 export const CLOUDFLARE_DEPLOY_HELPER_URL = DEPLOY_HELPER_URL;
 export const CLOUDFLARE_HEALTHCHECK_WORKER_URL = HEALTHCHECK_WORKER_URL;
 export const CLOUDFLARE_WORKER_BUNDLE_URL = WORKER_BUNDLE_URL;
-export const CE_USE_LOCAL_WORKER_BUNDLE_FALLBACK = USE_LOCAL_WORKER_BUNDLE_FALLBACK;
 export const CE_DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED = DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED;
 // WALLECT CONNECT PROJECT ID (ReOwn - needed if upgrading rainbowkit / wagmi)
 // export const WALLETCONNECT_PROJECT_ID = "13b8465ab2e356ef5cf655f6a9061738";

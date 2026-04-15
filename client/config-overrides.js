@@ -6,6 +6,14 @@ const path = require('path');
 const webpack = require('webpack');
 const CopyPlugin = require('copy-webpack-plugin');
 
+const getStaticCopyPatterns = () => ([
+  {
+    from: path.resolve(__dirname, 'src', 'assets/img'),
+    to: path.resolve(__dirname, 'build', 'images'),
+    filter: async () => true,
+  },
+]);
+
 const override = function override(config, env) {
   const noMinify = process.env.NO_MINIFY === 'true';
   // allow importing from outside of app/src folder
@@ -60,19 +68,7 @@ const override = function override(config, env) {
 
   config.plugins.push(
     new CopyPlugin({
-      patterns: [
-        {
-          from: path.resolve(__dirname, 'src', 'assets/img'),
-          to: path.resolve(__dirname, 'build', 'images'),
-          filter: async () => true,
-        },
-        {
-          // Serve the known-good dist bundle as a raw static asset so the
-          // wizard can fetch exact worker bytes without webpack loader wrappers.
-          from: path.resolve(__dirname, '..', 'dist', 'sessionCorsWorker.bundle.js'),
-          to: 'worker/sessionCorsWorker.bundle.js',
-        },
-      ],
+      patterns: getStaticCopyPatterns(),
       options: { concurrency: 100 },
     }),
     new webpack.ProvidePlugin({
@@ -301,6 +297,7 @@ override.jest = (config) => {
 };
 
 module.exports = override;
+module.exports.getStaticCopyPatterns = getStaticCopyPatterns;
 
 // --- Dev server headers to allow Web3Auth/Google popup handshake ---
 // Keeps window.opener available (avoids "reading 'loginWithSessionId'" / COOP errors)

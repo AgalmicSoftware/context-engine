@@ -310,7 +310,7 @@ High-level flow:
 2. Enter worker secrets in the wizard. Normal mode automatically uses the GitHub-hosted `sessionCorsWorker.bundle.js` release asset for deploy-helper requests.
 3. Click `Deploy worker`
 4. Wait for the helper to create/update the worker and return the `workers.dev` URL
-5. If the helper cannot fetch the release asset, upload `dist/sessionCorsWorker.bundle.js` when the manual retry field appears
+5. If the helper cannot fetch the release asset, keep the default GitHub release URL and either paste a direct bundle URL override or run `nvm use 20 && npm run worker:bundle` and upload `dist/sessionCorsWorker.bundle.js`
 6. Confirm that the worker URL is now filled in before publishing metadata
 
 The first-party wizard now infers the Cloudflare account from the API token during deploy instead of asking for account ID separately.
