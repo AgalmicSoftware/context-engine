@@ -15,6 +15,7 @@ release-clean:
 sync-public:
 	bash scripts/sync-public-history.sh
 
-## Replay dev commits onto public main and push the branch to origin.
+## Replay dev commits onto public main and create or refresh the branch on origin.
+## Use --force-with-lease if the local target branch already exists.
 sync-public-push:
 	bash scripts/sync-public-history.sh --push

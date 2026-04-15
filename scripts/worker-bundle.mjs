@@ -2,7 +2,10 @@ import { build } from 'esbuild';
 import { mkdirSync } from 'fs';
 import { dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
-import { assertWorkerDependencyVersions } from './worker-dependency-guard.mjs';
+import {
+  assertWorkerDependencyVersions,
+  ensureWorkerDependencyInstall,
+} from './worker-dependency-guard.mjs';
 
 export const WORKER_BUNDLE_TARGETS = Object.freeze({
   sessionCorsWorker: Object.freeze({
@@ -41,16 +44,21 @@ export const resolveWorkerBundleTargets = ({
 export const buildWorkerBundles = async ({
   rootDir = process.cwd(),
   targetKeys = Object.keys(WORKER_BUNDLE_TARGETS),
+  ensureWorkerDeps = ensureWorkerDependencyInstall,
+  assertWorkerDeps = assertWorkerDependencyVersions,
+  esbuildImpl = build,
+  mkdirSyncImpl = mkdirSync,
 } = {}) => {
   const targets = resolveWorkerBundleTargets({ rootDir, targetKeys });
   if (targets.some((target) => target.enforceWorkerDependencyGuard)) {
-    assertWorkerDependencyVersions({ rootDir });
+    ensureWorkerDeps({ rootDir, dependencyName: 'ethers' });
+    assertWorkerDeps({ rootDir });
   }
 
   const results = [];
   for (const target of targets) {
-    mkdirSync(dirname(target.outputFile), { recursive: true });
-    await build({
+    mkdirSyncImpl(dirname(target.outputFile), { recursive: true });
+    await esbuildImpl({
       entryPoints: [target.entryPoint],
       outfile: target.outputFile,
       bundle: true,

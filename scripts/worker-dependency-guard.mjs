@@ -1,8 +1,13 @@
+import { execFileSync } from 'child_process';
 import { existsSync, readFileSync } from 'fs';
 import { createRequire } from 'module';
 import { dirname, resolve } from 'path';
 
 const DEFAULT_DEPENDENCY_NAMES = ['ethers'];
+const AUTO_REPAIRABLE_ISSUE_PATTERNS = Object.freeze([
+  /^unable to resolve .* from workers\/sessionCorsWorker\/worker\.js:/,
+  /^resolved install for .* but worker package-lock\.json expects /,
+]);
 
 const readJson = (filePath) => JSON.parse(readFileSync(filePath, 'utf8'));
 
@@ -32,12 +37,20 @@ const getPaths = (rootDir) => ({
   workerPackageJson: resolve(rootDir, 'workers/sessionCorsWorker/package.json'),
   workerPackageLockJson: resolve(rootDir, 'workers/sessionCorsWorker/package-lock.json'),
 });
+const resolveWorkerPackageDir = (rootDir) => resolve(rootDir, 'workers/sessionCorsWorker');
+const getNpmCommand = () => (process.platform === 'win32' ? 'npm.cmd' : 'npm');
 
 export const getWorkerDependencyVersionReport = ({
   rootDir = process.cwd(),
   dependencyName = 'ethers',
 } = {}) => {
   const paths = getPaths(rootDir);
+  const expectedWorkerPackageJsonPath = resolve(
+    resolveWorkerPackageDir(rootDir),
+    'node_modules',
+    dependencyName,
+    'package.json',
+  );
   const workerPackage = readJson(paths.workerPackageJson);
   const workerLock = existsSync(paths.workerPackageLockJson)
     ? readJson(paths.workerPackageLockJson)
@@ -53,20 +66,31 @@ export const getWorkerDependencyVersionReport = ({
   let resolvedPackageJsonPath = null;
   let installedVersion = null;
   let resolveError = null;
-  try {
-    const workerRequire = createRequire(paths.workerEntry);
+  if (existsSync(expectedWorkerPackageJsonPath)) {
+    resolvedPackageJsonPath = expectedWorkerPackageJsonPath;
     try {
-      resolvedPackageJsonPath = workerRequire.resolve(`${dependencyName}/package.json`);
+      installedVersion = readJson(resolvedPackageJsonPath).version || null;
     } catch (error) {
-      const resolvedEntry = workerRequire.resolve(dependencyName);
-      resolvedPackageJsonPath = findPackageJsonPath(resolvedEntry, dependencyName);
-      if (!resolvedPackageJsonPath) {
-        throw error;
-      }
+      resolveError = error instanceof Error ? error.message : String(error);
     }
-    installedVersion = readJson(resolvedPackageJsonPath).version || null;
-  } catch (error) {
-    resolveError = error instanceof Error ? error.message : String(error);
+  } else {
+    try {
+      const workerRequire = createRequire(paths.workerEntry);
+      try {
+        resolvedPackageJsonPath = workerRequire.resolve(`${dependencyName}/package.json`);
+      } catch (error) {
+        const resolvedEntry = workerRequire.resolve(dependencyName);
+        resolvedPackageJsonPath = findPackageJsonPath(resolvedEntry, dependencyName);
+        if (!resolvedPackageJsonPath) {
+          throw error;
+        }
+      }
+      resolveError = `expected worker-local install at ${expectedWorkerPackageJsonPath}, but resolved ${dependencyName} to ${resolvedPackageJsonPath}`;
+      installedVersion = readJson(resolvedPackageJsonPath).version || null;
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      resolveError = `expected worker-local install at ${expectedWorkerPackageJsonPath}: ${detail}`;
+    }
   }
 
   const issues = [];
@@ -128,4 +152,32 @@ export const assertWorkerDependencyVersions = ({
   ]);
 
   throw new Error(lines.join('\n'));
+};
+
+export const canAutoRepairWorkerDependencyReport = (report = {}) => {
+  const issues = Array.isArray(report?.issues) ? report.issues : [];
+  return (
+    issues.length > 0 &&
+    issues.every((issue) => AUTO_REPAIRABLE_ISSUE_PATTERNS.some((pattern) => pattern.test(String(issue || ''))))
+  );
+};
+
+export const ensureWorkerDependencyInstall = ({
+  rootDir = process.cwd(),
+  dependencyName = 'ethers',
+  getDependencyReport = getWorkerDependencyVersionReport,
+  execFileSyncImpl = execFileSync,
+  stdio = 'inherit',
+} = {}) => {
+  let report = getDependencyReport({ rootDir, dependencyName });
+  if (!canAutoRepairWorkerDependencyReport(report)) {
+    return { changed: false, report };
+  }
+
+  execFileSyncImpl(getNpmCommand(), ['ci'], {
+    cwd: resolveWorkerPackageDir(rootDir),
+    stdio,
+  });
+  report = getDependencyReport({ rootDir, dependencyName });
+  return { changed: true, report };
 };
