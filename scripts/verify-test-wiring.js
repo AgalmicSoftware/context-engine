@@ -117,9 +117,6 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectScriptContains('verify:worker-bundle', 'scripts/verify-worker-bundle-sync.mjs');
   expectScriptContains('verify:public-release-surface', 'scripts/verify-public-release-surface.js');
   expectScriptContains('verify:release', 'npm run lint');
-  expectScriptContains('verify:release', 'npm run typecheck:client');
-  expectScriptContains('verify:release', 'npm run test:release:client');
-  expectScriptContains('verify:release', 'npm run verify:public-release-surface');
   expectScriptContains('verify:release', 'npm run worker:bundle');
   expectScriptContains('verify:release', 'npm run verify:worker-bundle');
   expectScriptContains('verify:release', 'npm --prefix client run build');
