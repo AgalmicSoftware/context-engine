@@ -20,7 +20,7 @@ Options:
   --source-branch <name>
                Replay commits from this local branch (default: dev)
   --force-with-lease
-               Replace an existing local/remote target branch safely
+               Replace an existing local target branch safely
   -h, --help   Show this help text
 EOF
 }
@@ -56,7 +56,7 @@ TARGET_BRANCH="$DEFAULT_BRANCH_NAME"
 SOURCE_BRANCH="dev"
 DRY_RUN=0
 AUTO_PUSH=0
-ALLOW_BRANCH_REPLACE=0
+EXPLICIT_FORCE_WITH_LEASE=0
 REPLAYED_COUNT=0
 SKIPPED_COUNT=0
 REMOTE_BRANCH_EXISTS=0
@@ -164,12 +164,8 @@ reset_clone_to_branch_head() {
 
 sync_branch_back_to_source_repo() {
   if git -C "$REPO_ROOT" show-ref --verify --quiet "refs/heads/$TARGET_BRANCH"; then
-    if [ "$ALLOW_BRANCH_REPLACE" -ne 1 ]; then
-      fail "Local branch $TARGET_BRANCH already exists in the source repo. Delete it, pick another name, or rerun with --force-with-lease." 1
-    fi
-
     if [ "$(git -C "$REPO_ROOT" branch --show-current)" = "$TARGET_BRANCH" ]; then
-      fail "Local branch $TARGET_BRANCH is currently checked out. Check out another branch before rerunning with --force-with-lease." 1
+      fail "Local branch $TARGET_BRANCH is currently checked out. Check out another branch before rerunning sync-public-history.sh." 1
     fi
 
     git -C "$REPO_ROOT" fetch --quiet --force "$TEMP_CLONE" "$TARGET_BRANCH:$TARGET_BRANCH"
@@ -217,7 +213,7 @@ while [ $# -gt 0 ]; do
       SOURCE_BRANCH="$1"
       ;;
     --force-with-lease)
-      ALLOW_BRANCH_REPLACE=1
+      EXPLICIT_FORCE_WITH_LEASE=1
       ;;
     -h|--help)
       usage
@@ -241,13 +237,15 @@ if ! git -C "$REPO_ROOT" rev-parse --git-dir >/dev/null 2>&1; then
 fi
 
 if git -C "$REPO_ROOT" show-ref --verify --quiet "refs/heads/$TARGET_BRANCH"; then
-  if [ "$ALLOW_BRANCH_REPLACE" -ne 1 ]; then
+  if [ "$EXPLICIT_FORCE_WITH_LEASE" -ne 1 ]; then
     fail "Local branch $TARGET_BRANCH already exists in the source repo. Delete it, pick another name, or rerun with --force-with-lease." 1
   fi
 
   if [ "$(git -C "$REPO_ROOT" branch --show-current)" = "$TARGET_BRANCH" ]; then
-    fail "Local branch $TARGET_BRANCH is currently checked out. Check out another branch before rerunning with --force-with-lease." 1
+    fail "Local branch $TARGET_BRANCH is currently checked out. Check out another branch before rerunning sync-public-history.sh." 1
   fi
+
+  log_info "Local branch $TARGET_BRANCH already exists and will be refreshed with --force-with-lease."
 fi
 
 SOURCE_REMOTE_URL=$(git -C "$REPO_ROOT" remote get-url origin 2>/dev/null || true)
@@ -294,11 +292,11 @@ git -C "$TEMP_CLONE" fetch --quiet origin main
 if git -C "$TEMP_CLONE" ls-remote --exit-code --heads origin "$TARGET_BRANCH" >/dev/null 2>&1; then
   REMOTE_BRANCH_EXISTS=1
   REMOTE_BRANCH_SHA=$(git -C "$TEMP_CLONE" ls-remote --heads origin "$TARGET_BRANCH" | awk '{print $1}')
-  if [ "$ALLOW_BRANCH_REPLACE" -ne 1 ]; then
-    fail "Remote branch origin/$TARGET_BRANCH already exists. Pick another name or rerun with --force-with-lease." 1
+  if [ "$EXPLICIT_FORCE_WITH_LEASE" -eq 1 ]; then
+    log_info "Remote branch origin/$TARGET_BRANCH already exists and will be refreshed with --force-with-lease."
+  else
+    log_info "Remote branch origin/$TARGET_BRANCH already exists and will be refreshed automatically with --force-with-lease."
   fi
-
-  log_info "Remote branch origin/$TARGET_BRANCH already exists and will be replaced with --force-with-lease."
 fi
 
 git -C "$TEMP_CLONE" checkout --quiet -B "$TARGET_BRANCH" origin/main

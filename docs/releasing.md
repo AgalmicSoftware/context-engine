@@ -5,6 +5,8 @@ This repo now supports two public-release workflows:
 - `scripts/prepare-public-release.sh` builds a stripped working-tree artifact in `release-public/`
 - `scripts/sync-public-history.sh` replays `dev` commits onto public `main` one-by-one so GitHub shows readable per-commit diffs
 
+Separately, `.github/workflows/publish-worker-bundles.yml` rebuilds the Cloudflare worker fallback bundles on every push to public `main`/`master`, publishes them as GitHub release assets, and explicitly marks that worker-bundle release as the repo's latest release so the client default bundle URL at `releases/latest/download/sessionCorsWorker.bundle.js` keeps resolving to fresh assets.
+
 Use the history-sync flow when you want a public PR with preserved commit narrative. Use the artifact flow when you need a standalone stripped copy of the repo.
 
 ## Quick start
@@ -15,6 +17,7 @@ make sync-public
 make sync-public-push
 bash scripts/sync-public-history.sh --dry-run release-candidate
 bash scripts/sync-public-history.sh --push release-staging
+# Still accepted for compatibility, but no longer required
 bash scripts/sync-public-history.sh --push --force-with-lease release-staging
 
 # Stripped release artifact
@@ -32,9 +35,10 @@ Important behavior:
 - Public replay identity is always forced to `Agalmic <agalmicsoftware@protonmail.com>`
 - Commits that only touch stripped paths are skipped automatically
 - `--dry-run` lists which commits would replay vs skip without creating the replay branch
-- `--push` pushes the resulting branch to `origin`
+- `--push` pushes the resulting branch to `origin` and safely refreshes an existing remote target branch with `--force-with-lease` when needed
 - `--source-branch <name>` lets you replay from a temporary rebased branch instead of your primary `dev`
-- `--force-with-lease` safely refreshes an existing PR branch such as `release-staging`
+- Existing local target branches still require `--force-with-lease` before the script rewrites them
+- `--force-with-lease` remains accepted explicitly, and is required whenever the local target branch already exists
 - Without `--push`, the script prints the follow-up `git push -u origin <branch>` command after importing the branch back into the local repo
 
 Push safety:
@@ -43,7 +47,7 @@ Push safety:
 - Only the replayed public-safe commits become reachable from the branch you push
 - The same strip patterns as `prepare-public-release.sh` are applied before every replayed commit is created
 
-If `origin/<branch>` already exists, rerun with `--force-with-lease` to refresh that PR branch safely instead of creating a new one.
+If `origin/<branch>` already exists, the script refreshes that PR branch automatically with `--force-with-lease`. If the remote branch was deleted but a stale local branch still exists, rerun with `--force-with-lease` so the script can safely rewrite the local branch before recreating the remote one.
 
 If your local `dev` has not been rebased onto `origin/main` yet, create a temporary branch from `dev`, rebase that branch onto `origin/main`, and pass it via `--source-branch` so your day-to-day `dev` branch can stay untouched until you are ready.
 
@@ -92,7 +96,8 @@ Review each match. Published contract addresses, `localhost`, and `example.com` 
 ## Workflow
 
 1. Develop on local `dev` with private/internal files present where needed
-2. Run `make sync-public` or `bash scripts/sync-public-history.sh --push release-staging` to build a replayed public branch
-3. If the PR already exists, rerun with `--push --force-with-lease release-staging` to refresh the same branch
-4. Open or update the PR and use GitHub's `Rebase and merge` option when landing it on `main`
+2. Run `make sync-public` or `bash scripts/sync-public-history.sh --push release-staging` to build or refresh the replayed public branch
+   - If `release-staging` already exists locally, add `--force-with-lease`
+3. Open or update the PR from `release-staging` into `main`
+4. Choose the merge method intentionally: `Merge pull request` preserves the replayed `release-staging` commit SHAs on `main`, while `Rebase and merge` keeps `main` linear but assigns new SHAs
 5. For the artifact workflow, run `make release` and then run the PII scan against the stripped output before publishing it

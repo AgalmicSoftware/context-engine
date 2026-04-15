@@ -23,7 +23,7 @@ Starter files shipped in this folder:
 
 ## Supported Local Outputs
 
-- `npm run worker:bundle` now emits `dist/deployHelper.bundle.js` alongside `dist/sessionCorsWorker.bundle.js`
+- `npm run worker:bundle` now emits generated local fallback bundles at `dist/deployHelper.bundle.js` and `dist/sessionCorsWorker.bundle.js`
 - `npm run deploy-helper:deploy -- --worker-name <name> --api-token <token>` bundles and publishes this helper to your Cloudflare account without requiring Wrangler
   - if you omit `--admin-secret`, the script generates one and prints it after deploy
   - if you omit `--allowed-origins`, the CLI seeds the stable Context Engine hosted/local defaults used by `/new`

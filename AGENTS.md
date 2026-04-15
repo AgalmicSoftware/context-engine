@@ -8,7 +8,7 @@ npm run dev                       # dev server (port 3000, hot reload)
 
 # Worker bundle (from repo root; use Node 20 for root scripts)
 nvm use 20
-npm run worker:bundle            # rebuild dist/sessionCorsWorker.bundle.js
+npm run worker:bundle            # generate local dist/sessionCorsWorker.bundle.js fallback bundles
 
 # E2E tests & seeding (from repo root)
 npm run ai:test-gates:any-all                    # E2E gate verification
@@ -53,7 +53,7 @@ npm run ai:seed-survey:question-types            # seed question type data
 | `client/src/utilities/` | Utilities organized into subdirs: `web3/`, `crypto/`, `arweave/`, `session/`, `worker/`, `cache/`, `ai/`, `sbt/`, `ui/`, `survey/`, `docLibrary/` |
 | `client/src/utilities/web3/contractScripts.js` | See [`docs/contractScripts.MAP.md`](docs/contractScripts.MAP.md) for contract helpers navigation |
 | `workers/sessionCorsWorker/` | Cloudflare Worker source (canonical) |
-| `dist/sessionCorsWorker.bundle.js` | Checked-in local/manual worker bundle fallback used by the client build and E2E upload flows |
+| `dist/sessionCorsWorker.bundle.js` | Generated local/manual worker bundle fallback used by the client build and E2E upload flows when rebuilt locally |
 | `client/src/contractsABI/` | Contract ABI JSON files |
 | `contracts/` | Solidity smart contracts |
 | `scripts/test-*.ui.js` | Playwright E2E tests |
@@ -61,7 +61,7 @@ npm run ai:seed-survey:question-types            # seed question type data
 | `ARCHITECTURE.md` | System diagram, data flows, contract addresses |
 
 ### Generated / do-not-edit
-`node_modules/`, `build/`, `client/src/artifacts/`
+`node_modules/`, `build/`, `dist/`, `client/src/artifacts/`
 
 ## Documentation
 | Doc | What it is |

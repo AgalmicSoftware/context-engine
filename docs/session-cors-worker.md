@@ -14,7 +14,7 @@ Preferred worker sources:
 - `sessionCorsWorker` source tree: `https://github.com/AgalmicSoftware/context-engine/tree/main/workers/sessionCorsWorker`
 - `sessionCorsWorker` release bundle asset: `https://github.com/AgalmicSoftware/context-engine/releases/latest/download/sessionCorsWorker.bundle.js`
 - Deploy-helper source tree: `https://github.com/AgalmicSoftware/context-engine/tree/main/workers/deploy-helper`
-- The repo's `.github/workflows/publish-worker-bundles.yml` workflow rebuilds and republishes both bundle assets on every push to `main`/`master`, so the `releases/latest/download/...` URLs stay current after GitHub Actions is enabled.
+- The repo's `.github/workflows/publish-worker-bundles.yml` workflow rebuilds and republishes both bundle assets on every push to `main`/`master`, and it explicitly marks that worker-bundle release as GitHub's latest release so the `releases/latest/download/...` URLs stay current after GitHub Actions is enabled.
 
 ## Deployment modes
 
@@ -34,7 +34,7 @@ If you deploy via the Group Wizard and a deploy-helper:
    - The first-party wizard no longer asks for Cloudflare account ID; the deploy-helper resolves it from the API token.
 2) Fill worker secrets in the wizard (OpenAI key, Arweave JWK, RPC URL, Anthropic key only if any selected AI model uses Anthropic, and optional OpenRouter key) and then click "Deploy worker".
    - Normal mode now points deploy-helper requests at the GitHub release bundle URL automatically instead of asking for a local upload first.
-   - If the helper cannot fetch that release asset, the Worker step reveals a manual upload retry and points to `dist/sessionCorsWorker.bundle.js` as the local fallback file.
+   - If the helper cannot fetch that release asset, the Worker step keeps the GitHub URL as the default path and reveals one-off retry overrides: paste a direct bundle URL or upload `dist/sessionCorsWorker.bundle.js` if you want to override the hosted URL.
    - The in-wizard deployment panel links to the GitHub worker source, deploy-helper source, and worker docs instead of shipping mirrored source snapshots inside the client bundle.
 3) The deploy-helper uses the Workers API to fetch or create the account subdomain,
    enables the script’s workers.dev subdomain, and returns:
@@ -114,15 +114,12 @@ If you deploy via the Group Wizard and a deploy-helper:
   - and `getMissingWorkerSecretsForDeploy(...)` is empty for the current session config.
 - Sponsored deploy grants now keep only the Cloudflare API token plus the source worker bootstrap context on the sponsoring worker; the encrypted bundle itself carries only the resulting `deployGrantToken` and bootstrap worker URL. Grants do not snapshot account ID or a standalone helper URL.
 - For grant-backed sponsored deploys, the browser posts to the sponsoring `sessionCorsWorker` `/sponsored/redeem-deploy` route, and that source worker must have embedded deploy enabled from its deploy-time `DEPLOY_HELPER_ENABLED` binding. `/sponsor` no longer writes a standalone deploy-helper fallback URL into the bundle or grant.
-  - In that deploy-ready state, Publish deploys the worker first, then uploads metadata and registers on-chain. The regular normal-mode worker step now defaults to the hosted GitHub release asset URL, while the sponsored publish path still auto-fetches a raw static copy of the known-good local dist bundle from `/worker/sessionCorsWorker.bundle.js`.
-  - `client/config-overrides.js` copies `dist/sessionCorsWorker.bundle.js` into the client build as `/worker/sessionCorsWorker.bundle.js`, so the browser fetch path uses the same bytes as the working manual upload baseline instead of the webpack-managed `.txt` import pipeline.
-  - When that raw local asset is available, Publish uses its `bundleText` directly without asking the admin to upload a file.
+  - In that deploy-ready state, Publish deploys the worker first, then uploads metadata and registers on-chain. Both the regular normal-mode worker step and the sponsored publish path default to the hosted GitHub release asset URL.
 
 - The worker KV config now keeps a mirrored `embeddedDeployHelperEnabled` boolean so the frontend can reopen the wizard with the current deploy-time toggle state, but runtime behavior still comes from the worker's `DEPLOY_HELPER_ENABLED` binding.
-  - If that automatic local asset fetch fails, the normal-mode Publish panel surfaces the fetch error and exposes the known-good manual fallback file (`/dist/sessionCorsWorker.bundle.js`) for retry.
-  - For ordinary normal-mode worker deploys, the same `dist/sessionCorsWorker.bundle.js` path is now exposed only after a remote release-asset fetch failure.
+  - If the hosted release-asset fetch fails, the normal-mode worker step or sponsored normal-mode Publish panel keeps the GitHub release asset URL as the default path and offers either a manual bundle URL override or `nvm use 20 && npm run worker:bundle` plus `/dist/sessionCorsWorker.bundle.js` as an optional local upload override.
+  - `dist/sessionCorsWorker.bundle.js` remains a generated local/manual fallback bundle for upload retries, but the client build no longer serves `/worker/sessionCorsWorker.bundle.js`.
   - Advanced mode still keeps `Use URL` as the default path and preserves the manual `Upload file` override for testing.
-  - This fallback behavior is controlled by `REACT_APP_CE_USE_LOCAL_WORKER_BUNDLE_FALLBACK` / `CE_USE_LOCAL_WORKER_BUNDLE_FALLBACK`.
   - Lit payer secrets remain bundled/applied end-to-end, but they are still optional for deploy-readiness; they continue to drive `sponsored_lit` and payment delegation only when a valid Lit payer key is present.
 - Login-stage auto-funding now retries the faucet request against `meta.sourceSessionSlug` / `meta.sourceWorkerUrl` when the new sponsored session has not published its own worker yet, so the freshly connected wallet can still get publish gas from the originating sponsored session.
 - After that first worker deploy, later worker config/secrets adjustments are expected to flow through the signed `/admin/set-config` and `/admin/set-secrets` routes rather than the streamlined normal-mode auto-deploy banner.
@@ -991,7 +988,7 @@ Signed login/bootstrap requests:
 
 Manual:
 - Download the latest release bundle asset: `https://github.com/AgalmicSoftware/context-engine/releases/latest/download/sessionCorsWorker.bundle.js`.
-- Or rebuild the checked-in local fallback bundles from the repo root with `nvm use 20 && npm run worker:bundle`.
+- Or rebuild local fallback bundles from the repo root with `nvm use 20 && npm run worker:bundle`.
   - Session worker paste/upload file: `dist/sessionCorsWorker.bundle.js`
   - Deploy-helper paste/upload file: `dist/deployHelper.bundle.js`
 - Enable Node.js compatibility + add deps in the dashboard.
@@ -1023,9 +1020,9 @@ Warning: passing a Cloudflare API token to a deploy-helper requires trust.
 - The default deploy-helper bundle URL is the GitHub release asset: `https://github.com/AgalmicSoftware/context-engine/releases/latest/download/sessionCorsWorker.bundle.js`
 - Canonical worker sources live under `workers/sessionCorsWorker/` and `workers/deploy-helper/`.
 - This repo no longer mirrors `.js.txt` worker copies into `client/src/assets/worker/`.
-- Rebuild the checked-in fallback bundles with `nvm use 20 && npm run worker:bundle` and verify they match source with `npm run verify:worker-bundle`.
-- `dist/sessionCorsWorker.bundle.js` and `dist/deployHelper.bundle.js` are the local/manual fallback bundles for worker upload flows.
-- GitHub bundle publishing is now automated via `.github/workflows/publish-worker-bundles.yml`. Once Actions are enabled in the GitHub repo, every push to `main`/`master` creates a fresh release containing both bundle assets, which keeps `https://github.com/AgalmicSoftware/context-engine/releases/latest/download/sessionCorsWorker.bundle.js` live.
+- Rebuild local fallback bundles with `nvm use 20 && npm run worker:bundle` and verify they match source with `npm run verify:worker-bundle`.
+- `dist/sessionCorsWorker.bundle.js` and `dist/deployHelper.bundle.js` are generated local/manual fallback bundles for worker upload flows; they are not tracked git artifacts anymore.
+- GitHub bundle publishing is now automated via `.github/workflows/publish-worker-bundles.yml`. Once Actions are enabled in the GitHub repo, every push to `main`/`master` creates a fresh release containing both bundle assets and explicitly marks that release as latest, which keeps `https://github.com/AgalmicSoftware/context-engine/releases/latest/download/sessionCorsWorker.bundle.js` live.
 - The worker currently pins `ethers@6.15.0` intentionally. The root app and client remain on `ethers@5.7.2` until the broader client migration is done, so this version split is expected.
 
 ## Future work
