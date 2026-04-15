@@ -107,6 +107,10 @@ broadcast/
 /.tmp/
 /tmp/
 /tmp-launch-channel-chrome.js
+/.jest-cache/
+/.jest-tmp/
+/client/.jest-cache/
+/client/.jest-tmp/
 
 # AI agent local config and skills (maintainer-only; AGENTS.md is the public surface)
 .claude/
