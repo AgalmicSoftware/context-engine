@@ -1,4 +1,10 @@
 import { readPublicUrlBasePath } from './publicUrl.js';
+import {
+  PUBLIC_DISCOVERABILITY_URL,
+  PUBLIC_LLMS_URL,
+  PUBLIC_REPO_SOURCE_URL,
+  PUBLIC_REPO_URL,
+} from '../../variables/publicRepoMetadata.js';
 
 export const DEFAULT_PUBLIC_PAGE_TITLE =
   'Context Engine | AI-Assisted Deliberation, Surveys, and SBT-Gated Access';
@@ -7,6 +13,14 @@ export const DEFAULT_PUBLIC_PAGE_DESCRIPTION =
   'Context Engine helps groups run structured surveys, AI-assisted analysis, and public or private participation workflows with durable records and optional SBT-gated encryption.';
 
 export const DEFAULT_PUBLIC_PAGE_IMAGE = 'https://contextengine.xyz/android-chrome-512x512.png';
+export const DEFAULT_PUBLIC_SITE_NAME = 'Context Engine';
+export const DEFAULT_PUBLIC_SITE_URL = 'https://contextengine.xyz/';
+
+const PUBLIC_ORGANIZATION_ID = `${DEFAULT_PUBLIC_SITE_URL}#organization`;
+const PUBLIC_SOURCE_CODE_ID = `${DEFAULT_PUBLIC_SITE_URL}#source`;
+const PUBLIC_WEBSITE_ID = `${DEFAULT_PUBLIC_SITE_URL}#website`;
+const STRUCTURED_DATA_SELECTOR =
+  'script[type="application/ld+json"][data-ce-structured-data="public-page"]';
 
 const toStr = (value) => String(value ?? '').trim();
 
@@ -118,6 +132,54 @@ export const buildCanonicalPublicUrl = (
   const search = buildCanonicalSearch(locationLike?.search ?? windowLocation?.search, pathname);
   return origin ? `${origin}${pathname}${search}` : `${pathname}${search}`;
 };
+
+const buildPublicPageStructuredData = ({
+  title = DEFAULT_PUBLIC_PAGE_TITLE,
+  description = DEFAULT_PUBLIC_PAGE_DESCRIPTION,
+  canonicalUrl = DEFAULT_PUBLIC_SITE_URL,
+} = {}) => ({
+  '@context': 'https://schema.org',
+  '@graph': [
+    {
+      '@type': 'Organization',
+      '@id': PUBLIC_ORGANIZATION_ID,
+      name: DEFAULT_PUBLIC_SITE_NAME,
+      url: DEFAULT_PUBLIC_SITE_URL,
+      sameAs: [PUBLIC_REPO_URL],
+    },
+    {
+      '@type': 'WebSite',
+      '@id': PUBLIC_WEBSITE_ID,
+      url: DEFAULT_PUBLIC_SITE_URL,
+      name: DEFAULT_PUBLIC_SITE_NAME,
+      description: DEFAULT_PUBLIC_PAGE_DESCRIPTION,
+      publisher: { '@id': PUBLIC_ORGANIZATION_ID },
+    },
+    {
+      '@type': 'SoftwareSourceCode',
+      '@id': PUBLIC_SOURCE_CODE_ID,
+      name: DEFAULT_PUBLIC_SITE_NAME,
+      description: DEFAULT_PUBLIC_PAGE_DESCRIPTION,
+      codeRepository: PUBLIC_REPO_URL,
+      url: PUBLIC_REPO_SOURCE_URL,
+    },
+    {
+      '@type': 'WebPage',
+      '@id': `${canonicalUrl}#webpage`,
+      url: canonicalUrl,
+      name: title,
+      description,
+      isPartOf: { '@id': PUBLIC_WEBSITE_ID },
+      about: { '@id': PUBLIC_ORGANIZATION_ID },
+      significantLink: [
+        PUBLIC_REPO_URL,
+        PUBLIC_REPO_SOURCE_URL,
+        PUBLIC_DISCOVERABILITY_URL,
+        PUBLIC_LLMS_URL,
+      ],
+    },
+  ],
+});
 
 export const syncPublicPageHead = ({
   location = (typeof window !== 'undefined' ? window.location : undefined),

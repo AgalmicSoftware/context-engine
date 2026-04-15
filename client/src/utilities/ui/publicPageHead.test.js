@@ -4,6 +4,12 @@ import {
   buildCanonicalPublicUrl,
   syncPublicPageHead,
 } from './publicPageHead.js';
+import {
+  PUBLIC_DISCOVERABILITY_URL,
+  PUBLIC_LLMS_URL,
+  PUBLIC_REPO_SOURCE_URL,
+  PUBLIC_REPO_URL,
+} from '../../variables/publicRepoMetadata.js';
 
 describe('publicPageHead', () => {
   beforeEach(() => {
@@ -122,6 +128,51 @@ describe('publicPageHead', () => {
     );
     expect(document.head.querySelector('meta[property="og:url"]')?.getAttribute('content')).toBe(
       'https://contextengine.xyz/session/demo?session=edge'
+    );
+  });
+
+  it('publishes structured data with the GitHub repo in sameAs', () => {
+    syncPublicPageHead({
+      location: new URL('https://contextengine.xyz/about?ref=welcome'),
+    });
+
+    const structuredDataNode = document.head.querySelector(
+      'script[type="application/ld+json"][data-ce-structured-data="public-page"]'
+    );
+    expect(structuredDataNode).not.toBeNull();
+
+    const structuredData = JSON.parse(structuredDataNode?.textContent || '{}');
+    const graph = Array.isArray(structuredData['@graph']) ? structuredData['@graph'] : [];
+    const organization = graph.find((entry) => entry?.['@type'] === 'Organization');
+    const sourceCode = graph.find((entry) => entry?.['@type'] === 'SoftwareSourceCode');
+    const webPage = graph.find((entry) => entry?.['@type'] === 'WebPage');
+
+    expect(organization).toEqual(
+      expect.objectContaining({
+        '@id': `${DEFAULT_PUBLIC_SITE_URL}#organization`,
+        url: DEFAULT_PUBLIC_SITE_URL,
+        sameAs: [PUBLIC_REPO_URL],
+      })
+    );
+    expect(sourceCode).toEqual(
+      expect.objectContaining({
+        '@id': `${DEFAULT_PUBLIC_SITE_URL}#source`,
+        codeRepository: PUBLIC_REPO_URL,
+        url: PUBLIC_REPO_SOURCE_URL,
+      })
+    );
+    expect(webPage).toEqual(
+      expect.objectContaining({
+        url: 'https://contextengine.xyz/about',
+        name: DEFAULT_PUBLIC_PAGE_TITLE,
+        description: DEFAULT_PUBLIC_PAGE_DESCRIPTION,
+        significantLink: [
+          PUBLIC_REPO_URL,
+          PUBLIC_REPO_SOURCE_URL,
+          PUBLIC_DISCOVERABILITY_URL,
+          PUBLIC_LLMS_URL,
+        ],
+      })
     );
   });
 

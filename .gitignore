@@ -109,22 +109,10 @@ broadcast/
 /.tmp/
 /tmp/
 /tmp-launch-channel-chrome.js
-/node-compile-cache/
-/ce-hook-*/
-/ce-install-*/
-/ce-router-*/
-/ce-startup-*/
 /.jest-cache/
 /.jest-tmp/
-/.tmp-jest/
-/tmp_jest/
-/tmp_jest_cache/
 /client/.jest-cache/
 /client/.jest-tmp/
-/client/.tmp-jest/
-/client/tmp_jest/
-/client/tmp_jest_cache/
-/client/build-vite/
 
 # AI agent local config and skills (maintainer-only; AGENTS.md is the public surface)
 .claude/
