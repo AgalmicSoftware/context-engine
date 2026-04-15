@@ -80,6 +80,9 @@ Verification:
 Public discovery:
 - `docs/discoverability.md`: Static crawl assets, live GitHub branch links, and the Google Search Console checklist.
 
+Public discovery:
+- `docs/discoverability.md`: Static crawl assets, live GitHub branch links, and the Google Search Console checklist.
+
 ## Runtime Telemetry
 
 Opt-in diagnostics API (no production UI surface). Disabled unless explicitly enabled.
