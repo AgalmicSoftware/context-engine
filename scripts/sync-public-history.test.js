@@ -201,23 +201,65 @@ test('sync-public-history replays public commits, skips private-only commits, an
   });
 });
 
-test('sync-public-history refuses to run when the target remote branch already exists', () => {
+test('sync-public-history refreshes an existing remote PR branch safely without requiring --force-with-lease', () => {
   withSourceRepo(({ sourceDir }) => {
     git(sourceDir, ['push', '--quiet', 'origin', 'main:release-staging']);
 
-    const result = runSyncScript(sourceDir);
+    const result = runSyncScript(sourceDir, ['--push', 'release-staging']);
 
-    assert.equal(result.status, 1);
-    assert.match(result.stderr, /Remote branch origin\/release-staging already exists/);
-    assert.equal(git(sourceDir, ['branch', '--list', 'release-staging']).trim(), '');
+    assert.equal(result.status, 0);
+    assert.match(result.stderr, /Remote branch origin\/release-staging already exists and will be refreshed automatically with --force-with-lease\./);
+    assert.match(result.stdout, /Branch name: release-staging/);
+    assert.match(result.stdout, /Replayed commits: 2/);
+    assert.match(result.stdout, /Skipped commits: 1/);
+    assert.match(result.stdout, /Pushed: yes/);
+
+    const historySubjects = git(sourceDir, [
+      'log',
+      '--reverse',
+      '--format=%s',
+      'origin/main..origin/release-staging',
+    ]).trim().split('\n');
+    assert.deepEqual(historySubjects, [
+      'Public commit title',
+      'Mixed commit',
+    ]);
+
+    const trackedPaths = git(sourceDir, ['ls-tree', '-r', '--name-only', 'origin/release-staging']);
+    assert.doesNotMatch(trackedPaths, /^TODO\//m);
+    assert.doesNotMatch(trackedPaths, /^contextEngine-cc\//m);
   });
 });
 
-test('sync-public-history updates an existing PR branch with --force-with-lease without reintroducing private paths', () => {
+test('sync-public-history refuses to refresh an existing local target branch without --force-with-lease', () => {
   withSourceRepo(({ sourceDir }) => {
     const initialPush = runSyncScript(sourceDir, ['--push', 'release-staging']);
     assert.equal(initialPush.status, 0);
     assert.match(initialPush.stdout, /Pushed: yes/);
+
+    git(sourceDir, ['push', '--quiet', 'origin', '--delete', 'release-staging']);
+
+    writeFile(sourceDir, 'public.txt', 'public one\npublic two\npublic three\n');
+    writeFile(sourceDir, path.join('TODO', 'more-secret.md'), 'still private\n');
+    commitAll(sourceDir, 'Follow-up public commit', {
+      authorDate: '2025-01-05T06:07:08Z',
+      committerDate: '2025-01-05T06:07:08Z',
+    });
+
+    const refreshPush = runSyncScript(sourceDir, ['--push', 'release-staging']);
+
+    assert.equal(refreshPush.status, 1);
+    assert.match(refreshPush.stderr, /Local branch release-staging already exists in the source repo/);
+  });
+});
+
+test('sync-public-history recreates a deleted remote branch from an existing local target branch with --force-with-lease', () => {
+  withSourceRepo(({ sourceDir }) => {
+    const initialPush = runSyncScript(sourceDir, ['--push', 'release-staging']);
+    assert.equal(initialPush.status, 0);
+    assert.match(initialPush.stdout, /Pushed: yes/);
+
+    git(sourceDir, ['push', '--quiet', 'origin', '--delete', 'release-staging']);
 
     writeFile(sourceDir, 'public.txt', 'public one\npublic two\npublic three\n');
     writeFile(sourceDir, path.join('TODO', 'more-secret.md'), 'still private\n');
@@ -229,7 +271,7 @@ test('sync-public-history updates an existing PR branch with --force-with-lease 
     const refreshPush = runSyncScript(sourceDir, ['--push', '--force-with-lease', 'release-staging']);
 
     assert.equal(refreshPush.status, 0);
-    assert.match(refreshPush.stderr, /will be replaced with --force-with-lease/);
+    assert.match(refreshPush.stderr, /Local branch release-staging already exists and will be refreshed with --force-with-lease\./);
     assert.match(refreshPush.stdout, /Branch name: release-staging/);
     assert.match(refreshPush.stdout, /Replayed commits: 3/);
     assert.match(refreshPush.stdout, /Skipped commits: 1/);

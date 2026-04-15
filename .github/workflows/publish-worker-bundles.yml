@@ -59,6 +59,7 @@ jobs:
         with:
           tag_name: ${{ steps.meta.outputs.tag_name }}
           name: ${{ steps.meta.outputs.release_name }}
+          make_latest: true
           body: |
             Automated worker bundle release for `${{ github.sha }}` on `${{ github.ref_name }}`.
 

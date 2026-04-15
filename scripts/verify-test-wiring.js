@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { execFileSync } = require('node:child_process');
 
 function readJson(rootDir, relativePath) {
   return JSON.parse(fs.readFileSync(path.join(rootDir, relativePath), 'utf8'));
@@ -7,6 +8,17 @@ function readJson(rootDir, relativePath) {
 
 function readText(rootDir, relativePath) {
   return fs.readFileSync(path.join(rootDir, relativePath), 'utf8');
+}
+
+function listTrackedDistFiles(rootDir) {
+  if (!fs.existsSync(path.join(rootDir, '.git'))) {
+    return [];
+  }
+
+  return execFileSync('git', ['ls-files', 'dist'], {
+    cwd: rootDir,
+    encoding: 'utf8',
+  }).split('\n').filter(Boolean);
 }
 
 function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
@@ -18,6 +30,7 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   const publishWorkflow = fs.existsSync(path.join(rootDir, publishWorkflowPath))
     ? readText(rootDir, publishWorkflowPath)
     : '';
+  const trackedDistFiles = listTrackedDistFiles(rootDir);
 
   const expectScriptContains = (scriptName, expected) => {
     const actual = String(scripts[scriptName] || '');
@@ -70,11 +83,15 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectScriptContains('deploy-helper:deploy', 'scripts/deploy-helper-deploy.mjs');
   expectScriptContains('verify:worker-bundle', 'scripts/verify-worker-bundle-sync.mjs');
   expectScriptContains('verify:release', 'npm run lint');
+  expectScriptContains('verify:release', 'npm run worker:bundle');
   expectScriptContains('verify:release', 'npm run verify:worker-bundle');
   expectScriptContains('verify:release', 'npm --prefix client run build');
 
   if (!workflow.includes('run: npm run test:ci')) {
     failures.push('CI workflow must execute "npm run test:ci"');
+  }
+  if (!workflow.includes('run: npm run worker:bundle')) {
+    failures.push('CI workflow must execute "npm run worker:bundle"');
   }
   if (!workflow.includes('run: npm run verify:worker-bundle')) {
     failures.push('CI workflow must execute "npm run verify:worker-bundle"');
@@ -88,11 +105,20 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   if (!publishWorkflow.includes('softprops/action-gh-release@v2')) {
     failures.push('publish-worker-bundles workflow must publish release assets with softprops/action-gh-release@v2');
   }
+  if (!publishWorkflow.includes('make_latest: true')) {
+    failures.push('publish-worker-bundles workflow must explicitly mark worker bundle releases as latest');
+  }
   if (!publishWorkflow.includes('dist/sessionCorsWorker.bundle.js')) {
     failures.push('publish-worker-bundles workflow must upload dist/sessionCorsWorker.bundle.js');
   }
   if (!publishWorkflow.includes('dist/deployHelper.bundle.js')) {
     failures.push('publish-worker-bundles workflow must upload dist/deployHelper.bundle.js');
+  }
+  if (trackedDistFiles.includes('dist/sessionCorsWorker.bundle.js')) {
+    failures.push('dist/sessionCorsWorker.bundle.js must not be tracked by git');
+  }
+  if (trackedDistFiles.includes('dist/deployHelper.bundle.js')) {
+    failures.push('dist/deployHelper.bundle.js must not be tracked by git');
   }
 
   return failures;
