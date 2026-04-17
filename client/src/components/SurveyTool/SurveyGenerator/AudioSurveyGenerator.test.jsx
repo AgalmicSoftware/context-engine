@@ -1,6 +1,5 @@
-import React from 'react';
-import ReactDOM from 'react-dom';
-import { act } from 'react-dom/test-utils';
+import React, { act } from 'react';
+import { createRoot } from 'react-dom/client';
 
 const mockCallAI = jest.fn();
 const mockProcessAdditionalSources = jest.fn();
@@ -76,6 +75,8 @@ jest.mock('../../DemoViews/CorpusViewer.jsx', () => ({
 
 describe('AudioSurveyGenerator', () => {
   let container;
+  let root;
+  let previousActEnvironment;
   const findGenerateQuestionsButton = () =>
     Array.from(container.querySelectorAll('button')).find((node) => node.textContent.includes('Generate Questions'));
   const toggleCheckbox = (element) => {
@@ -117,7 +118,7 @@ describe('AudioSurveyGenerator', () => {
   };
   const renderSubject = async (node) => {
     await act(async () => {
-      ReactDOM.render(node, container);
+      root.render(node);
     });
   };
   const makeSessionConfig = ({
@@ -143,9 +144,15 @@ describe('AudioSurveyGenerator', () => {
     },
   });
 
+  beforeAll(() => {
+    previousActEnvironment = globalThis.IS_REACT_ACT_ENVIRONMENT;
+    globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+  });
+
   beforeEach(() => {
     container = document.createElement('div');
     document.body.appendChild(container);
+    root = createRoot(container);
     window.__litHooks = {
       saveKey: jest.fn(async () => ({ ciphertext: 'ciphertext', dataToEncryptHash: 'hash' })),
       getKey: jest.fn(async () => new Uint8Array(32).fill(7)),
@@ -187,22 +194,34 @@ describe('AudioSurveyGenerator', () => {
   afterEach(() => {
     delete window.__litHooks;
     delete window.litHooks;
-    ReactDOM.unmountComponentAtNode(container);
+    if (root) {
+      act(() => {
+        root.unmount();
+      });
+      root = null;
+    }
     container.remove();
     container = null;
   });
 
+  afterAll(() => {
+    if (typeof previousActEnvironment === 'undefined') {
+      delete globalThis.IS_REACT_ACT_ENVIRONMENT;
+      return;
+    }
+    globalThis.IS_REACT_ACT_ENVIRONMENT = previousActEnvironment;
+  });
+
   it('toggles transcript mode placeholder text', () => {
     act(() => {
-      ReactDOM.render(
+      root.render(
         <AudioSurveyGenerator
           provider={{}}
           network={{}}
           account="0x123"
           loginComplete
           toggleLoginModal={jest.fn()}
-        />,
-        container
+        />
       );
     });
 
@@ -222,15 +241,14 @@ describe('AudioSurveyGenerator', () => {
 
   it('hides the generate questions button until the full-size database tool has content', () => {
     act(() => {
-      ReactDOM.render(
+      root.render(
         <AudioSurveyGenerator
           provider={{}}
           network={{}}
           account="0x123"
           loginComplete
           toggleLoginModal={jest.fn()}
-        />,
-        container
+        />
       );
     });
 
@@ -245,7 +263,7 @@ describe('AudioSurveyGenerator', () => {
 
   it('hides the generate questions button in minified mode until content exists', () => {
     act(() => {
-      ReactDOM.render(
+      root.render(
         <AudioSurveyGenerator
           provider={{}}
           network={{}}
@@ -253,8 +271,7 @@ describe('AudioSurveyGenerator', () => {
           loginComplete
           toggleLoginModal={jest.fn()}
           minified
-        />,
-        container
+        />
       );
     });
 
@@ -282,15 +299,14 @@ describe('AudioSurveyGenerator', () => {
     );
 
     await act(async () => {
-      ReactDOM.render(
+      root.render(
         <AudioSurveyGenerator
           provider={{}}
           network={{}}
           account="0x123"
           loginComplete
           toggleLoginModal={jest.fn()}
-        />,
-        container
+        />
       );
     });
 
@@ -834,7 +850,7 @@ describe('AudioSurveyGenerator', () => {
 
   it('keeps Tool Explorer view controls out of minified mode', () => {
     act(() => {
-      ReactDOM.render(
+      root.render(
         <AudioSurveyGenerator
           provider={{}}
           network={{ id: 84532 }}
@@ -843,8 +859,7 @@ describe('AudioSurveyGenerator', () => {
           toggleLoginModal={jest.fn()}
           minified
           explorerMode="view"
-        />,
-        container
+        />
       );
     });
 
@@ -856,7 +871,7 @@ describe('AudioSurveyGenerator', () => {
 
   it('keeps the AudioSurveyGenerator session selector behind a gear toggle and can locally override/reset', () => {
     act(() => {
-      ReactDOM.render(
+      root.render(
         <AudioSurveyGenerator
           provider={{}}
           network={{ id: 84532 }}
@@ -865,8 +880,7 @@ describe('AudioSurveyGenerator', () => {
           toggleLoginModal={jest.fn()}
           activeSessionSlug="edge"
           sessionConfig={{ slug: 'edge', sessionName: 'Edge Session' }}
-        />,
-        container
+        />
       );
     });
 
