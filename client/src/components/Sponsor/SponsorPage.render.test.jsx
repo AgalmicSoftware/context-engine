@@ -1,5 +1,5 @@
-import React from 'react';
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import React, { act } from 'react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
 const ADMIN_ADDRESS = '0x00000000000000000000000000000000000000aa';
@@ -86,21 +86,29 @@ jest.mock('../../utilities/ui/notify.js', () => ({
 
 const SponsorPage = require('./SponsorPage.jsx').default;
 
-const renderSponsorPage = ({
+const renderSponsorPage = async ({
   account = ADMIN_ADDRESS,
   initialSessionId,
   initialRegistryChainId,
-} = {}) => render(
-  <SponsorPage
-    account={account}
-    provider={{}}
-    network={{ id: 84532 }}
-    loginComplete={true}
-    toggleLoginModal={jest.fn()}
-    initialSessionId={initialSessionId}
-    initialRegistryChainId={initialRegistryChainId}
-  />
-);
+} = {}) => {
+  let utils;
+  await act(async () => {
+    utils = render(
+      <SponsorPage
+        account={account}
+        provider={{}}
+        network={{ id: 84532 }}
+        loginComplete={true}
+        toggleLoginModal={jest.fn()}
+        initialSessionId={initialSessionId}
+        initialRegistryChainId={initialRegistryChainId}
+      />
+    );
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+  return utils;
+};
 
 const getFieldInputByLabel = (labelText) => (
   screen.getByText(labelText).parentElement.querySelector('input,textarea,select')
@@ -183,7 +191,7 @@ describe('SponsorPage', () => {
   });
 
   it('renders paste-first credential inputs and lets the admin unlock the worker URL for editing', async () => {
-    renderSponsorPage();
+    await renderSponsorPage();
 
     expect(await screen.findByTestId(E2E_TESTIDS.ADMIN_SESSION_SELECT)).toHaveValue('edge');
     expect(screen.queryByDisplayValue('https://worker.example')).not.toBeInTheDocument();
@@ -223,12 +231,14 @@ describe('SponsorPage', () => {
       ['edge', buildSessionConfig()],
     ];
 
-    renderSponsorPage({
+    await renderSponsorPage({
       initialSessionId: 'edge-session-id',
       initialRegistryChainId: 'chain-84532',
     });
 
-    expect(await screen.findByTestId(E2E_TESTIDS.ADMIN_SESSION_SELECT)).toHaveValue('edge');
+    await waitFor(() => {
+      expect(screen.getByTestId(E2E_TESTIDS.ADMIN_SESSION_SELECT)).toHaveValue('edge');
+    });
   });
 
   it('ignores late mount-time session loads after the page unmounts', async () => {
@@ -237,7 +247,7 @@ describe('SponsorPage', () => {
     mockLoadSessionRegistryCache.mockReturnValueOnce(deferredRegistryLoad.promise);
 
     try {
-      const view = renderSponsorPage();
+      const view = await renderSponsorPage();
 
       expect(await screen.findByTestId(E2E_TESTIDS.ADMIN_SESSION_SELECT)).toHaveValue('edge');
 
@@ -281,7 +291,7 @@ describe('SponsorPage', () => {
             }
           : { ok: true, json: async () => ({ ok: true }) }
     ));
-    renderSponsorPage();
+    await renderSponsorPage();
 
     fireEvent.change(getFieldInputByLabel('Label'), {
       target: { value: 'Launch week sponsor bundle' },
@@ -413,7 +423,7 @@ describe('SponsorPage', () => {
   });
 
   it('issues sponsored deploy grants with only the Cloudflare API token', async () => {
-    renderSponsorPage();
+    await renderSponsorPage();
 
     expect(await screen.findByTestId(E2E_TESTIDS.ADMIN_SESSION_SELECT)).toHaveValue('edge');
     fireEvent.change(getFieldInputByLabel('Label'), {
@@ -442,7 +452,7 @@ describe('SponsorPage', () => {
   });
 
   it('persists sponsor bundle fields across remounts when dev keep secrets on refresh is enabled', async () => {
-    const view = renderSponsorPage();
+    const view = await renderSponsorPage();
 
     expect(await screen.findByTestId(E2E_TESTIDS.ADMIN_SESSION_SELECT)).toHaveValue('edge');
     expect(getToggleCheckbox('Dev: keep secrets on refresh')).toBeChecked();
@@ -458,7 +468,7 @@ describe('SponsorPage', () => {
     });
 
     view.unmount();
-    renderSponsorPage();
+    await renderSponsorPage();
 
     expect(await screen.findByTestId(E2E_TESTIDS.ADMIN_SESSION_SELECT)).toHaveValue('edge');
     expect(getToggleCheckbox('Dev: keep secrets on refresh')).toBeChecked();
@@ -468,7 +478,7 @@ describe('SponsorPage', () => {
   });
 
   it('does not persist sponsor bundle fields when dev keep secrets on refresh is disabled', async () => {
-    const view = renderSponsorPage();
+    const view = await renderSponsorPage();
 
     expect(await screen.findByTestId(E2E_TESTIDS.ADMIN_SESSION_SELECT)).toHaveValue('edge');
 
@@ -483,7 +493,7 @@ describe('SponsorPage', () => {
     });
 
     view.unmount();
-    renderSponsorPage();
+    await renderSponsorPage();
 
     expect(await screen.findByTestId(E2E_TESTIDS.ADMIN_SESSION_SELECT)).toHaveValue('edge');
     expect(getToggleCheckbox('Dev: keep secrets on refresh')).not.toBeChecked();
@@ -513,7 +523,7 @@ describe('SponsorPage', () => {
           : { ok: true, json: async () => ({ ok: true }) }
     ));
 
-    renderSponsorPage();
+    await renderSponsorPage();
 
     expect(await screen.findByText(
       'Deploy grants are unavailable until embedded deploy-helper is enabled on the sponsoring session worker.'
@@ -545,7 +555,7 @@ describe('SponsorPage', () => {
       return Promise.resolve({ ok: true, json: async () => ({ ok: true }) });
     });
 
-    renderSponsorPage();
+    await renderSponsorPage();
 
     fireEvent.change(getFieldInputByLabel('Label'), {
       target: { value: 'Origin blocked sponsor flow' },
@@ -565,7 +575,7 @@ describe('SponsorPage', () => {
   });
 
   it('clears the previous share URL and tx id when a regeneration attempt fails', async () => {
-    renderSponsorPage();
+    await renderSponsorPage();
 
     fireEvent.change(getFieldInputByLabel('Label'), {
       target: { value: 'Launch week sponsor bundle' },
@@ -598,7 +608,7 @@ describe('SponsorPage', () => {
     mockHasUsableSessionWorkerConfig.mockReturnValue(false);
     mockResolveCorsProxyUrl.mockRejectedValueOnce(new Error('worker unavailable'));
 
-    renderSponsorPage();
+    await renderSponsorPage();
 
     expect(await screen.findByTestId(E2E_TESTIDS.ADMIN_SESSION_SELECT)).toHaveValue('edge');
 
@@ -635,7 +645,7 @@ describe('SponsorPage', () => {
   });
 
   it('normalizes pasted worker endpoint URLs before signing grant and upload requests', async () => {
-    renderSponsorPage();
+    await renderSponsorPage();
 
     expect(await screen.findByTestId(E2E_TESTIDS.ADMIN_SESSION_SELECT)).toHaveValue('edge');
     fireEvent.click(screen.getByRole('button', { name: 'Edit upload worker URL' }));
@@ -688,7 +698,7 @@ describe('SponsorPage', () => {
     const deferredWorkerUrl = createDeferred();
     mockResolveCorsProxyUrl.mockReturnValueOnce(deferredWorkerUrl.promise);
 
-    renderSponsorPage();
+    await renderSponsorPage();
 
     expect(await screen.findByTestId(E2E_TESTIDS.ADMIN_SESSION_SELECT)).toHaveValue('edge');
     fireEvent.click(screen.getByRole('button', { name: 'Edit upload worker URL' }));
@@ -741,7 +751,7 @@ describe('SponsorPage', () => {
       }),
     ]];
 
-    renderSponsorPage();
+    await renderSponsorPage();
 
     expect(await screen.findByText(
       'Sponsor uploads currently require a session with a direct `adminAddress`.'
@@ -763,7 +773,7 @@ describe('SponsorPage', () => {
   });
 
   it('rejects sponsored URL creation when no supported credentials are provided', async () => {
-    renderSponsorPage();
+    await renderSponsorPage();
 
     fireEvent.change(getFieldInputByLabel('Label'), {
       target: { value: 'Metadata only bundle' },
@@ -778,7 +788,7 @@ describe('SponsorPage', () => {
   });
 
   it('shows an error when the selected expiry is in the past', async () => {
-    renderSponsorPage();
+    await renderSponsorPage();
 
     fireEvent.change(getFieldInputByLabel('Label'), {
       target: { value: 'Launch week sponsor bundle' },

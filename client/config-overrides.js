@@ -145,11 +145,6 @@ const override = function override(config, env) {
     __dirname, 'src', 'shims', 'metamask-delegation-utils.js'
   );
 
-  // ✅ React 17 polyfill for React 18's 'react-dom/client' (required by @web3auth/modal v10)
-  config.resolve.alias['react-dom/client'] = path.resolve(
-    __dirname, 'src', 'shims', 'react-dom-client-shim.js'
-  );
-
   // existing ffmpeg mock
   config.resolve.alias['@ffmpeg/ffmpeg'] = path.join(
     __dirname,

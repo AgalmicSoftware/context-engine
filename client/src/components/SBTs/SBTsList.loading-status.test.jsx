@@ -1,5 +1,5 @@
-import React from 'react';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import React, { act } from 'react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import SBTsList from './SBTsList.jsx';
 import { writeGlobalSessionSelection } from '../../utilities/session/globalSessionState.js';
 import { upsertCachedSessionWorkerConfig } from '../../utilities/session/sessionWorkerConfigCache.js';
@@ -5434,7 +5434,10 @@ describe('SBTsList per-session loader countdown', () => {
     });
     expect(ensureLightSbtUniverse).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByRole('button', { name: /Refresh/i }));
+    await waitFor(() => expect(screen.getByRole('button', { name: /Refresh/i })).toBeEnabled());
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /Refresh/i }));
+    });
 
     await waitFor(() => {
       expect(refreshSessionUniverseRegistryCache).toHaveBeenCalledTimes(1);
@@ -5732,7 +5735,10 @@ describe('SBTsList per-session loader countdown', () => {
       expect(screen.getByTestId('session-chip-beta')).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole('button', { name: /Clear Cache/i }));
+    await waitFor(() => expect(screen.getByRole('button', { name: /Clear Cache/i })).toBeEnabled());
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /Clear Cache/i }));
+    });
 
     await waitFor(() => {
       expect(mockRemoveCache).toHaveBeenCalledWith('sbtCache', 'alpha');
