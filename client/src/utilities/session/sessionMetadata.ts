@@ -5,9 +5,25 @@
  *
  * Key exports: stripAuthoritativeSessionGateFields, normalizeSessionNaming, normalizeLitMetadataNetwork
  */
-import type { SessionMetadata, UnknownRecord } from './sessionTypes.js';
 
-const DEFAULT_LIT_NETWORK = 'chipotle';
+/**
+ * @typedef {object} SessionMetadata
+ * @property {boolean=} sponsored
+ * @property {string=} sponsoredSbtAddress
+ * @property {Array<Record<string, any>> | Record<string, any>=} gates
+ * @property {string=} sessionName
+ * @property {string=} orgName
+ * @property {string=} sessionInfo
+ * @property {string=} orgInfo
+ * @property {string | Record<string, any> | null=} sessionInfoEncrypted
+ * @property {string | Record<string, any> | null=} encryptedSessionInfo
+ * @property {string | Record<string, any> | null=} orgInfoEncrypted
+ * @property {string | Record<string, any> | null=} encryptedOrgInfo
+ * @property {{ network?: string }=} lit
+ * @property {string=} litNetwork
+ */
+
+const DEFAULT_LIT_NETWORK = 'naga-dev';
 const LEGACY_LIT_NETWORK_ALIASES = Object.freeze({
   chipotle: 'chipotle',
   'chipotle-v3': 'chipotle',
@@ -38,7 +54,7 @@ const resolveCanonicalLitNetwork = (value: unknown): string => {
  * @param {unknown} metadata
  * @returns {unknown}
  */
-export const stripAuthoritativeSessionGateFields = (metadata: unknown): unknown => {
+export const stripAuthoritativeSessionGateFields = (metadata) => {
   if (!isObj(metadata)) return metadata;
   const next = cloneMetadata(metadata);
   delete next.sponsored;
@@ -52,7 +68,7 @@ export const stripAuthoritativeSessionGateFields = (metadata: unknown): unknown 
  * @param {unknown} metadata
  * @returns {unknown}
  */
-export const normalizeSessionNaming = (metadata: unknown): unknown => {
+export const normalizeSessionNaming = (metadata) => {
   if (!isObj(metadata)) return metadata;
   const next = cloneMetadata(metadata);
 
@@ -90,7 +106,7 @@ export const normalizeSessionNaming = (metadata: unknown): unknown => {
  * @param {unknown} metadata
  * @returns {unknown}
  */
-export const normalizeLitMetadataNetwork = (metadata: unknown): unknown => {
+export const normalizeLitMetadataNetwork = (metadata) => {
   if (!isObj(metadata)) return metadata;
   const next = cloneMetadata(metadata);
 

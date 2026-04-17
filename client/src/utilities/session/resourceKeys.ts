@@ -91,6 +91,90 @@ type EffectiveFaucetConfigResult = {
   encryptedAvailable: boolean;
 };
 
+/**
+ * @typedef {import('ethers').providers.Provider} EthersProvider
+ * @typedef {import('ethers').Signer} EthersSigner
+ */
+
+/**
+ * @typedef {string | EthersProvider | EthersSigner | {
+ *   provider?: unknown,
+ *   request?: (request: { method: string, params?: unknown[] }) => Promise<unknown>
+ * } | null | undefined} ResourceKeyProviderLike
+ */
+
+/**
+ * @typedef {object} FaucetConfig
+ * @property {boolean} useLocal
+ * @property {string} privateKey
+ * @property {string} rpcUrl
+ * @property {string} amountEth
+ * @property {string} balanceThresholdEth
+ */
+
+/**
+ * @typedef {object} ResourceKeys
+ * @property {{ useLocal: boolean, apiKey: string }} rpc
+ * @property {{ useLocal: boolean, jwk: string }} arweave
+ * @property {FaucetConfig} faucet
+ */
+
+/**
+ * @typedef {object} ResourceKeyResolutionContext
+ * @property {string=} account
+ * @property {number | string | null=} chainId
+ * @property {ResourceKeyProviderLike=} providerLike
+ * @property {Record<string, any>=} lit
+ */
+
+/**
+ * @typedef {object} EffectiveResourceKeyOptions
+ * @property {string=} sessionSlug
+ * @property {Record<string, any> | null=} sessionConfig
+ * @property {boolean=} preferLocal
+ * @property {ResourceKeyResolutionContext=} context
+ */
+
+/**
+ * @typedef {object} EffectiveRpcKeyResult
+ * @property {string} apiKey
+ * @property {'session' | 'local'} source
+ * @property {string} sessionConfigSource
+ * @property {string} status
+ * @property {boolean} preferLocal
+ * @property {string} sessionStatus
+ * @property {string} groupStatus
+ * @property {string} localStatus
+ */
+
+/**
+ * @typedef {object} EffectiveArweaveKeyResult
+ * @property {string} arweaveJwk
+ * @property {'session' | 'local'} source
+ * @property {string} sessionConfigSource
+ * @property {string} status
+ * @property {boolean} preferLocal
+ * @property {string} sessionStatus
+ * @property {string} groupStatus
+ * @property {string} localStatus
+ */
+
+/**
+ * @typedef {object} EffectiveFaucetConfigResult
+ * @property {string} privateKey
+ * @property {'session' | 'local'} source
+ * @property {string} sessionConfigSource
+ * @property {string} status
+ * @property {boolean} preferLocal
+ * @property {string} sessionStatus
+ * @property {string} groupStatus
+ * @property {string} localStatus
+ * @property {string} rpcUrl
+ * @property {string} amountEth
+ * @property {string} balanceThresholdEth
+ * @property {boolean} encryptedAvailable
+ */
+
 const log = createLogger('resourceKeys');
 
 
@@ -180,17 +264,25 @@ const writeStore = (payload: ResourceKeyStore): void => {
   } catch (e) { log.warn('resourceKeys: fallback', e); }
 };
 
-export const getLocalResourceKeys = (slugIn = ''): ResourceKeys => {
+/**
+ * Reads locally persisted resource-key overrides for a session slug.
+ * @param {string} [slugIn='']
+ * @returns {ResourceKeys}
+ */
+export const getLocalResourceKeys = (slugIn = '') => {
   const slug = normalizeSlug(slugIn);
   const stored = readStore();
   const entry = stored.bySession[slug] || null;
   return entry ? normalizeSettings(entry) : normalizeSettings(DEFAULT_SETTINGS);
 };
 
-export const saveLocalResourceKeys = (
-  slugIn = '',
-  updates: Partial<ResourceKeys> = {}
-): ResourceKeys => {
+/**
+ * Persists local resource-key overrides for a session slug after normalizing their stored shape.
+ * @param {string} [slugIn='']
+ * @param {Partial<ResourceKeys>} [updates={}]
+ * @returns {ResourceKeys}
+ */
+export const saveLocalResourceKeys = (slugIn = '', updates = {}) => {
   const slug = normalizeSlug(slugIn);
   const stored = readStore();
   const current = stored.bySession[slug] || normalizeSettings(DEFAULT_SETTINGS);
@@ -201,7 +293,12 @@ export const saveLocalResourceKeys = (
   return next;
 };
 
-export const clearLocalResourceKeys = (slugIn = ''): void => {
+/**
+ * Removes locally persisted resource-key overrides for a session slug.
+ * @param {string} [slugIn='']
+ * @returns {void}
+ */
+export const clearLocalResourceKeys = (slugIn = '') => {
   const slug = normalizeSlug(slugIn);
   const stored = readStore();
   if (stored.bySession[slug]) {
@@ -336,6 +433,11 @@ const resolveSessionFaucetKey = async (
   return buildWorkerKeyMeta('privateKey');
 };
 
+/**
+ * Resolves the effective RPC API key for a session, preferring local overrides when requested.
+ * @param {EffectiveResourceKeyOptions} [options={}]
+ * @returns {Promise<EffectiveRpcKeyResult>}
+ */
 export const getEffectiveRpcKey = async ({
   sessionSlug,
   sessionConfig,
@@ -378,6 +480,11 @@ export const getEffectiveRpcKey = async ({
   };
 };
 
+/**
+ * Resolves the effective Arweave JWK for a session, preferring local overrides when requested.
+ * @param {EffectiveResourceKeyOptions} [options={}]
+ * @returns {Promise<EffectiveArweaveKeyResult>}
+ */
 export const getEffectiveArweaveKey = async ({
   sessionSlug,
   sessionConfig,
@@ -420,6 +527,11 @@ export const getEffectiveArweaveKey = async ({
   };
 };
 
+/**
+ * Resolves the effective faucet credentials and RPC settings for a session, preferring local overrides when requested.
+ * @param {EffectiveResourceKeyOptions} [options={}]
+ * @returns {Promise<EffectiveFaucetConfigResult>}
+ */
 export const getEffectiveFaucetConfig = async ({
   sessionSlug,
   sessionConfig,
@@ -488,6 +600,17 @@ export const getEffectiveSessionArweaveKey = getEffectiveArweaveKey;
 /** @type {typeof getEffectiveFaucetConfig} */
 export const getEffectiveSessionFaucetConfig = getEffectiveFaucetConfig;
 
+/**
+ * Shared helpers for reading, persisting, and resolving session resource keys.
+ * @type {{
+ *   getLocalResourceKeys: typeof getLocalResourceKeys,
+ *   saveLocalResourceKeys: typeof saveLocalResourceKeys,
+ *   clearLocalResourceKeys: typeof clearLocalResourceKeys,
+ *   getEffectiveRpcKey: typeof getEffectiveRpcKey,
+ *   getEffectiveArweaveKey: typeof getEffectiveArweaveKey,
+ *   getEffectiveFaucetConfig: typeof getEffectiveFaucetConfig
+ * }}
+ */
 export const resourceKeysUtils = {
   getLocalResourceKeys,
   saveLocalResourceKeys,
