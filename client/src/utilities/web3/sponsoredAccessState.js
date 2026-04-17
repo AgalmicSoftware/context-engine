@@ -125,6 +125,7 @@ const accessInflight = new Map();
 export const SPONSORED_ACCESS_CACHE_HIT_TTL_MS = 30 * 1000;
 const ACCESS_CACHE_STALE_TTL_MS = 15 * 60 * 1000;
 const ACCESS_CACHE_MAX = 500;
+const sponsoredAccessChangeListeners = new Set();
 
 const pruneAccessCache = (nowIn = Date.now()) => {
   const now = Number(nowIn || Date.now());
@@ -154,6 +155,66 @@ const buildAccessCacheKey = ({
   const mode = normalizeGateMode(gate);
   const addressKey = sbtAddresses.map((addr) => addr.toLowerCase()).sort().join('|');
   return `${normalizedAccount}:${addressKey}:${gate?.chainId || ''}:${mode}:${toStr(resourceKey).trim() || 'default'}`;
+};
+
+const normalizeAccessChangeStatus = (status) => (
+  toStr(status).trim().toLowerCase()
+);
+
+const normalizeAccessChangeAccount = (account) => {
+  const normalized = toStr(account).trim().toLowerCase();
+  return ethers.utils.isAddress(normalized) ? normalized : '';
+};
+
+const emitSponsoredAccessChange = (payload = {}) => {
+  sponsoredAccessChangeListeners.forEach((listener) => {
+    try {
+      listener(payload);
+    } catch (_) {}
+  });
+};
+
+const shouldEmitSponsoredAccessChange = (previousStatus, nextStatus) => {
+  const prev = normalizeAccessChangeStatus(previousStatus) || 'unknown';
+  const next = normalizeAccessChangeStatus(nextStatus);
+  if (next !== 'granted' && next !== 'denied') return false;
+  if (prev === next) return false;
+  return prev === 'checking' || prev === 'unknown';
+};
+
+export const addSponsoredAccessChangeListener = (listener) => {
+  if (typeof listener !== 'function') {
+    return () => {};
+  }
+  sponsoredAccessChangeListeners.add(listener);
+  return () => {
+    sponsoredAccessChangeListeners.delete(listener);
+  };
+};
+
+const writeCachedSponsoredAccess = ({
+  cacheKey,
+  sessionSlug,
+  account,
+  resourceKey,
+  value,
+  ts = Date.now(),
+} = {}) => {
+  if (!cacheKey || !value) return value || null;
+  const previousStatus = accessCache.get(cacheKey)?.value?.status || 'unknown';
+  const writeTs = Number(ts || Date.now()) || Date.now();
+  accessCache.set(cacheKey, { ts: writeTs, value });
+  pruneAccessCache(writeTs);
+  if (shouldEmitSponsoredAccessChange(previousStatus, value?.status)) {
+    emitSponsoredAccessChange({
+      sessionSlug: toStr(sessionSlug).trim(),
+      resourceKey: toStr(resourceKey).trim() || 'default',
+      account: normalizeAccessChangeAccount(account),
+      status: normalizeAccessChangeStatus(value?.status),
+      accessMode: 'sponsored-restricted',
+    });
+  }
+  return value;
 };
 
 const readAccessCacheEntry = ({
@@ -272,9 +333,14 @@ export const checkSponsoredAccessWithChecker = async ({
             ? checks.every(Boolean)
             : checks.some(Boolean);
         const value = { status: has ? 'granted' : 'denied', gate, resourceKey };
-        const writeTs = Date.now();
-        accessCache.set(key, { ts: writeTs, value });
-        pruneAccessCache(writeTs);
+        writeCachedSponsoredAccess({
+          cacheKey: key,
+          sessionSlug,
+          account,
+          resourceKey,
+          value,
+          ts: Date.now(),
+        });
         return value;
       } catch (err) {
         return { status: 'error', error: err?.message || 'unknown', gate, resourceKey };
