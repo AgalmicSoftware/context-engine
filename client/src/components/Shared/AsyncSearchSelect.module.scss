@@ -69,12 +69,6 @@
   white-space: nowrap;
 }
 
-.controlSpinner {
-  flex: 0 0 auto;
-  font-size: 0.92rem;
-  color: var(--ce-async-select-text-color);
-}
-
 .caret {
   width: 0;
   height: 0;
@@ -128,7 +122,8 @@
   overflow-y: auto;
 }
 
-.empty {
+.empty,
+.loading {
   padding: 10px;
   color: var(--ce-async-select-placeholder-color);
   text-align: center;
