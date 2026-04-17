@@ -29,7 +29,6 @@ import {
   Table,
   Progress
 } from 'reactstrap';
-import Select from 'react-select';
 
 
 import "../../assets/css/contextEngine.scss";
