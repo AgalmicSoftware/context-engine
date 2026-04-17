@@ -117,6 +117,7 @@ broadcast/
 # AI agent local config and skills (maintainer-only; AGENTS.md is the public surface)
 .claude/
 .codex/
+.codex-artifacts/
 .codex-solc/
 .codex-tmp/
 
