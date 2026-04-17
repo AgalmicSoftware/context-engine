@@ -139,6 +139,7 @@ describe('rpcProviders session-sponsored reads', () => {
       sessionAccessStatus: 'open',
       sessionRpcSource: 'root',
     }));
+    expect(provider?.__CE_RPC_CACHE_KEY).not.toContain(cfg.slug);
   });
 
   it('keeps a truly custom PATH override ahead of sponsored session root RPC', () => {
@@ -337,6 +338,55 @@ describe('rpcProviders session-sponsored reads', () => {
     }));
   });
 
+  it('prunes stuck transition-state providers after the TTL window', () => {
+    jest.useFakeTimers();
+    try {
+      const reduxAccount = '0x00000000000000000000000000000000000000ba';
+      const selectedAccount = '0x00000000000000000000000000000000000000bb';
+      jest.spyOn(store, 'getState').mockReturnValue({
+        profile: {
+          account: reduxAccount,
+        },
+      });
+      globalThis.ethereum = {
+        selectedAddress: selectedAccount,
+      };
+
+      const cfg = buildGroupCfg({
+        slug: 'session-sponsored-rpc-checking-ttl-prune',
+        rpcUrl: ROOT_RPC_URL,
+        sponsoredKeys: { rpc: true },
+        __registry: {
+          gateAuthority: 'onchain',
+          gatesByResource: {
+            rpc: {
+              lookupStatus: 'ok',
+              sbtAddresses: [RESTRICTED_SBT],
+              mode: 'any',
+              chainId: 84532,
+            },
+          },
+        },
+      });
+
+      const firstProvider = getReadProviderForGroup(cfg);
+
+      expect(firstProvider?.__CE_RPC_META).toEqual(expect.objectContaining({
+        sessionAccessStatus: 'checking',
+      }));
+      expect(firstProvider?.__CE_RPC_CACHE_KEY).toContain(`:${cfg.slug}:`);
+
+      jest.advanceTimersByTime(60_000);
+
+      const nextProvider = getReadProviderForGroup(cfg);
+
+      expect(nextProvider?.__CE_RPC_CACHE_KEY).toBe(firstProvider?.__CE_RPC_CACHE_KEY);
+      expect(nextProvider).not.toBe(firstProvider);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('keeps transition-state providers isolated per session slug when one session resolves', async () => {
     const account = '0x00000000000000000000000000000000000000a9';
     jest.spyOn(store, 'getState').mockReturnValue({
@@ -474,6 +524,7 @@ describe('rpcProviders session-sponsored reads', () => {
       sessionRpcSource: 'root',
       preferredUrls: expect.arrayContaining([ROOT_RPC_URL]),
     }));
+    expect(nextProvider?.__CE_RPC_CACHE_KEY).not.toContain(cfg.slug);
   });
 
   it('uses restricted sponsored session RPC after a cached wallet grant', async () => {
@@ -518,6 +569,7 @@ describe('rpcProviders session-sponsored reads', () => {
       sessionAccessMode: 'sponsored-restricted',
       sessionRpcSource: 'root',
     }));
+    expect(provider?.__CE_RPC_CACHE_KEY).not.toContain(cfg.slug);
   });
 
   it('fails closed when the selected wallet disagrees with a stale redux account that has a cached grant', async () => {
@@ -662,5 +714,6 @@ describe('rpcProviders session-sponsored reads', () => {
       sessionRpcSource: 'default-path',
     }));
     expect(provider?.__CE_RPC_META?.preferredUrls).not.toContain(ROOT_RPC_URL);
+    expect(provider?.__CE_RPC_CACHE_KEY).not.toContain(cfg.slug);
   });
 });

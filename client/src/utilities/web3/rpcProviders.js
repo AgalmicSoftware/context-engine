@@ -47,11 +47,17 @@ const PATH_RPC_SUCCESS_ONCE = new Set();
 const RPC_PROVIDER_MODE_DEFAULT = String(CE_RPC_PROVIDER_MODE || 'fallback').trim().toLowerCase() || 'fallback';
 const RPC_PROVIDER_SUCCESS_ONCE = new Set();
 const SPONSORED_RPC_RESOURCE_KEY = 'rpc';
+const SESSION_PROVIDER_TRANSITION_PRUNE_TTL_MS = 60 * 1000;
+const TRANSITIONAL_SESSION_ACCESS_STATUSES = new Set(['checking', 'unresolved']);
 
 const normalizeRpcProviderMode = (raw) => {
   const mode = String(raw || '').trim().toLowerCase();
   return mode === 'infura_only' ? 'infura_only' : 'fallback';
 };
+
+const shouldTrackSessionProviderCacheKey = (sessionAccessStatus = '') => (
+  TRANSITIONAL_SESSION_ACCESS_STATUSES.has(toLower(sessionAccessStatus))
+);
 
 const readRpcProviderMode = () => {
   try {
@@ -362,17 +368,21 @@ const resolveSponsoredSessionRpcAccess = (cfg = {}, sessionSlug = '', sessionRpc
       };
     }
 
+    const cachedStatus = toStr(cachedAccess?.status).trim().toLowerCase();
+
     // Regression guard: restricted sponsored RPC must fail closed until the
     // wallet grant is verified, so we warm the check in the background.
-    void warmSponsoredSessionRpcAccess({
-      sessionConfig: cfg,
-      sessionSlug,
-      account,
-    });
+    if (cachedStatus !== SPONSORED_GATE_STATES.UNAVAILABLE) {
+      void warmSponsoredSessionRpcAccess({
+        sessionConfig: cfg,
+        sessionSlug,
+        account,
+      });
+    }
 
     return {
       allowed: false,
-      status: cachedAccess?.status || 'checking',
+      status: cachedStatus || 'checking',
       accessMode: 'sponsored-restricted',
       account,
     };
@@ -438,7 +448,7 @@ function resolveGroupPathRpcPreference(cfg, chainId) {
   const sessionSlug = toStr(cfg?.slug).trim();
   const shouldUseSessionSlugInCacheKey = (
     !!sessionSlug &&
-    (toStr(sessionRootAccess.accessMode).trim() || 'none') !== 'none'
+    shouldTrackSessionProviderCacheKey(sessionRootAccess.status)
   );
   const accessCacheKey = [
     toStr(sessionRootAccess.accessMode).trim() || 'none',
@@ -463,22 +473,43 @@ function resolveGroupPathRpcPreference(cfg, chainId) {
 // === Cached provider registry (per chain + variant) ===
 const _providerCache = new Map();
 const _sessionProviderCacheKeys = new Map();
-const TRANSITIONAL_SESSION_ACCESS_STATUSES = new Set(['checking', 'unresolved']);
-
-const shouldTrackSessionProviderCacheKey = (sessionAccessStatus = '') => (
-  TRANSITIONAL_SESSION_ACCESS_STATUSES.has(toLower(sessionAccessStatus))
-);
+const clearTrackedSessionProviderCacheKey = (
+  sessionSlug = '',
+  cacheKey = '',
+  { deleteProvider = true } = {}
+) => {
+  const slug = toStr(sessionSlug).trim();
+  const key = toStr(cacheKey).trim();
+  if (!slug || !key) return;
+  const cacheKeys = _sessionProviderCacheKeys.get(slug);
+  if (!cacheKeys?.size || !cacheKeys.has(key)) return;
+  const timeoutId = cacheKeys.get(key);
+  if (timeoutId) {
+    clearTimeout(timeoutId);
+  }
+  cacheKeys.delete(key);
+  if (deleteProvider) {
+    _providerCache.delete(key);
+  }
+  if (!cacheKeys.size) {
+    _sessionProviderCacheKeys.delete(slug);
+  }
+};
 
 const trackSessionProviderCacheKey = (sessionSlug = '', cacheKey = '') => {
   const slug = toStr(sessionSlug).trim();
   const key = toStr(cacheKey).trim();
   if (!slug || !key) return;
+  clearTrackedSessionProviderCacheKey(slug, key, { deleteProvider: false });
+  const timeoutId = setTimeout(() => {
+    clearTrackedSessionProviderCacheKey(slug, key);
+  }, SESSION_PROVIDER_TRANSITION_PRUNE_TTL_MS);
   const existing = _sessionProviderCacheKeys.get(slug);
   if (existing) {
-    existing.add(key);
+    existing.set(key, timeoutId);
     return;
   }
-  _sessionProviderCacheKeys.set(slug, new Set([key]));
+  _sessionProviderCacheKeys.set(slug, new Map([[key, timeoutId]]));
 };
 
 const clearTrackedSessionProviderCache = (sessionSlug = '') => {
@@ -486,7 +517,10 @@ const clearTrackedSessionProviderCache = (sessionSlug = '') => {
   if (!slug) return;
   const cacheKeys = _sessionProviderCacheKeys.get(slug);
   if (!cacheKeys?.size) return;
-  cacheKeys.forEach((cacheKey) => {
+  cacheKeys.forEach((timeoutId, cacheKey) => {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
     _providerCache.delete(cacheKey);
   });
   _sessionProviderCacheKeys.delete(slug);

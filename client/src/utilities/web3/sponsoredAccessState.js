@@ -122,9 +122,13 @@ export const resolveSponsoredGateForResource = (cfg = {}, resourceKey = '') => {
 
 const accessCache = new Map();
 const accessInflight = new Map();
+const SPONSORED_ACCESS_INFLIGHT_TIMEOUT_MS = 30 * 1000;
 export const SPONSORED_ACCESS_CACHE_HIT_TTL_MS = 30 * 1000;
 const ACCESS_CACHE_STALE_TTL_MS = 15 * 60 * 1000;
 const ACCESS_CACHE_MAX = 500;
+const SPONSORED_ACCESS_STATES = Object.freeze({
+  TIMED_OUT: 'timed-out',
+});
 const sponsoredAccessChangeListeners = new Set();
 
 const pruneAccessCache = (nowIn = Date.now()) => {
@@ -237,22 +241,109 @@ const readAccessCacheEntry = ({
   return cached;
 };
 
+const toPublicSponsoredAccessValue = (value) => {
+  if (!value || typeof value !== 'object') return value || null;
+  const status = toStr(value?.status).trim().toLowerCase();
+  if (status !== SPONSORED_ACCESS_STATES.TIMED_OUT) {
+    return value;
+  }
+  // Keep timeout state internal so downstream consumers continue to treat it
+  // as a retryable unresolved check instead of a terminal denial.
+  return {
+    ...value,
+    status: SPONSORED_GATE_STATES.UNRESOLVED,
+  };
+};
+
 const runAccessCheckWithInflight = ({
   cacheKey,
   runCheck,
+  timeoutMs = SPONSORED_ACCESS_INFLIGHT_TIMEOUT_MS,
+  onResolve,
+  onReject,
+  onTimeout,
 } = {}) => {
   if (!cacheKey) {
-    return Promise.resolve(runCheck?.());
+    try {
+      return Promise.resolve(runCheck?.())
+        .then((value) => (typeof onResolve === 'function' ? onResolve(value) : value))
+        .catch((err) => {
+          if (typeof onReject === 'function') {
+            return onReject(err);
+          }
+          throw err;
+        });
+    } catch (err) {
+      if (typeof onReject === 'function') {
+        return Promise.resolve(onReject(err));
+      }
+      return Promise.reject(err);
+    }
   }
   if (accessInflight.has(cacheKey)) {
     return accessInflight.get(cacheKey);
   }
-  const inflight = Promise.resolve(runCheck?.())
-    .finally(() => {
+  let inflight = null;
+  inflight = new Promise((resolve, reject) => {
+    let settled = false;
+    let timeoutId = null;
+    const finish = (handler, value) => {
+      if (settled) return;
+      settled = true;
+      if (timeoutId !== null) {
+        clearTimeout(timeoutId);
+      }
       if (accessInflight.get(cacheKey) === inflight) {
         accessInflight.delete(cacheKey);
       }
-    });
+      handler(value);
+    };
+
+    timeoutId = setTimeout(() => {
+      try {
+        finish(resolve, typeof onTimeout === 'function' ? onTimeout() : null);
+      } catch (err) {
+        finish(reject, err);
+      }
+    }, Math.max(0, Number(timeoutMs || 0)));
+
+    let runPromise = null;
+    try {
+      runPromise = Promise.resolve(runCheck?.());
+    } catch (err) {
+      if (typeof onReject === 'function') {
+        try {
+          finish(resolve, onReject(err));
+        } catch (nextErr) {
+          finish(reject, nextErr);
+        }
+        return;
+      }
+      finish(reject, err);
+      return;
+    }
+
+    runPromise
+      .then((value) => {
+        if (settled) return undefined;
+        return typeof onResolve === 'function' ? onResolve(value) : value;
+      })
+      .catch((err) => {
+        if (settled) return undefined;
+        if (typeof onReject === 'function') {
+          return onReject(err);
+        }
+        throw err;
+      })
+      .then((value) => {
+        if (settled) return;
+        finish(resolve, value);
+      })
+      .catch((err) => {
+        if (settled) return;
+        finish(reject, err);
+      });
+  });
   accessInflight.set(cacheKey, inflight);
   return inflight;
 };
@@ -266,12 +357,13 @@ export const readCachedSponsoredAccess = ({
   const gateState = resolveSponsoredGateStateForResource(sessionConfig || {}, resourceKey);
   const gate = gateState?.gate || null;
   if (!gate || gate.type !== 'sbt') return null;
-  return readAccessCacheEntry({
+  const cached = readAccessCacheEntry({
     account,
     gate,
     resourceKey,
     maxAgeMs,
-  })?.value || null;
+  });
+  return cached?.value ? toPublicSponsoredAccessValue(cached.value) : null;
 };
 
 export const checkSponsoredAccessWithChecker = async ({
@@ -309,44 +401,57 @@ export const checkSponsoredAccessWithChecker = async ({
   const key = buildAccessCacheKey({ account, gate, resourceKey });
   const cached = key ? accessCache.get(key) : null;
   if (cached && (now - Number(cached.ts || 0)) < SPONSORED_ACCESS_CACHE_HIT_TTL_MS) {
-    return cached.value;
+    return toPublicSponsoredAccessValue(cached.value);
   }
   if (cached) accessCache.delete(key);
 
-  return runAccessCheckWithInflight({
+  const persistAccessResult = (value) => {
+    const status = toStr(value?.status).trim().toLowerCase();
+    if (
+      status !== 'granted' &&
+      status !== 'denied' &&
+      status !== SPONSORED_ACCESS_STATES.TIMED_OUT
+    ) {
+      return value;
+    }
+    return writeCachedSponsoredAccess({
+      cacheKey: key,
+      sessionSlug,
+      account,
+      resourceKey,
+      value,
+      ts: Date.now(),
+    });
+  };
+
+  return Promise.resolve(runAccessCheckWithInflight({
     cacheKey: key,
     runCheck: async () => {
-      try {
-        const checks = await Promise.all(
-          sbtAddresses.map((addr) =>
-            Promise.resolve(checkSbtAccess?.({
-              sbtAddress: addr,
-              account,
-              sessionConfig: cfg,
-              sessionSlug,
-              resourceKey,
-            }))
-          )
-        );
-        const has =
-          normalizeGateMode(gate) === 'all'
-            ? checks.every(Boolean)
-            : checks.some(Boolean);
-        const value = { status: has ? 'granted' : 'denied', gate, resourceKey };
-        writeCachedSponsoredAccess({
-          cacheKey: key,
-          sessionSlug,
-          account,
-          resourceKey,
-          value,
-          ts: Date.now(),
-        });
-        return value;
-      } catch (err) {
-        return { status: 'error', error: err?.message || 'unknown', gate, resourceKey };
-      }
+      const checks = await Promise.all(
+        sbtAddresses.map((addr) =>
+          Promise.resolve(checkSbtAccess?.({
+            sbtAddress: addr,
+            account,
+            sessionConfig: cfg,
+            sessionSlug,
+            resourceKey,
+          }))
+        )
+      );
+      const has =
+        normalizeGateMode(gate) === 'all'
+          ? checks.every(Boolean)
+          : checks.some(Boolean);
+      return { status: has ? 'granted' : 'denied', gate, resourceKey };
     },
-  });
+    onResolve: persistAccessResult,
+    onReject: (err) => ({ status: 'error', error: err?.message || 'unknown', gate, resourceKey }),
+    onTimeout: () => persistAccessResult({
+      status: SPONSORED_ACCESS_STATES.TIMED_OUT,
+      gate,
+      resourceKey,
+    }),
+  })).then((value) => toPublicSponsoredAccessValue(value));
 };
 
 export const primeSponsoredAccessCheckWithChecker = ({
@@ -372,7 +477,7 @@ export const primeSponsoredAccessCheckWithChecker = ({
     maxAgeMs: SPONSORED_ACCESS_CACHE_HIT_TTL_MS,
   });
   if (cached?.value) {
-    return Promise.resolve(cached.value);
+    return Promise.resolve(toPublicSponsoredAccessValue(cached.value));
   }
   return checkSponsoredAccessWithChecker({
     sessionConfig,
