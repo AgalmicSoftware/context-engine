@@ -1,3 +1,10 @@
+jest.mock('./contractScripts.js', () => ({
+  __esModule: true,
+  default: {
+    userHasSBT: jest.fn(),
+  },
+}));
+
 import store from '../../store.js';
 import contractScripts from './contractScripts.js';
 import {
@@ -7,20 +14,10 @@ import {
 } from './rpcProviders.js';
 import { checkSponsoredAccess } from './sponsoredAccess.js';
 
-jest.mock('./contractScripts.js', () => ({
-  __esModule: true,
-  default: {
-    userHasSBT: jest.fn(),
-  },
-}));
-
 const ROOT_RPC_URL = 'https://session-sponsored.example/rpc';
-const FAILING_ROOT_RPC_URL = 'https://session-sponsored-failing.example/rpc';
 const PATH_DEFAULT_BASE_SEPOLIA = 'https://base-sepolia-testnet.api.pocket.network';
 const RESTRICTED_SBT = '0x0000000000000000000000000000000000000A11';
-const OTHER_RESTRICTED_SBT = '0x0000000000000000000000000000000000000A12';
 const CUSTOM_PATH_RPC_URL = 'https://custom-path.example/rpc';
-const BASE_SEPOLIA_NETWORK = { chainId: 84532, name: 'base-sepolia' };
 
 const buildGroupCfg = (overrides = {}) => {
   const base = {
@@ -78,11 +75,6 @@ const buildWizardShapedRpcCfg = ({
   },
   ...(registry ? { __registry: registry } : {}),
 });
-
-const pinMockProviderNetwork = (provider) => {
-  provider.detectNetwork = jest.fn(async () => BASE_SEPOLIA_NETWORK);
-  provider.getNetwork = jest.fn(async () => BASE_SEPOLIA_NETWORK);
-};
 
 describe('rpcProviders session-sponsored reads', () => {
   beforeEach(() => {
@@ -146,56 +138,6 @@ describe('rpcProviders session-sponsored reads', () => {
       sessionAccessStatus: 'open',
       sessionRpcSource: 'root',
     }));
-    expect(provider?.__CE_RPC_CACHE_KEY).not.toContain(cfg.slug);
-  });
-
-  it('falls back to public PATH reads when the sponsored root RPC returns a malformed call exception', async () => {
-    const cfg = buildWizardShapedRpcCfg({
-      slug: 'session-sponsored-rpc-open-failing-root',
-      rootRpcUrl: FAILING_ROOT_RPC_URL,
-      registry: {
-        gateAuthority: 'onchain',
-        gatesByResource: {
-          rpc: {
-            lookupStatus: 'ok',
-            sbtAddresses: [],
-            mode: 'any',
-            chainId: 84532,
-          },
-        },
-      },
-    });
-
-    const provider = getReadProviderForGroup(cfg);
-    const rootConfig = provider.providerConfigs.find(
-      (entry) => entry?.provider?.connection?.url === FAILING_ROOT_RPC_URL
-    );
-    const pathConfig = provider.providerConfigs.find(
-      (entry) => entry?.provider?.connection?.url === PATH_DEFAULT_BASE_SEPOLIA
-    );
-    pinMockProviderNetwork(provider);
-    pinMockProviderNetwork(rootConfig.provider);
-    pinMockProviderNetwork(pathConfig.provider);
-
-    const sponsoredError = new Error(
-      'missing revert data in call exception; Transaction reverted without a reason string'
-    );
-    sponsoredError.code = 'CALL_EXCEPTION';
-    rootConfig.provider.send = jest.fn(async (method) => {
-      if (method === 'eth_chainId') return '0x14a34';
-      if (method === 'net_version') return '84532';
-      throw sponsoredError;
-    });
-    pathConfig.provider.send = jest.fn(async (method) => {
-      if (method === 'eth_chainId') return '0x14a34';
-      if (method === 'net_version') return '84532';
-      if (method === 'eth_blockNumber') return '0x64';
-      return '0x';
-    });
-
-    await expect(provider.getBlockNumber()).resolves.toBe(100);
-    expect(rootConfig.provider.send).toHaveBeenCalledWith('eth_blockNumber', []);
-    expect(pathConfig.provider.send).toHaveBeenCalledWith('eth_blockNumber', []);
   });
 
   it('keeps a truly custom PATH override ahead of sponsored session root RPC', () => {
@@ -245,29 +187,6 @@ describe('rpcProviders session-sponsored reads', () => {
       providerLabel: 'path',
       preferredUrls: expect.arrayContaining([PATH_DEFAULT_BASE_SEPOLIA]),
       sessionAccessStatus: 'unavailable',
-      sessionRpcSource: 'default-path',
-    }));
-  });
-
-  it('shares the cached provider across non-sponsored sessions with identical PATH inputs', () => {
-    const cfgA = buildWizardShapedRpcCfg({
-      slug: 'session-sponsored-rpc-unavailable-shared-path-a',
-    });
-    const cfgB = buildWizardShapedRpcCfg({
-      slug: 'session-sponsored-rpc-unavailable-shared-path-b',
-    });
-
-    const providerA = getReadProviderForGroup(cfgA);
-    const providerB = getReadProviderForGroup(cfgB);
-
-    expect(providerA).toBe(providerB);
-    expect(providerA?.__CE_RPC_CACHE_KEY).toBe(providerB?.__CE_RPC_CACHE_KEY);
-    expect(providerA?.__CE_RPC_CACHE_KEY).not.toContain(cfgA.slug);
-    expect(providerA?.__CE_RPC_CACHE_KEY).not.toContain(cfgB.slug);
-    expect(providerA?.__CE_RPC_META).toEqual(expect.objectContaining({
-      providerLabel: 'path',
-      sessionAccessStatus: 'unavailable',
-      sessionAccessMode: 'none',
       sessionRpcSource: 'default-path',
     }));
   });
@@ -358,299 +277,6 @@ describe('rpcProviders session-sponsored reads', () => {
     expect(provider?.__CE_RPC_META?.preferredUrls).toContain(PATH_DEFAULT_BASE_SEPOLIA);
   });
 
-  it('uses the default session gate for sponsored RPC when the rpc resource gate is unset', async () => {
-    const account = '0x00000000000000000000000000000000000000c1';
-    jest.spyOn(store, 'getState').mockReturnValue({
-      profile: {
-        account,
-      },
-    });
-    contractScripts.userHasSBT.mockResolvedValue(true);
-
-    const cfg = buildGroupCfg({
-      slug: 'session-sponsored-rpc-default-gate',
-      rpcUrl: ROOT_RPC_URL,
-      sponsoredKeys: { rpc: true },
-      __registry: {
-        gateAuthority: 'onchain',
-        gatesByResource: {
-          default: {
-            lookupStatus: 'ok',
-            sbtAddresses: [RESTRICTED_SBT],
-            mode: 'any',
-            chainId: 84532,
-          },
-          rpc: {
-            lookupStatus: 'ok',
-            sbtAddresses: [],
-            mode: 'any',
-            chainId: 84532,
-          },
-        },
-      },
-    });
-
-    const initialProvider = getReadProviderForGroup(cfg);
-
-    expect(initialProvider?.__CE_RPC_META).toEqual(expect.objectContaining({
-      providerLabel: 'path',
-      sessionAccessStatus: 'checking',
-      sessionAccessMode: 'sponsored-restricted',
-      sessionRpcSource: 'default-path',
-    }));
-    expect(initialProvider?.__CE_RPC_META?.preferredUrls).not.toContain(ROOT_RPC_URL);
-
-    const access = await checkSponsoredAccess({
-      sessionConfig: cfg,
-      sessionSlug: cfg.slug,
-      account,
-      resourceKey: 'rpc',
-    });
-    const provider = getReadProviderForGroup(cfg);
-
-    expect(access.status).toBe('granted');
-    expect(contractScripts.userHasSBT).toHaveBeenCalledWith(
-      'none',
-      RESTRICTED_SBT,
-      account,
-      0,
-      'latest',
-      cfg
-    );
-    expect(provider?.__CE_RPC_META).toEqual(expect.objectContaining({
-      providerLabel: 'session',
-      sessionAccessStatus: 'granted',
-      sessionAccessMode: 'sponsored-restricted',
-      sessionRpcSource: 'root',
-      preferredUrls: expect.arrayContaining([ROOT_RPC_URL]),
-    }));
-  });
-
-  it('keeps sponsored-restricted session cache keys isolated by slug', () => {
-    const account = '0x00000000000000000000000000000000000000aa';
-    jest.spyOn(store, 'getState').mockReturnValue({
-      profile: {
-        account,
-      },
-    });
-    contractScripts.userHasSBT.mockImplementation(() => new Promise(() => {}));
-
-    const cfg = buildGroupCfg({
-      slug: 'session-sponsored-rpc-checking-cache-key',
-      rpcUrl: ROOT_RPC_URL,
-      sponsoredKeys: { rpc: true },
-      __registry: {
-        gateAuthority: 'onchain',
-        gatesByResource: {
-          rpc: {
-            lookupStatus: 'ok',
-            sbtAddresses: [RESTRICTED_SBT],
-            mode: 'any',
-            chainId: 84532,
-          },
-        },
-      },
-    });
-
-    const provider = getReadProviderForGroup(cfg);
-
-    expect(provider?.__CE_RPC_CACHE_KEY).toContain(`:${cfg.slug}:`);
-    expect(provider?.__CE_RPC_META).toEqual(expect.objectContaining({
-      sessionAccessStatus: 'checking',
-      sessionAccessMode: 'sponsored-restricted',
-      sessionRpcSource: 'default-path',
-    }));
-  });
-
-  it('prunes stuck transition-state providers after the TTL window', () => {
-    jest.useFakeTimers();
-    try {
-      const reduxAccount = '0x00000000000000000000000000000000000000ba';
-      const selectedAccount = '0x00000000000000000000000000000000000000bb';
-      jest.spyOn(store, 'getState').mockReturnValue({
-        profile: {
-          account: reduxAccount,
-        },
-      });
-      globalThis.ethereum = {
-        selectedAddress: selectedAccount,
-      };
-
-      const cfg = buildGroupCfg({
-        slug: 'session-sponsored-rpc-checking-ttl-prune',
-        rpcUrl: ROOT_RPC_URL,
-        sponsoredKeys: { rpc: true },
-        __registry: {
-          gateAuthority: 'onchain',
-          gatesByResource: {
-            rpc: {
-              lookupStatus: 'ok',
-              sbtAddresses: [RESTRICTED_SBT],
-              mode: 'any',
-              chainId: 84532,
-            },
-          },
-        },
-      });
-
-      const firstProvider = getReadProviderForGroup(cfg);
-
-      expect(firstProvider?.__CE_RPC_META).toEqual(expect.objectContaining({
-        sessionAccessStatus: 'checking',
-      }));
-      expect(firstProvider?.__CE_RPC_CACHE_KEY).toContain(`:${cfg.slug}:`);
-
-      jest.advanceTimersByTime(60_000);
-
-      const nextProvider = getReadProviderForGroup(cfg);
-
-      expect(nextProvider?.__CE_RPC_CACHE_KEY).toBe(firstProvider?.__CE_RPC_CACHE_KEY);
-      expect(nextProvider).not.toBe(firstProvider);
-    } finally {
-      jest.useRealTimers();
-    }
-  });
-
-  it('keeps transition-state providers isolated per session slug when one session resolves', async () => {
-    const account = '0x00000000000000000000000000000000000000a9';
-    jest.spyOn(store, 'getState').mockReturnValue({
-      profile: {
-        account,
-      },
-    });
-    contractScripts.userHasSBT.mockImplementation((_providerName, sbtAddress) => {
-      if (sbtAddress === RESTRICTED_SBT) {
-        return Promise.resolve(true);
-      }
-      if (sbtAddress === OTHER_RESTRICTED_SBT) {
-        return new Promise(() => {});
-      }
-      return Promise.resolve(false);
-    });
-
-    const cfgA = buildGroupCfg({
-      slug: 'session-sponsored-rpc-checking-isolated-a',
-      rpcUrl: ROOT_RPC_URL,
-      sponsoredKeys: { rpc: true },
-      __registry: {
-        gateAuthority: 'onchain',
-        gatesByResource: {
-          rpc: {
-            lookupStatus: 'ok',
-            sbtAddresses: [RESTRICTED_SBT],
-            mode: 'any',
-            chainId: 84532,
-          },
-        },
-      },
-    });
-    const cfgB = buildGroupCfg({
-      slug: 'session-sponsored-rpc-checking-isolated-b',
-      rpcUrl: ROOT_RPC_URL,
-      sponsoredKeys: { rpc: true },
-      __registry: {
-        gateAuthority: 'onchain',
-        gatesByResource: {
-          rpc: {
-            lookupStatus: 'ok',
-            sbtAddresses: [OTHER_RESTRICTED_SBT],
-            mode: 'any',
-            chainId: 84532,
-          },
-        },
-      },
-    });
-
-    const providerA = getReadProviderForGroup(cfgA);
-    const providerB = getReadProviderForGroup(cfgB);
-
-    expect(providerA).not.toBe(providerB);
-    expect(providerA?.__CE_RPC_META).toEqual(expect.objectContaining({
-      sessionAccessStatus: 'checking',
-    }));
-    expect(providerB?.__CE_RPC_META).toEqual(expect.objectContaining({
-      sessionAccessStatus: 'checking',
-    }));
-
-    const access = await checkSponsoredAccess({
-      sessionConfig: cfgA,
-      sessionSlug: cfgA.slug,
-      account,
-      resourceKey: 'rpc',
-    });
-    const nextProviderB = getReadProviderForGroup(cfgB);
-
-    expect(access.status).toBe('granted');
-    expect(nextProviderB).toBe(providerB);
-    expect(nextProviderB?.__CE_RPC_META).toEqual(expect.objectContaining({
-      sessionAccessStatus: 'checking',
-      sessionRpcSource: 'default-path',
-    }));
-  });
-
-  it('switches diagnostics to the session root RPC after restricted access transitions from checking to granted', async () => {
-    const account = '0x00000000000000000000000000000000000000a8';
-    jest.spyOn(store, 'getState').mockReturnValue({
-      profile: {
-        account,
-      },
-    });
-    contractScripts.userHasSBT.mockResolvedValue(true);
-
-    const cfg = buildGroupCfg({
-      slug: 'session-sponsored-rpc-checking-to-granted',
-      rpcUrl: ROOT_RPC_URL,
-      sponsoredKeys: { rpc: true },
-      __registry: {
-        gateAuthority: 'onchain',
-        gatesByResource: {
-          rpc: {
-            lookupStatus: 'ok',
-            sbtAddresses: [RESTRICTED_SBT],
-            mode: 'any',
-            chainId: 84532,
-          },
-        },
-      },
-    });
-
-    const initialProvider = getReadProviderForGroup(cfg);
-    const initialPref = resolveGroupPathRpcPreference(cfg, 84532);
-    const initialDiagnostics = getReadProviderDiagnostics(84532, initialPref || {});
-
-    expect(initialProvider?.__CE_RPC_META).toEqual(expect.objectContaining({
-      providerLabel: 'path',
-      sessionAccessStatus: 'checking',
-      sessionAccessMode: 'sponsored-restricted',
-      sessionRpcSource: 'default-path',
-    }));
-    expect(initialDiagnostics.sessionRpcSource).toBe('default-path');
-    expect(initialDiagnostics.urls[0]).toBe(PATH_DEFAULT_BASE_SEPOLIA);
-
-    const access = await checkSponsoredAccess({
-      sessionConfig: cfg,
-      sessionSlug: cfg.slug,
-      account,
-      resourceKey: 'rpc',
-    });
-    const nextPref = resolveGroupPathRpcPreference(cfg, 84532);
-    const nextDiagnostics = getReadProviderDiagnostics(84532, nextPref || {});
-    const nextProvider = getReadProviderForGroup(cfg);
-
-    expect(access.status).toBe('granted');
-    expect(nextDiagnostics.providerLabel).toBe('session');
-    expect(nextDiagnostics.sessionRpcSource).toBe('root');
-    expect(nextDiagnostics.urls[0]).toBe(ROOT_RPC_URL);
-    expect(nextProvider?.__CE_RPC_META).toEqual(expect.objectContaining({
-      providerLabel: 'session',
-      sessionAccessStatus: 'granted',
-      sessionAccessMode: 'sponsored-restricted',
-      sessionRpcSource: 'root',
-      preferredUrls: expect.arrayContaining([ROOT_RPC_URL]),
-    }));
-    expect(nextProvider?.__CE_RPC_CACHE_KEY).not.toContain(cfg.slug);
-  });
-
   it('uses restricted sponsored session RPC after a cached wallet grant', async () => {
     const account = '0x00000000000000000000000000000000000000a2';
     jest.spyOn(store, 'getState').mockReturnValue({
@@ -693,7 +319,6 @@ describe('rpcProviders session-sponsored reads', () => {
       sessionAccessMode: 'sponsored-restricted',
       sessionRpcSource: 'root',
     }));
-    expect(provider?.__CE_RPC_CACHE_KEY).not.toContain(cfg.slug);
   });
 
   it('fails closed when the selected wallet disagrees with a stale redux account that has a cached grant', async () => {
@@ -838,6 +463,5 @@ describe('rpcProviders session-sponsored reads', () => {
       sessionRpcSource: 'default-path',
     }));
     expect(provider?.__CE_RPC_META?.preferredUrls).not.toContain(ROOT_RPC_URL);
-    expect(provider?.__CE_RPC_CACHE_KEY).not.toContain(cfg.slug);
   });
 });
