@@ -1,6 +1,6 @@
-import React from 'react';
-import ReactDOM from 'react-dom';
-import { act, Simulate } from 'react-dom/test-utils';
+import React, { act } from 'react';
+import { createRoot } from 'react-dom/client';
+import { Simulate } from 'react-dom/test-utils';
 
 import AudioInput from './AudioInput';
 import { requestAiRewrite } from '../../../utilities/ai/aiScripts';
@@ -41,6 +41,8 @@ const buildWhisperState = (overrides = {}) => ({
 
 describe('AudioInput', () => {
   let container;
+  let root;
+  let previousActEnvironment;
   let rafQueue = [];
   let rafId = 0;
 
@@ -54,9 +56,15 @@ describe('AudioInput', () => {
     });
   };
 
+  beforeAll(() => {
+    previousActEnvironment = globalThis.IS_REACT_ACT_ENVIRONMENT;
+    globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+  });
+
   beforeEach(() => {
     container = document.createElement('div');
     document.body.appendChild(container);
+    root = createRoot(container);
     useWhisper.mockReset();
     useWhisper.mockReturnValue(buildWhisperState());
     requestAiRewrite.mockReset();
@@ -74,11 +82,24 @@ describe('AudioInput', () => {
   });
 
   afterEach(() => {
-    ReactDOM.unmountComponentAtNode(container);
+    if (root) {
+      act(() => {
+        root.unmount();
+      });
+      root = null;
+    }
     container.remove();
     container = null;
     jest.useRealTimers();
     jest.restoreAllMocks();
+  });
+
+  afterAll(() => {
+    if (typeof previousActEnvironment === 'undefined') {
+      delete globalThis.IS_REACT_ACT_ENVIRONMENT;
+      return;
+    }
+    globalThis.IS_REACT_ACT_ENVIRONMENT = previousActEnvironment;
   });
 
   it('shows a long-form timer while recording', () => {
@@ -89,14 +110,13 @@ describe('AudioInput', () => {
     }));
 
     act(() => {
-      ReactDOM.render(
+      root.render(
         <AudioInput
           longFormMode
           updateFunction={jest.fn()}
           value=""
           placeholder="Speak"
-        />,
-        container
+        />
       );
     });
 
@@ -119,15 +139,14 @@ describe('AudioInput', () => {
     }));
 
     act(() => {
-      ReactDOM.render(
+      root.render(
         <AudioInput
           longFormMode
           recordingDurationSeconds={2}
           updateFunction={jest.fn()}
           value=""
           placeholder="Speak"
-        />,
-        container
+        />
       );
     });
 
@@ -143,14 +162,13 @@ describe('AudioInput', () => {
     useWhisper.mockReturnValue(buildWhisperState({ startRecording }));
 
     act(() => {
-      ReactDOM.render(
+      root.render(
         <AudioInput
           recordingDisabled
           updateFunction={jest.fn()}
           value=""
           placeholder="Speak"
-        />,
-        container
+        />
       );
     });
 
@@ -170,13 +188,12 @@ describe('AudioInput', () => {
     useWhisper.mockReturnValue(buildWhisperState({ startRecording }));
 
     act(() => {
-      ReactDOM.render(
+      root.render(
         <AudioInput
           updateFunction={jest.fn()}
           value=""
           placeholder="Speak"
-        />,
-        container
+        />
       );
     });
 
@@ -199,13 +216,12 @@ describe('AudioInput', () => {
     }));
 
     act(() => {
-      ReactDOM.render(
+      root.render(
         <AudioInput
           updateFunction={jest.fn()}
           value="Hello world"
           placeholder="Speak"
-        />,
-        container
+        />
       );
     });
 
@@ -221,14 +237,13 @@ describe('AudioInput', () => {
     }));
 
     act(() => {
-      ReactDOM.render(
+      root.render(
         <AudioInput
           enableDownloads={true}
           updateFunction={jest.fn()}
           value="Hello world"
           placeholder="Speak"
-        />,
-        container
+        />
       );
     });
 
@@ -244,14 +259,13 @@ describe('AudioInput', () => {
     }));
 
     act(() => {
-      ReactDOM.render(
+      root.render(
         <AudioInput
           enableDownloads={false}
           updateFunction={jest.fn()}
           value="Hello world"
           placeholder="Speak"
-        />,
-        container
+        />
       );
     });
 
@@ -267,14 +281,13 @@ describe('AudioInput', () => {
     }));
 
     act(() => {
-      ReactDOM.render(
+      root.render(
         <AudioInput
           enableDownloads={true}
           updateFunction={jest.fn()}
           value="Hello world"
           placeholder="Speak"
-        />,
-        container
+        />
       );
     });
 
@@ -296,15 +309,14 @@ describe('AudioInput', () => {
     }));
 
     act(() => {
-      ReactDOM.render(
+      root.render(
         <AudioInput
           longFormMode
           enableDownloads={true}
           updateFunction={jest.fn()}
           value="Hello world"
           placeholder="Speak"
-        />,
-        container
+        />
       );
     });
 
@@ -354,13 +366,12 @@ describe('AudioInput', () => {
     }));
 
     act(() => {
-      ReactDOM.render(
+      root.render(
         <AudioInput
           updateFunction={jest.fn()}
           value=""
           placeholder="Speak"
-        />,
-        container
+        />
       );
     });
 
@@ -383,13 +394,12 @@ describe('AudioInput', () => {
   it('skips duplicate same-text parent updates', () => {
     const updateSpy = jest.fn();
     act(() => {
-      ReactDOM.render(
+      root.render(
         <AudioInput
           updateFunction={updateSpy}
           value=""
           placeholder="Speak"
-        />,
-        container
+        />
       );
     });
 
@@ -417,13 +427,12 @@ describe('AudioInput', () => {
   it('emits same text again after parent-controlled reset', () => {
     const updateSpy = jest.fn();
     act(() => {
-      ReactDOM.render(
+      root.render(
         <AudioInput
           updateFunction={updateSpy}
           value=""
           placeholder="Speak"
-        />,
-        container
+        />
       );
     });
 
@@ -441,23 +450,21 @@ describe('AudioInput', () => {
 
     // Simulate controlled parent sync then external reset (e.g. Start Fresh).
     act(() => {
-      ReactDOM.render(
+      root.render(
         <AudioInput
           updateFunction={updateSpy}
           value="hello"
           placeholder="Speak"
-        />,
-        container
+        />
       );
     });
     act(() => {
-      ReactDOM.render(
+      root.render(
         <AudioInput
           updateFunction={updateSpy}
           value=""
           placeholder="Speak"
-        />,
-        container
+        />
       );
     });
 
@@ -476,13 +483,12 @@ describe('AudioInput', () => {
   it('coalesces burst typing into a single parent update per frame', () => {
     const updateSpy = jest.fn();
     act(() => {
-      ReactDOM.render(
+      root.render(
         <AudioInput
           updateFunction={updateSpy}
           value=""
           placeholder="Speak"
-        />,
-        container
+        />
       );
     });
 
@@ -514,13 +520,12 @@ describe('AudioInput', () => {
     const updateFns = [jest.fn(), jest.fn(), jest.fn(), jest.fn()];
 
     act(() => {
-      ReactDOM.render(
+      root.render(
         <AudioInput
           updateFunction={updateFns[0]}
           value="Initial text"
           placeholder="Speak"
-        />,
-        container
+        />
       );
     });
 
@@ -544,29 +549,26 @@ describe('AudioInput', () => {
     expect(updateFns[0]).toHaveBeenLastCalledWith('Waiting for AI... 1s');
 
     act(() => {
-      ReactDOM.render(
+      root.render(
         <AudioInput
           updateFunction={updateFns[1]}
           value="parent-live-1"
           placeholder="Speak"
-        />,
-        container
+        />
       );
-      ReactDOM.render(
+      root.render(
         <AudioInput
           updateFunction={updateFns[2]}
           value="parent-live-2"
           placeholder="Speak"
-        />,
-        container
+        />
       );
-      ReactDOM.render(
+      root.render(
         <AudioInput
           updateFunction={updateFns[3]}
           value="parent-live-3"
           placeholder="Speak"
-        />,
-        container
+        />
       );
     });
     act(() => {
@@ -582,13 +584,12 @@ describe('AudioInput', () => {
   it('cancels queued parent updates on unmount', () => {
     const updateSpy = jest.fn();
     act(() => {
-      ReactDOM.render(
+      root.render(
         <AudioInput
           updateFunction={updateSpy}
           value=""
           placeholder="Speak"
-        />,
-        container
+        />
       );
     });
 
@@ -601,7 +602,8 @@ describe('AudioInput', () => {
     expect(updateSpy).not.toHaveBeenCalled();
 
     act(() => {
-      ReactDOM.unmountComponentAtNode(container);
+      root.unmount();
+      root = null;
     });
     act(() => {
       flushRafQueue();
@@ -614,13 +616,12 @@ describe('AudioInput', () => {
     const updateSpy = jest.fn();
 
     act(() => {
-      ReactDOM.render(
+      root.render(
         <AudioInput
           updateFunction={updateSpy}
           value="Original version"
           placeholder="Speak"
-        />,
-        container
+        />
       );
     });
 

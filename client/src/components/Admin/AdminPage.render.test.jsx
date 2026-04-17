@@ -1,7 +1,7 @@
 /** @file AdminPage.render.test.jsx */
-import React from 'react';
+import React, { act } from 'react';
 import { ethers } from 'ethers';
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { getCachedSessionWorkerConfig } from '../../utilities/session/sessionWorkerConfigCache.js';
 import { CLOUDFLARE_CORS_WORKER_URL } from '../../variables/appConfig.js';
@@ -98,20 +98,28 @@ jest.mock('../SBTs/SBTSelector.jsx', () => () => <div data-testid="mock-admin-sb
 const AdminPage = require('./AdminPage.jsx').default;
 const Arweave = require('arweave');
 
-const renderAdminPage = ({
+const renderAdminPage = async ({
   account = ADMIN_ADDRESS,
   initialSessionId,
   initialRegistryChainId,
-} = {}) => render(
-  <AdminPage
-    account={account}
-    network={{ id: 84532 }}
-    loginComplete={true}
-    toggleLoginModal={jest.fn()}
-    initialSessionId={initialSessionId}
-    initialRegistryChainId={initialRegistryChainId}
-  />
-);
+} = {}) => {
+  let utils;
+  await act(async () => {
+    utils = render(
+      <AdminPage
+        account={account}
+        network={{ id: 84532 }}
+        loginComplete={true}
+        toggleLoginModal={jest.fn()}
+        initialSessionId={initialSessionId}
+        initialRegistryChainId={initialRegistryChainId}
+      />
+    );
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+  return utils;
+};
 
 const getWorkerSecretsPanel = () => screen.getByText('Worker secrets').closest('section');
 const getGatePanel = () => screen.getByText('On-chain default gate').closest('section');
@@ -123,19 +131,25 @@ const getFieldInputByLabel = (labelText) => (
   screen.getByText(labelText).parentElement.querySelector('input,textarea,select')
 );
 const getAllowOriginsInput = () => screen.getByLabelText('CORS allowlist');
-const openAllowlistEditor = () => {
-  fireEvent.click(screen.getByRole('button', { name: 'Allowlist' }));
+const clickAndSettle = async (element) => {
+  await act(async () => {
+    fireEvent.click(element);
+    await Promise.resolve();
+  });
+};
+const openAllowlistEditor = async () => {
+  await clickAndSettle(screen.getByRole('button', { name: 'Allowlist' }));
   return getAllowOriginsInput();
 };
 const waitForResolvedWorkerUrl = () => screen.findByDisplayValue('https://worker.example');
-const openWorkerSecretsPanel = () => {
+const openWorkerSecretsPanel = async () => {
   const panel = getWorkerSecretsPanel();
-  fireEvent.click(within(panel).getByRole('button', { name: 'Toggle Worker secrets section' }));
+  await clickAndSettle(within(panel).getByRole('button', { name: 'Toggle Worker secrets section' }));
   return panel;
 };
-const openGatePanel = () => {
+const openGatePanel = async () => {
   const panel = getGatePanel();
-  fireEvent.click(within(panel).getByRole('button', { name: 'Toggle On-chain default gate section' }));
+  await clickAndSettle(within(panel).getByRole('button', { name: 'Toggle On-chain default gate section' }));
   return panel;
 };
 
@@ -195,7 +209,7 @@ describe('AdminPage rendered interactions', () => {
   });
 
   it('renders the selected session controls inline and lets the admin unlock the worker URL for editing', async () => {
-    renderAdminPage();
+    await renderAdminPage();
 
     const sessionSelect = await screen.findByTestId(E2E_TESTIDS.ADMIN_SESSION_SELECT);
     expect(sessionSelect).toHaveValue('edge');
@@ -231,13 +245,13 @@ describe('AdminPage rendered interactions', () => {
   });
 
   it('reveals the tests section only after the worker Test button is clicked', async () => {
-    renderAdminPage();
+    await renderAdminPage();
     await waitForResolvedWorkerUrl();
 
     expect(screen.queryByText(/^Tests$/)).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Toggle Tests section' })).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Test' }));
+    await clickAndSettle(screen.getByRole('button', { name: 'Test' }));
 
     const testsPanel = await screen.findByText('Tests');
     expect(testsPanel).toBeInTheDocument();
@@ -263,7 +277,7 @@ describe('AdminPage rendered interactions', () => {
     ]];
 
     try {
-      renderAdminPage();
+      await renderAdminPage();
       await waitForResolvedWorkerUrl();
 
       await waitFor(() => {
@@ -277,7 +291,7 @@ describe('AdminPage rendered interactions', () => {
   });
 
   it('warns non-admin wallets and disables admin-only actions', async () => {
-    renderAdminPage({
+    await renderAdminPage({
       account: '0x00000000000000000000000000000000000000bb',
     });
 
@@ -287,7 +301,7 @@ describe('AdminPage rendered interactions', () => {
     expect(screen.queryByRole('button', { name: 'Save allowlist' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Add recommended origins' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Edit worker URL' })).not.toBeInTheDocument();
-    openGatePanel();
+    await openGatePanel();
     expect(screen.getByTestId(E2E_TESTIDS.ADMIN_GATE_UPDATE_BUTTON)).toBeDisabled();
   });
 
@@ -304,7 +318,7 @@ describe('AdminPage rendered interactions', () => {
       }),
     ]];
 
-    renderAdminPage({
+    await renderAdminPage({
       initialRegistryChainId: '84532',
     });
 
@@ -329,17 +343,17 @@ describe('AdminPage rendered interactions', () => {
         : { ok: true, json: async () => ({ ok: true }) }
     ));
 
-    renderAdminPage();
+    await renderAdminPage();
     await waitForResolvedWorkerUrl();
 
-    const workerSecretsPanel = openWorkerSecretsPanel();
+    const workerSecretsPanel = await openWorkerSecretsPanel();
     fireEvent.click(within(workerSecretsPanel).getByRole('button', { name: 'AI' }));
 
     fireEvent.change(getSecretInputByLabel('OpenAI API key'), {
       target: { value: '  sk-live-test  ' },
     });
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Save worker secrets' }));
+    await clickAndSettle(await screen.findByRole('button', { name: 'Save worker secrets' }));
 
     await waitFor(() => {
       expect(screen.getByText(/Worker secrets saved for edge/)).toBeInTheDocument();
@@ -401,17 +415,17 @@ describe('AdminPage rendered interactions', () => {
         : { ok: true, json: async () => ({ ok: true }) }
     ));
 
-    renderAdminPage();
+    await renderAdminPage();
     await waitForResolvedWorkerUrl();
 
-    const workerSecretsPanel = openWorkerSecretsPanel();
+    const workerSecretsPanel = await openWorkerSecretsPanel();
     fireEvent.click(within(workerSecretsPanel).getByRole('button', { name: 'AI' }));
 
     fireEvent.change(getSecretInputByLabel('OpenAI API key'), {
       target: { value: 'sk-live-test' },
     });
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Save worker secrets' }));
+    await clickAndSettle(await screen.findByRole('button', { name: 'Save worker secrets' }));
 
     await waitFor(() => {
       expect(mockSetSessionFieldsOnChain).toHaveBeenCalledWith(expect.objectContaining({
@@ -432,17 +446,17 @@ describe('AdminPage rendered interactions', () => {
         : { ok: true, json: async () => ({ ok: true, payerAddress: '0x3AC823CA9AcDA550244C6fF4927b5e1478E70Ff7' }) }
     ));
 
-    renderAdminPage();
+    await renderAdminPage();
     await waitForResolvedWorkerUrl();
 
-    const workerSecretsPanel = openWorkerSecretsPanel();
+    const workerSecretsPanel = await openWorkerSecretsPanel();
     fireEvent.click(within(workerSecretsPanel).getByRole('button', { name: 'Lit' }));
 
     fireEvent.change(getSecretInputByLabel('Lit payer private key'), {
       target: { value: '0x59c6995e998f97a5a0044976f84ce7de5d9d7f17b2f6a6a5f76f8864c8ad88f5' },
     });
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Save worker secrets' }));
+    await clickAndSettle(await screen.findByRole('button', { name: 'Save worker secrets' }));
 
     await waitFor(() => {
       expect(screen.getByText(/Worker secrets saved for edge/)).toBeInTheDocument();
@@ -470,17 +484,17 @@ describe('AdminPage rendered interactions', () => {
       }),
     ]];
 
-    renderAdminPage();
+    await renderAdminPage();
     await waitForResolvedWorkerUrl();
 
-    const workerSecretsPanel = openWorkerSecretsPanel();
+    const workerSecretsPanel = await openWorkerSecretsPanel();
     fireEvent.click(within(workerSecretsPanel).getByRole('button', { name: 'AI' }));
 
     fireEvent.change(getSecretInputByLabel('OpenAI API key'), {
       target: { value: 'sk-live-test' },
     });
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Save worker secrets' }));
+    await clickAndSettle(await screen.findByRole('button', { name: 'Save worker secrets' }));
 
     await waitFor(() => {
       expect(screen.getByText(/Worker secrets saved for edge/)).toBeInTheDocument();
@@ -505,17 +519,17 @@ describe('AdminPage rendered interactions', () => {
       }),
     ]];
 
-    renderAdminPage();
+    await renderAdminPage();
     await waitForResolvedWorkerUrl();
 
-    const workerSecretsPanel = openWorkerSecretsPanel();
+    const workerSecretsPanel = await openWorkerSecretsPanel();
     fireEvent.click(within(workerSecretsPanel).getByRole('button', { name: 'Lit' }));
 
     fireEvent.change(getSecretInputByLabel('Lit payer private key'), {
       target: { value: '0xabc123' },
     });
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Save worker secrets' }));
+    await clickAndSettle(await screen.findByRole('button', { name: 'Save worker secrets' }));
 
     await waitFor(() => {
       expect(screen.getByText(/Worker secrets saved for edge/)).toBeInTheDocument();
@@ -552,7 +566,7 @@ describe('AdminPage rendered interactions', () => {
         : { ok: true, json: async () => ({ ok: true }) }
     ));
 
-    renderAdminPage();
+    await renderAdminPage();
     await waitForResolvedWorkerUrl();
 
     await waitFor(() => {
@@ -564,11 +578,11 @@ describe('AdminPage rendered interactions', () => {
     });
     expect(global.fetch.mock.calls.find(([url]) => String(url).endsWith('/admin/lit-status'))).toBeUndefined();
 
-    const workerSecretsPanel = openWorkerSecretsPanel();
+    const workerSecretsPanel = await openWorkerSecretsPanel();
     fireEvent.click(within(workerSecretsPanel).getByRole('button', { name: 'Lit' }));
 
     const refreshButton = await screen.findByRole('button', { name: 'Refresh Lit status' });
-    fireEvent.click(refreshButton);
+    await clickAndSettle(refreshButton);
 
     await waitFor(() => {
       expect(mockBuildSignedAdminActionAuth).toHaveBeenCalledWith(expect.objectContaining({
@@ -576,11 +590,11 @@ describe('AdminPage rendered interactions', () => {
         slug: 'edge',
         workerUrl: 'https://worker.example',
       }));
+      expect(global.fetch).toHaveBeenCalledWith(
+        'https://worker.example/admin/lit-status',
+        expect.objectContaining({ method: 'POST' }),
+      );
     });
-    expect(global.fetch).toHaveBeenCalledWith(
-      'https://worker.example/admin/lit-status',
-      expect.objectContaining({ method: 'POST' }),
-    );
   });
 
   it('allows Lit status refresh to query a worker-stored payer before sponsored_lit is synced', async () => {
@@ -599,14 +613,14 @@ describe('AdminPage rendered interactions', () => {
         : { ok: true, json: async () => ({ ok: true }) }
     ));
 
-    renderAdminPage();
+    await renderAdminPage();
     await waitForResolvedWorkerUrl();
 
-    const workerSecretsPanel = openWorkerSecretsPanel();
+    const workerSecretsPanel = await openWorkerSecretsPanel();
     fireEvent.click(within(workerSecretsPanel).getByRole('button', { name: 'Lit' }));
 
     const refreshButton = await screen.findByRole('button', { name: 'Refresh Lit status' });
-    fireEvent.click(refreshButton);
+    await clickAndSettle(refreshButton);
 
     await waitFor(() => {
       expect(mockBuildSignedAdminActionAuth).toHaveBeenCalledWith(expect.objectContaining({
@@ -614,11 +628,11 @@ describe('AdminPage rendered interactions', () => {
         slug: 'edge',
         workerUrl: 'https://worker.example',
       }));
+      expect(global.fetch).toHaveBeenCalledWith(
+        'https://worker.example/admin/lit-status',
+        expect.objectContaining({ method: 'POST' }),
+      );
     });
-    expect(global.fetch).toHaveBeenCalledWith(
-      'https://worker.example/admin/lit-status',
-      expect.objectContaining({ method: 'POST' }),
-    );
   });
 
   it('hydrates the allowlist editor from the cached worker config overlay', async () => {
@@ -642,10 +656,10 @@ describe('AdminPage rendered interactions', () => {
       },
     }));
 
-    renderAdminPage();
+    await renderAdminPage();
     await waitForResolvedWorkerUrl();
 
-    expect(openAllowlistEditor()).toHaveValue('https://existing.example');
+    expect(await openAllowlistEditor()).toHaveValue('https://existing.example');
   });
 
   it('saves the edited allowOrigins list exactly for the selected session', async () => {
@@ -664,13 +678,13 @@ describe('AdminPage rendered interactions', () => {
       },
     }));
 
-    renderAdminPage();
+    await renderAdminPage();
     await waitForResolvedWorkerUrl();
 
-    fireEvent.change(openAllowlistEditor(), {
+    fireEvent.change(await openAllowlistEditor(), {
       target: { value: 'https://existing.example' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Save allowlist' }));
+    await clickAndSettle(screen.getByRole('button', { name: 'Save allowlist' }));
 
     await waitFor(() => {
       expect(screen.getByText(/allowOrigins saved \(1 origins\)/)).toBeInTheDocument();
@@ -705,13 +719,13 @@ describe('AdminPage rendered interactions', () => {
   });
 
   it('normalizes mixed delimiter allowOrigins input before saving', async () => {
-    renderAdminPage();
+    await renderAdminPage();
     await waitForResolvedWorkerUrl();
 
-    fireEvent.change(openAllowlistEditor(), {
+    fireEvent.change(await openAllowlistEditor(), {
       target: { value: 'https://alpha.example, http://localhost:7391\nhttps://alpha.example/' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Save allowlist' }));
+    await clickAndSettle(screen.getByRole('button', { name: 'Save allowlist' }));
 
     await waitFor(() => {
       expect(screen.getByText(/allowOrigins saved \(2 origins\)/)).toBeInTheDocument();
@@ -762,13 +776,13 @@ describe('AdminPage rendered interactions', () => {
       return Promise.resolve({ ok: true, status: 200, json: async () => ({ ok: true }) });
     });
 
-    renderAdminPage();
+    await renderAdminPage();
     await waitForResolvedWorkerUrl();
 
-    fireEvent.change(openAllowlistEditor(), {
+    fireEvent.change(await openAllowlistEditor(), {
       target: { value: 'https://existing.example' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Save allowlist' }));
+    await clickAndSettle(screen.getByRole('button', { name: 'Save allowlist' }));
 
     await waitFor(() => {
       expect(screen.getByText(/allowOrigins saved \(1 origins\)/)).toBeInTheDocument();
@@ -794,17 +808,17 @@ describe('AdminPage rendered interactions', () => {
       },
     }));
 
-    renderAdminPage();
+    await renderAdminPage();
     await waitForResolvedWorkerUrl();
 
-    fireEvent.change(openAllowlistEditor(), {
+    fireEvent.change(await openAllowlistEditor(), {
       target: { value: '' },
     });
     expect(screen.getByText(
       'Empty allowlist: saving this draft keeps CORS open for any browser origin.'
     )).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Save allowlist' }));
+    await clickAndSettle(screen.getByRole('button', { name: 'Save allowlist' }));
 
     await waitFor(() => {
       expect(screen.getByText(/allowOrigins saved with open CORS/)).toBeInTheDocument();
@@ -832,10 +846,10 @@ describe('AdminPage rendered interactions', () => {
       },
     }));
 
-    renderAdminPage();
+    await renderAdminPage();
     await waitForResolvedWorkerUrl();
 
-    openAllowlistEditor();
+    await openAllowlistEditor();
     fireEvent.click(screen.getByRole('button', { name: 'Add recommended origins' }));
 
     await waitFor(() => {
@@ -860,13 +874,13 @@ describe('AdminPage rendered interactions', () => {
         : Promise.reject(new TypeError('Failed to fetch'))
     ));
 
-    renderAdminPage();
+    await renderAdminPage();
     await waitForResolvedWorkerUrl();
 
-    fireEvent.change(openAllowlistEditor(), {
+    fireEvent.change(await openAllowlistEditor(), {
       target: { value: 'https://replacement.example' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Save allowlist' }));
+    await clickAndSettle(screen.getByRole('button', { name: 'Save allowlist' }));
 
     await waitFor(() => {
       expect(screen.getByText(
@@ -886,10 +900,10 @@ describe('AdminPage rendered interactions', () => {
     });
     sessionEntries = [['edge', buildSessionConfig({ corsWorkerUrl: '' })]];
 
-    renderAdminPage();
+    await renderAdminPage();
 
     await screen.findByRole('button', { name: 'Allowlist' });
-    openAllowlistEditor();
+    await openAllowlistEditor();
     await waitFor(() => {
       expect(screen.getByRole('button', { name: 'Save allowlist' })).toBeDisabled();
     });
@@ -912,10 +926,10 @@ describe('AdminPage rendered interactions', () => {
       },
     }));
 
-    renderAdminPage();
+    await renderAdminPage();
 
     expect(await screen.findByDisplayValue('https://worker-kv-cache.example')).toBeInTheDocument();
-    expect(openAllowlistEditor()).toHaveValue('');
+    expect(await openAllowlistEditor()).toHaveValue('');
     expect(screen.getByRole('button', { name: 'Save allowlist' })).toBeDisabled();
 
     await act(async () => {
@@ -938,7 +952,7 @@ describe('AdminPage rendered interactions', () => {
       corsWorkerUrl: '',
     })]];
 
-    renderAdminPage();
+    await renderAdminPage();
 
     const workerInput = await screen.findByPlaceholderText('https://<worker-name>.<account-subdomain>.workers.dev/');
     expect(workerInput).toHaveValue(CLOUDFLARE_CORS_WORKER_URL);
@@ -976,7 +990,7 @@ describe('AdminPage rendered interactions', () => {
     ]];
 
     try {
-      renderAdminPage();
+      await renderAdminPage();
       await waitForResolvedWorkerUrl();
 
       const metadataPanel = screen.getByText('Session metadata').closest('section');
@@ -987,7 +1001,7 @@ describe('AdminPage rendered interactions', () => {
       });
       expect(screen.getByDisplayValue('12345678')).toBeInTheDocument();
 
-      fireEvent.click(screen.getByRole('button', { name: 'Update metadata' }));
+      await clickAndSettle(screen.getByRole('button', { name: 'Update metadata' }));
 
       await waitFor(() => {
         expect(mockUploadSessionMetadata).toHaveBeenCalledTimes(1);
@@ -1004,12 +1018,12 @@ describe('AdminPage rendered interactions', () => {
       expect(uploadedMetadata.__registry).toBeUndefined();
       expect(uploadedMetadata.sponsoredKeys).toBeUndefined();
 
-      expect(mockUpdateSessionMetadataOnChain).toHaveBeenCalledWith(expect.objectContaining({
-        chainId: 84532,
-        slug: 'edge',
-        metadataURI: 'ar://metadata_tx_id',
-      }));
       await waitFor(() => {
+        expect(mockUpdateSessionMetadataOnChain).toHaveBeenCalledWith(expect.objectContaining({
+          chainId: 84532,
+          slug: 'edge',
+          metadataURI: 'ar://metadata_tx_id',
+        }));
         expect(screen.getByText(/Session metadata updated\./)).toBeInTheDocument();
       });
     } finally {
@@ -1036,7 +1050,7 @@ describe('AdminPage rendered interactions', () => {
     ]];
 
     try {
-      renderAdminPage();
+      await renderAdminPage();
       await waitForResolvedWorkerUrl();
 
       const metadataPanel = screen.getByText('Session metadata').closest('section');
@@ -1048,7 +1062,7 @@ describe('AdminPage rendered interactions', () => {
       fireEvent.click(autoFeatureToggle);
       expect(autoFeatureToggle).toBeChecked();
 
-      fireEvent.click(screen.getByRole('button', { name: 'Update metadata' }));
+      await clickAndSettle(screen.getByRole('button', { name: 'Update metadata' }));
 
       await waitFor(() => {
         expect(mockUploadSessionMetadata).toHaveBeenCalledTimes(1);
@@ -1088,7 +1102,7 @@ describe('AdminPage rendered interactions', () => {
     });
     sessionEntries = [['session-one', session1], ['session-two', session2]];
 
-    renderAdminPage();
+    await renderAdminPage();
 
     const sessionSelect = await screen.findByTestId(E2E_TESTIDS.ADMIN_SESSION_SELECT);
     expect(sessionSelect).toHaveValue('session-one');
@@ -1121,7 +1135,7 @@ describe('AdminPage rendered interactions', () => {
       }),
     ]];
 
-    renderAdminPage();
+    await renderAdminPage();
     await waitForResolvedWorkerUrl();
 
     const metadataPanel = screen.getByText('Session metadata').closest('section');
@@ -1168,7 +1182,7 @@ describe('AdminPage rendered interactions', () => {
     ]];
 
     try {
-      renderAdminPage();
+      await renderAdminPage();
       await waitForResolvedWorkerUrl();
 
       const metadataPanel = screen.getByText('Session metadata').closest('section');
@@ -1199,7 +1213,7 @@ describe('AdminPage rendered interactions', () => {
         target: { value: 'q1\nq2' },
       });
 
-      fireEvent.click(screen.getByRole('button', { name: 'Update metadata' }));
+      await clickAndSettle(screen.getByRole('button', { name: 'Update metadata' }));
 
       await waitFor(() => {
         expect(mockUploadSessionMetadata).toHaveBeenCalledTimes(1);
@@ -1261,7 +1275,7 @@ describe('AdminPage rendered interactions', () => {
       }),
     ]];
 
-    renderAdminPage();
+    await renderAdminPage();
     await waitForResolvedWorkerUrl();
 
     const metadataPanel = screen.getByText('Session metadata').closest('section');
@@ -1269,7 +1283,7 @@ describe('AdminPage rendered interactions', () => {
 
     expect(within(metadataPanel).getByText(/Session metadata could not be loaded/i)).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Update metadata' }));
+    await clickAndSettle(screen.getByRole('button', { name: 'Update metadata' }));
 
     await waitFor(() => {
       expect(screen.getByText(/Verify or edit the contract addresses before saving/i)).toBeInTheDocument();
@@ -1277,7 +1291,7 @@ describe('AdminPage rendered interactions', () => {
     expect(mockUploadSessionMetadata).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByLabelText(/I verified these fallback defaults/i));
-    fireEvent.click(screen.getByRole('button', { name: 'Update metadata' }));
+    await clickAndSettle(screen.getByRole('button', { name: 'Update metadata' }));
 
     await waitFor(() => {
       expect(mockUploadSessionMetadata).toHaveBeenCalledTimes(1);
@@ -1297,7 +1311,7 @@ describe('AdminPage rendered interactions', () => {
       };
     });
 
-    renderAdminPage();
+    await renderAdminPage();
 
     const sessionSelect = await screen.findByTestId(E2E_TESTIDS.ADMIN_SESSION_SELECT);
     expect(sessionSelect).toHaveValue('edge');
@@ -1322,23 +1336,25 @@ describe('AdminPage rendered interactions', () => {
       };
     });
 
-    renderAdminPage();
+    await renderAdminPage();
 
     const sessionSelect = await screen.findByTestId(E2E_TESTIDS.ADMIN_SESSION_SELECT);
-    expect(sessionSelect).toHaveValue('edge');
-    expect(within(sessionSelect).getByRole('option', { name: 'edge — Fresh Session' })).toBeInTheDocument();
-    expect(mockLoadSessionRegistryCache).toHaveBeenNthCalledWith(1, expect.objectContaining({
-      bootstrapRpc: true,
-    }));
-    expect(mockLoadSessionRegistryCache).toHaveBeenNthCalledWith(2, expect.objectContaining({
-      bootstrapRpc: false,
-    }));
+    await waitFor(() => {
+      expect(sessionSelect).toHaveValue('edge');
+      expect(within(sessionSelect).getByRole('option', { name: 'edge — Fresh Session' })).toBeInTheDocument();
+      expect(mockLoadSessionRegistryCache).toHaveBeenNthCalledWith(1, expect.objectContaining({
+        bootstrapRpc: true,
+      }));
+      expect(mockLoadSessionRegistryCache).toHaveBeenNthCalledWith(2, expect.objectContaining({
+        bootstrapRpc: false,
+      }));
+    });
   });
 
   it('syncs the session picker when another route updates the registry cache', async () => {
     sessionEntries = [];
 
-    renderAdminPage();
+    await renderAdminPage();
 
     expect(await screen.findByText('No sessions found in the registry.')).toBeInTheDocument();
 
@@ -1371,10 +1387,10 @@ describe('AdminPage rendered interactions', () => {
     });
 
     try {
-      renderAdminPage();
+      await renderAdminPage();
       await waitForResolvedWorkerUrl();
 
-      const workerSecretsPanel = openWorkerSecretsPanel();
+      const workerSecretsPanel = await openWorkerSecretsPanel();
       fireEvent.click(within(workerSecretsPanel).getByRole('button', { name: 'Arweave' }));
       fireEvent.click(within(workerSecretsPanel).getByRole('button', { name: 'Faucet' }));
 
@@ -1397,8 +1413,8 @@ describe('AdminPage rendered interactions', () => {
 
       expect(workerSecretsPanel).not.toHaveTextContent(faucetPrivateKey);
 
-      fireEvent.click(screen.getByRole('button', { name: 'Refresh Arweave balance' }));
-      fireEvent.click(screen.getByRole('button', { name: 'Refresh faucet balance' }));
+      await clickAndSettle(screen.getByRole('button', { name: 'Refresh Arweave balance' }));
+      await clickAndSettle(screen.getByRole('button', { name: 'Refresh faucet balance' }));
 
       await waitFor(() => {
         expect(mockReadArweaveWalletBalance).toHaveBeenCalledTimes(2);
@@ -1419,10 +1435,10 @@ describe('AdminPage rendered interactions', () => {
       .mockResolvedValue(ethers.utils.parseEther('0.1842'));
 
     try {
-      renderAdminPage();
+      await renderAdminPage();
       await waitForResolvedWorkerUrl();
 
-      const workerSecretsPanel = openWorkerSecretsPanel();
+      const workerSecretsPanel = await openWorkerSecretsPanel();
       fireEvent.click(within(workerSecretsPanel).getByRole('button', { name: 'Faucet' }));
 
       fireEvent.change(getSecretInputByLabel('Faucet private key'), {
@@ -1455,10 +1471,10 @@ describe('AdminPage rendered interactions', () => {
     });
 
     try {
-      renderAdminPage();
+      await renderAdminPage();
       await waitForResolvedWorkerUrl();
 
-      const workerSecretsPanel = openWorkerSecretsPanel();
+      const workerSecretsPanel = await openWorkerSecretsPanel();
       fireEvent.click(within(workerSecretsPanel).getByRole('button', { name: 'Arweave' }));
       fireEvent.click(within(workerSecretsPanel).getByRole('button', { name: 'Faucet' }));
 
@@ -1472,11 +1488,11 @@ describe('AdminPage rendered interactions', () => {
       await waitFor(() => {
         expect(mockReadArweaveWalletBalance).toHaveBeenCalledTimes(1);
         expect(faucetBalanceSpy).toHaveBeenCalledTimes(1);
+        expect(within(workerSecretsPanel).queryByText('Arweave balance')).not.toBeInTheDocument();
+        expect(within(workerSecretsPanel).queryByText('Faucet balance')).not.toBeInTheDocument();
+        expect(within(workerSecretsPanel).queryByText('0.000000 AR')).not.toBeInTheDocument();
+        expect(within(workerSecretsPanel).queryByText('0.0000 ETH')).not.toBeInTheDocument();
       });
-      expect(within(workerSecretsPanel).queryByText('Arweave balance')).not.toBeInTheDocument();
-      expect(within(workerSecretsPanel).queryByText('Faucet balance')).not.toBeInTheDocument();
-      expect(within(workerSecretsPanel).queryByText('0.000000 AR')).not.toBeInTheDocument();
-      expect(within(workerSecretsPanel).queryByText('0.0000 ETH')).not.toBeInTheDocument();
     } finally {
       faucetBalanceSpy.mockRestore();
     }
@@ -1486,10 +1502,10 @@ describe('AdminPage rendered interactions', () => {
     const faucetBalanceSpy = jest.spyOn(ethers.providers.JsonRpcProvider.prototype, 'getBalance');
 
     try {
-      renderAdminPage();
+      await renderAdminPage();
       await waitForResolvedWorkerUrl();
 
-      const workerSecretsPanel = openWorkerSecretsPanel();
+      const workerSecretsPanel = await openWorkerSecretsPanel();
       fireEvent.click(within(workerSecretsPanel).getByRole('button', { name: 'Arweave' }));
       fireEvent.click(within(workerSecretsPanel).getByRole('button', { name: 'Faucet' }));
 

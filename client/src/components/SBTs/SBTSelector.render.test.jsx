@@ -1,5 +1,5 @@
-import React from 'react';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import React, { act } from 'react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 const GENERAL_ADDRESS = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 const EDGE_FACTORY_ADDRESS = '0x1111111111111111111111111111111111111111';
@@ -38,7 +38,7 @@ jest.mock('react-select', () => ({
           {typeof noOptionsMessage === 'function' ? noOptionsMessage() : null}
         </div>
       )}
-      {!isLoading && options.length > 0 && (
+      {options.length > 0 && (
         <div data-testid="mock-sbt-select-options">
           {options.map((option) => (
             <div key={option.value}>{option.label}</div>
@@ -443,13 +443,18 @@ describe('SBTSelector rendered cold-load lifecycle', () => {
     expect(screen.queryByText(edgeAddress)).not.toBeInTheDocument();
 
     const edgeButton = await screen.findByTestId('ce-sbt-selector-session-source-edge');
-    fireEvent.click(edgeButton);
+    await act(async () => {
+      fireEvent.click(edgeButton);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
 
     await waitFor(() => {
+      expect(screen.queryByText(demoAddress)).not.toBeInTheDocument();
       expect(screen.getByText(edgeAddress)).toBeInTheDocument();
+      expect(screen.getByTestId('ce-sbt-selector-session-source-active')).toBeInTheDocument();
+      expect(screen.queryByTestId('ce-sbt-selector-session-source-edge')).not.toBeInTheDocument();
     });
-    expect(screen.queryByText(demoAddress)).not.toBeInTheDocument();
-    expect(screen.getByTestId('ce-sbt-selector-session-source-active')).toBeInTheDocument();
   });
 
   it('hides the opt-in other-session buttons when selector auto-search is disabled', async () => {

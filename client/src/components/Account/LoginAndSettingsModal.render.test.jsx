@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { act } from 'react';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import styles from './Account.module.scss';
 
@@ -234,12 +234,20 @@ const getPasskeyLoginButton = () => (
   screen.getAllByRole('button').find((button) => button.textContent.trim() === 'Login')
 );
 
-const openPreLoginSettingsDrawer = () => {
-  fireEvent.click(screen.getByRole('button', { name: 'Toggle pre-login settings' }));
+const clickAndSettle = async (element) => {
+  await act(async () => {
+    fireEvent.click(element);
+    await Promise.resolve();
+    await Promise.resolve();
+  });
 };
 
-const openPreLoginConfigPanel = () => {
-  fireEvent.click(screen.getByTestId('ce-prelogin-config-toggle'));
+const openPreLoginSettingsDrawer = async () => {
+  await clickAndSettle(screen.getByRole('button', { name: 'Toggle pre-login settings' }));
+};
+
+const openPreLoginConfigPanel = async () => {
+  await clickAndSettle(screen.getByTestId('ce-prelogin-config-toggle'));
 };
 
 afterEach(() => {
@@ -434,7 +442,7 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
 
     render(<LoginAndSettingsModal {...props} />);
 
-    openPreLoginSettingsDrawer();
+    await openPreLoginSettingsDrawer();
 
     expect(screen.getByTestId('ce-prelogin-settings-panel')).toBeInTheDocument();
     expect(document.getElementById('preLoginTooltipsToggleTooltip')).toBeTruthy();
@@ -442,7 +450,7 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Explainers On' }));
     expect(props.toggleTooltips).toHaveBeenCalledTimes(1);
 
-    openPreLoginConfigPanel();
+    await openPreLoginConfigPanel();
 
     fireEvent.change(screen.getByLabelText('AI endpoint'), {
       target: { value: 'https://self-hosted.example/v1' },
@@ -516,20 +524,22 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
 
     render(<LoginAndSettingsModal {...buildProps({ activeSessionSlug: 'demo' })} />);
 
-    openPreLoginSettingsDrawer();
+    await openPreLoginSettingsDrawer();
 
     expect(screen.queryByTestId('ce-prelogin-session-select')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('AI endpoint')).not.toBeInTheDocument();
 
-    expect(await screen.findByText('Network')).toBeInTheDocument();
-    expect(screen.getByText(/The active session targets/i)).toBeInTheDocument();
-    expect(screen.getByText('AI')).toBeInTheDocument();
-    expect(screen.getByText('Arweave')).toBeInTheDocument();
-    expect(screen.getByText('RPC')).toBeInTheDocument();
-    expect(screen.getByText('Tx gas')).toBeInTheDocument();
-    expect(screen.getByText('Connect wallet')).toBeInTheDocument();
-    expect(screen.getAllByText('Sponsored').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Demo Session').length).toBeGreaterThan(0);
+    await waitFor(() => {
+      expect(screen.getByText('Network')).toBeInTheDocument();
+      expect(screen.getByText(/The active session targets/i)).toBeInTheDocument();
+      expect(screen.getByText('AI')).toBeInTheDocument();
+      expect(screen.getByText('Arweave')).toBeInTheDocument();
+      expect(screen.getByText('RPC')).toBeInTheDocument();
+      expect(screen.getByText('Tx gas')).toBeInTheDocument();
+      expect(screen.getByText('Connect wallet')).toBeInTheDocument();
+      expect(screen.getAllByText('Sponsored').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('Demo Session').length).toBeGreaterThan(0);
+    });
   });
 
   it('keeps pre-login session and local AI controls behind Config while leaving the shared overview visible', async () => {
@@ -549,14 +559,14 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
 
     render(<LoginAndSettingsModal {...buildProps({ activeSessionSlug: 'demo' })} />);
 
-    openPreLoginSettingsDrawer();
+    await openPreLoginSettingsDrawer();
 
     expect(await screen.findByText('Network')).toBeInTheDocument();
     expect(screen.queryByTestId('ce-prelogin-session-select')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('OpenAI API key')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('AI endpoint')).not.toBeInTheDocument();
 
-    openPreLoginConfigPanel();
+    await openPreLoginConfigPanel();
 
     expect(screen.getByText('Network')).toBeInTheDocument();
     expect(screen.getByTestId('ce-prelogin-session-select')).toBeInTheDocument();
@@ -564,7 +574,7 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     expect(screen.getByLabelText('AI endpoint')).toBeInTheDocument();
   });
 
-  it('keeps the logged-out footer gear-only until the settings drawer opens', () => {
+  it('keeps the logged-out footer gear-only until the settings drawer opens', async () => {
     const props = buildProps({
       demoSurfaceMode: true,
       setDemoSurfaceMode: jest.fn(),
@@ -574,7 +584,7 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
 
     expect(screen.queryByRole('button', { name: 'Demo Mode On' })).not.toBeInTheDocument();
 
-    openPreLoginSettingsDrawer();
+    await openPreLoginSettingsDrawer();
 
     const panel = screen.getByTestId('ce-prelogin-settings-panel');
     const demoToggle = within(panel).getByRole('button', { name: 'Demo Mode On' });
@@ -589,13 +599,13 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     expect(props.setDemoSurfaceMode).toHaveBeenCalledWith(false);
   });
 
-  it('updates the demo mode toggle label when demoSurfaceMode changes', () => {
+  it('updates the demo mode toggle label when demoSurfaceMode changes', async () => {
     const props = buildProps({
       demoSurfaceMode: true,
     });
     const { rerender } = render(<LoginAndSettingsModal {...props} />);
 
-    openPreLoginSettingsDrawer();
+    await openPreLoginSettingsDrawer();
     expect(screen.getByRole('button', { name: 'Demo Mode On' })).toHaveAttribute('aria-pressed', 'true');
 
     rerender(<LoginAndSettingsModal {...props} demoSurfaceMode={false} />);
@@ -624,11 +634,11 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     expect(setDemoSurfaceMode).toHaveBeenCalledWith(false);
   });
 
-  it('renders the pre-login AI settings subsection with both provider key inputs and the Anthropic hint', () => {
+  it('renders the pre-login AI settings subsection with both provider key inputs and the Anthropic hint', async () => {
     render(<LoginAndSettingsModal {...buildProps()} />);
 
-    openPreLoginSettingsDrawer();
-    openPreLoginConfigPanel();
+    await openPreLoginSettingsDrawer();
+    await openPreLoginConfigPanel();
 
     expect(screen.getByText('AI settings')).toBeInTheDocument();
     expect(screen.getByLabelText('OpenAI API key')).toBeInTheDocument();
@@ -640,8 +650,8 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
   it('saves an OpenAI pre-login key and activates the local GPT-5 preset', async () => {
     render(<LoginAndSettingsModal {...buildProps()} />);
 
-    openPreLoginSettingsDrawer();
-    openPreLoginConfigPanel();
+    await openPreLoginSettingsDrawer();
+    await openPreLoginConfigPanel();
     fireEvent.change(screen.getByLabelText('OpenAI API key'), {
       target: { value: 'sk-open-test' },
     });
@@ -667,8 +677,8 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
   it('saves an Anthropic pre-login key and activates the local Claude Sonnet preset', async () => {
     render(<LoginAndSettingsModal {...buildProps()} />);
 
-    openPreLoginSettingsDrawer();
-    openPreLoginConfigPanel();
+    await openPreLoginSettingsDrawer();
+    await openPreLoginConfigPanel();
     fireEvent.change(screen.getByLabelText('Anthropic API key'), {
       target: { value: 'sk-ant-test' },
     });
@@ -691,7 +701,7 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     });
   });
 
-  it('lets pre-login settings switch the active session before connect', () => {
+  it('lets pre-login settings switch the active session before connect', async () => {
     getAllSessionSlugs.mockReturnValue(['edge']);
     getSessionConfigBySlugOrDefault.mockImplementation((slug) => (
       String(slug || '') === 'edge'
@@ -705,8 +715,8 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
 
     render(<LoginAndSettingsModal {...props} />);
 
-    openPreLoginSettingsDrawer();
-    openPreLoginConfigPanel();
+    await openPreLoginSettingsDrawer();
+    await openPreLoginConfigPanel();
 
     expect(screen.getByTestId('ce-prelogin-session-select')).toBeInTheDocument();
 
@@ -893,16 +903,15 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
 
     await waitFor(() => {
       expect(props.wagmiDisconnect).toHaveBeenCalledTimes(1);
+      expect(props.updateLoginInfo).toHaveBeenCalledWith({
+        loginInProgress: false,
+        loginComplete: false,
+        provider: null,
+      });
+      expect(props.changeAccount).toHaveBeenCalledWith({});
+      expect(clearAllWorkerSessionTokens).toHaveBeenCalledTimes(1);
+      expect(localStorage.getItem('ce:userDisconnected')).toBe('true');
     });
-
-    expect(props.updateLoginInfo).toHaveBeenCalledWith({
-      loginInProgress: false,
-      loginComplete: false,
-      provider: null,
-    });
-    expect(props.changeAccount).toHaveBeenCalledWith({});
-    expect(clearAllWorkerSessionTokens).toHaveBeenCalledTimes(1);
-    expect(localStorage.getItem('ce:userDisconnected')).toBe('true');
   });
 
   it('replaces the legacy settings summary strip with compact supported-resource cards', async () => {
