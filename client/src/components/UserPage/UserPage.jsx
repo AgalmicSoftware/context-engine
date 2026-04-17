@@ -2080,7 +2080,7 @@ class UserPage extends Component {
       }
       if (
         cached &&
-        (cached.status === 'unknown' || cached.status === 'error') &&
+        (cached.status === 'unknown' || cached.status === 'error' || cached.status === 'unresolved') &&
         cachedAgeMs < USERPAGE_GATE_UNKNOWN_RETRY_MS
       ) {
         this.scheduleResponseGateRetry(USERPAGE_GATE_UNKNOWN_RETRY_MS - cachedAgeMs);
@@ -2109,7 +2109,7 @@ class UserPage extends Component {
           if (!this._isMounted || generation !== this._responseGateAccessGeneration) return;
           const nextStatus = String(result?.status || 'unknown');
           this._setResponseGateAccessStatus(cacheKey, nextStatus, Date.now());
-          if (nextStatus === 'unknown' || nextStatus === 'error') {
+          if (nextStatus === 'unknown' || nextStatus === 'error' || nextStatus === 'unresolved') {
             this.scheduleResponseGateRetry(USERPAGE_GATE_UNKNOWN_RETRY_MS);
           }
           if (nextStatus !== previousStatus || !shouldPreserveStatusWhileRevalidating) {

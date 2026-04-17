@@ -120,15 +120,47 @@ import {
 } from './loginSettingsAiDisplayHelpers';
 
 const accountLog = createLogger('account');
-type AccountUserPageProps = {
-  viewAddress?: string;
-  account?: string;
-  provider?: string;
-  minimized?: boolean;
-  network?: unknown;
-  activeSessionSlug?: string;
-  sessionConfig?: unknown;
-  networkChainId?: unknown;
+const normalizeSettingsSessionSlug = (value) => {
+  const raw = toStr(value).trim().toLowerCase();
+  return raw === 'general' ? '' : raw;
+};
+const formatSettingsSessionSlug = (value) => {
+  const normalized = normalizeSettingsSessionSlug(value);
+  return normalized || 'general';
+};
+const buildSettingsSessionHref = (slugIn = '') => {
+  const normalizedBasePath = toStr(readPublicUrlBasePath()).trim().replace(/\/+$/, '');
+  const slug = normalizeSettingsSessionSlug(slugIn);
+  return `${normalizedBasePath}${slug ? `/session/${encodeURIComponent(slug)}` : '/session'}`;
+};
+const uniqueList = (values = []) => Array.from(new Set((Array.isArray(values) ? values : []).filter((value) => value !== undefined && value !== null)));
+const getSponsoredKeyAliases = (resourceKey = '') => {
+  if (resourceKey === 'txGas') return ['faucet', 'txGas'];
+  return [resourceKey];
+};
+const formatSponsoredStatusMeta = (entry, hasSponsors = false) => {
+  const status = entry?.status === 'unresolved'
+    ? 'error'
+    : (entry?.status || 'no-gate');
+  if (status === 'granted') {
+    return { label: 'Gate unlocked', tone: 'ok', detail: 'Sponsored key is available for the active session.' };
+  }
+  if (status === 'denied') {
+    return { label: 'Gate locked', tone: 'warn', detail: 'Sponsored key exists, but this wallet does not satisfy the SBT gate.' };
+  }
+  if (status === 'needs-wallet') {
+    return { label: 'Connect wallet', tone: 'warn', detail: 'Connect a wallet to evaluate the sponsor gate for this session.' };
+  }
+  if (status === 'invalid-gate') {
+    return { label: 'Invalid gate', tone: 'warn', detail: 'This sponsor gate configuration is incomplete.' };
+  }
+  if (status === 'unknown' || status === 'error') {
+    return { label: 'Checking failed', tone: 'muted', detail: 'We could not confirm gate access for this sponsor.' };
+  }
+  if (status === 'no-gate' && hasSponsors) {
+    return { label: 'Sponsored', tone: 'ok', detail: 'A sponsor key is configured and does not require an SBT gate.' };
+  }
+  return { label: 'Not sponsored', tone: 'muted', detail: 'No sponsor key is configured for the active session.' };
 };
 const AccountUserPage = React.lazy(
   () => import("components/UserPage/UserPage")

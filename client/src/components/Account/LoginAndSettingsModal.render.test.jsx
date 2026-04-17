@@ -1240,8 +1240,8 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
 
     render(subject.getSettingsDisplay());
 
-    expect(screen.getByText('Check unavailable')).toBeInTheDocument();
-    expect(screen.getByText('We could not confirm gate access for the active-session sponsor.')).toBeInTheDocument();
+    expect(screen.getByText('Checking failed')).toBeInTheDocument();
+    expect(screen.getByText('We could not confirm gate access for this sponsor.')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('Sponsored key configured')).toBeInTheDocument();
     expect(screen.queryByPlaceholderText('Sponsored key configured (SBT required)')).not.toBeInTheDocument();
   });
