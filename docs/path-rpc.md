@@ -101,17 +101,33 @@ Notes:
 
 ## How group-level PATH preference is resolved
 
-When a session still contains `rpc` overrides, `contractScripts` resolves PATH preference in this order:
+When a session still contains `rpc` or browser-visible worker/session RPC overrides, the
+main client read-provider stack resolves session preference in this order:
 
-1. `rpc.providers.path.rpcUrlsByChainId[activeChainId]`
-2. `rpc.providers.path.rpcUrl`
-3. built-in PATH default for the active chain
+1. explicit/custom PATH overrides from `rpc.path.*` or, if absent, `rpc.providers.path.*` (`rpc.path.*` wins when both are present)
+2. first non-empty session chain-id map: `rpc.rpcUrlsByChainId[activeChainId]` else top-level `rpcUrlsByChainId[activeChainId]` (the resolver does not merge both layers)
+3. top-level/browser-visible `rpcEndpoint` or `rpcUrl` for the session default chain only
+4. nested/session-root `rpc.rpcEndpoint`, `rpc.endpoint`, `rpc.rpcUrl`, or `rpc.url` for the session default chain only
+5. built-in PATH default for the active chain
 
 Behavior:
 
-- If `rpc.provider` is `path` or `pocket`, PATH is preferred.
-- If `rpc.provider` is unset/default and PATH overrides exist, PATH is preferred.
-- If `rpc.provider` is a non-PATH value and no PATH overrides are set, the app keeps the existing chain RPC order.
+- If `rpc.provider` is `path` or `pocket`, PATH/default-PATH stays eligible, but an allowed sponsored
+  session-root RPC can still take precedence unless a custom `rpc.path.*` or `rpc.providers.path.*`
+  override is present.
+- If `rpc.provider` is unset/default and custom `rpc.path.*` or `rpc.providers.path.*` overrides exist,
+  PATH is preferred.
+- Public `rpc.path.*` / `rpc.providers.path.*` overrides remain session-level read overrides only when `rpc.provider` is
+  unset, `default`, `path`, or `pocket`.
+- Browser-visible top-level session RPC fields (`rpcUrlsByChainId`, `rpcEndpoint`, `rpcUrl`) now feed the
+  same participant-facing read-provider path, not just Admin diagnostics; use `rpcUrlsByChainId` (top-level
+  or nested under `rpc.*`) for cross-chain contract reads because direct `rpcEndpoint`/`rpcUrl` only apply
+  on the session default chain.
+- If the session RPC has an explicit on-chain open gate for the `rpc` resource, the client may use it directly.
+- If the session `rpc` resource is restricted, the client fails closed until wallet access has been verified;
+  granted wallets switch onto the session RPC, while denied/unverified wallets stay on the normal fallback stack.
+- If `rpc.provider` is a non-PATH value such as `infura`, the resolver disables PATH/session-root preference
+  and uses the chain fallback stack with PATH URLs removed from the public, default, and fallback lists.
 - The app still falls back to the chain's public/default RPC list after any preferred PATH URLs.
 - Empty PATH override strings are ignored. On OP Sepolia and Base Sepolia, that falls back to the built-in
   chain PATH default and then the normal chain fallback list.
@@ -127,6 +143,8 @@ Important current behavior on OP Sepolia (`11155420`) and Base Sepolia (`84532`)
 
 - Session Wizard deploy payloads intentionally prefer non-PATH fallback/public RPCs first when building
   `rpcUrlsByChainId` for worker config.
+- Browser-visible worker/session RPC values mirrored onto top-level `rpcUrlsByChainId`, `rpcEndpoint`, or `rpcUrl`
+  can now be consumed by the main client read-provider path only when the on-chain `rpc` gate is open or the current wallet already has a cached grant.
 - AdminPage worker-config payloads currently default `rpcUrl` to `getDefaultHttpRpc(chainId)`, which is
   PATH-first when PATH preference is enabled.
 - AdminPage Resources -> Faucet balance is a read-only lookup that follows the session chain first:
@@ -189,8 +207,9 @@ If you want to run your own gateway:
 
 Suggested override fields:
 
-- single-chain override: `rpc.providers.path.rpcUrl`
-- per-chain override: `rpc.providers.path.rpcUrlsByChainId`
+- single-chain override: `rpc.path.rpcUrl` or `rpc.providers.path.rpcUrl`
+- per-chain override: `rpc.path.rpcUrlsByChainId` or `rpc.providers.path.rpcUrlsByChainId`
+- if both shapes are present, `rpc.path.*` wins
 
 ## Related docs
 
