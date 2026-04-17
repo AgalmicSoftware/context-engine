@@ -1,5 +1,5 @@
 import React from 'react';
-import Select from 'react-select';
+import CheckboxMultiSelect from '../../Shared/CheckboxMultiSelect.jsx';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faMagic, faTimes } from '@fortawesome/free-solid-svg-icons';
 import { getSegmentDisplayName } from '../../../utilities/demo/demoAnalysisMath.js';
@@ -88,15 +88,10 @@ const DemographicSelector = ({
       <div className={styles.selectorLayout}>
         {Object.entries(demographics).map(([category, options]) => (
           <div key={category} className={styles.selectorField}>
-            <Select
+            <CheckboxMultiSelect
               inputId={`demo-analysis-select-${slugify(category)}`}
               className={styles.demographicSelect}
-              classNamePrefix="demoAnalysisSelect"
-              closeMenuOnSelect={false}
-              controlShouldRenderValue={false}
-              hideSelectedOptions={false}
-              isClearable={true}
-              isMulti
+              isClearable
               onChange={(nextOptions) => {
                 const nextSegmentKeys = (Array.isArray(nextOptions) ? nextOptions : []).map(
                   (option) => `${category}:${option.value}`
