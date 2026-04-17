@@ -1,6 +1,7 @@
 import {
   checkSponsoredAccess,
   getDefaultSponsoredGate,
+  primeSponsoredAccessCheck,
   resolveSponsoredGateForResource,
 } from './sponsoredAccess.js';
 import contractScripts from './contractScripts.js';
@@ -195,6 +196,33 @@ describe('sponsoredAccess cache behavior', () => {
     } finally {
       nowSpy.mockRestore();
     }
+  });
+
+  it('dedupes concurrent direct and primed access checks into one SBT lookup', async () => {
+    let resolveLookup;
+    const lookup = new Promise((resolve) => {
+      resolveLookup = resolve;
+    });
+    contractScripts.userHasSBT.mockImplementation(() => lookup);
+
+    const args = {
+      sessionConfig: cfg,
+      sessionSlug: 'edge',
+      account: '0x00000000000000000000000000000000000000a7',
+      resourceKey: 'default',
+    };
+
+    const direct = checkSponsoredAccess(args);
+    const primed = primeSponsoredAccessCheck(args);
+
+    expect(contractScripts.userHasSBT).toHaveBeenCalledTimes(1);
+
+    resolveLookup(true);
+    const [directResult, primedResult] = await Promise.all([direct, primed]);
+
+    expect(directResult.status).toBe('granted');
+    expect(primedResult.status).toBe('granted');
+    expect(contractScripts.userHasSBT).toHaveBeenCalledTimes(1);
   });
 
   it('evicts oldest cached entries beyond max cache size', async () => {
