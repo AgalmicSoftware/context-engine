@@ -1,6 +1,82 @@
 import { ethers } from 'ethers';
 import { toStr } from '../shared/primitives.js';
 
+/** @typedef {Object<string, any>} SessionConfigLike */
+
+/**
+ * @typedef {'restricted'|'open'|'unresolved'|'unavailable'} SponsoredGateState
+ */
+
+/**
+ * @typedef {object} SponsoredGate
+ * @property {'sbt'} [type] Gate type.
+ * @property {string|null} [label] Human-readable gate label.
+ * @property {string|null} [gateId] Stable gate identifier.
+ * @property {string|null} [sbtAddress] Primary SBT address.
+ * @property {string[]} [sbtAddresses] All SBT addresses participating in the gate.
+ * @property {number|string|null} [chainId] Chain used for the gate check.
+ * @property {string|null} [litChain] Lit chain override.
+ * @property {'any'|'all'|string} [mode] Gate match mode.
+ * @property {Object<string, any>|null} [fallback] Optional fallback gate carrier.
+ * @property {number|string|null} [perMemberLimit] Optional per-member limit.
+ */
+
+/**
+ * @typedef {string|null|undefined} SponsoredResource
+ */
+
+/**
+ * @typedef {object} SponsoredAccessResult
+ * @property {'no-gate'|'unknown'|'needs-wallet'|'invalid-gate'|'granted'|'denied'|'error'|'unresolved'} status
+ * @property {SponsoredGate|null} gate
+ * @property {SponsoredResource} resourceKey
+ * @property {string} [error]
+ */
+
+/**
+ * @typedef {object} SponsoredGateResolution
+ * @property {boolean} handled
+ * @property {string} resourceKey
+ * @property {SponsoredGateState} status
+ * @property {SponsoredGate|null} gate
+ */
+
+/**
+ * @typedef {object} SponsoredAccessChangePayload
+ * @property {string} sessionSlug
+ * @property {string} resourceKey
+ * @property {string} account
+ * @property {string} status
+ * @property {string} accessMode
+ */
+
+/**
+ * @callback SponsoredAccessChangeListener
+ * @param {SponsoredAccessChangePayload} payload
+ * @returns {void}
+ */
+
+/**
+ * @callback CheckSbtAccessFn
+ * @param {{
+ *   sbtAddress: string,
+ *   account: string,
+ *   sessionConfig?: SessionConfigLike|null,
+ *   sessionSlug?: string,
+ *   resourceKey?: SponsoredResource,
+ * }} params
+ * @returns {Promise<boolean>|boolean}
+ */
+
+/**
+ * Canonical sponsored gate state constants.
+ * @type {{
+ *   readonly RESTRICTED: 'restricted',
+ *   readonly OPEN: 'open',
+ *   readonly UNRESOLVED: 'unresolved',
+ *   readonly UNAVAILABLE: 'unavailable',
+ * }}
+ */
 export const SPONSORED_GATE_STATES = Object.freeze({
   RESTRICTED: 'restricted',
   OPEN: 'open',
@@ -8,6 +84,11 @@ export const SPONSORED_GATE_STATES = Object.freeze({
   UNAVAILABLE: 'unavailable',
 });
 
+/**
+ * Normalize a sponsored gate mode to `any` or `all`.
+ * @param {SponsoredGate | null | undefined} [gate={}]
+ * @returns {'any'|'all'}
+ */
 export const normalizeGateMode = (gate = {}) => {
   if (!gate) return 'any';
 
@@ -27,6 +108,11 @@ export const normalizeGateMode = (gate = {}) => {
   return 'any';
 };
 
+/**
+ * Collect unique SBT addresses from a sponsored gate payload.
+ * @param {SponsoredGate | null | undefined} [gate={}]
+ * @returns {string[]}
+ */
 export const getGateSbtAddresses = (gate = {}) => {
   const out = [];
   const seen = new Set();
@@ -108,14 +194,31 @@ const resolveOnChainGateForResource = (cfg = {}, resourceKey = '') => {
   };
 };
 
+/**
+ * Resolve the default sponsored gate from a session config.
+ * @param {SessionConfigLike} [cfg={}]
+ * @returns {SponsoredGate|null}
+ */
 export const getDefaultSponsoredGate = (cfg = {}) => {
   return resolveOnChainGateForResource(cfg, 'default').gate;
 };
 
+/**
+ * Resolve the sponsored gate state for a resource key.
+ * @param {SessionConfigLike} [cfg={}]
+ * @param {SponsoredResource} [resourceKey='']
+ * @returns {SponsoredGateResolution}
+ */
 export const resolveSponsoredGateStateForResource = (cfg = {}, resourceKey = '') => {
   return resolveOnChainGateForResource(cfg, resourceKey || 'default');
 };
 
+/**
+ * Resolve the sponsored gate payload for a resource key.
+ * @param {SessionConfigLike} [cfg={}]
+ * @param {SponsoredResource} [resourceKey='']
+ * @returns {SponsoredGate|null}
+ */
 export const resolveSponsoredGateForResource = (cfg = {}, resourceKey = '') => {
   return resolveSponsoredGateStateForResource(cfg, resourceKey || 'default').gate;
 };
@@ -123,6 +226,11 @@ export const resolveSponsoredGateForResource = (cfg = {}, resourceKey = '') => {
 const accessCache = new Map();
 const accessInflight = new Map();
 const SPONSORED_ACCESS_INFLIGHT_TIMEOUT_MS = 30 * 1000;
+
+/**
+ * Cache hit TTL for repeated sponsored access reads.
+ * @type {number}
+ */
 export const SPONSORED_ACCESS_CACHE_HIT_TTL_MS = 30 * 1000;
 const ACCESS_CACHE_STALE_TTL_MS = 15 * 60 * 1000;
 const ACCESS_CACHE_MAX = 500;
@@ -186,6 +294,11 @@ const shouldEmitSponsoredAccessChange = (previousStatus, nextStatus) => {
   return prev === 'checking' || prev === 'unknown';
 };
 
+/**
+ * Subscribe to sponsored access state transitions for cached gate checks.
+ * @param {SponsoredAccessChangeListener} listener
+ * @returns {() => void}
+ */
 export const addSponsoredAccessChangeListener = (listener) => {
   if (typeof listener !== 'function') {
     return () => {};
@@ -348,6 +461,16 @@ const runAccessCheckWithInflight = ({
   return inflight;
 };
 
+/**
+ * Read a recent sponsored access result from the in-memory cache.
+ * @param {{
+ *   sessionConfig?: SessionConfigLike|null,
+ *   account?: string,
+ *   resourceKey?: SponsoredResource,
+ *   maxAgeMs?: number,
+ * }} [params={}]
+ * @returns {SponsoredAccessResult|null}
+ */
 export const readCachedSponsoredAccess = ({
   sessionConfig,
   account,
@@ -366,6 +489,17 @@ export const readCachedSponsoredAccess = ({
   return cached?.value ? toPublicSponsoredAccessValue(cached.value) : null;
 };
 
+/**
+ * Evaluate sponsored access for a resource using an injected SBT checker.
+ * @param {{
+ *   sessionConfig?: SessionConfigLike|null,
+ *   sessionSlug?: string,
+ *   account?: string,
+ *   resourceKey?: SponsoredResource,
+ *   checkSbtAccess?: CheckSbtAccessFn,
+ * }} [params={}]
+ * @returns {Promise<SponsoredAccessResult>}
+ */
 export const checkSponsoredAccessWithChecker = async ({
   sessionConfig,
   sessionSlug,
@@ -454,6 +588,17 @@ export const checkSponsoredAccessWithChecker = async ({
   })).then((value) => toPublicSponsoredAccessValue(value));
 };
 
+/**
+ * Warm the sponsored access cache for a gated resource when possible.
+ * @param {{
+ *   sessionConfig?: SessionConfigLike|null,
+ *   sessionSlug?: string,
+ *   account?: string,
+ *   resourceKey?: SponsoredResource,
+ *   checkSbtAccess?: CheckSbtAccessFn,
+ * }} [params={}]
+ * @returns {Promise<SponsoredAccessResult|null>}
+ */
 export const primeSponsoredAccessCheckWithChecker = ({
   sessionConfig,
   sessionSlug,

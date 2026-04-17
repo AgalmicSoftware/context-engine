@@ -28,6 +28,60 @@ import {
   addSponsoredAccessChangeListener,
 } from './sponsoredAccessState.js';
 
+/** @typedef {import('ethers').providers.Provider} EthersProvider */
+/** @typedef {Object<string, any>} SessionConfigLike */
+
+/**
+ * @typedef {object} ReadProviderGroupOptions
+ * @property {string} [contractKey] Contract slot to prioritize when resolving chainId.
+ * @property {boolean} [strict] Skip registry/default fallbacks while extracting chainId.
+ */
+
+/**
+ * @typedef {object} ReadProviderResolutionOptions
+ * @property {boolean} [treatPreferredUrlsAsPath] Treat preferred URLs as PATH-style endpoints.
+ * @property {string[]} [preferredUrls] Explicit preferred RPC URLs.
+ * @property {boolean} [skipGlobalPreferred] Ignore global PATH defaults.
+ * @property {string} [providerLabel] Provider label for diagnostics.
+ * @property {string} [cacheKey] Cache key suffix override.
+ * @property {string} [sessionAccessStatus] Sponsored session access status.
+ * @property {string} [sessionAccessMode] Sponsored session access mode.
+ * @property {string} [sessionRpcSource] Sponsored session RPC source.
+ */
+
+/**
+ * @typedef {object} ReadProviderPreference
+ * @property {string[]} [preferredUrls] Preferred RPC URLs for the provider cache key.
+ * @property {string} [providerLabel] Provider label surfaced in diagnostics.
+ * @property {string} [cacheKey] Cache key used for provider memoization.
+ * @property {boolean} [treatPreferredUrlsAsPath] Whether preferred URLs should be treated as PATH.
+ * @property {string} [sessionAccessStatus] Sponsored session access status.
+ * @property {string} [sessionAccessMode] Sponsored session access mode.
+ * @property {string} [sessionRpcSource] Sponsored session RPC source.
+ * @property {boolean} [skipGlobalPreferred] Skip global PATH defaults.
+ */
+
+/**
+ * @typedef {object} ReadProviderDiagnostics
+ * @property {number} chainId
+ * @property {string} chainName
+ * @property {'infura_only'|'fallback'} providerMode
+ * @property {string} providerLabel
+ * @property {boolean} preferPath
+ * @property {string[]} pathDefaults
+ * @property {string[]} preferredUrls
+ * @property {string[]} publicUrls
+ * @property {string[]} defaultUrls
+ * @property {string} fallbackUrl
+ * @property {string} configuredPaidRpcUrl
+ * @property {boolean} includesConfiguredPaidRpc
+ * @property {boolean} infuraOnlyForChain
+ * @property {string} sessionAccessStatus
+ * @property {string} sessionAccessMode
+ * @property {string} sessionRpcSource
+ * @property {string[]} urls
+ */
+
 const { getPathRpcUrl } = rpcDefaults;
 
 const contractsLog = createLogger('contracts');
@@ -50,6 +104,11 @@ const SPONSORED_RPC_RESOURCE_KEY = 'rpc';
 const SESSION_PROVIDER_TRANSITION_PRUNE_TTL_MS = 60 * 1000;
 const TRANSITIONAL_SESSION_ACCESS_STATUSES = new Set(['checking', 'unresolved']);
 
+/**
+ * Normalize CE RPC provider mode to a supported runtime value.
+ * @param {string | null | undefined} raw
+ * @returns {'infura_only'|'fallback'}
+ */
 const normalizeRpcProviderMode = (raw) => {
   const mode = String(raw || '').trim().toLowerCase();
   return mode === 'infura_only' ? 'infura_only' : 'fallback';
@@ -59,6 +118,10 @@ const shouldTrackSessionProviderCacheKey = (sessionAccessStatus = '') => (
   TRANSITIONAL_SESSION_ACCESS_STATUSES.has(toLower(sessionAccessStatus))
 );
 
+/**
+ * Read the active CE RPC provider mode from runtime globals or app config.
+ * @returns {'infura_only'|'fallback'}
+ */
 const readRpcProviderMode = () => {
   try {
     if (typeof globalThis !== 'undefined' && typeof globalThis.CE_RPC_PROVIDER_MODE !== 'undefined') {
@@ -396,6 +459,12 @@ const resolveSponsoredSessionRpcAccess = (cfg = {}, sessionSlug = '', sessionRpc
   };
 };
 
+/**
+ * Resolve PATH or sponsored-session RPC preference overrides for a session config.
+ * @param {SessionConfigLike} [cfg={}]
+ * @param {number|string|null|undefined} chainId
+ * @returns {ReadProviderPreference|null}
+ */
 function resolveGroupPathRpcPreference(cfg, chainId) {
   const id = Number(chainId || 0);
   if (!id) return null;
@@ -768,13 +837,21 @@ function _getCachedProvider(chainId, opts = {}) {
 
 
 /**
- * Choose a read-only provider for the given chainId using chains.js.
+ * Choose a cached read-only provider for the requested chain.
+ * @param {number|string|null|undefined} chainId
+ * @returns {EthersProvider}
  */
 function getReadProviderForChain(chainId) {
   const id = Number(chainId || 0);
   return _getCachedProvider(id);
 }
 
+/**
+ * Describe how the read provider would resolve for a chain and option set.
+ * @param {number|string|null|undefined} chainId
+ * @param {ReadProviderResolutionOptions} [opts={}]
+ * @returns {ReadProviderDiagnostics}
+ */
 function getReadProviderDiagnostics(chainId, opts = {}) {
   const resolution = buildReadProviderResolution(chainId, opts);
   return {
@@ -801,6 +878,11 @@ function getReadProviderDiagnostics(chainId, opts = {}) {
   };
 }
 
+/**
+ * Choose a local injected provider when available, otherwise fall back to the cached chain provider.
+ * @param {number|string|null|undefined} chainId
+ * @returns {EthersProvider}
+ */
 function getLocalAwareReadProviderForChain(chainId) {
   const id = Number(chainId || 0);
   const injectedProvider = typeof window !== 'undefined' ? window.ethereum : null;
@@ -817,6 +899,12 @@ function getLocalAwareReadProviderForChain(chainId) {
   return getReadProviderForChain(id);
 }
 
+/**
+ * Choose a local injected provider for a session when available, otherwise use the session read provider.
+ * @param {string | SessionConfigLike | null | undefined} groupKeyOrCfg
+ * @param {ReadProviderGroupOptions | null} [options=null]
+ * @returns {EthersProvider}
+ */
 function getLocalAwareReadProviderForGroup(groupKeyOrCfg, options = null) {
   const cfg = memoizedResolveSession(groupKeyOrCfg === undefined ? '' : groupKeyOrCfg);
   const chId = extractChainId(cfg, options);
@@ -835,8 +923,10 @@ function getLocalAwareReadProviderForGroup(groupKeyOrCfg, options = null) {
 }
 
 /**
- * Resolve a demo session (key/slug/object) to its chain and return a **read-only**
- * provider for that chain.
+ * Resolve a session key, slug, or config object to its read-only provider.
+ * @param {string | SessionConfigLike | null | undefined} groupKeyOrCfg
+ * @param {ReadProviderGroupOptions | null} [options=null]
+ * @returns {EthersProvider}
  */
 export function getReadProviderForGroup(groupKeyOrCfg, options = null) {
   const cfg = memoizedResolveSession(groupKeyOrCfg === undefined ? '' : groupKeyOrCfg);
@@ -869,6 +959,7 @@ export function getReadProviderForGroup(groupKeyOrCfg, options = null) {
   return provider;
 }
 
+/** @type {typeof getReadProviderForGroup} */
 export const getReadProviderForSession = getReadProviderForGroup;
 
 export {
