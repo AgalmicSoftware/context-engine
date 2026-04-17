@@ -5,6 +5,24 @@
  *
  * Key exports: stripAuthoritativeSessionGateFields, normalizeSessionNaming, normalizeLitMetadataNetwork
  */
+
+/**
+ * @typedef {object} SessionMetadata
+ * @property {boolean=} sponsored
+ * @property {string=} sponsoredSbtAddress
+ * @property {Array<Record<string, any>> | Record<string, any>=} gates
+ * @property {string=} sessionName
+ * @property {string=} orgName
+ * @property {string=} sessionInfo
+ * @property {string=} orgInfo
+ * @property {string | Record<string, any> | null=} sessionInfoEncrypted
+ * @property {string | Record<string, any> | null=} encryptedSessionInfo
+ * @property {string | Record<string, any> | null=} orgInfoEncrypted
+ * @property {string | Record<string, any> | null=} encryptedOrgInfo
+ * @property {{ network?: string }=} lit
+ * @property {string=} litNetwork
+ */
+
 const DEFAULT_LIT_NETWORK = 'naga-dev';
 const LEGACY_LIT_NETWORK_ALIASES = Object.freeze({
   'naga-dev': 'naga-dev',
@@ -26,6 +44,11 @@ const resolveCanonicalLitNetwork = (value) => {
   return LEGACY_LIT_NETWORK_ALIASES[normalized] || raw;
 };
 
+/**
+ * Removes authoritative gate fields that should come from the registry rather than Arweave metadata.
+ * @param {unknown} metadata
+ * @returns {unknown}
+ */
 export const stripAuthoritativeSessionGateFields = (metadata) => {
   if (!isObj(metadata)) return metadata;
   const next = cloneMetadata(metadata);
@@ -35,6 +58,11 @@ export const stripAuthoritativeSessionGateFields = (metadata) => {
   return next;
 };
 
+/**
+ * Normalizes session naming fields and drops legacy org-prefixed aliases from persisted metadata.
+ * @param {unknown} metadata
+ * @returns {unknown}
+ */
 export const normalizeSessionNaming = (metadata) => {
   if (!isObj(metadata)) return metadata;
   const next = cloneMetadata(metadata);
@@ -68,6 +96,11 @@ export const normalizeSessionNaming = (metadata) => {
   return next;
 };
 
+/**
+ * Moves legacy Lit network metadata into the nested `lit.network` field using the canonical runtime name.
+ * @param {unknown} metadata
+ * @returns {unknown}
+ */
 export const normalizeLitMetadataNetwork = (metadata) => {
   if (!isObj(metadata)) return metadata;
   const next = cloneMetadata(metadata);
