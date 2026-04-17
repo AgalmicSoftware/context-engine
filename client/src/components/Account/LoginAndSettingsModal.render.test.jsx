@@ -1073,6 +1073,54 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     expect(screen.queryByText('RPC Gate · ANY')).not.toBeInTheDocument();
   });
 
+  it('keeps unresolved sponsored AI access in a non-terminal state', () => {
+    const subject = new LoginAndSettingsModal(buildProps({
+      account: WAGMI_ADDRESS,
+      activeSessionSlug: 'edge',
+      loginComplete: true,
+      provider: 'wagmi',
+    }));
+    subject.state = {
+      ...subject.state,
+      aiSettingsOpen: true,
+      sponsoredAccessLoading: false,
+      sponsoredAccess: {
+        ai: { status: 'unresolved' },
+        arweave: null,
+        rpc: null,
+        txGas: null,
+      },
+    };
+    subject.getDisplaySessionConfig = jest.fn(() => ({
+      slug: 'edge',
+      sessionName: 'Edge Session',
+      sponsoredKeys: {
+        ai: 'edge-ai',
+      },
+    }));
+    subject.getSessionDescriptor = jest.fn(() => ({
+      label: 'Edge Session',
+      _sessionName: 'Edge Session',
+    }));
+    subject.getSettingsSessionOptions = jest.fn(() => [{ slug: 'edge', label: 'Edge Session' }]);
+    subject.getSponsoredSessionSources = jest.fn(() => ({
+      byResource: {
+        ai: [{ slug: 'edge', label: 'Edge Session', slugLabel: 'edge', isActive: true }],
+        arweave: [],
+        rpc: [],
+        txGas: [],
+      },
+      rpcScope: [],
+    }));
+
+    render(subject.getSettingsDisplay());
+
+    expect(screen.getByText('Checking failed')).toBeInTheDocument();
+    expect(screen.getByText('We could not confirm gate access for this sponsor.')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Sponsored key configured')).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText('Sponsored key configured (SBT required)')).not.toBeInTheDocument();
+  });
+
   it('keeps gas transaction UI hidden even when faucet success state exists', () => {
     const subject = new LoginAndSettingsModal(buildProps({
       account: WAGMI_ADDRESS,

@@ -1297,6 +1297,35 @@ describe('UserPage cache refresh pipeline', () => {
     expect(queueSpy).toHaveBeenCalledWith({ markLoading: false, bypassSignature: true });
   });
 
+  it('backs off cached unresolved gate access instead of re-queueing an immediate refresh', () => {
+    jest.useFakeTimers();
+    const account = '0x00000000000000000000000000000000000000bb';
+    const instance = makeInstance({ account });
+    const queueSpy = jest.spyOn(instance, 'queueCacheRefresh').mockImplementation(() => {});
+    const pendingKey = instance._buildGatePendingKey({
+      slug: 'edge',
+      resourceKey: 'questionResponses',
+    });
+    const cacheKey = instance._buildGateAccessCacheKey({
+      slug: 'edge',
+      resourceKey: 'questionResponses',
+    });
+
+    instance._responseGateAccessStatusByKey.set(cacheKey, {
+      status: 'unresolved',
+      ts: Date.now() - 5000,
+    });
+
+    instance._queueResponseGateAccessChecks(new Set([pendingKey]));
+
+    expect(checkSponsoredAccess).not.toHaveBeenCalled();
+    expect(queueSpy).not.toHaveBeenCalled();
+
+    jest.advanceTimersByTime(25000);
+    expect(queueSpy).toHaveBeenCalledTimes(1);
+    expect(queueSpy).toHaveBeenCalledWith({ markLoading: false, bypassSignature: true });
+  });
+
   it('keeps loading state when data remains uncertain and no cache sources are available', () => {
     const instance = makeInstance();
     instance.state.hasUncertainUserData = true;
