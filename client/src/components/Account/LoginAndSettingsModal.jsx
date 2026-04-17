@@ -111,7 +111,9 @@ const getSponsoredKeyAliases = (resourceKey = '') => {
   return [resourceKey];
 };
 const formatSponsoredStatusMeta = (entry, hasSponsors = false) => {
-  const status = entry?.status || 'no-gate';
+  const status = entry?.status === 'unresolved'
+    ? 'error'
+    : (entry?.status || 'no-gate');
   if (status === 'granted') {
     return { label: 'Gate unlocked', tone: 'ok', detail: 'Sponsored key is available for the active session.' };
   }
@@ -2138,10 +2140,19 @@ export class LoginAndSettingsModal extends Component {
     const sponsoredAccess = this.state.sponsoredAccess || {};
     const aiAccess = sponsoredAccess.ai || null;
     const aiAccessStatus = aiAccess?.status || '';
+    const aiAccessIsConfirmedLocked = (
+      aiAccessStatus === 'denied' ||
+      aiAccessStatus === 'needs-wallet' ||
+      aiAccessStatus === 'invalid-gate'
+    );
     const keyPlaceholder = useLocalAi
       ? 'Enter API key'
       : (sponsoredKeys.ai
-          ? (aiAccessStatus === 'granted' ? 'Sponsored key configured (unlocked)' : 'Sponsored key configured (SBT required)')
+          ? (
+            aiAccessStatus === 'granted'
+              ? 'Sponsored key configured (unlocked)'
+              : (aiAccessIsConfirmedLocked ? 'Sponsored key configured (SBT required)' : 'Sponsored key configured')
+          )
           : 'No sponsored key set');
 
     const transcriptionProvider = String(aiDisplay.transcription?.provider || 'openai').toLowerCase();
