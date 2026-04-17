@@ -36,6 +36,104 @@ import { ethers, utils } from 'ethers';
 import { createLogger } from '../logging';
 import { perfDebugDecryptEnvelope } from '../web3/rpcDebugStats.js';
 
+/**
+ * @typedef {object} CryptoFieldEntry
+ * @property {any=} value
+ * @property {boolean=} encrypted
+ * @property {string | Record<string, any>=} encryptedPortion
+ * @property {string=} hash
+ * @property {string=} poseidon
+ * @property {string=} zkSalt
+ */
+
+/**
+ * @typedef {object} CryptoAnswerSlice
+ * @property {Record<string, CryptoFieldEntry>=} answers
+ * @property {Record<string, CryptoFieldEntry>=} additionalComments
+ * @property {Record<string, any>=} importance
+ */
+
+/**
+ * @typedef {object} CryptoEncryptOptions
+ * @property {unknown=} provider
+ * @property {unknown=} providerLike
+ * @property {unknown=} providerKind
+ * @property {string=} account
+ * @property {number | string | null=} chainId
+ * @property {string=} surveyId
+ * @property {string[]=} onlyTheseQids
+ * @property {Array<Record<string, any>>=} questionPool
+ * @property {Record<string, any>=} lit
+ * @property {((inputs: bigint[]) => string | bigint | Promise<string | bigint>) | null=} hasher
+ * @property {((inputs: bigint[]) => string | bigint | Promise<string | bigint>) | null=} poseidon
+ * @property {string=} kind
+ * @property {string=} contextLabel
+ * @property {string=} label
+ * @property {string=} qId
+ */
+
+/**
+ * @typedef {object} CryptoDecryptOptions
+ * @property {unknown=} provider
+ * @property {unknown=} providerLike
+ * @property {unknown=} providerKind
+ * @property {string=} account
+ * @property {number | string | null=} chainId
+ * @property {string=} surveyId
+ * @property {Record<string, any>=} lit
+ * @property {Record<string, any>=} litOpts
+ * @property {boolean=} throwOnError
+ */
+
+/**
+ * @typedef {object} InviteSignatureVerificationResult
+ * @property {boolean} ok
+ * @property {string=} signer
+ * @property {boolean=} usedFallback
+ * @property {string=} error
+ */
+
+/**
+ * @typedef {object} CryptoUtilsTestApi
+ * @property {(options: {
+ *   jsonStr: string,
+ *   account?: string,
+ *   chainId?: number | string | null,
+ *   providerLike?: unknown,
+ *   litOpts?: Record<string, any>
+ * }) => string} buildDecryptEnvelopeCacheKey
+ */
+
+/**
+ * @typedef {object} CryptoUtilsApi
+ * @property {(providerLike: unknown) => ('wagmi' | 'porto' | 'web3auth')} getProviderKind
+ * @property {(providerLike: unknown) => { request: (request: { method: string, params?: unknown[] }) => Promise<unknown> }} _getProvider
+ * @property {(surveyState: CryptoAnswerSlice & Record<string, any>, optsOrPubKey?: CryptoEncryptOptions | string, extraOpts?: CryptoEncryptOptions) => Promise<CryptoAnswerSlice>} encryptMultipleAnswers
+ * @property {(slice: CryptoAnswerSlice & Record<string, any>, questionPool?: Array<Record<string, any>>, accountOrOpts?: string | CryptoDecryptOptions, providerKind?: string, opts?: CryptoDecryptOptions) => Promise<CryptoAnswerSlice>} decryptMultipleAnswers
+ * @property {(slice: CryptoAnswerSlice & Record<string, any>, qId: string, fieldToDecrypt: 'answer' | 'additional' | 'both', accountOrOpts?: string | CryptoDecryptOptions, providerKind?: string, opts?: CryptoDecryptOptions) => Promise<CryptoAnswerSlice>} decryptSingleField
+ * @property {(input: { chainId?: number | string | null, account?: string, surveyId?: string, qId?: string }) => string} computeContext
+ * @property {(qId: string, opts?: { questionPool?: Array<Record<string, any>> }) => { kind: 'freeform' | 'binary' | 'rating' | 'multichoice', options: string[] }} getQuestionKindMeta
+ * @property {(field: Record<string, any>, ctx?: { qId?: string, kind?: string, chainId?: number | string | null, surveyId?: string, optionsForKind?: string[], hasher?: ((inputs: bigint[]) => string | bigint | Promise<string | bigint>) | null }) => Promise<void>} addTopLevelPoseidonIfRequired
+ * @property {(identifier: unknown) => string} hashIdentifier
+ * @property {(data: unknown, password: string) => Promise<string>} encryptWithPassword
+ * @property {(encryptedData: string | { iv?: string, salt?: string, ciphertext?: string }, password: string) => Promise<any>} decryptWithPassword
+ * @property {(value: unknown, opts?: CryptoEncryptOptions) => Promise<string>} encryptEnvelopeValue
+ * @property {(envelopeJson: string | Record<string, any>, opts?: CryptoDecryptOptions) => Promise<any>} decryptEnvelopeValue
+ * @property {(input: { password?: string, sbtAddress?: string }) => string} computeGroupPasswordHash
+ * @property {(input: { password?: string, sbtAddress?: string, groupPasswordHash?: string }) => string | null} resolveGroupPasswordWalletScopeAddress
+ * @property {(sbtAddress: string, userAddress: string) => string} computeGroupMintMessageHash
+ * @property {(input: { password?: string, sbtAddress?: string, userAddress?: string, walletScopeSbtAddress?: string }) => Promise<string>} signGroupMintAuthorization
+ * @property {(input: { sbtAddress?: string, nonce?: string | number }) => string} buildInviteMessageHash
+ * @property {(input: { password?: string, sbtAddress?: string, nonce?: string | number, walletScopeSbtAddress?: string }) => Promise<string>} signInvite
+ * @property {(payload: Record<string, any>) => string} encodeInvite
+ * @property {(inviteCode: string) => ({ nonce: string, signature: string } | null)} decodeInvite
+ * @property {() => string} generateInviteNonce
+ * @property {(raw: unknown) => string} normalizeGroupPasswordInput
+ * @property {(raw: unknown) => string} encodeGroupPasswordForUrl
+ * @property {(input: { sbtAddress?: string, nonce?: string | number, signature?: string, groupPasswordHash?: string }) => InviteSignatureVerificationResult} verifyInviteSignature
+ * @property {CryptoUtilsTestApi} __test
+ */
+
 const log = createLogger('crypto');
 const logCryptoFallback = (e) => log.warn('crypto fallback:', e);
 
@@ -1839,32 +1937,59 @@ const encryptEnvelopeValue = async (value, opts = {}) => {
 
 /* ------------------------------ exports ---------------------------------- */
 
+/** @type {CryptoUtilsApi} */
 export const cryptoUtils = {
+  /** @type {CryptoUtilsApi['getProviderKind']} */
   getProviderKind,
+  /** @type {CryptoUtilsApi['_getProvider']} */
   _getProvider,
+  /** @type {CryptoUtilsApi['encryptMultipleAnswers']} */
   encryptMultipleAnswers,
+  /** @type {CryptoUtilsApi['decryptMultipleAnswers']} */
   decryptMultipleAnswers,
+  /** @type {CryptoUtilsApi['decryptSingleField']} */
   decryptSingleField,
+  /** @type {CryptoUtilsApi['computeContext']} */
   computeContext,
+  /** @type {CryptoUtilsApi['getQuestionKindMeta']} */
   getQuestionKindMeta,
+  /** @type {CryptoUtilsApi['addTopLevelPoseidonIfRequired']} */
   addTopLevelPoseidonIfRequired,
+  /** @type {CryptoUtilsApi['hashIdentifier']} */
   hashIdentifier,
+  /** @type {CryptoUtilsApi['encryptWithPassword']} */
   encryptWithPassword,
+  /** @type {CryptoUtilsApi['decryptWithPassword']} */
   decryptWithPassword,
+  /** @type {CryptoUtilsApi['encryptEnvelopeValue']} */
   encryptEnvelopeValue,
+  /** @type {CryptoUtilsApi['decryptEnvelopeValue']} */
   decryptEnvelopeValue,
+  /** @type {CryptoUtilsApi['computeGroupPasswordHash']} */
   computeGroupPasswordHash,
+  /** @type {CryptoUtilsApi['resolveGroupPasswordWalletScopeAddress']} */
   resolveGroupPasswordWalletScopeAddress,
+  /** @type {CryptoUtilsApi['computeGroupMintMessageHash']} */
   computeGroupMintMessageHash,
+  /** @type {CryptoUtilsApi['signGroupMintAuthorization']} */
   signGroupMintAuthorization,
+  /** @type {CryptoUtilsApi['buildInviteMessageHash']} */
   buildInviteMessageHash,
+  /** @type {CryptoUtilsApi['signInvite']} */
   signInvite,
+  /** @type {CryptoUtilsApi['encodeInvite']} */
   encodeInvite,
+  /** @type {CryptoUtilsApi['decodeInvite']} */
   decodeInvite,
+  /** @type {CryptoUtilsApi['generateInviteNonce']} */
   generateInviteNonce,
+  /** @type {CryptoUtilsApi['normalizeGroupPasswordInput']} */
   normalizeGroupPasswordInput,
+  /** @type {CryptoUtilsApi['encodeGroupPasswordForUrl']} */
   encodeGroupPasswordForUrl,
+  /** @type {CryptoUtilsApi['verifyInviteSignature']} */
   verifyInviteSignature,
+  /** @type {CryptoUtilsApi['__test']} */
   __test: {
     buildDecryptEnvelopeCacheKey,
   },

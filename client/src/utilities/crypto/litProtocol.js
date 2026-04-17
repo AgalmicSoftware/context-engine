@@ -21,6 +21,151 @@ import {
 } from '../worker/workerAuth.js';
 import { getCorsProxyUrlOrThrow } from '../worker/corsProxy.js';
 
+/**
+ * @typedef {import('ethers').providers.Provider} EthersProvider
+ * @typedef {import('ethers').Signer} EthersSigner
+ * @typedef {typeof import('buffer').Buffer} BufferConstructorLike
+ */
+
+/**
+ * @typedef {string | EthersProvider | EthersSigner | {
+ *   provider?: unknown,
+ *   request?: (request: { method: string, params?: unknown[] }) => Promise<unknown>
+ * } | null | undefined} LitProviderLike
+ */
+
+/**
+ * @typedef {object} LitAccessControlCondition
+ * @property {'and' | 'or'=} operator
+ * @property {string=} contractAddress
+ * @property {string=} standardContractType
+ * @property {string=} chain
+ * @property {string=} method
+ * @property {string[]=} parameters
+ * @property {{ comparator?: string, value?: string }=} returnValueTest
+ */
+
+/**
+ * @typedef {object} LitEncryptResult
+ * @property {string} ciphertext
+ * @property {string} dataToEncryptHash
+ */
+
+/**
+ * @typedef {object} LitUploadPayload
+ * @property {1} v
+ * @property {'text' | 'file'} kind
+ * @property {string} name
+ * @property {string} format
+ * @property {string} mime
+ * @property {'utf-8' | 'base64'} encoding
+ * @property {string} data
+ */
+
+/**
+ * @typedef {object} LitDecryptResult
+ * @property {LitUploadPayload} payload
+ * @property {string} txId
+ * @property {string} url
+ */
+
+/**
+ * @typedef {object} LitUploadResult
+ * @property {string} txId
+ * @property {string} url
+ * @property {string} arweaveUrl
+ * @property {string} envelope
+ */
+
+/**
+ * @typedef {object} LitHooksApi
+ * @property {(symmetricKey: Uint8Array | ArrayLike<number>, opts?: {
+ *   accessControlConditions?: LitAccessControlCondition[],
+ *   chain?: string,
+ *   connectTimeout?: number,
+ *   litNetwork?: string,
+ *   resourceId?: Record<string, any>,
+ *   providerLike?: LitProviderLike,
+ *   resourceAbilityRequests?: unknown,
+ *   userMaxPrice?: unknown,
+ *   paymentDelegation?: Record<string, any>,
+ *   account?: string,
+ *   rpcUrl?: string
+ * }) => Promise<LitEncryptResult>} saveKey
+ * @property {(opts?: {
+ *   accessControlConditions?: LitAccessControlCondition[],
+ *   chain?: string,
+ *   connectTimeout?: number,
+ *   litNetwork?: string,
+ *   resourceId?: Record<string, any>,
+ *   providerLike?: LitProviderLike,
+ *   resourceAbilityRequests?: unknown,
+ *   userMaxPrice?: unknown,
+ *   paymentDelegation?: Record<string, any>,
+ *   account?: string,
+ *   requesterAddress?: string,
+ *   ciphertext?: string,
+ *   dataToEncryptHash?: string,
+ *   encryptedSymmetricKey?: string,
+ *   toDecrypt?: string,
+ *   rpcUrl?: string
+ * }) => Promise<Uint8Array | string>} getKey
+ * @property {(() => void)=} clearCache
+ * @property {LitAccessControlCondition[] | null=} accessControlConditions
+ * @property {string=} litChain
+ * @property {string=} litNetwork
+ * @property {string=} chain
+ * @property {LitProviderLike=} providerLike
+ * @property {number=} connectTimeout
+ * @property {unknown=} resourceAbilityRequests
+ * @property {unknown=} userMaxPrice
+ * @property {Record<string, any>=} paymentDelegation
+ * @property {boolean=} __e2eMock
+ */
+
+/**
+ * @typedef {object} LitDevToolsApi
+ * @property {(options?: {
+ *   value?: unknown,
+ *   sbtAddresses?: string | string[],
+ *   contextLabel?: string,
+ *   chain?: string | number
+ * }) => Promise<string>} encryptForSbt
+ * @property {(envelopeJson: string | Record<string, any>) => Promise<any>} decryptEnvelope
+ */
+
+/**
+ * @typedef {object} LitStorageApi
+ * @property {(txId: unknown) => string} buildLitArweaveUrl
+ * @property {(url: unknown) => string | null} parseLitArweaveUrl
+ * @property {(url: unknown) => boolean} isLitArweaveUrl
+ * @property {(options?: {
+ *   data?: unknown,
+ *   format?: string,
+ *   name?: string,
+ *   mime?: string,
+ *   arweaveJwk?: Record<string, any>,
+ *   tags?: Array<Record<string, any>>,
+ *   arweave?: Record<string, any>,
+ *   providerLike?: LitProviderLike,
+ *   account?: string,
+ *   chainId?: number | string | null,
+ *   contextLabel?: string,
+ *   lit?: LitHooksApi & { accessControlConditions: LitAccessControlCondition[] }
+ * }) => Promise<LitUploadResult>} uploadEncryptedArweaveData
+ * @property {(options?: {
+ *   url?: string,
+ *   txId?: string,
+ *   providerLike?: LitProviderLike,
+ *   account?: string,
+ *   chainId?: number | string | null,
+ *   lit?: LitHooksApi,
+ *   arweave?: Record<string, any>
+ * }) => Promise<LitDecryptResult>} downloadEncryptedArweaveData
+ * @property {(payload: LitUploadPayload | null | undefined) => string} decodeLitPayloadToText
+ * @property {(payload: LitUploadPayload | null | undefined) => Blob | null} decodeLitPayloadToBlob
+ */
+
 const log = createLogger('sbt');
 
 const DEFAULT_LIT_NETWORK = 'naga-dev';
@@ -137,6 +282,11 @@ const installBufferBigUIntWriteShim = (BufferCtor) => {
   return bufferHasBigUIntWrite(BufferCtor);
 };
 
+/**
+ * Ensures the active runtime exposes a Buffer implementation compatible with Lit's bigint writes.
+ *
+ * @returns {BufferConstructorLike | null}
+ */
 export const ensureLitBufferCompatibility = () => {
   const scope = getGlobalScope();
   if (!scope) return null;
@@ -289,6 +439,12 @@ const LIT_NETWORK_ALIASES = Object.freeze({
   custom: 'custom',
 });
 
+/**
+ * Normalizes Lit network aliases to the runtime identifier expected by the Lit client.
+ *
+ * @param {string | null | undefined} litNetwork
+ * @returns {string}
+ */
 export const resolveLitNetwork = (litNetwork) => {
   const raw = toStr(litNetwork || DEFAULT_LIT_NETWORK).trim();
   if (!raw) return DEFAULT_LIT_NETWORK;
@@ -628,6 +784,12 @@ export const __test__wrapLitGetKeyWithCache = wrapLitGetKeyWithCache;
 
 const resolveLitChainFallbackWarnings = new Set();
 
+/**
+ * Resolves a chain name for Lit access control conditions from chain id or explicit chain labels.
+ *
+ * @param {{ chainId?: number | string | null, litChain?: number | string | null, chain?: number | string | null }} [options={}]
+ * @returns {string}
+ */
 export const resolveLitChain = ({ chainId, litChain, chain } = {}) => {
   const rawLitChain = litChain || chain;
   if (rawLitChain) {
@@ -660,6 +822,20 @@ export const resolveLitChain = ({ chainId, litChain, chain } = {}) => {
 
 const ensureArray = (val) => (Array.isArray(val) ? val : (val ? [val] : []));
 
+/**
+ * Builds Lit access control conditions that require ownership of one or more SBT contracts.
+ *
+ * @param {{
+ *   sbtAddress?: string | string[],
+ *   sbtAddresses?: string | string[],
+ *   chain?: string | number | null,
+ *   litChain?: string | number | null,
+ *   chainId?: number | string | null,
+ *   mode?: string | number | null,
+ *   requireAll?: boolean | number | string | null
+ * }} [options={}]
+ * @returns {LitAccessControlCondition[] | null}
+ */
 export const buildSbtAccessControlConditions = ({
   sbtAddress,
   sbtAddresses,
@@ -701,6 +877,17 @@ export const buildSbtAccessControlConditions = ({
   return out;
 };
 
+/**
+ * Builds Lit access control conditions that match a specific wallet address.
+ *
+ * @param {{
+ *   walletAddress?: string,
+ *   chain?: string | number | null,
+ *   litChain?: string | number | null,
+ *   chainId?: number | string | null
+ * }} [options={}]
+ * @returns {LitAccessControlCondition[] | null}
+ */
 export const buildWalletAddressAccessControlConditions = ({
   walletAddress,
   chain,
@@ -722,6 +909,18 @@ export const buildWalletAddressAccessControlConditions = ({
   ];
 };
 
+/**
+ * Builds Lit access control conditions that require a Hats Protocol wearer check to pass.
+ *
+ * @param {{
+ *   hatsAddress?: string,
+ *   hatId?: string | number | null,
+ *   chain?: string | number | null,
+ *   litChain?: string | number | null,
+ *   chainId?: number | string | null
+ * }} [options={}]
+ * @returns {LitAccessControlCondition[] | null}
+ */
 export const buildHatAccessControlConditions = ({
   hatsAddress,
   hatId,
@@ -1728,6 +1927,24 @@ const createE2eLitMockHooks = ({
   });
 };
 
+/**
+ * Creates Lit helper hooks for saving and retrieving symmetric keys under access control conditions.
+ *
+ * @param {{
+ *   providerLike?: LitProviderLike,
+ *   account?: string,
+ *   chainId?: number | string | null,
+ *   litChain?: string | number | null,
+ *   litNetwork?: string | null,
+ *   userMaxPrice?: unknown,
+ *   paymentDelegation?: Record<string, any>,
+ *   accessControlConditions?: LitAccessControlCondition[],
+ *   resourceAbilityRequests?: unknown,
+ *   connectTimeout?: number | string | null,
+ *   litConnectTimeout?: number | string | null
+ * }} [options={}]
+ * @returns {LitHooksApi}
+ */
 export const createLitHooks = ({
   providerLike,
   account,
@@ -2091,6 +2308,12 @@ export const createLitHooks = ({
   });
 };
 
+/**
+ * Publishes a sanitized Lit hook set on `window.__litHooks`.
+ *
+ * @param {LitHooksApi | Record<string, any> | null | undefined} hooks
+ * @returns {LitHooksApi | null}
+ */
 export const setGlobalLitHooks = (hooks) => {
   if (typeof window === 'undefined') return null;
   if (hooks && typeof hooks === 'object') {
@@ -2102,11 +2325,27 @@ export const setGlobalLitHooks = (hooks) => {
   return null;
 };
 
+/**
+ * Reads the currently registered global Lit hooks from the browser runtime.
+ *
+ * @returns {LitHooksApi | null}
+ */
 export const getGlobalLitHooks = () => {
   if (typeof window === 'undefined') return null;
   return window.__litHooks || window.litHooks || null;
 };
 
+/**
+ * Attaches lightweight Lit encryption helpers to `window.__litTools` for debugging flows in-browser.
+ *
+ * @param {{
+ *   providerLike?: LitProviderLike,
+ *   account?: string,
+ *   chainId?: number | string | null,
+ *   litChain?: string | number | null
+ * }} [options={}]
+ * @returns {LitDevToolsApi | null}
+ */
 export const attachLitDevTools = ({ providerLike, account, chainId, litChain } = {}) => {
   if (typeof window === 'undefined') return null;
   const tools = {
@@ -2158,8 +2397,20 @@ export const attachLitDevTools = ({ providerLike, account, chainId, litChain } =
 const LIT_ARWEAVE_PREFIX = 'lit://arweave/';
 const ALT_LIT_AR_PREFIX = 'lit+ar://';
 
+/**
+ * Builds the canonical `lit://arweave/` URL for a stored encrypted payload.
+ *
+ * @param {unknown} txId
+ * @returns {string}
+ */
 export const buildLitArweaveUrl = (txId) => `${LIT_ARWEAVE_PREFIX}${toStr(txId).trim()}`;
 
+/**
+ * Extracts an Arweave transaction id from a Lit storage URL.
+ *
+ * @param {unknown} url
+ * @returns {string | null}
+ */
 export const parseLitArweaveUrl = (url) => {
   const raw = toStr(url).trim();
   if (!raw) return null;
@@ -2172,6 +2423,12 @@ export const parseLitArweaveUrl = (url) => {
   return null;
 };
 
+/**
+ * Indicates whether a string is one of the supported Lit Arweave URL forms.
+ *
+ * @param {unknown} url
+ * @returns {boolean}
+ */
 export const isLitArweaveUrl = (url) => !!parseLitArweaveUrl(url);
 
 const readBlobAsArrayBuffer = (blob) =>
@@ -2281,6 +2538,25 @@ const encodeEncryptedPayload = async (data, opts = {}) => {
   };
 };
 
+/**
+ * Encrypts a text or file payload with the active Lit hooks and uploads the resulting envelope to Arweave.
+ *
+ * @param {{
+ *   data?: unknown,
+ *   format?: string,
+ *   name?: string,
+ *   mime?: string,
+ *   arweaveJwk?: Record<string, any>,
+ *   tags?: Array<Record<string, any>>,
+ *   arweave?: Record<string, any>,
+ *   providerLike?: LitProviderLike,
+ *   account?: string,
+ *   chainId?: number | string | null,
+ *   contextLabel?: string,
+ *   lit?: LitHooksApi & { accessControlConditions: LitAccessControlCondition[] }
+ * }} [options={}]
+ * @returns {Promise<LitUploadResult>}
+ */
 export const uploadEncryptedArweaveData = async ({
   data,
   format,
@@ -2328,6 +2604,20 @@ export const uploadEncryptedArweaveData = async ({
   };
 };
 
+/**
+ * Downloads an encrypted Lit payload from Arweave and decrypts it with the active Lit hooks.
+ *
+ * @param {{
+ *   url?: string,
+ *   txId?: string,
+ *   providerLike?: LitProviderLike,
+ *   account?: string,
+ *   chainId?: number | string | null,
+ *   lit?: LitHooksApi,
+ *   arweave?: Record<string, any>
+ * }} [options={}]
+ * @returns {Promise<LitDecryptResult>}
+ */
 export const downloadEncryptedArweaveData = async ({
   url,
   txId,
@@ -2365,6 +2655,12 @@ export const downloadEncryptedArweaveData = async ({
   return { payload, txId: resolvedTx, url: buildLitArweaveUrl(resolvedTx) };
 };
 
+/**
+ * Decodes a Lit upload payload to text when the payload metadata indicates a text-like resource.
+ *
+ * @param {LitUploadPayload | null | undefined} payload
+ * @returns {string}
+ */
 export const decodeLitPayloadToText = (payload) => {
   if (!payload || typeof payload !== 'object') return '';
   const mime = resolveMimeFromPayload(payload);
@@ -2386,6 +2682,12 @@ export const decodeLitPayloadToText = (payload) => {
   return '';
 };
 
+/**
+ * Decodes a base64-backed Lit upload payload into a Blob for binary consumption.
+ *
+ * @param {LitUploadPayload | null | undefined} payload
+ * @returns {Blob | null}
+ */
 export const decodeLitPayloadToBlob = (payload) => {
   if (!payload || typeof payload !== 'object') return null;
   if (payload.encoding !== 'base64' || typeof payload.data !== 'string') return null;
@@ -2397,6 +2699,7 @@ export const decodeLitPayloadToBlob = (payload) => {
   }
 };
 
+/** @type {LitStorageApi} */
 export const litStorage = {
   buildLitArweaveUrl,
   parseLitArweaveUrl,
