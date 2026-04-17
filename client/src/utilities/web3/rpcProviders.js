@@ -25,6 +25,7 @@ import {
   SPONSORED_ACCESS_CACHE_HIT_TTL_MS,
   resolveSponsoredGateStateForResource,
   readCachedSponsoredAccess,
+  addSponsoredAccessChangeListener,
 } from './sponsoredAccessState.js';
 
 const { getPathRpcUrl } = rpcDefaults;
@@ -434,6 +435,11 @@ function resolveGroupPathRpcPreference(cfg, chainId) {
     ? 'session'
     : (providerIsPath ? providerName : 'path');
   const cacheKeyPrefix = usingSessionRootUrls ? 'session' : 'path';
+  const sessionSlug = toStr(cfg?.slug).trim();
+  const shouldUseSessionSlugInCacheKey = (
+    !!sessionSlug &&
+    (toStr(sessionRootAccess.accessMode).trim() || 'none') !== 'none'
+  );
   const accessCacheKey = [
     toStr(sessionRootAccess.accessMode).trim() || 'none',
     toStr(sessionRootAccess.status).trim() || 'unavailable',
@@ -442,7 +448,7 @@ function resolveGroupPathRpcPreference(cfg, chainId) {
   return {
     preferredUrls,
     providerLabel: label,
-    cacheKey: `${cacheKeyPrefix}:${id}:${accessCacheKey}:${preferredUrls.join('|')}`,
+    cacheKey: `${cacheKeyPrefix}:${id}${shouldUseSessionSlugInCacheKey ? `:${sessionSlug}` : ''}:${accessCacheKey}:${preferredUrls.join('|')}`,
     treatPreferredUrlsAsPath: label === 'path' || label === 'pocket',
     sessionAccessStatus: sessionRootAccess.status,
     sessionAccessMode: sessionRootAccess.accessMode,
@@ -456,6 +462,52 @@ function resolveGroupPathRpcPreference(cfg, chainId) {
 
 // === Cached provider registry (per chain + variant) ===
 const _providerCache = new Map();
+const _sessionProviderCacheKeys = new Map();
+const TRANSITIONAL_SESSION_ACCESS_STATUSES = new Set(['checking', 'unresolved']);
+
+const shouldTrackSessionProviderCacheKey = (sessionAccessStatus = '') => (
+  TRANSITIONAL_SESSION_ACCESS_STATUSES.has(toLower(sessionAccessStatus))
+);
+
+const trackSessionProviderCacheKey = (sessionSlug = '', cacheKey = '') => {
+  const slug = toStr(sessionSlug).trim();
+  const key = toStr(cacheKey).trim();
+  if (!slug || !key) return;
+  const existing = _sessionProviderCacheKeys.get(slug);
+  if (existing) {
+    existing.add(key);
+    return;
+  }
+  _sessionProviderCacheKeys.set(slug, new Set([key]));
+};
+
+const clearTrackedSessionProviderCache = (sessionSlug = '') => {
+  const slug = toStr(sessionSlug).trim();
+  if (!slug) return;
+  const cacheKeys = _sessionProviderCacheKeys.get(slug);
+  if (!cacheKeys?.size) return;
+  cacheKeys.forEach((cacheKey) => {
+    _providerCache.delete(cacheKey);
+  });
+  _sessionProviderCacheKeys.delete(slug);
+};
+
+addSponsoredAccessChangeListener((payload = {}) => {
+  if (toStr(payload?.resourceKey).trim() !== SPONSORED_RPC_RESOURCE_KEY) return;
+  clearTrackedSessionProviderCache(payload?.sessionSlug);
+});
+
+const syncTrackedSessionProviderCache = (
+  sessionSlug = '',
+  cacheKey = '',
+  sessionAccessStatus = ''
+) => {
+  if (shouldTrackSessionProviderCacheKey(sessionAccessStatus)) {
+    trackSessionProviderCacheKey(sessionSlug, cacheKey);
+    return;
+  }
+  clearTrackedSessionProviderCache(sessionSlug);
+};
 
 const filterPathUrls = (urls = [], pathUrls = [], allowPath = true) => {
   const normalizedUrls = normalizeRpcUrlList(urls);
@@ -670,6 +722,10 @@ function _getCachedProvider(chainId, opts = {}) {
     },
     enumerable: false
   });
+  Object.defineProperty(fp, '__CE_RPC_CACHE_KEY', {
+    value: key,
+    enumerable: false
+  });
 
   _providerCache.set(key, fp);
   return fp;
@@ -704,6 +760,9 @@ function getReadProviderDiagnostics(chainId, opts = {}) {
       resolution.urls.includes(resolution.configuredPaidRpcUrl)
     ),
     infuraOnlyForChain: resolution.infuraOnlyForChain,
+    sessionAccessStatus: toStr(opts.sessionAccessStatus).trim() || '',
+    sessionAccessMode: toStr(opts.sessionAccessMode).trim() || '',
+    sessionRpcSource: toStr(opts.sessionRpcSource).trim() || '',
     urls: [...resolution.urls],
   };
 }
@@ -767,7 +826,13 @@ export function getReadProviderForGroup(groupKeyOrCfg, options = null) {
     });
   }
 
-  return rpcPref ? _getCachedProvider(chId, rpcPref) : _getCachedProvider(chId);
+  const provider = rpcPref ? _getCachedProvider(chId, rpcPref) : _getCachedProvider(chId);
+  syncTrackedSessionProviderCache(
+    slugOrEmpty,
+    provider?.__CE_RPC_CACHE_KEY,
+    rpcPref?.sessionAccessStatus
+  );
+  return provider;
 }
 
 export const getReadProviderForSession = getReadProviderForGroup;
