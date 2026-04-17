@@ -3,6 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('path');
+const { execFileSync } = require('node:child_process');
 
 const override = require('./config-overrides.js');
 
@@ -67,4 +68,38 @@ test('webpack override no longer injects the legacy global .sol/.html/.txt loade
     !next.module.rules.some((rule) => String(rule?.test) === '/\\.txt$/i'),
     'expected no global text raw-loader rule in the webpack override',
   );
+});
+
+test('webpack override no longer redirects CRA away from tsconfig.json', () => {
+  assert.equal(override.paths, undefined);
+});
+
+test('webpack override does not rewrite temp env vars during test bootstrap', () => {
+  const result = JSON.parse(execFileSync(
+    process.execPath,
+    [
+      '-e',
+      `
+        process.env.NODE_ENV = 'test';
+        const before = {
+          TMPDIR: process.env.TMPDIR ?? null,
+          TMP: process.env.TMP ?? null,
+          TEMP: process.env.TEMP ?? null,
+        };
+        require('./config-overrides.js');
+        const after = {
+          TMPDIR: process.env.TMPDIR ?? null,
+          TMP: process.env.TMP ?? null,
+          TEMP: process.env.TEMP ?? null,
+        };
+        process.stdout.write(JSON.stringify({ before, after }));
+      `,
+    ],
+    {
+      cwd: __dirname,
+      encoding: 'utf8',
+    },
+  ));
+
+  assert.deepEqual(result.after, result.before);
 });
