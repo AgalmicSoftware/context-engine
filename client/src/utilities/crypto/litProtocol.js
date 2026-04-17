@@ -35,6 +35,10 @@ import { getCorsProxyUrlOrThrow } from '../worker/corsProxy.js';
  */
 
 /**
+ * @typedef {string | Record<string, any>} ArweaveJwkLike
+ */
+
+/**
  * @typedef {object} LitAccessControlCondition
  * @property {'and' | 'or'=} operator
  * @property {string=} contractAddress
@@ -144,7 +148,7 @@ import { getCorsProxyUrlOrThrow } from '../worker/corsProxy.js';
  *   format?: string,
  *   name?: string,
  *   mime?: string,
- *   arweaveJwk?: Record<string, any>,
+ *   arweaveJwk?: ArweaveJwkLike,
  *   tags?: Array<Record<string, any>>,
  *   arweave?: Record<string, any>,
  *   providerLike?: LitProviderLike,
@@ -2546,7 +2550,7 @@ const encodeEncryptedPayload = async (data, opts = {}) => {
  *   format?: string,
  *   name?: string,
  *   mime?: string,
- *   arweaveJwk?: Record<string, any>,
+ *   arweaveJwk?: ArweaveJwkLike,
  *   tags?: Array<Record<string, any>>,
  *   arweave?: Record<string, any>,
  *   providerLike?: LitProviderLike,
