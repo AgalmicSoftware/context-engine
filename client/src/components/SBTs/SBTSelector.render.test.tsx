@@ -1,15 +1,6 @@
 import React, { act } from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
-import SBTSelector from './SBTSelector';
-import contractScripts, * as contractScriptsUtils from '../../utilities/web3/contractScripts.js';
-import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
-import * as sessionRegistryUtils from '../../utilities/web3/sessionRegistry.js';
-import * as sbtDisplayNameUtils from '../../utilities/sbt/sbtDisplayNames.js';
-import * as sessionScanScopeUtils from '../../utilities/session/sessionScanScope.js';
-import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
-import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
-
 const GENERAL_ADDRESS = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 const EDGE_FACTORY_ADDRESS = '0x1111111111111111111111111111111111111111';
 const GENERAL_FACTORY_ADDRESS = '0x2222222222222222222222222222222222222222';
@@ -477,8 +468,8 @@ describe('SBTSelector rendered cold-load lifecycle', () => {
     });
 
     await waitFor(() => {
-      expect(screen.queryByText('Demo Badge')).not.toBeInTheDocument();
-      expect(screen.getByText('Edge Badge')).toBeInTheDocument();
+      expect(screen.queryByText(demoAddress)).not.toBeInTheDocument();
+      expect(screen.getByText(edgeAddress)).toBeInTheDocument();
       expect(screen.getByTestId('ce-sbt-selector-session-source-active')).toBeInTheDocument();
       expect(screen.queryByTestId('ce-sbt-selector-session-source-edge')).not.toBeInTheDocument();
     });

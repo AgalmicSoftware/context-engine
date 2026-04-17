@@ -1,6 +1,6 @@
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
-import type { Root } from 'react-dom/client';
+import { Simulate } from 'react-dom/test-utils';
 
 import AudioInput from './AudioInput';
 import { requestAiRewrite } from '../../../utilities/ai/aiScripts';
@@ -111,11 +111,10 @@ const buildWhisperState = (overrides: Partial<WhisperState> = {}): WhisperState 
 });
 
 describe('AudioInput', () => {
-  let container: HTMLDivElement;
-  let root: Root;
-  let rootMounted = false;
-  let previousActEnvironment: boolean | undefined;
-  let rafQueue: RafEntry[] = [];
+  let container;
+  let root;
+  let previousActEnvironment;
+  let rafQueue = [];
   let rafId = 0;
   let requestAnimationFrameSpy: jest.SpyInstance<number, [FrameRequestCallback]>;
 
@@ -157,19 +156,18 @@ describe('AudioInput', () => {
   };
 
   beforeAll(() => {
-    previousActEnvironment = actGlobal.IS_REACT_ACT_ENVIRONMENT;
-    actGlobal.IS_REACT_ACT_ENVIRONMENT = true;
+    previousActEnvironment = globalThis.IS_REACT_ACT_ENVIRONMENT;
+    globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   });
 
   beforeEach(() => {
     container = document.createElement('div');
     document.body.appendChild(container);
     root = createRoot(container);
-    rootMounted = true;
-    mockUseWhisper.mockReset();
-    mockUseWhisper.mockReturnValue(buildWhisperState());
-    mockRequestAiRewrite.mockReset();
-    mockRequestAiRewrite.mockResolvedValue('rewritten');
+    useWhisper.mockReset();
+    useWhisper.mockReturnValue(buildWhisperState());
+    requestAiRewrite.mockReset();
+    requestAiRewrite.mockResolvedValue('rewritten');
     rafQueue = [];
     rafId = 0;
     requestAnimationFrameSpy = jest.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => {
@@ -183,11 +181,11 @@ describe('AudioInput', () => {
   });
 
   afterEach(() => {
-    if (rootMounted) {
+    if (root) {
       act(() => {
         root.unmount();
       });
-      rootMounted = false;
+      root = null;
     }
     container.remove();
     jest.useRealTimers();
@@ -196,10 +194,10 @@ describe('AudioInput', () => {
 
   afterAll(() => {
     if (typeof previousActEnvironment === 'undefined') {
-      delete actGlobal.IS_REACT_ACT_ENVIRONMENT;
+      delete globalThis.IS_REACT_ACT_ENVIRONMENT;
       return;
     }
-    actGlobal.IS_REACT_ACT_ENVIRONMENT = previousActEnvironment;
+    globalThis.IS_REACT_ACT_ENVIRONMENT = previousActEnvironment;
   });
 
   it('shows a long-form timer while recording', () => {
@@ -699,7 +697,7 @@ describe('AudioInput', () => {
 
     act(() => {
       root.unmount();
-      rootMounted = false;
+      root = null;
     });
     act(() => {
       flushRafQueue();

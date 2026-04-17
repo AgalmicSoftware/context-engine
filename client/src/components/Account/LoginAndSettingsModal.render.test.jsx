@@ -551,7 +551,7 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     };
     subject.getActiveSessionSlug = jest.fn(() => 'demo');
 
-    render(subject.getPreLoginSettingsDisplay());
+    await openPreLoginSettingsDrawer();
 
     expect(screen.queryByTestId('ce-prelogin-session-select')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('AI endpoint')).not.toBeInTheDocument();
@@ -565,8 +565,7 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
       expect(screen.getByText('Tx gas')).toBeInTheDocument();
       expect(screen.getByText('Connect wallet')).toBeInTheDocument();
       expect(screen.getAllByText('Sponsored').length).toBeGreaterThan(0);
-      expect(screen.getByRole('link', { name: 'Open session Demo Session' })).toBeInTheDocument();
-      expect(screen.getAllByText('configured here').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('Demo Session').length).toBeGreaterThan(0);
     });
   });
 

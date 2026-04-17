@@ -120,13 +120,29 @@ const renderAdminPage = async ({
 
 const getGatePanel = () => screen.getByText('On-chain default gate').closest('section');
 
+const getSecretInputByLabel = (labelText) => (
+  screen.getByText(labelText).parentElement.querySelector('input,textarea')
+);
+const getFieldInputByLabel = (labelText) => (
+  screen.getByText(labelText).parentElement.querySelector('input,textarea,select')
+);
+const getAllowOriginsInput = () => screen.getByLabelText('CORS allowlist');
 const clickAndSettle = async (element) => {
   await act(async () => {
     fireEvent.click(element);
     await Promise.resolve();
   });
 };
-const waitForResolvedWorkerUrl = () => screen.findByDisplayValue('https://worker.example.test');
+const openAllowlistEditor = async () => {
+  await clickAndSettle(screen.getByRole('button', { name: 'Allowlist' }));
+  return getAllowOriginsInput();
+};
+const waitForResolvedWorkerUrl = () => screen.findByDisplayValue('https://worker.example');
+const openWorkerSecretsPanel = async () => {
+  const panel = getWorkerSecretsPanel();
+  await clickAndSettle(within(panel).getByRole('button', { name: 'Toggle Worker secrets section' }));
+  return panel;
+};
 const openGatePanel = async () => {
   const panel = getGatePanel();
   await clickAndSettle(within(panel).getByRole('button', { name: 'Toggle On-chain default gate section' }));
@@ -318,17 +334,17 @@ describe('AdminPage rendered interactions', () => {
         : { ok: true, json: async () => ({ ok: true }) }
     ));
 
-    renderAdminPage();
+    await renderAdminPage();
     await waitForResolvedWorkerUrl();
 
-    const workerSecretsPanel = openWorkerSecretsPanel();
+    const workerSecretsPanel = await openWorkerSecretsPanel();
     fireEvent.click(within(workerSecretsPanel).getByRole('button', { name: 'AI' }));
 
     fireEvent.change(getSecretInputByLabel('OpenAI API key'), {
       target: { value: '  sk-live-test  ' },
     });
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Save worker secrets' }));
+    await clickAndSettle(await screen.findByRole('button', { name: 'Save worker secrets' }));
 
     await waitFor(() => {
       expect(screen.getByText(/Worker secrets saved for edge/)).toBeInTheDocument();
@@ -390,17 +406,17 @@ describe('AdminPage rendered interactions', () => {
         : { ok: true, json: async () => ({ ok: true }) }
     ));
 
-    renderAdminPage();
+    await renderAdminPage();
     await waitForResolvedWorkerUrl();
 
-    const workerSecretsPanel = openWorkerSecretsPanel();
+    const workerSecretsPanel = await openWorkerSecretsPanel();
     fireEvent.click(within(workerSecretsPanel).getByRole('button', { name: 'AI' }));
 
     fireEvent.change(getSecretInputByLabel('OpenAI API key'), {
       target: { value: 'sk-live-test' },
     });
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Save worker secrets' }));
+    await clickAndSettle(await screen.findByRole('button', { name: 'Save worker secrets' }));
 
     await waitFor(() => {
       expect(mockSetSessionFieldsOnChain).toHaveBeenCalledWith(expect.objectContaining({
@@ -421,17 +437,17 @@ describe('AdminPage rendered interactions', () => {
         : { ok: true, json: async () => ({ ok: true, payerAddress: '0x3AC823CA9AcDA550244C6fF4927b5e1478E70Ff7' }) }
     ));
 
-    renderAdminPage();
+    await renderAdminPage();
     await waitForResolvedWorkerUrl();
 
-    const workerSecretsPanel = openWorkerSecretsPanel();
+    const workerSecretsPanel = await openWorkerSecretsPanel();
     fireEvent.click(within(workerSecretsPanel).getByRole('button', { name: 'Lit' }));
 
     fireEvent.change(getSecretInputByLabel('Lit payer private key'), {
       target: { value: '0x59c6995e998f97a5a0044976f84ce7de5d9d7f17b2f6a6a5f76f8864c8ad88f5' },
     });
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Save worker secrets' }));
+    await clickAndSettle(await screen.findByRole('button', { name: 'Save worker secrets' }));
 
     await waitFor(() => {
       expect(screen.getByText(/Worker secrets saved for edge/)).toBeInTheDocument();
@@ -459,17 +475,17 @@ describe('AdminPage rendered interactions', () => {
       }),
     ]];
 
-    renderAdminPage();
+    await renderAdminPage();
     await waitForResolvedWorkerUrl();
 
-    const workerSecretsPanel = openWorkerSecretsPanel();
+    const workerSecretsPanel = await openWorkerSecretsPanel();
     fireEvent.click(within(workerSecretsPanel).getByRole('button', { name: 'AI' }));
 
     fireEvent.change(getSecretInputByLabel('OpenAI API key'), {
       target: { value: 'sk-live-test' },
     });
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Save worker secrets' }));
+    await clickAndSettle(await screen.findByRole('button', { name: 'Save worker secrets' }));
 
     await waitFor(() => {
       expect(screen.getByText(/Worker secrets saved for edge/)).toBeInTheDocument();
@@ -494,17 +510,17 @@ describe('AdminPage rendered interactions', () => {
       }),
     ]];
 
-    renderAdminPage();
+    await renderAdminPage();
     await waitForResolvedWorkerUrl();
 
-    const workerSecretsPanel = openWorkerSecretsPanel();
+    const workerSecretsPanel = await openWorkerSecretsPanel();
     fireEvent.click(within(workerSecretsPanel).getByRole('button', { name: 'Lit' }));
 
     fireEvent.change(getSecretInputByLabel('Lit payer private key'), {
       target: { value: '0xabc123' },
     });
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Save worker secrets' }));
+    await clickAndSettle(await screen.findByRole('button', { name: 'Save worker secrets' }));
 
     await waitFor(() => {
       expect(screen.getByText(/Worker secrets saved for edge/)).toBeInTheDocument();
@@ -541,7 +557,7 @@ describe('AdminPage rendered interactions', () => {
         : { ok: true, json: async () => ({ ok: true }) }
     ));
 
-    renderAdminPage();
+    await renderAdminPage();
     await waitForResolvedWorkerUrl();
 
     await waitFor(() => {
@@ -553,11 +569,11 @@ describe('AdminPage rendered interactions', () => {
     });
     expect(global.fetch.mock.calls.find(([url]) => String(url).endsWith('/admin/lit-status'))).toBeUndefined();
 
-    const workerSecretsPanel = openWorkerSecretsPanel();
+    const workerSecretsPanel = await openWorkerSecretsPanel();
     fireEvent.click(within(workerSecretsPanel).getByRole('button', { name: 'Lit' }));
 
     const refreshButton = await screen.findByRole('button', { name: 'Refresh Lit status' });
-    fireEvent.click(refreshButton);
+    await clickAndSettle(refreshButton);
 
     await waitFor(() => {
       expect(mockBuildSignedAdminActionAuth).toHaveBeenCalledWith(expect.objectContaining({
@@ -565,11 +581,11 @@ describe('AdminPage rendered interactions', () => {
         slug: 'edge',
         workerUrl: 'https://worker.example',
       }));
+      expect(global.fetch).toHaveBeenCalledWith(
+        'https://worker.example/admin/lit-status',
+        expect.objectContaining({ method: 'POST' }),
+      );
     });
-    expect(global.fetch).toHaveBeenCalledWith(
-      'https://worker.example/admin/lit-status',
-      expect.objectContaining({ method: 'POST' }),
-    );
   });
 
   it('allows Lit status refresh to query a worker-stored payer before sponsored_lit is synced', async () => {
@@ -588,14 +604,14 @@ describe('AdminPage rendered interactions', () => {
         : { ok: true, json: async () => ({ ok: true }) }
     ));
 
-    renderAdminPage();
+    await renderAdminPage();
     await waitForResolvedWorkerUrl();
 
-    const workerSecretsPanel = openWorkerSecretsPanel();
+    const workerSecretsPanel = await openWorkerSecretsPanel();
     fireEvent.click(within(workerSecretsPanel).getByRole('button', { name: 'Lit' }));
 
     const refreshButton = await screen.findByRole('button', { name: 'Refresh Lit status' });
-    fireEvent.click(refreshButton);
+    await clickAndSettle(refreshButton);
 
     await waitFor(() => {
       expect(mockBuildSignedAdminActionAuth).toHaveBeenCalledWith(expect.objectContaining({
@@ -603,11 +619,11 @@ describe('AdminPage rendered interactions', () => {
         slug: 'edge',
         workerUrl: 'https://worker.example',
       }));
+      expect(global.fetch).toHaveBeenCalledWith(
+        'https://worker.example/admin/lit-status',
+        expect.objectContaining({ method: 'POST' }),
+      );
     });
-    expect(global.fetch).toHaveBeenCalledWith(
-      'https://worker.example/admin/lit-status',
-      expect.objectContaining({ method: 'POST' }),
-    );
   });
 
   it('hydrates the allowlist editor from the cached worker config overlay', async () => {
@@ -631,10 +647,10 @@ describe('AdminPage rendered interactions', () => {
       },
     }));
 
-    renderAdminPage();
+    await renderAdminPage();
     await waitForResolvedWorkerUrl();
 
-    expect(openAllowlistEditor()).toHaveValue('https://existing.example');
+    expect(await openAllowlistEditor()).toHaveValue('https://existing.example');
   });
 
   it('saves the edited allowOrigins list exactly for the selected session', async () => {
@@ -653,13 +669,13 @@ describe('AdminPage rendered interactions', () => {
       },
     }));
 
-    renderAdminPage();
+    await renderAdminPage();
     await waitForResolvedWorkerUrl();
 
-    fireEvent.change(openAllowlistEditor(), {
+    fireEvent.change(await openAllowlistEditor(), {
       target: { value: 'https://existing.example' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Save allowlist' }));
+    await clickAndSettle(screen.getByRole('button', { name: 'Save allowlist' }));
 
     await waitFor(() => {
       expect(screen.getByText(/allowOrigins saved \(1 origins\)/)).toBeInTheDocument();
@@ -694,13 +710,13 @@ describe('AdminPage rendered interactions', () => {
   });
 
   it('normalizes mixed delimiter allowOrigins input before saving', async () => {
-    renderAdminPage();
+    await renderAdminPage();
     await waitForResolvedWorkerUrl();
 
-    fireEvent.change(openAllowlistEditor(), {
+    fireEvent.change(await openAllowlistEditor(), {
       target: { value: 'https://alpha.example, http://localhost:7391\nhttps://alpha.example/' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Save allowlist' }));
+    await clickAndSettle(screen.getByRole('button', { name: 'Save allowlist' }));
 
     await waitFor(() => {
       expect(screen.getByText(/allowOrigins saved \(2 origins\)/)).toBeInTheDocument();
@@ -751,13 +767,13 @@ describe('AdminPage rendered interactions', () => {
       return Promise.resolve({ ok: true, status: 200, json: async () => ({ ok: true }) });
     });
 
-    renderAdminPage();
+    await renderAdminPage();
     await waitForResolvedWorkerUrl();
 
-    fireEvent.change(openAllowlistEditor(), {
+    fireEvent.change(await openAllowlistEditor(), {
       target: { value: 'https://existing.example' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Save allowlist' }));
+    await clickAndSettle(screen.getByRole('button', { name: 'Save allowlist' }));
 
     await waitFor(() => {
       expect(screen.getByText(/allowOrigins saved \(1 origins\)/)).toBeInTheDocument();
@@ -783,17 +799,17 @@ describe('AdminPage rendered interactions', () => {
       },
     }));
 
-    renderAdminPage();
+    await renderAdminPage();
     await waitForResolvedWorkerUrl();
 
-    fireEvent.change(openAllowlistEditor(), {
+    fireEvent.change(await openAllowlistEditor(), {
       target: { value: '' },
     });
     expect(screen.getByText(
       'Empty allowlist: saving this draft keeps CORS open for any browser origin.'
     )).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Save allowlist' }));
+    await clickAndSettle(screen.getByRole('button', { name: 'Save allowlist' }));
 
     await waitFor(() => {
       expect(screen.getByText(/allowOrigins saved with open CORS/)).toBeInTheDocument();
@@ -821,10 +837,10 @@ describe('AdminPage rendered interactions', () => {
       },
     }));
 
-    renderAdminPage();
+    await renderAdminPage();
     await waitForResolvedWorkerUrl();
 
-    openAllowlistEditor();
+    await openAllowlistEditor();
     fireEvent.click(screen.getByRole('button', { name: 'Add recommended origins' }));
 
     await waitFor(() => {
@@ -849,13 +865,13 @@ describe('AdminPage rendered interactions', () => {
         : Promise.reject(new TypeError('Failed to fetch'))
     ));
 
-    renderAdminPage();
+    await renderAdminPage();
     await waitForResolvedWorkerUrl();
 
-    fireEvent.change(openAllowlistEditor(), {
+    fireEvent.change(await openAllowlistEditor(), {
       target: { value: 'https://replacement.example' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Save allowlist' }));
+    await clickAndSettle(screen.getByRole('button', { name: 'Save allowlist' }));
 
     await waitFor(() => {
       expect(screen.getByText(
@@ -875,10 +891,10 @@ describe('AdminPage rendered interactions', () => {
     });
     sessionEntries = [['edge', buildSessionConfig({ corsWorkerUrl: '' })]];
 
-    renderAdminPage();
+    await renderAdminPage();
 
     await screen.findByRole('button', { name: 'Allowlist' });
-    openAllowlistEditor();
+    await openAllowlistEditor();
     await waitFor(() => {
       expect(screen.getByRole('button', { name: 'Save allowlist' })).toBeDisabled();
     });
@@ -901,10 +917,10 @@ describe('AdminPage rendered interactions', () => {
       },
     }));
 
-    renderAdminPage();
+    await renderAdminPage();
 
     expect(await screen.findByDisplayValue('https://worker-kv-cache.example')).toBeInTheDocument();
-    expect(openAllowlistEditor()).toHaveValue('');
+    expect(await openAllowlistEditor()).toHaveValue('');
     expect(screen.getByRole('button', { name: 'Save allowlist' })).toBeDisabled();
 
     await act(async () => {
@@ -927,7 +943,7 @@ describe('AdminPage rendered interactions', () => {
       corsWorkerUrl: '',
     })]];
 
-    renderAdminPage();
+    await renderAdminPage();
 
     const workerInput = await screen.findByPlaceholderText('https://<worker-name>.<account-subdomain>.workers.dev/');
     expect(workerInput).toHaveValue(CLOUDFLARE_CORS_WORKER_URL);
@@ -965,7 +981,7 @@ describe('AdminPage rendered interactions', () => {
     ]];
 
     try {
-      renderAdminPage();
+      await renderAdminPage();
       await waitForResolvedWorkerUrl();
 
       const metadataPanel = screen.getByText('Session metadata').closest('section');
@@ -976,7 +992,7 @@ describe('AdminPage rendered interactions', () => {
       });
       expect(screen.getByDisplayValue('12345678')).toBeInTheDocument();
 
-      fireEvent.click(screen.getByRole('button', { name: 'Update metadata' }));
+      await clickAndSettle(screen.getByRole('button', { name: 'Update metadata' }));
 
       await waitFor(() => {
         expect(mockUploadSessionMetadata).toHaveBeenCalledTimes(1);
@@ -993,12 +1009,12 @@ describe('AdminPage rendered interactions', () => {
       expect(uploadedMetadata.__registry).toBeUndefined();
       expect(uploadedMetadata.sponsoredKeys).toBeUndefined();
 
-      expect(mockUpdateSessionMetadataOnChain).toHaveBeenCalledWith(expect.objectContaining({
-        chainId: 84532,
-        slug: 'edge',
-        metadataURI: 'ar://metadata_tx_id',
-      }));
       await waitFor(() => {
+        expect(mockUpdateSessionMetadataOnChain).toHaveBeenCalledWith(expect.objectContaining({
+          chainId: 84532,
+          slug: 'edge',
+          metadataURI: 'ar://metadata_tx_id',
+        }));
         expect(screen.getByText(/Session metadata updated\./)).toBeInTheDocument();
       });
     } finally {
@@ -1025,7 +1041,7 @@ describe('AdminPage rendered interactions', () => {
     ]];
 
     try {
-      renderAdminPage();
+      await renderAdminPage();
       await waitForResolvedWorkerUrl();
 
       const metadataPanel = screen.getByText('Session metadata').closest('section');
@@ -1037,7 +1053,7 @@ describe('AdminPage rendered interactions', () => {
       fireEvent.click(autoFeatureToggle);
       expect(autoFeatureToggle).toBeChecked();
 
-      fireEvent.click(screen.getByRole('button', { name: 'Update metadata' }));
+      await clickAndSettle(screen.getByRole('button', { name: 'Update metadata' }));
 
       await waitFor(() => {
         expect(mockUploadSessionMetadata).toHaveBeenCalledTimes(1);
@@ -1077,7 +1093,7 @@ describe('AdminPage rendered interactions', () => {
     });
     sessionEntries = [['session-one', session1], ['session-two', session2]];
 
-    renderAdminPage();
+    await renderAdminPage();
 
     const sessionSelect = await screen.findByTestId(E2E_TESTIDS.ADMIN_SESSION_SELECT);
     expect(sessionSelect).toHaveValue('session-one');
@@ -1110,7 +1126,7 @@ describe('AdminPage rendered interactions', () => {
       }),
     ]];
 
-    renderAdminPage();
+    await renderAdminPage();
     await waitForResolvedWorkerUrl();
 
     const metadataPanel = screen.getByText('Session metadata').closest('section');
@@ -1157,7 +1173,7 @@ describe('AdminPage rendered interactions', () => {
     ]];
 
     try {
-      renderAdminPage();
+      await renderAdminPage();
       await waitForResolvedWorkerUrl();
 
       const metadataPanel = screen.getByText('Session metadata').closest('section');
@@ -1188,7 +1204,7 @@ describe('AdminPage rendered interactions', () => {
         target: { value: 'q1\nq2' },
       });
 
-      fireEvent.click(screen.getByRole('button', { name: 'Update metadata' }));
+      await clickAndSettle(screen.getByRole('button', { name: 'Update metadata' }));
 
       await waitFor(() => {
         expect(mockUploadSessionMetadata).toHaveBeenCalledTimes(1);
@@ -1250,7 +1266,7 @@ describe('AdminPage rendered interactions', () => {
       }),
     ]];
 
-    renderAdminPage();
+    await renderAdminPage();
     await waitForResolvedWorkerUrl();
 
     const metadataPanel = screen.getByText('Session metadata').closest('section');
@@ -1258,7 +1274,7 @@ describe('AdminPage rendered interactions', () => {
 
     expect(within(metadataPanel).getByText(/Session metadata could not be loaded/i)).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Update metadata' }));
+    await clickAndSettle(screen.getByRole('button', { name: 'Update metadata' }));
 
     await waitFor(() => {
       expect(screen.getByText(/Verify or edit the contract addresses before saving/i)).toBeInTheDocument();
@@ -1266,7 +1282,7 @@ describe('AdminPage rendered interactions', () => {
     expect(mockUploadSessionMetadata).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByLabelText(/I verified these fallback defaults/i));
-    fireEvent.click(screen.getByRole('button', { name: 'Update metadata' }));
+    await clickAndSettle(screen.getByRole('button', { name: 'Update metadata' }));
 
     await waitFor(() => {
       expect(mockUploadSessionMetadata).toHaveBeenCalledTimes(1);
@@ -1342,13 +1358,206 @@ describe('AdminPage rendered interactions', () => {
     expect(sessionSelect).toHaveValue('edge');
   });
 
-  it('preserves decrypted encrypted fields across equivalent registry cache refreshes', async () => {
-    const { encryptedFieldsUtils } = require('../../utilities/crypto/encryptedFields.js');
-    const firstEnvelope = {
-      ciphertext: 'cipher-openai',
-      metadata: {
-        chainId: 84532,
-        resource: 'admin',
+  it('shows Arweave and faucet balances inline with worker secrets and refreshes both cards', async () => {
+    const arweave = Arweave.init({ host: 'arweave.net', port: 443, protocol: 'https' });
+    const arweaveJwk = await arweave.wallets.generate();
+    const arweaveAddress = await arweave.wallets.jwkToAddress(arweaveJwk);
+    const arweaveShort = `${arweaveAddress.slice(0, 6)}…${arweaveAddress.slice(-4)}`;
+    const faucetWallet = ethers.Wallet.createRandom();
+    const faucetPrivateKey = faucetWallet.privateKey;
+    const faucetAddress = faucetWallet.address;
+    const faucetShort = `${faucetAddress.slice(0, 6)}…${faucetAddress.slice(-4)}`;
+    const arweaveBalanceSpy = jest
+      .spyOn(ethers.providers.JsonRpcProvider.prototype, 'getBalance')
+      .mockResolvedValue(ethers.utils.parseEther('0.1842'));
+    mockReadArweaveWalletBalance.mockResolvedValue({
+      address: arweaveAddress,
+      balanceUrl: `https://arweave.net/wallet/${arweaveAddress}/balance`,
+      gatewayBase: 'https://arweave.net',
+      winston: '12345678000000',
+    });
+
+    try {
+      await renderAdminPage();
+      await waitForResolvedWorkerUrl();
+
+      const workerSecretsPanel = await openWorkerSecretsPanel();
+      fireEvent.click(within(workerSecretsPanel).getByRole('button', { name: 'Arweave' }));
+      fireEvent.click(within(workerSecretsPanel).getByRole('button', { name: 'Faucet' }));
+
+      fireEvent.change(getSecretInputByLabel('Arweave JWK (JSON)'), {
+        target: { value: JSON.stringify(arweaveJwk) },
+      });
+      fireEvent.change(getSecretInputByLabel('Faucet private key'), {
+        target: { value: faucetPrivateKey },
+      });
+
+      await waitFor(() => {
+        expect(mockReadArweaveWalletBalance).toHaveBeenCalledTimes(1);
+        expect(arweaveBalanceSpy).toHaveBeenCalledTimes(1);
+      });
+      expect(await within(workerSecretsPanel).findByText('12.345678 AR')).toBeInTheDocument();
+      expect(within(workerSecretsPanel).getByText('0.1842 ETH')).toBeInTheDocument();
+      expect(within(workerSecretsPanel).getByText(arweaveShort)).toBeInTheDocument();
+      expect(within(workerSecretsPanel).getByText(`${faucetShort} • Base Sepolia (84532)`)).toBeInTheDocument();
+      expect(screen.queryByText('Resources')).not.toBeInTheDocument();
+
+      expect(workerSecretsPanel).not.toHaveTextContent(faucetPrivateKey);
+
+      await clickAndSettle(screen.getByRole('button', { name: 'Refresh Arweave balance' }));
+      await clickAndSettle(screen.getByRole('button', { name: 'Refresh faucet balance' }));
+
+      await waitFor(() => {
+        expect(mockReadArweaveWalletBalance).toHaveBeenCalledTimes(2);
+        expect(arweaveBalanceSpy).toHaveBeenCalledTimes(2);
+      });
+    } finally {
+      arweaveBalanceSpy.mockRestore();
+    }
+  });
+
+  it('accepts bare hex faucet private keys when previewing faucet balance', async () => {
+    const faucetWallet = ethers.Wallet.createRandom();
+    const faucetPrivateKey = faucetWallet.privateKey.slice(2);
+    const faucetAddress = faucetWallet.address;
+    const faucetShort = `${faucetAddress.slice(0, 6)}…${faucetAddress.slice(-4)}`;
+    const faucetBalanceSpy = jest
+      .spyOn(ethers.providers.JsonRpcProvider.prototype, 'getBalance')
+      .mockResolvedValue(ethers.utils.parseEther('0.1842'));
+
+    try {
+      await renderAdminPage();
+      await waitForResolvedWorkerUrl();
+
+      const workerSecretsPanel = await openWorkerSecretsPanel();
+      fireEvent.click(within(workerSecretsPanel).getByRole('button', { name: 'Faucet' }));
+
+      fireEvent.change(getSecretInputByLabel('Faucet private key'), {
+        target: { value: faucetPrivateKey },
+      });
+
+      await waitFor(() => {
+        expect(faucetBalanceSpy).toHaveBeenCalledTimes(1);
+      });
+      expect(await within(workerSecretsPanel).findByText('0.1842 ETH')).toBeInTheDocument();
+      expect(within(workerSecretsPanel).getByText(`${faucetShort} • Base Sepolia (84532)`)).toBeInTheDocument();
+      expect(within(workerSecretsPanel).queryByText('Invalid key')).not.toBeInTheDocument();
+    } finally {
+      faucetBalanceSpy.mockRestore();
+    }
+  });
+
+  it('hides zero-balance resource summaries in worker secrets', async () => {
+    const arweave = Arweave.init({ host: 'arweave.net', port: 443, protocol: 'https' });
+    const arweaveJwk = await arweave.wallets.generate();
+    const faucetWallet = ethers.Wallet.createRandom();
+    const faucetBalanceSpy = jest
+      .spyOn(ethers.providers.JsonRpcProvider.prototype, 'getBalance')
+      .mockResolvedValue(ethers.constants.Zero);
+    mockReadArweaveWalletBalance.mockResolvedValue({
+      address: await arweave.wallets.jwkToAddress(arweaveJwk),
+      balanceUrl: 'https://arweave.net/wallet/test/balance',
+      gatewayBase: 'https://arweave.net',
+      winston: '5',
+    });
+
+    try {
+      await renderAdminPage();
+      await waitForResolvedWorkerUrl();
+
+      const workerSecretsPanel = await openWorkerSecretsPanel();
+      fireEvent.click(within(workerSecretsPanel).getByRole('button', { name: 'Arweave' }));
+      fireEvent.click(within(workerSecretsPanel).getByRole('button', { name: 'Faucet' }));
+
+      fireEvent.change(getSecretInputByLabel('Arweave JWK (JSON)'), {
+        target: { value: JSON.stringify(arweaveJwk) },
+      });
+      fireEvent.change(getSecretInputByLabel('Faucet private key'), {
+        target: { value: faucetWallet.privateKey },
+      });
+
+      await waitFor(() => {
+        expect(mockReadArweaveWalletBalance).toHaveBeenCalledTimes(1);
+        expect(faucetBalanceSpy).toHaveBeenCalledTimes(1);
+        expect(within(workerSecretsPanel).queryByText('Arweave balance')).not.toBeInTheDocument();
+        expect(within(workerSecretsPanel).queryByText('Faucet balance')).not.toBeInTheDocument();
+        expect(within(workerSecretsPanel).queryByText('0.000000 AR')).not.toBeInTheDocument();
+        expect(within(workerSecretsPanel).queryByText('0.0000 ETH')).not.toBeInTheDocument();
+      });
+    } finally {
+      faucetBalanceSpy.mockRestore();
+    }
+  }, 15000);
+
+  it('shows invalid resource states when the Arweave JWK or faucet key cannot be parsed', async () => {
+    const faucetBalanceSpy = jest.spyOn(ethers.providers.JsonRpcProvider.prototype, 'getBalance');
+
+    try {
+      await renderAdminPage();
+      await waitForResolvedWorkerUrl();
+
+      const workerSecretsPanel = await openWorkerSecretsPanel();
+      fireEvent.click(within(workerSecretsPanel).getByRole('button', { name: 'Arweave' }));
+      fireEvent.click(within(workerSecretsPanel).getByRole('button', { name: 'Faucet' }));
+
+      fireEvent.change(getSecretInputByLabel('Arweave JWK (JSON)'), {
+        target: { value: '{' },
+      });
+      fireEvent.change(getSecretInputByLabel('Faucet private key'), {
+        target: { value: 'not-a-private-key' },
+      });
+
+      expect(await within(workerSecretsPanel).findByText('Invalid JWK')).toBeInTheDocument();
+      expect(await within(workerSecretsPanel).findByText('Invalid key')).toBeInTheDocument();
+      expect(mockReadArweaveWalletBalance).not.toHaveBeenCalled();
+      expect(faucetBalanceSpy).not.toHaveBeenCalled();
+    } finally {
+      faucetBalanceSpy.mockRestore();
+    }
+  });
+});
+
+describe('AdminPage metadata draft helpers', () => {
+  it('does not inject default AI metadata when the source has no ai field and draft is untouched', () => {
+    const { applyAdminMetadataDraft, buildAdminMetadataDraft } = require('./AdminPage.jsx').__adminPageTestUtils;
+    const sourceMetadata = {
+      slug: 'legacy-session',
+      sessionName: 'Legacy Session',
+      defaultTags: 'governance',
+      blockLimits: { start: 100, end: 200 },
+    };
+    const draft = buildAdminMetadataDraft(sourceMetadata);
+    const result = applyAdminMetadataDraft(sourceMetadata, draft);
+
+    expect(result.ai).toBeUndefined();
+    expect(result.defaultTags).toBe('governance');
+    expect(result.blockLimits).toEqual({ start: 100, end: 200 });
+  });
+
+  it('applies AI metadata when the admin changes a model field even if source had no ai', () => {
+    const { applyAdminMetadataDraft, buildAdminMetadataDraft } = require('./AdminPage.jsx').__adminPageTestUtils;
+    const sourceMetadata = { slug: 'legacy-session' };
+    const draft = buildAdminMetadataDraft(sourceMetadata);
+    draft.aiThinkingProvider = 'anthropic';
+    draft.aiThinkingModel = 'claude-3-7-sonnet';
+
+    const result = applyAdminMetadataDraft(sourceMetadata, draft);
+
+    expect(result.ai).toBeDefined();
+    expect(result.ai.models.thinking.provider).toBe('anthropic');
+    expect(result.ai.models.thinking.model).toBe('claude-3-7-sonnet');
+  });
+
+  it('preserves unknown contract keys through metadata save round-trip', () => {
+    const { buildEditableSessionMetadataPayload } = require('./AdminPage.jsx').__adminPageTestUtils;
+    const sessionConfig = {
+      slug: 'edge',
+      networkChainId: 84532,
+      blockLimits: { start: 100 },
+      contracts: {
+        surveys: { address: '0x111', chainId: 84532 },
+        xp: { address: '0x999', chainId: 84532 },
+        governance: { address: '0xabc', chainId: 84532 },
       },
       recipients: [
         {

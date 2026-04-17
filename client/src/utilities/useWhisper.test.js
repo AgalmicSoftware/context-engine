@@ -1,3 +1,5 @@
+/* eslint-disable import/first */
+
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 

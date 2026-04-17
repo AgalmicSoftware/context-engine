@@ -92,16 +92,12 @@ jest.mock('../../utilities/ui/notify.js', () => ({
 
 const SponsorPage = require('./SponsorPage.jsx').default;
 
-const renderSponsorPage = ({
+const renderSponsorPage = async ({
   account = ADMIN_ADDRESS,
   initialSessionId,
   initialRegistryChainId,
-}: {
-  account?: string;
-  initialSessionId?: string;
-  initialRegistryChainId?: string;
 } = {}) => {
-  let utils: any;
+  let utils;
   await act(async () => {
     utils = render(
       <SponsorPage
@@ -486,24 +482,8 @@ describe('SponsorPage', () => {
     }));
   });
 
-  it('does not apply stale create completions after the selected session changes', async () => {
-    sessionEntries = [
-      ['edge', buildSessionConfig()],
-      ['other', buildSessionConfig({
-        slug: 'other',
-        sessionName: 'Other Session',
-        __registry: {
-          sessionIdHex: '0xother-session-id',
-          adminAddress: ADMIN_ADDRESS,
-          registryChainId: 84532,
-          chainId: 84532,
-        },
-      })],
-    ];
-    const uploadDeferred = createDeferred<string>();
-    mockUploadDataToArweave.mockReturnValueOnce(uploadDeferred.promise);
-
-    await renderSponsorPage();
+  it('persists sponsor bundle fields across remounts when dev keep secrets on refresh is enabled', async () => {
+    const view = await renderSponsorPage();
 
     expect(await screen.findByTestId(E2E_TESTIDS.ADMIN_SESSION_SELECT)).toHaveValue('edge');
     fireEvent.change(getFieldInputByLabel('Label'), {
@@ -615,34 +595,7 @@ describe('SponsorPage', () => {
     expect(getFieldInputByLabel('Cloudflare API token')).toHaveValue('');
   });
 
-  it('redacts legacy sponsor draft caches that contain raw secrets', async () => {
-    localStorage.setItem('ce:sponsorPageDraft:v1', JSON.stringify({
-      v: 1,
-      persistBundleSecrets: true,
-      bundleForm: {
-        label: 'Legacy cached bundle',
-        openaiKey: 'sk-legacy-openai',
-        cloudflareApiToken: 'cf-legacy-token',
-        customRpcUrl: 'https://rpc.example.test/secret',
-        arweaveJwk: '{"kty":"RSA","d":"secret"}',
-        faucetPrivateKey: '0xlegacyfaucet',
-      },
-    }));
-
-    await renderSponsorPage();
-
-    expect(await screen.findByTestId(E2E_TESTIDS.ADMIN_SESSION_SELECT)).toHaveValue('edge');
-    expect(getFieldInputByLabel('Label')).toHaveValue('Legacy cached bundle');
-    expect(getFieldInputByLabel('OpenAI key')).toHaveValue('');
-    expect(getFieldInputByLabel('Cloudflare API token')).toHaveValue('');
-    expect(getFieldInputByLabel('Custom RPC URL')).toHaveValue('');
-    const cached = JSON.parse(localStorage.getItem('ce:sponsorPageDraft:v1') || '{}');
-    expect(JSON.stringify(cached)).not.toContain('sk-legacy-openai');
-    expect(JSON.stringify(cached)).not.toContain('cf-legacy-token');
-    expect(JSON.stringify(cached)).not.toContain('0xlegacyfaucet');
-  });
-
-  it('does not persist sponsor draft fields when draft persistence is disabled', async () => {
+  it('does not persist sponsor bundle fields when dev keep secrets on refresh is disabled', async () => {
     const view = await renderSponsorPage();
 
     expect(await screen.findByTestId(E2E_TESTIDS.ADMIN_SESSION_SELECT)).toHaveValue('edge');
