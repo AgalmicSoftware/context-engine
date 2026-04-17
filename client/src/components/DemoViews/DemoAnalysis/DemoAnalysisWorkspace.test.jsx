@@ -2,11 +2,10 @@ import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import DemoAnalysisWorkspace from './DemoAnalysisWorkspace.jsx';
 
-jest.mock('react-select', () => ({
+jest.mock('../../Shared/CheckboxMultiSelect.jsx', () => ({
   __esModule: true,
   default: ({
     inputId,
-    isMulti,
     onChange,
     options = [],
     value = [],
@@ -14,19 +13,14 @@ jest.mock('react-select', () => ({
     <select
       data-testid={inputId}
       id={inputId}
-      multiple={Boolean(isMulti)}
+      multiple
       onChange={(event) => {
-        if (isMulti) {
-          const selectedValues = Array.from(event.target.selectedOptions).map((option) => option.value);
-          onChange(
-            options.filter((option) => selectedValues.includes(String(option.value)))
-          );
-          return;
-        }
-        const nextOption = options.find((option) => String(option.value) === event.target.value) || null;
-        onChange(nextOption);
+        const selectedValues = Array.from(event.target.selectedOptions).map((option) => option.value);
+        onChange(
+          options.filter((option) => selectedValues.includes(String(option.value)))
+        );
       }}
-      value={Array.isArray(value) ? value.map((option) => option.value) : (value?.value || '')}
+      value={Array.isArray(value) ? value.map((option) => option.value) : []}
     >
       {options.map((option) => (
         <option key={option.value} value={option.value}>
