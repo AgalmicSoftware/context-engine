@@ -26,6 +26,13 @@ export const DEFAULT_AUTO_REQUEST_TESTNET_FUNDS = readPublicBoolEnv(
   'REACT_APP_DEFAULT_AUTO_REQUEST_TESTNET_FUNDS',
   true
 );
+// Default first-run value of `state.demoSurfaceMode`. If a user has a
+// stored `ce:demoSurfaceMode` preference in localStorage, that wins;
+// fresh installs / no-storage cases honor this env default.
+export const DEFAULT_DEMO_SURFACE_MODE = readPublicBoolEnv(
+  'REACT_APP_CE_DEMO_SURFACE_MODE_DEFAULT',
+  true
+);
 // Porto passkey session-key mode (true = silent tx/message signing)
 export const PORTO_SESSION_KEY_ENABLED = readPublicBoolEnv(
   'REACT_APP_PORTO_SESSION_KEY_ENABLED',

@@ -58,6 +58,11 @@ stays centralized in `client/src/variables/publicDeploymentConfig.js`.
     (`Group`, `Collect`, `Account`) or crypto-native (`SBT`, `Mint`, `Wallet`) terms.
   - Supported values: `plain` (default), `crypto`
 
+- `REACT_APP_CE_DEMO_SURFACE_MODE_DEFAULT=true`
+  - Sets the first-run default for `demoSurfaceMode`, which controls the surface-level demo affordances.
+  - Stored `ce:demoSurfaceMode` localStorage preferences win over this setting.
+  - This only takes effect on fresh installs or when no stored preference exists.
+
 - `REACT_APP_ENABLE_LIT_SESSION_PAYER_WALLET_INPUT=false`
   - Temporary rollout flag for the `/new` SessionWizard Lit payer-wallet UI.
   - `false` hides the Lit worker-secret card in `/new`.
