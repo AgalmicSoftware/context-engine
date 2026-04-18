@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## 2026-04-17
+
+### Completed TODOs
+
+- PRD 388: pinned `client` devDependency `typescript` to exactly `5.8.3` to match `@lit-protocol/contracts@0.9.1`'s strict peer, and adopted `--legacy-peer-deps` as the durable client install contract via `client/.npmrc` so `npm install` / `npm ci` no longer require the flag at the CLI. Strict restoration of plain `npm install` at the dep-graph level is deferred to the PRD 396 Phase 2 toolchain decision (move off `react-scripts@4` / CRA).
+
 ## 2026-04-16
 
 ### Completed TODOs

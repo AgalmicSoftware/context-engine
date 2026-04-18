@@ -14,7 +14,7 @@ Be constructive in issues and PRs.
 4. Install root dependencies:
    `npm install`
 5. Install client dependencies:
-   `cd client && npm install --legacy-peer-deps`
+   `cd client && npm install` (the `--legacy-peer-deps` contract is carried via `client/.npmrc`)
 
 The local React dev server runs with:
 
