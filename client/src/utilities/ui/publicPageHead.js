@@ -7,7 +7,7 @@ import {
 } from '../../variables/publicRepoMetadata.js';
 
 export const DEFAULT_PUBLIC_PAGE_TITLE =
-  'Context Engine | AI-Assisted Deliberation, Surveys, and SBT-Gated Access';
+  'Context Engine | Deliberation Toolkit';
 
 export const DEFAULT_PUBLIC_PAGE_DESCRIPTION =
   'Context Engine helps groups run structured surveys, AI-assisted analysis, and public or private participation workflows with durable records and optional SBT-gated encryption.';
