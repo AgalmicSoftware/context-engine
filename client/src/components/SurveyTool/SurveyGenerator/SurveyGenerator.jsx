@@ -1140,10 +1140,6 @@ export default function AudioSurveyGenerator({
         <>
       <form onSubmit={handleSubmit}>
         <div className={styles.formSection}>
-          <div className={styles.ingestHeader}>
-            <h3 className={styles.sectionTitle}>Content</h3>
-          </div>
-
           <div className={styles.textInputGroup}>
             <AudioInput
               placeholder={transcriptMode ? "Speak to capture transcript or Paste Text..." : "Speak or type text here..."}
@@ -1165,234 +1161,225 @@ export default function AudioSurveyGenerator({
             />
           </div>
 
-          <div className={styles.additionalContextSection}>
-            {/* <h4 className={styles.contextHeader}>Additional Context (URL / File)</h4> */}
-
-            {additionalSources.length > 0 && (
-              <ul className={styles.sourceList}>
-                {additionalSources.map((item, idx) => (
-                  <li key={idx} className={styles.sourceItem}>
-                    <span className={styles.sourceTypeLabel}>[{item.type}]</span>
-                    <span className={styles.sourceName}>{item.name}</span>
-                    <button
-                      type="button"
-                      onClick={() => removeAdditionalSource(idx)}
-                      className={styles.removeSourceBtn}
-                    >
-                      ×
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-
-            {shouldShowSaveExtraSourcesControl && (
-              <div className={styles.docSaveRow}>
-                <label className={styles.docSaveToggle} htmlFor={E2E_TESTIDS.DATABASE_SAVE_DOCS_TOGGLE}>
-                  <input
-                    id={E2E_TESTIDS.DATABASE_SAVE_DOCS_TOGGLE}
-                    type="checkbox"
-                    checked={saveExtraSourcesToDocLibrary}
-                    onChange={(event) => {
-                      setSaveExtraSourcesToDocLibrary(event.target.checked);
-                      if (!event.target.checked) setShowSaveDocAudienceMenu(false);
-                    }}
-                    data-testid={E2E_TESTIDS.DATABASE_SAVE_DOCS_TOGGLE}
-                  />
-                  <span>Save to Session Doc Library</span>
-                </label>
-
-                {saveExtraSourcesToDocLibrary && (
-                  <div className={styles.docSaveAudienceWrap}>
-                    <button
-                      type="button"
-                      className={styles.docSaveAudienceButton}
-                      onClick={() => setShowSaveDocAudienceMenu((value) => !value)}
-                      data-testid={E2E_TESTIDS.DATABASE_SAVE_DOCS_AUDIENCE_BUTTON}
-                      data-ce-doc-save-audience={saveDocAudience}
-                    >
-                      <FontAwesomeIcon icon={faLock} />
-                      <span>{saveDocAudienceLabel}</span>
-                      <FontAwesomeIcon icon={showSaveDocAudienceMenu ? faCaretUp : faCaretDown} />
-                    </button>
-
-                    {showSaveDocAudienceMenu && (
-                      <div
-                        className={styles.docSaveAudienceMenu}
-                        data-testid={E2E_TESTIDS.DATABASE_SAVE_DOCS_AUDIENCE_MENU}
-                      >
-                        <button
-                          type="button"
-                          className={`${styles.docSaveAudienceOption} ${saveDocAudience === 'self' ? styles.active : ''}`}
-                          onClick={() => {
-                            setSaveDocAudience('self');
-                            setShowSaveDocAudienceMenu(false);
-                          }}
-                          data-testid={E2E_TESTIDS.DATABASE_SAVE_DOCS_AUDIENCE_SELF}
-                        >
-                          <FontAwesomeIcon icon={faLock} />
-                          <span>only me</span>
-                        </button>
-
-                        {docSaveGate.hasRecipients ? (
-                          <button
-                            type="button"
-                            className={`${styles.docSaveAudienceOption} ${saveDocAudience === 'session' ? styles.active : ''}`}
-                            onClick={() => {
-                              setSaveDocAudience('session');
-                              setShowSaveDocAudienceMenu(false);
-                            }}
-                            data-testid={E2E_TESTIDS.DATABASE_SAVE_DOCS_AUDIENCE_SESSION}
-                          >
-                            <FontAwesomeIcon icon={faLock} />
-                            <span>{docSaveSessionLabel}</span>
-                          </button>
-                        ) : (
-                          <div className={styles.docSaveAudienceNote}>
-                            Session <code>docUploads</code> gate unavailable. Saved docs will stay private to your wallet.
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-
-            <div className={styles.addSourceControls}>
-              {/* URL Input */}
-              <div className={styles.urlInputContainer}>
-                <Input
-                  type="url"
-                  placeholder="Add URL"
-                  value={additionalUrlInput}
-                  onChange={(e) => setAdditionalUrlInput(e.target.value)}
-                  onKeyDown={handleUrlKeyDown}
-                  className={styles.urlInputField}
-                  // Removed bsSize="sm" to match default height
-                />
-                <button
-                  type="button"
-                  className={styles.internalUrlAddBtn}
-                  onClick={addAdditionalUrl}
-                  disabled={!additionalUrlInput.trim()}
-                  title="Add URL"
-                >
-                  <FontAwesomeIcon icon={faPlus} />
-                </button>
-              </div>
-
-              {/* File Upload Button */}
-              <div className={styles.fileUploadWrapper}>
-                <input
-                  type="file"
-                  ref={additionalFileInputRef}
-                  style={{ display: 'none' }}
-                  accept=".pdf, .md, .txt, .csv, .ppt, .pptx, .json"
-                  onChange={handleAdditionalFileUpload}
-                />
-                <Button
-                  type="button"
-                  color="secondary"
-                  outline
-                  className={styles.compactBtn}
-                  onClick={() => additionalFileInputRef.current && additionalFileInputRef.current.click()}
-                  title="Allowed: .pdf, .md, .txt, .csv, .ppt"
-                  // Removed size="sm" to match default height
-                >
-                  {/* Upload File */}
-                  <FontAwesomeIcon icon={faUpload} style={{ opacity: '0.5' }} />
-                </Button>
-              </div>
-
-              {/* Transcript Mode Toggle */}
-              <div
-                className={`${styles.transcriptToggleBtn} ${transcriptMode ? styles.active : ''}`}
-                onClick={handleTranscriptModeToggle}
-                title="Enable Transcript Mode (Summary + Arweave Upload)"
-                data-testid="transcript-mode-toggle"
+          <div className={styles.addSourceControls}>
+            <div className={styles.urlInputContainer}>
+              <Input
+                type="url"
+                placeholder="Add URL"
+                value={additionalUrlInput}
+                onChange={(e) => setAdditionalUrlInput(e.target.value)}
+                onKeyDown={handleUrlKeyDown}
+                className={styles.urlInputField}
+              />
+              <button
+                type="button"
+                className={styles.internalUrlAddBtn}
+                onClick={addAdditionalUrl}
+                disabled={!additionalUrlInput.trim()}
+                title="Add URL"
               >
-                <FontAwesomeIcon
-                  icon={transcriptMode ? faCheckSquare : faSquare}
-                  className={styles.checkboxIcon}
-                />
-                <span>Transcript</span>
-              </div>
-
-              {/* Upload Summary Toggle (Visible only in Transcript Mode) */}
-              {transcriptMode && (
-                <div
-                  className={`${styles.transcriptToggleBtn} ${uploadSummaryToArweave ? styles.active : ''}`}
-                  onClick={() => setUploadSummaryToArweave(!uploadSummaryToArweave)}
-                  title="If checked, the summary is uploaded to Arweave and attached as a permanent document. If unchecked, the summary is passed directly to AI for question generation without permanent storage."
-                  style={{ marginLeft: '10px' }}
-                >
-                  <FontAwesomeIcon
-                    icon={uploadSummaryToArweave ? faCheckSquare : faSquare}
-                    className={styles.checkboxIcon}
-                  />
-                  <span>Upload Summary</span>
-                </div>
-              )}
-
-              {transcriptMode && uploadSummaryToArweave && (
-                <div
-                  className={`${styles.transcriptToggleBtn} ${encryptSummary ? styles.active : ''}`}
-                  onClick={() => setEncryptSummary(!encryptSummary)}
-                  title="Encrypt the summary before uploading to Arweave (Lit + SBT gate)."
-                  style={{ marginLeft: '10px' }}
-                >
-                  <FontAwesomeIcon
-                    icon={encryptSummary ? faCheckSquare : faSquare}
-                    className={styles.checkboxIcon}
-                  />
-                  <span>Encrypt Summary</span>
-                </div>
-              )}
+                <FontAwesomeIcon icon={faPlus} />
+              </button>
             </div>
 
-            {transcriptMode && uploadSummaryToArweave && encryptSummary && (
-              <div className={styles.litGateRow}>
-                <SBTSelector
-                  id="summary-encryption"
-                  label="SBTs that can decrypt the summary"
-                  selectedSBTs={summaryGateSBTs}
-                  onAddSBT={(sbt) => setSummaryGateSBTs((prev) => [...prev, sbt])}
-                  onRemoveSBT={(address) =>
-                    setSummaryGateSBTs((prev) =>
-                      prev.filter((item) => String(item.address || '').toLowerCase() !== String(address || '').toLowerCase())
-                    )
-                  }
-                  network={network}
-                  sessionSlug={resolvedSessionSlug || ''}
-                  defaultFeaturedSBTs={resolvedSessionConfig?.defaultFeaturedSBTs || []}
-                  enableGroupSelect
-                  variant="create"
+            <div className={styles.fileUploadWrapper}>
+              <input
+                type="file"
+                ref={additionalFileInputRef}
+                style={{ display: 'none' }}
+                accept=".pdf, .md, .txt, .csv, .ppt, .pptx, .json"
+                onChange={handleAdditionalFileUpload}
+              />
+              <Button
+                type="button"
+                color="secondary"
+                outline
+                className={styles.compactBtn}
+                onClick={() => additionalFileInputRef.current && additionalFileInputRef.current.click()}
+                title="Allowed: .pdf, .md, .txt, .csv, .ppt"
+              >
+                <FontAwesomeIcon icon={faUpload} style={{ opacity: '0.5' }} />
+              </Button>
+            </div>
+
+            <div
+              className={`${styles.transcriptToggleBtn} ${transcriptMode ? styles.active : ''}`}
+              onClick={handleTranscriptModeToggle}
+              title="Enable Transcript Mode (Summary + Arweave Upload)"
+              data-testid="transcript-mode-toggle"
+            >
+              <FontAwesomeIcon
+                icon={transcriptMode ? faCheckSquare : faSquare}
+                className={styles.checkboxIcon}
+              />
+              <span>Transcript</span>
+            </div>
+
+            {transcriptMode && (
+              <div
+                className={`${styles.transcriptToggleBtn} ${uploadSummaryToArweave ? styles.active : ''}`}
+                onClick={() => setUploadSummaryToArweave(!uploadSummaryToArweave)}
+                title="If checked, the summary is uploaded to Arweave and attached as a permanent document. If unchecked, the summary is passed directly to AI for question generation without permanent storage."
+              >
+                <FontAwesomeIcon
+                  icon={uploadSummaryToArweave ? faCheckSquare : faSquare}
+                  className={styles.checkboxIcon}
                 />
-                <FormGroup className={styles.litGateMode}>
-                  <Label>Gate mode</Label>
-                  <Input
-                    type="select"
-                    value={summaryGateMode}
-                    onChange={(e) => setSummaryGateMode(e.target.value)}
-                  >
-                    <option value="any">Any (OR)</option>
-                    <option value="all">All (AND)</option>
-                  </Input>
-                </FormGroup>
+                <span>Upload Summary</span>
               </div>
             )}
 
-            {transcriptMode && uploadSummaryToArweave && encryptSummary && summaryGateSBTs.length === 0 && summaryGateAddresses.length === 0 && (
-              <div className={styles.encryptionWarning}>
-                Select at least one SBT to encrypt the summary.
+            {transcriptMode && uploadSummaryToArweave && (
+              <div
+                className={`${styles.transcriptToggleBtn} ${encryptSummary ? styles.active : ''}`}
+                onClick={() => setEncryptSummary(!encryptSummary)}
+                title="Encrypt the summary before uploading to Arweave (Lit + SBT gate)."
+              >
+                <FontAwesomeIcon
+                  icon={encryptSummary ? faCheckSquare : faSquare}
+                  className={styles.checkboxIcon}
+                />
+                <span>Encrypt Summary</span>
               </div>
             )}
           </div>
+
+          {(additionalSources.length > 0 || shouldShowSaveExtraSourcesControl || (transcriptMode && uploadSummaryToArweave && encryptSummary)) && (
+            <div className={styles.additionalContextSection}>
+              {additionalSources.length > 0 && (
+                <ul className={styles.sourceList}>
+                  {additionalSources.map((item, idx) => (
+                    <li key={idx} className={styles.sourceItem}>
+                      <span className={styles.sourceTypeLabel}>[{item.type}]</span>
+                      <span className={styles.sourceName}>{item.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => removeAdditionalSource(idx)}
+                        className={styles.removeSourceBtn}
+                      >
+                        ×
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              {shouldShowSaveExtraSourcesControl && (
+                <div className={styles.docSaveRow}>
+                  <label className={styles.docSaveToggle} htmlFor={E2E_TESTIDS.DATABASE_SAVE_DOCS_TOGGLE}>
+                    <input
+                      id={E2E_TESTIDS.DATABASE_SAVE_DOCS_TOGGLE}
+                      type="checkbox"
+                      checked={saveExtraSourcesToDocLibrary}
+                      onChange={(event) => {
+                        setSaveExtraSourcesToDocLibrary(event.target.checked);
+                        if (!event.target.checked) setShowSaveDocAudienceMenu(false);
+                      }}
+                      data-testid={E2E_TESTIDS.DATABASE_SAVE_DOCS_TOGGLE}
+                    />
+                    <span>Save to Session Doc Library</span>
+                  </label>
+
+                  {saveExtraSourcesToDocLibrary && (
+                    <div className={styles.docSaveAudienceWrap}>
+                      <button
+                        type="button"
+                        className={styles.docSaveAudienceButton}
+                        onClick={() => setShowSaveDocAudienceMenu((value) => !value)}
+                        data-testid={E2E_TESTIDS.DATABASE_SAVE_DOCS_AUDIENCE_BUTTON}
+                        data-ce-doc-save-audience={saveDocAudience}
+                      >
+                        <FontAwesomeIcon icon={faLock} />
+                        <span>{saveDocAudienceLabel}</span>
+                        <FontAwesomeIcon icon={showSaveDocAudienceMenu ? faCaretUp : faCaretDown} />
+                      </button>
+
+                      {showSaveDocAudienceMenu && (
+                        <div
+                          className={styles.docSaveAudienceMenu}
+                          data-testid={E2E_TESTIDS.DATABASE_SAVE_DOCS_AUDIENCE_MENU}
+                        >
+                          <button
+                            type="button"
+                            className={`${styles.docSaveAudienceOption} ${saveDocAudience === 'self' ? styles.active : ''}`}
+                            onClick={() => {
+                              setSaveDocAudience('self');
+                              setShowSaveDocAudienceMenu(false);
+                            }}
+                            data-testid={E2E_TESTIDS.DATABASE_SAVE_DOCS_AUDIENCE_SELF}
+                          >
+                            <FontAwesomeIcon icon={faLock} />
+                            <span>only me</span>
+                          </button>
+
+                          {docSaveGate.hasRecipients ? (
+                            <button
+                              type="button"
+                              className={`${styles.docSaveAudienceOption} ${saveDocAudience === 'session' ? styles.active : ''}`}
+                              onClick={() => {
+                                setSaveDocAudience('session');
+                                setShowSaveDocAudienceMenu(false);
+                              }}
+                              data-testid={E2E_TESTIDS.DATABASE_SAVE_DOCS_AUDIENCE_SESSION}
+                            >
+                              <FontAwesomeIcon icon={faLock} />
+                              <span>{docSaveSessionLabel}</span>
+                            </button>
+                          ) : (
+                            <div className={styles.docSaveAudienceNote}>
+                              Session <code>docUploads</code> gate unavailable. Saved docs will stay private to your wallet.
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {transcriptMode && uploadSummaryToArweave && encryptSummary && (
+                <div className={styles.litGateRow}>
+                  <SBTSelector
+                    id="summary-encryption"
+                    label="SBTs that can decrypt the summary"
+                    selectedSBTs={summaryGateSBTs}
+                    onAddSBT={(sbt) => setSummaryGateSBTs((prev) => [...prev, sbt])}
+                    onRemoveSBT={(address) =>
+                      setSummaryGateSBTs((prev) =>
+                        prev.filter((item) => String(item.address || '').toLowerCase() !== String(address || '').toLowerCase())
+                      )
+                    }
+                    network={network}
+                    sessionSlug={resolvedSessionSlug || ''}
+                    defaultFeaturedSBTs={resolvedSessionConfig?.defaultFeaturedSBTs || []}
+                    enableGroupSelect
+                    variant="create"
+                  />
+                  <FormGroup className={styles.litGateMode}>
+                    <Label>Gate mode</Label>
+                    <Input
+                      type="select"
+                      value={summaryGateMode}
+                      onChange={(e) => setSummaryGateMode(e.target.value)}
+                    >
+                      <option value="any">Any (OR)</option>
+                      <option value="all">All (AND)</option>
+                    </Input>
+                  </FormGroup>
+                </div>
+              )}
+
+              {transcriptMode && uploadSummaryToArweave && encryptSummary && summaryGateSBTs.length === 0 && summaryGateAddresses.length === 0 && (
+                <div className={styles.encryptionWarning}>
+                  Select at least one SBT to encrypt the summary.
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <div className={styles.formSection}>
-          <h3 className={styles.sectionTitle}>Question Types</h3>
+          <h3 className={styles.sectionTitle}>Types</h3>
 
           <div className={styles.questionTypeGrid}>
             <div
