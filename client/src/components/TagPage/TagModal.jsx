@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Modal, ModalBody, ModalHeader } from 'reactstrap';
 
-import styles from '../DemoViews/CorpusViewer.module.scss';
+import styles from './TagPage.module.scss';
 import TagPage from './TagPage.jsx';
 
 const buildEmptyQuestionsText = (selectedTags = []) => {
@@ -19,11 +19,6 @@ const TagModal = ({ isOpen, toggle, activeTag }) => {
   useEffect(() => {
     setSelectedTags(normalizedActiveTag ? [normalizedActiveTag] : []);
   }, [normalizedActiveTag]);
-
-  const modalTitle = useMemo(() => {
-    if (!selectedTags.length) return 'Tag explorer';
-    return selectedTags.map((tag) => `#${tag}`).join(' + ');
-  }, [selectedTags]);
 
   const emptyQuestionsText = useMemo(
     () => buildEmptyQuestionsText(selectedTags),
@@ -43,17 +38,34 @@ const TagModal = ({ isOpen, toggle, activeTag }) => {
     setSelectedTags(normalizedNextTags);
   };
 
+  const closeButton = (
+    <button
+      type="button"
+      className={styles.tagModalCloseButton}
+      onClick={toggle}
+      aria-label="Close tag explorer"
+    >
+      <span aria-hidden="true">×</span>
+    </button>
+  );
+
   return (
     <Modal
       isOpen={isOpen}
       toggle={toggle}
-      centered
-      scrollable
-      size="xl"
       modalClassName={styles.tagModal}
+      contentClassName={styles.tagModalContent}
+      backdropClassName={styles.tagModalBackdrop}
+      wrapClassName={styles.tagModalWrap}
     >
-      <ModalHeader toggle={toggle}>{modalTitle}</ModalHeader>
-      <ModalBody>
+      <ModalHeader
+        toggle={toggle}
+        className={styles.tagModalHeaderBar}
+        close={closeButton}
+      >
+        Tag explorer
+      </ModalHeader>
+      <ModalBody className={styles.tagModalBody}>
         {isOpen && selectedTags.length ? (
           <TagPage
             embedded={true}
