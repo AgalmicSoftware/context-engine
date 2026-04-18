@@ -17,7 +17,6 @@ import {
   CardBody,
   FormText,
   InputGroup,
-  InputGroupAddon,
   InputGroupText,
   Modal,
   ModalHeader,
@@ -25,7 +24,6 @@ import {
   ModalFooter,
   Collapse,
   Alert,
-  CustomInput,
   Table,
   Progress
 } from 'reactstrap';

@@ -14,7 +14,6 @@ import {
   CardBody,
   FormText,
   InputGroup,
-  InputGroupAddon,
   InputGroupText,
   ModalHeader,
   ModalBody,
