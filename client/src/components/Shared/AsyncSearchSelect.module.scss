@@ -69,6 +69,16 @@
   white-space: nowrap;
 }
 
+.controlSpinner {
+  flex: 0 0 auto;
+  width: 12px;
+  height: 12px;
+  border: 1.5px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 9999px;
+  animation: ce-async-select-spin 0.7s linear infinite;
+}
+
 .caret {
   width: 0;
   height: 0;
@@ -150,4 +160,14 @@
 
 .optionSelected {
   background: var(--ce-async-select-option-selected);
+}
+
+@keyframes ce-async-select-spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
 }

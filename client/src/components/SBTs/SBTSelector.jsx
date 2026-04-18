@@ -6,7 +6,7 @@ import { ethers } from 'ethers';
 import styles from './SBTSelector.module.scss';
 import { faCog, faExternalLinkAlt, faSpinner, faTimes } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import Select from 'react-select';
+import AsyncSearchSelect from "../Shared/AsyncSearchSelect.jsx";
 
 import contractScripts from '../../utilities/web3/contractScripts.js';
 import {
@@ -2211,37 +2211,6 @@ class SBTSelector extends React.Component {
     );
   };
 
-  getSelectStyles = (variant) => {
-    const isDark = variant === 'admin' || variant === 'create';
-    const textColor = isDark ? '#f4f7ff' : '#000000';
-    const placeholderColor = isDark ? 'rgba(244, 247, 255, 0.45)' : '#666666';
-    const controlBg = isDark ? 'rgba(8, 10, 26, 0.65)' : '#ffffff';
-    const controlBorder = isDark ? 'rgba(255, 255, 255, 0.16)' : 'rgba(0, 0, 0, 0.1)';
-    const menuBg = isDark ? '#0f1233' : '#ffffff';
-    const optionFocused = isDark ? 'rgba(77, 255, 164, 0.18)' : '#f1f3f6';
-    const optionSelected = isDark ? 'rgba(77, 255, 164, 0.28)' : '#e2e6ee';
-
-    return {
-      option: (provided, state) => ({
-        ...provided,
-        color: textColor,
-        backgroundColor: state.isSelected ? optionSelected : state.isFocused ? optionFocused : menuBg,
-      }),
-      singleValue: (provided) => ({ ...provided, color: textColor }),
-      input: (provided) => ({ ...provided, color: textColor }),
-      control: (provided) => ({
-        ...provided,
-        color: textColor,
-        backgroundColor: controlBg,
-        borderColor: controlBorder,
-        boxShadow: 'none',
-        minHeight: '38px',
-      }),
-      menu: (provided) => ({ ...provided, backgroundColor: menuBg, color: textColor }),
-      placeholder: (provided) => ({ ...provided, color: placeholderColor }),
-    };
-  };
-
   getSbtOptionsByAddress = (sbtOptionsInput) => {
     const sbtOptions = Array.isArray(sbtOptionsInput) ? sbtOptionsInput : [];
     const memo = this._sbtOptionsByAddressMemo || {};
@@ -2532,7 +2501,7 @@ class SBTSelector extends React.Component {
             </div>
           )}
           <div className={styles.selectorRow}>
-            <Select
+            <AsyncSearchSelect
               id={`sbtDropdown-${this.props.id}`}
               options={selectOptions}
               onChange={this.handleSBTSelection}
@@ -2540,7 +2509,7 @@ class SBTSelector extends React.Component {
               classNamePrefix="sbtSelect"
               formatOptionLabel={this.formatOptionLabel}
               getOptionValue={this.getSelectOptionValue}
-              styles={this.getSelectStyles(variant)}
+              variant={variant}
               value={selectedOption}
               placeholder={`Select ${t('sbt')}...`}
               isLoading={isSelectorLoading}
