@@ -1,3 +1,5 @@
+// @ts-nocheck
+// Mechanical Phase 4 extension migration: keep legacy runtime behavior identical and tighten types separately.
 /**
  * @module contractScriptsImpl
  * @description Web3 contract interaction layer — the primary bridge between React components and on-chain state.

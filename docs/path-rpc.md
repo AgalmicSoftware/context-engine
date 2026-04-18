@@ -11,7 +11,7 @@ For scan-scope, profile deep-scan, and RPC guardrail flags, see
 - PATH is Pocket Network's gateway product.
 - The built-in public endpoint family currently lives under `api.pocket.network`.
 - Context Engine uses PATH in two different places:
-  - client read-provider ordering (`client/src/variables/chains.js`, `client/src/utilities/web3/contractScripts.impl.js`)
+  - client read-provider ordering (`client/src/variables/chains.js`, `client/src/utilities/web3/contractScripts.impl.ts`)
   - worker/session RPC overrides (`workers/sessionCorsWorker/worker.js`, Session Wizard/Admin worker config payloads)
 
 Built-in anonymous RPC defaults live in `client/src/variables/rpcDefaults.js`.
@@ -56,7 +56,7 @@ Those fallback URLs come from `client/src/variables/rpcDefaults.js`.
 
 General client read providers are PATH-first, but session-registry bootstrap reads are not.
 
-- `client/src/utilities/web3/sessionRegistry.js` intentionally uses `getDefaultHttpRpc(chainId, { allowPath: false })`
+- `client/src/utilities/web3/sessionRegistry.ts` intentionally uses `getDefaultHttpRpc(chainId, { allowPath: false })`
   for bootstrap reads.
 - That means cold registry hydration and other `bootstrapRpc: true` code paths use public/default
   non-PATH RPCs first.

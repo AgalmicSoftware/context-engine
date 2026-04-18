@@ -181,7 +181,7 @@ Decrypt:  Client ──▸ Lit SDK decrypt(payload) ──▸ Lit nodes verify S
 | SBT management | `components/SBTs/SBTsList.jsx`, `SBTPage.jsx`, `CreateSBTGroup.jsx` |
 | Gate components | `components/Gates/` |
 | **Utilities** | |
-| Web3 / contracts | `utilities/web3/contractScripts.js` (compat barrel), `contractScripts.impl.js`, `contractHelpers.js`, `contractEventListeners.js`, `contractProfile.js`, `sessionRegistry.js`, `portoFunctions.js` |
+| Web3 / contracts | `utilities/web3/contractScripts.js` (compat barrel), `contractScripts.impl.ts`, `contractHelpers.ts`, `contractEventListeners.ts`, `contractProfile.ts`, `sessionRegistry.ts`, `portoFunctions.ts` |
 | Crypto / Lit | `utilities/crypto/litProtocol.js`, `cryptography.js`, `encryptedFields.js` |
 | Arweave | `utilities/arweave/arweaveScripts.js`, `arweaveUrls.js` |
 | Session helpers | `utilities/session/sessionNaming.js`, `sessionMetadata.js`, `resourceKeys.js` |
