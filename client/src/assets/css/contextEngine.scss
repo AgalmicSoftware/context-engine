@@ -4014,7 +4014,8 @@ fieldset[disabled] .btn-link.active {
   border-top-right-radius: 0.2857rem;
 }
 
-.modal-header .close {
+.modal-header .close,
+.modal-header .btn-close {
   padding: 24px 24px 0 24px;
   margin: -1rem -1rem -1rem auto;
 }
