@@ -412,25 +412,75 @@ $input-border: tokens.$ce-input-border;
     }
   }
 
-  .countInput {
-    width: 80px;
-    height: 38px;
-    text-align: center;
-    font-weight: 700;
-    color: var(--ce-color-white) !important;
-    background: rgba(0, 0, 0, 0.25) !important;
-    border: 1px solid rgba(77, 255, 164, 0.45) !important;
-    border-radius: var(--ce-radius-6);
+  .countControlRow {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 10px;
   }
 
-  .quickCountButton {
-    background: rgba(255, 255, 255, 0.06) !important;
-    border: 1px solid rgba(255, 255, 255, 0.2) !important;
-    color: rgba(255, 255, 255, 0.8) !important;
-    font-weight: 700;
-    &:hover {
-      background: rgba(255, 255, 255, 0.14) !important;
+  .countReadout {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 92px;
+    min-height: 42px;
+    padding: 0 14px;
+    border-radius: var(--ce-radius-pill);
+    border: 1px solid rgba(77, 255, 164, 0.42);
+    background: linear-gradient(180deg, rgba(77, 255, 164, 0.12) 0%, rgba(255, 255, 255, 0.04) 100%);
+    box-shadow: 0 6px 22px rgba(0, 0, 0, 0.22);
+    color: rgba(244, 247, 255, 0.96);
+    font-weight: 800;
+    font-size: 1rem;
+    letter-spacing: 0.04em;
+
+    span {
+      display: inline-block;
+      min-width: 2ch;
+      text-align: right;
+    }
+  }
+
+  .countAdjustButton {
+    width: 42px;
+    height: 42px;
+    padding: 0 !important;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--ce-radius-round) !important;
+    border: 1px solid rgba(255, 255, 255, 0.18) !important;
+    background: rgba(255, 255, 255, 0.08) !important;
+    color: rgba(244, 247, 255, 0.92) !important;
+    font-size: 1.35rem !important;
+    font-weight: 800 !important;
+    line-height: 1 !important;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+
+    &:hover:not(:disabled) {
+      transform: translateY(-1px);
+      background: rgba(77, 255, 164, 0.18) !important;
+      border-color: rgba(77, 255, 164, 0.42) !important;
       color: var(--ce-color-white) !important;
+    }
+
+    &:focus,
+    &:focus-visible {
+      background: rgba(77, 255, 164, 0.18) !important;
+      border-color: rgba(77, 255, 164, 0.6) !important;
+      color: var(--ce-color-white) !important;
+      box-shadow: 0 0 0 2px rgba(77, 255, 164, 0.22);
+    }
+
+    &:disabled {
+      opacity: 1;
+      cursor: not-allowed;
+      background: rgba(255, 255, 255, 0.03) !important;
+      border-color: rgba(255, 255, 255, 0.1) !important;
+      color: rgba(244, 247, 255, 0.38) !important;
+      box-shadow: none;
     }
   }
 
@@ -559,6 +609,10 @@ $input-border: tokens.$ce-input-border;
     .docSaveAudienceButton {
       width: 100%;
       justify-content: center;
+    }
+
+    .countReadout {
+      min-width: 84px;
     }
 
     .litGateRow {

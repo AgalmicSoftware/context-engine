@@ -1,5 +1,5 @@
 
-import React, { Suspense, useState, useEffect, useRef, useMemo } from 'react';
+import React, { Suspense, useState, useEffect, useRef, useMemo, useId } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faSpinner,
@@ -92,6 +92,12 @@ const AI_PROVIDER_LABELS = Object.freeze({
   custom: 'Custom',
   local: 'Local',
 });
+const DEFAULT_QUESTION_COUNT = 10;
+const QUESTION_COUNT_STEP = 5;
+const MIN_QUESTION_COUNT = 5;
+const MAX_QUESTION_COUNT = 50;
+
+const clampQuestionCount = (value) => Math.min(MAX_QUESTION_COUNT, Math.max(MIN_QUESTION_COUNT, value));
 const formatAiPromptModelLabel = (config = {}) => {
   const providerKey = toStr(config?.provider).trim().toLowerCase();
   const model = toStr(config?.model).trim();
@@ -184,7 +190,7 @@ export default function AudioSurveyGenerator({
     rating: false,
     freeform: false,
   });
-  const [count, setCount] = useState(10);
+  const [count, setCount] = useState(DEFAULT_QUESTION_COUNT);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -207,6 +213,7 @@ export default function AudioSurveyGenerator({
   const [localSessionOverrideTouched, setLocalSessionOverrideTouched] = useState(false);
   const demoSurfaceEnabled = demoSurfaceMode !== false;
   const [showDemoCorpusView, setShowDemoCorpusView] = useState(demoSurfaceEnabled);
+  const questionCountLabelId = useId();
 
   // Multi-source State
   const [additionalSources, setAdditionalSources] = useState([]);
@@ -611,6 +618,10 @@ export default function AudioSurveyGenerator({
       e.preventDefault();
       addAdditionalUrl();
     }
+  };
+
+  const adjustQuestionCount = (delta) => {
+    setCount((previousCount) => clampQuestionCount(previousCount + delta));
   };
 
   const handleAdditionalFileUpload = (e) => {
@@ -1428,19 +1439,41 @@ export default function AudioSurveyGenerator({
         </div>
 
         <div className={styles.formSection}>
-          <h3 className={styles.sectionTitle}>Number of Questions</h3>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap' }}>
-            <Input
-              type="number"
-              value={count}
-              onChange={(e) => setCount(parseInt(e.target.value, 10))}
-              min="1"
-              max="50"
-              required
-              className={styles.countInput}
-            />
-            <Button color="secondary" className={styles.quickCountButton} onClick={() => setCount(10)}>10</Button>
-            <Button color="secondary" className={styles.quickCountButton} onClick={() => setCount(20)}>20</Button>
+          <h3 className={styles.sectionTitle} id={questionCountLabelId}>Number of Questions</h3>
+          <div className={styles.countControlRow} role="group" aria-labelledby={questionCountLabelId}>
+            <div
+              className={styles.countReadout}
+              aria-label="Question count"
+              data-testid={E2E_TESTIDS.DATABASE_QUESTION_COUNT_VALUE}
+              aria-live="polite"
+              aria-atomic="true"
+            >
+              #:
+              {' '}
+              <span>{count}</span>
+            </div>
+            <Button
+              type="button"
+              color="secondary"
+              className={styles.countAdjustButton}
+              onClick={() => adjustQuestionCount(-QUESTION_COUNT_STEP)}
+              disabled={count <= MIN_QUESTION_COUNT || loading}
+              aria-label="Decrease question count"
+              data-testid={E2E_TESTIDS.DATABASE_QUESTION_COUNT_DECREMENT}
+            >
+              -
+            </Button>
+            <Button
+              type="button"
+              color="secondary"
+              className={styles.countAdjustButton}
+              onClick={() => adjustQuestionCount(QUESTION_COUNT_STEP)}
+              disabled={count >= MAX_QUESTION_COUNT || loading}
+              aria-label="Increase question count"
+              data-testid={E2E_TESTIDS.DATABASE_QUESTION_COUNT_INCREMENT}
+            >
+              +
+            </Button>
           </div>
         </div>
 
