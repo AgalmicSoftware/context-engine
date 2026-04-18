@@ -1007,7 +1007,7 @@ export const TagPageView = ({
                       ))}
                     </div>
                   ) : (
-                    <p className={styles.tagPickerEmpty}>No additional tags available in this session scope yet.</p>
+                    <p className={styles.tagPickerEmpty}>{demoCorpusMode ? 'No additional tags available in this demo corpus yet.' : 'No additional tags available in this session scope yet.'}</p>
                   )}
                 </div>
               )}
@@ -1059,7 +1059,7 @@ export const TagPageView = ({
                           href={entry.url}
                           className={styles.demoCorpusLink}
                           target="_blank"
-                          rel="noreferrer"
+                          rel="noopener noreferrer"
                         >
                           View source
                         </a>

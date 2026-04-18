@@ -9,13 +9,6 @@ import styles from './QuestionTagDropdown.module.scss';
 
 export { getQuestionTagDisplayList } from '../../utilities/survey/questionTags.js';
 
-type QuestionTagDropdownProps = {
-  tags?: unknown[];
-  baseUrl?: string;
-  sessionSlug?: string;
-  onTagSelect?: ((tag: string) => void) | null;
-};
-
 const resolveTagRouteBaseUrl = (baseUrl = '') => {
   const explicitBaseUrl = String(baseUrl ?? '').trim();
   if (explicitBaseUrl) return explicitBaseUrl.replace(/\/+$/, '');

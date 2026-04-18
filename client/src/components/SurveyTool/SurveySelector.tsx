@@ -34,13 +34,11 @@ import { faBookmark, faLock, faUnlock, faPlus, faMinus, faCaretDown, faCaretUp, 
 
 import AudioInput from '../Shared/AudioInput/AudioInput';
 import QuestionFilter from './QuestionFilter';
-import type { QuestionFilterHandle } from './QuestionFilter';
-import PileHologramAssistant from './PileHologramAssistant';
-import QuestionTagDropdown from './QuestionTagDropdown';
+import PileHologramAssistant from './PileHologramAssistant.jsx';
+import QuestionTagDropdown from './QuestionTagDropdown.jsx';
 import SingleQuestionResponse from './SingleQuestionResponse';
 import { JsonButtonRow, JsonIconButton, JsonPanel, JsonToggleButton } from '../Shared/Json/JsonControls';
-import LazyFallback from '../Shared/LazyFallback';
-import SessionChipSelector from '../Shared/SessionChipSelector';
+import SessionChipSelector from '../Shared/SessionChipSelector.jsx';
 import { getQuestionTagDisplayList } from '../../utilities/survey/questionTags.js';
 
 // Crypto and contract utilities
