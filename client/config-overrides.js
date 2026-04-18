@@ -105,6 +105,31 @@ const override = function override(config, env) {
     new webpack.NormalModuleReplacementPlugin(/^@lit-protocol\/contracts\/custom-network-signatures$/, (resource) => {
       const rootBase = path.resolve(__dirname, 'node_modules', '@lit-protocol', 'contracts');
       resource.request = path.join(rootBase, 'dist', 'custom-network-signatures.browser.js');
+    }),
+
+    // PRD 358 Phase 4 — resolver shim for utility .js → .ts rename sites.
+    // Existing callers across the repo import relative utility modules with an
+    // explicit `.js` extension. As utilities are converted to TypeScript, their
+    // callers cannot be touched in the same commit (too large a blast radius),
+    // and webpack 4 resolves `.js` extensions strictly. When the `.ts` sibling
+    // of a requested `./foo.js` exists, rewrite the request so webpack picks up
+    // the converted file. The regex matches any relative request (`./foo.js`,
+    // `../foo.js`, `../../utilities/foo.js`, and deeper — the greedy `.+`
+    // group consumes additional path segments). Skipped when either the
+    // importing directory or the resolved `.ts` path contains a `node_modules`
+    // segment, because some dependencies ship raw `.ts` sources alongside
+    // their compiled `.js` outputs (e.g. `@lit-protocol/contracts`) and a
+    // broad rewrite would route webpack into a Babel-unparseable asset.
+    new webpack.NormalModuleReplacementPlugin(/^\.\.?\/.+\.js$/, (resource) => {
+      if (!resource || !resource.context || typeof resource.request !== 'string') return;
+      if (resource.context.includes(`${path.sep}node_modules${path.sep}`)) return;
+      const tsRequest = resource.request.replace(/\.js$/, '.ts');
+      if (tsRequest === resource.request) return;
+      const absoluteTs = path.resolve(resource.context, tsRequest);
+      if (absoluteTs.includes(`${path.sep}node_modules${path.sep}`)) return;
+      if (fs.existsSync(absoluteTs)) {
+        resource.request = tsRequest;
+      }
     })
   );
 
@@ -236,6 +261,12 @@ override.jest = (config) => {
   const oxScopedPrefixes = '(erc\\d{4}|tempo|trusted-setups|window)';
   next.moduleNameMapper = {
     ...(next.moduleNameMapper || {}),
+    // PRD 358 Phase 4 — strip trailing `.js` on relative imports so Jest's
+    // default moduleFileExtensions resolve `.ts` siblings of converted
+    // utilities. Matches `./foo.js`, `../foo.js`, `./a/b.js`, etc. Existing
+    // `.js` files continue to resolve because Jest's extension order still
+    // lists `.js` ahead of `.ts`.
+    '^(\\.{1,2}/.+)\\.js$': '$1',
     '^node:os$': path.join('<rootDir>', 'src', 'shims', 'node-os.js'),
     '^node:events$': path.join('<rootDir>', 'src', 'shims', 'node-events.js'),
     '^@lit-protocol/contracts/(prod|dev)/(.*)$': path.join(
