@@ -77,7 +77,7 @@ const QuestionTagDropdown = ({ tags, baseUrl = '', sessionSlug = '' }) => {
       >
         <FontAwesomeIcon icon={faHashtag} />
       </DropdownToggle>
-      <DropdownMenu right className={styles.menu}>
+      <DropdownMenu end className={styles.menu}>
         {displayTags.map((tag) => (
           <DropdownItem
             key={tag}
