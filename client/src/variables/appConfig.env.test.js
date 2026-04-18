@@ -1,5 +1,6 @@
 const ENV_KEYS = [
   'REACT_APP_DEFAULT_AUTO_REQUEST_TESTNET_FUNDS',
+  'REACT_APP_CE_DEMO_SURFACE_MODE_DEFAULT',
   'REACT_APP_PORTO_SESSION_KEY_ENABLED',
   'REACT_APP_ENABLE_CE_LOGO_ANIMATION',
   'REACT_APP_TERMINOLOGY_MODE',
@@ -176,6 +177,27 @@ describe('appConfig env-backed config', () => {
       expect(config.CE_SESSION_SCAN_RESOLVE_DEMO_SESSION_ALIASES).toBe(false);
     });
   });
+
+  it.each([
+    [undefined, true],
+    ['false', false],
+    ['true', true],
+    ['wat', true],
+  ])(
+    'reads REACT_APP_CE_DEMO_SURFACE_MODE_DEFAULT=%p as %p',
+    (value, expected) => {
+      if (typeof value === 'undefined') {
+        delete process.env.REACT_APP_CE_DEMO_SURFACE_MODE_DEFAULT;
+      } else {
+        process.env.REACT_APP_CE_DEMO_SURFACE_MODE_DEFAULT = value;
+      }
+
+      jest.isolateModules(() => {
+        const config = require('./appConfig.js');
+        expect(config.DEFAULT_DEMO_SURFACE_MODE).toBe(expected);
+      });
+    }
+  );
 
   it('keeps the repo-default session scan scope and slug list when env overrides are absent', () => {
     jest.isolateModules(() => {

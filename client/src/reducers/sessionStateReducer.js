@@ -18,6 +18,7 @@ import {
   normalizeGlobalSessionSelection,
   readStoredGlobalSessionSelection,
 } from '../utilities/session/globalSessionState.js';
+import { DEFAULT_DEMO_SURFACE_MODE } from '../variables/appConfig.js';
 
 const readStoredTooltipsEnabled = () => {
   try {
@@ -33,9 +34,12 @@ const normalizeDemoSurfaceMode = (value) => value === false ? false : true;
 const readStoredDemoSurfaceMode = () => {
   try {
     const storedValue = localStorage.getItem('ce:demoSurfaceMode');
-    return storedValue !== null ? normalizeDemoSurfaceMode(JSON.parse(storedValue)) : true;
+    if (storedValue !== null) {
+      return normalizeDemoSurfaceMode(JSON.parse(storedValue));
+    }
+    return DEFAULT_DEMO_SURFACE_MODE;
   } catch (_) {
-    return true;
+    return DEFAULT_DEMO_SURFACE_MODE;
   }
 };
 
