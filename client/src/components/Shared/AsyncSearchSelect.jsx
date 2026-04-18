@@ -150,6 +150,13 @@ const AsyncSearchSelect = ({
         >
           {hasValue ? renderOptionLabel(value) : placeholder}
         </span>
+        {isLoading ? (
+          <span
+            className={styles.controlSpinner}
+            data-testid="ce-async-select-control-spinner"
+            aria-hidden="true"
+          />
+        ) : null}
         <span className={styles.caret} aria-hidden="true" />
       </button>
       {open && (
