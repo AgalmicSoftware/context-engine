@@ -73,27 +73,17 @@ const QuestionTagDropdown = ({
         <FontAwesomeIcon icon={faHashtag} />
       </DropdownToggle>
       <DropdownMenu end className={styles.menu}>
-        {displayTags.map((tag) => {
-          const usesModalSelect = typeof onTagSelect === 'function';
-
-          return (
-            <DropdownItem
-              key={tag}
-              tag={usesModalSelect ? 'button' : Link}
-              type={usesModalSelect ? 'button' : undefined}
-              to={usesModalSelect ? undefined : buildTagHref(tag, baseUrl, sessionSlug)}
-              className={styles.item}
-              onClick={(event: React.MouseEvent<HTMLElement>) => {
-                event.stopPropagation();
-                if (!usesModalSelect) return;
-                event.preventDefault();
-                onTagSelect(tag);
-              }}
-            >
-              #{tag}
-            </DropdownItem>
-          );
-        })}
+        {displayTags.map((tag) => (
+          <DropdownItem
+            key={tag}
+            tag={Link}
+            to={buildTagHref(tag, baseUrl, sessionSlug)}
+            className={styles.item}
+            onClick={(event) => event.stopPropagation()}
+          >
+            #{tag}
+          </DropdownItem>
+        ))}
       </DropdownMenu>
     </UncontrolledDropdown>
   );

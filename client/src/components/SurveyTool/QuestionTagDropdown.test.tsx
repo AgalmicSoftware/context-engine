@@ -33,7 +33,7 @@ jest.mock('reactstrap', () => {
         </button>
       );
     },
-    DropdownMenu: ({ children, end, ...props }: any) => {
+    DropdownMenu: ({ children, end, ...props }) => {
       const { isOpen } = React.useContext(DropdownContext);
       if (!isOpen) return null;
       return <div {...props}>{children}</div>;
