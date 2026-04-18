@@ -9,6 +9,8 @@ export const PUBLIC_REPO_ISSUES_URL = `${PUBLIC_REPO_URL}/issues`;
 export const PUBLIC_REPO_NEW_ISSUE_URL = `${PUBLIC_REPO_ISSUES_URL}/new`;
 export const PUBLIC_DISCOVERABILITY_URL = 'https://contextengine.xyz/discoverability.html';
 export const PUBLIC_LLMS_URL = 'https://contextengine.xyz/llms.txt';
+export const PUBLIC_DISCOVERABILITY_PATH = '/discoverability.html';
+export const PUBLIC_LLMS_PATH = '/llms.txt';
 export const buildPublicRepoLatestReleaseAssetUrl = (filename = '') => (
   filename ? `${PUBLIC_REPO_URL}/releases/latest/download/${String(filename).replace(/^\/+/, '')}` : ''
 );

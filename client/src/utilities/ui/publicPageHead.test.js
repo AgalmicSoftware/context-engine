@@ -131,6 +131,77 @@ describe('publicPageHead', () => {
     );
   });
 
+  it('emits deployment-origin discovery significantLink URLs for root-host deployments', () => {
+    window.history.replaceState({}, '', '/');
+
+    syncPublicPageHead({ location: window.location });
+
+    const structuredData = JSON.parse(
+      document.head.querySelector(
+        'script[type="application/ld+json"][data-ce-structured-data="public-page"]'
+      )?.textContent || '{}'
+    );
+    const webPage = structuredData['@graph']?.find?.((entry) => entry?.['@type'] === 'WebPage');
+
+    expect(webPage?.significantLink).toEqual(
+      expect.arrayContaining([
+        `${window.location.origin}/discoverability.html`,
+        `${window.location.origin}/llms.txt`,
+      ])
+    );
+  });
+
+  it('emits deployment-origin discovery significantLink URLs for custom origins', () => {
+    const location = { origin: 'https://preview.example.test', pathname: '/', search: '' };
+
+    syncPublicPageHead({ location });
+
+    const structuredData = JSON.parse(
+      document.head.querySelector(
+        'script[type="application/ld+json"][data-ce-structured-data="public-page"]'
+      )?.textContent || '{}'
+    );
+    const webPage = structuredData['@graph']?.find?.((entry) => entry?.['@type'] === 'WebPage');
+
+    expect(webPage?.significantLink).toEqual(
+      expect.arrayContaining([
+        'https://preview.example.test/discoverability.html',
+        'https://preview.example.test/llms.txt',
+      ])
+    );
+  });
+
+  it('respects PUBLIC_URL when building deployment discovery significantLink URLs', () => {
+    const priorPublicUrl = process.env.PUBLIC_URL;
+    const location = { origin: 'https://preview.example.test', pathname: '/', search: '' };
+
+    process.env.PUBLIC_URL = '/ce/';
+
+    try {
+      syncPublicPageHead({ location });
+
+      const structuredData = JSON.parse(
+        document.head.querySelector(
+          'script[type="application/ld+json"][data-ce-structured-data="public-page"]'
+        )?.textContent || '{}'
+      );
+      const webPage = structuredData['@graph']?.find?.((entry) => entry?.['@type'] === 'WebPage');
+
+      expect(webPage?.significantLink).toEqual(
+        expect.arrayContaining([
+          'https://preview.example.test/ce/discoverability.html',
+          'https://preview.example.test/ce/llms.txt',
+        ])
+      );
+    } finally {
+      if (typeof priorPublicUrl === 'undefined') {
+        delete process.env.PUBLIC_URL;
+      } else {
+        process.env.PUBLIC_URL = priorPublicUrl;
+      }
+    }
+  });
+
   it('publishes structured data with the GitHub repo in sameAs', () => {
     syncPublicPageHead({
       location: new URL('https://contextengine.xyz/about?ref=welcome'),
