@@ -1,4 +1,4 @@
-/**
+/*
  * @module appRpcSelection
  * @description RPC endpoint selection and failover — picks primary and fallback RPC URLs
  *              for a given chain based on configuration and latency ranking.
@@ -10,9 +10,19 @@ import {
   getPreferredPathRpcUrl,
 } from '../../variables/chains.js';
 
-export const normalizeRpcCandidateList = (urls = []) => {
-  const out = [];
-  const seen = new Set();
+type RpcChainLike = {
+  id?: number;
+  rpcUrls?: {
+    default?: { http?: ReadonlyArray<string> };
+    public?: { http?: ReadonlyArray<string> };
+  };
+};
+
+export const normalizeRpcCandidateList = (
+  urls: ReadonlyArray<string | null | undefined> = []
+): string[] => {
+  const out: string[] = [];
+  const seen = new Set<string>();
   urls.forEach((raw) => {
     const url = String(raw || '').trim();
     if (!url || seen.has(url)) return;
@@ -22,7 +32,7 @@ export const normalizeRpcCandidateList = (urls = []) => {
   return out;
 };
 
-export const getPrimaryRpcUrlForChain = (chain) => {
+export const getPrimaryRpcUrlForChain = (chain: RpcChainLike): string => {
   const chainId = Number(chain?.id || 0);
   return (
     getPreferredPathRpcUrl(chainId) ||
@@ -33,7 +43,7 @@ export const getPrimaryRpcUrlForChain = (chain) => {
   );
 };
 
-export const getFallbackRpcUrlForChain = (chain) => {
+export const getFallbackRpcUrlForChain = (chain: RpcChainLike): string => {
   const chainId = Number(chain?.id || 0);
   const primary = getPrimaryRpcUrlForChain(chain);
   const candidates = normalizeRpcCandidateList([
