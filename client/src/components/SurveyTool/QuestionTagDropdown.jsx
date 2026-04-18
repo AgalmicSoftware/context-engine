@@ -3,28 +3,11 @@ import { DropdownItem, DropdownMenu, DropdownToggle, UncontrolledDropdown } from
 import { Link } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faHashtag } from '@fortawesome/free-solid-svg-icons';
-import { normalizeTagList } from '../../utilities/defaultTags.js';
 import { readPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
+import { getQuestionTagDisplayList } from '../../utilities/survey/questionTags.js';
 import styles from './QuestionTagDropdown.module.scss';
 
-export const getQuestionTagDisplayList = (tags) => {
-  if (!Array.isArray(tags)) return [];
-
-  const seen = new Set();
-  const out = [];
-
-  tags.forEach((rawTag) => {
-    const displayTag = String(rawTag ?? '').trim();
-    const normalizedTag = normalizeTagList([displayTag])[0];
-
-    if (!displayTag || !normalizedTag || seen.has(normalizedTag)) return;
-
-    seen.add(normalizedTag);
-    out.push(displayTag);
-  });
-
-  return out;
-};
+export { getQuestionTagDisplayList } from '../../utilities/survey/questionTags.js';
 
 const resolveTagRouteBaseUrl = (baseUrl = '') => {
   const explicitBaseUrl = String(baseUrl ?? '').trim();

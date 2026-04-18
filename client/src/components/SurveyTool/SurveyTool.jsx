@@ -37,11 +37,10 @@ import CreateSurvey from './CreateSurvey';
 import SurveyResults from './SurveyResults';
 import QuestionFilter from './QuestionFilter';
 import PileHologramAssistant from './PileHologramAssistant.jsx';
-import QuestionTagDropdown, {
-  getQuestionTagDisplayList,
-} from './QuestionTagDropdown.jsx';
+import QuestionTagDropdown from './QuestionTagDropdown.jsx';
 import SingleQuestionResponse from './SingleQuestionResponse';
 import { JsonButtonRow, JsonIconButton, JsonPanel, JsonToggleButton } from '../Shared/Json/JsonControls';
+import { getQuestionTagDisplayList } from '../../utilities/survey/questionTags.js';
 
 // Crypto and contract utilities
 import contractScripts, {
@@ -15159,7 +15158,6 @@ class PileViewMode extends SurveyQuestions {
     });
   };
 
-
   getIsPileSubmitRailVisible = () => {
     const pendingStats = this.getPendingStatsSnapshot?.() || { total: 0 };
     return !!(
@@ -15847,11 +15845,6 @@ class PileViewMode extends SurveyQuestions {
       </div>
     );
 
-    const pileInteractionUnitClassName = [
-      styles.pileInteractionUnit,
-      pileTopRailVisible ? styles.pileInteractionUnitWithSubmitRail : '',
-    ].filter(Boolean).join(' ');
-
     const footerControls = (
       <div className={`${styles.pileFooter}${pileTopRailVisible ? '' : ` ${styles.pileFooterHidden}`}`}>
         {showPileSubmitSuccessBadge ? (
@@ -15903,7 +15896,7 @@ class PileViewMode extends SurveyQuestions {
     return (
       <div className={styles.pileViewContainer}>
         <div className={styles.pileWrapper}>
-          <div className={pileInteractionUnitClassName}>
+          <div className={styles.pileInteractionUnit}>
             {SHOW_PILE_HOLOGRAM_TOGGLE && (
               <button
                 type="button"

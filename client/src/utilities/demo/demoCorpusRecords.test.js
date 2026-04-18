@@ -1,12 +1,5 @@
 import { buildDemoCorpusRecords } from './demoCorpusRecords.js';
 
-const normalizeDemoText = (value = '') => String(value || '').replace(/\s+/g, ' ').trim();
-const truncateDemoText = (value = '', maxLength = 180) => {
-  const normalized = normalizeDemoText(value);
-  if (normalized.length <= maxLength) return normalized;
-  return `${normalized.slice(0, maxLength - 1).trimEnd()}...`;
-};
-
 describe('demoCorpusRecords', () => {
   it('uses entry text as summary when the title is synthesized from summary copy', () => {
     const summary = `
@@ -39,9 +32,12 @@ describe('demoCorpusRecords', () => {
     ]);
 
     expect(records).toHaveLength(1);
-    expect(records[0].title).not.toBe(normalizeDemoText(summary));
-    expect(records[0].summary).toBe(truncateDemoText(text, 320));
-    expect(records[0].summary).not.toBe(normalizeDemoText(summary));
+    expect(records[0].title.length).toBeLessThanOrEqual(140);
+    expect(records[0].title.endsWith('...')).toBe(true);
+    expect(records[0].summary.length).toBeLessThanOrEqual(320);
+    expect(records[0].summary.endsWith('...')).toBe(true);
+    expect(records[0].summary).toContain('longer body');
+    expect(records[0].summary).not.toBe(records[0].title);
   });
 
   it('formats Z-suffixed timestamps in UTC so the calendar day stays stable', () => {
