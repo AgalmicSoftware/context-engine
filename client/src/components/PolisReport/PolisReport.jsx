@@ -3345,7 +3345,7 @@ export default function PolisReport({
               >
                 <h5 id={styles.sectionHeader} className={styles.sectionTitle}>
                   <FontAwesomeIcon icon={beeswarmOpen ? faCaretUp : faCaretDown} style={{ marginRight: '6px' }} />
-                  Consensus and Debated Questions
+                  Consensus and Difference
                 </h5>
                 <div className={styles.pdfIgnore} style={{ textAlign: 'right', flex: '1' }}>
                   {beeswarmOpen ? 'Hide' : 'Show'}
