@@ -220,20 +220,30 @@ describe('AboutPage', () => {
   it.each([
     [
       'ce-about-recognition-ethereum',
-      /passkey ethereum wallet model rather than email/i,
-      /users do not need to know anything about cryptocurrency to use it/i,
+      /cryptographic foundation for proof-of-human and attestation-based access/i,
+      /users do not need any crypto expertise to use it/i,
     ],
     [
       'ce-about-recognition-radicalxchange',
-      /social identity, plural governance, and group-owned value/i,
-      /retaining ownership over the preference data and value they create/i,
+      /builds on radicalxchange ideas around social identity, plural governance, and groups owning the data and value they create/i,
+      /retain ownership over the preference data and value they create/i,
     ],
     [
       'ce-about-recognition-pol-is',
-      /current sota for large-group discourse software/i,
-      /vtaiwan demonstration/i,
+      /large-group discourse software can clarify both consensus and persistent difference/i,
+      /vtaiwan where simple agree \/ unsure \/ disagree inputs helped structure public reasoning/i,
     ],
-  ])('shows updated whitepaper-derived copy in the %s recognition modal', async (testId, firstCopy, secondCopy) => {
+    [
+      'ce-about-recognition-collective-intelligence-project',
+      /context engine is social infrastructure for the ai transition/i,
+      /alongside cip’s work on scalable collective decision-making for transformative technology/i,
+    ],
+    [
+      'ce-about-recognition-edge-city',
+      /edge patagonia, sponsored by protocol labs/i,
+      /prototype tools for resilient technology, coordination, and governance in live community settings/i,
+    ],
+  ])('shows product-facing recognition modal copy in the %s recognition modal', async (testId, firstCopy, secondCopy) => {
     renderAboutPage();
 
     fireEvent.click(screen.getByTestId(testId));
