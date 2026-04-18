@@ -3,7 +3,7 @@
 ## Quick commands
 ```bash
 # Client (from client/)
-cd client && npm install --legacy-peer-deps  # install client dependencies
+cd client && npm install  # install client dependencies (legacy-peer-deps carried via client/.npmrc)
 npm run dev                       # dev server (port 3000, hot reload)
 
 # Worker bundle (from repo root; use Node 20 for root scripts)
@@ -21,7 +21,7 @@ npm run ai:seed-survey:question-types            # seed question type data
 - Run frontend package commands from `client/`.
 - Root worker/test scripts are standardized on Node `^20.0.0` (`nvm use 20`).
 - The frontend package itself still supports Node `^16.14.2`, npm `9.2.0` (`nvm use 16`) when you are working only inside `client/`.
-- Fresh `client/` installs still require `npm install --legacy-peer-deps` because the current React Scripts / Lit / ethers peer graph does not resolve cleanly with plain npm install.
+- Fresh `client/` installs use the standard `npm install`; the `--legacy-peer-deps` contract is carried automatically via `client/.npmrc` because `react-scripts@4.0.3`'s optional TypeScript peer still conflicts with `@lit-protocol/contracts@0.9.1`'s strict peer. Plain `npm install` just works.
 - `npm run dev` is the hot-reload frontend dev server; `npm start` serves the existing production build from `build/`.
 - Useful frontend scripts: `npm test`, `CI=true npm test -- --watchAll=false`, `npm run lint`, `npm run build`, `npm run analyze`.
 - Frontend logging is off by default. In the browser console, run `window.CE_LOGGING.enabled = true`, then `window.CE_LOGGING_HELP()` for categories and usage.
