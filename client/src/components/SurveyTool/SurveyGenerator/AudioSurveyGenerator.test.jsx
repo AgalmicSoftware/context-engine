@@ -281,6 +281,51 @@ describe('AudioSurveyGenerator', () => {
     expect(findGenerateQuestionsButton()).toBeTruthy();
   });
 
+  it('uses simplified section headings in the generator surface', async () => {
+    act(() => {
+      root.render(
+        <AudioSurveyGenerator
+          provider={{}}
+          network={{}}
+          account="0x123"
+          loginComplete
+          toggleLoginModal={jest.fn()}
+        />
+      );
+    });
+
+    await act(async () => {
+      const urlInput = container.querySelector('input[type="url"][placeholder="Add URL"]');
+      Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set.call(
+        urlInput,
+        'https://example.com/seed-source'
+      );
+      urlInput.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+
+    await act(async () => {
+      const addButton = container.querySelector('button[title="Add URL"]');
+      addButton.click();
+    });
+
+    const sectionHeadings = Array.from(container.querySelectorAll('h3')).map((node) => node.textContent.trim());
+    expect(sectionHeadings).toContain('Types');
+    expect(sectionHeadings).not.toContain('Content');
+    expect(sectionHeadings).not.toContain('Question Types');
+
+    const anyHeading = Array.from(container.querySelectorAll('h1, h2, h3, h4, h5, h6')).map((node) => node.textContent.trim());
+    expect(anyHeading).not.toContain('Content');
+    expect(anyHeading).not.toContain('Question Types');
+    expect(anyHeading).not.toContain('Additional Context (URL / File)');
+
+    const form = container.querySelector('form');
+    const addSourceControls = form.querySelector(`[class*="addSourceControls"]`);
+    expect(addSourceControls).toBeTruthy();
+    const additionalContextSection = form.querySelector(`[class*="additionalContextSection"]`);
+    expect(additionalContextSection).toBeTruthy();
+    expect(additionalContextSection.contains(addSourceControls)).toBe(false);
+  });
+
   it('uses webpage source type when only additional URL sources are provided', async () => {
     mockProcessAdditionalSources.mockResolvedValue(
       'This is extracted webpage content from additional sources only, and it is long enough to pass validation.'
