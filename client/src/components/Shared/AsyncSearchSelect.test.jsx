@@ -159,6 +159,13 @@ describe('AsyncSearchSelect', () => {
     expect(screen.queryByTestId('ce-async-select-empty')).not.toBeInTheDocument();
   });
 
+  it('shows a loading spinner in the closed control when isLoading is true', () => {
+    render(<Harness isLoading />);
+
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+    expect(screen.getByTestId('ce-async-select-control-spinner')).toBeInTheDocument();
+  });
+
   it('shows noOptionsMessage when not loading and filtered list is empty; skips render when noOptionsMessage returns null', () => {
     const view = render(<Harness noOptionsMessage={() => 'Nothing found'} />);
 

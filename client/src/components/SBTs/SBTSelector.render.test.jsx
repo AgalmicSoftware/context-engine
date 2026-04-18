@@ -15,7 +15,7 @@ const createDeferred = () => {
   return { promise, resolve, reject };
 };
 
-jest.mock('react-select', () => ({
+jest.mock('../Shared/AsyncSearchSelect.jsx', () => ({
   __esModule: true,
   default: ({
     options = [],
