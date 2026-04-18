@@ -17,6 +17,7 @@ import styles from './CorpusViewer.module.scss';
 import ArxivCard from './ArxivCard.jsx';
 import InsiderCard from './InsiderCard.jsx';
 import TagModal from '../TagPage/TagModal.jsx';
+import { buildDemoCorpusRecords } from '../../utilities/demo/demoCorpusRecords.js';
 import WorldResultsMap from './DemoAnalysis/WorldResultsMap.jsx';
 import PolicyGlobe, {
   getPolicyJurisdictionAnchor,
@@ -367,6 +368,10 @@ const EmptyCorpusState = ({ corpus, title, text }) => (
 
 const CorpusViewer = ({ onAtlasIssueOpen = null, showGithubLink = true }) => {
   const corpusDefinitions = useMemo(() => buildCorpusDefinitions(), []);
+  const demoCorpusRecords = useMemo(
+    () => buildDemoCorpusRecords(corpusDefinitions),
+    [corpusDefinitions]
+  );
 
   const [activeCorpusKey, setActiveCorpusKey] = useState(corpusDefinitions[0]?.key || 'tweets');
   const [activeTag, setActiveTag] = useState(null);
@@ -502,6 +507,8 @@ const CorpusViewer = ({ onAtlasIssueOpen = null, showGithubLink = true }) => {
         isOpen={!!activeTag}
         toggle={() => setActiveTag(null)}
         activeTag={activeTag}
+        demoCorpusMode={true}
+        demoCorpusRecords={demoCorpusRecords}
       />
     </div>
   );
