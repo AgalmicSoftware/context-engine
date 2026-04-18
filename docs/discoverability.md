@@ -57,3 +57,18 @@ Public crawlability helps web search and future discovery, but it does not force
 an immediate refresh of every AI cache. If a Claude Project GitHub integration
 is connected, use its manual sync control as well. When exact freshness matters,
 paste the live `main` branch link or the relevant raw document URL directly.
+
+## Runtime vs canonical URLs
+
+Canonical production-site discovery URLs stay fixed at:
+
+- `https://contextengine.xyz/discoverability.html`
+- `https://contextengine.xyz/llms.txt`
+
+Use those canonical URLs when an external reference explicitly needs to point at
+the production site.
+
+Deployment-relative discovery asset URLs are emitted by `syncPublicPageHead()`
+at runtime for the current deployment origin plus the configured `PUBLIC_URL`
+base path. On `https://contextengine.xyz/` they match the canonical URLs. On
+preview hosts or subpath deployments, they resolve to that deployment instead.
