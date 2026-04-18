@@ -16,6 +16,6 @@ describe('Account.module.scss modal account layout guards', () => {
     const scss = fs.readFileSync(path.join(__dirname, 'Account.module.scss'), 'utf8');
 
     expect(scss).toMatch(/#loginModalCard\s*{[\s\S]*?:global\(\.card-header\)\s*{[\s\S]*?position:\s*relative;[\s\S]*?padding-right:\s*4\.25rem;/);
-    expect(scss).toMatch(/:global\(\.modal-login \.close\)\s*{[\s\S]*?position:\s*absolute;[\s\S]*?top:\s*1rem;[\s\S]*?right:\s*1rem;[\s\S]*?background:\s*transparent;[\s\S]*?opacity:\s*0\.5;/);
+    expect(scss).toMatch(/:global\(\.modal-login \.close\)\s*(?:,[^{]*?)?\s*{[\s\S]*?position:\s*absolute;[\s\S]*?top:\s*1rem;[\s\S]*?right:\s*1rem;[\s\S]*?background:\s*transparent;[\s\S]*?opacity:\s*0\.5;/);
   });
 });
