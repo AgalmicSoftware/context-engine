@@ -160,10 +160,7 @@ type GetUserSBTsMinimalMethod = ((
 
 type ContractProfileDeps = {
   resolveSession: (groupKeyOrCfg: GroupKeyOrCfg) => any;
-  getReadProviderForGroup: (
-    groupKeyOrCfg: GroupKeyOrCfg,
-    opts?: { contractKey?: string; skipGlobalPreferred?: boolean }
-  ) => any;
+  getReadProviderForGroup: (groupKeyOrCfg: GroupKeyOrCfg, opts?: { contractKey?: string }) => any;
   CUSTOM_SBT_ABI: any;
   callWithRetry: <T>(
     operation: () => Promise<T>,
@@ -313,10 +310,6 @@ const requireContractProfileMethod = <T extends (...args: any[]) => any>(
 };
 
 const SBT_READ_PROVIDER_OPTIONS = Object.freeze({ contractKey: 'sbtFactory' as const });
-const SBT_LOG_READ_PROVIDER_OPTIONS = Object.freeze({
-  contractKey: 'sbtFactory' as const,
-  skipGlobalPreferred: true,
-});
 
 export function createContractProfileMethods(deps: ContractProfileDeps): ContractProfileMethods {
   const {
@@ -450,7 +443,7 @@ export function createContractProfileMethods(deps: ContractProfileDeps): Contrac
       let run: Promise<string[]> | null = null;
       run = (async (): Promise<string[]> => {
         try {
-          const provider = getReadProviderForGroup(groupKeyOrCfg, SBT_LOG_READ_PROVIDER_OPTIONS);
+          const provider = getReadProviderForGroup(groupKeyOrCfg, SBT_READ_PROVIDER_OPTIONS);
           const factory = new ethers.Contract(addr, SBT_FACTORY_ABI, provider);
           const filter = factory.filters.SBTCreated();
           const addrs = new Set<string>();
