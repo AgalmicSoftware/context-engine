@@ -143,6 +143,11 @@ describe('AudioSurveyGenerator', () => {
       },
     },
   });
+  const buildAiQuestions = (count) => Array.from({ length: count }, (_, index) => ({
+    prompt: `Generated question ${index + 1}?`,
+    questionType: 'binary',
+    tags: ['generated'],
+  }));
 
   beforeAll(() => {
     previousActEnvironment = globalThis.IS_REACT_ACT_ENVIRONMENT;
@@ -324,6 +329,113 @@ describe('AudioSurveyGenerator', () => {
     const additionalContextSection = form.querySelector(`[class*="additionalContextSection"]`);
     expect(additionalContextSection).toBeTruthy();
     expect(additionalContextSection.contains(addSourceControls)).toBe(false);
+  });
+
+  it('shows the question count readout with the default value', () => {
+    act(() => {
+      root.render(
+        <AudioSurveyGenerator
+          provider={{}}
+          network={{}}
+          account="0x123"
+          loginComplete
+          toggleLoginModal={jest.fn()}
+        />
+      );
+    });
+
+    expect(
+      container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_QUESTION_COUNT_VALUE}"]`).textContent
+    ).toBe('#: 10');
+  });
+
+  it('decrements the question count by five and clamps at five', () => {
+    act(() => {
+      root.render(
+        <AudioSurveyGenerator
+          provider={{}}
+          network={{}}
+          account="0x123"
+          loginComplete
+          toggleLoginModal={jest.fn()}
+        />
+      );
+    });
+
+    const countValue = () => container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_QUESTION_COUNT_VALUE}"]`);
+    const decrementButton = container.querySelector(
+      `[data-testid="${E2E_TESTIDS.DATABASE_QUESTION_COUNT_DECREMENT}"]`
+    );
+
+    expect(countValue().textContent).toBe('#: 10');
+    expect(decrementButton.disabled).toBe(false);
+
+    toggleCheckbox(decrementButton);
+    expect(countValue().textContent).toBe('#: 5');
+    expect(decrementButton.disabled).toBe(true);
+
+    toggleCheckbox(decrementButton);
+    expect(countValue().textContent).toBe('#: 5');
+  });
+
+  it('increments the question count by five and clamps at fifty', () => {
+    act(() => {
+      root.render(
+        <AudioSurveyGenerator
+          provider={{}}
+          network={{}}
+          account="0x123"
+          loginComplete
+          toggleLoginModal={jest.fn()}
+        />
+      );
+    });
+
+    const countValue = () => container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_QUESTION_COUNT_VALUE}"]`);
+    const incrementButton = container.querySelector(
+      `[data-testid="${E2E_TESTIDS.DATABASE_QUESTION_COUNT_INCREMENT}"]`
+    );
+
+    for (let index = 0; index < 8; index += 1) {
+      toggleCheckbox(incrementButton);
+    }
+
+    expect(countValue().textContent).toBe('#: 50');
+    expect(incrementButton.disabled).toBe(true);
+
+    toggleCheckbox(incrementButton);
+    expect(countValue().textContent).toBe('#: 50');
+  });
+
+  it('passes the adjusted question count through to the AI prompt on submit', async () => {
+    mockCallAI.mockResolvedValue(JSON.stringify({
+      surveyTitle: 'Adjusted Count Survey',
+      questions: buildAiQuestions(15),
+    }));
+
+    await renderSubject(
+      <AudioSurveyGenerator
+        provider={{}}
+        network={{}}
+        account="0x123"
+        loginComplete
+        toggleLoginModal={jest.fn()}
+      />
+    );
+
+    toggleCheckbox(container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_QUESTION_COUNT_INCREMENT}"]`));
+    setAudioInputValue('This database tool content is comfortably longer than fifty characters for generation.');
+
+    const form = container.querySelector('form');
+    await act(async () => {
+      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    });
+
+    expect(mockCallAI).toHaveBeenCalledTimes(1);
+    expect(
+      container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_QUESTION_COUNT_VALUE}"]`).textContent
+    ).toBe('#: 15');
+    expect(mockCallAI.mock.calls[0][0]).toMatch(/numberOfSeedStatementsOrPrompts:\s*15\b/);
   });
 
   it('uses webpage source type when only additional URL sources are provided', async () => {
