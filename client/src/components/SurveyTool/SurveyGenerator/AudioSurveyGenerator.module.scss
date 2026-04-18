@@ -200,13 +200,6 @@ $input-border: tokens.$ce-input-border;
     }
   }
 
-  .ingestHeader {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 15px;
-  }
-
   .generateButton {
     padding: 15px;
     background-color: #2a63ca !important;
@@ -236,16 +229,7 @@ $input-border: tokens.$ce-input-border;
 
   /* --- Additional Context Styling --- */
   .additionalContextSection {
-    margin-top: 10px;
-    /* border-top removed */
-    padding-top: 5px;
-  }
-
-  .contextHeader {
-    font-size: 0.95rem;
-    color: rgba(255, 255, 255, 0.6);
-    margin-bottom: 10px;
-    font-weight: 600;
+    margin-top: 12px;
   }
 
   .sourceList {
@@ -387,9 +371,9 @@ $input-border: tokens.$ce-input-border;
   .addSourceControls {
     display: flex;
     flex-wrap: nowrap;
-    /* Force one line */
     align-items: center;
     gap: 10px;
+    margin-top: 10px;
   }
 
   .urlInputContainer {
