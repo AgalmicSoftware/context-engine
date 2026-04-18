@@ -47,11 +47,19 @@ const AsyncSearchSelect = ({
   const filteredOptions = useMemo(() => {
     const trimmed = String(query || '').trim().toLowerCase();
     return trimmed
-      ? normalizedOptions.filter((option) => (
-        String(option?.label ?? option?.value ?? '').toLowerCase().includes(trimmed)
-      ))
+      ? normalizedOptions.filter((option) => {
+        const haystack = [
+          option?.label,
+          option?.value,
+          typeof getOptionValue === 'function' ? getOptionValue(option) : null,
+        ]
+          .filter((valuePart) => valuePart !== null && valuePart !== undefined)
+          .join(' ')
+          .toLowerCase();
+        return haystack.includes(trimmed);
+      })
       : normalizedOptions;
-  }, [normalizedOptions, query]);
+  }, [getOptionValue, normalizedOptions, query]);
   const closeMenu = useCallback(() => {
     setOpen(false);
     setQuery('');
@@ -70,11 +78,16 @@ const AsyncSearchSelect = ({
     const handlePointerDown = (event) => wrapperRef.current
       && !wrapperRef.current.contains(event.target)
       && closeMenu();
+    const handleFocusIn = (event) => wrapperRef.current
+      && !wrapperRef.current.contains(event.target)
+      && closeMenu();
     const handleKeyDown = (event) => event.key === 'Escape' && closeMenu();
     document.addEventListener('pointerdown', handlePointerDown);
+    document.addEventListener('focusin', handleFocusIn);
     document.addEventListener('keydown', handleKeyDown);
     return () => {
       document.removeEventListener('pointerdown', handlePointerDown);
+      document.removeEventListener('focusin', handleFocusIn);
       document.removeEventListener('keydown', handleKeyDown);
     };
   }, [closeMenu, open]);
@@ -141,7 +154,7 @@ const AsyncSearchSelect = ({
         aria-labelledby={controlLabelId}
         disabled={disabled}
       >
-        <span
+        <div
           id={controlLabelId}
           className={styles.controlLabel}
           style={{
@@ -149,7 +162,7 @@ const AsyncSearchSelect = ({
           }}
         >
           {hasValue ? renderOptionLabel(value) : placeholder}
-        </span>
+        </div>
         {isLoading ? (
           <span
             className={styles.controlSpinner}
