@@ -983,10 +983,6 @@ $muted-text: tokens.$ce-muted-text;
     transform: translateY(-1px);
   }
 
-  :global(.btn-close) {
-    filter: invert(1) grayscale(100%) brightness(190%);
-    background-size: 14px 14px;
-  }
 }
 
 .createSbtModalBody {
