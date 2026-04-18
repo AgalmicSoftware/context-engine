@@ -6,6 +6,7 @@ import { MemoryRouter } from 'react-router-dom';
 import fs from 'fs';
 import path from 'path';
 import TagPage from './TagPage.jsx';
+import TagModal from './TagModal.jsx';
 
 const mockListNamespaceEntriesSync = jest.fn();
 const mockSubscribeCacheUpdates = jest.fn(() => () => {});
@@ -32,6 +33,47 @@ jest.mock('../../utilities/ai/aiScripts.js', () => ({
   __esModule: true,
   callAI: (...args) => mockCallAI(...args),
 }));
+
+jest.mock('reactstrap', () => {
+  const actual = jest.requireActual('reactstrap');
+
+  return {
+    ...actual,
+    Modal: ({
+      isOpen,
+      children,
+      modalClassName,
+      contentClassName,
+      backdropClassName,
+      wrapClassName,
+    }) => (isOpen ? (
+      <div
+        data-testid="tag-modal-shell"
+        data-modal-class={modalClassName}
+        data-content-class={contentClassName}
+        data-backdrop-class={backdropClassName}
+        data-wrap-class={wrapClassName}
+      >
+        {children}
+      </div>
+    ) : null),
+    ModalHeader: ({ children, className, close, toggle }) => (
+      <div data-testid="tag-modal-header" data-class={className}>
+        <span>{children}</span>
+        {close || (
+          <button type="button" onClick={toggle} aria-label="Close">
+            ×
+          </button>
+        )}
+      </div>
+    ),
+    ModalBody: ({ children, className }) => (
+      <div data-testid="tag-modal-body" data-class={className}>
+        {children}
+      </div>
+    ),
+  };
+});
 
 const createTagPageStore = (sessionStateOverrides = {}) => createStore(
   (state = {
@@ -82,6 +124,22 @@ const renderTagPage = ({
   </Provider>
 );
 
+const renderTagModal = ({
+  activeTag = 'Google',
+  isOpen = true,
+  sessionState = {},
+} = {}) => render(
+  <Provider store={createTagPageStore(sessionState)}>
+    <MemoryRouter initialEntries={['/demo/corpus-viewer']}>
+      <TagModal
+        isOpen={isOpen}
+        toggle={jest.fn()}
+        activeTag={activeTag}
+      />
+    </MemoryRouter>
+  </Provider>
+);
+
 describe('TagPage', () => {
   beforeEach(() => {
     mockSubscribeCacheUpdates.mockReturnValue(() => {});
@@ -124,7 +182,8 @@ describe('TagPage', () => {
   it('renders without crashing', () => {
     renderTagPage({ entry: '/tag/governance+ai' });
 
-    expect(screen.getByRole('heading', { name: /questions tagged with/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '#governance + #ai' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: /questions tagged with/i })).not.toBeInTheDocument();
     expect(screen.getByText('What changed?')).toBeInTheDocument();
     expect(screen.getByText('1 response')).toBeInTheDocument();
     expect(screen.getByTitle('View question page')).toHaveAttribute('href', '/question/q1?session=edge');
@@ -157,23 +216,64 @@ describe('TagPage', () => {
       },
     });
 
+    expect(screen.getByRole('heading', { name: '#AI Governance' })).toBeInTheDocument();
+    expect(screen.queryByText(/^Tag explorer$/i)).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /remove AI Governance tag/i })).toHaveTextContent('#AI Governance');
     expect(screen.getByText('No questions tagged AI Governance in this session yet.')).toBeInTheDocument();
   });
 
-  it('only offers comparison tags that co-occur with the current result set', () => {
+  it('keeps related tags first while still including the broader scoped tag universe in the picker', () => {
     renderTagPage({ entry: '/tag/governance' });
 
     fireEvent.click(screen.getByRole('button', { name: /add tag to comparison/i }));
 
     const dialog = screen.getByRole('dialog', { name: /add tag to comparison/i });
     expect(dialog).toBeInTheDocument();
+    const dialogButtons = within(dialog).getAllByRole('button').map((button) => button.textContent);
+    expect(dialogButtons).toEqual(['#ai', '#culture']);
     expect(within(dialog).getByRole('button', { name: /add ai tag to comparison/i })).toBeInTheDocument();
-    expect(within(dialog).queryByRole('button', { name: /add culture tag to comparison/i })).not.toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: /add culture tag to comparison/i })).toBeInTheDocument();
     fireEvent.click(within(dialog).getByRole('button', { name: /add ai tag to comparison/i }));
 
     expect(screen.getByRole('button', { name: /remove ai tag/i })).toBeInTheDocument();
     expect(screen.queryByRole('dialog', { name: /add tag to comparison/i })).not.toBeInTheDocument();
+  });
+
+  it('uses the scoped tag universe in the comparison picker even when the current selection has no matching questions', () => {
+    renderTagPage({ entry: '/tag/nonexistent' });
+
+    fireEvent.click(screen.getByRole('button', { name: /add tag to comparison/i }));
+
+    const dialog = screen.getByRole('dialog', { name: /add tag to comparison/i });
+    expect(within(dialog).getByRole('button', { name: /add governance tag to comparison/i })).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: /add ai tag to comparison/i })).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: /add culture tag to comparison/i })).toBeInTheDocument();
+    expect(within(dialog).queryByText(/no additional tags available/i)).not.toBeInTheDocument();
+  });
+
+  it('only shows the comparison picker empty state when no additional scoped tags exist', () => {
+    mockListNamespaceEntriesSync.mockImplementation((namespace) => {
+      if (namespace !== 'questionsCache') return [];
+      return [
+        buildQuestionsEntry({
+          slug: 'edge',
+          questions: {
+            q1: {
+              id: 'q1',
+              prompt: 'Only governance question',
+              tags: ['governance'],
+            },
+          },
+        }),
+      ];
+    });
+
+    renderTagPage({ entry: '/tag/governance' });
+
+    fireEvent.click(screen.getByRole('button', { name: /add tag to comparison/i }));
+
+    const dialog = screen.getByRole('dialog', { name: /add tag to comparison/i });
+    expect(within(dialog).getByText('No additional tags available in this session scope yet.')).toBeInTheDocument();
   });
 
   it('treats trailing-slash tag routes the same as canonical tag routes', () => {
@@ -420,5 +520,65 @@ describe('TagPage', () => {
       expect.objectContaining({ sessionSlug: '' })
     );
     expect(await screen.findByText('Mocked interpretation')).toBeInTheDocument();
+  });
+});
+
+describe('TagModal', () => {
+  beforeEach(() => {
+    mockSubscribeCacheUpdates.mockReturnValue(() => {});
+    mockGetAllSessionSlugs.mockReturnValue(['', 'edge', 'alpha', 'beta']);
+    mockGetSessionConfigBySlug.mockReturnValue(null);
+    mockGetDemoSessionConfigBySlug.mockReturnValue(null);
+    mockCallAI.mockResolvedValue('Mocked interpretation');
+    mockListNamespaceEntriesSync.mockImplementation((namespace) => {
+      if (namespace !== 'questionsCache') return [];
+      return [
+        buildQuestionsEntry({
+          slug: 'edge',
+          questions: {
+            q1: {
+              id: 'q1',
+              prompt: 'What changed?',
+              tags: ['Google', 'AI Governance', 'culture'],
+            },
+          },
+        }),
+      ];
+    });
+  });
+
+  it('uses dedicated tag-modal shell classes and keeps Tag explorer in the top chrome', () => {
+    renderTagModal();
+
+    const shell = screen.getByTestId('tag-modal-shell');
+    expect(shell).toHaveAttribute('data-modal-class', 'tagModal');
+    expect(shell).toHaveAttribute('data-content-class', 'tagModalContent');
+    expect(shell).toHaveAttribute('data-backdrop-class', 'tagModalBackdrop');
+    expect(shell).toHaveAttribute('data-wrap-class', 'tagModalWrap');
+    expect(screen.getByTestId('tag-modal-header')).toHaveAttribute('data-class', 'tagModalHeaderBar');
+    expect(screen.getByText('Tag explorer')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /close tag explorer/i })).toBeInTheDocument();
+  });
+
+  it('shows the selected tag as the dominant heading and updates it when a comparison tag is added', () => {
+    renderTagModal();
+
+    expect(screen.getByRole('heading', { name: '#Google' })).toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole('button', { name: /add ai governance tag to comparison/i })[0]);
+    expect(screen.getByRole('heading', { name: '#Google + #AI Governance' })).toBeInTheDocument();
+  });
+
+  it('keeps the modal framed fullscreen and the backdrop lighter than the default overlay', () => {
+    const scssPath = path.join(__dirname, 'TagPage.module.scss');
+    const scss = fs.readFileSync(scssPath, 'utf8');
+    const jsxPath = path.join(__dirname, 'TagModal.jsx');
+    const jsx = fs.readFileSync(jsxPath, 'utf8');
+
+    expect(scss).toMatch(/\.tagModal\s*{[\s\S]*padding:\s*16px 0 !important;/);
+    expect(scss).toMatch(/:global\(\.modal-dialog\)\s*{[\s\S]*width:\s*min\(1440px,\s*calc\(100vw - 32px\)\);[\s\S]*height:\s*calc\(100vh - 32px\);/);
+    expect(scss).toMatch(/\.tagModalContent\s*{[\s\S]*display:\s*flex;[\s\S]*flex-direction:\s*column;[\s\S]*height:\s*100%;/);
+    expect(scss).toMatch(/\.tagModalBackdrop\s*{[\s\S]*background:\s*rgba\(3,\s*5,\s*18,\s*0\.08\) !important;/);
+    expect(jsx).toContain('contentClassName={styles.tagModalContent}');
+    expect(jsx).toContain('backdropClassName={styles.tagModalBackdrop}');
   });
 });
