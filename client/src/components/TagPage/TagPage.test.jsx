@@ -7,6 +7,7 @@ import fs from 'fs';
 import path from 'path';
 import TagPage from './TagPage.jsx';
 import TagModal from './TagModal.jsx';
+import { buildDemoCorpusRecords } from '../../utilities/demo/demoCorpusRecords.js';
 
 const mockListNamespaceEntriesSync = jest.fn();
 const mockSubscribeCacheUpdates = jest.fn(() => () => {});
@@ -107,6 +108,76 @@ const buildQuestionsEntry = ({
   },
 });
 
+const demoCorpusRecords = buildDemoCorpusRecords([
+  {
+    key: 'tweets',
+    label: 'AI Discourse Tweets',
+    entries: [
+      {
+        id: 'google-contrails',
+        title: 'Google on contrails',
+        summary: 'Google partnered with American Airlines to reduce contrails.',
+        author: '@jburnmurdoch',
+        created_at: '2023-08-09T08:17:22.000Z',
+        tags: ['Google', 'Anthropic'],
+        url: 'https://example.com/google-contrails',
+      },
+      {
+        id: 'google-agi',
+        title: '25 years at Google: from PageRank to AGI',
+        summary: 'Reflections on DeepMind and the path to AGI.',
+        author: 'Dwarkesh Patel',
+        created_at: '2024-01-02T00:00:00.000Z',
+        tags: ['Google', 'DeepMind'],
+        url: 'https://example.com/google-agi',
+      },
+      {
+        id: 'google-microsoft',
+        title: 'Microsoft weighs in on Google competition',
+        summary: 'Microsoft compares its strategy against Google.',
+        author: '@industry',
+        created_at: '2024-02-10T00:00:00.000Z',
+        tags: ['Google', 'Microsoft'],
+        url: 'https://example.com/google-microsoft',
+      },
+    ],
+  },
+  {
+    key: 'ai_laws_policy',
+    label: 'AI Laws & Policy',
+    entries: [
+      {
+        id: 'policy-governance',
+        title: 'A governance brief',
+        summary: 'A policy entry that keeps broader corpus tags available.',
+        jurisdiction: 'EU',
+        date: '2024-03-01',
+        tags: ['AI Governance', 'Policy'],
+        url: 'https://example.com/policy-governance',
+      },
+      {
+        id: 'policy-international-framework',
+        title: 'Comprehensive international AI framework',
+        summary: 'A policy entry with enough tags to verify selected demo tags never get clipped.',
+        jurisdiction: 'European Union',
+        date: '2024-08-01',
+        tags: [
+          'Regulation',
+          'AI Governance',
+          'Risk-Based Approach',
+          'Transparency',
+          'Accountability',
+          'Human Oversight',
+          'Human Rights',
+          'Frontier Models',
+          'International Coordination',
+        ],
+        url: 'https://example.com/policy-international-framework',
+      },
+    ],
+  },
+]);
+
 const renderTagPage = ({
   entry = '/tag/governance',
   isQuestionCacheReady = true,
@@ -128,13 +199,18 @@ const renderTagModal = ({
   activeTag = 'Google',
   isOpen = true,
   sessionState = {},
+  entry = '/demo/corpus-viewer',
+  demoCorpusMode = false,
+  demoCorpusRecordsOverride = [],
 } = {}) => render(
   <Provider store={createTagPageStore(sessionState)}>
-    <MemoryRouter initialEntries={['/demo/corpus-viewer']}>
+    <MemoryRouter initialEntries={[entry]}>
       <TagModal
         isOpen={isOpen}
         toggle={jest.fn()}
         activeTag={activeTag}
+        demoCorpusMode={demoCorpusMode}
+        demoCorpusRecords={demoCorpusRecordsOverride}
       />
     </MemoryRouter>
   </Provider>
@@ -222,6 +298,49 @@ describe('TagPage', () => {
     expect(screen.getByText('No questions tagged AI Governance in this session yet.')).toBeInTheDocument();
   });
 
+  it('shows demo corpus matches when the caller opts in and hides session scope behind the cog', () => {
+    renderTagPage({
+      entry: '/demo/corpus-viewer',
+      tagPageProps: {
+        embedded: true,
+        demoCorpusMode: true,
+        demoCorpusRecords,
+        selectedTagsOverride: ['Google'],
+      },
+    });
+
+    expect(screen.getByTestId('ce-tag-page-demo-corpus')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /demo corpus/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Google on contrails' })).toBeInTheDocument();
+    expect(screen.getByText(/25 years at Google: from PageRank to AGI/i)).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Questions' })).not.toBeInTheDocument();
+    expect(screen.queryByTestId('tag-page-session-scope')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /tag page session selector/i }));
+
+    expect(screen.getByText(/demo corpus mode uses the demo corpus records currently loaded in this view/i)).toBeInTheDocument();
+    expect(screen.getByTestId('ce-tag-page-demo-session-info')).toHaveTextContent('Session scope: edge');
+    expect(screen.queryByRole('button', { name: /use global default/i })).not.toBeInTheDocument();
+  });
+
+  it('keeps matched demo corpus tags visible even when an entry has a long tag list', () => {
+    renderTagPage({
+      entry: '/demo/corpus-viewer',
+      tagPageProps: {
+        embedded: true,
+        demoCorpusMode: true,
+        demoCorpusRecords,
+        selectedTagsOverride: ['International Coordination'],
+      },
+    });
+
+    const cardTitle = screen.getByRole('heading', { name: 'Comprehensive international AI framework' });
+    const card = cardTitle.closest('article');
+    expect(card).not.toBeNull();
+    expect(within(card).getByText('#International Coordination')).toBeInTheDocument();
+    expect(within(card).getByText('#Frontier Models')).toBeInTheDocument();
+  });
+
   it('keeps related tags first while still including the broader scoped tag universe in the picker', () => {
     renderTagPage({ entry: '/tag/governance' });
 
@@ -274,6 +393,29 @@ describe('TagPage', () => {
 
     const dialog = screen.getByRole('dialog', { name: /add tag to comparison/i });
     expect(within(dialog).getByText('No additional tags available in this session scope yet.')).toBeInTheDocument();
+  });
+
+  it('keeps related demo tags first while still including the broader demo corpus tag universe in the picker', () => {
+    renderTagPage({
+      entry: '/demo/corpus-viewer',
+      tagPageProps: {
+        embedded: true,
+        demoCorpusMode: true,
+        demoCorpusRecords,
+        selectedTagsOverride: ['Google'],
+      },
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /add tag to comparison/i }));
+
+    const dialog = screen.getByRole('dialog', { name: /add tag to comparison/i });
+    expect(within(dialog).getAllByRole('button').slice(0, 3).map((button) => button.textContent)).toEqual([
+      '#Anthropic',
+      '#DeepMind',
+      '#Microsoft',
+    ]);
+    expect(within(dialog).getByRole('button', { name: /add AI Governance tag to comparison/i })).toBeInTheDocument();
+    expect(within(dialog).queryByText(/no additional tags available/i)).not.toBeInTheDocument();
   });
 
   it('treats trailing-slash tag routes the same as canonical tag routes', () => {
@@ -566,6 +708,18 @@ describe('TagModal', () => {
     expect(screen.getByRole('heading', { name: '#Google' })).toBeInTheDocument();
     fireEvent.click(screen.getAllByRole('button', { name: /add ai governance tag to comparison/i })[0]);
     expect(screen.getByRole('heading', { name: '#Google + #AI Governance' })).toBeInTheDocument();
+  });
+
+  it('uses demo corpus results when the modal caller opts in outside /session/demo', () => {
+    renderTagModal({
+      entry: '/demo/corpus-viewer',
+      demoCorpusMode: true,
+      demoCorpusRecordsOverride: demoCorpusRecords,
+    });
+
+    expect(screen.getByTestId('ce-tag-page-demo-corpus')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Google on contrails' })).toBeInTheDocument();
+    expect(screen.queryByTestId('tag-page-session-scope')).not.toBeInTheDocument();
   });
 
   it('keeps the modal framed fullscreen and the backdrop lighter than the default overlay', () => {

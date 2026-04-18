@@ -447,7 +447,7 @@ describe('CorpusViewer', () => {
 
   it('opens the tag modal with the clicked tweet tag as TagPage filter context', () => {
     render(
-      <MemoryRouter>
+      <MemoryRouter initialEntries={['/session/demo']}>
         <CorpusViewer />
       </MemoryRouter>
     );
@@ -462,14 +462,17 @@ describe('CorpusViewer', () => {
     const tagPageProps = mockTagPage.mock.calls.at(-1)[0];
     expect(tagPageProps).toMatchObject({
       embedded: true,
+      demoCorpusMode: true,
       emptyQuestionsText: 'No questions tagged Google in this session yet.',
       selectedTagsOverride: ['Google'],
     });
+    expect(Array.isArray(tagPageProps.demoCorpusRecords)).toBe(true);
+    expect(tagPageProps.demoCorpusRecords.length).toBeGreaterThan(0);
   });
 
   it('opens the tag modal from generic corpus entry tags', () => {
     render(
-      <MemoryRouter>
+      <MemoryRouter initialEntries={['/session/demo']}>
         <CorpusViewer />
       </MemoryRouter>
     );
@@ -478,6 +481,7 @@ describe('CorpusViewer', () => {
     fireEvent.click(screen.getAllByRole('button', { name: 'AI Governance' })[0]);
 
     const tagPageProps = mockTagPage.mock.calls.at(-1)[0];
+    expect(tagPageProps.demoCorpusMode).toBe(true);
     expect(tagPageProps.selectedTagsOverride).toEqual(['AI Governance']);
     expect(screen.getByTestId('tag-page-mock')).toHaveTextContent('AI Governance');
   });
