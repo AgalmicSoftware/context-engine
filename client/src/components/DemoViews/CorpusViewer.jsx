@@ -368,6 +368,7 @@ const EmptyCorpusState = ({ corpus, title, text }) => (
 
 const CorpusViewer = ({ onAtlasIssueOpen = null, showGithubLink = true }) => {
   const corpusDefinitions = useMemo(() => buildCorpusDefinitions(), []);
+  // Intentionally cross-corpus: tag explorer shows every record with the clicked tag across all demo corpuses, ignoring any per-tab (e.g. PolicyGlobe) filter.
   const demoCorpusRecords = useMemo(
     () => buildDemoCorpusRecords(corpusDefinitions),
     [corpusDefinitions]
