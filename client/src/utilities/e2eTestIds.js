@@ -78,6 +78,9 @@ const E2E_TESTIDS = Object.freeze({
   DATABASE_SAVE_DOCS_AUDIENCE_MENU: 'ce-database-save-docs-audience-menu',
   DATABASE_SAVE_DOCS_AUDIENCE_SELF: 'ce-database-save-docs-audience-self',
   DATABASE_SAVE_DOCS_AUDIENCE_SESSION: 'ce-database-save-docs-audience-session',
+  DATABASE_QUESTION_COUNT_VALUE: 'ce-database-question-count-value',
+  DATABASE_QUESTION_COUNT_DECREMENT: 'ce-database-question-count-decrement',
+  DATABASE_QUESTION_COUNT_INCREMENT: 'ce-database-question-count-increment',
 
   SESSION_RESULTS_TOGGLE: 'ce-session-results-toggle',
   SURVEY_FILTER_TOGGLE: 'ce-survey-filter-toggle',
