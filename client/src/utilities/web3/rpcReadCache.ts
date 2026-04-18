@@ -1,4 +1,4 @@
-/**
+/*
  * @file rpcReadCache.js
  * @module rpcReadCache
  * @description RPC response caching layer — wraps ethers JsonRpcProvider.send() with
@@ -20,48 +20,132 @@ import { rpcDebugReadProviderContext, rpcDebugRecord } from './rpcDebugStats.js'
 import { toStr } from '../shared/primitives.js';
 import { createLogger } from '../logging.js';
 
-const log = createLogger('rpcReadCache');
-let evictionIntervalStarted = false;
-let evictionIntervalId = null;
+type LooseObject = { [key: string]: unknown };
+type RpcParams = unknown[];
+type RpcCacheMethod = 'eth_call' | 'eth_getLogs' | 'eth_blockNumber' | 'eth_chainId';
+type ProviderSend = (methodIn: unknown, paramsIn: unknown) => Promise<any>;
 
+interface RpcCacheEntry {
+  expiresAt: number;
+  value: any;
+}
 
-const isObj = (val) => !!val && typeof val === 'object' && !Array.isArray(val);
-const normalizeDebugTag = (value) => {
+interface RpcCacheByMethod {
+  [method: string]: Map<string, RpcCacheEntry>;
+  eth_call: Map<string, RpcCacheEntry>;
+  eth_getLogs: Map<string, RpcCacheEntry>;
+  eth_blockNumber: Map<string, RpcCacheEntry>;
+  eth_chainId: Map<string, RpcCacheEntry>;
+}
+
+interface RpcReadCacheState {
+  v: number;
+  inflight: Map<string, Promise<any>>;
+  cacheByMethod: RpcCacheByMethod;
+}
+
+interface ProviderDebugContext extends LooseObject {
+  fn?: unknown;
+  fnTag?: unknown;
+  fromBlock?: unknown;
+  method?: unknown;
+  rpcMethod?: unknown;
+  scope?: unknown;
+  scopeTag?: unknown;
+  toBlock?: unknown;
+}
+
+interface ProviderSendMeta {
+  chainId: number;
+  providerKey: string;
+  providerLabel: string;
+  url: string;
+}
+
+interface WrappedProviderMeta extends LooseObject {
+  chainId?: unknown;
+  providerKey?: unknown;
+  providerLabel?: unknown;
+  url?: unknown;
+}
+
+interface WrappedProvider extends LooseObject {
+  send: ProviderSend;
+  __CE_RPC_DEBUG_CONTEXT__?: ProviderDebugContext | null;
+  __CE_RPC_SEND_META?: ProviderSendMeta;
+  __CE_RPC_SEND_WRAPPED__?: boolean;
+}
+
+interface RpcDebugTags {
+  fnTag: string | null;
+  scopeTag: string | null;
+}
+
+type RpcCacheGlobals = typeof globalThis & {
+  __CE_RPC_READ_CACHE__?: RpcReadCacheState;
+  CE_RPC_CACHE_DISABLED?: boolean;
+  ENABLE_RPC_DEBUG_STATS?: boolean;
+  ENABLE_RPC_DEBUG_TRACE?: boolean;
+};
+
+const log: any = createLogger('rpcReadCache');
+let evictionIntervalStarted: boolean = false;
+let evictionIntervalId: ReturnType<typeof setInterval> | null = null;
+
+const createCacheByMethod = (): RpcCacheByMethod => ({
+  eth_call: new Map<string, RpcCacheEntry>(),
+  eth_getLogs: new Map<string, RpcCacheEntry>(),
+  eth_blockNumber: new Map<string, RpcCacheEntry>(),
+  eth_chainId: new Map<string, RpcCacheEntry>(),
+});
+
+const createGlobalCacheState = (): RpcReadCacheState => ({
+  v: 1,
+  inflight: new Map<string, Promise<any>>(),
+  cacheByMethod: createCacheByMethod(),
+});
+
+const getGlobalObject = (): RpcCacheGlobals => (
+  typeof globalThis !== 'undefined' ? (globalThis as RpcCacheGlobals) : ({} as RpcCacheGlobals)
+);
+
+const isObj = (val: unknown): val is LooseObject => !!val && typeof val === 'object' && !Array.isArray(val);
+const normalizeDebugTag = (value: unknown): string | null => {
   const raw = toStr(value).trim().toLowerCase();
   return raw || null;
 };
-const normalizeDebugMethod = (value) => {
+const normalizeDebugMethod = (value: unknown): string => {
   const raw = toStr(value).trim().toLowerCase();
   return raw || '';
 };
 
-const nowMs = () => Date.now();
+const nowMs = (): number => Date.now();
 
-const isCacheDisabled = () => {
+const isCacheDisabled = (): boolean => {
   try {
-    return typeof globalThis !== 'undefined' && globalThis.CE_RPC_CACHE_DISABLED === true;
+    return getGlobalObject().CE_RPC_CACHE_DISABLED === true;
   } catch (_) {
     return false;
   }
 };
 
-const isDebugTraceEnabled = () => {
+const isDebugTraceEnabled = (): boolean => {
   try {
-    return typeof globalThis !== 'undefined' && globalThis.ENABLE_RPC_DEBUG_TRACE === true;
+    return getGlobalObject().ENABLE_RPC_DEBUG_TRACE === true;
   } catch (_) {
     return false;
   }
 };
 
-const isRpcDebugEnabled = () => {
+const isRpcDebugEnabled = (): boolean => {
   try {
-    return typeof globalThis !== 'undefined' && globalThis.ENABLE_RPC_DEBUG_STATS === true;
+    return getGlobalObject().ENABLE_RPC_DEBUG_STATS === true;
   } catch (_) {
     return false;
   }
 };
 
-const safeStackSnippet = () => {
+const safeStackSnippet = (): string => {
   if (!isDebugTraceEnabled()) return '';
   try {
     const stack = new Error().stack;
@@ -91,7 +175,7 @@ const safeStackSnippet = () => {
       'node_modules',
       'webpack-internal',
     ];
-    const isIgnorable = (line) => {
+    const isIgnorable = (line: string): boolean => {
       const lower = String(line || '').toLowerCase();
       return ignoreSubstrings.some((s) => lower.includes(s));
     };
@@ -108,20 +192,20 @@ const safeStackSnippet = () => {
   }
 };
 
-const normalizeHexAddress = (value) => {
+const normalizeHexAddress = (value: unknown): string => {
   const raw = toStr(value).trim();
   if (!raw) return '';
   if (raw.startsWith('0x') && raw.length === 42) return raw.toLowerCase();
   return raw;
 };
 
-const normalizeHex = (value) => {
+const normalizeHex = (value: unknown): string => {
   const raw = toStr(value).trim();
   if (!raw) return '';
   return raw.toLowerCase();
 };
 
-const normalizeLogsAddress = (value) => {
+const normalizeLogsAddress = (value: unknown): string | string[] => {
   if (!Array.isArray(value)) return normalizeHexAddress(value);
   const normalized = value
     .map(normalizeHexAddress)
@@ -132,7 +216,7 @@ const normalizeLogsAddress = (value) => {
   return normalized;
 };
 
-const normalizeBlockTag = (value) => {
+const normalizeBlockTag = (value: unknown): string => {
   if (value == null) return 'latest';
   if (typeof value === 'number' && Number.isFinite(value)) {
     return `0x${Math.max(0, Math.floor(value)).toString(16)}`;
@@ -142,40 +226,41 @@ const normalizeBlockTag = (value) => {
   return raw.toLowerCase();
 };
 
-const matchesProviderDebugContext = (contextIn, methodIn, paramsIn) => {
-  if (!contextIn || typeof contextIn !== 'object') return true;
+const matchesProviderDebugContext = (contextIn: unknown, methodIn: unknown, paramsIn: unknown): boolean => {
+  if (!isObj(contextIn)) return true;
+  const context = contextIn as ProviderDebugContext;
   const method = normalizeDebugMethod(methodIn);
-  const params = Array.isArray(paramsIn) ? paramsIn : [];
-  const contextMethod = normalizeDebugMethod(contextIn.method || contextIn.rpcMethod || '');
+  const params: RpcParams = Array.isArray(paramsIn) ? paramsIn : [];
+  const contextMethod = normalizeDebugMethod(context.method || context.rpcMethod || '');
   if (contextMethod && contextMethod !== method) return false;
 
-  const hasFrom = Object.prototype.hasOwnProperty.call(contextIn, 'fromBlock');
-  const hasTo = Object.prototype.hasOwnProperty.call(contextIn, 'toBlock');
+  const hasFrom = Object.prototype.hasOwnProperty.call(context, 'fromBlock');
+  const hasTo = Object.prototype.hasOwnProperty.call(context, 'toBlock');
   if (!hasFrom && !hasTo) return true;
   if (method !== 'eth_getlogs') return false;
 
-  const filter = isObj(params[0]) ? params[0] : {};
+  const filter: LooseObject = isObj(params[0]) ? params[0] : {};
   if (hasFrom) {
-    const ctxFrom = normalizeBlockTag(contextIn.fromBlock);
+    const ctxFrom = normalizeBlockTag(context.fromBlock);
     const reqFrom = normalizeBlockTag(filter.fromBlock);
     if (ctxFrom !== reqFrom) return false;
   }
   if (hasTo) {
-    const ctxTo = normalizeBlockTag(contextIn.toBlock);
+    const ctxTo = normalizeBlockTag(context.toBlock);
     const reqTo = normalizeBlockTag(filter.toBlock);
     if (ctxTo !== reqTo) return false;
   }
   return true;
 };
 
-const isNumericHex = (value) => {
+const isNumericHex = (value: unknown): boolean => {
   const raw = toStr(value).trim().toLowerCase();
   return /^0x[0-9a-f]+$/.test(raw) && raw !== '0x';
 };
 
-const stableKeyStringify = (value) => {
-  const seen = new Set();
-  const walk = (v) => {
+const stableKeyStringify = (value: unknown): string => {
+  const seen = new Set<object>();
+  const walk = (v: unknown): unknown => {
     if (v == null) return v;
     if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') return v;
     if (typeof v === 'bigint') return `bigint:${v.toString()}`;
@@ -183,9 +268,10 @@ const stableKeyStringify = (value) => {
     if (typeof v === 'object') {
       if (seen.has(v)) return '[Circular]';
       seen.add(v);
-      const out = {};
-      Object.keys(v).sort().forEach((k) => {
-        out[k] = walk(v[k]);
+      const record = v as LooseObject;
+      const out: LooseObject = {};
+      Object.keys(record).sort().forEach((k) => {
+        out[k] = walk(record[k]);
       });
       return out;
     }
@@ -202,15 +288,15 @@ const stableKeyStringify = (value) => {
   }
 };
 
-const buildMethodKeyPart = (methodIn, paramsIn) => {
+const buildMethodKeyPart = (methodIn: unknown, paramsIn: unknown): string => {
   const method = toStr(methodIn).trim() || 'unknown';
-  const params = Array.isArray(paramsIn) ? paramsIn : [];
+  const params: RpcParams = Array.isArray(paramsIn) ? paramsIn : [];
 
   if (method === 'eth_blockNumber') return 'bn';
   if (method === 'eth_chainId') return 'chainId';
 
   if (method === 'eth_call') {
-    const tx = isObj(params[0]) ? params[0] : {};
+    const tx: LooseObject = isObj(params[0]) ? params[0] : {};
     const blockTag = normalizeBlockTag(params[1]);
     const normTx = {
       to: normalizeHexAddress(tx.to),
@@ -228,7 +314,7 @@ const buildMethodKeyPart = (methodIn, paramsIn) => {
   }
 
   if (method === 'eth_getLogs') {
-    const filter = isObj(params[0]) ? params[0] : {};
+    const filter: LooseObject = isObj(params[0]) ? params[0] : {};
     const addressNorm = normalizeLogsAddress(filter.address);
     const topics = Array.isArray(filter.topics) ? filter.topics : [];
     const topicsNorm = stableKeyStringify(
@@ -255,9 +341,9 @@ const buildMethodKeyPart = (methodIn, paramsIn) => {
   return `${method}:${stableKeyStringify(params)}`;
 };
 
-const resolveTtlMs = (methodIn, paramsIn) => {
+const resolveTtlMs = (methodIn: unknown, paramsIn: unknown): number => {
   const method = toStr(methodIn).trim();
-  const params = Array.isArray(paramsIn) ? paramsIn : [];
+  const params: RpcParams = Array.isArray(paramsIn) ? paramsIn : [];
 
   if (method === 'eth_chainId') return 60 * 60 * 1000;
   if (method === 'eth_blockNumber') return 2000;
@@ -270,7 +356,7 @@ const resolveTtlMs = (methodIn, paramsIn) => {
   }
 
   if (method === 'eth_getLogs') {
-    const filter = isObj(params[0]) ? params[0] : {};
+    const filter: LooseObject = isObj(params[0]) ? params[0] : {};
     const fromBlock = normalizeBlockTag(filter.fromBlock);
     const toBlock = normalizeBlockTag(filter.toBlock);
     const isLatest =
@@ -287,7 +373,7 @@ const resolveTtlMs = (methodIn, paramsIn) => {
   return 0;
 };
 
-const DEDUPE_METHODS = new Set([
+const DEDUPE_METHODS: ReadonlySet<string> = new Set([
   'eth_call',
   'eth_getLogs',
   'eth_getBlockByNumber',
@@ -298,38 +384,29 @@ const DEDUPE_METHODS = new Set([
   'eth_chainId',
 ]);
 
-const TTL_METHODS = new Set([
+const TTL_METHODS: ReadonlySet<string> = new Set([
   'eth_call',
   'eth_getLogs',
   'eth_blockNumber',
   'eth_chainId',
 ]);
 
-const METHOD_CACHE_LIMITS = Object.freeze({
+const METHOD_CACHE_LIMITS: Readonly<Record<RpcCacheMethod, number>> = Object.freeze({
   eth_call: 800,
   eth_getLogs: 250,
   eth_blockNumber: 50,
   eth_chainId: 50,
 });
 
-const getGlobalCache = () => {
-  const g = typeof globalThis !== 'undefined' ? globalThis : {};
+const getGlobalCache = (): RpcReadCacheState => {
+  const g = getGlobalObject();
   if (!g.__CE_RPC_READ_CACHE__ || typeof g.__CE_RPC_READ_CACHE__ !== 'object') {
-    g.__CE_RPC_READ_CACHE__ = {
-      v: 1,
-      inflight: new Map(), // keyHash -> Promise
-      cacheByMethod: {
-        eth_call: new Map(),
-        eth_getLogs: new Map(),
-        eth_blockNumber: new Map(),
-        eth_chainId: new Map(),
-      },
-    };
+    g.__CE_RPC_READ_CACHE__ = createGlobalCacheState();
   }
   return g.__CE_RPC_READ_CACHE__;
 };
 
-export const evictExpiredEntries = () => {
+export const evictExpiredEntries = (): number => {
   try {
     const globalCache = getGlobalCache();
     const cacheByMethod = globalCache?.cacheByMethod;
@@ -361,7 +438,7 @@ export const evictExpiredEntries = () => {
   }
 };
 
-const startEvictionInterval = () => {
+const startEvictionInterval = (): void => {
   if (evictionIntervalStarted) return;
   try {
     evictionIntervalId = setInterval(evictExpiredEntries, 60_000);
@@ -371,37 +448,40 @@ const startEvictionInterval = () => {
   }
 };
 
-const cacheLruGet = (map, key) => {
+const cacheLruGet = <T>(map: Map<string, T> | null | undefined, key: string): T | null => {
   if (!map || !map.has(key)) return null;
-  const value = map.get(key);
+  const value = map.get(key) as T;
   map.delete(key);
   map.set(key, value);
   return value;
 };
 
-const cacheLruSet = (map, key, entry, maxSize) => {
+const cacheLruSet = <T>(map: Map<string, T> | null | undefined, key: string, entry: T, maxSize: number): void => {
   if (!map) return;
   if (map.has(key)) map.delete(key);
   map.set(key, entry);
   const limit = Number(maxSize || 0);
   if (limit > 0) {
     while (map.size > limit) {
-      const oldest = map.keys().next().value;
-      if (!oldest) break;
-      map.delete(oldest);
+      const oldest = map.keys().next();
+      if (oldest.done) break;
+      map.delete(oldest.value);
     }
   }
 };
 
-const getCacheMapForMethod = (method) => {
+const getCacheMapForMethod = (method: unknown): Map<string, RpcCacheEntry> | null => {
   const g = getGlobalCache();
   const m = toStr(method).trim();
   if (!m) return null;
-  if (!g.cacheByMethod[m]) g.cacheByMethod[m] = new Map();
+  if (!g.cacheByMethod[m]) g.cacheByMethod[m] = new Map<string, RpcCacheEntry>();
   return g.cacheByMethod[m];
 };
 
-export const wrapEthersJsonRpcSend = (provider, meta = {}) => {
+export const wrapEthersJsonRpcSend = <T extends WrappedProvider | null | undefined>(
+  provider: T,
+  meta: WrappedProviderMeta = {},
+): T => {
   if (!provider || typeof provider.send !== 'function') return provider;
   startEvictionInterval();
   if (provider.__CE_RPC_SEND_WRAPPED__ === true) return provider;
@@ -419,9 +499,9 @@ export const wrapEthersJsonRpcSend = (provider, meta = {}) => {
     }
   })();
 
-  const readProviderRpcDebugContext = (method, params) => {
+  const readProviderRpcDebugContext = (method: string, params: RpcParams): RpcDebugTags => {
     try {
-      const mapped = rpcDebugReadProviderContext(provider);
+      const mapped: any = rpcDebugReadProviderContext(provider);
       if (mapped && typeof mapped === 'object' && matchesProviderDebugContext(mapped, method, params)) {
         return {
           fnTag: normalizeDebugTag(mapped.fnTag || mapped.fn || ''),
@@ -441,7 +521,7 @@ export const wrapEthersJsonRpcSend = (provider, meta = {}) => {
     }
   };
 
-  const originalSend = provider.send.bind(provider);
+  const originalSend: ProviderSend = provider.send.bind(provider) as ProviderSend;
   try {
     Object.defineProperty(provider, '__CE_RPC_SEND_WRAPPED__', { value: true, enumerable: false });
   } catch (_) {
@@ -449,9 +529,9 @@ export const wrapEthersJsonRpcSend = (provider, meta = {}) => {
     provider.__CE_RPC_SEND_WRAPPED__ = true;
   }
 
-  provider.send = async (methodIn, paramsIn) => {
+  provider.send = async (methodIn: unknown, paramsIn: unknown): Promise<any> => {
     const method = toStr(methodIn).trim() || 'unknown';
-    const params = Array.isArray(paramsIn) ? paramsIn : [];
+    const params: RpcParams = Array.isArray(paramsIn) ? paramsIn : [];
 
     const wantsDedupe = DEDUPE_METHODS.has(method);
     const wantsTtl = TTL_METHODS.has(method);
@@ -529,7 +609,7 @@ export const wrapEthersJsonRpcSend = (provider, meta = {}) => {
       }
     }
 
-    const run = (async () => {
+    const run: Promise<any> = (async (): Promise<any> => {
       return await originalSend(methodIn, paramsIn);
     })();
 
@@ -540,7 +620,7 @@ export const wrapEthersJsonRpcSend = (provider, meta = {}) => {
       const elapsed = nowMs() - t0;
       if (ttlMs > 0) {
         const cacheMap = getCacheMapForMethod(method);
-        const limit = METHOD_CACHE_LIMITS[method] || 0;
+        const limit = METHOD_CACHE_LIMITS[method as RpcCacheMethod] || 0;
         if (cacheMap) {
           cacheLruSet(cacheMap, keyHash, { value: result, expiresAt: nowMs() + ttlMs }, limit);
         }
@@ -596,17 +676,12 @@ export const wrapEthersJsonRpcSend = (provider, meta = {}) => {
   return provider;
 };
 
-export const __test__resetRpcReadCache = () => {
-  const g = typeof globalThis !== 'undefined' ? globalThis : {};
+export const __test__resetRpcReadCache = (): void => {
+  const g = getGlobalObject();
   if (g.__CE_RPC_READ_CACHE__ && typeof g.__CE_RPC_READ_CACHE__ === 'object') {
     try {
-      g.__CE_RPC_READ_CACHE__.inflight = new Map();
-      g.__CE_RPC_READ_CACHE__.cacheByMethod = {
-        eth_call: new Map(),
-        eth_getLogs: new Map(),
-        eth_blockNumber: new Map(),
-        eth_chainId: new Map(),
-      };
+      g.__CE_RPC_READ_CACHE__.inflight = new Map<string, Promise<any>>();
+      g.__CE_RPC_READ_CACHE__.cacheByMethod = createCacheByMethod();
     } catch (e) { log.warn('rpcReadCache: fallback', e); }
   }
   if (evictionIntervalId != null) {
