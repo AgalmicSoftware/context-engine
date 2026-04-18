@@ -1,4 +1,4 @@
-/**
+/*
  * @module contractHelpers
  * @description Read-only provider helpers and shared contract utility methods extracted from contractScripts.
  *              Keeps RPC/block-window logic isolated from session, survey, and SBT domain methods.
@@ -14,13 +14,261 @@ import {
 } from '../session/sponsoredBootstrapFunding.js';
 import { extractChainId } from './chainIdResolution.js';
 
-const normalizeFundingErrorMessage = (error) => (
-  String(error?.message || error || '').trim().toLowerCase()
+type SessionConfigLike = {
+  slug?: string;
+  networkChainId?: number | string | null;
+  contracts?: {
+    surveys?: {
+      chainId?: number | string | null;
+      address?: string | null;
+      [key: string]: any;
+    };
+    sbtFactory?: {
+      chainId?: number | string | null;
+      address?: string | null;
+      [key: string]: any;
+    };
+    [key: string]: any;
+  };
+  blockLimits?: {
+    start?: unknown;
+    end?: unknown;
+    [key: string]: any;
+  };
+  __forceLatestBlock?: boolean;
+  [key: string]: any;
+};
+
+type GroupKeyOrCfg = SessionConfigLike | string | null | undefined;
+
+type RpcMetaLike = {
+  preferredUrls?: Array<string | null | undefined>;
+  providerMode?: string | null;
+  providerLabel?: string | null;
+  skipGlobalPreferred?: boolean;
+  [key: string]: any;
+};
+
+type ReadProviderLike = {
+  getBlockNumber?: () => Promise<number>;
+  getGasPrice?: () => Promise<any>;
+  getBlock?: (blockNumber: number | string) => Promise<any>;
+  getLogs?: (filter: any) => Promise<any[]>;
+  getBalance?: (address: string) => Promise<any>;
+  __CE_RPC_META?: RpcMetaLike;
+  [key: string]: any;
+};
+
+type AsyncCacheSlot<T> = {
+  value: T | null;
+  promise: Promise<T> | null;
+  ts: number;
+};
+
+type LatestBlockCache = Map<string, { block: number; timestamp: number } | any> & {
+  value?: number | null;
+  promise?: Promise<number> | null;
+  ts?: number;
+  _map?: Record<string, AsyncCacheSlot<number>>;
+  [key: string]: any;
+};
+
+type GasPriceCache = Map<string, any> & {
+  value?: any;
+  promise?: Promise<any> | null;
+  ts?: number;
+  _map?: Record<string, AsyncCacheSlot<any>>;
+  [key: string]: any;
+};
+
+type ContractsLogger = {
+  log: (...args: unknown[]) => void;
+  warn: (...args: unknown[]) => void;
+  error: (...args: unknown[]) => void;
+};
+
+type FundingError = Error & {
+  stage?: string;
+  status?: number;
+  reason?: string;
+  details?: unknown;
+};
+
+type RequestContext = {
+  account?: string;
+  providerLike?: string;
+  chainId?: number | string | null;
+  networkChainId?: number | string | null;
+  [key: string]: any;
+};
+
+type SendTestnetFundsOptions = {
+  context?: RequestContext | null;
+  amountEth?: string | number | null;
+  amount?: string | number | null;
+  sbtAddress?: string | null;
+  hashedPassword?: string | null;
+  groupPasswordHash?: string | null;
+  signature?: string | null;
+  [key: string]: any;
+};
+
+type LatestBlockOptions = {
+  contractKey?: string | null;
+  force?: boolean;
+  [key: string]: any;
+};
+
+type RelevantBlockWindowOptions = {
+  contractKey?: string | null;
+  __forceLatestBlock?: boolean;
+  [key: string]: any;
+};
+
+type ProviderScopeCacheKeyArgs = {
+  provider?: ReadProviderLike | null;
+  groupKeyOrCfg?: GroupKeyOrCfg;
+  chainId?: number | string | null;
+  contractKey?: string;
+};
+
+type BlockWindow = {
+  fromBlock: number;
+  toBlock: number;
+};
+
+type FaucetRequestBody = {
+  action: 'request_test_eth';
+  to: string;
+  [key: string]: unknown;
+};
+
+type StoreState = {
+  profile?: {
+    account?: string;
+    provider?: string;
+    network?: {
+      id?: number | string | null;
+      chainId?: number | string | null;
+      [key: string]: any;
+    };
+    [key: string]: any;
+  };
+  sessionState?: {
+    activeSessionSlug?: string;
+    [key: string]: any;
+  };
+  [key: string]: any;
+};
+
+type StoreLike = {
+  getState?: () => StoreState | any;
+  [key: string]: any;
+};
+
+type ContractHelperDeps = {
+  resolveSession: (groupKeyOrCfg: GroupKeyOrCfg) => SessionConfigLike;
+  latestBlockCache: LatestBlockCache;
+  gasPriceCache: GasPriceCache;
+  BLOCK_CACHE_MS: number;
+  getReadProviderForGroup: (groupKeyOrCfg: GroupKeyOrCfg, opts?: { contractKey?: string }) => any;
+  shouldLog: (category: string, level?: string) => boolean;
+  rpcLog: (...args: unknown[]) => void;
+  callWithRetry: <T>(
+    operation: () => Promise<T>,
+    operationName: string,
+    context?: Record<string, unknown>
+  ) => Promise<T>;
+  MAX_CACHE_SIZE: number;
+  isLogsRangeTooLargeError: (error: unknown) => boolean;
+  contractsLog: ContractsLogger;
+  getReadProviderForChain: ((chainId: number | string | undefined) => any) | null | undefined;
+  normalizeSessionSlug: (slug: string) => string;
+  shouldBypassSessionScopeWindow: (
+    groupKeyOrCfg: GroupKeyOrCfg,
+    cfg: SessionConfigLike | null | undefined
+  ) => boolean;
+  getScopeDecisionForSlug: (slug: string) => any;
+  logScopeWindowSkipOnce: (decision: any) => void;
+  parsePositiveBlockNumber: (value: unknown) => number | null | undefined;
+  resolveSessionStartFromRegistry: (args: {
+    cfg: SessionConfigLike | null | undefined;
+    slug: string;
+  }) => Promise<number | null | undefined>;
+  DEFAULT_CHAIN_ID: number;
+  store: StoreLike | any;
+  getSessionConfigBySlug: (slug: string) => SessionConfigLike | null | undefined;
+  getCorsProxyUrlOrThrow: (args: {
+    sessionConfig?: SessionConfigLike | null;
+    sessionSlug?: string;
+    context?: RequestContext;
+    allowDemoFallback?: boolean;
+  }) => Promise<string>;
+  fetchWorkerWithAuth: (url: string, init?: RequestInit, opts?: {
+    sessionSlug?: string;
+    context?: RequestContext;
+    workerUrl?: string;
+    allowDemoFallback?: boolean;
+  }) => Promise<Response>;
+  fetchImpl?: typeof fetch;
+};
+
+type ContractBlockCacheEntry = {
+  block: any;
+  timestamp: number;
+};
+
+type ContractHelperMethods = {
+  _blockCache?: Record<string, ContractBlockCacheEntry>;
+  getLatestBlockNumber: (
+    providerName?: string,
+    groupKeyOrCfg?: GroupKeyOrCfg,
+    opts?: LatestBlockOptions | null
+  ) => Promise<number>;
+  getGasPrice: (groupKeyOrCfg?: GroupKeyOrCfg) => Promise<any>;
+  getBlockWithCaching: (
+    this: ContractHelperMethods,
+    providerPassedIn: { getBlock: (blockNumber: number | string) => Promise<any> },
+    blockNumber: number | string,
+    providerName?: string,
+    chainKey?: string
+  ) => Promise<any>;
+  fetchLogsSmart: (
+    this: ContractHelperMethods,
+    filter: any,
+    fromBlock: number,
+    toBlock: number,
+    depth?: number,
+    maxDepth?: number,
+    groupKeyOrCfg?: GroupKeyOrCfg
+  ) => Promise<any[]>;
+  getNativeBalance: (address: string, groupKeyOrCfg?: GroupKeyOrCfg) => Promise<any>;
+  getRelevantBlockWindowForFilter: (
+    this: ContractHelperMethods,
+    groupKeyOrCfg: GroupKeyOrCfg,
+    opts?: RelevantBlockWindowOptions | null
+  ) => Promise<BlockWindow>;
+  sendTestnetFunds: (
+    recipientAddress: string,
+    groupKeyOrCfg?: GroupKeyOrCfg,
+    opts?: SendTestnetFundsOptions | null
+  ) => Promise<any>;
+  getGasPriceToDisplay: (this: ContractHelperMethods, groupKeyOrCfg?: GroupKeyOrCfg) => Promise<string>;
+};
+
+const normalizeFundingErrorMessage = (error: unknown): string => (
+  String((error as FundingError)?.message || error || '').trim().toLowerCase()
 );
 
-const isMissingLocalFaucetKeyFundingError = (error) => {
-  const stage = String(error?.stage || '').trim().toLowerCase();
-  const status = Number(error?.status || 0);
+const createFundingError = (
+  message: string,
+  extra: Partial<FundingError> = {}
+): FundingError => Object.assign(new Error(message), extra);
+
+const isMissingLocalFaucetKeyFundingError = (error: unknown): boolean => {
+  const fundingError = error as FundingError;
+  const stage = String(fundingError?.stage || '').trim().toLowerCase();
+  const status = Number(fundingError?.status || 0);
   const message = normalizeFundingErrorMessage(error);
   return (
     stage === 'faucet-request' &&
@@ -29,9 +277,10 @@ const isMissingLocalFaucetKeyFundingError = (error) => {
   );
 };
 
-const isRetryableSponsoredBootstrapFundingError = (error) => {
-  const stage = String(error?.stage || '').trim().toLowerCase();
-  const status = Number(error?.status || 0);
+const isRetryableSponsoredBootstrapFundingError = (error: unknown): boolean => {
+  const fundingError = error as FundingError;
+  const stage = String(fundingError?.stage || '').trim().toLowerCase();
+  const status = Number(fundingError?.status || 0);
   if (status === 404) return true;
 
   const message = normalizeFundingErrorMessage(error);
@@ -52,7 +301,7 @@ const isRetryableSponsoredBootstrapFundingError = (error) => {
   );
 };
 
-export function createContractHelperMethods(deps) {
+export function createContractHelperMethods(deps: ContractHelperDeps): ContractHelperMethods {
   const {
     resolveSession,
     latestBlockCache,
@@ -77,10 +326,16 @@ export function createContractHelperMethods(deps) {
     getSessionConfigBySlug,
     getCorsProxyUrlOrThrow,
     fetchWorkerWithAuth,
-    fetchImpl = (...args) => fetch(...args),
+    fetchImpl = (...args: Parameters<typeof fetch>) => fetch(...args),
   } = deps;
 
-  const resolveChainIdForRead = (cfg, contractKey = '') => {
+  void DEFAULT_CHAIN_ID;
+  void getReadProviderForChain;
+
+  const resolveChainIdForRead = (
+    cfg: SessionConfigLike | null | undefined,
+    contractKey: string = ''
+  ): number => {
     const normalizedContractKey = String(contractKey || '').trim();
     const preferredCandidates = normalizedContractKey === 'sbtFactory'
       ? [
@@ -113,12 +368,15 @@ export function createContractHelperMethods(deps) {
     groupKeyOrCfg,
     chainId,
     contractKey = '',
-  } = {}) => {
+  }: ProviderScopeCacheKeyArgs = {}): string => {
     const providerMeta = provider && typeof provider === 'object' ? provider.__CE_RPC_META : null;
     const preferredUrls = Array.isArray(providerMeta?.preferredUrls)
-      ? providerMeta.preferredUrls.map((url) => String(url || '').trim()).filter(Boolean).join(',')
+      ? providerMeta.preferredUrls
+        .map((url: string | null | undefined) => String(url || '').trim())
+        .filter((url: string) => Boolean(url))
+        .join(',')
       : '';
-    const fallbackGroupKey = (() => {
+    const fallbackGroupKey = ((): string => {
       if (typeof groupKeyOrCfg === 'string') {
         const str = String(groupKeyOrCfg || '').trim();
         return str || 'general';
@@ -139,8 +397,13 @@ export function createContractHelperMethods(deps) {
     ].join('|');
   };
 
-  return {
-    async getLatestBlockNumber(providerName = 'none', groupKeyOrCfg = null, opts = null) {
+  const methods: ContractHelperMethods = {
+    async getLatestBlockNumber(
+      providerName: string = 'none',
+      groupKeyOrCfg: GroupKeyOrCfg = null,
+      opts: LatestBlockOptions | null = null
+    ): Promise<number> {
+      void providerName;
       const cfg = resolveSession(groupKeyOrCfg === undefined ? '' : groupKeyOrCfg);
       const contractKey = String(opts?.contractKey || '').trim();
       const chId = resolveChainIdForRead(cfg, contractKey);
@@ -148,7 +411,7 @@ export function createContractHelperMethods(deps) {
       const provider = getReadProviderForGroup(
         groupKeyOrCfg,
         contractKey ? { contractKey } : undefined
-      );
+      ) as ReadProviderLike;
 
       const key = buildProviderScopeCacheKey({
         provider,
@@ -181,22 +444,22 @@ export function createContractHelperMethods(deps) {
 
       const groupKey =
         (typeof groupKeyOrCfg === 'string' && groupKeyOrCfg) ||
-        (groupKeyOrCfg && groupKeyOrCfg.slug) ||
+        (groupKeyOrCfg && typeof groupKeyOrCfg === 'object' && groupKeyOrCfg.slug) ||
         null;
       slot.promise = callWithRetry(
-        () => provider.getBlockNumber(),
+        () => provider.getBlockNumber!(),
         'getBlockNumber',
         { op: 'getBlockNumber', chainId: chId || null, groupKey }
       );
 
       return slot.promise
-        .then((bn) => {
+        .then((bn: number) => {
           slot.value = bn;
           slot.promise = null;
           slot.ts = Date.now();
           return bn;
         })
-        .catch((error) => {
+        .catch((error: unknown) => {
           const prev = slot.value;
           slot.promise = null;
           if (prev !== null && prev !== undefined) {
@@ -209,10 +472,10 @@ export function createContractHelperMethods(deps) {
         });
     },
 
-    async getGasPrice(groupKeyOrCfg = null) {
+    async getGasPrice(groupKeyOrCfg: GroupKeyOrCfg = null): Promise<any> {
       const cfg = resolveSession(groupKeyOrCfg === undefined ? '' : groupKeyOrCfg);
       const chId = resolveChainIdForRead(cfg, '');
-      const provider = getReadProviderForGroup(groupKeyOrCfg);
+      const provider = getReadProviderForGroup(groupKeyOrCfg) as ReadProviderLike;
 
       const key = buildProviderScopeCacheKey({
         provider,
@@ -240,20 +503,20 @@ export function createContractHelperMethods(deps) {
 
       const groupKey =
         (typeof groupKeyOrCfg === 'string' && groupKeyOrCfg) ||
-        (groupKeyOrCfg && groupKeyOrCfg.slug) ||
+        (groupKeyOrCfg && typeof groupKeyOrCfg === 'object' && groupKeyOrCfg.slug) ||
         null;
       slot.promise = callWithRetry(
-        () => provider.getGasPrice(),
+        () => provider.getGasPrice!(),
         'getGasPrice',
         { op: 'getGasPrice', chainId: chId || null, groupKey }
       )
-        .then((bn) => {
+        .then((bn: any) => {
           slot.value = bn;
           slot.promise = null;
           slot.ts = Date.now();
           return bn;
         })
-        .catch((error) => {
+        .catch((error: unknown) => {
           slot.value = null;
           slot.promise = null;
           slot.ts = 0;
@@ -263,10 +526,18 @@ export function createContractHelperMethods(deps) {
       return slot.promise;
     },
 
-    async getBlockWithCaching(providerPassedIn, blockNumber, providerName = 'none', chainKey = 'default') {
+    async getBlockWithCaching(
+      this: ContractHelperMethods,
+      providerPassedIn: { getBlock: (blockNumber: number | string) => Promise<any> },
+      blockNumber: number | string,
+      providerName: string = 'none',
+      chainKey: string = 'default'
+    ): Promise<any> {
+      void providerName;
+      const blockCache = this._blockCache!;
       const key = `${String(chainKey)}_${String(blockNumber)}`;
-      if (this._blockCache[key] && (Date.now() - this._blockCache[key].timestamp < BLOCK_CACHE_MS)) {
-        return this._blockCache[key].block;
+      if (blockCache[key] && (Date.now() - blockCache[key].timestamp < BLOCK_CACHE_MS)) {
+        return blockCache[key].block;
       }
 
       const block = await callWithRetry(
@@ -274,34 +545,42 @@ export function createContractHelperMethods(deps) {
         `getBlock(${blockNumber})`
       );
       const now = Date.now();
-      Object.keys(this._blockCache).forEach((cacheKey) => {
-        if (now - (this._blockCache[cacheKey]?.timestamp || 0) >= BLOCK_CACHE_MS) {
-          delete this._blockCache[cacheKey];
+      Object.keys(blockCache).forEach((cacheKey: string) => {
+        if (now - (blockCache[cacheKey]?.timestamp || 0) >= BLOCK_CACHE_MS) {
+          delete blockCache[cacheKey];
         }
       });
 
-      this._blockCache[key] = { block, timestamp: now };
+      blockCache[key] = { block, timestamp: now };
 
-      const keys = Object.keys(this._blockCache);
+      const keys = Object.keys(blockCache);
       if (keys.length > MAX_CACHE_SIZE) {
         keys.sort(
-          (a, b) => (this._blockCache[a]?.timestamp || 0) - (this._blockCache[b]?.timestamp || 0)
+          (a: string, b: string) => (blockCache[a]?.timestamp || 0) - (blockCache[b]?.timestamp || 0)
         );
         for (let i = 0; i < keys.length - MAX_CACHE_SIZE; i += 1) {
-          delete this._blockCache[keys[i]];
+          delete blockCache[keys[i]];
         }
       }
       return block;
     },
 
-    async fetchLogsSmart(filter, fromBlock, toBlock, depth = 0, maxDepth = 20, groupKeyOrCfg = '') {
+    async fetchLogsSmart(
+      this: ContractHelperMethods,
+      filter: any,
+      fromBlock: number,
+      toBlock: number,
+      depth: number = 0,
+      maxDepth: number = 20,
+      groupKeyOrCfg: GroupKeyOrCfg = ''
+    ): Promise<any[]> {
       if (fromBlock > toBlock) return [];
       const rangeName = `logs[${fromBlock}-${toBlock}]`;
-      const providerForLogs = getReadProviderForGroup(groupKeyOrCfg);
+      const providerForLogs = getReadProviderForGroup(groupKeyOrCfg) as ReadProviderLike;
 
       try {
         return await callWithRetry(
-          () => providerForLogs.getLogs({ ...filter, fromBlock, toBlock }),
+          () => providerForLogs.getLogs!({ ...filter, fromBlock, toBlock }),
           `getLogs ${rangeName}`,
           {
             op: 'getLogs',
@@ -309,11 +588,11 @@ export function createContractHelperMethods(deps) {
             toBlock,
             groupKey:
               (typeof groupKeyOrCfg === 'string' && groupKeyOrCfg) ||
-              (groupKeyOrCfg && groupKeyOrCfg.slug) ||
+              (groupKeyOrCfg && typeof groupKeyOrCfg === 'object' && groupKeyOrCfg.slug) ||
               null,
           }
         );
-      } catch (error) {
+      } catch (error: unknown) {
         if (isLogsRangeTooLargeError(error) && depth < maxDepth) {
           const mid = Math.floor((fromBlock + toBlock) / 2);
           const [left, right] = await Promise.all([
@@ -326,7 +605,7 @@ export function createContractHelperMethods(deps) {
       }
     },
 
-    async getNativeBalance(address, groupKeyOrCfg = null) {
+    async getNativeBalance(address: string, groupKeyOrCfg: GroupKeyOrCfg = null): Promise<any> {
       if (!address || !ethers.utils.isAddress(address)) {
         contractsLog.warn('[getNativeBalance] invalid address supplied:', address);
         return ethers.BigNumber.from(0);
@@ -340,7 +619,7 @@ export function createContractHelperMethods(deps) {
         0
       ) || 0;
 
-      const provider = getReadProviderForGroup(groupKeyOrCfg);
+      const provider = getReadProviderForGroup(groupKeyOrCfg) as ReadProviderLike;
 
       rpcLog('RPC Call:', {
         function: 'getNativeBalance',
@@ -351,12 +630,16 @@ export function createContractHelperMethods(deps) {
       });
 
       return callWithRetry(
-        () => provider.getBalance(address),
+        () => provider.getBalance!(address),
         'provider.getBalance (getNativeBalance)'
       );
     },
 
-    async getRelevantBlockWindowForFilter(groupKeyOrCfg, opts = null) {
+    async getRelevantBlockWindowForFilter(
+      this: ContractHelperMethods,
+      groupKeyOrCfg: GroupKeyOrCfg,
+      opts: RelevantBlockWindowOptions | null = null
+    ): Promise<BlockWindow> {
       const cfg = resolveSession(groupKeyOrCfg || '');
       const slug = normalizeSessionSlug(cfg?.slug || '');
       const contractKey = String(opts?.contractKey || '').trim();
@@ -382,11 +665,13 @@ export function createContractHelperMethods(deps) {
       }
 
       const lim = cfg && cfg.blockLimits;
-      const hasOwn = (obj, key) => !!obj && Object.prototype.hasOwnProperty.call(obj, key);
-      const resolveRequiredStart = async () => {
+      const hasOwn = (obj: Record<string, unknown> | null | undefined, key: string): boolean => (
+        !!obj && Object.prototype.hasOwnProperty.call(obj, key)
+      );
+      const resolveRequiredStart = async (): Promise<number> => {
         const slugLabel = slug || 'general';
         const hasStartField = hasOwn(lim, 'start');
-        const rawStart = hasStartField ? lim.start : undefined;
+        const rawStart = hasStartField ? lim?.start : undefined;
         const rawStartNum = parsePositiveBlockNumber(rawStart);
         if (rawStartNum) return rawStartNum;
 
@@ -399,7 +684,7 @@ export function createContractHelperMethods(deps) {
                 start: fallbackStart,
               };
             }
-          } catch (e) { contractsLog.warn('contractHelpers: fallback', e); }
+          } catch (e: unknown) { contractsLog.warn('contractHelpers: fallback', e); }
           contractsLog.warn(
             '[blockLimits] Recovered missing blockLimits.start from SessionRegistry.SessionCreated.',
             {
@@ -438,7 +723,7 @@ export function createContractHelperMethods(deps) {
         if (toBlock < fromBlock) toBlock = fromBlock;
 
         return { fromBlock, toBlock };
-      } catch (error) {
+      } catch (error: any) {
         contractsLog.warn('[blockLimits] Failed to fetch latest block; falling back to start block only.', {
           slug: slug || 'general',
           start,
@@ -448,13 +733,17 @@ export function createContractHelperMethods(deps) {
       }
     },
 
-    async sendTestnetFunds(recipientAddress, groupKeyOrCfg = null, opts = null) {
+    async sendTestnetFunds(
+      recipientAddress: string,
+      groupKeyOrCfg: GroupKeyOrCfg = null,
+      opts: SendTestnetFundsOptions | null = null
+    ): Promise<any> {
       try {
         if (!recipientAddress || !ethers.utils.isAddress(recipientAddress)) {
           throw new Error('Invalid recipient address');
         }
 
-        const activeSlug = (() => {
+        const activeSlug = ((): string => {
           try {
             const sessionState = store?.getState?.()?.sessionState || {};
             return sessionState?.activeSessionSlug || sessionState?.activeSessionSlug || '';
@@ -472,26 +761,26 @@ export function createContractHelperMethods(deps) {
           : getSessionConfigBySlug(requestedSessionSlug || '');
         const resolvedSessionSlug = normalizeSessionSlug(cfg?.slug || requestedSessionSlug || '');
 
-        const requestOptions = (opts && typeof opts === 'object') ? opts : {};
+        const requestOptions: SendTestnetFundsOptions = (opts && typeof opts === 'object') ? opts : {};
         const contextOverride = (
           requestOptions.context &&
           typeof requestOptions.context === 'object' &&
           !Array.isArray(requestOptions.context)
         ) ? requestOptions.context : {};
-        const state = store?.getState?.();
+        const state = store?.getState?.() as StoreState | undefined;
         const profile = state?.profile || {};
         const network = profile.network || {};
         const overrideChainId = contextOverride.chainId ?? contextOverride.networkChainId ?? null;
-        const context = {
+        const context: RequestContext = {
           account: contextOverride.account || profile.account || '',
           providerLike: contextOverride.providerLike || profile.provider || 'wagmi',
           chainId: overrideChainId || network.id || network.chainId || cfg?.networkChainId || null,
         };
-        const requestBody = {
+        const requestBody: FaucetRequestBody = {
           action: 'request_test_eth',
           to: recipientAddress,
         };
-        ['amountEth', 'amount', 'sbtAddress', 'hashedPassword', 'groupPasswordHash', 'signature'].forEach((key) => {
+        ['amountEth', 'amount', 'sbtAddress', 'hashedPassword', 'groupPasswordHash', 'signature'].forEach((key: string) => {
           if (
             requestOptions[key] !== undefined &&
             requestOptions[key] !== null &&
@@ -500,7 +789,15 @@ export function createContractHelperMethods(deps) {
             requestBody[key] = requestOptions[key];
           }
         });
-        const requestWithWorker = async ({ sessionSlug, sessionConfig, workerUrlOverride } = {}) => {
+        const requestWithWorker = async ({
+          sessionSlug,
+          sessionConfig,
+          workerUrlOverride,
+        }: {
+          sessionSlug?: string | null;
+          sessionConfig?: SessionConfigLike | null;
+          workerUrlOverride?: string | null;
+        } = {}): Promise<any> => {
           const resolvedSessionSlugForRequest = normalizeSessionSlug(sessionSlug || '');
           let corsWorkerUrl = workerUrlOverride || '';
           if (!corsWorkerUrl) {
@@ -511,13 +808,14 @@ export function createContractHelperMethods(deps) {
                 context,
                 allowDemoFallback: defaultStrictAllowDemoFallback(),
               });
-            } catch (error) {
-              const wrapped = new Error(error?.message || 'Worker URL unavailable for requested session');
-              wrapped.stage = 'worker-url-resolution';
-              throw wrapped;
+            } catch (error: any) {
+              throw createFundingError(
+                error?.message || 'Worker URL unavailable for requested session',
+                { stage: 'worker-url-resolution' }
+              );
             }
           }
-          const baseUrl = corsWorkerUrl.replace(/\/+$/, '');
+          const baseUrl = String(corsWorkerUrl || '').replace(/\/+$/, '');
 
           const res = await fetchWorkerWithAuth(
             baseUrl,
@@ -534,14 +832,17 @@ export function createContractHelperMethods(deps) {
             }
           );
 
-          const data = await res.json().catch(() => ({}));
+          const data = await res.json().catch(() => ({} as Record<string, any>));
           if (!res.ok) {
-            const wrapped = new Error(data?.error || `Faucet request failed (${res.status})`);
-            wrapped.stage = 'faucet-request';
-            wrapped.status = Number(res.status || 0) || 0;
-            wrapped.reason = data?.reason || '';
-            wrapped.details = data?.details || null;
-            throw wrapped;
+            throw createFundingError(
+              data?.error || `Faucet request failed (${res.status})`,
+              {
+                stage: 'faucet-request',
+                status: Number(res.status || 0) || 0,
+                reason: data?.reason || '',
+                details: data?.details || null,
+              }
+            );
           }
           return data;
         };
@@ -551,7 +852,13 @@ export function createContractHelperMethods(deps) {
         const bootstrapTargetSessionSlug = normalizeSessionSlug(sponsoredBootstrapFundingContext?.targetSessionSlug || '');
         const bootstrapFaucetGrantToken = String(sponsoredBootstrapFundingContext?.faucetGrantToken || '').trim();
 
-        const requestWithSponsoredFaucetGrant = async ({ workerUrl, faucetGrantToken } = {}) => {
+        const requestWithSponsoredFaucetGrant = async ({
+          workerUrl,
+          faucetGrantToken,
+        }: {
+          workerUrl?: string | null;
+          faucetGrantToken?: string | null;
+        } = {}): Promise<any> => {
           const baseUrl = String(workerUrl || '').trim().replace(/\/+$/, '');
           if (!baseUrl || !faucetGrantToken) {
             throw new Error('Sponsored faucet bootstrap grant is unavailable.');
@@ -564,17 +871,20 @@ export function createContractHelperMethods(deps) {
               to: recipientAddress,
             }),
           });
-          const data = await res.json().catch(() => ({}));
+          const data = await res.json().catch(() => ({} as Record<string, any>));
           if (!res.ok) {
             if (Number(res.status || 0) === 404) {
               clearSponsoredBootstrapFaucetGrantToken();
             }
-            const wrapped = new Error(data?.error || `Faucet request failed (${res.status})`);
-            wrapped.stage = 'faucet-request';
-            wrapped.status = Number(res.status || 0) || 0;
-            wrapped.reason = data?.reason || '';
-            wrapped.details = data?.details || null;
-            throw wrapped;
+            throw createFundingError(
+              data?.error || `Faucet request failed (${res.status})`,
+              {
+                stage: 'faucet-request',
+                status: Number(res.status || 0) || 0,
+                reason: data?.reason || '',
+                details: data?.details || null,
+              }
+            );
           }
           clearSponsoredBootstrapFaucetGrantToken();
           return data;
@@ -585,7 +895,7 @@ export function createContractHelperMethods(deps) {
             sessionSlug: resolvedSessionSlug,
             sessionConfig: cfg,
           });
-        } catch (primaryError) {
+        } catch (primaryError: any) {
           const shouldRetryWithSponsoredBootstrap = (
             (bootstrapSessionSlug || bootstrapWorkerUrl) &&
             bootstrapTargetSessionSlug === resolvedSessionSlug &&
@@ -607,7 +917,7 @@ export function createContractHelperMethods(deps) {
                   workerUrl: bootstrapWorkerUrl,
                   faucetGrantToken: bootstrapFaucetGrantToken,
                 });
-              } catch (grantError) {
+              } catch (grantError: any) {
                 if (Number(grantError?.status || 0) === 404) {
                   throw primaryError;
                 }
@@ -622,7 +932,7 @@ export function createContractHelperMethods(deps) {
                 workerUrl: bootstrapWorkerUrl,
                 faucetGrantToken: bootstrapFaucetGrantToken,
               });
-            } catch (grantError) {
+            } catch (grantError: any) {
               if (Number(grantError?.status || 0) !== 404) {
                 throw grantError;
               }
@@ -637,19 +947,24 @@ export function createContractHelperMethods(deps) {
             workerUrlOverride: bootstrapWorkerUrl,
           });
         }
-      } catch (error) {
-        const wrapped = new Error(`Failed to request test ETH: ${error.message}`);
-        wrapped.stage = error?.stage || '';
-        wrapped.status = Number(error?.status || 0) || 0;
-        wrapped.reason = error?.reason || '';
-        wrapped.details = error?.details || null;
-        throw wrapped;
+      } catch (error: any) {
+        throw createFundingError(
+          `Failed to request test ETH: ${error?.message || String(error)}`,
+          {
+            stage: error?.stage || '',
+            status: Number(error?.status || 0) || 0,
+            reason: error?.reason || '',
+            details: error?.details || null,
+          }
+        );
       }
     },
 
-    async getGasPriceToDisplay(groupKeyOrCfg = null) {
+    async getGasPriceToDisplay(this: ContractHelperMethods, groupKeyOrCfg: GroupKeyOrCfg = null): Promise<string> {
       const gasPriceBN = await this.getGasPrice(groupKeyOrCfg);
       return utils.formatUnits(gasPriceBN, 'gwei');
     },
   };
+
+  return methods;
 }
