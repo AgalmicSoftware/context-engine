@@ -456,7 +456,8 @@ describe('CorpusViewer', () => {
 
     expect(screen.getByRole('dialog')).toBeInTheDocument();
     expect(screen.getByTestId('tag-page-mock')).toHaveTextContent('Google');
-    expect(screen.getByText('#Google')).toBeInTheDocument();
+    expect(screen.getByText('Tag explorer')).toBeInTheDocument();
+    expect(screen.queryByText('#Google')).not.toBeInTheDocument();
 
     const tagPageProps = mockTagPage.mock.calls.at(-1)[0];
     expect(tagPageProps).toMatchObject({
@@ -478,6 +479,6 @@ describe('CorpusViewer', () => {
 
     const tagPageProps = mockTagPage.mock.calls.at(-1)[0];
     expect(tagPageProps.selectedTagsOverride).toEqual(['AI Governance']);
-    expect(screen.getByText('#AI Governance')).toBeInTheDocument();
+    expect(screen.getByTestId('tag-page-mock')).toHaveTextContent('AI Governance');
   });
 });

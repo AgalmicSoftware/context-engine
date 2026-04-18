@@ -176,6 +176,21 @@ const buildTagPageSessionSelectorOptions = ({
   return Array.from(options.values());
 };
 
+const sortTagEntriesByCount = ({
+  counts = new Map(),
+  displayMap = new Map(),
+} = {}) => Array.from(counts.entries())
+  .sort((left, right) => {
+    if (right[1] !== left[1]) return right[1] - left[1];
+    const leftLabel = displayMap.get(left[0]) || left[0];
+    const rightLabel = displayMap.get(right[0]) || right[0];
+    return leftLabel.localeCompare(rightLabel);
+  })
+  .map(([normalizedTag]) => ({
+    normalizedTag,
+    displayTag: displayMap.get(normalizedTag) || normalizedTag,
+  }));
+
 const collectTagPageData = ({
   selectedTags,
   scopeFilterMode = 'all',
@@ -196,8 +211,8 @@ const collectTagPageData = ({
   const seen = new Set();
   const relatedCounts = new Map();
   const relatedDisplay = new Map();
-  const pickerCounts = new Map();
-  const pickerDisplay = new Map();
+  const scopedCounts = new Map();
+  const scopedDisplay = new Map();
 
   scopedEntries.forEach((entry) => {
     const sessionSlug = normalizeSessionSlug(entry?.slug || '');
@@ -217,6 +232,18 @@ const collectTagPageData = ({
 
         const questionTags = getQuestionTagDisplayList(question?.tags);
         const normalizedQuestionTags = normalizeTagList(questionTags);
+        const questionSeenScoped = new Set();
+        questionTags.forEach((tag) => {
+          const normalizedTag = normalizeTagList([tag])[0];
+          const displayTag = String(tag || '').trim() || normalizedTag;
+          if (!normalizedTag || normalizedSelectedTags.includes(normalizedTag) || questionSeenScoped.has(normalizedTag)) return;
+          questionSeenScoped.add(normalizedTag);
+          if (!scopedDisplay.has(normalizedTag)) {
+            scopedDisplay.set(normalizedTag, displayTag);
+          }
+          scopedCounts.set(normalizedTag, (scopedCounts.get(normalizedTag) || 0) + 1);
+        });
+
         const hasAllSelectedTags = normalizedSelectedTags.every((tag) => normalizedQuestionTags.includes(tag));
 
         if (!hasAllSelectedTags) return;
@@ -226,20 +253,15 @@ const collectTagPageData = ({
         seen.add(dedupeKey);
 
         const questionSeenRelated = new Set();
-        const questionSeenPicker = new Set();
         questionTags.forEach((tag) => {
           const normalizedTag = normalizeTagList([tag])[0];
+          const displayTag = String(tag || '').trim() || normalizedTag;
           if (!normalizedTag || normalizedSelectedTags.includes(normalizedTag) || questionSeenRelated.has(normalizedTag)) return;
           questionSeenRelated.add(normalizedTag);
-          relatedDisplay.set(normalizedTag, String(tag || '').trim() || normalizedTag);
+          if (!relatedDisplay.has(normalizedTag)) {
+            relatedDisplay.set(normalizedTag, displayTag);
+          }
           relatedCounts.set(normalizedTag, (relatedCounts.get(normalizedTag) || 0) + 1);
-        });
-        questionTags.forEach((tag) => {
-          const normalizedTag = normalizeTagList([tag])[0];
-          if (!normalizedTag || normalizedSelectedTags.includes(normalizedTag) || questionSeenPicker.has(normalizedTag)) return;
-          questionSeenPicker.add(normalizedTag);
-          pickerDisplay.set(normalizedTag, String(tag || '').trim() || normalizedTag);
-          pickerCounts.set(normalizedTag, (pickerCounts.get(normalizedTag) || 0) + 1);
         });
 
         questions.push({
@@ -261,23 +283,21 @@ const collectTagPageData = ({
     return a.prompt.localeCompare(b.prompt);
   });
 
-  const relatedTags = Array.from(relatedCounts.entries())
-    .sort((left, right) => {
-      if (right[1] !== left[1]) return right[1] - left[1];
-      const leftLabel = relatedDisplay.get(left[0]) || left[0];
-      const rightLabel = relatedDisplay.get(right[0]) || right[0];
-      return leftLabel.localeCompare(rightLabel);
+  const relatedTagEntries = sortTagEntriesByCount({
+    counts: relatedCounts,
+    displayMap: relatedDisplay,
+  });
+  const relatedTags = relatedTagEntries.map(({ displayTag }) => displayTag);
+  const relatedNormalizedTags = new Set(relatedTagEntries.map(({ normalizedTag }) => normalizedTag));
+  const pickerTags = [
+    ...relatedTags,
+    ...sortTagEntriesByCount({
+      counts: scopedCounts,
+      displayMap: scopedDisplay,
     })
-    .map(([normalizedTag]) => relatedDisplay.get(normalizedTag) || normalizedTag);
-
-  const pickerTags = Array.from(pickerCounts.entries())
-    .sort((left, right) => {
-      if (right[1] !== left[1]) return right[1] - left[1];
-      const leftLabel = pickerDisplay.get(left[0]) || left[0];
-      const rightLabel = pickerDisplay.get(right[0]) || right[0];
-      return leftLabel.localeCompare(rightLabel);
-    })
-    .map(([normalizedTag]) => pickerDisplay.get(normalizedTag) || normalizedTag);
+      .filter(({ normalizedTag }) => !relatedNormalizedTags.has(normalizedTag))
+      .map(({ displayTag }) => displayTag),
+  ];
 
   return {
     questions: sortedQuestions,
@@ -609,6 +629,11 @@ export const TagPageView = ({
     [effectiveScopeState.filterMode, effectiveScopeSlugs, sbtCacheVersion, selectedTags]
   );
   const showQuestionLoadingState = !isQuestionCacheReady && !questions.length;
+  const titleText = useMemo(() => (
+    selectedTags.length
+      ? selectedTags.map((tag) => `#${tag}`).join(' + ')
+      : 'Tag explorer'
+  ), [selectedTags]);
 
   const handleAddTag = (rawTag) => {
     const displayTag = String(rawTag || '').trim();
@@ -713,8 +738,13 @@ export const TagPageView = ({
         <header className={styles.header}>
           <div className={styles.headerTopRow}>
             <div className={styles.headerLead}>
-              <p className={styles.eyebrow}>Tag explorer</p>
-              <h1 className={styles.title}>Questions tagged with</h1>
+              {!embedded ? <p className={styles.eyebrow}>Tag explorer</p> : null}
+              <h1
+                className={[styles.title, embedded ? styles.titleEmbedded : ''].filter(Boolean).join(' ')}
+                data-testid="tag-page-title"
+              >
+                {titleText}
+              </h1>
             </div>
             <div className={styles.headerMeta}>
               <div className={styles.scopeMeta}>
@@ -826,7 +856,7 @@ export const TagPageView = ({
                       ))}
                     </div>
                   ) : (
-                    <p className={styles.tagPickerEmpty}>No related tags available for this comparison yet.</p>
+                    <p className={styles.tagPickerEmpty}>No additional tags available in this session scope yet.</p>
                   )}
                 </div>
               )}
