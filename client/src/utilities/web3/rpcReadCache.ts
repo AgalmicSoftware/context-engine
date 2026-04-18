@@ -1,5 +1,5 @@
 /*
- * @file rpcReadCache.js
+ * @file rpcReadCache.ts
  * @module rpcReadCache
  * @description RPC response caching layer — wraps ethers JsonRpcProvider.send() with
  *              in-flight dedup, short TTL caching for "latest" reads, and immutable caching for block-range queries.
