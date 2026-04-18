@@ -106,6 +106,25 @@ describe('AsyncSearchSelect', () => {
     expect(screen.queryByRole('option', { name: 'Gamma' })).not.toBeInTheDocument();
   });
 
+  it('filters by option value as well as label', () => {
+    render(
+      <Harness
+        options={[
+          { label: 'Alpha', value: '0xaaa' },
+          { label: 'Beta', value: '0xbbb' },
+        ]}
+      />
+    );
+
+    openMenu();
+    fireEvent.change(screen.getByRole('textbox', { name: /search options/i }), {
+      target: { value: '0xbbb' },
+    });
+
+    expect(screen.queryByRole('option', { name: 'Alpha' })).not.toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Beta' })).toBeInTheDocument();
+  });
+
   it('uses getOptionValue to match the incoming value prop against options (marks aria-selected)', () => {
     const keyedOptions = [
       { slug: 'alpha', value: '1', label: 'Alpha' },
@@ -193,6 +212,24 @@ describe('AsyncSearchSelect', () => {
     expect(trigger).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
     expect(spy).not.toHaveBeenCalled();
+  });
+
+  it('closes menu when focus moves outside the wrapper', async () => {
+    render(
+      <>
+        <Harness />
+        <button type="button" data-testid="outside">out</button>
+      </>
+    );
+
+    openMenu();
+    expect(screen.getByRole('listbox')).toBeInTheDocument();
+
+    fireEvent.focusIn(screen.getByTestId('outside'));
+
+    await waitFor(() => {
+      expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+    });
   });
 
   it('does not crash when value is null and getOptionValue is not null-safe', () => {
