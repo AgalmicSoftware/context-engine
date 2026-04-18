@@ -93,7 +93,7 @@ Use it for new files, refactors, and cleanup PRs. Legacy exceptions stay listed 
 - [ ] `client/src/utilities/sbt/createSbtFormCache.js` uses `Sbt` instead of `SBT` inside a camelCase utility filename.
 - [ ] `client/src/utilities/sbt/createSbtFormCache.test.js` mirrors the same `Sbt` acronym casing issue as the source file.
 - [ ] `client/src/utilities/session/pendingSbtDrafts.js` uses `Sbt` instead of `SBT` inside a camelCase utility filename.
-- [ ] `client/src/utilities/web3/appRpcSelection.js` uses `Rpc` instead of `RPC` inside a camelCase utility filename.
+- [ ] `client/src/utilities/web3/appRpcSelection.ts` uses `Rpc` instead of `RPC` inside a camelCase utility filename.
 - [ ] `client/src/utilities/web3/appRpcSelection.test.js` mirrors the same `Rpc` acronym casing issue as the source file.
 - [ ] `scripts/build_external_llm_prompt.py` uses snake_case instead of kebab-case.
 - [ ] `scripts/dev-sessionCorsWorker-local.mjs` contains a camelCase segment instead of pure
