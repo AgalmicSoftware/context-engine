@@ -1,5 +1,5 @@
 /*
- * @module rpcSelection
+ * @module appRpcSelection
  * @description RPC endpoint selection and failover — picks primary and fallback RPC URLs
  *              for a given chain based on configuration and latency ranking.
  *
