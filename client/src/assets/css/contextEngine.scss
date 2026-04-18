@@ -4020,6 +4020,33 @@ fieldset[disabled] .btn-link.active {
   margin: -1rem -1rem -1rem auto;
 }
 
+.btn-close {
+  box-sizing: content-box;
+  width: 1em;
+  height: 1em;
+  padding: 0.25em;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  opacity: 0.5;
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.btn-close::before {
+  content: '×';
+  display: inline-block;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.btn-close:hover,
+.btn-close:focus {
+  opacity: 0.75;
+  text-decoration: none;
+}
+
 .modal-title {
   margin-bottom: 0;
   line-height: 1.1;
