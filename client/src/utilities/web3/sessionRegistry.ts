@@ -1,5 +1,7 @@
+// @ts-nocheck
+// Mechanical Phase 4 extension migration: keep legacy runtime behavior identical and tighten types separately.
 /**
- * @file sessionRegistry.js
+ * @file sessionRegistry.ts
  * @module sessionRegistry
  * @description SessionRegistry contract read/write helpers and local cache.
  *              Fetches on-chain session metadata, resolves resource gates, and manages registry cache updates.

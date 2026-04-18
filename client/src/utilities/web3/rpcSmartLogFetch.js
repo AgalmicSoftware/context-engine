@@ -240,7 +240,7 @@ export const isNonRecoverableGetLogsError = (err) => {
 
 /**
  * Factory: creates a bound fetchLogsSmartWithProvider using caller-provided retry infrastructure.
- * Avoids circular dependency since callWithRetry lives in contractScripts.impl.js.
+ * Avoids circular dependency since callWithRetry lives in contractScripts.impl.ts.
  *
  * @param {object} deps
  * @param {Function} deps.callWithRetry retry wrapper from contractScripts.impl
