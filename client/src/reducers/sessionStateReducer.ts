@@ -16,13 +16,7 @@ import {
   normalizeGlobalSessionSelection,
   readStoredGlobalSessionSelection,
 } from '../utilities/session/globalSessionState.js';
-import {
-  normalizeDemoSurfaceMode,
-  persistDemoSurfaceMode,
-  persistTooltipsEnabled,
-  readStoredDemoSurfaceMode,
-  readStoredTooltipsEnabled,
-} from '../utilities/session/sessionPreferencesStorage.js';
+import { DEFAULT_DEMO_SURFACE_MODE } from '../variables/appConfig.js';
 
 export interface SessionState {
   primarySessionSlug: string;
@@ -80,7 +74,25 @@ const isRecord = (value: unknown): value is Record<string, unknown> => (
   !Array.isArray(value)
 );
 
-const getInitialState = (): SessionState => ({
+const readStoredDemoSurfaceMode = () => {
+  try {
+    const storedValue = localStorage.getItem('ce:demoSurfaceMode');
+    if (storedValue !== null) {
+      return normalizeDemoSurfaceMode(JSON.parse(storedValue));
+    }
+    return DEFAULT_DEMO_SURFACE_MODE;
+  } catch (_) {
+    return DEFAULT_DEMO_SURFACE_MODE;
+  }
+};
+
+const persistDemoSurfaceMode = (value) => {
+  try {
+    localStorage.setItem('ce:demoSurfaceMode', JSON.stringify(normalizeDemoSurfaceMode(value)));
+  } catch (_) {}
+};
+
+const getInitialState = () => ({
     ...readStoredGlobalSessionSelection(),
     metricsOptIn: false,       // Reserved for a persisted analytics preference.
     focusedTab: 4,            // Default home tab index (Tools). Keep Welcome opt-in.

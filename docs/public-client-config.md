@@ -230,45 +230,12 @@ SPA fallback concept, but their redirect config syntax differs.
   - Stored `ce:demoSurfaceMode` localStorage preferences win over this setting.
   - This only takes effect on fresh installs or when no stored preference exists.
 
-- `REACT_APP_CE_DEMO_SESSION_SLUGS=demo-1,demo-3,demo-2,demo`
-  - Sets the ordered list of session slugs that receive public demo-session affordances.
-  - The first slug is used by the About-page Demo CTA when no explicit list-scoped session is selected.
-  - These slugs also reuse the bundled Context Polis fixture unless a caller provides a per-slug `demoDataBySlug` dataset.
-  - Temporary June 17, 2026 migration note: `demo-1` points the public demo CTA
-    at a live SessionRegistry session seeded with copied Context fixture
-    questions and featured SBT metadata. `demo_sessions.json` also carries a
-    display-only `demo-1` fallback so the route can mount when live registry
-    metadata is slow. Worker URL, faucet sponsorship, and gate authority stay in
-    SessionRegistry plus Worker KV, not in the demo fixture. Remove both
-    compatibility entries after the Cloudflare-backed demo question/response
-    storage replaces the Arweave/on-chain copy.
-
-- `REACT_APP_CE_ENABLE_WALLETCONNECT_FALLBACK=false`
-  - Controls RainbowKit's MetaMask fallback when MetaMask is not injected.
-  - Default `false` keeps the login modal on the injected MetaMask connector and avoids opening WalletConnect bridge sockets during normal startup.
-  - Set `true` only when a deployment intentionally wants the legacy WalletConnect fallback for MetaMask mobile/QR flows.
-
-## Arweave Read Policy Toggles
-
-- `REACT_APP_CE_ARWEAVE_DIRECT_TO_AR_IO=true`
-  - Controls whether browser Arweave payload reads stay on the configured AR.IO gateway for their retry budget.
-  - Default `true` uses `REACT_APP_CE_ARWEAVE_AR_IO_URL` / `window.CE_ARWEAVE_AR_IO_URL` when provided, otherwise `https://ar-io.dev`.
-  - Display-critical metadata reads for sessions, SBTs, surveys, and questions
-    also stay on AR.IO while this is enabled; they do not fan out through legacy
-    gateways unless direct mode is intentionally disabled.
-  - Set `false` only when a deployment intentionally wants legacy fallback fanout through `https://arweave.net`, Irys, Permagate, and alternate raw/tx-data routes.
-
-- `REACT_APP_CE_ARWEAVE_PREFLIGHT_SESSION_METADATA=false`
-  - Controls GraphQL tx-existence precheck for session metadata reads.
-  - Default `false` keeps session metadata gateway-first so fresh uploads can display before GraphQL indexing catches up.
-
-- `REACT_APP_CE_ARWEAVE_PREFLIGHT_SBT_METADATA=false`
-  - Controls GraphQL tx-existence precheck for SBT tokenURI metadata reads.
-  - Default `false` keeps SBT metadata gateway-first for initial display parity with session metadata.
-
-- `REACT_APP_CE_ARWEAVE_PREFLIGHT_RESPONSE_PAYLOADS=true`
-  - Controls GraphQL tx-existence precheck for survey/question response payload reads.
-  - Default `true` keeps the existing conservative response-payload behavior unless a deployment intentionally disables it.
+- `REACT_APP_ENABLE_LIT_SESSION_PAYER_WALLET_INPUT=false`
+  - Temporary rollout flag for the `/new` SessionWizard Lit payer-wallet UI.
+  - `false` hides the Lit worker-secret card in `/new`.
+  - `true` enables the existing Lit payer-wallet inputs in `/new`.
+  - This is migration scaffolding for the Naga-to-Chipotle Lit transition, not
+    the long-term Chipotle config surface.
 
 ## Arweave Read Policy Toggles
 

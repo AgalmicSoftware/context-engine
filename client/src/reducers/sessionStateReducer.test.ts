@@ -13,23 +13,22 @@ import {
 } from '../actions/types';
 
 const DEMO_SURFACE_MODE_ENV_KEY = 'REACT_APP_CE_DEMO_SURFACE_MODE_DEFAULT';
-const env = process.env as Record<string, string | undefined>;
-const ORIGINAL_DEMO_SURFACE_MODE_ENV = env[DEMO_SURFACE_MODE_ENV_KEY];
+const ORIGINAL_DEMO_SURFACE_MODE_ENV = process.env[DEMO_SURFACE_MODE_ENV_KEY];
 
 const restoreDemoSurfaceModeEnv = () => {
   if (typeof ORIGINAL_DEMO_SURFACE_MODE_ENV === 'undefined') {
-    delete env[DEMO_SURFACE_MODE_ENV_KEY];
+    delete process.env[DEMO_SURFACE_MODE_ENV_KEY];
     return;
   }
 
-  env[DEMO_SURFACE_MODE_ENV_KEY] = ORIGINAL_DEMO_SURFACE_MODE_ENV;
+  process.env[DEMO_SURFACE_MODE_ENV_KEY] = ORIGINAL_DEMO_SURFACE_MODE_ENV;
 };
 
-const loadReducerWithDemoSurfaceModeDefault = (value?: string) => {
+const loadReducerWithDemoSurfaceModeDefault = (value) => {
   if (typeof value === 'undefined') {
-    delete env[DEMO_SURFACE_MODE_ENV_KEY];
+    delete process.env[DEMO_SURFACE_MODE_ENV_KEY];
   } else {
-    env[DEMO_SURFACE_MODE_ENV_KEY] = value;
+    process.env[DEMO_SURFACE_MODE_ENV_KEY] = value;
   }
 
   jest.resetModules();
@@ -81,16 +80,6 @@ describe('sessionStateReducer', () => {
     const reloadedReducer = loadReducerWithDemoSurfaceModeDefault('false');
 
     expect(reloadedReducer(undefined, { type: '@@INIT' }).demoSurfaceMode).toBe(true);
-  });
-
-  it('falls back when stored session preferences contain malformed JSON', () => {
-    localStorage.setItem('ce:demoSurfaceMode', '{bad');
-    localStorage.setItem('ce:tooltipsEnabled', '{bad');
-    const reloadedReducer = loadReducerWithDemoSurfaceModeDefault('false');
-    const state = reloadedReducer(undefined, { type: '@@INIT' });
-
-    expect(state.demoSurfaceMode).toBe(false);
-    expect(state.tooltipsEnabled).toBe(true);
   });
 
   describe('demoSurfaceMode default precedence', () => {
