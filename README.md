@@ -35,8 +35,10 @@ Context Engine separates how the web app is hosted from how each session establi
 - Root scripts, worker bundling, contract tooling, and client workflows: Node.js 20.19+ or 22.12+ with npm 10
 - Foundry (`forge` / `anvil`) for local-chain and root contract test workflows
 
-For client dependency installs, use `npm i --force` for now until the current
-install conflict is fixed.
+The client install contract is tracked via `client/.npmrc`
+(`legacy-peer-deps=true`), so no manual CLI flag is needed even though
+`react-scripts@4.0.3`'s optional TypeScript peer still conflicts with
+`@lit-protocol/contracts@0.9.1`'s strict peer requirement.
 
 ### Clone and Install
 
@@ -49,7 +51,7 @@ npm install
 
 cd client
 nvm use 16
-npm i --force
+npm install
 npm run dev
 ```
 
