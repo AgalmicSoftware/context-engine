@@ -50,7 +50,8 @@
   /* subtle background color */
 }
 
-.modalHeader :global(.close) {
+.modalHeader :global(.close),
+.modalHeader :global(.btn-close) {
   position: absolute;
   top: 0.85rem;
   right: 0.85rem;
@@ -66,7 +67,9 @@
 }
 
 .modalHeader :global(.close):hover,
-.modalHeader :global(.close):focus {
+.modalHeader :global(.close):focus,
+.modalHeader :global(.btn-close):hover,
+.modalHeader :global(.btn-close):focus {
   background: transparent;
   color: #0f1222;
 }

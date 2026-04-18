@@ -1047,14 +1047,17 @@ $text: #f4f7ff;
   padding: 20px;
 }
 
-.tagModal :global(.close) {
+.tagModal :global(.close),
+.tagModal :global(.btn-close) {
   color: $text;
   opacity: 0.72;
   text-shadow: none;
 }
 
 .tagModal :global(.close:hover),
-.tagModal :global(.close:focus) {
+.tagModal :global(.close:focus),
+.tagModal :global(.btn-close:hover),
+.tagModal :global(.btn-close:focus) {
   color: $accent;
   opacity: 1;
 }
