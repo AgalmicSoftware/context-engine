@@ -1,3 +1,4 @@
+// @ts-nocheck
 // Mechanical Phase 4 extension migration: keep legacy runtime behavior identical and tighten types separately.
 /**
  * @file sessionRegistry.ts

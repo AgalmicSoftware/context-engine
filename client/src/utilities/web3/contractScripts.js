@@ -9,7 +9,7 @@
  *       `require()` of raw client source is not supported here.
  */
 
-/** @typedef {typeof import('./contractScripts.impl.js')} ContractScriptsImplModule */
+/** @typedef {typeof import('./contractScripts.impl')} ContractScriptsImplModule */
 /** @typedef {ContractScriptsImplModule['default']} ContractScriptsDefaultExport */
 
 const _impl = require('./contractScripts.impl.js');
