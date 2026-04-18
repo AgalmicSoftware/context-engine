@@ -12,14 +12,48 @@ import {
   UPDATE_GLOBAL_SESSION_SELECTION,
 } from '../actions/types';
 
+const DEMO_SURFACE_MODE_ENV_KEY = 'REACT_APP_CE_DEMO_SURFACE_MODE_DEFAULT';
+const ORIGINAL_DEMO_SURFACE_MODE_ENV = process.env[DEMO_SURFACE_MODE_ENV_KEY];
+
+const restoreDemoSurfaceModeEnv = () => {
+  if (typeof ORIGINAL_DEMO_SURFACE_MODE_ENV === 'undefined') {
+    delete process.env[DEMO_SURFACE_MODE_ENV_KEY];
+    return;
+  }
+
+  process.env[DEMO_SURFACE_MODE_ENV_KEY] = ORIGINAL_DEMO_SURFACE_MODE_ENV;
+};
+
+const loadReducerWithDemoSurfaceModeDefault = (value) => {
+  if (typeof value === 'undefined') {
+    delete process.env[DEMO_SURFACE_MODE_ENV_KEY];
+  } else {
+    process.env[DEMO_SURFACE_MODE_ENV_KEY] = value;
+  }
+
+  jest.resetModules();
+  return require('./sessionStateReducer').default;
+};
+
 describe('sessionStateReducer', () => {
   beforeEach(() => {
     localStorage.clear();
   });
 
+  afterEach(() => {
+    restoreDemoSurfaceModeEnv();
+    jest.resetModules();
+  });
+
+  afterAll(() => {
+    restoreDemoSurfaceModeEnv();
+  });
+
   it('returns the initial state', () => {
     const initialSelection = readStoredGlobalSessionSelection();
-    expect(reducer(undefined, { type: '@@INIT' })).toEqual({
+    const reloadedReducer = loadReducerWithDemoSurfaceModeDefault();
+
+    expect(reloadedReducer(undefined, { type: '@@INIT' })).toEqual({
       metricsOptIn: false,
       focusedTab: 4,
       loginInProgress: false,
@@ -42,17 +76,49 @@ describe('sessionStateReducer', () => {
     });
   });
 
-  it('treats missing or legacy null demoSurfaceMode storage as enabled by default', () => {
-    jest.resetModules();
-    let reloadedReducer = require('./sessionStateReducer').default;
-
-    expect(reloadedReducer(undefined, { type: '@@INIT' }).demoSurfaceMode).toBe(true);
-
+  it('treats legacy null demoSurfaceMode storage as enabled', () => {
     localStorage.setItem('ce:demoSurfaceMode', JSON.stringify(null));
-    jest.resetModules();
-    reloadedReducer = require('./sessionStateReducer').default;
+    const reloadedReducer = loadReducerWithDemoSurfaceModeDefault('false');
 
     expect(reloadedReducer(undefined, { type: '@@INIT' }).demoSurfaceMode).toBe(true);
+  });
+
+  describe('demoSurfaceMode default precedence', () => {
+    it('uses stored false regardless of the env default', () => {
+      localStorage.setItem('ce:demoSurfaceMode', JSON.stringify(false));
+
+      expect(
+        loadReducerWithDemoSurfaceModeDefault('true')(undefined, { type: '@@INIT' }).demoSurfaceMode
+      ).toBe(false);
+
+      expect(
+        loadReducerWithDemoSurfaceModeDefault('false')(undefined, { type: '@@INIT' }).demoSurfaceMode
+      ).toBe(false);
+    });
+
+    it('uses stored true regardless of the env default', () => {
+      localStorage.setItem('ce:demoSurfaceMode', JSON.stringify(true));
+
+      expect(
+        loadReducerWithDemoSurfaceModeDefault('false')(undefined, { type: '@@INIT' }).demoSurfaceMode
+      ).toBe(true);
+
+      expect(
+        loadReducerWithDemoSurfaceModeDefault('true')(undefined, { type: '@@INIT' }).demoSurfaceMode
+      ).toBe(true);
+    });
+
+    it('uses the env default when no demoSurfaceMode preference is stored and the default is true', () => {
+      const reloadedReducer = loadReducerWithDemoSurfaceModeDefault('true');
+
+      expect(reloadedReducer(undefined, { type: '@@INIT' }).demoSurfaceMode).toBe(true);
+    });
+
+    it('uses the env default when no demoSurfaceMode preference is stored and the default is false', () => {
+      const reloadedReducer = loadReducerWithDemoSurfaceModeDefault('false');
+
+      expect(reloadedReducer(undefined, { type: '@@INIT' }).demoSurfaceMode).toBe(false);
+    });
   });
 
   it('hydrates the canonical global session selection from localStorage', () => {
