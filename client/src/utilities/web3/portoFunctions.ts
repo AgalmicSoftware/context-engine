@@ -27,13 +27,37 @@
 
 import { createWalletClient, fallback, http } from 'viem';
 import { toAccount, privateKeyToAccount } from 'viem/accounts';
-import contractScripts from './contractScripts'; // Import purely for read-provider fallback if needed
+import contractScripts from './contractScripts.js'; // Import purely for read-provider fallback if needed
 import { PORTO_SESSION_KEY_ENABLED } from '../../variables/appConfig.js';
 import { chainHexId, getDefaultGasPriceGwei, getPortoRelayUrl as resolvePortoRelayUrl, resolvePortoChain } from '../../variables/chains.js';
 import { createLogger } from '../logging.js';
 
 const portoLog = createLogger('porto');
 
+type AnyObj = Record<string, any>;
+
+interface PortoSession {
+  credentialId: string;
+  address: string;
+  privateKey: string | null;
+}
+
+interface PortoSessionRecord {
+  version: number;
+  credentialId: string;
+  address: string;
+  encryptedPrivateKey: string;
+  encryptedPrivateKeyIv: string;
+}
+
+interface EncryptedPrivateKeyRecord {
+  iv: string;
+  data: string;
+}
+
+interface RestoreSessionOptions {
+  requireSigner?: boolean;
+}
 
 
 
@@ -42,10 +66,10 @@ const portoLog = createLogger('porto');
 // --- Configuration ---
 // For this demo, use a relay URL from chains.js.
 // In a production Porto setup, this might point to a specific Bundler or Relay URL.
-let portoChain = resolvePortoChain();
-let relayUrl = resolvePortoRelayUrl(portoChain);
-let portoChainIdHex = chainHexId(portoChain);
-let portoChainIdDec = String(portoChain?.id ?? 0);
+let portoChain: any = resolvePortoChain();
+let relayUrl: string = resolvePortoRelayUrl(portoChain);
+let portoChainIdHex: string = chainHexId(portoChain);
+let portoChainIdDec: string = String(portoChain?.id ?? 0);
 const PORTO_STORAGE_KEY = 'porto_session_v1';
 const PORTO_DB_NAME = 'porto_session_db';
 const PORTO_DB_VERSION = 1;
@@ -53,7 +77,7 @@ const PORTO_DB_STORE = 'porto_sessions';
 const PORTO_SESSION_RECORD_VERSION = 1;
 const PORTO_SESSION_KEY_CONTEXT = 'porto_session_key_v1';
 
-const syncPortoChainState = (chainOrId) => {
+const syncPortoChainState = (chainOrId: any): void => {
   const resolved = resolvePortoChain(chainOrId);
   portoChain = resolved;
   relayUrl = resolvePortoRelayUrl(resolved);
@@ -61,7 +85,7 @@ const syncPortoChainState = (chainOrId) => {
   portoChainIdDec = String(resolved?.id ?? 0);
 };
 
-export function setPortoChain(chainOrId) {
+export function setPortoChain(chainOrId: any): void {
   const prevId = portoChain?.id;
   const prevRelay = relayUrl;
   syncPortoChainState(chainOrId);
@@ -74,14 +98,14 @@ export function setPortoChain(chainOrId) {
   }
 }
 
-export function getPortoChain() {
+export function getPortoChain(): any {
   return portoChain;
 }
 
 // State to hold the authenticated session
-let currentSession = null;
-let currentSessionSignerAccount = null;
-let viemWalletClient = null;
+let currentSession: PortoSession | null = null;
+let currentSessionSignerAccount: any = null;
+let viemWalletClient: any = null;
 let sessionKeyEnabled = typeof PORTO_SESSION_KEY_ENABLED === 'boolean'
   ? PORTO_SESSION_KEY_ENABLED
   : true;
@@ -94,7 +118,7 @@ const PORTO_FALLBACK_CALLDATA_GAS = 350000n;
 const PORTO_FALLBACK_MEDIUM_CALLDATA_GAS = 700000n;
 const PORTO_FALLBACK_LARGE_CALLDATA_GAS = 1200000n;
 const PORTO_FALLBACK_HUGE_CALLDATA_GAS = 1600000n;
-const PORTO_FALLBACK_GAS_BY_SELECTOR = {
+const PORTO_FALLBACK_GAS_BY_SELECTOR: Record<string, bigint> = {
   // SURVEYS.addSurvey(bytes32,bytes32,bytes32[],bytes32[])
   '0xbaea8df2': 1400000n,
   // SURVEYS.addQuestions(bytes32[],bytes32[],bytes32[])
@@ -103,19 +127,19 @@ const PORTO_FALLBACK_GAS_BY_SELECTOR = {
   '0x0ea045bc': 1400000n,
 };
 
-const parseTxSelector = (data) => {
+const parseTxSelector = (data: unknown): string => {
   const raw = String(data || '').trim().toLowerCase();
   if (!raw.startsWith('0x') || raw.length < 10) return '';
   return raw.slice(0, 10);
 };
 
-const countHexDataBytes = (data) => {
+const countHexDataBytes = (data: unknown): number => {
   const raw = String(data || '').trim().toLowerCase();
   if (!raw.startsWith('0x') || raw.length <= 2) return 0;
   return Math.floor((raw.length - 2) / 2);
 };
 
-const resolvePortoFallbackGas = (tx = {}) => {
+const resolvePortoFallbackGas = (tx: AnyObj = {}): bigint => {
   const data = tx?.data;
   const selector = parseTxSelector(data);
   if (selector && Object.prototype.hasOwnProperty.call(PORTO_FALLBACK_GAS_BY_SELECTOR, selector)) {
@@ -129,7 +153,7 @@ const resolvePortoFallbackGas = (tx = {}) => {
   return PORTO_FALLBACK_CALLDATA_GAS;
 };
 
-const parseGweiToWei = (value) => {
+const parseGweiToWei = (value: unknown): bigint | null => {
   const raw = String(value || '').trim();
   if (!/^\d+(?:\.\d+)?$/.test(raw)) return null;
   const [wholeRaw, fracRaw = ''] = raw.split('.');
@@ -138,7 +162,7 @@ const parseGweiToWei = (value) => {
   return (whole * 1000000000n) + frac;
 };
 
-const resolvePortoDefaultGasPriceWei = (chainOrId = portoChain) => {
+const resolvePortoDefaultGasPriceWei = (chainOrId: any = portoChain): bigint | null => {
   try {
     const chainId = Number(
       typeof chainOrId === 'object'
@@ -151,9 +175,9 @@ const resolvePortoDefaultGasPriceWei = (chainOrId = portoChain) => {
   }
 };
 
-const uniqueRpcUrls = (urls = []) => {
-  const seen = new Set();
-  const out = [];
+const uniqueRpcUrls = (urls: any[] = []): string[] => {
+  const seen = new Set<string>();
+  const out: string[] = [];
   urls.forEach((entry) => {
     const value = String(entry || '').trim().replace(/\/+$/, '');
     if (!value || seen.has(value)) return;
@@ -163,7 +187,7 @@ const uniqueRpcUrls = (urls = []) => {
   return out;
 };
 
-const resolvePortoRelayUrls = (chain, primaryUrl) => uniqueRpcUrls([
+const resolvePortoRelayUrls = (chain: any, primaryUrl: string): string[] => uniqueRpcUrls([
   primaryUrl,
   ...(chain?.rpcUrls?.public?.http || []),
   ...(chain?.rpcUrls?.default?.http || []),
@@ -171,20 +195,20 @@ const resolvePortoRelayUrls = (chain, primaryUrl) => uniqueRpcUrls([
 
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
-const normalizePortoAddress = (value) => String(value || '').trim().toLowerCase();
-const hasCurrentPortoSessionMetadata = () => (
+const normalizePortoAddress = (value: unknown): string => String(value || '').trim().toLowerCase();
+const hasCurrentPortoSessionMetadata = (): boolean => (
   !!currentSession &&
   typeof currentSession === 'object' &&
   String(currentSession.credentialId || '').trim() !== '' &&
   normalizePortoAddress(currentSession.address) !== ''
 );
-const hasCurrentPortoSessionSigner = () => (
+const hasCurrentPortoSessionSigner = (): boolean => (
   !!currentSessionSignerAccount ||
   !!viemWalletClient ||
   (typeof currentSession?.privateKey === 'string' && currentSession.privateKey.length > 0)
 );
 
-const buildHydratedPortoSession = ({ credentialId, address } = {}) => {
+const buildHydratedPortoSession = ({ credentialId, address }: Partial<PortoSession> = {}): PortoSession | null => {
   const normalizedCredentialId = String(credentialId || '').trim();
   const rawAddress = String(address || '').trim();
   if (!normalizedCredentialId || !normalizePortoAddress(rawAddress)) {
@@ -197,8 +221,8 @@ const buildHydratedPortoSession = ({ credentialId, address } = {}) => {
   };
 };
 
-const adoptHydratedPortoSession = (session) => {
-  const nextSession = buildHydratedPortoSession(session);
+const adoptHydratedPortoSession = (session: Partial<PortoSession> | null | undefined): string | null => {
+  const nextSession = buildHydratedPortoSession(session || {});
   if (!nextSession) return null;
   const prevAddress = normalizePortoAddress(currentSession?.address);
   const nextAddress = normalizePortoAddress(nextSession.address);
@@ -215,7 +239,7 @@ const adoptHydratedPortoSession = (session) => {
  * ------------------------------------------------------------------
  */
 
-function bufferToBase64URL(buffer) {
+function bufferToBase64URL(buffer: any): string {
   const bytes = new Uint8Array(buffer);
   let string = '';
   for (let i = 0; i < bytes.byteLength; i++) {
@@ -224,7 +248,7 @@ function bufferToBase64URL(buffer) {
   return btoa(string).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
-function base64URLToBuffer(base64url) {
+function base64URLToBuffer(base64url: string): ArrayBuffer {
   const base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
   const padLen = (4 - (base64.length % 4)) % 4;
   const padded = base64 + '='.repeat(padLen);
@@ -240,7 +264,7 @@ function base64URLToBuffer(base64url) {
  * 1.5 Secure Session Storage (IndexedDB + AES-GCM)
  * ------------------------------------------------------------------
  */
-function openPortoSessionDb() {
+function openPortoSessionDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     if (typeof indexedDB === 'undefined') {
       reject(new Error('IndexedDB not available'));
@@ -258,14 +282,14 @@ function openPortoSessionDb() {
   });
 }
 
-async function readPortoSessionRecord() {
+async function readPortoSessionRecord(): Promise<PortoSessionRecord | null> {
   const db = await openPortoSessionDb();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(PORTO_DB_STORE, 'readonly');
     const store = tx.objectStore(PORTO_DB_STORE);
     const request = store.get(PORTO_STORAGE_KEY);
     const cleanup = () => db.close();
-    request.onsuccess = () => resolve(request.result || null);
+    request.onsuccess = () => resolve((request.result as PortoSessionRecord | null) || null);
     request.onerror = () => reject(request.error);
     tx.oncomplete = cleanup;
     tx.onerror = () => {
@@ -279,7 +303,7 @@ async function readPortoSessionRecord() {
   });
 }
 
-async function writePortoSessionRecord(record) {
+async function writePortoSessionRecord(record: PortoSessionRecord): Promise<void> {
   const db = await openPortoSessionDb();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(PORTO_DB_STORE, 'readwrite');
@@ -300,7 +324,7 @@ async function writePortoSessionRecord(record) {
   });
 }
 
-async function deletePortoSessionRecord() {
+async function deletePortoSessionRecord(): Promise<void> {
   const db = await openPortoSessionDb();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(PORTO_DB_STORE, 'readwrite');
@@ -321,7 +345,7 @@ async function deletePortoSessionRecord() {
   });
 }
 
-async function derivePortoSessionKey(credentialId) {
+async function derivePortoSessionKey(credentialId: string): Promise<CryptoKey> {
   if (!window.crypto?.subtle) {
     throw new Error('WebCrypto subtle API not available');
   }
@@ -336,7 +360,7 @@ async function derivePortoSessionKey(credentialId) {
   );
 }
 
-async function encryptPrivateKey(privateKey, credentialId) {
+async function encryptPrivateKey(privateKey: string, credentialId: string): Promise<EncryptedPrivateKeyRecord> {
   const key = await derivePortoSessionKey(credentialId);
   const iv = window.crypto.getRandomValues(new Uint8Array(12));
   const encoded = textEncoder.encode(privateKey);
@@ -351,7 +375,7 @@ async function encryptPrivateKey(privateKey, credentialId) {
   };
 }
 
-async function decryptPrivateKey(encryptedPrivateKey, encryptedPrivateKeyIv, credentialId) {
+async function decryptPrivateKey(encryptedPrivateKey: string, encryptedPrivateKeyIv: string, credentialId: string): Promise<string> {
   const key = await derivePortoSessionKey(credentialId);
   const iv = new Uint8Array(base64URLToBuffer(encryptedPrivateKeyIv));
   const ciphertext = new Uint8Array(base64URLToBuffer(encryptedPrivateKey));
@@ -363,7 +387,7 @@ async function decryptPrivateKey(encryptedPrivateKey, encryptedPrivateKeyIv, cre
   return textDecoder.decode(plaintext);
 }
 
-const buildValidatedPortoSession = ({ credentialId, address, privateKey } = {}) => {
+const buildValidatedPortoSession = ({ credentialId, address, privateKey }: Partial<PortoSession> = {}): PortoSession | null => {
   const normalizedCredentialId = String(credentialId || '').trim();
   const normalizedPrivateKey = String(privateKey || '').trim();
   const normalizedAddress = normalizePortoAddress(address);
@@ -371,7 +395,7 @@ const buildValidatedPortoSession = ({ credentialId, address, privateKey } = {}) 
     return null;
   }
   try {
-    const account = privateKeyToAccount(normalizedPrivateKey);
+    const account = privateKeyToAccount(normalizedPrivateKey as any);
     if (normalizePortoAddress(account.address) !== normalizedAddress) {
       return null;
     }
@@ -385,7 +409,7 @@ const buildValidatedPortoSession = ({ credentialId, address, privateKey } = {}) 
   }
 };
 
-async function promptForPasskey(credentialId) {
+async function promptForPasskey(credentialId: string): Promise<void> {
   const challenge = new Uint8Array(32);
   window.crypto.getRandomValues(challenge);
   await navigator.credentials.get({
@@ -400,14 +424,14 @@ async function promptForPasskey(credentialId) {
       userVerification: 'required',
       timeout: 60000
     }
-  });
+  } as any);
 }
 
 /**
  * 2. Create the Viem Account wrapper around WebAuthn
  * ------------------------------------------------------------------
  */
-function createWebAuthnViemAccount(credentialId, publicKey, signerAccount, options = {}) {
+function createWebAuthnViemAccount(credentialId: string, publicKey: string, signerAccount: any, options: AnyObj = {}): any {
   const {
     requireUserVerification = true,
     requireUserVerificationForTypedData = true
@@ -416,14 +440,14 @@ function createWebAuthnViemAccount(credentialId, publicKey, signerAccount, optio
   return toAccount({
     address: publicKey,
 
-    async signMessage({ message }) {
+    async signMessage({ message }: AnyObj) {
       if (requireUserVerification) {
         await promptForPasskey(credentialId);
       }
       return signerAccount.signMessage({ message });
     },
 
-    async signTypedData(typedData) {
+    async signTypedData(typedData: any) {
       portoLog.log("Signing TypedData (Porto):", typedData);
       if (requireUserVerificationForTypedData) {
         await promptForPasskey(credentialId);
@@ -434,7 +458,7 @@ function createWebAuthnViemAccount(credentialId, publicKey, signerAccount, optio
       return signerAccount.signTypedData(typedData);
     },
 
-    async signTransaction(transaction) {
+    async signTransaction(transaction: any) {
       portoLog.log("Signing Transaction (Porto):", transaction);
 
       if (requireUserVerification) {
@@ -445,10 +469,10 @@ function createWebAuthnViemAccount(credentialId, publicKey, signerAccount, optio
       // This ensures the RPC recovers the same address that we displayed to the user.
       return signerAccount.signTransaction(transaction);
     }
-  });
+  } as any);
 }
 
-function _initViemClient() {
+function _initViemClient(): void {
   if (!currentSession) return;
   if (!relayUrl) {
     portoLog.warn('[PORTO_RPC] Missing relay URL; skipping client init.');
@@ -456,7 +480,7 @@ function _initViemClient() {
   }
   const signerAccount = currentSessionSignerAccount || (
     typeof currentSession.privateKey === 'string' && currentSession.privateKey
-      ? privateKeyToAccount(currentSession.privateKey)
+      ? privateKeyToAccount(currentSession.privateKey as any)
       : null
   );
   if (!signerAccount) {
@@ -478,13 +502,13 @@ function _initViemClient() {
   );
 
   const relayCandidates = resolvePortoRelayUrls(portoChain, relayUrl);
-  const relayTransports = relayCandidates.map((url) => (
+  const relayTransports: any[] = relayCandidates.map((url) => (
     http(url, {
       timeout: PORTO_RPC_TIMEOUT_MS,
       retryCount: PORTO_RPC_RETRY_COUNT,
     })
   ));
-  const transport = relayTransports.length > 1
+  const transport: any = relayTransports.length > 1
     ? fallback(relayTransports, {
       rank: false,
       retryCount: PORTO_FALLBACK_RETRY_COUNT,
@@ -501,7 +525,7 @@ function _initViemClient() {
   // Store a reference on window for cross-module access (cryptography.js)
   // This avoids circular import issues
   if (typeof window !== 'undefined') {
-    window.__portoMockProvider = createPortoProviderMock();
+    (window as any).__portoMockProvider = createPortoProviderMock();
   }
 
   if (typeof currentSession.privateKey === 'string') {
@@ -509,9 +533,9 @@ function _initViemClient() {
   }
 }
 
-async function _saveSession() {
+async function _saveSession(): Promise<boolean> {
   if (!currentSession) return false;
-  let privateKey = currentSession.privateKey;
+  let privateKey: any = currentSession.privateKey;
 
   try {
     const encrypted = await encryptPrivateKey(privateKey, currentSession.credentialId);
@@ -534,7 +558,7 @@ async function _saveSession() {
 const PORTO_KDF_SALT = new TextEncoder().encode('contextengine.xyz:porto:v1');
 const PORTO_KDF_INFO = new TextEncoder().encode('ethereum-private-key');
 
-async function derivePortoPrivateKey(rawIdBytes) {
+async function derivePortoPrivateKey(rawIdBytes: ArrayBuffer | Uint8Array): Promise<string> {
   const ikm = rawIdBytes instanceof Uint8Array ? rawIdBytes : new Uint8Array(rawIdBytes);
   const baseKey = await crypto.subtle.importKey('raw', ikm, 'HKDF', false, ['deriveBits']);
   const derived = await crypto.subtle.deriveBits(
@@ -550,7 +574,7 @@ async function derivePortoPrivateKey(rawIdBytes) {
  * ------------------------------------------------------------------
  */
 
-export async function authenticatePorto() {
+export async function authenticatePorto(): Promise<string> {
   if (!window.PublicKeyCredential) {
     throw new Error("WebAuthn not supported in this browser.");
   }
@@ -590,14 +614,14 @@ export async function authenticatePorto() {
   };
 
   try {
-    const credential = await navigator.credentials.create({ publicKey: createOptions });
+    const credential: any = await navigator.credentials.create({ publicKey: createOptions as any });
 
     // Derive the private key and address deterministically from the rawId bytes
     // This ensures the address we show the user is the same one that signs the tx
     const rawIdBytes = new Uint8Array(credential.rawId);
-    let privateKey = await derivePortoPrivateKey(rawIdBytes);
+    let privateKey: string | null = await derivePortoPrivateKey(rawIdBytes);
     try {
-      const account = privateKeyToAccount(privateKey);
+      const account = privateKeyToAccount(privateKey as any);
 
       currentSession = {
         credentialId: bufferToBase64URL(credential.rawId),
@@ -618,7 +642,7 @@ export async function authenticatePorto() {
   }
 }
 
-export async function loginWithPorto() {
+export async function loginWithPorto(): Promise<string> {
   if (!window.PublicKeyCredential) {
     throw new Error("WebAuthn not supported in this browser.");
   }
@@ -637,14 +661,14 @@ export async function loginWithPorto() {
   };
 
   try {
-    const credential = await navigator.credentials.get({ publicKey: getOptions });
+    const credential: any = await navigator.credentials.get({ publicKey: getOptions as any });
     if (!credential) throw new Error("No credential received.");
 
     // Re-derive the private key and address from the rawId (just like in registration)
     const rawIdBytes = new Uint8Array(credential.rawId);
-    let newPrivateKey = await derivePortoPrivateKey(rawIdBytes);
+    let newPrivateKey: string | null = await derivePortoPrivateKey(rawIdBytes);
     try {
-      const newAccount = privateKeyToAccount(newPrivateKey);
+      const newAccount = privateKeyToAccount(newPrivateKey as any);
 
       currentSession = {
         credentialId: bufferToBase64URL(credential.rawId),
@@ -665,14 +689,14 @@ export async function loginWithPorto() {
   }
 }
 
-export async function restoreSession(options = {}) {
+export async function restoreSession(options: RestoreSessionOptions = {}): Promise<string | null> {
   const requireSigner = options?.requireSigner !== false;
   try {
     if (hasCurrentPortoSessionMetadata() && (!requireSigner || hasCurrentPortoSessionSigner())) {
-      return currentSession.address;
+      return currentSession!.address;
     }
 
-    let record = null;
+    let record: PortoSessionRecord | null = null;
     try {
       record = await readPortoSessionRecord();
     } catch (e) {
@@ -697,12 +721,12 @@ export async function restoreSession(options = {}) {
       try {
         try {
           await promptForPasskey(record.credentialId);
-        } catch (e) {
+        } catch (e: any) {
           portoLog.warn('Porto session restore blocked — passkey assertion failed:', e?.message || e);
           return null;
         }
 
-        let privateKey = await decryptPrivateKey(
+        let privateKey: string | null = await decryptPrivateKey(
           record.encryptedPrivateKey,
           record.encryptedPrivateKeyIv,
           record.credentialId
@@ -717,7 +741,7 @@ export async function restoreSession(options = {}) {
             portoLog.warn('Discarding invalid Porto session record: stored address does not match private key.');
           } else {
             currentSession = restoredSession;
-            currentSessionSignerAccount = privateKeyToAccount(privateKey);
+            currentSessionSignerAccount = privateKeyToAccount(privateKey as any);
             _initViemClient();
             return currentSession.address;
           }
@@ -731,12 +755,12 @@ export async function restoreSession(options = {}) {
 
     const stored = localStorage.getItem(PORTO_STORAGE_KEY);
     if (stored) {
-      const session = JSON.parse(stored);
+      const session: any = JSON.parse(stored);
       const restoredSession = buildValidatedPortoSession(session);
       if (restoredSession) {
         try {
           await promptForPasskey(restoredSession.credentialId);
-        } catch (e) {
+        } catch (e: any) {
           portoLog.warn('Porto session restore blocked — passkey assertion failed:', e?.message || e);
           return null;
         }
@@ -746,7 +770,7 @@ export async function restoreSession(options = {}) {
         if (persisted) {
           localStorage.removeItem(PORTO_STORAGE_KEY);
         }
-        currentSessionSignerAccount = privateKeyToAccount(restoredSession.privateKey);
+        currentSessionSignerAccount = privateKeyToAccount(restoredSession.privateKey as any);
         _initViemClient();
         return currentSession.address;
       }
@@ -761,7 +785,7 @@ export async function restoreSession(options = {}) {
   return null;
 }
 
-export function logoutPorto() {
+export function logoutPorto(): void {
   try {
     localStorage.removeItem(PORTO_STORAGE_KEY);
   } catch (e) { portoLog.warn('portoFunctions: fallback', e); }
@@ -773,28 +797,28 @@ export function logoutPorto() {
   viemWalletClient = null;
 }
 
-export function getPortoAddress() {
+export function getPortoAddress(): string | null {
   return currentSession ? currentSession.address : null;
 }
 
-export function setPortoSessionKeyEnabled(enabled) {
+export function setPortoSessionKeyEnabled(enabled: any): void {
   sessionKeyEnabled = Boolean(enabled);
   if (currentSession) {
     _initViemClient();
   }
 }
 
-export function getPortoSessionKeyEnabled() {
+export function getPortoSessionKeyEnabled(): boolean {
   return sessionKeyEnabled;
 }
 
-export async function sendPortoTransaction(txRequest) {
+export async function sendPortoTransaction(txRequest: AnyObj): Promise<any> {
   if (!viemWalletClient) {
     await restoreSession({ requireSigner: true });
   }
   if (!viemWalletClient) throw new Error("Porto client not initialized");
 
-  const collectErrorFragments = (value, depth = 0, out = []) => {
+  const collectErrorFragments = (value: any, depth = 0, out: string[] = []): string[] => {
     if (depth > 5 || value == null) return out;
     if (Array.isArray(value)) {
       value.forEach((item) => collectErrorFragments(item, depth + 1, out));
@@ -825,7 +849,7 @@ export async function sendPortoTransaction(txRequest) {
     });
     return out;
   };
-  const isReplacementUnderpricedError = (error) => {
+  const isReplacementUnderpricedError = (error: any): boolean => {
     const blob = collectErrorFragments(error)
       .join(' ')
       .toLowerCase();
@@ -836,7 +860,7 @@ export async function sendPortoTransaction(txRequest) {
       || (blob.includes('replacement') && (blob.includes('underpriced') || blob.includes('fee too low')))
     );
   };
-  const parseHexToBigInt = (value) => {
+  const parseHexToBigInt = (value: any): bigint | null => {
     const raw = String(value || '').trim();
     if (!/^0x[0-9a-f]+$/i.test(raw)) return null;
     try {
@@ -845,7 +869,7 @@ export async function sendPortoTransaction(txRequest) {
       return null;
     }
   };
-  const parseNonceToBigInt = (value) => {
+  const parseNonceToBigInt = (value: any): bigint | null => {
     if (value == null || value === '') return null;
     if (typeof value === 'bigint') {
       return value >= 0n ? value : null;
@@ -872,20 +896,20 @@ export async function sendPortoTransaction(txRequest) {
     }
     return null;
   };
-  const bumpByPercent = (value, percent) => {
+  const bumpByPercent = (value: any, percent: any): bigint | null => {
     const base = (typeof value === 'bigint') ? value : null;
     if (!base || base <= 0n) return null;
     const pct = BigInt(Math.max(100, Number(percent) || 100));
     return (base * pct + 99n) / 100n;
   };
-  const maxBigInt = (a, b) => {
+  const maxBigInt = (a: any, b: any): bigint | null => {
     const lhs = (typeof a === 'bigint' && a > 0n) ? a : null;
     const rhs = (typeof b === 'bigint' && b > 0n) ? b : null;
     if (lhs == null) return rhs;
     if (rhs == null) return lhs;
     return lhs > rhs ? lhs : rhs;
   };
-  const readPendingNonce = async () => {
+  const readPendingNonce = async (): Promise<bigint | null> => {
     try {
       const nonceHex = await viemWalletClient.request({
         method: 'eth_getTransactionCount',
@@ -896,14 +920,14 @@ export async function sendPortoTransaction(txRequest) {
       return null;
     }
   };
-  const readGasPrice = async () => {
+  const readGasPrice = async (): Promise<bigint | null> => {
     try {
       const gasPriceHex = await viemWalletClient.request({
         method: 'eth_gasPrice',
         params: [],
       });
       return parseHexToBigInt(gasPriceHex);
-    } catch (error) {
+    } catch (error: any) {
       const fallback = resolvePortoDefaultGasPriceWei(portoChain);
       portoLog.warn('[PORTO_RPC] eth_gasPrice failed; using chain default fallback', {
         chainId: portoChain?.id || null,
@@ -913,9 +937,9 @@ export async function sendPortoTransaction(txRequest) {
       return fallback;
     }
   };
-  const sendAttempts = Math.max(1, Number.parseInt(String(globalThis?.CE_PORTO_SEND_RETRY_ATTEMPTS || '4').trim(), 10) || 4);
-  const retryBaseDelayMs = Math.max(100, Number.parseInt(String(globalThis?.CE_PORTO_SEND_RETRY_BASE_DELAY_MS || '400').trim(), 10) || 400);
-  const minRetryGasPriceWei = parseGweiToWei(globalThis?.CE_PORTO_SEND_MIN_RETRY_GWEI || '0.08');
+  const sendAttempts = Math.max(1, Number.parseInt(String((globalThis as any)?.CE_PORTO_SEND_RETRY_ATTEMPTS || '4').trim(), 10) || 4);
+  const retryBaseDelayMs = Math.max(100, Number.parseInt(String((globalThis as any)?.CE_PORTO_SEND_RETRY_BASE_DELAY_MS || '400').trim(), 10) || 400);
+  const minRetryGasPriceWei = parseGweiToWei((globalThis as any)?.CE_PORTO_SEND_MIN_RETRY_GWEI || '0.08');
 
   try {
     const gasHex = txRequest.gas || txRequest.gasLimit || null;
@@ -935,7 +959,7 @@ export async function sendPortoTransaction(txRequest) {
         });
         if (estimated) {
           gas = estimated;
-          portoLog.log('[PORTO_RPC] Estimated gas:', gas.toString());
+          portoLog.log('[PORTO_RPC] Estimated gas:', estimated.toString());
         }
       } catch (err) {
         const fallback = resolvePortoFallbackGas(txRequest);
@@ -945,9 +969,9 @@ export async function sendPortoTransaction(txRequest) {
     }
     let baselineGasPrice = await readGasPrice();
     let replacementNonce = parseNonceToBigInt(txRequest?.nonce);
-    let lastError = null;
+    let lastError: any = null;
     for (let attempt = 1; attempt <= sendAttempts; attempt += 1) {
-      const txPayload = {
+      const txPayload: AnyObj = {
         to: txRequest.to,
         value: txRequest.value ? BigInt(txRequest.value) : BigInt(0),
         data: txRequest.data,
@@ -977,7 +1001,7 @@ export async function sendPortoTransaction(txRequest) {
         // Convert Ethers v5 txRequest (hex strings) to Viem format (BigInts where needed)
         const hash = await viemWalletClient.sendTransaction(txPayload);
         return hash;
-      } catch (error) {
+      } catch (error: any) {
         lastError = error;
         const replacementUnderpriced = isReplacementUnderpricedError(error);
         portoLog.warn('[PORTO_RPC] sendTransaction attempt failed', {
@@ -1015,13 +1039,13 @@ export async function sendPortoTransaction(txRequest) {
  * 4. The Bridge: Mock Provider for Ethers v5
  * ------------------------------------------------------------------
  */
-export const createPortoProviderMock = () => {
+export const createPortoProviderMock = (): any => {
   return {
     isPorto: true,
     isMetaMask: false,
 
     // EIP-1193 request method
-    request: async ({ method, params }) => {
+    request: async ({ method, params }: { method: string; params?: any[] }) => {
       switch (method) {
         case 'eth_requestAccounts':
         case 'eth_accounts':
@@ -1036,7 +1060,7 @@ export const createPortoProviderMock = () => {
 
         case 'eth_sendTransaction':
           // Intercept transaction, send via Viem sidecar
-          return await sendPortoTransaction(params[0]);
+          return await sendPortoTransaction(params![0]);
 
         case 'eth_estimateGas':
           const tx = params?.[0] || {};
@@ -1065,7 +1089,7 @@ export const createPortoProviderMock = () => {
           if (!viemWalletClient) throw new Error("Porto client not initialized. Please authenticate first.");
 
           // params[0] is the address (from), params[1] is the typed data (JSON string or object)
-          let typedData = typeof params[1] === 'string' ? JSON.parse(params[1]) : params[1];
+          let typedData = typeof params?.[1] === 'string' ? JSON.parse(params[1]) : params?.[1];
 
           // Sanitization: Viem throws if 'EIP712Domain' is present in 'types'
           // We must remove it, as Viem infers it from the 'domain' property
@@ -1085,7 +1109,7 @@ export const createPortoProviderMock = () => {
           }
           if (!viemWalletClient) throw new Error("Porto client not initialized. Please authenticate first.");
           // params[0] is the hex-encoded message, params[1] is the address
-          const rawMessage = params[0];
+          const rawMessage = params?.[0];
           const message =
             typeof rawMessage === 'string' && /^0x(?:[0-9a-fA-F]{2})*$/.test(rawMessage)
               ? { raw: rawMessage }
@@ -1104,7 +1128,7 @@ export const createPortoProviderMock = () => {
           if (viemWalletClient) {
              try {
                return await viemWalletClient.request({ method, params });
-             } catch (err) {
+             } catch (err: any) {
                const fallbackWei = resolvePortoDefaultGasPriceWei(portoChain);
                if (method === 'eth_gasPrice' && typeof fallbackWei === 'bigint' && fallbackWei > 0n) {
                  portoLog.warn('[PORTO_RPC] eth_gasPrice bridge fallback', {
@@ -1119,7 +1143,7 @@ export const createPortoProviderMock = () => {
           }
 
           // Fallback to app's read provider if Viem not ready (e.g. read-only before auth)
-          const readProvider = contractScripts.getReadProviderForGroup('');
+          const readProvider = (contractScripts as any).getReadProviderForGroup('');
           // FallbackProvider in ethers v5 might not expose .send, so we check safely
           if(readProvider && typeof readProvider.send === 'function') {
              return await readProvider.send(method, params || []);
@@ -1143,8 +1167,8 @@ export const createPortoProviderMock = () => {
     },
 
     // Stub event listeners to prevent Ethers errors
-    on: (event, handler) => {},
-    removeListener: (event, handler) => {},
+    on: (event: any, handler: any) => {},
+    removeListener: (event: any, handler: any) => {},
     enable: async () => {
         const addr = getPortoAddress();
         return addr ? [addr] : [];
