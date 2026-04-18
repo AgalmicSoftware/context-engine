@@ -440,7 +440,7 @@ function createWebAuthnViemAccount(credentialId: string, publicKey: string, sign
   return toAccount({
     address: publicKey,
 
-    async signMessage({ message }) {
+    async signMessage({ message }: AnyObj) {
       if (requireUserVerification) {
         await promptForPasskey(credentialId);
       }
@@ -614,7 +614,7 @@ export async function authenticatePorto(): Promise<string> {
   };
 
   try {
-    const credential = await navigator.credentials.create({ publicKey: createOptions });
+    const credential: any = await navigator.credentials.create({ publicKey: createOptions as any });
 
     // Derive the private key and address deterministically from the rawId bytes
     // This ensures the address we show the user is the same one that signs the tx
@@ -820,14 +820,6 @@ export function getPortoSessionKeyEnabled(): boolean {
   return sessionKeyEnabled;
 }
 
-export function hasPortoSessionSigner(): boolean {
-  return hasCurrentPortoSessionSigner();
-}
-
-export function isPortoAutoSignReady(): boolean {
-  return !!(sessionKeyEnabled && hasCurrentPortoSessionMetadata() && hasCurrentPortoSessionSigner());
-}
-
 export async function sendPortoTransaction(txRequest: AnyObj): Promise<any> {
   if (!viemWalletClient) {
     await restoreSession({ requireSigner: true });
@@ -865,12 +857,7 @@ export async function sendPortoTransaction(txRequest: AnyObj): Promise<any> {
     });
     return out;
   };
-  const classifyRecoverableSendError = (error: unknown): {
-    replacementUnderpriced: boolean;
-    nonceTooLow: boolean;
-    alreadyKnown: boolean;
-    recoverable: boolean;
-  } => {
+  const isReplacementUnderpricedError = (error: any): boolean => {
     const blob = collectErrorFragments(error)
       .join(' ')
       .toLowerCase();
@@ -924,49 +911,6 @@ export async function sendPortoTransaction(txRequest: AnyObj): Promise<any> {
       } catch (_) {
         return null;
       }
-    }
-    if (/^\d+$/.test(raw)) {
-      try {
-        return BigInt(raw);
-      } catch (_) {
-        return null;
-      }
-    }
-    return null;
-  };
-  const parseFeeToBigInt = (value: any): bigint | null => {
-    if (value == null || value === '') return null;
-    if (typeof value === 'bigint') return value >= 0n ? value : null;
-    if (typeof value === 'number') {
-      if (!Number.isFinite(value) || value < 0) return null;
-      return BigInt(Math.trunc(value));
-    }
-    if (typeof value === 'object') {
-      if (typeof value.toBigInt === 'function') {
-        try {
-          const parsed = value.toBigInt();
-          return typeof parsed === 'bigint' && parsed >= 0n ? parsed : null;
-        } catch (_) {}
-      }
-      const hexLike = value._hex || value.hex;
-      if (typeof hexLike === 'string') {
-        const parsedHex = parseHexToBigInt(hexLike);
-        if (parsedHex != null && parsedHex >= 0n) return parsedHex;
-      }
-      if (typeof value.toString === 'function' && value.toString !== Object.prototype.toString) {
-        try {
-          return parseFeeToBigInt(value.toString());
-        } catch (_) {
-          return null;
-        }
-      }
-      return null;
-    }
-    const raw = String(value || '').trim();
-    if (!raw) return null;
-    if (/^0x[0-9a-f]+$/i.test(raw)) {
-      const parsedHex = parseHexToBigInt(raw);
-      return parsedHex != null && parsedHex >= 0n ? parsedHex : null;
     }
     if (/^\d+$/.test(raw)) {
       try {
@@ -1232,7 +1176,7 @@ export const createPortoProviderMock = (): any => {
           if (!viemWalletClient) throw new Error("Porto client not initialized. Please authenticate first.");
 
           // params[0] is the address (from), params[1] is the typed data (JSON string or object)
-          let typedData = typeof params[1] === 'string' ? JSON.parse(params[1]) : params[1];
+          let typedData = typeof params?.[1] === 'string' ? JSON.parse(params[1]) : params?.[1];
 
           // Sanitization: Viem throws if 'EIP712Domain' is present in 'types'
           // We must remove it, as Viem infers it from the 'domain' property
@@ -1310,8 +1254,8 @@ export const createPortoProviderMock = (): any => {
     },
 
     // Stub event listeners to prevent Ethers errors
-    on: (event, handler) => {},
-    removeListener: (event, handler) => {},
+    on: (event: any, handler: any) => {},
+    removeListener: (event: any, handler: any) => {},
     enable: async () => {
         const addr = getPortoAddress();
         return addr ? [addr] : [];
