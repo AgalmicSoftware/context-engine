@@ -12,7 +12,13 @@ const buildEmptyQuestionsText = (selectedTags = []) => {
   return 'No questions found for this tag comparison yet.';
 };
 
-const TagModal = ({ isOpen, toggle, activeTag }) => {
+const TagModal = ({
+  isOpen,
+  toggle,
+  activeTag,
+  demoCorpusMode = false,
+  demoCorpusRecords = [],
+}) => {
   const normalizedActiveTag = String(activeTag || '').trim();
   const [selectedTags, setSelectedTags] = useState([]);
 
@@ -69,6 +75,8 @@ const TagModal = ({ isOpen, toggle, activeTag }) => {
         {isOpen && selectedTags.length ? (
           <TagPage
             embedded={true}
+            demoCorpusMode={demoCorpusMode}
+            demoCorpusRecords={demoCorpusRecords}
             selectedTagsOverride={selectedTags}
             onSelectedTagsChange={handleSelectedTagsChange}
             emptyQuestionsText={emptyQuestionsText}

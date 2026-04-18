@@ -20,8 +20,8 @@ import SingleQuestionResponse from '../SurveyTool/SingleQuestionResponse.jsx';
 import SessionChipSelector from '../Shared/SessionChipSelector.jsx';
 import {
   buildTagPagePath,
-  getQuestionTagDisplayList,
 } from '../SurveyTool/QuestionTagDropdown.jsx';
+import { getQuestionTagDisplayList } from '../../utilities/survey/questionTags.js';
 import styles from './TagPage.module.scss';
 
 const parseTagPath = (pathname = '') => {
@@ -190,6 +190,101 @@ const sortTagEntriesByCount = ({
     normalizedTag,
     displayTag: displayMap.get(normalizedTag) || normalizedTag,
   }));
+
+const buildDemoCorpusEmptyText = (selectedTags = []) => {
+  if (selectedTags.length === 1) {
+    return `No demo corpus entries tagged ${selectedTags[0]} yet.`;
+  }
+
+  return 'No demo corpus entries match this tag comparison yet.';
+};
+
+const buildVisibleDemoCorpusTags = ({
+  entryTags = [],
+  normalizedSelectedTags = [],
+} = {}) => {
+  const selectedTagSet = new Set(normalizedSelectedTags);
+  const selected = [];
+  const unselected = [];
+
+  (Array.isArray(entryTags) ? entryTags : []).forEach((tag) => {
+    const normalizedTag = normalizeTagList([tag])[0];
+    if (!normalizedTag) return;
+
+    if (selectedTagSet.has(normalizedTag)) {
+      selected.push(tag);
+      return;
+    }
+
+    unselected.push(tag);
+  });
+
+  return [...selected, ...unselected];
+};
+
+const collectDemoCorpusData = ({ selectedTags, demoCorpusRecords = [] } = {}) => {
+  const normalizedSelectedTags = normalizeTagList(selectedTags);
+  if (!normalizedSelectedTags.length) {
+    return { entries: [], relatedTags: [], pickerTags: [] };
+  }
+
+  const relatedCounts = new Map();
+  const relatedDisplay = new Map();
+  const scopedCounts = new Map();
+  const scopedDisplay = new Map();
+  const matchedEntries = [];
+
+  (Array.isArray(demoCorpusRecords) ? demoCorpusRecords : []).forEach((entry) => {
+    const scopedSeen = new Set();
+    entry.tags.forEach((tag) => {
+      const normalizedTag = normalizeTagList([tag])[0];
+      if (!normalizedTag || normalizedSelectedTags.includes(normalizedTag) || scopedSeen.has(normalizedTag)) return;
+      scopedSeen.add(normalizedTag);
+      if (!scopedDisplay.has(normalizedTag)) {
+        scopedDisplay.set(normalizedTag, tag);
+      }
+      scopedCounts.set(normalizedTag, (scopedCounts.get(normalizedTag) || 0) + 1);
+    });
+
+    const hasAllSelectedTags = normalizedSelectedTags.every((tag) => entry.normalizedTags.includes(tag));
+    if (!hasAllSelectedTags) return;
+
+    const relatedSeen = new Set();
+    entry.tags.forEach((tag) => {
+      const normalizedTag = normalizeTagList([tag])[0];
+      if (!normalizedTag || normalizedSelectedTags.includes(normalizedTag) || relatedSeen.has(normalizedTag)) return;
+      relatedSeen.add(normalizedTag);
+      if (!relatedDisplay.has(normalizedTag)) {
+        relatedDisplay.set(normalizedTag, tag);
+      }
+      relatedCounts.set(normalizedTag, (relatedCounts.get(normalizedTag) || 0) + 1);
+    });
+
+    matchedEntries.push(entry);
+  });
+
+  const relatedTagEntries = sortTagEntriesByCount({
+    counts: relatedCounts,
+    displayMap: relatedDisplay,
+  });
+  const relatedTags = relatedTagEntries.map(({ displayTag }) => displayTag);
+  const relatedNormalizedTags = new Set(relatedTagEntries.map(({ normalizedTag }) => normalizedTag));
+  const pickerTags = [
+    ...relatedTags,
+    ...sortTagEntriesByCount({
+      counts: scopedCounts,
+      displayMap: scopedDisplay,
+    })
+      .filter(({ normalizedTag }) => !relatedNormalizedTags.has(normalizedTag))
+      .map(({ displayTag }) => displayTag),
+  ];
+
+  return {
+    entries: matchedEntries,
+    relatedTags,
+    pickerTags,
+  };
+};
 
 const collectTagPageData = ({
   selectedTags,
@@ -401,6 +496,8 @@ export const TagPageView = ({
   onSelectedTagsChange = null,
   emptyQuestionsText = 'No questions found.',
   embedded = false,
+  demoCorpusMode = false,
+  demoCorpusRecords = [],
 }) => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -475,6 +572,7 @@ export const TagPageView = ({
     () => normalizedSelectedTags.slice().sort((left, right) => left.localeCompare(right)).join('||'),
     [normalizedSelectedTags]
   );
+  const isDemoCorpusContext = demoCorpusMode === true;
 
   const queryPinnedScopeSlug = useMemo(() => (
     parseQuestionSessionSlugFromSearch(location.search)
@@ -558,25 +656,31 @@ export const TagPageView = ({
     sessionRegistryRevision,
   ]);
   const sessionSelectorHint = useMemo(() => buildTagPageSelectorHint({
-    routePinned,
-    localOverrideTouched: localSessionOverrideTouched,
+    routePinned: isDemoCorpusContext ? false : routePinned,
+    localOverrideTouched: isDemoCorpusContext ? false : localSessionOverrideTouched,
     globalSelection: globalSessionSelection,
   }), [
     globalSessionSelection,
+    isDemoCorpusContext,
     localSessionOverrideTouched,
     routePinned,
   ]);
   const selectedSessionSelectorSlug = routePinned
     ? normalizeSessionSlug(queryPinnedScopeSlug)
     : (localSessionOverrideTouched ? normalizedLocalOverrideSlug : null);
-  const sessionSelectorOptions = useMemo(() => buildTagPageSessionSelectorOptions({
-    selectedSlug: selectedSessionSelectorSlug,
-    primarySlug: globalSessionSelection.primarySessionSlug || '',
-    scopedSlugs: effectiveScopeSlugs,
-    sessionRegistryRevision,
-  }), [
+  const sessionSelectorOptions = useMemo(() => (
+    isDemoCorpusContext
+      ? []
+      : buildTagPageSessionSelectorOptions({
+        selectedSlug: selectedSessionSelectorSlug,
+        primarySlug: globalSessionSelection.primarySessionSlug || '',
+        scopedSlugs: effectiveScopeSlugs,
+        sessionRegistryRevision,
+      })
+  ), [
     effectiveScopeSlugs,
     globalSessionSelection.primarySessionSlug,
+    isDemoCorpusContext,
     sessionRegistryRevision,
     selectedSessionSelectorSlug,
   ]);
@@ -609,26 +713,57 @@ export const TagPageView = ({
   }, [cacheVersion, questionResponsesNonce]);
 
   // NOTE: Full cache scan on each update. Acceptable for current scale; add slug-indexed cache if this becomes a bottleneck.
-  const { questions, relatedTags, pickerTags } = useMemo(
-    () => collectTagPageData({
-      selectedTags,
-      scopeFilterMode: effectiveScopeState.filterMode,
-      scopeSlugs: effectiveScopeSlugs,
+  const questionData = useMemo(
+    () => (
+      isDemoCorpusContext
+        ? { questions: [], relatedTags: [], pickerTags: [] }
+        : collectTagPageData({
+          selectedTags,
+          scopeFilterMode: effectiveScopeState.filterMode,
+          scopeSlugs: effectiveScopeSlugs,
+          cacheVersion,
+          questionResponsesNonce,
+        })
+    ),
+    [
       cacheVersion,
+      effectiveScopeState.filterMode,
+      effectiveScopeSlugs,
+      isDemoCorpusContext,
       questionResponsesNonce,
-    }),
-    [cacheVersion, effectiveScopeState.filterMode, effectiveScopeSlugs, questionResponsesNonce, selectedTags]
-  );
-  const sbtGroups = useMemo(
-    () => collectSbtGroupData({
       selectedTags,
-      scopeFilterMode: effectiveScopeState.filterMode,
-      scopeSlugs: effectiveScopeSlugs,
-      cacheVersion: sbtCacheVersion,
-    }),
-    [effectiveScopeState.filterMode, effectiveScopeSlugs, sbtCacheVersion, selectedTags]
+    ]
   );
-  const showQuestionLoadingState = !isQuestionCacheReady && !questions.length;
+  const demoCorpusData = useMemo(
+    () => (
+      isDemoCorpusContext
+        ? collectDemoCorpusData({ selectedTags, demoCorpusRecords })
+        : { entries: [], relatedTags: [], pickerTags: [] }
+    ),
+    [demoCorpusRecords, isDemoCorpusContext, selectedTags]
+  );
+  const questions = questionData.questions;
+  const demoCorpusEntries = demoCorpusData.entries;
+  const relatedTags = isDemoCorpusContext ? demoCorpusData.relatedTags : questionData.relatedTags;
+  const pickerTags = isDemoCorpusContext ? demoCorpusData.pickerTags : questionData.pickerTags;
+  const sbtGroups = useMemo(
+    () => (
+      isDemoCorpusContext
+        ? []
+        : collectSbtGroupData({
+          selectedTags,
+          scopeFilterMode: effectiveScopeState.filterMode,
+          scopeSlugs: effectiveScopeSlugs,
+          cacheVersion: sbtCacheVersion,
+        })
+    ),
+    [effectiveScopeState.filterMode, effectiveScopeSlugs, isDemoCorpusContext, sbtCacheVersion, selectedTags]
+  );
+  const showQuestionLoadingState = !isDemoCorpusContext && !isQuestionCacheReady && !questions.length;
+  const demoCorpusEmptyText = useMemo(
+    () => buildDemoCorpusEmptyText(selectedTags),
+    [selectedTags]
+  );
   const titleText = useMemo(() => (
     selectedTags.length
       ? selectedTags.map((tag) => `#${tag}`).join(' + ')
@@ -748,13 +883,15 @@ export const TagPageView = ({
             </div>
             <div className={styles.headerMeta}>
               <div className={styles.scopeMeta}>
-                <div
-                  className={styles.scopeBadge}
-                  data-testid="tag-page-session-scope"
-                  title={scopeSummary.title}
-                >
-                  {scopeSummary.label}
-                </div>
+                {!isDemoCorpusContext ? (
+                  <div
+                    className={styles.scopeBadge}
+                    data-testid="tag-page-session-scope"
+                    title={scopeSummary.title}
+                  >
+                    {scopeSummary.label}
+                  </div>
+                ) : null}
                 <div
                   className={[
                     styles.sessionSelectorTriggerRow,
@@ -788,8 +925,12 @@ export const TagPageView = ({
                       data-testid="ce-tag-page-session-selector-panel"
                     >
                       <div className={styles.sessionSelectorPopoverHeader}>
-                        <div className={styles.sessionSelectorHint}>{sessionSelectorHint}</div>
-                        {!routePinned && localSessionOverrideTouched ? (
+                        <div className={styles.sessionSelectorHint}>
+                          {isDemoCorpusContext
+                            ? 'Demo corpus mode uses the demo corpus records currently loaded in this view instead of session-scoped questions.'
+                            : sessionSelectorHint}
+                        </div>
+                        {!isDemoCorpusContext && !routePinned && localSessionOverrideTouched ? (
                           <button
                             type="button"
                             className={styles.sessionSelectorReset}
@@ -800,13 +941,23 @@ export const TagPageView = ({
                           </button>
                         ) : null}
                       </div>
-                      <SessionChipSelector
-                        options={sessionSelectorOptions.map((option) => ({
-                          ...option,
-                          disabled: routePinned,
-                        }))}
-                        onToggle={handleSessionSelect}
-                      />
+                      {isDemoCorpusContext ? (
+                        <div
+                          className={styles.sessionSelectorInfoCard}
+                          data-testid="ce-tag-page-demo-session-info"
+                        >
+                          <div className={styles.sessionSelectorInfoLabel}>Hidden session scope</div>
+                          <div className={styles.sessionSelectorInfoValue}>{scopeSummary.label}</div>
+                        </div>
+                      ) : (
+                        <SessionChipSelector
+                          options={sessionSelectorOptions.map((option) => ({
+                            ...option,
+                            disabled: routePinned,
+                          }))}
+                          onToggle={handleSessionSelect}
+                        />
+                      )}
                     </div>
                   ) : null}
                 </div>
@@ -882,132 +1033,196 @@ export const TagPageView = ({
           )}
         </header>
 
-        <section className={styles.section}>
-          <div className={styles.sectionHeader}>
-            <h2 className={styles.sectionTitle}>Questions</h2>
-            <span className={styles.sectionMeta}>{questions.length}</span>
-          </div>
-          {questions.length ? (
-            <div className={styles.questionList}>
-              {questions.map((question) => (
-                <div
-                  key={`${question.sessionSlug || 'global'}-${question.networkId}-${question.id}`}
-                  className={styles.questionCardShell}
-                >
-                  <SingleQuestionResponse
-                    question={question}
-                    response={null}
-                    isOwnResponse={false}
-                    mode="mini"
-                    showImportance={false}
-                    onDecryptQuestion={() => {}}
-                    questionOnly={true}
-                    network={{
-                      ...(network && typeof network === 'object' ? network : {}),
-                      id: question.networkId || network?.id || '',
-                      chainId: question.networkId || network?.chainId || '',
-                    }}
-                    sessionSlug={effectiveSingleScopeSlug || question.sessionSlug || ''}
-                    questionsCacheNonce={cacheVersion}
-                    questionResponsesNonce={questionResponsesNonce}
-                  />
-                  <div className={styles.questionMeta}>
-                    {question.responseCount} {question.responseCount === 1 ? 'response' : 'responses'}
-                  </div>
-                </div>
-              ))}
+        {isDemoCorpusContext ? (
+          <section className={styles.section} data-testid="ce-tag-page-demo-corpus">
+            <div className={styles.sectionHeader}>
+              <h2 className={styles.sectionTitle}>Demo corpus</h2>
+              <span className={styles.sectionMeta}>{demoCorpusEntries.length}</span>
             </div>
-          ) : showQuestionLoadingState ? (
-            <p className={styles.emptyState} role="status" aria-live="polite">
-              Loading questions...
-            </p>
-          ) : (
-            <p className={styles.emptyState}>{emptyQuestionsText}</p>
-          )}
-        </section>
-
-        <section className={styles.section}>
-          <div className={styles.sectionHeader}>
-            <h2 className={styles.sectionTitle}>SBT Groups</h2>
-            <span className={styles.sectionMeta}>{sbtGroups.length}</span>
-          </div>
-          {sbtGroups.length ? (
-            <div className={styles.sbtGroupList}>
-              {sbtGroups.map((group) => (
-                <a
-                  key={`${group.sessionSlug || 'general'}-${group.networkId}-${group.address}`}
-                  href={buildSbtDetailPath(group.address, group.sessionSlug)}
-                  className={styles.sbtGroupCard}
-                >
-                  {group.image ? (
-                    <img
-                      src={group.image}
-                      alt=""
-                      className={styles.sbtGroupImage}
-                    />
-                  ) : null}
-                  <div>
-                    <div className={styles.sbtGroupName}>{group.name}</div>
-                    {group.tags.length ? (
-                      <div className={styles.sbtGroupTags}>
-                        {group.tags.map((tag) => (
-                          <span key={`${group.address}-${tag}`} className={styles.sbtGroupTagMini}>
-                            #{tag}
-                          </span>
-                        ))}
-                      </div>
+            {demoCorpusEntries.length ? (
+              <div className={styles.demoCorpusList}>
+                {demoCorpusEntries.map((entry) => (
+                  <article key={entry.key} className={styles.demoCorpusCard}>
+                    <div className={styles.demoCorpusCardTopRow}>
+                      <span className={styles.demoCorpusBadge}>{entry.corpusLabel}</span>
+                      {entry.metaLine ? (
+                        <span className={styles.demoCorpusMeta}>{entry.metaLine}</span>
+                      ) : null}
+                    </div>
+                    <h3 className={styles.demoCorpusTitle}>{entry.title}</h3>
+                    {entry.summary ? (
+                      <p className={styles.demoCorpusSummary}>{entry.summary}</p>
                     ) : null}
-                  </div>
-                </a>
-              ))}
-            </div>
-          ) : (
-            <p className={styles.emptyState}>No SBT groups found with these tags.</p>
-          )}
-        </section>
+                    <div className={styles.demoCorpusFooter}>
+                      {entry.url ? (
+                        <a
+                          href={entry.url}
+                          className={styles.demoCorpusLink}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          View source
+                        </a>
+                      ) : null}
+                      {entry.tags.length ? (
+                        <div className={styles.demoCorpusTagList}>
+                          {buildVisibleDemoCorpusTags({
+                            entryTags: entry.tags,
+                            normalizedSelectedTags,
+                          }).map((tag) => {
+                            const isSelectedTag = normalizedSelectedTags.includes(normalizeTagList([tag])[0]);
+                            return (
+                              <span
+                                key={`${entry.key}-${tag}`}
+                                className={[
+                                  styles.demoCorpusTag,
+                                  isSelectedTag ? styles.demoCorpusTagSelected : '',
+                                ].filter(Boolean).join(' ')}
+                              >
+                                #{tag}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      ) : null}
+                    </div>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <p className={styles.emptyState}>{demoCorpusEmptyText}</p>
+            )}
+          </section>
+        ) : (
+          <>
+            <section className={styles.section}>
+              <div className={styles.sectionHeader}>
+                <h2 className={styles.sectionTitle}>Questions</h2>
+                <span className={styles.sectionMeta}>{questions.length}</span>
+              </div>
+              {questions.length ? (
+                <div className={styles.questionList}>
+                  {questions.map((question) => (
+                    <div
+                      key={`${question.sessionSlug || 'global'}-${question.networkId}-${question.id}`}
+                      className={styles.questionCardShell}
+                    >
+                      <SingleQuestionResponse
+                        question={question}
+                        response={null}
+                        isOwnResponse={false}
+                        mode="mini"
+                        showImportance={false}
+                        onDecryptQuestion={() => {}}
+                        questionOnly={true}
+                        network={{
+                          ...(network && typeof network === 'object' ? network : {}),
+                          id: question.networkId || network?.id || '',
+                          chainId: question.networkId || network?.chainId || '',
+                        }}
+                        sessionSlug={effectiveSingleScopeSlug || question.sessionSlug || ''}
+                        questionsCacheNonce={cacheVersion}
+                        questionResponsesNonce={questionResponsesNonce}
+                      />
+                      <div className={styles.questionMeta}>
+                        {question.responseCount} {question.responseCount === 1 ? 'response' : 'responses'}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : showQuestionLoadingState ? (
+                <p className={styles.emptyState} role="status" aria-live="polite">
+                  Loading questions...
+                </p>
+              ) : (
+                <p className={styles.emptyState}>{emptyQuestionsText}</p>
+              )}
+            </section>
 
-        <section className={styles.section}>
-          <div className={styles.sectionHeader}>
-            <h2 className={styles.sectionTitle}>AI Interpretation</h2>
-          </div>
-          {aiLoading ? (
-            <p className={styles.aiLoadingText} role="status" aria-live="polite">
-              Generating interpretation...
-            </p>
-          ) : aiError ? (
-            <div>
-              <div className={styles.aiError}>{aiError}</div>
-              <button
-                type="button"
-                className={styles.summarizeButton}
-                onClick={() => handleSummarize({ force: true })}
-              >
-                Try again
-              </button>
-            </div>
-          ) : aiInterpretation ? (
-            <div>
-              <div className={styles.aiContent}>{aiInterpretation}</div>
-              <button
-                type="button"
-                className={styles.regenerateButton}
-                onClick={() => handleSummarize({ force: true })}
-              >
-                Regenerate
-              </button>
-            </div>
-          ) : (
-            <button
-              type="button"
-              className={styles.summarizeButton}
-              disabled={!questions.length || !hasSingleSessionScope}
-              title={!hasSingleSessionScope ? 'Select a single session to enable AI interpretation' : undefined}
-              onClick={() => handleSummarize()}
-            >
-              Summarize discussions
-            </button>
-          )}
-        </section>
+            <section className={styles.section}>
+              <div className={styles.sectionHeader}>
+                <h2 className={styles.sectionTitle}>SBT Groups</h2>
+                <span className={styles.sectionMeta}>{sbtGroups.length}</span>
+              </div>
+              {sbtGroups.length ? (
+                <div className={styles.sbtGroupList}>
+                  {sbtGroups.map((group) => (
+                    <a
+                      key={`${group.sessionSlug || 'general'}-${group.networkId}-${group.address}`}
+                      href={buildSbtDetailPath(group.address, group.sessionSlug)}
+                      className={styles.sbtGroupCard}
+                    >
+                      {group.image ? (
+                        <img
+                          src={group.image}
+                          alt=""
+                          className={styles.sbtGroupImage}
+                        />
+                      ) : null}
+                      <div>
+                        <div className={styles.sbtGroupName}>{group.name}</div>
+                        {group.tags.length ? (
+                          <div className={styles.sbtGroupTags}>
+                            {group.tags.map((tag) => (
+                              <span key={`${group.address}-${tag}`} className={styles.sbtGroupTagMini}>
+                                #{tag}
+                              </span>
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
+                    </a>
+                  ))}
+                </div>
+              ) : (
+                <p className={styles.emptyState}>No SBT groups found with these tags.</p>
+              )}
+            </section>
+
+            <section className={styles.section}>
+              <div className={styles.sectionHeader}>
+                <h2 className={styles.sectionTitle}>AI Interpretation</h2>
+              </div>
+              {aiLoading ? (
+                <p className={styles.aiLoadingText} role="status" aria-live="polite">
+                  Generating interpretation...
+                </p>
+              ) : aiError ? (
+                <div>
+                  <div className={styles.aiError}>{aiError}</div>
+                  <button
+                    type="button"
+                    className={styles.summarizeButton}
+                    onClick={() => handleSummarize({ force: true })}
+                  >
+                    Try again
+                  </button>
+                </div>
+              ) : aiInterpretation ? (
+                <div>
+                  <div className={styles.aiContent}>{aiInterpretation}</div>
+                  <button
+                    type="button"
+                    className={styles.regenerateButton}
+                    onClick={() => handleSummarize({ force: true })}
+                  >
+                    Regenerate
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className={styles.summarizeButton}
+                  disabled={!questions.length || !hasSingleSessionScope}
+                  title={!hasSingleSessionScope ? 'Select a single session to enable AI interpretation' : undefined}
+                  onClick={() => handleSummarize()}
+                >
+                  Summarize discussions
+                </button>
+              )}
+            </section>
+          </>
+        )}
       </div>
     </div>
   );
