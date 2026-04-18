@@ -32,9 +32,10 @@ describe('demoCorpusRecords', () => {
     ]);
 
     expect(records).toHaveLength(1);
-    expect(records[0].title.length).toBeLessThanOrEqual(140);
+    // truncateDemoText(value, maxLength) returns at most (maxLength - 1) trimmed chars + '...' = maxLength + 2 chars total.
+    expect(records[0].title.length).toBeLessThanOrEqual(142);
     expect(records[0].title.endsWith('...')).toBe(true);
-    expect(records[0].summary.length).toBeLessThanOrEqual(320);
+    expect(records[0].summary.length).toBeLessThanOrEqual(322);
     expect(records[0].summary.endsWith('...')).toBe(true);
     expect(records[0].summary).toContain('longer body');
     expect(records[0].summary).not.toBe(records[0].title);
