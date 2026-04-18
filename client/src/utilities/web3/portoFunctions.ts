@@ -22,7 +22,7 @@
  *   (the signing account remains in memory; the raw private-key string does not)
  * - Legacy localStorage sessions migrated to IndexedDB then deleted
  */
-/* client/src/utilities/porto/portoFunctions.js */
+/* client/src/utilities/web3/portoFunctions.ts */
 /* global BigInt */
 
 import { createWalletClient, fallback, http } from 'viem';
