@@ -1725,7 +1725,8 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   font-weight: bold;
 }
 
-.questionsDashboard .form-group label {
+.questionsDashboard .form-group label,
+.questionsDashboard .mb-3 label {
   font-size: 1.25em;
 }
 
