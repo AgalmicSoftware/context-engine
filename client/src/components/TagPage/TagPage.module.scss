@@ -34,7 +34,6 @@ $tag-route-accent-alt: tokens.$ce-indigo;
 
 .header {
   margin-bottom: 24px;
-  min-width: 0;
 }
 
 .headerTopRow {
@@ -44,12 +43,11 @@ $tag-route-accent-alt: tokens.$ce-indigo;
   flex-wrap: wrap;
   gap: 16px;
   margin-bottom: 18px;
-  min-width: 0;
 }
 
 .headerLead {
   min-width: 0;
-  flex: 1 1 320px;
+  flex: 1 1 420px;
 }
 
 .headerMeta {
@@ -72,38 +70,27 @@ $tag-route-accent-alt: tokens.$ce-indigo;
   position: relative;
   flex-wrap: wrap;
   justify-content: flex-end;
-  min-width: 0;
-  max-width: 100%;
+}
+
+.eyebrow {
+  margin: 0 0 10px;
+  color: rgba(244, 247, 255, 0.65);
+  font-size: 0.78rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
 
 .title {
   margin: 0;
-  font-size: clamp(2rem, 5.2vw, 3.65rem);
-  line-height: 0.96;
+  font-size: clamp(2.6rem, 7vw, 4.8rem);
+  line-height: 0.94;
   letter-spacing: -0.04em;
   max-width: 100%;
   overflow-wrap: anywhere;
 }
 
 .titleEmbedded {
-  font-size: clamp(2rem, 5.35vw, 3.95rem);
-}
-
-.titlePillHeading {
-  display: flex;
-  width: 100%;
-  margin: 0;
-  min-width: 0;
-  font-size: 1rem;
-  line-height: 1;
-}
-
-.titleTagRow {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  gap: 12px;
-  max-width: 100%;
+  font-size: clamp(3rem, 8vw, 5.8rem);
 }
 
 .scopeBadge {
@@ -290,6 +277,110 @@ $tag-route-accent-alt: tokens.$ce-indigo;
   overflow-y: auto;
   height: 100%;
   width: 100%;
+  padding: clamp(18px, 2.6vw, 30px);
+}
+
+.tagModalWrap {
+  overflow: hidden;
+}
+
+.tagModal {
+  padding: 16px 0 !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+
+  :global(.modal-dialog) {
+    width: min(1440px, calc(100vw - 32px));
+    max-width: min(1440px, calc(100vw - 32px));
+    height: calc(100vh - 32px);
+    min-height: calc(100vh - 32px);
+    margin: 0 auto;
+    display: flex;
+    align-items: stretch;
+    pointer-events: none;
+  }
+}
+
+.tagModalContent {
+  background:
+    radial-gradient(circle at top right, rgba(77, 255, 164, 0.08), transparent 32%),
+    linear-gradient(180deg, rgba(12, 18, 34, 0.98), rgba(8, 12, 24, 0.98));
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 22px !important;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45) !important;
+  color: $page-text-color !important;
+  overflow: hidden;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  pointer-events: auto;
+}
+
+.tagModalBackdrop {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  background: rgba(3, 5, 18, 0.08) !important;
+  opacity: 1 !important;
+  z-index: 1040 !important;
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+}
+
+.tagModalHeaderBar {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  color: $page-text-color;
+  flex: 0 0 auto;
+  padding: 16px 20px;
+
+  :global(.modal-title) {
+    color: rgba(244, 247, 255, 0.88);
+    font-size: 0.92rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+}
+
+.tagModalCloseButton {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  color: rgba(244, 247, 255, 0.9);
+  cursor: pointer;
+  width: 2.4rem;
+  height: 2.4rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.45rem;
+  line-height: 1;
+  padding: 0;
+  transition:
+    border-color 0.18s ease,
+    color 0.18s ease,
+    background 0.18s ease,
+    transform 0.18s ease;
+
+  &:hover,
+  &:focus {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(77, 255, 164, 0.34);
+    color: tokens.$ce-clickable;
+    transform: translateY(-1px);
+  }
+}
+
+.tagModalBody {
+  background: transparent;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
   padding: clamp(18px, 2.6vw, 30px);
 }
 
@@ -1013,13 +1104,7 @@ $tag-route-accent-alt: tokens.$ce-indigo;
 
   .title,
   .titleEmbedded {
-    font-size: clamp(1.85rem, 8.2vw, 2.85rem);
-  }
-
-  .tagPillHero {
-    gap: 10px;
-    padding: 12px 15px;
-    font-size: clamp(1.1rem, 5.2vw, 1.75rem);
+    font-size: clamp(2.45rem, 12vw, 3.8rem);
   }
 
   .headerTopRow {
@@ -1129,6 +1214,25 @@ $tag-route-accent-alt: tokens.$ce-indigo;
 
   .tagModalChromePopover {
     width: min(300px, calc(100vw - 32px));
+  }
+
+  .tagModal {
+    padding: 12px 0 !important;
+
+    :global(.modal-dialog) {
+      width: calc(100vw - 24px);
+      max-width: calc(100vw - 24px);
+      height: calc(100vh - 24px);
+      min-height: calc(100vh - 24px);
+    }
+  }
+
+  .tagModalHeaderBar {
+    padding: 14px 16px;
+  }
+
+  .tagModalBody {
+    padding: 18px 16px;
   }
 
   .questionMeta {
