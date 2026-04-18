@@ -1,7 +1,7 @@
 import { readPublicUrlBasePath } from './publicUrl.js';
 import {
-  PUBLIC_DISCOVERABILITY_URL,
-  PUBLIC_LLMS_URL,
+  PUBLIC_DISCOVERABILITY_PATH,
+  PUBLIC_LLMS_PATH,
   PUBLIC_REPO_SOURCE_URL,
   PUBLIC_REPO_URL,
 } from '../../variables/publicRepoMetadata.js';
@@ -139,10 +139,24 @@ export const buildCanonicalPublicUrl = (
   return origin ? `${origin}${pathname}${search}` : `${pathname}${search}`;
 };
 
+export const buildDeploymentDiscoveryUrl = (
+  assetPath,
+  locationLike = (typeof window !== 'undefined' ? window.location : undefined)
+) => {
+  const windowLocation = typeof window !== 'undefined' ? window.location : undefined;
+  const origin = toStr(locationLike?.origin) || toStr(windowLocation?.origin);
+  const basePath = readPublicUrlBasePath();
+  const normalizedAssetPath = toStr(assetPath).startsWith('/') ? toStr(assetPath) : `/${toStr(assetPath)}`;
+  return origin
+    ? `${origin}${basePath}${normalizedAssetPath}`
+    : `${basePath}${normalizedAssetPath}`;
+};
+
 const buildPublicPageStructuredData = ({
   title = DEFAULT_PUBLIC_PAGE_TITLE,
   description = DEFAULT_PUBLIC_PAGE_DESCRIPTION,
   canonicalUrl = DEFAULT_PUBLIC_SITE_URL,
+  location,
 } = {}) => ({
   '@context': 'https://schema.org',
   '@graph': [
@@ -180,8 +194,8 @@ const buildPublicPageStructuredData = ({
       significantLink: [
         PUBLIC_REPO_URL,
         PUBLIC_REPO_SOURCE_URL,
-        PUBLIC_DISCOVERABILITY_URL,
-        PUBLIC_LLMS_URL,
+        buildDeploymentDiscoveryUrl(PUBLIC_DISCOVERABILITY_PATH, location),
+        buildDeploymentDiscoveryUrl(PUBLIC_LLMS_PATH, location),
       ],
     },
   ],
@@ -239,6 +253,7 @@ export const syncPublicPageHead = ({
         title: resolvedTitle,
         description: resolvedDescription,
         canonicalUrl: resolvedCanonicalUrl || DEFAULT_PUBLIC_SITE_URL,
+        location,
       })
     )
   );
