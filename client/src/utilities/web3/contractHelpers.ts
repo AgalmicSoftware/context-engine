@@ -198,14 +198,6 @@ type ContractHelperDeps = {
   DEFAULT_CHAIN_ID: number;
   store: StoreLike | any;
   getSessionConfigBySlug: (slug: string) => SessionConfigLike | null | undefined;
-  refreshSessionRegistryFieldsCache?: ((args: {
-    chainId?: number | string | null;
-    slug?: string | null;
-    sessionId?: string | null;
-    providerLike?: unknown;
-    fieldKeys?: string[];
-    bootstrapRpc?: boolean;
-  }) => Promise<SessionConfigLike | null | undefined>) | null;
   getCorsProxyUrlOrThrow: (args: {
     sessionConfig?: SessionConfigLike | null;
     sessionSlug?: string;
@@ -309,18 +301,6 @@ const isRetryableSponsoredBootstrapFundingError = (error: unknown): boolean => {
   );
 };
 
-const isRetryableWorkerUrlResolutionFundingError = (error: unknown): boolean => {
-  const fundingError = error as FundingError;
-  const stage = String(fundingError?.stage || '').trim().toLowerCase();
-  if (stage !== 'worker-url-resolution') return false;
-  const message = normalizeFundingErrorMessage(error);
-  return (
-    message.includes('worker url unavailable') ||
-    message.includes('worker url is not configured') ||
-    message.includes('not deployable yet')
-  );
-};
-
 export function createContractHelperMethods(deps: ContractHelperDeps): ContractHelperMethods {
   const {
     resolveSession,
@@ -344,7 +324,6 @@ export function createContractHelperMethods(deps: ContractHelperDeps): ContractH
     DEFAULT_CHAIN_ID,
     store,
     getSessionConfigBySlug,
-    refreshSessionRegistryFieldsCache = null,
     getCorsProxyUrlOrThrow,
     fetchWorkerWithAuth,
     fetchImpl = (...args: Parameters<typeof fetch>) => fetch(...args),
@@ -356,7 +335,33 @@ export function createContractHelperMethods(deps: ContractHelperDeps): ContractH
   const resolveChainIdForRead = (
     cfg: SessionConfigLike | null | undefined,
     contractKey: string = ''
-  ): number => extractChainId(cfg, { contractKey, strict: true });
+  ): number => {
+    const normalizedContractKey = String(contractKey || '').trim();
+    const preferredCandidates = normalizedContractKey === 'sbtFactory'
+      ? [
+          cfg?.contracts?.sbtFactory?.chainId,
+          cfg?.networkChainId,
+          cfg?.contracts?.surveys?.chainId,
+        ]
+      : normalizedContractKey === 'surveys'
+        ? [
+            cfg?.contracts?.surveys?.chainId,
+            cfg?.networkChainId,
+            cfg?.contracts?.sbtFactory?.chainId,
+          ]
+        : [
+            cfg?.networkChainId,
+            cfg?.contracts?.surveys?.chainId,
+            cfg?.contracts?.sbtFactory?.chainId,
+          ];
+
+    const orderedCandidates = preferredCandidates.concat([0]);
+    for (const candidate of orderedCandidates) {
+      const id = Number(candidate || 0);
+      if (Number.isFinite(id) && id > 0) return Math.floor(id);
+    }
+    return 0;
+  };
 
   const buildProviderScopeCacheKey = ({
     provider,
@@ -399,12 +404,7 @@ export function createContractHelperMethods(deps: ContractHelperDeps): ContractH
       opts: LatestBlockOptions | null = null
     ): Promise<number> {
       void providerName;
-      const cfg = (
-        opts &&
-        typeof opts === 'object' &&
-        opts._resolvedCfg &&
-        typeof opts._resolvedCfg === 'object'
-      ) ? opts._resolvedCfg : resolveSession(groupKeyOrCfg === undefined ? '' : groupKeyOrCfg);
+      const cfg = resolveSession(groupKeyOrCfg === undefined ? '' : groupKeyOrCfg);
       const contractKey = String(opts?.contractKey || '').trim();
       const chId = resolveChainIdForRead(cfg, contractKey);
       const force = !!(opts && opts.force === true);
@@ -612,7 +612,12 @@ export function createContractHelperMethods(deps: ContractHelperDeps): ContractH
       }
 
       const cfg = resolveSession(groupKeyOrCfg === undefined ? '' : groupKeyOrCfg);
-      const chId = extractChainId(cfg, { strict: true });
+      const chId = Number(
+        cfg?.networkChainId ||
+        cfg?.contracts?.surveys?.chainId ||
+        cfg?.contracts?.sbtFactory?.chainId ||
+        0
+      ) || 0;
 
       const provider = getReadProviderForGroup(groupKeyOrCfg) as ReadProviderLike;
 
@@ -635,12 +640,7 @@ export function createContractHelperMethods(deps: ContractHelperDeps): ContractH
       groupKeyOrCfg: GroupKeyOrCfg,
       opts: RelevantBlockWindowOptions | null = null
     ): Promise<BlockWindow> {
-      const cfg = (
-        opts &&
-        typeof opts === 'object' &&
-        opts._resolvedCfg &&
-        typeof opts._resolvedCfg === 'object'
-      ) ? opts._resolvedCfg : resolveSession(groupKeyOrCfg || '');
+      const cfg = resolveSession(groupKeyOrCfg || '');
       const slug = normalizeSessionSlug(cfg?.slug || '');
       const contractKey = String(opts?.contractKey || '').trim();
       const forceLatestBlock = !!(
@@ -711,7 +711,6 @@ export function createContractHelperMethods(deps: ContractHelperDeps): ContractH
           {
             ...(forceLatestBlock ? { force: true } : {}),
             ...(contractKey ? { contractKey } : {}),
-            _resolvedCfg: cfg,
           }
         );
 
@@ -772,11 +771,10 @@ export function createContractHelperMethods(deps: ContractHelperDeps): ContractH
         const profile = state?.profile || {};
         const network = profile.network || {};
         const overrideChainId = contextOverride.chainId ?? contextOverride.networkChainId ?? null;
-        const sessionChainId = cfg?.networkChainId ?? cfg?.chainId ?? cfg?.registryChainId ?? null;
         const context: RequestContext = {
           account: contextOverride.account || profile.account || '',
           providerLike: contextOverride.providerLike || profile.provider || 'wagmi',
-          chainId: overrideChainId || sessionChainId || network.id || network.chainId || null,
+          chainId: overrideChainId || network.id || network.chainId || cfg?.networkChainId || null,
         };
         const requestBody: FaucetRequestBody = {
           action: 'request_test_eth',
@@ -848,36 +846,6 @@ export function createContractHelperMethods(deps: ContractHelperDeps): ContractH
           }
           return data;
         };
-        const refreshSessionFieldsForFunding = async (): Promise<SessionConfigLike | null> => {
-          if (!resolvedSessionSlug || typeof refreshSessionRegistryFieldsCache !== 'function') return null;
-          const refreshChainId = (
-            sessionChainId ||
-            cfg?.__registry?.registryChainId ||
-            cfg?.__registry?.chainId ||
-            cfg?.networkChainId ||
-            context.chainId ||
-            null
-          );
-          try {
-            const refreshed = await refreshSessionRegistryFieldsCache({
-              chainId: refreshChainId,
-              slug: resolvedSessionSlug,
-              sessionId: cfg?.sessionId || cfg?.__registry?.sessionId || cfg?.__registry?.sessionIdHex || null,
-              providerLike: context.providerLike,
-            });
-            return (
-              refreshed ||
-              getSessionConfigBySlug(resolvedSessionSlug) ||
-              null
-            );
-          } catch (refreshError: any) {
-            contractsLog.warn('[faucet] Failed to refresh session registry fields before funding retry.', {
-              slug: resolvedSessionSlug,
-              error: refreshError?.message || String(refreshError),
-            });
-            return null;
-          }
-        };
         const sponsoredBootstrapFundingContext = readSponsoredBootstrapFundingContext();
         const bootstrapSessionSlug = normalizeSessionSlug(sponsoredBootstrapFundingContext?.sessionSlug || '');
         const bootstrapWorkerUrl = sponsoredBootstrapFundingContext?.workerUrl || '';
@@ -928,23 +896,6 @@ export function createContractHelperMethods(deps: ContractHelperDeps): ContractH
             sessionConfig: cfg,
           });
         } catch (primaryError: any) {
-          let fundingErrorForFallback = primaryError;
-          if (isRetryableWorkerUrlResolutionFundingError(primaryError)) {
-            const refreshedConfig = await refreshSessionFieldsForFunding();
-            if (refreshedConfig) {
-              try {
-                return await requestWithWorker({
-                  sessionSlug: resolvedSessionSlug,
-                  sessionConfig: refreshedConfig,
-                });
-              } catch (retryError: any) {
-                fundingErrorForFallback = retryError;
-                if (!isRetryableSponsoredBootstrapFundingError(retryError)) {
-                  throw retryError;
-                }
-              }
-            }
-          }
           const shouldRetryWithSponsoredBootstrap = (
             (bootstrapSessionSlug || bootstrapWorkerUrl) &&
             bootstrapTargetSessionSlug === resolvedSessionSlug &&
@@ -952,12 +903,12 @@ export function createContractHelperMethods(deps: ContractHelperDeps): ContractH
               bootstrapSessionSlug !== resolvedSessionSlug ||
               !!bootstrapWorkerUrl
             ) &&
-            isRetryableSponsoredBootstrapFundingError(fundingErrorForFallback)
+            isRetryableSponsoredBootstrapFundingError(primaryError)
           );
           if (!shouldRetryWithSponsoredBootstrap) {
-            throw fundingErrorForFallback;
+            throw primaryError;
           }
-          if (isMissingLocalFaucetKeyFundingError(fundingErrorForFallback)) {
+          if (isMissingLocalFaucetKeyFundingError(primaryError)) {
             // Bootstrap faucet grants are single-use; once consumed, later
             // requests must come from the deployed session's own faucet key.
             if (bootstrapFaucetGrantToken && bootstrapWorkerUrl) {
@@ -968,12 +919,12 @@ export function createContractHelperMethods(deps: ContractHelperDeps): ContractH
                 });
               } catch (grantError: any) {
                 if (Number(grantError?.status || 0) === 404) {
-                  throw fundingErrorForFallback;
+                  throw primaryError;
                 }
                 throw grantError;
               }
             }
-            throw fundingErrorForFallback;
+            throw primaryError;
           }
           if (bootstrapFaucetGrantToken && bootstrapWorkerUrl) {
             try {
