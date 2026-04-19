@@ -153,7 +153,20 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
     gap: 25px;
     align-items: center;
     margin-bottom: 25px;
-    .viewModeSwitch {
+    .primaryControls,
+    .secondaryControls {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+
+    .secondaryControls {
+      margin-left: auto;
+    }
+
+    .viewModeSwitch,
+    .atlasLayoutSwitch {
       display: flex;
       align-items: center;
       background: rgba(0, 0, 0, 0.3);
@@ -188,7 +201,9 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
           margin-right: 6px;
         }
       }
+    }
 
+    .viewModeSwitch {
       .viewModeSeparator {
         display: inline-block;
         width: 1px;
@@ -239,7 +254,6 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
       display: flex;
       align-items: center;
       gap: 10px;
-      margin-left: 20px;
       .filterLabel {
         font-size: 0.85rem;
         color: $text-muted;
@@ -334,6 +348,67 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
       cursor: grabbing;
     }
 
+    &.packedAtlasViewContainer {
+      cursor: default;
+      touch-action: auto;
+      &:active {
+        cursor: default;
+      }
+    }
+
+    .packedAtlasTitleRow {
+      position: absolute;
+      top: 14px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 45;
+      width: min(70%, 720px);
+      text-align: center;
+      pointer-events: none;
+    }
+
+    .packedAtlasTitleButton {
+      pointer-events: auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 7px 14px;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      border-radius: 999px;
+      background: rgba(11, 17, 32, 0.55);
+      color: inherit;
+      cursor: pointer;
+      transition:
+        transform 0.2s ease,
+        border-color 0.2s ease,
+        background-color 0.2s ease,
+        box-shadow 0.2s ease;
+
+      &:hover,
+      &:focus-visible {
+        transform: translateY(-1px);
+        border-color: rgba($primary-glow, 0.45);
+        background: rgba(15, 23, 42, 0.85);
+        box-shadow: 0 10px 24px rgba(0, 0, 0, 0.22);
+        outline: none;
+      }
+    }
+
+    .packedAtlasTitle {
+      color: rgba(241, 245, 249, 0.96);
+      font-size: clamp(1rem, 1.5vw, 1.35rem);
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      line-height: 1.2;
+      text-wrap: balance;
+      text-shadow: 0 6px 18px rgba(2, 6, 23, 0.45);
+    }
+
+    .packedAtlasTitleIcon {
+      font-size: 0.85rem;
+      color: rgba(191, 219, 254, 0.88);
+    }
+
     .backArrow {
       position: absolute;
       top: 20px;
@@ -348,6 +423,8 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
       align-items: center;
       gap: 8px;
       font-weight: bold;
+      border: none;
+      font-family: inherit;
       transition:
         background-color 0.2s,
         border-color 0.2s,
@@ -433,8 +510,14 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
         justify-content: space-between;
         .minimizeBtn {
           cursor: pointer;
+          background: transparent;
+          border: none;
+          padding: 0;
           color: $text-muted;
           font-size: 0.8em;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
           &:hover {
             color: var(--ce-color-white);
           }
@@ -442,16 +525,20 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
       }
 
       .topNodeItem {
+        width: 100%;
         padding: 10px;
         margin-bottom: 8px;
         background: rgba(255, 255, 255, 0.05);
         border-radius: var(--ce-radius-6);
         cursor: pointer;
+        text-align: left;
+        border: 1px solid transparent;
+        color: inherit;
+        font-family: inherit;
         transition:
           transform 0.2s,
           background-color 0.2s,
           border-color 0.2s;
-        border: 1px solid transparent;
         &:hover {
           background: rgba(255, 255, 255, 0.1);
           border-color: $primary-glow;
@@ -501,6 +588,7 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
       transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
       z-index: 10;
       .nodeDot {
+        position: relative;
         border-radius: var(--ce-radius-round);
         background-color: #0b1120;
         display: flex;
@@ -619,6 +707,98 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
         .nodeDot {
           background-color: $accent-yellow;
           border: none;
+        }
+      }
+
+      &.packedAtlasNode {
+        .nodeDot {
+          overflow: hidden;
+          border-width: 1.5px;
+          box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04), 0 8px 24px rgba(0, 0, 0, 0.2);
+        }
+
+        .packedNodeDot {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .packedNodeLabel {
+          position: absolute;
+          inset: 14%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          text-align: center;
+          white-space: normal;
+          line-height: 1.1;
+          padding: 0;
+          transform: scale(0.94);
+          text-shadow: 0 2px 10px rgba(11, 17, 32, 0.55);
+          background: transparent;
+          border-radius: 0;
+        }
+
+        &.depthCenter {
+          .packedNodeDot {
+            background: rgba($primary-glow, 0.12);
+            border-color: rgba($primary-glow, 0.55);
+          }
+          .packedNodeLabel {
+            font-size: 1.1rem;
+          }
+        }
+
+        &.depth0 {
+          .packedNodeDot {
+            background: rgba(59, 130, 246, 0.17);
+            border-color: rgba(147, 197, 253, 0.32);
+          }
+          .packedNodeLabel {
+            color: rgba(219, 234, 254, 0.96);
+          }
+        }
+
+        &.depth1 {
+          .packedNodeDot {
+            background: rgba($accent-teal, 0.16);
+            border-color: rgba($accent-teal, 0.3);
+          }
+          .packedNodeLabel {
+            color: rgba(204, 251, 241, 0.96);
+          }
+        }
+
+        &.depth2 {
+          .packedNodeDot {
+            background: rgba($accent-green, 0.14);
+            border-color: rgba($accent-green, 0.28);
+          }
+          .packedNodeLabel {
+            color: rgba(220, 252, 231, 0.95);
+          }
+        }
+
+        &.depth3 {
+          .packedNodeDot {
+            background: rgba($accent-yellow, 0.18);
+            border: 1.5px solid rgba($accent-yellow, 0.3);
+          }
+          .packedNodeLabel {
+            color: rgba(254, 249, 195, 0.95);
+          }
+        }
+
+        &:hover,
+        &.hovered {
+          .packedNodeDot {
+            transform: scale(1.03);
+          }
+          .packedNodeLabel {
+            background: transparent;
+            padding: 0;
+            transform: scale(1);
+          }
         }
       }
     }
