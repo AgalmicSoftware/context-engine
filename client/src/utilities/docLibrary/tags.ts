@@ -8,37 +8,7 @@ export const DOC_LIBRARY_DOC_ROLES = Object.freeze({
   PHOTO_ANALYSIS: 'photo-analysis',
 });
 
-export type ArweaveTag = {
-  name: string;
-  value: string;
-};
-
-type CommonTagsInput = {
-  kind?: unknown;
-  storage?: unknown;
-};
-
-type SessionTagsInput = {
-  sessionIdHex?: unknown;
-};
-
-type SbtTagsInput = {
-  chainId?: unknown;
-  sbtAddress?: unknown;
-};
-
-type PlaintextFileMetaTagsInput = {
-  name?: unknown;
-  mime?: unknown;
-  size?: unknown;
-};
-
-type RoleTagsInput = {
-  role?: unknown;
-  derivedFromTxId?: unknown;
-};
-
-export const normalizeSessionIdHex = (raw: unknown): string => {
+export const normalizeSessionIdHex = (raw) => {
   const value = toStr(raw).trim();
   if (!value) return '';
   if (value.startsWith('0x') && value.length === 34) {
@@ -96,8 +66,8 @@ export const buildDocLibraryPlaintextFileMetaTags = ({ name, mime, size }: Plain
   return out;
 };
 
-export const buildDocLibraryRoleTags = ({ role, derivedFromTxId }: RoleTagsInput = {}): ArweaveTag[] => {
-  const out: ArweaveTag[] = [];
+export const buildDocLibraryRoleTags = ({ role, derivedFromTxId } = {}) => {
+  const out = [];
   const safeRole = truncateTagValue(role, 60).toLowerCase();
   const safeDerivedFromTxId = truncateTagValue(derivedFromTxId, 80);
   if (safeRole) out.push({ name: 'CE-DocRole', value: safeRole });
@@ -105,7 +75,7 @@ export const buildDocLibraryRoleTags = ({ role, derivedFromTxId }: RoleTagsInput
   return out;
 };
 
-export const mergeTags = (...lists: unknown[]): ArweaveTag[] => (
+export const mergeTags = (...lists) => (
   lists
     .flatMap((list) => (Array.isArray(list) ? list : []))
     .filter((t) => t && typeof t === 'object' && typeof t.name === 'string' && typeof t.value === 'string')
