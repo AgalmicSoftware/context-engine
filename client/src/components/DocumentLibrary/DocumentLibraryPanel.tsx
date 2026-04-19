@@ -2,18 +2,8 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-  faSpinner,
-  faSync,
-  faUpload,
-  faLink,
-  faLock,
-  faLockOpen,
-  faEye,
-  faCopy,
-  faExternalLinkAlt,
-} from '@fortawesome/free-solid-svg-icons';
-import { Button, Input, Modal, ModalBody, ModalHeader } from 'reactstrap';
+import { faSync } from '@fortawesome/free-solid-svg-icons';
+import { Button, Modal, ModalBody, ModalHeader } from 'reactstrap';
 
 import styles from './DocumentLibraryPanel.module.scss';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
@@ -32,7 +22,6 @@ import {
   buildDocLibraryPlaintextFileMetaTags,
   buildDocLibrarySbtTags,
   buildDocLibrarySessionTags,
-  DOC_LIBRARY_DOC_ROLES,
   mergeTags,
   normalizeSbtAddress,
   normalizeSessionIdHex,
@@ -49,6 +38,7 @@ import {
 } from '../../utilities/storage/storageClient.js';
 import {
   STORAGE_BACKENDS,
+  normalizeStorageBackend,
   normalizeStorageRef,
 } from '../../utilities/storage/storageRefs.js';
 import {
@@ -56,10 +46,13 @@ import {
   uploadDocLibraryFile,
   uploadDocLibraryUrlRecord,
 } from '../../utilities/docLibrary/uploads.js';
-import SBTSelector from '../SBTs/SBTSelector';
 import { toStr } from '../../utilities/shared/primitives.js';
-import { notify } from '../../utilities/ui/notify.js';
 import { createLogger } from '../../utilities/logging.js';
+import {
+  DocumentLibraryList,
+  DocumentLibraryUploadControls,
+  DocumentLibraryViewerBody,
+} from './DocumentLibraryPanelViews';
 
 const log = createLogger('DocumentLibraryPanel');
 
@@ -134,6 +127,7 @@ type ListFilter = {
 type AutoOpenDoc = {
   txId: string;
   tagMap: DocTagMap;
+  storageRef?: StorageRef | null;
 };
 
 type OpenableDoc = Pick<DocRecord, 'txId' | 'tagMap' | 'storageRef'>;
@@ -176,7 +170,7 @@ type EncryptAudience =
 
 type FetchArweaveBlobResult =
   | { ok: true; blob: Blob; contentType: string }
-  | { ok: false; error: string };
+  | { ok: false; error: string; stale?: boolean };
 
 type UploadResult = {
   txId?: string;
@@ -334,28 +328,6 @@ const buildDocRecordFromStorageItem = (item: Record<string, unknown>): DocRecord
   });
 };
 
-const copyToClipboard = async (text: unknown): Promise<boolean> => {
-  try {
-    await navigator.clipboard.writeText(String(text || ''));
-    notify.success('Copied to clipboard');
-    return true;
-  } catch (_) {
-    return false;
-  }
-};
-
-const sanitizeHttpUrl = (raw: unknown): string => {
-  const value = toStr(raw).trim();
-  if (!value) return '';
-  try {
-    const parsed = new URL(value);
-    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return '';
-    return parsed.toString();
-  } catch (_) {
-    return '';
-  }
-};
-
 const isTextLikeMime = (mime: unknown): boolean => {
   const m = toStr(mime).trim().toLowerCase();
   if (!m) return false;
@@ -370,13 +342,20 @@ const isTextLikeMime = (mime: unknown): boolean => {
   ].includes(m);
 };
 
-const safeFilename = (name: unknown, fallback = 'document'): string => {
-  const raw = toStr(name).trim();
-  if (!raw) return fallback;
-  return raw.replace(/[\\/:*?"<>|]+/g, '_').slice(0, 180) || fallback;
+const isArweaveTxId = (value: unknown): boolean => /^[a-z0-9_-]{43}$/i.test(toStr(value).trim());
+
+const buildAsyncContextKeyPart = (value: unknown): string => {
+  try {
+    return JSON.stringify(value ?? null);
+  } catch (_) {
+    return String(value ?? '');
+  }
 };
 
-const isArweaveTxId = (value: unknown): boolean => /^[a-z0-9_-]{43}$/i.test(toStr(value).trim());
+const isValidStorageDocRef = (storageRef: StorageRef | null): storageRef is StorageRef => {
+  if (!storageRef?.id) return false;
+  return storageRef.backend === STORAGE_BACKENDS.CLOUDFLARE || isArweaveTxId(storageRef.id);
+};
 
 const buildSessionListFilters = (sessionIdHex: string): ListFilter[] => ([
   { name: 'CE-DocLibrary', values: ['1'] },
@@ -391,11 +370,12 @@ const buildSbtListFilters = ({ chainId, sbtAddress }: { chainId?: number | strin
 
 const fetchArweaveBlobWithFallback = async (
   txId: string,
-  opts: { gateways?: string[] } = {},
+  opts: { gateways?: string[]; isCurrent?: () => boolean } = {},
 ): Promise<FetchArweaveBlobResult> => {
   const gateways = Array.isArray(opts.gateways) && opts.gateways.length
       ? opts.gateways
       : DOC_LIBRARY_ARWEAVE_GATEWAYS;
+  const isCurrent = typeof opts.isCurrent === 'function' ? opts.isCurrent : null;
 
   let lastErr: unknown = null;
   for (const gw of gateways) {
@@ -407,8 +387,10 @@ const fetchArweaveBlobWithFallback = async (
         lastErr = new Error(`Arweave fetch failed (${resp.status})`);
         continue;
       }
+      if (isCurrent && !isCurrent()) return { ok: false, error: '', stale: true };
       // eslint-disable-next-line no-await-in-loop
       const blob = await resp.blob();
+      if (isCurrent && !isCurrent()) return { ok: false, error: '', stale: true };
       const ct = resp.headers.get('content-type') || blob.type || '';
       return { ok: true, blob, contentType: ct };
     } catch (err) {
@@ -416,120 +398,6 @@ const fetchArweaveBlobWithFallback = async (
     }
   }
   return { ok: false, error: getErrorMessage(lastErr, 'Arweave fetch failed.') };
-};
-
-type DocRowImagePreviewProps = {
-  txId: string;
-  name: string;
-  isEncryptedStorage: boolean;
-  arweaveUrl: string;
-  provider?: unknown;
-  account?: string | null;
-  chainId?: number | string | null;
-  panelContextKey?: string;
-  litHooks?: LitHooks;
-};
-
-const DocRowImagePreview = ({
-  txId,
-  name,
-  isEncryptedStorage,
-  arweaveUrl,
-  provider,
-  account,
-  chainId,
-  panelContextKey,
-  litHooks: scopedLitHooks,
-}: DocRowImagePreviewProps) => {
-  const [encryptedPreviewUrl, setEncryptedPreviewUrl] = useState('');
-
-  useEffect(() => {
-    if (!isEncryptedStorage) {
-      setEncryptedPreviewUrl('');
-      return undefined;
-    }
-    if (!txId) {
-      setEncryptedPreviewUrl('');
-      return undefined;
-    }
-
-    const litHooks = (
-      (scopedLitHooks && typeof scopedLitHooks === 'object' ? scopedLitHooks : null) ||
-      getGlobalLitHooks()
-    ) as LitHooks;
-    if (!provider || !toStr(account).trim()) {
-      setEncryptedPreviewUrl('');
-      return undefined;
-    }
-
-    let cancelled = false;
-    let objectUrl = '';
-
-    const loadEncryptedPreview = async () => {
-      try {
-        const { payload } = await litStorage.downloadEncryptedArweaveData({
-          url: litStorage.buildLitArweaveUrl(txId),
-          providerLike: provider,
-          account,
-          chainId: chainId || null,
-          ...(litHooks && typeof litHooks.getKey === 'function'
-            ? { lit: { getKey: litHooks.getKey } }
-            : {}),
-          arweave: {
-            debugContext: {
-              category: 'doc_lit_preview',
-              caller: 'DocumentLibraryPanel.DocRowImagePreview',
-              slug: panelContextKey || '',
-              chainId: Number(chainId || 0) || null,
-            },
-          },
-        });
-
-        const blob = litStorage.decodeLitPayloadToBlob(payload);
-        if (!blob || !toStr(blob.type).trim().toLowerCase().startsWith('image/')) {
-          throw new Error('Encrypted image preview unavailable.');
-        }
-        if (typeof URL === 'undefined' || typeof URL.createObjectURL !== 'function') return;
-
-        objectUrl = URL.createObjectURL(blob);
-        if (cancelled) {
-          if (objectUrl && typeof URL.revokeObjectURL === 'function') {
-            URL.revokeObjectURL(objectUrl);
-          }
-          return;
-        }
-        setEncryptedPreviewUrl(objectUrl);
-      } catch (_) {
-        if (!cancelled) setEncryptedPreviewUrl('');
-      }
-    };
-
-    loadEncryptedPreview();
-
-    return () => {
-      cancelled = true;
-      if (objectUrl && typeof URL !== 'undefined' && typeof URL.revokeObjectURL === 'function') {
-        try {
-          URL.revokeObjectURL(objectUrl);
-        } catch (e) {
-          log.warn('DocumentLibraryPanel: preview cleanup', e);
-        }
-      }
-    };
-  }, [account, chainId, isEncryptedStorage, panelContextKey, provider, scopedLitHooks, txId]);
-
-  const previewSrc = isEncryptedStorage ? encryptedPreviewUrl : arweaveUrl;
-  if (!previewSrc) return null;
-
-  return (
-    <div className={styles.docPreview} data-testid={E2E_TESTIDS.DOC_ROW_IMAGE_PREVIEW}>
-      <img
-        src={previewSrc}
-        alt={`${name || 'Document'} preview`}
-        className={styles.docPreviewImage}
-      />
-    </div>
-  );
 };
 
 export default function DocumentLibraryPanel({
@@ -569,8 +437,8 @@ export default function DocumentLibraryPanel({
   const panelContextKey = useMemo(() => {
     const slug = toStr(sessionSlug).trim().toLowerCase();
     if (mode === 'session') {
-      const id = slug || normalizedSessionIdHex;
-      return id ? `session:${id}` : '';
+      const id = normalizedSessionIdHex || '';
+      return (slug || id) ? `session:${slug}:${id}` : '';
     }
     if (mode === 'sbt') {
       const chain = resolvedSbtChainId ? String(resolvedSbtChainId) : '';
@@ -645,6 +513,17 @@ export default function DocumentLibraryPanel({
       })
       : ''
   ), [docUploadsGate.chainId, docUploadsGate.hasRecipients, network?.id, sessionHasLitChipotle]);
+  const docAsyncConfigKey = useMemo(() => buildAsyncContextKeyPart({
+    corsWorkerUrl: toStr(sessionConfig?.corsWorkerUrl).trim(),
+    docLibrary: sessionConfig?.docLibrary || null,
+    docProvider,
+    docUploadsGate,
+    graphqlUrl,
+    graphqlUrls,
+    lit: sessionConfig?.lit || null,
+    litNetwork: toStr(sessionConfig?.litNetwork).trim(),
+    storageProfile: sessionConfig?.storageProfile || null,
+  }), [docProvider, docUploadsGate, graphqlUrl, graphqlUrls, sessionConfig]);
 
   const locationSearch = typeof window !== 'undefined' ? (window.location.search || '') : '';
 
@@ -652,24 +531,30 @@ export default function DocumentLibraryPanel({
     if (typeof window === 'undefined') return null;
     try {
       const qp = new URLSearchParams(locationSearch);
-      const txId = toStr(qp.get('__ceDocTx') || '').trim();
-      if (!isArweaveTxId(txId)) return null;
+      const storage = normalizeStorageBackend(
+        qp.get('__ceDocStorage') || '',
+        STORAGE_BACKENDS.LIT_ARWEAVE
+      );
+      const refId = toStr(qp.get('__ceDocRef') || qp.get('__ceDocTx') || '').trim();
+      const storageRef = normalizeDocStorageRef(
+        { backend: storage, id: refId },
+        { fallbackBackend: storage }
+      );
+      if (!isValidStorageDocRef(storageRef)) return null;
 
-      const storage = toStr(qp.get('__ceDocStorage') || '').trim() || 'lit-arweave';
       const kind = toStr(qp.get('__ceDocKind') || '').trim() || 'file';
       const name = toStr(qp.get('__ceDocName') || '').trim();
 
       const tagMap = {
-        'CE-DocStorage': storage,
+        'CE-DocStorage': storageRef.backend,
         'CE-DocKind': kind,
         ...(name ? { 'CE-DocName': name } : {}),
       };
 
-      return { txId, tagMap };
+      return { txId: storageRef.id, tagMap, storageRef };
     } catch (_) {
       return null;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [locationSearch]);
 
   const [docs, setDocs] = useState<DocRecord[]>([]);
@@ -687,6 +572,8 @@ export default function DocumentLibraryPanel({
   const [file, setFile] = useState<File | null>(null);
   const [urlInput, setUrlInput] = useState('');
   const [urlTitle, setUrlTitle] = useState('');
+  const [fileUploadPending, setFileUploadPending] = useState(false);
+  const [urlUploadPending, setUrlUploadPending] = useState(false);
 
   // Track whether the user has manually changed encryption defaults; if they have,
   // don't auto-reset when gates/config load asynchronously.
@@ -712,6 +599,59 @@ export default function DocumentLibraryPanel({
   const [viewerMime, setViewerMime] = useState('');
 
   const autoOpenedRef = useRef('');
+  const autoOpeningRef = useRef('');
+  const viewerRequestSeqRef = useRef(0);
+  const viewerContextKey = useMemo(() => ([
+    panelContextKey,
+    toStr(account).trim().toLowerCase(),
+    String(network?.id || ''),
+    loginComplete ? '1' : '0',
+    docAsyncConfigKey,
+  ].join('|')), [account, docAsyncConfigKey, loginComplete, network?.id, panelContextKey]);
+  const activeViewerContextKeyRef = useRef(viewerContextKey);
+  activeViewerContextKeyRef.current = viewerContextKey;
+  const activeUploadContextKeyRef = useRef(viewerContextKey);
+  activeUploadContextKeyRef.current = viewerContextKey;
+  const activeFileRef = useRef<File | null>(file);
+  activeFileRef.current = file;
+  const activeUrlInputRef = useRef(urlInput);
+  activeUrlInputRef.current = urlInput;
+  const activeUrlTitleRef = useRef(urlTitle);
+  activeUrlTitleRef.current = urlTitle;
+  const fileUploadInFlightRef = useRef(false);
+  const urlUploadInFlightRef = useRef(false);
+  const fileUploadAttemptSeqRef = useRef(0);
+  const urlUploadAttemptSeqRef = useRef(0);
+
+  useEffect(() => () => {
+    viewerRequestSeqRef.current += 1;
+    listRequestSeqRef.current += 1;
+    fileUploadAttemptSeqRef.current += 1;
+    urlUploadAttemptSeqRef.current += 1;
+    activeListQueryKeyRef.current = '__unmounted__';
+    activeViewerContextKeyRef.current = '__unmounted__';
+    activeUploadContextKeyRef.current = '__unmounted__';
+    loadingRef.current = false;
+    fileUploadInFlightRef.current = false;
+    urlUploadInFlightRef.current = false;
+  }, []);
+
+  useEffect(() => {
+    viewerRequestSeqRef.current += 1;
+    fileUploadAttemptSeqRef.current += 1;
+    urlUploadAttemptSeqRef.current += 1;
+    setViewerOpen(false);
+    setViewerLoading(false);
+    setViewerError('');
+    setViewerTitle('');
+    setViewerText('');
+    setViewerBlobUrl('');
+    setViewerMime('');
+    fileUploadInFlightRef.current = false;
+    urlUploadInFlightRef.current = false;
+    setFileUploadPending(false);
+    setUrlUploadPending(false);
+  }, [viewerContextKey]);
 
   useEffect(() => {
     return () => {
@@ -770,7 +710,7 @@ export default function DocumentLibraryPanel({
       return buildSbtListFilters({ chainId: sbtChainId || network?.id || null, sbtAddress: normalizedSbtAddress });
     }
     return [];
-  }, [isArweaveBackedDocProvider, mode, normalizedSessionIdHex, normalizedSbtAddress, network?.id, sbtChainId, sessionSlug]);
+  }, [isArweaveBackedDocProvider, mode, normalizedSessionIdHex, normalizedSbtAddress, network?.id, sbtChainId]);
 
   const listQueryKey = useMemo(() => (
     JSON.stringify({
@@ -788,6 +728,8 @@ export default function DocumentLibraryPanel({
     if (mode === 'sbt') return !!normalizedSbtAddress && !!Number(sbtChainId || network?.id || 0);
     return false;
   }, [docProvider, isArweaveBackedDocProvider, mode, normalizedSessionIdHex, normalizedSbtAddress, network?.id, sbtChainId, sessionSlug]);
+  const listRunKey = useMemo(() => `${viewerContextKey}|${canList ? '1' : '0'}|${listQueryKey}`, [canList, listQueryKey, viewerContextKey]);
+  activeListQueryKeyRef.current = listRunKey;
 
   const loadDocs = useCallback(async ({ reset }: { reset?: boolean } = {}) => {
     if (!canList) return;
@@ -795,7 +737,7 @@ export default function DocumentLibraryPanel({
     if (!reset && !cursorRef.current) return;
     setError('');
     const requestSeq = (listRequestSeqRef.current += 1);
-    const expectedQueryKey = listQueryKey;
+    const expectedQueryKey = listRunKey;
     loadingRef.current = true;
     setLoading(true);
     try {
@@ -857,10 +799,9 @@ export default function DocumentLibraryPanel({
       loadingRef.current = false;
       setLoading(false);
     }
-  }, [account, canList, docProvider, graphqlUrl, graphqlUrls, listFilters, network?.id, pageSize, provider, sessionConfig, sessionSlug, listQueryKey]);
+  }, [account, canList, docProvider, graphqlUrl, graphqlUrls, listFilters, network?.id, pageSize, provider, sessionConfig, sessionSlug, listRunKey]);
 
   useEffect(() => {
-    activeListQueryKeyRef.current = listQueryKey;
     // Cancel in-flight requests for the previous query to avoid stale updates.
     listRequestSeqRef.current += 1;
     loadingRef.current = false;
@@ -871,9 +812,10 @@ export default function DocumentLibraryPanel({
     setCursor(null);
     if (!canList) return;
     loadDocs({ reset: true });
-  }, [canList, listQueryKey, loadDocs]);
+  }, [canList, listRunKey, loadDocs]);
 
   const closeViewer = useCallback(() => {
+    viewerRequestSeqRef.current += 1;
     setViewerOpen(false);
     setViewerLoading(false);
     setViewerError('');
@@ -883,9 +825,39 @@ export default function DocumentLibraryPanel({
     setViewerMime('');
   }, []);
 
-  const openDoc = useCallback(async (doc: OpenableDoc) => {
+  const openDoc = useCallback(async (doc: OpenableDoc): Promise<boolean> => {
     const txId = toStr(doc?.txId).trim();
-    if (!txId) return;
+    if (!txId) return false;
+    const requestSeq = viewerRequestSeqRef.current + 1;
+    viewerRequestSeqRef.current = requestSeq;
+    const viewerContextAtStart = activeViewerContextKeyRef.current;
+    const isCurrentViewerRequest = () => (
+      viewerRequestSeqRef.current === requestSeq &&
+      activeViewerContextKeyRef.current === viewerContextAtStart
+    );
+    const revokeStaleBlobUrl = (blobUrl: string) => {
+      if (!blobUrl || typeof URL === 'undefined' || typeof URL.revokeObjectURL !== 'function') return;
+      try { URL.revokeObjectURL(blobUrl); } catch (e) { log.warn('DocumentLibraryPanel: stale blob cleanup', e); }
+    };
+    const applyTextViewerState = ({ title, mime, text }: { title: string; mime: string; text: string }) => {
+      if (!isCurrentViewerRequest()) return false;
+      setViewerTitle(title);
+      setViewerMime(mime);
+      setViewerText(text);
+      setViewerLoading(false);
+      return true;
+    };
+    const applyBlobViewerState = ({ title, mime, blobUrl }: { title: string; mime: string; blobUrl: string }) => {
+      if (!isCurrentViewerRequest()) {
+        revokeStaleBlobUrl(blobUrl);
+        return false;
+      }
+      setViewerTitle(title);
+      setViewerMime(mime);
+      setViewerBlobUrl(blobUrl);
+      setViewerLoading(false);
+      return true;
+    };
 
     const tagMap = doc?.tagMap || {};
     const storage = toStr(tagMap['CE-DocStorage']).trim().toLowerCase();
@@ -913,22 +885,24 @@ export default function DocumentLibraryPanel({
           sessionConfig,
           context: { account, providerLike: provider, chainId: network?.id || null },
         });
+        if (!isCurrentViewerRequest()) return false;
         const blob = await response.blob();
+        if (!isCurrentViewerRequest()) return false;
         const mime = toStr(response.headers.get('content-type') || blob.type || storageRef?.contentType || '').trim();
         if (kind === 'link' || isTextLikeMime(mime)) {
           const text = await blob.text();
-          setViewerTitle(toStr(tagMap['CE-DocName']).trim() || (kind === 'link' ? 'Link record' : 'Document'));
-          setViewerMime(mime || (kind === 'link' ? 'application/json' : 'text/plain'));
-          setViewerText(text || '');
-          setViewerLoading(false);
-          return;
+          return applyTextViewerState({
+            title: toStr(tagMap['CE-DocName']).trim() || (kind === 'link' ? 'Link record' : 'Document'),
+            mime: mime || (kind === 'link' ? 'application/json' : 'text/plain'),
+            text: text || '',
+          });
         }
         const blobUrl = typeof URL !== 'undefined' ? URL.createObjectURL(blob) : '';
-        setViewerTitle(toStr(tagMap['CE-DocName']).trim() || 'Document');
-        setViewerMime(mime);
-        setViewerBlobUrl(blobUrl);
-        setViewerLoading(false);
-        return;
+        return applyBlobViewerState({
+          title: toStr(tagMap['CE-DocName']).trim() || 'Document',
+          mime,
+          blobUrl,
+        });
       }
 
       if (isEncrypted) {
@@ -953,27 +927,28 @@ export default function DocumentLibraryPanel({
             },
           },
         });
+        if (!isCurrentViewerRequest()) return false;
 
         const name = toStr(payload?.name || '').trim() || (kind === 'link' ? 'Encrypted link' : 'Encrypted document');
         const mime = toStr(payload?.mime || '').trim();
         const text = litStorage.decodeLitPayloadToText(payload);
         if (text) {
-          setViewerTitle(name);
-          setViewerMime(mime || 'text/plain');
-          setViewerText(text);
-          setViewerLoading(false);
-          return;
+          return applyTextViewerState({
+            title: name,
+            mime: mime || 'text/plain',
+            text,
+          });
         }
         const blob = litStorage.decodeLitPayloadToBlob(payload);
         if (!blob) {
           throw new Error('Unable to decode encrypted document.');
         }
         const blobUrl = typeof URL !== 'undefined' ? URL.createObjectURL(blob) : '';
-        setViewerTitle(name);
-        setViewerMime(blob.type || mime || '');
-        setViewerBlobUrl(blobUrl);
-        setViewerLoading(false);
-        return;
+        return applyBlobViewerState({
+          title: name,
+          mime: blob.type || mime || '',
+          blobUrl,
+        });
       }
 
       if (kind === 'link') {
@@ -985,63 +960,80 @@ export default function DocumentLibraryPanel({
             chainId: Number(network?.id || 0) || null,
           },
         });
-        setViewerTitle(toStr(tagMap['CE-DocName']).trim() || 'Link record');
-        setViewerMime('application/json');
-        setViewerText(text || '');
-        setViewerLoading(false);
-        return;
+        return applyTextViewerState({
+          title: toStr(tagMap['CE-DocName']).trim() || 'Link record',
+          mime: 'application/json',
+          text: text || '',
+        });
       }
 
-      const res = await fetchArweaveBlobWithFallback(txId);
+      const res = await fetchArweaveBlobWithFallback(txId, { isCurrent: isCurrentViewerRequest });
+      if (!isCurrentViewerRequest()) return false;
+      if (!res.ok && res.stale) return false;
       if (!res.ok) throw new Error(res.error || 'Failed to fetch document.');
       const blob = res.blob;
       const mime = toStr(res.contentType || blob.type || '').trim();
       if (isTextLikeMime(mime)) {
         const text = await blob.text();
-        setViewerTitle(toStr(tagMap['CE-DocName']).trim() || 'Document');
-        setViewerMime(mime || 'text/plain');
-        setViewerText(text || '');
-        setViewerLoading(false);
-        return;
+        return applyTextViewerState({
+          title: toStr(tagMap['CE-DocName']).trim() || 'Document',
+          mime: mime || 'text/plain',
+          text: text || '',
+        });
       }
       const blobUrl = typeof URL !== 'undefined' ? URL.createObjectURL(blob) : '';
-      setViewerTitle(toStr(tagMap['CE-DocName']).trim() || 'Document');
-      setViewerMime(mime);
-      setViewerBlobUrl(blobUrl);
-      setViewerLoading(false);
+      return applyBlobViewerState({
+        title: toStr(tagMap['CE-DocName']).trim() || 'Document',
+        mime,
+        blobUrl,
+      });
     } catch (err) {
+      if (!isCurrentViewerRequest()) return false;
       setViewerLoading(false);
       setViewerError(getErrorMessage(err, 'Failed to open document.'));
       setViewerTitle('Error');
+      return false;
     }
   }, [provider, account, network?.id, panelContextKey, getActiveLitHooks, sessionConfig, sessionSlug]);
 
   useEffect(() => {
     if (!autoOpenDoc || !autoOpenDoc.txId) return;
 
-    const key = `${panelContextKey}:${autoOpenDoc.txId}`;
+    const key = `${panelContextKey}:${autoOpenDoc.storageRef?.backend || ''}:${autoOpenDoc.txId}`;
     if (autoOpenedRef.current === key) return;
+    if (autoOpeningRef.current === key) return;
 
     const storage = toStr(autoOpenDoc.tagMap?.['CE-DocStorage']).trim().toLowerCase();
     const wantsEncrypted = storage === 'lit-arweave' || storage === 'lit';
     if (wantsEncrypted && (!loginComplete || !toStr(account).trim() || !provider)) return;
-    if (wantsEncrypted) {
-      const litHooks = getActiveLitHooks();
-      if (!litHooks || typeof litHooks.getKey !== 'function') return;
-    }
 
-    autoOpenedRef.current = key;
-    openDoc({ txId: autoOpenDoc.txId, tagMap: autoOpenDoc.tagMap });
+    let cancelled = false;
+    autoOpeningRef.current = key;
+    openDoc({ txId: autoOpenDoc.txId, tagMap: autoOpenDoc.tagMap, storageRef: autoOpenDoc.storageRef })
+      .then((opened) => {
+        if (autoOpeningRef.current === key) autoOpeningRef.current = '';
+        if (cancelled || !opened) return;
+        autoOpenedRef.current = key;
 
-    // Clear params so refresh/back doesn't re-open repeatedly.
-    try {
-      const url = new URL(window.location.href);
-      ['__ceDocTx', '__ceDocStorage', '__ceDocKind', '__ceDocName'].forEach((param) => {
-        url.searchParams.delete(param);
+        // Clear params so refresh/back doesn't re-open repeatedly.
+        try {
+          const url = new URL(window.location.href);
+          ['__ceDocTx', '__ceDocRef', '__ceDocStorage', '__ceDocKind', '__ceDocName'].forEach((param) => {
+            url.searchParams.delete(param);
+          });
+          window.history.replaceState({}, '', url.toString());
+        } catch (e) { log.warn('DocumentLibraryPanel: fallback', e); }
+      })
+      .catch((error) => {
+        if (autoOpeningRef.current === key) autoOpeningRef.current = '';
+        log.warn('DocumentLibraryPanel: auto-open failed', error);
       });
-      window.history.replaceState({}, '', url.toString());
-    } catch (e) { log.warn('DocumentLibraryPanel: fallback', e); }
-  }, [autoOpenDoc, panelContextKey, loginComplete, provider, account, openDoc, getActiveLitHooks]);
+
+    return () => {
+      cancelled = true;
+      if (autoOpeningRef.current === key) autoOpeningRef.current = '';
+    };
+  }, [autoOpenDoc, panelContextKey, loginComplete, provider, account, openDoc]);
 
   const addCustomSbt = useCallback((sbt: CustomSbtEntry) => {
     const addr = normalizeSbtAddress(sbt?.address);
@@ -1170,6 +1162,7 @@ export default function DocumentLibraryPanel({
   ]);
 
   const uploadFile = useCallback(async () => {
+    if (fileUploadInFlightRef.current) return;
     if (!isUploadableDocProvider) return;
     if (!file) return;
     if (!loginComplete && typeof toggleLoginModal === 'function') {
@@ -1202,6 +1195,15 @@ export default function DocumentLibraryPanel({
       return;
     }
 
+    const uploadContextKey = activeUploadContextKeyRef.current;
+    const uploadAttemptSeq = (fileUploadAttemptSeqRef.current += 1);
+    const submittedFile = file;
+    const isCurrentUploadContext = () => activeUploadContextKeyRef.current === uploadContextKey;
+    const isCurrentUploadAttemptSeq = () => fileUploadAttemptSeqRef.current === uploadAttemptSeq;
+    const isCurrentUploadAttempt = () => isCurrentUploadContext() && activeFileRef.current === submittedFile;
+    fileUploadInFlightRef.current = true;
+    setFileUploadPending(true);
+
     try {
       if (!locked) {
         const result = await uploadDocLibraryFileUntyped({
@@ -1213,6 +1215,7 @@ export default function DocumentLibraryPanel({
           chainId: network?.id || null,
           tags,
         });
+        if (!isCurrentUploadContext()) return;
         const txId = toStr(result?.txId).trim();
         if (txId) {
           setDocs((prev) => [
@@ -1225,7 +1228,7 @@ export default function DocumentLibraryPanel({
             ...prev,
           ]);
         }
-        setFile(null);
+        if (isCurrentUploadAttempt()) setFile(null);
         return;
       }
 
@@ -1255,6 +1258,7 @@ export default function DocumentLibraryPanel({
           contextLabel: `doc:${sessionSlug || ''}`,
         },
       });
+      if (!isCurrentUploadContext()) return;
 
       const txId = toStr(result?.txId).trim();
       if (txId) {
@@ -1268,9 +1272,16 @@ export default function DocumentLibraryPanel({
           ...prev,
         ]);
       }
-      setFile(null);
+      if (isCurrentUploadAttempt()) setFile(null);
     } catch (err) {
-      setError(getErrorMessage(err, 'Upload failed.'));
+      if (isCurrentUploadAttempt()) {
+        setError(getErrorMessage(err, 'Upload failed.'));
+      }
+    } finally {
+      if (isCurrentUploadAttemptSeq() && isCurrentUploadContext()) {
+        fileUploadInFlightRef.current = false;
+        setFileUploadPending(false);
+      }
     }
   }, [
     docProvider,
@@ -1294,6 +1305,7 @@ export default function DocumentLibraryPanel({
   ]);
 
   const uploadUrlRecord = useCallback(async () => {
+    if (urlUploadInFlightRef.current) return;
     if (!isUploadableDocProvider) return;
     const url = toStr(urlInput).trim();
     if (!url) return;
@@ -1346,6 +1358,20 @@ export default function DocumentLibraryPanel({
       return;
     }
 
+    const uploadContextKey = activeUploadContextKeyRef.current;
+    const uploadAttemptSeq = (urlUploadAttemptSeqRef.current += 1);
+    const submittedUrlInput = urlInput;
+    const submittedUrlTitle = urlTitle;
+    const isCurrentUploadContext = () => activeUploadContextKeyRef.current === uploadContextKey;
+    const isCurrentUploadAttemptSeq = () => urlUploadAttemptSeqRef.current === uploadAttemptSeq;
+    const isCurrentUrlUploadAttempt = () => (
+      isCurrentUploadContext() &&
+      activeUrlInputRef.current === submittedUrlInput &&
+      activeUrlTitleRef.current === submittedUrlTitle
+    );
+    urlUploadInFlightRef.current = true;
+    setUrlUploadPending(true);
+
     try {
       if (!locked) {
         const result = await uploadDocLibraryUrlRecordUntyped({
@@ -1358,6 +1384,7 @@ export default function DocumentLibraryPanel({
           chainId: network?.id || null,
           tags,
         });
+        if (!isCurrentUploadContext()) return;
         const txId = toStr(result?.txId).trim();
         if (txId) {
           setDocs((prev) => [
@@ -1370,8 +1397,10 @@ export default function DocumentLibraryPanel({
             ...prev,
           ]);
         }
-        setUrlInput('');
-        setUrlTitle('');
+        if (isCurrentUrlUploadAttempt()) {
+          setUrlInput('');
+          setUrlTitle('');
+        }
         return;
       }
 
@@ -1402,6 +1431,7 @@ export default function DocumentLibraryPanel({
           contextLabel: `doc-link:${sessionSlug || ''}`,
         },
       });
+      if (!isCurrentUploadContext()) return;
 
       const txId = toStr(result?.txId).trim();
       if (txId) {
@@ -1415,10 +1445,19 @@ export default function DocumentLibraryPanel({
           ...prev,
         ]);
       }
-      setUrlInput('');
-      setUrlTitle('');
+      if (isCurrentUrlUploadAttempt()) {
+        setUrlInput('');
+        setUrlTitle('');
+      }
     } catch (err) {
-      setError(getErrorMessage(err, 'Upload failed.'));
+      if (isCurrentUrlUploadAttempt()) {
+        setError(getErrorMessage(err, 'Upload failed.'));
+      }
+    } finally {
+      if (isCurrentUploadAttemptSeq() && isCurrentUploadContext()) {
+        urlUploadInFlightRef.current = false;
+        setUrlUploadPending(false);
+      }
     }
   }, [
     docProvider,
@@ -1441,102 +1480,6 @@ export default function DocumentLibraryPanel({
     normalizedSbtAddress,
     sbtChainId,
   ]);
-
-  const renderViewerBody = () => {
-    if (viewerError) {
-      return <div className={styles.viewerError} data-testid={E2E_TESTIDS.DOC_VIEWER_ERROR}>{viewerError}</div>;
-    }
-    if (viewerLoading) {
-      return (
-        <div className={styles.viewerLoading}>
-          <FontAwesomeIcon icon={faSpinner} spin /> Loading…
-        </div>
-      );
-    }
-
-    if (viewerText) {
-      const mime = toStr(viewerMime).trim().toLowerCase();
-      if (mime === 'application/json') {
-        try {
-          const parsed = JSON.parse(viewerText);
-          if (parsed && parsed.kind === 'link' && parsed.url) {
-            const safeUrl = sanitizeHttpUrl(parsed.url);
-            return (
-              <div className={styles.viewerLink}>
-                <div className={styles.viewerLinkTitle}>{toStr(parsed.title).trim() || 'Link'}</div>
-                {safeUrl ? (
-                  <a href={safeUrl} target="_blank" rel="noopener noreferrer">
-                    {safeUrl}
-                  </a>
-                ) : (
-                  <div className={styles.noticeInline}>
-                    Unsafe or invalid URL (not rendered as a link): <code>{toStr(parsed.url).trim()}</code>
-                  </div>
-                )}
-                <pre className={styles.viewerPre} data-testid={E2E_TESTIDS.DOC_VIEWER_TEXT}>{viewerText}</pre>
-              </div>
-            );
-          }
-        } catch (e) { log.warn('DocumentLibraryPanel: fallback', e); }
-      }
-      return <pre className={styles.viewerPre} data-testid={E2E_TESTIDS.DOC_VIEWER_TEXT}>{viewerText}</pre>;
-    }
-
-    if (viewerBlobUrl) {
-      const mime = toStr(viewerMime).trim().toLowerCase();
-      const filename = safeFilename(viewerTitle, 'document');
-
-      if (mime.startsWith('image/')) {
-        return (
-          <div className={styles.viewerMedia}>
-            <img src={viewerBlobUrl} alt={filename} className={styles.viewerImage} data-testid={E2E_TESTIDS.DOC_VIEWER_IMAGE} />
-            <a href={viewerBlobUrl} download={filename} className={styles.viewerDownload} data-testid={E2E_TESTIDS.DOC_VIEWER_DOWNLOAD}>
-              Download file
-            </a>
-          </div>
-        );
-      }
-      if (mime === 'application/pdf') {
-        return (
-          <div className={styles.viewerMedia}>
-            <iframe title="PDF" src={viewerBlobUrl} className={styles.viewerPdf} data-testid={E2E_TESTIDS.DOC_VIEWER_PDF} />
-            <a href={viewerBlobUrl} download={filename} className={styles.viewerDownload} data-testid={E2E_TESTIDS.DOC_VIEWER_DOWNLOAD}>
-              Download file
-            </a>
-          </div>
-        );
-      }
-      if (mime.startsWith('audio/')) {
-        return (
-          <div className={styles.viewerMedia}>
-            <audio controls src={viewerBlobUrl} className={styles.viewerAudio} />
-            <a href={viewerBlobUrl} download={filename} className={styles.viewerDownload} data-testid={E2E_TESTIDS.DOC_VIEWER_DOWNLOAD}>
-              Download file
-            </a>
-          </div>
-        );
-      }
-      if (mime.startsWith('video/')) {
-        return (
-          <div className={styles.viewerMedia}>
-            <video controls src={viewerBlobUrl} className={styles.viewerVideo} />
-            <a href={viewerBlobUrl} download={filename} className={styles.viewerDownload} data-testid={E2E_TESTIDS.DOC_VIEWER_DOWNLOAD}>
-              Download file
-            </a>
-          </div>
-        );
-      }
-      return (
-        <div className={styles.viewerMedia}>
-          <a href={viewerBlobUrl} download={filename} className={styles.viewerDownload} data-testid={E2E_TESTIDS.DOC_VIEWER_DOWNLOAD}>
-            Download file
-          </a>
-        </div>
-      );
-    }
-
-    return <div className={styles.viewerEmpty}>No preview available.</div>;
-  };
 
   return (
     <div
@@ -1583,345 +1526,76 @@ export default function DocumentLibraryPanel({
       {!!error && <div className={styles.error}>{error}</div>}
 
       {showUploadControls ? (
-        <div className={styles.uploadBox}>
-        <div className={styles.uploadRow}>
-          <div className={styles.uploadLabel}>File</div>
-          <input
-            type="file"
-            className={styles.fileInput}
-            data-testid={E2E_TESTIDS.DOC_UPLOAD_FILE_INPUT}
-            onChange={(e) => setFile(e.target.files && e.target.files[0] ? e.target.files[0] : null)}
-          />
-          <Button
-            type="button"
-            color="primary"
-            size="sm"
-            className={styles.primaryBtn}
-            onClick={uploadFile}
-            disabled={!file || !isUploadableDocProvider}
-            data-testid={E2E_TESTIDS.DOC_UPLOAD_FILE_BUTTON}
-          >
-            <FontAwesomeIcon icon={faUpload} /> Upload
-          </Button>
-        </div>
-
-        <div className={styles.uploadRow}>
-          <div className={styles.uploadLabel}>
-            URL
-          </div>
-          <Input
-            type="url"
-            value={urlInput}
-            onChange={(e) => setUrlInput(e.target.value)}
-            placeholder="Add URL (stored as a link record, not fetched)"
-            className={styles.urlField}
-            data-testid={E2E_TESTIDS.DOC_URL_INPUT}
-          />
-          <Button
-            type="button"
-            color="primary"
-            size="sm"
-            className={styles.primaryBtn}
-            onClick={uploadUrlRecord}
-            disabled={!toStr(urlInput).trim() || !isUploadableDocProvider}
-            title="Upload link record"
-            data-testid={E2E_TESTIDS.DOC_URL_ADD_BUTTON}
-          >
-            <FontAwesomeIcon icon={faLink} /> Add
-          </Button>
-        </div>
-
-        <div className={styles.uploadRow}>
-          <div className={styles.uploadLabel} />
-          <Input
-            type="text"
-            value={urlTitle}
-            onChange={(e) => setUrlTitle(e.target.value)}
-            placeholder="Optional title"
-            className={styles.urlField}
-            data-testid={E2E_TESTIDS.DOC_URL_TITLE_INPUT}
-          />
-        </div>
-
-        <div className={styles.encryptBox}>
-          <div className={styles.encryptHeader}>
-            <button
-              type="button"
-              className={styles.lockToggle}
-              onClick={toggleLocked}
-              disabled={requiresLitDocumentStorage}
-              title={requiresLitDocumentStorage ? 'Lit-Arweave session storage requires encrypted uploads' : (locked ? 'Upload plaintext' : 'Encrypt with Lit')}
-              data-testid={E2E_TESTIDS.DOC_LOCK_TOGGLE}
-              data-ce-locked={locked ? 'true' : 'false'}
-            >
-              <FontAwesomeIcon icon={locked ? faLock : faLockOpen} />
-              <span className={styles.lockLabel}>{locked ? 'Locked (Encrypted)' : 'Unlocked (Plaintext)'}</span>
-            </button>
-          </div>
-
-          {sessionGateUnsupportedMessage ? (
-            <div className={styles.noticeInline}>
-              {sessionGateUnsupportedMessage}
-            </div>
-          ) : null}
-
-          {locked && (
-            <div className={styles.encryptControls}>
-              <div className={styles.audienceRow}>
-                <label className={styles.radioLabel}>
-                  <input
-                    type="radio"
-                    name="audienceMode"
-                    checked={audienceMode === 'sessionGate'}
-                    onChange={() => {
-                      userEncryptionOverrideRef.current = true;
-                      setAudienceMode('sessionGate');
-                    }}
-                    disabled={!docUploadsGate.hasRecipients}
-                    data-testid={E2E_TESTIDS.DOC_AUDIENCE_SESSION_GATE}
-                  />
-                  Session <code>docUploads</code> gate
-                </label>
-                <label className={styles.radioLabel}>
-                  <input
-                    type="radio"
-                    name="audienceMode"
-                    checked={audienceMode === 'custom'}
-                    onChange={() => {
-                      userEncryptionOverrideRef.current = true;
-                      setAudienceMode('custom');
-                    }}
-                    data-testid={E2E_TESTIDS.DOC_AUDIENCE_CUSTOM}
-                  />
-                  Custom SBT(s)
-                </label>
-              </div>
-
-              {audienceMode === 'sessionGate' && (
-                <div className={styles.gateSummary}>
-                  {docUploadsGate.hasRecipients ? (
-                    <div>
-                      <div><strong>Mode:</strong> {docUploadsGate.mode}</div>
-                      <div><strong>SBTs:</strong> {docUploadsGate.sbtAddresses.length}</div>
-                    </div>
-                  ) : (
-                    <div className={styles.noticeInline}>
-                      Session <code>docUploads</code> gate is unavailable or empty. Uploads will default to plaintext unless you pick Custom SBT(s).
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {audienceMode === 'custom' && (
-                <div className={styles.customAudience}>
-                  <div
-                    className={styles.customSelectorWrap}
-                    data-testid={E2E_TESTIDS.DOC_CUSTOM_SBT_SELECTOR}
-                  >
-                    <SBTSelector
-                      id={`doc-library-custom-${mode || 'session'}`}
-                      label="Select SBT access"
-                      selectedSBTs={customSbtList}
-                      onAddSBT={addCustomSbt}
-                      onRemoveSBT={removeCustomSbt}
-                      network={network}
-                      sessionSlug={sessionSlug || ''}
-                      discoverySessionSlugs={[sessionSlug || '']}
-                      variant="create"
-                    />
-                  </div>
-
-                  <div className={styles.customRow}>
-                    <label className={styles.radioLabel}>
-                      <input
-                        type="radio"
-                        name="customGateMode"
-                        checked={customGateMode === 'any'}
-                        onChange={() => setCustomGateMode('any')}
-                        data-testid={E2E_TESTIDS.DOC_CUSTOM_MODE_ANY}
-                      />
-                      Any
-                    </label>
-                    <label className={styles.radioLabel}>
-                      <input
-                        type="radio"
-                        name="customGateMode"
-                        checked={customGateMode === 'all'}
-                        onChange={() => setCustomGateMode('all')}
-                        data-testid={E2E_TESTIDS.DOC_CUSTOM_MODE_ALL}
-                      />
-                      All
-                    </label>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        {secondaryAssociationType === 'sbt' && mode !== 'session' && (
-          <div className={styles.secondaryAssoc}>
-            <label className={styles.checkboxLabel}>
-              <input type="checkbox" checked={alsoAssociateSbt} onChange={(e) => setAlsoAssociateSbt(e.target.checked)} />
-              Also associate with SBT group
-            </label>
-            {alsoAssociateSbt && (
-              <div className={styles.secondaryRow}>
-                <Input
-                  type="number"
-                  value={assocSbtChainId}
-                  onChange={(e) => setAssocSbtChainId(e.target.value)}
-                  placeholder="chainId"
-                  className={styles.secondaryField}
-                />
-                <Input
-                  type="text"
-                  value={assocSbtAddress}
-                  onChange={(e) => setAssocSbtAddress(e.target.value)}
-                  placeholder="0xSbtAddress"
-                  className={styles.secondaryField}
-                />
-              </div>
-            )}
-          </div>
-        )}
-
-        {secondaryAssociationType === 'session' && (
-          <div className={styles.secondaryAssoc}>
-            <label className={styles.checkboxLabel}>
-              <input
-                type="checkbox"
-                checked={alsoAssociateSession}
-                onChange={(e) => setAlsoAssociateSession(e.target.checked)}
-                disabled={!normalizedSecondarySessionIdHex}
-              />
-              Also associate with session
-              {!normalizedSecondarySessionIdHex && <span className={styles.muted}> (sessionId unavailable)</span>}
-            </label>
-          </div>
-        )}
-        </div>
+        <DocumentLibraryUploadControls
+          file={file}
+          onFileChange={setFile}
+          onUploadFile={uploadFile}
+          fileUploadPending={fileUploadPending}
+          urlInput={urlInput}
+          onUrlInputChange={setUrlInput}
+          urlTitle={urlTitle}
+          onUrlTitleChange={setUrlTitle}
+          onUploadUrlRecord={uploadUrlRecord}
+          urlUploadPending={urlUploadPending}
+          isUploadableDocProvider={isUploadableDocProvider}
+          requiresLitDocumentStorage={requiresLitDocumentStorage}
+          locked={locked}
+          onToggleLocked={toggleLocked}
+          sessionGateUnsupportedMessage={sessionGateUnsupportedMessage}
+          audienceMode={audienceMode}
+          onAudienceModeChange={(nextMode) => {
+            userEncryptionOverrideRef.current = true;
+            setAudienceMode(nextMode);
+          }}
+          docUploadsGate={docUploadsGate}
+          customSbtList={customSbtList}
+          addCustomSbt={addCustomSbt}
+          removeCustomSbt={removeCustomSbt}
+          customGateMode={customGateMode}
+          onCustomGateModeChange={setCustomGateMode}
+          network={network}
+          sessionSlug={sessionSlug}
+          mode={mode}
+          secondaryAssociationType={secondaryAssociationType}
+          alsoAssociateSbt={alsoAssociateSbt}
+          onAlsoAssociateSbtChange={setAlsoAssociateSbt}
+          assocSbtChainId={assocSbtChainId}
+          onAssocSbtChainIdChange={setAssocSbtChainId}
+          assocSbtAddress={assocSbtAddress}
+          onAssocSbtAddressChange={setAssocSbtAddress}
+          alsoAssociateSession={alsoAssociateSession}
+          onAlsoAssociateSessionChange={setAlsoAssociateSession}
+          normalizedSecondarySessionIdHex={normalizedSecondarySessionIdHex}
+        />
       ) : null}
 
-      <div className={styles.list}>
-        {!docs.length && !loading && canList && (
-          <div className={styles.empty}>No documents found yet.</div>
-        )}
-        {docs.map((doc) => {
-          const tagMap = doc?.tagMap || {};
-          const storage = toStr(tagMap['CE-DocStorage']).trim().toLowerCase();
-          const kind = toStr(tagMap['CE-DocKind']).trim().toLowerCase();
-          const docRole = toStr(tagMap['CE-DocRole']).trim().toLowerCase();
-          const mimeType = toStr(tagMap['CE-DocMime'] || doc?.data?.type).trim().toLowerCase();
-          const isImageDoc = mimeType.startsWith('image/') || docRole === DOC_LIBRARY_DOC_ROLES.PHOTO;
-          const name = toStr(tagMap['CE-DocName']).trim() || (kind === 'link' ? 'Link record' : (storage === 'lit-arweave' ? 'Encrypted document' : 'Document'));
-          const txId = toStr(doc?.txId).trim();
-          const isEncryptedStorage = storage === 'lit-arweave' || storage === 'lit';
-          const storageRef = normalizeDocStorageRef(doc?.storageRef || { backend: storage, id: txId }, { fallbackBackend: storage || STORAGE_BACKENDS.ARWEAVE });
-          const isCloudflareStorage = storageRef?.backend === STORAGE_BACKENDS.CLOUDFLARE;
-          const arweaveUrl = txId && !isCloudflareStorage ? arweaveScripts.buildArweaveGatewayUrl(txId) : '';
-          const litUrl = txId && !isCloudflareStorage ? litStorage.buildLitArweaveUrl(txId) : '';
-          const storageUrl = isCloudflareStorage ? toStr(storageRef?.uri).trim() : (isEncryptedStorage ? litUrl : arweaveUrl);
-          const ts = doc?.block?.timestamp ? Number(doc.block.timestamp) * 1000 : null;
-          const indexStatus = !doc?.block ? 'pending' : (ts ? 'indexed' : 'unconfirmed');
-          const timeLabel = ts ? new Date(ts).toLocaleString() : (doc?.block ? 'Unconfirmed' : 'Pending indexing');
-          const showPhotoRoleBadge = docRole === DOC_LIBRARY_DOC_ROLES.PHOTO;
-          const showPhotoAnalysisRoleBadge = docRole === DOC_LIBRARY_DOC_ROLES.PHOTO_ANALYSIS;
-
-          return (
-            <div
-              key={txId}
-              className={styles.docRow}
-              data-testid={E2E_TESTIDS.DOC_ROW}
-              data-ce-doc-txid={txId}
-              data-ce-doc-storage={storage || ''}
-              data-ce-doc-kind={kind || ''}
-              data-ce-index-status={indexStatus}
-            >
-              <div className={styles.docSummary}>
-                {isImageDoc && !isCloudflareStorage ? (
-                  <DocRowImagePreview
-                    txId={txId}
-                    name={name}
-                    isEncryptedStorage={isEncryptedStorage}
-                    arweaveUrl={arweaveUrl}
-                    provider={provider}
-                    account={account}
-                    chainId={network?.id || null}
-                    panelContextKey={panelContextKey}
-                    litHooks={scopedLitHooks}
-                  />
-                ) : null}
-                <div className={styles.docMeta}>
-                  <div className={styles.docName}>{name}</div>
-                  <div className={styles.docSub}>
-                    {showPhotoRoleBadge && <span className={styles.badge}>photo</span>}
-                    {showPhotoAnalysisRoleBadge && <span className={styles.badge}>photo analysis</span>}
-                    {!showPhotoRoleBadge && isImageDoc && <span className={styles.badge}>image</span>}
-                    <span className={styles.badge}>{kind || 'file'}</span>
-                    <span className={styles.badge}>{storage || 'arweave'}</span>
-                    <span className={styles.time}>{timeLabel}</span>
-                  </div>
-                </div>
-              </div>
-              <div className={styles.docActions}>
-                <button
-                  type="button"
-                  className={styles.iconBtn}
-                  onClick={() => openDoc(doc)}
-                  title="View"
-                  data-testid={E2E_TESTIDS.DOC_ROW_VIEW}
-                >
-                  <FontAwesomeIcon icon={faEye} />
-                </button>
-                <button type="button" className={styles.iconBtn} onClick={() => copyToClipboard(storageUrl)} title="Copy link">
-                  <FontAwesomeIcon icon={faCopy} />
-                </button>
-                {arweaveUrl ? (
-                  <a
-                    className={styles.iconBtn}
-                    href={arweaveUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    title="Open in Arweave gateway"
-                    data-testid={E2E_TESTIDS.DOC_ROW_OPEN_ARWEAVE}
-                  >
-                    <FontAwesomeIcon icon={faExternalLinkAlt} />
-                  </a>
-                ) : null}
-              </div>
-            </div>
-          );
-        })}
-
-        {loading && (
-          <div className={styles.loadingRow}>
-            <FontAwesomeIcon icon={faSpinner} spin /> Loading…
-          </div>
-        )}
-
-        {canList && docs.length > 0 && (
-          <div className={styles.pagination}>
-            <Button
-              type="button"
-              color="secondary"
-              outline
-              size="sm"
-              onClick={() => loadDocs({ reset: false })}
-              disabled={loading || !cursor}
-            >
-              Load more
-            </Button>
-          </div>
-        )}
-      </div>
+      <DocumentLibraryList
+        docs={docs}
+        loading={loading}
+        canList={canList}
+        cursor={cursor}
+        onLoadMore={() => loadDocs({ reset: false })}
+        openDoc={openDoc}
+        provider={provider}
+        account={account}
+        network={network}
+        panelContextKey={panelContextKey}
+        litHooks={scopedLitHooks}
+      />
 
       <Modal isOpen={viewerOpen} toggle={closeViewer} size="lg" centered data-testid={E2E_TESTIDS.DOC_VIEWER}>
         <ModalHeader toggle={closeViewer} data-testid={E2E_TESTIDS.DOC_VIEWER_TITLE}>
           {viewerTitle || 'Document'}
         </ModalHeader>
         <ModalBody>
-          {renderViewerBody()}
+          <DocumentLibraryViewerBody
+            viewerError={viewerError}
+            viewerLoading={viewerLoading}
+            viewerText={viewerText}
+            viewerMime={viewerMime}
+            viewerBlobUrl={viewerBlobUrl}
+            viewerTitle={viewerTitle}
+          />
         </ModalBody>
       </Modal>
     </div>
