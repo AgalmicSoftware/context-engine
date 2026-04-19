@@ -194,7 +194,7 @@ const E2E_TESTIDS = Object.freeze({
   QUESTION_FILTER_AI_APPLY: 'ce-question-filter-ai-apply',
   QUESTION_FILTER_CLEAR_ALL: 'ce-question-filter-clear-all',
 
-  // CreateSurvey (authoring)
+  // CreateQuestionsAndSurveys (authoring)
   CREATE_PANEL: 'ce-create-panel',
   CREATE_MODE_SWITCH: 'ce-create-mode-switch',
   CREATE_CLEAR: 'ce-create-clear',

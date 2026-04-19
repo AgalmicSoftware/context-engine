@@ -176,7 +176,7 @@ Decrypt:  Client ──▸ Lit SDK decrypt(payload) ──▸ Lit nodes verify S
 | Document library | `components/DocumentLibrary/SessionDocumentsPage.jsx`, `DocumentLibraryPanel.jsx` |
 | Admin | `components/Admin/AdminPage.jsx` |
 | About page | `components/About/AboutPage.jsx` |
-| Survey tool | `components/SurveyTool/SurveyTool.jsx`, `CreateSurvey.jsx`, `SurveyResults.jsx` |
+| Survey tool | `components/SurveyTool/SurveyTool.jsx`, `CreateQuestionsAndSurveys.jsx`, `SurveyResults.jsx` |
 | Shared UI | `components/Shared/AudioInput/AudioInput.jsx`, `components/Shared/Json/JsonControls.jsx`, `components/Shared/Json/JsonDisplay.jsx` |
 | SBT management | `components/SBTs/SBTsList.jsx`, `SBTPage.jsx`, `CreateSBTGroup.jsx` |
 | Gate components | `components/Gates/` |
