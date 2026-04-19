@@ -1,9 +1,9 @@
-import CreateSurvey, {
+import CreateQuestionsAndSurveys, {
   hasSubmittedResourcesInManagedCache,
   readManagedCacheSnapshot,
   sanitizeDocumentUrls,
   selectManagedNetBucketSnapshot,
-} from './CreateSurvey.jsx';
+} from './CreateQuestionsAndSurveys.jsx';
 import { renderToStaticMarkup } from 'react-dom/server';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import { arweaveScripts } from '../../utilities/arweave/arweaveScripts';
@@ -12,6 +12,7 @@ import * as resourceKeys from '../../utilities/session/resourceKeys.js';
 import contractScripts from '../../utilities/web3/contractScripts.js';
 import { sessionRegistryUtils } from '../../utilities/web3/sessionRegistry.js';
 import { getChainById, getDefaultHttpRpc } from '../../variables/chains.js';
+import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
 jest.mock('../../utilities/cache/cacheScripts.js', () => ({
   peekCacheSync: jest.fn(() => null),
@@ -24,7 +25,7 @@ jest.mock('../../utilities/cache/cacheScripts.js', () => ({
 const REGISTRY_CACHE_KEY = 'dg:sessionRegistryCache:v1';
 
 const makeInstance = (props = {}) => {
-  const instance = new CreateSurvey({
+  const instance = new CreateQuestionsAndSurveys({
     network: { id: 84532 },
     activeSessionSlug: 'edge',
     ...props,
@@ -69,7 +70,7 @@ const nodeHasClassName = (node, className) => {
   return String(raw).split(/\s+/).includes(className);
 };
 
-describe('CreateSurvey managed cache reads', () => {
+describe('CreateQuestionsAndSurveys managed cache reads', () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
@@ -1296,6 +1297,83 @@ describe('CreateSurvey managed cache reads', () => {
     );
     expect(modeSwitches).toHaveLength(1);
     expect(treeHasText(modeSwitches[0], 'from URL / Content')).toBe(true);
+  });
+
+  it('hides survey/question gate controls when the active session exposes no selectable gates', () => {
+    const instance = makeInstance();
+    instance.resolveGateOptions = jest.fn(() => ({
+      gateMap: {},
+      gateOptions: [],
+      defaultGateId: '',
+    }));
+    instance.state = {
+      ...instance.state,
+      showAutoTool: false,
+      isStandaloneQuestion: false,
+      title: 'Survey Title',
+      questions: [{
+        uiKey: 'q1',
+        id: 'q1',
+        type: 'freeform',
+        prompt: 'Question 1',
+        tags: [],
+        currentTagInputValue: '',
+        aiGeneratedTagsFromSource: [],
+        isGeneratingTags: false,
+      }],
+    };
+
+    const tree = instance.render();
+    const markup = renderToStaticMarkup(tree);
+    const gateLockMatches = markup.match(new RegExp(`data-testid="${E2E_TESTIDS.GATE_LOCK}"`, 'g')) || [];
+    const surveyTitleLocks = collectTreeNodes(tree, (node) => nodeHasClassName(node, 'surveyTitleLock'));
+    const inheritToggles = collectTreeNodes(tree, (node) => nodeHasClassName(node, 'inheritToggle'));
+
+    expect(gateLockMatches).toHaveLength(0);
+    expect(surveyTitleLocks).toHaveLength(0);
+    expect(inheritToggles).toHaveLength(0);
+  });
+
+  it('renders survey/question gate controls when the active session has selectable gates', () => {
+    const instance = makeInstance();
+    instance.resolveGateOptions = jest.fn(() => ({
+      gateMap: {
+        gate_1: { id: 'gate_1' },
+      },
+      gateOptions: [{
+        id: 'gate_1',
+        label: 'Edge Session',
+        badgeLabel: 'Edge Session',
+        color: '#5affc2',
+      }],
+      defaultGateId: 'gate_1',
+    }));
+    instance.state = {
+      ...instance.state,
+      showAutoTool: false,
+      isStandaloneQuestion: false,
+      title: 'Survey Title',
+      questions: [{
+        uiKey: 'q1',
+        id: 'q1',
+        type: 'freeform',
+        prompt: 'Question 1',
+        tags: [],
+        currentTagInputValue: '',
+        aiGeneratedTagsFromSource: [],
+        isGeneratingTags: false,
+      }],
+    };
+
+    const tree = instance.render();
+    const markup = renderToStaticMarkup(tree);
+    const gateLockMatches = markup.match(new RegExp(`data-testid="${E2E_TESTIDS.GATE_LOCK}"`, 'g')) || [];
+    const surveyTitleLocks = collectTreeNodes(tree, (node) => nodeHasClassName(node, 'surveyTitleLock'));
+    const inheritToggles = collectTreeNodes(tree, (node) => nodeHasClassName(node, 'inheritToggle'));
+
+    expect(gateLockMatches).toHaveLength(2);
+    expect(surveyTitleLocks).toHaveLength(1);
+    expect(inheritToggles).toHaveLength(1);
   });
 
   it('renders uploaded-question Arweave links against ar.io when direct mode is enabled', () => {
