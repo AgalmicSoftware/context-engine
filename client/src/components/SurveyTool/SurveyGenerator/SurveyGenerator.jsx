@@ -14,7 +14,8 @@ import {
   faPlus,
   faSquare,
   faCheckSquare,
-  faUpload
+  faUpload,
+  faImage
 } from '@fortawesome/free-solid-svg-icons';
 import {
   Input,
@@ -32,7 +33,8 @@ import {
   generateAudioDiscussionSummary,
   uploadMarkdownSummaryToArweave,
   processAdditionalSources,
-  fetchContentFromURL
+  fetchContentFromURL,
+  analyzePhotoForQuestionGeneration
 } from '../../../utilities/ai/aiScripts.js';
 import { getEffectiveAiConfig } from '../../../utilities/ai/aiSettings.js';
 import {
@@ -55,7 +57,9 @@ import {
 } from '../../../utilities/crypto/litProtocol.js';
 import {
   buildDocLibraryCommonTags,
+  buildDocLibraryRoleTags,
   buildDocLibrarySessionTags,
+  DOC_LIBRARY_DOC_ROLES,
   mergeTags,
   normalizeSessionIdHex,
 } from '../../../utilities/docLibrary/tags.js';
@@ -96,8 +100,41 @@ const DEFAULT_QUESTION_COUNT = 10;
 const QUESTION_COUNT_STEP = 5;
 const MIN_QUESTION_COUNT = 5;
 const MAX_QUESTION_COUNT = 50;
+const SUPPORTED_PHOTO_EXTENSIONS = /\.(png|jpe?g|webp|gif)$/i;
+const SUPPORTED_PHOTO_ACCEPT = 'image/png,image/jpeg,image/webp,image/gif';
 
 const clampQuestionCount = (value) => Math.min(MAX_QUESTION_COUNT, Math.max(MIN_QUESTION_COUNT, value));
+
+const buildAdditionalSourceId = (ref) => {
+  ref.current += 1;
+  return `database-source-${ref.current}`;
+};
+
+const isSupportedPhotoFile = (file) => (
+  Boolean(file) &&
+  (
+    /^image\/(png|jpeg|webp|gif)$/i.test(String(file?.type || '').trim()) ||
+    SUPPORTED_PHOTO_EXTENSIONS.test(String(file?.name || '').trim())
+  )
+);
+
+const buildPhotoAnalysisMarkdown = ({ photoName, analysisText } = {}) => {
+  const safeName = toStr(photoName).trim() || 'uploaded photo';
+  const body = toStr(analysisText).trim();
+  return [
+    '# Photo Analysis',
+    '',
+    `Source photo: ${safeName}`,
+    '',
+    body,
+  ].join('\n');
+};
+
+const buildPhotoAnalysisFilename = (photoName = '') => {
+  const safeName = toStr(photoName).trim() || 'photo';
+  const withoutExtension = safeName.replace(/\.(png|jpe?g|webp|gif)$/i, '') || safeName;
+  return `${withoutExtension}.analysis.md`;
+};
 const formatAiPromptModelLabel = (config = {}) => {
   const providerKey = toStr(config?.provider).trim().toLowerCase();
   const model = toStr(config?.model).trim();
@@ -219,7 +256,9 @@ export default function AudioSurveyGenerator({
   const [additionalSources, setAdditionalSources] = useState([]);
   const [additionalUrlInput, setAdditionalUrlInput] = useState('');
   const additionalFileInputRef = useRef(null);
+  const additionalPhotoInputRef = useRef(null);
   const uploadAudioInputRef = useRef(null);
+  const additionalSourceIdRef = useRef(0);
   const [saveExtraSourcesToDocLibrary, setSaveExtraSourcesToDocLibrary] = useState(false);
   const [saveDocAudience, setSaveDocAudience] = useState('self');
   const [showSaveDocAudienceMenu, setShowSaveDocAudienceMenu] = useState(false);
@@ -608,7 +647,12 @@ export default function AudioSurveyGenerator({
     if (!additionalUrlInput.trim()) return;
     setAdditionalSources(prev => [
       ...prev,
-      { type: 'url', value: additionalUrlInput.trim(), name: additionalUrlInput.trim() }
+      {
+        id: buildAdditionalSourceId(additionalSourceIdRef),
+        type: 'url',
+        value: additionalUrlInput.trim(),
+        name: additionalUrlInput.trim(),
+      }
     ]);
     setAdditionalUrlInput('');
   };
@@ -630,13 +674,101 @@ export default function AudioSurveyGenerator({
     const file = files[0];
     setAdditionalSources(prev => [
       ...prev,
-      { type: 'file', value: file, name: file.name }
+      {
+        id: buildAdditionalSourceId(additionalSourceIdRef),
+        type: 'file',
+        value: file,
+        name: file.name,
+      }
+    ]);
+    e.target.value = '';
+  };
+
+  const handleAdditionalPhotoUpload = (e) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    const file = files[0];
+    if (!isSupportedPhotoFile(file)) {
+      setError('Unsupported photo format. Use png, jpg, jpeg, webp, or gif.');
+      e.target.value = '';
+      return;
+    }
+    setError('');
+    setAdditionalSources((prev) => [
+      ...prev,
+      {
+        id: buildAdditionalSourceId(additionalSourceIdRef),
+        type: 'photo',
+        value: file,
+        name: file.name,
+        analysisStatus: 'queued',
+        analysisError: '',
+        analysisText: '',
+      },
     ]);
     e.target.value = '';
   };
 
   const removeAdditionalSource = (index) => {
     setAdditionalSources(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const updateAdditionalSourceById = (sourceId, patch) => {
+    setAdditionalSources((prev) => (
+      (Array.isArray(prev) ? prev : []).map((source) => (
+        source?.id === sourceId
+          ? {
+              ...source,
+              ...(typeof patch === 'function' ? patch(source) : patch),
+            }
+          : source
+      ))
+    ));
+  };
+
+  const analyzeQueuedPhotoSources = async (sources = []) => {
+    const queuedSources = Array.isArray(sources) ? sources : [];
+    const analysisBySourceId = new Map();
+    for (const source of queuedSources) {
+      if (source?.type !== 'photo') continue;
+      const cachedAnalysis = toStr(source?.analysisText).trim();
+      if (cachedAnalysis) {
+        analysisBySourceId.set(source.id, cachedAnalysis);
+        updateAdditionalSourceById(source.id, {
+          analysisStatus: 'ready',
+          analysisError: '',
+          analysisText: cachedAnalysis,
+        });
+        continue;
+      }
+
+      updateAdditionalSourceById(source.id, {
+        analysisStatus: 'loading',
+        analysisError: '',
+      });
+      try {
+        const result = await analyzePhotoForQuestionGeneration(source.value, aiRequestOptions);
+        if (abortedRef.current) return analysisBySourceId;
+        const analysisText = toStr(result?.text || result).trim();
+        if (!analysisText) {
+          throw new Error('Photo analysis returned no usable text.');
+        }
+        analysisBySourceId.set(source.id, analysisText);
+        updateAdditionalSourceById(source.id, {
+          analysisStatus: 'ready',
+          analysisError: '',
+          analysisText,
+        });
+      } catch (err) {
+        const message = err?.message || 'Photo analysis failed.';
+        updateAdditionalSourceById(source.id, {
+          analysisStatus: 'error',
+          analysisError: message,
+        });
+        throw new Error(`Photo analysis failed for ${source?.name || 'photo'}: ${message}`);
+      }
+    }
+    return analysisBySourceId;
   };
 
   const resolveDocSaveEncryption = () => {
@@ -695,7 +827,7 @@ export default function AudioSurveyGenerator({
     };
   };
 
-  const saveQueuedSourcesToDocLibrary = async (sources = []) => {
+  const saveQueuedSourcesToDocLibrary = async (sources = [], photoAnalysisBySourceId = new Map()) => {
     const queuedSources = Array.isArray(sources) ? sources : [];
     if (!saveExtraSourcesToDocLibrary || queuedSources.length === 0) return [];
     if (!loginComplete) {
@@ -711,13 +843,18 @@ export default function AudioSurveyGenerator({
 
     for (const source of queuedSources) {
       const isUrlSource = source?.type === 'url';
+      const isPhotoSource = source?.type === 'photo';
       const kind = isUrlSource ? 'link' : 'file';
-      const tags = mergeTags(
+      const baseTags = mergeTags(
         buildDocLibraryCommonTags({ kind, storage: 'lit-arweave' }),
         buildDocLibrarySessionTags({ sessionIdHex: resolvedSessionIdHex }),
+        isPhotoSource
+          ? buildDocLibraryRoleTags({ role: DOC_LIBRARY_DOC_ROLES.PHOTO })
+          : [],
       );
 
       let result = null;
+      const viewerUrls = [];
       if (isUrlSource) {
         result = await uploadDocLibraryUrlRecord({
           url: source?.value,
@@ -727,7 +864,7 @@ export default function AudioSurveyGenerator({
           account,
           providerLike: provider,
           chainId: network?.id || null,
-          tags,
+          tags: baseTags,
           encryption: {
             ...encryption,
             contextLabel: `doc-link:${resolvedSessionSlug || ''}`,
@@ -741,7 +878,7 @@ export default function AudioSurveyGenerator({
           account,
           providerLike: provider,
           chainId: network?.id || null,
-          tags,
+          tags: baseTags,
           encryption,
         });
       }
@@ -753,7 +890,45 @@ export default function AudioSurveyGenerator({
         kind: result?.kind || kind,
         name: source?.name || '',
       });
-      savedViewerUrls.push(viewerUrl || result?.url || '');
+      viewerUrls.push(viewerUrl || result?.url || '');
+
+      if (isPhotoSource) {
+        const analysisText = toStr(photoAnalysisBySourceId?.get(source?.id) || source?.analysisText).trim();
+        if (analysisText) {
+          const analysisFile = new File(
+            [buildPhotoAnalysisMarkdown({ photoName: source?.name, analysisText })],
+            buildPhotoAnalysisFilename(source?.name),
+            { type: 'text/markdown' },
+          );
+          const analysisTags = mergeTags(
+            buildDocLibraryCommonTags({ kind: 'file', storage: 'lit-arweave' }),
+            buildDocLibrarySessionTags({ sessionIdHex: resolvedSessionIdHex }),
+            buildDocLibraryRoleTags({
+              role: DOC_LIBRARY_DOC_ROLES.PHOTO_ANALYSIS,
+              derivedFromTxId: result?.txId,
+            }),
+          );
+          const analysisResult = await uploadDocLibraryFile({
+            file: analysisFile,
+            sessionSlug: resolvedSessionSlug || '',
+            sessionConfig: resolvedSessionConfig,
+            account,
+            providerLike: provider,
+            chainId: network?.id || null,
+            tags: analysisTags,
+            encryption,
+          });
+          const analysisViewerUrl = buildSessionDocLibraryViewerUrl({
+            sessionToken: docSaveSessionToken,
+            txId: analysisResult?.txId,
+            storage: analysisResult?.storage || 'lit-arweave',
+            kind: analysisResult?.kind || 'file',
+            name: analysisFile.name,
+          });
+          viewerUrls.push(analysisViewerUrl || analysisResult?.url || '');
+        }
+      }
+      savedViewerUrls.push({ sourceId: source?.id || '', viewerUrls });
     }
 
     return savedViewerUrls;
@@ -777,7 +952,12 @@ export default function AudioSurveyGenerator({
     // Auto-add pending URL from the URL input bar
     if (additionalUrlInput && additionalUrlInput.trim()) {
       const pendingUrl = additionalUrlInput.trim();
-      effectiveSources.push({ type: 'url', value: pendingUrl, name: pendingUrl });
+      effectiveSources.push({
+        id: buildAdditionalSourceId(additionalSourceIdRef),
+        type: 'url',
+        value: pendingUrl,
+        name: pendingUrl,
+      });
       setAdditionalUrlInput('');
     }
     let sourceTypeOverride = '';
@@ -814,21 +994,41 @@ export default function AudioSurveyGenerator({
         }
       }
 
-      const savedDocUrls = await saveQueuedSourcesToDocLibrary(queuedAdditionalSources);
+      const photoAnalysisBySourceId = await analyzeQueuedPhotoSources(effectiveSources);
+      const savedDocRefs = await saveQueuedSourcesToDocLibrary(queuedAdditionalSources, photoAnalysisBySourceId);
 
       // 2. Process Additional Sources
       if (effectiveSources.length > 0) {
-        const additionalContent = await processAdditionalSources(effectiveSources, aiRequestOptions);
-        if (content) {
-            content = `${content}\n\n--- Additional Context ---\n\n${additionalContent}`;
-        } else {
-            content = additionalContent;
+        const photoSources = effectiveSources.filter((src) => src?.type === 'photo');
+        const nonPhotoSources = effectiveSources.filter((src) => src?.type !== 'photo');
+        const additionalContentSections = [];
+
+        if (photoSources.length > 0) {
+          photoSources.forEach((src) => {
+            const analysisText = toStr(photoAnalysisBySourceId.get(src?.id)).trim();
+            if (!analysisText) return;
+            additionalContentSections.push(`--- Photo Source: ${src.name} ---\n\n${analysisText}`);
+          });
+        }
+
+        if (nonPhotoSources.length > 0) {
+          const additionalContent = await processAdditionalSources(nonPhotoSources, aiRequestOptions);
+          if (additionalContent) additionalContentSections.push(additionalContent.trim());
+        }
+
+        const mergedAdditionalContent = additionalContentSections.filter(Boolean).join('\n\n');
+        if (mergedAdditionalContent) {
+          if (content) {
+            content = `${content}\n\n--- Additional Context ---\n\n${mergedAdditionalContent}`;
+          } else {
+            content = mergedAdditionalContent;
+          }
         }
         effectiveSources.forEach((src, idx) => {
           const queuedSource = idx < queuedAdditionalSources.length ? queuedAdditionalSources[idx] : null;
-          const savedViewerUrl = idx < savedDocUrls.length ? savedDocUrls[idx] : '';
-          if (savedViewerUrl && queuedSource === src) {
-            currentDocumentURLs.push(savedViewerUrl);
+          const savedRef = idx < savedDocRefs.length ? savedDocRefs[idx] : null;
+          if (savedRef?.viewerUrls?.length && queuedSource === src) {
+            currentDocumentURLs.push(...savedRef.viewerUrls.filter(Boolean));
             return;
           }
           if (src.type === 'url') currentDocumentURLs.push(src.value);
@@ -837,6 +1037,9 @@ export default function AudioSurveyGenerator({
         const additionalSourcesAreAllUrls = effectiveSources.every((src) => src.type === 'url');
         if (!transcriptMode && !hasPrimaryTextInput && additionalSourcesAreAllUrls) {
           sourceTypeOverride = 'webpage';
+        }
+        if (!transcriptMode && !hasPrimaryTextInput && photoSources.length > 0 && nonPhotoSources.length === 0) {
+          sourceTypeOverride = 'document';
         }
       }
 
@@ -1213,6 +1416,26 @@ export default function AudioSurveyGenerator({
               </Button>
             </div>
 
+            <div className={styles.fileUploadWrapper}>
+              <input
+                type="file"
+                ref={additionalPhotoInputRef}
+                style={{ display: 'none' }}
+                accept={SUPPORTED_PHOTO_ACCEPT}
+                onChange={handleAdditionalPhotoUpload}
+              />
+              <Button
+                type="button"
+                color="secondary"
+                outline
+                className={styles.compactBtn}
+                onClick={() => additionalPhotoInputRef.current && additionalPhotoInputRef.current.click()}
+                title="Allowed: .png, .jpg, .jpeg, .webp, .gif"
+              >
+                <FontAwesomeIcon icon={faImage} style={{ opacity: '0.65' }} />
+              </Button>
+            </div>
+
             <div
               className={`${styles.transcriptToggleBtn} ${transcriptMode ? styles.active : ''}`}
               onClick={handleTranscriptModeToggle}
@@ -1260,9 +1483,24 @@ export default function AudioSurveyGenerator({
               {additionalSources.length > 0 && (
                 <ul className={styles.sourceList}>
                   {additionalSources.map((item, idx) => (
-                    <li key={idx} className={styles.sourceItem}>
+                    <li key={item?.id || idx} className={styles.sourceItem}>
                       <span className={styles.sourceTypeLabel}>[{item.type}]</span>
-                      <span className={styles.sourceName}>{item.name}</span>
+                      <div className={styles.sourceMeta}>
+                        <span className={styles.sourceName}>{item.name}</span>
+                        {item.type === 'photo' && (
+                          <span
+                            className={`${styles.sourceStatus} ${styles[`sourceStatus${(item.analysisStatus || 'queued').charAt(0).toUpperCase()}${(item.analysisStatus || 'queued').slice(1)}`] || ''}`}
+                          >
+                            {item.analysisStatus === 'loading'
+                              ? 'Analyzing photo...'
+                              : item.analysisStatus === 'ready'
+                                ? 'Analysis ready'
+                                : item.analysisStatus === 'error'
+                                  ? (item.analysisError || 'Analysis failed')
+                                  : 'Queued for analysis'}
+                          </span>
+                        )}
+                      </div>
                       <button
                         type="button"
                         onClick={() => removeAdditionalSource(idx)}
