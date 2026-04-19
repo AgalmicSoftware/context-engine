@@ -167,18 +167,18 @@ Decrypt:  Client ──▸ Lit SDK decrypt(payload) ──▸ Lit nodes verify S
 
 | Area | Files |
 |------|-------|
-| Entry / routing | `components/MainSite/MainSite.tsx` |
-| Home tab shell | `components/MainContent/MainAreaTabs.tsx`, `ToolExplorer.tsx`, `OnboardingWalkthrough.tsx` |
-| Account / login settings | `components/Account/LoginAndSettingsModal.tsx`, `LoginButton.tsx` |
-| Session wizard | `components/Sessions/SessionWizard.tsx` |
-| Session page shell | `components/OnePageSession/OnePageSession.tsx` |
-| Demo-only views | `components/DemoViews/DemosIndex.tsx`, `RiskMatrixDemo.tsx`, `CorpusViewer.tsx`, `components/DemoViews/DemoAnalysis/`, `components/DemoViews/DebateHUD/` |
-| Document library | `components/DocumentLibrary/SessionDocumentsPage.tsx`, `DocumentLibraryPanel.tsx` |
-| Admin | `components/Admin/AdminPage.tsx` |
-| About page | `components/About/AboutPage.tsx` |
-| Survey tool | `components/SurveyTool/SurveyTool.tsx`, `CreateQuestionsAndSurveys.tsx`, `SurveyResults.tsx` |
-| Shared UI | `components/Shared/AudioInput/AudioInput.tsx`, `components/Shared/Json/JsonControls.tsx`, `components/Shared/Json/JsonDisplay.tsx` |
-| SBT management | `components/SBTs/SBTsList.tsx`, `SBTPage.tsx`, `CreateSBTGroup.tsx` |
+| Entry / routing | `components/MainSite/MainSite.jsx` |
+| Home tab shell | `components/MainContent/MainAreaTabs.jsx`, `ToolExplorer.jsx`, `OnboardingWalkthrough.jsx` |
+| Account / login settings | `components/Account/LoginAndSettingsModal.jsx`, `LoginButton.jsx` |
+| Session wizard | `components/Sessions/SessionWizard.jsx` |
+| Session page shell | `components/OnePageSession/OnePageSession.jsx` |
+| Demo-only views | `components/DemoViews/DemosIndex.jsx`, `RiskMatrixDemo.jsx`, `CorpusViewer.jsx`, `components/DemoViews/DemoAnalysis/`, `components/DemoViews/DebateHUD/` |
+| Document library | `components/DocumentLibrary/SessionDocumentsPage.jsx`, `DocumentLibraryPanel.jsx` |
+| Admin | `components/Admin/AdminPage.jsx` |
+| About page | `components/About/AboutPage.jsx` |
+| Survey tool | `components/SurveyTool/SurveyTool.jsx`, `CreateQuestionsAndSurveys.jsx`, `SurveyResults.jsx` |
+| Shared UI | `components/Shared/AudioInput/AudioInput.jsx`, `components/Shared/Json/JsonControls.jsx`, `components/Shared/Json/JsonDisplay.jsx` |
+| SBT management | `components/SBTs/SBTsList.jsx`, `SBTPage.jsx`, `CreateSBTGroup.jsx` |
 | Gate components | `components/Gates/` |
 | **Utilities** | |
 | Web3 / contracts | `utilities/web3/contractScripts.js` (compat barrel), `contractScripts.impl.ts`, `contractHelpers.ts`, `contractEventListeners.ts`, `contractProfile.ts`, `sessionRegistry.ts`, `portoFunctions.ts` |

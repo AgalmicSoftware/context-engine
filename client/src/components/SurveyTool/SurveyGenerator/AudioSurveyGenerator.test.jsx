@@ -73,8 +73,8 @@ jest.mock('../../Shared/AudioInput/AudioInput.jsx', () => (props) => (
   />
 ));
 
-jest.mock('../CreateSurvey.jsx', () => () => (
-  <div data-testid="create-survey" />
+jest.mock('../CreateQuestionsAndSurveys.jsx', () => () => (
+  <div data-testid="create-questions-and-surveys" />
 ));
 
 jest.mock('../../DocumentLibrary/DocumentLibraryPanel.jsx', () => ({
@@ -1105,7 +1105,7 @@ describe('AudioSurveyGenerator', () => {
 
     expect(mockCallAI).not.toHaveBeenCalled();
     expect(container.textContent).toContain('Save failed.');
-    expect(container.querySelector('[data-testid="create-survey"]')).toBeNull();
+    expect(container.querySelector('[data-testid="create-questions-and-surveys"]')).toBeNull();
   });
 
   it('defers loading the demo corpus module until explorer view renders it', async () => {

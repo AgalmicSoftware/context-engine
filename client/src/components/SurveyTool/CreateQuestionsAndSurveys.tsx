@@ -690,6 +690,7 @@ const mergeCreateSurveySessionConfigWithRegistry = ({
   };
 };
 const writeCreateSurveyCache = writeCache as unknown as CreateSurveyCacheWriter;
+const writeCreateSurveyCacheOptimistic = writeCacheOptimistic as unknown as CreateSurveyCacheWriter;
 const contractScriptsForSubmit = contractScripts as unknown as CreateSurveyContractScriptsWithSession;
 
 const DOCUMENT_URL_ERROR_TEXT = 'Document URLs must use http://, https://, a root-relative path (/...), ar://, or a supported Lit encrypted-doc URL.';
@@ -838,7 +839,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
       }
       nextState.documentURLs = sanitizeDocumentUrls(props.documentURLs || []);
       // If props provided URLs, we don't necessarily want to pre-fill the input buffer, just the list
-      this.state.docURLInput = '';
+      nextState.docURLInput = '';
     }
     (this.state as CreateQuestionsAndSurveysState).questions = initialQuestions;
     this._copySuccessResetTimers = {
@@ -1302,7 +1303,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
               uiKey: q.uiKey || `loaded-${index}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
               tags: currentTags,
               aiGeneratedTagsFromSource: aiTags,
-              options: q.type === 'multichoice' && Array.isArray(q.options) ? q.options : (q.type === 'multichoice' ? [] : undefined),
+              options: normalizeAuthoringQuestionOptions(q.type, q.options),
               singleSelect,
               currentTagInputValue: q.currentTagInputValue || '',
               isGeneratingTags: q.isGeneratingTags || false,
@@ -1443,7 +1444,8 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
     this.setState(
       {
         documentURLs: [...safeDocumentUrls, normalizedUrl],
-        docURLInput: ''
+        docURLInput: '',
+        docURLError: ''
       },
       () => {
         this.updateSurveyHash();
@@ -1472,26 +1474,8 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
     });
     if (!newQuestionDraft) return;
 
-    const isMultichoice = type === 'multichoice';
-    const newQuestionId = this.generateQuestionId(type, '', [], false);
-    const newUiKey = `new-${this.state.questions.length}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    const newQuestionData = {
-      id: newQuestionId,
-      uiKey: newUiKey,
-      type: type,
-      prompt: '',
-      options: isMultichoice ? [] : undefined,
-      singleSelect: isMultichoice ? false : undefined,
-      associatedSurveyId: '',
-      tags: [],
-      aiGeneratedTagsFromSource: [],
-      currentTagInputValue: '',
-      isGeneratingTags: false,
-      lockGateIds: this.state.isStandaloneQuestion ? [] : null,
-    };
-
-    this.setState(prevState => ({
-      questions: [...prevState.questions, newQuestionData],
+    this.setState((prevState: CreateQuestionsAndSurveysState) => ({
+      questions: [...prevState.questions, newQuestionDraft.question],
       addingQuestionType: 'Question Type',
       focusTargetUiKey: newQuestionDraft.uiKey // Set focus target instead of scroll
     }), () => {
@@ -1500,82 +1484,15 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
     });
   };
 
-  handleQuestionChange = (index, key, value) => {
-    const { questions } = this.state;
-    const updatedQuestions = [...questions];
-    const questionToUpdate = { ...updatedQuestions[index] };
-
-    questionToUpdate[key] = value;
-    if (key === 'prompt' || key === 'type' || key === 'singleSelect') {
-      questionToUpdate.id = this.generateQuestionId(
-        questionToUpdate.type,
-        questionToUpdate.prompt,
-        questionToUpdate.options || [],
-        questionToUpdate.singleSelect
-      );
-    }
-
-    updatedQuestions[index] = questionToUpdate;
-
-    this.setState({ questions: updatedQuestions }, () => {
-      this.updateSurveyHash();
-      this.saveToLocalStorage();
+  handleQuestionChange = (index: number, key: string, value: unknown): void => {
+    const updatedQuestions = buildCreateSurveyQuestionFieldUpdateList({
+      generateQuestionId: this.generateQuestionId,
+      key,
+      questionIndex: index,
+      questions: this.state.questions,
+      value,
     });
-  };
-
-  handleOptionChange = (qIdx, optIdx, val) => {
-    const { questions } = this.state;
-    const updatedQuestions = [...questions];
-    const questionToUpdate = { ...updatedQuestions[qIdx] };
-
-    if (!Array.isArray(questionToUpdate.options)) {
-      questionToUpdate.options = [];
-    }
-    const newOptions = [...questionToUpdate.options];
-    newOptions[optIdx] = val;
-    questionToUpdate.options = newOptions;
-    questionToUpdate.id = this.generateQuestionId(
-      questionToUpdate.type,
-      questionToUpdate.prompt,
-      questionToUpdate.options,
-      questionToUpdate.singleSelect
-    );
-
-    updatedQuestions[qIdx] = questionToUpdate;
-    this.setState({ questions: updatedQuestions }, this.saveToLocalStorage);
-  };
-
-  addOption = (questionIndex) => {
-    const { questions } = this.state;
-    const updatedQuestions = [...questions];
-    const q = { ...updatedQuestions[questionIndex] };
-
-    if (!q.options) q.options = [];
-    const newOptions = [...q.options, ''];
-    q.options = newOptions;
-    q.id = this.generateQuestionId(q.type, q.prompt, q.options, q.singleSelect);
-
-    updatedQuestions[questionIndex] = q;
-    this.setState({ questions: updatedQuestions }, this.saveToLocalStorage);
-  };
-
-  removeOption = (questionIndex, optionIndex) => {
-    const { questions } = this.state;
-    const updatedQuestions = [...questions];
-    const q = { ...updatedQuestions[questionIndex] };
-
-    if (!Array.isArray(q.options)) q.options = [];
-    const newOptions = q.options.filter((_, i) => i !== optionIndex);
-    q.options = newOptions;
-    q.id = this.generateQuestionId(q.type, q.prompt, q.options, q.singleSelect);
-
-    updatedQuestions[questionIndex] = q;
-    this.setState({ questions: updatedQuestions }, this.saveToLocalStorage);
-  };
-
-  removeQuestion = (index) => {
-    const updated = this.state.questions.filter((_, i) => i !== index);
-    this.setState({ questions: updated }, () => {
+    this.setState(buildCreateSurveyQuestionListValidationPatch(updatedQuestions), () => {
       this.updateSurveyHash();
       this.saveToLocalStorage();
     });
@@ -1702,14 +1619,13 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
 
   updateSurveyHash: () => void = () => {
     const { title, isStandaloneQuestion, documentURLs } = this.state;
-    if (isStandaloneQuestion) {
-      this.setState({ surveyHash: '' });
-    } else {
-      const urlsForHash = sanitizeDocumentUrls(documentURLs);
-      const surveyData = { title, documentURLs: urlsForHash };
-      const newHash = "0x" + sha256(JSON.stringify(surveyData)).toString();
-      this.setState({ surveyHash: newHash });
-    }
+    const newHash = buildCreateSurveyHashValue({
+      digest: createSurveySha256,
+      documentURLs,
+      isStandaloneQuestion,
+      title,
+    });
+    this.setState(buildCreateSurveyHashPatch(newHash));
   };
 
   getEncryptionConfig = (): CreateSurveyEncryptionConfig => {
@@ -1822,36 +1738,8 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
     }), this.saveToLocalStorage);
   };
 
-  toggleStandaloneQuestion = () => {
-    this.setState((prev) => {
-      const nextStandalone = !prev.isStandaloneQuestion;
-      const nextQuestions = (Array.isArray(prev.questions) ? prev.questions : []).map((q) => {
-        const current = q || {};
-        const currentLock = current.lockGateIds;
-        if (nextStandalone) {
-          return {
-            ...current,
-            lockGateIds: currentLock === null ? [] : normalizeGateIds(currentLock),
-          };
-        }
-        const normalized = Array.isArray(currentLock) ? normalizeGateIds(currentLock) : [];
-        return {
-          ...current,
-          lockGateIds: normalized.length ? normalized : null,
-        };
-      });
-      return {
-        isStandaloneQuestion: nextStandalone,
-        surveyAddedSuccessfully: false,
-        questionsAddedSuccessfully: false,
-        submissionError: '',
-        lastSubmittedSurveyId: '',
-        lastSubmittedSurveyArweaveTxId: '',
-        openLockKey: '',
-        surveyLockGateIds: nextStandalone ? [] : normalizeGateIds(prev.surveyLockGateIds),
-        questions: nextQuestions,
-      };
-    }, () => {
+  toggleStandaloneQuestion: () => void = () => {
+    this.setState((prev: CreateQuestionsAndSurveysState) => buildCreateSurveyStandaloneToggleState(prev), () => {
       this.updateSurveyHash();
       this.saveToLocalStorage();
     });
@@ -2081,11 +1969,11 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
       if (!primaryNetId) return false;
 
       const existing = readManagedCacheSnapshot('questionsCache', primarySlug);
-      const next = (existing && typeof existing === 'object') ? { ...existing } : {};
-      const netBucket = (next[primaryNetId] && typeof next[primaryNetId] === 'object')
-        ? { ...next[primaryNetId] }
+      const next: ManagedCacheSnapshot = isObjectLikeRecord(existing) ? { ...existing } : {};
+      const netBucket: ManagedCacheBucket = isObjectLikeRecord(next[primaryNetId])
+        ? { ...(next[primaryNetId] as UnknownRecord) }
         : {};
-      const questions = (netBucket.questions && typeof netBucket.questions === 'object')
+      const questions: ManagedResourceMap = isObjectLikeRecord(netBucket.questions)
         ? { ...netBucket.questions }
         : {};
 
@@ -2108,7 +1996,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
 
       // Best-effort write-through: failures here must not fail successful on-chain submits.
       try {
-        await writeCacheOptimistic('questionsCache', primarySlug, next);
+        await writeCreateSurveyCacheOptimistic('questionsCache', primarySlug, next);
       } catch (error: unknown) {
         surveyLog.warn('[CreateQuestionsAndSurveys] Failed to seed questions cache write-through', {
           slug: primarySlug,
@@ -2166,7 +2054,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
       }
 
       const existing = readManagedCacheSnapshot('surveysCache', primarySlug);
-      let next = (existing && typeof existing === 'object') ? { ...existing } : {};
+      let next: ManagedCacheSnapshot = isObjectLikeRecord(existing) ? { ...existing } : {};
       next = ensureManagedSurveysNet(next, primaryNetId);
       const netBucket = next[primaryNetId] as ManagedCacheBucket;
       const surveys = netBucket.surveys as ManagedResourceMap;
@@ -2181,7 +2069,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
       }
 
       try {
-        await writeCacheOptimistic('surveysCache', primarySlug, next);
+        await writeCreateSurveyCacheOptimistic('surveysCache', primarySlug, next);
       } catch (error: unknown) {
         surveyLog.warn('[CreateQuestionsAndSurveys] Failed to seed surveys cache write-through', {
           slug: primarySlug,
@@ -3053,20 +2941,12 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
     });
     const firstKey = built.length > 0 ? built[0].uiKey : null;
 
-    this.setState({
-      questions: built,
+    this.setState(buildCreateSurveyAutoGeneratedDraftPatch({
       documentURLs: sanitizeDocumentUrls(docURLs || []),
       focusTargetUiKey: firstKey,
       questions: built,
       title: aiTitle || '',
-      showAutoTool: false,
-      surveyAddedSuccessfully: false,
-      questionsAddedSuccessfully: false,
-      submissionError: '',
-      lastSubmittedSurveyId: '',
-      lastSubmittedSurveyArweaveTxId: '',
-      focusTargetUiKey: firstKey
-    }, () => {
+    }), () => {
       this.updateSurveyHash();
       this.saveToLocalStorage();
     });
@@ -3160,11 +3040,15 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
     }, this.saveToLocalStorage);
   };
 
-  handleCurrentTagInputChange = (qIndex, value) => {
-    this.setState(prevState => {
-      const updatedQuestions = [...prevState.questions];
-      updatedQuestions[qIndex] = { ...updatedQuestions[qIndex], currentTagInputValue: value };
-      return { questions: updatedQuestions };
+  handleCurrentTagInputChange = (qIndex: number, value: unknown): void => {
+    this.setState((prevState: CreateQuestionsAndSurveysState) => {
+      return {
+        questions: buildCreateSurveyQuestionTagInputValueList({
+          questions: prevState.questions,
+          questionIndex: qIndex,
+          value,
+        }),
+      };
     });
   };
 
@@ -3360,6 +3244,8 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
     } = this.state;
     const docUrlErrorId = 'ce-create-doc-url-error';
     const safeDocumentUrls = sanitizeDocumentUrls(documentURLs);
+    const renderedQuestions = questions as CreateSurveyRenderedQuestion[];
+    const uploadedQuestionEntries = uploadedQuestions as CreateSurveyUploadedQuestionEntry[];
     const hasAuthoredDraftContent = (
       questions.length > 0 ||
       title.trim() !== '' ||
@@ -3847,21 +3733,21 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
             {/* Progress Indicator: Only visible during/after submission steps */}
             {(isSubmitting || this.state.showSubmitSteps) && (
               <div className={styles.progressIndicator}>
-                <div className={submitStep >= 1 ? styles.stepCompleted : styles.step}>
+                <div className={buildCreateSurveyProgressStepClassName(styles, submitStep, 1)}>
                   <FontAwesomeIcon
                     icon={submitStep === 1 ? faSpinner : submitStep > 1 ? faCheck : faExclamationCircle}
                     spin={submitStep === 1}
                   />
                   <span>Upload Arweave</span>
                 </div>
-                <div className={submitStep >= 2 ? styles.stepCompleted : styles.step}>
+                <div className={buildCreateSurveyProgressStepClassName(styles, submitStep, 2)}>
                   <FontAwesomeIcon
                     icon={submitStep === 2 ? faSpinner : submitStep > 2 ? faCheck : faExclamationCircle}
                     spin={submitStep === 2}
                   />
                   <span>Submit Contract</span>
                 </div>
-                <div className={submitStep >= 3 ? styles.stepCompleted : styles.step}>
+                <div className={buildCreateSurveyProgressStepClassName(styles, submitStep, 3)}>
                   <FontAwesomeIcon
                     icon={submitStep === 3 ? faCheck : faExclamationCircle}
                   />
@@ -3899,15 +3785,17 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
                         <a href={`${window.location.origin}${buildQuestionRoutePath(questionId, { sessionSlug })}`}>
                           {questionId.substring(0, 10)}...{questionId.substring(questionId.length - 8)}
                         </a>
-                        <a
-                          href={normalizeArweaveUrl(arweaveTxId, { contextLabel: 'create_survey_question_link' })}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          title="View on Arweave"
-                          style={{ marginLeft: '10px', marginRight: '5px', textDecoration: 'none', color: '#007bff' }}
-                        >
-                          <FontAwesomeIcon icon={faExternalLinkAlt} size="sm" />
-                        </a>
+                        {arweaveTxId && (
+                          <a
+                            href={normalizeArweaveUrl(arweaveTxId, { contextLabel: 'create_survey_question_link' })}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title="View on Arweave"
+                            style={CREATE_SURVEY_UPLOADED_QUESTION_LINK_STYLE}
+                          >
+                            <FontAwesomeIcon icon={faExternalLinkAlt} size="sm" />
+                          </a>
+                        )}
                         <Button
                           className={styles.copyQuestionIdButton}
                           onClick={() => this.copyQuestionIdToClipboard(questionId)}
@@ -4082,13 +3970,10 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
               >
                 <div
                   className={styles.toggleKnob}
-                  style={{
-                    left: isStandaloneQuestion ? '31px' : '1px',
-                    backgroundColor: isStandaloneQuestion ? '#4caf50' : '#fff',
-                  }}
+                  style={resolveCreateSurveyToggleKnobStyle(isStandaloneQuestion)}
                 />
               </div>
-              <Label className={styles.toggleLabel} style={{ marginLeft: '10px' }}>
+              <Label className={styles.toggleLabel} style={CREATE_SURVEY_TRAILING_TOGGLE_LABEL_STYLE}>
                 Questions
               </Label>
             </div>
