@@ -1,5 +1,5 @@
 /**
- * @file encryptedFields.js
+ * @file encryptedFields.ts
  * @module encryptedFields
  * @description Field-level encryption/decryption — resolves encrypted field values in session
  *              configuration using the active crypto envelope.
@@ -10,43 +10,66 @@ import store from '../../store.js';
 import { cryptoUtils } from './cryptography.js';
 import { toStr } from '../shared/primitives.js';
 
-/**
- * @typedef {string | Record<string, any>} EncryptedEnvelope
- */
+type EncryptedEnvelope = string | Record<string, any>;
 
-/**
- * @typedef {object} EncryptionContext
- * @property {string=} account
- * @property {unknown=} providerLike
- * @property {number | string | null=} chainId
- * @property {{ getKey?: (options?: Record<string, any>) => Promise<Uint8Array | string> } | null=} lit
- */
+type LitHooks = {
+  getKey?: (options?: Record<string, any>) => Promise<Uint8Array | string>;
+} | null;
 
-/**
- * @typedef {object} EncryptedValueResolution
- * @property {any} value
- * @property {'missing' | 'wallet-required' | 'lit-unavailable' | 'encrypted' | 'locked'} status
- * @property {boolean} encryptedAvailable
- */
+type EncryptionContext = {
+  account?: string;
+  providerLike?: unknown;
+  chainId?: number | string | null;
+  lit?: LitHooks;
+};
 
-/**
- * @typedef {object} EncryptedFieldsApi
- * @property {(envelope: EncryptedEnvelope | null | undefined, context?: EncryptionContext) => Promise<EncryptedValueResolution>} resolveEncryptedValue
- * @property {(groupCfg: { encryptedFields?: Record<string, EncryptedEnvelope | null | undefined> } | null | undefined, fieldPath: string | string[], context?: EncryptionContext) => Promise<EncryptedValueResolution>} resolveEncryptedFieldValue
- */
+type EncryptedValueStatus =
+  | 'missing'
+  | 'wallet-required'
+  | 'lit-unavailable'
+  | 'encrypted'
+  | 'locked';
 
-const pathKey = (path) => (
+type EncryptedValueResolution = {
+  value: any;
+  status: EncryptedValueStatus;
+  encryptedAvailable: boolean;
+};
+
+type GroupCfg = {
+  encryptedFields?: Record<string, EncryptedEnvelope | null | undefined>;
+} | null | undefined;
+
+type EncryptedFieldsApi = {
+  resolveEncryptedValue: (
+    envelope: EncryptedEnvelope | null | undefined,
+    context?: EncryptionContext
+  ) => Promise<EncryptedValueResolution>;
+  resolveEncryptedFieldValue: (
+    groupCfg: GroupCfg,
+    fieldPath: string | string[],
+    context?: EncryptionContext
+  ) => Promise<EncryptedValueResolution>;
+};
+
+type WalletContext = {
+  account: string;
+  providerLike: unknown;
+  chainId: number | string | null;
+};
+
+const pathKey = (path: string | string[]): string => (
   Array.isArray(path) ? path.join('.') : toStr(path)
 );
 
-const hasOverrideValue = (obj, key) => (
+const hasOverrideValue = (obj: Record<string, any> | null | undefined, key: string): boolean => (
   !!obj &&
   typeof obj === 'object' &&
   Object.prototype.hasOwnProperty.call(obj, key) &&
   obj[key] !== undefined
 );
 
-const getWalletContext = (override = {}) => {
+const getWalletContext = (override: EncryptionContext = {}): WalletContext => {
   try {
     const state = store?.getState?.();
     const profile = state?.profile || {};
@@ -63,25 +86,32 @@ const getWalletContext = (override = {}) => {
     return {
       account: hasOverrideValue(override, 'account') ? toStr(override.account) : '',
       providerLike: hasOverrideValue(override, 'providerLike') ? override.providerLike : 'wagmi',
-      chainId: hasOverrideValue(override, 'chainId') ? override.chainId : null,
+      chainId: hasOverrideValue(override, 'chainId') ? (override.chainId ?? null) : null,
     };
   }
 };
 
-const getLitHooks = (override = {}) => {
+const getLitHooks = (override: EncryptionContext = {}): LitHooks => {
   if (override.lit) return override.lit;
   if (typeof window === 'undefined') return null;
-  return window.__litHooks || window.litHooks || null;
+  const litWindow = window as typeof window & {
+    __litHooks?: LitHooks;
+    litHooks?: LitHooks;
+  };
+  return litWindow.__litHooks || litWindow.litHooks || null;
 };
 
 /**
  * Resolves and decrypts a single encrypted envelope with the active wallet and Lit hook context.
  *
- * @param {EncryptedEnvelope | null | undefined} envelope
- * @param {EncryptionContext} [context={}]
+ * @param envelope
+ * @param context
  * @returns {Promise<EncryptedValueResolution>}
  */
-export const resolveEncryptedValue = async (envelope, context = {}) => {
+export const resolveEncryptedValue = async (
+  envelope: EncryptedEnvelope | null | undefined,
+  context: EncryptionContext = {}
+): Promise<EncryptedValueResolution> => {
   if (!envelope) {
     return { value: '', status: 'missing', encryptedAvailable: false };
   }
@@ -121,12 +151,16 @@ export const resolveEncryptedValue = async (envelope, context = {}) => {
 /**
  * Resolves and decrypts an encrypted field stored under `groupCfg.encryptedFields[fieldPath]`.
  *
- * @param {{ encryptedFields?: Record<string, EncryptedEnvelope | null | undefined> } | null | undefined} groupCfg
- * @param {string | string[]} fieldPath
- * @param {EncryptionContext} [context={}]
+ * @param groupCfg
+ * @param fieldPath
+ * @param context
  * @returns {Promise<EncryptedValueResolution>}
  */
-export const resolveEncryptedFieldValue = async (groupCfg, fieldPath, context = {}) => {
+export const resolveEncryptedFieldValue = async (
+  groupCfg: GroupCfg,
+  fieldPath: string | string[],
+  context: EncryptionContext = {}
+): Promise<EncryptedValueResolution> => {
   const key = pathKey(fieldPath);
   if (!key) return { value: '', status: 'missing', encryptedAvailable: false };
 
@@ -172,8 +206,7 @@ export const resolveEncryptedFieldValue = async (groupCfg, fieldPath, context = 
   }
 };
 
-/** @type {EncryptedFieldsApi} */
 export const encryptedFieldsUtils = {
   resolveEncryptedValue,
   resolveEncryptedFieldValue,
-};
+} satisfies EncryptedFieldsApi;
