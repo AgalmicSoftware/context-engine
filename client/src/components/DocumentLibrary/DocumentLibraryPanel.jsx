@@ -33,6 +33,7 @@ import {
   buildDocLibraryPlaintextFileMetaTags,
   buildDocLibrarySbtTags,
   buildDocLibrarySessionTags,
+  DOC_LIBRARY_DOC_ROLES,
   mergeTags,
   normalizeSbtAddress,
   normalizeSessionIdHex,
@@ -1243,6 +1244,9 @@ export default function DocumentLibraryPanel({
           const tagMap = doc?.tagMap || {};
           const storage = toStr(tagMap['CE-DocStorage']).trim().toLowerCase();
           const kind = toStr(tagMap['CE-DocKind']).trim().toLowerCase();
+          const docRole = toStr(tagMap['CE-DocRole']).trim().toLowerCase();
+          const mimeType = toStr(tagMap['CE-DocMime'] || doc?.data?.type).trim().toLowerCase();
+          const isImageDoc = mimeType.startsWith('image/') || docRole === DOC_LIBRARY_DOC_ROLES.PHOTO;
           const name = toStr(tagMap['CE-DocName']).trim() || (kind === 'link' ? 'Link record' : (storage === 'lit-arweave' ? 'Encrypted document' : 'Document'));
           const txId = toStr(doc?.txId).trim();
           const isEncryptedStorage = storage === 'lit-arweave' || storage === 'lit';
@@ -1251,6 +1255,8 @@ export default function DocumentLibraryPanel({
           const ts = doc?.block?.timestamp ? Number(doc.block.timestamp) * 1000 : null;
           const indexStatus = !doc?.block ? 'pending' : (ts ? 'indexed' : 'unconfirmed');
           const timeLabel = ts ? new Date(ts).toLocaleString() : (doc?.block ? 'Unconfirmed' : 'Pending indexing');
+          const showPhotoRoleBadge = docRole === DOC_LIBRARY_DOC_ROLES.PHOTO;
+          const showPhotoAnalysisRoleBadge = docRole === DOC_LIBRARY_DOC_ROLES.PHOTO_ANALYSIS;
 
           return (
             <div
@@ -1265,6 +1271,9 @@ export default function DocumentLibraryPanel({
               <div className={styles.docMeta}>
                 <div className={styles.docName}>{name}</div>
                 <div className={styles.docSub}>
+                  {showPhotoRoleBadge && <span className={styles.badge}>photo</span>}
+                  {showPhotoAnalysisRoleBadge && <span className={styles.badge}>photo analysis</span>}
+                  {!showPhotoRoleBadge && isImageDoc && <span className={styles.badge}>image</span>}
                   <span className={styles.badge}>{kind || 'file'}</span>
                   <span className={styles.badge}>{storage || 'arweave'}</span>
                   <span className={styles.time}>{timeLabel}</span>

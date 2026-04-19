@@ -3,6 +3,11 @@
 import { ethers } from 'ethers';
 import { toStr } from '../shared/primitives.js';
 
+export const DOC_LIBRARY_DOC_ROLES = Object.freeze({
+  PHOTO: 'photo',
+  PHOTO_ANALYSIS: 'photo-analysis',
+});
+
 export const normalizeSessionIdHex = (raw) => {
   const value = toStr(raw).trim();
   if (!value) return '';
@@ -58,6 +63,15 @@ export const buildDocLibraryPlaintextFileMetaTags = ({ name, mime, size } = {}) 
   if (safeName) out.push({ name: 'CE-DocName', value: safeName });
   if (safeMime) out.push({ name: 'CE-DocMime', value: safeMime });
   if (safeSize) out.push({ name: 'CE-DocSize', value: safeSize });
+  return out;
+};
+
+export const buildDocLibraryRoleTags = ({ role, derivedFromTxId } = {}) => {
+  const out = [];
+  const safeRole = truncateTagValue(role, 60).toLowerCase();
+  const safeDerivedFromTxId = truncateTagValue(derivedFromTxId, 80);
+  if (safeRole) out.push({ name: 'CE-DocRole', value: safeRole });
+  if (safeDerivedFromTxId) out.push({ name: 'CE-DocDerivedFromTx', value: safeDerivedFromTxId });
   return out;
 };
 
