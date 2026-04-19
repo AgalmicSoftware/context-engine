@@ -4,7 +4,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faThumbsUp, faChevronRight, faBookmark, faTimes, faComment, faLink, faCheck,
   faPlus, faNetworkWired, faArrowLeft, faFire, faSitemap, faCaretDown, faCaretUp,
-  faArrowUp, faArrowDown, faList
+  faArrowUp, faArrowDown, faList, faCircle, faExternalLinkAlt
 } from '@fortawesome/free-solid-svg-icons';
 import { useParams, useNavigate } from 'react-router-dom';
 import { FormGroup, Label, Input } from 'reactstrap';
@@ -21,6 +21,8 @@ import {
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { notify } from '../../utilities/ui/notify.js';
 import { buildTagHref } from '../SurveyTool/QuestionTagDropdown.jsx';
+
+const { hierarchy: d3Hierarchy, pack: d3Pack } = require('d3');
 
 const StandalonePoliticalCompass = React.lazy(() => (
   import('../DemoViews/DebateHUD/PoliticalCompassView.jsx').then((module) => ({
@@ -661,89 +663,251 @@ const calculateAtlasNodeSize = (node, isMobile, disagreementRange) => {
   return isMobile ? totalSize * 0.7 : totalSize;
 };
 
-export const AtlasView = ({ data, onNodeClick }) => {
+const DEFAULT_ATLAS_DIMENSIONS = Object.freeze({ w: 1000, h: 800 });
+export const ATLAS_LAYOUT_MODES = Object.freeze({
+  ORBITAL: 'orbital',
+  PACKED: 'packed',
+});
+export const DEBATE_VISUAL_MODES = Object.freeze({
+  CIRCLES: 'circles',
+  ATLAS: 'atlas',
+  TREE: 'tree',
+  LIST: 'list',
+});
+
+const getInitialDebateVisualMode = (atlasLayoutMode) => (
+  atlasLayoutMode === ATLAS_LAYOUT_MODES.ORBITAL
+    ? DEBATE_VISUAL_MODES.ATLAS
+    : DEBATE_VISUAL_MODES.CIRCLES
+);
+
+const getAtlasCommentCount = (node) => (
+  (node.questions ? node.questions.length : 0) + (node.comments ? node.comments.length : 0)
+);
+
+const flattenAtlasNodes = (nodes = []) => {
+  let res = [];
+  nodes.forEach((node) => {
+    res.push(node);
+    if (Array.isArray(node?.children) && node.children.length > 0) {
+      res = res.concat(flattenAtlasNodes(node.children));
+    }
+  });
+  return res;
+};
+
+const getAtlasCenterNode = (atlasRoot, data) => (
+  atlasRoot ? atlasRoot : { id: 'virtual-root', name: 'AI Policy Atlas', children: data, depth: -1 }
+);
+
+const measureAtlasContainer = (node, fallback = DEFAULT_ATLAS_DIMENSIONS) => {
+  const width = Number(node?.offsetWidth) || 0;
+  const height = Number(node?.offsetHeight) || 0;
+  return {
+    w: width > 0 ? width : fallback.w,
+    h: height > 0 ? height : fallback.h,
+  };
+};
+
+const normalizeAtlasDepthValue = (value, fallback = 0) => {
+  const numericValue = Number(value);
+  return Number.isFinite(numericValue) ? numericValue : fallback;
+};
+
+const resolveAtlasVisualDepth = (atlasRoot, hierarchyDepth) => {
+  if (atlasRoot) {
+    return normalizeAtlasDepthValue(atlasRoot.depth, 0) + hierarchyDepth;
+  }
+  return hierarchyDepth - 1;
+};
+
+const getAtlasDepthClass = (visualDepth, isCenter = false) => (
+  isCenter ? 'depthCenter' : `depth${Math.max(0, Math.min(visualDepth, 3))}`
+);
+
+const buildAtlasRenderNode = (node, atlasRoot, hierarchyDepth, options = {}) => {
+  const { isCenter = false, x = 0, y = 0, r = null, ...restOptions } = options;
+  const visualDepth = isCenter
+    ? normalizeAtlasDepthValue(node?.depth, 0)
+    : resolveAtlasVisualDepth(atlasRoot, hierarchyDepth);
+
+  return {
+    ...node,
+    ...restOptions,
+    x,
+    y,
+    r,
+    isCenter,
+    hierarchyDepth,
+    depth: visualDepth,
+    depthClass: getAtlasDepthClass(visualDepth, isCenter),
+    heat: calculateHeat(node),
+    disagreementScore: calculateDisagreementScore(node),
+  };
+};
+
+const calculateAtlasPackValue = (node) => {
+  if (Array.isArray(node?.children) && node.children.length > 0) {
+    return 0;
+  }
+  return Math.max(calculateDisagreementScore(node), 1);
+};
+
+const shouldAlwaysShowPackedLabel = (node) => node.hierarchyDepth === 1;
+const getPackedAtlasGroupId = (hierarchyNode) => {
+  if (!hierarchyNode) return '';
+  const lineage = [];
+  let currentNode = hierarchyNode;
+  while (currentNode) {
+    lineage.unshift(currentNode);
+    currentNode = currentNode.parent || null;
+  }
+  const groupNode = lineage[1] || lineage[0] || hierarchyNode;
+  return String(groupNode?.data?.id || hierarchyNode?.data?.id || '').trim();
+};
+
+const useAtlasContainerDimensions = (measureKey) => {
   const containerRef = useRef(null);
-  const [dimensions, setDimensions] = useState({ w: 1000, h: 800 });
-  const [offset, setOffset] = useState({ x: 0, y: 0 });
-  const [isDragging, setIsDragging] = useState(false);
-  const [startPan, setStartPan] = useState({ x: 0, y: 0 });
-  const [hoveredNodeId, setHoveredNodeId] = useState(null);
+  const [dimensions, setDimensions] = useState(DEFAULT_ATLAS_DIMENSIONS);
 
-  // Drill-down State
-  const [atlasRootId, setAtlasRootId] = useState(null); // null = global root
-  const [atlasHistoryIds, setAtlasHistoryIds] = useState([]); // Stack
+  useEffect(() => {
+    const measure = () => {
+      setDimensions((prev) => measureAtlasContainer(containerRef.current, prev));
+    };
 
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [measureKey]);
+
+  return { containerRef, dimensions };
+};
+
+const useAtlasNavigationState = (data, onNodeClick) => {
+  const [atlasRootId, setAtlasRootId] = useState(null);
+  const [atlasHistoryIds, setAtlasHistoryIds] = useState([]);
   const [showActiveDebates, setShowActiveDebates] = useState(false);
 
   const atlasRoot = useMemo(() => (
     atlasRootId ? findAtlasNodeById(data, atlasRootId) : null
   ), [atlasRootId, data]);
 
-  useEffect(() => {
-    if (containerRef.current) {
-      setDimensions({
-        w: containerRef.current.offsetWidth,
-        h: containerRef.current.offsetHeight
-      });
+  const topNodes = useMemo(() => (
+    flattenAtlasNodes(data)
+      .sort((a, b) => calculateHeat(b) - calculateHeat(a))
+      .slice(0, 3)
+  ), [data]);
 
-      const handleResize = () => {
-         if(containerRef.current) {
-            setDimensions({
-                w: containerRef.current.offsetWidth,
-                h: containerRef.current.offsetHeight
-            });
-         }
-      };
-      window.addEventListener('resize', handleResize);
-      return () => window.removeEventListener('resize', handleResize);
-    }
-  }, []);
+  const handleAtlasNodeClick = useCallback((node) => {
+    if (!node || node.id === 'virtual-root') return;
 
-  const handleAtlasNodeClick = (node) => {
-    // Prevent interaction with the invisible virtual root
-    if (node.id === 'virtual-root') return;
-
-    // 1. Central Node Click: Open Modal immediately
-    if (node.isCenter) {
+    if (node.isCenter || !Array.isArray(node.children) || node.children.length === 0) {
       onNodeClick(node);
       return;
     }
 
-    // 2. Leaf Node Click: Open Modal
-    if (!node.children || node.children.length === 0) {
-      onNodeClick(node);
-      return;
-    }
-
-    // 3. Cluster Parent Click: Drill Down
     setAtlasHistoryIds((prev) => [...prev, atlasRootId]);
     setAtlasRootId(node.id);
-    setOffset({ x: 0, y: 0 });
     setShowActiveDebates(false);
-  };
+  }, [atlasRootId, onNodeClick]);
 
-  const handleBack = (e) => {
-    e.stopPropagation();
+  const handleBack = useCallback((event) => {
+    event?.stopPropagation?.();
     if (atlasHistoryIds.length === 0) return;
-    const prevHistory = [...atlasHistoryIds];
-    const prevRoot = prevHistory.pop();
-    setAtlasHistoryIds(prevHistory);
+    const nextHistory = [...atlasHistoryIds];
+    const prevRoot = nextHistory.pop();
+    setAtlasHistoryIds(nextHistory);
     setAtlasRootId(prevRoot || null);
-    setOffset({ x: 0, y: 0 });
-  };
+  }, [atlasHistoryIds]);
 
-  const topNodes = useMemo(() => {
-    const flatten = (nodes) => {
-      let res = [];
-      nodes.forEach(n => {
-        res.push(n);
-        if(n.children) res = res.concat(flatten(n.children));
-      });
-      return res;
-    };
-    const all = flatten(data);
-    return all.sort((a,b) => calculateHeat(b) - calculateHeat(a)).slice(0, 3);
-  }, [data]);
+  return {
+    atlasRoot,
+    showActiveDebates,
+    setShowActiveDebates,
+    topNodes,
+    handleAtlasNodeClick,
+    handleBack,
+  };
+};
+
+const AtlasChrome = ({
+  atlasRoot,
+  handleBack,
+  onNodeClick,
+  showActiveDebates,
+  setShowActiveDebates,
+  topNodes,
+}) => (
+  <>
+    {atlasRoot && (
+      <button type="button" className={styles.backArrow} onClick={handleBack}>
+        <FontAwesomeIcon icon={faArrowLeft} /> Up Level
+      </button>
+    )}
+
+    {!atlasRoot && (
+      <button
+        type="button"
+        className={styles.hotDebatesBtn}
+        onClick={() => setShowActiveDebates((prev) => !prev)}
+      >
+        <FontAwesomeIcon icon={faFire} /> Top Debates
+      </button>
+    )}
+
+    <div className={`${styles.topNodesOverlay} ${showActiveDebates ? styles.visible : ''}`}>
+      <h3>
+        <span><FontAwesomeIcon icon={faFire} /> Active Debates</span>
+        <button
+          type="button"
+          className={styles.minimizeBtn}
+          aria-label="Minimize active debates"
+          onClick={() => setShowActiveDebates(false)}
+        >
+          <FontAwesomeIcon icon={faTimes} />
+        </button>
+      </h3>
+      {topNodes.map((node, index) => (
+        <button
+          key={`${node.id || node.name}-${index}`}
+          type="button"
+          className={styles.topNodeItem}
+          onClick={(event) => {
+            event.stopPropagation();
+            onNodeClick(node);
+          }}
+        >
+          <span className={styles.nodeTitle}>{node.name}</span>
+          <div className={styles.nodeStats}>
+            <span><FontAwesomeIcon icon={faThumbsUp} /> {calculateNetUpvotes(node.votes)}</span>
+            <span><FontAwesomeIcon icon={faComment} /> {getAtlasCommentCount(node)}</span>
+          </div>
+        </button>
+      ))}
+    </div>
+  </>
+);
+
+const OrbitalAtlasView = ({
+  data,
+  atlasRoot,
+  containerRef,
+  dimensions,
+  handleAtlasNodeClick,
+  handleBack,
+  onNodeClick,
+  showActiveDebates,
+  setShowActiveDebates,
+  topNodes,
+}) => {
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [startPan, setStartPan] = useState({ x: 0, y: 0 });
+  const [hoveredNodeId, setHoveredNodeId] = useState(null);
+
+  useEffect(() => {
+    setOffset({ x: 0, y: 0 });
+  }, [atlasRoot]);
 
   // --- Organic Layout Calculation ---
   const layout = useMemo(() => {
@@ -751,16 +915,13 @@ export const AtlasView = ({ data, onNodeClick }) => {
     const links = [];
 
     // The "Virtual Root" is the global center point.
-    const centerNode = atlasRoot ? atlasRoot : { id: 'virtual-root', name: 'AI Policy Atlas', children: data, depth: -1 };
+    const centerNode = getAtlasCenterNode(atlasRoot, data);
 
-    nodes.push({
-      ...centerNode,
-      x: 0, y: 0,
+    nodes.push(buildAtlasRenderNode(centerNode, atlasRoot, 0, {
       isCenter: true,
-      depthClass: 'depthCenter',
-      heat: calculateHeat(centerNode),
-      disagreementScore: calculateDisagreementScore(centerNode),
-    });
+      x: 0,
+      y: 0,
+    }));
 
     if (!centerNode.children) return { nodes, links };
 
@@ -813,17 +974,10 @@ export const AtlasView = ({ data, onNodeClick }) => {
              nodeY = parentY + Math.sin(myAngle) * dist;
           }
 
-          const visualDepth = atlasRoot ? (atlasRoot.depth !== undefined ? atlasRoot.depth + level : level) : (level - 1);
-
-          const newNode = {
-            ...child,
+          const newNode = buildAtlasRenderNode(child, atlasRoot, level, {
             x: nodeX,
             y: nodeY,
-            depth: visualDepth,
-            depthClass: `depth${Math.max(0, Math.min(visualDepth, 3))}`,
-            heat: calculateHeat(child),
-            disagreementScore: calculateDisagreementScore(child),
-          };
+          });
           nodes.push(newNode);
 
           if (parent.id !== 'virtual-root') {
@@ -891,36 +1045,14 @@ export const AtlasView = ({ data, onNodeClick }) => {
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}
     >
-      {atlasRoot && (
-        <div className={styles.backArrow} onClick={handleBack}>
-          <FontAwesomeIcon icon={faArrowLeft} /> Up Level
-        </div>
-      )}
-
-      {!atlasRoot && (
-        <button
-          className={styles.hotDebatesBtn}
-          onClick={() => setShowActiveDebates(!showActiveDebates)}
-        >
-          <FontAwesomeIcon icon={faFire} /> Top Debates
-        </button>
-      )}
-
-      <div className={`${styles.topNodesOverlay} ${showActiveDebates ? styles.visible : ''}`}>
-        <h3>
-            <span><FontAwesomeIcon icon={faFire} /> Active Debates</span>
-            <span className={styles.minimizeBtn} onClick={() => setShowActiveDebates(false)}><FontAwesomeIcon icon={faTimes} /></span>
-        </h3>
-        {topNodes.map((n, i) => (
-            <div key={i} className={styles.topNodeItem} onClick={(e) => { e.stopPropagation(); onNodeClick(n); }}>
-            <span className={styles.nodeTitle}>{n.name}</span>
-            <div className={styles.nodeStats}>
-                <span><FontAwesomeIcon icon={faThumbsUp} /> {calculateNetUpvotes(n.votes)}</span>
-                <span><FontAwesomeIcon icon={faComment} /> {(n.questions?.length||0) + (n.comments?.length||0)}</span>
-            </div>
-            </div>
-        ))}
-      </div>
+      <AtlasChrome
+        atlasRoot={atlasRoot}
+        handleBack={handleBack}
+        onNodeClick={onNodeClick}
+        showActiveDebates={showActiveDebates}
+        setShowActiveDebates={setShowActiveDebates}
+        topNodes={topNodes}
+      />
 
       <svg className={styles.atlasSvgLayer}>
         {layout.links.map((link, i) => (
@@ -944,6 +1076,9 @@ export const AtlasView = ({ data, onNodeClick }) => {
                 top: cy + node.y,
                 zIndex: isHovered ? 200 : (node.isCenter ? 100 : undefined)
             }}
+            data-testid={E2E_TESTIDS.ATLAS_NODE}
+            data-ce-node-id={node.id}
+            data-ce-node-layout={ATLAS_LAYOUT_MODES.ORBITAL}
             onClick={(e) => { e.stopPropagation(); handleAtlasNodeClick(node); }}
             onMouseEnter={() => setHoveredNodeId(node.id)}
             onMouseLeave={() => setHoveredNodeId(null)}
@@ -962,6 +1097,202 @@ export const AtlasView = ({ data, onNodeClick }) => {
         );
       })}
     </div>
+  );
+};
+
+const PackedAtlasView = ({
+  data,
+  atlasRoot,
+  containerRef,
+  dimensions,
+  handleAtlasNodeClick,
+  handleBack,
+  onNodeClick,
+  showActiveDebates,
+  setShowActiveDebates,
+  topNodes,
+}) => {
+  const [hoveredNodeId, setHoveredNodeId] = useState(null);
+  const [hoveredGroupId, setHoveredGroupId] = useState('');
+  const isMobile = dimensions.w < 768;
+  const packedTitle = atlasRoot ? String(atlasRoot?.name || '').trim() : '';
+  const isTopLevelPackedView = !atlasRoot;
+
+  const layout = useMemo(() => {
+    const centerNode = atlasRoot
+      ? {
+        id: `${atlasRoot.id}::packed-inner-root`,
+        name: atlasRoot.name,
+        depth: atlasRoot.depth,
+        children: Array.isArray(atlasRoot.children) ? atlasRoot.children : [],
+      }
+      : getAtlasCenterNode(atlasRoot, data);
+    const inset = isMobile ? 12 : 18;
+    const headerHeight = atlasRoot ? (isMobile ? 52 : 46) : 0;
+    const packLayout = d3Pack()
+      .size([
+        Math.max(dimensions.w - (inset * 2), 1),
+        Math.max(dimensions.h - (inset * 2) - headerHeight, 1),
+      ])
+      .padding(isMobile ? 4 : 8);
+
+    // Only leaves contribute a direct size signal so parent circles scale from
+    // their subtree instead of double-counting their own disagreement score.
+    const hierarchy = d3Hierarchy(centerNode, (node) => (
+      Array.isArray(node?.children) && node.children.length > 0 ? node.children : null
+    ))
+      .sum((node) => calculateAtlasPackValue(node))
+      .sort((a, b) => (Number(b.value) || 0) - (Number(a.value) || 0));
+
+    const packedRoot = packLayout(hierarchy);
+
+    const nodes = packedRoot.descendants()
+      .filter((node) => node.depth > 0)
+      .map((node) => buildAtlasRenderNode(node.data, atlasRoot, node.depth, {
+        isCenter: false,
+        x: node.x + inset,
+        y: node.y + inset + headerHeight,
+        r: node.r,
+        groupId: getPackedAtlasGroupId(node),
+      }))
+      .sort((a, b) => {
+        if (a.hierarchyDepth !== b.hierarchyDepth) return a.hierarchyDepth - b.hierarchyDepth;
+        return Number(b.r || 0) - Number(a.r || 0);
+      });
+
+    return { nodes };
+  }, [atlasRoot, data, dimensions.h, dimensions.w, isMobile]);
+
+  return (
+    <div ref={containerRef} className={`${styles.atlasViewContainer} ${styles.packedAtlasViewContainer}`}>
+      <AtlasChrome
+        atlasRoot={atlasRoot}
+        handleBack={handleBack}
+        onNodeClick={onNodeClick}
+        showActiveDebates={showActiveDebates}
+        setShowActiveDebates={setShowActiveDebates}
+        topNodes={topNodes}
+      />
+
+      {packedTitle && (
+        <div className={styles.packedAtlasTitleRow}>
+          <button
+            type="button"
+            className={styles.packedAtlasTitleButton}
+            data-testid={E2E_TESTIDS.ATLAS_TITLE_ACTION}
+            data-ce-node-id={atlasRoot?.id || ''}
+            aria-label={`Open ${packedTitle}`}
+            title={`Open ${packedTitle}`}
+            onClick={() => onNodeClick(atlasRoot)}
+          >
+            <span className={styles.packedAtlasTitle}>{packedTitle}</span>
+            <FontAwesomeIcon icon={faExternalLinkAlt} className={styles.packedAtlasTitleIcon} />
+          </button>
+        </div>
+      )}
+
+      {layout.nodes.map((node) => {
+        const diameter = Math.max((Number(node.r) || 0) * 2, 0);
+        const isHovered = hoveredNodeId === node.id;
+        const isTopLevelGroupNode = isTopLevelPackedView && node.hierarchyDepth === 1;
+        const groupId = String(node.groupId || node.id || '').trim();
+        const isHoveredGroup = Boolean(groupId) && hoveredGroupId === groupId;
+        const showChildLabelsForGroup = isTopLevelPackedView
+          && isHoveredGroup
+          && hoveredNodeId !== groupId;
+        const alwaysVisible = isTopLevelPackedView
+          ? (
+            isTopLevelGroupNode
+              ? !showChildLabelsForGroup
+              : node.hierarchyDepth === 2 && showChildLabelsForGroup
+          )
+          : shouldAlwaysShowPackedLabel(node);
+
+        return (
+          <div
+            key={node.id}
+            className={`${styles.atlasNode} ${styles.packedAtlasNode} ${styles[node.depthClass]} ${isHovered ? styles.hovered : ''}`}
+            style={{
+              left: node.x,
+              top: node.y,
+              zIndex: node.isCenter ? 120 : (isHovered ? 140 : 20 + node.hierarchyDepth),
+            }}
+            data-testid={E2E_TESTIDS.ATLAS_NODE}
+            data-ce-node-id={node.id}
+            data-ce-node-layout={ATLAS_LAYOUT_MODES.PACKED}
+            onClick={(event) => {
+              event.stopPropagation();
+              handleAtlasNodeClick(node);
+            }}
+            onMouseEnter={() => {
+              setHoveredNodeId(node.id);
+              setHoveredGroupId(groupId);
+            }}
+            onMouseLeave={() => {
+              setHoveredNodeId((currentValue) => (
+                currentValue === node.id ? null : currentValue
+              ));
+              setHoveredGroupId((currentValue) => (
+                currentValue === groupId ? '' : currentValue
+              ));
+            }}
+          >
+            <div
+              className={`${styles.nodeDot} ${styles.packedNodeDot} ${node.heat > 10 ? styles.hot : ''}`}
+              style={{ width: `${diameter}px`, height: `${diameter}px` }}
+            >
+              <div className={`${styles.nodeLabel} ${styles.packedNodeLabel} ${alwaysVisible ? styles.alwaysVisible : ''}`}>
+                {node.name}
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+export const AtlasView = ({ data, onNodeClick, atlasLayoutMode = ATLAS_LAYOUT_MODES.ORBITAL }) => {
+  const { containerRef, dimensions } = useAtlasContainerDimensions(atlasLayoutMode);
+  const {
+    atlasRoot,
+    showActiveDebates,
+    setShowActiveDebates,
+    topNodes,
+    handleAtlasNodeClick,
+    handleBack,
+  } = useAtlasNavigationState(data, onNodeClick);
+
+  if (atlasLayoutMode === ATLAS_LAYOUT_MODES.PACKED) {
+    return (
+      <PackedAtlasView
+        data={data}
+        atlasRoot={atlasRoot}
+        containerRef={containerRef}
+        dimensions={dimensions}
+        handleAtlasNodeClick={handleAtlasNodeClick}
+        handleBack={handleBack}
+        onNodeClick={onNodeClick}
+        showActiveDebates={showActiveDebates}
+        setShowActiveDebates={setShowActiveDebates}
+        topNodes={topNodes}
+      />
+    );
+  }
+
+  return (
+    <OrbitalAtlasView
+      data={data}
+      atlasRoot={atlasRoot}
+      containerRef={containerRef}
+      dimensions={dimensions}
+      handleAtlasNodeClick={handleAtlasNodeClick}
+      handleBack={handleBack}
+      onNodeClick={onNodeClick}
+      showActiveDebates={showActiveDebates}
+      setShowActiveDebates={setShowActiveDebates}
+      topNodes={topNodes}
+    />
   );
 };
 
@@ -1967,6 +2298,7 @@ const DebateMap = ({
   embedded = false,
   requestedModalNodeId = null,
   onModalClose = null,
+  atlasLayoutMode = ATLAS_LAYOUT_MODES.PACKED,
 }) => {
   const externalDemoEnabled = externalDemoMode && typeof externalDemoMode === 'object'
     ? !!externalDemoMode.tools
@@ -1974,7 +2306,7 @@ const DebateMap = ({
   const urlDemoParam = typeof window !== 'undefined'
     && new URLSearchParams(window.location.search).get('demo') === '1';
   const initialDemoEnabled = externalDemoEnabled || urlDemoParam;
-  const [visualMode, setVisualMode] = useState('atlas'); // 'atlas', 'tree', 'list'
+  const [visualMode, setVisualMode] = useState(() => getInitialDebateVisualMode(atlasLayoutMode));
   const [selectedCategoryId, setSelectedCategoryId] = useState(null);
   const [modalNodeId, setModalNodeId] = useState(null);
   const [orderByUpvotes, setOrderByUpvotes] = useState(false);
@@ -2028,6 +2360,10 @@ const DebateMap = ({
   useEffect(() => {
     setDemoMode(initialDemoEnabled);
   }, [initialDemoEnabled]);
+
+  useEffect(() => {
+    setVisualMode(getInitialDebateVisualMode(atlasLayoutMode));
+  }, [atlasLayoutMode]);
 
   useEffect(() => {
     if (!requestedModalNodeId) return;
@@ -2124,6 +2460,12 @@ const DebateMap = ({
   }, []);
 
   const handleCategoryClick = (cat) => setSelectedCategoryId(cat?.id || null);
+  const handleVisualModeChange = useCallback((nextVisualMode) => {
+    setVisualMode(nextVisualMode);
+    if (nextVisualMode !== DEBATE_VISUAL_MODES.TREE) {
+      setSelectedCategoryId(null);
+    }
+  }, []);
 
   const flattenTree = useCallback((node, parentPath = []) => {
     let res = [{ ...node, parentPath }];
@@ -2133,7 +2475,7 @@ const DebateMap = ({
 
   const sortedNodes = useMemo(() => {
     // Only process sorting if in LIST mode
-    if (visualMode !== 'list') return [];
+    if (visualMode !== DEBATE_VISUAL_MODES.LIST) return [];
 
     return treeDataState.flatMap(c => flattenTree(c))
       .filter(n => {
@@ -2173,6 +2515,11 @@ const DebateMap = ({
     styles.debateMapWrapper,
     embedded ? styles.embeddedAtlas : styles.standaloneAtlas,
   ].filter(Boolean).join(' ');
+  const atlasViewLayoutMode = visualMode === DEBATE_VISUAL_MODES.ATLAS
+    ? ATLAS_LAYOUT_MODES.ORBITAL
+    : ATLAS_LAYOUT_MODES.PACKED;
+  const isAtlasVisualMode = visualMode === DEBATE_VISUAL_MODES.CIRCLES
+    || visualMode === DEBATE_VISUAL_MODES.ATLAS;
 
   return (
     <div className={wrapperClassName}>
@@ -2185,56 +2532,90 @@ const DebateMap = ({
         )}
 
         <div className={styles.controls}>
-          {/* UPDATED: 3-Way Switcher */}
-          <div className={styles.viewModeSwitch}>
-            <button className={visualMode === 'atlas' ? styles.active : ''} onClick={() => { setVisualMode('atlas'); setSelectedCategoryId(null); }}><FontAwesomeIcon icon={faNetworkWired} /> Atlas</button>
-            <button className={visualMode === 'tree' ? styles.active : ''} onClick={() => setVisualMode('tree')}><FontAwesomeIcon icon={faSitemap} /> Tree</button>
-            <button className={visualMode === 'list' ? styles.active : ''} onClick={() => setVisualMode('list')}><FontAwesomeIcon icon={faList} /> List</button>
-            {embedded && (
-              <>
-                <span className={styles.viewModeSeparator} />
-                <span className={styles.inlineLegendItem}>
-                  <span className={`${styles.legendDot} ${styles.category}`} />
-                  <span>Category</span>
-                </span>
-                <span className={styles.inlineLegendItem}>
-                  <span className={`${styles.legendDot} ${styles.subcategory}`} />
-                  <span>Sub-Category</span>
-                </span>
-                <span className={styles.inlineLegendItem}>
-                  <span className={`${styles.legendDot} ${styles.topic}`} />
-                  <span>Topic</span>
-                </span>
-                <span className={styles.inlineLegendItem}>
-                  <span className={`${styles.legendDot} ${styles.instance}`} />
-                  <span>Instance</span>
-                </span>
-              </>
+          <div className={styles.primaryControls}>
+            <div className={styles.viewModeSwitch}>
+              <button
+                type="button"
+                data-testid={E2E_TESTIDS.DEBATE_VIEW_MODE}
+                data-ce-view-mode={DEBATE_VISUAL_MODES.CIRCLES}
+                className={visualMode === DEBATE_VISUAL_MODES.CIRCLES ? styles.active : ''}
+                onClick={() => handleVisualModeChange(DEBATE_VISUAL_MODES.CIRCLES)}
+              >
+                <FontAwesomeIcon icon={faCircle} /> Circles
+              </button>
+              <button
+                type="button"
+                data-testid={E2E_TESTIDS.DEBATE_VIEW_MODE}
+                data-ce-view-mode={DEBATE_VISUAL_MODES.ATLAS}
+                className={visualMode === DEBATE_VISUAL_MODES.ATLAS ? styles.active : ''}
+                onClick={() => handleVisualModeChange(DEBATE_VISUAL_MODES.ATLAS)}
+              >
+                <FontAwesomeIcon icon={faNetworkWired} /> Atlas
+              </button>
+              <button
+                type="button"
+                data-testid={E2E_TESTIDS.DEBATE_VIEW_MODE}
+                data-ce-view-mode={DEBATE_VISUAL_MODES.TREE}
+                className={visualMode === DEBATE_VISUAL_MODES.TREE ? styles.active : ''}
+                onClick={() => handleVisualModeChange(DEBATE_VISUAL_MODES.TREE)}
+              >
+                <FontAwesomeIcon icon={faSitemap} /> Tree
+              </button>
+              <button
+                type="button"
+                data-testid={E2E_TESTIDS.DEBATE_VIEW_MODE}
+                data-ce-view-mode={DEBATE_VISUAL_MODES.LIST}
+                className={visualMode === DEBATE_VISUAL_MODES.LIST ? styles.active : ''}
+                onClick={() => handleVisualModeChange(DEBATE_VISUAL_MODES.LIST)}
+              >
+                <FontAwesomeIcon icon={faList} /> List
+              </button>
+              {embedded && (
+                <>
+                  <span className={styles.viewModeSeparator} />
+                  <span className={styles.inlineLegendItem}>
+                    <span className={`${styles.legendDot} ${styles.category}`} />
+                    <span>Category</span>
+                  </span>
+                  <span className={styles.inlineLegendItem}>
+                    <span className={`${styles.legendDot} ${styles.subcategory}`} />
+                    <span>Sub-Category</span>
+                  </span>
+                  <span className={styles.inlineLegendItem}>
+                    <span className={`${styles.legendDot} ${styles.topic}`} />
+                    <span>Topic</span>
+                  </span>
+                  <span className={styles.inlineLegendItem}>
+                    <span className={`${styles.legendDot} ${styles.instance}`} />
+                    <span>Instance</span>
+                  </span>
+                </>
+              )}
+            </div>
+          </div>
+
+          <div className={styles.secondaryControls}>
+            <div className={styles.controlGroup}>
+              {visualMode === DEBATE_VISUAL_MODES.LIST && (
+                <label><input type="checkbox" checked={orderByUpvotes} onChange={e => setOrderByUpvotes(e.target.checked)} /> Order by Upvotes</label>
+              )}
+              <label><input type="checkbox" checked={demoMode} onChange={e => setDemoMode(e.target.checked)} /> Demo Mode</label>
+            </div>
+
+            {visualMode === DEBATE_VISUAL_MODES.LIST && (
+              <div className={styles.filterGroup}>
+                <span className={styles.filterLabel}>Filter Depth:</span>
+                <select value={nodeTypeFilter} onChange={e => setNodeTypeFilter(e.target.value)}>
+                  <option value="all">All</option>
+                  <option value="category">Category</option>
+                  <option value="subcategory">Sub-category</option>
+                </select>
+              </div>
             )}
           </div>
-
-          <div className={styles.controlGroup}>
-             {/* UPDATED: Only show OrderByUpvotes in LIST mode */}
-             {visualMode === 'list' && (
-                <label><input type="checkbox" checked={orderByUpvotes} onChange={e => setOrderByUpvotes(e.target.checked)} /> Order by Upvotes</label>
-             )}
-             <label><input type="checkbox" checked={demoMode} onChange={e => setDemoMode(e.target.checked)} /> Demo Mode</label>
-          </div>
-
-          {/* UPDATED: Only show Filters in LIST mode */}
-          {visualMode === 'list' && (
-             <div className={styles.filterGroup}>
-               <span className={styles.filterLabel}>Filter Depth:</span>
-               <select value={nodeTypeFilter} onChange={e => setNodeTypeFilter(e.target.value)}>
-                 <option value="all">All</option>
-                 <option value="category">Category</option>
-                 <option value="subcategory">Sub-category</option>
-               </select>
-             </div>
-          )}
         </div>
 
-        {visualMode === 'tree' && (
+        {visualMode === DEBATE_VISUAL_MODES.TREE && (
           <div className={styles.categorySelector}>
              {treeDataState.map((cat, i) => (
                <button key={i} className={`${styles.categoryButton} ${selectedCategory?.id === cat.id ? styles.active : ''}`} onClick={() => handleCategoryClick(cat)}>{cat.name}</button>
@@ -2243,14 +2624,18 @@ const DebateMap = ({
         )}
 
         <div className={styles.nodesContainer}>
-           {visualMode === 'list' ? (
+           {visualMode === DEBATE_VISUAL_MODES.LIST ? (
              <div className={styles.flatListContainer}>
                 {sortedNodes.map((node, i) => (
                   <FlatNode key={i} node={node} parentPath={node.parentPath} onNodeClick={handleNodeClick} onBookmark={handleBookmark} bookmarkedNodes={bookmarkedNodes} />
                 ))}
              </div>
-           ) : visualMode === 'atlas' ? (
-             <AtlasView data={treeDataState} onNodeClick={handleNodeClick} />
+           ) : isAtlasVisualMode ? (
+             <AtlasView
+               data={treeDataState}
+               onNodeClick={handleNodeClick}
+               atlasLayoutMode={atlasViewLayoutMode}
+             />
            ) : (
              <div
                className={styles.orgChartContainer}
