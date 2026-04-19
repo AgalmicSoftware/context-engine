@@ -33,7 +33,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faBookmark, faLock, faUnlock, faPlus, faMinus, faCaretDown, faCaretUp, faCheck, faTimes, faArrowLeft, faArrowRight, faSpinner, faExpand, faExternalLinkAlt, faFilter, faExclamationCircle, faMicrophone, faChevronLeft, faChevronRight, faComment, faQuestionCircle, faBullhorn, faRobot } from '@fortawesome/free-solid-svg-icons';
 
 import AudioInput from '../Shared/AudioInput/AudioInput.jsx';
-import CreateSurvey from './CreateSurvey';
+import CreateQuestionsAndSurveys from './CreateQuestionsAndSurveys';
 import SurveyResults from './SurveyResults';
 import QuestionFilter from './QuestionFilter';
 import PileHologramAssistant from './PileHologramAssistant.jsx';
@@ -16039,7 +16039,7 @@ class PileViewMode extends SurveyQuestions {
 
         {!showHologramAssistant && showCreate && (
           <div className={styles.pileFullControls} ref={this.createSectionRef}>
-            <CreateSurvey
+            <CreateQuestionsAndSurveys
               {...this.props}
               hideSurveyQuestionToggleUntilAuthoring={true}
             />
