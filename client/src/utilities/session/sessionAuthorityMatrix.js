@@ -38,7 +38,7 @@ export const AUTHORITY_MATRIX = deepFreeze({
     ],
   },
   gates: {
-    fields: ['sponsored', 'sponsoredSbtAddress', 'gates'],
+    fields: ['sponsored', 'gates'],
     authoritativeSource: AUTHORITY_SOURCES.REGISTRY,
     allowedFallbacks: [],
     mustNotOverride: [

@@ -2,7 +2,9 @@ import { getDemoAvatar, getDemoAvatarByName } from './demoAvatars.js';
 
 describe('demoAvatars', () => {
   const expectHistoricalPhotoUrl = (url) => {
-    expect(url).toMatch(/^(\/historical-avatars\/|https:\/\/upload\.wikimedia\.org\/wikipedia\/commons\/)/);
+    expect(url).toMatch(
+      /^(\/historical-avatars\/|https:\/\/upload\.wikimedia\.org\/wikipedia\/commons\/|https:\/\/commons\.wikimedia\.org\/wiki\/Special:FilePath\/)/
+    );
   };
 
   it('resolves merged demo wallet addresses to avatar metadata', () => {

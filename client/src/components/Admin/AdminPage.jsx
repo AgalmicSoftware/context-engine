@@ -827,7 +827,6 @@ const resolveDefaultGateFromConfig = (cfg = {}) => {
   if (gate?.sbtAddress) rawAddresses.push(gate.sbtAddress);
   if (!rawAddresses.length && Array.isArray(sponsored?.sbtAddresses)) rawAddresses.push(...sponsored.sbtAddresses);
   if (!rawAddresses.length && sponsored?.sbtAddress) rawAddresses.push(sponsored.sbtAddress);
-  if (!rawAddresses.length && cfg?.sponsoredSbtAddress) rawAddresses.push(cfg.sponsoredSbtAddress);
   const sbtAddresses = dedupeSbtSelections(rawAddresses).map((entry) => entry.address);
   const chainId = Number(
     gate?.chainId ||

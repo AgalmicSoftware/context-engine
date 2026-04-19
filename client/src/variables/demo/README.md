@@ -94,9 +94,9 @@ utilities/ui/demoAvatars.js
   v
 utilities/ui/historicalFigureAvatars.js
   |
-  +--> utilities/ui/historicalFigurePhotoManifest.json
-  |
   +--> utilities/ui/historicalFigureLocalPhotoManifest.json
+  |
+  +--> utilities/ui/historicalFigurePhotoManifest.json
   |
   v
 PoliticalCompassView, PolisReport, CommunityTab, SimUserPage
@@ -106,8 +106,13 @@ Related files:
 
 - [`demoAvatars.js`](../../utilities/ui/demoAvatars.js)
 - [`historicalFigureAvatars.js`](../../utilities/ui/historicalFigureAvatars.js)
-- [`historicalFigurePhotoManifest.json`](../../utilities/ui/historicalFigurePhotoManifest.json)
 - [`historicalFigureLocalPhotoManifest.json`](../../utilities/ui/historicalFigureLocalPhotoManifest.json)
+- [`historicalFigurePhotoManifest.json`](../../utilities/ui/historicalFigurePhotoManifest.json)
+
+Canonical shipped source:
+
+- `historicalFigureLocalPhotoManifest.json` is the canonical manifest for repo-shipped demo avatars under `client/public/historical-avatars/`.
+- `historicalFigurePhotoManifest.json` must stay free of placeholder sentinel values and may only contain approved local asset paths or intentionally whitelisted hosted URLs.
 
 ## Adding a New Historical Figure
 
@@ -117,7 +122,7 @@ To add a new historical figure cleanly, update the datasets that drive the surfa
 2. Update [`historical_figures_tree_qs_and_votes.json`](./historical_figures_tree_qs_and_votes.json) with debate questions, at least several in-character comments, and vote stances.
 3. Update [`historical_figure_demographics.js`](./historical_figure_demographics.js) with the figure's demographics entry, including display name, bio, era, country, gender, affiliation, and atlas category.
 4. Update [`demo_sbt_collection.json`](./demo_sbt_collection.json) with matching demographic attributes.
-5. Update avatar manifests in [`historicalFigurePhotoManifest.json`](../../utilities/ui/historicalFigurePhotoManifest.json) and [`historicalFigureLocalPhotoManifest.json`](../../utilities/ui/historicalFigureLocalPhotoManifest.json).
+5. Update [`historicalFigureLocalPhotoManifest.json`](../../utilities/ui/historicalFigureLocalPhotoManifest.json) first, then keep [`historicalFigurePhotoManifest.json`](../../utilities/ui/historicalFigurePhotoManifest.json) aligned if a second manifest is still being used for hosted or mirrored sources.
 6. Optionally update [`additional_historical_figures.json`](./additional_historical_figures.json) when you need richer persona fields such as `biggestHope`, `biggestFear`, or `avatarPrompt`.
 7. Optionally update [`historical_figure_users.json`](./historical_figure_users.json) when the figure needs a full SimUserPage-style profile.
 8. Keep [`historical_figures_merged.json`](./historical_figures_merged.json) in sync with the source datasets if your workflow does not regenerate it automatically.

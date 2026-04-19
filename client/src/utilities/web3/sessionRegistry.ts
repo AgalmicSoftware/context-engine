@@ -1039,11 +1039,8 @@ const buildSessionConfigFromRegistry = ({
   });
   if (sponsored) {
     nextConfig.sponsored = sponsored;
-    const defaultGate = sponsored.defaultGateId && sponsored.gates?.[sponsored.defaultGateId];
-    if (defaultGate?.sbtAddress) nextConfig.sponsoredSbtAddress = defaultGate.sbtAddress;
   } else if (hasOnChainGateData) {
     delete nextConfig.sponsored;
-    delete nextConfig.sponsoredSbtAddress;
   }
 
   nextConfig.__registry = {

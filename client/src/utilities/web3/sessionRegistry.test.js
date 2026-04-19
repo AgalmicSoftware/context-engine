@@ -1060,6 +1060,60 @@ describe('sessionRegistry contract defaults', () => {
     expect(config.__registry.metadataDefaultedContractKeys).not.toContain('surveys');
   });
 
+  it('derives sponsored gates without reintroducing the legacy sponsoredSbtAddress root field', () => {
+    const config = __sessionRegistryTestUtils.buildSessionConfigFromRegistry({
+      session: {
+        slug: 'sponsored-edge',
+        chainId: CONFIGURED_REGISTRY_CHAIN_ID,
+        metadataURI: 'ar://tx',
+        encryptedMetadataURI: '',
+        adminAddress: '0x0000000000000000000000000000000000000001',
+        updatedAt: 1,
+        sessionId: '0xb20bcc6d40274759b4a5cd94d949b578',
+        sessionIdHex: '0xb20bcc6d40274759b4a5cd94d949b578',
+      },
+      metadata: {
+        ai: {
+          models: {
+            fast: { provider: 'openai' },
+          },
+        },
+      },
+      gatesByResource: {
+        default: {
+          lookupStatus: 'ok',
+          sbtAddresses: ['0x00000000000000000000000000000000000000f1'],
+          chainId: CONFIGURED_REGISTRY_CHAIN_ID,
+          mode: 'any',
+        },
+        ai: {
+          lookupStatus: 'ok',
+          sbtAddresses: ['0x00000000000000000000000000000000000000f1'],
+          chainId: CONFIGURED_REGISTRY_CHAIN_ID,
+          mode: 'any',
+        },
+      },
+      fieldsByKey: {},
+      registryChainId: CONFIGURED_REGISTRY_CHAIN_ID,
+      metadataLoadState: 'loaded',
+    });
+
+    expect(config.sponsored).toEqual(expect.objectContaining({
+      defaultGateId: 'registry-default',
+      resources: expect.objectContaining({
+        ai: expect.objectContaining({
+          gateId: 'registry-ai',
+          provider: 'openai',
+        }),
+      }),
+    }));
+    expect(config.sponsored.gates['registry-default']).toEqual(expect.objectContaining({
+      sbtAddress: '0x00000000000000000000000000000000000000f1',
+      sbtAddresses: ['0x00000000000000000000000000000000000000f1'],
+    }));
+    expect(config).not.toHaveProperty('sponsoredSbtAddress');
+  });
+
   it('marks synthesized contract defaults when registry metadata could not be loaded', () => {
     const config = __sessionRegistryTestUtils.buildSessionConfigFromRegistry({
       session: {
