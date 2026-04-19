@@ -153,45 +153,17 @@ export const ContractPage = ({ activeSessionSlug, reduxActiveSessionSlug }: Cont
   });
   const photoAnalysisPromptDisplay = buildPhotoAnalysisPrompt('<SourceFilename>');
 
-  const promptItems = useMemo<PromptItem[]>(
-    () => [
-      { id: 'seedGen', title: 'Question Generation', file: 'seedGenPrompt.js', content: seedGenPrompt },
-      {
-        id: 'questionSelection',
-        title: 'Question Selection',
-        file: 'questionSelectionPrompt.js',
-        content: questionSelectionPrompt,
-      },
-      { id: 'audioSummary', title: 'Audio Summary', file: 'audioSummaryPrompt.js', content: audioSummaryPrompt },
-      {
-        id: 'photoAnalysis',
-        title: 'Photo Analysis',
-        file: 'photoAnalysisPrompt.js',
-        content: photoAnalysisPromptDisplay,
-      },
-      {
-        id: 'compareToolkit',
-        title: 'Compare Toolkit',
-        file: 'compareToolkitPrompt.js',
-        content: compareToolkitPromptDisplay,
-      },
-      {
-        id: 'clusterAnalysisSystem',
-        title: 'Cluster Analysis (System)',
-        file: 'clusterAnalysisPrompt.js',
-        content: CLUSTER_ANALYSIS_SYSTEM_PROMPT,
-      },
-      {
-        id: 'clusterAnalysis',
-        title: 'Cluster Analysis (User)',
-        file: 'clusterAnalysisPrompt.js',
-        content: clusterAnalysisPromptDisplay,
-      },
-      { id: 'userAnalysis', title: 'User Analysis', file: 'userAnalysisPrompt.js', content: userAnalysisPromptDisplay },
-      { id: 'aiRewrite', title: 'AI Rewrite', file: 'aiRewritePrompt.js', content: aiRewritePrompt },
-    ],
-    [clusterAnalysisPromptDisplay, compareToolkitPromptDisplay, photoAnalysisPromptDisplay, userAnalysisPromptDisplay],
-  );
+  const promptItems = useMemo(() => ([
+    { id: 'seedGen', title: 'Question Generation', file: 'seedGenPrompt.js', content: seedGenPrompt },
+    { id: 'questionSelection', title: 'Question Selection', file: 'questionSelectionPrompt.js', content: questionSelectionPrompt },
+    { id: 'audioSummary', title: 'Audio Summary', file: 'audioSummaryPrompt.js', content: audioSummaryPrompt },
+    { id: 'photoAnalysis', title: 'Photo Analysis', file: 'photoAnalysisPrompt.js', content: photoAnalysisPromptDisplay },
+    { id: 'compareToolkit', title: 'Compare Toolkit', file: 'compareToolkitPrompt.js', content: compareToolkitPromptDisplay },
+    { id: 'clusterAnalysisSystem', title: 'Cluster Analysis (System)', file: 'clusterAnalysisPrompt.js', content: CLUSTER_ANALYSIS_SYSTEM_PROMPT },
+    { id: 'clusterAnalysis', title: 'Cluster Analysis (User)', file: 'clusterAnalysisPrompt.js', content: clusterAnalysisPromptDisplay },
+    { id: 'userAnalysis', title: 'User Analysis', file: 'userAnalysisPrompt.js', content: userAnalysisPromptDisplay },
+    { id: 'aiRewrite', title: 'AI Rewrite', file: 'aiRewritePrompt.js', content: aiRewritePrompt },
+  ]), [clusterAnalysisPromptDisplay, compareToolkitPromptDisplay, photoAnalysisPromptDisplay, userAnalysisPromptDisplay]);
 
   const sessionNetworkChainId = contributesSessionContracts ? activeSession?.networkChainId : undefined;
   const contracts = useMemo(() => {
