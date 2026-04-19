@@ -1,7 +1,18 @@
 import { ethers } from 'ethers';
 import { toStr } from '../shared/primitives.js';
 
-export const normalizeLitPayerPrivateKey = (value) => {
+type LitPayerWallet = {
+  privateKey: string;
+  address: string;
+};
+
+type LitPayerWalletStatus = LitPayerWallet & {
+  ready: boolean;
+  valid: boolean;
+  error: string;
+};
+
+export const normalizeLitPayerPrivateKey = (value: unknown): string => {
   const trimmed = toStr(value).trim();
   if (!trimmed) return '';
   if (/^0x[0-9a-fA-F]{64}$/.test(trimmed)) return trimmed;
@@ -9,7 +20,7 @@ export const normalizeLitPayerPrivateKey = (value) => {
   return trimmed;
 };
 
-export const deriveLitPayerAddress = (privateKey) => {
+export const deriveLitPayerAddress = (privateKey: unknown): string => {
   const normalized = normalizeLitPayerPrivateKey(privateKey);
   if (!normalized) return '';
   try {
@@ -19,7 +30,7 @@ export const deriveLitPayerAddress = (privateKey) => {
   }
 };
 
-export const createLitPayerWallet = () => {
+export const createLitPayerWallet = (): LitPayerWallet => {
   const wallet = ethers.Wallet.createRandom();
   return {
     privateKey: toStr(wallet.privateKey).trim(),
@@ -27,7 +38,7 @@ export const createLitPayerWallet = () => {
   };
 };
 
-export const getLitPayerWalletStatus = (privateKey) => {
+export const getLitPayerWalletStatus = (privateKey: unknown): LitPayerWalletStatus => {
   const normalizedPrivateKey = normalizeLitPayerPrivateKey(privateKey);
   if (!normalizedPrivateKey) {
     return {
@@ -47,7 +58,7 @@ export const getLitPayerWalletStatus = (privateKey) => {
       valid: true,
       error: '',
     };
-  } catch (error) {
+  } catch (error: any) {
     return {
       privateKey: normalizedPrivateKey,
       address: '',

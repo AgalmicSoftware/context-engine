@@ -15,30 +15,100 @@ import {
 import { createLogger } from '../logging.js';
 import { toStr } from '../shared/primitives.js';
 
+type LitGate = any;
+
+type LitRecipient = {
+  accessControlConditions: any;
+  chain: string | null;
+  [key: string]: any;
+};
+
+type GatePolicyGate = {
+  type: 'sbt';
+  label: string | null;
+  gateId: string | null;
+  sbtAddresses: string[];
+  chainId: number | string | null;
+  litChain: string | null;
+  chain?: string | null;
+  mode: string;
+};
+
+type GateRecipientPayload = {
+  resourceKey: string;
+  gate: GatePolicyGate;
+  recipient: LitRecipient;
+};
+
+type GatePolicyAccumulator = {
+  gates: GatePolicyGate[];
+  recipients: LitRecipient[];
+};
+
+type GatePolicyArgs = {
+  cfg?: any;
+  fallbackChainId?: number | string | null;
+};
+
+type ResponseGatePolicyArgs = GatePolicyArgs & {
+  isQuestionResponseFlow?: boolean;
+};
+
+type UploadTargets = {
+  survey?: boolean;
+  questions?: boolean;
+  questionTags?: boolean;
+  docUrls?: boolean;
+  [key: string]: any;
+};
+
+type UploadGatePolicyArgs = GatePolicyArgs & {
+  targets?: UploadTargets;
+  isStandaloneQuestion?: boolean;
+  manualGate?: LitGate | null;
+};
+
+type AppendGateRecipientArgs = {
+  out: GatePolicyAccumulator;
+  dedupe: Set<string>;
+  gateDedupe: Set<string>;
+  gate?: LitGate | null;
+  fallbackChainId?: number | string | null;
+  resourceKey: string;
+};
+
 const log = createLogger('crypto', { prefix: '[litGatePolicy]' });
 
-const normalizeText = (value) => {
+const normalizeText = (value: unknown): string => {
   const text = toStr(value).trim();
   if (!text) return '';
   if (/^\[object\s+object\]$/i.test(text)) return '';
   return text;
 };
 
-const normalizeGateType = (value) => toStr(value).trim().toLowerCase();
+const normalizeGateType = (value: unknown): string => toStr(value).trim().toLowerCase();
 
-const buildRecipientDedupeKey = (recipient) => JSON.stringify({
+const buildRecipientDedupeKey = (recipient: LitRecipient): string => JSON.stringify({
   chain: recipient.chain || null,
   accessControlConditions: recipient.accessControlConditions || null,
 });
 
-const buildGateDedupeKey = (gate) => JSON.stringify({
+const buildGateDedupeKey = (gate: any): string => JSON.stringify({
   chainId: Number(gate?.chainId || 0) || null,
   litChain: toStr(gate?.litChain || gate?.chain || '').trim().toLowerCase(),
   mode: normalizeGateMode(gate),
   sbtAddresses: getGateSbtAddresses(gate).map((addr) => addr.toLowerCase()).sort(),
 });
 
-export const createLitRecipientFromGate = ({ gate, fallbackChainId, resourceKey = '' } = {}) => {
+export const createLitRecipientFromGate = ({
+  gate,
+  fallbackChainId,
+  resourceKey = '',
+}: {
+  gate?: LitGate | null;
+  fallbackChainId?: number | string | null;
+  resourceKey?: string;
+} = {}): GateRecipientPayload | null => {
   const rawGateType = gate?.type;
   const gateType = normalizeGateType(rawGateType);
   if (typeof rawGateType !== 'undefined' && gateType !== 'sbt') {
@@ -84,7 +154,14 @@ export const createLitRecipientFromGate = ({ gate, fallbackChainId, resourceKey 
   };
 };
 
-const appendGateRecipient = ({ out, dedupe, gateDedupe, gate, fallbackChainId, resourceKey }) => {
+const appendGateRecipient = ({
+  out,
+  dedupe,
+  gateDedupe,
+  gate,
+  fallbackChainId,
+  resourceKey,
+}: AppendGateRecipientArgs): void => {
   const payloads = [{
     gate,
     fallbackChainId,
@@ -107,14 +184,14 @@ export const buildResponseGatePolicy = ({
   cfg = {},
   isQuestionResponseFlow = false,
   fallbackChainId = null,
-} = {}) => {
+}: ResponseGatePolicyArgs = {}) => {
   const primaryResource = isQuestionResponseFlow ? 'questionResponses' : 'surveyResponses';
   const primaryState = resolveSponsoredGateStateForResource(cfg, primaryResource);
   const primaryGateIsExplicitOpen = primaryState?.status === SPONSORED_GATE_STATES.OPEN;
 
-  const out = { gates: [], recipients: [] };
-  const dedupe = new Set();
-  const gateDedupe = new Set();
+  const out: GatePolicyAccumulator = { gates: [], recipients: [] };
+  const dedupe = new Set<string>();
+  const gateDedupe = new Set<string>();
 
   if (primaryState?.status === SPONSORED_GATE_STATES.RESTRICTED && primaryState.gate) {
     appendGateRecipient({
@@ -149,8 +226,14 @@ export const buildResponseGatePolicy = ({
   };
 };
 
-const resolveUploadResourceKeys = ({ targets = {}, isStandaloneQuestion = false } = {}) => {
-  const out = [];
+const resolveUploadResourceKeys = ({
+  targets = {},
+  isStandaloneQuestion = false,
+}: {
+  targets?: UploadTargets;
+  isStandaloneQuestion?: boolean;
+} = {}): string[] => {
+  const out: string[] = [];
   if (isStandaloneQuestion) {
     if (targets.questions || targets.questionTags) out.push('questionResponses');
     return out;
@@ -167,16 +250,16 @@ export const buildUploadGatePolicy = ({
   isStandaloneQuestion = false,
   fallbackChainId = null,
   manualGate = null,
-} = {}) => {
+}: UploadGatePolicyArgs = {}) => {
   const resourceKeys = resolveUploadResourceKeys({ targets, isStandaloneQuestion });
   const states = resourceKeys.map((resourceKey) => ({
     resourceKey,
     state: resolveSponsoredGateStateForResource(cfg, resourceKey),
   }));
 
-  const out = { gates: [], recipients: [] };
-  const dedupe = new Set();
-  const gateDedupe = new Set();
+  const out: GatePolicyAccumulator = { gates: [], recipients: [] };
+  const dedupe = new Set<string>();
+  const gateDedupe = new Set<string>();
 
   let hasExplicitOpenResource = false;
   states.forEach(({ resourceKey, state }) => {
