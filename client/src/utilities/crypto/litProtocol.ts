@@ -6,173 +6,21 @@
  *
  * Key exports: getGlobalLitHooks, buildSbtAccessControlConditions, resolveLitChain, litStorage, uploadEncryptedArweaveData
  */
+// @ts-nocheck
 import { Buffer } from 'buffer/';
 import { ethers } from 'ethers';
+import { createPublicClient, createWalletClient, custom, http } from 'viem';
 import { cryptoUtils } from './cryptography.js';
-import {
-  DEFAULT_CHIPOTLE_ACTION_CODE,
-} from './litChipotleCatalog.js';
-import {
-  buildLitChipotlePolicy,
-  fingerprintLitChipotlePolicy,
-  normalizeChipotleCekHex,
-  normalizeLitChipotleMetadataVersion,
-} from './litChipotlePolicy.js';
 import { arweaveScripts } from '../arweave/arweaveScripts.js';
 import { createLogger } from '../logging';
 import { perfDebugLitGetKey } from '../web3/rpcDebugStats.js';
 import { toStr } from '../shared/primitives.js';
 import {
   fetchWorkerWithAuth,
+  buildSignedBootstrapAdminAuth,
   normalizeWorkerUrl,
 } from '../worker/workerAuth.js';
-
-type UnknownRecord = Record<string, unknown>;
-type ChainInput = unknown;
-type ByteInput = Uint8Array | ArrayBuffer | ArrayBufferView | ArrayLike<number>;
-type LitProviderLike = unknown;
-type LitAccessControlCondition = UnknownRecord & {
-  operator?: 'and' | 'or' | string;
-  contractAddress?: string;
-  standardContractType?: string;
-  chain?: string;
-  method?: string;
-  parameters?: string[];
-  returnValueTest?: {
-    comparator?: string;
-    value?: string;
-  };
-};
-type LitHookOptions = UnknownRecord & {
-  accessControlConditions?: unknown;
-  chain?: unknown;
-  connectTimeout?: unknown;
-  litNetwork?: unknown;
-  resourceId?: unknown;
-  providerLike?: LitProviderLike;
-  resourceAbilityRequests?: unknown;
-  userMaxPrice?: unknown;
-  account?: unknown;
-  requesterAddress?: unknown;
-  ciphertext?: unknown;
-  dataToEncryptHash?: unknown;
-  encryptedSymmetricKey?: unknown;
-  toDecrypt?: unknown;
-  chipotle?: UnknownRecord | null;
-  chainId?: unknown;
-  rpcUrl?: unknown;
-};
-type LitHooksApi = UnknownRecord & {
-  saveKey?: ((...args: unknown[]) => Promise<unknown> | unknown) | null;
-  getKey?: ((...args: unknown[]) => Promise<unknown> | unknown) | null;
-  clearCache?: (() => void) | null;
-  accessControlConditions?: LitAccessControlCondition[] | null;
-  litChain?: unknown;
-  litNetwork?: unknown;
-  chain?: unknown;
-  providerLike?: LitProviderLike;
-  connectTimeout?: unknown;
-  resourceAbilityRequests?: unknown;
-  userMaxPrice?: unknown;
-  __e2eMock?: boolean;
-};
-type LitDevToolsApi = UnknownRecord & {
-  encryptForSbt: (options?: UnknownRecord) => Promise<string>;
-  decryptEnvelope: (envelopeJson: unknown) => Promise<unknown>;
-};
-type LitUploadPayload = UnknownRecord & {
-  v?: 1;
-  kind?: 'text' | 'file' | string;
-  name?: string;
-  format?: string;
-  mime?: string;
-  encoding?: 'utf-8' | 'base64' | string;
-  data?: string;
-};
-type ArweaveJwkLike = string | UnknownRecord;
-type LitUploadOptions = UnknownRecord & {
-  data?: unknown;
-  format?: unknown;
-  name?: unknown;
-  mime?: unknown;
-  arweaveJwk?: unknown;
-  tags?: unknown;
-  arweave?: UnknownRecord;
-  providerLike?: LitProviderLike;
-  account?: unknown;
-  chainId?: unknown;
-  contextLabel?: unknown;
-  lit?: LitHooksApi;
-};
-type LitDownloadOptions = UnknownRecord & {
-  url?: unknown;
-  txId?: unknown;
-  providerLike?: LitProviderLike;
-  account?: unknown;
-  chainId?: unknown;
-  lit?: LitHooksApi;
-  arweave?: UnknownRecord;
-};
-type SbtGateInfo = {
-  sbtAddresses: string[];
-  gateMode: 'any' | 'all';
-  litChain: string;
-  chainId: number | null;
-};
-type ChipotleGate = {
-  sbtAddresses: string[];
-  gateChainId: number | null;
-  gateMode: 'any' | 'all';
-  litChain: string;
-};
-type LitChipotlePolicy = UnknownRecord & {
-  chainId: number;
-  gateMode: 'any' | 'all' | string;
-  sbtAddresses: string[];
-  litActionCid: string;
-  litPkpId: string;
-};
-type LitGetKeyCacheEntry = {
-  expiresAt: number;
-  value?: unknown;
-  errMsg?: string;
-};
-type BufferCtorLike = {
-  prototype?: UnknownRecord;
-  alloc?: (size: number) => Uint8Array & UnknownRecord;
-};
-
-declare global {
-  interface Window {
-    __litHooks?: LitHooksApi | null;
-    litHooks?: LitHooksApi | null;
-    __litTools?: LitDevToolsApi | null;
-  }
-
-  // eslint-disable-next-line no-var
-  var CE_E2E_LIT_MOCK: boolean | undefined;
-}
-
-const isRecord = (value: unknown): value is UnknownRecord => (
-  !!value && typeof value === 'object' && !Array.isArray(value)
-);
-const asRecord = (value: unknown): UnknownRecord => (isRecord(value) ? value : {});
-const toErrorMessage = (err: unknown, fallback = ''): string => {
-  if (isRecord(err) && typeof err.message === 'string') return err.message;
-  const message = String(err || '').trim();
-  return message || fallback;
-};
-const toBytes = (value: unknown): Uint8Array => {
-  if (value instanceof Uint8Array) return value;
-  if (value instanceof ArrayBuffer) return new Uint8Array(value);
-  if (ArrayBuffer.isView(value)) {
-    return new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
-  }
-  if (value && typeof value === 'object' && typeof (value as ArrayLike<number>).length === 'number') {
-    return new Uint8Array(value as ArrayLike<number>);
-  }
-  return new Uint8Array([]);
-};
+import { getCorsProxyUrlOrThrow } from '../worker/corsProxy.js';
 
 /**
  * @typedef {import('ethers').providers.Provider} EthersProvider
@@ -188,7 +36,7 @@ const toBytes = (value: unknown): Uint8Array => {
  */
 
 /**
- * @typedef {string | Record<string, unknown>} ArweaveJwkLike
+ * @typedef {string | Record<string, any>} ArweaveJwkLike
  */
 
 /**
@@ -241,10 +89,11 @@ const toBytes = (value: unknown): Uint8Array => {
  *   chain?: string,
  *   connectTimeout?: number,
  *   litNetwork?: string,
- *   resourceId?: Record<string, unknown>,
+ *   resourceId?: Record<string, any>,
  *   providerLike?: LitProviderLike,
  *   resourceAbilityRequests?: unknown,
  *   userMaxPrice?: unknown,
+ *   paymentDelegation?: Record<string, any>,
  *   account?: string,
  *   rpcUrl?: string
  * }) => Promise<LitEncryptResult>} saveKey
@@ -253,10 +102,11 @@ const toBytes = (value: unknown): Uint8Array => {
  *   chain?: string,
  *   connectTimeout?: number,
  *   litNetwork?: string,
- *   resourceId?: Record<string, unknown>,
+ *   resourceId?: Record<string, any>,
  *   providerLike?: LitProviderLike,
  *   resourceAbilityRequests?: unknown,
  *   userMaxPrice?: unknown,
+ *   paymentDelegation?: Record<string, any>,
  *   account?: string,
  *   requesterAddress?: string,
  *   ciphertext?: string,
@@ -274,6 +124,7 @@ const toBytes = (value: unknown): Uint8Array => {
  * @property {number=} connectTimeout
  * @property {unknown=} resourceAbilityRequests
  * @property {unknown=} userMaxPrice
+ * @property {Record<string, any>=} paymentDelegation
  * @property {boolean=} __e2eMock
  */
 
@@ -285,7 +136,7 @@ const toBytes = (value: unknown): Uint8Array => {
  *   contextLabel?: string,
  *   chain?: string | number
  * }) => Promise<string>} encryptForSbt
- * @property {(envelopeJson: string | Record<string, unknown>) => Promise<unknown>} decryptEnvelope
+ * @property {(envelopeJson: string | Record<string, any>) => Promise<any>} decryptEnvelope
  */
 
 /**
@@ -299,8 +150,8 @@ const toBytes = (value: unknown): Uint8Array => {
  *   name?: string,
  *   mime?: string,
  *   arweaveJwk?: ArweaveJwkLike,
- *   tags?: Array<Record<string, unknown>>,
- *   arweave?: Record<string, unknown>,
+ *   tags?: Array<Record<string, any>>,
+ *   arweave?: Record<string, any>,
  *   providerLike?: LitProviderLike,
  *   account?: string,
  *   chainId?: number | string | null,
@@ -314,7 +165,7 @@ const toBytes = (value: unknown): Uint8Array => {
  *   account?: string,
  *   chainId?: number | string | null,
  *   lit?: LitHooksApi,
- *   arweave?: Record<string, unknown>
+ *   arweave?: Record<string, any>
  * }) => Promise<LitDecryptResult>} downloadEncryptedArweaveData
  * @property {(payload: LitUploadPayload | null | undefined) => string} decodeLitPayloadToText
  * @property {(payload: LitUploadPayload | null | undefined) => Blob | null} decodeLitPayloadToBlob
@@ -322,21 +173,69 @@ const toBytes = (value: unknown): Uint8Array => {
 
 const log = createLogger('sbt');
 
-const buildChipotlePolicy = buildLitChipotlePolicy as (input?: UnknownRecord) => LitChipotlePolicy;
-const fingerprintChipotlePolicy = fingerprintLitChipotlePolicy as (policy?: UnknownRecord) => string;
-
-const DEFAULT_LIT_NETWORK = 'chipotle';
+const DEFAULT_LIT_NETWORK = 'naga-dev';
 const DEFAULT_LIT_CHAIN = 'ethereum';
 const DEFAULT_LIT_CONNECT_TIMEOUT = 45000;
 const DEFAULT_LIT_SESSION_TTL_MS = 1000 * 60 * 10;
+const DEFAULT_LIT_PAYMENT_DELEGATION_TTL_MS = 1000 * 60 * 10;
+const LIT_AUTH_APP_NAME = 'context-engine';
+const NAGA_DEFAULT_KEY_SET_ID = 'naga-keyset1';
+const NAGA_ROOT_KEY_TYPE_SUBNET = 1;
+const NAGA_ROOT_KEY_TYPE_HD_ROOT = 2;
+const NAGA_HANDSHAKE_V1_NETWORKS = Object.freeze(new Set(['naga-dev']));
 
-const getGlobalScope = (): (typeof globalThis & { Buffer?: BufferCtorLike }) | null => {
+let litClientModulePromise = null;
+let litAuthModulePromise = null;
+let litContractsModulePromise = null;
+let litNetworksModulePromise = null;
+
+const getLitClientModule = async () => {
+  if (!litClientModulePromise) {
+    litClientModulePromise = import('@lit-protocol/lit-client').catch((err) => {
+      litClientModulePromise = null;
+      throw err;
+    });
+  }
+  return litClientModulePromise;
+};
+
+const getLitAuthModule = async () => {
+  if (!litAuthModulePromise) {
+    litAuthModulePromise = import('@lit-protocol/auth').catch((err) => {
+      litAuthModulePromise = null;
+      throw err;
+    });
+  }
+  return litAuthModulePromise;
+};
+
+const getLitContractsModule = async () => {
+  if (!litContractsModulePromise) {
+    litContractsModulePromise = import('@lit-protocol/contracts').catch((err) => {
+      litContractsModulePromise = null;
+      throw err;
+    });
+  }
+  return litContractsModulePromise;
+};
+
+const getLitNetworksModule = async () => {
+  if (!litNetworksModulePromise) {
+    litNetworksModulePromise = import('@lit-protocol/networks').catch((err) => {
+      litNetworksModulePromise = null;
+      throw err;
+    });
+  }
+  return litNetworksModulePromise;
+};
+
+const getGlobalScope = () => {
   if (typeof globalThis !== 'undefined') return globalThis;
   if (typeof window !== 'undefined') return window;
   return null;
 };
 
-const bufferHasBigUIntWrite = (BufferCtor: BufferCtorLike | null | undefined) => {
+const bufferHasBigUIntWrite = (BufferCtor) => {
   try {
     if (!BufferCtor || typeof BufferCtor.alloc !== 'function') return false;
     const probe = BufferCtor.alloc(8);
@@ -349,14 +248,10 @@ const bufferHasBigUIntWrite = (BufferCtor: BufferCtorLike | null | undefined) =>
   }
 };
 
-const installBufferBigUIntWriteShim = (BufferCtor: BufferCtorLike | null | undefined) => {
+const installBufferBigUIntWriteShim = (BufferCtor) => {
   if (!BufferCtor || !BufferCtor.prototype) return false;
 
-  const writeCompat = function writeBigUInt64BECompat(
-    this: Uint8Array,
-    value: string | number | bigint,
-    offset = 0
-  ) {
+  const writeCompat = function writeBigUInt64BECompat(value, offset = 0) {
     const bigIntCtor = (
       typeof globalThis !== 'undefined' &&
       typeof globalThis.BigInt === 'function'
@@ -383,12 +278,11 @@ const installBufferBigUIntWriteShim = (BufferCtor: BufferCtorLike | null | undef
     return start + 8;
   };
 
-  const prototype = BufferCtor.prototype;
-  if (typeof prototype.writeBigUInt64BE !== 'function') {
-    prototype.writeBigUInt64BE = writeCompat;
+  if (typeof BufferCtor.prototype.writeBigUInt64BE !== 'function') {
+    BufferCtor.prototype.writeBigUInt64BE = writeCompat;
   }
-  if (typeof prototype.writeBigUint64BE !== 'function') {
-    prototype.writeBigUint64BE = prototype.writeBigUInt64BE;
+  if (typeof BufferCtor.prototype.writeBigUint64BE !== 'function') {
+    BufferCtor.prototype.writeBigUint64BE = BufferCtor.prototype.writeBigUInt64BE;
   }
   return bufferHasBigUIntWrite(BufferCtor);
 };
@@ -405,16 +299,16 @@ export const ensureLitBufferCompatibility = () => {
   const runtimeBuffer = scope.Buffer;
   if (bufferHasBigUIntWrite(runtimeBuffer)) return runtimeBuffer;
 
-  if (bufferHasBigUIntWrite(Buffer as unknown as BufferCtorLike)) {
-    scope.Buffer = Buffer as unknown as BufferCtorLike;
+  if (bufferHasBigUIntWrite(Buffer)) {
+    scope.Buffer = Buffer;
     return scope.Buffer;
   }
 
   if (installBufferBigUIntWriteShim(runtimeBuffer)) {
     return runtimeBuffer;
   }
-  if (installBufferBigUIntWriteShim(Buffer as unknown as BufferCtorLike)) {
-    scope.Buffer = Buffer as unknown as BufferCtorLike;
+  if (installBufferBigUIntWriteShim(Buffer)) {
+    scope.Buffer = Buffer;
     return scope.Buffer;
   }
   return null;
@@ -422,9 +316,8 @@ export const ensureLitBufferCompatibility = () => {
 
 ensureLitBufferCompatibility();
 
-const logLit = (level: string, message: string, meta?: unknown) => {
-  const logger = log as unknown as Record<string, (...args: unknown[]) => void>;
-  const fn = logger[level] || logger.log;
+const logLit = (level, message, meta) => {
+  const fn = log[level] || log.log;
   if (meta === undefined) {
     fn(message);
   } else {
@@ -432,7 +325,7 @@ const logLit = (level: string, message: string, meta?: unknown) => {
   }
 };
 
-const normalizeConnectTimeout = (value: unknown) => {
+const normalizeConnectTimeout = (value) => {
   const num = Number(value || 0);
   if (!Number.isFinite(num) || num <= 0) return DEFAULT_LIT_CONNECT_TIMEOUT;
   return Math.floor(num);
@@ -449,7 +342,7 @@ const isE2eLitMockEnabled = () => {
   if (typeof window === 'undefined') return false;
 
   try {
-    if ((globalThis as typeof globalThis & { CE_E2E_LIT_MOCK?: boolean }).CE_E2E_LIT_MOCK === true) return true;
+    if (globalThis.CE_E2E_LIT_MOCK === true) return true;
   } catch (e) { void e; /* fallback: lit mock detection. */ }
   try {
     if (localStorage.getItem('ce-e2e-lit-mock') === '1') return true;
@@ -461,7 +354,71 @@ const isE2eLitMockEnabled = () => {
   return false;
 };
 
-const LIT_CHAIN_BY_ID: Readonly<Record<number, string>> = Object.freeze({
+const runWithTimeout = async ({ run, timeoutMs, timeoutMessage }) => {
+  let timeoutId = null;
+  let timedOut = false;
+  const taskPromise = Promise.resolve()
+    .then(() => run())
+    .catch((err) => {
+      // Avoid an unhandled rejection if the task fails after timeout wins the race.
+      if (timedOut) return null;
+      throw err;
+    });
+
+  const timeoutPromise = new Promise((_, reject) => {
+    timeoutId = setTimeout(() => {
+      timedOut = true;
+      reject(new Error(timeoutMessage));
+    }, timeoutMs);
+  });
+
+  try {
+    return await Promise.race([taskPromise, timeoutPromise]);
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
+};
+
+const createLitClientWithTimeout = async ({ network, timeoutMs }) => {
+  let timeoutId = null;
+  let timedOut = false;
+  const createPromise = getLitClientModule()
+    .then((module) => {
+      const createLitClient = module?.createLitClient;
+      if (typeof createLitClient !== 'function') {
+        throw new Error('Lit client module missing createLitClient export.');
+      }
+      return createLitClient({ network });
+    })
+    .then((client) => {
+      if (timedOut && client && typeof client.disconnect === 'function') {
+        try {
+          client.disconnect();
+        } catch (e) { log.warn('litProtocol: cleanup', e); }
+      }
+      return client;
+    })
+    .catch((err) => {
+      // Avoid an unhandled rejection if createLitClient fails after timeout wins the race.
+      if (timedOut) return null;
+      throw err;
+    });
+
+  const timeoutPromise = new Promise((_, reject) => {
+    timeoutId = setTimeout(() => {
+      timedOut = true;
+      reject(new Error(`Lit connect timed out after ${timeoutMs}ms.`));
+    }, timeoutMs);
+  });
+
+  try {
+    return await Promise.race([createPromise, timeoutPromise]);
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
+};
+
+const LIT_CHAIN_BY_ID = Object.freeze({
   1: 'ethereum',
   10: 'optimism',
   56: 'bsc',
@@ -475,220 +432,54 @@ const LIT_CHAIN_BY_ID: Readonly<Record<number, string>> = Object.freeze({
   11155420: 'optimismSepolia',
 });
 
-const LIT_WALLET_CHAIN_FALLBACKS: Readonly<Record<string, string>> = Object.freeze({});
-
-const CHAIN_ID_BY_LIT_CHAIN: Readonly<Record<string, number>> = Object.freeze(
-  Object.entries(LIT_CHAIN_BY_ID).reduce((acc: Record<string, number>, [id, chain]) => {
-    acc[chain] = Number(id);
-    return acc;
-  }, {})
-);
-
-const LIT_UNSUPPORTED_CONTRACT_GATE_ERRORS: Readonly<Record<string, string>> = Object.freeze({});
-
-const LIT_NETWORK_ALIASES: Readonly<Record<string, string>> = Object.freeze({
-  chipotle: 'chipotle',
-  'chipotle-v3': 'chipotle',
-  'naga-dev': 'chipotle',
-  nagadev: 'chipotle',
-  'naga-test': 'chipotle',
-  nagatest: 'chipotle',
-  'naga-mainnet': 'chipotle',
-  naga: 'chipotle',
-  datil: 'chipotle',
+const LIT_NETWORK_ALIASES = Object.freeze({
+  // Intentionally no datil-dev/datil-test aliases: datil is deprecated and
+  // this project is still in testing where strict backward compatibility is not required.
+  'naga-dev': 'naga-dev',
+  nagadev: 'naga-dev',
+  'naga-test': 'naga-test',
+  nagatest: 'naga-test',
+  'naga-mainnet': 'naga',
+  datil: 'naga',
   custom: 'custom',
 });
 
 /**
- * Normalizes historical Lit network labels to the worker-mediated runtime label used by CE.
+ * Normalizes Lit network aliases to the runtime identifier expected by the Lit client.
  *
  * @param {string | null | undefined} litNetwork
  * @returns {string}
  */
-export const resolveLitNetwork = (litNetwork: unknown) => {
+export const resolveLitNetwork = (litNetwork) => {
   const raw = toStr(litNetwork || DEFAULT_LIT_NETWORK).trim();
   if (!raw) return DEFAULT_LIT_NETWORK;
   const normalized = raw.toLowerCase().replace(/_/g, '-');
-  return LIT_NETWORK_ALIASES[normalized] || DEFAULT_LIT_NETWORK;
+  return LIT_NETWORK_ALIASES[normalized] || raw;
 };
 
-const resolveLitCipherPayload = (value: unknown): UnknownRecord | null => {
+const resolveLitCipherPayload = (value) => {
   if (!value) return null;
-  if (isRecord(value) && value.ciphertext && value.dataToEncryptHash) {
+  if (typeof value === 'object' && value.ciphertext && value.dataToEncryptHash) {
     return value;
   }
   if (typeof value === 'string') {
     try {
       const parsed = JSON.parse(value);
-      if (isRecord(parsed) && parsed.ciphertext && parsed.dataToEncryptHash) return parsed;
+      if (parsed && parsed.ciphertext && parsed.dataToEncryptHash) return parsed;
     } catch (e) { log.warn('litProtocol: fallback', e); }
   }
   return null;
 };
 
-const normalizeSbtAddressList = (values: unknown = []) => {
-  const out: string[] = [];
-  const seen = new Set<string>();
-  (Array.isArray(values) ? values : []).forEach((raw) => {
-    const value = toStr(raw).trim();
-    if (!value || !ethers.utils.isAddress(value)) return;
-    const normalized = ethers.utils.getAddress(value);
-    const dedupeKey = normalized.toLowerCase();
-    if (seen.has(dedupeKey)) return;
-    seen.add(dedupeKey);
-    out.push(normalized);
-  });
-  return out;
-};
-
-const extractSbtGateFromAccessControlConditions = (conditions: unknown): SbtGateInfo | null => {
-  const entries = Array.isArray(conditions) ? conditions : [];
-  const sbtAddresses: string[] = [];
-  const seen = new Set<string>();
-  let gateMode: 'any' | 'all' = 'any';
-  let litChain = '';
-
-  entries.forEach((entry) => {
-    if (!entry || typeof entry !== 'object') return;
-    const operator = toStr(entry.operator).trim().toLowerCase();
-    if (operator === 'and') gateMode = 'all';
-    if (operator === 'or' && gateMode !== 'all') gateMode = 'any';
-
-    const contractAddress = toStr(entry.contractAddress).trim();
-    if (!ethers.utils.isAddress(contractAddress)) return;
-    if (toStr(entry.standardContractType).trim().toUpperCase() !== 'ERC721') return;
-    if (toStr(entry.method).trim() !== 'balanceOf') return;
-    const parameters = Array.isArray(entry.parameters) ? entry.parameters : [];
-    if (toStr(parameters[0]).trim() !== ':userAddress') return;
-    const comparator = toStr(entry.returnValueTest?.comparator).trim();
-    const value = toStr(entry.returnValueTest?.value).trim();
-    if (comparator !== '>' || value !== '0') return;
-
-    const normalized = ethers.utils.getAddress(contractAddress);
-    const dedupeKey = normalized.toLowerCase();
-    if (!seen.has(dedupeKey)) {
-      seen.add(dedupeKey);
-      sbtAddresses.push(normalized);
-    }
-    if (!litChain) litChain = toStr(entry.chain).trim();
-  });
-
-  if (!sbtAddresses.length) return null;
-  return {
-    sbtAddresses,
-    gateMode,
-    litChain,
-    chainId: Number(CHAIN_ID_BY_LIT_CHAIN[litChain] || 0) || null,
-  };
-};
-
-const encodeChipotleKeyMessage = (raw: unknown) => {
-  const bytes = toBytes(raw);
-  return ethers.utils.hexlify(bytes);
-};
-
-const decodeChipotleKeyMessage = (value: unknown) => {
-  const normalized = normalizeChipotleCekHex(value);
-  const bytes = ethers.utils.arrayify(normalized);
-  if (bytes.length !== 32) {
-    throw new Error(`Lit Chipotle CEK had invalid length (${bytes.length}).`);
-  }
-  return bytes;
-};
-
-const parseChipotleActionResponse = (payload: unknown): UnknownRecord => {
-  if (isRecord(payload) && isRecord(payload.response)) {
-    if (isRecord(payload.response.response)) {
-      return payload.response.response;
-    }
-    return payload.response;
-  }
-  return isRecord(payload) ? payload : {};
-};
-
-const buildChipotleDataHashSentinel = ({
-  litActionCid = '',
-  chainId = null,
-  gateMode = 'any',
-  sbtAddresses = [],
-  policyFingerprint = '',
-}: {
-  litActionCid?: unknown;
-  chainId?: unknown;
-  gateMode?: unknown;
-  sbtAddresses?: unknown;
-  policyFingerprint?: unknown;
-} = {}) => (
-  [
-    'chipotle-v3',
-    toStr(litActionCid).trim() || 'action',
-    Number(chainId || 0) || 0,
-    toStr(gateMode).trim() || 'any',
-    normalizeSbtAddressList(sbtAddresses).join(',').toLowerCase(),
-    toStr(policyFingerprint).trim().toLowerCase(),
-  ].join(':')
-);
-
-const buildChipotleGateFromOptions = ({
-  accessControlConditions,
-  chipotle = {},
-  chainId,
-}: {
-  accessControlConditions?: unknown;
-  chipotle?: unknown;
-  chainId?: unknown;
-} = {}): ChipotleGate => {
-  const explicitGate = asRecord(chipotle);
-  const explicitPolicy = isRecord(explicitGate.policy)
-    ? explicitGate.policy
-    : {};
-  const derivedGate = extractSbtGateFromAccessControlConditions(accessControlConditions) || ({} as Partial<SbtGateInfo>);
-  const sbtAddresses = normalizeSbtAddressList(
-    explicitGate.sbtAddresses || explicitPolicy.sbtAddresses || derivedGate.sbtAddresses || []
-  );
-  if (!sbtAddresses.length) {
-    throw new Error('Lit Chipotle requires at least one SBT gate address.');
-  }
-  const gateChainId = Number(
-    explicitGate.chainId ||
-    explicitPolicy.chainId ||
-    derivedGate.chainId ||
-    chainId ||
-    0
-  ) || null;
-  const gateMode = toStr(
-    explicitGate.gateMode ||
-    explicitPolicy.gateMode ||
-    derivedGate.gateMode ||
-    'any'
-  ).trim().toLowerCase() === 'all'
-    ? 'all'
-    : 'any';
-  return {
-    sbtAddresses,
-    gateChainId,
-    gateMode,
-    litChain: toStr(explicitGate.litChain || derivedGate.litChain).trim(),
-  };
-};
-
-const isChipotleRuntimeConfigured = (chipotle: UnknownRecord = {}) => (
-  !!toStr(chipotle?.workerUrl).trim() &&
-  !!toStr(chipotle?.sessionSlug).trim()
-);
-
-const resolveLitErrorMessage = (err: unknown) => {
+const resolveLitErrorMessage = (err) => {
   if (!err) return 'Unknown Lit error';
-  const errRecord = asRecord(err);
-  const direct = toStr(errRecord.message || '').trim();
+  const direct = toStr(err?.message || '').trim();
   if (direct) return direct;
-  const nestedError = asRecord(errRecord.error);
-  const nestedCause = asRecord(errRecord.cause);
   const nested = toStr(
-    nestedError.message ||
-    nestedCause.message ||
-    errRecord.reason ||
-    errRecord.details ||
+    err?.error?.message ||
+    err?.cause?.message ||
+    err?.reason ||
+    err?.details ||
     ''
   ).trim();
   if (nested) return nested;
@@ -699,15 +490,12 @@ const resolveLitErrorMessage = (err: unknown) => {
   return String(err);
 };
 
-const normalizeAccessControlConditions = (
-  conditions: unknown,
-  chainFallback: unknown
-): LitAccessControlCondition[] | null => {
+const normalizeAccessControlConditions = (conditions, chainFallback) => {
   if (!Array.isArray(conditions)) return null;
   const chain = toStr(chainFallback || '').trim();
   return conditions
     .map((cond) => {
-      if (!isRecord(cond)) return cond as LitAccessControlCondition;
+      if (!cond || typeof cond !== 'object') return cond;
       if (cond.operator) return cond;
       if (cond.chain) return cond;
       if (!chain) return cond;
@@ -715,7 +503,7 @@ const normalizeAccessControlConditions = (
     });
 };
 
-const summarizeAccConditions = (conditions: unknown) => {
+const summarizeAccConditions = (conditions) => {
   if (!Array.isArray(conditions) || !conditions.length) {
     return {
       hasConditions: false,
@@ -745,24 +533,19 @@ const LIT_GETKEY_SUCCESS_CACHE_MAX = 600;
 const LIT_GETKEY_NEG_CACHE_MAX = 250;
 const LIT_GETKEY_PRUNE_EVERY_N = 25;
 
-type StableJsonPrimitive = null | string | number | boolean;
-type StableJsonValue = StableJsonPrimitive | StableJsonValue[] | StableJsonObject;
-type StableJsonObject = { [key: string]: StableJsonValue };
-
-const stableKeyStringify = (value: unknown) => {
-  const seen = new Set<object>();
-  const walk = (v: unknown): StableJsonValue => {
-    if (v == null) return null;
+const stableKeyStringify = (value) => {
+  const seen = new Set();
+  const walk = (v) => {
+    if (v == null) return v;
     if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') return v;
     if (typeof v === 'bigint') return `bigint:${v.toString()}`;
     if (Array.isArray(v)) return v.map(walk);
     if (typeof v === 'object') {
       if (seen.has(v)) return '[Circular]';
       seen.add(v);
-      const record = v as UnknownRecord;
-      const out: StableJsonObject = {};
-      Object.keys(record).sort().forEach((k) => {
-        out[k] = walk(record[k]);
+      const out = {};
+      Object.keys(v).sort().forEach((k) => {
+        out[k] = walk(v[k]);
       });
       return out;
     }
@@ -779,7 +562,7 @@ const stableKeyStringify = (value: unknown) => {
   }
 };
 
-const hashStable = (value: unknown) => {
+const hashStable = (value) => {
   const raw = typeof value === 'string' ? value : stableKeyStringify(value);
   try {
     return ethers.utils.id(raw);
@@ -788,9 +571,8 @@ const hashStable = (value: unknown) => {
   }
 };
 
-const isAccFailure = (err: unknown) => {
-  const errRecord = asRecord(err);
-  const msg = toStr(errRecord.message || errRecord.reason || '').toLowerCase();
+const isAccFailure = (err) => {
+  const msg = toStr(err?.message || err?.reason || '').toLowerCase();
   if (!msg) return false;
   return (
     msg.includes('access control') ||
@@ -801,9 +583,8 @@ const isAccFailure = (err: unknown) => {
   );
 };
 
-const isTransientLitError = (err: unknown) => {
-  const errRecord = asRecord(err);
-  const msg = toStr(errRecord.message || errRecord.reason || '').toLowerCase();
+const isTransientLitError = (err) => {
+  const msg = toStr(err?.message || err?.reason || '').toLowerCase();
   if (!msg) return false;
   return (
     msg.includes('timed out') ||
@@ -826,8 +607,7 @@ const buildLitGetKeyCacheKey = ({
   ciphertext,
   dataToEncryptHash,
   encryptedSymmetricKey,
-  chipotlePolicyFingerprint,
-}: LitHookOptions = {}) => {
+} = {}) => {
   const requester = toStr(requesterAddress).trim().toLowerCase();
   const network = resolveLitNetwork(litNetwork);
   const resolvedChain = toStr(chain).trim();
@@ -837,24 +617,18 @@ const buildLitGetKeyCacheKey = ({
     ciphertext: toStr(ciphertext).trim(),
     dataToEncryptHash: toStr(dataToEncryptHash).trim(),
     encryptedSymmetricKey: toStr(encryptedSymmetricKey).trim(),
-    chipotlePolicyFingerprint: toStr(chipotlePolicyFingerprint).trim().toLowerCase(),
   });
   return hashStable([requester, network, resolvedChain, condsHash, resourceHash, cipherHash].join('|'));
 };
 
-const touchLru = (map: Map<string, LitGetKeyCacheEntry>, key: string, value: LitGetKeyCacheEntry) => {
+const touchLru = (map, key, value) => {
   try {
     map.delete(key);
     map.set(key, value);
   } catch (e) { log.warn('litProtocol: fallback', e); }
 };
 
-const cacheLruSet = (
-  map: Map<string, LitGetKeyCacheEntry> | null,
-  key: string,
-  entry: LitGetKeyCacheEntry,
-  maxSize: number
-) => {
+const cacheLruSet = (map, key, entry, maxSize) => {
   if (!map) return;
   try {
     if (map.has(key)) map.delete(key);
@@ -870,10 +644,10 @@ const cacheLruSet = (
   } catch (e) { log.warn('litProtocol: fallback', e); }
 };
 
-const pruneExpiredCacheEntries = (map: Map<string, LitGetKeyCacheEntry>, now: number) => {
+const pruneExpiredCacheEntries = (map, now) => {
   try {
     if (!map || map.size === 0) return;
-    const dead: string[] = [];
+    const dead = [];
     for (const [k, v] of map.entries()) {
       if (!v || typeof v !== 'object') continue;
       if (Number(v.expiresAt || 0) <= now) dead.push(k);
@@ -882,13 +656,10 @@ const pruneExpiredCacheEntries = (map: Map<string, LitGetKeyCacheEntry>, now: nu
   } catch (e) { log.warn('litProtocol: fallback', e); }
 };
 
-const wrapLitGetKeyWithCache = (
-  getKeyUncached: (opts?: LitHookOptions) => Promise<unknown> | unknown,
-  context: LitHookOptions = {}
-) => {
-  const successCache = new Map<string, LitGetKeyCacheEntry>(); // key -> { expiresAt, value }
-  const negativeCache = new Map<string, LitGetKeyCacheEntry>(); // key -> { expiresAt, errMsg }
-  const inflight = new Map<string, Promise<unknown>>(); // key -> Promise
+const wrapLitGetKeyWithCache = (getKeyUncached, context = {}) => {
+  const successCache = new Map(); // key -> { expiresAt, value }
+  const negativeCache = new Map(); // key -> { expiresAt, errMsg }
+  const inflight = new Map(); // key -> Promise
 
   let opCount = 0;
 
@@ -899,7 +670,7 @@ const wrapLitGetKeyWithCache = (
     opCount = 0;
   };
 
-  const getKey = async (opts: LitHookOptions = {}) => {
+  const getKey = async (opts = {}) => {
     perfDebugLitGetKey('attempt');
 
     const requester = toStr(
@@ -935,11 +706,6 @@ const wrapLitGetKeyWithCache = (
       ciphertext: cipherPayload?.ciphertext || opts.ciphertext || '',
       dataToEncryptHash: cipherPayload?.dataToEncryptHash || opts.dataToEncryptHash || '',
       encryptedSymmetricKey: opts.encryptedSymmetricKey || opts.toDecrypt || '',
-      chipotlePolicyFingerprint: (() => {
-        const chipotle = asRecord(opts.chipotle);
-        const policy = asRecord(chipotle.policy);
-        return chipotle.policyFingerprint || policy.policyFingerprint || '';
-      })(),
     });
 
     const now = Date.now();
@@ -987,11 +753,10 @@ const wrapLitGetKeyWithCache = (
 
     try {
       const value = await run;
-      const settledAt = Date.now();
       cacheLruSet(
         successCache,
         key,
-        { expiresAt: settledAt + LIT_GETKEY_SUCCESS_TTL_MS, value },
+        { expiresAt: now + LIT_GETKEY_SUCCESS_TTL_MS, value },
         LIT_GETKEY_SUCCESS_CACHE_MAX
       );
       negativeCache.delete(key);
@@ -1021,7 +786,6 @@ const wrapLitGetKeyWithCache = (
 
 // Test-only export to validate caching and key scoping without initializing a real Lit client.
 export const __test__wrapLitGetKeyWithCache = wrapLitGetKeyWithCache;
-export const __test__extractSbtGateFromAccessControlConditions = extractSbtGateFromAccessControlConditions;
 
 const resolveLitChainFallbackWarnings = new Set();
 
@@ -1031,15 +795,7 @@ const resolveLitChainFallbackWarnings = new Set();
  * @param {{ chainId?: number | string | null, litChain?: number | string | null, chain?: number | string | null }} [options={}]
  * @returns {string}
  */
-export const resolveLitChain = ({
-  chainId,
-  litChain,
-  chain,
-}: {
-  chainId?: ChainInput;
-  litChain?: ChainInput;
-  chain?: ChainInput;
-} = {}) => {
+export const resolveLitChain = ({ chainId, litChain, chain } = {}) => {
   const rawLitChain = litChain || chain;
   if (rawLitChain) {
     const numericId = Number(rawLitChain);
@@ -1069,33 +825,7 @@ export const resolveLitChain = ({
   return DEFAULT_LIT_CHAIN;
 };
 
-export const resolveLitWalletAddressChain = ({
-  chainId,
-  litChain,
-  chain,
-}: {
-  chainId?: ChainInput;
-  litChain?: ChainInput;
-  chain?: ChainInput;
-} = {}) => {
-  const resolvedChain = resolveLitChain({ chainId, litChain, chain });
-  return LIT_WALLET_CHAIN_FALLBACKS[resolvedChain] || resolvedChain;
-};
-
-export const getUnsupportedLitContractAccessControlError = ({
-  chainId,
-  litChain,
-  chain,
-}: {
-  chainId?: ChainInput;
-  litChain?: ChainInput;
-  chain?: ChainInput;
-} = {}) => {
-  const resolvedChain = resolveLitChain({ chainId, litChain, chain });
-  return LIT_UNSUPPORTED_CONTRACT_GATE_ERRORS[resolvedChain] || '';
-};
-
-const ensureArray = (val: unknown): unknown[] => (Array.isArray(val) ? val : (val ? [val] : []));
+const ensureArray = (val) => (Array.isArray(val) ? val : (val ? [val] : []));
 
 /**
  * Builds Lit access control conditions that require ownership of one or more SBT contracts.
@@ -1119,15 +849,7 @@ export const buildSbtAccessControlConditions = ({
   chainId,
   mode,
   requireAll,
-}: {
-  sbtAddress?: unknown;
-  sbtAddresses?: unknown;
-  chain?: ChainInput;
-  litChain?: ChainInput;
-  chainId?: ChainInput;
-  mode?: unknown;
-  requireAll?: unknown;
-} = {}): LitAccessControlCondition[] | undefined => {
+} = {}) => {
   const addresses = ensureArray(sbtAddresses || sbtAddress).filter(Boolean);
   const resolvedChain = resolveLitChain({ chainId, litChain, chain });
   const normalizedMode = mode == null ? '' : String(mode).trim().toLowerCase();
@@ -1140,7 +862,7 @@ export const buildSbtAccessControlConditions = ({
     normalizedMode === '1';
   const operator = isAll ? 'and' : 'or';
   const conditions = addresses
-    .filter((addr): addr is string => typeof addr === 'string' && ethers.utils.isAddress(addr))
+    .filter((addr) => ethers.utils.isAddress(addr))
     .map((addr) => ({
       contractAddress: addr,
       standardContractType: 'ERC721',
@@ -1150,9 +872,9 @@ export const buildSbtAccessControlConditions = ({
       returnValueTest: { comparator: '>', value: '0' },
     }));
 
-  if (!conditions.length) return null as unknown as undefined;
+  if (!conditions.length) return null;
   if (conditions.length === 1) return conditions;
-  const out: LitAccessControlCondition[] = [];
+  const out = [];
   conditions.forEach((cond, idx) => {
     if (idx > 0) out.push({ operator });
     out.push(cond);
@@ -1176,15 +898,10 @@ export const buildWalletAddressAccessControlConditions = ({
   chain,
   litChain,
   chainId,
-}: {
-  walletAddress?: unknown;
-  chain?: ChainInput;
-  litChain?: ChainInput;
-  chainId?: ChainInput;
-} = {}): LitAccessControlCondition[] | null => {
+} = {}) => {
   const address = toStr(walletAddress).trim().toLowerCase();
   if (!ethers.utils.isAddress(address)) return null;
-  const resolvedChain = resolveLitWalletAddressChain({ chainId, litChain, chain });
+  const resolvedChain = resolveLitChain({ chainId, litChain, chain });
   return [
     {
       contractAddress: '',
@@ -1215,13 +932,7 @@ export const buildHatAccessControlConditions = ({
   chain,
   litChain,
   chainId,
-}: {
-  hatsAddress?: unknown;
-  hatId?: unknown;
-  chain?: ChainInput;
-  litChain?: ChainInput;
-  chainId?: ChainInput;
-} = {}): LitAccessControlCondition[] | null => {
+} = {}) => {
   const address = toStr(hatsAddress).trim();
   const id = toStr(hatId).trim();
   if (!address || !ethers.utils.isAddress(address) || !id) return null;
@@ -1238,7 +949,564 @@ export const buildHatAccessControlConditions = ({
   ];
 };
 
-const normalizeUserMaxPrice = (value: unknown) => {
+const createMemoryAuthStorage = (networkName) => {
+  const authDataByAddress = new Map();
+  const delegationSigByPublicKey = new Map();
+  const pkpTokenIdsByAuth = new Map();
+
+  return {
+    config: { appName: LIT_AUTH_APP_NAME, networkName, type: 'memory' },
+    read: async ({ address }) => authDataByAddress.get(String(address || '').toLowerCase()) || null,
+    write: async ({ address, authData }) => {
+      authDataByAddress.set(String(address || '').toLowerCase(), authData);
+    },
+    writeInnerDelegationAuthSig: async ({ publicKey, authSig }) => {
+      delegationSigByPublicKey.set(String(publicKey || ''), String(authSig || ''));
+    },
+    readInnerDelegationAuthSig: async ({ publicKey }) => (
+      delegationSigByPublicKey.get(String(publicKey || '')) || null
+    ),
+    writePKPTokens: async ({ authMethodType, authMethodId, tokenIds }) => {
+      const key = `${String(authMethodType)}:${String(authMethodId || '')}`;
+      pkpTokenIdsByAuth.set(key, Array.isArray(tokenIds) ? tokenIds : []);
+    },
+    readPKPTokens: async ({ authMethodType, authMethodId }) => {
+      const key = `${String(authMethodType)}:${String(authMethodId || '')}`;
+      return pkpTokenIdsByAuth.get(key) || null;
+    },
+  };
+};
+
+const authManagerByNetwork = new Map();
+
+const getAuthManager = async (networkName) => {
+  if (authManagerByNetwork.has(networkName)) {
+    return authManagerByNetwork.get(networkName);
+  }
+
+  const authModule = await getLitAuthModule();
+  const createAuthManager = authModule?.createAuthManager;
+  if (typeof createAuthManager !== 'function') {
+    throw new Error('Lit auth module missing createAuthManager export.');
+  }
+
+  // Keep Lit auth material in-memory only. The SDK localStorage plugin persists
+  // session keypairs and delegation auth signatures, which extends decryption
+  // capability beyond the current tab lifetime.
+  const storage = createMemoryAuthStorage(networkName);
+
+  const manager = createAuthManager({ storage });
+  authManagerByNetwork.set(networkName, manager);
+  return manager;
+};
+
+let litClientPromise = null;
+let litClientKey = null;
+let litClientInstance = null;
+const nagaRootKeyMaterialPromiseByNetwork = new Map();
+
+const resolveLitNetworkModule = async ({ litNetwork, rpcUrl } = {}) => {
+  const resolvedNetwork = resolveLitNetwork(litNetwork);
+  const networksModule = await getLitNetworksModule();
+  const naga = networksModule?.naga;
+  const nagaDev = networksModule?.nagaDev;
+  const nagaTest = networksModule?.nagaTest;
+  const networkByName = {
+    'naga-dev': nagaDev,
+    'naga-test': nagaTest,
+    naga,
+  };
+
+  if (resolvedNetwork === 'custom') {
+    if (!rpcUrl) {
+      throw new Error('Custom Lit network requires rpcUrl.');
+    }
+    if (!nagaDev || typeof nagaDev.withOverrides !== 'function') {
+      throw new Error('Lit networks module missing nagaDev.withOverrides.');
+    }
+    return nagaDev.withOverrides({ rpcUrl });
+  }
+  const baseNetwork = networkByName[resolvedNetwork];
+  if (!baseNetwork) {
+    throw new Error(`Unsupported Lit network "${resolvedNetwork}".`);
+  }
+  if (rpcUrl && typeof baseNetwork.withOverrides === 'function') {
+    return baseNetwork.withOverrides({ rpcUrl });
+  }
+  return baseNetwork;
+};
+
+const resolveNetworkRpcUrl = (networkModule) => {
+  try {
+    if (networkModule && typeof networkModule.getRpcUrl === 'function') {
+      return networkModule.getRpcUrl();
+    }
+  } catch (e) { log.warn('litProtocol: fallback', e); }
+  return null;
+};
+
+const normalizeHexNoPrefix = (value) => {
+  const raw = toStr(value).trim();
+  if (!raw) return '';
+  return raw.startsWith('0x') ? raw.slice(2) : raw;
+};
+
+const normalizeAddressLower = (value) => toStr(value).trim().toLowerCase();
+const NAGA_ROOT_KEY_LOG_SCAN_BLOCKS = 50000n;
+
+const normalizeBlockNumberBigInt = (value, fallback = 0n) => {
+  if (typeof value === 'bigint') return value >= 0n ? value : fallback;
+  const num = Number(value);
+  if (!Number.isFinite(num) || num < 0) return fallback;
+  const bigIntCtor = (
+    typeof globalThis !== 'undefined' &&
+    typeof globalThis.BigInt === 'function'
+  ) ? globalThis.BigInt : null;
+  if (!bigIntCtor) return fallback;
+  return bigIntCtor(Math.floor(num));
+};
+
+const readLatestRootKeyTypeFromLog = ({ log, latestByType, targetStaking } = {}) => {
+  if (!(latestByType instanceof Map)) return;
+  if (normalizeAddressLower(log?.args?.stakingContract) !== targetStaking) return;
+  const keyType = Number(log?.args?.rootKey?.keyType);
+  if (!Number.isFinite(keyType)) return;
+  const pubkey = normalizeHexNoPrefix(log?.args?.rootKey?.pubkey);
+  if (!pubkey) return;
+  const blockNumber = normalizeBlockNumberBigInt(log?.blockNumber, 0n);
+  const current = latestByType.get(keyType);
+  if (!current || blockNumber > current.blockNumber) {
+    latestByType.set(keyType, { blockNumber, values: [pubkey] });
+    return;
+  }
+  if (blockNumber === current.blockNumber) {
+    current.values.push(pubkey);
+  }
+};
+
+const hasLatestRootKeyTypes = (latestByType, types = []) => (
+  ensureArray(types)
+    .map((value) => Number(value))
+    .filter((value) => Number.isFinite(value))
+    .every((value) => latestByType.has(value))
+);
+
+const scanNagaRootKeySetLogsReverse = async ({
+  publicClient,
+  pubkeyRouterAddress,
+  rootKeySetEvent,
+  stakingAddress,
+  blockChunkSize = NAGA_ROOT_KEY_LOG_SCAN_BLOCKS,
+} = {}) => {
+  if (!publicClient || typeof publicClient.getBlockNumber !== 'function' || typeof publicClient.getLogs !== 'function') {
+    throw new Error('Lit root key scan requires a public client with getBlockNumber/getLogs.');
+  }
+
+  const chunkSize = normalizeBlockNumberBigInt(blockChunkSize, NAGA_ROOT_KEY_LOG_SCAN_BLOCKS) || NAGA_ROOT_KEY_LOG_SCAN_BLOCKS;
+  const latestByType = new Map();
+  const targetStaking = normalizeAddressLower(stakingAddress);
+  let toBlock = normalizeBlockNumberBigInt(await publicClient.getBlockNumber(), 0n);
+
+  while (toBlock >= 0n) {
+    const fromBlock = toBlock >= (chunkSize - 1n)
+      ? (toBlock - chunkSize + 1n)
+      : 0n;
+    const logs = await publicClient.getLogs({
+      address: pubkeyRouterAddress,
+      event: rootKeySetEvent,
+      fromBlock,
+      toBlock,
+    });
+
+    (Array.isArray(logs) ? logs : []).forEach((log) => {
+      readLatestRootKeyTypeFromLog({ log, latestByType, targetStaking });
+    });
+
+    if (hasLatestRootKeyTypes(latestByType, [NAGA_ROOT_KEY_TYPE_SUBNET, NAGA_ROOT_KEY_TYPE_HD_ROOT])) {
+      break;
+    }
+    if (fromBlock === 0n) break;
+    toBlock = fromBlock - 1n;
+  }
+
+  return latestByType;
+};
+
+const cloneLitNetworkModule = (networkModule) => {
+  if (!networkModule || typeof networkModule.withOverrides !== 'function') {
+    return networkModule;
+  }
+  try {
+    return networkModule.withOverrides({ rpcUrl: resolveNetworkRpcUrl(networkModule) || undefined });
+  } catch (_) {
+    return networkModule;
+  }
+};
+
+const resolveRootKeyMaterialFromChain = async ({ resolvedNetwork, networkModule }) => {
+  if (resolvedNetwork !== 'naga-dev') {
+    throw new Error(`Root key material resolver is unavailable for network "${resolvedNetwork}".`);
+  }
+  const contractsModule = await getLitContractsModule();
+  const signatures = contractsModule?.nagaDevSignatures;
+  const rootKeySetEvent = signatures?.PubkeyRouter?.events?.find((entry) => entry?.name === 'RootKeySet');
+  const pubkeyRouterAddress = signatures?.PubkeyRouter?.address;
+  const stakingAddress = signatures?.Staking?.address;
+  const rpcUrl = resolveNetworkRpcUrl(networkModule);
+  const chainConfig = networkModule?.getChainConfig?.();
+
+  if (!rootKeySetEvent || !pubkeyRouterAddress || !stakingAddress || !rpcUrl || !chainConfig) {
+    throw new Error('Unable to resolve naga-dev root key metadata from Lit contracts/network module.');
+  }
+
+  const publicClient = createPublicClient({
+    chain: chainConfig,
+    transport: http(rpcUrl),
+  });
+  const latestByType = await scanNagaRootKeySetLogsReverse({
+    publicClient,
+    pubkeyRouterAddress,
+    rootKeySetEvent,
+    stakingAddress,
+  });
+
+  const subnetKeys = Array.from(
+    new Set((latestByType.get(NAGA_ROOT_KEY_TYPE_SUBNET)?.values || []).filter(Boolean))
+  );
+  if (!subnetKeys.length) {
+    throw new Error('Lit naga-dev root key event logs are missing keyType=1 (subnet key).');
+  }
+  const hdRootPubkeys = Array.from(
+    new Set((latestByType.get(NAGA_ROOT_KEY_TYPE_HD_ROOT)?.values || []).filter(Boolean))
+  );
+
+  return {
+    subnetPublicKey: subnetKeys[0],
+    hdRootPubkeys,
+  };
+};
+
+export const __test__scanNagaRootKeySetLogsReverse = scanNagaRootKeySetLogsReverse;
+
+const getCachedRootKeyMaterial = async ({ resolvedNetwork, networkModule }) => {
+  const cacheKey = `${resolvedNetwork}::${resolveNetworkRpcUrl(networkModule) || ''}`;
+  if (nagaRootKeyMaterialPromiseByNetwork.has(cacheKey)) {
+    return nagaRootKeyMaterialPromiseByNetwork.get(cacheKey);
+  }
+  const loadPromise = resolveRootKeyMaterialFromChain({ resolvedNetwork, networkModule }).catch((err) => {
+    nagaRootKeyMaterialPromiseByNetwork.delete(cacheKey);
+    throw err;
+  });
+  nagaRootKeyMaterialPromiseByNetwork.set(cacheKey, loadPromise);
+  return loadPromise;
+};
+
+const createNagaHandshakeV1Schema = ({ rootKeys }) => ({
+  parse: (rawResponse) => {
+    const payload = rawResponse?.data && typeof rawResponse.data === 'object'
+      ? rawResponse.data
+      : rawResponse;
+    const latestBlockhash = toStr(payload?.latestBlockhash).trim();
+    const nodeIdentityKey = toStr(payload?.nodeIdentityKey).trim();
+    if (!latestBlockhash || !nodeIdentityKey) {
+      throw new Error('Lit handshake response is missing latestBlockhash or nodeIdentityKey.');
+    }
+
+    const keySetEpochRaw = payload?.keySets?.[NAGA_DEFAULT_KEY_SET_ID]?.epoch;
+    const keySetEpoch = Number(keySetEpochRaw ?? payload?.epoch ?? 0);
+    const subnetFromResponse = normalizeHexNoPrefix(
+      payload?.subnetPublicKey ||
+      payload?.serverPublicKey ||
+      payload?.networkPublicKey ||
+      payload?.networkPublicKeySet
+    );
+    const subnetPublicKey = (
+      subnetFromResponse && subnetFromResponse.toUpperCase() !== 'ERR'
+        ? subnetFromResponse
+        : rootKeys.subnetPublicKey
+    );
+    const hdRootPubkeys = Array.from(
+      new Set(
+        (
+          Array.isArray(payload?.hdRootPubkeys) && payload.hdRootPubkeys.length
+            ? payload.hdRootPubkeys
+            : rootKeys.hdRootPubkeys
+        )
+          .map(normalizeHexNoPrefix)
+          .filter(Boolean)
+      )
+    );
+
+    const normalized = {
+      serverPublicKey: subnetPublicKey,
+      subnetPublicKey,
+      networkPublicKey: subnetPublicKey,
+      networkPublicKeySet: subnetPublicKey,
+      clientSdkVersion: toStr(payload?.clientSdkVersion).trim() || '8.0.0-naga-dev',
+      hdRootPubkeys,
+      attestation: payload?.attestation ?? null,
+      latestBlockhash,
+      nodeVersion: toStr(payload?.nodeVersion).trim() || 'unknown',
+      nodeIdentityKey,
+      epoch: Number.isFinite(keySetEpoch) ? keySetEpoch : 0,
+    };
+
+    return {
+      parseData: () => normalized,
+    };
+  },
+});
+
+const withPatchedHandshakeFetch = async ({ handshakeKeySetId, run }) => {
+  if (!handshakeKeySetId || typeof globalThis.fetch !== 'function') {
+    return run();
+  }
+  const originalFetch = globalThis.fetch.bind(globalThis);
+  const patchedFetch = async (input, init) => {
+    const urlText = typeof input === 'string' ? input : (input?.url || '');
+    if (!urlText) return originalFetch(input, init);
+    let pathname = '';
+    try {
+      const base = typeof window !== 'undefined' ? window.location.origin : 'https://localhost';
+      pathname = new URL(urlText, base).pathname;
+    } catch (_) {
+      pathname = '';
+    }
+    if (!/\/web\/handshake\/v1\/?$/.test(pathname)) {
+      return originalFetch(input, init);
+    }
+
+    const method = toStr(init?.method || (typeof input === 'object' ? input?.method : '') || 'GET').toUpperCase();
+    if (method !== 'POST') {
+      return originalFetch(input, init);
+    }
+
+    if (typeof init?.body !== 'string') {
+      return originalFetch(input, init);
+    }
+
+    let parsedBody = null;
+    try {
+      parsedBody = JSON.parse(init.body);
+    } catch (_) {
+      parsedBody = null;
+    }
+    if (!parsedBody || typeof parsedBody !== 'object') {
+      return originalFetch(input, init);
+    }
+    if (!parsedBody.keySetId) parsedBody.keySetId = handshakeKeySetId;
+    if (!parsedBody.keySetIdentifier) parsedBody.keySetIdentifier = handshakeKeySetId;
+    return originalFetch(input, {
+      ...(init || {}),
+      body: JSON.stringify(parsedBody),
+    });
+  };
+
+  globalThis.fetch = patchedFetch;
+  if (typeof window !== 'undefined') {
+    window.fetch = patchedFetch;
+  }
+  try {
+    return await run();
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (typeof window !== 'undefined') {
+      window.fetch = originalFetch;
+    }
+  }
+};
+
+const prepareNetworkModuleForHandshake = async ({ resolvedNetwork, networkModule }) => {
+  if (!NAGA_HANDSHAKE_V1_NETWORKS.has(resolvedNetwork)) {
+    return { networkModule, handshakeKeySetId: null };
+  }
+
+  const compatibleModule = cloneLitNetworkModule(networkModule);
+  const endpoints = compatibleModule?.getEndpoints?.();
+  const handshakeInput = compatibleModule?.api?.handshake?.schemas?.Input;
+  if (!endpoints?.HANDSHAKE || !handshakeInput) {
+    return { networkModule: compatibleModule, handshakeKeySetId: null };
+  }
+
+  const rootKeys = await getCachedRootKeyMaterial({
+    resolvedNetwork,
+    networkModule: compatibleModule,
+  });
+
+  endpoints.HANDSHAKE.version = '/v1';
+  handshakeInput.ResponseData = createNagaHandshakeV1Schema({ rootKeys });
+
+  logLit('info', '[lit] naga handshake compat enabled', {
+    litNetwork: resolvedNetwork,
+    handshakeVersion: '/v1',
+    keySetId: NAGA_DEFAULT_KEY_SET_ID,
+    hdRootCount: rootKeys.hdRootPubkeys.length,
+  });
+
+  return {
+    networkModule: compatibleModule,
+    handshakeKeySetId: NAGA_DEFAULT_KEY_SET_ID,
+  };
+};
+
+const getLitClient = async (opts = {}) => {
+  ensureLitBufferCompatibility();
+  const { litNetwork, connectTimeout, litConnectTimeout, rpcUrl } = opts || {};
+  const resolvedNetwork = resolveLitNetwork(litNetwork);
+  const resolvedConnectTimeout = normalizeConnectTimeout(connectTimeout || litConnectTimeout);
+  const networkModule = await resolveLitNetworkModule({ litNetwork: resolvedNetwork, rpcUrl });
+  const rpc = resolveNetworkRpcUrl(networkModule);
+  const nextClientKey = `${resolvedNetwork}::${rpc || ''}`;
+
+  if (litClientPromise && litClientKey === nextClientKey) return litClientPromise;
+
+  if (litClientInstance && litClientKey && litClientKey !== nextClientKey) {
+    try {
+      if (typeof litClientInstance.disconnect === 'function') {
+        litClientInstance.disconnect();
+      }
+    } catch (e) { log.warn('litProtocol: cleanup', e); }
+  }
+
+  litClientKey = nextClientKey;
+  litClientPromise = (async () => {
+    const connectStartedAt = Date.now();
+    const getPhaseTimeout = (phaseLabel) => {
+      const elapsed = Date.now() - connectStartedAt;
+      const remaining = resolvedConnectTimeout - elapsed;
+      if (remaining <= 0) {
+        throw new Error(`Lit connect timed out during ${phaseLabel} after ${resolvedConnectTimeout}ms.`);
+      }
+      return Math.max(1, Math.ceil(remaining));
+    };
+
+    logLit('info', '[lit] connect start', {
+      litNetwork: resolvedNetwork,
+      connectTimeout: resolvedConnectTimeout,
+      rpcUrl: rpc || null,
+    });
+    const prepared = await runWithTimeout({
+      run: () => prepareNetworkModuleForHandshake({
+        resolvedNetwork,
+        networkModule,
+      }),
+      timeoutMs: getPhaseTimeout('handshake bootstrap'),
+      timeoutMessage: `Lit connect timed out during handshake bootstrap after ${resolvedConnectTimeout}ms.`,
+    });
+    const client = await withPatchedHandshakeFetch({
+      handshakeKeySetId: prepared.handshakeKeySetId,
+      run: () => createLitClientWithTimeout({
+        network: prepared.networkModule,
+        timeoutMs: getPhaseTimeout('client initialization'),
+      }),
+    });
+    litClientInstance = client;
+    logLit('info', '[lit] connect ok', { litNetwork: resolvedNetwork });
+    return client;
+  })().catch((err) => {
+    logLit('error', '[lit] connect failed', {
+      litNetwork: resolvedNetwork,
+      connectTimeout: resolvedConnectTimeout,
+      rpcUrl: rpc || null,
+      message: err?.message || err,
+    });
+    litClientPromise = null;
+    litClientKey = null;
+    litClientInstance = null;
+    throw err;
+  });
+  return litClientPromise;
+};
+
+const resolveProvider = (providerLike) => {
+  const provider = cryptoUtils._getProvider(providerLike);
+  if (!provider || typeof provider.request !== 'function') {
+    throw new Error('Lit requires an EIP-1193 provider to sign.');
+  }
+  return provider;
+};
+
+const resolveWalletClient = async (providerLike) => {
+  const provider = resolveProvider(providerLike);
+  const ethersProvider = new ethers.providers.Web3Provider(provider, 'any');
+  const signer = ethersProvider.getSigner();
+  const address = await signer.getAddress();
+  return createWalletClient({
+    account: address,
+    transport: custom(provider),
+  });
+};
+
+const LIT_ABILITY_ALIASES = Object.freeze({
+  'access-control-condition-decryption': 'access-control-condition-decryption',
+  accesscontrolconditiondecryption: 'access-control-condition-decryption',
+  AccessControlConditionDecryption: 'access-control-condition-decryption',
+  'access-control-condition-signing': 'access-control-condition-signing',
+  accesscontrolconditionsigning: 'access-control-condition-signing',
+  AccessControlConditionSigning: 'access-control-condition-signing',
+  'pkp-signing': 'pkp-signing',
+  pkpsigning: 'pkp-signing',
+  PKPSigning: 'pkp-signing',
+  'lit-payment-delegation': 'lit-payment-delegation',
+  paymentdelegation: 'lit-payment-delegation',
+  PaymentDelegation: 'lit-payment-delegation',
+  'lit-action-execution': 'lit-action-execution',
+  litactionexecution: 'lit-action-execution',
+  LitActionExecution: 'lit-action-execution',
+});
+
+const toLitAbility = (ability) => {
+  const raw = toStr(ability).trim();
+  if (!raw) return null;
+  return LIT_ABILITY_ALIASES[raw] || LIT_ABILITY_ALIASES[raw.replace(/[-_]/g, '')] || null;
+};
+
+const toResourceWildcard = (resource) => {
+  if (resource == null) return '*';
+  if (typeof resource === 'string') {
+    const trimmed = resource.trim();
+    return trimmed || '*';
+  }
+  if (typeof resource?.resource === 'string' && resource.resource.trim()) {
+    return resource.resource.trim();
+  }
+  if (typeof resource?.toString === 'function') {
+    const text = toStr(resource.toString()).trim();
+    if (text.includes('://')) return '*';
+    return text || '*';
+  }
+  return '*';
+};
+
+// Lit decrypt uses the ENCRYPTION_SIGN endpoint under the hood, which requires both
+// decryption and signing capabilities on the session.
+const DEFAULT_LIT_RESOURCES = Object.freeze([
+  ['access-control-condition-decryption', '*'],
+  ['access-control-condition-signing', '*'],
+]);
+
+const resolveLitResources = (resourceAbilityRequests) => {
+  if (!Array.isArray(resourceAbilityRequests) || !resourceAbilityRequests.length) {
+    return DEFAULT_LIT_RESOURCES;
+  }
+
+  const mapped = resourceAbilityRequests
+    .map((item) => {
+      if (Array.isArray(item)) {
+        const ability = toLitAbility(item[0]);
+        const resource = toResourceWildcard(item[1]);
+        return ability ? [ability, resource] : null;
+      }
+      const ability = toLitAbility(item?.ability);
+      const resource = toResourceWildcard(item?.resource);
+      return ability ? [ability, resource] : null;
+    })
+    .filter(Boolean);
+
+  return mapped.length ? mapped : DEFAULT_LIT_RESOURCES;
+};
+
+const normalizeUserMaxPrice = (value) => {
   if (typeof value === 'bigint') return value;
   const raw = toStr(value).trim();
   if (!raw) return undefined;
@@ -1256,11 +1524,199 @@ const normalizeUserMaxPrice = (value: unknown) => {
   }
 };
 
-const sanitizePublicLitHooks = (hooks: unknown = {}): LitHooksApi => {
-  return hooks as LitHooksApi;
+const shouldUseSponsoredLitDelegation = (paymentDelegation = {}) => {
+  if (!paymentDelegation || typeof paymentDelegation !== 'object') return false;
+  if (toStr(paymentDelegation.bootstrapLitPayerPrivateKey).trim()) return true;
+  return paymentDelegation.enabled === true || paymentDelegation.sponsored === true;
 };
 
-let e2eLitMockMasterKeyPromise: Promise<CryptoKey> | null = null;
+// Regression guard: createLitHooks can receive bootstrap payer keys for worker
+// delegation, but returned hooks may be published on window.__litHooks.
+// Strip secret-only fields before exposing hook metadata outside this module.
+const sanitizePublicPaymentDelegation = (paymentDelegation) => {
+  if (!paymentDelegation || typeof paymentDelegation !== 'object') return paymentDelegation;
+  const { bootstrapLitPayerPrivateKey, ...rest } = paymentDelegation;
+  return Object.keys(rest).length ? rest : undefined;
+};
+
+const sanitizePublicLitHooks = (hooks = {}) => {
+  if (!hooks || typeof hooks !== 'object') return hooks;
+  if (!Object.prototype.hasOwnProperty.call(hooks, 'paymentDelegation')) return hooks;
+  return {
+    ...hooks,
+    paymentDelegation: sanitizePublicPaymentDelegation(hooks.paymentDelegation),
+  };
+};
+
+const buildLitPaymentDelegationAudience = () => {
+  try {
+    if (typeof window !== 'undefined' && window.location?.origin) {
+      return toStr(window.location.origin).trim();
+    }
+  } catch (_) {}
+  return '';
+};
+
+const resolveDelegationWorkerUrl = (value) => {
+  if (typeof value !== 'string') return '';
+  const normalized = normalizeWorkerUrl(value);
+  if (!normalized) return '';
+  try {
+    return new URL(normalized).toString().replace(/\/+$/, '');
+  } catch {
+    return '';
+  }
+};
+
+const requestLitPaymentDelegationAuthSig = async ({
+  sessionPublicKey,
+  litNetwork,
+  paymentDelegation,
+  context,
+} = {}) => {
+  const delegation = paymentDelegation && typeof paymentDelegation === 'object' ? paymentDelegation : {};
+  if (!shouldUseSponsoredLitDelegation(delegation)) return null;
+
+  const sessionSlug = toStr(delegation.sessionSlug).trim();
+  const sessionConfig = delegation.sessionConfig && typeof delegation.sessionConfig === 'object'
+    ? delegation.sessionConfig
+    : null;
+  const bootstrapLitPayerPrivateKey = toStr(delegation.bootstrapLitPayerPrivateKey).trim();
+  const explicitWorkerUrl = resolveDelegationWorkerUrl(delegation.workerUrl);
+  const workerUrl = toStr(
+    explicitWorkerUrl || await getCorsProxyUrlOrThrow({
+      sessionSlug,
+      sessionConfig,
+      context,
+      allowDemoFallback: delegation.allowDemoFallback,
+    })
+  ).trim();
+  if (!workerUrl) {
+    throw new Error('Lit sponsorship worker URL is missing.');
+  }
+
+  const audience = buildLitPaymentDelegationAudience();
+  if (bootstrapLitPayerPrivateKey) {
+    const adminAuth = await buildSignedBootstrapAdminAuth({
+      slug: sessionSlug,
+      workerUrl,
+      statement: 'Admin request: bootstrap lit payment delegation',
+      context,
+    });
+    const response = await fetch(`${workerUrl.replace(/\/+$/, '')}/lit/payment-delegation`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...adminAuth,
+        sessionSlug,
+        sessionPublicKey,
+        litNetwork,
+        litPayerPrivateKey: bootstrapLitPayerPrivateKey,
+        expiresAt: new Date(Date.now() + DEFAULT_LIT_PAYMENT_DELEGATION_TTL_MS).toISOString(),
+        audience,
+      }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(data?.error || 'Failed to bootstrap Lit payment delegation.');
+    }
+    return data?.capabilityAuthSig || null;
+  }
+
+  const response = await fetchWorkerWithAuth(
+    `${workerUrl.replace(/\/+$/, '')}/lit/payment-delegation`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionPublicKey,
+        litNetwork,
+        expiresAt: new Date(Date.now() + DEFAULT_LIT_PAYMENT_DELEGATION_TTL_MS).toISOString(),
+        audience,
+      }),
+    },
+    {
+      sessionSlug,
+      sessionConfig,
+      context,
+      workerUrl,
+      allowDemoFallback: delegation.allowDemoFallback,
+    },
+  );
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data?.error || 'Failed to load Lit payment delegation.');
+  }
+  return data?.capabilityAuthSig || null;
+};
+
+const getAuthContext = async ({
+  litClient,
+  providerLike,
+  chain,
+  resourceAbilityRequests,
+  litNetwork,
+  paymentDelegation,
+  context,
+} = {}) => {
+  ensureLitBufferCompatibility();
+  const resources = resolveLitResources(resourceAbilityRequests);
+
+  logLit('info', '[lit] session start', {
+    litNetwork: litNetwork || null,
+    chain: chain || null,
+    resourceCount: resources.length,
+  });
+
+  try {
+    const walletClient = await resolveWalletClient(providerLike);
+    const authManager = await getAuthManager(litNetwork || DEFAULT_LIT_NETWORK);
+    const authContext = await authManager.createEoaAuthContext({
+      config: { account: walletClient },
+      authConfig: {
+        domain: (typeof window !== 'undefined' && window.location?.host) ? window.location.host : 'localhost',
+        statement: 'Authorize Lit session',
+        resources,
+        expiration: new Date(Date.now() + DEFAULT_LIT_SESSION_TTL_MS).toISOString(),
+      },
+      litClient,
+    });
+    const sessionPublicKey = toStr(authContext?.sessionKeyPair?.publicKey).trim();
+    const capabilityAuthSig = await requestLitPaymentDelegationAuthSig({
+      sessionPublicKey,
+      litNetwork: litNetwork || DEFAULT_LIT_NETWORK,
+      paymentDelegation,
+      context,
+    }).catch((error) => {
+      if (!shouldUseSponsoredLitDelegation(paymentDelegation)) return null;
+      throw error;
+    });
+    if (capabilityAuthSig) {
+      authContext.authConfig = {
+        ...(authContext.authConfig || {}),
+        capabilityAuthSigs: [
+          ...(
+            Array.isArray(authContext?.authConfig?.capabilityAuthSigs)
+              ? authContext.authConfig.capabilityAuthSigs
+              : []
+          ),
+          capabilityAuthSig,
+        ],
+      };
+    }
+    logLit('info', '[lit] session ok', { litNetwork: litNetwork || null, chain: chain || null });
+    return authContext;
+  } catch (err) {
+    logLit('error', '[lit] session failed', {
+      litNetwork: litNetwork || null,
+      chain: chain || null,
+      message: err?.message || err,
+    });
+    throw err;
+  }
+};
+
+let e2eLitMockMasterKeyPromise = null;
 const getE2eLitMockMasterKey = async () => {
   if (e2eLitMockMasterKeyPromise) return e2eLitMockMasterKeyPromise;
   e2eLitMockMasterKeyPromise = (async () => {
@@ -1280,7 +1736,7 @@ const getE2eLitMockMasterKey = async () => {
   return e2eLitMockMasterKeyPromise;
 };
 
-const e2eLitMockEncodePayload = async (keyBytes: BufferSource) => {
+const e2eLitMockEncodePayload = async (keyBytes) => {
   if (typeof window === 'undefined' || !window.crypto || !window.crypto.subtle) {
     throw new Error('Lit mock requires WebCrypto support.');
   }
@@ -1305,7 +1761,7 @@ const e2eLitMockEncodePayload = async (keyBytes: BufferSource) => {
   };
 };
 
-const e2eLitMockDecodePayload = async (ciphertextB64: unknown) => {
+const e2eLitMockDecodePayload = async (ciphertextB64) => {
   if (typeof window === 'undefined' || !window.crypto || !window.crypto.subtle) {
     throw new Error('Lit mock requires WebCrypto support.');
   }
@@ -1322,10 +1778,10 @@ const e2eLitMockDecodePayload = async (ciphertextB64: unknown) => {
   return new Uint8Array(plainBuf);
 };
 
-const e2eLitMockParseConditions = (conditions: unknown) => {
+const e2eLitMockParseConditions = (conditions) => {
   const list = Array.isArray(conditions) ? conditions : [];
-  let operator: 'and' | 'or' | null = null;
-  const checks: Array<{ type: 'erc721-balance' | 'wallet-address'; address: string }> = [];
+  let operator = null;
+  const checks = [];
 
   for (const cond of list) {
     if (!cond || typeof cond !== 'object') continue;
@@ -1338,7 +1794,7 @@ const e2eLitMockParseConditions = (conditions: unknown) => {
     const addr = toStr(cond.contractAddress).trim();
     const comparator = toStr(cond.returnValueTest?.comparator).trim();
     const value = toStr(cond.returnValueTest?.value).trim().toLowerCase();
-    const parameters = Array.isArray(cond.parameters) ? cond.parameters.map((entry: unknown) => toStr(entry).trim()) : [];
+    const parameters = Array.isArray(cond.parameters) ? cond.parameters.map((entry) => toStr(entry).trim()) : [];
     if (method === 'balanceof' && ethers.utils.isAddress(addr)) {
       checks.push({ type: 'erc721-balance', address: addr.toLowerCase() });
       continue;
@@ -1354,15 +1810,7 @@ const e2eLitMockParseConditions = (conditions: unknown) => {
   };
 };
 
-const e2eLitMockCheckAccessControlConditions = async ({
-  requesterAddress,
-  conditions,
-  providerLike,
-}: {
-  requesterAddress?: unknown;
-  conditions?: unknown;
-  providerLike?: LitProviderLike;
-}) => {
+const e2eLitMockCheckAccessControlConditions = async ({ requesterAddress, conditions, providerLike }) => {
   if (!Array.isArray(conditions) || !conditions.length) return false;
   const req = toStr(requesterAddress).trim();
   if (!ethers.utils.isAddress(req)) return false;
@@ -1373,11 +1821,11 @@ const e2eLitMockCheckAccessControlConditions = async ({
     return false;
   }
 
-  const provider = cryptoUtils._getProvider(providerLike as Parameters<typeof cryptoUtils._getProvider>[0]);
+  const provider = cryptoUtils._getProvider(providerLike);
   const ethersProvider = new ethers.providers.Web3Provider(provider, 'any');
   const abi = ['function balanceOf(address owner) view returns (uint256)'];
 
-  const checks: boolean[] = [];
+  const checks = [];
   for (const check of parsed.checks) {
     if (check?.type === 'wallet-address') {
       checks.push(check.address === req.toLowerCase());
@@ -1401,18 +1849,19 @@ const createE2eLitMockHooks = ({
   litChain,
   litNetwork,
   userMaxPrice,
+  paymentDelegation,
   accessControlConditions,
   resourceAbilityRequests,
   connectTimeout,
   litConnectTimeout,
-}: LitHookOptions = {}): LitHooksApi => {
+} = {}) => {
   ensureLitBufferCompatibility();
   const resolvedChain = resolveLitChain({ chainId, litChain });
   const resolvedNetwork = resolveLitNetwork(litNetwork);
   const resolvedConnectTimeout = normalizeConnectTimeout(connectTimeout || litConnectTimeout);
   const baseConditions = Array.isArray(accessControlConditions) ? accessControlConditions : null;
 
-  const saveKey = async (symmetricKey: unknown, opts: LitHookOptions = {}) => {
+  const saveKey = async (symmetricKey, opts = {}) => {
     ensureLitBufferCompatibility();
     const conditions = Array.isArray(opts.accessControlConditions)
       ? opts.accessControlConditions
@@ -1420,12 +1869,12 @@ const createE2eLitMockHooks = ({
     if (!conditions || !conditions.length) {
       throw new Error('Lit mock saveKey requires access control conditions.');
     }
-    const keyBytes = toBytes(symmetricKey);
+    const keyBytes = symmetricKey instanceof Uint8Array ? symmetricKey : new Uint8Array(symmetricKey || []);
     if (!keyBytes.length) throw new Error('Lit mock saveKey requires key bytes.');
     return e2eLitMockEncodePayload(keyBytes);
   };
 
-  const getKeyUncached = async (opts: LitHookOptions = {}) => {
+  const getKeyUncached = async (opts = {}) => {
     ensureLitBufferCompatibility();
     const effectiveProviderLike = opts.providerLike || providerLike;
     const requester = toStr(opts.requesterAddress || opts.account || account || '').trim();
@@ -1478,204 +1927,8 @@ const createE2eLitMockHooks = ({
     connectTimeout: resolvedConnectTimeout,
     resourceAbilityRequests,
     userMaxPrice: normalizeUserMaxPrice(userMaxPrice),
+    paymentDelegation,
     __e2eMock: true,
-  });
-};
-
-const createLitChipotleHooks = ({
-  providerLike,
-  account,
-  chainId,
-  accessControlConditions,
-  connectTimeout,
-  chipotle,
-}: LitHookOptions = {}): LitHooksApi | null => {
-  const chipotleConfig = asRecord(chipotle);
-  const normalizedWorkerUrl = normalizeWorkerUrl(chipotleConfig.workerUrl);
-  const sessionSlug = toStr(chipotleConfig.sessionSlug).trim();
-  const sessionConfig = chipotleConfig.sessionConfig && typeof chipotleConfig.sessionConfig === 'object'
-    ? chipotleConfig.sessionConfig
-    : null;
-  const litCredentials = asRecord(chipotleConfig.litCredentials);
-  const baseConditions = Array.isArray(accessControlConditions) ? accessControlConditions : null;
-
-  if (!isChipotleRuntimeConfigured({
-    workerUrl: normalizedWorkerUrl,
-    sessionSlug,
-    litCredentials,
-  })) {
-    return null;
-  }
-
-  const executeChipotleAction = async ({
-    op,
-    gate,
-    message,
-    ciphertext,
-    chipotleMetadata,
-  }: {
-    op?: 'encrypt' | 'decrypt' | string;
-    gate?: ChipotleGate;
-    message?: unknown;
-    ciphertext?: unknown;
-    chipotleMetadata?: unknown;
-  } = {}) => {
-    if (!gate) throw new Error('Lit Chipotle gate is required.');
-    const chipotleActionUrl = `${normalizedWorkerUrl.replace(/\/+$/, '')}/lit/chipotle-action`;
-    const response = await fetchWorkerWithAuth(
-      chipotleActionUrl,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'lit_chipotle_execute',
-          actionCode: DEFAULT_CHIPOTLE_ACTION_CODE,
-          op,
-          sbtAddresses: gate.sbtAddresses,
-          gateMode: gate.gateMode,
-          chainId: gate.gateChainId,
-          ...(chipotleMetadata ? { chipotle: chipotleMetadata } : {}),
-          ...(message ? { message } : {}),
-          ...(ciphertext ? { ciphertext } : {}),
-        }),
-      },
-      {
-        sessionSlug,
-        sessionConfig,
-        context: {
-          account,
-          providerLike,
-          chainId,
-        },
-        workerUrl: normalizedWorkerUrl,
-      },
-    );
-    const payload = asRecord(await response.json().catch(() => ({})));
-    if (!response.ok) {
-      throw new Error(toStr(payload.error).trim() || `Lit Chipotle request failed (${response.status}).`);
-    }
-    const actionResponse = parseChipotleActionResponse(payload);
-    if (actionResponse?.ok === false) {
-      throw new Error(toStr(actionResponse.reason).trim() || 'Lit Chipotle gate check failed.');
-    }
-    return actionResponse;
-  };
-
-  const saveKey = async (symmetricKey: unknown, opts: LitHookOptions = {}) => {
-    const gate = buildChipotleGateFromOptions({
-      accessControlConditions: Array.isArray(opts.accessControlConditions)
-        ? opts.accessControlConditions
-        : baseConditions,
-      chipotle: opts.chipotle || chipotle,
-      chainId: opts.chainId || chainId || null,
-    });
-    const wrapped = await executeChipotleAction({
-      op: 'encrypt',
-      gate,
-      message: encodeChipotleKeyMessage(symmetricKey),
-    });
-    const wrappedCiphertext = toStr(wrapped?.ciphertext).trim();
-    if (!wrappedCiphertext) {
-      throw new Error('Lit Chipotle encrypt did not return ciphertext.');
-    }
-    const responsePolicy = wrapped?.policy
-      ? buildChipotlePolicy(asRecord(wrapped.policy))
-      : buildChipotlePolicy({
-        chainId: gate.gateChainId,
-        gateMode: gate.gateMode,
-        sbtAddresses: gate.sbtAddresses,
-        litActionCid: litCredentials.litActionCid,
-        litPkpId: litCredentials.litPkpId,
-      });
-    const policyFingerprint = toStr(
-      wrapped?.policyFingerprint || fingerprintChipotlePolicy(responsePolicy)
-    ).trim();
-    if (policyFingerprint.toLowerCase() !== fingerprintChipotlePolicy(responsePolicy).toLowerCase()) {
-      throw new Error('Lit Chipotle encrypt returned mismatched policy metadata.');
-    }
-    return {
-      ciphertext: wrappedCiphertext,
-      dataToEncryptHash: buildChipotleDataHashSentinel({
-        litActionCid: responsePolicy.litActionCid,
-        chainId: responsePolicy.chainId,
-        gateMode: responsePolicy.gateMode,
-        sbtAddresses: responsePolicy.sbtAddresses,
-        policyFingerprint,
-      }),
-      chipotle: {
-        version: 2,
-        litActionCid: responsePolicy.litActionCid,
-        litPkpId: responsePolicy.litPkpId,
-        sbtAddresses: responsePolicy.sbtAddresses,
-        gateMode: responsePolicy.gateMode,
-        chainId: responsePolicy.chainId,
-        policyFingerprint,
-        policy: responsePolicy,
-      },
-    };
-  };
-
-  const getKeyUncached = async (opts: LitHookOptions = {}) => {
-    const ciphertext = toStr(
-      opts.ciphertext ||
-      opts.encryptedSymmetricKey ||
-      opts.toDecrypt
-    ).trim();
-    if (!ciphertext) {
-      throw new Error('Lit Chipotle decrypt requires ciphertext.');
-    }
-    const metadataVersion = normalizeLitChipotleMetadataVersion(opts.chipotle || {});
-    if (opts.chipotle && metadataVersion !== 2) {
-      throw new Error('Lit Chipotle legacy wrapped keys are not supported.');
-    }
-    const gate = buildChipotleGateFromOptions({
-      accessControlConditions: Array.isArray(opts.accessControlConditions)
-        ? opts.accessControlConditions
-        : baseConditions,
-      chipotle: opts.chipotle || chipotle,
-      chainId: opts.chainId || chainId || null,
-    });
-    const unwrapped = await executeChipotleAction({
-      op: 'decrypt',
-      gate,
-      ciphertext,
-      chipotleMetadata: opts.chipotle || null,
-    });
-    const plaintext = toStr(unwrapped?.plaintext).trim();
-    if (!plaintext) {
-      throw new Error('Lit Chipotle decrypt did not return plaintext.');
-    }
-    return decodeChipotleKeyMessage(plaintext);
-  };
-
-  const { getKey, clearCache } = wrapLitGetKeyWithCache(getKeyUncached, {
-    account,
-    litNetwork: 'chipotle',
-    chain: '',
-    accessControlConditions: baseConditions,
-  });
-
-  return sanitizePublicLitHooks({
-    saveKey,
-    getKey,
-    clearCache,
-    accessControlConditions: baseConditions,
-    litChain: '',
-    litNetwork: 'chipotle',
-    chain: '',
-    providerLike,
-    connectTimeout,
-    chipotle: {
-      enabled: true,
-      workerUrl: normalizedWorkerUrl,
-      sessionSlug,
-      litCredentials: {
-        litApiBase: toStr(litCredentials.litApiBase).trim(),
-        litActionCid: toStr(litCredentials.litActionCid).trim(),
-        litGroupId: toStr(litCredentials.litGroupId).trim(),
-        litPkpId: toStr(litCredentials.litPkpId).trim(),
-      },
-    },
   });
 };
 
@@ -1689,11 +1942,11 @@ const createLitChipotleHooks = ({
  *   litChain?: string | number | null,
  *   litNetwork?: string | null,
  *   userMaxPrice?: unknown,
+ *   paymentDelegation?: Record<string, any>,
  *   accessControlConditions?: LitAccessControlCondition[],
  *   resourceAbilityRequests?: unknown,
  *   connectTimeout?: number | string | null,
- *   litConnectTimeout?: number | string | null,
- *   chipotle?: Record<string, unknown>
+ *   litConnectTimeout?: number | string | null
  * }} [options={}]
  * @returns {LitHooksApi}
  */
@@ -1704,14 +1957,15 @@ export const createLitHooks = ({
   litChain,
   litNetwork,
   userMaxPrice,
+  paymentDelegation,
   accessControlConditions,
   resourceAbilityRequests,
   connectTimeout,
   litConnectTimeout,
-  chipotle,
-}: LitHookOptions = {}): LitHooksApi | null => {
+} = {}) => {
   ensureLitBufferCompatibility();
   const resolvedChain = resolveLitChain({ chainId, litChain });
+  const resolvedNetwork = resolveLitNetwork(litNetwork);
   const resolvedConnectTimeout = normalizeConnectTimeout(connectTimeout || litConnectTimeout);
   const resolvedUserMaxPrice = normalizeUserMaxPrice(userMaxPrice);
   const baseConditions = Array.isArray(accessControlConditions) ? accessControlConditions : null;
@@ -1722,44 +1976,353 @@ export const createLitHooks = ({
       account,
       chainId,
       litChain: resolvedChain,
-      litNetwork: resolveLitNetwork(litNetwork),
+      litNetwork: resolvedNetwork,
       userMaxPrice: resolvedUserMaxPrice,
+      paymentDelegation,
       accessControlConditions: baseConditions || undefined,
       resourceAbilityRequests,
       connectTimeout: resolvedConnectTimeout,
     });
   }
 
-  const chipotleHooks = createLitChipotleHooks({
-    providerLike,
-    account,
-    chainId,
-    accessControlConditions: baseConditions,
-    connectTimeout: resolvedConnectTimeout,
-    chipotle,
-  });
-  if (chipotleHooks) {
-    return chipotleHooks;
-  }
-
-  logLit('info', '[lit] chipotle runtime unavailable; no hooks published', {
+  logLit('info', '[lit] hooks init', {
+    litNetwork: resolvedNetwork,
     chain: resolvedChain,
     conditionCount: baseConditions ? baseConditions.length : 0,
     connectTimeout: resolvedConnectTimeout,
   });
-  return null;
+
+  const getSession = async (override = {}) => {
+    const effectiveNetwork = resolveLitNetwork(override.litNetwork || resolvedNetwork);
+    const client = await getLitClient({
+      litNetwork: effectiveNetwork,
+      connectTimeout: override.connectTimeout || resolvedConnectTimeout,
+      rpcUrl: override.rpcUrl,
+    });
+    return getAuthContext({
+      litClient: client,
+      providerLike: override.providerLike || providerLike,
+      chain: override.chain || resolvedChain,
+      resourceAbilityRequests: override.resourceAbilityRequests || resourceAbilityRequests,
+      litNetwork: effectiveNetwork,
+      paymentDelegation: override.paymentDelegation || paymentDelegation,
+      context: {
+        account: override.account || account,
+        providerLike: override.providerLike || providerLike,
+        chainId,
+      },
+    });
+  };
+
+  const saveKey = async (symmetricKey, opts = {}) => {
+    const conditions = Array.isArray(opts.accessControlConditions)
+      ? opts.accessControlConditions
+      : baseConditions;
+    if (!conditions || !conditions.length) {
+      throw new Error('Lit saveKey requires access control conditions.');
+    }
+    const chain = opts.chain || resolvedChain;
+    const timeout = normalizeConnectTimeout(opts.connectTimeout || resolvedConnectTimeout);
+    const effectiveNetwork = resolveLitNetwork(opts.litNetwork || resolvedNetwork);
+    const effectiveUserMaxPrice = normalizeUserMaxPrice(opts.userMaxPrice) ?? resolvedUserMaxPrice;
+    logLit('info', '[lit] saveKey start', {
+      litNetwork: effectiveNetwork,
+      chain,
+      connectTimeout: timeout,
+      conditionCount: conditions.length,
+      hasResourceId: !!opts.resourceId,
+    });
+    let client;
+    try {
+      client = await getLitClient({
+        litNetwork: effectiveNetwork,
+        connectTimeout: timeout,
+        rpcUrl: opts.rpcUrl,
+      });
+    } catch (err) {
+      logLit('error', '[lit] saveKey connect failed', {
+        litNetwork: effectiveNetwork,
+        chain,
+        connectTimeout: timeout,
+        message: err?.message || err,
+      });
+      throw err;
+    }
+    const keyBytes = symmetricKey instanceof Uint8Array ? symmetricKey : new Uint8Array(symmetricKey || []);
+
+    // Lit encrypt (saving the wrapped CEK) requires an authenticated session; without it Lit nodes
+    // can return 401s from the ENCRYPTION_SIGN endpoint (seen in no-mock E2E runs).
+    const authContext = await getSession({
+      chain,
+      connectTimeout: timeout,
+      providerLike: opts.providerLike,
+      resourceAbilityRequests: opts.resourceAbilityRequests,
+      litNetwork: effectiveNetwork,
+      rpcUrl: opts.rpcUrl,
+      paymentDelegation: opts.paymentDelegation || paymentDelegation,
+      account: opts.account || account,
+    });
+
+    try {
+      const { ciphertext, dataToEncryptHash } = await client.encrypt({
+        accessControlConditions: conditions,
+        chain,
+        dataToEncrypt: keyBytes,
+        ...(effectiveUserMaxPrice !== undefined ? { userMaxPrice: effectiveUserMaxPrice } : {}),
+        ...(opts.resourceId ? { resourceId: opts.resourceId } : {}),
+        authContext,
+      });
+      if (!ciphertext || !dataToEncryptHash) {
+        throw new Error('Lit encrypt did not return ciphertext/dataToEncryptHash.');
+      }
+      logLit('info', '[lit] saveKey ok', {
+        litNetwork: effectiveNetwork,
+        chain,
+        mode: 'ciphertext',
+      });
+      return { ciphertext, dataToEncryptHash };
+    } catch (err) {
+      logLit('error', '[lit] saveKey encrypt failed', {
+        litNetwork: effectiveNetwork,
+        chain,
+        connectTimeout: timeout,
+        message: err?.message || err,
+      });
+      throw err;
+    }
+  };
+
+  const getKeyUncached = async (opts = {}) => {
+    const conditions = normalizeAccessControlConditions(
+      Array.isArray(opts.accessControlConditions) ? opts.accessControlConditions : baseConditions,
+      opts.chain || resolvedChain
+    );
+    const toDecrypt = opts.encryptedSymmetricKey || opts.toDecrypt;
+    const cipherPayload = resolveLitCipherPayload(
+      opts.ciphertext && opts.dataToEncryptHash
+        ? { ciphertext: opts.ciphertext, dataToEncryptHash: opts.dataToEncryptHash }
+        : toDecrypt
+    );
+    if (!cipherPayload && !toDecrypt) {
+      throw new Error('Lit getKey requires ciphertext/dataToEncryptHash.');
+    }
+    const chain = opts.chain || resolvedChain;
+    const timeout = normalizeConnectTimeout(opts.connectTimeout || resolvedConnectTimeout);
+    const effectiveNetwork = resolveLitNetwork(opts.litNetwork || resolvedNetwork);
+    const effectiveUserMaxPrice = normalizeUserMaxPrice(opts.userMaxPrice) ?? resolvedUserMaxPrice;
+    const accSummary = summarizeAccConditions(conditions);
+    logLit('info', '[lit] getKey start', {
+      litNetwork: effectiveNetwork,
+      chain,
+      connectTimeout: timeout,
+      hasCiphertext: !!cipherPayload,
+      hasEncryptedSymmetricKey: !!toDecrypt,
+      hasConditions: accSummary.hasConditions,
+      conditionCount: accSummary.conditionCount,
+      firstConditionChain: accSummary.firstChain,
+      firstConditionMethod: accSummary.firstMethod,
+    });
+    let client;
+    try {
+      client = await getLitClient({
+        litNetwork: effectiveNetwork,
+        connectTimeout: timeout,
+        rpcUrl: opts.rpcUrl,
+      });
+    } catch (err) {
+      logLit('error', '[lit] getKey connect failed', {
+        litNetwork: effectiveNetwork,
+        chain,
+        connectTimeout: timeout,
+        message: err?.message || err,
+      });
+      throw err;
+    }
+
+    const authContext = await getSession({
+      chain,
+      connectTimeout: timeout,
+      providerLike: opts.providerLike,
+      resourceAbilityRequests: opts.resourceAbilityRequests,
+      litNetwork: effectiveNetwork,
+      rpcUrl: opts.rpcUrl,
+      paymentDelegation: opts.paymentDelegation || paymentDelegation,
+      account: opts.account || account,
+    });
+
+    if (cipherPayload && typeof client.decrypt === 'function') {
+      if (!accSummary.hasConditions) {
+        const missingConditionsError = new Error(
+          'Lit ciphertext payload is missing accessControlConditions.'
+        );
+        logLit('error', '[lit] getKey decrypt failed', {
+          litNetwork: effectiveNetwork,
+          chain,
+          connectTimeout: timeout,
+          hasCiphertext: true,
+          hasEncryptedSymmetricKey: !!toDecrypt,
+          hasConditions: false,
+          message: missingConditionsError.message,
+        });
+        if (!(typeof client.getEncryptionKey === 'function' && toDecrypt)) {
+          throw missingConditionsError;
+        }
+      }
+      try {
+        logLit('info', '[lit] decrypt start', {
+          litNetwork: effectiveNetwork,
+          chain,
+          conditionCount: accSummary.conditionCount,
+        });
+        const { decryptedData } = await client.decrypt({
+          accessControlConditions: conditions,
+          chain,
+          ciphertext: cipherPayload.ciphertext,
+          dataToEncryptHash: cipherPayload.dataToEncryptHash,
+          ...(effectiveUserMaxPrice !== undefined ? { userMaxPrice: effectiveUserMaxPrice } : {}),
+          authContext,
+        });
+        logLit('info', '[lit] decrypt ok', {
+          litNetwork: effectiveNetwork,
+          chain,
+        });
+        logLit('info', '[lit] getKey ok', {
+          litNetwork: effectiveNetwork,
+          chain,
+          mode: 'ciphertext',
+        });
+        return decryptedData;
+      } catch (err) {
+        const message = resolveLitErrorMessage(err);
+        logLit('error', '[lit] getKey decrypt failed', {
+          litNetwork: effectiveNetwork,
+          chain,
+          connectTimeout: timeout,
+          hasCiphertext: true,
+          hasEncryptedSymmetricKey: !!toDecrypt,
+          hasConditions: accSummary.hasConditions,
+          conditionCount: accSummary.conditionCount,
+          firstConditionChain: accSummary.firstChain,
+          firstConditionMethod: accSummary.firstMethod,
+          resourceId: opts.resourceId || null,
+          name: err?.name || null,
+          code: err?.code ?? err?.errorCode ?? null,
+          message,
+          cause: resolveLitErrorMessage(err?.cause || err?.error || ''),
+        });
+        if (typeof client.getEncryptionKey === 'function' && toDecrypt) {
+          try {
+            logLit('info', '[lit] decrypt fallback unwrap start', {
+              litNetwork: effectiveNetwork,
+              chain,
+            });
+            const fallbackKey = await client.getEncryptionKey({
+              accessControlConditions: conditions,
+              chain,
+              resourceId: opts.resourceId,
+              toDecrypt,
+              encryptedSymmetricKey: toDecrypt,
+              ...(effectiveUserMaxPrice !== undefined ? { userMaxPrice: effectiveUserMaxPrice } : {}),
+              authContext,
+            });
+            logLit('info', '[lit] decrypt fallback unwrap ok', {
+              litNetwork: effectiveNetwork,
+              chain,
+            });
+            return fallbackKey;
+          } catch (fallbackErr) {
+            logLit('error', '[lit] decrypt fallback unwrap failed', {
+              litNetwork: effectiveNetwork,
+              chain,
+              connectTimeout: timeout,
+              name: fallbackErr?.name || null,
+              code: fallbackErr?.code ?? fallbackErr?.errorCode ?? null,
+              message: resolveLitErrorMessage(fallbackErr),
+            });
+          }
+        }
+        throw err instanceof Error ? err : new Error(message);
+      }
+    }
+
+    if (typeof client.getEncryptionKey === 'function' && toDecrypt) {
+      try {
+        logLit('info', '[lit] unwrap start', {
+          litNetwork: effectiveNetwork,
+          chain,
+        });
+        const decryptedKey = await client.getEncryptionKey({
+          accessControlConditions: conditions,
+          chain,
+          resourceId: opts.resourceId,
+          toDecrypt,
+          encryptedSymmetricKey: toDecrypt,
+          ...(effectiveUserMaxPrice !== undefined ? { userMaxPrice: effectiveUserMaxPrice } : {}),
+          authContext,
+        });
+        logLit('info', '[lit] unwrap ok', {
+          litNetwork: effectiveNetwork,
+          chain,
+        });
+        logLit('info', '[lit] getKey ok', {
+          litNetwork: effectiveNetwork,
+          chain,
+          mode: 'encryptedSymmetricKey',
+        });
+        return decryptedKey;
+      } catch (err) {
+        logLit('error', '[lit] getKey key-unwrap failed', {
+          litNetwork: effectiveNetwork,
+          chain,
+          connectTimeout: timeout,
+          hasConditions: accSummary.hasConditions,
+          conditionCount: accSummary.conditionCount,
+          firstConditionChain: accSummary.firstChain,
+          firstConditionMethod: accSummary.firstMethod,
+          name: err?.name || null,
+          code: err?.code ?? err?.errorCode ?? null,
+          message: resolveLitErrorMessage(err),
+        });
+        throw err instanceof Error ? err : new Error(resolveLitErrorMessage(err));
+      }
+    }
+
+    if (toDecrypt && !cipherPayload) {
+      throw new Error('Legacy encryptedSymmetricKey payload requires re-encryption for Lit v8.');
+    }
+
+    throw new Error('Lit decrypt is unavailable on this client.');
+  };
+
+  const { getKey, clearCache } = wrapLitGetKeyWithCache(getKeyUncached, {
+    account,
+    litNetwork: resolvedNetwork,
+    chain: resolvedChain,
+    accessControlConditions: baseConditions,
+  });
+
+  return sanitizePublicLitHooks({
+    saveKey,
+    getKey,
+    clearCache,
+    accessControlConditions: baseConditions,
+    litChain: resolvedChain,
+    litNetwork: resolvedNetwork,
+    userMaxPrice: resolvedUserMaxPrice,
+    paymentDelegation,
+  });
 };
 
 /**
  * Publishes a sanitized Lit hook set on `window.__litHooks`.
  *
- * @param {LitHooksApi | Record<string, unknown> | null | undefined} hooks
+ * @param {LitHooksApi | Record<string, any> | null | undefined} hooks
  * @returns {LitHooksApi | null}
  */
-export const setGlobalLitHooks = (hooks: LitHooksApi | UnknownRecord | null | undefined): LitHooksApi | null => {
+export const setGlobalLitHooks = (hooks) => {
   if (typeof window === 'undefined') return null;
   if (hooks && typeof hooks === 'object') {
-    const publicHooks = sanitizePublicLitHooks(hooks) as LitHooksApi;
+    const publicHooks = sanitizePublicLitHooks(hooks);
     window.__litHooks = publicHooks;
     return publicHooks;
   }
@@ -1788,20 +2351,10 @@ export const getGlobalLitHooks = () => {
  * }} [options={}]
  * @returns {LitDevToolsApi | null}
  */
-export const attachLitDevTools = ({
-  providerLike,
-  account,
-  chainId,
-  litChain,
-}: {
-  providerLike?: LitProviderLike;
-  account?: string;
-  chainId?: ChainInput;
-  litChain?: ChainInput;
-} = {}): LitDevToolsApi | null => {
+export const attachLitDevTools = ({ providerLike, account, chainId, litChain } = {}) => {
   if (typeof window === 'undefined') return null;
   const tools = {
-    encryptForSbt: async ({ value, sbtAddresses, contextLabel, chain }: UnknownRecord = {}) => {
+    encryptForSbt: async ({ value, sbtAddresses, contextLabel, chain } = {}) => {
       const hooks = getGlobalLitHooks();
       if (!hooks || typeof hooks.saveKey !== 'function') {
         throw new Error('Lit hooks not initialized.');
@@ -1827,7 +2380,7 @@ export const attachLitDevTools = ({
         },
       });
     },
-    decryptEnvelope: async (envelopeJson: unknown) => {
+    decryptEnvelope: async (envelopeJson) => {
       const hooks = getGlobalLitHooks();
       if (!hooks || typeof hooks.getKey !== 'function') {
         throw new Error('Lit hooks not initialized.');
@@ -1855,7 +2408,7 @@ const ALT_LIT_AR_PREFIX = 'lit+ar://';
  * @param {unknown} txId
  * @returns {string}
  */
-export const buildLitArweaveUrl = (txId: unknown) => `${LIT_ARWEAVE_PREFIX}${toStr(txId).trim()}`;
+export const buildLitArweaveUrl = (txId) => `${LIT_ARWEAVE_PREFIX}${toStr(txId).trim()}`;
 
 /**
  * Extracts an Arweave transaction id from a Lit storage URL.
@@ -1863,7 +2416,7 @@ export const buildLitArweaveUrl = (txId: unknown) => `${LIT_ARWEAVE_PREFIX}${toS
  * @param {unknown} url
  * @returns {string | null}
  */
-export const parseLitArweaveUrl = (url: unknown) => {
+export const parseLitArweaveUrl = (url) => {
   const raw = toStr(url).trim();
   if (!raw) return null;
   if (raw.startsWith(LIT_ARWEAVE_PREFIX)) {
@@ -1881,10 +2434,10 @@ export const parseLitArweaveUrl = (url: unknown) => {
  * @param {unknown} url
  * @returns {boolean}
  */
-export const isLitArweaveUrl = (url: unknown) => !!parseLitArweaveUrl(url);
+export const isLitArweaveUrl = (url) => !!parseLitArweaveUrl(url);
 
-const readBlobAsArrayBuffer = (blob: Blob) =>
-  new Promise<ArrayBuffer | string | null>((resolve, reject) => {
+const readBlobAsArrayBuffer = (blob) =>
+  new Promise((resolve, reject) => {
     try {
       const reader = new FileReader();
       reader.onload = () => resolve(reader.result);
@@ -1895,7 +2448,7 @@ const readBlobAsArrayBuffer = (blob: Blob) =>
     }
   });
 
-const MIME_BY_EXT: Readonly<Record<string, string>> = Object.freeze({
+const MIME_BY_EXT = Object.freeze({
   jpg: 'image/jpeg',
   jpeg: 'image/jpeg',
   png: 'image/png',
@@ -1913,7 +2466,7 @@ const MIME_BY_EXT: Readonly<Record<string, string>> = Object.freeze({
   wav: 'audio/wav',
 });
 
-const resolveExt = ({ name, format }: { name?: unknown; format?: unknown } = {}) => {
+const resolveExt = ({ name, format } = {}) => {
   const fmt = toStr(format).trim().toLowerCase();
   if (fmt) return fmt;
   const rawName = toStr(name).trim();
@@ -1924,17 +2477,7 @@ const resolveExt = ({ name, format }: { name?: unknown; format?: unknown } = {})
   return '';
 };
 
-const resolveMimeFromParts = ({
-  mime,
-  name,
-  format,
-  type,
-}: {
-  mime?: unknown;
-  name?: unknown;
-  format?: unknown;
-  type?: unknown;
-} = {}) => {
+const resolveMimeFromParts = ({ mime, name, format, type } = {}) => {
   const raw = toStr(mime || type).trim();
   const ext = resolveExt({ name, format });
   if (raw && raw !== 'application/octet-stream') return raw;
@@ -1942,16 +2485,14 @@ const resolveMimeFromParts = ({
   return raw || 'application/octet-stream';
 };
 
-const resolveMimeFromPayload = (payload: unknown) => {
-  const payloadRecord = asRecord(payload) as LitUploadPayload;
-  return resolveMimeFromParts({
-    mime: payloadRecord.mime,
-    name: payloadRecord.name,
-    format: payloadRecord.format,
+const resolveMimeFromPayload = (payload) =>
+  resolveMimeFromParts({
+    mime: payload?.mime,
+    name: payload?.name,
+    format: payload?.format,
   });
-};
 
-const isTextLikeMime = (mime: string) => {
+const isTextLikeMime = (mime) => {
   if (!mime) return false;
   if (mime.startsWith('text/')) return true;
   return [
@@ -1964,15 +2505,15 @@ const isTextLikeMime = (mime: string) => {
   ].includes(mime);
 };
 
-const encodeEncryptedPayload = async (data: unknown, opts: { name?: string; format?: string; mime?: string } = {}): Promise<LitUploadPayload> => {
+const encodeEncryptedPayload = async (data, opts = {}) => {
   const name = toStr(opts.name || '');
   const format = toStr(opts.format || '');
   const mime = toStr(opts.mime || '');
 
   if (typeof File !== 'undefined' && (data instanceof File || data instanceof Blob)) {
     const buf = await readBlobAsArrayBuffer(data);
-    const b64 = Buffer.from(toBytes(buf)).toString('base64');
-    const resolvedName = name || (data instanceof File ? data.name : '') || 'encrypted-file';
+    const b64 = Buffer.from(new Uint8Array(buf || [])).toString('base64');
+    const resolvedName = name || data.name || 'encrypted-file';
     const resolvedFormat = resolveExt({ name: resolvedName, format });
     const resolvedMime = resolveMimeFromParts({
       mime,
@@ -2011,8 +2552,8 @@ const encodeEncryptedPayload = async (data: unknown, opts: { name?: string; form
  *   name?: string,
  *   mime?: string,
  *   arweaveJwk?: ArweaveJwkLike,
- *   tags?: Array<Record<string, unknown>>,
- *   arweave?: Record<string, unknown>,
+ *   tags?: Array<Record<string, any>>,
+ *   arweave?: Record<string, any>,
  *   providerLike?: LitProviderLike,
  *   account?: string,
  *   chainId?: number | string | null,
@@ -2034,7 +2575,7 @@ export const uploadEncryptedArweaveData = async ({
   chainId,
   contextLabel,
   lit,
-}: LitUploadOptions = {}) => {
+} = {}) => {
   if (!lit || typeof lit.saveKey !== 'function') {
     throw new Error('Lit saveKey is required to encrypt Arweave data.');
   }
@@ -2042,11 +2583,7 @@ export const uploadEncryptedArweaveData = async ({
     throw new Error('Lit accessControlConditions are required to encrypt Arweave data.');
   }
 
-  const payload = await encodeEncryptedPayload(data, {
-    format: toStr(format),
-    name: toStr(name),
-    mime: toStr(mime),
-  });
+  const payload = await encodeEncryptedPayload(data, { format, name, mime });
   const envelope = await cryptoUtils.encryptEnvelopeValue(payload, {
     providerLike,
     account,
@@ -2067,14 +2604,13 @@ export const uploadEncryptedArweaveData = async ({
   return {
     txId,
     url: buildLitArweaveUrl(txId),
-    arweaveUrl: arweaveScripts.buildArweaveGatewayUrl(txId),
+    arweaveUrl: arweaveScripts.buildArweaveGatewayUrl(txId, 'https://arweave.net'),
     envelope,
   };
 };
 
 /**
- * Downloads an encrypted Arweave envelope payload and decrypts it with self-recipient wallet
- * signing, Lit hooks, or both when the envelope carries both recipient types.
+ * Downloads an encrypted Lit payload from Arweave and decrypts it with the active Lit hooks.
  *
  * @param {{
  *   url?: string,
@@ -2083,7 +2619,7 @@ export const uploadEncryptedArweaveData = async ({
  *   account?: string,
  *   chainId?: number | string | null,
  *   lit?: LitHooksApi,
- *   arweave?: Record<string, unknown>
+ *   arweave?: Record<string, any>
  * }} [options={}]
  * @returns {Promise<LitDecryptResult>}
  */
@@ -2095,15 +2631,18 @@ export const downloadEncryptedArweaveData = async ({
   chainId,
   lit,
   arweave,
-}: LitDownloadOptions = {}): Promise<{ payload: LitUploadPayload; txId: string; url: string }> => {
+} = {}) => {
   const resolvedTx = toStr(txId || '') || parseLitArweaveUrl(url);
   if (!resolvedTx) throw new Error('Missing Arweave transaction ID for Lit doc.');
+  if (!lit || typeof lit.getKey !== 'function') {
+    throw new Error('Lit getKey is required to decrypt Arweave data.');
+  }
 
-  const arweaveOpts: UnknownRecord = isRecord(arweave) ? { ...arweave } : {};
+  const arweaveOpts = (arweave && typeof arweave === 'object') ? { ...arweave } : {};
   const existingDebugContext = (
     arweaveOpts.debugContext && typeof arweaveOpts.debugContext === 'object'
   )
-    ? asRecord(arweaveOpts.debugContext)
+    ? arweaveOpts.debugContext
     : {};
   arweaveOpts.debugContext = {
     ...existingDebugContext,
@@ -2112,14 +2651,13 @@ export const downloadEncryptedArweaveData = async ({
   };
 
   const envelopeJson = await arweaveScripts.downloadDataFromArweave(resolvedTx, arweaveOpts);
-  const litOpts = lit && typeof lit.getKey === 'function' ? { getKey: lit.getKey } : undefined;
   const payload = await cryptoUtils.decryptEnvelopeValue(envelopeJson, {
     account,
     chainId,
     providerLike,
-    ...(litOpts ? { litOpts } : {}),
+    litOpts: { getKey: lit.getKey },
   });
-  return { payload: asRecord(payload) as LitUploadPayload, txId: resolvedTx, url: buildLitArweaveUrl(resolvedTx) };
+  return { payload, txId: resolvedTx, url: buildLitArweaveUrl(resolvedTx) };
 };
 
 /**
@@ -2128,21 +2666,20 @@ export const downloadEncryptedArweaveData = async ({
  * @param {LitUploadPayload | null | undefined} payload
  * @returns {string}
  */
-export const decodeLitPayloadToText = (payload: unknown) => {
+export const decodeLitPayloadToText = (payload) => {
   if (!payload || typeof payload !== 'object') return '';
-  const payloadRecord = payload as LitUploadPayload;
-  const mime = resolveMimeFromPayload(payloadRecord);
+  const mime = resolveMimeFromPayload(payload);
   const shouldDecode =
-    payloadRecord.kind === 'text' ||
-    payloadRecord.encoding === 'utf-8' ||
+    payload.kind === 'text' ||
+    payload.encoding === 'utf-8' ||
     isTextLikeMime(mime);
   if (!shouldDecode) return '';
-  if (payloadRecord.encoding === 'utf-8' || payloadRecord.kind === 'text') {
-    return toStr(payloadRecord.data || '');
+  if (payload.encoding === 'utf-8' || payload.kind === 'text') {
+    return toStr(payload.data || '');
   }
-  if (payloadRecord.encoding === 'base64' && typeof payloadRecord.data === 'string') {
+  if (payload.encoding === 'base64' && typeof payload.data === 'string') {
     try {
-      return Buffer.from(payloadRecord.data, 'base64').toString('utf8');
+      return Buffer.from(payload.data, 'base64').toString('utf8');
     } catch (_) {
       return '';
     }
@@ -2156,13 +2693,12 @@ export const decodeLitPayloadToText = (payload: unknown) => {
  * @param {LitUploadPayload | null | undefined} payload
  * @returns {Blob | null}
  */
-export const decodeLitPayloadToBlob = (payload: unknown) => {
+export const decodeLitPayloadToBlob = (payload) => {
   if (!payload || typeof payload !== 'object') return null;
-  const payloadRecord = payload as LitUploadPayload;
-  if (payloadRecord.encoding !== 'base64' || typeof payloadRecord.data !== 'string') return null;
+  if (payload.encoding !== 'base64' || typeof payload.data !== 'string') return null;
   try {
-    const bytes = Uint8Array.from(Buffer.from(payloadRecord.data, 'base64'));
-    return new Blob([bytes], { type: resolveMimeFromPayload(payloadRecord) });
+    const bytes = Uint8Array.from(Buffer.from(payload.data, 'base64'));
+    return new Blob([bytes], { type: resolveMimeFromPayload(payload) });
   } catch (_) {
     return null;
   }

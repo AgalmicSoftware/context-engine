@@ -16,25 +16,12 @@ import type { SponsoredGate } from '../web3/sponsoredAccessState.js';
 import { createLogger } from '../logging.js';
 import { toStr } from '../shared/primitives.js';
 
-type UnknownRecord = Record<string, unknown>;
-type LitGate = UnknownRecord & {
-  type?: unknown;
-  label?: unknown;
-  name?: unknown;
-  title?: unknown;
-  gateId?: unknown;
-  id?: unknown;
-  sbtAddress?: unknown;
-  sbtAddresses?: unknown;
-  chainId?: unknown;
-  litChain?: unknown;
-  chain?: unknown;
-};
+type LitGate = any;
 
 type LitRecipient = {
-  accessControlConditions: unknown;
+  accessControlConditions: any;
   chain: string | null;
-  [key: string]: unknown;
+  [key: string]: any;
 };
 
 type GatePolicyGate = {
@@ -60,7 +47,7 @@ type GatePolicyAccumulator = {
 };
 
 type GatePolicyArgs = {
-  cfg?: UnknownRecord;
+  cfg?: any;
   fallbackChainId?: number | string | null;
 };
 
@@ -73,7 +60,7 @@ type UploadTargets = {
   questions?: boolean;
   questionTags?: boolean;
   docUrls?: boolean;
-  [key: string]: unknown;
+  [key: string]: any;
 };
 
 type UploadGatePolicyArgs = GatePolicyArgs & {
@@ -107,7 +94,7 @@ const buildRecipientDedupeKey = (recipient: LitRecipient): string => JSON.string
   accessControlConditions: recipient.accessControlConditions || null,
 });
 
-const buildGateDedupeKey = (gate: LitGate): string => JSON.stringify({
+const buildGateDedupeKey = (gate: any): string => JSON.stringify({
   chainId: Number(gate?.chainId || 0) || null,
   litChain: toStr(gate?.litChain || gate?.chain || '').trim().toLowerCase(),
   mode: normalizeGateMode(gate as SponsoredGate),
@@ -177,7 +164,7 @@ const appendGateRecipient = ({
   fallbackChainId,
   resourceKey,
 }: AppendGateRecipientArgs): void => {
-  const payload = createLitRecipientFromGate({
+  const payloads = [{
     gate,
     fallbackChainId,
     resourceKey,

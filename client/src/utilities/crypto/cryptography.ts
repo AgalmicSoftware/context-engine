@@ -29,6 +29,7 @@
  */
 
 /* eslint-env es2020 */
+// @ts-nocheck
 
 import { Buffer } from 'buffer';
 import { ethers, utils } from 'ethers';

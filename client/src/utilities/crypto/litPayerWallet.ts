@@ -58,10 +58,7 @@ export const getLitPayerWalletStatus = (privateKey: unknown): LitPayerWalletStat
       valid: true,
       error: '',
     };
-  } catch (error: unknown) {
-    const message = error && typeof error === 'object' && 'message' in error
-      ? (error as { message?: unknown }).message
-      : 'Invalid private key.';
+  } catch (error: any) {
     return {
       privateKey: normalizedPrivateKey,
       address: '',
