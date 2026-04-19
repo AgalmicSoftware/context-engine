@@ -1,322 +1,318 @@
 {
   "AdaLovelace": {
     "name": "Ada Lovelace",
-    "src": "TODO_ARWEAVE:ada-lovelace-avatar"
+    "src": "/historical-avatars/adalovelace.png"
   },
   "AdamSmith": {
     "name": "Adam Smith",
-    "src": "TODO_ARWEAVE:adam-smith-avatar"
+    "src": "/historical-avatars/adamsmith.jpg"
   },
   "AlanTuring": {
     "name": "Alan Turing",
-    "src": "TODO_ARWEAVE:alan-turing-avatar"
+    "src": "/historical-avatars/alanturing.jpg"
   },
   "AlbertEinstein": {
     "name": "Albert Einstein",
-    "src": "TODO_ARWEAVE:albert-einstein-avatar"
+    "src": "/historical-avatars/alberteinstein.jpg"
   },
   "AlexanderGrahamBell": {
     "name": "Alexander Graham Bell",
-    "src": "TODO_ARWEAVE:alexander-graham-bell-avatar"
+    "src": "/historical-avatars/alexandergrahambell.jpeg"
   },
   "AlexanderTheGreat": {
     "name": "Alexander the Great",
-    "src": "TODO_ARWEAVE:alexander-the-great-avatar"
+    "src": "/historical-avatars/alexanderthegreat.jpg"
   },
   "AndrewCarnegie": {
     "name": "Andrew Carnegie",
-    "src": "TODO_ARWEAVE:andrew-carnegie-avatar"
+    "src": "/historical-avatars/andrewcarnegie.jpg"
   },
   "Archimedes": {
     "name": "Archimedes",
-    "src": "TODO_ARWEAVE:archimedes-avatar"
+    "src": "/historical-avatars/archimedes.jpg"
   },
   "AshokaTheGreat": {
     "name": "AshokaTheGreat",
-    "src": "TODO_ARWEAVE:ashokathegreat-avatar"
+    "src": "/historical-avatars/ashokathegreat.jpg"
   },
   "AugustusCaesar": {
     "name": "Augustus Caesar",
-    "src": "TODO_ARWEAVE:augustus-caesar-avatar"
+    "src": "/historical-avatars/augustuscaesar.jpg"
   },
   "BuckminsterFuller": {
     "name": "BuckminsterFuller",
-    "src": "TODO_ARWEAVE:buckminsterfuller-avatar"
+    "src": "/historical-avatars/buckminsterfuller.jpg"
   },
   "CatherineTheGreat": {
     "name": "Catherine the Great",
-    "src": "TODO_ARWEAVE:catherine-the-great-avatar"
+    "src": "/historical-avatars/catherinethegreat.jpg"
   },
   "CharlesDarwin": {
     "name": "Charles Darwin",
-    "src": "TODO_ARWEAVE:charles-darwin-avatar"
+    "src": "/historical-avatars/charlesdarwin.jpg"
   },
   "Confucius": {
     "name": "Confucius",
-    "src": "TODO_ARWEAVE:confucius-avatar"
+    "src": "/historical-avatars/confucius.jpg"
   },
   "CyrusTheGreat": {
     "name": "Cyrus the Great",
-    "src": "TODO_ARWEAVE:cyrus-the-great-avatar"
+    "src": "/historical-avatars/cyrusthegreat.jpg"
   },
   "DesmondTutu": {
     "name": "Desmond Tutu",
-    "src": "TODO_ARWEAVE:desmond-tutu-avatar"
+    "src": "/historical-avatars/desmondtutu.jpg"
   },
   "EleanorRoosevelt": {
     "name": "Eleanor Roosevelt",
-    "src": "TODO_ARWEAVE:eleanor-roosevelt-avatar"
+    "src": "/historical-avatars/eleanorroosevelt.jpg"
   },
   "FDR": {
     "name": "Franklin D. Roosevelt",
-    "src": "TODO_ARWEAVE:franklin-d-roosevelt-avatar"
+    "src": "/historical-avatars/fdr.jpg"
   },
   "Franklin": {
     "name": "Benjamin Franklin",
-    "src": "TODO_ARWEAVE:benjamin-franklin-avatar"
+    "src": "/historical-avatars/franklin.jpg"
   },
   "FrederickDouglass": {
     "name": "Frederick Douglass",
-    "src": "TODO_ARWEAVE:frederick-douglass-avatar"
+    "src": "/historical-avatars/frederickdouglass.jpg"
   },
   "Fuller": {
     "name": "Buckminster Fuller",
-    "src": "TODO_ARWEAVE:buckminster-fuller-avatar"
+    "src": "/historical-avatars/fuller.jpg"
   },
   "GraceHopper": {
     "name": "Grace Hopper",
-    "src": "TODO_ARWEAVE:grace-hopper-avatar"
+    "src": "/historical-avatars/gracehopper.jpg"
   },
   "Hamilton": {
     "name": "Alexander Hamilton",
-    "src": "TODO_ARWEAVE:alexander-hamilton-avatar"
+    "src": "/historical-avatars/hamilton.jpg"
   },
   "Hammurabi": {
     "name": "Hammurabi",
-    "src": "TODO_ARWEAVE:hammurabi-avatar"
+    "src": "/historical-avatars/hammurabi.jpg"
   },
   "HannahArendt": {
     "name": "HannahArendt",
-    "src": "TODO_ARWEAVE:hannaharendt-avatar"
+    "src": "/historical-avatars/hannaharendt.jpg"
   },
   "HarrietTubman": {
     "name": "HarrietTubman",
-    "src": "TODO_ARWEAVE:harriettubman-avatar"
+    "src": "/historical-avatars/harrietttubman.jpg"
   },
   "HedyLamarr": {
     "name": "HedyLamarr",
-    "src": "TODO_ARWEAVE:hedylamarr-avatar"
+    "src": "/historical-avatars/hedylamarr.jpg"
   },
   "HenryFord": {
     "name": "Henry Ford",
-    "src": "TODO_ARWEAVE:henry-ford-avatar"
+    "src": "/historical-avatars/henryford.jpg"
   },
   "Hypatia": {
     "name": "Hypatia",
-    "src": "TODO_ARWEAVE:hypatia-avatar"
+    "src": "/historical-avatars/hypatia.png"
   },
   "IbnKhaldun": {
     "name": "IbnKhaldun",
-    "src": "TODO_ARWEAVE:ibnkhaldun-avatar"
+    "src": "/historical-avatars/ibnkhaldun.jpg"
   },
   "JFK": {
     "name": "John F. Kennedy",
-    "src": "TODO_ARWEAVE:john-f-kennedy-avatar"
+    "src": "/historical-avatars/jfk.jpg"
   },
   "JRobertOppenheimer": {
     "name": "J. Robert Oppenheimer",
-    "src": "TODO_ARWEAVE:j-robert-oppenheimer-avatar"
+    "src": "/historical-avatars/jrobertoppenheimer.jpg"
   },
   "JamesMadison": {
     "name": "James Madison",
-    "src": "TODO_ARWEAVE:james-madison-avatar"
+    "src": "/historical-avatars/jamesmadison.jpg"
   },
   "JamesWatt": {
     "name": "James Watt",
-    "src": "TODO_ARWEAVE:james-watt-avatar"
+    "src": "/historical-avatars/jameswatt.jpg"
   },
   "JeanJacquesRousseau": {
     "name": "Jean-Jacques Rousseau",
-    "src": "TODO_ARWEAVE:jean-jacques-rousseau-avatar"
+    "src": "/historical-avatars/jeanjacquesrousseau.jpg"
   },
   "Jefferson": {
     "name": "Thomas Jefferson",
-    "src": "TODO_ARWEAVE:thomas-jefferson-avatar"
+    "src": "/historical-avatars/jefferson.jpg"
   },
   "JohnLocke": {
     "name": "John Locke",
-    "src": "TODO_ARWEAVE:john-locke-avatar"
+    "src": "/historical-avatars/johnlocke.jpg"
   },
   "JustinianI": {
     "name": "Justinian I",
-    "src": "TODO_ARWEAVE:justinian-i-avatar"
+    "src": "/historical-avatars/justiniani.jpg"
   },
   "KarlMarx": {
     "name": "Karl Marx",
-    "src": "TODO_ARWEAVE:karl-marx-avatar"
+    "src": "/historical-avatars/karlmarx.png"
   },
   "LBJ": {
     "name": "Lyndon B. Johnson",
-    "src": "TODO_ARWEAVE:lyndon-b-johnson-avatar"
+    "src": "/historical-avatars/lbj.jpg"
   },
   "LechWalesa": {
     "name": "Lech Walesa",
-    "src": "TODO_ARWEAVE:lech-walesa-avatar"
+    "src": "/historical-avatars/lechwalesa.jpg"
   },
   "LeonardodaVinci": {
     "name": "LeonardodaVinci",
-    "src": "TODO_ARWEAVE:leonardodavinci-avatar"
+    "src": "/historical-avatars/leonardodavinci.png"
   },
   "Lincoln": {
     "name": "Abraham Lincoln",
-    "src": "TODO_ARWEAVE:abraham-lincoln-avatar"
+    "src": "/historical-avatars/lincoln.jpg"
   },
   "MLK": {
     "name": "Martin Luther King Jr.",
-    "src": "TODO_ARWEAVE:martin-luther-king-jr-avatar"
+    "src": "/historical-avatars/mlk.jpg"
   },
   "Machiavelli": {
     "name": "Niccolo Machiavelli",
-    "src": "TODO_ARWEAVE:niccolo-machiavelli-avatar"
+    "src": "/historical-avatars/machiavelli.jpg"
   },
   "MahatmaGandhi": {
     "name": "Mahatma Gandhi",
-    "src": "TODO_ARWEAVE:mahatma-gandhi-avatar"
+    "src": "/historical-avatars/mahatmagandhi.jpg"
   },
   "MarcusAurelius": {
     "name": "Marcus Aurelius",
-    "src": "TODO_ARWEAVE:marcus-aurelius-avatar"
+    "src": "/historical-avatars/marcusaurelius.jpg"
   },
   "MarieCurie": {
     "name": "MarieCurie",
-    "src": "TODO_ARWEAVE:mariecurie-avatar"
+    "src": "/historical-avatars/mariecurie.jpg"
   },
   "NapoleonBonaparte": {
     "name": "Napoleon Bonaparte",
-    "src": "TODO_ARWEAVE:napoleon-bonaparte-avatar"
+    "src": "/historical-avatars/napoleonbonaparte.jpg"
   },
   "NelsonMandela": {
     "name": "Nelson Mandela",
-    "src": "TODO_ARWEAVE:nelson-mandela-avatar"
+    "src": "/historical-avatars/nelsonmandela.jpg"
   },
   "NikitaKhrushchev": {
     "name": "NikitaKhrushchev",
-    "src": "TODO_ARWEAVE:nikitakhrushchev-avatar"
+    "src": "/historical-avatars/nikitakhrushchev.jpg"
   },
   "NikolaTesla": {
     "name": "Nikola Tesla",
-    "src": "TODO_ARWEAVE:nikola-tesla-avatar"
+    "src": "/historical-avatars/nikolatesla.jpeg"
   },
   "NormanBorlaug": {
     "name": "Norman Borlaug",
-    "src": "TODO_ARWEAVE:norman-borlaug-avatar"
+    "src": "/historical-avatars/normanborlaug.jpg"
   },
   "Obama": {
     "name": "Barack Obama",
-    "src": "TODO_ARWEAVE:barack-obama-avatar"
+    "src": "/historical-avatars/obama.jpg"
   },
   "OttoVonBismarck": {
     "name": "Otto von Bismarck",
-    "src": "TODO_ARWEAVE:otto-von-bismarck-avatar"
+    "src": "/historical-avatars/ottovonbismarck.jpg"
   },
   "Plato": {
     "name": "Plato",
-    "src": "TODO_ARWEAVE:plato-avatar"
+    "src": "/historical-avatars/plato.png"
   },
   "QueenElizabethI": {
     "name": "Queen Elizabeth I",
-    "src": "TODO_ARWEAVE:queen-elizabeth-i-avatar"
+    "src": "/historical-avatars/queenelizabethi.jpg"
   },
   "RachelCarson": {
     "name": "Rachel Carson",
-    "src": "TODO_ARWEAVE:rachel-carson-avatar"
+    "src": "/historical-avatars/rachelcarson.jpg"
   },
   "Reagan": {
     "name": "Ronald Reagan",
-    "src": "TODO_ARWEAVE:ronald-reagan-avatar"
+    "src": "/historical-avatars/reagan.jpg"
   },
   "Rockefeller": {
     "name": "John D. Rockefeller",
-    "src": "TODO_ARWEAVE:john-d-rockefeller-avatar"
-  },
-  "RosaParks": {
-    "name": "Rosa Parks",
-    "src": "TODO_ARWEAVE:rosa-parks-avatar"
-  },
-  "Sequoyah": {
-    "name": "Sequoyah",
-    "src": "TODO_ARWEAVE:sequoyah-avatar"
-  },
-  "SimonBolivar": {
-    "name": "Simon Bolivar",
-    "src": "TODO_ARWEAVE:simon-bolivar-avatar"
-  },
-  "SojournerTruth": {
-    "name": "SojournerTruth",
-    "src": "TODO_ARWEAVE:sojournertruth-avatar"
-  },
-  "SunTzu": {
-    "name": "Sun Tzu",
-    "src": "TODO_ARWEAVE:sun-tzu-avatar"
-  },
-  "SunYatSen": {
-    "name": "Sun Yat-sen",
-    "src": "TODO_ARWEAVE:sun-yat-sen-avatar"
-  },
-  "SusanBAnthony": {
-    "name": "Susan B. Anthony",
-    "src": "TODO_ARWEAVE:susan-b-anthony-avatar"
-  },
-  "ThomasEdison": {
-    "name": "Thomas Edison",
-    "src": "TODO_ARWEAVE:thomas-edison-avatar"
-  },
-  "ThomasPaine": {
-    "name": "ThomasPaine",
-    "src": "TODO_ARWEAVE:thomaspaine-avatar"
-  },
-  "VannevarBush": {
-    "name": "Vannevar Bush",
-    "src": "TODO_ARWEAVE:vannevar-bush-avatar"
-  },
-  "Voltaire": {
-    "name": "Voltaire",
-    "src": "TODO_ARWEAVE:voltaire-avatar"
-  },
-  "Washington": {
-    "name": "George Washington",
-    "src": "TODO_ARWEAVE:george-washington-avatar"
-  },
-  "WinstonChurchill": {
-    "name": "Winston Churchill",
-    "src": "TODO_ARWEAVE:winston-churchill-avatar"
-  },
-  "vonNeumann": {
-    "name": "John von Neumann",
-    "src": "TODO_ARWEAVE:john-von-neumann-avatar"
-  },
-  "ÉmilieDuChâtelet": {
-    "name": "ÉmilieDuChâtelet",
-    "src": "TODO_ARWEAVE:emilieduchatelet-avatar"
-  },
-  "FlorenceNightingale": {
-    "name": "FlorenceNightingale",
-    "src": "TODO_ARWEAVE:florence-nightingale-avatar"
-  },
-  "GalileoGalilei": {
-    "name": "GalileoGalilei",
-    "src": "TODO_ARWEAVE:galileo-galilei-avatar"
+    "src": "/historical-avatars/rockefeller.jpg"
   },
   "RosaParks": {
     "name": "RosaParks",
-    "src": "TODO_ARWEAVE:rosa-parks-avatar"
+    "src": "/historical-avatars/rosaparks.jpg"
+  },
+  "Sequoyah": {
+    "name": "Sequoyah",
+    "src": "/historical-avatars/sequoyah.jpg"
+  },
+  "SimonBolivar": {
+    "name": "Simon Bolivar",
+    "src": "/historical-avatars/simonbolivar.png"
+  },
+  "SojournerTruth": {
+    "name": "SojournerTruth",
+    "src": "/historical-avatars/sojournertruth.jpg"
+  },
+  "SunTzu": {
+    "name": "Sun Tzu",
+    "src": "/historical-avatars/suntzu.jpg"
+  },
+  "SunYatSen": {
+    "name": "Sun Yat-sen",
+    "src": "/historical-avatars/sunyatsen.jpg"
+  },
+  "SusanBAnthony": {
+    "name": "Susan B. Anthony",
+    "src": "/historical-avatars/susanbanthony.jpg"
+  },
+  "ThomasEdison": {
+    "name": "Thomas Edison",
+    "src": "/historical-avatars/thomasedison.jpg"
+  },
+  "ThomasPaine": {
+    "name": "ThomasPaine",
+    "src": "/historical-avatars/thomaspaine.jpg"
+  },
+  "VannevarBush": {
+    "name": "Vannevar Bush",
+    "src": "/historical-avatars/vannevarbush.jpg"
+  },
+  "Voltaire": {
+    "name": "Voltaire",
+    "src": "/historical-avatars/voltaire.jpg"
+  },
+  "Washington": {
+    "name": "George Washington",
+    "src": "/historical-avatars/washington.jpg"
+  },
+  "WinstonChurchill": {
+    "name": "Winston Churchill",
+    "src": "/historical-avatars/winstonchurchill.jpg"
+  },
+  "vonNeumann": {
+    "name": "John von Neumann",
+    "src": "/historical-avatars/vonneumann.gif"
+  },
+  "ÉmilieDuChâtelet": {
+    "name": "ÉmilieDuChâtelet",
+    "src": "/historical-avatars/emilieduchatelet.jpg"
+  },
+  "FlorenceNightingale": {
+    "name": "FlorenceNightingale",
+    "src": "https://commons.wikimedia.org/wiki/Special:FilePath/Florence%20Nightingale.jpg"
+  },
+  "GalileoGalilei": {
+    "name": "GalileoGalilei",
+    "src": "https://commons.wikimedia.org/wiki/Special:FilePath/Galileo%20by%20leoni.jpg"
   },
   "WangariMaathai": {
     "name": "WangariMaathai",
-    "src": "TODO_ARWEAVE:wangari-maathai-avatar"
+    "src": "https://commons.wikimedia.org/wiki/Special:FilePath/Wangari%20Matthai%202001%20%28cropped%29.jpg"
   },
   "Aristotle": {
     "name": "Aristotle",
-    "src": "TODO_ARWEAVE:aristotle-avatar"
+    "src": "https://commons.wikimedia.org/wiki/Special:FilePath/Bust%20of%20Aristotle.jpg"
   }
 }

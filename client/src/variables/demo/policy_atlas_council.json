@@ -24,7 +24,7 @@
       ],
       "responses": []
     },
-    "avatar": "TODO_ARWEAVE:franklin-d-roosevelt-avatar"
+    "avatar": "/historical-avatars/fdr.jpg"
   },
   {
     "id": "0x_pseudo_address_aurelius",
@@ -51,7 +51,7 @@
       ],
       "responses": []
     },
-    "avatar": "TODO_ARWEAVE:marcus-aurelius-avatar"
+    "avatar": "/historical-avatars/marcusaurelius.jpg"
   },
   {
     "id": "0x_pseudo_address_churchill",
@@ -78,7 +78,7 @@
       ],
       "responses": []
     },
-    "avatar": "TODO_ARWEAVE:winston-churchill-avatar"
+    "avatar": "/historical-avatars/winstonchurchill.jpg"
   },
   {
     "id": "0x_pseudo_address_lincoln",
@@ -105,7 +105,7 @@
       ],
       "responses": []
     },
-    "avatar": "TODO_ARWEAVE:abraham-lincoln-avatar"
+    "avatar": "/historical-avatars/lincoln.jpg"
   },
   {
     "id": "0x_pseudo_address_augustus",
@@ -132,7 +132,7 @@
       ],
       "responses": []
     },
-    "avatar": "TODO_ARWEAVE:augustus-caesar-avatar"
+    "avatar": "/historical-avatars/augustuscaesar.jpg"
   },
   {
     "id": "0x_pseudo_address_alexander_great",
@@ -159,7 +159,7 @@
       ],
       "responses": []
     },
-    "avatar": "TODO_ARWEAVE:alexander-the-great-avatar"
+    "avatar": "/historical-avatars/alexanderthegreat.jpg"
   },
   {
     "id": "0x_pseudo_address_smith",
@@ -186,7 +186,7 @@
       ],
       "responses": []
     },
-    "avatar": "TODO_ARWEAVE:adam-smith-avatar"
+    "avatar": "/historical-avatars/adamsmith.jpg"
   },
   {
     "id": "0x_pseudo_address_einstein",
@@ -213,7 +213,7 @@
       ],
       "responses": []
     },
-    "avatar": "TODO_ARWEAVE:albert-einstein-avatar"
+    "avatar": "/historical-avatars/alberteinstein.jpg"
   },
   {
     "id": "0x_pseudo_address_carson",
@@ -240,7 +240,7 @@
       ],
       "responses": []
     },
-    "avatar": "TODO_ARWEAVE:rachel-carson-avatar"
+    "avatar": "/historical-avatars/rachelcarson.jpg"
   },
   {
     "id": "0x_pseudo_address_borlaug",
@@ -267,7 +267,7 @@
       ],
       "responses": []
     },
-    "avatar": "TODO_ARWEAVE:norman-borlaug-avatar"
+    "avatar": "/historical-avatars/normanborlaug.jpg"
   },
   {
     "id": "0x_pseudo_address_darwin",
@@ -294,7 +294,7 @@
       ],
       "responses": []
     },
-    "avatar": "TODO_ARWEAVE:charles-darwin-avatar"
+    "avatar": "/historical-avatars/charlesdarwin.jpg"
   },
   {
     "id": "0x_pseudo_address_elizabeth",
@@ -321,7 +321,7 @@
       ],
       "responses": []
     },
-    "avatar": "TODO_ARWEAVE:queen-elizabeth-i-avatar"
+    "avatar": "/historical-avatars/queenelizabethi.jpg"
   },
   {
     "id": "0x_pseudo_address_marx",
@@ -348,7 +348,7 @@
       ],
       "responses": []
     },
-    "avatar": "TODO_ARWEAVE:karl-marx-avatar"
+    "avatar": "/historical-avatars/karlmarx.png"
   },
   {
     "id": "0x_pseudo_address_king_jr",
@@ -375,7 +375,7 @@
       ],
       "responses": []
     },
-    "avatar": "TODO_ARWEAVE:martin-luther-king-jr-avatar"
+    "avatar": "/historical-avatars/mlk.jpg"
   },
   {
     "id": "0x_pseudo_address_voltaire",
@@ -402,7 +402,7 @@
       ],
       "responses": []
     },
-    "avatar": "TODO_ARWEAVE:voltaire-avatar"
+    "avatar": "/historical-avatars/voltaire.jpg"
   },
   {
     "id": "0x_pseudo_address_gandhi",
@@ -429,7 +429,7 @@
       ],
       "responses": []
     },
-    "avatar": "TODO_ARWEAVE:mahatma-gandhi-avatar"
+    "avatar": "/historical-avatars/mahatmagandhi.jpg"
   },
   {
     "id": "0x_pseudo_address_mandela",
@@ -456,7 +456,7 @@
       ],
       "responses": []
     },
-    "avatar": "TODO_ARWEAVE:nelson-mandela-avatar"
+    "avatar": "/historical-avatars/nelsonmandela.jpg"
   },
   {
     "id": "0x_pseudo_address_anthony",
@@ -483,7 +483,7 @@
       ],
       "responses": []
     },
-    "avatar": "TODO_ARWEAVE:susan-b-anthony-avatar"
+    "avatar": "/historical-avatars/susanbanthony.jpg"
   },
   {
     "id": "0x_pseudo_address_bolivar",
@@ -510,7 +510,7 @@
       ],
       "responses": []
     },
-    "avatar": "TODO_ARWEAVE:simon-bolivar-avatar"
+    "avatar": "/historical-avatars/simonbolivar.png"
   },
   {
     "id": "0x_pseudo_address_locke",
@@ -537,7 +537,7 @@
       ],
       "responses": []
     },
-    "avatar": "TODO_ARWEAVE:john-locke-avatar"
+    "avatar": "/historical-avatars/johnlocke.jpg"
   },
   {
     "id": "0x_pseudo_address_rousseau",
@@ -564,7 +564,7 @@
       ],
       "responses": []
     },
-    "avatar": "TODO_ARWEAVE:jean-jacques-rousseau-avatar"
+    "avatar": "/historical-avatars/jeanjacquesrousseau.jpg"
   },
   {
     "id": "0x_pseudo_address_douglass",
@@ -591,7 +591,7 @@
       ],
       "responses": []
     },
-    "avatar": "TODO_ARWEAVE:frederick-douglass-avatar"
+    "avatar": "/historical-avatars/frederickdouglass.jpg"
   },
   {
     "id": "0x_pseudo_address_tutu",
@@ -618,7 +618,7 @@
       ],
       "responses": []
     },
-    "avatar": "TODO_ARWEAVE:desmond-tutu-avatar"
+    "avatar": "/historical-avatars/desmondtutu.jpg"
   },
   {
     "id": "0x_pseudo_address_walesa",
@@ -645,7 +645,7 @@
       ],
       "responses": []
     },
-    "avatar": "TODO_ARWEAVE:lech-walesa-avatar"
+    "avatar": "/historical-avatars/lechwalesa.jpg"
   },
   {
     "id": "0x_pseudo_address_sun",
@@ -672,7 +672,7 @@
       ],
       "responses": []
     },
-    "avatar": "TODO_ARWEAVE:sun-yat-sen-avatar"
+    "avatar": "/historical-avatars/sunyatsen.jpg"
   },
   {
     "id": "0x_pseudo_address_ford",
@@ -699,7 +699,7 @@
       ],
       "responses": []
     },
-    "avatar": "TODO_ARWEAVE:henry-ford-avatar"
+    "avatar": "/historical-avatars/henryford.jpg"
   },
   {
     "id": "0x_pseudo_address_rockefeller",
@@ -726,7 +726,7 @@
       ],
       "responses": []
     },
-    "avatar": "TODO_ARWEAVE:john-d-rockefeller-avatar"
+    "avatar": "/historical-avatars/rockefeller.jpg"
   },
   {
     "id": "0x_pseudo_address_lovelace",
@@ -753,7 +753,7 @@
       ],
       "responses": []
     },
-    "avatar": "TODO_ARWEAVE:ada-lovelace-avatar"
+    "avatar": "/historical-avatars/adalovelace.png"
   },
   {
     "id": "0x_pseudo_address_tesla",
@@ -780,7 +780,7 @@
       ],
       "responses": []
     },
-    "avatar": "TODO_ARWEAVE:nikola-tesla-avatar"
+    "avatar": "/historical-avatars/nikolatesla.jpeg"
   },
   {
     "id": "0x_pseudo_address_edison",
@@ -807,7 +807,7 @@
       ],
       "responses": []
     },
-    "avatar": "TODO_ARWEAVE:thomas-edison-avatar"
+    "avatar": "/historical-avatars/thomasedison.jpg"
   },
   {
     "id": "0x_pseudo_address_turing",
@@ -834,7 +834,7 @@
       ],
       "responses": []
     },
-    "avatar": "TODO_ARWEAVE:alan-turing-avatar"
+    "avatar": "/historical-avatars/alanturing.jpg"
   },
   {
     "id": "0x_pseudo_address_carnegie",
@@ -861,7 +861,7 @@
       ],
       "responses": []
     },
-    "avatar": "TODO_ARWEAVE:andrew-carnegie-avatar"
+    "avatar": "/historical-avatars/andrewcarnegie.jpg"
   },
   {
     "id": "0x_pseudo_address_oppenheimer",
@@ -888,7 +888,7 @@
       ],
       "responses": []
     },
-    "avatar": "TODO_ARWEAVE:j-robert-oppenheimer-avatar"
+    "avatar": "/historical-avatars/jrobertoppenheimer.jpg"
   },
   {
     "id": "0x_pseudo_address_hopper",
@@ -915,7 +915,7 @@
       ],
       "responses": []
     },
-    "avatar": "TODO_ARWEAVE:grace-hopper-avatar"
+    "avatar": "/historical-avatars/gracehopper.jpg"
   },
   {
     "id": "0x_pseudo_address_bell",
@@ -942,7 +942,7 @@
       ],
       "responses": []
     },
-    "avatar": "TODO_ARWEAVE:alexander-graham-bell-avatar"
+    "avatar": "/historical-avatars/alexandergrahambell.jpeg"
   },
   {
     "id": "0x_pseudo_address_archimedes",
@@ -969,7 +969,7 @@
       ],
       "responses": []
     },
-    "avatar": "TODO_ARWEAVE:archimedes-avatar"
+    "avatar": "/historical-avatars/archimedes.jpg"
   },
   {
     "id": "0x_pseudo_address_watt",
@@ -996,7 +996,7 @@
       ],
       "responses": []
     },
-    "avatar": "TODO_ARWEAVE:james-watt-avatar"
+    "avatar": "/historical-avatars/jameswatt.jpg"
   },
   {
     "id": "0x_pseudo_address_hammurabi",
@@ -1023,7 +1023,7 @@
       ],
       "responses": []
     },
-    "avatar": "TODO_ARWEAVE:hammurabi-avatar"
+    "avatar": "/historical-avatars/hammurabi.jpg"
   },
   {
     "id": "0x_pseudo_address_hamilton",
@@ -1050,7 +1050,7 @@
       ],
       "responses": []
     },
-    "avatar": "TODO_ARWEAVE:alexander-hamilton-avatar"
+    "avatar": "/historical-avatars/hamilton.jpg"
   },
   {
     "id": "0x_pseudo_address_eleanor",
@@ -1077,7 +1077,7 @@
       ],
       "responses": []
     },
-    "avatar": "TODO_ARWEAVE:eleanor-roosevelt-avatar"
+    "avatar": "/historical-avatars/eleanorroosevelt.jpg"
   },
   {
     "id": "0x_pseudo_address_confucius",
@@ -1104,7 +1104,7 @@
       ],
       "responses": []
     },
-    "avatar": "TODO_ARWEAVE:confucius-avatar"
+    "avatar": "/historical-avatars/confucius.jpg"
   },
   {
     "id": "0x_pseudo_address_plato",
@@ -1131,7 +1131,7 @@
       ],
       "responses": []
     },
-    "avatar": "TODO_ARWEAVE:plato-avatar"
+    "avatar": "/historical-avatars/plato.png"
   },
   {
     "id": "0x_pseudo_address_machiavelli",
@@ -1158,7 +1158,7 @@
       ],
       "responses": []
     },
-    "avatar": "TODO_ARWEAVE:niccolo-machiavelli-avatar"
+    "avatar": "/historical-avatars/machiavelli.jpg"
   },
   {
     "id": "0x_pseudo_address_madison",
@@ -1185,7 +1185,7 @@
       ],
       "responses": []
     },
-    "avatar": "TODO_ARWEAVE:james-madison-avatar"
+    "avatar": "/historical-avatars/jamesmadison.jpg"
   },
   {
     "id": "0x_pseudo_address_justinian",
@@ -1212,7 +1212,7 @@
       ],
       "responses": []
     },
-    "avatar": "TODO_ARWEAVE:justinian-i-avatar"
+    "avatar": "/historical-avatars/justiniani.jpg"
   },
   {
     "id": "0x_pseudo_address_napoleon",
@@ -1239,7 +1239,7 @@
       ],
       "responses": []
     },
-    "avatar": "TODO_ARWEAVE:napoleon-bonaparte-avatar"
+    "avatar": "/historical-avatars/napoleonbonaparte.jpg"
   },
   {
     "id": "0x_pseudo_address_cyrus",
@@ -1266,7 +1266,7 @@
       ],
       "responses": []
     },
-    "avatar": "TODO_ARWEAVE:cyrus-the-great-avatar"
+    "avatar": "/historical-avatars/cyrusthegreat.jpg"
   },
   {
     "id": "0x_pseudo_address_bismarck",
@@ -1293,7 +1293,7 @@
       ],
       "responses": []
     },
-    "avatar": "TODO_ARWEAVE:otto-von-bismarck-avatar"
+    "avatar": "/historical-avatars/ottovonbismarck.jpg"
   },
   {
     "id": "0x_pseudo_address_catherine",
@@ -1320,7 +1320,7 @@
       ],
       "responses": []
     },
-    "avatar": "TODO_ARWEAVE:catherine-the-great-avatar"
+    "avatar": "/historical-avatars/catherinethegreat.jpg"
   },
   {
     "id": "0x_pseudo_address_nightingale",
@@ -1347,7 +1347,7 @@
       ],
       "responses": []
     },
-    "avatar": "TODO_ARWEAVE:florence-nightingale-avatar"
+    "avatar": "https://commons.wikimedia.org/wiki/Special:FilePath/Florence%20Nightingale.jpg"
   },
   {
     "id": "0x_pseudo_address_galileo",
@@ -1374,7 +1374,7 @@
       ],
       "responses": []
     },
-    "avatar": "TODO_ARWEAVE:galileo-galilei-avatar"
+    "avatar": "https://commons.wikimedia.org/wiki/Special:FilePath/Galileo%20by%20leoni.jpg"
   },
   {
     "id": "0x_pseudo_address_parks",
@@ -1401,7 +1401,7 @@
       ],
       "responses": []
     },
-    "avatar": "TODO_ARWEAVE:rosa-parks-avatar"
+    "avatar": "/historical-avatars/rosaparks.jpg"
   },
   {
     "id": "0x_pseudo_address_maathai",
@@ -1428,7 +1428,7 @@
       ],
       "responses": []
     },
-    "avatar": "TODO_ARWEAVE:wangari-maathai-avatar"
+    "avatar": "https://commons.wikimedia.org/wiki/Special:FilePath/Wangari%20Matthai%202001%20%28cropped%29.jpg"
   },
   {
     "id": "0x_pseudo_address_aristotle",
@@ -1455,6 +1455,6 @@
       ],
       "responses": []
     },
-    "avatar": "TODO_ARWEAVE:aristotle-avatar"
+    "avatar": "https://commons.wikimedia.org/wiki/Special:FilePath/Bust%20of%20Aristotle.jpg"
   }
 ]

@@ -1156,10 +1156,7 @@ const normalizeFeaturedDraftGateAutoLink = (value = null) => {
 };
 
 const buildPendingSbtDeployContextSignature = (sessionLike = {}, fallbackChainId = null) => {
-  // TODO: pending linked SBT drafts currently invalidate on chain/factory changes only.
-  // Normal mode auto-generates the slug from the session name, so slug churn should
-  // stay rare, but future hardening could require a finalized name/slug before
-  // allowing linked SBT drafts to be created at all.
+  // PRD 422 tracks stronger invalidation and slug-finalization rules for linked pending SBT drafts.
   const chainId = Number(
     sessionLike?.networkChainId ||
     sessionLike?.contracts?.sbtFactory?.chainId ||
@@ -1819,7 +1816,7 @@ const DEFAULT_TEMPLATE = (() => {
     privateKey: '',
     encryptedPrivateKey: '',
   };
-  draft.sponsoredSbtAddress = '';
+  delete draft.sponsoredSbtAddress;
   draft.sponsored = {
     ...(draft.sponsored && typeof draft.sponsored === 'object' ? draft.sponsored : {}),
     defaultGateId: 'gate-1',
@@ -1879,7 +1876,7 @@ const RESOURCE_SECRET_FIELDS = {
   ],
   rpc: [
     { key: 'customRpcUrl', label: 'Custom RPC URL', type: 'text', placeholder: 'https://...' },
-    // TODO: Re-enable custom RPC key input once we support PATH gateway auth.
+    // Intentionally hidden until PATH gateway auth is supported (tracked in PRD 198 / 354).
     // { key: 'customRpcKey', label: 'Custom RPC key', type: 'password' },
   ],
   arweave: [
@@ -2068,7 +2065,6 @@ const HIDDEN_FIELDS = new Set([
   'networkChainId',
   'rpc',
   'sponsored',
-  'sponsoredSbtAddress',
   'arweave',
   'litCredentials',
 ]);
@@ -3459,7 +3455,7 @@ const SessionWizard = ({
         // NOTE: For now we assume session chain === registry chain; split these when they diverge.
         next.networkChainId = chainId;
       }
-      // TODO: In the future, contract addresses will resolve from <chainId>.contracts.contextengine.eth.
+      // Contract defaults currently come from bundled per-chain config; ENS discovery is tracked in PRD 060 / 096.
       const defaults = getSessionWizardContractDefaults(chainId);
       if (!next.contracts || typeof next.contracts !== 'object') {
         next.contracts = {};
@@ -3478,7 +3474,7 @@ const SessionWizard = ({
         }
         next.contracts[key].chainId = chainId;
       });
-      // TODO: For now we auto-fill PATH public RPCs; later we will point to our own PATH gateway.
+      // Auto-fill the current PATH public RPC; dedicated gateway/provider-tier work is tracked in PRD 198 / 354.
       const pathRpc = getDefaultHttpRpc(chainId);
       if (pathRpc) {
         if (!next.rpc || typeof next.rpc !== 'object') next.rpc = {};
@@ -3801,10 +3797,7 @@ const SessionWizard = ({
 
   const defaultSponsoredGateId = draft?.sponsored?.defaultGateId;
   const defaultSponsoredGate = defaultSponsoredGateId ? draft?.sponsored?.gates?.[defaultSponsoredGateId] : null;
-  const defaultSponsoredGateSbtAddress = toStr(defaultSponsoredGate?.sbtAddress || '').trim();
-  const legacyDefaultSponsoredSbtAddress = toStr(draft?.sponsoredSbtAddress || '').trim();
-  // Legacy fallback: sponsoredSbtAddress will be removed once migrated.
-  const defaultSponsoredSbtAddress = defaultSponsoredGateSbtAddress || legacyDefaultSponsoredSbtAddress;
+  const defaultSponsoredSbtAddress = toStr(defaultSponsoredGate?.sbtAddress || '').trim();
   const defaultSponsoredLookupSlug = resolvedActiveSessionSlug || draft?.slug || '';
   const defaultSponsoredLookupContracts = useStableSerializedObject(draft?.contracts || {});
   const defaultSponsoredLookupRegistry = useStableSerializedObject(draft?.__registry || {});
@@ -3861,7 +3854,6 @@ const SessionWizard = ({
         if (displayName) sbtName = displayName;
       } catch (e) { log.warn('SessionWizard: fallback', e); }
       if (cancelled) return;
-      // TODO: Remove legacy sponsoredSbtAddress once all configs use sponsored.gates.
       const defaultSbt = { address: defaultAddr, name: `${sbtName} (Sponsored SBT)` };
       setEncryptionGates((prev) => {
         if (!prev.length) return prev;
@@ -4744,7 +4736,7 @@ const SessionWizard = ({
     const isSecretPath = isSecretFieldPath(currentPath);
     const canLock = shouldLockable(value) && (!isSecretPath || !workerSecretsEnabled);
     if (!forceShow && isSecretPath && workerSecretsEnabled) return null;
-    // TODO: Provide a filter-builder UI that serializes into defaultFilterState.
+    // PRD 423 tracks a user-facing builder for serialized defaultFilterState presets.
     const isDefaultFilterState = keyString === 'defaultFilterState';
     const isQuestionsPrompt = keyString === 'questionsGenPrompt';
     const isSessionHeaderField = keyString === 'sessionHeader';
@@ -4807,7 +4799,6 @@ const SessionWizard = ({
       ariaLabel: `${displayLabelText} info`,
     });
     const slugValidationError = isSlugField ? getSessionSlugValidationError(value) : '';
-    // TODO: Validate slug uniqueness against SessionRegistry before allowing publish.
 
     if (keyString === 'ai.models.transcription.provider') {
       return (
@@ -6029,7 +6020,7 @@ const SessionWizard = ({
     if (metadata.lit && typeof metadata.lit === 'object') {
       metadata.lit.defaultGateId = defaultGateId || metadata.lit.defaultGateId;
     }
-    // TODO: Measure and enforce per-member limits per provider (ai/arweave/txGas). UI hidden for now.
+    // PRD 424 tracks per-member budget semantics and enforcement. Keep the field hidden until then.
     metadata.perMemberSpendLimits = {
       ...(metadata.perMemberSpendLimits || {}),
       ai: gateSelections.ai?.perMemberLimit || metadata.perMemberSpendLimits?.ai || '',

@@ -17,7 +17,7 @@
       "sourceOrigins": [
         "historical_figure_users"
       ],
-      "avatar": "TODO_ARWEAVE:franklin-avatar",
+      "avatar": "/historical-avatars/franklin.jpg",
       "Karma": 100,
       "highlightedAdvice": "An investment in knowledge pays the best interest. But knowledge without civic virtue is merely cleverness—and cleverness without character is the most dangerous thing in a republic.",
       "profileQuestions": [
@@ -164,7 +164,7 @@
       "sourceOrigins": [
         "historical_figure_users"
       ],
-      "avatar": "TODO_ARWEAVE:fdr-avatar",
+      "avatar": "/historical-avatars/fdr.jpg",
       "Karma": 95,
       "highlightedAdvice": "The test of our progress is not whether we add more to the abundance of those who have much; it is whether we provide enough for those who have too little.",
       "profileQuestions": [
@@ -309,7 +309,7 @@
       "sourceOrigins": [
         "historical_figure_users"
       ],
-      "avatar": "TODO_ARWEAVE:rosaparks-avatar",
+      "avatar": "/historical-avatars/rosaparks.jpg",
       "Karma": 98,
       "highlightedAdvice": "Each person must live their life as a model for others. I have learned over the years that when one's mind is made up, this diminishes fear.",
       "profileQuestions": [
@@ -456,7 +456,7 @@
       "sourceOrigins": [
         "historical_figure_users"
       ],
-      "avatar": "TODO_ARWEAVE:mlk-avatar",
+      "avatar": "/historical-avatars/mlk.jpg",
       "Karma": 99,
       "highlightedAdvice": "The arc of the moral universe is long, but it bends toward justice—if enough people are willing to bend it. Silence in the face of injustice is complicity.",
       "profileQuestions": [
@@ -603,7 +603,7 @@
         "policy_atlas_council",
         "historical_figures_tree_qs_and_votes"
       ],
-      "avatar": "TODO_ARWEAVE:hamilton-avatar",
+      "avatar": "/historical-avatars/hamilton.jpg",
       "Karma": 92,
       "highlightedAdvice": "A nation which can prefer disgrace to danger is prepared for a master, and deserves one. Build institutions that outlast individuals.",
       "profileQuestions": [
@@ -719,7 +719,7 @@
       "sourceOrigins": [
         "historical_figure_users"
       ],
-      "avatar": "TODO_ARWEAVE:jfk-avatar",
+      "avatar": "/historical-avatars/jfk.jpg",
       "Karma": 90,
       "highlightedAdvice": "Ask not what the world can do for you—ask what you can do for the world. The energy, faith, and devotion you bring will light your country and all who serve it.",
       "profileQuestions": [
@@ -870,7 +870,7 @@
       "sourceOrigins": [
         "historical_figure_users"
       ],
-      "avatar": "TODO_ARWEAVE:lbj-avatar",
+      "avatar": "/historical-avatars/lbj.jpg",
       "Karma": 82,
       "highlightedAdvice": "You do not examine legislation in the light of the benefits it will convey if properly administered, but in the light of the wrongs it would do and the harm it would cause if improperly administered. Then pass it anyway, because the cost of inaction is always higher.",
       "profileQuestions": [
@@ -1015,7 +1015,7 @@
       "sourceOrigins": [
         "historical_figure_users"
       ],
-      "avatar": "TODO_ARWEAVE:obama-avatar",
+      "avatar": "/historical-avatars/obama.jpg",
       "Karma": 88,
       "highlightedAdvice": "Change will not come if we wait for some other person or some other time. We are the ones we've been waiting for. We are the change that we seek.",
       "profileQuestions": [
@@ -1160,7 +1160,7 @@
       "sourceOrigins": [
         "historical_figure_users"
       ],
-      "avatar": "TODO_ARWEAVE:vannevarbush-avatar",
+      "avatar": "/historical-avatars/vannevarbush.jpg",
       "Karma": 85,
       "highlightedAdvice": "Science is not a luxury or an expense—it is the foundation on which the health, prosperity, and security of a nation rest. Starve it, and you starve the future.",
       "profileQuestions": [
@@ -1305,7 +1305,7 @@
       "sourceOrigins": [
         "historical_figure_users"
       ],
-      "avatar": "TODO_ARWEAVE:reagan-avatar",
+      "avatar": "/historical-avatars/reagan.jpg",
       "Karma": 80,
       "highlightedAdvice": "Trust the people. They are the most reliable force in human affairs. Government exists to serve them, not the other way around.",
       "profileQuestions": [
@@ -1452,7 +1452,7 @@
       "sourceOrigins": [
         "historical_figure_users"
       ],
-      "avatar": "TODO_ARWEAVE:lincoln-avatar",
+      "avatar": "/historical-avatars/lincoln.jpg",
       "Karma": 97,
       "highlightedAdvice": "I am not bound to win, but I am bound to be true. I am not bound to succeed, but I am bound to live by the light that I have.",
       "profileQuestions": [
@@ -1597,7 +1597,7 @@
       "sourceOrigins": [
         "historical_figure_users"
       ],
-      "avatar": "TODO_ARWEAVE:washington-avatar",
+      "avatar": "/historical-avatars/washington.jpg",
       "Karma": 96,
       "highlightedAdvice": "Guard against the impostures of pretended patriotism. The nation's strength lies not in its armies but in the character of its citizens and the integrity of its institutions.",
       "profileQuestions": [
@@ -1742,7 +1742,7 @@
       "sourceOrigins": [
         "historical_figure_users"
       ],
-      "avatar": "TODO_ARWEAVE:jefferson-avatar",
+      "avatar": "/historical-avatars/jefferson.jpg",
       "Karma": 88,
       "highlightedAdvice": "Educate and inform the whole mass of the people. They are the only sure reliance for the preservation of our liberty. An informed citizenry is the most powerful force on earth.",
       "profileQuestions": [
@@ -1889,7 +1889,7 @@
       "sourceOrigins": [
         "historical_figure_users"
       ],
-      "avatar": "TODO_ARWEAVE:vonneumann-avatar",
+      "avatar": "/historical-avatars/vonneumann.gif",
       "Karma": 91,
       "highlightedAdvice": "If you say why not bomb them tomorrow, I say why not today? If you say today at five o'clock, I say why not one o'clock? The logic of strategy is relentless—which is precisely why it must be constrained by wisdom.",
       "profileQuestions": [
@@ -2036,7 +2036,7 @@
         "policy_atlas_council",
         "historical_figures_tree_qs_and_votes"
       ],
-      "avatar": "TODO_ARWEAVE:henryford-avatar",
+      "avatar": "/historical-avatars/henryford.jpg",
       "Karma": 78,
       "highlightedAdvice": "Real scale is not a trick of finance; it is a system built well enough that regular people can afford what it produces.",
       "profileQuestions": [
@@ -2151,7 +2151,7 @@
         "policy_atlas_council",
         "historical_figures_tree_qs_and_votes"
       ],
-      "avatar": "TODO_ARWEAVE:rockefeller-avatar",
+      "avatar": "/historical-avatars/rockefeller.jpg",
       "Karma": 80,
       "highlightedAdvice": "Growth without discipline is merely noise. Pair enterprise with responsibility and then keep both on a long horizon.",
       "profileQuestions": [
@@ -2266,7 +2266,7 @@
         "policy_atlas_council",
         "historical_figures_tree_qs_and_votes"
       ],
-      "avatar": "TODO_ARWEAVE:adalovelace-avatar",
+      "avatar": "/historical-avatars/adalovelace.png",
       "Karma": 94,
       "highlightedAdvice": "The analytical engine weaves algebraic patterns just as the Jacquard loom weaves flowers and leaves; it remains our duty to decide which patterns are worth weaving.",
       "profileQuestions": [
@@ -2381,7 +2381,7 @@
         "policy_atlas_council",
         "historical_figures_tree_qs_and_votes"
       ],
-      "avatar": "TODO_ARWEAVE:nikolatesla-avatar",
+      "avatar": "/historical-avatars/nikolatesla.jpeg",
       "Karma": 93,
       "highlightedAdvice": "The future belongs to those who give the world more light with less friction. Do not wire humanity into a private switchboard.",
       "profileQuestions": [
@@ -2496,7 +2496,7 @@
         "policy_atlas_council",
         "historical_figures_tree_qs_and_votes"
       ],
-      "avatar": "TODO_ARWEAVE:thomasedison-avatar",
+      "avatar": "/historical-avatars/thomasedison.jpg",
       "Karma": 84,
       "highlightedAdvice": "Genius is still a matter of perspiration. Build systems people can inspect, repair, and put to work.",
       "profileQuestions": [
@@ -2611,7 +2611,7 @@
         "policy_atlas_council",
         "historical_figures_tree_qs_and_votes"
       ],
-      "avatar": "TODO_ARWEAVE:hammurabi-avatar",
+      "avatar": "/historical-avatars/hammurabi.jpg",
       "Karma": 88,
       "highlightedAdvice": "If the builder, the owner, and the magistrate do not know their obligations, the innocent will carry the cost.",
       "profileQuestions": [
@@ -2726,7 +2726,7 @@
         "policy_atlas_council",
         "historical_figures_tree_qs_and_votes"
       ],
-      "avatar": "TODO_ARWEAVE:eleanorroosevelt-avatar",
+      "avatar": "/historical-avatars/eleanorroosevelt.jpg",
       "Karma": 96,
       "highlightedAdvice": "Where, after all, do universal rights begin? In small places, close to home. That is exactly where AI must be judged.",
       "profileQuestions": [
@@ -2841,7 +2841,7 @@
         "policy_atlas_council",
         "historical_figures_tree_qs_and_votes"
       ],
-      "avatar": "TODO_ARWEAVE:confucius-avatar",
+      "avatar": "/historical-avatars/confucius.jpg",
       "Karma": 91,
       "highlightedAdvice": "To govern is to rectify. Let the standards of conduct be clear before the mechanisms become subtle.",
       "profileQuestions": [
@@ -2956,7 +2956,7 @@
         "policy_atlas_council",
         "historical_figures_tree_qs_and_votes"
       ],
-      "avatar": "TODO_ARWEAVE:plato-avatar",
+      "avatar": "/historical-avatars/plato.png",
       "Karma": 86,
       "highlightedAdvice": "The first question is not whether a system is powerful, but whether it leads the soul upward or drags it further into the cave.",
       "profileQuestions": [
@@ -3103,7 +3103,7 @@
       "biggestHope": "AI becomes an instrument of intellectual communion—a mirror and amplifier of human reasoning that deepens the dialogue between mind and cosmos.",
       "biggestFear": "We entrust the future to machinery we cannot comprehend, handing dominion to forces whose logic we surrendered the moment we stopped asking 'why.'",
       "avatarPrompt": "portrait of an ancient Greek mathematician and philosopher woman with dark hair, flowing white robes, subtle mathematical diagrams and astronomical instruments faintly visible in background, classical Greek marble columns softly blurred, oil painting aesthetic, luminous and ethereal, highly detailed, realistic",
-      "avatar": "TODO_ARWEAVE:hypatia-avatar"
+      "avatar": "/historical-avatars/hypatia.png"
     },
     {
       "name": "IbnKhaldun",
@@ -3153,7 +3153,7 @@
       "biggestHope": "AI reveals the cycles of civilization—allowing leaders to anticipate collapse before it comes and to cultivate the virtue and moderation that sustains empires.",
       "biggestFear": "We accelerate toward a crisis of such magnitude that all precedent fails, and the very machinery meant to warn us becomes the instrument of our undoing.",
       "avatarPrompt": "portrait of a 14th century Islamic scholar and historian with rich turban and elegant robes, historical manuscript pages and detailed architectural drawings of cities softly in background, candlelit study, oil painting style, scholarly and dignified, highly detailed, warm lighting, realistic",
-      "avatar": "TODO_ARWEAVE:ibnkhaldun-avatar"
+      "avatar": "/historical-avatars/ibnkhaldun.jpg"
     },
     {
       "name": "HarrietTubman",
@@ -3205,7 +3205,7 @@
       "biggestHope": "AI becomes a tool of liberation—automating drudgery and expanding opportunity for those who have been forced to labor, and honoring the dignity and consent of all peoples.",
       "biggestFear": "We chain people once more to systems of extraction—this time invisible, computational, and with no slavecatcher's face to resist.",
       "avatarPrompt": "portrait of a 19th century African American woman with determined gaze and weathered features, elements of freedom and the Underground Railroad subtly suggested in background landscape, soft starlight and forest silhouettes, photographic realism, powerful and dignified, highly detailed, dramatic natural lighting, realistic",
-      "avatar": "TODO_ARWEAVE:harrietttubman-avatar"
+      "avatar": "/historical-avatars/harrietttubman.jpg"
     },
     {
       "name": "MarieCurie",
@@ -3222,7 +3222,7 @@
         "historical_figure_users",
         "additional_historical_figures"
       ],
-      "avatar": "TODO_ARWEAVE:mariecurie-avatar",
+      "avatar": "/historical-avatars/mariecurie.jpg",
       "Karma": 98,
       "highlightedAdvice": "Nothing in life is to be feared, only understood; but understanding also requires painstaking protection of those who bear the risk.",
       "profileQuestions": [
@@ -3369,7 +3369,7 @@
       "biggestHope": "AI amplifies the voice of the people—making it possible for any citizen to craft compelling arguments and participate in the grand conversation of democracy without needing gatekeepers' permission.",
       "biggestFear": "Machines flood the commons with seamless lies, and truth becomes impossible to distinguish from craft, leaving the people paralyzed and politics a game of algorithmic manipulation.",
       "avatarPrompt": "portrait of an 18th century American revolutionary writer and political figure with period clothing and serious expression, printing press and pamphlets subtly in background, candlelit study, engraving and oil painting blend, dramatic chiaroscuro, highly detailed, realistic",
-      "avatar": "TODO_ARWEAVE:thomaspaine-avatar"
+      "avatar": "/historical-avatars/thomaspaine.jpg"
     },
     {
       "name": "SojournerTruth",
@@ -3419,7 +3419,7 @@
       "biggestHope": "AI becomes an instrument of recognition—seeing the overlooked, valuing the marginalized, and ensuring that no human is deemed beneath the machine's consideration.",
       "biggestFear": "We encode yesterday's prejudices into silicon and stone, and the excluded are excluded more thoroughly, more swiftly, and with less recourse than ever before.",
       "avatarPrompt": "portrait of a 19th century African American abolitionist and women's rights activist with dignified bearing and powerful gaze, anti-slavery gathering and audience subtly in background, period dress and wrapped head covering, dramatic rim lighting, photographic realism, powerful and noble, highly detailed, realistic",
-      "avatar": "TODO_ARWEAVE:sojournertruth-avatar"
+      "avatar": "/historical-avatars/sojournertruth.jpg"
     },
     {
       "name": "LeonardodaVinci",
@@ -3471,7 +3471,7 @@
       "biggestHope": "AI becomes a universal mind—blending art and science, anatomy and architecture, logic and dream—to unlock possibilities humans alone could never imagine.",
       "biggestFear": "We build clever copyists that rearrange the past but never venture into true novelty, making AI a tool of conformity rather than a spark of transcendence.",
       "avatarPrompt": "portrait of a Renaissance master with long hair and beard, surrounded by sketches of flying machines, anatomical drawings and architectural designs faintly visible in background, candlelit artist's studio, old master oil painting style, visionary and brilliant, highly detailed, realistic",
-      "avatar": "TODO_ARWEAVE:leonardodavinci-avatar"
+      "avatar": "/historical-avatars/leonardodavinci.png"
     },
     {
       "name": "AshokaTheGreat",
@@ -3521,7 +3521,7 @@
       "biggestHope": "A global system of AI governance emerges from enlightened self-restraint—where the powerful voluntarily share knowledge and technology, creating stability through mutual flourishing.",
       "biggestFear": "The machinery of empire merely shifts—from stone and iron to silicon and code—and the conquered peoples are exploited by algorithms they cannot see or resist.",
       "avatarPrompt": "portrait of an ancient Indian emperor Ashoka with regal bearing and Buddhist regalia, stone pillars and dharma wheels subtly carved in background, palace interior with golden light, historical painting style, majestic and contemplative, highly detailed, warm lighting, realistic",
-      "avatar": "TODO_ARWEAVE:ashokathegreat-avatar"
+      "avatar": "/historical-avatars/ashokathegreat.jpg"
     },
     {
       "name": "BuckminsterFuller",
@@ -3571,7 +3571,7 @@
       "biggestHope": "AI enables what I called the 'great design revolution'—a world where scarcity is engineered away, where every human being has abundance and dignity, and where competition becomes collaboration.",
       "biggestFear": "We optimize systems toward the wrong goals—making fewer people richer while most remain trapped in artificial scarcity, because the machinery of distribution remains broken.",
       "avatarPrompt": "portrait of a 20th century American inventor and architect with contemplative expression, geodesic dome and structural blueprints subtly in background, futuristic design elements, studio lighting, modern portrait photography style, visionary and intellectual, highly detailed, realistic",
-      "avatar": "TODO_ARWEAVE:buckminsterfuller-avatar"
+      "avatar": "/historical-avatars/buckminsterfuller.jpg"
     },
     {
       "name": "HannahArendt",
@@ -3621,7 +3621,7 @@
       "biggestHope": "AI systems become instruments of transparency—making the logic of power visible, the decisions traceable, and the exercise of governance open to challenge and contestation by the public sphere.",
       "biggestFear": "We build totalitarian systems of such sophistication and speed that resistance becomes impossible, and the machinery of domination is so ordinary, so bureaucratic, so automatic that no one even notices.",
       "avatarPrompt": "portrait of a 20th century German-American political theorist woman with serious expression and period styling, academic library and philosophical texts subtly in background, contemplative indoor lighting, elegant photographic realism, intellectual and intense, highly detailed, realistic",
-      "avatar": "TODO_ARWEAVE:hannaharendt-avatar"
+      "avatar": "/historical-avatars/hannaharendt.jpg"
     },
     {
       "name": "HedyLamarr",
@@ -3671,7 +3671,7 @@
       "biggestHope": "AI becomes a democratizer of invention—allowing the overlooked and excluded to design, build, and patent innovations that transform the world and break the monopoly of inherited advantage.",
       "biggestFear": "We hoard the most powerful tools for the privileged few, and the greatest inventions possible remain forever unmade because the minds that could have created them never got access to the technology.",
       "avatarPrompt": "portrait of a mid-20th century Austrian-American actress and inventor with striking features and intelligent gaze, frequency-hopping patent diagrams and early radio equipment subtly in background, studio lighting with art deco aesthetic, glamorous yet intellectual, highly detailed, realistic",
-      "avatar": "TODO_ARWEAVE:hedylamarr-avatar"
+      "avatar": "/historical-avatars/hedylamarr.jpg"
     },
     {
       "name": "Sequoyah",
@@ -3721,7 +3721,7 @@
       "biggestHope": "AI technology becomes a tool of indigenous self-determination—preserving endangered languages, revitalizing cultural knowledge, and creating economic opportunities that remain under community control.",
       "biggestFear": "We extract indigenous knowledge, language, and culture to train algorithms that profit outsiders, while the original communities remain impoverished and their heritage becomes the property of distant corporations.",
       "avatarPrompt": "portrait of a Cherokee inventor and scholar with dignified bearing, Cherokee syllabary script and cultural symbols subtly visible in background, natural light filtered through forest, historical portrait painting style, noble and determined, highly detailed, realistic",
-      "avatar": "TODO_ARWEAVE:sequoyah-avatar"
+      "avatar": "/historical-avatars/sequoyah.jpg"
     },
     {
       "name": "ÉmilieDuChâtelet",
@@ -3773,7 +3773,7 @@
       "biggestHope": "AI is developed and governed by minds from every background—men, women, nonbinary thinkers, from every continent and culture—bringing the full spectrum of human insight to the hardest problems.",
       "biggestFear": "We build AI in the image of a narrow elite, and the systems inherit the blind spots and prejudices of their makers, while the perspectives of billions remain unheard.",
       "avatarPrompt": "portrait of an 18th century French aristocratic mathematician and physicist woman with elegant period dress and refined features, mathematical equations and physics manuscripts softly visible in background, candlelit salon, rococo oil painting style, brilliant and elegant, highly detailed, realistic",
-      "avatar": "TODO_ARWEAVE:emilieduchatelet-avatar"
+      "avatar": "/historical-avatars/emilieduchatelet.jpg"
     },
     {
       "name": "NikitaKhrushchev",
@@ -3823,7 +3823,7 @@
       "biggestHope": "AI systems enhance democratic governance by making policy coordination transparent and rapid, while remaining accountable to citizens who can audit and challenge every decision.",
       "biggestFear": "We hand absolute power to machines and the men who control them, creating totalitarianism at the speed of computation—faster, more thorough, and more impossible to resist than anything history has seen.",
       "avatarPrompt": "portrait of a Soviet-era political leader with stern expression and period clothing, Communist symbols and government building architecture subtly in background, state portrait style photography, powerful and austere, highly detailed, realistic",
-      "avatar": "TODO_ARWEAVE:nikitakhrushchev-avatar"
+      "avatar": "/historical-avatars/nikitakhrushchev.jpg"
     },
     {
       "name": "Voltaire",
@@ -3873,7 +3873,7 @@
       "biggestHope": "AI-augmented discourse becomes a grand debate where ideas clash openly, the best arguments prevail, and society gradually becomes more rational, more tolerant, and more just through relentless questioning.",
       "biggestFear": "Censors—whether bureaucratic or algorithmic—determine the boundaries of acceptable thought, and free discourse becomes impossible because the platform itself has become a gatekeeper of truth.",
       "avatarPrompt": "portrait of an 18th century French Enlightenment philosopher and writer with sharp features and perceptive gaze, period wig and aristocratic clothing, writing desk and books subtly in background, candlelit study, old master portrait style, witty and incisive, highly detailed, realistic",
-      "avatar": "TODO_ARWEAVE:voltaire-avatar"
+      "avatar": "/historical-avatars/voltaire.jpg"
     }
   ],
   "polisVotes": {
