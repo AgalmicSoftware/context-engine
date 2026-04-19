@@ -1,18 +1,10 @@
 import { getDemoAvatar, getDemoAvatarByName } from './demoAvatars.js';
 
 describe('demoAvatars', () => {
-  const expectHistoricalPhotoUrl = (url: string) => {
+  const expectHistoricalPhotoUrl = (url) => {
     expect(url).toMatch(
       /^(\/historical-avatars\/|https:\/\/upload\.wikimedia\.org\/wikipedia\/commons\/|https:\/\/commons\.wikimedia\.org\/wiki\/Special:FilePath\/)/
     );
-  };
-
-  const requireAvatarInfo = (avatarInfo: ReturnType<typeof getDemoAvatar>) => {
-    expect(avatarInfo).not.toBeNull();
-    if (!avatarInfo) {
-      throw new Error('Expected demo avatar metadata.');
-    }
-    return avatarInfo;
   };
 
   it('resolves merged demo wallet addresses to avatar metadata', () => {

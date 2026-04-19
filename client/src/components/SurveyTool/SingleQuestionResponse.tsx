@@ -1119,7 +1119,7 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
       userHeldSBTs: this.props.userHeldSBTs,
     });
     const decryptCtaClassName = styles.decryptCta;
-    const wrapCompactDecryptCta = (buttonNode: React.ReactNode, field = ''): React.ReactNode => {
+    const wrapCompactDecryptCta = (buttonNode, field = '') => {
       if (!compactEncryptedAnswerCta || !stackCompactDecryptCta) return buttonNode;
       return (
         <div className={styles.compactDecryptCtaStack} data-ce-decrypt-field={field}>

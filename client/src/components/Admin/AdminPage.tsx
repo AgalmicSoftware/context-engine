@@ -170,10 +170,30 @@ export const __adminPageTestUtils = {
   getSessionReadRpcConfig,
 };
 
-const buildSecretPresenceTargetKey = ({ slug, workerUrl }: { slug?: unknown; workerUrl?: unknown } = {}) => {
-  const normalizedSlug = normalizeSlug(slug);
-  const normalizedWorkerUrl = normalizeWorkerUrl(workerUrl);
-  return normalizedWorkerUrl ? `${normalizedSlug}\n${normalizedWorkerUrl}` : '';
+const resolveDefaultGateFromConfig = (cfg = {}) => {
+  const sponsored = cfg?.sponsored && typeof cfg.sponsored === 'object' ? cfg.sponsored : {};
+  const gates = sponsored.gates && typeof sponsored.gates === 'object' ? sponsored.gates : {};
+  const defaultGateId = toStr(sponsored.defaultGateId || sponsored.defaultGate).trim();
+  const gate = defaultGateId ? gates[defaultGateId] : null;
+  const rawAddresses = [];
+  if (Array.isArray(gate?.sbtAddresses)) rawAddresses.push(...gate.sbtAddresses);
+  if (gate?.sbtAddress) rawAddresses.push(gate.sbtAddress);
+  if (!rawAddresses.length && Array.isArray(sponsored?.sbtAddresses)) rawAddresses.push(...sponsored.sbtAddresses);
+  if (!rawAddresses.length && sponsored?.sbtAddress) rawAddresses.push(sponsored.sbtAddress);
+  const sbtAddresses = dedupeSbtSelections(rawAddresses).map((entry) => entry.address);
+  const chainId = Number(
+    gate?.chainId ||
+    sponsored?.chainId ||
+    cfg?.networkChainId ||
+    cfg?.__registry?.chainId ||
+    0
+  ) || null;
+  return {
+    gateId: defaultGateId || '',
+    sbtAddresses,
+    mode: normalizeGateMode(gate?.mode || sponsored?.mode),
+    chainId,
+  };
 };
 
 const AdminPage = ({

@@ -9,7 +9,6 @@
 /**
  * @typedef {object} SessionMetadata
  * @property {boolean=} sponsored
- * @property {string=} sponsoredSbtAddress
  * @property {Array<Record<string, any>> | Record<string, any>=} gates
  * @property {string=} sessionName
  * @property {string=} orgName

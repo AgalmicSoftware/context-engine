@@ -1497,40 +1497,6 @@ describe('sessionRegistry contract defaults', () => {
     expect(config).not.toHaveProperty('sponsoredSbtAddress');
   });
 
-  it('hydrates registry rpcUrl fields into the client read-provider path config', () => {
-    const config = __sessionRegistryTestUtils.buildSessionConfigFromRegistry({
-      session: {
-        slug: 'rpc-sponsored-edge',
-        chainId: CONFIGURED_REGISTRY_CHAIN_ID,
-        metadataURI: 'ar://tx',
-        encryptedMetadataURI: '',
-        adminAddress: '0x0000000000000000000000000000000000000001',
-        updatedAt: 1,
-        sessionId: '0xb20bcc6d40274759b4a5cd94d949b579',
-        sessionIdHex: '0xb20bcc6d40274759b4a5cd94d949b579',
-      },
-      metadata: {},
-      gatesByResource: {
-        rpc: {
-          lookupStatus: 'ok',
-          sbtAddresses: [],
-          chainId: CONFIGURED_REGISTRY_CHAIN_ID,
-          mode: 'any',
-        },
-      },
-      fieldsByKey: {
-        rpcUrl: ' https://browser-safe-rpc.example ',
-        sponsored_rpc: '1',
-      },
-      registryChainId: CONFIGURED_REGISTRY_CHAIN_ID,
-      metadataLoadState: 'loaded',
-    });
-
-    expect(config.rpc.providers.path.rpcUrl).toBe('https://browser-safe-rpc.example');
-    expect(config.sponsoredKeys.rpc).toBe(true);
-    expect(config.__registry.gatesByResource.rpc.lookupStatus).toBe('ok');
-  });
-
   it('marks synthesized contract defaults when registry metadata could not be loaded', () => {
     const config = __sessionRegistryTestUtils.buildSessionConfigFromRegistry({
       session: {

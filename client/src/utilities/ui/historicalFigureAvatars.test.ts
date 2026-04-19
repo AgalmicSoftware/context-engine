@@ -8,36 +8,10 @@ import {
 } from './historicalFigureAvatars.js';
 
 describe('historicalFigureAvatars', () => {
-  const expectHistoricalPhotoUrl = (url: string) => {
+  const expectHistoricalPhotoUrl = (url) => {
     expect(url).toMatch(
       /^(\/historical-avatars\/|https:\/\/upload\.wikimedia\.org\/wikipedia\/commons\/|https:\/\/commons\.wikimedia\.org\/wiki\/Special:FilePath\/)/
     );
-  };
-  const createMockCanvas = (dataUrl: string) => {
-    const getContext = jest.fn(() => ({
-      fillStyle: '',
-      fillRect: jest.fn(),
-    } as unknown as CanvasRenderingContext2D));
-    const toDataURL = jest.fn(() => dataUrl);
-    const canvas = {
-      width: 0,
-      height: 0,
-      getContext,
-      toDataURL,
-    } as unknown as HTMLCanvasElement;
-
-    return { canvas, getContext, toDataURL };
-  };
-
-  const mockCanvasCreateElement = (canvas: HTMLCanvasElement) => {
-    const nativeCreateElement = document.createElement.bind(document);
-    const createElement = ((tagName: string, options?: ElementCreationOptions) => {
-      if (tagName === 'canvas') {
-        return canvas;
-      }
-      return nativeCreateElement(tagName, options);
-    }) as typeof document.createElement;
-    return jest.spyOn(document, 'createElement').mockImplementation(createElement);
   };
 
   it('provides Wikimedia photo URLs for every historical figure in the demo Polis dataset', () => {
