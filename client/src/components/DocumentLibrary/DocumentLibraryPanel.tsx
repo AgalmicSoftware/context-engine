@@ -1614,29 +1614,15 @@ export default function DocumentLibraryPanel({
               data-ce-doc-kind={kind || ''}
               data-ce-index-status={indexStatus}
             >
-              <div className={styles.docSummary}>
-                {isImageDoc ? (
-                  <DocRowImagePreview
-                    txId={txId}
-                    name={name}
-                    isEncryptedStorage={isEncryptedStorage}
-                    arweaveUrl={arweaveUrl}
-                    provider={provider}
-                    account={account}
-                    chainId={network?.id || null}
-                    panelContextKey={panelContextKey}
-                  />
-                ) : null}
-                <div className={styles.docMeta}>
-                  <div className={styles.docName}>{name}</div>
-                  <div className={styles.docSub}>
-                    {showPhotoRoleBadge && <span className={styles.badge}>photo</span>}
-                    {showPhotoAnalysisRoleBadge && <span className={styles.badge}>photo analysis</span>}
-                    {!showPhotoRoleBadge && isImageDoc && <span className={styles.badge}>image</span>}
-                    <span className={styles.badge}>{kind || 'file'}</span>
-                    <span className={styles.badge}>{storage || 'arweave'}</span>
-                    <span className={styles.time}>{timeLabel}</span>
-                  </div>
+              <div className={styles.docMeta}>
+                <div className={styles.docName}>{name}</div>
+                <div className={styles.docSub}>
+                  {showPhotoRoleBadge && <span className={styles.badge}>photo</span>}
+                  {showPhotoAnalysisRoleBadge && <span className={styles.badge}>photo analysis</span>}
+                  {!showPhotoRoleBadge && isImageDoc && <span className={styles.badge}>image</span>}
+                  <span className={styles.badge}>{kind || 'file'}</span>
+                  <span className={styles.badge}>{storage || 'arweave'}</span>
+                  <span className={styles.time}>{timeLabel}</span>
                 </div>
               </div>
               <div className={styles.docActions}>
