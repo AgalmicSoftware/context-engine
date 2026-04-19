@@ -1148,7 +1148,6 @@ class SingleQuestionResponse extends Component {
       userHeldSBTs: this.props.userHeldSBTs,
     });
     const decryptCtaClassName = styles.decryptCta;
-    // TODO: PRD 161 cleanup - consider CSS-only stacking.
     const wrapCompactDecryptCta = (buttonNode, field = '') => {
       if (!compactEncryptedAnswerCta || !stackCompactDecryptCta) return buttonNode;
       return (

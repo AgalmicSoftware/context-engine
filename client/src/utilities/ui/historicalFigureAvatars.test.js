@@ -9,7 +9,9 @@ import {
 
 describe('historicalFigureAvatars', () => {
   const expectHistoricalPhotoUrl = (url) => {
-    expect(url).toMatch(/^(\/historical-avatars\/|https:\/\/upload\.wikimedia\.org\/wikipedia\/commons\/)/);
+    expect(url).toMatch(
+      /^(\/historical-avatars\/|https:\/\/upload\.wikimedia\.org\/wikipedia\/commons\/|https:\/\/commons\.wikimedia\.org\/wiki\/Special:FilePath\/)/
+    );
   };
 
   it('provides Wikimedia photo URLs for every historical figure in the demo Polis dataset', () => {
@@ -40,6 +42,10 @@ describe('historicalFigureAvatars', () => {
 
   it('keeps the Wikimedia photo path for known historical figures by default', () => {
     expectHistoricalPhotoUrl(getHistoricalFigureAvatarOrBlockie('Franklin'));
+  });
+
+  it('keeps remote-only historical figures available when no local asset is shipped yet', () => {
+    expectHistoricalPhotoUrl(getHistoricalFigureAvatar('Aristotle'));
   });
 
   it('can prefer a deterministic blockie for known historical figures', () => {

@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## 2026-04-19
+
+### Completed TODOs
+
+- PRD 320: made the local historical-avatar asset set canonical for demo personas, removed tracked placeholder avatar sentinel strings from the historical figure manifests and demo fixtures, rewrote avatar-source tests to ban placeholder-style sentinels and unapproved hotlinks, cleaned up PRD-backed inline TODO comments in `SessionWizard` / `SingleQuestionResponse`, and removed the remaining `sponsoredSbtAddress` compatibility reads so `sponsored.gates` is the only canonical sponsored-SBT shape.
+
 ## 2026-04-17
 
 ### Completed TODOs

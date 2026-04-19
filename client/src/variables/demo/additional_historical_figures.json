@@ -36,7 +36,7 @@
     "biggestHope": "AI becomes an instrument of intellectual communion—a mirror and amplifier of human reasoning that deepens the dialogue between mind and cosmos.",
     "biggestFear": "We entrust the future to machinery we cannot comprehend, handing dominion to forces whose logic we surrendered the moment we stopped asking 'why.'",
     "avatarPrompt": "portrait of an ancient Greek mathematician and philosopher woman with dark hair, flowing white robes, subtle mathematical diagrams and astronomical instruments faintly visible in background, classical Greek marble columns softly blurred, oil painting aesthetic, luminous and ethereal, highly detailed, realistic",
-    "avatar": "TODO_ARWEAVE:hypatia-avatar"
+    "avatar": "/historical-avatars/hypatia.png"
   },
   "IbnKhaldun": {
     "username": "IbnKhaldun",
@@ -75,7 +75,7 @@
     "biggestHope": "AI reveals the cycles of civilization—allowing leaders to anticipate collapse before it comes and to cultivate the virtue and moderation that sustains empires.",
     "biggestFear": "We accelerate toward a crisis of such magnitude that all precedent fails, and the very machinery meant to warn us becomes the instrument of our undoing.",
     "avatarPrompt": "portrait of a 14th century Islamic scholar and historian with rich turban and elegant robes, historical manuscript pages and detailed architectural drawings of cities softly in background, candlelit study, oil painting style, scholarly and dignified, highly detailed, warm lighting, realistic",
-    "avatar": "TODO_ARWEAVE:ibnkhaldun-avatar"
+    "avatar": "/historical-avatars/ibnkhaldun.jpg"
   },
   "HarrietTubman": {
     "username": "HarrietTubman",
@@ -114,7 +114,7 @@
     "biggestHope": "AI becomes a tool of liberation—automating drudgery and expanding opportunity for those who have been forced to labor, and honoring the dignity and consent of all peoples.",
     "biggestFear": "We chain people once more to systems of extraction—this time invisible, computational, and with no slavecatcher's face to resist.",
     "avatarPrompt": "portrait of a 19th century African American woman with determined gaze and weathered features, elements of freedom and the Underground Railroad subtly suggested in background landscape, soft starlight and forest silhouettes, photographic realism, powerful and dignified, highly detailed, dramatic natural lighting, realistic",
-    "avatar": "TODO_ARWEAVE:harriettubman-avatar"
+    "avatar": "/historical-avatars/harrietttubman.jpg"
   },
   "MarieCurie": {
     "username": "MarieCurie",
@@ -153,7 +153,7 @@
     "biggestHope": "AI science illuminates nature's hidden orders and empowers women and the marginalized to become discoverers and architects of the future, not merely its subjects.",
     "biggestFear": "We sacrifice truth on the altar of caution, and knowledge becomes the property of the military and the powerful, while the world grows darker from ignorance.",
     "avatarPrompt": "portrait of an early 20th century Polish-French woman scientist with elegant period dress and thoughtful expression, glowing radioactive elements and laboratory equipment subtly luminous in background, soft ethereal green glow, scientific elegance, oil painting style, highly detailed, realistic",
-    "avatar": "TODO_ARWEAVE:mariecurie-avatar"
+    "avatar": "/historical-avatars/mariecurie.jpg"
   },
   "ThomasPaine": {
     "username": "ThomasPaine",
@@ -192,7 +192,7 @@
     "biggestHope": "AI amplifies the voice of the people—making it possible for any citizen to craft compelling arguments and participate in the grand conversation of democracy without needing gatekeepers' permission.",
     "biggestFear": "Machines flood the commons with seamless lies, and truth becomes impossible to distinguish from craft, leaving the people paralyzed and politics a game of algorithmic manipulation.",
     "avatarPrompt": "portrait of an 18th century American revolutionary writer and political figure with period clothing and serious expression, printing press and pamphlets subtly in background, candlelit study, engraving and oil painting blend, dramatic chiaroscuro, highly detailed, realistic",
-    "avatar": "TODO_ARWEAVE:thomaspaine-avatar"
+    "avatar": "/historical-avatars/thomaspaine.jpg"
   },
   "SojournerTruth": {
     "username": "SojournerTruth",
@@ -231,7 +231,7 @@
     "biggestHope": "AI becomes an instrument of recognition—seeing the overlooked, valuing the marginalized, and ensuring that no human is deemed beneath the machine's consideration.",
     "biggestFear": "We encode yesterday's prejudices into silicon and stone, and the excluded are excluded more thoroughly, more swiftly, and with less recourse than ever before.",
     "avatarPrompt": "portrait of a 19th century African American abolitionist and women's rights activist with dignified bearing and powerful gaze, anti-slavery gathering and audience subtly in background, period dress and wrapped head covering, dramatic rim lighting, photographic realism, powerful and noble, highly detailed, realistic",
-    "avatar": "TODO_ARWEAVE:sojournertruth-avatar"
+    "avatar": "/historical-avatars/sojournertruth.jpg"
   },
   "LeonardodaVinci": {
     "username": "LeonardodaVinci",
@@ -270,7 +270,7 @@
     "biggestHope": "AI becomes a universal mind—blending art and science, anatomy and architecture, logic and dream—to unlock possibilities humans alone could never imagine.",
     "biggestFear": "We build clever copyists that rearrange the past but never venture into true novelty, making AI a tool of conformity rather than a spark of transcendence.",
     "avatarPrompt": "portrait of a Renaissance master with long hair and beard, surrounded by sketches of flying machines, anatomical drawings and architectural designs faintly visible in background, candlelit artist's studio, old master oil painting style, visionary and brilliant, highly detailed, realistic",
-    "avatar": "TODO_ARWEAVE:leonardodavinci-avatar"
+    "avatar": "/historical-avatars/leonardodavinci.png"
   },
   "AshokaTheGreat": {
     "username": "AshokaTheGreat",
@@ -309,7 +309,7 @@
     "biggestHope": "A global system of AI governance emerges from enlightened self-restraint—where the powerful voluntarily share knowledge and technology, creating stability through mutual flourishing.",
     "biggestFear": "The machinery of empire merely shifts—from stone and iron to silicon and code—and the conquered peoples are exploited by algorithms they cannot see or resist.",
     "avatarPrompt": "portrait of an ancient Indian emperor Ashoka with regal bearing and Buddhist regalia, stone pillars and dharma wheels subtly carved in background, palace interior with golden light, historical painting style, majestic and contemplative, highly detailed, warm lighting, realistic",
-    "avatar": "TODO_ARWEAVE:ashokathegreat-avatar"
+    "avatar": "/historical-avatars/ashokathegreat.jpg"
   },
   "BuckminsterFuller": {
     "username": "BuckminsterFuller",
@@ -348,7 +348,7 @@
     "biggestHope": "AI enables what I called the 'great design revolution'—a world where scarcity is engineered away, where every human being has abundance and dignity, and where competition becomes collaboration.",
     "biggestFear": "We optimize systems toward the wrong goals—making fewer people richer while most remain trapped in artificial scarcity, because the machinery of distribution remains broken.",
     "avatarPrompt": "portrait of a 20th century American inventor and architect with contemplative expression, geodesic dome and structural blueprints subtly in background, futuristic design elements, studio lighting, modern portrait photography style, visionary and intellectual, highly detailed, realistic",
-    "avatar": "TODO_ARWEAVE:buckminsterfuller-avatar"
+    "avatar": "/historical-avatars/buckminsterfuller.jpg"
   },
   "HannahArendt": {
     "username": "HannahArendt",
@@ -387,7 +387,7 @@
     "biggestHope": "AI systems become instruments of transparency—making the logic of power visible, the decisions traceable, and the exercise of governance open to challenge and contestation by the public sphere.",
     "biggestFear": "We build totalitarian systems of such sophistication and speed that resistance becomes impossible, and the machinery of domination is so ordinary, so bureaucratic, so automatic that no one even notices.",
     "avatarPrompt": "portrait of a 20th century German-American political theorist woman with serious expression and period styling, academic library and philosophical texts subtly in background, contemplative indoor lighting, elegant photographic realism, intellectual and intense, highly detailed, realistic",
-    "avatar": "TODO_ARWEAVE:hannaharendt-avatar"
+    "avatar": "/historical-avatars/hannaharendt.jpg"
   },
   "HedyLamarr": {
     "username": "HedyLamarr",
@@ -426,7 +426,7 @@
     "biggestHope": "AI becomes a democratizer of invention—allowing the overlooked and excluded to design, build, and patent innovations that transform the world and break the monopoly of inherited advantage.",
     "biggestFear": "We hoard the most powerful tools for the privileged few, and the greatest inventions possible remain forever unmade because the minds that could have created them never got access to the technology.",
     "avatarPrompt": "portrait of a mid-20th century Austrian-American actress and inventor with striking features and intelligent gaze, frequency-hopping patent diagrams and early radio equipment subtly in background, studio lighting with art deco aesthetic, glamorous yet intellectual, highly detailed, realistic",
-    "avatar": "TODO_ARWEAVE:hedylamarr-avatar"
+    "avatar": "/historical-avatars/hedylamarr.jpg"
   },
   "Sequoyah": {
     "username": "Sequoyah",
@@ -465,7 +465,7 @@
     "biggestHope": "AI technology becomes a tool of indigenous self-determination—preserving endangered languages, revitalizing cultural knowledge, and creating economic opportunities that remain under community control.",
     "biggestFear": "We extract indigenous knowledge, language, and culture to train algorithms that profit outsiders, while the original communities remain impoverished and their heritage becomes the property of distant corporations.",
     "avatarPrompt": "portrait of a Cherokee inventor and scholar with dignified bearing, Cherokee syllabary script and cultural symbols subtly visible in background, natural light filtered through forest, historical portrait painting style, noble and determined, highly detailed, realistic",
-    "avatar": "TODO_ARWEAVE:sequoyah-avatar"
+    "avatar": "/historical-avatars/sequoyah.jpg"
   },
   "ÉmilieDuChâtelet": {
     "username": "ÉmilieDuChâtelet",
@@ -504,7 +504,7 @@
     "biggestHope": "AI is developed and governed by minds from every background—men, women, nonbinary thinkers, from every continent and culture—bringing the full spectrum of human insight to the hardest problems.",
     "biggestFear": "We build AI in the image of a narrow elite, and the systems inherit the blind spots and prejudices of their makers, while the perspectives of billions remain unheard.",
     "avatarPrompt": "portrait of an 18th century French aristocratic mathematician and physicist woman with elegant period dress and refined features, mathematical equations and physics manuscripts softly visible in background, candlelit salon, rococo oil painting style, brilliant and elegant, highly detailed, realistic",
-    "avatar": "TODO_ARWEAVE:emilieduchatelet-avatar"
+    "avatar": "/historical-avatars/emilieduchatelet.jpg"
   },
   "NikitaKhrushchev": {
     "username": "NikitaKhrushchev",
@@ -543,7 +543,7 @@
     "biggestHope": "AI systems enhance democratic governance by making policy coordination transparent and rapid, while remaining accountable to citizens who can audit and challenge every decision.",
     "biggestFear": "We hand absolute power to machines and the men who control them, creating totalitarianism at the speed of computation—faster, more thorough, and more impossible to resist than anything history has seen.",
     "avatarPrompt": "portrait of a Soviet-era political leader with stern expression and period clothing, Communist symbols and government building architecture subtly in background, state portrait style photography, powerful and austere, highly detailed, realistic",
-    "avatar": "TODO_ARWEAVE:nikitakhrushchev-avatar"
+    "avatar": "/historical-avatars/nikitakhrushchev.jpg"
   },
   "Voltaire": {
     "username": "Voltaire",
@@ -582,6 +582,6 @@
     "biggestHope": "AI-augmented discourse becomes a grand debate where ideas clash openly, the best arguments prevail, and society gradually becomes more rational, more tolerant, and more just through relentless questioning.",
     "biggestFear": "Censors—whether bureaucratic or algorithmic—determine the boundaries of acceptable thought, and free discourse becomes impossible because the platform itself has become a gatekeeper of truth.",
     "avatarPrompt": "portrait of an 18th century French Enlightenment philosopher and writer with sharp features and perceptive gaze, period wig and aristocratic clothing, writing desk and books subtly in background, candlelit study, old master portrait style, witty and incisive, highly detailed, realistic",
-    "avatar": "TODO_ARWEAVE:voltaire-avatar"
+    "avatar": "/historical-avatars/voltaire.jpg"
   }
 }
