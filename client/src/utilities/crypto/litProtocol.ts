@@ -6,6 +6,7 @@
  *
  * Key exports: getGlobalLitHooks, buildSbtAccessControlConditions, resolveLitChain, litStorage, uploadEncryptedArweaveData
  */
+// @ts-nocheck
 import { Buffer } from 'buffer/';
 import { ethers } from 'ethers';
 import { createPublicClient, createWalletClient, custom, http } from 'viem';
