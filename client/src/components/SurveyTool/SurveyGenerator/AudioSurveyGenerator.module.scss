@@ -473,15 +473,26 @@ $input-border: tokens.$ce-input-border;
     display: flex;
     align-items: center;
     gap: 10px;
-    flex-wrap: wrap;
-    margin-top: 10px;
+    flex-wrap: nowrap;
+    white-space: nowrap;
+    min-width: 0;
+  }
+
+  .countInlineLabel {
+    flex: 0 0 auto;
+    opacity: 0.3;
+    color: rgba(244, 247, 255, 0.92);
+    font-size: 0.98rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
   }
 
   .countReadout {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-width: 92px;
+    flex: 0 0 auto;
+    min-width: 72px;
     min-height: 42px;
     padding: 0 14px;
     border-radius: var(--ce-radius-pill);
@@ -501,43 +512,47 @@ $input-border: tokens.$ce-input-border;
   }
 
   .countAdjustButton {
-    width: 42px;
-    height: 42px;
-    padding: 0 !important;
+    width: auto;
+    min-width: 28px;
+    height: auto;
+    padding: 0 2px !important;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border-radius: var(--ce-radius-round) !important;
-    border: 1px solid rgba(255, 255, 255, 0.18) !important;
-    background: rgba(255, 255, 255, 0.08) !important;
+    border-radius: 0 !important;
+    border: none !important;
+    background: transparent !important;
     color: rgba(244, 247, 255, 0.92) !important;
     font-size: 1.35rem !important;
     font-weight: 800 !important;
     line-height: 1 !important;
-    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+    box-shadow: none !important;
 
     &:hover:not(:disabled) {
       transform: translateY(-1px);
-      background: rgba(77, 255, 164, 0.18) !important;
-      border-color: rgba(77, 255, 164, 0.42) !important;
-      color: var(--ce-color-white) !important;
+      background: transparent !important;
+      border: none !important;
+      color: #4dffa4 !important;
     }
 
     &:focus,
     &:focus-visible {
-      background: rgba(77, 255, 164, 0.18) !important;
-      border-color: rgba(77, 255, 164, 0.6) !important;
-      color: var(--ce-color-white) !important;
-      box-shadow: 0 0 0 2px rgba(77, 255, 164, 0.22);
+      background: transparent !important;
+      border: none !important;
+      color: #4dffa4 !important;
+      text-decoration: underline;
+      text-underline-offset: 0.16em;
+      box-shadow: none !important;
     }
 
     &:disabled {
-      opacity: 1;
+      opacity: 0.4;
       cursor: not-allowed;
-      background: rgba(255, 255, 255, 0.03) !important;
-      border-color: rgba(255, 255, 255, 0.1) !important;
       color: rgba(244, 247, 255, 0.38) !important;
-      box-shadow: none;
+      background: transparent !important;
+      border: none !important;
+      box-shadow: none !important;
+      transform: none;
     }
   }
 
@@ -670,8 +685,22 @@ $input-border: tokens.$ce-input-border;
       justify-content: center;
     }
 
+    .countControlRow {
+      gap: 8px;
+    }
+
+    .countInlineLabel {
+      font-size: 0.92rem;
+    }
+
     .countReadout {
-      min-width: 84px;
+      min-width: 64px;
+      padding: 0 12px;
+    }
+
+    .countAdjustButton {
+      min-width: 24px;
+      font-size: 1.2rem !important;
     }
 
     .litGateRow {

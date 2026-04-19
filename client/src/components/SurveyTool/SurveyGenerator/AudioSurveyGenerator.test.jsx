@@ -390,7 +390,9 @@ describe('AudioSurveyGenerator', () => {
 
     expect(
       container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_QUESTION_COUNT_VALUE}"]`).textContent
-    ).toBe('#: 10');
+    ).toBe('10');
+    expect(container.textContent).toContain('# Questions');
+    expect(container.textContent).not.toContain('Number of Questions');
   });
 
   it('decrements the question count by five and clamps at five', () => {
@@ -411,15 +413,15 @@ describe('AudioSurveyGenerator', () => {
       `[data-testid="${E2E_TESTIDS.DATABASE_QUESTION_COUNT_DECREMENT}"]`
     );
 
-    expect(countValue().textContent).toBe('#: 10');
+    expect(countValue().textContent).toBe('10');
     expect(decrementButton.disabled).toBe(false);
 
     toggleCheckbox(decrementButton);
-    expect(countValue().textContent).toBe('#: 5');
+    expect(countValue().textContent).toBe('5');
     expect(decrementButton.disabled).toBe(true);
 
     toggleCheckbox(decrementButton);
-    expect(countValue().textContent).toBe('#: 5');
+    expect(countValue().textContent).toBe('5');
   });
 
   it('increments the question count by five and clamps at fifty', () => {
@@ -444,11 +446,11 @@ describe('AudioSurveyGenerator', () => {
       toggleCheckbox(incrementButton);
     }
 
-    expect(countValue().textContent).toBe('#: 50');
+    expect(countValue().textContent).toBe('50');
     expect(incrementButton.disabled).toBe(true);
 
     toggleCheckbox(incrementButton);
-    expect(countValue().textContent).toBe('#: 50');
+    expect(countValue().textContent).toBe('50');
   });
 
   it('passes the adjusted question count through to the AI prompt on submit', async () => {
@@ -478,7 +480,7 @@ describe('AudioSurveyGenerator', () => {
     expect(mockCallAI).toHaveBeenCalledTimes(1);
     expect(
       container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_QUESTION_COUNT_VALUE}"]`).textContent
-    ).toBe('#: 15');
+    ).toBe('15');
     expect(mockCallAI.mock.calls[0][0]).toMatch(/numberOfSeedStatementsOrPrompts:\s*15\b/);
   });
 
