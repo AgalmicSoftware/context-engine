@@ -136,6 +136,29 @@ const getAtlasNodeDiameter = (label) => {
   expect(dotElement).toBeTruthy();
   return parseFloat(dotElement.style.width);
 };
+const getAtlasNodeElementById = (nodeId, layout = '') => (
+  screen.getAllByTestId(E2E_TESTIDS.ATLAS_NODE).find((element) => (
+    element.getAttribute('data-ce-node-id') === nodeId
+      && (!layout || element.getAttribute('data-ce-node-layout') === layout)
+  ))
+);
+const getDebateViewModeButton = (mode) => (
+  screen.getAllByTestId(E2E_TESTIDS.DEBATE_VIEW_MODE).find((element) => (
+    element.getAttribute('data-ce-view-mode') === mode
+  ))
+);
+const getPackedNodeLabel = (label) => (
+  screen.getAllByText(label).find((element) => (
+    String(element.className || '').includes('packedNodeLabel')
+  ))
+);
+const getAtlasNodeDiameterById = (nodeId, layout = '') => {
+  const nodeElement = getAtlasNodeElementById(nodeId, layout);
+  expect(nodeElement).toBeTruthy();
+  const dotElement = nodeElement.querySelector('[class*="nodeDot"]');
+  expect(dotElement).toBeTruthy();
+  return parseFloat(dotElement.style.width);
+};
 const privacyAndSurveillanceNodeId = '0x4320000000000000000000000000000000000000000000000000000000000000';
 const deceptiveAlignmentNodeId = '0x1110000000000000000000000000000000000000000000000000000000000000';
 const liabilityFrameworksNodeId = '0x3140000000000000000000000000000000000000000000000000000000000000';
@@ -199,6 +222,64 @@ describe('DebateMap', () => {
 
     expect(screen.getByRole('heading', { name: /^Debate Map$/i })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: /^AI Policy Atlas$/i })).not.toBeInTheDocument();
+  });
+
+  it('renders circles mode by default in DebateMap', () => {
+    render(
+      <MemoryRouter>
+        <DebateMap
+          account=""
+          provider=""
+          network={{ id: 84532 }}
+          activeSessionSlug=""
+          toggleLoginModal={jest.fn()}
+        />
+      </MemoryRouter>
+    );
+
+    expect(getAtlasNodeElementById('0x1000000000000000000000000000000000000000000000000000000000000000', 'packed')).toBeTruthy();
+  });
+
+  it('switches between circles and atlas from the main mode controls', () => {
+    render(
+      <MemoryRouter>
+        <DebateMap
+          account=""
+          provider=""
+          network={{ id: 84532 }}
+          activeSessionSlug=""
+          toggleLoginModal={jest.fn()}
+        />
+      </MemoryRouter>
+    );
+
+    expect(getAtlasNodeElementById('0x1000000000000000000000000000000000000000000000000000000000000000', 'packed')).toBeTruthy();
+
+    fireEvent.click(getDebateViewModeButton('atlas'));
+
+    expect(getAtlasNodeElementById('0x1000000000000000000000000000000000000000000000000000000000000000', 'orbital')).toBeTruthy();
+    expect(getAtlasNodeElementById('0x1000000000000000000000000000000000000000000000000000000000000000', 'packed')).toBeFalsy();
+
+    fireEvent.click(getDebateViewModeButton('circles'));
+
+    expect(getAtlasNodeElementById('0x1000000000000000000000000000000000000000000000000000000000000000', 'packed')).toBeTruthy();
+  });
+
+  it('starts in atlas mode when explicitly configured', () => {
+    render(
+      <MemoryRouter>
+        <DebateMap
+          account=""
+          provider=""
+          network={{ id: 84532 }}
+          activeSessionSlug=""
+          toggleLoginModal={jest.fn()}
+          atlasLayoutMode="orbital"
+        />
+      </MemoryRouter>
+    );
+
+    expect(getAtlasNodeElementById('0x1000000000000000000000000000000000000000000000000000000000000000', 'orbital')).toBeTruthy();
   });
 
   it('builds historical compass points using the current vote for x and other votes for y', () => {
@@ -392,6 +473,161 @@ describe('DebateMap', () => {
 
     expect(getAtlasNodeDiameter('High Disagreement')).toBeGreaterThan(
       getAtlasNodeDiameter('Low Disagreement')
+    );
+  });
+
+  it('renders nested packed atlas nodes in circles mode', () => {
+    render(
+      <MemoryRouter>
+        <DebateMap
+          account=""
+          provider=""
+          network={{ id: 84532 }}
+          activeSessionSlug=""
+          toggleLoginModal={jest.fn()}
+        />
+      </MemoryRouter>
+    );
+
+    expect(getAtlasNodeElementById('0x1000000000000000000000000000000000000000000000000000000000000000', 'packed')).toBeTruthy();
+    expect(getAtlasNodeElementById(deceptiveAlignmentNodeId, 'packed')).toBeTruthy();
+  });
+
+  it('drills into packed top-level parent circles and uses the title action to open them', () => {
+    const onNodeClick = jest.fn();
+
+    render(
+      <AtlasView
+        data={[
+          {
+            id: 'parent-node',
+            name: 'Parent Node',
+            children: [
+              { id: 'child-node', name: 'Child Node' },
+            ],
+          },
+        ]}
+        onNodeClick={onNodeClick}
+        atlasLayoutMode="packed"
+      />
+    );
+
+    fireEvent.click(getAtlasNodeElementById('parent-node', 'packed'));
+
+    expect(screen.getByRole('button', { name: /up level/i })).toBeInTheDocument();
+    expect(screen.getByTestId(E2E_TESTIDS.ATLAS_TITLE_ACTION)).toHaveTextContent('Parent Node');
+    expect(getAtlasNodeElementById('child-node', 'packed')).toBeTruthy();
+
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.ATLAS_TITLE_ACTION));
+
+    expect(onNodeClick).toHaveBeenLastCalledWith(expect.objectContaining({ id: 'parent-node' }));
+  });
+
+  it('drills into packed child circles, hides the outer root circle, and exposes a clickable title action', () => {
+    const onNodeClick = jest.fn();
+
+    render(
+      <AtlasView
+        data={[
+          {
+            id: 'parent-node',
+            name: 'Parent Node',
+            children: [
+              {
+                id: 'child-node',
+                name: 'Child Node',
+                children: [
+                  { id: 'grandchild-node', name: 'Grandchild Node' },
+                ],
+              },
+            ],
+          },
+        ]}
+        onNodeClick={onNodeClick}
+        atlasLayoutMode="packed"
+      />
+    );
+
+    fireEvent.click(getAtlasNodeElementById('child-node', 'packed'));
+
+    expect(screen.getByRole('button', { name: /up level/i })).toBeInTheDocument();
+    expect(screen.getByTestId(E2E_TESTIDS.ATLAS_TITLE_ACTION)).toHaveTextContent('Child Node');
+    expect(getAtlasNodeElementById('child-node', 'packed')).toBeFalsy();
+    expect(getAtlasNodeElementById('grandchild-node', 'packed')).toBeTruthy();
+
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.ATLAS_TITLE_ACTION));
+
+    expect(onNodeClick).toHaveBeenLastCalledWith(expect.objectContaining({ id: 'child-node' }));
+  });
+
+  it('swaps packed root labels from parent titles to child titles when hovering within a cluster', () => {
+    render(
+      <AtlasView
+        data={[
+          {
+            id: 'parent-node',
+            name: 'Parent Node',
+            children: [
+              { id: 'child-node-a', name: 'Child Node A' },
+              { id: 'child-node-b', name: 'Child Node B' },
+            ],
+          },
+        ]}
+        onNodeClick={jest.fn()}
+        atlasLayoutMode="packed"
+      />
+    );
+
+    expect(String(getPackedNodeLabel('Parent Node')?.className || '')).toContain('alwaysVisible');
+    expect(String(getPackedNodeLabel('Child Node A')?.className || '')).not.toContain('alwaysVisible');
+
+    fireEvent.mouseEnter(getAtlasNodeElementById('child-node-a', 'packed'));
+
+    expect(String(getPackedNodeLabel('Parent Node')?.className || '')).not.toContain('alwaysVisible');
+    expect(String(getPackedNodeLabel('Child Node A')?.className || '')).toContain('alwaysVisible');
+    expect(String(getPackedNodeLabel('Child Node B')?.className || '')).toContain('alwaysVisible');
+  });
+
+  it('opens atlas leaf modals from the packed layout', async () => {
+    render(
+      <MemoryRouter>
+        <DebateMap
+          account=""
+          provider=""
+          network={{ id: 84532 }}
+          activeSessionSlug=""
+          toggleLoginModal={jest.fn()}
+        />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(getAtlasNodeElementById(deceptiveAlignmentNodeId, 'packed'));
+
+    expect(await screen.findByRole('heading', { name: 'Deceptive Alignment' })).toBeInTheDocument();
+  });
+
+  it('sizes packed atlas nodes by disagreement instead of raw vote volume', () => {
+    render(
+      <AtlasView
+        data={[
+          {
+            id: 'low-disagreement',
+            name: 'Low Disagreement',
+            votes: { up: 60, down: 4 },
+          },
+          {
+            id: 'high-disagreement',
+            name: 'High Disagreement',
+            votes: { up: 18, down: 16 },
+          },
+        ]}
+        onNodeClick={jest.fn()}
+        atlasLayoutMode="packed"
+      />
+    );
+
+    expect(getAtlasNodeDiameterById('high-disagreement', 'packed')).toBeGreaterThan(
+      getAtlasNodeDiameterById('low-disagreement', 'packed')
     );
   });
 
@@ -659,6 +895,7 @@ describe('DebateMap', () => {
     );
 
     expect(await screen.findByTitle('Copy Deep Link URL')).toBeInTheDocument();
+    expect(screen.getByTitle('Copy Deep Link URL')).toBeInTheDocument();
 
     fireEvent.click(screen.getByTitle('Close'));
 

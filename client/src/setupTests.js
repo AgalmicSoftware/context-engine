@@ -78,6 +78,110 @@ jest.mock('d3', () => {
     fn.ticks = () => [];
     return fn;
   };
+
+  const buildHierarchyNode = (data, childrenAccessor, depth = 0, parent = null) => {
+    const childrenData = childrenAccessor ? childrenAccessor(data) : null;
+    const node = {
+      data,
+      depth,
+      parent,
+      children: null,
+      value: 0,
+      x: 0,
+      y: 0,
+      r: 0,
+      descendants() {
+        return [
+          this,
+          ...((this.children || []).flatMap((child) => child.descendants())),
+        ];
+      },
+      sum(valueAccessor) {
+        const ownValue = Number(valueAccessor ? valueAccessor(this.data) : 0) || 0;
+        const childValue = (this.children || []).reduce((sum, child) => {
+          child.sum(valueAccessor);
+          return sum + (Number(child.value) || 0);
+        }, 0);
+        this.value = ownValue + childValue;
+        return this;
+      },
+      sort(compare) {
+        if (Array.isArray(this.children) && this.children.length > 0) {
+          this.children.sort(compare);
+          this.children.forEach((child) => child.sort(compare));
+        }
+        return this;
+      },
+    };
+
+    const childNodes = Array.isArray(childrenData)
+      ? childrenData.map((child) => buildHierarchyNode(child, childrenAccessor, depth + 1, node))
+      : null;
+
+    node.children = childNodes;
+
+    return node;
+  };
+
+  const hierarchy = (data, childrenAccessor) => buildHierarchyNode(data, childrenAccessor);
+
+  const pack = () => {
+    let currentSize = [1, 1];
+    let currentPadding = 0;
+
+    const layoutNode = (node, x, y, radius) => {
+      node.x = x;
+      node.y = y;
+      node.r = radius;
+
+      if (!Array.isArray(node.children) || node.children.length === 0) {
+        return node;
+      }
+
+      const count = node.children.length;
+      const childTotal = node.children.reduce((sum, child) => sum + Math.max(Number(child.value) || 0, 1), 0);
+      const availableRadius = Math.max(radius - currentPadding - 6, 1);
+      const ringDistanceBase = Math.max(radius - currentPadding - 10, 0);
+
+      node.children.forEach((child, index) => {
+        const weight = Math.max(Number(child.value) || 0, 1) / Math.max(childTotal, 1);
+        const childRadius = count === 1
+          ? availableRadius * 0.72
+          : Math.max(availableRadius * 0.16, availableRadius * 0.68 * Math.sqrt(weight));
+        const angle = (-Math.PI / 2) + ((Math.PI * 2 * index) / count);
+        const distance = count === 1 ? 0 : Math.max(ringDistanceBase - childRadius, 0) * 0.45;
+
+        layoutNode(
+          child,
+          x + (Math.cos(angle) * distance),
+          y + (Math.sin(angle) * distance),
+          Math.min(childRadius, availableRadius)
+        );
+      });
+
+      return node;
+    };
+
+    const packLayout = (root) => {
+      const rootRadius = Math.max(Math.min(currentSize[0], currentSize[1]) / 2, 1);
+      return layoutNode(root, currentSize[0] / 2, currentSize[1] / 2, rootRadius);
+    };
+
+    packLayout.size = (next) => {
+      if (next === undefined) return currentSize;
+      currentSize = Array.isArray(next) ? next : currentSize;
+      return packLayout;
+    };
+
+    packLayout.padding = (next) => {
+      if (next === undefined) return currentPadding;
+      currentPadding = Number(next) || 0;
+      return packLayout;
+    };
+
+    return packLayout;
+  };
+
   return {
     __esModule: true,
     scaleLinear: chain,
@@ -89,6 +193,8 @@ jest.mock('d3', () => {
     schemeCategory10: [],
     schemeTableau10: [],
     color: jest.fn(),
+    hierarchy,
+    pack,
   };
 });
 
