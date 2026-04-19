@@ -90,6 +90,14 @@ const RECOGNITION_GROUPS = [
       { url: 'https://www.edgecity.live/patagonia', text: 'Edge City' },
     ],
   },
+  {
+    name: 'Loophole',
+    description:
+      'Loophole is a useful way to stress-test rules and reason about policy proposals. Context Engine uses it to enrich the debate atlas with concrete loophole, overreach, and patch-comparison cases people can inspect and debate.',
+    links: [
+      { url: 'https://github.com/brendanhogan/loophole', text: 'GitHub Repo' },
+    ],
+  },
 ];
 
 const RECOGNIZED_INDIVIDUALS = [];
