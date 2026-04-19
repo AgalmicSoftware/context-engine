@@ -263,7 +263,7 @@ Notes:
 - In `/session/new`, if a locked field points to a gate with no SBT addresses, encryption is skipped for that field (value stays plaintext) so metadata upload still works for open/no-gate sessions.
 - Open/general sessions do not require selecting SBTs unless a field is explicitly being Lit-encrypted.
 - Survey/question creation now throws explicit errors when a session is missing `contracts.surveys.address` (instead of returning undefined and causing `receipt` destructure errors in UI).
-- CreateSurvey submit now performs a one-shot registry refresh for the active slug before contract writes when `contracts.surveys.address` is missing, so newly registered sessions are less likely to fail with stale local config.
+- CreateQuestionsAndSurveys submit now performs a one-shot registry refresh for the active slug before contract writes when `contracts.surveys.address` is missing, so newly registered sessions are less likely to fail with stale local config.
 - The app bootstraps registry reads via public RPCs (no PATH)
   even if `USE_ONCHAIN_SESSION_REGISTRY` is false, so SBT addresses + metadata resolve reliably.
   TODO: resolve default registry/contract addresses from `<chainId>.contracts.contextengine.eth`.
@@ -276,7 +276,7 @@ Notes:
 - Other encrypted fields are stored in `encryptedFields` and blanked in place.
 
 QA:
-- Create a session with multiple encryption gates and verify Admin, Database, and CreateSurvey prefill SBTs + mode from the primary gate.
+- Create a session with multiple encryption gates and verify Admin, Database, and CreateQuestionsAndSurveys prefill SBTs + mode from the primary gate.
 
 ## Runtime Mapping
 

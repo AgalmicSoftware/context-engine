@@ -33,7 +33,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faBookmark, faLock, faUnlock, faPlus, faMinus, faCaretDown, faCaretUp, faCheck, faTimes, faArrowLeft, faArrowRight, faSpinner, faExpand, faExternalLinkAlt, faFilter, faExclamationCircle, faCog, faMicrophone, faChevronLeft, faChevronRight, faComment, faQuestionCircle, faBullhorn, faRobot } from '@fortawesome/free-solid-svg-icons';
 
 import AudioInput from '../Shared/AudioInput/AudioInput.jsx';
-import CreateSurvey from './CreateSurvey';
+import CreateQuestionsAndSurveys from './CreateQuestionsAndSurveys';
 import SurveyResults from './SurveyResults';
 import QuestionFilter from './QuestionFilter';
 import PileHologramAssistant from './PileHologramAssistant.jsx';
@@ -1384,7 +1384,7 @@ export class SurveySelector extends Component {
 
         {/* Create survey */}
         {createSurveyMode && (
-          <CreateSurvey
+          <CreateQuestionsAndSurveys
             {...this.props}
             toggleLoginModal={this.props.toggleLoginModal}
             expanded={createSurveyMode}

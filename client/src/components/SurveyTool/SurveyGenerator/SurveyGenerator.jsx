@@ -42,7 +42,7 @@ import {
   getSessionConfigBySlug,
 } from '../../../utilities/web3/contractScripts.js';
 import AudioInput from '../../Shared/AudioInput/AudioInput.jsx';
-import CreateSurvey from '../CreateSurvey.jsx';
+import CreateQuestionsAndSurveys from '../CreateQuestionsAndSurveys.jsx';
 import SBTSelector from '../../SBTs/SBTSelector.jsx';
 import DocumentLibraryPanel from '../../DocumentLibrary/DocumentLibraryPanel.jsx';
 import SessionChipSelector from '../../Shared/SessionChipSelector.jsx';
@@ -1102,7 +1102,7 @@ export default function AudioSurveyGenerator({
       if (abortedRef.current) return;
 
       // 5. Spawn Survey Tool
-      // This updates state.documentURLs, which CreateSurvey picks up
+      // This updates state.documentURLs, which CreateQuestionsAndSurveys picks up
       processAndSetQuestions(aiData, finalDocUrls);
       setShowCreateSurvey(true);
 
@@ -1129,7 +1129,7 @@ export default function AudioSurveyGenerator({
 
     return (
       <div className={styles.createSurveyContainer}>
-        <CreateSurvey
+        <CreateQuestionsAndSurveys
           miniaturized={minified}
           preformedQuestions={statementsToUpload}
           preformedSurvey={preformedSurvey}

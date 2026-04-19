@@ -1,4 +1,4 @@
-/** @file CreateSurvey.jsx */
+/** @file CreateQuestionsAndSurveys.jsx */
 
 import React, { Component } from 'react';
 import {
@@ -25,7 +25,7 @@ import {
   faEraser,
   faQuestionCircle
 } from '@fortawesome/free-solid-svg-icons';
-import styles from './CreateSurvey.module.scss';
+import styles from './CreateQuestionsAndSurveys.module.scss';
 import { arweaveScripts } from '../../utilities/arweave/arweaveScripts';
 import CETooltip from '../Shared/CETooltip';
 import { normalizeArweaveUrl, parseArweaveTxId } from '../../utilities/arweave/arweaveUrls.js';
@@ -291,7 +291,7 @@ const formatAiPromptModelLabel = (config = {}) => {
   return model || provider || 'Configured model';
 };
 
-class CreateSurvey extends Component {
+class CreateQuestionsAndSurveys extends Component {
   constructor(props) {
     super(props);
     this.state = {
@@ -976,7 +976,7 @@ class CreateSurvey extends Component {
         });
         return true;
       } catch (error) {
-        surveyLog.error('[CreateSurvey] Error parsing saved survey from localStorage:', error);
+        surveyLog.error('[CreateQuestionsAndSurveys] Error parsing saved survey from localStorage:', error);
         this.clearUnfinishedSurveyDraft();
       }
     }
@@ -1232,7 +1232,7 @@ class CreateSurvey extends Component {
       bookmarksCache.questions = Array.from(new Set([...(bookmarksCache.questions || []), idL]));
     }
 
-    void writeCache('bookmarksCache', slug, bookmarksCache).catch((e) => { surveyLog.warn('CreateSurvey: fallback', e); });
+    void writeCache('bookmarksCache', slug, bookmarksCache).catch((e) => { surveyLog.warn('CreateQuestionsAndSurveys: fallback', e); });
     this.setState({ bookmarkedQuestionsSet: set });
   };
 
@@ -1270,7 +1270,7 @@ class CreateSurvey extends Component {
       bookmarksCache.surveys = Array.from(new Set([...(bookmarksCache.surveys || []), idL]));
     }
 
-    void writeCache('bookmarksCache', slug, bookmarksCache).catch((e) => { surveyLog.warn('CreateSurvey: fallback', e); });
+    void writeCache('bookmarksCache', slug, bookmarksCache).catch((e) => { surveyLog.warn('CreateQuestionsAndSurveys: fallback', e); });
     this.setState({ bookmarkedSurveysSet: set });
   };
 
@@ -1630,7 +1630,7 @@ class CreateSurvey extends Component {
 
           window.sessionStorage.setItem(RECENT_QUESTION_PAYLOADS_KEY, JSON.stringify(nextRecent));
         }
-      } catch (e) { surveyLog.warn('CreateSurvey: fallback', e); }
+      } catch (e) { surveyLog.warn('CreateQuestionsAndSurveys: fallback', e); }
 
       // Keep cache write-through scoped to the primary authoring namespace.
       // Only use the general bucket when authoring is actually general.
@@ -1666,7 +1666,7 @@ class CreateSurvey extends Component {
       try {
         await writeCacheOptimistic('questionsCache', primarySlug, next);
       } catch (error) {
-        surveyLog.warn('[CreateSurvey] Failed to seed questions cache write-through', {
+        surveyLog.warn('[CreateQuestionsAndSurveys] Failed to seed questions cache write-through', {
           slug: primarySlug,
           error: error?.message || String(error),
         });
@@ -1675,7 +1675,7 @@ class CreateSurvey extends Component {
 
       return true;
     } catch (error) {
-      surveyLog.warn('[CreateSurvey] Failed to seed uploaded questions cache', {
+      surveyLog.warn('[CreateQuestionsAndSurveys] Failed to seed uploaded questions cache', {
         error: error?.message || String(error),
       });
       return false;
@@ -1734,7 +1734,7 @@ class CreateSurvey extends Component {
       try {
         await writeCacheOptimistic('surveysCache', primarySlug, next);
       } catch (error) {
-        surveyLog.warn('[CreateSurvey] Failed to seed surveys cache write-through', {
+        surveyLog.warn('[CreateQuestionsAndSurveys] Failed to seed surveys cache write-through', {
           slug: primarySlug,
           error: error?.message || String(error),
         });
@@ -1743,7 +1743,7 @@ class CreateSurvey extends Component {
 
       return true;
     } catch (error) {
-      surveyLog.warn('[CreateSurvey] Failed to seed submitted survey cache', {
+      surveyLog.warn('[CreateQuestionsAndSurveys] Failed to seed submitted survey cache', {
         error: error?.message || String(error),
       });
       return false;
@@ -1758,7 +1758,7 @@ class CreateSurvey extends Component {
     if (typeof this._cacheWatchUnsubscribe === 'function') {
       try {
         this._cacheWatchUnsubscribe();
-      } catch (e) { surveyLog.warn('CreateSurvey: cleanup', e); }
+      } catch (e) { surveyLog.warn('CreateQuestionsAndSurveys: cleanup', e); }
       this._cacheWatchUnsubscribe = null;
     }
     if (this._cacheWatchCoalescer) {
@@ -1869,7 +1869,7 @@ class CreateSurvey extends Component {
       if (need !== this.state.needsNetworkSwitch) {
         this.setState({ needsNetworkSwitch: need });
       }
-    } catch (e) { surveyLog.warn('CreateSurvey: fallback', e); }
+    } catch (e) { surveyLog.warn('CreateQuestionsAndSurveys: fallback', e); }
   };
 
   switchToCorrectNetwork = async () => {
@@ -1903,7 +1903,7 @@ class CreateSurvey extends Component {
             }]
           });
           this.setState({ needsNetworkSwitch: false });
-        } catch (e) { surveyLog.warn('CreateSurvey: fallback', e); }
+        } catch (e) { surveyLog.warn('CreateQuestionsAndSurveys: fallback', e); }
       }
     }
   };
@@ -1974,7 +1974,7 @@ class CreateSurvey extends Component {
           this.setState({ needsNetworkSwitch: true });
           return;
         }
-      } catch (e) { surveyLog.warn('CreateSurvey: fallback', e); }
+      } catch (e) { surveyLog.warn('CreateQuestionsAndSurveys: fallback', e); }
     }
 
     this.setState({
@@ -2617,7 +2617,7 @@ class CreateSurvey extends Component {
         }
       }
     } catch (error) {
-      surveyLog.error("[CreateSurvey] Failed to create survey/questions:", error);
+      surveyLog.error("[CreateQuestionsAndSurveys] Failed to create survey/questions:", error);
       const shouldResetSubmitProgress = !!error?.resetSubmitProgress;
       this.setState({
         isSubmitting: false,
@@ -3031,6 +3031,7 @@ class CreateSurvey extends Component {
     const sessionConfig = this.getSessionConfig();
     const resolvedSessionConfig = this.getResolvedSessionConfig();
     const { gateOptions, defaultGateId } = this.resolveGateOptions(resolvedSessionConfig, { isStandaloneQuestion });
+    const hasSelectableGateOptions = Array.isArray(gateOptions) && gateOptions.length > 0;
     const gateIdSet = new Set((Array.isArray(gateOptions) ? gateOptions : []).map((opt) => opt.id));
     const resolvedContracts = mergeSessionContractMaps(
       resolvedSessionConfig?.contracts,
@@ -3102,38 +3103,40 @@ class CreateSurvey extends Component {
               onChange={this.handleTitleChange}
               required={!isStandaloneQuestion}
             />
-            <div className={styles.surveyTitleLock}>
-              <GateMultiSelectLock
-                gateOptions={gateOptions}
-                selectedGateIds={surveySelectedGateIds}
-                onChangeSelectedGateIds={(nextIds) => {
-                  const normalized = normalizeSelectedGateIds(nextIds);
-                  this.setState({ surveyLockGateIds: normalized }, this.saveToLocalStorage);
-                  if (!normalized.length) {
-                    this.setState({ openLockKey: '' });
-                  }
-                }}
-                open={openLockKey === 'survey'}
-                onToggleOpen={(nextOpen) => {
-                  if (nextOpen && surveySelectedGateIds.length === 0 && defaultGateId) {
-                    this.setState({ surveyLockGateIds: [defaultGateId] }, this.saveToLocalStorage);
-                  }
-                  this.setState({ openLockKey: nextOpen ? 'survey' : '' });
-                }}
-                disabled={!gateOptions.length}
-                badgeText={formatGateBadge(surveySelectedGateIds)}
-                showDots={true}
-              />
-              <FontAwesomeIcon icon={faQuestionCircle} className={styles.tooltip} id="cs-survey-gate-tip" />
-              <CETooltip
-                placement="right"
-                trigger="hover focus click"
-                target="cs-survey-gate-tip"
-                className={styles.tooltipBubble}
-              >
-                {`Only holders of selected ${t('sbtsLower')} can access locked content.`}
-              </CETooltip>
-            </div>
+            {hasSelectableGateOptions ? (
+              <div className={styles.surveyTitleLock}>
+                <GateMultiSelectLock
+                  gateOptions={gateOptions}
+                  selectedGateIds={surveySelectedGateIds}
+                  onChangeSelectedGateIds={(nextIds) => {
+                    const normalized = normalizeSelectedGateIds(nextIds);
+                    this.setState({ surveyLockGateIds: normalized }, this.saveToLocalStorage);
+                    if (!normalized.length) {
+                      this.setState({ openLockKey: '' });
+                    }
+                  }}
+                  open={openLockKey === 'survey'}
+                  onToggleOpen={(nextOpen) => {
+                    if (nextOpen && surveySelectedGateIds.length === 0 && defaultGateId) {
+                      this.setState({ surveyLockGateIds: [defaultGateId] }, this.saveToLocalStorage);
+                    }
+                    this.setState({ openLockKey: nextOpen ? 'survey' : '' });
+                  }}
+                  disabled={!hasSelectableGateOptions}
+                  badgeText={formatGateBadge(surveySelectedGateIds)}
+                  showDots={true}
+                />
+                <FontAwesomeIcon icon={faQuestionCircle} className={styles.tooltip} id="cs-survey-gate-tip" />
+                <CETooltip
+                  placement="right"
+                  trigger="hover focus click"
+                  target="cs-survey-gate-tip"
+                  className={styles.tooltipBubble}
+                >
+                  {`Only holders of selected ${t('sbtsLower')} can access locked content.`}
+                </CETooltip>
+              </div>
+            ) : null}
           </div>
         )}
 
@@ -3233,7 +3236,7 @@ class CreateSurvey extends Component {
                       ? normalizeSelectedGateIds(question.lockGateIds)
                       : (inheritsSurvey ? surveySelectedGateIds : normalizeSelectedGateIds(question.lockGateIds));
 
-                    return (
+                    return hasSelectableGateOptions ? (
                       <>
                         {!isStandaloneQuestion && (
                           <label className={styles.inheritToggle}>
@@ -3293,12 +3296,12 @@ class CreateSurvey extends Component {
                             }
                             this.setState({ openLockKey: nextOpen ? lockKey : '' });
                           }}
-                          disabled={!gateOptions.length}
+                          disabled={!hasSelectableGateOptions}
                           badgeText={formatGateBadge(selectedGateIds)}
                           showDots={true}
                         />
                       </>
-                    );
+                    ) : null;
                   })()}
 
                   <Button className={styles.removeQuestionButton} onClick={() => this.removeQuestion(qIndex)}>
@@ -3783,4 +3786,4 @@ class CreateSurvey extends Component {
   }
 }
 
-export default CreateSurvey;
+export default CreateQuestionsAndSurveys;

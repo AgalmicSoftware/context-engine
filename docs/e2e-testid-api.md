@@ -173,7 +173,7 @@ Agent page UI: `client/src/components/Agent/AgentPage.jsx`
 | `ce-survey-locked-decrypt` | `client/src/components/SurveyTool/SurveyTool.jsx` | Locked-banner decrypt action button (manual gated prompt retry). | yes |  |
 | `ce-survey-answer-input` | `client/src/components/Shared/AudioInput/AudioInput.jsx` (wired from `SurveyTool.jsx`) | Textarea used for a freeform question answer. | yes | `data-ce-question-id` |
 | `ce-survey-submit` | `client/src/components/SurveyTool/SurveyTool.jsx` | Primary submit button (header, footer, or pile view). | yes |  |
-| `ce-survey-create-toggle` | `client/src/components/SurveyTool/SurveyTool.jsx` | Header create icon toggle (open/close CreateSurvey panel). | yes |  |
+| `ce-survey-create-toggle` | `client/src/components/SurveyTool/SurveyTool.jsx` | Header create icon toggle (open/close CreateQuestionsAndSurveys panel). | yes |  |
 | `ce-survey-create-toggle-pile` | `client/src/components/SurveyTool/SurveyTool.jsx` | Pile view create icon toggle (open/close create interface). | yes |  |
 | `ce-survey-view-all` | `client/src/components/SurveyTool/SurveyTool.jsx` | Pile view "View All Questions" control. | yes |  |
 | `ce-survey-pile-hologram-toggle` | `client/src/components/SurveyTool/SurveyTool.jsx` | Reserved top-right pile-view hologram toggle for the future voice-only avatar mode. The test ID remains stable, but the button is currently hidden in the UI. | yes |  |
@@ -213,24 +213,24 @@ Agent page UI: `client/src/components/Agent/AgentPage.jsx`
 | `ce-encrypted-additional-notice` | `client/src/components/SurveyTool/SingleQuestionResponse.jsx` | "Additional comments are encrypted" notice. | yes | `data-ce-question-id` |
 | `ce-decrypt-additional` | `client/src/components/SurveyTool/SingleQuestionResponse.jsx` | Button that decrypts encrypted additional comments. | yes | `data-ce-question-id` |
 
-## CreateSurvey (Authoring)
+## CreateQuestionsAndSurveys (Authoring)
 
 | `data-testid` | Component path(s) | Meaning / When Present | TestID API | Disambiguators |
 | --- | --- | --- | --- | --- |
-| `ce-create-panel` | `client/src/components/SurveyTool/CreateSurvey.jsx` | Root element of the CreateSurvey panel. | yes |  |
-| `ce-create-mode-switch` | `client/src/components/SurveyTool/CreateSurvey.jsx` | Switch between Manual and "from URL / Content" modes (when available). | yes |  |
-| `ce-create-clear` | `client/src/components/SurveyTool/CreateSurvey.jsx` | Clear form button (when visible). | yes |  |
-| `ce-create-title` | `client/src/components/SurveyTool/CreateSurvey.jsx` | Title input for Survey mode. | yes |  |
-| `ce-create-question` | `client/src/components/SurveyTool/CreateSurvey.jsx` | Per-question container in the authoring form. | yes | `data-ce-question-index` |
-| `ce-create-question-prompt` | `client/src/components/SurveyTool/CreateSurvey.jsx` | Question prompt textarea within a question container. | yes |  |
-| `ce-create-question-tag-input` | `client/src/components/SurveyTool/CreateSurvey.jsx` | Tag input within a question container. | yes |  |
-| `ce-create-question-add-tag` | `client/src/components/SurveyTool/CreateSurvey.jsx` | "Add Tag" control (checkmark) within a question container (only visible when input is non-empty). | yes |  |
-| `ce-create-question-add-option` | `client/src/components/SurveyTool/CreateSurvey.jsx` | "Add Option" control for multichoice questions. | yes |  |
-| `ce-create-question-single-select` | `client/src/components/SurveyTool/CreateSurvey.jsx` | Checkbox that enables single-select multichoice mode. | yes |  |
-| `ce-create-submit` | `client/src/components/SurveyTool/CreateSurvey.jsx` | Primary submit button for Create Questions / Create Survey. | yes |  |
-| `ce-create-success` | `client/src/components/SurveyTool/CreateSurvey.jsx` | Success confirmation wrapper shown after authoring submit completes. | yes |  |
-| `ce-create-uploaded-questions` | `client/src/components/SurveyTool/CreateSurvey.jsx` | Wrapper around the list of uploaded questions (when present). | yes |  |
-| `ce-create-uploaded-question` | `client/src/components/SurveyTool/CreateSurvey.jsx` | Per-uploaded-question list item in the success UI (when present). | yes | `data-ce-question-id` |
+| `ce-create-panel` | `client/src/components/SurveyTool/CreateQuestionsAndSurveys.jsx` | Root element of the CreateQuestionsAndSurveys panel. | yes |  |
+| `ce-create-mode-switch` | `client/src/components/SurveyTool/CreateQuestionsAndSurveys.jsx` | Switch between Manual and "from URL / Content" modes (when available). | yes |  |
+| `ce-create-clear` | `client/src/components/SurveyTool/CreateQuestionsAndSurveys.jsx` | Clear form button (when visible). | yes |  |
+| `ce-create-title` | `client/src/components/SurveyTool/CreateQuestionsAndSurveys.jsx` | Title input for Survey mode. | yes |  |
+| `ce-create-question` | `client/src/components/SurveyTool/CreateQuestionsAndSurveys.jsx` | Per-question container in the authoring form. | yes | `data-ce-question-index` |
+| `ce-create-question-prompt` | `client/src/components/SurveyTool/CreateQuestionsAndSurveys.jsx` | Question prompt textarea within a question container. | yes |  |
+| `ce-create-question-tag-input` | `client/src/components/SurveyTool/CreateQuestionsAndSurveys.jsx` | Tag input within a question container. | yes |  |
+| `ce-create-question-add-tag` | `client/src/components/SurveyTool/CreateQuestionsAndSurveys.jsx` | "Add Tag" control (checkmark) within a question container (only visible when input is non-empty). | yes |  |
+| `ce-create-question-add-option` | `client/src/components/SurveyTool/CreateQuestionsAndSurveys.jsx` | "Add Option" control for multichoice questions. | yes |  |
+| `ce-create-question-single-select` | `client/src/components/SurveyTool/CreateQuestionsAndSurveys.jsx` | Checkbox that enables single-select multichoice mode. | yes |  |
+| `ce-create-submit` | `client/src/components/SurveyTool/CreateQuestionsAndSurveys.jsx` | Primary submit button for Create Questions / Create Survey. | yes |  |
+| `ce-create-success` | `client/src/components/SurveyTool/CreateQuestionsAndSurveys.jsx` | Success confirmation wrapper shown after authoring submit completes. | yes |  |
+| `ce-create-uploaded-questions` | `client/src/components/SurveyTool/CreateQuestionsAndSurveys.jsx` | Wrapper around the list of uploaded questions (when present). | yes |  |
+| `ce-create-uploaded-question` | `client/src/components/SurveyTool/CreateQuestionsAndSurveys.jsx` | Per-uploaded-question list item in the success UI (when present). | yes | `data-ce-question-id` |
 
 ## SBT Create / View
 
