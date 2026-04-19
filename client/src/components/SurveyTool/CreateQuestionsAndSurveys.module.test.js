@@ -1,9 +1,9 @@
 import fs from 'fs';
 import path from 'path';
 
-describe('CreateSurvey.module.scss final submit CTA guards', () => {
+describe('CreateQuestionsAndSurveys.module.scss final submit CTA guards', () => {
   it('uses the shared final submit shell while keeping progress and submit states intact', () => {
-    const scss = fs.readFileSync(path.join(__dirname, 'CreateSurvey.module.scss'), 'utf8');
+    const scss = fs.readFileSync(path.join(__dirname, 'CreateQuestionsAndSurveys.module.scss'), 'utf8');
 
     expect(scss).toMatch(/@use\s+"scss\/finalSubmitCta"\s+as\s+finalSubmitCta;/);
     expect(scss).toMatch(/\.createSurveyButton,\s*#submitNewSurveyButton\s*{[\s\S]*?@include\s+finalSubmitCta\.final-submit-cta-shell\([\s\S]*?\);[\s\S]*?position:\s*relative;[\s\S]*?overflow:\s*hidden;/);
@@ -13,7 +13,7 @@ describe('CreateSurvey.module.scss final submit CTA guards', () => {
   });
 
   it('keeps the final submit content wrapper uppercase and centered', () => {
-    const scss = fs.readFileSync(path.join(__dirname, 'CreateSurvey.module.scss'), 'utf8');
+    const scss = fs.readFileSync(path.join(__dirname, 'CreateQuestionsAndSurveys.module.scss'), 'utf8');
 
     expect(scss).toMatch(/\.buttonContent\s*{[\s\S]*?@include\s+finalSubmitCta\.final-submit-cta-content\(\$gap:\s*10px\);[\s\S]*?text-transform:\s*uppercase;/);
   });
