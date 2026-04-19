@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client';
 const mockCallAI = jest.fn();
 const mockProcessAdditionalSources = jest.fn();
 const mockFetchContentFromURL = jest.fn();
+const mockAnalyzePhotoForQuestionGeneration = jest.fn();
 const mockGetAllSessionSlugs = jest.fn();
 const mockGetSessionConfigBySlug = jest.fn();
 const mockDocumentLibraryPanel = jest.fn();
@@ -19,6 +20,7 @@ jest.mock('../../../utilities/ai/aiScripts.js', () => ({
   uploadMarkdownSummaryToArweave: jest.fn(),
   processAdditionalSources: (...args) => mockProcessAdditionalSources(...args),
   fetchContentFromURL: (...args) => mockFetchContentFromURL(...args),
+  analyzePhotoForQuestionGeneration: (...args) => mockAnalyzePhotoForQuestionGeneration(...args),
 }));
 
 jest.mock('../../../utilities/web3/contractScripts.js', () => ({
@@ -116,6 +118,17 @@ describe('AudioSurveyGenerator', () => {
     });
     return file;
   };
+  const addAdditionalPhoto = (file = new File(['photo-source'], 'memo.png', { type: 'image/png' })) => {
+    const fileInput = container.querySelector('input[type="file"][accept*="image/png"]');
+    Object.defineProperty(fileInput, 'files', {
+      configurable: true,
+      value: [file],
+    });
+    act(() => {
+      fileInput.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    return file;
+  };
   const renderSubject = async (node) => {
     await act(async () => {
       root.render(node);
@@ -165,6 +178,7 @@ describe('AudioSurveyGenerator', () => {
     mockCallAI.mockReset();
     mockProcessAdditionalSources.mockReset();
     mockFetchContentFromURL.mockReset();
+    mockAnalyzePhotoForQuestionGeneration.mockReset();
     mockGetAllSessionSlugs.mockReset();
     mockGetSessionConfigBySlug.mockReset();
     mockDocumentLibraryPanel.mockReset();
@@ -283,6 +297,26 @@ describe('AudioSurveyGenerator', () => {
     expect(findGenerateQuestionsButton()).toBeUndefined();
 
     setAudioInputValue('Compact database tool content.');
+    expect(findGenerateQuestionsButton()).toBeTruthy();
+  });
+
+  it('treats queued photo uploads as valid DatabaseTool input content', async () => {
+    await renderSubject(
+      <AudioSurveyGenerator
+        provider={{}}
+        network={{}}
+        account="0x123"
+        loginComplete
+        toggleLoginModal={jest.fn()}
+      />
+    );
+
+    expect(findGenerateQuestionsButton()).toBeUndefined();
+
+    addAdditionalPhoto();
+
+    expect(container.textContent).toContain('[photo]');
+    expect(container.textContent).toContain('Queued for analysis');
     expect(findGenerateQuestionsButton()).toBeTruthy();
   });
 
@@ -491,6 +525,82 @@ describe('AudioSurveyGenerator', () => {
     expect(mockCallAI.mock.calls[0][0]).toMatch(/SourceType:\s*webpage/);
   });
 
+  it('blocks question generation when photo analysis is unsupported by the configured AI provider or model', async () => {
+    mockAnalyzePhotoForQuestionGeneration.mockRejectedValueOnce(
+      new Error('Photo analysis requires a vision-capable OpenAI, Anthropic, or OpenRouter model.')
+    );
+
+    await renderSubject(
+      <AudioSurveyGenerator
+        provider={{}}
+        network={{ id: 84532 }}
+        account="0x123"
+        loginComplete
+        toggleLoginModal={jest.fn()}
+        activeSessionSlug="edge"
+        sessionConfig={makeSessionConfig()}
+      />
+    );
+
+    addAdditionalPhoto();
+
+    const form = container.querySelector('form');
+    await act(async () => {
+      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    });
+
+    expect(mockAnalyzePhotoForQuestionGeneration).toHaveBeenCalledTimes(1);
+    expect(mockCallAI).not.toHaveBeenCalled();
+    expect(mockUploadDocLibraryFile).not.toHaveBeenCalled();
+    expect(container.textContent).toContain('Photo analysis requires a vision-capable OpenAI, Anthropic, or OpenRouter model.');
+    expect(container.textContent).toContain('Photo analysis failed for memo.png');
+  });
+
+  it('injects successful photo analysis into the question-generation prompt without calling generic file processing', async () => {
+    const photo = new File(['photo-source'], 'whiteboard.png', { type: 'image/png' });
+    mockAnalyzePhotoForQuestionGeneration.mockResolvedValueOnce({
+      text: 'This screenshot shows a policy whiteboard with three budget scenarios, two risk warnings, and a recommendation to phase in disclosure requirements over six months.',
+    });
+    mockCallAI.mockResolvedValue(JSON.stringify({
+      surveyTitle: 'Photo Survey',
+      questions: [
+        {
+          prompt: 'Should the phased disclosure plan move forward?',
+          questionType: 'binary',
+          tags: ['photo'],
+        },
+      ],
+    }));
+
+    await renderSubject(
+      <AudioSurveyGenerator
+        provider={{}}
+        network={{ id: 84532 }}
+        account="0x123"
+        loginComplete
+        toggleLoginModal={jest.fn()}
+        activeSessionSlug="edge"
+        sessionConfig={makeSessionConfig()}
+      />
+    );
+
+    addAdditionalPhoto(photo);
+
+    const form = container.querySelector('form');
+    await act(async () => {
+      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    });
+
+    expect(mockAnalyzePhotoForQuestionGeneration).toHaveBeenCalledWith(photo, expect.objectContaining({
+      sessionSlug: 'edge',
+    }));
+    expect(mockProcessAdditionalSources).not.toHaveBeenCalled();
+    expect(mockCallAI).toHaveBeenCalledTimes(1);
+    expect(mockCallAI.mock.calls[0][0]).toContain('Photo Source: whiteboard.png');
+    expect(mockCallAI.mock.calls[0][0]).toContain('phase in disclosure requirements over six months');
+    expect(container.textContent).toContain('Analysis ready');
+  });
+
   it('hides the save-to-doc-library toggle until an additional source is queued', async () => {
     await renderSubject(
       <AudioSurveyGenerator
@@ -613,6 +723,132 @@ describe('AudioSurveyGenerator', () => {
       expect.stringContaining('/session/0xSessionToken/docs?'),
     ]);
     expect(onQuestionsGenerated.mock.calls[0][1][0].startsWith('/session/0xSessionToken/docs?')).toBe(true);
+  });
+
+  it('keeps photo analysis ephemeral when doc-library saving is disabled', async () => {
+    mockAnalyzePhotoForQuestionGeneration.mockResolvedValueOnce({
+      text: 'This document photo summarizes a draft charter with enough detail to drive question generation without additional text input.',
+    });
+    mockCallAI.mockResolvedValue(JSON.stringify({
+      surveyTitle: 'Ephemeral Photo Survey',
+      questions: [
+        {
+          prompt: 'Should ephemeral photo analysis stay unsaved?',
+          questionType: 'binary',
+          tags: ['photo'],
+        },
+      ],
+    }));
+
+    await renderSubject(
+      <AudioSurveyGenerator
+        provider={{ request: jest.fn() }}
+        network={{ id: 84532 }}
+        account="0x123"
+        loginComplete
+        toggleLoginModal={jest.fn()}
+        activeSessionSlug="edge"
+        sessionConfig={makeSessionConfig()}
+      />
+    );
+
+    addAdditionalPhoto();
+
+    const form = container.querySelector('form');
+    await act(async () => {
+      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    });
+
+    expect(mockUploadDocLibraryFile).not.toHaveBeenCalled();
+    expect(mockCallAI).toHaveBeenCalledTimes(1);
+  });
+
+  it('saves queued photo sources as both the original image and a paired analysis sidecar', async () => {
+    const onQuestionsGenerated = jest.fn();
+    const photo = new File(['photo-source'], 'policy-note.png', { type: 'image/png' });
+    mockAnalyzePhotoForQuestionGeneration.mockResolvedValueOnce({
+      text: 'This screenshot shows a policy note with enough text to generate several concrete survey questions about implementation timing and risk tradeoffs.',
+    });
+    mockUploadDocLibraryFile
+      .mockResolvedValueOnce({
+        txId: 'C'.repeat(43),
+        url: `https://example.com/${'C'.repeat(43)}`,
+        storage: 'lit-arweave',
+        kind: 'file',
+        tagMap: {},
+        data: { size: null, type: 'application/json' },
+      })
+      .mockResolvedValueOnce({
+        txId: 'D'.repeat(43),
+        url: `https://example.com/${'D'.repeat(43)}`,
+        storage: 'lit-arweave',
+        kind: 'file',
+        tagMap: {},
+        data: { size: null, type: 'application/json' },
+      });
+    mockCallAI.mockResolvedValue(JSON.stringify({
+      surveyTitle: 'Saved Photo Survey',
+      questions: [
+        {
+          prompt: 'Should the policy note analysis be saved beside the image?',
+          questionType: 'binary',
+          tags: ['photo'],
+        },
+      ],
+    }));
+
+    await renderSubject(
+      <AudioSurveyGenerator
+        provider={{ request: jest.fn() }}
+        network={{ id: 84532 }}
+        account="0x123"
+        loginComplete
+        toggleLoginModal={jest.fn()}
+        activeSessionSlug="edge"
+        sessionConfig={makeSessionConfig({
+          sessionId: '0xSessionToken',
+          sessionIdHex: `0x${'6'.repeat(32)}`,
+        })}
+        onQuestionsGenerated={onQuestionsGenerated}
+      />
+    );
+
+    addAdditionalPhoto(photo);
+    toggleCheckbox(container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_SAVE_DOCS_TOGGLE}"]`));
+
+    const form = container.querySelector('form');
+    await act(async () => {
+      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    });
+
+    expect(mockUploadDocLibraryFile).toHaveBeenCalledTimes(2);
+    expect(mockUploadDocLibraryFile.mock.calls[0][0]).toEqual(expect.objectContaining({
+      file: photo,
+      encryption: expect.objectContaining({
+        contextLabel: 'doc:edge',
+      }),
+      tags: expect.arrayContaining([
+        expect.objectContaining({ name: 'CE-DocRole', value: 'photo' }),
+      ]),
+    }));
+    expect(mockUploadDocLibraryFile.mock.calls[1][0]).toEqual(expect.objectContaining({
+      file: expect.objectContaining({
+        name: 'policy-note.analysis.md',
+        type: 'text/markdown',
+      }),
+      encryption: expect.objectContaining({
+        contextLabel: 'doc:edge',
+      }),
+      tags: expect.arrayContaining([
+        expect.objectContaining({ name: 'CE-DocRole', value: 'photo-analysis' }),
+        expect.objectContaining({ name: 'CE-DocDerivedFromTx', value: 'C'.repeat(43) }),
+      ]),
+    }));
+    expect(onQuestionsGenerated).toHaveBeenCalledTimes(1);
+    expect(onQuestionsGenerated.mock.calls[0][1]).toEqual([
+      expect.stringContaining(`/session/0xSessionToken/docs?__ceDocTx=${'C'.repeat(43)}`),
+      expect.stringContaining(`/session/0xSessionToken/docs?__ceDocTx=${'D'.repeat(43)}`),
+    ]);
   });
 
   it('defaults saved-doc audience to the session name and shows both audience options when the doc gate exists', async () => {

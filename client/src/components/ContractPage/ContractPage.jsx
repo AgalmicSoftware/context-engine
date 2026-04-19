@@ -12,6 +12,7 @@ import { aiRewritePrompt } from '../../prompts/aiRewritePrompt.js';
 import { audioSummaryPrompt } from '../../prompts/audioSummaryPrompt.js';
 import buildClusterAnalysisPrompt, { CLUSTER_ANALYSIS_SYSTEM_PROMPT } from '../../prompts/clusterAnalysisPrompt.js';
 import buildCompareToolkitPrompt from '../../prompts/compareToolkitPrompt.js';
+import buildPhotoAnalysisPrompt from '../../prompts/photoAnalysisPrompt.js';
 import { questionSelectionPrompt } from '../../prompts/questionSelectionPrompt.js';
 import buildUserAnalysisPrompt from '../../prompts/userAnalysisPrompt.js';
 // CSS
@@ -122,17 +123,19 @@ export const ContractPage = ({ activeSessionSlug, reduxActiveSessionSlug }) => {
     responses: '<Responses>',
     createdCounts: '<CreatedCounts>',
   });
+  const photoAnalysisPromptDisplay = buildPhotoAnalysisPrompt('<SourceFilename>');
 
   const promptItems = useMemo(() => ([
     { id: 'seedGen', title: 'Question Generation', file: 'seedGenPrompt.js', content: seedGenPrompt },
     { id: 'questionSelection', title: 'Question Selection', file: 'questionSelectionPrompt.js', content: questionSelectionPrompt },
     { id: 'audioSummary', title: 'Audio Summary', file: 'audioSummaryPrompt.js', content: audioSummaryPrompt },
+    { id: 'photoAnalysis', title: 'Photo Analysis', file: 'photoAnalysisPrompt.js', content: photoAnalysisPromptDisplay },
     { id: 'compareToolkit', title: 'Compare Toolkit', file: 'compareToolkitPrompt.js', content: compareToolkitPromptDisplay },
     { id: 'clusterAnalysisSystem', title: 'Cluster Analysis (System)', file: 'clusterAnalysisPrompt.js', content: CLUSTER_ANALYSIS_SYSTEM_PROMPT },
     { id: 'clusterAnalysis', title: 'Cluster Analysis (User)', file: 'clusterAnalysisPrompt.js', content: clusterAnalysisPromptDisplay },
     { id: 'userAnalysis', title: 'User Analysis', file: 'userAnalysisPrompt.js', content: userAnalysisPromptDisplay },
     { id: 'aiRewrite', title: 'AI Rewrite', file: 'aiRewritePrompt.js', content: aiRewritePrompt },
-  ]), [clusterAnalysisPromptDisplay, compareToolkitPromptDisplay, userAnalysisPromptDisplay]);
+  ]), [clusterAnalysisPromptDisplay, compareToolkitPromptDisplay, photoAnalysisPromptDisplay, userAnalysisPromptDisplay]);
 
   const sessionContracts = activeSession?.contracts;
   const sessionNetworkChainId = activeSession?.networkChainId;
