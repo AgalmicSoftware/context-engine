@@ -222,28 +222,44 @@ describe('AboutPage', () => {
       'ce-about-recognition-ethereum',
       /cryptographic foundation for proof-of-human and attestation-based access/i,
       /users do not need any crypto expertise to use it/i,
+      null,
     ],
     [
       'ce-about-recognition-radicalxchange',
       /builds on radicalxchange ideas around social identity, plural governance, and groups owning the data and value they create/i,
       /retain ownership over the preference data and value they create/i,
+      null,
     ],
     [
       'ce-about-recognition-pol-is',
       /large-group discourse software can clarify both consensus and persistent difference/i,
       /vtaiwan where simple agree \/ unsure \/ disagree inputs helped structure public reasoning/i,
+      null,
     ],
     [
       'ce-about-recognition-collective-intelligence-project',
       /context engine is social infrastructure for the ai transition/i,
       /alongside cip’s work on scalable collective decision-making for transformative technology/i,
+      null,
     ],
     [
       'ce-about-recognition-edge-city',
       /edge patagonia, sponsored by protocol labs/i,
       /prototype tools for resilient technology, coordination, and governance in live community settings/i,
+      null,
     ],
-  ])('shows product-facing recognition modal copy in the %s recognition modal', async (testId, firstCopy, secondCopy) => {
+    [
+      'ce-about-recognition-loophole',
+      /loophole is a useful way to stress-test rules and reason about policy proposals/i,
+      /context engine uses it to enrich the debate atlas with concrete loophole, overreach, and patch-comparison cases people can inspect and debate/i,
+      'https://github.com/brendanhogan/loophole',
+    ],
+  ])('shows product-facing recognition modal copy in the %s recognition modal', async (
+    testId,
+    firstCopy,
+    secondCopy,
+    expectedLinkHref
+  ) => {
     renderAboutPage();
 
     fireEvent.click(screen.getByTestId(testId));
@@ -255,6 +271,9 @@ describe('AboutPage', () => {
     expect(
       within(dialog).getByRole('button', { name: /close recognition details/i })
     ).toBeVisible();
+    if (expectedLinkHref) {
+      expect(within(dialog).getByRole('link', { name: /github repo/i })).toHaveAttribute('href', expectedLinkHref);
+    }
 
     fireEvent.click(within(dialog).getByRole('button', { name: /close recognition details/i }));
 
