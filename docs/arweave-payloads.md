@@ -3,7 +3,7 @@
 This doc captures example JSON payloads that are uploaded to Arweave and the
 matching object shapes that `contractScripts` expects when calling into the
 contracts. These examples reflect the current JSON generation logic in:
-- `client/src/components/SurveyTool/CreateQuestionsAndSurveys.tsx`
+- `client/src/components/SurveyTool/CreateQuestionsAndSurveys.jsx`
 - `client/src/components/SurveyTool/SurveyTool.jsx`
 - `client/src/components/SBTs/CreateSBTGroup.tsx`
 

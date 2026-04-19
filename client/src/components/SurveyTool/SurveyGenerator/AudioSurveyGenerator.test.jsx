@@ -57,7 +57,7 @@ jest.mock('../../Shared/AudioInput/AudioInput', () => (props) => (
   />
 ));
 
-jest.mock('../CreateQuestionsAndSurveys', () => () => (
+jest.mock('../CreateQuestionsAndSurveys.jsx', () => () => (
   <div data-testid="create-questions-and-surveys" />
 ));
 

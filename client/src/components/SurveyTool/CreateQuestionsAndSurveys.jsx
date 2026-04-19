@@ -1,4 +1,4 @@
-/** @file CreateQuestionsAndSurveys.tsx */
+/** @file CreateQuestionsAndSurveys.jsx */
 
 import React, { Component } from 'react';
 import {
@@ -303,10 +303,8 @@ const formatAiPromptModelLabel = (config: any = {}) => {
   return model || provider || 'Configured model';
 };
 
-class CreateQuestionsAndSurveys extends Component<any, any> {
-  [key: string]: any;
-
-  constructor(props: any) {
+class CreateQuestionsAndSurveys extends Component {
+  constructor(props) {
     super(props);
     this.state = {
       title: '',
@@ -1254,7 +1252,7 @@ class CreateQuestionsAndSurveys extends Component<any, any> {
       bookmarksCache.questions = Array.from(new Set([...(bookmarksCache.questions || []), idL]));
     }
 
-    void writeCache('bookmarksCache', slug, bookmarksCache).catch((e: any) => { surveyLog.warn('CreateQuestionsAndSurveys: fallback', e); });
+    void writeCache('bookmarksCache', slug, bookmarksCache).catch((e) => { surveyLog.warn('CreateQuestionsAndSurveys: fallback', e); });
     this.setState({ bookmarkedQuestionsSet: set });
   };
 
@@ -1292,7 +1290,7 @@ class CreateQuestionsAndSurveys extends Component<any, any> {
       bookmarksCache.surveys = Array.from(new Set([...(bookmarksCache.surveys || []), idL]));
     }
 
-    void writeCache('bookmarksCache', slug, bookmarksCache).catch((e: any) => { surveyLog.warn('CreateQuestionsAndSurveys: fallback', e); });
+    void writeCache('bookmarksCache', slug, bookmarksCache).catch((e) => { surveyLog.warn('CreateQuestionsAndSurveys: fallback', e); });
     this.setState({ bookmarkedSurveysSet: set });
   };
 
@@ -1687,7 +1685,7 @@ class CreateQuestionsAndSurveys extends Component<any, any> {
       // Best-effort write-through: failures here must not fail successful on-chain submits.
       try {
         await writeCacheOptimistic('questionsCache', primarySlug, next);
-      } catch (error: any) {
+      } catch (error) {
         surveyLog.warn('[CreateQuestionsAndSurveys] Failed to seed questions cache write-through', {
           slug: primarySlug,
           error: getErrorMessage(error, String(error)),
@@ -1696,9 +1694,9 @@ class CreateQuestionsAndSurveys extends Component<any, any> {
       }
 
       return true;
-    } catch (error: any) {
+    } catch (error) {
       surveyLog.warn('[CreateQuestionsAndSurveys] Failed to seed uploaded questions cache', {
-        error: getErrorMessage(error, String(error)),
+        error: error?.message || String(error),
       });
       return false;
     }
@@ -1755,7 +1753,7 @@ class CreateQuestionsAndSurveys extends Component<any, any> {
 
       try {
         await writeCacheOptimistic('surveysCache', primarySlug, next);
-      } catch (error: any) {
+      } catch (error) {
         surveyLog.warn('[CreateQuestionsAndSurveys] Failed to seed surveys cache write-through', {
           slug: primarySlug,
           error: getErrorMessage(error, String(error)),
@@ -1764,9 +1762,9 @@ class CreateQuestionsAndSurveys extends Component<any, any> {
       }
 
       return true;
-    } catch (error: any) {
+    } catch (error) {
       surveyLog.warn('[CreateQuestionsAndSurveys] Failed to seed submitted survey cache', {
-        error: getErrorMessage(error, String(error)),
+        error: error?.message || String(error),
       });
       return false;
     }
@@ -2662,7 +2660,7 @@ class CreateQuestionsAndSurveys extends Component<any, any> {
           });
         }
       }
-    } catch (error: any) {
+    } catch (error) {
       surveyLog.error("[CreateQuestionsAndSurveys] Failed to create survey/questions:", error);
       const shouldResetSubmitProgress = !!error?.resetSubmitProgress;
       this.setState({
@@ -3082,7 +3080,7 @@ class CreateQuestionsAndSurveys extends Component<any, any> {
     const resolvedSessionConfig = this.getResolvedSessionConfig();
     const { gateOptions, defaultGateId } = this.resolveGateOptions(resolvedSessionConfig, { isStandaloneQuestion });
     const hasSelectableGateOptions = Array.isArray(gateOptions) && gateOptions.length > 0;
-    const gateIdSet: any = new Set((Array.isArray(gateOptions) ? gateOptions : []).map((opt: any) => opt.id));
+    const gateIdSet = new Set((Array.isArray(gateOptions) ? gateOptions : []).map((opt) => opt.id));
     const resolvedContracts = mergeSessionContractMaps(
       resolvedSessionConfig?.contracts,
       this.props.contracts,
@@ -3144,7 +3142,7 @@ class CreateQuestionsAndSurveys extends Component<any, any> {
                 <GateMultiSelectLock
                   gateOptions={gateOptions}
                   selectedGateIds={surveySelectedGateIds}
-                  onChangeSelectedGateIds={(nextIds: any) => {
+                  onChangeSelectedGateIds={(nextIds) => {
                     const normalized = normalizeSelectedGateIds(nextIds);
                     this.setState({ surveyLockGateIds: normalized }, this.saveToLocalStorage);
                     if (!normalized.length) {
@@ -3152,14 +3150,15 @@ class CreateQuestionsAndSurveys extends Component<any, any> {
                     }
                   }}
                   open={openLockKey === 'survey'}
-                  onToggleOpen={(nextOpen: any) => {
+                  onToggleOpen={(nextOpen) => {
                     if (nextOpen && surveySelectedGateIds.length === 0 && defaultGateId) {
                       this.setState({ surveyLockGateIds: [defaultGateId] }, this.saveToLocalStorage);
                     }
                     this.setState({ openLockKey: nextOpen ? 'survey' : '' });
                   }}
                   disabled={!hasSelectableGateOptions}
-                  showDots={false}
+                  badgeText={formatGateBadge(surveySelectedGateIds)}
+                  showDots={true}
                 />
                 <FontAwesomeIcon icon={faQuestionCircle} className={styles.tooltip} id="cs-survey-gate-tip" />
                 <CETooltip
@@ -3353,7 +3352,8 @@ class CreateQuestionsAndSurveys extends Component<any, any> {
                             this.setState({ openLockKey: nextOpen ? lockKey : '' });
                           }}
                           disabled={!hasSelectableGateOptions}
-                          showDots={false}
+                          badgeText={formatGateBadge(selectedGateIds)}
+                          showDots={true}
                         />
                       </>
                     ) : null;

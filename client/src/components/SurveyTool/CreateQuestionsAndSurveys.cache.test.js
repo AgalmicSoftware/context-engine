@@ -3,7 +3,7 @@ import CreateQuestionsAndSurveys, {
   readManagedCacheSnapshot,
   sanitizeDocumentUrls,
   selectManagedNetBucketSnapshot,
-} from './CreateQuestionsAndSurveys';
+} from './CreateQuestionsAndSurveys.jsx';
 import { renderToStaticMarkup } from 'react-dom/server';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import { arweaveScripts } from '../../utilities/arweave/arweaveScripts';
@@ -30,7 +30,7 @@ const peekCacheSyncMock = cacheScripts.peekCacheSync as jest.Mock;
 const subscribeCacheUpdatesMock = cacheScripts.subscribeCacheUpdates as jest.Mock;
 const writeCacheOptimisticMock = cacheScripts.writeCacheOptimistic as jest.Mock;
 
-const makeInstance = (props: CreateQuestionsAndSurveysProps = {}): any => {
+const makeInstance = (props = {}) => {
   const instance = new CreateQuestionsAndSurveys({
     network: { id: 84532 },
     activeSessionSlug: 'edge',
@@ -76,7 +76,7 @@ const nodeHasClassName = (node, className) => {
   return String(raw).split(/\s+/).includes(className);
 };
 
-describe('CreateSurvey managed cache reads', () => {
+describe('CreateQuestionsAndSurveys managed cache reads', () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
