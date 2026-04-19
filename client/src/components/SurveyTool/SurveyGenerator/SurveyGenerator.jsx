@@ -1,5 +1,5 @@
 
-import React, { Suspense, useState, useEffect, useRef, useMemo, useId } from 'react';
+import React, { Suspense, useState, useEffect, useRef, useMemo } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faSpinner,
@@ -250,7 +250,6 @@ export default function AudioSurveyGenerator({
   const [localSessionOverrideTouched, setLocalSessionOverrideTouched] = useState(false);
   const demoSurfaceEnabled = demoSurfaceMode !== false;
   const [showDemoCorpusView, setShowDemoCorpusView] = useState(demoSurfaceEnabled);
-  const questionCountLabelId = useId();
 
   // Multi-source State
   const [additionalSources, setAdditionalSources] = useState([]);
@@ -1677,17 +1676,15 @@ export default function AudioSurveyGenerator({
         </div>
 
         <div className={styles.formSection}>
-          <h3 className={styles.sectionTitle} id={questionCountLabelId}>Number of Questions</h3>
-          <div className={styles.countControlRow} role="group" aria-labelledby={questionCountLabelId}>
+          <div className={styles.countControlRow} role="group" aria-label="Number of questions">
+            <span className={styles.countInlineLabel} aria-hidden="true"># Questions</span>
             <div
               className={styles.countReadout}
-              aria-label="Question count"
+              aria-label={`Number of questions: ${count}`}
               data-testid={E2E_TESTIDS.DATABASE_QUESTION_COUNT_VALUE}
               aria-live="polite"
               aria-atomic="true"
             >
-              #:
-              {' '}
               <span>{count}</span>
             </div>
             <Button
