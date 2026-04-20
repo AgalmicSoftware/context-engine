@@ -12,12 +12,30 @@ import { getCorsProxyUrlOrThrow } from '../worker/corsProxy.js';
 import { buildSiweMessage } from '../worker/workerAuth.js';
 import { normalizeSessionSlug } from './sessionConfigResolvers.js';
 
+type AnyRecord = Record<string, any>;
+type BuildArweaveUploadBootstrapAuthOptions = {
+  signer?: AnyRecord | null;
+  providerLike?: unknown;
+  sessionSlug?: unknown;
+  sessionConfig?: AnyRecord | null;
+};
+type BuildArweaveUploadBootstrapAuthResult = {
+  address: string;
+  message: string;
+  signature: string;
+  sessionSlug: string;
+};
+type RetryOptions = {
+  attempts?: number;
+  baseDelayMs?: number;
+};
+
 export const buildArweaveUploadBootstrapAuth = async ({
   signer = null,
   providerLike = null,
   sessionSlug = '',
   sessionConfig = null,
-} = {}) => {
+}: BuildArweaveUploadBootstrapAuthOptions = {}): Promise<BuildArweaveUploadBootstrapAuthResult | null> => {
   if (!signer || typeof signer.signMessage !== 'function') return null;
   const slug = normalizeSessionSlug(sessionSlug || sessionConfig?.slug || '');
   let signerAddress = '';
@@ -72,8 +90,9 @@ export const buildArweaveUploadBootstrapAuth = async ({
   };
 };
 
-export const isRetryableArweaveUploadError = (error) => {
-  const msg = String(error?.message || error || '').toLowerCase();
+export const isRetryableArweaveUploadError = (error: unknown): boolean => {
+  const source = (error && typeof error === 'object') ? error as AnyRecord : {};
+  const msg = String(source.message || error || '').toLowerCase();
   if (!msg) return false;
 
   // Worker errors can bubble up as e.g. "Arweave post failed (504)" where the
@@ -96,15 +115,15 @@ export const isRetryableArweaveUploadError = (error) => {
 };
 
 export const uploadDataToArweaveWithRetry = async (
-  data,
-  format,
-  opts,
-  { attempts = 3, baseDelayMs = 350 } = {}
-) => {
-  let lastErr = null;
+  data: unknown,
+  format: unknown,
+  opts: unknown,
+  { attempts = 3, baseDelayMs = 350 }: RetryOptions = {}
+): Promise<unknown> => {
+  let lastErr: unknown = null;
   for (let i = 0; i < attempts; i += 1) {
     try {
-      return await arweaveScripts.uploadDataToArweave(data, format, opts);
+      return await arweaveScripts.uploadDataToArweave(data, format, opts as AnyRecord | undefined);
     } catch (err) {
       lastErr = err;
       if (i >= attempts - 1 || !isRetryableArweaveUploadError(err)) {
