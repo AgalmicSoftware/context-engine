@@ -25,7 +25,9 @@ const CheckboxMultiSelect = ({
   const searchRef = useRef(null);
   const listRef = useRef(null);
 
-  const normalizedValue = Array.isArray(value) ? value : [];
+  const normalizedValue = useMemo(() => (
+    Array.isArray(value) ? value : []
+  ), [value]);
   const selectedKeys = useMemo(() => {
     const keys = new Set();
     normalizedValue.forEach((option) => {
@@ -35,7 +37,9 @@ const CheckboxMultiSelect = ({
     return keys;
   }, [normalizedValue]);
 
-  const normalizedOptions = Array.isArray(options) ? options : [];
+  const normalizedOptions = useMemo(() => (
+    Array.isArray(options) ? options : []
+  ), [options]);
 
   const filteredOptions = useMemo(() => {
     const trimmed = String(query || '').trim().toLowerCase();
