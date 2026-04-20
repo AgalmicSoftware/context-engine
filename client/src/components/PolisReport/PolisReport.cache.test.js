@@ -3,7 +3,6 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import PolisReport, {
   applyFilterStateToAggregator,
   buildClusterAnalysisDataKey,
-  buildPolisReportPdfFilename,
   buildPrecomputedDemoClusterState,
   buildRatingMatrixFromRealData,
   buildRatingMatrixFromDemo,
@@ -66,7 +65,7 @@ jest.mock('../../utilities/survey/polisReportMath.js', () => ({
   findRepresentativeQuestions: jest.fn(() => ({})),
 }));
 
-jest.mock('utilities/ui/displayHelpers.js', () => ({
+jest.mock('utilities/proposalScripts.js', () => ({
   __esModule: true,
   getShortenedAddress: jest.fn((value) => String(value || '')),
 }));

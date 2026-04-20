@@ -462,15 +462,6 @@ export function buildClusterAnalysisDataKey({
   questionResponsesNonce = 0,
   questionPrompts = {},
   allQuestions = [],
-}: {
-  activeClusterAssignments?: number[];
-  activeClusterCount?: number;
-  activeRepQuestions?: PolisRepQuestionsMap;
-  embeddingChoice?: string;
-  useDemoData?: boolean;
-  questionResponsesNonce?: number;
-  questionPrompts?: StringMap;
-  allQuestions?: string[];
 } = {}) {
   const assignmentHash = (Array.isArray(activeClusterAssignments) ? activeClusterAssignments : []).reduce((acc, val) => {
     return (acc * 31 + (val + 1)) % 1000000007;
@@ -1704,7 +1695,7 @@ export default function PolisReport({
     activeClusterCount,
     activeRepQuestions,
     embeddingChoice,
-    useDemoData: effectiveUseDemoData,
+    useDemoData,
     questionResponsesNonce,
     questionPrompts,
     allQuestions,
@@ -1713,7 +1704,7 @@ export default function PolisReport({
     activeClusterCount,
     activeRepQuestions,
     embeddingChoice,
-    effectiveUseDemoData,
+    useDemoData,
     questionResponsesNonce,
     questionPrompts,
     allQuestions,
