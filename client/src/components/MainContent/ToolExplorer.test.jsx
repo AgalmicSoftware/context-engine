@@ -211,10 +211,10 @@ describe('ToolExplorer session propagation', () => {
     expect(await screen.findByRole('link', { name: /^Full Screen$/i })).toHaveAttribute('href', '/ce/atlas');
   });
 
-  it('shows Add/View controls for Data, defaults to Add, and resets after leaving', async () => {
+  it('shows Add/View controls for Context, defaults to Add, and resets after leaving', async () => {
     renderToolExplorer({ activeSessionSlug: 'edge' });
 
-    fireEvent.click(screen.getByText('Data'));
+    fireEvent.click(screen.getByText('Context'));
 
     expect(await screen.findByTestId('mock-audio-survey-generator')).toHaveAttribute('data-explorer-mode', 'add');
     expect(screen.getByTestId(E2E_TESTIDS.TOOL_EXPLORER_DATA_ADD)).toBeInTheDocument();
@@ -236,7 +236,7 @@ describe('ToolExplorer session propagation', () => {
     expect(await screen.findByTestId('mock-audio-survey-generator')).toHaveAttribute('data-explorer-mode', 'add');
 
     fireEvent.click(screen.getByRole('button', { name: /^← Back$/i }));
-    fireEvent.click(screen.getByText('Data'));
+    fireEvent.click(screen.getByText('Context'));
 
     expect(await screen.findByTestId('mock-audio-survey-generator')).toHaveAttribute('data-explorer-mode', 'add');
     expect(mockAudioSurveyGenerator).toHaveBeenLastCalledWith(expect.objectContaining({
@@ -244,10 +244,10 @@ describe('ToolExplorer session propagation', () => {
     }));
   });
 
-  it('passes demoSurfaceMode through to the expanded Data tool', async () => {
+  it('passes demoSurfaceMode through to the expanded Context tool', async () => {
     renderToolExplorer({ activeSessionSlug: 'edge', demoSurfaceMode: false });
 
-    fireEvent.click(screen.getByText('Data'));
+    fireEvent.click(screen.getByText('Context'));
 
     expect(await screen.findByTestId('mock-audio-survey-generator')).toHaveAttribute('data-demo-surface-mode', 'false');
     expect(mockAudioSurveyGenerator).toHaveBeenLastCalledWith(expect.objectContaining({
