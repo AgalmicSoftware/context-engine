@@ -71,12 +71,8 @@
 
 .controlSpinner {
   flex: 0 0 auto;
-  width: 12px;
-  height: 12px;
-  border: 1.5px solid currentColor;
-  border-right-color: transparent;
-  border-radius: 9999px;
-  animation: ce-async-select-spin 0.7s linear infinite;
+  font-size: 0.92rem;
+  color: var(--ce-async-select-text-color);
 }
 
 .caret {
@@ -132,8 +128,7 @@
   overflow-y: auto;
 }
 
-.empty,
-.loading {
+.empty {
   padding: 10px;
   color: var(--ce-async-select-placeholder-color);
   text-align: center;
@@ -160,14 +155,4 @@
 
 .optionSelected {
   background: var(--ce-async-select-option-selected);
-}
-
-@keyframes ce-async-select-spin {
-  from {
-    transform: rotate(0deg);
-  }
-
-  to {
-    transform: rotate(360deg);
-  }
 }
