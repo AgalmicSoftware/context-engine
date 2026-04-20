@@ -223,8 +223,20 @@ describe('AudioSurveyGenerator', () => {
     mockGetAllSessionSlugs.mockReturnValue(['edge', 'rxc']);
     mockGetSessionConfigBySlug.mockImplementation((slug) => {
       const normalized = String(slug || '');
-      if (normalized === 'edge') return { slug: 'edge', sessionName: 'Edge Session' };
-      if (normalized === 'rxc') return { slug: 'rxc', sessionName: 'Debate Session' };
+      if (normalized === 'edge') {
+        return makeSessionConfig({
+          slug: 'edge',
+          sessionName: 'Edge Session',
+          sessionIdHex: `0x${'2'.repeat(32)}`,
+        });
+      }
+      if (normalized === 'rxc') {
+        return makeSessionConfig({
+          slug: 'rxc',
+          sessionName: 'Debate Session',
+          sessionIdHex: `0x${'3'.repeat(32)}`,
+        });
+      }
       return {};
     });
     mockUploadDocLibraryUrlRecord.mockResolvedValue({
@@ -1456,7 +1468,7 @@ describe('AudioSurveyGenerator', () => {
     expect(container.querySelector('[data-testid="mock-document-library-panel"]')).toBeNull();
   });
 
-  it('keeps the AudioSurveyGenerator session selector behind a gear toggle and can locally override/reset', () => {
+  it('keeps the standalone AudioSurveyGenerator session selector behind a gear toggle and can locally override/reset', () => {
     act(() => {
       root.render(
         <AudioSurveyGenerator
@@ -1496,5 +1508,36 @@ describe('AudioSurveyGenerator', () => {
 
     expect(container.querySelector('[data-testid="ce-database-session-chip-edge"]')).toHaveAttribute('data-session-selected', 'true');
     expect(container.textContent).toContain('Using the global primary session by default.');
+  });
+
+  it('suppresses the internal selector when a parent controls the session override and uses that session in view mode', async () => {
+    await renderSubject(
+      <AudioSurveyGenerator
+        provider={{}}
+        network={{ id: 84532 }}
+        account="0x123"
+        loginComplete
+        toggleLoginModal={jest.fn()}
+        activeSessionSlug="edge"
+        sessionConfig={makeSessionConfig({
+          slug: 'edge',
+          sessionName: 'Edge Session',
+          sessionIdHex: `0x${'2'.repeat(32)}`,
+        })}
+        explorerMode="view"
+        demoSurfaceMode={false}
+        sessionOverrideSlug="rxc"
+        sessionOverrideTouched={true}
+        hideInternalSessionSelector
+      />
+    );
+
+    expect(container.querySelector('[data-testid="ce-database-session-selector"]')).toBeNull();
+    expect(container.querySelector('[data-testid="mock-document-library-panel"]')).toBeTruthy();
+    expect(mockDocumentLibraryPanel).toHaveBeenLastCalledWith(expect.objectContaining({
+      sessionSlug: 'rxc',
+      mode: 'session',
+      sessionIdHex: `0x${'3'.repeat(32)}`,
+    }));
   });
 });
