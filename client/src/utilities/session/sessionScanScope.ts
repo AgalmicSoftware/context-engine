@@ -20,8 +20,57 @@ import {
 } from './globalSessionState.js';
 import { getDemoSessionMap } from './sessionDemoCompat.js';
 
+type DemoSessionMap = Record<string, Record<string, any>>;
+type SessionScanScope = 'active' | 'all' | 'general' | 'list';
+type SessionScanSlugOptions = {
+  allowEmpty?: boolean;
+};
+type SessionScanScopeOptions = {
+  scope?: unknown;
+  list?: unknown;
+  activeSlug?: unknown;
+  activeSlugFromRoute?: boolean;
+};
+type SessionBlockLimits = {
+  start?: unknown;
+  end?: unknown;
+};
+type ResolvedSessionWindow = {
+  fromBlock?: unknown;
+  toBlock?: unknown;
+};
+type ValidateSessionScanWindowOptions = {
+  slug?: unknown;
+  blockLimits?: SessionBlockLimits | null;
+  resolvedWindow?: ResolvedSessionWindow | null;
+  maxBlockRange?: unknown;
+};
+type ValidatedSessionScanWindowFailure = {
+  ok: false;
+  code: 'invalid_block_limits' | 'invalid_block_window';
+  message: string;
+};
+type ValidatedSessionScanWindowSuccess = {
+  ok: true;
+  slug: string;
+  fromBlock: number;
+  toBlock: number;
+  requestedToBlock: number;
+  rangeBlocks: number;
+  requestedRangeBlocks: number;
+  wasCapped: boolean;
+  maxBlockRange: number;
+};
+type ValidatedSessionScanWindowResult =
+  | ValidatedSessionScanWindowFailure
+  | ValidatedSessionScanWindowSuccess;
+type GlobalSessionSelection = Record<string, any> & {
+  selectedSessionScope?: unknown;
+  selectedSessionSlugs?: unknown;
+};
+
 const log = createLogger('sessionScanScope');
-const DEMO_SESSION_MAP = getDemoSessionMap();
+const DEMO_SESSION_MAP = getDemoSessionMap() as DemoSessionMap;
 
 
 const URL_PARAM_KEY = 'ceSessionScanScope';
@@ -32,18 +81,20 @@ const GLOBAL_KEY = 'CE_SESSION_SCAN_SCOPE';
 const GLOBAL_SLUGS_KEY = 'CE_SESSION_SCAN_SLUGS';
 const GLOBAL_DEMO_ALIAS_KEY = 'CE_SESSION_SCAN_RESOLVE_DEMO_SESSION_ALIASES';
 export const DEFAULT_SESSION_SCAN_MAX_BLOCK_RANGE = 10000;
-const VALID_SESSION_SCAN_SCOPES = new Set(['all', 'active', 'general', 'list']);
-const FAIL_CLOSED_SESSION_SCAN_SCOPE = 'active';
-const normalizeSessionScanSlugToken = (raw) => canonicalizeSessionSlug(raw);
+const VALID_SESSION_SCAN_SCOPES = new Set<SessionScanScope>(['all', 'active', 'general', 'list']);
+const FAIL_CLOSED_SESSION_SCAN_SCOPE: SessionScanScope = 'active';
+const normalizeSessionScanSlugToken = (raw: unknown): string => canonicalizeSessionSlug(raw);
 
-const normalizeMaxBlockRange = (value) => {
+const normalizeMaxBlockRange = (value: unknown): number | null => {
   if (value == null || value === '') return null;
   const n = Number(value);
   if (!Number.isFinite(n) || n <= 0) return null;
   return Math.max(1, Math.floor(n));
 };
 
-export const readSessionScanMaxBlockRange = (fallback = DEFAULT_SESSION_SCAN_MAX_BLOCK_RANGE) => {
+export const readSessionScanMaxBlockRange = (
+  fallback: unknown = DEFAULT_SESSION_SCAN_MAX_BLOCK_RANGE
+): number => {
   const fallbackValue = normalizeMaxBlockRange(fallback) || DEFAULT_SESSION_SCAN_MAX_BLOCK_RANGE;
   try {
     if (typeof process !== 'undefined' && process?.env) {
@@ -54,17 +105,20 @@ export const readSessionScanMaxBlockRange = (fallback = DEFAULT_SESSION_SCAN_MAX
   return fallbackValue;
 };
 
-const readResolveDemoAliasToggle = () => {
+const readResolveDemoAliasToggle = (): boolean => {
   try {
-    if (typeof globalThis !== 'undefined' && typeof globalThis[GLOBAL_DEMO_ALIAS_KEY] !== 'undefined') {
-      return globalThis[GLOBAL_DEMO_ALIAS_KEY] === true;
+    if (typeof globalThis !== 'undefined') {
+      const runtimeGlobals = globalThis as Record<string, unknown>;
+      if (typeof runtimeGlobals[GLOBAL_DEMO_ALIAS_KEY] !== 'undefined') {
+        return runtimeGlobals[GLOBAL_DEMO_ALIAS_KEY] === true;
+      }
     }
   } catch (e) { void e; /* fallback: demo alias toggle lookup. */ }
   return CE_SESSION_SCAN_RESOLVE_DEMO_SESSION_ALIASES === true;
 };
 
-const extractSlugFromWorkerHost = (raw = '') => {
-  const readHostSlug = (hostRaw = '') => {
+const extractSlugFromWorkerHost = (raw: unknown = ''): string => {
+  const readHostSlug = (hostRaw: unknown = ''): string => {
     const host = toStr(hostRaw).trim().toLowerCase();
     if (!host || !host.endsWith('.workers.dev')) return '';
     const subdomain = host.split('.')[0] || '';
@@ -86,9 +140,9 @@ const extractSlugFromWorkerHost = (raw = '') => {
   return readHostSlug(hostCandidate);
 };
 
-export const normalizeSessionScanScope = (raw) => {
+export const normalizeSessionScanScope = (raw: unknown): SessionScanScope => {
   const val = toStr(raw).trim().toLowerCase();
-  if (VALID_SESSION_SCAN_SCOPES.has(val)) return val;
+  if (VALID_SESSION_SCAN_SCOPES.has(val as SessionScanScope)) return val as SessionScanScope;
   log.warn('[sessionScanScope] Invalid ceSessionScanScope value; using fail-closed fallback', {
     raw,
     fallback: FAIL_CLOSED_SESSION_SCAN_SCOPE,
@@ -97,7 +151,10 @@ export const normalizeSessionScanScope = (raw) => {
   return FAIL_CLOSED_SESSION_SCAN_SCOPE;
 };
 
-export const normalizeSessionScanSlug = (raw, { allowEmpty = true } = {}) => {
+export const normalizeSessionScanSlug = (
+  raw: unknown,
+  { allowEmpty = true }: SessionScanSlugOptions = {}
+): string | null => {
   if (raw == null) return allowEmpty ? '' : null;
   const value = toStr(raw);
   const trimmed = value.trim();
@@ -109,7 +166,7 @@ export const normalizeSessionScanSlug = (raw, { allowEmpty = true } = {}) => {
   return normalizeSessionScanSlugToken(workerSlug || trimmed);
 };
 
-const normalizeFiniteBlockNumber = (value) => {
+const normalizeFiniteBlockNumber = (value: unknown): number | null => {
   if (value == null) return null;
   if (typeof value === 'string' && value.trim() === '') return null;
   const n = Number(value);
@@ -117,7 +174,7 @@ const normalizeFiniteBlockNumber = (value) => {
   return Math.max(0, Math.floor(n));
 };
 
-const buildSessionLabel = (slugIn) => {
+const buildSessionLabel = (slugIn: unknown): string => {
   const normalized = normalizeSessionScanSlug(slugIn, { allowEmpty: true });
   if (normalized == null || normalized === '') return 'general';
   return normalized;
@@ -128,7 +185,7 @@ export const resolveValidatedSessionScanWindow = ({
   blockLimits = null,
   resolvedWindow = null,
   maxBlockRange = readSessionScanMaxBlockRange(DEFAULT_SESSION_SCAN_MAX_BLOCK_RANGE),
-} = {}) => {
+}: ValidateSessionScanWindowOptions = {}): ValidatedSessionScanWindowResult => {
   const slugLabel = buildSessionLabel(slug);
   const resolvedFromRaw = normalizeFiniteBlockNumber(resolvedWindow?.fromBlock);
   const resolvedToRaw = normalizeFiniteBlockNumber(resolvedWindow?.toBlock);
@@ -201,28 +258,31 @@ export const resolveValidatedSessionScanWindow = ({
   };
 };
 
-const normalizeSessionScanListSlug = (raw, { allowEmpty = true } = {}) => {
+const normalizeSessionScanListSlug = (
+  raw: unknown,
+  { allowEmpty = true }: SessionScanSlugOptions = {}
+): string | null => {
   const slug = normalizeSessionScanSlug(raw, { allowEmpty });
   if (slug == null) return null;
   if (!readResolveDemoAliasToggle()) return slug;
-  return resolveSessionSlugAliasFromDemoSessions({
+  return (resolveSessionSlugAliasFromDemoSessions as any)({
     sessionSlug: slug,
     demoSessions: DEMO_SESSION_MAP,
     allowSessionName: true,
   }).sessionSlug;
 };
 
-export const normalizeSessionScanSlugs = (raw) => {
+export const normalizeSessionScanSlugs = (raw: unknown): string[] => {
   const isArray = Array.isArray(raw);
-  const list = Array.isArray(raw)
+  const list: unknown[] = Array.isArray(raw)
     ? raw.flatMap((item) => (
       typeof item === 'string'
         ? item.split(',')
         : [item]
     ))
     : toStr(raw).split(',');
-  const seen = new Set();
-  const out = [];
+  const seen = new Set<string>();
+  const out: string[] = [];
   list.forEach((item) => {
     const slug = normalizeSessionScanListSlug(item, { allowEmpty: isArray });
     if (slug == null) return;
@@ -233,7 +293,7 @@ export const normalizeSessionScanSlugs = (raw) => {
   return out;
 };
 
-const parseStoredSlugs = (raw) => {
+const parseStoredSlugs = (raw: unknown): string[] => {
   const str = toStr(raw).trim();
   if (!str) return [];
   if (str.startsWith('[')) {
@@ -245,9 +305,9 @@ const parseStoredSlugs = (raw) => {
   return normalizeSessionScanSlugs(str);
 };
 
-const dedupeSlugs = (slugs = []) => {
-  const seen = new Set();
-  const out = [];
+const dedupeSlugs = (slugs: ReadonlyArray<unknown> = []): string[] => {
+  const seen = new Set<string>();
+  const out: string[] = [];
   slugs.forEach((item) => {
     // Keep explicit general/default entries ("general" => "") when list mode is used.
     const slug = normalizeSessionScanListSlug(item, { allowEmpty: true });
@@ -259,7 +319,11 @@ const dedupeSlugs = (slugs = []) => {
   return out;
 };
 
-export const getAllowedSessionSlugs = (scopeIn, listIn, activeSlugIn) => {
+export const getAllowedSessionSlugs = (
+  scopeIn: unknown,
+  listIn: unknown,
+  activeSlugIn: unknown
+): string[] => {
   const scope = normalizeSessionScanScope(
     typeof scopeIn === 'undefined' ? readSessionScanScope() : scopeIn
   );
@@ -274,7 +338,10 @@ export const getAllowedSessionSlugs = (scopeIn, listIn, activeSlugIn) => {
   return [];
 };
 
-export const isSessionSlugAllowedByScope = (slugIn, opts = {}) => {
+export const isSessionSlugAllowedByScope = (
+  slugIn: unknown,
+  opts: SessionScanScopeOptions = {}
+): boolean => {
   const hasActiveSlug = !!(opts && Object.prototype.hasOwnProperty.call(opts, 'activeSlug'));
   const hasActiveSlugFromRoute = !!(opts && Object.prototype.hasOwnProperty.call(opts, 'activeSlugFromRoute'));
   const activeSlugRaw = hasActiveSlug ? opts.activeSlug : undefined;
@@ -301,7 +368,7 @@ export const isSessionSlugAllowedByScope = (slugIn, opts = {}) => {
   return allowed.includes(slug);
 };
 
-export const readSessionScanScope = () => {
+export const readSessionScanScope = (): SessionScanScope => {
   // Precedence:
   // 1) URL param `?ceSessionScanScope=active|general|list|all`
   // 2) localStorage `ce:sessionScanScope`
@@ -326,13 +393,16 @@ export const readSessionScanScope = () => {
   } catch (e) { void e; /* fallback: scope lookup. */ }
 
   try {
-    if (typeof globalThis !== 'undefined' && typeof globalThis[GLOBAL_KEY] !== 'undefined') {
-      return normalizeSessionScanScope(globalThis[GLOBAL_KEY]);
+    if (typeof globalThis !== 'undefined') {
+      const runtimeGlobals = globalThis as Record<string, unknown>;
+      if (typeof runtimeGlobals[GLOBAL_KEY] !== 'undefined') {
+        return normalizeSessionScanScope(runtimeGlobals[GLOBAL_KEY]);
+      }
     }
   } catch (e) { void e; /* fallback: scope lookup. */ }
 
   try {
-    const selection = readStoredGlobalSessionSelection();
+    const selection = readStoredGlobalSessionSelection() as GlobalSessionSelection | null;
     if (selection?.selectedSessionScope) {
       return normalizeSessionScanScope(selection.selectedSessionScope);
     }
@@ -341,7 +411,7 @@ export const readSessionScanScope = () => {
   return FAIL_CLOSED_SESSION_SCAN_SCOPE;
 };
 
-export const readSessionScanSlugs = () => {
+export const readSessionScanSlugs = (): string[] => {
   // Precedence:
   // 1) URL param `?ceSessionScanSlugs=general,edge,test`
   // 2) localStorage `ce:sessionScanSlugs` (CSV or JSON array)
@@ -366,13 +436,16 @@ export const readSessionScanSlugs = () => {
   } catch (e) { void e; /* fallback: slug scope lookup. */ }
 
   try {
-    if (typeof globalThis !== 'undefined' && typeof globalThis[GLOBAL_SLUGS_KEY] !== 'undefined') {
-      return normalizeSessionScanSlugs(globalThis[GLOBAL_SLUGS_KEY]);
+    if (typeof globalThis !== 'undefined') {
+      const runtimeGlobals = globalThis as Record<string, unknown>;
+      if (typeof runtimeGlobals[GLOBAL_SLUGS_KEY] !== 'undefined') {
+        return normalizeSessionScanSlugs(runtimeGlobals[GLOBAL_SLUGS_KEY]);
+      }
     }
   } catch (e) { void e; /* fallback: slug scope lookup. */ }
 
   try {
-    const selection = readStoredGlobalSessionSelection();
+    const selection = readStoredGlobalSessionSelection() as GlobalSessionSelection | null;
     if (Array.isArray(selection?.selectedSessionSlugs)) {
       return normalizeSessionScanSlugs(selection.selectedSessionSlugs);
     }
@@ -381,11 +454,13 @@ export const readSessionScanSlugs = () => {
   return [];
 };
 
-export const writeSessionScanScope = (scopeIn) => {
+export const writeSessionScanScope = (scopeIn: unknown): SessionScanScope => {
   const scope = normalizeSessionScanScope(scopeIn);
 
   try {
-    if (typeof globalThis !== 'undefined') globalThis[GLOBAL_KEY] = scope;
+    if (typeof globalThis !== 'undefined') {
+      (globalThis as Record<string, unknown>)[GLOBAL_KEY] = scope;
+    }
   } catch (e) { log.warn('sessionScanScope: fallback', e); }
 
   try {
@@ -393,22 +468,24 @@ export const writeSessionScanScope = (scopeIn) => {
   } catch (e) { log.warn('sessionScanScope: fallback', e); }
 
   try {
-    const selection = normalizeGlobalSessionSelection({
-      ...readStoredGlobalSessionSelection(),
+    const selection = (normalizeGlobalSessionSelection as any)({
+      ...(readStoredGlobalSessionSelection() as GlobalSessionSelection | null),
       selectedSessionScope: scope,
     });
-    persistGlobalSessionSelection(selection);
-    dispatchGlobalSessionSelectionUpdatedEvent(selection);
+    (persistGlobalSessionSelection as any)(selection);
+    (dispatchGlobalSessionSelectionUpdatedEvent as any)(selection);
   } catch (e) { log.warn('sessionScanScope: fallback', e); }
 
   return scope;
 };
 
-export const writeSessionScanSlugs = (slugsIn) => {
+export const writeSessionScanSlugs = (slugsIn: unknown): string[] => {
   const slugs = normalizeSessionScanSlugs(slugsIn);
 
   try {
-    if (typeof globalThis !== 'undefined') globalThis[GLOBAL_SLUGS_KEY] = slugs;
+    if (typeof globalThis !== 'undefined') {
+      (globalThis as Record<string, unknown>)[GLOBAL_SLUGS_KEY] = slugs;
+    }
   } catch (e) { log.warn('sessionScanScope: fallback', e); }
 
   try {
@@ -416,12 +493,12 @@ export const writeSessionScanSlugs = (slugsIn) => {
   } catch (e) { log.warn('sessionScanScope: fallback', e); }
 
   try {
-    const selection = normalizeGlobalSessionSelection({
-      ...readStoredGlobalSessionSelection(),
+    const selection = (normalizeGlobalSessionSelection as any)({
+      ...(readStoredGlobalSessionSelection() as GlobalSessionSelection | null),
       selectedSessionSlugs: slugs,
     });
-    persistGlobalSessionSelection(selection);
-    dispatchGlobalSessionSelectionUpdatedEvent(selection);
+    (persistGlobalSessionSelection as any)(selection);
+    (dispatchGlobalSessionSelectionUpdatedEvent as any)(selection);
   } catch (e) { log.warn('sessionScanScope: fallback', e); }
 
   return slugs;

@@ -15,14 +15,27 @@ import {
   readSessionScanSlugs,
 } from './sessionScanScope.js';
 
+type ScopeWindowDecision = {
+  slug: string;
+  scope: string;
+  list: string[];
+  activeSlug: string;
+  activeSlugFromRoute: boolean;
+  allowed: boolean;
+};
+
+type ScopeWindowBypassConfig = {
+  __ignoreSessionScanScope?: boolean;
+};
+
 const contractsLog = createLogger('contracts');
 
-export const SESSION_SCOPE_WINDOW_SKIP_LOGGED = new Set();
+export const SESSION_SCOPE_WINDOW_SKIP_LOGGED = new Set<string>();
 
 export const readActiveSessionSlugForScope = () => {
   let fromStore = '';
   try {
-    const state = store?.getState?.() || {};
+    const state = (store as { getState?: () => any })?.getState?.() || {};
     const sessionState = state?.sessionState || {};
     const raw =
       sessionState?.activeSessionSlug ||
@@ -56,16 +69,16 @@ export const readActiveSessionSlugForScope = () => {
   return { activeSlug: fromStore, activeSlugFromRoute: false };
 };
 
-export const getScopeDecisionForSlug = (slugIn) => {
+export const getScopeDecisionForSlug = (slugIn: unknown): ScopeWindowDecision => {
   const slug = normalizeSessionSlug(slugIn || '');
-  const scope = readSessionScanScope();
+  const scope = String(readSessionScanScope() || '');
   const scopeActive = readActiveSessionSlugForScope();
   const activeSlug = scopeActive?.activeSlug || '';
   const activeSlugFromRoute = scopeActive?.activeSlugFromRoute === true;
   if (scope === 'all') {
     return { slug, scope, list: [], activeSlug, activeSlugFromRoute, allowed: true };
   }
-  const list = readSessionScanSlugs();
+  const list = (Array.isArray(readSessionScanSlugs()) ? readSessionScanSlugs() : []) as string[];
   const allowed = isSessionSlugAllowedByScope(slug, {
     scope,
     list,
@@ -75,28 +88,45 @@ export const getScopeDecisionForSlug = (slugIn) => {
   return { slug, scope, list, activeSlug, activeSlugFromRoute, allowed };
 };
 
-export const logScopeWindowSkipOnce = ({ slug, scope, list, activeSlug }) => {
-  const slugLabel = slug || 'general';
+export const logScopeWindowSkipOnce = ({
+  slug,
+  scope,
+  list,
+  activeSlug,
+}: {
+  slug?: unknown;
+  scope?: unknown;
+  list?: unknown;
+  activeSlug?: unknown;
+}): void => {
+  const slugLabel = String(slug || 'general');
   if (SESSION_SCOPE_WINDOW_SKIP_LOGGED.has(slugLabel)) return;
   SESSION_SCOPE_WINDOW_SKIP_LOGGED.add(slugLabel);
   contractsLog.info('[SessionScanScope] getRelevantBlockWindowForFilter skipped out-of-scope slug', {
     slug: slugLabel,
     scope,
-    activeSlug: activeSlug || 'general',
+    activeSlug: String(activeSlug || 'general'),
     list: (Array.isArray(list) ? list : []).map((s) => normalizeSessionSlug(s || '') || 'general'),
   });
 };
 
-export const shouldBypassSessionScopeWindow = (groupKeyOrCfg, resolvedCfg = null) => {
+export const shouldBypassSessionScopeWindow = (
+  groupKeyOrCfg: unknown,
+  resolvedCfg: unknown = null
+): boolean => {
+  const groupConfig = (
+    groupKeyOrCfg && typeof groupKeyOrCfg === 'object' && !Array.isArray(groupKeyOrCfg)
+  ) ? groupKeyOrCfg as ScopeWindowBypassConfig : null;
+  const resolvedConfig = (
+    resolvedCfg && typeof resolvedCfg === 'object' && !Array.isArray(resolvedCfg)
+  ) ? resolvedCfg as ScopeWindowBypassConfig : null;
   const fromArg = (
-    groupKeyOrCfg &&
-    typeof groupKeyOrCfg === 'object' &&
-    groupKeyOrCfg.__ignoreSessionScanScope === true
+    groupConfig &&
+    groupConfig.__ignoreSessionScanScope === true
   );
   const fromResolved = (
-    resolvedCfg &&
-    typeof resolvedCfg === 'object' &&
-    resolvedCfg.__ignoreSessionScanScope === true
+    resolvedConfig &&
+    resolvedConfig.__ignoreSessionScanScope === true
   );
   return !!(fromArg || fromResolved);
 };

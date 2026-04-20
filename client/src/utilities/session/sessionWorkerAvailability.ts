@@ -7,30 +7,39 @@ import { overlayCachedSessionWorkerConfig } from './sessionWorkerConfigCache.js'
 import { parseWorkerConfig } from './sessionParsers.js';
 import { normalizeWorkerUrl } from '../worker/workerUrl.js';
 
-const isObj = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
+type SessionConfigLike = Record<string, any>;
 
-export const getConfiguredSessionWorkerUrlFromConfig = (sessionConfig = null) => {
-  const parsed = parseWorkerConfig(sessionConfig);
+type SessionWorkerAvailabilityOptions = {
+  slug?: unknown;
+  sessionConfig?: unknown;
+  allowSharedFallback?: boolean;
+};
+
+const isObj = (value: unknown): value is SessionConfigLike => (
+  !!value && typeof value === 'object' && !Array.isArray(value)
+);
+
+export const getConfiguredSessionWorkerUrlFromConfig = (sessionConfig: unknown = null): string => {
+  const parsed = parseWorkerConfig(sessionConfig as any);
   const canonicalUrl = normalizeWorkerUrl(parsed?.config?.corsWorkerUrl || '');
   return canonicalUrl;
 };
 
 export const resolveConfiguredSessionWorkerUrlFromConfig = (
-  sessionConfig = null
-) => getConfiguredSessionWorkerUrlFromConfig(sessionConfig);
+  sessionConfig: unknown = null
+): string => getConfiguredSessionWorkerUrlFromConfig(sessionConfig);
 
-export const getSharedFallbackWorkerUrl = () => {
-  return normalizeWorkerUrl(CLOUDFLARE_CORS_WORKER_URL);
-};
+export const getSharedFallbackWorkerUrl = (): string => normalizeWorkerUrl(CLOUDFLARE_CORS_WORKER_URL);
 
 export const shouldUseSharedFallbackWorkerUrl = ({
   slug,
   sessionConfig,
-} = {}) => {
-  const normalizedSlug = canonicalizeSessionSlug(slug ?? sessionConfig?.slug ?? '');
+}: SessionWorkerAvailabilityOptions = {}): boolean => {
+  const sessionConfigSource = isObj(sessionConfig) ? sessionConfig : null;
+  const normalizedSlug = canonicalizeSessionSlug(slug ?? sessionConfigSource?.slug ?? '');
   if (normalizedSlug !== '') return false;
   if (!USE_ONCHAIN_SESSION_REGISTRY) return false;
-  const baseConfig = isObj(sessionConfig) ? sessionConfig : null;
+  const baseConfig = sessionConfigSource;
   if (!baseConfig) return false;
   if (resolveConfiguredSessionWorkerUrlFromConfig(baseConfig)) {
     return false;
@@ -41,9 +50,9 @@ export const shouldUseSharedFallbackWorkerUrl = ({
 const getEffectiveSessionWorkerConfig = ({
   slug,
   sessionConfig,
-} = {}) => {
-  const normalizedSlug = canonicalizeSessionSlug(slug ?? sessionConfig?.slug ?? '');
-  const baseConfig = sessionConfig && typeof sessionConfig === 'object' ? sessionConfig : null;
+}: SessionWorkerAvailabilityOptions = {}): SessionConfigLike | null => {
+  const baseConfig = isObj(sessionConfig) ? sessionConfig : null;
+  const normalizedSlug = canonicalizeSessionSlug(slug ?? baseConfig?.slug ?? '');
   return overlayCachedSessionWorkerConfig({
     slug: normalizedSlug,
     sessionConfig: baseConfig,
@@ -54,8 +63,9 @@ export const getUsableSessionWorkerUrl = ({
   slug,
   sessionConfig,
   allowSharedFallback = false,
-} = {}) => {
-  const normalizedSlug = canonicalizeSessionSlug(slug ?? sessionConfig?.slug ?? '');
+}: SessionWorkerAvailabilityOptions = {}): string => {
+  const sessionConfigSource = isObj(sessionConfig) ? sessionConfig : null;
+  const normalizedSlug = canonicalizeSessionSlug(slug ?? sessionConfigSource?.slug ?? '');
   const effectiveSessionConfig = getEffectiveSessionWorkerConfig({
     slug: normalizedSlug,
     sessionConfig,
@@ -77,8 +87,9 @@ export const hasUsableSessionWorkerConfig = ({
   slug,
   sessionConfig,
   allowSharedFallback = true,
-} = {}) => {
-  const normalizedSlug = canonicalizeSessionSlug(slug ?? sessionConfig?.slug ?? '');
+}: SessionWorkerAvailabilityOptions = {}): boolean => {
+  const sessionConfigSource = isObj(sessionConfig) ? sessionConfig : null;
+  const normalizedSlug = canonicalizeSessionSlug(slug ?? sessionConfigSource?.slug ?? '');
   return getUsableSessionWorkerUrl({
     slug: normalizedSlug,
     sessionConfig,

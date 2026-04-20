@@ -9,9 +9,32 @@ import { toStr } from '../shared/primitives.js';
 import { readPublicUrlBasePath } from '../ui/publicUrl.js';
 import { canonicalizeSessionSlug, resolveCanonicalSessionConfig } from './canonicalSessionContext.js';
 
-const isObj = (val) => !!val && typeof val === 'object' && !Array.isArray(val);
+type SessionInput = Record<string, any>;
+type SessionConfigLike = Record<string, any>;
+type SessionContractRef = {
+  address?: string;
+  chainId?: number;
+};
+type SessionContractMap = Record<string, SessionContractRef>;
 
-const toPositiveNumber = (val) => {
+type ResolveSessionConfigAliasesOptions = {
+  defaults?: SessionInput;
+  resolveBySlug?: ((slug: string) => unknown) | null;
+  fallbackConfig?: unknown;
+};
+
+type ResolvedSessionConfigAliases = {
+  hasExplicitSessionSlug: boolean;
+  sessionSlug: string;
+  sessionConfig: unknown;
+  sessionConfigSource: string;
+  warnings: unknown[];
+  provenance: unknown;
+};
+
+const isObj = (val: unknown): val is SessionInput => !!val && typeof val === 'object' && !Array.isArray(val);
+
+const toPositiveNumber = (val: unknown): number | undefined => {
   const num = Number(val || 0);
   return Number.isFinite(num) && num > 0 ? num : undefined;
 };
@@ -19,23 +42,23 @@ const toPositiveNumber = (val) => {
 const CONTRACT_KEY_ALIASES = Object.freeze({
   surveys: ['surveys', 'survey', 'surveysContract', 'surveyContract'],
   sbtFactory: ['sbtFactory', 'sbt_factory', 'sbtfactory', 'sbtFactoryContract', 'factory'],
-});
+} as const);
 
 const CONTRACT_ADDRESS_ALIASES = Object.freeze({
   surveys: ['surveysAddress', 'surveyAddress', 'surveysContractAddress', 'surveyContractAddress'],
   sbtFactory: ['sbtFactoryAddress', 'factoryAddress', 'sbtFactoryContractAddress'],
-});
+} as const);
 
 const CONTRACT_CHAINID_ALIASES = Object.freeze({
   surveys: ['surveysChainId', 'surveyChainId'],
   sbtFactory: ['sbtFactoryChainId', 'factoryChainId'],
-});
+} as const);
 
-export const normalizeSessionSlug = (rawSlug) => {
+export const normalizeSessionSlug = (rawSlug: unknown): string => {
   return canonicalizeSessionSlug(rawSlug);
 };
 
-const stripConfiguredPublicBasePath = (pathname = '') => {
+const stripConfiguredPublicBasePath = (pathname: unknown = ''): string => {
   const path = toStr(pathname).trim();
   const basePath = readPublicUrlBasePath();
   if (!path || !basePath || basePath === '/') return path;
@@ -46,7 +69,7 @@ const stripConfiguredPublicBasePath = (pathname = '') => {
   return path;
 };
 
-export const resolveSessionSlugFromPathname = (pathname = '') => {
+export const resolveSessionSlugFromPathname = (pathname: unknown = ''): string | null => {
   const path = stripConfiguredPublicBasePath(pathname);
   if (!path) return null;
   const match = path.match(/^\/session(?:\/([^/?#]+))?(?:[/?#]|$)/i);
@@ -58,27 +81,27 @@ export const resolveSessionSlugFromPathname = (pathname = '') => {
   }
 };
 
-export const resolveActiveSessionSlug = (input = {}) => normalizeSessionSlug(
+export const resolveActiveSessionSlug = (input: SessionInput = {}): string => normalizeSessionSlug(
   input.activeSessionSlug ??
   input.sessionSlug ??
   input.slug
 );
 
-export const resolveSessionSlug = (input = {}) => normalizeSessionSlug(
+export const resolveSessionSlug = (input: SessionInput = {}): string => normalizeSessionSlug(
   input.sessionSlug ??
   input.activeSessionSlug ??
   input.slug
 );
 
-export const resolveSessionSlugPinned = (input = {}) => (
+export const resolveSessionSlugPinned = (input: SessionInput = {}): boolean => (
   !!(input.sessionSlugPinned)
 );
 
-export const resolveSessionName = (input = {}) => (
+export const resolveSessionName = (input: SessionInput = {}): string => (
   toStr(input.sessionName ?? '').trim()
 );
 
-export const resolveSessionAliases = (input = {}) => {
+export const resolveSessionAliases = (input: SessionInput = {}) => {
   const activeSessionSlug = resolveActiveSessionSlug(input);
   const sessionSlug = normalizeSessionSlug(input.sessionSlug ?? activeSessionSlug);
   const sessionSlugPinned = resolveSessionSlugPinned(input);
@@ -91,26 +114,27 @@ export const resolveSessionAliases = (input = {}) => {
   };
 };
 
-const normalizeContractRef = (value) => {
+const normalizeContractRef = (value: unknown): SessionContractRef | null => {
   if (!value) return null;
   if (typeof value === 'string') {
     const address = toStr(value).trim();
     return address ? { address } : null;
   }
   if (!isObj(value)) return null;
+  const source = value as SessionConfigLike;
   const address = toStr(
-    value.address ??
-    value.contractAddress ??
-    value.addr ??
-    value.target ??
-    value.value ??
+    source.address ??
+    source.contractAddress ??
+    source.addr ??
+    source.target ??
+    source.value ??
     ''
   ).trim();
   const chainId = toPositiveNumber(
-    value.chainId ??
-    value.chainID ??
-    value.networkChainId ??
-    value.chain
+    source.chainId ??
+    source.chainID ??
+    source.networkChainId ??
+    source.chain
   );
   if (!address && !chainId) return null;
   return {
@@ -119,7 +143,10 @@ const normalizeContractRef = (value) => {
   };
 };
 
-const pickContractRefFromMap = (contracts, keys = []) => {
+const pickContractRefFromMap = (
+  contracts: unknown,
+  keys: ReadonlyArray<string> = []
+): SessionContractRef | null => {
   if (!isObj(contracts)) return null;
   for (const key of keys) {
     if (!Object.prototype.hasOwnProperty.call(contracts, key)) continue;
@@ -129,7 +156,7 @@ const pickContractRefFromMap = (contracts, keys = []) => {
   return null;
 };
 
-const pickFirstStringFromConfig = (cfg, keys = []) => {
+const pickFirstStringFromConfig = (cfg: unknown, keys: ReadonlyArray<string> = []): string => {
   if (!isObj(cfg)) return '';
   for (const key of keys) {
     const value = toStr(cfg[key]).trim();
@@ -138,7 +165,10 @@ const pickFirstStringFromConfig = (cfg, keys = []) => {
   return '';
 };
 
-const pickFirstChainIdFromConfig = (cfg, keys = []) => {
+const pickFirstChainIdFromConfig = (
+  cfg: unknown,
+  keys: ReadonlyArray<string> = []
+): number | undefined => {
   if (!isObj(cfg)) return undefined;
   for (const key of keys) {
     const value = toPositiveNumber(cfg[key]);
@@ -147,8 +177,8 @@ const pickFirstChainIdFromConfig = (cfg, keys = []) => {
   return undefined;
 };
 
-export const mergeSessionContractMaps = (...maps) => {
-  const out = {};
+export const mergeSessionContractMaps = (...maps: unknown[]): SessionContractMap => {
+  const out: SessionContractMap = {};
   maps.forEach((map) => {
     if (!isObj(map)) return;
     Object.entries(map).forEach(([key, value]) => {
@@ -164,16 +194,19 @@ export const mergeSessionContractMaps = (...maps) => {
   return out;
 };
 
-export const resolveSessionConfigAliases = (input = {}, opts = {}) => {
+export const resolveSessionConfigAliases = (
+  input: SessionInput = {},
+  opts: ResolveSessionConfigAliasesOptions = {}
+): ResolvedSessionConfigAliases => {
   const source = isObj(input) ? input : {};
   const defaults = isObj(opts.defaults) ? opts.defaults : {};
   const resolveBySlug = typeof opts.resolveBySlug === 'function' ? opts.resolveBySlug : null;
-  const resolved = resolveCanonicalSessionConfig({
+  const resolved = (resolveCanonicalSessionConfig as any)({
     source,
     defaults,
     resolveBySlug,
     fallbackConfig: opts.fallbackConfig,
-  });
+  }) as ResolvedSessionConfigAliases;
 
   return {
     hasExplicitSessionSlug: resolved.hasExplicitSessionSlug,
@@ -185,13 +218,13 @@ export const resolveSessionConfigAliases = (input = {}, opts = {}) => {
   };
 };
 
-export const resolveSessionContractRef = (input = {}) => {
+export const resolveSessionContractRef = (input: SessionInput = {}) => {
   const aliases = resolveSessionConfigAliases(input, {
     defaults: input.defaults,
     resolveBySlug: input.resolveBySlug,
     fallbackConfig: input.fallbackConfig,
   });
-  const cfg = aliases.sessionConfig;
+  const cfg = isObj(aliases.sessionConfig) ? aliases.sessionConfig : null;
   const contracts = mergeSessionContractMaps(
     isObj(cfg?.contracts) ? cfg.contracts : null,
     isObj(input.contracts) ? input.contracts : null
@@ -205,7 +238,7 @@ export const resolveSessionContractRef = (input = {}) => {
       chainId: undefined,
     };
   }
-  const keyAliases = CONTRACT_KEY_ALIASES[contractKey];
+  const keyAliases = (CONTRACT_KEY_ALIASES as Record<string, readonly string[]>)[contractKey];
   if (!keyAliases) {
     return {
       ...aliases,
@@ -216,8 +249,12 @@ export const resolveSessionContractRef = (input = {}) => {
   }
   const refFromMap = pickContractRefFromMap(contracts, keyAliases) || {};
 
-  const addressFallbackAliases = CONTRACT_ADDRESS_ALIASES[contractKey] || [];
-  const chainIdFallbackAliases = CONTRACT_CHAINID_ALIASES[contractKey] || [];
+  const addressFallbackAliases = (
+    (CONTRACT_ADDRESS_ALIASES as Record<string, readonly string[]>)[contractKey] || []
+  );
+  const chainIdFallbackAliases = (
+    (CONTRACT_CHAINID_ALIASES as Record<string, readonly string[]>)[contractKey] || []
+  );
 
   const address = (
     toStr(refFromMap.address).trim() ||
