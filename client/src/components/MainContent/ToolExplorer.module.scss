@@ -261,6 +261,52 @@
   min-width: 132px;
 }
 
+.headerIconButton {
+  width: 56px;
+  min-width: 56px;
+  padding: 0;
+}
+
+.headerSessionSelector {
+  position: relative;
+  display: inline-flex;
+}
+
+.headerSessionSelectorPanel {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 4;
+  width: min(540px, calc(100vw - 32px));
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(31, 37, 79, 0.98);
+  box-shadow: 0 18px 36px rgba(0, 0, 0, 0.28);
+}
+
+.headerSessionSelectorHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.headerSessionSelectorHint {
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.86rem;
+}
+
+.headerSessionResetButton {
+  min-height: 38px;
+  padding: 8px 12px;
+  font-size: 0.86rem;
+  text-transform: none;
+  font-weight: 600;
+  gap: 6px;
+}
+
 .headerActionButtonActive {
   background: rgba(77, 255, 164, 0.14);
   color: #4dffa4;
@@ -314,6 +360,12 @@
     font-size: 1.02rem;
     min-height: 50px;
     padding: 12px 18px;
+  }
+
+  .headerIconButton {
+    width: 50px;
+    min-width: 50px;
+    padding: 0;
   }
 }
 

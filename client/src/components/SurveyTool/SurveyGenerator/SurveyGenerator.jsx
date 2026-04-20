@@ -254,22 +254,26 @@ export const hasDatabaseToolInputContent = ({
 const LazyCorpusViewer = React.lazy(() => import('../../DemoViews/CorpusViewer.jsx'));
 
 
-export default function AudioSurveyGenerator({
-  provider,
-  network,
-  account,
-  loginComplete,
-  toggleLoginModal,
-  minified = false,
-  defaultTags,
-  onQuestionsGenerated,
-  hideEncryption = true,
-  sessionConfig,
-  activeSessionSlug,
-  contracts,
-  explorerMode = 'add',
-  demoSurfaceMode = null,
-}) {
+export default function AudioSurveyGenerator(rawProps = {}) {
+  const {
+    provider,
+    network,
+    account,
+    loginComplete,
+    toggleLoginModal,
+    minified = false,
+    defaultTags,
+    onQuestionsGenerated,
+    hideEncryption = true,
+    sessionConfig,
+    activeSessionSlug,
+    contracts,
+    explorerMode = 'add',
+    demoSurfaceMode = null,
+    sessionOverrideSlug,
+    sessionOverrideTouched,
+    hideInternalSessionSelector,
+  } = rawProps;
   // UI Modes
   const [transcriptMode, setTranscriptMode] = useState(false);
   // NEW: Toggle for Arweave upload
@@ -319,6 +323,10 @@ export default function AudioSurveyGenerator({
   const [showSessionSelector, setShowSessionSelector] = useState(false);
   const [localSessionOverrideSlug, setLocalSessionOverrideSlug] = useState(null);
   const [localSessionOverrideTouched, setLocalSessionOverrideTouched] = useState(false);
+  const hasControlledSessionOverride =
+    Object.prototype.hasOwnProperty.call(rawProps, 'sessionOverrideSlug') ||
+    Object.prototype.hasOwnProperty.call(rawProps, 'sessionOverrideTouched') ||
+    Object.prototype.hasOwnProperty.call(rawProps, 'hideInternalSessionSelector');
   const demoSurfaceEnabled = demoSurfaceMode !== false;
   const [showDemoCorpusView, setShowDemoCorpusView] = useState(demoSurfaceEnabled);
 
@@ -336,16 +344,43 @@ export default function AudioSurveyGenerator({
   const [summaryGateSBTs, setSummaryGateSBTs] = useState([]);
   const [summaryGateMode, setSummaryGateMode] = useState('any');
   const lastSummaryGateKeyRef = useRef('');
+  const controlledSessionTouched = Boolean(sessionOverrideTouched);
 
   const effectiveSessionSlugInput = useMemo(() => (
-    localSessionOverrideTouched
-      ? normalizeSessionSlug(localSessionOverrideSlug || '')
-      : activeSessionSlug
-  ), [activeSessionSlug, localSessionOverrideSlug, localSessionOverrideTouched]);
+    hasControlledSessionOverride
+      ? (
+        controlledSessionTouched
+          ? normalizeSessionSlug(sessionOverrideSlug || '')
+          : activeSessionSlug
+      )
+      : (
+        localSessionOverrideTouched
+          ? normalizeSessionSlug(localSessionOverrideSlug || '')
+          : activeSessionSlug
+      )
+  ), [
+    activeSessionSlug,
+    controlledSessionTouched,
+    hasControlledSessionOverride,
+    localSessionOverrideSlug,
+    localSessionOverrideTouched,
+    sessionOverrideSlug,
+  ]);
   const effectiveSessionConfigInput = useMemo(() => {
+    if (hasControlledSessionOverride) {
+      if (!controlledSessionTouched) return sessionConfig;
+      return getSessionConfigBySlug(normalizeSessionSlug(sessionOverrideSlug || '')) || null;
+    }
     if (!localSessionOverrideTouched) return sessionConfig;
     return getSessionConfigBySlug(normalizeSessionSlug(localSessionOverrideSlug || '')) || null;
-  }, [localSessionOverrideSlug, localSessionOverrideTouched, sessionConfig]);
+  }, [
+    controlledSessionTouched,
+    hasControlledSessionOverride,
+    localSessionOverrideSlug,
+    localSessionOverrideTouched,
+    sessionConfig,
+    sessionOverrideSlug,
+  ]);
   const resolvedSessionAliases = useMemo(() => resolveSessionConfigAliases({
     sessionSlug: effectiveSessionSlugInput,
     sessionConfig: effectiveSessionConfigInput,
@@ -1338,6 +1373,7 @@ export default function AudioSurveyGenerator({
   const isExplorerViewMode = !minified && explorerMode === 'view';
   const showDemoCorpusPanel = demoSurfaceEnabled && showDemoCorpusView;
   const showViewModeToolbar = demoSurfaceEnabled;
+  const showInternalSessionSelector = !minified && !hideInternalSessionSelector && !hasControlledSessionOverride;
 
   useEffect(() => {
     if (isExplorerViewMode) setShowDemoCorpusView(demoSurfaceEnabled);
@@ -1378,7 +1414,6 @@ export default function AudioSurveyGenerator({
             sessionConfig={resolvedSessionConfig}
             mode="session"
             sessionIdHex={resolvedSessionIdHex}
-            secondaryAssociationType="sbt"
             compact={false}
             pageSize={10}
           />
@@ -1401,7 +1436,7 @@ export default function AudioSurveyGenerator({
           : styles.databaseTool
       }
     >
-      {!minified && (
+      {showInternalSessionSelector && (
         <div className={styles.sessionSelectorTriggerRow} data-testid="ce-database-session-selector">
           <button
             type="button"
