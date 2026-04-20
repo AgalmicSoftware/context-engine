@@ -5,6 +5,7 @@ import demoPolisData from '../../variables/demo/demo_polis_data.json';
 import historicalFigureDemographics from '../../variables/demo/historical_figure_demographics.js';
 import buildDemoAnalysisData, {
   DEMO_ANALYSIS_RESPONSE_OPTIONS,
+  buildQuestionTags,
 } from './demoAnalysisAdapter.js';
 
 describe('demoAnalysisAdapter', () => {
@@ -83,6 +84,80 @@ describe('demoAnalysisAdapter', () => {
     expect(tagNames).toContain('arXiv');
     expect(tagNames).toContain('LessWrong');
     expect(tagIds).not.toContain('ai-daily-integration');
+  });
+
+  it('normalizes corpus source aliases so breakdown tags stay clean', () => {
+    const tags = buildQuestionTags({
+      sources: 'metr, scifi, sci-fi, LessWrong',
+    });
+
+    expect(tags.map((tag) => tag.tagID)).toEqual([
+      'source:metr',
+      'source:scifi',
+      'source:lesswrong',
+    ]);
+    expect(tags.map((tag) => tag.tagName)).toEqual([
+      'METR',
+      'Sci-Fi',
+      'LessWrong',
+    ]);
+  });
+
+  it('separates unique persona counts from modeled response totals when synthetic rows reuse an xid', () => {
+    const sourceData = {
+      comments: [
+        {
+          commentBody: 'Test breakdown question',
+        },
+      ],
+      participantsVotes: [
+        {
+          participant: '0xbase-ada',
+          xid: 'AdaLovelace',
+          votes: { 0: 1 },
+        },
+        {
+          participant: '0xsynthetic-ada',
+          xid: 'AdaLovelace',
+          votes: { 0: 0 },
+        },
+        {
+          participant: '0xbase-grace',
+          xid: 'GraceHopper',
+          votes: { 0: -1 },
+        },
+      ],
+    };
+    const metadataByXid = {
+      AdaLovelace: {
+        eraBucket: 'Modern',
+        region: 'Europe',
+        country: 'United Kingdom',
+        gender: 'Woman',
+        affiliation: 'Mathematics',
+        atlasCategory: 'Foundations',
+      },
+      GraceHopper: {
+        eraBucket: 'Modern',
+        region: 'North America',
+        country: 'United States',
+        gender: 'Woman',
+        affiliation: 'Computer Science',
+        atlasCategory: 'Foundations',
+      },
+    };
+
+    const syntheticAnalysisData = buildDemoAnalysisData(sourceData, metadataByXid);
+    const overallRows = syntheticAnalysisData.flatResponses.filter(
+      (row) => row.questionId === '0' && row.segmentKey === 'All'
+    );
+
+    expect(syntheticAnalysisData.questions[0].participationCount).toBe(2);
+    expect(syntheticAnalysisData.demographics.Era).toEqual([
+      { value: 'Modern', count: 2 },
+    ]);
+    expect(overallRows[0]?.participantCount).toBe(2);
+    expect(overallRows[0]?.totalVotes).toBe(3);
   });
 
   it('keeps the adapter free of a baked-in demo polis fixture import', () => {

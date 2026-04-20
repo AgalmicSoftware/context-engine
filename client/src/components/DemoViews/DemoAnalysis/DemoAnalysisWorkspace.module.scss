@@ -33,6 +33,43 @@
   border-color: #f0e68c;
 }
 
+.selectedQuestionBanner {
+  display: grid;
+  gap: 0.6rem;
+  border-color: #bfd7ff;
+  background: linear-gradient(180deg, #f4f8ff 0%, #eef4ff 100%);
+}
+
+.selectedQuestionBannerHeader {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  align-items: baseline;
+}
+
+.selectedQuestionBannerLabel {
+  color: #0b4f8a;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.selectedQuestionBannerMeta {
+  color: #5f6b7a;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.selectedQuestionBannerText {
+  margin: 0;
+  color: #17212b;
+  font-size: 1.08rem;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
 .heatmapPanel,
 .chartPanel,
 .mapPanel {
@@ -321,6 +358,13 @@
   }
 }
 
+.suggestionButtonActive {
+  border-color: #ffc56f;
+  border-left-color: #e65516;
+  background: #fffaf0;
+  box-shadow: 0 0 0 1px rgba(230, 85, 22, 0.08);
+}
+
 .reportRowButton {
   border: 1px solid #e0e0e0;
   border-radius: var(--ce-radius-8, 8px);
@@ -499,6 +543,14 @@
   font-size: 0.88rem;
 }
 
+.breakdownQuestionText {
+  margin: 0.35rem 0 0;
+  color: #495057;
+  font-size: 0.96rem;
+  line-height: 1.45;
+  max-width: 60rem;
+}
+
 .breakdownBarRow {
   display: grid;
   grid-template-columns: 88px minmax(0, 1fr) 52px;
@@ -635,30 +687,6 @@
   line-height: 1.55;
 }
 
-.mapSelectedQuestionPanel {
-  display: grid;
-  gap: 0.45rem;
-  border-top: 1px solid #d7dde5;
-  background: rgba(248, 249, 252, 0.98);
-  padding: 0.95rem 1rem 1.05rem;
-}
-
-.mapSelectedQuestionLabel {
-  color: #495057;
-  font-size: 0.78rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.mapSelectedQuestionText {
-  margin: 0;
-  color: #212529;
-  font-size: 1rem;
-  font-weight: 600;
-  line-height: 1.45;
-}
-
 .mapFrameCompact {
   align-items: center;
   display: flex;
@@ -713,6 +741,11 @@
 
   .selectorLayout {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .selectedQuestionBannerHeader {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }
 

@@ -115,9 +115,13 @@ describe('DemoAnalysisWorkspace', () => {
     });
 
     expect(screen.getByTestId('demo-analysis-selected-question').textContent).toBe(suggestionQuestionText);
+    expect(screen.getByTestId('demo-analysis-breakdown-question').textContent).toBe(suggestionQuestionText);
     expect(suggestionQuestionText).toBeTruthy();
     expect(screen.getByTestId('demo-analysis-question-breakdown')).toHaveTextContent(/overall/i);
+    expect(screen.getByTestId('demo-analysis-question-breakdown')).toHaveTextContent(/personas/i);
+    expect(screen.getByTestId('demo-analysis-question-breakdown')).toHaveTextContent(/modeled responses/i);
     expect(screen.getByTestId('demo-analysis-report-summary').textContent).toMatch(/:/);
+    expect(screen.getByTestId('demo-analysis-suggestion-0')).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('auto-selects a strong correlation from the wand action', async () => {
@@ -130,6 +134,10 @@ describe('DemoAnalysisWorkspace', () => {
     });
 
     expect(screen.getByTestId('demo-analysis-selected-question').textContent).toBeTruthy();
+    expect(screen.getByTestId('demo-analysis-question-banner')).toBeInTheDocument();
+    expect(screen.getByTestId('demo-analysis-breakdown-question').textContent).toBe(
+      screen.getByTestId('demo-analysis-selected-question').textContent
+    );
   });
 
   it('keeps auto-select usable after only one demographic segment is chosen', async () => {

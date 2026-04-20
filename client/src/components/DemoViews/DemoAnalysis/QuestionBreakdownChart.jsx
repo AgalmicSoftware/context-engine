@@ -7,6 +7,25 @@ const BAR_COLORS = Object.freeze({
   Disagree: 'linear-gradient(90deg, #8e2e3b 0%, #ff6b6b 100%)',
 });
 
+const formatCountLabel = (count = 0, singular = '', plural = '') => {
+  const normalizedCount = Number(count || 0);
+  return `${normalizedCount} ${normalizedCount === 1 ? singular : plural}`;
+};
+
+const formatDatasetMeta = (rows = []) => {
+  const modeledResponseCount = Number(rows[0]?.totalVotes || 0);
+  const participantCount = Number(rows[0]?.participantCount || modeledResponseCount);
+
+  if (modeledResponseCount > participantCount) {
+    return [
+      formatCountLabel(participantCount, 'persona', 'personas'),
+      formatCountLabel(modeledResponseCount, 'modeled response', 'modeled responses'),
+    ].join(' · ');
+  }
+
+  return formatCountLabel(participantCount, 'persona', 'personas');
+};
+
 const QuestionBreakdownChart = ({
   question,
   flatResponses = [],
@@ -50,7 +69,12 @@ const QuestionBreakdownChart = ({
   return (
     <section className={`${styles.panel} ${styles.chartPanel}`} data-testid="demo-analysis-question-breakdown">
       <div className={styles.panelHeader}>
-        <h3 className={styles.panelTitle}>Question Breakdown</h3>
+        <div>
+          <h3 className={styles.panelTitle}>Question Breakdown</h3>
+          <p className={styles.breakdownQuestionText} data-testid="demo-analysis-breakdown-question">
+            {question.text}
+          </p>
+        </div>
         <button type="button" className={styles.clearButton} onClick={() => onOpenDrilldown(question.id)}>
           Details
         </button>
@@ -62,7 +86,7 @@ const QuestionBreakdownChart = ({
             <div className={styles.breakdownDatasetHeader}>
               <span className={styles.breakdownDatasetTitle}>{dataset.label}</span>
               <span className={styles.breakdownDatasetMeta}>
-                {dataset.rows[0]?.totalVotes || 0} voters
+                {formatDatasetMeta(dataset.rows)}
               </span>
             </div>
             <div className={styles.breakdownBars}>
