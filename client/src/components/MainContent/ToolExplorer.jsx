@@ -81,7 +81,7 @@ const ToolExplorer = (props) => {
       status: 'live',
     },
     {
-      name: 'Data',
+      name: 'Context',
       subtext: 'AI Opinion Database',
       explainText: 'AI Database Tool ingests URLs or PDFs, generates debate-worthy questions using AI, and allows users to select and add these questions to a debate tree and/or question bank.',
       image: magnifyingGlassImage,
@@ -140,7 +140,7 @@ const ToolExplorer = (props) => {
 
   const expandedToolName = expandedComponent?.data?.name || '';
   const showGroupsHeaderActions = expandedToolName === 'Groups';
-  const showDataHeaderActions = expandedToolName === 'Data';
+  const showDataHeaderActions = expandedToolName === 'Context';
   const expandedDemoCard = expandedComponent?.data?.status === 'future';
 
   const readInitialGroupsCreateState = () => (
