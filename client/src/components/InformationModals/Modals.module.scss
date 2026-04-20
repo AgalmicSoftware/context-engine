@@ -1655,11 +1655,7 @@ input[type='radio']:checked:after {
   }
 }
 
-.welcomeSlideImage {
-  border: 0;
-}
-
-.welcomeSlideImageIntro {
+#greetingImage {
   max-width: 95vw;
   align-self: flex-end;
   mix-blend-mode: lighten !important;
@@ -1810,22 +1806,22 @@ input[type='radio']:checked:after {
   color: var(--ce-color-white);
 }
 
-.welcomeSlideBulletList.isTitlelessBulletList {
+#betaExaplainerList.titlelessBulletListContainer {
   height: auto;
   align-self: center;
 }
 
-.welcomeSlideBulletList.isTitlelessBulletList .welcomeSlideBulletItems {
+#betaExaplainerList.titlelessBulletListContainer #betaExplainerBulletpoint {
   margin-top: 0;
   margin-bottom: 0;
 }
 
-.welcomeSlideBulletList.isTitlelessBulletList .welcomeSlideBulletText {
+#betaExaplainerList.titlelessBulletListContainer #betaExplainerBulletText {
   margin-top: 0;
   margin-bottom: 0;
 }
 
-.welcomeSlideMediaText {
+.siteExplainerText {
   font-size: 50px;
   color: var(--ce-color-white);
 }
@@ -1850,11 +1846,11 @@ input[type='radio']:checked:after {
   color: var(--ce-color-white);
 }
 
-.welcomeSlideBulletTrailingText {
+.betaExplainerBulletTrailingText {
   color: rgba(255, 255, 255, 0.7);
 }
 
-.welcomeSlideMediaButtonCentered {
+#siteExplainerMultiply {
   width: 65%;
   height: 390px;
   display: flex;
