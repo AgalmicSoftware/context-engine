@@ -33,17 +33,11 @@ const contractsLog = createLogger('contracts');
 
 export const SESSION_SCOPE_WINDOW_SKIP_LOGGED = new Set<string>();
 
-const isRecord = (value: unknown): value is Record<string, unknown> => (
-  !!value && typeof value === 'object'
-);
-
 export const readActiveSessionSlugForScope = () => {
   let fromStore = '';
   try {
-    const state = (store as { getState?: () => unknown })?.getState?.() || {};
-    const sessionState = isRecord(state) && isRecord(state.sessionState)
-      ? state.sessionState
-      : {};
+    const state = (store as { getState?: () => any })?.getState?.() || {};
+    const sessionState = state?.sessionState || {};
     const raw =
       sessionState.activeSessionSlug ||
       '';

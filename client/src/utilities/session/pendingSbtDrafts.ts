@@ -6,7 +6,7 @@ type PendingSbtContractEntry = {
 };
 
 type PendingSbtContractsMap = Record<string, PendingSbtContractEntry>;
-type SessionConfigLike = Record<string, unknown>;
+type SessionConfigLike = Record<string, any>;
 
 type BuildPendingSbtDeploySessionConfigOptions = {
   sessionConfig?: unknown;
@@ -14,10 +14,6 @@ type BuildPendingSbtDeploySessionConfigOptions = {
   networkChainId?: unknown;
   contracts?: unknown;
 };
-
-const isObj = (value: unknown): value is SessionConfigLike => (
-  !!value && typeof value === 'object' && !Array.isArray(value)
-);
 
 const normalizePendingSbtContractEntry = (value: unknown): PendingSbtContractEntry | null => {
   if (!value) return null;
@@ -27,8 +23,8 @@ const normalizePendingSbtContractEntry = (value: unknown): PendingSbtContractEnt
     return address ? { address } : null;
   }
 
-  if (!isObj(value)) return null;
-  const source = value;
+  if (typeof value !== 'object' || Array.isArray(value)) return null;
+  const source = value as SessionConfigLike;
 
   const address = toStr(
     source.address ||
@@ -56,7 +52,7 @@ const normalizePendingSbtContractEntry = (value: unknown): PendingSbtContractEnt
 export const clonePendingSbtDeployContracts = (
   contractsIn: unknown = {}
 ): PendingSbtContractsMap => {
-  if (!isObj(contractsIn)) {
+  if (!contractsIn || typeof contractsIn !== 'object' || Array.isArray(contractsIn)) {
     return {};
   }
 
@@ -76,8 +72,10 @@ export const buildPendingSbtDeploySessionConfig = ({
   { slug?: string; networkChainId?: number; contracts: PendingSbtContractsMap } | null
 ) => {
   const source = (
-    isObj(sessionConfig)
-  ) ? sessionConfig : {};
+    sessionConfig &&
+    typeof sessionConfig === 'object' &&
+    !Array.isArray(sessionConfig)
+  ) ? sessionConfig as SessionConfigLike : {};
 
   const slug = toStr(source.slug || source.sessionSlug || sessionSlug).trim();
   const resolvedNetworkChainId = Number(
