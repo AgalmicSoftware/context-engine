@@ -2,6 +2,7 @@ import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import PolisReport, {
   applyFilterStateToAggregator,
+  buildClusterAnalysisDataKey,
   buildPrecomputedDemoClusterState,
   buildRatingMatrixFromDemo,
   formatBlockchainNetworkLabel,
@@ -59,10 +60,6 @@ jest.mock('../../utilities/survey/polisReportMath.js', () => ({
     total: 0,
   }))),
   findRepresentativeQuestions: jest.fn(() => ({})),
-}));
-
-jest.mock('../../utilities/ai/aiScripts.js', () => ({
-  analyzeClusterOpinions: jest.fn(),
 }));
 
 jest.mock('utilities/proposalScripts.js', () => ({
@@ -563,6 +560,41 @@ describe('PolisReport demo data defaults', () => {
     await waitFor(() => {
       expect(screen.getAllByTestId(E2E_TESTIDS.POLIS_CLUSTER_ANALYSIS)).toHaveLength(3);
     });
+  });
+
+  it('ignores questionResponsesNonce churn in the demo-mode cluster-analysis cache key', () => {
+    const sharedArgs = {
+      activeClusterAssignments: [0, 1, 1, 0],
+      activeClusterCount: 2,
+      activeRepQuestions: { 0: [{ questionIndex: 0 }], 1: [{ questionIndex: 1 }] },
+      embeddingChoice: 'UMAP',
+      questionPrompts: { 0: 'Prompt A', 1: 'Prompt B' },
+      allQuestions: [{}, {}],
+    };
+
+    const demoKeyA = buildClusterAnalysisDataKey({
+      ...sharedArgs,
+      useDemoData: true,
+      questionResponsesNonce: 0,
+    });
+    const demoKeyB = buildClusterAnalysisDataKey({
+      ...sharedArgs,
+      useDemoData: true,
+      questionResponsesNonce: 7,
+    });
+    const liveKeyA = buildClusterAnalysisDataKey({
+      ...sharedArgs,
+      useDemoData: false,
+      questionResponsesNonce: 0,
+    });
+    const liveKeyB = buildClusterAnalysisDataKey({
+      ...sharedArgs,
+      useDemoData: false,
+      questionResponsesNonce: 7,
+    });
+
+    expect(demoKeyA).toBe(demoKeyB);
+    expect(liveKeyA).not.toBe(liveKeyB);
   });
 
   it('defaults custom demo datasets to UMAP with 3 groups and clears manual K in Polis Auto mode', () => {

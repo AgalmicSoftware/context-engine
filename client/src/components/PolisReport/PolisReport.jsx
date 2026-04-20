@@ -209,6 +209,36 @@ export function shouldAutoEnablePolisDemoData(input = {}) {
   return POLIS_DEMO_AUTOLOAD_SLUG_SET.has(slug) && hasPolisDemoDatasetForSlug(slug, input);
 }
 
+export function buildClusterAnalysisDataKey({
+  activeClusterAssignments = [],
+  activeClusterCount = 0,
+  activeRepQuestions = {},
+  embeddingChoice = '',
+  useDemoData = false,
+  questionResponsesNonce = 0,
+  questionPrompts = {},
+  allQuestions = [],
+} = {}) {
+  const assignmentHash = (Array.isArray(activeClusterAssignments) ? activeClusterAssignments : []).reduce((acc, val) => {
+    return (acc * 31 + (val + 1)) % 1000000007;
+  }, 7);
+  const promptEntries = Object.entries(questionPrompts || {});
+  let promptsHash = 0;
+  promptEntries.forEach(([key, value]) => {
+    const text = `${key}:${value || ''}`;
+    for (let i = 0; i < text.length; i += 31) {
+      promptsHash = (promptsHash * 33 + text.charCodeAt(i)) % 1000000007;
+    }
+  });
+  const questionCount = allQuestions?.length || 0;
+  const repCount = Object.keys(activeRepQuestions || {}).length;
+  // Demo-mode analysis derives from the fixed fixture, so upstream response
+  // nonce churn should not invalidate the visible cluster-analysis cache.
+  const nonce = useDemoData ? 0 : (questionResponsesNonce ?? 0);
+
+  return `${embeddingChoice}-${activeClusterCount}-${nonce}-${questionCount}-${promptEntries.length}-${repCount}-${assignmentHash}-${promptsHash}`;
+}
+
 /**************************************************************
  * Helper: applyFilterStateToAggregator
  * Filters the aggregator BEFORE building the rating matrix.
@@ -1347,27 +1377,21 @@ export default function PolisReport({
       return false;
     }
   });
-  const analysisDataKey = useMemo(() => {
-    const assignmentHash = activeClusterAssignments.reduce((acc, val) => {
-      return (acc * 31 + (val + 1)) % 1000000007;
-    }, 7);
-    const promptEntries = Object.entries(questionPrompts || {});
-    let promptsHash = 0;
-    promptEntries.forEach(([key, value]) => {
-      const text = `${key}:${value || ''}`;
-      for (let i = 0; i < text.length; i += 31) {
-        promptsHash = (promptsHash * 33 + text.charCodeAt(i)) % 1000000007;
-      }
-    });
-    const questionCount = allQuestions?.length || 0;
-    const repCount = Object.keys(activeRepQuestions || {}).length;
-    const nonce = questionResponsesNonce ?? 0;
-    return `${embeddingChoice}-${activeClusterCount}-${nonce}-${questionCount}-${promptEntries.length}-${repCount}-${assignmentHash}-${promptsHash}`;
-  }, [
+  const analysisDataKey = useMemo(() => buildClusterAnalysisDataKey({
     activeClusterAssignments,
     activeClusterCount,
     activeRepQuestions,
     embeddingChoice,
+    useDemoData,
+    questionResponsesNonce,
+    questionPrompts,
+    allQuestions,
+  }), [
+    activeClusterAssignments,
+    activeClusterCount,
+    activeRepQuestions,
+    embeddingChoice,
+    useDemoData,
     questionResponsesNonce,
     questionPrompts,
     allQuestions,
