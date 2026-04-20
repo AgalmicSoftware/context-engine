@@ -304,12 +304,6 @@ export const isNonRecoverableGetLogsError = (err: unknown): boolean => {
 /**
  * Factory: creates a bound fetchLogsSmartWithProvider using caller-provided retry infrastructure.
  * Avoids circular dependency since callWithRetry lives in contractScripts.impl.ts.
- *
- * @param {object} deps
- * @param {Function} deps.callWithRetry retry wrapper from contractScripts.impl
- * @param {number} deps.INITIAL_DELAY_MS_DEFAULT base retry delay
- * @param {number} deps.DELAY_MULTIPLIER_DEFAULT retry backoff multiplier
- * @returns {Function} fetchLogsSmartWithProvider
  */
 export function createFetchLogsSmartWithProvider({
   callWithRetry,

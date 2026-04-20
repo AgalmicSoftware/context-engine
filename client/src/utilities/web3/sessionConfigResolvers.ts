@@ -19,7 +19,6 @@ import {
   getDemoSessionConfigForDisplay,
 } from '../session/sessionSourceResolver.js';
 import { overlayCachedSessionWorkerConfig } from '../session/sessionWorkerConfigCache.js';
-import { extractChainId } from './chainIdResolution.js';
 import { sessionRegistryStore } from './sessionRegistry.js';
 
 type AnyRecord = Record<string, any>;
@@ -134,7 +133,7 @@ export function resolveSession(groupKeyOrCfg?: unknown): SessionConfigLike | nul
     };
   }
   if (typeof resolvedInput === 'object') return normalizeSessionNaming(resolvedInput) as SessionConfigLike;
-  // Fallback to "general" only when strict demo-fallback policy allows it.
+  // Fallback to "general" — gated behind strict demo-fallback policy (PRD 238 Stage-C).
   if (!defaultStrictAllowDemoFallback()) return null;
   return getDemoDefaultSessionConfig() as SessionConfigLike | null;
 }
@@ -223,7 +222,7 @@ export function getAllSessionEntries(): SessionConfigEntry[] {
       ([key, cfg]) => [key, normalizeSessionNaming(cfg) as SessionConfigLike] as SessionConfigEntry
     );
   }
-  // In on-chain mode, do not silently fall back to demo sessions.
+  // In on-chain mode, do not silently fall back to demo sessions (PRD 238 Stage-C).
   if (!defaultStrictAllowDemoFallback()) return [];
   return getAllDemoSessionConfigs() as SessionConfigEntry[];
 }
@@ -269,8 +268,13 @@ export function getSessionLists(slugOrEmpty: unknown): SessionLists {
 
 export function getSessionChainId(sessionKeyOrCfg: unknown = null): number | null {
   const cfg = getSessionConfigBySlugOrDefault(sessionKeyOrCfg === undefined ? '' : sessionKeyOrCfg);
-  const id = extractChainId(cfg, { strict: true });
-  return id || null;
+  const id = Number(
+    cfg?.networkChainId ||
+    cfg?.contracts?.surveys?.chainId ||
+    cfg?.contracts?.sbtFactory?.chainId ||
+    0
+  );
+  return Number.isFinite(id) && id > 0 ? id : null;
 }
 
 export function getSessionNetwork(sessionKeyOrCfg: unknown = null): AnyRecord | null {

@@ -35,7 +35,6 @@ type SessionConfigLike = AnyRecord;
 type ReadProviderGroupOptions = {
   contractKey?: string;
   strict?: boolean;
-  skipGlobalPathDefaults?: boolean;
   [key: string]: any;
 };
 type ReadProviderResolutionOptions = {
@@ -47,7 +46,6 @@ type ReadProviderResolutionOptions = {
   sessionAccessStatus?: string;
   sessionAccessMode?: string;
   sessionRpcSource?: string;
-  sessionSponsoredUrls?: string[];
   [key: string]: any;
 };
 type ReadProviderPreference = ReadProviderResolutionOptions;
@@ -86,7 +84,6 @@ type ReadProviderResolution = {
   infuraOnlyForChain: boolean;
   configuredPaidRpcUrl: string;
   treatPreferredUrlsAsPath: boolean;
-  sessionSponsoredUrls: string[];
 };
 type SponsoredSessionRpcAccess = {
   allowed: boolean;
@@ -174,53 +171,6 @@ const isPathTransportError = (err: unknown): boolean => {
   );
 };
 
-const isSponsoredRpcFallbackError = (err: unknown): boolean => {
-  if (isPathTransportError(err)) return true;
-  const errorLike = err as AnyRecord;
-  const code = String(errorLike?.code ?? errorLike?.error?.code ?? '').toUpperCase();
-  const message = String(
-    errorLike?.reason ||
-    errorLike?.shortMessage ||
-    errorLike?.message ||
-    errorLike?.error?.message ||
-    ''
-  ).toLowerCase();
-
-  if (code !== 'CALL_EXCEPTION' && code !== 'UNPREDICTABLE_GAS_LIMIT') return false;
-  return (
-    message.includes('missing revert data') ||
-    message.includes('bad result from backend') ||
-    message.includes('could not coalesce') ||
-    message.includes('value=null') ||
-    message.includes('value= null') ||
-    message.includes('failed to fetch') ||
-    message.includes('network error') ||
-    message.includes('timeout') ||
-    message.includes('server error')
-  );
-};
-
-const toSponsoredRpcFallbackError = (err: unknown, meta: AnyRecord = {}): Error => {
-  const errorLike = err as AnyRecord;
-  const message = String(
-    errorLike?.reason ||
-    errorLike?.shortMessage ||
-    errorLike?.message ||
-    errorLike?.error?.message ||
-    'Sponsored RPC read failed.'
-  );
-  const fallbackError = new Error(message);
-  Object.assign(fallbackError as AnyRecord, {
-    code: 'SERVER_ERROR',
-    reason: message,
-    originalCode: errorLike?.code ?? errorLike?.error?.code ?? '',
-    originalError: err,
-    __ce_sponsored_rpc_fallback: true,
-    ...meta,
-  });
-  return fallbackError;
-};
-
 const logPathRpcErrorOnce = (url: string, err: unknown, meta: AnyRecord = {}): void => {
   if (!url || !isPathTransportError(err)) return;
   if (PATH_RPC_ERROR_ONCE.has(url)) return;
@@ -228,7 +178,7 @@ const logPathRpcErrorOnce = (url: string, err: unknown, meta: AnyRecord = {}): v
   const errorLike = err as AnyRecord;
   const code = errorLike?.code ?? errorLike?.error?.code;
   const message = errorLike?.message || errorLike?.error?.message || '';
-  rpcLogger.warn('PATH RPC failed; falling back', { url, code, message, ...meta });
+  rpcLogger.error('PATH RPC failed; falling back', { url, code, message, ...meta });
 };
 
 const markRangeTooLargeError = (err: unknown): void => {
@@ -359,7 +309,7 @@ const warmSponsoredSessionRpcAccess = ({
   account?: string;
 } = {}): void => {
   Promise.resolve()
-    .then(() => import('./sponsoredAccessLazy.js'))
+    .then(() => import('./sponsoredAccess.js'))
     .then((mod) => mod?.primeSponsoredAccessCheck?.({
       sessionConfig,
       sessionSlug,
@@ -550,9 +500,7 @@ function resolveGroupPathRpcPreference(cfg: SessionConfigLike = {}, chainId: unk
   const providerName = toLower(rpc.provider || rpc.mode || cfg?.rpcProvider || '');
   const providerIsDefault = !providerName || providerName === 'default';
   const providerIsPath = PATH_PROVIDER_KEYS.has(providerName);
-  const preferGlobal = cfg?.__CE_skipGlobalPathDefaults === true
-    ? false
-    : readPreferPathRpcFlag(id);
+  const preferGlobal = readPreferPathRpcFlag(id);
   const pathDefaultUrls = dedupeRpcUrls(getPathRpcUrl(id));
   const pathOverrideUrls = resolvePathOverrideUrls(cfg, id);
   const usingCustomPathOverrides = hasCustomPathOverrides(pathOverrideUrls, pathDefaultUrls);
@@ -612,7 +560,6 @@ function resolveGroupPathRpcPreference(cfg: SessionConfigLike = {}, chainId: unk
       : usingSessionRootUrls
         ? 'root'
         : 'default-path',
-    sessionSponsoredUrls: usingSessionRootUrls ? sessionRootUrls : [],
   };
 }
 
@@ -718,7 +665,6 @@ const buildReadProviderResolution = (
     ? pathDefaultUrls
     : [];
   const preferredUrls = infuraOnlyForChain ? [] : (preferredUrlsRaw.length ? preferredUrlsRaw : globalPreferred);
-  const sessionSponsoredUrls = dedupeRpcUrls(opts.sessionSponsoredUrls);
   const allowPathUrls = !infuraOnlyForChain && (
     treatPreferredUrlsAsPath ||
     (!preferredUrlsRaw.length && !opts.skipGlobalPreferred && preferPathFlag)
@@ -782,7 +728,6 @@ const buildReadProviderResolution = (
     infuraOnlyForChain,
     configuredPaidRpcUrl,
     treatPreferredUrlsAsPath,
-    sessionSponsoredUrls,
   };
 };
 
@@ -802,7 +747,6 @@ function _getCachedProvider(chainId: unknown, opts: ReadProviderResolutionOption
     publicUrls,
     defaultUrls,
     preferredUrls,
-    sessionSponsoredUrls,
     providerLabel,
     preferPathFlag,
     pathDefaultUrls,
@@ -840,20 +784,10 @@ function _getCachedProvider(chainId: unknown, opts: ReadProviderResolutionOption
   }
 
   const lastIndex = urls.length - 1;
-  const sessionSponsoredUrlSet = new Set(sessionSponsoredUrls.map((url) => toLower(url)));
-  const hasSessionSponsoredFallbackUrls = (
-    toStr(opts.sessionRpcSource).trim() === 'root' &&
-    sessionSponsoredUrlSet.size > 0 &&
-    urls.some((url) => !sessionSponsoredUrlSet.has(toLower(url)))
-  );
 
   const providerConfigs: any[] = urls.map((url, idx) => {
     const isBackup = urls.length > 1 && idx === lastIndex;
     const provider = new ethers.providers.JsonRpcProvider(url, staticNet) as AnyRecord;
-    const isSponsoredRootUrl = (
-      hasSessionSponsoredFallbackUrls &&
-      sessionSponsoredUrlSet.has(toLower(url))
-    );
 
     const basePerform = provider.perform.bind(provider);
     provider.perform = async (method: string, params: unknown) => {
@@ -869,17 +803,6 @@ function _getCachedProvider(chainId: unknown, opts: ReadProviderResolutionOption
           markRangeTooLargeError(err);
           logPathRpcErrorOnce(url, err, { chainId: id, method, provider: providerLabel });
           logVerboseRpcError('PATH RPC error detail', err, {
-            chainId: id,
-            method,
-            provider: providerLabel,
-            url,
-          });
-        }
-        // Regression guard: ethers v5 forwards CALL_EXCEPTION at quorum=1, so
-        // malformed sponsored RPC reads must be downgraded before public/POKT
-        // fallbacks get skipped.
-        if (isSponsoredRootUrl && isSponsoredRpcFallbackError(err)) {
-          throw toSponsoredRpcFallbackError(err, {
             chainId: id,
             method,
             provider: providerLabel,
@@ -1035,29 +958,7 @@ export function getReadProviderForGroup(
     contractsLog.warn('getReadProviderForGroup: Could not resolve chainId for group', groupKeyOrCfg);
   }
 
-  let rpcPref = resolveGroupPathRpcPreference(
-    options?.skipGlobalPathDefaults === true
-      ? { ...cfg, __CE_skipGlobalPathDefaults: true }
-      : cfg,
-    chId
-  );
-  if (options?.skipGlobalPathDefaults === true && !rpcPref) {
-    rpcPref = {
-      skipGlobalPreferred: true,
-      providerLabel: toStr(options.providerLabel || '') || 'default',
-    };
-  }
-  if (options?.skipGlobalPreferred === true) {
-    rpcPref = rpcPref?.sessionRpcSource === 'root'
-      ? {
-        ...rpcPref,
-        skipGlobalPreferred: true,
-      }
-      : {
-        skipGlobalPreferred: true,
-        providerLabel: toStr(options.providerLabel || '') || 'default',
-      };
-  }
+  const rpcPref = resolveGroupPathRpcPreference(cfg, chId);
   if (shouldLog('rpc', 'log')) {
     rpcLog('PROVIDER_SELECT', {
       function: 'getReadProviderForGroup',
@@ -1067,7 +968,6 @@ export function getReadProviderForGroup(
       contractKey: String(options?.contractKey || '').trim() || null,
       chainLabel: chId ? getChainLabelById(chId) : null,
       rpcProvider: rpcPref?.providerLabel || 'default',
-      skipGlobalPreferred: options?.skipGlobalPreferred === true,
     });
   }
 

@@ -173,27 +173,7 @@ const resolveOnChainGateForResource = (
     };
   }
 
-  const requestedGateSnapshot = gatesByResource[key] || null;
-  const defaultGateSnapshot = key !== 'default' ? (gatesByResource.default || null) : null;
-  const requestedLookupStatus = toStr(requestedGateSnapshot?.lookupStatus).trim().toLowerCase();
-  const defaultLookupStatus = toStr(defaultGateSnapshot?.lookupStatus).trim().toLowerCase();
-  const requestedSbtAddresses = getGateSbtAddresses({
-    sbtAddresses: requestedGateSnapshot?.sbtAddresses,
-    sbtAddress: requestedGateSnapshot?.sbtAddress,
-  });
-  const defaultSbtAddresses = getGateSbtAddresses({
-    sbtAddresses: defaultGateSnapshot?.sbtAddresses,
-    sbtAddress: defaultGateSnapshot?.sbtAddress,
-  });
-  const shouldUseDefaultGate = (
-    key === 'rpc' &&
-    defaultLookupStatus === 'ok' &&
-    (
-      requestedLookupStatus !== 'ok' ||
-      (!requestedSbtAddresses.length && defaultSbtAddresses.length)
-    )
-  );
-  const gateSnapshot = shouldUseDefaultGate ? defaultGateSnapshot : requestedGateSnapshot;
+  const gateSnapshot = gatesByResource[key] || null;
   const lookupStatus = toStr(gateSnapshot?.lookupStatus).trim().toLowerCase();
   if (lookupStatus !== 'ok') {
     return {
@@ -221,7 +201,7 @@ const resolveOnChainGateForResource = (
     status: SPONSORED_GATE_STATES.RESTRICTED,
     gate: {
       type: 'sbt',
-      label: toStr(gateSnapshot?.label || gateSnapshot?.name || gateSnapshot?.title).trim() || `Registry ${shouldUseDefaultGate ? 'default' : key} gate`,
+      label: toStr(gateSnapshot?.label || gateSnapshot?.name || gateSnapshot?.title).trim() || `Registry ${key} gate`,
       gateId: toStr(gateSnapshot?.gateId || gateSnapshot?.id).trim() || null,
       sbtAddress: sbtAddresses[0],
       sbtAddresses,
