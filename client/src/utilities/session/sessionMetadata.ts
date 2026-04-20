@@ -6,21 +6,19 @@
  * Key exports: stripAuthoritativeSessionGateFields, normalizeSessionNaming, normalizeLitMetadataNetwork
  */
 
-/**
- * @typedef {object} SessionMetadata
- * @property {boolean=} sponsored
- * @property {Array<Record<string, any>> | Record<string, any>=} gates
- * @property {string=} sessionName
- * @property {string=} orgName
- * @property {string=} sessionInfo
- * @property {string=} orgInfo
- * @property {string | Record<string, any> | null=} sessionInfoEncrypted
- * @property {string | Record<string, any> | null=} encryptedSessionInfo
- * @property {string | Record<string, any> | null=} orgInfoEncrypted
- * @property {string | Record<string, any> | null=} encryptedOrgInfo
- * @property {{ network?: string }=} lit
- * @property {string=} litNetwork
- */
+export type SessionMetadata = Record<string, any> & {
+  gates?: Array<Record<string, any>> | Record<string, any>;
+  lit?: Record<string, any> | null;
+  litNetwork?: string;
+  orgInfo?: string;
+  orgInfoEncrypted?: string | Record<string, any> | null;
+  orgName?: string;
+  sessionInfo?: string;
+  sessionInfoEncrypted?: string | Record<string, any> | null;
+  sessionName?: string;
+  sponsored?: boolean | Record<string, any>;
+  sponsoredSbtAddress?: string;
+};
 
 const DEFAULT_LIT_NETWORK = 'naga-dev';
 const LEGACY_LIT_NETWORK_ALIASES = Object.freeze({
@@ -30,17 +28,19 @@ const LEGACY_LIT_NETWORK_ALIASES = Object.freeze({
   nagatest: 'naga-test',
   'naga-mainnet': 'naga',
   datil: 'naga',
-});
+} as const);
 
-const isObj = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
-const cloneMetadata = (metadata) => (isObj(metadata) ? { ...metadata } : metadata);
-const readTrimmedString = (value) => (typeof value === 'string' ? value.trim() : '');
+const isObj = (value: unknown): value is SessionMetadata => (
+  !!value && typeof value === 'object' && !Array.isArray(value)
+);
+const cloneMetadata = <T>(metadata: T): T => (isObj(metadata) ? { ...metadata } as T : metadata);
+const readTrimmedString = (value: unknown): string => (typeof value === 'string' ? value.trim() : '');
 
-const resolveCanonicalLitNetwork = (value) => {
+const resolveCanonicalLitNetwork = (value: unknown): string => {
   const raw = readTrimmedString(value || DEFAULT_LIT_NETWORK);
   if (!raw) return DEFAULT_LIT_NETWORK;
   const normalized = raw.toLowerCase().replace(/_/g, '-');
-  return LEGACY_LIT_NETWORK_ALIASES[normalized] || raw;
+  return (LEGACY_LIT_NETWORK_ALIASES as Record<string, string>)[normalized] || raw;
 };
 
 /**
@@ -48,7 +48,7 @@ const resolveCanonicalLitNetwork = (value) => {
  * @param {unknown} metadata
  * @returns {unknown}
  */
-export const stripAuthoritativeSessionGateFields = (metadata) => {
+export const stripAuthoritativeSessionGateFields = (metadata: unknown): unknown => {
   if (!isObj(metadata)) return metadata;
   const next = cloneMetadata(metadata);
   delete next.sponsored;
@@ -62,7 +62,7 @@ export const stripAuthoritativeSessionGateFields = (metadata) => {
  * @param {unknown} metadata
  * @returns {unknown}
  */
-export const normalizeSessionNaming = (metadata) => {
+export const normalizeSessionNaming = (metadata: unknown): unknown => {
   if (!isObj(metadata)) return metadata;
   const next = cloneMetadata(metadata);
 
@@ -100,7 +100,7 @@ export const normalizeSessionNaming = (metadata) => {
  * @param {unknown} metadata
  * @returns {unknown}
  */
-export const normalizeLitMetadataNetwork = (metadata) => {
+export const normalizeLitMetadataNetwork = (metadata: unknown): unknown => {
   if (!isObj(metadata)) return metadata;
   const next = cloneMetadata(metadata);
 

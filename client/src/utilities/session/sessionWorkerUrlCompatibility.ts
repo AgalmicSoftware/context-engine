@@ -1,4 +1,8 @@
-const hasOwn = (value, key) => Object.prototype.hasOwnProperty.call(value || {}, key);
+type SessionConfigLike = Record<string, unknown>;
+
+const hasOwn = (value: unknown, key: string): boolean => (
+  Object.prototype.hasOwnProperty.call(value || {}, key)
+);
 
 export const SESSION_WORKER_URL_COMPATIBILITY_KEYS = Object.freeze([
   'corsWorkerURL',
@@ -8,20 +12,23 @@ export const SESSION_WORKER_URL_COMPATIBILITY_KEYS = Object.freeze([
   'sessionWorkerUrl',
   'sessionWorkerURL',
   'workerURL',
-]);
+] as const);
 
 export const SESSION_WORKER_METADATA_ALIAS_KEYS = Object.freeze([
   'rpcUrl',
   ...SESSION_WORKER_URL_COMPATIBILITY_KEYS,
-]);
+] as const);
 
-export const readConfiguredSessionWorkerUrlCandidate = (sessionConfig = null) => {
+export const readConfiguredSessionWorkerUrlCandidate = (
+  sessionConfig: unknown = null
+): unknown => {
   if (!sessionConfig || typeof sessionConfig !== 'object' || Array.isArray(sessionConfig)) {
     return undefined;
   }
-  if (hasOwn(sessionConfig, 'corsWorkerUrl')) return sessionConfig.corsWorkerUrl;
+  const source = sessionConfig as SessionConfigLike;
+  if (hasOwn(source, 'corsWorkerUrl')) return source.corsWorkerUrl;
   for (const key of SESSION_WORKER_URL_COMPATIBILITY_KEYS) {
-    if (hasOwn(sessionConfig, key)) return sessionConfig[key];
+    if (hasOwn(source, key)) return source[key];
   }
   return undefined;
 };

@@ -7,11 +7,15 @@ import { normalizeSessionNaming } from './sessionMetadata.js';
 import { getDemoSessionMap } from './sessionDemoCompat.js';
 import { getUsableSessionWorkerUrl } from './sessionWorkerAvailability.js';
 
-const DEMO_SESSION_MAP = getDemoSessionMap();
+type SessionConfigLike = Record<string, any>;
 
-const isObj = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
+const DEMO_SESSION_MAP = getDemoSessionMap() as Record<string, SessionConfigLike>;
 
-const findDemoSessionConfigBySlug = (slugIn = '') => {
+const isObj = (value: unknown): value is SessionConfigLike => (
+  !!value && typeof value === 'object' && !Array.isArray(value)
+);
+
+const findDemoSessionConfigBySlug = (slugIn: unknown = ''): SessionConfigLike | null => {
   const slug = canonicalizeSessionSlug(slugIn);
   if (!isObj(DEMO_SESSION_MAP)) return null;
   if (!slug) return isObj(DEMO_SESSION_MAP.general) ? DEMO_SESSION_MAP.general : null;
@@ -27,15 +31,15 @@ const findDemoSessionConfigBySlug = (slugIn = '') => {
   return isObj(bySlug) ? bySlug : null;
 };
 
-export const resolveSessionSlugAlias = (sessionSlug, opts = {}) => (
-  resolveSessionSlugAliasFromDemoSessions({
+export const resolveSessionSlugAlias = (sessionSlug: unknown, opts: Record<string, any> = {}) => (
+  (resolveSessionSlugAliasFromDemoSessions as any)({
     sessionSlug,
     demoSessions: DEMO_SESSION_MAP,
     ...(opts || {}),
   })
 );
 
-export const getDemoSessionConfigForDisplay = (slug) => (
+export const getDemoSessionConfigForDisplay = (slug: unknown) => (
   normalizeSessionNaming(findDemoSessionConfigBySlug(slug))
 );
 
@@ -50,16 +54,19 @@ export const getAllDemoSessionConfigs = () => (
   ])
 );
 
-export const findDemoSessionByWorkerUrl = (url = '') => {
+export const findDemoSessionByWorkerUrl = (url: unknown = '') => {
   const normalizedTargetUrl = normalizeBaseUrl(url);
   for (const [, cfg] of getAllDemoSessionConfigs()) {
+    const sessionConfig = (cfg && typeof cfg === 'object' && !Array.isArray(cfg))
+      ? cfg as SessionConfigLike
+      : null;
     const normalizedWorkerUrl = normalizeBaseUrl(getUsableSessionWorkerUrl({
-      slug: cfg?.slug || '',
-      sessionConfig: cfg,
+      slug: sessionConfig?.slug || '',
+      sessionConfig,
       allowSharedFallback: true,
     }));
     if (!normalizedWorkerUrl) continue;
-    if (!normalizedTargetUrl || normalizedWorkerUrl === normalizedTargetUrl) return cfg;
+    if (!normalizedTargetUrl || normalizedWorkerUrl === normalizedTargetUrl) return sessionConfig;
   }
   return null;
 };

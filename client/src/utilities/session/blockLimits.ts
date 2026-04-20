@@ -1,16 +1,31 @@
-const toFiniteNumber = (value) => {
+type BlockLimitSource = {
+  start?: unknown;
+  end?: unknown;
+};
+
+export type NormalizedBlockLimits = {
+  start: number;
+  end: number | null;
+};
+
+const toFiniteNumber = (value: unknown): number | null => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
 };
 
-const toPositiveBlock = (value) => {
+const toPositiveBlock = (value: unknown): number | null => {
   const parsed = toFiniteNumber(value);
   if (!parsed || parsed <= 0) return null;
   return Math.floor(parsed);
 };
 
-export const normalizeBlockLimitsForConfig = (value, fallbackStart = null) => {
-  const source = value && typeof value === 'object' ? value : {};
+export const normalizeBlockLimitsForConfig = (
+  value: unknown,
+  fallbackStart: unknown = null
+): NormalizedBlockLimits | null => {
+  const source: BlockLimitSource = value && typeof value === 'object' && !Array.isArray(value)
+    ? value as BlockLimitSource
+    : {};
   const start = toPositiveBlock(source.start) || toPositiveBlock(fallbackStart);
   if (!start) return null;
 
