@@ -19,6 +19,8 @@ $tag-route-accent-alt: tokens.$ce-indigo;
 .pageEmbedded {
   min-height: auto;
   padding: 0;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 .shell {
@@ -30,10 +32,13 @@ $tag-route-accent-alt: tokens.$ce-indigo;
 
 .shellEmbedded {
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .header {
   margin-bottom: 24px;
+  min-width: 0;
 }
 
 .headerTopRow {
@@ -43,11 +48,12 @@ $tag-route-accent-alt: tokens.$ce-indigo;
   flex-wrap: wrap;
   gap: 16px;
   margin-bottom: 18px;
+  min-width: 0;
 }
 
 .headerLead {
   min-width: 0;
-  flex: 1 1 420px;
+  flex: 1 1 320px;
 }
 
 .headerMeta {
@@ -70,6 +76,8 @@ $tag-route-accent-alt: tokens.$ce-indigo;
   position: relative;
   flex-wrap: wrap;
   justify-content: flex-end;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .eyebrow {
@@ -82,15 +90,32 @@ $tag-route-accent-alt: tokens.$ce-indigo;
 
 .title {
   margin: 0;
-  font-size: clamp(2.6rem, 7vw, 4.8rem);
-  line-height: 0.94;
+  font-size: clamp(2rem, 5.2vw, 3.65rem);
+  line-height: 0.96;
   letter-spacing: -0.04em;
   max-width: 100%;
   overflow-wrap: anywhere;
 }
 
 .titleEmbedded {
-  font-size: clamp(3rem, 8vw, 5.8rem);
+  font-size: clamp(2rem, 5.35vw, 3.95rem);
+}
+
+.titlePillHeading {
+  display: flex;
+  width: 100%;
+  margin: 0;
+  min-width: 0;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.titleTagRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 12px;
+  max-width: 100%;
 }
 
 .scopeBadge {
@@ -140,9 +165,8 @@ $tag-route-accent-alt: tokens.$ce-indigo;
 
 .tagModalContent {
   background:
-    radial-gradient(circle at top right, rgba($tag-route-accent, 0.18), transparent 34%),
-    radial-gradient(circle at top left, rgba($tag-route-accent-alt, 0.16), transparent 30%),
-    linear-gradient(180deg, rgba($tag-route-bg, 0.985), rgba($tag-route-bg-deep, 0.985));
+    radial-gradient(circle at top right, rgba(77, 255, 164, 0.08), transparent 32%),
+    linear-gradient(180deg, rgba(12, 18, 34, 0.98), rgba(8, 12, 24, 0.98));
   border: 1px solid rgba(255, 255, 255, 0.1) !important;
   border-radius: 22px !important;
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45) !important;
@@ -156,9 +180,6 @@ $tag-route-accent-alt: tokens.$ce-indigo;
   height: 100%;
   pointer-events: auto;
   position: relative;
-
-  /* Match the fullscreen tag route's blue app surface inside the modal shell. */
-  background-color: $tag-route-bg;
 }
 
 .tagModalBackdrop {
@@ -179,10 +200,8 @@ $tag-route-accent-alt: tokens.$ce-indigo;
   display: flex;
   width: 100%;
   justify-content: space-between;
-  background:
-    linear-gradient(180deg, rgba($tag-route-accent-alt, 0.16), rgba($tag-route-bg, 0.1)),
-    rgba(255, 255, 255, 0.03);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   flex: 0 0 auto;
   min-height: 68px;
   padding: 16px 20px;
@@ -248,9 +267,7 @@ $tag-route-accent-alt: tokens.$ce-indigo;
   padding: 14px;
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 16px;
-  background:
-    linear-gradient(180deg, rgba($tag-route-accent-alt, 0.14), rgba($tag-route-bg-deep, 0.14)),
-    rgba($tag-route-bg, 0.98);
+  background: rgba(31, 37, 79, 0.98);
   box-shadow: 0 22px 42px rgba(0, 0, 0, 0.34);
   text-transform: none;
   letter-spacing: normal;
@@ -277,110 +294,6 @@ $tag-route-accent-alt: tokens.$ce-indigo;
   overflow-y: auto;
   height: 100%;
   width: 100%;
-  padding: clamp(18px, 2.6vw, 30px);
-}
-
-.tagModalWrap {
-  overflow: hidden;
-}
-
-.tagModal {
-  padding: 16px 0 !important;
-  overflow-x: hidden !important;
-  overflow-y: auto !important;
-
-  :global(.modal-dialog) {
-    width: min(1440px, calc(100vw - 32px));
-    max-width: min(1440px, calc(100vw - 32px));
-    height: calc(100vh - 32px);
-    min-height: calc(100vh - 32px);
-    margin: 0 auto;
-    display: flex;
-    align-items: stretch;
-    pointer-events: none;
-  }
-}
-
-.tagModalContent {
-  background:
-    radial-gradient(circle at top right, rgba(77, 255, 164, 0.08), transparent 32%),
-    linear-gradient(180deg, rgba(12, 18, 34, 0.98), rgba(8, 12, 24, 0.98));
-  border: 1px solid rgba(255, 255, 255, 0.1) !important;
-  border-radius: 22px !important;
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45) !important;
-  color: $page-text-color !important;
-  overflow: hidden;
-  display: flex;
-  flex: 1 1 auto;
-  flex-direction: column;
-  min-height: 0;
-  height: 100%;
-  pointer-events: auto;
-}
-
-.tagModalBackdrop {
-  position: fixed !important;
-  inset: 0 !important;
-  width: 100vw !important;
-  height: 100vh !important;
-  background: rgba(3, 5, 18, 0.08) !important;
-  opacity: 1 !important;
-  z-index: 1040 !important;
-  backdrop-filter: blur(2px);
-  -webkit-backdrop-filter: blur(2px);
-}
-
-.tagModalHeaderBar {
-  align-items: center;
-  background: rgba(255, 255, 255, 0.03);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  color: $page-text-color;
-  flex: 0 0 auto;
-  padding: 16px 20px;
-
-  :global(.modal-title) {
-    color: rgba(244, 247, 255, 0.88);
-    font-size: 0.92rem;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-  }
-}
-
-.tagModalCloseButton {
-  background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 999px;
-  color: rgba(244, 247, 255, 0.9);
-  cursor: pointer;
-  width: 2.4rem;
-  height: 2.4rem;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.45rem;
-  line-height: 1;
-  padding: 0;
-  transition:
-    border-color 0.18s ease,
-    color 0.18s ease,
-    background 0.18s ease,
-    transform 0.18s ease;
-
-  &:hover,
-  &:focus {
-    background: rgba(255, 255, 255, 0.08);
-    border-color: rgba(77, 255, 164, 0.34);
-    color: tokens.$ce-clickable;
-    transform: translateY(-1px);
-  }
-}
-
-.tagModalBody {
-  background: transparent;
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow: auto;
   padding: clamp(18px, 2.6vw, 30px);
 }
 
@@ -500,6 +413,8 @@ $tag-route-accent-alt: tokens.$ce-indigo;
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .tagPill {
@@ -730,6 +645,8 @@ $tag-route-accent-alt: tokens.$ce-indigo;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.035));
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.2);
+  min-width: 0;
+  max-width: 100%;
 }
 
 .demoCorpusCardTopRow {
@@ -738,6 +655,7 @@ $tag-route-accent-alt: tokens.$ce-indigo;
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
+  min-width: 0;
 }
 
 .demoCorpusBadge {
@@ -760,6 +678,9 @@ $tag-route-accent-alt: tokens.$ce-indigo;
   color: rgba(244, 247, 255, 0.7);
   font-size: 0.84rem;
   line-height: 1.5;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 
 .demoCorpusTitle {
@@ -767,6 +688,44 @@ $tag-route-accent-alt: tokens.$ce-indigo;
   color: rgba(255, 255, 255, 0.98);
   font-size: 1.1rem;
   line-height: 1.35;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.demoCorpusTitleRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+
+.demoCorpusExpandButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(244, 247, 255, 0.82);
+  cursor: pointer;
+  transition:
+    background 0.18s ease,
+    border-color 0.18s ease,
+    color 0.18s ease,
+    transform 0.18s ease;
+
+  &:hover,
+  &:focus {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(77, 255, 164, 0.3);
+    color: tokens.$ce-clickable;
+    transform: translateY(-1px);
+  }
 }
 
 .demoCorpusSummary {
@@ -774,6 +733,9 @@ $tag-route-accent-alt: tokens.$ce-indigo;
   color: rgba(244, 247, 255, 0.84);
   font-size: 0.92rem;
   line-height: 1.65;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 
 .demoCorpusFooter {
@@ -782,6 +744,8 @@ $tag-route-accent-alt: tokens.$ce-indigo;
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
+  width: 100%;
+  min-width: 0;
 }
 
 .demoCorpusLink {
@@ -797,6 +761,7 @@ $tag-route-accent-alt: tokens.$ce-indigo;
   font-size: 0.86rem;
   font-weight: 700;
   text-decoration: none;
+  flex: 0 0 auto;
   transition:
     background 0.18s ease,
     border-color 0.18s ease,
@@ -811,10 +776,41 @@ $tag-route-accent-alt: tokens.$ce-indigo;
   }
 }
 
+.demoCorpusLinkIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  align-self: flex-end;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(244, 247, 255, 0.88);
+  text-decoration: none;
+  transition:
+    background 0.18s ease,
+    border-color 0.18s ease,
+    color 0.18s ease,
+    transform 0.18s ease;
+
+  &:hover,
+  &:focus {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(77, 255, 164, 0.3);
+    color: tokens.$ce-clickable;
+    transform: translateY(-1px);
+  }
+}
+
 .demoCorpusTagList {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  flex: 1 1 420px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .demoCorpusTag {
@@ -827,6 +823,8 @@ $tag-route-accent-alt: tokens.$ce-indigo;
   background: rgba(255, 255, 255, 0.04);
   color: rgba(244, 247, 255, 0.78);
   font-size: 0.78rem;
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 
 .demoCorpusTagSelected {
@@ -1027,7 +1025,13 @@ $tag-route-accent-alt: tokens.$ce-indigo;
 
   .title,
   .titleEmbedded {
-    font-size: clamp(2.45rem, 12vw, 3.8rem);
+    font-size: clamp(1.85rem, 8.2vw, 2.85rem);
+  }
+
+  .tagPillHero {
+    gap: 10px;
+    padding: 12px 15px;
+    font-size: clamp(1.1rem, 5.2vw, 1.75rem);
   }
 
   .headerTopRow {
@@ -1137,34 +1141,6 @@ $tag-route-accent-alt: tokens.$ce-indigo;
 
   .tagModalChromePopover {
     width: min(300px, calc(100vw - 32px));
-  }
-
-  .demoCorpusCard {
-    padding: 14px;
-  }
-
-  .demoCorpusFooter {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .tagModal {
-    padding: 12px 0 !important;
-
-    :global(.modal-dialog) {
-      width: calc(100vw - 24px);
-      max-width: calc(100vw - 24px);
-      height: calc(100vh - 24px);
-      min-height: calc(100vh - 24px);
-    }
-  }
-
-  .tagModalHeaderBar {
-    padding: 14px 16px;
-  }
-
-  .tagModalBody {
-    padding: 18px 16px;
   }
 
   .questionMeta {
