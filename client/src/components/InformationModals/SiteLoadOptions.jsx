@@ -87,6 +87,7 @@ class SiteLoadOptions extends Component {
 
   getExplainerText = () => {
     const currentSlide = getWelcomeSlide(this.props.arrowIndex);
+    const isTitlelessSlide = !String(currentSlide?.title || '').trim();
 
     // Create an empty array to hold JSX elements
     let bulletPointElements = [];
@@ -102,11 +103,16 @@ class SiteLoadOptions extends Component {
         }
 
         const displayStyle = point.bold === '' && point.text === '' ? 'none' : 'list-item';
-
         const element = (
           <li key={i} style={{ display: displayStyle }}>
             <h4 id={styles.betaExplainerBulletText}>
-              <strong>{point.bold}</strong> {point.text}
+              {point.bold ? <strong>{point.bold}</strong> : null}
+              {point.bold && point.text ? ' ' : null}
+              {point.text ? (
+                <span className={styles.betaExplainerBulletTrailingText}>
+                  {point.text}
+                </span>
+              ) : null}
             </h4>
           </li>
         );
@@ -122,7 +128,11 @@ class SiteLoadOptions extends Component {
     // Return JSX
     return (
       <>
-        <div id={styles.betaExaplainerList} style={{ display: listDisplayStyle }}>
+        <div
+          id={styles.betaExaplainerList}
+          className={isTitlelessSlide ? styles.titlelessBulletListContainer : ''}
+          style={{ display: listDisplayStyle }}
+        >
           <ul id={styles.betaExplainerBulletpoint}>
             { bulletPointElements }
           </ul>

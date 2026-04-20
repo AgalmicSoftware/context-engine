@@ -68,18 +68,35 @@ describe('SiteLoadOptions', () => {
     expect(greetingImage).toHaveAttribute('data-slide-layout', 'flushBottom');
   });
 
-  it('keeps the second slide bound to the centered robot layout hooks', () => {
-    renderSiteLoadOptions(1);
+  it('centers bullet content for titleless slides and dims only the trailing copy', () => {
+    const { container } = renderSiteLoadOptions(1);
 
     const robotImage = screen.getByAltText('Context Engine toolkit slide');
     const robotButton = robotImage.closest('button');
+    const bulletListContainer = container.querySelector('#betaExaplainerList');
+    const bulletList = container.querySelector('#betaExplainerBulletpoint');
+    const firstBoldText = screen.getByText('A toolkit', { selector: 'strong' });
+    const firstTrailingText = screen.getByText('for large-group discourse and coordination', { selector: 'span' });
 
-    expect(screen.getByText(/A toolkit/i)).toBeInTheDocument();
     expect(robotImage).toBeInTheDocument();
     expect(robotImage.id).toBe('betaViewerRobot');
     expect(robotButton?.id).toBe('siteExplainerMultiply');
     expect(robotButton).toHaveAttribute('data-slide-layout', 'centered');
     expect(robotImage).toHaveAttribute('data-slide-layout', 'centered');
+    expect(bulletListContainer).toHaveClass('titlelessBulletListContainer');
+    expect(firstBoldText).toBeInTheDocument();
+    expect(firstTrailingText).toHaveClass('betaExplainerBulletTrailingText');
+    expect(bulletList).not.toHaveClass('titlelessBulletList');
+  });
+
+  it('leaves titled slides on the existing bullet alignment', () => {
+    const { container } = renderSiteLoadOptions(2);
+
+    const bulletListContainer = container.querySelector('#betaExaplainerList');
+    const bulletList = container.querySelector('#betaExplainerBulletpoint');
+
+    expect(screen.getByText(/Open-source templates/i)).toBeInTheDocument();
+    expect(bulletListContainer).not.toHaveClass('titlelessBulletListContainer');
   });
 
   it('removes the unused email updates UI and still lets the sidebar collapse', () => {
