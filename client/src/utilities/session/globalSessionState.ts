@@ -5,6 +5,16 @@ import {
   CE_SESSION_SCAN_SLUGS,
 } from '../../variables/appConfig.js';
 
+type GlobalSessionScope = 'all' | 'active' | 'general' | 'list';
+type GlobalSessionSelectionInput = Record<string, any>;
+type GlobalSessionSelection = {
+  primarySessionSlug: string;
+  primarySessionExplicit: boolean;
+  activeSessionSlug: string;
+  selectedSessionScope: GlobalSessionScope;
+  selectedSessionSlugs: string[];
+};
+
 export const GLOBAL_SESSION_PRIMARY_STORAGE_KEY = 'ce:primarySessionSlug';
 export const GLOBAL_SESSION_PRIMARY_EXPLICIT_STORAGE_KEY = 'ce:primarySessionSlugExplicit';
 export const GLOBAL_SESSION_SCOPE_STORAGE_KEY = 'ce:selectedSessionScope';
@@ -13,21 +23,21 @@ export const GLOBAL_SESSION_SELECTION_UPDATED_EVENT = 'ce:global-session-selecti
 
 const LEGACY_SCOPE_STORAGE_KEY = 'ce:sessionScanScope';
 const LEGACY_SLUGS_STORAGE_KEY = 'ce:sessionScanSlugs';
-const VALID_SCOPE_MODES = new Set(['all', 'active', 'general', 'list']);
-const hasOwn = (value, key) => Object.prototype.hasOwnProperty.call(value || {}, key);
-export const DEFAULT_GLOBAL_SESSION_SCOPE = VALID_SCOPE_MODES.has(
-  toStr(CE_SESSION_SCAN_SCOPE).trim().toLowerCase()
+const VALID_SCOPE_MODES = new Set<GlobalSessionScope>(['all', 'active', 'general', 'list']);
+const hasOwn = (value: unknown, key: string): boolean => Object.prototype.hasOwnProperty.call(value || {}, key);
+export const DEFAULT_GLOBAL_SESSION_SCOPE: GlobalSessionScope = VALID_SCOPE_MODES.has(
+  toStr(CE_SESSION_SCAN_SCOPE).trim().toLowerCase() as GlobalSessionScope
 )
-  ? toStr(CE_SESSION_SCAN_SCOPE).trim().toLowerCase()
+  ? toStr(CE_SESSION_SCAN_SCOPE).trim().toLowerCase() as GlobalSessionScope
   : 'active';
 
-const safeWindow = () => (
+const safeWindow = (): Window | null => (
   typeof window !== 'undefined' && window && typeof window.addEventListener === 'function'
     ? window
     : null
 );
 
-const readLocalStorage = (key) => {
+const readLocalStorage = (key: string): string | null => {
   try {
     if (typeof localStorage === 'undefined') return null;
     return localStorage.getItem(key);
@@ -36,20 +46,20 @@ const readLocalStorage = (key) => {
   }
 };
 
-const writeLocalStorage = (key, value) => {
+const writeLocalStorage = (key: string, value: string): void => {
   try {
     if (typeof localStorage === 'undefined') return;
     localStorage.setItem(key, value);
   } catch (_) {}
 };
 
-export const normalizeGlobalSessionScope = (value) => {
+export const normalizeGlobalSessionScope = (value: unknown): GlobalSessionScope => {
   const normalized = toStr(value).trim().toLowerCase();
-  if (VALID_SCOPE_MODES.has(normalized)) return normalized;
+  if (VALID_SCOPE_MODES.has(normalized as GlobalSessionScope)) return normalized as GlobalSessionScope;
   return DEFAULT_GLOBAL_SESSION_SCOPE;
 };
 
-export const normalizeGlobalSessionSlugs = (value) => {
+export const normalizeGlobalSessionSlugs = (value: unknown): string[] => {
   const source = Array.isArray(value)
     ? value.flatMap((entry) => (
       typeof entry === 'string'
@@ -57,8 +67,8 @@ export const normalizeGlobalSessionSlugs = (value) => {
         : [entry]
     ))
     : toStr(value).split(',');
-  const seen = new Set();
-  const out = [];
+  const seen = new Set<string>();
+  const out: string[] = [];
   source.forEach((entry) => {
     const slug = normalizeSessionSlug(entry);
     if (slug == null) return;
@@ -69,18 +79,18 @@ export const normalizeGlobalSessionSlugs = (value) => {
   return out;
 };
 
-export const normalizeGlobalPrimarySessionSlug = (value) => (
+export const normalizeGlobalPrimarySessionSlug = (value: unknown): string => (
   normalizeSessionSlug(value)
 );
 
-export const derivePrimarySessionSlugFromList = (slugs = []) => {
+export const derivePrimarySessionSlugFromList = (slugs: unknown[] = []): string => {
   const normalizedSlugs = normalizeGlobalSessionSlugs(slugs);
   const firstConcreteSlug = normalizedSlugs.find((slug) => slug !== '');
   if (firstConcreteSlug) return firstConcreteSlug;
   return normalizedSlugs[0] || '';
 };
 
-const parseStoredSlugList = (raw) => {
+const parseStoredSlugList = (raw: unknown): string[] => {
   const value = toStr(raw).trim();
   if (!value) return [];
   if (value.startsWith('[')) {
@@ -91,7 +101,7 @@ const parseStoredSlugList = (raw) => {
   return normalizeGlobalSessionSlugs(value);
 };
 
-const readStoredPrimarySessionExplicit = () => {
+const readStoredPrimarySessionExplicit = (): boolean => {
   const raw = readLocalStorage(GLOBAL_SESSION_PRIMARY_EXPLICIT_STORAGE_KEY);
   if (raw == null) return false;
   try {
@@ -101,7 +111,9 @@ const readStoredPrimarySessionExplicit = () => {
   }
 };
 
-export const normalizeGlobalSessionSelection = (value = {}) => {
+export const normalizeGlobalSessionSelection = (
+  value: GlobalSessionSelectionInput = {}
+): GlobalSessionSelection => {
   const source = value && typeof value === 'object' ? value : {};
   const hasExplicitPrimarySessionSlug =
     Object.prototype.hasOwnProperty.call(source, 'primarySessionSlug') ||
@@ -157,7 +169,7 @@ export const normalizeGlobalSessionSelection = (value = {}) => {
   };
 };
 
-export const readStoredGlobalSessionSelection = () => {
+export const readStoredGlobalSessionSelection = (): GlobalSessionSelection => {
   const primarySessionSlug = readLocalStorage(GLOBAL_SESSION_PRIMARY_STORAGE_KEY);
   const selectedSessionScope =
     readLocalStorage(GLOBAL_SESSION_SCOPE_STORAGE_KEY) ??
@@ -176,7 +188,9 @@ export const readStoredGlobalSessionSelection = () => {
   });
 };
 
-export const resolveScopedSessionSlugsFromSelection = (value = {}) => {
+export const resolveScopedSessionSlugsFromSelection = (
+  value: GlobalSessionSelectionInput = {}
+): string[] => {
   const selection = normalizeGlobalSessionSelection(value);
   if (selection.selectedSessionScope === 'general') return [''];
   if (selection.selectedSessionScope === 'active') return [selection.primarySessionSlug || ''];
@@ -184,7 +198,9 @@ export const resolveScopedSessionSlugsFromSelection = (value = {}) => {
   return [];
 };
 
-export const dispatchGlobalSessionSelectionUpdatedEvent = (value = {}) => {
+export const dispatchGlobalSessionSelectionUpdatedEvent = (
+  value: GlobalSessionSelectionInput = {}
+): GlobalSessionSelection => {
   const target = safeWindow();
   if (!target || typeof target.dispatchEvent !== 'function') return normalizeGlobalSessionSelection(value);
   const selection = normalizeGlobalSessionSelection(value);
@@ -196,15 +212,18 @@ export const dispatchGlobalSessionSelectionUpdatedEvent = (value = {}) => {
   return selection;
 };
 
-const writeLegacyRuntimeSessionGlobals = (selection) => {
+const writeLegacyRuntimeSessionGlobals = (selection: GlobalSessionSelection): void => {
   try {
     if (typeof globalThis === 'undefined' || !globalThis) return;
-    globalThis.CE_SESSION_SCAN_SCOPE = selection.selectedSessionScope;
-    globalThis.CE_SESSION_SCAN_SLUGS = [...selection.selectedSessionSlugs];
+    const runtimeGlobals = globalThis as Record<string, any>;
+    runtimeGlobals.CE_SESSION_SCAN_SCOPE = selection.selectedSessionScope;
+    runtimeGlobals.CE_SESSION_SCAN_SLUGS = [...selection.selectedSessionSlugs];
   } catch (_) {}
 };
 
-export const persistGlobalSessionSelection = (value = {}) => {
+export const persistGlobalSessionSelection = (
+  value: GlobalSessionSelectionInput = {}
+): GlobalSessionSelection => {
   const source = value && typeof value === 'object' ? value : {};
   const storedSelection = readStoredGlobalSessionSelection();
   const hasPrimaryInput =
@@ -259,7 +278,9 @@ export const persistGlobalSessionSelection = (value = {}) => {
   return selection;
 };
 
-export const writeGlobalSessionSelection = (value = {}) => {
+export const writeGlobalSessionSelection = (
+  value: GlobalSessionSelectionInput = {}
+): GlobalSessionSelection => {
   const selection = persistGlobalSessionSelection(value);
   dispatchGlobalSessionSelectionUpdatedEvent(selection);
   return selection;

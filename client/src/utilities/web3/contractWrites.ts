@@ -10,12 +10,47 @@ import { ethers } from 'ethers';
 import { createLogger } from '../logging.js';
 import { isExecutionRevertDuringEstimate, extractEstimateErrorMessage } from './errorClassifiers.js';
 
+type AnyRecord = Record<string, any>;
+type ResolveReceiptRevertMessageOptions = {
+  contract?: AnyRecord | null;
+  method?: string;
+  args?: unknown[];
+  txOverrides?: AnyRecord;
+  from?: string;
+  ethersProvider?: AnyRecord | null;
+  txParams?: AnyRecord;
+  receipt?: AnyRecord | null;
+  fallbackMessage?: string;
+};
+type ResolveTxGasOverridesOptions = {
+  contract?: AnyRecord | null;
+  method?: string;
+  args?: unknown[];
+  existingOverrides?: AnyRecord;
+  fallbackGasLimit?: unknown;
+  minEstimate?: unknown;
+  logLabel?: string;
+  preferFallbackGasLimit?: boolean;
+};
+type SendContractWriteViaProviderOptions = {
+  signingProvider?: AnyRecord | null;
+  ethersProvider?: AnyRecord | null;
+  signer?: AnyRecord | null;
+  contract?: AnyRecord | null;
+  method?: string;
+  args?: unknown[];
+  txOverrides?: AnyRecord;
+  onBroadcastTxHash?: ((txHash: unknown) => unknown) | null;
+  rpcFunction?: string;
+  revertMessage?: string;
+};
+
 const contractsLog = createLogger('contracts');
 const rpcLogger = createLogger('rpc', { prefix: '[RPC_DEBUG]' });
-const rpcLog = (...args) => {
+const rpcLog = (...args: unknown[]): void => {
   rpcLogger.log(...args);
 };
-const logBroadcastCallbackFailure = (method, error) => {
+const logBroadcastCallbackFailure = (method: unknown, error: unknown): void => {
   contractsLog.warn(
     `[${method}] onBroadcastTxHash callback failed; continuing transaction wait`,
     extractEstimateErrorMessage(error)
@@ -32,15 +67,17 @@ const resolveReceiptRevertMessage = async ({
   txParams,
   receipt,
   fallbackMessage,
-} = {}) => {
-  const staticCall = contract?.callStatic?.[method];
+}: ResolveReceiptRevertMessageOptions = {}): Promise<string> => {
+  const methodName = String(method || '');
+  const resolvedFallbackMessage = String(fallbackMessage || '');
+  const staticCall = contract?.callStatic?.[methodName];
   if (typeof staticCall === 'function') {
     try {
       await staticCall(...(Array.isArray(args) ? args : []), {
         ...(txOverrides && typeof txOverrides === 'object' ? txOverrides : {}),
         from,
       });
-      return fallbackMessage;
+      return resolvedFallbackMessage;
     } catch (error) {
       const reason = extractEstimateErrorMessage(error).trim();
       if (reason) {
@@ -50,7 +87,7 @@ const resolveReceiptRevertMessage = async ({
   }
 
   if (!ethersProvider || typeof ethersProvider.call !== 'function') {
-    return fallbackMessage;
+    return resolvedFallbackMessage;
   }
 
   const callTx = {
@@ -62,10 +99,10 @@ const resolveReceiptRevertMessage = async ({
 
   try {
     await ethersProvider.call(callTx, receipt?.blockNumber ?? 'latest');
-    return fallbackMessage;
+    return resolvedFallbackMessage;
   } catch (error) {
     const reason = extractEstimateErrorMessage(error).trim();
-    return reason || fallbackMessage;
+    return reason || resolvedFallbackMessage;
   }
 };
 
@@ -78,7 +115,8 @@ const resolveTxGasOverrides = async ({
   minEstimate = '80000',
   logLabel = 'tx',
   preferFallbackGasLimit = false,
-} = {}) => {
+}: ResolveTxGasOverridesOptions = {}): Promise<AnyRecord> => {
+  const methodName = String(method || '');
   const fallback = ethers.BigNumber.from(String(fallbackGasLimit));
   const min = ethers.BigNumber.from(String(minEstimate));
   const safeOverrides = existingOverrides && typeof existingOverrides === 'object'
@@ -91,9 +129,9 @@ const resolveTxGasOverrides = async ({
   }
 
   try {
-    const estimateFn = contract?.estimateGas?.[method];
+    const estimateFn = contract?.estimateGas?.[methodName];
     if (typeof estimateFn !== 'function') {
-      throw new Error(`estimateGas.${method} unavailable`);
+      throw new Error(`estimateGas.${methodName} unavailable`);
     }
     const estimate = await estimateFn(...args, safeOverrides);
     if (!estimate || estimate.lt(min)) {
@@ -135,24 +173,28 @@ const sendContractWriteViaProvider = async ({
   onBroadcastTxHash,
   rpcFunction = method,
   revertMessage = `${method} transaction reverted on-chain.`,
-} = {}) => {
+}: SendContractWriteViaProviderOptions = {}): Promise<{ txHash: unknown; receipt: AnyRecord }> => {
+  const methodName = String(method || '');
   if (!contract?.interface || typeof contract.interface.encodeFunctionData !== 'function') {
-    throw new Error(`sendContractWriteViaProvider requires a contract interface for ${method}.`);
+    throw new Error(`sendContractWriteViaProvider requires a contract interface for ${methodName}.`);
   }
   const to = contract?.address || contract?.target;
   if (!to) {
-    throw new Error(`sendContractWriteViaProvider requires a contract address for ${method}.`);
+    throw new Error(`sendContractWriteViaProvider requires a contract address for ${methodName}.`);
+  }
+  if (!signer || typeof signer.getAddress !== 'function') {
+    throw new Error(`sendContractWriteViaProvider requires a signer for ${methodName}.`);
   }
 
   const from = await signer.getAddress();
-  const data = contract.interface.encodeFunctionData(method, args);
-  const txParams = {
+  const data = contract.interface.encodeFunctionData(methodName, args);
+  const txParams: AnyRecord = {
     from,
     to,
     data,
   };
 
-  const assignHexQuantity = (key, value) => {
+  const assignHexQuantity = (key: string, value: unknown): void => {
     if (value == null) return;
     txParams[key] = ethers.BigNumber.from(value).toHexString();
   };
@@ -189,8 +231,9 @@ const sendContractWriteViaProvider = async ({
   if (typeof onBroadcastTxHash === 'function') {
     try {
       const callbackResult = onBroadcastTxHash(txHash);
-      if (callbackResult && typeof callbackResult.catch === 'function') {
-        callbackResult.catch((error) => {
+      const callbackPromise = callbackResult as { catch?: (onRejected: (error: unknown) => void) => unknown };
+      if (callbackPromise && typeof callbackPromise.catch === 'function') {
+        callbackPromise.catch((error: unknown) => {
           logBroadcastCallbackFailure(method, error);
         });
       }
@@ -199,7 +242,10 @@ const sendContractWriteViaProvider = async ({
     }
   }
 
-  const receipt = await ethersProvider.waitForTransaction(txHash);
+  if (!ethersProvider || typeof ethersProvider.waitForTransaction !== 'function') {
+    throw new Error('Connected wallet provider does not support waiting for transaction receipts.');
+  }
+  const receipt = await ethersProvider.waitForTransaction(txHash) as AnyRecord;
   if (!receipt || (receipt.status !== undefined && receipt.status !== 1)) {
     const resolvedRevertMessage = await resolveReceiptRevertMessage({
       contract,

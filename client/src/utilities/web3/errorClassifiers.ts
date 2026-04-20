@@ -8,20 +8,29 @@ import { toStr } from '../shared/primitives.js';
 import { isEmptyRevertDataValue } from './deterministicFactoryHelpers.js';
 import { summarizeRpcError, truncateRpcString } from './rpcErrorSummarization.js';
 
-const buildUnsupportedConfiguredDeterministicFactoryError = (factoryAddress = '', cause = null) => {
+type ErrorWithCode = Error & {
+  code?: string;
+  cause?: unknown;
+};
+type RpcSummary = Record<string, any>;
+
+const buildUnsupportedConfiguredDeterministicFactoryError = (
+  factoryAddress = '',
+  cause: unknown = null
+): ErrorWithCode => {
   const factorySuffix = factoryAddress ? ` (${factoryAddress})` : '';
   const wrappedError = new Error(
     `This session's SBT factory${factorySuffix} does not support predictable-address deployment yet. ` +
     'Turn off "Make address predictable before deploy", or switch to a newer SBT factory.'
-  );
+  ) as ErrorWithCode;
   wrappedError.code = 'UNSUPPORTED_CONFIGURED_DETERMINISTIC_FACTORY';
   if (cause) wrappedError.cause = cause;
   return wrappedError;
 };
 
-export const isUnsupportedConfiguredDeterministicFactoryError = (error) => {
-  const queue = [error];
-  const seen = new Set();
+export const isUnsupportedConfiguredDeterministicFactoryError = (error: unknown): boolean => {
+  const queue: any[] = [error];
+  const seen = new Set<any>();
   let sawRevert = false;
   let sawEmptyData = false;
 
@@ -95,12 +104,15 @@ export const isUnsupportedConfiguredDeterministicFactoryError = (error) => {
   return sawRevert && sawEmptyData;
 };
 
-export const maybeWrapUnsupportedConfiguredDeterministicFactoryError = (error, factoryAddress = '') => {
+export const maybeWrapUnsupportedConfiguredDeterministicFactoryError = (
+  error: unknown,
+  factoryAddress = ''
+): unknown => {
   if (!isUnsupportedConfiguredDeterministicFactoryError(error)) return error;
   return buildUnsupportedConfiguredDeterministicFactoryError(factoryAddress, error);
 };
 
-export const extractEstimateErrorMessage = (err) => (
+export const extractEstimateErrorMessage = (err: any): string => (
   toStr(
     err?.reason ||
     err?.errorName ||
@@ -118,7 +130,7 @@ const NONEXISTENT_TOKEN_ERROR_PATTERNS = [
   'owner query for nonexistent token',
 ];
 
-export const isNonexistentTokenError = (err) => {
+export const isNonexistentTokenError = (err: any): boolean => {
   if (!err) return false;
   const errorName = toStr(err?.errorName || err?.error?.errorName).toLowerCase();
   if (errorName && NONEXISTENT_TOKEN_ERROR_PATTERNS.some((pattern) => errorName.includes(pattern))) {
@@ -135,7 +147,7 @@ export const isNonexistentTokenError = (err) => {
   return NONEXISTENT_TOKEN_ERROR_PATTERNS.some((pattern) => haystack.includes(pattern));
 };
 
-export const isExecutionRevertDuringEstimate = (err) => {
+export const isExecutionRevertDuringEstimate = (err: any): boolean => {
   if (!err) return false;
   const code = toStr(err?.code || err?.error?.code).toUpperCase();
   if (code === 'CALL_EXCEPTION') return true;
@@ -150,7 +162,7 @@ export const isExecutionRevertDuringEstimate = (err) => {
   );
 };
 
-export const isWalletRejectionError = (err) => {
+export const isWalletRejectionError = (err: any): boolean => {
   const code = err?.code ?? err?.error?.code;
   if (code === 4001 || code === '4001' || code === 'ACTION_REJECTED') return true;
   const message = toStr(err?.message || err?.error?.message || err?.reason || err?.error?.reason).toLowerCase();
@@ -163,8 +175,8 @@ export const isWalletRejectionError = (err) => {
   );
 };
 
-export const getUserFacingTransactionError = (err, maxLen = 180) => {
-  const summary = summarizeRpcError(err);
+export const getUserFacingTransactionError = (err: any, maxLen = 180): string => {
+  const summary = summarizeRpcError(err) as RpcSummary | null;
   const rawMessage =
     summary?.message ||
     err?.reason ||
@@ -175,7 +187,7 @@ export const getUserFacingTransactionError = (err, maxLen = 180) => {
   return truncateRpcString(toStr(rawMessage).replace(/\s+/g, ' ').trim() || 'Unknown error.', maxLen);
 };
 
-export const notifyUserFacingTransactionError = (err, prefix = 'Transaction failed: ') => {
+export const notifyUserFacingTransactionError = (err: any, prefix = 'Transaction failed: '): void => {
   if (isWalletRejectionError(err)) {
     notify.error('Wallet request rejected.');
     return;
