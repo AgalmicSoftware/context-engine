@@ -2,7 +2,15 @@ import React from 'react';
 import { getSegmentDisplayName } from '../../../utilities/demo/demoAnalysisMath.js';
 import styles from './DemoAnalysisWorkspace.module.scss';
 
-const ComparisonSuggestions = ({ suggestions = [], onSuggestionClick }) => {
+const buildSuggestionSelectionKey = (questionId = '', pair = []) => (
+  `${String(questionId || '').trim()}::${[...(Array.isArray(pair) ? pair : [])].sort().join('::')}`
+);
+
+const ComparisonSuggestions = ({
+  suggestions = [],
+  onSuggestionClick,
+  activeSuggestionKey = '',
+}) => {
   if (!Array.isArray(suggestions) || suggestions.length === 0) {
     return (
       <section className={`${styles.panel} ${styles.suggestionPanel}`}>
@@ -24,20 +32,28 @@ const ComparisonSuggestions = ({ suggestions = [], onSuggestionClick }) => {
       </div>
       <div className={styles.suggestionsList}>
         {suggestions.map((suggestion, index) => (
-          <button
-            key={`${suggestion.pair.join('::')}::${suggestion.questionId}`}
-            type="button"
-            data-testid={`demo-analysis-suggestion-${index}`}
-            className={styles.suggestionButton}
-            onClick={() => onSuggestionClick(suggestion)}
-          >
-            <span className={styles.suggestionPair}>
-              {getSegmentDisplayName(suggestion.pair[0])}
-              <span className={styles.suggestionVs}>vs</span>
-              {getSegmentDisplayName(suggestion.pair[1])}
-            </span>
-            <span className={styles.suggestionQuestion}>{suggestion.questionText}</span>
-          </button>
+          (() => {
+            const selectionKey = buildSuggestionSelectionKey(suggestion.questionId, suggestion.pair);
+            const isActive = selectionKey === activeSuggestionKey;
+
+            return (
+              <button
+                key={`${suggestion.pair.join('::')}::${suggestion.questionId}`}
+                type="button"
+                data-testid={`demo-analysis-suggestion-${index}`}
+                className={`${styles.suggestionButton} ${isActive ? styles.suggestionButtonActive : ''}`.trim()}
+                aria-pressed={isActive}
+                onClick={() => onSuggestionClick(suggestion)}
+              >
+                <span className={styles.suggestionPair}>
+                  {getSegmentDisplayName(suggestion.pair[0])}
+                  <span className={styles.suggestionVs}>vs</span>
+                  {getSegmentDisplayName(suggestion.pair[1])}
+                </span>
+                <span className={styles.suggestionQuestion}>{suggestion.questionText}</span>
+              </button>
+            );
+          })()
         ))}
       </div>
     </section>

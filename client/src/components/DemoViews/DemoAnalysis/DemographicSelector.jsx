@@ -11,6 +11,11 @@ const slugify = (value = '') => String(value || '')
   .replace(/[^a-z0-9]+/g, '-')
   .replace(/^-+|-+$/g, '');
 
+const formatPersonaCount = (count = 0) => {
+  const normalizedCount = Number(count || 0);
+  return `${normalizedCount} persona${normalizedCount === 1 ? '' : 's'}`;
+};
+
 const DemographicSelector = ({
   demographics = {},
   selectedSegmentKeys = [],
@@ -100,14 +105,14 @@ const DemographicSelector = ({
               }}
               options={(Array.isArray(options) ? options : []).map((option) => ({
                 value: option.value,
-                label: `${option.value} (${option.count})`,
+                label: `${option.value} (${formatPersonaCount(option.count)})`,
               }))}
               placeholder={category}
               value={(Array.isArray(options) ? options : [])
                 .filter((option) => selectedSet.has(`${category}:${option.value}`))
                 .map((option) => ({
                   value: option.value,
-                  label: `${option.value} (${option.count})`,
+                  label: `${option.value} (${formatPersonaCount(option.count)})`,
                 }))}
             />
           </div>
