@@ -16,6 +16,12 @@ const originalPublicUrl = process.env.PUBLIC_URL;
 
 jest.mock('../../utilities/web3/contractScripts.js', () => ({
   __esModule: true,
+  getAllSessionSlugs: (...args) => mockGetAllSessionSlugs(...args),
+  getSessionConfigBySlug: (...args) => mockGetSessionConfigBySlug(...args),
+}));
+
+jest.mock('../SurveyTool/SurveyTool.jsx', () => ({
+  __esModule: true,
   getAllSessionSlugs: (...args: any[]) => mockGetAllSessionSlugs(...args),
   getSessionConfigBySlug: (...args: any[]) => mockGetSessionConfigBySlug(...args),
 }));
@@ -118,6 +124,16 @@ describe('ToolExplorer session propagation', () => {
   beforeEach(() => {
     mockGetAllSessionSlugs.mockReturnValue(['edge', 'rxc']);
     mockGetSessionConfigBySlug.mockImplementation((slug: unknown) => {
+      const normalized = String(slug || '');
+      if (normalized === 'edge') return { slug: 'edge', sessionName: 'Edge Session' };
+      if (normalized === 'rxc') return { slug: 'rxc', sessionName: 'Debate Session' };
+      return {};
+    });
+  });
+
+  beforeEach(() => {
+    mockGetAllSessionSlugs.mockReturnValue(['edge', 'rxc']);
+    mockGetSessionConfigBySlug.mockImplementation((slug) => {
       const normalized = String(slug || '');
       if (normalized === 'edge') return { slug: 'edge', sessionName: 'Edge Session' };
       if (normalized === 'rxc') return { slug: 'rxc', sessionName: 'Debate Session' };
@@ -268,6 +284,37 @@ describe('ToolExplorer session propagation', () => {
     expect(await screen.findByTestId('mock-audio-survey-generator')).toHaveAttribute('data-explorer-mode', 'add');
     expect(mockAudioSurveyGenerator).toHaveBeenLastCalledWith(expect.objectContaining({
       explorerMode: 'add',
+      hideInternalSessionSelector: true,
+    }));
+  });
+
+  it('renders Add, View, then the header gear and forwards session overrides into Context', async () => {
+    const { container } = renderToolExplorer({ activeSessionSlug: 'edge' });
+
+    fireEvent.click(screen.getByText('Context'));
+
+    expect(await screen.findByTestId('mock-audio-survey-generator')).toBeInTheDocument();
+    const headerGroup = container.querySelector(`.${styles.headerModeToggleGroup}`);
+    const headerButtons = Array.from(headerGroup.querySelectorAll('button')).map(
+      (node) => node.getAttribute('aria-label') || node.textContent.trim()
+    );
+
+    expect(headerButtons).toEqual(['Add', 'View', 'Context session selector']);
+    expect(mockAudioSurveyGenerator).toHaveBeenLastCalledWith(expect.objectContaining({
+      sessionOverrideSlug: null,
+      sessionOverrideTouched: false,
+      hideInternalSessionSelector: true,
+    }));
+
+    fireEvent.click(screen.getByTestId('ce-database-session-selector-toggle'));
+
+    expect(screen.getByTestId('ce-database-session-selector-panel')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('ce-database-session-chip-rxc'));
+
+    expect(mockAudioSurveyGenerator).toHaveBeenLastCalledWith(expect.objectContaining({
+      explorerMode: 'add',
+      sessionOverrideSlug: 'rxc',
+      sessionOverrideTouched: true,
       hideInternalSessionSelector: true,
     }));
   });
