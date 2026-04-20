@@ -12,6 +12,7 @@ import { serializeFilterState } from '../../utilities/survey/filterStateUtils.js
 import { isFreeformBlankAnswer } from '../../utilities/survey/freeformAnswerUtils.js';
 import * as aiScripts from '../../utilities/ai/aiScripts.js';
 import * as aiSettings from '../../utilities/ai/aiSettings.js';
+import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import * as contractScriptsModule from '../../utilities/web3/contractScripts.js';
 import * as sponsoredAccess from '../../utilities/web3/sponsoredAccess.js';
 
@@ -2501,6 +2502,55 @@ describe('QuestionFilter cache helpers', () => {
     });
   });
 
+  it('tracks AI apply elapsed seconds and resets when applying stops', () => {
+    const instance = new QuestionFilter({});
+    instance._isMounted = true;
+    instance.setState = jest.fn((next, cb) => {
+      const patch = typeof next === 'function' ? next(instance.state, instance.props) : next;
+      instance.state = { ...instance.state, ...(patch || {}) };
+      if (typeof cb === 'function') cb();
+      return patch;
+    });
+
+    let intervalCallback = null;
+    const intervalSpy = jest.spyOn(global, 'setInterval').mockImplementation((fn) => {
+      intervalCallback = fn;
+      return 1234;
+    });
+    const clearIntervalSpy = jest.spyOn(global, 'clearInterval').mockImplementation(() => {});
+    const nowSpy = jest.spyOn(Date, 'now');
+
+    instance.state = {
+      ...instance.state,
+      aiApplying: true,
+      aiApplyingElapsedSec: 0,
+    };
+
+    nowSpy.mockReturnValue(1000);
+    instance.syncAiApplyingElapsedTimer();
+    expect(intervalSpy).toHaveBeenCalledTimes(1);
+    expect(typeof intervalCallback).toBe('function');
+
+    nowSpy.mockReturnValue(3900);
+    intervalCallback();
+    expect(instance.state.aiApplyingElapsedSec).toBe(2);
+
+    instance.state = {
+      ...instance.state,
+      aiApplying: false,
+      aiApplyingElapsedSec: 2,
+    };
+    instance.syncAiApplyingElapsedTimer();
+
+    expect(clearIntervalSpy).toHaveBeenCalledWith(1234);
+    expect(instance.state.aiApplyingElapsedSec).toBe(0);
+    expect(instance._aiApplyingElapsedTimer).toBeNull();
+
+    intervalSpy.mockRestore();
+    clearIntervalSpy.mockRestore();
+    nowSpy.mockRestore();
+  });
+
   it('suppresses duplicate count emissions when filtered count is unchanged', () => {
     const onCountUpdate = jest.fn();
     const instance = new QuestionFilter({
@@ -2731,5 +2781,49 @@ describe('QuestionFilter encrypted count gate tooltip integration', () => {
       mode: 'all',
     });
     expect(tooltip.props.sbtAddresses).toEqual([gateSbt]);
+  });
+
+  it('renders compact AI apply copy with elapsed seconds', () => {
+    const instance = new QuestionFilter({
+      questions: [{ id: 'q1', prompt: 'Q1', type: 'freeform' }],
+      questionResponses: {},
+      network: { id: 84532 },
+      resultsMode: true,
+      filterModalOpen: true,
+      isQuestionCacheReady: true,
+      isSBTCacheReady: true,
+    });
+
+    instance.state = {
+      ...instance.state,
+      aiDraftQuery: 'a question of each type',
+      aiRankingCount: 4,
+      aiApplying: true,
+      aiApplyingElapsedSec: 9,
+      expandedSections: {
+        ...instance.state.expandedSections,
+        ai: true,
+      },
+      filteredQuestionsCount: 1,
+    };
+    instance.buildFilterPipelineResult = jest.fn(() => ({
+      finalQuestions: [{ id: 'q1', prompt: 'Q1', type: 'freeform' }],
+      count: 1,
+    }));
+    instance.getFilterSummaryItems = jest.fn(() => []);
+    instance.getAllTagsWithCounts = jest.fn(() => []);
+    instance.getAiAccessState = jest.fn(() => ({
+      enabled: true,
+      localKeyAvailable: false,
+    }));
+
+    const tree = instance.render();
+    const aiApplyButton = findElement(
+      tree,
+      (element) => element?.props?.['data-testid'] === E2E_TESTIDS.QUESTION_FILTER_AI_APPLY
+    );
+
+    expect(aiApplyButton).toBeTruthy();
+    expect(getNodeText(aiApplyButton)).toContain('Applying... 9s');
   });
 });

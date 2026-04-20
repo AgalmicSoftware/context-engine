@@ -416,11 +416,17 @@ $text-color: #444;
 }
 
 .aiFilterInputWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+
   :global(.audioTextarea),
   :global([class*='audioTextarea']) {
     color: #333 !important;
-    background: rgba(0, 0, 0, 0.04) !important;
+    background: rgba(255, 255, 255, 0.9) !important;
     border-color: $pastel-border !important;
+    font-size: 1rem !important;
+    min-height: 88px;
   }
 
   :global(.audioTextarea)::placeholder,
@@ -443,6 +449,134 @@ $text-color: #444;
   label {
     color: $heading-color;
   }
+}
+
+.aiActionCard {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 0.8rem 0.9rem;
+  background: rgba(255, 255, 255, 0.74);
+  border: 1px solid rgba(128, 223, 238, 0.95);
+  border-radius: var(--ce-radius-8);
+  box-shadow: 0 8px 20px rgba(145, 205, 217, 0.14);
+}
+
+.aiActionRow {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  width: 100%;
+}
+
+.aiCountControl {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.4rem 0.55rem;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(128, 223, 238, 0.95);
+  border-radius: var(--ce-radius-8);
+  flex: 0 0 auto;
+}
+
+.aiCountLabel {
+  margin: 0;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: $heading-color;
+}
+
+.aiCountInput {
+  width: 72px !important;
+  min-height: 36px;
+  margin: 0 !important;
+  text-align: center;
+  font-size: 0.95rem !important;
+  font-weight: 600;
+}
+
+.aiApplyButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  min-height: 40px;
+  padding: 0.62rem 0.9rem;
+  border-radius: var(--ce-radius-8);
+  border: 1px solid #171941 !important;
+  background: #171941 !important;
+  color: #fff !important;
+  font-size: 0.95rem;
+  font-weight: 600;
+  white-space: nowrap;
+  box-shadow: 0 8px 18px rgba(23, 25, 65, 0.18);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+  flex: 0 0 auto;
+
+  &:hover,
+  &:focus {
+    background: #101230 !important;
+    border-color: #101230 !important;
+    color: #fff !important;
+    transform: translateY(-1px);
+    box-shadow: 0 10px 22px rgba(23, 25, 65, 0.22);
+  }
+
+  &:disabled {
+    background: #58637d !important;
+    border-color: #58637d !important;
+    color: rgba(255, 255, 255, 0.94) !important;
+    opacity: 1;
+    box-shadow: none;
+    transform: none;
+  }
+}
+
+.aiApplySpinner {
+  font-size: 0.95rem;
+}
+
+.aiCombineGroup {
+  margin-bottom: 0;
+  margin-left: auto;
+  flex: 0 0 auto;
+}
+
+.aiCombineRow {
+  padding: 0;
+  margin: 0;
+  font-size: 0.92rem;
+  white-space: nowrap;
+
+  input[type='checkbox'] {
+    margin-right: 0.5rem;
+  }
+}
+
+.aiStatusText,
+.aiHintText,
+.aiErrorText {
+  margin: 0;
+  font-size: 0.88rem;
+}
+
+.aiStatusText {
+  color: $heading-color;
+}
+
+.aiHintText {
+  color: #5f6b7b;
+  font-style: italic;
+}
+
+.aiErrorText {
+  color: #b02a37;
+  font-weight: 500;
 }
 
 .searchInput {
@@ -604,6 +738,32 @@ $text-color: #444;
       padding: 2px 4px !important;
       font-size: 1rem !important;
     }
+  }
+
+  .aiActionCard {
+    padding: 0.8rem;
+  }
+
+  .aiActionRow,
+  .aiCountControl,
+  .aiCombineGroup {
+    width: 100%;
+  }
+
+  .aiActionRow {
+    flex-wrap: wrap;
+  }
+
+  .aiCountControl {
+    justify-content: space-between;
+  }
+
+  .aiApplyButton {
+    width: 100%;
+  }
+
+  .aiCombineGroup {
+    margin-left: 0;
   }
 
   // Ensure tag/filter bubbles don't overflow and can break long words
