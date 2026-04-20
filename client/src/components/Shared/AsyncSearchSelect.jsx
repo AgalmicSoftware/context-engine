@@ -1,4 +1,6 @@
 import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { faSpinner } from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import styles from './AsyncSearchSelect.module.scss';
 
 const cx = (...names) => names.filter(Boolean).join(' ');
@@ -60,6 +62,7 @@ const AsyncSearchSelect = ({
       })
       : normalizedOptions;
   }, [getOptionValue, normalizedOptions, query]);
+  const hasVisibleOptions = filteredOptions.length > 0;
   const closeMenu = useCallback(() => {
     setOpen(false);
     setQuery('');
@@ -110,11 +113,11 @@ const AsyncSearchSelect = ({
     closeMenu();
   }, [closeMenu, disabled, onChange]);
   const handleSearchKeyDown = useCallback((event) => {
-    if (event.key === 'ArrowDown' && !isLoading && filteredOptions.length > 0) {
+    if (event.key === 'ArrowDown' && hasVisibleOptions) {
       event.preventDefault();
       focusOptionAt(0);
     }
-  }, [filteredOptions.length, focusOptionAt, isLoading]);
+  }, [focusOptionAt, hasVisibleOptions]);
   const handleRowKeyDown = useCallback((event, option, index) => {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
@@ -136,7 +139,6 @@ const AsyncSearchSelect = ({
       focusOptionAt(index - 1);
     }
   }, [filteredOptions.length, focusOptionAt, handleSelect]);
-  const loadingContent = typeof loadingMessage === 'function' ? loadingMessage() : 'Loading…';
   const emptyContent = typeof noOptionsMessage === 'function' ? noOptionsMessage() : 'No options';
   return (
     <div
@@ -164,7 +166,9 @@ const AsyncSearchSelect = ({
           {hasValue ? renderOptionLabel(value) : placeholder}
         </div>
         {isLoading ? (
-          <span
+          <FontAwesomeIcon
+            icon={faSpinner}
+            spin
             className={styles.controlSpinner}
             data-testid="ce-async-select-control-spinner"
             aria-hidden="true"
@@ -193,18 +197,8 @@ const AsyncSearchSelect = ({
               disabled={disabled}
             />
           </div>
-          {isLoading ? (
-            <div
-              className={styles.loading}
-              data-testid="ce-async-select-loading"
-              role="status"
-              aria-live="polite"
-            >
-              {loadingContent}
-            </div>
-          ) : null}
           {!isLoading &&
-          filteredOptions.length === 0 &&
+          !hasVisibleOptions &&
           emptyContent !== null &&
           emptyContent !== undefined ? (
             <div
@@ -222,7 +216,7 @@ const AsyncSearchSelect = ({
             role="listbox"
             aria-label={placeholder || 'Options'}
           >
-            {!isLoading && filteredOptions.length > 0 ? (
+            {hasVisibleOptions ? (
               filteredOptions.map((option, index) => {
                 const optionKey = optionKeyFor(option);
                 const isSelected = hasValue && optionKey !== '' && optionKey === selectedKey;

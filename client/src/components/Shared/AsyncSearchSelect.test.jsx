@@ -163,19 +163,29 @@ describe('AsyncSearchSelect', () => {
     expect(screen.getByRole('option', { name: 'Beta' })).toHaveAttribute('aria-selected', 'false');
   });
 
-  it('shows loadingMessage in the menu when isLoading is true and does not show options or the no-options message', () => {
+  it('keeps already-available options visible and selectable while loading stays in the control', async () => {
+    const spy = jest.fn();
     render(
       <Harness
         isLoading
+        onChangeSpy={spy}
         loadingMessage={() => 'Searching...'}
         noOptionsMessage={() => 'Nothing here'}
       />
     );
 
     openMenu();
-    expect(screen.getByTestId('ce-async-select-loading')).toHaveTextContent('Searching...');
-    expect(screen.queryByRole('option', { name: 'Alpha' })).not.toBeInTheDocument();
+    expect(screen.queryByTestId('ce-async-select-loading')).not.toBeInTheDocument();
+    expect(screen.getByTestId('ce-async-select-control-spinner')).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Alpha' })).toBeInTheDocument();
     expect(screen.queryByTestId('ce-async-select-empty')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('option', { name: 'Beta' }));
+
+    expect(spy).toHaveBeenCalledWith({ value: 'beta', label: 'Beta' });
+    await waitFor(() => {
+      expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+    });
   });
 
   it('shows a loading spinner in the closed control when isLoading is true', () => {
