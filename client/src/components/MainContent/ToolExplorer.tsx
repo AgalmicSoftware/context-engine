@@ -7,7 +7,6 @@ import { createLogger } from '../../utilities/logging';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { hasCachedCreateSbtForm } from '../../utilities/sbt/sbtCreateFormCache.js';
 import { sbtsListPath } from '../../utilities/ui/terminology.js';
-import { buildPublicRoute } from '../../utilities/ui/publicUrl.js';
 import { getAllSessionSlugs, getSessionConfigBySlug } from '../../utilities/web3/contractScripts.js';
 import { normalizeSessionSlug } from '../../utilities/session/sessionNaming.js';
 import { toStr } from '../../utilities/shared/primitives.js';
@@ -18,9 +17,9 @@ import {
   Col,
 } from 'reactstrap';
 
-import ToolExplorerPluginExplainer from './ToolExplorerPluginExplainer';
-import LazyFallback from '../Shared/LazyFallback';
-import SessionChipSelector from '../Shared/SessionChipSelector';
+import ToolExplorerPluginExplainer from './ToolExplorerPluginExplainer.jsx';
+import LazyFallback from '../Shared/LazyFallback.jsx';
+import SessionChipSelector from '../Shared/SessionChipSelector.jsx';
 
 import riskMatrixImage from '../../assets/img/risk_matrix.jpg';
 import modelDirectoryImage from '../../assets/img/model_directory.jpg';
@@ -67,7 +66,7 @@ const ToolExplorer = (props: ToolExplorerProps) => {
   const [showEmbeddedCreateGroup, setShowEmbeddedCreateGroup] = useState(false);
   const [dataToolMode, setDataToolMode] = useState('add');
   const [showDataSessionSelector, setShowDataSessionSelector] = useState(false);
-  const [dataSessionOverrideSlug, setDataSessionOverrideSlug] = useState<string | null>(null);
+  const [dataSessionOverrideSlug, setDataSessionOverrideSlug] = useState(null);
   const [dataSessionOverrideTouched, setDataSessionOverrideTouched] = useState(false);
   const demoSurfaceEnabled = props.demoSurfaceMode !== false;
   const showDemoCards = demoSurfaceEnabled;
@@ -225,7 +224,7 @@ const ToolExplorer = (props: ToolExplorerProps) => {
     setShowEmbeddedCreateGroup((prevState) => !prevState);
   };
 
-  const handleDataSessionSelect = (slugIn: unknown) => {
+  const handleDataSessionSelect = (slugIn) => {
     setDataSessionOverrideSlug(normalizeSessionSlug(slugIn || ''));
     setDataSessionOverrideTouched(true);
   };
