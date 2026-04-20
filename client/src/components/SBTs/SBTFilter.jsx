@@ -1812,7 +1812,7 @@ class SBTFilter extends React.Component {
         {/* If autoExpand is true, or the user toggled showFilterOptions, display the filter UI */}
         {(this.props.autoExpand || showFilterOptions) && (
           <div style={{ position: 'relative' }}>
-            {loading && (
+            {!this.props.hideLoadingOverlay && loading && (
               <div style={{
                 position: 'absolute',
                 top: 0,
