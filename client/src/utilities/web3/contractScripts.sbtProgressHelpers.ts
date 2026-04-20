@@ -3,6 +3,27 @@
  * @description Helpers for tracking SBT event scan progress across holder refresh passes.
  */
 
+type AnyRecord = Record<string, any>;
+type SbtScanProgressEvent = AnyRecord & {
+  phase?: unknown;
+  fromBlock?: unknown;
+  toBlock?: unknown;
+  totalBlocks?: number;
+  scannedBlocks?: number;
+  remainingBlocks?: number;
+  completionRatio?: number;
+};
+type SbtScanProgressState = AnyRecord & {
+  phase: unknown;
+  fromBlock: number;
+  toBlock: number;
+  totalBlocks: number;
+  scannedBlocks: number;
+  maxConcurrency: number | null;
+  onLogs: ((payload: AnyRecord) => Promise<unknown> | unknown) | null;
+  onProgress: ((progress?: SbtScanProgressEvent) => void) | null;
+};
+
 // One holder refresh scans a single chronological SBTActivity stream. Keep progress
 // monotonic within that phase so UI consumers do not see 100%, then 0%, during a
 // single holders refresh.
@@ -17,7 +38,18 @@ export const createSbtEventScanProgressState = ({
   passOffsetBlocks = 0,
   initialScannedBlocks = 0,
   maxConcurrency = null,
-} = {}) => {
+}: {
+  onProgress?: ((payload: SbtScanProgressEvent) => unknown) | null;
+  onLogs?: ((payload: AnyRecord) => Promise<unknown> | unknown) | null;
+  phase?: unknown;
+  fromBlock?: unknown;
+  toBlock?: unknown;
+  scanTotalBlocks?: unknown;
+  phaseTotalBlocks?: unknown;
+  passOffsetBlocks?: unknown;
+  initialScannedBlocks?: unknown;
+  maxConcurrency?: unknown;
+} = {}): SbtScanProgressState | null => {
   if (typeof onProgress !== 'function' && typeof onLogs !== 'function') return null;
 
   const normalizedScanTotalBlocks = Math.max(0, Math.floor(Number(scanTotalBlocks || 0)));
@@ -47,7 +79,7 @@ export const createSbtEventScanProgressState = ({
     scannedBlocks: normalizedInitialScannedBlocks,
     maxConcurrency: normalizedMaxConcurrency,
     onLogs: typeof onLogs === 'function' ? onLogs : null,
-    onProgress: typeof onProgress === 'function' ? (progress = {}) => {
+    onProgress: typeof onProgress === 'function' ? (progress: SbtScanProgressEvent = {}) => {
       const passScannedBlocks = Math.max(
         0,
         Math.min(
