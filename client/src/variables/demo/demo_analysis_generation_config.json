@@ -1,0 +1,174 @@
+{
+  "treeNodeIdsByQuestionId": {
+    "0": "0x1300000000000000000000000000000000000000000000000000000000000000",
+    "2": "0x1110000000000000000000000000000000000000000000000000000000000000",
+    "3": "0x1330000000000000000000000000000000000000000000000000000000000000",
+    "4": "0x3100000000000000000000000000000000000000000000000000000000000000",
+    "6": "0x3210000000000000000000000000000000000000000000000000000000000000",
+    "9": "0x3120000000000000000000000000000000000000000000000000000000000000",
+    "11": "0x1140000000000000000000000000000000000000000000000000000000000000",
+    "15": "0x2220000000000000000000000000000000000000000000000000000000000000",
+    "17": "0x4330000000000000000000000000000000000000000000000000000000000000",
+    "18": "0x4320000000000000000000000000000000000000000000000000000000000000",
+    "19": "0x4230000000000000000000000000000000000000000000000000000000000000",
+    "21": "0x4300000000000000000000000000000000000000000000000000000000000000",
+    "24": "0x4000000000000000000000000000000000000000000000000000000000000000",
+    "28": "0x3210000000000000000000000000000000000000000000000000000000000000",
+    "29": "0x2230000000000000000000000000000000000000000000000000000000000000",
+    "30": "0x3100000000000000000000000000000000000000000000000000000000000000",
+    "31": "0x1100000000000000000000000000000000000000000000000000000000000000",
+    "32": "0x2100000000000000000000000000000000000000000000000000000000000000",
+    "33": "0x4100000000000000000000000000000000000000000000000000000000000000",
+    "34": "0x3140000000000000000000000000000000000000000000000000000000000000",
+    "35": "0x1320000000000000000000000000000000000000000000000000000000000000",
+    "36": "0x4130000000000000000000000000000000000000000000000000000000000000",
+    "37": "0x4000000000000000000000000000000000000000000000000000000000000000",
+    "38": "0x3110000000000000000000000000000000000000000000000000000000000000",
+    "39": "0x4210000000000000000000000000000000000000000000000000000000000000",
+    "40": "0x4000000000000000000000000000000000000000000000000000000000000000",
+    "41": "0x3300000000000000000000000000000000000000000000000000000000000000"
+  },
+  "questionOverridesByQuestionId": {
+    "2": {
+      "category": "ALIGNMENT & INTERPRETABILITY APPROACHES",
+      "commentBody": "Reward-hacking evidence in frontier-model evaluations should be treated as a live warning about deceptive alignment, not a lab curiosity.",
+      "keyTension": "METR-style reward hacking suggests evaluators may already be seeing strategic benchmark gaming, but skeptics argue those failures do not yet imply robust long-horizon deception.",
+      "sourceTags": ["metr", "arxiv", "LessWrong", "insiders"],
+      "type": "binary"
+    },
+    "15": {
+      "commentBody": "AI systems may advise on critical infrastructure, but accountable humans should retain decisive authority over consequential actions.",
+      "keyTension": "Autonomous systems can react faster than human operators, but handing them decisive control over critical infrastructure can dissolve accountability precisely where mistakes are hardest to reverse.",
+      "sourceTags": ["atlas", "laws", "insiders"],
+      "type": "binary"
+    },
+    "17": {
+      "commentBody": "People should be able to refuse or contest AI systems that act on their behalf or make consequential decisions without meaningful consent.",
+      "keyTension": "Convenience and scale push institutions toward default automation, but autonomy erodes quickly when consent is hidden inside systems people cannot realistically refuse.",
+      "sourceTags": ["laws", "atlas", "insiders"],
+      "type": "binary"
+    },
+    "18": {
+      "commentBody": "AI surveillance of workers, students, tenants, and citizens should face strict civil-liberties limits from the outset.",
+      "keyTension": "Administrators want more data and earlier intervention, but surveillance architectures built for convenience tend to outlive their benign justifications and invite abuse.",
+      "sourceTags": ["laws", "atlas", "insiders"],
+      "type": "binary"
+    },
+    "30": {
+      "commentBody": "Frontier AI should be governed primarily by public law and accountable institutions, not private lab discretion.",
+      "keyTension": "Labs have operational knowledge, but legitimacy and durable accountability still require rules that can survive changes in management, incentives, and market pressure.",
+      "sourceTags": ["laws", "atlas", "insiders"],
+      "type": "binary"
+    },
+    "31": {
+      "commentBody": "Alignment research should be a core engineering discipline for frontier labs, not a side project to capability scaling.",
+      "keyTension": "Some labs treat alignment as one input among many, while safety-focused critics argue capability scaling without equally serious alignment work is reckless by construction.",
+      "sourceTags": ["arxiv", "LessWrong", "insiders"],
+      "type": "binary"
+    },
+    "32": {
+      "commentBody": "AI capability growth is fast enough that governments should plan for compressed timelines, not assume decades of slack.",
+      "keyTension": "Empirical capability trends increasingly support shorter planning horizons, yet skeptics warn that benchmark progress can overstate real-world readiness and tempt premature panic.",
+      "sourceTags": ["metr", "arxiv", "LessWrong", "insiders"],
+      "type": "binary"
+    },
+    "33": {
+      "commentBody": "AI progress should be judged by whether it lowers ordinary costs and makes daily work easier, not just by elite productivity gains.",
+      "keyTension": "Institutions celebrate benchmark wins and premium use cases first, but the broader public mostly experiences AI through bills, queues, service quality, and workplace burden.",
+      "sourceTags": ["metr", "tweets", "insiders"],
+      "type": "binary"
+    },
+    "34": {
+      "commentBody": "Anyone harmed by consequential AI decisions should have a right to explanation, human appeal, and a named liable party.",
+      "keyTension": "Clear liability can slow deployment and raise compliance costs, but absent liability the people most affected by automation are left arguing with systems that answer to nobody.",
+      "sourceTags": ["laws", "atlas", "insiders"],
+      "type": "binary"
+    },
+    "35": {
+      "commentBody": "Frontier AI should be treated as a civilization-risk technology whose catastrophic pathways belong at the center of policy, not the margins.",
+      "keyTension": "Focusing on catastrophic pathways can crowd out nearer-term harms, but relegating worst-case scenarios to the margins leaves institutions unprepared for the fastest-scaling failures.",
+      "sourceTags": ["arxiv", "LessWrong", "insiders", "laws"],
+      "type": "binary"
+    },
+    "36": {
+      "commentBody": "AI productivity gains should count as progress only if they are shared broadly rather than captured by a narrow elite.",
+      "keyTension": "Automation can create enormous surplus, but without bargaining power, public provision, or redistribution the gains tend to harden existing hierarchies instead of expanding freedom.",
+      "sourceTags": ["atlas", "insiders", "tweets"],
+      "type": "binary"
+    },
+    "37": {
+      "commentBody": "A positive AI future is one where powerful systems widen human agency and materially improve daily life rather than deepen dependence or exclusion.",
+      "keyTension": "Post-scarcity visions sound attractive, but the harder question is whether actual institutions will use AI to broaden access and dignity or to centralize control behind smoother interfaces.",
+      "sourceTags": ["tweets", "scifi", "LessWrong", "insiders"],
+      "type": "binary"
+    },
+    "38": {
+      "commentBody": "Governments should move now on audit rights, appeal paths, and technical oversight instead of waiting for perfect understanding.",
+      "keyTension": "Acting early risks clumsy rules, but waiting for full clarity effectively hands the first durable constitution of AI to whichever firms already dominate deployment.",
+      "sourceTags": ["laws", "insiders", "atlas"],
+      "type": "binary"
+    },
+    "39": {
+      "category": "INFORMATION ECOSYSTEM & MISINFORMATION",
+      "commentBody": "AI-mediated media should strengthen public judgment and human dignity rather than prey on attention, anger, or social exclusion.",
+      "keyTension": "Cheap synthetic persuasion can feel like democratized expression, but discourse systems optimized for engagement can steadily corrode the habits of judgment a republic depends on.",
+      "sourceTags": ["tweets", "scifi", "insiders"],
+      "type": "binary"
+    },
+    "40": {
+      "category": "DESIRABLE AI OUTCOMES",
+      "commentBody": "Optimism about AI is warranted only if its gains are broadly shared and visibly reduce drudgery for ordinary people.",
+      "keyTension": "Abstract optimism is easy when capability curves rise, but durable public confidence depends on whether concrete benefits reach beyond the already powerful.",
+      "sourceTags": ["tweets", "arxiv", "LessWrong", "insiders"],
+      "type": "binary"
+    },
+    "41": {
+      "commentBody": "Industry self-governance is only credible when companies can be audited against real public standards.",
+      "keyTension": "Voluntary commitments can move faster than legislation, but they become public-relations theater when outsiders cannot verify whether firms actually met their own promises.",
+      "sourceTags": ["laws", "insiders", "tweets"],
+      "type": "binary"
+    }
+  },
+  "syntheticParticipantConfig": {
+    "mappedQuestionMutationMultiplier": 0.72,
+    "sourceMutationWeights": {
+      "tweets": 0.01,
+      "laws": 0.02,
+      "arxiv": 0.04,
+      "lesswrong": 0.04,
+      "insiders": 0.03,
+      "atlas": 0.03,
+      "scifi": 0.02,
+      "metr": 0.06
+    },
+    "typeMutationWeights": {
+      "binary": 0.01,
+      "poll": 0.04,
+      "freeform": 0.05,
+      "rating": 0.03
+    },
+    "majorityConfidenceThreshold": 0.58,
+    "variantProfiles": [
+      {
+        "id": "consensus_echo",
+        "mutationRate": 0.14,
+        "missingVoteFillRate": 0.22,
+        "dropVoteRate": 0.02,
+        "targetModeWeights": {
+          "majority": 0.74,
+          "unsure": 0.26
+        }
+      },
+      {
+        "id": "bridge_builder",
+        "mutationRate": 0.22,
+        "missingVoteFillRate": 0.34,
+        "dropVoteRate": 0.04,
+        "targetModeWeights": {
+          "majority": 0.42,
+          "unsure": 0.58
+        }
+      }
+    ]
+  }
+}

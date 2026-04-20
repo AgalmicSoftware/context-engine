@@ -15,6 +15,10 @@ import QuestionDrilldownModal from './QuestionDrilldownModal.jsx';
 import WorldResultsMap from './WorldResultsMap.jsx';
 import styles from './DemoAnalysisWorkspace.module.scss';
 
+const buildSuggestionSelectionKey = (questionId = '', segmentKeys = []) => (
+  `${String(questionId || '').trim()}::${[...(Array.isArray(segmentKeys) ? segmentKeys : [])].sort().join('::')}`
+);
+
 const DemoAnalysisWorkspace = ({
   demoData = demoAnalysisData,
   metadataByXid = historicalFigureDemographics,
@@ -52,6 +56,10 @@ const DemoAnalysisWorkspace = ({
 
   const selectedQuestion = questionMap.get(selectedQuestionId) || null;
   const drilldownQuestion = questionMap.get(drilldownQuestionId) || null;
+  const activeSuggestionKey = useMemo(() => {
+    if (!selectedQuestionId || selectedSegmentKeys.length < 2) return '';
+    return buildSuggestionSelectionKey(selectedQuestionId, selectedSegmentKeys);
+  }, [selectedQuestionId, selectedSegmentKeys]);
 
   const suggestions = useMemo(() => {
     const related = findMostDivergentPairs({
@@ -142,8 +150,26 @@ const DemoAnalysisWorkspace = ({
         onSuggestFromSegment={handleAutoSelectCorrelation}
       />
 
+      {selectedQuestion ? (
+        <section className={`${styles.panel} ${styles.selectedQuestionBanner}`} data-testid="demo-analysis-question-banner">
+          <div className={styles.selectedQuestionBannerHeader}>
+            <span className={styles.selectedQuestionBannerLabel}>Current focus question</span>
+            <span className={styles.selectedQuestionBannerMeta}>
+              The suggestion card, map, and breakdown below are all keyed to this prompt.
+            </span>
+          </div>
+          <p className={styles.selectedQuestionBannerText} data-testid="demo-analysis-selected-question">
+            {selectedQuestion.text}
+          </p>
+        </section>
+      ) : null}
+
       <div className={styles.primaryGrid}>
-        <ComparisonSuggestions suggestions={suggestions} onSuggestionClick={handleSuggestionClick} />
+        <ComparisonSuggestions
+          suggestions={suggestions}
+          onSuggestionClick={handleSuggestionClick}
+          activeSuggestionKey={activeSuggestionKey}
+        />
         <WorldResultsMap
           question={selectedQuestion}
           responses={analysisData.flatResponses}
