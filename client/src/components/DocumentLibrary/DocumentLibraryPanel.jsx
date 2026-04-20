@@ -6,14 +6,12 @@ import {
   faSpinner,
   faSync,
   faUpload,
-  faPlus,
   faLink,
   faLock,
   faLockOpen,
   faEye,
   faCopy,
   faExternalLinkAlt,
-  faTimes,
 } from '@fortawesome/free-solid-svg-icons';
 import { Button, Input, Modal, ModalBody, ModalHeader } from 'reactstrap';
 
@@ -48,6 +46,7 @@ import {
   uploadDocLibraryFile,
   uploadDocLibraryUrlRecord,
 } from '../../utilities/docLibrary/uploads.js';
+import SBTSelector from '../SBTs/SBTSelector.jsx';
 import { toStr } from '../../utilities/shared/primitives.js';
 import { notify } from '../../utilities/ui/notify.js';
 import { createLogger } from '../../utilities/logging.js';
@@ -238,7 +237,6 @@ export default function DocumentLibraryPanel({
   const lastContextKeyRef = useRef('');
   const [locked, setLocked] = useState(false);
   const [audienceMode, setAudienceMode] = useState('custom'); // "sessionGate" | "custom"
-  const [customSbtInput, setCustomSbtInput] = useState('');
   const [customSbtList, setCustomSbtList] = useState([]);
   const [customGateMode, setCustomGateMode] = useState('any'); // any|all
 
@@ -276,7 +274,6 @@ export default function DocumentLibraryPanel({
 
     // Prevent accidental re-use of a prior group's custom audience list when the
     // panel is reused across navigation.
-    setCustomSbtInput('');
     if (mode === 'sbt') {
       setCustomSbtList(normalizedSbtAddress ? [{ address: normalizedSbtAddress }] : []);
     } else {
@@ -543,28 +540,27 @@ export default function DocumentLibraryPanel({
     } catch (e) { log.warn('DocumentLibraryPanel: fallback', e); }
   }, [autoOpenDoc, panelContextKey, loginComplete, provider, account, openDoc]);
 
-  const addCustomSbt = useCallback(() => {
-    const addr = normalizeSbtAddress(customSbtInput);
+  const addCustomSbt = useCallback((sbt) => {
+    const addr = normalizeSbtAddress(sbt?.address);
     if (!addr) return;
     setCustomSbtList((prev) => {
       const list = Array.isArray(prev) ? prev : [];
-      if (list.some((e) => (e?.address || '').toLowerCase() === addr)) return list;
-      return [...list, { address: addr }];
+      if (list.some((entry) => (entry?.address || '').toLowerCase() === addr)) return list;
+      return [
+        ...list,
+        {
+          ...sbt,
+          address: addr,
+        },
+      ];
     });
-    setCustomSbtInput('');
-  }, [customSbtInput]);
+  }, []);
 
   const removeCustomSbt = useCallback((addr) => {
     const target = normalizeSbtAddress(addr);
     if (!target) return;
     setCustomSbtList((prev) => (Array.isArray(prev) ? prev.filter((e) => (e?.address || '').toLowerCase() !== target) : []));
   }, []);
-
-  const seedCustomFromSessionGate = useCallback(() => {
-    if (!docUploadsGate.hasRecipients) return;
-    setCustomSbtList(docUploadsGate.sbtAddresses.map((a) => ({ address: normalizeSbtAddress(a) })).filter((e) => e.address));
-    setCustomGateMode(docUploadsGate.mode || 'any');
-  }, [docUploadsGate.hasRecipients, docUploadsGate.mode, docUploadsGate.sbtAddresses]);
 
   const resolveAssociationTags = useCallback(({ kind, storage, plaintextMeta } = {}) => {
     const common = buildDocLibraryCommonTags({ kind, storage });
@@ -1102,7 +1098,6 @@ export default function DocumentLibraryPanel({
                   {docUploadsGate.hasRecipients ? (
                     <div>
                       <div><strong>Mode:</strong> {docUploadsGate.mode}</div>
-                      <div><strong>Chain:</strong> {docUploadsGate.chainId || network?.id || 'unknown'}</div>
                       <div><strong>SBTs:</strong> {docUploadsGate.sbtAddresses.length}</div>
                     </div>
                   ) : (
@@ -1115,38 +1110,21 @@ export default function DocumentLibraryPanel({
 
               {audienceMode === 'custom' && (
                 <div className={styles.customAudience}>
-                  <div className={styles.customRow}>
-                    <Input
-                      type="text"
-                      value={customSbtInput}
-                      onChange={(e) => setCustomSbtInput(e.target.value)}
-                      placeholder="0xSbtAddress"
-                      className={styles.customInput}
-                      data-testid={E2E_TESTIDS.DOC_CUSTOM_SBT_INPUT}
+                  <div
+                    className={styles.customSelectorWrap}
+                    data-testid={E2E_TESTIDS.DOC_CUSTOM_SBT_SELECTOR}
+                  >
+                    <SBTSelector
+                      id={`doc-library-custom-${mode || 'session'}`}
+                      label="Select SBT access"
+                      selectedSBTs={customSbtList}
+                      onAddSBT={addCustomSbt}
+                      onRemoveSBT={removeCustomSbt}
+                      network={network}
+                      sessionSlug={sessionSlug || ''}
+                      discoverySessionSlugs={[sessionSlug || '']}
+                      variant="create"
                     />
-                    <Button type="button" color="secondary" size="sm" onClick={addCustomSbt} data-testid={E2E_TESTIDS.DOC_CUSTOM_SBT_ADD}>
-                      <FontAwesomeIcon icon={faPlus} /> Add
-                    </Button>
-                    {docUploadsGate.hasRecipients && (
-                      <Button type="button" color="secondary" outline size="sm" onClick={seedCustomFromSessionGate}>
-                        Copy from session gate
-                      </Button>
-                    )}
-                    {mode === 'sbt' && normalizedSbtAddress && (
-                      <Button
-                        type="button"
-                        color="secondary"
-                        outline
-                        size="sm"
-                        onClick={() => setCustomSbtList((prev) => {
-                          const list = Array.isArray(prev) ? prev : [];
-                          if (list.some((e) => (e?.address || '').toLowerCase() === normalizedSbtAddress)) return list;
-                          return [...list, { address: normalizedSbtAddress }];
-                        })}
-                      >
-                        Add current SBT
-                      </Button>
-                    )}
                   </div>
 
                   <div className={styles.customRow}>
@@ -1170,30 +1148,14 @@ export default function DocumentLibraryPanel({
                       />
                       All
                     </label>
-                    <div className={styles.chainHint}>
-                      Chain: {Number(sbtChainId || docUploadsGate.chainId || network?.id || 0) || 'unknown'}
-                    </div>
                   </div>
-
-                  {customSbtList.length > 0 && (
-                    <div className={styles.customList}>
-                      {customSbtList.map((entry) => (
-                        <div key={entry.address} className={styles.customItem}>
-                          <code>{entry.address}</code>
-                          <button type="button" className={styles.iconBtn} onClick={() => removeCustomSbt(entry.address)} title="Remove">
-                            <FontAwesomeIcon icon={faTimes} />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
                 </div>
               )}
             </div>
           )}
         </div>
 
-        {secondaryAssociationType === 'sbt' && (
+        {secondaryAssociationType === 'sbt' && mode !== 'session' && (
           <div className={styles.secondaryAssoc}>
             <label className={styles.checkboxLabel}>
               <input type="checkbox" checked={alsoAssociateSbt} onChange={(e) => setAlsoAssociateSbt(e.target.checked)} />

@@ -55,7 +55,6 @@ export default function SessionDocumentsPage({
         sessionConfig={sessionConfig}
         mode="session"
         sessionIdHex={resolvedSessionIdHex}
-        secondaryAssociationType="sbt"
         compact={false}
         pageSize={25}
       />

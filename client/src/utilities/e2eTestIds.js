@@ -244,6 +244,7 @@ const E2E_TESTIDS = Object.freeze({
   DOC_AUDIENCE_CUSTOM: 'ce-doc-audience-custom',
   DOC_CUSTOM_SBT_INPUT: 'ce-doc-custom-sbt-input',
   DOC_CUSTOM_SBT_ADD: 'ce-doc-custom-sbt-add',
+  DOC_CUSTOM_SBT_SELECTOR: 'ce-doc-custom-sbt-selector',
   DOC_CUSTOM_MODE_ANY: 'ce-doc-custom-mode-any',
   DOC_CUSTOM_MODE_ALL: 'ce-doc-custom-mode-all',
   DOC_ROW: 'ce-doc-row',
