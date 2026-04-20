@@ -312,6 +312,7 @@ class QuestionFilter extends React.Component {
       aiFilterApplied: false,
       aiCombineWithOtherFilters,
       aiApplying: false,
+      aiApplyingElapsedSec: 0,
       aiApplyError: '',
       aiLastAppliedSignature: '',
       // We set the collapsible sections so that ONLY “tags” is auto-open. Others default to false:
@@ -379,6 +380,8 @@ class QuestionFilter extends React.Component {
     this._aiAutoApplyQueuedSignature = '';
     this._aiApplyRequestSeq = 0;
     this._aiLatestRequestSeq = 0;
+    this._aiApplyingElapsedTimer = null;
+    this._aiApplyingStartedAtMs = null;
   }
 
   /* -------------------------- LIFECYCLE METHODS -------------------------- */
@@ -416,6 +419,31 @@ class QuestionFilter extends React.Component {
       });
     } catch (_) {
       return false;
+    }
+  };
+
+  syncAiApplyingElapsedTimer = () => {
+    if (this.state.aiApplying) {
+      if (!this._aiApplyingStartedAtMs) this._aiApplyingStartedAtMs = Date.now();
+      if (!this._aiApplyingElapsedTimer) {
+        this._aiApplyingElapsedTimer = setInterval(() => {
+          const started = Number(this._aiApplyingStartedAtMs || Date.now());
+          const elapsed = Math.max(0, Math.floor((Date.now() - started) / 1000));
+          if (elapsed !== Number(this.state.aiApplyingElapsedSec || 0)) {
+            this.setState({ aiApplyingElapsedSec: elapsed });
+          }
+        }, 1000);
+      }
+      return;
+    }
+
+    if (this._aiApplyingElapsedTimer) {
+      clearInterval(this._aiApplyingElapsedTimer);
+      this._aiApplyingElapsedTimer = null;
+    }
+    this._aiApplyingStartedAtMs = null;
+    if (this.state.aiApplyingElapsedSec !== 0) {
+      this.setState({ aiApplyingElapsedSec: 0 });
     }
   };
 
@@ -562,6 +590,7 @@ class QuestionFilter extends React.Component {
 
   async componentDidMount() {
     this._isMounted = true;
+    this.syncAiApplyingElapsedTimer();
     let initialFiltersApplied = false;
     const hasUrlFilterState = this.hasExternalFilterState(this.props);
     const shouldApplyDefaultFilterState = this.shouldApplyDefaultFilterState(this.props);
@@ -859,6 +888,7 @@ class QuestionFilter extends React.Component {
 
   componentDidUpdate(prevProps, prevState) {
     measureSync('ce.questionFilter.componentDidUpdate', () => {
+      this.syncAiApplyingElapsedTimer();
       const filterPersistenceScopeChanged =
         this.getFilterPersistenceScopeSignature(prevProps) !==
         this.getFilterPersistenceScopeSignature(this.props);
@@ -1007,6 +1037,11 @@ class QuestionFilter extends React.Component {
     this._isMounted = false;
     clearTimeout(this.copySuccessTimeout);
     clearTimeout(this.bookmarkFeedbackTimeout);
+    if (this._aiApplyingElapsedTimer) {
+      clearInterval(this._aiApplyingElapsedTimer);
+      this._aiApplyingElapsedTimer = null;
+    }
+    this._aiApplyingStartedAtMs = null;
     this._aiAutoApplyInFlightSignature = '';
     this._aiAutoApplyQueuedSignature = '';
     this._aiLatestRequestSeq = this._aiApplyRequestSeq;
@@ -1118,6 +1153,7 @@ class QuestionFilter extends React.Component {
     aiCombineWithOtherFilters: false,
     aiRankedQuestionIds: [],
     aiApplying: false,
+    aiApplyingElapsedSec: 0,
     aiApplyError: '',
     aiLastAppliedSignature: '',
     filterByResponded: false,
@@ -2931,6 +2967,7 @@ handleLoadFilter = () => {
       aiRankingCount,
       aiCombineWithOtherFilters,
       aiApplying,
+      aiApplyingElapsedSec,
       aiApplyError,
       filterLoading,
       sbtFilterLocalState,
@@ -2958,6 +2995,9 @@ handleLoadFilter = () => {
     const aiAccessState = this.getAiAccessState();
     const aiSectionDisabled = isTopQuestionsModeActive;
     const aiControlsDisabled = isTopQuestionsModeActive || !aiAccessState.enabled || aiApplying;
+    const aiApplyButtonLabel = aiApplying
+      ? `Applying... ${Math.max(0, Number(aiApplyingElapsedSec || 0))}s`
+      : 'Apply';
     const pipelineForRender = this.buildFilterPipelineResult(false);
     const encryptedCount = pipelineForRender.finalQuestions
       .filter(q => String(q?.prompt || '').trim() === '[encrypted]').length;
@@ -3296,63 +3336,64 @@ handleLoadFilter = () => {
                     dataTestId={E2E_TESTIDS.QUESTION_FILTER_AI_QUERY}
                     disabled={aiControlsDisabled}
                   />
-                  <div style={{ marginTop: '10px' }}>
-                    <Label style={{ marginBottom: '5px', fontSize: '0.95rem' }}>
-                      Number of questions to return:
-                    </Label>
-                    <Input
-                      type="number"
-                      data-testid={E2E_TESTIDS.QUESTION_FILTER_AI_TOP_N}
-                      min="1"
-                      value={aiRankingCount}
-                      onChange={this.handleAiTopNChange}
-                      style={{
-                        width: '120px',
-                        marginBottom: '10px',
-                        fontSize: '1.1rem'
-                      }}
-                      disabled={aiControlsDisabled}
-                    />
-                    <FormGroup check style={{ marginBottom: '10px' }}>
-                      <Label check className={styles.filterOption}>
+                  <div className={styles.aiActionCard}>
+                    <div className={styles.aiActionRow}>
+                      <div className={styles.aiCountControl}>
+                        <Label className={styles.aiCountLabel} for={E2E_TESTIDS.QUESTION_FILTER_AI_TOP_N}>
+                          Questions
+                        </Label>
                         <Input
-                          type="checkbox"
-                          checked={aiCombineWithOtherFilters}
-                          onChange={this.handleAiCombineWithFiltersChange}
+                          id={E2E_TESTIDS.QUESTION_FILTER_AI_TOP_N}
+                          className={styles.aiCountInput}
+                          type="number"
+                          data-testid={E2E_TESTIDS.QUESTION_FILTER_AI_TOP_N}
+                          min="1"
+                          value={aiRankingCount}
+                          onChange={this.handleAiTopNChange}
                           disabled={aiControlsDisabled}
                         />
-                        Combine with other filters
-                      </Label>
-                    </FormGroup>
-                    <Button
-                      color="info"
-                      data-testid={E2E_TESTIDS.QUESTION_FILTER_AI_APPLY}
-                      disabled={aiControlsDisabled}
-                      onClick={() => this.handleApplyAIFilter({ auto: false, source: 'manual-click' })}
-                    >
-                      {aiApplying ? 'Applying AI...' : 'Apply AI Filter'}
-                    </Button>
+                      </div>
+                      <Button
+                        color="info"
+                        className={styles.aiApplyButton}
+                        data-testid={E2E_TESTIDS.QUESTION_FILTER_AI_APPLY}
+                        disabled={aiControlsDisabled}
+                        onClick={() => this.handleApplyAIFilter({ auto: false, source: 'manual-click' })}
+                      >
+                        {aiApplying && (
+                          <FontAwesomeIcon
+                            icon={faSpinner}
+                            spin
+                            className={styles.aiApplySpinner}
+                          />
+                        )}
+                        <span>{aiApplyButtonLabel}</span>
+                      </Button>
+                      <FormGroup check className={styles.aiCombineGroup}>
+                        <Label check className={`${styles.filterOption} ${styles.aiCombineRow}`}>
+                          <Input
+                            type="checkbox"
+                            checked={aiCombineWithOtherFilters}
+                            onChange={this.handleAiCombineWithFiltersChange}
+                            disabled={aiControlsDisabled}
+                          />
+                          Combine with other filters
+                        </Label>
+                      </FormGroup>
+                    </div>
                     {this.state.aiFilterApplied && aiSearchQuery && !aiApplyError && (
-                      <p style={{ marginTop: '8px', fontStyle: 'italic', color: '#666' }}>
-                        Active AI filter: "{aiSearchQuery}" (Top {normalizePositiveInt(this.state.aiAppliedTopN, DEFAULT_AI_TOP_N)}
-                        {aiCombineWithOtherFilters ? ', combined' : ', override'})
+                      <p className={styles.aiStatusText}>
+                        Active: "{aiSearchQuery}" • Top {normalizePositiveInt(this.state.aiAppliedTopN, DEFAULT_AI_TOP_N)} • {aiCombineWithOtherFilters ? 'Combined' : 'Override'}
                       </p>
                     )}
                     {this.state.aiFilterApplied && aiSearchQuery && !aiCombineWithOtherFilters && !aiApplyError && (
-                      <p style={{ marginTop: '8px', fontStyle: 'italic', color: '#666' }}>
+                      <p className={styles.aiHintText}>
                         AI Top-N override mode is active. Enable "Combine with other filters" to intersect with type/tag/SBT filters.
                       </p>
                     )}
                     {!!aiApplyError && (
-                      <p style={{ marginTop: '8px', color: '#b02a37' }}>
+                      <p className={styles.aiErrorText}>
                         {aiApplyError}
-                      </p>
-                    )}
-                    {!aiApplyError && aiAccessState.enabled && (
-                      <p style={{ marginTop: '8px', fontStyle: 'italic', color: '#666' }}>
-                        {aiAccessState.localKeyAvailable
-                          ? 'Local AI key detected.'
-                          : 'Using session AI access path.'}
                       </p>
                     )}
                   </div>
