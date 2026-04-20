@@ -16,23 +16,6 @@ const formatPersonaCount = (count = 0) => {
   return `${normalizedCount} persona${normalizedCount === 1 ? '' : 's'}`;
 };
 
-type DemographicOption = {
-  value: string;
-  count?: number;
-};
-
-type DemographicsByCategory = Record<string, DemographicOption[]>;
-
-type DemographicSelectorProps = {
-  demographics?: DemographicsByCategory;
-  selectedSegmentKeys?: string[];
-  onToggleSegment: (segmentKey: string) => void;
-  onCategoryChange: (category: string, segmentKeys: string[]) => void;
-  onClearAll: () => void;
-  onAutoSelectCorrelation: () => void;
-  onSuggestFromSegment: (segmentKey: string) => void;
-};
-
 const DemographicSelector = ({
   demographics = {},
   selectedSegmentKeys = [],

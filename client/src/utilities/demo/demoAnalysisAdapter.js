@@ -37,11 +37,22 @@ const slugify = (value = '') => String(value || '')
   .replace(/[^a-z0-9]+/g, '-')
   .replace(/^-+|-+$/g, '');
 
+const normalizeSourceId = (value = '') => {
+  const trimmed = String(value || '').trim().toLowerCase();
+  if (!trimmed) return '';
+  if (trimmed === 'sci-fi' || trimmed === 'scifi') return 'scifi';
+  if (trimmed === 'metr') return 'metr';
+  return slugify(trimmed);
+};
+
 const normalizeSourceName = (value = '') => {
   const trimmed = String(value || '').trim();
   if (!trimmed) return '';
-  if (trimmed === 'arxiv') return 'arXiv';
-  if (trimmed === 'LessWrong') return 'LessWrong';
+  const normalized = trimmed.toLowerCase();
+  if (normalized === 'arxiv') return 'arXiv';
+  if (normalized === 'lesswrong') return 'LessWrong';
+  if (normalized === 'metr') return 'METR';
+  if (normalized === 'sci-fi' || normalized === 'scifi') return 'Sci-Fi';
   return toTitleCase(trimmed);
 };
 
@@ -65,7 +76,7 @@ export const buildQuestionTags = (comment = {}) => {
     .filter(Boolean);
 
   rawSources.forEach((source) => {
-    const normalizedId = slugify(source);
+    const normalizedId = normalizeSourceId(source);
     if (!normalizedId || seenSources.has(normalizedId)) return;
     seenSources.add(normalizedId);
     tags.push({
@@ -100,6 +111,16 @@ const incrementMapCount = (map, key) => {
   map.set(key, Number(map.get(key) || 0) + 1);
 };
 
+const getParticipantIdentityKey = (participant = {}, fallbackKey = '') => {
+  const xid = String(participant?.xid || '').trim();
+  if (xid) return xid;
+
+  const participantId = String(participant?.participant || '').trim();
+  if (participantId) return participantId;
+
+  return String(fallbackKey || '').trim();
+};
+
 const getParticipantSegments = (participant = {}, metadata = {}) => {
   const segments = [{ segmentKey: 'All', category: 'All', value: 'All' }];
   DEMO_ANALYSIS_DEMOGRAPHIC_DIMENSIONS.forEach(({ label, field }) => {
@@ -118,14 +139,28 @@ const buildDemographicSummary = (participantsVotes = [], metadataByXid = {}) => 
   const countsByCategory = new Map(
     DEMO_ANALYSIS_DEMOGRAPHIC_DIMENSIONS.map(({ label }) => [label, new Map()])
   );
+  const participantKeysByCategoryValue = new Map(
+    DEMO_ANALYSIS_DEMOGRAPHIC_DIMENSIONS.map(({ label }) => [label, new Map()])
+  );
 
-  participantsVotes.forEach((participant) => {
+  participantsVotes.forEach((participant, participantIndex) => {
     const xid = String(participant?.xid || '').trim();
     const metadata = metadataByXid[xid];
     if (!metadata) return;
+
+    const participantKey = getParticipantIdentityKey(participant, `row:${participantIndex}`);
     DEMO_ANALYSIS_DEMOGRAPHIC_DIMENSIONS.forEach(({ label, field }) => {
       const value = String(metadata?.[field] || '').trim();
       if (!value) return;
+
+      const categoryParticipantKeys = participantKeysByCategoryValue.get(label);
+      if (!categoryParticipantKeys.has(value)) {
+        categoryParticipantKeys.set(value, new Set());
+      }
+      const seenParticipantKeys = categoryParticipantKeys.get(value);
+      if (seenParticipantKeys.has(participantKey)) return;
+
+      seenParticipantKeys.add(participantKey);
       incrementMapCount(countsByCategory.get(label), value);
     });
   });
@@ -167,8 +202,9 @@ export const buildDemoAnalysisData = (
     const questionId = question.id;
     const responseCountsBySegment = new Map();
     const denominatorsBySegment = new Map();
+    const uniqueParticipantKeysBySegment = new Map();
 
-    participantsVotes.forEach((participant) => {
+    participantsVotes.forEach((participant, participantIndex) => {
       const xid = String(participant?.xid || '').trim();
       const metadata = metadataByXid[xid];
       const rawVote = participant?.votes?.[questionId];
@@ -178,17 +214,22 @@ export const buildDemoAnalysisData = (
       const responseLabel = VOTE_LABEL_BY_VALUE[normalizedVoteKey];
       if (!responseLabel) return;
 
+      const participantKey = getParticipantIdentityKey(participant, `row:${participantIndex}`);
       const segments = getParticipantSegments(participant, metadata);
       segments.forEach(({ segmentKey }) => {
         incrementMapCount(denominatorsBySegment, segmentKey);
         if (!responseCountsBySegment.has(segmentKey)) {
           responseCountsBySegment.set(segmentKey, new Map());
         }
+        if (!uniqueParticipantKeysBySegment.has(segmentKey)) {
+          uniqueParticipantKeysBySegment.set(segmentKey, new Set());
+        }
+        uniqueParticipantKeysBySegment.get(segmentKey).add(participantKey);
         incrementMapCount(responseCountsBySegment.get(segmentKey), responseLabel);
       });
     });
 
-    question.participationCount = Number(denominatorsBySegment.get('All') || 0);
+    question.participationCount = Number(uniqueParticipantKeysBySegment.get('All')?.size || 0);
     segmentCounts[questionId] = {};
     questionTagsData[questionId] = buildQuestionTags(comments[question.index]);
 
@@ -197,6 +238,7 @@ export const buildDemoAnalysisData = (
       .forEach(([segmentKey, denominator]) => {
         segmentCounts[questionId][segmentKey] = denominator;
         const responseCounts = responseCountsBySegment.get(segmentKey) || new Map();
+        const participantCount = Number(uniqueParticipantKeysBySegment.get(segmentKey)?.size || 0);
         DEMO_ANALYSIS_RESPONSE_OPTIONS.forEach((responseText) => {
           const count = Number(responseCounts.get(responseText) || 0);
           flatResponses.push({
@@ -204,6 +246,7 @@ export const buildDemoAnalysisData = (
             responseText,
             segmentKey,
             count,
+            participantCount,
             totalVotes: denominator,
             rate: denominator > 0 ? count / denominator : 0,
           });

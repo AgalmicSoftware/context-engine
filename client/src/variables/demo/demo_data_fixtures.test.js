@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 
 import corpusSample from './corpus_sample.json';
+import demoAnalysisGenerationConfig from './demo_analysis_generation_config.json';
 import debateMapData from './debate_map_demo_data.json';
 import demoAnalysisData from './demo_analysis_data.json';
 import debates from './debates.json';
@@ -30,6 +31,9 @@ describe('demo data fixture cleanup', () => {
 
   it('keeps the dedicated breakdown analysis fixture separate from the canonical Polis demo fixture', () => {
     const demoDir = __dirname;
+    const syntheticVariantCount = Array.isArray(demoAnalysisGenerationConfig?.syntheticParticipantConfig?.variantProfiles)
+      ? demoAnalysisGenerationConfig.syntheticParticipantConfig.variantProfiles.length
+      : 0;
 
     expect(fs.existsSync(path.join(demoDir, 'demo_analysis_data.json'))).toBe(true);
     expect(Object.keys(demoAnalysisData)).toEqual([
@@ -37,7 +41,24 @@ describe('demo data fixture cleanup', () => {
       'participantsVotes',
     ]);
     expect(demoAnalysisData.comments).toHaveLength(demoPolisData.comments.length);
-    expect(demoAnalysisData.participantsVotes).toHaveLength(demoPolisData.participantsVotes.length);
+    expect(demoAnalysisData.participantsVotes).toHaveLength(
+      demoPolisData.participantsVotes.length * (syntheticVariantCount + 1)
+    );
+  });
+
+  it('keeps breakdown generation curation in a dedicated demo variable file', () => {
+    const demoDir = __dirname;
+
+    expect(fs.existsSync(path.join(demoDir, 'demo_analysis_generation_config.json'))).toBe(true);
+    expect(Object.keys(demoAnalysisGenerationConfig)).toEqual([
+      'treeNodeIdsByQuestionId',
+      'questionOverridesByQuestionId',
+      'syntheticParticipantConfig',
+    ]);
+    expect(Object.keys(demoAnalysisGenerationConfig.treeNodeIdsByQuestionId).length).toBeGreaterThan(0);
+    expect(Object.keys(demoAnalysisGenerationConfig.questionOverridesByQuestionId).length).toBeGreaterThan(0);
+    expect(Array.isArray(demoAnalysisGenerationConfig?.syntheticParticipantConfig?.variantProfiles)).toBe(true);
+    expect(demoAnalysisGenerationConfig.syntheticParticipantConfig.variantProfiles.length).toBeGreaterThan(0);
   });
 
   it('merges the split debate fixtures into a single dataset', () => {
@@ -92,8 +113,8 @@ describe('demo data fixture cleanup', () => {
       ],
       dwarkesh_lab_insiders: [
         'amodei_dario_dwarkesh_2026_scaling',
-        'amodei_dario_dwarkesh_2023_scaling',
         'hassabis_demis_dwarkesh_2024_superhuman',
+        'amodei_dario_dwarkesh_2023_scaling',
       ],
       ai_scifi_books: [
         'shelley_frankenstein',
