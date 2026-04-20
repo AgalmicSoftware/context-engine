@@ -229,13 +229,197 @@ $input-border: tokens.$ce-input-border;
 
   /* --- Additional Context Styling --- */
   .additionalContextSection {
-    margin-top: 12px;
+    margin-top: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .photoCardGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 12px;
+  }
+
+  .photoCard {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 14px;
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: rgba(255, 255, 255, 0.06);
+    box-shadow: 0 6px 22px rgba(0, 0, 0, 0.25);
+  }
+
+  .photoCardTop {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    min-width: 0;
+  }
+
+  .photoPreviewFrame {
+    width: 104px;
+    min-width: 104px;
+    height: 92px;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: rgba(9, 14, 32, 0.6);
+  }
+
+  .photoPreviewImage,
+  .photoPreviewFallback {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  .photoPreviewImage {
+    object-fit: cover;
+    background: rgba(9, 14, 32, 0.85);
+  }
+
+  .photoPreviewFallback {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: rgba(244, 247, 255, 0.7);
+    font-size: 1.3rem;
+  }
+
+  .photoCardMeta {
+    min-width: 0;
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding-right: 28px;
+  }
+
+  .photoName {
+    color: rgba(244, 247, 255, 0.96);
+    font-size: 0.94rem;
+    font-weight: 700;
+    line-height: 1.45;
+    word-break: break-word;
+  }
+
+  .photoCardStatusRow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .photoStatusChip,
+  .photoStatusToggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    max-width: 100%;
+    padding: 6px 10px;
+    border-radius: var(--ce-radius-pill);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    background: rgba(255, 255, 255, 0.08);
+    color: rgba(244, 247, 255, 0.95);
+    font-size: 0.76rem;
+    font-weight: 700;
+    line-height: 1.2;
+  }
+
+  .photoStatusChipQueued {
+    color: rgba(244, 247, 255, 0.78);
+  }
+
+  .photoStatusChipLoading {
+    color: #7fe8ff;
+    border-color: rgba(127, 232, 255, 0.36);
+    background: rgba(127, 232, 255, 0.12);
+  }
+
+  .photoStatusChipError {
+    color: #ffd3d3;
+    border-color: rgba(255, 107, 107, 0.44);
+    background: rgba(255, 107, 107, 0.14);
+  }
+
+  .photoStatusToggle {
+    cursor: pointer;
+    border-color: rgba(77, 255, 164, 0.4);
+    background: rgba(77, 255, 164, 0.12);
+    color: #d7ffe9;
+    transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+
+    &:hover,
+    &:focus,
+    &:focus-visible {
+      background: rgba(77, 255, 164, 0.2);
+      border-color: rgba(77, 255, 164, 0.58);
+      color: #ffffff;
+      text-decoration: none;
+      box-shadow: 0 0 0 2px rgba(77, 255, 164, 0.18);
+      outline: none;
+    }
+  }
+
+  .photoErrorText,
+  .photoAnalysisBody {
+    border-radius: 12px;
+    padding: 10px 12px;
+    font-size: 0.84rem;
+    line-height: 1.55;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  .photoErrorText {
+    border: 1px solid rgba(255, 107, 107, 0.3);
+    background: rgba(255, 107, 107, 0.1);
+    color: #ffd7d7;
+  }
+
+  .photoAnalysisBody {
+    border: 1px solid rgba(77, 255, 164, 0.2);
+    background: rgba(9, 14, 32, 0.58);
+    color: rgba(244, 247, 255, 0.92);
+  }
+
+  .photoRemoveBtn {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 28px;
+    height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 999px;
+    background: rgba(10, 14, 33, 0.72);
+    color: #ffd3d3;
+    cursor: pointer;
+    font-size: 1rem;
+    line-height: 1;
+    transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+
+    &:hover,
+    &:focus,
+    &:focus-visible {
+      background: rgba(255, 107, 107, 0.16);
+      border-color: rgba(255, 107, 107, 0.46);
+      color: #ffffff;
+      outline: none;
+      box-shadow: 0 0 0 2px rgba(255, 107, 107, 0.18);
+    }
   }
 
   .sourceList {
     list-style: none;
     padding-left: 0;
-    margin-bottom: 15px;
+    margin: 0;
   }
 
   .docSaveRow {
@@ -334,10 +518,11 @@ $input-border: tokens.$ce-input-border;
     display: flex;
     align-items: center;
     background: rgba(255, 255, 255, 0.05);
-    padding: 6px 10px;
-    margin-bottom: 5px;
+    padding: 8px 10px;
+    margin-bottom: 6px;
     border-radius: var(--ce-radius-4);
     font-size: 0.9em;
+    border: 1px solid rgba(255, 255, 255, 0.1);
   }
 
   .sourceTypeLabel {
@@ -361,28 +546,6 @@ $input-border: tokens.$ce-input-border;
     white-space: nowrap;
   }
 
-  .sourceStatus {
-    font-size: 0.75rem;
-    line-height: 1.35;
-    color: rgba(255, 255, 255, 0.7);
-  }
-
-  .sourceStatusQueued {
-    color: rgba(255, 255, 255, 0.7);
-  }
-
-  .sourceStatusLoading {
-    color: #7fe8ff;
-  }
-
-  .sourceStatusReady {
-    color: #4dffa4;
-  }
-
-  .sourceStatusError {
-    color: #ff8b8b;
-  }
-
   .removeSourceBtn {
     background: none;
     border: none;
@@ -403,6 +566,28 @@ $input-border: tokens.$ce-input-border;
     align-items: center;
     gap: 10px;
     margin-top: 10px;
+  }
+
+  @media (max-width: 640px) {
+    .photoCardTop {
+      flex-direction: column;
+    }
+
+    .photoPreviewFrame {
+      width: 100%;
+      min-width: 0;
+      height: 160px;
+    }
+
+    .photoCardMeta {
+      width: 100%;
+      padding-right: 0;
+    }
+
+    .photoRemoveBtn {
+      top: 12px;
+      right: 12px;
+    }
   }
 
   .urlInputContainer {

@@ -280,17 +280,21 @@ Agent page UI: `client/src/components/Agent/AgentPage.jsx`
 
 ## Tool Explorer Data View
 
-| `data-testid` | Component path(s) | Meaning / When Present | TestID API |
-| --- | --- | --- | --- |
-| `ce-tool-explorer-data-add` | `client/src/components/MainContent/ToolExplorer.jsx` | Header action that switches the expanded Tool Explorer `Data` card into add/create mode. | yes |
-| `ce-tool-explorer-data-view` | `client/src/components/MainContent/ToolExplorer.jsx` | Header action that switches the expanded Tool Explorer `Data` card into view/library mode. | yes |
-| `ce-database-view-demo-toggle` | `client/src/components/SurveyTool/SurveyGenerator/SurveyGenerator.jsx` | Local checkbox inside Tool Explorer `Data` view mode that toggles between demo corpus and real session docs when demo surfaces are enabled. | yes |
-| `ce-database-view-panel` | `client/src/components/SurveyTool/SurveyGenerator/SurveyGenerator.jsx` | Root wrapper for the Tool Explorer `Data` view-mode content shell. | yes |
-| `ce-database-save-docs-toggle` | `client/src/components/SurveyTool/SurveyGenerator/SurveyGenerator.jsx` | Checkbox shown in Tool Explorer `Data` add mode once queued extra URL/file sources exist; enables saving those queued sources into the session doc library on Generate. | yes |
+| `data-testid` | Component path(s) | Meaning / When Present | TestID API | Disambiguators |
+| --- | --- | --- | --- | --- |
+| `ce-tool-explorer-data-add` | `client/src/components/MainContent/ToolExplorer.jsx` | Header action that switches the expanded Tool Explorer `Data` card into add/create mode. | yes |  |
+| `ce-tool-explorer-data-view` | `client/src/components/MainContent/ToolExplorer.jsx` | Header action that switches the expanded Tool Explorer `Data` card into view/library mode. | yes |  |
+| `ce-database-view-demo-toggle` | `client/src/components/SurveyTool/SurveyGenerator/SurveyGenerator.jsx` | Local checkbox inside Tool Explorer `Data` view mode that toggles between demo corpus and real session docs when demo surfaces are enabled. | yes |  |
+| `ce-database-view-panel` | `client/src/components/SurveyTool/SurveyGenerator/SurveyGenerator.jsx` | Root wrapper for the Tool Explorer `Data` view-mode content shell. | yes |  |
+| `ce-database-photo-source-card` | `client/src/components/SurveyTool/SurveyGenerator/SurveyGenerator.jsx` | Compact queued-photo card shown in Tool Explorer `Data` add mode for each uploaded image. | yes | `data-ce-source-id` |
+| `ce-database-photo-source-preview` | `client/src/components/SurveyTool/SurveyGenerator/SurveyGenerator.jsx` | Thumbnail preview image rendered inside a queued photo card. | yes | `data-ce-source-id` |
+| `ce-database-photo-source-analysis-toggle` | `client/src/components/SurveyTool/SurveyGenerator/SurveyGenerator.jsx` | Ready-state `Analysis complete` toggle button that expands or collapses inline photo analysis beneath a queued photo card. | yes | `data-ce-source-id` |
+| `ce-database-photo-source-analysis-body` | `client/src/components/SurveyTool/SurveyGenerator/SurveyGenerator.jsx` | Expanded inline analysis body for a queued photo card after photo analysis completes. | yes | `data-ce-source-id` |
+| `ce-database-save-docs-toggle` | `client/src/components/SurveyTool/SurveyGenerator/SurveyGenerator.jsx` | Checkbox shown in Tool Explorer `Data` add mode once queued extra URL/file/photo sources exist; enables saving those queued sources into the session doc library on Generate. | yes |  |
 | `ce-database-save-docs-audience-button` | `client/src/components/SurveyTool/SurveyGenerator/SurveyGenerator.jsx` | Compact lock/audience button shown when queued extra sources are set to save into the session doc library. | yes | `data-ce-doc-save-audience` (`self` or `session`) |
-| `ce-database-save-docs-audience-menu` | `client/src/components/SurveyTool/SurveyGenerator/SurveyGenerator.jsx` | Audience popover for Tool Explorer saved extra sources. | yes |
-| `ce-database-save-docs-audience-self` | `client/src/components/SurveyTool/SurveyGenerator/SurveyGenerator.jsx` | Audience option that saves queued extra sources as private `only me` doc-library entries. | yes |
-| `ce-database-save-docs-audience-session` | `client/src/components/SurveyTool/SurveyGenerator/SurveyGenerator.jsx` | Audience option that saves queued extra sources with the session `docUploads` gate when available. | yes |
+| `ce-database-save-docs-audience-menu` | `client/src/components/SurveyTool/SurveyGenerator/SurveyGenerator.jsx` | Audience popover for Tool Explorer saved extra sources. | yes |  |
+| `ce-database-save-docs-audience-self` | `client/src/components/SurveyTool/SurveyGenerator/SurveyGenerator.jsx` | Audience option that saves queued extra sources as private `only me` doc-library entries. | yes |  |
+| `ce-database-save-docs-audience-session` | `client/src/components/SurveyTool/SurveyGenerator/SurveyGenerator.jsx` | Audience option that saves queued extra sources with the session `docUploads` gate when available. | yes |  |
 
 ## Doc Library
 
