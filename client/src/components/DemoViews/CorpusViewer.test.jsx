@@ -118,8 +118,13 @@ describe('CorpusViewer', () => {
     expect(mobileBlock).toContain('max-width: none;');
     expect(mobileBlock).toContain('min-width: 0;');
     expect(mobileBlock).toContain('width: 100%;');
+    expect(mobileBlock).toContain('min-height: 104px;');
     expect(mobileBlock).toContain('.tabIcon {');
     expect(mobileBlock).toContain('font-size: 28px;');
+    expect(mobileBlock).toContain('.tabLabel {');
+    expect(mobileBlock).toContain('font-size: 18px;');
+    expect(mobileBlock).toContain('line-height: 1.18;');
+    expect(mobileBlock).toContain('white-space: normal;');
     expect(mobileBlock).toContain('.policyMapColumn {');
     expect(mobileBlock).toContain('order: -1;');
     expect(mobileBlock).toContain('.policyListColumn {');
@@ -144,9 +149,12 @@ describe('CorpusViewer', () => {
     expect(phoneBlock).toContain('.tabButton {');
     expect(phoneBlock).toContain('.tabBar {');
     expect(phoneBlock).toContain('gap: 8px;');
-    expect(phoneBlock).toContain('min-height: 78px;');
+    expect(phoneBlock).toContain('min-height: 96px;');
     expect(phoneBlock).toContain('.tabIcon {');
     expect(phoneBlock).toContain('font-size: 26px;');
+    expect(phoneBlock).toContain('.tabLabel {');
+    expect(phoneBlock).toContain('font-size: 17px;');
+    expect(phoneBlock).toContain('line-height: 1.16;');
     expect(phoneBlock).toContain('.tweetCard .tweetAuthorRow {');
     expect(phoneBlock).toContain('grid-template-columns: 40px minmax(0, 1fr);');
 
