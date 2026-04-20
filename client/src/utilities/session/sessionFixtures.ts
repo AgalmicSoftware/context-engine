@@ -6,10 +6,10 @@
  *              VALID_LOCAL_OVERRIDES, CORRUPT_METADATA_TYPES, STALE_CACHE_SESSION,
  *              DEMO_SESSION, SLUG_MISMATCH, MISSING_SOURCES
  */
-const deepFreeze = (value) => {
+const deepFreeze = <T>(value: T): T => {
   if (!value || typeof value !== 'object') return value;
   Object.getOwnPropertyNames(value).forEach((key) => {
-    const next = value[key];
+    const next = (value as Record<string, unknown>)[key];
     if (next && typeof next === 'object' && !Object.isFrozen(next)) {
       deepFreeze(next);
     }

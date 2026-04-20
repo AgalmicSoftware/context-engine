@@ -1,6 +1,21 @@
 import { toStr } from '../shared/primitives.js';
 
-const normalizePendingSbtContractEntry = (value) => {
+type PendingSbtContractEntry = {
+  address?: string;
+  chainId?: number;
+};
+
+type PendingSbtContractsMap = Record<string, PendingSbtContractEntry>;
+type SessionConfigLike = Record<string, any>;
+
+type BuildPendingSbtDeploySessionConfigOptions = {
+  sessionConfig?: unknown;
+  sessionSlug?: unknown;
+  networkChainId?: unknown;
+  contracts?: unknown;
+};
+
+const normalizePendingSbtContractEntry = (value: unknown): PendingSbtContractEntry | null => {
   if (!value) return null;
 
   if (typeof value === 'string') {
@@ -9,19 +24,20 @@ const normalizePendingSbtContractEntry = (value) => {
   }
 
   if (typeof value !== 'object' || Array.isArray(value)) return null;
+  const source = value as SessionConfigLike;
 
   const address = toStr(
-    value.address ||
-    value.contractAddress ||
-    value.addr ||
-    value.target ||
+    source.address ||
+    source.contractAddress ||
+    source.addr ||
+    source.target ||
     ''
   ).trim();
   const chainId = Number(
-    value.chainId ||
-    value.chainID ||
-    value.networkChainId ||
-    value.chain ||
+    source.chainId ||
+    source.chainID ||
+    source.networkChainId ||
+    source.chain ||
     0
   ) || null;
 
@@ -33,7 +49,9 @@ const normalizePendingSbtContractEntry = (value) => {
   };
 };
 
-export const clonePendingSbtDeployContracts = (contractsIn = {}) => {
+export const clonePendingSbtDeployContracts = (
+  contractsIn: unknown = {}
+): PendingSbtContractsMap => {
   if (!contractsIn || typeof contractsIn !== 'object' || Array.isArray(contractsIn)) {
     return {};
   }
@@ -42,7 +60,7 @@ export const clonePendingSbtDeployContracts = (contractsIn = {}) => {
     Object.entries(contractsIn)
       .map(([key, value]) => [key, normalizePendingSbtContractEntry(value)])
       .filter(([, value]) => !!value)
-  );
+  ) as PendingSbtContractsMap;
 };
 
 export const buildPendingSbtDeploySessionConfig = ({
@@ -50,12 +68,14 @@ export const buildPendingSbtDeploySessionConfig = ({
   sessionSlug = '',
   networkChainId = null,
   contracts = null,
-} = {}) => {
+}: BuildPendingSbtDeploySessionConfigOptions = {}): (
+  { slug?: string; networkChainId?: number; contracts: PendingSbtContractsMap } | null
+) => {
   const source = (
     sessionConfig &&
     typeof sessionConfig === 'object' &&
     !Array.isArray(sessionConfig)
-  ) ? sessionConfig : {};
+  ) ? sessionConfig as SessionConfigLike : {};
 
   const slug = toStr(source.slug || source.sessionSlug || sessionSlug).trim();
   const resolvedNetworkChainId = Number(

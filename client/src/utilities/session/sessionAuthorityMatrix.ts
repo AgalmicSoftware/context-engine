@@ -5,10 +5,19 @@
  *
  * Key exports: AUTHORITY_SOURCES, AUTHORITY_MATRIX, isDemoSourceAllowed
  */
-const deepFreeze = (value) => {
+type AuthorityGroup = {
+  fields: string[];
+  authoritativeSource: string | null;
+  allowedFallbacks: string[];
+  mustNotOverride: string[];
+};
+
+type AuthorityMatrix = Record<string, AuthorityGroup>;
+
+const deepFreeze = <T>(value: T): T => {
   if (!value || typeof value !== 'object') return value;
   Object.getOwnPropertyNames(value).forEach((key) => {
-    const next = value[key];
+    const next = (value as Record<string, unknown>)[key];
     if (next && typeof next === 'object' && !Object.isFrozen(next)) {
       deepFreeze(next);
     }
@@ -24,9 +33,9 @@ export const AUTHORITY_SOURCES = Object.freeze({
   BROWSER: 'browser',
   DEMO: 'demo',
   CACHE: 'cache',
-});
+} as const);
 
-export const AUTHORITY_MATRIX = deepFreeze({
+export const AUTHORITY_MATRIX = deepFreeze<AuthorityMatrix>({
   identity: {
     fields: ['slug', 'sessionId', 'metadataURI', 'chainId'],
     authoritativeSource: AUTHORITY_SOURCES.REGISTRY,
@@ -110,7 +119,7 @@ export const AUTHORITY_MATRIX = deepFreeze({
   },
 });
 
-export const isDemoSourceAllowed = (fieldGroup, mode) => {
+export const isDemoSourceAllowed = (fieldGroup: string, mode: string): boolean => {
   if (mode !== 'demo' && mode !== 'off-chain') return false;
   const group = AUTHORITY_MATRIX[fieldGroup];
   if (!group || !Array.isArray(group.allowedFallbacks)) return false;

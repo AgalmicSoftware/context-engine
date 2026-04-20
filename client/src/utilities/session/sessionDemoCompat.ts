@@ -1,29 +1,37 @@
 import demoSessions from '../../variables/demo/demo_sessions.json';
 import { toStr, normalizeSlug as normalizeBaseSlug } from '../shared/primitives.js';
 
+type DemoSessionConfig = Record<string, any>;
+type DemoSessionMap = Record<string, DemoSessionConfig>;
+type SessionTemplateSeedMap = Record<string, readonly string[]>;
+
 export const LEGACY_SESSION_ALIASES = Object.freeze({
   general: '',
-});
+} as const);
 
 export const SESSION_TEMPLATE_SEED_KEYS = Object.freeze({
   wizardBase: Object.freeze(['general']),
-});
+} as const);
 
-const isObj = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
-const readTrimmedSessionSlug = (raw) => toStr(raw).trim();
-const normalizeLegacyAliasToken = (raw) => normalizeBaseSlug(readTrimmedSessionSlug(raw));
-const cloneValue = (value) => {
-  if (Array.isArray(value)) return value.map((entry) => cloneValue(entry));
+const isObj = (value: unknown): value is DemoSessionConfig => (
+  !!value && typeof value === 'object' && !Array.isArray(value)
+);
+const readTrimmedSessionSlug = (raw: unknown): string => toStr(raw).trim();
+const normalizeLegacyAliasToken = (raw: unknown): string => (
+  normalizeBaseSlug(readTrimmedSessionSlug(raw))
+);
+const cloneValue = <T>(value: T): T => {
+  if (Array.isArray(value)) return value.map((entry) => cloneValue(entry)) as T;
   if (isObj(value)) {
-    return Object.keys(value).reduce((acc, key) => {
+    return Object.keys(value).reduce<Record<string, any>>((acc, key) => {
       acc[key] = cloneValue(value[key]);
       return acc;
-    }, {});
+    }, {}) as T;
   }
   return value;
 };
-const mergeDeep = (target, source) => {
-  const out = isObj(target) ? { ...target } : {};
+const mergeDeep = (target: unknown, source: unknown): DemoSessionConfig => {
+  const out: DemoSessionConfig = isObj(target) ? { ...target } : {};
   Object.entries(isObj(source) ? source : {}).forEach(([key, value]) => {
     if (isObj(value)) {
       out[key] = mergeDeep(out[key], value);
@@ -33,21 +41,22 @@ const mergeDeep = (target, source) => {
   });
   return out;
 };
-const getBaselineDemoSessionKeys = () => (
-  isObj(demoSessions) ? Object.keys(demoSessions) : []
+const getBaselineDemoSessionKeys = (): string[] => (
+  isObj(demoSessions) ? Object.keys(demoSessions as DemoSessionMap) : []
 );
-const readDemoSessionSlugByKey = (key) => {
+const readDemoSessionSlugByKey = (key: string): string => {
   const sessionConfig = getDemoSessionConfigByKey(key);
   if (key === 'general') return readTrimmedSessionSlug(sessionConfig?.slug || '');
   return readTrimmedSessionSlug(sessionConfig?.slug);
 };
 
-export const canonicalizeLegacySessionAlias = (rawSlug) => {
+export const canonicalizeLegacySessionAlias = (rawSlug: unknown): string => {
   const slug = readTrimmedSessionSlug(rawSlug);
   if (!slug) return '';
   const aliasToken = normalizeLegacyAliasToken(slug);
-  if (Object.prototype.hasOwnProperty.call(LEGACY_SESSION_ALIASES, aliasToken)) {
-    return LEGACY_SESSION_ALIASES[aliasToken];
+  const aliases = LEGACY_SESSION_ALIASES as Record<string, string>;
+  if (Object.prototype.hasOwnProperty.call(aliases, aliasToken)) {
+    return aliases[aliasToken];
   }
   return slug;
 };
@@ -59,7 +68,7 @@ export const getReservedLegacySessionSlugs = () => (
   ])
 );
 
-export const isReservedLegacySessionSlug = (slug) => (
+export const isReservedLegacySessionSlug = (slug: unknown): boolean => (
   getReservedLegacySessionSlugs().has(readTrimmedSessionSlug(slug).toLowerCase())
 );
 
@@ -71,18 +80,18 @@ export const getBaselineDemoPlaceholderSlugs = () => (
   getBaselineDemoSessionSlugs().filter((slug) => slug !== '')
 );
 
-export const getDemoTemplateSeed = (name) => {
-  const keys = SESSION_TEMPLATE_SEED_KEYS[name];
+export const getDemoTemplateSeed = (name: string): DemoSessionConfig => {
+  const keys = (SESSION_TEMPLATE_SEED_KEYS as SessionTemplateSeedMap)[name];
   if (!Array.isArray(keys)) return {};
   return keys.reduce((acc, key) => (
     mergeDeep(acc, cloneValue(getDemoSessionConfigByKey(key) || {}))
   ), {});
 };
 
-export const getDemoSessionConfigByKey = (key) => {
+export const getDemoSessionConfigByKey = (key: unknown): DemoSessionConfig | null => {
   const normalizedKey = toStr(key).trim();
   if (!normalizedKey || !isObj(demoSessions)) return null;
-  const entry = demoSessions[normalizedKey];
+  const entry = (demoSessions as DemoSessionMap)[normalizedKey];
   return isObj(entry) ? entry : null;
 };
 
