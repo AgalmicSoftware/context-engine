@@ -54,8 +54,8 @@
 }
 
 .uploadBox {
-  background: rgba(0, 0, 0, 0.15);
-  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(8, 12, 32, 0.34);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: var(--ce-radius-12);
   padding: 10px;
   margin-bottom: 12px;
@@ -87,8 +87,8 @@
 }
 
 .encryptBox {
-  margin-top: 10px;
-  padding-top: 10px;
+  margin-top: 8px;
+  padding-top: 8px;
   border-top: 1px solid rgba(255, 255, 255, 0.10);
 }
 
@@ -143,19 +143,19 @@
 }
 
 .gateSummary {
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: var(--ce-radius-10);
-  padding: 10px;
-  margin-bottom: 10px;
+  padding: 9px 10px;
+  margin-bottom: 8px;
   font-size: 0.92rem;
 }
 
 .customAudience {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: var(--ce-radius-10);
-  padding: 10px;
+  padding: 8px;
 }
 
 .customRow {
@@ -163,35 +163,22 @@
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
-  margin-bottom: 8px;
+  margin-top: 8px;
 }
 
-.customInput {
-  flex: 1;
-  min-width: 220px;
-}
+.customSelectorWrap {
+  margin-bottom: 6px;
 
-.customList {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
+  :global([data-testid='ce-sbt-selector-root']) {
+    padding: 10px;
+    border-radius: var(--ce-radius-10);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(9, 13, 34, 0.28);
+  }
 
-.customItem {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 6px 8px;
-  border: 1px solid rgba(255, 255, 255, 0.10);
-  border-radius: var(--ce-radius-10);
-  background: rgba(0, 0, 0, 0.14);
-}
-
-.chainHint {
-  opacity: 0.8;
-  font-size: 0.9rem;
-  margin-left: auto;
+  :global([data-testid='ce-sbt-selector-selected']) {
+    box-shadow: none;
+  }
 }
 
 .secondaryAssoc {
