@@ -1796,16 +1796,40 @@ class CommunityTab extends Component {
   }
 
   renderQuestionSwarm() {
-    const useDemoPoints = this._shouldUseDemoBeeswarmData();
-    const points = useDemoPoints
-      ? this._buildCommunityBeeswarmPoints()
-      : (this._beeswarmPoints && this._beeswarmPoints.length > 0
-        ? this._beeswarmPoints
-        : this._buildCommunityBeeswarmPoints());
+    const points = this._getQuestionSwarmPoints();
     return (
       <section className={styles.beeswarmSection} data-testid="ce-community-beeswarm-section">
         <BeeswarmPlot points={points} height={220} showIdleSummary={false} />
       </section>
+    );
+  }
+
+  _getQuestionSwarmPoints = () => {
+    if (this._shouldUseDemoBeeswarmData()) {
+      return this._buildCommunityBeeswarmPoints();
+    }
+    if (Array.isArray(this._beeswarmPoints) && this._beeswarmPoints.length > 0) {
+      return this._beeswarmPoints;
+    }
+    return this._buildCommunityBeeswarmPoints();
+  }
+
+  renderQuestionsModalContent = () => {
+    const points = this._getQuestionSwarmPoints();
+    return (
+      <div className={styles.questionsModalContent}>
+        <div className={styles.questionsModalTopBar}>
+          <a
+            href="/questions"
+            className={styles.questionsModalLink}
+          >
+            View Full Questions
+          </a>
+        </div>
+        <div className={styles.questionsModalPlot}>
+          <BeeswarmPlot points={points} height={240} showIdleSummary={false} />
+        </div>
+      </div>
     );
   }
 
@@ -1974,17 +1998,7 @@ class CommunityTab extends Component {
           </div>
         );
       case 'questions':
-        // Render link to questions page
-        return (
-          <div>
-            <p id={styles.seeQuestionsText}>
-              See questions{' '}
-              <a href="/questions" target="_blank" rel="noopener noreferrer" id={styles.seeQuestionsLinkText}>
-                here
-              </a>
-            </p>
-          </div>
-        );
+        return this.renderQuestionsModalContent();
       default:
         return <p>No content specified.</p>;
     }
