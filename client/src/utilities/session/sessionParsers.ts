@@ -16,34 +16,107 @@ import {
 import { readConfiguredSessionWorkerUrlCandidate } from './sessionWorkerUrlCompatibility.js';
 import { normalizeWorkerUrl } from '../worker/workerUrl.js';
 
-const isObj = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
-const hasOwn = (value, key) => Object.prototype.hasOwnProperty.call(value || {}, key);
-const trimString = (value) => toStr(value).trim();
-const cloneValue = (value) => {
-  if (Array.isArray(value)) return value.map((entry) => cloneValue(entry));
+type AnyRecord = Record<string, any>;
+type SessionIdentityInput = AnyRecord & {
+  slug?: unknown;
+  sessionId?: unknown;
+  metadataURI?: unknown;
+  chainId?: unknown;
+};
+type ParsedSessionIdentity = {
+  ok: boolean;
+  slug: string;
+  sessionId: string;
+  metadataURI: string;
+  chainId: number | null;
+  errors: string[];
+};
+type SessionMetadataInput = AnyRecord;
+type ParsedSessionMetadata = {
+  ok: boolean;
+  metadata: AnyRecord;
+  errors: string[];
+};
+type WorkerConfig = {
+  corsWorkerUrl: string;
+  allowOrigins: string[];
+  limits: AnyRecord;
+  rpcEndpoint: string;
+  embeddedDeployHelperEnabled?: boolean;
+};
+type WorkerConfigInput = AnyRecord & {
+  corsWorkerUrl?: unknown;
+  allowOrigins?: unknown;
+  limits?: unknown;
+  rpcEndpoint?: unknown;
+  rpcUrl?: unknown;
+  rpc?: unknown;
+  embeddedDeployHelperEnabled?: unknown;
+  deployHelperEnabled?: unknown;
+};
+type ParsedWorkerConfig = {
+  ok: boolean;
+  config: WorkerConfig;
+  errors: string[];
+};
+type LocalResourceOverrides = {
+  rpc: { useLocal: boolean; apiKey: string };
+  arweave: { useLocal: boolean; jwk: string };
+  faucet: { useLocal: boolean; privateKey: string };
+};
+type LocalResourceOverridesInput = AnyRecord & {
+  rpc?: unknown;
+  arweave?: unknown;
+  faucet?: unknown;
+};
+type ParsedLocalResourceOverrides = {
+  ok: boolean;
+  overrides: LocalResourceOverrides;
+  errors: string[];
+};
+
+const LOCAL_OVERRIDE_SECTIONS = [
+  { sectionKey: 'rpc', secretKey: 'apiKey' },
+  { sectionKey: 'arweave', secretKey: 'jwk' },
+  { sectionKey: 'faucet', secretKey: 'privateKey' },
+] as const;
+
+const isObj = (value: unknown): value is AnyRecord => !!value && typeof value === 'object' && !Array.isArray(value);
+const hasOwn = (value: unknown, key: string): boolean => Object.prototype.hasOwnProperty.call(value || {}, key);
+const trimString = (value: unknown): string => toStr(value).trim();
+const cloneValue = <T>(value: T): T => {
+  if (Array.isArray(value)) return value.map((entry) => cloneValue(entry)) as T;
   if (isObj(value)) {
-    return Object.keys(value).reduce((acc, key) => {
+    return Object.keys(value).reduce((acc: AnyRecord, key) => {
       acc[key] = cloneValue(value[key]);
       return acc;
-    }, {});
+    }, {}) as T;
   }
-  return typeof value === 'string' ? value.trim() : value;
+  return (typeof value === 'string' ? value.trim() : value) as T;
 };
-const pushTypeError = (errors, field, expected) => {
+const pushTypeError = (errors: string[], field: string, expected: string): void => {
   errors.push(`${field} must be ${expected}.`);
 };
-const defaultWorkerConfig = () => ({
+const defaultWorkerConfig = (): WorkerConfig => ({
   corsWorkerUrl: '',
   allowOrigins: [],
   limits: {},
   rpcEndpoint: '',
 });
-const defaultLocalOverrides = () => ({
+const defaultLocalOverrides = (): LocalResourceOverrides => ({
   rpc: { useLocal: false, apiKey: '' },
   arweave: { useLocal: false, jwk: '' },
   faucet: { useLocal: false, privateKey: '' },
 });
-const normalizeOptionalStringField = (target, key, errors, { label = key, transform } = {}) => {
+const normalizeOptionalStringField = (
+  target: AnyRecord,
+  key: string,
+  errors: string[],
+  {
+    label = key,
+    transform,
+  }: { label?: string; transform?: ((value: string) => string) | undefined } = {}
+): string => {
   if (!hasOwn(target, key)) return '';
   const raw = target[key];
   if (raw == null) {
@@ -63,7 +136,12 @@ const normalizeOptionalStringField = (target, key, errors, { label = key, transf
   target[key] = typeof transform === 'function' ? transform(trimmed) : trimmed;
   return target[key];
 };
-const normalizeOptionalBooleanField = (target, key, errors, { label = key } = {}) => {
+const normalizeOptionalBooleanField = (
+  target: AnyRecord,
+  key: string,
+  errors: string[],
+  { label = key }: { label?: string } = {}
+): boolean => {
   if (!hasOwn(target, key)) return false;
   const raw = target[key];
   if (raw == null) return false;
@@ -73,7 +151,7 @@ const normalizeOptionalBooleanField = (target, key, errors, { label = key } = {}
   }
   return raw;
 };
-const parsePositiveInteger = (raw, field, errors) => {
+const parsePositiveInteger = (raw: unknown, field: string, errors: string[]): number | null => {
   if (raw == null || raw === '') return null;
   const next = Number(raw);
   if (!Number.isInteger(next) || next <= 0) {
@@ -82,7 +160,7 @@ const parsePositiveInteger = (raw, field, errors) => {
   }
   return next;
 };
-const normalizeTags = (metadata, errors) => {
+const normalizeTags = (metadata: AnyRecord, errors: string[]): void => {
   if (!hasOwn(metadata, 'tags')) return;
   const raw = metadata.tags;
   if (raw == null) {
@@ -94,7 +172,7 @@ const normalizeTags = (metadata, errors) => {
     delete metadata.tags;
     return;
   }
-  const tags = raw.reduce((acc, entry, index) => {
+  const tags = raw.reduce((acc: string[], entry: unknown, index: number) => {
     if (typeof entry !== 'string') {
       pushTypeError(errors, `tags[${index}]`, 'a string');
       return acc;
@@ -109,14 +187,14 @@ const normalizeTags = (metadata, errors) => {
     delete metadata.tags;
   }
 };
-const stripInternalMetadataFields = (metadata) => {
+const stripInternalMetadataFields = <T>(metadata: T): T => {
   if (!isObj(metadata)) return metadata;
   Object.keys(metadata).forEach((key) => {
     if (key.startsWith('__')) delete metadata[key];
   });
   return metadata;
 };
-const normalizeLegacySessionNaming = (metadata) => {
+const normalizeLegacySessionNaming = (metadata: AnyRecord): AnyRecord => {
   if (!isObj(metadata)) return metadata;
   const sessionName = normalizeOptionalStringField(metadata, 'sessionName', [], { label: 'sessionName' });
   const orgName = normalizeOptionalStringField(metadata, 'orgName', [], { label: 'orgName' });
@@ -127,72 +205,9 @@ const normalizeLegacySessionNaming = (metadata) => {
   if (!sessionInfo && orgInfo) metadata.sessionInfo = orgInfo;
   return metadata;
 };
-
-/**
- * @typedef {Object} SessionIdentityInput
- * @property {string=} slug
- * @property {string=} sessionId
- * @property {string=} metadataURI
- * @property {number|string|null=} chainId
- */
-
-/**
- * @typedef {Object} ParsedSessionIdentity
- * @property {boolean} ok
- * @property {string} slug
- * @property {string} sessionId
- * @property {string} metadataURI
- * @property {number|null} chainId
- * @property {string[]} errors
- */
-
-/**
- * @typedef {Object<string, *>} SessionMetadataInput
- */
-
-/**
- * @typedef {Object} ParsedSessionMetadata
- * @property {boolean} ok
- * @property {Object<string, *>} metadata
- * @property {string[]} errors
- */
-
-/**
- * @typedef {Object} WorkerConfigInput
- * @property {string=} corsWorkerUrl
- * @property {(string|string[])=} allowOrigins
- * @property {Object<string, *>=} limits
- * @property {string=} rpcEndpoint
- */
-
-/**
- * @typedef {Object} ParsedWorkerConfig
- * @property {boolean} ok
- * @property {{ corsWorkerUrl: string, allowOrigins: string[], limits: Object<string, *>, rpcEndpoint: string }} config
- * @property {string[]} errors
- */
-
-/**
- * @typedef {Object} LocalResourceOverridesInput
- * @property {{ useLocal?: boolean, apiKey?: string }=} rpc
- * @property {{ useLocal?: boolean, jwk?: string }=} arweave
- * @property {{ useLocal?: boolean, privateKey?: string }=} faucet
- */
-
-/**
- * @typedef {Object} ParsedLocalResourceOverrides
- * @property {boolean} ok
- * @property {{ rpc: { useLocal: boolean, apiKey: string }, arweave: { useLocal: boolean, jwk: string }, faucet: { useLocal: boolean, privateKey: string } }} overrides
- * @property {string[]} errors
- */
-
-/**
- * @param {SessionIdentityInput} raw
- * @returns {ParsedSessionIdentity}
- */
-export const parseSessionIdentity = (raw = {}) => {
+export const parseSessionIdentity = (raw: SessionIdentityInput = {}): ParsedSessionIdentity => {
   const input = isObj(raw) ? raw : {};
-  const errors = [];
+  const errors: string[] = [];
 
   let slug = '';
   if (hasOwn(input, 'slug')) {
@@ -247,11 +262,7 @@ export const parseSessionIdentity = (raw = {}) => {
   };
 };
 
-/**
- * @param {SessionMetadataInput} raw
- * @returns {ParsedSessionMetadata}
- */
-export const parseSessionMetadata = (raw) => {
+export const parseSessionMetadata = (raw: SessionMetadataInput): ParsedSessionMetadata => {
   if (!isObj(raw)) {
     return {
       ok: false,
@@ -260,7 +271,7 @@ export const parseSessionMetadata = (raw) => {
     };
   }
 
-  const errors = [];
+  const errors: string[] = [];
   const metadata = stripInternalMetadataFields(cloneValue(raw));
 
   normalizeOptionalStringField(metadata, 'slug', errors, {
@@ -303,11 +314,7 @@ export const parseSessionMetadata = (raw) => {
   };
 };
 
-/**
- * @param {WorkerConfigInput} raw
- * @returns {ParsedWorkerConfig}
- */
-export const parseWorkerConfig = (raw) => {
+export const parseWorkerConfig = (raw: WorkerConfigInput): ParsedWorkerConfig => {
   if (!isObj(raw)) {
     return {
       ok: false,
@@ -316,7 +323,7 @@ export const parseWorkerConfig = (raw) => {
     };
   }
 
-  const errors = [];
+  const errors: string[] = [];
   const config = defaultWorkerConfig();
 
   // Accept legacy and compatibility key variants for backwards compatibility.
@@ -348,7 +355,7 @@ export const parseWorkerConfig = (raw) => {
     } else if (!Array.isArray(raw.allowOrigins)) {
       pushTypeError(errors, 'allowOrigins', 'an array of strings or a comma/newline-delimited string');
     } else {
-      config.allowOrigins = raw.allowOrigins.reduce((acc, entry, index) => {
+      config.allowOrigins = raw.allowOrigins.reduce((acc: string[], entry: unknown, index: number) => {
         if (typeof entry !== 'string') {
           pushTypeError(errors, `allowOrigins[${index}]`, 'a string');
           return acc;
@@ -411,11 +418,9 @@ export const parseWorkerConfig = (raw) => {
   };
 };
 
-/**
- * @param {LocalResourceOverridesInput} raw
- * @returns {ParsedLocalResourceOverrides}
- */
-export const parseLocalResourceOverrides = (raw) => {
+export const parseLocalResourceOverrides = (
+  raw: LocalResourceOverridesInput
+): ParsedLocalResourceOverrides => {
   if (!isObj(raw)) {
     return {
       ok: false,
@@ -424,31 +429,28 @@ export const parseLocalResourceOverrides = (raw) => {
     };
   }
 
-  const errors = [];
+  const errors: string[] = [];
   const overrides = defaultLocalOverrides();
 
-  [
-    ['rpc', 'apiKey'],
-    ['arweave', 'jwk'],
-    ['faucet', 'privateKey'],
-  ].forEach(([sectionKey, secretKey]) => {
+  LOCAL_OVERRIDE_SECTIONS.forEach(({ sectionKey, secretKey }) => {
     const sectionRaw = raw[sectionKey];
     if (sectionRaw == null) return;
     if (!isObj(sectionRaw)) {
       pushTypeError(errors, sectionKey, 'an object');
       return;
     }
-    overrides[sectionKey].useLocal = normalizeOptionalBooleanField(sectionRaw, 'useLocal', errors, {
+    const section = overrides[sectionKey] as AnyRecord;
+    section.useLocal = normalizeOptionalBooleanField(sectionRaw, 'useLocal', errors, {
       label: `${sectionKey}.useLocal`,
     });
     if (hasOwn(sectionRaw, secretKey)) {
       const secret = sectionRaw[secretKey];
       if (secret == null) {
-        overrides[sectionKey][secretKey] = '';
+        section[secretKey] = '';
       } else if (typeof secret !== 'string') {
         pushTypeError(errors, `${sectionKey}.${secretKey}`, 'a string');
       } else {
-        overrides[sectionKey][secretKey] = trimString(secret);
+        section[secretKey] = trimString(secret);
       }
     }
   });

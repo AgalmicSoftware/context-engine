@@ -2,18 +2,30 @@ import { normalizeSessionSlug } from './sessionNaming.js';
 import { normalizeBaseUrl } from '../urlUtils.js';
 import { toStr } from '../shared/primitives.js';
 
+type SponsoredBootstrapFundingInput = Record<string, any>;
+type SponsoredBootstrapFundingContext = {
+  sessionSlug: string;
+  workerUrl: string;
+  targetSessionSlug: string;
+  faucetGrantToken?: string;
+};
+
 export const SPONSORED_BOOTSTRAP_FUNDING_CONTEXT_KEY = 'ce:sponsoredBootstrapFunding:v1';
 
-const canUseSessionStorage = () => (
+const canUseSessionStorage = (): boolean => (
   typeof window !== 'undefined' &&
   typeof window.sessionStorage !== 'undefined'
 );
 
-const hasFundingContext = (value = {}) => (
+const hasFundingContext = (
+  value: Partial<SponsoredBootstrapFundingContext> = {}
+): boolean => (
   !!toStr(value?.sessionSlug).trim() || !!toStr(value?.workerUrl).trim()
 );
 
-const persistSponsoredBootstrapFundingContext = (normalized = {}) => {
+const persistSponsoredBootstrapFundingContext = (
+  normalized: SponsoredBootstrapFundingContext
+): SponsoredBootstrapFundingContext => {
   if (!canUseSessionStorage()) return normalized;
   try {
     if (!hasFundingContext(normalized)) {
@@ -28,7 +40,9 @@ const persistSponsoredBootstrapFundingContext = (normalized = {}) => {
   return normalized;
 };
 
-export const normalizeSponsoredBootstrapFundingContext = (value = {}) => {
+export const normalizeSponsoredBootstrapFundingContext = (
+  value: SponsoredBootstrapFundingInput = {}
+): SponsoredBootstrapFundingContext => {
   const source = value && typeof value === 'object' ? value : {};
   const faucetGrantToken = toStr(
     source.faucetGrantToken ??
@@ -55,7 +69,7 @@ export const normalizeSponsoredBootstrapFundingContext = (value = {}) => {
   };
 };
 
-export const readSponsoredBootstrapFundingContext = () => {
+export const readSponsoredBootstrapFundingContext = (): SponsoredBootstrapFundingContext | null => {
   if (!canUseSessionStorage()) return null;
   try {
     const raw = sessionStorage.getItem(SPONSORED_BOOTSTRAP_FUNDING_CONTEXT_KEY);
@@ -67,12 +81,14 @@ export const readSponsoredBootstrapFundingContext = () => {
   }
 };
 
-export const writeSponsoredBootstrapFundingContext = (value = {}) => {
+export const writeSponsoredBootstrapFundingContext = (
+  value: SponsoredBootstrapFundingInput = {}
+): SponsoredBootstrapFundingContext => {
   const normalized = normalizeSponsoredBootstrapFundingContext(value);
   return persistSponsoredBootstrapFundingContext(normalized);
 };
 
-export const clearSponsoredBootstrapFaucetGrantToken = () => {
+export const clearSponsoredBootstrapFaucetGrantToken = (): SponsoredBootstrapFundingContext => {
   const current = readSponsoredBootstrapFundingContext();
   const normalized = normalizeSponsoredBootstrapFundingContext({
     ...(current && typeof current === 'object' ? current : {}),
@@ -81,7 +97,7 @@ export const clearSponsoredBootstrapFaucetGrantToken = () => {
   return persistSponsoredBootstrapFundingContext(normalized);
 };
 
-export const clearSponsoredBootstrapFundingContext = () => {
+export const clearSponsoredBootstrapFundingContext = (): void => {
   if (!canUseSessionStorage()) return;
   try {
     sessionStorage.removeItem(SPONSORED_BOOTSTRAP_FUNDING_CONTEXT_KEY);

@@ -8,41 +8,38 @@
 import { resolveDemoSessionBySlug } from './sessionConfigResolvers.js';
 import { resolveSessionContractRef } from '../session/sessionNaming.js';
 
-/**
- * @typedef {{ address: string, chainId?: number }} ContractRef
- *
- * Return a flat map of *all* session contracts, each as {address, chainId}.
- * - Copies every key under cfg.contracts verbatim.
- * - Per-entry chainId falls back to cfg.networkChainId when omitted.
- *
- * @param {object|null|undefined} cfg
- * @returns {Record<string, ContractRef>}
- */
-function getSessionAddresses(cfg) {
+type AnyRecord = Record<string, any>;
+type ContractRef = {
+  address: string;
+  chainId?: number;
+};
+
+function getSessionAddresses(cfg: AnyRecord | null | undefined): Record<string, ContractRef> {
   if (cfg && cfg.__unresolved) {
     return {};
   }
-  const normalizeContractRef = (value) => {
+  const normalizeContractRef = (value: unknown): Partial<ContractRef> => {
     if (!value) return {};
     if (typeof value === 'string') {
       const address = value.trim();
       return address ? { address } : {};
     }
     if (typeof value !== 'object') return {};
+    const source = value as AnyRecord;
     const address = String(
-      value.address ??
-      value.contractAddress ??
-      value.addr ??
-      value.target ??
+      source.address ??
+      source.contractAddress ??
+      source.addr ??
+      source.target ??
       ''
     ).trim();
-    const chainId = Number(value.chainId || value.chainID || value.networkChainId || value.chain || 0) || undefined;
+    const chainId = Number(source.chainId || source.chainID || source.networkChainId || source.chain || 0) || undefined;
     return {
       ...(address ? { address } : {}),
       ...(chainId ? { chainId } : {}),
     };
   };
-  const out = {};
+  const out: Record<string, ContractRef> = {};
   // Temporary migration guard: registry cache can contain partial metadata before contracts are hydrated.
   // Do not implicitly fall back to "general" when cfg is missing/unknown.
   const hasExplicitSlug = typeof cfg?.slug === 'string';
@@ -82,13 +79,11 @@ function getSessionAddresses(cfg) {
   return out;
 }
 
-/**
- * Clamp a candidate [from,to] to session blockLimits when present.
- * @param {object|null} cfg
- * @param {number} fromBlock
- * @param {number} toBlock
- */
-function getSessionBlockWindow(cfg, fromBlock, toBlock) {
+function getSessionBlockWindow(
+  cfg: AnyRecord | null,
+  fromBlock: unknown,
+  toBlock: unknown
+): { fromBlock: number; toBlock: number } {
   let f = Number(fromBlock || 0);
   let t = Number(toBlock || 0);
   const lim = cfg && cfg.blockLimits;
@@ -97,7 +92,7 @@ function getSessionBlockWindow(cfg, fromBlock, toBlock) {
   return { fromBlock: f, toBlock: t };
 }
 
-const parsePositiveBlockNumber = (value) => {
+const parsePositiveBlockNumber = (value: unknown): number | null => {
   const n = Number(value);
   if (!Number.isFinite(n) || n <= 0) return null;
   return Math.max(1, Math.floor(n));

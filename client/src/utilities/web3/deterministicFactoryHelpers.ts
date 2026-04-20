@@ -6,7 +6,7 @@
 import { ethers } from 'ethers';
 import { toStr } from '../shared/primitives.js';
 
-export function normalizeCreate2Salt(raw) {
+export function normalizeCreate2Salt(raw: unknown): string {
   const trimmed = toStr(raw).trim();
   if (!trimmed) return '';
   if (ethers.utils.isHexString(trimmed, 32)) return trimmed;
@@ -14,12 +14,12 @@ export function normalizeCreate2Salt(raw) {
   return ethers.utils.id(trimmed);
 }
 
-export function hasNonZeroHashValue(raw) {
+export function hasNonZeroHashValue(raw: unknown): boolean {
   const normalized = toStr(raw).trim().toLowerCase();
   return !!normalized && normalized !== ethers.constants.HashZero.toLowerCase();
 }
 
-export function isEmptyRevertDataValue(value) {
+export function isEmptyRevertDataValue(value: unknown): boolean {
   const normalized = toStr(value).trim().toLowerCase();
   return normalized === '0x' || normalized === '0x0';
 }

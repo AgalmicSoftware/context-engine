@@ -19,38 +19,127 @@ import {
 import { canonicalizeLegacySessionAlias } from './sessionDemoCompat.js';
 import { SESSION_WORKER_METADATA_ALIAS_KEYS } from './sessionWorkerUrlCompatibility.js';
 
-const isObj = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
-const cloneValue = (value) => {
-  if (Array.isArray(value)) return value.map((entry) => cloneValue(entry));
+type AnyRecord = Record<string, any>;
+type ParsedSessionIdentity = ReturnType<typeof parseSessionIdentity>;
+type ParsedSessionMetadata = ReturnType<typeof parseSessionMetadata>;
+type ParsedWorkerConfig = ReturnType<typeof parseWorkerConfig>;
+type ParsedLocalResourceOverrides = ReturnType<typeof parseLocalResourceOverrides>;
+type WorkerConfig = ParsedWorkerConfig['config'];
+type LocalResourceOverrides = ParsedLocalResourceOverrides['overrides'];
+type ResolveSessionConfigFromSourcesOptions = {
+  sessionSlug?: unknown;
+  getRegistrySessionConfig?: ((slug: string) => unknown) | null;
+  demoSessions?: unknown;
+  preferRegistry?: boolean;
+  allowDemoFallback?: boolean;
+};
+type SessionConfigResolution = {
+  sessionSlug: string;
+  sessionConfig: AnyRecord | null;
+  sessionConfigSource: string;
+  warnings: string[];
+};
+type ResolveCanonicalSessionConfigOptions = {
+  source?: unknown;
+  defaults?: unknown;
+  resolveBySlug?: ((slug: string) => unknown) | null;
+  fallbackConfig?: unknown;
+};
+type CanonicalSessionConfigResolution = {
+  hasExplicitSessionSlug: boolean;
+  activeSessionSlug: string;
+  requestedSessionSlug: string;
+  sessionSlug: string;
+  sessionConfig: AnyRecord | null;
+  sessionConfigSource: string;
+  warnings: string[];
+  ok: boolean;
+  error: string;
+  provenance: {
+    sessionSlug: string;
+    sessionConfig: string;
+  };
+};
+type ResolveSessionSlugAliasOptions = {
+  sessionSlug?: unknown;
+  demoSessions?: unknown;
+  allowSessionName?: boolean;
+};
+type ResolveCanonicalSessionContextOptions = {
+  requestedSlug?: unknown;
+  routeContext?: unknown;
+  registrySession?: unknown;
+  metadata?: unknown;
+  workerConfig?: unknown;
+  localOverrides?: unknown;
+  demoSession?: unknown;
+  mode?: unknown;
+};
+type CanonicalSessionContextResult = {
+  ok: boolean;
+  context: {
+    identity: {
+      slug: string;
+      sessionId: string;
+      metadataURI: string;
+      chainId: number | null;
+    };
+    metadata: AnyRecord;
+    worker: WorkerConfig;
+    local: LocalResourceOverrides;
+    effective: AnyRecord;
+  };
+  provenance: {
+    identity: string;
+    metadata: string;
+    worker: string;
+    local: string;
+  };
+  warnings: string[];
+  errors: string[];
+};
+
+const EMPTY_IDENTITY: ParsedSessionIdentity = {
+  ok: true,
+  slug: '',
+  sessionId: '',
+  metadataURI: '',
+  chainId: null,
+  errors: [],
+};
+
+const isObj = (value: unknown): value is AnyRecord => !!value && typeof value === 'object' && !Array.isArray(value);
+const cloneValue = <T>(value: T): T => {
+  if (Array.isArray(value)) return value.map((entry) => cloneValue(entry)) as T;
   if (isObj(value)) {
-    return Object.keys(value).reduce((acc, key) => {
+    return Object.keys(value).reduce((acc: AnyRecord, key) => {
       acc[key] = cloneValue(value[key]);
       return acc;
-    }, {});
+    }, {}) as T;
   }
   return value;
 };
-const buildEmptyWorkerConfig = () => ({
+const buildEmptyWorkerConfig = (): WorkerConfig => ({
   corsWorkerUrl: '',
   allowOrigins: [],
   limits: {},
   rpcEndpoint: '',
 });
-const buildEmptyLocalOverrides = () => ({
+const buildEmptyLocalOverrides = (): LocalResourceOverrides => ({
   rpc: { useLocal: false, apiKey: '' },
   arweave: { useLocal: false, jwk: '' },
   faucet: { useLocal: false, privateKey: '' },
 });
-const hasOwnKeys = (value) => isObj(value) && Object.keys(value).length > 0;
-const readTrimmedSessionSlug = (raw) => toStr(raw).trim();
-const normalizeSessionAliasToken = (raw) => normalizeBaseSlug(readTrimmedSessionSlug(raw));
-const RESERVED_SESSION_SLUG_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
-export const isReservedSessionSlugKey = (rawSlug) => (
+const hasOwnKeys = (value: unknown): value is AnyRecord => isObj(value) && Object.keys(value).length > 0;
+const readTrimmedSessionSlug = (raw: unknown): string => toStr(raw).trim();
+const normalizeSessionAliasToken = (raw: unknown): string => normalizeBaseSlug(readTrimmedSessionSlug(raw));
+const RESERVED_SESSION_SLUG_KEYS = new Set<string>(['__proto__', 'constructor', 'prototype']);
+export const isReservedSessionSlugKey = (rawSlug: unknown): boolean => (
   RESERVED_SESSION_SLUG_KEYS.has(normalizeSessionAliasToken(rawSlug))
 );
 // chainId alone is not sufficient — a partial/malformed registry record with only
 // chainId should not suppress the route identity or mark resolution as authoritative.
-const hasIdentityValue = (identity) => !!(
+const hasIdentityValue = (identity: ParsedSessionIdentity | AnyRecord | null | undefined): boolean => !!(
   identity &&
   (
     identity.slug ||
@@ -58,12 +147,12 @@ const hasIdentityValue = (identity) => !!(
     identity.metadataURI
   )
 );
-const collectPrefixedErrors = (target, prefix, entries = []) => {
+const collectPrefixedErrors = (target: string[], prefix: string, entries: string[] = []): void => {
   entries.forEach((entry) => {
     target.push(`${prefix}: ${entry}`);
   });
 };
-const buildRouteIdentityInput = (requestedSlug, routeContext) => {
+const buildRouteIdentityInput = (requestedSlug: unknown, routeContext: unknown): AnyRecord => {
   const route = isObj(routeContext) ? routeContext : {};
   return {
     slug: requestedSlug !== undefined
@@ -79,7 +168,7 @@ const buildRouteIdentityInput = (requestedSlug, routeContext) => {
     chainId: route.chainId ?? route.networkChainId,
   };
 };
-const buildRegistryIdentityInput = (registrySession) => {
+const buildRegistryIdentityInput = (registrySession: unknown): AnyRecord => {
   const registry = isObj(registrySession) ? registrySession : {};
   const registryMeta = isObj(registry.__registry) ? registry.__registry : {};
   return {
@@ -102,7 +191,7 @@ const buildRegistryIdentityInput = (registrySession) => {
     ),
   };
 };
-const buildDemoIdentityInput = (requestedSlug, demoSession) => {
+const buildDemoIdentityInput = (requestedSlug: unknown, demoSession: unknown): AnyRecord => {
   const demo = isObj(demoSession) ? demoSession : {};
   return {
     slug: demo.slug ?? requestedSlug,
@@ -126,7 +215,7 @@ const EFFECTIVE_METADATA_STRIP_KEYS = Array.from(new Set([
   ...SESSION_WORKER_METADATA_ALIAS_KEYS,
   'faucetKey',
 ]));
-const stripEffectiveMetadataOverrides = (metadata) => {
+const stripEffectiveMetadataOverrides = (metadata: unknown): AnyRecord => {
   if (!isObj(metadata)) return {};
   const next = cloneValue(metadata);
   EFFECTIVE_METADATA_STRIP_KEYS.forEach((key) => {
@@ -135,7 +224,7 @@ const stripEffectiveMetadataOverrides = (metadata) => {
   return next;
 };
 
-export const canonicalizeSessionSlug = (rawSlug) => {
+export const canonicalizeSessionSlug = (rawSlug: unknown): string => {
   const slug = readTrimmedSessionSlug(rawSlug);
   if (!slug) return '';
   // Preserve real session slugs verbatim; only canonicalize reserved aliases.
@@ -144,7 +233,7 @@ export const canonicalizeSessionSlug = (rawSlug) => {
   return canonicalSlug;
 };
 
-const findDemoSessionConfigBySlug = (demoSessions, slugIn = '') => {
+const findDemoSessionConfigBySlug = (demoSessions: unknown, slugIn: unknown = ''): AnyRecord | null => {
   const demo = isObj(demoSessions) ? demoSessions : {};
   const slug = canonicalizeSessionSlug(slugIn);
   if (!slug) return isObj(demo.general) ? demo.general : null;
@@ -156,7 +245,11 @@ const findDemoSessionConfigBySlug = (demoSessions, slugIn = '') => {
   return isObj(bySlug) ? bySlug : null;
 };
 
-const findDemoSessionConfigByAlias = (demoSessions, slugIn = '', { allowSessionName = false } = {}) => {
+const findDemoSessionConfigByAlias = (
+  demoSessions: unknown,
+  slugIn: unknown = '',
+  { allowSessionName = false }: { allowSessionName?: boolean } = {}
+): AnyRecord | null => {
   const demo = isObj(demoSessions) ? demoSessions : {};
   const slug = canonicalizeSessionSlug(slugIn);
   const aliasToken = normalizeSessionAliasToken(slugIn);
@@ -177,7 +270,7 @@ export const resolveSessionSlugAliasFromDemoSessions = ({
   sessionSlug,
   demoSessions,
   allowSessionName = false,
-} = {}) => {
+}: ResolveSessionSlugAliasOptions = {}) => {
   const requestedSessionSlug = canonicalizeSessionSlug(sessionSlug);
   const sessionConfig = findDemoSessionConfigByAlias(demoSessions, requestedSessionSlug, {
     allowSessionName,
@@ -199,7 +292,7 @@ export const resolveSessionConfigFromSources = ({
   demoSessions,
   preferRegistry = true,
   allowDemoFallback = !USE_ONCHAIN_SESSION_REGISTRY,
-} = {}) => {
+}: ResolveSessionConfigFromSourcesOptions = {}): SessionConfigResolution => {
   const slug = canonicalizeSessionSlug(sessionSlug);
   if (preferRegistry && typeof getRegistrySessionConfig === 'function') {
     const cached = getRegistrySessionConfig(slug);
@@ -236,7 +329,7 @@ export const resolveCanonicalSessionConfig = ({
   defaults = {},
   resolveBySlug,
   fallbackConfig,
-} = {}) => {
+}: ResolveCanonicalSessionConfigOptions = {}): CanonicalSessionConfigResolution => {
   const sourceObj = isObj(source) ? source : {};
   const defaultsObj = isObj(defaults) ? defaults : {};
 
@@ -320,23 +413,24 @@ export const resolveCanonicalSessionContext = ({
   localOverrides,
   demoSession,
   mode,
-} = {}) => {
-  const warnings = [];
-  const errors = [];
+}: ResolveCanonicalSessionContextOptions = {}): CanonicalSessionContextResult => {
+  const warnings: string[] = [];
+  const errors: string[] = [];
+  const normalizedMode = typeof mode === 'string' ? mode : '';
 
   const routeIdentity = parseSessionIdentity(buildRouteIdentityInput(requestedSlug, routeContext));
   const registryIdentity = parseSessionIdentity(buildRegistryIdentityInput(registrySession));
-  const demoIdentityAllowed = isDemoSourceAllowed('identity', mode);
+  const demoIdentityAllowed = isDemoSourceAllowed('identity', normalizedMode);
   const demoIdentity = demoIdentityAllowed
     ? parseSessionIdentity(buildDemoIdentityInput(requestedSlug, demoSession))
-    : { ok: true, slug: '', sessionId: '', metadataURI: '', chainId: null, errors: [] };
+    : EMPTY_IDENTITY;
 
   collectPrefixedErrors(errors, 'route identity', routeIdentity.errors);
   collectPrefixedErrors(errors, 'registry identity', registryIdentity.errors);
   if (demoIdentityAllowed) {
     collectPrefixedErrors(errors, 'demo identity', demoIdentity.errors);
   }
-  const authoritativeIdentityRequired = mode !== 'demo' && mode !== 'off-chain';
+  const authoritativeIdentityRequired = normalizedMode !== 'demo' && normalizedMode !== 'off-chain';
 
   let effectiveIdentity = cloneValue(routeIdentity);
   let identityProvenance = 'route';
@@ -354,7 +448,7 @@ export const resolveCanonicalSessionContext = ({
       chainId: null,
       errors: [],
       ok: true,
-    };
+    } as ParsedSessionIdentity;
   }
 
   if (authoritativeIdentityRequired && !hasIdentityValue(registryIdentity)) {
@@ -373,11 +467,11 @@ export const resolveCanonicalSessionContext = ({
 
   const metadataProvided = metadata !== undefined && metadata !== null;
   const metadataIsCache = isObj(metadata) && !!metadata.__fromCache;
-  const metadataParsed = metadataProvided
+  const metadataParsed: ParsedSessionMetadata = metadataProvided
     ? parseSessionMetadata(metadata)
     : { ok: true, metadata: {}, errors: [] };
-  const demoMetadataAllowed = isDemoSourceAllowed('textMetadata', mode);
-  const demoMetadataParsed = demoMetadataAllowed && demoSession !== undefined && demoSession !== null
+  const demoMetadataAllowed = isDemoSourceAllowed('textMetadata', normalizedMode);
+  const demoMetadataParsed: ParsedSessionMetadata = demoMetadataAllowed && demoSession !== undefined && demoSession !== null
     ? parseSessionMetadata(demoSession)
     : { ok: true, metadata: {}, errors: [] };
 
@@ -388,7 +482,7 @@ export const resolveCanonicalSessionContext = ({
     collectPrefixedErrors(errors, 'demo metadata', demoMetadataParsed.errors);
   }
 
-  let effectiveMetadata = {};
+  let effectiveMetadata: AnyRecord = {};
   let metadataProvenance = 'cache';
   if (metadataProvided && !metadataIsCache && isObj(metadata)) {
     effectiveMetadata = cloneValue(metadataParsed.metadata);
@@ -423,7 +517,7 @@ export const resolveCanonicalSessionContext = ({
   }
 
   const workerProvided = workerConfig !== undefined && workerConfig !== null;
-  const workerParsed = workerProvided
+  const workerParsed: ParsedWorkerConfig = workerProvided
     ? parseWorkerConfig(workerConfig)
     : { ok: true, config: buildEmptyWorkerConfig(), errors: [] };
   if (workerProvided) {
@@ -435,7 +529,7 @@ export const resolveCanonicalSessionContext = ({
   }
 
   const localProvided = localOverrides !== undefined && localOverrides !== null;
-  const localParsed = localProvided
+  const localParsed: ParsedLocalResourceOverrides = localProvided
     ? parseLocalResourceOverrides(localOverrides)
     : { ok: true, overrides: buildEmptyLocalOverrides(), errors: [] };
   if (localProvided) {
