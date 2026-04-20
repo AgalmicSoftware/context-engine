@@ -6,14 +6,14 @@
 import { toStr } from '../shared/primitives.js';
 import { normalizeSessionSlug, resolveSessionByName } from './sessionConfigResolvers.js';
 
-type UnknownRecord = Record<string, unknown>;
+type AnyRecord = Record<string, any>;
 type ResolvedSbtSessionSlug = {
   slug: string;
   explicit: boolean;
 };
 
 export const resolveSessionNameValue = (metadata: unknown = {}): string => {
-  const source = (metadata && typeof metadata === 'object') ? metadata as UnknownRecord : {};
+  const source = (metadata && typeof metadata === 'object') ? metadata as AnyRecord : {};
   const fromCanonical = toStr(source.sessionName).trim();
   if (fromCanonical) return fromCanonical;
   return '';
@@ -23,7 +23,7 @@ export const resolveSbtSessionSlug = (
   metadata: unknown = {},
   fallbackSlug = ''
 ): ResolvedSbtSessionSlug => {
-  const source = (metadata && typeof metadata === 'object') ? metadata as UnknownRecord : {};
+  const source = (metadata && typeof metadata === 'object') ? metadata as AnyRecord : {};
   const hasExplicitSlugField =
     metadata &&
     typeof metadata === 'object' &&
@@ -51,9 +51,9 @@ export const resolveSbtSessionSlug = (
   }
 
   const byName = resolveSessionByName(resolveSessionNameValue(metadata));
-  if (byName && typeof (byName as UnknownRecord).slug !== 'undefined') {
+  if (byName && typeof (byName as AnyRecord).slug !== 'undefined') {
     return {
-      slug: normalizeSessionSlug((byName as UnknownRecord).slug || ''),
+      slug: normalizeSessionSlug((byName as AnyRecord).slug || ''),
       explicit: false,
     };
   }
@@ -66,7 +66,7 @@ export const resolveSbtSessionSlug = (
 
 export const normalizeSbtSessionLinkFields = (metadata: unknown, fallbackSlug = ''): unknown => {
   if (!metadata || typeof metadata !== 'object') return metadata;
-  const next = metadata as UnknownRecord;
+  const next = metadata as AnyRecord;
   const resolved = resolveSbtSessionSlug(next, fallbackSlug);
   next.sessionSlug = resolved.slug;
   next.sessionSlugExplicit = resolved.explicit;
@@ -77,20 +77,17 @@ export const normalizeSbtSessionLinkFields = (metadata: unknown, fallbackSlug = 
 export const normalizeSessionNameFields = (
   metadata: unknown,
   fallbackSessionName = '',
-  options: UnknownRecord = {}
+  options: AnyRecord = {}
 ): unknown => {
+  void options;
   if (!metadata || typeof metadata !== 'object') return metadata;
-  const next = metadata as UnknownRecord;
+  const next = metadata as AnyRecord;
   const fallback = toStr(fallbackSessionName).trim();
   const sessionName = resolveSessionNameValue(next) || fallback;
-  const sessionSlug = normalizeSessionSlug(
-    toStr(options?.sessionSlug ?? next.sessionSlug ?? '').trim()
-  );
   if (sessionName) {
     next.sessionName = sessionName;
   } else {
     if (typeof next.sessionName !== 'string') next.sessionName = '';
   }
-  if (sessionSlug) next.sessionSlug = sessionSlug;
   return next;
 };

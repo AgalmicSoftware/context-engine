@@ -30,10 +30,9 @@ import {
   ENABLE_TARGETED_SBT_METADATA_LOOKUP,
   PREFER_PATH_RPC,
   SHOW_DEMO_SESSIONS,
-} from '../../variables/appConfig';
-import type { UnknownRecord } from './sessionTypes.js';
+} from '../../variables/appConfig.js';
 
-type RuntimeGlobals = typeof globalThis & UnknownRecord;
+type RuntimeGlobals = Record<string, any>;
 
 const getRuntimeGlobals = (): RuntimeGlobals => globalThis as RuntimeGlobals;
 

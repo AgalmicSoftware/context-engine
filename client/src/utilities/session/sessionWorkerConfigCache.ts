@@ -63,6 +63,75 @@ type UpsertCachedSessionWorkerConfigArgs = {
   registryChainId?: unknown;
 };
 
+type AnyRecord = Record<string, any>;
+type WorkerConfig = ReturnType<typeof parseWorkerConfig>['config'];
+type WorkerConfigFieldPresence = {
+  allowOrigins: boolean;
+  limits: boolean;
+  rpcEndpoint: boolean;
+  embeddedDeployHelperEnabled: boolean;
+};
+type CacheIdentity = {
+  slug: string;
+  sessionIdHex: string;
+  registryChainId: number | null;
+};
+type WorkerConfigRecord = {
+  config: WorkerConfig;
+  cachedAtMs: number;
+  writeNonce: number;
+  slug: string;
+  sessionIdHex: string;
+  registryChainId: number | null;
+  fieldPresence: WorkerConfigFieldPresence;
+};
+type WorkerConfigStore = {
+  v: number;
+  bySession: Record<string, WorkerConfigRecord>;
+  slugIndex: Record<string, string | null>;
+};
+type VisibleCachedWorkerConfig = {
+  corsWorkerUrl: string;
+  allowOrigins?: string[];
+  limits?: AnyRecord;
+  rpcEndpoint?: string;
+  embeddedDeployHelperEnabled?: boolean;
+} | null;
+type ReplicaMeta = {
+  applied: boolean;
+  cachedConfig: WorkerConfig | null;
+  cachedAtMs: number | null;
+  writeNonce: number;
+  registryUpdatedAtMs: number | null;
+  reason: string;
+  sourceConfig: AnyRecord | null;
+};
+type CacheLookupArgs = {
+  slug?: unknown;
+  sessionConfig?: unknown;
+};
+type CacheIdentityInput = {
+  slug?: unknown;
+  sessionConfig?: unknown;
+  sessionIdHex?: unknown;
+  registryChainId?: unknown;
+};
+type SessionWorkerConfigReplicaState = {
+  sessionConfig: AnyRecord | null;
+  cachedConfig: WorkerConfig | null;
+  cacheApplied: boolean;
+  cacheUpdatedAtMs: number | null;
+  registryUpdatedAtMs: number | null;
+  reason: string;
+};
+type UpsertCachedSessionWorkerConfigArgs = {
+  slug?: unknown;
+  config?: unknown;
+  sessionConfig?: unknown;
+  sessionIdHex?: unknown;
+  registryChainId?: unknown;
+};
+
 const WORKER_CONFIG_CACHE_KEY = 'ce:sessionWorkerConfigCache:v1';
 const REGISTRY_CACHE_KEY = 'dg:sessionRegistryCache:v1';
 const WORKER_CONFIG_CACHE_VERSION = 3;
@@ -70,7 +139,7 @@ const WORKER_CONFIG_REPLICA_META = '__workerConfigReplicaMeta';
 const SESSION_WORKER_CACHE_KEY_PREFIX = 'session:';
 const SLUG_WORKER_CACHE_KEY_PREFIX = 'slug:';
 
-const isObj = (value: unknown): value is UnknownRecord => !!value && typeof value === 'object' && !Array.isArray(value);
+const isObj = (value: unknown): value is AnyRecord => !!value && typeof value === 'object' && !Array.isArray(value);
 const hasOwn = (value: unknown, key: string): boolean => Object.prototype.hasOwnProperty.call(value || {}, key);
 const toTrimmedString = (value: unknown): string => (
   typeof value === 'string'
@@ -82,26 +151,22 @@ const toTrimmedString = (value: unknown): string => (
 const cloneValue = <T>(value: T): T => {
   if (Array.isArray(value)) return value.map((entry) => cloneValue(entry)) as T;
   if (isObj(value)) {
-    return Object.keys(value).reduce((acc: UnknownRecord, key) => {
+    return Object.keys(value).reduce((acc: AnyRecord, key) => {
       acc[key] = cloneValue(value[key]);
       return acc;
     }, {}) as T;
   }
   return value;
 };
-const hasWorkerConfigValue = (config: unknown): boolean => {
-  const configObj = isObj(config) ? config : {};
-  const allowOrigins = configObj.allowOrigins;
-  const limits = configObj.limits;
-  return !!config && (
-    !!configObj.corsWorkerUrl ||
-    (Array.isArray(allowOrigins) && allowOrigins.length > 0) ||
-    (isObj(limits) && Object.keys(limits).length > 0) ||
-    !!configObj.rpcEndpoint ||
-    hasOwn(configObj, 'embeddedDeployHelperEnabled') ||
-    hasOwn(configObj, 'litCredentials')
-  );
-};
+const hasWorkerConfigValue = (config: unknown): boolean => (
+  !!config && (
+    !!(config as AnyRecord).corsWorkerUrl ||
+    (Array.isArray((config as AnyRecord).allowOrigins) && (config as AnyRecord).allowOrigins.length > 0) ||
+    (isObj((config as AnyRecord).limits) && Object.keys((config as AnyRecord).limits).length > 0) ||
+    !!(config as AnyRecord).rpcEndpoint ||
+    hasOwn(config, 'embeddedDeployHelperEnabled')
+  )
+);
 const normalizeTimestampMs = (value: unknown): number => {
   const raw = Number(value || 0);
   if (!Number.isFinite(raw) || raw <= 0) return 0;
@@ -197,7 +262,7 @@ const getSessionIdentityFromConfig = (sessionConfig: unknown = null): CacheIdent
     ),
   };
 };
-const readRegistrySessionConfigBySlug = (slugIn: unknown = ''): SessionConfig | null => {
+const readRegistrySessionConfigBySlug = (slugIn: unknown = ''): AnyRecord | null => {
   if (typeof window === 'undefined') return null;
   try {
     const parsed = JSON.parse(localStorage.getItem(REGISTRY_CACHE_KEY) || 'null');
@@ -276,7 +341,7 @@ const finalizeStore = (bySession: Record<string, WorkerConfigRecord> = {}): Work
 });
 
 const getConfiguredSessionWorkerUrlFromConfig = (sessionConfig: unknown = null): string => {
-  const parsed = parseWorkerConfig(isObj(sessionConfig) ? sessionConfig : {});
+  const parsed = parseWorkerConfig((isObj(sessionConfig) ? sessionConfig : {}) as AnyRecord);
   const canonicalUrl = normalizeWorkerUrl(parsed?.config?.corsWorkerUrl || '');
   if (canonicalUrl) return canonicalUrl;
   const rawCompatibilityUrl = readConfiguredSessionWorkerUrlCandidate(sessionConfig);
@@ -362,7 +427,7 @@ const buildVisibleCachedWorkerConfig = (
 };
 
 const normalizeWorkerConfigEntry = (value: unknown): WorkerConfig | null => {
-  const parsed = parseWorkerConfig(isObj(value) ? value : {});
+  const parsed = parseWorkerConfig((isObj(value) ? value : {}) as AnyRecord);
   if (!parsed?.ok && !hasWorkerConfigValue(parsed?.config)) return null;
   return hasWorkerConfigValue(parsed?.config) ? parsed.config : null;
 };
@@ -475,11 +540,11 @@ export const getCachedSessionWorkerConfig = (
 };
 
 const buildOverlaySessionWorkerConfig = (
-  baseConfig: SessionWorkerConfigReplica,
+  baseConfig: AnyRecord,
   record: WorkerConfigRecord
-): SessionWorkerConfigReplica => {
-  const cachedConfig: Partial<WorkerConfig> = isObj(record?.config) ? record.config : {};
-  const next: SessionWorkerConfigReplica = {
+): AnyRecord => {
+  const cachedConfig: AnyRecord = isObj(record?.config) ? record.config : {};
+  const next: AnyRecord = {
     ...baseConfig,
     corsWorkerUrl: cachedConfig.corsWorkerUrl || baseConfig.corsWorkerUrl || '',
   };
@@ -509,11 +574,11 @@ const getReplicaMeta = (sessionConfig: unknown = null): ReplicaMeta | null => {
     : null;
 };
 
-const getReplicaSourceConfig = (existingMeta: ReplicaMeta | null, fallbackConfig: unknown): SessionWorkerConfigReplica | null => {
+const getReplicaSourceConfig = (existingMeta: ReplicaMeta | null, fallbackConfig: unknown): AnyRecord | null => {
   if (isObj(existingMeta?.sourceConfig)) {
-    return cloneValue(existingMeta.sourceConfig) as SessionWorkerConfigReplica;
+    return cloneValue(existingMeta.sourceConfig);
   }
-  return isObj(fallbackConfig) ? cloneValue(fallbackConfig) as SessionWorkerConfigReplica : null;
+  return isObj(fallbackConfig) ? cloneValue(fallbackConfig) : null;
 };
 
 const setReplicaMeta = <T>(sessionConfig: T, meta: ReplicaMeta): T => {
@@ -559,7 +624,7 @@ export const getSessionWorkerConfigReplicaState = ({
   slug,
   sessionConfig,
 }: CacheLookupArgs = {}): SessionWorkerConfigReplicaState => {
-  const inputConfig = isObj(sessionConfig) ? sessionConfig as SessionWorkerConfigReplica : null;
+  const inputConfig = isObj(sessionConfig) ? sessionConfig : null;
   if (!inputConfig) {
     return {
       sessionConfig: null,
@@ -574,7 +639,7 @@ export const getSessionWorkerConfigReplicaState = ({
   const normalizedSlug = canonicalizeSessionSlug(slug ?? inputConfig.slug ?? '');
   const existingMeta = getReplicaMeta(inputConfig);
   let existingRecord = null;
-  let baseConfig: SessionWorkerConfigReplica | null = inputConfig;
+  let baseConfig: AnyRecord | null = inputConfig;
 
   if (existingMeta?.applied === true) {
     existingRecord = getCachedSessionWorkerConfigRecord({
@@ -661,7 +726,7 @@ export const getSessionWorkerConfigReplicaState = ({
 export const overlayCachedSessionWorkerConfig = ({
   slug,
   sessionConfig,
-}: CacheLookupArgs = {}): SessionWorkerConfigReplica | null => getSessionWorkerConfigReplicaState({
+}: CacheLookupArgs = {}): AnyRecord | null => getSessionWorkerConfigReplicaState({
   slug,
   sessionConfig,
 }).sessionConfig;

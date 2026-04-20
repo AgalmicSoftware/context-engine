@@ -91,96 +91,77 @@ type EffectiveFaucetConfigResult = {
   encryptedAvailable: boolean;
 };
 
-/**
- * @typedef {import('ethers').providers.Provider} EthersProvider
- * @typedef {import('ethers').Signer} EthersSigner
- */
-
-/**
- * @typedef {string | EthersProvider | EthersSigner | {
- *   provider?: unknown,
- *   request?: (request: { method: string, params?: unknown[] }) => Promise<unknown>
- * } | null | undefined} ResourceKeyProviderLike
- */
-
-/**
- * @typedef {object} FaucetConfig
- * @property {boolean} useLocal
- * @property {string} privateKey
- * @property {string} rpcUrl
- * @property {string} amountEth
- * @property {string} balanceThresholdEth
- */
-
-/**
- * @typedef {object} ResourceKeys
- * @property {{ useLocal: boolean, apiKey: string }} rpc
- * @property {{ useLocal: boolean, jwk: string }} arweave
- * @property {FaucetConfig} faucet
- */
-
-/**
- * @typedef {object} ResourceKeyResolutionContext
- * @property {string=} account
- * @property {number | string | null=} chainId
- * @property {ResourceKeyProviderLike=} providerLike
- * @property {Record<string, any>=} lit
- */
-
-/**
- * @typedef {object} EffectiveResourceKeyOptions
- * @property {string=} sessionSlug
- * @property {Record<string, any> | null=} sessionConfig
- * @property {boolean=} preferLocal
- * @property {ResourceKeyResolutionContext=} context
- */
-
-/**
- * @typedef {object} EffectiveRpcKeyResult
- * @property {string} apiKey
- * @property {'session' | 'local'} source
- * @property {string} sessionConfigSource
- * @property {string} status
- * @property {boolean} preferLocal
- * @property {string} sessionStatus
- * @property {string} groupStatus
- * @property {string} localStatus
- */
-
-/**
- * @typedef {object} EffectiveArweaveKeyResult
- * @property {string} arweaveJwk
- * @property {'session' | 'local'} source
- * @property {string} sessionConfigSource
- * @property {string} status
- * @property {boolean} preferLocal
- * @property {string} sessionStatus
- * @property {string} groupStatus
- * @property {string} localStatus
- */
-
-/**
- * @typedef {object} EffectiveFaucetConfigResult
- * @property {string} privateKey
- * @property {'session' | 'local'} source
- * @property {string} sessionConfigSource
- * @property {string} status
- * @property {boolean} preferLocal
- * @property {string} sessionStatus
- * @property {string} groupStatus
- * @property {string} localStatus
- * @property {string} rpcUrl
- * @property {string} amountEth
- * @property {string} balanceThresholdEth
- * @property {boolean} encryptedAvailable
- */
+type AnyRecord = Record<string, any>;
+type ResourceKeyProviderLike = string | AnyRecord | null | undefined;
+type FaucetConfig = {
+  useLocal: boolean;
+  privateKey: string;
+  rpcUrl: string;
+  amountEth: string;
+  balanceThresholdEth: string;
+};
+type ResourceKeys = {
+  rpc: { useLocal: boolean; apiKey: string };
+  arweave: { useLocal: boolean; jwk: string };
+  faucet: FaucetConfig;
+};
+type ResourceKeyStore = {
+  v: number;
+  bySession: Record<string, ResourceKeys>;
+  byGroup: Record<string, ResourceKeys>;
+};
+type ResourceKeyResolutionContext = {
+  account?: string;
+  chainId?: number | string | null;
+  providerLike?: ResourceKeyProviderLike;
+  lit?: AnyRecord;
+};
+type EffectiveResourceKeyOptions = {
+  sessionSlug?: string;
+  sessionConfig?: AnyRecord | null;
+  preferLocal?: boolean;
+  context?: ResourceKeyResolutionContext;
+};
+type EffectiveRpcKeyResult = {
+  apiKey: string;
+  source: 'session' | 'local';
+  sessionConfigSource: string;
+  status: string;
+  preferLocal: boolean;
+  sessionStatus: string;
+  groupStatus: string;
+  localStatus: string;
+};
+type EffectiveArweaveKeyResult = {
+  arweaveJwk: string;
+  source: 'session' | 'local';
+  sessionConfigSource: string;
+  status: string;
+  preferLocal: boolean;
+  sessionStatus: string;
+  groupStatus: string;
+  localStatus: string;
+};
+type EffectiveFaucetConfigResult = {
+  privateKey: string;
+  source: 'session' | 'local';
+  sessionConfigSource: string;
+  status: string;
+  preferLocal: boolean;
+  sessionStatus: string;
+  groupStatus: string;
+  localStatus: string;
+  rpcUrl: string;
+  amountEth: string;
+  balanceThresholdEth: string;
+  encryptedAvailable: boolean;
+};
 
 const log = createLogger('resourceKeys');
 
 
 const STORAGE_KEY = 'ce:resourceKeys:v1';
 const RESERVED_KEYS = new Set<string>(['__proto__', 'constructor', 'prototype']);
-const isObj = (value: unknown): value is UnknownRecord => !!value && typeof value === 'object' && !Array.isArray(value);
 
 const DEFAULT_SETTINGS = Object.freeze<ResourceKeys>({
   rpc: { useLocal: false, apiKey: '' },
@@ -190,7 +171,7 @@ const DEFAULT_SETTINGS = Object.freeze<ResourceKeys>({
 
 const buildWorkerKeyMeta = <TKey extends 'apiKey' | 'jwk' | 'privateKey'>(
   keyName: TKey
-): WorkerKeyMeta<TKey> => ({
+): Record<TKey, string> & { status: string; encryptedAvailable: boolean } => ({
   [keyName]: '',
   status: 'worker',
   encryptedAvailable: false,
@@ -209,10 +190,10 @@ const normalizeJwkValue = (value: unknown): string => {
 };
 
 const normalizeSettings = (raw: unknown = {}): ResourceKeys => {
-  const obj = isObj(raw) ? raw : {};
-  const rpc = isObj(obj.rpc) ? obj.rpc : {};
-  const arweave = isObj(obj.arweave) ? obj.arweave : {};
-  const faucet = isObj(obj.faucet) ? obj.faucet : {};
+  const obj: AnyRecord = raw && typeof raw === 'object' ? raw as AnyRecord : {};
+  const rpc = obj.rpc && typeof obj.rpc === 'object' ? obj.rpc : {};
+  const arweave = obj.arweave && typeof obj.arweave === 'object' ? obj.arweave : {};
+  const faucet = obj.faucet && typeof obj.faucet === 'object' ? obj.faucet : {};
   return {
     rpc: {
       useLocal: !!rpc.useLocal,
@@ -233,11 +214,11 @@ const normalizeSettings = (raw: unknown = {}): ResourceKeys => {
 };
 
 const normalizeStore = (raw: unknown = null): ResourceKeyStore => {
-  const obj = isObj(raw) ? raw : {};
+  const obj: AnyRecord = raw && typeof raw === 'object' ? raw as AnyRecord : {};
   const bySessionRaw =
     isObj(obj.bySession)
       ? obj.bySession
-      : (isObj(obj.byGroup) ? obj.byGroup : {});
+      : (obj.byGroup && typeof obj.byGroup === 'object' ? obj.byGroup : {});
   const bySession: Record<string, ResourceKeys> = {};
   Object.entries(bySessionRaw).forEach(([slug, entry]) => {
     const key = normalizeSlug(slug);
@@ -264,25 +245,17 @@ const writeStore = (payload: ResourceKeyStore): void => {
   } catch (e) { log.warn('resourceKeys: fallback', e); }
 };
 
-/**
- * Reads locally persisted resource-key overrides for a session slug.
- * @param {string} [slugIn='']
- * @returns {ResourceKeys}
- */
-export const getLocalResourceKeys = (slugIn = '') => {
+export const getLocalResourceKeys = (slugIn = ''): ResourceKeys => {
   const slug = normalizeSlug(slugIn);
   const stored = readStore();
   const entry = stored.bySession[slug] || null;
   return entry ? normalizeSettings(entry) : normalizeSettings(DEFAULT_SETTINGS);
 };
 
-/**
- * Persists local resource-key overrides for a session slug after normalizing their stored shape.
- * @param {string} [slugIn='']
- * @param {Partial<ResourceKeys>} [updates={}]
- * @returns {ResourceKeys}
- */
-export const saveLocalResourceKeys = (slugIn = '', updates = {}) => {
+export const saveLocalResourceKeys = (
+  slugIn = '',
+  updates: Partial<ResourceKeys> = {}
+): ResourceKeys => {
   const slug = normalizeSlug(slugIn);
   const stored = readStore();
   const current = stored.bySession[slug] || normalizeSettings(DEFAULT_SETTINGS);
@@ -293,12 +266,7 @@ export const saveLocalResourceKeys = (slugIn = '', updates = {}) => {
   return next;
 };
 
-/**
- * Removes locally persisted resource-key overrides for a session slug.
- * @param {string} [slugIn='']
- * @returns {void}
- */
-export const clearLocalResourceKeys = (slugIn = '') => {
+export const clearLocalResourceKeys = (slugIn = ''): void => {
   const slug = normalizeSlug(slugIn);
   const stored = readStore();
   if (stored.bySession[slug]) {
@@ -315,7 +283,7 @@ export const saveLocalSessionResourceKeys = saveLocalResourceKeys;
 /** @type {typeof clearLocalResourceKeys} */
 export const clearLocalSessionResourceKeys = clearLocalResourceKeys;
 
-const resolveSessionConfig = (slugIn = ''): SessionConfig | null => {
+const resolveSessionConfig = (slugIn = ''): AnyRecord | null => {
   const normalizedSlug = canonicalizeSessionSlug(slugIn);
   const allowDemoFallback = normalizedSlug === '' ? true : defaultStrictAllowDemoFallback();
   const resolved = resolveSessionConfigFromSources({
@@ -325,8 +293,7 @@ const resolveSessionConfig = (slugIn = ''): SessionConfig | null => {
     allowDemoFallback: false,
   });
   if (resolved.sessionConfig || !allowDemoFallback) return resolved.sessionConfig;
-  const demoConfig = getDemoSessionConfigForDisplay(resolved.sessionSlug);
-  return isObj(demoConfig) ? demoConfig as SessionConfig : null;
+  return getDemoSessionConfigForDisplay(resolved.sessionSlug) as AnyRecord | null;
 };
 
 // Legacy alias removed — function is now resolveSessionConfig directly.
@@ -361,7 +328,7 @@ const getWalletContext = (
   }
 };
 
-const getLitHooks = (override: ResourceKeyResolutionContext = {}): UnknownRecord | null => {
+const getLitHooks = (override: ResourceKeyResolutionContext = {}): AnyRecord => {
   if (override.lit) return override.lit;
   const hooks = getGlobalLitHooks();
   return isObj(hooks) ? hooks : null;
@@ -407,37 +374,32 @@ const resolveEncryptedValue = async (
 };
 
 const resolveSessionRpcKey = async (
-  sessionCfg: SessionConfig | null,
+  sessionCfg: AnyRecord | null,
   context: ResourceKeyResolutionContext = {}
-): Promise<WorkerKeyMeta<'apiKey'>> => {
+): Promise<AnyRecord> => {
   void sessionCfg;
   void context;
   return buildWorkerKeyMeta('apiKey');
 };
 
 const resolveSessionArweaveKey = async (
-  sessionCfg: SessionConfig | null,
+  sessionCfg: AnyRecord | null,
   context: ResourceKeyResolutionContext = {}
-): Promise<WorkerKeyMeta<'jwk'>> => {
+): Promise<AnyRecord> => {
   void sessionCfg;
   void context;
   return buildWorkerKeyMeta('jwk');
 };
 
 const resolveSessionFaucetKey = async (
-  sessionCfg: SessionConfig | null,
+  sessionCfg: AnyRecord | null,
   context: ResourceKeyResolutionContext = {}
-): Promise<WorkerKeyMeta<'privateKey'>> => {
+): Promise<AnyRecord> => {
   void sessionCfg;
   void context;
   return buildWorkerKeyMeta('privateKey');
 };
 
-/**
- * Resolves the effective RPC API key for a session, preferring local overrides when requested.
- * @param {EffectiveResourceKeyOptions} [options={}]
- * @returns {Promise<EffectiveRpcKeyResult>}
- */
 export const getEffectiveRpcKey = async ({
   sessionSlug,
   sessionConfig,
@@ -480,11 +442,6 @@ export const getEffectiveRpcKey = async ({
   };
 };
 
-/**
- * Resolves the effective Arweave JWK for a session, preferring local overrides when requested.
- * @param {EffectiveResourceKeyOptions} [options={}]
- * @returns {Promise<EffectiveArweaveKeyResult>}
- */
 export const getEffectiveArweaveKey = async ({
   sessionSlug,
   sessionConfig,
@@ -527,11 +484,6 @@ export const getEffectiveArweaveKey = async ({
   };
 };
 
-/**
- * Resolves the effective faucet credentials and RPC settings for a session, preferring local overrides when requested.
- * @param {EffectiveResourceKeyOptions} [options={}]
- * @returns {Promise<EffectiveFaucetConfigResult>}
- */
 export const getEffectiveFaucetConfig = async ({
   sessionSlug,
   sessionConfig,
@@ -600,17 +552,6 @@ export const getEffectiveSessionArweaveKey = getEffectiveArweaveKey;
 /** @type {typeof getEffectiveFaucetConfig} */
 export const getEffectiveSessionFaucetConfig = getEffectiveFaucetConfig;
 
-/**
- * Shared helpers for reading, persisting, and resolving session resource keys.
- * @type {{
- *   getLocalResourceKeys: typeof getLocalResourceKeys,
- *   saveLocalResourceKeys: typeof saveLocalResourceKeys,
- *   clearLocalResourceKeys: typeof clearLocalResourceKeys,
- *   getEffectiveRpcKey: typeof getEffectiveRpcKey,
- *   getEffectiveArweaveKey: typeof getEffectiveArweaveKey,
- *   getEffectiveFaucetConfig: typeof getEffectiveFaucetConfig
- * }}
- */
 export const resourceKeysUtils = {
   getLocalResourceKeys,
   saveLocalResourceKeys,

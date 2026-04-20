@@ -7,24 +7,14 @@ import { DEFAULT_CHAIN_ID } from '../../variables/appConfig.js';
 
 export { DEFAULT_CHAIN_ID };
 
-type ChainEntry = {
-  chainId?: unknown;
-};
-type ChainConfig = {
-  contracts?: {
-    sbtFactory?: ChainEntry;
-    surveys?: ChainEntry;
-  };
-  networkChainId?: unknown;
-  __registry?: ChainEntry;
-};
+type AnyRecord = Record<string, any>;
 type ExtractChainIdOptions = {
   contractKey?: unknown;
   strict?: boolean;
 };
 
 export function extractChainId(cfg: unknown, options: ExtractChainIdOptions | null = null): number {
-  const config = (cfg && typeof cfg === 'object') ? cfg as ChainConfig : {};
+  const config = (cfg && typeof cfg === 'object') ? cfg as AnyRecord : {};
   const contractKey = String(options?.contractKey || '').trim();
   const strict = options?.strict === true;
   const preferredCandidates = contractKey === 'sbtFactory'
@@ -63,7 +53,7 @@ export function extractChainIdOrUndefined(
   cfg: unknown,
   options: ExtractChainIdOptions | null = null
 ): number | undefined {
-  const config = (cfg && typeof cfg === 'object') ? cfg as ChainConfig : {};
+  const config = (cfg && typeof cfg === 'object') ? cfg as AnyRecord : {};
   const contractKey = String(options?.contractKey || '').trim();
   const preferredCandidates = contractKey === 'sbtFactory'
     ? [

@@ -67,15 +67,17 @@ const resolveReceiptRevertMessage = async ({
   txParams,
   receipt,
   fallbackMessage,
-} = {}) => {
-  const staticCall = contract?.callStatic?.[method];
+}: ResolveReceiptRevertMessageOptions = {}): Promise<string> => {
+  const methodName = String(method || '');
+  const resolvedFallbackMessage = String(fallbackMessage || '');
+  const staticCall = contract?.callStatic?.[methodName];
   if (typeof staticCall === 'function') {
     try {
       await staticCall(...(Array.isArray(args) ? args : []), {
         ...(txOverrides && typeof txOverrides === 'object' ? txOverrides : {}),
         from,
       });
-      return fallbackMessage;
+      return resolvedFallbackMessage;
     } catch (error) {
       const reason = extractEstimateErrorMessage(error).trim();
       if (reason) {
@@ -85,7 +87,7 @@ const resolveReceiptRevertMessage = async ({
   }
 
   if (!ethersProvider || typeof ethersProvider.call !== 'function') {
-    return fallbackMessage;
+    return resolvedFallbackMessage;
   }
 
   const callTx = {
@@ -97,10 +99,10 @@ const resolveReceiptRevertMessage = async ({
 
   try {
     await ethersProvider.call(callTx, receipt?.blockNumber ?? 'latest');
-    return fallbackMessage;
+    return resolvedFallbackMessage;
   } catch (error) {
     const reason = extractEstimateErrorMessage(error).trim();
-    return reason || fallbackMessage;
+    return reason || resolvedFallbackMessage;
   }
 };
 
