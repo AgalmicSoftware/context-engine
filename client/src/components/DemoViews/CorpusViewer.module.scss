@@ -667,6 +667,15 @@ $text: #f4f7ff;
   width: 100%;
 }
 
+.tweetActionRow {
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.tweetActionRow .externalLink {
+  margin-left: auto;
+}
+
 .cardFooter:empty,
 .cardFooterLinks:empty {
   display: none;
@@ -1075,6 +1084,11 @@ $text: #f4f7ff;
   white-space: normal;
 }
 
+.debateMapIcon {
+  flex-shrink: 0;
+  font-size: 0.8rem;
+}
+
 .debateMapLinkButton {
   appearance: none;
   cursor: pointer;
@@ -1355,6 +1369,14 @@ $text: #f4f7ff;
   .cardFooterLinks,
   .debateMapFooterLinks {
     gap: 10px;
+  }
+
+  .tweetActionRow {
+    align-items: stretch;
+  }
+
+  .tweetActionRow .externalLink {
+    margin-left: 0;
   }
 
   .debateMapLink,

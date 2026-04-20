@@ -2,7 +2,13 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { connect } from 'react-redux';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCog } from '@fortawesome/free-solid-svg-icons';
+import {
+  faCaretDown,
+  faCaretUp,
+  faCog,
+  faExternalLinkAlt,
+  faPlus,
+} from '@fortawesome/free-solid-svg-icons';
 import { listNamespaceEntriesSync, subscribeCacheUpdates } from '../../utilities/cache/cacheScripts.js';
 import { callAI } from '../../utilities/ai/aiScripts.js';
 import { normalizeTagList } from '../../utilities/defaultTags.js';
@@ -67,7 +73,7 @@ const buildSessionScopeLabel = (slugIn = '') => {
     : (sessionName || slug);
 };
 
-const buildGlobalTagPageScope = (selection = {}) => {
+export const buildGlobalTagPageScope = (selection = {}) => {
   const scopeMode = String(selection?.selectedSessionScope || '').trim().toLowerCase() || 'active';
   if (scopeMode === 'all') {
     return { filterMode: 'all', scopeSlugs: [] };
@@ -87,7 +93,7 @@ const buildGlobalTagPageScope = (selection = {}) => {
   };
 };
 
-const describeScopeSummary = ({
+export const describeScopeSummary = ({
   filterMode = 'all',
   scopeSlugs = [],
   routePinned = false,
@@ -498,6 +504,7 @@ export const TagPageView = ({
   embedded = false,
   demoCorpusMode = false,
   demoCorpusRecords = [],
+  hideEmbeddedSessionSelector = false,
 }) => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -506,6 +513,7 @@ export const TagPageView = ({
   const [sessionRegistryRevision, setSessionRegistryRevision] = useState(0);
   const [tagPickerOpen, setTagPickerOpen] = useState(false);
   const [sessionSelectorOpen, setSessionSelectorOpen] = useState(false);
+  const [expandedDemoEntryKeys, setExpandedDemoEntryKeys] = useState({});
   const [localSessionOverrideTouched, setLocalSessionOverrideTouched] = useState(false);
   const [localSessionOverrideSlug, setLocalSessionOverrideSlug] = useState(null);
   const [aiInterpretation, setAiInterpretation] = useState(null);
@@ -699,6 +707,10 @@ export const TagPageView = ({
   }, [selectedTagsCacheKey]);
 
   useEffect(() => {
+    setExpandedDemoEntryKeys({});
+  }, [selectedTagsCacheKey]);
+
+  useEffect(() => {
     setAiInterpretation(null);
     setAiError(null);
     setAiLoading(false);
@@ -867,6 +879,41 @@ export const TagPageView = ({
     }
   };
 
+  const renderSelectedTagPills = ({ hero = false } = {}) => selectedTags.map((tag) => (
+    <span
+      key={tag}
+      className={[
+        styles.tagPill,
+        hero ? styles.tagPillHero : '',
+      ].filter(Boolean).join(' ')}
+    >
+      <span className={styles.tagPillLabel}>#{tag}</span>
+      <button
+        type="button"
+        className={[
+          styles.tagPillRemove,
+          hero ? styles.tagPillRemoveHero : '',
+        ].filter(Boolean).join(' ')}
+        onClick={(event) => {
+          event.stopPropagation();
+          handleRemoveTag(tag);
+        }}
+        aria-label={`Remove ${tag} tag`}
+      >
+        ×
+      </button>
+    </span>
+  ));
+
+  const toggleDemoEntryExpanded = (entryKey) => {
+    const normalizedKey = String(entryKey || '').trim();
+    if (!normalizedKey) return;
+    setExpandedDemoEntryKeys((prev) => ({
+      ...prev,
+      [normalizedKey]: !prev[normalizedKey],
+    }));
+  };
+
   return (
     <div className={[styles.page, embedded ? styles.pageEmbedded : ''].filter(Boolean).join(' ')}>
       <div className={[styles.shell, embedded ? styles.shellEmbedded : ''].filter(Boolean).join(' ')}>
@@ -874,120 +921,127 @@ export const TagPageView = ({
           <div className={styles.headerTopRow}>
             <div className={styles.headerLead}>
               {!embedded ? <p className={styles.eyebrow}>Tag explorer</p> : null}
-              <h1
-                className={[styles.title, embedded ? styles.titleEmbedded : ''].filter(Boolean).join(' ')}
-                data-testid="tag-page-title"
-              >
-                {titleText}
-              </h1>
-            </div>
-            <div className={styles.headerMeta}>
-              <div className={styles.scopeMeta}>
-                {!isDemoCorpusContext ? (
-                  <div
-                    className={styles.scopeBadge}
-                    data-testid="tag-page-session-scope"
-                    title={scopeSummary.title}
-                  >
-                    {scopeSummary.label}
-                  </div>
-                ) : null}
-                <div
-                  className={[
-                    styles.sessionSelectorTriggerRow,
-                    sessionSelectorOpen ? styles.sessionSelectorTriggerRowOpen : '',
-                  ].filter(Boolean).join(' ')}
-                  data-testid="ce-tag-page-session-selector"
-                  data-session-selector-open={sessionSelectorOpen ? 'true' : 'false'}
+              {embedded && selectedTags.length ? (
+                <h1
+                  className={styles.titlePillHeading}
+                  data-testid="tag-page-title"
+                  aria-label={titleText}
                 >
-                  {sessionSelectorOpen ? (
-                    <button
-                      type="button"
-                      className={styles.sessionSelectorBackdrop}
-                      aria-label="Close tag page session selector"
-                      data-testid="ce-tag-page-session-selector-backdrop"
-                      onClick={() => setSessionSelectorOpen(false)}
-                    />
-                  ) : null}
-                  <button
-                    type="button"
-                    className={styles.sessionSelectorToggle}
-                    aria-label="Tag page session selector"
-                    aria-expanded={sessionSelectorOpen}
-                    data-testid="ce-tag-page-session-selector-toggle"
-                    onClick={() => setSessionSelectorOpen((prev) => !prev)}
-                  >
-                    <FontAwesomeIcon icon={faCog} />
-                  </button>
-                  {sessionSelectorOpen ? (
+                  <span className={styles.titleTagRow}>
+                    {renderSelectedTagPills({ hero: true })}
+                  </span>
+                </h1>
+              ) : (
+                <h1
+                  className={[styles.title, embedded ? styles.titleEmbedded : ''].filter(Boolean).join(' ')}
+                  data-testid="tag-page-title"
+                >
+                  {titleText}
+                </h1>
+              )}
+            </div>
+            {!embedded || !hideEmbeddedSessionSelector ? (
+              <div className={[styles.headerMeta, embedded ? styles.headerMetaEmbedded : ''].filter(Boolean).join(' ')}>
+                <div className={styles.scopeMeta}>
+                  {!isDemoCorpusContext ? (
                     <div
-                      className={styles.sessionSelectorPopover}
-                      data-testid="ce-tag-page-session-selector-panel"
+                      className={styles.scopeBadge}
+                      data-testid="tag-page-session-scope"
+                      title={scopeSummary.title}
                     >
-                      <div className={styles.sessionSelectorPopoverHeader}>
-                        <div className={styles.sessionSelectorHint}>
-                          {isDemoCorpusContext
-                            ? 'Demo corpus mode uses the demo corpus records currently loaded in this view instead of session-scoped questions.'
-                            : sessionSelectorHint}
-                        </div>
-                        {!isDemoCorpusContext && !routePinned && localSessionOverrideTouched ? (
-                          <button
-                            type="button"
-                            className={styles.sessionSelectorReset}
-                            data-testid="ce-tag-page-session-selector-reset"
-                            onClick={resetSessionSelection}
-                          >
-                            Use global default
-                          </button>
-                        ) : null}
-                      </div>
-                      {isDemoCorpusContext ? (
-                        <div
-                          className={styles.sessionSelectorInfoCard}
-                          data-testid="ce-tag-page-demo-session-info"
-                        >
-                          <div className={styles.sessionSelectorInfoLabel}>Hidden session scope</div>
-                          <div className={styles.sessionSelectorInfoValue}>{scopeSummary.label}</div>
-                        </div>
-                      ) : (
-                        <SessionChipSelector
-                          options={sessionSelectorOptions.map((option) => ({
-                            ...option,
-                            disabled: routePinned,
-                          }))}
-                          onToggle={handleSessionSelect}
-                        />
-                      )}
+                      {scopeSummary.label}
                     </div>
                   ) : null}
+                  <div
+                    className={[
+                      styles.sessionSelectorTriggerRow,
+                      sessionSelectorOpen ? styles.sessionSelectorTriggerRowOpen : '',
+                    ].filter(Boolean).join(' ')}
+                    data-testid="ce-tag-page-session-selector"
+                    data-session-selector-open={sessionSelectorOpen ? 'true' : 'false'}
+                  >
+                    {sessionSelectorOpen ? (
+                      <button
+                        type="button"
+                        className={styles.sessionSelectorBackdrop}
+                        aria-label="Close tag page session selector"
+                        data-testid="ce-tag-page-session-selector-backdrop"
+                        onClick={() => setSessionSelectorOpen(false)}
+                      />
+                    ) : null}
+                    <button
+                      type="button"
+                      className={styles.sessionSelectorToggle}
+                      aria-label="Tag page session selector"
+                      aria-expanded={sessionSelectorOpen}
+                      data-testid="ce-tag-page-session-selector-toggle"
+                      onClick={() => setSessionSelectorOpen((prev) => !prev)}
+                    >
+                      <FontAwesomeIcon icon={faCog} />
+                    </button>
+                    {sessionSelectorOpen ? (
+                      <div
+                        className={styles.sessionSelectorPopover}
+                        data-testid="ce-tag-page-session-selector-panel"
+                      >
+                        <div className={styles.sessionSelectorPopoverHeader}>
+                          <div className={styles.sessionSelectorHint}>
+                            {isDemoCorpusContext
+                              ? 'Demo corpus mode uses the demo corpus records currently loaded in this view instead of session-scoped questions.'
+                              : sessionSelectorHint}
+                          </div>
+                          {!isDemoCorpusContext && !routePinned && localSessionOverrideTouched ? (
+                            <button
+                              type="button"
+                              className={styles.sessionSelectorReset}
+                              data-testid="ce-tag-page-session-selector-reset"
+                              onClick={resetSessionSelection}
+                            >
+                              Use global default
+                            </button>
+                          ) : null}
+                        </div>
+                        {isDemoCorpusContext ? (
+                          <div
+                            className={styles.sessionSelectorInfoCard}
+                            data-testid="ce-tag-page-demo-session-info"
+                          >
+                            <div className={styles.sessionSelectorInfoLabel}>Hidden session scope</div>
+                            <div className={styles.sessionSelectorInfoValue}>{scopeSummary.label}</div>
+                          </div>
+                        ) : (
+                          <SessionChipSelector
+                            options={sessionSelectorOptions.map((option) => ({
+                              ...option,
+                              disabled: routePinned,
+                            }))}
+                            onToggle={handleSessionSelect}
+                          />
+                        )}
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
               </div>
-            </div>
+            ) : null}
           </div>
           <div className={styles.headerControls}>
-            <div className={styles.tagRow}>
-              {selectedTags.map((tag) => (
-                <button
-                  key={tag}
-                  type="button"
-                  className={styles.tagPill}
-                  onClick={() => handleRemoveTag(tag)}
-                  aria-label={`Remove ${tag} tag`}
-                >
-                  <span>#{tag}</span>
-                  <span className={styles.tagPillRemove}>x</span>
-                </button>
-              ))}
-            </div>
-            <div className={styles.tagPicker}>
+            {!embedded ? (
+              <div className={styles.tagRow}>
+                {renderSelectedTagPills()}
+              </div>
+            ) : null}
+            <div className={[styles.tagPicker, embedded ? styles.tagPickerEmbedded : ''].filter(Boolean).join(' ')}>
               <button
                 type="button"
                 className={styles.addTagButton}
+                aria-label="Add tag to comparison"
                 aria-expanded={tagPickerOpen}
                 aria-haspopup="dialog"
                 onClick={() => setTagPickerOpen((prev) => !prev)}
               >
-                Add tag to comparison
+                <FontAwesomeIcon icon={faPlus} />
+                <span>Add tag</span>
               </button>
               {tagPickerOpen && (
                 <div className={styles.tagPickerPopover} role="dialog" aria-label="Add tag to comparison">
@@ -1049,12 +1103,25 @@ export const TagPageView = ({
                         <span className={styles.demoCorpusMeta}>{entry.metaLine}</span>
                       ) : null}
                     </div>
-                    <h3 className={styles.demoCorpusTitle}>{entry.title}</h3>
-                    {entry.summary ? (
+                    <div className={styles.demoCorpusTitleRow}>
+                      <h3 className={styles.demoCorpusTitle}>{entry.title}</h3>
+                      {entry.corpusKey === 'tweets' && entry.summary ? (
+                        <button
+                          type="button"
+                          className={styles.demoCorpusExpandButton}
+                          aria-label={`${expandedDemoEntryKeys[entry.key] ? 'Collapse' : 'Expand'} ${entry.title}`}
+                          aria-expanded={!!expandedDemoEntryKeys[entry.key]}
+                          onClick={() => toggleDemoEntryExpanded(entry.key)}
+                        >
+                          <FontAwesomeIcon icon={expandedDemoEntryKeys[entry.key] ? faCaretUp : faCaretDown} />
+                        </button>
+                      ) : null}
+                    </div>
+                    {entry.summary && (entry.corpusKey !== 'tweets' || expandedDemoEntryKeys[entry.key]) ? (
                       <p className={styles.demoCorpusSummary}>{entry.summary}</p>
                     ) : null}
                     <div className={styles.demoCorpusFooter}>
-                      {entry.url ? (
+                      {entry.url && entry.corpusKey !== 'tweets' ? (
                         <a
                           href={entry.url}
                           className={styles.demoCorpusLink}
@@ -1084,6 +1151,18 @@ export const TagPageView = ({
                             );
                           })}
                         </div>
+                      ) : null}
+                      {entry.url && entry.corpusKey === 'tweets' ? (
+                        <a
+                          href={entry.url}
+                          className={styles.demoCorpusLinkIcon}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          aria-label="View source"
+                          title="View source"
+                        >
+                          <FontAwesomeIcon icon={faExternalLinkAlt} />
+                        </a>
                       ) : null}
                     </div>
                   </article>

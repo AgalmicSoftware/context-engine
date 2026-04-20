@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
+  faAtlas,
   faEye,
   faHeart,
   faLink,
@@ -120,36 +121,61 @@ const getAvatarLetter = (handle = '') => {
 
 const formatCount = (value) => Number(value || 0).toLocaleString();
 
-export const DebateMapSection = ({ entry, onAtlasIssueOpen }) => {
+export const DebateMapSection = ({
+  entry,
+  onAtlasIssueOpen,
+  inline = false,
+  showAtlasIcon = false,
+}) => {
   const linkedIssues = resolveDebateMapIssues(entry);
 
   if (linkedIssues.length === 0) return null;
 
+  const issueLinks = linkedIssues.map((issue) => (
+    onAtlasIssueOpen ? (
+      <button
+        key={issue.id}
+        type="button"
+        className={`${styles.debateMapLink} ${styles.debateMapLinkButton}`}
+        title={issue.pathLabel}
+        onClick={() => onAtlasIssueOpen(issue.id)}
+      >
+        {showAtlasIcon ? (
+          <FontAwesomeIcon
+            icon={faAtlas}
+            className={styles.debateMapIcon}
+            aria-hidden="true"
+          />
+        ) : null}
+        <span>{issue.label}</span>
+      </button>
+    ) : (
+      <Link
+        key={issue.id}
+        to={issue.href}
+        className={styles.debateMapLink}
+        title={issue.pathLabel}
+      >
+        {showAtlasIcon ? (
+          <FontAwesomeIcon
+            icon={faAtlas}
+            className={styles.debateMapIcon}
+            aria-hidden="true"
+          />
+        ) : null}
+        <span>{issue.label}</span>
+      </Link>
+    )
+  ));
+
+  if (inline) {
+    return issueLinks;
+  }
+
   return (
     <div className={styles.debateMapFooter}>
       <div className={styles.debateMapFooterLinks}>
-        {linkedIssues.map((issue) => (
-          onAtlasIssueOpen ? (
-            <button
-              key={issue.id}
-              type="button"
-              className={`${styles.debateMapLink} ${styles.debateMapLinkButton}`}
-              title={issue.pathLabel}
-              onClick={() => onAtlasIssueOpen(issue.id)}
-            >
-              {issue.label}
-            </button>
-          ) : (
-            <Link
-              key={issue.id}
-              to={issue.href}
-              className={styles.debateMapLink}
-              title={issue.pathLabel}
-            >
-              {issue.label}
-            </Link>
-          )
-        ))}
+        {issueLinks}
       </div>
     </div>
   );
@@ -263,8 +289,13 @@ const TweetCard = ({ entry, onTagClick, onAtlasIssueOpen }) => {
             <span>{formatCount(entry.engagement?.views)}</span>
           </span>
         </div>
-        <div className={styles.cardFooterLinks}>
-          <DebateMapSection entry={entry} onAtlasIssueOpen={onAtlasIssueOpen} />
+        <div className={`${styles.cardFooterLinks} ${styles.tweetActionRow}`}>
+          <DebateMapSection
+            entry={entry}
+            onAtlasIssueOpen={onAtlasIssueOpen}
+            inline={true}
+            showAtlasIcon={true}
+          />
           <ExternalSourceLink entry={entry} fallbackLabel="View post" />
         </div>
       </div>
