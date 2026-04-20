@@ -102,6 +102,12 @@ const MIN_QUESTION_COUNT = 5;
 const MAX_QUESTION_COUNT = 50;
 const SUPPORTED_PHOTO_EXTENSIONS = /\.(png|jpe?g|webp|gif)$/i;
 const SUPPORTED_PHOTO_ACCEPT = 'image/png,image/jpeg,image/webp,image/gif';
+const PHOTO_ANALYSIS_STATUS_LABELS = Object.freeze({
+  queued: 'Queued for analysis',
+  loading: 'Analyzing photo...',
+  ready: 'Analysis complete',
+  error: 'Analysis failed',
+});
 
 const clampQuestionCount = (value) => Math.min(MAX_QUESTION_COUNT, Math.max(MIN_QUESTION_COUNT, value));
 
@@ -117,6 +123,71 @@ const isSupportedPhotoFile = (file) => (
     SUPPORTED_PHOTO_EXTENSIONS.test(String(file?.name || '').trim())
   )
 );
+
+const buildQueuedPhotoSource = (file, ref) => ({
+  id: buildAdditionalSourceId(ref),
+  type: 'photo',
+  value: file,
+  name: file.name,
+  analysisStatus: 'queued',
+  analysisError: '',
+  analysisText: '',
+  analysisExpanded: false,
+});
+
+const buildUnsupportedPhotoMessage = (count = 0) => (
+  `Skipped ${count} unsupported photo${count === 1 ? '' : 's'}. Use png, jpg, jpeg, webp, or gif.`
+);
+
+const getPhotoStatusLabel = (source = {}) => {
+  const status = toStr(source?.analysisStatus || 'queued').trim().toLowerCase();
+  if (status === 'error') {
+    return toStr(source?.analysisError).trim() || PHOTO_ANALYSIS_STATUS_LABELS.error;
+  }
+  return PHOTO_ANALYSIS_STATUS_LABELS[status] || PHOTO_ANALYSIS_STATUS_LABELS.queued;
+};
+
+const buildPhotoPreviewUrl = (file) => {
+  if (!file || typeof URL === 'undefined' || typeof URL.createObjectURL !== 'function') {
+    return '';
+  }
+  return URL.createObjectURL(file);
+};
+
+function QueuedPhotoPreview({ file, photoName, sourceId }) {
+  const [previewSrc] = useState(() => buildPhotoPreviewUrl(file));
+
+  useEffect(() => {
+    return () => {
+      if (previewSrc && typeof URL !== 'undefined' && typeof URL.revokeObjectURL === 'function') {
+        URL.revokeObjectURL(previewSrc);
+      }
+    };
+  }, [previewSrc]);
+
+  if (!previewSrc) {
+    return (
+      <div
+        className={styles.photoPreviewFallback}
+        aria-hidden="true"
+        data-testid={E2E_TESTIDS.DATABASE_PHOTO_SOURCE_PREVIEW}
+        data-ce-source-id={sourceId}
+      >
+        <FontAwesomeIcon icon={faImage} />
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={previewSrc}
+      alt={`${photoName || 'Uploaded photo'} preview`}
+      className={styles.photoPreviewImage}
+      data-testid={E2E_TESTIDS.DATABASE_PHOTO_SOURCE_PREVIEW}
+      data-ce-source-id={sourceId}
+    />
+  );
+}
 
 const buildPhotoAnalysisMarkdown = ({ photoName, analysisText } = {}) => {
   const safeName = toStr(photoName).trim() || 'uploaded photo';
@@ -686,30 +757,28 @@ export default function AudioSurveyGenerator({
   const handleAdditionalPhotoUpload = (e) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
-    const file = files[0];
-    if (!isSupportedPhotoFile(file)) {
-      setError('Unsupported photo format. Use png, jpg, jpeg, webp, or gif.');
-      e.target.value = '';
-      return;
+    const selectedFiles = Array.from(files);
+    const validFiles = selectedFiles.filter(isSupportedPhotoFile);
+    const invalidCount = selectedFiles.length - validFiles.length;
+
+    if (validFiles.length > 0) {
+      setAdditionalSources((prev) => [
+        ...prev,
+        ...validFiles.map((file) => buildQueuedPhotoSource(file, additionalSourceIdRef)),
+      ]);
     }
-    setError('');
-    setAdditionalSources((prev) => [
-      ...prev,
-      {
-        id: buildAdditionalSourceId(additionalSourceIdRef),
-        type: 'photo',
-        value: file,
-        name: file.name,
-        analysisStatus: 'queued',
-        analysisError: '',
-        analysisText: '',
-      },
-    ]);
+
+    if (invalidCount > 0) {
+      setError(buildUnsupportedPhotoMessage(invalidCount));
+    } else {
+      setError('');
+    }
+
     e.target.value = '';
   };
 
-  const removeAdditionalSource = (index) => {
-    setAdditionalSources(prev => prev.filter((_, i) => i !== index));
+  const removeAdditionalSource = (sourceId) => {
+    setAdditionalSources((prev) => prev.filter((source) => source?.id !== sourceId));
   };
 
   const updateAdditionalSourceById = (sourceId, patch) => {
@@ -744,6 +813,7 @@ export default function AudioSurveyGenerator({
       updateAdditionalSourceById(source.id, {
         analysisStatus: 'loading',
         analysisError: '',
+        analysisExpanded: false,
       });
       try {
         const result = await analyzePhotoForQuestionGeneration(source.value, aiRequestOptions);
@@ -763,11 +833,18 @@ export default function AudioSurveyGenerator({
         updateAdditionalSourceById(source.id, {
           analysisStatus: 'error',
           analysisError: message,
+          analysisExpanded: false,
         });
         throw new Error(`Photo analysis failed for ${source?.name || 'photo'}: ${message}`);
       }
     }
     return analysisBySourceId;
+  };
+
+  const togglePhotoAnalysisExpanded = (sourceId) => {
+    updateAdditionalSourceById(sourceId, (source) => ({
+      analysisExpanded: !source?.analysisExpanded,
+    }));
   };
 
   const resolveDocSaveEncryption = () => {
@@ -1246,6 +1323,14 @@ export default function AudioSurveyGenerator({
     additionalSources,
     audioFile,
   });
+  const queuedPhotoSources = useMemo(
+    () => additionalSources.filter((source) => source?.type === 'photo'),
+    [additionalSources],
+  );
+  const queuedNonPhotoSources = useMemo(
+    () => additionalSources.filter((source) => source?.type !== 'photo'),
+    [additionalSources],
+  );
   const shouldShowSaveExtraSourcesControl = additionalSources.length > 0;
   const saveDocAudienceLabel = saveDocAudience === 'session' && docSaveGate.hasRecipients
     ? docSaveSessionLabel
@@ -1421,6 +1506,7 @@ export default function AudioSurveyGenerator({
                 ref={additionalPhotoInputRef}
                 style={{ display: 'none' }}
                 accept={SUPPORTED_PHOTO_ACCEPT}
+                multiple
                 onChange={handleAdditionalPhotoUpload}
               />
               <Button
@@ -1479,31 +1565,98 @@ export default function AudioSurveyGenerator({
 
           {(additionalSources.length > 0 || shouldShowSaveExtraSourcesControl || (transcriptMode && uploadSummaryToArweave && encryptSummary)) && (
             <div className={styles.additionalContextSection}>
-              {additionalSources.length > 0 && (
+              {queuedPhotoSources.length > 0 && (
+                <div className={styles.photoCardGrid}>
+                  {queuedPhotoSources.map((item) => {
+                    const statusKey = toStr(item?.analysisStatus || 'queued').trim().toLowerCase();
+                    const statusLabel = getPhotoStatusLabel(item);
+                    const analysisBodyId = `database-photo-analysis-${item?.id || 'unknown'}`;
+                    const hasExpandedAnalysis = statusKey === 'ready' && item?.analysisExpanded && toStr(item?.analysisText).trim();
+
+                    return (
+                      <div
+                        key={item?.id}
+                        className={styles.photoCard}
+                        data-testid={E2E_TESTIDS.DATABASE_PHOTO_SOURCE_CARD}
+                        data-ce-source-id={item?.id}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => removeAdditionalSource(item?.id)}
+                          className={styles.photoRemoveBtn}
+                          aria-label={`Remove photo ${item?.name || ''}`.trim()}
+                        >
+                          ×
+                        </button>
+
+                        <div className={styles.photoCardTop}>
+                          <div className={styles.photoPreviewFrame}>
+                            <QueuedPhotoPreview
+                              file={item?.value}
+                              photoName={item?.name}
+                              sourceId={item?.id}
+                            />
+                          </div>
+
+                          <div className={styles.photoCardMeta}>
+                            <div className={styles.photoName} title={item?.name}>{item?.name}</div>
+                            <div className={styles.photoCardStatusRow}>
+                              {statusKey === 'ready' ? (
+                                <button
+                                  type="button"
+                                  className={`${styles.photoStatusChip} ${styles.photoStatusToggle}`}
+                                  onClick={() => togglePhotoAnalysisExpanded(item?.id)}
+                                  aria-expanded={Boolean(item?.analysisExpanded)}
+                                  aria-controls={analysisBodyId}
+                                  data-testid={E2E_TESTIDS.DATABASE_PHOTO_SOURCE_ANALYSIS_TOGGLE}
+                                  data-ce-source-id={item?.id}
+                                >
+                                  <span>{PHOTO_ANALYSIS_STATUS_LABELS.ready}</span>
+                                  <FontAwesomeIcon icon={item?.analysisExpanded ? faCaretUp : faCaretDown} />
+                                </button>
+                              ) : (
+                                <span
+                                  className={`${styles.photoStatusChip} ${styles[`photoStatusChip${statusKey.charAt(0).toUpperCase()}${statusKey.slice(1)}`] || ''}`}
+                                >
+                                  {statusKey === 'error' ? PHOTO_ANALYSIS_STATUS_LABELS.error : statusLabel}
+                                </span>
+                              )}
+                            </div>
+                            {statusKey === 'error' && toStr(item?.analysisError).trim() ? (
+                              <div className={styles.photoErrorText}>{item.analysisError}</div>
+                            ) : null}
+                          </div>
+                        </div>
+
+                        {hasExpandedAnalysis ? (
+                          <div
+                            id={analysisBodyId}
+                            className={styles.photoAnalysisBody}
+                            data-testid={E2E_TESTIDS.DATABASE_PHOTO_SOURCE_ANALYSIS_BODY}
+                            data-ce-source-id={item?.id}
+                          >
+                            {item.analysisText}
+                          </div>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {queuedNonPhotoSources.length > 0 && (
                 <ul className={styles.sourceList}>
-                  {additionalSources.map((item, idx) => (
-                    <li key={item?.id || idx} className={styles.sourceItem}>
+                  {queuedNonPhotoSources.map((item) => (
+                    <li key={item?.id} className={styles.sourceItem}>
                       <span className={styles.sourceTypeLabel}>[{item.type}]</span>
                       <div className={styles.sourceMeta}>
                         <span className={styles.sourceName}>{item.name}</span>
-                        {item.type === 'photo' && (
-                          <span
-                            className={`${styles.sourceStatus} ${styles[`sourceStatus${(item.analysisStatus || 'queued').charAt(0).toUpperCase()}${(item.analysisStatus || 'queued').slice(1)}`] || ''}`}
-                          >
-                            {item.analysisStatus === 'loading'
-                              ? 'Analyzing photo...'
-                              : item.analysisStatus === 'ready'
-                                ? 'Analysis ready'
-                                : item.analysisStatus === 'error'
-                                  ? (item.analysisError || 'Analysis failed')
-                                  : 'Queued for analysis'}
-                          </span>
-                        )}
                       </div>
                       <button
                         type="button"
-                        onClick={() => removeAdditionalSource(idx)}
+                        onClick={() => removeAdditionalSource(item?.id)}
                         className={styles.removeSourceBtn}
+                        aria-label={`Remove ${item?.type || 'source'} ${item?.name || ''}`.trim()}
                       >
                         ×
                       </button>
