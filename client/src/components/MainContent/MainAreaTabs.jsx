@@ -2,7 +2,7 @@
 
 import React, { Component, Suspense } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faCog, faGlobe, faPlay, faTools } from "@fortawesome/free-solid-svg-icons";
+import { faCompass, faGlobe, faPlay, faTools } from "@fortawesome/free-solid-svg-icons";
 import { createLogger } from '../../utilities/logging';
 
 import styles from "./MainContent.module.scss";
@@ -127,7 +127,7 @@ class MainAreaTabs extends Component {
                       className={activeClassName(this.props.focusedTab === MAIN_AREA_TABS.WELCOME)}
                       onClick={() => this.changeTabs(MAIN_AREA_TABS.WELCOME)}
                     >
-                      <FontAwesomeIcon icon={faCog} id={styles.navTabIcon} />
+                      <FontAwesomeIcon icon={faCompass} id={styles.navTabIcon} />
                       <div id="mainContentTabTitle"> {MAIN_AREA_TAB_TITLES[MAIN_AREA_TABS.WELCOME]} </div>
                     </NavLink>
                   </NavItem>

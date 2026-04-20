@@ -78,7 +78,7 @@ export const WELCOME_SLIDES = [
     imageAlt: 'Context Engine motivation slide',
     bulletPoints: [
       { bold: 'Info Overwhelm', text: 'multiplies other shared risks' },
-      { bold: 'Opinion Data', text: 'can influence AI outcomes' },
+      { bold: 'Preference Data', text: 'can influence AI outcomes' },
       { bold: 'Everyone', text: 'will be affected by AI decisions' },
     ],
   },
