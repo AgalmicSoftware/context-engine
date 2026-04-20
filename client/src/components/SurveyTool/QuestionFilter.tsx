@@ -584,7 +584,7 @@ class QuestionFilter extends React.Component<any, any> {
     }
   };
 
-  syncAiApplyingElapsedTimer = (): void => {
+  syncAiApplyingElapsedTimer = () => {
     if (this.state.aiApplying) {
       if (!this._aiApplyingStartedAtMs) this._aiApplyingStartedAtMs = Date.now();
       if (!this._aiApplyingElapsedTimer) {
@@ -592,7 +592,7 @@ class QuestionFilter extends React.Component<any, any> {
           const started = Number(this._aiApplyingStartedAtMs || Date.now());
           const elapsed = Math.max(0, Math.floor((Date.now() - started) / 1000));
           if (elapsed !== Number(this.state.aiApplyingElapsedSec || 0)) {
-            this.setState(buildQuestionFilterAiElapsedPatch(elapsed));
+            this.setState({ aiApplyingElapsedSec: elapsed });
           }
         }, 1000);
       }
@@ -605,11 +605,11 @@ class QuestionFilter extends React.Component<any, any> {
     }
     this._aiApplyingStartedAtMs = null;
     if (this.state.aiApplyingElapsedSec !== 0) {
-      this.setState(buildQuestionFilterAiElapsedPatch(0));
+      this.setState({ aiApplyingElapsedSec: 0 });
     }
   };
 
-  getAiAccessState = (propsIn: QuestionFilterSessionProps = this.props): QuestionFilterAiAccessState => {
+  getAiAccessState = (propsIn = this.props) => {
     const cfg = this.getEffectiveSessionConfig(propsIn);
     const gateState = resolveSponsoredGateStateForResource(cfg, 'ai');
     const sponsoredStatus = String(gateState?.status || SPONSORED_GATE_STATES.UNAVAILABLE);
@@ -1212,8 +1212,8 @@ class QuestionFilter extends React.Component<any, any> {
 
   componentWillUnmount() {
     this._isMounted = false;
-    if (this.copySuccessTimeout) clearTimeout(this.copySuccessTimeout);
-    if (this.bookmarkFeedbackTimeout) clearTimeout(this.bookmarkFeedbackTimeout);
+    clearTimeout(this.copySuccessTimeout);
+    clearTimeout(this.bookmarkFeedbackTimeout);
     if (this._aiApplyingElapsedTimer) {
       clearInterval(this._aiApplyingElapsedTimer);
       this._aiApplyingElapsedTimer = null;
@@ -3522,7 +3522,7 @@ class QuestionFilter extends React.Component<any, any> {
                         <span>{aiApplyButtonLabel}</span>
                       </Button>
                       <FormGroup check className={styles.aiCombineGroup}>
-                        <Label check className={buildQuestionFilterAiCombineRowClassName(styles)}>
+                        <Label check className={`${styles.filterOption} ${styles.aiCombineRow}`}>
                           <Input
                             type="checkbox"
                             checked={aiCombineWithOtherFilters}
