@@ -75,6 +75,24 @@ describe('CheckboxMultiSelect', () => {
     expect(screen.queryByRole('checkbox', { name: 'Gamma' })).not.toBeInTheDocument();
   });
 
+  it('normalizes non-array value and options props without crashing', () => {
+    render(
+      <CheckboxMultiSelect
+        inputId="test-cms-null"
+        options={null}
+        value={null}
+        onChange={jest.fn()}
+        placeholder="Pick things"
+      />
+    );
+
+    openMenu();
+
+    expect(screen.getByTestId('test-cms-null')).toBeInTheDocument();
+    expect(screen.getByText('No matches')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Clear all/i })).not.toBeInTheDocument();
+  });
+
   it('renders a clear button when value is non-empty and clears all on click', () => {
     const spy = jest.fn();
     render(<Harness initial={[{ value: 'a', label: 'Alpha' }]} onChangeSpy={spy} />);
