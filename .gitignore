@@ -109,6 +109,11 @@ broadcast/
 /.tmp/
 /tmp/
 /tmp-launch-channel-chrome.js
+/node-compile-cache/
+/ce-hook-*/
+/ce-install-*/
+/ce-router-*/
+/ce-startup-*/
 /.jest-cache/
 /.jest-tmp/
 /.tmp-jest/
