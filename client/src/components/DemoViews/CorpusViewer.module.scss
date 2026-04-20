@@ -1165,7 +1165,7 @@ $text: #f4f7ff;
     flex-direction: column;
     gap: 8px;
     max-width: none;
-    min-height: 84px;
+    min-height: 104px;
     min-width: 0;
     padding: 12px 12px 13px;
     width: 100%;
@@ -1176,8 +1176,8 @@ $text: #f4f7ff;
   }
 
   .tabLabel {
-    font-size: 14px;
-    line-height: 1.22;
+    font-size: 18px;
+    line-height: 1.18;
     white-space: normal;
   }
 
@@ -1383,7 +1383,7 @@ $text: #f4f7ff;
   }
 
   .tabButton {
-    min-height: 78px;
+    min-height: 96px;
     padding: 11px 10px 12px;
   }
 
@@ -1392,8 +1392,8 @@ $text: #f4f7ff;
   }
 
   .tabLabel {
-    font-size: 13px;
-    line-height: 1.18;
+    font-size: 17px;
+    line-height: 1.16;
   }
 
   .policyListTitle,
