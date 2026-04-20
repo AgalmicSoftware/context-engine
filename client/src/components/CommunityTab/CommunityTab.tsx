@@ -1830,7 +1830,7 @@ class CommunityTab extends Component<any, any> {
       <div className={styles.questionsModalContent}>
         <div className={styles.questionsModalTopBar}>
           <a
-            href={buildPublicRoute('/questions')}
+            href="/questions"
             className={styles.questionsModalLink}
           >
             View Full Questions
