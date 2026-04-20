@@ -1153,6 +1153,50 @@ describe('SBTFilter performance guards', () => {
     });
   });
 
+  it('can suppress the top-level loading overlay for embedded results filters', () => {
+    const withOverlay = createSubject(
+      {
+        mode: 'responder',
+        autoExpand: true,
+      },
+      {
+        loading: true,
+        showFilterOptions: true,
+      }
+    ).render();
+
+    const withoutOverlay = createSubject(
+      {
+        mode: 'responder',
+        autoExpand: true,
+        hideLoadingOverlay: true,
+      },
+      {
+        loading: true,
+        showFilterOptions: true,
+      }
+    ).render();
+
+    const spinnerNodesWithOverlay = findElementsInTree(
+      withOverlay,
+      (element) => element?.props?.icon?.iconName === 'spinner'
+    );
+    const spinnerNodesWithoutOverlay = findElementsInTree(
+      withoutOverlay,
+      (element) => element?.props?.icon?.iconName === 'spinner'
+    );
+    const [filterOptions] = findElementsInTree(
+      withoutOverlay,
+      (element) =>
+        typeof element?.props?.className === 'string' &&
+        element.props.className.includes('filterOptions')
+    );
+
+    expect(spinnerNodesWithOverlay).toHaveLength(1);
+    expect(spinnerNodesWithoutOverlay).toHaveLength(0);
+    expect(filterOptions).toBeTruthy();
+  });
+
   it('adds light-surface classes to the collapsed filter button and panel when requested', () => {
     const subject = createSubject(
       {

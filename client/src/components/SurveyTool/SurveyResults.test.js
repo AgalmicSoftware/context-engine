@@ -2322,6 +2322,40 @@ describe('SurveyResults export/view controls', () => {
     expect(surveyFilter).toBeTruthy();
   });
 
+  it('suppresses the embedded SBTFilter loading overlay in survey results', () => {
+    const subject = createSubject({
+      isOpen: true,
+      viewMode: 'survey',
+      filterState: {},
+      isResponsesCacheReady: true,
+      isQuestionCacheReady: true,
+      isSBTCacheReady: true,
+    });
+
+    subject.state = {
+      ...subject.state,
+      viewMode: 'survey',
+      surveyId: '0x1111111111111111111111111111111111111111111111111111111111111111',
+      surveyViewMode: 'aggregate',
+      sbtFilteredAggregatorQuestionResponses: {},
+      aggregateQuestionResponses: {},
+      responses: [],
+      sbtFilteredResponses: [],
+      filterState: { sbtFilter: {} },
+    };
+
+    const tree = subject.render();
+    const surveyFilter = findElement(
+      tree,
+      (element) =>
+        element?.props?.autoExpand === false &&
+        element?.props?.buttonSurface === 'light'
+    );
+
+    expect(surveyFilter).toBeTruthy();
+    expect(surveyFilter.props.hideLoadingOverlay).toBe(true);
+  });
+
   it('renders the current export options list', () => {
     const subject = createSubject({
       isOpen: true,
