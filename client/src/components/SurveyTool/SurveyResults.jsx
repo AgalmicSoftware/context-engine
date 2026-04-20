@@ -4836,6 +4836,7 @@ return (
               setFilterLoading={this.setFilterLoading}
               autoExpand={false}
               buttonSurface="light"
+              hideLoadingOverlay={true}
               externalSBTFilterState={this.state.filterState.sbtFilter}
               isQuestionCacheReady={this.props.isQuestionCacheReady}
               isSBTCacheReady={this.props.isSBTCacheReady}
@@ -4852,6 +4853,7 @@ return (
               setFilterLoading={this.setFilterLoading}
               autoExpand={false}
               buttonSurface="light"
+              hideLoadingOverlay={true}
               externalSBTFilterState={this.state.filterState.sbtFilter}
               isQuestionCacheReady={this.props.isQuestionCacheReady}
               isSBTCacheReady={this.props.isSBTCacheReady}
