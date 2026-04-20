@@ -1656,7 +1656,6 @@ input[type='radio']:checked:after {
 }
 
 #greetingImage {
-  max-height: 60vh;
   max-width: 95vw;
   align-self: flex-end;
   mix-blend-mode: lighten !important;
@@ -1773,6 +1772,21 @@ input[type='radio']:checked:after {
   color: var(--ce-color-white);
 }
 
+#betaExaplainerList.titlelessBulletListContainer {
+  height: auto;
+  align-self: center;
+}
+
+#betaExaplainerList.titlelessBulletListContainer #betaExplainerBulletpoint {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+#betaExaplainerList.titlelessBulletListContainer #betaExplainerBulletText {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
 .siteExplainerText {
   font-size: 50px;
   color: var(--ce-color-white);
@@ -1796,6 +1810,10 @@ input[type='radio']:checked:after {
   padding: 10px;
   font-size: 1.25em;
   color: var(--ce-color-white);
+}
+
+.betaExplainerBulletTrailingText {
+  color: rgba(255, 255, 255, 0.7);
 }
 
 #siteExplainerMultiply {
