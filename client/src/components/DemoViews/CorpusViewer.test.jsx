@@ -166,8 +166,10 @@ describe('CorpusViewer', () => {
     expect(corpusScss).toMatch(/\.policyMapLens\s*{[\s\S]*?padding:\s*4px 4px 0;/);
     expect(corpusScss).toMatch(/\.policyMapPanel\s*{[\s\S]*?padding:\s*10px 10px 12px;/);
     expect(corpusScss).toMatch(/\.debateMapLink\s*{[\s\S]*?box-sizing:\s*border-box;/);
+    expect(corpusScss).toMatch(/\.debateMapIcon\s*{[\s\S]*?font-size:\s*0\.8rem;/);
     expect(corpusScss).toMatch(/\.externalLink\s*{[\s\S]*?box-sizing:\s*border-box;/);
     expect(corpusScss).toMatch(/\.cardFooterLinks\s*{[\s\S]*?width:\s*100%;/);
+    expect(corpusScss).toMatch(/\.tweetActionRow\s*{[\s\S]*?justify-content:\s*flex-start;/);
     expect(mapScss).toMatch(/\.mapFrameCompact\s*{[\s\S]*?width:\s*100%;[\s\S]*?padding:\s*0;/);
     expect(mapScss).toMatch(/\.mapFrameCompact\s*{[\s\S]*?:global\(svg\)\s*{[\s\S]*?display:\s*block;[\s\S]*?max-width:\s*none;[\s\S]*?width:\s*100%;/);
     expect(compactMapMobileBlock).toContain('.mapFrameCompact {');
@@ -193,6 +195,21 @@ describe('CorpusViewer', () => {
       'href',
       '/atlas/0x2110000000000000000000000000000000000000000000000000000000000000?demo=1'
     );
+  });
+
+  it('keeps atlas node links and the source action on the same tweet action row', () => {
+    render(
+      <MemoryRouter>
+        <CorpusViewer />
+      </MemoryRouter>
+    );
+
+    const issueLink = screen.getAllByRole('link', { name: 'Exponential Progress Debate' })[0];
+    const actionRow = issueLink.parentElement;
+
+    expect(actionRow).toBeTruthy();
+    expect(within(actionRow).getByRole('link', { name: 'View post' })).toBeInTheDocument();
+    expect(issueLink.querySelector('svg[data-icon="atlas"]')).not.toBeNull();
   });
 
   it('routes atlas issue clicks through the session callback when provided', () => {

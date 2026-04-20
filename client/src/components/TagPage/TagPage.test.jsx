@@ -43,29 +43,41 @@ jest.mock('reactstrap', () => {
     Modal: ({
       isOpen,
       children,
+      innerRef,
       modalClassName,
       contentClassName,
       backdropClassName,
       wrapClassName,
-    }) => (isOpen ? (
-      <div
-        data-testid="tag-modal-shell"
-        data-modal-class={modalClassName}
-        data-content-class={contentClassName}
-        data-backdrop-class={backdropClassName}
-        data-wrap-class={wrapClassName}
-      >
-        {children}
-      </div>
-    ) : null),
+    }) => {
+      const refCallback = (node) => {
+        if (typeof innerRef === 'function') {
+          innerRef(node);
+        } else if (innerRef && typeof innerRef === 'object') {
+          innerRef.current = node;
+        }
+      };
+
+      return isOpen ? (
+        <div
+          ref={refCallback}
+          data-testid="tag-modal-shell"
+          data-modal-class={modalClassName}
+          data-content-class={contentClassName}
+          data-backdrop-class={backdropClassName}
+          data-wrap-class={wrapClassName}
+        >
+          {children}
+        </div>
+      ) : null;
+    },
     ModalHeader: ({ children, className, close, toggle }) => (
       <div data-testid="tag-modal-header" data-class={className}>
         <span>{children}</span>
-        {close || (
+        {close || (toggle ? (
           <button type="button" onClick={toggle} aria-label="Close">
             ×
           </button>
-        )}
+        ) : null)}
       </div>
     ),
     ModalBody: ({ children, className }) => (
@@ -202,12 +214,13 @@ const renderTagModal = ({
   entry = '/demo/corpus-viewer',
   demoCorpusMode = false,
   demoCorpusRecordsOverride = [],
+  toggle = jest.fn(),
 } = {}) => render(
   <Provider store={createTagPageStore(sessionState)}>
     <MemoryRouter initialEntries={[entry]}>
       <TagModal
         isOpen={isOpen}
-        toggle={jest.fn()}
+        toggle={toggle}
         activeTag={activeTag}
         demoCorpusMode={demoCorpusMode}
         demoCorpusRecords={demoCorpusRecordsOverride}
@@ -273,11 +286,32 @@ describe('TagPage', () => {
     expect(scss).toMatch(/\.sectionTitle\s*{[\s\S]*?color:\s*\$page-text-color;/);
   });
 
+  it('keeps the fullscreen tag modal content shrink-safe so demo cards cannot overflow the viewport width', () => {
+    const scssPath = path.join(__dirname, 'TagPage.module.scss');
+    const scss = fs.readFileSync(scssPath, 'utf8');
+
+    expect(scss).toMatch(/\.pageEmbedded\s*{[\s\S]*?overflow-x:\s*hidden;/);
+    expect(scss).toMatch(/\.headerControls\s*{[\s\S]*?width:\s*100%;[\s\S]*?min-width:\s*0;/);
+    expect(scss).toMatch(/\.tagPickerEmbedded\s*{[\s\S]*?margin-left:\s*auto;/);
+    expect(scss).toMatch(/\.tagPickerPopover\s*{[\s\S]*?right:\s*0;[\s\S]*?max-height:\s*min\(420px,\s*calc\(100vh - 220px\)\);[\s\S]*?overflow-y:\s*auto;/);
+    expect(scss).toMatch(/\.demoCorpusFooter\s*{[\s\S]*?width:\s*100%;[\s\S]*?min-width:\s*0;/);
+    expect(scss).toMatch(/\.demoCorpusTagList\s*{[\s\S]*?flex:\s*1 1 420px;[\s\S]*?min-width:\s*0;[\s\S]*?max-width:\s*100%;/);
+    expect(scss).toMatch(/@media \(max-width:\s*720px\)\s*{[\s\S]*?\.headerTopRow\s*{[\s\S]*?flex-direction:\s*row;[\s\S]*?flex-wrap:\s*wrap;/);
+    expect(scss).toMatch(/@media \(max-width:\s*720px\)\s*{[\s\S]*?\.headerLead\s*{[\s\S]*?flex:\s*1 1 auto;[\s\S]*?width:\s*auto;/);
+    expect(scss).toMatch(/@media \(max-width:\s*720px\)\s*{[\s\S]*?\.headerMeta\s*{[\s\S]*?width:\s*auto;[\s\S]*?flex:\s*0 0 auto;/);
+    expect(scss).toMatch(/@media \(max-width:\s*720px\)\s*{[\s\S]*?\.headerControls\s*{[\s\S]*?flex-direction:\s*row;[\s\S]*?flex-wrap:\s*wrap;/);
+    expect(scss).toMatch(/@media \(max-width:\s*720px\)\s*{[\s\S]*?\.tagPickerPopover\s*{[\s\S]*?right:\s*0;[\s\S]*?left:\s*auto;[\s\S]*?max-height:\s*min\(360px,\s*calc\(100vh - 190px\)\);/);
+    expect(scss).toMatch(/@media \(max-width:\s*720px\)\s*{[\s\S]*?\.demoCorpusTagList\s*{[\s\S]*?flex:\s*0 1 auto;[\s\S]*?width:\s*100%;[\s\S]*?align-items:\s*flex-start;/);
+    expect(scss).toMatch(/@media \(max-width:\s*720px\)\s*{[\s\S]*?\.demoCorpusTag\s*{[\s\S]*?align-self:\s*flex-start;/);
+  });
+
   it('displays tag pills from the URL', () => {
     renderTagPage({ entry: '/tag/governance+AI%20Policy' });
 
-    expect(screen.getByRole('button', { name: /remove governance tag/i })).toHaveTextContent('#governance');
-    expect(screen.getByRole('button', { name: /remove AI Policy tag/i })).toHaveTextContent('#AI Policy');
+    expect(screen.getByText('#governance')).toBeInTheDocument();
+    expect(screen.getByText('#AI Policy')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /remove governance tag/i })).toHaveTextContent('×');
+    expect(screen.getByRole('button', { name: /remove AI Policy tag/i })).toHaveTextContent('×');
   });
 
   it('supports an embedded tag selection override with a custom empty question state', () => {
@@ -294,7 +328,9 @@ describe('TagPage', () => {
 
     expect(screen.getByRole('heading', { name: '#AI Governance' })).toBeInTheDocument();
     expect(screen.queryByText(/^Tag explorer$/i)).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /remove AI Governance tag/i })).toHaveTextContent('#AI Governance');
+    expect(screen.getAllByRole('button', { name: /remove AI Governance tag/i })).toHaveLength(1);
+    expect(screen.getByText('#AI Governance')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /remove AI Governance tag/i })).toHaveTextContent('×');
     expect(screen.getByText('No questions tagged AI Governance in this session yet.')).toBeInTheDocument();
   });
 
@@ -339,6 +375,30 @@ describe('TagPage', () => {
     expect(card).not.toBeNull();
     expect(within(card).getByText('#International Coordination')).toBeInTheDocument();
     expect(within(card).getByText('#Frontier Models')).toBeInTheDocument();
+  });
+
+  it('keeps demo tweet cards collapsed by default and expands them on demand with a footer icon link', () => {
+    renderTagPage({
+      entry: '/demo/corpus-viewer',
+      tagPageProps: {
+        embedded: true,
+        demoCorpusMode: true,
+        demoCorpusRecords,
+        selectedTagsOverride: ['Google'],
+      },
+    });
+
+    const cardTitle = screen.getByRole('heading', { name: 'Google on contrails' });
+    const card = cardTitle.closest('article');
+    expect(card).not.toBeNull();
+    expect(within(card).queryByText('Google partnered with American Airlines to reduce contrails.')).not.toBeInTheDocument();
+    expect(within(card).queryByText('View source')).not.toBeInTheDocument();
+    expect(within(card).getByRole('link', { name: /view source/i })).toHaveAttribute('href', 'https://example.com/google-contrails');
+
+    fireEvent.click(within(card).getByRole('button', { name: /expand google on contrails/i }));
+
+    expect(within(card).getByText('Google partnered with American Airlines to reduce contrails.')).toBeInTheDocument();
+    expect(within(card).getByRole('button', { name: /collapse google on contrails/i })).toHaveAttribute('aria-expanded', 'true');
   });
 
   it('keeps related tags first while still including the broader scoped tag universe in the picker', () => {
@@ -416,6 +476,27 @@ describe('TagPage', () => {
     ]);
     expect(within(dialog).getByRole('button', { name: /add AI Governance tag to comparison/i })).toBeInTheDocument();
     expect(within(dialog).queryByText(/no additional tags available/i)).not.toBeInTheDocument();
+  });
+
+  it('keeps the add-tag control compact while preserving the comparison-picker accessibility label', () => {
+    renderTagPage({
+      entry: '/demo/corpus-viewer',
+      tagPageProps: {
+        embedded: true,
+        demoCorpusMode: true,
+        demoCorpusRecords,
+        selectedTagsOverride: ['Media'],
+      },
+    });
+
+    const addTagButton = screen.getByRole('button', { name: /add tag to comparison/i });
+    expect(addTagButton).toHaveTextContent('Add tag');
+    expect(addTagButton).not.toHaveTextContent('Add tag to comparison');
+
+    fireEvent.click(addTagButton);
+
+    expect(screen.getByRole('dialog', { name: /add tag to comparison/i })).toBeInTheDocument();
+    expect(screen.getByText('Select another tag to compare')).toBeInTheDocument();
   });
 
   it('treats trailing-slash tag routes the same as canonical tag routes', () => {
@@ -689,17 +770,29 @@ describe('TagModal', () => {
     });
   });
 
-  it('uses dedicated tag-modal shell classes and keeps Tag explorer in the top chrome', () => {
-    renderTagModal();
+  it('uses dedicated tag-modal shell classes and keeps the demo info cog beside the modal close control', () => {
+    renderTagModal({
+      entry: '/demo/corpus-viewer',
+      demoCorpusMode: true,
+      demoCorpusRecordsOverride: demoCorpusRecords,
+    });
 
     const shell = screen.getByTestId('tag-modal-shell');
     expect(shell).toHaveAttribute('data-modal-class', 'tagModal');
     expect(shell).toHaveAttribute('data-content-class', 'tagModalContent');
     expect(shell).toHaveAttribute('data-backdrop-class', 'tagModalBackdrop');
     expect(shell).toHaveAttribute('data-wrap-class', 'tagModalWrap');
-    expect(screen.getByTestId('tag-modal-header')).toHaveAttribute('data-class', 'tagModalHeaderBar');
+    expect(screen.getByTestId('tag-modal-top-bar')).toHaveClass('tagModalHeaderBar');
     expect(screen.getByText('Tag explorer')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /close tag explorer/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /tag explorer info/i })).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: /close tag explorer/i })).toHaveLength(1);
+
+    fireEvent.click(screen.getByRole('button', { name: /tag explorer info/i }));
+
+    expect(screen.getByTestId('tag-modal-demo-info-panel')).toBeInTheDocument();
+    expect(screen.getByText(/demo corpus mode uses the demo corpus records currently loaded in this view/i)).toBeInTheDocument();
+    expect(screen.getByText(/session scope: edge/i)).toBeInTheDocument();
+    expect(screen.queryByTestId('ce-tag-page-session-selector-toggle')).not.toBeInTheDocument();
   });
 
   it('shows the selected tag as the dominant heading and updates it when a comparison tag is added', () => {
@@ -708,6 +801,46 @@ describe('TagModal', () => {
     expect(screen.getByRole('heading', { name: '#Google' })).toBeInTheDocument();
     fireEvent.click(screen.getAllByRole('button', { name: /add ai governance tag to comparison/i })[0]);
     expect(screen.getByRole('heading', { name: '#Google + #AI Governance' })).toBeInTheDocument();
+  });
+
+  it('only lets the dedicated x control remove the last selected tag in the modal', () => {
+    const toggle = jest.fn();
+    renderTagModal({ toggle });
+
+    fireEvent.click(screen.getByText('#Google'));
+    expect(toggle).not.toHaveBeenCalled();
+    expect(screen.getByRole('heading', { name: '#Google' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /remove Google tag/i }));
+    expect(toggle).toHaveBeenCalledTimes(1);
+  });
+
+  it('resets the modal scroll area to the top when the selected tag context changes', () => {
+    const toggle = jest.fn();
+    const { rerender } = renderTagModal({ activeTag: 'Google', toggle });
+    const shell = screen.getByTestId('tag-modal-shell');
+    const scrollArea = screen.getByTestId('tag-modal-scroll-area');
+
+    shell.scrollTop = 180;
+    scrollArea.scrollTop = 240;
+
+    rerender(
+      <Provider store={createTagPageStore({})}>
+        <MemoryRouter initialEntries={['/demo/corpus-viewer']}>
+          <TagModal
+            isOpen={true}
+            toggle={toggle}
+            activeTag="Open Source"
+            demoCorpusMode={false}
+            demoCorpusRecords={[]}
+          />
+        </MemoryRouter>
+      </Provider>
+    );
+
+    expect(screen.getByRole('heading', { name: '#Open Source' })).toBeInTheDocument();
+    expect(screen.getByTestId('tag-modal-shell').scrollTop).toBe(0);
+    expect(screen.getByTestId('tag-modal-scroll-area').scrollTop).toBe(0);
   });
 
   it('uses demo corpus results when the modal caller opts in outside /session/demo', () => {
@@ -728,11 +861,29 @@ describe('TagModal', () => {
     const jsxPath = path.join(__dirname, 'TagModal.jsx');
     const jsx = fs.readFileSync(jsxPath, 'utf8');
 
-    expect(scss).toMatch(/\.tagModal\s*{[\s\S]*padding:\s*16px 0 !important;/);
+    expect(scss).toMatch(/\.tagModal\s*{[\s\S]*padding:\s*16px 0 !important;[\s\S]*overflow:\s*hidden !important;/);
     expect(scss).toMatch(/:global\(\.modal-dialog\)\s*{[\s\S]*width:\s*min\(1440px,\s*calc\(100vw - 32px\)\);[\s\S]*height:\s*calc\(100vh - 32px\);/);
-    expect(scss).toMatch(/\.tagModalContent\s*{[\s\S]*display:\s*flex;[\s\S]*flex-direction:\s*column;[\s\S]*height:\s*100%;/);
+    expect(scss).toMatch(/\.tagModalContent\s*{[\s\S]*display:\s*flex;[\s\S]*flex-direction:\s*column;[\s\S]*flex-wrap:\s*nowrap;[\s\S]*height:\s*100%;[\s\S]*position:\s*relative;/);
     expect(scss).toMatch(/\.tagModalBackdrop\s*{[\s\S]*background:\s*rgba\(3,\s*5,\s*18,\s*0\.08\) !important;/);
+    expect(scss).toMatch(/\.tagModalHeaderBar\s*{[\s\S]*display:\s*flex;[\s\S]*width:\s*100%;[\s\S]*justify-content:\s*space-between;[\s\S]*position:\s*relative;/);
+    expect(scss).toMatch(/\.tagModalHeaderActions\s*{[\s\S]*display:\s*inline-flex;[\s\S]*align-items:\s*center;[\s\S]*gap:\s*10px;/);
+    expect(scss).toMatch(/\.tagModalChromeButton\s*{[\s\S]*border-radius:\s*999px;[\s\S]*width:\s*2\.4rem;[\s\S]*height:\s*2\.4rem;/);
+    expect(scss).toMatch(/\.tagModalChromePopover\s*{[\s\S]*position:\s*absolute;[\s\S]*top:\s*calc\(100% \+ 10px\);[\s\S]*right:\s*0;/);
+    expect(scss).toMatch(/\.tagModalBody\s*{[\s\S]*overflow:\s*hidden;[\s\S]*padding:\s*0;/);
+    expect(scss).toMatch(/\.tagModalScrollArea\s*{[\s\S]*overflow-x:\s*hidden;[\s\S]*overflow-y:\s*auto;[\s\S]*height:\s*100%;[\s\S]*width:\s*100%;/);
+    expect(scss).toMatch(/\.titleEmbedded\s*{[\s\S]*font-size:\s*clamp\(2rem,\s*5\.35vw,\s*3\.95rem\);/);
+    expect(scss).toMatch(/\.titlePillHeading\s*{[\s\S]*font-size:\s*1rem;[\s\S]*line-height:\s*1;/);
+    expect(scss).toMatch(/\.tagPillHero\s*{[\s\S]*font-size:\s*clamp\(1\.25rem,\s*3\.6vw,\s*2\.7rem\);/);
+    expect(scss).toMatch(/\.tagPillRemove\s*{[\s\S]*min-width:\s*1\.5rem;[\s\S]*min-height:\s*1\.5rem;[\s\S]*border:\s*0;[\s\S]*background:\s*transparent;[\s\S]*font-size:\s*1\.18rem;/);
+    expect(scss).toMatch(/\.tagPillRemoveHero\s*{[\s\S]*min-width:\s*1\.8rem;[\s\S]*min-height:\s*1\.8rem;[\s\S]*font-size:\s*1\.38rem;/);
     expect(jsx).toContain('contentClassName={styles.tagModalContent}');
     expect(jsx).toContain('backdropClassName={styles.tagModalBackdrop}');
+    expect(jsx).toContain('innerRef={modalRef}');
+    expect(jsx).toContain('data-testid="tag-modal-top-bar"');
+    expect(jsx).toContain('data-testid="tag-modal-demo-info-toggle"');
+    expect(jsx).toContain('data-testid="tag-modal-demo-info-panel"');
+    expect(jsx).toContain('data-testid="tag-modal-scroll-area"');
+    expect(jsx).not.toMatch(/import\s+\{\s*[^}]*\bModalHeader\b/);
+    expect(jsx).not.toMatch(/<ModalHeader\b/);
   });
 });
