@@ -5,27 +5,37 @@
 
 import { ethers } from 'ethers';
 
-export const normalizeHistorySummaryCount = (value) => {
+type AnyRecord = Record<string, any>;
+type SbtHistorySummary = {
+  totalMinted: string;
+  totalBurned: string;
+  activeSupply: string;
+  currentHolderCount: string;
+  historicalHolderCount: string;
+};
+
+export const normalizeHistorySummaryCount = (value: unknown): string | null => {
   if (value == null) return null;
   let raw = '';
   try {
     raw = ethers.BigNumber.isBigNumber(value)
       ? value.toString()
       : String(value).trim();
-  } catch (_) {
+  } catch {
     raw = '';
   }
   if (!/^\d+$/.test(raw)) return null;
   return raw.replace(/^0+(?=\d)/, '') || '0';
 };
 
-export const normalizeSbtHistorySummary = (value) => {
+export const normalizeSbtHistorySummary = (value: unknown): SbtHistorySummary | null => {
   if (!value || typeof value !== 'object') return null;
-  const totalMinted = normalizeHistorySummaryCount(value.totalMinted ?? value[0]);
-  const totalBurned = normalizeHistorySummaryCount(value.totalBurned ?? value[1]);
-  const activeSupply = normalizeHistorySummaryCount(value.activeSupply ?? value[2]);
-  const currentHolderCount = normalizeHistorySummaryCount(value.currentHolderCount ?? value[3]);
-  const historicalHolderCount = normalizeHistorySummaryCount(value.historicalHolderCount ?? value[4]);
+  const summary = value as AnyRecord;
+  const totalMinted = normalizeHistorySummaryCount(summary.totalMinted ?? summary[0]);
+  const totalBurned = normalizeHistorySummaryCount(summary.totalBurned ?? summary[1]);
+  const activeSupply = normalizeHistorySummaryCount(summary.activeSupply ?? summary[2]);
+  const currentHolderCount = normalizeHistorySummaryCount(summary.currentHolderCount ?? summary[3]);
+  const historicalHolderCount = normalizeHistorySummaryCount(summary.historicalHolderCount ?? summary[4]);
   if (
     totalMinted == null ||
     totalBurned == null ||
@@ -49,7 +59,12 @@ export const deriveSbtHistorySummaryFromCounts = ({
   burnedCountByAddress = {},
   mintedEventCount = 0,
   burnedEventCount = 0,
-} = {}) => {
+}: {
+  mintedCountByAddress?: Record<string, unknown>;
+  burnedCountByAddress?: Record<string, unknown>;
+  mintedEventCount?: unknown;
+  burnedEventCount?: unknown;
+} = {}): SbtHistorySummary | null => {
   let activeSupply = 0;
   let currentHolderCount = 0;
 

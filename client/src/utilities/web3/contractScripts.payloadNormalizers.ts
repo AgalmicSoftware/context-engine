@@ -5,9 +5,11 @@
 
 import { createLogger } from '../logging.js';
 
+type AnyRecord = Record<string, any>;
+
 const contractsLog = createLogger('contracts');
 
-export const coerceStringArray = (value) => {
+export const coerceStringArray = (value: unknown): string[] => {
   if (Array.isArray(value)) return value.map((v) => String(v));
   if (typeof value === 'string') {
     const trimmed = value.trim();
@@ -24,9 +26,11 @@ export const coerceStringArray = (value) => {
   return [];
 };
 
-export const normalizeConvictionImportance = (responseJson) => {
+export const normalizeConvictionImportance = <T extends AnyRecord | null | undefined>(
+  responseJson: T
+): T => {
   if (!responseJson || typeof responseJson !== 'object') return responseJson;
-  const normalize = (obj) => {
+  const normalize = (obj: AnyRecord | null | undefined): void => {
     if (!obj || typeof obj !== 'object') return;
     const hasConviction = obj.conviction !== undefined && obj.conviction !== null;
     const hasImportance = obj.importance !== undefined && obj.importance !== null;
@@ -35,13 +39,13 @@ export const normalizeConvictionImportance = (responseJson) => {
   };
   normalize(responseJson);
   if (Array.isArray(responseJson.responses)) {
-    responseJson.responses.forEach(normalize);
+    responseJson.responses.forEach((entry: unknown) => normalize(entry as AnyRecord));
   }
   return responseJson;
 };
 
 // Preserve UI flags (like singleSelect) as question payloads move into caches.
-export const normalizeQuestionFlags = (questionData) => {
+export const normalizeQuestionFlags = (questionData: AnyRecord | null | undefined): void => {
   if (!questionData || typeof questionData !== 'object') return;
   if (questionData.singleSelect === undefined && questionData.oneSelectionOnly !== undefined) {
     questionData.singleSelect = !!questionData.oneSelectionOnly;
