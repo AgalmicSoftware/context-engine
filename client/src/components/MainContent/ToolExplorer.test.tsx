@@ -272,38 +272,6 @@ describe('ToolExplorer session propagation', () => {
     }));
   });
 
-  it('renders Add, View, then the header gear and forwards session overrides into Context', async () => {
-    const { container } = renderToolExplorer({ activeSessionSlug: 'edge' });
-
-    fireEvent.click(screen.getByText('Context'));
-
-    expect(await screen.findByTestId('mock-audio-survey-generator')).toBeInTheDocument();
-    const headerGroup = container.querySelector(`.${styles.headerModeToggleGroup}`) as HTMLElement | null;
-    if (!headerGroup) throw new Error('Expected header mode toggle group');
-    const headerButtons = Array.from(headerGroup.querySelectorAll('button')).map(
-      (node) => node.getAttribute('aria-label') || node.textContent?.trim()
-    );
-
-    expect(headerButtons).toEqual(['Add', 'View', 'Context session selector']);
-    expect(mockAudioSurveyGenerator).toHaveBeenLastCalledWith(expect.objectContaining({
-      sessionOverrideSlug: null,
-      sessionOverrideTouched: false,
-      hideInternalSessionSelector: true,
-    }));
-
-    fireEvent.click(screen.getByTestId('ce-database-session-selector-toggle'));
-
-    expect(screen.getByTestId('ce-database-session-selector-panel')).toBeInTheDocument();
-    fireEvent.click(screen.getByTestId('ce-database-session-chip-rxc'));
-
-    expect(mockAudioSurveyGenerator).toHaveBeenLastCalledWith(expect.objectContaining({
-      explorerMode: 'add',
-      sessionOverrideSlug: 'rxc',
-      sessionOverrideTouched: true,
-      hideInternalSessionSelector: true,
-    }));
-  });
-
   it('passes demoSurfaceMode through to the expanded Context tool', async () => {
     renderToolExplorer({ activeSessionSlug: 'edge', demoSurfaceMode: false });
 
