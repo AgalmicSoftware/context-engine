@@ -422,6 +422,80 @@ describe('CommunityTab helpers', () => {
     openSpy.mockRestore();
   });
 
+  it('renders a beeswarm preview alongside the full questions link in modal content', () => {
+    const instance = new CommunityTab({ activeSessionSlug: 'edge' });
+    instance.state = {
+      ...instance.state,
+      modalType: 'questions',
+    };
+    instance._beeswarmPoints = [
+      {
+        questionId: 'q1',
+        label: 'Prompt one',
+        extremity: 0.34,
+        agrees: 2,
+        disagrees: 1,
+        unsure: 0,
+        total: 3,
+      },
+    ];
+
+    const tree = instance.renderModalContent();
+    const [plotNode] = collectTreeNodes(tree, (node) => node?.type === BeeswarmPlot);
+    const [anchorNode] = collectTreeNodes(
+      tree,
+      (node) => node?.type === 'a' && node?.props?.href === '/questions'
+    );
+    const modalChildren = Array.isArray(tree?.props?.children)
+      ? tree.props.children
+      : [tree?.props?.children].filter(Boolean);
+    const [topBarNode, plotWrapNode] = modalChildren;
+
+    expect(plotNode).toBeTruthy();
+    expect(plotNode.props.points).toEqual(instance._beeswarmPoints);
+    expect(plotNode.props.height).toBe(240);
+    expect(plotNode.props.showIdleSummary).toBe(false);
+    expect(anchorNode).toBeTruthy();
+    expect(collectNodeText(anchorNode)).toBe('View Full Questions');
+    expect(anchorNode.props.target).toBeUndefined();
+    expect(anchorNode.props.rel).toBeUndefined();
+    expect(topBarNode).toBeTruthy();
+    expect(plotWrapNode).toBeTruthy();
+    expect(collectTreeNodes(topBarNode, (node) => node?.type === 'a' && node?.props?.href === '/questions')).toHaveLength(1);
+    expect(collectTreeNodes(plotWrapNode, (node) => node?.type === BeeswarmPlot)).toHaveLength(1);
+  });
+
+  it('falls back to computed beeswarm points in the questions modal when no cached points exist', () => {
+    const instance = new CommunityTab({ activeSessionSlug: 'edge' });
+    instance.state = {
+      ...instance.state,
+      modalType: 'questions',
+    };
+    instance._beeswarmPoints = [];
+    const fallbackPoints = [
+      {
+        questionId: 'q-fallback',
+        label: 'Fallback prompt',
+        extremity: 0,
+        agrees: 0,
+        disagrees: 0,
+        unsure: 0,
+        total: 0,
+      },
+    ];
+    jest.spyOn(instance, '_shouldUseDemoBeeswarmData').mockReturnValue(false);
+    const buildSpy = jest
+      .spyOn(instance, '_buildCommunityBeeswarmPoints')
+      .mockReturnValue(fallbackPoints);
+
+    const tree = instance.renderModalContent();
+    const [plotNode] = collectTreeNodes(tree, (node) => node?.type === BeeswarmPlot);
+
+    expect(buildSpy).toHaveBeenCalledTimes(1);
+    expect(plotNode).toBeTruthy();
+    expect(plotNode.props.points).toBe(fallbackPoints);
+  });
+
   it('opts the CommunityTab SBT modal into compact SBT settings without affecting other SBTsList uses', () => {
     const instance = new CommunityTab({
       provider: 'mock-provider',
