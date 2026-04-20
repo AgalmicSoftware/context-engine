@@ -12,6 +12,9 @@ const mockCorpusViewer = jest.fn();
 const mockUploadDocLibraryFile = jest.fn();
 const mockUploadDocLibraryUrlRecord = jest.fn();
 let mockCorpusViewerModuleLoadCount = 0;
+let originalCreateObjectURL;
+let originalRevokeObjectURL;
+let previewUrlCounter = 0;
 
 jest.mock('../../../utilities/ai/aiScripts.js', () => ({
   callAI: (...args) => mockCallAI(...args),
@@ -81,6 +84,19 @@ describe('AudioSurveyGenerator', () => {
   let previousActEnvironment;
   const findGenerateQuestionsButton = () =>
     Array.from(container.querySelectorAll('button')).find((node) => node.textContent.includes('Generate Questions'));
+  const getPhotoCards = () =>
+    Array.from(container.querySelectorAll(`[data-testid="${E2E_TESTIDS.DATABASE_PHOTO_SOURCE_CARD}"]`));
+  const getPhotoCardByName = (name) =>
+    getPhotoCards().find((node) => node.textContent.includes(name));
+  const getPhotoSourceId = (node) => node?.getAttribute('data-ce-source-id') || '';
+  const getPhotoAnalysisToggleBySourceId = (sourceId) =>
+    container.querySelector(
+      `[data-testid="${E2E_TESTIDS.DATABASE_PHOTO_SOURCE_ANALYSIS_TOGGLE}"][data-ce-source-id="${sourceId}"]`
+    );
+  const getPhotoAnalysisBodyBySourceId = (sourceId) =>
+    container.querySelector(
+      `[data-testid="${E2E_TESTIDS.DATABASE_PHOTO_SOURCE_ANALYSIS_BODY}"][data-ce-source-id="${sourceId}"]`
+    );
   const toggleCheckbox = (element) => {
     act(() => {
       element.click();
@@ -118,16 +134,17 @@ describe('AudioSurveyGenerator', () => {
     });
     return file;
   };
-  const addAdditionalPhoto = (file = new File(['photo-source'], 'memo.png', { type: 'image/png' })) => {
+  const addAdditionalPhoto = (files = [new File(['photo-source'], 'memo.png', { type: 'image/png' })]) => {
+    const normalizedFiles = Array.isArray(files) ? files : [files];
     const fileInput = container.querySelector('input[type="file"][accept*="image/png"]');
     Object.defineProperty(fileInput, 'files', {
       configurable: true,
-      value: [file],
+      value: normalizedFiles,
     });
     act(() => {
       fileInput.dispatchEvent(new Event('change', { bubbles: true }));
     });
-    return file;
+    return normalizedFiles;
   };
   const renderSubject = async (node) => {
     await act(async () => {
@@ -165,9 +182,27 @@ describe('AudioSurveyGenerator', () => {
   beforeAll(() => {
     previousActEnvironment = globalThis.IS_REACT_ACT_ENVIRONMENT;
     globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+    originalCreateObjectURL = URL.createObjectURL;
+    originalRevokeObjectURL = URL.revokeObjectURL;
+    Object.defineProperty(URL, 'createObjectURL', {
+      configurable: true,
+      writable: true,
+      value: jest.fn((file) => {
+        previewUrlCounter += 1;
+        return `blob:audio-survey-${previewUrlCounter}-${file?.name || 'preview'}`;
+      }),
+    });
+    Object.defineProperty(URL, 'revokeObjectURL', {
+      configurable: true,
+      writable: true,
+      value: jest.fn(),
+    });
   });
 
   beforeEach(() => {
+    previewUrlCounter = 0;
+    URL.createObjectURL.mockClear();
+    URL.revokeObjectURL.mockClear();
     container = document.createElement('div');
     document.body.appendChild(container);
     root = createRoot(container);
@@ -224,6 +259,24 @@ describe('AudioSurveyGenerator', () => {
   });
 
   afterAll(() => {
+    if (typeof originalCreateObjectURL === 'function') {
+      Object.defineProperty(URL, 'createObjectURL', {
+        configurable: true,
+        writable: true,
+        value: originalCreateObjectURL,
+      });
+    } else {
+      delete URL.createObjectURL;
+    }
+    if (typeof originalRevokeObjectURL === 'function') {
+      Object.defineProperty(URL, 'revokeObjectURL', {
+        configurable: true,
+        writable: true,
+        value: originalRevokeObjectURL,
+      });
+    } else {
+      delete URL.revokeObjectURL;
+    }
     if (typeof previousActEnvironment === 'undefined') {
       delete globalThis.IS_REACT_ACT_ENVIRONMENT;
       return;
@@ -300,7 +353,10 @@ describe('AudioSurveyGenerator', () => {
     expect(findGenerateQuestionsButton()).toBeTruthy();
   });
 
-  it('treats queued photo uploads as valid DatabaseTool input content', async () => {
+  it('queues multiple photo uploads as preview cards and treats them as valid DatabaseTool input content', async () => {
+    const firstPhoto = new File(['photo-one'], 'memo.png', { type: 'image/png' });
+    const secondPhoto = new File(['photo-two'], 'diagram.webp', { type: 'image/webp' });
+
     await renderSubject(
       <AudioSurveyGenerator
         provider={{}}
@@ -313,11 +369,62 @@ describe('AudioSurveyGenerator', () => {
 
     expect(findGenerateQuestionsButton()).toBeUndefined();
 
-    addAdditionalPhoto();
+    addAdditionalPhoto([firstPhoto, secondPhoto]);
+    await act(async () => {});
 
-    expect(container.textContent).toContain('[photo]');
+    expect(getPhotoCards()).toHaveLength(2);
+    expect(container.querySelectorAll(`[data-testid="${E2E_TESTIDS.DATABASE_PHOTO_SOURCE_PREVIEW}"]`)).toHaveLength(2);
+    expect(URL.createObjectURL).toHaveBeenCalledTimes(2);
+    expect(container.textContent).toContain('memo.png');
+    expect(container.textContent).toContain('diagram.webp');
     expect(container.textContent).toContain('Queued for analysis');
     expect(findGenerateQuestionsButton()).toBeTruthy();
+  });
+
+  it('queues only valid photos from a mixed selection and shows one concise validation error', async () => {
+    const validPng = new File(['photo-one'], 'memo.png', { type: 'image/png' });
+    const invalidPdf = new File(['not-a-photo'], 'notes.pdf', { type: 'application/pdf' });
+    const validGif = new File(['photo-two'], 'diagram.gif', { type: 'image/gif' });
+
+    await renderSubject(
+      <AudioSurveyGenerator
+        provider={{}}
+        network={{}}
+        account="0x123"
+        loginComplete
+        toggleLoginModal={jest.fn()}
+      />
+    );
+
+    addAdditionalPhoto([validPng, invalidPdf, validGif]);
+
+    expect(getPhotoCards()).toHaveLength(2);
+    expect(container.textContent).toContain('Skipped 1 unsupported photo. Use png, jpg, jpeg, webp, or gif.');
+    expect(container.textContent).toContain('memo.png');
+    expect(container.textContent).toContain('diagram.gif');
+    expect(container.textContent).not.toContain('notes.pdf');
+  });
+
+  it('does not expose inline photo analysis while a queued photo is not ready', async () => {
+    await renderSubject(
+      <AudioSurveyGenerator
+        provider={{}}
+        network={{}}
+        account="0x123"
+        loginComplete
+        toggleLoginModal={jest.fn()}
+      />
+    );
+
+    addAdditionalPhoto();
+
+    const photoCard = getPhotoCardByName('memo.png');
+    const sourceId = getPhotoSourceId(photoCard);
+
+    expect(photoCard).toBeTruthy();
+    expect(photoCard.textContent).toContain('Queued for analysis');
+    expect(getPhotoAnalysisToggleBySourceId(sourceId)).toBeNull();
+    expect(getPhotoAnalysisBodyBySourceId(sourceId)).toBeNull();
   });
 
   it('uses simplified section headings in the generator surface', async () => {
@@ -600,7 +707,63 @@ describe('AudioSurveyGenerator', () => {
     expect(mockCallAI).toHaveBeenCalledTimes(1);
     expect(mockCallAI.mock.calls[0][0]).toContain('Photo Source: whiteboard.png');
     expect(mockCallAI.mock.calls[0][0]).toContain('phase in disclosure requirements over six months');
-    expect(container.textContent).toContain('Analysis ready');
+    expect(container.textContent).toContain('Analysis complete');
+    expect(container.textContent).not.toContain('Analysis ready');
+  });
+
+  it('expands and collapses inline photo analysis from the Analysis complete toggle', async () => {
+    const photo = new File(['photo-source'], 'whiteboard.png', { type: 'image/png' });
+    mockAnalyzePhotoForQuestionGeneration.mockResolvedValueOnce({
+      text: 'This screenshot shows a policy whiteboard with three budget scenarios, two risk warnings, and a recommendation to phase in disclosure requirements over six months.',
+    });
+    mockCallAI.mockResolvedValue(JSON.stringify({
+      surveyTitle: 'Photo Survey',
+      questions: [
+        {
+          prompt: 'Should the phased disclosure plan move forward?',
+          questionType: 'binary',
+          tags: ['photo'],
+        },
+      ],
+    }));
+
+    await renderSubject(
+      <AudioSurveyGenerator
+        provider={{}}
+        network={{ id: 84532 }}
+        account="0x123"
+        loginComplete
+        toggleLoginModal={jest.fn()}
+        activeSessionSlug="edge"
+        sessionConfig={makeSessionConfig()}
+      />
+    );
+
+    addAdditionalPhoto(photo);
+
+    const form = container.querySelector('form');
+    await act(async () => {
+      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    });
+
+    const photoCard = getPhotoCardByName('whiteboard.png');
+    const sourceId = getPhotoSourceId(photoCard);
+    const analysisToggle = getPhotoAnalysisToggleBySourceId(sourceId);
+
+    expect(analysisToggle).toBeTruthy();
+    expect(analysisToggle.textContent).toContain('Analysis complete');
+    expect(analysisToggle.getAttribute('aria-expanded')).toBe('false');
+    expect(getPhotoAnalysisBodyBySourceId(sourceId)).toBeNull();
+
+    toggleCheckbox(analysisToggle);
+    expect(getPhotoAnalysisToggleBySourceId(sourceId).getAttribute('aria-expanded')).toBe('true');
+    expect(getPhotoAnalysisBodyBySourceId(sourceId).textContent).toContain(
+      'phase in disclosure requirements over six months'
+    );
+
+    toggleCheckbox(getPhotoAnalysisToggleBySourceId(sourceId));
+    expect(getPhotoAnalysisToggleBySourceId(sourceId).getAttribute('aria-expanded')).toBe('false');
+    expect(getPhotoAnalysisBodyBySourceId(sourceId)).toBeNull();
   });
 
   it('hides the save-to-doc-library toggle until an additional source is queued', async () => {
@@ -851,6 +1014,35 @@ describe('AudioSurveyGenerator', () => {
       expect.stringContaining(`/session/0xSessionToken/docs?__ceDocTx=${'C'.repeat(43)}`),
       expect.stringContaining(`/session/0xSessionToken/docs?__ceDocTx=${'D'.repeat(43)}`),
     ]);
+  });
+
+  it('removing one queued photo leaves the other queued photo intact', async () => {
+    const firstPhoto = new File(['photo-one'], 'memo.png', { type: 'image/png' });
+    const secondPhoto = new File(['photo-two'], 'diagram.webp', { type: 'image/webp' });
+
+    await renderSubject(
+      <AudioSurveyGenerator
+        provider={{}}
+        network={{}}
+        account="0x123"
+        loginComplete
+        toggleLoginModal={jest.fn()}
+      />
+    );
+
+    addAdditionalPhoto([firstPhoto, secondPhoto]);
+
+    const firstCard = getPhotoCardByName('memo.png');
+    const secondCard = getPhotoCardByName('diagram.webp');
+
+    expect(firstCard).toBeTruthy();
+    expect(secondCard).toBeTruthy();
+
+    toggleCheckbox(firstCard.querySelector('button[aria-label="Remove photo memo.png"]'));
+
+    expect(getPhotoCards()).toHaveLength(1);
+    expect(getPhotoCardByName('memo.png')).toBeUndefined();
+    expect(getPhotoCardByName('diagram.webp')).toBeTruthy();
   });
 
   it('defaults saved-doc audience to the session name and shows both audience options when the doc gate exists', async () => {
