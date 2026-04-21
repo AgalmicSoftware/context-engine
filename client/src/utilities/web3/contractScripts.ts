@@ -12,9 +12,13 @@ type ContractScriptsDefaultExport = ContractScriptsImplModule['default'];
 
 const _impl = require('./contractScripts.impl.js') as ContractScriptsImplModule;
 const defaultExport = _impl.default as ContractScriptsDefaultExport;
-const barrelExports = exports as AnyRecord;
+const commonJsExports = typeof exports === 'undefined'
+  ? null
+  : (exports as AnyRecord);
 
-Object.defineProperty(exports, '__esModule', { value: true });
+if (commonJsExports) {
+  Object.defineProperty(commonJsExports, '__esModule', { value: true });
+}
 
 // Re-export as plain configurable properties (required for jest.spyOn compatibility)
 export default defaultExport;
@@ -44,29 +48,31 @@ export const __test__contractScriptsSbtProgress = _impl.__test__contractScriptsS
 export const __test__contractScriptsSbtHistory = _impl.__test__contractScriptsSbtHistory;
 export const __test__contractScriptsErrors = _impl.__test__contractScriptsErrors;
 
-barrelExports.default = defaultExport;
-barrelExports.normalizeSessionSlug = normalizeSessionSlug;
-barrelExports.getDefaultSessionConfig = getDefaultSessionConfig;
-barrelExports.getSessionConfigBySlug = getSessionConfigBySlug;
-barrelExports.getDemoSessionConfigBySlug = getDemoSessionConfigBySlug;
-barrelExports.getSessionConfigBySlugOrDefault = getSessionConfigBySlugOrDefault;
-barrelExports.getAllSessionEntries = getAllSessionEntries;
-barrelExports.getAllSessionSlugs = getAllSessionSlugs;
-barrelExports.getSessionConfigByName = getSessionConfigByName;
-barrelExports.getSessionSlugByName = getSessionSlugByName;
-barrelExports.getSessionLists = getSessionLists;
-barrelExports.getSessionChainId = getSessionChainId;
-barrelExports.getSessionNetwork = getSessionNetwork;
-barrelExports.getChainLabelById = getChainLabelById;
-barrelExports.getReadProviderForGroup = getReadProviderForGroup;
-barrelExports.getReadProviderForSession = getReadProviderForSession;
-barrelExports.getProviderLocation = getProviderLocation;
-barrelExports.getNativeBalance = getNativeBalance;
-barrelExports.getETHBalance = getETHBalance;
-barrelExports.__test__contractScriptsArweaveCache = __test__contractScriptsArweaveCache;
-barrelExports.__test__contractScriptsArweaveUploads = __test__contractScriptsArweaveUploads;
-barrelExports.__test__contractScriptsSessionNameFields = __test__contractScriptsSessionNameFields;
-barrelExports.__test__contractScriptsSbtMemo = __test__contractScriptsSbtMemo;
-barrelExports.__test__contractScriptsSbtProgress = __test__contractScriptsSbtProgress;
-barrelExports.__test__contractScriptsSbtHistory = __test__contractScriptsSbtHistory;
-barrelExports.__test__contractScriptsErrors = __test__contractScriptsErrors;
+if (commonJsExports) {
+  commonJsExports.default = defaultExport;
+  commonJsExports.normalizeSessionSlug = normalizeSessionSlug;
+  commonJsExports.getDefaultSessionConfig = getDefaultSessionConfig;
+  commonJsExports.getSessionConfigBySlug = getSessionConfigBySlug;
+  commonJsExports.getDemoSessionConfigBySlug = getDemoSessionConfigBySlug;
+  commonJsExports.getSessionConfigBySlugOrDefault = getSessionConfigBySlugOrDefault;
+  commonJsExports.getAllSessionEntries = getAllSessionEntries;
+  commonJsExports.getAllSessionSlugs = getAllSessionSlugs;
+  commonJsExports.getSessionConfigByName = getSessionConfigByName;
+  commonJsExports.getSessionSlugByName = getSessionSlugByName;
+  commonJsExports.getSessionLists = getSessionLists;
+  commonJsExports.getSessionChainId = getSessionChainId;
+  commonJsExports.getSessionNetwork = getSessionNetwork;
+  commonJsExports.getChainLabelById = getChainLabelById;
+  commonJsExports.getReadProviderForGroup = getReadProviderForGroup;
+  commonJsExports.getReadProviderForSession = getReadProviderForSession;
+  commonJsExports.getProviderLocation = getProviderLocation;
+  commonJsExports.getNativeBalance = getNativeBalance;
+  commonJsExports.getETHBalance = getETHBalance;
+  commonJsExports.__test__contractScriptsArweaveCache = __test__contractScriptsArweaveCache;
+  commonJsExports.__test__contractScriptsArweaveUploads = __test__contractScriptsArweaveUploads;
+  commonJsExports.__test__contractScriptsSessionNameFields = __test__contractScriptsSessionNameFields;
+  commonJsExports.__test__contractScriptsSbtMemo = __test__contractScriptsSbtMemo;
+  commonJsExports.__test__contractScriptsSbtProgress = __test__contractScriptsSbtProgress;
+  commonJsExports.__test__contractScriptsSbtHistory = __test__contractScriptsSbtHistory;
+  commonJsExports.__test__contractScriptsErrors = __test__contractScriptsErrors;
+}
