@@ -3,7 +3,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
-const os = require('node:os');
 const path = require('node:path');
 const { execFileSync, spawnSync } = require('node:child_process');
 
@@ -16,7 +15,9 @@ function writeFile(rootDir, relativePath, contents) {
 }
 
 function withTempGitRepo(run) {
-  const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ce-text-hygiene-'));
+  const tempRoot = path.join(__dirname, '.tmp-text-hygiene-');
+  fs.mkdirSync(tempRoot, { recursive: true });
+  const rootDir = fs.mkdtempSync(path.join(tempRoot, 'repo-'));
   try {
     execFileSync('git', ['init'], { cwd: rootDir, stdio: 'ignore' });
     return run(rootDir);
@@ -89,10 +90,9 @@ test('check-text-hygiene skips deleted tracked files before filename validation'
   });
 });
 
-test('check-text-hygiene fails tracked CHANGELOG.md entries with singular planning identifiers', () => {
+test('check-text-hygiene fails tracked CHANGELOG.md entries with singular PRD identifiers', () => {
   withTempGitRepo((rootDir) => {
-    const planningId = `${'PR'}${'D'} 123`;
-    writeFile(rootDir, 'CHANGELOG.md', `# Changelog\n\n- ${planningId}: internal note\n`);
+    writeFile(rootDir, 'CHANGELOG.md', '# Changelog\n\n- PRD 123: internal note\n');
     execFileSync('git', ['add', 'CHANGELOG.md'], { cwd: rootDir, stdio: 'ignore' });
 
     const result = runHygieneCheck(rootDir);
@@ -101,15 +101,14 @@ test('check-text-hygiene fails tracked CHANGELOG.md entries with singular planni
     assert.match(result.stderr, /Text hygiene check failed:/);
     assert.match(
       result.stderr,
-      new RegExp(`CHANGELOG\\.md:3: changelog must not reference internal planning identifier "${planningId}"`)
+      /CHANGELOG\.md:3: changelog must not reference PRD identifier "PRD 123"/
     );
   });
 });
 
-test('check-text-hygiene fails tracked CHANGELOG.md entries with plural planning ranges', () => {
+test('check-text-hygiene fails tracked CHANGELOG.md entries with plural PRD ranges', () => {
   withTempGitRepo((rootDir) => {
-    const planningRange = `${'PR'}${'D'}s 277-280`;
-    writeFile(rootDir, 'CHANGELOG.md', `# Changelog\n\n- Covers ${planningRange} in one release note.\n`);
+    writeFile(rootDir, 'CHANGELOG.md', '# Changelog\n\n- Covers PRDs 277-280 in one release note.\n');
     execFileSync('git', ['add', 'CHANGELOG.md'], { cwd: rootDir, stdio: 'ignore' });
 
     const result = runHygieneCheck(rootDir);
@@ -118,7 +117,7 @@ test('check-text-hygiene fails tracked CHANGELOG.md entries with plural planning
     assert.match(result.stderr, /Text hygiene check failed:/);
     assert.match(
       result.stderr,
-      new RegExp(`CHANGELOG\\.md:3: changelog must not reference internal planning identifier "${planningRange}"`)
+      /CHANGELOG\.md:3: changelog must not reference PRD identifier "PRDs 277-280"/
     );
   });
 });
@@ -131,21 +130,20 @@ test('check-text-hygiene passes clean tracked CHANGELOG.md entries', () => {
     const result = runHygieneCheck(rootDir);
 
     assert.equal(result.status, 0);
-    assert.doesNotMatch(result.stderr, /changelog must not reference internal planning identifier/);
+    assert.doesNotMatch(result.stderr, /changelog must not reference PRD identifier/);
     assert.match(result.stdout, /Text hygiene check passed/i);
   });
 });
 
-test('check-text-hygiene ignores planning identifiers outside tracked changelog files', () => {
+test('check-text-hygiene ignores PRD identifiers outside tracked changelog files', () => {
   withTempGitRepo((rootDir) => {
-    const planningId = `${'PR'}${'D'} 123`;
-    writeFile(rootDir, 'docs/notes.md', `Reminder: ${planningId} stays in planning docs.\n`);
+    writeFile(rootDir, 'docs/notes.md', 'Reminder: PRD 123 stays in planning docs.\n');
     execFileSync('git', ['add', 'docs/notes.md'], { cwd: rootDir, stdio: 'ignore' });
 
     const result = runHygieneCheck(rootDir);
 
     assert.equal(result.status, 0);
-    assert.doesNotMatch(result.stderr, /changelog must not reference internal planning identifier/);
+    assert.doesNotMatch(result.stderr, /changelog must not reference PRD identifier/);
     assert.match(result.stdout, /Text hygiene check passed/i);
   });
 });
