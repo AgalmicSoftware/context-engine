@@ -2263,6 +2263,52 @@ describe('UserPage cold-load network fallback', () => {
     );
   });
 
+  it('honors legacy sbtCache mintedAddresses when count maps are empty placeholders', () => {
+    const viewAddress = '0x00000000000000000000000000000000000000aa';
+    const networkID = '84532';
+    const instance = makeInstance({ viewAddress });
+
+    const dataByNamespace = {
+      surveysCache: [],
+      questionsCache: [],
+      sbtCache: [{
+        slug: 'edge',
+        data: {
+          [networkID]: {
+            sbtList: {
+              '0x100': {
+                sbtAddress: '0x100',
+                sbtInfo: { name: 'Badge 100', unlisted: false },
+                mintedAddresses: [viewAddress],
+                burnedAddresses: [],
+                mintedCountByAddress: {},
+                burnedCountByAddress: {},
+                countsLoaded: false,
+              },
+            },
+          },
+        },
+      }],
+      userCache: [],
+    };
+
+    instance._dgHasAny = jest.fn(() => true);
+    instance._dgReadAll = jest.fn((name) => dataByNamespace[name] || []);
+
+    instance._refreshAllDataFromCache({ force: true, markLoading: true });
+
+    expect(instance.state.sbtList).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          sbtInfo: expect.objectContaining({
+            name: 'Badge 100',
+            sbtAddress: '0x100',
+          }),
+        }),
+      ])
+    );
+  });
+
   it('keeps legacy sbtCache set-only burn behavior when ownership counts are absent', () => {
     const viewAddress = '0x00000000000000000000000000000000000000aa';
     const networkID = '84532';
