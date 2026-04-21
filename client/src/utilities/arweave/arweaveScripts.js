@@ -548,6 +548,75 @@ const createArweaveFetchError = ({
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+const buildRetryableTimeoutError = (label = 'operation', timeoutMs = 0) => {
+  const err = new Error(`${String(label || 'operation')} timed out after ${timeoutMs}ms`);
+  err.name = 'TimeoutError';
+  err.code = 'ETIMEDOUT';
+  err.retryable = true;
+  err.kind = 'network';
+  err.timeoutMs = Number(timeoutMs || 0) || 0;
+  return err;
+};
+
+const withTimeout = async (promise, ms, label = 'operation') => {
+  const timeoutMs = Math.max(1, Number(ms || 0));
+  let timer = null;
+  const timeoutPromise = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      reject(buildRetryableTimeoutError(label, timeoutMs));
+    }, timeoutMs);
+  });
+  try {
+    return await Promise.race([Promise.resolve(promise), timeoutPromise]);
+  } finally {
+    clearTimeout(timer);
+  }
+};
+
+const isEmptyGatewayResponseText = (text) => String(text ?? '').trim().length === 0;
+
+const createEmptyGatewayResponseError = ({
+  txId = '',
+  gateway = '',
+  attempt = 0,
+} = {}) => createArweaveFetchError({
+  txId,
+  status: null,
+  retryable: true,
+  kind: 'network',
+  gateway,
+  attempt,
+  message: 'Arweave gateway returned empty response body.',
+});
+
+const readResponseBodyPreview = async (response) => {
+  if (!response || typeof response.text !== 'function') return '';
+  try {
+    return String(await response.text()).slice(0, 200);
+  } catch (_) {
+    return '';
+  }
+};
+
+const parseWorkerUploadResponseJson = async (response) => {
+  let previewResponse = null;
+  try {
+    previewResponse = typeof response?.clone === 'function' ? response.clone() : response;
+  } catch (_) {
+    previewResponse = response;
+  }
+  try {
+    return await response.json();
+  } catch (_) {
+    const bodyPreview = await readResponseBodyPreview(previewResponse);
+    log.error('arweave upload response parse failed', {
+      status: Number(response?.status || 0) || null,
+      bodyPreview,
+    });
+    throw new Error('arweave upload response malformed');
+  }
+};
+
 const ARWEAVE_TEXT_CACHE_TTL_MS = 10 * 60 * 1000;
 const ARWEAVE_TEXT_CACHE_MAX = 600;
 const ARWEAVE_FAILURE_CACHE_MAX = 1200;
@@ -574,6 +643,7 @@ const ARWEAVE_TX_EVENT_DEDUPE_TTL_MS = 30 * 1000;
 const ARWEAVE_GRAPHQL_COOLDOWN_BASE_MS = 30 * 1000;
 const ARWEAVE_GRAPHQL_COOLDOWN_MAX_MS = 5 * 60 * 1000;
 const ARWEAVE_GRAPHQL_TIMEOUT_MS = 3500;
+export const ARWEAVE_CHUNK_UPLOAD_TIMEOUT_MS = 30_000;
 const MAX_ARWEAVE_UPLOAD_BYTES = 100 * 1024 * 1024; // 100 MB
 const arweaveTextCache = new Map();
 const arweaveTextInFlight = new Map();
@@ -602,7 +672,7 @@ const getArweaveTextCacheEntry = (txId) => {
 
 const setArweaveTextCacheEntry = (txId, text) => {
   const key = String(txId || '').trim();
-  if (!key) return;
+  if (!key || String(text ?? '').trim().length === 0) return;
   arweaveTextCache.delete(key);
   arweaveTextCache.set(key, { text, ts: Date.now() });
   while (arweaveTextCache.size > ARWEAVE_TEXT_CACHE_MAX) {
@@ -990,6 +1060,16 @@ const tryWayfinderFallback = async ({
       const resp = await fetchWithTimeout(url, { redirect: 'follow' }, gatewayTimeoutMs);
       if (resp?.ok) {
         const text = await resp.text();
+        if (isEmptyGatewayResponseText(text)) {
+          lastError = createEmptyGatewayResponseError({
+            txId,
+            gateway: String(candidate.gateway || 'wayfinder'),
+            attempt,
+          });
+          markGatewayFailure(candidate.gateway, { status: null, kind: 'network' });
+          sawRetryableNonNotFound = true;
+          continue;
+        }
         const contentType = String(resp?.headers?.get?.('content-type') || '').trim().toLowerCase();
         const derivedStatus = looksLikeHtmlGatewayPayload({ text, contentType })
           ? inferStatusFromHtmlGatewayPayload(text)
@@ -1566,9 +1646,14 @@ const uploadDirectToArweave = async ({
     const uploader = await arweave.transactions.getUploader(tx);
     while (!uploader.isComplete) {
       // eslint-disable-next-line no-await-in-loop
-      await uploader.uploadChunk();
+      await withTimeout(
+        uploader.uploadChunk(),
+        ARWEAVE_CHUNK_UPLOAD_TIMEOUT_MS,
+        'Arweave chunk upload'
+      );
     }
-  } catch {
+  } catch (err) {
+    if (err?.code === 'ETIMEDOUT' && err?.retryable) throw err;
     const res = await arweave.transactions.post(tx);
     if (res?.status !== 200 && res?.status !== 202) {
       throw new Error(`Arweave post failed (${res?.status || 'unknown'})`);
@@ -1813,7 +1898,7 @@ async function uploadDataToArweave(data, format, opts = {}) {
         ts: new Date().toISOString(),
       });
 
-      let payload = await response.json().catch(() => ({}));
+      let payload = await parseWorkerUploadResponseJson(response);
       let message = payload?.error || payload?.message || (response.ok ? '' : `Arweave upload failed (${response.status})`);
 
       if (!response.ok && arweaveJwkValue && isWorkerMissingSessionSecretsError(message)) {
@@ -1832,7 +1917,7 @@ async function uploadDataToArweave(data, format, opts = {}) {
                 sessionSlug: candidate?.sessionSlug || '',
                 workerUrl: candidateBaseUrl,
               });
-          const bootstrapPayload = await bootstrapResponse.json().catch(() => ({}));
+          const bootstrapPayload = await parseWorkerUploadResponseJson(bootstrapResponse);
           const bootstrapMessage =
             bootstrapPayload?.error ||
             bootstrapPayload?.message ||
@@ -2163,7 +2248,11 @@ async function downloadDataFromArweave(txID, opts = {}) {
               attemptedUrls: new Set(),
               allAttemptedUrls: attemptedUrlsAcrossAllPasses,
             });
-            if (arIoOnlyResult?.ok && typeof arIoOnlyResult.text === 'string') {
+            if (
+              arIoOnlyResult?.ok &&
+              typeof arIoOnlyResult.text === 'string' &&
+              !isEmptyGatewayResponseText(arIoOnlyResult.text)
+            ) {
               logArweaveFetchDebug('log', '[arweave] ar.io-only hit', {
                 txId: normalizedTxId,
                 route: arIoOnlyResult.route,
@@ -2230,6 +2319,13 @@ async function downloadDataFromArweave(txID, opts = {}) {
                   const resp = await fetchWithTimeout(url, { redirect: 'follow' }, gatewayTimeoutMs);
                   if (resp.ok) {
                     const text = await resp.text();
+                    if (isEmptyGatewayResponseText(text)) {
+                      throw createEmptyGatewayResponseError({
+                        txId: normalizedTxId,
+                        gateway,
+                        attempt,
+                      });
+                    }
                     const contentType = String(resp?.headers?.get?.('content-type') || '').trim().toLowerCase();
                     const derivedStatus = looksLikeHtmlGatewayPayload({ text, contentType })
                       ? inferStatusFromHtmlGatewayPayload(text)
@@ -2398,7 +2494,11 @@ async function downloadDataFromArweave(txID, opts = {}) {
             attemptedUrls: attemptedUrlsAcrossAllPasses,
             allAttemptedUrls: attemptedUrlsAcrossAllPasses,
           });
-          if (wayfinderResult?.ok && typeof wayfinderResult.text === 'string') {
+          if (
+            wayfinderResult?.ok &&
+            typeof wayfinderResult.text === 'string' &&
+            !isEmptyGatewayResponseText(wayfinderResult.text)
+          ) {
             logArweaveFetchDebug('log', '[arweave] wayfinder fallback hit', {
               txId: normalizedTxId,
               route: wayfinderResult.route,
