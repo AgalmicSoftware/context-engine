@@ -41,6 +41,15 @@ class Footer extends React.Component {
               <ul>
                 <li>
                   <NavLink
+                    href="/new"
+                    target=""
+                    id={styles.footerLink}
+                  >
+                    NEW
+                  </NavLink>
+                </li>
+                <li>
+                  <NavLink
                     // href="https://docsend.com/view/28x54q8ez7pccsqq"
                     // target="_blank"
                     href="/about"
