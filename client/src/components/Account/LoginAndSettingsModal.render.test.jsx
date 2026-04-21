@@ -167,6 +167,7 @@ const restorePublicUrl = () => {
 
 const loadIsolatedSettingsModal = () => {
   jest.resetModules();
+  jest.doMock('react', () => React);
   let loaded;
 
   jest.isolateModules(() => {
@@ -177,6 +178,8 @@ const loadIsolatedSettingsModal = () => {
       checkSponsoredAccess: require('../../utilities/web3/sponsoredAccess.js').checkSponsoredAccess,
     };
   });
+
+  jest.dontMock('react');
 
   return loaded;
 };
@@ -307,7 +310,7 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     render(subject.getSettingsDisplay());
 
     expect(screen.getByText('SESSION')).toBeInTheDocument();
-    expect(screen.getByText('Edge Session')).toBeInTheDocument();
+    expect(screen.getAllByText('Edge Session').length).toBeGreaterThan(0);
     const sessionLink = screen.getByRole('link', { name: 'Open session Edge Session' });
     expect(sessionLink).toHaveAttribute('href', '/session/edge');
     expect(sessionLink).not.toHaveAttribute('target');
@@ -370,7 +373,7 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
 
     render(subject.getSettingsDisplay());
 
-    expect(screen.getByText('Edge Session')).toBeInTheDocument();
+    expect(screen.getAllByText('Edge Session').length).toBeGreaterThan(0);
     expect(screen.queryByText('session:')).not.toBeInTheDocument();
     expect(screen.getByText('Network')).toBeInTheDocument();
     expect(screen.getByText('Base Sepolia')).toBeInTheDocument();
@@ -522,9 +525,21 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
       return { status: 'no-gate' };
     });
 
-    render(<LoginAndSettingsModal {...buildProps({ activeSessionSlug: 'demo' })} />);
+    const subject = new LoginAndSettingsModal(buildProps({ activeSessionSlug: 'demo' }));
+    subject.state = {
+      ...subject.state,
+      preLoginSettingsOpen: true,
+      preLoginConfigOpen: false,
+      sponsoredAccess: {
+        ai: { status: 'needs-wallet' },
+        arweave: { status: 'no-gate' },
+        rpc: { status: 'no-gate' },
+        txGas: { status: 'no-gate' },
+      },
+    };
+    subject.getActiveSessionSlug = jest.fn(() => 'demo');
 
-    await openPreLoginSettingsDrawer();
+    render(subject.getPreLoginSettingsDisplay());
 
     expect(screen.queryByTestId('ce-prelogin-session-select')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('AI endpoint')).not.toBeInTheDocument();
@@ -538,7 +553,8 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
       expect(screen.getByText('Tx gas')).toBeInTheDocument();
       expect(screen.getByText('Connect wallet')).toBeInTheDocument();
       expect(screen.getAllByText('Sponsored').length).toBeGreaterThan(0);
-      expect(screen.getAllByText('Demo Session').length).toBeGreaterThan(0);
+      expect(screen.getByRole('link', { name: 'Open session Demo Session' })).toBeInTheDocument();
+      expect(screen.getAllByText('configured here').length).toBeGreaterThan(0);
     });
   });
 
@@ -953,14 +969,25 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
       return { status: 'no-gate' };
     });
 
-    render(<LoginAndSettingsModal {...buildProps({
+    const subject = new LoginAndSettingsModal(buildProps({
       account: WAGMI_ADDRESS,
       activeSessionSlug: 'demo',
       loginComplete: true,
       provider: 'wagmi',
-    })} />);
+    }));
+    subject.state = {
+      ...subject.state,
+      aiSettingsOpen: true,
+      sponsoredAccess: {
+        ai: { status: 'granted' },
+        arweave: { status: 'granted' },
+        rpc: { status: 'granted' },
+        txGas: { status: 'no-gate' },
+      },
+    };
+    subject.getActiveSessionSlug = jest.fn(() => 'demo');
 
-    fireEvent.click(screen.getByRole('button', { name: /config/i }));
+    const { rerender } = render(subject.getSettingsDisplay());
 
     expect(await screen.findByText('AI')).toBeInTheDocument();
     expect(screen.getByText('Arweave')).toBeInTheDocument();
@@ -970,12 +997,90 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     expect(screen.queryByText('AI gate')).not.toBeInTheDocument();
     expect(screen.queryByText('RPC scan scope')).not.toBeInTheDocument();
     expect(screen.queryByText(/Gate status is evaluated against the active session/i)).not.toBeInTheDocument();
-    expect(screen.getAllByText('Demo Session').length).toBeGreaterThan(0);
+    expect(screen.getByRole('link', { name: 'Open session Demo Session' })).toBeInTheDocument();
+    expect(screen.getAllByText('configured here').length).toBeGreaterThan(0);
     expect(screen.queryAllByText('Edge Session')).toHaveLength(0);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Show other AI sponsor sessions' }));
+    expect(screen.getByRole('button', { name: 'Show other AI sponsor sessions' })).toBeInTheDocument();
+    subject.state = {
+      ...subject.state,
+      expandedSponsorResources: {
+        ...subject.state.expandedSponsorResources,
+        ai: true,
+      },
+    };
+    rerender(subject.getSettingsDisplay());
 
     expect((await screen.findAllByText('Edge Session')).length).toBeGreaterThan(0);
+  });
+
+  it('separates active-session sponsorship from other sponsor sessions', async () => {
+    getAllSessionSlugs.mockReturnValue(['op-session-test']);
+    getSessionConfigBySlugOrDefault.mockImplementation((slug) => {
+      const normalized = String(slug || '').trim().toLowerCase();
+      if (!normalized) {
+        return {
+          slug: '',
+          sessionName: 'General',
+          sponsoredKeys: {},
+        };
+      }
+      if (normalized === 'op-session-test') {
+        return {
+          slug: 'op-session-test',
+          sessionName: 'OP Session Test',
+          sponsoredKeys: {
+            rpc: 'sponsored-rpc',
+          },
+        };
+      }
+      return {};
+    });
+    checkSponsoredAccess.mockImplementation(async () => ({ status: 'unknown' }));
+
+    const modalRef = React.createRef();
+
+    render(<LoginAndSettingsModal
+      {...buildProps({
+        account: WAGMI_ADDRESS,
+        activeSessionSlug: '',
+        loginComplete: true,
+        provider: 'wagmi',
+      })}
+      ref={modalRef}
+    />);
+
+    await act(async () => {
+      modalRef.current.setState({
+        aiSettingsOpen: true,
+        sponsoredAccess: {
+          ai: { status: 'unknown' },
+          arweave: { status: 'unknown' },
+          rpc: { status: 'denied' },
+          txGas: { status: 'unknown' },
+        },
+      });
+    });
+
+    const rpcCard = (await screen.findByText('RPC')).closest(`.${styles.supportedResourceCard}`);
+    expect(rpcCard).toBeTruthy();
+    expect(within(rpcCard).getByText('Not sponsored')).toBeInTheDocument();
+    expect(within(rpcCard).queryByText('Gate locked')).not.toBeInTheDocument();
+    expect(within(rpcCard).getByText('General')).toBeInTheDocument();
+    expect(within(rpcCard).getByText('not configured here')).toBeInTheDocument();
+    expect(within(rpcCard).queryByText('OP Session Test')).not.toBeInTheDocument();
+
+    fireEvent.click(within(rpcCard).getByRole('button', { name: 'Show other RPC sponsor sessions' }));
+
+    await waitFor(() => {
+      expect(within(rpcCard).getByText('OP Session Test')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /Resource keys/i }));
+
+    expect(await screen.findByText(
+      'No active-session RPC sponsor. Other sessions with RPC: OP Session Test. Switch sessions to use one.'
+    )).toBeInTheDocument();
   });
 
   it('does not render the legacy send-testnet-funds control in settings', () => {
@@ -1067,9 +1172,9 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
 
     render(subject.getSettingsDisplay());
 
-    expect(screen.getByText('Checking failed')).toBeInTheDocument();
+    expect(screen.getByText('Check unavailable')).toBeInTheDocument();
     expect(screen.getAllByText('Edge Session').length).toBeGreaterThan(0);
-    expect(screen.getByText('We could not confirm gate access for this sponsor.')).toBeInTheDocument();
+    expect(screen.getByText('We could not confirm gate access for the active-session sponsor.')).toBeInTheDocument();
     expect(screen.queryByText('RPC Gate · ANY')).not.toBeInTheDocument();
   });
 
@@ -1115,8 +1220,8 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
 
     render(subject.getSettingsDisplay());
 
-    expect(screen.getByText('Checking failed')).toBeInTheDocument();
-    expect(screen.getByText('We could not confirm gate access for this sponsor.')).toBeInTheDocument();
+    expect(screen.getByText('Check unavailable')).toBeInTheDocument();
+    expect(screen.getByText('We could not confirm gate access for the active-session sponsor.')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('Sponsored key configured')).toBeInTheDocument();
     expect(screen.queryByPlaceholderText('Sponsored key configured (SBT required)')).not.toBeInTheDocument();
   });
