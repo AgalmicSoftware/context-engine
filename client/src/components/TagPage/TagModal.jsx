@@ -124,7 +124,7 @@ const TagModal = ({
 }) => {
   const location = useLocation();
   const reduxContext = useContext(ReactReduxContext);
-  const sessionState = reduxContext?.store?.getState?.()?.sessionState || {};
+  const sessionState = reduxContext?.store?.getState?.()?.sessionState;
   const normalizedActiveTag = String(activeTag || '').trim();
   const [selectedTags, setSelectedTags] = useState([]);
   const [demoInfoOpen, setDemoInfoOpen] = useState(false);
@@ -143,14 +143,16 @@ const TagModal = ({
     () => selectedTags.join('||'),
     [selectedTags]
   );
+  const globalSessionSelection = useMemo(
+    () => normalizeGlobalSessionSelection(sessionState || {}),
+    [sessionState]
+  );
   const demoScopeSummary = useMemo(() => {
     if (!demoCorpusMode) return null;
 
     const queryPinnedScopeSlug = parseQuestionSessionSlugFromSearch(location.search);
     const routePinned = queryPinnedScopeSlug !== null;
-    const globalScopeState = buildGlobalTagPageScope(
-      normalizeGlobalSessionSelection(sessionState || {})
-    );
+    const globalScopeState = buildGlobalTagPageScope(globalSessionSelection);
     const effectiveScopeState = routePinned
       ? {
         filterMode: 'set',
@@ -164,7 +166,7 @@ const TagModal = ({
       routePinned,
       localOverrideTouched: false,
     });
-  }, [demoCorpusMode, location.search, sessionState]);
+  }, [demoCorpusMode, globalSessionSelection, location.search]);
 
   const resetAllScrollContainers = useCallback(() => {
     const modalNode = modalRef.current;

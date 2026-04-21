@@ -855,6 +855,22 @@ describe('TagModal', () => {
     expect(screen.queryByTestId('tag-page-session-scope')).not.toBeInTheDocument();
   });
 
+  it('describes the current global session scope inside demo info when the modal is not URL-pinned', () => {
+    renderTagModal({
+      entry: '/demo/corpus-viewer',
+      demoCorpusMode: true,
+      demoCorpusRecordsOverride: demoCorpusRecords,
+      sessionState: {
+        selectedSessionScope: 'list',
+        selectedSessionSlugs: ['alpha', 'beta'],
+      },
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /tag explorer info/i }));
+
+    expect(screen.getByTestId('tag-modal-demo-info-panel')).toHaveTextContent('Session scope: alpha + beta');
+  });
+
   it('keeps the modal framed fullscreen and the backdrop lighter than the default overlay', () => {
     const scssPath = path.join(__dirname, 'TagPage.module.scss');
     const scss = fs.readFileSync(scssPath, 'utf8');
