@@ -2739,6 +2739,7 @@ class UserPage extends Component {
             sbtInfo: null,
             mintedSet: new Set(),
             burnedSet: new Set(),
+            viewerCountsAuthoritative: false,
             blockNumber: 0,
             slug: slug || '',
           };
@@ -2747,18 +2748,23 @@ class UserPage extends Component {
           if (!aggEntry.sbtInfo && entry.sbtInfo) aggEntry.sbtInfo = entry.sbtInfo;
           if (aggEntry.sbtInfo && entry.sbtInfo) aggEntry.sbtInfo = { ...aggEntry.sbtInfo, ...entry.sbtInfo };
           const hasExplicitCounts = hasExplicitOwnershipCounts(entry, viewAddressLower);
+          if (hasExplicitCounts) {
+            aggEntry.mintedSet.delete(viewAddressLower);
+            aggEntry.burnedSet.delete(viewAddressLower);
+            aggEntry.viewerCountsAuthoritative = true;
+          }
           (Array.isArray(entry.mintedAddresses) ? entry.mintedAddresses : [])
             .forEach((address) => {
               const addressLower = String(address || '').toLowerCase();
               if (!addressLower) return;
-              if (hasExplicitCounts && addressLower === viewAddressLower) return;
+              if ((hasExplicitCounts || aggEntry.viewerCountsAuthoritative) && addressLower === viewAddressLower) return;
               aggEntry.mintedSet.add(addressLower);
             });
           (Array.isArray(entry.burnedAddresses) ? entry.burnedAddresses : [])
             .forEach((address) => {
               const addressLower = String(address || '').toLowerCase();
               if (!addressLower) return;
-              if (hasExplicitCounts && addressLower === viewAddressLower) return;
+              if ((hasExplicitCounts || aggEntry.viewerCountsAuthoritative) && addressLower === viewAddressLower) return;
               aggEntry.burnedSet.add(addressLower);
             });
           applyOwnershipSignal(aggEntry, entry, viewAddressLower);
