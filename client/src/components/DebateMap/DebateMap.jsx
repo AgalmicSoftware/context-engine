@@ -18,6 +18,7 @@ import {
   getHistoricalFigureAvatarOrBlockie,
   getHistoricalFigureBlockie,
 } from 'utilities/ui/historicalFigureAvatars.js';
+import { buildPublicRoute } from 'utilities/ui/publicUrl.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { notify } from '../../utilities/ui/notify.js';
 import { buildTagHref } from '../SurveyTool/QuestionTagDropdown.jsx';
@@ -33,23 +34,6 @@ const StandalonePoliticalCompass = React.lazy(() => (
 const uiLog = createLogger('ui');
 
 const cleanAtlasCategoryName = (name) => String(name || '').replace(/^\d+\.\s*/, '');
-const getConfiguredPublicBasePath = () => {
-  const raw = String(
-    (typeof process !== 'undefined' && process?.env ? process.env.PUBLIC_URL : '') || ''
-  ).trim();
-  if (!raw) return '';
-  try {
-    return String(new URL(raw).pathname || '').trim().replace(/\/+$/, '');
-  } catch (_) {
-    return raw.replace(/\/+$/, '');
-  }
-};
-const buildPublicRoute = (pathname = '') => {
-  const normalizedPath = String(pathname || '').trim();
-  if (!normalizedPath) return getConfiguredPublicBasePath() || '/';
-  const basePath = getConfiguredPublicBasePath();
-  return `${basePath}${normalizedPath}` || normalizedPath;
-};
 
 const findAtlasNodeById = (nodes, targetId) => {
   const normalizedTargetId = String(targetId || '').trim().toLowerCase();
