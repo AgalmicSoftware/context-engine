@@ -335,33 +335,7 @@ export function createContractHelperMethods(deps: ContractHelperDeps): ContractH
   const resolveChainIdForRead = (
     cfg: SessionConfigLike | null | undefined,
     contractKey: string = ''
-  ): number => {
-    const normalizedContractKey = String(contractKey || '').trim();
-    const preferredCandidates = normalizedContractKey === 'sbtFactory'
-      ? [
-          cfg?.contracts?.sbtFactory?.chainId,
-          cfg?.networkChainId,
-          cfg?.contracts?.surveys?.chainId,
-        ]
-      : normalizedContractKey === 'surveys'
-        ? [
-            cfg?.contracts?.surveys?.chainId,
-            cfg?.networkChainId,
-            cfg?.contracts?.sbtFactory?.chainId,
-          ]
-        : [
-            cfg?.networkChainId,
-            cfg?.contracts?.surveys?.chainId,
-            cfg?.contracts?.sbtFactory?.chainId,
-          ];
-
-    const orderedCandidates = preferredCandidates.concat([0]);
-    for (const candidate of orderedCandidates) {
-      const id = Number(candidate || 0);
-      if (Number.isFinite(id) && id > 0) return Math.floor(id);
-    }
-    return 0;
-  };
+  ): number => extractChainId(cfg, { contractKey, strict: true });
 
   const buildProviderScopeCacheKey = ({
     provider,
@@ -612,12 +586,7 @@ export function createContractHelperMethods(deps: ContractHelperDeps): ContractH
       }
 
       const cfg = resolveSession(groupKeyOrCfg === undefined ? '' : groupKeyOrCfg);
-      const chId = Number(
-        cfg?.networkChainId ||
-        cfg?.contracts?.surveys?.chainId ||
-        cfg?.contracts?.sbtFactory?.chainId ||
-        0
-      ) || 0;
+      const chId = extractChainId(cfg, { strict: true });
 
       const provider = getReadProviderForGroup(groupKeyOrCfg) as ReadProviderLike;
 

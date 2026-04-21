@@ -19,6 +19,7 @@ import {
   getDemoSessionConfigForDisplay,
 } from '../session/sessionSourceResolver.js';
 import { overlayCachedSessionWorkerConfig } from '../session/sessionWorkerConfigCache.js';
+import { extractChainId } from './chainIdResolution.js';
 import { sessionRegistryStore } from './sessionRegistry.js';
 
 type AnyRecord = Record<string, any>;
@@ -268,13 +269,8 @@ export function getSessionLists(slugOrEmpty: unknown): SessionLists {
 
 export function getSessionChainId(sessionKeyOrCfg: unknown = null): number | null {
   const cfg = getSessionConfigBySlugOrDefault(sessionKeyOrCfg === undefined ? '' : sessionKeyOrCfg);
-  const id = Number(
-    cfg?.networkChainId ||
-    cfg?.contracts?.surveys?.chainId ||
-    cfg?.contracts?.sbtFactory?.chainId ||
-    0
-  );
-  return Number.isFinite(id) && id > 0 ? id : null;
+  const id = extractChainId(cfg, { strict: true });
+  return id || null;
 }
 
 export function getSessionNetwork(sessionKeyOrCfg: unknown = null): AnyRecord | null {
