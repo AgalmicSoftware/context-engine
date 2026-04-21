@@ -7,21 +7,84 @@ import { STORAGE_BACKENDS, normalizeStorageRef } from '../storage/storageRefs.js
 import { cryptoUtils } from '../crypto/cryptography.js';
 import { litStorage } from '../crypto/litProtocol.js';
 import { toStr } from '../shared/primitives.js';
-import {
-  buildDocUploadTagMap as buildTagMap,
-  createDocLibraryLinkRecord,
-  isSelfRecipientDocEncryption,
-  normalizeDocUploadTagsForTagMap as normalizeTagsForTagMap,
-  resolveDocUploadResultId,
-  resolveDocUploadResultStorage,
-} from './docUploadContracts.js';
+import { buildPublicUrlPath } from '../ui/publicUrl.js';
 
-export {
-  buildSessionDocLibraryViewerUrl,
-  createDocLibraryLinkRecord,
-  isSelfRecipientDocEncryption,
-  resolveDocUploadsGate,
-} from './docUploadContracts.js';
+export const resolveDocUploadsGate = (sessionConfig) => {
+  const gate = sessionConfig?.__registry?.gatesByResource?.docUploads || null;
+  const sbtAddresses = Array.isArray(gate?.sbtAddresses) ? gate.sbtAddresses.filter(Boolean) : [];
+  const chainId = Number(gate?.chainId || 0) || null;
+  const rawMode = gate?.mode;
+  const normalizedMode = toStr(rawMode || '').trim().toLowerCase();
+  const mode = (
+    rawMode === 1 ||
+    normalizedMode === '1' ||
+    normalizedMode === 'all' ||
+    normalizedMode === 'and'
+  ) ? 'all' : 'any';
+  const lookupStatus = toStr(gate?.lookupStatus || '').trim().toLowerCase();
+  return {
+    gate,
+    lookupStatus,
+    sbtAddresses,
+    chainId,
+    mode,
+    hasRecipients: lookupStatus === 'ok' && sbtAddresses.length > 0,
+  };
+};
+
+const normalizeTagsForTagMap = (tags) => (
+  (Array.isArray(tags) ? tags : [])
+    .filter((tag) => tag && typeof tag === 'object')
+    .map((tag) => ({ name: toStr(tag.name).trim(), value: toStr(tag.value).trim() }))
+    .filter((tag) => tag.name && tag.value !== '')
+);
+
+const buildTagMap = (tags) => Object.fromEntries(
+  normalizeTagsForTagMap(tags).map((tag) => [tag.name, tag.value])
+);
+
+export const buildSessionDocLibraryViewerUrl = ({
+  sessionToken,
+  txId,
+  storage = 'lit-arweave',
+  kind = 'file',
+  name = '',
+} = {}) => {
+  const token = toStr(sessionToken).trim();
+  const id = toStr(txId).trim();
+  if (!token || !id) return '';
+  const pathname = buildPublicUrlPath(`/session/${encodeURIComponent(token)}/docs`);
+  const query = new URLSearchParams();
+  query.set('__ceDocTx', id);
+  query.set('__ceDocStorage', toStr(storage).trim() || 'lit-arweave');
+  query.set('__ceDocKind', toStr(kind).trim() || 'file');
+  if (toStr(name).trim()) query.set('__ceDocName', toStr(name).trim());
+  return `${pathname}?${query.toString()}`;
+};
+
+export const createDocLibraryLinkRecord = ({ url, title } = {}) => {
+  const rawUrl = toStr(url).trim();
+  if (!rawUrl) throw new Error('Invalid URL.');
+
+  let parsed;
+  try {
+    parsed = new URL(rawUrl);
+  } catch (_) {
+    throw new Error('Invalid URL.');
+  }
+
+  if (!/^https?:$/.test(parsed.protocol)) {
+    throw new Error('URL must be http(s).');
+  }
+
+  return {
+    v: 1,
+    kind: 'link',
+    url: parsed.toString(),
+    title: toStr(title).trim() || null,
+    createdAt: new Date().toISOString(),
+  };
+};
 
 const buildBaseUploadContext = ({ account, providerLike, chainId } = {}) => ({
   account,

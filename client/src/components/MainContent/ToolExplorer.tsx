@@ -7,6 +7,7 @@ import { createLogger } from '../../utilities/logging';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { hasCachedCreateSbtForm } from '../../utilities/sbt/sbtCreateFormCache.js';
 import { sbtsListPath } from '../../utilities/ui/terminology.js';
+import { buildPublicRoute } from '../../utilities/ui/publicUrl.js';
 import { getAllSessionSlugs, getSessionConfigBySlug } from '../../utilities/web3/contractScripts.js';
 import { normalizeSessionSlug } from '../../utilities/session/sessionNaming.js';
 import { toStr } from '../../utilities/shared/primitives.js';
@@ -39,19 +40,6 @@ const DebateMap = React.lazy(() => import("../DebateMap/DebateMap"));
 const AudioSurveyGenerator = React.lazy(() => import("../SurveyTool/SurveyGenerator/SurveyGenerator"));
 
 const log = createLogger('ui');
-
-type ToolComponent = React.ComponentType<any> | React.LazyExoticComponent<React.ComponentType<any>>;
-
-type ToolData = {
-  name: string;
-  subtext: string;
-  explainText: string;
-  image: string;
-  headerImage?: string | null;
-  content: ToolComponent;
-  disabled: boolean;
-  status: 'live' | 'future';
-};
 
 type ExpandedComponentState = {
   component: ToolComponent;
