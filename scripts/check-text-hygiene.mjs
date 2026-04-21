@@ -36,6 +36,8 @@ const WHITESPACE_ONLY_ISSUE_PATTERNS = Object.freeze([
   /:\d+: trailing whitespace$/,
 ]);
 
+const CHANGELOG_PRD_IDENTIFIER_PATTERN = /\bPRDs?[\s-]\d{1,4}(-[A-Z]\d+)?(-\d{1,4})?\b/g;
+
 const isTrackedTextFile = (filePath) => {
   if (INCLUDED_SPECIAL_FILES.has(filePath)) {
     return true;
@@ -100,6 +102,14 @@ export const collectTextHygieneIssues = ({ rootDir = process.cwd() } = {}) => {
       const line = lines[index].replace(/\r$/, '');
       if (/[ \t]+$/.test(line)) {
         issues.push(`${filePath}:${index + 1}: trailing whitespace`);
+      }
+
+      if (path.basename(filePath) === 'CHANGELOG.md') {
+        for (const match of line.matchAll(CHANGELOG_PRD_IDENTIFIER_PATTERN)) {
+          issues.push(
+            `${filePath}:${index + 1}: changelog must not reference PRD identifier "${match[0]}"`
+          );
+        }
       }
     }
   }
