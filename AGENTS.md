@@ -92,6 +92,7 @@ npm run ai:seed-survey:question-types            # seed question type data
 
 ## Workflow
 - Commit convention: `autocoder: <descriptive message>` for automated changes
+- Commit messages must not reference internal PRD identifiers (e.g. `PRD 334`, `PRDs 329-336`). Describe the change by what it does, not by the tracking ID — PRDs churn (merged, renumbered, deprecated) and referencing them ties public commit history to internal bookkeeping.
 - Keep fixture/test data non-identifying (no real names, emails, API keys)
 - New user-facing workflow/features should add or update related automated E2E smoke coverage when relevant, especially for UI, encryption, gating, worker, or Arweave flows
 - Park PRDs and other planned-work writeups under `TODO/` (typically `TODO/PRDs/`), not `docs/`
