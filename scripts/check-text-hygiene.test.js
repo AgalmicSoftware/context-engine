@@ -3,6 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 const { execFileSync, spawnSync } = require('node:child_process');
 
@@ -15,9 +16,7 @@ function writeFile(rootDir, relativePath, contents) {
 }
 
 function withTempGitRepo(run) {
-  const tempRoot = path.join(__dirname, '.tmp-text-hygiene-');
-  fs.mkdirSync(tempRoot, { recursive: true });
-  const rootDir = fs.mkdtempSync(path.join(tempRoot, 'repo-'));
+  const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ce-text-hygiene-'));
   try {
     execFileSync('git', ['init'], { cwd: rootDir, stdio: 'ignore' });
     return run(rootDir);
