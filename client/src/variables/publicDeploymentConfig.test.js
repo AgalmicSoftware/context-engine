@@ -11,6 +11,9 @@ const ORIGINAL_ENV = ENV_KEYS.reduce((acc, key) => {
   return acc;
 }, {});
 
+const EXPECTED_DEFAULT_SHARED_WORKER_URL = 'https://demo-worker-030226.agalmic.workers.dev'; // intentional: production default worker URL snapshot - must fail if defaults silently change
+const EXPECTED_DEPLOY_HELPER_URL = 'https://ce-deploy-helper.agalmic.workers.dev/'; // intentional: production default deploy URL snapshot - must fail if defaults silently change
+
 const clearPublicDeploymentEnv = () => {
   ENV_KEYS.forEach((key) => {
     try {
@@ -56,9 +59,9 @@ describe('publicDeploymentConfig', () => {
     jest.isolateModules(() => {
       const config = require('./publicDeploymentConfig.js');
 
-      expect(config.DEFAULT_SHARED_WORKER_URL).toBe('https://demo-worker-030226.agalmic.workers.dev');
-      expect(config.DEPLOY_HELPER_URL).toBe('https://ce-deploy-helper.agalmic.workers.dev/');
-      expect(config.HEALTHCHECK_WORKER_URL).toBe('https://demo-worker-030226.agalmic.workers.dev');
+      expect(config.DEFAULT_SHARED_WORKER_URL).toBe(EXPECTED_DEFAULT_SHARED_WORKER_URL);
+      expect(config.DEPLOY_HELPER_URL).toBe(EXPECTED_DEPLOY_HELPER_URL);
+      expect(config.HEALTHCHECK_WORKER_URL).toBe(EXPECTED_DEFAULT_SHARED_WORKER_URL);
     });
   });
 
@@ -78,7 +81,7 @@ describe('publicDeploymentConfig', () => {
     process.env.REACT_APP_CE_SHARED_WORKER_URL = 'https://shared.example.test/';
     process.env.REACT_APP_CE_DEPLOY_HELPER_URL = 'https://deploy-helper.example.test';
     process.env.REACT_APP_CE_HEALTHCHECK_WORKER_URL = 'https://healthcheck.example.test/';
-    process.env.REACT_APP_CE_WORKER_BUNDLE_URL = 'https://assets.example.com/sessionCorsWorker.bundle.js';
+    process.env.REACT_APP_CE_WORKER_BUNDLE_URL = 'https://assets.example.test/sessionCorsWorker.bundle.js';
     process.env.REACT_APP_CE_DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED = 'false';
 
     jest.isolateModules(() => {

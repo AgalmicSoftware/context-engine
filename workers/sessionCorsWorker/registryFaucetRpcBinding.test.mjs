@@ -3,6 +3,19 @@ import assert from 'node:assert/strict';
 
 import { createRegistryFaucetRpcHelpersWithWorkerDeps } from './registryFaucetRpcBinding.js';
 
+const BASE_SEPOLIA_FAUCET_FALLBACK_RPC_URLS = Object.freeze([
+  'https://sepolia.base.org', // intentional: production faucet fallback snapshot
+  'https://base-sepolia-rpc.publicnode.com', // intentional: production faucet fallback snapshot
+  'https://base-sepolia.drpc.org', // intentional: production faucet fallback snapshot
+]);
+const OP_SEPOLIA_FAUCET_FALLBACK_RPC_URLS = Object.freeze([
+  'https://sepolia.optimism.io', // intentional: production faucet fallback snapshot
+  'https://optimism-sepolia.publicnode.com', // intentional: production faucet fallback snapshot
+  'https://optimism-sepolia-rpc.publicnode.com', // intentional: production faucet fallback snapshot
+  'https://optimism-sepolia.drpc.org', // intentional: production faucet fallback snapshot
+  'https://optimism-sepolia.gateway.tenderly.co', // intentional: production faucet fallback snapshot
+]);
+
 const toStr = (value) => (typeof value === 'string' ? value : value == null ? '' : String(value));
 
 const createDeps = () => ({
@@ -74,27 +87,27 @@ test('createRegistryFaucetRpcHelpersWithWorkerDeps preserves registry and gate R
 
   const config = {
     registryChainId: '84532',
-    rpcUrl: [' https://shared.example ', 'https://direct-only.example'],
+    rpcUrl: [' https://shared.example.test ', 'https://direct-only.example.test'],
     rpcUrlsByChainId: {
-      84532: ['https://shared.example', ' https://mapped-only.example '],
-      8453: ['https://mainnet-only.example'],
+      84532: ['https://shared.example.test', ' https://mapped-only.example.test '],
+      8453: ['https://mainnet-only.example.test'],
     },
   };
 
   assert.deepEqual(helpers.resolveRegistryRpcUrls(config), [
-    'https://shared.example',
-    'https://mapped-only.example',
-    'https://direct-only.example',
+    'https://shared.example.test',
+    'https://mapped-only.example.test',
+    'https://direct-only.example.test',
   ]);
-  assert.equal(helpers.resolveRegistryRpcUrl(config), 'https://shared.example');
+  assert.equal(helpers.resolveRegistryRpcUrl(config), 'https://shared.example.test');
   assert.deepEqual(helpers.resolveRpcUrlListForGate(config, 84532), [
-    'https://shared.example',
-    'https://mapped-only.example',
-    'https://direct-only.example',
+    'https://shared.example.test',
+    'https://mapped-only.example.test',
+    'https://direct-only.example.test',
   ]);
-  assert.equal(helpers.resolveRpcUrlForGate(config, 84532), 'https://shared.example');
+  assert.equal(helpers.resolveRpcUrlForGate(config, 84532), 'https://shared.example.test');
   assert.deepEqual(helpers.resolveRpcUrlListForGate(config, 8453), [
-    'https://mainnet-only.example',
+    'https://mainnet-only.example.test',
   ]);
 });
 
@@ -102,59 +115,57 @@ test('createRegistryFaucetRpcHelpersWithWorkerDeps preserves faucet rpc explicit
   const helpers = createRegistryFaucetRpcHelpersWithWorkerDeps({
     deps: createDeps(),
     defaults: {
-      defaultFaucetRpcUrl: 'https://default.example',
+      defaultFaucetRpcUrl: 'https://default.example.test',
     },
   });
 
   const explicitConfig = {
     registryChainId: 84532,
     networkChainId: 84532,
-    rpcUrl: 'https://fallback.example',
+    rpcUrl: 'https://fallback.example.test',
     rpcUrlsByChainId: {
-      84532: ['https://mapped.example'],
+      84532: ['https://mapped.example.test'],
     },
   };
 
   assert.equal(
-    helpers.resolveFaucetRpcUrl(explicitConfig, { chainId: 8453, rpcUrl: ' https://explicit.example ' }),
-    'https://explicit.example',
+    helpers.resolveFaucetRpcUrl(explicitConfig, { chainId: 8453, rpcUrl: ' https://explicit.example.test ' }),
+    'https://explicit.example.test',
   );
 
   const networkPreferredConfig = {
     registryChainId: 8453,
     networkChainId: 84532,
-    rpcUrl: 'https://fallback.example',
+    rpcUrl: 'https://fallback.example.test',
     rpcUrlsByChainId: {
-      84532: [' https://network-chain.example '],
-      8453: ['https://registry-chain.example'],
+      84532: [' https://network-chain.example.test '],
+      8453: ['https://registry-chain.example.test'],
     },
   };
 
   assert.equal(
     helpers.resolveFaucetRpcUrl(networkPreferredConfig, {}),
-    'https://network-chain.example',
+    'https://network-chain.example.test',
   );
 
   assert.deepEqual(
     helpers.resolveFaucetRpcUrls({
       registryChainId: 84532,
       networkChainId: 84532,
-      rpcUrl: ['https://shared.example', 'https://fallback-only.example'],
+      rpcUrl: ['https://shared.example.test', 'https://fallback-only.example.test'],
       rpcUrlsByChainId: {
-        84532: ['https://shared.example', 'https://mapped-only.example'],
+        84532: ['https://shared.example.test', 'https://mapped-only.example.test'],
       },
     }, {
-      rpcUrl: 'https://explicit.example',
+      rpcUrl: 'https://explicit.example.test',
     }),
     [
-      'https://explicit.example',
-      'https://sepolia.base.org',
-      'https://base-sepolia-rpc.publicnode.com',
-      'https://base-sepolia.drpc.org',
-      'https://shared.example',
-      'https://mapped-only.example',
-      'https://fallback-only.example',
-      'https://default.example',
+      'https://explicit.example.test',
+      ...BASE_SEPOLIA_FAUCET_FALLBACK_RPC_URLS,
+      'https://shared.example.test',
+      'https://mapped-only.example.test',
+      'https://fallback-only.example.test',
+      'https://default.example.test',
     ],
   );
 
@@ -162,24 +173,20 @@ test('createRegistryFaucetRpcHelpersWithWorkerDeps preserves faucet rpc explicit
     helpers.resolveFaucetRpcUrls({
       registryChainId: 11155420,
       networkChainId: 11155420,
-      rpcUrl: ['https://shared.example', 'https://fallback-only.example'],
+      rpcUrl: ['https://shared.example.test', 'https://fallback-only.example.test'],
       rpcUrlsByChainId: {
-        11155420: ['https://shared.example', 'https://mapped-only.example'],
+        11155420: ['https://shared.example.test', 'https://mapped-only.example.test'],
       },
     }, {
-      rpcUrl: 'https://explicit.example',
+      rpcUrl: 'https://explicit.example.test',
     }),
     [
-      'https://explicit.example',
-      'https://sepolia.optimism.io',
-      'https://optimism-sepolia.publicnode.com',
-      'https://optimism-sepolia-rpc.publicnode.com',
-      'https://optimism-sepolia.drpc.org',
-      'https://optimism-sepolia.gateway.tenderly.co',
-      'https://shared.example',
-      'https://mapped-only.example',
-      'https://fallback-only.example',
-      'https://default.example',
+      'https://explicit.example.test',
+      ...OP_SEPOLIA_FAUCET_FALLBACK_RPC_URLS,
+      'https://shared.example.test',
+      'https://mapped-only.example.test',
+      'https://fallback-only.example.test',
+      'https://default.example.test',
     ],
   );
 });

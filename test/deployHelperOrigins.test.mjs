@@ -21,14 +21,14 @@ const makeKvBinding = (initial = {}) => {
 
 test('resolveDeployHelperAllowList prefers the KV override over env origins', async () => {
   const allowList = await resolveDeployHelperAllowList({
-    ALLOWED_ORIGINS: 'https://env.example',
+    ALLOWED_ORIGINS: 'https://env.example.test',
     DEPLOY_HELPER_KV: makeKvBinding({
-      'deploy-helper:origins': JSON.stringify(['https://kv.example']),
+      'deploy-helper:origins': JSON.stringify(['https://kv.example.test']),
     }),
   });
 
   assert.deepEqual(allowList, {
-    origins: ['https://kv.example'],
+    origins: ['https://kv.example.test'],
     source: 'kv',
   });
 });
@@ -46,9 +46,9 @@ test('resolveDeployHelperAllowList falls back to localhost-only when env and KV 
 test('resolveDeployHelperFallbackAllowList keeps configured env origins available for admin CORS', async () => {
   assert.deepEqual(
     resolveDeployHelperFallbackAllowList({
-      ALLOWED_ORIGINS: 'https://env.example\nhttp://localhost:3000',
+      ALLOWED_ORIGINS: 'https://env.example.test\nhttp://localhost:3000',
     }),
-    ['https://env.example', 'http://localhost:3000']
+    ['https://env.example.test', 'http://localhost:3000']
   );
 });
 
@@ -57,7 +57,7 @@ test('ensureWorkersDevSubdomain clears stale lookup errors after it successfully
     new Response(JSON.stringify({
       success: false,
       errors: [{
-        message: 'You do not have a workers.dev subdomain. Please go to Cloudflare Workers first.',
+        message: 'You do not have a worker subdomain. Please go to Cloudflare Workers first.',
       }],
     }), {
       status: 400,
@@ -106,7 +106,7 @@ test('ensureWorkersDevSubdomain clears stale lookup errors after it successfully
   assert.equal(result.scriptSubdomainError, '');
   assert.equal(
     result.workerUrl,
-    'https://ce-deploy-helper.ce-ab09af5b7d.workers.dev/'
+    'https://ce-deploy-helper.ce-ab09af5b7d.workers.dev/' // intentional: real URL — tests worker URL construction
   );
   assert.match(String(calls[1][1]?.body || ''), /"subdomain":"ce-ab09af5b7d"/);
 });

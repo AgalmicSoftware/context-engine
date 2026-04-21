@@ -25,13 +25,13 @@ describe('imageScripts worker auth options', () => {
   });
 
   it('uses the strict demo-fallback policy for worker-backed image fetches', async () => {
-    getCorsProxyUrlOrThrow.mockResolvedValue('https://worker.example/base/');
+    getCorsProxyUrlOrThrow.mockResolvedValue('https://worker.example.test/base/');
     fetchWorkerWithAuth.mockResolvedValue({
       ok: true,
       blob: async () => new Blob([new Uint8Array([137, 80, 78, 71])], { type: 'image/png' }),
     });
 
-    const result = await fetchImageFromURL('https://arweave.net/some-image');
+    const result = await fetchImageFromURL('https://image.example.test/some-image');
 
     expect(result).toBeInstanceOf(File);
     expect(result.type).toBe('image/png');
@@ -39,12 +39,12 @@ describe('imageScripts worker auth options', () => {
       allowDemoFallback: defaultStrictAllowDemoFallback(),
     });
     expect(fetchWorkerWithAuth).toHaveBeenCalledWith(
-      'https://worker.example/base/',
+      'https://worker.example.test/base/',
       expect.objectContaining({
         method: 'POST',
       }),
       expect.objectContaining({
-        workerUrl: 'https://worker.example/base',
+        workerUrl: 'https://worker.example.test/base',
         allowDemoFallback: defaultStrictAllowDemoFallback(),
       }),
     );

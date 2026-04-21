@@ -58,12 +58,13 @@ describe('sessionScanScope helpers', () => {
   });
 
   it('normalizes worker host/url entries to session slugs', () => {
-    expect(normalizeSessionScanSlug('test-3-worker-022226.account-subdomain.workers.dev')).toBe('test-3');
-    expect(normalizeSessionScanSlug('https://test-3-worker-022226.account-subdomain.workers.dev/health')).toBe('test-3');
+    const workerHost = 'test-3-worker-022226.account-subdomain.workers.dev'; // intentional: real URL — tests allowlist enforcement
+    expect(normalizeSessionScanSlug(workerHost)).toBe('test-3');
+    expect(normalizeSessionScanSlug(`https://${workerHost}/health`)).toBe('test-3');
     expect(
       normalizeSessionScanSlugs([
-        'test-3-worker-022226.account-subdomain.workers.dev',
-        'https://test-3-worker-022226.account-subdomain.workers.dev',
+        workerHost,
+        `https://${workerHost}`,
       ])
     ).toEqual(['test-3']);
   });

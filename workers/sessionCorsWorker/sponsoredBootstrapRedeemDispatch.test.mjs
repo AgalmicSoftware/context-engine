@@ -21,7 +21,7 @@ const createKvEnv = (record = null, envOverrides = {}) => {
   };
 };
 
-const createDeployRequest = (body = {}, origin = 'https://allowed.example') => ({
+const createDeployRequest = (body = {}, origin = 'https://allowed.example.test') => ({
   headers: new Headers({ Origin: origin }),
   json: async () => body,
 });
@@ -30,7 +30,7 @@ const createDeployDeps = (overrides = {}) => ({
   json: createJsonStub(),
   getCorsContext: async () => ({
     ok: true,
-    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
+    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
   }),
   ...overrides,
 });
@@ -64,7 +64,7 @@ test('dispatchSponsoredBootstrapRedeem uses the embedded deploy-helper path firs
     type: 'deploy-worker',
     sourceSessionSlug: 'source-session',
     sourceConfig: {
-      allowOrigins: ['https://allowed.example'],
+      allowOrigins: ['https://allowed.example.test'],
     },
     cloudflareApiToken: 'cf-sponsored-token',
   }, {
@@ -90,7 +90,7 @@ test('dispatchSponsoredBootstrapRedeem uses the embedded deploy-helper path firs
         return {
           ok: true,
           status: 200,
-          body: { ok: true, workerUrl: 'https://fresh-session.example.workers.dev' },
+          body: { ok: true, workerUrl: 'https://fresh-session.example.test' },
         };
       },
       fetch: async () => {
@@ -107,14 +107,14 @@ test('dispatchSponsoredBootstrapRedeem uses the embedded deploy-helper path firs
       apiToken: 'cf-sponsored-token',
     },
     env,
-    requestOrigin: 'https://allowed.example',
+    requestOrigin: 'https://allowed.example.test',
     consoleImpl: console,
   }]);
   assert.deepEqual(deletes, ['sponsoredGrant:deploy-grant-1']);
   assert.deepEqual(result, {
-    body: { ok: true, workerUrl: 'https://fresh-session.example.workers.dev' },
+    body: { ok: true, workerUrl: 'https://fresh-session.example.test' },
     status: 200,
-    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
+    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
   });
 });
 
@@ -123,7 +123,7 @@ test('dispatchSponsoredBootstrapRedeem returns retryable embedded deploy failure
     type: 'deploy-worker',
     sourceSessionSlug: 'source-session',
     sourceConfig: {
-      allowOrigins: ['https://allowed.example'],
+      allowOrigins: ['https://allowed.example.test'],
     },
     cloudflareApiToken: 'cf-sponsored-token',
   }, {
@@ -159,7 +159,7 @@ test('dispatchSponsoredBootstrapRedeem returns retryable embedded deploy failure
   assert.deepEqual(result, {
     body: { error: 'Embedded deploy unavailable.' },
     status: 502,
-    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
+    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
   });
 });
 
@@ -168,7 +168,7 @@ test('dispatchSponsoredBootstrapRedeem rejects deploy grants when embedded deplo
     type: 'deploy-worker',
     sourceSessionSlug: 'source-session',
     sourceConfig: {
-      allowOrigins: ['https://allowed.example'],
+      allowOrigins: ['https://allowed.example.test'],
       embeddedDeployHelperEnabled: true,
     },
     cloudflareApiToken: 'cf-sponsored-token',
@@ -201,7 +201,7 @@ test('dispatchSponsoredBootstrapRedeem rejects deploy grants when embedded deplo
   assert.deepEqual(result, {
     body: { error: 'Embedded sponsored deploy is disabled on this worker.' },
     status: 400,
-    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
+    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
   });
 });
 
@@ -210,7 +210,7 @@ test('dispatchSponsoredBootstrapRedeem returns embedded deploy failures directly
     type: 'deploy-worker',
     sourceSessionSlug: 'source-session',
     sourceConfig: {
-      allowOrigins: ['https://allowed.example'],
+      allowOrigins: ['https://allowed.example.test'],
     },
     cloudflareApiToken: 'cf-sponsored-token',
   }, {
@@ -245,7 +245,7 @@ test('dispatchSponsoredBootstrapRedeem returns embedded deploy failures directly
   assert.deepEqual(result, {
     body: { error: 'Missing workerName.' },
     status: 400,
-    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
+    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
   });
 });
 
@@ -254,7 +254,7 @@ test('dispatchSponsoredBootstrapRedeem runs faucet grants through the faucet ser
     type: 'faucet-tx',
     sourceSessionSlug: 'source-session',
     sourceConfig: {
-      allowOrigins: ['https://allowed.example'],
+      allowOrigins: ['https://allowed.example.test'],
       faucet: { amountEth: '0.0002' },
     },
     faucetPrivateKey: '0xfaucet',
@@ -263,7 +263,7 @@ test('dispatchSponsoredBootstrapRedeem runs faucet grants through the faucet ser
 
   const result = await dispatchSponsoredBootstrapRedeem({
     request: {
-      headers: new Headers({ Origin: 'https://allowed.example' }),
+      headers: new Headers({ Origin: 'https://allowed.example.test' }),
       json: async () => ({
         faucetGrantToken: 'faucet-grant-1',
         to: '0x1111111111111111111111111111111111111111',
@@ -276,14 +276,14 @@ test('dispatchSponsoredBootstrapRedeem runs faucet grants through the faucet ser
       json: createJsonStub(),
       getCorsContext: async () => ({
         ok: true,
-        headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
+        headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
       }),
       faucet: async (value) => {
         faucetCalls.push(value);
         return {
           body: { txHash: '0xfaucet123' },
           status: 200,
-          headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
+          headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
         };
       },
     },
@@ -298,10 +298,10 @@ test('dispatchSponsoredBootstrapRedeem runs faucet grants through the faucet ser
       faucetPrivateKey: '0xfaucet',
     },
     config: {
-      allowOrigins: ['https://allowed.example'],
+      allowOrigins: ['https://allowed.example.test'],
       faucet: { amountEth: '0.0002' },
     },
-    baseHeaders: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
+    baseHeaders: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
     slug: 'source-session',
     requesterAddress: '0x1111111111111111111111111111111111111111',
     tokenHasFaucetScope: true,
@@ -310,6 +310,6 @@ test('dispatchSponsoredBootstrapRedeem runs faucet grants through the faucet ser
   assert.deepEqual(result, {
     body: { txHash: '0xfaucet123' },
     status: 200,
-    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
+    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
   });
 });

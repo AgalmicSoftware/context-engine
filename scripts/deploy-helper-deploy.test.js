@@ -38,12 +38,12 @@ test('parseArgs accepts required deploy-helper flags and boolean switches', asyn
   assert.deepEqual(parseArgs([
     '--worker-name', 'ce-helper',
     '--api-token', 'cf-token',
-    '--allowed-origins', 'https://app.example.com,http://localhost:3000',
+    '--allowed-origins', 'https://app.example.test,http://localhost:3000',
     '--skip-build',
   ]), {
     'worker-name': 'ce-helper',
     'api-token': 'cf-token',
-    'allowed-origins': 'https://app.example.com,http://localhost:3000',
+    'allowed-origins': 'https://app.example.test,http://localhost:3000',
     'skip-build': true,
   });
 });
@@ -63,8 +63,8 @@ test('resolveDeployHelperDeployConfig falls back to the stable hosted/local boot
 
   assert.deepEqual(config.allowedOrigins, DEFAULT_DEPLOY_HELPER_ALLOWED_ORIGINS);
   assert.deepEqual(config.allowedOrigins, [
-    'https://contextengine.xyz',
-    'https://www.contextengine.xyz',
+    'https://contextengine.xyz', // intentional: production default hosted app origin
+    'https://www.contextengine.xyz', // intentional: production default hosted app origin
     'http://localhost:3000',
     'http://127.0.0.1:3000',
     'http://localhost:3001',
@@ -84,7 +84,7 @@ test('resolveDeployHelperDeployConfig bootstrap defaults do not infer arbitrary 
     env: {},
   });
 
-  assert.equal(config.allowedOrigins.includes('https://app.example.com'), false);
+  assert.equal(config.allowedOrigins.includes('https://app.example.test'), false);
 });
 
 test('resolveDeployHelperDeployConfig normalizes explicit env allowlist values', async () => {
@@ -99,7 +99,7 @@ test('resolveDeployHelperDeployConfig normalizes explicit env allowlist values',
     env: {
       CLOUDFLARE_API_TOKEN: 'cf-token',
       DEPLOY_HELPER_WORKER_NAME: 'ce-helper',
-      ALLOWED_ORIGINS: 'https://app.example.com\nlocalhost:3000',
+      ALLOWED_ORIGINS: 'https://app.example.test\nlocalhost:3000',
     },
     rootDir: '/tmp/context-engine',
   });
@@ -107,7 +107,7 @@ test('resolveDeployHelperDeployConfig normalizes explicit env allowlist values',
   assert.equal(config.apiToken, 'cf-token');
   assert.equal(config.workerName, 'ce-helper');
   assert.deepEqual(config.allowedOrigins, [
-    'https://app.example.com',
+    'https://app.example.test',
     'http://localhost:3000',
   ]);
   assert.equal(config.workerBundleUrl, DEFAULT_SESSION_WORKER_BUNDLE_URL);
@@ -121,8 +121,8 @@ test('buildDeployHelperUploadMetadata writes the expected bindings', async () =>
   const { buildDeployHelperUploadMetadata } = await loadModule();
   const metadata = buildDeployHelperUploadMetadata({
     kvNamespaceId: 'kv-123',
-    allowedOrigins: ['https://app.example.com', 'http://localhost:3000'],
-    workerBundleUrl: 'https://assets.example.com/sessionCorsWorker.bundle.js',
+    allowedOrigins: ['https://app.example.test', 'http://localhost:3000'],
+    workerBundleUrl: 'https://assets.example.test/sessionCorsWorker.bundle.js',
     compatibilityDate: '2025-01-01',
     workerCompatibilityDate: '2025-02-02',
     defaultSessionSlug: 'alpha',
@@ -131,8 +131,8 @@ test('buildDeployHelperUploadMetadata writes the expected bindings', async () =>
   assert.equal(metadata.main_module, 'worker.mjs');
   assert.deepEqual(metadata.bindings, [
     { name: 'DEPLOY_HELPER_KV', type: 'kv_namespace', namespace_id: 'kv-123' },
-    { name: 'ALLOWED_ORIGINS', type: 'plain_text', text: 'https://app.example.com,http://localhost:3000' },
-    { name: 'WORKER_BUNDLE_URL', type: 'plain_text', text: 'https://assets.example.com/sessionCorsWorker.bundle.js' },
+    { name: 'ALLOWED_ORIGINS', type: 'plain_text', text: 'https://app.example.test,http://localhost:3000' },
+    { name: 'WORKER_BUNDLE_URL', type: 'plain_text', text: 'https://assets.example.test/sessionCorsWorker.bundle.js' },
     { name: 'WORKER_COMPATIBILITY_DATE', type: 'plain_text', text: '2025-02-02' },
     { name: 'DEFAULT_SESSION_SLUG', type: 'plain_text', text: 'alpha' },
   ]);
@@ -169,7 +169,7 @@ test('deployDeployHelperWorker generates an ADMIN_SECRET when one is not provide
   });
 });
 
-test('deployDeployHelperWorker uploads the bundled helper, reuses matching KV, and enables workers.dev', async () => {
+test('deployDeployHelperWorker uploads the bundled helper, reuses matching KV, and enables worker subdomain', async () => {
   const { deployDeployHelperWorker } = await loadModule();
   const fetchMock = makeFetchSequence([
     cfSuccess([{ id: 'account-123', name: 'Test Account' }]),
@@ -184,7 +184,7 @@ test('deployDeployHelperWorker uploads the bundled helper, reuses matching KV, a
     apiToken: 'cf-token',
     workerName: 'ce-helper',
     bundleSource: 'export default { async fetch() { return new Response("ok"); } };',
-    allowedOrigins: ['https://app.example.com', 'http://localhost:3000'],
+    allowedOrigins: ['https://app.example.test', 'http://localhost:3000'],
     fetchImpl: fetchMock,
     adminSecret: 'top-secret',
   });
@@ -193,7 +193,7 @@ test('deployDeployHelperWorker uploads the bundled helper, reuses matching KV, a
   assert.equal(result.accountId, 'account-123');
   assert.equal(result.kvNamespaceId, 'kv-123');
   assert.equal(result.reusedKvNamespace, true);
-  assert.equal(result.workerUrl, 'https://ce-helper.tenant-subdomain.workers.dev/');
+  assert.equal(result.workerUrl, 'https://ce-helper.tenant-subdomain.workers.dev/'); // intentional: real URL — tests worker URL construction
   assert.equal(result.generatedAdminSecret, false);
 
   const scriptUpload = fetchMock.calls[2];

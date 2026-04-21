@@ -11,6 +11,7 @@ const PAYER_PRIVATE_KEY = '0x59c6995e998f97a5a0044976f84ce7de5d9d7f17b2f6a6a5f76
 const PAYER_ADDRESS = '0x3AC823CA9AcDA550244C6fF4927b5e1478E70Ff7';
 const REQUESTER_ADDRESS = '0x00000000000000000000000000000000000000aa';
 const SESSION_PUBLIC_KEY = '6e28158980f0a619cb6c90ddc396e5c79bdf65cf60b1ab5df0e9972620c07ef4';
+const DEFAULT_LIT_RPC_URL = 'https://yellowstone-rpc.litprotocol.com/'; // intentional: real URL — tests default RPC enforcement
 
 const loadLitPaymentDelegationModule = async (ethersOverride) => {
   const source = readFileSync(new URL('./litPaymentDelegation.js', import.meta.url), 'utf8');
@@ -44,7 +45,7 @@ test('readLitPayerStatus supports a v5-shaped ethers runtime', async () => {
 
     balance(address) {
       assert.equal(address, PAYER_ADDRESS);
-      assert.equal(this.provider.connection?.url, 'https://yellowstone-rpc.litprotocol.com/');
+      assert.equal(this.provider.connection?.url, DEFAULT_LIT_RPC_URL);
       return Promise.resolve(v5Ethers.BigNumber.from('1000000000000000000'));
     }
 
@@ -105,7 +106,7 @@ test('issueLitPaymentDelegation caps expiration at the worker ttl', async () => 
 
     getPayers(address) {
       assert.equal(address.toLowerCase(), REQUESTER_ADDRESS.toLowerCase());
-      assert.equal(this.provider.connection?.url, 'https://yellowstone-rpc.litprotocol.com/');
+      assert.equal(this.provider.connection?.url, DEFAULT_LIT_RPC_URL);
       return Promise.resolve([]);
     }
 
@@ -149,7 +150,7 @@ test('issueLitPaymentDelegation caps expiration at the worker ttl', async () => 
       sessionPublicKey: SESSION_PUBLIC_KEY,
       litNetwork: 'naga-dev',
       litPayerPrivateKey: PAYER_PRIVATE_KEY,
-      audience: 'https://allowed.example/path',
+      audience: 'https://allowed.example.test/path',
       expiresAt: '2099-01-01T00:00:00.000Z',
     });
 
@@ -158,7 +159,7 @@ test('issueLitPaymentDelegation caps expiration at the worker ttl', async () => 
     assert.equal(result.delegatedNow, true);
     assert.match(
       result.capabilityAuthSig.signedMessage,
-      /^allowed\.example wants you to sign in with your Ethereum account:/m,
+      /^allowed\.example.test wants you to sign in with your Ethereum account:/m,
     );
   } finally {
     Date.now = originalDateNow;
@@ -173,7 +174,7 @@ test('issueLitPaymentDelegation preserves the auth sig when status refresh fails
 
     getPayers(address) {
       assert.equal(address.toLowerCase(), REQUESTER_ADDRESS.toLowerCase());
-      assert.equal(this.provider.connection?.url, 'https://yellowstone-rpc.litprotocol.com/');
+      assert.equal(this.provider.connection?.url, DEFAULT_LIT_RPC_URL);
       return Promise.resolve([]);
     }
 
@@ -215,7 +216,7 @@ test('issueLitPaymentDelegation preserves the auth sig when status refresh fails
     sessionPublicKey: SESSION_PUBLIC_KEY,
     litNetwork: 'naga-dev',
     litPayerPrivateKey: PAYER_PRIVATE_KEY,
-    audience: 'https://allowed.example/path',
+    audience: 'https://allowed.example.test/path',
     expiresAt: '2099-01-01T00:00:00.000Z',
   });
 
@@ -224,6 +225,6 @@ test('issueLitPaymentDelegation preserves the auth sig when status refresh fails
   assert.equal(result.status, null);
   assert.match(
     result.capabilityAuthSig.signedMessage,
-    /^allowed\.example wants you to sign in with your Ethereum account:/m,
+    /^allowed\.example.test wants you to sign in with your Ethereum account:/m,
   );
 });

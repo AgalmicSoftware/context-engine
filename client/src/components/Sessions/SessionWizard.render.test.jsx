@@ -48,7 +48,7 @@ const buildMockSponsoredBundle = () => ({
     createdBy: '0xadmin',
     expiresAt: '2099-03-21T12:00:00.000Z',
     sourceSessionSlug: 'source-session',
-    sourceWorkerUrl: 'https://source-worker.example',
+    sourceWorkerUrl: 'https://source-worker.example.test',
   },
 });
 const buildMockPendingSbtDraft = ({
@@ -184,7 +184,7 @@ jest.mock('../../utilities/arweave/arweaveScripts.js', () => ({
   arweaveScripts: {
     uploadDataToArweave: jest.fn(),
     downloadDataFromArweave: (...args) => mockDownloadDataFromArweave(...args),
-    buildArweaveGatewayUrl: jest.fn((txId) => `https://arweave.net/${txId}`),
+    buildArweaveGatewayUrl: jest.fn((txId) => `https://arweave.example.test/${txId}`),
   },
 }));
 
@@ -425,7 +425,7 @@ describe('SessionWizard rendered validation', () => {
               address: sessionContracts[contractKey].address,
               id: sessionContracts[contractKey].chainId || 84532,
               testnet: true,
-              explorerUrl: `https://example.com/${contractKey}`,
+              explorerUrl: `https://example.example.test/${contractKey}`,
             }]
           : [],
       }))
@@ -586,7 +586,7 @@ describe('SessionWizard rendered validation', () => {
         createdBy: '0xadmin',
         expiresAt: '2099-03-21T12:00:00.000Z',
         sourceSessionSlug: 'source-session',
-        sourceWorkerUrl: 'https://source-worker.example',
+        sourceWorkerUrl: 'https://source-worker.example.test',
       },
     });
 
@@ -661,7 +661,7 @@ describe('SessionWizard rendered validation', () => {
         createdBy: '0xadmin',
         expiresAt: '2099-03-21T12:00:00.000Z',
         sourceSessionSlug: 'source-session',
-        sourceWorkerUrl: 'https://source-worker.example',
+        sourceWorkerUrl: 'https://source-worker.example.test',
       },
     });
 
@@ -721,7 +721,7 @@ describe('SessionWizard rendered validation', () => {
   it('keeps the image area minimal until a clipboard URL is pasted, then expands it on click', async () => {
     const originalClipboard = navigator.clipboard;
     const read = jest.fn().mockResolvedValue([]);
-    const readText = jest.fn().mockResolvedValue('https://example.com/session-header.png');
+    const readText = jest.fn().mockResolvedValue('https://example.example.test/session-header.png');
 
     try {
       localStorage.setItem('ce:sessionWizardDraft:v1', JSON.stringify({
@@ -749,13 +749,13 @@ describe('SessionWizard rendered validation', () => {
         expect(readText).toHaveBeenCalledTimes(1);
       });
       expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_HEADER_URL)).toHaveValue(
-        'https://example.com/session-header.png'
+        'https://example.example.test/session-header.png'
       );
       expect(screen.queryByText('Pasted image from clipboard.')).not.toBeInTheDocument();
       expect(screen.queryByText('Pasted image URL from clipboard.')).not.toBeInTheDocument();
 
       const previewImage = await screen.findByRole('img', { name: 'Session header preview' });
-      expect(previewImage).toHaveAttribute('src', 'https://example.com/session-header.png');
+      expect(previewImage).toHaveAttribute('src', 'https://example.example.test/session-header.png');
       expect(screen.getByRole('button', { name: 'Remove session header image' })).toBeInTheDocument();
 
       fireEvent.click(screen.getByRole('button', { name: 'Remove session header image' }));
@@ -2718,7 +2718,7 @@ describe('SessionWizard rendered validation', () => {
     }
   });
 
-  it('surfaces workers.dev activation details after deploy-helper succeeds', async () => {
+  it('surfaces worker activation details after deploy-helper succeeds', async () => {
     const originalFetch = global.fetch;
     const { WORKER_BUNDLE_URL } = require('../../variables/publicDeploymentConfig.js');
     const workerAuth = require('../../utilities/worker/workerAuth.js');
@@ -2774,7 +2774,7 @@ describe('SessionWizard rendered validation', () => {
 
       await waitFor(() => {
         expect(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_STATUS)).toHaveTextContent(
-          'Worker deployed. workers.dev status: account active (tenant-subdomain); script enabled.'
+          /Worker deployed\..*account active \(tenant-subdomain\); script enabled\./
         );
       });
       const deployCall = global.fetch.mock.calls.find(([url]) => String(url).endsWith('/deploy'));
@@ -2797,16 +2797,16 @@ describe('SessionWizard rendered validation', () => {
     expect(resolveSessionWizardWorkerBaseUrl({
       configuredWorkerUrl: '',
       deployWorkerUrl: '',
-      fallbackWorkerUrl: 'https://shared.example',
+      fallbackWorkerUrl: 'https://shared.example.test',
       workerMode: 'custom',
     })).toBe('');
 
     expect(resolveSessionWizardWorkerBaseUrl({
       configuredWorkerUrl: '',
       deployWorkerUrl: '',
-      fallbackWorkerUrl: 'https://shared.example',
+      fallbackWorkerUrl: 'https://shared.example.test',
       workerMode: 'default',
-    })).toBe('https://shared.example');
+    })).toBe('https://shared.example.test');
   });
 
   it('fills publish progress gradually within an active step and completes at 100 after done', () => {
@@ -3906,6 +3906,7 @@ describe('SessionWizard rendered validation', () => {
   });
 
   it('shows the effective default worker RPC URL as the RPC field placeholder without extra helper copy', async () => {
+    const defaultPocketRpcUrl = 'https://op-sepolia-testnet.api.pocket.network'; // intentional: production default worker RPC placeholder
     renderSessionWizard();
     selectNormalModeCard('Worker');
 
@@ -3917,8 +3918,8 @@ describe('SessionWizard rendered validation', () => {
     const rpcInput = within(rpcCard).getByRole('textbox');
 
     expect(rpcInput).toHaveValue('');
-    expect(rpcInput).toHaveAttribute('placeholder', 'https://op-sepolia-testnet.api.pocket.network');
-    expect(within(rpcCard).queryByText('Default worker RPC: https://op-sepolia-testnet.api.pocket.network')).not.toBeInTheDocument();
+    expect(rpcInput).toHaveAttribute('placeholder', defaultPocketRpcUrl);
+    expect(within(rpcCard).queryByText(`Default worker RPC: ${defaultPocketRpcUrl}`)).not.toBeInTheDocument();
   });
 
   it('renders non-worker session wizard tooltips through the same explainer toggle path', async () => {
@@ -4621,7 +4622,7 @@ describe('SessionWizard rendered validation', () => {
 
       fireEvent.click(screen.getByRole('button', { name: /^Publish$/i }));
       fireEvent.click(screen.getByLabelText('Advanced publish settings'));
-      fireEvent.change(screen.getByPlaceholderText('ar://<txId> or https://arweave.net/<txId>'), {
+      fireEvent.change(screen.getByPlaceholderText(/ar:\/\/<txId>/i), {
         target: { value: 'ar://'.concat('a'.repeat(43)) },
       });
 

@@ -9,10 +9,10 @@ import historicalFigurePhotoManifest from './historicalFigurePhotoManifest.json'
 
 const LOCAL_AVATAR_PREFIX = '/historical-avatars/';
 const APPROVED_REMOTE_PREFIXES = [
-  'https://arweave.net/',
-  'https://ar-io.dev/',
-  'https://commons.wikimedia.org/wiki/Special:FilePath/',
-  'https://upload.wikimedia.org/wikipedia/commons/',
+  'https://arweave.net/', // intentional: real URL — tests allowlist enforcement
+  'https://ar-io.dev/', // intentional: real URL - tests allowlist enforcement
+  'https://commons.wikimedia.org/wiki/Special:FilePath/', // intentional: real URL - verifies approved Wikimedia avatar source allowlist
+  'https://upload.wikimedia.org/wikipedia/commons/', // intentional: real URL - verifies approved Wikimedia avatar source allowlist
 ];
 
 const getDuplicateTopLevelManifestKeys = (manifestFilename) => {

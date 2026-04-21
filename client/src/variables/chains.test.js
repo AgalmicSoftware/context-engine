@@ -13,16 +13,38 @@ import {
 import localContracts from './local-contracts.json';
 import rpcDefaults from './rpcDefaults.js';
 
-const {
-  getPathRpcUrl,
-  getPublicRpcUrls,
-} = rpcDefaults;
+const { getPathRpcUrl } = rpcDefaults;
+
+const BASE_SEPOLIA_PUBLIC_RPC_URLS = Object.freeze([
+  'https://base-sepolia-rpc.publicnode.com', // intentional: production RPC fallback snapshot
+  'https://base-sepolia.publicnode.com', // intentional: production RPC fallback snapshot
+  'https://base-sepolia.blockscout.com/api/eth-rpc', // intentional: production RPC fallback snapshot
+  'https://base-sepolia.gateway.tenderly.co', // intentional: production RPC fallback snapshot
+  'https://base-sepolia.drpc.org', // intentional: production RPC fallback snapshot
+  'https://sepolia.base.org', // intentional: production RPC fallback snapshot
+]);
+const OP_SEPOLIA_PUBLIC_RPC_URLS = Object.freeze([
+  'https://sepolia.optimism.io', // intentional: production RPC fallback snapshot
+  'https://optimism-sepolia.publicnode.com', // intentional: production RPC fallback snapshot
+  'https://optimism-sepolia-rpc.publicnode.com', // intentional: production RPC fallback snapshot
+  'https://optimism-sepolia.gateway.tenderly.co', // intentional: production RPC fallback snapshot
+  'https://optimism-sepolia.drpc.org', // intentional: production RPC fallback snapshot
+]);
+
+const withoutLeadingOptionalRpcUrls = (urls, optionalUrls = []) => {
+  const remaining = [...(Array.isArray(urls) ? urls : [])];
+  optionalUrls.forEach((optionalUrl) => {
+    if (optionalUrl && remaining[0] === optionalUrl) {
+      remaining.shift();
+    }
+  });
+  return remaining;
+};
 
 describe('chains RPC defaults', () => {
   const prevIncludeLocalRegistry = globalThis.CE_INCLUDE_LOCAL_SESSION_REGISTRY;
   const configuredPaidBaseSepoliaRpcUrl = String(process.env.REACT_APP_CE_BASE_SEPOLIA_PAID_RPC_URL_HTTP || '').trim();
-  const BASE_SEPOLIA_PUBLIC_RPC_URLS = Object.freeze(getPublicRpcUrls(84532));
-  const OP_SEPOLIA_PUBLIC_RPC_URLS = Object.freeze(getPublicRpcUrls(11155420));
+  const configuredPaidOpSepoliaRpcUrl = String(process.env.REACT_APP_CE_OP_SEPOLIA_PAID_RPC_URL_HTTP || '').trim();
 
   beforeEach(() => {
     delete globalThis.CE_INCLUDE_LOCAL_SESSION_REGISTRY;
@@ -49,41 +71,28 @@ describe('chains RPC defaults', () => {
       expect(publicUrls.some((url) => /infura\.io/i.test(String(url || '')))).toBe(false);
       expect(defaultUrls.some((url) => /infura\.io/i.test(String(url || '')))).toBe(false);
     }
-    expect(publicUrls).toContain('https://base-sepolia-rpc.publicnode.com');
-    expect(defaultUrls).toContain('https://base-sepolia-rpc.publicnode.com');
-    expect(publicUrls).toContain('https://base-sepolia.drpc.org');
-    expect(defaultUrls).toContain('https://base-sepolia.drpc.org');
-    expect(publicUrls).toContain('https://base-sepolia.gateway.tenderly.co');
-    expect(defaultUrls).toContain('https://base-sepolia.gateway.tenderly.co');
-    expect(publicUrls).toContain('https://base-sepolia.blockscout.com/api/eth-rpc');
-    expect(defaultUrls).toContain('https://base-sepolia.blockscout.com/api/eth-rpc');
-    expect(publicUrls).not.toContain('https://base-sepolia.blockpi.network/v1/rpc/public');
-    expect(defaultUrls).not.toContain('https://base-sepolia.blockpi.network/v1/rpc/public');
+    BASE_SEPOLIA_PUBLIC_RPC_URLS
+      .filter((url) => !/base\.org$/i.test(String(url || '')))
+      .forEach((url) => {
+        expect(publicUrls).toContain(url);
+        expect(defaultUrls).toContain(url);
+      });
+    expect(publicUrls.some((url) => /blockpi\.network/i.test(String(url || '')))).toBe(false);
+    expect(defaultUrls.some((url) => /blockpi\.network/i.test(String(url || '')))).toBe(false);
   });
 
-  it('sources Base Sepolia public fallback URLs from the shared rpc defaults manifest', () => {
-    expect(BASE_SEPOLIA_PUBLIC_RPC_URLS).toEqual([
-      'https://base-sepolia-rpc.publicnode.com',
-      'https://base-sepolia.publicnode.com',
-      'https://base-sepolia.blockscout.com/api/eth-rpc',
-      'https://base-sepolia.gateway.tenderly.co',
-      'https://base-sepolia.drpc.org',
-      'https://sepolia.base.org',
-    ]);
-    expect(baseSepolia.rpcUrls?.public?.http).toEqual(expect.arrayContaining(BASE_SEPOLIA_PUBLIC_RPC_URLS));
-    expect(baseSepolia.rpcUrls?.default?.http).toEqual(expect.arrayContaining(BASE_SEPOLIA_PUBLIC_RPC_URLS));
+  it('ships Base Sepolia public fallback URLs in the expected production order', () => {
+    const optionalPrefixUrls = [getPathRpcUrl(84532), configuredPaidBaseSepoliaRpcUrl];
+
+    expect(withoutLeadingOptionalRpcUrls(baseSepolia.rpcUrls?.public?.http, optionalPrefixUrls)).toEqual(BASE_SEPOLIA_PUBLIC_RPC_URLS);
+    expect(withoutLeadingOptionalRpcUrls(baseSepolia.rpcUrls?.default?.http, optionalPrefixUrls)).toEqual(BASE_SEPOLIA_PUBLIC_RPC_URLS);
   });
 
-  it('sources OP Sepolia public fallback URLs from the shared rpc defaults manifest', () => {
-    expect(OP_SEPOLIA_PUBLIC_RPC_URLS).toEqual([
-      'https://sepolia.optimism.io',
-      'https://optimism-sepolia.publicnode.com',
-      'https://optimism-sepolia-rpc.publicnode.com',
-      'https://optimism-sepolia.gateway.tenderly.co',
-      'https://optimism-sepolia.drpc.org',
-    ]);
-    expect(optimismSepolia.rpcUrls?.public?.http).toEqual(expect.arrayContaining(OP_SEPOLIA_PUBLIC_RPC_URLS));
-    expect(optimismSepolia.rpcUrls?.default?.http).toEqual(expect.arrayContaining(OP_SEPOLIA_PUBLIC_RPC_URLS));
+  it('ships OP Sepolia public fallback URLs in the expected production order', () => {
+    const optionalPrefixUrls = [getPathRpcUrl(11155420), configuredPaidOpSepoliaRpcUrl];
+
+    expect(withoutLeadingOptionalRpcUrls(optimismSepolia.rpcUrls?.public?.http, optionalPrefixUrls)).toEqual(OP_SEPOLIA_PUBLIC_RPC_URLS);
+    expect(withoutLeadingOptionalRpcUrls(optimismSepolia.rpcUrls?.default?.http, optionalPrefixUrls)).toEqual(OP_SEPOLIA_PUBLIC_RPC_URLS);
   });
 
   it('returns a non-sepolia.base.org fallback URL when PATH is disabled', () => {
@@ -92,7 +101,7 @@ describe('chains RPC defaults', () => {
     expect(url).toBeTruthy();
     expect(url).not.toBe(getPathRpcUrl(84532));
     expect(url).not.toContain('pocket.network');
-    expect(url).not.toBe('https://sepolia.base.org');
+    expect(url).not.toBe(BASE_SEPOLIA_PUBLIC_RPC_URLS.find((entry) => /base\.org$/i.test(String(entry || ''))));
   });
 
   it('returns a non-PATH wallet RPC URL for PATH-first chains', () => {
@@ -169,7 +178,7 @@ describe('chains RPC defaults', () => {
     expect(isLocalDevLoopbackHost('localhost')).toBe(true);
     expect(isLocalDevLoopbackHost('::1')).toBe(true);
     expect(isLocalDevLoopbackHost('[::1]')).toBe(true);
-    expect(isLocalDevLoopbackHost('ce.example.com')).toBe(false);
+    expect(isLocalDevLoopbackHost('ce.example.test')).toBe(false);
   });
 
   it('exposes the checked-in OP Sepolia contract defaults', () => {

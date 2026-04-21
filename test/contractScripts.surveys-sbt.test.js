@@ -178,7 +178,7 @@ describeLocal('contractScripts surveys + SBT (local)', () => {
   const buildTokenUriData = (overrides = {}) => ({
     name: overrides.name || 'ContextEngine Group',
     description: overrides.description || 'contextEngine test token',
-    image: overrides.image || 'https://arweave.net/EXAMPLE_IMAGE_TX_ID',
+    image: overrides.image || 'https://arweave.example.test/EXAMPLE_IMAGE_TX_ID',
     burnAuth: overrides.burnAuth || 'AdminOnly',
     network: overrides.network || 'Anvil',
     unlisted: overrides.unlisted ?? false,
@@ -255,7 +255,7 @@ describeLocal('contractScripts surveys + SBT (local)', () => {
       title: 'ContextEngine Research Sprint',
       questionIDs: questionIds,
       creator: account,
-      documentURLs: ['https://example.com/context-engine'],
+      documentURLs: ['https://example.example.test/context-engine'],
       groupName,
       creationBlock,
     };
