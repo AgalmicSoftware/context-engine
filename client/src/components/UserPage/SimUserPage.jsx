@@ -11,26 +11,8 @@ import {
   getHistoricalFigureAvatarOrBlockie,
   getHistoricalFigureBlockie,
 } from '../../utilities/ui/historicalFigureAvatars.js';
+import { buildPublicRoute } from '../../utilities/ui/publicUrl.js';
 import SingleQuestionResponse from '../SurveyTool/SingleQuestionResponse.jsx';
-
-const getConfiguredPublicBasePath = () => {
-  const raw = String(
-    (typeof process !== 'undefined' && process?.env ? process.env.PUBLIC_URL : '') || ''
-  ).trim();
-  if (!raw) return '';
-  try {
-    return String(new URL(raw).pathname || '').trim().replace(/\/+$/, '');
-  } catch (_) {
-    return raw.replace(/\/+$/, '');
-  }
-};
-
-const buildPublicRoute = (pathname = '') => {
-  const normalizedPath = String(pathname || '').trim();
-  if (!normalizedPath) return getConfiguredPublicBasePath() || '/';
-  const basePath = getConfiguredPublicBasePath();
-  return `${basePath}${normalizedPath}` || normalizedPath;
-};
 
 // Build node name lookup from tree
 const nodeNames = {};

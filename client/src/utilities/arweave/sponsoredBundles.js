@@ -2,6 +2,7 @@ import bufferModule from 'buffer/';
 import { cryptoUtils } from '../crypto/cryptography.js';
 import { deriveLitPayerAddress } from '../crypto/litPayerWallet.js';
 import { toStr } from '../shared/primitives.js';
+import { buildPublicRoute } from '../ui/publicUrl.js';
 import { arweaveScripts } from './arweaveScripts.js';
 
 export const SPONSORED_BUNDLE_TYPE = 'contextengine-sponsored-bundle';
@@ -33,21 +34,7 @@ const base64UrlEncode = (bytes) => (
     .replace(/\//g, '_')
     .replace(/=+$/g, '')
 );
-const getConfiguredPublicBasePath = () => {
-  const raw = toStr(
-    (typeof process !== 'undefined' && process?.env ? process.env.PUBLIC_URL : '') || ''
-  ).trim();
-  if (!raw) return '';
-  try {
-    return toStr(new URL(raw).pathname || '').trim().replace(/\/+$/, '');
-  } catch {
-    return raw.replace(/\/+$/, '');
-  }
-};
-const getDefaultSponsoredSessionPath = () => {
-  const basePath = getConfiguredPublicBasePath();
-  return basePath ? `${basePath}/new` : '/new';
-};
+const getDefaultSponsoredSessionPath = () => buildPublicRoute('/new');
 
 const createSponsoredBundleError = (code, message) => {
   const error = new Error(message);

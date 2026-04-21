@@ -12,3 +12,22 @@ export const readPublicUrlBasePath = (proc = (typeof process !== 'undefined' ? p
     return raw.replace(/\/+$/, '');
   }
 };
+
+export const buildPublicUrlPath = (
+  pathname = '',
+  proc = (typeof process !== 'undefined' ? process : undefined)
+) => {
+  const normalizedPath = toStr(pathname).trim();
+  if (!normalizedPath) return '';
+  const basePath = readPublicUrlBasePath(proc);
+  return `${basePath}${normalizedPath}` || normalizedPath;
+};
+
+export const buildPublicRoute = (
+  pathname = '',
+  proc = (typeof process !== 'undefined' ? process : undefined)
+) => {
+  const normalizedPath = toStr(pathname).trim();
+  if (!normalizedPath) return readPublicUrlBasePath(proc) || '/';
+  return buildPublicUrlPath(normalizedPath, proc) || normalizedPath;
+};

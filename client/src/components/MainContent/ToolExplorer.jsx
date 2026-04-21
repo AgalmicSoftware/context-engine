@@ -7,6 +7,7 @@ import { createLogger } from '../../utilities/logging';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { hasCachedCreateSbtForm } from '../../utilities/sbt/createSbtFormCache.js';
 import { sbtsListPath } from '../../utilities/ui/terminology.js';
+import { buildPublicRoute } from '../../utilities/ui/publicUrl.js';
 import { getAllSessionSlugs, getSessionConfigBySlug } from '../../utilities/web3/contractScripts.js';
 import { normalizeSessionSlug } from '../../utilities/session/sessionNaming.js';
 import { toStr } from '../../utilities/shared/primitives.js';
@@ -39,23 +40,6 @@ const DebateMap = React.lazy(() => import("../DebateMap/DebateMap.jsx"));
 const AudioSurveyGenerator = React.lazy(() => import("../SurveyTool/SurveyGenerator/SurveyGenerator.jsx"));
 
 const log = createLogger('ui');
-const getConfiguredPublicBasePath = () => {
-  const raw = String(
-    (typeof process !== 'undefined' && process?.env ? process.env.PUBLIC_URL : '') || ''
-  ).trim();
-  if (!raw) return '';
-  try {
-    return String(new URL(raw).pathname || '').trim().replace(/\/+$/, '');
-  } catch (_) {
-    return raw.replace(/\/+$/, '');
-  }
-};
-const buildPublicRoute = (pathname = '') => {
-  const normalizedPath = String(pathname || '').trim();
-  if (!normalizedPath) return getConfiguredPublicBasePath() || '/';
-  const basePath = getConfiguredPublicBasePath();
-  return `${basePath}${normalizedPath}` || normalizedPath;
-};
 
 const ToolExplorer = (props) => {
   const [expandedComponent, setExpandedComponent] = useState(null);

@@ -1,6 +1,7 @@
 import historicalFigureLocalPhotoManifest from './historicalFigureLocalPhotoManifest.json';
 import historicalFigurePhotoManifest from './historicalFigurePhotoManifest.json';
 import { generateBlockieDataUrl } from './blockieAvatars.js';
+import { buildPublicUrlPath } from './publicUrl.js';
 
 const HISTORICAL_FIGURE_LOCAL_PHOTO_BY_USERNAME = Object.freeze(historicalFigureLocalPhotoManifest || {});
 const HISTORICAL_FIGURE_REMOTE_PHOTO_BY_USERNAME = Object.freeze(historicalFigurePhotoManifest || {});
@@ -45,24 +46,11 @@ const HISTORICAL_FIGURE_USERNAME_BY_NORMALIZED_NAME = Object.freeze(
   }, {})
 );
 
-const getConfiguredPublicBasePath = () => {
-  const raw = String(
-    (typeof process !== 'undefined' && process?.env ? process.env.PUBLIC_URL : '') || ''
-  ).trim();
-  if (!raw) return '';
-  try {
-    return String(new URL(raw).pathname || '').trim().replace(/\/+$/, '');
-  } catch (_) {
-    return raw.replace(/\/+$/, '');
-  }
-};
-
 const buildPublicAssetPath = (pathname = '') => {
   const normalizedPath = String(pathname || '').trim();
   if (!normalizedPath) return '';
   if (/^https?:\/\//i.test(normalizedPath)) return normalizedPath;
-  const basePath = getConfiguredPublicBasePath();
-  return `${basePath}${normalizedPath}` || normalizedPath;
+  return buildPublicUrlPath(normalizedPath);
 };
 
 const buildHistoricalFigureBlockieSeed = (usernameIn = '') => {
