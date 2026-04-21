@@ -1284,24 +1284,6 @@ class CreateSBTGroup extends Component {
     return normalized.filter((gateId) => validGateSet.has(gateId));
   };
 
-  formatGateBadge = (gateIds = [], gateOptions = []) => {
-    const selectedGateIds = Array.isArray(gateIds) ? gateIds : [];
-    if (selectedGateIds.length === 0) return t('sbt');
-
-    const labels = Array.from(new Set(
-      selectedGateIds
-        .map((gateId) => (
-          (Array.isArray(gateOptions) ? gateOptions : []).find((gate) => gate.id === gateId)?.badgeLabel ||
-          (Array.isArray(gateOptions) ? gateOptions : []).find((gate) => gate.id === gateId)?.label ||
-          gateId
-        ))
-        .filter(Boolean)
-    ));
-
-    if (labels.length === 1) return labels[0];
-    return `${selectedGateIds.length} ${t('gatesLower')}`;
-  };
-
   setLockGateIds = (fieldKey, nextIds, validGateIds = []) => {
     this.resetFormStateForEdit();
     const normalized = this.normalizeSelectedGateIds(nextIds, validGateIds);
@@ -4143,8 +4125,7 @@ class CreateSBTGroup extends Component {
           validGateIds,
         })}
         disabled={!gateOptions.length}
-        badgeText={this.formatGateBadge(selectedGateIds, gateOptions)}
-        showDots={true}
+        showDots={false}
       />
     );
 
