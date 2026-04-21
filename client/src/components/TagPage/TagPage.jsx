@@ -11,6 +11,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { listNamespaceEntriesSync, subscribeCacheUpdates } from '../../utilities/cache/cacheScripts.js';
 import { callAI } from '../../utilities/ai/aiScripts.js';
+import buildTagInterpretationPrompt from '../../prompts/tagInterpretationPrompt.js';
 import { normalizeTagList } from '../../utilities/defaultTags.js';
 import { normalizeSessionSlug } from '../../utilities/session/sessionNaming.js';
 import {
@@ -518,9 +519,11 @@ export const TagPageView = ({
   const [localSessionOverrideSlug, setLocalSessionOverrideSlug] = useState(null);
   const [aiInterpretation, setAiInterpretation] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
+  const [aiElapsedMs, setAiElapsedMs] = useState(0);
   const [aiError, setAiError] = useState(null);
   const aiCacheRef = useRef(new Map());
   const aiRequestKeyRef = useRef('');
+  const aiStartedAtRef = useRef(null);
 
   useEffect(() => {
     const unsubscribe = subscribeCacheUpdates((payload = {}) => {
@@ -703,6 +706,8 @@ export const TagPageView = ({
     setAiInterpretation(null);
     setAiError(null);
     setAiLoading(false);
+    setAiElapsedMs(0);
+    aiStartedAtRef.current = null;
     aiRequestKeyRef.current = '';
   }, [selectedTagsCacheKey]);
 
@@ -714,6 +719,8 @@ export const TagPageView = ({
     setAiInterpretation(null);
     setAiError(null);
     setAiLoading(false);
+    setAiElapsedMs(0);
+    aiStartedAtRef.current = null;
     aiRequestKeyRef.current = '';
   }, [effectiveScopeCacheKey]);
 
@@ -721,8 +728,24 @@ export const TagPageView = ({
     setAiInterpretation(null);
     setAiError(null);
     setAiLoading(false);
+    setAiElapsedMs(0);
+    aiStartedAtRef.current = null;
     aiRequestKeyRef.current = '';
   }, [cacheVersion, questionResponsesNonce]);
+
+  useEffect(() => {
+    if (!aiLoading) return undefined;
+
+    const startedAt = aiStartedAtRef.current || Date.now();
+    aiStartedAtRef.current = startedAt;
+    setAiElapsedMs(Date.now() - startedAt);
+
+    const timerId = setInterval(() => {
+      setAiElapsedMs(Date.now() - startedAt);
+    }, 100);
+
+    return () => clearInterval(timerId);
+  }, [aiLoading]);
 
   // NOTE: Full cache scan on each update. Acceptable for current scale; add slug-indexed cache if this becomes a bottleneck.
   const questionData = useMemo(
@@ -848,16 +871,12 @@ export const TagPageView = ({
     }
 
     setAiLoading(true);
+    setAiElapsedMs(0);
+    aiStartedAtRef.current = Date.now();
     setAiError(null);
     aiRequestKeyRef.current = aiCacheKey;
 
-    const prompt = [
-      `Analyze these questions tagged with ${selectedTags.join(', ')}. For each, the prompt and response count are given. Provide: 1) Key themes, 2) Areas of consensus, 3) Points of disagreement, 4) Suggested follow-up questions. Be concise.`,
-      '',
-      ...questions.slice(0, 20).map((question) => (
-        `Q: ${question.prompt} (${question.responseCount} ${question.responseCount === 1 ? 'response' : 'responses'})`
-      )),
-    ].join('\n');
+    const prompt = buildTagInterpretationPrompt({ selectedTags, questions });
 
     try {
       const result = await callAI(prompt, { sessionSlug: effectiveSingleScopeSlug });
@@ -875,6 +894,7 @@ export const TagPageView = ({
     } finally {
       if (aiRequestKeyRef.current === aiCacheKey) {
         setAiLoading(false);
+        aiStartedAtRef.current = null;
       }
     }
   };
@@ -920,8 +940,7 @@ export const TagPageView = ({
         <header className={styles.header}>
           <div className={styles.headerTopRow}>
             <div className={styles.headerLead}>
-              {!embedded ? <p className={styles.eyebrow}>Tag explorer</p> : null}
-              {embedded && selectedTags.length ? (
+              {selectedTags.length ? (
                 <h1
                   className={styles.titlePillHeading}
                   data-testid="tag-page-title"
@@ -1026,11 +1045,6 @@ export const TagPageView = ({
             ) : null}
           </div>
           <div className={styles.headerControls}>
-            {!embedded ? (
-              <div className={styles.tagRow}>
-                {renderSelectedTagPills()}
-              </div>
-            ) : null}
             <div className={[styles.tagPicker, embedded ? styles.tagPickerEmbedded : ''].filter(Boolean).join(' ')}>
               <button
                 type="button"
@@ -1264,7 +1278,7 @@ export const TagPageView = ({
               </div>
               {aiLoading ? (
                 <p className={styles.aiLoadingText} role="status" aria-live="polite">
-                  Generating interpretation...
+                  Generating interpretation... {(aiElapsedMs / 1000).toFixed(1)}s
                 </p>
               ) : aiError ? (
                 <div>

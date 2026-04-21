@@ -7,6 +7,7 @@ import fs from 'fs';
 import path from 'path';
 import TagPage from './TagPage.jsx';
 import TagModal from './TagModal.jsx';
+import buildTagInterpretationPrompt from '../../prompts/tagInterpretationPrompt.js';
 import { buildDemoCorpusRecords } from '../../utilities/demo/demoCorpusRecords.js';
 
 const mockListNamespaceEntriesSync = jest.fn();
@@ -265,13 +266,23 @@ describe('TagPage', () => {
 
   afterEach(() => {
     jest.useRealTimers();
+    jest.restoreAllMocks();
     jest.clearAllMocks();
   });
 
   it('renders without crashing', () => {
     renderTagPage({ entry: '/tag/governance+ai' });
 
-    expect(screen.getByRole('heading', { name: '#governance + #ai' })).toBeInTheDocument();
+    const title = screen.getByRole('heading', { name: '#governance + #ai' });
+    expect(title).toBeInTheDocument();
+    expect(title).toHaveClass('titlePillHeading');
+    expect(screen.queryByText(/^Tag explorer$/i)).not.toBeInTheDocument();
+    expect(within(title).getByText('#governance').parentElement).toHaveClass('tagPillHero');
+    expect(within(title).getByText('#ai').parentElement).toHaveClass('tagPillHero');
+    expect(screen.getAllByText('#governance')).toHaveLength(1);
+    expect(screen.getAllByText('#ai')).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: /remove governance tag/i })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: /remove ai tag/i })).toHaveLength(1);
     expect(screen.queryByRole('heading', { name: /questions tagged with/i })).not.toBeInTheDocument();
     expect(screen.getByText('What changed?')).toBeInTheDocument();
     expect(screen.getByText('1 response')).toBeInTheDocument();
@@ -310,6 +321,9 @@ describe('TagPage', () => {
 
     expect(screen.getByText('#governance')).toBeInTheDocument();
     expect(screen.getByText('#AI Policy')).toBeInTheDocument();
+    expect(screen.getByTestId('tag-page-title')).toHaveClass('titlePillHeading');
+    expect(screen.getAllByText('#governance')).toHaveLength(1);
+    expect(screen.getAllByText('#AI Policy')).toHaveLength(1);
     expect(screen.getByRole('button', { name: /remove governance tag/i })).toHaveTextContent('×');
     expect(screen.getByRole('button', { name: /remove AI Policy tag/i })).toHaveTextContent('×');
   });
@@ -738,11 +752,61 @@ describe('TagPage', () => {
       fireEvent.click(summarizeButton);
     });
 
+    const expectedPrompt = buildTagInterpretationPrompt({
+      selectedTags: ['governance'],
+      questions: [
+        {
+          prompt: 'General governance question',
+          responseCount: 0,
+        },
+      ],
+    });
     expect(mockCallAI).toHaveBeenCalledWith(
-      expect.stringContaining('General governance question'),
+      expectedPrompt,
       expect.objectContaining({ sessionSlug: '' })
     );
     expect(await screen.findByText('Mocked interpretation')).toBeInTheDocument();
+  });
+
+  it('shows elapsed seconds while AI interpretation is generating', async () => {
+    jest.useFakeTimers();
+    let nowMs = 1000;
+    jest.spyOn(Date, 'now').mockImplementation(() => nowMs);
+    let resolveAi;
+    mockCallAI.mockImplementationOnce(() => new Promise((resolve) => {
+      resolveAi = resolve;
+    }));
+
+    renderTagPage({ entry: '/tag/governance' });
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /summarize discussions/i }));
+    });
+
+    expect(screen.getByRole('status')).toHaveTextContent('Generating interpretation... 0.0s');
+
+    act(() => {
+      nowMs += 2500;
+      jest.advanceTimersByTime(2500);
+    });
+
+    expect(screen.getByRole('status')).toHaveTextContent('Generating interpretation... 2.5s');
+
+    await act(async () => {
+      resolveAi('Delayed interpretation');
+      await Promise.resolve();
+    });
+
+    expect(screen.getByText('Delayed interpretation')).toBeInTheDocument();
+  });
+
+  it('keeps the Tag Explorer AI prompt builder in the prompts folder', () => {
+    const promptPath = path.join(__dirname, '../../prompts/tagInterpretationPrompt.js');
+    const promptSource = fs.readFileSync(promptPath, 'utf8');
+    const componentSource = fs.readFileSync(path.join(__dirname, 'TagPage.jsx'), 'utf8');
+
+    expect(promptSource).toContain('export default function buildTagInterpretationPrompt');
+    expect(componentSource).toContain('../../prompts/tagInterpretationPrompt.js');
   });
 });
 

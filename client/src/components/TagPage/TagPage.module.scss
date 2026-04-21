@@ -80,14 +80,6 @@ $tag-route-accent-alt: tokens.$ce-indigo;
   max-width: 100%;
 }
 
-.eyebrow {
-  margin: 0 0 10px;
-  color: rgba(244, 247, 255, 0.65);
-  font-size: 0.78rem;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
 .title {
   margin: 0;
   font-size: clamp(2rem, 5.2vw, 3.65rem);
@@ -407,14 +399,6 @@ $tag-route-accent-alt: tokens.$ce-indigo;
   color: rgba(244, 247, 255, 0.96);
   font-size: 0.94rem;
   line-height: 1.5;
-}
-
-.tagRow {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  min-width: 0;
-  max-width: 100%;
 }
 
 .tagPill {
