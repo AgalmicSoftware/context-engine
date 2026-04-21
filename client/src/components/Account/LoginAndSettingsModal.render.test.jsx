@@ -551,7 +551,7 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     };
     subject.getActiveSessionSlug = jest.fn(() => 'demo');
 
-    await openPreLoginSettingsDrawer();
+    render(subject.getPreLoginSettingsDisplay());
 
     expect(screen.queryByTestId('ce-prelogin-session-select')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('AI endpoint')).not.toBeInTheDocument();
@@ -565,7 +565,8 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
       expect(screen.getByText('Tx gas')).toBeInTheDocument();
       expect(screen.getByText('Connect wallet')).toBeInTheDocument();
       expect(screen.getAllByText('Sponsored').length).toBeGreaterThan(0);
-      expect(screen.getAllByText('Demo Session').length).toBeGreaterThan(0);
+      expect(screen.getByRole('link', { name: 'Open session Demo Session' })).toBeInTheDocument();
+      expect(screen.getAllByText('configured here').length).toBeGreaterThan(0);
     });
   });
 
@@ -1240,8 +1241,8 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
 
     render(subject.getSettingsDisplay());
 
-    expect(screen.getByText('Checking failed')).toBeInTheDocument();
-    expect(screen.getByText('We could not confirm gate access for this sponsor.')).toBeInTheDocument();
+    expect(screen.getByText('Check unavailable')).toBeInTheDocument();
+    expect(screen.getByText('We could not confirm gate access for the active-session sponsor.')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('Sponsored key configured')).toBeInTheDocument();
     expect(screen.queryByPlaceholderText('Sponsored key configured (SBT required)')).not.toBeInTheDocument();
   });
