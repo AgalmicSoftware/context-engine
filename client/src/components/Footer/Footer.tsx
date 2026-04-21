@@ -50,9 +50,9 @@ class Footer extends React.Component<FooterProps> {
               <ul>
                 <li>
                   <NavLink
-                    href={buildPublicRoute('/new')}
+                    href="/new"
                     target=""
-                    className={styles.footerLink}
+                    id={styles.footerLink}
                   >
                     NEW
                   </NavLink>
