@@ -17,7 +17,9 @@ const AsyncSearchSelect = ({
   loadingMessage,
   noOptionsMessage,
   formatOptionLabel,
+  formatValueLabel,
   getOptionValue,
+  filterOption,
   classNamePrefix,
   variant = 'default',
   className = '',
@@ -45,11 +47,18 @@ const AsyncSearchSelect = ({
     (option) => (typeof formatOptionLabel === 'function' ? formatOptionLabel(option) : getFallbackLabel(option)),
     [formatOptionLabel]
   );
+  const renderValueLabel = useCallback(
+    (option) => (typeof formatValueLabel === 'function' ? formatValueLabel(option) : renderOptionLabel(option)),
+    [formatValueLabel, renderOptionLabel]
+  );
   const selectedKey = useMemo(() => optionKeyFor(value), [optionKeyFor, value]);
   const filteredOptions = useMemo(() => {
     const trimmed = String(query || '').trim().toLowerCase();
     return trimmed
       ? normalizedOptions.filter((option) => {
+        if (typeof filterOption === 'function') {
+          return filterOption(option, trimmed);
+        }
         const haystack = [
           option?.label,
           option?.value,
@@ -61,13 +70,23 @@ const AsyncSearchSelect = ({
         return haystack.includes(trimmed);
       })
       : normalizedOptions;
-  }, [getOptionValue, normalizedOptions, query]);
+  }, [filterOption, getOptionValue, normalizedOptions, query]);
   const hasVisibleOptions = filteredOptions.length > 0;
   const closeMenu = useCallback(() => {
     setOpen(false);
     setQuery('');
     setFocusedIndex(-1);
   }, []);
+  const handleWrapperBlur = useCallback((event) => {
+    if (!open || !wrapperRef.current) return;
+    const nextFocused = event.relatedTarget;
+    if (nextFocused && wrapperRef.current.contains(nextFocused)) return;
+    requestAnimationFrame(() => {
+      const activeElement = document.activeElement;
+      if (wrapperRef.current?.contains(activeElement)) return;
+      closeMenu();
+    });
+  }, [closeMenu, open]);
   const focusOptionAt = useCallback((index) => {
     setFocusedIndex(index);
     const row = listRef.current?.querySelector(`[data-ce-async-select-index="${index}"]`);
@@ -116,8 +135,10 @@ const AsyncSearchSelect = ({
     if (event.key === 'ArrowDown' && hasVisibleOptions) {
       event.preventDefault();
       focusOptionAt(0);
+      return;
     }
-  }, [focusOptionAt, hasVisibleOptions]);
+    if (event.key === 'Tab') closeMenu();
+  }, [closeMenu, focusOptionAt, hasVisibleOptions]);
   const handleRowKeyDown = useCallback((event, option, index) => {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
@@ -137,12 +158,15 @@ const AsyncSearchSelect = ({
         return;
       }
       focusOptionAt(index - 1);
+      return;
     }
-  }, [filteredOptions.length, focusOptionAt, handleSelect]);
+    if (event.key === 'Tab') closeMenu();
+  }, [closeMenu, filteredOptions.length, focusOptionAt, handleSelect]);
   const emptyContent = typeof noOptionsMessage === 'function' ? noOptionsMessage() : 'No options';
   return (
     <div
       ref={wrapperRef}
+      onBlurCapture={handleWrapperBlur}
       className={cx(styles.wrapper, className, classNamePrefix && `${classNamePrefix}__container`)}
       data-ce-async-select-open={open ? 'true' : 'false'}
       data-ce-async-select-variant={variant}
@@ -163,7 +187,7 @@ const AsyncSearchSelect = ({
             color: hasValue ? 'var(--ce-async-select-text-color)' : 'var(--ce-async-select-placeholder-color)',
           }}
         >
-          {hasValue ? renderOptionLabel(value) : placeholder}
+          {hasValue ? renderValueLabel(value) : placeholder}
         </div>
         {isLoading ? (
           <FontAwesomeIcon

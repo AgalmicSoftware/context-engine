@@ -196,6 +196,20 @@
   color: inherit;
 }
 
+.selectedValueLabel {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  color: inherit;
+}
+
+.selectedValueText {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .optionImage {
   width: 20px;
   height: 20px;

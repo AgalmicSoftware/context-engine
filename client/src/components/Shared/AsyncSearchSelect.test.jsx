@@ -17,7 +17,9 @@ const Harness = ({
   loadingMessage,
   noOptionsMessage,
   formatOptionLabel,
+  formatValueLabel,
   getOptionValue,
+  filterOption,
   disabled = false,
   id = 'test-async-search-select',
   inputId,
@@ -39,7 +41,9 @@ const Harness = ({
       loadingMessage={loadingMessage}
       noOptionsMessage={noOptionsMessage}
       formatOptionLabel={formatOptionLabel}
+      formatValueLabel={formatValueLabel}
       getOptionValue={getOptionValue}
+      filterOption={filterOption}
       disabled={disabled}
     />
   );
@@ -77,6 +81,19 @@ describe('AsyncSearchSelect', () => {
     openMenu();
     expect(screen.getByText('Formatted Alpha')).toBeInTheDocument();
     expect(screen.getByText('Formatted Beta')).toBeInTheDocument();
+  });
+
+  it('renders the selected value with formatValueLabel when provided', () => {
+    render(
+      <Harness
+        initialValue={{ value: 'beta', label: 'Beta' }}
+        formatOptionLabel={(option) => <span>{`Menu ${option.label}`}</span>}
+        formatValueLabel={(option) => <div>{`Selected ${option.label}`}</div>}
+      />
+    );
+
+    expect(screen.getByRole('button', { name: /selected beta/i })).toHaveTextContent('Selected Beta');
+    expect(screen.queryByText('Menu Beta')).not.toBeInTheDocument();
   });
 
   it('calls onChange with the full option on selection and closes the menu', async () => {
@@ -119,6 +136,26 @@ describe('AsyncSearchSelect', () => {
     openMenu();
     fireEvent.change(screen.getByRole('textbox', { name: /search options/i }), {
       target: { value: '0xbbb' },
+    });
+
+    expect(screen.queryByRole('option', { name: 'Alpha' })).not.toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Beta' })).toBeInTheDocument();
+  });
+
+  it('uses a custom filterOption when provided', () => {
+    render(
+      <Harness
+        options={[
+          { label: 'Alpha', value: '0xaaa', alias: 'first' },
+          { label: 'Beta', value: '0xbbb', alias: 'second' },
+        ]}
+        filterOption={(option, query) => String(option?.alias || '').includes(query)}
+      />
+    );
+
+    openMenu();
+    fireEvent.change(screen.getByRole('textbox', { name: /search options/i }), {
+      target: { value: 'second' },
     });
 
     expect(screen.queryByRole('option', { name: 'Alpha' })).not.toBeInTheDocument();
@@ -240,6 +277,46 @@ describe('AsyncSearchSelect', () => {
     await waitFor(() => {
       expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
     });
+  });
+
+  it('closes the menu when tabbing away from the search input', async () => {
+    render(
+      <>
+        <Harness />
+        <button type="button">outside</button>
+      </>
+    );
+
+    openMenu();
+    fireEvent.keyDown(screen.getByRole('textbox', { name: /search options/i }), { key: 'Tab' });
+
+    await waitFor(() => {
+      expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+    });
+  });
+
+  it('closes the menu when blur moves focus outside the wrapper', async () => {
+    render(
+      <>
+        <Harness />
+        <button type="button" data-testid="outside">outside</button>
+      </>
+    );
+
+    openMenu();
+    const firstOption = screen.getByRole('option', { name: 'Alpha' });
+    firstOption.focus();
+    const outside = screen.getByTestId('outside');
+    const activeElementSpy = jest.spyOn(document, 'activeElement', 'get').mockReturnValue(outside);
+    fireEvent.blur(firstOption, { relatedTarget: outside });
+
+    try {
+      await waitFor(() => {
+        expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+      });
+    } finally {
+      activeElementSpy.mockRestore();
+    }
   });
 
   it('does not crash when value is null and getOptionValue is not null-safe', () => {
