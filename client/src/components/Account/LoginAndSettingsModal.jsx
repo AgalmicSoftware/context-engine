@@ -110,10 +110,13 @@ const getSponsoredKeyAliases = (resourceKey = '') => {
   if (resourceKey === 'txGas') return ['faucet', 'txGas'];
   return [resourceKey];
 };
-const formatSponsoredStatusMeta = (entry, hasSponsors = false) => {
+const formatSponsoredStatusMeta = (entry, hasActiveSponsor = false) => {
   const status = entry?.status === 'unresolved'
     ? 'error'
     : (entry?.status || 'no-gate');
+  if (!hasActiveSponsor) {
+    return { label: 'Not sponsored', tone: 'muted', detail: 'No sponsor key is configured for the active session.' };
+  }
   if (status === 'granted') {
     return { label: 'Gate unlocked', tone: 'ok', detail: 'Sponsored key is available for the active session.' };
   }
@@ -127,9 +130,9 @@ const formatSponsoredStatusMeta = (entry, hasSponsors = false) => {
     return { label: 'Invalid gate', tone: 'warn', detail: 'This sponsor gate configuration is incomplete.' };
   }
   if (status === 'unknown' || status === 'error') {
-    return { label: 'Checking failed', tone: 'muted', detail: 'We could not confirm gate access for this sponsor.' };
+    return { label: 'Check unavailable', tone: 'muted', detail: 'We could not confirm gate access for the active-session sponsor.' };
   }
-  if (status === 'no-gate' && hasSponsors) {
+  if (status === 'no-gate' && hasActiveSponsor) {
     return { label: 'Sponsored', tone: 'ok', detail: 'A sponsor key is configured and does not require an SBT gate.' };
   }
   return { label: 'Not sponsored', tone: 'muted', detail: 'No sponsor key is configured for the active session.' };
@@ -1828,47 +1831,26 @@ export class LoginAndSettingsModal extends Component {
     const activeSession = this.getSessionDescriptor(sessionSlug, sessionConfig);
     const sponsoredAccess = this.state.sponsoredAccess || {};
     const sponsorSessions = this.getSponsoredSessionSources({ activeSlug: sessionSlug });
+    const buildSponsorshipCard = (key, title) => {
+      const sessions = sponsorSessions.byResource[key] || [];
+      const activeSponsorSession = sessions.find((entry) => entry?.isActive) || null;
+      const otherSponsorSessions = sessions.filter((entry) => !entry?.isActive);
+      return {
+        key,
+        title,
+        status: formatSponsoredStatusMeta(sponsoredAccess[key] || null, !!activeSponsorSession),
+        access: sponsoredAccess[key] || null,
+        activeSession,
+        activeSponsorSession,
+        otherSponsorSessions,
+        sessions,
+      };
+    };
     const sponsorshipCards = [
-      {
-        key: 'ai',
-        title: 'AI',
-        status: formatSponsoredStatusMeta(
-          sponsoredAccess.ai || null,
-          sponsorSessions.byResource.ai.length > 0
-        ),
-        access: sponsoredAccess.ai || null,
-        sessions: sponsorSessions.byResource.ai,
-      },
-      {
-        key: 'arweave',
-        title: 'Arweave',
-        status: formatSponsoredStatusMeta(
-          sponsoredAccess.arweave,
-          sponsorSessions.byResource.arweave.length > 0
-        ),
-        access: sponsoredAccess.arweave,
-        sessions: sponsorSessions.byResource.arweave,
-      },
-      {
-        key: 'rpc',
-        title: 'RPC',
-        status: formatSponsoredStatusMeta(
-          sponsoredAccess.rpc,
-          sponsorSessions.byResource.rpc.length > 0
-        ),
-        access: sponsoredAccess.rpc,
-        sessions: sponsorSessions.byResource.rpc,
-      },
-      {
-        key: 'txGas',
-        title: 'Tx gas',
-        status: formatSponsoredStatusMeta(
-          sponsoredAccess.txGas,
-          sponsorSessions.byResource.txGas.length > 0
-        ),
-        access: sponsoredAccess.txGas,
-        sessions: sponsorSessions.byResource.txGas,
-      },
+      buildSponsorshipCard('ai', 'AI'),
+      buildSponsorshipCard('arweave', 'Arweave'),
+      buildSponsorshipCard('rpc', 'RPC'),
+      buildSponsorshipCard('txGas', 'Tx gas'),
     ];
 
     return {
@@ -2005,12 +1987,35 @@ export class LoginAndSettingsModal extends Component {
     return list.find((entry) => entry?.isActive) || list[0] || null;
   };
 
+  formatResourceSponsorHint = ({
+    resourceKey = '',
+    resourceLabel = '',
+    sponsoredKeys = {},
+    sponsorSessions = {},
+  } = {}) => {
+    const label = resourceLabel || resourceKey || 'resource';
+    const activeHasSponsor = getSponsoredKeyAliases(resourceKey)
+      .some((alias) => !!sponsoredKeys?.[alias]);
+    const otherSessions = (sponsorSessions?.byResource?.[resourceKey] || [])
+      .filter((entry) => !entry?.isActive);
+    if (activeHasSponsor) {
+      if (!otherSessions.length) {
+        return `${label} sponsor is configured for the active session.`;
+      }
+      return `${label} sponsor is configured for the active session. Other sessions also sponsor ${label}: ${otherSessions.map((entry) => entry.label).join(', ')}.`;
+    }
+    if (otherSessions.length) {
+      return `No active-session ${label} sponsor. Other sessions with ${label}: ${otherSessions.map((entry) => entry.label).join(', ')}. Switch sessions to use one.`;
+    }
+    return `No active-session ${label} sponsor configured.`;
+  };
+
   renderSupportedResourceCard = (card) => {
-    const sessions = Array.isArray(card?.sessions) ? card.sessions : [];
-    const primarySession = this.getPrimarySponsorSession(sessions);
-    const extraSessions = primarySession
-      ? sessions.filter((entry) => entry?.slug !== primarySession.slug)
-      : sessions;
+    const activeSession = card?.activeSession || this.getSessionDescriptor(this.getActiveSessionSlug());
+    const activeSponsorSession = card?.activeSponsorSession || null;
+    const extraSessions = Array.isArray(card?.otherSponsorSessions)
+      ? card.otherSponsorSessions
+      : (Array.isArray(card?.sessions) ? card.sessions.filter((entry) => !entry?.isActive) : []);
     const extrasExpanded = !!this.state.expandedSponsorResources?.[card.key];
     const extraCount = extraSessions.length;
 
@@ -2024,28 +2029,36 @@ export class LoginAndSettingsModal extends Component {
         </div>
         <div className={styles.supportedResourceDetail}>{card.status.detail}</div>
         <div className={styles.supportedResourceSessions}>
-          <div className={styles.supportedResourceSessionsLabel}>Session</div>
-          {primarySession ? (
-            <div className={styles.supportedResourcePrimarySession}>
-              {this.renderSessionPills([primarySession])}
-            </div>
-          ) : (
-            <div className={styles.aiSettingsHintStrong}>No sponsor session configured.</div>
-          )}
-          {extraCount > 0 ? (
-            <button
-              type="button"
-              className={styles.supportedResourceMoreButton}
-              onClick={() => this.toggleSupportedResourceSessions(card.key)}
-              aria-expanded={extrasExpanded}
-              aria-label={`${extrasExpanded ? 'Hide' : 'Show'} other ${card.title} sponsor sessions`}
+          <div className={styles.supportedResourceSessionsLabel}>Active session</div>
+          <div className={styles.supportedResourcePrimarySession}>
+            {this.renderSessionPills([activeSession])}
+            <span
+              className={`${styles.supportedResourceActiveState} ${
+                activeSponsorSession
+                  ? styles.supportedResourceActiveStateOn
+                  : styles.supportedResourceActiveStateOff
+              }`}
             >
-              {extrasExpanded ? 'Hide other sessions' : `${extraCount} more`}
-              <FontAwesomeIcon
-                icon={extrasExpanded ? faCaretUp : faCaretDown}
-                className={styles.supportedResourceMoreChevron}
-              />
-            </button>
+              {activeSponsorSession ? 'configured here' : 'not configured here'}
+            </span>
+          </div>
+          {extraCount > 0 ? (
+            <div className={styles.supportedResourceOtherSessions}>
+              <div className={styles.supportedResourceSessionsLabel}>Other sessions with {card.title}</div>
+              <button
+                type="button"
+                className={styles.supportedResourceMoreButton}
+                onClick={() => this.toggleSupportedResourceSessions(card.key)}
+                aria-expanded={extrasExpanded}
+                aria-label={`${extrasExpanded ? 'Hide' : 'Show'} other ${card.title} sponsor sessions`}
+              >
+                {extrasExpanded ? 'Hide other sessions' : `${extraCount} other ${extraCount === 1 ? 'session' : 'sessions'}`}
+                <FontAwesomeIcon
+                  icon={extrasExpanded ? faCaretUp : faCaretDown}
+                  className={styles.supportedResourceMoreChevron}
+                />
+              </button>
+            </div>
           ) : null}
           {extraCount > 0 && extrasExpanded ? (
             <div className={styles.supportedResourceExtraSessions}>
@@ -2540,9 +2553,12 @@ export class LoginAndSettingsModal extends Component {
                         <span>Use local override</span>
                       </label>
                       <div className={styles.aiSettingsHint}>
-                        {sponsorSessions.byResource.rpc.length
-                          ? `Sponsored by ${sponsorSessions.byResource.rpc.map((entry) => entry.label).join(', ')}`
-                          : 'No RPC sponsor sessions configured.'}
+                        {this.formatResourceSponsorHint({
+                          resourceKey: 'rpc',
+                          resourceLabel: 'RPC',
+                          sponsoredKeys,
+                          sponsorSessions,
+                        })}
                       </div>
                     </div>
 
@@ -2564,9 +2580,12 @@ export class LoginAndSettingsModal extends Component {
                         <span>Use local override</span>
                       </label>
                       <div className={styles.aiSettingsHint}>
-                        {sponsorSessions.byResource.arweave.length
-                          ? `Sponsored by ${sponsorSessions.byResource.arweave.map((entry) => entry.label).join(', ')}`
-                          : 'No Arweave sponsor sessions configured.'}
+                        {this.formatResourceSponsorHint({
+                          resourceKey: 'arweave',
+                          resourceLabel: 'Arweave',
+                          sponsoredKeys,
+                          sponsorSessions,
+                        })}
                       </div>
                     </div>
                   </div>
