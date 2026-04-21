@@ -29,6 +29,15 @@ const renderFooter = () => render(
 const footerStylesheet = fs.readFileSync(path.join(__dirname, 'Footer.module.scss'), 'utf8');
 
 describe('Footer', () => {
+  it('renders a NEW link to /new', () => {
+    renderFooter();
+
+    const newLink = screen.getByRole('link', { name: 'NEW' });
+
+    expect(newLink).toHaveAttribute('href', '/new');
+    expect(newLink).toHaveTextContent('NEW');
+  });
+
   it('renders the CPAL attribution text with a separate GitHub icon link', () => {
     renderFooter();
 
