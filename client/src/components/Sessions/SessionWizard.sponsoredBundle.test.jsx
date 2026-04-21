@@ -235,7 +235,7 @@ const buildDecryptedSponsoredBundle = (overrides = {}) => {
     openrouterKey: 'sponsored-openrouter',
     arweaveJwk: '{"kty":"RSA"}',
     faucetPrivateKey: '0xsponsoredfaucet',
-    customRpcUrl: 'https://sponsored-rpc.example',
+    customRpcUrl: 'https://sponsored-rpc.example.test',
     litPayerPrivateKey: '0x59c6995e998f97a5a0044976f84ce7de5d9d7f17b2f6a6a5f76f8864c8ad88f5',
     litPayerAddress: '0x3AC823CA9AcDA550244C6fF4927b5e1478E70Ff7',
     customRpcKey: 'ignore-me',
@@ -245,7 +245,7 @@ const buildDecryptedSponsoredBundle = (overrides = {}) => {
       createdBy: '0xadmin',
       expiresAt: '2099-03-21T12:00:00.000Z',
       sourceSessionSlug: 'source-session',
-      sourceWorkerUrl: 'https://source-worker.example',
+      sourceWorkerUrl: 'https://source-worker.example.test',
     },
   };
   return {
@@ -473,7 +473,37 @@ describe('SessionWizard sponsored bundle flow', () => {
     mockDownloadDataFromArweave.mockResolvedValue(buildEnvelope());
     mockUploadDataToArweave.mockResolvedValue('a'.repeat(43));
     mockRegisterSessionOnChain.mockResolvedValue({ txs: [] });
-    buildContractViewerContracts.mockImplementation(buildMockContractViewerContracts);
+    buildContractViewerContracts.mockImplementation(({ sessionContracts = {} } = {}) => (
+      Object.keys(sessionContracts).map((contractKey) => ({
+        key: contractKey,
+        name:
+          contractKey === 'surveys'
+            ? 'Questions and Surveys'
+            : contractKey === 'sbtFactory'
+              ? 'SBT Factory'
+              : contractKey === 'sessionRegistry'
+                ? 'Session Registry'
+                : contractKey,
+        explainer: `Explainer for ${contractKey}`,
+        sourceFile:
+          contractKey === 'surveys'
+            ? 'Surveys.sol'
+            : contractKey === 'sbtFactory'
+              ? 'SBTFactory.sol'
+              : contractKey === 'sessionRegistry'
+                ? 'SessionRegistry.sol'
+                : 'Contract.sol',
+        source: `contract ${contractKey} {}`,
+        addresses: sessionContracts[contractKey]?.address
+          ? [{
+              address: sessionContracts[contractKey].address,
+              id: sessionContracts[contractKey].chainId || 84532,
+              testnet: true,
+              explorerUrl: `https://example.example.test/${contractKey}`,
+            }]
+          : [],
+      }))
+    ));
     mockDecryptWithPassword.mockResolvedValue(buildDecryptedSponsoredBundle());
   });
 
@@ -495,13 +525,13 @@ describe('SessionWizard sponsored bundle flow', () => {
       customRpcKey: 'keep-me',
     }, {
       openaiKey: 'sponsored-openai',
-      customRpcUrl: 'https://sponsored-rpc.example',
+      customRpcUrl: 'https://sponsored-rpc.example.test',
       customRpcKey: 'ignore-me',
     })).toEqual(expect.objectContaining({
       openaiKey: 'sponsored-openai',
       arweaveJwk: '{"kty":"cached"}',
       faucetPrivateKey: '0xcachedfaucet',
-      customRpcUrl: 'https://sponsored-rpc.example',
+      customRpcUrl: 'https://sponsored-rpc.example.test',
       customRpcKey: '',
     }));
   });
@@ -523,7 +553,7 @@ describe('SessionWizard sponsored bundle flow', () => {
       workerName: 'launch-week-worker',
     }, {
       deployGrantToken: 'deploy-grant-token',
-      bootstrapWorkerUrl: 'https://source-worker.example',
+      bootstrapWorkerUrl: 'https://source-worker.example.test',
       openaiKey: 'sponsored-openai',
     })).toEqual({
       apiToken: '',
@@ -540,7 +570,7 @@ describe('SessionWizard sponsored bundle flow', () => {
       expect(resolveSponsoredBundleDeployReadiness({
         sponsoredBundle: {
           deployGrantToken: 'deploy-grant-token',
-          bootstrapWorkerUrl: 'https://source-worker.example',
+          bootstrapWorkerUrl: 'https://source-worker.example.test',
           openaiKey: 'sponsored-openai',
         },
         deployForm: {
@@ -558,7 +588,7 @@ describe('SessionWizard sponsored bundle flow', () => {
       expect(resolveSponsoredBundleDeployReadiness({
         sponsoredBundle: {
           deployGrantToken: 'deploy-grant-token',
-          bootstrapWorkerUrl: 'https://source-worker.example',
+          bootstrapWorkerUrl: 'https://source-worker.example.test',
           openaiKey: 'sponsored-openai',
         },
         deployForm: {
@@ -575,7 +605,7 @@ describe('SessionWizard sponsored bundle flow', () => {
 
       expect(resolveSponsoredBundleDeployReadiness({
         sponsoredBundle: {
-          bootstrapWorkerUrl: 'https://source-worker.example',
+          bootstrapWorkerUrl: 'https://source-worker.example.test',
           openaiKey: 'sponsored-openai',
         },
         deployForm: {
@@ -599,7 +629,7 @@ describe('SessionWizard sponsored bundle flow', () => {
         wizardMode: 'normal',
         sponsoredBundle: {
           deployGrantToken: 'deploy-grant-token',
-          bootstrapWorkerUrl: 'https://source-worker.example',
+          bootstrapWorkerUrl: 'https://source-worker.example.test',
           openaiKey: 'sponsored-openai',
         },
         deployForm: {
@@ -627,7 +657,7 @@ describe('SessionWizard sponsored bundle flow', () => {
       expect(resolveSponsoredBundleDeployReadiness({
         sponsoredBundle: {
           deployGrantToken: 'deploy-grant-token',
-          bootstrapWorkerUrl: 'https://source-worker.example',
+          bootstrapWorkerUrl: 'https://source-worker.example.test',
           openaiKey: 'sponsored-openai',
           arweaveJwk: '{"kty":"RSA"}',
         },
@@ -667,7 +697,7 @@ describe('SessionWizard sponsored bundle flow', () => {
       expect(resolveSponsoredBundleDeployReadiness({
         sponsoredBundle: {
           deployGrantToken: '',
-          bootstrapWorkerUrl: 'https://source-worker.example',
+          bootstrapWorkerUrl: 'https://source-worker.example.test',
           openaiKey: 'sponsored-openai',
           arweaveJwk: '{"kty":"RSA"}',
         },
@@ -1049,8 +1079,12 @@ describe('SessionWizard sponsored bundle flow', () => {
     expect(screen.queryByText('OpenRouter key')).not.toBeInTheDocument();
     expect(getFieldInputByLabel('Arweave JWK *')).toHaveValue('{"kty":"RSA"}');
     expect(getFieldInputByLabel('Faucet private key')).toHaveValue('0xsponsoredfaucet');
-    expect(getFieldInputByLabel('Lit API key')).toHaveValue('lit-account-secret');
-    expect(screen.queryByText('Lit usage API key')).not.toBeInTheDocument();
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_PAYER_PRIVATE_KEY)).toHaveValue(
+      '0x59c6995e998f97a5a0044976f84ce7de5d9d7f17b2f6a6a5f76f8864c8ad88f5'
+    );
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_PAYER_ADDRESS)).toHaveValue(
+      '0x3AC823CA9AcDA550244C6fF4927b5e1478E70Ff7'
+    );
     expect(getFieldInputByLabel('Custom RPC URL')).toHaveValue('https://sponsored-rpc.example.test');
     expect(screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN)).toHaveValue('');
     expect(getToggleCheckbox('Dev: keep secrets on refresh')).not.toBeChecked();
@@ -1398,7 +1432,6 @@ describe('SessionWizard sponsored bundle flow', () => {
 
     expect(getFieldInputByLabel('OpenAI key *')).toHaveValue('sponsored-openai');
     expect(getFieldInputByLabel('Custom RPC URL')).toHaveValue('https://sponsored-rpc.example.test');
-    expect(getFieldInputByLabel('Lit API key')).toHaveValue('lit-account-secret');
     expect(screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN)).toHaveValue('');
     expect(mockDownloadDataFromArweave).toHaveBeenCalledTimes(1);
   });

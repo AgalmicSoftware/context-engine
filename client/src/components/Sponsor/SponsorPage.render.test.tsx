@@ -224,7 +224,7 @@ describe('SponsorPage', () => {
     expect(screen.getByTestId('ce-sponsor-expiry-input')).toHaveAttribute('min', expect.stringMatching(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/));
     expect(screen.getByText('Issue one-time deploy grants through the selected sponsoring session worker instead of writing raw deploy credentials into the bundle.')).toBeInTheDocument();
     expect(screen.getByText('Uses sponsoring worker: https://worker.example.test')).toBeInTheDocument();
-    expect(getToggleCheckbox('Remember non-secret draft fields')).toBeChecked();
+    expect(getToggleCheckbox('Dev: keep secrets on refresh')).toBeChecked();
     expect(screen.getByTestId(E2E_TESTIDS.SPONSOR_WORKER_URL_TOGGLE)).toBeInTheDocument();
     expect(screen.getByTestId(E2E_TESTIDS.SPONSOR_CREATE)).toBeInTheDocument();
 
@@ -368,12 +368,8 @@ describe('SponsorPage', () => {
       arweaveJwk: '{"kty":"RSA"}',
       faucetPrivateKey: '0xsponsoredfaucet',
       customRpcUrl: 'https://rpc.example.test',
-      litApiBase: 'https://api.chipotle.litprotocol.com',
-      litGroupId: 'group_123',
-      litPkpId: 'pkp_123',
-      litActionCid: 'bafy123',
-      litAccountApiKey: 'lit-account-secret',
-      litUsageApiKey: 'lit-secret',
+      litPayerPrivateKey: '0x59c6995e998f97a5a0044976f84ce7de5d9d7f17b2f6a6a5f76f8864c8ad88f5',
+      litPayerAddress: expectedLitPayerAddress,
       bootstrapWorkerUrl: 'https://worker.example.test',
       deployGrantToken: 'deploy-grant-token',
       faucetGrantToken: 'faucet-grant-token',

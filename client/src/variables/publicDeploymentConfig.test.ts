@@ -85,7 +85,7 @@ describe('publicDeploymentConfig', () => {
     process.env.REACT_APP_CE_SHARED_WORKER_URL = 'https://shared.example.test/';
     process.env.REACT_APP_CE_DEPLOY_HELPER_URL = 'https://deploy-helper.example.test';
     process.env.REACT_APP_CE_HEALTHCHECK_WORKER_URL = 'https://healthcheck.example.test/';
-    process.env.REACT_APP_CE_WORKER_BUNDLE_URL = 'https://assets.example.com/sessionCorsWorker.bundle.js';
+    process.env.REACT_APP_CE_WORKER_BUNDLE_URL = 'https://assets.example.test/sessionCorsWorker.bundle.js';
     process.env.REACT_APP_CE_DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED = 'false';
 
     jest.isolateModules(() => {

@@ -34,7 +34,7 @@ jest.mock('../../utilities/crypto/litProtocol.js', () => ({
   buildSbtAccessControlConditions: (...args) => mockBuildSbtAccessControlConditions(...args),
   getGlobalLitHooks: (...args) => mockGetGlobalLitHooks(...args),
   litStorage: {
-    buildLitArweaveUrl: (txId) => `https://lit.example/${txId}`,
+    buildLitArweaveUrl: (txId) => `https://lit.example.test/${txId}`,
     downloadEncryptedArweaveData: jest.fn(),
     decodeLitPayloadToText: jest.fn(),
     decodeLitPayloadToBlob: jest.fn(),
@@ -44,7 +44,7 @@ jest.mock('../../utilities/crypto/litProtocol.js', () => ({
 
 jest.mock('../../utilities/arweave/arweaveScripts.js', () => ({
   arweaveScripts: {
-    buildArweaveGatewayUrl: (txId, gateway = 'https://arweave.net') => `${gateway}/${txId}`,
+    buildArweaveGatewayUrl: (txId, gateway = 'https://arweave.example.test') => `${gateway}/${txId}`,
     downloadDataFromArweave: jest.fn(),
   },
 }));
@@ -90,7 +90,7 @@ const TEST_SESSION_CONFIG = {
   docLibrary: {
     provider: 'arweave',
     arweave: {
-      graphqlUrl: 'https://arweave.example/graphql',
+      graphqlUrl: 'https://arweave.example.test/graphql',
     },
   },
 };
@@ -102,7 +102,7 @@ describe('DocumentLibraryPanel photo docs', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockResolveDocLibraryProvider.mockReturnValue('arweave');
-    mockResolveArweaveGraphqlUrl.mockReturnValue('https://arweave.example/graphql');
+    mockResolveArweaveGraphqlUrl.mockReturnValue('https://arweave.example.test/graphql');
     mockResolveDocUploadsGate.mockReturnValue({
       gate: null,
       lookupStatus: '',

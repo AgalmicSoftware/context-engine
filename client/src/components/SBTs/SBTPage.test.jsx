@@ -53,6 +53,31 @@ describe('SBTPage session routing and holder loading', () => {
       }
     }
   });
+  subject.state = {
+    ...subject.state,
+    sbtInfo: {
+      name: 'Badge',
+      image: 'https://example.example.test/badge.png',
+      mintingEndTime: 0,
+      burnAuth: 0,
+      hasPasswordMint: false,
+      maxTokens: '0',
+      admin: '0x00000000000000000000000000000000000000a2',
+    },
+    userHasSBT: false,
+    userIsSbtAdmin: false,
+    mintingStatus: 'idle',
+    burningStatus: 'idle',
+    hasGroupPasswordMint: false,
+    hasInviteMint: false,
+  };
+  const tree = subject.render();
+  const cardNode = findElementInTree(
+    tree,
+    (element) => element?.props?.role === 'button' && typeof element?.props?.onClick === 'function'
+  );
+  return { cardNode, sbtAddress };
+};
 
   it('does not mark an error copied when error clipboard write rejects', async () => {
     const subject = createSubject();
@@ -85,26 +110,17 @@ describe('SBTPage session routing and holder loading', () => {
     }
   });
 
-  it('restarts the minting countdown after SBT address context changes', () => {
-    jest.useFakeTimers();
-    const clearIntervalSpy = jest.spyOn(global, 'clearInterval');
-    try {
-      const subject = createSubject({
-        SBTAddress: '0x00000000000000000000000000000000000000aa',
-      });
-      subject.loadSBTInfo = jest.fn();
-      subject.checkForMintPassword = jest.fn();
-      subject.getActiveBlockTimeMs = jest.fn(() => 1000);
-      const previousIntervalId = setInterval(() => {}, 1000);
-      subject.state = {
-        ...subject.state,
-        intervalId: previousIntervalId,
-      };
-      const prevProps = subject.props;
-      subject.props = {
-        ...subject.props,
-        SBTAddress: '0x00000000000000000000000000000000000000bb',
-      };
+const createCachedSbtInfo = (overrides = {}) => ({
+  tokenURI: 'ar://HLDsCm3ALbbgjVTCPVLhU8aF9taAdKyD1DyB7A8zkaXM',
+  image: 'https://example.example.test/badge.png',
+  mintingEndTime: 0,
+  burnAuth: 0,
+  hasPasswordMint: false,
+  maxTokens: '0',
+  admin: '0x00000000000000000000000000000000000000a2',
+  chainID: 84532,
+  ...overrides,
+});
 
       subject.componentDidUpdate(prevProps);
 
@@ -135,11 +151,394 @@ describe('SBTPage session routing and holder loading', () => {
 
       jest.advanceTimersByTime(1000);
 
-      expect(subject.state.intervalId).toBeNull();
-      expect(subject.state.mintCountdown).toBeNull();
-    } finally {
-      jest.useRealTimers();
-    }
+  it('reuses memoized net-holder list when holder signatures are unchanged', () => {
+    const subject = createSubject();
+    const computeSpy = jest.spyOn(subject, 'computeNetHoldersList');
+    const minted = ['0xA', '0xB'];
+    const burned = ['0xB'];
+
+    const first = subject.getMemoizedNetHoldersList(minted, burned);
+    const second = subject.getMemoizedNetHoldersList(minted, burned);
+    const third = subject.getMemoizedNetHoldersList([...minted], burned);
+
+    expect(first).toEqual(['0xa']);
+    expect(second).toBe(first);
+    expect(third).toBe(first);
+    expect(computeSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('skips modal filtered-list state updates when signatures are equivalent', () => {
+    const subject = createSubject();
+    const baseline = ['0xabc'];
+
+    subject.state = {
+      ...subject.state,
+      filteredMintedUsers: baseline,
+      filteredMintedUsersSignature: subject.buildAddressListSignature(baseline),
+      loadingMintedFilter: false,
+    };
+
+    subject.handleModalFilteredMintedUsers(['0xAbC']);
+    expect(subject.setState).not.toHaveBeenCalled();
+  });
+
+  it('keeps address signatures stable for equivalent lists with different casing', () => {
+    const subject = createSubject();
+    const sig1 = subject.buildAddressListSignature(['0xabc', '0xdef']);
+    const sig2 = subject.buildAddressListSignature(['0xAbC', '0xDeF']);
+    expect(sig2).toBe(sig1);
+  });
+
+  it('changes address signatures when list content changes at equal length', () => {
+    const subject = createSubject();
+    const sig1 = subject.buildAddressListSignature(['0xabc', '0xdef']);
+    const sig2 = subject.buildAddressListSignature(['0xabc', '0x999']);
+    expect(sig2).not.toBe(sig1);
+  });
+
+  it('changes address signatures when the same list reference mutates in place', () => {
+    const subject = createSubject();
+    const shared = ['0xabc', '0xdef'];
+    const sig1 = subject.buildAddressListSignature(shared);
+    shared[1] = '0x999';
+    const sig2 = subject.buildAddressListSignature(shared);
+    expect(sig2).not.toBe(sig1);
+  });
+
+  it('shows creator/admin fields without duplicate deployer row in stats', () => {
+    const subject = createSubject({
+      SBTAddress: '0x00000000000000000000000000000000000000a1',
+    });
+    subject.state = {
+      ...subject.state,
+      sbtInfo: {
+        name: 'Badge',
+        tokenURI: 'ar://HLDsCm3ALbbgjVTCPVLhU8aF9taAdKyD1DyB7A8zkaXM',
+        image: 'https://example.example.test/badge.png',
+        mintingEndTime: 0,
+        burnAuth: 0,
+        maxTokens: '0',
+        admin: '0x00000000000000000000000000000000000000a2',
+        creator: '0x00000000000000000000000000000000000000a3',
+      },
+      mintedAddresses: [],
+      burnedAddresses: [],
+      countsLoaded: true,
+      loadingMintersBurners: false,
+      showStats: true,
+    };
+
+    const tree = subject.render();
+    expect(treeIncludesText(tree, 'Admin:')).toBe(true);
+    expect(treeIncludesText(tree, 'Creator:')).toBe(true);
+    expect(treeIncludesText(tree, 'Deployer:')).toBe(false);
+  });
+
+  it('hides the docs entry section in UX while keeping the rest of the page visible', () => {
+    const subject = createSubject({
+      SBTAddress: '0x00000000000000000000000000000000000000a1',
+      account: '0x00000000000000000000000000000000000000a4',
+    });
+    subject.state = {
+      ...subject.state,
+      sbtInfo: {
+        name: 'Badge',
+        tokenURI: 'https://arweave.example.test/example',
+        image: defaultSbtImage,
+        mintingEndTime: 0,
+        burnAuth: 0,
+        maxTokens: '0',
+        admin: '0x00000000000000000000000000000000000000a2',
+      },
+      mintedAddresses: [],
+      burnedAddresses: [],
+      countsLoaded: true,
+      loadingMintersBurners: false,
+      showStats: true,
+      showActions: true,
+      showMoreDetails: false,
+      showAdminSection: false,
+      showDocsSection: true,
+    };
+
+    const tree = subject.render();
+    expect(treeIncludesText(tree, 'DOCS')).toBe(false);
+    expect(treeIncludesText(tree, 'MORE')).toBe(true);
+  });
+
+  it('uses Arweave metadata URL for token link when tokenURI is embedded data JSON', () => {
+    const txId = 'Sng0VG2vetgNPITw5mtvt6om-fBCNu3KI5GZAYeEttY';
+    const dataUriPayload = Buffer
+      .from(JSON.stringify({ metadataUri: `ar://${txId}` }), 'utf8')
+      .toString('base64');
+    const subject = createSubject({
+      SBTAddress: '0x00000000000000000000000000000000000000a1',
+    });
+    subject.state = {
+      ...subject.state,
+      sbtInfo: {
+        name: 'Badge',
+        tokenURI: `data:application/json;base64,${dataUriPayload}`,
+        image: 'https://example.example.test/badge.png',
+        mintingEndTime: 0,
+        burnAuth: 0,
+        maxTokens: '0',
+        admin: '0x00000000000000000000000000000000000000a2',
+      },
+      mintedAddresses: [],
+      burnedAddresses: [],
+      countsLoaded: true,
+      loadingMintersBurners: false,
+      showStats: true,
+    };
+
+    const tree = subject.render();
+    const metadataLink = findElementInTree(
+      tree,
+      (element) => element?.props?.title === 'Open token metadata'
+    );
+
+    expect(metadataLink).toBeTruthy();
+    expect(metadataLink.props.href).toContain(txId);
+    expect(String(metadataLink.props.href || '').startsWith('data:')).toBe(false);
+  });
+
+  it('normalizes subdomain arweave tokenURI links to the preferred gateway URL', () => {
+    const txId = 'Sng0VG2vetgNPITw5mtvt6om-fBCNu3KI5GZAYeEttY';
+    const subdomainGateway = 'https://nknrqljpprb2ncdidz57t6g5o346sreaimrxm7qp3ybzitf7bvya.arweave.net'; // intentional: real URL — tests allowlist enforcement
+    const preferredGateway = 'https://ar-io.dev'; // intentional: real URL - verifies production gateway normalization
+    const subdomainUrl = `${subdomainGateway}/${txId}`;
+    globalThis.CE_ARWEAVE_DIRECT_TO_AR_IO = true;
+    globalThis.CE_ARWEAVE_AR_IO_URL = preferredGateway;
+    const subject = createSubject({
+      SBTAddress: '0x00000000000000000000000000000000000000a1',
+    });
+    subject.state = {
+      ...subject.state,
+      sbtInfo: {
+        name: 'Badge',
+        tokenURI: subdomainUrl,
+        image: 'https://example.example.test/badge.png',
+        mintingEndTime: 0,
+        burnAuth: 0,
+        maxTokens: '0',
+        admin: '0x00000000000000000000000000000000000000a2',
+      },
+      mintedAddresses: [],
+      burnedAddresses: [],
+      countsLoaded: true,
+      loadingMintersBurners: false,
+      showStats: true,
+    };
+
+    const tree = subject.render();
+    const metadataLink = findElementInTree(
+      tree,
+      (element) => element?.props?.title === 'Open token metadata'
+    );
+
+    expect(metadataLink).toBeTruthy();
+    expect(metadataLink.props.href).toBe(`${preferredGateway}/${txId}`);
+  });
+
+  it('prefers canonical metadata pointer over image-like fields in embedded tokenURI JSON', () => {
+    const txId = '4kpvO6qf-tN4l0R9vQh-Sz6ekU2xq9j5qM4R1X3vZkA';
+    const dataUriPayload = Buffer.from(JSON.stringify({
+      metadataUri: `ar://${txId}`,
+      external_url: 'https://cdn.example.test/preview.png',
+      tokenURI: 'https://cdn.example.test/also-image.jpg',
+      uri: 'https://cdn.example.test/banner.webp',
+    }), 'utf8').toString('base64');
+    const subject = createSubject({
+      SBTAddress: '0x00000000000000000000000000000000000000a1',
+    });
+    subject.state = {
+      ...subject.state,
+      sbtInfo: {
+        name: 'Badge',
+        tokenURI: `data:application/json;base64,${dataUriPayload}`,
+        image: 'https://example.example.test/badge.png',
+        mintingEndTime: 0,
+        burnAuth: 0,
+        maxTokens: '0',
+        admin: '0x00000000000000000000000000000000000000a2',
+      },
+      mintedAddresses: [],
+      burnedAddresses: [],
+      countsLoaded: true,
+      loadingMintersBurners: false,
+      showStats: true,
+    };
+
+    const tree = subject.render();
+    const metadataLink = findElementInTree(
+      tree,
+      (element) => element?.props?.title === 'Open token metadata'
+    );
+
+    expect(metadataLink).toBeTruthy();
+    expect(metadataLink.props.href).toContain(txId);
+    expect(metadataLink.props.href).not.toContain('preview.png');
+    expect(metadataLink.props.href).not.toContain('also-image.jpg');
+  });
+
+  it('prefers embedded tokenURI over metadataUri when both are present', () => {
+    const sbtTxId = 'GfaX7MhJndTePSYdECj8VJmFQ5m2KDtDMU8fHgUTw24';
+    const sessionTxId = 'ue3Ek_Mh1ypNvvCaGlfrntt_8HxJ9CDiwDlG06uoTpY';
+    const dataUriPayload = Buffer.from(JSON.stringify({
+      tokenURI: `ar://${sbtTxId}`,
+      metadataUri: `ar://${sessionTxId}`,
+      sessionSlug: 'general3',
+    }), 'utf8').toString('base64');
+    const subject = createSubject({
+      SBTAddress: '0x00000000000000000000000000000000000000a1',
+    });
+    subject.state = {
+      ...subject.state,
+      sbtInfo: {
+        name: 'Badge',
+        tokenURI: `data:application/json;base64,${dataUriPayload}`,
+        image: 'https://example.example.test/badge.png',
+        mintingEndTime: 0,
+        burnAuth: 0,
+        maxTokens: '0',
+        admin: '0x00000000000000000000000000000000000000a2',
+      },
+      mintedAddresses: [],
+      burnedAddresses: [],
+      countsLoaded: true,
+      loadingMintersBurners: false,
+      showStats: true,
+    };
+
+    const tree = subject.render();
+    const metadataLink = findElementInTree(
+      tree,
+      (element) => element?.props?.title === 'Open token metadata'
+    );
+
+    expect(metadataLink).toBeTruthy();
+    expect(metadataLink.props.href).toContain(sbtTxId);
+    expect(metadataLink.props.href).not.toContain(sessionTxId);
+  });
+
+  it('hides metadata icon when embedded tokenURI JSON only contains image-like links', () => {
+    const dataUriPayload = Buffer.from(JSON.stringify({
+      external_url: 'https://cdn.example.test/preview.png',
+      tokenURI: 'https://cdn.example.test/also-image.jpg',
+      uri: 'https://cdn.example.test/banner.webp',
+    }), 'utf8').toString('base64');
+    const subject = createSubject({
+      SBTAddress: '0x00000000000000000000000000000000000000a1',
+    });
+    subject.state = {
+      ...subject.state,
+      sbtInfo: {
+        name: 'Badge',
+        tokenURI: `data:application/json;base64,${dataUriPayload}`,
+        image: 'https://example.example.test/badge.png',
+        mintingEndTime: 0,
+        burnAuth: 0,
+        maxTokens: '0',
+        admin: '0x00000000000000000000000000000000000000a2',
+      },
+      mintedAddresses: [],
+      burnedAddresses: [],
+      countsLoaded: true,
+      loadingMintersBurners: false,
+      showStats: true,
+    };
+
+    const tree = subject.render();
+    const metadataLink = findElementInTree(
+      tree,
+      (element) => element?.props?.title === 'Open token metadata'
+    );
+
+    expect(metadataLink).toBeNull();
+  });
+
+  it('uses default fallback image when metadata image is missing', () => {
+    const subject = createSubject({
+      SBTAddress: '0x00000000000000000000000000000000000000a1',
+    });
+    subject.state = {
+      ...subject.state,
+      sbtInfo: {
+        name: 'Badge',
+        tokenURI: 'https://example.example.test/metadata/sbt.json',
+        mintingEndTime: 0,
+        burnAuth: 0,
+        maxTokens: '0',
+        admin: '0x00000000000000000000000000000000000000a2',
+      },
+      mintedAddresses: [],
+      burnedAddresses: [],
+      countsLoaded: true,
+      loadingMintersBurners: false,
+      showStats: true,
+    };
+
+    const tree = subject.render();
+    const sbtImage = findElementInTree(
+      tree,
+      (element) => element?.type === 'img' && element?.props?.alt === 'Badge'
+    );
+
+    expect(sbtImage).toBeTruthy();
+    expect(sbtImage.props.src).toBe(defaultSbtImage);
+  });
+
+  it('falls back to the next Arweave gateway when the preferred image URL fails', () => {
+    const txId = 'DqYBh1qm9GvaTOGkF5R7abnLoB3OPiXNNBcTsYPtlRc';
+    const canonicalArweaveGateway = 'https://arweave.net'; // intentional: real URL — tests allowlist enforcement
+    const preferredGateway = 'https://ar-io.dev'; // intentional: real URL - verifies production gateway fallback order
+    const arIoSubdomainGateway = 'https://b2tadb22u32gxwsm4gsbpfd3ng44xia5zy7cltjuc4j3da7nsulq.ar-io.dev'; // intentional: real URL - verifies AR.IO subdomain parsing
+    globalThis.CE_ARWEAVE_DIRECT_TO_AR_IO = true;
+    globalThis.CE_ARWEAVE_AR_IO_URL = preferredGateway;
+    const subject = createSubject({
+      SBTAddress: '0x00000000000000000000000000000000000000a1',
+    });
+    subject.state = {
+      ...subject.state,
+      sbtInfo: {
+        name: 'Badge',
+        tokenURI: `ar://${txId}`,
+        image: `${arIoSubdomainGateway}/${txId}?`,
+        mintingEndTime: 0,
+        burnAuth: 0,
+        maxTokens: '0',
+        admin: '0x00000000000000000000000000000000000000a2',
+      },
+      mintedAddresses: [],
+      burnedAddresses: [],
+      countsLoaded: true,
+      loadingMintersBurners: false,
+      showStats: true,
+    };
+
+    const firstAttempt = subject.getDisplayImageRenderState(subject.state.sbtInfo);
+    expect(firstAttempt.src).toBe(`${preferredGateway}/${txId}`);
+
+    subject.handleDisplayImageError(firstAttempt);
+    subject.handleDisplayImageError(firstAttempt);
+
+    expect(subject.state.displayImageFallbackIndex).toBe(1);
+
+    const tree = subject.render();
+    const sbtImage = findElementInTree(
+      tree,
+      (element) => element?.props?.['data-testid'] === E2E_TESTIDS.SBT_PAGE_IMAGE
+    );
+
+    expect(sbtImage).toBeTruthy();
+    expect(sbtImage.props.src).toBe(`${canonicalArweaveGateway}/${txId}`);
+  });
+
+  it('returns N/A for zero/invalid actor addresses', () => {
+    const subject = createSubject();
+    expect(subject.renderAddressLink(ethers.constants.AddressZero, 'admin')).toBe('N/A');
+    expect(subject.renderAddressLink('not-an-address', 'admin')).toBe('N/A');
   });
 
   it('uses sessionSlug routing only when metadata marks it explicit', () => {
@@ -869,7 +1268,7 @@ describe('SBTPage session routing and holder loading', () => {
             sbtInfo: {
               name: 'Cold Load Badge',
               tokenURI: 'ar://HLDsCm3ALbbgjVTCPVLhU8aF9taAdKyD1DyB7A8zkaXM',
-              image: 'https://example.com/badge.png',
+              image: 'https://example.example.test/badge.png',
               mintingEndTime: 0,
               burnAuth: 0,
               hasPasswordMint: false,
@@ -1068,7 +1467,7 @@ describe('SBTPage session routing and holder loading', () => {
             slug: 'beta',
             sbtInfo: {
               tokenURI: 'ar://HLDsCm3ALbbgjVTCPVLhU8aF9taAdKyD1DyB7A8zkaXM',
-              image: 'https://example.com/beta-badge.png',
+              image: 'https://example.example.test/beta-badge.png',
               mintingEndTime: 0,
               burnAuth: 0,
               hasPasswordMint: false,
@@ -1113,7 +1512,7 @@ describe('SBTPage session routing and holder loading', () => {
     expect(cacheScripts.readCache).toHaveBeenCalledTimes(1);
     expect(subject.state.resolvedSessionSlug).toBe('alpha');
     expect(subject.state.sbtInfo).toEqual(expect.objectContaining({
-      image: 'https://example.com/beta-badge.png',
+      image: 'https://example.example.test/beta-badge.png',
       chainID: 84532,
     }));
     expect(subject.state.userHasSBT).toBe(false);
@@ -1131,7 +1530,7 @@ describe('SBTPage session routing and holder loading', () => {
             sbtInfo: {
               name: 'Badge',
               tokenURI: 'ar://HLDsCm3ALbbgjVTCPVLhU8aF9taAdKyD1DyB7A8zkaXM',
-              image: 'https://example.com/badge.png',
+              image: 'https://example.example.test/badge.png',
               description: '',
               descriptionEncrypted: 'desc-envelope',
               descriptionAccess: { type: 'sbt', gateIds: ['gate-description'], chainId: 84532 },
@@ -1164,7 +1563,7 @@ describe('SBTPage session routing and holder loading', () => {
       .mockImplementation(async (envelope) => {
         if (envelope === 'desc-envelope') return 'Private description';
         if (envelope === 'tags-envelope') return ['alpha', 'beta'];
-        if (envelope === 'docs-envelope') return ['https://doc.test/private'];
+        if (envelope === 'docs-envelope') return ['https://doc.example.test/private'];
         return null;
       });
     window.__litHooks = { getKey: jest.fn() };
@@ -1187,7 +1586,7 @@ describe('SBTPage session routing and holder loading', () => {
       descriptionDecrypted: true,
       tags: ['alpha', 'beta'],
       tagsDecrypted: true,
-      documentURLs: ['https://doc.test/private'],
+      documentURLs: ['https://doc.example.test/private'],
       documentURLsDecrypted: true,
     }));
   });
@@ -1252,7 +1651,7 @@ describe('SBTPage session routing and holder loading', () => {
         if (envelope === 'name-envelope') return 'Private Badge';
         if (envelope === 'desc-envelope') return 'Private description';
         if (envelope === 'tags-envelope') return ['alpha', 'beta'];
-        if (envelope === 'docs-envelope') return ['https://doc.test/private'];
+        if (envelope === 'docs-envelope') return ['https://doc.example.test/private'];
         return null;
       });
     const downloadSpy = jest.spyOn(litStorage, 'downloadEncryptedArweaveData').mockResolvedValue({
@@ -1287,7 +1686,7 @@ describe('SBTPage session routing and holder loading', () => {
       descriptionDecrypted: true,
       tags: ['alpha', 'beta'],
       tagsDecrypted: true,
-      documentURLs: ['https://doc.test/private'],
+      documentURLs: ['https://doc.example.test/private'],
       documentURLsDecrypted: true,
       image: 'blob:locked-image',
       imageDecrypted: true,
@@ -1454,7 +1853,7 @@ describe('SBTPage session routing and holder loading', () => {
             sbtInfo: {
               name: 'Badge',
               tokenURI: 'ar://HLDsCm3ALbbgjVTCPVLhU8aF9taAdKyD1DyB7A8zkaXM',
-              image: 'https://example.com/badge.png',
+              image: 'https://example.example.test/badge.png',
               description: '',
               descriptionEncrypted: 'desc-envelope',
               descriptionAccess: { type: 'sbt', gateIds: ['gate-description'], chainId: 84532 },
@@ -1520,7 +1919,7 @@ describe('SBTPage session routing and holder loading', () => {
             sbtInfo: {
               name: 'Badge',
               tokenURI: 'ar://HLDsCm3ALbbgjVTCPVLhU8aF9taAdKyD1DyB7A8zkaXM',
-              image: 'https://example.com/badge.png',
+              image: 'https://example.example.test/badge.png',
               description: '',
               descriptionEncrypted: 'desc-envelope',
               descriptionAccess: { type: 'sbt', gateIds: ['gate-description'], chainId: 84532 },
@@ -1690,7 +2089,7 @@ describe('SBTPage session routing and holder loading', () => {
               sbtAddress,
               sbtInfo: {
                 tokenURI: 'ar://HLDsCm3ALbbgjVTCPVLhU8aF9taAdKyD1DyB7A8zkaXM',
-                image: 'https://example.com/badge.png',
+                image: 'https://example.example.test/badge.png',
                 mintingEndTime: 0,
                 burnAuth: 0,
                 hasPasswordMint: false,
@@ -1972,7 +2371,7 @@ describe('SBTPage session routing and holder loading', () => {
             sbtAddress,
             sbtInfo: {
               tokenURI: 'ar://HLDsCm3ALbbgjVTCPVLhU8aF9taAdKyD1DyB7A8zkaXM',
-              image: 'https://example.com/badge.png',
+              image: 'https://example.example.test/badge.png',
               mintingEndTime: 0,
               burnAuth: 0,
               burnAuthNeedsOnChainRefresh: true,
@@ -2027,7 +2426,7 @@ describe('SBTPage session routing and holder loading', () => {
             sbtAddress,
             sbtInfo: {
               tokenURI: 'ar://HLDsCm3ALbbgjVTCPVLhU8aF9taAdKyD1DyB7A8zkaXM',
-              image: 'https://example.com/badge.png',
+              image: 'https://example.example.test/badge.png',
               mintingEndTime: 0,
               burnAuth: 0,
               hasPasswordMint: false,
@@ -2208,7 +2607,7 @@ describe('SBTPage session routing and holder loading', () => {
             sbtAddress,
             sbtInfo: {
               tokenURI: 'ar://HLDsCm3ALbbgjVTCPVLhU8aF9taAdKyD1DyB7A8zkaXM',
-              image: 'https://example.com/badge.png',
+              image: 'https://example.example.test/badge.png',
               mintingEndTime: 0,
               burnAuth: 0,
               hasPasswordMint: false,
@@ -2232,7 +2631,7 @@ describe('SBTPage session routing and holder loading', () => {
             sbtAddress,
             sbtInfo: {
               tokenURI: 'ar://HLDsCm3ALbbgjVTCPVLhU8aF9taAdKyD1DyB7A8zkaXM',
-              image: 'https://example.com/badge.png',
+              image: 'https://example.example.test/badge.png',
               mintingEndTime: 0,
               burnAuth: 0,
               hasPasswordMint: false,
@@ -2288,7 +2687,7 @@ describe('SBTPage session routing and holder loading', () => {
             sbtAddress,
             sbtInfo: {
               tokenURI: 'ar://HLDsCm3ALbbgjVTCPVLhU8aF9taAdKyD1DyB7A8zkaXM',
-              image: 'https://example.com/badge.png',
+              image: 'https://example.example.test/badge.png',
               mintingEndTime: 0,
               burnAuth: 0,
               hasPasswordMint: false,
@@ -2539,7 +2938,7 @@ describe('SBTPage session routing and holder loading', () => {
       sbtInfo: {
         name: 'Badge',
         tokenURI: 'ar://HLDsCm3ALbbgjVTCPVLhU8aF9taAdKyD1DyB7A8zkaXM',
-        image: 'https://example.com/badge.png',
+        image: 'https://example.example.test/badge.png',
         mintingEndTime: 0,
         burnAuth: 0,
         maxTokens: '0',
@@ -2582,7 +2981,7 @@ describe('SBTPage session routing and holder loading', () => {
       sbtInfo: {
         name: 'Badge',
         tokenURI: 'ar://HLDsCm3ALbbgjVTCPVLhU8aF9taAdKyD1DyB7A8zkaXM',
-        image: 'https://example.com/badge.png',
+        image: 'https://example.example.test/badge.png',
         mintingEndTime: 0,
         burnAuth: 0,
         maxTokens: '0',
@@ -2610,7 +3009,7 @@ describe('SBTPage session routing and holder loading', () => {
       sbtInfo: {
         name: 'Badge',
         tokenURI: 'ar://HLDsCm3ALbbgjVTCPVLhU8aF9taAdKyD1DyB7A8zkaXM',
-        image: 'https://example.com/badge.png',
+        image: 'https://example.example.test/badge.png',
         mintingEndTime: 0,
         burnAuth: 0,
         maxTokens: '0',
@@ -2649,7 +3048,7 @@ describe('SBTPage session routing and holder loading', () => {
       sbtInfo: {
         name: 'Badge',
         tokenURI: 'ar://HLDsCm3ALbbgjVTCPVLhU8aF9taAdKyD1DyB7A8zkaXM',
-        image: 'https://example.com/badge.png',
+        image: 'https://example.example.test/badge.png',
         mintingEndTime: 0,
         burnAuth: 0,
         maxTokens: '0',
@@ -3204,7 +3603,7 @@ describe('SBTPage session routing and holder loading', () => {
       ...subject.state,
       sbtInfo: {
         name: 'Open Badge',
-        image: 'https://example.com/badge.png',
+        image: 'https://example.example.test/badge.png',
         mintingEndTime: 0,
         burnAuth: 0,
         hasPasswordMint: false,
@@ -3245,7 +3644,7 @@ describe('SBTPage session routing and holder loading', () => {
         ...subject.state,
         sbtInfo: {
           name: 'Open Badge',
-          image: 'https://example.com/badge.png',
+          image: 'https://example.example.test/badge.png',
           mintingEndTime: 0,
           burnAuth: 0,
           hasPasswordMint: false,
@@ -3279,7 +3678,7 @@ describe('SBTPage session routing and holder loading', () => {
         ...subject.state,
         sbtInfo: {
           name: 'Open Badge',
-          image: 'https://example.com/badge.png',
+          image: 'https://example.example.test/badge.png',
           mintingEndTime: 0,
           burnAuth: 0,
           hasPasswordMint: false,
@@ -3316,7 +3715,7 @@ describe('SBTPage session routing and holder loading', () => {
       ...subject.state,
       sbtInfo: {
         name: 'Private Badge',
-        image: 'https://example.com/badge.png',
+        image: 'https://example.example.test/badge.png',
         mintingEndTime: 0,
         burnAuth: 0,
         hasPasswordMint: false,

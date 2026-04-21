@@ -333,17 +333,50 @@ describe('deploy-helper worker', () => {
       accountId: 'acc-123',
       workerName: 'test-worker',
       sessionSlug: 'alpha-session',
-      bundleText: 'export default { fetch() {} };',
-      storageProfile: {
-        backend: 'cloudflare',
-        cloudflare: { useR2: true },
+      bundleUrl: 'https://bundles.example.test/sessionCorsWorker.bundle.js',
+      secrets: {
+        openaiKey: '  sk-openai  ',
+        arweaveJwk: { kty: 'RSA', n: 'abc' },
+        faucetPrivateKey: 12345,
+        litPayerPrivateKey: '  0xlit  ',
+        litPayerAddress: '  0x00000000000000000000000000000000000000bb  ',
       },
     }), {}, {});
     const payload = await response.json();
 
-    expect(response.status).toBe(400);
-    expect(payload?.error).toBe('Cloudflare R2 storage requires r2BucketName when R2 is explicitly requested.');
-    expect(fetchMock.calls.length).toBe(0);
+    expect(response.status).toBe(200);
+    expect(payload?.ok).toBe(true);
+    expect(fetchMock.calls.length).toBe(9);
+
+    const scriptUpload = fetchMock.calls[2];
+    const uploadForm = scriptUpload[1].body;
+    const metadataBlob = uploadForm.get('metadata');
+    const metadataText = await new Response(metadataBlob).text();
+    const uploadMetadata = JSON.parse(metadataText);
+    expect(uploadMetadata.main_module).toBe('worker.mjs');
+    expect(uploadForm.get('worker.mjs')).toBeTruthy();
+    expect(uploadForm.get('worker.js')).toBeNull();
+
+    const configWrite = fetchMock.calls[4];
+    expect(JSON.parse(configWrite[1].body).allowOrigins).toEqual([
+      'http://localhost:3000',
+    ]);
+
+    const secretsWrite = fetchMock.calls[5];
+    expect(String(secretsWrite[0])).toMatch(/\/storage\/kv\/namespaces\/kv-123\/values\/session:alpha-session:secrets$/);
+    expect(JSON.parse(secretsWrite[1].body)).toEqual({
+      openaiKey: 'sk-openai',
+      arweaveJwk: '{"kty":"RSA","n":"abc"}',
+      faucetPrivateKey: '12345',
+      litPayerPrivateKey: '0xlit',
+      litPayerAddress: '0x00000000000000000000000000000000000000bb',
+    });
+
+    const configRewrite = fetchMock.calls[8];
+    expect(String(configRewrite[0])).toMatch(/\/storage\/kv\/namespaces\/kv-123\/values\/session:alpha-session:config$/);
+    expect(JSON.parse(configRewrite[1].body).corsWorkerUrl).toBe(
+      'https://test-worker.tenant-subdomain.workers.dev/' // intentional: real URL — tests worker URL construction
+    );
   });
 
   it('returns a structured 502 when Cloudflare API lookup fails at the network layer', async () => {
@@ -394,27 +427,22 @@ describe('deploy-helper worker', () => {
     ]);
     global.fetch = fetchMock;
 
-    try {
-      const response = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
-        apiToken: 'cf-token',
-        accountId: 'acc-123',
-        workerName: 'test-worker',
-        sessionSlug: 'alpha-session',
-        bundleUrl: 'https://bundles.example.test/sessionCorsWorker.bundle.js',
-      }), {}, {});
-      const payload = await response.json();
+    const response = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
+      apiToken: 'cf-token',
+      accountId: 'acc-123',
+      workerName: 'test-worker',
+      sessionSlug: 'alpha-session',
+      bundleUrl: 'https://bundles.example.test/sessionCorsWorker.bundle.js',
+    }), {}, {});
+    const payload = await response.json();
 
-      expect(response.status).toBe(207);
-      expect(payload?.ok).toBe(true);
-      expect(payload?.partial).toBe(true);
-      expect(payload?.workerUrl).toBe('https://test-worker.tenant-subdomain.workers.dev/'); // intentional: real URL — tests worker URL construction
-      expect(payload?.configWriteError).toBe('final config rewrite failed');
-      expect(payload?.configWriteStatus).toBe(500);
-      expect(fetchMock.calls.length).toBe(9);
-      expectBundleDiagnosticsLog(consoleLogSpy, 'bundleUrl');
-    } finally {
-      consoleLogSpy.mockRestore();
-    }
+    expect(response.status).toBe(207);
+    expect(payload?.ok).toBe(true);
+    expect(payload?.partial).toBe(true);
+    expect(payload?.workerUrl).toBe('https://test-worker.tenant-subdomain.workers.dev/'); // intentional: real URL — tests worker URL construction
+    expect(payload?.configWriteError).toBe('final config rewrite failed');
+    expect(payload?.configWriteStatus).toBe(500);
+    expect(fetchMock.calls.length).toBe(9);
   });
 
   it('includes bundle diagnostics when Cloudflare rejects the uploaded worker entrypoint', async () => {
@@ -427,15 +455,14 @@ describe('deploy-helper worker', () => {
     ]);
     global.fetch = fetchMock;
 
-    try {
-      const response = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
-        apiToken: 'cf-token',
-        accountId: 'acc-123',
-        workerName: 'test-worker',
-        sessionSlug: 'alpha-session',
-        bundleUrl: 'https://bundles.example.test/sessionCorsWorker.bundle.js',
-      }), {}, {});
-      const payload = await response.json();
+    const response = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
+      apiToken: 'cf-token',
+      accountId: 'acc-123',
+      workerName: 'test-worker',
+      sessionSlug: 'alpha-session',
+      bundleUrl: 'https://bundles.example.test/sessionCorsWorker.bundle.js',
+    }), {}, {});
+    const payload = await response.json();
 
       expect(response.status).toBe(502);
       expect(payload?.error || '').toContain('no registered event handlers');

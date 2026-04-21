@@ -49,7 +49,7 @@ const buildMockSponsoredBundle = () => ({
     createdBy: '0xadmin',
     expiresAt: '2099-03-21T12:00:00.000Z',
     sourceSessionSlug: 'source-session',
-    sourceWorkerUrl: 'https://source-worker.example',
+    sourceWorkerUrl: 'https://source-worker.example.test',
   },
 });
 const buildMockPendingSbtDraft = ({
@@ -185,7 +185,7 @@ jest.mock('../../utilities/arweave/arweaveScripts.js', () => ({
   arweaveScripts: {
     uploadDataToArweave: jest.fn(),
     downloadDataFromArweave: (...args) => mockDownloadDataFromArweave(...args),
-    buildArweaveGatewayUrl: jest.fn((txId) => `https://arweave.net/${txId}`),
+    buildArweaveGatewayUrl: jest.fn((txId) => `https://arweave.example.test/${txId}`),
   },
 }));
 
@@ -558,7 +558,7 @@ describe('SessionWizard rendered validation', () => {
         createdBy: '0xadmin',
         expiresAt: '2099-03-21T12:00:00.000Z',
         sourceSessionSlug: 'source-session',
-        sourceWorkerUrl: 'https://source-worker.example',
+        sourceWorkerUrl: 'https://source-worker.example.test',
       },
     });
 
@@ -633,7 +633,7 @@ describe('SessionWizard rendered validation', () => {
         createdBy: '0xadmin',
         expiresAt: '2099-03-21T12:00:00.000Z',
         sourceSessionSlug: 'source-session',
-        sourceWorkerUrl: 'https://source-worker.example',
+        sourceWorkerUrl: 'https://source-worker.example.test',
       },
     });
 
@@ -693,7 +693,7 @@ describe('SessionWizard rendered validation', () => {
   it('keeps the image area minimal until a clipboard URL is pasted, then expands it on click', async () => {
     const originalClipboard = navigator.clipboard;
     const read = jest.fn().mockResolvedValue([]);
-    const readText = jest.fn().mockResolvedValue('https://example.com/session-header.png');
+    const readText = jest.fn().mockResolvedValue('https://example.example.test/session-header.png');
 
     try {
       localStorage.setItem('ce:sessionWizardDraft:v1', JSON.stringify({
@@ -721,13 +721,13 @@ describe('SessionWizard rendered validation', () => {
         expect(readText).toHaveBeenCalledTimes(1);
       });
       expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_HEADER_URL)).toHaveValue(
-        'https://example.com/session-header.png'
+        'https://example.example.test/session-header.png'
       );
       expect(screen.queryByText('Pasted image from clipboard.')).not.toBeInTheDocument();
       expect(screen.queryByText('Pasted image URL from clipboard.')).not.toBeInTheDocument();
 
       const previewImage = await screen.findByRole('img', { name: 'Session header preview' });
-      expect(previewImage).toHaveAttribute('src', 'https://example.com/session-header.png');
+      expect(previewImage).toHaveAttribute('src', 'https://example.example.test/session-header.png');
       expect(screen.getByRole('button', { name: 'Remove session header image' })).toBeInTheDocument();
 
       fireEvent.click(screen.getByRole('button', { name: 'Remove session header image' }));
@@ -2383,7 +2383,7 @@ describe('SessionWizard rendered validation', () => {
     }
   });
 
-  it('surfaces workers.dev activation details after deploy-helper succeeds', async () => {
+  it('surfaces worker activation details after deploy-helper succeeds', async () => {
     const originalFetch = global.fetch;
     const { WORKER_BUNDLE_URL } = require('../../variables/publicDeploymentConfig.js');
     const workerAuth = require('../../utilities/worker/workerAuth.js');
@@ -2439,7 +2439,7 @@ describe('SessionWizard rendered validation', () => {
 
       await waitFor(() => {
         expect(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_STATUS)).toHaveTextContent(
-          'Worker deployed. workers.dev status: account active (tenant-subdomain); script enabled.'
+          /Worker deployed\..*account active \(tenant-subdomain\); script enabled\./
         );
       });
       const deployCall = global.fetch.mock.calls.find(([url]) => String(url).endsWith('/deploy'));
@@ -2462,16 +2462,16 @@ describe('SessionWizard rendered validation', () => {
     expect(resolveSessionWizardWorkerBaseUrl({
       configuredWorkerUrl: '',
       deployWorkerUrl: '',
-      fallbackWorkerUrl: 'https://shared.example',
+      fallbackWorkerUrl: 'https://shared.example.test',
       workerMode: 'custom',
     })).toBe('');
 
     expect(resolveSessionWizardWorkerBaseUrl({
       configuredWorkerUrl: '',
       deployWorkerUrl: '',
-      fallbackWorkerUrl: 'https://shared.example',
+      fallbackWorkerUrl: 'https://shared.example.test',
       workerMode: 'default',
-    })).toBe('https://shared.example');
+    })).toBe('https://shared.example.test');
   });
 
   it('fills publish progress gradually within an active step and completes at 100 after done', () => {
@@ -3384,6 +3384,236 @@ describe('SessionWizard rendered validation', () => {
     )).toBeInTheDocument();
   });
 
+  it('disables worker secret inputs when user-paid mode is enabled and restores them when turned off in advanced mode', async () => {
+    renderSessionWizard();
+    enableAdvancedMode();
+    fireEvent.click(await screen.findByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
+
+    const openAiKeyInput = await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_OPENAI_KEY);
+    const requirePayToggle = screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_SECRETS_REQUIRE_PAY);
+
+    expect(openAiKeyInput).toBeEnabled();
+    expect(requirePayToggle).not.toBeChecked();
+
+    fireEvent.change(openAiKeyInput, { target: { value: 'sk-test' } });
+    fireEvent.click(requirePayToggle);
+
+    await waitFor(() => {
+      expect(requirePayToggle).toBeChecked();
+      expect(openAiKeyInput).toBeDisabled();
+    });
+
+    fireEvent.click(requirePayToggle);
+
+    await waitFor(() => {
+      expect(requirePayToggle).not.toBeChecked();
+      expect(openAiKeyInput).toBeEnabled();
+    });
+  });
+
+  it('renders a compact Lit private key row in the normal-mode worker secret view', async () => {
+    renderSessionWizard();
+
+    selectNormalModeCard('Worker');
+    const litCard = (await screen.findByText('LIT')).closest(`[data-testid="${E2E_TESTIDS.WIZARD_RESOURCE_CARD}"]`);
+
+    expect(litCard).not.toBeNull();
+    expect(within(litCard).getByText('Private key')).toBeInTheDocument();
+    expect(within(litCard).getByRole('button', { name: 'Generate' })).toBeInTheDocument();
+    expect(within(litCard).queryByText('Account')).not.toBeInTheDocument();
+    expect(within(litCard).queryByText('Ready for Lit sponsorship.')).not.toBeInTheDocument();
+  });
+
+  it('reveals the Lit wallet and copies it after a private key is entered', async () => {
+    const originalClipboard = navigator.clipboard;
+    const writeText = jest.fn().mockResolvedValue(undefined);
+    const validKey = '0x59c6995e998f97a5a0044976f84ce7de5d9d7f17b2f6a6a5f76f8864c8ad88f5';
+    const expectedAddress = ethers.utils.computeAddress(validKey);
+
+    try {
+      Object.defineProperty(navigator, 'clipboard', {
+        configurable: true,
+        value: { writeText },
+      });
+
+      renderSessionWizard();
+      selectNormalModeCard('Worker');
+
+      fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_PAYER_PRIVATE_KEY), {
+        target: { value: validKey },
+      });
+
+      expect(await screen.findByText('Account')).toBeInTheDocument();
+      expect(screen.queryByText('Ready for Lit sponsorship.')).not.toBeInTheDocument();
+      expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_PAYER_ADDRESS)).toHaveValue(expectedAddress);
+
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_COPY_LIT_PAYER_ADDRESS));
+
+      await waitFor(() => {
+        expect(writeText).toHaveBeenCalledWith(expectedAddress);
+      });
+    } finally {
+      Object.defineProperty(navigator, 'clipboard', {
+        configurable: true,
+        value: originalClipboard,
+      });
+    }
+  });
+
+  it('re-derives the Lit payer address when the private key changes', async () => {
+    const firstKey = '0x59c6995e998f97a5a0044976f84ce7de5d9d7f17b2f6a6a5f76f8864c8ad88f5';
+    const secondKey = '0x8b3a350cf5c34c9194ca3a545d8f8a5f8d79f6c43f95b0f37cd0f2c0b9f0c2ef';
+    const firstAddress = ethers.utils.computeAddress(firstKey);
+    const secondAddress = ethers.utils.computeAddress(secondKey);
+
+    renderSessionWizard();
+    selectNormalModeCard('Worker');
+
+    const keyInput = await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_PAYER_PRIVATE_KEY);
+    fireEvent.change(keyInput, {
+      target: { value: firstKey },
+    });
+
+    expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_PAYER_ADDRESS)).toHaveValue(firstAddress);
+
+    fireEvent.change(keyInput, {
+      target: { value: secondKey },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_PAYER_ADDRESS)).toHaveValue(secondAddress);
+    });
+  });
+
+  it('waits for a worker URL before enabling Lit payment delegation in wizard hooks', async () => {
+    const litProtocol = require('../../utilities/crypto/litProtocol.js');
+
+    renderSessionWizard();
+
+    await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    selectNormalModeCard('Worker');
+
+    fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_PAYER_PRIVATE_KEY), {
+      target: { value: '0x59c6995e998f97a5a0044976f84ce7de5d9d7f17b2f6a6a5f76f8864c8ad88f5' },
+    });
+
+    await waitFor(() => {
+      const lastCall = litProtocol.createLitHooks.mock.calls[litProtocol.createLitHooks.mock.calls.length - 1]?.[0];
+      expect(lastCall?.paymentDelegation).toBeUndefined();
+    });
+  });
+
+  it('disables Lit payment delegation resolution when user-paid mode is enabled', () => {
+    const validKey = '0x59c6995e998f97a5a0044976f84ce7de5d9d7f17b2f6a6a5f76f8864c8ad88f5';
+    const baseArgs = {
+      workerSecretsEnabled: true,
+      resolvedWorkerUrl: 'https://deployed.example.test',
+      litPayerPrivateKey: validKey,
+      draft: { slug: 'edge' },
+      chainId: 84532,
+    };
+
+    expect(resolveSessionWizardLitPaymentDelegation(baseArgs)).toEqual(expect.objectContaining({
+      enabled: true,
+      workerUrl: 'https://deployed.example.test',
+      bootstrapLitPayerPrivateKey: validKey,
+    }));
+    expect(resolveSessionWizardLitPaymentDelegation({
+      ...baseArgs,
+      workerSecretsEnabled: false,
+    })).toBeUndefined();
+  });
+
+  it('renders worker resource tooltips for each visible secret section', async () => {
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    jest.useFakeTimers();
+    try {
+      renderSessionWizard();
+      selectNormalModeCard('Worker');
+
+      const tooltipCases = [
+        ['ai', 'Session-funded API keys used for AI inference and transcription.'],
+        ['rpc', 'Authenticated RPC endpoint used by the worker for chain reads and related operations.'],
+        ['arweave', 'Account used to pay for Arweave uploads and storage.'],
+        ['txGas', 'Faucet signer used to send small testnet funding grants.'],
+        ['lit', 'Payer account used to sponsor Lit operations for this session.'],
+      ];
+
+      for (const [resourceKey, copy] of tooltipCases) {
+        const trigger = await screen.findByTestId(`ce-wizard-resource-tooltip-${resourceKey}`);
+        fireEvent.mouseOver(trigger);
+        expect(await screen.findByText(copy)).toBeInTheDocument();
+        fireEvent.mouseOut(trigger);
+      }
+    } finally {
+      act(() => {
+        jest.runOnlyPendingTimers();
+      });
+      jest.useRealTimers();
+      consoleErrorSpy.mockRestore();
+    }
+  });
+
+  it('hides and restores worker step tooltip triggers when explainers are toggled', async () => {
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    jest.useFakeTimers();
+    try {
+      const { store } = renderSessionWizardWithTooltipStore();
+      selectNormalModeCard('Worker');
+
+      const rpcTooltipTrigger = await screen.findByTestId('ce-wizard-resource-tooltip-rpc');
+      const allowedOriginsTrigger = await screen.findByTestId('ce-wizard-worker-tooltip-gw-allowed-origins');
+
+      fireEvent.mouseOver(rpcTooltipTrigger);
+      expect(await screen.findByText('Authenticated RPC endpoint used by the worker for chain reads and related operations.')).toBeInTheDocument();
+      fireEvent.mouseOut(rpcTooltipTrigger);
+
+      expect(allowedOriginsTrigger).toBeInTheDocument();
+
+      act(() => {
+        store.dispatch({ type: 'SET_TOOLTIPS', payload: false });
+      });
+
+      await waitFor(() => {
+        expect(screen.queryByTestId('ce-wizard-resource-tooltip-rpc')).not.toBeInTheDocument();
+        expect(screen.queryByTestId('ce-wizard-worker-tooltip-gw-allowed-origins')).not.toBeInTheDocument();
+      });
+
+      act(() => {
+        store.dispatch({ type: 'SET_TOOLTIPS', payload: true });
+      });
+
+      const restoredTrigger = await screen.findByTestId('ce-wizard-resource-tooltip-rpc');
+      expect(await screen.findByTestId('ce-wizard-worker-tooltip-gw-allowed-origins')).toBeInTheDocument();
+
+      fireEvent.click(restoredTrigger);
+      expect(await screen.findByText('Authenticated RPC endpoint used by the worker for chain reads and related operations.')).toBeInTheDocument();
+    } finally {
+      act(() => {
+        jest.runOnlyPendingTimers();
+      });
+      jest.useRealTimers();
+      consoleErrorSpy.mockRestore();
+    }
+  });
+
+  it('shows the effective default worker RPC URL as the RPC field placeholder without extra helper copy', async () => {
+    const defaultPocketRpcUrl = 'https://op-sepolia-testnet.api.pocket.network'; // intentional: production default worker RPC placeholder
+    renderSessionWizard();
+    selectNormalModeCard('Worker');
+
+    const rpcCard = await waitFor(() => {
+      const card = getWizardResourceCard('rpc');
+      expect(card).toBeTruthy();
+      return card;
+    });
+    const rpcInput = within(rpcCard).getByRole('textbox');
+
+    expect(rpcInput).toHaveValue('');
+    expect(rpcInput).toHaveAttribute('placeholder', defaultPocketRpcUrl);
+    expect(within(rpcCard).queryByText(`Default worker RPC: ${defaultPocketRpcUrl}`)).not.toBeInTheDocument();
+  });
+
   it('renders non-worker session wizard tooltips through the same explainer toggle path', async () => {
     const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     jest.useFakeTimers();
@@ -3416,6 +3646,748 @@ describe('SessionWizard rendered validation', () => {
       jest.useRealTimers();
       consoleErrorSpy.mockRestore();
     }
+  });
+
+  it('hides Lit worker UI and strips cached Lit sponsorship state when the rollout flag is off', async () => {
+    const litProtocol = require('../../utilities/crypto/litProtocol.js');
+    const cachedLitKey = '0x59c6995e998f97a5a0044976f84ce7de5d9d7f17b2f6a6a5f76f8864c8ad88f5';
+    const cachedLitAddress = ethers.utils.computeAddress(cachedLitKey);
+    mockEnableLitSessionPayerWalletInput = false;
+    localStorage.setItem('ce:sessionWizardDraft:v1', JSON.stringify({
+      workerSecretsEnabled: true,
+      workerSecrets: {
+        litPayerPrivateKey: cachedLitKey,
+        litPayerAddress: cachedLitAddress,
+      },
+      provisionedSponsoredContext: {
+        sessionSlug: 'edge',
+        workerUrl: 'https://deployed.example.test',
+        fields: {
+          sponsored_lit: '1',
+        },
+      },
+    }));
+
+    renderSessionWizard();
+    selectNormalModeCard('Worker');
+
+    expect(screen.queryByText('LIT')).not.toBeInTheDocument();
+    expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_PAYER_PRIVATE_KEY)).not.toBeInTheDocument();
+    expect(screen.queryByTestId('ce-wizard-resource-tooltip-lit')).not.toBeInTheDocument();
+
+    await waitFor(() => {
+      const lastCall = litProtocol.createLitHooks.mock.calls[litProtocol.createLitHooks.mock.calls.length - 1]?.[0];
+      expect(lastCall?.paymentDelegation).toBeUndefined();
+    });
+
+    await waitFor(() => {
+      const cached = JSON.parse(localStorage.getItem('ce:sessionWizardDraft:v1') || '{}');
+      expect(cached.workerSecrets?.litPayerPrivateKey).toBe('');
+      expect(cached.workerSecrets?.litPayerAddress).toBe('');
+      expect(cached.provisionedSponsoredContext?.fields?.sponsored_lit).toBe('0');
+    });
+  });
+
+  it('excludes hidden Lit secrets from deploy payloads and sponsored outputs when the rollout flag is off', async () => {
+    const originalFetch = global.fetch;
+    const workerAuth = require('../../utilities/worker/workerAuth.js');
+    const originalNormalizeWorkerUrl = workerAuth.normalizeWorkerUrl.getMockImplementation();
+    const web3ProviderSpy = jest.spyOn(ethers.providers, 'Web3Provider').mockImplementation(() => ({
+      getSigner: () => ({
+        getAddress: jest.fn().mockResolvedValue(TEST_ADMIN_ADDRESS),
+        signMessage: jest.fn().mockResolvedValue('0xsigned-admin-request'),
+      }),
+    }));
+    const verifyMessageSpy = jest
+      .spyOn(ethers.utils, 'verifyMessage')
+      .mockReturnValue(TEST_ADMIN_ADDRESS);
+    mockEnableLitSessionPayerWalletInput = false;
+    localStorage.setItem('ce:sessionWizardDraft:v1', JSON.stringify({
+      workerSecretsEnabled: true,
+      workerSecrets: {
+        litPayerPrivateKey: '0x59c6995e998f97a5a0044976f84ce7de5d9d7f17b2f6a6a5f76f8864c8ad88f5',
+        litPayerAddress: '0x3AC823CA9AcDA550244C6fF4927b5e1478E70Ff7',
+      },
+      provisionedSponsoredContext: {
+        sessionSlug: 'hidden-lit-session',
+        workerUrl: 'https://deployed.example.test',
+        fields: {
+          sponsored_lit: '1',
+        },
+      },
+    }));
+
+    workerAuth.normalizeWorkerUrl.mockImplementation((value = '') => {
+      const trimmed = String(value || '').trim();
+      return trimmed || 'https://deploy-helper.example.test';
+    });
+    global.fetch = jest.fn(async (url) => {
+      const normalizedUrl = String(url);
+      if (normalizedUrl.endsWith('/account')) {
+        return { ok: true, json: async () => ({ accountId: 'cf-account-1', accountName: 'Test Account' }) };
+      }
+      if (normalizedUrl.endsWith('/deploy')) {
+        return {
+          ok: true,
+          json: async () => ({
+            ok: true,
+            workerUrl: 'https://deployed.example.test',
+            writesSessionConfig: true,
+            writesSessionSecrets: false,
+          }),
+        };
+      }
+      if (normalizedUrl.endsWith('/auth/nonce')) {
+        return { ok: true, json: async () => ({ nonce: 'wizard-admin-nonce' }) };
+      }
+      if (normalizedUrl.endsWith('/admin/set-secrets')) {
+        return { ok: true, json: async () => ({ ok: true }) };
+      }
+      return { ok: true, json: async () => ({ ok: true }) };
+    });
+
+    try {
+      renderSessionWizard({
+        account: TEST_ADMIN_ADDRESS,
+        toggleLoginModal: jest.fn(),
+      });
+      enableAdvancedMode();
+
+      const sessionNameInput = await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+      if (!screen.queryByTestId(E2E_TESTIDS.WIZARD_SLUG)) {
+        fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_METADATA_PANEL_TOGGLE));
+      }
+
+      fireEvent.change(sessionNameInput, {
+        target: { value: 'Hidden Lit Deploy Session' },
+      });
+      fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SLUG), {
+        target: { value: 'hidden-lit-deploy-session' },
+      });
+
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
+      fireEvent.click(await screen.findByRole('button', { name: 'Use My Own' }));
+
+      const deployHelperInput = screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_HELPER_URL);
+      fireEvent.change(deployHelperInput, {
+        target: { value: 'https://deploy-helper.example.test' },
+      });
+      const cloudflareTokenInput = screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN);
+      const reactPropsKey = Object.keys(cloudflareTokenInput).find((key) => key.startsWith('__reactProps$'));
+      act(() => {
+        cloudflareTokenInput[reactPropsKey].onChange({ target: { value: 'cf-test-token' } });
+      });
+
+      fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_OPENAI_KEY), {
+        target: { value: 'sk-latest' },
+      });
+      fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_ARWEAVE_JWK), {
+        target: { value: '{"kty":"RSA","n":"abc"}' },
+      });
+
+      expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_PAYER_PRIVATE_KEY)).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_WORKER));
+
+      let deployCall;
+      await waitFor(() => {
+        deployCall = global.fetch.mock.calls.find(([url]) => String(url).endsWith('/deploy'));
+        expect(deployCall).toBeTruthy();
+      });
+
+      const deployPayload = JSON.parse(deployCall[1].body);
+      expect(deployPayload.secrets).toEqual(expect.objectContaining({
+        openaiKey: 'sk-latest',
+        arweaveJwk: '{"kty":"RSA","n":"abc"}',
+      }));
+      expect(deployPayload.secrets.litPayerPrivateKey).toBeUndefined();
+      expect(deployPayload.secrets.litPayerAddress).toBeUndefined();
+
+      await waitFor(() => {
+        const cached = JSON.parse(localStorage.getItem('ce:sessionWizardDraft:v1') || '{}');
+        expect(cached.provisionedSponsoredContext?.fields?.sponsored_lit).toBe('0');
+      });
+    } finally {
+      global.fetch = originalFetch;
+      workerAuth.normalizeWorkerUrl.mockImplementation(originalNormalizeWorkerUrl);
+      web3ProviderSpy.mockRestore();
+      verifyMessageSpy.mockRestore();
+    }
+  });
+
+  it('sends the latest worker secret snapshot in the deploy payload from advanced mode', async () => {
+    const originalFetch = global.fetch;
+    const workerAuth = require('../../utilities/worker/workerAuth.js');
+    const originalNormalizeWorkerUrl = workerAuth.normalizeWorkerUrl.getMockImplementation();
+    const web3ProviderSpy = jest.spyOn(ethers.providers, 'Web3Provider').mockImplementation(() => ({
+      getSigner: () => ({
+        getAddress: jest.fn().mockResolvedValue(TEST_ADMIN_ADDRESS),
+        signMessage: jest.fn().mockResolvedValue('0xsigned-admin-request'),
+      }),
+    }));
+    const verifyMessageSpy = jest
+      .spyOn(ethers.utils, 'verifyMessage')
+      .mockReturnValue(TEST_ADMIN_ADDRESS);
+    workerAuth.normalizeWorkerUrl.mockImplementation((value = '') => {
+      const trimmed = String(value || '').trim();
+      return trimmed || 'https://deploy-helper.example.test';
+    });
+    global.fetch = jest.fn(async (url) => {
+      const normalizedUrl = String(url);
+      if (normalizedUrl.endsWith('/account')) {
+        return { ok: true, json: async () => ({ accountId: 'cf-account-1', accountName: 'Test Account' }) };
+      }
+      if (normalizedUrl.endsWith('/deploy')) {
+        return {
+          ok: true,
+          json: async () => ({
+            ok: true,
+            workerUrl: 'https://deployed.example.test',
+            writesSessionConfig: true,
+            writesSessionSecrets: false,
+          }),
+        };
+      }
+      if (normalizedUrl.endsWith('/auth/nonce')) {
+        return { ok: true, json: async () => ({ nonce: 'wizard-admin-nonce' }) };
+      }
+      if (normalizedUrl.endsWith('/admin/set-secrets')) {
+        return { ok: true, json: async () => ({ ok: true }) };
+      }
+      return { ok: true, json: async () => ({ ok: true }) };
+    });
+
+    try {
+      renderSessionWizard({
+        account: TEST_ADMIN_ADDRESS,
+        toggleLoginModal: jest.fn(),
+      });
+      enableAdvancedMode();
+      fireEvent.change(screen.getAllByRole('combobox')[0], {
+        target: { value: '84532' },
+      });
+
+      const sessionNameInput = await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+      if (!screen.queryByTestId(E2E_TESTIDS.WIZARD_SLUG)) {
+        fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_METADATA_PANEL_TOGGLE));
+      }
+
+      fireEvent.change(sessionNameInput, {
+        target: { value: 'Timing Regression Session' },
+      });
+      fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SLUG), {
+        target: { value: 'timing-regression-session' },
+      });
+
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
+      fireEvent.click(await screen.findByRole('button', { name: 'Use My Own' }));
+
+      await waitFor(() => {
+        expect(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_NAME)).toHaveTextContent('timing-regression-session');
+      });
+      expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_WORKER_URL)).not.toBeInTheDocument();
+      expect(screen.getByTestId(E2E_TESTIDS.WIZARD_EMBEDDED_DEPLOY_HELPER_ENABLED)).toBeChecked();
+
+      const deployHelperInput = screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_HELPER_URL);
+      fireEvent.change(deployHelperInput, {
+        target: { value: 'https://deploy-helper.example.test' },
+      });
+      await waitFor(() => {
+        expect(deployHelperInput).toHaveValue('https://deploy-helper.example.test');
+      });
+      const cloudflareTokenInput = screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN);
+      const reactPropsKey = Object.keys(cloudflareTokenInput).find((key) => key.startsWith('__reactProps$'));
+      expect(reactPropsKey).toBeTruthy();
+      act(() => {
+        cloudflareTokenInput[reactPropsKey].onChange({ target: { value: 'cf-test-token' } });
+      });
+      await waitFor(() => {
+        expect(screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN)).toHaveValue('cf-test-token');
+      });
+      fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_OPENAI_KEY), {
+        target: { value: 'sk-older' },
+      });
+      fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_OPENAI_KEY), {
+        target: { value: 'sk-latest' },
+      });
+      fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_ARWEAVE_JWK), {
+        target: { value: '  {"kty":"RSA","n":"abc"}  ' },
+      });
+      fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_PAYER_PRIVATE_KEY), {
+        target: { value: '0x59c6995e998f97a5a0044976f84ce7de5d9d7f17b2f6a6a5f76f8864c8ad88f5' },
+      });
+
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_WORKER));
+
+      let deployCall;
+      await waitFor(() => {
+        deployCall = global.fetch.mock.calls.find(([url]) => String(url).endsWith('/deploy'));
+        if (!deployCall) {
+          const deployStatus = screen.queryByTestId(E2E_TESTIDS.WIZARD_DEPLOY_STATUS)?.textContent || '<none>';
+          throw new Error(`Deploy call not found. Status: ${deployStatus}`);
+        }
+      });
+
+      const deployPayload = JSON.parse(deployCall[1].body);
+      expect(deployPayload.embeddedDeployHelperEnabled).toBe(true);
+      expect(deployPayload.secrets).toEqual(expect.objectContaining({
+        openaiKey: 'sk-latest',
+        arweaveJwk: '{"kty":"RSA","n":"abc"}',
+        litPayerPrivateKey: '0x59c6995e998f97a5a0044976f84ce7de5d9d7f17b2f6a6a5f76f8864c8ad88f5',
+      }));
+
+      await waitFor(() => {
+        expect(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_STATUS)).toHaveTextContent('Worker deployed.');
+      });
+      expect(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_URL)).toHaveValue('https://deployed.example.test');
+
+      expect(workerAuth.buildSignedAdminActionAuth).toHaveBeenCalledWith(expect.objectContaining({
+        action: 'set-secrets',
+        body: expect.objectContaining({
+          secrets: expect.objectContaining({
+            openaiKey: 'sk-latest',
+            arweaveJwk: '{"kty":"RSA","n":"abc"}',
+            litPayerPrivateKey: '0x59c6995e998f97a5a0044976f84ce7de5d9d7f17b2f6a6a5f76f8864c8ad88f5',
+          }),
+        }),
+      }));
+      const secretsSyncCall = global.fetch.mock.calls.find(([url]) => String(url).endsWith('/admin/set-secrets'));
+      const secretsSyncPayload = JSON.parse(secretsSyncCall[1].body);
+      expect(secretsSyncPayload.secrets).toEqual(expect.objectContaining({
+        openaiKey: 'sk-latest',
+        arweaveJwk: '{"kty":"RSA","n":"abc"}',
+        litPayerPrivateKey: '0x59c6995e998f97a5a0044976f84ce7de5d9d7f17b2f6a6a5f76f8864c8ad88f5',
+      }));
+
+      await waitFor(() => {
+        const cachedRaw = localStorage.getItem('ce:sessionWizardDraft:v1') || '{}';
+        expect(JSON.parse(cachedRaw)).toEqual(expect.objectContaining({
+          provisionedSponsoredContext: expect.objectContaining({
+            workerUrl: 'https://deployed.example.test',
+            fields: expect.objectContaining({
+              sponsored_lit: '1',
+            }),
+          }),
+        }));
+      });
+      expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith('/account'))).toBe(false);
+    } finally {
+      global.fetch = originalFetch;
+      workerAuth.normalizeWorkerUrl.mockImplementation(originalNormalizeWorkerUrl);
+      web3ProviderSpy.mockRestore();
+      verifyMessageSpy.mockRestore();
+    }
+  });
+
+  it('skips browser secret sync when the deploy helper confirms it already wrote worker secrets', async () => {
+    const originalFetch = global.fetch;
+    const workerAuth = require('../../utilities/worker/workerAuth.js');
+    const originalNormalizeWorkerUrl = workerAuth.normalizeWorkerUrl.getMockImplementation();
+    const web3ProviderSpy = jest.spyOn(ethers.providers, 'Web3Provider').mockImplementation(() => ({
+      getSigner: () => ({
+        getAddress: jest.fn().mockResolvedValue(TEST_ADMIN_ADDRESS),
+        signMessage: jest.fn().mockResolvedValue('0xsigned-admin-request'),
+      }),
+    }));
+    const verifyMessageSpy = jest
+      .spyOn(ethers.utils, 'verifyMessage')
+      .mockReturnValue(TEST_ADMIN_ADDRESS);
+    workerAuth.normalizeWorkerUrl.mockImplementation((value = '') => {
+      const trimmed = String(value || '').trim();
+      return trimmed || 'https://deploy-helper.example.test';
+    });
+    global.fetch = jest.fn(async (url) => {
+      const normalizedUrl = String(url);
+      if (normalizedUrl.endsWith('/account')) {
+        return { ok: true, json: async () => ({ accountId: 'cf-account-1', accountName: 'Test Account' }) };
+      }
+      if (normalizedUrl.endsWith('/deploy')) {
+        return {
+          ok: true,
+          json: async () => ({
+            ok: true,
+            workerUrl: 'https://deployed.example.test',
+            writesSessionConfig: true,
+            writesSessionSecrets: true,
+          }),
+        };
+      }
+      if (normalizedUrl.endsWith('/auth/nonce')) {
+        return { ok: true, json: async () => ({ nonce: 'wizard-admin-nonce' }) };
+      }
+      if (normalizedUrl.endsWith('/admin/set-secrets')) {
+        throw new Error('browser secret sync should be skipped when helper writes secrets');
+      }
+      return { ok: true, json: async () => ({ ok: true }) };
+    });
+
+    try {
+      renderSessionWizard({
+        account: TEST_ADMIN_ADDRESS,
+        toggleLoginModal: jest.fn(),
+      });
+      enableAdvancedMode();
+      fireEvent.change(screen.getAllByRole('combobox')[0], {
+        target: { value: '84532' },
+      });
+
+      const sessionNameInput = await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+      if (!screen.queryByTestId(E2E_TESTIDS.WIZARD_SLUG)) {
+        fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_METADATA_PANEL_TOGGLE));
+      }
+
+      fireEvent.change(sessionNameInput, {
+        target: { value: 'Helper Secret Sync Session' },
+      });
+      fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SLUG), {
+        target: { value: 'helper-secret-sync-session' },
+      });
+
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
+      fireEvent.click(await screen.findByRole('button', { name: 'Use My Own' }));
+
+      const deployHelperInput = screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_HELPER_URL);
+      fireEvent.change(deployHelperInput, {
+        target: { value: 'https://deploy-helper.example.test' },
+      });
+      const cloudflareTokenInput = screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN);
+      const reactPropsKey = Object.keys(cloudflareTokenInput).find((key) => key.startsWith('__reactProps$'));
+      act(() => {
+        cloudflareTokenInput[reactPropsKey].onChange({ target: { value: 'cf-test-token' } });
+      });
+      fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_OPENAI_KEY), {
+        target: { value: 'sk-latest' },
+      });
+      fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_ARWEAVE_JWK), {
+        target: { value: '{"kty":"RSA","n":"abc"}' },
+      });
+
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_WORKER));
+
+      await waitFor(() => {
+        expect(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_STATUS)).toHaveTextContent(
+          'Secrets sync note: Deploy helper already wrote secrets; skipped browser post-deploy secret sync.'
+        );
+      });
+      expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith('/account'))).toBe(false);
+      expect(
+        global.fetch.mock.calls.some(([url]) => String(url).endsWith('/admin/set-secrets'))
+      ).toBe(false);
+    } finally {
+      global.fetch = originalFetch;
+      workerAuth.normalizeWorkerUrl.mockImplementation(originalNormalizeWorkerUrl);
+      web3ProviderSpy.mockRestore();
+      verifyMessageSpy.mockRestore();
+    }
+  });
+
+  it('includes a cached Cloudflare account id in the deploy-helper payload', async () => {
+    const originalFetch = global.fetch;
+    const workerAuth = require('../../utilities/worker/workerAuth.js');
+    const originalNormalizeWorkerUrl = workerAuth.normalizeWorkerUrl.getMockImplementation();
+    const web3ProviderSpy = jest.spyOn(ethers.providers, 'Web3Provider').mockImplementation(() => ({
+      getSigner: () => ({
+        getAddress: jest.fn().mockResolvedValue(TEST_ADMIN_ADDRESS),
+        signMessage: jest.fn().mockResolvedValue('0xsigned-admin-request'),
+      }),
+    }));
+    const verifyMessageSpy = jest
+      .spyOn(ethers.utils, 'verifyMessage')
+      .mockReturnValue(TEST_ADMIN_ADDRESS);
+    localStorage.setItem('ce:sessionWizardDraft:v1', JSON.stringify({
+      deployForm: {
+        accountId: 'cf-account-1',
+      },
+    }));
+    workerAuth.normalizeWorkerUrl.mockImplementation((value = '') => {
+      const trimmed = String(value || '').trim();
+      return trimmed || 'https://deploy-helper.example.test';
+    });
+    global.fetch = jest.fn(async (url) => {
+      const normalizedUrl = String(url);
+      if (normalizedUrl.endsWith('/deploy')) {
+        return {
+          ok: true,
+          json: async () => ({
+            ok: true,
+            workerUrl: 'https://deployed.example.test',
+            writesSessionConfig: true,
+            writesSessionSecrets: false,
+          }),
+        };
+      }
+      if (normalizedUrl.endsWith('/auth/nonce')) {
+        return { ok: true, json: async () => ({ nonce: 'wizard-admin-nonce' }) };
+      }
+      if (normalizedUrl.endsWith('/admin/set-secrets')) {
+        return { ok: true, json: async () => ({ ok: true }) };
+      }
+      return { ok: true, json: async () => ({ ok: true }) };
+    });
+
+    try {
+      renderSessionWizard({
+        account: TEST_ADMIN_ADDRESS,
+        toggleLoginModal: jest.fn(),
+      });
+      enableAdvancedMode();
+
+      const sessionNameInput = await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+      if (!screen.queryByTestId(E2E_TESTIDS.WIZARD_SLUG)) {
+        fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_METADATA_PANEL_TOGGLE));
+      }
+
+      fireEvent.change(sessionNameInput, {
+        target: { value: 'Deploy Account Id Session' },
+      });
+      fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SLUG), {
+        target: { value: 'deploy-account-id-session' },
+      });
+
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
+      fireEvent.click(await screen.findByRole('button', { name: 'Use My Own' }));
+
+      const deployHelperInput = screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_HELPER_URL);
+      fireEvent.change(deployHelperInput, {
+        target: { value: 'https://deploy-helper.example.test' },
+      });
+      const cloudflareTokenInput = screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN);
+      const reactPropsKey = Object.keys(cloudflareTokenInput).find((key) => key.startsWith('__reactProps$'));
+      act(() => {
+        cloudflareTokenInput[reactPropsKey].onChange({ target: { value: 'cf-test-token' } });
+      });
+      fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_OPENAI_KEY), {
+        target: { value: 'sk-latest' },
+      });
+      fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_ARWEAVE_JWK), {
+        target: { value: '{"kty":"RSA","n":"abc"}' },
+      });
+
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_WORKER));
+
+      let deployCall;
+      await waitFor(() => {
+        deployCall = global.fetch.mock.calls.find(([url]) => String(url).endsWith('/deploy'));
+        expect(deployCall).toBeTruthy();
+      });
+
+      const deployPayload = JSON.parse(deployCall[1].body);
+      expect(deployPayload.accountId).toBe('cf-account-1');
+      expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith('/account'))).toBe(false);
+    } finally {
+      global.fetch = originalFetch;
+      workerAuth.normalizeWorkerUrl.mockImplementation(originalNormalizeWorkerUrl);
+      web3ProviderSpy.mockRestore();
+      verifyMessageSpy.mockRestore();
+    }
+  });
+
+  it('backfills the deploy admin address from the connected wallet provider when account props lag behind', async () => {
+    const originalFetch = global.fetch;
+    const workerAuth = require('../../utilities/worker/workerAuth.js');
+    const { cryptoUtils } = require('../../utilities/crypto/cryptography.js');
+    const originalNormalizeWorkerUrl = workerAuth.normalizeWorkerUrl.getMockImplementation();
+    const originalGetProvider = cryptoUtils._getProvider.getMockImplementation();
+    workerAuth.normalizeWorkerUrl.mockImplementation((value = '') => {
+      const trimmed = String(value || '').trim();
+      return trimmed || 'https://deploy-helper.example.test';
+    });
+    const providerRequest = jest.fn(async ({ method }) => {
+      if (method === 'eth_accounts' || method === 'eth_requestAccounts') {
+        return [TEST_ADMIN_ADDRESS];
+      }
+      return [];
+    });
+    cryptoUtils._getProvider.mockImplementation(() => ({
+      request: providerRequest,
+    }));
+    global.fetch = jest.fn(async (url) => {
+      const normalizedUrl = String(url);
+      if (normalizedUrl.endsWith('/account')) {
+        return { ok: true, json: async () => ({ accountId: 'cf-account-1', accountName: 'Test Account' }) };
+      }
+      if (normalizedUrl.endsWith('/deploy')) {
+        return {
+          ok: true,
+          json: async () => ({
+            ok: true,
+            workerUrl: 'https://deployed.example.test',
+            writesSessionConfig: true,
+            writesSessionSecrets: false,
+          }),
+        };
+      }
+      if (normalizedUrl.endsWith('/admin/set-secrets')) {
+        return { ok: true, json: async () => ({ ok: true }) };
+      }
+      return { ok: true, json: async () => ({ ok: true, nonce: 'wizard-admin-nonce' }) };
+    });
+
+    try {
+      renderSessionWizard({
+        account: '',
+        loginComplete: true,
+        toggleLoginModal: jest.fn(),
+      });
+      enableAdvancedMode();
+      fireEvent.change(screen.getAllByRole('combobox')[0], {
+        target: { value: '84532' },
+      });
+
+      const sessionNameInput = await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+      if (!screen.queryByTestId(E2E_TESTIDS.WIZARD_SLUG)) {
+        fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_METADATA_PANEL_TOGGLE));
+      }
+
+      fireEvent.change(sessionNameInput, {
+        target: { value: 'Wallet Race Session' },
+      });
+      fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SLUG), {
+        target: { value: 'wallet-race-session' },
+      });
+
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
+      fireEvent.click(await screen.findByRole('button', { name: 'Use My Own' }));
+
+      const cloudflareTokenInput = screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN);
+      const reactPropsKey = Object.keys(cloudflareTokenInput).find((key) => key.startsWith('__reactProps$'));
+      act(() => {
+        cloudflareTokenInput[reactPropsKey].onChange({ target: { value: 'cf-test-token' } });
+      });
+      fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_OPENAI_KEY), {
+        target: { value: 'sk-race' },
+      });
+      fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_ARWEAVE_JWK), {
+        target: { value: '{"kty":"RSA","n":"race"}' },
+      });
+
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_WORKER));
+
+      let deployCall;
+      await waitFor(() => {
+        deployCall = global.fetch.mock.calls.find(([url]) => String(url).endsWith('/deploy'));
+        expect(deployCall).toBeTruthy();
+      });
+
+      const deployPayload = JSON.parse(deployCall[1].body);
+      expect(deployPayload.adminAddress).toBe(TEST_ADMIN_ADDRESS);
+      expect(providerRequest.mock.calls.map(([payload]) => payload?.method)).not.toContain('eth_requestAccounts');
+      await waitFor(() => {
+        expect(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_STATUS)).toHaveTextContent('Worker deployed.');
+      });
+      expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith('/account'))).toBe(false);
+    } finally {
+      global.fetch = originalFetch;
+      workerAuth.normalizeWorkerUrl.mockImplementation(originalNormalizeWorkerUrl);
+      cryptoUtils._getProvider.mockImplementation(originalGetProvider);
+    }
+  });
+
+  it('prompts for login instead of attempting publish when publish is available but no wallet is connected', async () => {
+    const { cryptoUtils } = require('../../utilities/crypto/cryptography.js');
+    const originalGetProvider = cryptoUtils._getProvider.getMockImplementation();
+    const providerRequest = jest.fn(async ({ method }) => {
+      if (method === 'eth_accounts') return [];
+      if (method === 'eth_chainId') return '0x14a34';
+      if (method === 'net_version') return '84532';
+      if (method === 'eth_requestAccounts') {
+        throw new Error('publish should open the login modal instead of requesting wallet accounts');
+      }
+      return [];
+    });
+    cryptoUtils._getProvider.mockImplementation(() => ({
+      request: providerRequest,
+    }));
+    const toggleLoginModal = jest.fn();
+    try {
+      renderSessionWizard({
+        account: '',
+        loginComplete: false,
+        toggleLoginModal,
+      });
+      enableAdvancedMode();
+
+      const sessionNameInput = await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+      fireEvent.change(sessionNameInput, {
+        target: { value: 'Login Required Publish Session' },
+      });
+
+      fireEvent.click(screen.getByRole('button', { name: /^Publish$/i }));
+      fireEvent.click(screen.getByLabelText('Advanced publish settings'));
+      fireEvent.change(screen.getByPlaceholderText(/ar:\/\/<txId>/i), {
+        target: { value: 'ar://'.concat('a'.repeat(43)) },
+      });
+
+      const publishButton = await screen.findByTestId(E2E_TESTIDS.WIZARD_PUBLISH);
+      await waitFor(() => {
+        expect(publishButton).not.toBeDisabled();
+      });
+
+      fireEvent.click(publishButton);
+
+      await waitFor(() => {
+        expect(toggleLoginModal).toHaveBeenCalledWith(true);
+        expect(screen.getByText('Connect your wallet to publish this session.')).toBeInTheDocument();
+      });
+      expect(providerRequest.mock.calls.map(([payload]) => payload?.method)).not.toContain('eth_requestAccounts');
+    } finally {
+      cryptoUtils._getProvider.mockImplementation(originalGetProvider);
+    }
+  });
+
+  it('prompts for login before direct worker deploy starts when no wallet session is active', async () => {
+    const toggleLoginModal = jest.fn();
+    const originalFetch = global.fetch;
+    global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({ ok: true }) }));
+
+    try {
+      renderSessionWizard({
+        account: '',
+        loginComplete: false,
+        toggleLoginModal,
+      });
+      enableAdvancedMode();
+      fireEvent.change(screen.getAllByRole('combobox')[0], {
+        target: { value: '84532' },
+      });
+
+      const sessionNameInput = await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+      if (!screen.queryByTestId(E2E_TESTIDS.WIZARD_SLUG)) {
+        fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_METADATA_PANEL_TOGGLE));
+      }
+
+      fireEvent.change(sessionNameInput, {
+        target: { value: 'Login Before Deploy Session' },
+      });
+      fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SLUG), {
+        target: { value: 'login-before-deploy-session' },
+      });
+
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
+      fireEvent.click(await screen.findByRole('button', { name: 'Use My Own' }));
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_WORKER));
+
+      await waitFor(() => {
+        expect(toggleLoginModal).toHaveBeenCalledWith(true);
+        expect(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_STATUS)).toHaveTextContent(
+          'Connect your wallet to set the admin address.'
+        );
+      });
+      expect(global.fetch.mock.calls.find(([url]) => String(url).endsWith('/deploy'))).toBeUndefined();
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
+
+  it('keeps the custom AI RPC field empty until the admin sets it', async () => {
+    renderSessionWizard();
+    selectNormalModeCard('Worker');
+
+    const customRpcLabel = await screen.findByText('Custom RPC URL');
+    const customRpcGroup = customRpcLabel.closest('.resourceInput') || customRpcLabel.parentElement?.parentElement;
+    const customRpcInput = within(customRpcGroup).getByRole('textbox');
+
+    expect(customRpcInput).toHaveValue('');
   });
 
   it('blocks publish with a required-slug status message when the slug is blank', async () => {
