@@ -134,7 +134,7 @@ test('dispatchAuthenticatedSecretActionRoute rejects models outside the provider
 });
 
 test('dispatchAuthenticatedSecretActionRoute passes auth context to custom RPC execution', async () => {
-  const secrets = { customRpcUrl: 'https://rpc.ankr.com/eth' };
+  const secrets = { customRpcUrl: 'https://rpc.example.test/eth' };
   const downstreamResponse = new Response('pong');
 
   const result = await dispatchAuthenticatedSecretActionRoute({
@@ -215,7 +215,7 @@ test('dispatchAuthenticatedSecretActionRoute preserves faucet secret failure pas
     path: '/',
     action: 'request_test_eth',
     body: { address: '0xabc' },
-    config: { rpcUrl: 'https://rpc.example' },
+    config: { rpcUrl: 'https://rpc.example.test' },
     slug: 'session-a',
     address: '0xabc',
     env: { GROUP_KV: {} },
@@ -240,7 +240,7 @@ test('dispatchAuthenticatedSecretActionRoute preserves faucet secret failure pas
 });
 
 test('dispatchAuthenticatedSecretActionRoute preserves proof-backed faucet bypass and downstream handoff shape', async () => {
-  const config = { rpcUrl: 'https://rpc.example' };
+  const config = { rpcUrl: 'https://rpc.example.test' };
   const secrets = { faucetPrivateKey: '0xabc' };
   const downstreamResponse = new Response('funded');
 
@@ -293,7 +293,7 @@ test('dispatchAuthenticatedSecretActionRoute preserves proof-backed faucet bypas
 });
 
 test('dispatchAuthenticatedSecretActionRoute allows same-wallet faucet requests to re-check gate access without token scope', async () => {
-  const config = { rpcUrl: 'https://rpc.example' };
+  const config = { rpcUrl: 'https://rpc.example.test' };
   const secrets = { faucetPrivateKey: '0xabc' };
   const downstreamResponse = new Response('funded');
 

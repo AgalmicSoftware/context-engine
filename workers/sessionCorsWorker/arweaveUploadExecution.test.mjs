@@ -192,7 +192,7 @@ test('arweaveUpload preserves upload start/success logging and transaction tag w
     secrets: {
       arweaveJwk: '{"kty":"RSA"}',
     },
-    baseHeaders: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
+    baseHeaders: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
     config: { registryAddress: '0x0000000000000000000000000000000000000001' },
     slug: 'session-success',
     uploaderAddress: '0xabc',
@@ -214,7 +214,7 @@ test('arweaveUpload preserves upload start/success logging and transaction tag w
       resolveArweaveCtor: async () => ({
         init: (config) => {
           assert.deepEqual(config, {
-            host: 'arweave.net',
+            host: 'arweave.net', // intentional: real URL — tests allowlist enforcement
             port: 443,
             protocol: 'https',
             timeout: 60000,
@@ -244,7 +244,7 @@ test('arweaveUpload preserves upload start/success logging and transaction tag w
   assert.deepEqual(result, {
     body: { id: 'tx-123' },
     status: 200,
-    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
+    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
   });
   assert.equal(uploader.uploadChunkCalls, 1);
   assert.deepEqual(tx.tags, [

@@ -17,6 +17,13 @@ describe('arweaveUrls helpers', () => {
   const txId = '8_2VRRP5Ka0b5F9yiq_nm2hJto8qnQazZ2EtfLJ0viE';
   const testArIoGateway = 'https://ar-io.example.test';
   const testArweaveGateway = 'https://arweave.example.test';
+  const defaultArIoGateway = 'https://ar-io.dev'; // intentional: real URL - verifies production AR.IO gateway routing
+  const canonicalArweaveGateway = 'https://arweave.net'; // intentional: real URL — tests allowlist enforcement
+  const subdomainArweaveGateway = 'https://nknrqljpprb2ncdidz57t6g5o346sreaimrxm7qp3ybzitf7bvya.arweave.net'; // intentional: real URL — tests allowlist enforcement
+  const irysGateway = 'https://gateway.irys.xyz'; // intentional: real URL — tests allowlist enforcement
+  const arIoSubdomainGateway = 'https://b2tadb22u32gxwsm4gsbpfd3ng44xia5zy7cltjuc4j3da7nsulq.ar-io.dev'; // intentional: real URL - verifies AR.IO subdomain parsing
+  const gatewayFanoutPrimary = 'https://permagate.io'; // intentional: real URL - verifies production gateway fanout
+  const gatewayFanoutSecondary = 'https://g8way.io'; // intentional: real URL - verifies production gateway fanout
 
   afterEach(() => {
     try { delete globalThis.CE_ARWEAVE_GATEWAY_URL; } catch (_) {}
@@ -36,33 +43,33 @@ describe('arweaveUrls helpers', () => {
     expect(parseArweaveTxId(txId)).toBe(txId);
     expect(parseArweaveTxId(`ar://${txId}`)).toBe(txId);
     expect(parseArweaveTxId(`ar://${txId}?foo=bar`)).toBe(txId);
-    expect(parseArweaveTxId(`https://arweave.net/${txId}`)).toBe(txId);
-    expect(parseArweaveTxId(`https://arweave.net/${txId}/`)).toBe(txId);
-    expect(parseArweaveTxId(`https://arweave.net/tx/${txId}/data`)).toBe(txId);
-    expect(parseArweaveTxId(`https://nknrqljpprb2ncdidz57t6g5o346sreaimrxm7qp3ybzitf7bvya.arweave.net/${txId}`)).toBe(txId);
+    expect(parseArweaveTxId(`${canonicalArweaveGateway}/${txId}`)).toBe(txId);
+    expect(parseArweaveTxId(`${canonicalArweaveGateway}/${txId}/`)).toBe(txId);
+    expect(parseArweaveTxId(`${canonicalArweaveGateway}/tx/${txId}/data`)).toBe(txId);
+    expect(parseArweaveTxId(`${subdomainArweaveGateway}/${txId}`)).toBe(txId);
   });
 
   it('normalizes arweave txIds to gateway URLs and leaves other values unchanged', () => {
     globalThis.CE_ARWEAVE_DIRECT_TO_AR_IO = false;
-    expect(normalizeArweaveUrl(txId)).toBe(`https://ar-io.dev/${txId}`);
-    expect(normalizeArweaveUrl(`ar://${txId}`)).toBe(`https://ar-io.dev/${txId}`);
-    expect(normalizeArweaveUrl(`https://arweave.net/tx/${txId}/data`)).toBe(`https://ar-io.dev/${txId}`);
-    expect(normalizeArweaveUrl(`https://nknrqljpprb2ncdidz57t6g5o346sreaimrxm7qp3ybzitf7bvya.arweave.net/${txId}`)).toBe(`https://ar-io.dev/${txId}`);
+    expect(normalizeArweaveUrl(txId)).toBe(`${defaultArIoGateway}/${txId}`);
+    expect(normalizeArweaveUrl(`ar://${txId}`)).toBe(`${defaultArIoGateway}/${txId}`);
+    expect(normalizeArweaveUrl(`${canonicalArweaveGateway}/tx/${txId}/data`)).toBe(`${defaultArIoGateway}/${txId}`);
+    expect(normalizeArweaveUrl(`${subdomainArweaveGateway}/${txId}`)).toBe(`${defaultArIoGateway}/${txId}`);
     expect(normalizeArweaveUrl('assets/img/ce_header.webp')).toBe('assets/img/ce_header.webp');
-    expect(normalizeArweaveUrl('https://example.com/foo.png')).toBe('https://example.com/foo.png');
+    expect(normalizeArweaveUrl('https://example.example.test/foo.png')).toBe('https://example.example.test/foo.png');
   });
 
-  it('defaults to ar.io-first gateway fanout unless direct-to-ar.io mode is explicitly enabled', () => {
+  it('defaults to AR.IO-first gateway fanout unless direct-to-AR.IO mode is explicitly enabled', () => {
     expect(getDefaultArweaveGateways()).toEqual([
-      'https://ar-io.dev',
-      'https://arweave.net',
-      'https://gateway.irys.xyz',
-      'https://permagate.io',
-      'https://g8way.io',
+      defaultArIoGateway,
+      canonicalArweaveGateway,
+      irysGateway,
+      gatewayFanoutPrimary,
+      gatewayFanoutSecondary,
     ]);
   });
 
-  it('uses ar.io when direct-to-ar.io mode is enabled for user-facing links', () => {
+  it('uses AR.IO when direct-to-AR.IO mode is enabled for user-facing links', () => {
     globalThis.CE_ARWEAVE_DIRECT_TO_AR_IO = true;
     globalThis.CE_ARWEAVE_AR_IO_URL = testArIoGateway;
 
@@ -79,20 +86,20 @@ describe('arweaveUrls helpers', () => {
   it('builds gateway fallback candidates for tx ids and known gateway URLs', () => {
     globalThis.CE_ARWEAVE_DIRECT_TO_AR_IO = true;
     globalThis.CE_ARWEAVE_AR_IO_URL = testArIoGateway;
-    globalThis.CE_ARWEAVE_GATEWAYS = ['https://backup.example.test', 'https://arweave.net'];
+    globalThis.CE_ARWEAVE_GATEWAYS = ['https://backup.example.test', canonicalArweaveGateway];
 
     const candidates = buildArweaveGatewayUrlCandidates(
-      `https://b2tadb22u32gxwsm4gsbpfd3ng44xia5zy7cltjuc4j3da7nsulq.ar-io.dev/${txId}?`
+      `${arIoSubdomainGateway}/${txId}?`
     );
 
     expect(candidates).toEqual([
       `${testArIoGateway}/${txId}`,
       'https://backup.example.test/8_2VRRP5Ka0b5F9yiq_nm2hJto8qnQazZ2EtfLJ0viE',
-      `https://arweave.net/${txId}`,
-      `https://ar-io.dev/${txId}`,
-      `https://gateway.irys.xyz/${txId}`,
-      `https://permagate.io/${txId}`,
-      `https://g8way.io/${txId}`,
+      `${canonicalArweaveGateway}/${txId}`,
+      `${defaultArIoGateway}/${txId}`,
+      `${irysGateway}/${txId}`,
+      `${gatewayFanoutPrimary}/${txId}`,
+      `${gatewayFanoutSecondary}/${txId}`,
     ]);
   });
 });

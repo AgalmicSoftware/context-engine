@@ -8,7 +8,7 @@ const SESSION_REGISTRY_CACHE_UPDATED_EVENT = 'ce:session-registry-cache-updated'
 const buildSessionConfig = (overrides = {}) => ({
   slug: 'edge',
   sessionName: 'Edge Session',
-  corsWorkerUrl: 'https://worker.example',
+  corsWorkerUrl: 'https://worker.example.test',
   networkChainId: 84532,
   __registry: {
     registryChainId: 84532,
@@ -144,7 +144,7 @@ describe('SponsorPage', () => {
                 ok: true,
                 deployGrantToken: 'deploy-grant-token',
                 faucetGrantToken: '',
-                bootstrapWorkerUrl: 'https://worker.example',
+                bootstrapWorkerUrl: 'https://worker.example.test',
               }),
             }
         : { ok: true, json: async () => ({ ok: true }) }
@@ -153,11 +153,11 @@ describe('SponsorPage', () => {
     mockLoadSessionRegistryCache.mockResolvedValue(undefined);
     mockGetAllSessionEntries.mockImplementation(() => sessionEntries);
     mockResolveCorsProxyUrl.mockResolvedValue({
-      url: 'https://worker.example',
+      url: 'https://worker.example.test',
       source: 'session-config',
       status: 'ok',
     });
-    mockGetUsableSessionWorkerUrl.mockReturnValue('https://worker.example');
+    mockGetUsableSessionWorkerUrl.mockReturnValue('https://worker.example.test');
     mockHasUsableSessionWorkerConfig.mockReturnValue(true);
     mockFetchSessionFromRegistry.mockResolvedValue(buildSessionConfig());
     mockEncryptWithPassword.mockResolvedValue('encrypted-base64');
@@ -194,7 +194,7 @@ describe('SponsorPage', () => {
     await renderSponsorPage();
 
     expect(await screen.findByTestId(E2E_TESTIDS.ADMIN_SESSION_SELECT)).toHaveValue('edge');
-    expect(screen.queryByDisplayValue('https://worker.example')).not.toBeInTheDocument();
+    expect(screen.queryByDisplayValue('https://worker.example.test')).not.toBeInTheDocument();
 
     expect(getFieldInputByLabel('Label')).toBeInTheDocument();
     expect(getFieldInputByLabel('OpenAI key')).toBeInTheDocument();
@@ -207,13 +207,13 @@ describe('SponsorPage', () => {
     expect(screen.getByPlaceholderText('No expiry')).toBeInTheDocument();
     expect(screen.getByTestId('ce-sponsor-expiry-input')).toHaveAttribute('min', expect.stringMatching(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/));
     expect(screen.getByText('Issue one-time deploy grants through the selected sponsoring session worker instead of writing raw deploy credentials into the bundle.')).toBeInTheDocument();
-    expect(screen.getByText('Uses sponsoring worker: https://worker.example')).toBeInTheDocument();
+    expect(screen.getByText('Uses sponsoring worker: https://worker.example.test')).toBeInTheDocument();
     expect(getToggleCheckbox('Dev: keep secrets on refresh')).toBeChecked();
     expect(screen.getByTestId(E2E_TESTIDS.SPONSOR_WORKER_URL_TOGGLE)).toBeInTheDocument();
     expect(screen.getByTestId(E2E_TESTIDS.SPONSOR_CREATE)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Edit upload worker URL' }));
-    const workerInput = await screen.findByDisplayValue('https://worker.example');
+    const workerInput = await screen.findByDisplayValue('https://worker.example.test');
     expect(screen.getByTestId(E2E_TESTIDS.SPONSOR_WORKER_URL)).toBe(workerInput);
     expect(workerInput).toHaveProperty('readOnly', false);
 
@@ -286,7 +286,7 @@ describe('SponsorPage', () => {
                 ok: true,
                 deployGrantToken: 'deploy-grant-token',
                 faucetGrantToken: 'faucet-grant-token',
-                bootstrapWorkerUrl: 'https://worker.example',
+                bootstrapWorkerUrl: 'https://worker.example.test',
               }),
             }
           : { ok: true, json: async () => ({ ok: true }) }
@@ -306,7 +306,7 @@ describe('SponsorPage', () => {
       target: { value: '0xsponsoredfaucet' },
     });
     fireEvent.change(getFieldInputByLabel('Custom RPC URL'), {
-      target: { value: 'https://rpc.example' },
+      target: { value: 'https://rpc.example.test' },
     });
     fireEvent.change(getFieldInputByLabel('Lit payer private key'), {
       target: { value: '0x59c6995e998f97a5a0044976f84ce7de5d9d7f17b2f6a6a5f76f8864c8ad88f5' },
@@ -333,22 +333,22 @@ describe('SponsorPage', () => {
       encryptedData: 'encrypted-base64',
     }));
     expect(JSON.stringify(envelope)).not.toContain('sk-live-openai');
-    expect(JSON.stringify(envelope)).not.toContain('https://rpc.example');
+    expect(JSON.stringify(envelope)).not.toContain('https://rpc.example.test');
     expect(JSON.stringify(envelope)).not.toContain('cf-live-token');
     expect(JSON.stringify(envelope)).not.toContain('0xsponsoredfaucet');
     expect(mockEncryptWithPassword).toHaveBeenCalledWith(expect.objectContaining({
       openaiKey: 'sk-live-openai',
       arweaveJwk: '{"kty":"RSA"}',
       faucetPrivateKey: '0xsponsoredfaucet',
-      customRpcUrl: 'https://rpc.example',
+      customRpcUrl: 'https://rpc.example.test',
       litPayerPrivateKey: '0x59c6995e998f97a5a0044976f84ce7de5d9d7f17b2f6a6a5f76f8864c8ad88f5',
       litPayerAddress: expectedLitPayerAddress,
-      bootstrapWorkerUrl: 'https://worker.example',
+      bootstrapWorkerUrl: 'https://worker.example.test',
       deployGrantToken: 'deploy-grant-token',
       faucetGrantToken: 'faucet-grant-token',
       meta: expect.objectContaining({
         sourceSessionSlug: 'edge',
-        sourceWorkerUrl: 'https://worker.example',
+        sourceWorkerUrl: 'https://worker.example.test',
       }),
     }), expect.any(String));
     expect(mockEncryptWithPassword.mock.calls[0][0]).not.toHaveProperty('cloudflareApiToken');
@@ -357,7 +357,7 @@ describe('SponsorPage', () => {
     expect(JSON.parse(grantCall[1].body)).toEqual(expect.objectContaining({
       sessionSlug: 'edge',
       grantRequest: {
-        bootstrapWorkerUrl: 'https://worker.example',
+        bootstrapWorkerUrl: 'https://worker.example.test',
         deploy: {
           cloudflareApiToken: 'cf-live-token',
         },
@@ -371,11 +371,11 @@ describe('SponsorPage', () => {
     expect(mockBuildSignedAdminActionAuth).toHaveBeenCalledWith(expect.objectContaining({
       action: 'issue-sponsored-grants',
       slug: 'edge',
-      workerUrl: 'https://worker.example',
+      workerUrl: 'https://worker.example.test',
       body: expect.objectContaining({
         sessionSlug: 'edge',
         grantRequest: expect.objectContaining({
-          bootstrapWorkerUrl: 'https://worker.example',
+          bootstrapWorkerUrl: 'https://worker.example.test',
           deploy: expect.objectContaining({
             cloudflareApiToken: 'cf-live-token',
           }),
@@ -391,7 +391,7 @@ describe('SponsorPage', () => {
     }));
     expect(mockUploadDataToArweave.mock.calls[0][2]).toEqual(expect.objectContaining({
       arweaveJwk: '{"kty":"RSA"}',
-      workerUrl: 'https://worker.example',
+      workerUrl: 'https://worker.example.test',
       skipAuth: true,
       adminAuth: expect.objectContaining({
         address: ADMIN_ADDRESS,
@@ -402,7 +402,7 @@ describe('SponsorPage', () => {
     }));
     expect(mockBuildSignedBootstrapAdminAuth).toHaveBeenCalledWith(expect.objectContaining({
       slug: 'edge',
-      workerUrl: 'https://worker.example',
+      workerUrl: 'https://worker.example.test',
       statement: 'Admin request: bootstrap arweave upload',
       context: expect.objectContaining({
         account: ADMIN_ADDRESS,
@@ -418,7 +418,7 @@ describe('SponsorPage', () => {
     expect(txRow).toHaveTextContent('Arweave tx:');
     expect(within(txRow).getByRole('link', { name: 'sponsor_tx_id' })).toHaveAttribute(
       'href',
-      'https://ar-io.dev/sponsor_tx_id',
+      'https://ar-io.dev/sponsor_tx_id', // intentional: real URL - verifies sponsor tx gateway link
     );
   });
 
@@ -568,7 +568,7 @@ describe('SponsorPage', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId(E2E_TESTIDS.SPONSOR_STATUS)).toHaveTextContent(
-        "Sponsored grant request could not reach https://worker.example. This is usually CORS or worker availability; ensure http://localhost is in that worker session's allowOrigins and retry."
+        "Sponsored grant request could not reach https://worker.example.test. This is usually CORS or worker availability; ensure http://localhost is in that worker session's allowOrigins and retry."
       );
     });
     expect(mockUploadDataToArweave).not.toHaveBeenCalled();
@@ -589,7 +589,7 @@ describe('SponsorPage', () => {
     expect(await screen.findByLabelText('Sponsored share URL')).toBeInTheDocument();
     expect(await screen.findByRole('link', { name: 'sponsor_tx_id' })).toHaveAttribute(
       'href',
-      'https://ar-io.dev/sponsor_tx_id',
+      'https://ar-io.dev/sponsor_tx_id', // intentional: real URL - verifies sponsor tx gateway link
     );
 
     mockUploadDataToArweave.mockRejectedValueOnce(new Error('Upload failed'));
@@ -616,7 +616,7 @@ describe('SponsorPage', () => {
     expect(createButton).toBeDisabled();
 
     fireEvent.click(screen.getByRole('button', { name: 'Edit upload worker URL' }));
-    const workerInput = screen.getByPlaceholderText('https://<worker-name>.<account-subdomain>.workers.dev/');
+    const workerInput = screen.getByPlaceholderText(/worker-name.*account-subdomain/i);
     fireEvent.change(workerInput, {
       target: { value: 'https://manual.example.test' },
     });
@@ -650,7 +650,7 @@ describe('SponsorPage', () => {
     expect(await screen.findByTestId(E2E_TESTIDS.ADMIN_SESSION_SELECT)).toHaveValue('edge');
     fireEvent.click(screen.getByRole('button', { name: 'Edit upload worker URL' }));
 
-    const workerInput = await screen.findByDisplayValue('https://worker.example');
+    const workerInput = await screen.findByDisplayValue('https://worker.example.test');
     fireEvent.change(workerInput, {
       target: { value: 'https://manual.example.test/auth/login' },
     });
@@ -703,7 +703,7 @@ describe('SponsorPage', () => {
     expect(await screen.findByTestId(E2E_TESTIDS.ADMIN_SESSION_SELECT)).toHaveValue('edge');
     fireEvent.click(screen.getByRole('button', { name: 'Edit upload worker URL' }));
 
-    const workerInput = await screen.findByDisplayValue('https://worker.example');
+    const workerInput = await screen.findByDisplayValue('https://worker.example.test');
     fireEvent.change(workerInput, {
       target: { value: 'https://manual.example.test' },
     });

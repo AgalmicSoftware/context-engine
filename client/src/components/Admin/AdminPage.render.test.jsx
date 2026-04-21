@@ -13,7 +13,7 @@ const SESSION_REGISTRY_CACHE_UPDATED_EVENT = 'ce:session-registry-cache-updated'
 const buildSessionConfig = (overrides = {}) => ({
   slug: 'edge',
   sessionName: 'Edge Session',
-  corsWorkerUrl: 'https://worker.example',
+  corsWorkerUrl: 'https://worker.example.test',
   networkChainId: 84532,
   __registry: {
     registryChainId: 84532,
@@ -141,7 +141,7 @@ const openAllowlistEditor = async () => {
   await clickAndSettle(screen.getByRole('button', { name: 'Allowlist' }));
   return getAllowOriginsInput();
 };
-const waitForResolvedWorkerUrl = () => screen.findByDisplayValue('https://worker.example');
+const waitForResolvedWorkerUrl = () => screen.findByDisplayValue('https://worker.example.test');
 const openWorkerSecretsPanel = async () => {
   const panel = getWorkerSecretsPanel();
   await clickAndSettle(within(panel).getByRole('button', { name: 'Toggle Worker secrets section' }));
@@ -174,7 +174,7 @@ describe('AdminPage rendered interactions', () => {
     mockLoadSessionRegistryCache.mockResolvedValue(undefined);
     mockGetAllSessionEntries.mockImplementation(() => sessionEntries);
     mockResolveCorsProxyUrl.mockResolvedValue({
-      url: 'https://worker.example',
+      url: 'https://worker.example.test',
       source: 'session-config',
       status: 'ok',
     });
@@ -222,7 +222,7 @@ describe('AdminPage rendered interactions', () => {
     expect(sessionLink).toHaveAttribute('href', expect.stringContaining('/session/edge'));
     expect(sessionLink).toHaveAttribute('target', '_blank');
 
-    const workerInput = await screen.findByDisplayValue('https://worker.example');
+    const workerInput = await screen.findByDisplayValue('https://worker.example.test');
     expect(workerInput).toHaveProperty('readOnly', true);
     expect(screen.queryByText('Resolved (ok)')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Copy worker URL' })).toHaveClass(styles.heroCardInputIconButton);
@@ -272,7 +272,7 @@ describe('AdminPage rendered interactions', () => {
     sessionEntries = [[
       'edge',
       buildSessionConfig({
-        sessionHeaderImg: 'https://broken.example/session-header.png',
+        sessionHeaderImg: 'https://broken.example.test/session-header.png',
       }),
     ]];
 
@@ -359,14 +359,14 @@ describe('AdminPage rendered interactions', () => {
       expect(screen.getByText(/Worker secrets saved for edge/)).toBeInTheDocument();
     });
 
-    expect(global.fetch).toHaveBeenCalledWith('https://worker.example/admin/set-secrets', expect.objectContaining({
+    expect(global.fetch).toHaveBeenCalledWith('https://worker.example.test/admin/set-secrets', expect.objectContaining({
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
     }));
     expect(mockBuildSignedAdminActionAuth).toHaveBeenCalledWith(expect.objectContaining({
       action: 'set-secrets',
       slug: 'edge',
-      workerUrl: 'https://worker.example',
+      workerUrl: 'https://worker.example.test',
       body: {
         sessionSlug: 'edge',
         secrets: {
@@ -588,10 +588,10 @@ describe('AdminPage rendered interactions', () => {
       expect(mockBuildSignedAdminActionAuth).toHaveBeenCalledWith(expect.objectContaining({
         action: 'lit-status',
         slug: 'edge',
-        workerUrl: 'https://worker.example',
+        workerUrl: 'https://worker.example.test',
       }));
       expect(global.fetch).toHaveBeenCalledWith(
-        'https://worker.example/admin/lit-status',
+        'https://worker.example.test/admin/lit-status',
         expect.objectContaining({ method: 'POST' }),
       );
     });
@@ -626,10 +626,10 @@ describe('AdminPage rendered interactions', () => {
       expect(mockBuildSignedAdminActionAuth).toHaveBeenCalledWith(expect.objectContaining({
         action: 'lit-status',
         slug: 'edge',
-        workerUrl: 'https://worker.example',
+        workerUrl: 'https://worker.example.test',
       }));
       expect(global.fetch).toHaveBeenCalledWith(
-        'https://worker.example/admin/lit-status',
+        'https://worker.example.test/admin/lit-status',
         expect.objectContaining({ method: 'POST' }),
       );
     });
@@ -646,10 +646,10 @@ describe('AdminPage rendered interactions', () => {
       bySession: {
         edge: {
           config: {
-            corsWorkerUrl: 'https://worker.example',
-            allowOrigins: ['https://existing.example'],
+            corsWorkerUrl: 'https://worker.example.test',
+            allowOrigins: ['https://existing.example.test'],
             limits: { perWalletPerDay: 3 },
-            rpcEndpoint: 'https://rpc.example',
+            rpcEndpoint: 'https://rpc.example.test',
           },
           cachedAtMs: 1700000000000,
         },
@@ -659,7 +659,7 @@ describe('AdminPage rendered interactions', () => {
     await renderAdminPage();
     await waitForResolvedWorkerUrl();
 
-    expect(await openAllowlistEditor()).toHaveValue('https://existing.example');
+    expect(await openAllowlistEditor()).toHaveValue('https://existing.example.test');
   });
 
   it('saves the edited allowOrigins list exactly for the selected session', async () => {
@@ -668,10 +668,10 @@ describe('AdminPage rendered interactions', () => {
       bySession: {
         edge: {
           config: {
-            corsWorkerUrl: 'https://worker.example',
-            allowOrigins: ['https://existing.example', 'https://remove-me.example'],
+            corsWorkerUrl: 'https://worker.example.test',
+            allowOrigins: ['https://existing.example.test', 'https://remove-me.example.test'],
             limits: { perWalletPerDay: 3 },
-            rpcEndpoint: 'https://rpc.example',
+            rpcEndpoint: 'https://rpc.example.test',
           },
           cachedAtMs: 1700000000000,
         },
@@ -682,7 +682,7 @@ describe('AdminPage rendered interactions', () => {
     await waitForResolvedWorkerUrl();
 
     fireEvent.change(await openAllowlistEditor(), {
-      target: { value: 'https://existing.example' },
+      target: { value: 'https://existing.example.test' },
     });
     await clickAndSettle(screen.getByRole('button', { name: 'Save allowlist' }));
 
@@ -693,12 +693,12 @@ describe('AdminPage rendered interactions', () => {
     expect(mockBuildSignedAdminActionAuth).toHaveBeenCalledWith(expect.objectContaining({
       action: 'set-config',
       slug: 'edge',
-      workerUrl: 'https://worker.example',
+      workerUrl: 'https://worker.example.test',
       body: expect.objectContaining({
         sessionSlug: 'edge',
         adminAddress: ADMIN_ADDRESS,
         config: expect.objectContaining({
-          allowOrigins: ['https://existing.example'],
+          allowOrigins: ['https://existing.example.test'],
         }),
       }),
     }));
@@ -709,12 +709,12 @@ describe('AdminPage rendered interactions', () => {
     expect(payload.action).toBe('set-config');
     expect(payload.slug).toBe('edge');
     expect(Object.prototype.hasOwnProperty.call(payload.config, 'adminAddress')).toBe(false);
-    expect(payload.config.allowOrigins).toEqual(['https://existing.example']);
+    expect(payload.config.allowOrigins).toEqual(['https://existing.example.test']);
     expect(getCachedSessionWorkerConfig('edge')).toEqual(expect.objectContaining({
-      corsWorkerUrl: 'https://worker.example',
-      allowOrigins: ['https://existing.example'],
+      corsWorkerUrl: 'https://worker.example.test',
+      allowOrigins: ['https://existing.example.test'],
       limits: { perWalletPerDay: 3 },
-      rpcEndpoint: 'https://rpc.example',
+      rpcEndpoint: 'https://rpc.example.test',
     }));
   });
 
@@ -723,7 +723,7 @@ describe('AdminPage rendered interactions', () => {
     await waitForResolvedWorkerUrl();
 
     fireEvent.change(await openAllowlistEditor(), {
-      target: { value: 'https://alpha.example, http://localhost:7391\nhttps://alpha.example/' },
+      target: { value: 'https://alpha.example.test, http://localhost:7391\nhttps://alpha.example.test/' },
     });
     await clickAndSettle(screen.getByRole('button', { name: 'Save allowlist' }));
 
@@ -734,7 +734,7 @@ describe('AdminPage rendered interactions', () => {
     const adminCall = global.fetch.mock.calls.find(([url]) => String(url).endsWith('/admin/set-config'));
     const payload = JSON.parse(adminCall[1].body);
     expect(payload.config.allowOrigins).toEqual([
-      'https://alpha.example',
+      'https://alpha.example.test',
       'http://localhost:7391',
     ]);
   });
@@ -780,7 +780,7 @@ describe('AdminPage rendered interactions', () => {
     await waitForResolvedWorkerUrl();
 
     fireEvent.change(await openAllowlistEditor(), {
-      target: { value: 'https://existing.example' },
+      target: { value: 'https://existing.example.test' },
     });
     await clickAndSettle(screen.getByRole('button', { name: 'Save allowlist' }));
 
@@ -800,8 +800,8 @@ describe('AdminPage rendered interactions', () => {
       bySession: {
         edge: {
           config: {
-            corsWorkerUrl: 'https://worker.example',
-            allowOrigins: ['https://existing.example'],
+            corsWorkerUrl: 'https://worker.example.test',
+            allowOrigins: ['https://existing.example.test'],
           },
           cachedAtMs: 1700000000000,
         },
@@ -838,8 +838,8 @@ describe('AdminPage rendered interactions', () => {
       bySession: {
         edge: {
           config: {
-            corsWorkerUrl: 'https://worker.example',
-            allowOrigins: ['https://existing.example', 'http://localhost:7391'],
+            corsWorkerUrl: 'https://worker.example.test',
+            allowOrigins: ['https://existing.example.test', 'http://localhost:7391'],
           },
           cachedAtMs: 1700000000000,
         },
@@ -858,9 +858,9 @@ describe('AdminPage rendered interactions', () => {
 
     const values = getAllowOriginsInput().value.split('\n').filter(Boolean);
     expect(values).toEqual(expect.arrayContaining([
-      'https://existing.example',
+      'https://existing.example.test',
       'http://localhost:7391',
-      'https://contextengine.xyz',
+      'https://contextengine.xyz', // intentional: production recommended origin assertion
       window.location.origin,
     ]));
     expect(values.filter((entry) => entry === 'http://localhost:7391')).toHaveLength(1);
@@ -878,13 +878,13 @@ describe('AdminPage rendered interactions', () => {
     await waitForResolvedWorkerUrl();
 
     fireEvent.change(await openAllowlistEditor(), {
-      target: { value: 'https://replacement.example' },
+      target: { value: 'https://replacement.example.test' },
     });
     await clickAndSettle(screen.getByRole('button', { name: 'Save allowlist' }));
 
     await waitFor(() => {
       expect(screen.getByText(
-        /Worker request could not reach https:\/\/worker\.example\./
+        /Worker request could not reach https:\/\/worker\.example\.test\./
       )).toBeInTheDocument();
     });
     expect(screen.getByText(
@@ -921,20 +921,20 @@ describe('AdminPage rendered interactions', () => {
       v: 1,
       bySession: {
         edge: {
-          corsWorkerUrl: 'https://worker-kv-cache.example',
+          corsWorkerUrl: 'https://worker-kv-cache.example.test',
         },
       },
     }));
 
     await renderAdminPage();
 
-    expect(await screen.findByDisplayValue('https://worker-kv-cache.example')).toBeInTheDocument();
+    expect(await screen.findByDisplayValue('https://worker-kv-cache.example.test')).toBeInTheDocument();
     expect(await openAllowlistEditor()).toHaveValue('');
     expect(screen.getByRole('button', { name: 'Save allowlist' })).toBeDisabled();
 
     await act(async () => {
       resolveWorkerLookup({
-        url: 'https://worker-kv-cache.example',
+        url: 'https://worker-kv-cache.example.test',
         source: 'worker-config-cache',
         status: 'plain',
       });
@@ -954,7 +954,7 @@ describe('AdminPage rendered interactions', () => {
 
     await renderAdminPage();
 
-    const workerInput = await screen.findByPlaceholderText('https://<worker-name>.<account-subdomain>.workers.dev/');
+    const workerInput = await screen.findByPlaceholderText(/worker-name.*account-subdomain/i);
     expect(workerInput).toHaveValue(CLOUDFLARE_CORS_WORKER_URL);
     expect(screen.getByRole('link', { name: 'Open session' })).toHaveAttribute('href', 'http://localhost/session');
 
@@ -1368,7 +1368,7 @@ describe('AdminPage rendered interactions', () => {
   });
 
   it('shows Arweave and faucet balances inline with worker secrets and refreshes both cards', async () => {
-    const arweave = Arweave.init({ host: 'arweave.net', port: 443, protocol: 'https' });
+    const arweave = Arweave.init({ host: 'arweave.example.test', port: 443, protocol: 'https' });
     const arweaveJwk = await arweave.wallets.generate();
     const arweaveAddress = await arweave.wallets.jwkToAddress(arweaveJwk);
     const arweaveShort = `${arweaveAddress.slice(0, 6)}…${arweaveAddress.slice(-4)}`;
@@ -1381,8 +1381,8 @@ describe('AdminPage rendered interactions', () => {
       .mockResolvedValue(ethers.utils.parseEther('0.1842'));
     mockReadArweaveWalletBalance.mockResolvedValue({
       address: arweaveAddress,
-      balanceUrl: `https://arweave.net/wallet/${arweaveAddress}/balance`,
-      gatewayBase: 'https://arweave.net',
+      balanceUrl: `https://arweave.example.test/wallet/${arweaveAddress}/balance`,
+      gatewayBase: 'https://arweave.example.test',
       winston: '12345678000000',
     });
 
@@ -1457,7 +1457,7 @@ describe('AdminPage rendered interactions', () => {
   });
 
   it('hides zero-balance resource summaries in worker secrets', async () => {
-    const arweave = Arweave.init({ host: 'arweave.net', port: 443, protocol: 'https' });
+    const arweave = Arweave.init({ host: 'arweave.example.test', port: 443, protocol: 'https' });
     const arweaveJwk = await arweave.wallets.generate();
     const faucetWallet = ethers.Wallet.createRandom();
     const faucetBalanceSpy = jest
@@ -1465,8 +1465,8 @@ describe('AdminPage rendered interactions', () => {
       .mockResolvedValue(ethers.constants.Zero);
     mockReadArweaveWalletBalance.mockResolvedValue({
       address: await arweave.wallets.jwkToAddress(arweaveJwk),
-      balanceUrl: 'https://arweave.net/wallet/test/balance',
-      gatewayBase: 'https://arweave.net',
+      balanceUrl: 'https://arweave.example.test/wallet/test/balance',
+      gatewayBase: 'https://arweave.example.test',
       winston: '5',
     });
 

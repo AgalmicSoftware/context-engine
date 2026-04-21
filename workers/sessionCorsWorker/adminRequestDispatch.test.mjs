@@ -18,7 +18,7 @@ const createAdminDeps = (overrides = {}) => ({
     ok: true,
     address: '0xabc',
     existingConfig: { adminAddress: '0xabc' },
-    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
+    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
     targetSlug: 'session-a',
   }),
   mergeWorkerConfigRecords: ({ existingConfig, incomingConfig, slug }) => ({
@@ -97,7 +97,7 @@ test('dispatchAdminRequest merges config and persists the result after authority
         return {
           ok: true,
           existingConfig: null,
-          headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
+          headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
           targetSlug: 'session-a',
         };
       },
@@ -118,7 +118,7 @@ test('dispatchAdminRequest merges config and persists the result after authority
   assert.deepEqual(result, {
     body: { ok: true },
     status: 200,
-    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
+    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
   });
 });
 
@@ -130,7 +130,7 @@ test('dispatchAdminRequest seeds bootstrap adminAddress from the top-level body 
       json: async () => createSignedBody({
         adminAddress: '0xabc',
         config: {
-          allowOrigins: ['https://allowed.example'],
+          allowOrigins: ['https://allowed.example.test'],
         },
       }),
     },
@@ -142,7 +142,7 @@ test('dispatchAdminRequest seeds bootstrap adminAddress from the top-level body 
       resolveAdminRequestAuthority: async () => ({
         ok: true,
         existingConfig: null,
-        headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
+        headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
         targetSlug: 'session-a',
       }),
       isAddress: (value) => value === '0xabc',
@@ -158,14 +158,14 @@ test('dispatchAdminRequest seeds bootstrap adminAddress from the top-level body 
 
   assert.deepEqual(calls, [
     ['mergeWorkerConfigRecords', null, {
-      allowOrigins: ['https://allowed.example'],
+      allowOrigins: ['https://allowed.example.test'],
       adminAddress: '0xabc',
     }, 'session-a'],
     ['putSessionConfig', { GROUP_KV: {} }, 'session-a', {
       merged: true,
       slug: 'session-a',
       incomingConfig: {
-        allowOrigins: ['https://allowed.example'],
+        allowOrigins: ['https://allowed.example.test'],
         adminAddress: '0xabc',
       },
     }],
@@ -173,7 +173,7 @@ test('dispatchAdminRequest seeds bootstrap adminAddress from the top-level body 
   assert.deepEqual(result, {
     body: { ok: true },
     status: 200,
-    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
+    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
   });
 });
 
@@ -199,10 +199,10 @@ test('dispatchAdminRequest filters and normalizes allowed secrets before persist
       resolveAdminRequestAuthority: async () => ({
         ok: true,
         existingConfig: { adminAddress: '0xabc' },
-        headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
+        headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
         targetSlug: 'session-a',
       }),
-      getSessionSecrets: async () => ({ openaiKey: 'sk-existing', customRpcUrl: 'https://rpc.example' }),
+      getSessionSecrets: async () => ({ openaiKey: 'sk-existing', customRpcUrl: 'https://rpc.example.test' }),
       normalizeSecretValue: (value) => {
         calls.push(['normalizeSecretValue', value]);
         if (typeof value === 'string') return value.trim();
@@ -220,7 +220,7 @@ test('dispatchAdminRequest filters and normalizes allowed secrets before persist
     ['normalizeSecretValue', '  0xlit  '],
     ['putSessionSecrets', { GROUP_KV: {} }, 'session-a', {
       openaiKey: 'sk-new',
-      customRpcUrl: 'https://rpc.example',
+      customRpcUrl: 'https://rpc.example.test',
       arweaveJwk: '{"kty":"RSA"}',
       litPayerPrivateKey: '0xlit',
     }],
@@ -228,7 +228,7 @@ test('dispatchAdminRequest filters and normalizes allowed secrets before persist
   assert.deepEqual(result, {
     body: { ok: true },
     status: 200,
-    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
+    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
   });
 });
 
@@ -273,7 +273,7 @@ test('dispatchAdminRequest reads Lit payer status via the helper route', async (
       litNetwork: 'naga-test',
     },
     status: 200,
-    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
+    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
   });
 });
 
@@ -292,7 +292,7 @@ test('dispatchAdminRequest issues one-time sponsored deploy and faucet grants', 
     request: {
       json: async () => createSignedBody({
         grantRequest: {
-          bootstrapWorkerUrl: 'https://source-worker.example',
+          bootstrapWorkerUrl: 'https://source-worker.example.test',
           expiresAt: '2099-03-21T12:00:00.000Z',
           deploy: {
             cloudflareApiToken: 'cf-sponsored-token',
@@ -311,11 +311,11 @@ test('dispatchAdminRequest issues one-time sponsored deploy and faucet grants', 
       resolveAdminRequestAuthority: async () => ({
         ok: true,
         existingConfig: {
-          corsWorkerUrl: 'https://source-worker.example',
-          allowOrigins: ['https://allowed.example'],
+          corsWorkerUrl: 'https://source-worker.example.test',
+          allowOrigins: ['https://allowed.example.test'],
           faucet: { amountEth: '0.0002' },
         },
-        headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
+        headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
         targetSlug: 'session-a',
       }),
       now: () => Date.parse('2099-03-20T12:00:00.000Z'),
@@ -324,11 +324,11 @@ test('dispatchAdminRequest issues one-time sponsored deploy and faucet grants', 
   });
 
   assert.equal(result.status, 200);
-  assert.equal(result.headers['Access-Control-Allow-Origin'], 'https://allowed.example');
+  assert.equal(result.headers['Access-Control-Allow-Origin'], 'https://allowed.example.test');
   assert.equal(result.body.ok, true);
   assert.equal(typeof result.body.deployGrantToken, 'string');
   assert.equal(typeof result.body.faucetGrantToken, 'string');
-  assert.equal(result.body.bootstrapWorkerUrl, 'https://source-worker.example');
+  assert.equal(result.body.bootstrapWorkerUrl, 'https://source-worker.example.test');
   assert.equal(kvCalls.length, 2);
   assert.deepEqual(kvCalls[0][2], { expirationTtl: 86400 });
   assert.deepEqual(kvCalls[1][2], { expirationTtl: 86400 });
@@ -336,8 +336,8 @@ test('dispatchAdminRequest issues one-time sponsored deploy and faucet grants', 
     type: 'deploy-worker',
     sourceSessionSlug: 'session-a',
     sourceConfig: {
-      corsWorkerUrl: 'https://source-worker.example',
-      allowOrigins: ['https://allowed.example'],
+      corsWorkerUrl: 'https://source-worker.example.test',
+      allowOrigins: ['https://allowed.example.test'],
       faucet: { amountEth: '0.0002' },
     },
     cloudflareApiToken: 'cf-sponsored-token',
@@ -348,8 +348,8 @@ test('dispatchAdminRequest issues one-time sponsored deploy and faucet grants', 
     type: 'faucet-tx',
     sourceSessionSlug: 'session-a',
     sourceConfig: {
-      corsWorkerUrl: 'https://source-worker.example',
-      allowOrigins: ['https://allowed.example'],
+      corsWorkerUrl: 'https://source-worker.example.test',
+      allowOrigins: ['https://allowed.example.test'],
       faucet: { amountEth: '0.0002' },
     },
     faucetPrivateKey: '0xfaucet',
@@ -363,7 +363,7 @@ test('dispatchAdminRequest returns a CORS-safe error when sponsored grant persis
     request: {
       json: async () => createSignedBody({
         grantRequest: {
-          bootstrapWorkerUrl: 'https://source-worker.example',
+          bootstrapWorkerUrl: 'https://source-worker.example.test',
           deploy: {
             cloudflareApiToken: 'cf-sponsored-token',
           },
@@ -385,10 +385,10 @@ test('dispatchAdminRequest returns a CORS-safe error when sponsored grant persis
       resolveAdminRequestAuthority: async () => ({
         ok: true,
         existingConfig: {
-          corsWorkerUrl: 'https://source-worker.example',
-          allowOrigins: ['https://allowed.example'],
+          corsWorkerUrl: 'https://source-worker.example.test',
+          allowOrigins: ['https://allowed.example.test'],
         },
-        headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
+        headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
         targetSlug: 'session-a',
       }),
     }),
@@ -397,7 +397,7 @@ test('dispatchAdminRequest returns a CORS-safe error when sponsored grant persis
   assert.deepEqual(result, {
     body: { error: 'KV write exploded' },
     status: 500,
-    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
+    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
   });
 });
 
@@ -416,7 +416,7 @@ test('dispatchAdminRequest allows sponsored deploy grants without a standalone h
     request: {
       json: async () => createSignedBody({
         grantRequest: {
-          bootstrapWorkerUrl: 'https://source-worker.example',
+          bootstrapWorkerUrl: 'https://source-worker.example.test',
           deploy: {
             cloudflareApiToken: 'cf-sponsored-token',
           },
@@ -431,10 +431,10 @@ test('dispatchAdminRequest allows sponsored deploy grants without a standalone h
       resolveAdminRequestAuthority: async () => ({
         ok: true,
         existingConfig: {
-          corsWorkerUrl: 'https://source-worker.example',
-          allowOrigins: ['https://allowed.example'],
+          corsWorkerUrl: 'https://source-worker.example.test',
+          allowOrigins: ['https://allowed.example.test'],
         },
-        headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
+        headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
         targetSlug: 'session-a',
       }),
       now: () => Date.parse('2099-03-20T12:00:00.000Z'),
@@ -453,7 +453,7 @@ test('dispatchAdminRequest rejects sponsored deploy grants when embedded deploy-
     request: {
       json: async () => createSignedBody({
         grantRequest: {
-          bootstrapWorkerUrl: 'https://source-worker.example',
+          bootstrapWorkerUrl: 'https://source-worker.example.test',
           deploy: {
             cloudflareApiToken: 'cf-sponsored-token',
           },
@@ -473,7 +473,7 @@ test('dispatchAdminRequest rejects sponsored deploy grants when embedded deploy-
   assert.deepEqual(result, {
     body: { error: 'Deploy grants require embedded deploy-helper to be enabled on the sponsoring worker.' },
     status: 400,
-    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
+    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
   });
 });
 
@@ -484,8 +484,8 @@ test('dispatchAdminRequest ignores unexpected helper/account fields and still st
     request: {
       json: async () => createSignedBody({
         grantRequest: {
-          deployHelperUrl: 'https://ignored-helper.example.workers.dev',
-          bootstrapWorkerUrl: 'https://source-worker.example',
+          deployHelperUrl: 'https://ignored-helper.example.test',
+          bootstrapWorkerUrl: 'https://source-worker.example.test',
           deploy: {
             cloudflareApiToken: 'cf-sponsored-token',
             cloudflareAccountId: 'ignored-account-id',
@@ -536,7 +536,7 @@ test('dispatchAdminRequest merges limits and persists the result for set-limits'
       resolveAdminRequestAuthority: async () => ({
         ok: true,
         existingConfig: { adminAddress: '0xabc', limits: { perWalletPerDay: 3 } },
-        headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
+        headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
         targetSlug: 'session-a',
       }),
       mergeWorkerLimitRecords: ({ existingConfig, incomingLimits, slug }) => {
@@ -563,7 +563,7 @@ test('dispatchAdminRequest merges limits and persists the result for set-limits'
   assert.deepEqual(result, {
     body: { ok: true },
     status: 200,
-    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
+    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
   });
 });
 
@@ -582,7 +582,7 @@ test('dispatchAdminRequest returns explicit unknown-action failures after admin 
       resolveAdminRequestAuthority: async () => ({
         ok: true,
         existingConfig: { adminAddress: '0xabc' },
-        headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
+        headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
         targetSlug: 'session-a',
       }),
       putSessionConfig: async () => {
@@ -598,6 +598,6 @@ test('dispatchAdminRequest returns explicit unknown-action failures after admin 
   assert.deepEqual(result, {
     body: { error: 'Unknown admin action.' },
     status: 400,
-    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
+    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
   });
 });
