@@ -1973,7 +1973,11 @@ class SBTSelector extends React.Component {
     try {
       if (this.getSelectedSbtKeySet().has(selectedKey)) return;
 
-      let selectedSBT = this.state.sbtOptions.find(
+      const selectableOptions = [
+        ...(Array.isArray(this.state.sbtOptions) ? this.state.sbtOptions : []),
+        ...this.normalizeAdditionalSBTOptions(),
+      ];
+      let selectedSBT = selectableOptions.find(
         (sbt) => {
           const optionKey = this.getSelectableSbtKey(sbt);
           return optionKey
@@ -2191,10 +2195,33 @@ class SBTSelector extends React.Component {
       .filter((option) => !hiddenSlugSet.has(option.value));
   };
 
+  normalizeAdditionalSBTOptions = (optionsInput = this.props.additionalSBTOptions) => (
+    Array.isArray(optionsInput)
+      ? optionsInput
+          .map((entry) => {
+            const address = String(entry?.address || entry?.sbtAddress || entry?.value || '').trim();
+            if (!address) return null;
+            return {
+              ...entry,
+              address,
+              name: entry?.name || entry?.label || address,
+            };
+          })
+          .filter(Boolean)
+      : []
+  );
+
   formatOptionLabel = ({ label, image, value }) => (
     <div className={styles.optionLabel}>
       {image && <img src={normalizeArweaveUrl(image, { contextLabel: 'sbt_selector_image' })} alt="" className={styles.optionImage} />}
       <span>{label}</span>
+    </div>
+  );
+
+  formatValueLabel = ({ label, image, value }) => (
+    <div className={styles.selectedValueLabel}>
+      {image && <img src={normalizeArweaveUrl(image, { contextLabel: 'sbt_selector_image' })} alt="" className={styles.optionImage} />}
+      <span className={styles.selectedValueText}>{label || value}</span>
     </div>
   );
 
@@ -2356,19 +2383,7 @@ class SBTSelector extends React.Component {
     const currentSessionSlug = this.getEffectiveSessionSlug();
     const activeSessionSlug = this.getPropSessionSlug();
 
-    const additionalOptions = Array.isArray(this.props.additionalSBTOptions)
-      ? this.props.additionalSBTOptions
-          .map((entry) => {
-            const address = String(entry?.address || entry?.sbtAddress || '').trim();
-            if (!address) return null;
-            return {
-              ...entry,
-              address,
-              name: entry?.name || entry?.label || address,
-            };
-          })
-          .filter(Boolean)
-      : [];
+    const additionalOptions = this.normalizeAdditionalSBTOptions();
     const mergedSbtOptions = [
       ...sbtOptions,
       ...additionalOptions.filter((entry) => (
@@ -2508,6 +2523,7 @@ class SBTSelector extends React.Component {
               className={styles.sbtDropdown}
               classNamePrefix="sbtSelect"
               formatOptionLabel={this.formatOptionLabel}
+              formatValueLabel={this.formatValueLabel}
               getOptionValue={this.getSelectOptionValue}
               variant={variant}
               value={selectedOption}
