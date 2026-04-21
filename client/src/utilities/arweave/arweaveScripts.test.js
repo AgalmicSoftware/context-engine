@@ -53,8 +53,11 @@ const textResp = (status, textBody = '', contentType = 'text/plain') => ({
 
 const TEST_ARWEAVE_GATEWAY = 'https://arweave.example.test';
 const TEST_ARWEAVE_BACKUP_GATEWAY = 'https://arweave-backup.example.test';
-const TEST_AR_IO_GATEWAY = 'https://unit.ar-io.dev';
+const TEST_AR_IO_GATEWAY = 'https://unit.ar-io.dev'; // intentional: real URL - verifies AR.IO gateway override handling
+const DEFAULT_AR_IO_GATEWAY = 'https://ar-io.dev'; // intentional: real URL - verifies production AR.IO gateway routing
 const TEST_IRYS_GATEWAY = 'https://gateway-irys.example.test';
+const PERMAGATE_GRAPHQL_URL = 'https://permagate.io/graphql'; // intentional: real URL - verifies production GraphQL precheck routing
+const G8WAY_GRAPHQL_URL = 'https://g8way.io/graphql'; // intentional: real URL - verifies production GraphQL fallback routing
 
 describe('arweaveScripts.buildArweaveGatewayUrl', () => {
   const txId = '8_2VRRP5Ka0b5F9yiq_nm2hJto8qnQazZ2EtfLJ0viE';
@@ -65,7 +68,7 @@ describe('arweaveScripts.buildArweaveGatewayUrl', () => {
     try { delete globalThis.CE_ARWEAVE_DIRECT_TO_AR_IO; } catch (_) {}
   });
 
-  it('uses ar.io gateway when direct-to-ar.io mode is enabled', () => {
+  it('uses AR.IO gateway when direct-to-AR.IO mode is enabled', () => {
     globalThis.CE_ARWEAVE_DIRECT_TO_AR_IO = true;
     globalThis.CE_ARWEAVE_AR_IO_URL = TEST_AR_IO_GATEWAY;
 
@@ -94,11 +97,11 @@ describe('arweaveScripts.readArweaveWalletBalance', () => {
     try {
       const result = await arweaveScripts.readArweaveWalletBalance(jwk);
 
-      expect(global.fetch).toHaveBeenCalledWith(`https://ar-io.dev/wallet/${address}/balance`);
+      expect(global.fetch).toHaveBeenCalledWith(`${DEFAULT_AR_IO_GATEWAY}/wallet/${address}/balance`);
       expect(result).toEqual({
         address,
-        balanceUrl: `https://ar-io.dev/wallet/${address}/balance`,
-        gatewayBase: 'https://ar-io.dev',
+        balanceUrl: `${DEFAULT_AR_IO_GATEWAY}/wallet/${address}/balance`,
+        gatewayBase: DEFAULT_AR_IO_GATEWAY,
         winston: '12345678000000',
       });
     } finally {
@@ -134,12 +137,12 @@ describe('arweaveScripts.downloadDataFromArweave', () => {
   beforeEach(() => {
     global.fetch = jest.fn();
     globalThis.CE_ARWEAVE_DIRECT_TO_AR_IO = false;
-    getCorsProxyUrlOrThrow.mockResolvedValue('https://selected.worker.example');
+    getCorsProxyUrlOrThrow.mockResolvedValue('https://selected.worker.example.test');
     resolveCorsProxyUrl.mockImplementation(async ({ sessionSlug }) => {
       const slug = typeof sessionSlug === 'string' ? sessionSlug.trim() : '';
       if (slug === 'open') {
         return {
-          url: 'https://open.worker.example',
+          url: 'https://open.worker.example.test',
           session: {
             slug: 'open',
             __registry: {
@@ -153,7 +156,7 @@ describe('arweaveScripts.downloadDataFromArweave', () => {
       }
       if (slug === 'closed') {
         return {
-          url: 'https://closed.worker.example',
+          url: 'https://closed.worker.example.test',
           session: {
             slug: 'closed',
             __registry: {
@@ -167,7 +170,7 @@ describe('arweaveScripts.downloadDataFromArweave', () => {
         };
       }
       return {
-        url: 'https://selected.worker.example',
+        url: 'https://selected.worker.example.test',
         session: {
           slug,
           __registry: {
@@ -402,7 +405,7 @@ describe('arweaveScripts.downloadDataFromArweave', () => {
       kind: 'not_found',
     });
 
-    // ar.io-family gateways now skip the slow /raw and /tx-data legacy probes.
+    // AR.IO-family gateways now skip the slow /raw and /tx-data legacy probes.
     expect(global.fetch).toHaveBeenCalledTimes(7);
   });
 
@@ -506,7 +509,7 @@ describe('arweaveScripts.downloadDataFromArweave', () => {
     });
 
     expect(global.fetch).toHaveBeenCalledTimes(1);
-    expect(String(global.fetch.mock.calls[0]?.[0] || '')).toBe('https://permagate.io/graphql');
+    expect(String(global.fetch.mock.calls[0]?.[0] || '')).toBe(PERMAGATE_GRAPHQL_URL);
   });
 
   it('skips graphql precheck by default for sbt metadata reads and goes straight to the gateway', async () => {
@@ -548,7 +551,7 @@ describe('arweaveScripts.downloadDataFromArweave', () => {
     expect(String(global.fetch.mock.calls[0]?.[0] || '')).not.toContain('/graphql');
   });
 
-  it('prefers healthy GraphQL endpoints before legacy arweave.net prechecks', async () => {
+  it('prefers healthy GraphQL endpoints before legacy gateway prechecks', async () => {
     globalThis.CE_ARWEAVE_PREFLIGHT_SBT_METADATA = true;
     global.fetch.mockResolvedValueOnce(jsonResp(200, {
       data: { transactions: { edges: [] } },
@@ -568,7 +571,7 @@ describe('arweaveScripts.downloadDataFromArweave', () => {
     });
 
     expect(global.fetch).toHaveBeenCalledTimes(1);
-    expect(String(global.fetch.mock.calls[0]?.[0] || '')).toBe('https://permagate.io/graphql');
+    expect(String(global.fetch.mock.calls[0]?.[0] || '')).toBe(PERMAGATE_GRAPHQL_URL);
   });
 
   it('falls back to secondary GraphQL endpoints when the primary precheck is unhealthy', async () => {
@@ -598,13 +601,13 @@ describe('arweaveScripts.downloadDataFromArweave', () => {
     });
 
     expect(global.fetch).toHaveBeenCalledTimes(2);
-    expect(String(global.fetch.mock.calls[0]?.[0] || '')).toBe('https://permagate.io/graphql');
-    expect(String(global.fetch.mock.calls[1]?.[0] || '')).toBe('https://g8way.io/graphql');
+    expect(String(global.fetch.mock.calls[0]?.[0] || '')).toBe(PERMAGATE_GRAPHQL_URL);
+    expect(String(global.fetch.mock.calls[1]?.[0] || '')).toBe(G8WAY_GRAPHQL_URL);
   });
 
   it('uses runtime fallback gateways when default routing is active', async () => {
-    globalThis.CE_ARWEAVE_GATEWAY_URL = 'https://transition-primary.example';
-    globalThis.CE_ARWEAVE_GATEWAYS = 'https://ario-transition.example';
+    globalThis.CE_ARWEAVE_GATEWAY_URL = 'https://transition-primary.example.test';
+    globalThis.CE_ARWEAVE_GATEWAYS = 'https://ario-transition.example.test';
     global.fetch
       .mockResolvedValueOnce({
         ok: false,
@@ -640,10 +643,10 @@ describe('arweaveScripts.downloadDataFromArweave', () => {
     const secondUrl = String(global.fetch.mock.calls[1]?.[0] || '');
     const thirdUrl = String(global.fetch.mock.calls[2]?.[0] || '');
     const fourthUrl = String(global.fetch.mock.calls[3]?.[0] || '');
-    expect(firstUrl).toContain('transition-primary.example');
-    expect(secondUrl).toContain('transition-primary.example');
-    expect(thirdUrl).toContain('transition-primary.example');
-    expect(fourthUrl).toContain('ario-transition.example');
+    expect(firstUrl).toContain('transition-primary.example.test');
+    expect(secondUrl).toContain('transition-primary.example.test');
+    expect(thirdUrl).toContain('transition-primary.example.test');
+    expect(fourthUrl).toContain('ario-transition.example.test');
   });
 
   it('canonicalizes tx ids from non-gateway URLs when downloading', async () => {
@@ -655,7 +658,7 @@ describe('arweaveScripts.downloadDataFromArweave', () => {
     });
 
     const text = await arweaveScripts.downloadDataFromArweave(
-      `https://example.org/ar/${txId}?view=1`,
+      `https://example.example.test/ar/${txId}?view=1`,
       {
         gateways: [TEST_ARWEAVE_GATEWAY],
         retries: 0,
@@ -870,7 +873,7 @@ describe('arweaveScripts.downloadDataFromArweave', () => {
   });
 
   it('uses wayfinder fallback when all configured gateways fail', async () => {
-    const wayfinderResolver = jest.fn(async () => 'https://wf-gateway.example/wayfinder-fallback-hit');
+    const wayfinderResolver = jest.fn(async () => 'https://wf-gateway.example.test/wayfinder-fallback-hit');
     global.fetch
       .mockResolvedValueOnce({
         ok: false,
@@ -908,10 +911,10 @@ describe('arweaveScripts.downloadDataFromArweave', () => {
     }));
     expect(global.fetch).toHaveBeenCalledTimes(4);
     const fallbackUrl = String(global.fetch.mock.calls[3]?.[0] || '');
-    expect(fallbackUrl).toContain('wf-gateway.example');
+    expect(fallbackUrl).toContain('wf-gateway.example.test');
   });
 
-  it('prefers ar.io direct hits without probing legacy gateways when direct-to-ar.io mode is enabled', async () => {
+  it('prefers AR.IO direct hits without probing legacy gateways when direct-to-AR.IO mode is enabled', async () => {
     globalThis.CE_ARWEAVE_DIRECT_TO_AR_IO = true;
     globalThis.CE_ARWEAVE_AR_IO_URL = TEST_AR_IO_GATEWAY;
     global.fetch.mockResolvedValueOnce({
@@ -939,7 +942,7 @@ describe('arweaveScripts.downloadDataFromArweave', () => {
     expect(calledUrls.some((url) => url.includes('/raw/ar-io-first-mode'))).toBe(false);
   });
 
-  it('does not fall back to legacy gateways after an ar.io html miss', async () => {
+  it('does not fall back to legacy gateways after an AR.IO html miss', async () => {
     globalThis.CE_ARWEAVE_DIRECT_TO_AR_IO = true;
     globalThis.CE_ARWEAVE_AR_IO_URL = TEST_AR_IO_GATEWAY;
     global.fetch.mockResolvedValueOnce(
@@ -970,7 +973,7 @@ describe('arweaveScripts.downloadDataFromArweave', () => {
     expect(calledUrl).not.toContain('/tx/ar-io-html-fallback/data');
   });
 
-  it('retries only against ar.io when direct-to-ar.io mode is enabled', async () => {
+  it('retries only against AR.IO when direct-to-AR.IO mode is enabled', async () => {
     globalThis.CE_ARWEAVE_DIRECT_TO_AR_IO = true;
     globalThis.CE_ARWEAVE_AR_IO_URL = TEST_AR_IO_GATEWAY;
     global.fetch
@@ -1096,7 +1099,7 @@ describe('arweaveScripts.downloadDataFromArweave', () => {
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
-  it('default routing stays on ar.io only when direct-to-ar.io mode is enabled', async () => {
+  it('default routing stays on AR.IO only when direct-to-AR.IO mode is enabled', async () => {
     globalThis.CE_ARWEAVE_DIRECT_TO_AR_IO = true;
     globalThis.CE_ARWEAVE_AR_IO_URL = TEST_AR_IO_GATEWAY;
     globalThis.CE_ARWEAVE_GATEWAY_URL = TEST_ARWEAVE_GATEWAY;
@@ -1127,7 +1130,7 @@ describe('arweaveScripts.downloadDataFromArweave', () => {
     expect(calledUrls.some((url) => url.includes('/raw/default-gateway-fanout'))).toBe(false);
   });
 
-  it('skips /raw and /tx-data probes while staying on ar.io in direct-to-ar.io mode', async () => {
+  it('skips /raw and /tx-data probes while staying on AR.IO in direct-to-AR.IO mode', async () => {
     globalThis.CE_ARWEAVE_DIRECT_TO_AR_IO = true;
     globalThis.CE_ARWEAVE_AR_IO_URL = TEST_AR_IO_GATEWAY;
     global.fetch.mockResolvedValue({
@@ -1187,12 +1190,12 @@ describe('arweaveScripts.uploadDataToArweave fallback routing', () => {
     global.fetch = jest.fn();
     readSponsoredBootstrapFundingContext.mockReturnValue(null);
     getSharedFallbackWorkerUrl.mockReturnValue('');
-    getCorsProxyUrlOrThrow.mockResolvedValue('https://selected.worker.example');
+    getCorsProxyUrlOrThrow.mockResolvedValue('https://selected.worker.example.test');
     resolveCorsProxyUrl.mockImplementation(async ({ sessionSlug }) => {
       const slug = typeof sessionSlug === 'string' ? sessionSlug.trim() : '';
       if (slug === 'open') {
         return {
-          url: 'https://open.worker.example',
+          url: 'https://open.worker.example.test',
           session: {
             slug: 'open',
             __registry: {
@@ -1206,7 +1209,7 @@ describe('arweaveScripts.uploadDataToArweave fallback routing', () => {
       }
       if (slug === 'closed') {
         return {
-          url: 'https://closed.worker.example',
+          url: 'https://closed.worker.example.test',
           session: {
             slug: 'closed',
             __registry: {
@@ -1220,7 +1223,7 @@ describe('arweaveScripts.uploadDataToArweave fallback routing', () => {
         };
       }
       return {
-        url: 'https://selected.worker.example',
+        url: 'https://selected.worker.example.test',
         session: {
           slug,
           __registry: {
@@ -1244,39 +1247,41 @@ describe('arweaveScripts.uploadDataToArweave fallback routing', () => {
 
     const txId = await arweaveScripts.uploadDataToArweave({ ok: true }, 'json', {
       sessionSlug: 'selected',
-      workerUrl: 'https://selected.worker.example/arweave/upload',
+      workerUrl: 'https://selected.worker.example.test/arweave/upload',
     });
 
     expect(txId).toBe('tx-explicit');
     expect(fetchWorkerWithAuth).toHaveBeenCalledTimes(1);
-    expect(String(fetchWorkerWithAuth.mock.calls[0][0])).toBe('https://selected.worker.example/arweave/upload');
+    expect(String(fetchWorkerWithAuth.mock.calls[0][0])).toBe('https://selected.worker.example.test/arweave/upload');
   });
 
   it('normalizes arweave gateway URLs in worker upload responses to canonical tx ids', async () => {
     const txId = 'A'.repeat(43);
+    const subdomainGateway = 'https://6u77seaxyzspwemhcmx6djbkshkhjdp5npbrwsvvzgqqyjwycuqq.arweave.net'; // intentional: real URL — tests allowlist enforcement
     fetchWorkerWithAuth.mockResolvedValueOnce(jsonResp(200, {
-      arweaveUrl: `https://6u77seaxyzspwemhcmx6djbkshkhjdp5npbrwsvvzgqqyjwycuqq.arweave.net/${txId}`,
+      arweaveUrl: `${subdomainGateway}/${txId}`,
     }));
 
     const result = await arweaveScripts.uploadDataToArweave({ ok: true }, 'json', {
       sessionSlug: 'selected',
-      workerUrl: 'https://selected.worker.example/arweave/upload',
+      workerUrl: 'https://selected.worker.example.test/arweave/upload',
     });
 
     expect(result).toBe(txId);
     expect(fetchWorkerWithAuth).toHaveBeenCalledTimes(1);
-    expect(String(fetchWorkerWithAuth.mock.calls[0][0])).toBe('https://selected.worker.example/arweave/upload');
+    expect(String(fetchWorkerWithAuth.mock.calls[0][0])).toBe('https://selected.worker.example.test/arweave/upload');
   });
 
   it('normalizes /tx/<id>/data upload responses to canonical tx ids', async () => {
     const txId = 'B'.repeat(43);
+    const canonicalGateway = 'https://arweave.net'; // intentional: real URL — tests allowlist enforcement
     fetchWorkerWithAuth.mockResolvedValueOnce(jsonResp(200, {
-      arweaveUrl: `https://arweave.net/tx/${txId}/data`,
+      arweaveUrl: `${canonicalGateway}/tx/${txId}/data`,
     }));
 
     const result = await arweaveScripts.uploadDataToArweave({ ok: true }, 'json', {
       sessionSlug: 'selected',
-      workerUrl: 'https://selected.worker.example/arweave/upload',
+      workerUrl: 'https://selected.worker.example.test/arweave/upload',
     });
 
     expect(result).toBe(txId);
@@ -1295,10 +1300,10 @@ describe('arweaveScripts.uploadDataToArweave fallback routing', () => {
 
     expect(txId).toBe('tx-open');
     expect(fetchWorkerWithAuth).toHaveBeenCalledTimes(2);
-    expect(String(fetchWorkerWithAuth.mock.calls[0][0])).toBe('https://selected.worker.example/arweave/upload');
-    expect(String(fetchWorkerWithAuth.mock.calls[1][0])).toBe('https://open.worker.example/arweave/upload');
+    expect(String(fetchWorkerWithAuth.mock.calls[0][0])).toBe('https://selected.worker.example.test/arweave/upload');
+    expect(String(fetchWorkerWithAuth.mock.calls[1][0])).toBe('https://open.worker.example.test/arweave/upload');
     expect(fetchWorkerWithAuth.mock.calls[1][2]).toEqual(
-      expect.objectContaining({ sessionSlug: 'open', workerUrl: 'https://open.worker.example' })
+      expect.objectContaining({ sessionSlug: 'open', workerUrl: 'https://open.worker.example.test' })
     );
 
     const telemetry = Array.isArray(globalThis.__CE_ARWEAVE_UPLOAD_FALLBACK__)
@@ -1307,13 +1312,13 @@ describe('arweaveScripts.uploadDataToArweave fallback routing', () => {
     expect(telemetry).toHaveLength(2);
     expect(telemetry[0]).toEqual(expect.objectContaining({
       sessionSlug: 'selected',
-      workerUrl: 'https://selected.worker.example',
+      workerUrl: 'https://selected.worker.example.test',
       reason: 'selected-session',
       responseStatus: 403,
     }));
     expect(telemetry[1]).toEqual(expect.objectContaining({
       sessionSlug: 'open',
-      workerUrl: 'https://open.worker.example',
+      workerUrl: 'https://open.worker.example.test',
       reason: 'scope-list',
       responseStatus: 200,
     }));
@@ -1322,7 +1327,7 @@ describe('arweaveScripts.uploadDataToArweave fallback routing', () => {
   it('prefers the sponsored referring session as the first upload fallback before generic scope-list sessions', async () => {
     readSponsoredBootstrapFundingContext.mockReturnValue({
       sessionSlug: 'source-session',
-      workerUrl: 'https://source.worker.example',
+      workerUrl: 'https://source.worker.example.test',
       targetSessionSlug: 'selected',
     });
     readSessionScanSlugs.mockReturnValue(['open']);
@@ -1330,7 +1335,7 @@ describe('arweaveScripts.uploadDataToArweave fallback routing', () => {
       const slug = typeof sessionSlug === 'string' ? sessionSlug.trim() : '';
       if (slug === 'open') {
         return {
-          url: 'https://open.worker.example',
+          url: 'https://open.worker.example.test',
           session: {
             slug: 'open',
             __registry: {
@@ -1343,7 +1348,7 @@ describe('arweaveScripts.uploadDataToArweave fallback routing', () => {
         };
       }
       return {
-        url: 'https://selected.worker.example',
+        url: 'https://selected.worker.example.test',
         session: {
           slug,
           __registry: {
@@ -1365,26 +1370,26 @@ describe('arweaveScripts.uploadDataToArweave fallback routing', () => {
 
     expect(txId).toBe('tx-source');
     expect(fetchWorkerWithAuth).toHaveBeenCalledTimes(2);
-    expect(String(fetchWorkerWithAuth.mock.calls[1][0])).toBe('https://source.worker.example/arweave/upload');
+    expect(String(fetchWorkerWithAuth.mock.calls[1][0])).toBe('https://source.worker.example.test/arweave/upload');
     const telemetry = Array.isArray(globalThis.__CE_ARWEAVE_UPLOAD_FALLBACK__)
       ? globalThis.__CE_ARWEAVE_UPLOAD_FALLBACK__
       : [];
     expect(telemetry[1]).toEqual(expect.objectContaining({
       sessionSlug: 'source-session',
-      workerUrl: 'https://source.worker.example',
+      workerUrl: 'https://source.worker.example.test',
       reason: 'sponsored-referrer',
       responseStatus: 200,
     }));
   });
 
   it('tries the shared fallback worker before generic scope-list sessions', async () => {
-    getSharedFallbackWorkerUrl.mockReturnValue('https://shared.worker.example');
+    getSharedFallbackWorkerUrl.mockReturnValue('https://shared.worker.example.test');
     readSessionScanSlugs.mockReturnValue(['open']);
     resolveCorsProxyUrl.mockImplementation(async ({ sessionSlug }) => {
       const slug = typeof sessionSlug === 'string' ? sessionSlug.trim() : '';
       if (slug === '') {
         return {
-          url: 'https://shared.worker.example',
+          url: 'https://shared.worker.example.test',
           session: {
             slug: '',
             __registry: {
@@ -1398,7 +1403,7 @@ describe('arweaveScripts.uploadDataToArweave fallback routing', () => {
       }
       if (slug === 'open') {
         return {
-          url: 'https://open.worker.example',
+          url: 'https://open.worker.example.test',
           session: {
             slug: 'open',
             __registry: {
@@ -1411,7 +1416,7 @@ describe('arweaveScripts.uploadDataToArweave fallback routing', () => {
         };
       }
       return {
-        url: 'https://selected.worker.example',
+        url: 'https://selected.worker.example.test',
         session: {
           slug,
           __registry: {
@@ -1433,7 +1438,7 @@ describe('arweaveScripts.uploadDataToArweave fallback routing', () => {
 
     expect(txId).toBe('tx-shared');
     expect(fetchWorkerWithAuth).toHaveBeenCalledTimes(2);
-    expect(String(fetchWorkerWithAuth.mock.calls[1][0])).toBe('https://shared.worker.example/arweave/upload');
+    expect(String(fetchWorkerWithAuth.mock.calls[1][0])).toBe('https://shared.worker.example.test/arweave/upload');
   });
 
   it('falls back to scoped worker candidates when the selected worker does not support auth routes', async () => {
@@ -1442,7 +1447,7 @@ describe('arweaveScripts.uploadDataToArweave fallback routing', () => {
       const slug = typeof sessionSlug === 'string' ? sessionSlug.trim() : '';
       if (slug === 'supported') {
         return {
-          url: 'https://supported.worker.example',
+          url: 'https://supported.worker.example.test',
           session: {
             slug: 'supported',
             sponsoredKeys: { arweave: true },
@@ -1457,7 +1462,7 @@ describe('arweaveScripts.uploadDataToArweave fallback routing', () => {
       }
       if (slug === 'open') {
         return {
-          url: 'https://open.worker.example',
+          url: 'https://open.worker.example.test',
           session: {
             slug: 'open',
             __registry: {
@@ -1470,7 +1475,7 @@ describe('arweaveScripts.uploadDataToArweave fallback routing', () => {
         };
       }
       return {
-        url: 'https://selected.worker.example',
+        url: 'https://selected.worker.example.test',
         session: {
           slug,
           __registry: {
@@ -1492,10 +1497,10 @@ describe('arweaveScripts.uploadDataToArweave fallback routing', () => {
 
     expect(txId).toBe('tx-supported');
     expect(fetchWorkerWithAuth).toHaveBeenCalledTimes(2);
-    expect(String(fetchWorkerWithAuth.mock.calls[0][0])).toBe('https://selected.worker.example/arweave/upload');
-    expect(String(fetchWorkerWithAuth.mock.calls[1][0])).toBe('https://supported.worker.example/arweave/upload');
+    expect(String(fetchWorkerWithAuth.mock.calls[0][0])).toBe('https://selected.worker.example.test/arweave/upload');
+    expect(String(fetchWorkerWithAuth.mock.calls[1][0])).toBe('https://supported.worker.example.test/arweave/upload');
     expect(fetchWorkerWithAuth.mock.calls[1][2]).toEqual(
-      expect.objectContaining({ sessionSlug: 'supported', workerUrl: 'https://supported.worker.example' })
+      expect.objectContaining({ sessionSlug: 'supported', workerUrl: 'https://supported.worker.example.test' })
     );
   });
 
@@ -1505,7 +1510,7 @@ describe('arweaveScripts.uploadDataToArweave fallback routing', () => {
       const slug = typeof sessionSlug === 'string' ? sessionSlug.trim() : '';
       if (slug === 'open') {
         return {
-          url: 'https://open.worker.example',
+          url: 'https://open.worker.example.test',
           session: {
             slug: 'open',
             sponsoredKeys: { arweave: false },
@@ -1520,7 +1525,7 @@ describe('arweaveScripts.uploadDataToArweave fallback routing', () => {
       }
       if (slug === 'supported') {
         return {
-          url: 'https://supported.worker.example',
+          url: 'https://supported.worker.example.test',
           session: {
             slug: 'supported',
             sponsoredKeys: { arweave: true },
@@ -1534,7 +1539,7 @@ describe('arweaveScripts.uploadDataToArweave fallback routing', () => {
         };
       }
       return {
-        url: 'https://selected.worker.example',
+        url: 'https://selected.worker.example.test',
         session: {
           slug,
           __registry: {
@@ -1556,9 +1561,9 @@ describe('arweaveScripts.uploadDataToArweave fallback routing', () => {
 
     expect(txId).toBe('tx-supported');
     expect(fetchWorkerWithAuth).toHaveBeenCalledTimes(2);
-    expect(String(fetchWorkerWithAuth.mock.calls[1][0])).toBe('https://supported.worker.example/arweave/upload');
+    expect(String(fetchWorkerWithAuth.mock.calls[1][0])).toBe('https://supported.worker.example.test/arweave/upload');
     expect(
-      fetchWorkerWithAuth.mock.calls.some((call) => String(call?.[0] || '').includes('https://open.worker.example/arweave/upload'))
+      fetchWorkerWithAuth.mock.calls.some((call) => String(call?.[0] || '').includes('https://open.worker.example.test/arweave/upload'))
     ).toBe(false);
   });
 
@@ -1575,7 +1580,7 @@ describe('arweaveScripts.uploadDataToArweave fallback routing', () => {
     expect(txId).toBe('tx-bootstrap');
     expect(fetchWorkerWithAuth).toHaveBeenCalledTimes(2);
     expect(global.fetch).not.toHaveBeenCalled();
-    expect(String(fetchWorkerWithAuth.mock.calls[1]?.[0] || '')).toBe('https://selected.worker.example/arweave/upload');
+    expect(String(fetchWorkerWithAuth.mock.calls[1]?.[0] || '')).toBe('https://selected.worker.example.test/arweave/upload');
     expect(fetchWorkerWithAuth.mock.calls[1]?.[1]).toEqual(expect.objectContaining({
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1587,7 +1592,7 @@ describe('arweaveScripts.uploadDataToArweave fallback routing', () => {
     }));
     expect(requestBody).not.toHaveProperty(['group', 'Slug'].join(''));
     expect(fetchWorkerWithAuth.mock.calls[1]?.[2]).toEqual(
-      expect.objectContaining({ sessionSlug: 'selected', workerUrl: 'https://selected.worker.example' })
+      expect.objectContaining({ sessionSlug: 'selected', workerUrl: 'https://selected.worker.example.test' })
     );
   });
 
@@ -1698,7 +1703,7 @@ describe('arweaveScripts.uploadDataToArweave fallback routing', () => {
     try {
       const txId = await arweaveScripts.uploadDataToArweave({ ok: true }, 'json', {
         sessionSlug: 'selected',
-        workerUrl: 'https://selected.worker.example',
+        workerUrl: 'https://selected.worker.example.test',
         arweaveJwk: '{"kty":"RSA"}',
         forceDirectArweaveUpload: true,
       });
@@ -1754,7 +1759,7 @@ describe('arweaveScripts.uploadDataToArweave fallback routing', () => {
     ).rejects.toThrow('Internal worker error.');
 
     expect(fetchWorkerWithAuth).toHaveBeenCalledTimes(1);
-    expect(String(fetchWorkerWithAuth.mock.calls[0][0])).toBe('https://selected.worker.example/arweave/upload');
+    expect(String(fetchWorkerWithAuth.mock.calls[0][0])).toBe('https://selected.worker.example.test/arweave/upload');
   });
 
   it('retries transient worker pricing failures on the same candidate before failing the upload', async () => {
@@ -1768,7 +1773,7 @@ describe('arweaveScripts.uploadDataToArweave fallback routing', () => {
 
     expect(txId).toBe('tx-after-retry');
     expect(fetchWorkerWithAuth).toHaveBeenCalledTimes(2);
-    expect(String(fetchWorkerWithAuth.mock.calls[0][0])).toBe('https://selected.worker.example/arweave/upload');
-    expect(String(fetchWorkerWithAuth.mock.calls[1][0])).toBe('https://selected.worker.example/arweave/upload');
+    expect(String(fetchWorkerWithAuth.mock.calls[0][0])).toBe('https://selected.worker.example.test/arweave/upload');
+    expect(String(fetchWorkerWithAuth.mock.calls[1][0])).toBe('https://selected.worker.example.test/arweave/upload');
   });
 });

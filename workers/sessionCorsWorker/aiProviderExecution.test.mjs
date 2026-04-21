@@ -50,7 +50,7 @@ test('proxyAnthropic preserves request apiKey precedence, prompt body shaping, a
       temperature: 0.4,
     },
     secrets: { anthropicKey: ' sk-worker ' },
-    baseHeaders: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
+    baseHeaders: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
     deps: {
       json: createJsonStub(),
       fetch: async (...args) => {
@@ -64,11 +64,11 @@ test('proxyAnthropic preserves request apiKey precedence, prompt body shaping, a
       },
     },
     constants: {
-      anthropicUrl: 'https://api.anthropic.example/v1/messages',
+      anthropicUrl: 'https://api.anthropic.example.test/v1/messages',
     },
   });
 
-  assert.equal(fetchArgs?.[0], 'https://api.anthropic.example/v1/messages');
+  assert.equal(fetchArgs?.[0], 'https://api.anthropic.example.test/v1/messages');
   assert.deepEqual(fetchArgs?.[1]?.headers, {
     'content-type': 'application/json',
     'anthropic-version': '2023-06-01',
@@ -88,7 +88,7 @@ test('proxyAnthropic preserves request apiKey precedence, prompt body shaping, a
       },
     },
     status: 200,
-    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
+    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
   });
 });
 
@@ -157,7 +157,7 @@ test('proxyOpenAI preserves request apiKey precedence and responses request shap
       reasoning_effort: 'high',
     },
     secrets: { openaiKey: ' sk-worker ' },
-    baseHeaders: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
+    baseHeaders: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
     deps: {
       json: createJsonStub(),
       fetch: async (...args) => {
@@ -176,11 +176,11 @@ test('proxyOpenAI preserves request apiKey precedence and responses request shap
       },
     },
     constants: {
-      openAiResponsesUrl: 'https://api.openai.example/v1/responses',
+      openAiResponsesUrl: 'https://api.openai.example.test/v1/responses',
     },
   });
 
-  assert.equal(fetchArgs?.[0], 'https://api.openai.example/v1/responses');
+  assert.equal(fetchArgs?.[0], 'https://api.openai.example.test/v1/responses');
   assert.deepEqual(fetchArgs?.[1]?.headers, {
     'content-type': 'application/json',
     authorization: 'Bearer sk-request',
@@ -206,7 +206,7 @@ test('proxyOpenAI preserves request apiKey precedence and responses request shap
       },
     },
     status: 200,
-    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
+    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
   });
 });
 
@@ -239,11 +239,11 @@ test('proxyOpenAI preserves chat-completions reasoning request shaping for non-r
       },
     },
     constants: {
-      openAiChatUrl: 'https://api.openai.example/v1/chat/completions',
+      openAiChatUrl: 'https://api.openai.example.test/v1/chat/completions',
     },
   });
 
-  assert.equal(fetchArgs?.[0], 'https://api.openai.example/v1/chat/completions');
+  assert.equal(fetchArgs?.[0], 'https://api.openai.example.test/v1/chat/completions');
   assert.deepEqual(JSON.parse(fetchArgs?.[1]?.body), {
     model: 'o3-mini',
     messages: [{ role: 'user', content: 'solve this' }],
@@ -329,11 +329,11 @@ test('proxyOpenRouter preserves request apiKey precedence, header shaping, and s
       functions: [{ name: 'ignored-when-tools-exist' }],
       reasoning_effort: 'high',
       max_tokens: 88,
-      appUrl: 'https://app.example',
+      appUrl: 'https://app.example.test',
       appName: 'Context Engine',
     },
     secrets: { openrouterKey: ' sk-worker ' },
-    baseHeaders: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
+    baseHeaders: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
     deps: {
       json: createJsonStub(),
       fetch: async (...args) => {
@@ -347,15 +347,15 @@ test('proxyOpenRouter preserves request apiKey precedence, header shaping, and s
       },
     },
     constants: {
-      openRouterChatUrl: 'https://openrouter.example/api/v1/chat/completions',
+      openRouterChatUrl: 'https://openrouter.example.test/api/v1/chat/completions',
     },
   });
 
-  assert.equal(fetchArgs?.[0], 'https://openrouter.example/api/v1/chat/completions');
+  assert.equal(fetchArgs?.[0], 'https://openrouter.example.test/api/v1/chat/completions');
   assert.deepEqual(fetchArgs?.[1]?.headers, {
     'content-type': 'application/json',
     authorization: 'Bearer sk-request',
-    'HTTP-Referer': 'https://app.example',
+    'HTTP-Referer': 'https://app.example.test',
     'X-Title': 'Context Engine',
   });
   assert.deepEqual(JSON.parse(fetchArgs?.[1]?.body), {
@@ -374,7 +374,7 @@ test('proxyOpenRouter preserves request apiKey precedence, header shaping, and s
       },
     },
     status: 200,
-    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
+    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
   });
 });
 
@@ -410,11 +410,11 @@ test('proxyCustomRPC preserves override-without-request-key rejection before fet
 
   const result = await proxyCustomRPC({
     payload: {
-      rpcUrl: 'https://rpc.attacker.example/v1/chat/completions',
+      rpcUrl: 'https://rpc.attacker.example.test/v1/chat/completions',
       prompt: 'ping',
     },
     secrets: {
-      customRpcUrl: 'https://rpc.safe.example/v1/chat/completions',
+      customRpcUrl: 'https://rpc.safe.example.test/v1/chat/completions',
       customRpcKey: 'sk-worker',
     },
     baseHeaders: { 'Access-Control-Allow-Origin': '*' },
@@ -513,7 +513,7 @@ test('proxyCustomRPC rejects custom RPC URLs with userinfo before fetch', async 
   const result = await proxyCustomRPC({
     payload: {
       apiKey: 'sk-request',
-      rpcUrl: 'https://user:pass@rpc.example.com',
+      rpcUrl: 'https://user:pass@rpc.example.test',
       prompt: 'ping',
     },
     secrets: {},
@@ -543,7 +543,7 @@ test('proxyCustomRPC rejects missing auth or missing auth scopes before fetch', 
   const missingAuthResult = await proxyCustomRPC({
     payload: {
       apiKey: 'sk-request',
-      rpcUrl: 'https://rpc.example/v1/chat/completions',
+      rpcUrl: 'https://rpc.example.test/v1/chat/completions',
       prompt: 'ping',
     },
     secrets: {},
@@ -561,7 +561,7 @@ test('proxyCustomRPC rejects missing auth or missing auth scopes before fetch', 
   const missingScopesResult = await proxyCustomRPC({
     payload: {
       apiKey: 'sk-request',
-      rpcUrl: 'https://rpc.example/v1/chat/completions',
+      rpcUrl: 'https://rpc.example.test/v1/chat/completions',
       prompt: 'ping',
     },
     secrets: {},
@@ -625,7 +625,7 @@ test('proxyCustomRPC preserves non-Response passthrough from safeFetch', async (
   const result = await proxyCustomRPC({
     payload: {
       apiKey: 'sk-request',
-      rpcUrl: 'https://rpc.example/v1/chat/completions',
+      rpcUrl: 'https://rpc.example.test/v1/chat/completions',
       prompt: 'ping',
     },
     secrets: {},
@@ -650,7 +650,7 @@ test('proxyCustomRPC preserves upstream error fallback to Custom RPC error', asy
   const result = await proxyCustomRPC({
     payload: {
       apiKey: 'sk-request',
-      rpcUrl: 'https://rpc.example/v1/chat/completions',
+      rpcUrl: 'https://rpc.example.test/v1/chat/completions',
       prompt: 'ping',
     },
     secrets: {},
@@ -684,7 +684,7 @@ test('proxyCustomRPC allows authenticated requests without custom_rpc scope and 
   const result = await proxyCustomRPC({
     payload: {
       apiKey: ' sk-request ',
-      rpcUrl: 'https://rpc.ankr.com/eth',
+      rpcUrl: 'https://rpc.example.test/eth',
       model: 'o3-mini',
       prompt: 'solve this',
       response_format: { type: 'json_schema' },
@@ -695,10 +695,10 @@ test('proxyCustomRPC allows authenticated requests without custom_rpc scope and 
       temperature: 0.3,
     },
     secrets: {
-      customRpcUrl: 'https://rpc.secret.example/v1/chat/completions',
+      customRpcUrl: 'https://rpc.secret.example.test/v1/chat/completions',
       customRpcKey: 'sk-worker',
     },
-    baseHeaders: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
+    baseHeaders: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
     auth: createCustomRpcAuth({ ai: true }),
     deps: {
       json: createJsonStub(),
@@ -718,7 +718,7 @@ test('proxyCustomRPC allows authenticated requests without custom_rpc scope and 
     },
   });
 
-  assert.equal(fetchArgs?.[0], 'https://rpc.ankr.com/eth');
+  assert.equal(fetchArgs?.[0], 'https://rpc.example.test/eth');
   assert.deepEqual(fetchArgs?.[1]?.headers, {
     'content-type': 'application/json',
     authorization: 'Bearer sk-request',
@@ -739,13 +739,13 @@ test('proxyCustomRPC allows authenticated requests without custom_rpc scope and 
       },
     },
     status: 200,
-    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
+    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
   });
   assert.deepEqual(logCalls, [[
     '[ai] custom rpc request',
     {
       walletAddress: '0xabc',
-      rpcDomain: 'rpc.ankr.com',
+      rpcDomain: 'rpc.example.test',
     },
   ]]);
 });

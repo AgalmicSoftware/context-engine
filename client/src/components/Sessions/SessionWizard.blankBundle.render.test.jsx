@@ -39,7 +39,7 @@ const buildMockSponsoredBundle = () => ({
   openaiKey: 'sponsored-openai',
   arweaveJwk: '{"kty":"RSA","n":"sponsored"}',
   faucetGrantToken: 'sponsored-faucet-grant',
-  customRpcUrl: 'https://sponsored-rpc.example',
+  customRpcUrl: 'https://sponsored-rpc.example.test',
   deployGrantToken: 'sponsored-deploy-grant',
   meta: {
     label: 'Launch Week',
@@ -47,7 +47,7 @@ const buildMockSponsoredBundle = () => ({
     createdBy: '0xadmin',
     expiresAt: '2099-03-21T12:00:00.000Z',
     sourceSessionSlug: 'source-session',
-    sourceWorkerUrl: 'https://source-worker.example',
+    sourceWorkerUrl: 'https://source-worker.example.test',
   },
 });
 
@@ -82,7 +82,7 @@ jest.mock('../../utilities/arweave/arweaveScripts.js', () => ({
   arweaveScripts: {
     uploadDataToArweave: jest.fn(),
     downloadDataFromArweave: (...args) => mockDownloadDataFromArweave(...args),
-    buildArweaveGatewayUrl: jest.fn((txId) => `https://arweave.net/${txId}`),
+    buildArweaveGatewayUrl: jest.fn((txId) => `https://arweave.example.test/${txId}`),
   },
 }));
 
