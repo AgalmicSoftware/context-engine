@@ -612,15 +612,10 @@ const parseWorkerUploadResponseJson = async (response) => {
     return await response.json();
   } catch (_) {
     const bodyPreview = await readResponseBodyPreview(previewResponse);
-    const details = {
+    log.error('arweave upload response parse failed', {
       status: Number(response?.status || 0) || null,
       bodyPreview,
-    };
-    if (!response?.ok) {
-      log.warn('arweave upload response parse failed', details);
-      return {};
-    }
-    log.error('arweave upload response parse failed', details);
+    });
     throw new Error('arweave upload response malformed');
   }
 };

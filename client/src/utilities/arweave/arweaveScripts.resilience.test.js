@@ -207,37 +207,4 @@ describe('arweaveScripts upload/download resilience', () => {
     }));
     expect(parseLog[1].bodyPreview.length).toBeLessThanOrEqual(200);
   });
-
-  it('uses status-aware failure for non-ok malformed worker upload JSON responses', async () => {
-    jest.useFakeTimers();
-    const htmlBody = `<html>${'transient worker error '.repeat(20)}</html>`;
-    fetchWorkerWithAuth.mockResolvedValue(malformedJsonResp(502, htmlBody));
-
-    const uploadPromise = arweaveScripts.uploadDataToArweave({ ok: true }, 'json', {
-      sessionSlug: 'selected',
-    });
-    const assertion = expect(uploadPromise).rejects.toMatchObject({
-      message: 'Arweave upload failed (502)',
-      status: 502,
-    });
-
-    await flushMicrotasks(20);
-    jest.advanceTimersByTime(750);
-    await flushMicrotasks(20);
-    jest.advanceTimersByTime(1500);
-    await flushMicrotasks(20);
-    await assertion;
-
-    expect(fetchWorkerWithAuth).toHaveBeenCalledTimes(3);
-    const parseLog = mockLogger.warn.mock.calls.find(
-      ([message]) => message === 'arweave upload response parse failed'
-    );
-    expect(parseLog?.[1]).toEqual(expect.objectContaining({
-      status: 502,
-      bodyPreview: htmlBody.slice(0, 200),
-    }));
-    expect(mockLogger.error.mock.calls.some(
-      ([message]) => message === 'arweave upload response parse failed'
-    )).toBe(false);
-  });
 });
