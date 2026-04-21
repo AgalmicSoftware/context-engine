@@ -2605,10 +2605,20 @@ class UserPage extends Component {
         : null;
       return { mintedCountMap, burnedCountMap };
     };
-    const hasExplicitOwnershipCounts = (entry = {}) => {
+    const hasMeaningfulOwnershipCounts = (entry = {}, addressLower = '') => {
       const { mintedCountMap, burnedCountMap } = getOwnershipCountMaps(entry);
-      return !!(mintedCountMap || burnedCountMap);
+      if (!mintedCountMap && !burnedCountMap) return false;
+      if (entry?.countsLoaded === true) return true;
+      const normalizedAddress = String(addressLower || '').toLowerCase();
+      if (!normalizedAddress) return false;
+      return (
+        Object.prototype.hasOwnProperty.call(mintedCountMap || {}, normalizedAddress) ||
+        Object.prototype.hasOwnProperty.call(burnedCountMap || {}, normalizedAddress)
+      );
     };
+    const hasExplicitOwnershipCounts = (entry = {}, addressLower = '') => (
+      hasMeaningfulOwnershipCounts(entry, addressLower)
+    );
     const readOwnershipCount = (countMap, addressLower) => (
       countMap
         ? Math.max(0, Number(countMap[addressLower] || 0) || 0)
@@ -2617,6 +2627,7 @@ class UserPage extends Component {
     const applyOwnershipSignal = (aggEntry, entry, addressLower) => {
       const { mintedCountMap, burnedCountMap } = getOwnershipCountMaps(entry);
       if (!mintedCountMap && !burnedCountMap) return;
+      if (!hasMeaningfulOwnershipCounts(entry, addressLower)) return;
 
       const mintedCount = readOwnershipCount(mintedCountMap, addressLower);
       const burnedCount = readOwnershipCount(burnedCountMap, addressLower);
@@ -2735,7 +2746,7 @@ class UserPage extends Component {
           if (slug && !aggEntry.slug) aggEntry.slug = slug;
           if (!aggEntry.sbtInfo && entry.sbtInfo) aggEntry.sbtInfo = entry.sbtInfo;
           if (aggEntry.sbtInfo && entry.sbtInfo) aggEntry.sbtInfo = { ...aggEntry.sbtInfo, ...entry.sbtInfo };
-          const hasExplicitCounts = hasExplicitOwnershipCounts(entry);
+          const hasExplicitCounts = hasExplicitOwnershipCounts(entry, viewAddressLower);
           (Array.isArray(entry.mintedAddresses) ? entry.mintedAddresses : [])
             .forEach((address) => {
               const addressLower = String(address || '').toLowerCase();
@@ -2852,7 +2863,7 @@ class UserPage extends Component {
             aggEntry.mintedSet.has(viewAddressLower) ||
             aggEntry.burnedSet.has(viewAddressLower)
           );
-          const hasExplicitCounts = !!(mintedCountMap || burnedCountMap);
+          const hasExplicitCounts = hasExplicitOwnershipCounts(item, viewAddressLower);
           if (hasExplicitCounts) {
             if (mintedCount > burnedCount) {
               aggEntry.mintedSet.add(viewAddressLower);
