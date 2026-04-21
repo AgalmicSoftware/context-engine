@@ -3042,20 +3042,6 @@ class CreateQuestionsAndSurveys extends Component {
     const normalizeSelectedGateIds = (value) => (
       normalizeGateIds(value).filter((gateId) => gateIdSet.has(gateId))
     );
-    const getGateOptionById = (gateId) => (
-      (Array.isArray(gateOptions) ? gateOptions : []).find((opt) => opt.id === gateId) || null
-    );
-    const formatGateBadge = (ids) => {
-      const list = Array.isArray(ids) ? ids : [];
-      if (list.length === 0) return t('sbt');
-      const labels = Array.from(new Set(
-        list
-          .map((gateId) => getGateOptionById(gateId)?.badgeLabel || getGateOptionById(gateId)?.label || gateId)
-          .filter(Boolean)
-      ));
-      if (labels.length === 1) return labels[0];
-      return `${list.length} ${t('gatesLower')}`;
-    };
     const surveySelectedGateIds = !isStandaloneQuestion
       ? normalizeSelectedGateIds(surveyLockGateIds)
       : [];
@@ -3123,8 +3109,7 @@ class CreateQuestionsAndSurveys extends Component {
                     this.setState({ openLockKey: nextOpen ? 'survey' : '' });
                   }}
                   disabled={!hasSelectableGateOptions}
-                  badgeText={formatGateBadge(surveySelectedGateIds)}
-                  showDots={true}
+                  showDots={false}
                 />
                 <FontAwesomeIcon icon={faQuestionCircle} className={styles.tooltip} id="cs-survey-gate-tip" />
                 <CETooltip
@@ -3297,8 +3282,7 @@ class CreateQuestionsAndSurveys extends Component {
                             this.setState({ openLockKey: nextOpen ? lockKey : '' });
                           }}
                           disabled={!hasSelectableGateOptions}
-                          badgeText={formatGateBadge(selectedGateIds)}
-                          showDots={true}
+                          showDots={false}
                         />
                       </>
                     ) : null;

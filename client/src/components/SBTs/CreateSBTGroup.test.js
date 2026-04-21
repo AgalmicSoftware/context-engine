@@ -4,6 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import CreateSBTGroup from './CreateSBTGroup';
 import styles from './CreateSBTGroup.module.scss';
+import gateLockStyles from '../Gates/GateMultiSelectLock.module.scss';
 import contractScripts from '../../utilities/web3/contractScripts.js';
 import { getDemoSessionConfigBySlug } from '../../utilities/web3/contractScripts.js';
 import { arweaveScripts } from '../../utilities/arweave/arweaveScripts.js';
@@ -1064,6 +1065,40 @@ describe('CreateSBTGroup cache helpers', () => {
     expect(screen.getByTestId(E2E_TESTIDS.SBT_CREATE_NAME_LOCK_ROW)).toBeInTheDocument();
     expect(screen.getByTestId(E2E_TESTIDS.SBT_CREATE_IMAGE_LOCK_ROW)).toBeInTheDocument();
     expect(screen.getAllByTestId(E2E_TESTIDS.GATE_LOCK)).toHaveLength(5);
+  });
+
+  it('renders metadata field locks without SBT badge text or inline gate dots', () => {
+    const instance = makeInstance({
+      network: { id: 84532, name: 'Base Sepolia' },
+      sessionSlug: 'test',
+    });
+    instance.state = {
+      ...instance.state,
+      tokenInfoCollapsed: false,
+      metadataLockGateIds: {
+        ...instance.state.metadataLockGateIds,
+        description: ['gate-1', 'gate-2'],
+      },
+    };
+    instance.resolveLockGateOptions = jest.fn(() => ({
+      gateOptions: [
+        { id: 'gate-1', label: 'Alpha Gate', badgeLabel: 'Alpha Gate', color: '#5affc2' },
+        { id: 'gate-2', label: 'Beta Gate', badgeLabel: 'Beta Gate', color: '#5b8cff' },
+      ],
+      defaultGateId: 'gate-1',
+    }));
+
+    render(instance.render());
+
+    const descriptionRow = screen.getByTestId(E2E_TESTIDS.SBT_CREATE_DESCRIPTION_LOCK_ROW);
+    const lock = within(descriptionRow).getByTestId(E2E_TESTIDS.GATE_LOCK);
+
+    expect(within(lock).getByTestId(E2E_TESTIDS.GATE_LOCK_BUTTON)).toBeInTheDocument();
+    expect(within(lock).queryByText(/\bSBT\b/i)).not.toBeInTheDocument();
+    expect(within(lock).queryByText(/Alpha Gate/i)).not.toBeInTheDocument();
+    expect(within(lock).queryByText(/Beta Gate/i)).not.toBeInTheDocument();
+    expect(within(lock).queryByText(/\b\d+\s+gates?\b/i)).not.toBeInTheDocument();
+    expect(lock.querySelector(`.${gateLockStyles.dots}`)).toBeNull();
   });
 
   it('auto-enables predictable deployment with an auto salt when standalone group password is selected', () => {
