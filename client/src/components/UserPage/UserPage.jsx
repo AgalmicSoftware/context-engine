@@ -2596,6 +2596,39 @@ class UserPage extends Component {
       setSourceSlug(questionResponseSourceSlugById, qidLower, slug, { replace: true });
       setResponseSourceSlug(questionResponseSourceSlugByKey, qidLower, responderLower, slug, { replace: true });
     };
+    const getOwnershipCountMaps = (entry = {}) => {
+      const mintedCountMap = (entry?.mintedCountByAddress && typeof entry.mintedCountByAddress === 'object')
+        ? entry.mintedCountByAddress
+        : null;
+      const burnedCountMap = (entry?.burnedCountByAddress && typeof entry.burnedCountByAddress === 'object')
+        ? entry.burnedCountByAddress
+        : null;
+      return { mintedCountMap, burnedCountMap };
+    };
+    const hasExplicitOwnershipCounts = (entry = {}) => {
+      const { mintedCountMap, burnedCountMap } = getOwnershipCountMaps(entry);
+      return !!(mintedCountMap || burnedCountMap);
+    };
+    const readOwnershipCount = (countMap, addressLower) => (
+      countMap
+        ? Math.max(0, Number(countMap[addressLower] || 0) || 0)
+        : 0
+    );
+    const applyOwnershipSignal = (aggEntry, entry, addressLower) => {
+      const { mintedCountMap, burnedCountMap } = getOwnershipCountMaps(entry);
+      if (!mintedCountMap && !burnedCountMap) return;
+
+      const mintedCount = readOwnershipCount(mintedCountMap, addressLower);
+      const burnedCount = readOwnershipCount(burnedCountMap, addressLower);
+      // Regression guard (PRD 336): count maps decide the viewer's current ownership;
+      // raw address sets remain bulk history for non-viewer aggregation.
+      if (mintedCount > burnedCount) {
+        aggEntry.mintedSet.add(addressLower);
+        aggEntry.burnedSet.delete(addressLower);
+      } else if (burnedCount > 0) {
+        aggEntry.burnedSet.add(addressLower);
+      }
+    };
 
     surveysCaches.forEach(({ slug, data: cacheObj }) => {
       const netObj = this._readNetworkCache(cacheObj, networkID);
@@ -2702,10 +2735,22 @@ class UserPage extends Component {
           if (slug && !aggEntry.slug) aggEntry.slug = slug;
           if (!aggEntry.sbtInfo && entry.sbtInfo) aggEntry.sbtInfo = entry.sbtInfo;
           if (aggEntry.sbtInfo && entry.sbtInfo) aggEntry.sbtInfo = { ...aggEntry.sbtInfo, ...entry.sbtInfo };
+          const hasExplicitCounts = hasExplicitOwnershipCounts(entry);
           (Array.isArray(entry.mintedAddresses) ? entry.mintedAddresses : [])
-            .forEach((address) => aggEntry.mintedSet.add(String(address || '').toLowerCase()));
+            .forEach((address) => {
+              const addressLower = String(address || '').toLowerCase();
+              if (!addressLower) return;
+              if (hasExplicitCounts && addressLower === viewAddressLower) return;
+              aggEntry.mintedSet.add(addressLower);
+            });
           (Array.isArray(entry.burnedAddresses) ? entry.burnedAddresses : [])
-            .forEach((address) => aggEntry.burnedSet.add(String(address || '').toLowerCase()));
+            .forEach((address) => {
+              const addressLower = String(address || '').toLowerCase();
+              if (!addressLower) return;
+              if (hasExplicitCounts && addressLower === viewAddressLower) return;
+              aggEntry.burnedSet.add(addressLower);
+            });
+          applyOwnershipSignal(aggEntry, entry, viewAddressLower);
           aggEntry.blockNumber = Math.max(aggEntry.blockNumber || 0, Number(entry.blockNumber || 0));
           if (entry.sbtAddress) aggEntry.sbtAddress = entry.sbtAddress;
           sbtAggregate[key] = aggEntry;
