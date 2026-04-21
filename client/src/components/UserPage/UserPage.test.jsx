@@ -2263,6 +2263,112 @@ describe('UserPage cold-load network fallback', () => {
     );
   });
 
+  it('lets authoritative sbtCache zero counts override earlier legacy mint signal', () => {
+    const viewAddress = '0x00000000000000000000000000000000000000aa';
+    const networkID = '84532';
+    const instance = makeInstance({ viewAddress });
+
+    const legacyEntry = {
+      slug: 'legacy',
+      data: {
+        [networkID]: {
+          sbtList: {
+            '0x100': {
+              sbtAddress: '0x100',
+              sbtInfo: { name: 'Badge 100', unlisted: false },
+              mintedAddresses: [viewAddress],
+              burnedAddresses: [],
+            },
+          },
+        },
+      },
+    };
+    const authoritativeEntry = {
+      slug: 'authoritative',
+      data: {
+        [networkID]: {
+          sbtList: {
+            '0x100': {
+              sbtAddress: '0x100',
+              sbtInfo: { name: 'Badge 100', unlisted: false },
+              mintedAddresses: [],
+              burnedAddresses: [],
+              mintedCountByAddress: {},
+              burnedCountByAddress: {},
+              countsLoaded: true,
+            },
+          },
+        },
+      },
+    };
+    const dataByNamespace = {
+      surveysCache: [],
+      questionsCache: [],
+      sbtCache: [legacyEntry, authoritativeEntry],
+      userCache: [],
+    };
+
+    instance._dgHasAny = jest.fn(() => true);
+    instance._dgReadAll = jest.fn((name) => dataByNamespace[name] || []);
+
+    instance._refreshAllDataFromCache({ force: true, markLoading: true });
+
+    expect(instance.state.sbtList).toHaveLength(0);
+  });
+
+  it('keeps authoritative sbtCache zero counts sticky over later legacy mint signal', () => {
+    const viewAddress = '0x00000000000000000000000000000000000000aa';
+    const networkID = '84532';
+    const instance = makeInstance({ viewAddress });
+
+    const legacyEntry = {
+      slug: 'legacy',
+      data: {
+        [networkID]: {
+          sbtList: {
+            '0x100': {
+              sbtAddress: '0x100',
+              sbtInfo: { name: 'Badge 100', unlisted: false },
+              mintedAddresses: [viewAddress],
+              burnedAddresses: [],
+            },
+          },
+        },
+      },
+    };
+    const authoritativeEntry = {
+      slug: 'authoritative',
+      data: {
+        [networkID]: {
+          sbtList: {
+            '0x100': {
+              sbtAddress: '0x100',
+              sbtInfo: { name: 'Badge 100', unlisted: false },
+              mintedAddresses: [],
+              burnedAddresses: [],
+              mintedCountByAddress: {},
+              burnedCountByAddress: {},
+              countsLoaded: true,
+            },
+          },
+        },
+      },
+    };
+    const dataByNamespace = {
+      surveysCache: [],
+      questionsCache: [],
+      sbtCache: [authoritativeEntry, legacyEntry],
+      userCache: [],
+    };
+
+    instance._dgHasAny = jest.fn(() => true);
+    instance._dgReadAll = jest.fn((name) => dataByNamespace[name] || []);
+
+    instance._refreshAllDataFromCache({ force: true, markLoading: true });
+
+    expect(instance.state.sbtList).toHaveLength(0);
+  });
+
   it('honors legacy sbtCache mintedAddresses when count maps are empty placeholders', () => {
     const viewAddress = '0x00000000000000000000000000000000000000aa';
     const networkID = '84532';
