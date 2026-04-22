@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 
 import { Avatar } from './CharacterSVG';
-import { debateData, sourceLinks } from './debateData';
+import { debateData, sourceLinks } from '../../../variables/demo/debateData.js';
 import { darkTheme as T, soften, useTheme } from './debateHudTheme';
 
 export const NodeIcon = ({ type }) => {

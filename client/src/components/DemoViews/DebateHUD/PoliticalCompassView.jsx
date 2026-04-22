@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 
-import { debateData, voterProfiles } from './debateData';
+import { debateData, voterProfiles } from '../../../variables/demo/debateData.js';
 import { ThemeContext, darkTheme, soften, useTheme } from './debateHudTheme';
 import { getDemoAvatarByName } from '../../../utilities/ui/demoAvatars.js';
 import { generateBlockieDataUrl } from '../../../utilities/ui/blockieAvatars.js';

@@ -33,6 +33,7 @@ This directory contains demo and fixture data for the Context Engine survey plat
 | --- | --- |
 | [`historical_figure_demographics.js`](./historical_figure_demographics.js) | Computes demographic breakdowns from merged historical figure data plus the Polis fixture. Exports `DEMO_ANALYSIS_DEMOGRAPHIC_FIELDS` and the default historical figure lookup object. |
 | [`historical_figure_demographics.test.js`](./historical_figure_demographics.test.js) | Regression coverage for the demographics lookup and fixture completeness. |
+| [`debateData.js`](./debateData.js) | Debate HUD fixture module with debate cards, argument trees, audience roster/votes, voter profiles, and source links. |
 | [`index.js`](./index.js) | Barrel export for the most commonly imported demo datasets and demographics helpers. |
 
 ## Primary Consumers
@@ -45,6 +46,9 @@ The main consumers of this folder are:
 - [`PolisReport.jsx`](../../components/PolisReport/PolisReport.jsx)
 - [`DebateMap.jsx`](../../components/DebateMap/DebateMap.jsx)
 - [`PoliticalCompassView.jsx`](../../components/DemoViews/DebateHUD/PoliticalCompassView.jsx)
+- [`DebateSelector.tsx`](../../components/DemoViews/DebateHUD/DebateSelector.tsx)
+- [`ArgumentTreeView.jsx`](../../components/DemoViews/DebateHUD/ArgumentTreeView.jsx)
+- [`VotesOnArgumentsView.jsx`](../../components/DemoViews/DebateHUD/VotesOnArgumentsView.jsx)
 - [`CommunityTab.jsx`](../../components/CommunityTab/CommunityTab.jsx)
 - [`SimUserPage.jsx`](../../components/UserPage/SimUserPage.jsx)
 
