@@ -37,7 +37,7 @@ import { toStr } from '../../utilities/shared/primitives.js';
 
 
 
-import AudioInput from '../Shared/AudioInput/AudioInput.jsx';
+import AudioInput from '../Shared/AudioInput/AudioInput';
 import { rankQuestionsAI } from '../../utilities/ai/aiScripts.js';
 import { getLocalAiSettings } from '../../utilities/ai/aiSettings.js';
 import { resolveEncryptionGate } from '../../utilities/crypto/encryptionGates.js';

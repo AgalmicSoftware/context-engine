@@ -55,7 +55,7 @@ import {
 } from '../../utilities/session/sessionWorkerAvailability.js';
 import { buildSponsoredFlagFields as buildSponsoredSessionFlagFields } from '../../utilities/session/sponsoredFlags.js';
 import { toStr, normalizeSlug as _canonicalizeSlug } from '../../utilities/shared/primitives.js';
-import AudioInput from '../Shared/AudioInput/AudioInput.jsx';
+import AudioInput from '../Shared/AudioInput/AudioInput';
 import SBTSelector from '../SBTs/SBTSelector.jsx';
 import { JsonPanel } from '../Shared/Json/JsonControls';
 import { sanitizeSessionWizardMetadataPayload } from '../Sessions/sessionWizardWriteNormalization.js';

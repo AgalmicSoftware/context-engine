@@ -41,7 +41,7 @@ import {
   getAllSessionSlugs,
   getSessionConfigBySlug,
 } from '../../../utilities/web3/contractScripts.js';
-import AudioInput from '../../Shared/AudioInput/AudioInput.jsx';
+import AudioInput from '../../Shared/AudioInput/AudioInput';
 import CreateQuestionsAndSurveys from '../CreateQuestionsAndSurveys.jsx';
 import SBTSelector from '../../SBTs/SBTSelector.jsx';
 import DocumentLibraryPanel from '../../DocumentLibrary/DocumentLibraryPanel.jsx';
