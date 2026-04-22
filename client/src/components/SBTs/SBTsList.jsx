@@ -16,7 +16,7 @@ import { faSpinner, faSync, faTrash, faPlus, faLock, faCog, faChevronUp, faChevr
 import { Button } from 'reactstrap';
 import SBTPage from './SBTPage';
 import CreateGroup from './CreateSBTGroup';
-import SessionChipSelector from '../Shared/SessionChipSelector.jsx';
+import SessionChipSelector from '../Shared/SessionChipSelector';
 import { ethers } from 'ethers';
 import { createLogger } from '../../utilities/logging.js';
 import { normalizeArweaveUrl } from '../../utilities/arweave/arweaveUrls.js';

@@ -43,19 +43,6 @@ import { Button, Card, CardHeader, CardBody, CardFooter, Modal } from "reactstra
 
 import CETooltip from '../Shared/CETooltip';
 import SessionChipSelector from '../Shared/SessionChipSelector';
-import {
-  LoginSettingsSupportedResourceCard,
-} from './LoginSettingsResourceSummary';
-import {
-  LoginSettingsInlineNetworkSummary,
-  LoginSettingsPanelNetworkSummary,
-} from './LoginSettingsNetworkSummary';
-import {
-  LoginSettingsConfigToggleControl,
-  LoginSettingsControlRow,
-  LoginSettingsSessionSummary,
-} from './LoginSettingsControlRow';
-import LoginSettingsSectionCard from './LoginSettingsSectionCard';
 
 // Smart contract interactions and config
 import {
