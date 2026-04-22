@@ -5,15 +5,26 @@ import { createStore } from 'redux';
 import CETooltip from './CETooltip';
 
 jest.mock('reactstrap', () => ({
-  UncontrolledTooltip: ({ children, target }) => (
+  UncontrolledTooltip: ({ children, target }: { children: React.ReactNode; target: string }) => (
     <div data-testid="mock-ce-tooltip" data-target={target}>
       {children}
     </div>
   ),
 }));
 
-const createTooltipStore = (tooltipsEnabled) => createStore(
-  (state = { sessionState: { tooltipsEnabled } }, action) => {
+type TooltipState = {
+  sessionState: {
+    tooltipsEnabled: boolean;
+  };
+};
+
+type TooltipAction = {
+  type: string;
+  payload: boolean;
+};
+
+const createTooltipStore = (tooltipsEnabled: boolean) => createStore(
+  (state: TooltipState = { sessionState: { tooltipsEnabled } }, action: TooltipAction): TooltipState => {
     if (action.type === 'SET_TOOLTIPS') {
       return {
         sessionState: {
@@ -26,7 +37,7 @@ const createTooltipStore = (tooltipsEnabled) => createStore(
   }
 );
 
-const renderWithTooltipsEnabled = (tooltipsEnabled) => {
+const renderWithTooltipsEnabled = (tooltipsEnabled: boolean) => {
   const store = createTooltipStore(tooltipsEnabled);
 
   return render(
