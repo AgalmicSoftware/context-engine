@@ -2,7 +2,7 @@ import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import SessionChipSelector from './SessionChipSelector';
 
-const buildOptions = (labels = []) => labels.map((label) => ({
+const buildOptions = (labels: string[] = []) => labels.map((label) => ({
   key: label,
   slug: label.toLowerCase(),
   label,
