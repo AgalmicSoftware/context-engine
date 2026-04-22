@@ -552,6 +552,13 @@ export const writeLocalAiSettingsEnvelope = (nextSettings = {}, { storage } = {}
 export const migrateLegacyLocalAiSettingsIfNeeded = ({ storage } = {}) => {
   const current = readLocalAiSettingsEnvelope({ storage });
   if (!current.ok || current.status !== 'legacy') return current;
+  if (current.metadata?.legacyPlaintextDetected && !current.metadata?.encryptedAvailable) {
+    return {
+      ...current,
+      status: 'skipped-plaintext-only',
+      reason: 'encrypted-key-missing',
+    };
+  }
   return writeLocalAiSettingsEnvelope(current.settings, { storage });
 };
 
