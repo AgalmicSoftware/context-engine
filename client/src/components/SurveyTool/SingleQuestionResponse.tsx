@@ -23,7 +23,6 @@ import {
 import { normalizeSessionSlug, resolveSessionSlugFromPathname } from '../../utilities/session/sessionNaming.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { normalizeArweaveUrl } from '../../utilities/arweave/arweaveUrls.js';
-import { getLegacyArweaveTxId } from '../../utilities/storage/storageRefs.js';
 import GateTooltip from '../Gates/GateTooltip';
 import {
   listNamespaceEntriesSync,
