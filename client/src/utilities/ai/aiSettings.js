@@ -34,7 +34,9 @@ export const AI_MODEL_TYPES = Object.freeze({
   THINKING: 'thinking',
 });
 
-const AI_SETTINGS_STORAGE_KEY = 'ce:aiSettings:v1';
+export const AI_SETTINGS_STORAGE_KEY = 'ce:aiSettings:v1';
+export const AI_SETTINGS_ENVELOPE_VERSION = 1;
+export const AI_SETTINGS_ENVELOPE_KIND = 'ai-settings';
 
 export const DEFAULT_REASONING_EFFORT = 'low';
 
@@ -194,6 +196,45 @@ const stripProviderKeys = (settings = {}) => {
       openrouter: scrub(providers.openrouter || {}),
       custom: scrub(providers.custom || {}),
     },
+  };
+};
+
+const getAiSettingsStorage = (storageIn) => {
+  if (storageIn !== undefined) return storageIn;
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) return window.localStorage;
+  } catch (_) {}
+  return null;
+};
+
+const hasProviderPlaintextKey = (entry = {}) => !!toStr(entry?.apiKey).trim();
+const hasProviderEncryptedKey = (entry = {}) => !!toStr(entry?.encryptedApiKey).trim();
+
+const summarizeAiSettingsSecretMetadata = (settings = {}) => {
+  const providers = settings?.providers && typeof settings.providers === 'object'
+    ? settings.providers
+    : {};
+  const entries = Object.values(providers);
+  return {
+    encryptedAvailable: entries.some((entry) => hasProviderEncryptedKey(entry)),
+    legacyPlaintextDetected: entries.some((entry) => hasProviderPlaintextKey(entry)),
+  };
+};
+
+const stripPlaintextProviderKeys = (settings = {}) => {
+  const normalized = normalizeAiSettings(settings, { includeUseLocal: true });
+  const providers = normalized.providers && typeof normalized.providers === 'object'
+    ? normalized.providers
+    : {};
+  return {
+    ...normalized,
+    providers: Object.entries(providers).reduce((acc, [provider, entry]) => {
+      acc[provider] = {
+        ...entry,
+        apiKey: '',
+      };
+      return acc;
+    }, {}),
   };
 };
 
@@ -398,6 +439,122 @@ const buildDefaultAiSettings = (includeUseLocal = true) => (
   normalizeAiSettings(DEFAULT_SETTINGS, { includeUseLocal })
 );
 
+export const normalizeLocalAiSettingsEnvelopeRecord = (raw = null) => {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    return {
+      ok: false,
+      status: 'missing',
+      settings: null,
+      metadata: {
+        encryptedAvailable: false,
+        legacyPlaintextDetected: false,
+      },
+    };
+  }
+
+  if (Number(raw.v || 0) === AI_SETTINGS_ENVELOPE_VERSION && raw.kind === AI_SETTINGS_ENVELOPE_KIND) {
+    const settings = normalizeAiSettings(raw.settings || {}, { includeUseLocal: true });
+    const secretMeta = summarizeAiSettingsSecretMetadata(settings);
+    return {
+      ok: true,
+      status: 'envelope',
+      settings,
+      metadata: {
+        encryptedAvailable: !!raw.metadata?.encryptedAvailable || secretMeta.encryptedAvailable,
+        legacyPlaintextDetected: !!raw.metadata?.legacyPlaintextDetected || secretMeta.legacyPlaintextDetected,
+        requiresWallet: !!raw.metadata?.requiresWallet,
+      },
+    };
+  }
+
+  const settings = normalizeAiSettings(raw, { includeUseLocal: true });
+  return {
+    ok: true,
+    status: 'legacy',
+    settings,
+    metadata: {
+      ...summarizeAiSettingsSecretMetadata(settings),
+      requiresWallet: false,
+    },
+  };
+};
+
+export const readLocalAiSettingsEnvelope = ({ storage } = {}) => {
+  const storageRef = getAiSettingsStorage(storage);
+  if (!storageRef) {
+    return {
+      ok: false,
+      status: 'missing-storage',
+      settings: null,
+      metadata: {
+        encryptedAvailable: false,
+        legacyPlaintextDetected: false,
+      },
+    };
+  }
+  try {
+    const raw = JSON.parse(storageRef.getItem(AI_SETTINGS_STORAGE_KEY) || 'null');
+    return normalizeLocalAiSettingsEnvelopeRecord(raw);
+  } catch (error) {
+    return {
+      ok: false,
+      status: 'parse-failed',
+      settings: null,
+      error: toStr(error?.message || error),
+      metadata: {
+        encryptedAvailable: false,
+        legacyPlaintextDetected: false,
+      },
+    };
+  }
+};
+
+export const writeLocalAiSettingsEnvelope = (nextSettings = {}, { storage } = {}) => {
+  const storageRef = getAiSettingsStorage(storage);
+  if (!storageRef) {
+    return {
+      ok: false,
+      status: 'missing-storage',
+      error: 'localStorage is unavailable.',
+    };
+  }
+
+  const normalized = normalizeAiSettings(nextSettings, { includeUseLocal: true });
+  const metadata = summarizeAiSettingsSecretMetadata(normalized);
+  const envelope = {
+    v: AI_SETTINGS_ENVELOPE_VERSION,
+    kind: AI_SETTINGS_ENVELOPE_KIND,
+    updatedAt: Date.now(),
+    settings: stripPlaintextProviderKeys(normalized),
+    metadata: {
+      encryptedAvailable: metadata.encryptedAvailable,
+      legacyPlaintextDetected: metadata.legacyPlaintextDetected,
+      requiresWallet: metadata.encryptedAvailable,
+    },
+  };
+
+  try {
+    storageRef.setItem(AI_SETTINGS_STORAGE_KEY, JSON.stringify(envelope));
+    return {
+      ok: true,
+      status: 'written',
+      envelope,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      status: 'write-failed',
+      error: toStr(error?.message || error),
+    };
+  }
+};
+
+export const migrateLegacyLocalAiSettingsIfNeeded = ({ storage } = {}) => {
+  const current = readLocalAiSettingsEnvelope({ storage });
+  if (!current.ok || current.status !== 'legacy') return current;
+  return writeLocalAiSettingsEnvelope(current.settings, { storage });
+};
+
 const resolveSessionConfigEntry = (slugIn = '') => {
   const resolved = resolveSessionConfigFromSources({
     sessionSlug: slugIn,
@@ -443,14 +600,10 @@ export const getSessionAiSettings = (slugIn = '') => {
 // Legacy alias removed — function is now getSessionAiSettings directly.
 
 export const getLocalAiSettings = () => {
-  if (typeof window === 'undefined') return buildDefaultAiSettings(true);
-  try {
-    const raw = JSON.parse(localStorage.getItem(AI_SETTINGS_STORAGE_KEY) || 'null');
-    if (!raw) return buildDefaultAiSettings(true);
-    return normalizeAiSettings(raw, { includeUseLocal: true });
-  } catch {
-    return buildDefaultAiSettings(true);
-  }
+  const result = readLocalAiSettingsEnvelope();
+  return result.ok && result.settings
+    ? normalizeAiSettings(result.settings, { includeUseLocal: true })
+    : buildDefaultAiSettings(true);
 };
 
 export const saveLocalAiSettings = (nextSettings = {}) => {
