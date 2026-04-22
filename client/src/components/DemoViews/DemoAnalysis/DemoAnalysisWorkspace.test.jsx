@@ -2,7 +2,7 @@ import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import DemoAnalysisWorkspace from './DemoAnalysisWorkspace.jsx';
 
-jest.mock('../../Shared/CheckboxMultiSelect.jsx', () => ({
+jest.mock('../../Shared/CheckboxMultiSelect', () => ({
   __esModule: true,
   default: ({
     inputId,
