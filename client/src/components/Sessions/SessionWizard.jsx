@@ -9,7 +9,7 @@ import styles from './SessionWizard.module.scss';
 import LockableFieldFrame from './LockableFieldFrame.jsx';
 import BlockLimitsField from './BlockLimitsField.jsx';
 import SessionHeaderField from './SessionHeaderField.jsx';
-import FeaturedSbtField from './FeaturedSbtField.jsx';
+import FeaturedSbtField from './FeaturedSbtField';
 import ContractsSection from './ContractsSection';
 import EncryptionPanel from './EncryptionPanel.jsx';
 import WorkerPanel from './WorkerPanel.jsx';
