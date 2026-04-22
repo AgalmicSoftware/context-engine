@@ -18,7 +18,7 @@ import {
   NavLink
 } from "reactstrap";
 
-import LazyFallback from "../Shared/LazyFallback.jsx";
+import LazyFallback from "../Shared/LazyFallback";
 
 const log = createLogger('ui');
 

@@ -110,7 +110,7 @@ import MainAreaTabs from "../MainContent/MainAreaTabs.jsx";
 import RightSide from '../RightSidebar/RightSide.jsx';
 import OnboardingOverlay from '../Onboarding/OnboardingOverlay.jsx';
 import Footer from "../Footer/Footer.jsx";
-import LazyFallback from "../Shared/LazyFallback.jsx";
+import LazyFallback from "../Shared/LazyFallback";
 import DevE2eNav from "../E2E/DevE2eNav.jsx";
 import RouteErrorBoundary from '../ErrorBoundary/RouteErrorBoundary.jsx';
 
