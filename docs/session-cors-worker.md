@@ -177,6 +177,10 @@ Admin test panel:
   - Local dev frequently runs at `http://localhost:3001` (and E2E may use `http://127.0.0.1:3000`).
   - Use the `/admin` CORS allowlist editor to inspect and edit the full list directly. `Add recommended origins` appends the current browser origin plus the stable defaults, and `Save allowlist` persists the exact list you entered.
   - Trusted admin origins (for example the first-party localhost admin hosts) can now reach `/admin/*` even when the session's current allowlist is wrong, so admins can repair a blocked allowlist without manual KV edits first.
+- Static custom-domain frontend deploys must add the final browser origin (for
+  example `https://app.example`) to the same `allowOrigins` list after DNS
+  cutover. See the Netlify/static hosting checklist in
+  [`docs/public-client-config.md#netlify-static-deploy`](public-client-config.md#netlify-static-deploy).
 - When AI/Arweave/Faucet tests hit `Session config not found.`, the panel now auto-attempts
   a signed `/admin/set-config` using the selected session metadata, then retries the test once.
   This recovery also covers login-stage 404s (`Worker login failed (404)`) so fresh workers can be
