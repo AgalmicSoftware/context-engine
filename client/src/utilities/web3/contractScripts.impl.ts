@@ -4685,20 +4685,30 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
 
   // "Group" here refers to SBT token group/collection, not session group
   /** Read helper for on-chain groupPasswordHash */
-  async getGroupPasswordHash(providerName, SBTAddress, groupKeyOrCfg = null) {
+  async getGroupPasswordHash(providerName, SBTAddress, groupKeyOrCfg = null, options = {}) {
     try {
       const provider = getLocalAwareReadProviderForGroup(groupKeyOrCfg, SBT_READ_PROVIDER_OPTIONS);
       const CustomSBT = new ethers.Contract(SBTAddress, CUSTOM_SBT_ABI, provider);
       if (!CustomSBT.groupPasswordHash) return null;
       const v = await callWithRetry(() => CustomSBT.groupPasswordHash(), 'CustomSBT.groupPasswordHash');
       return v;
-    } catch (e) {
+    } catch (error) {
       try {
-        if (typeof window !== 'undefined' && window.ethereum) {
-          const provider = new ethers.providers.Web3Provider(window.ethereum, 'any');
+        const win = typeof window !== 'undefined' ? window : {};
+        const fallback = resolveReadProvider({
+          groupKeyOrCfg,
+          readOptions: SBT_READ_PROVIDER_OPTIONS,
+          allowInjectedReadFallback: !!options?.allowInjectedReadFallback,
+          injectedProvider: win.ethereum,
+          readProviderFactory: () => {
+            throw error;
+          },
+        });
+        if (fallback.ok && fallback.source === 'injected-wallet') {
+          const provider = new ethers.providers.Web3Provider(fallback.provider, 'any');
           const CustomSBT = new ethers.Contract(SBTAddress, CUSTOM_SBT_ABI, provider);
           if (!CustomSBT.groupPasswordHash) return null;
-          inviteLog.warn('[INVITE_DEBUG v2] getGroupPasswordHash falling back to injected provider');
+          inviteLog.warn('[INVITE_DEBUG v2] getGroupPasswordHash falling back to injected provider by explicit opt-in');
           const v = await CustomSBT.groupPasswordHash();
           return v;
         }
