@@ -42,6 +42,7 @@ import {
   readSessionScanScope,
   readSessionScanSlugs,
 } from '../../utilities/session/sessionScanScope.js';
+import { resolveActiveSessionSlug } from '../../utilities/session/sessionNaming.js';
 import {
   hasNamespaceEntriesSync,
   listNamespaceSlugsSync,
@@ -178,7 +179,12 @@ class UserPage extends Component {
     };
   }
 
-  getBookmarksSlug = () => this.props.activeSessionSlug || '';
+  getActiveSessionSlug = () => resolveActiveSessionSlug({
+    activeSessionSlug: this.props.activeSessionSlug,
+    sessionSlug: this.props.sessionSlug,
+  }) || '';
+
+  getBookmarksSlug = () => this.getActiveSessionSlug();
 
   getBookmarksCache = () => {
     const defaultCache = { surveys: [], questions: [], users: [], filters: [] };
@@ -3827,17 +3833,6 @@ class UserPage extends Component {
         }
         nextBookmarked = true;
 
-        // Phase 5 Task: Ensure clicking Bookmark Icon sets isEditingNickname = true (if adding)
-        if (this._isMounted) {
-          this.setState({ isEditingNickname: true }, () => {
-            setTimeout(() => {
-              try {
-                const el = document.querySelector('input[aria-label="Set nickname"]');
-                if (el) { el.focus(); el.select(); }
-              } catch (e) { accountLog.warn('UserPage: fallback', e); }
-            }, 0);
-          });
-        }
     }
 
     this.persistBookmarksCache(bookmarksCache, 'toggleBookmark');
