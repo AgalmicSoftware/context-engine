@@ -24,6 +24,22 @@ Rationale:
 - `/auth/login` already evaluates contract gates and then mints a short-lived token; duplicating gates in metadata gives minimal auth-path performance benefit while adding consistency risk.
 - New session metadata writes remove authoritative gate fields so gate updates do not require metadata re-upload.
 
+## Authority Matrix
+
+The registry migration has several authority boundaries that should stay explicit during staged rollout:
+
+| Concern | Authoritative Source | Compatibility / Fallback | Notes |
+|---|---|---|---|
+| Session identity (`slug`, `sessionId`, registry chain) | `SessionRegistry` | Demo config only while off-chain/demo fallback remains enabled | New writes should use a canonical registry slug; legacy exact-byte sessions remain readable through compatibility lookups until migration proves safe. |
+| Resource gates (`default`, `questionResponses`, `surveyResponses`, `docUploads`, `docUrls`, `ai`, `arweave`, `rpc`, `txGas`, `lit`) | `SessionRegistry` | None for auth decisions | Arweave metadata can carry UI defaults, but must not override on-chain gate authority. |
+| Faucet eligibility | `SessionRegistry` `txGas` resource gate | Future fallback resources must be explicit, documented, and fail closed | Current low-risk target is `txGas` first, with any broader fallback requiring opt-in semantics and tests. |
+| Registry and contract address discovery | Runtime override / verified discovery, then bundled fallback | Bundled `SESSION_REGISTRY_ADDRESSES` and `SESSION_CONTRACTS_BY_CHAIN` stay as compatibility fallback | Discovery should be observable before it becomes required; stale bundled defaults should not be treated as the permanent source of truth. |
+| Worker config and secrets | Worker KV / worker secret store | Browser-local overrides only for local developer preferences | Worker runtime config is operational, not gate authority. Secrets must not flow through Arweave metadata. |
+
+The code-level read-only companion for these rows is
+`client/src/utilities/session/sessionAuthorityMatrix.ts`. Keep this document and
+that matrix aligned when changing authority or fallback semantics.
+
 ## On‑Chain: SessionRegistry.sol
 
 The registry stores minimal, updateable session facts:
