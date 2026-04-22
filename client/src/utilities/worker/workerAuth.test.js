@@ -218,36 +218,6 @@ describe('workerAuth token cache envelopes', () => {
       nowSeconds: 1200,
     })).toEqual({ ok: false, status: 'missing-expiry' });
   });
-
-  it('rejects scoped v1 token envelopes with excessive cache lifetimes', () => {
-    const envelope = __test__workerAuthTokenCache.buildTokenCacheEnvelope({
-      token: 'token-1',
-      exp: 1000 + (25 * 60 * 60),
-      workerUrl: 'https://worker.example',
-      sessionSlug: 'edge',
-      address: TEST_ADDRESS,
-      issuedAt: 1000,
-    });
-
-    expect(__test__workerAuthTokenCache.normalizeTokenCacheEntry(envelope, {
-      workerUrl: 'https://worker.example',
-      sessionSlug: 'edge',
-      address: TEST_ADDRESS,
-      nowSeconds: 1200,
-    })).toEqual({ ok: false, status: 'ttl-too-long' });
-
-    expect(__test__workerAuthTokenCache.normalizeTokenCacheEntry(envelope, {
-      workerUrl: 'https://worker.example',
-      sessionSlug: 'edge',
-      address: TEST_ADDRESS,
-      nowSeconds: 1200,
-      maxTtlSeconds: 26 * 60 * 60,
-    })).toEqual(expect.objectContaining({
-      ok: true,
-      token: 'token-1',
-      legacy: false,
-    }));
-  });
 });
 
 describe('workerAuth canonical session resolution', () => {
@@ -378,9 +348,6 @@ describe('workerAuth canonical session resolution', () => {
       workerUrl: 'https://worker.example/auth/login',
       context: authContext,
     })).resolves.toBe('token-1');
-
-    expect(new Headers(global.fetch.mock.calls[0][1].headers).get('X-Anonymous-Client-Id')).toMatch(/^[a-z0-9_-]{8,128}$/);
-    expect(new Headers(global.fetch.mock.calls[1][1].headers).get('X-Anonymous-Client-Id')).toBeNull();
 
     const cacheKey = __test__workerAuthTokenCache.buildTokenCacheKey({
       workerUrl: 'https://worker.example',

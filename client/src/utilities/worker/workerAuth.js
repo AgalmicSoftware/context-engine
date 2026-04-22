@@ -234,7 +234,6 @@ const normalizeTokenCacheEntry = (entry, {
   address,
   nowSeconds = Math.floor(Date.now() / 1000),
   skewSeconds = TOKEN_SKEW_SECONDS,
-  maxTtlSeconds = MAX_TOKEN_CACHE_TTL_SECONDS,
 } = {}) => {
   if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
     return { ok: false, status: 'malformed' };
@@ -251,11 +250,6 @@ const normalizeTokenCacheEntry = (entry, {
   }
 
   if (Number(entry.v || 0) >= 1) {
-    const issuedAt = Number(entry.issuedAt || 0) || null;
-    const maxTtl = Number(maxTtlSeconds || 0);
-    if (issuedAt && Number.isFinite(maxTtl) && maxTtl > 0 && expiresAt > issuedAt + maxTtl) {
-      return { ok: false, status: 'ttl-too-long' };
-    }
     const expectedWorkerUrl = normalizeWorkerUrl(workerUrl);
     const expectedSlug = normalizeSessionSlug(sessionSlug);
     const expectedAddress = normalizeAddress(address);
