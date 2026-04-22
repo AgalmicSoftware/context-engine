@@ -15,7 +15,7 @@ import { faGithub, faTwitter } from '@fortawesome/free-brands-svg-icons';
 import corpusSample from '../../variables/demo/corpus_sample.json';
 import styles from './CorpusViewer.module.scss';
 import ArxivCard from './ArxivCard';
-import InsiderCard from './InsiderCard.jsx';
+import InsiderCard from './InsiderCard';
 import TagModal from '../TagPage/TagModal.jsx';
 import { buildDemoCorpusRecords } from '../../utilities/demo/demoCorpusRecords.js';
 import WorldResultsMap from './DemoAnalysis/WorldResultsMap.jsx';
