@@ -7,7 +7,12 @@
  */
 import { toStr } from '../shared/primitives.js';
 import { readPublicUrlBasePath } from '../ui/publicUrl.js';
-import { canonicalizeSessionSlug, resolveCanonicalSessionConfig } from './canonicalSessionContext.js';
+import { DEFAULT_SESSION_SLUG_ALIAS } from '../../variables/appConfig.js';
+import {
+  canonicalizeSessionSlug,
+  isReservedSessionSlugKey,
+  resolveCanonicalSessionConfig,
+} from './canonicalSessionContext.js';
 
 type SessionInput = Record<string, any>;
 type SessionConfigLike = Record<string, any>;
@@ -33,6 +38,8 @@ type ResolvedSessionConfigAliases = {
 };
 
 const isObj = (val: unknown): val is SessionInput => !!val && typeof val === 'object' && !Array.isArray(val);
+const REGISTRY_SESSION_SLUG_RE = /^[a-z0-9_-]+$/;
+const MAX_REGISTRY_SESSION_SLUG_LENGTH = 128;
 
 const toPositiveNumber = (val: unknown): number | undefined => {
   const num = Number(val || 0);
@@ -56,6 +63,70 @@ const CONTRACT_CHAINID_ALIASES = Object.freeze({
 
 export const normalizeSessionSlug = (rawSlug: unknown): string => {
   return canonicalizeSessionSlug(rawSlug);
+};
+
+export const normalizeRegistrySessionSlugForWrite = (rawSlug: unknown): string => {
+  const normalized = toStr(rawSlug).trim().toLowerCase();
+  const defaultAlias = toStr(DEFAULT_SESSION_SLUG_ALIAS || 'general').trim().toLowerCase() || 'general';
+  if (!normalized || normalized === defaultAlias) return defaultAlias;
+  return normalized;
+};
+
+export const validateRegistrySessionSlugForWrite = (
+  rawSlug: unknown,
+  { allowDefault = true } = {}
+) => {
+  const input = toStr(rawSlug).trim();
+  const slug = normalizeRegistrySessionSlugForWrite(rawSlug);
+  const defaultAlias = toStr(DEFAULT_SESSION_SLUG_ALIAS || 'general').trim().toLowerCase() || 'general';
+
+  if (!allowDefault && slug === defaultAlias && (!input || input.toLowerCase() === defaultAlias)) {
+    return {
+      ok: false,
+      slug,
+      changed: slug !== input,
+      reason: 'default-disallowed',
+      error: 'A non-default session slug is required.',
+    };
+  }
+
+  if (isReservedSessionSlugKey(slug)) {
+    return {
+      ok: false,
+      slug,
+      changed: slug !== input,
+      reason: 'reserved',
+      error: 'This session slug is reserved.',
+    };
+  }
+
+  if (slug.length > MAX_REGISTRY_SESSION_SLUG_LENGTH) {
+    return {
+      ok: false,
+      slug,
+      changed: slug !== input,
+      reason: 'too-long',
+      error: `Session slugs must be ${MAX_REGISTRY_SESSION_SLUG_LENGTH} characters or fewer.`,
+    };
+  }
+
+  if (!REGISTRY_SESSION_SLUG_RE.test(slug)) {
+    return {
+      ok: false,
+      slug,
+      changed: slug !== input,
+      reason: 'invalid-format',
+      error: 'Session slugs must use lowercase letters, numbers, "_" or "-".',
+    };
+  }
+
+  return {
+    ok: true,
+    slug,
+    changed: slug !== input,
+    reason: '',
+    error: '',
+  };
 };
 
 const stripConfiguredPublicBasePath = (pathname: unknown = ''): string => {
