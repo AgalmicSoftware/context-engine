@@ -12,12 +12,19 @@ import {
 } from '../../../utilities/ui/jsonFunctions';
 import styles from './JsonDisplay.module.scss';
 
+type JsonDisplayProps = {
+  data: unknown;
+  label?: string;
+  defaultOpen?: boolean;
+  maxHeight?: number | string;
+};
+
 const JsonDisplay = ({
   data,
   label = 'View .json',
   defaultOpen = false,
   maxHeight = 300,
-}) => {
+}: JsonDisplayProps) => {
   const [open, setOpen] = useState(defaultOpen);
 
   if (data == null) return null;
@@ -43,7 +50,9 @@ const JsonDisplay = ({
         <div className={styles.jsonBody}>
           <button
             className={styles.copyButton}
-            onClick={() => { void copyJsonToClipboard(data); }}
+            onClick={() => {
+              void copyJsonToClipboard(data);
+            }}
             type="button"
             title="Copy JSON"
             aria-label="Copy JSON"
