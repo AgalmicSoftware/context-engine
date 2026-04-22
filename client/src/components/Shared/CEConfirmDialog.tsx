@@ -9,7 +9,19 @@ import {
 } from 'reactstrap';
 import styles from './CEConfirmDialog.module.scss';
 
-const joinClasses = (...classes) => classes.filter(Boolean).join(' ');
+type CEConfirmDialogProps = {
+  isOpen?: boolean;
+  title: React.ReactNode;
+  body: React.ReactNode;
+  confirmLabel?: React.ReactNode;
+  cancelLabel?: React.ReactNode;
+  danger?: boolean;
+  onConfirm?: () => void;
+  onCancel?: () => void;
+  testId?: string;
+};
+
+const joinClasses = (...classes: Array<string | false | null | undefined>) => classes.filter(Boolean).join(' ');
 
 const CEConfirmDialog = ({
   isOpen,
@@ -21,7 +33,7 @@ const CEConfirmDialog = ({
   onConfirm,
   onCancel,
   testId = 'ce-confirm-dialog',
-}) => {
+}: CEConfirmDialogProps) => {
   const handleCancel = () => {
     if (typeof onCancel === 'function') onCancel();
   };
