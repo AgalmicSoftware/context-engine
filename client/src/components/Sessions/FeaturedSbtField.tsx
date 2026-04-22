@@ -1,7 +1,7 @@
 /** @file FeaturedSbtField.tsx */
 import React from 'react';
 import { FormGroup, Label } from 'reactstrap';
-import SBTSelector from '../SBTs/SBTSelector';
+import SBTSelector from '../SBTs/SBTSelector.jsx';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import styles from './SessionWizard.module.scss';
 
