@@ -122,7 +122,7 @@ import {
 } from './errorClassifiers.js';
 import { getSessionAddresses, getSessionBlockWindow, parsePositiveBlockNumber } from './sessionAddressHelpers.js';
 import { resolveTxGasOverrides, sendContractWriteViaProvider } from './contractWrites.js';
-import { resolveSignerProvider } from './providerAdapter.js';
+import { resolveReadProvider, resolveSignerProvider } from './providerAdapter.js';
 import {
   resolveSessionNameValue,
   normalizeSbtSessionLinkFields,
@@ -4708,19 +4708,29 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
   },
 
   /** Read helper for on-chain mintedTokens */
-  async getMintedTokens(providerName, SBTAddress, groupKeyOrCfg = null) {
+  async getMintedTokens(providerName, SBTAddress, groupKeyOrCfg = null, options = {}) {
     try {
       if (!SBTAddress || !ethers.utils.isAddress(SBTAddress)) return null;
       const provider = getLocalAwareReadProviderForGroup(groupKeyOrCfg, SBT_READ_PROVIDER_OPTIONS);
       const CustomSBT = new ethers.Contract(SBTAddress, ["function mintedTokens() view returns (uint256)"], provider);
       const v = await callWithRetry(() => CustomSBT.mintedTokens(), 'CustomSBT.mintedTokens');
       return v != null ? v.toString() : null;
-    } catch (_) {
+    } catch (error) {
       try {
-        if (typeof window !== 'undefined' && window.ethereum) {
-          const provider = new ethers.providers.Web3Provider(window.ethereum, 'any');
+        const win = typeof window !== 'undefined' ? window : {};
+        const fallback = resolveReadProvider({
+          groupKeyOrCfg,
+          readOptions: SBT_READ_PROVIDER_OPTIONS,
+          allowInjectedReadFallback: !!options?.allowInjectedReadFallback,
+          injectedProvider: win.ethereum,
+          readProviderFactory: () => {
+            throw error;
+          },
+        });
+        if (fallback.ok && fallback.source === 'injected-wallet') {
+          const provider = new ethers.providers.Web3Provider(fallback.provider, 'any');
           const CustomSBT = new ethers.Contract(SBTAddress, ["function mintedTokens() view returns (uint256)"], provider);
-          inviteLog.warn('[INVITE_DEBUG v2] getMintedTokens falling back to injected provider');
+          inviteLog.warn('[INVITE_DEBUG v2] getMintedTokens falling back to injected provider by explicit opt-in');
           const v = await CustomSBT.mintedTokens();
           return v != null ? v.toString() : null;
         }
