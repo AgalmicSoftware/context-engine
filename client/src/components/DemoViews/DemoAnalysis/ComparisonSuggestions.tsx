@@ -2,7 +2,19 @@ import React from 'react';
 import { getSegmentDisplayName } from '../../../utilities/demo/demoAnalysisMath.js';
 import styles from './DemoAnalysisWorkspace.module.scss';
 
-const buildSuggestionSelectionKey = (questionId = '', pair = []) => (
+export type ComparisonSuggestion = {
+  questionId: string;
+  questionText: string;
+  pair: string[];
+};
+
+export type ComparisonSuggestionsProps = {
+  suggestions?: ComparisonSuggestion[] | null;
+  onSuggestionClick: (suggestion: ComparisonSuggestion) => void;
+  activeSuggestionKey?: string;
+};
+
+const buildSuggestionSelectionKey = (questionId = '', pair: string[] = []) => (
   `${String(questionId || '').trim()}::${[...(Array.isArray(pair) ? pair : [])].sort().join('::')}`
 );
 
@@ -10,7 +22,7 @@ const ComparisonSuggestions = ({
   suggestions = [],
   onSuggestionClick,
   activeSuggestionKey = '',
-}) => {
+}: ComparisonSuggestionsProps) => {
   if (!Array.isArray(suggestions) || suggestions.length === 0) {
     return (
       <section className={`${styles.panel} ${styles.suggestionPanel}`}>
