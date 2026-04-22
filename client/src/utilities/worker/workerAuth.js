@@ -33,6 +33,7 @@ const accountLog = createLogger('account');
 
 const STORAGE_PREFIX = 'ce:workerToken:v1';
 const TOKEN_SKEW_SECONDS = 30;
+const MAX_TOKEN_CACHE_TTL_SECONDS = 24 * 60 * 60;
 const NONCE_MISMATCH_ERROR = 'nonce mismatch or expired';
 const ONCHAIN_GATE_UNAVAILABLE_ERROR = 'on-chain gate data unavailable';
 const LOGIN_GATE_UNAVAILABLE_RETRIES = 2;
@@ -233,6 +234,7 @@ const normalizeTokenCacheEntry = (entry, {
   address,
   nowSeconds = Math.floor(Date.now() / 1000),
   skewSeconds = TOKEN_SKEW_SECONDS,
+  maxTtlSeconds = MAX_TOKEN_CACHE_TTL_SECONDS,
 } = {}) => {
   if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
     return { ok: false, status: 'malformed' };
@@ -249,6 +251,11 @@ const normalizeTokenCacheEntry = (entry, {
   }
 
   if (Number(entry.v || 0) >= 1) {
+    const issuedAt = Number(entry.issuedAt || 0) || null;
+    const maxTtl = Number(maxTtlSeconds || 0);
+    if (issuedAt && Number.isFinite(maxTtl) && maxTtl > 0 && expiresAt > issuedAt + maxTtl) {
+      return { ok: false, status: 'ttl-too-long' };
+    }
     const expectedWorkerUrl = normalizeWorkerUrl(workerUrl);
     const expectedSlug = normalizeSessionSlug(sessionSlug);
     const expectedAddress = normalizeAddress(address);
