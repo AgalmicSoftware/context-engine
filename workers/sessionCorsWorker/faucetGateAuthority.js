@@ -76,12 +76,10 @@ export const createFaucetGateAuthorityWithDeps = ({
       };
     }
 
-    // TODO(PRD-137): Confirm whether faucet eligibility should require `txGas`
-    // specifically or any on-chain session gate containing the requested SBT.
-    // Until that is clarified, prefer `txGas` first and then fall back to the
-    // other worker-known resource gates so we only fund SBTs explicitly wired
-    // into the session's on-chain gate configuration.
-    const gateKeys = ['txGas', ...resourceGateKeys.filter((key) => key !== 'txGas')];
+    const allowResourceGateFallback = config?.faucet?.allowResourceGateFallback === true;
+    const gateKeys = allowResourceGateFallback
+      ? ['txGas', ...resourceGateKeys.filter((key) => key !== 'txGas')]
+      : ['txGas'];
     const failures = [];
     for (const resourceKey of gateKeys) {
       const gateResult = await readResourceGateOnChain({
