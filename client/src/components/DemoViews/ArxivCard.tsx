@@ -3,6 +3,29 @@ import React from 'react';
 import styles from './CorpusViewer.module.scss';
 import { DebateMapSection, ExternalSourceLink } from './TweetCard.jsx';
 
+type ArxivEntry = {
+  id?: string;
+  title?: string;
+  url?: string;
+  author?: string;
+  authors?: string[];
+  category?: string;
+  date?: string;
+  published_at?: string;
+  published?: string;
+  created_at?: string;
+  year?: string | number;
+  summary?: string;
+  abstract?: string;
+  tags?: string[];
+};
+
+export type ArxivCardProps = {
+  entry?: ArxivEntry | null;
+  onTagClick?: (tag: string) => void;
+  onAtlasIssueOpen?: (...args: unknown[]) => void;
+};
+
 const extractArxivId = (url = '') => {
   try {
     const parsedUrl = new URL(url);
@@ -25,7 +48,7 @@ const formatAuthorSurname = (author = '') => {
   return parts[parts.length - 1] || '';
 };
 
-const formatCompactAuthors = (entry = {}) => {
+const formatCompactAuthors = (entry: ArxivEntry = {}) => {
   const listedAuthors = Array.isArray(entry.authors)
     ? entry.authors.filter(Boolean)
     : [];
@@ -44,7 +67,7 @@ const formatCompactAuthors = (entry = {}) => {
   return `${surnames[0]}, ${surnames[1]} et al.`;
 };
 
-const parseDisplayDate = (value) => {
+const parseDisplayDate = (value: unknown) => {
   const rawValue = String(value || '').trim();
   if (!rawValue) return null;
 
@@ -58,7 +81,7 @@ const parseDisplayDate = (value) => {
   return Number.isNaN(parsedDate.getTime()) ? null : parsedDate;
 };
 
-const formatEntryDate = (entry = {}) => {
+const formatEntryDate = (entry: ArxivEntry = {}) => {
   const datedValue = entry.date || entry.published_at || entry.published || entry.created_at;
   if (datedValue) {
     const parsedDate = parseDisplayDate(datedValue);
@@ -76,12 +99,12 @@ const formatEntryDate = (entry = {}) => {
   return null;
 };
 
-const ArxivCard = ({ entry, onTagClick, onAtlasIssueOpen }) => {
+const ArxivCard = ({ entry = null, onTagClick, onAtlasIssueOpen }: ArxivCardProps) => {
   const arxivId = extractArxivId(entry?.url);
   const authorLabel = Array.isArray(entry?.authors) && entry.authors.length > 0
     ? entry.authors.join(', ')
-    : formatCompactAuthors(entry);
-  const dateLabel = formatEntryDate(entry);
+    : formatCompactAuthors(entry || {});
+  const dateLabel = formatEntryDate(entry || {});
   const summaryText = entry?.summary || entry?.abstract || '';
   const tags = Array.isArray(entry?.tags) ? entry.tags : [];
 
