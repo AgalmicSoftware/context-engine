@@ -4,14 +4,16 @@ import { ethers } from 'ethers';
 import { Button, Input, Label, FormGroup, Modal, ModalBody, ModalHeader } from 'reactstrap';
 import { ReactReduxContext } from 'react-redux';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCaretDown, faCaretUp, faCheck, faCog, faCopy, faExclamationCircle, faExpand, faExternalLinkAlt, faImage, faPlus, faQuestionCircle, faRedoAlt, faSpinner, faTimes, faTrash, faUpload } from '@fortawesome/free-solid-svg-icons';
+import { faCaretDown, faCaretUp, faCheck, faCog, faCopy, faExclamationCircle, faExternalLinkAlt, faImage, faPlus, faQuestionCircle, faRedoAlt, faSpinner, faTimes, faTrash, faUpload } from '@fortawesome/free-solid-svg-icons';
 import styles from './SessionWizard.module.scss';
 import LockableFieldFrame from './LockableFieldFrame.jsx';
 import BlockLimitsField from './BlockLimitsField.jsx';
+import SessionHeaderField from './SessionHeaderField.jsx';
+import FeaturedSbtField from './FeaturedSbtField.jsx';
+import ContractsSection from './ContractsSection.jsx';
 import SBTSelector from '../SBTs/SBTSelector.jsx';
 import CreateSBTGroup, { finalizeDeferredCreateSbtDraftUpload } from '../SBTs/CreateSBTGroup.jsx';
 import GateMultiSelectLock from '../Gates/GateMultiSelectLock.jsx';
-import CompactImageChooser from '../Shared/CompactImageChooser.jsx';
 import { JsonToggleButton, JsonPanel, JsonButtonRow } from '../Shared/Json/JsonControls.jsx';
 import { readCompactImageClipboard } from '../Shared/compactImageClipboard.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
@@ -4615,92 +4617,6 @@ const SessionWizard = ({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [featuredDraftGateAutoLink, encryptionGates, pendingSbtDrafts]);
 
-  function renderCompactSessionHeaderField() {
-    return (
-      <CompactImageChooser
-        className={styles.compactSessionHeaderStandalone}
-        rootTestId={E2E_TESTIDS.WIZARD_SESSION_HEADER_INLINE_BAR}
-        urlButtonTestId={E2E_TESTIDS.WIZARD_SESSION_HEADER_URL_TOGGLE}
-        pasteButtonTestId={E2E_TESTIDS.WIZARD_SESSION_HEADER_PASTE}
-        urlInputTestId={E2E_TESTIDS.WIZARD_SESSION_HEADER_URL}
-        isUrlMode={compactSessionHeaderMode === 'url'}
-        isUploadMode={sessionHeaderMode === 'upload'}
-        showUrlInput={compactSessionHeaderMode === 'url'}
-        urlValue={draft?.sessionHeader == null ? '' : draft.sessionHeader}
-        onUrlChange={(event) => {
-          updateDraftValue(['sessionHeader'], event.target.value);
-          setSessionHeaderStatus('');
-        }}
-        onToggleUrlMode={() => {
-          setCompactSessionHeaderMode((prev) => (prev === 'url' ? 'idle' : 'url'));
-          setSessionHeaderMode('url');
-          setSessionHeaderFile(null);
-          setSessionHeaderStatus('');
-        }}
-        onPaste={handlePasteSessionHeaderFromClipboard}
-        onUploadClick={() => {
-          setCompactSessionHeaderMode('idle');
-          setSessionHeaderMode('upload');
-          setSessionHeaderStatus('');
-          if (compactSessionHeaderInputRef.current) {
-            compactSessionHeaderInputRef.current.click();
-          }
-        }}
-        onFileChange={(event) => {
-          setSessionHeaderMode('upload');
-          setSessionHeaderFile(event.target.files?.[0] || null);
-          setSessionHeaderStatus('');
-        }}
-        fileInputRef={compactSessionHeaderInputRef}
-        previewSrc={sessionHeaderPreviewSrc}
-        previewAlt="Session header preview"
-        onClear={handleClearSessionHeaderPreview}
-        enablePreviewExpand={true}
-        expandedPreviewAlt="Expanded session header preview"
-        statusText={sessionHeaderUploadStatus}
-        statusTone={sessionHeaderUploadStatusTone}
-        expandAriaLabel="Expand session header image"
-        clearAriaLabel="Remove session header image"
-      />
-    );
-  }
-
-  function renderSessionHeaderPreviewSurface({ compact = false } = {}) {
-    const previewSrc = toStr(sessionHeaderPreviewSrc).trim();
-    const surfaceClassName = compact
-      ? `${styles.sessionHeaderPreviewSurface} ${styles.sessionHeaderPreviewSurfaceCompact}`
-      : styles.sessionHeaderPreviewSurface;
-    if (!previewSrc) return null;
-    return (
-      <div className={surfaceClassName}>
-        <button
-          type="button"
-          className={styles.sessionHeaderPreviewSurfaceFilled}
-          onClick={() => setSessionHeaderPreviewModalOpen(true)}
-          aria-label="Expand session header image"
-        >
-          <img src={previewSrc} alt="Session header preview" />
-          <span className={styles.sessionHeaderPreviewOverlay}>
-            <FontAwesomeIcon icon={faExpand} />
-            <span>Expand</span>
-          </span>
-        </button>
-        <button
-          type="button"
-          className={styles.sessionHeaderPreviewClearButton}
-          onClick={(event) => {
-            event.stopPropagation();
-            handleClearSessionHeaderPreview();
-          }}
-          aria-label="Remove session header image"
-          title="Remove image"
-        >
-          <FontAwesomeIcon icon={faTimes} />
-        </button>
-      </div>
-    );
-  }
-
   const renderField = (key, value, path, opts = {}) => {
     const forceShow = !!opts.forceShow;
     if (!forceShow && path.length === 0 && (ADMIN_ONLY_FIELDS.has(key) || HIDDEN_FIELDS.has(key))) {
@@ -4983,42 +4899,26 @@ const SessionWizard = ({
         return addr && arr.findIndex((other) => toStr(other.address).toLowerCase() === addr) === idx;
       });
       return (
-        <FormGroup key={keyString} className={styles.fieldGroup}>
-          <div className={styles.fieldHeader}>
-            <div className={styles.fieldLabelRow}>
-              <Label>{displayLabelText}</Label>
-              {fieldTooltipControl}
-              <button
-                type="button"
-                className={styles.inlineLinkButton}
-                onClick={() => launchCreateSbtModal({ targetType: 'defaultFeaturedSBTs' })}
-                data-testid={E2E_TESTIDS.WIZARD_CREATE_SBT}
-                data-ce-sbt-target="defaultFeaturedSBTs"
-              >
-                {`Create ${t('sbt')}`}
-              </button>
-            </div>
-          </div>
-          <SBTSelector
-            id="default-featured-sbts"
-            label={`Choose ${t('sbts')} to feature by default`}
-            selectedSBTs={uniqueSelections}
-            onAddSBT={(sbt) => {
-              const next = [...uniqueSelections, sbt];
-              updateDraftValue(['defaultFeaturedSBTs'], serializeDefaultFeaturedSbtSelections(next));
-            }}
-            onRemoveSBT={(address) => handleRemoveDefaultFeaturedSbt(address)}
-            network={network}
-            additionalSBTOptions={pendingSbtSelectorOptions}
-            chainId={selectorSourceChainId}
-            sessionSlug={selectorSourceSessionConfig?.slug || resolvedActiveSessionSlug || ''}
-            sessionConfig={selectorSourceSessionConfig}
-            sbtCacheRevision={sbtCacheRevision}
-            ensureLightSbtUniverse={ensureLightSbtUniverse}
-            variant="admin"
-            defaultFeaturedSBTs={uniqueSelections.map((entry) => entry.address)}
-          />
-        </FormGroup>
+        <FeaturedSbtField
+          key={keyString}
+          label={displayLabelText}
+          tooltipControl={fieldTooltipControl}
+          createButtonLabel={`Create ${t('sbt')}`}
+          onCreateSbt={() => launchCreateSbtModal({ targetType: 'defaultFeaturedSBTs' })}
+          selectedSBTs={uniqueSelections}
+          onSelectionsChange={(next) => {
+            updateDraftValue(['defaultFeaturedSBTs'], serializeDefaultFeaturedSbtSelections(next));
+          }}
+          onRemove={(address) => handleRemoveDefaultFeaturedSbt(address)}
+          selectorLabel={`Choose ${t('sbts')} to feature by default`}
+          network={network}
+          additionalSBTOptions={pendingSbtSelectorOptions}
+          chainId={selectorSourceChainId}
+          sessionSlug={selectorSourceSessionConfig?.slug || resolvedActiveSessionSlug || ''}
+          sessionConfig={selectorSourceSessionConfig}
+          sbtCacheRevision={sbtCacheRevision}
+          ensureLightSbtUniverse={ensureLightSbtUniverse}
+        />
       );
     }
 
@@ -5028,71 +4928,62 @@ const SessionWizard = ({
       const visibleKeys = getVisibleSessionWizardContractKeys(contracts, defaults);
       const isCollapsed = metadataObjectCollapsed.contracts;
       return (
-        <div key={keyString} className={styles.objectGroup}>
-          <div className={styles.objectHeader}>
-            <div className={styles.objectTitle}>{displayLabel}</div>
-            <button
-              type="button"
-              className={styles.objectToggle}
-              onClick={() =>
-                setMetadataObjectCollapsed((prev) => ({ ...prev, contracts: !prev.contracts }))
-              }
-              aria-label={`${displayLabel} ${isCollapsed ? 'expand' : 'collapse'}`}
-            >
-              <FontAwesomeIcon icon={isCollapsed ? faCaretDown : faCaretUp} />
-            </button>
-          </div>
-          {!isCollapsed && (
-            <div className={styles.contractsGrid}>
-              {visibleKeys.length ? visibleKeys.map((contractKey) => {
-                const entry = contracts[contractKey] || {};
-                const address = toStr(entry.address || '').trim() || toStr(defaults?.[contractKey] || '').trim();
-                const contractTooltipId = `gw-contract-tooltip-${contractKey}`;
-                const contractLabel = formatContractLabel(contractKey);
-                return (
-                  <div
-                    key={contractKey}
-                    className={styles.contractRow}
-                    data-testid={getSessionWizardContractRowTestId(contractKey)}
-                  >
-                    <div className={styles.contractRowHeader}>
-                      <div className={styles.contractLabelActions}>
-                        <div className={styles.contractLabel}>{contractLabel}</div>
-                        <div className={styles.contractActions}>
-                          {renderSessionWizardInfoTooltip({
-                            id: contractTooltipId,
-                            content: getContractExplainer(contractKey),
-                            placement: 'right',
-                            testId: getSessionWizardContractTooltipTestId(contractKey),
-                            ariaLabel: `${contractLabel} contract info`,
-                          })}
-                          <button
-                            type="button"
-                            className={`${styles.iconButton} ${styles.contractActionButton}`}
-                            onClick={() => openContractViewerModal(contractKey)}
-                            aria-label={`Open ${contractLabel} contract details`}
-                            title={`Open ${contractLabel} contract details`}
-                            data-testid={getSessionWizardContractModalTriggerTestId(contractKey)}
-                          >
-                            <FontAwesomeIcon icon={faExternalLinkAlt} />
-                          </button>
-                        </div>
-                      </div>
+        <ContractsSection
+          key={keyString}
+          title={displayLabel}
+          contracts={contracts}
+          defaults={defaults}
+          visibleKeys={visibleKeys}
+          isCollapsed={isCollapsed}
+          onToggleCollapsed={() =>
+            setMetadataObjectCollapsed((prev) => ({ ...prev, contracts: !prev.contracts }))
+          }
+          toggleAriaLabel={`${displayLabel} ${isCollapsed ? 'expand' : 'collapse'}`}
+          renderContractEntry={(contractKey) => {
+            const entry = contracts[contractKey] || {};
+            const address = toStr(entry.address || '').trim() || toStr(defaults?.[contractKey] || '').trim();
+            const contractTooltipId = `gw-contract-tooltip-${contractKey}`;
+            const contractLabel = formatContractLabel(contractKey);
+            return (
+              <div
+                key={contractKey}
+                className={styles.contractRow}
+                data-testid={getSessionWizardContractRowTestId(contractKey)}
+              >
+                <div className={styles.contractRowHeader}>
+                  <div className={styles.contractLabelActions}>
+                    <div className={styles.contractLabel}>{contractLabel}</div>
+                    <div className={styles.contractActions}>
+                      {renderSessionWizardInfoTooltip({
+                        id: contractTooltipId,
+                        content: getContractExplainer(contractKey),
+                        placement: 'right',
+                        testId: getSessionWizardContractTooltipTestId(contractKey),
+                        ariaLabel: `${contractLabel} contract info`,
+                      })}
+                      <button
+                        type="button"
+                        className={`${styles.iconButton} ${styles.contractActionButton}`}
+                        onClick={() => openContractViewerModal(contractKey)}
+                        aria-label={`Open ${contractLabel} contract details`}
+                        title={`Open ${contractLabel} contract details`}
+                        data-testid={getSessionWizardContractModalTriggerTestId(contractKey)}
+                      >
+                        <FontAwesomeIcon icon={faExternalLinkAlt} />
+                      </button>
                     </div>
-                    <Input
-                      className={styles.contractInput}
-                      value={address}
-                      placeholder="0x..."
-                      onChange={(e) => updateDraftValue(['contracts', contractKey, 'address'], e.target.value)}
-                    />
                   </div>
-                );
-              }) : (
-                <div className={styles.helperText}>No contract defaults available for this chain.</div>
-              )}
-            </div>
-          )}
-        </div>
+                </div>
+                <Input
+                  className={styles.contractInput}
+                  value={address}
+                  placeholder="0x..."
+                  onChange={(e) => updateDraftValue(['contracts', contractKey, 'address'], e.target.value)}
+                />
+              </div>
+            );
+          }}
+        />
       );
     }
 
@@ -5228,33 +5119,35 @@ const SessionWizard = ({
         .filter(Boolean);
       const isContractsBlock = path.length === 0 && key === 'contracts';
       const isCollapsed = isContractsBlock && metadataObjectCollapsed.contracts;
+      if (isContractsBlock) {
+        return (
+          <ContractsSection
+            key={keyString}
+            title={displayLabel}
+            variant="object"
+            childNodes={childNodes}
+            emptyMessage="No editable fields in this section yet."
+            isCollapsed={isCollapsed}
+            onToggleCollapsed={() =>
+              setMetadataObjectCollapsed((prev) => ({ ...prev, contracts: !prev.contracts }))
+            }
+          />
+        );
+      }
       return (
         <div key={keyString} className={styles.objectGroup}>
           <div className={styles.objectHeader}>
             <div className={styles.objectTitle}>{displayLabel}</div>
-            {isContractsBlock && (
-              <button
-                type="button"
-                className={styles.objectToggle}
-                onClick={() =>
-                  setMetadataObjectCollapsed((prev) => ({ ...prev, contracts: !prev.contracts }))
-                }
-              >
-                <FontAwesomeIcon icon={isCollapsed ? faCaretDown : faCaretUp} />
-              </button>
+          </div>
+          <div className={styles.objectBody}>
+            {childNodes.length ? childNodes : (
+              <div className={styles.helperText}>
+                {key === 'arweave' && workerSecretsEnabled
+                  ? 'Arweave keys are stored in worker secrets.'
+                  : 'No editable fields in this section yet.'}
+              </div>
             )}
           </div>
-          {!isCollapsed && (
-            <div className={styles.objectBody}>
-              {childNodes.length ? childNodes : (
-                <div className={styles.helperText}>
-                  {key === 'arweave' && workerSecretsEnabled
-                    ? 'Arweave keys are stored in worker secrets.'
-                    : 'No editable fields in this section yet.'}
-                </div>
-              )}
-            </div>
-          )}
         </div>
       );
     }
@@ -5288,55 +5181,67 @@ const SessionWizard = ({
             label="Image"
             labelPrefix={<FontAwesomeIcon icon={faImage} className={styles.compactSessionHeaderIcon} />}
           >
-            {renderCompactSessionHeaderField()}
+            <SessionHeaderField
+              compact
+              value={draft?.sessionHeader}
+              sessionHeaderMode={sessionHeaderMode}
+              compactSessionHeaderMode={compactSessionHeaderMode}
+              sessionHeaderPreviewSrc={sessionHeaderPreviewSrc}
+              sessionHeaderUploadStatus={sessionHeaderUploadStatus}
+              sessionHeaderUploadStatusTone={sessionHeaderUploadStatusTone}
+              compactSessionHeaderInputRef={compactSessionHeaderInputRef}
+              onCompactUrlChange={(event) => {
+                updateDraftValue(['sessionHeader'], event.target.value);
+                setSessionHeaderStatus('');
+              }}
+              onToggleCompactUrlMode={() => {
+                setCompactSessionHeaderMode((prev) => (prev === 'url' ? 'idle' : 'url'));
+                setSessionHeaderMode('url');
+                setSessionHeaderFile(null);
+                setSessionHeaderStatus('');
+              }}
+              onPaste={handlePasteSessionHeaderFromClipboard}
+              onCompactUploadClick={() => {
+                setCompactSessionHeaderMode('idle');
+                setSessionHeaderMode('upload');
+                setSessionHeaderStatus('');
+                if (compactSessionHeaderInputRef.current) {
+                  compactSessionHeaderInputRef.current.click();
+                }
+              }}
+              onCompactFileChange={(event) => {
+                setSessionHeaderMode('upload');
+                setSessionHeaderFile(event.target.files?.[0] || null);
+                setSessionHeaderStatus('');
+              }}
+              onClear={handleClearSessionHeaderPreview}
+            />
           </LockableFieldFrame>
         );
       }
       return (
         <LockableFieldFrame key={keyString} {...fieldFrameProps}>
-          <div className={styles.inlineToggleRow}>
-            <Label className={styles.workerRadio}>
-                <Input
-                  type="radio"
-                  name="sessionHeaderMode"
-                  checked={sessionHeaderMode === 'url'}
-                  onChange={() => {
-                    setSessionHeaderMode('url');
-                    setSessionHeaderFile(null);
-                    setSessionHeaderStatus('');
-                  }}
-                />
-                Use URL
-              </Label>
-              <Label className={styles.workerRadio}>
-                <Input
-                  type="radio"
-                  name="sessionHeaderMode"
-                  checked={sessionHeaderMode === 'upload'}
-                  onChange={() => {
-                    setSessionHeaderMode('upload');
-                    setSessionHeaderStatus('');
-                  }}
-                />
-                Upload file
-              </Label>
-          </div>
-          {sessionHeaderMode === 'url' ? (
-            <Input
-              value={value == null ? '' : value}
-              onChange={(e) => updateDraftValue(currentPath, e.target.value)}
-              placeholder="https://..."
-              data-testid={E2E_TESTIDS.WIZARD_SESSION_HEADER_URL}
-            />
-          ) : (
-            <Input
-              type="file"
-              accept="image/*"
-              onChange={(e) => setSessionHeaderFile(e.target.files?.[0] || null)}
-            />
-          )}
-          {renderSessionHeaderPreviewSurface()}
-          {sessionHeaderUploadStatus && <div className={styles.statusNote}>{sessionHeaderUploadStatus}</div>}
+          <SessionHeaderField
+            value={value}
+            sessionHeaderMode={sessionHeaderMode}
+            compactSessionHeaderMode={compactSessionHeaderMode}
+            sessionHeaderPreviewSrc={sessionHeaderPreviewSrc}
+            sessionHeaderUploadStatus={sessionHeaderUploadStatus}
+            sessionHeaderUploadStatusTone={sessionHeaderUploadStatusTone}
+            onUrlChange={(e) => updateDraftValue(currentPath, e.target.value)}
+            onUseUrlMode={() => {
+              setSessionHeaderMode('url');
+              setSessionHeaderFile(null);
+              setSessionHeaderStatus('');
+            }}
+            onUseUploadMode={() => {
+              setSessionHeaderMode('upload');
+              setSessionHeaderStatus('');
+            }}
+            onAdvancedFileChange={(e) => setSessionHeaderFile(e.target.files?.[0] || null)}
+            onClear={handleClearSessionHeaderPreview}
+            onExpandPreview={() => setSessionHeaderPreviewModalOpen(true)}
+          />
         </LockableFieldFrame>
       );
     }
