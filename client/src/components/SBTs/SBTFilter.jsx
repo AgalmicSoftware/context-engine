@@ -5,7 +5,6 @@ import { FormGroup, Label, Input, Button } from 'reactstrap';
 import styles from './SBTSelector.module.scss';
 import SBTSelector from './SBTSelector.jsx';
 import contractScripts, { getSessionChainId, getSessionSlugByName, normalizeSessionSlug } from '../../utilities/web3/contractScripts.js';
-import proposalScripts from '../../utilities/proposalScripts';
 import { resolveSbtDisplayLabel } from '../../utilities/sbt/sbtDisplayNames.js';
 
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';

@@ -22,7 +22,7 @@ import { hasCachedCreateSbtForm } from '../../utilities/sbt/sbtCreateFormCache.j
 import { getSbtDisplayName } from '../../utilities/sbt/sbtDisplayNames.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { readSessionScanScope, readSessionScanSlugs } from '../../utilities/session/sessionScanScope.js';
-import proposalScripts from '../../utilities/proposalScripts.js';
+import { getShortenedAddress } from '../../utilities/ui/displayHelpers.js';
 import { isCryptoMode, sbtsListPath, t } from '../../utilities/ui/terminology.js';
 import defaultSbtImage from '../../assets/img/ce_circuit_logo.png';
 import {
@@ -689,24 +689,17 @@ const isSessionAutoFeatureEnabled = (sessionConfig = null) => (
                 <div className={styles.sbtGrid}>
                 {featuredRenderEntries.map(({ kind, entry }, index: number) => {
                   if (kind === 'cache') {
-                    const {
-                      imageUrl,
-                      isMintingActive,
-                      isPasswordLocked,
-                      resolvedSessionSlug,
-                      sbtAddress,
-                      sbtKey,
-                      sbtName,
-                      shortenedAddress,
-                    } = buildCacheFeaturedCardModel({
-                      defaultImage: defaultSbtImage,
-                      effectiveSessionSlug,
-                      entry,
-                      getDisplayName: getSbtDisplayName,
-                      getShortAddress: getShortenedAddress,
-                      index,
-                      sbtLabel: t('sbt'),
-                    });
+                    const sbt = entry?.sbt || null;
+                    const sbtInfo = sbt?.sbtInfo || {};
+                    const sbtAddress = String(entry?.address || '').trim();
+                    const resolvedSessionSlug = normalizeSessionSlug(entry?.sessionSlug || effectiveSessionSlug || '');
+                    const sbtKey = `${resolvedSessionSlug || 'general'}:${String(sbtAddress || '').toLowerCase() || index}`;
+                    const imageUrl = normalizeFeaturedCardImageUrl(sbtInfo?.image) || defaultSbtImage;
+                    const sbtName = getSbtDisplayName(sbtInfo) || `Unnamed ${t('sbt')}`;
+                    const shortenedAddress = getShortenedAddress(sbtAddress, false);
+                    const mintingEndTime = Number(sbtInfo?.mintingEndTime || 0);
+                    const isMintingActive = mintingEndTime === 0 || mintingEndTime > Math.floor(Date.now() / 1000);
+                    const isPasswordLocked = !!(sbtInfo?.hasPasswordMint);
                     return (
                       <a
                         key={sbtKey}

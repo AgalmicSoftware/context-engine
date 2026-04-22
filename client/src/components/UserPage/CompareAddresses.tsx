@@ -499,7 +499,7 @@ const formatRatingValue = (val: unknown, scale: number | null): string => {
 const buildQuestionEntries = (users: CompareUser[] = [], labels: string[] = []): CompareQuestionEntry[] => {
   const map = new Map<string, CompareQuestionEntry>();
   (users || []).forEach((u, idx) => {
-    const label = String(labels[idx] || getShortenedAddress(u?.address || '', false) || `User ${idx + 1}`);
+    const label = labels[idx] || getShortenedAddress(u?.address || '', false) || `User ${idx + 1}`;
     (Array.isArray(u?.questions) ? u.questions : []).forEach((q) => {
       const qidRaw = q?.id || q?.questionID || q?.questionId || q?.qId;
       if (!qidRaw) return;
