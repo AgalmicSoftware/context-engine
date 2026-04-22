@@ -2,7 +2,7 @@ import React from 'react';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { createStore } from 'redux';
-import CETooltip from './CETooltip.jsx';
+import CETooltip from './CETooltip';
 
 jest.mock('reactstrap', () => ({
   UncontrolledTooltip: ({ children, target }) => (

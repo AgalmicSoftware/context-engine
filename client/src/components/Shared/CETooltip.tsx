@@ -1,9 +1,18 @@
 import React, { useContext } from 'react';
 import { ReactReduxContext, useSelector } from 'react-redux';
 import { UncontrolledTooltip } from 'reactstrap';
+import type { UncontrolledTooltipProps } from 'reactstrap';
 
-const CETooltipEnabled = (props) => {
-  const enabled = useSelector((state) => state?.sessionState?.tooltipsEnabled !== false);
+type TooltipPreferenceState = {
+  sessionState?: {
+    tooltipsEnabled?: boolean;
+  };
+};
+
+const CETooltipEnabled = (props: UncontrolledTooltipProps) => {
+  const enabled = useSelector<TooltipPreferenceState, boolean>(
+    (state) => state.sessionState?.tooltipsEnabled !== false
+  );
 
   React.useEffect(() => {
     if (!enabled && typeof document !== 'undefined') {
@@ -17,7 +26,7 @@ const CETooltipEnabled = (props) => {
   return <UncontrolledTooltip {...props} />;
 };
 
-const CETooltip = (props) => {
+const CETooltip = (props: UncontrolledTooltipProps) => {
   const reduxContext = useContext(ReactReduxContext);
   if (!reduxContext?.store) return <UncontrolledTooltip {...props} />;
   return <CETooltipEnabled {...props} />;
