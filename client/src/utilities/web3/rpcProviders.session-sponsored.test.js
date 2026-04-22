@@ -15,6 +15,7 @@ import {
 import { checkSponsoredAccess } from './sponsoredAccess.js';
 
 const ROOT_RPC_URL = 'https://session-sponsored.example/rpc';
+const FAILING_ROOT_RPC_URL = 'https://session-sponsored-failing.example/rpc';
 const PATH_DEFAULT_BASE_SEPOLIA = 'https://base-sepolia-testnet.api.pocket.network';
 const RESTRICTED_SBT = '0x0000000000000000000000000000000000000A11';
 const OTHER_RESTRICTED_SBT = '0x0000000000000000000000000000000000000A12';
@@ -140,6 +141,52 @@ describe('rpcProviders session-sponsored reads', () => {
       sessionRpcSource: 'root',
     }));
     expect(provider?.__CE_RPC_CACHE_KEY).not.toContain(cfg.slug);
+  });
+
+  it('falls back to public PATH reads when the sponsored root RPC returns a malformed call exception', async () => {
+    const cfg = buildWizardShapedRpcCfg({
+      slug: 'session-sponsored-rpc-open-failing-root',
+      rootRpcUrl: FAILING_ROOT_RPC_URL,
+      registry: {
+        gateAuthority: 'onchain',
+        gatesByResource: {
+          rpc: {
+            lookupStatus: 'ok',
+            sbtAddresses: [],
+            mode: 'any',
+            chainId: 84532,
+          },
+        },
+      },
+    });
+
+    const provider = getReadProviderForGroup(cfg);
+    const rootConfig = provider.providerConfigs.find(
+      (entry) => entry?.provider?.connection?.url === FAILING_ROOT_RPC_URL
+    );
+    const pathConfig = provider.providerConfigs.find(
+      (entry) => entry?.provider?.connection?.url === PATH_DEFAULT_BASE_SEPOLIA
+    );
+
+    const sponsoredError = new Error(
+      'missing revert data in call exception; Transaction reverted without a reason string'
+    );
+    sponsoredError.code = 'CALL_EXCEPTION';
+    rootConfig.provider.send = jest.fn(async (method) => {
+      if (method === 'eth_chainId') return '0x14a34';
+      if (method === 'net_version') return '84532';
+      throw sponsoredError;
+    });
+    pathConfig.provider.send = jest.fn(async (method) => {
+      if (method === 'eth_chainId') return '0x14a34';
+      if (method === 'net_version') return '84532';
+      if (method === 'eth_blockNumber') return '0x64';
+      return '0x';
+    });
+
+    await expect(provider.getBlockNumber()).resolves.toBe(100);
+    expect(rootConfig.provider.send).toHaveBeenCalledWith('eth_blockNumber', []);
+    expect(pathConfig.provider.send).toHaveBeenCalledWith('eth_blockNumber', []);
   });
 
   it('keeps a truly custom PATH override ahead of sponsored session root RPC', () => {

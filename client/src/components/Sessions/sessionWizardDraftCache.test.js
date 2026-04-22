@@ -1,4 +1,5 @@
 import {
+  SESSION_WIZARD_DRAFT_CACHE_MAX_BYTES,
   SESSION_WIZARD_CACHE_KEY,
   clearSessionWizardDraftCache,
   readSessionWizardDraftCache,
@@ -21,6 +22,26 @@ const createMemoryStorage = () => {
 describe('sessionWizardDraftCache', () => {
   it('preserves the legacy SessionWizard draft key', () => {
     expect(SESSION_WIZARD_CACHE_KEY).toBe('ce:sessionWizardDraft:v1');
+  });
+
+  it('uses a wizard-sized cache budget instead of the generic JSON helper default', () => {
+    expect(SESSION_WIZARD_DRAFT_CACHE_MAX_BYTES).toBe(4 * 1024 * 1024);
+    const storage = createMemoryStorage();
+    const payload = {
+      draft: {
+        slug: 'large-draft',
+        sessionName: 'Large Draft',
+        sessionInfo: 'x'.repeat((256 * 1024) + 1),
+      },
+    };
+
+    const result = writeSessionWizardDraftCache(payload, { storage });
+
+    expect(result).toEqual(expect.objectContaining({
+      ok: true,
+      key: SESSION_WIZARD_CACHE_KEY,
+    }));
+    expect(readSessionWizardDraftCache({ storage })).toEqual(payload);
   });
 
   it('reads and writes draft payloads through JSON storage helpers', () => {
