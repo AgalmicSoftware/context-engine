@@ -51,14 +51,14 @@ jest.mock('../HooksHOC/withWagmiBridge', () => ({
   WagmiHooksHOC: (Comp) => Comp,
 }));
 
-jest.mock('../Navbar/Navbar', () => () => null);
-jest.mock('../MainContent/MainAreaTabs', () => () => null);
-jest.mock('../Onboarding/OnboardingOverlay', () => () => null);
-jest.mock('../Footer/Footer', () => () => null);
-jest.mock('../UserPage/SimUserPage', () => () => null);
+jest.mock('../Navbar/Navbar.jsx', () => () => null);
+jest.mock('../MainContent/MainAreaTabs.jsx', () => () => null);
+jest.mock('../Onboarding/OnboardingOverlay.jsx', () => () => null);
+jest.mock('../Footer/Footer.jsx', () => () => null);
+jest.mock('../UserPage/SimUserPage.jsx', () => () => null);
 jest.mock('../Shared/LazyFallback', () => () => null);
-jest.mock('../E2E/DevE2eNav', () => () => null);
-jest.mock('../ErrorBoundary/RouteErrorBoundary', () => ({
+jest.mock('../E2E/DevE2eNav.jsx', () => () => null);
+jest.mock('../ErrorBoundary/RouteErrorBoundary.jsx', () => ({
   __esModule: true,
   default: ({ children }) => children,
 }));
