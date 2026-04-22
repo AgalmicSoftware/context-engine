@@ -65,7 +65,6 @@ describe('sessionStateReducer', () => {
       demoSurfaceMode: true,
       loginModalToggled: false,
       afterLoginModalToggled: false,
-      settingsModalToggled: false,
       primarySessionSlug: initialSelection.primarySessionSlug,
       primarySessionExplicit: initialSelection.primarySessionExplicit,
       activeSessionSlug: initialSelection.activeSessionSlug,
