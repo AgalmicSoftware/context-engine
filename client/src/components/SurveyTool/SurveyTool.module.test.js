@@ -494,12 +494,13 @@ describe('SurveyTool module', () => {
     expect(hiddenFooter).toBeNull();
   });
 
-  it('replaces the pile submit button with a centered success checkmark after submit', () => {
+  it('links the pile success checkmark to the submitted responder user page after submit', () => {
+    const responderAddress = '0xABCDEFABCDEFABCDEFABCDEFABCDEFABCDEFABCD';
     const shell = new SurveyTool({
       minifiedMode: 'pile',
       network: { id: 84532 },
       networkChainId: 84532,
-      account: '0x1111111111111111111111111111111111111111',
+      account: responderAddress,
       questionResponsesNonce: 5,
       onFilterChange: jest.fn(),
     });
@@ -540,11 +541,61 @@ describe('SurveyTool module', () => {
 
     expect(submitButton).toBeNull();
     expect(successBadge).not.toBeNull();
+    expect(successBadge?.type).toBe('a');
+    expect(successBadge?.props?.href).toBe(`/u/${responderAddress.toLowerCase()}`);
+    expect(successBadge?.props?.['data-testid']).toBe(E2E_TESTIDS.SURVEY_SUBMITTED_INDICATOR);
+    expect(successBadge?.props?.['aria-label']).toBe('View your submitted responses');
+    expect(successBadge?.props?.title).toBe('View your submitted responses');
+    expect(successIcon).not.toBeNull();
+    expect(hiddenFooter).toBeNull();
+  });
+
+  it('keeps the pile success checkmark non-clickable when no responder address is available', () => {
+    const shell = new SurveyTool({
+      minifiedMode: 'pile',
+      network: { id: 84532 },
+      networkChainId: 84532,
+      account: '',
+      questionResponsesNonce: 5,
+      onFilterChange: jest.fn(),
+    });
+    const pileElement = shell.render();
+    const PileViewModeClass = pileElement.type;
+    const subject = new PileViewModeClass(pileElement.props);
+    const visibleList = [{ id: 'q1', type: 'freeform', prompt: 'Q1' }];
+
+    subject.isMaskedPromptText = jest.fn(() => false);
+    subject.getPendingStatsSnapshot = jest.fn(() => ({ total: 0, encrypted: 0 }));
+    subject.state = {
+      ...subject.state,
+      loading: false,
+      pileQuestions: visibleList,
+      allQuestionsForFilter: visibleList,
+      activePileIndex: 0,
+      filterState: {},
+      isFilterActive: false,
+      showCreate: false,
+      filterModalOpen: false,
+      submissionComplete: true,
+      submittedSinceLastEdit: true,
+      isSubmitting: false,
+      autoDecryptEnabled: false,
+      autoDecryptAttempted: {},
+      decryptingByKey: {},
+      isHydratingPriorResponses: false,
+    };
+
+    const tree = subject.render();
+    const successBadge = findNodeByClassName(tree, 'pileSubmitSuccessBadge');
+    const successIcon = findNodeByClassName(tree, 'pileSubmitSuccessIcon');
+
+    expect(successBadge).not.toBeNull();
+    expect(successBadge?.type).toBe('div');
+    expect(successBadge?.props?.href).toBeUndefined();
     expect(successBadge?.props?.['data-testid']).toBe(E2E_TESTIDS.SURVEY_SUBMITTED_INDICATOR);
     expect(successBadge?.props?.role).toBe('status');
     expect(successBadge?.props?.['aria-label']).toBe('Submitted');
     expect(successIcon).not.toBeNull();
-    expect(hiddenFooter).toBeNull();
   });
 
   it('keeps pile action opacity scoped to buttons and anchors the mini spinner outside the controls stack', () => {

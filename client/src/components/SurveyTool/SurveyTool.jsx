@@ -15714,6 +15714,14 @@ class PileViewMode extends SurveyQuestions {
       !pileSubmittedStateActive
     );
     const finalSubmitText = this.state.pileSubmitTempText || pileSubmitLabel;
+    const pileSubmitResponderAddress = String(this.props.account || '').trim();
+    const pileSubmitResponderAddressLower =
+      pileSubmitResponderAddress && utils.isAddress(pileSubmitResponderAddress)
+        ? pileSubmitResponderAddress.toLowerCase()
+        : '';
+    const pileSubmitResponderHref = pileSubmitResponderAddressLower
+      ? `/u/${pileSubmitResponderAddressLower}`
+      : '';
 
     const handleSubmitClick = async () => {
       if (!this.props.loginComplete) {
@@ -15848,15 +15856,27 @@ class PileViewMode extends SurveyQuestions {
     const footerControls = (
       <div className={`${styles.pileFooter}${pileTopRailVisible ? '' : ` ${styles.pileFooterHidden}`}`}>
         {showPileSubmitSuccessBadge ? (
-          <div
-            className={styles.pileSubmitSuccessBadge}
-            data-testid={E2E_TESTIDS.SURVEY_SUBMITTED_INDICATOR}
-            role="status"
-            aria-label="Submitted"
-            title="Submitted"
-          >
-            <FontAwesomeIcon icon={faCheck} className={styles.pileSubmitSuccessIcon} />
-          </div>
+          pileSubmitResponderHref ? (
+            <a
+              href={pileSubmitResponderHref}
+              className={styles.pileSubmitSuccessBadge}
+              data-testid={E2E_TESTIDS.SURVEY_SUBMITTED_INDICATOR}
+              aria-label="View your submitted responses"
+              title="View your submitted responses"
+            >
+              <FontAwesomeIcon icon={faCheck} className={styles.pileSubmitSuccessIcon} />
+            </a>
+          ) : (
+            <div
+              className={styles.pileSubmitSuccessBadge}
+              data-testid={E2E_TESTIDS.SURVEY_SUBMITTED_INDICATOR}
+              role="status"
+              aria-label="Submitted"
+              title="Submitted"
+            >
+              <FontAwesomeIcon icon={faCheck} className={styles.pileSubmitSuccessIcon} />
+            </div>
+          )
         ) : (
           <Button
             onClick={handleSubmitClick}
