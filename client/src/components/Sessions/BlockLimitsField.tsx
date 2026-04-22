@@ -1,7 +1,25 @@
-/** @file BlockLimitsField.jsx */
+/** @file BlockLimitsField.tsx */
 import React from 'react';
 import { FormGroup, Input, Label } from 'reactstrap';
 import styles from './SessionWizard.module.scss';
+
+type BlockNumberValue = number | string | null | undefined;
+
+export type BlockLimitsFieldProps = {
+  blockLimits?: {
+    start?: BlockNumberValue;
+    end?: BlockNumberValue;
+  } | null;
+  onStartChange: (value: string) => void;
+  blockLimitDuration: number | string;
+  blockLimitUnit: string;
+  onDurationChange: (value: string) => void;
+  onUnitChange: (value: string) => void;
+  latestChainBlock?: BlockNumberValue;
+  latestBlockStatus?: React.ReactNode;
+  label: React.ReactNode;
+  tooltipControl?: React.ReactNode;
+};
 
 const BlockLimitsField = ({
   blockLimits,
@@ -14,7 +32,7 @@ const BlockLimitsField = ({
   latestBlockStatus,
   label,
   tooltipControl,
-}) => {
+}: BlockLimitsFieldProps) => {
   const startValue = blockLimits?.start ?? '';
   const endValue = blockLimits?.end ?? null;
 
@@ -32,7 +50,7 @@ const BlockLimitsField = ({
           <Input
             type="number"
             value={startValue == null ? '' : startValue}
-            onChange={(e) => onStartChange(e.target.value)}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => onStartChange(e.target.value)}
           />
           {latestChainBlock != null && (
             <div className={styles.helperText}>
@@ -48,13 +66,13 @@ const BlockLimitsField = ({
               type="number"
               value={blockLimitDuration}
               min="0"
-              onChange={(e) => onDurationChange(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => onDurationChange(e.target.value)}
               placeholder="0"
             />
             <Input
               type="select"
               value={blockLimitUnit}
-              onChange={(e) => onUnitChange(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => onUnitChange(e.target.value)}
             >
               <option value="minutes">minutes</option>
               <option value="hours">hours</option>
