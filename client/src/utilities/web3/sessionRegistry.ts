@@ -30,7 +30,10 @@ import { litStorage } from '../crypto/litProtocol.js';
 import { cryptoUtils } from '../crypto/cryptography.js';
 import { normalizeSessionNaming, stripAuthoritativeSessionGateFields } from '../session/sessionMetadata.js';
 import { overlayCachedSessionWorkerConfig } from '../session/sessionWorkerConfigCache.js';
-import { mergeSessionContractMaps } from '../session/sessionNaming.js';
+import {
+  mergeSessionContractMaps,
+  validateRegistrySessionSlugForWrite,
+} from '../session/sessionNaming.js';
 import { toStr } from '../shared/primitives.js';
 import { createLogger } from '../logging.js';
 import { wrapEthersJsonRpcSend } from './rpcReadCache.js';
@@ -1523,9 +1526,11 @@ export const registerSessionOnChain = async ({
   if (!registryAddress) {
     throw new Error('Session registry address not configured for this chain.');
   }
-  const rawSlug = toStr(slug).trim();
-  // Empty slug maps to "general" on-chain; metadata can keep ''.
-  const registrySlug = toRegistrySlug(rawSlug);
+  const slugValidation = validateRegistrySessionSlugForWrite(slug);
+  if (!slugValidation.ok) {
+    throw new Error(slugValidation.error || 'Invalid session slug.');
+  }
+  const registrySlug = slugValidation.slug;
   const sessionIdHex = normalizeSessionIdHex(sessionId);
   if (!sessionIdHex) {
     throw new Error('Session ID (UUID) is required.');
