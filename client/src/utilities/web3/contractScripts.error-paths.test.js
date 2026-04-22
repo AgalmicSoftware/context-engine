@@ -265,6 +265,13 @@ describe('error paths', () => {
     );
   });
 
+  it('keeps legacy unknown provider fallback isolated in getProviderLocation compatibility wrapper', () => {
+    const injectedProvider = makeRpcProvider();
+    window.ethereum = injectedProvider;
+
+    expect(contractScripts.getProviderLocation('legacy-extension')).toBe(injectedProvider);
+  });
+
   it('throws submitResponses RPC timeouts instead of failing silently', async () => {
     const timeoutError = Object.assign(new Error('RPC timeout while broadcasting transaction.'), {
       code: 'NETWORK_ERROR',
