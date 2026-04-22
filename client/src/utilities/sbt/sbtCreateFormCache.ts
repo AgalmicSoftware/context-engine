@@ -6,14 +6,6 @@ import {
 const LEGACY_CREATE_SBT_FORM_CACHE_KEY = 'createSbtFormCache';
 const SCOPED_CREATE_SBT_FORM_CACHE_KEY_PREFIX = 'dg:createSbtFormCache:';
 
-type StorageLike = {
-  getItem: (key: string) => string | null;
-  setItem: (key: string, value: string) => void;
-  removeItem: (key: string) => void;
-};
-
-type CreateSbtDraftPayload = Record<string, unknown>;
-
 export const CREATE_SBT_FORM_CACHE_LEGACY_POLICY = Object.freeze({
   legacyKey: LEGACY_CREATE_SBT_FORM_CACHE_KEY,
   scopedKeyPrefix: SCOPED_CREATE_SBT_FORM_CACHE_KEY_PREFIX,
@@ -22,11 +14,7 @@ export const CREATE_SBT_FORM_CACHE_LEGACY_POLICY = Object.freeze({
   removeAfter: 'one public release after scoped create-SBT draft writes are verified',
 });
 
-const isRecord = (value: unknown): value is Record<string, unknown> => (
-  !!value && typeof value === 'object'
-);
-
-const getSessionStorage = (storageIn?: StorageLike | null): StorageLike | null => {
+const getSessionStorage = (storageIn) => {
   if (storageIn !== undefined) return storageIn;
   try {
     if (typeof window !== 'undefined' && window.sessionStorage) return window.sessionStorage;
