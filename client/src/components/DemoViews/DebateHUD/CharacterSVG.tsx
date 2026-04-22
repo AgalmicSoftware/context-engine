@@ -2,10 +2,19 @@ import React from 'react';
 
 import { darkTheme as T, soften, useTheme } from './debateHudTheme';
 
-export const CharacterSVG = ({ name, size = 80 }) => {
+type CharacterSVGProps = {
+  name: string;
+  size?: number;
+};
+
+type AvatarProps = CharacterSVGProps & {
+  color: string;
+};
+
+export const CharacterSVG = ({ name, size = 80 }: CharacterSVGProps) => {
   useTheme();
 
-  const svgs = {
+  const svgs: Record<string, React.ReactElement> = {
     "Condorcet": (
       <svg viewBox="0 0 80 80" style={{ width: size, height: size }}>
         <defs>
@@ -146,7 +155,7 @@ export const CharacterSVG = ({ name, size = 80 }) => {
   return svgs[name] || <div style={{ width: size, height: size, background: T.border, borderRadius: 8 }} />;
 };
 
-export const Avatar = ({ name, color, size = 36 }) => {
+export const Avatar = ({ name, color, size = 36 }: AvatarProps) => {
   useTheme();
 
   const hasSVG = ["Condorcet", "David Hume", "Machiavelli", "William of Ockham", "Mary Shelley", "John Stuart Mill"].includes(name);
@@ -162,7 +171,7 @@ export const Avatar = ({ name, color, size = 36 }) => {
     );
   }
 
-  const initials = name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
+  const initials = name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
   return (
     <div style={{
       width: size, height: size, borderRadius: "50%",
