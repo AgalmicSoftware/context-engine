@@ -1,5 +1,5 @@
 import { QuestionFilter } from './QuestionFilter';
-import GateTooltip from '../Gates/GateTooltip.jsx';
+import GateTooltip from '../Gates/GateTooltip';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import {
   initCacheManager,

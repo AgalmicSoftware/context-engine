@@ -1,9 +1,17 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
-import GateTooltip from './GateTooltip.jsx';
+import GateTooltip from './GateTooltip';
 
 jest.mock('reactstrap', () => ({
-  UncontrolledTooltip: ({ children, target, placement }) => (
+  UncontrolledTooltip: ({
+    children,
+    target,
+    placement,
+  }: {
+    children: React.ReactNode;
+    target: string;
+    placement: string;
+  }) => (
     <div data-testid="mock-gate-tooltip" data-target={target} data-placement={placement}>
       {children}
     </div>
@@ -11,7 +19,7 @@ jest.mock('reactstrap', () => ({
 }));
 
 jest.mock('../../utilities/sbt/sbtDisplayNames.js', () => ({
-  resolveSbtDisplayLabel: jest.fn(({ address }) => {
+  resolveSbtDisplayLabel: jest.fn(({ address }: { address?: string }) => {
     if (String(address || '').toLowerCase() === '0x1111111111111111111111111111111111111111') {
       return 'VIP SBT';
     }

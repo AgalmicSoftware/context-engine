@@ -1,6 +1,6 @@
 import SingleQuestionResponse from './SingleQuestionResponse.jsx';
 import styles from './SingleQuestionResponse.module.scss';
-import GateTooltip from '../Gates/GateTooltip.jsx';
+import GateTooltip from '../Gates/GateTooltip';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import { renderToStaticMarkup } from 'react-dom/server';
 import fs from 'fs';
