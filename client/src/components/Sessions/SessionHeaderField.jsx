@@ -3,7 +3,7 @@ import React from 'react';
 import { Input, Label } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faExpand, faTimes } from '@fortawesome/free-solid-svg-icons';
-import CompactImageChooser from '../Shared/CompactImageChooser.jsx';
+import CompactImageChooser from '../Shared/CompactImageChooser';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { toStr } from '../../utilities/shared/primitives.js';
 import styles from './SessionWizard.module.scss';
