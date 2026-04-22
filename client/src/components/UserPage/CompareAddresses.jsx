@@ -5,7 +5,7 @@ import { Collapse } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPlus, faSpinner, faExternalLinkAlt, faDownload } from '@fortawesome/free-solid-svg-icons';
 import styles from './UserPage.module.scss';
-import proposalScripts from 'utilities/proposalScripts.js';
+import { getShortenedAddress } from 'utilities/ui/displayHelpers.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
 
@@ -248,7 +248,7 @@ const formatRatingValue = (val, scale) => {
 const buildQuestionEntries = (users = [], labels = []) => {
   const map = new Map();
   (users || []).forEach((u, idx) => {
-    const label = labels[idx] || proposalScripts.getShortenedAddress(u?.address || '', false) || `User ${idx + 1}`;
+    const label = labels[idx] || getShortenedAddress(u?.address || '', false) || `User ${idx + 1}`;
     (Array.isArray(u?.questions) ? u.questions : []).forEach((q) => {
       const qidRaw = q?.id || q?.questionID || q?.questionId || q?.qId;
       if (!qidRaw) return;
@@ -722,7 +722,7 @@ const CompareAddress = ({ firstAddress, account, scanSpecificUserProfile }) => {
   const renderInputOrYouPill = (address, index) => {
     const isSelf = !!account && !!address && address.toLowerCase() === account.toLowerCase();
     if (isSelf) {
-      const short = proposalScripts.getShortenedAddress(address, false);
+      const short = getShortenedAddress(address, false);
       const blockieUrl = generateBlockieDataUrl(String(address || '').toLowerCase(), 8, 4);
       const title = `You (${short})`;
       return (
@@ -754,7 +754,7 @@ const CompareAddress = ({ firstAddress, account, scanSpecificUserProfile }) => {
     const nickname = nicknameByAddress.get(String(address || '').trim().toLowerCase()) || '';
 
     if (nickname) {
-      const shortened = String(proposalScripts.getShortenedAddress(address, false) || '').replace('...', '…');
+      const shortened = String(getShortenedAddress(address, false) || '').replace('...', '…');
       const title = `${nickname} (${shortened})`;
       const blockieUrl = generateBlockieDataUrl(String(address || '').toLowerCase(), 8, 4);
       return (
@@ -1339,7 +1339,7 @@ const CompareAddress = ({ firstAddress, account, scanSpecificUserProfile }) => {
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
             {bookmarks.map((b) => {
-              const short = proposalScripts.getShortenedAddress(b.address, false);
+              const short = getShortenedAddress(b.address, false);
               const blockieUrl = generateBlockieDataUrl(String(b.addressLower || b.address || '').toLowerCase(), 8, 4);
               const labelForTitle = b.label || short;
               const title = `${labelForTitle} (${short})`;

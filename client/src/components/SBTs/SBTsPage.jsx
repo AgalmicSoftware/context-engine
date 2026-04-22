@@ -23,7 +23,7 @@ import { normalizeArweaveUrl } from '../../utilities/arweave/arweaveUrls.js';
 import { getSbtDisplayName } from '../../utilities/sbt/sbtDisplayNames.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { readSessionScanScope, readSessionScanSlugs } from '../../utilities/session/sessionScanScope.js';
-import proposalScripts from '../../utilities/proposalScripts.js';
+import { getShortenedAddress } from '../../utilities/ui/displayHelpers.js';
 import { isCryptoMode, sbtsListPath, t } from '../../utilities/ui/terminology.js';
 import defaultSbtImage from '../../assets/img/ce_circuit_logo.png';
 
@@ -576,7 +576,7 @@ export class SBTsPage extends Component {
                     const sbtKey = `${resolvedSessionSlug || 'general'}:${String(sbtAddress || '').toLowerCase() || index}`;
                     const imageUrl = normalizeFeaturedCardImageUrl(sbtInfo?.image) || defaultSbtImage;
                     const sbtName = getSbtDisplayName(sbtInfo) || `Unnamed ${t('sbt')}`;
-                    const shortenedAddress = proposalScripts.getShortenedAddress(sbtAddress, false);
+                    const shortenedAddress = getShortenedAddress(sbtAddress, false);
                     const mintingEndTime = Number(sbtInfo?.mintingEndTime || 0);
                     const isMintingActive = mintingEndTime === 0 || mintingEndTime > Math.floor(Date.now() / 1000);
                     const isPasswordLocked = !!(sbtInfo?.hasPasswordMint);

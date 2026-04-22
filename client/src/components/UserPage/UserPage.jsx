@@ -17,7 +17,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 
 
-import proposalScripts from 'utilities/proposalScripts.js';
+import { getShortenedAddress } from 'utilities/ui/displayHelpers.js';
 import StatsSection from './UserStats';
 import CompareAddressSection from './CompareAddresses';
 import SBTPage from '../SBTs/SBTPage';
@@ -3356,7 +3356,7 @@ class UserPage extends Component {
         const sbtAddress = String(entry.sbtAddress || key || sbtInfo.sbtAddress || '');
         const preferredName = String(getSbtDisplayName(sbtInfo) || '').trim();
         const shortenedAddress = (sbtAddress && sbtAddress.length > 10)
-          ? proposalScripts.getShortenedAddress(sbtAddress, false)
+          ? getShortenedAddress(sbtAddress, false)
           : sbtAddress;
         const fallbackName = shortenedAddress ? `${t('sbt')} ${shortenedAddress}` : t('sbt');
         userSBTs.push({
@@ -4711,7 +4711,7 @@ class UserPage extends Component {
         ? username
         : (username && !isSimulated)
           ? username
-          : (propViewAddress ? proposalScripts.getShortenedAddress(propViewAddress, false) : '');
+          : (propViewAddress ? getShortenedAddress(propViewAddress, false) : '');
     const addressHref = minimized ? profileUrl : explorerUrl;
     const shouldLinkAddressLabel = !!addressHref;
     const addressDisplay = shouldLinkAddressLabel
