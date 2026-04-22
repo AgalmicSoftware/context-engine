@@ -12141,7 +12141,11 @@ export class MainSite extends Component {
               sbtScanProgressBySlug={this.state.sbtScanProgressBySlug}
               sbtRealtimeCoverageBySlug={this.state.sbtRealtimeCoverageBySlug}
               cacheInitializationError={cacheInitializationError}
-              autoFeatureSBTsWithFeaturedSbtTags={sessionConfig.autoFeatureSBTsWithFeaturedSbtTags}
+              autoFeatureSBTsBySessionSlug={
+                sessionConfig?.autoFeatureSBTsBySessionSlug !== undefined
+                  ? sessionConfig.autoFeatureSBTsBySessionSlug
+                  : sessionConfig?.autoFeatureSBTsWithFeaturedSbtTags
+              }
               routeQuestionsOpen={isQuestionsRoute}
               routeAutoOpenResults={isQuestionResultsRoute}
             />

@@ -11,7 +11,7 @@
     "defaultSbtTags": "",
     "defaultFilterState": null,
     "defaultFeaturedSBTs": [],
-    "autoFeatureSBTsWithFeaturedSbtTags": false,
+    "autoFeatureSBTsBySessionSlug": false,
     "HIGHLIGHTED_QUESTION_IDS": [],
     "BLOCKED_QUESTION_IDS": [],
     "HIGHLIGHTED_SURVEY_IDS": [],

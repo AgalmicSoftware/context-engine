@@ -136,8 +136,14 @@ const getDisplaySessionLists = (slugIn = '') => {
   };
 };
 
+const resolveAutoFeatureBySessionSlug = (metadata) => (
+  metadata?.autoFeatureSBTsBySessionSlug !== undefined
+    ? metadata.autoFeatureSBTsBySessionSlug
+    : metadata?.autoFeatureSBTsWithFeaturedSbtTags
+);
+
 const isSessionAutoFeatureEnabled = (sessionConfig = null) => (
-  sessionConfig?.autoFeatureSBTsWithFeaturedSbtTags !== false
+  resolveAutoFeatureBySessionSlug(sessionConfig) !== false
 );
 
 export class SBTsPage extends Component {
