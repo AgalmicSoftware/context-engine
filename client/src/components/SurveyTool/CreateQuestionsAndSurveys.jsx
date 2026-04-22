@@ -28,7 +28,7 @@ import {
 import styles from './CreateQuestionsAndSurveys.module.scss';
 import { arweaveScripts } from '../../utilities/arweave/arweaveScripts';
 import CETooltip from '../Shared/CETooltip';
-import CEConfirmDialog from '../Shared/CEConfirmDialog.jsx';
+import CEConfirmDialog from '../Shared/CEConfirmDialog';
 import { normalizeArweaveUrl, parseArweaveTxId } from '../../utilities/arweave/arweaveUrls.js';
 import contractScripts, { getSessionConfigBySlug, normalizeSessionSlug } from '../../utilities/web3/contractScripts.js';
 import {
