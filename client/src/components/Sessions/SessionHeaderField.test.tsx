@@ -1,10 +1,11 @@
 import React from 'react';
 import { createRef } from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
-import SessionHeaderField from './SessionHeaderField.jsx';
+import SessionHeaderField from './SessionHeaderField';
+import type { SessionHeaderFieldProps } from './SessionHeaderField';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
-const renderSessionHeaderField = (props = {}) => render(
+const renderSessionHeaderField = (props: Partial<SessionHeaderFieldProps> = {}) => render(
   <SessionHeaderField
     value="https://example.test/header.png"
     sessionHeaderMode="url"

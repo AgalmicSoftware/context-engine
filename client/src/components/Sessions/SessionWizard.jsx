@@ -8,7 +8,7 @@ import { faCaretDown, faCaretUp, faCheck, faCog, faCopy, faExclamationCircle, fa
 import styles from './SessionWizard.module.scss';
 import LockableFieldFrame from './LockableFieldFrame';
 import BlockLimitsField from './BlockLimitsField';
-import SessionHeaderField from './SessionHeaderField.jsx';
+import SessionHeaderField from './SessionHeaderField';
 import FeaturedSbtField from './FeaturedSbtField';
 import ContractsSection from './ContractsSection';
 import EncryptionPanel from './EncryptionPanel.jsx';
