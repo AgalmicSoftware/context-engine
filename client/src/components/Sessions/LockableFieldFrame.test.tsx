@@ -12,7 +12,7 @@ jest.mock('../Shared/CETooltip', () => {
   );
 });
 
-jest.mock('../Gates/GateMultiSelectLock.jsx', () => {
+jest.mock('../Gates/GateMultiSelectLock', () => {
   const React = require('react');
   const { E2E_TESTIDS } = require('../../utilities/e2eTestIds.js');
   return (props: { open?: boolean; onToggleOpen?: (open: boolean) => void }) => (

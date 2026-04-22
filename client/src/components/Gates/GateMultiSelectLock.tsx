@@ -1,4 +1,4 @@
-/** @file GateMultiSelectLock.jsx */
+/** @file GateMultiSelectLock.tsx */
 import React, { useEffect, useMemo, useRef } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faExternalLinkAlt, faLock, faLockOpen } from '@fortawesome/free-solid-svg-icons';
@@ -9,10 +9,42 @@ import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { toStr } from '../../utilities/shared/primitives.js';
 import { t } from '../../utilities/ui/terminology.js';
 
-const normalizeId = (val) => toStr(val).trim();
+type GateOption = {
+  id?: unknown;
+  label?: unknown;
+  displayLabel?: unknown;
+  badgeLabel?: unknown;
+  secondaryLabel?: unknown;
+  color?: unknown;
+  mode?: unknown;
+  operator?: unknown;
+  gateMode?: unknown;
+  requireAll?: boolean;
+  sbtAddresses?: unknown;
+  sbtAddress?: unknown;
+  sourceSessionSlug?: unknown;
+  sessionSlug?: unknown;
+};
 
-const uniq = (arr) => {
-  const out = [];
+export type GateMultiSelectLockProps = {
+  gateOptions: GateOption[] | null | undefined;
+  selectedGateIds: unknown[] | null | undefined;
+  onChangeSelectedGateIds?: (gateIds: string[]) => void;
+  open: boolean;
+  onToggleOpen?: (open: boolean) => void;
+  disabled?: boolean;
+  showDots?: boolean;
+};
+
+const resolveGateSbtDisplayLabel = resolveSbtDisplayLabel as (args: {
+  address: unknown;
+  fallback?: string;
+}) => string;
+
+const normalizeId = (val: unknown) => toStr(val).trim();
+
+const uniq = (arr: unknown[] | null | undefined) => {
+  const out: string[] = [];
   const seen = new Set();
   (Array.isArray(arr) ? arr : []).forEach((item) => {
     const value = normalizeId(item);
@@ -23,12 +55,12 @@ const uniq = (arr) => {
   return out;
 };
 
-const shortAddr = (value) => {
+const shortAddr = (value: unknown) => {
   const text = normalizeId(value);
   return text.length > 12 ? `${text.slice(0, 6)}...${text.slice(-4)}` : text;
 };
 
-const normalizeGateMode = (option = {}) => {
+const normalizeGateMode = (option: GateOption = {}) => {
   const raw = normalizeId(
     option?.mode ||
     option?.operator ||
@@ -39,22 +71,23 @@ const normalizeGateMode = (option = {}) => {
   return 'any';
 };
 
-const collectSbtAddresses = (option = {}) => uniq([
+const collectSbtAddresses = (option: GateOption = {}) => uniq([
   ...(Array.isArray(option?.sbtAddresses) ? option.sbtAddresses : []),
   option?.sbtAddress,
 ]);
 
-const resolveSbtItems = (addresses = [], sessionSlug = '') => (
+const resolveSbtItems = (addresses: unknown[] = [], sessionSlug = '') => (
   (Array.isArray(addresses) ? addresses : []).map((address) => {
+    const normalizedAddress = normalizeId(address);
     const short = shortAddr(address);
-    const label = resolveSbtDisplayLabel({
-      address,
+    const label = resolveGateSbtDisplayLabel({
+      address: normalizedAddress,
       fallback: 'short',
     }) || short;
     return {
-      address,
+      address: normalizedAddress,
       label: label === short ? label : `${label} (${short})`,
-      href: buildSbtDetailPath(address, sessionSlug),
+      href: buildSbtDetailPath(normalizedAddress, sessionSlug),
     };
   })
 );
@@ -67,8 +100,8 @@ const GateMultiSelectLock = ({
   onToggleOpen,
   disabled,
   showDots = true,
-}) => {
-  const containerRef = useRef(null);
+}: GateMultiSelectLockProps) => {
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const options = useMemo(() => (
     Array.isArray(gateOptions) ? gateOptions.filter(Boolean) : []
   ), [gateOptions]);
@@ -92,10 +125,10 @@ const GateMultiSelectLock = ({
 
   useEffect(() => {
     if (!open) return () => {};
-    const handle = (evt) => {
+    const handle = (evt: MouseEvent | TouchEvent) => {
       const el = containerRef.current;
       if (!el) return;
-      if (el.contains(evt.target)) return;
+      if (evt.target instanceof Node && el.contains(evt.target)) return;
       if (typeof onToggleOpen === 'function') onToggleOpen(false);
     };
     document.addEventListener('mousedown', handle);
@@ -106,12 +139,12 @@ const GateMultiSelectLock = ({
     };
   }, [open, onToggleOpen]);
 
-  const updateSelection = (nextSet) => {
+  const updateSelection = (nextSet: Set<string>) => {
     const next = optionIds.filter((id) => nextSet.has(id));
     if (typeof onChangeSelectedGateIds === 'function') onChangeSelectedGateIds(next);
   };
 
-  const toggleGate = (gateId) => {
+  const toggleGate = (gateId: unknown) => {
     const id = normalizeId(gateId);
     if (!id) return;
     const nextSet = new Set(selected);
@@ -186,7 +219,10 @@ const GateMultiSelectLock = ({
             const color = normalizeId(opt?.color) || '#888';
             const checked = selected.includes(gateId);
             const sbtAddresses = collectSbtAddresses(opt);
-            const sbtItems = resolveSbtItems(sbtAddresses, opt?.sourceSessionSlug || opt?.sessionSlug || '');
+            const sbtItems = resolveSbtItems(
+              sbtAddresses,
+              normalizeId(opt?.sourceSessionSlug || opt?.sessionSlug)
+            );
             const modeLabel = sbtAddresses.length > 0
               ? (normalizeGateMode(opt) === 'all' ? `All selected ${t('sbts')} required` : `Any one selected ${t('sbt')} unlocks`)
               : '';
