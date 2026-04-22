@@ -196,4 +196,63 @@ describe('CreateQuestionsAndSurveys lock UI', () => {
     expect(screen.getByTestId('ce-survey-clear-confirm-cancel')).toHaveTextContent('Keep editing');
     expect(screen.getByTestId('ce-survey-clear-confirm-confirm')).toHaveTextContent('Clear');
   });
+
+  it('shows invalid document URL feedback inline instead of calling window.alert', () => {
+    const alertSpy = jest.spyOn(window, 'alert').mockImplementation(() => {});
+    const instance = makeInstance();
+    instance.state = {
+      ...instance.state,
+      isStandaloneQuestion: false,
+      docURLInput: 'ftp://example.com/source.pdf',
+      documentURLs: [],
+      docURLError: '',
+    };
+
+    instance.addDocumentURL();
+
+    expect(alertSpy).not.toHaveBeenCalled();
+    expect(instance.state.documentURLs).toEqual([]);
+    expect(instance.state.docURLInput).toBe('ftp://example.com/source.pdf');
+    expect(instance.state.docURLError).toMatch(/Document URLs must use/);
+
+    alertSpy.mockRestore();
+  });
+
+  it('clears document URL feedback after a valid URL is added', () => {
+    const instance = makeInstance();
+    instance.updateSurveyHash = jest.fn();
+    instance.saveToLocalStorage = jest.fn();
+    instance.state = {
+      ...instance.state,
+      isStandaloneQuestion: false,
+      docURLInput: 'https://example.com/source.pdf',
+      documentURLs: [],
+      docURLError: 'Previous validation error',
+    };
+
+    instance.addDocumentURL();
+
+    expect(instance.state.documentURLs).toEqual(['https://example.com/source.pdf']);
+    expect(instance.state.docURLInput).toBe('');
+    expect(instance.state.docURLError).toBe('');
+    expect(instance.updateSurveyHash).toHaveBeenCalledTimes(1);
+    expect(instance.saveToLocalStorage).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders document URL validation feedback with a stable test id', () => {
+    const instance = makeInstance();
+    instance.state = {
+      ...instance.state,
+      showAutoTool: false,
+      isStandaloneQuestion: false,
+      title: 'Draft survey',
+      docURLInput: 'bad-url',
+      docURLError: 'Document URLs must use http:// or https://.',
+      questions: [],
+    };
+
+    render(instance.render());
+
+    expect(screen.getByTestId('ce-create-doc-url-error')).toHaveTextContent('Document URLs must use');
+  });
 });
