@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
 
-import { audienceRoster, audienceVotes, debateData } from './debateData';
+import { audienceRoster, audienceVotes, debateData } from '../../../variables/demo/debateData.js';
 import { darkTheme as T, soften, useTheme } from './debateHudTheme';
 
 const CastYourVote = ({ debate, userVotes, setUserVotes }) => {
