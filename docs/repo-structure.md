@@ -26,12 +26,12 @@ Use it for new files, refactors, and cleanup PRs. Legacy exceptions stay listed 
 - Session creation UI belongs under `client/src/components/Sessions/`; keep `SessionWizard.tsx` and its helper/test modules co-located there.
 - Session page shell UI belongs under `client/src/components/OnePageSession/`; keep `OnePageSession.tsx` and its helper/test modules co-located there.
 - Demo-only route views belong under `client/src/components/DemoViews/`; keep reusable demo subareas grouped there instead of under generic catch-all names.
-- Session doc-library UI belongs under `client/src/components/DocumentLibrary/`; keep `SessionDocumentsPage.tsx` and `DocumentLibraryPanel.tsx` together there.
-- Rendered React component files use PascalCase filenames and `.tsx` extensions. All production components are now TypeScript.
+- Session doc-library UI belongs under `client/src/components/DocumentLibrary/`; keep `SessionDocumentsPage.jsx` and `DocumentLibraryPanel.jsx` together there.
+- Rendered React component files use PascalCase filenames. Existing JavaScript components may stay `.jsx`; TypeScript migration slices should use `.tsx`.
 - Component-specific styles are co-located as `<ComponentName>.module.scss`.
 - Component-specific tests are co-located beside the source component.
 - Preferred component test naming is `<ComponentName>.test.jsx` for JavaScript tests and `<ComponentName>.test.tsx` once the test itself is converted.
-- Prefer purpose-led component names over legacy tab-label placeholders; for example, `client/src/components/MainContent/ToolExplorer.tsx` and `OnboardingWalkthrough.tsx` are clearer than generic `*Tab` filenames.
+- Prefer purpose-led component names over legacy tab-label placeholders; for example, `client/src/components/MainContent/ToolExplorer.jsx` and `OnboardingWalkthrough.jsx` are clearer than generic `*Tab` filenames.
 - Descriptive test qualifiers are allowed before `.test` when needed: `<ComponentName>.render.test.jsx`, `<ComponentName>.routes.test.jsx`.
 - Cross-workflow reusable UI extracted from feature folders belongs under `client/src/components/Shared/` (for example `client/src/components/Shared/AudioInput/` and `client/src/components/Shared/Json/`).
 - Do not create new lowercase component directories under `client/src/components/`.
