@@ -43,7 +43,7 @@ jest.setTimeout(20000);
 jest.mock('../SBTs/SBTSelector.jsx', () => () => <div data-testid="mock-wizard-sbt-selector" />);
 jest.mock('../SBTs/CreateSBTGroup.jsx', () => () => null);
 jest.mock('../Gates/GateMultiSelectLock.jsx', () => () => <div data-testid="mock-wizard-gate-lock" />);
-jest.mock('../Shared/Json/JsonControls.jsx', () => ({
+jest.mock('../Shared/Json/JsonControls', () => ({
   JsonToggleButton: () => null,
   JsonPanel: () => null,
   JsonButtonRow: () => null,
