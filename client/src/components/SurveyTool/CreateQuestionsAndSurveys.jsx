@@ -330,6 +330,7 @@ class CreateQuestionsAndSurveys extends Component {
       // Minimal manual doc URL field (single source buffer)
       docURLInput: (sanitizeDocumentUrls(props.documentURLs || [])[0]) || '',
       docURLError: '',
+      formValidationError: '',
 
       // Auto-focus target (replaces scrollTargetUiKey)
       focusTargetUiKey: null,
@@ -970,6 +971,7 @@ class CreateQuestionsAndSurveys extends Component {
         // Don't force overwrite input buffer with list content
         parsedSurvey.docURLInput = '';
         parsedSurvey.docURLError = '';
+        parsedSurvey.formValidationError = '';
 
         parsedSurvey.openLockKey = '';
         parsedSurvey.surveyLockGateIds = normalizeGateIds(parsedSurvey.surveyLockGateIds);
@@ -1023,6 +1025,7 @@ class CreateQuestionsAndSurveys extends Component {
       delete stateToSave.submitStep;
       delete stateToSave.submissionError;
       delete stateToSave.docURLError;
+      delete stateToSave.formValidationError;
       delete stateToSave.surveyAddedSuccessfully;
       delete stateToSave.questionsAddedSuccessfully;
 
@@ -1040,7 +1043,7 @@ class CreateQuestionsAndSurveys extends Component {
   };
 
   handleTitleChange = (event) => {
-    this.setState({ title: event.target.value }, () => {
+    this.setState({ title: event.target.value, formValidationError: '' }, () => {
       this.updateSurveyHash();
       this.saveToLocalStorage();
     });
@@ -1140,7 +1143,7 @@ class CreateQuestionsAndSurveys extends Component {
 
     updatedQuestions[index] = questionToUpdate;
 
-    this.setState({ questions: updatedQuestions }, () => {
+    this.setState({ questions: updatedQuestions, formValidationError: '' }, () => {
       this.updateSurveyHash();
       this.saveToLocalStorage();
     });
@@ -1943,6 +1946,7 @@ class CreateQuestionsAndSurveys extends Component {
       lastSubmittedSurveyArweaveTxId: '',
       showClearFormConfirm: false,
       docURLError: '',
+      formValidationError: '',
     }, () => {
       // Clear localStorage
       this.clearUnfinishedSurveyDraft();
@@ -1954,14 +1958,14 @@ class CreateQuestionsAndSurveys extends Component {
     // Early validation per spec: block empty survey titles before setting submitting state
     if (!this.state.isStandaloneQuestion) {
       if (!this.state.title || !this.state.title.trim()) {
-        alert("Please enter a survey title.");
+        this.setState({ formValidationError: 'Please enter a survey title.' });
         return;
       }
     }
 
     const blankQuestionIndex = findFirstBlankQuestionPromptIndex(this.state.questions);
     if (blankQuestionIndex !== -1) {
-      alert(`Question ${blankQuestionIndex + 1} prompt cannot be blank.`);
+      this.setState({ formValidationError: `Question ${blankQuestionIndex + 1} prompt cannot be blank.` });
       return;
     }
 
@@ -2718,6 +2722,7 @@ class CreateQuestionsAndSurveys extends Component {
       // Only set buffer if needed, usually we just want the list
       docURLInput: '',
       docURLError: '',
+      formValidationError: '',
       isStandaloneQuestion: !aiTitle,
       title: aiTitle || '',
       showAutoTool: false,
@@ -3022,7 +3027,8 @@ class CreateQuestionsAndSurveys extends Component {
       autoPopulateAiTags, lastSubmittedSurveyArweaveTxId,
       submitStep,
       surveyLockGateIds,
-      openLockKey
+      openLockKey,
+      formValidationError
     } = this.state;
     const docUrlErrorId = 'ce-create-doc-url-error';
     const safeDocumentUrls = sanitizeDocumentUrls(documentURLs);
@@ -3202,6 +3208,16 @@ class CreateQuestionsAndSurveys extends Component {
                 </ul>
               </div>
             )}
+          </div>
+        )}
+
+        {formValidationError && (
+          <div
+            className={styles.inlineValidationError}
+            data-testid="ce-create-validation-error"
+            role="alert"
+          >
+            {formValidationError}
           </div>
         )}
 
