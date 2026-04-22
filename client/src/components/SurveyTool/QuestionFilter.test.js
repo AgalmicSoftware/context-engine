@@ -17,7 +17,7 @@ import * as contractScriptsModule from '../../utilities/web3/contractScripts.js'
 import * as sponsoredAccess from '../../utilities/web3/sponsoredAccess.js';
 
 jest.mock('../SBTs/SBTFilter.jsx', () => () => null);
-jest.mock('../Shared/AudioInput/AudioInput.jsx', () => () => null);
+jest.mock('../Shared/AudioInput/AudioInput', () => () => null);
 
 const MANAGED_NAMESPACES = [
   'questionsCache',

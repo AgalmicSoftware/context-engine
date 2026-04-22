@@ -1,78 +1,20 @@
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
+import type { Root } from 'react-dom/client';
 import { Simulate } from 'react-dom/test-utils';
 
 import AudioInput from './AudioInput';
 import { requestAiRewrite } from '../../../utilities/ai/aiScripts';
 import { useWhisper, RECORDING_STATUS } from '../../../utilities/useWhisper';
 
-type LastRecording = {
-  blob: Blob | null;
-  mimeType?: string;
-};
-
-type MutableRef<T> = {
-  current: T | null;
-};
-
-type TranscriptState = {
-  live: string;
-  final: string;
-};
-
-type AnalyserNodeLike = {
-  fftSize: number;
-  frequencyBinCount: number;
-  getByteFrequencyData: (array: Uint8Array) => void;
-  disconnect: () => void;
-};
-
-type MediaStreamLike = {
-  id?: string;
-};
-
-type SourceNodeLike = {
-  connect: (node: AnalyserNodeLike) => void;
-  disconnect: () => void;
-};
-
-type AudioContextLike = {
-  state: AudioContextState;
-  createAnalyser: () => AnalyserNodeLike;
-  createMediaStreamSource: (stream: MediaStreamLike) => SourceNodeLike;
-  resume: () => Promise<void>;
-};
-
-type WhisperState = {
-  status: string;
-  isRecording: boolean;
-  isPaused: boolean;
-  isProcessing: boolean;
-  isStreaming: boolean;
-  transcript: TranscriptState;
-  errorMessage: string;
-  startRecording: () => void;
-  stopRecording: () => void;
-  pauseRecording: () => void;
-  resumeRecording: () => void;
-  audioContextRef: MutableRef<AudioContextLike>;
-  mediaStreamRef: MutableRef<MediaStreamLike>;
-  lastRecordingBlobRef: {
-    current: LastRecording;
-  };
-  getLastRecordingBlob: () => LastRecording;
-};
-
-type UseWhisperMock = jest.MockedFunction<(options?: unknown) => WhisperState>;
-type RequestAiRewriteMock = jest.MockedFunction<(text: string, options?: unknown) => Promise<string>>;
-
+type WhisperState = Record<string, any>;
 type RafEntry = {
   id: number;
   cb: FrameRequestCallback;
 } | null;
 
-const mockUseWhisper = useWhisper as unknown as UseWhisperMock;
-const mockRequestAiRewrite = requestAiRewrite as unknown as RequestAiRewriteMock;
+const mockUseWhisper = useWhisper as unknown as jest.Mock;
+const mockRequestAiRewrite = requestAiRewrite as unknown as jest.Mock;
 const actGlobal = globalThis as typeof globalThis & {
   IS_REACT_ACT_ENVIRONMENT?: boolean;
 };
@@ -91,7 +33,7 @@ jest.mock('../../../utilities/useWhisper', () => {
   return { ...actual, useWhisper: jest.fn() };
 });
 
-const buildWhisperState = (overrides: Partial<WhisperState> = {}): WhisperState => ({
+const buildWhisperState = (overrides: WhisperState = {}) => ({
   status: RECORDING_STATUS.READY,
   isRecording: false,
   isPaused: false,
@@ -111,10 +53,11 @@ const buildWhisperState = (overrides: Partial<WhisperState> = {}): WhisperState 
 });
 
 describe('AudioInput', () => {
-  let container;
-  let root;
-  let previousActEnvironment;
-  let rafQueue = [];
+  let container: HTMLDivElement;
+  let root: Root;
+  let rootMounted = false;
+  let previousActEnvironment: boolean | undefined;
+  let rafQueue: RafEntry[] = [];
   let rafId = 0;
   let requestAnimationFrameSpy: jest.SpyInstance<number, [FrameRequestCallback]>;
 
@@ -123,26 +66,8 @@ describe('AudioInput', () => {
     return element as T;
   };
 
-  const setNativeValue = (element: Element, value: string) => {
-    const ownDescriptor = Object.getOwnPropertyDescriptor(element, 'value');
-    const prototype = Object.getPrototypeOf(element);
-    const prototypeDescriptor = prototype ? Object.getOwnPropertyDescriptor(prototype, 'value') : undefined;
-    const setter = prototypeDescriptor?.set || ownDescriptor?.set;
-    if (setter) {
-      setter.call(element, value);
-      return;
-    }
-    (element as HTMLInputElement | HTMLTextAreaElement).value = value;
-  };
-
   const changeElementValue = (element: Element, value: string) => {
-    setNativeValue(element, value);
-    element.dispatchEvent(new Event('input', { bubbles: true }));
-    element.dispatchEvent(new Event('change', { bubbles: true }));
-  };
-
-  const clickElement = (element: Element) => {
-    element.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    Simulate.change(element, { target: { value } } as any);
   };
 
   const flushRafQueue = () => {
@@ -156,18 +81,19 @@ describe('AudioInput', () => {
   };
 
   beforeAll(() => {
-    previousActEnvironment = globalThis.IS_REACT_ACT_ENVIRONMENT;
-    globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+    previousActEnvironment = actGlobal.IS_REACT_ACT_ENVIRONMENT;
+    actGlobal.IS_REACT_ACT_ENVIRONMENT = true;
   });
 
   beforeEach(() => {
     container = document.createElement('div');
     document.body.appendChild(container);
     root = createRoot(container);
-    useWhisper.mockReset();
-    useWhisper.mockReturnValue(buildWhisperState());
-    requestAiRewrite.mockReset();
-    requestAiRewrite.mockResolvedValue('rewritten');
+    rootMounted = true;
+    mockUseWhisper.mockReset();
+    mockUseWhisper.mockReturnValue(buildWhisperState());
+    mockRequestAiRewrite.mockReset();
+    mockRequestAiRewrite.mockResolvedValue('rewritten');
     rafQueue = [];
     rafId = 0;
     requestAnimationFrameSpy = jest.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => {
@@ -181,11 +107,11 @@ describe('AudioInput', () => {
   });
 
   afterEach(() => {
-    if (root) {
+    if (rootMounted) {
       act(() => {
         root.unmount();
       });
-      root = null;
+      rootMounted = false;
     }
     container.remove();
     jest.useRealTimers();
@@ -194,10 +120,10 @@ describe('AudioInput', () => {
 
   afterAll(() => {
     if (typeof previousActEnvironment === 'undefined') {
-      delete globalThis.IS_REACT_ACT_ENVIRONMENT;
+      delete actGlobal.IS_REACT_ACT_ENVIRONMENT;
       return;
     }
-    globalThis.IS_REACT_ACT_ENVIRONMENT = previousActEnvironment;
+    actGlobal.IS_REACT_ACT_ENVIRONMENT = previousActEnvironment;
   });
 
   it('shows a long-form timer while recording', () => {
@@ -426,9 +352,9 @@ describe('AudioInput', () => {
   it('retries waveform setup until audio refs are ready and then schedules animation', () => {
     jest.useFakeTimers({ doNotFake: ['requestAnimationFrame', 'cancelAnimationFrame'] });
 
-    const audioContextRef: MutableRef<AudioContextLike> = { current: null };
-    const mediaStreamRef: MutableRef<MediaStreamLike> = { current: null };
-    const analyser: AnalyserNodeLike = {
+    const audioContextRef: { current: any } = { current: null };
+    const mediaStreamRef: { current: any } = { current: null };
+    const analyser = {
       fftSize: 0,
       frequencyBinCount: 32,
       getByteFrequencyData: jest.fn(),
@@ -598,18 +524,16 @@ describe('AudioInput', () => {
     expect(updateSpy).toHaveBeenLastCalledWith('abc');
   });
 
-  it('keeps AI waiting text out of parent updates during rerenders', () => {
+  it('does not re-emit waiting text during parent rerenders with new update callbacks', () => {
     mockRequestAiRewrite.mockImplementation(() => new Promise(() => {}));
     let waitingTick: (() => void) | null = null;
-    const setIntervalMock: typeof window.setInterval = (handler: TimerHandler) => {
-      if (typeof handler === 'function') {
-        waitingTick = () => handler();
+    jest.spyOn(window, 'setInterval').mockImplementation(((cb: TimerHandler) => {
+      if (typeof cb === 'function') {
+        waitingTick = () => cb();
       }
       return 1;
-    };
-    const clearIntervalMock: typeof window.clearInterval = () => {};
-    jest.spyOn(window, 'setInterval').mockImplementation(setIntervalMock);
-    jest.spyOn(window, 'clearInterval').mockImplementation(clearIntervalMock);
+    }) as any);
+    jest.spyOn(window, 'clearInterval').mockImplementation((() => {}) as any);
     const updateFns = [jest.fn(), jest.fn(), jest.fn(), jest.fn()];
 
     act(() => {
@@ -622,7 +546,6 @@ describe('AudioInput', () => {
       );
     });
 
-    const textarea = requireElement(container.querySelector('textarea'));
     const rewriteButton = requireElement(container.querySelector('button[title="AI rewrite"]'));
 
     act(() => {
@@ -697,7 +620,7 @@ describe('AudioInput', () => {
 
     act(() => {
       root.unmount();
-      root = null;
+      rootMounted = false;
     });
     act(() => {
       flushRafQueue();
