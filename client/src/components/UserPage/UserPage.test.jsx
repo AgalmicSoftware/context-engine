@@ -68,6 +68,101 @@ const createDeferred = () => {
   return { promise, resolve, reject };
 };
 
+let analysisCacheTestSeq = 0;
+
+const makeAnalysisCacheInstance = (props = {}) => {
+  analysisCacheTestSeq += 1;
+  const slug = props.activeSessionSlug || `analysis-cache-test-${analysisCacheTestSeq}`;
+  const viewAddress = props.viewAddress || '0x00000000000000000000000000000000000000aa';
+  const networkID = String(props.network?.id || 84532);
+  const instance = makeInstance({
+    activeSessionSlug: slug,
+    viewAddress,
+    network: { id: Number(networkID) },
+    account: '0x00000000000000000000000000000000000000bb',
+    ...props,
+  });
+
+  instance.state = {
+    ...instance.state,
+    username: 'Cache Test User',
+    sbtList: [{
+      sbtInfo: {
+        name: 'Cache Badge',
+        sbtAddress: '0x00000000000000000000000000000000000000cc',
+      },
+    }],
+    questionResponseInfo: [{
+      id: 'q1',
+      type: 'freeform',
+      prompt: 'What should be cached?',
+    }],
+    detailedQuestionResponses: {
+      q1: {
+        answer: { value: 'A deterministic answer' },
+        conviction: 4,
+      },
+    },
+    surveyResponseInfo: [],
+    detailedSurveyResponses: {},
+    questionCreationInfo: [],
+    surveyCreationInfo: [],
+  };
+
+  jest.spyOn(instance, '_getAiSessionSlugCandidates').mockReturnValue([slug]);
+  jest.spyOn(instance, '_getSessionConfigForSlugExact').mockImplementation((candidate) => (
+    candidate === slug
+      ? {
+        slug,
+        ai: {
+          mode: 'openai',
+          models: { thinking: 'gpt-5' },
+          modelProviders: { thinking: 'openai' },
+        },
+      }
+      : null
+  ));
+  checkSponsoredAccess.mockResolvedValue({
+    status: 'no-gate',
+    gate: null,
+    resourceKey: 'ai',
+  });
+
+  return {
+    instance,
+    slug,
+    networkID,
+    addressLower: viewAddress.toLowerCase(),
+  };
+};
+
+const getSingleAnalysisCacheEntry = ({ slug, networkID, addressLower }) => {
+  const cacheObj = cacheScripts.peekCacheSync('analysisCache', slug, { clone: false });
+  const bucket = cacheObj?.[networkID]?.[addressLower] || {};
+  const [[fingerprint, entry] = []] = Object.entries(bucket);
+  return { cacheObj, fingerprint, entry };
+};
+
+const writeSingleAnalysisCacheEntry = async ({
+  slug,
+  networkID,
+  addressLower,
+  fingerprint,
+  entry,
+}) => {
+  const current = cacheScripts.peekCacheSync('analysisCache', slug, { clone: false }) || {};
+  await cacheScripts.writeCache('analysisCache', slug, {
+    ...current,
+    [networkID]: {
+      ...(current[networkID] || {}),
+      [addressLower]: {
+        ...(current[networkID]?.[addressLower] || {}),
+        [fingerprint]: entry,
+      },
+    },
+  });
+};
+
 const REGISTRY_CACHE_KEY = 'dg:sessionRegistryCache:v1';
 
 const collectTreeNodes = (node, predicate, acc = []) => {
@@ -119,6 +214,7 @@ describe('UserPage cache refresh pipeline', () => {
     try { delete globalThis.CE_USER_PROFILE_SCAN_ALL_SESSIONS_QUESTIONS; } catch (_) {}
     try { delete globalThis.CE_SESSION_SCAN_SCOPE; } catch (_) {}
     try { delete globalThis.CE_SESSION_SCAN_SLUGS; } catch (_) {}
+    try { localStorage.removeItem('ce:aiSettings:v1'); } catch (_) {}
     try { localStorage.removeItem('ce:sessionScanScope'); } catch (_) {}
     try { localStorage.removeItem('ce:sessionScanSlugs'); } catch (_) {}
   });
@@ -671,6 +767,188 @@ describe('UserPage cache refresh pipeline', () => {
         sessionConfig: expect.objectContaining({ slug: 'open-slug' }),
       })
     );
+  });
+
+  it('writes analysisCache after a cache miss calls AI', async () => {
+    const now = 1710000000000;
+    const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(now);
+    const { instance, slug, networkID, addressLower } = makeAnalysisCacheInstance();
+    const result = {
+      summary: 'fresh summary',
+      details: 'fresh details',
+      name: 'Fresh Analysis',
+      historicalAlignment: {
+        figure: 'Ada Lovelace',
+        reasoning: 'Analytical framing.',
+      },
+    };
+    analyzeUserOpinions.mockResolvedValueOnce(result);
+
+    try {
+      await instance.analyzeUser();
+
+      expect(analyzeUserOpinions).toHaveBeenCalledTimes(1);
+      const { fingerprint, entry } = getSingleAnalysisCacheEntry({ slug, networkID, addressLower });
+      expect(fingerprint).toEqual(expect.any(String));
+      expect(entry).toMatchObject({
+        version: 1,
+        fingerprint,
+        cachedAt: now,
+        expiresAt: now + (24 * 60 * 60 * 1000),
+        address: addressLower,
+        networkId: networkID,
+        aiContext: {
+          sessionSlug: slug,
+          provider: 'openai',
+          model: 'gpt-5',
+        },
+        result,
+      });
+      expect(instance.state.analysisServedFromCache).toBe(false);
+      expect(instance.state.analysisCachedAt).toBeNull();
+    } finally {
+      nowSpy.mockRestore();
+    }
+  });
+
+  it('hydrates unchanged analysis input from analysisCache without calling AI', async () => {
+    const cachedAt = 1710000000000;
+    const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(cachedAt);
+    const { instance, slug, networkID, addressLower } = makeAnalysisCacheInstance();
+    analyzeUserOpinions.mockResolvedValueOnce({
+      summary: 'seed summary',
+      details: 'seed details',
+      name: 'Seed Analysis',
+      historicalAlignment: {},
+    });
+
+    try {
+      await instance.analyzeUser();
+      const seeded = getSingleAnalysisCacheEntry({ slug, networkID, addressLower });
+      const cachedResult = {
+        name: 'Cached Analysis',
+        summary: 'cached summary',
+        details: 'cached details',
+        historicalAlignment: {
+          figure: 'Grace Hopper',
+          reasoning: 'Cached reasoning.',
+        },
+      };
+      await writeSingleAnalysisCacheEntry({
+        slug,
+        networkID,
+        addressLower,
+        fingerprint: seeded.fingerprint,
+        entry: {
+          ...seeded.entry,
+          result: cachedResult,
+        },
+      });
+
+      analyzeUserOpinions.mockClear();
+      nowSpy.mockReturnValue(cachedAt + (2 * 60 * 60 * 1000));
+
+      await instance.analyzeUser();
+
+      expect(analyzeUserOpinions).not.toHaveBeenCalled();
+      expect(instance.state.analysisName).toBe('Cached Analysis');
+      expect(instance.state.aiAnalysis).toBe('cached summary');
+      expect(instance.state.analysisDetails).toBe('cached details');
+      expect(instance.state.analysisHistoricalFigure).toBe('Grace Hopper');
+      expect(instance.state.analysisHistoricalReasoning).toBe('Cached reasoning.');
+      expect(instance.state.analysisServedFromCache).toBe(true);
+      expect(instance.state.analysisCachedAt).toBe(cachedAt);
+    } finally {
+      nowSpy.mockRestore();
+    }
+  });
+
+  it('treats expired analysisCache entries as misses', async () => {
+    const cachedAt = 1710000000000;
+    const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(cachedAt);
+    const { instance, slug, networkID, addressLower } = makeAnalysisCacheInstance();
+    analyzeUserOpinions.mockResolvedValueOnce({
+      summary: 'seed summary',
+      details: 'seed details',
+      name: 'Seed Analysis',
+      historicalAlignment: {},
+    });
+
+    try {
+      await instance.analyzeUser();
+      const seeded = getSingleAnalysisCacheEntry({ slug, networkID, addressLower });
+      await writeSingleAnalysisCacheEntry({
+        slug,
+        networkID,
+        addressLower,
+        fingerprint: seeded.fingerprint,
+        entry: {
+          ...seeded.entry,
+          expiresAt: cachedAt - 1,
+        },
+      });
+
+      analyzeUserOpinions.mockClear();
+      analyzeUserOpinions.mockResolvedValueOnce({
+        summary: 'new summary after expiry',
+        details: 'new details after expiry',
+        name: 'Fresh After Expiry',
+        historicalAlignment: {},
+      });
+
+      await instance.analyzeUser();
+
+      expect(analyzeUserOpinions).toHaveBeenCalledTimes(1);
+      expect(instance.state.analysisName).toBe('Fresh After Expiry');
+      expect(instance.state.analysisServedFromCache).toBe(false);
+      const refreshed = getSingleAnalysisCacheEntry({ slug, networkID, addressLower });
+      expect(refreshed.entry.cachedAt).toBe(cachedAt);
+      expect(refreshed.entry.result.summary).toBe('new summary after expiry');
+    } finally {
+      nowSpy.mockRestore();
+    }
+  });
+
+  it('forceRefresh bypasses analysisCache and overwrites the cached entry', async () => {
+    const cachedAt = 1710000000000;
+    const refreshedAt = cachedAt + 5000;
+    const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(cachedAt);
+    const { instance, slug, networkID, addressLower } = makeAnalysisCacheInstance();
+    analyzeUserOpinions.mockResolvedValueOnce({
+      summary: 'seed summary',
+      details: 'seed details',
+      name: 'Seed Analysis',
+      historicalAlignment: {},
+    });
+
+    try {
+      await instance.analyzeUser();
+      const seeded = getSingleAnalysisCacheEntry({ slug, networkID, addressLower });
+
+      analyzeUserOpinions.mockClear();
+      analyzeUserOpinions.mockResolvedValueOnce({
+        summary: 'force refreshed summary',
+        details: 'force refreshed details',
+        name: 'Force Refreshed Analysis',
+        historicalAlignment: {
+          figure: 'Katherine Johnson',
+          reasoning: 'Fresh calculation.',
+        },
+      });
+      nowSpy.mockReturnValue(refreshedAt);
+
+      await instance.analyzeUser(true);
+
+      expect(analyzeUserOpinions).toHaveBeenCalledTimes(1);
+      expect(instance.state.analysisName).toBe('Force Refreshed Analysis');
+      expect(instance.state.analysisServedFromCache).toBe(false);
+      const refreshed = getSingleAnalysisCacheEntry({ slug, networkID, addressLower });
+      expect(refreshed.fingerprint).toBe(seeded.fingerprint);
+      expect(refreshed.entry.cachedAt).toBe(refreshedAt);
+      expect(refreshed.entry.result.summary).toBe('force refreshed summary');
+    } finally {
+      nowSpy.mockRestore();
+    }
   });
 
   it('prefers in-scope open-gate session over stale cache slugs for analyze routing', async () => {
