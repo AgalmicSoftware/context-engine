@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import AsyncSearchSelect from './AsyncSearchSelect.jsx';
+import AsyncSearchSelect from './AsyncSearchSelect';
 
 const OPTIONS = [
   { value: 'alpha', label: 'Alpha' },
