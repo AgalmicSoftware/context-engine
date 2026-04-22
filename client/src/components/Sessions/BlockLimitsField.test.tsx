@@ -1,8 +1,9 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
-import BlockLimitsField from './BlockLimitsField.jsx';
+import BlockLimitsField from './BlockLimitsField';
+import type { BlockLimitsFieldProps } from './BlockLimitsField';
 
-const renderBlockLimitsField = (props = {}) => render(
+const renderBlockLimitsField = (props: Partial<BlockLimitsFieldProps> = {}) => render(
   <BlockLimitsField
     blockLimits={{ start: 123, end: null }}
     onStartChange={() => {}}

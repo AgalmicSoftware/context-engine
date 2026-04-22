@@ -7,7 +7,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCaretDown, faCaretUp, faCheck, faCog, faCopy, faExclamationCircle, faExternalLinkAlt, faImage, faQuestionCircle, faRedoAlt, faSpinner, faTimes, faUpload } from '@fortawesome/free-solid-svg-icons';
 import styles from './SessionWizard.module.scss';
 import LockableFieldFrame from './LockableFieldFrame.jsx';
-import BlockLimitsField from './BlockLimitsField.jsx';
+import BlockLimitsField from './BlockLimitsField';
 import SessionHeaderField from './SessionHeaderField.jsx';
 import FeaturedSbtField from './FeaturedSbtField';
 import ContractsSection from './ContractsSection';
