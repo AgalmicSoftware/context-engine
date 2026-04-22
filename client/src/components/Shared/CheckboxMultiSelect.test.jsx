@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
-import CheckboxMultiSelect from './CheckboxMultiSelect.jsx';
+import CheckboxMultiSelect from './CheckboxMultiSelect';
 
 const OPTIONS = [
   { value: 'a', label: 'Alpha' },
