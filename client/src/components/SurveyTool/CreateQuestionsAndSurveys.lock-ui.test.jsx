@@ -114,4 +114,86 @@ describe('CreateQuestionsAndSurveys lock UI', () => {
     expect(within(questionLock).queryByText(/\b\d+\s+gates?\b/i)).not.toBeInTheDocument();
     expect(questionLock.querySelector(`.${gateLockStyles.dots}`)).toBeNull();
   });
+
+  it('opens an app-native clear confirmation instead of calling window.confirm', () => {
+    const confirmSpy = jest.spyOn(window, 'confirm').mockImplementation(() => true);
+    const instance = makeInstance();
+    instance.state = {
+      ...instance.state,
+      title: 'Draft survey',
+      questions: [{ uiKey: 'q1', prompt: 'Question 1', type: 'freeform' }],
+      showClearFormConfirm: false,
+    };
+
+    instance.handleClearForm();
+
+    expect(confirmSpy).not.toHaveBeenCalled();
+    expect(instance.state.showClearFormConfirm).toBe(true);
+
+    confirmSpy.mockRestore();
+  });
+
+  it('clears the form only after the app-native confirmation is accepted', () => {
+    const instance = makeInstance();
+    instance.clearUnfinishedSurveyDraft = jest.fn();
+    instance.updateSurveyHash = jest.fn();
+    instance.state = {
+      ...instance.state,
+      title: 'Draft survey',
+      questions: [{ uiKey: 'q1', prompt: 'Question 1', type: 'freeform' }],
+      documentURLs: ['https://example.com/doc.pdf'],
+      docURLInput: 'https://example.com/next.pdf',
+      surveyHash: '0xhash',
+      isStandaloneQuestion: false,
+      surveyLockGateIds: ['gate_1'],
+      openLockKey: 'survey-title',
+      surveyAddedSuccessfully: true,
+      questionsAddedSuccessfully: true,
+      isSubmitting: true,
+      submissionError: 'stale error',
+      lastSubmittedSurveyId: 'survey-1',
+      lastSubmittedSurveyArweaveTxId: 'tx-1',
+      showClearFormConfirm: true,
+    };
+
+    instance.confirmClearForm();
+
+    expect(instance.state).toEqual(expect.objectContaining({
+      title: '',
+      questions: [],
+      documentURLs: [],
+      docURLInput: '',
+      surveyHash: '',
+      isStandaloneQuestion: true,
+      surveyLockGateIds: [],
+      openLockKey: '',
+      surveyAddedSuccessfully: false,
+      questionsAddedSuccessfully: false,
+      isSubmitting: false,
+      submissionError: '',
+      lastSubmittedSurveyId: '',
+      lastSubmittedSurveyArweaveTxId: '',
+      showClearFormConfirm: false,
+    }));
+    expect(instance.clearUnfinishedSurveyDraft).toHaveBeenCalledTimes(1);
+    expect(instance.updateSurveyHash).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders the clear confirmation dialog with stable test ids', () => {
+    const instance = makeInstance();
+    instance.state = {
+      ...instance.state,
+      showAutoTool: false,
+      showClearFormConfirm: true,
+      title: 'Draft survey',
+      questions: [{ uiKey: 'q1', id: 'q1', type: 'freeform', prompt: 'Question 1', tags: [] }],
+    };
+
+    render(instance.render());
+
+    expect(screen.getByTestId('ce-survey-clear-confirm-title')).toHaveTextContent('Clear form?');
+    expect(screen.getByTestId('ce-survey-clear-confirm-body')).toHaveTextContent('unsaved survey or question draft');
+    expect(screen.getByTestId('ce-survey-clear-confirm-cancel')).toHaveTextContent('Keep editing');
+    expect(screen.getByTestId('ce-survey-clear-confirm-confirm')).toHaveTextContent('Clear');
+  });
 });
