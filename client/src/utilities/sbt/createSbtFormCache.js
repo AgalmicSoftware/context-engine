@@ -1,3 +1,8 @@
+import {
+  removeKeys,
+  safeJsonRead,
+} from '../cache/storageJson.js';
+
 const LEGACY_CREATE_SBT_FORM_CACHE_KEY = 'createSbtFormCache';
 const SCOPED_CREATE_SBT_FORM_CACHE_KEY_PREFIX = 'dg:createSbtFormCache:';
 
@@ -13,11 +18,7 @@ const getSessionStorage = (storageIn) => {
 
 const removeCacheKey = (storage, key) => {
   if (!storage || !key) return;
-  try {
-    storage.removeItem(key);
-  } catch (e) {
-    void e;
-  }
+  removeKeys(storage, key);
 };
 
 export const normalizeCreateSbtFormCacheSessionSlug = (value = '') => {
@@ -92,18 +93,16 @@ export const hasMeaningfulCreateSbtFormPayload = (parsed) => {
 
 const readCreateSbtFormPayload = ({ storage, key, clearInvalid = false }) => {
   if (!storage || !key) return null;
-  const raw = storage.getItem(key);
-  if (!raw) return null;
-
-  try {
-    const parsed = JSON.parse(raw);
-    if (parsed && typeof parsed === 'object') return parsed;
-  } catch (e) {
-    void e;
-  }
-
-  if (clearInvalid) removeCacheKey(storage, key);
-  return null;
+  const result = safeJsonRead(
+    storage,
+    key,
+    (parsed) => {
+      if (parsed && typeof parsed === 'object') return parsed;
+      throw new Error('Create SBT form cache payload must be a JSON object.');
+    },
+    { clearInvalid }
+  );
+  return result.ok ? result.value : null;
 };
 
 const migrateLegacyCreateSbtFormCache = ({ storage, sessionSlug = '' }) => {
