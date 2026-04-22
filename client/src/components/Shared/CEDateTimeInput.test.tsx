@@ -2,18 +2,18 @@ import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import CEDateTimeInput from './CEDateTimeInput';
 
-const allowIntermediateNativeInputValues = (input) => {
+const allowIntermediateNativeInputValues = (input: HTMLInputElement) => {
   let currentValue = input.value;
   Object.defineProperty(input, 'value', {
     configurable: true,
     get: () => currentValue,
-    set: (nextValue) => {
+    set: (nextValue: string) => {
       currentValue = nextValue;
     },
   });
 
   return () => {
-    delete input.value;
+    Reflect.deleteProperty(input, 'value');
   };
 };
 
@@ -32,7 +32,7 @@ describe('CEDateTimeInput', () => {
       />
     );
 
-    const input = screen.getByTestId('ce-date-time-input');
+    const input = screen.getByTestId('ce-date-time-input') as HTMLInputElement;
     expect(input).toHaveValue('2026-04-06T12:30');
     expect(input).toHaveAttribute('min', '2026-04-06T09:15');
 
@@ -58,7 +58,7 @@ describe('CEDateTimeInput', () => {
       />
     );
 
-    const input = screen.getByTestId('ce-date-time-input');
+    const input = screen.getByTestId('ce-date-time-input') as HTMLInputElement;
     expect(input).toHaveAttribute('min', '2026-04-06T09:15');
   });
 
@@ -66,7 +66,7 @@ describe('CEDateTimeInput', () => {
     const handleChange = jest.fn();
 
     const Wrapper = () => {
-      const [selected, setSelected] = React.useState(new Date('2026-04-06T12:30:00'));
+      const [selected, setSelected] = React.useState<Date | null>(new Date('2026-04-06T12:30:00'));
 
       return (
         <>
@@ -86,7 +86,7 @@ describe('CEDateTimeInput', () => {
 
     render(<Wrapper />);
 
-    const input = screen.getByTestId('ce-date-time-input');
+    const input = screen.getByTestId('ce-date-time-input') as HTMLInputElement;
     const restoreValueProperty = allowIntermediateNativeInputValues(input);
 
     try {
@@ -116,7 +116,7 @@ describe('CEDateTimeInput', () => {
     const handleChange = jest.fn();
 
     const Wrapper = () => {
-      const [selected, setSelected] = React.useState(new Date('2026-04-06T12:30:00'));
+      const [selected, setSelected] = React.useState<Date | null>(new Date('2026-04-06T12:30:00'));
 
       return (
         <>
@@ -136,7 +136,7 @@ describe('CEDateTimeInput', () => {
 
     render(<Wrapper />);
 
-    const input = screen.getByTestId('ce-date-time-input');
+    const input = screen.getByTestId('ce-date-time-input') as HTMLInputElement;
     const restoreValueProperty = allowIntermediateNativeInputValues(input);
 
     try {
