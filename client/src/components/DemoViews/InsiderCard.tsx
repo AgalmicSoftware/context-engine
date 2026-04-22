@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 
 import styles from './CorpusViewer.module.scss';
-import { DebateMapSection, ExternalSourceLink } from './TweetCard.jsx';
+import { DebateMapSection, ExternalSourceLink } from './TweetCard';
 
 type InsiderEntry = {
   id?: string;

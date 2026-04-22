@@ -27,7 +27,7 @@ import PolicyGlobe, {
   getPolicyStatusLabel,
 } from './PolicyGlobe.jsx';
 import policyStyles from './PolicyGlobe.module.scss';
-import TweetCard, { DebateMapSection, ExternalSourceLink } from './TweetCard.jsx';
+import TweetCard, { DebateMapSection, ExternalSourceLink } from './TweetCard';
 import { PUBLIC_AI_DISCOURSE_CORPUS_URL } from '../../variables/publicRepoMetadata.js';
 
 // Hidden tabs — restore by adding 'cross_corpus' or 'lesswrong_posts' back to this array
