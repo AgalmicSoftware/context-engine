@@ -733,10 +733,17 @@ const buildWorkerSessionConfigPayload = ({
   return out;
 };
 
+const resolveAutoFeatureBySessionSlug = (metadata) => (
+  metadata?.autoFeatureSBTsBySessionSlug !== undefined
+    ? metadata.autoFeatureSBTsBySessionSlug
+    : metadata?.autoFeatureSBTsWithFeaturedSbtTags
+);
+
 const buildEditableSessionMetadataPayload = ({
   sessionConfig,
   blockLimits,
   fallbackStart = null,
+  autoFeatureSBTsBySessionSlug,
   autoFeatureSBTsWithFeaturedSbtTags,
   hasAutoFeatureOverride = false,
   advancedDraft = null,
@@ -752,13 +759,21 @@ const buildEditableSessionMetadataPayload = ({
     throw new Error('Session metadata requires blockLimits.start (positive block number).');
   }
   metadata.blockLimits = normalizedBlockLimits;
+  const existingAutoFeature = resolveAutoFeatureBySessionSlug(metadata);
+  delete metadata.autoFeatureSBTsWithFeaturedSbtTags;
   if (hasAutoFeatureOverride) {
-    metadata.autoFeatureSBTsWithFeaturedSbtTags = autoFeatureSBTsWithFeaturedSbtTags === true;
+    const overrideAutoFeature = autoFeatureSBTsBySessionSlug !== undefined
+      ? autoFeatureSBTsBySessionSlug
+      : autoFeatureSBTsWithFeaturedSbtTags;
+    metadata.autoFeatureSBTsBySessionSlug = overrideAutoFeature === true;
+  } else if (existingAutoFeature !== undefined) {
+    metadata.autoFeatureSBTsBySessionSlug = existingAutoFeature;
   }
   const withAdvancedEdits = advancedDraft ? applyAdminMetadataDraft(metadata, advancedDraft) : metadata;
   const sanitized = sanitizeSessionWizardMetadataPayload(withAdvancedEdits, {
     defaultAiModels: ADMIN_DEFAULT_AI_MODELS,
   });
+  delete sanitized.autoFeatureSBTsWithFeaturedSbtTags;
   const originalContracts = metadata.contracts && typeof metadata.contracts === 'object' ? metadata.contracts : {};
   const sanitizedContracts = sanitized.contracts && typeof sanitized.contracts === 'object' ? sanitized.contracts : {};
   const mergedContracts = { ...originalContracts, ...sanitizedContracts };
@@ -1330,7 +1345,7 @@ const AdminPage = ({
       end: toStr(groupMetadata?.blockLimits?.end).trim(),
     });
     setMetadataConfigDraft(buildAdminMetadataDraft(groupMetadata || {}));
-    setMetadataAutoFeatureDraft(groupMetadata?.autoFeatureSBTsWithFeaturedSbtTags !== false);
+    setMetadataAutoFeatureDraft(resolveAutoFeatureBySessionSlug(groupMetadata) !== false);
     setCopiedRawMetadataJson(false);
     // `metadataDraftTouched` is intentionally omitted so same-session edits do not retrigger hydration.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -2687,7 +2702,7 @@ const AdminPage = ({
         sessionConfig: groupMetadata,
         blockLimits: metadataBlockLimitsDraft,
         fallbackStart: metadataLatestBlock,
-        autoFeatureSBTsWithFeaturedSbtTags: metadataAutoFeatureDraft,
+        autoFeatureSBTsBySessionSlug: metadataAutoFeatureDraft,
         hasAutoFeatureOverride: metadataAutoFeatureTouched,
         advancedDraft: metadataConfigDraft,
       });
@@ -3298,7 +3313,7 @@ const AdminPage = ({
                             setMetadataAutoFeatureDraft(!!e.target.checked);
                           }}
                         />
-                        Auto-feature SBTs whose metadata points to this session URL
+                        Auto-feature by session slug
                       </Label>
                     </FormGroup>
                     <FormGroup className={styles.metadataSelectorGroup}>

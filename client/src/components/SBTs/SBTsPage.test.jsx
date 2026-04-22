@@ -338,6 +338,7 @@ describe('SBTsPage auto-feature flag', () => {
     const betaManualAddress = '0x00000000000000000000000000000000000000b1';
     const betaAutoAddress = '0x00000000000000000000000000000000000000b2';
     const gammaAutoAddress = '0x00000000000000000000000000000000000000c1';
+    const deltaAutoAddress = '0x00000000000000000000000000000000000000d1';
 
     contractScripts.getSessionConfigBySlug.mockImplementation((slug) => {
       const normalized = String(slug || '');
@@ -352,12 +353,20 @@ describe('SBTsPage auto-feature flag', () => {
         return {
           slug: 'beta',
           featured_SBTs_LIST: [betaManualAddress],
-          autoFeatureSBTsWithFeaturedSbtTags: false,
+          autoFeatureSBTsBySessionSlug: false,
         };
       }
       if (normalized === 'gamma') {
         return {
           slug: 'gamma',
+          featured_SBTs_LIST: [],
+          autoFeatureSBTsBySessionSlug: true,
+          autoFeatureSBTsWithFeaturedSbtTags: false,
+        };
+      }
+      if (normalized === 'delta') {
+        return {
+          slug: 'delta',
           featured_SBTs_LIST: [],
           autoFeatureSBTsWithFeaturedSbtTags: true,
         };
@@ -409,6 +418,20 @@ describe('SBTsPage auto-feature flag', () => {
           },
         };
       }
+      if (slug === 'delta') {
+        return {
+          '84532': {
+            sbtList: {
+              [deltaAutoAddress.toLowerCase()]: {
+                sbtAddress: deltaAutoAddress,
+                sbtInfo: {
+                  sessionSlug: 'delta',
+                },
+              },
+            },
+          },
+        };
+      }
       return null;
     });
 
@@ -419,15 +442,17 @@ describe('SBTsPage auto-feature flag', () => {
       effectiveSessionAutoFeature: true,
       isSBTCacheReady: true,
       includeListScopeSessions: true,
-      listScopeSessionSlugs: ['alpha', 'beta'],
+      listScopeSessionSlugs: ['alpha', 'beta', 'gamma', 'delta'],
     });
 
     expect(result).toEqual([
       { address: alphaManualAddress, sessionSlug: 'alpha' },
       { address: alphaAutoAddress, sessionSlug: 'alpha' },
       { address: betaManualAddress, sessionSlug: 'beta' },
+      { address: gammaAutoAddress, sessionSlug: 'gamma' },
+      { address: deltaAutoAddress, sessionSlug: 'delta' },
     ]);
-    expect(peekCacheSync.mock.calls.map((args) => args[1])).toEqual(['alpha']);
+    expect(peekCacheSync.mock.calls.map((args) => args[1])).toEqual(['alpha', 'gamma', 'delta']);
   });
 
   it('supports externally controlled embedded create state while hiding the mini action row', () => {
@@ -962,7 +987,7 @@ describe('SBTsPage auto-feature flag', () => {
         isSBTCacheReady={true}
         defaultFeaturedSBTs={[]}
         sessionSlug="alpha"
-        sessionConfig={{ autoFeatureSBTsWithFeaturedSbtTags: false }}
+        sessionConfig={{ autoFeatureSBTsBySessionSlug: false }}
         miniaturized={true}
       />
     );

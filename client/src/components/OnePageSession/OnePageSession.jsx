@@ -58,6 +58,12 @@ const AGGREGATOR_PARSE_MEMO_MAX = 3000;
 const SBT_TOOLTIP_LABEL = isCryptoMode() ? 'Soulbound tokens (SBTs)' : `${t('sbtFull')}s`;
 const DEMO_CORPUS_GITHUB_URL = PUBLIC_AI_DISCOURSE_CORPUS_URL;
 
+const resolveAutoFeatureBySessionSlug = (metadata) => (
+  metadata?.autoFeatureSBTsBySessionSlug !== undefined
+    ? metadata.autoFeatureSBTsBySessionSlug
+    : metadata?.autoFeatureSBTsWithFeaturedSbtTags
+);
+
 const isPerfCountersEnabled = () => {
   try {
     return typeof globalThis !== 'undefined' && (
@@ -559,6 +565,7 @@ class OnePageSession extends Component {
     slug,
     sessionName,
     questionsGenPrompt,
+    autoFeatureSBTsBySessionSlug,
     autoFeatureSBTsWithFeaturedSbtTags,
     incomingSessionConfig,
     contracts,
@@ -573,6 +580,7 @@ class OnePageSession extends Component {
       prevInputs.slug === slug &&
       prevInputs.sessionName === sessionName &&
       prevInputs.questionsGenPrompt === questionsGenPrompt &&
+      prevInputs.autoFeatureSBTsBySessionSlug === autoFeatureSBTsBySessionSlug &&
       prevInputs.autoFeatureSBTsWithFeaturedSbtTags === autoFeatureSBTsWithFeaturedSbtTags &&
       prevInputs.baseSessionConfig === baseSessionConfig &&
       prevInputs.contracts === contracts
@@ -580,21 +588,30 @@ class OnePageSession extends Component {
       return this._resolvedSessionConfigMemoValue;
     }
 
+    const propAutoFeature = autoFeatureSBTsBySessionSlug !== undefined
+      ? autoFeatureSBTsBySessionSlug
+      : autoFeatureSBTsWithFeaturedSbtTags;
+    const resolvedAutoFeature = propAutoFeature !== undefined
+      ? propAutoFeature
+      : resolveAutoFeatureBySessionSlug(baseSessionConfig);
     const resolved = {
       ...baseSessionConfig,
       slug,
       sessionName,
       questionsGenPrompt,
-      autoFeatureSBTsWithFeaturedSbtTags,
       contracts: (contracts && typeof contracts === 'object')
         ? contracts
         : (baseSessionConfig.contracts || {}),
     };
+    if (resolvedAutoFeature !== undefined) {
+      resolved.autoFeatureSBTsBySessionSlug = resolvedAutoFeature;
+    }
 
     this._resolvedSessionConfigMemoInputs = {
       slug,
       sessionName,
       questionsGenPrompt,
+      autoFeatureSBTsBySessionSlug,
       autoFeatureSBTsWithFeaturedSbtTags,
       baseSessionConfig,
       contracts,
@@ -2045,6 +2062,7 @@ class OnePageSession extends Component {
       contracts,
       blockLimits,
       networkChainId,
+      autoFeatureSBTsBySessionSlug,
       autoFeatureSBTsWithFeaturedSbtTags,
       questionsGenPrompt, // <-- Destructured
       sessionConfig: incomingSessionConfig,
@@ -2054,6 +2072,7 @@ class OnePageSession extends Component {
       slug,
       sessionName,
       questionsGenPrompt,
+      autoFeatureSBTsBySessionSlug,
       autoFeatureSBTsWithFeaturedSbtTags,
       incomingSessionConfig,
       contracts,

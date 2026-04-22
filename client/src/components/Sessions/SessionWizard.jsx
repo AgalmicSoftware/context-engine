@@ -913,6 +913,11 @@ const DEFAULT_AI_MODELS = Object.freeze({
   thinking: 'gpt-5',
 });
 const DEFAULT_NEW_SESSION_SBT_TAGS = 'group, event, idea, demographic, location';
+const resolveAutoFeatureBySessionSlug = (metadata) => (
+  metadata?.autoFeatureSBTsBySessionSlug !== undefined
+    ? metadata.autoFeatureSBTsBySessionSlug
+    : metadata?.autoFeatureSBTsWithFeaturedSbtTags
+);
 const METADATA_FIELD_ORDER = [
   'networkChainId',
   'sessionId',
@@ -927,7 +932,7 @@ const METADATA_FIELD_ORDER = [
   'defaultSbtTags',
   'defaultFilterState',
   'defaultFeaturedSBTs',
-  'autoFeatureSBTsWithFeaturedSbtTags',
+  'autoFeatureSBTsBySessionSlug',
   'HIGHLIGHTED_QUESTION_IDS',
   'BLOCKED_QUESTION_IDS',
   'HIGHLIGHTED_SURVEY_IDS',
@@ -952,7 +957,7 @@ const MORE_OPTIONS_FIELDS = new Set([
   'defaultTags',
   'defaultSbtTags',
   'defaultFeaturedSBTs',
-  'autoFeatureSBTsWithFeaturedSbtTags',
+  'autoFeatureSBTsBySessionSlug',
   'questionsGenPrompt',
   'defaultFilterState',
 ]);
@@ -1778,8 +1783,12 @@ const normalizeDraftShape = (draftIn = {}) => {
   if (!toStr(draft.faucet.rpcUrl).trim()) {
     draft.faucet.rpcUrl = getDefaultHttpRpc(chainId) || draft.faucet.rpcUrl;
   }
-  if (typeof draft.autoFeatureSBTsWithFeaturedSbtTags !== 'boolean') {
-    draft.autoFeatureSBTsWithFeaturedSbtTags = true;
+  const resolvedAutoFeature = resolveAutoFeatureBySessionSlug(draft);
+  delete draft.autoFeatureSBTsWithFeaturedSbtTags;
+  if (typeof resolvedAutoFeature !== 'boolean') {
+    draft.autoFeatureSBTsBySessionSlug = true;
+  } else {
+    draft.autoFeatureSBTsBySessionSlug = resolvedAutoFeature;
   }
   if (typeof draft.embeddedDeployHelperEnabled !== 'boolean') {
     draft.embeddedDeployHelperEnabled = CE_DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED !== false;
@@ -1804,7 +1813,8 @@ const DEFAULT_TEMPLATE = (() => {
   draft.defaultFilterState = draft.defaultFilterState ?? null;
   // The wizard seed reuses the default-session demo config, but fresh `/new`
   // drafts should start with session-group auto-feature enabled.
-  draft.autoFeatureSBTsWithFeaturedSbtTags = true;
+  delete draft.autoFeatureSBTsWithFeaturedSbtTags;
+  draft.autoFeatureSBTsBySessionSlug = true;
   draft.embeddedDeployHelperEnabled = CE_DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED !== false;
   draft.litCredentials = {};
   draft.perMemberSpendLimits = draft.perMemberSpendLimits || { ai: '', arweave: '', txGas: '' };
@@ -2081,7 +2091,7 @@ const FIELD_TOOLTIPS = {
   questionsGenPrompt: 'Extra instructions for the AI when it generates questions for this session.',
   defaultFilterState: 'Advanced: a saved starting state for the question filter UI. Most sessions can leave this alone unless you want the page to open with a specific preset.',
   defaultFeaturedSBTs: `Manually feature specific ${t('sbtsLower')} for this session. These are surfaced first in ${t('sbt')} selectors and featured session views.`,
-  autoFeatureSBTsWithFeaturedSbtTags: `Automatically show ${t('sbtsLower')} created for this session in featured Groups areas when their metadata points to this session URL. In list scope, this session can also contribute those ${t('sbtsLower')} to the shared featured strip.`,
+  autoFeatureSBTsBySessionSlug: `Automatically show ${t('sbtsLower')} created for this session in featured Groups areas when their metadata points to this session slug. In list scope, this session can also contribute those ${t('sbtsLower')} to the shared featured strip.`,
   networkChainId: 'Primary chain id for the session.',
   contracts: 'Contract addresses + chain ids for this session.',
   blockLimits: 'Optional start and end limits for indexing this session. Use this when the session should only read activity from a certain block range or time window.',
@@ -2106,7 +2116,7 @@ const FIELD_LABELS = {
   sessionHeader: 'Header Image',
   defaultTags: 'Default Tag Suggestions',
   defaultFeaturedSBTs: `Default ${t('sbts')}`,
-  autoFeatureSBTsWithFeaturedSbtTags: `Auto-feature Session ${t('sbts')}`,
+  autoFeatureSBTsBySessionSlug: `Auto-feature Session ${t('sbts')}`,
   contracts: 'Smart Contracts',
   blockLimits: 'Time Limits',
 };
@@ -2127,7 +2137,7 @@ const TOP_LEVEL_FIELD_ORDER = [
   'defaultTags',
   'defaultSbtTags',
   'defaultFeaturedSBTs',
-  'autoFeatureSBTsWithFeaturedSbtTags',
+  'autoFeatureSBTsBySessionSlug',
   'questionsGenPrompt',
   'defaultFilterState',
 ];
@@ -5298,7 +5308,7 @@ const SessionWizard = ({
     const isBool = typeof value === 'boolean';
     const isNumber = typeof value === 'number';
     if (isBool) {
-      const checkboxClass = keyString === 'autoFeatureSBTsWithFeaturedSbtTags' ? styles.checkboxOffset : '';
+      const checkboxClass = keyString === 'autoFeatureSBTsBySessionSlug' ? styles.checkboxOffset : '';
       return (
         <FormGroup key={keyString} className={styles.fieldGroup}>
           <div className={styles.fieldHeader}>
@@ -5918,6 +5928,11 @@ const SessionWizard = ({
     if (!metadata.sessionName) delete metadata.sessionName;
     if (!metadata.sessionInfo) delete metadata.sessionInfo;
     metadata.slug = normalizeSlug(metadata.slug);
+    const resolvedAutoFeature = resolveAutoFeatureBySessionSlug(metadata);
+    delete metadata.autoFeatureSBTsWithFeaturedSbtTags;
+    if (resolvedAutoFeature !== undefined) {
+      metadata.autoFeatureSBTsBySessionSlug = resolvedAutoFeature;
+    }
     const formattedSessionId = sessionRegistryUtils.formatSessionId(sessionId);
     const sessionIdHex = sessionRegistryUtils.normalizeSessionIdHex(sessionId);
     metadata.sessionId = formattedSessionId || toStr(sessionId).trim() || '';
