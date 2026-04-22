@@ -6,7 +6,7 @@ import { ethers } from 'ethers';
 import styles from './SBTSelector.module.scss';
 import { faCog, faExternalLinkAlt, faSpinner, faTimes } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import AsyncSearchSelect from "../Shared/AsyncSearchSelect.jsx";
+import AsyncSearchSelect from "../Shared/AsyncSearchSelect";
 
 import contractScripts from '../../utilities/web3/contractScripts.js';
 import {

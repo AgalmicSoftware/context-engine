@@ -3,9 +3,40 @@ import { faSpinner } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import styles from './AsyncSearchSelect.module.scss';
 
-const cx = (...names) => names.filter(Boolean).join(' ');
+type AsyncSearchOption = Record<string, unknown> & {
+  value?: unknown;
+  label?: React.ReactNode;
+};
 
-const getFallbackLabel = (option) => option?.label ?? option?.value ?? '';
+type AsyncSearchSelectProps = {
+  id?: string;
+  options?: AsyncSearchOption[] | null;
+  value?: AsyncSearchOption | null;
+  onChange?: (option: AsyncSearchOption) => void;
+  placeholder?: string;
+  isLoading?: boolean;
+  loadingMessage?: () => React.ReactNode;
+  noOptionsMessage?: () => React.ReactNode;
+  formatOptionLabel?: (option: AsyncSearchOption) => React.ReactNode;
+  formatValueLabel?: (option: AsyncSearchOption) => React.ReactNode;
+  getOptionValue?: (option: AsyncSearchOption | null | undefined) => unknown;
+  filterOption?: (option: AsyncSearchOption, query: string) => boolean;
+  classNamePrefix?: string;
+  variant?: string;
+  className?: string;
+  disabled?: boolean;
+  inputId?: string;
+};
+
+const cx = (...names: Array<string | false | null | undefined>) => names.filter(Boolean).join(' ');
+
+const focusElement = (node: Element | null) => {
+  if (node instanceof HTMLElement) node.focus();
+};
+
+const getFallbackLabel = (option: AsyncSearchOption | null | undefined) => (
+  option?.label ?? (option?.value == null ? '' : String(option.value))
+);
 
 const AsyncSearchSelect = ({
   id,
@@ -25,30 +56,30 @@ const AsyncSearchSelect = ({
   className = '',
   disabled = false,
   inputId,
-}) => {
+}: AsyncSearchSelectProps) => {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [focusedIndex, setFocusedIndex] = useState(-1);
-  const wrapperRef = useRef(null);
-  const searchRef = useRef(null);
-  const listRef = useRef(null);
+  const wrapperRef = useRef<HTMLDivElement | null>(null);
+  const searchRef = useRef<HTMLInputElement | null>(null);
+  const listRef = useRef<HTMLDivElement | null>(null);
   const generatedId = useId();
   const resolvedInputId = inputId || id || 'ce-async-select-' + generatedId;
   const controlLabelId = resolvedInputId + '-label';
   const normalizedOptions = useMemo(() => (Array.isArray(options) ? options : []), [options]);
   const hasValue = value !== null && value !== undefined;
-  const optionKeyFor = useCallback((option) => {
+  const optionKeyFor = useCallback((option: AsyncSearchOption | null | undefined) => {
     if (option === null || option === undefined) return '';
     return String(
       (typeof getOptionValue === 'function' ? getOptionValue(option) : option?.value) ?? ''
     );
   }, [getOptionValue]);
   const renderOptionLabel = useCallback(
-    (option) => (typeof formatOptionLabel === 'function' ? formatOptionLabel(option) : getFallbackLabel(option)),
+    (option: AsyncSearchOption) => (typeof formatOptionLabel === 'function' ? formatOptionLabel(option) : getFallbackLabel(option)),
     [formatOptionLabel]
   );
   const renderValueLabel = useCallback(
-    (option) => (typeof formatValueLabel === 'function' ? formatValueLabel(option) : renderOptionLabel(option)),
+    (option: AsyncSearchOption) => (typeof formatValueLabel === 'function' ? formatValueLabel(option) : renderOptionLabel(option)),
     [formatValueLabel, renderOptionLabel]
   );
   const selectedKey = useMemo(() => optionKeyFor(value), [optionKeyFor, value]);
@@ -77,33 +108,35 @@ const AsyncSearchSelect = ({
     setQuery('');
     setFocusedIndex(-1);
   }, []);
-  const handleWrapperBlur = useCallback((event) => {
+  const handleWrapperBlur = useCallback((event: React.FocusEvent<HTMLDivElement>) => {
     if (!open || !wrapperRef.current) return;
     const nextFocused = event.relatedTarget;
-    if (nextFocused && wrapperRef.current.contains(nextFocused)) return;
+    if (nextFocused instanceof Node && wrapperRef.current.contains(nextFocused)) return;
     requestAnimationFrame(() => {
       const activeElement = document.activeElement;
-      if (wrapperRef.current?.contains(activeElement)) return;
+      if (activeElement && wrapperRef.current?.contains(activeElement)) return;
       closeMenu();
     });
   }, [closeMenu, open]);
-  const focusOptionAt = useCallback((index) => {
+  const focusOptionAt = useCallback((index: number) => {
     setFocusedIndex(index);
     const row = listRef.current?.querySelector(`[data-ce-async-select-index="${index}"]`);
-    if (row && typeof row.focus === 'function') row.focus();
+    focusElement(row ?? null);
   }, []);
   useEffect(() => {
     if (disabled && open) closeMenu();
   }, [closeMenu, disabled, open]);
   useEffect(() => {
     if (!open) return undefined;
-    const handlePointerDown = (event) => wrapperRef.current
+    const handlePointerDown = (event: PointerEvent) => wrapperRef.current
+      && event.target instanceof Node
       && !wrapperRef.current.contains(event.target)
       && closeMenu();
-    const handleFocusIn = (event) => wrapperRef.current
+    const handleFocusIn = (event: FocusEvent) => wrapperRef.current
+      && event.target instanceof Node
       && !wrapperRef.current.contains(event.target)
       && closeMenu();
-    const handleKeyDown = (event) => event.key === 'Escape' && closeMenu();
+    const handleKeyDown = (event: KeyboardEvent) => event.key === 'Escape' && closeMenu();
     document.addEventListener('pointerdown', handlePointerDown);
     document.addEventListener('focusin', handleFocusIn);
     document.addEventListener('keydown', handleKeyDown);
@@ -126,12 +159,12 @@ const AsyncSearchSelect = ({
     }
     setOpen(true);
   }, [closeMenu, disabled, open]);
-  const handleSelect = useCallback((option) => {
+  const handleSelect = useCallback((option: AsyncSearchOption) => {
     if (disabled || !onChange) return;
     onChange(option);
     closeMenu();
   }, [closeMenu, disabled, onChange]);
-  const handleSearchKeyDown = useCallback((event) => {
+  const handleSearchKeyDown = useCallback((event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'ArrowDown' && hasVisibleOptions) {
       event.preventDefault();
       focusOptionAt(0);
@@ -139,7 +172,7 @@ const AsyncSearchSelect = ({
     }
     if (event.key === 'Tab') closeMenu();
   }, [closeMenu, focusOptionAt, hasVisibleOptions]);
-  const handleRowKeyDown = useCallback((event, option, index) => {
+  const handleRowKeyDown = useCallback((event: React.KeyboardEvent<HTMLDivElement>, option: AsyncSearchOption, index: number) => {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
       handleSelect(option);
