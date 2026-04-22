@@ -121,11 +121,11 @@ const readCreateSbtFormPayload = ({
   clearInvalid?: boolean;
 }): CreateSbtDraftPayload | null => {
   if (!storage || !key) return null;
-  const result = safeJsonRead<CreateSbtDraftPayload>(
+  const result = safeJsonRead(
     storage,
     key,
     (parsed) => {
-      if (isRecord(parsed)) return parsed;
+      if (parsed && typeof parsed === 'object') return parsed;
       throw new Error('Create SBT form cache payload must be a JSON object.');
     },
     { clearInvalid }
