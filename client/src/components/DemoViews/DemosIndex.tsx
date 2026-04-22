@@ -4,14 +4,22 @@ import { Link } from "react-router-dom";
 import { readPublicUrlBasePath } from "../../utilities/ui/publicUrl.js";
 import demoSessions from "../../variables/demo/demo_sessions.json";
 
-const cardStyle = {
+type DemoSessionEntry = {
+  sessionName?: string;
+  sessionInfo?: string;
+  slug?: string;
+};
+
+const demoSessionEntries = demoSessions as Record<string, DemoSessionEntry>;
+
+const cardStyle: React.CSSProperties = {
   background: "rgba(255,255,255,0.06)",
   borderRadius: 12,
   padding: 24,
   marginBottom: 16,
 };
 
-const linkStyle = {
+const linkStyle: React.CSSProperties = {
   color: "#4dffa4",
   textDecoration: "none",
   display: "inline-flex",
@@ -25,7 +33,7 @@ const linkStyle = {
 
 const DemosIndex = () => {
   const basePath = readPublicUrlBasePath();
-  const demoEntries = Object.entries(demoSessions);
+  const demoEntries = Object.entries(demoSessionEntries);
 
   return (
     <div style={{ padding: "40px 20px", maxWidth: 960, margin: "0 auto" }}>
