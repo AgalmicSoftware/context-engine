@@ -1,4 +1,5 @@
 import {
+  CREATE_SBT_FORM_CACHE_LEGACY_POLICY,
   LEGACY_CREATE_SBT_FORM_CACHE_KEY,
   getScopedCreateSbtFormCacheKey,
   hasCachedCreateSbtForm,
@@ -12,6 +13,16 @@ describe('createSbtFormCache helpers', () => {
 
   it('returns false when no cache exists', () => {
     expect(hasCachedCreateSbtForm()).toBe(false);
+  });
+
+  it('documents the legacy migration policy in code', () => {
+    expect(CREATE_SBT_FORM_CACHE_LEGACY_POLICY).toEqual({
+      legacyKey: LEGACY_CREATE_SBT_FORM_CACHE_KEY,
+      scopedKeyPrefix: 'dg:createSbtFormCache:',
+      legacyWritesAllowed: false,
+      migration: 'read-migrate-clear',
+      removeAfter: 'one public release after scoped create-SBT draft writes are verified',
+    });
   });
 
   it('detects meaningful legacy create cache payloads', () => {
