@@ -225,13 +225,8 @@ export const normalizeWalletError = (error: unknown): AdapterResult => {
 };
 
 const getChainIdHex = (chain: AnyRecord = {}): string => {
-  const explicit = String(chain.chainIdHex || '').trim();
+  const explicit = String(chain.chainIdHex || chain.chainId || '').trim();
   if (explicit.startsWith('0x')) return explicit;
-  const chainIdValue = chain.id ?? chain.chainId ?? explicit;
-  const numericChainId = Number(chainIdValue || 0);
-  if (Number.isFinite(numericChainId) && numericChainId > 0) {
-    return `0x${numericChainId.toString(16)}`;
-  }
   return chainHexId(chain);
 };
 
