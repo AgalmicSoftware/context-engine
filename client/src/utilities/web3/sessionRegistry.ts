@@ -609,7 +609,7 @@ const toRegistrySlug = (raw: unknown) => {
   return slug;
 };
 
-const validateRegistrySlugForWriteOrThrow = (raw: unknown) => {
+const validateRegistrySlugForWriteOrThrow = (raw) => {
   const slugValidation = validateRegistrySessionSlugForWrite(raw);
   if (!slugValidation.ok) {
     throw new Error(slugValidation.error || 'Invalid session slug.');
@@ -617,7 +617,7 @@ const validateRegistrySlugForWriteOrThrow = (raw: unknown) => {
   return slugValidation.slug;
 };
 
-const setValueAtPath = (obj: AnyRecord, path: string[], value: unknown) => {
+const setValueAtPath = (obj, path, value) => {
   let cur = obj;
   path.forEach((key: string, idx: number) => {
     if (idx === path.length - 1) {
@@ -1852,11 +1852,7 @@ export const registerSessionOnChain = async ({
   if (!registryAddress) {
     throw new Error('Session registry address not configured for this chain.');
   }
-  const slugValidation = validateRegistrySessionSlugForWrite(slug);
-  if (!slugValidation.ok) {
-    throw new Error(slugValidation.error || 'Invalid session slug.');
-  }
-  const registrySlug = slugValidation.slug;
+  const registrySlug = validateRegistrySlugForWriteOrThrow(slug);
   const sessionIdHex = normalizeSessionIdHex(sessionId);
   if (!sessionIdHex) {
     throw new Error('Session ID (UUID) is required.');

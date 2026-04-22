@@ -209,6 +209,9 @@ const getAiSettingsStorage = (storageIn) => {
 
 const hasProviderPlaintextKey = (entry = {}) => !!toStr(entry?.apiKey).trim();
 const hasProviderEncryptedKey = (entry = {}) => !!toStr(entry?.encryptedApiKey).trim();
+// Regression guard: plaintext keys are runtime-only; persistence must stay on
+// the envelope writer so normal saves cannot downgrade or leak apiKey values.
+let volatileLocalAiProviderKeys = {};
 
 const summarizeAiSettingsSecretMetadata = (settings = {}) => {
   const providers = settings?.providers && typeof settings.providers === 'object'
@@ -218,6 +221,43 @@ const summarizeAiSettingsSecretMetadata = (settings = {}) => {
   return {
     encryptedAvailable: entries.some((entry) => hasProviderEncryptedKey(entry)),
     legacyPlaintextDetected: entries.some((entry) => hasProviderPlaintextKey(entry)),
+  };
+};
+
+const rememberVolatilePlaintextProviderKeys = (settings = {}) => {
+  const providers = settings?.providers && typeof settings.providers === 'object'
+    ? settings.providers
+    : {};
+  volatileLocalAiProviderKeys = {
+    ...volatileLocalAiProviderKeys,
+    ...Object.entries(providers).reduce((acc, [provider, entry]) => {
+      if (!entry || typeof entry !== 'object' || !Object.prototype.hasOwnProperty.call(entry, 'apiKey')) {
+        return acc;
+      }
+      const apiKey = toStr(entry.apiKey).trim();
+      acc[provider] = apiKey;
+      return acc;
+    }, {}),
+  };
+  Object.keys(volatileLocalAiProviderKeys).forEach((provider) => {
+    if (!volatileLocalAiProviderKeys[provider]) {
+      delete volatileLocalAiProviderKeys[provider];
+    }
+  });
+};
+
+const overlayVolatilePlaintextProviderKeys = (settings = {}) => {
+  if (!Object.keys(volatileLocalAiProviderKeys).length) return settings;
+  const normalized = normalizeAiSettings(settings, { includeUseLocal: true });
+  return {
+    ...normalized,
+    providers: Object.entries(normalized.providers || {}).reduce((acc, [provider, entry]) => {
+      acc[provider] = {
+        ...entry,
+        apiKey: volatileLocalAiProviderKeys[provider] || entry.apiKey || '',
+      };
+      return acc;
+    }, {}),
   };
 };
 
@@ -608,9 +648,10 @@ export const getSessionAiSettings = (slugIn = '') => {
 
 export const getLocalAiSettings = () => {
   const result = readLocalAiSettingsEnvelope();
-  return result.ok && result.settings
+  const settings = result.ok && result.settings
     ? normalizeAiSettings(result.settings, { includeUseLocal: true })
     : buildDefaultAiSettings(true);
+  return overlayVolatilePlaintextProviderKeys(settings);
 };
 
 export const saveLocalAiSettings = (nextSettings = {}) => {
