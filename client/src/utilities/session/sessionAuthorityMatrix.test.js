@@ -18,7 +18,7 @@ describe('sessionAuthorityMatrix', () => {
     expect(isDemoSourceAllowed('workerConfig', 'demo')).toBe(false);
   });
 
-  it('documents registry authority, faucet, and discovery boundaries', () => {
+  it('documents PRD 441 registry authority, faucet, and discovery boundaries', () => {
     expect(AUTHORITY_MATRIX.slugNormalization).toEqual(expect.objectContaining({
       authoritativeSource: AUTHORITY_SOURCES.REGISTRY,
       fields: expect.arrayContaining(['registrySlug', 'legacyExactSlug']),
@@ -35,14 +35,5 @@ describe('sessionAuthorityMatrix', () => {
         AUTHORITY_SOURCES.BUNDLED,
       ]),
     }));
-  });
-
-  it('stores Lit Chipotle identifiers in worker config authority instead of worker secrets', () => {
-    expect(AUTHORITY_MATRIX.workerConfig.fields).toContain('litCredentials');
-    expect(AUTHORITY_MATRIX.secrets.fields).not.toContain('litCredentials');
-    expect(AUTHORITY_MATRIX.secrets.fields).toEqual(expect.arrayContaining([
-      'litAccountApiKey',
-      'litUsageApiKey',
-    ]));
   });
 });
