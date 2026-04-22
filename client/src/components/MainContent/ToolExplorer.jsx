@@ -20,7 +20,7 @@ import {
 
 import ToolExplorerPluginExplainer from './ToolExplorerPluginExplainer.jsx';
 import LazyFallback from '../Shared/LazyFallback';
-import SessionChipSelector from '../Shared/SessionChipSelector.jsx';
+import SessionChipSelector from '../Shared/SessionChipSelector';
 
 import riskMatrixImage from '../../assets/img/risk_matrix.jpg';
 import modelDirectoryImage from '../../assets/img/model_directory.jpg';

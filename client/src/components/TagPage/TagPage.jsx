@@ -24,7 +24,7 @@ import { normalizeGlobalSessionSelection } from '../../utilities/session/globalS
 import { parseQuestionSessionSlugFromSearch } from '../../utilities/survey/questionRouting.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import SingleQuestionResponse from '../SurveyTool/SingleQuestionResponse.jsx';
-import SessionChipSelector from '../Shared/SessionChipSelector.jsx';
+import SessionChipSelector from '../Shared/SessionChipSelector';
 import {
   buildTagPagePath,
 } from '../SurveyTool/QuestionTagDropdown.jsx';

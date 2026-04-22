@@ -1,10 +1,56 @@
 import React from 'react';
-import PropTypes from 'prop-types';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faExternalLinkAlt } from '@fortawesome/free-solid-svg-icons';
 import styles from './SessionChipSelector.module.scss';
 
-const normalizeSlug = (slug) => String(slug || '').trim();
+type CSSVariableStyle = React.CSSProperties & {
+  [key: `--${string}`]: string | number | undefined;
+};
+
+type SessionChipOption = {
+  key?: React.Key;
+  slug?: string | null;
+  label: string;
+  ariaLabel?: string;
+  selected?: boolean;
+  active?: boolean;
+  loaded?: boolean;
+  general?: boolean;
+  primary?: boolean;
+  disabled?: boolean;
+  href?: string;
+  showOpen?: boolean;
+  metaText?: string;
+  progressText?: string;
+  showProgress?: boolean;
+  indeterminate?: boolean;
+  style?: CSSVariableStyle;
+  rowTestId?: string;
+  chipTestId?: string;
+  checkTestId?: string;
+  openTestId?: string;
+  openTitle?: string;
+  progressWrapTestId?: string;
+  progressTrackTestId?: string;
+  progressFillTestId?: string;
+  progressTextTestId?: string;
+  onToggle?: (slug: string, option: SessionChipOption) => void;
+  onOpen?: (slug: string, option: SessionChipOption, event: React.MouseEvent<HTMLSpanElement>) => void;
+};
+
+type SessionChipSelectorProps = {
+  options?: SessionChipOption[] | null;
+  onToggle?: (slug: string, option: SessionChipOption) => void;
+  onOpen?: (slug: string, option: SessionChipOption, event: React.MouseEvent<HTMLSpanElement>) => void;
+  emptyText?: string;
+  className?: string;
+  collapsedLimit?: number;
+  expandLabel?: string;
+  collapseLabel?: string;
+  expandToggleTestId?: string;
+};
+
+const normalizeSlug = (slug?: string | null) => String(slug || '').trim();
 
 const SessionChipSelector = ({
   options = [],
@@ -16,7 +62,7 @@ const SessionChipSelector = ({
   expandLabel = 'See more',
   collapseLabel = 'Show less',
   expandToggleTestId = '',
-}) => {
+}: SessionChipSelectorProps) => {
   const list = Array.isArray(options) ? options : [];
   const normalizedCollapsedLimit = Number.isFinite(Number(collapsedLimit))
     ? Math.max(0, Math.floor(Number(collapsedLimit)))
@@ -64,7 +110,7 @@ const SessionChipSelector = ({
           if (typeof onToggle === 'function') onToggle(slug, option);
         };
 
-        const handleOpenClick = (event) => {
+        const handleOpenClick = (event: React.MouseEvent<HTMLSpanElement>) => {
           event.preventDefault();
           event.stopPropagation();
           if (typeof option.onOpen === 'function') {
@@ -175,47 +221,6 @@ const SessionChipSelector = ({
       ) : null}
     </div>
   );
-};
-
-SessionChipSelector.propTypes = {
-  options: PropTypes.arrayOf(PropTypes.shape({
-    key: PropTypes.string,
-    slug: PropTypes.string,
-    label: PropTypes.string.isRequired,
-    ariaLabel: PropTypes.string,
-    selected: PropTypes.bool,
-    active: PropTypes.bool,
-    loaded: PropTypes.bool,
-    general: PropTypes.bool,
-    primary: PropTypes.bool,
-    disabled: PropTypes.bool,
-    href: PropTypes.string,
-    showOpen: PropTypes.bool,
-    metaText: PropTypes.string,
-    progressText: PropTypes.string,
-    showProgress: PropTypes.bool,
-    indeterminate: PropTypes.bool,
-    style: PropTypes.object,
-    rowTestId: PropTypes.string,
-    chipTestId: PropTypes.string,
-    checkTestId: PropTypes.string,
-    openTestId: PropTypes.string,
-    openTitle: PropTypes.string,
-    progressWrapTestId: PropTypes.string,
-    progressTrackTestId: PropTypes.string,
-    progressFillTestId: PropTypes.string,
-    progressTextTestId: PropTypes.string,
-    onToggle: PropTypes.func,
-    onOpen: PropTypes.func,
-  })),
-  onToggle: PropTypes.func,
-  onOpen: PropTypes.func,
-  emptyText: PropTypes.string,
-  className: PropTypes.string,
-  collapsedLimit: PropTypes.number,
-  expandLabel: PropTypes.string,
-  collapseLabel: PropTypes.string,
-  expandToggleTestId: PropTypes.string,
 };
 
 export default SessionChipSelector;
