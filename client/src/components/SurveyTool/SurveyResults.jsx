@@ -57,7 +57,7 @@ import contractScripts, {
   getAllSessionSlugs,
   getSessionConfigBySlug,
 } from '../../utilities/web3/contractScripts.js';
-import proposalScripts from 'utilities/proposalScripts.js';
+import { getShortenedAddress, getShortenedQuestionID, getShortenedSurveyID } from 'utilities/ui/displayHelpers.js';
 import SBTFilter from '../SBTs/SBTFilter.jsx';
 import QuestionFilter from './QuestionFilter';
 import PolisReport from '../PolisReport/PolisReport';
@@ -2624,7 +2624,7 @@ switch (exportType) {
   case 'CSV (Responses)':
     csvContent = this.generateResponsesCSV();
     const forCSVName = true;
-    const surveyIdShort = surveyId ? proposalScripts.getShortenedSurveyID(surveyId, false, null, forCSVName) : 'all';
+    const surveyIdShort = surveyId ? getShortenedSurveyID(surveyId, false, null, forCSVName) : 'all';
     surveyLog.log('surveyIdShort:', surveyIdShort);
     const responseFileLabel = viewMode === 'survey' ? `contextEngine_surveyResponses_${surveyIdShort}` : 'contextEngine_questionsResponses';
     filename = `${responseFileLabel}_${timestamp}.csv`;
@@ -3471,7 +3471,7 @@ buildLockedGateDetails = (lockedRows = [], questionLookup = {}) => {
       });
       detailsByAddress.set(key, {
         address,
-        label: displayLabel || label || proposalScripts.getShortenedAddress(address, true),
+        label: displayLabel || label || getShortenedAddress(address, true),
         href: buildSbtDetailPath(address, gateContext.slug),
       });
     });
@@ -4038,7 +4038,7 @@ return (
       </thead>
       <tbody>
         {questionEntries.map((entry) => {
-          const shortened = proposalScripts.getShortenedQuestionID(entry.questionId, false);
+          const shortened = getShortenedQuestionID(entry.questionId, false);
           const bookmarked = this.state.bookmarkedQuestionIDs.includes(entry.questionId);
           return (
             <tr key={entry.questionId}>
@@ -4472,7 +4472,7 @@ const currentSurveyIdForFilter = this.state.viewMode === 'survey' ? this.state.s
 const isSynced = (viewMode === 'questions' ? questionColor === 'success' && responseColor === 'success' : responseColor === 'success');
 
 const surveyIdAbbreviation = currentSurveyId
-  ? proposalScripts.getShortenedSurveyID(currentSurveyId, false, null, false)
+  ? getShortenedSurveyID(currentSurveyId, false, null, false)
   : null;
 
 // Compute a context-aware filtered questions count for display
@@ -4982,7 +4982,7 @@ return (
                           className={styles.responderLink}
                           onClick={(e) => e.stopPropagation()}
                         >
-                          {proposalScripts.getShortenedAddress(response.responder, false)}
+                          {getShortenedAddress(response.responder, false)}
                         </a>
                         <a
                           href={`/survey/${encodeURIComponent(currentSurveyId)}/${encodeURIComponent(response.responder)}${this.getEffectiveSlug() ? `?session=${encodeURIComponent(this.getEffectiveSlug())}` : ''}`}
