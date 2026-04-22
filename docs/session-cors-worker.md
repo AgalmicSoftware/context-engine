@@ -970,6 +970,9 @@ Signed login/bootstrap requests:
     it keeps the authenticated-wallet recipient requirement when `scopes.faucet` is absent and now re-checks the
     current `txGas` gate for same-wallet generic funding requests before falling back to the existing
     `Missing sbtAddress.`, `Invalid sbtAddress.`, `Invalid password.`, and group-signature failure behavior.
+  - For SBT proof-backed faucet eligibility, the `txGas` resource gate is authoritative by default. The worker
+    only checks other session resource gates when session config explicitly sets
+    `faucet.allowResourceGateFallback: true`.
   - Faucet RPC execution now also routes through a shared helper after preflight + eligibility:
     it keeps the ordered per-RPC fallback loop, threshold `403` when `currentBalanceWei > thresholdWeiBig`,
     `eth_gasPrice` fallback to `0x3b9aca00`, per-RPC error accumulation, and the final
