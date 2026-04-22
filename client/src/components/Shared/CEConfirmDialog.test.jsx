@@ -1,6 +1,6 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
-import CEConfirmDialog from './CEConfirmDialog.jsx';
+import CEConfirmDialog from './CEConfirmDialog';
 
 describe('CEConfirmDialog', () => {
   it('renders app-native confirmation copy with stable test ids', () => {
