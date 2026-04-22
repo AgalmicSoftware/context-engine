@@ -1,4 +1,3 @@
-/* global BigInt */
 import { webcrypto } from 'crypto';
 import { ethers } from 'ethers';
 import { TextDecoder, TextEncoder } from 'util';
