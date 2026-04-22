@@ -2,7 +2,7 @@ import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
-import ArxivCard from './ArxivCard.jsx';
+import ArxivCard from './ArxivCard';
 
 describe('ArxivCard', () => {
   it('renders arxiv-specific metadata, tags, and source link', () => {
