@@ -41,6 +41,8 @@ test('route inventory records auth requirement, owner, and response smoke shape'
     assert.match(route.path, /^\/api\//);
     assert.match(route.method, /^(GET|POST)$/);
     assert.ok(Object.values(ROUTE_AUTH).includes(route.auth), `unknown auth mode for ${key}`);
+    assert.equal(typeof route.authHelper, 'string');
+    assert.notEqual(route.authHelper.trim(), '');
     assert.equal(typeof route.owner, 'string');
     assert.notEqual(route.owner.trim(), '');
     assert.equal(typeof route.responseShape, 'string');
@@ -55,4 +57,14 @@ test('only local JWT issuance uses trusted-local auth instead of bearer auth', (
     .map(routeKey);
 
   assert.deepEqual(trustedLocalRoutes, ['POST /api/auth/local-jwt']);
+});
+
+test('route inventory records the auth helper planned for router decomposition', () => {
+  for (const route of ROUTE_INVENTORY) {
+    if (route.auth === ROUTE_AUTH.TRUSTED_LOCAL) {
+      assert.equal(route.authHelper, 'requireTrustedLocalRequest');
+    } else {
+      assert.equal(route.authHelper, 'requireLocalJwtAuth');
+    }
+  }
 });

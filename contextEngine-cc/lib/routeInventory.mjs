@@ -3,7 +3,13 @@ export const ROUTE_AUTH = Object.freeze({
   LOCAL_JWT: 'local-jwt',
 });
 
-export const ROUTE_INVENTORY = Object.freeze([
+const authHelperForMode = (auth) => (
+  auth === ROUTE_AUTH.TRUSTED_LOCAL
+    ? 'requireTrustedLocalRequest'
+    : 'requireLocalJwtAuth'
+);
+
+const ROUTE_INVENTORY_ENTRIES = [
   {
     method: 'POST',
     path: '/api/auth/local-jwt',
@@ -158,7 +164,14 @@ export const ROUTE_INVENTORY = Object.freeze([
     owner: 'config',
     responseShape: 'updated public hook config',
   },
-]);
+];
+
+export const ROUTE_INVENTORY = Object.freeze(
+  ROUTE_INVENTORY_ENTRIES.map((route) => Object.freeze({
+    ...route,
+    authHelper: route.authHelper || authHelperForMode(route.auth),
+  }))
+);
 
 export const routeKey = ({ method, path } = {}) => `${String(method || '').toUpperCase()} ${String(path || '')}`;
 
