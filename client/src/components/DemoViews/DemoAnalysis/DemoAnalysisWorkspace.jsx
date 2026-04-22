@@ -8,7 +8,7 @@ import {
   parseSegmentKey,
 } from '../../../utilities/demo/demoAnalysisMath.js';
 import ComparisonReport from './ComparisonReport.jsx';
-import ComparisonSuggestions from './ComparisonSuggestions.jsx';
+import ComparisonSuggestions from './ComparisonSuggestions';
 import DemographicSelector from './DemographicSelector.jsx';
 import QuestionBreakdownChart from './QuestionBreakdownChart.jsx';
 import QuestionDrilldownModal from './QuestionDrilldownModal.jsx';
