@@ -41,6 +41,35 @@ jest.mock('react-simple-maps', () => ({
 import CorpusViewer from './CorpusViewer.jsx';
 import PolicyGlobe from './PolicyGlobe.jsx';
 
+const originalMatchMedia = window.matchMedia;
+
+const setMobileViewport = (matches) => {
+  Object.defineProperty(window, 'matchMedia', {
+    writable: true,
+    value: jest.fn().mockImplementation((query) => {
+      const listeners = new Set();
+
+      return {
+        matches: query === '(max-width: 720px)' ? matches : false,
+        media: query,
+        onchange: null,
+        addEventListener: jest.fn((eventName, listener) => {
+          if (eventName === 'change') listeners.add(listener);
+        }),
+        removeEventListener: jest.fn((eventName, listener) => {
+          if (eventName === 'change') listeners.delete(listener);
+        }),
+        addListener: jest.fn((listener) => listeners.add(listener)),
+        removeListener: jest.fn((listener) => listeners.delete(listener)),
+        dispatchEvent: jest.fn((event) => {
+          listeners.forEach((listener) => listener(event));
+          return true;
+        }),
+      };
+    }),
+  });
+};
+
 const extractMediaBlock = (scss, query, requiredSnippet = '') => {
   let searchFrom = 0;
 
@@ -94,6 +123,13 @@ describe('CorpusViewer', () => {
     mockTagPage.mockClear();
   });
 
+  afterEach(() => {
+    Object.defineProperty(window, 'matchMedia', {
+      writable: true,
+      value: originalMatchMedia,
+    });
+  });
+
   it('keeps the mobile tab strip, card metadata, and action rows viewport-safe', () => {
     const corpusScss = fs.readFileSync(path.join(__dirname, 'CorpusViewer.module.scss'), 'utf8');
     const mobileBlock = extractMediaBlock(corpusScss, '@media (max-width: 720px)', '.container {');
@@ -140,6 +176,8 @@ describe('CorpusViewer', () => {
     expect(mobileBlock).toContain('grid-column: 2;');
     expect(mobileBlock).toContain('.cardFooter {');
     expect(mobileBlock).toContain('flex-direction: column;');
+    expect(mobileBlock).toContain('.tweetPreviewControl {');
+    expect(mobileBlock).toContain('margin-top: 2px;');
     expect(mobileBlock).toContain('.debateMapLink,');
     expect(mobileBlock).toContain('overflow-wrap: anywhere;');
     expect(mobileBlock).toContain('.externalLink span {');
@@ -157,6 +195,10 @@ describe('CorpusViewer', () => {
     expect(phoneBlock).toContain('line-height: 1.16;');
     expect(phoneBlock).toContain('.tweetCard .tweetAuthorRow {');
     expect(phoneBlock).toContain('grid-template-columns: 40px minmax(0, 1fr);');
+    expect(phoneBlock).toContain('.tweetPreviewControl {');
+    expect(phoneBlock).toContain('flex-direction: column;');
+    expect(phoneBlock).toContain('.tweetPreviewButton {');
+    expect(phoneBlock).toContain('width: 100%;');
 
     expect(policyMobileBlock).toContain('.filterButton {');
     expect(policyMobileBlock).toContain('font-size: 11px;');
@@ -177,6 +219,77 @@ describe('CorpusViewer', () => {
     expect(compactMapMobileBlock).toContain('.mapFrameCompact :global(svg) {');
     expect(compactMapMobileBlock).toContain('max-width: none;');
     expect(mapJsx).toMatch(/projectionConfig=\{\{\s*rotate:\s*\[-10,\s*0,\s*0\],\s*scale:\s*compact \? 147 : 147\s*\}\}/);
+  });
+
+  it('shows only the first five tweets behind a mobile View more control', () => {
+    setMobileViewport(true);
+
+    render(
+      <MemoryRouter>
+        <CorpusViewer />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByTestId('ce-context-tweet-list').querySelectorAll('article')).toHaveLength(5);
+    expect(screen.queryByText('@sama')).not.toBeInTheDocument();
+    expect(screen.getByText('5 of 25 tweets shown')).toBeInTheDocument();
+
+    const viewMoreButton = screen.getByTestId('ce-context-tweets-view-more');
+    expect(viewMoreButton).toHaveTextContent('View more');
+    expect(viewMoreButton).toHaveAttribute('aria-controls', 'ce-context-tweet-list');
+    expect(viewMoreButton).toHaveAttribute('aria-expanded', 'false');
+
+    fireEvent.click(viewMoreButton);
+
+    expect(screen.getByTestId('ce-context-tweet-list').querySelectorAll('article')).toHaveLength(25);
+    expect(screen.getByText('@sama')).toBeInTheDocument();
+    expect(screen.getByText('Showing all 25 tweets')).toBeInTheDocument();
+    expect(screen.getByTestId('ce-context-tweets-view-more')).toHaveTextContent('Show fewer');
+    expect(screen.getByTestId('ce-context-tweets-view-more')).toHaveAttribute('aria-expanded', 'true');
+
+    fireEvent.click(screen.getByTestId('ce-context-tweets-view-more'));
+
+    expect(screen.getByTestId('ce-context-tweet-list').querySelectorAll('article')).toHaveLength(5);
+    expect(screen.queryByText('@sama')).not.toBeInTheDocument();
+    expect(screen.getByText('5 of 25 tweets shown')).toBeInTheDocument();
+  });
+
+  it('renders every tweet without the mobile View more control on desktop', () => {
+    setMobileViewport(false);
+
+    render(
+      <MemoryRouter>
+        <CorpusViewer />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByTestId('ce-context-tweet-list').querySelectorAll('article')).toHaveLength(25);
+    expect(screen.getByText('@sama')).toBeInTheDocument();
+    expect(screen.queryByTestId('ce-context-tweets-view-more')).not.toBeInTheDocument();
+    expect(screen.queryByText('5 of 25 tweets shown')).not.toBeInTheDocument();
+  });
+
+  it('resets the mobile tweet preview after switching away from Tweets', () => {
+    setMobileViewport(true);
+
+    render(
+      <MemoryRouter>
+        <CorpusViewer />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(screen.getByTestId('ce-context-tweets-view-more'));
+    expect(screen.getByTestId('ce-context-tweet-list').querySelectorAll('article')).toHaveLength(25);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Papers' }));
+    expect(screen.queryByTestId('ce-context-tweets-view-more')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Tweets' }));
+
+    expect(screen.getByTestId('ce-context-tweet-list').querySelectorAll('article')).toHaveLength(5);
+    expect(screen.queryByText('@sama')).not.toBeInTheDocument();
+    expect(screen.getByTestId('ce-context-tweets-view-more')).toHaveTextContent('View more');
+    expect(screen.getByTestId('ce-context-tweets-view-more')).toHaveAttribute('aria-expanded', 'false');
   });
 
   it('maps legacy tweet debate tags into atlas issue links', () => {
