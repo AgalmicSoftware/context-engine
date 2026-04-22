@@ -296,12 +296,13 @@ describe('aiSettings secret resolution', () => {
     expect(getLocalAiSettings().providers.openai.apiKey).toBe('');
   });
 
-  it('migrates legacy local AI settings to an envelope when explicitly invoked', () => {
+  it('migrates legacy local AI settings to an envelope when encrypted keys are available', () => {
     localStorage.setItem(AI_SETTINGS_STORAGE_KEY, JSON.stringify({
       useLocal: true,
       providers: {
         anthropic: {
           apiKey: 'sk-ant-test',
+          encryptedApiKey: '{"v":1,"ciphertext":"enc"}',
         },
       },
     }));
@@ -316,6 +317,32 @@ describe('aiSettings secret resolution', () => {
     expect(stored.kind).toBe(AI_SETTINGS_ENVELOPE_KIND);
     expect(JSON.stringify(stored)).not.toContain('sk-ant-test');
     expect(stored.metadata.legacyPlaintextDetected).toBe(true);
+    expect(stored.settings.providers.anthropic.encryptedApiKey).toBe('{"v":1,"ciphertext":"enc"}');
+  });
+
+  it('does not migrate plaintext-only legacy local AI settings without an encrypted replacement', () => {
+    const legacySettings = {
+      useLocal: true,
+      providers: {
+        anthropic: {
+          apiKey: 'sk-ant-test',
+        },
+      },
+    };
+    localStorage.setItem(AI_SETTINGS_STORAGE_KEY, JSON.stringify(legacySettings));
+
+    const result = migrateLegacyLocalAiSettingsIfNeeded();
+
+    expect(result).toEqual(expect.objectContaining({
+      ok: true,
+      status: 'skipped-plaintext-only',
+      reason: 'encrypted-key-missing',
+      metadata: expect.objectContaining({
+        legacyPlaintextDetected: true,
+        encryptedAvailable: false,
+      }),
+    }));
+    expect(JSON.parse(localStorage.getItem(AI_SETTINGS_STORAGE_KEY))).toEqual(legacySettings);
   });
 
   it('preserves top-level modelProviders overrides through local settings normalization', () => {
