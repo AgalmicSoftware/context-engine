@@ -45,7 +45,7 @@ jest.mock('../../../utilities/docLibrary/uploads.js', () => {
 import AudioSurveyGenerator from './SurveyGenerator';
 import { E2E_TESTIDS } from '../../../utilities/e2eTestIds.js';
 
-jest.mock('../../Shared/AudioInput/AudioInput.jsx', () => (props) => (
+jest.mock('../../Shared/AudioInput/AudioInput', () => (props) => (
   <textarea
     data-testid="audio-input"
     data-enable-downloads={String(!!props.enableDownloads)}

@@ -1,4 +1,4 @@
-/** @file AudioInput.jsx */
+/** @file AudioInput.tsx */
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
@@ -28,6 +28,66 @@ import { createLogger } from '../../../utilities/logging.js';
 const surveyLog = createLogger('surveys');
 const LIVE_CONVERSATION_RECORDER_DISABLED_REASON = 'Recording is temporarily disabled while we move long-form conversation capture into a future PRD.';
 
+type SessionConfig = Record<string, unknown>;
+
+type LastRecording = {
+  blob: Blob | null;
+  mimeType?: string;
+};
+
+type UseWhisperResult = {
+  status: string;
+  isRecording: boolean;
+  isPaused: boolean;
+  isProcessing: boolean;
+  isStreaming: boolean;
+  transcript: {
+    live?: string;
+    final?: string;
+  };
+  errorMessage: string;
+  startRecording: () => void;
+  stopRecording: () => void;
+  pauseRecording: () => void;
+  resumeRecording: () => void;
+  audioContextRef?: React.MutableRefObject<AudioContext | null>;
+  mediaStreamRef?: React.MutableRefObject<MediaStream | null>;
+  lastRecordingBlobRef?: React.MutableRefObject<LastRecording | null>;
+  getLastRecordingBlob?: () => LastRecording | null | undefined;
+};
+
+type AudioInputProps = {
+  placeholder?: string;
+  updateFunction?: (text: string) => void;
+  toggleEncryption?: (encrypted: boolean) => void;
+  value?: string | number | null;
+  encrypted?: boolean;
+  dataTestId?: string;
+  dataCeQuestionId?: string;
+  hideEncryption?: boolean;
+  enableAiRewrite?: boolean;
+  smallEncryptToggle?: boolean;
+  forceGlow?: boolean;
+  disableEncryption?: boolean;
+  placeholderOpacity?: number | string | null;
+  disabled?: boolean;
+  recordingDisabled?: boolean;
+  sessionSlug?: string;
+  sessionConfig?: SessionConfig | null;
+  context?: unknown;
+  workerUrl?: string;
+  longFormMode?: boolean;
+  showRecorderControlsInTextbox?: boolean;
+  showRecordingTimerInTextbox?: boolean;
+  recordingDurationSeconds?: number | string | null;
+  enableDownloads?: boolean;
+};
+
+type PlaceholderStyle = React.CSSProperties & {
+  '--placeholder-opacity'?: string;
+};
+
+const describeError = (err: unknown) => (err instanceof Error ? err.message : err);
 
 const AudioInput = ({
   placeholder,
@@ -56,8 +116,8 @@ const AudioInput = ({
   showRecordingTimerInTextbox = false,
   recordingDurationSeconds = null,
   enableDownloads = false,
-}) => {
-  const [encryptBoxChecked, setEncryptBoxChecked] = useState(encrypted);
+}: AudioInputProps) => {
+  const [encryptBoxChecked, setEncryptBoxChecked] = useState<boolean | undefined>(encrypted);
   const [userText, setUserText] = useState('');
   const [originalText, setOriginalText] = useState('');
   const [rewrittenText, setRewrittenText] = useState('');
@@ -65,28 +125,28 @@ const AudioInput = ({
   const [waitingForAI, setWaitingForAI] = useState(false);
   const [waitingSeconds, setWaitingSeconds] = useState(0);
   const [recorderNotice, setRecorderNotice] = useState('');
-  const waitTimerRef = useRef(null);
+  const waitTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   // Live mirror to avoid stale closure in waiting timer effect
   const waitingForAIRef = useRef(false);
   useEffect(() => { waitingForAIRef.current = waitingForAI; }, [waitingForAI]);
 
   // Elapsed timer for long-form sessions (seconds)
   const [recordingSeconds, setRecordingSeconds] = useState(0);
-  const recordTimerRef = useRef(null);
+  const recordTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const autoStopTriggeredRef = useRef(false);
 
   // Waveform overlay refs
-  const textareaWrapRef = useRef(null);
-  const canvasRef = useRef(null);
-  const analyserRef = useRef(null);
-  const sourceNodeRef = useRef(null);
-  const waveformSetupRetryTimeoutRef = useRef(null);
-  const animationRef = useRef(null);
+  const textareaWrapRef = useRef<HTMLDivElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const sourceNodeRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const waveformSetupRetryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const animationRef = useRef<number | null>(null);
   const lastDrawRef = useRef(0);
   const resizeListenerAttachedRef = useRef(false);
-  const dataArrayRef = useRef(null);
+  const dataArrayRef = useRef<Uint8Array | null>(null);
   const bufferLenRef = useRef(0);
-  const ctx2dRef = useRef(null);
+  const ctx2dRef = useRef<CanvasRenderingContext2D | null>(null);
 
   const [downloadsOpen, setDownloadsOpen] = useState(false);
   const isRecorderDisabled = !!recordingDisabled;
@@ -96,12 +156,12 @@ const AudioInput = ({
 
   // Guard against state updates after unmount / async completion
   const abortedRef = useRef(false);
-  const parentUpdateRafRef = useRef(null);
-  const parentUpdateTimeoutRef = useRef(null);
-  const queuedParentTextRef = useRef(undefined);
+  const parentUpdateRafRef = useRef<number | null>(null);
+  const parentUpdateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const queuedParentTextRef = useRef<string | undefined>(undefined);
   const lastEmittedTextRef = useRef('');
   const hasEmittedTextRef = useRef(false);
-  const updateFunctionRef = useRef(updateFunction);
+  const updateFunctionRef = useRef<AudioInputProps['updateFunction']>(updateFunction);
 
   useEffect(() => {
     updateFunctionRef.current = updateFunction;
@@ -153,7 +213,7 @@ const AudioInput = ({
 
   // Defer and coalesce parent updates; avoid re-emitting identical text
   const callParentUpdate = useCallback(
-    (text) => {
+    (text: string) => {
       if (typeof updateFunctionRef.current !== 'function' || abortedRef.current) return;
       if (queuedParentTextRef.current === text) return;
       if (
@@ -193,7 +253,7 @@ const AudioInput = ({
     mediaStreamRef,
     lastRecordingBlobRef,
     getLastRecordingBlob
-  } = useWhisper({
+  } = (useWhisper as any)({
     apiKey: '',
     silenceDetection: false,
     timeSlice: 0,
@@ -204,7 +264,7 @@ const AudioInput = ({
     // Live words are distracting - do not inject into textarea while recording
     onTranscriptionUpdate: () => {},
     // Final text: append to existing content (defer parent update to avoid setState-in-render warnings)
-    onTranscriptionComplete: (finalText) => {
+    onTranscriptionComplete: (finalText: string) => {
       const cleaned = (finalText || '').trim();
       if (!cleaned) return;
       setUserText(prev => {
@@ -215,11 +275,11 @@ const AudioInput = ({
         return next;
       });
     },
-    onError: (err) => {
-      surveyLog.error('[AudioInput] Transcription error:', err?.message || err);
+    onError: (err: unknown) => {
+      surveyLog.error('[AudioInput] Transcription error:', describeError(err));
     },
     onRecordingStop: () => { hasRecordedRef.current = true; }
-  });
+  }) as UseWhisperResult;
 
   // Live flags for visibility handler to avoid stale closures
   const isRecordingRef = useRef(false);
@@ -229,7 +289,7 @@ const AudioInput = ({
 
   // Sync external value
   useEffect(() => {
-    let syncedText;
+    let syncedText: string;
     if (value && value !== placeholder) {
       syncedText = String(value);
       setUserText(syncedText);
@@ -361,6 +421,7 @@ const AudioInput = ({
       ctx = canvas.getContext('2d');
       ctx2dRef.current = ctx;
     }
+    if (!ctx) return;
 
     const analyser = analyserRef.current;
     const bufferLength = analyser.frequencyBinCount;
@@ -468,16 +529,20 @@ const AudioInput = ({
       }
 
       if (!sourceNodeRef.current) {
+        const analyser = analyserRef.current;
+        if (!analyser) return false;
         const source = ctx.createMediaStreamSource(stream);
         sourceNodeRef.current = source;
-        source.connect(analyserRef.current);
+        source.connect(analyser);
       }
 
       // Ensure waveform buffers and context are ready
       if (canvasRef.current && !ctx2dRef.current) {
         ctx2dRef.current = canvasRef.current.getContext('2d');
       }
-      const blen = analyserRef.current.frequencyBinCount;
+      const analyser = analyserRef.current;
+      if (!analyser) return false;
+      const blen = analyser.frequencyBinCount;
       if (!dataArrayRef.current || bufferLenRef.current !== blen) {
         dataArrayRef.current = new Uint8Array(blen);
         bufferLenRef.current = blen;
@@ -585,7 +650,7 @@ const AudioInput = ({
   }, [isRecording, isPaused, drawWaveform]);
 
   // Handlers
-  const handleRecordClick = (e) => {
+  const handleRecordClick = (e?: React.MouseEvent<HTMLButtonElement>) => {
     if (e) e.preventDefault();
     if (isRecorderDisabled) {
       setRecorderNotice(LIVE_CONVERSATION_RECORDER_DISABLED_REASON);
@@ -605,7 +670,7 @@ const AudioInput = ({
     }
   };
 
-  const handleInputChange = (e) => {
+  const handleInputChange: React.ChangeEventHandler<HTMLInputElement> = (e) => {
     if (!waitingForAI) {
       const next = e.target.value;
       if (recorderNotice) setRecorderNotice('');
@@ -628,12 +693,12 @@ const AudioInput = ({
       setAiRewriteActive(false);
       setWaitingForAI(true);
       setWaitingSeconds(0);
-      const cleaned = await requestAiRewrite(orig, {
+      const cleaned = String(await requestAiRewrite(orig, {
         sessionSlug: effectiveSessionSlug,
         sessionConfig: effectiveSessionConfig,
         context,
         workerUrl,
-      });
+      }));
       if (abortedRef.current) return;
       setWaitingForAI(false);
       setWaitingSeconds(0);
@@ -671,7 +736,7 @@ const AudioInput = ({
   const showInlineOverlay = (wantsTimer || wantsInlineControls) && (isRecording || isPaused);
 
   // Download helpers
-  const pad2 = (n) => String(n).padStart(2, '0');
+  const pad2 = (n: number) => String(n).padStart(2, '0');
   const makeTimestamp = () => {
     const d = new Date();
     const YYYY = d.getFullYear();
@@ -682,9 +747,9 @@ const AudioInput = ({
     const ss = pad2(d.getSeconds());
     return { YYYY, MM, DD, HH, mm, ss };
   };
-  const extFromMime = (mt) => {
+  const extFromMime = (mt?: string) => {
     if (!mt) return 'mp3';
-    const map = {
+    const map: Record<string, string> = {
       'audio/mpeg': 'mp3',
       'audio/wav': 'wav',
       'audio/x-wav': 'wav',
@@ -760,7 +825,7 @@ const AudioInput = ({
   const hasText = (visibleText || '').trim().length > 0;
   const hasAudio = !!(lastRecordingBlobRef?.current?.blob) || hasRecordedRef.current === true;
   const showDownloadDock = !!enableDownloads && hasText && hasAudio && !isProcessingUI;
-  const placeholderStyle =
+  const placeholderStyle: PlaceholderStyle | undefined =
     placeholderOpacity === null || placeholderOpacity === undefined
       ? undefined
       : { '--placeholder-opacity': String(placeholderOpacity) };
@@ -839,7 +904,7 @@ const AudioInput = ({
               />
               <InputGroupText className={styles.inputGroupText}>
                 <input
-                  addon="true"
+                  {...({ addon: 'true' } as React.InputHTMLAttributes<HTMLInputElement> & { addon: string })}
                   type="checkbox"
                   aria-label="encrypt"
                   checked={encryptBoxChecked}

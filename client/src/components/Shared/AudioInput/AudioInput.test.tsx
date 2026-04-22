@@ -1,10 +1,23 @@
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
+import type { Root } from 'react-dom/client';
 import { Simulate } from 'react-dom/test-utils';
 
 import AudioInput from './AudioInput';
 import { requestAiRewrite } from '../../../utilities/ai/aiScripts';
 import { useWhisper, RECORDING_STATUS } from '../../../utilities/useWhisper';
+
+type WhisperState = Record<string, any>;
+type RafEntry = {
+  id: number;
+  cb: FrameRequestCallback;
+} | null;
+
+const mockUseWhisper = useWhisper as unknown as jest.Mock;
+const mockRequestAiRewrite = requestAiRewrite as unknown as jest.Mock;
+const actGlobal = globalThis as typeof globalThis & {
+  IS_REACT_ACT_ENVIRONMENT?: boolean;
+};
 
 jest.mock('../../../utilities/ai/aiScripts', () => {
   const actual = jest.requireActual('../../../utilities/ai/aiScripts');
@@ -20,7 +33,7 @@ jest.mock('../../../utilities/useWhisper', () => {
   return { ...actual, useWhisper: jest.fn() };
 });
 
-const buildWhisperState = (overrides = {}) => ({
+const buildWhisperState = (overrides: WhisperState = {}) => ({
   status: RECORDING_STATUS.READY,
   isRecording: false,
   isPaused: false,
@@ -40,38 +53,50 @@ const buildWhisperState = (overrides = {}) => ({
 });
 
 describe('AudioInput', () => {
-  let container;
-  let root;
-  let previousActEnvironment;
-  let rafQueue = [];
+  let container: HTMLDivElement;
+  let root: Root;
+  let rootMounted = false;
+  let previousActEnvironment: boolean | undefined;
+  let rafQueue: RafEntry[] = [];
   let rafId = 0;
+  let requestAnimationFrameSpy: jest.SpyInstance<number, [FrameRequestCallback]>;
+
+  const requireElement = <T extends Element>(element: T | null): T => {
+    expect(element).not.toBeNull();
+    return element as T;
+  };
+
+  const changeElementValue = (element: Element, value: string) => {
+    Simulate.change(element, { target: { value } } as any);
+  };
 
   const flushRafQueue = () => {
     const queue = rafQueue.slice();
     rafQueue = [];
     queue.forEach((entry) => {
       if (entry && typeof entry.cb === 'function') {
-        entry.cb();
+        entry.cb(0);
       }
     });
   };
 
   beforeAll(() => {
-    previousActEnvironment = globalThis.IS_REACT_ACT_ENVIRONMENT;
-    globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+    previousActEnvironment = actGlobal.IS_REACT_ACT_ENVIRONMENT;
+    actGlobal.IS_REACT_ACT_ENVIRONMENT = true;
   });
 
   beforeEach(() => {
     container = document.createElement('div');
     document.body.appendChild(container);
     root = createRoot(container);
-    useWhisper.mockReset();
-    useWhisper.mockReturnValue(buildWhisperState());
-    requestAiRewrite.mockReset();
-    requestAiRewrite.mockResolvedValue('rewritten');
+    rootMounted = true;
+    mockUseWhisper.mockReset();
+    mockUseWhisper.mockReturnValue(buildWhisperState());
+    mockRequestAiRewrite.mockReset();
+    mockRequestAiRewrite.mockResolvedValue('rewritten');
     rafQueue = [];
     rafId = 0;
-    jest.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => {
+    requestAnimationFrameSpy = jest.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => {
       rafId += 1;
       rafQueue.push({ id: rafId, cb });
       return rafId;
@@ -82,29 +107,28 @@ describe('AudioInput', () => {
   });
 
   afterEach(() => {
-    if (root) {
+    if (rootMounted) {
       act(() => {
         root.unmount();
       });
-      root = null;
+      rootMounted = false;
     }
     container.remove();
-    container = null;
     jest.useRealTimers();
     jest.restoreAllMocks();
   });
 
   afterAll(() => {
     if (typeof previousActEnvironment === 'undefined') {
-      delete globalThis.IS_REACT_ACT_ENVIRONMENT;
+      delete actGlobal.IS_REACT_ACT_ENVIRONMENT;
       return;
     }
-    globalThis.IS_REACT_ACT_ENVIRONMENT = previousActEnvironment;
+    actGlobal.IS_REACT_ACT_ENVIRONMENT = previousActEnvironment;
   });
 
   it('shows a long-form timer while recording', () => {
     jest.useFakeTimers();
-    useWhisper.mockReturnValue(buildWhisperState({
+    mockUseWhisper.mockReturnValue(buildWhisperState({
       status: RECORDING_STATUS.RECORDING,
       isRecording: true,
     }));
@@ -132,7 +156,7 @@ describe('AudioInput', () => {
   it('auto-stops recording when a duration limit is reached', () => {
     jest.useFakeTimers();
     const stopRecording = jest.fn();
-    useWhisper.mockReturnValue(buildWhisperState({
+    mockUseWhisper.mockReturnValue(buildWhisperState({
       status: RECORDING_STATUS.RECORDING,
       isRecording: true,
       stopRecording,
@@ -159,7 +183,7 @@ describe('AudioInput', () => {
 
   it('surfaces a temporary notice instead of starting the disabled recorder', () => {
     const startRecording = jest.fn();
-    useWhisper.mockReturnValue(buildWhisperState({ startRecording }));
+    mockUseWhisper.mockReturnValue(buildWhisperState({ startRecording }));
 
     act(() => {
       root.render(
@@ -172,8 +196,7 @@ describe('AudioInput', () => {
       );
     });
 
-    const micButton = container.querySelector('button[aria-label="Recording temporarily disabled"]');
-    expect(micButton).not.toBeNull();
+    const micButton = requireElement(container.querySelector('button[aria-label="Recording temporarily disabled"]'));
 
     act(() => {
       Simulate.click(micButton);
@@ -185,7 +208,7 @@ describe('AudioInput', () => {
 
   it('starts recording by default when the mic button is clicked', () => {
     const startRecording = jest.fn();
-    useWhisper.mockReturnValue(buildWhisperState({ startRecording }));
+    mockUseWhisper.mockReturnValue(buildWhisperState({ startRecording }));
 
     act(() => {
       root.render(
@@ -197,8 +220,7 @@ describe('AudioInput', () => {
       );
     });
 
-    const micButton = container.querySelector('button[aria-label="Start recording"]');
-    expect(micButton).not.toBeNull();
+    const micButton = requireElement(container.querySelector('button[aria-label="Start recording"]'));
 
     act(() => {
       Simulate.click(micButton);
@@ -210,7 +232,7 @@ describe('AudioInput', () => {
 
   it('hides the download dock by default even when text and audio exist', () => {
     const blob = new Blob([new Uint8Array([1, 2, 3])], { type: 'audio/wav' });
-    useWhisper.mockReturnValue(buildWhisperState({
+    mockUseWhisper.mockReturnValue(buildWhisperState({
       lastRecordingBlobRef: { current: { blob, mimeType: 'audio/wav' } },
       getLastRecordingBlob: () => ({ blob, mimeType: 'audio/wav' }),
     }));
@@ -231,7 +253,7 @@ describe('AudioInput', () => {
 
   it('shows the download dock when downloads are enabled and text/audio exist', () => {
     const blob = new Blob([new Uint8Array([1, 2, 3])], { type: 'audio/wav' });
-    useWhisper.mockReturnValue(buildWhisperState({
+    mockUseWhisper.mockReturnValue(buildWhisperState({
       lastRecordingBlobRef: { current: { blob, mimeType: 'audio/wav' } },
       getLastRecordingBlob: () => ({ blob, mimeType: 'audio/wav' }),
     }));
@@ -247,13 +269,12 @@ describe('AudioInput', () => {
       );
     });
 
-    const downloadToggle = container.querySelector('button[title="Downloads"]');
-    expect(downloadToggle).not.toBeNull();
+    expect(requireElement(container.querySelector('button[title="Downloads"]'))).not.toBeNull();
   });
 
   it('hides the download dock when downloads are disabled', () => {
     const blob = new Blob([new Uint8Array([1, 2, 3])], { type: 'audio/wav' });
-    useWhisper.mockReturnValue(buildWhisperState({
+    mockUseWhisper.mockReturnValue(buildWhisperState({
       lastRecordingBlobRef: { current: { blob, mimeType: 'audio/wav' } },
       getLastRecordingBlob: () => ({ blob, mimeType: 'audio/wav' }),
     }));
@@ -275,7 +296,7 @@ describe('AudioInput', () => {
 
   it('hides audio download choice outside transcription recording mode', () => {
     const blob = new Blob([new Uint8Array([1, 2, 3])], { type: 'audio/wav' });
-    useWhisper.mockReturnValue(buildWhisperState({
+    mockUseWhisper.mockReturnValue(buildWhisperState({
       lastRecordingBlobRef: { current: { blob, mimeType: 'audio/wav' } },
       getLastRecordingBlob: () => ({ blob, mimeType: 'audio/wav' }),
     }));
@@ -291,8 +312,7 @@ describe('AudioInput', () => {
       );
     });
 
-    const downloadToggle = container.querySelector('button[title="Downloads"]');
-    expect(downloadToggle).not.toBeNull();
+    const downloadToggle = requireElement(container.querySelector('button[title="Downloads"]'));
     act(() => {
       Simulate.click(downloadToggle);
     });
@@ -303,7 +323,7 @@ describe('AudioInput', () => {
 
   it('shows audio and transcript download choices in transcription recording mode', () => {
     const blob = new Blob([new Uint8Array([1, 2, 3])], { type: 'audio/wav' });
-    useWhisper.mockReturnValue(buildWhisperState({
+    mockUseWhisper.mockReturnValue(buildWhisperState({
       lastRecordingBlobRef: { current: { blob, mimeType: 'audio/wav' } },
       getLastRecordingBlob: () => ({ blob, mimeType: 'audio/wav' }),
     }));
@@ -320,8 +340,7 @@ describe('AudioInput', () => {
       );
     });
 
-    const downloadToggle = container.querySelector('button[title="Downloads"]');
-    expect(downloadToggle).not.toBeNull();
+    const downloadToggle = requireElement(container.querySelector('button[title="Downloads"]'));
     act(() => {
       Simulate.click(downloadToggle);
     });
@@ -333,8 +352,8 @@ describe('AudioInput', () => {
   it('retries waveform setup until audio refs are ready and then schedules animation', () => {
     jest.useFakeTimers();
 
-    const audioContextRef = { current: null };
-    const mediaStreamRef = { current: null };
+    const audioContextRef: { current: any } = { current: null };
+    const mediaStreamRef: { current: any } = { current: null };
     const analyser = {
       fftSize: 0,
       frequencyBinCount: 32,
@@ -356,9 +375,9 @@ describe('AudioInput', () => {
       clearRect: jest.fn(),
       fillRect: jest.fn(),
       fillStyle: '#000',
-    }));
+    } as unknown as CanvasRenderingContext2D));
 
-    useWhisper.mockReturnValue(buildWhisperState({
+    mockUseWhisper.mockReturnValue(buildWhisperState({
       status: RECORDING_STATUS.RECORDING,
       isRecording: true,
       audioContextRef,
@@ -375,7 +394,7 @@ describe('AudioInput', () => {
       );
     });
 
-    const rafCallsBeforeRefs = window.requestAnimationFrame.mock.calls.length;
+    const rafCallsBeforeRefs = requestAnimationFrameSpy.mock.calls.length;
     expect(fakeAudioContext.createAnalyser).not.toHaveBeenCalled();
 
     audioContextRef.current = fakeAudioContext;
@@ -388,7 +407,7 @@ describe('AudioInput', () => {
     expect(fakeAudioContext.createAnalyser).toHaveBeenCalledTimes(1);
     expect(fakeAudioContext.createMediaStreamSource).toHaveBeenCalledTimes(1);
     expect(sourceNode.connect).toHaveBeenCalledWith(analyser);
-    expect(window.requestAnimationFrame.mock.calls.length).toBeGreaterThan(rafCallsBeforeRefs);
+    expect(requestAnimationFrameSpy.mock.calls.length).toBeGreaterThan(rafCallsBeforeRefs);
   });
 
   it('skips duplicate same-text parent updates', () => {
@@ -403,11 +422,10 @@ describe('AudioInput', () => {
       );
     });
 
-    const textarea = container.querySelector('textarea');
-    expect(textarea).not.toBeNull();
+    const textarea = requireElement(container.querySelector('textarea'));
 
     act(() => {
-      Simulate.change(textarea, { target: { value: 'hello' } });
+      changeElementValue(textarea, 'hello');
     });
     act(() => {
       flushRafQueue();
@@ -416,7 +434,7 @@ describe('AudioInput', () => {
     expect(updateSpy).toHaveBeenLastCalledWith('hello');
 
     act(() => {
-      Simulate.change(textarea, { target: { value: 'hello' } });
+      changeElementValue(textarea, 'hello');
     });
     act(() => {
       flushRafQueue();
@@ -436,11 +454,10 @@ describe('AudioInput', () => {
       );
     });
 
-    let textarea = container.querySelector('textarea');
-    expect(textarea).not.toBeNull();
+    let textarea = requireElement(container.querySelector('textarea'));
 
     act(() => {
-      Simulate.change(textarea, { target: { value: 'hello' } });
+      changeElementValue(textarea, 'hello');
     });
     act(() => {
       flushRafQueue();
@@ -468,10 +485,9 @@ describe('AudioInput', () => {
       );
     });
 
-    textarea = container.querySelector('textarea');
-    expect(textarea).not.toBeNull();
+    textarea = requireElement(container.querySelector('textarea'));
     act(() => {
-      Simulate.change(textarea, { target: { value: 'hello' } });
+      changeElementValue(textarea, 'hello');
     });
     act(() => {
       flushRafQueue();
@@ -492,13 +508,12 @@ describe('AudioInput', () => {
       );
     });
 
-    const textarea = container.querySelector('textarea');
-    expect(textarea).not.toBeNull();
+    const textarea = requireElement(container.querySelector('textarea'));
 
     act(() => {
-      Simulate.change(textarea, { target: { value: 'a' } });
-      Simulate.change(textarea, { target: { value: 'ab' } });
-      Simulate.change(textarea, { target: { value: 'abc' } });
+      changeElementValue(textarea, 'a');
+      changeElementValue(textarea, 'ab');
+      changeElementValue(textarea, 'abc');
     });
     expect(updateSpy).not.toHaveBeenCalled();
 
@@ -510,13 +525,15 @@ describe('AudioInput', () => {
   });
 
   it('does not re-emit waiting text during parent rerenders with new update callbacks', () => {
-    requestAiRewrite.mockImplementation(() => new Promise(() => {}));
-    let waitingTick = null;
-    jest.spyOn(window, 'setInterval').mockImplementation((cb) => {
-      waitingTick = cb;
+    mockRequestAiRewrite.mockImplementation(() => new Promise(() => {}));
+    let waitingTick: (() => void) | null = null;
+    jest.spyOn(window, 'setInterval').mockImplementation(((cb: TimerHandler) => {
+      if (typeof cb === 'function') {
+        waitingTick = () => cb();
+      }
       return 1;
-    });
-    jest.spyOn(window, 'clearInterval').mockImplementation(() => {});
+    }) as any);
+    jest.spyOn(window, 'clearInterval').mockImplementation((() => {}) as any);
     const updateFns = [jest.fn(), jest.fn(), jest.fn(), jest.fn()];
 
     act(() => {
@@ -529,17 +546,18 @@ describe('AudioInput', () => {
       );
     });
 
-    const rewriteButton = container.querySelector('button[title="AI rewrite"]');
-    expect(rewriteButton).not.toBeNull();
+    const rewriteButton = requireElement(container.querySelector('button[title="AI rewrite"]'));
 
     act(() => {
       Simulate.click(rewriteButton);
     });
     expect(updateFns[0]).toHaveBeenCalledTimes(0);
-    expect(typeof waitingTick).toBe('function');
+    const tick = waitingTick as (() => void) | null;
+    expect(typeof tick).toBe('function');
+    if (!tick) throw new Error('Expected waiting timer callback');
 
     act(() => {
-      waitingTick();
+      tick();
     });
     act(() => {
       flushRafQueue();
@@ -593,17 +611,16 @@ describe('AudioInput', () => {
       );
     });
 
-    const textarea = container.querySelector('textarea');
-    expect(textarea).not.toBeNull();
+    const textarea = requireElement(container.querySelector('textarea'));
 
     act(() => {
-      Simulate.change(textarea, { target: { value: 'queued' } });
+      changeElementValue(textarea, 'queued');
     });
     expect(updateSpy).not.toHaveBeenCalled();
 
     act(() => {
       root.unmount();
-      root = null;
+      rootMounted = false;
     });
     act(() => {
       flushRafQueue();
@@ -612,7 +629,7 @@ describe('AudioInput', () => {
   });
 
   it('emits rewritten text and reverted text through the parent update callback', async () => {
-    requestAiRewrite.mockResolvedValue('Polished version');
+    mockRequestAiRewrite.mockResolvedValue('Polished version');
     const updateSpy = jest.fn();
 
     act(() => {
@@ -625,8 +642,7 @@ describe('AudioInput', () => {
       );
     });
 
-    const rewriteButton = container.querySelector('button[title="AI rewrite"]');
-    expect(rewriteButton).not.toBeNull();
+    const rewriteButton = requireElement(container.querySelector('button[title="AI rewrite"]'));
 
     await act(async () => {
       Simulate.click(rewriteButton);
@@ -637,8 +653,7 @@ describe('AudioInput', () => {
     });
     expect(updateSpy).toHaveBeenCalledWith('Polished version');
 
-    const revertButton = container.querySelector('button[title="Revert to original"]');
-    expect(revertButton).not.toBeNull();
+    const revertButton = requireElement(container.querySelector('button[title="Revert to original"]'));
 
     act(() => {
       Simulate.click(revertButton);

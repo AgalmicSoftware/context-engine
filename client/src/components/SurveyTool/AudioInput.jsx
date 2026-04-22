@@ -1,1 +1,1 @@
-export { default } from '../Shared/AudioInput/AudioInput.jsx';
+export { default } from '../Shared/AudioInput/AudioInput';
