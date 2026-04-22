@@ -290,6 +290,57 @@ describe('error paths', () => {
     expect(contractScripts.getProviderLocation('legacy-extension')).toBe(injectedProvider);
   });
 
+  it('does not fall back to injected wallet reads for minted token counts by default', async () => {
+    const injectedProvider = makeRpcProvider();
+    window.ethereum = injectedProvider;
+    const configuredContract = {
+      mintedTokens: jest.fn(async () => {
+        throw new Error('configured read failed');
+      }),
+    };
+    const injectedContract = {
+      mintedTokens: jest.fn(async () => ethers.BigNumber.from('7')),
+    };
+    let contractCalls = 0;
+    const contractSpy = jest.spyOn(ethers, 'Contract').mockImplementation(function MockContract() {
+      contractCalls += 1;
+      return contractCalls === 1 ? configuredContract : injectedContract;
+    });
+
+    await expect(contractScripts.getMintedTokens('none', TEST_ADDRESS, GROUP_CFG)).resolves.toBeNull();
+
+    expect(configuredContract.mintedTokens).toHaveBeenCalledTimes(1);
+    expect(injectedContract.mintedTokens).not.toHaveBeenCalled();
+    expect(contractSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps minted token injected fallback available by explicit opt-in', async () => {
+    const injectedProvider = makeRpcProvider();
+    window.ethereum = injectedProvider;
+    const configuredContract = {
+      mintedTokens: jest.fn(async () => {
+        throw new Error('configured read failed');
+      }),
+    };
+    const injectedContract = {
+      mintedTokens: jest.fn(async () => ethers.BigNumber.from('7')),
+    };
+    let contractCalls = 0;
+    const contractSpy = jest.spyOn(ethers, 'Contract').mockImplementation(function MockContract() {
+      contractCalls += 1;
+      return contractCalls === 1 ? configuredContract : injectedContract;
+    });
+
+    await expect(contractScripts.getMintedTokens('none', TEST_ADDRESS, GROUP_CFG, {
+      allowInjectedReadFallback: true,
+    })).resolves.toBe('7');
+
+    expect(configuredContract.mintedTokens).toHaveBeenCalledTimes(1);
+    expect(injectedContract.mintedTokens).toHaveBeenCalledTimes(1);
+    expect(contractSpy).toHaveBeenCalledTimes(2);
+    expect(contractSpy.mock.calls[1][2].provider).toBe(injectedProvider);
+  });
+
   it('throws submitResponses RPC timeouts instead of failing silently', async () => {
     const timeoutError = Object.assign(new Error('RPC timeout while broadcasting transaction.'), {
       code: 'NETWORK_ERROR',
