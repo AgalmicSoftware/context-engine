@@ -1,13 +1,24 @@
 import React from 'react';
 import styles from './DemoAnalysisWorkspace.module.scss';
 
-const getCellColor = (value) => {
+type HeatmapData = {
+  title: string;
+  rowLabels: string[];
+  columnLabels: string[];
+  pivotData?: Array<Array<number | null | undefined>>;
+};
+
+type IndicatorHeatmapProps = {
+  data?: HeatmapData | null;
+};
+
+const getCellColor = (value: number | null | undefined) => {
   if (value === null || value === undefined) return 'rgba(255,255,255,0.04)';
   const alpha = Math.max(0.12, Math.min(0.88, Number(value || 0)));
   return `rgba(91, 140, 255, ${alpha})`;
 };
 
-const IndicatorHeatmap = ({ data }) => {
+const IndicatorHeatmap = ({ data }: IndicatorHeatmapProps) => {
   if (!data || !Array.isArray(data.rowLabels) || data.rowLabels.length === 0) {
     return (
       <section className={`${styles.panel} ${styles.heatmapPanel}`}>
