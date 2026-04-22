@@ -1,8 +1,18 @@
 import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCheck, faClipboard } from '@fortawesome/free-solid-svg-icons';
+import type { IconProp } from '@fortawesome/fontawesome-svg-core';
 
 import styles from './JsonControls.module.scss';
+
+type JsonButtonProps = {
+  label: string;
+  icon?: IconProp;
+  onClick?: React.MouseEventHandler<HTMLButtonElement>;
+  title?: string;
+  className?: string;
+  disabled?: boolean;
+};
 
 export const JsonIconButton = ({
   label,
@@ -11,7 +21,7 @@ export const JsonIconButton = ({
   title,
   className = '',
   disabled = false,
-}) => (
+}: JsonButtonProps) => (
   <button
     type="button"
     className={`${styles.jsonIconButton} ${className}`.trim()}
@@ -34,6 +44,9 @@ export const JsonToggleButton = ({
   disabled = false,
   icon,
   iconPosition = 'right',
+}: JsonButtonProps & {
+  active?: boolean;
+  iconPosition?: 'left' | 'right';
 }) => (
   <button
     type="button"
@@ -53,6 +66,16 @@ export const JsonToggleButton = ({
   </button>
 );
 
+type JsonPanelProps = {
+  onCopy?: React.MouseEventHandler<HTMLButtonElement>;
+  copied?: boolean;
+  copyTitle?: string;
+  children: React.ReactNode;
+  as?: React.ElementType;
+  contentProps?: React.HTMLAttributes<HTMLElement> & Record<string, unknown>;
+  className?: string;
+};
+
 export const JsonPanel = ({
   onCopy,
   copied = false,
@@ -61,7 +84,7 @@ export const JsonPanel = ({
   as: Component = 'div',
   contentProps = {},
   className = '',
-}) => {
+}: JsonPanelProps) => {
   const mergedContentClassName = `${styles.jsonContent} ${contentProps.className || ''}`.trim();
 
   return (
@@ -88,6 +111,10 @@ export const JsonButtonRow = ({
   children,
   align = 'start',
   className = '',
+}: {
+  children: React.ReactNode;
+  align?: 'start' | 'center' | 'end';
+  className?: string;
 }) => {
   const alignmentClass =
     align === 'center'
