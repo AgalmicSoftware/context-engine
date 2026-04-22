@@ -2,6 +2,7 @@ import {
   buildSignedAdminActionAuth,
   buildSignedBootstrapAdminAuth,
   clearAllWorkerSessionTokens,
+  __test__workerAuthTokenCache,
   fetchWorkerWithAuth,
   getWorkerAuthHeaders,
   getWorkerSessionToken,
@@ -137,6 +138,85 @@ describe('workerAuth normalizeWorkerUrl', () => {
   });
 });
 
+describe('workerAuth token cache envelopes', () => {
+  it('normalizes scoped v1 token envelopes', () => {
+    const envelope = __test__workerAuthTokenCache.buildTokenCacheEnvelope({
+      token: 'token-1',
+      exp: 4600,
+      workerUrl: 'https://worker.example/auth/login',
+      sessionSlug: 'edge',
+      address: TEST_ADDRESS,
+      issuedAt: 1000,
+    });
+
+    expect(__test__workerAuthTokenCache.normalizeTokenCacheEntry(envelope, {
+      workerUrl: 'https://worker.example',
+      sessionSlug: 'edge',
+      address: TEST_ADDRESS,
+      nowSeconds: 1200,
+      skewSeconds: 30,
+    })).toEqual(expect.objectContaining({
+      ok: true,
+      token: 'token-1',
+      expiresAt: 4600,
+      issuedAt: 1000,
+      legacy: false,
+    }));
+  });
+
+  it('rejects scoped token envelopes that target a different worker/session/address', () => {
+    const envelope = __test__workerAuthTokenCache.buildTokenCacheEnvelope({
+      token: 'token-1',
+      exp: 4600,
+      workerUrl: 'https://worker.example',
+      sessionSlug: 'edge',
+      address: TEST_ADDRESS,
+      issuedAt: 1000,
+    });
+
+    expect(__test__workerAuthTokenCache.normalizeTokenCacheEntry(envelope, {
+      workerUrl: 'https://other-worker.example',
+      sessionSlug: 'edge',
+      address: TEST_ADDRESS,
+      nowSeconds: 1200,
+    })).toEqual({ ok: false, status: 'scope-mismatch' });
+
+    expect(__test__workerAuthTokenCache.normalizeTokenCacheEntry(envelope, {
+      workerUrl: 'https://worker.example',
+      sessionSlug: 'other-session',
+      address: TEST_ADDRESS,
+      nowSeconds: 1200,
+    })).toEqual({ ok: false, status: 'scope-mismatch' });
+
+    expect(__test__workerAuthTokenCache.normalizeTokenCacheEntry(envelope, {
+      workerUrl: 'https://worker.example',
+      sessionSlug: 'edge',
+      address: NEXT_TEST_ADDRESS,
+      nowSeconds: 1200,
+    })).toEqual({ ok: false, status: 'scope-mismatch' });
+  });
+
+  it('keeps legacy token entries readable only when they still have a valid expiry', () => {
+    expect(__test__workerAuthTokenCache.normalizeTokenCacheEntry({
+      token: 'legacy-token',
+      exp: 4600,
+    }, {
+      nowSeconds: 1200,
+      skewSeconds: 30,
+    })).toEqual(expect.objectContaining({
+      ok: true,
+      token: 'legacy-token',
+      legacy: true,
+    }));
+
+    expect(__test__workerAuthTokenCache.normalizeTokenCacheEntry({
+      token: 'legacy-token',
+    }, {
+      nowSeconds: 1200,
+    })).toEqual({ ok: false, status: 'missing-expiry' });
+  });
+});
+
 describe('workerAuth canonical session resolution', () => {
   const originalFetch = global.fetch;
   const authContext = {
@@ -251,6 +331,34 @@ describe('workerAuth canonical session resolution', () => {
       context: authContext,
       allowDemoFallback: false,
     });
+  });
+
+  it('writes scoped v1 token envelopes after successful login', async () => {
+    const exp = Math.floor(Date.now() / 1000) + 3600;
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce(jsonResp(200, { nonce: 'nonce-1' }))
+      .mockResolvedValueOnce(jsonResp(200, { token: 'token-1', exp }));
+
+    await expect(getWorkerSessionToken({
+      sessionSlug: 'edge',
+      workerUrl: 'https://worker.example/auth/login',
+      context: authContext,
+    })).resolves.toBe('token-1');
+
+    const cacheKey = __test__workerAuthTokenCache.buildTokenCacheKey({
+      workerUrl: 'https://worker.example',
+      slug: 'edge',
+      address: TEST_ADDRESS,
+    });
+    expect(JSON.parse(localStorage.getItem(cacheKey))).toEqual(expect.objectContaining({
+      v: 1,
+      workerUrl: 'https://worker.example',
+      sessionSlug: 'edge',
+      address: TEST_ADDRESS,
+      expiresAt: exp,
+      token: 'token-1',
+    }));
   });
 
   it('keeps explicit demo fallback opt-in fail-closed when no shipped demo session exists', async () => {
