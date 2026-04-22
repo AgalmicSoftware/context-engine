@@ -182,7 +182,15 @@ const isDemoAutomationFixtureSbt = (
 export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
   _featuredListMemo: MemoBucket<string>;
 
-  _featuredEntriesMemo: MemoBucket<FeaturedEntry>;
+const resolveAutoFeatureBySessionSlug = (metadata) => (
+  metadata?.autoFeatureSBTsBySessionSlug !== undefined
+    ? metadata.autoFeatureSBTsBySessionSlug
+    : metadata?.autoFeatureSBTsWithFeaturedSbtTags
+);
+
+const isSessionAutoFeatureEnabled = (sessionConfig = null) => (
+  resolveAutoFeatureBySessionSlug(sessionConfig) !== false
+);
 
   _featuredCacheCardsMemo: MemoBucket<CacheBackedFeaturedCard>;
 

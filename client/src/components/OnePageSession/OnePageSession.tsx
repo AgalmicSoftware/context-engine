@@ -66,6 +66,12 @@ const ONE_PAGE_DEMO_PERF_SCOPE = 'onePageDemo';
 const SBT_TOOLTIP_LABEL = isCryptoMode() ? 'Soulbound tokens (SBTs)' : `${t('sbtFull')}s`;
 const DEMO_CORPUS_GITHUB_URL = PUBLIC_AI_DISCOURSE_CORPUS_URL;
 
+const resolveAutoFeatureBySessionSlug = (metadata) => (
+  metadata?.autoFeatureSBTsBySessionSlug !== undefined
+    ? metadata.autoFeatureSBTsBySessionSlug
+    : metadata?.autoFeatureSBTsWithFeaturedSbtTags
+);
+
 const isPerfCountersEnabled = () => {
   try {
     return typeof globalThis !== 'undefined' && (
@@ -577,7 +583,6 @@ class OnePageSession extends Component<any, any> {
     const resolvedAutoFeature = propAutoFeature !== undefined
       ? propAutoFeature
       : resolveAutoFeatureBySessionSlug(baseSessionConfig);
-    const resolvedSlug = slug || baseSessionConfig.slug || '';
     const resolved = {
       ...baseSessionConfig,
       slug: resolvedSlug,

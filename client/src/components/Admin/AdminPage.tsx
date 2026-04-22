@@ -154,10 +154,755 @@ type AdminDecryptedFieldEntry = {
   envelope?: unknown;
   [key: string]: unknown;
 };
-type AdminDecryptedFieldMap = Record<string, AdminDecryptedFieldEntry>;
-type AdminMetadataBlockLimitsDraft = {
-  start: string;
-  end: string;
+
+const normalizeSlug = (raw) => {
+  const slug = _canonicalizeSlug(raw);
+  return slug === 'general' ? '' : slug;
+};
+
+const countSessionsForChain = (entries = [], chainId = null) => {
+  const list = Array.isArray(entries) ? entries : [];
+  if (!chainId) return list.length;
+  return list.filter(([, cfg]) => {
+    const cfgChainId = Number(cfg?.__registry?.registryChainId || cfg?.__registry?.chainId || 0) || 0;
+    return cfgChainId === chainId;
+  }).length;
+};
+
+const normalizeWorkerUrl = (url) => normalizeBaseUrl(url);
+const normalizeAiProvider = (raw, fallback = 'openai') => {
+  const provider = toStr(raw).trim().toLowerCase();
+  if (['openai', 'anthropic', 'openrouter', 'custom'].includes(provider)) return provider;
+  return fallback;
+};
+const inferAiProviderFromModel = (modelRaw) => {
+  const model = toStr(modelRaw).trim().toLowerCase();
+  if (!model) return '';
+  if (model.startsWith('claude')) return 'anthropic';
+  if (/^(gpt-|o[1-9]|chatgpt)/.test(model)) return 'openai';
+  if (model.includes('/')) return 'openrouter';
+  return '';
+};
+const buildTxExplorerUrl = (hash, chainId) => {
+  const base = toStr(getChainById(chainId)?.blockExplorers?.default?.url).trim();
+  if (!base || !hash) return '';
+  return `${base.replace(/\/+$/, '')}/tx/${hash}`;
+};
+const buildSessionUrl = (slug, { allowGeneral = false } = {}) => {
+  const hasExplicitSlug = slug !== undefined && slug !== null;
+  const normalized = normalizeSlug(slug);
+  const base = typeof window !== 'undefined' && window.location ? window.location.origin : '';
+  if (!normalized) return allowGeneral && hasExplicitSlug ? `${base}/session` : '';
+  return `${base}/session/${encodeURIComponent(normalized)}`;
+};
+const renderTestResult = (entry) => {
+  if (!entry) return 'Not run';
+  if (typeof entry === 'string') return entry;
+  const label = toStr(entry?.label || entry?.text).trim();
+  const href = toStr(entry?.href).trim();
+  if (href) {
+    return (
+      <a href={href} target="_blank" rel="noreferrer">
+        {label || 'View'}
+      </a>
+    );
+  }
+  return label || 'OK';
+};
+
+const shortAddress = (addr) => {
+  const s = toStr(addr);
+  if (!s) return '';
+  return `${s.slice(0, 6)}…${s.slice(-4)}`;
+};
+const getCurrentOrigin = () => {
+  try {
+    return typeof window !== 'undefined' ? toStr(window.location?.origin).trim() : '';
+  } catch (_) {
+    return '';
+  }
+};
+const buildAdminWorkerCorsMessage = (workerBase, detail = '') => {
+  const origin = getCurrentOrigin() || '<current-origin>';
+  const worker = toStr(workerBase).trim() || 'session worker';
+  const suffix = detail ? ` (${detail})` : '';
+  return `Worker request could not reach ${worker}${suffix}. This is usually CORS or worker availability; ensure ${origin} is in that worker session's allowOrigins. If this session still resolves an older worker URL, finish deploy/config sync or edit the worker URL override first.`;
+};
+const normalizeAdminWorkerFetchError = ({ error, workerBase, responseStatus = 0, responseError = '' } = {}) => {
+  const raw = toStr(error?.message || error).trim();
+  const lowered = raw.toLowerCase();
+  const detail = toStr(responseError).trim();
+  const detailLower = detail.toLowerCase();
+  if ((Number(responseStatus || 0) === 403 && detailLower.includes('origin')) || detailLower.includes('origin not allowed')) {
+    return buildAdminWorkerCorsMessage(workerBase, detail || 'Origin not allowed');
+  }
+  if (lowered.includes('origin not allowed')) {
+    return buildAdminWorkerCorsMessage(workerBase, raw);
+  }
+  if (lowered.includes('failed to fetch') || lowered.includes('networkerror')) {
+    return buildAdminWorkerCorsMessage(workerBase);
+  }
+  return raw || 'Failed to update worker allowOrigins.';
+};
+const ADMIN_ACTION_NONCE_RETRY_ATTEMPTS = 3;
+const isRetryableAdminNonceFailure = ({ responseStatus = 0, responseError = '' } = {}) => {
+  const status = Number(responseStatus || 0);
+  const detail = toStr(responseError).trim().toLowerCase();
+  if (status !== 400 || !detail) return false;
+  return detail.includes('nonce mismatch or expired') || detail.includes('nonce already used');
+};
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const deepClone = (value) => JSON.parse(JSON.stringify(value || {}));
+
+const getAdminSessionDisplayUrl = ({ selectedSlug, selectedConfig, groupMetadata } = {}) => {
+  if (!selectedConfig && !groupMetadata) return '';
+  const resolvedSlug = selectedConfig?.slug ?? groupMetadata?.slug ?? selectedSlug;
+  return buildSessionUrl(resolvedSlug, { allowGeneral: true });
+};
+
+const collectEncryptedEntries = (metadata) => {
+  const entries = {};
+  if (!metadata || typeof metadata !== 'object') return entries;
+  const fields = metadata.encryptedFields;
+  if (fields && typeof fields === 'object') {
+    Object.entries(fields).forEach(([key, value]) => {
+      if (value == null || value === '') return;
+      entries[key] = value;
+    });
+  }
+  const sessionInfoEncrypted = metadata.sessionInfoEncrypted;
+  if (sessionInfoEncrypted) {
+    entries.sessionInfo = sessionInfoEncrypted;
+  }
+  const aiProviders = metadata.ai?.providers;
+  if (aiProviders && typeof aiProviders === 'object') {
+    Object.entries(aiProviders).forEach(([key, cfg]) => {
+      const encrypted = cfg?.encryptedApiKey;
+      if (!encrypted) return;
+      const path = `ai.providers.${key}.apiKey`;
+      if (!entries[path]) entries[path] = encrypted;
+    });
+  }
+  const rpcProviders = metadata.rpc?.providers;
+  if (rpcProviders && typeof rpcProviders === 'object') {
+    Object.entries(rpcProviders).forEach(([key, cfg]) => {
+      const encrypted = cfg?.encryptedApiKey;
+      if (!encrypted) return;
+      const path = `rpc.providers.${key}.apiKey`;
+      if (!entries[path]) entries[path] = encrypted;
+    });
+  }
+  const arweaveEncrypted = metadata.arweave?.encryptedJwk;
+  if (arweaveEncrypted && !entries['arweave.jwk']) entries['arweave.jwk'] = arweaveEncrypted;
+  const faucetEncrypted = metadata.faucet?.encryptedPrivateKey;
+  if (faucetEncrypted && !entries['faucet.privateKey']) entries['faucet.privateKey'] = faucetEncrypted;
+  return entries;
+};
+
+const formatPreviewValue = (value, limit = 180) => {
+  const raw = toStr(value);
+  if (!raw) return '';
+  if (raw.length <= limit) return raw;
+  return `${raw.slice(0, limit)}…`;
+};
+
+const ADMIN_DEFAULT_AI_MODELS = Object.freeze({
+  fast: 'gpt-5',
+  thinking: 'gpt-5',
+});
+
+const ADMIN_AI_PROVIDER_OPTIONS = Object.freeze([
+  { value: 'openai', label: 'OpenAI' },
+  { value: 'anthropic', label: 'Anthropic' },
+  { value: 'openrouter', label: 'OpenRouter' },
+  { value: 'custom', label: 'Custom RPC' },
+]);
+
+const dedupeTrimmedList = (values = []) => {
+  const out = [];
+  const seen = new Set();
+  (Array.isArray(values) ? values : []).forEach((value) => {
+    const trimmed = toStr(value).trim();
+    if (!trimmed) return;
+    const lower = trimmed.toLowerCase();
+    if (seen.has(lower)) return;
+    seen.add(lower);
+    out.push(trimmed);
+  });
+  return out;
+};
+
+const formatDelimitedDraftList = (value) => (
+  Array.isArray(value) ? dedupeTrimmedList(value).join('\n') : ''
+);
+
+const parseDelimitedDraftList = (raw) => {
+  if (Array.isArray(raw)) return dedupeTrimmedList(raw);
+  const trimmed = toStr(raw).trim();
+  if (!trimmed) return [];
+  if (trimmed.startsWith('[')) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) return dedupeTrimmedList(parsed);
+    } catch (_) {}
+  }
+  return dedupeTrimmedList(trimmed.split(/[\n,]+/));
+};
+
+const splitAllowOriginsInput = (value) => {
+  if (Array.isArray(value)) {
+    return value.flatMap((entry) => splitAllowOriginsInput(entry));
+  }
+  return toStr(value)
+    .split(/[\n,]+/)
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+};
+
+const parseAllowOriginsDraft = (raw) => normalizeOriginList(splitAllowOriginsInput(raw));
+
+const formatAllowOriginsDraft = (value) => parseAllowOriginsDraft(value).join('\n');
+
+const formatDefaultFilterStateDraft = (value) => {
+  if (value == null || value === '') return '';
+  if (typeof value === 'string') return value;
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch (_) {
+    return String(value);
+  }
+};
+
+const parseDefaultFilterStateDraft = (raw) => {
+  const trimmed = toStr(raw).trim();
+  if (!trimmed) return null;
+  if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+    try {
+      return JSON.parse(trimmed);
+    } catch (error) {
+      throw new Error('Default filter state must be valid JSON or a plain query string.');
+    }
+  }
+  return trimmed;
+};
+
+const buildUserPageUrl = (address) => {
+  const trimmed = toStr(address).trim();
+  if (!trimmed) return '';
+  return `/u/${encodeURIComponent(trimmed)}`;
+};
+
+const ADMIN_EDITABLE_CONTRACT_FIELDS = Object.freeze([
+  { contractKey: 'surveys', draftKey: 'contractSurveysAddress', label: 'Surveys contract' },
+  { contractKey: 'sbtFactory', draftKey: 'contractSbtFactoryAddress', label: 'SBT factory contract' },
+  { contractKey: 'sessionRegistry', draftKey: 'contractSessionRegistryAddress', label: 'SessionRegistry contract' },
+]);
+
+const ADMIN_EDITABLE_CONTRACT_KEY_SET = new Set(
+  ADMIN_EDITABLE_CONTRACT_FIELDS.map(({ contractKey }) => contractKey)
+);
+
+const getAdminContractChainIdFallback = (metadata = {}, contractKey = '') => {
+  const existingChainId = Number(metadata?.contracts?.[contractKey]?.chainId || 0) || 0;
+  if (existingChainId) return existingChainId;
+  if (contractKey === 'sessionRegistry') {
+    return Number(
+      metadata?.__registry?.registryChainId ||
+      metadata?.registryChainId ||
+      metadata?.__registry?.chainId ||
+      metadata?.networkChainId ||
+      0
+    ) || 0;
+  }
+  return Number(
+    metadata?.networkChainId ||
+    metadata?.__registry?.chainId ||
+    metadata?.__registry?.registryChainId ||
+    0
+  ) || 0;
+};
+
+const normalizeAdminContractAddress = (raw, label) => {
+  const trimmed = toStr(raw).trim();
+  if (!trimmed) return '';
+  try {
+    return ethers.utils.getAddress(trimmed);
+  } catch (_) {
+    throw new Error(`${label} must be a valid EVM address.`);
+  }
+};
+
+const buildAdminMetadataDraft = (metadata = {}) => {
+  const fastModel = toStr(
+    metadata?.ai?.models?.fast?.model ||
+    metadata?.ai?.model ||
+    ADMIN_DEFAULT_AI_MODELS.fast
+  ).trim() || ADMIN_DEFAULT_AI_MODELS.fast;
+  const thinkingModel = toStr(
+    metadata?.ai?.models?.thinking?.model ||
+    metadata?.ai?.thinkingModel ||
+    ADMIN_DEFAULT_AI_MODELS.thinking
+  ).trim() || ADMIN_DEFAULT_AI_MODELS.thinking;
+  const transcriptionModel = toStr(
+    metadata?.ai?.models?.transcription?.model ||
+    metadata?.ai?.transcription ||
+    'whisper-1'
+  ).trim() || 'whisper-1';
+
+  return {
+    defaultTags: toStr(metadata?.defaultTags).trim(),
+    questionsGenPrompt: toStr(metadata?.questionsGenPrompt).trim(),
+    defaultSbtTags: toStr(metadata?.defaultSbtTags).trim(),
+    defaultFilterState: formatDefaultFilterStateDraft(metadata?.defaultFilterState),
+    contractSurveysAddress: toStr(metadata?.contracts?.surveys?.address).trim(),
+    contractSbtFactoryAddress: toStr(metadata?.contracts?.sbtFactory?.address).trim(),
+    contractSessionRegistryAddress: toStr(metadata?.contracts?.sessionRegistry?.address).trim(),
+    defaultFeaturedSBTs: dedupeSbtSelections(metadata?.defaultFeaturedSBTs || []),
+    highlightedQuestionIds: formatDelimitedDraftList(metadata?.HIGHLIGHTED_QUESTION_IDS),
+    blockedQuestionIds: formatDelimitedDraftList(metadata?.BLOCKED_QUESTION_IDS),
+    highlightedSurveyIds: formatDelimitedDraftList(metadata?.HIGHLIGHTED_SURVEY_IDS),
+    blockedSurveyIds: formatDelimitedDraftList(metadata?.BLOCKED_SURVEY_IDS),
+    ignoredSbtsList: formatDelimitedDraftList(metadata?.ignored_SBTs_LIST),
+    featuredSbtsList: formatDelimitedDraftList(metadata?.featured_SBTs_LIST),
+    faucetAmountEth: toStr(metadata?.faucet?.amountEth).trim(),
+    faucetBalanceThresholdEth: toStr(metadata?.faucet?.balanceThresholdEth).trim(),
+    aiFastProvider: normalizeAiProvider(
+      metadata?.ai?.models?.fast?.provider ||
+      inferAiProviderFromModel(metadata?.ai?.models?.fast?.model) ||
+      metadata?.ai?.provider ||
+      metadata?.ai?.mode ||
+      'openai'
+    ),
+    aiFastModel: fastModel,
+    aiThinkingProvider: normalizeAiProvider(
+      metadata?.ai?.models?.thinking?.provider ||
+      inferAiProviderFromModel(metadata?.ai?.models?.thinking?.model) ||
+      metadata?.ai?.provider ||
+      metadata?.ai?.mode ||
+      'openai'
+    ),
+    aiThinkingModel: thinkingModel,
+    aiTranscriptionProvider: normalizeAiProvider(
+      metadata?.ai?.models?.transcription?.provider || 'openai',
+      'openai'
+    ),
+    aiTranscriptionModel: transcriptionModel,
+  };
+};
+
+const applyAdminMetadataDraft = (metadata = {}, draft = {}) => {
+  const next = deepClone(metadata && typeof metadata === 'object' ? metadata : {});
+
+  next.defaultTags = toStr(draft.defaultTags).trim();
+  next.questionsGenPrompt = toStr(draft.questionsGenPrompt).trim();
+  next.defaultSbtTags = toStr(draft.defaultSbtTags).trim();
+  next.defaultFilterState = parseDefaultFilterStateDraft(draft.defaultFilterState);
+  next.defaultFeaturedSBTs = dedupeSbtSelections(draft.defaultFeaturedSBTs || []).map((entry) => entry.address);
+  next.HIGHLIGHTED_QUESTION_IDS = parseDelimitedDraftList(draft.highlightedQuestionIds);
+  next.BLOCKED_QUESTION_IDS = parseDelimitedDraftList(draft.blockedQuestionIds);
+  next.HIGHLIGHTED_SURVEY_IDS = parseDelimitedDraftList(draft.highlightedSurveyIds);
+  next.BLOCKED_SURVEY_IDS = parseDelimitedDraftList(draft.blockedSurveyIds);
+  next.ignored_SBTs_LIST = parseDelimitedDraftList(draft.ignoredSbtsList);
+  next.featured_SBTs_LIST = parseDelimitedDraftList(draft.featuredSbtsList);
+
+  const existingContracts = next.contracts && typeof next.contracts === 'object'
+    ? { ...next.contracts }
+    : {};
+  ADMIN_EDITABLE_CONTRACT_FIELDS.forEach(({ contractKey, draftKey, label }) => {
+    const normalizedAddress = normalizeAdminContractAddress(draft[draftKey], label);
+    if (!normalizedAddress) return;
+    const existingEntry = existingContracts[contractKey] && typeof existingContracts[contractKey] === 'object'
+      ? { ...existingContracts[contractKey] }
+      : {};
+    const fallbackChainId = getAdminContractChainIdFallback(next, contractKey);
+    existingContracts[contractKey] = {
+      ...existingEntry,
+      address: normalizedAddress,
+      ...(fallbackChainId ? { chainId: fallbackChainId } : {}),
+    };
+  });
+  if (Object.keys(existingContracts).length) next.contracts = existingContracts;
+
+  const faucet = next.faucet && typeof next.faucet === 'object' ? { ...next.faucet } : {};
+  const faucetAmountEth = toStr(draft.faucetAmountEth).trim();
+  const faucetBalanceThresholdEth = toStr(draft.faucetBalanceThresholdEth).trim();
+  if (faucetAmountEth) faucet.amountEth = faucetAmountEth;
+  else delete faucet.amountEth;
+  if (faucetBalanceThresholdEth) faucet.balanceThresholdEth = faucetBalanceThresholdEth;
+  else delete faucet.balanceThresholdEth;
+  if (Object.keys(faucet).length) next.faucet = faucet;
+  else delete next.faucet;
+
+  const hasExistingAi = !!(metadata && metadata.ai && typeof metadata.ai === 'object');
+  const aiDefaults = buildAdminMetadataDraft({});
+  const aiDraftTouched = (
+    normalizeAiProvider(draft.aiFastProvider, aiDefaults.aiFastProvider) !== aiDefaults.aiFastProvider ||
+    (toStr(draft.aiFastModel).trim() || aiDefaults.aiFastModel) !== aiDefaults.aiFastModel ||
+    normalizeAiProvider(draft.aiThinkingProvider, aiDefaults.aiThinkingProvider) !== aiDefaults.aiThinkingProvider ||
+    (toStr(draft.aiThinkingModel).trim() || aiDefaults.aiThinkingModel) !== aiDefaults.aiThinkingModel ||
+    normalizeAiProvider(draft.aiTranscriptionProvider, aiDefaults.aiTranscriptionProvider) !== aiDefaults.aiTranscriptionProvider ||
+    (toStr(draft.aiTranscriptionModel).trim() || aiDefaults.aiTranscriptionModel) !== aiDefaults.aiTranscriptionModel
+  );
+
+  if (hasExistingAi || aiDraftTouched) {
+    const ai = next.ai && typeof next.ai === 'object' ? { ...next.ai } : {};
+    const existingModels = ai.models && typeof ai.models === 'object' ? ai.models : {};
+    ai.models = {
+      ...existingModels,
+      fast: {
+        ...(existingModels.fast && typeof existingModels.fast === 'object' ? existingModels.fast : {}),
+        provider: normalizeAiProvider(draft.aiFastProvider, 'openai'),
+        model: toStr(draft.aiFastModel).trim() || ADMIN_DEFAULT_AI_MODELS.fast,
+      },
+      thinking: {
+        ...(existingModels.thinking && typeof existingModels.thinking === 'object' ? existingModels.thinking : {}),
+        provider: normalizeAiProvider(draft.aiThinkingProvider, 'openai'),
+        model: toStr(draft.aiThinkingModel).trim() || ADMIN_DEFAULT_AI_MODELS.thinking,
+      },
+      transcription: {
+        ...(existingModels.transcription && typeof existingModels.transcription === 'object' ? existingModels.transcription : {}),
+        provider: normalizeAiProvider(draft.aiTranscriptionProvider, 'openai'),
+        model: toStr(draft.aiTranscriptionModel).trim() || 'whisper-1',
+      },
+    };
+    next.ai = ai;
+  }
+
+  return next;
+};
+
+const parseResourceDisplayAmount = (display) => {
+  const match = toStr(display).trim().match(/^([0-9]+(?:\.[0-9]+)?)\s+(AR|ETH)$/i);
+  if (!match) return null;
+  const amount = Number(match[1]);
+  return Number.isFinite(amount) ? amount : null;
+};
+
+const shouldShowInlineResourceSummary = (resource = {}) => {
+  if (resource?.manualRefreshAvailable === true) return true;
+  const display = toStr(resource?.display).trim();
+  if (!display) return false;
+  if (resource?.loading || display === 'Loading...') return true;
+  if (['Invalid JWK', 'Invalid key', 'Unable to load balance', 'RPC unavailable'].includes(display)) return true;
+  const amount = parseResourceDisplayAmount(display);
+  return amount != null && amount > 0;
+};
+
+const normalizeSbtSelection = (value) => {
+  if (Array.isArray(value)) {
+    return value
+      .map((entry) => {
+        if (!entry) return null;
+        if (typeof entry === 'string') {
+          const address = entry.trim();
+          if (!address) return null;
+          return { address, name: address };
+        }
+        if (typeof entry === 'object') {
+          const address = toStr(entry.address || entry.sbtAddress || entry.value).trim();
+          if (!address) return null;
+          return { ...entry, address, name: entry.name || entry.label || address };
+        }
+        return null;
+      })
+      .filter(Boolean);
+  }
+  if (typeof value === 'string' && value.trim()) {
+    return value
+      .split(/[\n,]+/)
+      .map((addr) => addr.trim())
+      .filter(Boolean)
+      .map((addr) => ({ address: addr, name: addr }));
+  }
+  return [];
+};
+
+const dedupeSbtSelections = (value) => {
+  const out = [];
+  const seen = new Set();
+  normalizeSbtSelection(value).forEach((entry) => {
+    if (!ethers.utils.isAddress(entry.address)) return;
+    const checksum = ethers.utils.getAddress(entry.address);
+    const lower = checksum.toLowerCase();
+    if (seen.has(lower)) return;
+    seen.add(lower);
+    out.push({ ...entry, address: checksum, name: entry.name || checksum });
+  });
+  return out;
+};
+
+const normalizeGateMode = (raw) => {
+  const mode = toStr(raw).trim().toLowerCase();
+  if (mode === 'all' || mode === 'and') return 'all';
+  return 'any';
+};
+
+const parseChainIdInput = (raw) => {
+  const matches = toStr(raw).match(/\d+/g);
+  if (!matches || !matches.length) return 0;
+  return Number(matches[matches.length - 1]) || 0;
+};
+const normalizeRpcUrlList = (value) => {
+  if (Array.isArray(value)) {
+    return value.map((entry) => toStr(entry).trim()).filter(Boolean);
+  }
+  const trimmed = toStr(value).trim();
+  return trimmed ? [trimmed] : [];
+};
+const sanitizeRpcUrlMap = (value) => {
+  if (!value || typeof value !== 'object') return {};
+  const out = {};
+  Object.entries(value).forEach(([chainKey, urls]) => {
+    const normalized = normalizeRpcUrlList(urls);
+    if (normalized.length) out[String(chainKey)] = normalized;
+  });
+  return out;
+};
+const pickFirstNonEmptyRpcUrlMap = (...candidates) => candidates.reduce((found, candidate) => {
+  if (found && Object.keys(found).length > 0) return found;
+  const sanitized = sanitizeRpcUrlMap(candidate);
+  return Object.keys(sanitized).length > 0 ? sanitized : found;
+}, {});
+const getSessionReadRpcConfig = ({
+  sessionConfig,
+  fallbackChainId,
+} = {}) => {
+  const cfg = sessionConfig && typeof sessionConfig === 'object' ? sessionConfig : {};
+  const rpcRoot = cfg.rpc && typeof cfg.rpc === 'object' ? cfg.rpc : {};
+  const rpcProviders = rpcRoot.providers && typeof rpcRoot.providers === 'object' ? rpcRoot.providers : {};
+  const pathProvider = rpcProviders.path && typeof rpcProviders.path === 'object' ? rpcProviders.path : {};
+  const faucetCfg = cfg.faucet && typeof cfg.faucet === 'object' ? cfg.faucet : {};
+  const chainId = Number(
+    cfg.networkChainId ||
+    cfg.__registry?.chainId ||
+    cfg.__registry?.registryChainId ||
+    fallbackChainId ||
+    0
+  ) || 0;
+  const rpcUrlsByChainId = pickFirstNonEmptyRpcUrlMap(
+    pathProvider.rpcUrlsByChainId,
+    rpcRoot.rpcUrlsByChainId,
+    cfg.rpcUrlsByChainId
+  );
+  const chainRpcUrl = chainId
+    ? normalizeRpcUrlList(rpcUrlsByChainId[String(chainId)] || rpcUrlsByChainId[chainId])[0] || ''
+    : '';
+  const defaultRpcUrl = chainId
+    ? toStr(getDefaultHttpRpc(chainId, { allowPath: false }) || getDefaultHttpRpc(chainId)).trim()
+    : '';
+  const rpcUrl = (
+    normalizeRpcUrlList(faucetCfg.rpcUrl)[0] ||
+    chainRpcUrl ||
+    normalizeRpcUrlList(pathProvider.rpcUrl)[0] ||
+    normalizeRpcUrlList(rpcRoot.rpcUrl)[0] ||
+    normalizeRpcUrlList(cfg.rpcUrl)[0] ||
+    defaultRpcUrl
+  );
+  return {
+    chainId,
+    rpcUrl: toStr(rpcUrl).trim(),
+  };
+};
+const buildWorkerSessionConfigPayload = ({
+  sessionConfig,
+  account,
+  fallbackChainId,
+} = {}) => {
+  const normalizeContractEntry = (entry, chainIdFallback) => {
+    if (!entry || typeof entry !== 'object') return null;
+    const address = toStr(entry.address || entry.contractAddress || '').trim();
+    const chainId = Number(entry.chainId || entry.networkChainId || chainIdFallback || 0) || 0;
+    if (!address) return null;
+    return {
+      address,
+      ...(chainId ? { chainId } : {}),
+    };
+  };
+  const cfg = sessionConfig && typeof sessionConfig === 'object' ? sessionConfig : {};
+  const registry = cfg.__registry && typeof cfg.__registry === 'object' ? cfg.__registry : {};
+  const rpcRoot = cfg.rpc && typeof cfg.rpc === 'object' ? cfg.rpc : {};
+  const rpcProviders = rpcRoot.providers && typeof rpcRoot.providers === 'object' ? rpcRoot.providers : {};
+  const pathProvider = rpcProviders.path && typeof rpcProviders.path === 'object' ? rpcProviders.path : {};
+  const inferredSessionChainId = Number(cfg.networkChainId || fallbackChainId || 0) || 0;
+  const registryChainId = Number(
+    registry.registryChainId ||
+    registry.chainId ||
+    inferredSessionChainId ||
+    0
+  ) || 0;
+  const rpcUrlFromConfig = (
+    normalizeRpcUrlList(pathProvider.rpcUrl)[0] ||
+    normalizeRpcUrlList(rpcRoot.rpcUrl)[0] ||
+    normalizeRpcUrlList(cfg.rpcUrl)[0] ||
+    normalizeRpcUrlList(cfg.faucet?.rpcUrl)[0] ||
+    ''
+  );
+  const rpcUrlsByChainId = pickFirstNonEmptyRpcUrlMap(
+    pathProvider.rpcUrlsByChainId,
+    cfg.rpcUrlsByChainId
+  );
+  const rpcUrlsForRegistryChain = normalizeRpcUrlList(
+    registryChainId ? (rpcUrlsByChainId[String(registryChainId)] || rpcUrlsByChainId[registryChainId]) : []
+  );
+  const defaultChainRpcUrl = registryChainId ? toStr(getDefaultHttpRpc(registryChainId)).trim() : '';
+  const resolvedRpcUrl = rpcUrlFromConfig || rpcUrlsForRegistryChain[0] || defaultChainRpcUrl;
+  const resolvedRpcUrlsByChainId = { ...rpcUrlsByChainId };
+  if (registryChainId && resolvedRpcUrl) {
+    const key = String(registryChainId);
+    if (!normalizeRpcUrlList(resolvedRpcUrlsByChainId[key]).length) {
+      resolvedRpcUrlsByChainId[key] = [resolvedRpcUrl];
+    }
+  }
+  const allowOriginsRaw = cfg.allowOrigins;
+  const allowOrigins = Array.isArray(allowOriginsRaw)
+    ? allowOriginsRaw.map((entry) => toStr(entry).trim()).filter(Boolean)
+    : toStr(allowOriginsRaw)
+      .split(/[\n,]+/)
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+  const limits = cfg.limits && typeof cfg.limits === 'object' ? cfg.limits : {};
+  const scopes = cfg.scopes && typeof cfg.scopes === 'object' ? cfg.scopes : {};
+  const faucetCfg = cfg.faucet && typeof cfg.faucet === 'object' ? cfg.faucet : {};
+
+  const out = {
+    adminAddress: toStr(registry.adminAddress || cfg.adminAddress || account).trim(),
+  };
+  const slug = normalizeSlug(cfg.slug || '');
+  const registryAddress = toStr(registry.registryAddress || registry.address || '').trim();
+  const resolvedRegistryAddress = registryAddress || toStr(
+    registryChainId
+      ? (getSessionRegistryAddress(registryChainId) || sessionRegistryUtils.resolveRegistryAddress(registryChainId))
+      : ''
+  ).trim();
+  const hatsAddress = toStr(registry.hatsAddress || cfg.hatsAddress || '').trim();
+  const adminHatId = toStr(registry.adminHatId || cfg.adminHatId || '').trim();
+  if (slug || slug === '') out.slug = slug;
+  if (resolvedRegistryAddress) out.registryAddress = resolvedRegistryAddress;
+  if (registryChainId) out.registryChainId = registryChainId;
+  if (hatsAddress) out.hatsAddress = hatsAddress;
+  if (adminHatId) out.adminHatId = adminHatId;
+  if (inferredSessionChainId) {
+    out.networkChainId = inferredSessionChainId;
+  }
+  const sessionId = toStr(registry.sessionId || registry.sessionIdHex || cfg.sessionId || '').trim();
+  if (sessionId) out.sessionId = sessionId;
+  if (resolvedRpcUrl) out.rpcUrl = resolvedRpcUrl;
+  if (Object.keys(resolvedRpcUrlsByChainId).length) out.rpcUrlsByChainId = resolvedRpcUrlsByChainId;
+  if (allowOrigins.length) out.allowOrigins = allowOrigins;
+  if (Object.keys(limits).length) out.limits = limits;
+  if (Object.keys(scopes).length) out.scopes = scopes;
+  const blockLimits = normalizeBlockLimitsForConfig(cfg.blockLimits);
+  if (blockLimits) out.blockLimits = blockLimits;
+
+  const contractsObj = cfg.contracts && typeof cfg.contracts === 'object' ? cfg.contracts : {};
+  const normalizedContracts = {};
+  Object.entries(contractsObj).forEach(([key, value]) => {
+    const normalized = normalizeContractEntry(value, cfg.networkChainId || fallbackChainId);
+    if (!normalized) return;
+    normalizedContracts[key] = normalized;
+  });
+  if (Object.keys(normalizedContracts).length) out.contracts = normalizedContracts;
+
+  const faucet = {};
+  const faucetRpcUrl = normalizeRpcUrlList(faucetCfg.rpcUrl)[0] || resolvedRpcUrl;
+  const faucetAmountEth = toStr(faucetCfg.amountEth).trim();
+  const faucetBalanceThresholdEth = toStr(faucetCfg.balanceThresholdEth).trim();
+  if (faucetRpcUrl) faucet.rpcUrl = faucetRpcUrl;
+  if (faucetAmountEth) faucet.amountEth = faucetAmountEth;
+  if (faucetBalanceThresholdEth) faucet.balanceThresholdEth = faucetBalanceThresholdEth;
+  if (Object.keys(faucet).length) out.faucet = faucet;
+
+  return out;
+};
+
+const resolveAutoFeatureBySessionSlug = (metadata) => (
+  metadata?.autoFeatureSBTsBySessionSlug !== undefined
+    ? metadata.autoFeatureSBTsBySessionSlug
+    : metadata?.autoFeatureSBTsWithFeaturedSbtTags
+);
+
+const buildEditableSessionMetadataPayload = ({
+  sessionConfig,
+  blockLimits,
+  fallbackStart = null,
+  autoFeatureSBTsBySessionSlug,
+  autoFeatureSBTsWithFeaturedSbtTags,
+  hasAutoFeatureOverride = false,
+  advancedDraft = null,
+} = {}) => {
+  const metadata = deepClone(sessionConfig && typeof sessionConfig === 'object' ? sessionConfig : {});
+  delete metadata.__registry;
+  delete metadata.sponsoredKeys;
+  const normalizedBlockLimits = normalizeBlockLimitsForConfig(
+    blockLimits && typeof blockLimits === 'object' ? blockLimits : metadata.blockLimits,
+    fallbackStart,
+  );
+  if (!normalizedBlockLimits) {
+    throw new Error('Session metadata requires blockLimits.start (positive block number).');
+  }
+  metadata.blockLimits = normalizedBlockLimits;
+  const existingAutoFeature = resolveAutoFeatureBySessionSlug(metadata);
+  delete metadata.autoFeatureSBTsWithFeaturedSbtTags;
+  if (hasAutoFeatureOverride) {
+    const overrideAutoFeature = autoFeatureSBTsBySessionSlug !== undefined
+      ? autoFeatureSBTsBySessionSlug
+      : autoFeatureSBTsWithFeaturedSbtTags;
+    metadata.autoFeatureSBTsBySessionSlug = overrideAutoFeature === true;
+  } else if (existingAutoFeature !== undefined) {
+    metadata.autoFeatureSBTsBySessionSlug = existingAutoFeature;
+  }
+  const withAdvancedEdits = advancedDraft ? applyAdminMetadataDraft(metadata, advancedDraft) : metadata;
+  const sanitized = sanitizeSessionWizardMetadataPayload(withAdvancedEdits, {
+    defaultAiModels: ADMIN_DEFAULT_AI_MODELS,
+  });
+  delete sanitized.autoFeatureSBTsWithFeaturedSbtTags;
+  const originalContracts = metadata.contracts && typeof metadata.contracts === 'object' ? metadata.contracts : {};
+  const sanitizedContracts = sanitized.contracts && typeof sanitized.contracts === 'object' ? sanitized.contracts : {};
+  const mergedContracts = { ...originalContracts, ...sanitizedContracts };
+  if (Object.keys(mergedContracts).length) {
+    sanitized.contracts = mergedContracts;
+  } else {
+    delete sanitized.contracts;
+  }
+  return sanitized;
+};
+const addSessionConfigHint = (message) => {
+  const raw = toStr(message).trim();
+  if (!raw) return 'Worker session config is missing. Run the AI test again as admin to seed it, or re-deploy for this slug.';
+  if (!raw.toLowerCase().includes('session config not found')) return raw;
+  return `${raw} Re-run this test while connected as the admin wallet to seed worker config, then verify the worker URL and selected session slug match.`;
+};
+
+const shouldSeedWorkerConfigFromError = (message) => {
+  const raw = toStr(message).toLowerCase();
+  if (!raw) return false;
+  if (raw.includes('session config not found')) return true;
+  return false;
+};
+
+const buildHealthAuthMismatchState = ({
+  unauthStatus,
+  unauthError = '',
+  authError = '',
+} = {}) => {
+  const status = Number(unauthStatus || 0) || 0;
+  const authMsg = toStr(authError).toLowerCase();
+  const unsupportedAuthRoute = (
+    status > 0 &&
+    (status === 401 || status === 403) &&
+    (
+      authMsg.includes('worker login failed (404)') ||
+      authMsg.includes('worker auth login route not supported')
+    )
+  );
+  if (!unsupportedAuthRoute) return null;
+  const detail = toStr(unauthError).trim();
+  const suffix = detail ? `: ${detail}` : '';
+  return {
+    healthLabel: `Auth required${suffix}; /auth/login unsupported (404)`,
+    statusMessage: 'Health endpoint is gated, but this worker URL does not expose /auth/login.',
+  };
 };
 
 export const __adminPageTestUtils = {

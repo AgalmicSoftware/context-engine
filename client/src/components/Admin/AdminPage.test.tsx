@@ -159,14 +159,14 @@ describe('AdminPage', () => {
         blockLimits: { start: 12345 },
       },
     });
-    const legacyPayload = adminPageTestUtils.buildEditableSessionMetadataPayload({
+    const legacyPayload = __adminPageTestUtils.buildEditableSessionMetadataPayload({
       sessionConfig: {
         slug: 'test-10',
         blockLimits: { start: 12345 },
         autoFeatureSBTsWithFeaturedSbtTags: false,
       },
     });
-    const precedencePayload = adminPageTestUtils.buildEditableSessionMetadataPayload({
+    const precedencePayload = __adminPageTestUtils.buildEditableSessionMetadataPayload({
       sessionConfig: {
         slug: 'test-10',
         blockLimits: { start: 12345 },
@@ -174,7 +174,7 @@ describe('AdminPage', () => {
         autoFeatureSBTsWithFeaturedSbtTags: false,
       },
     });
-    const overriddenPayload = adminPageTestUtils.buildEditableSessionMetadataPayload({
+    const overriddenPayload = __adminPageTestUtils.buildEditableSessionMetadataPayload({
       sessionConfig: {
         slug: 'test-10',
         blockLimits: { start: 12345 },
