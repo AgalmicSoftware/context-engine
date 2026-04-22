@@ -7,6 +7,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCaretDown, faCaretUp, faCheck, faCog, faCopy, faExclamationCircle, faExpand, faExternalLinkAlt, faImage, faPlus, faQuestionCircle, faRedoAlt, faSpinner, faTimes, faTrash, faUpload } from '@fortawesome/free-solid-svg-icons';
 import styles from './SessionWizard.module.scss';
 import LockableFieldFrame from './LockableFieldFrame.jsx';
+import BlockLimitsField from './BlockLimitsField.jsx';
 import SBTSelector from '../SBTs/SBTSelector.jsx';
 import CreateSBTGroup, { finalizeDeferredCreateSbtDraftUpload } from '../SBTs/CreateSBTGroup.jsx';
 import GateMultiSelectLock from '../Gates/GateMultiSelectLock.jsx';
@@ -5181,61 +5182,23 @@ const SessionWizard = ({
     }
 
     if (path.length === 0 && key === 'blockLimits') {
-      const startValue = value?.start ?? '';
-      const endValue = value?.end ?? null;
       return (
-        <FormGroup key={keyString} className={styles.fieldGroup}>
-          <div className={styles.fieldHeader}>
-            <div className={styles.fieldLabelRow}>
-              <Label>{displayLabelText}</Label>
-              {fieldTooltipControl}
-            </div>
-          </div>
-          <div className={styles.blockLimitsGrid}>
-            <FormGroup>
-              <Label>Start block</Label>
-              <Input
-                type="number"
-                value={startValue == null ? '' : startValue}
-                onChange={(e) => {
-                  blockStartManualRef.current = true;
-                  const raw = e.target.value;
-                  updateDraftValue(['blockLimits', 'start'], raw === '' ? null : Number(raw));
-                }}
-              />
-              {latestChainBlock != null && (
-                <div className={styles.helperText}>
-                  Latest block: {Number(latestChainBlock).toLocaleString()}
-                </div>
-              )}
-              {latestBlockStatus && <div className={styles.helperText}>{latestBlockStatus}</div>}
-            </FormGroup>
-            <FormGroup>
-              <Label>End after</Label>
-              <div className={styles.blockLimitInline}>
-                <Input
-                  type="number"
-                  value={blockLimitDuration}
-                  min="0"
-                  onChange={(e) => setBlockLimitDuration(e.target.value)}
-                  placeholder="0"
-                />
-                <Input
-                  type="select"
-                  value={blockLimitUnit}
-                  onChange={(e) => setBlockLimitUnit(e.target.value)}
-                >
-                  <option value="minutes">minutes</option>
-                  <option value="hours">hours</option>
-                  <option value="days">days</option>
-                </Input>
-              </div>
-              <div className={styles.helperText}>
-                {endValue ? `Ends at block ${Number(endValue).toLocaleString()}.` : 'No end block set.'}
-              </div>
-            </FormGroup>
-          </div>
-        </FormGroup>
+        <BlockLimitsField
+          key={keyString}
+          blockLimits={value}
+          onStartChange={(raw) => {
+            blockStartManualRef.current = true;
+            updateDraftValue(['blockLimits', 'start'], raw === '' ? null : Number(raw));
+          }}
+          blockLimitDuration={blockLimitDuration}
+          blockLimitUnit={blockLimitUnit}
+          onDurationChange={setBlockLimitDuration}
+          onUnitChange={setBlockLimitUnit}
+          latestChainBlock={latestChainBlock}
+          latestBlockStatus={latestBlockStatus}
+          label={displayLabelText}
+          tooltipControl={fieldTooltipControl}
+        />
       );
     }
 
