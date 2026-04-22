@@ -961,6 +961,7 @@ const MORE_OPTIONS_FIELDS = new Set([
   'autoFeatureSBTsBySessionSlug',
   'questionsGenPrompt',
   'defaultFilterState',
+  'sponsoredSbtAddress',
 ]);
 const WORKER_ONLY_DRAFT_FIELDS = new Set([
   'embeddedDeployHelperEnabled',
@@ -2093,6 +2094,7 @@ const FIELD_TOOLTIPS = {
   defaultFilterState: 'Advanced: a saved starting state for the question filter UI. Most sessions can leave this alone unless you want the page to open with a specific preset.',
   defaultFeaturedSBTs: `Manually feature specific ${t('sbtsLower')} for this session. These are surfaced first in ${t('sbt')} selectors and featured session views.`,
   autoFeatureSBTsBySessionSlug: `Automatically show ${t('sbtsLower')} created for this session in featured Groups areas when their metadata points to this session slug. In list scope, this session can also contribute those ${t('sbtsLower')} to the shared featured strip.`,
+  sponsoredSbtAddress: `Legacy default ${t('sbt')} gate address. Most sessions should configure Privacy & Access instead.`,
   networkChainId: 'Primary chain id for the session.',
   contracts: 'Contract addresses + chain ids for this session.',
   blockLimits: 'Optional start and end limits for indexing this session. Use this when the session should only read activity from a certain block range or time window.',
@@ -2118,6 +2120,7 @@ const FIELD_LABELS = {
   defaultTags: 'Default Tag Suggestions',
   defaultFeaturedSBTs: `Default ${t('sbts')}`,
   autoFeatureSBTsBySessionSlug: `Auto-feature Session ${t('sbts')}`,
+  sponsoredSbtAddress: `Sponsored ${t('sbt')} Address`,
   contracts: 'Smart Contracts',
   blockLimits: 'Time Limits',
 };
