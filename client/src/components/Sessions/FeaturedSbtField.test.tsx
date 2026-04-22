@@ -1,9 +1,24 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
-import FeaturedSbtField from './FeaturedSbtField.jsx';
+import FeaturedSbtField from './FeaturedSbtField';
+import type { FeaturedSbtFieldProps } from './FeaturedSbtField';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
-jest.mock('../SBTs/SBTSelector.jsx', () => (props) => {
+type MockSbtEntry = {
+  address: string;
+  name: string;
+};
+
+type MockSbtSelectorProps = {
+  id?: string;
+  label?: string;
+  selectedSBTs?: MockSbtEntry[] | null;
+  defaultFeaturedSBTs?: string[];
+  onAddSBT?: (sbt: MockSbtEntry) => void;
+  onRemoveSBT?: (address: string) => void;
+};
+
+jest.mock('../SBTs/SBTSelector.jsx', () => (props: MockSbtSelectorProps) => {
   const selectedSBTs = Array.isArray(props.selectedSBTs) ? props.selectedSBTs : [];
   return (
     <div
@@ -32,7 +47,7 @@ jest.mock('../SBTs/SBTSelector.jsx', () => (props) => {
   );
 });
 
-const renderFeaturedSbtField = (props = {}) => render(
+const renderFeaturedSbtField = (props: Partial<FeaturedSbtFieldProps> = {}) => render(
   <FeaturedSbtField
     label="Default Groups"
     tooltipControl={<span data-testid="featured-tooltip">?</span>}

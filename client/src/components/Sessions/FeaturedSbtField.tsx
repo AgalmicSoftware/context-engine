@@ -1,9 +1,32 @@
-/** @file FeaturedSbtField.jsx */
+/** @file FeaturedSbtField.tsx */
 import React from 'react';
 import { FormGroup, Label } from 'reactstrap';
 import SBTSelector from '../SBTs/SBTSelector.jsx';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import styles from './SessionWizard.module.scss';
+
+type FeaturedSbtEntry = {
+  address?: string;
+  [key: string]: unknown;
+};
+
+export type FeaturedSbtFieldProps = {
+  label: React.ReactNode;
+  tooltipControl?: React.ReactNode;
+  createButtonLabel: React.ReactNode;
+  onCreateSbt?: React.MouseEventHandler<HTMLButtonElement>;
+  selectedSBTs?: FeaturedSbtEntry[] | null;
+  onSelectionsChange: (nextSelections: FeaturedSbtEntry[]) => void;
+  onRemove: (address?: string) => void;
+  selectorLabel: string;
+  network?: unknown;
+  additionalSBTOptions?: unknown;
+  chainId?: unknown;
+  sessionSlug?: string;
+  sessionConfig?: unknown;
+  sbtCacheRevision?: unknown;
+  ensureLightSbtUniverse?: unknown;
+};
 
 const FeaturedSbtField = ({
   label,
@@ -21,7 +44,7 @@ const FeaturedSbtField = ({
   sessionConfig,
   sbtCacheRevision,
   ensureLightSbtUniverse,
-}) => {
+}: FeaturedSbtFieldProps) => {
   const selections = Array.isArray(selectedSBTs) ? selectedSBTs : [];
 
   return (
@@ -45,10 +68,10 @@ const FeaturedSbtField = ({
         id="default-featured-sbts"
         label={selectorLabel}
         selectedSBTs={selections}
-        onAddSBT={(sbt) => {
+        onAddSBT={(sbt: FeaturedSbtEntry) => {
           onSelectionsChange([...selections, sbt]);
         }}
-        onRemoveSBT={(address) => onRemove(address)}
+        onRemoveSBT={(address: string) => onRemove(address)}
         network={network}
         additionalSBTOptions={additionalSBTOptions}
         chainId={chainId}
