@@ -71,8 +71,8 @@ describe('aiSettings secret resolution', () => {
     expect(getLocalAiSettings().reasoningEffort).toBe('low');
   });
 
-  it('preserves saved provider API keys through local settings normalization', () => {
-    saveLocalAiSettings({
+  it('keeps plaintext provider API keys volatile while saving an envelope record', () => {
+    const saved = saveLocalAiSettings({
       useLocal: true,
       providers: {
         anthropic: {
@@ -83,9 +83,42 @@ describe('aiSettings secret resolution', () => {
     });
 
     const settings = getLocalAiSettings();
+    const storedRaw = localStorage.getItem(AI_SETTINGS_STORAGE_KEY);
+    const stored = JSON.parse(storedRaw);
+    const persisted = readLocalAiSettingsEnvelope();
 
+    expect(saved.providers.anthropic.apiKey).toBe('sk-ant-test');
     expect(settings.providers.anthropic.apiKey).toBe('sk-ant-test');
     expect(settings.providers.anthropic.encryptedApiKey).toBe('{"v":1,"ciphertext":"enc"}');
+    expect(storedRaw).not.toContain('sk-ant-test');
+    expect(stored.kind).toBe(AI_SETTINGS_ENVELOPE_KIND);
+    expect(stored.settings.providers.anthropic.apiKey).toBe('');
+    expect(stored.settings.providers.anthropic.encryptedApiKey).toBe('{"v":1,"ciphertext":"enc"}');
+    expect(persisted.settings.providers.anthropic.apiKey).toBe('');
+  });
+
+  it('does not downgrade an existing local AI envelope during normal saves', () => {
+    writeLocalAiSettingsEnvelope({
+      useLocal: true,
+      providers: {
+        openai: {
+          encryptedApiKey: '{"v":1,"ciphertext":"enc-open"}',
+        },
+      },
+    });
+
+    const saved = saveLocalAiSettings({
+      useLocal: false,
+      reasoningEffort: 'high',
+    });
+    const stored = JSON.parse(localStorage.getItem(AI_SETTINGS_STORAGE_KEY));
+
+    expect(saved.useLocal).toBe(false);
+    expect(saved.reasoningEffort).toBe('high');
+    expect(stored.kind).toBe(AI_SETTINGS_ENVELOPE_KIND);
+    expect(stored.settings.useLocal).toBe(false);
+    expect(stored.settings.reasoningEffort).toBe('high');
+    expect(stored.settings.providers.openai.encryptedApiKey).toBe('{"v":1,"ciphertext":"enc-open"}');
   });
 
   it('reads legacy local AI settings through the envelope adapter with plaintext metadata', () => {

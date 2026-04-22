@@ -501,6 +501,14 @@ const toRegistrySlug = (raw) => {
   return slug;
 };
 
+const validateRegistrySlugForWriteOrThrow = (raw) => {
+  const slugValidation = validateRegistrySessionSlugForWrite(raw);
+  if (!slugValidation.ok) {
+    throw new Error(slugValidation.error || 'Invalid session slug.');
+  }
+  return slugValidation.slug;
+};
+
 const setValueAtPath = (obj, path, value) => {
   let cur = obj;
   path.forEach((key, idx) => {
@@ -1526,11 +1534,7 @@ export const registerSessionOnChain = async ({
   if (!registryAddress) {
     throw new Error('Session registry address not configured for this chain.');
   }
-  const slugValidation = validateRegistrySessionSlugForWrite(slug);
-  if (!slugValidation.ok) {
-    throw new Error(slugValidation.error || 'Invalid session slug.');
-  }
-  const registrySlug = slugValidation.slug;
+  const registrySlug = validateRegistrySlugForWriteOrThrow(slug);
   const sessionIdHex = normalizeSessionIdHex(sessionId);
   if (!sessionIdHex) {
     throw new Error('Session ID (UUID) is required.');
@@ -1834,7 +1838,7 @@ export const setSessionFieldsOnChain = async ({
   if (!registryAddress) {
     throw new Error('Session registry address not configured for this chain.');
   }
-  const registrySlug = toRegistrySlug(slug);
+  const registrySlug = validateRegistrySlugForWriteOrThrow(slug);
   const { signingProvider, ethersProvider, signer } = getWriteContextFromProviderLike(providerLike);
   const contract = new ethers.Contract(registryAddress, SESSION_REGISTRY_ABI, signer);
   const txFeeOverrides = await resolveTxFeeOverrides({
@@ -1932,7 +1936,7 @@ export const updateSessionMetadataOnChain = async ({
   if (!registryAddress) {
     throw new Error('Session registry address not configured for this chain.');
   }
-  const registrySlug = toRegistrySlug(slug);
+  const registrySlug = validateRegistrySlugForWriteOrThrow(slug);
   const { signingProvider, ethersProvider, signer } = getWriteContextFromProviderLike(providerLike);
   const contract = new ethers.Contract(registryAddress, SESSION_REGISTRY_ABI, signer);
   if (typeof contract.updateSessionMetadata !== 'function') {
@@ -1990,7 +1994,7 @@ export const setResourceGatesOnChain = async ({
   if (!registryAddress) {
     throw new Error('Session registry address not configured for this chain.');
   }
-  const registrySlug = toRegistrySlug(slug);
+  const registrySlug = validateRegistrySlugForWriteOrThrow(slug);
   const { signingProvider, ethersProvider, signer } = getWriteContextFromProviderLike(providerLike);
   const contract = new ethers.Contract(registryAddress, SESSION_REGISTRY_ABI, signer);
   const writeChainId = Number(chainId || 0) || 0;

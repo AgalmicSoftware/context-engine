@@ -46,6 +46,7 @@ type ReadProviderResolutionOptions = {
   sessionAccessStatus?: string;
   sessionAccessMode?: string;
   sessionRpcSource?: string;
+  sessionSponsoredUrls?: string[];
   [key: string]: any;
 };
 type ReadProviderPreference = ReadProviderResolutionOptions;
@@ -84,6 +85,7 @@ type ReadProviderResolution = {
   infuraOnlyForChain: boolean;
   configuredPaidRpcUrl: string;
   treatPreferredUrlsAsPath: boolean;
+  sessionSponsoredUrls: string[];
 };
 type SponsoredSessionRpcAccess = {
   allowed: boolean;
@@ -169,6 +171,53 @@ const isPathTransportError = (err: unknown): boolean => {
     message.includes('connection') ||
     message.includes('server error')
   );
+};
+
+const isSponsoredRpcFallbackError = (err: unknown): boolean => {
+  if (isPathTransportError(err)) return true;
+  const errorLike = err as AnyRecord;
+  const code = String(errorLike?.code ?? errorLike?.error?.code ?? '').toUpperCase();
+  const message = String(
+    errorLike?.reason ||
+    errorLike?.shortMessage ||
+    errorLike?.message ||
+    errorLike?.error?.message ||
+    ''
+  ).toLowerCase();
+
+  if (code !== 'CALL_EXCEPTION' && code !== 'UNPREDICTABLE_GAS_LIMIT') return false;
+  return (
+    message.includes('missing revert data') ||
+    message.includes('bad result from backend') ||
+    message.includes('could not coalesce') ||
+    message.includes('value=null') ||
+    message.includes('value= null') ||
+    message.includes('failed to fetch') ||
+    message.includes('network error') ||
+    message.includes('timeout') ||
+    message.includes('server error')
+  );
+};
+
+const toSponsoredRpcFallbackError = (err: unknown, meta: AnyRecord = {}): Error => {
+  const errorLike = err as AnyRecord;
+  const message = String(
+    errorLike?.reason ||
+    errorLike?.shortMessage ||
+    errorLike?.message ||
+    errorLike?.error?.message ||
+    'Sponsored RPC read failed.'
+  );
+  const fallbackError = new Error(message);
+  Object.assign(fallbackError as AnyRecord, {
+    code: 'SERVER_ERROR',
+    reason: message,
+    originalCode: errorLike?.code ?? errorLike?.error?.code ?? '',
+    originalError: err,
+    __ce_sponsored_rpc_fallback: true,
+    ...meta,
+  });
+  return fallbackError;
 };
 
 const logPathRpcErrorOnce = (url: string, err: unknown, meta: AnyRecord = {}): void => {
@@ -560,6 +609,7 @@ function resolveGroupPathRpcPreference(cfg: SessionConfigLike = {}, chainId: unk
       : usingSessionRootUrls
         ? 'root'
         : 'default-path',
+    sessionSponsoredUrls: usingSessionRootUrls ? sessionRootUrls : [],
   };
 }
 
@@ -665,6 +715,7 @@ const buildReadProviderResolution = (
     ? pathDefaultUrls
     : [];
   const preferredUrls = infuraOnlyForChain ? [] : (preferredUrlsRaw.length ? preferredUrlsRaw : globalPreferred);
+  const sessionSponsoredUrls = dedupeRpcUrls(opts.sessionSponsoredUrls);
   const allowPathUrls = !infuraOnlyForChain && (
     treatPreferredUrlsAsPath ||
     (!preferredUrlsRaw.length && !opts.skipGlobalPreferred && preferPathFlag)
@@ -728,6 +779,7 @@ const buildReadProviderResolution = (
     infuraOnlyForChain,
     configuredPaidRpcUrl,
     treatPreferredUrlsAsPath,
+    sessionSponsoredUrls,
   };
 };
 
@@ -747,6 +799,7 @@ function _getCachedProvider(chainId: unknown, opts: ReadProviderResolutionOption
     publicUrls,
     defaultUrls,
     preferredUrls,
+    sessionSponsoredUrls,
     providerLabel,
     preferPathFlag,
     pathDefaultUrls,
@@ -784,10 +837,20 @@ function _getCachedProvider(chainId: unknown, opts: ReadProviderResolutionOption
   }
 
   const lastIndex = urls.length - 1;
+  const sessionSponsoredUrlSet = new Set(sessionSponsoredUrls.map((url) => toLower(url)));
+  const hasSessionSponsoredFallbackUrls = (
+    toStr(opts.sessionRpcSource).trim() === 'root' &&
+    sessionSponsoredUrlSet.size > 0 &&
+    urls.some((url) => !sessionSponsoredUrlSet.has(toLower(url)))
+  );
 
   const providerConfigs: any[] = urls.map((url, idx) => {
     const isBackup = urls.length > 1 && idx === lastIndex;
     const provider = new ethers.providers.JsonRpcProvider(url, staticNet) as AnyRecord;
+    const isSponsoredRootUrl = (
+      hasSessionSponsoredFallbackUrls &&
+      sessionSponsoredUrlSet.has(toLower(url))
+    );
 
     const basePerform = provider.perform.bind(provider);
     provider.perform = async (method: string, params: unknown) => {
@@ -803,6 +866,17 @@ function _getCachedProvider(chainId: unknown, opts: ReadProviderResolutionOption
           markRangeTooLargeError(err);
           logPathRpcErrorOnce(url, err, { chainId: id, method, provider: providerLabel });
           logVerboseRpcError('PATH RPC error detail', err, {
+            chainId: id,
+            method,
+            provider: providerLabel,
+            url,
+          });
+        }
+        // Regression guard: ethers v5 forwards CALL_EXCEPTION at quorum=1, so
+        // malformed sponsored RPC reads must be downgraded before public/POKT
+        // fallbacks get skipped.
+        if (isSponsoredRootUrl && isSponsoredRpcFallbackError(err)) {
+          throw toSponsoredRpcFallbackError(err, {
             chainId: id,
             method,
             provider: providerLabel,
