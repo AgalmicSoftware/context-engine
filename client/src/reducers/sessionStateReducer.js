@@ -63,7 +63,6 @@ const getInitialState = () => ({
     // Modal state
     loginModalToggled: false,
     afterLoginModalToggled: false,
-    settingsModalToggled: false,
     onboardingStep: null,
     tooltipsEnabled: readStoredTooltipsEnabled(),
 });

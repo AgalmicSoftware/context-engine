@@ -3,7 +3,6 @@ import {
   CHANGE_METRICS_CHOICE,
   CHANGE_FOCUSED_TAB,
   TOGGLE_LOGIN_MODAL,
-  TOGGLE_SETTINGS_MODAL,
   TOGGLE_TOOLTIPS,
   SET_DEMO_SURFACE_MODE,
   LOGIN_IN_PROGRESS,
@@ -51,13 +50,6 @@ export const changeFocusedTab = (newTabIndex) => dispatch => {
 export const toggleLoginModal = (modalIsOpen) => dispatch => {
   dispatch({
     type: TOGGLE_LOGIN_MODAL,
-    payload: modalIsOpen,
-  });
-}
-
-export const toggleSettingsModal = (modalIsOpen) => dispatch => {
-  dispatch({
-    type: TOGGLE_SETTINGS_MODAL,
     payload: modalIsOpen,
   });
 }
