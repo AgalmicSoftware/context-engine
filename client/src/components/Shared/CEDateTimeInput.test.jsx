@@ -1,6 +1,6 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
-import CEDateTimeInput from './CEDateTimeInput.jsx';
+import CEDateTimeInput from './CEDateTimeInput';
 
 const allowIntermediateNativeInputValues = (input) => {
   let currentValue = input.value;

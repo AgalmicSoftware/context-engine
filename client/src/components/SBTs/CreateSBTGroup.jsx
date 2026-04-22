@@ -38,7 +38,7 @@ import {
 import { JsonButtonRow, JsonPanel, JsonToggleButton } from '../Shared/Json/JsonControls';
 import JsonDisplay from '../Shared/Json/JsonDisplay';
 import CETooltip from '../Shared/CETooltip';
-import CEDateTimeInput from '../Shared/CEDateTimeInput.jsx';
+import CEDateTimeInput from '../Shared/CEDateTimeInput';
 import GateMultiSelectLock from '../Gates/GateMultiSelectLock';
 import CompactImageChooser from '../Shared/CompactImageChooser.jsx';
 import { readCompactImageClipboard } from '../Shared/compactImageClipboard.js';

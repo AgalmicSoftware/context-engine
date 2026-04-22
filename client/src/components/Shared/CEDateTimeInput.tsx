@@ -1,8 +1,25 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 
-const padNumber = (value) => String(value).padStart(2, '0');
+type CEDateTimeInputProps = Omit<
+  React.InputHTMLAttributes<HTMLInputElement>,
+  'min' | 'onChange' | 'step' | 'type' | 'value'
+> & {
+  selected?: Date | null;
+  onChange?: (value: Date | null) => void;
+  minDate?: Date | null;
+  isClearable?: boolean;
+  showTimeSelect?: boolean;
+  timeIntervals?: number | string;
+  placeholderText?: string;
+  calendarClassName?: string;
+  timeFormat?: string;
+  timeCaption?: string;
+  dateFormat?: string;
+};
 
-const toLocalInputValue = (value, withTime = false) => {
+const padNumber = (value: number) => String(value).padStart(2, '0');
+
+const toLocalInputValue = (value: Date | null | undefined, withTime = false) => {
   if (!(value instanceof Date) || !Number.isFinite(value.getTime())) {
     return '';
   }
@@ -17,7 +34,7 @@ const toLocalInputValue = (value, withTime = false) => {
   return `${year}-${month}-${day}T${hours}:${minutes}`;
 };
 
-const normalizeDateValue = (rawValue, withTime = false) => {
+const normalizeDateValue = (rawValue: string, withTime = false) => {
   const value = String(rawValue || '').trim();
   if (!value) return null;
   const normalized = withTime ? value : `${value}T00:00`;
@@ -25,15 +42,15 @@ const normalizeDateValue = (rawValue, withTime = false) => {
   return Number.isFinite(parsed.getTime()) ? parsed : null;
 };
 
-const joinClassNames = (...parts) => parts.filter(Boolean).join(' ');
+const joinClassNames = (...parts: Array<string | false | null | undefined>) => parts.filter(Boolean).join(' ');
 
-const normalizeTimeStepSeconds = (showTimeSelect, timeIntervals) => (
+const normalizeTimeStepSeconds = (showTimeSelect: boolean, timeIntervals: number | string) => (
   showTimeSelect
     ? Math.max(1, Number(timeIntervals || 15)) * 60
     : undefined
 );
 
-const alignMinDateToStepBoundary = (value, stepSeconds) => {
+const alignMinDateToStepBoundary = (value: Date | null | undefined, stepSeconds?: number) => {
   if (!(value instanceof Date) || !Number.isFinite(value.getTime())) {
     return value;
   }
@@ -69,7 +86,7 @@ const CEDateTimeInput = ({
   timeCaption,
   dateFormat,
   ...rest
-}) => {
+}: CEDateTimeInputProps) => {
   void timeFormat;
   void timeCaption;
   void dateFormat;
@@ -77,7 +94,7 @@ const CEDateTimeInput = ({
   const selectedInputValue = toLocalInputValue(selected, showTimeSelect);
   const [draftValue, setDraftValue] = useState(() => selectedInputValue);
   const preserveDraftOnNextSelectedSyncRef = useRef(false);
-  const inputRef = useRef(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
   const step = normalizeTimeStepSeconds(showTimeSelect, timeIntervals);
   const normalizedMinDate = useMemo(
     () => (
