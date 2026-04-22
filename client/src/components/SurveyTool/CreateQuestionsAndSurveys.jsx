@@ -329,6 +329,7 @@ class CreateQuestionsAndSurveys extends Component {
 
       // Minimal manual doc URL field (single source buffer)
       docURLInput: (sanitizeDocumentUrls(props.documentURLs || [])[0]) || '',
+      docURLError: '',
 
       // Auto-focus target (replaces scrollTargetUiKey)
       focusTargetUiKey: null,
@@ -968,6 +969,7 @@ class CreateQuestionsAndSurveys extends Component {
         parsedSurvey.documentURLs = sanitizeDocumentUrls(parsedSurvey.documentURLs || this.state.documentURLs);
         // Don't force overwrite input buffer with list content
         parsedSurvey.docURLInput = '';
+        parsedSurvey.docURLError = '';
 
         parsedSurvey.openLockKey = '';
         parsedSurvey.surveyLockGateIds = normalizeGateIds(parsedSurvey.surveyLockGateIds);
@@ -1020,6 +1022,7 @@ class CreateQuestionsAndSurveys extends Component {
       delete stateToSave.showSubmitSteps;
       delete stateToSave.submitStep;
       delete stateToSave.submissionError;
+      delete stateToSave.docURLError;
       delete stateToSave.surveyAddedSuccessfully;
       delete stateToSave.questionsAddedSuccessfully;
 
@@ -1044,7 +1047,7 @@ class CreateQuestionsAndSurveys extends Component {
   };
 
   handleDocURLInputChange = (e) => {
-    this.setState({ docURLInput: e.target.value });
+    this.setState({ docURLInput: e.target.value, docURLError: '' });
   };
 
   addDocumentURL = () => {
@@ -1053,21 +1056,22 @@ class CreateQuestionsAndSurveys extends Component {
     if (!trimmed) return;
     const normalizedUrl = sanitizeDocumentUrls([trimmed])[0] || '';
     if (!normalizedUrl) {
-      alert(DOCUMENT_URL_ERROR_TEXT);
+      this.setState({ docURLError: DOCUMENT_URL_ERROR_TEXT });
       return;
     }
     const safeDocumentUrls = sanitizeDocumentUrls(documentURLs);
 
     // Prevent duplicates
     if (safeDocumentUrls.some((url) => url.toLowerCase() === normalizedUrl.toLowerCase())) {
-      this.setState({ docURLInput: '' });
+      this.setState({ docURLInput: '', docURLError: '' });
       return;
     }
 
     this.setState(
       {
         documentURLs: [...safeDocumentUrls, normalizedUrl],
-        docURLInput: ''
+        docURLInput: '',
+        docURLError: ''
       },
       () => {
         this.updateSurveyHash();
@@ -1938,6 +1942,7 @@ class CreateQuestionsAndSurveys extends Component {
       lastSubmittedSurveyId: '',
       lastSubmittedSurveyArweaveTxId: '',
       showClearFormConfirm: false,
+      docURLError: '',
     }, () => {
       // Clear localStorage
       this.clearUnfinishedSurveyDraft();
@@ -2712,6 +2717,7 @@ class CreateQuestionsAndSurveys extends Component {
       documentURLs: sanitizeDocumentUrls(docURLs || []),
       // Only set buffer if needed, usually we just want the list
       docURLInput: '',
+      docURLError: '',
       isStandaloneQuestion: !aiTitle,
       title: aiTitle || '',
       showAutoTool: false,
@@ -3018,6 +3024,7 @@ class CreateQuestionsAndSurveys extends Component {
       surveyLockGateIds,
       openLockKey
     } = this.state;
+    const docUrlErrorId = 'ce-create-doc-url-error';
     const safeDocumentUrls = sanitizeDocumentUrls(documentURLs);
     const hasAuthoredDraftContent = (
       questions.length > 0 ||
@@ -3142,6 +3149,8 @@ class CreateQuestionsAndSurveys extends Component {
                 value={this.state.docURLInput || ''}
                 onChange={this.handleDocURLInputChange}
                 onKeyDown={this.handleDocUrlKeyDown}
+                aria-invalid={this.state.docURLError ? 'true' : undefined}
+                aria-describedby={this.state.docURLError ? docUrlErrorId : undefined}
               />
               <button
                 type="button"
@@ -3152,6 +3161,15 @@ class CreateQuestionsAndSurveys extends Component {
                 <FontAwesomeIcon icon={faPlus} />
               </button>
             </div>
+            {this.state.docURLError && (
+              <div
+                id={docUrlErrorId}
+                className={styles.inlineValidationError}
+                data-testid="ce-create-doc-url-error"
+              >
+                {this.state.docURLError}
+              </div>
+            )}
 
             {safeDocumentUrls.length > 0 && (
               <div className={styles.documentUrlDisplay}>
