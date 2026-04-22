@@ -40,7 +40,7 @@ import JsonDisplay from '../Shared/Json/JsonDisplay';
 import CETooltip from '../Shared/CETooltip';
 import CEDateTimeInput from '../Shared/CEDateTimeInput';
 import GateMultiSelectLock from '../Gates/GateMultiSelectLock';
-import CompactImageChooser from '../Shared/CompactImageChooser.jsx';
+import CompactImageChooser from '../Shared/CompactImageChooser';
 import { readCompactImageClipboard } from '../Shared/compactImageClipboard.js';
 import { resolveSessionContractRef } from '../../utilities/session/sessionNaming.js';
 

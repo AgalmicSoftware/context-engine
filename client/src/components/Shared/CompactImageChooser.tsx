@@ -9,11 +9,50 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import styles from './CompactImageChooser.module.scss';
 
-const toText = (value) => (typeof value === 'string' ? value : value == null ? '' : String(value));
+type CompactImageStatusTone = 'default' | 'loading' | 'error';
 
-const joinClassNames = (...parts) => parts.filter(Boolean).join(' ');
+type CompactImageChooserProps = {
+  className?: string;
+  rootTestId?: string;
+  urlButtonTestId?: string;
+  pasteButtonTestId?: string;
+  uploadButtonTestId?: string;
+  fileInputTestId?: string;
+  urlInputTestId?: string;
+  isUrlMode?: boolean;
+  isUploadMode?: boolean;
+  showUrlInput?: boolean;
+  urlValue?: string;
+  urlInputName?: string;
+  onUrlChange?: React.ChangeEventHandler<HTMLInputElement>;
+  onToggleUrlMode?: React.MouseEventHandler<HTMLButtonElement>;
+  onPaste?: React.MouseEventHandler<HTMLButtonElement>;
+  onUploadClick?: React.MouseEventHandler<HTMLButtonElement>;
+  onFileChange?: React.ChangeEventHandler<HTMLInputElement>;
+  fileInputRef?: React.Ref<HTMLInputElement>;
+  accept?: string;
+  urlPlaceholder?: string;
+  urlInputAriaLabel?: string;
+  selectedFileLabel?: string;
+  previewSrc?: string;
+  previewFile?: Blob | null;
+  previewAlt?: string;
+  onClear?: () => void;
+  enablePreviewExpand?: boolean;
+  expandedPreviewAlt?: string;
+  statusText?: string;
+  statusTone?: CompactImageStatusTone;
+  helpText?: string;
+  uploadAriaLabel?: string;
+  clearAriaLabel?: string;
+  expandAriaLabel?: string;
+};
 
-const resolveStatusIcon = (tone) => {
+const toText = (value: unknown) => (typeof value === 'string' ? value : value == null ? '' : String(value));
+
+const joinClassNames = (...parts: Array<string | false | null | undefined>) => parts.filter(Boolean).join(' ');
+
+const resolveStatusIcon = (tone: CompactImageStatusTone) => {
   if (tone === 'loading') return <FontAwesomeIcon icon={faSpinner} spin />;
   if (tone === 'error') return <FontAwesomeIcon icon={faExclamationCircle} />;
   return null;
@@ -54,7 +93,7 @@ const CompactImageChooser = ({
   uploadAriaLabel = 'Upload image',
   clearAriaLabel = 'Remove image',
   expandAriaLabel = 'Expand image preview',
-}) => {
+}: CompactImageChooserProps) => {
   const [generatedPreviewSrc, setGeneratedPreviewSrc] = useState('');
   const [expandedOpen, setExpandedOpen] = useState(false);
 
