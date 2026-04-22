@@ -30,6 +30,8 @@ export const AUTHORITY_SOURCES = Object.freeze({
   ARWEAVE: 'arweave',
   WORKER_KV: 'worker-kv',
   WORKER_SECRETS: 'worker-secrets',
+  DISCOVERY: 'discovery',
+  BUNDLED: 'bundled',
   BROWSER: 'browser',
   DEMO: 'demo',
   CACHE: 'cache',
@@ -53,6 +55,40 @@ export const AUTHORITY_MATRIX = deepFreeze<AuthorityMatrix>({
     mustNotOverride: [
       AUTHORITY_SOURCES.ARWEAVE,
       AUTHORITY_SOURCES.BROWSER,
+      AUTHORITY_SOURCES.DEMO,
+      AUTHORITY_SOURCES.CACHE,
+    ],
+  },
+  slugNormalization: {
+    fields: ['slug', 'registrySlug', 'legacyExactSlug'],
+    authoritativeSource: AUTHORITY_SOURCES.REGISTRY,
+    allowedFallbacks: [AUTHORITY_SOURCES.DEMO],
+    mustNotOverride: [
+      AUTHORITY_SOURCES.ARWEAVE,
+      AUTHORITY_SOURCES.BROWSER,
+      AUTHORITY_SOURCES.CACHE,
+    ],
+  },
+  faucetEligibility: {
+    fields: ['txGas', 'faucetFallbackResources'],
+    authoritativeSource: AUTHORITY_SOURCES.REGISTRY,
+    allowedFallbacks: [],
+    mustNotOverride: [
+      AUTHORITY_SOURCES.ARWEAVE,
+      AUTHORITY_SOURCES.BROWSER,
+      AUTHORITY_SOURCES.DEMO,
+      AUTHORITY_SOURCES.CACHE,
+    ],
+  },
+  registryDiscovery: {
+    fields: ['sessionRegistryAddress', 'sessionContractsByChain'],
+    authoritativeSource: AUTHORITY_SOURCES.DISCOVERY,
+    allowedFallbacks: [
+      AUTHORITY_SOURCES.BROWSER,
+      AUTHORITY_SOURCES.BUNDLED,
+    ],
+    mustNotOverride: [
+      AUTHORITY_SOURCES.ARWEAVE,
       AUTHORITY_SOURCES.DEMO,
       AUTHORITY_SOURCES.CACHE,
     ],

@@ -17,4 +17,23 @@ describe('sessionAuthorityMatrix', () => {
     expect(isDemoSourceAllowed('identity', 'production')).toBe(false);
     expect(isDemoSourceAllowed('workerConfig', 'demo')).toBe(false);
   });
+
+  it('documents PRD 441 registry authority, faucet, and discovery boundaries', () => {
+    expect(AUTHORITY_MATRIX.slugNormalization).toEqual(expect.objectContaining({
+      authoritativeSource: AUTHORITY_SOURCES.REGISTRY,
+      fields: expect.arrayContaining(['registrySlug', 'legacyExactSlug']),
+    }));
+    expect(AUTHORITY_MATRIX.faucetEligibility).toEqual(expect.objectContaining({
+      authoritativeSource: AUTHORITY_SOURCES.REGISTRY,
+      allowedFallbacks: [],
+      fields: expect.arrayContaining(['txGas']),
+    }));
+    expect(AUTHORITY_MATRIX.registryDiscovery).toEqual(expect.objectContaining({
+      authoritativeSource: AUTHORITY_SOURCES.DISCOVERY,
+      allowedFallbacks: expect.arrayContaining([
+        AUTHORITY_SOURCES.BROWSER,
+        AUTHORITY_SOURCES.BUNDLED,
+      ]),
+    }));
+  });
 });
