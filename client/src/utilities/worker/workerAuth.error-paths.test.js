@@ -146,10 +146,7 @@ describe('error paths', () => {
     ).rejects.toThrow('Worker login did not return a token.');
 
     expect(global.fetch).toHaveBeenCalledTimes(2);
-    expect(JSON.parse(localStorage.getItem(cacheKey))).toEqual({
-      token: 'expired-token',
-      exp: expect.any(Number),
-    });
+    expect(localStorage.getItem(cacheKey)).toBeNull();
   });
 
   it('treats malformed nonce responses as controlled failures instead of crashing', async () => {
