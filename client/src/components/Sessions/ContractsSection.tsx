@@ -1,22 +1,42 @@
-/** @file ContractsSection.jsx */
+/** @file ContractsSection.tsx */
 import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCaretDown, faCaretUp } from '@fortawesome/free-solid-svg-icons';
 import styles from './SessionWizard.module.scss';
 
+type ContractRecord = Record<string, unknown>;
+
+export type ContractsSectionProps = {
+  title: React.ReactNode;
+  variant?: 'grid' | 'object';
+  contracts?: ContractRecord | null;
+  defaults?: ContractRecord | null;
+  visibleKeys?: string[] | null;
+  childNodes?: React.ReactNode[] | null;
+  emptyMessage?: React.ReactNode;
+  isCollapsed?: boolean;
+  onToggleCollapsed?: React.MouseEventHandler<HTMLButtonElement>;
+  toggleAriaLabel?: string;
+  renderContractEntry?: (
+    contractKey: string,
+    contracts: ContractRecord | null | undefined,
+    defaults: ContractRecord | null | undefined
+  ) => React.ReactNode;
+};
+
 const ContractsSection = ({
   title,
   variant = 'grid',
-  contracts,
-  defaults,
-  visibleKeys,
-  childNodes,
+  contracts = null,
+  defaults = null,
+  visibleKeys = [],
+  childNodes = [],
   emptyMessage = 'No contract defaults available for this chain.',
-  isCollapsed,
+  isCollapsed = false,
   onToggleCollapsed,
   toggleAriaLabel,
   renderContractEntry,
-}) => {
+}: ContractsSectionProps) => {
   const keys = Array.isArray(visibleKeys) ? visibleKeys : [];
   const children = Array.isArray(childNodes) ? childNodes : [];
 
@@ -36,7 +56,7 @@ const ContractsSection = ({
       {!isCollapsed && variant === 'grid' && (
         <div className={styles.contractsGrid}>
           {keys.length ? keys.map((contractKey) => (
-            renderContractEntry(contractKey, contracts, defaults)
+            renderContractEntry!(contractKey, contracts, defaults)
           )) : (
             <div className={styles.helperText}>{emptyMessage}</div>
           )}

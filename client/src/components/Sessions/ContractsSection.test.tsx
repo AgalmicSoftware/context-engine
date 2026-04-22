@@ -1,6 +1,7 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
-import ContractsSection from './ContractsSection.jsx';
+import ContractsSection from './ContractsSection';
+import type { ContractsSectionProps } from './ContractsSection';
 import {
   getSessionWizardContractRowTestId,
 } from '../ContractPage/contractMetadata.js';
@@ -14,8 +15,8 @@ const defaults = {
   sessionRegistry: '0xbbb',
 };
 
-const renderContractsSection = (props = {}) => {
-  const renderContractEntry = props.renderContractEntry || ((contractKey) => (
+const renderContractsSection = (props: Partial<ContractsSectionProps> = {}) => {
+  const renderContractEntry = props.renderContractEntry || ((contractKey: string) => (
     <div
       key={contractKey}
       data-testid={getSessionWizardContractRowTestId(contractKey)}
