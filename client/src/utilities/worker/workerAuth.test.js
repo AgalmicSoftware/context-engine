@@ -215,6 +215,36 @@ describe('workerAuth token cache envelopes', () => {
       nowSeconds: 1200,
     })).toEqual({ ok: false, status: 'missing-expiry' });
   });
+
+  it('rejects scoped v1 token envelopes with excessive cache lifetimes', () => {
+    const envelope = __test__workerAuthTokenCache.buildTokenCacheEnvelope({
+      token: 'token-1',
+      exp: 1000 + (25 * 60 * 60),
+      workerUrl: 'https://worker.example',
+      sessionSlug: 'edge',
+      address: TEST_ADDRESS,
+      issuedAt: 1000,
+    });
+
+    expect(__test__workerAuthTokenCache.normalizeTokenCacheEntry(envelope, {
+      workerUrl: 'https://worker.example',
+      sessionSlug: 'edge',
+      address: TEST_ADDRESS,
+      nowSeconds: 1200,
+    })).toEqual({ ok: false, status: 'ttl-too-long' });
+
+    expect(__test__workerAuthTokenCache.normalizeTokenCacheEntry(envelope, {
+      workerUrl: 'https://worker.example',
+      sessionSlug: 'edge',
+      address: TEST_ADDRESS,
+      nowSeconds: 1200,
+      maxTtlSeconds: 26 * 60 * 60,
+    })).toEqual(expect.objectContaining({
+      ok: true,
+      token: 'token-1',
+      legacy: false,
+    }));
+  });
 });
 
 describe('workerAuth canonical session resolution', () => {
