@@ -20,7 +20,7 @@ import { buildQuestionRoutePath } from '../../utilities/survey/questionRouting.j
 import { normalizeSessionSlug, resolveSessionSlugFromPathname } from '../../utilities/session/sessionNaming.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { normalizeArweaveUrl } from '../../utilities/arweave/arweaveUrls.js';
-import GateTooltip from '../Gates/GateTooltip.jsx';
+import GateTooltip from '../Gates/GateTooltip';
 import {
   listNamespaceEntriesSync,
   peekCacheSync,

@@ -3,20 +3,54 @@ import { resolveSbtDisplayLabel } from '../../utilities/sbt/sbtDisplayNames.js';
 import { t } from '../../utilities/ui/terminology.js';
 import CETooltip from '../Shared/CETooltip';
 
-const shortAddr = (addr) => {
+const resolveGateSbtDisplayLabel = resolveSbtDisplayLabel as (args: {
+  address: string;
+  chainId?: unknown;
+  fallback?: string;
+}) => string;
+
+type GateConfig = {
+  label?: unknown;
+  name?: unknown;
+  mode?: unknown;
+  operator?: unknown;
+  gateMode?: unknown;
+  requireAll?: boolean;
+  sbtAddresses?: unknown;
+  sbtAddress?: unknown;
+  chainId?: unknown;
+};
+
+type HeldSbt = string | {
+  address?: unknown;
+  sbtAddress?: unknown;
+  contractAddress?: unknown;
+};
+
+export type GateTooltipProps = {
+  gateId?: unknown;
+  gateConfig?: GateConfig | null;
+  mode?: unknown;
+  sbtAddresses?: unknown[] | null;
+  userHeldSBTs?: HeldSbt[] | null;
+  children?: React.ReactNode;
+  placement?: React.ComponentProps<typeof CETooltip>['placement'];
+};
+
+const shortAddr = (addr: unknown) => {
   const text = String(addr || '').trim();
   return text.length > 12 ? `${text.slice(0, 6)}...${text.slice(-4)}` : text;
 };
 
-const normalizeText = (value) => String(value || '').trim();
+const normalizeText = (value: unknown) => String(value || '').trim();
 
-const normalizeGateMode = (gateConfig = null, fallbackMode = '') => {
+const normalizeGateMode = (gateConfig: GateConfig | null = null, fallbackMode: unknown = '') => {
   const raw = normalizeText(fallbackMode || gateConfig?.mode || gateConfig?.operator || gateConfig?.gateMode).toLowerCase();
   if (gateConfig?.requireAll === true || raw === 'all' || raw === 'and') return 'all';
   return 'any';
 };
 
-const normalizeHeldAddress = (value) => {
+const normalizeHeldAddress = (value: HeldSbt) => {
   if (!value) return '';
   if (typeof value === 'string') return normalizeText(value).toLowerCase();
   return normalizeText(
@@ -26,10 +60,10 @@ const normalizeHeldAddress = (value) => {
   ).toLowerCase();
 };
 
-const collectSbtAddresses = (gateConfig = null, sbtAddresses = []) => {
-  const out = [];
+const collectSbtAddresses = (gateConfig: GateConfig | null = null, sbtAddresses: unknown[] | null = []) => {
+  const out: string[] = [];
   const seen = new Set();
-  const push = (value) => {
+  const push = (value: unknown) => {
     const address = normalizeText(value);
     if (!address) return;
     const key = address.toLowerCase();
@@ -53,7 +87,7 @@ const GateTooltip = ({
   userHeldSBTs = [],
   children,
   placement = 'top',
-}) => {
+}: GateTooltipProps) => {
   const tooltipIdRef = useRef(`gate-tooltip-${Math.random().toString(36).slice(2, 10)}`);
 
   if (children == null) return null;
@@ -81,7 +115,7 @@ const GateTooltip = ({
           </div>
           {resolvedSbtAddresses.length > 0 ? (
             resolvedSbtAddresses.map((addr, index) => {
-              const name = resolveSbtDisplayLabel({
+              const name = resolveGateSbtDisplayLabel({
                 address: addr,
                 chainId: gateConfig?.chainId || null,
                 fallback: 'short',

@@ -14,7 +14,7 @@ import {
 } from 'reactstrap';
 import styles from './QuestionFilter.module.scss';
 import SBTFilter from '../SBTs/SBTFilter.jsx';
-import GateTooltip from '../Gates/GateTooltip.jsx';
+import GateTooltip from '../Gates/GateTooltip';
 import CETooltip from '../Shared/CETooltip';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
