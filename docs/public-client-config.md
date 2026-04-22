@@ -28,7 +28,7 @@ server.
 ### 1. Set frontend variables
 
 Before building, review `client/.env.example`, `client/src/variables/publicDeploymentConfig.js`,
-and `client/src/variables/appConfig.js`. Vite bakes `REACT_APP_*` values into
+and `client/src/variables/appConfig.js`. CRA bakes `REACT_APP_*` values into
 the browser bundle at build time, so changes require a rebuild/redeploy.
 
 For a custom-domain self-host, the values to check first are:
@@ -58,8 +58,6 @@ npm run build
 ```
 
 The output directory is `client/build/`.
-Before building, the build script removes stale legacy `client/build-vite/` and
-`client/vite-build/` directories if they exist locally.
 
 ### 3. Upload to Netlify
 
@@ -70,16 +68,10 @@ connected repo deploy, set the publish directory to:
 client/build
 ```
 
-Do not upload `client/build-vite/` or `client/vite-build/`. Those names are
-legacy ignored artifacts from older local builds and can contain partial or
-stale CSS output. If a Netlify deploy looks unstyled or low-contrast, rebuild
-from `client/` and upload the fresh `client/build/` directory.
-
 Because the app uses client-side routing, configure an SPA route fallback. Either
 include a Netlify `_redirects` file in the published build output:
 
 ```text
-/demo/dacc /about 301
 /*    /index.html   200
 ```
 
@@ -87,42 +79,13 @@ Or configure the same rule in `netlify.toml`:
 
 ```toml
 [[redirects]]
-  from = "/demo/dacc"
-  to = "/about"
-  status = 301
-
-[[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
 ```
 
 For manual drag-and-drop deploys, the `_redirects` file must be present inside
-the uploaded `client/build/` directory. Keep any specific legacy redirects above
-the SPA fallback rule.
-
-When hosting the app under a subpath, set `PUBLIC_URL` to that mount path before
-building, for example `PUBLIC_URL=/ce npm run build`. Internal session,
-question/results, contract, and group routes strip that configured base before
-matching app routes and reapply it when generating links, so deep links such as
-`/ce/session/demo/questions`, `/ce/contracts`, and `/ce/groups` stay inside the
-mounted app. The SPA fallback must also be scoped to the same deployed base path
-by the hosting platform.
-
-Set browser cache headers so search-result clicks and fresh navigations
-revalidate the deployed files after each deploy. For manual drag-and-drop
-deploys, keep the `_headers` file inside `client/public/` so Vite copies it into
-the uploaded `client/build/` directory:
-
-```text
-/*
-  Cache-Control: no-cache, max-age=0, must-revalidate
-  Pragma: no-cache
-  Expires: 0
-```
-
-This cannot replace already-running JavaScript in an open tab. It makes the
-browser re-check the app shell on the next navigation, reload, or new visit.
+the uploaded `client/build/` directory.
 
 ### 4. Attach the custom domain
 

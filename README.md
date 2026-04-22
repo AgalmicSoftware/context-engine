@@ -52,6 +52,14 @@ For testing, run modes, and deeper setup:
 - [docs/session-creation-guide.md](docs/session-creation-guide.md)
 - [docs/public-client-config.md#static-frontend-deploy](docs/public-client-config.md#static-frontend-deploy) for Netlify/custom-domain static frontend deploys
 
+### Static Frontend Deploy
+
+To host the React frontend on a custom domain with Netlify, build the static
+client bundle and follow the Netlify notes in
+[docs/public-client-config.md#netlify-static-deploy](docs/public-client-config.md#netlify-static-deploy).
+After domain cutover, update the session worker `allowOrigins` list so AI,
+Arweave, auth, and `/health` requests accept the new origin.
+
 ## Features
 
 ### Survey and Response Management
