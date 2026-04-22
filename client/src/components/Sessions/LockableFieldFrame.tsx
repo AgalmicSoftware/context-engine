@@ -1,4 +1,4 @@
-/** @file LockableFieldFrame.jsx */
+/** @file LockableFieldFrame.tsx */
 import React from 'react';
 import { FormGroup, Label } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -7,6 +7,32 @@ import GateMultiSelectLock from '../Gates/GateMultiSelectLock.jsx';
 import CETooltip from '../Shared/CETooltip';
 import { toStr } from '../../utilities/shared/primitives.js';
 import styles from './SessionWizard.module.scss';
+
+type GateLockProps = React.ComponentProps<typeof GateMultiSelectLock>;
+
+export type LockableFieldFrameProps = {
+  label: React.ReactNode;
+  tooltipText?: React.ReactNode;
+  tooltipId?: string;
+  tooltipPlacement?: React.ComponentProps<typeof CETooltip>['placement'];
+  tooltipTestId?: string;
+  tooltipAriaLabel?: string;
+  tooltipsEnabled?: boolean;
+  canLock?: boolean;
+  isLocked?: boolean;
+  onLockToggle?: React.MouseEventHandler<HTMLButtonElement>;
+  lockTitle?: string;
+  lockDisabled?: boolean;
+  lockBadgeLabel?: React.ReactNode;
+  lockBadgeStyle?: React.CSSProperties;
+  lockIconStyle?: React.CSSProperties;
+  gateLockProps?: GateLockProps | null;
+  lockTrailingContent?: React.ReactNode;
+  labelPrefix?: React.ReactNode;
+  labelInlineControl?: React.ReactNode;
+  fieldError?: React.ReactNode;
+  children?: React.ReactNode;
+};
 
 const LockableFieldFrame = ({
   label,
@@ -30,7 +56,7 @@ const LockableFieldFrame = ({
   labelInlineControl = null,
   fieldError = '',
   children,
-}) => {
+}: LockableFieldFrameProps) => {
   const normalizedTooltipText = toStr(tooltipText).trim();
   const tooltipControl = tooltipsEnabled && tooltipId && normalizedTooltipText ? (
     <>
