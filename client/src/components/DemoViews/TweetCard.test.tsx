@@ -1,6 +1,6 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
-import { TestMemoryRouter as MemoryRouter } from 'testUtils/TestMemoryRouter';
+import { MemoryRouter } from 'react-router-dom';
 
 import TweetCard from './TweetCard';
 
