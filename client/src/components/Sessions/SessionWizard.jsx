@@ -4,14 +4,15 @@ import { ethers } from 'ethers';
 import { Button, Input, Label, FormGroup, Modal, ModalBody, ModalHeader } from 'reactstrap';
 import { ReactReduxContext } from 'react-redux';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCaretDown, faCaretUp, faCheck, faCog, faCopy, faExclamationCircle, faExternalLinkAlt, faImage, faPlus, faQuestionCircle, faRedoAlt, faSpinner, faTimes, faTrash, faUpload } from '@fortawesome/free-solid-svg-icons';
+import { faCaretDown, faCaretUp, faCheck, faCog, faCopy, faExclamationCircle, faExternalLinkAlt, faImage, faQuestionCircle, faRedoAlt, faSpinner, faTimes, faUpload } from '@fortawesome/free-solid-svg-icons';
 import styles from './SessionWizard.module.scss';
 import LockableFieldFrame from './LockableFieldFrame.jsx';
 import BlockLimitsField from './BlockLimitsField.jsx';
 import SessionHeaderField from './SessionHeaderField.jsx';
 import FeaturedSbtField from './FeaturedSbtField.jsx';
 import ContractsSection from './ContractsSection.jsx';
-import SBTSelector from '../SBTs/SBTSelector.jsx';
+import EncryptionPanel from './EncryptionPanel.jsx';
+import WorkerPanel from './WorkerPanel.jsx';
 import CreateSBTGroup, { finalizeDeferredCreateSbtDraftUpload } from '../SBTs/CreateSBTGroup.jsx';
 import GateMultiSelectLock from '../Gates/GateMultiSelectLock.jsx';
 import { JsonToggleButton, JsonPanel, JsonButtonRow } from '../Shared/Json/JsonControls.jsx';
@@ -103,7 +104,6 @@ import {
   withSecretsSyncStatus,
   withWorkerConfigSyncWarning,
 } from './sessionWizardSecrets.js';
-import { buildCloudflareTokenTemplateUrl } from './cloudflareTokenTemplate.js';
 import { getSbtDisplayName } from '../../utilities/sbt/sbtDisplayNames.js';
 import { toStr } from '../../utilities/shared/primitives.js';
 import { notify } from '../../utilities/ui/notify.js';
@@ -125,7 +125,6 @@ import {
   normalizeSponsoredBootstrapFundingContext,
   writeSponsoredBootstrapFundingContext,
 } from '../../utilities/session/sponsoredBootstrapFunding.js';
-import { PUBLIC_GITHUB_BRANCH, PUBLIC_REPO_URL } from '../../variables/publicRepoMetadata.js';
 import ContractViewer from '../ContractPage/ContractViewer.jsx';
 import {
   buildContractsPageHref,
@@ -974,10 +973,6 @@ const CONTRACT_LABELS = {
   sbtFactory: `${t('sbt')} Factory`,
   sessionRegistry: 'Session Registry',
 };
-
-const SESSION_CORS_WORKER_SOURCE_URL = `${PUBLIC_REPO_URL}/tree/${PUBLIC_GITHUB_BRANCH}/workers/sessionCorsWorker`;
-const DEPLOY_HELPER_SOURCE_URL = `${PUBLIC_REPO_URL}/tree/${PUBLIC_GITHUB_BRANCH}/workers/deploy-helper`;
-const SESSION_CORS_WORKER_DOCS_URL = `${PUBLIC_REPO_URL}/blob/${PUBLIC_GITHUB_BRANCH}/docs/session-cors-worker.md`;
 
 const generateSessionId = () => {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -7916,166 +7911,33 @@ const SessionWizard = ({
       )}
 
       {(!isNormalMode || !collapsedSections.encryption) && (
-      <section id="session-wizard-section-encryption" className={`${styles.panel} ${styles.encryptionPanel}`}>
-        <div className={styles.panelHeaderRow}>
-          <button type="button" className={styles.panelHeader} onClick={() => toggleSection('encryption')}>
-            <span className={styles.panelTitle}>
-              {isNormalMode ? 'Privacy & Access' : `${t('sbts')} allowed to decrypt locked fields`}
-              {renderSessionWizardInfoTooltip({
-                id: 'gw-encryption-visibility',
-                content: `${t('gates')} control who can decrypt locked fields and access sponsored AI and other protected resources. Leave this open for a public link, or attach ${t('sbtLower')} ${t('gatesLower')} for members-only access.`,
-                placement: 'right',
-                testId: 'ce-wizard-tooltip-gw-encryption-visibility',
-                ariaLabel: 'Encryption visibility info',
-              })}
-            </span>
-            <FontAwesomeIcon icon={collapsedSections.encryption ? faCaretDown : faCaretUp} />
-          </button>
-          <button
-            type="button"
-            className={`${styles.inlineLinkButton} ${styles.createSbtButton}`}
-            onClick={() => launchCreateSbtModal({ targetType: 'gate', gateId: activeCreateSbtTargetGateId })}
-            data-testid={E2E_TESTIDS.WIZARD_CREATE_SBT}
-            data-ce-sbt-target={activeCreateSbtTargetGateId}
-            title={
-              activeCreateSbtTargetGate
-                ? `Create ${t('sbt')} for ${activeCreateSbtTargetGate.label || activeCreateSbtTargetGate.id}`
-                : `Create ${t('sbt')}`
-            }
-          >
-            {`Create ${t('sbt')}`}
-          </button>
-        </div>
-        {!collapsedSections.encryption && (
-          <div className={styles.panelBody}>
-            <div className={styles.encryptionGateList}>
-              {encryptionGates.map((gate, idx) => (
-                <div
-                  key={gate.id}
-                  className={styles.encryptionGateCard}
-                  onMouseDownCapture={() => focusCreateSbtTargetGate(gate.id)}
-                  onFocusCapture={() => focusCreateSbtTargetGate(gate.id)}
-                >
-                  <div className={styles.encryptionGateHeader}>
-                    <div className={styles.encryptionGateTitleRow}>
-                      <span className={styles.gateColor} style={{ background: gate.color }} />
-                      <Input
-                        value={gate.label}
-                        onChange={(e) => updateEncryptionGate(gate.id, { label: e.target.value })}
-                        className={styles.gateLabelInput}
-                      />
-                    </div>
-                    <div className={styles.encryptionGateMode}>
-                      <button
-                        type="button"
-                        className={`${styles.gateModeWord} ${gate.mode === 'any' ? styles.gateModeActive : ''}`}
-                        onClick={() => updateEncryptionGate(gate.id, { mode: 'any' })}
-                      >
-                        ANY
-                      </button>
-                      <span className={styles.gateModeSeparator}>/</span>
-                      <button
-                        type="button"
-                        className={`${styles.gateModeWord} ${gate.mode === 'all' ? styles.gateModeActive : ''}`}
-                        onClick={() => updateEncryptionGate(gate.id, { mode: 'all' })}
-                      >
-                        ALL
-                      </button>
-                      {renderSessionWizardInfoTooltip({
-                        id: `gw-encrypt-mode-${gate.id}`,
-                        content: `ANY means someone only needs one of these ${t('sbtsLower')}. ALL means they need every ${t('sbtLower')} listed.`,
-                        placement: 'right',
-                        testId: `ce-wizard-tooltip-gw-encrypt-mode-${gate.id}`,
-                        ariaLabel: `${gate.label || gate.id} mode info`,
-                      })}
-                    </div>
-                    {idx > 0 && (
-                      <button
-                        type="button"
-                        className={styles.gateRemoveButton}
-                        onClick={() => removeEncryptionGate(gate.id)}
-                        title={`Remove ${t('gateLower')}`}
-                      >
-                        <FontAwesomeIcon icon={faTrash} />
-                      </button>
-                    )}
-                  </div>
-                  <div className={styles.gateRow}>
-                    <SBTSelector
-                      id={`encryption-gate-${gate.id}`}
-                      // label="SBTs allowed to decrypt locked fields"
-                      label=""
-                      selectedSBTs={normalizeSbtSelection(gate.sbts || [])}
-                      onAddSBT={(sbt) => handleGateAddSbt(gate.id, sbt)}
-                      onRemoveSBT={(address) => handleGateRemoveSbt(gate.id, address)}
-                      network={network}
-                      additionalSBTOptions={pendingSbtSelectorOptions}
-                      chainId={selectorSourceChainId}
-                      sessionSlug={selectorSourceSessionConfig?.slug || resolvedActiveSessionSlug || ''}
-                      sessionConfig={selectorSourceSessionConfig}
-                      sbtCacheRevision={sbtCacheRevision}
-                      ensureLightSbtUniverse={ensureLightSbtUniverse}
-                      variant="admin"
-                    />
-                  </div>
-                </div>
-              ))}
-              {encryptionGates.length === 1 && (
-                <button
-                  type="button"
-                  className={styles.ghostGateCard}
-                  onClick={addEncryptionGate}
-                  aria-label={`Add ${t('gateLower')}`}
-                  data-testid={E2E_TESTIDS.WIZARD_ADD_GATE}
-                  data-ce-gate-add-kind="ghost"
-                >
-                  <FontAwesomeIcon icon={faPlus} />
-                </button>
-              )}
-            </div>
-            {pendingSbtDrafts.length > 0 && (
-              <div className={styles.pendingSbtList}>
-                {pendingSbtDrafts.map((entry) => (
-                  <div
-                    key={entry.id || entry.predictedAddress}
-                    className={styles.pendingSbtCard}
-                    data-testid={E2E_TESTIDS.WIZARD_PENDING_SBT}
-                    data-ce-sbt-address={toStr(entry.predictedAddress).trim().toLowerCase() || undefined}
-                  >
-                    <div className={styles.pendingSbtContent}>
-                      <strong>{entry.displayName}</strong>
-                      <code>{entry.predictedAddress}</code>
-                      <span className={styles.pendingSbtStatus}>
-                        {entry.deployed ? 'Deployed' : 'Deploys during Publish'}
-                      </span>
-                    </div>
-                    <button
-                      type="button"
-                      className={styles.gateRemoveButton}
-                      onClick={() => removePendingSbtDraft(entry.predictedAddress)}
-                      title={`Remove pending ${t('sbt')}`}
-                    >
-                      <FontAwesomeIcon icon={faTrash} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-            {encryptionGates.length >= 2 && (
-              <button
-                type="button"
-                className={styles.addGateRailButton}
-                onClick={addEncryptionGate}
-                aria-label={`Add ${t('gate')}`}
-                data-testid={E2E_TESTIDS.WIZARD_ADD_GATE}
-                data-ce-gate-add-kind="rail"
-              >
-                <FontAwesomeIcon icon={faPlus} />
-              </button>
-            )}
-          </div>
-        )}
-      </section>
+        <EncryptionPanel
+          isNormalMode={isNormalMode}
+          t={t}
+          renderSessionWizardInfoTooltip={renderSessionWizardInfoTooltip}
+          isCollapsed={collapsedSections.encryption}
+          onToggleCollapsed={() => toggleSection('encryption')}
+          launchCreateSbtModal={launchCreateSbtModal}
+          activeCreateSbtTargetGateId={activeCreateSbtTargetGateId}
+          activeCreateSbtTargetGate={activeCreateSbtTargetGate}
+          encryptionGates={encryptionGates}
+          focusCreateSbtTargetGate={focusCreateSbtTargetGate}
+          updateEncryptionGate={updateEncryptionGate}
+          removeEncryptionGate={removeEncryptionGate}
+          normalizeSbtSelection={normalizeSbtSelection}
+          handleGateAddSbt={handleGateAddSbt}
+          handleGateRemoveSbt={handleGateRemoveSbt}
+          network={network}
+          pendingSbtSelectorOptions={pendingSbtSelectorOptions}
+          selectorSourceChainId={selectorSourceChainId}
+          selectorSourceSessionConfig={selectorSourceSessionConfig}
+          resolvedActiveSessionSlug={resolvedActiveSessionSlug}
+          sbtCacheRevision={sbtCacheRevision}
+          ensureLightSbtUniverse={ensureLightSbtUniverse}
+          addEncryptionGate={addEncryptionGate}
+          pendingSbtDrafts={pendingSbtDrafts}
+          removePendingSbtDraft={removePendingSbtDraft}
+        />
       )}
 
       {(!isNormalMode || !collapsedSections.metadata) && (
@@ -8180,479 +8042,68 @@ const SessionWizard = ({
       )}
 
       {(!isNormalMode || (showNormalModeWorkerStep && !collapsedSections.worker)) && (
-      <section id="session-wizard-section-worker" className={styles.panel}>
-        <button
-          type="button"
-          className={styles.panelHeader}
-          onClick={() => toggleSection('worker')}
-          data-testid={E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE}
-        >
-          <span className={styles.panelTitle}>{isNormalMode ? 'Worker Setup' : 'Worker deployment & secrets'}</span>
-          <FontAwesomeIcon icon={collapsedSections.worker ? faCaretDown : faCaretUp} />
-        </button>
-        {!collapsedSections.worker && (
-          <div className={styles.panelBody}>
-            <div className={styles.workerModeRow}>
-              {!showSharedWorkerChoice ? (
-                <div className={styles.workerModeCopy}>
-                  <div className={styles.workerModeTitle}>Bring your own worker</div>
-                  <div className={styles.workerModeSummary}>
-                    Deploy your own worker or paste a worker URL you control. Shared hosted worker
-                    support is planned separately.
-                  </div>
-                </div>
-              ) : !isNormalMode && (
-                <div className={styles.workerModeCopy}>
-                  <div className={styles.workerModeTitle}>How should this session run?</div>
-                  <div className={styles.workerModeSummary}>
-                    {workerMode === 'default' ? 'Shared hosted worker' : 'Custom worker deployment'}
-                  </div>
-                </div>
-              )}
-              {showSharedWorkerChoice && (
-                <>
-                  <div className={styles.workerModePills} data-testid={E2E_TESTIDS.WIZARD_WORKER_MODE_TOGGLE}>
-                    <button
-                      type="button"
-                      className={`${styles.workerModePill} ${workerMode === 'default' ? styles.workerModePillActive : ''}`}
-                      data-testid={E2E_TESTIDS.WIZARD_WORKER_MODE_BUTTON}
-                      data-ce-worker-mode="default"
-                      onClick={() => {
-                        setWorkerMode('default');
-                        setWorkerUrlAutoFilled(false);
-                        updateDraftValue(['corsWorkerUrl'], getDefaultWorkerUrl());
-                      }}
-                    >
-                      Using Default Worker
-                    </button>
-                    <button
-                      type="button"
-                      className={`${styles.workerModePill} ${workerMode !== 'default' ? styles.workerModePillActive : ''}`}
-                      data-testid={E2E_TESTIDS.WIZARD_WORKER_MODE_BUTTON}
-                      data-ce-worker-mode="custom"
-                      onClick={() => {
-                        setWorkerMode('custom');
-                        setWorkerUrlAutoFilled(false);
-                        const normalizedConfigured = normalizeWorkerAuthUrl(toStr(draft.corsWorkerUrl).trim());
-                        const normalizedDefault = normalizeWorkerAuthUrl(getDefaultWorkerUrl());
-                        const normalizedDeployed = normalizeWorkerAuthUrl(toStr(deployWorkerUrl).trim());
-                        if (!deployComplete) {
-                          if (normalizedConfigured) updateDraftValue(['corsWorkerUrl'], '');
-                          return;
-                        }
-                        if ((!normalizedConfigured || normalizedConfigured === normalizedDefault) && normalizedDeployed) {
-                          updateDraftValue(['corsWorkerUrl'], normalizedDeployed);
-                        }
-                      }}
-                    >
-                      Use My Own
-                    </button>
-                  </div>
-                  {renderSessionWizardInfoTooltip({
-                    id: 'gw-worker-mode-tip',
-                    content: 'Toggle between the shared hosted worker and deploying your own. Using your own requires a free Cloudflare account (or Vercel Edge, AWS Lambda@Edge, Fly.io, Render, Deno Deploy). Deploy as a module worker with Node.js + npm deps.',
-                    placement: 'right',
-                    testId: 'ce-wizard-worker-tooltip-gw-worker-mode-tip',
-                    ariaLabel: 'Worker mode info',
-                  })}
-                </>
-              )}
-            </div>
-            <div className={styles.workerSecretsPanel}>
-              {!isNormalMode && (
-                <div className={styles.workerSecretsHeader}>
-                  <div className={styles.workerSecretsTitle}>Worker secrets</div>
-                  <div className={styles.workerSecretsToggles}>
-                    {DEV_PERSIST_WORKER_SECRETS && (
-                      <Label className={styles.workerToggle}>
-                        <Input
-                          type="checkbox"
-                          checked={persistWorkerSecrets}
-                          onChange={(e) => setPersistWorkerSecrets(!!e.target.checked)}
-                        />
-                        <span>Dev: keep secrets on refresh</span>
-                        {renderSessionWizardInfoTooltip({
-                          id: 'gw-worker-persist-secrets-tip',
-                          content: 'Stores worker secrets in localStorage so they survive refresh. Do not enable on shared machines.',
-                          placement: 'right',
-                          testId: 'ce-wizard-worker-tooltip-gw-worker-persist-secrets-tip',
-                          ariaLabel: 'Persist worker secrets info',
-                        })}
-                      </Label>
-                    )}
-                    <Label className={styles.workerToggle}>
-                      <Input
-                        type="checkbox"
-                        checked={!workerSecretsEnabled}
-                        data-testid={E2E_TESTIDS.WIZARD_WORKER_SECRETS_REQUIRE_PAY}
-                        onChange={(e) => {
-                          const requirePay = !!e.target.checked;
-                          setWorkerSecretsEnabled(!requirePay);
-                          if (!requirePay) clearWorkerSecretFields();
-                        }}
-                      />
-                      <span>Require users to pay for usage</span>
-                      {renderSessionWizardInfoTooltip({
-                        id: 'gw-worker-kv-tip',
-                        content: 'When enabled, users must provide their own API keys and fund minimal transaction and storage fees. When off (default), the session admin provides keys via worker secrets.',
-                        placement: 'right',
-                        testId: 'ce-wizard-worker-tooltip-gw-worker-kv-tip',
-                        ariaLabel: 'Worker secrets mode info',
-                      })}
-                    </Label>
-                  </div>
-                </div>
-              )}
-              <div className={styles.resourceSection}>
-                {!isNormalMode && (
-                  <>
-                    <div className={styles.resourceHeader}>
-                      <span className={styles.subSectionTitle}>{`Resource ${t('gatesLower')} (on-chain)`}</span>
-                      {renderSessionWizardInfoTooltip({
-                        id: 'gw-tip-resource-gates',
-                        content: `SessionRegistry ${t('gatesLower')} are authoritative for login/resource access. Default ${t('gateLower')} applies to all resources; click a lock icon to assign a different ${t('gateLower')}.`,
-                        placement: 'right',
-                        testId: 'ce-wizard-worker-tooltip-gw-tip-resource-gates',
-                        ariaLabel: 'Resource gates info',
-                      })}
-                    </div>
-                    <div className={styles.helperText}>
-                      {effectivePersistWorkerSecrets
-                        ? 'Developer mode: secrets are cached locally and will survive refresh.'
-                        : 'Secrets are not saved locally — re-enter them if you refresh the page.'}
-                    </div>
-                  </>
-                )}
-                <div className={styles.gateGrid}>
-                  {workerResourceKeys.map(renderResourceCard)}
-                </div>
-              </div>
-              <div className={styles.workerConfigGrid}>
-                <FormGroup>
-                  <Label className={styles.fieldLabelRow}>
-                    <span>Allowed origins (comma or newline)</span>
-                    {renderSessionWizardInfoTooltip({
-                      id: 'gw-allowed-origins',
-                      content: 'The URL(s) where your site will be accessible — e.g. a subdomain of contextengine.eth or a custom domain. Include localhost for development.',
-                      placement: 'right',
-                      testId: 'ce-wizard-worker-tooltip-gw-allowed-origins',
-                      ariaLabel: 'Allowed origins info',
-                    })}
-                  </Label>
-                  <Input
-                    type="textarea"
-                    rows="2"
-                    value={workerAllowOrigins}
-                    placeholder={DEFAULT_ALLOWED_ORIGINS}
-                    onChange={(e) => setWorkerAllowOrigins(e.target.value)}
-                  />
-                </FormGroup>
-              </div>
-            </div>
-            {workerMode !== 'default' && shouldUseSponsoredAutoDeployFlow ? (
-              <div className={styles.statusNote}>
-                Sponsored deploy bundle is ready. Normal mode will use the GitHub-hosted worker bundle automatically. If a retry needs a different source, keep that Git URL as the default and add a manual bundle URL or upload override after a fetch failure. In advanced mode you can still switch between Upload file and Use URL for manual testing.
-              </div>
-            ) : null}
-            {workerMode !== 'default' && (!shouldUseSponsoredAutoDeployFlow || !isNormalMode) && (
-              <div className={styles.workerDeployPanel}>
-                <div className={styles.workerDeployHeader}>
-                  {deployForm.workerName ? (
-                    <div className={styles.workerDeployName} data-testid={E2E_TESTIDS.WIZARD_WORKER_NAME}>
-                      {deployForm.workerName}
-                    </div>
-                  ) : <span />}
-                </div>
-                <div className={styles.workerDeployGrid}>
-                  {renderEmbeddedDeployHelperToggle()}
-                  {shouldShowDeployHelperUrlInput && (
-                    <FormGroup>
-                      <Label>Deploy-helper URL</Label>
-                      <Input
-                        value={deployHelperUrl}
-                        placeholder="https://<deploy-helper-name>.<account-subdomain>.workers.dev/"
-                        data-testid={E2E_TESTIDS.WIZARD_DEPLOY_HELPER_URL}
-                        onChange={(e) => setDeployHelperUrl(e.target.value)}
-                      />
-                    </FormGroup>
-                  )}
-                  {!isNormalMode && (
-                    <FormGroup className={styles.bundleToggleGroup}>
-                      <Label>Worker bundle source</Label>
-                      <div className={styles.inlineToggleRow}>
-                        <Label className={styles.workerRadio}>
-                          <Input
-                            type="radio"
-                            name="bundleMode"
-                            checked={bundleMode === 'upload'}
-                            data-testid={E2E_TESTIDS.WIZARD_BUNDLE_MODE_UPLOAD}
-                            onChange={() => setBundleMode('upload')}
-                          />
-                          Upload file
-                        </Label>
-                        <Label className={styles.workerRadio}>
-                          <Input
-                            type="radio"
-                            name="bundleMode"
-                            checked={bundleMode === 'url'}
-                            data-testid={E2E_TESTIDS.WIZARD_BUNDLE_MODE_URL}
-                            onChange={() => setBundleMode('url')}
-                          />
-                          Use URL
-                        </Label>
-                      </div>
-                    </FormGroup>
-                  )}
-                  {isNormalMode ? (
-                    <>
-                      <FormGroup>
-                        <Label>Worker bundle URL (release asset)</Label>
-                        <Input
-                          value={normalModeBundleUrl}
-                          readOnly
-                          data-testid={E2E_TESTIDS.WIZARD_BUNDLE_URL}
-                        />
-                        <div className={styles.helperText}>
-                          {normalModeBundleHelpText}
-                        </div>
-                      </FormGroup>
-                      {showNormalModeManualBundleControls && (
-                        <>
-                          <FormGroup>
-                            <Label>Manual bundle URL override (optional)</Label>
-                            <Input
-                              type="url"
-                              value={normalModeBundleUrlOverride}
-                              placeholder="https://github.com/<org>/<repo>/releases/download/<tag>/sessionCorsWorker.bundle.js"
-                              data-testid={E2E_TESTIDS.WIZARD_BUNDLE_URL_OVERRIDE}
-                              invalid={!!normalModeBundleUrlOverrideValidationError}
-                              onChange={(e) => setNormalModeBundleUrlOverride(e.target.value)}
-                            />
-                            <div className={styles.helperText}>
-                              {MANUAL_BUNDLE_URL_OVERRIDE_HELP}
-                            </div>
-                            {normalModeBundleUrlOverrideValidationError && (
-                              <div className={styles.errorText}>{normalModeBundleUrlOverrideValidationError}</div>
-                            )}
-                          </FormGroup>
-                          <FormGroup>
-                            <Label>Upload bundle file (optional)</Label>
-                            <div className={styles.bundleFileInputRow}>
-                              <Input
-                                type="file"
-                                accept=".js,.mjs"
-                                innerRef={normalModeRetryBundleFileInputRef}
-                                data-testid={E2E_TESTIDS.WIZARD_BUNDLE_FILE_INPUT}
-                                onChange={(e) => {
-                                  const file = e.target.files && e.target.files[0];
-                                  setBundleFile(file || null);
-                                }}
-                              />
-                              <Button
-                                type="button"
-                                className={styles.secondaryButton}
-                                onClick={clearSelectedBundleFile}
-                                data-testid={E2E_TESTIDS.WIZARD_CLEAR_BUNDLE_FILE_DEPLOY}
-                                disabled={!bundleFile}
-                              >
-                                Clear bundle file
-                              </Button>
-                            </div>
-                            <div className={styles.helperText}>
-                              {normalModeManualBundleHelpText}
-                            </div>
-                            {bundleFile && (
-                              <div className={styles.helperText}>
-                                Using {bundleFile.name || LOCAL_WORKER_BUNDLE_FALLBACK_FILE_PATH} for this deploy.
-                              </div>
-                            )}
-                          </FormGroup>
-                        </>
-                      )}
-                    </>
-                  ) : bundleMode === 'url' ? (
-                    <FormGroup>
-                      <Label className={styles.fieldLabelRow}>
-                        <span>Worker bundle URL (release asset)</span>
-                        {renderSessionWizardInfoTooltip({
-                          id: 'gw-bundle-url-tip',
-                          content: 'Optional. Leave blank to use the deploy-helper default bundle URL.',
-                          placement: 'right',
-                          testId: 'ce-wizard-worker-tooltip-gw-bundle-url-tip',
-                          ariaLabel: 'Worker bundle URL info',
-                        })}
-                      </Label>
-                      <Input
-                        value={deployForm.bundleUrl}
-                        placeholder="https://github.com/<org>/<repo>/releases/latest/download/sessionCorsWorker.bundle.js"
-                        data-testid={E2E_TESTIDS.WIZARD_BUNDLE_URL}
-                        onChange={(e) => setDeployForm((prev) => ({ ...prev, bundleUrl: e.target.value }))}
-                      />
-                    </FormGroup>
-                  ) : (
-                    <FormGroup>
-                      <Label>Upload bundle file</Label>
-                      <Input
-                        type="file"
-                        accept=".js,.mjs"
-                        innerRef={advancedBundleFileInputRef}
-                        data-testid={E2E_TESTIDS.WIZARD_BUNDLE_FILE_INPUT}
-                        onChange={(e) => {
-                          const file = e.target.files && e.target.files[0];
-                          setBundleFile(file || null);
-                        }}
-                      />
-                    </FormGroup>
-                  )}
-                  <FormGroup>
-                    <Label className={styles.fieldLabelRow}>
-                      <span>Cloudflare API token</span>
-                      {renderSessionWizardInfoTooltip({
-                        id: 'gw-cf-token-tip',
-                        content: 'Use the prefilled template link below. It includes Workers/KV/Routes, Account Settings, Tail (read), R2, Pages, Builds, Agents, Observability, and Containers permissions.',
-                        placement: 'right',
-                        testId: 'ce-wizard-worker-tooltip-gw-cf-token-tip',
-                        ariaLabel: 'Cloudflare API token info',
-                      })}
-                    </Label>
-	                    <Input
-	                      type="password"
-	                      value={deployForm.apiToken}
-	                      data-testid={E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN}
-	                      onChange={(e) => setDeployForm((prev) => ({ ...prev, apiToken: e.target.value }))}
-	                    />
-                    {!isNormalMode && showSponsoredDeployAccessNotice && (
-                      <div className={styles.helperText}>
-                        Deploy access is currently provided by the sponsored bundle. Enter a Cloudflare API token here to override it.
-                      </div>
-                    )}
-                    <div className={styles.helperText}>
-                      <Button
-                        type="button"
-                        className={styles.secondaryButton}
-                        onClick={() => window.open(buildCloudflareTokenTemplateUrl({
-                          slug: toStr(draft.slug || resolvedActiveSessionSlug).trim(),
-                        }), '_blank')}
-                      >
-                        Create prefilled API token
-                      </Button>
-                    </div>
-                    <div className={styles.helperText}>
-                      You must be logged into Cloudflare before using the prefilled API token button.
-                    </div>
-                    <div className={styles.helperText}>
-                      Account is inferred from the API token during deploy.
-                    </div>
-                  </FormGroup>
-	                  <FormGroup>
-	                    <Label>Admin address</Label>
-	                    <Input
-	                      value={deployForm.adminAddress ?? ''}
-	                      placeholder={account || '0x...'}
-	                      onChange={(e) => setDeployForm((prev) => ({ ...prev, adminAddress: e.target.value }))}
-	                    />
-	                  </FormGroup>
-                </div>
-	                <div className={styles.workerDeployActions}>
-	                  <Button
-	                    type="button"
-	                    className={styles.actionButton}
-	                    data-testid={E2E_TESTIDS.WIZARD_DEPLOY_WORKER}
-	                    onClick={handleDeployWorker}
-	                    disabled={deployInFlight}
-	                  >
-                    Deploy worker
-	                  </Button>
-                  </div>
-	                {deployStatus && (
-	                  <div className={`${styles.copyStatus} ${deployStatusIsError ? styles.copyStatusError : ''}`} data-testid={E2E_TESTIDS.WIZARD_DEPLOY_STATUS}>
-	                    {deployStatus}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {showWorkerUrlField ? (
-              <div className={styles.corsFieldRow}>
-                <div className={styles.corsFieldBlock}>
-                  {renderField('corsWorkerUrl', displayedWorkerUrl, [], { forceShow: true })}
-                  {workerUrlAutoFilled && (
-                    <div className={styles.corsFieldBadgeRow}>
-                      <div className={styles.corsFieldBadge}>
-                        Auto-filled from deploy-helper
-                      </div>
-                      {renderSessionWizardInfoTooltip({
-                        id: 'gw-worker-autofill-tip',
-                        content: 'You can still edit this field manually if you want to point to a different worker.',
-                        placement: 'right',
-                        testId: 'ce-wizard-worker-tooltip-gw-worker-autofill-tip',
-                        ariaLabel: 'Auto-filled worker URL info',
-                      })}
-                    </div>
-                  )}
-                </div>
-                {showSharedWorkerChoice && (
-                  <Button
-                    type="button"
-                    className={styles.secondaryButton}
-                    onClick={() => {
-                      setWorkerUrlAutoFilled(false);
-                      updateDraftValue(['corsWorkerUrl'], getDefaultWorkerUrl());
-                    }}
-                  >
-                    Reset to default
-                  </Button>
-                )}
-              </div>
-            ) : (
-              <div className={styles.helperText}>
-                Worker URL appears here after a successful custom worker deploy.
-              </div>
-            )}
-
-            {!isNormalMode && (
-              <div className={styles.workerIntro}>
-                <div className={styles.workerIntroTitle}>Worker Deployment</div>
-                <p className={styles.workerIntroCopy}>
-                  Sessions use a Cloudflare Worker for CORS proxy, AI, and faucet services.
-                </p>
-                <p className={styles.workerIntroCopy}>
-                  The default hosted worker is used automatically unless a custom worker URL is configured.
-                </p>
-                <div className={styles.workerLinks}>
-                  <a
-                    href={SESSION_CORS_WORKER_SOURCE_URL}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={styles.workerDocLink}
-                  >
-                    Worker source
-                    <FontAwesomeIcon icon={faExternalLinkAlt} />
-                  </a>
-                  <a
-                    href={DEPLOY_HELPER_SOURCE_URL}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={styles.workerDocLink}
-                  >
-                    Deploy helper
-                    <FontAwesomeIcon icon={faExternalLinkAlt} />
-                  </a>
-                  <a
-                    href={SESSION_CORS_WORKER_DOCS_URL}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={styles.workerDocLink}
-                  >
-                    Worker docs
-                    <FontAwesomeIcon icon={faExternalLinkAlt} />
-                  </a>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-      </section>
+        <WorkerPanel
+          isNormalMode={isNormalMode}
+          t={t}
+          renderSessionWizardInfoTooltip={renderSessionWizardInfoTooltip}
+          isCollapsed={collapsedSections.worker}
+          onToggleCollapsed={() => toggleSection('worker')}
+          showSharedWorkerChoice={showSharedWorkerChoice}
+          workerMode={workerMode}
+          onWorkerModeChange={setWorkerMode}
+          setWorkerUrlAutoFilled={setWorkerUrlAutoFilled}
+          updateDraftValue={updateDraftValue}
+          getDefaultWorkerUrl={getDefaultWorkerUrl}
+          draft={draft}
+          deployWorkerUrl={deployWorkerUrl}
+          deployComplete={deployComplete}
+          devPersistWorkerSecrets={DEV_PERSIST_WORKER_SECRETS}
+          persistWorkerSecrets={persistWorkerSecrets}
+          setPersistWorkerSecrets={setPersistWorkerSecrets}
+          workerSecretsEnabled={workerSecretsEnabled}
+          setWorkerSecretsEnabled={setWorkerSecretsEnabled}
+          clearWorkerSecretFields={clearWorkerSecretFields}
+          effectivePersistWorkerSecrets={effectivePersistWorkerSecrets}
+          workerResourceKeys={workerResourceKeys}
+          renderResourceCard={renderResourceCard}
+          workerAllowOrigins={workerAllowOrigins}
+          setWorkerAllowOrigins={setWorkerAllowOrigins}
+          defaultAllowedOrigins={DEFAULT_ALLOWED_ORIGINS}
+          shouldUseSponsoredAutoDeployFlow={shouldUseSponsoredAutoDeployFlow}
+          deployForm={deployForm}
+          renderEmbeddedDeployHelperToggle={renderEmbeddedDeployHelperToggle}
+          shouldShowDeployHelperUrlInput={shouldShowDeployHelperUrlInput}
+          deployHelperUrl={deployHelperUrl}
+          setDeployHelperUrl={setDeployHelperUrl}
+          bundleMode={bundleMode}
+          setBundleMode={setBundleMode}
+          normalModeBundleUrl={normalModeBundleUrl}
+          normalModeBundleHelpText={normalModeBundleHelpText}
+          showNormalModeManualBundleControls={showNormalModeManualBundleControls}
+          normalModeBundleUrlOverride={normalModeBundleUrlOverride}
+          setNormalModeBundleUrlOverride={setNormalModeBundleUrlOverride}
+          normalModeBundleUrlOverrideValidationError={normalModeBundleUrlOverrideValidationError}
+          manualBundleUrlOverrideHelp={MANUAL_BUNDLE_URL_OVERRIDE_HELP}
+          normalModeRetryBundleFileInputRef={normalModeRetryBundleFileInputRef}
+          setBundleFile={setBundleFile}
+          clearSelectedBundleFile={clearSelectedBundleFile}
+          bundleFile={bundleFile}
+          normalModeManualBundleHelpText={normalModeManualBundleHelpText}
+          localWorkerBundleFallbackFilePath={LOCAL_WORKER_BUNDLE_FALLBACK_FILE_PATH}
+          advancedBundleFileInputRef={advancedBundleFileInputRef}
+          showSponsoredDeployAccessNotice={showSponsoredDeployAccessNotice}
+          account={account}
+          resolvedActiveSessionSlug={resolvedActiveSessionSlug}
+          setDeployForm={setDeployForm}
+          handleDeployWorker={handleDeployWorker}
+          deployInFlight={deployInFlight}
+          deployStatus={deployStatus}
+          deployStatusIsError={deployStatusIsError}
+          showWorkerUrlField={showWorkerUrlField}
+          displayedWorkerUrl={displayedWorkerUrl}
+          renderField={renderField}
+          workerUrlAutoFilled={workerUrlAutoFilled}
+        />
       )}
 
       {(!isNormalMode || !collapsedSections.publish) && (
