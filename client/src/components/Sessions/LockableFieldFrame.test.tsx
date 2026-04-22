@@ -1,11 +1,11 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
-import LockableFieldFrame from './LockableFieldFrame.jsx';
+import LockableFieldFrame from './LockableFieldFrame';
 
 jest.mock('../Shared/CETooltip', () => {
   const React = require('react');
-  return ({ children, target }) => (
+  return ({ children, target }: { children: React.ReactNode; target: string }) => (
     <div data-testid="mock-ce-tooltip" data-target={target}>
       {children}
     </div>
@@ -15,7 +15,7 @@ jest.mock('../Shared/CETooltip', () => {
 jest.mock('../Gates/GateMultiSelectLock.jsx', () => {
   const React = require('react');
   const { E2E_TESTIDS } = require('../../utilities/e2eTestIds.js');
-  return (props) => (
+  return (props: { open?: boolean; onToggleOpen?: (open: boolean) => void }) => (
     <button
       type="button"
       data-testid={E2E_TESTIDS.GATE_LOCK}
