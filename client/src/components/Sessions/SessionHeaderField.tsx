@@ -1,4 +1,4 @@
-/** @file SessionHeaderField.jsx */
+/** @file SessionHeaderField.tsx */
 import React from 'react';
 import { Input, Label } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -7,6 +7,32 @@ import CompactImageChooser from '../Shared/CompactImageChooser';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { toStr } from '../../utilities/shared/primitives.js';
 import styles from './SessionWizard.module.scss';
+
+type SessionHeaderMode = 'url' | 'upload' | string;
+type CompactSessionHeaderMode = 'idle' | 'url' | string;
+type UploadStatusTone = React.ComponentProps<typeof CompactImageChooser>['statusTone'];
+
+export type SessionHeaderFieldProps = {
+  compact?: boolean;
+  value?: string | null;
+  sessionHeaderMode: SessionHeaderMode;
+  compactSessionHeaderMode: CompactSessionHeaderMode;
+  sessionHeaderPreviewSrc?: string | null;
+  sessionHeaderUploadStatus?: string;
+  sessionHeaderUploadStatusTone?: UploadStatusTone;
+  compactSessionHeaderInputRef?: React.Ref<HTMLInputElement>;
+  onUrlChange?: React.ChangeEventHandler<HTMLInputElement>;
+  onCompactUrlChange?: React.ChangeEventHandler<HTMLInputElement>;
+  onToggleCompactUrlMode?: React.MouseEventHandler<HTMLButtonElement>;
+  onPaste?: React.MouseEventHandler<HTMLButtonElement>;
+  onCompactUploadClick?: React.MouseEventHandler<HTMLButtonElement>;
+  onCompactFileChange?: React.ChangeEventHandler<HTMLInputElement>;
+  onUseUrlMode?: React.ChangeEventHandler<HTMLInputElement>;
+  onUseUploadMode?: React.ChangeEventHandler<HTMLInputElement>;
+  onAdvancedFileChange?: React.ChangeEventHandler<HTMLInputElement>;
+  onClear: () => void;
+  onExpandPreview?: React.MouseEventHandler<HTMLButtonElement>;
+};
 
 const SessionHeaderField = ({
   compact = false,
@@ -28,7 +54,7 @@ const SessionHeaderField = ({
   onAdvancedFileChange,
   onClear,
   onExpandPreview,
-}) => {
+}: SessionHeaderFieldProps) => {
   const previewSrc = toStr(sessionHeaderPreviewSrc).trim();
 
   if (compact) {
@@ -49,7 +75,7 @@ const SessionHeaderField = ({
         onUploadClick={onCompactUploadClick}
         onFileChange={onCompactFileChange}
         fileInputRef={compactSessionHeaderInputRef}
-        previewSrc={sessionHeaderPreviewSrc}
+        previewSrc={previewSrc}
         previewAlt="Session header preview"
         onClear={onClear}
         enablePreviewExpand={true}
