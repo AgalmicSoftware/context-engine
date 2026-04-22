@@ -341,6 +341,57 @@ describe('error paths', () => {
     expect(contractSpy.mock.calls[1][2].provider).toBe(injectedProvider);
   });
 
+  it('does not fall back to injected wallet reads for group password hashes by default', async () => {
+    const injectedProvider = makeRpcProvider();
+    window.ethereum = injectedProvider;
+    const configuredContract = {
+      groupPasswordHash: jest.fn(async () => {
+        throw new Error('configured read failed');
+      }),
+    };
+    const injectedContract = {
+      groupPasswordHash: jest.fn(async () => ethers.constants.HashZero),
+    };
+    let contractCalls = 0;
+    const contractSpy = jest.spyOn(ethers, 'Contract').mockImplementation(function MockContract() {
+      contractCalls += 1;
+      return contractCalls === 1 ? configuredContract : injectedContract;
+    });
+
+    await expect(contractScripts.getGroupPasswordHash('none', TEST_ADDRESS, GROUP_CFG)).resolves.toBeNull();
+
+    expect(configuredContract.groupPasswordHash).toHaveBeenCalledTimes(1);
+    expect(injectedContract.groupPasswordHash).not.toHaveBeenCalled();
+    expect(contractSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps group password hash injected fallback available by explicit opt-in', async () => {
+    const injectedProvider = makeRpcProvider();
+    window.ethereum = injectedProvider;
+    const configuredContract = {
+      groupPasswordHash: jest.fn(async () => {
+        throw new Error('configured read failed');
+      }),
+    };
+    const injectedContract = {
+      groupPasswordHash: jest.fn(async () => ethers.constants.HashZero),
+    };
+    let contractCalls = 0;
+    const contractSpy = jest.spyOn(ethers, 'Contract').mockImplementation(function MockContract() {
+      contractCalls += 1;
+      return contractCalls === 1 ? configuredContract : injectedContract;
+    });
+
+    await expect(contractScripts.getGroupPasswordHash('none', TEST_ADDRESS, GROUP_CFG, {
+      allowInjectedReadFallback: true,
+    })).resolves.toBe(ethers.constants.HashZero);
+
+    expect(configuredContract.groupPasswordHash).toHaveBeenCalledTimes(1);
+    expect(injectedContract.groupPasswordHash).toHaveBeenCalledTimes(1);
+    expect(contractSpy).toHaveBeenCalledTimes(2);
+    expect(contractSpy.mock.calls[1][2].provider).toBe(injectedProvider);
+  });
+
   it('throws submitResponses RPC timeouts instead of failing silently', async () => {
     const timeoutError = Object.assign(new Error('RPC timeout while broadcasting transaction.'), {
       code: 'NETWORK_ERROR',
