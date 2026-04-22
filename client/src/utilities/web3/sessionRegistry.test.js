@@ -396,6 +396,49 @@ describe('registerSessionOnChain duplicate guards', () => {
     jest.restoreAllMocks();
   });
 
+  it('rejects unsafe registry slugs before resolving a wallet provider', async () => {
+    cryptoUtils._getProvider.mockClear();
+    const contractSpy = jest.spyOn(ethers, 'Contract');
+
+    await expect(registerSessionOnChain({
+      providerLike: makeWalletProvider(),
+      chainId: CONFIGURED_REGISTRY_CHAIN_ID,
+      slug: 'Team A!',
+      sessionId: '0x11111111111111111111111111111111',
+      metadataURI: 'ar://example',
+    })).rejects.toThrow('Session slugs must use lowercase letters, numbers, "_" or "-".');
+
+    expect(cryptoUtils._getProvider).not.toHaveBeenCalled();
+    expect(contractSpy).not.toHaveBeenCalled();
+  });
+
+  it('normalizes registry slugs before duplicate checks', async () => {
+    const walletProvider = makeWalletProvider();
+    const signer = { provider: null, getAddress: jest.fn().mockResolvedValue(TEST_SIGNER_ADDRESS) };
+    const contractMock = {
+      sessionIdExists: jest.fn().mockResolvedValue(false),
+      sessionExists: jest.fn().mockResolvedValue(true),
+      createSession: jest.fn(),
+    };
+    cryptoUtils._getProvider.mockReturnValue(walletProvider);
+
+    installWeb3ProviderMock({ signer });
+    jest.spyOn(ethers, 'Contract').mockImplementation(function MockContract() {
+      return contractMock;
+    });
+
+    await expect(registerSessionOnChain({
+      providerLike: walletProvider,
+      chainId: CONFIGURED_REGISTRY_CHAIN_ID,
+      slug: ' Team_A-1 ',
+      sessionId: '0x11111111111111111111111111111112',
+      metadataURI: 'ar://example',
+    })).rejects.toThrow('Session slug "team_a-1" is already registered on-chain.');
+
+    expect(contractMock.sessionExists).toHaveBeenCalledWith('team_a-1');
+    expect(contractMock.createSession).not.toHaveBeenCalled();
+  });
+
   it('throws a clear error when the connected wallet is on a different chain than the registry write target', async () => {
     const walletProvider = { request: jest.fn() };
     const signer = {
