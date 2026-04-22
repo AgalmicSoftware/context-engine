@@ -28,6 +28,7 @@ import {
 import styles from './CreateQuestionsAndSurveys.module.scss';
 import { arweaveScripts } from '../../utilities/arweave/arweaveScripts';
 import CETooltip from '../Shared/CETooltip';
+import CEConfirmDialog from '../Shared/CEConfirmDialog.jsx';
 import { normalizeArweaveUrl, parseArweaveTxId } from '../../utilities/arweave/arweaveUrls.js';
 import contractScripts, { getSessionConfigBySlug, normalizeSessionSlug } from '../../utilities/web3/contractScripts.js';
 import {
@@ -341,6 +342,7 @@ class CreateQuestionsAndSurveys extends Component {
 
       // Wagmi network switch requirement
       needsNetworkSwitch: false,
+      showClearFormConfirm: false,
 
       // Lock-driven Lit encryption
       surveyLockGateIds: [],
@@ -1910,10 +1912,14 @@ class CreateQuestionsAndSurveys extends Component {
 
   // Handle clearing the form
   handleClearForm = () => {
-    if (!window.confirm("Are you sure you want to clear the form?")) {
-      return;
-    }
+    this.setState({ showClearFormConfirm: true });
+  };
 
+  cancelClearForm = () => {
+    this.setState({ showClearFormConfirm: false });
+  };
+
+  confirmClearForm = () => {
     // Reset state
     this.setState({
       title: '',
@@ -1930,7 +1936,8 @@ class CreateQuestionsAndSurveys extends Component {
       isSubmitting: false,
       submissionError: '',
       lastSubmittedSurveyId: '',
-      lastSubmittedSurveyArweaveTxId: ''
+      lastSubmittedSurveyArweaveTxId: '',
+      showClearFormConfirm: false,
     }, () => {
       // Clear localStorage
       this.clearUnfinishedSurveyDraft();
@@ -3765,6 +3772,17 @@ class CreateQuestionsAndSurveys extends Component {
         ) : (
           manualCreationUI
         )}
+        <CEConfirmDialog
+          isOpen={!!this.state.showClearFormConfirm}
+          title="Clear form?"
+          body="This removes the unsaved survey or question draft from this browser."
+          confirmLabel="Clear"
+          cancelLabel="Keep editing"
+          danger
+          onCancel={this.cancelClearForm}
+          onConfirm={this.confirmClearForm}
+          testId="ce-survey-clear-confirm"
+        />
       </div>
     );
   }
