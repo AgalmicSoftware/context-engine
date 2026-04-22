@@ -5,6 +5,7 @@ import {
 } from '../../utilities/cache/storageJson.js';
 
 export const SESSION_WIZARD_CACHE_KEY = 'ce:sessionWizardDraft:v1';
+export const SESSION_WIZARD_DRAFT_CACHE_MAX_BYTES = 4 * 1024 * 1024;
 
 const getLocalStorage = (storageIn) => {
   if (storageIn !== undefined) return storageIn;
@@ -30,7 +31,9 @@ export const writeSessionWizardDraftCache = (payload, { storage, maxBytes } = {}
       error: 'localStorage is unavailable.',
     };
   }
-  return safeJsonWrite(storageRef, SESSION_WIZARD_CACHE_KEY, payload, { maxBytes });
+  return safeJsonWrite(storageRef, SESSION_WIZARD_CACHE_KEY, payload, {
+    maxBytes: maxBytes ?? SESSION_WIZARD_DRAFT_CACHE_MAX_BYTES,
+  });
 };
 
 export const clearSessionWizardDraftCache = ({
