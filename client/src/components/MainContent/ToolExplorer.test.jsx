@@ -37,7 +37,7 @@ jest.mock('../MainContent/RiskMatrix.jsx', () => ({
   default: () => null,
 }));
 
-jest.mock('../Shared/AudioInput/AudioInput.jsx', () => ({
+jest.mock('../Shared/AudioInput/AudioInput', () => ({
   __esModule: true,
   default: () => null,
 }));

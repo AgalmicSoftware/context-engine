@@ -92,7 +92,7 @@ jest.mock('../../utilities/crypto/litProtocol.js', () => ({
   resolveLitNetwork: jest.fn(() => 'datil-dev'),
 }));
 
-jest.mock('../Shared/AudioInput/AudioInput.jsx', () => () => <div data-testid="mock-admin-audio-input" />);
+jest.mock('../Shared/AudioInput/AudioInput', () => () => <div data-testid="mock-admin-audio-input" />);
 jest.mock('../SBTs/SBTSelector.jsx', () => () => <div data-testid="mock-admin-sbt-selector" />);
 
 const AdminPage = require('./AdminPage.jsx').default;
