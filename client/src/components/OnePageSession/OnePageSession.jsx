@@ -22,7 +22,7 @@ import { ethers } from 'ethers';
 
 import styles from './OnePageSession.module.scss';
 
-import LazyFallback from '../Shared/LazyFallback.jsx';
+import LazyFallback from '../Shared/LazyFallback';
 
 import contractScripts, { getAllSessionSlugs } from '../../utilities/web3/contractScripts.js';
 

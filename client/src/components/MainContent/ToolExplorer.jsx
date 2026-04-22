@@ -19,7 +19,7 @@ import {
 } from 'reactstrap';
 
 import ToolExplorerPluginExplainer from './ToolExplorerPluginExplainer.jsx';
-import LazyFallback from '../Shared/LazyFallback.jsx';
+import LazyFallback from '../Shared/LazyFallback';
 import SessionChipSelector from '../Shared/SessionChipSelector.jsx';
 
 import riskMatrixImage from '../../assets/img/risk_matrix.jpg';
