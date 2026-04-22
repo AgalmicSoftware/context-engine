@@ -43,20 +43,14 @@ The main consumers of this folder are:
 - [`demoAnalysisAdapter.js`](../../utilities/demo/demoAnalysisAdapter.js)
 - [`demoAvatars.js`](../../utilities/ui/demoAvatars.js)
 - [`sessionSourceResolver.js`](../../utilities/session/sessionSourceResolver.js)
-- [`PolisReport.tsx`](../../components/PolisReport/PolisReport.tsx)
-- [`DebateMap.tsx`](../../components/DebateMap/DebateMap.tsx)
-- [`PoliticalCompassView.tsx`](../../components/DemoViews/DebateHUD/PoliticalCompassView.tsx)
+- [`PolisReport.jsx`](../../components/PolisReport/PolisReport.jsx)
+- [`DebateMap.jsx`](../../components/DebateMap/DebateMap.jsx)
+- [`PoliticalCompassView.jsx`](../../components/DemoViews/DebateHUD/PoliticalCompassView.jsx)
 - [`DebateSelector.tsx`](../../components/DemoViews/DebateHUD/DebateSelector.tsx)
-- [`ArgumentTreeView.tsx`](../../components/DemoViews/DebateHUD/ArgumentTreeView.tsx)
-- [`VotesOnArgumentsView.tsx`](../../components/DemoViews/DebateHUD/VotesOnArgumentsView.tsx)
-- [`CommunityTab.tsx`](../../components/CommunityTab/CommunityTab.tsx)
-- [`SimUserPage.tsx`](../../components/UserPage/SimUserPage.tsx)
-
-## Temporary Demo Session Seed
-
-`demo_sessions.json` keeps `demo-1` as a temporary display/question compatibility seed until the Cloudflare-backed demo session replaces the Arweave/on-chain preload path. Worker URLs, faucet sponsorship, and gate authority must stay in the live SessionRegistry plus Worker KV config, not in this fixture. Remove the preloaded question IDs when the pure Cloudflare demo session ships.
-
-When `demo-1` resolves from the live registry, the main session route applies this fixture only as a display overlay for temporary demo fields such as featured SBTs and seeded question compatibility. Registry-backed operational fields still win: `corsWorkerUrl`, sponsored flags, contract addresses, block windows, and resource gates must be updated through the admin wallet. For answer submissions, the live registry must expose an open `arweave`/`responses` gate and a truthy `sponsored_arweave` field after saving an Arweave JWK in the worker admin flow.
+- [`ArgumentTreeView.jsx`](../../components/DemoViews/DebateHUD/ArgumentTreeView.jsx)
+- [`VotesOnArgumentsView.jsx`](../../components/DemoViews/DebateHUD/VotesOnArgumentsView.jsx)
+- [`CommunityTab.jsx`](../../components/CommunityTab/CommunityTab.jsx)
+- [`SimUserPage.jsx`](../../components/UserPage/SimUserPage.jsx)
 
 ## Conceptual Data Pipeline
 
