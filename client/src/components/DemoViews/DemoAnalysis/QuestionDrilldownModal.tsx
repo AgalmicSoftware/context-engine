@@ -2,6 +2,37 @@ import React from 'react';
 import { getSegmentDisplayName } from '../../../utilities/demo/demoAnalysisMath.js';
 import styles from './DemoAnalysisWorkspace.module.scss';
 
+type DrilldownQuestion = {
+  id: string;
+  text: string;
+  options: string[];
+};
+
+type ComparisonGroup = {
+  segmentKey: string;
+};
+
+type FlatResponse = {
+  questionId: string;
+  segmentKey: string;
+  responseText: string;
+  rate?: number | string | null;
+};
+
+type QuestionTag = {
+  tagID: string | number;
+  tagName: string;
+};
+
+export type QuestionDrilldownModalProps = {
+  isOpen: boolean;
+  question?: DrilldownQuestion | null;
+  comparisonGroups?: ComparisonGroup[] | null;
+  flatResponses?: FlatResponse[] | null;
+  questionTags?: QuestionTag[] | null;
+  onClose: () => void;
+};
+
 const QuestionDrilldownModal = ({
   isOpen,
   question,
@@ -9,10 +40,12 @@ const QuestionDrilldownModal = ({
   flatResponses = [],
   questionTags = [],
   onClose,
-}) => {
+}: QuestionDrilldownModalProps) => {
   if (!isOpen || !question) return null;
 
   const segmentKeys = ['All', ...(comparisonGroups || []).map((group) => group.segmentKey)];
+  const responses = Array.isArray(flatResponses) ? flatResponses : [];
+  const tags = Array.isArray(questionTags) ? questionTags : [];
 
   return (
     <div className={styles.modalBackdrop}>
@@ -27,9 +60,9 @@ const QuestionDrilldownModal = ({
           </button>
         </div>
 
-        {questionTags.length > 0 && (
+        {tags.length > 0 && (
           <div className={styles.tagFilterRow}>
-            {questionTags.map((tag) => (
+            {tags.map((tag) => (
               <span key={tag.tagID} className={styles.ratePill}>
                 {tag.tagName}
               </span>
@@ -52,7 +85,7 @@ const QuestionDrilldownModal = ({
                 <tr key={segmentKey}>
                   <td className={styles.tableRowLabel}>{getSegmentDisplayName(segmentKey)}</td>
                   {question.options.map((option) => {
-                    const row = flatResponses.find((item) => (
+                    const row = responses.find((item) => (
                       item.questionId === question.id &&
                       item.segmentKey === segmentKey &&
                       item.responseText === option

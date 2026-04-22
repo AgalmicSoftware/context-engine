@@ -11,7 +11,7 @@ import ComparisonReport from './ComparisonReport.jsx';
 import ComparisonSuggestions from './ComparisonSuggestions';
 import DemographicSelector from './DemographicSelector.jsx';
 import QuestionBreakdownChart from './QuestionBreakdownChart.jsx';
-import QuestionDrilldownModal from './QuestionDrilldownModal.jsx';
+import QuestionDrilldownModal from './QuestionDrilldownModal';
 import WorldResultsMap from './WorldResultsMap.jsx';
 import styles from './DemoAnalysisWorkspace.module.scss';
 
