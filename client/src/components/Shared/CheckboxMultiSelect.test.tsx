@@ -2,14 +2,26 @@ import React, { useState } from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import CheckboxMultiSelect from './CheckboxMultiSelect';
 
-const OPTIONS = [
+type TestOption = {
+  value?: unknown;
+  label?: React.ReactNode;
+};
+
+type HarnessProps = {
+  initial?: TestOption[];
+  isClearable?: boolean;
+  disabled?: boolean;
+  onChangeSpy?: (nextValue: TestOption[]) => void;
+};
+
+const OPTIONS: TestOption[] = [
   { value: 'a', label: 'Alpha' },
   { value: 'b', label: 'Beta' },
   { value: 'c', label: 'Gamma' },
 ];
 
-const Harness = ({ initial = [], isClearable = true, disabled = false, onChangeSpy }) => {
-  const [value, setValue] = useState(initial);
+const Harness = ({ initial = [], isClearable = true, disabled = false, onChangeSpy }: HarnessProps) => {
+  const [value, setValue] = useState<TestOption[]>(initial);
   return (
     <CheckboxMultiSelect
       inputId="test-cms"
