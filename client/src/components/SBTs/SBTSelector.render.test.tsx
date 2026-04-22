@@ -21,7 +21,7 @@ const createDeferred = <T = any>(): Deferred<T> => {
   return { promise, resolve, reject };
 };
 
-jest.mock('../Shared/AsyncSearchSelect.jsx', () => ({
+jest.mock('../Shared/AsyncSearchSelect', () => ({
   __esModule: true,
   default: ({
     options = [],
