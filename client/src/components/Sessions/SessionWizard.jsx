@@ -141,6 +141,11 @@ import usePendingSbtDrafts, {
   normalizePendingSbtDrafts,
 } from './hooks/usePendingSbtDrafts.js';
 import useSessionSlugState from './hooks/useSessionSlugState.js';
+import {
+  clearSessionWizardDraftCache,
+  readSessionWizardDraftCache,
+  writeSessionWizardDraftCache,
+} from './sessionWizardDraftCache.js';
 
 const { getPathRpcUrl } = rpcDefaults;
 const log = createLogger('general');
@@ -1309,7 +1314,6 @@ const mergeDeep = (target, source) => {
   return out;
 };
 
-const SESSION_WIZARD_CACHE_KEY = 'ce:sessionWizardDraft:v1';
 const SESSION_WIZARD_SPONSORED_BUNDLE_CACHE_KEY = 'ce:sessionWizardSponsoredBundle:v1';
 const SESSION_WIZARD_SPONSORED_BUNDLE_TAB_ID_KEY = 'ce:sessionWizardSponsoredBundle:tabId:v1';
 const SESSION_WIZARD_NEW_SESSION_BANNER_DISMISSED_KEY = 'ce_new_session_banner_dismissed';
@@ -1609,20 +1613,12 @@ const clearSessionWizardSponsoredBundleCacheStorage = async () => {
 };
 
 const readSessionWizardCache = () => {
-  if (typeof window === 'undefined') return null;
-  try {
-    const raw = localStorage.getItem(SESSION_WIZARD_CACHE_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch (_) {
-    return null;
-  }
+  return readSessionWizardDraftCache();
 };
 
 const writeSessionWizardCache = (payload) => {
-  if (typeof window === 'undefined') return;
-  try {
-    localStorage.setItem(SESSION_WIZARD_CACHE_KEY, JSON.stringify(payload));
-  } catch (e) { log.warn('SessionWizard: fallback', e); }
+  const result = writeSessionWizardDraftCache(payload);
+  if (!result.ok) log.warn('SessionWizard: fallback', result.error || result.status);
 };
 
 const readSessionWizardSponsoredBundleCache = async (txId = '') => {
@@ -1667,11 +1663,12 @@ const writeSessionWizardSponsoredBundleCache = async (txId = '', bundle = null) 
 };
 
 const clearSessionWizardCache = () => {
-  if (typeof window === 'undefined') return;
-  try {
-    localStorage.removeItem(SESSION_WIZARD_CACHE_KEY);
-    clearSessionWizardPendingSbtDraftsCache();
-  } catch (e) { log.warn('SessionWizard: fallback', e); }
+  const result = clearSessionWizardDraftCache({
+    clearPendingSbtDrafts: clearSessionWizardPendingSbtDraftsCache,
+  });
+  if (!result.ok && result.status !== 'missing-storage') {
+    log.warn('SessionWizard: fallback', result.status);
+  }
 };
 
 const normalizeDraftShape = (draftIn = {}) => {
