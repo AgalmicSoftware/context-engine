@@ -4,8 +4,9 @@ import { ethers } from 'ethers';
 import { Button, Input, Label, FormGroup, Modal, ModalBody, ModalHeader } from 'reactstrap';
 import { ReactReduxContext } from 'react-redux';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCaretDown, faCaretUp, faCheck, faCog, faCopy, faExclamationCircle, faExpand, faExternalLinkAlt, faImage, faLock, faLockOpen, faPlus, faQuestionCircle, faRedoAlt, faSpinner, faTimes, faTrash, faUpload } from '@fortawesome/free-solid-svg-icons';
+import { faCaretDown, faCaretUp, faCheck, faCog, faCopy, faExclamationCircle, faExpand, faExternalLinkAlt, faImage, faPlus, faQuestionCircle, faRedoAlt, faSpinner, faTimes, faTrash, faUpload } from '@fortawesome/free-solid-svg-icons';
 import styles from './SessionWizard.module.scss';
+import LockableFieldFrame from './LockableFieldFrame.jsx';
 import SBTSelector from '../SBTs/SBTSelector.jsx';
 import CreateSBTGroup, { finalizeDeferredCreateSbtDraftUpload } from '../SBTs/CreateSBTGroup.jsx';
 import GateMultiSelectLock from '../Gates/GateMultiSelectLock.jsx';
@@ -4809,6 +4810,43 @@ const SessionWizard = ({
       ariaLabel: `${displayLabelText} info`,
     });
     const slugValidationError = isSlugField ? getSessionSlugValidationError(value) : '';
+    const fieldGateLockProps = !isSlugField ? {
+      gateOptions,
+      selectedGateIds,
+      onChangeSelectedGateIds: (nextIds) => {
+        const filtered = normalizeGateIds(nextIds).filter((id) => gateIds.includes(id));
+        setEncryptedFieldGates((prev) => {
+          const next = { ...(prev || {}) };
+          if (!filtered.length) {
+            delete next[keyString];
+            return next;
+          }
+          next[keyString] = filtered.length === 1 ? filtered[0] : filtered;
+          return next;
+        });
+        if (!filtered.length) setOpenLockKey('');
+      },
+      open: openLockKey === keyString,
+      onToggleOpen: (nextOpen) => setOpenLockKey(nextOpen ? keyString : ''),
+      disabled: !gateIds.length,
+      showDots: true,
+    } : null;
+    const fieldFrameProps = {
+      label: displayLabelText,
+      tooltipText,
+      tooltipId,
+      tooltipPlacement: 'right',
+      tooltipAriaLabel: `${displayLabelText} info`,
+      tooltipsEnabled: sessionWizardTooltipsEnabled,
+      canLock,
+      isLocked: lockActive,
+      onLockToggle: handleLockClick,
+      lockTitle,
+      lockBadgeLabel: showLockBadge ? lockBadgeLabel : '',
+      lockBadgeStyle,
+      lockIconStyle,
+      gateLockProps: fieldGateLockProps,
+    };
 
     if (keyString === 'ai.models.transcription.provider') {
       return (
@@ -5202,60 +5240,11 @@ const SessionWizard = ({
       const isFlat = isStringArray(value);
       const display = isFlat ? value.join('\n') : JSON.stringify(value, null, 2);
       return (
-        <FormGroup key={keyString} className={styles.fieldGroup}>
-          <div className={styles.fieldHeader}>
-            <div className={styles.fieldLabelRow}>
-              <Label>{displayLabelText}</Label>
-              {fieldTooltipControl}
-            </div>
-            <div className={styles.fieldActions}>
-              {canLock && (
-                <div className={styles.lockMeta}>
-                  {showLockBadge && (
-                    <span
-                      className={styles.lockBadge}
-                      style={lockBadgeStyle}
-                    >
-                      {lockBadgeLabel}
-                    </span>
-                  )}
-                  {isSlugField ? (
-                    <button
-                      type="button"
-                      className={`${styles.lockButton} ${lockActive ? styles.locked : ''}`}
-                      onClick={handleLockClick}
-                      title={lockTitle}
-                      disabled={isSlugField && slugPinnedByPendingSbtDrafts}
-                    >
-                      <FontAwesomeIcon icon={lockActive ? faLock : faLockOpen} style={lockIconStyle} />
-                    </button>
-                  ) : (
-                    <GateMultiSelectLock
-                      gateOptions={gateOptions}
-                      selectedGateIds={selectedGateIds}
-                      onChangeSelectedGateIds={(nextIds) => {
-                        const filtered = normalizeGateIds(nextIds).filter((id) => gateIds.includes(id));
-                        setEncryptedFieldGates((prev) => {
-                          const next = { ...(prev || {}) };
-                          if (!filtered.length) {
-                            delete next[keyString];
-                            return next;
-                          }
-                          next[keyString] = filtered.length === 1 ? filtered[0] : filtered;
-                          return next;
-                        });
-                        if (!filtered.length) setOpenLockKey('');
-                      }}
-                      open={openLockKey === keyString}
-                      onToggleOpen={(nextOpen) => setOpenLockKey(nextOpen ? keyString : '')}
-                      disabled={!gateIds.length}
-                      showDots={true}
-                    />
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
+        <LockableFieldFrame
+          key={keyString}
+          {...fieldFrameProps}
+          fieldError={fieldErrors[keyString]}
+        >
           <Input
             type="textarea"
             rows="4"
@@ -5263,8 +5252,7 @@ const SessionWizard = ({
             onChange={(e) => updateArrayValue(currentPath, e.target.value, !isFlat)}
             className={styles.textarea}
           />
-          {fieldErrors[keyString] && <div className={styles.errorText}>{fieldErrors[keyString]}</div>}
-        </FormGroup>
+        </LockableFieldFrame>
       );
     }
 
@@ -5310,173 +5298,36 @@ const SessionWizard = ({
     if (isBool) {
       const checkboxClass = keyString === 'autoFeatureSBTsBySessionSlug' ? styles.checkboxOffset : '';
       return (
-        <FormGroup key={keyString} className={styles.fieldGroup}>
-          <div className={styles.fieldHeader}>
-            <label className={`${styles.fieldLabelRow} ${styles.fieldLabelRowCheckbox}`}>
-              <Input
-                type="checkbox"
-                checked={!!value}
-                onChange={(e) => updateDraftValue(currentPath, !!e.target.checked)}
-                disabled={isDefaultFilterState || isNetworkChainField}
-                className={`${styles.inlineCheckbox} ${checkboxClass}`}
-              />
-              <span className={styles.fieldLabelText}>{displayLabelText}</span>
-              {fieldTooltipControl}
-            </label>
-            <div className={styles.fieldActions}>
-              {canLock && (
-                <div className={styles.lockMeta}>
-                  {showLockBadge && (
-                    <span
-                      className={styles.lockBadge}
-                      style={lockBadgeStyle}
-                    >
-                      {lockBadgeLabel}
-                    </span>
-                  )}
-                  {isSlugField ? (
-                    <button
-                      type="button"
-                      className={`${styles.lockButton} ${lockActive ? styles.locked : ''}`}
-                      onClick={handleLockClick}
-                      title={lockTitle}
-                    >
-                      <FontAwesomeIcon icon={lockActive ? faLock : faLockOpen} style={lockIconStyle} />
-                    </button>
-                  ) : (
-                    <GateMultiSelectLock
-                      gateOptions={gateOptions}
-                      selectedGateIds={selectedGateIds}
-                      onChangeSelectedGateIds={(nextIds) => {
-                        const filtered = normalizeGateIds(nextIds).filter((id) => gateIds.includes(id));
-                        setEncryptedFieldGates((prev) => {
-                          const next = { ...(prev || {}) };
-                          if (!filtered.length) {
-                            delete next[keyString];
-                            return next;
-                          }
-                          next[keyString] = filtered.length === 1 ? filtered[0] : filtered;
-                          return next;
-                        });
-                        if (!filtered.length) setOpenLockKey('');
-                      }}
-                      open={openLockKey === keyString}
-                      onToggleOpen={(nextOpen) => setOpenLockKey(nextOpen ? keyString : '')}
-                      disabled={!gateIds.length}
-                      showDots={true}
-                    />
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        </FormGroup>
+        <LockableFieldFrame
+          key={keyString}
+          {...fieldFrameProps}
+          labelInlineControl={(
+            <Input
+              type="checkbox"
+              checked={!!value}
+              onChange={(e) => updateDraftValue(currentPath, !!e.target.checked)}
+              disabled={isDefaultFilterState || isNetworkChainField}
+              className={`${styles.inlineCheckbox} ${checkboxClass}`}
+            />
+          )}
+        />
       );
     }
     if (isSessionHeaderField) {
       if (isNormalMode) {
         return (
-          <FormGroup key={keyString} className={styles.fieldGroup}>
-            <div className={styles.fieldHeader}>
-              <div className={styles.fieldLabelRow}>
-                <FontAwesomeIcon icon={faImage} className={styles.compactSessionHeaderIcon} />
-                <Label>Image</Label>
-                {fieldTooltipControl}
-              </div>
-              <div className={styles.fieldActions}>
-                {canLock && (
-                  <div className={styles.lockMeta}>
-                    {showLockBadge && (
-                      <span
-                        className={styles.lockBadge}
-                        style={lockBadgeStyle}
-                      >
-                        {lockBadgeLabel}
-                      </span>
-                    )}
-                    <GateMultiSelectLock
-                      gateOptions={gateOptions}
-                      selectedGateIds={selectedGateIds}
-                      onChangeSelectedGateIds={(nextIds) => {
-                        const filtered = normalizeGateIds(nextIds).filter((id) => gateIds.includes(id));
-                        setEncryptedFieldGates((prev) => {
-                          const next = { ...(prev || {}) };
-                          if (!filtered.length) {
-                            delete next[keyString];
-                            return next;
-                          }
-                          next[keyString] = filtered.length === 1 ? filtered[0] : filtered;
-                          return next;
-                        });
-                        if (!filtered.length) setOpenLockKey('');
-                      }}
-                      open={openLockKey === keyString}
-                      onToggleOpen={(nextOpen) => setOpenLockKey(nextOpen ? keyString : '')}
-                      disabled={!gateIds.length}
-                      showDots={true}
-                    />
-                  </div>
-                )}
-              </div>
-            </div>
+          <LockableFieldFrame
+            key={keyString}
+            {...fieldFrameProps}
+            label="Image"
+            labelPrefix={<FontAwesomeIcon icon={faImage} className={styles.compactSessionHeaderIcon} />}
+          >
             {renderCompactSessionHeaderField()}
-          </FormGroup>
+          </LockableFieldFrame>
         );
       }
       return (
-        <FormGroup key={keyString} className={styles.fieldGroup}>
-          <div className={styles.fieldHeader}>
-            <div className={styles.fieldLabelRow}>
-              <Label>{displayLabelText}</Label>
-              {fieldTooltipControl}
-            </div>
-            <div className={styles.fieldActions}>
-              {canLock && (
-                <div className={styles.lockMeta}>
-                  {showLockBadge && (
-                    <span
-                      className={styles.lockBadge}
-                      style={lockBadgeStyle}
-                    >
-                      {lockBadgeLabel}
-                    </span>
-                  )}
-                  {isSlugField ? (
-                    <button
-                      type="button"
-                      className={`${styles.lockButton} ${lockActive ? styles.locked : ''}`}
-                      onClick={handleLockClick}
-                      title={lockTitle}
-                    >
-                      <FontAwesomeIcon icon={lockActive ? faLock : faLockOpen} style={lockIconStyle} />
-                    </button>
-                  ) : (
-                    <GateMultiSelectLock
-                      gateOptions={gateOptions}
-                      selectedGateIds={selectedGateIds}
-                      onChangeSelectedGateIds={(nextIds) => {
-                        const filtered = normalizeGateIds(nextIds).filter((id) => gateIds.includes(id));
-                        setEncryptedFieldGates((prev) => {
-                          const next = { ...(prev || {}) };
-                          if (!filtered.length) {
-                            delete next[keyString];
-                            return next;
-                          }
-                          next[keyString] = filtered.length === 1 ? filtered[0] : filtered;
-                          return next;
-                        });
-                        if (!filtered.length) setOpenLockKey('');
-                      }}
-                      open={openLockKey === keyString}
-                      onToggleOpen={(nextOpen) => setOpenLockKey(nextOpen ? keyString : '')}
-                      disabled={!gateIds.length}
-                      showDots={true}
-                    />
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
+        <LockableFieldFrame key={keyString} {...fieldFrameProps}>
           <div className={styles.inlineToggleRow}>
             <Label className={styles.workerRadio}>
                 <Input
@@ -5520,7 +5371,7 @@ const SessionWizard = ({
           )}
           {renderSessionHeaderPreviewSurface()}
           {sessionHeaderUploadStatus && <div className={styles.statusNote}>{sessionHeaderUploadStatus}</div>}
-        </FormGroup>
+        </LockableFieldFrame>
       );
     }
 
@@ -5557,70 +5408,24 @@ const SessionWizard = ({
       );
     }
     return (
-      <FormGroup key={keyString} className={styles.fieldGroup}>
-        <div className={styles.fieldHeader}>
-          <div className={styles.fieldLabelRow}>
-            <Label>{displayLabelText}</Label>
-            {fieldTooltipControl}
-            </div>
-          <div className={styles.fieldActions}>
-            {canLock && (
-              <div className={styles.lockMeta}>
-                {showLockBadge && (
-                  <span
-                    className={styles.lockBadge}
-                    style={lockBadgeStyle}
-                  >
-                    {lockBadgeLabel}
-                  </span>
-                )}
-                {isSlugField ? (
-                  <>
-                    <button
-                      type="button"
-                      className={`${styles.lockButton} ${lockActive ? styles.locked : ''}`}
-                      onClick={handleLockClick}
-                      title={lockTitle}
-                    >
-                      <FontAwesomeIcon icon={lockActive ? faLock : faLockOpen} style={lockIconStyle} />
-                    </button>
-                    {!privateSlugMode && slugAvailability.status === 'checking' && (
-                      <FontAwesomeIcon icon={faSpinner} spin style={{ marginLeft: 6, opacity: 0.5, fontSize: 12 }} title="Checking availability…" />
-                    )}
-                    {!privateSlugMode && slugAvailability.status === 'available' && (
-                      <FontAwesomeIcon icon={faCheck} style={{ marginLeft: 6, color: '#4dffa4', fontSize: 12 }} title="Slug available" data-testid={E2E_TESTIDS.WIZARD_SLUG_AVAILABLE} />
-                    )}
-                    {!privateSlugMode && slugAvailability.status === 'taken' && (
-                      <FontAwesomeIcon icon={faExclamationCircle} style={{ marginLeft: 6, color: '#ffcc7b', fontSize: 12 }} title="Slug already taken" data-testid={E2E_TESTIDS.WIZARD_SLUG_TAKEN} />
-                    )}
-                  </>
-                ) : (
-                  <GateMultiSelectLock
-                    gateOptions={gateOptions}
-                    selectedGateIds={selectedGateIds}
-                    onChangeSelectedGateIds={(nextIds) => {
-                      const filtered = normalizeGateIds(nextIds).filter((id) => gateIds.includes(id));
-                      setEncryptedFieldGates((prev) => {
-                        const next = { ...(prev || {}) };
-                        if (!filtered.length) {
-                          delete next[keyString];
-                          return next;
-                        }
-                        next[keyString] = filtered.length === 1 ? filtered[0] : filtered;
-                        return next;
-                      });
-                      if (!filtered.length) setOpenLockKey('');
-                    }}
-                    open={openLockKey === keyString}
-                    onToggleOpen={(nextOpen) => setOpenLockKey(nextOpen ? keyString : '')}
-                    disabled={!gateIds.length}
-                    showDots={true}
-                  />
-                )}
-              </div>
+      <LockableFieldFrame
+        key={keyString}
+        {...fieldFrameProps}
+        lockTrailingContent={isSlugField ? (
+          <>
+            {!privateSlugMode && slugAvailability.status === 'checking' && (
+              <FontAwesomeIcon icon={faSpinner} spin style={{ marginLeft: 6, opacity: 0.5, fontSize: 12 }} title="Checking availability…" />
             )}
-          </div>
-        </div>
+            {!privateSlugMode && slugAvailability.status === 'available' && (
+              <FontAwesomeIcon icon={faCheck} style={{ marginLeft: 6, color: '#4dffa4', fontSize: 12 }} title="Slug available" data-testid={E2E_TESTIDS.WIZARD_SLUG_AVAILABLE} />
+            )}
+            {!privateSlugMode && slugAvailability.status === 'taken' && (
+              <FontAwesomeIcon icon={faExclamationCircle} style={{ marginLeft: 6, color: '#ffcc7b', fontSize: 12 }} title="Slug already taken" data-testid={E2E_TESTIDS.WIZARD_SLUG_TAKEN} />
+            )}
+          </>
+        ) : null}
+        fieldError={slugValidationError}
+      >
         <Input
           type={isNumber ? 'number' : 'text'}
           value={value == null ? '' : value}
@@ -5641,10 +5446,7 @@ const SessionWizard = ({
             {`Queued ${t('sbt')} drafts pinned this slug so their uploaded metadata stays aligned with the final session URL.`}
           </div>
         )}
-        {slugValidationError && (
-          <div className={styles.errorText}>{slugValidationError}</div>
-        )}
-      </FormGroup>
+      </LockableFieldFrame>
     );
   };
 
