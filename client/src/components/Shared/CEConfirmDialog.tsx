@@ -1,4 +1,5 @@
 import React from 'react';
+import PropTypes from 'prop-types';
 import {
   Button,
   Modal,
@@ -85,6 +86,18 @@ const CEConfirmDialog = ({
       </ModalFooter>
     </Modal>
   );
+};
+
+CEConfirmDialog.propTypes = {
+  isOpen: PropTypes.bool,
+  title: PropTypes.node.isRequired,
+  body: PropTypes.node.isRequired,
+  confirmLabel: PropTypes.node,
+  cancelLabel: PropTypes.node,
+  danger: PropTypes.bool,
+  onConfirm: PropTypes.func,
+  onCancel: PropTypes.func,
+  testId: PropTypes.string,
 };
 
 export default CEConfirmDialog;
