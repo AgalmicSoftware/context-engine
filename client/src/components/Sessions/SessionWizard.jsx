@@ -136,6 +136,11 @@ import {
 } from '../ContractPage/contractMetadata.js';
 import { buildContractViewerContracts } from '../ContractPage/contractViewerUtils.js';
 import { normalizeRoutePath as normalizeMainSiteRoutePath } from '../MainSite/routePathHelpers.js';
+import usePendingSbtDrafts, {
+  clearSessionWizardPendingSbtDraftsCache,
+  normalizePendingSbtDrafts,
+} from './hooks/usePendingSbtDrafts.js';
+import useSessionSlugState from './hooks/useSessionSlugState.js';
 
 const { getPathRpcUrl } = rpcDefaults;
 const log = createLogger('general');
@@ -1043,31 +1048,6 @@ const normalizeSbtSelection = (value) => {
   return [];
 };
 
-const normalizePendingSbtDrafts = (value) => {
-  if (!Array.isArray(value)) return [];
-  const seen = new Set();
-  return value
-    .map((entry) => {
-      const predictedAddress = toStr(entry?.predictedAddress || entry?.address).trim();
-      if (!predictedAddress || !ethers.utils.isAddress(predictedAddress)) return null;
-      const key = predictedAddress.toLowerCase();
-      if (seen.has(key)) return null;
-      seen.add(key);
-      return {
-        ...entry,
-        id: toStr(entry?.id).trim() || key,
-        predictedAddress,
-        displayName: toStr(entry?.displayName || entry?.name || predictedAddress).trim() || predictedAddress,
-        tokenURI: toStr(entry?.tokenURI).trim(),
-        metadataUploadStatus: (
-          toStr(entry?.metadataUploadStatus).trim() ||
-          (toStr(entry?.tokenURI).trim() ? 'ready' : 'pending-upload')
-        ),
-      };
-    })
-    .filter(Boolean);
-};
-
 const serializeDefaultFeaturedSbtSelections = (value = []) => {
   const seen = new Set();
   // Keep pending featured selections marked in the cached draft so a refresh can
@@ -1330,7 +1310,6 @@ const mergeDeep = (target, source) => {
 };
 
 const SESSION_WIZARD_CACHE_KEY = 'ce:sessionWizardDraft:v1';
-const SESSION_WIZARD_PENDING_SBT_DRAFTS_KEY = 'ce:sessionWizardPendingSbtDrafts:v1';
 const SESSION_WIZARD_SPONSORED_BUNDLE_CACHE_KEY = 'ce:sessionWizardSponsoredBundle:v1';
 const SESSION_WIZARD_SPONSORED_BUNDLE_TAB_ID_KEY = 'ce:sessionWizardSponsoredBundle:tabId:v1';
 const SESSION_WIZARD_NEW_SESSION_BANNER_DISMISSED_KEY = 'ce_new_session_banner_dismissed';
@@ -1646,28 +1625,6 @@ const writeSessionWizardCache = (payload) => {
   } catch (e) { log.warn('SessionWizard: fallback', e); }
 };
 
-const readSessionWizardPendingSbtDraftsCache = () => {
-  if (typeof window === 'undefined' || !window.sessionStorage) return [];
-  try {
-    const raw = sessionStorage.getItem(SESSION_WIZARD_PENDING_SBT_DRAFTS_KEY);
-    return normalizePendingSbtDrafts(raw ? JSON.parse(raw) : []);
-  } catch (_) {
-    return [];
-  }
-};
-
-const writeSessionWizardPendingSbtDraftsCache = (payload = []) => {
-  if (typeof window === 'undefined' || !window.sessionStorage) return;
-  try {
-    const normalized = normalizePendingSbtDrafts(payload);
-    if (!normalized.length) {
-      sessionStorage.removeItem(SESSION_WIZARD_PENDING_SBT_DRAFTS_KEY);
-      return;
-    }
-    sessionStorage.setItem(SESSION_WIZARD_PENDING_SBT_DRAFTS_KEY, JSON.stringify(normalized));
-  } catch (e) { log.warn('SessionWizard: fallback', e); }
-};
-
 const readSessionWizardSponsoredBundleCache = async (txId = '') => {
   const normalizedTxId = toStr(txId).trim();
   if (!normalizedTxId || typeof window === 'undefined' || !window.sessionStorage) return null;
@@ -1706,13 +1663,6 @@ const writeSessionWizardSponsoredBundleCache = async (txId = '', bundle = null) 
     } else {
       await clearSessionWizardSponsoredBundleCacheStorage();
     }
-  } catch (e) { log.warn('SessionWizard: fallback', e); }
-};
-
-const clearSessionWizardPendingSbtDraftsCache = () => {
-  if (typeof window === 'undefined' || !window.sessionStorage) return;
-  try {
-    sessionStorage.removeItem(SESSION_WIZARD_PENDING_SBT_DRAFTS_KEY);
   } catch (e) { log.warn('SessionWizard: fallback', e); }
 };
 
@@ -2408,7 +2358,6 @@ const SessionWizard = ({
   const cachedDraftHasEmbeddedDeployHelperEnabled = (
     typeof cachedWizard?.draft?.embeddedDeployHelperEnabled === 'boolean'
   );
-  const cachedPendingSbtDrafts = useMemo(() => readSessionWizardPendingSbtDraftsCache(), []);
   const sourceEmbeddedDeployHelperDefault = useMemo(() => {
     // The canonical default session slug is an empty string, so only treat
     // nullish values as "no source session".
@@ -2477,9 +2426,6 @@ const SessionWizard = ({
   const [isSessionIdRegenerating, setIsSessionIdRegenerating] = useState(false);
   const [privateSlugMode, setPrivateSlugMode] = useState(() => !!cachedWizard?.privateSlugMode);
   const lastManualSlugRef = useRef(toStr(cachedWizard?.lastManualSlug).trim());
-  const [slugAvailability, setSlugAvailability] = useState({ status: 'idle' });
-  const slugCheckTimerRef = useRef(null);
-  const slugCheckIdRef = useRef(0);
   const [encryptedFieldGates, setEncryptedFieldGates] = useState(() => (
     cachedWizard?.encryptedFieldGates && typeof cachedWizard.encryptedFieldGates === 'object'
       ? cachedWizard.encryptedFieldGates
@@ -2528,11 +2474,28 @@ const SessionWizard = ({
     if (available.length) return available[0].id;
     return DEFAULT_CHAIN_ID;
   });
+  const checkSessionSlugExists = useCallback(({ registryChainId: chainId, slug }) => (
+    sessionRegistryUtils
+      .getRegistryContract(chainId)
+      .sessionExists(sessionRegistryUtils.toRegistrySlug(slug))
+  ), []);
+  const { slugAvailability } = useSessionSlugState({
+    slug: draft?.slug,
+    privateSlugMode,
+    registryChainId,
+    isReservedSlug: isReservedSessionSlug,
+    sessionExists: checkSessionSlugExists,
+  });
   const initialGateRef = useRef(initialGates[0]);
   const [encryptionGates, setEncryptionGates] = useState(() => initialGates);
   // Pending SBT drafts carry deploy secrets and claim codes, so keep them out
   // of localStorage while still surviving same-tab refreshes via sessionStorage.
-  const [pendingSbtDrafts, setPendingSbtDrafts] = useState(() => cachedPendingSbtDrafts);
+  const {
+    pendingSbtDrafts,
+    setPendingSbtDrafts,
+    normalizedPendingSbtDrafts,
+    hasUndeployedPendingSbtDrafts,
+  } = usePendingSbtDrafts();
   const [createSbtModalState, setCreateSbtModalState] = useState(() => ({
     open: false,
     targetType: 'gate',
@@ -2742,11 +2705,6 @@ const SessionWizard = ({
     network?.id,
     registryChainId,
   ]);
-  const normalizedPendingSbtDrafts = useMemo(
-    () => normalizePendingSbtDrafts(pendingSbtDrafts),
-    [pendingSbtDrafts]
-  );
-  const hasUndeployedPendingSbtDrafts = normalizedPendingSbtDrafts.some((entry) => entry.deployed !== true);
   const slugFreezeAnchor = toStr(draft?.slug || resolvedActiveSessionSlug).trim();
   // Regression guard: queued SBT metadata already bakes in the active session slug.
   // Keep the wizard URL stable until those pending deployments are cleared.
@@ -3301,47 +3259,6 @@ const SessionWizard = ({
   }, [draft?.sessionName, draft?.slug, privateSlugMode, slugPinnedByPendingSbtDrafts]);
 
   useEffect(() => {
-    // Invalidate any in-flight check immediately on every dependency change
-    slugCheckIdRef.current += 1;
-    if (slugCheckTimerRef.current) clearTimeout(slugCheckTimerRef.current);
-    slugCheckTimerRef.current = null;
-
-    if (privateSlugMode) {
-      setSlugAvailability({ status: 'idle' });
-      return;
-    }
-    const slug = toStr(draft?.slug).trim();
-    if (!slug) {
-      setSlugAvailability({ status: 'idle' });
-      return;
-    }
-    if (isReservedSessionSlug(slug)) {
-      setSlugAvailability({ status: 'idle' });
-      return;
-    }
-    let cancelled = false;
-    slugCheckTimerRef.current = setTimeout(() => {
-      slugCheckTimerRef.current = null;
-      setSlugAvailability({ status: 'checking' });
-      (async () => {
-        try {
-          const exists = await sessionRegistryUtils
-            .getRegistryContract(registryChainId)
-            .sessionExists(sessionRegistryUtils.toRegistrySlug(slug));
-          if (!cancelled) setSlugAvailability({ status: exists ? 'taken' : 'available' });
-        } catch (_) {
-          if (!cancelled) setSlugAvailability({ status: 'error' });
-        }
-      })();
-    }, 300);
-    return () => {
-      cancelled = true;
-      if (slugCheckTimerRef.current) clearTimeout(slugCheckTimerRef.current);
-      slugCheckTimerRef.current = null;
-    };
-  }, [draft?.slug, privateSlugMode, registryChainId]);
-
-  useEffect(() => {
     const prev = lastHasPrivateSbtNameRef.current;
     lastHasPrivateSbtNameRef.current = hasPrivateSbtName;
     if (!hasPrivateSbtName || prev) return;
@@ -3384,7 +3301,6 @@ const SessionWizard = ({
       deployWorkerUrl,
       provisionedSponsoredContext,
     });
-    writeSessionWizardPendingSbtDraftsCache(pendingSbtDrafts);
   }, [
     sessionId,
     draft,
