@@ -50,7 +50,7 @@ import contractScripts, {
 } from '../../utilities/web3/contractScripts.js';
 import { ethers, utils } from 'ethers';
 import CESlider from '../Shared/CESlider';
-import proposalScripts from 'utilities/proposalScripts.js';
+import { getShortenedAddress } from 'utilities/ui/displayHelpers.js';
 import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 import { serializeFilterState, deserializeFilterState } from '../../utilities/survey/filterStateUtils.js';
 import { ENABLE_IMPORTANCE_SLIDER_TOGGLE } from '../../variables/appConfig.js';
@@ -10393,8 +10393,8 @@ export class SurveyQuestions extends Component {
         .filter(Boolean)
     )).map((address) => ({
       address,
-      label: this.resolveSbtGateLabel(address) || proposalScripts.getShortenedAddress(address, false),
-      meta: proposalScripts.getShortenedAddress(address, false),
+      label: this.resolveSbtGateLabel(address) || getShortenedAddress(address, false),
+      meta: getShortenedAddress(address, false),
       href: buildSbtDetailPath(address, sessionSlug),
     }))
   );
@@ -10468,7 +10468,7 @@ export class SurveyQuestions extends Component {
         sbtItems: this.buildGateAudienceSbtItems(sbtAddresses, question?.sessionSlug || ''),
         sbtSummary: sbtAddresses.length > 0
           ? sbtAddresses
-            .map((addr) => this.resolveSbtGateLabel(addr) || proposalScripts.getShortenedAddress(addr, false))
+            .map((addr) => this.resolveSbtGateLabel(addr) || getShortenedAddress(addr, false))
             .join(', ')
           : 'none',
         recipients,
@@ -10528,7 +10528,7 @@ export class SurveyQuestions extends Component {
         sbtItems: this.buildGateAudienceSbtItems(sbtAddresses, responseGateSessionSlug || ''),
         sbtSummary: sbtAddresses.length > 0
           ? sbtAddresses
-            .map((addr) => this.resolveSbtGateLabel(addr) || proposalScripts.getShortenedAddress(addr, false))
+            .map((addr) => this.resolveSbtGateLabel(addr) || getShortenedAddress(addr, false))
             .join(', ')
           : 'none',
         recipients: gateRecipients,
@@ -10944,7 +10944,7 @@ export class SurveyQuestions extends Component {
         );
         const maybeGateId = this.normalizeGateLabelText(gate?.gateId || gate?.id || '');
         const sbtLabelFallback = sbtAddresses.length > 0
-          ? `${this.resolveSbtGateLabel(sbtAddresses[0], slug) || proposalScripts.getShortenedAddress(sbtAddresses[0], false)} gate`
+          ? `${this.resolveSbtGateLabel(sbtAddresses[0], slug) || getShortenedAddress(sbtAddresses[0], false)} gate`
           : 'Question gate';
         const label = !isGenericResourceGateLabel(configuredLabel)
           ? configuredLabel
@@ -10979,7 +10979,7 @@ export class SurveyQuestions extends Component {
       questionCount: detail.questionIds.size,
       sbts: detail.sbtAddresses.map((address) => ({
         address,
-        label: this.resolveSbtGateLabel(address, detail.sessionSlug || slug) || proposalScripts.getShortenedAddress(address, false),
+        label: this.resolveSbtGateLabel(address, detail.sessionSlug || slug) || getShortenedAddress(address, false),
         href: buildSbtDetailPath(address, detail.sessionSlug || slug),
       })),
     }));
@@ -11195,7 +11195,7 @@ export class SurveyQuestions extends Component {
     if (label) return label;
     if (fallbackSbt) {
       const sbtName = this.resolveSbtGateLabel(fallbackSbt);
-      return `${t('sbt')} ${sbtName || proposalScripts.getShortenedAddress(fallbackSbt, false)}`;
+      return `${t('sbt')} ${sbtName || getShortenedAddress(fallbackSbt, false)}`;
     }
     return `default ${t('gateLower')}`;
   };
@@ -11307,7 +11307,7 @@ export class SurveyQuestions extends Component {
     const allSbtAddresses = Array.from(new Set(gateDetails.flatMap((entry) => entry.sbtAddresses || [])));
     const sbtSummary = allSbtAddresses.length > 0
       ? allSbtAddresses
-        .map((addr) => this.resolveSbtGateLabel(addr) || proposalScripts.getShortenedAddress(addr, false))
+        .map((addr) => this.resolveSbtGateLabel(addr) || getShortenedAddress(addr, false))
         .join(', ')
       : 'none';
 
@@ -12841,7 +12841,7 @@ export class SurveyQuestions extends Component {
     const viewedAddressLower = viewedAddressRaw.toLowerCase();
     const shortenedViewAddress =
       viewedAddressRaw
-        ? proposalScripts.getShortenedAddress(
+        ? getShortenedAddress(
             viewedAddressRaw,
             notClickable
           )

@@ -30,7 +30,7 @@ import {
   findRepresentativeQuestions,
 } from '../../utilities/survey/polisReportMath.js';
 
-import proposalScripts from 'utilities/proposalScripts.js';
+import { getShortenedAddress } from 'utilities/ui/displayHelpers.js';
 import demoData from '../../variables/demo/demo_polis_data.json';
 import { POLIS_DEMO_DATA_AUTOLOAD_SLUGS } from '../../variables/appConfig.js';
 import { getChainById } from '../../variables/chains.js';
@@ -2001,7 +2001,7 @@ export default function PolisReport({
           const imgSrc = displayName
             ? getPolisHistoricalParticipantAvatar(displayName, addr)
             : getBlockieFor(addr);
-          const shortAddr = proposalScripts.getShortenedAddress(addr, false) || addr;
+          const shortAddr = getShortenedAddress(addr, false) || addr;
           const linkHref = displayName ? `/su/${displayName}` : (isEth ? `/u/${addr}` : '');
           const label = displayName || addr;
           const shortLabel = displayName || shortAddr;
@@ -2605,7 +2605,7 @@ export default function PolisReport({
                 const displayName = demoDisplayNames?.[addr];
                 const hasLink = isEth || !!displayName;
                 const linkHref = displayName ? `/su/${displayName}` : `/u/${addr}`;
-                const linkLabel = displayName || proposalScripts.getShortenedAddress(addr, false);
+                const linkLabel = displayName || getShortenedAddress(addr, false);
                 const historicalAvatar = displayName
                   ? getPolisHistoricalParticipantAvatar(displayName, addr)
                   : '';
@@ -2614,7 +2614,7 @@ export default function PolisReport({
                   displayName
                     ? (showAddresses ? displayName : null)
                     : ((isEth && showAddresses)
-                      ? proposalScripts.getShortenedAddress(addr, false)
+                      ? getShortenedAddress(addr, false)
                       : null);
 
                 return (

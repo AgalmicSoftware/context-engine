@@ -62,11 +62,9 @@ jest.mock('../../utilities/survey/polisReportMath.js', () => ({
   findRepresentativeQuestions: jest.fn(() => ({})),
 }));
 
-jest.mock('utilities/proposalScripts.js', () => ({
+jest.mock('utilities/ui/displayHelpers.js', () => ({
   __esModule: true,
-  default: {
-    getShortenedAddress: jest.fn((value) => String(value || '')),
-  },
+  getShortenedAddress: jest.fn((value) => String(value || '')),
 }));
 
 jest.mock('utilities/logging.js', () => ({

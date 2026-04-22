@@ -5,7 +5,7 @@ import { faUsers, faVoteYea, faSpinner, faScroll, faUsersCog, faChevronDown, faC
 import styles from './CommunityTab.module.scss';
 import historicalFigures from '../../variables/demo/historical_figure_users.json';
 import { Modal, ModalHeader, ModalBody, Collapse } from 'reactstrap';
-import proposalScripts from 'utilities/proposalScripts.js';
+import { getShortenedAddress } from 'utilities/ui/displayHelpers.js';
 import contractScripts, {
   getAllSessionSlugs,
   getDemoSessionConfigBySlug,
@@ -1704,7 +1704,7 @@ class CommunityTab extends Component {
               <span className={styles.name}>
                 {user.username.startsWith('0x') && (
                   <>
-                    {proposalScripts.getShortenedAddress(user.name, true)}
+                    {getShortenedAddress(user.name, true)}
                   </>
                 )}
                 {!user.username.startsWith('0x') && (
@@ -1744,7 +1744,7 @@ class CommunityTab extends Component {
                 <span className={styles.name}>
                   {user.username.startsWith('0x') && (
                     <>
-                      {proposalScripts.getShortenedAddress(user.name, true)}
+                      {getShortenedAddress(user.name, true)}
                     </>
                   )}
                   {!user.username.startsWith('0x') && (
@@ -1955,7 +1955,7 @@ class CommunityTab extends Component {
                           style={{ borderRadius: 4, marginRight: 6 }}
                         />
                       ) : null}
-                      {proposalScripts.getShortenedAddress(address, true)}
+                      {getShortenedAddress(address, true)}
                     </div>
                   );
                 })}

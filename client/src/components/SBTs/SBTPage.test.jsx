@@ -4,7 +4,7 @@ import { ethers } from 'ethers';
 import contractScripts from '../../utilities/web3/contractScripts.js';
 import * as contractScriptsModule from '../../utilities/web3/contractScripts.js';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
-import proposalScripts from '../../utilities/proposalScripts.js';
+import { getShortenedAddress } from '../../utilities/ui/displayHelpers.js';
 import defaultSbtImage from '../../assets/img/ce_circuit_logo.png';
 import { cryptoUtils } from 'utilities/crypto/cryptography.js';
 import { litStorage } from 'utilities/crypto/litProtocol.js';
@@ -1163,7 +1163,7 @@ describe('SBTPage modal holder optimizations', () => {
     expect(progressBar).toBeTruthy();
     expect(treeIncludesText(tree, 'Scanning mint/burn history: 40 blocks remaining')).toBe(true);
     expect(treeIncludesText(tree, '(blocks 2,000-2,079)')).toBe(false);
-    expect(treeIncludesText(tree, proposalScripts.getShortenedAddress(holderAddress, false))).toBe(true);
+    expect(treeIncludesText(tree, getShortenedAddress(holderAddress, false))).toBe(true);
     expect(treeIncludesText(tree, 'No holders found.')).toBe(false);
   });
 
@@ -3537,7 +3537,7 @@ describe('SBTPage modal holder optimizations', () => {
     const addressNode = findElementInTree(cardNode, (element) => element?.props?.id === styles.miniSbtAddress);
 
     expect(addressNode).not.toBeNull();
-    expect(flattenText(addressNode)).toContain(proposalScripts.getShortenedAddress(sbtAddress, false));
+    expect(flattenText(addressNode)).toContain(getShortenedAddress(sbtAddress, false));
 
     cryptoModeSpy.mockRestore();
   });

@@ -14,7 +14,6 @@ import {
   faBookmark,
   faCheck,
 } from '@fortawesome/free-solid-svg-icons';
-import proposalScripts from 'utilities/proposalScripts.js';
 import styles from './SingleQuestionResponse.module.scss';
 import { createLogger } from 'utilities/logging.js';
 import { buildQuestionRoutePath } from '../../utilities/survey/questionRouting.js';

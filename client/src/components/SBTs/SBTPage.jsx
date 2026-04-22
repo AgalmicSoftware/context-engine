@@ -15,7 +15,7 @@ import {
   normalizeSessionSlug,
 } from '../../utilities/web3/contractScripts.js';
 import { getChainBlockTimeMs } from '../../variables/chains.js';
-import proposalScripts from '../../utilities/proposalScripts.js';
+import { getShortenedAddress, getShortenedTransactionHash } from '../../utilities/ui/displayHelpers.js';
 import styles from './SBTPage.module.scss';
 import SBTFilter from '../SBTs/SBTFilter';
 import contextEngineLoadingGif from '../../assets/img/context_engine_logo_animation.gif';
@@ -1793,7 +1793,7 @@ class SBTPage extends Component {
     const isZeroAddress =
       normalized.toLowerCase() === String(ethers.constants.AddressZero || '').toLowerCase();
     if (!normalized || isZeroAddress || !ethers.utils.isAddress(normalized)) return "N/A";
-    const shortenedAddress = proposalScripts.getShortenedAddress(normalized, false);
+    const shortenedAddress = getShortenedAddress(normalized, false);
     return (
       <>
         <a href={`/u/${normalized}`} target="_blank" rel="noopener noreferrer">
@@ -4071,7 +4071,7 @@ renderMintButton() {
                     <p>Token ID: {burnSearchResult.tokenId}</p>
                   )}
                   {burnSearchResult.address && (
-                    <p>Owner: {proposalScripts.getShortenedAddress(burnSearchResult.address, false)}</p>
+                    <p>Owner: {getShortenedAddress(burnSearchResult.address, false)}</p>
                   )}
                 </div>
               )}
@@ -4547,7 +4547,7 @@ renderMintButton() {
           </div>
           <p id={styles.miniSbtName}>{sbtName}</p>
           {showMiniSbtAddress ? (
-            <p id={styles.miniSbtAddress}>{proposalScripts.getShortenedAddress(sbtAddressForDisplay, false)}</p>
+            <p id={styles.miniSbtAddress}>{getShortenedAddress(sbtAddressForDisplay, false)}</p>
           ) : null}
           {miniMintArea}
         </div>
@@ -4630,7 +4630,7 @@ renderMintButton() {
     }
 
     const burnAuthLabels = ["Admin Only", "Owner Only", "Both", "Neither"];
-    const addressDisplay = proposalScripts.getShortenedAddress(sbtAddressForDisplay, false);
+    const addressDisplay = getShortenedAddress(sbtAddressForDisplay, false);
 
     const netHolders = this.getMemoizedNetHoldersList(mintedAddresses, burnedAddresses);
     // For the holders modal, treat any non-empty holders list as "ready" even if the
@@ -4984,7 +4984,7 @@ renderMintButton() {
                               target="_blank"
                               rel="noopener noreferrer"
                             >
-                              {proposalScripts.getShortenedTransactionHash(lastMintTxHash)}
+                              {getShortenedTransactionHash(lastMintTxHash)}
                             </a>
                           </p>
                         </div>
@@ -5000,7 +5000,7 @@ renderMintButton() {
                               target="_blank"
                               rel="noopener noreferrer"
                             >
-                              {proposalScripts.getShortenedTransactionHash(lastBurnTxHash)}
+                              {getShortenedTransactionHash(lastBurnTxHash)}
                             </a>
                           </p>
                         </div>
@@ -5021,7 +5021,7 @@ renderMintButton() {
                               <br />
                               Tx Hash:{' '}
                               <a href={this.getExplorerLink(transactionHash)} target="_blank" rel="noopener noreferrer">
-                                {proposalScripts.getShortenedTransactionHash(transactionHash)}
+                                {getShortenedTransactionHash(transactionHash)}
                               </a>
                             </>
                           )}
@@ -5143,7 +5143,7 @@ renderMintButton() {
                           />
                         ) : null}
                         <a href={`/u/${address}`} target="_blank" rel="noopener noreferrer" className={styles.userAddressLink}>
-                          {proposalScripts.getShortenedAddress(address, false)}
+                          {getShortenedAddress(address, false)}
                         </a>
                       </div>
                       <div className={styles.userItemActions}>

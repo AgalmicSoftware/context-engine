@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCaretDown, faCaretUp, faCheck, faCopy } from '@fortawesome/free-solid-svg-icons';
-import proposalScripts from '../../utilities/proposalScripts.js';
+import { getShortenedAddress } from '../../utilities/ui/displayHelpers.js';
 import { notify } from '../../utilities/ui/notify.js';
 import {
   CONTRACT_VIEWER_SECTION_TESTID,
@@ -162,7 +162,7 @@ const ContractViewer = ({
                   className={styles.contractAddress}
                   onClick={(event) => event.stopPropagation()}
                 >
-                  {proposalScripts.getShortenedAddress(
+                  {getShortenedAddress(
                     addressEntry.address,
                     true,
                     addressEntry.explorerUrl
