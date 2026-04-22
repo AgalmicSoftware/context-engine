@@ -1,13 +1,19 @@
-/** @file LazyFallback.jsx */
+/** @file LazyFallback.tsx */
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faSpinner } from '@fortawesome/free-solid-svg-icons';
 import React from 'react';
+
+type LazyFallbackProps = {
+  label?: React.ReactNode;
+  subtext?: React.ReactNode;
+  minHeight?: React.CSSProperties['minHeight'];
+};
 
 export default function LazyFallback({
   label = 'Loading...',
   subtext = '',
   minHeight = '40vh',
-}) {
+}: LazyFallbackProps) {
   return (
     <div
       style={{
