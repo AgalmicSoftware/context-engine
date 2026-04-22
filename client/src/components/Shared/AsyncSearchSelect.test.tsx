@@ -2,7 +2,29 @@ import React, { useState } from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import AsyncSearchSelect from './AsyncSearchSelect';
 
-const OPTIONS = [
+type TestOption = Record<string, unknown> & {
+  value?: unknown;
+  label?: React.ReactNode;
+};
+
+type HarnessProps = {
+  options?: TestOption[] | null;
+  initialValue?: TestOption | null;
+  onChangeSpy?: (option: TestOption) => void;
+  placeholder?: string;
+  isLoading?: boolean;
+  loadingMessage?: () => React.ReactNode;
+  noOptionsMessage?: () => React.ReactNode;
+  formatOptionLabel?: (option: TestOption) => React.ReactNode;
+  formatValueLabel?: (option: TestOption) => React.ReactNode;
+  getOptionValue?: (option: TestOption | null | undefined) => unknown;
+  filterOption?: (option: TestOption, query: string) => boolean;
+  disabled?: boolean;
+  id?: string;
+  inputId?: string;
+};
+
+const OPTIONS: TestOption[] = [
   { value: 'alpha', label: 'Alpha' },
   { value: 'beta', label: 'Beta' },
   { value: 'gamma', label: 'Gamma' },
@@ -23,8 +45,8 @@ const Harness = ({
   disabled = false,
   id = 'test-async-search-select',
   inputId,
-}) => {
-  const [value, setValue] = useState(initialValue);
+}: HarnessProps) => {
+  const [value, setValue] = useState<TestOption | null>(initialValue);
 
   return (
     <AsyncSearchSelect
@@ -327,7 +349,7 @@ describe('AsyncSearchSelect', () => {
         value={null}
         onChange={jest.fn()}
         placeholder="Pick one"
-        getOptionValue={(option) => option.slug}
+        getOptionValue={(option) => option!.slug}
       />
     );
 
