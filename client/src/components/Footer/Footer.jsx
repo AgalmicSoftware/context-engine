@@ -3,7 +3,7 @@ import PropTypes from 'prop-types';
 import { connect } from 'react-redux';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faGithub } from "@fortawesome/free-brands-svg-icons";
-import { changeFocusedTab, toggleLoginModal, toggleSettingsModal } from '../../actions/sessionStateActions.js';
+import { changeFocusedTab, toggleLoginModal } from '../../actions/sessionStateActions.js';
 import { PUBLIC_REPO_URL } from '../../variables/publicRepoMetadata.js';
 
 // CSS
@@ -149,7 +149,6 @@ class Footer extends React.Component {
 Footer.propTypes = {
   changeFocusedTab: PropTypes.func.isRequired,
   toggleLoginModal: PropTypes.func.isRequired,
-  toggleSettingsModal: PropTypes.func.isRequired,
   focusedTab: PropTypes.number,
   loginModalToggled: PropTypes.bool,
 };
@@ -157,7 +156,6 @@ Footer.propTypes = {
 const mapStateToProps = state => ({
   focusedTab: state.sessionState.focusedTab,
   loginModalToggled: state.sessionState.loginModalToggled,
-  settingsModalToggled: state.sessionState.settingsModalToggled,
 });
 
-export default connect(mapStateToProps, { changeFocusedTab, toggleLoginModal, toggleSettingsModal })(Footer)
+export default connect(mapStateToProps, { changeFocusedTab, toggleLoginModal })(Footer)

@@ -10,14 +10,12 @@ import Footer from './Footer.jsx';
 jest.mock('../../actions/sessionStateActions.js', () => ({
   changeFocusedTab: jest.fn(() => ({ type: 'CHANGE_FOCUSED_TAB' })),
   toggleLoginModal: jest.fn(() => ({ type: 'TOGGLE_LOGIN_MODAL' })),
-  toggleSettingsModal: jest.fn(() => ({ type: 'TOGGLE_SETTINGS_MODAL' })),
 }));
 
 const buildStore = () => createStore((state = {
   sessionState: {
     focusedTab: 0,
     loginModalToggled: false,
-    settingsModalToggled: false,
   },
 }) => state);
 
