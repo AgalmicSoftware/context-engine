@@ -3550,6 +3550,25 @@ describe('SessionWizard rendered validation', () => {
     expect(screen.getByText('Ends at block 988,000.')).toBeInTheDocument();
   });
 
+  it('keeps legacy sponsoredSbtAddress inside optional details in normal mode', async () => {
+    const sponsoredSbtAddress = '0x00000000000000000000000000000000000000f1';
+    localStorage.setItem('ce:sessionWizardDraft:v1', JSON.stringify({
+      draft: {
+        sponsoredSbtAddress,
+      },
+    }));
+
+    renderSessionWizard();
+
+    await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+
+    expect(screen.queryByDisplayValue(sponsoredSbtAddress)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /Optional details/i }));
+
+    expect(await screen.findByDisplayValue(sponsoredSbtAddress)).toBeInTheDocument();
+  });
+
   it('keeps session details open after filling both fields in normal mode', async () => {
     renderSessionWizard();
 
