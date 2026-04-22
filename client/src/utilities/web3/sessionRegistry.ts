@@ -1852,7 +1852,11 @@ export const registerSessionOnChain = async ({
   if (!registryAddress) {
     throw new Error('Session registry address not configured for this chain.');
   }
-  const registrySlug = validateRegistrySlugForWriteOrThrow(slug);
+  const slugValidation = validateRegistrySessionSlugForWrite(slug);
+  if (!slugValidation.ok) {
+    throw new Error(slugValidation.error || 'Invalid session slug.');
+  }
+  const registrySlug = slugValidation.slug;
   const sessionIdHex = normalizeSessionIdHex(sessionId);
   if (!sessionIdHex) {
     throw new Error('Session ID (UUID) is required.');
