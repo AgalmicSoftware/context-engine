@@ -24,7 +24,7 @@ npm run ai:seed-survey:question-types            # seed question type data
 - Fresh `client/` installs use the standard `npm install`; the `--legacy-peer-deps` contract is carried automatically via `client/.npmrc` because `react-scripts@4.0.3`'s optional TypeScript peer still conflicts with `@lit-protocol/contracts@0.9.1`'s strict peer. Plain `npm install` just works.
 - When upgrading peer-sensitive `client/` dependencies (Lit Protocol packages, `react-scripts`, `reactstrap`, `react-popper`, or anything else declaring a React / TypeScript peer), re-run `cd client && npm install --legacy-peer-deps=false` in isolation to re-expose any new hard peer conflicts before committing the upgrade. The `.npmrc` suppresses those warnings during normal installs, so this is the only way to catch a regression that shrinks the supported peer surface.
 - `npm run dev` is the hot-reload frontend dev server; `npm start` serves the existing production build from `build/`.
-- Useful frontend scripts: `npm test` (Jest 30), `npm test -- --watchAll=false`, `npm run lint` (ESLint 9 flat config), `npm run build`, `npm run analyze`.
+- Useful frontend scripts: `npm test`, `npm test -- --watchAll=false`, `npm run lint`, `npm run build`, `npm run analyze`.
 - Codex targeted Jest runs should use the approval-friendly form from `client/`: `npm test -- --watchAll=false --runTestsByPath <paths...>`. Do not prefix targeted Jest commands with `CI=true`; shell env assignments make sandbox auto-approval less reliable and trigger repeated prompts for Jest's temp-dir haste-map cache.
 - Frontend logging is off by default. In the browser console, run `window.CE_LOGGING.enabled = true`, then `window.CE_LOGGING_HELP()` for categories and usage.
 
@@ -92,7 +92,8 @@ npm run ai:seed-survey:question-types            # seed question type data
 - Tooltip pattern: `<FontAwesomeIcon icon={faQuestionCircle}/>` + `<UncontrolledTooltip>` (reactstrap)
 
 ## Workflow
-- Commit convention: `autocoder: <descriptive message>` for automated changes
+- Commit convention for automated changes: `<type>(autocoder): <short imperative summary>` (for example, `fix(autocoder): guard empty response payload`). Use `feat`, `fix`, `refactor`, `test`, `docs`, or `chore` as the type.
+- Keep commit messages concise: imperative subject, no trailing period, no internal PRD identifiers, and an optional body capped at 0-3 short lines when helpful.
 - Commit messages must not reference internal PRD identifiers (e.g. `PRD 334`, `PRDs 329-336`). Describe the change by what it does, not by the tracking ID — PRDs churn (merged, renumbered, deprecated) and referencing them ties public commit history to internal bookkeeping.
 - Keep fixture/test data non-identifying (no real names, emails, API keys)
 - New user-facing workflow/features should add or update related automated E2E smoke coverage when relevant, especially for UI, encryption, gating, worker, or Arweave flows
