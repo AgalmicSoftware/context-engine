@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faBook,
@@ -87,6 +87,44 @@ const POLICY_ANCHOR_TO_ISO_A3 = Object.freeze({
   uk: ['GBR'],
   us: ['USA'],
 });
+
+const MOBILE_TWEET_PREVIEW_LIMIT = 5;
+const MOBILE_TWEET_PREVIEW_QUERY = '(max-width: 720px)';
+
+const readIsMobileTweetPreview = () => (
+  typeof window !== 'undefined'
+  && typeof window.matchMedia === 'function'
+  && window.matchMedia(MOBILE_TWEET_PREVIEW_QUERY).matches
+);
+
+const useIsMobileTweetPreview = () => {
+  const [isMobileTweetPreview, setIsMobileTweetPreview] = useState(readIsMobileTweetPreview);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+      return undefined;
+    }
+
+    const mediaQuery = window.matchMedia(MOBILE_TWEET_PREVIEW_QUERY);
+    const handleChange = (event) => setIsMobileTweetPreview(!!event.matches);
+
+    setIsMobileTweetPreview(mediaQuery.matches);
+
+    if (typeof mediaQuery.addEventListener === 'function') {
+      mediaQuery.addEventListener('change', handleChange);
+      return () => mediaQuery.removeEventListener('change', handleChange);
+    }
+
+    if (typeof mediaQuery.addListener === 'function') {
+      mediaQuery.addListener(handleChange);
+      return () => mediaQuery.removeListener(handleChange);
+    }
+
+    return undefined;
+  }, []);
+
+  return isMobileTweetPreview;
+};
 
 const mergePolicyMapStatus = (currentStatus = '', nextStatus = '') => {
   if (!currentStatus) return nextStatus;
@@ -376,8 +414,14 @@ const CorpusViewer = ({ onAtlasIssueOpen = null, showGithubLink = true }) => {
 
   const [activeCorpusKey, setActiveCorpusKey] = useState(corpusDefinitions[0]?.key || 'tweets');
   const [activeTag, setActiveTag] = useState(null);
+  const [mobileTweetsExpanded, setMobileTweetsExpanded] = useState(false);
+  const isMobileTweetPreview = useIsMobileTweetPreview();
 
   const activeCorpus = corpusDefinitions.find((corpus) => corpus.key === activeCorpusKey) || corpusDefinitions[0];
+
+  useEffect(() => {
+    setMobileTweetsExpanded(false);
+  }, [activeCorpusKey]);
 
   if (!activeCorpus) return null;
 
@@ -402,11 +446,55 @@ const CorpusViewer = ({ onAtlasIssueOpen = null, showGithubLink = true }) => {
     })
   );
 
-  const renderEntriesCollection = (entries) => (
-    <div className={`${styles.entriesCollection} ${shouldUseHalfWidthGrid(activeCorpus.key) ? styles.entriesCollectionHalf : ''}`.trim()}>
+  const renderEntriesCollection = (entries, { id, testId } = {}) => (
+    <div
+      id={id}
+      data-testid={testId}
+      className={`${styles.entriesCollection} ${shouldUseHalfWidthGrid(activeCorpus.key) ? styles.entriesCollectionHalf : ''}`.trim()}
+    >
       {renderEntries(entries)}
     </div>
   );
+
+  const renderTweetEntriesCollection = () => {
+    const tweetEntries = activeCorpus.entries.filter(Boolean);
+    const shouldShowMobilePreview = (
+      isMobileTweetPreview
+      && tweetEntries.length > MOBILE_TWEET_PREVIEW_LIMIT
+    );
+    const visibleEntries = shouldShowMobilePreview && !mobileTweetsExpanded
+      ? tweetEntries.slice(0, MOBILE_TWEET_PREVIEW_LIMIT)
+      : tweetEntries;
+    const tweetCountLabel = mobileTweetsExpanded
+      ? `Showing all ${tweetEntries.length} tweets`
+      : `${Math.min(MOBILE_TWEET_PREVIEW_LIMIT, tweetEntries.length)} of ${tweetEntries.length} tweets shown`;
+
+    return (
+      <>
+        {renderEntriesCollection(visibleEntries, {
+          id: 'ce-context-tweet-list',
+          testId: 'ce-context-tweet-list',
+        })}
+        {shouldShowMobilePreview ? (
+          <div className={styles.tweetPreviewControl}>
+            <span className={styles.tweetPreviewCount} aria-live="polite">
+              {tweetCountLabel}
+            </span>
+            <button
+              type="button"
+              aria-controls="ce-context-tweet-list"
+              aria-expanded={mobileTweetsExpanded}
+              className={styles.tweetPreviewButton}
+              data-testid="ce-context-tweets-view-more"
+              onClick={() => setMobileTweetsExpanded((value) => !value)}
+            >
+              {mobileTweetsExpanded ? 'Show fewer' : 'View more'}
+            </button>
+          </div>
+        ) : null}
+      </>
+    );
+  };
 
   return (
     <div className={styles.container}>
@@ -499,6 +587,8 @@ const CorpusViewer = ({ onAtlasIssueOpen = null, showGithubLink = true }) => {
           </PolicyGlobe>
         ) : activeCorpus.entries.length === 0 ? (
           <EmptyCorpusState corpus={activeCorpus} />
+        ) : activeCorpus.key === 'tweets' ? (
+          renderTweetEntriesCollection()
         ) : (
           renderEntriesCollection(activeCorpus.entries)
         )}

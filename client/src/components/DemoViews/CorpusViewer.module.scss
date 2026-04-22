@@ -270,6 +270,59 @@ $text: #f4f7ff;
   grid-template-columns: 1fr;
 }
 
+.tweetPreviewControl {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--ce-radius-8);
+  box-sizing: border-box;
+  color: $text;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  max-width: 100%;
+  padding: 10px 12px;
+  width: 100%;
+}
+
+.tweetPreviewCount {
+  color: $muted;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.35;
+  min-width: 0;
+}
+
+.tweetPreviewButton {
+  appearance: none;
+  background: rgba(77, 255, 164, 0.12);
+  border: 1px solid rgba(77, 255, 164, 0.32);
+  border-radius: var(--ce-radius-pill);
+  color: $accent;
+  cursor: pointer;
+  flex: 0 0 auto;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.2;
+  padding: 8px 12px;
+  transition:
+    background 0.18s ease,
+    border-color 0.18s ease,
+    color 0.18s ease;
+}
+
+.tweetPreviewButton:hover {
+  background: rgba(77, 255, 164, 0.18);
+  border-color: rgba(77, 255, 164, 0.48);
+  color: #b7ffd9;
+}
+
+.tweetPreviewButton:focus-visible {
+  outline: 2px solid rgba(77, 255, 164, 0.5);
+  outline-offset: 2px;
+}
+
 .card {
   background: $card;
   border: 1px solid $card-border;
@@ -1379,6 +1432,10 @@ $text: #f4f7ff;
     margin-left: 0;
   }
 
+  .tweetPreviewControl {
+    margin-top: 2px;
+  }
+
   .debateMapLink,
   .externalLink {
     align-items: flex-start;
@@ -1442,5 +1499,14 @@ $text: #f4f7ff;
   .externalIconLink {
     height: 40px;
     width: 40px;
+  }
+
+  .tweetPreviewControl {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .tweetPreviewButton {
+    width: 100%;
   }
 }
