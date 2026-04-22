@@ -1,6 +1,6 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
-import SessionChipSelector from './SessionChipSelector.jsx';
+import SessionChipSelector from './SessionChipSelector';
 
 const buildOptions = (labels = []) => labels.map((label) => ({
   key: label,

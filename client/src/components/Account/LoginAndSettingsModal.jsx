@@ -42,7 +42,7 @@ import { Button, Card, CardHeader, CardBody, CardFooter, Modal } from "reactstra
 
 import UserPage from "components/UserPage/UserPage.jsx";
 import CETooltip from '../Shared/CETooltip';
-import SessionChipSelector from '../Shared/SessionChipSelector.jsx';
+import SessionChipSelector from '../Shared/SessionChipSelector';
 
 // Smart contract interactions and config
 import {

@@ -45,7 +45,7 @@ import AudioInput from '../../Shared/AudioInput/AudioInput.jsx';
 import CreateQuestionsAndSurveys from '../CreateQuestionsAndSurveys.jsx';
 import SBTSelector from '../../SBTs/SBTSelector.jsx';
 import DocumentLibraryPanel from '../../DocumentLibrary/DocumentLibraryPanel.jsx';
-import SessionChipSelector from '../../Shared/SessionChipSelector.jsx';
+import SessionChipSelector from '../../Shared/SessionChipSelector';
 
 import { seedGenPrompt } from '../../../prompts/seedGenPrompt.js';
 import {
