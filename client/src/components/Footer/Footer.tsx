@@ -5,7 +5,6 @@ import { connect } from 'react-redux';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faGithub } from "@fortawesome/free-brands-svg-icons";
 import { changeFocusedTab, toggleLoginModal } from '../../actions/sessionStateActions.js';
-import type { RootState } from '../../reducers/index.js';
 import { PUBLIC_REPO_URL } from '../../variables/publicRepoMetadata.js';
 import { buildPublicRoute } from '../../utilities/ui/publicUrl.js';
 
@@ -147,7 +146,14 @@ class Footer extends React.Component<FooterProps> {
   }
 }
 
-const mapStateToProps = (state: RootState) => ({
+Footer.propTypes = {
+  changeFocusedTab: PropTypes.func.isRequired,
+  toggleLoginModal: PropTypes.func.isRequired,
+  focusedTab: PropTypes.number,
+  loginModalToggled: PropTypes.bool,
+};
+
+const mapStateToProps = state => ({
   focusedTab: state.sessionState.focusedTab,
   loginModalToggled: state.sessionState.loginModalToggled,
 });
