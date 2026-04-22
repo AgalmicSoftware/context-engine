@@ -6,6 +6,14 @@ import {
 const LEGACY_CREATE_SBT_FORM_CACHE_KEY = 'createSbtFormCache';
 const SCOPED_CREATE_SBT_FORM_CACHE_KEY_PREFIX = 'dg:createSbtFormCache:';
 
+export const CREATE_SBT_FORM_CACHE_LEGACY_POLICY = Object.freeze({
+  legacyKey: LEGACY_CREATE_SBT_FORM_CACHE_KEY,
+  scopedKeyPrefix: SCOPED_CREATE_SBT_FORM_CACHE_KEY_PREFIX,
+  legacyWritesAllowed: false,
+  migration: 'read-migrate-clear',
+  removeAfter: 'one public release after scoped create-SBT draft writes are verified',
+});
+
 const getSessionStorage = (storageIn) => {
   if (storageIn !== undefined) return storageIn;
   try {
@@ -109,8 +117,6 @@ const migrateLegacyCreateSbtFormCache = ({ storage, sessionSlug = '' }) => {
   if (!storage) return;
   const scopedKey = getScopedCreateSbtFormCacheKey(sessionSlug);
   try {
-    // TODO: Remove legacy cache migration once all pre-session-scoped drafts have aged out
-    // and back-compat shims for the unscoped 'createSbtFormCache' key are removed.
     const legacyValue = storage.getItem(LEGACY_CREATE_SBT_FORM_CACHE_KEY);
     if (!legacyValue || storage.getItem(scopedKey)) return;
     const legacyPayload = readCreateSbtFormPayload({
