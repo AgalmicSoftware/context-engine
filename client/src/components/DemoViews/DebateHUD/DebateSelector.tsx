@@ -3,7 +3,12 @@ import React from 'react';
 import { debateData } from './debateData';
 import { darkTheme as T, soften, useTheme } from './debateHudTheme';
 
-const DebateSelector = ({ selectedDebateId, onSelect }) => {
+type DebateSelectorProps = {
+  selectedDebateId?: string | number;
+  onSelect?: (debateId: string | number) => void;
+};
+
+const DebateSelector = ({ selectedDebateId, onSelect }: DebateSelectorProps) => {
   useTheme();
 
   return (
@@ -15,7 +20,7 @@ const DebateSelector = ({ selectedDebateId, onSelect }) => {
       scrollbarWidth: "thin"}}>
       {debateData.map((debate) => {
         const selected = debate.id === selectedDebateId;
-        const category = debate.category || "Debate";
+        const category = ('category' in debate && debate.category) ? String(debate.category) : "Debate";
 
         return (
           <button
