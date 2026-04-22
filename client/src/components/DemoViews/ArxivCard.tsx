@@ -1,7 +1,7 @@
 import React from 'react';
 
 import styles from './CorpusViewer.module.scss';
-import { DebateMapSection, ExternalSourceLink } from './TweetCard.jsx';
+import { DebateMapSection, ExternalSourceLink } from './TweetCard';
 
 type ArxivEntry = {
   id?: string;
