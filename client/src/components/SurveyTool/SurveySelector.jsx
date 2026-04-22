@@ -40,7 +40,7 @@ import PileHologramAssistant from './PileHologramAssistant.jsx';
 import QuestionTagDropdown from './QuestionTagDropdown.jsx';
 import SingleQuestionResponse from './SingleQuestionResponse';
 import { JsonButtonRow, JsonIconButton, JsonPanel, JsonToggleButton } from '../Shared/Json/JsonControls';
-import SessionChipSelector from '../Shared/SessionChipSelector.jsx';
+import SessionChipSelector from '../Shared/SessionChipSelector';
 import { getQuestionTagDisplayList } from '../../utilities/survey/questionTags.js';
 
 // Crypto and contract utilities
