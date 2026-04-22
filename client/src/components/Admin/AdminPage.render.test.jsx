@@ -1056,7 +1056,7 @@ describe('AdminPage rendered interactions', () => {
       const metadataPanel = screen.getByText('Session metadata').closest('section');
       fireEvent.click(within(metadataPanel).getAllByRole('button')[0]);
 
-      const autoFeatureToggle = await screen.findByLabelText('Auto-feature SBTs whose metadata points to this session URL');
+      const autoFeatureToggle = await screen.findByLabelText('Auto-feature by session slug');
       expect(autoFeatureToggle).not.toBeChecked();
 
       fireEvent.click(autoFeatureToggle);
@@ -1068,11 +1068,31 @@ describe('AdminPage rendered interactions', () => {
         expect(mockUploadSessionMetadata).toHaveBeenCalledTimes(1);
       });
       expect(mockUploadSessionMetadata).toHaveBeenCalledWith(expect.objectContaining({
-        autoFeatureSBTsWithFeaturedSbtTags: true,
+        autoFeatureSBTsBySessionSlug: true,
       }), expect.any(Object));
+      expect(mockUploadSessionMetadata.mock.calls[0][0]).not.toHaveProperty('autoFeatureSBTsWithFeaturedSbtTags');
     } finally {
       currentBlockSpy.mockRestore();
     }
+  });
+
+  it('prefers canonical metadata auto-feature flag over the legacy alias in admin', async () => {
+    sessionEntries = [[
+      'edge',
+      buildSessionConfig({
+        autoFeatureSBTsBySessionSlug: false,
+        autoFeatureSBTsWithFeaturedSbtTags: true,
+      }),
+    ]];
+
+    await renderAdminPage();
+    await waitForResolvedWorkerUrl();
+
+    const metadataPanel = screen.getByText('Session metadata').closest('section');
+    fireEvent.click(within(metadataPanel).getAllByRole('button')[0]);
+
+    const autoFeatureToggle = await screen.findByLabelText('Auto-feature by session slug');
+    expect(autoFeatureToggle).not.toBeChecked();
   });
 
   it('rehydrates metadata draft when switching sessions even if previous session had unsaved edits', async () => {

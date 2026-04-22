@@ -93,7 +93,7 @@ frontend can rehydrate it easily. Suggested structure:
   "defaultSbtTags": "",
   "defaultFilterState": null,
   "defaultFeaturedSBTs": [],
-  "autoFeatureSBTsWithFeaturedSbtTags": false,
+  "autoFeatureSBTsBySessionSlug": false,
   "HIGHLIGHTED_QUESTION_IDS": [],
   "BLOCKED_QUESTION_IDS": [],
   "HIGHLIGHTED_SURVEY_IDS": [],
@@ -154,9 +154,10 @@ Notes:
 - `blockLimits.start` should be set for any real session.
   - Missing/invalid `blockLimits.start` is treated as a configuration error in current code; there is no implicit scan-from-zero fallback.
   - Do not hardcode chain-specific "start blocks" in code; keep them in session config / registry metadata.
-- `autoFeatureSBTsWithFeaturedSbtTags` keeps its legacy field name for compatibility, but its current meaning is:
+- `autoFeatureSBTsBySessionSlug` controls session-slug auto-feature behavior:
   when `true`, Groups featured strips auto-feature SBTs whose metadata authoritatively declares a matching `sessionSlug` for that session slug.
   Manual `defaultFeaturedSBTs` / `featured_SBTs_LIST` entries are still included, and in selected-session `list` scope the featured strip aggregates across the listed sessions while respecting each session's own toggle.
+- The legacy `autoFeatureSBTsWithFeaturedSbtTags` key is still supported as a deprecated read alias.
 - `/session/:slug` now also kicks off active-session light SBT discovery after the partial featured-metadata pass.
   This lets the embedded Groups strip and concrete session SBT views populate from the session page itself instead of depending on a prior `/sbts` visit.
 
@@ -175,7 +176,7 @@ Wizard UX notes:
 - `/session/new` now stores a provider per model (`ai.models.fast.provider`, `ai.models.thinking.provider`).
 - The wizard no longer writes AI/RPC/Arweave/faucet secrets into metadata.
 - The wizard no longer writes authoritative gate fields (`sponsored`, `sponsoredSbtAddress`) into metadata; resource gates are written on-chain during session registration.
-- In `/session/new`, `autoFeatureSBTsWithFeaturedSbtTags` means "auto-feature SBTs whose metadata authoritatively declares a matching `sessionSlug` for this session slug"; the legacy field name is preserved for compatibility, and the session can also contribute those SBTs to the shared featured strip when selected-session scope is `list`.
+- In `/session/new`, `autoFeatureSBTsBySessionSlug` means "auto-feature SBTs whose metadata authoritatively declares a matching `sessionSlug` for this session slug"; the session can also contribute those SBTs to the shared featured strip when selected-session scope is `list`.
 - In `/session/new`, new session drafts seed `defaultSbtTags` with `group, event, idea, demographic, location`.
 - In `/session/new`, new session drafts seed OpenAI `gpt-5` for both fast/thinking models and set `ai.reasoningEffort` to `low`.
 - Session metadata now uses `sessionName`/`sessionInfo`/`sessionInfoEncrypted`/`sessionHeaderImg` as canonical keys; legacy `org*` aliases are not consumed in `/session/new`.

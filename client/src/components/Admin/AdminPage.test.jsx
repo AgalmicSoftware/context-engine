@@ -159,17 +159,39 @@ describe('AdminPage', () => {
         blockLimits: { start: 12345 },
       },
     });
+    const legacyPayload = __adminPageTestUtils.buildEditableSessionMetadataPayload({
+      sessionConfig: {
+        slug: 'test-10',
+        blockLimits: { start: 12345 },
+        autoFeatureSBTsWithFeaturedSbtTags: false,
+      },
+    });
+    const precedencePayload = __adminPageTestUtils.buildEditableSessionMetadataPayload({
+      sessionConfig: {
+        slug: 'test-10',
+        blockLimits: { start: 12345 },
+        autoFeatureSBTsBySessionSlug: true,
+        autoFeatureSBTsWithFeaturedSbtTags: false,
+      },
+    });
     const overriddenPayload = __adminPageTestUtils.buildEditableSessionMetadataPayload({
       sessionConfig: {
         slug: 'test-10',
         blockLimits: { start: 12345 },
+        autoFeatureSBTsWithFeaturedSbtTags: false,
       },
-      autoFeatureSBTsWithFeaturedSbtTags: false,
+      autoFeatureSBTsBySessionSlug: true,
       hasAutoFeatureOverride: true,
     });
 
     expect(basePayload).not.toHaveProperty('autoFeatureSBTsWithFeaturedSbtTags');
-    expect(overriddenPayload.autoFeatureSBTsWithFeaturedSbtTags).toBe(false);
+    expect(basePayload).not.toHaveProperty('autoFeatureSBTsBySessionSlug');
+    expect(legacyPayload.autoFeatureSBTsBySessionSlug).toBe(false);
+    expect(legacyPayload).not.toHaveProperty('autoFeatureSBTsWithFeaturedSbtTags');
+    expect(precedencePayload.autoFeatureSBTsBySessionSlug).toBe(true);
+    expect(precedencePayload).not.toHaveProperty('autoFeatureSBTsWithFeaturedSbtTags');
+    expect(overriddenPayload.autoFeatureSBTsBySessionSlug).toBe(true);
+    expect(overriddenPayload).not.toHaveProperty('autoFeatureSBTsWithFeaturedSbtTags');
   });
 
   it('builds admin metadata drafts from existing config values', () => {
