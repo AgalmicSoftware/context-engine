@@ -2,7 +2,7 @@ import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
-import InsiderCard from './InsiderCard.jsx';
+import InsiderCard from './InsiderCard';
 
 describe('InsiderCard', () => {
   it('renders tag pills as buttons and forwards tag clicks', () => {

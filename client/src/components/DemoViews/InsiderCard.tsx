@@ -3,7 +3,27 @@ import React, { useState } from 'react';
 import styles from './CorpusViewer.module.scss';
 import { DebateMapSection, ExternalSourceLink } from './TweetCard.jsx';
 
-const INSIDER_ROLE_BY_ID = {
+type InsiderEntry = {
+  id?: string;
+  author?: string;
+  title?: string;
+  role_company?: string;
+  date?: string;
+  interviewer?: string;
+  top_quotes?: string[];
+  tags?: string[];
+  summary?: string;
+  url?: string;
+  debate_map_issues?: unknown[];
+};
+
+export type InsiderCardProps = {
+  entry?: InsiderEntry | null;
+  onTagClick?: (tag: string) => void;
+  onAtlasIssueOpen?: (...args: unknown[]) => void;
+};
+
+const INSIDER_ROLE_BY_ID: Record<string, string> = {
   amodei_dario_dwarkesh_2023_scaling: 'CEO, Anthropic',
   amodei_dario_dwarkesh_2026_scaling: 'CEO, Anthropic',
   hassabis_demis_dwarkesh_2024_superhuman: 'CEO, Google DeepMind',
@@ -26,7 +46,7 @@ const INSIDER_ROLE_BY_ID = {
   karpathy_andrej_dwarkesh_2025_agi: 'AI researcher and educator',
 };
 
-const formatInterviewDate = (value) => {
+const formatInterviewDate = (value: unknown) => {
   if (!value) return null;
   const rawValue = String(value).trim();
   const plainDateMatch = rawValue.match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -53,25 +73,27 @@ const buildInitials = (name = '') => {
   return parts.slice(0, 2).map((part) => part.charAt(0).toUpperCase()).join('');
 };
 
-const buildRoleCompany = (entry = {}) => (
-  entry.role_company || INSIDER_ROLE_BY_ID[entry.id] || null
-);
+const buildRoleCompany = (entry: InsiderEntry = {}) => {
+  const mappedRole = entry.id ? INSIDER_ROLE_BY_ID[entry.id] : '';
+  return entry.role_company || mappedRole || null;
+};
 
-const buildLeadQuote = (entry = {}) => {
+const buildLeadQuote = (entry: InsiderEntry = {}) => {
   const quotes = Array.isArray(entry.top_quotes) ? entry.top_quotes : [];
   return quotes[0] || '';
 };
 
 const INSIDER_SUMMARY_PREVIEW_LENGTH = 300;
 
-const InsiderCard = ({ entry, onTagClick, onAtlasIssueOpen }) => {
+const InsiderCard = ({ entry = {}, onTagClick, onAtlasIssueOpen }: InsiderCardProps) => {
+  const resolvedEntry = entry || {};
   const [expanded, setExpanded] = useState(false);
-  const intervieweeName = entry.author || entry.title || 'Unknown interviewee';
-  const interviewDate = formatInterviewDate(entry.date);
-  const roleCompany = buildRoleCompany(entry);
-  const leadQuote = buildLeadQuote(entry);
-  const tags = Array.isArray(entry.tags) ? entry.tags : [];
-  const summaryText = entry.summary || 'No summary available for this interview yet.';
+  const intervieweeName = resolvedEntry.author || resolvedEntry.title || 'Unknown interviewee';
+  const interviewDate = formatInterviewDate(resolvedEntry.date);
+  const roleCompany = buildRoleCompany(resolvedEntry);
+  const leadQuote = buildLeadQuote(resolvedEntry);
+  const tags = Array.isArray(resolvedEntry.tags) ? resolvedEntry.tags : [];
+  const summaryText = resolvedEntry.summary || 'No summary available for this interview yet.';
   const shouldClampSummary = summaryText.length > INSIDER_SUMMARY_PREVIEW_LENGTH;
   const visibleSummary = shouldClampSummary && !expanded
     ? `${summaryText.slice(0, INSIDER_SUMMARY_PREVIEW_LENGTH)}…`
@@ -92,9 +114,9 @@ const InsiderCard = ({ entry, onTagClick, onAtlasIssueOpen }) => {
               {roleCompany}
             </div>
           ) : null}
-          {entry.interviewer ? (
+          {resolvedEntry.interviewer ? (
             <div className={styles.insiderInterviewer}>
-              with {entry.interviewer}
+              with {resolvedEntry.interviewer}
             </div>
           ) : null}
         </div>
@@ -142,12 +164,12 @@ const InsiderCard = ({ entry, onTagClick, onAtlasIssueOpen }) => {
             Interview date: {interviewDate}
           </div>
         ) : null}
-        {(entry?.url || (Array.isArray(entry?.debate_map_issues) && entry.debate_map_issues.length > 0)) ? (
+        {(resolvedEntry?.url || (Array.isArray(resolvedEntry?.debate_map_issues) && resolvedEntry.debate_map_issues.length > 0)) ? (
           <div className={styles.cardFooter}>
-            <DebateMapSection entry={entry} onAtlasIssueOpen={onAtlasIssueOpen} />
-            {entry?.url ? (
+            <DebateMapSection entry={resolvedEntry} onAtlasIssueOpen={onAtlasIssueOpen} />
+            {resolvedEntry?.url ? (
               <div className={styles.cardFooterLinks}>
-                <ExternalSourceLink entry={entry} fallbackLabel="View interview" />
+                <ExternalSourceLink entry={resolvedEntry} fallbackLabel="View interview" />
               </div>
             ) : null}
           </div>
