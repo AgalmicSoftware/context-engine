@@ -14,6 +14,80 @@ import debateMapData from '../../variables/demo/debate_map_demo_data.json';
 import { readPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
 import styles from './CorpusViewer.module.scss';
 
+type AtlasNode = {
+  id: string;
+  name: string;
+  children?: AtlasNode[];
+};
+
+type AtlasIssue = {
+  id: string;
+  href: string;
+  label: string;
+  pathLabel: string;
+};
+
+type LegacyIssueLink = {
+  atlasNodeId?: string;
+  nodeId?: string;
+  id?: string;
+  label?: string;
+};
+
+type DebateIssueRef = string | {
+  atlasNodeId?: string;
+  nodeId?: string;
+  id?: string;
+  label?: string;
+  name?: string;
+};
+
+export type CorpusEntry = {
+  id?: string;
+  author?: string;
+  author_name?: string;
+  display_name?: string;
+  created_at?: string;
+  text?: string;
+  summary?: string;
+  sentiment?: string;
+  tags?: string[];
+  url?: string;
+  source_label?: string;
+  engagement?: {
+    likes?: number | string | null;
+    reposts?: number | string | null;
+    views?: number | string | null;
+  };
+  debate_map_issues?: unknown[];
+  debateMapIssues?: unknown[];
+  debate_nodes?: unknown[];
+  [key: string]: unknown;
+};
+
+type AtlasIssueOpenHandler = (issueId: string) => void;
+
+export type DebateMapSectionProps = {
+  entry?: CorpusEntry | null;
+  onAtlasIssueOpen?: AtlasIssueOpenHandler;
+  inline?: boolean;
+  showAtlasIcon?: boolean;
+};
+
+export type ExternalSourceLinkProps = {
+  entry?: Pick<CorpusEntry, 'url' | 'source_label'> | null;
+  fallbackLabel?: string;
+};
+
+export type TweetCardProps = {
+  entry?: CorpusEntry | null;
+  onTagClick?: (tag: string) => void;
+  onAtlasIssueOpen?: AtlasIssueOpenHandler;
+};
+
+const debateMapNodes = debateMapData as AtlasNode[];
+const legacyDebateMapLinks = corpusDebateMapLinks as Record<string, LegacyIssueLink[]>;
+
 const buildPublicRoute = (pathname = '') => {
   const normalizedPath = String(pathname || '').trim();
   if (!normalizedPath) return readPublicUrlBasePath() || '/';
@@ -21,7 +95,11 @@ const buildPublicRoute = (pathname = '') => {
   return `${basePath}${normalizedPath}` || normalizedPath;
 };
 
-const buildAtlasIssueIndex = (nodes, parentPath = [], acc = {}) => {
+const buildAtlasIssueIndex = (
+  nodes: AtlasNode[] | null | undefined,
+  parentPath: string[] = [],
+  acc: Record<string, Omit<AtlasIssue, 'href'>> = {}
+) => {
   (Array.isArray(nodes) ? nodes : []).forEach((node) => {
     const nextPath = [...parentPath, node.name];
     acc[node.id] = {
@@ -34,11 +112,13 @@ const buildAtlasIssueIndex = (nodes, parentPath = [], acc = {}) => {
   return acc;
 };
 
-const ATLAS_ISSUE_INDEX = buildAtlasIssueIndex(debateMapData);
+const ATLAS_ISSUE_INDEX = buildAtlasIssueIndex(debateMapNodes);
 
-const formatDate = (value) => {
+const formatDate = (value: unknown) => {
   if (!value) return null;
-  const date = new Date(value);
+  const date = value instanceof Date
+    ? value
+    : new Date(typeof value === 'number' ? value : String(value));
   if (Number.isNaN(date.getTime())) return null;
   return date.toLocaleDateString(undefined, {
     day: 'numeric',
@@ -47,18 +127,20 @@ const formatDate = (value) => {
   });
 };
 
-const resolveDebateMapIssues = (entry = {}) => {
+const resolveDebateMapIssues = (entry: CorpusEntry | null | undefined = {}) => {
   const rawIssues = Array.isArray(entry?.debate_map_issues)
     ? entry.debate_map_issues
     : (Array.isArray(entry?.debateMapIssues)
       ? entry.debateMapIssues
       : (Array.isArray(entry?.debate_nodes) ? entry.debate_nodes : []));
 
-  const normalizedIssues = [];
+  const normalizedIssues: AtlasIssue[] = [];
   const seenIssueIds = new Set();
 
-  const pushIssue = (atlasNodeId, labelOverride = '') => {
-    const atlasIssue = ATLAS_ISSUE_INDEX[atlasNodeId];
+  const pushIssue = (atlasNodeId: unknown, labelOverride = '') => {
+    const nodeId = String(atlasNodeId || '').trim();
+    if (!nodeId) return;
+    const atlasIssue = ATLAS_ISSUE_INDEX[nodeId];
     if (!atlasIssue || seenIssueIds.has(atlasIssue.id)) return;
 
     seenIssueIds.add(atlasIssue.id);
@@ -77,8 +159,8 @@ const resolveDebateMapIssues = (entry = {}) => {
         return;
       }
 
-      const mappedLegacyIssues = Array.isArray(corpusDebateMapLinks?.[issueRef])
-        ? corpusDebateMapLinks[issueRef]
+      const mappedLegacyIssues = Array.isArray(legacyDebateMapLinks?.[issueRef])
+        ? legacyDebateMapLinks[issueRef]
         : [];
 
       mappedLegacyIssues.forEach((mappedIssue) => {
@@ -88,23 +170,24 @@ const resolveDebateMapIssues = (entry = {}) => {
     }
 
     if (!issueRef || typeof issueRef !== 'object') return;
+    const issueObject = issueRef as Partial<Record<'atlasNodeId' | 'nodeId' | 'id' | 'label' | 'name', unknown>>;
 
     pushIssue(
-      issueRef.atlasNodeId || issueRef.nodeId || issueRef.id,
-      issueRef.label || issueRef.name || ''
+      issueObject.atlasNodeId || issueObject.nodeId || issueObject.id,
+      String(issueObject.label || issueObject.name || '')
     );
   });
 
   return normalizedIssues;
 };
 
-const normalizeHandle = (author = '') => {
+const normalizeHandle = (author: unknown = '') => {
   const rawAuthor = String(author || '').trim();
   if (!rawAuthor) return '';
   return rawAuthor.startsWith('@') ? rawAuthor : `@${rawAuthor}`;
 };
 
-const buildDisplayName = (entry = {}) => {
+const buildDisplayName = (entry: CorpusEntry = {}) => {
   const explicitName = String(entry.author_name || entry.display_name || '').trim();
   if (explicitName) return explicitName;
 
@@ -114,19 +197,19 @@ const buildDisplayName = (entry = {}) => {
   return normalizedHandle.replace(/[_.]+/g, ' ');
 };
 
-const getAvatarLetter = (handle = '') => {
+const getAvatarLetter = (handle: unknown = '') => {
   const normalizedHandle = normalizeHandle(handle).replace(/^@/, '').trim();
   return (normalizedHandle.charAt(0) || '?').toUpperCase();
 };
 
-const formatCount = (value) => Number(value || 0).toLocaleString();
+const formatCount = (value: unknown) => Number(value || 0).toLocaleString();
 
 export const DebateMapSection = ({
   entry,
   onAtlasIssueOpen,
   inline = false,
   showAtlasIcon = false,
-}) => {
+}: DebateMapSectionProps) => {
   const linkedIssues = resolveDebateMapIssues(entry);
 
   if (linkedIssues.length === 0) return null;
@@ -181,7 +264,7 @@ export const DebateMapSection = ({
   );
 };
 
-export const ExternalSourceLink = ({ entry, fallbackLabel = 'View source' }) => {
+export const ExternalSourceLink = ({ entry, fallbackLabel = 'View source' }: ExternalSourceLinkProps) => {
   if (!entry?.url) return null;
 
   return (
@@ -197,13 +280,14 @@ export const ExternalSourceLink = ({ entry, fallbackLabel = 'View source' }) => 
   );
 };
 
-const TweetCard = ({ entry, onTagClick, onAtlasIssueOpen }) => {
+const TweetCard = ({ entry = {}, onTagClick, onAtlasIssueOpen }: TweetCardProps) => {
+  const resolvedEntry = entry || {};
   const [expanded, setExpanded] = useState(false);
-  const summaryText = entry.text || entry.summary || '';
+  const summaryText = resolvedEntry.text || resolvedEntry.summary || '';
   const shouldTruncate = summaryText.length > 280 && !expanded;
   const displayText = shouldTruncate ? `${summaryText.slice(0, 280)}…` : summaryText;
-  const createdAt = formatDate(entry.created_at);
-  const normalizedSentiment = String(entry.sentiment || '').toLowerCase();
+  const createdAt = formatDate(resolvedEntry.created_at);
+  const normalizedSentiment = String(resolvedEntry.sentiment || '').toLowerCase();
   const sentimentClassName = normalizedSentiment.includes('optim')
     ? styles.sentimentOptimistic
     : (normalizedSentiment.includes('skept') || normalizedSentiment.includes('caut'))
@@ -213,10 +297,10 @@ const TweetCard = ({ entry, onTagClick, onAtlasIssueOpen }) => {
         || normalizedSentiment.includes('doom'))
         ? styles.sentimentAlarmist
         : styles.sentimentNeutral;
-  const tags = Array.isArray(entry.tags) ? entry.tags : [];
-  const handle = normalizeHandle(entry.author);
-  const authorName = buildDisplayName(entry);
-  const showMetadataRow = tags.length > 0 || entry.sentiment;
+  const tags = Array.isArray(resolvedEntry.tags) ? resolvedEntry.tags : [];
+  const handle = normalizeHandle(resolvedEntry.author);
+  const authorName = buildDisplayName(resolvedEntry);
+  const showMetadataRow = tags.length > 0 || resolvedEntry.sentiment;
 
   return (
     <article className={`${styles.card} ${styles.tweetCard}`}>
@@ -266,9 +350,9 @@ const TweetCard = ({ entry, onTagClick, onAtlasIssueOpen }) => {
               {tag}
             </button>
           ))}
-          {entry.sentiment ? (
+          {resolvedEntry.sentiment ? (
             <span className={`${styles.sentimentBadge} ${sentimentClassName}`}>
-              {entry.sentiment}
+              {resolvedEntry.sentiment}
             </span>
           ) : null}
         </div>
@@ -278,25 +362,25 @@ const TweetCard = ({ entry, onTagClick, onAtlasIssueOpen }) => {
         <div className={styles.engagementRow}>
           <span className={styles.tweetEngagementIcon}>
             <FontAwesomeIcon icon={faHeart} />
-            <span>{formatCount(entry.engagement?.likes)}</span>
+            <span>{formatCount(resolvedEntry.engagement?.likes)}</span>
           </span>
           <span className={styles.tweetEngagementIcon}>
             <FontAwesomeIcon icon={faRetweet} />
-            <span>{formatCount(entry.engagement?.reposts)}</span>
+            <span>{formatCount(resolvedEntry.engagement?.reposts)}</span>
           </span>
           <span className={styles.tweetEngagementIcon}>
             <FontAwesomeIcon icon={faEye} />
-            <span>{formatCount(entry.engagement?.views)}</span>
+            <span>{formatCount(resolvedEntry.engagement?.views)}</span>
           </span>
         </div>
         <div className={`${styles.cardFooterLinks} ${styles.tweetActionRow}`}>
           <DebateMapSection
-            entry={entry}
+            entry={resolvedEntry}
             onAtlasIssueOpen={onAtlasIssueOpen}
             inline={true}
             showAtlasIcon={true}
           />
-          <ExternalSourceLink entry={entry} fallbackLabel="View post" />
+          <ExternalSourceLink entry={resolvedEntry} fallbackLabel="View post" />
         </div>
       </div>
     </article>
