@@ -6,7 +6,7 @@ jest.mock('../../../utilities/ui/jsonFunctions', () => ({
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 
-import JsonDisplay from './JsonDisplay.jsx';
+import JsonDisplay from './JsonDisplay';
 import {
   copyJsonToClipboard,
   formatJsonForDisplay,

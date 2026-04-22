@@ -37,7 +37,7 @@ import {
   getSessionRegistryChains,
 } from '../../variables/chains.js';
 import { JsonButtonRow, JsonPanel, JsonToggleButton } from '../Shared/Json/JsonControls';
-import JsonDisplay from '../Shared/Json/JsonDisplay.jsx';
+import JsonDisplay from '../Shared/Json/JsonDisplay';
 import CETooltip from '../Shared/CETooltip';
 import CEDateTimeInput from '../Shared/CEDateTimeInput.jsx';
 import GateMultiSelectLock from '../Gates/GateMultiSelectLock';
