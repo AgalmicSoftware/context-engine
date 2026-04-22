@@ -255,4 +255,64 @@ describe('CreateQuestionsAndSurveys lock UI', () => {
 
     expect(screen.getByTestId('ce-create-doc-url-error')).toHaveTextContent('Document URLs must use');
   });
+
+  it('shows missing survey title validation inline instead of calling window.alert', async () => {
+    const alertSpy = jest.spyOn(window, 'alert').mockImplementation(() => {});
+    const instance = makeInstance({
+      loginComplete: true,
+      toggleLoginModal: jest.fn(),
+    });
+    instance.state = {
+      ...instance.state,
+      isStandaloneQuestion: false,
+      title: '   ',
+      questions: [{ uiKey: 'q1', id: 'q1', type: 'freeform', prompt: 'Question 1', tags: [] }],
+      formValidationError: '',
+    };
+
+    await instance.createSurvey();
+
+    expect(alertSpy).not.toHaveBeenCalled();
+    expect(instance.state.formValidationError).toBe('Please enter a survey title.');
+
+    alertSpy.mockRestore();
+  });
+
+  it('shows blank question prompt validation inline instead of calling window.alert', async () => {
+    const alertSpy = jest.spyOn(window, 'alert').mockImplementation(() => {});
+    const instance = makeInstance({
+      loginComplete: true,
+      toggleLoginModal: jest.fn(),
+    });
+    instance.state = {
+      ...instance.state,
+      isStandaloneQuestion: false,
+      title: 'Survey title',
+      questions: [{ uiKey: 'q1', id: 'q1', type: 'freeform', prompt: '   ', tags: [] }],
+      formValidationError: '',
+    };
+
+    await instance.createSurvey();
+
+    expect(alertSpy).not.toHaveBeenCalled();
+    expect(instance.state.formValidationError).toBe('Question 1 prompt cannot be blank.');
+
+    alertSpy.mockRestore();
+  });
+
+  it('renders form validation feedback with a stable test id', () => {
+    const instance = makeInstance();
+    instance.state = {
+      ...instance.state,
+      showAutoTool: false,
+      isStandaloneQuestion: false,
+      title: '',
+      formValidationError: 'Please enter a survey title.',
+      questions: [{ uiKey: 'q1', id: 'q1', type: 'freeform', prompt: 'Question 1', tags: [] }],
+    };
+
+    render(instance.render());
+
+    expect(screen.getByTestId('ce-create-validation-error')).toHaveTextContent('Please enter a survey title.');
+  });
 });
