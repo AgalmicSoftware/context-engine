@@ -1,10 +1,35 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import styles from './CheckboxMultiSelect.module.scss';
 
-const toOptionKey = (option) => (
+type CheckboxOption = {
+  value?: unknown;
+  label?: React.ReactNode;
+};
+
+type CheckboxMultiSelectProps = {
+  inputId?: string;
+  options?: CheckboxOption[] | null;
+  value?: CheckboxOption[] | null;
+  onChange?: (nextValue: CheckboxOption[]) => void;
+  placeholder?: string;
+  isClearable?: boolean;
+  className?: string;
+  ariaLabel?: string;
+  disabled?: boolean;
+};
+
+const focusElement = (node: Element | null) => {
+  if (node instanceof HTMLElement) node.focus();
+};
+
+const toOptionKey = (option?: CheckboxOption | null) => (
   option && (option.value !== undefined && option.value !== null)
     ? String(option.value)
     : ''
+);
+
+const getOptionLabel = (option: CheckboxOption) => (
+  option.label ?? (option.value == null ? '' : String(option.value))
 );
 
 const CheckboxMultiSelect = ({
@@ -17,13 +42,13 @@ const CheckboxMultiSelect = ({
   className = '',
   ariaLabel,
   disabled = false,
-}) => {
+}: CheckboxMultiSelectProps) => {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [focusedIndex, setFocusedIndex] = useState(-1);
-  const wrapperRef = useRef(null);
-  const searchRef = useRef(null);
-  const listRef = useRef(null);
+  const wrapperRef = useRef<HTMLDivElement | null>(null);
+  const searchRef = useRef<HTMLInputElement | null>(null);
+  const listRef = useRef<HTMLDivElement | null>(null);
 
   const normalizedValue = useMemo(() => (
     Array.isArray(value) ? value : []
@@ -55,12 +80,12 @@ const CheckboxMultiSelect = ({
 
   useEffect(() => {
     if (!open) return undefined;
-    const handlePointerDown = (event) => {
-      if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
+    const handlePointerDown = (event: MouseEvent) => {
+      if (wrapperRef.current && event.target instanceof Node && !wrapperRef.current.contains(event.target)) {
         setOpen(false);
       }
     };
-    const handleKeyDown = (event) => {
+    const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         setOpen(false);
       }
@@ -82,7 +107,7 @@ const CheckboxMultiSelect = ({
     setFocusedIndex(-1);
   }, [open]);
 
-  const toggleOption = useCallback((option) => {
+  const toggleOption = useCallback((option: CheckboxOption) => {
     if (disabled || !onChange) return;
     const key = toOptionKey(option);
     if (!key) return;
@@ -95,7 +120,7 @@ const CheckboxMultiSelect = ({
     }
   }, [disabled, onChange, normalizedValue, selectedKeys]);
 
-  const handleClearAll = useCallback((event) => {
+  const handleClearAll = useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
     if (event) {
       event.stopPropagation();
       event.preventDefault();
@@ -109,7 +134,7 @@ const CheckboxMultiSelect = ({
     setOpen((prev) => !prev);
   }, [disabled]);
 
-  const handleSearchKeyDown = useCallback((event) => {
+  const handleSearchKeyDown = useCallback((event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'ArrowDown') {
       event.preventDefault();
       if (filteredOptions.length > 0) {
@@ -117,13 +142,13 @@ const CheckboxMultiSelect = ({
         const list = listRef.current;
         if (list) {
           const firstRow = list.querySelector('[data-cms-row-index="0"]');
-          if (firstRow && typeof firstRow.focus === 'function') firstRow.focus();
+          focusElement(firstRow);
         }
       }
     }
   }, [filteredOptions.length]);
 
-  const handleRowKeyDown = useCallback((event, option, index) => {
+  const handleRowKeyDown = useCallback((event: React.KeyboardEvent<HTMLLabelElement>, option: CheckboxOption, index: number) => {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
       toggleOption(option);
@@ -136,7 +161,7 @@ const CheckboxMultiSelect = ({
       const list = listRef.current;
       if (list) {
         const nextRow = list.querySelector(`[data-cms-row-index="${nextIndex}"]`);
-        if (nextRow && typeof nextRow.focus === 'function') nextRow.focus();
+        focusElement(nextRow);
       }
       return;
     }
@@ -152,7 +177,7 @@ const CheckboxMultiSelect = ({
       const list = listRef.current;
       if (list) {
         const prevRow = list.querySelector(`[data-cms-row-index="${prevIndex}"]`);
-        if (prevRow && typeof prevRow.focus === 'function') prevRow.focus();
+        focusElement(prevRow);
       }
     }
   }, [filteredOptions.length, toggleOption]);
@@ -233,7 +258,7 @@ const CheckboxMultiSelect = ({
                       onChange={() => toggleOption(option)}
                       tabIndex={-1}
                     />
-                    <span className={styles.rowLabel}>{option?.label ?? option?.value}</span>
+                    <span className={styles.rowLabel}>{getOptionLabel(option)}</span>
                   </label>
                 );
               })
