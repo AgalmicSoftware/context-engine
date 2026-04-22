@@ -35,7 +35,7 @@ const mockAppDependencies = () => {
   }));
 
   jest.doMock('@rainbow-me/rainbowkit/styles.css', () => ({}));
-  jest.doMock('./Shared/CEToaster.jsx', () => ({
+  jest.doMock('./Shared/CEToaster', () => ({
     __esModule: true,
     default: (props) => {
       mockToaster(props);

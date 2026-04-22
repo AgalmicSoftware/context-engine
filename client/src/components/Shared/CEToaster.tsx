@@ -1,7 +1,24 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { subscribeToToasts } from '../../utilities/ui/toastBus.js';
 
-const POSITION_STYLES = Object.freeze({
+type ToastPosition = 'bottom-right';
+
+type ToastPayload = {
+  id: string;
+  message: string;
+  kind?: string;
+  duration: number;
+  icon?: React.ReactNode;
+};
+
+type CEToasterProps = {
+  position?: ToastPosition;
+  toastOptions?: {
+    style?: React.CSSProperties;
+  };
+};
+
+const POSITION_STYLES: Record<ToastPosition, React.CSSProperties> = Object.freeze({
   'bottom-right': {
     bottom: 16,
     right: 16,
@@ -9,21 +26,21 @@ const POSITION_STYLES = Object.freeze({
   },
 });
 
-const KIND_ACCENTS = Object.freeze({
+const KIND_ACCENTS: Record<string, string> = Object.freeze({
   success: '#2ecf98',
   error: '#ff7b7b',
   warn: '#ffbe5c',
   info: '#6ea8ff',
 });
 
-const KIND_ICONS = Object.freeze({
+const KIND_ICONS: Record<string, React.ReactNode> = Object.freeze({
   success: 'OK',
   error: '!',
   warn: '!',
   info: 'i',
 });
 
-const buildViewportStyle = (position) => ({
+const buildViewportStyle = (position: ToastPosition): React.CSSProperties => ({
   position: 'fixed',
   zIndex: 2147483647,
   display: 'flex',
@@ -34,7 +51,10 @@ const buildViewportStyle = (position) => ({
   ...(POSITION_STYLES[position] || POSITION_STYLES['bottom-right']),
 });
 
-const buildToastStyle = (kind, baseStyle = {}) => ({
+const buildToastStyle = (
+  kind: string,
+  baseStyle: React.CSSProperties = {}
+): React.CSSProperties => ({
   pointerEvents: 'auto',
   borderRadius: 12,
   padding: '12px 14px',
@@ -45,7 +65,7 @@ const buildToastStyle = (kind, baseStyle = {}) => ({
   ...baseStyle,
 });
 
-const closeButtonStyle = {
+const closeButtonStyle: React.CSSProperties = {
   appearance: 'none',
   border: 0,
   background: 'transparent',
@@ -58,32 +78,32 @@ const closeButtonStyle = {
   padding: 0,
 };
 
-const DEFAULT_TOAST_STYLE = Object.freeze({});
+const DEFAULT_TOAST_STYLE: React.CSSProperties = Object.freeze({});
 
 const CEToaster = ({
   position = 'bottom-right',
   toastOptions = {},
-}) => {
-  const [toasts, setToasts] = useState([]);
-  const timersRef = useRef(new Map());
+}: CEToasterProps) => {
+  const [toasts, setToasts] = useState<ToastPayload[]>([]);
+  const timersRef = useRef(new Map<string, ReturnType<typeof setTimeout>>());
   const viewportStyle = useMemo(() => buildViewportStyle(position), [position]);
   const baseToastStyle = toastOptions?.style || DEFAULT_TOAST_STYLE;
 
   useEffect(() => {
     const timers = timersRef.current;
-    const clearToastTimer = (id) => {
+    const clearToastTimer = (id: string) => {
       const timer = timers.get(id);
       if (!timer) return;
       clearTimeout(timer);
       timers.delete(id);
     };
 
-    const dismissToast = (id) => {
+    const dismissToast = (id: string) => {
       clearToastTimer(id);
       setToasts((current) => current.filter((toast) => toast.id !== id));
     };
 
-    const unsubscribe = subscribeToToasts((payload) => {
+    const unsubscribe = subscribeToToasts((payload: ToastPayload) => {
       setToasts((current) => [...current, payload]);
       if (payload.duration > 0) {
         const timer = setTimeout(() => dismissToast(payload.id), payload.duration);
