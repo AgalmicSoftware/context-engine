@@ -1,6 +1,6 @@
 import React from 'react';
 import { act, fireEvent, render, screen } from '@testing-library/react';
-import CEToaster from './CEToaster.jsx';
+import CEToaster from './CEToaster';
 import { showToast } from '../../utilities/ui/toastBus.js';
 
 describe('CEToaster', () => {
