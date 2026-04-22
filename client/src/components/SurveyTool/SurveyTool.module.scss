@@ -4379,6 +4379,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   height: 60px;
   border-radius: 50%;
   color: var(--ce-color-white);
+  text-decoration: none;
   background:
     radial-gradient(circle at 30% 28%, rgba(255, 255, 255, 0.26), rgba(255, 255, 255, 0.03) 48%),
     linear-gradient(135deg, #59d77d 0%, #39b963 100%);
@@ -4386,6 +4387,17 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     0 14px 30px rgba(6, 44, 18, 0.28),
     0 0 0 1px rgba(255, 255, 255, 0.18);
   animation: pileSubmitSuccessPop 220ms ease-out;
+
+  &:hover,
+  &:focus {
+    color: var(--ce-color-white);
+    text-decoration: none;
+  }
+
+  &:focus-visible {
+    outline: 2px solid rgba(255, 255, 255, 0.86);
+    outline-offset: 3px;
+  }
 }
 
 .pileSubmitSuccessIcon {
