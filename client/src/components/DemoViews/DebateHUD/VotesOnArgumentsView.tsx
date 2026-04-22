@@ -3,14 +3,67 @@ import React, { useRef, useState } from 'react';
 import { audienceRoster, audienceVotes, debateData } from '../../../variables/demo/debateData.js';
 import { darkTheme as T, soften, useTheme } from './debateHudTheme';
 
-const CastYourVote = ({ debate, userVotes, setUserVotes }) => {
+type VoteSide = 'A' | 'B';
+
+type DebateFigure = {
+  name: string;
+  voice: string;
+};
+
+type DebateSide = {
+  label: string;
+  color: string;
+  figure: DebateFigure;
+};
+
+type CompassPoint = {
+  name: string;
+  x: number;
+  y: number;
+};
+
+type Debate = {
+  id: number;
+  title: string;
+  sideA: DebateSide;
+  sideB: DebateSide;
+  compass?: {
+    points?: CompassPoint[];
+  };
+};
+
+type AudienceMember = {
+  name: string;
+  icon: string;
+  votes: number[];
+};
+
+type AudienceTally = {
+  a: number;
+  b: number;
+  total: number;
+};
+
+type UserVotes = Record<number, VoteSide>;
+
+type CastYourVoteProps = {
+  debate: Debate;
+  userVotes: UserVotes;
+  setUserVotes: React.Dispatch<React.SetStateAction<UserVotes>>;
+};
+
+type VotesOnArgumentsViewProps = {
+  selectedDebateId?: number;
+};
+
+const CastYourVote = ({ debate, userVotes, setUserVotes }: CastYourVoteProps) => {
   useTheme();
 
   const userVote = userVotes[debate.id];
-  const tally = audienceVotes[debate.id - 1];
+  const tally = audienceVotes[debate.id - 1] as AudienceTally;
 
-  const castVote = (side) => {
-    setUserVotes(prev => ({ ...prev, [debate.id]: side }));
+  const castVote = (side: VoteSide) => {
+    setUserVotes((prev) => ({ ...prev, [debate.id]: side }));
   };
 
   const compassOffsetRef = useRef({
@@ -30,7 +83,7 @@ const CastYourVote = ({ debate, userVotes, setUserVotes }) => {
   const userCompassPos = userVote ? (() => {
     // Use side debater positions directly instead of name-matching audienceRoster
     const sideLabel = userVote === "A" ? debate.sideA?.label : debate.sideB?.label;
-    const sidePoint = debate.compass?.points?.find(p => p.name === sideLabel);
+    const sidePoint = debate.compass?.points?.find((p) => p.name === sideLabel);
     if (!sidePoint) return { x: 0.5 + compassOffsetRef.current.x, y: 0.5 + compassOffsetRef.current.y };
     return {
       x: Math.max(0.05, Math.min(0.95, sidePoint.x + compassOffsetRef.current.x)),
@@ -59,9 +112,10 @@ const CastYourVote = ({ debate, userVotes, setUserVotes }) => {
         </p>
 
         <div style={{ display: "flex", gap: 16, justifyContent: "center", marginBottom: 24 }}>
-          {[
+          {([
             { side: "A", data: debate.sideA },
-            { side: "B", data: debate.sideB }].map(({ side, data }) => {
+            { side: "B", data: debate.sideB },
+          ] as Array<{ side: VoteSide; data: DebateSide }>).map(({ side, data }) => {
             const selected = userVote === side;
             return (
               <button key={side} onClick={() => castVote(side)} style={{
@@ -112,9 +166,9 @@ const CastYourVote = ({ debate, userVotes, setUserVotes }) => {
             <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 6 }}>Notable voices on your side:</div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
               {audienceRoster
-                .filter(m => m.votes[debate.id - 1] === (userVote === "A" ? 1 : 2))
+                .filter((m: AudienceMember) => m.votes[debate.id - 1] === (userVote === "A" ? 1 : 2))
                 .slice(0, 8)
-                .map(m => (
+                .map((m: AudienceMember) => (
                   <span key={m.name} style={{
                     padding: "3px 8px", borderRadius: 10, fontSize: 11,
                     background: soften(userVote === "A" ? debate.sideA.color : debate.sideB.color, 0.1),
@@ -134,7 +188,7 @@ const CastYourVote = ({ debate, userVotes, setUserVotes }) => {
                 <div style={{ position: "absolute", bottom: 0, right: 0, width: "50%", height: "50%", background: soften("#ff9800", 0.08) }} />
                 <div style={{ position: "absolute", top: "50%", left: 0, right: 0, height: 1, background: T.border }} />
                 <div style={{ position: "absolute", left: "50%", top: 0, bottom: 0, width: 1, background: T.border }} />
-                {debate.compass.points.map((p, i) => (
+                {debate.compass.points?.map((p, i) => (
                   <div key={i} style={{
                     position: "absolute", left: `${p.x * 100}%`, top: `${(1 - p.y) * 100}%`,
                     width: 5, height: 5, borderRadius: "50%", background: T.textLight, transform: "translate(-50%, -50%)"}} />
@@ -162,7 +216,7 @@ const CastYourVote = ({ debate, userVotes, setUserVotes }) => {
           border: `1px solid ${T.border}`, boxShadow: T.shadow}}>
           <h4 style={{ margin: "0 0 12px", fontSize: 14, fontWeight: 600 }}>Your Voting Record</h4>
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            {debateData.map(d => {
+            {debateData.map((d: Debate) => {
               const v = userVotes[d.id];
               return (
                 <div key={d.id} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, padding: "4px 0" }}>
@@ -185,11 +239,11 @@ const CastYourVote = ({ debate, userVotes, setUserVotes }) => {
   );
 };
 
-const VotesOnArgumentsView = ({ selectedDebateId }) => {
+const VotesOnArgumentsView = ({ selectedDebateId }: VotesOnArgumentsViewProps) => {
   useTheme();
 
-  const [userVotes, setUserVotes] = useState({});
-  const debate = debateData.find((item) => item.id === selectedDebateId) || debateData[0];
+  const [userVotes, setUserVotes] = useState<UserVotes>({});
+  const debate = (debateData as Debate[]).find((item) => item.id === selectedDebateId) || debateData[0] as Debate | undefined;
 
   if (!debate) return null;
 
