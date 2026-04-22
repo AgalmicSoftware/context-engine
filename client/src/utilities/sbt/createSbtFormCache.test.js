@@ -80,6 +80,28 @@ describe('createSbtFormCache helpers', () => {
     expect(hasCachedCreateSbtForm({ sessionSlug: 'general' })).toBe(true);
   });
 
+  it('clears malformed scoped cache payloads when requested', () => {
+    const scopedKey = getScopedCreateSbtFormCacheKey('edge');
+    sessionStorage.setItem(scopedKey, '{bad json');
+
+    expect(hasCachedCreateSbtForm({
+      sessionSlug: 'edge',
+      clearInvalid: true,
+    })).toBe(false);
+    expect(sessionStorage.getItem(scopedKey)).toBeNull();
+  });
+
+  it('clears non-object scoped cache payloads when requested', () => {
+    const scopedKey = getScopedCreateSbtFormCacheKey('edge');
+    sessionStorage.setItem(scopedKey, JSON.stringify('not-a-draft'));
+
+    expect(hasCachedCreateSbtForm({
+      sessionSlug: 'edge',
+      clearInvalid: true,
+    })).toBe(false);
+    expect(sessionStorage.getItem(scopedKey)).toBeNull();
+  });
+
   it('requires a name plus additional draft data before treating a cache payload as meaningful', () => {
     expect(hasMeaningfulCreateSbtFormPayload({ sbtName: 'Alpha' })).toBe(false);
     expect(hasMeaningfulCreateSbtFormPayload({ tags: ['alpha'] })).toBe(false);
