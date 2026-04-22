@@ -156,7 +156,7 @@ jest.mock('../SBTs/CreateSBTGroup.jsx', () => ({
   finalizeDeferredCreateSbtDraftUpload: (...args) => mockFinalizeDeferredCreateSbtDraftUpload(...args),
 }));
 jest.mock('../Gates/GateMultiSelectLock.jsx', () => () => <div data-testid="mock-wizard-gate-lock" />);
-jest.mock('../Shared/Json/JsonControls.jsx', () => ({
+jest.mock('../Shared/Json/JsonControls', () => ({
   JsonToggleButton: () => null,
   JsonPanel: () => null,
   JsonButtonRow: () => null,
