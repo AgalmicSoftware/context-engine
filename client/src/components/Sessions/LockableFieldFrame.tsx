@@ -3,7 +3,7 @@ import React from 'react';
 import { FormGroup, Label } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faLock, faLockOpen, faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
-import GateMultiSelectLock from '../Gates/GateMultiSelectLock';
+import GateMultiSelectLock from '../Gates/GateMultiSelectLock.jsx';
 import CETooltip from '../Shared/CETooltip';
 import { toStr } from '../../utilities/shared/primitives.js';
 import styles from './SessionWizard.module.scss';
