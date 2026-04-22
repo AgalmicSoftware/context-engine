@@ -28,6 +28,7 @@ import CETooltip from '../Shared/CETooltip';
 import SingleQuestionResponse from '../SurveyTool/SingleQuestionResponse.jsx';
 
 import { analyzeUserOpinions } from 'utilities/ai/aiScripts.js';
+import { getEffectiveAiConfig } from 'utilities/ai/aiSettings.js';
 
 import { generateBlockieDataUrl } from 'utilities/ui/blockieAvatars.js';
 import { createLogger } from 'utilities/logging.js';
@@ -66,6 +67,132 @@ const USERPAGE_GATE_UNKNOWN_RETRY_MS = 30 * 1000;
 const USERPAGE_GATE_TERMINAL_RECHECK_MS = 60 * 1000;
 const USERPAGE_RESPONSE_PARSE_MEMO_LIMIT = 300;
 const PROFILE_SCAN_REPORT_EVENT = 'ce:profile-scan-report';
+const USER_ANALYSIS_CACHE_VERSION = 1;
+const USER_ANALYSIS_TTL_MS = 24 * 60 * 60 * 1000;
+
+const isPlainAnalysisObject = (value) => (
+  value != null &&
+  typeof value === 'object' &&
+  !Array.isArray(value)
+);
+
+const sortUserAnalysisKeys = (value) => {
+  if (Array.isArray(value)) {
+    return value.map((item) => sortUserAnalysisKeys(item));
+  }
+  if (!isPlainAnalysisObject(value)) return value;
+  return Object.keys(value)
+    .sort()
+    .reduce((acc, key) => {
+      acc[key] = sortUserAnalysisKeys(value[key]);
+      return acc;
+    }, {});
+};
+
+const digestUserAnalysisCanonicalString = async (canonical) => {
+  const subtle = globalThis?.crypto?.subtle;
+  if (subtle && typeof subtle.digest === 'function' && typeof TextEncoder !== 'undefined') {
+    const buffer = await subtle.digest('SHA-256', new TextEncoder().encode(canonical));
+    return Array.from(new Uint8Array(buffer))
+      .map((byte) => byte.toString(16).padStart(2, '0'))
+      .join('');
+  }
+
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < canonical.length; i += 1) {
+    hash ^= canonical.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return `fnv1a:${hash.toString(16).padStart(8, '0')}`;
+};
+
+const buildUserAnalysisFingerprint = async ({
+  userData,
+  address,
+  networkId,
+  sessionSlug,
+  provider,
+  model,
+}) => {
+  const canonical = JSON.stringify(sortUserAnalysisKeys({
+    version: USER_ANALYSIS_CACHE_VERSION,
+    userData,
+    address: String(address || '').trim().toLowerCase(),
+    networkId: String(networkId || ''),
+    sessionSlug: String(sessionSlug || ''),
+    provider: String(provider || '').trim().toLowerCase(),
+    model: String(model || '').trim(),
+  }));
+  return digestUserAnalysisCanonicalString(canonical);
+};
+
+const deriveAnalysisAiContextFromSessionConfig = (sessionSlug, sessionConfig = {}) => {
+  const ai = (sessionConfig?.ai && typeof sessionConfig.ai === 'object') ? sessionConfig.ai : {};
+  const models = (ai.models && typeof ai.models === 'object') ? ai.models : {};
+  const modelProviders = (ai.modelProviders && typeof ai.modelProviders === 'object') ? ai.modelProviders : {};
+  const thinkingModel = models.thinking || models.reasoning || models.default;
+  const fallbackProvider = String(ai.mode || ai.provider || 'openai').trim().toLowerCase() || 'openai';
+  const provider = String(
+    (thinkingModel && typeof thinkingModel === 'object' ? thinkingModel.provider : '') ||
+    modelProviders.thinking ||
+    modelProviders.reasoning ||
+    modelProviders.default ||
+    fallbackProvider
+  ).trim().toLowerCase() || 'openai';
+  const model = String(
+    (thinkingModel && typeof thinkingModel === 'object'
+      ? (thinkingModel.model || thinkingModel.name || thinkingModel.value)
+      : thinkingModel) ||
+    'gpt-5'
+  ).trim() || 'gpt-5';
+  return {
+    sessionSlug: String(sessionSlug || ''),
+    provider,
+    model,
+  };
+};
+
+const resolveUserAnalysisAiContext = async (sessionSlug, sessionConfig = {}) => {
+  const fallback = deriveAnalysisAiContextFromSessionConfig(sessionSlug, sessionConfig);
+  try {
+    const effective = await getEffectiveAiConfig({
+      sessionSlug: String(sessionSlug || ''),
+      thinking: true,
+      resolveSecrets: false,
+    });
+    return {
+      sessionSlug: String(sessionSlug || ''),
+      provider: String(effective?.provider || fallback.provider || 'openai').trim().toLowerCase() || 'openai',
+      model: String(effective?.model || fallback.model || 'gpt-5').trim() || 'gpt-5',
+    };
+  } catch (error) {
+    accountLog.warn('[UserPage] analysis AI context fallback:', error);
+    return fallback;
+  }
+};
+
+const normalizeUserAnalysisResult = (result = {}) => ({
+  name: result?.name || 'User Analysis',
+  summary: result?.summary || '',
+  details: result?.details || '',
+  historicalAlignment: {
+    figure: result?.historicalAlignment?.figure || '',
+    reasoning: result?.historicalAlignment?.reasoning || '',
+  },
+});
+
+const formatAnalysisCacheAge = (cachedAt) => {
+  const ts = Number(cachedAt || 0);
+  if (!Number.isFinite(ts) || ts <= 0) return '';
+  const ageMs = Math.max(0, Date.now() - ts);
+  const minute = 60 * 1000;
+  const hour = 60 * minute;
+  const day = 24 * hour;
+  if (ageMs < minute) return 'just now';
+  if (ageMs < hour) return `${Math.max(1, Math.floor(ageMs / minute))}m ago`;
+  if (ageMs < day) return `${Math.max(1, Math.floor(ageMs / hour))}h ago`;
+  return `${Math.max(1, Math.floor(ageMs / day))}d ago`;
+};
 
 
 
@@ -120,6 +247,8 @@ class UserPage extends Component {
       analysisElapsedMs: 0,
       analysisHistoricalFigure: '',
       analysisHistoricalReasoning: '',
+      analysisServedFromCache: false,
+      analysisCachedAt: null,
       showFullProfileModal: false,
       isSimulated: false,
       // Default: Questions tab
@@ -132,8 +261,6 @@ class UserPage extends Component {
       showSectionSurveysCreatedOpen: true,
       showSectionQuestionResponsesOpen: true,
       showSectionQuestionsCreatedOpen: true,
-
-      // NOTE: Analysis-result caching is temporarily disabled; no analysis cache stored.
 
       // NEW: nickname (inline, header actions; visible on any user page)
       nicknameInput: '',
@@ -4067,6 +4194,115 @@ class UserPage extends Component {
     }
   };
 
+  _buildAnalysisCacheContext = async ({
+    userData,
+    analysisSession,
+    addressLower,
+    networkId,
+  }) => {
+    const sessionSlug = String(analysisSession?.slug || '');
+    const aiContext = await resolveUserAnalysisAiContext(
+      sessionSlug,
+      analysisSession?.sessionConfig || {}
+    );
+    const fingerprint = await buildUserAnalysisFingerprint({
+      userData,
+      address: addressLower,
+      networkId,
+      sessionSlug,
+      provider: aiContext.provider,
+      model: aiContext.model,
+    });
+    return {
+      sessionSlug,
+      aiContext,
+      fingerprint,
+    };
+  };
+
+  _readAnalysisCacheEntry = ({
+    sessionSlug,
+    networkId,
+    addressLower,
+    fingerprint,
+  }) => {
+    const cacheObj = peekCacheSync('analysisCache', sessionSlug, { clone: false });
+    const entry = cacheObj?.[networkId]?.[addressLower]?.[fingerprint];
+    if (!entry || typeof entry !== 'object') return null;
+    if (entry.version !== USER_ANALYSIS_CACHE_VERSION) return null;
+    if (entry.fingerprint !== fingerprint) return null;
+    if (String(entry.networkId || '') !== String(networkId || '')) return null;
+    if (String(entry.address || '').toLowerCase() !== addressLower) return null;
+    if (Date.now() >= Number(entry.expiresAt || 0)) return null;
+    return entry;
+  };
+
+  _hydrateAnalysisFromCache = (entry) => {
+    const result = normalizeUserAnalysisResult(entry?.result || {});
+    this.clearAnalysisTimer();
+    this.setState({
+      showAnalysisModal: true,
+      aiAnalysis: result.summary,
+      analysisDetails: result.details,
+      analysisName: result.name,
+      analysisHistoricalFigure: result.historicalAlignment.figure,
+      analysisHistoricalReasoning: result.historicalAlignment.reasoning,
+      analysisElapsedMs: 0,
+      analysisError: '',
+      analyzing: false,
+      analysisServedFromCache: true,
+      analysisCachedAt: Number(entry?.cachedAt || 0) || null,
+    });
+  };
+
+  _writeAnalysisCacheEntry = async ({
+    sessionSlug,
+    networkId,
+    addressLower,
+    fingerprint,
+    aiContext,
+    result,
+  }) => {
+    const cachedAt = Date.now();
+    const entry = {
+      version: USER_ANALYSIS_CACHE_VERSION,
+      fingerprint,
+      cachedAt,
+      expiresAt: cachedAt + USER_ANALYSIS_TTL_MS,
+      address: addressLower,
+      networkId,
+      aiContext: {
+        sessionSlug,
+        provider: aiContext.provider,
+        model: aiContext.model,
+      },
+      result: normalizeUserAnalysisResult(result),
+    };
+
+    const current = peekCacheSync('analysisCache', sessionSlug, { clone: false });
+    const next = (current && typeof current === 'object') ? { ...current } : {};
+    const networkBucket = (next[networkId] && typeof next[networkId] === 'object')
+      ? { ...next[networkId] }
+      : {};
+    const addressBucketSource = (
+      networkBucket[addressLower] &&
+      typeof networkBucket[addressLower] === 'object'
+    )
+      ? networkBucket[addressLower]
+      : {};
+    const addressBucket = {};
+    Object.entries(addressBucketSource).forEach(([key, sibling]) => {
+      if (sibling && Number(sibling.expiresAt || 0) > cachedAt) {
+        addressBucket[key] = sibling;
+      }
+    });
+    addressBucket[fingerprint] = entry;
+    networkBucket[addressLower] = addressBucket;
+    next[networkId] = networkBucket;
+    await writeCache('analysisCache', sessionSlug, next);
+    return entry;
+  };
+
   analyzeUser = async (forceRefresh = false) => {
     if (!this._isMounted) return;
 
@@ -4213,8 +4449,53 @@ class UserPage extends Component {
       surveysCreated,
       createdCounts
     };
+    const addressLower = String(this.props.viewAddress || '').trim().toLowerCase();
+    const networkId = String(
+      this.props.network?.id ??
+      this.props.network?.chainId ??
+      ''
+    );
 
     try {
+      this.setState({
+        showAnalysisModal: true,
+        analysisError: '',
+        aiAnalysis: '',
+        analysisDetails: '',
+        analysisName: '',
+        analysisElapsedMs: 0,
+        analysisHistoricalFigure: '',
+        analysisHistoricalReasoning: '',
+        analyzing: false,
+        analysisServedFromCache: false,
+        analysisCachedAt: null,
+      });
+
+      const analysisSession = await this.resolveAnalysisSessionContext();
+      if (!analysisSession?.sessionConfig) {
+        throw new Error('No valid AI session configuration available for this profile context.');
+      }
+      let cacheContext = await this._buildAnalysisCacheContext({
+        userData,
+        analysisSession,
+        addressLower,
+        networkId,
+      });
+      if (!forceRefresh) {
+        const cachedEntry = this._readAnalysisCacheEntry({
+          sessionSlug: cacheContext.sessionSlug,
+          networkId,
+          addressLower,
+          fingerprint: cacheContext.fingerprint,
+        });
+        if (cachedEntry) {
+          if (!this._isMounted) return;
+          this._hydrateAnalysisFromCache(cachedEntry);
+          return;
+        }
+      }
+
+      if (!this._isMounted) return;
       this.setState({
         showAnalysisModal: true,
         analyzing: true,
@@ -4224,14 +4505,12 @@ class UserPage extends Component {
         analysisName: '',
         analysisElapsedMs: 0,
         analysisHistoricalFigure: '',
-        analysisHistoricalReasoning: ''
+        analysisHistoricalReasoning: '',
+        analysisServedFromCache: false,
+        analysisCachedAt: null,
       });
       this.startAnalysisTimer();
 
-      const analysisSession = await this.resolveAnalysisSessionContext();
-      if (!analysisSession?.sessionConfig) {
-        throw new Error('No valid AI session configuration available for this profile context.');
-      }
       const aiOptions = {
         sessionSlug: String(analysisSession.slug || ''),
         sessionConfig: analysisSession.sessionConfig,
@@ -4252,6 +4531,25 @@ class UserPage extends Component {
         });
         const fallbackSession = await this.resolveAnalysisSessionContext([analysisSession.slug]);
         if (!fallbackSession?.sessionConfig) throw err;
+        cacheContext = await this._buildAnalysisCacheContext({
+          userData,
+          analysisSession: fallbackSession,
+          addressLower,
+          networkId,
+        });
+        if (!forceRefresh) {
+          const cachedEntry = this._readAnalysisCacheEntry({
+            sessionSlug: cacheContext.sessionSlug,
+            networkId,
+            addressLower,
+            fingerprint: cacheContext.fingerprint,
+          });
+          if (cachedEntry) {
+            if (!this._isMounted) return;
+            this._hydrateAnalysisFromCache(cachedEntry);
+            return;
+          }
+        }
         const fallbackOpts = {
           sessionSlug: String(fallbackSession.slug || ''),
           sessionConfig: fallbackSession.sessionConfig,
@@ -4265,22 +4563,39 @@ class UserPage extends Component {
       if (!this._isMounted) return;
 
       // Update UI
+      const normalizedResult = normalizeUserAnalysisResult(result);
       this.setState({
-        aiAnalysis: result.summary || '',
-        analysisDetails: result.details || '',
-        analysisName: result.name || 'User Analysis',
-        analysisHistoricalFigure: result?.historicalAlignment?.figure || '',
-        analysisHistoricalReasoning: result?.historicalAlignment?.reasoning || '',
-        analyzing: false
+        aiAnalysis: normalizedResult.summary,
+        analysisDetails: normalizedResult.details,
+        analysisName: normalizedResult.name,
+        analysisHistoricalFigure: normalizedResult.historicalAlignment.figure,
+        analysisHistoricalReasoning: normalizedResult.historicalAlignment.reasoning,
+        analyzing: false,
+        analysisServedFromCache: false,
+        analysisCachedAt: null,
       });
       this.clearAnalysisTimer();
+      try {
+        await this._writeAnalysisCacheEntry({
+          sessionSlug: cacheContext.sessionSlug,
+          networkId,
+          addressLower,
+          fingerprint: cacheContext.fingerprint,
+          aiContext: cacheContext.aiContext,
+          result: normalizedResult,
+        });
+      } catch (cacheError) {
+        accountLog.warn('[UserPage] analysis cache write failed:', cacheError);
+      }
     } catch (e) {
       accountLog.error('[UserPage] analyzeUser failed:', e);
       if (!this._isMounted) return;
       this.setState({
         analyzing: false,
         analysisError: 'Unable to generate analysis right now. Please try again later.',
-        showAnalysisModal: true
+        showAnalysisModal: true,
+        analysisServedFromCache: false,
+        analysisCachedAt: null,
       });
       this.clearAnalysisTimer();
     }
@@ -4344,6 +4659,8 @@ class UserPage extends Component {
       analysisElapsedMs,
       analysisHistoricalFigure,
       analysisHistoricalReasoning,
+      analysisServedFromCache,
+      analysisCachedAt,
       showFullProfileModal,
       isSimulated,
       selectedTab,
@@ -4425,6 +4742,9 @@ class UserPage extends Component {
 
     // Gate Analyze/Compare until *all* user caches are ready (surveys incl. responses)
     const disabledByCache = !(isSBTReady && isSurveyReady && isQuestionReady && isResponsesReady);
+    const analysisCacheAge = analysisServedFromCache
+      ? formatAnalysisCacheAge(analysisCachedAt)
+      : '';
 
     // --- Loading States Logic ---
     const surveyDeepScanLoadingActive = this.isDeepScanLoadingEnabledForSection('surveys') && isDeepScanning;
@@ -5211,7 +5531,6 @@ class UserPage extends Component {
             {/* Close “X” is intentionally hidden via CSS; do not delete this feature. */}
             <div className={styles.modalTitleRow}>
               {analysisName || 'User Analysis'}
-              {/* DO NOT DELETE THIS SECTION - button we will be used in the future
               <button
                 type="button"
                 className={styles.refreshIconButton}
@@ -5221,8 +5540,13 @@ class UserPage extends Component {
                 aria-label="Refresh analysis"
               >
                 <FontAwesomeIcon icon={faSync} spin={analyzing} id={styles.refreshAnalysisIcon} />
-              </button> */}
+              </button>
             </div>
+            {analysisCacheAge && (
+              <div className={styles.analysisCacheStatus}>
+                Cached analysis from {analysisCacheAge}
+              </div>
+            )}
           </ModalHeader>
           <ModalBody className={styles.modalBody}>
             {analyzing && (
