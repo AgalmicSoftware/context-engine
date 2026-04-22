@@ -47,7 +47,7 @@ import { callAI } from '../../utilities/ai/aiScripts.js';
 import { getEffectiveAiConfig } from '../../utilities/ai/aiSettings.js';
 import { seedGenPrompt } from '../../prompts/seedGenPrompt.js';
 import { JsonButtonRow, JsonPanel, JsonToggleButton } from '../Shared/Json/JsonControls';
-import GateMultiSelectLock from '../Gates/GateMultiSelectLock.jsx';
+import GateMultiSelectLock from '../Gates/GateMultiSelectLock';
 import {
   getGateSbtAddresses,
   normalizeGateMode,

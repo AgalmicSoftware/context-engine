@@ -1,12 +1,12 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
-import GateMultiSelectLock from './GateMultiSelectLock.jsx';
+import GateMultiSelectLock from './GateMultiSelectLock';
 import styles from './GateMultiSelectLock.module.scss';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 
 jest.mock('../../utilities/sbt/sbtDisplayNames.js', () => ({
-  resolveSbtDisplayLabel: jest.fn(({ address }) => (
+  resolveSbtDisplayLabel: jest.fn(({ address }: { address?: string }) => (
     String(address || '').toLowerCase() === '0x1111111111111111111111111111111111111111'
       ? 'VIP Pass'
       : ''

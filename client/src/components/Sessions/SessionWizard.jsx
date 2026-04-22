@@ -14,7 +14,7 @@ import ContractsSection from './ContractsSection';
 import EncryptionPanel from './EncryptionPanel.jsx';
 import WorkerPanel from './WorkerPanel.jsx';
 import CreateSBTGroup, { finalizeDeferredCreateSbtDraftUpload } from '../SBTs/CreateSBTGroup.jsx';
-import GateMultiSelectLock from '../Gates/GateMultiSelectLock.jsx';
+import GateMultiSelectLock from '../Gates/GateMultiSelectLock';
 import { JsonToggleButton, JsonPanel, JsonButtonRow } from '../Shared/Json/JsonControls';
 import { readCompactImageClipboard } from '../Shared/compactImageClipboard.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
