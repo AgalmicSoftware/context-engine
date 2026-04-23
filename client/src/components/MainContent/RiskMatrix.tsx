@@ -6,23 +6,8 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faExternalLinkAlt, faNetworkWired } from '@fortawesome/free-solid-svg-icons';
 
 import styles from './RiskMatrix.module.scss';
-import {
-  getRiskMatrixAtlasScenarioCountForCell,
-  getRiskMatrixAtlasScenariosForCell,
-} from '../../variables/demo/riskMatrixAtlasScenarioData.js';
-import seedComments from '../../variables/demo/riskMatrixSeedComments.json';
-import {
-  enrichRiskMatrixCommentRecord,
-  getRiskMatrixCorpusSourceCitations,
-  type RiskMatrixCorpusRef,
-  type RiskMatrixHistoricalFigure,
-} from '../../variables/demo/riskMatrixCommentContext';
-import {
-  buildAtlasNodeRoute,
-  buildPublicUrlPath,
-  readWindowLocationPath,
-} from '../../utilities/ui/publicUrl.js';
-import { getHistoricalFigureAvatarByName } from '../../utilities/ui/historicalFigureAvatars.js';
+import { getRiskMatrixAtlasScenariosForCell } from '../../variables/demo/riskMatrixAtlasScenarioData.js';
+import { buildPublicRoute, buildPublicUrlPath } from '../../utilities/ui/publicUrl.js';
 
 export type RiskValence = 'opportunity' | 'risk';
 
@@ -193,94 +178,6 @@ const formatSelectionTitle = (cellId = '') => {
 
   const [catX, subX, catY, subY] = cellId.split('.');
   return `${catX} / ${subX} vs ${catY} / ${subY}`;
-};
-
-const parseSelectionStateFromCell = (cellId = '') => {
-  if (isAggregateCellId(cellId)) {
-    const [activeCategoryX, activeCategoryY] = cellId.split('_vs_');
-    if (!activeCategoryX || !activeCategoryY) return null;
-
-    return {
-      activeCategoryX,
-      activeCategoryY,
-      activeSubcategoryX: null,
-      activeSubcategoryY: null,
-    };
-  }
-
-  if (!isCanonicalCellId(cellId)) return null;
-
-  const [activeCategoryX, activeSubcategoryX, activeCategoryY, activeSubcategoryY] = cellId.split('.');
-  return {
-    activeCategoryX,
-    activeCategoryY,
-    activeSubcategoryX,
-    activeSubcategoryY,
-  };
-};
-
-const getCommentsForCellRecords = (
-  cellId: string,
-  comments: RiskCommentRecord[] = []
-): RiskCommentRecord[] => {
-  if (typeof cellId !== 'string' || !cellId) return [];
-
-  if (isAggregateCellId(cellId)) {
-    const [catX, catY] = cellId.split('_vs_');
-    if (!catX || !catY) return [];
-
-    return comments.filter(
-      (entry) => isCanonicalCellId(entry.cell)
-        && entry.cell.startsWith(`${catX}.`)
-        && entry.cell.includes(`.${catY}.`)
-    );
-  }
-
-  return comments.filter((entry) => entry.cell === cellId);
-};
-
-const hasRestoreState = (restoreState: RiskMatrixRestoreState | null | undefined) => (
-  Boolean(restoreState && typeof restoreState === 'object' && Object.keys(restoreState).length > 0)
-);
-
-const buildInitialRiskMatrixState = (
-  restoreState: RiskMatrixRestoreState | null | undefined
-): RiskMatrixState => {
-  const nextComments = Array.isArray(restoreState?.comments)
-    ? restoreState.comments.filter(isValidCommentRecord).map(normalizeCommentRecord).map(enrichRiskMatrixCommentRecord)
-    : INITIAL_COMMENTS;
-  const rawSelectedCellId = String(restoreState?.selectedCellId || '').trim();
-  const selectedCellId = (isAggregateCellId(rawSelectedCellId) || isCanonicalCellId(rawSelectedCellId))
-    ? rawSelectedCellId
-    : '';
-  const derivedSelectionState = parseSelectionStateFromCell(selectedCellId);
-  const nextValence = VALID_VALENCES.has(String(restoreState?.valence || ''))
-    ? (restoreState?.valence as RiskValence)
-    : DEFAULT_VALENCE;
-  const parsedIntensity = Number(restoreState?.intensity);
-  const nextIntensity = Number.isFinite(parsedIntensity) && parsedIntensity > 0
-    ? parsedIntensity
-    : DEFAULT_INTENSITY;
-  const modal = Boolean(restoreState?.modal && selectedCellId);
-
-  return {
-    comments: nextComments,
-    modal,
-    selectedCellId: modal ? selectedCellId : '',
-    existingComments: modal ? getCommentsForCellRecords(selectedCellId, nextComments) : [],
-    comment: typeof restoreState?.comment === 'string' ? restoreState.comment : '',
-    valence: nextValence,
-    intensity: nextIntensity,
-    heatmap: buildHeatmapFromComments(nextComments),
-    activeCategoryX: restoreState?.activeCategoryX ?? derivedSelectionState?.activeCategoryX ?? null,
-    activeCategoryY: restoreState?.activeCategoryY ?? derivedSelectionState?.activeCategoryY ?? null,
-    activeSubcategoryX: restoreState?.activeSubcategoryX ?? derivedSelectionState?.activeSubcategoryX ?? null,
-    activeSubcategoryY: restoreState?.activeSubcategoryY ?? derivedSelectionState?.activeSubcategoryY ?? null,
-    hoveredRowIndex: null,
-    hoveredColIndex: null,
-    hoveredSubRowIndex: null,
-    hoveredSubColIndex: null,
-  };
 };
 
 const resolveAtlasAssetPath = (value = '') => {
