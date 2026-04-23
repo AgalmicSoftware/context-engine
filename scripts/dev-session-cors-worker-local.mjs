@@ -11,7 +11,7 @@ const host = process.env.HOST || '127.0.0.1';
 
 const tokenSecret = String(process.env.TOKEN_HMAC_SECRET || '').trim();
 if (!tokenSecret) {
-  console.error('Missing TOKEN_HMAC_SECRET. Example: TOKEN_HMAC_SECRET=dev-secret node scripts/dev-sessionCorsWorker-local.mjs');
+  console.error('Missing TOKEN_HMAC_SECRET. Example: TOKEN_HMAC_SECRET=dev-secret node scripts/dev-session-cors-worker-local.mjs');
   process.exit(1);
 }
 

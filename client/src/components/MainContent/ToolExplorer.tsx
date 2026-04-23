@@ -5,7 +5,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCog, faExpand, faEye, faPlus } from '@fortawesome/free-solid-svg-icons';
 import { createLogger } from '../../utilities/logging';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
-import { hasCachedCreateSbtForm } from '../../utilities/sbt/createSbtFormCache.js';
+import { hasCachedCreateSbtForm } from '../../utilities/sbt/sbtCreateFormCache.js';
 import { sbtsListPath } from '../../utilities/ui/terminology.js';
 import { buildPublicRoute } from '../../utilities/ui/publicUrl.js';
 import { getAllSessionSlugs, getSessionConfigBySlug } from '../../utilities/web3/contractScripts.js';

@@ -41,7 +41,7 @@ import {
   readStoredGlobalSessionSelection,
 } from '../../utilities/session/globalSessionState.js';
 import { hasUsableSessionWorkerConfig } from '../../utilities/session/sessionWorkerAvailability.js';
-import { hasCachedCreateSbtForm } from '../../utilities/sbt/createSbtFormCache.js';
+import { hasCachedCreateSbtForm } from '../../utilities/sbt/sbtCreateFormCache.js';
 import { getSbtDescriptionText, getSbtDisplayName } from '../../utilities/sbt/sbtDisplayNames.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { readPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
