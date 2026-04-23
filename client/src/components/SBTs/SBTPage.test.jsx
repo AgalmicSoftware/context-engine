@@ -11,7 +11,6 @@ import { litStorage } from 'utilities/crypto/litProtocol.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import {
-  LEGACY_CREATED_SBTS_STORAGE_KEY,
   SBT_PASSWORD_RECOVERY_KIND,
   SBT_PASSWORD_RECOVERY_STORAGE_KEY,
 } from '../../utilities/sbt/sbtPasswordRecoveryStore.js';
@@ -3970,7 +3969,7 @@ const createCachedSbtInfo = (overrides = {}) => ({
     expect(handleMintSpy).toHaveBeenCalledTimes(1);
   });
 
-  it('loads cached passwords from the scoped recovery store before legacy createdSBTs', () => {
+  it('loads cached passwords from the scoped recovery store', () => {
     const sbtAddress = '0x0000000000000000000000000000000000000201';
     const sbtLower = sbtAddress.toLowerCase();
     const subject = createSubject({
@@ -3993,18 +3992,13 @@ const createCachedSbtInfo = (overrides = {}) => ({
         },
       },
     }));
-    localStorage.setItem(LEGACY_CREATED_SBTS_STORAGE_KEY, JSON.stringify({
-      [sbtLower]: {
-        passwords: ['legacy-code'],
-      },
-    }));
 
     subject.loadCachedPasswords();
 
     expect(subject.state.cachedPasswords).toEqual(['scoped-code']);
   });
 
-  it('keeps admin-generated invite codes export-only until explicitly saved to the recovery cache', async () => {
+  it('persists admin-generated invite codes to the scoped recovery store', async () => {
     const sbtAddress = '0x0000000000000000000000000000000000000202';
     const sbtLower = sbtAddress.toLowerCase();
     const subject = createSubject({
@@ -4023,19 +4017,13 @@ const createCachedSbtInfo = (overrides = {}) => ({
 
     await subject.handleGenerateAdminInvites();
 
-    expect(localStorage.getItem(SBT_PASSWORD_RECOVERY_STORAGE_KEY)).toBeNull();
-    expect(localStorage.getItem(LEGACY_CREATED_SBTS_STORAGE_KEY)).toBeNull();
-    expect(subject.state.adminGeneratedPasswords).toEqual(['admin-one', 'admin-two']);
-    expect(subject.state.cachedPasswords).toEqual([]);
-
-    subject.saveAdminGeneratedPasswordsToRecoveryCache();
-
     const recoveryStore = JSON.parse(localStorage.getItem(SBT_PASSWORD_RECOVERY_STORAGE_KEY));
     expect(recoveryStore.entries[`84532:${sbtLower}`]).toEqual(expect.objectContaining({
       chainId: 84532,
       sbtAddress: sbtLower,
       passwords: ['admin-one', 'admin-two'],
     }));
+    expect(subject.state.adminGeneratedPasswords).toEqual(['admin-one', 'admin-two']);
     expect(subject.state.cachedPasswords).toEqual(['admin-one', 'admin-two']);
   });
 

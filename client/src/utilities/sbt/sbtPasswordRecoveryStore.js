@@ -4,7 +4,6 @@ import {
 } from '../cache/storageJson.js';
 
 export const SBT_PASSWORD_RECOVERY_STORAGE_KEY = 'ce:sbtPasswordRecovery:v1';
-export const LEGACY_CREATED_SBTS_STORAGE_KEY = 'createdSBTs';
 export const SBT_PASSWORD_RECOVERY_ENVELOPE_VERSION = 1;
 export const SBT_PASSWORD_RECOVERY_KIND = 'sbt-password-recovery';
 export const SBT_PASSWORD_RECOVERY_DEFAULT_TTL_MS = 30 * 24 * 60 * 60 * 1000;
@@ -149,31 +148,10 @@ export const writeSbtPasswordRecoveryStore = (store, { storage, now = Date.now()
   return safeJsonWrite(storageRef, SBT_PASSWORD_RECOVERY_STORAGE_KEY, normalizedStore);
 };
 
-export const readLegacyCreatedSbtCodes = ({ sbtAddress, storage } = {}) => {
-  const storageRef = getLocalStorage(storage);
-  const address = normalizeAddress(sbtAddress);
-  if (!storageRef || !address) return [];
-
-  const result = safeJsonRead(storageRef, LEGACY_CREATED_SBTS_STORAGE_KEY);
-  if (!result.ok || !result.value || typeof result.value !== 'object') return [];
-
-  const legacyByAddress = {};
-  Object.entries(result.value).forEach(([key, value]) => {
-    legacyByAddress[normalizeAddress(key)] = value;
-  });
-
-  if (legacyByAddress[address] && Array.isArray(legacyByAddress[address].passwords)) {
-    return normalizePasswords(legacyByAddress[address].passwords);
-  }
-
-  return normalizePasswords(result.value.passwords);
-};
-
 export const getSbtPasswordRecoveryCodes = ({
   chainId,
   sbtAddress,
   storage,
-  includeLegacyFallback = true,
   now = Date.now(),
 } = {}) => {
   const store = readSbtPasswordRecoveryStore({ storage, now });
@@ -191,9 +169,7 @@ export const getSbtPasswordRecoveryCodes = ({
     if (addressEntry?.passwords?.length > 0) return [...addressEntry.passwords];
   }
 
-  return includeLegacyFallback
-    ? readLegacyCreatedSbtCodes({ sbtAddress, storage })
-    : [];
+  return [];
 };
 
 export const upsertSbtPasswordRecoveryCodes = ({
@@ -246,7 +222,6 @@ export const upsertSbtPasswordRecoveryCodes = ({
 export default {
   getSbtPasswordRecoveryCodes,
   getSbtPasswordRecoveryKey,
-  readLegacyCreatedSbtCodes,
   readSbtPasswordRecoveryStore,
   upsertSbtPasswordRecoveryCodes,
   writeSbtPasswordRecoveryStore,

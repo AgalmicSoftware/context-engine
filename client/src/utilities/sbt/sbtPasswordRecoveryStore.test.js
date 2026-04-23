@@ -1,5 +1,4 @@
 import {
-  LEGACY_CREATED_SBTS_STORAGE_KEY,
   SBT_PASSWORD_RECOVERY_DEFAULT_TTL_MS,
   SBT_PASSWORD_RECOVERY_KIND,
   SBT_PASSWORD_RECOVERY_STORAGE_KEY,
@@ -86,7 +85,7 @@ describe('sbtPasswordRecoveryStore', () => {
     })).toEqual(['alpha', 'beta', 'gamma']);
   });
 
-  it('ignores expired entries and falls back to legacy createdSBTs only for reads', () => {
+  it('ignores expired entries instead of falling back to legacy storage', () => {
     const storage = createMemoryStorage();
     const sbtAddress = '0xabc0000000000000000000000000000000000000';
     const key = getSbtPasswordRecoveryKey({ chainId: 84532, sbtAddress });
@@ -105,11 +104,6 @@ describe('sbtPasswordRecoveryStore', () => {
         },
       },
     }));
-    storage.setItem(LEGACY_CREATED_SBTS_STORAGE_KEY, JSON.stringify({
-      [sbtAddress]: {
-        passwords: ['legacy'],
-      },
-    }));
 
     expect(readSbtPasswordRecoveryStore({ storage, now: 2000 }).entries).toEqual({});
     expect(getSbtPasswordRecoveryCodes({
@@ -117,21 +111,6 @@ describe('sbtPasswordRecoveryStore', () => {
       sbtAddress,
       storage,
       now: 2000,
-    })).toEqual(['legacy']);
-  });
-
-  it('does not write legacy createdSBTs when saving new recovery codes', () => {
-    const storage = createMemoryStorage();
-
-    upsertSbtPasswordRecoveryCodes({
-      chainId: 84532,
-      sbtAddress: '0xabc0000000000000000000000000000000000000',
-      passwords: ['fresh'],
-      storage,
-      now: 1000,
-    });
-
-    expect(storage.getItem(SBT_PASSWORD_RECOVERY_STORAGE_KEY)).toContain('fresh');
-    expect(storage.getItem(LEGACY_CREATED_SBTS_STORAGE_KEY)).toBeNull();
+    })).toEqual([]);
   });
 });

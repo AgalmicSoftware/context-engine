@@ -17,7 +17,6 @@ import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { getSessionContractsForChain, getSessionRegistryChains } from '../../variables/chains.js';
 import { getScopedCreateSbtFormCacheKey } from '../../utilities/sbt/sbtCreateFormCache.js';
 import {
-  LEGACY_CREATED_SBTS_STORAGE_KEY,
   SBT_PASSWORD_RECOVERY_STORAGE_KEY,
 } from '../../utilities/sbt/sbtPasswordRecoveryStore.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
@@ -140,7 +139,6 @@ describe('CreateSBTGroup cache helpers', () => {
       sbtAddress: sbtAddress.toLowerCase(),
       passwords: ['code-one', 'code-two'],
     }));
-    expect(localStorage.getItem(LEGACY_CREATED_SBTS_STORAGE_KEY)).toBeNull();
   });
 
   it('loadFormCache restores tags and dates, then updates hash', () => {
@@ -2942,7 +2940,7 @@ describe('CreateSBTGroup cache helpers', () => {
     expect(sessionStorage.getItem(scopedKey)).toBeNull();
   });
 
-  it('does not persist password recovery codes during mint unless explicitly saved later', async () => {
+  it('persists password recovery codes during mint to the scoped recovery store', async () => {
     localStorage.clear();
     const sbtAddress = '0x00000000000000000000000000000000000000b3';
     const instance = makeInstance({
@@ -2979,8 +2977,12 @@ describe('CreateSBTGroup cache helpers', () => {
     await instance.mintSBT();
 
     expect(instance.generateSBTInviteLinks).toHaveBeenCalledWith(sbtAddress, ['shared-secret']);
-    expect(instance.state.savedRecoveryCodesLocally).toBe(false);
-    expect(localStorage.getItem(SBT_PASSWORD_RECOVERY_STORAGE_KEY)).toBeNull();
+    const recoveryStore = JSON.parse(localStorage.getItem(SBT_PASSWORD_RECOVERY_STORAGE_KEY));
+    expect(recoveryStore.entries[`84532:${sbtAddress.toLowerCase()}`]).toEqual(expect.objectContaining({
+      chainId: 84532,
+      sbtAddress: sbtAddress.toLowerCase(),
+      passwords: ['shared-secret'],
+    }));
   });
 
   it('renders the open-mint URL card in the success UI for anyone-can-mint SBTs', () => {

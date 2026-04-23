@@ -667,7 +667,6 @@ class CreateSBTGroup extends Component {
       network: initialAuthoringChain.chainId || '',
       copiedLinkIndex: null,
       exportFormat: 'json',
-      savedRecoveryCodesLocally: false,
       countdown: 12,
       countdownActive: false,
       sbtSymbol: '',
@@ -3140,26 +3139,6 @@ class CreateSBTGroup extends Component {
     });
   };
 
-  saveCreatedSbtCodesToRecoveryCache = () => {
-    const { passwordList, sbtAddress, sbtDistribution } = this.state;
-    const hasPasswordMintOnChain = (
-      sbtDistribution?.distributionOption === 'hasPasswords'
-      || sbtDistribution?.distributionOption === 'groupPassword'
-    );
-    const result = this.persistCreatedSbtCodes({
-      sbtAddress,
-      hasPasswordMintOnChain,
-      codesToStore: passwordList,
-    });
-    if (!result?.ok) {
-      sbtLog.warn('Failed to persist SBT password recovery codes:', result?.status);
-      notify.warn('Failed to save recovery codes to the local recovery cache on this device.');
-      return;
-    }
-    this.setState({ savedRecoveryCodesLocally: true });
-    notify.success('Saved recovery codes to the local recovery cache on this device.');
-  };
-
   handleDeferredSave = async () => {
     if (typeof this.props.onSaveDraft !== 'function') {
       throw new Error('Session draft save is unavailable.');
@@ -3575,6 +3554,11 @@ class CreateSBTGroup extends Component {
         );
       }
 
+      const codesToStore = usesInviteCodes ? [groupPassword] : finalPasswordList;
+      const recoveryWrite = this.persistCreatedSbtCodes({ sbtAddress, hasPasswordMintOnChain, codesToStore });
+      if (!recoveryWrite?.ok) {
+        sbtLog.warn('Failed to persist SBT password recovery codes:', recoveryWrite?.status);
+      }
       this.suppressFormCachePersistenceAfterSuccess();
 
       this.setState({
@@ -3582,7 +3566,6 @@ class CreateSBTGroup extends Component {
         sbtAddress,
         currentStep: 3,
         passwordList: usesInviteCodes ? [groupPassword] : finalPasswordList,
-        savedRecoveryCodesLocally: false,
       });
 
       // Shareable links
@@ -4065,7 +4048,6 @@ class CreateSBTGroup extends Component {
       network,
       copiedLinkIndex,
       exportFormat,
-      savedRecoveryCodesLocally,
       sbtSymbol,
       passwordList,
       tags,
@@ -4880,25 +4862,13 @@ class CreateSBTGroup extends Component {
           passwordList.length > 0 && (
           <div className={styles.sbtInviteLinks}>
             <h3>Password Recovery</h3>
-            <p>
-              {savedRecoveryCodesLocally
-                ? 'Saved to the local recovery cache on this device.'
-                : 'Not stored locally by default. Export or save explicitly if you want browser-side recovery on this device.'}
-            </p>
+            <p>Saved to the local recovery cache on this device and available to export.</p>
             <div className={styles.exportOptions}>
               <select value={exportFormat} onChange={this.handleExportFormatChange} className={styles.exportFormatSelect}>
                 <option value="json">JSON</option>
                 <option value="csv">CSV</option>
               </select>
               <button onClick={this.exportPasswords} className={styles.exportButton}>Export Passwords</button>
-              <button
-                type="button"
-                onClick={this.saveCreatedSbtCodesToRecoveryCache}
-                className={styles.exportButton}
-                disabled={savedRecoveryCodesLocally}
-              >
-                {savedRecoveryCodesLocally ? 'Saved to Local Recovery Cache' : 'Save to Local Recovery Cache'}
-              </button>
             </div>
           </div>
         )}
@@ -4918,25 +4888,13 @@ class CreateSBTGroup extends Component {
                 </li>
               ))}
             </ul>
-            <p>
-              {savedRecoveryCodesLocally
-                ? 'Saved to the local recovery cache on this device.'
-                : 'Not stored locally by default. Export or save explicitly if you want browser-side recovery on this device.'}
-            </p>
+            <p>Saved to the local recovery cache on this device and available to export.</p>
             <div className={styles.exportOptions}>
               <select value={exportFormat} onChange={this.handleExportFormatChange} className={styles.exportFormatSelect}>
                 <option value="json">JSON</option>
                 <option value="csv">CSV</option>
               </select>
               <button onClick={this.exportPasswords} className={styles.exportButton}>Export Passwords</button>
-              <button
-                type="button"
-                onClick={this.saveCreatedSbtCodesToRecoveryCache}
-                className={styles.exportButton}
-                disabled={savedRecoveryCodesLocally}
-              >
-                {savedRecoveryCodesLocally ? 'Saved to Local Recovery Cache' : 'Save to Local Recovery Cache'}
-              </button>
             </div>
           </div>
         )}
