@@ -35,7 +35,7 @@ const renderWorkerPanel = (props: Partial<WorkerPanelProps> = {}) => render(
     defaultAllowedOrigins="https://app.example"
     shouldUseSponsoredAutoDeployFlow={false}
     deployForm={{}}
-    deployHelperToggle={null}
+    renderEmbeddedDeployHelperToggle={() => null}
     shouldShowDeployHelperUrlInput={false}
     deployHelperUrl=""
     setDeployHelperUrl={() => {}}
@@ -60,11 +60,9 @@ const renderWorkerPanel = (props: Partial<WorkerPanelProps> = {}) => render(
     resolvedActiveSessionSlug="demo-session"
     setDeployForm={() => {}}
     handleDeployWorker={() => {}}
-    deployStatusDisplayState={{
-      deployButtonDisabled: false,
-      deployStatusText: '',
-      isError: false,
-    }}
+    deployInFlight={false}
+    deployStatus=""
+    deployStatusIsError={false}
     showWorkerUrlField={false}
     displayedWorkerUrl=""
     renderField={() => null}
