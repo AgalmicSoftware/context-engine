@@ -1,4 +1,4 @@
-/** @file AccountDisplay.jsx */
+/** @file AccountDisplay.tsx */
 import React from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faCaretDown } from "@fortawesome/free-solid-svg-icons";
@@ -6,20 +6,34 @@ import { faCaretDown } from "@fortawesome/free-solid-svg-icons";
 import styles from "./Navbar.module.scss";
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
-export const AccountDisplayTorus = (props) => {
+export type AccountDisplayTorusProps = {
+  account: string;
+  launchAccountSettings: () => void;
+  userImageURL?: string | null;
+  avatarUrl?: string;
+  loginComplete?: boolean;
+  provider?: string | null;
+};
 
-  const shortenedAddress = `${props.account.slice(0, 4)}...${props.account.slice(-4)}`;
+export const AccountDisplayTorus = ({
+  account,
+  launchAccountSettings,
+  userImageURL,
+  avatarUrl,
+}: AccountDisplayTorusProps) => {
+
+  const shortenedAddress = `${account.slice(0, 4)}...${account.slice(-4)}`;
 
   // Primary image preference: use userImageURL if present; otherwise fall back to blockie
-  const primaryImgSrc = props.userImageURL || props.avatarUrl;
-  const showMiniBlockie = !!props.userImageURL && !!props.avatarUrl;
+  const primaryImgSrc = userImageURL || avatarUrl;
+  const showMiniBlockie = !!userImageURL && !!avatarUrl;
 
   return (
     <>
         <button
         className={styles.addressButton}
         data-testid={E2E_TESTIDS.WALLET_DISPLAY}
-        data-ce-wallet-address={props.account ? props.account : undefined}
+        data-ce-wallet-address={account || undefined}
         style={{
         display: 'flex',
         alignItems: 'center',
@@ -33,7 +47,7 @@ export const AccountDisplayTorus = (props) => {
         width: '250px'
         }}
         onClick={() => {
-        props.launchAccountSettings();
+        launchAccountSettings();
         }
         }>
         {primaryImgSrc && (
@@ -51,7 +65,7 @@ export const AccountDisplayTorus = (props) => {
         {/* If a user image exists, also show a tiny deterministic blockie adjacent to it */}
         {showMiniBlockie && (
           <img
-            src={props.avatarUrl}
+            src={avatarUrl}
             alt=""
             style={{
               borderRadius: '50%',

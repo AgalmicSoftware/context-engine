@@ -8,7 +8,7 @@ import styles from "./Navbar.module.scss";
 
 import LoginButton from 'components/Account/LoginButton.jsx';
 import LoginAndSettingsModal from '../Account/LoginAndSettingsModal.jsx'
-import { AccountDisplayTorus } from './AccountDisplay.jsx';
+import { AccountDisplayTorus } from './AccountDisplay';
 
 import { generateBlockieDataUrl } from 'utilities/ui/blockieAvatars.js';
 import { createLogger } from 'utilities/logging.js';
