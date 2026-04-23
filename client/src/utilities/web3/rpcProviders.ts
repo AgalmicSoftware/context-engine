@@ -227,7 +227,7 @@ const logPathRpcErrorOnce = (url: string, err: unknown, meta: AnyRecord = {}): v
   const errorLike = err as AnyRecord;
   const code = errorLike?.code ?? errorLike?.error?.code;
   const message = errorLike?.message || errorLike?.error?.message || '';
-  rpcLogger.error('PATH RPC failed; falling back', { url, code, message, ...meta });
+  rpcLogger.warn('PATH RPC failed; falling back', { url, code, message, ...meta });
 };
 
 const markRangeTooLargeError = (err: unknown): void => {

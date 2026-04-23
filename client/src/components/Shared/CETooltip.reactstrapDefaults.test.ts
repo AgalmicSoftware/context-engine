@@ -1,16 +1,8 @@
-const PopperContent = require('reactstrap/lib/PopperContent').default;
-
-type PopperContentDefaults = {
-  defaultProps?: {
-    transition?: {
-      timeout?: number;
-    };
-  };
-};
+import { PopperContent } from 'reactstrap';
 
 describe('reactstrap tooltip defaults', () => {
   it('keeps PopperContent transition timeout defined for default tooltips', () => {
-    const transition = (PopperContent as PopperContentDefaults)?.defaultProps?.transition;
+    const transition = (PopperContent as any)?.defaultProps?.transition;
 
     expect(transition).toEqual(
       expect.objectContaining({

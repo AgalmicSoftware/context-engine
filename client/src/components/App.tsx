@@ -3,7 +3,7 @@ import React from "react";
 import { Routes, Route } from 'react-router-dom'
 import { Provider } from 'react-redux';
 import store from '../store.js';
-import { SERVER } from '../variables/appConfig.js';
+import { CE_ENABLE_WALLETCONNECT_FALLBACK, SERVER } from '../variables/appConfig.js';
 import { installCeAgent } from '../utilities/ceAgent.js';
 import { createLogger } from '../utilities/logging';
 import { syncPublicPageHead } from '../utilities/ui/publicPageHead.js';
@@ -23,11 +23,13 @@ import {
   connectorsForWallets,
   RainbowKitProvider,
 } from '@rainbow-me/rainbowkit';
+import type { Wallet } from '@rainbow-me/rainbowkit';
 import {
   metaMaskWallet,
 } from '@rainbow-me/rainbowkit/wallets';
 import { configureChains, createClient, createStorage, WagmiConfig } from 'wagmi';
 import { noopStorage } from '@wagmi/core';
+import { MetaMaskConnector } from 'wagmi/connectors/metaMask';
 import { goerli, localhost } from 'wagmi/chains';
 import {
   mainnet,
@@ -100,11 +102,26 @@ const { chains, provider, webSocketProvider } = configureChains(
   ]
 );
 
+const buildMetaMaskWallet = (): Wallet => {
+  const wallet = metaMaskWallet({ chains, shimDisconnect: true });
+  if (CE_ENABLE_WALLETCONNECT_FALLBACK) return wallet;
+
+  return {
+    ...wallet,
+    createConnector: () => ({
+      connector: new MetaMaskConnector({
+        chains,
+        options: { shimDisconnect: true },
+      }),
+    }),
+  };
+};
+
 const connectors = connectorsForWallets([
   {
     groupName: "Recommended",
     wallets: [
-              metaMaskWallet({ chains, shimDisconnect: true }),
+              buildMetaMaskWallet(),
     ],
   },]);
 

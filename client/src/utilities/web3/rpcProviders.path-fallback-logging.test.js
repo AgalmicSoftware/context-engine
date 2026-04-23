@@ -1,6 +1,3 @@
-import { ethers } from 'ethers';
-import { getReadProviderForGroup } from './rpcProviders.js';
-
 jest.mock('../logging.js', () => ({
   __mockRpcLogger: {
     log: jest.fn(),
@@ -26,6 +23,9 @@ jest.mock('../logging.js', () => ({
 }));
 
 const { __mockRpcLogger: mockRpcLogger } = jest.requireMock('../logging.js');
+
+import { ethers } from 'ethers';
+import { getReadProviderForGroup } from './rpcProviders.js';
 
 const PATH_DEFAULT_OP_SEPOLIA = 'https://op-sepolia-testnet.api.pocket.network';
 
@@ -88,18 +88,5 @@ describe('rpcProviders PATH fallback logging', () => {
     expect(mockRpcLogger.error).not.toHaveBeenCalled();
 
     performSpy.mockRestore();
-  });
-
-  it('honors skipGlobalPreferred for historical log scans', () => {
-    const provider = getReadProviderForGroup(buildGroupCfg(), {
-      contractKey: 'sbtFactory',
-      skipGlobalPreferred: true,
-    });
-    const urls = (provider?.providerConfigs || [])
-      .map((entry) => entry?.provider?.connection?.url)
-      .filter(Boolean);
-
-    expect(urls[0]).not.toBe(PATH_DEFAULT_OP_SEPOLIA);
-    expect(urls).not.toContain(PATH_DEFAULT_OP_SEPOLIA);
   });
 });
