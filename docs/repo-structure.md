@@ -65,7 +65,7 @@ Use it for new files, refactors, and cleanup PRs. Legacy exceptions stay listed 
 ## 6. Canonical Acronyms
 
 - Canonical acronyms in this repo are `SBT`, `AI`, `RPC`, and `UX`.
-- In PascalCase names, keep the acronym uppercase: `SBTSelector.tsx`, `DebateMap.tsx`.
+- In PascalCase names, keep the acronym uppercase: `SBTSelector.jsx`, `DebateMap.jsx`.
 - In camelCase module names, a leading acronym may be lowercase to satisfy camelCase: `sbtDisplayNames.js`, `sbtCreateFormCache.js`, `rpcSelection.js`.
 - In lowercase-only naming schemes such as kebab-case script filenames, use lowercase segments: `test-sbt-auto-mint.ui.js`, `run-ux-workflows.js`, `rpc-errors.js`.
 - Do not mix title-cased acronym fragments such as `Sbt`, `Ai`, `Rpc`, or `Ux` inside mixed-case filenames.
@@ -81,18 +81,4 @@ Use it for new files, refactors, and cleanup PRs. Legacy exceptions stay listed 
 
 ## TODO: Remaining Naming Violations
 
-- [ ] `client/src/components/SurveyTool/SurveyGenerator/AudioSurveyGenerator.test.js` is a component test that still uses `.test.js` instead of `.test.jsx`.
-- [ ] `client/src/components/CommunityTab/CommunityTab.test.js` is a component test that still uses `.test.js` instead of `.test.jsx`.
-- [ ] `client/src/components/DebateMode/LiveDebateMode.test.js` is a component test that still uses `.test.js` instead of `.test.jsx`.
-- [ ] `client/src/components/SBTs/CreateSBTGroup.test.js` is a component test that still uses `.test.js` instead of `.test.jsx`.
-- [ ] `client/src/components/SBTs/SBTSelector.test.js` is a component test that still uses `.test.js` instead of `.test.jsx`.
-- [ ] `client/src/components/SurveyTool/BeeswarmPlot.test.js` is a component test that still uses `.test.js` instead of `.test.jsx`.
-- [ ] `client/src/components/SurveyTool/QuestionFilter.test.js` is a component test that still uses `.test.js` instead of `.test.jsx`.
-- [ ] `client/src/components/SurveyTool/SingleQuestionResponse.test.js` is a component test that still uses `.test.js` instead of `.test.jsx`.
-- [ ] `client/src/components/SurveyTool/SurveyResults.test.js` is a component test that still uses `.test.js` instead of `.test.jsx`.
-- [ ] `client/src/utilities/sbt/createSbtFormCache.js` uses `Sbt` instead of `SBT` inside a camelCase utility filename.
-- [ ] `client/src/utilities/sbt/createSbtFormCache.test.js` mirrors the same `Sbt` acronym casing issue as the source file.
-- [ ] `client/src/utilities/session/pendingSbtDrafts.js` uses `Sbt` instead of `SBT` inside a camelCase utility filename.
-- [ ] `client/src/utilities/web3/appRpcSelection.ts` uses `Rpc` instead of `RPC` inside a camelCase utility filename.
-- [ ] `client/src/utilities/web3/appRpcSelection.test.js` mirrors the same `Rpc` acronym casing issue as the source file.
 - [ ] `scripts/build_external_llm_prompt.py` uses snake_case instead of kebab-case.

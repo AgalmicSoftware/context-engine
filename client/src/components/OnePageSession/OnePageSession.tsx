@@ -44,7 +44,6 @@ import {
 } from '../../utilities/cache/cacheScripts.js';
 import { measureSync } from '../../utilities/ui/uiPerfStats.js';
 import { readPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
-import { lazyWithRetry } from '../../utilities/ui/lazyImportRetry.js';
 import { hasCachedCreateSbtForm as hasCachedCreateSbtFormCache } from '../../utilities/sbt/sbtCreateFormCache.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { getSbtDisplayName } from '../../utilities/sbt/sbtDisplayNames.js';

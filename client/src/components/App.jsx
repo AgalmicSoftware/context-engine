@@ -46,7 +46,7 @@ import { InjectedConnector } from 'wagmi/connectors/injected';
 import {
   getFallbackRpcUrlForChain,
   getPrimaryRpcUrlForChain,
-} from '../utilities/web3/appRpcSelection.js';
+} from '../utilities/web3/rpcSelection.js';
 import { wasUserExplicitlyDisconnected } from '../utilities/web3/wagmiDisconnectState.js';
 import { jsonRpcProvider } from 'wagmi/providers/jsonRpc';
 

@@ -113,7 +113,7 @@ const mockAppDependencies = () => {
     jsonRpcProvider: jest.fn(() => ({})),
   }));
 
-  jest.doMock('../utilities/web3/appRpcSelection.js', () => ({
+  jest.doMock('../utilities/web3/rpcSelection.js', () => ({
     getFallbackRpcUrlForChain: jest.fn(() => 'https://fallback.example'),
     getPrimaryRpcUrlForChain: jest.fn(() => 'https://primary.example'),
   }));

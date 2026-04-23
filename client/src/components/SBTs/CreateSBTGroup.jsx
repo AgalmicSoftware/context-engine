@@ -69,7 +69,7 @@ import {
   getScopedCreateSbtFormCacheKey,
   hasMeaningfulCreateSbtFormPayload,
   LEGACY_CREATE_SBT_FORM_CACHE_KEY as FORM_CACHE_KEY,
-} from '../../utilities/sbt/createSbtFormCache.js';
+} from '../../utilities/sbt/sbtCreateFormCache.js';
 import { isCryptoMode, t } from '../../utilities/ui/terminology.js';
 import { normalizeWorkerUrl } from '../../utilities/worker/workerAuth.js';
 
