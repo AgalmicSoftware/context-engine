@@ -35,7 +35,7 @@ test('getSessionConfig reads the session config KV key and normalizes with the r
   });
 });
 
-test('getSessionSecrets reads the session secrets KV key without config normalization', async () => {
+test('getSessionSecrets reads legacy session secrets without config normalization', async () => {
   const calls = [];
   const env = { GROUP_KV: {} };
   const rawSecrets = { openaiKey: 'sk-test' };
@@ -50,6 +50,22 @@ test('getSessionSecrets reads the session secrets KV key without config normaliz
   assert.deepEqual(calls, [
     ['getKvJson', env, 'session:session-a:secrets'],
   ]);
+  assert.deepEqual(result, rawSecrets);
+});
+
+test('getSessionSecrets unwraps v1 session secrets envelopes', async () => {
+  const rawSecrets = { openaiKey: 'sk-test' };
+
+  const result = await getSessionSecrets({ GROUP_KV: {} }, 'session-a', {
+    getKvJson: async () => ({
+      v: 1,
+      kind: 'session-secrets',
+      createdAt: 1000,
+      updatedAt: 2000,
+      secrets: rawSecrets,
+    }),
+  });
+
   assert.deepEqual(result, rawSecrets);
 });
 
@@ -91,18 +107,25 @@ test('putSessionConfig normalizes the value and writes the config KV key', async
   ]);
 });
 
-test('putSessionSecrets preserves the secrets payload and writes the secrets KV key', async () => {
+test('putSessionSecrets wraps the secrets payload in a v1 envelope', async () => {
   const calls = [];
   const env = { GROUP_KV: {} };
   const secrets = { openaiKey: 'sk-test', customRpcUrl: 'https://rpc.example' };
 
   await putSessionSecrets(env, 'session-a', secrets, {
+    now: () => 1234567890000,
     putKvJson: async (passedEnv, key, value) => {
       calls.push(['putKvJson', passedEnv, key, value]);
     },
   });
 
   assert.deepEqual(calls, [
-    ['putKvJson', env, 'session:session-a:secrets', secrets],
+    ['putKvJson', env, 'session:session-a:secrets', {
+      v: 1,
+      kind: 'session-secrets',
+      createdAt: 1234567890000,
+      updatedAt: 1234567890000,
+      secrets,
+    }],
   ]);
 });

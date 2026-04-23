@@ -238,21 +238,29 @@ Runtime:
     - saving an empty `allowOrigins` list is intentional and means "open CORS" for that session (no allowlist).
     - if a `slug` field is present in the config payload, the authenticated request slug / KV key remains authoritative and overwrites mismatched values.
     - `/admin/set-config` preserves existing `limits` / `scopes` object branches when malformed non-object patches are sent, instead of letting those branches degrade into corrupted shapes.
-- `session:{slug}:secrets` JSON:
+- `session:{slug}:secrets` v1 envelope JSON:
   ```json
   {
-    "openaiKey": "...",
-    "anthropicKey": "...",
-    "openrouterKey": "...",
-    "customRpcUrl": "...",
-    "customRpcKey": "...",
-    "arweaveJwk": "{...}",
-    "faucetPrivateKey": "..."
+    "v": 1,
+    "kind": "session-secrets",
+    "createdAt": 1760000000000,
+    "updatedAt": 1760000000000,
+    "secrets": {
+      "openaiKey": "...",
+      "anthropicKey": "...",
+      "openrouterKey": "...",
+      "customRpcUrl": "...",
+      "customRpcKey": "...",
+      "arweaveJwk": "{...}",
+      "faucetPrivateKey": "..."
+    }
   }
   ```
   - Worker KV secrets are normalized on write:
     string values are trimmed, plain objects are persisted as JSON strings,
     and non-object scalars are stringified before storage.
+  - Reads still accept legacy unversioned secrets objects, but new admin and
+    deploy-helper writes store the v1 envelope.
 
 ## Session authority model
 

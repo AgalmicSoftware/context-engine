@@ -130,7 +130,14 @@ describe('deploy-helper worker', () => {
 
     const secretsWrite = fetchMock.calls[5];
     expect(String(secretsWrite[0])).toMatch(/\/storage\/kv\/namespaces\/kv-123\/values\/session:alpha-session:secrets$/);
-    expect(JSON.parse(secretsWrite[1].body)).toEqual({
+    const secretsEnvelope = JSON.parse(secretsWrite[1].body);
+    expect(secretsEnvelope).toEqual(expect.objectContaining({
+      v: 1,
+      kind: 'session-secrets',
+      createdAt: expect.any(Number),
+      updatedAt: expect.any(Number),
+    }));
+    expect(secretsEnvelope.secrets).toEqual({
       openaiKey: 'sk-openai',
       arweaveJwk: '{"kty":"RSA","n":"abc"}',
       faucetPrivateKey: '12345',

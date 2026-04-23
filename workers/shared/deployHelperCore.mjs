@@ -1,4 +1,5 @@
 import rpcDefaults from '../../client/src/variables/rpcDefaults.js';
+import { buildSessionSecretsEnvelope } from './sessionSecretsEnvelope.mjs';
 
 const { getPathRpcUrl } = rpcDefaults;
 
@@ -600,6 +601,7 @@ export const executeDeployHelperRequest = async ({
   const sessionConfigKey = `session:${sessionSlug}:config`;
   const sessionSecretsKey = `session:${sessionSlug}:secrets`;
   const secrets = sanitizeSecrets(body?.secrets || {});
+  const secretsEnvelope = buildSessionSecretsEnvelope(secrets);
 
   const configPut = await cfFetch(apiToken, `/accounts/${accountId}/storage/kv/namespaces/${kvId}/values/${sessionConfigKey}`, {
     method: 'PUT',
@@ -618,7 +620,7 @@ export const executeDeployHelperRequest = async ({
   const secretsPut = await cfFetch(apiToken, `/accounts/${accountId}/storage/kv/namespaces/${kvId}/values/${sessionSecretsKey}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(secrets),
+    body: JSON.stringify(secretsEnvelope),
   }, { fetchImpl });
   if (!secretsPut.ok) {
     return buildFailure(502, {
