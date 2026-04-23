@@ -5,6 +5,8 @@ import { Modal } from 'reactstrap';
 
 import seedComments from './riskMatrixTestData.json';
 import styles from './RiskMatrix.module.scss';
+import { getRiskMatrixAtlasScenariosForCell } from '../../variables/demo/riskMatrixAtlasScenarioData.js';
+import { buildPublicRoute } from '../../utilities/ui/publicUrl.js';
 
 type RiskValence = 'opportunity' | 'risk';
 
@@ -41,6 +43,26 @@ type RiskMatrixState = {
   hoveredColIndex: number | null;
   hoveredSubRowIndex: number | null;
   hoveredSubColIndex: number | null;
+};
+
+type RiskMatrixAtlasScenario = {
+  id: string;
+  riskMatrixCell: string;
+  atlasNodeId: string;
+  atlasNodeLabel: string;
+  title: string;
+  shortTitle?: string;
+  summary: string;
+  valence: 'risk' | 'opportunity' | 'mixed';
+  intensity: number;
+  confidence: string;
+  timeHorizon: string;
+  primaryMechanism: string;
+  riskClaim?: string;
+  opportunityClaim?: string;
+  counterpoint?: string;
+  image?: string | null;
+  imageAlt?: string;
 };
 
 export const RISK_MATRIX_CATEGORIES: RiskCategory[] = [
@@ -810,6 +832,67 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
     );
   };
 
+  renderAtlasScenarioCards = (scenarios: RiskMatrixAtlasScenario[]) => {
+    if (!Array.isArray(scenarios) || scenarios.length === 0) return null;
+
+    return (
+      <section className={styles.atlasScenarioRail} aria-label="Related atlas scenario visualizations">
+        <div className={styles.atlasScenarioRailHeader}>
+          <span className={styles.atlasScenarioEyebrow}>Atlas-linked scenarios</span>
+          <span className={styles.atlasScenarioCount}>{scenarios.length}</span>
+        </div>
+        <div className={styles.atlasScenarioGrid}>
+          {scenarios.map((scenario) => {
+            const atlasHref = `${buildPublicRoute(`/atlas/${scenario.atlasNodeId}`)}?demo=1`;
+
+            return (
+              <article
+                key={scenario.id}
+                className={styles.atlasScenarioCard}
+                data-testid="ce-risk-matrix-atlas-scenario-card"
+              >
+                {scenario.image ? (
+                  <img
+                    className={styles.atlasScenarioImage}
+                    src={scenario.image}
+                    alt={scenario.imageAlt || `${scenario.title} visualization`}
+                  />
+                ) : (
+                  <div className={styles.atlasScenarioImageFallback} aria-hidden="true">
+                    <span>{scenario.atlasNodeLabel}</span>
+                  </div>
+                )}
+                <div className={styles.atlasScenarioContent}>
+                  <div className={styles.atlasScenarioMetaRow}>
+                    <span className={clsx(
+                      styles.atlasScenarioValence,
+                      scenario.valence === 'risk' && styles.atlasScenarioValenceRisk,
+                      scenario.valence === 'opportunity' && styles.atlasScenarioValenceOpportunity,
+                      scenario.valence === 'mixed' && styles.atlasScenarioValenceMixed
+                    )}>
+                      {scenario.valence}
+                    </span>
+                    <span>{scenario.confidence}</span>
+                    <span>{scenario.timeHorizon}</span>
+                  </div>
+                  <h4 className={styles.atlasScenarioTitle}>{scenario.title}</h4>
+                  <p className={styles.atlasScenarioSummary}>{scenario.summary}</p>
+                  <div className={styles.atlasScenarioMechanism}>
+                    <span>Mechanism</span>
+                    <p>{scenario.primaryMechanism}</p>
+                  </div>
+                  <a className={styles.atlasScenarioLink} href={atlasHref}>
+                    Open {scenario.atlasNodeLabel} in atlas
+                  </a>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      </section>
+    );
+  };
+
   renderModal = () => {
     const {
       comment,
@@ -822,6 +905,7 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
     const canSaveComment = !isAggregateSelection && comment.trim().length > 0;
     const modalTitle = formatSelectionTitle(selectedCellId);
     const commentsLabel = existingComments.length === 1 ? '1 note' : `${existingComments.length} notes`;
+    const atlasScenarios = getRiskMatrixAtlasScenariosForCell(selectedCellId) as RiskMatrixAtlasScenario[];
 
     return (
       <Modal
@@ -849,6 +933,8 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
               ×
             </button>
           </div>
+
+          {this.renderAtlasScenarioCards(atlasScenarios)}
 
           {existingComments.length > 0 ? (
             <ul className={styles.commentList} data-testid="ce-risk-matrix-comment-list">
