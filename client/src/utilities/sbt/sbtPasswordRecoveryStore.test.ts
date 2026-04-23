@@ -144,7 +144,7 @@ describe('sbtPasswordRecoveryStore', () => {
       now,
     })).toEqual(['migrated-code']);
 
-    const stored = JSON.parse(storage.getItem(SBT_PASSWORD_RECOVERY_STORAGE_KEY) || '{}');
+    const stored = JSON.parse(storage.getItem(SBT_PASSWORD_RECOVERY_STORAGE_KEY));
     expect(stored.entries[unknownKey]).toBeUndefined();
     expect(stored.entries[scopedKey]).toEqual(expect.objectContaining({
       chainId: 84532,
