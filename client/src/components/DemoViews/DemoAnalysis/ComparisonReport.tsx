@@ -14,9 +14,89 @@ import {
 } from '../../../utilities/demo/demoAnalysisMath.js';
 import styles from './ComparisonReport.module.scss';
 
-const Collapse = ({ isOpen, children }) => (isOpen ? <div>{children}</div> : null);
+type ComparisonGroup = {
+  segmentKey?: string;
+  name: string;
+};
 
-const ComparisonLegend = ({ groups, colorScale }) => (
+type Question = {
+  id: string | number;
+  text: string;
+};
+
+type FlatResponse = {
+  questionId: string | number;
+  responseText: string;
+  segmentKey: string;
+  rate?: number;
+};
+
+type QuestionTag = {
+  tagID: string;
+  tagName: string;
+};
+
+type GroupRate = {
+  groupName: string;
+  segmentKey?: string;
+  rate: number;
+  color?: string;
+};
+
+type AnalysisRow = {
+  questionId: string;
+  questionText: string;
+  responseText: string;
+  consensus: number | null;
+  divergence: number | null;
+  divisiveness: number | null;
+  groupRates: GroupRate[];
+  tags: QuestionTag[];
+};
+
+type BeeswarmPoint = AnalysisRow & {
+  index: number;
+  extremity: number | null;
+  primaryTag: QuestionTag | null;
+  x: number;
+  y: number;
+};
+
+type QuestionTagsById = Record<string, QuestionTag[]>;
+
+type ColorScale = (value: string | number) => string;
+
+type CollapseProps = {
+  isOpen: boolean;
+  children: React.ReactNode;
+};
+
+type ComparisonLegendProps = {
+  groups: ComparisonGroup[];
+  colorScale: ColorScale;
+};
+
+type TagLegendProps = {
+  selectedTags: QuestionTag[];
+  colorScale: ColorScale;
+};
+
+type RateVisualizerProps = {
+  groupRates: GroupRate[];
+  colorScale: ColorScale;
+};
+
+type ComparisonReportProps = {
+  flatResponses?: FlatResponse[];
+  questions?: Question[];
+  comparisonGroups?: ComparisonGroup[];
+  questionTagsData?: QuestionTagsById;
+  onInspectQuestion: (questionId: string) => void;
+};
+
+const Collapse = ({ isOpen, children }: CollapseProps) => (isOpen ? <div>{children}</div> : null);
+
+const ComparisonLegend = ({ groups, colorScale }: ComparisonLegendProps) => (
   <div className={styles.legendContainer}>
     <span className={styles.legendTitle}>Comparing Groups:</span>
     <div className={styles.legendPills}>
@@ -33,7 +113,7 @@ const ComparisonLegend = ({ groups, colorScale }) => (
   </div>
 );
 
-const TagLegend = ({ selectedTags, colorScale }) => {
+const TagLegend = ({ selectedTags, colorScale }: TagLegendProps) => {
   if (!selectedTags || selectedTags.length === 0) {
     return null;
   }
@@ -56,7 +136,7 @@ const TagLegend = ({ selectedTags, colorScale }) => {
   );
 };
 
-const DivergenceVisualizer = ({ groupRates, colorScale }) => {
+const DivergenceVisualizer = ({ groupRates, colorScale }: RateVisualizerProps) => {
   const { min, max } = getMinMaxAgreement(groupRates);
   const minColor = colorScale(groupRates.findIndex((group) => group.groupName === min.groupName));
   const maxColor = colorScale(groupRates.findIndex((group) => group.groupName === max.groupName));
@@ -83,7 +163,7 @@ const DivergenceVisualizer = ({ groupRates, colorScale }) => {
   );
 };
 
-const ConsensusVisualizer = ({ groupRates, colorScale }) => {
+const ConsensusVisualizer = ({ groupRates, colorScale }: RateVisualizerProps) => {
   const consensusRate = Math.min(...groupRates.map((group) => group.rate));
   const sortedGroupRates = [...groupRates].sort((left, right) => right.rate - left.rate);
 
@@ -117,20 +197,20 @@ const ComparisonReport = ({
   comparisonGroups = [],
   questionTagsData = {},
   onInspectQuestion,
-}) => {
+}: ComparisonReportProps) => {
   const [consensusOpen, setConsensusOpen] = useState(true);
   const [divergenceOpen, setDivergenceOpen] = useState(true);
   const [beeswarmOpen, setBeeswarmOpen] = useState(true);
   const [showAllTags, setShowAllTags] = useState(false);
-  const [selectedTagIDs, setSelectedTagIDs] = useState(new Set());
-  const [hoveredContent, setHoveredContent] = useState(null);
+  const [selectedTagIDs, setSelectedTagIDs] = useState<Set<string>>(new Set());
+  const [hoveredContent, setHoveredContent] = useState<React.ReactNode | null>(null);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
   const [swarmWidth, setSwarmWidth] = useState(700);
 
-  const containerRef = useRef(null);
-  const swarmContainerRef = useRef(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const swarmContainerRef = useRef<HTMLDivElement | null>(null);
 
-  const handleMouseMove = (event) => {
+  const handleMouseMove = (event: React.MouseEvent<HTMLDivElement>) => {
     if (!containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
     setTooltipPos({
@@ -139,8 +219,13 @@ const ComparisonReport = ({
     });
   };
 
-  const analysisRows = useMemo(
-    () => buildComparisonReportRows({
+  const analysisRows = useMemo<AnalysisRow[]>(
+    () => (buildComparisonReportRows as (input: {
+      flatResponses: FlatResponse[];
+      questions: Question[];
+      comparisonGroups: ComparisonGroup[];
+      questionTagsData: QuestionTagsById;
+    }) => AnalysisRow[])({
       flatResponses,
       questions,
       comparisonGroups,
@@ -150,8 +235,8 @@ const ComparisonReport = ({
   );
 
   const tagInfo = useMemo(() => {
-    const tagCounts = {};
-    const uniqueTags = new Map();
+    const tagCounts: Record<string, number> = {};
+    const uniqueTags = new Map<string, QuestionTag>();
     analysisRows.forEach((row) => {
       row.tags.forEach((tag) => {
         if (!tag?.tagID) return;
@@ -169,10 +254,10 @@ const ComparisonReport = ({
     return { tagCounts, displayTags };
   }, [analysisRows]);
 
-  const groupColorScale = useMemo(() => d3.scaleOrdinal(d3.schemeCategory10), []);
+  const groupColorScale = useMemo<ColorScale>(() => d3.scaleOrdinal<string | number, string>(d3.schemeCategory10), []);
   const tagColorScale = useMemo(() => {
     const tagIDs = tagInfo.displayTags.map((tag) => tag.tagID);
-    return d3.scaleOrdinal(d3.schemeTableau10).domain(tagIDs);
+    return d3.scaleOrdinal<string | number, string>(d3.schemeTableau10).domain(tagIDs);
   }, [tagInfo.displayTags]);
 
   const filteredRows = useMemo(() => {
@@ -183,11 +268,11 @@ const ComparisonReport = ({
   const analysisResults = useMemo(() => ({
     topConsensus: filteredRows
       .filter((row) => row.consensus !== null)
-      .sort((left, right) => right.consensus - left.consensus)
+      .sort((left, right) => Number(right.consensus || 0) - Number(left.consensus || 0))
       .slice(0, 20),
     topDivergence: filteredRows
       .filter((row) => row.divergence !== null)
-      .sort((left, right) => right.divergence - left.divergence)
+      .sort((left, right) => Number(right.divergence || 0) - Number(left.divergence || 0))
       .slice(0, 20),
     beeswarmData: filteredRows
       .filter((row) => row.divisiveness !== null)
@@ -209,7 +294,7 @@ const ComparisonReport = ({
       Math.max(0, swarmWidth - plotPadding.left - plotPadding.right),
       160,
       plotPadding
-    );
+    ) as BeeswarmPoint[];
   }, [analysisResults.beeswarmData, swarmWidth]);
 
   useEffect(() => {
@@ -231,7 +316,7 @@ const ComparisonReport = ({
     [selectedTagIDs, tagInfo.displayTags]
   );
 
-  const handleTagChange = (tagID) => {
+  const handleTagChange = (tagID: string) => {
     setSelectedTagIDs((previous) => {
       const next = new Set(previous);
       if (next.has(tagID)) {
@@ -251,7 +336,7 @@ const ComparisonReport = ({
       return <p className={styles.noData}>No data available to generate a beeswarm plot for the current filter.</p>;
     }
 
-    const tooltipForPoint = (point) => (
+    const tooltipForPoint = (point: BeeswarmPoint) => (
       <div className={styles.tooltipContent}>
         <p className={styles.tooltipQuestion}>{point.questionText}</p>
         <p className={styles.tooltipResponse}>Response: "{point.responseText}"</p>
@@ -297,7 +382,7 @@ const ComparisonReport = ({
     );
   };
 
-  const renderAnalysisList = (items, type) => {
+  const renderAnalysisList = (items: AnalysisRow[], type: 'Consensus' | 'Divergence') => {
     if (comparisonGroups.length < 2) {
       return <p className={styles.noData}>Please select at least two demographic groups to compare.</p>;
     }
