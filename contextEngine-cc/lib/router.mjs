@@ -1,0 +1,2011 @@
+import { setTimeout as nativeSetTimeout, clearTimeout as nativeClearTimeout } from 'node:timers';
+import { readFileSync, mkdirSync, existsSync, readdirSync, rmSync } from 'fs';
+import { resolve, dirname, relative } from 'path';
+import { fileURLToPath } from 'url';
+import { homedir } from 'os';
+import { ethers } from 'ethers';
+import { decodeTokenPayload, verifyJwt, signJwt } from './jwt.mjs';
+import { debug, warn, error } from './log.mjs';
+import {
+  decryptFromFile,
+  encryptToFile,
+  isEncryptedFile,
+  migrateToEncrypted,
+  writeSecureFile,
+} from './keyEncryption.mjs';
+import { requireLocalJwtAuth as requireAuth } from './localAuth.mjs';
+import { listScopedSessions, getCorsWorkerUrl, getSessionMetadata } from './sessions.mjs';
+import {
+  CE_SESSION_SCAN_SCOPE,
+  CE_SESSION_SCAN_SLUGS,
+  DEFAULT_CHAIN_ID,
+  DEFAULT_CHAIN_METADATA,
+  resolveRpcUrlsForChain,
+} from './constants.mjs';
+import {
+  fetchQuestionIds,
+  getRandomUnseen,
+  getMergedAnsweredQuestionIds,
+  formatQuestionForTerminal,
+  warmQuestionCache,
+  clearServed,
+} from './questions.mjs';
+import { submitResponses as submitOnChain, submitQuestions, canSubmit } from './submit.mjs';
+import { isTrustedLocalRequest } from './localRequest.mjs';
+import { recordConfirmedSubmission } from './submissionState.mjs';
+
+const LOCAL_AUTH_ORIGIN = 'http://localhost:7391';
+import { normalizeConfiguredSessions } from '../public/js/sessionSlugs.mjs';
+import {
+  deriveResponseGateOptionsFromMetadata,
+  normalizeResponseAudienceSelections,
+  isEncryptedAudience,
+} from './responseAudience.mjs';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const DATA_DIR = resolve(process.env.CE_CC_DATA_DIR || resolve(__dirname, '..', '.data'));
+const RESPONSES_DIR = resolve(DATA_DIR, 'responses');
+const WORKER_TOKENS_DIR = resolve(DATA_DIR, 'worker-tokens');
+const CONFIRMED_SUBMISSIONS_DIR = resolve(DATA_DIR, 'confirmed-submissions');
+const SETTINGS_PATH = resolve(DATA_DIR, 'settings.json');
+const DEFAULT_HOOK_COOLDOWN_MS = 45_000;
+const MAX_HOOK_COOLDOWN_MS = 600_000;
+const RESPONSE_COOLDOWN_INCREMENT_MS = 120_000;
+const AUTO_SUBMIT_AWAIT_TIMEOUT_MS_DEFAULT = 30_000;
+const DEFAULT_QUESTION_SURFACING_MODE = 'manual';
+const QUESTION_SURFACING_MODES = new Set(['manual', 'idle', 'ambient']);
+function getAutoSubmitAwaitTimeoutMs() {
+  const raw = Number(process.env.CE_CC_AUTO_SUBMIT_AWAIT_TIMEOUT_MS);
+  return Number.isFinite(raw) && raw > 0 ? raw : AUTO_SUBMIT_AWAIT_TIMEOUT_MS_DEFAULT;
+}
+const FAUCET_THRESHOLD_ETH = '0.001';
+const FAUCET_THRESHOLD_WEI = ethers.utils.parseEther(FAUCET_THRESHOLD_ETH);
+const SESSION_SLUG_RE = /^[a-z0-9_-]+$/i;
+const MAX_SESSION_SLUG_LENGTH = 128;
+const CONFIG_SESSION_SLUG_RE = /^[a-z0-9][a-z0-9_-]{0,63}$/;
+const LOOPBACK_HOSTNAMES = new Set(['localhost', '127.0.0.1', '0.0.0.0', '::1', '[::1]']);
+const MAX_ANSWER_LENGTH = 10_000;
+const DEFAULT_SUBMIT_SETTINGS = Object.freeze({
+  submitMode: 'immediate',
+  autoSubmitResponses: true,
+  batchSize: 5,
+});
+
+function normalizeHookCooldownMs(value, fallback = DEFAULT_HOOK_COOLDOWN_MS) {
+  const raw = Number(value);
+  const fallbackNum = Number(fallback);
+  const base = Number.isFinite(raw)
+    ? raw
+    : (Number.isFinite(fallbackNum) ? fallbackNum : DEFAULT_HOOK_COOLDOWN_MS);
+  return Math.max(0, Math.min(MAX_HOOK_COOLDOWN_MS, Math.floor(base)));
+}
+
+function normalizeBooleanConfig(value, fallback) {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === 'true') return true;
+    if (normalized === 'false') return false;
+  }
+  return fallback;
+}
+
+function normalizeQuestionSurfacingMode(value, fallback = DEFAULT_QUESTION_SURFACING_MODE) {
+  const normalized = String(value || '').trim().toLowerCase();
+  return QUESTION_SURFACING_MODES.has(normalized) ? normalized : fallback;
+}
+
+function validateQuestionSurfacingMode(value) {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (!QUESTION_SURFACING_MODES.has(normalized)) {
+    return {
+      ok: false,
+      error: `questionSurfacingMode must be one of: ${[...QUESTION_SURFACING_MODES].join(', ')}.`,
+    };
+  }
+  return { ok: true, mode: normalized };
+}
+
+function withHookConfigDefaults(config = {}) {
+  const raw = config && typeof config === 'object' ? config : {};
+  return {
+    serverUrl: 'http://localhost:7391',
+    ...raw,
+    questionSurfacingMode: normalizeQuestionSurfacingMode(raw.questionSurfacingMode),
+    ambientInterruptions: normalizeBooleanConfig(raw.ambientInterruptions, false),
+    statuslineQuestionHints: normalizeBooleanConfig(raw.statuslineQuestionHints, true),
+  };
+}
+
+// Hook config lives in the installed plugin state dir (shared with hook.mjs)
+// The hook is installed at ~/.claude/plugins/contextEngine-cc/ — state must match
+const HOOK_STATE_DIR = resolve(
+  process.env.CE_CC_HOOK_STATE_DIR ||
+  resolve(homedir(), '.claude', 'plugins', 'contextEngine-cc', '.state')
+);
+const HOOK_CONFIG_PATH = resolve(HOOK_STATE_DIR, 'config.json');
+const HOOK_COOLDOWN_PATH = resolve(HOOK_STATE_DIR, 'last-ts');
+const HOOK_DASHBOARD_PATH = resolve(HOOK_STATE_DIR, 'dashboard.json');
+// Prevent concurrent routes from submitting the same local pending response twice.
+const pendingResponseSubmissionLocks = new Set();
+
+function loadHookConfig() {
+  if (!existsSync(HOOK_CONFIG_PATH)) return withHookConfigDefaults();
+  try { return withHookConfigDefaults(JSON.parse(readFileSync(HOOK_CONFIG_PATH, 'utf8'))); }
+  catch { return withHookConfigDefaults(); }
+}
+
+function loadHookDashboardState() {
+  if (!existsSync(HOOK_DASHBOARD_PATH)) return null;
+  try { return JSON.parse(readFileSync(HOOK_DASHBOARD_PATH, 'utf8')); }
+  catch { return null; }
+}
+
+function loadHookTimestamp(path) {
+  if (!existsSync(path)) return null;
+  const raw = Number(readFileSync(path, 'utf8').trim());
+  return Number.isFinite(raw) && raw > 0 ? raw : null;
+}
+
+function saveHookConfig(config) {
+  mkdirSync(HOOK_STATE_DIR, { recursive: true });
+  writeSecureFile(HOOK_CONFIG_PATH, JSON.stringify(config, null, 2));
+}
+
+function getSelectedHookSessions(config = {}) {
+  return normalizeConfiguredSessions({
+    selectedSessions: config.selectedSessions,
+  });
+}
+
+function getConfiguredSessions(config = {}) {
+  return normalizeConfiguredSessions({
+    selectedSessions: config.selectedSessions,
+    defaultSession: config.defaultSession,
+  });
+}
+
+function getHookCooldownState(config = {}) {
+  const totalMs = normalizeHookCooldownMs(config.cooldownMs);
+  const lastShownAt = loadHookTimestamp(HOOK_COOLDOWN_PATH);
+  const elapsedMs = lastShownAt ? Math.max(0, Date.now() - lastShownAt) : 0;
+  const remainingMs = lastShownAt ? Math.max(0, totalMs - elapsedMs) : 0;
+  return {
+    totalMs,
+    lastShownAt,
+    remainingMs,
+    active: remainingMs > 0,
+  };
+}
+
+function loadSettings() {
+  if (!existsSync(SETTINGS_PATH)) return { ...DEFAULT_SUBMIT_SETTINGS };
+  try {
+    return normalizeSubmitSettings(JSON.parse(readFileSync(SETTINGS_PATH, 'utf8')));
+  } catch {
+    return { ...DEFAULT_SUBMIT_SETTINGS };
+  }
+}
+
+function saveSettings(settings) {
+  mkdirSync(DATA_DIR, { recursive: true });
+  writeSecureFile(SETTINGS_PATH, JSON.stringify(normalizeSubmitSettings(settings), null, 2));
+}
+
+function normalizeSubmitSettings(settings = {}) {
+  const explicitAutoSubmitResponses = typeof settings?.autoSubmitResponses === 'boolean'
+    ? settings.autoSubmitResponses
+    : null;
+  const normalizedMode = settings?.submitMode === 'batch' ? 'batch' : 'immediate';
+  const autoSubmitResponses = explicitAutoSubmitResponses == null
+    ? normalizedMode !== 'batch'
+    : explicitAutoSubmitResponses;
+
+  return {
+    submitMode: autoSubmitResponses ? 'immediate' : 'batch',
+    autoSubmitResponses,
+    batchSize: Math.max(1, Math.min(50, Number(settings?.batchSize) || DEFAULT_SUBMIT_SETTINGS.batchSize)),
+  };
+}
+
+function applySubmitSettingsUpdate(current = loadSettings(), patch = {}) {
+  const base = normalizeSubmitSettings(current);
+  const next = {
+    ...base,
+  };
+
+  if (patch?.batchSize !== undefined) {
+    next.batchSize = patch.batchSize;
+  }
+  if (typeof patch?.autoSubmitResponses === 'boolean') {
+    next.autoSubmitResponses = patch.autoSubmitResponses;
+  } else if (patch?.submitMode !== undefined) {
+    next.autoSubmitResponses = patch.submitMode !== 'batch';
+  }
+
+  return normalizeSubmitSettings(next);
+}
+
+function buildPublicSubmitSettings(settings = loadSettings()) {
+  const normalized = normalizeSubmitSettings(settings);
+  return {
+    ...normalized,
+    chainId: DEFAULT_CHAIN_ID,
+    chainName: DEFAULT_CHAIN_METADATA.name,
+    txExplorerTxBaseUrl: DEFAULT_CHAIN_METADATA.txExplorerTxBaseUrl,
+  };
+}
+
+function buildPublicHookConfig(config = loadHookConfig()) {
+  const { defaultConviction: _unusedDefaultConviction, ...publicConfig } = withHookConfigDefaults(config);
+  return {
+    ...publicConfig,
+    chainId: DEFAULT_CHAIN_ID,
+    chainName: DEFAULT_CHAIN_METADATA.name,
+    txExplorerTxBaseUrl: DEFAULT_CHAIN_METADATA.txExplorerTxBaseUrl,
+  };
+}
+
+function saveWorkerToken(slug, token) {
+  mkdirSync(WORKER_TOKENS_DIR, { recursive: true });
+  const file = resolve(WORKER_TOKENS_DIR, `${slug.replace(/[^a-zA-Z0-9_-]/g, '_')}.jwt`);
+  writeSecureFile(file, token);
+}
+
+function loadWorkerToken(slug) {
+  const file = resolve(WORKER_TOKENS_DIR, `${slug.replace(/[^a-zA-Z0-9_-]/g, '_')}.jwt`);
+  if (!existsSync(file)) return null;
+  try { return readFileSync(file, 'utf8').trim(); }
+  catch { return null; }
+}
+
+function getWorkerTokenStatus(slug, walletAddress = '') {
+  const tokenStr = loadWorkerToken(slug);
+  if (!tokenStr) {
+    return { session: slug, status: 'missing', expired: false };
+  }
+
+  const validation = validateWorkerToken(tokenStr, {
+    session: slug,
+    walletAddress,
+  });
+  if (!validation.ok) {
+    const loweredError = String(validation.error || '').toLowerCase();
+    const expired = loweredError.includes('expired');
+    return {
+      session: slug,
+      status: expired ? 'expired' : 'invalid',
+      expired,
+      error: validation.error,
+    };
+  }
+
+  return {
+    session: slug,
+    status: 'valid',
+    expired: false,
+    expiresAt: validation.payload?.exp
+      ? new Date(Number(validation.payload.exp) * 1000).toISOString()
+      : null,
+  };
+}
+
+function summarizeWorkerTokenStatuses(slugs = [], walletAddress = '') {
+  const sessions = (Array.isArray(slugs) ? slugs : []).map((slug) => getWorkerTokenStatus(slug, walletAddress));
+  const validSessions = sessions.filter((entry) => entry.status === 'valid').map((entry) => entry.session);
+  const missingSessions = sessions.filter((entry) => entry.status === 'missing').map((entry) => entry.session);
+  const expiredSessions = sessions.filter((entry) => entry.status === 'expired').map((entry) => entry.session);
+  const invalidSessions = sessions.filter((entry) => entry.status === 'invalid').map((entry) => entry.session);
+  const needsAttentionCount = missingSessions.length + expiredSessions.length + invalidSessions.length;
+
+  return {
+    ready: needsAttentionCount === 0,
+    total: sessions.length,
+    validCount: validSessions.length,
+    missingCount: missingSessions.length,
+    expiredCount: expiredSessions.length,
+    invalidCount: invalidSessions.length,
+    needsAttentionCount,
+    validSessions,
+    missingSessions,
+    expiredSessions,
+    invalidSessions,
+    sessions,
+  };
+}
+
+function getResponseFilePath(slug, questionId) {
+  return resolve(RESPONSES_DIR, slug, `${String(questionId || '').replace(/[^a-fA-F0-9x]/g, '_')}.json`);
+}
+
+function buildPendingSubmissionLockKey(slug, response) {
+  const normalizedSlug = String(slug ?? '').trim().toLowerCase();
+  const questionId = String(response?.questionId || '').trim().toLowerCase();
+  const respondent = String(response?.respondent || '').trim().toLowerCase();
+  if (!questionId) return '';
+  const lockSlug = normalizedSlug || '__default__';
+  return `${lockSlug}:${respondent}:${questionId}`;
+}
+
+function acquirePendingSubmissionLease(slug, responses) {
+  const input = Array.isArray(responses) ? responses : [];
+  const acquiredKeys = [];
+  const localKeys = new Set();
+  const lockedResponses = [];
+
+  input.forEach((response) => {
+    const key = buildPendingSubmissionLockKey(slug, response);
+    if (!key || localKeys.has(key) || pendingResponseSubmissionLocks.has(key)) return;
+    localKeys.add(key);
+    pendingResponseSubmissionLocks.add(key);
+    acquiredKeys.push(key);
+    lockedResponses.push(response);
+  });
+
+  return {
+    responses: lockedResponses,
+    release() {
+      acquiredKeys.forEach((key) => pendingResponseSubmissionLocks.delete(key));
+    },
+  };
+}
+
+function loadPendingResponses(slug) {
+  const validated = validateSessionSlug(slug);
+  if (!validated.ok) return [];
+  const dir = resolve(RESPONSES_DIR, validated.slug);
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir)
+    .filter(f => f.endsWith('.json'))
+    .map(f => {
+      try { return JSON.parse(readFileSync(resolve(dir, f), 'utf8')); }
+      catch { return null; }
+    })
+    .filter(r => r && !r.submitted);
+}
+
+async function buildStatusSessionSummary(
+  slug,
+  walletAddress,
+  {
+    fetchQuestionIdsImpl = fetchQuestionIds,
+    getMergedAnsweredQuestionIdsImpl = getMergedAnsweredQuestionIds,
+  } = {}
+) {
+  const pending = filterResponsesByRespondent(loadPendingResponses(slug), walletAddress);
+  try {
+    const ids = await fetchQuestionIdsImpl(slug);
+    const allIds = Array.isArray(ids) ? ids : [...(ids || [])];
+    const answeredIds = allIds.length > 0
+      ? await getMergedAnsweredQuestionIdsImpl(slug, allIds, walletAddress)
+      : new Set();
+    const total = allIds.length;
+    const answered = answeredIds?.size || 0;
+    return {
+      slug,
+      total,
+      answered,
+      remaining: Math.max(0, total - answered),
+      pending: pending.length,
+    };
+  } catch (err) {
+    return {
+      slug,
+      total: 0,
+      answered: 0,
+      remaining: 0,
+      pending: pending.length,
+      error: err.message,
+    };
+  }
+}
+
+const normalizeAddressLower = (value) => String(value || '').trim().toLowerCase();
+const shortAddress = (value) => {
+  const normalized = normalizeAddressLower(value);
+  return normalized ? normalized.slice(0, 10) : 'unknown';
+};
+// Fail-closed: treat any non-explicitly-false value as encryption requested.
+// Only false, 'false', 0, '', null, undefined are treated as 'no encryption'.
+function isEncryptionRequested(value) {
+  if (value == null || value === '' || value === 0) return false;
+  if (value === false || value === 'false') return false;
+  return true; // fail closed - unknown truthy values treated as 'yes, encrypt'
+}
+
+export function filterResponsesByRespondent(responses, respondentAddress = '') {
+  const input = Array.isArray(responses) ? responses : [];
+  const respondent = normalizeAddressLower(respondentAddress);
+  if (!respondent) return input.slice();
+  return input.filter((entry) => normalizeAddressLower(entry?.respondent) === respondent);
+}
+
+export function filterPendingResponsesForSubmission(
+  responses,
+  { respondentAddress = '', questionIds = [] } = {}
+) {
+  const filteredByRespondent = filterResponsesByRespondent(responses, respondentAddress);
+  const ids = Array.isArray(questionIds)
+    ? questionIds.map((id) => String(id || '').trim().toLowerCase()).filter(Boolean)
+    : [];
+  if (!ids.length) return filteredByRespondent;
+  const idSet = new Set(ids);
+  return filteredByRespondent.filter((entry) => idSet.has(String(entry?.questionId || '').toLowerCase()));
+}
+
+function validateSessionSlug(value, { required = false, allowExplicitEmpty = false } = {}) {
+  const raw = value == null ? null : String(value).trim();
+  if (raw == null) {
+    if (required) return { ok: false, error: 'session required.' };
+    return { ok: true, slug: '' };
+  }
+  if (!raw) {
+    if (required && !allowExplicitEmpty) return { ok: false, error: 'session required.' };
+    return { ok: true, slug: '' };
+  }
+  const slug = raw;
+  if (slug.length > MAX_SESSION_SLUG_LENGTH || !SESSION_SLUG_RE.test(slug)) {
+    return { ok: false, error: 'Invalid session slug.' };
+  }
+  return { ok: true, slug };
+}
+
+function validateConfigSessionSlug(value, fieldName, { allowEmpty = false } = {}) {
+  if (typeof value !== 'string') {
+    return { ok: false, error: `${fieldName} must be a string.` };
+  }
+  const slug = value.trim();
+  if (!slug) {
+    if (allowEmpty) {
+      return { ok: true, slug: '' };
+    }
+    return { ok: false, error: `${fieldName} must be a non-empty session slug.` };
+  }
+  if (slug.includes('/') || slug.includes('\\') || slug.includes('..')) {
+    return { ok: false, error: `${fieldName} must not contain path separators.` };
+  }
+  if (!CONFIG_SESSION_SLUG_RE.test(slug)) {
+    return {
+      ok: false,
+      error: `${fieldName} must be a lowercase slug matching /^[a-z0-9][a-z0-9_-]{0,63}$/.`,
+    };
+  }
+  return { ok: true, slug };
+}
+
+function validateSelectedSessions(value) {
+  if (!Array.isArray(value)) {
+    return { ok: false, error: 'selectedSessions must be an array of session slugs.' };
+  }
+  const selectedSessions = [];
+  for (let index = 0; index < value.length; index += 1) {
+    const entryValidation = validateConfigSessionSlug(value[index], `selectedSessions[${index}]`, {
+      allowEmpty: true,
+    });
+    if (!entryValidation.ok) return entryValidation;
+    selectedSessions.push(entryValidation.slug);
+  }
+  return { ok: true, selectedSessions };
+}
+
+function validateLoopbackServerUrl(value) {
+  if (typeof value !== 'string') {
+    return { ok: false, error: 'serverUrl must be a string URL.' };
+  }
+  const serverUrl = value.trim();
+  if (!serverUrl) {
+    return { ok: false, error: 'serverUrl must be a valid loopback URL.' };
+  }
+  let parsed;
+  try {
+    parsed = new URL(serverUrl);
+  } catch {
+    return { ok: false, error: 'serverUrl must be a valid URL.' };
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    return { ok: false, error: 'serverUrl must use http:// or https://.' };
+  }
+  if (!LOOPBACK_HOSTNAMES.has(parsed.hostname)) {
+    return {
+      ok: false,
+      error: 'serverUrl must use a loopback host (localhost, 127.0.0.1, ::1, or 0.0.0.0).',
+    };
+  }
+  return { ok: true, serverUrl };
+}
+
+function validateQuestionId(value) {
+  const questionId = String(value || '').trim();
+  if (!ethers.utils.isHexString(questionId, 32)) {
+    return { ok: false, error: 'questionId must be a 32-byte hex string.' };
+  }
+  return { ok: true, questionId: questionId.toLowerCase() };
+}
+
+function normalizeStoredResponseAnswer(answer, normalizedQuestionType, resolvedAnswer) {
+  if (Array.isArray(answer)) {
+    if (normalizedQuestionType !== 'multichoice') {
+      return { ok: false, status: 400, error: 'Invalid answer type' };
+    }
+    const normalizedChoices = [];
+    for (const entry of answer) {
+      const entryType = typeof entry;
+      if (entryType !== 'string' && entryType !== 'number') {
+        return { ok: false, status: 400, error: 'Invalid answer type' };
+      }
+      const normalizedEntry = String(entry).trim();
+      if (!normalizedEntry) continue;
+      if (normalizedEntry.length > MAX_ANSWER_LENGTH) {
+        return { ok: false, status: 400, error: `Answer options must be ${MAX_ANSWER_LENGTH} characters or fewer.` };
+      }
+      normalizedChoices.push(normalizedEntry);
+    }
+    if (normalizedChoices.length === 0) {
+      return { ok: false, status: 400, error: 'questionId and answer are required.' };
+    }
+    return { ok: true, storedAnswer: normalizedChoices };
+  }
+
+  const rawAnswerType = typeof answer;
+  const isBinaryBoolean = normalizedQuestionType === 'binary' && rawAnswerType === 'boolean';
+  if (rawAnswerType !== 'string' && rawAnswerType !== 'number' && !isBinaryBoolean) {
+    return { ok: false, status: 400, error: 'Invalid answer type' };
+  }
+
+  const normalizedStoredAnswer = normalizedQuestionType === 'rating' ? resolvedAnswer : answer;
+  if (typeof normalizedStoredAnswer === 'string' && normalizedStoredAnswer.length > MAX_ANSWER_LENGTH) {
+    return { ok: false, status: 400, error: `Answer must be ${MAX_ANSWER_LENGTH} characters or fewer.` };
+  }
+
+  return { ok: true, storedAnswer: normalizedStoredAnswer };
+}
+
+function validateWorkerToken(workerToken, { session = '', walletAddress = '' } = {}) {
+  const raw = String(workerToken || '').trim();
+  if (!raw) return { ok: false, error: 'workerToken required.' };
+
+  const payload = decodeTokenPayload(raw);
+  if (!payload || typeof payload !== 'object') {
+    return { ok: false, error: 'Invalid worker token.' };
+  }
+
+  const exp = Number(payload?.exp || 0);
+  if (!Number.isFinite(exp) || exp <= 0) {
+    return { ok: false, error: 'Worker token missing exp.' };
+  }
+  if (Math.floor(Date.now() / 1000) >= exp) {
+    return { ok: false, error: 'Worker token expired.' };
+  }
+
+  const normalizedSession = String(session || '').trim().toLowerCase();
+  if (normalizedSession) {
+    const tokenSlug = String(payload?.slug || '').trim().toLowerCase();
+    if (!tokenSlug || tokenSlug !== normalizedSession) {
+      return { ok: false, error: 'Worker token does not match session.' };
+    }
+  }
+
+  const normalizedWallet = String(walletAddress || '').trim().toLowerCase();
+  if (normalizedWallet) {
+    const tokenSub = String(payload?.sub || '').trim();
+    if (!ethers.utils.isAddress(tokenSub) || tokenSub.toLowerCase() !== normalizedWallet) {
+      return { ok: false, error: 'Worker token does not match authenticated wallet.' };
+    }
+  }
+
+  return { ok: true, payload };
+}
+
+export function buildHookResponseDefaults(config = {}) {
+  return {
+    encrypt: !!config?.encryptByDefault,
+  };
+}
+
+function buildCompactHookQuestion(question, slug) {
+  if (!question) return null;
+  return {
+    id: question.id || '',
+    session: slug,
+    sessionName: question.sessionName || slug,
+    type: question.type || 'unknown',
+    prompt: question.prompt || '(no prompt)',
+    options: Array.isArray(question.options) ? question.options : [],
+    singleSelect: question.singleSelect !== false,
+    tags: Array.isArray(question.tags) ? question.tags : [],
+    associatedSurveyId: question.associatedSurveyId || null,
+    arweaveTxId: question.arweaveTxId || null,
+  };
+}
+
+function buildAutoSubmitStatus(kind, fields = {}) {
+  switch (kind) {
+    case 'submitted':
+      return {
+        status: 'submitted',
+        alert: 'success',
+        message: 'Auto-submit succeeded.',
+        ...fields,
+      };
+    case 'worker-auth-required':
+      return {
+        status: 'worker-auth-required',
+        alert: 'warning',
+        message: 'Worker auth is required before auto-submit can run.',
+        ...fields,
+      };
+    case 'pending':
+      return {
+        status: 'pending',
+        alert: 'info',
+        message: 'Auto-submit is still in progress; the response remains pending locally.',
+        ...fields,
+      };
+    case 'failed':
+      return {
+        status: 'failed',
+        alert: 'error',
+        message: 'Auto-submit failed; the response remains pending locally.',
+        ...fields,
+      };
+    case 'disabled':
+    default:
+      return {
+        status: 'disabled',
+        alert: 'info',
+        message: 'Auto-submit is disabled; the response was saved locally.',
+        ...fields,
+      };
+  }
+}
+
+function json(res, statusCode, data) {
+  res.writeHead(statusCode, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify(data));
+}
+
+async function proxyUpstreamResponse(res, upstream) {
+  const contentType = upstream.headers.get('content-type') || 'application/json';
+  const bodyText = await upstream.text();
+  res.writeHead(upstream.status, { 'Content-Type': contentType });
+  res.end(bodyText);
+}
+
+function getFaucetProvider() {
+  const rpcUrl = resolveRpcUrlsForChain(DEFAULT_CHAIN_ID)[0];
+  return new ethers.providers.JsonRpcProvider(rpcUrl);
+}
+
+function resolveFaucetProvider(deps = {}) {
+  return typeof deps.getFaucetProvider === 'function'
+    ? deps.getFaucetProvider()
+    : getFaucetProvider();
+}
+
+async function getFaucetBalanceStatus(address, deps = {}) {
+  const provider = resolveFaucetProvider(deps);
+  const balanceWei = await provider.getBalance(address);
+  return {
+    address,
+    balanceWei,
+    balanceEth: ethers.utils.formatEther(balanceWei),
+    eligible: balanceWei.lt(FAUCET_THRESHOLD_WEI),
+    thresholdEth: FAUCET_THRESHOLD_ETH,
+  };
+}
+
+function buildFaucetWorkerRequestBody(recipientAddress, requestBody = {}) {
+  const payload = {
+    action: 'request_test_eth',
+    to: recipientAddress,
+  };
+  const source = (requestBody && typeof requestBody === 'object') ? requestBody : {};
+  ['amountEth', 'amount', 'sbtAddress', 'hashedPassword', 'groupPasswordHash', 'signature'].forEach((key) => {
+    if (source[key] !== undefined && source[key] !== null && String(source[key]).trim() !== '') {
+      payload[key] = source[key];
+    }
+  });
+  return payload;
+}
+
+async function requestFaucetWorkerTransfer({ slug, recipientAddress, requestBody = {} }, deps = {}) {
+  const resolveWorkerUrl = typeof deps.getCorsWorkerUrl === 'function'
+    ? deps.getCorsWorkerUrl
+    : getCorsWorkerUrl;
+  const fetchImpl = typeof deps.fetch === 'function' ? deps.fetch : fetch;
+  const workerUrl = await resolveWorkerUrl(slug);
+  const workerToken = loadWorkerToken(slug);
+  if (!workerUrl || !workerToken) {
+    return {
+      workerUrl,
+      workerToken,
+      workerResponse: null,
+    };
+  }
+
+  const workerResponse = await fetchImpl(`${String(workerUrl).replace(/\/+$/, '')}/${slug}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${workerToken}`,
+    },
+    body: JSON.stringify(buildFaucetWorkerRequestBody(recipientAddress, requestBody)),
+  });
+
+  return {
+    workerUrl,
+    workerToken,
+    workerResponse,
+  };
+}
+
+function getStoredPrivateKeyFromFile() {
+  const keyPath = resolve(DATA_DIR, 'wallet.key');
+  if (!existsSync(keyPath)) return null;
+  try {
+    const decrypted = decryptFromFile(keyPath);
+    if (decrypted) return decrypted.toString('utf8').trim() || null;
+
+    if (isEncryptedFile(keyPath)) {
+      warn(
+        '[auth] Warning: wallet.key could not be decrypted on this machine. On-chain submission may fail until you re-authenticate with a private key.'
+      );
+      return null;
+    }
+
+    const legacy = readFileSync(keyPath, 'utf8').trim() || null;
+    if (legacy) {
+      try {
+        migrateToEncrypted(keyPath);
+      } catch (err) {
+        warn(`[auth] Warning: failed to migrate wallet.key to encrypted storage (${err.message}).`);
+      }
+    }
+    return legacy;
+  }
+  catch { return null; }
+}
+
+async function authenticateWithWorker(slug, walletAddress, privateKey, deps = {}) {
+  const resolveWorkerUrl = typeof deps.getCorsWorkerUrl === 'function' ? deps.getCorsWorkerUrl : getCorsWorkerUrl;
+  const fetchImpl = typeof deps.fetch === 'function' ? deps.fetch : fetch;
+  const workerUrl = await resolveWorkerUrl(slug);
+  if (!workerUrl) throw new Error(`No worker URL for session "${slug}".`);
+  const baseUrl = String(workerUrl).replace(/\/+$/, '');
+
+  const nonceResp = await fetchImpl(`${baseUrl}/auth/nonce`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Origin: LOCAL_AUTH_ORIGIN },
+    body: JSON.stringify({ address: walletAddress, sessionSlug: slug }),
+  });
+  const nonceData = await nonceResp.json();
+  if (!nonceResp.ok || !nonceData?.nonce) {
+    throw new Error(`Failed to get worker nonce: ${nonceData?.error || nonceResp.status}`);
+  }
+
+  const wallet = new ethers.Wallet(privateKey);
+  // SIWE spec requires EIP-55 checksummed address (not lowercase)
+  const checksummedAddress = wallet.address;
+
+  const chainId = DEFAULT_CHAIN_ID;
+  const now = new Date();
+  const exp = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+  const message = 'localhost:7391 wants you to sign in with your Ethereum account:\n'
+    + checksummedAddress + '\n\nSign in to Context Engine.\n\n'
+    + `URI: ${LOCAL_AUTH_ORIGIN}\nVersion: 1\nChain ID: ` + chainId
+    + '\nNonce: ' + nonceData.nonce
+    + '\nIssued At: ' + now.toISOString()
+    + '\nExpiration Time: ' + exp.toISOString();
+
+  const signature = await wallet.signMessage(message);
+
+  const loginResp = await fetchImpl(`${baseUrl}/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Origin: LOCAL_AUTH_ORIGIN },
+    body: JSON.stringify({ address: checksummedAddress, message, signature, sessionSlug: slug }),
+  });
+  const loginData = await loginResp.json();
+  if (!loginResp.ok || !loginData?.token) {
+    throw new Error(`Worker login failed: ${loginData?.error || loginResp.status}`);
+  }
+
+  saveWorkerToken(slug, loginData.token);
+  debug(`[auth] Auto-authenticated with worker for session "${slug}"`);
+  return loginData.token;
+}
+
+async function ensureWorkerToken(slug, walletAddress, deps = {}) {
+  const existing = loadWorkerToken(slug);
+  if (existing) return existing;
+  const privateKey = getStoredPrivateKeyFromFile();
+  if (!privateKey) return null;
+  try {
+    return await authenticateWithWorker(slug, walletAddress, privateKey, deps);
+  } catch (err) {
+    warn(`[auth] Auto worker-auth failed for ${slug}: ${err.message}`);
+    return null;
+  }
+}
+
+function findFirstSessionWithWorkerToken(slugs = []) {
+  for (const slug of slugs) {
+    if (loadWorkerToken(slug)) return slug;
+  }
+  return '';
+}
+
+async function autoRequestFaucetAfterAuth(walletAddress, hookConfig, deps = {}) {
+  const selectedSessions = getConfiguredSessions(hookConfig);
+  let slug = findFirstSessionWithWorkerToken(selectedSessions);
+  if (!slug && selectedSessions.length > 0) {
+    const privateKey = getStoredPrivateKeyFromFile();
+    if (privateKey) {
+      for (const s of selectedSessions) {
+        try {
+          await authenticateWithWorker(s, walletAddress, privateKey, deps);
+          slug = s;
+          break;
+        } catch (err) {
+          warn(`[auth] Auto worker-auth failed for ${s} during faucet: ${err.message}`);
+        }
+      }
+    }
+  }
+  if (!slug) {
+    debug('[auth] Auto-faucet: skipped (no worker token and auto-auth failed)');
+    return;
+  }
+
+  const balance = await getFaucetBalanceStatus(walletAddress, deps);
+  if (!balance.eligible) {
+    debug(`[auth] Auto-faucet: wallet above threshold (${balance.balanceEth} ETH)`);
+    return;
+  }
+
+  const faucetRequest = await requestFaucetWorkerTransfer({ slug, recipientAddress: walletAddress }, deps);
+  if (!faucetRequest.workerToken) {
+    debug('[auth] Auto-faucet: skipped (no worker token)');
+    return;
+  }
+  if (!faucetRequest.workerUrl) {
+    throw new Error(`No worker URL for session "${slug}".`);
+  }
+
+  const responseText = await faucetRequest.workerResponse.text();
+  let responseData = null;
+  try {
+    responseData = JSON.parse(responseText);
+  } catch {
+    responseData = null;
+  }
+
+  if (!faucetRequest.workerResponse.ok) {
+    const reason = String(responseData?.error || responseText || '').trim();
+    throw new Error(reason || `Worker responded with ${faucetRequest.workerResponse.status}.`);
+  }
+
+  const amountEth = String(responseData?.amountEth || '').trim() || 'unknown';
+  const txHash = String(responseData?.txHash || '').trim() || 'unknown';
+  debug(`[auth] Auto-faucet: sent ${amountEth} ETH to ${walletAddress} (tx: ${txHash})`);
+}
+
+// TODO(PRD-348): Defer splitting this monolithic router into focused route modules for a later slice.
+export async function handleRoute(req, res, { url, method, body }, deps = {}) {
+  const path = url.pathname;
+  const submitOnChainImpl = typeof deps.submitOnChain === 'function' ? deps.submitOnChain : submitOnChain;
+  const canSubmitImpl = typeof deps.canSubmit === 'function' ? deps.canSubmit : canSubmit;
+  const getRandomUnseenImpl = typeof deps.getRandomUnseen === 'function' ? deps.getRandomUnseen : getRandomUnseen;
+  const formatQuestionForTerminalImpl = typeof deps.formatQuestionForTerminal === 'function'
+    ? deps.formatQuestionForTerminal
+    : formatQuestionForTerminal;
+
+  // --- Auth: issue local JWT (for skip-SIWE flow) ---
+
+  if (path === '/api/auth/local-jwt' && method === 'POST') {
+    const trusted = isTrustedLocalRequest(req);
+    if (!trusted.ok) {
+      return json(res, 403, {
+        error: 'Local JWT issuance is restricted to trusted local requests.',
+        reason: trusted.reason,
+      });
+    }
+
+    const walletAddressInput = String(body?.walletAddress || '').trim();
+    if (!ethers.utils.isAddress(walletAddressInput)) {
+      return json(res, 400, { error: 'Valid walletAddress required.' });
+    }
+    const walletAddress = walletAddressInput.toLowerCase();
+
+    const privateKeyInput = String(body?.privateKey || '').trim();
+    if (!privateKeyInput) {
+      return json(res, 400, { error: 'privateKey is required to prove wallet ownership.' });
+    }
+    if (!/^0x[0-9a-fA-F]{64}$/.test(privateKeyInput)) {
+      return json(res, 400, { error: 'privateKey must be a 32-byte hex string (0x...).' });
+    }
+    try {
+      const derived = new ethers.Wallet(privateKeyInput).address.toLowerCase();
+      if (derived !== walletAddress) {
+        return json(res, 400, { error: 'privateKey does not match walletAddress.' });
+      }
+    } catch {
+      return json(res, 400, { error: 'Invalid privateKey.' });
+    }
+
+    const keyPath = resolve(DATA_DIR, 'wallet.key');
+    if (existsSync(keyPath)) {
+      try {
+        const storedPrivateKey = getStoredPrivateKeyFromFile();
+        if (storedPrivateKey) {
+          const storedAddress = new ethers.Wallet(storedPrivateKey).address.toLowerCase();
+          if (storedAddress !== walletAddress) {
+            rmSync(keyPath, { force: true });
+            rmSync(RESPONSES_DIR, { recursive: true, force: true });
+            mkdirSync(RESPONSES_DIR, { recursive: true });
+            rmSync(WORKER_TOKENS_DIR, { recursive: true, force: true });
+            mkdirSync(WORKER_TOKENS_DIR, { recursive: true });
+            rmSync(CONFIRMED_SUBMISSIONS_DIR, { recursive: true, force: true });
+            debug(
+              `[auth] Cleaned up old credentials for wallet switch: ${shortAddress(storedAddress)} → ${shortAddress(walletAddress)}`
+            );
+          }
+        }
+      } catch (err) {
+        warn(
+          `[auth] Warning: existing wallet.key could not be derived (${err.message}). On-chain submission may fail until you re-authenticate with a private key.`
+        );
+      }
+    }
+
+    const token = signJwt({ sub: walletAddress, scope: 'claude-code' });
+
+    // Store private key for server-side signing (testnet only)
+    if (privateKeyInput) {
+      mkdirSync(DATA_DIR, { recursive: true });
+      encryptToFile(keyPath, privateKeyInput);
+    }
+
+    const hookConfig = loadHookConfig();
+    const shouldAutoInstall = hookConfig.autoCli !== false;
+
+    // Auto-install token to plugin state dir when enabled.
+    if (shouldAutoInstall) {
+      try {
+        mkdirSync(HOOK_STATE_DIR, { recursive: true });
+        const tokenPath = resolve(HOOK_STATE_DIR, 'token.jwt');
+        writeSecureFile(tokenPath, token);
+        debug(`[auth] Auto-installed JWT to ${tokenPath}`);
+      } catch (err) {
+        error(`[auth] Failed to auto-install JWT:`, err.message);
+      }
+    }
+    json(res, 200, {
+      token,
+      autoInstalled: shouldAutoInstall,
+      walletAddress,
+      privateKeyStored: !!privateKeyInput,
+    });
+
+    autoRequestFaucetAfterAuth(walletAddress, hookConfig, deps).then(() => {
+      // fire-and-forget
+    }).catch((err) => {
+      error('[auth] Auto-faucet failed:', err.message);
+    });
+    return;
+  }
+
+  // --- Store worker tokens per session (for Arweave uploads) ---
+
+  if (path === '/api/auth/worker-token' && method === 'POST') {
+    const auth = requireAuth(req);
+    if (!auth.ok) return json(res, auth.status, { error: auth.error });
+    const { session, workerToken } = body || {};
+    const sessionValidation = validateSessionSlug(session, {
+      required: true,
+      allowExplicitEmpty: true,
+    });
+    if (!sessionValidation.ok) {
+      return json(res, 400, { error: sessionValidation.error });
+    }
+    if (!workerToken) {
+      return json(res, 400, { error: 'session and workerToken required.' });
+    }
+    const tokenValidation = validateWorkerToken(workerToken, {
+      session: sessionValidation.slug,
+      walletAddress: auth.payload?.sub || '',
+    });
+    if (!tokenValidation.ok) {
+      return json(res, 400, { error: tokenValidation.error });
+    }
+    try {
+      const slug = sessionValidation.slug;
+      const normalizedWorkerToken = String(workerToken).trim();
+      const respondent = normalizeAddressLower(auth.payload?.sub || '');
+      saveWorkerToken(slug, normalizedWorkerToken);
+
+      (async () => {
+        let pendingLease = null;
+        try {
+          const config = loadHookConfig();
+          if (config.autoSubmitOnLogin === false || !respondent) return;
+
+          const pending = filterResponsesByRespondent(loadPendingResponses(slug), respondent);
+          if (!pending.length) return;
+          pendingLease = acquirePendingSubmissionLease(slug, pending);
+          const pendingToSubmit = pendingLease.responses;
+          if (!pendingToSubmit.length) return;
+
+          const result = await submitOnChainImpl(pendingToSubmit, slug, normalizedWorkerToken);
+          if (!result.ok) {
+            error(`[router] Auto-submit on login failed for ${slug}: ${result.error}`);
+            return;
+          }
+
+          const submittedAt = new Date().toISOString();
+          for (let i = 0; i < pendingToSubmit.length; i += 1) {
+            const response = pendingToSubmit[i];
+            const file = getResponseFilePath(slug, response.questionId);
+            const stored = JSON.parse(readFileSync(file, 'utf8'));
+            stored.submitted = true;
+            stored.txHash = result.txHash;
+            stored.blockNumber = result.blockNumber ?? null;
+            stored.arweaveTxId = result.arweaveTxIds?.[i] || null;
+            stored.surveyArweaveTxId = result.surveyArweaveTxId || null;
+            stored.submittedAt = submittedAt;
+            writeSecureFile(file, JSON.stringify(stored, null, 2));
+          }
+
+          debug(
+            `[router] Auto-submitted ${pendingToSubmit.length} pending response${pendingToSubmit.length === 1 ? '' : 's'} on login for ${slug} → tx ${result.txHash}`
+          );
+        } catch (err) {
+          error(`[router] Auto-submit on login error for ${slug}: ${err.message}`);
+        } finally {
+          pendingLease?.release();
+        }
+      })();
+
+      return json(res, 200, { ok: true, session: sessionValidation.slug });
+    } catch (err) {
+      return json(res, 500, { error: err.message });
+    }
+  }
+
+  if (path === '/api/auth/worker-tokens' && method === 'GET') {
+    const auth = requireAuth(req);
+    if (!auth.ok) return json(res, auth.status, { error: auth.error });
+    // Return which sessions have stored worker tokens
+    try {
+      mkdirSync(WORKER_TOKENS_DIR, { recursive: true });
+      const files = readdirSync(WORKER_TOKENS_DIR).filter(f => f.endsWith('.jwt'));
+      const sessions = files.map(f => f.replace(/\.jwt$/, ''));
+      return json(res, 200, { sessions });
+    } catch (err) {
+      return json(res, 200, { sessions: [] });
+    }
+  }
+
+  // Check token freshness for selected sessions
+  if (path === '/api/auth/check' && method === 'GET') {
+    const auth = requireAuth(req);
+    if (!auth.ok) return json(res, auth.status, { error: auth.error });
+    try {
+      const config = loadHookConfig();
+      const selected = getConfiguredSessions(config);
+      const workerTokenSummary = summarizeWorkerTokenStatuses(selected, auth.payload?.sub || '');
+      const anyExpired = workerTokenSummary.expiredCount > 0 || workerTokenSummary.invalidCount > 0;
+      return json(res, 200, {
+        sessions: workerTokenSummary.sessions,
+        anyExpired,
+        needsAttention: workerTokenSummary.needsAttentionCount > 0,
+        refreshUrl: config.serverUrl || 'http://localhost:7391',
+      });
+    } catch (err) {
+      return json(res, 500, { error: err.message });
+    }
+  }
+
+  // --- Protected routes ---
+
+  if (path === '/api/me' && method === 'GET') {
+    const auth = requireAuth(req);
+    if (!auth.ok) return json(res, auth.status, { error: auth.error });
+    return json(res, 200, auth.payload);
+  }
+
+  if (path === '/api/sessions' && method === 'GET') {
+    const auth = requireAuth(req);
+    if (!auth.ok) return json(res, auth.status, { error: auth.error });
+    try {
+      const { scoped, all } = await listScopedSessions();
+      for (const slug of scoped) {
+        warmQuestionCache(slug);
+      }
+      return json(res, 200, {
+        sessions: scoped,
+        allSessions: all,
+        scope: CE_SESSION_SCAN_SCOPE,
+        scopeSlugs: CE_SESSION_SCAN_SLUGS,
+      });
+    } catch (err) {
+      return json(res, 500, { error: err.message });
+    }
+  }
+
+  if (path === '/api/session/worker-url' && method === 'GET') {
+    const auth = requireAuth(req);
+    if (!auth.ok) return json(res, auth.status, { error: auth.error });
+    const sessionValidation = validateSessionSlug(url.searchParams.get('session'), {
+      required: true,
+      allowExplicitEmpty: true,
+    });
+    if (!sessionValidation.ok) return json(res, 400, { error: sessionValidation.error });
+    const slug = sessionValidation.slug;
+    try {
+      const workerUrl = await getCorsWorkerUrl(slug);
+      return json(res, 200, { workerUrl: workerUrl || null, slug });
+    } catch (err) {
+      return json(res, 500, { error: err.message });
+    }
+  }
+
+  if (path === '/api/faucet/check' && method === 'GET') {
+    const auth = requireAuth(req);
+    if (!auth.ok) return json(res, auth.status, { error: auth.error });
+    const sessionValidation = validateSessionSlug(url.searchParams.get('session'), {
+      required: true,
+      allowExplicitEmpty: true,
+    });
+    if (!sessionValidation.ok) return json(res, 400, { error: sessionValidation.error });
+    const address = String(auth.payload?.sub || '').trim().toLowerCase();
+    try {
+      const balance = await getFaucetBalanceStatus(address, deps);
+      return json(res, 200, {
+        address: balance.address,
+        balanceEth: balance.balanceEth,
+        eligible: balance.eligible,
+        thresholdEth: balance.thresholdEth,
+      });
+    } catch (err) {
+      return json(res, 500, { error: err.message });
+    }
+  }
+
+  if (path === '/api/faucet' && method === 'POST') {
+    const auth = requireAuth(req);
+    if (!auth.ok) return json(res, auth.status, { error: auth.error });
+    const sessionValidation = validateSessionSlug(body?.session, {
+      required: true,
+      allowExplicitEmpty: true,
+    });
+    if (!sessionValidation.ok) return json(res, 400, { error: sessionValidation.error });
+    const slug = sessionValidation.slug;
+
+    const recipientAddress = String(auth.payload?.sub || '').trim().toLowerCase();
+    if (!ethers.utils.isAddress(recipientAddress)) {
+      return json(res, 400, { error: 'Valid recipient address required.' });
+    }
+
+    try {
+      const workerToken = await ensureWorkerToken(slug, recipientAddress, deps);
+      if (!workerToken) {
+        return json(res, 401, { error: 'No worker token stored. Re-authenticate via PWA.' });
+      }
+      const faucetRequest = await requestFaucetWorkerTransfer({
+        slug,
+        recipientAddress,
+        requestBody: body,
+      }, deps);
+      if (!faucetRequest.workerUrl) return json(res, 400, { error: 'No worker URL for session' });
+      return proxyUpstreamResponse(res, faucetRequest.workerResponse);
+    } catch (err) {
+      return json(res, 500, { error: err.message });
+    }
+  }
+
+  if (path === '/api/questions' && method === 'GET') {
+    const auth = requireAuth(req);
+    if (!auth.ok) return json(res, auth.status, { error: auth.error });
+    const sessionValidation = validateSessionSlug(url.searchParams.get('session'));
+    if (!sessionValidation.ok) return json(res, 400, { error: sessionValidation.error });
+    const slug = sessionValidation.slug;
+    const walletAddr = auth.payload?.sub || '';
+    try {
+      const hookConfig = loadHookConfig();
+      const allowReanswer = hookConfig.allowReanswer === true || hookConfig.allowReanswer === 'true';
+      const randomUnseen = await getRandomUnseenImpl(slug, { walletAddress: walletAddr, allowReanswer });
+      const question = randomUnseen?.question || null;
+      if (!question) return json(res, 200, { question: null, message: 'No questions available.', allowReanswer });
+      const metadata = await getSessionMetadata(slug).catch(() => null);
+      const audienceContext = deriveResponseGateOptionsFromMetadata(metadata, { isQuestionResponseFlow: true });
+      return json(res, 200, {
+        question,
+        allowReanswer,
+        gateOptions: audienceContext.gateOptions,
+        defaultGateId: audienceContext.defaultGateId || '',
+      });
+    } catch (err) {
+      return json(res, 500, { error: err.message });
+    }
+  }
+
+  if (path === '/api/hook/question' && method === 'GET') {
+    const auth = requireAuth(req);
+    if (!auth.ok) return json(res, auth.status, { error: auth.error });
+    const sessionValidation = validateSessionSlug(url.searchParams.get('session'));
+    if (!sessionValidation.ok) return json(res, 400, { error: sessionValidation.error });
+    const slug = sessionValidation.slug;
+    const serverUrl = `${req.headers['x-forwarded-proto'] || 'http'}://${req.headers['host'] || 'localhost'}`;
+    const walletAddr = auth.payload?.sub || '';
+    const hookConfig = loadHookConfig();
+    const presentation = String(url.searchParams.get('presentation') || '').trim().toLowerCase();
+    const compactPresentation = presentation === 'compact' || presentation === 'model';
+    const peek = url.searchParams.get('peek') === '1' || url.searchParams.get('peek') === 'true';
+    const allowReanswer = hookConfig.allowReanswer === true || hookConfig.allowReanswer === 'true';
+    const cooldownMs = normalizeHookCooldownMs(hookConfig.cooldownMs);
+    const defaults = buildHookResponseDefaults(hookConfig);
+    try {
+      const metadata = await getSessionMetadata(slug).catch(() => null);
+      const audienceContext = deriveResponseGateOptionsFromMetadata(metadata, { isQuestionResponseFlow: true });
+      const audienceDefaults = {
+        answerEncryptionAudience: defaults.encrypt
+          ? (audienceContext.defaultGateId ? 'gate' : 'self')
+          : 'none',
+        answerEncryptionGateId: audienceContext.defaultGateId || null,
+        additionalEncryptionAudience: 'follow',
+        additionalEncryptionGateId: null,
+      };
+      const randomUnseen = await getRandomUnseenImpl(slug, { walletAddress: walletAddr, allowReanswer, peek });
+      const question = randomUnseen?.question || null;
+      const answeredCount = Number(randomUnseen?.answeredCount || 0);
+      const totalCount = Number(randomUnseen?.totalCount || 0);
+      const pending = filterResponsesByRespondent(loadPendingResponses(slug), walletAddr);
+      const stats = {
+        total: totalCount,
+        answered: answeredCount,
+        remaining: Math.max(0, totalCount - answeredCount),
+        pending: pending.length,
+      };
+      if (!question) {
+        const noQuestionResult = {
+          ok: true,
+          presentation: compactPresentation ? 'compact' : 'default',
+          formatted: null,
+          question: null,
+          wallet: walletAddr,
+          stats,
+          allowReanswer,
+          cooldownMs,
+          defaults: {
+            ...defaults,
+            ...audienceDefaults,
+          },
+          gateOptions: audienceContext.gateOptions,
+          defaultGateId: audienceContext.defaultGateId || '',
+        };
+        if (compactPresentation) delete noQuestionResult.formatted;
+        return json(res, 200, noQuestionResult);
+      }
+      const formatted = formatQuestionForTerminalImpl(question, slug, serverUrl);
+
+      // Include recent responses for AI-suggested freeform answers
+      let recentResponses = null;
+      const isFreeform = question.type === 'freeform' || (!['binary', 'multichoice', 'rating'].includes(question.type));
+      if (!peek && isFreeform && hookConfig.aiSuggestFreeform !== false) {
+        try {
+          // Gather ALL responses across all sessions for this wallet
+          const allSlugs = getConfiguredSessions(hookConfig);
+          if (allSlugs.length === 0 && slug) allSlugs.push(String(slug).trim());
+          const responses = [];
+          for (const s of allSlugs) {
+            const dir = resolve(RESPONSES_DIR, s);
+            if (!existsSync(dir)) continue;
+            for (const f of readdirSync(dir).filter(f => f.endsWith('.json'))) {
+              try {
+                const r = JSON.parse(readFileSync(resolve(dir, f), 'utf8'));
+                if ((r.respondent || '').toLowerCase() === walletAddr.toLowerCase() && r.answer) {
+                  responses.push({ type: r.questionType, answer: r.answer, ts: r.timestamp });
+                }
+              } catch { /* skip */ }
+            }
+          }
+          // Sort by timestamp, take the last 10
+          responses.sort((a, b) => (a.ts || '').localeCompare(b.ts || ''));
+          recentResponses = responses.slice(-10).reverse();
+        } catch { /* best-effort */ }
+      }
+
+      const result = {
+        ok: true,
+        presentation: compactPresentation ? 'compact' : 'default',
+        formatted,
+        question: compactPresentation ? buildCompactHookQuestion(question, slug) : question,
+        wallet: walletAddr,
+        stats,
+        allowReanswer,
+        cooldownMs,
+        defaults: {
+          ...defaults,
+          ...audienceDefaults,
+        },
+        gateOptions: audienceContext.gateOptions,
+        defaultGateId: audienceContext.defaultGateId || '',
+        showImportance: !!hookConfig.showImportance,
+      };
+      if (recentResponses && recentResponses.length > 0) {
+        result.aiSuggestFreeform = true;
+        if (compactPresentation) {
+          result.recentResponseCount = recentResponses.length;
+        } else {
+          result.recentResponses = recentResponses;
+        }
+      }
+      if (compactPresentation) {
+        delete result.formatted;
+      }
+      return json(res, 200, result);
+    } catch (err) {
+      return json(res, 500, { error: err.message });
+    }
+  }
+
+  if (path === '/api/status' && method === 'GET') {
+    const auth = requireAuth(req);
+    if (!auth.ok) return json(res, auth.status, { error: auth.error });
+
+    const hookConfig = loadHookConfig();
+    const sessions = getConfiguredSessions(hookConfig);
+    const fetchQuestionIdsImpl = typeof deps.fetchQuestionIds === 'function'
+      ? deps.fetchQuestionIds
+      : fetchQuestionIds;
+    const getMergedAnsweredQuestionIdsImpl = typeof deps.getMergedAnsweredQuestionIds === 'function'
+      ? deps.getMergedAnsweredQuestionIds
+      : getMergedAnsweredQuestionIds;
+
+    try {
+      const walletAddress = auth.payload?.sub || '';
+      const sessionSummaries = await Promise.all(
+        sessions.map((slug) => buildStatusSessionSummary(slug, walletAddress, {
+          fetchQuestionIdsImpl,
+          getMergedAnsweredQuestionIdsImpl,
+        }))
+      );
+      const totals = sessionSummaries.reduce((acc, entry) => ({
+        sessions: acc.sessions + 1,
+        total: acc.total + Number(entry.total || 0),
+        answered: acc.answered + Number(entry.answered || 0),
+        remaining: acc.remaining + Number(entry.remaining || 0),
+        pending: acc.pending + Number(entry.pending || 0),
+      }), {
+        sessions: 0,
+        total: 0,
+        answered: 0,
+        remaining: 0,
+        pending: 0,
+      });
+      const settings = loadSettings();
+      const cooldown = getHookCooldownState(hookConfig);
+      const submitStatus = canSubmitImpl();
+      const workerTokenSummary = summarizeWorkerTokenStatuses(sessions, walletAddress);
+      const dashboard = loadHookDashboardState();
+
+      return json(res, 200, {
+        wallet: walletAddress,
+        config: {
+          serverUrl: hookConfig.serverUrl || 'http://localhost:7391',
+          defaultSession: String(hookConfig.defaultSession || '').trim(),
+          selectedSessions: sessions,
+          cooldownMs: normalizeHookCooldownMs(hookConfig.cooldownMs),
+          allowReanswer: hookConfig.allowReanswer === true || hookConfig.allowReanswer === 'true',
+          aiSuggestFreeform: hookConfig.aiSuggestFreeform !== false,
+          showImportance: !!hookConfig.showImportance,
+          questionSurfacingMode: normalizeQuestionSurfacingMode(hookConfig.questionSurfacingMode),
+          ambientInterruptions: normalizeBooleanConfig(hookConfig.ambientInterruptions, false),
+          statuslineQuestionHints: normalizeBooleanConfig(hookConfig.statuslineQuestionHints, true),
+          chainId: DEFAULT_CHAIN_ID,
+          chainName: DEFAULT_CHAIN_METADATA.name,
+          txExplorerTxBaseUrl: DEFAULT_CHAIN_METADATA.txExplorerTxBaseUrl,
+        },
+        cooldown,
+        dashboard,
+        sessions: sessionSummaries,
+        totals,
+        submit: {
+          ready: !!submitStatus.ready,
+          hasKey: !!submitStatus.hasKey,
+          hasContract: !!submitStatus.hasContract,
+          autoSubmitResponses: settings.autoSubmitResponses,
+          mode: settings.submitMode,
+          batchSize: settings.batchSize,
+          chainId: DEFAULT_CHAIN_ID,
+          chainName: DEFAULT_CHAIN_METADATA.name,
+          workerTokens: {
+            ready: workerTokenSummary.ready,
+            total: workerTokenSummary.total,
+            validCount: workerTokenSummary.validCount,
+            missingCount: workerTokenSummary.missingCount,
+            expiredCount: workerTokenSummary.expiredCount,
+            invalidCount: workerTokenSummary.invalidCount,
+            needsAttentionCount: workerTokenSummary.needsAttentionCount,
+            missingSessions: workerTokenSummary.missingSessions,
+            expiredSessions: workerTokenSummary.expiredSessions,
+            invalidSessions: workerTokenSummary.invalidSessions,
+          },
+        },
+        serverTime: new Date().toISOString(),
+      });
+    } catch (err) {
+      return json(res, 500, { error: err.message });
+    }
+  }
+
+  // --- Response submission (store locally for later on-chain submission) ---
+
+  if (path === '/api/respond' && method === 'POST') {
+    const auth = requireAuth(req);
+    if (!auth.ok) return json(res, auth.status, { error: auth.error });
+    const {
+      questionId,
+      session,
+      answer,
+      questionType,
+      conviction,
+      importance,
+      additional,
+      encrypt,
+      encryptAdditional,
+      answerEncryptionAudience,
+      answerEncryptionGateId,
+      additionalEncryptionAudience,
+      additionalEncryptionGateId,
+    } = body || {};
+    const questionValidation = validateQuestionId(questionId);
+    if (!questionValidation.ok) {
+      return json(res, 400, { error: questionValidation.error });
+    }
+    const canonicalQuestionId = questionValidation.questionId;
+    const encryptionRequested = isEncryptionRequested(encrypt);
+    const hasAdditionalText = String(additional ?? '').trim() !== '';
+    const hasExplicitEncryptAdditional = Object.prototype.hasOwnProperty.call(body || {}, 'encryptAdditional');
+    const encryptionAdditionalRequested = hasExplicitEncryptAdditional
+      ? isEncryptionRequested(encryptAdditional)
+      : (encryptionRequested && hasAdditionalText);
+    const normalizedQuestionType = String(questionType || 'unknown').toLowerCase().trim();
+    // Normalize rating answers: extract first numeric value from label strings like '4-6 (Medium)'
+    let resolvedAnswer = answer;
+    if (normalizedQuestionType === 'rating' && answer != null) {
+      if (typeof answer === 'number') {
+        resolvedAnswer = answer;
+      } else {
+        const str = String(answer).trim();
+        const direct = Number(str);
+        if (Number.isFinite(direct)) {
+          resolvedAnswer = direct;
+        } else {
+          const match = str.match(/(\d+(?:\.\d+)?)/);
+          resolvedAnswer = match ? Number(match[1]) : answer;
+        }
+      }
+    }
+    const isEmptyAnswer = resolvedAnswer == null
+      || (typeof resolvedAnswer === 'string' && resolvedAnswer.trim() === '');
+    const isInvalidRating = normalizedQuestionType === 'rating'
+      && (resolvedAnswer == null || !Number.isFinite(Number(resolvedAnswer)) || Number(resolvedAnswer) < 0 || Number(resolvedAnswer) > 10);
+    if (isEmptyAnswer || isInvalidRating) {
+      return json(res, 400, { error: 'questionId and answer are required.' });
+    }
+    const storedAnswerResult = normalizeStoredResponseAnswer(answer, normalizedQuestionType, resolvedAnswer);
+    if (!storedAnswerResult.ok) {
+      return json(res, storedAnswerResult.status, { error: storedAnswerResult.error });
+    }
+    try {
+      const sessionValidation = validateSessionSlug(session, {
+        required: true,
+        allowExplicitEmpty: true,
+      });
+      if (!sessionValidation.ok) {
+        return json(res, 400, { error: sessionValidation.error });
+      }
+      const slug = sessionValidation.slug;
+      const metadata = await getSessionMetadata(slug).catch(() => null);
+      const audienceContext = deriveResponseGateOptionsFromMetadata(metadata, { isQuestionResponseFlow: true });
+      const normalizedAudiences = normalizeResponseAudienceSelections({
+        answerAudience: answerEncryptionAudience,
+        answerGateId: answerEncryptionGateId,
+        additionalAudience: additionalEncryptionAudience,
+        additionalGateId: additionalEncryptionGateId,
+        encryptRequested: encryptionRequested,
+        encryptAdditionalRequested: hasExplicitEncryptAdditional ? encryptionAdditionalRequested : null,
+        hasAdditionalText,
+        gateOptions: audienceContext.gateOptions,
+      });
+      const dir = resolve(RESPONSES_DIR, slug);
+      // Path traversal guard (defense-in-depth): ensure resolved dir stays under RESPONSES_DIR
+      const rel = relative(resolve(RESPONSES_DIR), dir);
+      if (rel.startsWith('..') || resolve(RESPONSES_DIR, rel) !== dir) {
+        return json(res, 400, { error: 'Invalid session slug.' });
+      }
+      mkdirSync(dir, { recursive: true });
+      const response = {
+        questionId: canonicalQuestionId,
+        answer: storedAnswerResult.storedAnswer,
+        conviction: conviction != null ? conviction : null,
+        importance: importance != null ? importance : null,
+        additional: additional || null,
+        encrypt: isEncryptedAudience(normalizedAudiences.answerEncryptionAudience),
+        encryptAdditional: hasAdditionalText
+          ? isEncryptedAudience(normalizedAudiences.additionalEncryptionAudience)
+          : false,
+        answerEncryptionAudience: normalizedAudiences.answerEncryptionAudience,
+        answerEncryptionGateId: normalizedAudiences.answerEncryptionGateId,
+        additionalEncryptionAudience: normalizedAudiences.additionalEncryptionAudience,
+        additionalEncryptionGateId: normalizedAudiences.additionalEncryptionGateId,
+        additionalAudienceMode: normalizedAudiences.additionalAudienceMode,
+        questionType: questionType || 'unknown',
+        respondent: auth.payload.sub,
+        timestamp: new Date().toISOString(),
+        submitted: false, // not yet on-chain
+      };
+      const file = resolve(dir, `${canonicalQuestionId.replace(/[^a-fA-F0-9x]/g, '_')}.json`);
+      writeSecureFile(file, JSON.stringify(response, null, 2));
+
+      // Clear the "recently served" mark so it doesn't block the pool unnecessarily
+      clearServed(questionId);
+
+      // Auto-increment cooldown by 2 minutes after each response (bounded to max).
+      try {
+        const hookConfig = loadHookConfig();
+        const currentCooldown = normalizeHookCooldownMs(hookConfig.cooldownMs);
+        hookConfig.cooldownMs = normalizeHookCooldownMs(
+          currentCooldown + RESPONSE_COOLDOWN_INCREMENT_MS
+        );
+        saveHookConfig(hookConfig);
+        debug(`[router] Cooldown incremented: ${currentCooldown / 1000}s → ${hookConfig.cooldownMs / 1000}s`);
+      } catch (err) {
+        error(`[router] Failed to increment cooldown:`, err.message);
+      }
+
+      // Auto-submit if immediate mode is enabled. Await the submit attempt so
+      // the HTTP response carries the actual outcome (or a timeout marker so
+      // the caller knows the submit is still running in the background).
+      const settings = loadSettings();
+      if (settings.autoSubmitResponses && canSubmitImpl().ready) {
+        const walletAddr = String(auth.payload?.sub || '').trim().toLowerCase();
+        const submitPromise = (async () => {
+          try {
+            const workerToken = await ensureWorkerToken(slug, walletAddr, deps);
+            if (!workerToken) {
+              warn(
+                `[submit] Auto-submit skipped for ${canonicalQuestionId}: no worker token stored or obtainable for session "${slug}"`
+              );
+              return { kind: 'no_worker_token' };
+            }
+
+            try {
+              const balance = await getFaucetBalanceStatus(walletAddr, deps);
+              if (balance.eligible && workerToken) {
+                debug(`[submit] Balance low (${balance.balanceEth} ETH), requesting faucet funds...`);
+                const faucetRequest = await requestFaucetWorkerTransfer({ slug, recipientAddress: walletAddr }, deps);
+                if (faucetRequest.workerResponse?.ok) {
+                  const faucetData = await faucetRequest.workerResponse.json().catch(() => ({}));
+                  debug(
+                    `[submit] Faucet funded: ${faucetData.amountEth || 'unknown'} ETH (tx: ${faucetData.txHash || 'unknown'})`
+                  );
+                  await new Promise((resolve) => setTimeout(resolve, 5000));
+                } else {
+                  const errText = await faucetRequest.workerResponse?.text().catch(() => '');
+                  warn(`[submit] Faucet request failed: ${errText}`);
+                }
+              }
+            } catch (faucetErr) {
+              warn(`[submit] Auto-faucet check failed: ${faucetErr.message}`);
+            }
+
+            const result = await submitOnChainImpl([response], slug, workerToken);
+            if (result.ok) {
+              const stored = JSON.parse(readFileSync(file, 'utf8'));
+              stored.submitted = true;
+              stored.txHash = result.txHash;
+              stored.blockNumber = result.blockNumber ?? null;
+              stored.submittedAt = new Date().toISOString();
+              writeSecureFile(file, JSON.stringify(stored, null, 2));
+              debug(`[router] Auto-submitted response ${canonicalQuestionId} → tx ${result.txHash}`);
+              return { kind: 'submitted', txHash: result.txHash, blockNumber: result.blockNumber ?? null };
+            }
+            error(`[router] Auto-submit failed for ${canonicalQuestionId}: ${result.error}`);
+            return { kind: 'failed', error: String(result.error || 'submit failed') };
+          } catch (err) {
+            error(`[router] Auto-submit error for ${canonicalQuestionId}: ${err.message}`);
+            return { kind: 'failed', error: err.message };
+          }
+        })();
+
+        let timeoutId;
+        const timeoutPromise = new Promise((resolveTimeout) => {
+          timeoutId = nativeSetTimeout(
+            () => resolveTimeout({ kind: 'timeout' }),
+            getAutoSubmitAwaitTimeoutMs(),
+          );
+        });
+
+        const outcome = await Promise.race([submitPromise, timeoutPromise]);
+        nativeClearTimeout(timeoutId);
+        // On timeout, do NOT cancel submitPromise — let it run so the
+        // background `stored.submitted = true` write still happens.
+
+        if (outcome.kind === 'submitted') {
+          const autoSubmit = buildAutoSubmitStatus('submitted', {
+            txHash: outcome.txHash,
+            blockNumber: outcome.blockNumber,
+          });
+          return json(res, 200, {
+            ok: true,
+            stored: true,
+            submitted: true,
+            txHash: outcome.txHash,
+            blockNumber: outcome.blockNumber,
+            requiresWorkerAuth: false,
+            autoSubmit,
+            acknowledgement: 'Submitted securely. Auto-submit succeeded.',
+            message: autoSubmit.message,
+          });
+        }
+        if (outcome.kind === 'no_worker_token') {
+          const autoSubmit = buildAutoSubmitStatus('worker-auth-required');
+          return json(res, 200, {
+            ok: true,
+            stored: true,
+            submitted: false,
+            requiresWorkerAuth: true,
+            autoSubmit,
+            acknowledgement: 'Saved locally. Worker auth is required before auto-submit can run.',
+            message:
+              'Worker auth is required for this session before auto-submit can run; complete worker auth at http://localhost:7391.',
+          });
+        }
+        if (outcome.kind === 'timeout') {
+          const autoSubmit = buildAutoSubmitStatus('pending');
+          return json(res, 200, {
+            ok: true,
+            stored: true,
+            submitted: false,
+            pending: true,
+            requiresWorkerAuth: false,
+            autoSubmit,
+            acknowledgement: 'Saved locally. Auto-submit is still in progress.',
+            message: autoSubmit.message,
+          });
+        }
+        const autoSubmit = buildAutoSubmitStatus('failed', {
+          error: outcome.error,
+        });
+        return json(res, 200, {
+          ok: true,
+          stored: true,
+          submitted: false,
+          error: outcome.error,
+          requiresWorkerAuth: false,
+          autoSubmit,
+          acknowledgement: 'Saved locally. Auto-submit failed.',
+          message: `${autoSubmit.message} ${outcome.error || ''}`.trim(),
+        });
+      }
+
+      const autoSubmit = buildAutoSubmitStatus('disabled');
+      return json(res, 200, {
+        ok: true,
+        stored: true,
+        submitted: false,
+        autoSubmit,
+        acknowledgement: 'Saved locally. Auto-submit is disabled.',
+        message: autoSubmit.message,
+      });
+    } catch (err) {
+      return json(res, 500, { error: err.message });
+    }
+  }
+
+  // --- On-chain submission endpoint ---
+
+  if (path === '/api/responses/submit-onchain' && method === 'POST') {
+    const auth = requireAuth(req);
+    if (!auth.ok) return json(res, auth.status, { error: auth.error });
+
+    const { session, questionIds } = body || {};
+    const sessionValidation = validateSessionSlug(session, {
+      required: true,
+      allowExplicitEmpty: true,
+    });
+    if (!sessionValidation.ok) return json(res, 400, { error: sessionValidation.error });
+    const normalizedQuestionIds = Array.isArray(questionIds)
+      ? questionIds.map((value) => validateQuestionId(value))
+      : null;
+    if (Array.isArray(normalizedQuestionIds) && normalizedQuestionIds.some((entry) => !entry.ok)) {
+      return json(res, 400, { error: 'questionIds must contain only 32-byte hex strings.' });
+    }
+    const normalizedSession = sessionValidation.slug;
+
+    const status = canSubmitImpl();
+    if (!status.ready) {
+      return json(res, 400, { error: `Not ready: hasKey=${status.hasKey}, hasContract=${status.hasContract}` });
+    }
+
+    try {
+      // Load pending responses for this session
+      let pending = loadPendingResponses(normalizedSession);
+      pending = filterPendingResponsesForSubmission(pending, {
+        respondentAddress: auth.payload?.sub || '',
+        questionIds: Array.isArray(normalizedQuestionIds)
+          ? normalizedQuestionIds.map((entry) => entry.questionId)
+          : questionIds,
+      });
+      if (pending.length === 0) {
+        return json(res, 200, { ok: true, count: 0, message: 'No pending responses to submit.' });
+      }
+
+      const pendingLease = acquirePendingSubmissionLease(normalizedSession, pending);
+      const pendingToSubmit = pendingLease.responses;
+      if (pendingToSubmit.length === 0) {
+        return json(res, 200, { ok: true, count: 0, message: 'No pending responses to submit.' });
+      }
+
+      try {
+        const walletAddress = String(auth.payload?.sub || '').trim().toLowerCase();
+        const workerToken = await ensureWorkerToken(normalizedSession, walletAddress, deps);
+        if (!workerToken) {
+          return json(res, 401, { error: 'No worker token stored. Re-authenticate via PWA.' });
+        }
+        const result = await submitOnChainImpl(pendingToSubmit, normalizedSession, workerToken);
+
+        if (result.ok) {
+          // submitResponses() now submits both encrypted and plaintext responses.
+          // arweaveTxIds are returned in the same order as the input pending array.
+          for (let i = 0; i < pendingToSubmit.length; i++) {
+            const r = pendingToSubmit[i];
+            const file = getResponseFilePath(normalizedSession, r.questionId);
+            if (existsSync(file)) {
+              const stored = JSON.parse(readFileSync(file, 'utf8'));
+              stored.submitted = true;
+              stored.txHash = result.txHash;
+              stored.blockNumber = result.blockNumber ?? null;
+              stored.arweaveTxId = result.arweaveTxIds?.[i] || null;
+              stored.surveyArweaveTxId = result.surveyArweaveTxId || null;
+              stored.submittedAt = new Date().toISOString();
+              writeSecureFile(file, JSON.stringify(stored, null, 2));
+            }
+          }
+        }
+
+        return json(res, 200, result);
+      } finally {
+        pendingLease.release();
+      }
+    } catch (err) {
+      return json(res, 500, { error: err.message });
+    }
+  }
+
+  if (path === '/api/submit/status' && method === 'GET') {
+    const auth = requireAuth(req);
+    if (!auth.ok) return json(res, auth.status, { error: auth.error });
+    return json(res, 200, { ...canSubmitImpl(), settings: buildPublicSubmitSettings() });
+  }
+
+  // --- Pending responses ---
+
+  if (path === '/api/responses/pending' && method === 'GET') {
+    const auth = requireAuth(req);
+    if (!auth.ok) return json(res, auth.status, { error: auth.error });
+    const sessionValidation = validateSessionSlug(url.searchParams.get('session'), {
+      required: true,
+      allowExplicitEmpty: true,
+    });
+    if (!sessionValidation.ok) return json(res, 400, { error: sessionValidation.error });
+    const slug = sessionValidation.slug;
+    try {
+      let pending = loadPendingResponses(slug);
+      // Filter by authenticated wallet address so different wallets see only their own
+      pending = filterResponsesByRespondent(pending, auth.payload?.sub || '');
+      return json(res, 200, { pending, count: pending.length });
+    } catch (err) {
+      return json(res, 500, { error: err.message });
+    }
+  }
+
+  if (path === '/api/responses/mark-submitted' && method === 'POST') {
+    const auth = requireAuth(req);
+    if (!auth.ok) return json(res, auth.status, { error: auth.error });
+    const { questionId, session, txHash, arweaveTxId } = body || {};
+    const questionValidation = validateQuestionId(questionId);
+    if (!questionValidation.ok) return json(res, 400, { error: questionValidation.error });
+    const sessionValidation = validateSessionSlug(session, {
+      required: true,
+      allowExplicitEmpty: true,
+    });
+    if (!sessionValidation.ok) return json(res, 400, { error: sessionValidation.error });
+    try {
+      const slug = sessionValidation.slug;
+      const canonicalQuestionId = questionValidation.questionId;
+      const file = getResponseFilePath(slug, canonicalQuestionId);
+      if (!existsSync(file)) {
+        return json(res, 404, { error: 'Response not found.' });
+      }
+      const response = JSON.parse(readFileSync(file, 'utf8'));
+      const respondent = String(response?.respondent || '').trim().toLowerCase();
+      const walletAddress = String(auth.payload?.sub || '').trim().toLowerCase();
+      if (respondent && walletAddress && respondent !== walletAddress) {
+        return json(res, 404, { error: 'Response not found.' });
+      }
+      response.submitted = true;
+      response.txHash = txHash || null;
+      response.arweaveTxId = arweaveTxId || null;
+      response.submittedAt = new Date().toISOString();
+      writeSecureFile(file, JSON.stringify(response, null, 2));
+      try {
+        recordConfirmedSubmission({
+          slug,
+          walletAddress,
+          txHash: txHash || null,
+          questionIds: [canonicalQuestionId],
+          arweaveTxIds: arweaveTxId ? [arweaveTxId] : [],
+          submittedAt: response.submittedAt,
+        });
+      } catch (stateErr) {
+        error(`[router] Failed to record confirmed submission state for ${canonicalQuestionId}: ${stateErr.message}`);
+      }
+      return json(res, 200, { ok: true, submitted: true });
+    } catch (err) {
+      return json(res, 500, { error: err.message });
+    }
+  }
+
+  // --- Question creation (on-chain) ---
+
+  if (path === '/api/questions/create' && method === 'POST') {
+    const auth = requireAuth(req);
+    if (!auth.ok) return json(res, auth.status, { error: auth.error });
+
+    const { session, questions } = body || {};
+    const sessionValidation = validateSessionSlug(session, {
+      required: true,
+      allowExplicitEmpty: true,
+    });
+    if (!sessionValidation.ok) return json(res, 400, { error: sessionValidation.error });
+    const normalizedSession = sessionValidation.slug;
+    if (!Array.isArray(questions) || questions.length === 0) {
+      return json(res, 400, { error: 'questions array required (at least 1).' });
+    }
+
+    // Validate each question
+    for (const q of questions) {
+      if (!q.type || !q.prompt) {
+        return json(res, 400, { error: 'Each question must have type and prompt.' });
+      }
+    }
+
+    const status = canSubmitImpl();
+    if (!status.ready) {
+      return json(res, 400, { error: `Not ready: hasKey=${status.hasKey}, hasContract=${status.hasContract}` });
+    }
+
+    try {
+      const walletAddress = String(auth.payload?.sub || '').trim().toLowerCase();
+      const workerToken = await ensureWorkerToken(normalizedSession, walletAddress, deps);
+      if (!workerToken) {
+        return json(res, 401, { error: 'No worker token stored. Re-authenticate via PWA.' });
+      }
+      const result = await submitQuestions(questions, normalizedSession, workerToken);
+      return json(res, result.ok ? 200 : 500, result);
+    } catch (err) {
+      return json(res, 500, { error: err.message });
+    }
+  }
+
+  // --- Settings (submit mode: immediate vs batch) ---
+
+  if (path === '/api/settings' && method === 'GET') {
+    const auth = requireAuth(req);
+    if (!auth.ok) return json(res, auth.status, { error: auth.error });
+    return json(res, 200, buildPublicSubmitSettings());
+  }
+
+  if (path === '/api/settings' && method === 'POST') {
+    const auth = requireAuth(req);
+    if (!auth.ok) return json(res, auth.status, { error: auth.error });
+    const current = loadSettings();
+    const updated = applySubmitSettingsUpdate(current, body);
+    saveSettings(updated);
+    return json(res, 200, { ok: true, settings: buildPublicSubmitSettings(updated) });
+  }
+
+  // --- Hook config (session selection for CC hook) ---
+
+  if (path === '/api/config' && method === 'GET') {
+    const auth = requireAuth(req);
+    if (!auth.ok) return json(res, auth.status, { error: auth.error });
+    return json(res, 200, buildPublicHookConfig());
+  }
+
+  if (path === '/api/config' && method === 'POST') {
+    const auth = requireAuth(req);
+    if (!auth.ok) return json(res, auth.status, { error: auth.error });
+    const current = loadHookConfig();
+    const updated = { ...current };
+    delete updated.defaultConviction;
+    // Merge provided fields
+    if (body?.serverUrl !== undefined) {
+      const serverUrlValidation = validateLoopbackServerUrl(body.serverUrl);
+      if (!serverUrlValidation.ok) {
+        return json(res, 400, { error: serverUrlValidation.error });
+      }
+      updated.serverUrl = serverUrlValidation.serverUrl;
+    }
+    if (body?.defaultSession !== undefined) {
+      const defaultSessionValidation = validateConfigSessionSlug(
+        body.defaultSession,
+        'defaultSession',
+        { allowEmpty: true },
+      );
+      if (!defaultSessionValidation.ok) {
+        return json(res, 400, { error: defaultSessionValidation.error });
+      }
+      updated.defaultSession = defaultSessionValidation.slug;
+    }
+    if (body?.selectedSessions !== undefined) {
+      const selectedSessionsValidation = validateSelectedSessions(body.selectedSessions);
+      if (!selectedSessionsValidation.ok) {
+        return json(res, 400, { error: selectedSessionsValidation.error });
+      }
+      updated.selectedSessions = selectedSessionsValidation.selectedSessions;
+      // Keep defaultSession in sync with selectedSessions
+      if (body.defaultSession === undefined) {
+        updated.defaultSession = selectedSessionsValidation.selectedSessions.length > 0
+          ? selectedSessionsValidation.selectedSessions[0]
+          : '';
+      }
+    }
+    // Hook timing settings (ms)
+    if (body?.minTimeoutMs !== undefined) {
+      updated.minTimeoutMs = Math.max(0, Math.min(300_000, Number(body.minTimeoutMs) || 20_000));
+    }
+    if (body?.cooldownMs !== undefined) {
+      updated.cooldownMs = normalizeHookCooldownMs(body.cooldownMs);
+    }
+    // PWA preferences
+    if (body?.autoCli !== undefined) {
+      updated.autoCli = !!body.autoCli;
+    }
+    if (body?.encryptByDefault !== undefined) {
+      updated.encryptByDefault = !!body.encryptByDefault;
+    }
+    if (body?.aiSuggestFreeform !== undefined) {
+      updated.aiSuggestFreeform = !!body.aiSuggestFreeform;
+    }
+    if (body?.allowReanswer !== undefined) {
+      updated.allowReanswer = body.allowReanswer === true || body.allowReanswer === 'true';
+    }
+    if (body?.showImportance !== undefined) {
+      updated.showImportance = !!body.showImportance;
+    }
+    if (typeof body?.autoSubmitOnLogin === 'boolean') {
+      updated.autoSubmitOnLogin = body.autoSubmitOnLogin;
+    }
+    if (body?.questionSurfacingMode !== undefined) {
+      const surfacingModeValidation = validateQuestionSurfacingMode(body.questionSurfacingMode);
+      if (!surfacingModeValidation.ok) {
+        return json(res, 400, { error: surfacingModeValidation.error });
+      }
+      updated.questionSurfacingMode = surfacingModeValidation.mode;
+    }
+    if (body?.ambientInterruptions !== undefined) {
+      updated.ambientInterruptions = normalizeBooleanConfig(body.ambientInterruptions, false);
+    }
+    if (body?.statuslineQuestionHints !== undefined) {
+      updated.statuslineQuestionHints = normalizeBooleanConfig(body.statuslineQuestionHints, true);
+    }
+    saveHookConfig(updated);
+    return json(res, 200, { ok: true, config: buildPublicHookConfig(updated) });
+  }
+
+  return null; // not handled — fall through to static files
+}
