@@ -22,6 +22,7 @@ const createNonceDeps = (overrides = {}) => ({
   resolveExistingSessionCors: async () => ({
     ok: true,
     headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
+    config: { allowOrigins: ['https://allowed.example'] },
   }),
   buildNonce: () => 'nonce-1',
   putNonce: async () => {},
@@ -122,6 +123,104 @@ test('dispatchAuthNonceRequest preserves existing-session CORS passthrough befor
   assert.equal(result, corsResponse);
 });
 
+test('dispatchAuthNonceRequest rejects missing and untrusted Origins before nonce creation', async () => {
+  let missingOriginNonceCalled = false;
+  const missingOrigin = await dispatchAuthNonceRequest({
+    request: {
+      json: async () => createNonceBody(),
+      headers: new Headers(),
+    },
+    env: { GROUP_KV: {} },
+    baseHeaders: { 'Access-Control-Allow-Origin': '*' },
+    slug: '',
+    deps: createNonceDeps({
+      putNonce: async () => {
+        missingOriginNonceCalled = true;
+      },
+    }),
+  });
+
+  assert.equal(missingOriginNonceCalled, false);
+  assert.deepEqual(missingOrigin, {
+    body: { error: 'Missing Origin for worker login.' },
+    status: 403,
+    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
+  });
+
+  let untrustedNonceCalled = false;
+  const untrustedOrigin = await dispatchAuthNonceRequest({
+    request: {
+      json: async () => createNonceBody(),
+      headers: new Headers({ Origin: 'https://blocked.example' }),
+    },
+    env: { GROUP_KV: {} },
+    baseHeaders: { 'Access-Control-Allow-Origin': '*' },
+    slug: '',
+    deps: createNonceDeps({
+      resolveExistingSessionCors: async () => ({
+        ok: true,
+        headers: { 'Access-Control-Allow-Origin': 'https://blocked.example' },
+        config: { allowOrigins: ['https://allowed.example'] },
+      }),
+      putNonce: async () => {
+        untrustedNonceCalled = true;
+      },
+    }),
+  });
+
+  assert.equal(untrustedNonceCalled, false);
+  assert.deepEqual(untrustedOrigin, {
+    body: { error: 'Untrusted worker login origin.' },
+    status: 403,
+    headers: { 'Access-Control-Allow-Origin': 'https://blocked.example' },
+  });
+});
+
+test('dispatchAuthNonceRequest applies nonce rate limits before nonce creation', async () => {
+  let buildNonceCalled = false;
+
+  const result = await dispatchAuthNonceRequest({
+    request: {
+      json: async () => createNonceBody({ address: '0xAbC' }),
+      headers: new Headers({ Origin: 'https://allowed.example' }),
+    },
+    env: { GROUP_KV: {} },
+    baseHeaders: { 'Access-Control-Allow-Origin': '*' },
+    slug: '',
+    deps: createNonceDeps({
+      now: () => 1234567890,
+      NONCE_RATE_LIMIT_MAX: 5,
+      NONCE_RATE_LIMIT_WINDOW_MS: 60000,
+      NONCE_RATE_LIMIT_TTL_SECONDS: 60,
+      checkNonceRateLimit: async (value) => {
+        assert.deepEqual(value, {
+          env: { GROUP_KV: {} },
+          slug: 'session-a',
+          address: '0xAbC',
+          limit: 5,
+          now: value.now,
+          windowMs: 60000,
+          ttlSeconds: 60,
+        });
+        assert.equal(value.now(), 1234567890);
+        return { ok: false, error: 'Too many nonce requests. Try again shortly.' };
+      },
+      buildNonce: () => {
+        buildNonceCalled = true;
+        return 'nonce-1';
+      },
+    }),
+  });
+
+  assert.equal(buildNonceCalled, false);
+  assert.deepEqual(result, {
+    body: { error: 'Too many nonce requests. Try again shortly.' },
+    status: 429,
+    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
+  });
+});
+
+
 test('dispatchAuthNonceRequest preserves missing-slug failure before CORS and nonce storage', async () => {
   let corsCalled = false;
   let putNonceCalled = false;
@@ -163,6 +262,7 @@ test('dispatchAuthNonceRequest forwards trusted-admin bypass intent for explicit
   await dispatchAuthNonceRequest({
     request: {
       json: async () => createNonceBody({ adminAction: true }),
+      headers: new Headers({ Origin: 'http://localhost:3000' }),
     },
     env: { GROUP_KV: {} },
     baseHeaders: { 'Access-Control-Allow-Origin': '*' },
@@ -191,6 +291,7 @@ test('dispatchAuthNonceRequest lowercases the nonce storage key, preserves ttl, 
         address: '0xAbCDEF',
         sessionSlug: 'session-b',
       }),
+      headers: new Headers({ Origin: 'https://allowed.example' }),
     },
     env,
     baseHeaders: { 'Access-Control-Allow-Origin': '*' },
@@ -229,6 +330,7 @@ test('dispatchAuthNonceRequest accepts an explicit general-session slug without 
       json: async () => createNonceBody({
         sessionSlug: 'general',
       }),
+      headers: new Headers({ Origin: 'https://allowed.example' }),
     },
     env: { GROUP_KV: {} },
     baseHeaders: { 'Access-Control-Allow-Origin': '*' },
@@ -244,6 +346,7 @@ test('dispatchAuthNonceRequest accepts an explicit general-session slug without 
         return {
           ok: true,
           headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
+          config: { allowOrigins: ['https://allowed.example'] },
         };
       },
       putNonce: async (...args) => {
