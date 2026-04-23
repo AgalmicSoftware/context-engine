@@ -65,6 +65,24 @@ const resolveSbtAddress = (input) => {
   return input || null;
 };
 
+const resolveSbtChainId = (input) => {
+  const readChainId = (value) => {
+    const chainId = Number(value?.chainId || value?.chainID || 0);
+    return chainId > 0 ? chainId : null;
+  };
+
+  if (Array.isArray(input)) {
+    const found = input.find((entry) => readChainId(entry));
+    return readChainId(found);
+  }
+
+  if (input && typeof input === 'object') {
+    return readChainId(input);
+  }
+
+  return null;
+};
+
 class SBTPage extends Component {
   _isMounted = false;
   hasAttemptedListMint = false; // Flag for sequential minting
@@ -174,6 +192,20 @@ class SBTPage extends Component {
     if (sbtChainId > 0) return sbtChainId;
     const sessionChainId = Number(getSessionChainId(this.getEffectiveSessionSlug()) || 0);
     return sessionChainId > 0 ? sessionChainId : null;
+  };
+
+  getRecoveryCacheChainId = () => {
+    const sbtChainId = Number(this.state?.sbtInfo?.chainID || this.state?.sbtInfo?.chainId || 0);
+    if (sbtChainId > 0) return sbtChainId;
+
+    const propChainId = resolveSbtChainId(this.props?.SBTAddress);
+    if (propChainId > 0) return propChainId;
+
+    const sessionChainId = Number(getSessionChainId(this.getEffectiveSessionSlug()) || 0);
+    if (sessionChainId > 0) return sessionChainId;
+
+    const networkChainId = Number(this.state?.network?.id || this.props?.network?.id || 0);
+    return networkChainId > 0 ? networkChainId : null;
   };
 
   getActiveBlockTimeMs = (multiplier = 1) => {
@@ -1633,7 +1665,7 @@ class SBTPage extends Component {
   loadCachedPasswords = () => {
     const sbtAddress = resolveSbtAddress(this.props.SBTAddress);
     const cached = getSbtPasswordRecoveryCodes({
-      chainId: this.getActiveChainId(),
+      chainId: this.getRecoveryCacheChainId(),
       sbtAddress,
     });
 
@@ -2858,6 +2890,10 @@ class SBTPage extends Component {
             filteredMintedUsersSignature: holderState.filteredMintedUsersSignature,
             holdersMetaKey: nextHoldersMetaKey
           };
+        }, () => {
+          if (this._isMounted && isCurrentLoad()) {
+            this.loadCachedPasswords();
+          }
         });
       }
 
@@ -3581,7 +3617,7 @@ class SBTPage extends Component {
       this.cacheTransactionHash(tx.transactionHash);
 
       const recoveryWrite = upsertSbtPasswordRecoveryCodes({
-        chainId: this.getActiveChainId(),
+        chainId: this.getRecoveryCacheChainId(),
         sbtAddress: sbtAddressOriginalCase,
         passwords: newPasswordList,
         mode: 'append',

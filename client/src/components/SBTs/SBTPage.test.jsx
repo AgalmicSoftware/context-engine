@@ -3840,6 +3840,41 @@ describe('SBTPage modal holder optimizations', () => {
     expect(subject.state.cachedPasswords).toEqual(['scoped-code']);
   });
 
+  it('prefers the viewed SBT chain over the connected network when loading cached passwords', () => {
+    const sbtAddress = '0x0000000000000000000000000000000000000203';
+    const sbtLower = sbtAddress.toLowerCase();
+    const now = Date.now();
+    const subject = createSubject({
+      SBTAddress: sbtAddress,
+      network: { id: 11155420, name: 'OP Sepolia' },
+    });
+    subject.state = {
+      ...subject.state,
+      sbtInfo: {
+        chainID: 84532,
+      },
+    };
+    localStorage.setItem(SBT_PASSWORD_RECOVERY_STORAGE_KEY, JSON.stringify({
+      v: 1,
+      kind: SBT_PASSWORD_RECOVERY_KIND,
+      updatedAt: now,
+      entries: {
+        [`84532:${sbtLower}`]: {
+          chainId: 84532,
+          sbtAddress: sbtLower,
+          passwords: ['base-only-code'],
+          createdAt: now,
+          updatedAt: now,
+          expiresAt: now + 60_000,
+        },
+      },
+    }));
+
+    subject.loadCachedPasswords();
+
+    expect(subject.state.cachedPasswords).toEqual(['base-only-code']);
+  });
+
   it('persists admin-generated invite codes to the scoped recovery store', async () => {
     const sbtAddress = '0x0000000000000000000000000000000000000202';
     const sbtLower = sbtAddress.toLowerCase();
