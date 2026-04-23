@@ -1,4 +1,4 @@
-/** @file MainAreaTabs.jsx */
+/** @file MainAreaTabs.tsx */
 
 import React, { Component, Suspense } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -39,12 +39,42 @@ const MAIN_AREA_TAB_TITLES = Object.freeze({
   [MAIN_AREA_TABS.COMMUNITY]: "Community",
   [MAIN_AREA_TABS.TOOLS]: "Tools",
   [MAIN_AREA_TABS.WELCOME]: "Welcome",
-});
-const getTabTitle = (tabIndex) => MAIN_AREA_TAB_TITLES[tabIndex] || "";
+} as Record<number, string>);
+const getTabTitle = (tabIndex: number | null | undefined) => (
+  tabIndex == null ? "" : MAIN_AREA_TAB_TITLES[tabIndex] || ""
+);
 
+type MainAreaTabsProps = {
+  focusedTab: number;
+  changeFocusedTab: (tabIndex: number) => void;
+  toggleLoginModal: (loginModalIsOpen: boolean) => void;
+  toggleDemoMode: (demoModeOn: boolean) => void;
+  demoMode?: unknown;
+  demoSurfaceMode?: unknown;
+  provider?: unknown;
+  network?: unknown;
+  account?: string;
+  activeSessionSlug?: string;
+  loginComplete?: boolean;
+  loginInProgress?: boolean;
+  isQuestionCacheReady?: boolean;
+  isSurveyCacheReady?: boolean;
+  isSBTCacheReady?: boolean;
+  sbtCacheRevision?: number;
+  sbtRealtimeCoverageBySlug?: unknown;
+  ensureLightSbtDiscovery?: (...args: unknown[]) => unknown;
+  ensureLightSbtUniverse?: (...args: unknown[]) => unknown;
+};
 
-class MainAreaTabs extends Component {
-  state = {
+type MainAreaTabsState = {
+  tabChangesSinceRefresh: number;
+  currentTabIndex: number | null;
+  currentTabTitle: string;
+  mountedTabs: Record<number, boolean>;
+};
+
+class MainAreaTabs extends Component<MainAreaTabsProps, MainAreaTabsState> {
+  state: MainAreaTabsState = {
     tabChangesSinceRefresh: 0,
     currentTabIndex: null,
     currentTabTitle: "",
@@ -62,7 +92,7 @@ class MainAreaTabs extends Component {
     }));
   }
 
-  shouldComponentUpdate(nextProps, nextState) {
+  shouldComponentUpdate(_nextProps: MainAreaTabsProps, _nextState: MainAreaTabsState) {
     return true;
   }
 
@@ -73,7 +103,7 @@ class MainAreaTabs extends Component {
     }
   }
 
-  changeTabs = (nextTabIndex) => {
+  changeTabs = (nextTabIndex: number) => {
     const nextTabTitle = getTabTitle(nextTabIndex);
     this.props.changeFocusedTab(nextTabIndex);
 
@@ -89,7 +119,7 @@ class MainAreaTabs extends Component {
   };
 
   render() {
-    const activeClassName = (isActive) => (isActive ? 'active' : '');
+    const activeClassName = (isActive: boolean) => (isActive ? 'active' : '');
     return (
       <div id={styles.mainAreaTabsAlt}>
                 <Card id={styles.mainTabsCard}>
@@ -148,7 +178,7 @@ class MainAreaTabs extends Component {
                           account={this.props.account}
                           loginComplete={this.props.loginComplete}
                           loginInProgress={this.props.loginInProgress}
-                          toggleLoginModal={(loginModalIsOpen) => this.props.toggleLoginModal(loginModalIsOpen)}
+                          toggleLoginModal={(loginModalIsOpen: boolean) => this.props.toggleLoginModal(loginModalIsOpen)}
                           //
                           isQuestionCacheReady={this.props.isQuestionCacheReady}
                           isSurveyCacheReady={this.props.isSurveyCacheReady}
@@ -167,7 +197,7 @@ class MainAreaTabs extends Component {
                     {this.state.mountedTabs[MAIN_AREA_TABS.TOOLS] ? (
                       <Suspense fallback={<LazyFallback label="Loading..." />}>
                         <ToolExplorer
-                          toggleLoginModal={(loginModalIsOpen) => this.props.toggleLoginModal(loginModalIsOpen)}
+                          toggleLoginModal={(loginModalIsOpen: boolean) => this.props.toggleLoginModal(loginModalIsOpen)}
                           //
                           account={this.props.account}
                           provider={this.props.provider}
@@ -188,9 +218,9 @@ class MainAreaTabs extends Component {
                     {this.state.mountedTabs[MAIN_AREA_TABS.WELCOME] ? (
                       <Suspense fallback={<LazyFallback label="Loading..." />}>
                         <OnboardingWalkthrough
-                          changeTabFunction={(newTab) => this.changeTabs(newTab)}
+                          changeTabFunction={(newTab: number) => this.changeTabs(newTab)}
                           //
-                          toggleDemoMode={(demoModeOn) => this.props.toggleDemoMode(demoModeOn)}
+                          toggleDemoMode={(demoModeOn: boolean) => this.props.toggleDemoMode(demoModeOn)}
                           demoMode={this.props.demoMode}
                         />
                       </Suspense>
