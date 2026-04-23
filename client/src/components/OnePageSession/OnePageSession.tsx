@@ -53,9 +53,9 @@ import { isCryptoMode, sbtsListPath, t } from '../../utilities/ui/terminology.js
 import { PUBLIC_AI_DISCOURSE_CORPUS_URL } from '../../variables/publicRepoMetadata.js';
 
 const SurveyPage = React.lazy(() => import('../SurveyTool/SurveyPage'));
-const MemoSurveyPage = React.memo((props: any) => <SurveyPage {...props} />);
-const SBTsPage = React.lazy(() => import('../SBTs/SBTsPage'));
-const PolisReport = React.lazy(() => import('../PolisReport/PolisReport'));
+const MemoSurveyPage = React.memo((props) => <SurveyPage {...props} />);
+const SBTsPage = React.lazy(() => import('../SBTs/SBTsPage.jsx'));
+const PolisReport = React.lazy(() => import('../PolisReport/PolisReport.jsx'));
 const DebateMap = React.lazy(() => import('../DebateMap/DebateMap'));
 const CorpusViewer = React.lazy(() => import('../DemoViews/CorpusViewer'));
 const RiskMatrix = React.lazy(() => import('../MainContent/RiskMatrix'));

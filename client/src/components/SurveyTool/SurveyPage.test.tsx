@@ -4,7 +4,7 @@ import SurveyPage from './SurveyPage';
 
 const mockSurveyTool = jest.fn();
 
-jest.mock('components/SurveyTool/SurveyTool', () => (props: any) => {
+jest.mock('components/SurveyTool/SurveyTool.jsx', () => (props: any) => {
   mockSurveyTool(props);
   return null;
 });

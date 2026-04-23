@@ -6,52 +6,13 @@ import SurveyTool from "components/SurveyTool/SurveyTool";
 
 import styles from "./SurveyPage.module.scss";
 
-type SurveyPageCallback = (...args: unknown[]) => unknown;
-
 type SurveyPageProps = {
   activeSessionSlug?: string;
   sessionSlug?: string;
   sessionSlugPinned?: boolean;
   sessionConfig?: unknown;
-  minifiedMode?: string;
-  surveyID?: string;
-  displayAnswerMode?: boolean;
-  viewAddress?: string;
-  autoOpenResults?: boolean;
-  filterState?: unknown;
-  singleQuestionMode?: boolean;
-  toggleLoginModal?: () => void;
-  account?: string;
-  provider?: unknown;
-  loginComplete?: boolean;
-  loginInProgress?: boolean;
-  network?: { id?: number; chainId?: number; name?: string };
-  isSBTCacheReady?: boolean;
-  isSurveyCacheReady?: boolean;
-  isQuestionCacheReady?: boolean;
-  isResponsesCacheReady?: boolean;
-  cacheHasLoaded?: boolean;
-  scanForSurveyGroup?: unknown;
-  questionResponsesNonce?: number;
-  questionScanProgress?: unknown;
-  questionPool?: unknown[];
-  refreshSurveyResponsesByID?: SurveyPageCallback;
-  refreshQuestionMetadata?: SurveyPageCallback;
-  refreshQuestionResponses?: SurveyPageCallback;
-  defaultTags?: unknown[];
-  defaultFilterState?: unknown;
-  sessionInfo?: unknown;
-  sessionName?: string;
-  defaultFeaturedSBTs?: unknown[];
-  onViewAllClick?: SurveyPageCallback;
-  hideEmbeddedDebugUi?: boolean;
-  onResultsModalClose?: () => void;
-  onFilterChange?: SurveyPageCallback;
-  contracts?: unknown;
-  blockLimits?: unknown;
-  networkChainId?: number;
-  litHooks?: unknown;
-  [key: string]: unknown;
+  minifiedMode?: unknown;
+  [key: string]: any;
 };
 
 class SurveyComponent extends Component<SurveyPageProps> {
