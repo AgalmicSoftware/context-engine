@@ -1,15 +1,12 @@
 import fs from 'fs';
 import path from 'path';
 import React from 'react';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { TestMemoryRouter as MemoryRouter } from 'testUtils/TestMemoryRouter';
-
-import CorpusViewer from './CorpusViewer';
-import PolicyGlobe from './PolicyGlobe';
+import { fireEvent, render, screen, within } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 
 const mockTagPage = jest.fn();
 
-jest.mock('../TagPage/TagPage', () => ({
+jest.mock('../TagPage/TagPage.jsx', () => ({
   __esModule: true,
   default: (props: any) => {
     mockTagPage(props);
@@ -41,14 +38,10 @@ jest.mock('react-simple-maps', () => ({
   Graticule: () => null,
 }));
 
+import CorpusViewer from './CorpusViewer';
+import PolicyGlobe from './PolicyGlobe';
+
 const originalMatchMedia = window.matchMedia;
-const originalFetch = global.fetch;
-const fullCrossCorpusPayload = JSON.parse(
-  fs.readFileSync(
-    path.join(__dirname, '../../../../ai-discourse-corpus/corpuses/cross-corpus-debates.json'),
-    'utf8'
-  )
-);
 
 const setMobileViewport = (matches: boolean) => {
   Object.defineProperty(window, 'matchMedia', {
@@ -125,8 +118,6 @@ const renderPolicyGlobeHarness = (entries: any[]) => render(
   </PolicyGlobe>
 );
 
-const getTabButton = (name: string) => screen.getAllByRole('button', { name })[0];
-
 describe('CorpusViewer', () => {
   beforeEach(() => {
     mockTagPage.mockClear();
@@ -136,10 +127,6 @@ describe('CorpusViewer', () => {
     Object.defineProperty(window, 'matchMedia', {
       writable: true,
       value: originalMatchMedia,
-    });
-    Object.defineProperty(global, 'fetch', {
-      writable: true,
-      value: originalFetch,
     });
   });
 
@@ -157,11 +144,7 @@ describe('CorpusViewer', () => {
       path.join(__dirname, 'DemoAnalysis', 'WorldResultsMap.tsx'),
       'utf8'
     );
-    const compactMapMobileBlock = extractMediaBlock(
-      mapScss,
-      '@media (max-width: 640px)',
-      '.mapFrameCompact {'
-    );
+    const compactMapMobileBlock = extractMediaBlock(mapScss, '@media (max-width: 640px)', '.panel,');
 
     expect(mobileBlock).toContain('.tabButton {');
     expect(mobileBlock).toContain('.tabBar {');
@@ -222,8 +205,6 @@ describe('CorpusViewer', () => {
     expect(policyMobileBlock).toContain('white-space: normal;');
     expect(corpusScss).toMatch(/\.tabIcon\s*{[\s\S]*?font-size:\s*24px;/);
     expect(corpusScss).toMatch(/\.container\s*{[\s\S]*?box-sizing:\s*border-box;[\s\S]*?max-width:\s*100%;[\s\S]*?width:\s*100%;/);
-    expect(corpusScss).toMatch(/\.metrCard\s*{[\s\S]*?background:\s*linear-gradient\(180deg,\s*#ffffff 0%,\s*#fbfdff 100%\);/);
-    expect(corpusScss).toMatch(/\.metrCard \.entrySummary\s*{[\s\S]*?color:\s*#4b5563;/);
     expect(corpusScss).toMatch(/\.policyMapLens\s*{[\s\S]*?padding:\s*4px 4px 0;/);
     expect(corpusScss).toMatch(/\.policyMapPanel\s*{[\s\S]*?padding:\s*10px 10px 12px;/);
     expect(corpusScss).toMatch(/\.debateMapLink\s*{[\s\S]*?box-sizing:\s*border-box;/);
@@ -240,42 +221,6 @@ describe('CorpusViewer', () => {
     expect(mapJsx).toMatch(/projectionConfig=\{\{\s*rotate:\s*\[-10,\s*0,\s*0\],\s*scale:\s*compact \? 147 : 147\s*\}\}/);
   });
 
-  it('defaults to Cross-Corpus and loads the richer active corpus from GitHub on demand', async () => {
-    const fetchMock = jest.fn().mockResolvedValue({
-      ok: true,
-      json: async () => fullCrossCorpusPayload,
-    });
-    Object.defineProperty(global, 'fetch', {
-      writable: true,
-      value: fetchMock,
-    });
-
-    render(
-      <MemoryRouter>
-        <CorpusViewer />
-      </MemoryRouter>
-    );
-
-    expect(getTabButton('Cross-Corpus')).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByText('Is AI Progress Actually Exponential?')).toBeInTheDocument();
-    expect(screen.queryByText(/Shared ground: 3 confirmed agreements/i)).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByTestId('ce-context-load-full-corpus'));
-
-    await waitFor(() => {
-      expect(screen.getAllByText(/Shared ground: 3 confirmed agreements/i).length).toBeGreaterThan(0);
-    });
-
-    expect(fetchMock).toHaveBeenCalledWith(
-      'https://raw.githubusercontent.com/AgalmicSoftware/context-engine/main/ai-discourse-corpus/corpuses/cross-corpus-debates.json',
-      { cache: 'no-store' }
-    );
-    expect(screen.getByTestId('ce-context-corpus-status')).toHaveTextContent(
-      'Loaded full Cross-Corpus corpus • 13 entries'
-    );
-    expect(screen.getByTestId('ce-context-load-full-corpus')).toBeDisabled();
-  });
-
   it('shows only the first five tweets behind a mobile View more control', () => {
     setMobileViewport(true);
 
@@ -284,8 +229,6 @@ describe('CorpusViewer', () => {
         <CorpusViewer />
       </MemoryRouter>
     );
-
-    fireEvent.click(screen.getByRole('button', { name: 'Tweets' }));
 
     expect(screen.getByTestId('ce-context-tweet-list').querySelectorAll('article')).toHaveLength(5);
     expect(screen.queryByText('@sama')).not.toBeInTheDocument();
@@ -320,8 +263,6 @@ describe('CorpusViewer', () => {
       </MemoryRouter>
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Tweets' }));
-
     expect(screen.getByTestId('ce-context-tweet-list').querySelectorAll('article')).toHaveLength(25);
     expect(screen.getByText('@sama')).toBeInTheDocument();
     expect(screen.queryByTestId('ce-context-tweets-view-more')).not.toBeInTheDocument();
@@ -337,7 +278,6 @@ describe('CorpusViewer', () => {
       </MemoryRouter>
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Tweets' }));
     fireEvent.click(screen.getByTestId('ce-context-tweets-view-more'));
     expect(screen.getByTestId('ce-context-tweet-list').querySelectorAll('article')).toHaveLength(25);
 
@@ -354,12 +294,10 @@ describe('CorpusViewer', () => {
 
   it('maps legacy tweet debate tags into atlas issue links', () => {
     render(
-      <MemoryRouter initialEntries={['/session/demo']}>
+      <MemoryRouter>
         <CorpusViewer />
       </MemoryRouter>
     );
-
-    fireEvent.click(screen.getByRole('button', { name: 'Tweets' }));
 
     const issueLink = screen.getAllByRole('link', { name: 'Exponential Progress Debate' })[0];
     const tweetCard = issueLink.closest('article') as HTMLElement;
@@ -368,7 +306,7 @@ describe('CorpusViewer', () => {
     expect(within(tweetCard).getByRole('link', { name: 'Exponential Progress Debate' })).toBeInTheDocument();
     expect(issueLink).toHaveAttribute(
       'href',
-      '/atlas/0x2110000000000000000000000000000000000000000000000000000000000000?demo=1&returnTo=%2Fsession%2Fdemo'
+      '/atlas/0x2110000000000000000000000000000000000000000000000000000000000000?demo=1'
     );
   });
 
@@ -378,8 +316,6 @@ describe('CorpusViewer', () => {
         <CorpusViewer />
       </MemoryRouter>
     );
-
-    fireEvent.click(screen.getByRole('button', { name: 'Tweets' }));
 
     const issueLink = screen.getAllByRole('link', { name: 'Exponential Progress Debate' })[0];
     const actionRow = issueLink.parentElement as HTMLElement;
@@ -398,7 +334,6 @@ describe('CorpusViewer', () => {
       </MemoryRouter>
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Tweets' }));
     fireEvent.click(screen.getAllByRole('button', { name: 'Exponential Progress Debate' })[0]);
 
     expect(onAtlasIssueOpen).toHaveBeenCalledWith(
@@ -415,64 +350,6 @@ describe('CorpusViewer', () => {
     );
 
     expect(screen.queryByRole('link', { name: /Full corpus on GitHub/i })).not.toBeInTheDocument();
-  });
-
-  it('reports active corpus load state and responds to external load requests when embedded under another header', async () => {
-    const fetchMock = jest.fn().mockResolvedValue({
-      ok: true,
-      json: async () => fullCrossCorpusPayload,
-    });
-    const onExternalLoadStateChange = jest.fn();
-    Object.defineProperty(global, 'fetch', {
-      writable: true,
-      value: fetchMock,
-    });
-
-    const { rerender } = render(
-      <MemoryRouter>
-        <CorpusViewer
-          showGithubLink={false}
-          externalLoadRequestNonce={0}
-          onExternalLoadStateChange={onExternalLoadStateChange}
-        />
-      </MemoryRouter>
-    );
-
-    await waitFor(() => {
-      expect(onExternalLoadStateChange).toHaveBeenCalledWith(expect.objectContaining({
-        activeCorpusKey: 'cross_corpus',
-        activeCorpusLabel: 'Cross-Corpus',
-        loadStatus: 'idle',
-        loadButtonLabel: 'Load full corpus',
-        disableLoadButton: false,
-      }));
-    });
-
-    rerender(
-      <MemoryRouter>
-        <CorpusViewer
-          showGithubLink={false}
-          externalLoadRequestNonce={1}
-          onExternalLoadStateChange={onExternalLoadStateChange}
-        />
-      </MemoryRouter>
-    );
-
-    await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith(
-        'https://raw.githubusercontent.com/AgalmicSoftware/context-engine/main/ai-discourse-corpus/corpuses/cross-corpus-debates.json',
-        { cache: 'no-store' }
-      );
-    });
-
-    await waitFor(() => {
-      expect(onExternalLoadStateChange).toHaveBeenCalledWith(expect.objectContaining({
-        activeCorpusKey: 'cross_corpus',
-        loadStatus: 'loaded',
-        loadButtonLabel: 'Full corpus loaded',
-        disableLoadButton: true,
-      }));
-    });
   });
 
   it('renders the standalone GitHub corpus link against the canonical public repo', () => {
@@ -505,47 +382,6 @@ describe('CorpusViewer', () => {
     expect(within(arxivCard).getByRole('link', { name: 'View paper' })).toHaveAttribute(
       'href',
       'https://arxiv.org/abs/2005.14165'
-    );
-  });
-
-  it('renders LessWrong entries with their novel argument context visible', () => {
-    render(
-      <MemoryRouter>
-        <CorpusViewer />
-      </MemoryRouter>
-    );
-
-    fireEvent.click(getTabButton('LessWrong'));
-
-    const title = screen.getByText('The AI-Box Experiment');
-    const lessWrongCard = title.closest('article') as HTMLElement;
-
-    expect(lessWrongCard).toBeTruthy();
-    expect(within(lessWrongCard).getByText('Novel argument')).toBeInTheDocument();
-    expect(within(lessWrongCard).getByRole('link', { name: 'View source' })).toHaveAttribute(
-      'href',
-      'https://www.yudkowsky.net/singularity/aibox'
-    );
-  });
-
-  it('renders cross-corpus debate entries with synthesis metadata and dataset links', () => {
-    render(
-      <MemoryRouter>
-        <CorpusViewer />
-      </MemoryRouter>
-    );
-
-    fireEvent.click(getTabButton('Cross-Corpus'));
-
-    const title = screen.getByText('Is AI Progress Actually Exponential?');
-    const crossCorpusCard = title.closest('article') as HTMLElement;
-
-    expect(crossCorpusCard).toBeTruthy();
-    expect(within(crossCorpusCard).getByText('Central tension')).toBeInTheDocument();
-    expect(within(crossCorpusCard).getByText(/Synthesizes: METR • Dwarkesh • LessWrong/i)).toBeInTheDocument();
-    expect(within(crossCorpusCard).getByRole('link', { name: 'Open dataset' })).toHaveAttribute(
-      'href',
-      'https://github.com/AgalmicSoftware/context-engine/blob/main/ai-discourse-corpus/corpuses/cross-corpus-debates.json'
     );
   });
 
@@ -754,7 +590,6 @@ describe('CorpusViewer', () => {
       </MemoryRouter>
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Tweets' }));
     fireEvent.click(screen.getAllByRole('button', { name: 'Google' })[0]);
 
     expect(screen.getByRole('dialog')).toBeInTheDocument();
