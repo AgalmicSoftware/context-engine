@@ -85,7 +85,7 @@ jest.mock('../SurveyTool/SurveyGenerator/SurveyGenerator.jsx', () => ({
   },
 }));
 
-jest.mock('./ToolExplorerPluginExplainer.jsx', () => ({
+jest.mock('./ToolExplorerPluginExplainer', () => ({
   __esModule: true,
   default: () => <div data-testid="mock-explainer" />,
 }));
