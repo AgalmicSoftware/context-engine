@@ -24,7 +24,7 @@ import {
   normalizeSurveyToolFilterState as directNormalizeSurveyToolFilterState,
 } from './surveyToolUtils.js';
 import { QuestionFilter as RawQuestionFilter } from './QuestionFilter.jsx';
-import PileHologramAssistant from './PileHologramAssistant.jsx';
+import PileHologramAssistant from './PileHologramAssistant';
 import QuestionTagDropdown from './QuestionTagDropdown';
 import styles from './SurveyTool.module.scss';
 import { renderToStaticMarkup } from 'react-dom/server';
