@@ -30,7 +30,7 @@ jest.mock('../HooksHOC/withWagmiBridge.jsx', () => ({
   WagmiHooksHOC: (Comp) => Comp,
 }));
 
-jest.mock('../Navbar/Navbar.jsx', () => () => null);
+jest.mock('../Navbar/Navbar', () => () => null);
 jest.mock('../MainContent/MainAreaTabs', () => () => null);
 jest.mock('../Onboarding/OnboardingOverlay', () => () => null);
 jest.mock('../Footer/Footer', () => () => null);

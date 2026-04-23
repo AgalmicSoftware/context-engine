@@ -5,7 +5,7 @@ import { Provider } from 'react-redux';
 import { createStore } from 'redux';
 import { fireEvent, render, screen } from '@testing-library/react';
 
-import { Navbar } from './Navbar.jsx';
+import { Navbar } from './Navbar';
 
 const navbarStylesheet = fs.readFileSync(
   path.join(__dirname, 'Navbar.module.scss'),
@@ -13,7 +13,7 @@ const navbarStylesheet = fs.readFileSync(
 );
 
 jest.mock('./AccountDisplay.jsx', () => ({
-  AccountDisplayTorus: ({ account }) => (
+  AccountDisplayTorus: ({ account }: any) => (
     <div data-testid="account-display">{account}</div>
   ),
 }));
@@ -42,7 +42,7 @@ jest.mock('../../variables/appConfig.js', () => ({
 describe('Navbar logo navigation', () => {
   const originalPublicUrl = process.env.PUBLIC_URL;
 
-  const buildStore = (overrides = {}) => createStore((state = {
+  const buildStore = (overrides: any = {}) => createStore((state = {
     sessionState: {
       loginModalToggled: false,
       loginComplete: false,
@@ -54,7 +54,7 @@ describe('Navbar logo navigation', () => {
     },
   }) => state);
 
-  const renderNavbar = (props = {}, storeOverrides = {}) => render(
+  const renderNavbar = (props: any = {}, storeOverrides: any = {}) => render(
     <Provider store={buildStore(storeOverrides)}>
       <Navbar
         demoMode={{ tools: false }}
@@ -67,11 +67,11 @@ describe('Navbar logo navigation', () => {
   );
 
   beforeEach(() => {
-    process.env.PUBLIC_URL = '/ce-base';
+    (process.env as Record<string, string | undefined>).PUBLIC_URL = '/ce-base';
   });
 
   afterEach(() => {
-    process.env.PUBLIC_URL = originalPublicUrl;
+    (process.env as Record<string, string | undefined>).PUBLIC_URL = originalPublicUrl;
     jest.restoreAllMocks();
   });
 

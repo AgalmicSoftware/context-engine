@@ -1,4 +1,4 @@
-/** @file Navbar.jsx */
+/** @file Navbar.tsx */
 import React, { Component } from "react";
 
 import styles from "./Navbar.module.scss";
@@ -12,16 +12,17 @@ import {
   CE_LOGO_ANIMATION_DURATION_MS_PINGPONG,
 } from "../../variables/appConfig.js";
 
-import AccountSection from "./AccountSection.jsx";
+import AccountSectionRaw from "./AccountSection.jsx";
 import withRouter from "../HooksHOC/withRouterBridge.jsx";
 import { createLogger } from 'utilities/logging.js';
 import { readPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
 
 const uiLog = createLogger('ui');
+const AccountSection = AccountSectionRaw as React.ComponentType<any>;
 
 const getConfiguredBaseUrl = () => readPublicUrlBasePath() || "/";
 
-const getInternalNavigationTarget = (target) => {
+const getInternalNavigationTarget = (target: string) => {
   if (!target) return null;
 
   if (typeof window === "undefined") {
@@ -37,21 +38,39 @@ const getInternalNavigationTarget = (target) => {
   }
 };
 
-export class Navbar extends Component {
-  logoTimeoutId = null;
+type NavbarProps = {
+  demoMode?: unknown;
+  toggleDemoMode?: (demoModeOn: boolean) => void;
+  loginComplete?: boolean;
+  loginInProgress?: boolean;
+  provider?: string | null;
+  account?: string;
+  sendTestETH?: (amountToSend: unknown) => void;
+  navigate?: (target: string) => void;
+  history?: {
+    push?: (target: string) => void;
+  };
+};
 
-  constructor(props) {
+type NavbarState = {
+  showAnimatedLogo: boolean;
+};
+
+export class Navbar extends Component<NavbarProps, NavbarState> {
+  logoTimeoutId: number | null = null;
+
+  constructor(props: NavbarProps) {
     super(props);
     const hasWindow = typeof window !== "undefined";
     const shouldAnimate =
       ENABLE_CE_LOGO_ANIMATION &&
       hasWindow &&
-      !window.__ceLogoAnimationPlayed;
+      !(window as any).__ceLogoAnimationPlayed;
     this.state = {
       showAnimatedLogo: shouldAnimate,
     };
     if (shouldAnimate && hasWindow) {
-      window.__ceLogoAnimationPlayed = true;
+      (window as any).__ceLogoAnimationPlayed = true;
     }
   }
 
@@ -73,9 +92,9 @@ export class Navbar extends Component {
     }
   }
 
-  componentDidUpdate(prevProps) {}
+  componentDidUpdate(_prevProps: NavbarProps) {}
 
-  navigateWithWindow = (target) => {
+  navigateWithWindow = (target: string) => {
     if (typeof window !== "undefined" && window.location) {
       window.location.assign(target);
     }
@@ -106,18 +125,19 @@ export class Navbar extends Component {
         ? AnimatedLogoPingPong
         : AnimatedLogo;
     const logoSrc = this.state.showAnimatedLogo ? animatedLogoSrc : StaticLogo;
+    const legacyFluidImgProp = { fluid: "true" } as Record<string, string>;
 
   const beforeLogin = (
     <>
         <div id={styles.navbarContainer}>
           <div id={styles.navbarLogoCol}>
-            <img id={styles.mainLogo} src={logoSrc} fluid="true" alt="logo" onClick={this.logoClicked}>
+            <img id={styles.mainLogo} src={logoSrc} {...legacyFluidImgProp} alt="logo" onClick={this.logoClicked}>
             </img>
           </div>
           <div id={styles.accountSection}>
               <AccountSection
                 demoMode={this.props.demoMode}
-                toggleDemoMode={(demoModeOn) => this.props.toggleDemoMode(demoModeOn)}
+                          toggleDemoMode={(demoModeOn: boolean) => this.props.toggleDemoMode?.(demoModeOn)}
                 loginComplete={this.props.loginComplete}
                 loginInProgress={this.props.loginInProgress}
                 provider={this.props.provider}
@@ -131,7 +151,7 @@ export class Navbar extends Component {
     <>
         <div id={styles.navbarContainerLoggedIn}>
             <div id={styles.navbarLogoColLoggedIn}>
-              <img id={styles.mainLogoLoggedIn} src={logoSrc} fluid="true" alt="ce_logo" onClick={this.logoClicked}></img>
+              <img id={styles.mainLogoLoggedIn} src={logoSrc} {...legacyFluidImgProp} alt="ce_logo" onClick={this.logoClicked}></img>
             </div>
             <div id={styles.accountSectionLoggedIn}>
               <AccountSection
@@ -139,9 +159,9 @@ export class Navbar extends Component {
                 provider={this.props.provider}
                 loginComplete={this.props.loginComplete}
                 loginInProgress={this.props.loginInProgress}
-                sendTestETH={(amountToSend) => this.props.sendTestETH(amountToSend)}
+                sendTestETH={(amountToSend: unknown) => this.props.sendTestETH?.(amountToSend)}
                 demoMode={this.props.demoMode}
-                toggleDemoMode={(demoModeOn) => this.props.toggleDemoMode(demoModeOn)}
+                toggleDemoMode={(demoModeOn: boolean) => this.props.toggleDemoMode?.(demoModeOn)}
                 />
             </div>
           </div>
