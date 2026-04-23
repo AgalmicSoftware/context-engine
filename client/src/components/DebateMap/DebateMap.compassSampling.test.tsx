@@ -20,27 +20,53 @@ jest.mock('../../utilities/ui/notify.js', () => ({
   },
 }));
 
-const parseHistoricalVote = (vote) => {
+type VoteEntry = {
+  username: string;
+  value: number;
+};
+
+type CompassPoint = {
+  x: number;
+  y: number;
+};
+
+type DebateTreeNode = {
+  id: string;
+  compass?: {
+    xAxis?: unknown;
+    yAxis?: unknown;
+  };
+  children?: DebateTreeNode[];
+};
+
+type HistoricalFigure = {
+  votes?: Record<string, string | number>;
+  comments?: Array<{ id?: unknown }>;
+};
+
+const historicalFigures = historicalFigureData as Record<string, HistoricalFigure>;
+
+const parseHistoricalVote = (vote: unknown): number | null => {
   if (vote === 'up') return 1;
   if (vote === 'down') return -1;
 
-  const parsedVote = parseInt(vote, 10);
+  const parsedVote = parseInt(String(vote), 10);
   return Number.isNaN(parsedVote) ? null : parsedVote;
 };
 
-const getQuadrantKey = (point) => (
+const getQuadrantKey = (point: CompassPoint) => (
   `${point.y > 0.5 ? 'top' : 'bottom'}-${point.x > 0.5 ? 'right' : 'left'}`
 );
 
-const getVoteEntriesForNode = (nodeId) => (
-  Object.entries(historicalFigureData || {}).reduce((entries, [username, figure]) => {
+const getVoteEntriesForNode = (nodeId: string): VoteEntry[] => (
+  Object.entries(historicalFigures || {}).reduce<VoteEntry[]>((entries, [username, figure]) => {
     const parsedVote = parseHistoricalVote(figure?.votes?.[nodeId]);
-    if (!Number.isFinite(parsedVote)) return entries;
+    if (parsedVote == null || !Number.isFinite(parsedVote)) return entries;
     return entries.concat({ username, value: parsedVote });
   }, [])
 );
 
-const getCompassNodes = (nodes, acc = []) => {
+const getCompassNodes = (nodes: DebateTreeNode[], acc: DebateTreeNode[] = []) => {
   (nodes || []).forEach((node) => {
     if (node?.compass?.xAxis && node?.compass?.yAxis) {
       acc.push(node);
@@ -61,7 +87,7 @@ const TARGETED_ENRICHMENT_NODE_IDS = Object.freeze([
 
 describe('DebateMap compass sampling', () => {
   it('preserves every represented simulated quadrant when sampling atlas compass figures', () => {
-    getCompassNodes(treeData).forEach((node) => {
+    getCompassNodes(treeData as DebateTreeNode[]).forEach((node) => {
       const voteEntries = getVoteEntriesForNode(node.id);
       if (voteEntries.length === 0) return;
 
@@ -82,7 +108,7 @@ describe('DebateMap compass sampling', () => {
   it('keeps the most vulnerable atlas leaves meaningfully seeded after persona merges', () => {
     TARGETED_ENRICHMENT_NODE_IDS.forEach((nodeId) => {
       const voteEntries = getVoteEntriesForNode(nodeId);
-      const commentCount = Object.values(historicalFigureData || {}).reduce((total, figure) => (
+      const commentCount = Object.values(historicalFigures || {}).reduce((total, figure) => (
         total + ((figure?.comments || []).some((comment) => String(comment?.id) === nodeId) ? 1 : 0)
       ), 0);
 
