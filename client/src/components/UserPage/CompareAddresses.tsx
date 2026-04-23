@@ -1,5 +1,4 @@
 /** @file CompareAddresses.tsx */
-// @ts-nocheck
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Collapse } from 'reactstrap';
@@ -51,21 +50,13 @@ type CompareDrillTone = 'agree' | 'disagree' | 'unsure' | 'info' | 'muted';
 type CompareSectionKey = 'agree' | 'dis';
 type ComparisonTone = 'agreement' | 'disagreement';
 type VennRegionKey = 'a' | 'b' | 'c' | 'ab' | 'ac' | 'bc' | 'abc';
-type UnknownRecord = Record<string, unknown>;
-type CompareGlobalThis = typeof globalThis & {
-  CE_E2E_AI_MOCK?: boolean;
-};
-type CompareRunComparison = (
-  addresses: string[],
-  options?: { skipNavigate?: boolean }
-) => Promise<void>;
 
 interface CompareBookmark {
   address?: string;
   addressLower?: string;
   nickname?: string;
   label?: string;
-  [key: string]: unknown;
+  [key: string]: any;
 }
 
 interface CompareSbt {
@@ -74,9 +65,9 @@ interface CompareSbt {
   imageUrl?: string | null;
   sbtInfo?: {
     image?: string | null;
-    [key: string]: unknown;
+    [key: string]: any;
   };
-  [key: string]: unknown;
+  [key: string]: any;
 }
 
 interface CompareQuestion {
@@ -88,10 +79,10 @@ interface CompareQuestion {
   title?: string;
   text?: string;
   type?: string;
-  answer?: unknown;
+  answer?: any;
   additionalComment?: string;
-  options?: unknown;
-  [key: string]: unknown;
+  options?: any;
+  [key: string]: any;
 }
 
 interface CompareUser {
@@ -100,8 +91,8 @@ interface CompareUser {
   label?: string;
   sbts?: CompareSbt[];
   questions?: CompareQuestion[];
-  surveys?: unknown[];
-  [key: string]: unknown;
+  surveys?: any[];
+  [key: string]: any;
 }
 
 interface CompareUserSummary {
@@ -116,7 +107,7 @@ interface CompareQuestionResponse {
   userIndex: number;
   label: string;
   address: string;
-  answer: unknown;
+  answer: any;
   comment: string | null;
 }
 
@@ -136,44 +127,44 @@ interface CompareCompassAxis {
   id?: string;
   label?: string;
   description?: string;
-  [key: string]: unknown;
+  [key: string]: any;
 }
 
 interface CompareCompassPoint {
   address?: string;
   x: number;
   y: number;
-  [key: string]: unknown;
+  [key: string]: any;
 }
 
 interface CompareCompassData {
   axes?: CompareCompassAxis[];
   points?: CompareCompassPoint[];
   evidence?: {
-    x?: unknown;
-    y?: unknown;
-    [key: string]: unknown;
+    x?: any;
+    y?: any;
+    [key: string]: any;
   };
-  [key: string]: unknown;
+  [key: string]: any;
 }
 
 interface CompareVennResult {
   counts: Partial<Record<VennRegionKey, number>>;
   semantics?: string | null;
-  evidenceMap?: Partial<Record<VennRegionKey, unknown[]>>;
-  [key: string]: unknown;
+  evidenceMap?: Partial<Record<VennRegionKey, any[]>>;
+  [key: string]: any;
 }
 
 interface CompareMatrixData {
   mode?: string;
   columns?: Array<{ key: string; label: string }>;
-  rows?: unknown[];
-  [key: string]: unknown;
+  rows?: any[];
+  [key: string]: any;
 }
 
 interface CompareDrillParticipant {
   label: string;
-  response?: unknown;
+  response?: any;
   responseFull?: string;
   comment?: string | null;
   commentFull?: string | null;
@@ -267,7 +258,7 @@ interface VennProps {
   labels?: string[];
   users?: CompareUser[] | null;
   preCounts?: Partial<Record<VennRegionKey, number>> | null;
-  evidence?: Partial<Record<VennRegionKey, unknown[]>> | null;
+  evidence?: Partial<Record<VennRegionKey, any[]>> | null;
   semantics?: string | null;
 }
 
@@ -285,25 +276,30 @@ interface OpinionCompassProps {
   precomputed?: CompareCompassData | null;
 }
 
+interface CompareBookmark {
+  address?: string;
+  addressLower?: string;
+  nickname?: string;
+  label?: string;
+  [key: string]: unknown;
+}
+
+interface CompareSbt {
+  name?: string;
+  image?: string | null;
+  imageUrl?: string | null;
+  sbtInfo?: {
+    image?: string | null;
+    [key: string]: unknown;
+  };
+  [key: string]: unknown;
+}
 
 
-
-const isUnknownRecord = (value: unknown): value is UnknownRecord =>
-  Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-
-const toUnknownRecord = (value: unknown): UnknownRecord =>
-  isUnknownRecord(value) ? value : {};
-
-const readRecordProperty = (record: UnknownRecord, key: string): UnknownRecord =>
-  toUnknownRecord(record[key]);
-
-const getCompareSbtLabelTyped = getCompareSbtLabel as (entry?: unknown) => string;
-const getCompareSbtKeyTyped = getCompareSbtKey as (entry?: unknown) => string;
-
-export const readDgObjectValues = (name: string): UnknownRecord[] => {
+export const readDgObjectValues = (name: string): Record<string, any>[] => {
   return listNamespaceEntriesSync(name, { cloneValues: false })
     .map((entry) => entry?.value)
-    .filter(isUnknownRecord);
+    .filter((value) => value && typeof value === 'object');
 };
 
 export const buildNicknameByAddressMap = (bookmarks: CompareBookmark[] = []): Map<string, string> => {
@@ -362,8 +358,8 @@ const getSbtDetails = (sbtName: string): { name: string; image: string | null } 
   return { name: sbtName, image: null };
 };
 
-const resolveSbtDisplayNameForCompareEntry = (entry: unknown = null): string => getCompareSbtLabelTyped(entry);
-const resolveSbtCompareKeyForEntry = (entry: unknown = null): string => getCompareSbtKeyTyped(entry);
+const resolveSbtDisplayNameForCompareEntry = (entry: any = null): string => getCompareSbtLabel(entry as any);
+const resolveSbtCompareKeyForEntry = (entry: any = null): string => getCompareSbtKey(entry as any);
 
 
 /* -----------------------------
@@ -440,8 +436,8 @@ const getCommonUnsureQuestions = (users: CompareUser[] = []): CompareUnsureQuest
 const MAX_DRILL_QUESTIONS = 6;
 const MAX_DRILL_OPTIONS = 6;
 
-const unwrapAnswerValue = (answer: unknown): unknown => {
-  if (isUnknownRecord(answer) && 'value' in answer) return answer.value;
+const unwrapAnswerValue = (answer: any): any => {
+  if (answer && typeof answer === 'object' && 'value' in answer) return answer.value;
   return answer;
 };
 
@@ -463,7 +459,7 @@ const toCleanText = (val: unknown): string => {
   return trimmed === '*' ? '' : trimmed;
 };
 
-const toAnswerArray = (value: unknown): string[] => {
+const toAnswerArray = (value: any): string[] => {
   const raw = unwrapAnswerValue(value);
   if (Array.isArray(raw)) {
     return raw.map((v) => toCleanText(v)).filter(Boolean);
@@ -500,7 +496,7 @@ const formatRatingValue = (val: unknown, scale: number | null): string => {
 const buildQuestionEntries = (users: CompareUser[] = [], labels: string[] = []): CompareQuestionEntry[] => {
   const map = new Map<string, CompareQuestionEntry>();
   (users || []).forEach((u, idx) => {
-    const label = labels[idx] || getShortenedAddress(u?.address || '', false) || `User ${idx + 1}`;
+    const label = String(labels[idx] || getShortenedAddress(u?.address || '', false) || `User ${idx + 1}`);
     (Array.isArray(u?.questions) ? u.questions : []).forEach((q) => {
       const qidRaw = q?.id || q?.questionID || q?.questionId || q?.qId;
       if (!qidRaw) return;
@@ -560,139 +556,6 @@ export const resolveCompareAddressPillContentStyle = (): React.CSSProperties => 
   gap: 8,
 });
 
-export const resolveCompareAddressBlockieStyle = (): React.CSSProperties => ({
-  borderRadius: 3,
-});
-
-export const buildCompareProfileHref = (address: unknown): string => {
-  const normalizedAddress = String(address || '').trim();
-  return normalizedAddress ? buildPublicRoute(`/u/${normalizedAddress}`) : '';
-};
-
-export const buildCompareClassName = (...classNames: unknown[]): string => (
-  classNames
-    .map((className) => String(className || ''))
-    .filter(Boolean)
-    .join(' ')
-);
-
-export const resolveCompareUnsurePanelStyle = (): React.CSSProperties => ({
-  marginTop: 8,
-});
-
-export const resolveCompareUnsureHeaderStyle = (): React.CSSProperties => ({
-  fontWeight: 700,
-  marginBottom: 6,
-});
-
-export const resolveCompareUnsureMoreStyle = (): React.CSSProperties => ({
-  fontSize: 12,
-  marginTop: 6,
-  opacity: 0.8,
-});
-
-export const resolveCompareBookmarksHeaderStyle = (): React.CSSProperties => ({
-  color: 'white',
-  fontWeight: '600',
-  marginBottom: '10px',
-});
-
-export const resolveCompareBookmarksListStyle = (): React.CSSProperties => ({
-  display: 'flex',
-  flexWrap: 'wrap',
-  gap: 10,
-});
-
-export const resolveCompareErrorStyle = (): React.CSSProperties => ({
-  marginTop: 8,
-});
-
-export const resolveCompareVisualSectionStyle = (): React.CSSProperties => ({
-  padding: '6px 0',
-});
-
-export const resolveCompareLoadingTextStyle = (): React.CSSProperties => ({
-  marginLeft: 6,
-});
-
-export const resolveCompareClickableResultItemStyle = (): React.CSSProperties => ({
-  cursor: 'pointer',
-});
-
-export const resolveCompareDrillBodyStyle = (): React.CSSProperties => ({
-  marginTop: 6,
-});
-
-export const resolveCompareVennWrapStyle = (): React.CSSProperties => ({
-  overflowX: 'auto',
-  position: 'relative',
-});
-
-export const resolveCompareVennTooltipStyle = ({
-  clientWidth,
-  x = 0,
-  y = 0,
-}: {
-  clientWidth?: unknown;
-  x?: unknown;
-  y?: unknown;
-} = {}): React.CSSProperties => {
-  const width = Number(clientWidth || 420);
-  const left = Math.max(8, Math.min(Number(x || 0) + 6, width - 420));
-  return {
-    left,
-    top: Number(y || 0) + 8,
-  };
-};
-
-export const resolveCompareVennTooltipHeaderStyle = (): React.CSSProperties => ({
-  fontWeight: 700,
-  marginBottom: 4,
-});
-
-export const resolveCompareVennTooltipListStyle = (): React.CSSProperties => ({
-  listStyle: 'none',
-  margin: 0,
-  padding: 0,
-});
-
-export const resolveCompareVennSbtRowStyle = (): React.CSSProperties => ({
-  alignItems: 'center',
-  display: 'flex',
-  gap: '8px',
-});
-
-export const resolveCompareVennSbtImageStyle = (): React.CSSProperties => ({
-  borderRadius: '4px',
-  flexShrink: 0,
-});
-
-export const resolveCompareVennNoteStyle = (): React.CSSProperties => ({
-  fontSize: 12,
-  marginTop: 4,
-  opacity: 0.75,
-});
-
-export const resolveCompareCompassLegendStyle = (): React.CSSProperties => ({
-  display: 'flex',
-  flexWrap: 'wrap',
-  gap: 8,
-  marginBottom: 8,
-});
-
-export const resolveCompareCompassLegendSwatchStyle = (background: unknown): React.CSSProperties => ({
-  background: String(background || ''),
-  borderRadius: 5,
-  display: 'inline-block',
-  height: 10,
-  marginRight: 6,
-  width: 10,
-});
-
-export const resolveCompareCompassScrollStyle = (): React.CSSProperties => ({
-  overflowX: 'auto',
-});
-
 const CompareAddress = ({ firstAddress, account, scanSpecificUserProfile }: CompareAddressProps) => {
   const [compareAddresses, setCompareAddresses] = useState<string[]>([]);
   const [showComparison, setShowComparison] = useState(false);
@@ -741,7 +604,6 @@ const CompareAddress = ({ firstAddress, account, scanSpecificUserProfile }: Comp
 
   // per-item drill-down state map: { 'agree-0': {open, loading, error, text, tree?}, ... }
   const [drillState, setDrillState] = useState<CompareDrillStateMap>({});
-  const runComparisonRef = useRef<CompareRunComparison | null>(null);
 
   useEffect(() => {
     // Extract addresses from the URL or use firstAddress
@@ -769,7 +631,7 @@ const CompareAddress = ({ firstAddress, account, scanSpecificUserProfile }: Comp
 
   const isE2eAutofillDisabled = React.useCallback(() => {
     try {
-      if (globalThis && (globalThis as CompareGlobalThis).CE_E2E_AI_MOCK === true) return true;
+      if (globalThis && (globalThis as any).CE_E2E_AI_MOCK === true) return true;
     } catch (e) { void e; /* fallback: agent/e2e mock detection. */ }
     try {
       const qp = new URLSearchParams(String(window?.location?.search || ''));
@@ -1055,7 +917,7 @@ const CompareAddress = ({ firstAddress, account, scanSpecificUserProfile }: Comp
             const out: CompareVennResult = {
               counts: { ...ensure.counts, ...vennRaw.counts },
               semantics: vennRaw.semantics || ensure.semantics,
-              evidenceMap: { ...ensure.evidenceMap, ...(vennRaw.evidenceMap || {}) } as Partial<Record<VennRegionKey, unknown[]>>,
+              evidenceMap: { ...ensure.evidenceMap, ...(vennRaw.evidenceMap || {}) } as Partial<Record<VennRegionKey, any[]>>,
             };
             const vennKeys: VennRegionKey[] = ['a', 'b', 'c', 'ab', 'ac', 'bc', 'abc'];
             for (const k of vennKeys) {
@@ -2111,8 +1973,8 @@ function Venn2({
   const ax = 140, ay = 100;
   const bx = 220, by = 100;
 
-  const ev = (evidence || {}) as Partial<Record<VennRegionKey, unknown[]>>;
-  const listFor = (key: VennRegionKey): unknown[] => (Array.isArray(ev[key]) ? ev[key] : []);
+  const ev = (evidence || {}) as Partial<Record<VennRegionKey, any[]>>;
+  const listFor = (key: VennRegionKey): any[] => (Array.isArray(ev[key]) ? ev[key] : []);
 
   const normalizeStance = (v: unknown): string => {
     if (v === null || v === undefined) return 'Unsure';
@@ -2355,7 +2217,7 @@ function Venn2({
                     <PolisQuestionHoverCard
                       label={label}
                       prompt={item.prompt}
-                      votes={votes}
+                      votes={votes as any}
                       metaLabel={metaLabel}
                     />
                   )}
@@ -2459,8 +2321,8 @@ function Venn3({
   const bx = 230, by = 110;
   const cx = 180, cy = 170;
 
-  const ev = (evidence || {}) as Partial<Record<VennRegionKey, unknown[]>>;
-  const listFor = (key: VennRegionKey): unknown[] => (Array.isArray(ev[key]) ? ev[key] : []);
+  const ev = (evidence || {}) as Partial<Record<VennRegionKey, any[]>>;
+  const listFor = (key: VennRegionKey): any[] => (Array.isArray(ev[key]) ? ev[key] : []);
 
   const normalizeStance = (v: unknown): string => {
     if (v === null || v === undefined) return 'Unsure';
@@ -2715,7 +2577,7 @@ function Venn3({
                     <PolisQuestionHoverCard
                       label={label}
                       prompt={item.prompt}
-                      votes={votes}
+                      votes={votes as any}
                       metaLabel={metaLabel}
                     />
                   )}
