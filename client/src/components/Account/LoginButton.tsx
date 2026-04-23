@@ -1,4 +1,4 @@
-/** @file LoginButton.jsx */
+/** @file LoginButton.tsx */
 import React, { Component } from 'react';
 import { connect } from 'react-redux';
 import { createLogger } from '../../utilities/logging';
@@ -14,7 +14,23 @@ import { faSpinner } from '@fortawesome/free-solid-svg-icons'
 
 const log = createLogger('account');
 
-class LoginButton extends Component {
+type LoginButtonOwnProps = {
+  launchAccountModal: () => void;
+};
+
+type LoginButtonStateProps = {
+  loginInProgress?: boolean;
+};
+
+type LoginButtonProps = LoginButtonOwnProps & LoginButtonStateProps;
+
+type RootState = {
+  sessionState: {
+    loginInProgress?: boolean;
+  };
+};
+
+class LoginButton extends Component<LoginButtonProps> {
 
     openLoginModal = () => {
         this.props.launchAccountModal()
@@ -48,7 +64,7 @@ class LoginButton extends Component {
 }
 
 
-const mapStateToProps = (state) => ({
+const mapStateToProps = (state: RootState): LoginButtonStateProps => ({
   loginInProgress: state.sessionState.loginInProgress,
 });
 
