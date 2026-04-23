@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, waitFor, cleanup, act } from '@testing-library/react';
-import { WagmiHooksHOC } from './withWagmiBridge.jsx';
+import { WagmiHooksHOC } from './withWagmiBridge';
 import { getSessionNetwork } from '../../utilities/web3/contractScripts.js';
 import { clearUserExplicitlyDisconnected } from '../../utilities/web3/wagmiDisconnectState.js';
 
@@ -12,12 +12,12 @@ const mockUseProvider = jest.fn();
 const mockUseDisconnect = jest.fn();
 
 jest.mock('wagmi', () => ({
-  useAccount: (...args) => mockUseAccount(...args),
-  useBalance: (...args) => mockUseBalance(...args),
-  useBlockNumber: (...args) => mockUseBlockNumber(...args),
-  useNetwork: (...args) => mockUseNetwork(...args),
-  useProvider: (...args) => mockUseProvider(...args),
-  useDisconnect: (...args) => mockUseDisconnect(...args),
+  useAccount: (...args: any[]) => mockUseAccount(...args),
+  useBalance: (...args: any[]) => mockUseBalance(...args),
+  useBlockNumber: (...args: any[]) => mockUseBlockNumber(...args),
+  useNetwork: (...args: any[]) => mockUseNetwork(...args),
+  useProvider: (...args: any[]) => mockUseProvider(...args),
+  useDisconnect: (...args: any[]) => mockUseDisconnect(...args),
 }));
 
 jest.mock('@rainbow-me/rainbowkit', () => ({
@@ -42,7 +42,10 @@ jest.mock('utilities/logging.js', () => ({
   }),
 }));
 
-const buildProps = (overrides = {}) => ({
+const mockGetSessionNetwork = getSessionNetwork as jest.Mock;
+const mockClearUserExplicitlyDisconnected = clearUserExplicitlyDisconnected as jest.Mock;
+
+const buildProps = (overrides: Record<string, any> = {}): any => ({
   changeAccount: jest.fn(),
   updateLoginInfo: jest.fn(),
   provider: null,
@@ -52,7 +55,15 @@ const buildProps = (overrides = {}) => ({
   ...overrides,
 });
 
-const configureWagmiMocks = ({ address = undefined, chain = null, chains = null } = {}) => {
+const configureWagmiMocks = ({
+  address = undefined,
+  chain = null,
+  chains = null,
+}: {
+  address?: string;
+  chain?: any;
+  chains?: any[] | null;
+} = {}) => {
   const resolvedChain = chain || { id: 84532, chainId: 84532, name: 'Base Sepolia' };
   const resolvedChains = chains || [resolvedChain];
   mockUseAccount.mockReturnValue({
@@ -91,18 +102,18 @@ describe('WagmiHooksHOC explicit disconnect flag handling', () => {
     const { rerender } = render(<Wrapped {...props} />);
 
     await act(async () => {});
-    expect(clearUserExplicitlyDisconnected).not.toHaveBeenCalled();
+    expect(mockClearUserExplicitlyDisconnected).not.toHaveBeenCalled();
 
     configureWagmiMocks({ address: '0x0000000000000000000000000000000000000001' });
     rerender(<Wrapped {...props} />);
 
     await waitFor(() => {
-      expect(clearUserExplicitlyDisconnected).toHaveBeenCalledTimes(1);
+      expect(mockClearUserExplicitlyDisconnected).toHaveBeenCalledTimes(1);
     });
 
     rerender(<Wrapped {...props} />);
     await act(async () => {});
-    expect(clearUserExplicitlyDisconnected).toHaveBeenCalledTimes(1);
+    expect(mockClearUserExplicitlyDisconnected).toHaveBeenCalledTimes(1);
   });
 
   it('does not clear the explicit disconnect flag when no wallet is connected', async () => {
@@ -112,7 +123,7 @@ describe('WagmiHooksHOC explicit disconnect flag handling', () => {
     render(<Wrapped {...buildProps()} />);
 
     await act(async () => {});
-    expect(clearUserExplicitlyDisconnected).not.toHaveBeenCalled();
+    expect(mockClearUserExplicitlyDisconnected).not.toHaveBeenCalled();
   });
 
   it('clears the explicit disconnect flag on reconnect even without redux dispatch props', async () => {
@@ -122,13 +133,13 @@ describe('WagmiHooksHOC explicit disconnect flag handling', () => {
     const { rerender } = render(<Wrapped provider={null} account="" loginComplete={false} activeSessionSlug="edge" />);
 
     await act(async () => {});
-    expect(clearUserExplicitlyDisconnected).not.toHaveBeenCalled();
+    expect(mockClearUserExplicitlyDisconnected).not.toHaveBeenCalled();
 
     configureWagmiMocks({ address: '0x0000000000000000000000000000000000000002' });
     rerender(<Wrapped provider={null} account="" loginComplete={false} activeSessionSlug="edge" />);
 
     await waitFor(() => {
-      expect(clearUserExplicitlyDisconnected).toHaveBeenCalledTimes(1);
+      expect(mockClearUserExplicitlyDisconnected).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -156,7 +167,7 @@ describe('WagmiHooksHOC explicit disconnect flag handling', () => {
     const address = '0x0000000000000000000000000000000000000004';
     const fixedSessionNetwork = { id: 84532, chainId: 84532, name: 'Base Sepolia' };
     const baseMainnet = { id: 8453, chainId: 8453, name: 'Base' };
-    getSessionNetwork.mockReturnValue(fixedSessionNetwork);
+    mockGetSessionNetwork.mockReturnValue(fixedSessionNetwork);
     configureWagmiMocks({
       address,
       chain: fixedSessionNetwork,
@@ -216,7 +227,7 @@ describe('WagmiHooksHOC explicit disconnect flag handling', () => {
       loginComplete: true,
     });
     const Wrapped = WagmiHooksHOC(() => null);
-    const Harness = ({ showFirst = true }) => (
+    const Harness = ({ showFirst = true }: { showFirst?: boolean }) => (
       <>
         {showFirst ? <Wrapped {...firstProps} /> : null}
         <Wrapped {...secondProps} />
@@ -256,7 +267,7 @@ describe('WagmiHooksHOC explicit disconnect flag handling', () => {
 
   it('keeps provider selection strict when active session slug is unresolved', async () => {
     configureWagmiMocks({ address: undefined });
-    getSessionNetwork.mockImplementation((slug) => {
+    mockGetSessionNetwork.mockImplementation((slug: string) => {
       if (slug === 'missing-session-slug') return null;
       if (slug === '') {
         return { id: 8453, chainId: 8453, name: 'Base' };
@@ -264,18 +275,18 @@ describe('WagmiHooksHOC explicit disconnect flag handling', () => {
       return null;
     });
 
-    const Probe = jest.fn(() => null);
-    Probe.displayName = 'Probe';
-    const Wrapped = WagmiHooksHOC(Probe);
+    const Probe = jest.fn((_props: any) => null);
+    (Probe as React.ComponentType<any>).displayName = 'Probe';
+    const Wrapped = WagmiHooksHOC(Probe as React.ComponentType<any>);
     render(<Wrapped {...buildProps({ activeSessionSlug: 'missing-session-slug' })} />);
 
     await act(async () => {});
 
-    expect(getSessionNetwork).toHaveBeenCalledWith('missing-session-slug');
-    expect(getSessionNetwork).not.toHaveBeenCalledWith('');
+    expect(mockGetSessionNetwork).toHaveBeenCalledWith('missing-session-slug');
+    expect(mockGetSessionNetwork).not.toHaveBeenCalledWith('');
     expect(mockUseProvider).toHaveBeenCalledWith({ chainId: undefined });
     expect(Probe).toHaveBeenCalled();
-    expect(Probe.mock.calls[0][0].network).toMatchObject({
+    expect((Probe.mock.calls[0]?.[0] as any).network).toMatchObject({
       id: 84532,
       chainId: 84532,
       name: 'Base Sepolia',
