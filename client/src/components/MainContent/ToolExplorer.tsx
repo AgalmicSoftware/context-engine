@@ -35,7 +35,7 @@ import plusSignImage from '../../assets/img/plus_sign.png';
 const RiskMatrix = React.lazy(() => import("../MainContent/RiskMatrix"));
 const SurveyTool = React.lazy(() => import("../SurveyTool/SurveyTool.jsx"));
 const AudioInput = React.lazy(() => import("../Shared/AudioInput/AudioInput"));
-const SBTsPage = React.lazy(() => import("../SBTs/SBTsPage.jsx"));
+const SBTsPage = React.lazy(() => import("../SBTs/SBTsPage"));
 const DebateMap = React.lazy(() => import("../DebateMap/DebateMap.jsx"));
 const AudioSurveyGenerator = React.lazy(() => import("../SurveyTool/SurveyGenerator/SurveyGenerator.jsx"));
 

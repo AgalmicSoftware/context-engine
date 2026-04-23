@@ -70,7 +70,7 @@ jest.mock('../SurveyTool/SurveyPage', () => (props) => {
   return <div data-testid="survey-page-full">Full Questions</div>;
 });
 
-jest.mock('../SBTs/SBTsPage.jsx', () => (props) => {
+jest.mock('../SBTs/SBTsPage', () => (props) => {
   mockSBTsPage(props);
   return (
     <div data-testid="sbts-page">
