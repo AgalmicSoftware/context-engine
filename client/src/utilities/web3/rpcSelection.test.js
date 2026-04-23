@@ -8,7 +8,7 @@ import {
   getFallbackRpcUrlForChain,
   getPrimaryRpcUrlForChain,
   normalizeRpcCandidateList,
-} from './appRpcSelection.js';
+} from './rpcSelection.js';
 
 const probeChainRpcWithFallback = async (chain, request) => {
   const primary = getPrimaryRpcUrlForChain(chain);
