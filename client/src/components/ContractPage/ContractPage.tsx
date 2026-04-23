@@ -29,7 +29,7 @@ import {
   resolveContractPageActiveSession,
   resolveContractPageReferrerSlug,
 } from './contractPageSessionResolution.js';
-import ContractViewer from './ContractViewer';
+import ContractViewer, { type ContractViewerContract } from './ContractViewer';
 import { normalizeContractKeyParam } from './contractMetadata.js';
 import { buildContractViewerContracts } from './contractViewerUtils.js';
 import { sbtsListPath, t } from '../../utilities/ui/terminology.js';
@@ -161,7 +161,7 @@ export const ContractPage = ({ activeSessionSlug, reduxActiveSessionSlug }: Cont
   });
   const photoAnalysisPromptDisplay = buildPhotoAnalysisPrompt('<SourceFilename>');
 
-  const promptItems = useMemo(() => ([
+  const promptItems = useMemo<PromptItem[]>(() => ([
     { id: 'seedGen', title: 'Question Generation', file: 'seedGenPrompt.js', content: seedGenPrompt },
     { id: 'questionSelection', title: 'Question Selection', file: 'questionSelectionPrompt.js', content: questionSelectionPrompt },
     { id: 'audioSummary', title: 'Audio Summary', file: 'audioSummaryPrompt.js', content: audioSummaryPrompt },
@@ -173,14 +173,14 @@ export const ContractPage = ({ activeSessionSlug, reduxActiveSessionSlug }: Cont
     { id: 'aiRewrite', title: 'AI Rewrite', file: 'aiRewritePrompt.js', content: aiRewritePrompt },
   ]), [clusterAnalysisPromptDisplay, compareToolkitPromptDisplay, photoAnalysisPromptDisplay, userAnalysisPromptDisplay]);
 
+  const sessionContracts = (
+    activeSession?.contracts &&
+    typeof activeSession.contracts === 'object'
+      ? activeSession.contracts as SessionContractsMap
+      : {}
+  );
   const sessionNetworkChainId = activeSession?.networkChainId;
   const contracts = useMemo(() => {
-    const sessionContracts = (
-      activeSession?.contracts &&
-      typeof activeSession.contracts === 'object'
-        ? activeSession.contracts as SessionContractsMap
-        : {}
-    );
     const firstContract = Object.values(sessionContracts)[0] || null;
     const chainId = Number(sessionNetworkChainId || firstContract?.chainId || 0) || undefined;
     return buildContractsForViewer({
@@ -526,6 +526,11 @@ export const ContractPage = ({ activeSessionSlug, reduxActiveSessionSlug }: Cont
       </div>
     </div>
   );
+};
+
+ContractPage.propTypes = {
+  activeSessionSlug: PropTypes.string,
+  reduxActiveSessionSlug: PropTypes.string,
 };
 
 const mapStateToProps = (state: { sessionState?: { activeSessionSlug?: string } }) => ({

@@ -27,15 +27,10 @@ type FilterEntry = {
   parsed: Record<string, any>;
 };
 
-type SessionBoundBookmark = {
-  id: string;
-  sessionSlug: string;
-};
-
 type BookmarkData = {
   users: BookmarkUser[];
-  surveys: SessionBoundBookmark[];
-  questions: SessionBoundBookmark[];
+  surveys: string[];
+  questions: string[];
   sbts: string[];
   filters: FilterEntry[];
   atlasNodes: string[];
@@ -85,25 +80,6 @@ const normalizeList = (value: unknown): string[] => {
   return value.map(toText).filter(Boolean);
 };
 
-const normalizeBookmarkRefs = (value: unknown, fallbackSessionSlug: unknown): SessionBoundBookmark[] => {
-  if (!Array.isArray(value)) return [];
-  const fallbackSlug = normalizeSessionSlug(fallbackSessionSlug || '');
-  return value.map((entry) => {
-    let id = '';
-    let sessionSlug = fallbackSlug;
-    if (typeof entry === 'string') {
-      id = entry;
-    } else if (entry && typeof entry === 'object') {
-      const record = entry as Record<string, unknown>;
-      id = toText(record.id || record.surveyId || record.surveyID || record.questionId || record.questionID || record.value);
-      sessionSlug = normalizeSessionSlug(record.sessionSlug ?? record.slug ?? fallbackSlug);
-    }
-    id = toText(id);
-    if (!id) return null;
-    return { id, sessionSlug };
-  }).filter((entry): entry is SessionBoundBookmark => !!entry);
-};
-
 const normalizeFilterEntries = (value: unknown): unknown[] => {
   if (!Array.isArray(value)) return [];
   return value.filter((entry) => entry != null && entry !== '');
@@ -125,14 +101,6 @@ const sortAlpha = (list: string[]) => {
   return [...list].sort((a, b) => String(a).localeCompare(String(b)));
 };
 
-const sortBookmarkRefs = (list: SessionBoundBookmark[]) => (
-  [...list].sort((a, b) => {
-    const idCmp = a.id.localeCompare(b.id);
-    if (idCmp !== 0) return idCmp;
-    return a.sessionSlug.localeCompare(b.sessionSlug);
-  })
-);
-
 const shortenId = (value: unknown, lead = 8, tail = 6) => {
   const text = toText(value);
   if (!text) return '';
@@ -140,35 +108,8 @@ const shortenId = (value: unknown, lead = 8, tail = 6) => {
   return `${text.slice(0, lead)}...${text.slice(-tail)}`;
 };
 
-const getBookmarkRefKey = (entry: SessionBoundBookmark) => (
-  `${entry.id.toLowerCase()}|${normalizeSessionSlug(entry.sessionSlug).toLowerCase()}`
-);
-
-const asBookmarkRef = (value: unknown, sessionSlug: unknown = ''): SessionBoundBookmark => {
-  if (value && typeof value === 'object') {
-    const record = value as Record<string, unknown>;
-    return {
-      id: toText(record.id || record.surveyId || record.surveyID || record.questionId || record.questionID || record.value),
-      sessionSlug: normalizeSessionSlug(record.sessionSlug ?? record.slug ?? sessionSlug),
-    };
-  }
-  return {
-    id: toText(value),
-    sessionSlug: normalizeSessionSlug(sessionSlug || ''),
-  };
-};
-
-export const buildSurveyBookmarkHref = (survey: unknown, sessionSlug: unknown = '') => {
-  const ref = asBookmarkRef(survey, sessionSlug);
-  if (!ref.id) return '/surveys';
-  const base = `/survey/${encodeURIComponent(ref.id)}`;
-  return ref.sessionSlug ? `${base}?session=${encodeURIComponent(ref.sessionSlug)}` : base;
-};
-
-export const buildQuestionBookmarkHref = (question: unknown, sessionSlug: unknown = '') => {
-  const ref = asBookmarkRef(question, sessionSlug);
-  return buildQuestionRoutePath(ref.id, { sessionSlug: ref.sessionSlug });
-};
+// Keep bookmark survey links session-agnostic unless a survey-specific slug is persisted.
+export const buildSurveyBookmarkHref = (surveyId: unknown) => `/survey/${toText(surveyId)}`;
 
 const normalizeUsers = (entries: unknown): BookmarkUser[] => {
   if (!Array.isArray(entries)) return [];
@@ -461,8 +402,8 @@ const BookmarksPage = () => {
 
       const merged: {
         users: unknown[];
-        surveys: SessionBoundBookmark[];
-        questions: SessionBoundBookmark[];
+        surveys: string[];
+        questions: string[];
         sbts: string[];
         filters: unknown[];
       } = {
@@ -473,7 +414,7 @@ const BookmarksPage = () => {
         filters: [],
       };
 
-      const mergeCache = (obj: any, entrySlug = '') => {
+      const mergeCache = (obj: any) => {
         if (!obj || typeof obj !== 'object') return;
         merged.users.push(...(Array.isArray(obj.users) ? obj.users : []));
         merged.surveys.push(...normalizeBookmarkRefs(obj.surveys, entrySlug));

@@ -24,28 +24,13 @@ import {
 } from '../../utilities/ui/publicUrl.js';
 import { getHistoricalFigureAvatarByName } from '../../utilities/ui/historicalFigureAvatars.js';
 
-export type RiskValence = 'opportunity' | 'risk';
+type RiskValence = 'opportunity' | 'risk';
 
-export type RiskCommentRecord = {
+type RiskCommentRecord = {
   cell: string;
   comment: string;
   valence: RiskValence;
   intensity: number;
-  historicalFigure?: RiskMatrixHistoricalFigure | null;
-  corpusRefs?: RiskMatrixCorpusRef[];
-};
-
-export type RiskMatrixRestoreState = {
-  comments?: RiskCommentRecord[];
-  modal?: boolean;
-  selectedCellId?: string;
-  comment?: string;
-  valence?: RiskValence;
-  intensity?: number;
-  activeCategoryX?: string | null;
-  activeCategoryY?: string | null;
-  activeSubcategoryX?: string | null;
-  activeSubcategoryY?: string | null;
 };
 
 type RiskCategory = {
@@ -55,9 +40,6 @@ type RiskCategory = {
 
 type RiskMatrixProps = {
   embedded?: boolean;
-  onOpenAtlasNode?: ((nodeId: string, restoreState?: RiskMatrixRestoreState) => void) | null;
-  restoreState?: RiskMatrixRestoreState | null;
-  onRestoreApplied?: (() => void) | null;
 };
 
 type RiskMatrixState = {
@@ -77,32 +59,6 @@ type RiskMatrixState = {
   hoveredColIndex: number | null;
   hoveredSubRowIndex: number | null;
   hoveredSubColIndex: number | null;
-  openCommentGroups: Record<RiskValence, boolean>;
-};
-
-type RiskMatrixAtlasScenario = {
-  id: string;
-  riskMatrixCell: string;
-  atlasNodeId: string;
-  atlasNodeLabel: string;
-  title: string;
-  shortTitle?: string;
-  summary: string;
-  valence: 'risk' | 'opportunity' | 'mixed';
-  intensity: number;
-  confidence: string;
-  timeHorizon: string;
-  primaryMechanism: string;
-  riskClaim?: string;
-  opportunityClaim?: string;
-  counterpoint?: string;
-  image?: string | null;
-  imageAlt?: string;
-  historicalAnchors?: Array<{
-    name: string;
-    avatar: string;
-    role?: string;
-  }>;
 };
 
 export const RISK_MATRIX_CATEGORIES: RiskCategory[] = [
@@ -157,7 +113,7 @@ const isValidCommentRecord = (entry: unknown): entry is RiskCommentRecord => {
 };
 
 const INITIAL_COMMENTS: RiskCommentRecord[] = Array.isArray(seedComments)
-  ? seedComments.filter(isValidCommentRecord).map(normalizeCommentRecord).map(enrichRiskMatrixCommentRecord)
+  ? seedComments.filter(isValidCommentRecord).map(normalizeCommentRecord)
   : [];
 
 export const buildHeatmapFromComments = (comments: RiskCommentRecord[] = []) => {
@@ -196,10 +152,9 @@ const formatSelectionTitle = (cellId = '') => {
   return `${catX} / ${subX} vs ${catY} / ${subY}`;
 };
 
-const parseSelectionStateFromCell = (cellId = '') => {
-  if (isAggregateCellId(cellId)) {
-    const [activeCategoryX, activeCategoryY] = cellId.split('_vs_');
-    if (!activeCategoryX || !activeCategoryY) return null;
+class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
+  constructor(props: RiskMatrixProps) {
+    super(props);
 
     return {
       activeCategoryX,
@@ -319,13 +274,26 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
     });
   };
 
-  toggleCommentGroup = (valence: RiskValence) => {
-    this.setState((previous) => ({
-      openCommentGroups: {
-        ...previous.openCommentGroups,
-        [valence]: !previous.openCommentGroups[valence],
-      },
-    }));
+  getCellValue = (catY: string, catX: string) => this.state.heatmap[`${catY}_${catX}`] || 0;
+
+  getCommentsForCell = (
+    cellId: string,
+    comments: RiskCommentRecord[] = this.state.comments
+  ): RiskCommentRecord[] => {
+    if (typeof cellId !== 'string' || !cellId) return [];
+
+    if (isAggregateCellId(cellId)) {
+      const [catX, catY] = cellId.split('_vs_');
+      if (!catX || !catY) return [];
+
+      return comments.filter(
+        (entry) => isCanonicalCellId(entry.cell)
+          && entry.cell.startsWith(`${catX}.`)
+          && entry.cell.includes(`.${catY}.`)
+      );
+    }
+
+    return comments.filter((entry) => entry.cell === cellId);
   };
 
   getCellValue = (catY: string, catX: string) => this.state.heatmap[`${catY}_${catX}`] || 0;
@@ -352,6 +320,18 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
     6,
     ...Object.values(this.state.heatmap).map((value) => Math.abs(value))
   );
+
+  getCurrentViewLabel = () => {
+    const { activeCategoryX, activeCategoryY } = this.state;
+
+    if (activeCategoryX && activeCategoryY) {
+      return `${activeCategoryY} x ${activeCategoryX}`;
+    }
+
+    if (activeCategoryX) return `Column focus: ${activeCategoryX}`;
+    if (activeCategoryY) return `Row focus: ${activeCategoryY}`;
+    return 'Matrix overview';
+  };
 
   getCellAriaLabel = (catX: string, catY: string, value: number) => {
     if (value === 0) {
@@ -747,6 +727,16 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
     const subcategoriesY = categoryY.subcategories;
     const numSubX = subcategoriesX.length;
     const numSubY = subcategoriesY.length;
+
+    const getSubCellValue = (subY: string, subX: string) => {
+      const cellId = `${activeCategoryX}.${subX}.${activeCategoryY}.${subY}`;
+      const comments = this.getCommentsForCell(cellId);
+
+      return comments.reduce((total, entry) => {
+        const signedValue = (entry.valence === 'risk' ? -1 : 1) * Number(entry.intensity);
+        return total + signedValue;
+      }, 0);
+    };
 
     return (
       <section className={styles.sectionCard} data-testid="ce-risk-matrix-subgrid">

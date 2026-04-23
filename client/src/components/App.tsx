@@ -3,7 +3,7 @@ import React from "react";
 import { Routes, Route } from 'react-router-dom'
 import { Provider } from 'react-redux';
 import store from '../store.js';
-import { CE_ENABLE_WALLETCONNECT_FALLBACK, SERVER } from '../variables/appConfig.js';
+import { SERVER } from '../variables/appConfig.js';
 import { installCeAgent } from '../utilities/ceAgent.js';
 import { createLogger } from '../utilities/logging';
 import { syncPublicPageHead } from '../utilities/ui/publicPageHead.js';
@@ -12,7 +12,7 @@ import CEToaster from './Shared/CEToaster';
 import "assets/css/contextEngine.scss";
 
 import withRouter from "./HooksHOC/withRouterBridge";
-import MainSite from "./MainSite/MainSite";
+import MainSite from "./MainSite/MainSite.jsx";
 import AppErrorBoundary from './ErrorBoundary/AppErrorBoundary';
 import { readColdLoadOnboardingState } from './Onboarding/onboardingConfig.js';
 import { toastTheme } from '../utilities/ui/toastTheme.js';
@@ -23,13 +23,11 @@ import {
   connectorsForWallets,
   RainbowKitProvider,
 } from '@rainbow-me/rainbowkit';
-import type { Wallet } from '@rainbow-me/rainbowkit';
 import {
   metaMaskWallet,
 } from '@rainbow-me/rainbowkit/wallets';
 import { configureChains, createClient, createStorage, WagmiConfig } from 'wagmi';
 import { noopStorage } from '@wagmi/core';
-import { MetaMaskConnector } from 'wagmi/connectors/metaMask';
 import { goerli, localhost } from 'wagmi/chains';
 import {
   mainnet,
@@ -44,7 +42,6 @@ import {
   getFallbackRpcUrlForChain,
   getPrimaryRpcUrlForChain,
 } from '../utilities/web3/rpcSelection.js';
-import { wrapEthersJsonRpcSend } from '../utilities/web3/rpcReadCache.js';
 import { wasUserExplicitlyDisconnected } from '../utilities/web3/wagmiDisconnectState.js';
 import { jsonRpcProvider } from 'wagmi/providers/jsonRpc';
 
@@ -72,38 +69,6 @@ type ColdLoadSnapshot = {
   shouldStartOnboarding: boolean;
 };
 
-const buildBackoffJsonRpcProvider = (
-  providerKey: string,
-  resolveUrl: (chain: any) => string,
-): any => {
-  const baseProvider: any = jsonRpcProvider({
-    rpc: (chain: any) => {
-      const url = resolveUrl(chain);
-      return url ? { http: url } : null;
-    },
-  });
-
-  return (chain: any): any => {
-    const config = typeof baseProvider === 'function' ? baseProvider(chain) : null;
-    if (!config || typeof config.provider !== 'function') return config;
-    const selectedUrl = (
-      config?.chain?.rpcUrls?.default?.http?.[0]
-      || config?.chain?.rpcUrls?.public?.http?.[0]
-      || resolveUrl(chain)
-      || ''
-    );
-    return {
-      ...config,
-      provider: (): any => wrapEthersJsonRpcSend(config.provider() as any, {
-        chainId: Number(chain?.id || config?.chain?.id || 0) || 0,
-        providerKey,
-        providerLabel: providerKey,
-        url: selectedUrl,
-      }) as any,
-    };
-  };
-};
-
 const { chains, provider, webSocketProvider } = configureChains(
   [
     mainnet,
@@ -120,31 +85,26 @@ const { chains, provider, webSocketProvider } = configureChains(
     // NOTE: `publicProvider()` is intentionally not used here.
     // We keep deterministic ordering by resolving primary/fallback RPC URLs ourselves
     // (from chains.js + chain rpcUrls public/default lists) via jsonRpcProvider.
-    buildBackoffJsonRpcProvider('wagmi-primary', getPrimaryRpcUrlForChain),
-    buildBackoffJsonRpcProvider('wagmi-fallback', getFallbackRpcUrlForChain),
+    jsonRpcProvider({
+      rpc: (chain: any) => {
+        const url = getPrimaryRpcUrlForChain(chain);
+        return url ? { http: url } : null;
+      },
+    }),
+    jsonRpcProvider({
+      rpc: (chain: any) => {
+        const url = getFallbackRpcUrlForChain(chain);
+        return url ? { http: url } : null;
+      },
+    }),
   ]
 );
-
-const buildMetaMaskWallet = (): Wallet => {
-  const wallet = metaMaskWallet({ chains, shimDisconnect: true });
-  if (CE_ENABLE_WALLETCONNECT_FALLBACK) return wallet;
-
-  return {
-    ...wallet,
-    createConnector: () => ({
-      connector: new MetaMaskConnector({
-        chains,
-        options: { shimDisconnect: true },
-      }),
-    }),
-  };
-};
 
 const connectors = connectorsForWallets([
   {
     groupName: "Recommended",
     wallets: [
-              buildMetaMaskWallet(),
+              metaMaskWallet({ chains, shimDisconnect: true }),
     ],
   },]);
 
@@ -251,20 +211,12 @@ const subscribeToHistorySync = (onChange: () => void) => {
   };
 };
 
-const getColdLoadOnboardingPathname = () => {
-  try {
-    return window.location?.pathname || '';
-  } catch (_) {
-    return '';
-  }
-};
-
 try {
-  _coldLoadSnapshot = readColdLoadOnboardingState(window.localStorage, getColdLoadOnboardingPathname());
+  _coldLoadSnapshot = readColdLoadOnboardingState(window.localStorage);
   firstVisit = _coldLoadSnapshot.firstVisit;
 } catch (_) {
   try {
-    _coldLoadSnapshot = readColdLoadOnboardingState(window.sessionStorage, getColdLoadOnboardingPathname());
+    _coldLoadSnapshot = readColdLoadOnboardingState(window.sessionStorage);
     firstVisit = _coldLoadSnapshot.firstVisit;
   } catch (__) {
     firstVisit = false;
@@ -299,13 +251,6 @@ class App extends React.Component<AppProps, AppState> {
     }
   };
 
-  didBrowserRouteChangeSinceRender = () => {
-    if (typeof window === 'undefined' || !window.location) return false;
-    const browserKey = `${window.location.pathname || ''}${window.location.search || ''}`;
-    const propsKey = `${this.props.location?.pathname || ''}${this.props.location?.search || ''}`;
-    return browserKey !== propsKey;
-  };
-
   componentDidMount() {
     document.body.classList.add("index-page");
 
@@ -317,13 +262,7 @@ class App extends React.Component<AppProps, AppState> {
     try { installCeAgent(); } catch (e) { log.warn('App: fallback', e); }
     // React Router updates do not cover direct history.replaceState/pushState calls,
     // so bridge the History API back into the same head-sync path.
-    this.unsubscribeHistorySync = subscribeToHistorySync(() => {
-      this.forceUpdate();
-      this.syncRouteHead();
-    });
-    if (this.didBrowserRouteChangeSinceRender()) {
-      this.forceUpdate();
-    }
+    this.unsubscribeHistorySync = subscribeToHistorySync(this.syncRouteHead);
     this.syncRouteHead();
 
   }
@@ -347,14 +286,7 @@ class App extends React.Component<AppProps, AppState> {
   }
 
   render() {
-    const location = (
-      typeof window !== 'undefined' && window.location
-        ? {
-          pathname: window.location.pathname || this.props.location?.pathname || '',
-          search: window.location.search || this.props.location?.search || '',
-        }
-        : (this.props.location || { pathname: '', search: '' })
-    );
+    const location = this.props.location || { pathname: '', search: '' }
 
     const search = location.search || ''
     const nftCode = search.substring(search.indexOf("=") + 1);
