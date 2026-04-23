@@ -219,10 +219,12 @@ export const upsertSbtPasswordRecoveryCodes = ({
   };
 };
 
-export default {
+const sbtPasswordRecoveryStore = {
   getSbtPasswordRecoveryCodes,
   getSbtPasswordRecoveryKey,
   readSbtPasswordRecoveryStore,
   upsertSbtPasswordRecoveryCodes,
   writeSbtPasswordRecoveryStore,
 };
+
+export default sbtPasswordRecoveryStore;
