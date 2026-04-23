@@ -191,10 +191,12 @@ export const createStorageNamespace = ({ prefix, version = 1 } = {}) => {
   };
 };
 
-export default {
+const storageJson = {
   boundedStringify,
   createStorageNamespace,
   removeKeys,
   safeJsonRead,
   safeJsonWrite,
 };
+
+export default storageJson;

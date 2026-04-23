@@ -173,14 +173,14 @@ export const ContractPage = ({ activeSessionSlug, reduxActiveSessionSlug }: Cont
     { id: 'aiRewrite', title: 'AI Rewrite', file: 'aiRewritePrompt.js', content: aiRewritePrompt },
   ]), [clusterAnalysisPromptDisplay, compareToolkitPromptDisplay, photoAnalysisPromptDisplay, userAnalysisPromptDisplay]);
 
-  const sessionContracts = (
-    activeSession?.contracts &&
-    typeof activeSession.contracts === 'object'
-      ? activeSession.contracts as SessionContractsMap
-      : {}
-  );
   const sessionNetworkChainId = activeSession?.networkChainId;
   const contracts = useMemo(() => {
+    const sessionContracts = (
+      activeSession?.contracts &&
+      typeof activeSession.contracts === 'object'
+        ? activeSession.contracts as SessionContractsMap
+        : {}
+    );
     const firstContract = Object.values(sessionContracts)[0] || null;
     const chainId = Number(sessionNetworkChainId || firstContract?.chainId || 0) || undefined;
     return buildContractsForViewer({
