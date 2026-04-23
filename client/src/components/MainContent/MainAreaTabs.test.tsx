@@ -17,7 +17,7 @@ jest.mock('./ToolExplorer.jsx', () => ({
   },
 }));
 
-jest.mock('./OnboardingWalkthrough.jsx', () => ({
+jest.mock('./OnboardingWalkthrough', () => ({
   __esModule: true,
   default: () => <div data-testid="mock-onboarding-walkthrough" />,
 }));

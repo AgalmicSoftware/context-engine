@@ -1,4 +1,4 @@
-/** @file OnboardingWalkthrough.jsx */
+/** @file OnboardingWalkthrough.tsx */
 
 import React, { Component } from "react";
 
@@ -17,8 +17,20 @@ import { faArrowRight, faArrowLeft } from '@fortawesome/free-solid-svg-icons';
 
 const log = createLogger('ui');
 
-class OnboardingWalkthrough extends Component {
-    state = {
+type OnboardingWalkthroughProps = {
+  changeTabFunction: (tabIndex: number) => void;
+  demoMode?: unknown;
+  toggleDemoMode?: (demoModeOn: boolean) => void;
+};
+
+type OnboardingWalkthroughState = {
+  openSidebar: boolean;
+  arrowIndex: number;
+  numSlides: number;
+};
+
+class OnboardingWalkthrough extends Component<OnboardingWalkthroughProps, OnboardingWalkthroughState> {
+    state: OnboardingWalkthroughState = {
       openSidebar: false,
       arrowIndex: 0,
       numSlides: WELCOME_SLIDES.length,
