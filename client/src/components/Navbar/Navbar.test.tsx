@@ -12,7 +12,7 @@ const navbarStylesheet = fs.readFileSync(
   'utf8'
 );
 
-jest.mock('./AccountDisplay', () => ({
+jest.mock('./AccountDisplay.jsx', () => ({
   AccountDisplayTorus: ({ account }: any) => (
     <div data-testid="account-display">{account}</div>
   ),
