@@ -113,4 +113,43 @@ describe('sbtPasswordRecoveryStore', () => {
       now: 2000,
     })).toEqual([]);
   });
+
+  it('promotes unknown-chain recovery entries once a later read knows the chain', () => {
+    const storage = createMemoryStorage();
+    const now = 3000;
+    const sbtAddress = '0xabc0000000000000000000000000000000000000';
+    const unknownKey = getSbtPasswordRecoveryKey({ chainId: null, sbtAddress });
+    const scopedKey = getSbtPasswordRecoveryKey({ chainId: 84532, sbtAddress });
+
+    storage.setItem(SBT_PASSWORD_RECOVERY_STORAGE_KEY, JSON.stringify({
+      v: 1,
+      kind: SBT_PASSWORD_RECOVERY_KIND,
+      updatedAt: 1000,
+      entries: {
+        [unknownKey]: {
+          chainId: null,
+          sbtAddress,
+          passwords: ['migrated-code'],
+          createdAt: 1000,
+          updatedAt: 1000,
+          expiresAt: now + 60_000,
+        },
+      },
+    }));
+
+    expect(getSbtPasswordRecoveryCodes({
+      chainId: 84532,
+      sbtAddress,
+      storage,
+      now,
+    })).toEqual(['migrated-code']);
+
+    const stored = JSON.parse(storage.getItem(SBT_PASSWORD_RECOVERY_STORAGE_KEY));
+    expect(stored.entries[unknownKey]).toBeUndefined();
+    expect(stored.entries[scopedKey]).toEqual(expect.objectContaining({
+      chainId: 84532,
+      sbtAddress,
+      passwords: ['migrated-code'],
+    }));
+  });
 });

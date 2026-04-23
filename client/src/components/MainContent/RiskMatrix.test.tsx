@@ -3,7 +3,15 @@ import { fireEvent, render, screen } from '@testing-library/react';
 
 import RiskMatrix from './RiskMatrix';
 
+const mutableEnv = process.env as Record<string, string | undefined>;
+const originalPublicUrl = process.env.PUBLIC_URL;
+
 describe('RiskMatrix', () => {
+  afterEach(() => {
+    if (originalPublicUrl === undefined) delete mutableEnv.PUBLIC_URL;
+    else mutableEnv.PUBLIC_URL = originalPublicUrl;
+  });
+
   it('adds the embedded wrapper modifier only when embedded mode is enabled', () => {
     const { container, rerender } = render(<RiskMatrix />);
 
@@ -68,6 +76,22 @@ describe('RiskMatrix', () => {
     );
     expect(screen.getByText('Alan Turing')).toBeInTheDocument();
     expect(screen.getByText('Ada Lovelace')).toBeInTheDocument();
+  });
+
+  it('prepends PUBLIC_URL to atlas scenario imagery for subpath deploys', () => {
+    mutableEnv.PUBLIC_URL = '/ce/';
+    render(<RiskMatrix />);
+
+    fireEvent.click(screen.getByTestId('ce-risk-matrix-cell-safety-vs-capabilities'));
+
+    expect(screen.getByAltText(/alan turing portrait anchoring the audit-aware agents overlap/i)).toHaveAttribute(
+      'src',
+      '/ce/historical-avatars/alanturing.jpg'
+    );
+    expect(screen.getByAltText('Alan Turing')).toHaveAttribute(
+      'src',
+      '/ce/historical-avatars/alanturing.jpg'
+    );
   });
 
   it('shows multiple linked crypto scenarios for capabilities x crypto overlaps', () => {
