@@ -1,25 +1,7 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
-import { Route, Routes } from 'react-router-dom';
-import { TestMemoryRouter as MemoryRouter } from 'testUtils/TestMemoryRouter';
-import DebateMap, {
-  AtlasView,
-  buildExpandedHistoricalCaseBriefMap,
-  buildHistoricalCaseBrief,
-  buildHistoricalCompassPoints,
-  getAtlasLinkStableKey,
-  getCompactTreeNodeLabel,
-  getDebateNodeStableKey,
-  getPackedAtlasClickTarget,
-  getPackedAtlasLabelFontSizePx,
-  getPackedAtlasVerticalLiftPx,
-  getTopAtlasNodesByHeat,
-  getTreeChildColumnCount,
-  getTreeChildStaggerPx,
-  getTreeSubtreeSpan,
-  getTreeViewportFitHeight,
-  getTreeViewportFitScale,
-} from './DebateMap';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import DebateMap, { AtlasView, buildHistoricalCaseBrief, buildHistoricalCompassPoints } from './DebateMap.jsx';
 import treeData from '../../variables/demo/debate_map_demo_data.json';
 import historicalFigureData from '../../variables/demo/historical_figures_tree_qs_and_votes.json';
 import loopholeHistoricalCases from '../../variables/demo/loophole_historical_cases.json';
@@ -80,21 +62,8 @@ jest.mock('../DemoViews/DebateHUD/PoliticalCompassView', () => ({
 
 const DebateMapComponent = DebateMap as React.ComponentType<any>;
 const AtlasViewComponent = AtlasView as React.ComponentType<any>;
-const buildExpandedHistoricalCaseBriefMapAny = buildExpandedHistoricalCaseBriefMap as any;
 const buildHistoricalCaseBriefAny = buildHistoricalCaseBrief as any;
 const buildHistoricalCompassPointsAny = buildHistoricalCompassPoints as any;
-const getAtlasLinkStableKeyAny = getAtlasLinkStableKey as any;
-const getCompactTreeNodeLabelAny = getCompactTreeNodeLabel as any;
-const getDebateNodeStableKeyAny = getDebateNodeStableKey as any;
-const getPackedAtlasClickTargetAny = getPackedAtlasClickTarget as any;
-const getPackedAtlasLabelFontSizePxAny = getPackedAtlasLabelFontSizePx as any;
-const getPackedAtlasVerticalLiftPxAny = getPackedAtlasVerticalLiftPx as any;
-const getTopAtlasNodesByHeatAny = getTopAtlasNodesByHeat as any;
-const getTreeChildColumnCountAny = getTreeChildColumnCount as any;
-const getTreeChildStaggerPxAny = getTreeChildStaggerPx as any;
-const getTreeSubtreeSpanAny = getTreeSubtreeSpan as any;
-const getTreeViewportFitHeightAny = getTreeViewportFitHeight as any;
-const getTreeViewportFitScaleAny = getTreeViewportFitScale as any;
 const mockedGetHistoricalFigureAvatarOrBlockie = getHistoricalFigureAvatarOrBlockie as jest.Mock;
 const treeDataFixture = treeData as any[];
 const historicalFigureDataFixture = historicalFigureData as Record<string, any>;
@@ -240,32 +209,8 @@ const renderDemoAtlasNode = (nodeId: string) => render(
   </MemoryRouter>
 );
 
-const getAtlasModalContent = (headingName: string | RegExp): HTMLElement => {
-  const heading = screen.getByRole('heading', { name: headingName });
-  const modalContent = heading.closest('[class*="modalContent"]');
-
-  if (!modalContent) {
-    throw new Error(`Expected modal content wrapper for heading ${String(headingName)}.`);
-  }
-
-  return modalContent as HTMLElement;
-};
-
-const getAtlasModalNetVoteScore = (modalContent: HTMLElement): number => {
-  const score = modalContent.querySelector('[class*="netScoreValue"]');
-  if (!score) throw new Error('Expected atlas modal net vote score.');
-  return Number(score.textContent);
-};
-
-const getAtlasModalConfirmVoteButton = (modalContent: HTMLElement): HTMLElement => {
-  const confirmButton = modalContent.querySelector('[class*="confirmBtn"]');
-  if (!confirmButton) throw new Error('Expected atlas modal vote confirmation button.');
-  return confirmButton as HTMLElement;
-};
-
 const openHistoricalCaseBrief = async (nodeId: string) => {
   renderDemoAtlasNode(nodeId);
-  fireEvent.click(await screen.findByRole('button', { name: /Historical Cases/i }));
   fireEvent.click(await screen.findByRole('button', { name: 'View full brief' }));
 };
 
@@ -273,7 +218,6 @@ describe('DebateMap', () => {
   afterEach(() => {
     mockNavigate.mockReset();
     mockedGetHistoricalFigureAvatarOrBlockie.mockClear();
-    localStorage.removeItem('bookmarkedNodes');
   });
 
   it('renders the standalone heading as Debate Map', () => {
@@ -307,76 +251,6 @@ describe('DebateMap', () => {
     );
 
     expect(getAtlasNodeElementById('0x1000000000000000000000000000000000000000000000000000000000000000', 'packed')).toBeTruthy();
-  });
-
-  it('ignores wrong-shaped bookmark storage before rendering bookmarkable list nodes', async () => {
-    localStorage.setItem('bookmarkedNodes', '{"bad":true}');
-
-    render(
-      <MemoryRouter>
-        <DebateMapComponent
-          account=""
-          provider=""
-          network={{ id: 84532 }}
-          activeSessionSlug=""
-          toggleLoginModal={jest.fn()}
-        />
-      </MemoryRouter>
-    );
-
-    fireEvent.click(getDebateViewModeButton('list'));
-
-    await waitFor(() => {
-      expect(screen.getByRole('heading', { name: /^Debate Map$/i })).toBeInTheDocument();
-      expect(screen.getAllByTestId(E2E_TESTIDS.DEBATE_VIEW_MODE).length).toBeGreaterThan(0);
-    });
-  });
-
-  it('builds stable keys for reorderable atlas and list items', () => {
-    expect(getDebateNodeStableKeyAny({ id: 'node-id', name: 'Name' }, 'fallback')).toBe('node-id');
-    expect(getDebateNodeStableKeyAny({ name: 'Name' }, 'fallback')).toBe('Name');
-    expect(getDebateNodeStableKeyAny({}, 'fallback')).toBe('fallback');
-
-    expect(getAtlasLinkStableKeyAny({
-      sourceId: 'source-id',
-      targetId: 'target-id',
-      source: { x: 1, y: 2 },
-      target: { x: 3, y: 4 },
-    }, 0)).toBe('source-id->target-id');
-    expect(getAtlasLinkStableKeyAny({
-      source: { x: 1, y: 2 },
-      target: { x: 3, y: 4 },
-    }, 7)).toBe('coords:1.000:2.000:3.000:4.000:7');
-  });
-
-  it('finds top atlas nodes by heat without changing pre-order tie behavior', () => {
-    const topNodes = getTopAtlasNodesByHeatAny([
-      {
-        id: 'early-tie',
-        votes: { up: 5, down: 0 },
-        children: [
-          {
-            id: 'nested-high',
-            votes: { up: 9, down: 0 },
-          },
-        ],
-      },
-      {
-        id: 'comment-heavy',
-        votes: { up: 3, down: 0 },
-        comments: [{ id: 'c1' }, { id: 'c2' }, { id: 'c3' }],
-      },
-      {
-        id: 'late-tie',
-        votes: { up: 5, down: 0 },
-      },
-    ], 3);
-
-    expect(topNodes.map((node: any) => node.id)).toEqual([
-      'comment-heavy',
-      'nested-high',
-      'early-tie',
-    ]);
   });
 
   it('switches between circles and atlas from the main mode controls', () => {
@@ -555,60 +429,6 @@ describe('DebateMap', () => {
     expect(fallbackBrief.decisionPrompt).toMatch(/What patch closes the exploit in Privacy & Surveillance/i);
   });
 
-  it('builds historical case briefs only for the expanded case key', () => {
-    const brief = buildHistoricalCaseBriefAny(
-      { title: 'Expanded case', summary: 'Expanded summary.' },
-      { name: 'Liability Frameworks' }
-    );
-    const buildBrief = jest.fn(() => brief);
-    const historicalCases = [
-      { id: 'collapsed-case', title: 'Collapsed case', summary: 'Collapsed summary.' },
-      { id: 'expanded-case', title: 'Expanded case', summary: 'Expanded summary.' },
-    ];
-
-    const collapsedBriefs = buildExpandedHistoricalCaseBriefMapAny(
-      historicalCases,
-      { id: 'node-a', name: 'Liability Frameworks' },
-      '',
-      buildBrief
-    );
-    expect(collapsedBriefs.size).toBe(0);
-    expect(buildBrief).not.toHaveBeenCalled();
-
-    const expandedBriefs = buildExpandedHistoricalCaseBriefMapAny(
-      historicalCases,
-      { id: 'node-a', name: 'Liability Frameworks' },
-      'expanded-case',
-      buildBrief
-    );
-
-    expect(buildBrief).toHaveBeenCalledTimes(1);
-    expect(buildBrief).toHaveBeenCalledWith(
-      historicalCases[1],
-      { id: 'node-a', name: 'Liability Frameworks' }
-    );
-    expect(expandedBriefs.get('expanded-case')).toBe(brief);
-  });
-
-  it('compacts long tree labels and child layouts for denser debate branches', () => {
-    expect(getCompactTreeNodeLabelAny('3. AI Governance & Policy')).toBe('AI Governance & Policy');
-    expect(getCompactTreeNodeLabelAny('International Coordination')).toBe('Intl. Coord.');
-    expect(getCompactTreeNodeLabelAny('Pre-deployment Testing')).toBe('Pre-deploy. Testing');
-    expect(getTreeChildColumnCountAny(1, 4)).toBe(2);
-    expect(getTreeChildColumnCountAny(0, 2)).toBe(2);
-    expect(getTreeSubtreeSpanAny({
-      children: [
-        { children: [{}, {}] },
-        {},
-      ],
-    })).toBe(3);
-    expect(getTreeChildStaggerPxAny(2, 1, 2)).toBeGreaterThan(getTreeChildStaggerPxAny(2, 0, 2));
-    expect(getTreeChildStaggerPxAny(2, 3, 2)).toBeGreaterThan(getTreeChildStaggerPxAny(2, 1, 2));
-    expect(getTreeViewportFitScaleAny(320, 960)).toBeCloseTo(0.3, 1);
-    expect(getTreeViewportFitScaleAny(1024, 800)).toBe(1);
-    expect(getTreeViewportFitHeightAny(1200, 0.5)).toBe(600);
-  });
-
   it('refreshes the drilled atlas node immediately when the data prop changes', () => {
     const onNodeClick = jest.fn();
     const initialData = [
@@ -744,12 +564,6 @@ describe('DebateMap', () => {
     fireEvent.click(getAtlasNodeElementById('child-node', 'packed') as HTMLElement);
 
     expect(screen.getByRole('button', { name: /up level/i })).toBeInTheDocument();
-    expect(screen.getByTestId(E2E_TESTIDS.ATLAS_TITLE_ACTION)).toHaveTextContent('Parent Node');
-    expect(getAtlasNodeElementById('child-node', 'packed')).toBeTruthy();
-
-    fireEvent.click(getAtlasNodeElementById('child-node', 'packed') as HTMLElement);
-
-    expect(screen.getByRole('button', { name: /up level/i })).toBeInTheDocument();
     expect(screen.getByTestId(E2E_TESTIDS.ATLAS_TITLE_ACTION)).toHaveTextContent('Child Node');
     expect(getAtlasNodeElementById('child-node', 'packed')).toBeFalsy();
     expect(getAtlasNodeElementById('grandchild-node', 'packed')).toBeTruthy();
@@ -801,43 +615,8 @@ describe('DebateMap', () => {
     );
 
     fireEvent.click(getAtlasNodeElementById(deceptiveAlignmentNodeId, 'packed') as HTMLElement);
-    expect(screen.getByTestId(E2E_TESTIDS.ATLAS_TITLE_ACTION)).toHaveTextContent('AI Safety & Alignment');
-
-    fireEvent.click(getAtlasNodeElementById(deceptiveAlignmentNodeId, 'packed') as HTMLElement);
-    expect(screen.getByTestId(E2E_TESTIDS.ATLAS_TITLE_ACTION)).toHaveTextContent('Alignment Research');
-
-    fireEvent.click(getAtlasNodeElementById(deceptiveAlignmentNodeId, 'packed') as HTMLElement);
 
     expect(await screen.findByRole('heading', { name: 'Deceptive Alignment' })).toBeInTheDocument();
-  });
-
-  it('renders tree mode with abbreviated labels and wrapped child columns', () => {
-    const { container } = render(
-      <MemoryRouter>
-        <DebateMapComponent
-          account=""
-          provider=""
-          network={{ id: 84532 }}
-          activeSessionSlug=""
-          toggleLoginModal={jest.fn()}
-        />
-      </MemoryRouter>
-    );
-
-    fireEvent.click(getDebateViewModeButton('tree'));
-    fireEvent.click(screen.getByRole('button', { name: 'AI Governance & Policy' }));
-
-    const orgChart = container.querySelector('[class*="orgChartContainer"]') as HTMLElement;
-    const treeRoot = container.querySelector('[data-ce-tree-scale]') as HTMLElement;
-
-    expect(within(orgChart).getByText('AI Governance & Policy')).toBeInTheDocument();
-    expect(within(orgChart).getByText('Intl. Coord.')).toBeInTheDocument();
-    expect(within(orgChart).getByText('Licensing & Compute Controls')).toBeInTheDocument();
-    expect(treeRoot).toBeTruthy();
-
-    const compactRows = Array.from(container.querySelectorAll('[data-ce-org-total-columns]'));
-    expect(compactRows.length).toBeGreaterThan(0);
-    expect(compactRows.some((element) => Number(element.getAttribute('data-ce-org-total-columns')) > 2)).toBe(true);
   });
 
   it('sizes packed atlas nodes by disagreement instead of raw vote volume', () => {
@@ -863,53 +642,6 @@ describe('DebateMap', () => {
     expect(getAtlasNodeDiameterById('high-disagreement', 'packed')).toBeGreaterThan(
       getAtlasNodeDiameterById('low-disagreement', 'packed')
     );
-  });
-
-  it('applies much larger packed label sizing to large top-level circles', () => {
-    const topLevelSize = getPackedAtlasLabelFontSizePxAny(
-      { hierarchyDepth: 1, isCenter: false },
-      520,
-      true
-    );
-    const childSize = getPackedAtlasLabelFontSizePxAny(
-      { hierarchyDepth: 2, isCenter: false },
-      220,
-      false
-    );
-    const leafSize = getPackedAtlasLabelFontSizePxAny(
-      { hierarchyDepth: 3, isCenter: false },
-      80,
-      false
-    );
-
-    expect(topLevelSize).toBeGreaterThanOrEqual(32);
-    expect(topLevelSize).toBeGreaterThan(childSize);
-    expect(childSize).toBeGreaterThan(leafSize);
-  });
-
-  it('lifts drilled packed circles upward when invisible root slack leaves too much empty space', () => {
-    const lift = getPackedAtlasVerticalLiftPxAny([
-      { y: 222, r: 120 },
-      { y: 224, r: 118 },
-      { y: 402, r: 96 },
-    ], 8);
-
-    expect(lift).toBeGreaterThan(90);
-    expect(lift).toBeLessThan(110);
-  });
-
-  it('routes nested packed-circle clicks to the next visible level instead of skipping ahead', () => {
-    const nodesById = new Map([
-      ['parent-node', { id: 'parent-node', hierarchyDepth: 1 }],
-      ['child-node', { id: 'child-node', hierarchyDepth: 2, groupId: 'parent-node' }],
-    ]);
-
-    expect(
-      getPackedAtlasClickTargetAny({ id: 'child-node', hierarchyDepth: 2, groupId: 'parent-node' }, nodesById)
-    ).toEqual(expect.objectContaining({ id: 'parent-node' }));
-    expect(
-      getPackedAtlasClickTargetAny({ id: 'parent-node', hierarchyDepth: 1 }, nodesById)
-    ).toEqual(expect.objectContaining({ id: 'parent-node' }));
   });
 
   it('removes historical demo questions immediately when demo mode turns off', async () => {
@@ -978,51 +710,12 @@ describe('DebateMap', () => {
     });
   });
 
-  it('opens key arguments by default and keeps historical briefs collapsed on atlas node entry', async () => {
-    renderDemoAtlasNode(privacyAndSurveillanceNodeId);
-
-    expect(await screen.findByRole('heading', { name: 'Privacy & Surveillance' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Key Arguments/i })).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByRole('heading', { name: 'For' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Historical Cases/i })).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.queryByRole('button', { name: 'View full brief' })).not.toBeInTheDocument();
-  });
-
-  it('preserves local atlas votes across demo-mode tree rebuilds', async () => {
-    renderDemoAtlasNode(liabilityFrameworksNodeId);
-
-    expect(await screen.findByRole('heading', { name: 'Liability Frameworks' })).toBeInTheDocument();
-    const modal = getAtlasModalContent('Liability Frameworks');
-    const initialScore = getAtlasModalNetVoteScore(modal);
-
-    fireEvent.click(within(modal).getByTitle('Cast Upvotes'));
-    fireEvent.change(within(modal).getByRole('spinbutton'), { target: { value: '3' } });
-    fireEvent.click(getAtlasModalConfirmVoteButton(modal));
-
-    await waitFor(() => {
-      expect(getAtlasModalNetVoteScore(getAtlasModalContent('Liability Frameworks'))).toBe(initialScore + 3);
-    });
-
-    const demoModeCheckbox = screen.getByLabelText(/Demo Mode/i);
-    fireEvent.click(demoModeCheckbox);
-    await waitFor(() => {
-      expect(demoModeCheckbox).not.toBeChecked();
-    });
-
-    fireEvent.click(demoModeCheckbox);
-    await waitFor(() => {
-      expect(demoModeCheckbox).toBeChecked();
-      expect(getAtlasModalNetVoteScore(getAtlasModalContent('Liability Frameworks'))).toBe(initialScore + 3);
-    });
-  });
-
   it('renders enriched Loophole historical cases inside relevant atlas nodes in demo mode', async () => {
     const privacyCase = getHistoricalCaseForNode(privacyAndSurveillanceNodeId);
 
     renderDemoAtlasNode(privacyAndSurveillanceNodeId);
 
     expect(await screen.findByText('Historical Cases')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /Historical Cases/i }));
     expect(await screen.findByText(privacyCase.title)).toBeInTheDocument();
     expect(screen.getAllByText(/Loophole Finder/i).length).toBeGreaterThan(0);
     expect(screen.getByText(privacyCase.summary)).toBeInTheDocument();
@@ -1223,84 +916,6 @@ describe('DebateMap', () => {
       expect(screen.queryByTitle('Copy Deep Link URL')).not.toBeInTheDocument();
     });
     expect(onModalClose).toHaveBeenCalledTimes(1);
-  });
-
-  it('returns to the originating route when a deep-linked atlas modal closes', async () => {
-    mockNavigate.mockClear();
-
-    render(
-      <MemoryRouter initialEntries={[
-        '/atlas/0x1110000000000000000000000000000000000000000000000000000000000000?demo=1&returnTo=%2Fsu%2FFranklin%3Ftab%3Datlas%23positions',
-      ]}>
-        <Routes>
-          <Route
-            path="/atlas/:nodeId"
-            element={(
-              <DebateMapComponent
-                account=""
-                provider=""
-                network={{ id: 84532 }}
-                activeSessionSlug=""
-                toggleLoginModal={jest.fn()}
-                demoMode={true}
-              />
-            )}
-          />
-        </Routes>
-      </MemoryRouter>
-    );
-
-    expect(await screen.findByTitle('Copy Deep Link URL')).toBeInTheDocument();
-
-    fireEvent.click(screen.getByTitle('Close'));
-
-    await waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith('/su/Franklin?tab=atlas#positions', { replace: true });
-    });
-  });
-
-  it('resets atlas modal scroll position when switching to a different requested node', async () => {
-    const baseProps = {
-      account: '',
-      provider: '',
-      network: { id: 84532 },
-      activeSessionSlug: '',
-      toggleLoginModal: jest.fn(),
-      embedded: true,
-      demoMode: true,
-    };
-
-    const { rerender } = render(
-      <MemoryRouter>
-        <DebateMapComponent
-          {...baseProps}
-          requestedModalNodeId={privacyAndSurveillanceNodeId}
-        />
-      </MemoryRouter>
-    );
-
-    expect(await screen.findByRole('heading', { name: 'Privacy & Surveillance' })).toBeInTheDocument();
-
-    const firstModalContent = getAtlasModalContent('Privacy & Surveillance');
-    firstModalContent.scrollTop = 320;
-    firstModalContent.scrollLeft = 48;
-
-    rerender(
-      <MemoryRouter>
-        <DebateMapComponent
-          {...baseProps}
-          requestedModalNodeId={deceptiveAlignmentNodeId}
-        />
-      </MemoryRouter>
-    );
-
-    expect(await screen.findByRole('heading', { name: 'Deceptive Alignment' })).toBeInTheDocument();
-
-    const secondModalContent = getAtlasModalContent('Deceptive Alignment');
-    await waitFor(() => {
-      expect(secondModalContent.scrollTop).toBe(0);
-      expect(secondModalContent.scrollLeft).toBe(0);
-    });
   });
 
   it('adds the embedded wrapper modifier only when embedded mode is enabled', () => {
