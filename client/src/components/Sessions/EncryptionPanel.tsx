@@ -1,4 +1,4 @@
-/** @file EncryptionPanel.jsx */
+/** @file EncryptionPanel.tsx */
 import React from 'react';
 import { Input } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -7,6 +7,54 @@ import styles from './SessionWizard.module.scss';
 import SBTSelector from '../SBTs/SBTSelector.jsx';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { toStr } from '../../utilities/shared/primitives.js';
+
+type EncryptionGate = {
+  id: string;
+  label?: string;
+  mode?: string;
+  color?: string;
+  sbts?: unknown[];
+};
+
+type PendingSbtDraft = {
+  id?: string;
+  displayName?: React.ReactNode;
+  predictedAddress?: string;
+  deployed?: boolean;
+};
+
+type SessionConfig = {
+  slug?: string;
+  [key: string]: unknown;
+};
+
+export type EncryptionPanelProps = {
+  isNormalMode: boolean;
+  t?: (key: string) => string;
+  renderSessionWizardInfoTooltip?: (props: Record<string, unknown>) => React.ReactNode;
+  isCollapsed: boolean;
+  onToggleCollapsed: () => void;
+  launchCreateSbtModal: (payload: { targetType: string; gateId: string }) => void;
+  activeCreateSbtTargetGateId: string;
+  activeCreateSbtTargetGate?: EncryptionGate | null;
+  encryptionGates?: EncryptionGate[];
+  focusCreateSbtTargetGate: (gateId: string) => void;
+  updateEncryptionGate: (gateId: string, patch: Partial<EncryptionGate>) => void;
+  removeEncryptionGate: (gateId: string) => void;
+  normalizeSbtSelection?: (value: unknown[]) => unknown[];
+  handleGateAddSbt: (gateId: string, sbt: unknown) => void;
+  handleGateRemoveSbt: (gateId: string, address: string) => void;
+  network?: string;
+  pendingSbtSelectorOptions?: unknown[];
+  selectorSourceChainId?: number | string;
+  selectorSourceSessionConfig?: SessionConfig | null;
+  resolvedActiveSessionSlug?: string;
+  sbtCacheRevision?: number;
+  ensureLightSbtUniverse?: () => unknown;
+  addEncryptionGate: () => void;
+  pendingSbtDrafts?: PendingSbtDraft[];
+  removePendingSbtDraft: (address?: string) => void;
+};
 
 const EncryptionPanel = ({
   isNormalMode,
@@ -34,16 +82,16 @@ const EncryptionPanel = ({
   addEncryptionGate,
   pendingSbtDrafts,
   removePendingSbtDraft,
-}) => {
-  const translate = typeof t === 'function' ? t : (key) => key;
+}: EncryptionPanelProps) => {
+  const translate = typeof t === 'function' ? t : (key: string) => key;
   const gates = Array.isArray(encryptionGates) ? encryptionGates : [];
   const pendingDrafts = Array.isArray(pendingSbtDrafts) ? pendingSbtDrafts : [];
   const renderInfoTooltip = typeof renderSessionWizardInfoTooltip === 'function'
     ? renderSessionWizardInfoTooltip
     : () => null;
-  const normalizeSelection = typeof normalizeSbtSelection === 'function'
+  const normalizeSelection: (value: unknown[]) => unknown[] = typeof normalizeSbtSelection === 'function'
     ? normalizeSbtSelection
-    : (value) => value;
+    : (value: unknown[]) => value;
 
   return (
     <section id="session-wizard-section-encryption" className={`${styles.panel} ${styles.encryptionPanel}`}>
@@ -136,8 +184,8 @@ const EncryptionPanel = ({
                     // label="SBTs allowed to decrypt locked fields"
                     label=""
                     selectedSBTs={normalizeSelection(gate.sbts || [])}
-                    onAddSBT={(sbt) => handleGateAddSbt(gate.id, sbt)}
-                    onRemoveSBT={(address) => handleGateRemoveSbt(gate.id, address)}
+                    onAddSBT={(sbt: unknown) => handleGateAddSbt(gate.id, sbt)}
+                    onRemoveSBT={(address: string) => handleGateRemoveSbt(gate.id, address)}
                     network={network}
                     additionalSBTOptions={pendingSbtSelectorOptions}
                     chainId={selectorSourceChainId}
