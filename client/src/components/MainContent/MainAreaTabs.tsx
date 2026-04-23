@@ -23,9 +23,9 @@ import LazyFallback from "../Shared/LazyFallback";
 const log = createLogger('ui');
 
 // Lazy tabs: load on first activation.
-const ToolExplorer = React.lazy(() => import("./ToolExplorer"));
+const ToolExplorer = React.lazy(() => import("./ToolExplorer.jsx"));
 const OnboardingWalkthrough = React.lazy(() => import("./OnboardingWalkthrough"));
-const CommunityTab = React.lazy(() => import("../CommunityTab/CommunityTab"));
+const CommunityTab = React.lazy(() => import("../CommunityTab/CommunityTab.jsx"));
 
 export const MAIN_AREA_TABS = Object.freeze({
   LATEST: 1,
