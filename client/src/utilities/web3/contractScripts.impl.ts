@@ -2782,14 +2782,18 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
         family: 'survey_metadata',
         path: 'survey metadata',
       });
-      qArrayToUpload.forEach((questionData: any, index: any) => {
+      qArrayToUpload.forEach((questionData, index) => {
         validateNoLockedPlaintextInPayload(questionData, {
           family: 'question_metadata',
           path: `question metadata[${index}]`,
         });
       });
 
-      const arweaveUploadOpts = await resolveArweaveUploadOpts(groupKeyOrCfg, {
+      const surveyDataString = JSON.stringify(surveyDataToUpload);
+      surveyArweaveHash = await arweaveScripts.uploadDataToArweave(
+        surveyDataString,
+        'json',
+        await resolveArweaveUploadOpts(groupKeyOrCfg, {
           providerLike: ethersProvider,
           signer,
       });
@@ -2942,16 +2946,11 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
         }, _sessionName, _sessionMetadataOptions)
       ));
 
-      qArrayToUpload.forEach((questionData: any, index: any) => {
+      qArrayToUpload.forEach((questionData, index) => {
         validateNoLockedPlaintextInPayload(questionData, {
           family: 'question_metadata',
           path: `question metadata[${index}]`,
         });
-      });
-
-      const arweaveUploadOpts = await resolveArweaveUploadOpts(groupKeyOrCfg, {
-        providerLike: ethersProvider,
-        signer,
       });
 
       for (let questionData of qArrayToUpload) {
@@ -3090,16 +3089,13 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
         family: 'survey_response_payload',
         path: 'survey response',
       });
-      const surveyResponseUpload = await uploadJsonPayloadForContractPointer({
-        payload: surveyResponse,
-        resource: STORAGE_RESOURCE_KEYS.RESPONSES,
-        groupKeyOrCfg,
-        cfg,
-        arweaveUploadOpts: arweaveOpts,
-        uploadWithRetry: true,
-        storageContext: uploadContext,
-      });
-      surveyResponseHashBytes = surveyResponseUpload.pointerBytes;
+      const surveyResponseString = JSON.stringify(surveyResponse);
+      const surveyResponseHash = await uploadDataToArweaveWithRetry(
+        surveyResponseString,
+        'json',
+        arweaveOpts
+      );
+      surveyResponseHashBytes = arweaveScripts.base64urlToHex(surveyResponseHash);
     }
     // Upload response objects sequentially to avoid Arweave anchor/signature races
     // that can appear when multiple uploads are posted in parallel for one wallet.

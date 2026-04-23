@@ -71,6 +71,10 @@ import {
   shouldRetryMaskedQuestionRefresh,
 } from '../../utilities/survey/questionRouting.js';
 import {
+  sanitizeQuestionPromptForResponsePayload,
+  sanitizeSurveyTitleForResponsePayload,
+} from '../../utilities/arweave/noLeakPayloads.js';
+import {
   normalizeSessionSlug,
   resolveSessionAliases,
   resolveSessionSlugFromPathname,
@@ -8740,7 +8744,7 @@ export class SurveyQuestions extends Component {
       let sessionName = '';
       const netBucket = netIdStr ? (surveysCache?.[netIdStr] || null) : null;
       const s = netBucket?.surveys?.[surveyIdLower];
-      if (s?.title) surveyTitle = s.title;
+      if (s?.title) surveyTitle = sanitizeSurveyTitleForResponsePayload(s);
       if (s?.sessionName) sessionName = s.sessionName;
       else if (context.sessionConfig?.sessionName) sessionName = context.sessionConfig.sessionName;
 
@@ -8814,7 +8818,9 @@ export class SurveyQuestions extends Component {
         questionID: q.id,
         responder: responderAddress || this.props.account,
         type: q.type,
-        prompt: q.prompt,
+        prompt: sanitizeQuestionPromptForResponsePayload(q, {
+          isLocked: this.getQuestionEncryptionGates(q).length > 0,
+        }),
         conviction: conviction !== null ? conviction : null,
         importance: importanceForPayload !== null ? importanceForPayload : null,
         answer: {
@@ -8867,7 +8873,9 @@ export class SurveyQuestions extends Component {
           ...(sessionName ? { sessionName: sessionName } : {}),
           questionID: q.id,
           type: q.type,
-          prompt: q.prompt,
+          prompt: sanitizeQuestionPromptForResponsePayload(q, {
+            isLocked: this.getQuestionEncryptionGates(q).length > 0,
+          }),
           conviction: null,
           importance: null,
           answer: { value: '', encrypted: false, hash: '', encryptedPortion: '' },
