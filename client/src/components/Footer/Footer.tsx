@@ -12,9 +12,29 @@ import styles from "./Footer.module.scss";
 // reactstrap components
 import { NavLink } from "reactstrap";
 
-class Footer extends React.Component {
+type FooterProps = {
+  changeFocusedTab: (tab: number) => void;
+  toggleLoginModal: (isOpen: boolean) => void;
+  focusedTab?: number;
+  loginModalToggled?: boolean;
+};
 
-  clickedSettingsLink = (e) => {
+type RootState = {
+  sessionState: {
+    focusedTab?: number;
+    loginModalToggled?: boolean;
+  };
+};
+
+class Footer extends React.Component<FooterProps> {
+  static propTypes = {
+    changeFocusedTab: PropTypes.func.isRequired,
+    toggleLoginModal: PropTypes.func.isRequired,
+    focusedTab: PropTypes.number,
+    loginModalToggled: PropTypes.bool,
+  };
+
+  clickedSettingsLink = (e: React.MouseEvent<HTMLElement>) => {
     e.preventDefault();
     this.props.toggleLoginModal(true)
   }
@@ -146,14 +166,7 @@ class Footer extends React.Component {
   }
 }
 
-Footer.propTypes = {
-  changeFocusedTab: PropTypes.func.isRequired,
-  toggleLoginModal: PropTypes.func.isRequired,
-  focusedTab: PropTypes.number,
-  loginModalToggled: PropTypes.bool,
-};
-
-const mapStateToProps = state => ({
+const mapStateToProps = (state: RootState) => ({
   focusedTab: state.sessionState.focusedTab,
   loginModalToggled: state.sessionState.loginModalToggled,
 });
