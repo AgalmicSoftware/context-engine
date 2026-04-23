@@ -160,7 +160,7 @@ import {
   NotFoundRoute,
   readHashQueryParam,
   SessionLoadingSkeleton,
-} from './routeStatusViews.jsx';
+} from './routeStatusViews';
 import {
   KNOWN_ROUTE_PREFIXES,
   isStaticNonCacheRoute,

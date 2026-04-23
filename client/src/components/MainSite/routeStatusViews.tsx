@@ -17,12 +17,19 @@ import {
 } from './routeStyles.js';
 import { buildPublicRoute } from './urlUtils.js';
 
+type RouteStatusPageProps = {
+  eyebrow?: string;
+  title?: string;
+  description?: string;
+  path?: string;
+};
+
 export const RouteStatusPage = ({
   eyebrow = '',
   title = '',
   description = '',
   path = '',
-}) => (
+}: RouteStatusPageProps) => (
   <div style={ROUTE_STATUS_SHELL_STYLE}>
     <div style={ROUTE_STATUS_CARD_STYLE}>
       {eyebrow ? <div style={ROUTE_STATUS_EYEBROW_STYLE}>{eyebrow}</div> : null}
@@ -34,11 +41,17 @@ export const RouteStatusPage = ({
   </div>
 );
 
+type ExperimentalStubProps = {
+  featureName?: string;
+  description?: string;
+  path?: string;
+};
+
 export const ExperimentalStub = ({
   featureName = 'This feature',
   description = '',
   path = '',
-}) => (
+}: ExperimentalStubProps) => (
   <RouteStatusPage
     eyebrow="Experimental"
     title="This feature is in development"
@@ -47,7 +60,7 @@ export const ExperimentalStub = ({
   />
 );
 
-export const NotFoundRoute = ({ path = '' }) => (
+export const NotFoundRoute = ({ path = '' }: { path?: string }) => (
   <RouteStatusPage
     eyebrow="404"
     title="Page not found"
@@ -56,7 +69,7 @@ export const NotFoundRoute = ({ path = '' }) => (
   />
 );
 
-export const readHashQueryParam = (hashValue = '', key = '') => {
+export const readHashQueryParam = (hashValue = '', key = ''): string => {
   const normalizedKey = String(key || '').trim();
   if (!normalizedKey) return '';
   const rawHash = String(hashValue || '').replace(/^#/, '').trim();
@@ -83,10 +96,15 @@ export const SESSION_LOADING_SKELETON_SECTION_LAYOUT = Object.freeze([
   },
 ]);
 
+type SessionLoadingSkeletonProps = {
+  statusTitle?: string;
+  statusDetail?: string;
+};
+
 export const SessionLoadingSkeleton = ({
   statusTitle = 'Resolving Session Link...',
   statusDetail = '',
-}) => (
+}: SessionLoadingSkeletonProps) => (
   <div
     className={styles.sessionLoadingSkeleton}
     role="status"
