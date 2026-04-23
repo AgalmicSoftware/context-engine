@@ -3,9 +3,34 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { toStr } from '../../utilities/shared/primitives.js';
 
-const readAgent = () => (typeof window !== 'undefined' ? window.__ceAgent : null);
+type AgentAction = Record<string, unknown>;
 
-const defaultActions = [
+type AgentState = {
+  route?: unknown;
+  account?: unknown;
+};
+
+type CeAgent = {
+  getState?: () => AgentState;
+  run?: (actions: AgentAction[]) => Promise<unknown>;
+  perform?: (action: AgentAction) => Promise<unknown>;
+};
+
+type AgentLogLine = {
+  at: string;
+  kind: string;
+  [key: string]: unknown;
+};
+
+declare global {
+  interface Window {
+    __ceAgent?: CeAgent | null;
+  }
+}
+
+const readAgent = (): CeAgent | null => (typeof window !== 'undefined' ? window.__ceAgent || null : null);
+
+const defaultActions: AgentAction[] = [
   { type: 'navigate', to: '/compare/' },
   { type: 'fill', testId: 'ce-compare-address-a', value: '0x0000000000000000000000000000000000000001' },
   { type: 'fill', testId: 'ce-compare-address-b', value: '0x0000000000000000000000000000000000000002' },
@@ -17,7 +42,7 @@ const defaultActions = [
 
 export default function AgentPage() {
   const [actionsText, setActionsText] = useState(() => `${JSON.stringify(defaultActions, null, 2)}\n`);
-  const [logLines, setLogLines] = useState([]);
+  const [logLines, setLogLines] = useState<AgentLogLine[]>([]);
   const [stepIdx, setStepIdx] = useState(0);
 
   // Agent is installed globally in App.componentDidMount; force one re-render after mount
@@ -37,11 +62,11 @@ export default function AgentPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [agent]);
 
-  const appendLog = (entry) => {
+  const appendLog = (entry: Record<string, unknown> & { kind: string }) => {
     setLogLines((prev) => [...prev, { at: new Date().toISOString(), ...entry }]);
   };
 
-  const parseActionsOrThrow = () => {
+  const parseActionsOrThrow = (): AgentAction[] => {
     const raw = toStr(actionsText).trim();
     if (!raw) return [];
     const parsed = JSON.parse(raw);
@@ -62,7 +87,7 @@ export default function AgentPage() {
       const result = await agentNow.run(actions);
       appendLog({ kind: 'run:result', result });
     } catch (e) {
-      appendLog({ kind: 'run:error', error: e?.message || String(e) });
+      appendLog({ kind: 'run:error', error: e instanceof Error ? e.message : String(e) });
     }
   };
 
@@ -83,7 +108,7 @@ export default function AgentPage() {
       appendLog({ kind: 'step:result', stepIdx, res });
       setStepIdx((i) => i + 1);
     } catch (e) {
-      appendLog({ kind: 'step:error', stepIdx, error: e?.message || String(e) });
+      appendLog({ kind: 'step:error', stepIdx, error: e instanceof Error ? e.message : String(e) });
     }
   };
 
