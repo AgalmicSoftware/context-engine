@@ -47,7 +47,7 @@ The main consumers of this folder are:
 - [`DebateMap.jsx`](../../components/DebateMap/DebateMap.jsx)
 - [`PoliticalCompassView.jsx`](../../components/DemoViews/DebateHUD/PoliticalCompassView.jsx)
 - [`DebateSelector.tsx`](../../components/DemoViews/DebateHUD/DebateSelector.tsx)
-- [`ArgumentTreeView.jsx`](../../components/DemoViews/DebateHUD/ArgumentTreeView.jsx)
+- [`ArgumentTreeView.tsx`](../../components/DemoViews/DebateHUD/ArgumentTreeView.tsx)
 - [`VotesOnArgumentsView.tsx`](../../components/DemoViews/DebateHUD/VotesOnArgumentsView.tsx)
 - [`CommunityTab.jsx`](../../components/CommunityTab/CommunityTab.jsx)
 - [`SimUserPage.jsx`](../../components/UserPage/SimUserPage.jsx)
