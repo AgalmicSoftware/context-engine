@@ -1,8 +1,7 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
-import * as bootRecovery from '../../bootRecovery.js';
 import AppErrorBoundary from './AppErrorBoundary';
-import RouteErrorBoundary from './RouteErrorBoundary';
+import RouteErrorBoundary from './RouteErrorBoundary.jsx';
 
 const Thrower = () => {
   throw new Error('Kaboom');
