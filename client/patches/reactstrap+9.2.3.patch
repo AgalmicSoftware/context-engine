@@ -1,0 +1,69 @@
+diff --git a/node_modules/reactstrap/esm/PopperContent.js b/node_modules/reactstrap/esm/PopperContent.js
+index ff128f9..52adc95 100644
+--- a/node_modules/reactstrap/esm/PopperContent.js
++++ b/node_modules/reactstrap/esm/PopperContent.js
+@@ -27,7 +27,7 @@ import PropTypes from 'prop-types';
+ import ReactDOM from 'react-dom';
+ import classNames from 'classnames';
+ import { Popper as ReactPopper } from 'react-popper';
+-import { getTarget, targetPropType, mapToCssModules, DOMElement, tagPropType } from './utils';
++import { getTarget, targetPropType, mapToCssModules, DOMElement, tagPropType, TransitionTimeouts } from './utils';
+ import Fade from './Fade';
+ function noop() {}
+ var propTypes = {
+@@ -63,7 +63,12 @@ var defaultProps = {
+   modifiers: [],
+   onClosed: noop,
+   fade: true,
+-  transition: _objectSpread({}, Fade.defaultProps)
++  transition: {
++    timeout: TransitionTimeouts.Fade,
++    appear: true,
++    enter: true,
++    exit: true
++  }
+ };
+ var PopperContent = /*#__PURE__*/function (_React$Component) {
+   _inherits(PopperContent, _React$Component);
+diff --git a/node_modules/reactstrap/lib/PopperContent.js b/node_modules/reactstrap/lib/PopperContent.js
+index 8912791..7c992b0 100644
+--- a/node_modules/reactstrap/lib/PopperContent.js
++++ b/node_modules/reactstrap/lib/PopperContent.js
+@@ -53,7 +53,12 @@ const defaultProps = {
+   modifiers: [],
+   onClosed: noop,
+   fade: true,
+-  transition: _objectSpread({}, _Fade.default.defaultProps)
++  transition: {
++    timeout: _utils.TransitionTimeouts.Fade,
++    appear: true,
++    enter: true,
++    exit: true
++  }
+ };
+ class PopperContent extends _react.default.Component {
+   constructor(props) {
+diff --git a/node_modules/reactstrap/src/PopperContent.js b/node_modules/reactstrap/src/PopperContent.js
+index 81f3caa..d2113d6 100644
+--- a/node_modules/reactstrap/src/PopperContent.js
++++ b/node_modules/reactstrap/src/PopperContent.js
+@@ -9,6 +9,7 @@ import {
+   mapToCssModules,
+   DOMElement,
+   tagPropType,
++  TransitionTimeouts,
+ } from './utils';
+ import Fade from './Fade';
+ 
+@@ -49,7 +50,10 @@ const defaultProps = {
+   onClosed: noop,
+   fade: true,
+   transition: {
+-    ...Fade.defaultProps,
++    timeout: TransitionTimeouts.Fade,
++    appear: true,
++    enter: true,
++    exit: true,
+   },
+ };
+ 

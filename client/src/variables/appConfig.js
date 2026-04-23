@@ -38,6 +38,12 @@ export const PORTO_SESSION_KEY_ENABLED = readPublicBoolEnv(
   'REACT_APP_PORTO_SESSION_KEY_ENABLED',
   true
 );
+// RainbowKit's MetaMask wallet falls back to WalletConnect when MetaMask is not injected.
+// Keep that external bridge opt-in so local startup does not open WalletConnect sockets.
+export const CE_ENABLE_WALLETCONNECT_FALLBACK = readPublicBoolEnv(
+  'REACT_APP_CE_ENABLE_WALLETCONNECT_FALLBACK',
+  false
+);
 // Animate CE logo on first page load before swapping to static image
 export const ENABLE_CE_LOGO_ANIMATION = readPublicBoolEnv(
   'REACT_APP_ENABLE_CE_LOGO_ANIMATION',
