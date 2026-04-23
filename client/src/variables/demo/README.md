@@ -50,7 +50,7 @@ The main consumers of this folder are:
 - [`ArgumentTreeView.tsx`](../../components/DemoViews/DebateHUD/ArgumentTreeView.tsx)
 - [`VotesOnArgumentsView.tsx`](../../components/DemoViews/DebateHUD/VotesOnArgumentsView.tsx)
 - [`CommunityTab.jsx`](../../components/CommunityTab/CommunityTab.jsx)
-- [`SimUserPage.jsx`](../../components/UserPage/SimUserPage.jsx)
+- [`SimUserPage.tsx`](../../components/UserPage/SimUserPage.tsx)
 
 ## Conceptual Data Pipeline
 

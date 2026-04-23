@@ -1,4 +1,4 @@
-/** @file SimUserPage.jsx */
+/** @file SimUserPage.tsx */
 import React, { Component } from 'react';
 import styles from './SimUserPage.module.scss';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -14,25 +14,40 @@ import {
 import { buildPublicRoute } from '../../utilities/ui/publicUrl.js';
 import SingleQuestionResponse from '../SurveyTool/SingleQuestionResponse.jsx';
 
+type SimUserPageProps = {
+  simUsername?: string;
+  minimized?: boolean;
+};
+
+type SimUserPageState = {
+  userInfo: any | null;
+  showFullProfileModal: boolean;
+};
+
+const historicalFiguresData = historicalFigures as any[];
+const atlasDataByUser = atlasData as Record<string, any>;
+const treeDataNodes = treeData as any[];
+const SingleQuestionResponseComponent = SingleQuestionResponse as React.ComponentType<any>;
+
 // Build node name lookup from tree
-const nodeNames = {};
-const buildNodeNames = (nodes) => {
-  nodes.forEach((n) => {
+const nodeNames: Record<string, string> = {};
+const buildNodeNames = (nodes: any[]) => {
+  nodes.forEach((n: any) => {
     nodeNames[n.id] = n.name.replace(/^\d+\.\s*/, '');
     if (n.children) buildNodeNames(n.children);
   });
 };
-buildNodeNames(treeData);
+buildNodeNames(treeDataNodes);
 
 // Compute vote correlations between all figures
-const computeRelatedFigures = (username) => {
-  const myData = atlasData[username];
+const computeRelatedFigures = (username: string) => {
+  const myData = atlasDataByUser[username];
   if (!myData || !myData.votes) return { allies: [], opponents: [] };
 
   const myVotes = myData.votes;
-  const scores = [];
+  const scores: any[] = [];
 
-  Object.entries(atlasData).forEach(([other, data]) => {
+  Object.entries(atlasDataByUser).forEach(([other, data]: [string, any]) => {
     if (other === username || !data.votes) return;
     let agree = 0;
     let disagree = 0;
@@ -41,8 +56,8 @@ const computeRelatedFigures = (username) => {
     Object.keys(myVotes).forEach((nodeId) => {
       if (data.votes[nodeId] !== undefined) {
         shared++;
-        const myVal = parseInt(myVotes[nodeId], 10);
-        const theirVal = parseInt(data.votes[nodeId], 10);
+        const myVal = parseInt(String(myVotes[nodeId]), 10);
+        const theirVal = parseInt(String(data.votes[nodeId]), 10);
         if ((myVal > 0 && theirVal > 0) || (myVal < 0 && theirVal < 0)) {
           agree++;
         } else if ((myVal > 0 && theirVal < 0) || (myVal < 0 && theirVal > 0)) {
@@ -66,8 +81,8 @@ const computeRelatedFigures = (username) => {
 };
 
 // Compute stance summary from vote patterns
-const computeStance = (username) => {
-  const data = atlasData[username];
+const computeStance = (username: string) => {
+  const data = atlasDataByUser[username];
   if (!data || !data.votes) return [];
 
   const dimensions = [
@@ -80,9 +95,9 @@ const computeStance = (username) => {
   return dimensions.map((dim) => {
     let score = 0;
     let count = 0;
-    Object.entries(data.votes).forEach(([nodeId, val]) => {
+    Object.entries(data.votes as Record<string, any>).forEach(([nodeId, val]) => {
       const prefix = nodeId.substring(0, 4);
-      const v = parseInt(val, 10);
+      const v = parseInt(String(val), 10);
       if (dim.positive.includes(prefix)) { score += v; count++; }
       if (dim.negative.includes(prefix)) { score -= v; count++; }
     });
@@ -92,19 +107,19 @@ const computeStance = (username) => {
   });
 };
 
-class SimUserPage extends Component {
-  state = {
+class SimUserPage extends Component<SimUserPageProps, SimUserPageState> {
+  state: SimUserPageState = {
     userInfo: null,
     showFullProfileModal: false,
   };
 
   componentDidMount() {
     const { simUsername } = this.props;
-    const userInfo = historicalFigures.find((figure) => figure.username === simUsername);
+    const userInfo = historicalFiguresData.find((figure) => figure.username === simUsername);
     this.setState({ userInfo });
   }
 
-  buildQuestionCardData = (question) => ({
+  buildQuestionCardData = (question: any) => ({
     question: {
       prompt: String(question?.question || '').trim() || 'Untitled question',
       type: String(question?.questionType || 'freeform').trim().toLowerCase() || 'freeform',
@@ -118,10 +133,10 @@ class SimUserPage extends Component {
     },
   });
 
-  renderQuestionResponse = (question, index, mode = 'mini') => {
+  renderQuestionResponse = (question: any, index: number, mode = 'mini') => {
     const cardData = this.buildQuestionCardData(question);
     return (
-      <SingleQuestionResponse
+      <SingleQuestionResponseComponent
         key={`simulated-question-${index}`}
         question={cardData.question}
         response={cardData.response}
@@ -133,7 +148,7 @@ class SimUserPage extends Component {
     );
   };
 
-  handleHistoricalAvatarError = (event, username, fallbackSeed = '') => {
+  handleHistoricalAvatarError = (event: React.SyntheticEvent<HTMLImageElement>, username: string, fallbackSeed = '') => {
     const target = event?.currentTarget;
     if (!target) return;
     const fallbackSrc = getHistoricalFigureBlockie(username, { fallbackSeed });
@@ -154,12 +169,12 @@ class SimUserPage extends Component {
       fallbackSeed: userInfo.name || userInfo.username,
     });
 
-    const figureAtlasData = atlasData[userInfo.username];
+    const figureAtlasData = atlasDataByUser[userInfo.username];
     const atlasPositions = figureAtlasData
       ? Object.entries(figureAtlasData.votes || {}).map(([nodeId, val]) => ({
           nodeId,
           nodeName: nodeNames[nodeId] || nodeId.substring(0, 10),
-          vote: parseInt(val, 10),
+          vote: parseInt(String(val), 10),
         })).sort((a, b) => Math.abs(b.vote) - Math.abs(a.vote)).slice(0, 8)
       : [];
 
@@ -276,7 +291,7 @@ class SimUserPage extends Component {
                 <div className={styles.surveySection}>
                   <h2 className={styles.screenReaderOnly}>Question Responses</h2>
                   <div className={styles.questionDeck}>
-                    {userInfo.questions.map((question, index) => this.renderQuestionResponse(question, index))}
+                    {userInfo.questions.map((question: any, index: number) => this.renderQuestionResponse(question, index))}
                   </div>
                 </div>
               </div>
@@ -291,7 +306,7 @@ class SimUserPage extends Component {
                       <div className={styles.relatedGroup}>
                         <h3 className={styles.relatedLabel}>Most Agreement</h3>
                         {allies.map((a, i) => {
-                          const allyInfo = historicalFigures.find((f) => f.username === a.username);
+                          const allyInfo = historicalFiguresData.find((f) => f.username === a.username);
                           const allyAvatar = getHistoricalFigureAvatarOrBlockie(a.username, {
                             preferBlockie: false,
                             fallbackSeed: a.username,
@@ -315,7 +330,7 @@ class SimUserPage extends Component {
                       <div className={styles.relatedGroup}>
                         <h3 className={styles.relatedLabel}>Most Disagreement</h3>
                         {opponents.map((o, i) => {
-                          const oppInfo = historicalFigures.find((f) => f.username === o.username);
+                          const oppInfo = historicalFiguresData.find((f) => f.username === o.username);
                           const oppAvatar = getHistoricalFigureAvatarOrBlockie(o.username, {
                             preferBlockie: false,
                             fallbackSeed: o.username,
@@ -370,7 +385,7 @@ class SimUserPage extends Component {
             <div className={styles.modalQuestions}>
               <h3>Question Responses</h3>
               <div className={styles.modalQuestionDeck}>
-                {userInfo.questions.map((question, index) => this.renderQuestionResponse(question, index, 'fullscreen'))}
+                {userInfo.questions.map((question: any, index: number) => this.renderQuestionResponse(question, index, 'fullscreen'))}
               </div>
             </div>
           </ModalBody>

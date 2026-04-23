@@ -13,7 +13,7 @@ export const SessionWizard = React.lazy(() => import("../Sessions/SessionWizard.
 export const OnePageSession = React.lazy(() => import("../OnePageSession/OnePageSession.jsx"));
 export const DemosIndex = React.lazy(() => import("../DemoViews/DemosIndex"));
 export const SessionDocumentsPage = React.lazy(() => import("../DocumentLibrary/SessionDocumentsPage"));
-export const SimulatedUserPage = React.lazy(() => import("../UserPage/SimUserPage.jsx"));
+export const SimulatedUserPage = React.lazy(() => import("../UserPage/SimUserPage"));
 export const UserPage = React.lazy(() => import("../UserPage/UserPage.jsx"));
 export const CompareAddresses = React.lazy(() => import("../UserPage/CompareAddresses.jsx"));
 export const ContractPage = React.lazy(() => import("../ContractPage/ContractPage.jsx"));
