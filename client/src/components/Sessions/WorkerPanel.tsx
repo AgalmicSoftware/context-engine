@@ -1,4 +1,4 @@
-/** @file WorkerPanel.jsx */
+/** @file WorkerPanel.tsx */
 import React from 'react';
 import { Button, FormGroup, Input, Label } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -15,6 +15,81 @@ import { PUBLIC_GITHUB_BRANCH, PUBLIC_REPO_URL } from '../../variables/publicRep
 const SESSION_CORS_WORKER_SOURCE_URL = `${PUBLIC_REPO_URL}/tree/${PUBLIC_GITHUB_BRANCH}/workers/sessionCorsWorker`;
 const DEPLOY_HELPER_SOURCE_URL = `${PUBLIC_REPO_URL}/tree/${PUBLIC_GITHUB_BRANCH}/workers/deploy-helper`;
 const SESSION_CORS_WORKER_DOCS_URL = `${PUBLIC_REPO_URL}/blob/${PUBLIC_GITHUB_BRANCH}/docs/session-cors-worker.md`;
+
+type DraftState = {
+  corsWorkerUrl?: string;
+  slug?: string;
+};
+
+type DeployForm = {
+  workerName?: string;
+  bundleUrl?: string;
+  apiToken?: string;
+  adminAddress?: string;
+};
+
+export type WorkerPanelProps = {
+  isNormalMode: boolean;
+  t?: (key: string) => string;
+  renderSessionWizardInfoTooltip?: (props: Record<string, unknown>) => React.ReactNode;
+  isCollapsed: boolean;
+  onToggleCollapsed: () => void;
+  showSharedWorkerChoice: boolean;
+  workerMode: string;
+  onWorkerModeChange: (mode: string) => void;
+  setWorkerUrlAutoFilled: (value: boolean) => void;
+  updateDraftValue: (path: string[], value: string) => void;
+  getDefaultWorkerUrl: () => string;
+  draft?: DraftState;
+  deployWorkerUrl?: string;
+  deployComplete: boolean;
+  devPersistWorkerSecrets: boolean;
+  persistWorkerSecrets: boolean;
+  setPersistWorkerSecrets: (value: boolean) => void;
+  workerSecretsEnabled: boolean;
+  setWorkerSecretsEnabled: (value: boolean) => void;
+  clearWorkerSecretFields: () => void;
+  effectivePersistWorkerSecrets: boolean;
+  workerResourceKeys?: string[];
+  renderResourceCard?: (resourceKey: string, index: number) => React.ReactNode;
+  workerAllowOrigins: string;
+  setWorkerAllowOrigins: (value: string) => void;
+  defaultAllowedOrigins: string;
+  shouldUseSponsoredAutoDeployFlow: boolean;
+  deployForm?: DeployForm;
+  renderEmbeddedDeployHelperToggle?: () => React.ReactNode;
+  shouldShowDeployHelperUrlInput: boolean;
+  deployHelperUrl: string;
+  setDeployHelperUrl: (value: string) => void;
+  bundleMode: string;
+  setBundleMode: (mode: string) => void;
+  normalModeBundleUrl: string;
+  normalModeBundleHelpText: string;
+  showNormalModeManualBundleControls: boolean;
+  normalModeBundleUrlOverride: string;
+  setNormalModeBundleUrlOverride: (value: string) => void;
+  normalModeBundleUrlOverrideValidationError?: string;
+  manualBundleUrlOverrideHelp: string;
+  normalModeRetryBundleFileInputRef?: React.Ref<HTMLInputElement>;
+  setBundleFile: (file: File | null) => void;
+  clearSelectedBundleFile: () => void;
+  bundleFile?: File | null;
+  normalModeManualBundleHelpText: string;
+  localWorkerBundleFallbackFilePath: string;
+  advancedBundleFileInputRef?: React.Ref<HTMLInputElement>;
+  showSponsoredDeployAccessNotice: boolean;
+  account?: string;
+  resolvedActiveSessionSlug?: string;
+  setDeployForm: React.Dispatch<React.SetStateAction<DeployForm>>;
+  handleDeployWorker: () => void;
+  deployInFlight: boolean;
+  deployStatus?: string;
+  deployStatusIsError: boolean;
+  showWorkerUrlField: boolean;
+  displayedWorkerUrl: string;
+  renderField: (...args: unknown[]) => React.ReactNode;
+  workerUrlAutoFilled: boolean;
+};
 
 const WorkerPanel = ({
   isNormalMode,
@@ -77,8 +152,8 @@ const WorkerPanel = ({
   displayedWorkerUrl,
   renderField,
   workerUrlAutoFilled,
-}) => {
-  const translate = typeof t === 'function' ? t : (key) => key;
+}: WorkerPanelProps) => {
+  const translate = typeof t === 'function' ? t : (key: string) => key;
   const renderInfoTooltip = typeof renderSessionWizardInfoTooltip === 'function'
     ? renderSessionWizardInfoTooltip
     : () => null;
