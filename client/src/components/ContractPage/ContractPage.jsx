@@ -27,7 +27,7 @@ import {
   resolveContractPageActiveSession,
   resolveContractPageReferrerSlug,
 } from './contractPageSessionResolution.js';
-import ContractViewer from './ContractViewer.jsx';
+import ContractViewer from './ContractViewer';
 import { normalizeContractKeyParam } from './contractMetadata.js';
 import { buildContractViewerContracts } from './contractViewerUtils.js';
 import { sbtsListPath, t } from '../../utilities/ui/terminology.js';

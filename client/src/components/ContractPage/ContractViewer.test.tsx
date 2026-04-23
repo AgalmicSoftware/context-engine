@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
-import ContractViewer from './ContractViewer.jsx';
+import ContractViewer from './ContractViewer';
 import {
   CONTRACT_VIEWER_TOGGLE_TESTID,
   getContractViewerCardTestId,
