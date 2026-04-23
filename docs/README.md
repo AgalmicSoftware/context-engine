@@ -9,10 +9,9 @@ Canonical reference set:
 
 Non-canonical / historical planning material:
 - `TODO/`
-- `TODO/PRDs/`
 - one-off debug prompts or migration notes unless they are explicitly linked below as current reference
 
-Planning docs and PRDs should be added under `TODO/`, not `docs/`.
+Planning docs should be added under `TODO/`, not `docs/`.
 
 ## How To Keep Docs Updated
 
