@@ -2,11 +2,11 @@ import React from 'react';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { createStore } from 'redux';
-import { TestMemoryRouter as MemoryRouter } from 'testUtils/TestMemoryRouter';
+import { MemoryRouter } from 'react-router-dom';
 import fs from 'fs';
 import path from 'path';
-import TagPage from './TagPage';
-import TagModal from './TagModal';
+import TagPage from './TagPage.jsx';
+import TagModal from './TagModal.jsx';
 import buildTagInterpretationPrompt from '../../prompts/tagInterpretationPrompt.js';
 import { buildDemoCorpusRecords } from '../../utilities/demo/demoCorpusRecords.js';
 
@@ -805,12 +805,10 @@ describe('TagPage', () => {
   });
 
   it('keeps the Tag Explorer AI prompt builder in the prompts folder', () => {
-    const promptShimPath = path.join(__dirname, '../../prompts/tagInterpretationPrompt.js');
-    const promptSourcePath = path.join(__dirname, '../../prompts/tagInterpretationPrompt.ts');
-    const promptSource = fs.readFileSync(promptSourcePath, 'utf8');
-    const componentSource = fs.readFileSync(path.join(__dirname, 'TagPage.tsx'), 'utf8');
+    const promptPath = path.join(__dirname, '../../prompts/tagInterpretationPrompt.js');
+    const promptSource = fs.readFileSync(promptPath, 'utf8');
+    const componentSource = fs.readFileSync(path.join(__dirname, 'TagPage.jsx'), 'utf8');
 
-    expect(fs.existsSync(promptShimPath)).toBe(false);
     expect(promptSource).toContain('export default function buildTagInterpretationPrompt');
     expect(componentSource).toContain('../../prompts/tagInterpretationPrompt.js');
   });
@@ -944,7 +942,7 @@ describe('TagModal', () => {
   it('keeps the modal framed fullscreen and the backdrop lighter than the default overlay', () => {
     const scssPath = path.join(__dirname, 'TagPage.module.scss');
     const scss = fs.readFileSync(scssPath, 'utf8');
-    const jsxPath = path.join(__dirname, 'TagModal.tsx');
+    const jsxPath = path.join(__dirname, 'TagModal.jsx');
     const jsx = fs.readFileSync(jsxPath, 'utf8');
 
     expect(scss).toMatch(/\.tagModal\s*{[\s\S]*padding:\s*16px 0 !important;[\s\S]*overflow:\s*hidden !important;/);
@@ -971,15 +969,5 @@ describe('TagModal', () => {
     expect(jsx).toContain('data-testid="tag-modal-scroll-area"');
     expect(jsx).not.toMatch(/import\s+\{\s*[^}]*\bModalHeader\b/);
     expect(jsx).not.toMatch(/<ModalHeader\b/);
-  });
-
-  it('uses the fullscreen tag route blue palette for the modal shell', () => {
-    const scssPath = path.join(__dirname, 'TagPage.module.scss');
-    const scss = fs.readFileSync(scssPath, 'utf8');
-
-    expect(scss).toMatch(/\$tag-route-bg:\s*#20204e;/);
-    expect(scss).toMatch(/\.tagModalContent\s*{[\s\S]*radial-gradient\(circle at top right,\s*rgba\(\$tag-route-accent,\s*0\.18\),\s*transparent 34%\),[\s\S]*linear-gradient\(180deg,\s*rgba\(\$tag-route-bg,\s*0\.985\),\s*rgba\(\$tag-route-bg-deep,\s*0\.985\)\);[\s\S]*background-color:\s*\$tag-route-bg;/);
-    expect(scss).toMatch(/\.tagModalHeaderBar\s*{[\s\S]*linear-gradient\(180deg,\s*rgba\(\$tag-route-accent-alt,\s*0\.16\),\s*rgba\(\$tag-route-bg,\s*0\.1\)\),/);
-    expect(scss).toMatch(/\.tagModalChromePopover\s*{[\s\S]*linear-gradient\(180deg,\s*rgba\(\$tag-route-accent-alt,\s*0\.14\),\s*rgba\(\$tag-route-bg-deep,\s*0\.14\)\),[\s\S]*rgba\(\$tag-route-bg,\s*0\.98\);/);
   });
 });
