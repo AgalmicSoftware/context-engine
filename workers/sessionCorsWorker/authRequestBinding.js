@@ -24,6 +24,10 @@ export const dispatchAuthNonceRequestWithWorkerDeps = async ({
       isAddress: deps?.isAddress,
       resolveWorkerBodySlugContext: deps?.resolveWorkerBodySlugContext,
       resolveExistingSessionCors: deps?.resolveExistingSessionCors,
+      validateTrustedLoginRequestOrigin: deps?.validateTrustedLoginRequestOrigin,
+      resolveTrustedAdminOrigins: deps?.resolveTrustedAdminOrigins,
+      checkNonceRateLimit: deps?.checkNonceRateLimit,
+      now: deps?.now,
       buildNonce: () => deps?.buildNonce?.({
         base64UrlEncode: deps?.base64UrlEncode,
       }),
@@ -34,6 +38,9 @@ export const dispatchAuthNonceRequestWithWorkerDeps = async ({
       ),
       MISSING_SLUG_ERROR: constants?.missingSlugError,
       NONCE_TTL_SECONDS: constants?.nonceTtlSeconds,
+      NONCE_RATE_LIMIT_MAX: constants?.nonceRateLimitMax,
+      NONCE_RATE_LIMIT_WINDOW_MS: constants?.nonceRateLimitWindowMs,
+      NONCE_RATE_LIMIT_TTL_SECONDS: constants?.nonceRateLimitTtlSeconds,
     },
   })
 );
@@ -61,6 +68,8 @@ export const dispatchAuthLoginRequestWithWorkerDeps = async ({
       validateRecoveredAddressMatchesRequest: deps?.validateRecoveredAddressMatchesRequest,
       parseSiweMessage: deps?.parseSiweMessage,
       validateSiwe: deps?.validateSiwe,
+      validateBrowserLoginOrigin: deps?.validateBrowserLoginOrigin,
+      resolveTrustedAdminOrigins: deps?.resolveTrustedAdminOrigins,
       validateSiweAddressMatchesRequest: deps?.validateSiweAddressMatchesRequest,
       consumeNonce: (envArg, slugArg, addressArg, nonceArg) => deps?.consumeNonce?.(
         envArg,
@@ -73,6 +82,8 @@ export const dispatchAuthLoginRequestWithWorkerDeps = async ({
       signToken: deps?.signToken,
       getAddress: deps?.getAddress,
       now: deps?.now,
+      LOGIN_SIWE_MAX_AGE_MS: constants?.loginSiweMaxAgeMs,
+      LOGIN_SIWE_FUTURE_SKEW_MS: constants?.loginSiweFutureSkewMs,
       TOKEN_TTL_SECONDS: constants?.tokenTtlSeconds,
       MISSING_SLUG_ERROR: constants?.missingSlugError,
       SESSION_CONFIG_NOT_FOUND_ERROR: constants?.sessionConfigNotFoundError,

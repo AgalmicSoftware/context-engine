@@ -35,8 +35,15 @@ test('dispatchAuthNonceRequestWithWorkerDeps preserves nonce-request wiring and 
         assert.equal(value.deps.isAddress, 'isAddress');
         assert.equal(value.deps.resolveWorkerBodySlugContext, 'resolveWorkerBodySlugContext');
         assert.equal(value.deps.resolveExistingSessionCors, 'resolveExistingSessionCors');
+        assert.equal(value.deps.validateTrustedLoginRequestOrigin, 'validateTrustedLoginRequestOrigin');
+        assert.equal(value.deps.resolveTrustedAdminOrigins, 'resolveTrustedAdminOrigins');
+        assert.equal(value.deps.checkNonceRateLimit, 'checkNonceRateLimit');
+        assert.equal(value.deps.now(), 1234567890);
         assert.equal(value.deps.MISSING_SLUG_ERROR, 'Missing sessionSlug.');
         assert.equal(value.deps.NONCE_TTL_SECONDS, 300);
+        assert.equal(value.deps.NONCE_RATE_LIMIT_MAX, 5);
+        assert.equal(value.deps.NONCE_RATE_LIMIT_WINDOW_MS, 60000);
+        assert.equal(value.deps.NONCE_RATE_LIMIT_TTL_SECONDS, 60);
 
         const builtNonce = value.deps.buildNonce();
         assert.equal(builtNonce, 'nonce-built');
@@ -49,6 +56,10 @@ test('dispatchAuthNonceRequestWithWorkerDeps preserves nonce-request wiring and 
       isAddress: 'isAddress',
       resolveWorkerBodySlugContext: 'resolveWorkerBodySlugContext',
       resolveExistingSessionCors: 'resolveExistingSessionCors',
+      validateTrustedLoginRequestOrigin: 'validateTrustedLoginRequestOrigin',
+      resolveTrustedAdminOrigins: 'resolveTrustedAdminOrigins',
+      checkNonceRateLimit: 'checkNonceRateLimit',
+      now: () => 1234567890,
       buildNonce: ({ base64UrlEncode }) => {
         assert.equal(base64UrlEncode, 'base64UrlEncode');
         return 'nonce-built';
@@ -58,6 +69,9 @@ test('dispatchAuthNonceRequestWithWorkerDeps preserves nonce-request wiring and 
     constants: {
       missingSlugError: 'Missing sessionSlug.',
       nonceTtlSeconds: 300,
+      nonceRateLimitMax: 5,
+      nonceRateLimitWindowMs: 60000,
+      nonceRateLimitTtlSeconds: 60,
     },
   });
 
@@ -96,11 +110,15 @@ test('dispatchAuthLoginRequestWithWorkerDeps preserves login-request wiring and 
         assert.equal(value.deps.validateRecoveredAddressMatchesRequest, 'validateRecoveredAddressMatchesRequest');
         assert.equal(value.deps.parseSiweMessage, 'parseSiweMessage');
         assert.equal(value.deps.validateSiwe, 'validateSiwe');
+        assert.equal(value.deps.validateBrowserLoginOrigin, 'validateBrowserLoginOrigin');
+        assert.equal(value.deps.resolveTrustedAdminOrigins, 'resolveTrustedAdminOrigins');
         assert.equal(value.deps.validateSiweAddressMatchesRequest, 'validateSiweAddressMatchesRequest');
         assert.equal(value.deps.computeScopesForLogin, 'computeScopesForLogin');
         assert.equal(value.deps.signToken, 'signToken');
         assert.equal(value.deps.getAddress, 'getAddress');
         assert.equal(value.deps.now(), 1234567890);
+        assert.equal(value.deps.LOGIN_SIWE_MAX_AGE_MS, 300000);
+        assert.equal(value.deps.LOGIN_SIWE_FUTURE_SKEW_MS, 60000);
         assert.equal(value.deps.TOKEN_TTL_SECONDS, 86400);
         assert.equal(value.deps.MISSING_SLUG_ERROR, 'Missing sessionSlug.');
         assert.equal(value.deps.SESSION_CONFIG_NOT_FOUND_ERROR, 'Session config not found.');
@@ -124,6 +142,8 @@ test('dispatchAuthLoginRequestWithWorkerDeps preserves login-request wiring and 
       validateRecoveredAddressMatchesRequest: 'validateRecoveredAddressMatchesRequest',
       parseSiweMessage: 'parseSiweMessage',
       validateSiwe: 'validateSiwe',
+      validateBrowserLoginOrigin: 'validateBrowserLoginOrigin',
+      resolveTrustedAdminOrigins: 'resolveTrustedAdminOrigins',
       validateSiweAddressMatchesRequest: 'validateSiweAddressMatchesRequest',
       consumeNonce: async (...args) => {
         consumeCalls.push(args);
@@ -136,6 +156,8 @@ test('dispatchAuthLoginRequestWithWorkerDeps preserves login-request wiring and 
     },
     constants: {
       usedNonceTtlSeconds: 600,
+      loginSiweMaxAgeMs: 300000,
+      loginSiweFutureSkewMs: 60000,
       tokenTtlSeconds: 86400,
       missingSlugError: 'Missing sessionSlug.',
       sessionConfigNotFoundError: 'Session config not found.',
