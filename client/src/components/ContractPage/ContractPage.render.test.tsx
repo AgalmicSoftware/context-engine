@@ -15,14 +15,16 @@ jest.mock('../../utilities/web3/contractScripts.js', () => ({
     base64urlToHex: jest.fn(() => ''),
     base64urlToBase64: jest.fn(() => ''),
   },
-  getSessionConfigBySlug: (...args) => mockGetSessionConfigBySlug(...args),
-  getDemoSessionConfigBySlug: (...args) => mockGetDemoSessionConfigBySlug(...args),
-  getSessionConfigBySlugOrDefault: (...args) => mockGetSessionConfigBySlugOrDefault(...args),
+  getSessionConfigBySlug: (...args: any[]) => mockGetSessionConfigBySlug(...args),
+  getDemoSessionConfigBySlug: (...args: any[]) => mockGetDemoSessionConfigBySlug(...args),
+  getSessionConfigBySlugOrDefault: (...args: any[]) => mockGetSessionConfigBySlugOrDefault(...args),
 }));
 
 jest.mock('./contractViewerUtils.js', () => ({
   buildContractViewerContracts: jest.fn(),
 }));
+
+const mockBuildContractViewerContracts = buildContractViewerContracts as jest.Mock;
 
 describe('ContractPage contract deep links', () => {
   const sessionConfig = {
@@ -60,12 +62,12 @@ describe('ContractPage contract deep links', () => {
     ));
     mockGetDemoSessionConfigBySlug.mockReturnValue(null);
     mockGetSessionConfigBySlugOrDefault.mockReturnValue(generalSessionConfig);
-    buildContractViewerContracts.mockImplementation(({
+    mockBuildContractViewerContracts.mockImplementation(({
       sessionContracts = {},
       includeSessionRegistry = true,
       includeCustomSBT = true,
       chainId = 84532,
-    } = {}) => {
+    }: any = {}) => {
       const entries = Object.keys(sessionContracts).map((contractKey) => ({
         key: contractKey,
         name:
