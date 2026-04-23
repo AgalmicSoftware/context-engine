@@ -3580,6 +3580,16 @@ class SBTPage extends Component {
 
       this.cacheTransactionHash(tx.transactionHash);
 
+      const recoveryWrite = upsertSbtPasswordRecoveryCodes({
+        chainId: this.getActiveChainId(),
+        sbtAddress: sbtAddressOriginalCase,
+        passwords: newPasswordList,
+        mode: 'append',
+      });
+      if (!recoveryWrite.ok) {
+        sbtLog.warn('Failed to persist admin invite recovery codes:', recoveryWrite.status);
+      }
+
       if (this._isMounted) this.setState({ adminGeneratedPasswords: newPasswordList, passwordGenerationCount: '' });
       this.loadCachedPasswords();
     } catch (error) {
@@ -3953,35 +3963,6 @@ renderMintButton() {
     if (this._isMounted) this.setState({ includePreviousPasswords: event.target.checked });
   };
 
-  saveAdminGeneratedPasswordsToRecoveryCache = () => {
-    const { adminGeneratedPasswords, cachedPasswords } = this.state;
-    const unsavedGeneratedPasswords = (adminGeneratedPasswords || []).filter(
-      (password) => !(cachedPasswords || []).includes(password)
-    );
-    if (!unsavedGeneratedPasswords.length) return;
-
-    const { SBTAddress: SBTAddressProp } = this.props;
-    const sbtAddressOriginalCase = Array.isArray(SBTAddressProp)
-      ? SBTAddressProp.find(entry => entry.sbtAddress !== undefined)?.sbtAddress
-      : (SBTAddressProp && SBTAddressProp.sbtAddress !== undefined ? SBTAddressProp.sbtAddress : SBTAddressProp);
-    if (!sbtAddressOriginalCase) return;
-
-    const recoveryWrite = upsertSbtPasswordRecoveryCodes({
-      chainId: this.getActiveChainId(),
-      sbtAddress: sbtAddressOriginalCase,
-      passwords: unsavedGeneratedPasswords,
-      mode: 'append',
-    });
-    if (!recoveryWrite.ok) {
-      sbtLog.warn('Failed to persist admin invite recovery codes:', recoveryWrite.status);
-      notify.warn('Failed to save generated invite codes to the local recovery cache on this device.');
-      return;
-    }
-
-    notify.success('Saved generated invite codes to the local recovery cache on this device.');
-    this.loadCachedPasswords();
-  };
-
   renderAdminActions = () => {
     const { userIsSbtAdmin, sbtInfo, burnSearchInput, burnSearchResult, burningStatus, adminGeneratedPasswords, cachedPasswords, includePreviousPasswords, exportFormat } = this.state;
     if (!userIsSbtAdmin || !sbtInfo) return null;
@@ -4019,10 +4000,6 @@ renderMintButton() {
     const openMintAutoJoinUrl = this.getOpenMintAutoJoinUrl(sbtAddr);
     const justGeneratedPasswords = adminGeneratedPasswords.length > 0;
     const onlyCachedPasswords = (adminGeneratedPasswords.length === 0 && combinedPasswords.length > 0);
-    const unsavedGeneratedPasswords = adminGeneratedPasswords.filter(
-      (password) => !cachedPasswords.includes(password)
-    );
-    const hasUnsavedGeneratedPasswords = unsavedGeneratedPasswords.length > 0;
     const renderIncludePreviousCheckbox = justGeneratedPasswords;
     const effectiveIncludePreviousPasswords = onlyCachedPasswords ? true : includePreviousPasswords;
 
@@ -4156,11 +4133,7 @@ renderMintButton() {
                     </li>
                   ))}
                 </ul>
-                <p>
-                  {hasUnsavedGeneratedPasswords
-                    ? 'These passwords are available to export now. They are not stored locally unless you choose Save to Local Recovery Cache.'
-                    : 'These passwords include any locally cached recovery codes already available on this device.'}
-                </p>
+                <p>These passwords are stored in the local recovery cache and/or newly generated.</p>
                 <div className={styles.exportOptions}>
                   {renderIncludePreviousCheckbox && (
                     <label>
@@ -4180,11 +4153,6 @@ renderMintButton() {
                     <option value="csv">CSV</option>
                   </select>
                   <button onClick={this.exportPasswords} className={styles.exportButton}>Export Passwords</button>
-                  {hasUnsavedGeneratedPasswords && (
-                    <button onClick={this.saveAdminGeneratedPasswordsToRecoveryCache} className={styles.exportButton}>
-                      Save to Local Recovery Cache
-                    </button>
-                  )}
                 </div>
               </div>
             ) : null}
@@ -4194,7 +4162,7 @@ renderMintButton() {
         {showNoMoreInvites && combinedPasswords.length > 0 && (
           <div className={styles.inviteGenerationSection}>
             <h4>Previously Generated Password Invites</h4>
-            <p>{`These are the locally cached recovery codes currently available on this device for this ${t('sbt')}:`}</p>
+            <p>{`These were previously cached or generated passwords from when the ${t('sbt')} was created:`}</p>
             <ul>
               {combinedPasswords.map((pw, idx) => (
                 <li key={idx}>
@@ -4228,7 +4196,7 @@ renderMintButton() {
         {showNoMoreInvites && combinedPasswords.length === 0 && (
           <div className={styles.inviteGenerationSection}>
             <h4>No Additional Password Invites</h4>
-            <p>Max tokens are set, so all invites should have been created initially. No more invites can be generated, and there are no locally cached recovery codes on this device.</p>
+            <p>Max tokens are set, so all invites should have been created initially. No more invites can be generated, and there are no cached passwords found.</p>
           </div>
         )}
       </div>
