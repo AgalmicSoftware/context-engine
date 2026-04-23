@@ -4,10 +4,9 @@ import { Input } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCaretDown, faCaretUp, faPlus, faTrash } from '@fortawesome/free-solid-svg-icons';
 import styles from './SessionWizard.module.scss';
-import SBTSelector from '../SBTs/SBTSelector';
+import SBTSelector from '../SBTs/SBTSelector.jsx';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { toStr } from '../../utilities/shared/primitives.js';
-import type { SessionWizardTooltipRenderOptions } from './SessionWizardInfoTooltip';
 
 type EncryptionGate = {
   id: string;
@@ -32,13 +31,7 @@ type SessionConfig = {
 export type EncryptionPanelProps = {
   isNormalMode: boolean;
   t?: (key: string) => string;
-  renderSessionWizardInfoTooltip?: (props: {
-    id?: string;
-    content?: React.ReactNode;
-    placement?: SessionWizardTooltipRenderOptions['placement'];
-    testId?: string;
-    ariaLabel?: string;
-  }) => React.ReactNode;
+  renderSessionWizardInfoTooltip?: (props: Record<string, unknown>) => React.ReactNode;
   isCollapsed: boolean;
   onToggleCollapsed: () => void;
   launchCreateSbtModal: (payload: { targetType: string; gateId: string }) => void;
@@ -51,13 +44,13 @@ export type EncryptionPanelProps = {
   normalizeSbtSelection?: (value: unknown[]) => unknown[];
   handleGateAddSbt: (gateId: string, sbt: unknown) => void;
   handleGateRemoveSbt: (gateId: string, address: string) => void;
-  network?: unknown;
+  network?: string;
   pendingSbtSelectorOptions?: unknown[];
-  selectorSourceChainId?: number | string | null;
+  selectorSourceChainId?: number | string;
   selectorSourceSessionConfig?: SessionConfig | null;
   resolvedActiveSessionSlug?: string;
-  sbtCacheRevision?: unknown;
-  ensureLightSbtUniverse?: (() => unknown) | null;
+  sbtCacheRevision?: number;
+  ensureLightSbtUniverse?: () => unknown;
   addEncryptionGate: () => void;
   pendingSbtDrafts?: PendingSbtDraft[];
   removePendingSbtDraft: (address?: string) => void;
