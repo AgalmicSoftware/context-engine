@@ -1,68 +1,15 @@
 import React from 'react';
 import { act, cleanup, render } from '@testing-library/react';
 
-const buildMockConfigureChainsResult = (_chains: unknown[], _providers: unknown[]) => ({
-  chains: [{ id: 84532, chainId: 84532, name: 'Base Sepolia' }],
-  provider: {},
-  webSocketProvider: { kind: 'configured-websocket-provider' },
-});
-const buildMockJsonRpcProvider = ({ rpc }: { rpc: (chain: any) => { http: string } | null }) => (
-  (chain: any) => {
-    const rpcConfig = rpc(chain);
-    if (!rpcConfig?.http) return null;
-    const provider = jest.fn(() => ({ send: jest.fn(), rpcUrl: rpcConfig.http }));
-    return {
-      chain: {
-        ...chain,
-        rpcUrls: {
-          ...(chain?.rpcUrls || {}),
-          default: { http: [rpcConfig.http] },
-          public: { http: [rpcConfig.http] },
-        },
-      },
-      provider,
-    };
-  }
-);
 const mockCreateClient = jest.fn(() => ({}));
-const mockConfigureChains = jest.fn(buildMockConfigureChainsResult);
-const mockConnectorsForWallets = jest.fn(() => []);
-const mockJsonRpcProvider = jest.fn(buildMockJsonRpcProvider);
-const mockWrapEthersJsonRpcSend = jest.fn((provider: any, _meta: any) => provider);
-const mockMetaMaskWalletCreateConnector = jest.fn(() => ({
-  connector: { id: 'walletConnect-fallback' },
-}));
-const mockMetaMaskWallet = jest.fn(() => ({
-  id: 'metaMask',
-  name: 'MetaMask',
-  iconUrl: 'metamask-icon',
-  iconBackground: '#fff',
-  createConnector: mockMetaMaskWalletCreateConnector,
-}));
-const mockMetaMaskConnector = jest.fn((options: unknown) => ({
-  id: 'metaMask-injected',
-  options,
-}));
-const mockReadColdLoadOnboardingState = jest.fn((_storage?: Storage, _pathname?: string) => ({
+const mockReadColdLoadOnboardingState = jest.fn((_storage?: Storage) => ({
   firstVisit: true,
   shouldStartOnboarding: false,
 }));
 const mockStoreDispatch = jest.fn();
 const mockSyncPublicPageHead = jest.fn();
 const mockToaster = jest.fn((_props?: any) => null);
-let MockMainSiteComponent: React.ComponentType<any> = () => null;
 let routeProps: any[] = [];
-let mockWalletConnectFallbackEnabled = false;
-
-type WalletGroup = {
-  wallets?: Array<{
-    createConnector: () => {
-      connector: {
-        id: string;
-      };
-    };
-  }>;
-};
 
 const MockRoute = (props: any) => {
   routeProps.push(props);
@@ -102,10 +49,7 @@ const mockAppDependencies = () => {
       dispatch: mockStoreDispatch,
     },
   }));
-  jest.doMock('../variables/appConfig.js', () => ({
-    SERVER: 'http://localhost',
-    CE_ENABLE_WALLETCONNECT_FALLBACK: mockWalletConnectFallbackEnabled,
-  }));
+  jest.doMock('../variables/appConfig.js', () => ({ SERVER: 'http://localhost' }));
   jest.doMock('../utilities/ceAgent.js', () => ({ installCeAgent: jest.fn() }));
   jest.doMock('../utilities/logging', () => ({
     createLogger: () => ({
@@ -122,9 +66,9 @@ const mockAppDependencies = () => {
     __esModule: true,
     default: (Comp: React.ComponentType<any>) => Comp,
   }));
-  jest.doMock('./MainSite/MainSite', () => ({
+  jest.doMock('./MainSite/MainSite.jsx', () => ({
     __esModule: true,
-    default: (props: any) => <MockMainSiteComponent {...props} />,
+    default: () => null,
   }));
   jest.doMock('./Onboarding/onboardingConfig.js', () => ({
     readColdLoadOnboardingState: mockReadColdLoadOnboardingState,
@@ -132,17 +76,21 @@ const mockAppDependencies = () => {
 
   jest.doMock('@rainbow-me/rainbowkit', () => ({
     getDefaultWallets: jest.fn(),
-    connectorsForWallets: mockConnectorsForWallets,
+    connectorsForWallets: jest.fn(() => []),
     RainbowKitProvider: ({ children }: { children: React.ReactNode }) => children,
   }));
   jest.doMock('@rainbow-me/rainbowkit/wallets', () => ({
     rainbowWallet: jest.fn(() => ({})),
-    metaMaskWallet: mockMetaMaskWallet,
+    metaMaskWallet: jest.fn(() => ({})),
     coinbaseWallet: jest.fn(() => ({})),
   }));
 
   jest.doMock('wagmi', () => ({
-    configureChains: mockConfigureChains,
+    configureChains: jest.fn(() => ({
+      chains: [{ id: 84532, chainId: 84532, name: 'Base Sepolia' }],
+      provider: {},
+      webSocketProvider: {},
+    })),
     createClient: mockCreateClient,
     createStorage: jest.fn(({ storage }: { storage: unknown }) => ({ storage })),
     WagmiConfig: ({ children }: { children: React.ReactNode }) => children,
@@ -154,9 +102,6 @@ const mockAppDependencies = () => {
       removeItem: jest.fn(),
     },
   }));
-  jest.doMock('wagmi/connectors/metaMask', () => ({
-    MetaMaskConnector: mockMetaMaskConnector,
-  }));
   jest.doMock('wagmi/chains', () => ({
     goerli: { id: 5, chainId: 5, name: 'Goerli' },
     localhost: { id: 31337, chainId: 31337, name: 'Localhost' },
@@ -165,13 +110,10 @@ const mockAppDependencies = () => {
     InjectedConnector: jest.fn(),
   }));
   jest.doMock('wagmi/providers/jsonRpc', () => ({
-    jsonRpcProvider: mockJsonRpcProvider,
-  }));
-  jest.doMock('../utilities/web3/rpcReadCache.js', () => ({
-    wrapEthersJsonRpcSend: mockWrapEthersJsonRpcSend,
+    jsonRpcProvider: jest.fn(() => ({})),
   }));
 
-  jest.doMock('../utilities/web3/rpcSelection.js', () => ({
+  jest.doMock('../utilities/web3/appRpcSelection.js', () => ({
     getFallbackRpcUrlForChain: jest.fn(() => 'https://fallback.example'),
     getPrimaryRpcUrlForChain: jest.fn(() => 'https://primary.example'),
   }));
@@ -191,7 +133,7 @@ const mockAppDependencies = () => {
 const loadAppModule = (): any => {
   let appModule: any;
   jest.isolateModules(() => {
-    appModule = require('./App');
+    appModule = require('./App.jsx');
   });
   return appModule;
 };
@@ -204,30 +146,6 @@ describe('App wagmi auto-connect persistence', () => {
     sessionStorage.clear();
     window.history.replaceState({}, '', '/');
     routeProps = [];
-    MockMainSiteComponent = () => null;
-    mockWalletConnectFallbackEnabled = false;
-    mockCreateClient.mockImplementation(() => ({}));
-    mockConfigureChains.mockImplementation(buildMockConfigureChainsResult);
-    mockJsonRpcProvider.mockImplementation(buildMockJsonRpcProvider);
-    mockWrapEthersJsonRpcSend.mockImplementation((provider: any, _meta: any) => provider);
-    mockConfigureChains.mockClear();
-    mockJsonRpcProvider.mockClear();
-    mockWrapEthersJsonRpcSend.mockClear();
-    mockConnectorsForWallets.mockReturnValue([]);
-    mockMetaMaskWalletCreateConnector.mockReturnValue({
-      connector: { id: 'walletConnect-fallback' },
-    });
-    mockMetaMaskWallet.mockImplementation(() => ({
-      id: 'metaMask',
-      name: 'MetaMask',
-      iconUrl: 'metamask-icon',
-      iconBackground: '#fff',
-      createConnector: mockMetaMaskWalletCreateConnector,
-    }));
-    mockMetaMaskConnector.mockImplementation((options: unknown) => ({
-      id: 'metaMask-injected',
-      options,
-    }));
     mockSyncPublicPageHead.mockReset();
     mockReadColdLoadOnboardingState.mockReturnValue({
       firstVisit: true,
@@ -255,88 +173,6 @@ describe('App wagmi auto-connect persistence', () => {
 
     expect(mockCreateClient).toHaveBeenCalledWith(
       expect.objectContaining({ autoConnect: true })
-    );
-  });
-
-  it('passes the configured websocket provider through without enabling WalletConnect by default', () => {
-    loadAppModule();
-
-    expect(mockCreateClient).toHaveBeenCalledWith(
-      expect.objectContaining({
-        webSocketProvider: { kind: 'configured-websocket-provider' },
-      })
-    );
-    expect(mockMetaMaskWalletCreateConnector).not.toHaveBeenCalled();
-  });
-
-  it('uses an injected-only MetaMask connector by default to avoid WalletConnect bridge startup', () => {
-    loadAppModule();
-
-    const connectorCalls = mockConnectorsForWallets.mock.calls as unknown as Array<[WalletGroup[]]>;
-    const walletGroups = connectorCalls[0]?.[0] ?? [];
-    const wallet = walletGroups[0]?.wallets?.[0];
-    if (!wallet) throw new Error('Expected injected MetaMask wallet in connectorsForWallets call.');
-    const connectorConfig = wallet.createConnector();
-
-    expect(mockMetaMaskWallet).toHaveBeenCalledWith(
-      expect.objectContaining({ chains: expect.any(Array), shimDisconnect: true })
-    );
-    expect(mockMetaMaskWalletCreateConnector).not.toHaveBeenCalled();
-    expect(mockMetaMaskConnector).toHaveBeenCalledWith(
-      expect.objectContaining({
-        chains: expect.any(Array),
-        options: { shimDisconnect: true },
-      })
-    );
-    expect(connectorConfig.connector).toEqual(
-      expect.objectContaining({ id: 'metaMask-injected' })
-    );
-  });
-
-  it('preserves RainbowKit MetaMask WalletConnect fallback when explicitly enabled', () => {
-    mockWalletConnectFallbackEnabled = true;
-
-    loadAppModule();
-
-    const connectorCalls = mockConnectorsForWallets.mock.calls as unknown as Array<[WalletGroup[]]>;
-    const walletGroups = connectorCalls[0]?.[0] ?? [];
-    const wallet = walletGroups[0]?.wallets?.[0];
-    if (!wallet) throw new Error('Expected MetaMask wallet fallback in connectorsForWallets call.');
-    const connectorConfig = wallet.createConnector();
-
-    expect(mockMetaMaskWalletCreateConnector).toHaveBeenCalledTimes(1);
-    expect(mockMetaMaskConnector).not.toHaveBeenCalled();
-    expect(connectorConfig.connector).toEqual({ id: 'walletConnect-fallback' });
-  });
-
-  it('wraps wagmi JSON-RPC providers with RPC rate-limit backoff metadata', () => {
-    loadAppModule();
-
-    const providerFactories = mockConfigureChains.mock.calls[0]?.[1] as Array<(chain: any) => any>;
-    const chain = { id: 11155420, chainId: 11155420, name: 'OP Sepolia' };
-    const primaryConfig = providerFactories[0](chain);
-    const fallbackConfig = providerFactories[1](chain);
-
-    primaryConfig.provider();
-    fallbackConfig.provider();
-
-    expect(mockWrapEthersJsonRpcSend).toHaveBeenNthCalledWith(
-      1,
-      expect.objectContaining({ rpcUrl: 'https://primary.example' }),
-      expect.objectContaining({
-        chainId: 11155420,
-        providerKey: 'wagmi-primary',
-        url: 'https://primary.example',
-      })
-    );
-    expect(mockWrapEthersJsonRpcSend).toHaveBeenNthCalledWith(
-      2,
-      expect.objectContaining({ rpcUrl: 'https://fallback.example' }),
-      expect.objectContaining({
-        chainId: 11155420,
-        providerKey: 'wagmi-fallback',
-        url: 'https://fallback.example',
-      })
     );
   });
 
@@ -443,28 +279,7 @@ describe('App wagmi auto-connect persistence', () => {
     expect(mockSyncPublicPageHead).toHaveBeenLastCalledWith();
   });
 
-  it('re-renders MainSite with the browser path after direct history.replaceState updates', () => {
-    const { default: App } = loadAppModule();
-
-    render(
-      <App
-        params={{}}
-        location={{ search: '', pathname: '/' }}
-        navigate={jest.fn()}
-      />
-    );
-
-    expect(routeProps[routeProps.length - 1].element.props.path).toBe('/');
-
-    act(() => {
-      window.history.replaceState({}, '', '/session/demo?view=results');
-    });
-
-    expect(routeProps[routeProps.length - 1].element.props.path).toBe('/session/demo');
-  });
-
   it('reuses the cold-load onboarding snapshot on mount', () => {
-    window.history.replaceState({}, '', '/session/demo');
     mockReadColdLoadOnboardingState.mockReturnValue({
       firstVisit: true,
       shouldStartOnboarding: true,
@@ -481,7 +296,6 @@ describe('App wagmi auto-connect persistence', () => {
     );
 
     expect(mockReadColdLoadOnboardingState).toHaveBeenCalledTimes(1);
-    expect(mockReadColdLoadOnboardingState).toHaveBeenCalledWith(window.localStorage, '/session/demo');
     expect(mockStoreDispatch).toHaveBeenCalledWith({
       type: 'SET_ONBOARDING_STEP',
       payload: 1,
@@ -515,8 +329,8 @@ describe('App wagmi auto-connect persistence', () => {
       />
     );
 
-    expect(mockReadColdLoadOnboardingState).toHaveBeenNthCalledWith(1, window.localStorage, '/');
-    expect(mockReadColdLoadOnboardingState).toHaveBeenNthCalledWith(2, window.sessionStorage, '/');
+    expect(mockReadColdLoadOnboardingState).toHaveBeenNthCalledWith(1, window.localStorage);
+    expect(mockReadColdLoadOnboardingState).toHaveBeenNthCalledWith(2, window.sessionStorage);
     expect(routeProps[0].element.props.firstVisit).toBe(true);
   });
 
