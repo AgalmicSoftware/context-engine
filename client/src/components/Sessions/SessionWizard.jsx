@@ -11,7 +11,7 @@ import BlockLimitsField from './BlockLimitsField';
 import SessionHeaderField from './SessionHeaderField';
 import FeaturedSbtField from './FeaturedSbtField';
 import ContractsSection from './ContractsSection';
-import EncryptionPanel from './EncryptionPanel.jsx';
+import EncryptionPanel from './EncryptionPanel';
 import WorkerPanel from './WorkerPanel';
 import CreateSBTGroup, { finalizeDeferredCreateSbtDraftUpload } from '../SBTs/CreateSBTGroup.jsx';
 import GateMultiSelectLock from '../Gates/GateMultiSelectLock';
