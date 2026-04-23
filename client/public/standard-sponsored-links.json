@@ -1,7 +1,8 @@
 {
   "version": 1,
   "temporaryFixture": true,
-  "description": "Temporary public fixture for standard sponsored setup links. Create URLs through /sponsor with intentionally public, disposable, resource-limited credentials only.",
+  "description": "Temporary public fixture for standard sponsored setup links. Sponsored URLs are bearer grants; only set active=true for links that are intentionally public and disposable.",
+  "replacementPrd": "docs/internal-prds/451_replace-standard-sponsored-links-fixture.md",
   "links": [
     {
       "label": "Sponsored setup 1",
