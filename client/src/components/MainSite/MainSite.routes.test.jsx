@@ -109,7 +109,7 @@ jest.mock('../SurveyTool/SurveyPage.jsx', () => {
   };
 });
 
-jest.mock('../DocumentLibrary/SessionDocumentsPage.jsx', () => {
+jest.mock('../DocumentLibrary/SessionDocumentsPage', () => {
   const React = require('react');
   return {
     __esModule: true,

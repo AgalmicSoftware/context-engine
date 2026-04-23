@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
-import SessionDocumentsPage from './SessionDocumentsPage.jsx';
+import SessionDocumentsPage from './SessionDocumentsPage';
 
 jest.mock('./DocumentLibraryPanel.jsx', () => () => <div data-testid="mock-doc-library-panel" />);
 
