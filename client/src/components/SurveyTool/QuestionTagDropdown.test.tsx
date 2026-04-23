@@ -1,6 +1,6 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
-import { TestMemoryRouter as MemoryRouter } from 'testUtils/TestMemoryRouter';
+import { MemoryRouter } from 'react-router-dom';
 import QuestionTagDropdown, { buildTagPagePath } from './QuestionTagDropdown';
 
 jest.mock('reactstrap', () => {
@@ -33,7 +33,7 @@ jest.mock('reactstrap', () => {
         </button>
       );
     },
-    DropdownMenu: ({ children, end, ...props }) => {
+    DropdownMenu: ({ children, end, ...props }: any) => {
       const { isOpen } = React.useContext(DropdownContext);
       if (!isOpen) return null;
       return <div {...props}>{children}</div>;

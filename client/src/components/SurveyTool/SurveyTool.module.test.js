@@ -20,12 +20,22 @@ import {
   syncDecryptedQuestionIntoBaseline,
 } from './surveyToolDecryptFlow.js';
 import {
-  buildCanDecryptContext,
-  evaluateCanDecryptPreCheck,
-  resolveCanDecryptGateAccess,
-} from './surveyToolCanDecryptController';
-import { buildCanDecryptOtherResponsesState } from './surveyQuestionsTypes.js';
-import { buildGatedPromptNoticeState } from './surveyToolViewState';
+  computeSubmitLabel as directComputeSubmitLabel,
+  normalizeSurveyToolFilterState as directNormalizeSurveyToolFilterState,
+} from './surveyToolUtils.js';
+import { QuestionFilter as RawQuestionFilter } from './QuestionFilter.jsx';
+import PileHologramAssistant from './PileHologramAssistant.jsx';
+import QuestionTagDropdown from './QuestionTagDropdown';
+import styles from './SurveyTool.module.scss';
+import { renderToStaticMarkup } from 'react-dom/server';
+import fs from 'fs';
+import path from 'path';
+import ConnectedSurveyResults from './SurveyResults.jsx';
+import contractScripts, * as contractScriptsModule from '../../utilities/web3/contractScripts.js';
+import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
+import * as sessionScanScope from '../../utilities/session/sessionScanScope.js';
+import * as sbtDisplayNameUtils from '../../utilities/sbt/sbtDisplayNames.js';
+import * as sponsoredAccess from '../../utilities/web3/sponsoredAccess.js';
 import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 import { t } from '../../utilities/ui/terminology.js';
 
