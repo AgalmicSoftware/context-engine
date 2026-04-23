@@ -1,6 +1,6 @@
 import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import DemoAnalysisWorkspace from './DemoAnalysisWorkspace.jsx';
+import DemoAnalysisWorkspace from './DemoAnalysisWorkspace';
 
 jest.mock('../../Shared/CheckboxMultiSelect', () => ({
   __esModule: true,
@@ -9,20 +9,20 @@ jest.mock('../../Shared/CheckboxMultiSelect', () => ({
     onChange,
     options = [],
     value = [],
-  }) => (
+  }: any) => (
     <select
       data-testid={inputId}
       id={inputId}
       multiple
       onChange={(event) => {
-        const selectedValues = Array.from(event.target.selectedOptions).map((option) => option.value);
+        const selectedValues = Array.from(event.target.selectedOptions).map((option: any) => option.value);
         onChange(
-          options.filter((option) => selectedValues.includes(String(option.value)))
+          options.filter((option: any) => selectedValues.includes(String(option.value)))
         );
       }}
       value={Array.isArray(value) ? value.map((option) => option.value) : []}
     >
-      {options.map((option) => (
+      {options.map((option: any) => (
         <option key={option.value} value={option.value}>
           {option.label}
         </option>
@@ -32,8 +32,8 @@ jest.mock('../../Shared/CheckboxMultiSelect', () => ({
 }));
 
 jest.mock('react-simple-maps', () => ({
-  ComposableMap: ({ children }) => <div data-testid="mock-composable-map">{children}</div>,
-  Geographies: ({ children }) => children({
+  ComposableMap: ({ children }: any) => <div data-testid="mock-composable-map">{children}</div>,
+  Geographies: ({ children }: any) => children({
     geographies: [
       { rsmKey: 'usa', properties: { name: 'United States of America' } },
       { rsmKey: 'gbr', properties: { name: 'United Kingdom' } },
@@ -41,7 +41,7 @@ jest.mock('react-simple-maps', () => ({
       { rsmKey: 'chn', properties: { name: 'China' } },
     ],
   }),
-  Geography: ({ children, geography }) => (
+  Geography: ({ children, geography }: any) => (
     <div data-testid={`mock-geo-${geography.properties.name}`}>
       {children}
     </div>
@@ -50,8 +50,8 @@ jest.mock('react-simple-maps', () => ({
   Graticule: () => null,
 }));
 
-const setMultiSelectValues = (testId, values) => {
-  const select = screen.getByTestId(testId);
+const setMultiSelectValues = (testId: string, values: string[]) => {
+  const select = screen.getByTestId(testId) as HTMLSelectElement;
   Array.from(select.options).forEach((option) => {
     option.selected = values.includes(option.value);
   });
