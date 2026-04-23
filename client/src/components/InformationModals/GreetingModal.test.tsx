@@ -3,7 +3,7 @@ import { Provider } from 'react-redux';
 import { createStore } from 'redux';
 import { render, screen } from '@testing-library/react';
 
-import GreetingModal from './GreetingModal.jsx';
+import GreetingModal from './GreetingModal';
 
 jest.mock('utilities/logging.js', () => ({
   createLogger: () => ({
@@ -18,7 +18,7 @@ jest.mock('utilities/logging.js', () => ({
 jest.mock('reactstrap', () => {
   const React = require('react');
 
-  const wrap = (Tag = 'div') => ({ children, ...props }) => {
+  const wrap = (Tag = 'div') => ({ children, ...props }: any) => {
     const { check, modalClassName, isOpen, ...rest } = props;
 
     return <Tag {...rest}>{children}</Tag>;
@@ -34,8 +34,8 @@ jest.mock('reactstrap', () => {
     Form: wrap('form'),
     FormGroup: wrap('div'),
     Label: wrap('label'),
-    Modal: ({ children, isOpen, modalClassName, ...props }) => (isOpen ? <div {...props}>{children}</div> : null),
-    Input: (props) => <input {...props} />,
+    Modal: ({ children, isOpen, modalClassName, ...props }: any) => (isOpen ? <div {...props}>{children}</div> : null),
+    Input: (props: any) => <input {...props} />,
   };
 });
 
@@ -46,7 +46,7 @@ const buildStore = () => createStore((state = {
   },
 }) => state);
 
-const renderGreetingModal = (props = {}) => render(
+const renderGreetingModal = (props: Record<string, unknown> = {}) => render(
   <Provider store={buildStore()}>
     <GreetingModal
       visible

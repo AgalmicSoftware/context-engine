@@ -1,4 +1,4 @@
-/** @file GreetingModal.jsx */
+/** @file GreetingModal.tsx */
 import React, { Component } from "react";
 import PropTypes from 'prop-types';
 import { connect } from 'react-redux';
@@ -19,23 +19,54 @@ import { faWindowClose, faCheck, faCheckSquare } from '@fortawesome/free-solid-s
 
 const log = createLogger('ui');
 
-class GreetingModal extends Component {
-  state = {
+type GreetingModalProps = {
+  fetchSessionState: () => void;
+  account?: string | null;
+  provider?: string | null;
+  visible?: boolean;
+  optOutAndEmailBottom?: boolean;
+  closeExplainerFunction: () => void;
+};
+
+type GreetingModalState = {
+  rulesModalOpen: boolean;
+  userOptsOutMetrics: boolean;
+  emailInput: string;
+};
+
+type RootState = {
+  profile: {
+    account?: string | null;
+    provider?: string | null;
+  };
+};
+
+class GreetingModal extends Component<GreetingModalProps, GreetingModalState> {
+  static propTypes = {
+    fetchSessionState: PropTypes.func.isRequired,
+    account: PropTypes.string,
+    provider: PropTypes.string,
+    visible: PropTypes.bool,
+    optOutAndEmailBottom: PropTypes.bool,
+    closeExplainerFunction: PropTypes.func.isRequired,
+  };
+
+  state: GreetingModalState = {
     rulesModalOpen: false,
     userOptsOutMetrics: false,
     emailInput: "",
   }
 
   componentDidMount() {
-    this.setState({ rulesModalOpen: this.props.visible });
+    this.setState({ rulesModalOpen: !!this.props.visible });
   }
 
   componentWillUnmount() {
   }
 
-  componentDidUpdate(nextProps) {
-    if (this.props.visible !== nextProps.visible) {
-      this.setState({ rulesModalOpen: this.props.visible });
+  componentDidUpdate(prevProps: GreetingModalProps) {
+    if (this.props.visible !== prevProps.visible) {
+      this.setState({ rulesModalOpen: !!this.props.visible });
     }
 
 
@@ -51,7 +82,7 @@ class GreetingModal extends Component {
     }
   }
 
-  emailInputChange = (e) => {
+  emailInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const latestEmail = e.target.value;
     this.setState({ emailInput: latestEmail });
   }
@@ -73,7 +104,7 @@ class GreetingModal extends Component {
 
     const formBottomVisibleID = this.props.optOutAndEmailBottom ? styles.betaInfo : styles.betaInfoInvisible;
 
-    var modalVisibleID = this.props.visible ? styles.rulesModal : styles.invisibleModal;
+    const modalVisibleID = this.props.visible ? styles.rulesModal : styles.invisibleModal;
 
 
 
@@ -165,13 +196,7 @@ class GreetingModal extends Component {
   }
 }
 
-GreetingModal.propTypes = {
-  fetchSessionState: PropTypes.func.isRequired,
-  account: PropTypes.string,
-  provider: PropTypes.string,
-};
-
-const mapStateToProps = state => ({
+const mapStateToProps = (state: RootState) => ({
   account: state.profile.account,
   provider: state.profile.provider,
 });
