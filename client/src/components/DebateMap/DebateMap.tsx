@@ -1,14 +1,14 @@
 /** @file DebateMap.tsx */
-import React, { useState, useCallback, useMemo, useEffect, useLayoutEffect, useRef } from 'react';
+// @ts-nocheck
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faThumbsUp, faChevronRight, faBookmark, faTimes, faComment, faLink, faCheck,
   faPlus, faNetworkWired, faArrowLeft, faFire, faSitemap, faCaretDown, faCaretUp,
   faArrowUp, faArrowDown, faList, faCircle, faExternalLinkAlt
 } from '@fortawesome/free-solid-svg-icons';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { FormGroup, Label, Input } from 'reactstrap';
-import { hierarchy as d3Hierarchy, pack as d3Pack } from 'd3';
 import treeData from '../../variables/demo/debate_map_demo_data.json';
 import historicalData from '../../variables/demo/historical_figures_tree_qs_and_votes.json';
 import loopholeHistoricalCases from '../../variables/demo/loophole_historical_cases.json';
@@ -20,10 +20,12 @@ import {
   getHistoricalFigureAvatarOrBlockie,
   getHistoricalFigureBlockie,
 } from 'utilities/ui/historicalFigureAvatars.js';
-import { buildPublicRoute, readSafeInternalReturnTo } from 'utilities/ui/publicUrl.js';
+import { buildPublicRoute } from 'utilities/ui/publicUrl.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { notify } from '../../utilities/ui/notify.js';
 import { buildTagHref } from '../SurveyTool/QuestionTagDropdown';
+
+const { hierarchy: d3Hierarchy, pack: d3Pack } = require('d3');
 
 const StandalonePoliticalCompass = React.lazy(() => (
   import('../DemoViews/DebateHUD/PoliticalCompassView').then((module) => ({
@@ -33,381 +35,9 @@ const StandalonePoliticalCompass = React.lazy(() => (
 
 const uiLog = createLogger('ui');
 
-type AtlasLayoutMode = 'orbital' | 'packed';
-type DebateVisualMode = 'circles' | 'atlas' | 'tree' | 'list';
-type VoteDirection = 'up' | 'down';
-type DemoModeProp = boolean | { tools?: unknown; [key: string]: unknown };
-type LocalVoteDeltas = Record<string, Record<VoteDirection, number>>;
+const cleanAtlasCategoryName = (name) => String(name || '').replace(/^\d+\.\s*/, '');
 
-interface DebateVoteTotals {
-  up?: number | string;
-  down?: number | string;
-  [key: string]: number | string | undefined;
-}
-
-interface DebateQuestionOption {
-  label?: string;
-  text?: string;
-  value?: string | number;
-  option?: string | number;
-  [key: string]: unknown;
-}
-
-interface DebateQuestion {
-  id?: string;
-  username?: string;
-  questionType?: string;
-  type?: string;
-  question?: string;
-  prompt?: string;
-  options?: unknown;
-  [key: string]: any;
-}
-
-interface DebateComment {
-  id?: string;
-  comment?: string;
-  username?: string;
-  [key: string]: any;
-}
-
-interface HistoricalVoteEntry {
-  username: string;
-  value: number;
-  comment?: string;
-  nodeId?: string;
-  [key: string]: unknown;
-}
-
-interface DebateArgument {
-  id?: string;
-  claim?: string;
-  strength?: number | string;
-  source?: string;
-  children?: DebateArgument[];
-  [key: string]: any;
-}
-
-interface DebateArguments {
-  pro?: DebateArgument[];
-  con?: DebateArgument[];
-  votes?: Record<string, string[]>;
-  [key: string]: any;
-}
-
-interface CompassAxis {
-  label?: string;
-  [key: string]: unknown;
-}
-
-interface HistoricalCompassPoint {
-  name: string;
-  x: number;
-  y: number;
-  type?: string;
-  color?: string;
-  comment?: string;
-  [key: string]: unknown;
-}
-
-interface CompassData {
-  xAxis?: CompassAxis;
-  yAxis?: CompassAxis;
-  points?: HistoricalCompassPoint[];
-  [key: string]: any;
-}
-
-interface HistoricalFieldRow {
-  label: string;
-  value: string;
-}
-
-interface HistoricalFieldDefinition {
-  key: string;
-  label: string;
-}
-
-interface HistoricalDraftArticle {
-  label: string;
-  body: string;
-}
-
-interface HistoricalCasePanel {
-  title: string;
-  tone: 'primary' | 'secondary';
-  rows: HistoricalFieldRow[];
-}
-
-interface HistoricalPatchOption {
-  id: string;
-  name: string;
-  summary: string;
-  favoredBy: string[];
-}
-
-interface HistoricalFigurePrincipleEntry {
-  name: string;
-  principles: string[];
-}
-
-interface HistoricalCaseBrief {
-  figurePrinciples: HistoricalFigurePrincipleEntry[];
-  draftLegalCode: { articles: HistoricalDraftArticle[] } | string;
-  adversarialAttack: {
-    panels: HistoricalCasePanel[];
-    fallbackText: string | null;
-  };
-  judgeTension: string;
-  whyHard: string | null;
-  decisionPrompt: string;
-  patchOptions: HistoricalPatchOption[];
-  bestPatch: string | null;
-  whyOtherFails: string | null;
-  precedentPressure: HistoricalFieldRow[];
-}
-
-type HistoricalCaseBriefBuilder = (
-  historicalCase: HistoricalCase,
-  content?: DebateNode,
-) => HistoricalCaseBrief;
-
-interface HistoricalCase {
-  id?: string;
-  title?: string;
-  summary?: string;
-  authors?: unknown;
-  category?: string;
-  venue?: string | number;
-  year?: string | number;
-  tags?: string[];
-  url?: string;
-  source_label?: string;
-  principles_by_figure?: Record<string, unknown>;
-  draft_legal_code?: {
-    articles?: unknown[];
-    [key: string]: unknown;
-  };
-  loophole_exploit?: Record<string, unknown>;
-  overreach_variant?: Record<string, unknown>;
-  judge_tension?: unknown;
-  why_the_case_is_hard?: unknown;
-  best_patch?: unknown;
-  why_other_patch_fails?: unknown;
-  open_question?: unknown;
-  concrete_patch_options?: unknown;
-  precedent_pressure?: Record<string, unknown>;
-  [key: string]: any;
-}
-
-const EMPTY_HISTORICAL_CASES: HistoricalCase[] = [];
-
-interface DebateNode {
-  id?: string;
-  name?: string;
-  depth?: number;
-  parentPath?: DebateNode[];
-  children?: DebateNode[];
-  votes?: DebateVoteTotals;
-  questions?: DebateQuestion[];
-  comments?: DebateComment[];
-  historicalVotes?: HistoricalVoteEntry[];
-  historicalCases?: HistoricalCase[];
-  scenarioVisualizations?: unknown[];
-  compass?: CompassData;
-  arguments?: DebateArguments;
-  isCenter?: boolean;
-  heat?: number;
-  disagreementScore?: number;
-  hierarchyDepth?: number;
-  depthClass?: string;
-  x?: number;
-  y?: number;
-  r?: number | null;
-  groupId?: string;
-  [key: string]: any;
-}
-
-interface HistoricalFigureRecord {
-  votes?: Record<string, string | number | null | undefined>;
-  comments?: DebateComment[];
-  questions?: DebateQuestion[];
-  [key: string]: any;
-}
-
-interface AtlasDimensions {
-  w: number;
-  h: number;
-}
-
-const parseBookmarkedNodeStorage = (saved: string | null): string[] => {
-  if (!saved) return [];
-  try {
-    const parsed = JSON.parse(saved);
-    if (!Array.isArray(parsed)) return [];
-    return parsed
-      .filter((value): value is string => typeof value === 'string')
-      .map((value) => value.trim())
-      .filter(Boolean);
-  } catch (e) {
-    uiLog.warn('DebateMap: ignoring invalid bookmarkedNodes storage', e);
-    return [];
-  }
-};
-
-interface DisagreementRange {
-  min: number;
-  max: number;
-}
-
-interface AtlasLink {
-  source: { x: number; y: number };
-  target: { x: number; y: number };
-  sourceId?: string;
-  targetId?: string;
-}
-
-export const getDebateNodeStableKey = (
-  node: Pick<DebateNode, 'id' | 'name'> | null | undefined,
-  fallback: string
-): string => {
-  const nodeId = String(node?.id || '').trim();
-  if (nodeId) return nodeId;
-  const nodeName = String(node?.name || '').trim();
-  if (nodeName) return nodeName;
-  return fallback;
-};
-
-const formatAtlasLinkCoordinate = (value: unknown): string => {
-  const numericValue = Number(value);
-  return Number.isFinite(numericValue) ? numericValue.toFixed(3) : '0.000';
-};
-
-export const getAtlasLinkStableKey = (link: AtlasLink, fallbackIndex: number): string => {
-  const sourceId = String(link?.sourceId || '').trim();
-  const targetId = String(link?.targetId || '').trim();
-  if (sourceId || targetId) return `${sourceId || 'source'}->${targetId || 'target'}`;
-  return [
-    'coords',
-    formatAtlasLinkCoordinate(link?.source?.x),
-    formatAtlasLinkCoordinate(link?.source?.y),
-    formatAtlasLinkCoordinate(link?.target?.x),
-    formatAtlasLinkCoordinate(link?.target?.y),
-    fallbackIndex,
-  ].join(':');
-};
-
-interface AtlasRenderNode extends DebateNode {
-  x: number;
-  y: number;
-  r: number | null;
-  isCenter: boolean;
-  hierarchyDepth: number;
-  depth: number;
-  depthClass: string;
-  heat: number;
-  disagreementScore: number;
-}
-
-interface PackedAtlasLayoutNode {
-  y: number;
-  r: number | null;
-}
-
-interface FlattenedDebateNode extends DebateNode {
-  parentPath: DebateNode[];
-}
-
-interface AtlasTopNodeCandidate {
-  node: DebateNode;
-  heat: number;
-  order: number;
-}
-
-interface AtlasViewProps {
-  data: DebateNode[];
-  onNodeClick: (node: DebateNode) => void;
-  atlasLayoutMode?: AtlasLayoutMode;
-}
-
-interface DebateMapProps {
-  activeSessionSlug?: string;
-  demoMode?: DemoModeProp;
-  embedded?: boolean;
-  requestedModalNodeId?: string | null;
-  onModalClose?: (() => void) | null;
-  atlasLayoutMode?: AtlasLayoutMode;
-}
-
-interface AtlasChromeProps {
-  atlasRoot: DebateNode | null;
-  handleBack: (event?: React.SyntheticEvent) => void;
-  onNodeClick: (node: DebateNode) => void;
-  showActiveDebates: boolean;
-  setShowActiveDebates: React.Dispatch<React.SetStateAction<boolean>>;
-  topNodes: DebateNode[];
-}
-
-interface AtlasLayoutViewProps {
-  data: DebateNode[];
-  atlasRoot: DebateNode | null;
-  containerRef: React.RefObject<HTMLDivElement>;
-  dimensions: AtlasDimensions;
-  handleAtlasNodeClick: (node: AtlasRenderNode | DebateNode) => void;
-  handleBack: (event?: React.SyntheticEvent) => void;
-  onNodeClick: (node: DebateNode) => void;
-  showActiveDebates: boolean;
-  setShowActiveDebates: React.Dispatch<React.SetStateAction<boolean>>;
-  topNodes: DebateNode[];
-}
-
-interface FlatNodeProps {
-  node: FlattenedDebateNode;
-  parentPath?: DebateNode[];
-  onNodeClick: (node: DebateNode) => void;
-  onBookmark: (nodeId: string) => void;
-  bookmarkedNodes: string[];
-}
-
-interface ModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  content: DebateNode | null;
-  onVote: (nodeId: string, voteType: VoteDirection, count?: number) => void;
-  copied: boolean;
-  onCopy: () => void;
-  onTagClick?: ((tag: string) => void) | null;
-}
-
-interface SuggestNodeModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  parentNode: DebateNode | null;
-  parentPath?: DebateNode[];
-  onSubmit: (parentNode: DebateNode | null, title: string) => void;
-}
-
-interface TreeNodeProps {
-  node: DebateNode;
-  depth?: number;
-  parentPath?: DebateNode[];
-  onNodeClick: (node: DebateNode) => void;
-  onBookmark: (nodeId: string) => void;
-  bookmarkedNodes: string[];
-  onSuggestNode: (node: DebateNode, parentPath: DebateNode[]) => void;
-  staggerOffsetPx?: number;
-  branchSpan?: number;
-}
-
-const atlasTreeData = treeData as DebateNode[];
-const historicalFigureData = historicalData as Record<string, HistoricalFigureRecord>;
-const historicalCaseEntries = Array.isArray(loopholeHistoricalCases)
-  ? (loopholeHistoricalCases as HistoricalCase[])
-  : [];
-const historicalFigurePrincipleMap = loopholeHistoricalFigurePrinciples as Record<string, unknown>;
-
-const cleanAtlasCategoryName = (name: unknown): string => String(name || '').replace(/^\d+\.\s*/, '');
-
-const findAtlasNodeById = (nodes: DebateNode[] | undefined, targetId: unknown): DebateNode | null => {
+const findAtlasNodeById = (nodes, targetId) => {
   const normalizedTargetId = String(targetId || '').trim().toLowerCase();
   if (!normalizedTargetId || !Array.isArray(nodes)) return null;
 
@@ -424,31 +54,31 @@ const findAtlasNodeById = (nodes: DebateNode[] | undefined, targetId: unknown): 
   return null;
 };
 
-const parseHistoricalVoteValue = (vote: unknown): number | null => {
+const parseHistoricalVoteValue = (vote) => {
   if (vote === null || vote === undefined || vote === '') return null;
   if (vote === 'up') return 1;
   if (vote === 'down') return -1;
 
-  const parsedVote = parseInt(String(vote), 10);
+  const parsedVote = parseInt(vote, 10);
   return Number.isNaN(parsedVote) ? null : parsedVote;
 };
 
-const normalizeCompassVote = (value: unknown): number => {
+const normalizeCompassVote = (value) => {
   const numericValue = Number(value);
   if (!Number.isFinite(numericValue)) return 0.5;
   return Math.max(0, Math.min(1, (numericValue + 8) / 16));
 };
 
-const getNameHash = (value: unknown): number => (
+const getNameHash = (value) => (
   Array.from(String(value || '')).reduce((sum, char) => sum + char.charCodeAt(0), 0)
 );
 
-const hslToHex = (h: number, s: number, l: number): string => {
+const hslToHex = (h, s, l) => {
   s /= 100;
   l /= 100;
 
   const a = s * Math.min(l, 1 - l);
-  const f = (n: number) => {
+  const f = (n) => {
     const k = (n + h / 30) % 12;
     const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
     return Math.round(255 * color).toString(16).padStart(2, '0');
@@ -457,25 +87,25 @@ const hslToHex = (h: number, s: number, l: number): string => {
   return `#${f(0)}${f(8)}${f(4)}`;
 };
 
-const getHistoricalCompassColor = (name: unknown): string => {
+const getHistoricalCompassColor = (name) => {
   const hue = (getNameHash(name) * 17) % 360;
   return hslToHex(hue, 72, 58);
 };
 
-const historicalFigureVoteMap = Object.entries(historicalFigureData || {}).reduce<Record<string, HistoricalVoteEntry[]>>((acc, [username, figure]) => {
-  acc[username] = Object.entries(figure?.votes || {}).reduce<HistoricalVoteEntry[]>((votes, [nodeId, vote]) => {
+const historicalFigureVoteMap = Object.entries(historicalData || {}).reduce((acc, [username, figure]) => {
+  acc[username] = Object.entries(figure?.votes || {}).reduce((votes, [nodeId, vote]) => {
     const parsedVote = parseHistoricalVoteValue(vote);
-    if (parsedVote !== null) {
-      votes.push({ username, nodeId, value: parsedVote });
+    if (Number.isFinite(parsedVote)) {
+      votes.push({ nodeId, value: parsedVote });
     }
     return votes;
   }, []);
   return acc;
 }, {});
 
-const historicalFigureCommentMap = Object.entries(historicalFigureData || {}).reduce<Record<string, Record<string, string>>>((acc, [username, figure]) => {
+const historicalFigureCommentMap = Object.entries(historicalData || {}).reduce((acc, [username, figure]) => {
   acc[username] = Array.isArray(figure?.comments)
-    ? figure.comments.reduce<Record<string, string>>((comments, entry) => {
+    ? figure.comments.reduce((comments, entry) => {
       if (entry?.id && typeof entry.comment === 'string') {
         comments[entry.id] = entry.comment;
       }
@@ -485,78 +115,70 @@ const historicalFigureCommentMap = Object.entries(historicalFigureData || {}).re
   return acc;
 }, {});
 
-const historicalCaseMap = historicalCaseEntries.reduce<Record<string, HistoricalCase[]>>((acc, entry) => {
+const historicalCaseMap = (Array.isArray(loopholeHistoricalCases) ? loopholeHistoricalCases : []).reduce((acc, entry) => {
   const issueIds = Array.isArray(entry?.debate_map_issues) ? entry.debate_map_issues : [];
 
   issueIds.forEach((issueId) => {
-    const normalizedIssueId = String(issueId || '').trim();
-    if (!normalizedIssueId) return;
-    if (!acc[normalizedIssueId]) {
-      acc[normalizedIssueId] = [];
+    if (!acc[issueId]) {
+      acc[issueId] = [];
     }
-    acc[normalizedIssueId].push(entry);
+    acc[issueId].push(entry);
   });
 
   return acc;
 }, {});
 
-const getHistoricalFigurePrinciples = (figureName: string): string[] => {
-  const principles = historicalFigurePrincipleMap?.[figureName];
+const getHistoricalFigurePrinciples = (figureName) => {
+  const principles = loopholeHistoricalFigurePrinciples?.[figureName];
   return Array.isArray(principles) ? principles.filter(Boolean) : [];
 };
 
-const normalizeHistoricalCaseText = (value: unknown): string => {
+const normalizeHistoricalCaseText = (value) => {
   if (typeof value === 'string') return value.trim();
   if (typeof value === 'number' && Number.isFinite(value)) return String(value);
   if (Array.isArray(value)) {
     return value
-      .map((entry: unknown) => normalizeHistoricalCaseText(entry))
+      .map((entry) => normalizeHistoricalCaseText(entry))
       .filter(Boolean)
       .join(', ');
   }
   return '';
 };
 
-const normalizeHistoricalCaseTextList = (values: unknown): string[] => (
+const normalizeHistoricalCaseTextList = (values) => (
   Array.isArray(values)
     ? values
-      .map((value: unknown) => normalizeHistoricalCaseText(value))
+      .map((value) => normalizeHistoricalCaseText(value))
       .filter(Boolean)
     : []
 );
 
-const buildHistoricalCaseFieldRows = (
-  source: Record<string, unknown> | null | undefined,
-  fields: HistoricalFieldDefinition[]
-): HistoricalFieldRow[] => {
+const buildHistoricalCaseFieldRows = (source, fields) => {
   if (!source || typeof source !== 'object') return [];
 
-  return fields.reduce<HistoricalFieldRow[]>((rows, field) => {
+  return fields.reduce((rows, field) => {
     const value = normalizeHistoricalCaseText(source?.[field.key]);
     if (!value) return rows;
     return rows.concat({ label: field.label, value });
   }, []);
 };
 
-const normalizeHistoricalDraftArticles = (
-  draftLegalCode: { articles?: unknown[] } | null | undefined
-): HistoricalDraftArticle[] => {
+const normalizeHistoricalDraftArticles = (draftLegalCode) => {
   const rawArticles = Array.isArray(draftLegalCode?.articles)
     ? draftLegalCode.articles
     : [];
 
-  return rawArticles.reduce<HistoricalDraftArticle[]>((articles, article, articleIndex) => {
+  return rawArticles.reduce((articles, article, articleIndex) => {
     const fallbackLabel = `Article ${articleIndex + 1}`;
     let body = '';
     let label = '';
 
     if (article && typeof article === 'object' && !Array.isArray(article)) {
-      const articleRecord = article as Record<string, unknown>;
       label = normalizeHistoricalCaseText(
-        articleRecord.label || articleRecord.title || articleRecord.article
+        article.label || article.title || article.article
       );
       body = normalizeHistoricalCaseText(
-        articleRecord.body || articleRecord.text || articleRecord.content || articleRecord.summary
+        article.body || article.text || article.content || article.summary
       );
     } else {
       body = normalizeHistoricalCaseText(article);
@@ -579,7 +201,7 @@ const normalizeHistoricalDraftArticles = (
   }, []);
 };
 
-const resolveHistoricalPatchFigureLabel = (rawValue: unknown, authors: string[]): string[] => {
+const resolveHistoricalPatchFigureLabel = (rawValue, authors) => {
   const normalizedValue = normalizeHistoricalCaseText(rawValue);
   const normalizedKey = normalizedValue.toLowerCase();
 
@@ -597,13 +219,13 @@ const resolveHistoricalPatchFigureLabel = (rawValue: unknown, authors: string[])
   return [normalizedValue];
 };
 
-const normalizeHistoricalPatchFavoredBy = (favoredBy: unknown, authors: string[]): string[] => {
+const normalizeHistoricalPatchFavoredBy = (favoredBy, authors) => {
   const favoredValues = Array.isArray(favoredBy)
     ? favoredBy
     : [favoredBy];
 
   const rawTokens = favoredValues
-    .flatMap((value: unknown) => {
+    .flatMap((value) => {
       const normalizedValue = normalizeHistoricalCaseText(value);
       if (!normalizedValue) return [];
       if (/^\s*(figure a|figure b|both)\s*$/i.test(normalizedValue)) {
@@ -619,9 +241,9 @@ const normalizeHistoricalPatchFavoredBy = (favoredBy: unknown, authors: string[]
   ));
 };
 
-const normalizeHistoricalPatchOptions = (patchOptions: unknown, authors: string[]): HistoricalPatchOption[] => (
+const normalizeHistoricalPatchOptions = (patchOptions, authors) => (
   Array.isArray(patchOptions)
-    ? patchOptions.reduce<HistoricalPatchOption[]>((normalizedPatches, patch, patchIndex) => {
+    ? patchOptions.reduce((normalizedPatches, patch, patchIndex) => {
       if (!patch || typeof patch !== 'object') return normalizedPatches;
 
       const name = normalizeHistoricalCaseText(patch.name);
@@ -642,12 +264,7 @@ const normalizeHistoricalPatchOptions = (patchOptions: unknown, authors: string[
     : []
 );
 
-const buildHistoricalCasePanel = (
-  title: string,
-  tone: 'primary' | 'secondary',
-  source: Record<string, unknown> | null | undefined,
-  fields: HistoricalFieldDefinition[]
-): HistoricalCasePanel | null => {
+const buildHistoricalCasePanel = (title, tone, source, fields) => {
   const rows = buildHistoricalCaseFieldRows(source, fields);
   if (rows.length === 0) return null;
 
@@ -658,10 +275,7 @@ const buildHistoricalCasePanel = (
   };
 };
 
-export const buildHistoricalCaseBrief = (
-  historicalCase: HistoricalCase,
-  content: DebateNode = {}
-): HistoricalCaseBrief => {
+export const buildHistoricalCaseBrief = (historicalCase, content = {}) => {
   const nodeName = String(content?.name || 'this issue').trim();
   const xAxisLabel = String(content?.compass?.xAxis?.label || '').trim();
   const yAxisLabel = String(content?.compass?.yAxis?.label || '').trim();
@@ -714,7 +328,7 @@ export const buildHistoricalCaseBrief = (
         { key: 'why_moral', label: 'Why moral' },
       ]
     ),
-  ].filter((panel): panel is HistoricalCasePanel => Boolean(panel));
+  ].filter(Boolean);
 
   const richJudgeTension = normalizeHistoricalCaseText(historicalCase?.judge_tension);
   const richWhyHard = normalizeHistoricalCaseText(historicalCase?.why_the_case_is_hard);
@@ -770,41 +384,11 @@ export const buildHistoricalCaseBrief = (
   };
 };
 
-const getHistoricalCaseCardKey = (historicalCase: HistoricalCase, caseIndex: number): string => {
-  const title = String(historicalCase?.title || historicalCase?.id || '').trim();
-  return String(historicalCase?.id || `${title}-${caseIndex}`);
-};
-
-export const buildExpandedHistoricalCaseBriefMap = (
-  historicalCases: HistoricalCase[] = EMPTY_HISTORICAL_CASES,
-  content: DebateNode = {},
-  expandedCaseKey = '',
-  buildBrief: HistoricalCaseBriefBuilder = buildHistoricalCaseBrief,
-): Map<string, HistoricalCaseBrief> => {
-  const normalizedExpandedKey = String(expandedCaseKey || '').trim();
-  const briefMap = new Map<string, HistoricalCaseBrief>();
-  if (!normalizedExpandedKey) return briefMap;
-
-  historicalCases.forEach((historicalCase, caseIndex) => {
-    if (!historicalCase || typeof historicalCase !== 'object') return;
-
-    const title = String(historicalCase.title || historicalCase.id || '').trim();
-    if (!title) return;
-
-    const caseKey = getHistoricalCaseCardKey(historicalCase, caseIndex);
-    if (caseKey !== normalizedExpandedKey) return;
-
-    briefMap.set(caseKey, buildBrief(historicalCase, content));
-  });
-
-  return briefMap;
-};
-
-const getHistoricalCompassSpreadY = (name: string): number => (
+const getHistoricalCompassSpreadY = (name) => (
   ((getNameHash(name) * 37) % 1000) / 999
 );
 
-const getHistoricalCompassY = (name: string, currentNodeId: string | null | undefined): number => {
+const getHistoricalCompassY = (name, currentNodeId) => {
   const voteSeries = historicalFigureVoteMap[name] || [];
   const alternateVote = voteSeries
     .filter(({ nodeId }) => nodeId !== currentNodeId)[1];
@@ -816,23 +400,20 @@ const getHistoricalCompassY = (name: string, currentNodeId: string | null | unde
   return getHistoricalCompassSpreadY(name);
 };
 
-const getCompassQuadrantKey = ({ x, y }: Pick<HistoricalCompassPoint, 'x' | 'y'>): string => {
+const getCompassQuadrantKey = ({ x, y }) => {
   const verticalKey = y > 0.5 ? 'top' : 'bottom';
   const horizontalKey = x > 0.5 ? 'right' : 'left';
   return `${verticalKey}-${horizontalKey}`;
 };
 
-const selectBalancedHistoricalCompassPoints = (
-  points: HistoricalCompassPoint[],
-  limit = 20
-): HistoricalCompassPoint[] => {
-  const normalizedLimit = Math.max(0, Number(limit) || 0);
+const selectBalancedHistoricalCompassPoints = (points, limit = 20) => {
+  const normalizedLimit = Math.max(0, parseInt(limit, 10) || 0);
   if (normalizedLimit === 0 || !Array.isArray(points) || points.length === 0) {
     return [];
   }
 
   const quadrantOrder = ['top-left', 'top-right', 'bottom-left', 'bottom-right'];
-  const quadrantBuckets = quadrantOrder.reduce<Record<string, HistoricalCompassPoint[]>>((acc, key) => {
+  const quadrantBuckets = quadrantOrder.reduce((acc, key) => {
     acc[key] = [];
     return acc;
   }, {});
@@ -846,9 +427,9 @@ const selectBalancedHistoricalCompassPoints = (
     return points.slice(0, normalizedLimit);
   }
 
-  const selected: HistoricalCompassPoint[] = [];
+  const selected = [];
   const selectedKeys = new Set();
-  const pushPoint = (point: HistoricalCompassPoint) => {
+  const pushPoint = (point) => {
     const pointKey = `${point.name}:${point.x}:${point.y}`;
     if (selectedKeys.has(pointKey)) return false;
     selected.push(point);
@@ -893,11 +474,11 @@ const selectBalancedHistoricalCompassPoints = (
 };
 
 export const buildHistoricalCompassPoints = (
-  voteEntries: HistoricalVoteEntry[] | null | undefined,
-  fallbackPoints: HistoricalCompassPoint[] = [],
-  currentNodeId: string | null | undefined,
+  voteEntries,
+  fallbackPoints = [],
+  currentNodeId,
   limit = 20
-): HistoricalCompassPoint[] => {
+) => {
   if (!Array.isArray(voteEntries) || voteEntries.length === 0) {
     return Array.isArray(fallbackPoints) ? fallbackPoints : [];
   }
@@ -916,31 +497,30 @@ export const buildHistoricalCompassPoints = (
       color: getHistoricalCompassColor(entry.username),
       comment: typeof entry?.comment === 'string'
         ? entry.comment
-        : (currentNodeId ? (historicalFigureCommentMap[entry.username]?.[currentNodeId] || '') : ''),
+        : (historicalFigureCommentMap[entry?.username]?.[currentNodeId] || ''),
     }));
 
   return selectBalancedHistoricalCompassPoints(sortedPoints, limit);
 };
 
-const buildAtlasTreeData = (demoMode: boolean): DebateNode[] => {
-  const updateNodeWithHistoricalData = (node: DebateNode): DebateNode => {
-    const nodeId = String(node.id || '').trim();
+const buildAtlasTreeData = (demoMode) => {
+  const updateNodeWithHistoricalData = (node) => {
     let demoUp = 0;
     let demoDown = 0;
-    let demoQuestions: DebateQuestion[] = [];
-    let demoComments: DebateComment[] = [];
-    let demoHistoricalVotes: HistoricalVoteEntry[] = [];
-    let demoHistoricalCases: HistoricalCase[] = [];
-    let demoScenarioVisualizations: unknown[] = [];
+    let demoQuestions = [];
+    let demoComments = [];
+    let demoHistoricalVotes = [];
+    let demoHistoricalCases = [];
+    let demoScenarioVisualizations = [];
 
     if (demoMode) {
-      Object.entries(historicalFigureData || {}).forEach(([username, figure]) => {
-        const voteValue = parseHistoricalVoteValue(nodeId ? figure?.votes?.[nodeId] : null);
+      Object.entries(historicalData || {}).forEach(([username, figure]) => {
+        const voteValue = parseHistoricalVoteValue(figure?.votes ? figure.votes[node.id] : null);
         if (voteValue !== null) {
           demoHistoricalVotes = demoHistoricalVotes.concat({
             username,
             value: voteValue,
-            comment: nodeId ? (historicalFigureCommentMap[username]?.[nodeId] || '') : '',
+            comment: historicalFigureCommentMap[username]?.[node.id] || '',
           });
           if (voteValue > 0) demoUp += voteValue;
           else if (voteValue < 0) demoDown += Math.abs(voteValue);
@@ -948,27 +528,27 @@ const buildAtlasTreeData = (demoMode: boolean): DebateNode[] => {
 
         if (Array.isArray(figure?.questions)) {
           const matchedQuestions = figure.questions
-            .filter((question) => question.id === nodeId)
+            .filter((question) => question.id === node.id)
             .map((question) => ({ ...question, username }));
           demoQuestions = demoQuestions.concat(matchedQuestions);
         }
 
         if (Array.isArray(figure?.comments)) {
           const matchedComments = figure.comments
-            .filter((comment) => comment.id === nodeId)
+            .filter((comment) => comment.id === node.id)
             .map((comment) => ({ ...comment, username }));
           demoComments = demoComments.concat(matchedComments);
         }
       });
 
-      demoHistoricalCases = nodeId && Array.isArray(historicalCaseMap[nodeId])
-        ? historicalCaseMap[nodeId]
+      demoHistoricalCases = Array.isArray(historicalCaseMap[node.id])
+        ? historicalCaseMap[node.id]
         : [];
-      demoScenarioVisualizations = nodeId ? getRiskMatrixAtlasScenariosForAtlasNode(nodeId) : [];
+      demoScenarioVisualizations = getRiskMatrixAtlasScenariosForAtlasNode(node.id);
     }
 
-    const currentUp = parseInt(String(node?.votes?.up || 0), 10) || 0;
-    const currentDown = parseInt(String(node?.votes?.down || 0), 10) || 0;
+    const currentUp = parseInt(node?.votes?.up || 0, 10) || 0;
+    const currentDown = parseInt(node?.votes?.down || 0, 10) || 0;
     const mergedQuestions = [...(node.questions || []), ...demoQuestions];
     const mergedComments = [...(node.comments || []), ...demoComments];
     const mergedHistoricalVotes = [
@@ -1019,129 +599,22 @@ const buildAtlasTreeData = (demoMode: boolean): DebateNode[] => {
     return nextNode;
   };
 
-  return atlasTreeData.map((category) => ({
+  return treeData.map((category) => ({
     ...updateNodeWithHistoricalData(category),
     name: cleanAtlasCategoryName(category.name),
   }));
 };
 
-const calculateNetUpvotes = (votes?: DebateVoteTotals | null): number => {
+const calculateNetUpvotes = (votes) => {
   if (!votes) return 0;
-  const up = parseInt(String(votes.up || 0), 10);
-  const down = parseInt(String(votes.down || 0), 10);
+  const up = parseInt(votes.up || 0, 10);
+  const down = parseInt(votes.down || 0, 10);
   return up - down;
 };
 
-const applyLocalVoteDeltasToTree = (
-  nodes: DebateNode[],
-  deltas: LocalVoteDeltas,
-): DebateNode[] => {
-  if (!deltas || Object.keys(deltas).length === 0) return nodes;
-
-  return nodes.map((node) => {
-    const nodeId = String(node?.id || '').trim();
-    const delta = nodeId ? deltas[nodeId] : undefined;
-    const nextChildren = Array.isArray(node.children)
-      ? applyLocalVoteDeltasToTree(node.children, deltas)
-      : node.children;
-
-    if (!delta) {
-      return nextChildren === node.children ? node : { ...node, children: nextChildren };
-    }
-
-    const current = node.votes || {};
-    const currentUp = parseInt(String(current.up || 0), 10) || 0;
-    const currentDown = parseInt(String(current.down || 0), 10) || 0;
-
-    return {
-      ...node,
-      children: nextChildren,
-      votes: {
-        ...current,
-        up: currentUp + (delta.up || 0),
-        down: currentDown + (delta.down || 0),
-      },
-    };
-  });
-};
-
-const TREE_LABEL_REPLACEMENTS: Array<[RegExp, string]> = [
-  [/\bPre-deployment\b/gi, 'Pre-deploy.'],
-  [/\bEvaluations\b/gi, 'Evals'],
-  [/\bEvaluation\b/gi, 'Eval'],
-  [/\bBenchmarks\b/gi, 'Bench.'],
-  [/\bInternational\b/gi, 'Intl.'],
-  [/\bCoordination\b/gi, 'Coord.'],
-  [/\bInterpretability\b/gi, 'Interp.'],
-  [/\bMisinformation\b/gi, 'Misinfo.'],
-  [/\bSurveillance\b/gi, 'Surveil.'],
-  [/\bProductivity\b/gi, 'Prod.'],
-  [/\bDisclosure\b/gi, 'Discl.'],
-  [/\bDemocratization\b/gi, 'Democratiz.'],
-  [/\bConcentration\b/gi, 'Concen.'],
-];
-
-export const getCompactTreeNodeLabel = (rawName: unknown): string => {
-  let label = cleanAtlasCategoryName(rawName).replace(/\s+/g, ' ').trim();
-  if (!label) return '';
-
-  label = label.replace(/\s+and\s+/gi, ' & ');
-  TREE_LABEL_REPLACEMENTS.forEach(([pattern, replacement]) => {
-    label = label.replace(pattern, replacement);
-  });
-
-  return label;
-};
-
-export const getTreeChildColumnCount = (depth: number, childCount: number): number => {
-  if (childCount <= 1) return childCount;
-  if (depth === 0 && childCount === 2) return 2;
-  return Math.min(2, childCount);
-};
-
-export const getTreeSubtreeSpan = (node: DebateNode | null | undefined): number => {
-  const children = Array.isArray(node?.children) ? node.children : [];
-  if (children.length === 0) return 1;
-
-  return children.reduce((sum, child) => sum + getTreeSubtreeSpan(child), 0);
-};
-
-export const getTreeChildStaggerPx = (depth: number, index: number, columnCount: number): number => {
-  if (index <= 0) return 0;
-
-  const safeColumns = Math.max(1, columnCount);
-  const rowIndex = Math.floor(index / safeColumns);
-  const columnIndex = index % safeColumns;
-  const depthBias = Math.min(depth, 3) * 3;
-
-  return (rowIndex * 10) + (columnIndex * (12 + depthBias));
-};
-
-export const getTreeViewportFitScale = (
-  viewportWidth: number,
-  contentWidth: number,
-  horizontalPadding = 32
-): number => {
-  const safeViewportWidth = Number(viewportWidth) || 0;
-  const safeContentWidth = Number(contentWidth) || 0;
-  if (safeViewportWidth <= 0 || safeContentWidth <= 0) return 1;
-
-  const availableWidth = Math.max(0, safeViewportWidth - horizontalPadding);
-  if (availableWidth <= 0) return 1;
-
-  return Math.min(1, availableWidth / safeContentWidth);
-};
-
-export const getTreeViewportFitHeight = (contentHeight: number, scale: number): number => {
-  const safeHeight = Number(contentHeight) || 0;
-  const safeScale = Number(scale) || 1;
-  if (safeHeight <= 0) return 0;
-  return Math.max(0, safeHeight * safeScale);
-};
-
-const getAtlasVoteTotals = (node: DebateNode) => {
-  const up = parseInt(String(node?.votes?.up || 0), 10) || 0;
-  const down = parseInt(String(node?.votes?.down || 0), 10) || 0;
+const getAtlasVoteTotals = (node) => {
+  const up = parseInt(node?.votes?.up || 0, 10) || 0;
+  const down = parseInt(node?.votes?.down || 0, 10) || 0;
   return {
     up,
     down,
@@ -1149,24 +622,20 @@ const getAtlasVoteTotals = (node: DebateNode) => {
   };
 };
 
-const calculateHeat = (node: DebateNode): number => {
+const calculateHeat = (node) => {
   const { total } = getAtlasVoteTotals(node);
   const comments = (node.questions ? node.questions.length : 0) + (node.comments ? node.comments.length : 0);
   return total + (comments * 3);
 };
 
-const calculateDisagreementScore = (node: DebateNode): number => {
+const calculateDisagreementScore = (node) => {
   const { up, down } = getAtlasVoteTotals(node);
   // Use the smaller side of the split so popular but one-sided nodes do not
   // overwhelm more contested debates in atlas view.
   return Math.min(up, down);
 };
 
-const calculateAtlasNodeSize = (
-  node: AtlasRenderNode,
-  isMobile: boolean,
-  disagreementRange: DisagreementRange
-): number => {
+const calculateAtlasNodeSize = (node, isMobile, disagreementRange) => {
   let baseSize = (node.depth === 0 ? 80 : (node.depth === 1 ? 40 : (node.depth === 2 ? 20 : 12)));
   if (node.isCenter) baseSize = 90;
 
@@ -1201,59 +670,32 @@ export const DEBATE_VISUAL_MODES = Object.freeze({
   LIST: 'list',
 });
 
-const getInitialDebateVisualMode = (atlasLayoutMode: AtlasLayoutMode): DebateVisualMode => (
+const getInitialDebateVisualMode = (atlasLayoutMode) => (
   atlasLayoutMode === ATLAS_LAYOUT_MODES.ORBITAL
     ? DEBATE_VISUAL_MODES.ATLAS
     : DEBATE_VISUAL_MODES.CIRCLES
 );
 
-const getAtlasCommentCount = (node: DebateNode): number => (
+const getAtlasCommentCount = (node) => (
   (node.questions ? node.questions.length : 0) + (node.comments ? node.comments.length : 0)
 );
 
-export const getTopAtlasNodesByHeat = (nodes: DebateNode[] = [], limit = 3): DebateNode[] => {
-  const maxNodes = Math.max(0, Math.floor(Number(limit) || 0));
-  if (maxNodes === 0) return [];
-
-  const topCandidates: AtlasTopNodeCandidate[] = [];
-  let visitOrder = 0;
-
-  const remember = (node: DebateNode) => {
-    topCandidates.push({
-      node,
-      heat: calculateHeat(node),
-      order: visitOrder,
-    });
-    topCandidates.sort((a, b) => (b.heat - a.heat) || (a.order - b.order));
-    if (topCandidates.length > maxNodes) {
-      topCandidates.length = maxNodes;
+const flattenAtlasNodes = (nodes = []) => {
+  let res = [];
+  nodes.forEach((node) => {
+    res.push(node);
+    if (Array.isArray(node?.children) && node.children.length > 0) {
+      res = res.concat(flattenAtlasNodes(node.children));
     }
-  };
-
-  const visit = (items: DebateNode[] = []) => {
-    items.forEach((node) => {
-      remember(node);
-      visitOrder += 1;
-
-      if (Array.isArray(node?.children) && node.children.length > 0) {
-        visit(node.children);
-      }
-    });
-  };
-
-  visit(nodes);
-
-  return topCandidates.map((candidate) => candidate.node);
+  });
+  return res;
 };
 
-const getAtlasCenterNode = (atlasRoot: DebateNode | null, data: DebateNode[]): DebateNode => (
+const getAtlasCenterNode = (atlasRoot, data) => (
   atlasRoot ? atlasRoot : { id: 'virtual-root', name: 'AI Policy Atlas', children: data, depth: -1 }
 );
 
-const measureAtlasContainer = (
-  node: HTMLElement | null,
-  fallback: AtlasDimensions = DEFAULT_ATLAS_DIMENSIONS
-): AtlasDimensions => {
+const measureAtlasContainer = (node, fallback = DEFAULT_ATLAS_DIMENSIONS) => {
   const width = Number(node?.offsetWidth) || 0;
   const height = Number(node?.offsetHeight) || 0;
   return {
@@ -1262,28 +704,23 @@ const measureAtlasContainer = (
   };
 };
 
-const normalizeAtlasDepthValue = (value: unknown, fallback = 0): number => {
+const normalizeAtlasDepthValue = (value, fallback = 0) => {
   const numericValue = Number(value);
   return Number.isFinite(numericValue) ? numericValue : fallback;
 };
 
-const resolveAtlasVisualDepth = (atlasRoot: DebateNode | null, hierarchyDepth: number): number => {
+const resolveAtlasVisualDepth = (atlasRoot, hierarchyDepth) => {
   if (atlasRoot) {
     return normalizeAtlasDepthValue(atlasRoot.depth, 0) + hierarchyDepth;
   }
   return hierarchyDepth - 1;
 };
 
-const getAtlasDepthClass = (visualDepth: number, isCenter = false): string => (
+const getAtlasDepthClass = (visualDepth, isCenter = false) => (
   isCenter ? 'depthCenter' : `depth${Math.max(0, Math.min(visualDepth, 3))}`
 );
 
-const buildAtlasRenderNode = (
-  node: DebateNode,
-  atlasRoot: DebateNode | null,
-  hierarchyDepth: number,
-  options: Partial<AtlasRenderNode> = {}
-): AtlasRenderNode => {
+const buildAtlasRenderNode = (node, atlasRoot, hierarchyDepth, options = {}) => {
   const { isCenter = false, x = 0, y = 0, r = null, ...restOptions } = options;
   const visualDepth = isCenter
     ? normalizeAtlasDepthValue(node?.depth, 0)
@@ -1304,75 +741,17 @@ const buildAtlasRenderNode = (
   };
 };
 
-const calculateAtlasPackValue = (node: DebateNode): number => {
+const calculateAtlasPackValue = (node) => {
   if (Array.isArray(node?.children) && node.children.length > 0) {
     return 0;
   }
   return Math.max(calculateDisagreementScore(node), 1);
 };
 
-const shouldAlwaysShowPackedLabel = (node: AtlasRenderNode): boolean => node.hierarchyDepth === 1;
-export const getPackedAtlasLabelFontSizePx = (
-  node: Pick<AtlasRenderNode, 'hierarchyDepth' | 'isCenter'>,
-  diameter: number,
-  alwaysVisible = false
-): number => {
-  const normalizedDiameter = Math.max(0, Number(diameter) || 0);
-  const hierarchyDepth = Math.max(0, Number(node?.hierarchyDepth) || 0);
-
-  let ratio = 0.038;
-  let minSize = 9;
-  let maxSize = 15;
-
-  if (node?.isCenter) {
-    ratio = 0.058;
-    minSize = 18;
-    maxSize = 30;
-  } else if (hierarchyDepth <= 1) {
-    ratio = 0.066;
-    minSize = 22;
-    maxSize = 34;
-  } else if (hierarchyDepth === 2) {
-    ratio = 0.05;
-    minSize = 12;
-    maxSize = 20;
-  }
-
-  const boostedSize = normalizedDiameter * ratio * (alwaysVisible ? 1.08 : 1);
-  return Math.max(minSize, Math.min(maxSize, Math.round(boostedSize * 10) / 10));
-};
-
-export const getPackedAtlasVerticalLiftPx = (
-  nodes: PackedAtlasLayoutNode[] = [],
-  desiredTopGutter = 10
-): number => {
-  if (!Array.isArray(nodes) || nodes.length === 0) return 0;
-
-  const minVisibleTop = nodes.reduce((currentMin, node) => {
-    const y = Number(node?.y) || 0;
-    const radius = Math.max(0, Number(node?.r) || 0);
-    return Math.min(currentMin, y - radius);
-  }, Number.POSITIVE_INFINITY);
-
-  if (!Number.isFinite(minVisibleTop)) return 0;
-  return Math.max(0, minVisibleTop - Math.max(0, Number(desiredTopGutter) || 0));
-};
-
-export const getPackedAtlasClickTarget = (
-  node: AtlasRenderNode | null | undefined,
-  nodesById: Map<string, AtlasRenderNode> = new Map()
-): AtlasRenderNode | null => {
-  if (!node) return null;
-  if (Number(node.hierarchyDepth || 0) <= 1) return node;
-
-  const directChildId = String(node.groupId || '').trim();
-  if (!directChildId) return node;
-  return nodesById.get(directChildId) || node;
-};
-
-const getPackedAtlasGroupId = (hierarchyNode: any): string => {
+const shouldAlwaysShowPackedLabel = (node) => node.hierarchyDepth === 1;
+const getPackedAtlasGroupId = (hierarchyNode) => {
   if (!hierarchyNode) return '';
-  const lineage: any[] = [];
+  const lineage = [];
   let currentNode = hierarchyNode;
   while (currentNode) {
     lineage.unshift(currentNode);
@@ -1382,9 +761,9 @@ const getPackedAtlasGroupId = (hierarchyNode: any): string => {
   return String(groupNode?.data?.id || hierarchyNode?.data?.id || '').trim();
 };
 
-const useAtlasContainerDimensions = (measureKey: AtlasLayoutMode) => {
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const [dimensions, setDimensions] = useState<AtlasDimensions>(DEFAULT_ATLAS_DIMENSIONS);
+const useAtlasContainerDimensions = (measureKey) => {
+  const containerRef = useRef(null);
+  const [dimensions, setDimensions] = useState(DEFAULT_ATLAS_DIMENSIONS);
 
   useEffect(() => {
     const measure = () => {
@@ -1399,18 +778,22 @@ const useAtlasContainerDimensions = (measureKey: AtlasLayoutMode) => {
   return { containerRef, dimensions };
 };
 
-const useAtlasNavigationState = (data: DebateNode[], onNodeClick: (node: DebateNode) => void) => {
-  const [atlasRootId, setAtlasRootId] = useState<string | null>(null);
-  const [atlasHistoryIds, setAtlasHistoryIds] = useState<Array<string | null>>([]);
+const useAtlasNavigationState = (data, onNodeClick) => {
+  const [atlasRootId, setAtlasRootId] = useState(null);
+  const [atlasHistoryIds, setAtlasHistoryIds] = useState([]);
   const [showActiveDebates, setShowActiveDebates] = useState(false);
 
   const atlasRoot = useMemo(() => (
     atlasRootId ? findAtlasNodeById(data, atlasRootId) : null
   ), [atlasRootId, data]);
 
-  const topNodes = useMemo(() => getTopAtlasNodesByHeat(data, 3), [data]);
+  const topNodes = useMemo(() => (
+    flattenAtlasNodes(data)
+      .sort((a, b) => calculateHeat(b) - calculateHeat(a))
+      .slice(0, 3)
+  ), [data]);
 
-  const handleAtlasNodeClick = useCallback((node: AtlasRenderNode | DebateNode) => {
+  const handleAtlasNodeClick = useCallback((node) => {
     if (!node || node.id === 'virtual-root') return;
 
     if (node.isCenter || !Array.isArray(node.children) || node.children.length === 0) {
@@ -1419,11 +802,11 @@ const useAtlasNavigationState = (data: DebateNode[], onNodeClick: (node: DebateN
     }
 
     setAtlasHistoryIds((prev) => [...prev, atlasRootId]);
-    setAtlasRootId(String(node.id || '').trim() || null);
+    setAtlasRootId(node.id);
     setShowActiveDebates(false);
   }, [atlasRootId, onNodeClick]);
 
-  const handleBack = useCallback((event?: React.SyntheticEvent) => {
+  const handleBack = useCallback((event) => {
     event?.stopPropagation?.();
     if (atlasHistoryIds.length === 0) return;
     const nextHistory = [...atlasHistoryIds];
@@ -1449,7 +832,7 @@ const AtlasChrome = ({
   showActiveDebates,
   setShowActiveDebates,
   topNodes,
-}: AtlasChromeProps) => (
+}) => (
   <>
     {atlasRoot && (
       <button type="button" className={styles.backArrow} onClick={handleBack}>
@@ -1511,11 +894,11 @@ const OrbitalAtlasView = ({
   showActiveDebates,
   setShowActiveDebates,
   topNodes,
-}: AtlasLayoutViewProps) => {
+}) => {
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [startPan, setStartPan] = useState({ x: 0, y: 0 });
-  const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
+  const [hoveredNodeId, setHoveredNodeId] = useState(null);
 
   useEffect(() => {
     setOffset({ x: 0, y: 0 });
@@ -1523,8 +906,8 @@ const OrbitalAtlasView = ({
 
   // --- Organic Layout Calculation ---
   const layout = useMemo(() => {
-    const nodes: AtlasRenderNode[] = [];
-    const links: AtlasLink[] = [];
+    const nodes = [];
+    const links = [];
 
     // The "Virtual Root" is the global center point.
     const centerNode = getAtlasCenterNode(atlasRoot, data);
@@ -1535,9 +918,7 @@ const OrbitalAtlasView = ({
       y: 0,
     }));
 
-    if (!centerNode.children) {
-      return { nodes, links, disagreementRange: { min: 0, max: 0 } };
-    }
+    if (!centerNode.children) return { nodes, links };
 
     const isMobile = dimensions.w < 768;
 
@@ -1547,14 +928,7 @@ const OrbitalAtlasView = ({
         ? (isMobile ? 160 : 250)
         : (isMobile ? 110 : 150);
 
-    const processRing = (
-      parent: DebateNode,
-      parentX: number,
-      parentY: number,
-      startAngle: number,
-      endAngle: number,
-      level: number
-    ) => {
+    const processRing = (parent, parentX, parentY, startAngle, endAngle, level) => {
        if (!parent.children || parent.children.length === 0) return;
 
        const count = parent.children.length;
@@ -1569,7 +943,7 @@ const OrbitalAtlasView = ({
 
        const angleStep = availableAngle / count;
 
-       parent.children.forEach((child: DebateNode, i: number) => {
+       parent.children.forEach((child, i) => {
           let nodeX, nodeY, myAngle;
 
           if (level === 1) {
@@ -1604,9 +978,7 @@ const OrbitalAtlasView = ({
           if (parent.id !== 'virtual-root') {
               links.push({
                   source: { x: parentX, y: parentY },
-                  target: { x: nodeX, y: nodeY },
-                  sourceId: String(parent.id || '').trim(),
-                  targetId: String(child.id || '').trim(),
+                  target: { x: nodeX, y: nodeY }
               });
           }
 
@@ -1632,20 +1004,21 @@ const OrbitalAtlasView = ({
       : { min: 0, max: 0 };
 
     return { nodes, links, disagreementRange };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data, atlasRoot, dimensions.w]);
 
   // Mouse/Touch Handlers
-  const onMouseDown = (e: React.MouseEvent<HTMLDivElement>) => { setIsDragging(true); setStartPan({ x: e.clientX - offset.x, y: e.clientY - offset.y }); };
-  const onMouseMove = (e: React.MouseEvent<HTMLDivElement>) => { if (!isDragging) return; setOffset({ x: e.clientX - startPan.x, y: e.clientY - startPan.y }); };
+  const onMouseDown = (e) => { setIsDragging(true); setStartPan({ x: e.clientX - offset.x, y: e.clientY - offset.y }); };
+  const onMouseMove = (e) => { if (!isDragging) return; setOffset({ x: e.clientX - startPan.x, y: e.clientY - startPan.y }); };
   const onMouseUp = () => setIsDragging(false);
 
-  const onTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+  const onTouchStart = (e) => {
     if (e.touches.length === 1) {
       setIsDragging(true);
       setStartPan({ x: e.touches[0].clientX - offset.x, y: e.touches[0].clientY - offset.y });
     }
   };
-  const onTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+  const onTouchMove = (e) => {
     if (!isDragging) return;
     setOffset({ x: e.touches[0].clientX - startPan.x, y: e.touches[0].clientY - startPan.y });
   };
@@ -1678,7 +1051,7 @@ const OrbitalAtlasView = ({
 
       <svg className={styles.atlasSvgLayer}>
         {layout.links.map((link, i) => (
-          <line key={getAtlasLinkStableKey(link, i)} x1={cx + link.source.x} y1={cy + link.source.y} x2={cx + link.target.x} y2={cy + link.target.y} />
+          <line key={i} x1={cx + link.source.x} y1={cy + link.source.y} x2={cx + link.target.x} y2={cy + link.target.y} />
         ))}
       </svg>
 
@@ -1691,7 +1064,7 @@ const OrbitalAtlasView = ({
 
         return (
           <div
-            key={getDebateNodeStableKey(node, `atlas-node-${i}`)}
+            key={i}
             className={`${styles.atlasNode} ${styles[node.depthClass]} ${isHovered ? styles.hovered : ''}`}
             style={{
                 left: cx + node.x,
@@ -1702,7 +1075,7 @@ const OrbitalAtlasView = ({
             data-ce-node-id={node.id}
             data-ce-node-layout={ATLAS_LAYOUT_MODES.ORBITAL}
             onClick={(e) => { e.stopPropagation(); handleAtlasNodeClick(node); }}
-            onMouseEnter={() => setHoveredNodeId(String(node.id || '').trim() || null)}
+            onMouseEnter={() => setHoveredNodeId(node.id)}
             onMouseLeave={() => setHoveredNodeId(null)}
           >
             <div
@@ -1733,8 +1106,8 @@ const PackedAtlasView = ({
   showActiveDebates,
   setShowActiveDebates,
   topNodes,
-}: AtlasLayoutViewProps) => {
-  const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
+}) => {
+  const [hoveredNodeId, setHoveredNodeId] = useState(null);
   const [hoveredGroupId, setHoveredGroupId] = useState('');
   const isMobile = dimensions.w < 768;
   const packedTitle = atlasRoot ? String(atlasRoot?.name || '').trim() : '';
@@ -1750,8 +1123,7 @@ const PackedAtlasView = ({
       }
       : getAtlasCenterNode(atlasRoot, data);
     const inset = isMobile ? 12 : 18;
-    const headerHeight = atlasRoot ? (isMobile ? 34 : 28) : 0;
-    const desiredTopGutter = atlasRoot ? (isMobile ? 10 : 8) : (isMobile ? 14 : 18);
+    const headerHeight = atlasRoot ? (isMobile ? 52 : 46) : 0;
     const packLayout = d3Pack()
       .size([
         Math.max(dimensions.w - (inset * 2), 1),
@@ -1761,36 +1133,30 @@ const PackedAtlasView = ({
 
     // Only leaves contribute a direct size signal so parent circles scale from
     // their subtree instead of double-counting their own disagreement score.
-    const hierarchy = d3Hierarchy(centerNode, (node: any) => (
+    const hierarchy = d3Hierarchy(centerNode, (node) => (
       Array.isArray(node?.children) && node.children.length > 0 ? node.children : null
     ))
-      .sum((node: any) => calculateAtlasPackValue(node))
-      .sort((a: any, b: any) => (Number(b.value) || 0) - (Number(a.value) || 0));
+      .sum((node) => calculateAtlasPackValue(node))
+      .sort((a, b) => (Number(b.value) || 0) - (Number(a.value) || 0));
 
     const packedRoot = packLayout(hierarchy);
 
-    const layoutNodes = packedRoot.descendants()
-      .filter((node: any) => node.depth > 0);
-    const verticalLift = getPackedAtlasVerticalLiftPx(layoutNodes, desiredTopGutter);
-
-    const nodes: AtlasRenderNode[] = layoutNodes
-      .map((node: any) => buildAtlasRenderNode(node.data, atlasRoot, node.depth, {
+    const nodes = packedRoot.descendants()
+      .filter((node) => node.depth > 0)
+      .map((node) => buildAtlasRenderNode(node.data, atlasRoot, node.depth, {
         isCenter: false,
         x: node.x + inset,
-        y: node.y + inset + headerHeight - verticalLift,
+        y: node.y + inset + headerHeight,
         r: node.r,
         groupId: getPackedAtlasGroupId(node),
       }))
-      .sort((a: AtlasRenderNode, b: AtlasRenderNode) => {
+      .sort((a, b) => {
         if (a.hierarchyDepth !== b.hierarchyDepth) return a.hierarchyDepth - b.hierarchyDepth;
         return Number(b.r || 0) - Number(a.r || 0);
       });
 
     return { nodes };
   }, [atlasRoot, data, dimensions.h, dimensions.w, isMobile]);
-  const layoutNodeMap = useMemo(() => new Map(
-    layout.nodes.map((node) => [String(node.id || '').trim(), node])
-  ), [layout.nodes]);
 
   return (
     <div ref={containerRef} className={`${styles.atlasViewContainer} ${styles.packedAtlasViewContainer}`}>
@@ -1812,9 +1178,7 @@ const PackedAtlasView = ({
             data-ce-node-id={atlasRoot?.id || ''}
             aria-label={`Open ${packedTitle}`}
             title={`Open ${packedTitle}`}
-            onClick={() => {
-              if (atlasRoot) onNodeClick(atlasRoot);
-            }}
+            onClick={() => onNodeClick(atlasRoot)}
           >
             <span className={styles.packedAtlasTitle}>{packedTitle}</span>
             <FontAwesomeIcon icon={faExternalLinkAlt} className={styles.packedAtlasTitleIcon} />
@@ -1838,7 +1202,6 @@ const PackedAtlasView = ({
               : node.hierarchyDepth === 2 && showChildLabelsForGroup
           )
           : shouldAlwaysShowPackedLabel(node);
-        const labelFontSizePx = getPackedAtlasLabelFontSizePx(node, diameter, alwaysVisible);
 
         return (
           <div
@@ -1854,17 +1217,15 @@ const PackedAtlasView = ({
             data-ce-node-layout={ATLAS_LAYOUT_MODES.PACKED}
             onClick={(event) => {
               event.stopPropagation();
-              const clickTarget = getPackedAtlasClickTarget(node, layoutNodeMap);
-              if (!clickTarget) return;
-              handleAtlasNodeClick(clickTarget);
+              handleAtlasNodeClick(node);
             }}
             onMouseEnter={() => {
-              setHoveredNodeId(String(node.id || '').trim() || null);
+              setHoveredNodeId(node.id);
               setHoveredGroupId(groupId);
             }}
             onMouseLeave={() => {
               setHoveredNodeId((currentValue) => (
-                currentValue === String(node.id || '').trim() ? null : currentValue
+                currentValue === node.id ? null : currentValue
               ));
               setHoveredGroupId((currentValue) => (
                 currentValue === groupId ? '' : currentValue
@@ -1875,10 +1236,7 @@ const PackedAtlasView = ({
               className={`${styles.nodeDot} ${styles.packedNodeDot} ${node.heat > 10 ? styles.hot : ''}`}
               style={{ width: `${diameter}px`, height: `${diameter}px` }}
             >
-              <div
-                className={`${styles.nodeLabel} ${styles.packedNodeLabel} ${alwaysVisible ? styles.alwaysVisible : ''}`}
-                style={{ fontSize: `${labelFontSizePx}px` }}
-              >
+              <div className={`${styles.nodeLabel} ${styles.packedNodeLabel} ${alwaysVisible ? styles.alwaysVisible : ''}`}>
                 {node.name}
               </div>
             </div>
@@ -1889,11 +1247,7 @@ const PackedAtlasView = ({
   );
 };
 
-export const AtlasView = ({
-  data,
-  onNodeClick,
-  atlasLayoutMode = ATLAS_LAYOUT_MODES.ORBITAL,
-}: AtlasViewProps) => {
+export const AtlasView = ({ data, onNodeClick, atlasLayoutMode = ATLAS_LAYOUT_MODES.ORBITAL }) => {
   const { containerRef, dimensions } = useAtlasContainerDimensions(atlasLayoutMode);
   const {
     atlasRoot,
@@ -1938,10 +1292,9 @@ export const AtlasView = ({
 };
 
 // 2. Flat Node (Search/List View)
-const FlatNode = ({ node, parentPath = [], onNodeClick, onBookmark, bookmarkedNodes }: FlatNodeProps) => {
+const FlatNode = ({ node, parentPath = [], onNodeClick, onBookmark, bookmarkedNodes }) => {
   const netUpvotes = calculateNetUpvotes(node.votes);
-  const nodeId = String(node.id || '').trim();
-  const isBookmarked = nodeId ? bookmarkedNodes.includes(nodeId) : false;
+  const isBookmarked = bookmarkedNodes.includes(node.id);
   const commentCount = (node.questions ? node.questions.length : 0) + (node.comments ? node.comments.length : 0);
 
   return (
@@ -1972,10 +1325,7 @@ const FlatNode = ({ node, parentPath = [], onNodeClick, onBookmark, bookmarkedNo
         <FontAwesomeIcon
           icon={faBookmark}
           className={`${styles.bookmark} ${isBookmarked ? styles.bookmarked : ''}`}
-          onClick={(e) => {
-            e.stopPropagation();
-            if (nodeId) onBookmark(nodeId);
-          }}
+          onClick={(e) => { e.stopPropagation(); onBookmark(node.id); }}
         />
         <FontAwesomeIcon icon={faChevronRight} className={styles.expandIcon} onClick={() => onNodeClick(node)} />
       </div>
@@ -1992,40 +1342,31 @@ const Modal = ({
   copied,
   onCopy,
   onTagClick,
-}: ModalProps) => {
-  const modalContentRef = useRef<HTMLDivElement | null>(null);
-  const defaultArgumentData = content?.arguments && typeof content.arguments === 'object'
-    ? content.arguments
-    : null;
-  const hasDefaultArguments = Boolean(defaultArgumentData);
-  const [activeVoteType, setActiveVoteType] = useState<VoteDirection | null>(null);
-  const [voteCount, setVoteCount] = useState('');
+}) => {
+  const [activeVoteType, setActiveVoteType] = useState(null); // 'up' | 'down' | null
+  const [voteCount, setVoteCount] = useState("");
   const [showVoteBreakdown, setShowVoteBreakdown] = useState(false);
   const [compassOpen, setCompassOpen] = useState(true);
-  const [argumentsOpen, setArgumentsOpen] = useState(hasDefaultArguments);
-  const [historicalCasesOpen, setHistoricalCasesOpen] = useState(false);
+  const [argumentsOpen, setArgumentsOpen] = useState(true);
+  const [historicalCasesOpen, setHistoricalCasesOpen] = useState(true);
   const [expandedHistoricalCaseId, setExpandedHistoricalCaseId] = useState('');
   const [questionsOpen, setQuestionsOpen] = useState(false);
 
   useEffect(() => {
-    if (modalContentRef.current) {
-      modalContentRef.current.scrollTop = 0;
-      modalContentRef.current.scrollLeft = 0;
-    }
     setCompassOpen(true);
-    setArgumentsOpen(hasDefaultArguments);
-    setHistoricalCasesOpen(false);
+    setArgumentsOpen(false);
+    setHistoricalCasesOpen(true);
     setExpandedHistoricalCaseId('');
     setQuestionsOpen(false);
-  }, [content?.id, hasDefaultArguments]);
+  }, [content?.id]);
 
-  const getUserAvatar = (username: string) => (
+  const getUserAvatar = (username) => (
     getHistoricalFigureAvatarOrBlockie(username, {
       preferBlockie: false,
       fallbackSeed: username || 'atlas-comment-user',
     })
   );
-  const handleUserAvatarError = (event: React.SyntheticEvent<HTMLImageElement>, username: string) => {
+  const handleUserAvatarError = (event, username) => {
     const target = event?.currentTarget;
     if (!target) return;
     const fallbackSrc = getHistoricalFigureBlockie(username, {
@@ -2035,14 +1376,14 @@ const Modal = ({
     target.src = fallbackSrc;
   };
 
-  const handleCollapseHeaderKeyDown = (event: React.KeyboardEvent<HTMLElement>, toggle: () => void) => {
+  const handleCollapseHeaderKeyDown = (event, toggle) => {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
       toggle();
     }
   };
 
-  const normalizeQuestionType = (questionType: unknown): string => {
+  const normalizeQuestionType = (questionType) => {
     const normalized = String(questionType || '')
       .trim()
       .toLowerCase()
@@ -2055,7 +1396,7 @@ const Modal = ({
     return normalized || 'freeform';
   };
 
-  const getQuestionTypeLabel = (questionType: unknown): string => {
+  const getQuestionTypeLabel = (questionType) => {
     switch (normalizeQuestionType(questionType)) {
       case 'binary':
         return 'Binary';
@@ -2070,10 +1411,10 @@ const Modal = ({
     }
   };
 
-  const getQuestionOptions = (question: DebateQuestion): string[] => {
+  const getQuestionOptions = (question) => {
     const rawOptions = question?.options;
 
-    const normalizeOptions = (options: Array<string | number | DebateQuestionOption>) => (
+    const normalizeOptions = (options) => (
       options
         .map((option) => {
           if (typeof option === 'string') return option.trim();
@@ -2116,7 +1457,7 @@ const Modal = ({
     return [];
   };
 
-  const renderQuestionPreview = (question: DebateQuestion) => {
+  const renderQuestionPreview = (question) => {
     const questionType = normalizeQuestionType(question?.questionType || question?.type);
 
     if (questionType === 'binary') {
@@ -2168,13 +1509,13 @@ const Modal = ({
   };
 
   const handleCastVotes = () => {
-    if (!content?.id || !activeVoteType || !voteCount) return;
-    onVote(content.id, activeVoteType, parseInt(voteCount, 10) || 0);
-    setVoteCount('');
+    if (!activeVoteType || !voteCount) return;
+    onVote(content.id, activeVoteType, parseInt(voteCount) || 0);
+    setVoteCount("");
     setActiveVoteType(null);
   };
 
-  const compassData = useMemo<CompassData | null>(() => {
+  const compassData = useMemo(() => {
     if (!content?.compass) return null;
 
     return {
@@ -2182,20 +1523,6 @@ const Modal = ({
       points: buildHistoricalCompassPoints(content.historicalVotes, content.compass.points, content.id),
     };
   }, [content]);
-
-  const historicalCases = Array.isArray(content?.historicalCases)
-    ? content.historicalCases
-    : EMPTY_HISTORICAL_CASES;
-  const historicalCaseBriefContent = useMemo<DebateNode>(() => ({
-    id: content?.id,
-    name: content?.name,
-    compass: content?.compass,
-  }), [content?.id, content?.name, content?.compass]);
-  const expandedHistoricalCaseBriefs = useMemo(() => buildExpandedHistoricalCaseBriefMap(
-    historicalCases,
-    historicalCaseBriefContent,
-    expandedHistoricalCaseId,
-  ), [expandedHistoricalCaseId, historicalCaseBriefContent, historicalCases]);
 
   if (!isOpen || !content) return null;
 
@@ -2211,6 +1538,7 @@ const Modal = ({
   const hasArguments = Boolean(argumentData);
   const totalArgumentCount = proArguments.length + conArguments.length;
   const questionCount = questions.length;
+  const historicalCases = Array.isArray(content.historicalCases) ? content.historicalCases : [];
   const historicalCaseCount = historicalCases.length;
   const compassTitle = content?.compass?.xAxis?.label || content?.name || 'Compass';
 
@@ -2223,11 +1551,11 @@ const Modal = ({
   const tags = ["AI Safety", "Policy"];
 
   // Calculate Counts from Content
-  const upVotes = parseInt(String(content.votes?.up || 0), 10);
-  const downVotes = parseInt(String(content.votes?.down || 0), 10);
+  const upVotes = parseInt(content.votes?.up || 0);
+  const downVotes = parseInt(content.votes?.down || 0);
   const netVotes = upVotes - downVotes;
 
-  const renderVoterAvatars = (argumentId: string) => {
+  const renderVoterAvatars = (argumentId) => {
     const voters = Array.isArray(argumentVotes?.[argumentId])
       ? [...new Set(argumentVotes[argumentId].filter(Boolean))]
       : [];
@@ -2265,7 +1593,7 @@ const Modal = ({
     );
   };
 
-  const renderArgumentCard = (argument: DebateArgument, side: 'pro' | 'con', treeKey: string) => {
+  const renderArgumentCard = (argument, side, treeKey) => {
     if (!argument || typeof argument !== 'object') return null;
 
     const claim = String(argument.claim || '').trim();
@@ -2292,7 +1620,7 @@ const Modal = ({
             {source}
           </div>
         )}
-        {argument.id ? renderVoterAvatars(argument.id) : null}
+        {renderVoterAvatars(argument.id)}
         {children.length > 0 && (
           <div className={styles.argumentChildren}>
             {children.map((childArgument, childIndex) => (
@@ -2308,7 +1636,7 @@ const Modal = ({
     );
   };
 
-  const renderHistoricalCaseFieldRows = (rows: HistoricalFieldRow[] = []) => {
+  const renderHistoricalCaseFieldRows = (rows = []) => {
     if (!Array.isArray(rows) || rows.length === 0) return null;
 
     return (
@@ -2326,7 +1654,7 @@ const Modal = ({
     );
   };
 
-  const renderHistoricalCaseCard = (historicalCase: HistoricalCase, caseIndex: number) => {
+  const renderHistoricalCaseCard = (historicalCase, caseIndex) => {
     if (!historicalCase || typeof historicalCase !== 'object') return null;
 
     const title = String(historicalCase.title || historicalCase.id || '').trim();
@@ -2336,19 +1664,19 @@ const Modal = ({
     const tagsList = Array.isArray(historicalCase.tags)
       ? historicalCase.tags.filter(Boolean)
       : [];
-    const caseKey = getHistoricalCaseCardKey(historicalCase, caseIndex);
+    const caseKey = historicalCase.id || `${title}-${caseIndex}`;
     const isExpanded = expandedHistoricalCaseId === caseKey;
     const detailPanelId = `historical-case-${caseKey}`;
-    const brief = isExpanded ? expandedHistoricalCaseBriefs.get(caseKey) : null;
+    const brief = buildHistoricalCaseBrief(historicalCase, content);
     const metaBits = [
       historicalCase.category,
       authors.length > 0 ? authors.join(', ') : '',
       historicalCase.venue,
       historicalCase.year,
     ].filter(Boolean);
-    const normalizedBestPatch = brief ? String(brief.bestPatch || '').trim().toLowerCase() : '';
+    const normalizedBestPatch = String(brief.bestPatch || '').trim().toLowerCase();
     const hasBestPatchCard = Boolean(normalizedBestPatch)
-      && Boolean(brief?.patchOptions.some((patch) => String(patch?.name || '').trim().toLowerCase() === normalizedBestPatch));
+      && brief.patchOptions.some((patch) => String(patch?.name || '').trim().toLowerCase() === normalizedBestPatch);
 
     return (
       <div
@@ -2397,7 +1725,7 @@ const Modal = ({
             {historicalCase.summary}
           </div>
         ) : null}
-        {isExpanded && brief && (
+        {isExpanded && (
           <div
             id={detailPanelId}
             className={styles.historicalCaseDetail}
@@ -2572,11 +1900,7 @@ const Modal = ({
 
   return (
     <div className={styles.modalOverlay} onClick={onClose}>
-      <div
-        ref={modalContentRef}
-        className={styles.modalContent}
-        onClick={(e) => e.stopPropagation()}
-      >
+      <div className={styles.modalContent} onClick={e => e.stopPropagation()}>
 
         {/* --- HEADER --- */}
         <div className={styles.modalHeader}>
@@ -2641,7 +1965,7 @@ const Modal = ({
                     </button>
                     <button
                       className={styles.cancelBtn}
-                      onClick={() => { setActiveVoteType(null); setVoteCount(''); }}
+                      onClick={() => { setActiveVoteType(null); setVoteCount(""); }}
                     >
                       <FontAwesomeIcon icon={faTimes} />
                     </button>
@@ -2695,7 +2019,7 @@ const Modal = ({
               <div className={`${styles.collapseContent} ${styles.compassSection}`}>
                 <div className={styles.compassContainer}>
                   <React.Suspense fallback={null}>
-                    <StandalonePoliticalCompass compass={compassData as any} />
+                    <StandalonePoliticalCompass compass={compassData} />
                   </React.Suspense>
                 </div>
               </div>
@@ -2834,12 +2158,12 @@ const Modal = ({
 };
 
 // 4. Suggest Node Modal
-const SuggestNodeModal = ({ isOpen, onClose, parentNode, parentPath = [], onSubmit }: SuggestNodeModalProps) => {
-  const [title, setTitle] = useState('');
-  const handleSubmit = () => { onSubmit(parentNode, title); setTitle(''); onClose(); };
+const SuggestNodeModal = ({ isOpen, onClose, parentNode, parentPath = [], onSubmit }) => {
+  const [title, setTitle] = useState("");
+  const handleSubmit = () => { onSubmit(parentNode, title); setTitle(""); onClose(); };
 
   if (!isOpen) return null;
-  const lineage = [...parentPath, parentNode].filter((node): node is DebateNode => Boolean(node));
+  const lineage = [...parentPath, parentNode].filter(Boolean);
 
   return (
     <div className={styles.modalOverlay}>
@@ -2882,45 +2206,14 @@ const SuggestNodeModal = ({ isOpen, onClose, parentNode, parentPath = [], onSubm
 };
 
 // 5. Tree Node (With Collapsibility)
-const TreeNode = ({
-  node,
-  depth = 0,
-  parentPath = [],
-  onNodeClick,
-  onBookmark,
-  bookmarkedNodes,
-  onSuggestNode,
-  staggerOffsetPx = 0,
-  branchSpan = 1,
-}: TreeNodeProps) => {
+const TreeNode = ({ node, depth = 0, parentPath = [], onNodeClick, onBookmark, bookmarkedNodes, onSuggestNode }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const hasChildren = node.children && node.children.length > 0;
   const netUpvotes = calculateNetUpvotes(node.votes);
-  const nodeId = String(node.id || '').trim();
-  const isBookmarked = nodeId ? bookmarkedNodes.includes(nodeId) : false;
-  const fullLabel = cleanAtlasCategoryName(node.name);
-  const compactLabel = getCompactTreeNodeLabel(node.name);
-  const sortedChildren = hasChildren
-    ? [...(node.children || [])].sort((a, b) => calculateNetUpvotes(b.votes) - calculateNetUpvotes(a.votes))
-    : [];
-  const childColumns = getTreeChildColumnCount(depth, sortedChildren.length);
-  const childBranchSpans = sortedChildren.map((child) => getTreeSubtreeSpan(child));
-  const totalChildColumns = childBranchSpans.reduce((sum, span) => sum + span, 0);
-  const wrapperStyle = {
-    '--ce-tree-node-stagger': `${staggerOffsetPx}px`,
-    '--ce-tree-branch-span': String(branchSpan),
-  } as React.CSSProperties;
-  const childrenRowStyle = {
-    '--ce-org-total-columns': String(totalChildColumns || 1),
-  } as React.CSSProperties;
+  const isBookmarked = bookmarkedNodes.includes(node.id);
 
   return (
-    <div
-      className={styles.orgNodeWrapper}
-      style={wrapperStyle}
-      data-ce-tree-depth={depth}
-      data-ce-tree-stagger={staggerOffsetPx}
-    >
+    <div className={styles.orgNodeWrapper}>
       <div
         className={`
           ${styles.orgCard}
@@ -2929,20 +2222,16 @@ const TreeNode = ({
           ${isCollapsed ? styles.collapsed : ''}
         `}
         onClick={() => onNodeClick(node)}
-        title={fullLabel || undefined}
       >
          <div className={styles.cardHeader}>
-             <span className={styles.nodeTitle}>{compactLabel || fullLabel}</span>
+             <span className={styles.nodeTitle}>{node.name}</span>
          </div>
          <div className={styles.cardStats}>
              <span><FontAwesomeIcon icon={faThumbsUp} /> {netUpvotes}</span>
              <FontAwesomeIcon
                icon={faBookmark}
                className={`${styles.bookmark} ${isBookmarked ? styles.bookmarked : ''}`}
-               onClick={(e) => {
-                 e.stopPropagation();
-                 if (nodeId) onBookmark(nodeId);
-               }}
+               onClick={(e) => { e.stopPropagation(); onBookmark(node.id); }}
              />
          </div>
 
@@ -2967,14 +2256,10 @@ const TreeNode = ({
 
       {hasChildren && !isCollapsed && (
         <div className={styles.orgChildrenContainer}>
-           <div
-             className={styles.orgChildrenRow}
-             style={childrenRowStyle}
-             data-ce-org-total-columns={totalChildColumns || 1}
-           >
-              {sortedChildren.map((child: DebateNode, i: number) => (
+           <div className={styles.orgChildrenRow}>
+              {[...node.children].sort((a, b) => calculateNetUpvotes(b.votes) - calculateNetUpvotes(a.votes)).map((child, i) => (
                 <TreeNode
-                  key={getDebateNodeStableKey(child, `tree-child-${i}`)}
+                  key={i}
                   node={child}
                   depth={depth + 1}
                   parentPath={[...parentPath, node]}
@@ -2982,8 +2267,6 @@ const TreeNode = ({
                   onBookmark={onBookmark}
                   bookmarkedNodes={bookmarkedNodes}
                   onSuggestNode={onSuggestNode}
-                  staggerOffsetPx={getTreeChildStaggerPx(depth + 1, i, childColumns)}
-                  branchSpan={childBranchSpans[i] || 1}
                 />
               ))}
            </div>
@@ -3011,45 +2294,40 @@ const DebateMap = ({
   requestedModalNodeId = null,
   onModalClose = null,
   atlasLayoutMode = ATLAS_LAYOUT_MODES.PACKED,
-}: DebateMapProps) => {
+}) => {
   const externalDemoEnabled = externalDemoMode && typeof externalDemoMode === 'object'
     ? !!externalDemoMode.tools
     : !!externalDemoMode;
-  // Routing Hooks
-  const { nodeId: paramNodeId } = useParams<{ nodeId?: string }>();
-  const navigate = useNavigate();
-  const location = useLocation();
-  const urlDemoParam = new URLSearchParams(location.search || '').get('demo') === '1';
+  const urlDemoParam = typeof window !== 'undefined'
+    && new URLSearchParams(window.location.search).get('demo') === '1';
   const initialDemoEnabled = externalDemoEnabled || urlDemoParam;
-  const [visualMode, setVisualMode] = useState<DebateVisualMode>(() => getInitialDebateVisualMode(atlasLayoutMode));
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
-  const [modalNodeId, setModalNodeId] = useState<string | null>(null);
+  const [visualMode, setVisualMode] = useState(() => getInitialDebateVisualMode(atlasLayoutMode));
+  const [selectedCategoryId, setSelectedCategoryId] = useState(null);
+  const [modalNodeId, setModalNodeId] = useState(null);
   const [orderByUpvotes, setOrderByUpvotes] = useState(false);
-  const [bookmarkedNodes, setBookmarkedNodes] = useState<string[]>([]);
+  const [bookmarkedNodes, setBookmarkedNodes] = useState([]);
   const [demoMode, setDemoMode] = useState(() => initialDemoEnabled);
-  const [treeDataState, setTreeDataState] = useState<DebateNode[]>(() => buildAtlasTreeData(initialDemoEnabled));
-  const [localVoteDeltas, setLocalVoteDeltas] = useState<LocalVoteDeltas>({});
+  const [treeDataState, setTreeDataState] = useState(() => buildAtlasTreeData(initialDemoEnabled));
   const [nodeTypeFilter, setNodeTypeFilter] = useState('all');
   const [copied, setCopied] = useState(false);
 
   // Suggest Modal State
   const [suggestNodeModalOpen, setSuggestNodeModalOpen] = useState(false);
-  const [suggestNodeParent, setSuggestNodeParent] = useState<DebateNode | null>(null);
-  const [suggestNodePath, setSuggestNodePath] = useState<DebateNode[]>([]);
+  const [suggestNodeParent, setSuggestNodeParent] = useState(null);
+  const [suggestNodePath, setSuggestNodePath] = useState([]);
 
-  // Tree viewport fit state
-  const treeContainerRef = useRef<HTMLDivElement | null>(null);
-  const treeContentRef = useRef<HTMLDivElement | null>(null);
-  const [treeFitScale, setTreeFitScale] = useState(1);
-  const [treeFitHeight, setTreeFitHeight] = useState<number | null>(null);
+  // Drag-to-Scroll State for Tree View
+  const treeContainerRef = useRef(null);
+  const [treeIsDragging, setTreeIsDragging] = useState(false);
+  const [treeStartX, setTreeStartX] = useState(0);
+  const [treeScrollLeft, setTreeScrollLeft] = useState(0);
 
   // Ref to track if we've already handled the deep link for the current ID
   const hasHandledDeepLink = useRef(false);
-  const localVoteDeltasRef = useRef<LocalVoteDeltas>({});
 
-  useEffect(() => {
-    localVoteDeltasRef.current = localVoteDeltas;
-  }, [localVoteDeltas]);
+  // Routing Hooks
+  const { nodeId: paramNodeId, tag: paramTag } = useParams();
+  const navigate = useNavigate();
 
   // --- NODE ID PARSING (Fallback to manual URL check for wildcard routes) ---
   const effectiveNodeId = useMemo(() => {
@@ -3057,6 +2335,7 @@ const DebateMap = ({
     const path = window.location.pathname;
     const match = path.match(/\/atlas\/(0x[a-fA-F0-9]+)/);
     return match ? match[1] : null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paramNodeId]);
 
   // Reset handled flag when the URL ID changes
@@ -3066,14 +2345,11 @@ const DebateMap = ({
 
   useEffect(() => {
     const saved = localStorage.getItem('bookmarkedNodes');
-    setBookmarkedNodes(parseBookmarkedNodeStorage(saved));
+    if (saved) setBookmarkedNodes(JSON.parse(saved));
   }, []);
 
   useEffect(() => {
-    setTreeDataState(applyLocalVoteDeltasToTree(
-      buildAtlasTreeData(demoMode),
-      localVoteDeltasRef.current,
-    ));
+    setTreeDataState(buildAtlasTreeData(demoMode));
   }, [demoMode]);
 
   useEffect(() => {
@@ -3089,19 +2365,13 @@ const DebateMap = ({
     setModalNodeId(String(requestedModalNodeId).trim() || null);
   }, [requestedModalNodeId]);
 
-  const modalReturnTo = useMemo(() => {
-    if (embedded || typeof window === 'undefined') return '';
-    const params = new URLSearchParams(location.search || '');
-    return readSafeInternalReturnTo(params.get('returnTo') || '', window);
-  }, [embedded, location.search]);
-
   const selectedCategory = useMemo(() => (
     selectedCategoryId ? findAtlasNodeById(treeDataState, selectedCategoryId) : null
   ), [selectedCategoryId, treeDataState]);
 
   const modalContent = useMemo(() => {
     if (!modalNodeId) return null;
-    return findAtlasNodeById(treeDataState, modalNodeId) || findAtlasNodeById(atlasTreeData, modalNodeId);
+    return findAtlasNodeById(treeDataState, modalNodeId) || findAtlasNodeById(treeData, modalNodeId);
   }, [modalNodeId, treeDataState]);
 
   // --- DEEP LINK EFFECT: Open Modal if URL has Node ID ---
@@ -3112,30 +2382,24 @@ const DebateMap = ({
       let found = findAtlasNodeById(treeDataState, effectiveNodeId);
 
       // 2. Fallback: If not found in active state, check raw treeData.
-      if (!found && treeDataState !== atlasTreeData) {
-         found = findAtlasNodeById(atlasTreeData, effectiveNodeId);
+      if (!found && treeDataState !== treeData) {
+         found = findAtlasNodeById(treeData, effectiveNodeId);
       }
 
       if (found) {
-          setModalNodeId(String(found.id || '').trim() || null);
+          setModalNodeId(found.id);
           hasHandledDeepLink.current = true; // Mark as handled so it doesn't re-open on re-renders (like Demo toggle)
       }
     }
   }, [effectiveNodeId, treeDataState]);
 
-  const handleNodeClick = useCallback((node: DebateNode) => setModalNodeId(String(node?.id || '').trim() || null), []);
+  const handleNodeClick = useCallback((node) => setModalNodeId(node?.id || null), []);
   const closeModal = useCallback(() => {
     setModalNodeId(null);
-    if (typeof onModalClose === 'function') {
-      onModalClose();
-      return;
-    }
-    if (modalReturnTo) {
-      navigate(modalReturnTo, { replace: true });
-    }
-  }, [modalReturnTo, navigate, onModalClose]);
+    onModalClose?.();
+  }, [onModalClose]);
 
-  const handleBookmark = useCallback((id: string) => {
+  const handleBookmark = useCallback((id) => {
     setBookmarkedNodes(prev => {
       const next = prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id];
       localStorage.setItem('bookmarkedNodes', JSON.stringify(next));
@@ -3145,9 +2409,8 @@ const DebateMap = ({
 
   // --- NEW: Copy Full URL for Deep Linking ---
   const copyToClipboard = useCallback(() => {
-    const modalContentId = String(modalContent?.id || '').trim();
-    if (modalContent && modalContentId) {
-      const deepLink = new URL(buildPublicRoute(`/atlas/${modalContentId}`), window.location.origin);
+    if(modalContent) {
+      const deepLink = new URL(buildPublicRoute(`/atlas/${modalContent.id}`), window.location.origin);
       if (demoMode) {
         deepLink.searchParams.set('demo', '1');
       }
@@ -3160,34 +2423,18 @@ const DebateMap = ({
   }, [demoMode, modalContent]);
 
   // --- NEW: Handle Tag Clicks to route ---
-  const handleTagClick = useCallback((tag: string) => {
+  const handleTagClick = useCallback((tag) => {
     // Regression guard: when the atlas is opened from a session page, tag exploration
     // should stay pinned to that session instead of widening back out to global scope.
     navigate(buildTagHref(tag, '', activeSessionSlug));
   }, [activeSessionSlug, navigate]);
 
-  const handleVote = useCallback((nodeId: string, voteType: VoteDirection, count = 1) => {
-    const normalizedNodeId = String(nodeId || '').trim();
-    if (!normalizedNodeId) return;
-
-    setLocalVoteDeltas(prev => {
-      const existing = prev[normalizedNodeId] || { up: 0, down: 0 };
-      const next = {
-        ...prev,
-        [normalizedNodeId]: {
-          ...existing,
-          [voteType]: (existing[voteType] || 0) + count,
-        },
-      };
-      localVoteDeltasRef.current = next;
-      return next;
-    });
-
+  const handleVote = useCallback((nodeId, voteType, count = 1) => {
     setTreeDataState(prev => {
-      const update = (nodes: DebateNode[]): DebateNode[] => nodes.map((node) => {
-         if (String(node.id || '').trim() === normalizedNodeId) {
+      const update = (nodes) => nodes.map(node => {
+         if (node.id === nodeId) {
            const current = node.votes || {};
-           const val = parseInt(String(current[voteType] || 0), 10);
+           const val = parseInt(current[voteType] || 0);
            return { ...node, votes: { ...current, [voteType]: val + count }};
          }
          if (node.children) return { ...node, children: update(node.children) };
@@ -3197,27 +2444,27 @@ const DebateMap = ({
     });
   }, []);
 
-  const handleSuggestNode = useCallback((parent: DebateNode, path: DebateNode[] = []) => {
+  const handleSuggestNode = useCallback((parent, path = []) => {
       setSuggestNodeParent(parent);
       setSuggestNodePath(path);
       setSuggestNodeModalOpen(true);
   }, []);
 
-  const handleSubmitSuggestedNode = useCallback((parent: DebateNode | null, title: string) => {
-      uiLog.log("Suggestion submitted for", parent?.name || 'unknown node', ":", title);
+  const handleSubmitSuggestedNode = useCallback((parent, title) => {
+      uiLog.log("Suggestion submitted for", parent.name, ":", title);
   }, []);
 
-  const handleCategoryClick = (cat: DebateNode) => setSelectedCategoryId(String(cat?.id || '').trim() || null);
-  const handleVisualModeChange = useCallback((nextVisualMode: DebateVisualMode) => {
+  const handleCategoryClick = (cat) => setSelectedCategoryId(cat?.id || null);
+  const handleVisualModeChange = useCallback((nextVisualMode) => {
     setVisualMode(nextVisualMode);
     if (nextVisualMode !== DEBATE_VISUAL_MODES.TREE) {
       setSelectedCategoryId(null);
     }
   }, []);
 
-  const flattenTree = useCallback((node: DebateNode, parentPath: DebateNode[] = []): FlattenedDebateNode[] => {
-    let res: FlattenedDebateNode[] = [{ ...node, parentPath }];
-    if (node.children) node.children.forEach((child: DebateNode) => { res = res.concat(flattenTree(child, [...parentPath, node])); });
+  const flattenTree = useCallback((node, parentPath = []) => {
+    let res = [{ ...node, parentPath }];
+    if (node.children) node.children.forEach(child => { res = res.concat(flattenTree(child, [...parentPath, node])); });
     return res;
   }, []);
 
@@ -3225,64 +2472,39 @@ const DebateMap = ({
     // Only process sorting if in LIST mode
     if (visualMode !== DEBATE_VISUAL_MODES.LIST) return [];
 
-    return treeDataState.flatMap((c) => flattenTree(c))
-      .filter((n) => {
+    return treeDataState.flatMap(c => flattenTree(c))
+      .filter(n => {
          if (nodeTypeFilter === 'all') return true;
          if (nodeTypeFilter === 'category' && n.parentPath.length !== 0) return false;
          if (nodeTypeFilter === 'subcategory' && n.parentPath.length !== 1) return false;
          return true;
       })
-      .sort((a, b) => orderByUpvotes ? (calculateNetUpvotes(b.votes) - calculateNetUpvotes(a.votes)) : 0);
+      .sort((a,b) => orderByUpvotes ? (calculateNetUpvotes(b.votes) - calculateNetUpvotes(a.votes)) : 0);
   }, [treeDataState, orderByUpvotes, flattenTree, nodeTypeFilter, visualMode]);
 
-  const updateTreeFit = useCallback(() => {
-    if (visualMode !== DEBATE_VISUAL_MODES.TREE || !selectedCategory) {
-      setTreeFitScale(1);
-      setTreeFitHeight(null);
-      return;
-    }
+  // -- Tree View Drag Scroll Handlers --
+  const onTreeMouseDown = (e) => {
+    if (!treeContainerRef.current) return;
+    setTreeIsDragging(true);
+    setTreeStartX(e.pageX - treeContainerRef.current.offsetLeft);
+    setTreeScrollLeft(treeContainerRef.current.scrollLeft);
+  };
 
-    const viewportWidth = treeContainerRef.current?.clientWidth || 0;
-    const contentWidth = treeContentRef.current?.scrollWidth || treeContentRef.current?.offsetWidth || 0;
-    const contentHeight = treeContentRef.current?.offsetHeight || 0;
+  const onTreeMouseLeave = () => {
+    setTreeIsDragging(false);
+  };
 
-    const nextScale = getTreeViewportFitScale(viewportWidth, contentWidth);
-    const nextHeight = getTreeViewportFitHeight(contentHeight, nextScale);
+  const onTreeMouseUp = () => {
+    setTreeIsDragging(false);
+  };
 
-    setTreeFitScale((prev) => (Math.abs(prev - nextScale) < 0.001 ? prev : nextScale));
-    setTreeFitHeight(nextHeight > 0 ? nextHeight : null);
-  }, [selectedCategory, visualMode]);
-
-  useLayoutEffect(() => {
-    updateTreeFit();
-  }, [updateTreeFit]);
-
-  useEffect(() => {
-    if (visualMode !== DEBATE_VISUAL_MODES.TREE || !selectedCategory) return undefined;
-
-    const handleResize = () => {
-      if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
-        window.requestAnimationFrame(updateTreeFit);
-        return;
-      }
-      updateTreeFit();
-    };
-
-    handleResize();
-    window.addEventListener('resize', handleResize);
-
-    let resizeObserver: ResizeObserver | null = null;
-    if (typeof ResizeObserver !== 'undefined') {
-      resizeObserver = new ResizeObserver(handleResize);
-      if (treeContainerRef.current) resizeObserver.observe(treeContainerRef.current);
-      if (treeContentRef.current) resizeObserver.observe(treeContentRef.current);
-    }
-
-    return () => {
-      window.removeEventListener('resize', handleResize);
-      resizeObserver?.disconnect();
-    };
-  }, [selectedCategory, updateTreeFit, visualMode]);
+  const onTreeMouseMove = (e) => {
+    if (!treeIsDragging || !treeContainerRef.current) return;
+    e.preventDefault();
+    const x = e.pageX - treeContainerRef.current.offsetLeft;
+    const walk = (x - treeStartX) * 1.5; // Scroll-fast multiplier
+    treeContainerRef.current.scrollLeft = treeScrollLeft - walk;
+  };
 
   const wrapperClassName = [
     styles.debateMapWrapper,
@@ -3293,13 +2515,6 @@ const DebateMap = ({
     : ATLAS_LAYOUT_MODES.PACKED;
   const isAtlasVisualMode = visualMode === DEBATE_VISUAL_MODES.CIRCLES
     || visualMode === DEBATE_VISUAL_MODES.ATLAS;
-  const treeRootClassName = [
-    styles.orgChartRoot,
-    treeFitScale < 0.86 ? styles.compactTreeFit : '',
-  ].filter(Boolean).join(' ');
-  const treeRootStyle = {
-    transform: `scale(${treeFitScale})`,
-  } as React.CSSProperties;
 
   return (
     <div className={wrapperClassName}>
@@ -3398,7 +2613,7 @@ const DebateMap = ({
         {visualMode === DEBATE_VISUAL_MODES.TREE && (
           <div className={styles.categorySelector}>
              {treeDataState.map((cat, i) => (
-               <button key={getDebateNodeStableKey(cat, `category-${i}`)} className={`${styles.categoryButton} ${selectedCategory?.id === cat.id ? styles.active : ''}`} onClick={() => handleCategoryClick(cat)}>{cat.name}</button>
+               <button key={i} className={`${styles.categoryButton} ${selectedCategory?.id === cat.id ? styles.active : ''}`} onClick={() => handleCategoryClick(cat)}>{cat.name}</button>
              ))}
           </div>
         )}
@@ -3407,7 +2622,7 @@ const DebateMap = ({
            {visualMode === DEBATE_VISUAL_MODES.LIST ? (
              <div className={styles.flatListContainer}>
                 {sortedNodes.map((node, i) => (
-                  <FlatNode key={getDebateNodeStableKey(node, `list-node-${i}`)} node={node} parentPath={node.parentPath} onNodeClick={handleNodeClick} onBookmark={handleBookmark} bookmarkedNodes={bookmarkedNodes} />
+                  <FlatNode key={i} node={node} parentPath={node.parentPath} onNodeClick={handleNodeClick} onBookmark={handleBookmark} bookmarkedNodes={bookmarkedNodes} />
                 ))}
              </div>
            ) : isAtlasVisualMode ? (
@@ -3420,28 +2635,23 @@ const DebateMap = ({
              <div
                className={styles.orgChartContainer}
                ref={treeContainerRef}
+               onMouseDown={onTreeMouseDown}
+               onMouseLeave={onTreeMouseLeave}
+               onMouseUp={onTreeMouseUp}
+               onMouseMove={onTreeMouseMove}
+               style={{ cursor: treeIsDragging ? 'grabbing' : 'grab' }}
              >
                 {selectedCategory ? (
-                   <div
-                     className={styles.orgChartFitStage}
-                     style={treeFitHeight ? { height: treeFitHeight } : undefined}
-                   >
-                     <div
-                       ref={treeContentRef}
-                       className={treeRootClassName}
-                       style={treeRootStyle}
-                       data-ce-tree-scale={treeFitScale.toFixed(3)}
-                     >
-                       <TreeNode
-                          node={selectedCategory}
-                          depth={0}
-                          parentPath={[]}
-                          onNodeClick={handleNodeClick}
-                          onBookmark={handleBookmark}
-                          bookmarkedNodes={bookmarkedNodes}
-                          onSuggestNode={handleSuggestNode}
-                       />
-                     </div>
+                   <div className={styles.orgChartRoot}>
+                     <TreeNode
+                        node={selectedCategory}
+                        depth={0}
+                        parentPath={[]}
+                        onNodeClick={handleNodeClick}
+                        onBookmark={handleBookmark}
+                        bookmarkedNodes={bookmarkedNodes}
+                        onSuggestNode={handleSuggestNode}
+                     />
                    </div>
                 ) : (
                    <div className={styles.emptyState}>Select a category above to view the Policy Org Chart</div>

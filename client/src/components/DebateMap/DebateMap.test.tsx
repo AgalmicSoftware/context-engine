@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import DebateMap, { AtlasView, buildHistoricalCaseBrief, buildHistoricalCompassPoints } from './DebateMap.jsx';
+import DebateMap, { AtlasView, buildHistoricalCaseBrief, buildHistoricalCompassPoints } from './DebateMap';
 import treeData from '../../variables/demo/debate_map_demo_data.json';
 import historicalFigureData from '../../variables/demo/historical_figures_tree_qs_and_votes.json';
 import loopholeHistoricalCases from '../../variables/demo/loophole_historical_cases.json';

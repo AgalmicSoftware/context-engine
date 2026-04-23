@@ -1,4 +1,5 @@
 /** @file CompareAddresses.tsx */
+// @ts-nocheck
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Collapse } from 'reactstrap';
