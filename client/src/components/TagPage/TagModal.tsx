@@ -6,7 +6,7 @@ import { faCog } from '@fortawesome/free-solid-svg-icons';
 import { Modal, ModalBody } from 'reactstrap';
 
 import styles from './TagPage.module.scss';
-import TagPage from './TagPage';
+import TagPage from './TagPage.jsx';
 import { normalizeGlobalSessionSelection } from '../../utilities/session/globalSessionState.js';
 import { parseQuestionSessionSlugFromSearch } from '../../utilities/survey/questionRouting.js';
 import { normalizeSessionSlug } from '../../utilities/session/sessionNaming.js';
