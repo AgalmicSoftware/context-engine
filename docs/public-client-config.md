@@ -154,6 +154,11 @@ SPA fallback concept, but their redirect config syntax differs.
   - Stored `ce:demoSurfaceMode` localStorage preferences win over this setting.
   - This only takes effect on fresh installs or when no stored preference exists.
 
+- `REACT_APP_CE_ENABLE_WALLETCONNECT_FALLBACK=false`
+  - Controls RainbowKit's MetaMask fallback when MetaMask is not injected.
+  - Default `false` keeps the login modal on the injected MetaMask connector and avoids opening WalletConnect bridge sockets during normal startup.
+  - Set `true` only when a deployment intentionally wants the legacy WalletConnect fallback for MetaMask mobile/QR flows.
+
 - `REACT_APP_ENABLE_LIT_SESSION_PAYER_WALLET_INPUT=false`
   - Temporary rollout flag for the `/new` SessionWizard Lit payer-wallet UI.
   - `false` hides the Lit worker-secret card in `/new`.

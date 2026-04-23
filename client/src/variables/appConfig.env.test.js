@@ -2,6 +2,7 @@ const ENV_KEYS = [
   'REACT_APP_DEFAULT_AUTO_REQUEST_TESTNET_FUNDS',
   'REACT_APP_CE_DEMO_SURFACE_MODE_DEFAULT',
   'REACT_APP_PORTO_SESSION_KEY_ENABLED',
+  'REACT_APP_CE_ENABLE_WALLETCONNECT_FALLBACK',
   'REACT_APP_ENABLE_CE_LOGO_ANIMATION',
   'REACT_APP_TERMINOLOGY_MODE',
   'REACT_APP_CE_SESSION_SCAN_SCOPE',
@@ -110,6 +111,7 @@ describe('appConfig env-backed config', () => {
   it('reads REACT_APP_* overrides across strings, booleans, numbers, and lists', () => {
     process.env.REACT_APP_DEFAULT_AUTO_REQUEST_TESTNET_FUNDS = 'false';
     process.env.REACT_APP_PORTO_SESSION_KEY_ENABLED = 'false';
+    process.env.REACT_APP_CE_ENABLE_WALLETCONNECT_FALLBACK = 'true';
     process.env.REACT_APP_ENABLE_CE_LOGO_ANIMATION = 'false';
     process.env.REACT_APP_TERMINOLOGY_MODE = 'crypto';
     process.env.REACT_APP_CE_SESSION_SCAN_SCOPE = 'general';
@@ -140,6 +142,7 @@ describe('appConfig env-backed config', () => {
 
       expect(config.DEFAULT_AUTO_REQUEST_TESTNET_FUNDS).toBe(false);
       expect(config.PORTO_SESSION_KEY_ENABLED).toBe(false);
+      expect(config.CE_ENABLE_WALLETCONNECT_FALLBACK).toBe(true);
       expect(config.ENABLE_CE_LOGO_ANIMATION).toBe(false);
       expect(config.TERMINOLOGY_MODE).toBe('crypto');
       expect(config.CE_SESSION_SCAN_SCOPE).toBe('general');
@@ -210,6 +213,7 @@ describe('appConfig env-backed config', () => {
       expect(config.CE_ARWEAVE_PREFLIGHT_SESSION_METADATA).toBe(false);
       expect(config.CE_ARWEAVE_PREFLIGHT_SBT_METADATA).toBe(false);
       expect(config.CE_ARWEAVE_PREFLIGHT_RESPONSE_PAYLOADS).toBe(true);
+      expect(config.CE_ENABLE_WALLETCONNECT_FALLBACK).toBe(false);
     });
   });
 });
