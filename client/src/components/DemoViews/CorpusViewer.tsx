@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import type { IconDefinition } from '@fortawesome/fontawesome-svg-core';
 import {
   faBook,
   faBrain,
@@ -30,6 +31,59 @@ import policyStyles from './PolicyGlobe.module.scss';
 import TweetCard, { DebateMapSection, ExternalSourceLink } from './TweetCard';
 import { PUBLIC_AI_DISCOURSE_CORPUS_URL } from '../../variables/publicRepoMetadata.js';
 
+type CorpusEntry = {
+  id?: string;
+  title?: string;
+  author?: string;
+  authors?: string[];
+  summary?: string;
+  abstract?: string;
+  tags?: string[];
+  url?: string;
+  image_url?: string;
+  date?: string | number;
+  date_enacted?: string | number;
+  created_at?: string | number;
+  year?: string | number;
+  jurisdiction?: string;
+  venue?: string;
+  interviewer?: string;
+  category?: string;
+  icon?: string;
+  label?: string;
+  [key: string]: any;
+};
+
+type CorpusDefinition = {
+  key: string;
+  label?: string;
+  tabLabel: string;
+  icon?: string;
+  count_full?: unknown;
+  entries: CorpusEntry[];
+  [key: string]: any;
+};
+
+type AtlasIssueOpenHandler = (...args: any[]) => void;
+
+type CorpusViewerProps = {
+  onAtlasIssueOpen?: AtlasIssueOpenHandler | null;
+  showGithubLink?: boolean;
+};
+
+type EntryCardProps = {
+  corpusKey: string;
+  entry: CorpusEntry;
+  onTagClick?: (tag: string) => void;
+  onAtlasIssueOpen?: AtlasIssueOpenHandler | null;
+};
+
+type EmptyCorpusStateProps = {
+  corpus: CorpusDefinition;
+  title?: string;
+  text?: string;
+};
+
 // Hidden tabs — restore by adding 'cross_corpus' or 'lesswrong_posts' back to this array
 const CORPUS_ORDER = [
   'tweets',
@@ -40,7 +94,7 @@ const CORPUS_ORDER = [
   'metr_evals_metrics',
 ];
 
-const ICONS = {
+const ICONS: Record<string, IconDefinition> = {
   bird: faTwitter,
   gavel: faGavel,
   'file-text': faFileAlt,
@@ -51,7 +105,7 @@ const ICONS = {
   link: faLink,
 };
 
-const ICON_FALLBACKS = {
+const ICON_FALLBACKS: Record<string, string> = {
   bird: '🐦',
   gavel: '⚖️',
   'file-text': '📄',
@@ -62,7 +116,7 @@ const ICON_FALLBACKS = {
   link: '🔗',
 };
 
-const TAB_LABELS = {
+const TAB_LABELS: Record<string, string> = {
   tweets: 'Tweets',
   ai_laws_policy: 'Laws & Policy',
   arxiv_ai_safety: 'Papers',
@@ -73,7 +127,7 @@ const TAB_LABELS = {
   cross_corpus: 'Cross-Corpus',
 };
 
-const POLICY_ANCHOR_TO_ISO_A3 = Object.freeze({
+const POLICY_ANCHOR_TO_ISO_A3 = Object.freeze<Record<string, string[]>>({
   africa: ['ZAF', 'EGY', 'NGA', 'KEN', 'ETH'],
   asean: ['IDN', 'MYS', 'PHL', 'SGP', 'THA', 'VNM'],
   australia: ['AUS'],
@@ -90,6 +144,8 @@ const POLICY_ANCHOR_TO_ISO_A3 = Object.freeze({
 
 const MOBILE_TWEET_PREVIEW_LIMIT = 5;
 const MOBILE_TWEET_PREVIEW_QUERY = '(max-width: 720px)';
+const demoCorpusesByKey = (corpusSample as { corpuses?: Record<string, any> }).corpuses || {};
+const getDemoCorpusRecords = buildDemoCorpusRecords as (demoCorpuses?: CorpusDefinition[]) => any[];
 
 const readIsMobileTweetPreview = () => (
   typeof window !== 'undefined'
@@ -106,7 +162,7 @@ const useIsMobileTweetPreview = () => {
     }
 
     const mediaQuery = window.matchMedia(MOBILE_TWEET_PREVIEW_QUERY);
-    const handleChange = (event) => setIsMobileTweetPreview(!!event.matches);
+    const handleChange = (event: MediaQueryListEvent) => setIsMobileTweetPreview(!!event.matches);
 
     setIsMobileTweetPreview(mediaQuery.matches);
 
@@ -132,8 +188,8 @@ const mergePolicyMapStatus = (currentStatus = '', nextStatus = '') => {
   return 'mixed';
 };
 
-const buildPolicyMapState = (entries = []) => {
-  const mapData = {};
+const buildPolicyMapState = (entries: CorpusEntry[] = []) => {
+  const mapData: Record<string, string> = {};
   let globalStatus = '';
 
   (Array.isArray(entries) ? entries : []).forEach((entry) => {
@@ -172,7 +228,7 @@ const shouldUseHalfWidthGrid = (corpusKey = '') => (
   corpusKey === 'tweets' || corpusKey === 'arxiv_ai_safety'
 );
 
-const formatAuthors = (entry = {}) => {
+const formatAuthors = (entry: CorpusEntry = {}) => {
   if (entry.author) return entry.author;
   if (!Array.isArray(entry.authors) || entry.authors.length === 0) return null;
   if (entry.authors.length === 1) return entry.authors[0];
@@ -180,13 +236,13 @@ const formatAuthors = (entry = {}) => {
   return `${entry.authors[0]} +${entry.authors.length - 1}`;
 };
 
-const buildInsiderAuthorKey = (entry = {}) => (
+const buildInsiderAuthorKey = (entry: CorpusEntry = {}) => (
   String(entry.author || entry.title || entry.id || '').trim().toLowerCase()
 );
 
-const diversifyInsiderEntries = (entries = []) => {
+const diversifyInsiderEntries = (entries: CorpusEntry[] = []) => {
   const remainingEntries = Array.isArray(entries) ? [...entries] : [];
-  const orderedEntries = [];
+  const orderedEntries: CorpusEntry[] = [];
   let lastAuthorKey = '';
 
   while (remainingEntries.length > 0) {
@@ -206,12 +262,12 @@ const diversifyInsiderEntries = (entries = []) => {
   return orderedEntries;
 };
 
-const buildCorpusDefinitions = () => (
+const buildCorpusDefinitions = (): CorpusDefinition[] => (
   CORPUS_ORDER
     .map((key) => {
-      const corpus = corpusSample?.corpuses?.[key];
+      const corpus = demoCorpusesByKey[key];
       if (!corpus) return null;
-      const entries = Array.isArray(corpus.entries) ? corpus.entries : [];
+      const entries = Array.isArray(corpus.entries) ? corpus.entries as CorpusEntry[] : [];
       const orderedEntries = key === 'dwarkesh_lab_insiders'
         ? diversifyInsiderEntries(entries)
         : entries;
@@ -224,10 +280,10 @@ const buildCorpusDefinitions = () => (
         tabLabel: TAB_LABELS[key] || corpus.label || key,
       };
     })
-    .filter(Boolean)
+    .filter((corpus): corpus is CorpusDefinition => Boolean(corpus))
 );
 
-const getEntryYear = (entry = {}) => {
+const getEntryYear = (entry: CorpusEntry = {}) => {
   if (entry.year) return entry.year;
   const datedValue = entry.date || entry.date_enacted || entry.created_at;
   if (!datedValue) return null;
@@ -235,16 +291,17 @@ const getEntryYear = (entry = {}) => {
   return Number.isNaN(date.getTime()) ? null : date.getFullYear();
 };
 
-const renderCorpusIcon = (iconKey) => {
-  const iconDefinition = ICONS[iconKey];
+const renderCorpusIcon = (iconKey: string | undefined) => {
+  const normalizedIconKey = iconKey || 'link';
+  const iconDefinition = ICONS[normalizedIconKey];
   if (iconDefinition) {
     return <FontAwesomeIcon icon={iconDefinition} />;
   }
-  return <span>{ICON_FALLBACKS[iconKey] || '•'}</span>;
+  return <span>{ICON_FALLBACKS[normalizedIconKey] || '•'}</span>;
 };
 
-const buildNonTweetMeta = (corpusKey, entry = {}) => {
-  const bits = [];
+const buildNonTweetMeta = (corpusKey: string, entry: CorpusEntry = {}) => {
+  const bits: Array<string | number> = [];
   const authorText = formatAuthors(entry);
   const year = getEntryYear(entry);
 
@@ -258,7 +315,7 @@ const buildNonTweetMeta = (corpusKey, entry = {}) => {
   return bits;
 };
 
-const EntryCard = ({ corpusKey, entry, onTagClick, onAtlasIssueOpen }) => {
+const EntryCard = ({ corpusKey, entry, onTagClick, onAtlasIssueOpen }: EntryCardProps) => {
   const isPolicyCorpus = corpusKey === 'ai_laws_policy';
   const isMetrCorpus = corpusKey === 'metr_evals_metrics';
   const meta = buildNonTweetMeta(corpusKey, entry);
@@ -366,7 +423,7 @@ const EntryCard = ({ corpusKey, entry, onTagClick, onAtlasIssueOpen }) => {
       </div>
 
       <div className={styles.cardFooter}>
-        <DebateMapSection entry={entry} onAtlasIssueOpen={onAtlasIssueOpen} />
+        <DebateMapSection entry={entry as any} onAtlasIssueOpen={onAtlasIssueOpen || undefined} />
         {entry?.url ? (
           <div className={styles.cardFooterLinks}>
             {isMetrCorpus ? (
@@ -390,7 +447,7 @@ const EntryCard = ({ corpusKey, entry, onTagClick, onAtlasIssueOpen }) => {
   );
 };
 
-const EmptyCorpusState = ({ corpus, title, text }) => (
+const EmptyCorpusState = ({ corpus, title, text }: EmptyCorpusStateProps) => (
   <div className={styles.emptyState}>
     <div className={styles.emptyStateIcon}>
       {renderCorpusIcon(corpus.icon)}
@@ -404,16 +461,16 @@ const EmptyCorpusState = ({ corpus, title, text }) => (
   </div>
 );
 
-const CorpusViewer = ({ onAtlasIssueOpen = null, showGithubLink = true }) => {
+const CorpusViewer = ({ onAtlasIssueOpen = null, showGithubLink = true }: CorpusViewerProps) => {
   const corpusDefinitions = useMemo(() => buildCorpusDefinitions(), []);
   // Intentionally cross-corpus: tag explorer shows every record with the clicked tag across all demo corpuses, ignoring any per-tab (e.g. PolicyGlobe) filter.
   const demoCorpusRecords = useMemo(
-    () => buildDemoCorpusRecords(corpusDefinitions),
+    () => getDemoCorpusRecords(corpusDefinitions),
     [corpusDefinitions]
   );
 
   const [activeCorpusKey, setActiveCorpusKey] = useState(corpusDefinitions[0]?.key || 'tweets');
-  const [activeTag, setActiveTag] = useState(null);
+  const [activeTag, setActiveTag] = useState<string | null>(null);
   const [mobileTweetsExpanded, setMobileTweetsExpanded] = useState(false);
   const isMobileTweetPreview = useIsMobileTweetPreview();
 
@@ -425,15 +482,15 @@ const CorpusViewer = ({ onAtlasIssueOpen = null, showGithubLink = true }) => {
 
   if (!activeCorpus) return null;
 
-  const renderEntries = (entries) => (
+  const renderEntries = (entries: CorpusEntry[]) => (
     entries.filter(Boolean).map((entry, index) => {
       const key = entry.id || entry.url || `${activeCorpus.key}-${index}`;
       return activeCorpus.key === 'tweets' ? (
-        <TweetCard key={key} entry={entry} onTagClick={setActiveTag} onAtlasIssueOpen={onAtlasIssueOpen} />
+        <TweetCard key={key} entry={entry as any} onTagClick={setActiveTag} onAtlasIssueOpen={onAtlasIssueOpen || undefined} />
       ) : activeCorpus.key === 'arxiv_ai_safety' ? (
-        <ArxivCard key={key} entry={entry} onTagClick={setActiveTag} onAtlasIssueOpen={onAtlasIssueOpen} />
+        <ArxivCard key={key} entry={entry as any} onTagClick={setActiveTag} onAtlasIssueOpen={onAtlasIssueOpen || undefined} />
       ) : activeCorpus.key === 'dwarkesh_lab_insiders' ? (
-        <InsiderCard key={key} entry={entry} onTagClick={setActiveTag} onAtlasIssueOpen={onAtlasIssueOpen} />
+        <InsiderCard key={key} entry={entry as any} onTagClick={setActiveTag} onAtlasIssueOpen={onAtlasIssueOpen || undefined} />
       ) : (
         <EntryCard
           key={key}
@@ -446,7 +503,10 @@ const CorpusViewer = ({ onAtlasIssueOpen = null, showGithubLink = true }) => {
     })
   );
 
-  const renderEntriesCollection = (entries, { id, testId } = {}) => (
+  const renderEntriesCollection = (
+    entries: CorpusEntry[],
+    { id, testId }: { id?: string; testId?: string } = {}
+  ) => (
     <div
       id={id}
       data-testid={testId}
@@ -560,21 +620,21 @@ const CorpusViewer = ({ onAtlasIssueOpen = null, showGithubLink = true }) => {
                     />
                   ) : (
                     <div className={styles.policyEntriesList}>
-                      {renderEntriesCollection(filteredEntries)}
+                      {renderEntriesCollection(filteredEntries as CorpusEntry[])}
                     </div>
                   )}
                 </div>
 
                 <aside className={styles.policyMapColumn}>
                   {(() => {
-                    const { globalStatus, mapData } = buildPolicyMapState(filteredEntries);
+                    const { globalStatus, mapData } = buildPolicyMapState(filteredEntries as CorpusEntry[]);
 
                     return (
                       <div className={styles.policyMapPanel}>
                         <div className={styles.policyMapLens}>
                           <WorldResultsMap
                             data={mapData}
-                            colorScale={(regionStatus) => getPolicyMapFill(regionStatus || globalStatus, !regionStatus)}
+                            colorScale={(regionStatus) => getPolicyMapFill(String(regionStatus || globalStatus), !regionStatus)}
                             compact
                           />
                         </div>
@@ -599,7 +659,7 @@ const CorpusViewer = ({ onAtlasIssueOpen = null, showGithubLink = true }) => {
         toggle={() => setActiveTag(null)}
         activeTag={activeTag}
         demoCorpusMode={true}
-        demoCorpusRecords={demoCorpusRecords}
+        demoCorpusRecords={demoCorpusRecords as any}
       />
     </div>
   );
