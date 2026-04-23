@@ -16,6 +16,8 @@ const SBT_ADMIN_ABI = ['function admin() view returns (address)', 'function owne
 const registryIface = new ethers.utils.Interface(REGISTRY_ABI);
 const erc721Iface = new ethers.utils.Interface(ERC721_ABI);
 const sbtAdminIface = new ethers.utils.Interface(SBT_ADMIN_ABI);
+const LOGIN_ORIGIN = 'https://contextengine.xyz';
+const LOGIN_DOMAIN = 'contextengine.xyz';
 
 const jsonRpcResponse = (payload) => ({
   ok: true,
@@ -260,6 +262,8 @@ export const createSignedSiweBody = async ({
     makeJsonRequest('/auth/nonce', {
       address: wallet.address,
       sessionSlug,
+    }, {
+      headers: { Origin: LOGIN_ORIGIN },
     }),
     env,
     {}
@@ -270,6 +274,7 @@ export const createSignedSiweBody = async ({
   }
 
   const message = buildSiweMessage({
+    domain: LOGIN_DOMAIN,
     address: wallet.address,
     nonce: noncePayload.nonce,
     chainId,
@@ -314,7 +319,9 @@ export const issueWorkerLoginToken = async ({
     sessionSlug,
   });
   const response = await worker.fetch(
-    makeJsonRequest('/auth/login', body),
+    makeJsonRequest('/auth/login', body, {
+      headers: { Origin: LOGIN_ORIGIN },
+    }),
     env,
     {}
   );
