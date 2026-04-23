@@ -448,7 +448,14 @@ describe('sessionCorsWorker admin routes', () => {
 
     expect(response.status).toBe(200);
     expect(payload).toEqual({ ok: true });
-    expect(readStoredJson(kv, SESSION_SECRETS_KEY(sessionSlug))).toEqual({
+    const stored = readStoredJson(kv, SESSION_SECRETS_KEY(sessionSlug));
+    expect(stored).toEqual(expect.objectContaining({
+      v: 1,
+      kind: 'session-secrets',
+      createdAt: expect.any(Number),
+      updatedAt: expect.any(Number),
+    }));
+    expect(stored.secrets).toEqual({
       openaiKey: 'sk-openai',
       customRpcUrl: 'https://rpc.example',
       arweaveJwk: '{"kty":"RSA"}',
@@ -483,7 +490,14 @@ describe('sessionCorsWorker admin routes', () => {
     );
 
     expect(response.status).toBe(200);
-    expect(readStoredJson(kv, SESSION_SECRETS_KEY(sessionSlug))).toEqual({
+    const stored = readStoredJson(kv, SESSION_SECRETS_KEY(sessionSlug));
+    expect(stored).toEqual(expect.objectContaining({
+      v: 1,
+      kind: 'session-secrets',
+      createdAt: expect.any(Number),
+      updatedAt: expect.any(Number),
+    }));
+    expect(stored.secrets).toEqual({
       openaiKey: 'sk-openai',
       arweaveJwk: '{"kty":"RSA","n":"abc"}',
       faucetPrivateKey: '12345',
@@ -521,7 +535,14 @@ describe('sessionCorsWorker admin routes', () => {
     );
 
     expect(response.status).toBe(200);
-    expect(readStoredJson(kv, SESSION_SECRETS_KEY(sessionSlug))).toEqual(existingSecrets);
+    const stored = readStoredJson(kv, SESSION_SECRETS_KEY(sessionSlug));
+    expect(stored).toEqual(expect.objectContaining({
+      v: 1,
+      kind: 'session-secrets',
+      createdAt: expect.any(Number),
+      updatedAt: expect.any(Number),
+    }));
+    expect(stored.secrets).toEqual(existingSecrets);
   });
 
   it('rejects set-secrets when the secrets payload is missing', async () => {
