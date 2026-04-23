@@ -444,6 +444,199 @@ button.cell {
   font-size: 0.88rem;
 }
 
+.atlasScenarioRail {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.atlasScenarioRailHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.atlasScenarioEyebrow {
+  color: rgba(125, 211, 252, 0.9);
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.atlasScenarioCount {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  min-height: 28px;
+  padding: 4px 8px;
+  border: 1px solid rgba(125, 211, 252, 0.22);
+  border-radius: var(--ce-radius-pill);
+  background: rgba(125, 211, 252, 0.08);
+  color: rgba(191, 219, 254, 0.96);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.atlasScenarioGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+.atlasScenarioCard {
+  display: grid;
+  grid-template-columns: minmax(168px, 0.44fr) minmax(0, 0.56fr);
+  gap: 14px;
+  padding: 12px;
+  border: 1px solid rgba(125, 211, 252, 0.18);
+  border-radius: var(--ce-radius-10);
+  background: rgba(8, 11, 33, 0.38);
+}
+
+.atlasScenarioImage,
+.atlasScenarioImageFallback {
+  width: 100%;
+  min-height: 176px;
+  aspect-ratio: 4 / 3;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--ce-radius-10);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.atlasScenarioImage {
+  display: block;
+  object-fit: cover;
+}
+
+.atlasScenarioImageFallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 14px;
+  color: rgba(244, 247, 255, 0.72);
+  font-size: 0.86rem;
+  font-weight: 800;
+  text-align: center;
+}
+
+.atlasScenarioContent {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.atlasScenarioMetaRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  color: $muted-text;
+  font-size: 0.72rem;
+  line-height: 1.35;
+
+  > span {
+    display: inline-flex;
+    align-items: center;
+    min-height: 24px;
+    padding: 4px 8px;
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: var(--ce-radius-pill);
+    background: rgba(255, 255, 255, 0.04);
+  }
+}
+
+.atlasScenarioValence {
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.atlasScenarioValenceRisk {
+  border-color: rgba(255, 107, 114, 0.22) !important;
+  color: #ff9298;
+}
+
+.atlasScenarioValenceOpportunity {
+  border-color: rgba(77, 255, 164, 0.22) !important;
+  color: #7fffc2;
+}
+
+.atlasScenarioValenceMixed {
+  border-color: rgba(255, 193, 77, 0.24) !important;
+  color: rgba(255, 210, 128, 0.96);
+}
+
+.atlasScenarioTitle {
+  margin: 0;
+  color: $text;
+  font-size: 1rem;
+  line-height: 1.28;
+}
+
+.atlasScenarioSummary {
+  margin: 0;
+  color: rgba(244, 247, 255, 0.82);
+  font-size: 0.88rem;
+  line-height: 1.55;
+}
+
+.atlasScenarioMechanism {
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--ce-radius-10);
+  background: rgba(255, 255, 255, 0.035);
+
+  span {
+    display: block;
+    margin-bottom: 6px;
+    color: rgba(125, 211, 252, 0.88);
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  p {
+    margin: 0;
+    color: rgba(244, 247, 255, 0.86);
+    font-size: 0.82rem;
+    line-height: 1.5;
+  }
+}
+
+.atlasScenarioLink {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  margin-top: auto;
+  padding: 9px 12px;
+  border: 1px solid rgba(77, 255, 164, 0.22);
+  border-radius: var(--ce-radius-10);
+  background: rgba(77, 255, 164, 0.08);
+  color: $accent;
+  font-size: 0.82rem;
+  font-weight: 800;
+  text-decoration: none;
+  transition:
+    background-color 0.18s ease,
+    border-color 0.18s ease,
+    color 0.18s ease,
+    transform 0.08s ease;
+
+  &:hover,
+  &:focus-visible {
+    outline: none;
+    border-color: $accent-border;
+    background: rgba(77, 255, 164, 0.14);
+    color: #7fffc2;
+    transform: translateY(-1px);
+  }
+}
+
 .modalCloseButton {
   appearance: none;
   display: inline-flex;
@@ -711,6 +904,15 @@ button.cell {
 
   .selectorGrid {
     grid-template-columns: 1fr;
+  }
+
+  .atlasScenarioCard {
+    grid-template-columns: 1fr;
+  }
+
+  .atlasScenarioImage,
+  .atlasScenarioImageFallback {
+    min-height: 150px;
   }
 
   .topBarMeta {
