@@ -1,8 +1,18 @@
 import React from 'react';
 import { PUBLIC_REPO_NEW_ISSUE_URL } from '../../variables/publicRepoMetadata.js';
 
-class RouteErrorBoundary extends React.Component {
-  constructor(props) {
+type RouteErrorBoundaryProps = {
+  children?: React.ReactNode;
+  resetKey?: string | number | null;
+};
+
+type RouteErrorBoundaryState = {
+  hasError: boolean;
+  errorMessage: string;
+};
+
+class RouteErrorBoundary extends React.Component<RouteErrorBoundaryProps, RouteErrorBoundaryState> {
+  constructor(props: RouteErrorBoundaryProps) {
     super(props);
     this.state = {
       hasError: false,
@@ -10,18 +20,18 @@ class RouteErrorBoundary extends React.Component {
     };
   }
 
-  static getDerivedStateFromError(error) {
+  static getDerivedStateFromError(error: Error | null): RouteErrorBoundaryState {
     return {
       hasError: true,
       errorMessage: (error && error.message) ? error.message : 'An unexpected error occurred.',
     };
   }
 
-  componentDidCatch(error, errorInfo) {
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error('RouteErrorBoundary caught an error:', error, errorInfo && errorInfo.componentStack);
   }
 
-  componentDidUpdate(prevProps) {
+  componentDidUpdate(prevProps: RouteErrorBoundaryProps) {
     if (this.state.hasError && this.props.resetKey && this.props.resetKey !== prevProps.resetKey) {
       this.setState({ hasError: false, errorMessage: '' });
     }
