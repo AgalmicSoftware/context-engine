@@ -102,7 +102,7 @@ import {
 
 // withWagmiBridge is a function component (allowed to use hooks from wagmi and RainbowKit).
 // It passes props to this class-component so that this component can use React hooks.
-import { WagmiHooksHOC } from '../HooksHOC/withWagmiBridge.jsx'
+import { WagmiHooksHOC } from '../HooksHOC/withWagmiBridge'
 
 // Components
 import Navbar from "../Navbar/Navbar";

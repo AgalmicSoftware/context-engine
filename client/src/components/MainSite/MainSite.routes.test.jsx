@@ -26,7 +26,7 @@ jest.mock('react-redux', () => ({
   connect: () => (Comp) => Comp,
 }));
 
-jest.mock('../HooksHOC/withWagmiBridge.jsx', () => ({
+jest.mock('../HooksHOC/withWagmiBridge', () => ({
   WagmiHooksHOC: (Comp) => Comp,
 }));
 

@@ -1,4 +1,4 @@
-/** @file withWagmiBridge.jsx */
+/** @file withWagmiBridge.tsx */
 import React, { useEffect, useRef } from "react";
 
 import { useAccount, useBalance, useBlockNumber, useNetwork, useProvider, useDisconnect } from 'wagmi'
@@ -10,13 +10,17 @@ import { createLogger } from 'utilities/logging.js';
 
 const accountLog = createLogger('account');
 
+declare global {
+  interface Window {
+    __wagmiReduxBridgeOwner?: string;
+  }
+}
 
-
-export function WagmiHooksHOC(Component) {
-    return function WrappedComponent(props) {
+export function WagmiHooksHOC(Component: React.ComponentType<any>) {
+    return function WrappedComponent(props: Record<string, any>) {
         // wagmi hooks
         const { address, isConnecting, isDisconnected } = useAccount({
-          onConnect({ address, connector, isReconnected }) {
+          onConnect({ address }: any) {
             accountLog.log("Connected – address: " + address)
           },
           onDisconnect() {
@@ -70,7 +74,7 @@ export function WagmiHooksHOC(Component) {
         const { openAccountModal } = useAccountModal();
         const { openChainModal } = useChainModal();
 
-        const examplePropFunc = (args) => {
+        const examplePropFunc = (args: unknown) => {
             accountLog.log("Footer-HooksHOC – callback working: " + args)
         };
 
@@ -111,7 +115,7 @@ export function WagmiHooksHOC(Component) {
 
         // --- NEW: Redux hydration bridge for wagmi autoConnect / disconnect ---
         // Keeps Redux session + profile in sync with wagmi so UI shows logged-in state after refresh.
-        const lastHydratedRef = useRef({ key: null });
+        const lastHydratedRef = useRef<{ key: string | null }>({ key: null });
         const prevAddressRef = useRef(address);
         useEffect(() => {
           const wasAddressConnected = Boolean(prevAddressRef.current);

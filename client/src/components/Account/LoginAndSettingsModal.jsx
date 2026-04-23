@@ -16,7 +16,7 @@ import {
 } from '../../actions/sessionStateActions.js';
 
 // Hooks HOC
-import { WagmiHooksHOC } from '../HooksHOC/withWagmiBridge.jsx'
+import { WagmiHooksHOC } from '../HooksHOC/withWagmiBridge'
 
 // CSS, icons, logos
 import '../../assets/css/contextEngine.scss'
