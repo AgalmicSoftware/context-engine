@@ -15,7 +15,7 @@ import { Container, Row, Col } from "reactstrap";
 
 import withRouter from "./HooksHOC/withRouterBridge";
 import MainSite from "./MainSite/MainSite.jsx";
-import AppErrorBoundary from './ErrorBoundary/AppErrorBoundary.jsx';
+import AppErrorBoundary from './ErrorBoundary/AppErrorBoundary';
 import { readColdLoadOnboardingState } from './Onboarding/onboardingConfig.js';
 import { toastTheme } from '../utilities/ui/toastTheme.js';
 

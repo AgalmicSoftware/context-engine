@@ -1,8 +1,17 @@
 import React from 'react';
 import { PUBLIC_REPO_NEW_ISSUE_URL } from '../../variables/publicRepoMetadata.js';
 
-class AppErrorBoundary extends React.Component {
-  constructor(props) {
+type AppErrorBoundaryProps = {
+  children?: React.ReactNode;
+};
+
+type AppErrorBoundaryState = {
+  hasError: boolean;
+  errorMessage: string;
+};
+
+class AppErrorBoundary extends React.Component<AppErrorBoundaryProps, AppErrorBoundaryState> {
+  constructor(props: AppErrorBoundaryProps) {
     super(props);
     this.state = {
       hasError: false,
@@ -10,14 +19,14 @@ class AppErrorBoundary extends React.Component {
     };
   }
 
-  static getDerivedStateFromError(error) {
+  static getDerivedStateFromError(error: Error | null): AppErrorBoundaryState {
     return {
       hasError: true,
       errorMessage: (error && error.message) ? error.message : 'An unexpected error occurred.',
     };
   }
 
-  componentDidCatch(error, errorInfo) {
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error('AppErrorBoundary caught an error:', error, errorInfo && errorInfo.componentStack);
   }
 
