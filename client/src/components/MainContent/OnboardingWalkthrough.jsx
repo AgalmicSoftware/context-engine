@@ -9,7 +9,7 @@ import styles from "./MainContent.module.scss";
 
 import { Container } from "reactstrap";
 
-import SiteLoadOptions from '../InformationModals/SiteLoadOptions.jsx';
+import SiteLoadOptions from '../InformationModals/SiteLoadOptions';
 import { WELCOME_SLIDES, getWelcomeSlide } from './welcomeSlides.js';
 
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
