@@ -20,9 +20,6 @@ type Question = {
   id: string;
   text: string;
   options: string[];
-  category?: string;
-  keyTension?: string;
-  sourcePromptType?: string;
 };
 
 type FlatResponse = {
@@ -56,14 +53,6 @@ type ComparisonGroup = {
 
 type QuestionTagsById = Record<string, QuestionTag[]>;
 
-type QuestionProfileSummary = {
-  profileId: string;
-  label: string;
-  confidence: string;
-  rationale: string;
-  count: number;
-};
-
 type Suggestion = {
   pair: string[];
   questionId: string;
@@ -76,7 +65,6 @@ type AnalysisData = {
   demographics: DemographicsByCategory;
   segmentCounts: SegmentCounts;
   questionTagsData: QuestionTagsById;
-  questionProfileSummaries: Record<string, QuestionProfileSummary[]>;
 };
 
 type DemoAnalysisWorkspaceProps = {
