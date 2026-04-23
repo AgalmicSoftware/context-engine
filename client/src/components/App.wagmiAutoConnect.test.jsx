@@ -62,7 +62,7 @@ const mockAppDependencies = () => {
     syncPublicPageHead: mockSyncPublicPageHead,
   }));
 
-  jest.doMock('./HooksHOC/withRouterBridge.jsx', () => ({
+  jest.doMock('./HooksHOC/withRouterBridge', () => ({
     __esModule: true,
     default: (Comp) => Comp,
   }));

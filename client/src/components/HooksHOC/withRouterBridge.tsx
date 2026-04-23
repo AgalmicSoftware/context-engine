@@ -1,11 +1,11 @@
-/** @file withRouterBridge.jsx */
-import { BrowserRouter, useLocation, useNavigate, useParams } from "react-router-dom";
-import { createLogger } from '../../utilities/logging';
+/** @file withRouterBridge.tsx */
+import type { ComponentType } from "react";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 
-const log = createLogger('general');
+type RouterBridgeOuterProps = Record<string, unknown>;
 
-  function withRouter(Component) {
-    function ComponentWithRouterProp(props) {
+  function withRouter(Component: ComponentType<any>) {
+    function ComponentWithRouterProp(props: RouterBridgeOuterProps) {
 
       const params = useParams()
       const navigate = useNavigate()
