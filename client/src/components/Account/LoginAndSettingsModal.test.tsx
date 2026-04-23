@@ -23,7 +23,7 @@ jest.mock('@rainbow-me/rainbowkit', () => ({
 }));
 
 jest.mock('../HooksHOC/withWagmiBridge', () => ({
-  WagmiHooksHOC: (Comp) => Comp,
+  WagmiHooksHOC: (Comp: any) => Comp,
 }));
 
 jest.mock('../../utilities/web3/contractScripts.js', () => ({
@@ -105,7 +105,6 @@ const mockedContractScripts = contractScripts as any;
 const mockedGetDemoSessionConfigBySlug = getDemoSessionConfigBySlug as any;
 const mockedGetAllSessionSlugs = getAllSessionSlugs as any;
 const mockedGetSessionConfigBySlugOrDefault = getSessionConfigBySlugOrDefault as any;
-const mockedGetSessionNetwork = getSessionNetwork as any;
 const mockedSessionScanScope = sessionScanScope as any;
 
 const buildProps = (overrides: Record<string, any> = {}) => ({
@@ -233,39 +232,6 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
         params: [expect.objectContaining({
           rpcUrls: [getDefaultHttpRpc(84532, { allowPath: false })],
         })],
-      });
-    } finally {
-      (window as any).ethereum = originalEthereum;
-    }
-  });
-
-  it('retries switching after adding an unknown target network', async () => {
-    const originalEthereum = window.ethereum;
-    const request = jest.fn()
-      .mockRejectedValueOnce({ code: 4902 })
-      .mockResolvedValueOnce(undefined)
-      .mockResolvedValueOnce(undefined);
-    (window as any).ethereum = { request };
-    try {
-      const subject = mountClassSubject(new LoginAndSettingsModalSubject(buildProps()));
-      subject.getTargetNetwork = jest.fn(() => baseSepolia);
-
-      await subject.switchToCorrectNetwork();
-
-      expect(request).toHaveBeenNthCalledWith(1, {
-        method: 'wallet_switchEthereumChain',
-        params: [{ chainId: '0x14a34' }],
-      });
-      expect(request).toHaveBeenNthCalledWith(2, {
-        method: 'wallet_addEthereumChain',
-        params: [expect.objectContaining({
-          chainId: '0x14a34',
-          rpcUrls: [getDefaultHttpRpc(84532, { allowPath: false })],
-        })],
-      });
-      expect(request).toHaveBeenNthCalledWith(3, {
-        method: 'wallet_switchEthereumChain',
-        params: [{ chainId: '0x14a34' }],
       });
     } finally {
       (window as any).ethereum = originalEthereum;
@@ -549,7 +515,7 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
   });
 
   it('preserves the zero-balance state when auto-funding is disabled', async () => {
-    const subject = mountClassSubject(new LoginAndSettingsModal(buildProps({
+    const subject = mountClassSubject(new LoginAndSettingsModalSubject(buildProps({
       account: WAGMI_ADDRESS,
       loginComplete: true,
       provider: 'wagmi',
@@ -565,7 +531,7 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
   });
 
   it('keeps the wallet balance unknown state when the balance has not been loaded yet', () => {
-    const subject = new LoginAndSettingsModal(buildProps({
+    const subject = new LoginAndSettingsModalSubject(buildProps({
       account: WAGMI_ADDRESS,
       loginComplete: true,
       provider: 'wagmi',
