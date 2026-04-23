@@ -358,7 +358,7 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
 
     .packedAtlasTitleRow {
       position: absolute;
-      top: 14px;
+      top: 8px;
       left: 50%;
       transform: translateX(-50%);
       z-index: 45;
@@ -372,7 +372,7 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
       display: inline-flex;
       align-items: center;
       gap: 10px;
-      padding: 7px 14px;
+      padding: 6px 13px;
       border: 1px solid rgba(255, 255, 255, 0.18);
       border-radius: 999px;
       background: rgba(11, 17, 32, 0.55);
@@ -725,18 +725,20 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
 
         .packedNodeLabel {
           position: absolute;
-          inset: 14%;
+          inset: 12%;
           display: flex;
           align-items: center;
           justify-content: center;
           text-align: center;
           white-space: normal;
-          line-height: 1.1;
+          line-height: 1.06;
           padding: 0;
           transform: scale(0.94);
           text-shadow: 0 2px 10px rgba(11, 17, 32, 0.55);
           background: transparent;
           border-radius: 0;
+          font-weight: 700;
+          letter-spacing: 0.02em;
         }
 
         &.depthCenter {
@@ -1175,7 +1177,10 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
     z-index: 2000;
     display: flex;
     justify-content: center;
-    align-items: center;
+    align-items: flex-start;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 24px 16px;
   }
 
   .modalContent {
@@ -1186,10 +1191,12 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
     border-radius: var(--ce-radius-12);
     max-width: 800px;
     width: 95%;
-    max-height: 90vh;
+    max-height: calc(100vh - 48px);
     overflow-y: auto;
+    overscroll-behavior: contain;
     position: relative;
     color: $text-main;
+    margin: 0 auto;
     &::-webkit-scrollbar {
       width: 8px;
     }
@@ -2634,7 +2641,7 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
     .modalContent {
       width: 90%;
       height: auto;
-      max-height: 85vh;
+      max-height: calc(100vh - 32px);
       border-radius: var(--ce-radius-12);
       .modalHeader .closeIcon {
         position: fixed;
