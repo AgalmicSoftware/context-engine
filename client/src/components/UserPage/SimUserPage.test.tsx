@@ -5,37 +5,7 @@ import path from 'path';
 import SimUserPage from './SimUserPage';
 import historicalFigures from '../../variables/demo/historical_figure_users.json';
 
-type TestSimQuestion = {
-  question: string;
-  questionType: string;
-  answer: {
-    value?: unknown;
-  };
-};
-
-type TestHistoricalFigure = {
-  name: string;
-  username: string;
-  questions: TestSimQuestion[];
-  biggestHope: string;
-};
-
-type MockSingleQuestionResponseProps = {
-  mode?: string;
-  question?: {
-    prompt?: string;
-    type?: string;
-  };
-  response?: {
-    answer?: {
-      value?: unknown;
-    };
-  };
-};
-
-const historicalFiguresData = historicalFigures as TestHistoricalFigure[];
-
-jest.mock('../SurveyTool/SingleQuestionResponse', () => (props: MockSingleQuestionResponseProps) => {
+jest.mock('../SurveyTool/SingleQuestionResponse.jsx', () => (props: any) => {
   const rawValue = props?.response?.answer?.value;
   const answerText = Array.isArray(rawValue) ? rawValue.join(' | ') : String(rawValue ?? '');
 
@@ -59,7 +29,7 @@ describe('SimUserPage', () => {
     ) => HTMLElement;
     const getContext = jest.fn(() => ({ fillStyle: '', fillRect: jest.fn() }));
     const toDataURL = jest.fn(() => value);
-    const createElementSpy = jest.spyOn(document, 'createElement').mockImplementation((tagName: string, options?: ElementCreationOptions) => {
+    const createElementSpy = jest.spyOn(document, 'createElement').mockImplementation((tagName: any, options?: any) => {
       if (tagName === 'canvas') {
         return {
           width: 0,
@@ -75,10 +45,9 @@ describe('SimUserPage', () => {
   };
 
   it('renders simulated question responses through the shared response-card presentation', async () => {
-    const figure = historicalFiguresData.find((entry) => entry.username === 'Franklin');
-    if (!figure) throw new Error('Franklin test fixture is missing');
-    const firstBinary = figure.questions.find((entry) => entry.questionType === 'binary');
-    const firstFreeform = figure.questions.find((entry) => entry.questionType === 'freeform');
+    const figure = historicalFigures.find((entry) => entry.username === 'Franklin') as any;
+    const firstBinary = figure.questions.find((entry: any) => entry.questionType === 'binary');
+    const firstFreeform = figure.questions.find((entry: any) => entry.questionType === 'freeform');
 
     render(<SimUserPage simUsername="Franklin" />);
 
@@ -93,7 +62,7 @@ describe('SimUserPage', () => {
     expect(screen.getByText(figure.questions[0].question)).toBeInTheDocument();
     expect(screen.getAllByText(String(firstBinary?.answer.value)).length).toBeGreaterThan(0);
     expect(
-      screen.getByText((content: string) => content.includes(String(firstFreeform?.answer.value).substring(0, 40)))
+      screen.getByText((content: string) => content.includes(String(firstFreeform.answer.value).substring(0, 40)))
     ).toBeInTheDocument();
     expect(screen.queryByText(/^Question 1$/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/^Binary$/i)).not.toBeInTheDocument();
@@ -105,7 +74,6 @@ describe('SimUserPage', () => {
     const previousPublicUrl = process.env.PUBLIC_URL;
     const mutableEnv = process.env as Record<string, string | undefined>;
     mutableEnv.PUBLIC_URL = '/ce/';
-    const priorUrl = window.location.href;
     try {
       window.history.replaceState({}, '', '/ce/su/Franklin?tab=atlas#positions');
       render(<SimUserPage simUsername="Franklin" />);
@@ -120,7 +88,6 @@ describe('SimUserPage', () => {
         .filter((link) => /^\/ce\/su\//.test(link.getAttribute('href') || ''));
       expect(profileLinks.length).toBeGreaterThan(0);
     } finally {
-      window.history.replaceState({}, '', priorUrl);
       if (previousPublicUrl === undefined) delete mutableEnv.PUBLIC_URL;
       else mutableEnv.PUBLIC_URL = previousPublicUrl;
     }
