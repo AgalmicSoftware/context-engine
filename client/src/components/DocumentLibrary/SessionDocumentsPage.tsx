@@ -1,4 +1,4 @@
-/** @file SessionDocumentsPage.jsx */
+/** @file SessionDocumentsPage.tsx */
 
 import React, { useMemo } from 'react';
 import styles from './SessionDocumentsPage.module.scss';
@@ -7,7 +7,35 @@ import DocumentLibraryPanel from './DocumentLibraryPanel.jsx';
 import { normalizeSessionIdHex } from '../../utilities/docLibrary/tags.js';
 import { normalizeSessionSlug } from '../../utilities/session/sessionNaming.js';
 
-const buildSessionBackHref = ({ sessionToken, sessionSlug } = {}) => {
+type SessionConfig = {
+  slug?: string;
+  sessionIdHex?: string;
+  sessionId?: string;
+  __registry?: {
+    sessionIdHex?: string;
+    sessionId?: string;
+  };
+  [key: string]: unknown;
+};
+
+type SessionDocumentsPageProps = {
+  provider?: unknown;
+  network?: string;
+  account?: string;
+  loginComplete?: boolean;
+  toggleLoginModal?: () => void;
+  sessionToken?: string;
+  sessionSlug?: string;
+  sessionConfig?: SessionConfig;
+  sessionIdHex?: string;
+};
+
+const DocumentLibraryPanelComponent = DocumentLibraryPanel as React.ComponentType<any>;
+
+const buildSessionBackHref = ({
+  sessionToken,
+  sessionSlug,
+}: Pick<SessionDocumentsPageProps, 'sessionToken' | 'sessionSlug'> = {}) => {
   const hasExplicitSessionSlug = sessionSlug !== undefined && sessionSlug !== null;
   const rawSlug = hasExplicitSessionSlug ? sessionSlug : sessionToken;
   const slug = normalizeSessionSlug(rawSlug || '');
@@ -24,7 +52,7 @@ export default function SessionDocumentsPage({
   sessionSlug,
   sessionConfig,
   sessionIdHex,
-} = {}) {
+}: SessionDocumentsPageProps = {}) {
   const resolvedSessionIdHex = useMemo(() => (
     normalizeSessionIdHex(
       sessionIdHex ||
@@ -45,7 +73,7 @@ export default function SessionDocumentsPage({
         <a className={styles.backLink} href={backHref}>Back to session</a>
       </div>
 
-      <DocumentLibraryPanel
+      <DocumentLibraryPanelComponent
         provider={provider}
         network={network}
         account={account}
