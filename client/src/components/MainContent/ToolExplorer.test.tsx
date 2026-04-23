@@ -11,17 +11,18 @@ const mockSurveyTool = jest.fn();
 const mockSBTsPage = jest.fn();
 const mockDebateMap = jest.fn();
 const mockAudioSurveyGenerator = jest.fn();
+const mutableEnv = process.env as Record<string, string | undefined>;
 const originalPublicUrl = process.env.PUBLIC_URL;
 
 jest.mock('../../utilities/web3/contractScripts.js', () => ({
   __esModule: true,
-  getAllSessionSlugs: (...args) => mockGetAllSessionSlugs(...args),
-  getSessionConfigBySlug: (...args) => mockGetSessionConfigBySlug(...args),
+  getAllSessionSlugs: (...args: any[]) => mockGetAllSessionSlugs(...args),
+  getSessionConfigBySlug: (...args: any[]) => mockGetSessionConfigBySlug(...args),
 }));
 
 jest.mock('../SurveyTool/SurveyTool.jsx', () => ({
   __esModule: true,
-  default: (props) => {
+  default: (props: any) => {
     mockSurveyTool(props);
     return (
       <div
@@ -44,7 +45,7 @@ jest.mock('../Shared/AudioInput/AudioInput', () => ({
 
 jest.mock('../SBTs/SBTsPage.jsx', () => ({
   __esModule: true,
-  default: (props) => {
+  default: (props: any) => {
     mockSBTsPage(props);
     return (
       <div
@@ -57,7 +58,7 @@ jest.mock('../SBTs/SBTsPage.jsx', () => ({
 
 jest.mock('../DebateMap/DebateMap.jsx', () => ({
   __esModule: true,
-  default: (props) => {
+  default: (props: any) => {
     mockDebateMap(props);
     return (
       <div
@@ -70,7 +71,7 @@ jest.mock('../DebateMap/DebateMap.jsx', () => ({
 
 jest.mock('../SurveyTool/SurveyGenerator/SurveyGenerator.jsx', () => ({
   __esModule: true,
-  default: (props) => {
+  default: (props: any) => {
     mockAudioSurveyGenerator(props);
     return (
       <div
@@ -90,7 +91,7 @@ jest.mock('./ToolExplorerPluginExplainer', () => ({
   default: () => <div data-testid="mock-explainer" />,
 }));
 
-const renderToolExplorer = (overrides = {}) => render(
+const renderToolExplorer = (overrides: Record<string, unknown> = {}) => render(
   <ToolExplorer
     activeSessionSlug="demo"
     account="0x1111111111111111111111111111111111111111"
@@ -110,13 +111,13 @@ describe('ToolExplorer session propagation', () => {
   afterEach(() => {
     jest.clearAllMocks();
     sessionStorage.clear();
-    if (originalPublicUrl === undefined) delete process.env.PUBLIC_URL;
-    else process.env.PUBLIC_URL = originalPublicUrl;
+    if (originalPublicUrl === undefined) delete mutableEnv.PUBLIC_URL;
+    else mutableEnv.PUBLIC_URL = originalPublicUrl;
   });
 
   beforeEach(() => {
     mockGetAllSessionSlugs.mockReturnValue(['edge', 'rxc']);
-    mockGetSessionConfigBySlug.mockImplementation((slug) => {
+    mockGetSessionConfigBySlug.mockImplementation((slug: unknown) => {
       const normalized = String(slug || '');
       if (normalized === 'edge') return { slug: 'edge', sessionName: 'Edge Session' };
       if (normalized === 'rxc') return { slug: 'rxc', sessionName: 'Debate Session' };
@@ -145,8 +146,9 @@ describe('ToolExplorer session propagation', () => {
     expect(screen.getByRole('link', { name: /^View All$/i })).toHaveAttribute('href', sbtsListPath());
     expect(screen.getByRole('button', { name: /^Create$/i })).toBeInTheDocument();
 
-    const headerLead = container.querySelector(`.${styles.expandedHeaderLead}`);
-    const headerActions = container.querySelector(`.${styles.expandedHeaderActions}`);
+    const headerLead = container.querySelector(`.${styles.expandedHeaderLead}`) as HTMLElement | null;
+    const headerActions = container.querySelector(`.${styles.expandedHeaderActions}`) as HTMLElement | null;
+    if (!headerLead || !headerActions) throw new Error('Expected expanded header regions');
     expect(headerLead).toContainElement(screen.getByRole('button', { name: /^← Back$/i }));
     expect(headerLead).toContainElement(screen.getByTestId('mock-explainer'));
     expect(headerActions).toContainElement(screen.getByRole('link', { name: /^View All$/i }));
@@ -221,7 +223,7 @@ describe('ToolExplorer session propagation', () => {
   });
 
   it('builds expanded header links against PUBLIC_URL for subpath deploys', async () => {
-    process.env.PUBLIC_URL = '/ce/';
+    mutableEnv.PUBLIC_URL = '/ce/';
 
     renderToolExplorer({ activeSessionSlug: 'edge' });
 
@@ -273,9 +275,10 @@ describe('ToolExplorer session propagation', () => {
     fireEvent.click(screen.getByText('Context'));
 
     expect(await screen.findByTestId('mock-audio-survey-generator')).toBeInTheDocument();
-    const headerGroup = container.querySelector(`.${styles.headerModeToggleGroup}`);
+    const headerGroup = container.querySelector(`.${styles.headerModeToggleGroup}`) as HTMLElement | null;
+    if (!headerGroup) throw new Error('Expected header mode toggle group');
     const headerButtons = Array.from(headerGroup.querySelectorAll('button')).map(
-      (node) => node.getAttribute('aria-label') || node.textContent.trim()
+      (node) => node.getAttribute('aria-label') || node.textContent?.trim()
     );
 
     expect(headerButtons).toEqual(['Add', 'View', 'Context session selector']);
@@ -316,7 +319,7 @@ describe('ToolExplorer session propagation', () => {
     { demoSurfaceMode: true, expectedDemoMode: 'true' },
   ])(
     'shows demo cards and the legend when demoSurfaceMode is $demoSurfaceMode',
-    async ({ demoSurfaceMode, expectedDemoMode }) => {
+    async ({ demoSurfaceMode, expectedDemoMode }: { demoSurfaceMode: boolean | null; expectedDemoMode: string }) => {
       renderToolExplorer({ demoSurfaceMode });
 
       expect(screen.getByText('Debate Tree')).toBeInTheDocument();
@@ -341,9 +344,10 @@ describe('ToolExplorer session propagation', () => {
     expect(screen.queryByText('Live')).not.toBeInTheDocument();
     expect(screen.queryByText('Demo')).not.toBeInTheDocument();
 
-    const explorerContainer = container.querySelector(`.${styles.explorerContainer}`);
-    const explorerRow = container.querySelector(`.${styles.explorerRow}`);
+    const explorerContainer = container.querySelector(`.${styles.explorerContainer}`) as HTMLElement | null;
+    const explorerRow = container.querySelector(`.${styles.explorerRow}`) as HTMLElement | null;
     const explorerCols = Array.from(container.querySelectorAll(`.${styles.explorerCol}`));
+    if (!explorerContainer || !explorerRow) throw new Error('Expected sparse explorer layout');
 
     expect(explorerContainer).toHaveClass(styles.explorerContainerSparse);
     expect(explorerRow).toHaveClass(styles.explorerRowSparse);
