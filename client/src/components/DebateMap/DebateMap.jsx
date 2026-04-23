@@ -26,7 +26,7 @@ import { buildTagHref } from '../SurveyTool/QuestionTagDropdown.jsx';
 const { hierarchy: d3Hierarchy, pack: d3Pack } = require('d3');
 
 const StandalonePoliticalCompass = React.lazy(() => (
-  import('../DemoViews/DebateHUD/PoliticalCompassView.jsx').then((module) => ({
+  import('../DemoViews/DebateHUD/PoliticalCompassView').then((module) => ({
     default: module.StandalonePoliticalCompass,
   }))
 ));
