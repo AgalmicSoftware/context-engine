@@ -5,17 +5,83 @@ import { ThemeContext, darkTheme, soften, useTheme } from './debateHudTheme';
 import { getDemoAvatarByName } from '../../../utilities/ui/demoAvatars.js';
 import { generateBlockieDataUrl } from '../../../utilities/ui/blockieAvatars.js';
 
-const compassQuotes = {};
+type CompassPoint = {
+  name: string;
+  x: number;
+  y: number;
+  color?: string;
+  type?: string;
+  comment?: string;
+};
 
-const PoliticalCompass = ({ compass, compact = true }) => {
+type Compass = {
+  xAxis: {
+    label?: string;
+    left: string;
+    right: string;
+  };
+  yAxis: {
+    top: string;
+    bottom: string;
+  };
+  points: CompassPoint[];
+};
+
+type VoterProfile = {
+  affiliation?: string;
+  role?: string;
+  keyClaims?: string[];
+  policyPositions?: Array<{
+    topic: string;
+    position: string;
+  }>;
+  themes?: string[];
+};
+
+type CompassQuote = {
+  type?: string;
+  text: string;
+  url?: string;
+  source?: string;
+};
+
+type TooltipState = {
+  name: string;
+  comment: string;
+  color: string;
+  left: number;
+  top: number;
+};
+
+type PoliticalCompassProps = {
+  compass: Compass;
+  compact?: boolean;
+};
+
+type FullscreenIconProps = {
+  expand: boolean;
+};
+
+type PoliticalCompassViewProps = {
+  selectedDebateId?: number;
+};
+
+type StandalonePoliticalCompassProps = PoliticalCompassProps & {
+  theme?: typeof darkTheme;
+};
+
+const compassQuotes: Record<string, CompassQuote[]> = {};
+const voterProfileMap = voterProfiles as Record<string, VoterProfile | undefined>;
+
+const PoliticalCompass = ({ compass, compact = true }: PoliticalCompassProps) => {
   const T = useTheme();
-  const wrapperRef = useRef(null);
-  const tooltipRef = useRef(null);
+  const wrapperRef = useRef<HTMLDivElement | null>(null);
+  const tooltipRef = useRef<HTMLDivElement | null>(null);
 
-  const [hoveredPoint, setHoveredPoint] = useState(null);
-  const [selectedPoint, setSelectedPoint] = useState(null);
+  const [hoveredPoint, setHoveredPoint] = useState<string | null>(null);
+  const [selectedPoint, setSelectedPoint] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [tooltipState, setTooltipState] = useState(null);
+  const [tooltipState, setTooltipState] = useState<TooltipState | null>(null);
 
   useEffect(() => {
     setSelectedPoint(null);
@@ -25,7 +91,7 @@ const PoliticalCompass = ({ compass, compact = true }) => {
 
   useEffect(() => {
     if (!isFullscreen) return;
-    const handler = (e) => { if (e.key === "Escape") setIsFullscreen(false); };
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") setIsFullscreen(false); };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [isFullscreen]);
@@ -38,20 +104,24 @@ const PoliticalCompass = ({ compass, compact = true }) => {
   const cH = svgH - 2 * padY;
   const cx = padX + cW / 2;
   const cy = padY + cH / 2;
-  const edgeLabelStyle = { fontSize: "14px", fontWeight: 800, fill: "#222" };
-  const getPointComment = (point) => (typeof point?.comment === "string" ? point.comment.trim() : "");
-  const getPointSlug = (pointName) => (
+  const edgeLabelStyle: React.CSSProperties = { fontSize: "14px", fontWeight: 800, fill: "#222" };
+  const getPointComment = (point?: CompassPoint | null) => (typeof point?.comment === "string" ? point.comment.trim() : "");
+  const getPointSlug = (pointName?: string) => (
     String(pointName || "point")
       .trim()
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-+|-+$/g, "")
   );
-  const getPointTestId = (pointName) => (
+  const getPointTestId = (pointName?: string) => (
     `ce-political-compass-point-${getPointSlug(pointName)}`
   );
 
-  const updateTooltipPosition = (event, point, pointComment = getPointComment(point)) => {
+  const updateTooltipPosition = (
+    event: React.MouseEvent<SVGGElement>,
+    point: CompassPoint,
+    pointComment = getPointComment(point)
+  ) => {
     if (!pointComment) {
       setTooltipState(null);
       return;
@@ -104,7 +174,11 @@ const PoliticalCompass = ({ compass, compact = true }) => {
     });
   };
 
-  const handlePointMouseEnter = (event, point, pointComment) => {
+  const handlePointMouseEnter = (
+    event: React.MouseEvent<SVGGElement>,
+    point: CompassPoint,
+    pointComment: string
+  ) => {
     setHoveredPoint(point.name);
 
     if (pointComment) {
@@ -120,7 +194,7 @@ const PoliticalCompass = ({ compass, compact = true }) => {
     setTooltipState(null);
   };
 
-  const splitEdgeLabel = (label) => {
+  const splitEdgeLabel = (label: string) => {
     const normalized = String(label || "").trim().replace(/\s+/g, " ");
     if (!normalized.includes(" ")) return [normalized];
 
@@ -136,7 +210,7 @@ const PoliticalCompass = ({ compass, compact = true }) => {
     ].filter(Boolean);
   };
 
-  const renderSideLabel = (label, x, anchor) => {
+  const renderSideLabel = (label: string, x: number, anchor: 'start' | 'middle' | 'end') => {
     const lines = splitEdgeLabel(label);
     if (lines.length === 1) {
       return (
@@ -162,7 +236,7 @@ const PoliticalCompass = ({ compass, compact = true }) => {
     bottomLeft: "rgba(230, 80, 80, 0.30)",
     bottomRight: "rgba(230, 210, 80, 0.35)",
   };
-  const getAvatarBaseRadius = (point) => {
+  const getAvatarBaseRadius = (point: CompassPoint) => {
     if (point?.type === "historical") return 16;
     if (point?.type === "debater") return 13;
     return 11;
@@ -200,7 +274,7 @@ const PoliticalCompass = ({ compass, compact = true }) => {
     Boolean(avatarInfo?.url)
   ));
 
-  const getShape = (point, px, py, size) => {
+  const getShape = (point: CompassPoint, px: number, py: number, size: number) => {
     if (point.type === "tweeter") {
       const d = size * 0.9;
       return <polygon points={`${px},${py - d} ${px + d},${py} ${px},${py + d} ${px - d},${py}`} />;
@@ -211,7 +285,7 @@ const PoliticalCompass = ({ compass, compact = true }) => {
     return <circle cx={px} cy={py} r={size} />;
   };
 
-  const FullscreenIcon = ({ expand }) => (
+  const FullscreenIcon = ({ expand }: FullscreenIconProps) => (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
       {expand ? (
         <>
@@ -244,9 +318,9 @@ const PoliticalCompass = ({ compass, compact = true }) => {
       </div>
 
       {selectedPoint && (() => {
-        const profile = voterProfiles[selectedPoint];
+        const profile = voterProfileMap[selectedPoint];
         const quotes = compassQuotes[selectedPoint] || [];
-        const sp = compass.points.find(p => p.name === selectedPoint);
+        const sp = compass.points.find((p) => p.name === selectedPoint);
         const pointComment = getPointComment(sp);
         const qLabel = sp ? (
           (sp.y > 0.5 ? compass.yAxis.top : compass.yAxis.bottom) + " / " +
@@ -321,7 +395,7 @@ const PoliticalCompass = ({ compass, compact = true }) => {
                     {profile.keyClaims.slice(0, 3).map((c, i) => (
                       <div key={i} style={{
                         fontSize: 12, color: T.text, padding: "4px 0",
-                        borderBottom: i < Math.min(profile.keyClaims.length, 3) - 1 ? `1px solid ${T.borderLight}` : "none",
+                        borderBottom: i < Math.min(profile.keyClaims?.length || 0, 3) - 1 ? `1px solid ${T.borderLight}` : "none",
                         lineHeight: 1.5}}>
                         <span style={{ color: (sp && sp.color) || T.accent, marginRight: 6, fontWeight: 700 }}>→</span>{c}
                       </div>
@@ -671,7 +745,7 @@ const PoliticalCompass = ({ compass, compact = true }) => {
   );
 };
 
-const PoliticalCompassView = ({ selectedDebateId }) => {
+const PoliticalCompassView = ({ selectedDebateId }: PoliticalCompassViewProps) => {
   useTheme();
   const debate = debateData.find((item) => item.id === selectedDebateId) || debateData[0];
 
@@ -684,7 +758,7 @@ const PoliticalCompassView = ({ selectedDebateId }) => {
   );
 };
 
-const StandalonePoliticalCompass = ({ compass, theme = darkTheme, compact = false }) => (
+const StandalonePoliticalCompass = ({ compass, theme = darkTheme, compact = false }: StandalonePoliticalCompassProps) => (
   <ThemeContext.Provider value={theme || darkTheme}>
     <PoliticalCompass compass={compass} compact={compact} />
   </ThemeContext.Provider>
