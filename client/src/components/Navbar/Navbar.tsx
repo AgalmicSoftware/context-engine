@@ -12,7 +12,7 @@ import {
   CE_LOGO_ANIMATION_DURATION_MS_PINGPONG,
 } from "../../variables/appConfig.js";
 
-import AccountSectionRaw from "./AccountSection.jsx";
+import AccountSectionRaw from "./AccountSection";
 import withRouter from "../HooksHOC/withRouterBridge.jsx";
 import { createLogger } from 'utilities/logging.js';
 import { readPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';

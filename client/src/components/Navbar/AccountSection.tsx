@@ -6,8 +6,8 @@ import type { RootState } from '../../reducers/index.js';
 
 import styles from "./Navbar.module.scss";
 
-import LoginButton from 'components/Account/LoginButton.jsx';
-import LoginAndSettingsModal from '../Account/LoginAndSettingsModal.jsx'
+import LoginButtonRaw from 'components/Account/LoginButton.jsx';
+import LoginAndSettingsModalRaw from '../Account/LoginAndSettingsModal.jsx'
 import { AccountDisplayTorus } from './AccountDisplay';
 
 import { generateBlockieDataUrl } from 'utilities/ui/blockieAvatars.js';
@@ -28,10 +28,28 @@ type AccountSectionProps = {
   toggleDemoMode?: (demoModeOn: boolean) => void;
 };
 
+type RootState = {
+  sessionState: {
+    loginModalToggled?: boolean;
+    loginComplete?: boolean;
+  };
+  profile: {
+    userImageURL?: string | null;
+  };
+};
+
 const LoginButton = LoginButtonRaw as React.ComponentType<any>;
 const LoginAndSettingsModal = LoginAndSettingsModalRaw as React.ComponentType<any>;
 
 class AccountSection extends Component<AccountSectionProps> {
+  static propTypes = {
+    toggleLoginModal: PropTypes.func.isRequired,
+    loginModalToggled: PropTypes.bool,
+    userImageURL: PropTypes.string,
+    account: PropTypes.string,
+    provider: PropTypes.string,
+  };
+
   state = {};
 
   componentDidMount() {}
