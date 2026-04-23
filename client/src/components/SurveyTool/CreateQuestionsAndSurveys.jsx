@@ -58,6 +58,7 @@ import { resolveEncryptionGate } from '../../utilities/crypto/encryptionGates.js
 import { buildUploadGatePolicy } from '../../utilities/crypto/litGatePolicy.js';
 import { createLogger } from 'utilities/logging.js';
 import { buildQuestionRoutePath } from '../../utilities/survey/questionRouting.js';
+import { validateNoLockedPlaintextInPayload } from '../../utilities/arweave/noLeakPayloads.js';
 import { mergeSessionContractMaps, resolveActiveSessionSlug } from '../../utilities/session/sessionNaming.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import {
@@ -2296,6 +2297,12 @@ class CreateQuestionsAndSurveys extends Component {
             return qD;
           })
         );
+        questionDataArray.forEach((questionData, index) => {
+          validateNoLockedPlaintextInPayload(questionData, {
+            family: 'question_metadata',
+            path: `question metadata[${index}]`,
+          });
+        });
         const surveyIdsForContract = uniqueQuestions.map(
           (q) => q.associatedSurveyId || ethers.constants.HashZero
         );
@@ -2471,6 +2478,12 @@ class CreateQuestionsAndSurveys extends Component {
             return base;
           })
         );
+        questionDataArray.forEach((questionData, index) => {
+          validateNoLockedPlaintextInPayload(questionData, {
+            family: 'question_metadata',
+            path: `question metadata[${index}]`,
+          });
+        });
         const questionIdsForContract = uniqueQuestions.map(q => q.id);
 
         // Fetch current block number for creationBlock optimization
@@ -2539,6 +2552,10 @@ class CreateQuestionsAndSurveys extends Component {
           if (surveyTitleEncrypted) completeSurveyData.titleEncrypted = surveyTitleEncrypted;
           if (docUrlsEncrypted) completeSurveyData.documentURLsEncrypted = docUrlsEncrypted;
         }
+        validateNoLockedPlaintextInPayload(completeSurveyData, {
+          family: 'survey_metadata',
+          path: 'survey metadata',
+        });
 
         // Step 1: Upload to Arweave (survey.json)
         this.setState({ progress: 30, submitStep: 1 });

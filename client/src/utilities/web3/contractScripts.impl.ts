@@ -43,6 +43,7 @@ import {
   buildArweaveUploadTags,
   resolveArweaveUploadOpts,
 } from '../arweave/arweaveUploadHelpers.js';
+import { validateNoLockedPlaintextInPayload } from '../arweave/noLeakPayloads.js';
 import { getGlobalLitHooks } from '../crypto/litProtocol.js';
 import { getCorsProxyUrlOrThrow } from '../worker/corsProxy.js';
 import { fetchWorkerWithAuth } from '../worker/workerAuth.js';
@@ -2573,6 +2574,17 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
         }, _sessionName, {})
       ));
 
+      validateNoLockedPlaintextInPayload(surveyDataToUpload, {
+        family: 'survey_metadata',
+        path: 'survey metadata',
+      });
+      qArrayToUpload.forEach((questionData, index) => {
+        validateNoLockedPlaintextInPayload(questionData, {
+          family: 'question_metadata',
+          path: `question metadata[${index}]`,
+        });
+      });
+
       const surveyDataString = JSON.stringify(surveyDataToUpload);
       surveyArweaveHash = await arweaveScripts.uploadDataToArweave(
         surveyDataString,
@@ -2701,6 +2713,13 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
         }, _sessionName, {})
       ));
 
+      qArrayToUpload.forEach((questionData, index) => {
+        validateNoLockedPlaintextInPayload(questionData, {
+          family: 'question_metadata',
+          path: `question metadata[${index}]`,
+        });
+      });
+
       for (let questionData of qArrayToUpload) {
         const questionDataString = JSON.stringify(questionData);
         const questionArweaveHash = await arweaveScripts.uploadDataToArweave(
@@ -2812,6 +2831,10 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
   if (ARWEAVE_ACTIVE) {
     const arweaveOpts = await resolveArweaveUploadOpts(groupKeyOrCfg);
     if (surveyResponse) {
+      validateNoLockedPlaintextInPayload(surveyResponse, {
+        family: 'survey_response_payload',
+        path: 'survey response',
+      });
       const surveyResponseString = JSON.stringify(surveyResponse);
       const surveyResponseHash = await uploadDataToArweaveWithRetry(
         surveyResponseString,
@@ -2824,6 +2847,10 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
     // that can appear when multiple uploads are posted in parallel for one wallet.
     questionResponseHashes = [];
     for (const response of questionResponses) {
+      validateNoLockedPlaintextInPayload(response, {
+        family: 'question_response_payload',
+        path: 'question response',
+      });
       // eslint-disable-next-line no-await-in-loop
       const txId = await uploadDataToArweaveWithRetry(
         JSON.stringify(response),
