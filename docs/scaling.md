@@ -68,4 +68,4 @@ Migration paths are straightforward. Public deployments move `oss-default -> spo
 
 - [ARCHITECTURE.md](../ARCHITECTURE.md)
 - [spec.md](../spec.md)
-- PRDs 277-280 in [`TODO/PRDs/`](../TODO/PRDs/) contain implementation detail for these scaling layers.
+- Internal planning notes cover implementation detail for these scaling layers.
