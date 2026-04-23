@@ -1,6 +1,6 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
-import ToolExplorer from './ToolExplorer.jsx';
+import ToolExplorer from './ToolExplorer';
 import styles from './ToolExplorer.module.scss';
 import { sbtsListPath } from '../../utilities/ui/terminology.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';

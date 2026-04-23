@@ -4,7 +4,7 @@ import MainAreaTabs, { MAIN_AREA_TABS } from './MainAreaTabs';
 
 const mockToolExplorer = jest.fn();
 
-jest.mock('./ToolExplorer.jsx', () => ({
+jest.mock('./ToolExplorer', () => ({
   __esModule: true,
   default: (props: any) => {
     mockToolExplorer(props);
