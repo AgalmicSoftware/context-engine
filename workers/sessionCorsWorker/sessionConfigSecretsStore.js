@@ -1,5 +1,9 @@
 import { getKvJson, putKvJson } from './responseKvHelpers.js';
 import { normalizeWorkerConfigRecord } from './sessionConfigNormalization.js';
+import {
+  buildSessionSecretsEnvelope,
+  unwrapSessionSecretsEnvelope,
+} from '../shared/sessionSecretsEnvelope.mjs';
 
 const SESSION_KV_PREFIX = 'session';
 
@@ -17,7 +21,8 @@ export const getSessionConfig = async (env, slug, deps) => {
 
 export const getSessionSecrets = async (env, slug, deps) => {
   const getKvJsonFn = typeof deps?.getKvJson === 'function' ? deps.getKvJson : getKvJson;
-  return getKvJsonFn(env, buildSessionSecretsKvKey(slug));
+  const raw = await getKvJsonFn(env, buildSessionSecretsKvKey(slug));
+  return unwrapSessionSecretsEnvelope(raw);
 };
 
 export const putSessionConfig = async (env, slug, value, deps) => {
@@ -32,5 +37,10 @@ export const putSessionConfig = async (env, slug, value, deps) => {
 
 export const putSessionSecrets = async (env, slug, value, deps) => {
   const putKvJsonFn = typeof deps?.putKvJson === 'function' ? deps.putKvJson : putKvJson;
-  await putKvJsonFn(env, buildSessionSecretsKvKey(slug), value);
+  const buildEnvelope = typeof deps?.buildSessionSecretsEnvelope === 'function'
+    ? deps.buildSessionSecretsEnvelope
+    : buildSessionSecretsEnvelope;
+  await putKvJsonFn(env, buildSessionSecretsKvKey(slug), buildEnvelope(value, {
+    now: deps?.now,
+  }));
 };
