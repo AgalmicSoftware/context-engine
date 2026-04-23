@@ -90,14 +90,19 @@ jest.mock('../../utilities/ui/notify.js', () => ({
   },
 }));
 
-const SponsorPage = require('./SponsorPage.jsx').default;
+const SponsorPage = require('./SponsorPage.jsx').default as React.ComponentType<any>;
+const getFetchMock = () => global.fetch as jest.Mock;
 
 const renderSponsorPage = async ({
   account = ADMIN_ADDRESS,
   initialSessionId,
   initialRegistryChainId,
+}: {
+  account?: string;
+  initialSessionId?: string;
+  initialRegistryChainId?: string;
 } = {}) => {
-  let utils;
+  let utils: any;
   await act(async () => {
     utils = render(
       <SponsorPage
@@ -291,6 +296,7 @@ describe('SponsorPage', () => {
   });
 
   it('uploads an encrypted sponsored bundle and renders a share URL with tx query plus hash key', async () => {
+    const expectedLitPayerAddress = '0x3AC823CA9AcDA550244C6fF4927b5e1478E70Ff7';
     getFetchMock().mockImplementation((url: any) => Promise.resolve(
       String(url).endsWith('/auth/nonce')
         ? { ok: true, json: async () => ({ nonce: 'test-admin-nonce' }) }
