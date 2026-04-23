@@ -81,6 +81,7 @@ export const resolveTrustedAdminOrigins = (env) => {
 export const resolveTrustedLoginOrigins = ({
   env,
   config,
+  allowTrustedAdminOrigins = false,
 } = {}, deps) => {
   const seen = new Set();
   const out = [];
@@ -94,14 +95,18 @@ export const resolveTrustedLoginOrigins = ({
   const configuredOrigins = resolveConfiguredAdminOrigins(config);
   configuredOrigins.forEach(append);
 
+  const trustedAdminOrigins = typeof deps?.resolveTrustedAdminOrigins === 'function'
+    ? deps.resolveTrustedAdminOrigins(env)
+    : resolveTrustedAdminOrigins(env);
   const envLoginOrigins = coerceOriginListInput(env?.LOGIN_TRUSTED_ORIGINS);
   if (envLoginOrigins.length) {
     envLoginOrigins.forEach(append);
   } else {
-    const trustedOrigins = typeof deps?.resolveTrustedAdminOrigins === 'function'
-      ? deps.resolveTrustedAdminOrigins(env)
-      : resolveTrustedAdminOrigins(env);
-    trustedOrigins.forEach(append);
+    trustedAdminOrigins.forEach(append);
+  }
+
+  if (allowTrustedAdminOrigins) {
+    trustedAdminOrigins.forEach(append);
   }
 
   return out;
@@ -111,6 +116,7 @@ export const validateTrustedLoginRequestOrigin = ({
   request,
   env,
   config,
+  allowTrustedAdminOrigins = false,
 } = {}, deps) => {
   const requestOrigin = normalizeOrigin(
     request?.headers?.get?.('Origin') || request?.headers?.get?.('origin') || ''
@@ -119,7 +125,11 @@ export const validateTrustedLoginRequestOrigin = ({
     return { ok: false, error: 'Missing Origin for worker login.' };
   }
 
-  const trustedOrigins = resolveTrustedLoginOrigins({ env, config }, deps);
+  const trustedOrigins = resolveTrustedLoginOrigins({
+    env,
+    config,
+    allowTrustedAdminOrigins,
+  }, deps);
   if (!trustedOrigins.includes(requestOrigin)) {
     return { ok: false, error: 'Untrusted worker login origin.' };
   }

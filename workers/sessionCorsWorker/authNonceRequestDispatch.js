@@ -1,4 +1,7 @@
 import {
+  resolveAnonymousRateIdentity,
+} from './anonymousRateIdentityNormalization.js';
+import {
   validateTrustedLoginRequestOrigin,
 } from './siweMessageValidation.js';
 
@@ -56,6 +59,7 @@ export const dispatchAuthNonceRequest = async ({
     request,
     env,
     config: corsState.config,
+    allowTrustedAdminOrigins: allowTrustedAdminAuthOrigin,
   }, {
     resolveTrustedAdminOrigins: deps?.resolveTrustedAdminOrigins,
   });
@@ -63,9 +67,20 @@ export const dispatchAuthNonceRequest = async ({
     return deps?.json?.({ error: originCheck?.error }, 403, headers);
   }
 
+  const rateLimitIdentity = (
+    typeof deps?.resolveAnonymousRateIdentity === 'function'
+      ? deps.resolveAnonymousRateIdentity(request)
+      : resolveAnonymousRateIdentity({
+        request,
+        deps: {
+          toStr: deps?.toStr,
+        },
+      })
+  );
   const rateLimitResult = await deps?.checkNonceRateLimit?.({
     env,
     slug: targetSlug,
+    identity: rateLimitIdentity,
     address,
     limit: deps?.NONCE_RATE_LIMIT_MAX,
     now: deps?.now,
