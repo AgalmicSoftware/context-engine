@@ -12,20 +12,26 @@ jest.mock('../../utilities/cache/cacheScripts.js', () => ({
   subscribeCacheUpdates: jest.fn(() => () => {}),
 }));
 
+const mockListNamespaceEntriesSync = cacheScripts.listNamespaceEntriesSync as jest.Mock;
+const buildNicknameMap = buildNicknameByAddressMap as (entries: any[]) => Map<string, string>;
+const buildSbtKeySets = buildCompareSbtKeySets as (entries: any[]) => Set<string>[];
+const buildSbtImageMap = buildCompareSbtImageMap as (entries: any[]) => Map<string, { name: string; image: string }>;
+const readObjectValues = readDgObjectValues as (namespace: string) => unknown[];
+
 describe('CompareAddresses cache scan helpers', () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
   it('reads namespace values without cloning cache objects', () => {
-    cacheScripts.listNamespaceEntriesSync.mockReturnValue([
+    mockListNamespaceEntriesSync.mockReturnValue([
       { slug: 'edge', value: { a: 1 } },
       { slug: 'edge2', value: null },
       { slug: 'edge3', value: 'x' },
       { slug: 'edge4', value: { b: 2 } },
     ]);
 
-    const result = readDgObjectValues('questionsCache');
+    const result = readObjectValues('questionsCache');
 
     expect(cacheScripts.listNamespaceEntriesSync).toHaveBeenCalledWith(
       'questionsCache',
@@ -35,7 +41,7 @@ describe('CompareAddresses cache scan helpers', () => {
   });
 
   it('builds nickname maps from already-hydrated bookmarks state', () => {
-    const map = buildNicknameByAddressMap([
+    const map = buildNicknameMap([
       {
         addressLower: '0xabc',
         label: 'Alice',
@@ -64,7 +70,7 @@ describe('CompareAddresses cache scan helpers', () => {
   });
 
   it('keeps distinct locked-name SBTs separate in compare key sets', () => {
-    const sets = buildCompareSbtKeySets([
+    const sets = buildSbtKeySets([
       {
         sbts: [
           {
@@ -90,7 +96,7 @@ describe('CompareAddresses cache scan helpers', () => {
   });
 
   it('keeps separate image map entries for different locked-name SBTs', () => {
-    const map = buildCompareSbtImageMap([
+    const map = buildSbtImageMap([
       {
         sbts: [
           {
