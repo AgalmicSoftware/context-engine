@@ -88,7 +88,6 @@ export const consumeNonce = async (env, slug, address, nonce, deps) => {
 export const checkNonceRateLimit = async ({
   env,
   slug,
-  identity,
   address,
   limit = DEFAULT_NONCE_RATE_LIMIT_MAX,
   now,
@@ -103,11 +102,9 @@ export const checkNonceRateLimit = async ({
     ? Number(windowMs)
     : DEFAULT_NONCE_RATE_LIMIT_WINDOW_MS;
   const windowStart = Math.floor(currentTime / numericWindowMs) * numericWindowMs;
-  const normalizedIdentity = String(identity || '').trim().toLowerCase();
-  const fallbackIdentity = String(address || '').trim().toLowerCase();
-  const rateIdentity = normalizedIdentity || fallbackIdentity || 'unknown';
+  const identity = String(address || '').trim().toLowerCase() || 'unknown';
   const sessionSlug = String(slug || '').trim();
-  const key = `rate:authNonce:${sessionSlug}:${rateIdentity}:${windowStart}`;
+  const key = `rate:authNonce:${sessionSlug}:${identity}:${windowStart}`;
 
   const raw = await env?.GROUP_KV?.get?.(key);
   const current = Number(raw || 0);

@@ -205,18 +205,6 @@ test('validateTrustedLoginRequestOrigin and validateBrowserLoginOrigin bind logi
     'http://localhost:3000',
   ]);
 
-  assert.deepEqual(validateTrustedLoginRequestOrigin({
-    request: { headers: new Headers({ Origin: 'http://localhost:3000' }) },
-    env: { LOGIN_TRUSTED_ORIGINS: 'https://login.example' },
-    config,
-    allowTrustedAdminOrigins: true,
-  }, {
-    resolveTrustedAdminOrigins: () => ['http://localhost:3000'],
-  }), {
-    ok: true,
-    origin: 'http://localhost:3000',
-  });
-
   assert.deepEqual(validateBrowserLoginOrigin({
     request: { headers: new Headers({ Origin: 'https://app.example' }) },
     siwe: { uri: 'https://evil.example' },

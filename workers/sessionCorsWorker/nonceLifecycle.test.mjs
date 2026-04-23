@@ -213,36 +213,3 @@ test('checkNonceRateLimit enforces a per-address fixed window limit', async () =
     ['put', 'rate:authNonce:session-a:0xabc:120000', '3', { expirationTtl: 61 }],
   ]);
 });
-
-test('checkNonceRateLimit prefers caller identity over the claimed wallet address', async () => {
-  const store = new Map();
-  const calls = [];
-  const env = {
-    GROUP_KV: {
-      get: async (key) => {
-        calls.push(['get', key]);
-        return store.get(key) || null;
-      },
-      put: async (key, value, opts) => {
-        calls.push(['put', key, value, opts]);
-        store.set(key, value);
-      },
-    },
-  };
-
-  await checkNonceRateLimit({
-    env,
-    slug: 'session-a',
-    identity: 'anon:cid:client_abc12345',
-    address: '0xVictimWallet',
-    limit: 2,
-    now: () => 123_456,
-    windowMs: 60_000,
-    ttlSeconds: 61,
-  });
-
-  assert.deepEqual(calls, [
-    ['get', 'rate:authNonce:session-a:anon:cid:client_abc12345:120000'],
-    ['put', 'rate:authNonce:session-a:anon:cid:client_abc12345:120000', '1', { expirationTtl: 61 }],
-  ]);
-});
