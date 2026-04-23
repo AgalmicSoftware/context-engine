@@ -13,7 +13,7 @@ import styles from "./Modals.module.scss";
 import { Card, CardFooter } from "reactstrap";
 
 // Components
-import GreetingModal from './GreetingModal.jsx';
+import GreetingModal from './GreetingModal';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faWindowClose, faQuestionCircle } from '@fortawesome/free-solid-svg-icons'
 
