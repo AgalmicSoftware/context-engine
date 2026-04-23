@@ -2,42 +2,42 @@ import React from 'react';
 import { act, cleanup, render } from '@testing-library/react';
 
 const mockCreateClient = jest.fn(() => ({}));
-const mockReadColdLoadOnboardingState = jest.fn(() => ({
+const mockReadColdLoadOnboardingState = jest.fn((_storage?: Storage) => ({
   firstVisit: true,
   shouldStartOnboarding: false,
 }));
 const mockStoreDispatch = jest.fn();
 const mockSyncPublicPageHead = jest.fn();
-const mockToaster = jest.fn(() => null);
-let routeProps = [];
+const mockToaster = jest.fn((_props?: any) => null);
+let routeProps: any[] = [];
 
-const MockRoute = (props) => {
+const MockRoute = (props: any) => {
   routeProps.push(props);
   return null;
 };
 
 const mockAppDependencies = () => {
   jest.doMock('react-redux', () => ({
-    Provider: ({ children }) => children,
+    Provider: ({ children }: { children: React.ReactNode }) => children,
   }));
 
   jest.doMock('react-router-dom', () => ({
-    BrowserRouter: ({ children }) => children,
-    Routes: ({ children }) => children,
+    BrowserRouter: ({ children }: { children: React.ReactNode }) => children,
+    Routes: ({ children }: { children: React.ReactNode }) => children,
     Route: MockRoute,
     Link: () => null,
   }));
 
   jest.doMock('reactstrap', () => ({
-    Container: ({ children }) => children,
-    Row: ({ children }) => children,
-    Col: ({ children }) => children,
+    Container: ({ children }: { children: React.ReactNode }) => children,
+    Row: ({ children }: { children: React.ReactNode }) => children,
+    Col: ({ children }: { children: React.ReactNode }) => children,
   }));
 
   jest.doMock('@rainbow-me/rainbowkit/styles.css', () => ({}));
   jest.doMock('./Shared/CEToaster', () => ({
     __esModule: true,
-    default: (props) => {
+    default: (props: any) => {
       mockToaster(props);
       return null;
     },
@@ -64,7 +64,7 @@ const mockAppDependencies = () => {
 
   jest.doMock('./HooksHOC/withRouterBridge', () => ({
     __esModule: true,
-    default: (Comp) => Comp,
+    default: (Comp: React.ComponentType<any>) => Comp,
   }));
   jest.doMock('./MainSite/MainSite.jsx', () => ({
     __esModule: true,
@@ -77,7 +77,7 @@ const mockAppDependencies = () => {
   jest.doMock('@rainbow-me/rainbowkit', () => ({
     getDefaultWallets: jest.fn(),
     connectorsForWallets: jest.fn(() => []),
-    RainbowKitProvider: ({ children }) => children,
+    RainbowKitProvider: ({ children }: { children: React.ReactNode }) => children,
   }));
   jest.doMock('@rainbow-me/rainbowkit/wallets', () => ({
     rainbowWallet: jest.fn(() => ({})),
@@ -92,8 +92,8 @@ const mockAppDependencies = () => {
       webSocketProvider: {},
     })),
     createClient: mockCreateClient,
-    createStorage: jest.fn(({ storage }) => ({ storage })),
-    WagmiConfig: ({ children }) => children,
+    createStorage: jest.fn(({ storage }: { storage: unknown }) => ({ storage })),
+    WagmiConfig: ({ children }: { children: React.ReactNode }) => children,
   }));
   jest.doMock('@wagmi/core', () => ({
     noopStorage: {
@@ -130,8 +130,8 @@ const mockAppDependencies = () => {
   }));
 };
 
-const loadAppModule = () => {
-  let appModule;
+const loadAppModule = (): any => {
+  let appModule: any;
   jest.isolateModules(() => {
     appModule = require('./App.jsx');
   });
@@ -204,7 +204,7 @@ describe('App wagmi auto-connect persistence', () => {
     );
 
     expect(mockToaster).toHaveBeenCalled();
-    expect(mockToaster.mock.calls[0][0]).toEqual(
+    expect((mockToaster.mock.calls[0]?.[0] as any)).toEqual(
       expect.objectContaining({
         position: 'bottom-right',
         toastOptions: {
@@ -303,7 +303,7 @@ describe('App wagmi auto-connect persistence', () => {
   });
 
   it('falls back to sessionStorage when the localStorage onboarding read fails', () => {
-    mockReadColdLoadOnboardingState.mockImplementation((storage) => {
+    mockReadColdLoadOnboardingState.mockImplementation((storage?: Storage) => {
       if (storage === window.localStorage) {
         throw new Error('localStorage unavailable');
       }
