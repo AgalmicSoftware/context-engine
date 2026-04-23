@@ -7,6 +7,7 @@ ce_public_release_strip_patterns() {
   cat <<'EOF'
 contextEngine-cc
 TODO
+local-private-version
 CLAUDE.md
 .claude
 .codex
@@ -33,6 +34,7 @@ ce_public_release_strip_assert_absent_patterns() {
   cat <<'EOF'
 CLAUDE.md
 .claude
+local-private-version
 scripts/test-*.js
 scripts/test-*.ui.js
 scripts/lib/e2e
