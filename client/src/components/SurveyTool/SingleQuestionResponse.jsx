@@ -956,7 +956,12 @@ class SingleQuestionResponse extends Component {
   };
 
   renderQuestionOnlyView() {
-    const { question = {}, mode } = this.props;
+    const {
+      question = {},
+      mode = 'mini',
+      questionPromptClassName,
+      questionPromptTestId,
+    } = this.props;
 
     // Stable id + URL
     const qid = this.getQuestionId(question);
@@ -965,6 +970,27 @@ class SingleQuestionResponse extends Component {
       ? normalizeArweaveUrl(question.arweaveTxId, { contextLabel: 'single_question_response_link' })
       : '';
     const hasCardActions = Boolean(qid || arweaveUrl);
+    const isFullscreen = mode === 'fullscreen';
+    const containerClassName = joinClassNames(
+      isFullscreen ? styles.fullscreenQuestionContainer : styles.miniQuestionContainer,
+      !isFullscreen && styles.clickThrough,
+      this.props.containerClassName
+    );
+    const questionBodyClassName = joinClassNames(
+      styles.questionTitleBody,
+      !hasCardActions && styles.questionTitleBodyNoLinks,
+      isFullscreen && styles.questionOnlyFullscreenBody,
+      this.props.bodyClassName
+    );
+    const questionPromptClassNames = joinClassNames(
+      styles.questionPromptText,
+      isFullscreen && styles.questionPromptTextFullscreen,
+      questionPromptClassName
+    );
+    const readOnlyAffordanceClassName = joinClassNames(
+      styles.questionOnlyAffordance,
+      isFullscreen && styles.questionOnlyAffordanceFullscreen
+    );
 
     const openQuestion = () => {
       try {
@@ -990,9 +1016,6 @@ class SingleQuestionResponse extends Component {
     let affordance = null;
 
     if (type === 'binary') {
-      const promptText =
-        (question && (question.prompt || question.title || question.text)) || '';
-
       // For binary, we render the row of pills inside the card
       affordance = (
         <div className={styles.answerPillsRow} aria-hidden="true">
@@ -1024,20 +1047,17 @@ class SingleQuestionResponse extends Component {
       affordance = null;
     }
 
-    // Click-through mini card (entire area clickable)
+    // Keep mini cards click-through like UserPage, while fullscreen cards act as static hero panels.
     return (
       <Card
-        className={`${styles.miniQuestionContainer} ${styles.clickThrough}`}
-        onClick={openQuestion}
-        onKeyDown={onKeyDown}
-        role="button"
-        tabIndex={0}
-        aria-label="Open question"
+        className={containerClassName}
+        onClick={!isFullscreen ? openQuestion : undefined}
+        onKeyDown={!isFullscreen ? onKeyDown : undefined}
+        role={!isFullscreen ? 'button' : undefined}
+        tabIndex={!isFullscreen ? 0 : undefined}
+        aria-label={!isFullscreen ? 'Open question' : undefined}
       >
-        <CardBody className={joinClassNames(
-          styles.questionTitleBody,
-          !hasCardActions && styles.questionTitleBodyNoLinks
-        )}>
+        <CardBody className={questionBodyClassName}>
           {hasCardActions && (
             <div className={styles.cardLinksContainer}>
               {arweaveUrl && (
@@ -1071,13 +1091,16 @@ class SingleQuestionResponse extends Component {
             </div>
           )}
           {/* Prompt */}
-          <div className={styles.questionPrompt}>
+          <div
+            className={questionPromptClassNames}
+            data-testid={questionPromptTestId}
+          >
             {question?.prompt || 'Untitled question'}
           </div>
 
           {/* Read-only affordance */}
           {affordance && (
-            <div className={styles.readOnlyAffordance}>
+            <div className={readOnlyAffordanceClassName}>
               {affordance}
             </div>
           )}

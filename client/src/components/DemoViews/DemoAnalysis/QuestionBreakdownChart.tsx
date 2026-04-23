@@ -98,12 +98,7 @@ const QuestionBreakdownChart = ({
   return (
     <section className={`${styles.panel} ${styles.chartPanel}`} data-testid="demo-analysis-question-breakdown">
       <div className={styles.panelHeader}>
-        <div>
-          <h3 className={styles.panelTitle}>Question Breakdown</h3>
-          <p className={styles.breakdownQuestionText} data-testid="demo-analysis-breakdown-question">
-            {question.text}
-          </p>
-        </div>
+        <h3 className={styles.panelTitle}>Question Breakdown</h3>
         <button type="button" className={styles.clearButton} onClick={() => onOpenDrilldown(question.id)}>
           Details
         </button>

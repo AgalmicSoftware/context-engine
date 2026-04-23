@@ -113,6 +113,31 @@ describe('SingleQuestionResponse card actions', () => {
     expect(findElement(tree, (node) => node?.props?.title === 'View question page')).not.toBeNull();
   });
 
+  it('supports a fullscreen question-only card without the mini click-through wrapper', () => {
+    const subject = createSubject({
+      mode: 'fullscreen',
+      questionOnly: true,
+      questionPromptClassName: 'heroPrompt',
+      questionPromptTestId: 'hero-question-prompt',
+      question: {
+        id: 'q-hero',
+        prompt: 'Hero question prompt',
+        type: 'binary',
+      },
+      response: null,
+    });
+
+    const tree = subject.render();
+    const outerCard = findElement(tree, (node) => nodeHasClassName(node, styles.fullscreenQuestionContainer));
+    const prompt = findElement(tree, (node) => node?.props?.['data-testid'] === 'hero-question-prompt');
+
+    expect(outerCard).not.toBeNull();
+    expect(outerCard.props.role).toBeUndefined();
+    expect(prompt).not.toBeNull();
+    expect(nodeHasClassName(prompt, 'heroPrompt')).toBe(true);
+    expect(renderToStaticMarkup(tree)).not.toContain('aria-label="Open question"');
+  });
+
   it('canonicalizes reserved session aliases in question-page links', () => {
     const debateSubject = createSubject({
       mode: 'mini',

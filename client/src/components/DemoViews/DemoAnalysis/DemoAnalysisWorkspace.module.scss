@@ -34,40 +34,25 @@
 }
 
 .selectedQuestionBanner {
-  display: grid;
-  gap: 0.6rem;
-  border-color: #bfd7ff;
-  background: linear-gradient(180deg, #f4f8ff 0%, #eef4ff 100%);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
-.selectedQuestionBannerHeader {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: 0.5rem 1rem;
-  align-items: baseline;
+.selectedQuestionCard {
+  margin-bottom: 0;
 }
 
-.selectedQuestionBannerLabel {
-  color: #0b4f8a;
-  font-size: 0.78rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+.selectedQuestionCardBody {
+  padding: 1.25rem 1.35rem 1.1rem;
 }
 
-.selectedQuestionBannerMeta {
-  color: #5f6b7a;
-  font-size: 0.9rem;
-  line-height: 1.4;
-}
-
-.selectedQuestionBannerText {
-  margin: 0;
-  color: #17212b;
-  font-size: 1.08rem;
-  font-weight: 700;
-  line-height: 1.45;
+.selectedQuestionCardPrompt {
+  color: #f8fbff;
+  font-size: clamp(1.6rem, 2.25vw, 2.16rem);
+  line-height: 1.42;
+  max-width: 48rem;
 }
 
 .heatmapPanel,
@@ -741,11 +726,6 @@
 
   .selectorLayout {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .selectedQuestionBannerHeader {
-    align-items: flex-start;
-    flex-direction: column;
   }
 }
 
