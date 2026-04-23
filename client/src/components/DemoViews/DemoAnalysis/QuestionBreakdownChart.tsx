@@ -5,14 +5,41 @@ const BAR_COLORS = Object.freeze({
   Agree: 'linear-gradient(90deg, #1d7f57 0%, #4dffa4 100%)',
   Unsure: 'linear-gradient(90deg, #8b6f1a 0%, #ffd166 100%)',
   Disagree: 'linear-gradient(90deg, #8e2e3b 0%, #ff6b6b 100%)',
-});
+} as Record<string, string>);
+
+type Question = {
+  id: string | number;
+  text: string;
+  options: string[];
+};
+
+type FlatResponse = {
+  questionId: string | number;
+  segmentKey: string;
+  responseText: string;
+  rate?: number;
+  totalVotes?: number;
+  participantCount?: number;
+};
+
+type ComparisonGroup = {
+  segmentKey: string;
+  name?: string;
+};
+
+type QuestionBreakdownChartProps = {
+  question?: Question | null;
+  flatResponses?: FlatResponse[];
+  comparisonGroups?: ComparisonGroup[];
+  onOpenDrilldown: (questionId: Question['id']) => void;
+};
 
 const formatCountLabel = (count = 0, singular = '', plural = '') => {
   const normalizedCount = Number(count || 0);
   return `${normalizedCount} ${normalizedCount === 1 ? singular : plural}`;
 };
 
-const formatDatasetMeta = (rows = []) => {
+const formatDatasetMeta = (rows: FlatResponse[] = []) => {
   const modeledResponseCount = Number(rows[0]?.totalVotes || 0);
   const participantCount = Number(rows[0]?.participantCount || modeledResponseCount);
 
@@ -31,7 +58,7 @@ const QuestionBreakdownChart = ({
   flatResponses = [],
   comparisonGroups = [],
   onOpenDrilldown,
-}) => {
+}: QuestionBreakdownChartProps) => {
   const datasets = useMemo(() => {
     if (!question) return [];
     const segmentKeys = ['All', ...(comparisonGroups || []).map((group) => group.segmentKey)];
@@ -45,6 +72,8 @@ const QuestionBreakdownChart = ({
         segmentKey,
         rows: question.options.map((responseText) => (
           rows.find((row) => row.responseText === responseText) || {
+            questionId: question.id,
+            segmentKey,
             responseText,
             rate: 0,
             totalVotes: 0,
