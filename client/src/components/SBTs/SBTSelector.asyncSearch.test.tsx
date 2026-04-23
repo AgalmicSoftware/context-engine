@@ -1,10 +1,6 @@
 import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
-import SBTSelector from './SBTSelector';
-import * as contractScriptsUtils from '../../utilities/web3/contractScripts.js';
-import * as sessionRegistryUtils from '../../utilities/web3/sessionRegistry.js';
-
 const GENERAL_FACTORY_ADDRESS = '0x2222222222222222222222222222222222222222';
 
 jest.mock('../../utilities/cache/cacheScripts.js', () => {
@@ -85,6 +81,10 @@ jest.mock('../../utilities/web3/contractScripts.js', () => {
     normalizeSessionSlug,
   };
 });
+
+import SBTSelector from './SBTSelector.jsx';
+import * as contractScriptsUtils from '../../utilities/web3/contractScripts.js';
+import * as sessionRegistryUtils from '../../utilities/web3/sessionRegistry.js';
 
 const mockGetAllSessionSlugs = contractScriptsUtils.getAllSessionSlugs as jest.Mock;
 const mockGetSessionChainId = contractScriptsUtils.getSessionChainId as jest.Mock;
