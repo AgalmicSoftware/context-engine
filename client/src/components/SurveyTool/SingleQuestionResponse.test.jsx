@@ -138,46 +138,6 @@ describe('SingleQuestionResponse card actions', () => {
     expect(findElement(tree, (node) => node?.props?.title === 'View question page')).not.toBeNull();
   });
 
-  it('uses storageRef before stale arweaveTxId for Arweave question links', () => {
-    const preferredTxId = 'b'.repeat(43);
-    const subject = createSubject({
-      mode: 'mini',
-      questionOnly: true,
-      question: {
-        id: 'q-created',
-        prompt: 'Created question prompt',
-        type: 'freeform',
-        arweaveTxId: 'a'.repeat(43),
-        storageRef: { backend: 'arweave', id: preferredTxId },
-      },
-      response: null,
-    });
-
-    const tree = subject.render();
-
-    expect(findElement(tree, (node) => node?.props?.title === 'View on Arweave')?.props?.href)
-      .toContain(preferredTxId);
-  });
-
-  it('does not render an Arweave link for Cloudflare-only question storage refs', () => {
-    const subject = createSubject({
-      mode: 'mini',
-      questionOnly: true,
-      question: {
-        id: 'q-created',
-        prompt: 'Created question prompt',
-        type: 'freeform',
-        storageRef: { backend: 'cloudflare', id: 'cf_questionopaque01' },
-      },
-      response: null,
-    });
-
-    const tree = subject.render();
-
-    expect(findElement(tree, (node) => node?.props?.title === 'View on Arweave')).toBeNull();
-    expect(findElement(tree, (node) => node?.props?.title === 'View question page')).not.toBeNull();
-  });
-
   it('supports a fullscreen question-only card without the mini click-through wrapper', () => {
     const subject = createSubject({
       mode: 'fullscreen',

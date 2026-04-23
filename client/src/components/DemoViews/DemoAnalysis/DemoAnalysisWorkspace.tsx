@@ -13,6 +13,7 @@ import DemographicSelector from './DemographicSelector';
 import QuestionBreakdownChart from './QuestionBreakdownChart';
 import QuestionDrilldownModal from './QuestionDrilldownModal';
 import WorldResultsMap from './WorldResultsMap';
+import SingleQuestionResponse from '../../SurveyTool/SingleQuestionResponse.jsx';
 import styles from './DemoAnalysisWorkspace.module.scss';
 
 type Question = {
@@ -213,16 +214,20 @@ const DemoAnalysisWorkspace = ({
       />
 
       {selectedQuestion ? (
-        <section className={`${styles.panel} ${styles.selectedQuestionBanner}`} data-testid="demo-analysis-question-banner">
-          <div className={styles.selectedQuestionBannerHeader}>
-            <span className={styles.selectedQuestionBannerLabel}>Current focus question</span>
-            <span className={styles.selectedQuestionBannerMeta}>
-              The suggestion card, map, and breakdown below are all keyed to this prompt.
-            </span>
-          </div>
-          <p className={styles.selectedQuestionBannerText} data-testid="demo-analysis-selected-question">
-            {selectedQuestion.text}
-          </p>
+        <section className={styles.selectedQuestionBanner} data-testid="demo-analysis-question-banner">
+          <SingleQuestionResponse
+            mode="fullscreen"
+            questionOnly={true}
+            question={{
+              prompt: selectedQuestion.text,
+              type: 'binary',
+            }}
+            response={null}
+            containerClassName={styles.selectedQuestionCard}
+            bodyClassName={styles.selectedQuestionCardBody}
+            questionPromptClassName={styles.selectedQuestionCardPrompt}
+            questionPromptTestId="demo-analysis-selected-question"
+          />
         </section>
       ) : null}
 

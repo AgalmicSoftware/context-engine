@@ -902,7 +902,6 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
       questionPromptClassName,
       questionPromptTestId,
     } = this.props;
-    const questionRecord = question || {};
 
     // Stable id + URL
     const qid = this.getQuestionId(questionRecord);
@@ -1037,7 +1036,7 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
             className={questionPromptClassNames}
             data-testid={questionPromptTestId}
           >
-            {questionRecord?.prompt || 'Untitled question'}
+            {question?.prompt || 'Untitled question'}
           </div>
 
           {/* Read-only affordance */}
