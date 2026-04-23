@@ -18,7 +18,7 @@ import ArxivCard from './ArxivCard';
 import InsiderCard from './InsiderCard';
 import TagModal from '../TagPage/TagModal.jsx';
 import { buildDemoCorpusRecords } from '../../utilities/demo/demoCorpusRecords.js';
-import WorldResultsMap from './DemoAnalysis/WorldResultsMap.jsx';
+import WorldResultsMap from './DemoAnalysis/WorldResultsMap';
 import PolicyGlobe, {
   getPolicyJurisdictionAnchor,
   getJurisdictionFlag,

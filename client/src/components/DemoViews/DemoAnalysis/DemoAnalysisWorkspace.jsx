@@ -12,7 +12,7 @@ import ComparisonSuggestions from './ComparisonSuggestions';
 import DemographicSelector from './DemographicSelector';
 import QuestionBreakdownChart from './QuestionBreakdownChart';
 import QuestionDrilldownModal from './QuestionDrilldownModal';
-import WorldResultsMap from './WorldResultsMap.jsx';
+import WorldResultsMap from './WorldResultsMap';
 import styles from './DemoAnalysisWorkspace.module.scss';
 
 const buildSuggestionSelectionKey = (questionId = '', segmentKeys = []) => (
