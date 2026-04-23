@@ -5,10 +5,16 @@ const GENERAL_ADDRESS = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 const EDGE_FACTORY_ADDRESS = '0x1111111111111111111111111111111111111111';
 const GENERAL_FACTORY_ADDRESS = '0x2222222222222222222222222222222222222222';
 
-const createDeferred = () => {
-  let resolve;
-  let reject;
-  const promise = new Promise((res, rej) => {
+type Deferred<T = any> = {
+  promise: Promise<T>;
+  resolve: (value: T | PromiseLike<T>) => void;
+  reject: (reason?: any) => void;
+};
+
+const createDeferred = <T = any>(): Deferred<T> => {
+  let resolve!: Deferred<T>['resolve'];
+  let reject!: Deferred<T>['reject'];
+  const promise = new Promise<T>((res, rej) => {
     resolve = res;
     reject = rej;
   });
@@ -23,7 +29,7 @@ jest.mock('../Shared/AsyncSearchSelect', () => ({
     noOptionsMessage,
     loadingMessage,
     placeholder,
-  }) => (
+  }: any) => (
     <div data-testid="mock-sbt-select">
       {placeholder ? (
         <div data-testid="mock-sbt-select-placeholder">{placeholder}</div>
@@ -40,7 +46,7 @@ jest.mock('../Shared/AsyncSearchSelect', () => ({
       )}
       {options.length > 0 && (
         <div data-testid="mock-sbt-select-options">
-          {options.map((option) => (
+          {options.map((option: any) => (
             <div key={option.value}>{option.label}</div>
           ))}
         </div>
@@ -50,7 +56,7 @@ jest.mock('../Shared/AsyncSearchSelect', () => ({
 }));
 
 jest.mock('../../utilities/cache/cacheScripts.js', () => {
-  let store = {};
+  let store: Record<string, any> = {};
   return {
     __esModule: true,
     __resetSbtCacheStore: () => {
@@ -163,29 +169,36 @@ import * as sessionScanScopeUtils from '../../utilities/session/sessionScanScope
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 
+const mockedContractScripts = contractScripts as any;
+const mockedContractScriptsUtils = contractScriptsUtils as any;
+const mockedCacheScripts = cacheScripts as any;
+const mockedSessionRegistryUtils = sessionRegistryUtils as any;
+const mockedSbtDisplayNameUtils = sbtDisplayNameUtils as any;
+const globalCe = globalThis as typeof globalThis & Record<string, any>;
+
 describe('SBTSelector rendered cold-load lifecycle', () => {
   beforeEach(() => {
     try { window.history.replaceState({}, '', '/'); } catch (_) {}
     localStorage.clear();
     sessionStorage.clear();
-    globalThis.CE_SESSION_SCAN_SCOPE = 'active';
-    globalThis.CE_SESSION_SCAN_SLUGS = [];
-    try { delete globalThis.CE_SBT_SELECTOR_AUTO_SEARCH_OTHER_SESSIONS; } catch (_) {}
-    cacheScripts.__resetSbtCacheStore();
+    globalCe.CE_SESSION_SCAN_SCOPE = 'active';
+    globalCe.CE_SESSION_SCAN_SLUGS = [];
+    try { delete globalCe.CE_SBT_SELECTOR_AUTO_SEARCH_OTHER_SESSIONS; } catch (_) {}
+    mockedCacheScripts.__resetSbtCacheStore();
     jest.clearAllMocks();
-    cacheScripts.readCache.mockImplementation(async (_namespace, slug = '') => (
-      cacheScripts.__getSbtCacheStore()[String(slug || '')] || {}
+    mockedCacheScripts.readCache.mockImplementation(async (_namespace: any, slug = '') => (
+      mockedCacheScripts.__getSbtCacheStore()[String(slug || '')] || {}
     ));
-    cacheScripts.writeCache.mockImplementation(async (_namespace, slug = '', value) => {
-      cacheScripts.__getSbtCacheStore()[String(slug || '')] = JSON.parse(JSON.stringify(value));
+    mockedCacheScripts.writeCache.mockImplementation(async (_namespace: any, slug = '', value: any) => {
+      mockedCacheScripts.__getSbtCacheStore()[String(slug || '')] = JSON.parse(JSON.stringify(value));
       return true;
     });
-    contractScriptsUtils.getAllSessionSlugs.mockReturnValue(['edge']);
-    contractScriptsUtils.getSessionLists.mockReturnValue({ featured_SBTs_LIST: [], ignored_SBTs_LIST: [] });
-    contractScriptsUtils.getSessionChainId.mockReturnValue(84532);
-    contractScriptsUtils.getSessionSlugByName.mockReturnValue(null);
-    sessionRegistryUtils.loadSessionRegistryCache.mockResolvedValue(null);
-    sbtDisplayNameUtils.warmSbtDisplayNamesTargeted.mockResolvedValue([]);
+    mockedContractScriptsUtils.getAllSessionSlugs.mockReturnValue(['edge']);
+    mockedContractScriptsUtils.getSessionLists.mockReturnValue({ featured_SBTs_LIST: [], ignored_SBTs_LIST: [] });
+    mockedContractScriptsUtils.getSessionChainId.mockReturnValue(84532);
+    mockedContractScriptsUtils.getSessionSlugByName.mockReturnValue(null);
+    mockedSessionRegistryUtils.loadSessionRegistryCache.mockResolvedValue(null);
+    mockedSbtDisplayNameUtils.warmSbtDisplayNamesTargeted.mockResolvedValue([]);
   });
 
   it('keeps list-scope general-session discovery in loading state until the default-session options arrive', async () => {
@@ -194,9 +207,9 @@ describe('SBTSelector rendered cold-load lifecycle', () => {
     localStorage.setItem('ce:sessionScanSlugs', JSON.stringify(['general']));
 
     const generalDiscovery = createDeferred();
-    const ref = React.createRef();
-    contractScripts.getAllSbtAddressesCached.mockImplementation(async (_provider, groupRef) => {
-      const slug = contractScriptsUtils.normalizeSessionSlug(groupRef?.slug || '');
+    const ref = React.createRef<any>();
+    mockedContractScripts.getAllSbtAddressesCached.mockImplementation(async (_provider: any, groupRef: any) => {
+      const slug = mockedContractScriptsUtils.normalizeSessionSlug(groupRef?.slug || '');
       if (slug === '') return generalDiscovery.promise;
       return [];
     });
@@ -234,13 +247,13 @@ describe('SBTSelector rendered cold-load lifecycle', () => {
     });
 
     await waitFor(() => {
-      const discoveredSlugs = contractScripts.getAllSbtAddressesCached.mock.calls
-        .map(([, groupRef]) => contractScriptsUtils.normalizeSessionSlug(groupRef?.slug || ''));
+      const discoveredSlugs = mockedContractScripts.getAllSbtAddressesCached.mock.calls
+        .map(([, groupRef]: any[]) => mockedContractScriptsUtils.normalizeSessionSlug(groupRef?.slug || ''));
       expect(discoveredSlugs).toEqual(['']);
     });
 
     await waitFor(() => {
-      const writtenSlugs = cacheScripts.writeCache.mock.calls.map(([, slug]) => String(slug || ''));
+      const writtenSlugs = mockedCacheScripts.writeCache.mock.calls.map(([, slug]: any[]) => String(slug || ''));
       expect(writtenSlugs).toContain('');
     });
 
@@ -256,7 +269,7 @@ describe('SBTSelector rendered cold-load lifecycle', () => {
   });
 
   it('opens selected SBT external links with the session-aware detail path', async () => {
-    contractScripts.getAllSbtAddressesCached.mockResolvedValue([]);
+    mockedContractScripts.getAllSbtAddressesCached.mockResolvedValue([]);
     const openSpy = jest.spyOn(window, 'open').mockImplementation(() => null);
     const { container } = render(
       <SBTSelector
@@ -275,7 +288,7 @@ describe('SBTSelector rendered cold-load lifecycle', () => {
     const externalLinkIcon = container.querySelector('[data-icon="external-link-alt"]');
     expect(externalLinkIcon).not.toBeNull();
 
-    fireEvent.click(externalLinkIcon);
+    fireEvent.click(externalLinkIcon as Element);
 
     expect(openSpy).toHaveBeenCalledWith(
       buildSbtDetailPath(GENERAL_ADDRESS, 'edge'),
@@ -285,8 +298,8 @@ describe('SBTSelector rendered cold-load lifecycle', () => {
   });
 
   it('prefers metadata-derived session hints for selected SBT external links', async () => {
-    contractScripts.getAllSbtAddressesCached.mockResolvedValue([]);
-    contractScriptsUtils.getSessionSlugByName.mockImplementation((name) => (
+    mockedContractScripts.getAllSbtAddressesCached.mockResolvedValue([]);
+    mockedContractScriptsUtils.getSessionSlugByName.mockImplementation((name: any) => (
       name === 'Demo Session' ? 'demo' : null
     ));
     const openSpy = jest.spyOn(window, 'open').mockImplementation(() => null);
@@ -311,7 +324,7 @@ describe('SBTSelector rendered cold-load lifecycle', () => {
     const externalLinkIcon = container.querySelector('[data-icon="external-link-alt"]');
     expect(externalLinkIcon).not.toBeNull();
 
-    fireEvent.click(externalLinkIcon);
+    fireEvent.click(externalLinkIcon as Element);
 
     expect(openSpy).toHaveBeenCalledWith(
       buildSbtDetailPath(GENERAL_ADDRESS, 'demo'),
@@ -325,7 +338,7 @@ describe('SBTSelector rendered cold-load lifecycle', () => {
     localStorage.setItem('ce:sessionScanSlugs', JSON.stringify(['demo']));
 
     const linkedAddress = '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
-    cacheScripts.listNamespaceEntriesSync.mockImplementation(() => ([
+    mockedCacheScripts.listNamespaceEntriesSync.mockImplementation(() => ([
       {
         namespace: 'sbtCache',
         slug: 'archive',
@@ -349,7 +362,7 @@ describe('SBTSelector rendered cold-load lifecycle', () => {
         },
       },
     ]));
-    contractScripts.getAllSbtAddressesCached.mockResolvedValue([]);
+    mockedContractScripts.getAllSbtAddressesCached.mockResolvedValue([]);
     const scopeSpy = jest
       .spyOn(sessionScanScopeUtils, 'readSessionScanScope')
       .mockReturnValue('list');
@@ -386,7 +399,7 @@ describe('SBTSelector rendered cold-load lifecycle', () => {
     const edgeAddress = '0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee';
     localStorage.setItem('ce:sessionScanScope', 'list');
     localStorage.setItem('ce:sessionScanSlugs', JSON.stringify(['demo']));
-    cacheScripts.__getSbtCacheStore().demo = {
+    mockedCacheScripts.__getSbtCacheStore().demo = {
       '84532': {
         sbtList: {
           [demoAddress]: {
@@ -403,7 +416,7 @@ describe('SBTSelector rendered cold-load lifecycle', () => {
         nameLookupState: {},
       },
     };
-    cacheScripts.__getSbtCacheStore().edge = {
+    mockedCacheScripts.__getSbtCacheStore().edge = {
       '84532': {
         sbtList: {
           [edgeAddress]: {
@@ -420,8 +433,8 @@ describe('SBTSelector rendered cold-load lifecycle', () => {
         nameLookupState: {},
       },
     };
-    contractScripts.getAllSbtAddressesCached.mockResolvedValue([]);
-    contractScriptsUtils.getAllSessionSlugs.mockReturnValue(['edge']);
+    mockedContractScripts.getAllSbtAddressesCached.mockResolvedValue([]);
+    mockedContractScriptsUtils.getAllSessionSlugs.mockReturnValue(['edge']);
 
     render(
       <SBTSelector
@@ -461,8 +474,8 @@ describe('SBTSelector rendered cold-load lifecycle', () => {
     const demoAddress = '0xdddddddddddddddddddddddddddddddddddddddd';
     localStorage.setItem('ce:sessionScanScope', 'list');
     localStorage.setItem('ce:sessionScanSlugs', JSON.stringify(['demo']));
-    globalThis.CE_SBT_SELECTOR_AUTO_SEARCH_OTHER_SESSIONS = false;
-    cacheScripts.__getSbtCacheStore().demo = {
+    globalCe.CE_SBT_SELECTOR_AUTO_SEARCH_OTHER_SESSIONS = false;
+    mockedCacheScripts.__getSbtCacheStore().demo = {
       '84532': {
         sbtList: {
           [demoAddress]: {
@@ -479,8 +492,8 @@ describe('SBTSelector rendered cold-load lifecycle', () => {
         nameLookupState: {},
       },
     };
-    contractScripts.getAllSbtAddressesCached.mockResolvedValue([]);
-    contractScriptsUtils.getAllSessionSlugs.mockReturnValue(['edge']);
+    mockedContractScripts.getAllSbtAddressesCached.mockResolvedValue([]);
+    mockedContractScriptsUtils.getAllSessionSlugs.mockReturnValue(['edge']);
 
     render(
       <SBTSelector
@@ -506,8 +519,8 @@ describe('SBTSelector rendered cold-load lifecycle', () => {
     const featuredAddress = '0xf111111111111111111111111111111111111111';
     const nonFeaturedAddress = '0xf222222222222222222222222222222222222222';
     const onAddSBT = jest.fn();
-    const ref = React.createRef();
-    contractScripts.getAllSbtAddressesCached.mockResolvedValue([]);
+    const ref = React.createRef<any>();
+    mockedContractScripts.getAllSbtAddressesCached.mockResolvedValue([]);
 
     render(
       <SBTSelector
@@ -532,7 +545,7 @@ describe('SBTSelector rendered cold-load lifecycle', () => {
     act(() => {
       ref.current.setState({ scopeFeaturedAddresses: [featuredAddress.toLowerCase()] });
     });
-    sbtDisplayNameUtils.hydrateSbtDisplayNameTargeted.mockClear();
+    mockedSbtDisplayNameUtils.hydrateSbtDisplayNameTargeted.mockClear();
 
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SBT_SELECTOR_MANUAL_TOGGLE));
     expect(screen.getByPlaceholderText('Enter Group Ethereum address')).toBeInTheDocument();
@@ -545,6 +558,6 @@ describe('SBTSelector rendered cold-load lifecycle', () => {
       expect(screen.getByRole('alert')).toHaveTextContent('Only featured Groups can be added by address in this selector.');
     });
     expect(onAddSBT).not.toHaveBeenCalled();
-    expect(sbtDisplayNameUtils.hydrateSbtDisplayNameTargeted).not.toHaveBeenCalled();
+    expect(mockedSbtDisplayNameUtils.hydrateSbtDisplayNameTargeted).not.toHaveBeenCalled();
   });
 });
