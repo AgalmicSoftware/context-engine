@@ -1,28 +1,29 @@
-/** @file AdminPage.test.jsx */
+/** @file AdminPage.test.tsx */
 import { ethers } from 'ethers';
 import AdminPage, { __adminPageTestUtils } from './AdminPage.jsx';
 import { DEFAULT_CHAIN_ID } from '../../variables/appConfig.js';
 import { getDefaultHttpRpc, getSessionRegistryAddress } from '../../variables/chains.js';
 
 const DEFAULT_CONFIG_CHAIN_ID = DEFAULT_CHAIN_ID;
+const adminPageTestUtils = __adminPageTestUtils as any;
 
 describe('AdminPage', () => {
   it('exports a component', () => {
     expect(typeof AdminPage).toBe('function');
   });
   it('keeps the open-session display URL when group metadata is available without a selected config', () => {
-    expect(__adminPageTestUtils.getAdminSessionDisplayUrl({
+    expect(adminPageTestUtils.getAdminSessionDisplayUrl({
       selectedSlug: 'debate',
       selectedConfig: null,
       groupMetadata: { slug: 'rxc', sessionName: 'Debate Session' },
     })).toBe('http://localhost/session/rxc');
-    expect(__adminPageTestUtils.getAdminSessionDisplayUrl({
+    expect(adminPageTestUtils.getAdminSessionDisplayUrl({
       selectedSlug: '',
       selectedConfig: null,
       groupMetadata: { slug: '', sessionName: 'Context Engine' },
     })).toBe('http://localhost/session');
 
-    expect(__adminPageTestUtils.getAdminSessionDisplayUrl({
+    expect(adminPageTestUtils.getAdminSessionDisplayUrl({
       selectedSlug: 'missing-session-slug',
       selectedConfig: null,
       groupMetadata: null,
@@ -30,7 +31,7 @@ describe('AdminPage', () => {
   });
 
   it('builds worker config payload with registry/rpc fallbacks from chain defaults', () => {
-    const payload = __adminPageTestUtils.buildWorkerSessionConfigPayload({
+    const payload = adminPageTestUtils.buildWorkerSessionConfigPayload({
       sessionConfig: {
         slug: 'test-3',
         networkChainId: DEFAULT_CONFIG_CHAIN_ID,
@@ -53,7 +54,7 @@ describe('AdminPage', () => {
   });
 
   it('includes normalized blockLimits in worker config payload', () => {
-    const payload = __adminPageTestUtils.buildWorkerSessionConfigPayload({
+    const payload = adminPageTestUtils.buildWorkerSessionConfigPayload({
       sessionConfig: {
         slug: 'test-8',
         networkChainId: 84532,
@@ -73,7 +74,7 @@ describe('AdminPage', () => {
   });
 
   it('resolves the faucet resource RPC from the session chain instead of the registry chain', () => {
-    const rpcConfig = __adminPageTestUtils.getSessionReadRpcConfig({
+    const rpcConfig = adminPageTestUtils.getSessionReadRpcConfig({
       sessionConfig: {
         slug: 'test-resource-rpc',
         networkChainId: 8453,
@@ -96,7 +97,7 @@ describe('AdminPage', () => {
   });
 
   it('falls back to the first non-empty rpcUrlsByChainId map after sanitization', () => {
-    const rpcConfig = __adminPageTestUtils.getSessionReadRpcConfig({
+    const rpcConfig = adminPageTestUtils.getSessionReadRpcConfig({
       sessionConfig: {
         slug: 'test-resource-rpc-fallback',
         networkChainId: 8453,
@@ -124,7 +125,7 @@ describe('AdminPage', () => {
   });
 
   it('builds editable session metadata payload with fallback start and strips registry-only fields', () => {
-    const payload = __adminPageTestUtils.buildEditableSessionMetadataPayload({
+    const payload = adminPageTestUtils.buildEditableSessionMetadataPayload({
       sessionConfig: {
         slug: 'test-9',
         sessionName: ' Test 9 ',
@@ -153,20 +154,20 @@ describe('AdminPage', () => {
   });
 
   it('applies an admin metadata auto-feature override only when requested', () => {
-    const basePayload = __adminPageTestUtils.buildEditableSessionMetadataPayload({
+    const basePayload = adminPageTestUtils.buildEditableSessionMetadataPayload({
       sessionConfig: {
         slug: 'test-10',
         blockLimits: { start: 12345 },
       },
     });
-    const legacyPayload = __adminPageTestUtils.buildEditableSessionMetadataPayload({
+    const legacyPayload = adminPageTestUtils.buildEditableSessionMetadataPayload({
       sessionConfig: {
         slug: 'test-10',
         blockLimits: { start: 12345 },
         autoFeatureSBTsWithFeaturedSbtTags: false,
       },
     });
-    const precedencePayload = __adminPageTestUtils.buildEditableSessionMetadataPayload({
+    const precedencePayload = adminPageTestUtils.buildEditableSessionMetadataPayload({
       sessionConfig: {
         slug: 'test-10',
         blockLimits: { start: 12345 },
@@ -174,7 +175,7 @@ describe('AdminPage', () => {
         autoFeatureSBTsWithFeaturedSbtTags: false,
       },
     });
-    const overriddenPayload = __adminPageTestUtils.buildEditableSessionMetadataPayload({
+    const overriddenPayload = adminPageTestUtils.buildEditableSessionMetadataPayload({
       sessionConfig: {
         slug: 'test-10',
         blockLimits: { start: 12345 },
@@ -195,7 +196,7 @@ describe('AdminPage', () => {
   });
 
   it('builds admin metadata drafts from existing config values', () => {
-    const draft = __adminPageTestUtils.buildAdminMetadataDraft({
+    const draft = adminPageTestUtils.buildAdminMetadataDraft({
       defaultTags: 'alpha, beta',
       defaultFilterState: { sort: 'recent' },
       defaultFeaturedSBTs: ['0x00000000000000000000000000000000000000aa'],
@@ -231,7 +232,7 @@ describe('AdminPage', () => {
   });
 
   it('defaults admin AI metadata drafts to GPT-5 when metadata is missing AI settings', () => {
-    const draft = __adminPageTestUtils.buildAdminMetadataDraft({});
+    const draft = adminPageTestUtils.buildAdminMetadataDraft({});
 
     expect(draft.aiFastProvider).toBe('openai');
     expect(draft.aiFastModel).toBe('gpt-5');
@@ -242,7 +243,7 @@ describe('AdminPage', () => {
   });
 
   it('preserves legacy AI fields when building and applying admin metadata drafts', () => {
-    const draft = __adminPageTestUtils.buildAdminMetadataDraft({
+    const draft = adminPageTestUtils.buildAdminMetadataDraft({
       ai: {
         mode: 'openai',
         model: 'gpt-4',
@@ -253,7 +254,7 @@ describe('AdminPage', () => {
     expect(draft.aiFastProvider).toBe('openai');
     expect(draft.aiFastModel).toBe('gpt-4');
 
-    const applied = __adminPageTestUtils.applyAdminMetadataDraft({
+    const applied = adminPageTestUtils.applyAdminMetadataDraft({
       ai: {
         mode: 'openai',
         model: 'gpt-4',
@@ -268,7 +269,7 @@ describe('AdminPage', () => {
   });
 
   it('applies advanced admin metadata edits and strips worker-only fields from the published payload', () => {
-    const payload = __adminPageTestUtils.buildEditableSessionMetadataPayload({
+    const payload = adminPageTestUtils.buildEditableSessionMetadataPayload({
       sessionConfig: {
         slug: 'test-11',
         blockLimits: { start: 12345 },
@@ -340,7 +341,7 @@ describe('AdminPage', () => {
   });
 
   it('applies editable contract overrides while preserving unknown contract metadata', () => {
-    const payload = __adminPageTestUtils.buildEditableSessionMetadataPayload({
+    const payload = adminPageTestUtils.buildEditableSessionMetadataPayload({
       sessionConfig: {
         slug: 'test-12',
         networkChainId: 84532,
@@ -379,7 +380,7 @@ describe('AdminPage', () => {
   });
 
   it('classifies gated health + unsupported auth login route as an explicit compatibility mismatch', () => {
-    const mismatch = __adminPageTestUtils.buildHealthAuthMismatchState({
+    const mismatch = adminPageTestUtils.buildHealthAuthMismatchState({
       unauthStatus: 401,
       unauthError: 'Unauthorized',
       authError: 'Worker auth login route not supported (404).',
@@ -392,7 +393,7 @@ describe('AdminPage', () => {
   });
 
   it('does not classify unrelated auth failures as route compatibility mismatches', () => {
-    const mismatch = __adminPageTestUtils.buildHealthAuthMismatchState({
+    const mismatch = adminPageTestUtils.buildHealthAuthMismatchState({
       unauthStatus: 401,
       unauthError: 'Unauthorized',
       authError: 'Worker login failed (500).',
