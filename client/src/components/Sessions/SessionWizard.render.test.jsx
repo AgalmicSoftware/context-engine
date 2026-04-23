@@ -296,6 +296,7 @@ import SessionWizard, {
   RESERVED_SESSION_SLUG_ERROR,
   deploySessionWizardPendingSbtDraft,
   finalizeSessionWizardPendingSbtDraft,
+  persistSessionWizardSbtRecoveryCodes,
   promotePendingSbtSelectionsAfterDeploy,
   resolveSessionWizardSelectorSourceConfig,
   resolveSessionWizardLitPaymentDelegation,
@@ -3064,6 +3065,33 @@ describe('SessionWizard rendered validation', () => {
       name: 'Pending SBT',
       metadataPreview: { phase: 'deployed' },
     }]);
+  });
+
+  it('persists published pending SBT recovery codes to the scoped recovery store', () => {
+    const writeRecoveryCodes = jest.fn(() => ({ ok: true, status: 'ok' }));
+
+    const result = persistSessionWizardSbtRecoveryCodes({
+      finalizedDraft: {
+        hasPasswordMintOnChain: true,
+        passwordList: ['claim-code-1'],
+        groupPassword: '',
+        usesInviteCodes: false,
+      },
+      sbtAddress: mockPendingSbtAddress,
+      sessionConfigForDeploy: {
+        networkChainId: 84532,
+      },
+      writeRecoveryCodes,
+    });
+
+    expect(result).toEqual({ ok: true, status: 'ok' });
+    expect(writeRecoveryCodes).toHaveBeenCalledWith({
+      chainId: 84532,
+      sbtAddress: mockPendingSbtAddress,
+      passwords: ['claim-code-1'],
+      mode: 'replace',
+    });
+    expect(localStorage.getItem('createdSBTs')).toBeNull();
   });
 
   it('resolves demo selector discovery from the source session config instead of the auto-seeded draft block window', () => {
