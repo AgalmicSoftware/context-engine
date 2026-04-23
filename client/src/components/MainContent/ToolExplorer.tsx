@@ -18,7 +18,7 @@ import {
   Col,
 } from 'reactstrap';
 
-import ToolExplorerPluginExplainer from './ToolExplorerPluginExplainer.jsx';
+import ToolExplorerPluginExplainer from './ToolExplorerPluginExplainer';
 import LazyFallback from '../Shared/LazyFallback';
 import SessionChipSelector from '../Shared/SessionChipSelector';
 
