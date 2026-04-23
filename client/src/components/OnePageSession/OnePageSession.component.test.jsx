@@ -104,7 +104,7 @@ jest.mock('../MainContent/RiskMatrix', () => ({
     return <div data-testid="risk-matrix-view">Risk Matrix</div>;
   },
 }));
-jest.mock('../DemoViews/DemoAnalysis/DemoAnalysisWorkspace.jsx', () => ({
+jest.mock('../DemoViews/DemoAnalysis/DemoAnalysisWorkspace', () => ({
   __esModule: true,
   default: (props) => {
     mockDemoAnalysisWorkspace(props);

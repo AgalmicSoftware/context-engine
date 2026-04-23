@@ -50,7 +50,7 @@ const PolisReport = React.lazy(() => import('../PolisReport/PolisReport.jsx'));
 const DebateMap = React.lazy(() => import('../DebateMap/DebateMap'));
 const CorpusViewer = React.lazy(() => import('../DemoViews/CorpusViewer.jsx'));
 const RiskMatrix = React.lazy(() => import('../MainContent/RiskMatrix'));
-const DemoAnalysisWorkspace = React.lazy(() => import('../DemoViews/DemoAnalysis/DemoAnalysisWorkspace.jsx'));
+const DemoAnalysisWorkspace = React.lazy(() => import('../DemoViews/DemoAnalysis/DemoAnalysisWorkspace'));
 
 const demoLog = createLogger('demo');
 const ONE_PAGE_DEMO_PERF_SCOPE = 'onePageDemo';
