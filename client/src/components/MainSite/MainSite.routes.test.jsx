@@ -57,7 +57,7 @@ jest.mock('../Onboarding/OnboardingOverlay.jsx', () => () => null);
 jest.mock('../Footer/Footer.jsx', () => () => null);
 jest.mock('../UserPage/SimUserPage.jsx', () => () => null);
 jest.mock('../Shared/LazyFallback', () => () => null);
-jest.mock('../E2E/DevE2eNav.jsx', () => () => null);
+jest.mock('../E2E/DevE2eNav', () => () => null);
 jest.mock('../ErrorBoundary/RouteErrorBoundary.jsx', () => ({
   __esModule: true,
   default: ({ children }) => children,
