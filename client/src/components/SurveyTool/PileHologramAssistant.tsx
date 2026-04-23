@@ -62,7 +62,7 @@ const BUST_PATH = [
   'C 88 336 108 318 132 308 Z',
 ].join(' ');
 
-const buildLatitudePath = (offsetY) => {
+const buildLatitudePath = (offsetY: number) => {
   const normalized = 1 - Math.pow(offsetY / FACE_RADIUS_Y, 2);
   if (normalized <= 0) return '';
 
@@ -97,7 +97,7 @@ const buildLatitudePath = (offsetY) => {
   ].join(' ');
 };
 
-const buildLongitudePath = (offsetX) => {
+const buildLongitudePath = (offsetX: number) => {
   const normalized = 1 - Math.pow(offsetX / FACE_RADIUS_X, 2);
   if (normalized <= 0) return '';
 
