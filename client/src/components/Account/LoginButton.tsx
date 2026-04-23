@@ -25,6 +25,12 @@ type LoginButtonStateProps = {
 
 type LoginButtonProps = LoginButtonOwnProps & LoginButtonStateProps;
 
+type RootState = {
+  sessionState: {
+    loginInProgress?: boolean;
+  };
+};
+
 class LoginButton extends Component<LoginButtonProps> {
 
     openLoginModal = () => {

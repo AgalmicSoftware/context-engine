@@ -18,7 +18,7 @@ jest.mock('./AccountDisplay', () => ({
   ),
 }));
 
-jest.mock('../Account/LoginAndSettingsModal', () => () => <div data-testid="web3-modal" />);
+jest.mock('../Account/LoginAndSettingsModal.jsx', () => () => <div data-testid="web3-modal" />);
 jest.mock('components/Account/LoginButton', () => () => <button type="button">Connect Wallet</button>);
 jest.mock('utilities/ui/blockieAvatars.js', () => ({
   generateBlockieDataUrl: () => '',
