@@ -70,16 +70,20 @@ This file can hold up to ten intentionally public sponsored `/new` URLs. The
 checked-in version keeps every slot inactive and empty. Operators may paste
 disposable sponsored URLs into the file, set selected entries to `"active": true`,
 and publish the JSON through the app's static assets or a GitHub-hosted raw file.
+Create those URLs through `/sponsor`, and back them only with low-budget,
+revocable resources.
 
 This is not a durable availability system. A link is "unused" only because the
 operator has left it active in the manifest; the fixture does not mark links used
 after a click. Treat every active URL as a public bearer grant and remove it once
-it is consumed, expired, or reported broken.
+it is consumed, expired, or reported broken. The fixture does not enforce spend
+limits, so cap AI/provider keys, faucet wallets, Arweave wallets, and Lit payer
+resources outside the manifest.
 
 See [`docs/standard-sponsored-links-fixture.md`](standard-sponsored-links-fixture.md)
-for the exact manifest contract. Replace the fixture with a worker-backed claim
-service before using sponsored-link inventory as durable availability
-infrastructure.
+for the exact manifest contract. Long term, this should be replaced by a
+worker-backed claim flow that returns one currently available setup link
+without publishing the full pool.
 
 ## Prerequisites
 
