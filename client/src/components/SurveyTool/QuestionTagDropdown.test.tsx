@@ -1,7 +1,7 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import QuestionTagDropdown, { buildTagPagePath } from './QuestionTagDropdown.jsx';
+import QuestionTagDropdown, { buildTagPagePath } from './QuestionTagDropdown';
 
 jest.mock('reactstrap', () => {
   const React = require('react');
@@ -12,7 +12,7 @@ jest.mock('reactstrap', () => {
 
   return {
     __esModule: true,
-    UncontrolledDropdown: ({ children, ...props }) => {
+    UncontrolledDropdown: ({ children, ...props }: any) => {
       const [isOpen, setIsOpen] = React.useState(false);
       return (
         <DropdownContext.Provider value={{ isOpen, setIsOpen }}>
@@ -20,9 +20,9 @@ jest.mock('reactstrap', () => {
         </DropdownContext.Provider>
       );
     },
-    DropdownToggle: ({ children, onClick, color, caret, ...props }) => {
+    DropdownToggle: ({ children, onClick, color, caret, ...props }: any) => {
       const { isOpen, setIsOpen } = React.useContext(DropdownContext);
-      const handleClick = (event) => {
+      const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
         if (typeof onClick === 'function') onClick(event);
         setIsOpen(!isOpen);
       };
@@ -33,12 +33,12 @@ jest.mock('reactstrap', () => {
         </button>
       );
     },
-    DropdownMenu: ({ children, end, ...props }) => {
+    DropdownMenu: ({ children, end, ...props }: any) => {
       const { isOpen } = React.useContext(DropdownContext);
       if (!isOpen) return null;
       return <div {...props}>{children}</div>;
     },
-    DropdownItem: ({ children, tag: Tag = 'button', to, href, ...props }) => {
+    DropdownItem: ({ children, tag: Tag = 'button', to, href, ...props }: any) => {
       if (Tag === 'button') {
         return (
           <button type="button" {...props}>
@@ -56,7 +56,7 @@ jest.mock('reactstrap', () => {
   };
 });
 
-const renderDropdown = (props = {}) => render(
+const renderDropdown = (props: any = {}) => render(
   <MemoryRouter>
     <QuestionTagDropdown {...props} />
   </MemoryRouter>
@@ -97,8 +97,9 @@ describe('QuestionTagDropdown', () => {
   });
 
   it('keeps tag routes aligned with PUBLIC_URL subpath hosting when no explicit baseUrl is provided', () => {
-    const priorPublicUrl = process.env.PUBLIC_URL;
-    process.env.PUBLIC_URL = '/ce/';
+    const mutableEnv = process.env as Record<string, string | undefined>;
+    const priorPublicUrl = mutableEnv.PUBLIC_URL;
+    mutableEnv.PUBLIC_URL = '/ce/';
 
     try {
       renderDropdown({ tags: ['governance'], sessionSlug: 'edge' });
@@ -112,8 +113,8 @@ describe('QuestionTagDropdown', () => {
       expect(buildTagPagePath(['governance', 'AI Policy'])).toBe('/ce/tag/governance+AI%20Policy');
       expect(buildTagPagePath([])).toBe('/ce/questions');
     } finally {
-      if (priorPublicUrl === undefined) delete process.env.PUBLIC_URL;
-      else process.env.PUBLIC_URL = priorPublicUrl;
+      if (priorPublicUrl === undefined) delete mutableEnv.PUBLIC_URL;
+      else mutableEnv.PUBLIC_URL = priorPublicUrl;
     }
   });
 });

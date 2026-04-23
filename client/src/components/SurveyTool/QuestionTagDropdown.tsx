@@ -9,6 +9,12 @@ import styles from './QuestionTagDropdown.module.scss';
 
 export { getQuestionTagDisplayList } from '../../utilities/survey/questionTags.js';
 
+type QuestionTagDropdownProps = {
+  tags?: unknown[];
+  baseUrl?: string;
+  sessionSlug?: string;
+};
+
 const resolveTagRouteBaseUrl = (baseUrl = '') => {
   const explicitBaseUrl = String(baseUrl ?? '').trim();
   if (explicitBaseUrl) return explicitBaseUrl.replace(/\/+$/, '');
@@ -22,13 +28,13 @@ const joinTagRoute = (baseUrl = '', pathname = '/') => {
   return `${normalizedBaseUrl}${normalizedPathname}`;
 };
 
-export const buildTagPagePath = (tags = [], baseUrl = '') => {
+export const buildTagPagePath = (tags: unknown[] = [], baseUrl = '') => {
   const displayTags = getQuestionTagDisplayList(tags);
   if (!displayTags.length) return joinTagRoute(baseUrl, '/questions');
   return joinTagRoute(baseUrl, `/tag/${displayTags.map((tag) => encodeURIComponent(tag)).join('+')}`);
 };
 
-export const buildTagHref = (tag, baseUrl = '', sessionSlug = '') => {
+export const buildTagHref = (tag: unknown, baseUrl = '', sessionSlug = '') => {
   const trimmedTag = String(tag ?? '').trim();
   const normalizedSessionSlug = String(sessionSlug ?? '').trim();
 
@@ -43,7 +49,7 @@ export const buildTagHref = (tag, baseUrl = '', sessionSlug = '') => {
     : path;
 };
 
-const QuestionTagDropdown = ({ tags, baseUrl = '', sessionSlug = '' }) => {
+const QuestionTagDropdown = ({ tags = [], baseUrl = '', sessionSlug = '' }: QuestionTagDropdownProps) => {
   const displayTags = getQuestionTagDisplayList(tags);
 
   if (!displayTags.length) return null;
@@ -67,7 +73,7 @@ const QuestionTagDropdown = ({ tags, baseUrl = '', sessionSlug = '' }) => {
             tag={Link}
             to={buildTagHref(tag, baseUrl, sessionSlug)}
             className={styles.item}
-            onClick={(event) => event.stopPropagation()}
+            onClick={(event: React.MouseEvent<HTMLElement>) => event.stopPropagation()}
           >
             #{tag}
           </DropdownItem>
