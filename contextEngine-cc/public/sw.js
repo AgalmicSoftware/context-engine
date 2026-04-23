@@ -1,5 +1,37 @@
 const CACHE_NAME = 'ce-cc-v8';
 const SHELL_ASSETS = ['/', '/index.html', '/manifest.webmanifest'];
+const STATIC_ASSET_PATHS = new Set([...SHELL_ASSETS, '/styles.css', '/ethers.umd.min.js']);
+const STATIC_ASSET_PREFIXES = ['/js/'];
+
+const isCacheableRequest = (request, url) => {
+  if (url.pathname.startsWith('/api/')) return false;
+  if (request.method !== 'GET' || url.origin !== self.location.origin) return false;
+  return request.mode === 'navigate'
+    || STATIC_ASSET_PATHS.has(url.pathname)
+    || STATIC_ASSET_PREFIXES.some((prefix) => url.pathname.startsWith(prefix));
+};
+
+const isCacheableResponse = (response) => !!response && response.ok;
+
+const putResponseInCache = async (request, response) => {
+  const cache = await caches.open(CACHE_NAME);
+  await cache.put(request, response.clone());
+};
+
+const fetchWithCacheFallback = async (request) => {
+  try {
+    const response = await fetch(request);
+    // Regression guard: don't pin stale or broken assets forever.
+    if (isCacheableResponse(response)) {
+      await putResponseInCache(request, response);
+    }
+    return response;
+  } catch (error) {
+    const cached = await caches.match(request);
+    if (cached) return cached;
+    throw error;
+  }
+};
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -20,24 +52,9 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
-  // Let API calls pass through to network — never cache them
-  if (url.pathname.startsWith('/api/')) {
+  if (!isCacheableRequest(event.request, url)) {
     return;
   }
 
-  // Never cache POST requests or cross-origin requests
-  if (event.request.method !== 'GET' || url.origin !== self.location.origin) {
-    return;
-  }
-
-  // Cache-first for shell assets
-  event.respondWith(
-    caches.match(event.request).then((cached) =>
-      cached || fetch(event.request).then((response) => {
-        const clone = response.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
-        return response;
-      })
-    )
-  );
+  event.respondWith(fetchWithCacheFallback(event.request));
 });
