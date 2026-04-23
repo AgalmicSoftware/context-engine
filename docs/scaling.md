@@ -34,7 +34,7 @@ The follower has two deployment forms. `Follower Core` is the self-hosted canoni
 
 ## Encryption and Private Compute
 
-Encryption backend defines key custody and the decrypt control plane. `lit-public` is the default public path. For enterprise/private deployments, the current preferred V1 direction is local key release plus client-side crypto: strict passkey-private mode where WebAuthn PRF is available, and KMS/Vault/OpenBao-backed release where a conventional enterprise trust model is acceptable. `lit-private` is deferred unless vendor-backed with clear licensing, private-chain support, offline behavior, SDK semantics, and deployment guidance. `tee` moves decrypt authority behind attested enclave-backed services for later advanced workloads. `threshold-private` is the later permissioned threshold path.
+Encryption backend defines key custody and the decrypt control plane. `lit-public` is the default public path. For enterprise/private deployments, the V1 direction is **Local Key Release** plus client-side crypto: strict passkey-private mode where WebAuthn PRF is available, and KMS/Vault/OpenBao-backed release where a conventional enterprise trust model is acceptable. A vendor-backed Lit cluster is only a later research option if licensing, private-chain support, offline behavior, SDK semantics, and deployment guidance are written down. `tee` moves decrypt authority behind attested enclave-backed services for later advanced workloads. `threshold-private` is the later permissioned threshold path.
 
 Private compute mode defines where gated decrypt and protected computation run. `client` is the default and keeps decrypt on the user device. `tee` enables authorized server-side compute inside enclaves. `threshold` is the later networked private-compute path.
 
@@ -43,9 +43,9 @@ Private query capability defines what indexed systems may do with protected data
 | Mode | Trust model | Scale benefit | Best for | Feasibility |
 |---|---|---|---|---|
 | `lit-public` | public Lit network | baseline | public OSS/default | already shipped |
-| `key-release-passkey-private` | passkey-sealed user keys plus local policy service | strong normal-path user privacy when WebAuthn PRF works | enterprise/private V1 strict mode | high after adapter work |
-| `key-release-kms` | customer KMS/Vault/OpenBao trust | modest, supportable | enterprise/private V1 compatibility mode | high |
-| `lit-private` | threshold crypto on private infra | moderate decrypt throughput and availability gain | advanced private hosted CE only with vendor-backed terms | deferred |
+| `key-release-passkey-private` | passkey-sealed user keys plus Local Key Release policy service | strong normal-path user privacy when WebAuthn PRF works | enterprise/private V1 strict mode | high after adapter work |
+| `key-release-kms` | customer KMS/Vault/OpenBao trust plus Local Key Release policy checks | modest, supportable | enterprise/private V1 compatibility mode | high |
+| `vendor-backed-lit-cluster` | Lit-style threshold crypto operated under explicit vendor terms | moderate decrypt throughput and availability gain | later advanced option only if vendor-backed | deferred |
 | `tee` | enclave-backed operator infra | high for private query, decrypt, and search | advanced enterprise/private workloads | medium |
 | `local-kms` | trusted operator | modest | simple enterprise install / compatibility mode | high |
 | `aws-kms` | AWS-managed HSM trust | modest | AWS-native enterprise | high |
@@ -58,7 +58,7 @@ Deployment profiles package the scaling layers into named defaults. They are pre
 | Profile | Audience | Read path | Write path | Encryption / private compute | Hosting style |
 |---|---|---|---|---|---|
 | `oss-default` | OSS users, small communities | RPC or optional indexed-lite | public sync | `lit-public`, client decrypt | simple public deploy |
-| `sponsored-cloudflare` | maintainer-run shared sessions | Cloudflare Lite mirror | public sync or light async intake | `lit-public` now; private Lit not a default path | Cloudflare-first |
+| `sponsored-cloudflare` | maintainer-run shared sessions | Cloudflare Lite mirror | public sync or light async intake | `lit-public` now; Local Key Release only for private profiles | Cloudflare-first |
 | `enterprise-private` | self-hosted orgs / regulated installs | full OSS follower core | private PoA sync or batch | key-release passkey-private or KMS/Vault/OpenBao compatibility; TEE later | Docker, VPC, or on-prem |
 | `max-scale-rollup` | future hosted large-scale CE | full follower core plus specialized read APIs | app rollup plus batch or async settlement | `tee` or future `threshold-private` | serious hosted infra |
 
