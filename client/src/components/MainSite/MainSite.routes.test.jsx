@@ -52,7 +52,7 @@ jest.mock('../HooksHOC/withWagmiBridge', () => ({
 }));
 
 jest.mock('../Navbar/Navbar.jsx', () => () => null);
-jest.mock('../MainContent/MainAreaTabs.jsx', () => () => null);
+jest.mock('../MainContent/MainAreaTabs', () => () => null);
 jest.mock('../Onboarding/OnboardingOverlay', () => () => null);
 jest.mock('../Footer/Footer', () => () => null);
 jest.mock('../UserPage/SimUserPage.jsx', () => () => null);
