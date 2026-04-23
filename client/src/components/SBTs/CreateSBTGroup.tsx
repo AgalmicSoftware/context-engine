@@ -23,6 +23,7 @@ import {
 import { ethers } from 'ethers';
 import { arweaveScripts } from '../../utilities/arweave/arweaveScripts.js';
 import { normalizeArweaveUrl, parseArweaveTxId } from '../../utilities/arweave/arweaveUrls.js';
+import { validateNoLockedPlaintextInPayload } from '../../utilities/arweave/noLeakPayloads.js';
 import contractScripts, { getSessionConfigBySlugOrDefault, normalizeSessionSlug } from '../../utilities/web3/contractScripts.js';
 import { getEffectiveArweaveKey } from '../../utilities/session/resourceKeys.js';
 import { toStr } from '../../utilities/shared/primitives.js';

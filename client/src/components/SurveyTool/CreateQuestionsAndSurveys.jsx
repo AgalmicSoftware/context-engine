@@ -2307,7 +2307,7 @@ class CreateQuestionsAndSurveys extends Component {
             return qD;
           })
         );
-        questionDataArray.forEach((questionData: any, index: any) => {
+        questionDataArray.forEach((questionData, index) => {
           validateNoLockedPlaintextInPayload(questionData, {
             family: 'question_metadata',
             path: `question metadata[${index}]`,
@@ -2488,13 +2488,13 @@ class CreateQuestionsAndSurveys extends Component {
             return base;
           })
         );
-        questionDataArray.forEach((questionData: any, index: any) => {
+        questionDataArray.forEach((questionData, index) => {
           validateNoLockedPlaintextInPayload(questionData, {
             family: 'question_metadata',
             path: `question metadata[${index}]`,
           });
         });
-        const questionIdsForContract = uniqueQuestions.map((q: any) => q.id);
+        const questionIdsForContract = uniqueQuestions.map(q => q.id);
 
         // Fetch current block number for creationBlock optimization
         let creationBlock = 0;
