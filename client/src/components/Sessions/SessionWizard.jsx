@@ -12,7 +12,7 @@ import SessionHeaderField from './SessionHeaderField';
 import FeaturedSbtField from './FeaturedSbtField';
 import ContractsSection from './ContractsSection';
 import EncryptionPanel from './EncryptionPanel.jsx';
-import WorkerPanel from './WorkerPanel.jsx';
+import WorkerPanel from './WorkerPanel';
 import CreateSBTGroup, { finalizeDeferredCreateSbtDraftUpload } from '../SBTs/CreateSBTGroup.jsx';
 import GateMultiSelectLock from '../Gates/GateMultiSelectLock';
 import { JsonToggleButton, JsonPanel, JsonButtonRow } from '../Shared/Json/JsonControls';
