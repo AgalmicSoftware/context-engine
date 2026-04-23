@@ -53,7 +53,7 @@ import { PUBLIC_AI_DISCOURSE_CORPUS_URL } from '../../variables/publicRepoMetada
 
 const SurveyPage = React.lazy(() => import('../SurveyTool/SurveyPage'));
 const MemoSurveyPage = React.memo((props) => <SurveyPage {...props} />);
-const SBTsPage = React.lazy(() => import('../SBTs/SBTsPage.jsx'));
+const SBTsPage = React.lazy(() => import('../SBTs/SBTsPage'));
 const PolisReport = React.lazy(() => import('../PolisReport/PolisReport.jsx'));
 const DebateMap = React.lazy(() => import('../DebateMap/DebateMap'));
 const CorpusViewer = React.lazy(() => import('../DemoViews/CorpusViewer'));

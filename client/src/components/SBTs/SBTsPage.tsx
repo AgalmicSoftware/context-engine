@@ -137,43 +137,113 @@ const SBTsListComponent = SBTsList as React.ComponentType<Record<string, unknown
 const CreateGroupComponent = CreateGroup as React.ComponentType<Record<string, unknown>>;
 const SBTPageComponent = SBTPage as React.ComponentType<Record<string, unknown>>;
 
-const sbtLog = createLogger('sbt');
-
-const getDisplaySessionConfig = (slugIn: unknown = ''): SBTSessionConfigLike | null => (
-  resolveDisplaySessionConfig({
-    getDemoSessionConfigBySlug,
-    getSessionConfigBySlug,
-    getSessionConfigBySlugOrDefault,
-    slugIn,
-  })
-);
-
-const getDisplaySessionLists = (slugIn: unknown = '') => (
-  resolveDisplaySessionLists({
-    getDemoSessionConfigBySlug,
-    getSessionConfigBySlug,
-    getSessionConfigBySlugOrDefault,
-    slugIn,
-  })
-);
-
-const getFeaturedSbtName = (sbt: FeaturedSbtLike | null | undefined): string => {
-  const info = isRecord(sbt?.sbtInfo) ? sbt.sbtInfo : {};
-  return String(
-    info.name ||
-    info.title ||
-    sbt?.name ||
-    ''
-  ).trim();
+type AnyRecord = Record<string, any>;
+type MaybeRecord = AnyRecord | null;
+type MemoBucket = {
+  key: string;
+  result: any[];
 };
 
-const isDemoAutomationFixtureSbt = (
-  sbt: FeaturedSbtLike | null | undefined,
-  sessionSlug: unknown = ''
-): boolean => {
-  if (normalizeSessionSlug(sessionSlug || '') !== 'demo') return false;
-  const name = getFeaturedSbtName(sbt);
-  if (!name) return false;
+type SBTsPageProps = AnyRecord;
+type SBTsPageState = {
+  showSBTsList: boolean;
+  showCreateGroup: boolean;
+};
+
+const SBTsListComponent = SBTsList as any;
+const CreateGroupComponent = CreateGroup as any;
+const SBTPageComponent = SBTPage as any;
+
+const sbtLog = createLogger('sbt');
+
+const normalizeFeaturedCardImageUrl = (value: any) => {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  if (/^ipfs:\/\//i.test(raw)) return `https://ipfs.io/ipfs/${raw.replace(/^ipfs:\/\//i, '')}`;
+  return normalizeArweaveUrl(raw, { contextLabel: 'sbt_page_featured_image' });
+};
+
+const dedupeAddressListCaseInsensitive = (list: any) => {
+  const seen = new Set();
+  const out: string[] = [];
+  (Array.isArray(list) ? list : []).forEach((addr) => {
+    const raw = String(addr || '').trim();
+    if (!raw) return;
+    const lower = raw.toLowerCase();
+    if (seen.has(lower)) return;
+    seen.add(lower);
+    out.push(raw);
+  });
+  return out;
+};
+
+const dedupeSessionSlugList = (list: any) => {
+  const seen = new Set();
+  const out: string[] = [];
+  (Array.isArray(list) ? list : []).forEach((slug) => {
+    const normalized = normalizeSessionSlug(slug || '');
+    if (seen.has(normalized)) return;
+    seen.add(normalized);
+    out.push(normalized);
+  });
+  return out;
+};
+
+const buildFeaturedProgressSignature = (progressBySlug: AnyRecord = {}, slugs: any[] = []) => (
+  dedupeSessionSlugList(slugs).map((slug) => {
+    const progress = progressBySlug?.[slug];
+    if (!progress || typeof progress !== 'object') return `${slug}:idle`;
+    return [
+      slug,
+      Number(progress.currentBlock || 0),
+      Number(progress.latestBlock || 0),
+      Number(progress.displayCurrentBlock || 0),
+      Number(progress.liveCurrentBlock || 0),
+      Number(progress.lastBlock || 0),
+      progress.scanInProgress ? '1' : '0',
+      progress.deferred ? '1' : '0',
+    ].join(':');
+  }).join('|')
+);
+
+const hasOwn = (obj: any, key: string) => (
+  !!obj && typeof obj === 'object' && Object.prototype.hasOwnProperty.call(obj, key)
+);
+
+const hasAuthoritativeSessionSlug = (obj: any) => {
+  if (!hasOwn(obj, 'sessionSlug')) return false;
+  const hasExplicitFlag = hasOwn(obj, 'sessionSlugExplicit');
+  return obj.sessionSlugExplicit === true || !hasExplicitFlag;
+};
+
+const resolveFeaturedSbtSessionSlug = (sbt: any) => {
+  const info = sbt?.sbtInfo || {};
+
+  if (hasAuthoritativeSessionSlug(info)) {
+    return normalizeSessionSlug(info?.sessionSlug || '');
+  }
+  if (hasAuthoritativeSessionSlug(sbt)) {
+    return normalizeSessionSlug(sbt?.sessionSlug || '');
+  }
+
+  // Auto-feature must respect metadata authority boundaries, not cache/source buckets.
+  const legacyRaw = info?.slug;
+  if (legacyRaw != null && String(legacyRaw).trim() !== '') {
+    return normalizeSessionSlug(legacyRaw);
+  }
+
+  return '';
+};
+
+const getDisplaySessionConfig = (slugIn = '') => {
+  const slug = normalizeSessionSlug(slugIn || '');
+  if (!slug) {
+    return (
+      getSessionConfigBySlugOrDefault('')
+      || getDemoSessionConfigBySlug('', { allowDemoFallback: true })
+      || null
+    );
+  }
   return (
     /\b(?:AI Gate|AI Gated Decrypt|AI Doc Library|AI Doc Filetypes|BrowserUse) Test SBT\b/i.test(name) ||
     /\[(?:e2e-|20\d{6}-\d{6}-(?:response-smoke|anyall|gated|survey|doc))/i.test(name)
@@ -183,26 +253,37 @@ const isDemoAutomationFixtureSbt = (
 export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
   _featuredListMemo: MemoBucket<string>;
 
-const resolveAutoFeatureBySessionSlug = (metadata) => (
+const resolveAutoFeatureBySessionSlug = (metadata: MaybeRecord = null) => (
   metadata?.autoFeatureSBTsBySessionSlug !== undefined
     ? metadata.autoFeatureSBTsBySessionSlug
     : metadata?.autoFeatureSBTsWithFeaturedSbtTags
 );
 
-const isSessionAutoFeatureEnabled = (sessionConfig = null) => (
+const isSessionAutoFeatureEnabled = (sessionConfig: AnyRecord | null = null) => (
   resolveAutoFeatureBySessionSlug(sessionConfig) !== false
 );
 
-  _featuredCacheCardsMemo: MemoBucket<CacheBackedFeaturedCard>;
+export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
+  _featuredListMemo: MemoBucket;
+
+  _featuredEntriesMemo: MemoBucket;
+
+  _featuredCacheCardsMemo: MemoBucket;
 
   constructor(props: SBTsPageProps) {
     super(props);
-    this.state = buildInitialState({
-      activeSessionSlug: props.activeSessionSlug,
-      hasCachedCreateSbtForm,
-      sessionConfig: props.sessionConfig,
-      sessionSlug: props.sessionSlug,
-    });
+    const initialCreateGroupSessionSlug = normalizeSessionSlug(
+      props.sessionSlug || props.sessionConfig?.slug || props.activeSessionSlug || ''
+    );
+    this.state = {
+      showSBTsList: false,
+      // Initialize Create Group open when cache exists (idempotent; only at mount time)
+      showCreateGroup: hasCachedCreateSbtForm({
+        sessionSlug: initialCreateGroupSessionSlug,
+        migrateLegacyToSessionKey: true,
+        clearInvalid: true,
+      } as any),
+    };
 
     this.toggleSBTsList = this.toggleSBTsList.bind(this);
     this.toggleCreateGroup = this.toggleCreateGroup.bind(this);
@@ -212,10 +293,7 @@ const isSessionAutoFeatureEnabled = (sessionConfig = null) => (
   }
 
   toggleSBTsList() {
-    this.setState((prevState) => buildBooleanTogglePatch({
-      state: prevState,
-      stateKey: 'showSBTsList',
-    }) as Pick<SBTsPageState, 'showSBTsList'>);
+    this.setState((prevState) => ({ showSBTsList: !prevState.showSBTsList }));
   }
 
   toggleCreateGroup() {
@@ -223,10 +301,7 @@ const isSessionAutoFeatureEnabled = (sessionConfig = null) => (
       this.props.onCreateGroupToggleExternal();
       return;
     }
-    this.setState((prevState) => buildBooleanTogglePatch({
-      state: prevState,
-      stateKey: 'showCreateGroup',
-    }) as Pick<SBTsPageState, 'showCreateGroup'>);
+    this.setState((prevState) => ({ showCreateGroup: !prevState.showCreateGroup }));
   }
 
   getMemoizedFeaturedList({
@@ -238,7 +313,7 @@ const isSessionAutoFeatureEnabled = (sessionConfig = null) => (
     isSBTCacheReady,
     isAllSessionsMode = false,
     progressBySlug = {},
-  }: FeaturedListArgs): string[] {
+  }: AnyRecord) {
     const baseList = dedupeAddressListCaseInsensitive(baseFeaturedList);
     const sessionSlugTarget = normalizeSessionSlug(effectiveSessionSlug || '');
     const key = [
@@ -293,15 +368,13 @@ const isSessionAutoFeatureEnabled = (sessionConfig = null) => (
     }
     if (autoFeature && !isAllSessionsMode) {
       try {
-        const cache = peekCacheSync('sbtCache', String(effectiveSessionSlug || ''), { clone: false });
-        if (isRecord(cache)) {
+        const cache = peekCacheSync('sbtCache', effectiveSessionSlug, { clone: false });
+        if (cache && typeof cache === 'object') {
           const autoFeaturedAddresses: string[] = [];
-          Object.values(cache).forEach((netNode) => {
-            const netRecord = isRecord(netNode) ? netNode : null;
-            const sbtList = isRecord(netRecord?.sbtList) ? netRecord.sbtList : null;
-            if (!sbtList) return;
-            Object.values(sbtList).forEach((rawSbt) => {
-              const sbt = asFeaturedSbt(rawSbt);
+          Object.values(cache).forEach((netNode: any) => {
+            const sbtList = netNode && typeof netNode === 'object' ? netNode.sbtList : null;
+            if (!sbtList || typeof sbtList !== 'object') return;
+            Object.values(sbtList).forEach((sbt: any) => {
               if (!sbt?.sbtAddress) return;
               if (sbt?.sbtInfo?.unlisted || sbt?.unlisted) return;
               if (isDemoAutomationFixtureSbt(sbt, sessionSlugTarget)) return;
@@ -335,7 +408,7 @@ const isSessionAutoFeatureEnabled = (sessionConfig = null) => (
     includeListScopeSessions = false,
     listScopeSessionSlugs = [],
     progressBySlug = {},
-  }: FeaturedEntriesArgs): FeaturedEntry[] {
+  }: AnyRecord) {
     const normalizedEffectiveSlug = normalizeSessionSlug(effectiveSessionSlug || '');
     const scopedSessionSlugs = includeListScopeSessions
       ? dedupeSessionSlugList(listScopeSessionSlugs)
@@ -375,8 +448,8 @@ const isSessionAutoFeatureEnabled = (sessionConfig = null) => (
       return this._featuredEntriesMemo.result;
     }
 
-    const seenAddresses = new Set<string>();
-    const next: FeaturedEntry[] = [];
+    const seenAddresses = new Set();
+    const next: AnyRecord[] = [];
     orderedSessionSlugs.forEach((slug) => {
       const featuredForSlug = slug === normalizedEffectiveSlug
         ? baseList
@@ -394,7 +467,7 @@ const isSessionAutoFeatureEnabled = (sessionConfig = null) => (
         isAllSessionsMode,
         progressBySlug,
       });
-      addresses.forEach((address) => {
+      addresses.forEach((address: any) => {
         const rawAddress = String(address || '').trim();
         if (!rawAddress) return;
         const lower = rawAddress.toLowerCase();
@@ -415,8 +488,12 @@ const isSessionAutoFeatureEnabled = (sessionConfig = null) => (
     featuredEntries = [],
     isSBTCacheReady = false,
     progressBySlug = {},
-  }: FeaturedCacheCardsArgs): CacheBackedFeaturedCard[] {
-    const normalizedEntries = normalizeFeaturedEntries(featuredEntries);
+  }: AnyRecord) {
+    const normalizedEntries = (Array.isArray(featuredEntries) ? featuredEntries : []).map((entry) => ({
+      address: String(entry?.address || '').trim(),
+      lowerAddress: String(entry?.address || '').trim().toLowerCase(),
+      sessionSlug: normalizeSessionSlug(entry?.sessionSlug || ''),
+    })).filter((entry) => entry.address && entry.lowerAddress);
     const key = [
       String(Number(this.props.sbtCacheRevision || 0)),
       isSBTCacheReady ? '1' : '0',
@@ -430,15 +507,13 @@ const isSessionAutoFeatureEnabled = (sessionConfig = null) => (
       return this._featuredCacheCardsMemo.result;
     }
 
-    const next = normalizedEntries.map<CacheBackedFeaturedCard | null>((entry) => {
-      let cacheMatch: CacheBackedFeaturedCard['sbt'] | null = null;
+    const next = normalizedEntries.map((entry) => {
+      let cacheMatch: AnyRecord | null = null;
       try {
         const cache = peekCacheSync('sbtCache', entry.sessionSlug, { clone: false });
-        if (isRecord(cache)) {
-          Object.values(cache).some((netNode) => {
-            const netRecord = isRecord(netNode) ? netNode : null;
-            const sbtList = isRecord(netRecord?.sbtList) ? netRecord.sbtList : null;
-            const candidate = asFeaturedSbt(sbtList?.[entry.lowerAddress]);
+        if (cache && typeof cache === 'object') {
+          Object.values(cache).some((netNode: any) => {
+            const candidate = netNode?.sbtList?.[entry.lowerAddress];
             if (!candidate?.sbtInfo) return false;
             cacheMatch = candidate as FeaturedSbtLike & { sbtInfo: FeaturedSbtMetadataLike };
             return true;
@@ -447,9 +522,8 @@ const isSessionAutoFeatureEnabled = (sessionConfig = null) => (
       } catch (e) {
         sbtLog.warn('[SBTsPage] cache-backed featured lookup failed:', e);
       }
-      const resolvedCacheMatch = cacheMatch as CacheBackedFeaturedCard['sbt'] | null;
+      const resolvedCacheMatch = cacheMatch as AnyRecord | null;
       if (!resolvedCacheMatch || !resolvedCacheMatch.sbtInfo) return null;
-      if (!hasCacheFeaturedCardImageMetadata(resolvedCacheMatch.sbtInfo)) return null;
       return {
         address: entry.address,
         sessionSlug: entry.sessionSlug,
@@ -608,8 +682,8 @@ const isSessionAutoFeatureEnabled = (sessionConfig = null) => (
         progressBySlug,
       })
       : [];
-    const cacheBackedFeaturedCardMap = new Map<string, CacheBackedFeaturedCard>(
-      cacheBackedFeaturedCards.map((entry) => {
+    const cacheBackedFeaturedCardMap = new Map(
+      cacheBackedFeaturedCards.map((entry: any) => {
         const sessionSlug = normalizeSessionSlug(entry?.sessionSlug || '');
         const lowerAddress = String(entry?.address || '').trim().toLowerCase();
         return [`${sessionSlug}|${lowerAddress}`, entry];
@@ -628,7 +702,7 @@ const isSessionAutoFeatureEnabled = (sessionConfig = null) => (
     });
     const featuredSessionSlugs = dedupeSessionSlugList([
       effectiveSessionSlug,
-      ...actualFeaturedEntries.map((entry) => entry.sessionSlug),
+      ...actualFeaturedEntries.map(({ sessionSlug }: AnyRecord) => sessionSlug),
     ]);
     const featuredScanActive = featuredSessionSlugs.some((slug) => {
       const progress = progressBySlug[slug];
@@ -688,7 +762,7 @@ const isSessionAutoFeatureEnabled = (sessionConfig = null) => (
                   />
                 )}
                 <div className={styles.sbtGrid}>
-                {featuredRenderEntries.map(({ kind, entry }, index: number) => {
+                {featuredRenderEntries.map(({ kind, entry }: AnyRecord, index: number) => {
                   if (kind === 'cache') {
                     const sbt = entry?.sbt || null;
                     const sbtInfo = sbt?.sbtInfo || {};
@@ -820,12 +894,8 @@ const isSessionAutoFeatureEnabled = (sessionConfig = null) => (
   }
 }
 
-const mapStateToProps = (state: UnknownRecord) => {
-  const sessionState = isRecord(state.sessionState) ? state.sessionState : {};
-  const activeSessionSlug = sessionState.activeSessionSlug == null
-    ? undefined
-    : String(sessionState.activeSessionSlug);
-  return { activeSessionSlug };
-};
+const mapStateToProps = (state: AnyRecord) => ({
+  activeSessionSlug: state.sessionState.activeSessionSlug,
+});
 
 export default connect(mapStateToProps)(SBTsPage);
