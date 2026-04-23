@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { dispatchAuthNonceRequest } from './authNonceRequestDispatch.js';
+import { checkNonceRateLimit } from './nonceLifecycle.js';
 
 const createJsonStub = () => (body, status, headers) => ({ body, status, headers });
 
@@ -24,6 +25,7 @@ const createNonceDeps = (overrides = {}) => ({
     headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
     config: { allowOrigins: ['https://allowed.example'] },
   }),
+  resolveTrustedAdminOrigins: () => ['http://localhost:3000'],
   buildNonce: () => 'nonce-1',
   putNonce: async () => {},
   MISSING_SLUG_ERROR: 'Missing sessionSlug.',
@@ -182,7 +184,10 @@ test('dispatchAuthNonceRequest applies nonce rate limits before nonce creation',
   const result = await dispatchAuthNonceRequest({
     request: {
       json: async () => createNonceBody({ address: '0xAbC' }),
-      headers: new Headers({ Origin: 'https://allowed.example' }),
+      headers: new Headers({
+        Origin: 'https://allowed.example',
+        'X-Anonymous-Client-Id': 'client_abc12345',
+      }),
     },
     env: { GROUP_KV: {} },
     baseHeaders: { 'Access-Control-Allow-Origin': '*' },
@@ -196,6 +201,7 @@ test('dispatchAuthNonceRequest applies nonce rate limits before nonce creation',
         assert.deepEqual(value, {
           env: { GROUP_KV: {} },
           slug: 'session-a',
+          identity: 'anon:cid:client_abc12345',
           address: '0xAbC',
           limit: 5,
           now: value.now,
@@ -218,6 +224,89 @@ test('dispatchAuthNonceRequest applies nonce rate limits before nonce creation',
     status: 429,
     headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
   });
+});
+
+test('dispatchAuthNonceRequest preserves trusted admin nonce recovery when LOGIN_TRUSTED_ORIGINS is narrower than admin origins', async () => {
+  let putNonceCalled = false;
+
+  const result = await dispatchAuthNonceRequest({
+    request: {
+      json: async () => createNonceBody({ adminAction: true }),
+      headers: new Headers({
+        Origin: 'http://localhost:3000',
+        'X-Anonymous-Client-Id': 'client_admin1234',
+      }),
+    },
+    env: {
+      GROUP_KV: {},
+      LOGIN_TRUSTED_ORIGINS: 'https://app.example',
+    },
+    baseHeaders: { 'Access-Control-Allow-Origin': '*' },
+    slug: '',
+    deps: createNonceDeps({
+      resolveExistingSessionCors: async () => ({
+        ok: true,
+        headers: { 'Access-Control-Allow-Origin': 'http://localhost:3000' },
+        config: { allowOrigins: ['https://app.example'] },
+      }),
+      putNonce: async () => {
+        putNonceCalled = true;
+      },
+      buildNonce: () => 'nonce-admin',
+    }),
+  });
+
+  assert.equal(putNonceCalled, true);
+  assert.deepEqual(result, {
+    body: { nonce: 'nonce-admin' },
+    status: 200,
+    headers: { 'Access-Control-Allow-Origin': 'http://localhost:3000' },
+  });
+});
+
+test('dispatchAuthNonceRequest rate limits by requester identity rather than the claimed wallet address', async () => {
+  const rateLimitStore = new Map();
+  const env = {
+    GROUP_KV: {
+      get: async (key) => rateLimitStore.get(key) || null,
+      put: async (key, value) => {
+        rateLimitStore.set(key, value);
+      },
+    },
+  };
+  const createRequest = (anonymousClientId) => ({
+    json: async () => createNonceBody({ address: '0xVictimWallet' }),
+    headers: new Headers({
+      Origin: 'https://allowed.example',
+      'X-Anonymous-Client-Id': anonymousClientId,
+    }),
+  });
+  const deps = createNonceDeps({
+    now: () => 1234567890,
+    NONCE_RATE_LIMIT_MAX: 1,
+    NONCE_RATE_LIMIT_WINDOW_MS: 60000,
+    NONCE_RATE_LIMIT_TTL_SECONDS: 60,
+    checkNonceRateLimit,
+    putNonce: async () => {},
+  });
+
+  const first = await dispatchAuthNonceRequest({
+    request: createRequest('client_alpha01'),
+    env,
+    baseHeaders: { 'Access-Control-Allow-Origin': '*' },
+    slug: '',
+    deps,
+  });
+  const second = await dispatchAuthNonceRequest({
+    request: createRequest('client_beta0002'),
+    env,
+    baseHeaders: { 'Access-Control-Allow-Origin': '*' },
+    slug: '',
+    deps,
+  });
+
+  assert.equal(first.status, 200);
+  assert.equal(second.status, 200);
 });
 
 

@@ -376,6 +376,9 @@ describe('workerAuth canonical session resolution', () => {
       context: authContext,
     })).resolves.toBe('token-1');
 
+    expect(new Headers(global.fetch.mock.calls[0][1].headers).get('X-Anonymous-Client-Id')).toMatch(/^[a-z0-9_-]{8,128}$/);
+    expect(new Headers(global.fetch.mock.calls[1][1].headers).get('X-Anonymous-Client-Id')).toBeNull();
+
     const cacheKey = __test__workerAuthTokenCache.buildTokenCacheKey({
       workerUrl: 'https://worker.example',
       slug: 'edge',
@@ -446,7 +449,8 @@ describe('workerAuth canonical session resolution', () => {
     }));
 
     await expect(tokenPromise).rejects.toMatchObject({ name: 'AbortError' });
-    expect(localStorage.length).toBe(0);
+    expect(Object.keys(localStorage).filter((key) => key.startsWith('ce:workerToken:v1:'))).toHaveLength(0);
+    expect(localStorage.getItem('ce:anonClientId:v1')).toMatch(/^[a-z0-9_-]{8,128}$/);
   });
 
   it('new request after logout/account-switch with stale context cannot reach /auth/login', async () => {
@@ -524,6 +528,7 @@ describe('workerAuth bootstrap admin signing', () => {
       sessionSlug: 'edge',
       adminAction: true,
     });
+    expect(new Headers(global.fetch.mock.calls[0][1].headers).get('X-Anonymous-Client-Id')).toMatch(/^[a-z0-9_-]{8,128}$/);
     expect(mockProviderRequest).toHaveBeenCalledWith(expect.objectContaining({
       method: 'eth_signTypedData_v4',
       params: [TEST_ADDRESS, expect.any(String)],
@@ -550,6 +555,7 @@ describe('workerAuth bootstrap admin signing', () => {
       sessionSlug: 'edge',
       adminAction: true,
     });
+    expect(new Headers(global.fetch.mock.calls[0][1].headers).get('X-Anonymous-Client-Id')).toMatch(/^[a-z0-9_-]{8,128}$/);
     expect(auth).toEqual({
       address: TEST_ADDRESS,
       message: expect.stringContaining('Admin request: bootstrap arweave upload'),
