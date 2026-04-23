@@ -13,7 +13,7 @@ import "assets/css/contextEngine.scss";
 
 import { Container, Row, Col } from "reactstrap";
 
-import withRouter from "./HooksHOC/withRouterBridge.jsx";
+import withRouter from "./HooksHOC/withRouterBridge";
 import MainSite from "./MainSite/MainSite.jsx";
 import AppErrorBoundary from './ErrorBoundary/AppErrorBoundary.jsx';
 import { readColdLoadOnboardingState } from './Onboarding/onboardingConfig.js';
