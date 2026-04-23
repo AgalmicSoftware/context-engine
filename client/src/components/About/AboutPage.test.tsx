@@ -7,7 +7,7 @@ import { MemoryRouter } from 'react-router-dom';
 import AboutPage, {
   getAboutDemoSessionPath,
   getConfiguredRecognitionIndividuals,
-} from './AboutPage.jsx';
+} from './AboutPage';
 
 const mutableEnv = process.env as Record<string, string | undefined>;
 const ORIGINAL_PUBLIC_URL = process.env.PUBLIC_URL;

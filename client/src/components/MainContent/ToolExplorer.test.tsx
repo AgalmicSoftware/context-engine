@@ -33,7 +33,7 @@ jest.mock('../SurveyTool/SurveyTool.jsx', () => ({
   },
 }));
 
-jest.mock('../MainContent/RiskMatrix.jsx', () => ({
+jest.mock('../MainContent/RiskMatrix', () => ({
   __esModule: true,
   default: () => null,
 }));

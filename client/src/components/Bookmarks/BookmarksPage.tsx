@@ -11,8 +11,48 @@ import { createLogger } from '../../utilities/logging.js';
 
 const log = createLogger('BookmarksPage');
 
+type BookmarkUser = {
+  address: string;
+  nickname: string;
+  username: string;
+  networkId: string;
+};
 
-const emptyData = {
+type FilterEntry = {
+  key: string;
+  raw: unknown;
+  parsed: Record<string, any>;
+};
+
+type BookmarkData = {
+  users: BookmarkUser[];
+  surveys: string[];
+  questions: string[];
+  sbts: string[];
+  filters: FilterEntry[];
+  atlasNodes: string[];
+};
+
+type BookmarkSectionKey = keyof BookmarkData;
+
+type SectionConfig = {
+  key: BookmarkSectionKey;
+  label: string;
+  emptyText: string;
+};
+
+type CacheEntry = {
+  key?: string;
+  slug?: string;
+  value?: any;
+};
+
+type FilterChip = {
+  type: string;
+  label: string;
+};
+
+const emptyData: BookmarkData = {
   users: [],
   surveys: [],
   questions: [],
@@ -21,30 +61,30 @@ const emptyData = {
   atlasNodes: []
 };
 
-const toText = (value) => (value == null ? '' : String(value)).trim();
+const toText = (value: unknown) => (value == null ? '' : String(value)).trim();
 
-const safeParse = (raw) => {
+const safeParse = (raw: unknown): any => {
   if (!raw) return null;
   try {
-    return JSON.parse(raw);
+    return JSON.parse(typeof raw === 'string' ? raw : String(raw));
   } catch (_) {
     return null;
   }
 };
 
-const normalizeList = (value) => {
+const normalizeList = (value: unknown): string[] => {
   if (!Array.isArray(value)) return [];
   return value.map(toText).filter(Boolean);
 };
 
-const normalizeFilterEntries = (value) => {
+const normalizeFilterEntries = (value: unknown): unknown[] => {
   if (!Array.isArray(value)) return [];
   return value.filter((entry) => entry != null && entry !== '');
 };
 
-const uniqBy = (list, keyFn) => {
+const uniqBy = <T,>(list: T[], keyFn: (item: T) => string): T[] => {
   const seen = new Set();
-  const out = [];
+  const out: T[] = [];
   list.forEach((item) => {
     const key = keyFn(item);
     if (!key || seen.has(key)) return;
@@ -54,11 +94,11 @@ const uniqBy = (list, keyFn) => {
   return out;
 };
 
-const sortAlpha = (list) => {
+const sortAlpha = (list: string[]) => {
   return [...list].sort((a, b) => String(a).localeCompare(String(b)));
 };
 
-const shortenId = (value, lead = 8, tail = 6) => {
+const shortenId = (value: unknown, lead = 8, tail = 6) => {
   const text = toText(value);
   if (!text) return '';
   if (text.length <= lead + tail + 3) return text;
@@ -66,12 +106,12 @@ const shortenId = (value, lead = 8, tail = 6) => {
 };
 
 // Keep bookmark survey links session-agnostic unless a survey-specific slug is persisted.
-export const buildSurveyBookmarkHref = (surveyId) => `/survey/${toText(surveyId)}`;
+export const buildSurveyBookmarkHref = (surveyId: unknown) => `/survey/${toText(surveyId)}`;
 
-const normalizeUsers = (entries) => {
+const normalizeUsers = (entries: unknown): BookmarkUser[] => {
   if (!Array.isArray(entries)) return [];
   const seen = new Set();
-  const out = [];
+  const out: BookmarkUser[] = [];
   entries.forEach((entry) => {
     let address = '';
     let nickname = '';
@@ -100,11 +140,11 @@ const normalizeUsers = (entries) => {
   return out;
 };
 
-const userLabel = (user) => {
+const userLabel = (user: BookmarkUser) => {
   return user.nickname || user.username || shortenId(user.address, 6, 4);
 };
 
-const sectionConfigs = [
+const sectionConfigs: SectionConfig[] = [
   { key: 'users', label: 'Users', emptyText: 'No user bookmarks yet.' },
   { key: 'surveys', label: 'Surveys', emptyText: 'No survey bookmarks yet.' },
   { key: 'questions', label: 'Questions', emptyText: 'No question bookmarks yet.' },
@@ -113,7 +153,7 @@ const sectionConfigs = [
   { key: 'atlasNodes', label: 'Atlas Nodes', emptyText: 'No atlas bookmarks yet.' }
 ];
 
-const getFilterCopyValue = (filterEntry) => {
+const getFilterCopyValue = (filterEntry: FilterEntry) => {
   if (!filterEntry) return '';
   const raw = filterEntry.raw;
   if (typeof raw === 'string') {
@@ -143,7 +183,7 @@ const getFilterCopyValue = (filterEntry) => {
   return '';
 };
 
-const parseFilterEntry = (entry) => {
+const parseFilterEntry = (entry: unknown): FilterEntry | null => {
   if (entry == null) return null;
   if (typeof entry === 'string') {
     const trimmed = entry.trim();
@@ -177,10 +217,16 @@ export const buildBookmarkPageSourceSignature = ({
   legacyBookmarksRaw = '',
   atlasNodesRaw = '',
   getRefId,
+}: {
+  bookmarkEntries?: CacheEntry[];
+  filtersEntries?: CacheEntry[];
+  legacyBookmarksRaw?: string;
+  atlasNodesRaw?: string;
+  getRefId?: (value: unknown) => string;
 } = {}) => {
   const resolveRefId = typeof getRefId === 'function'
     ? getRefId
-    : (value) => {
+    : (value: unknown) => {
       if (!value || typeof value !== 'object') return `p:${String(value)}`;
       return `o:${Object.keys(value).length}`;
     };
@@ -205,7 +251,7 @@ export const buildBookmarkPageSourceSignature = ({
   return parts.join('|');
 };
 
-export const buildBookmarkPageDataSignature = (data = emptyData) => {
+export const buildBookmarkPageDataSignature = (data: BookmarkData = emptyData) => {
   try {
     return JSON.stringify(data);
   } catch (_) {
@@ -214,43 +260,44 @@ export const buildBookmarkPageDataSignature = (data = emptyData) => {
 };
 
 export const readManagedBookmarkPageEntries = () => ({
-  bookmarkEntries: listNamespaceEntriesSync('bookmarksCache', { cloneValues: false }),
-  filtersEntries: listNamespaceEntriesSync('filters', { cloneValues: false }),
+  bookmarkEntries: listNamespaceEntriesSync('bookmarksCache', { cloneValues: false }) as CacheEntry[],
+  filtersEntries: listNamespaceEntriesSync('filters', { cloneValues: false }) as CacheEntry[],
 });
 
-const buildFilterChips = (filterState) => {
+const buildFilterChips = (filterState: unknown): FilterChip[] => {
   if (!filterState || typeof filterState !== 'object') return [];
-  const chips = [];
+  const state = filterState as Record<string, any>;
+  const chips: FilterChip[] = [];
 
-  const top = filterState.topQuestions;
+  const top = state.topQuestions;
   if (top !== null && top !== undefined && String(top).trim() !== '') {
     chips.push({ type: 'top', label: `Top ${top}` });
   }
 
-  const types = Array.isArray(filterState.questionTypes) ? filterState.questionTypes : [];
+  const types = Array.isArray(state.questionTypes) ? state.questionTypes : [];
   types.forEach((qt) => {
     const label = toText(qt);
     if (label) chips.push({ type: 'type', label });
   });
 
-  const tagSet = new Set();
-  const tagSources = [];
-  if (Array.isArray(filterState.selectedTags)) tagSources.push(...filterState.selectedTags);
-  if (Array.isArray(filterState.tags)) tagSources.push(...filterState.tags);
-  if (Array.isArray(filterState.includeTags)) tagSources.push(...filterState.includeTags);
-  if (typeof filterState.tag === 'string') tagSources.push(filterState.tag);
+  const tagSet = new Set<string>();
+  const tagSources: unknown[] = [];
+  if (Array.isArray(state.selectedTags)) tagSources.push(...state.selectedTags);
+  if (Array.isArray(state.tags)) tagSources.push(...state.tags);
+  if (Array.isArray(state.includeTags)) tagSources.push(...state.includeTags);
+  if (typeof state.tag === 'string') tagSources.push(state.tag);
   tagSources.forEach((tag) => {
     const value = toText(tag);
     if (value) tagSet.add(value);
   });
   tagSet.forEach((tag) => chips.push({ type: 'tag', label: `#${tag}` }));
 
-  const ai = toText(filterState.aiFilter);
+  const ai = toText(state.aiFilter);
   if (ai) chips.push({ type: 'ai', label: `AI: ${ai}` });
 
-  const sbtFilter = filterState.sbtFilter || null;
-  const sbtChips = [];
-  const addSbtItems = (prefix, entries) => {
+  const sbtFilter = state.sbtFilter || null;
+  const sbtChips: FilterChip[] = [];
+  const addSbtItems = (prefix: string, entries: unknown) => {
     if (!Array.isArray(entries)) return;
     entries.forEach((entry) => {
       let name = '';
@@ -281,8 +328,8 @@ const buildFilterChips = (filterState) => {
     addSbtItems(t('sbt'), sbtFilter.addresses);
   }
 
-  if (filterState.sbtFilterString) {
-    const label = toText(filterState.sbtFilterString);
+  if (state.sbtFilterString) {
+    const label = toText(state.sbtFilterString);
     if (label) sbtChips.push({ type: 'sbt', label });
   }
 
@@ -292,23 +339,26 @@ const buildFilterChips = (filterState) => {
 };
 
 const BookmarksPage = () => {
-  const [data, setData] = useState(emptyData);
-  const [expandedSections, setExpandedSections] = useState(() => (
+  const [data, setData] = useState<BookmarkData>(emptyData);
+  const [expandedSections, setExpandedSections] = useState<Record<BookmarkSectionKey, boolean>>(() => (
     sectionConfigs.reduce((acc, section) => {
       acc[section.key] = false;
       return acc;
-    }, {})
+    }, {} as Record<BookmarkSectionKey, boolean>)
   ));
   const [copiedFilterKey, setCopiedFilterKey] = useState('');
   const [refreshing, setRefreshing] = useState(false);
-  const refreshTimeoutRef = useRef(null);
-  const copyTimeoutRef = useRef(null);
-  const cacheRefreshCoalescerRef = useRef(null);
+  const refreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cacheRefreshCoalescerRef = useRef<ReturnType<typeof createCacheUpdateCoalescer> | null>(null);
   const sourceSignatureRef = useRef('');
   const dataSignatureRef = useRef('');
-  const valueRefMemoRef = useRef({ map: new WeakMap(), nextId: 1 });
+  const valueRefMemoRef = useRef<{ map: WeakMap<object, string>; nextId: number }>({
+    map: new WeakMap<object, string>(),
+    nextId: 1,
+  });
 
-  const getValueRefId = useCallback((value) => {
+  const getValueRefId = useCallback((value: unknown) => {
     if (!value || typeof value !== 'object') return `p:${String(value)}`;
     const memo = valueRefMemoRef.current;
     let refId = memo.map.get(value);
@@ -347,15 +397,21 @@ const BookmarksPage = () => {
       }
       sourceSignatureRef.current = sourceSignature;
 
-      const merged = {
+      const merged: {
+        users: unknown[];
+        surveys: string[];
+        questions: string[];
+        sbts: string[];
+        filters: unknown[];
+      } = {
         users: [],
         surveys: [],
         questions: [],
         sbts: [],
-        filters: []
+        filters: [],
       };
 
-      const mergeCache = (obj) => {
+      const mergeCache = (obj: any) => {
         if (!obj || typeof obj !== 'object') return;
         merged.users.push(...(Array.isArray(obj.users) ? obj.users : []));
         merged.surveys.push(...normalizeList(obj.surveys));
@@ -368,7 +424,7 @@ const BookmarksPage = () => {
         mergeCache(entry?.value);
       });
 
-      const normalizedFiltersFromCache = [];
+      const normalizedFiltersFromCache: unknown[] = [];
       filtersEntries.forEach((entry) => {
         const val = entry?.value;
         if (!val || typeof val !== 'object') return;
@@ -390,7 +446,7 @@ const BookmarksPage = () => {
       const filterEntries = uniqBy(
         [...merged.filters, ...normalizedFiltersFromCache]
           .map(parseFilterEntry)
-          .filter(Boolean),
+          .filter((entry): entry is FilterEntry => !!entry),
         (entry) => entry.key
       );
 
@@ -440,7 +496,7 @@ const BookmarksPage = () => {
     readBookmarks();
     if (typeof window === 'undefined') return;
 
-    const onStorage = (e) => {
+    const onStorage = (e: StorageEvent) => {
       if (!e || !e.key) {
         scheduleReadBookmarks();
         return;
@@ -454,7 +510,7 @@ const BookmarksPage = () => {
     };
 
     const onCustom = () => scheduleReadBookmarks();
-    const unsubscribeCache = subscribeCacheUpdates((evt) => {
+    const unsubscribeCache = subscribeCacheUpdates((evt: any) => {
       const ns = String(evt?.namespace || '');
       if (ns === 'bookmarksCache' || ns === 'filters') {
         scheduleReadBookmarks();
@@ -484,7 +540,7 @@ const BookmarksPage = () => {
     }, 0);
   }, [data]);
 
-  const toggleSection = useCallback((key) => {
+  const toggleSection = useCallback((key: BookmarkSectionKey) => {
     setExpandedSections((prev) => ({ ...prev, [key]: !prev[key] }));
   }, []);
 
@@ -497,7 +553,7 @@ const BookmarksPage = () => {
     }, 700);
   }, [readBookmarks]);
 
-  const handleCopyFilter = useCallback((filterEntry) => {
+  const handleCopyFilter = useCallback((filterEntry: FilterEntry) => {
     const value = getFilterCopyValue(filterEntry);
     if (!value || typeof navigator === 'undefined' || !navigator.clipboard?.writeText) return;
     navigator.clipboard.writeText(value).then(() => {
