@@ -3,17 +3,28 @@ import { Provider } from 'react-redux';
 import { createStore } from 'redux';
 import { fireEvent, render, screen } from '@testing-library/react';
 
-import OnboardingOverlay from './OnboardingOverlay.jsx';
+import OnboardingOverlay from './OnboardingOverlay';
 import { ONBOARDING_COMPLETE_STORAGE_KEY } from './onboardingConfig.js';
 
+type TestState = {
+  sessionState: {
+    onboardingStep: number | null;
+  };
+};
+
+type TestAction = {
+  type: string;
+  payload?: number | null;
+};
+
 const buildStore = (initialStep = 1) =>
-  createStore((state = { sessionState: { onboardingStep: initialStep } }, action) => {
+  createStore((state: TestState = { sessionState: { onboardingStep: initialStep } }, action: TestAction) => {
     if (action.type === 'SET_ONBOARDING_STEP') {
       return {
         ...state,
         sessionState: {
           ...state.sessionState,
-          onboardingStep: action.payload,
+          onboardingStep: action.payload ?? null,
         },
       };
     }
