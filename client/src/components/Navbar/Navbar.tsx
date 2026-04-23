@@ -13,7 +13,7 @@ import {
 } from "../../variables/appConfig.js";
 
 import AccountSectionRaw from "./AccountSection";
-import withRouter from "../HooksHOC/withRouterBridge.jsx";
+import withRouter from "../HooksHOC/withRouterBridge";
 import { createLogger } from 'utilities/logging.js';
 import { readPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
 
