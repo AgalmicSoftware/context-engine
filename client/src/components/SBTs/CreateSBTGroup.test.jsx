@@ -16,6 +16,10 @@ import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { getSessionContractsForChain, getSessionRegistryChains } from '../../variables/chains.js';
 import { getScopedCreateSbtFormCacheKey } from '../../utilities/sbt/sbtCreateFormCache.js';
+import {
+  LEGACY_CREATED_SBTS_STORAGE_KEY,
+  SBT_PASSWORD_RECOVERY_STORAGE_KEY,
+} from '../../utilities/sbt/sbtPasswordRecoveryStore.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { t } from '../../utilities/ui/terminology.js';
 
@@ -114,6 +118,29 @@ describe('CreateSBTGroup cache helpers', () => {
 
     expect(sessionStorage.getItem('createSbtFormCache')).toBeNull();
     expect(sessionStorage.getItem(getScopedCreateSbtFormCacheKey('test'))).toContain('"Scoped Draft"');
+  });
+
+  it('persists generated password codes to the scoped recovery store without legacy createdSBTs writes', () => {
+    localStorage.clear();
+    const sbtAddress = '0xABC0000000000000000000000000000000000000';
+    const instance = makeInstance({
+      network: { id: 84532, name: 'Base Sepolia' },
+      sessionSlug: 'test',
+    });
+
+    instance.persistCreatedSbtCodes({
+      sbtAddress,
+      hasPasswordMintOnChain: true,
+      codesToStore: ['code-one', 'code-two'],
+    });
+
+    const recoveryStore = JSON.parse(localStorage.getItem(SBT_PASSWORD_RECOVERY_STORAGE_KEY));
+    expect(recoveryStore.entries[`84532:${sbtAddress.toLowerCase()}`]).toEqual(expect.objectContaining({
+      chainId: 84532,
+      sbtAddress: sbtAddress.toLowerCase(),
+      passwords: ['code-one', 'code-two'],
+    }));
+    expect(localStorage.getItem(LEGACY_CREATED_SBTS_STORAGE_KEY)).toBeNull();
   });
 
   it('loadFormCache restores tags and dates, then updates hash', () => {
