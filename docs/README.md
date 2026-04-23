@@ -8,10 +8,10 @@ Canonical reference set:
 - the `docs/` reference docs listed below
 
 Non-canonical / historical planning material:
-- private planning files under ignored local paths
+- `TODO/`
 - one-off debug prompts or migration notes unless they are explicitly linked below as current reference
 
-Private planning docs should stay in ignored local paths, not in public docs.
+Planning docs should be added under `TODO/`, not `docs/`.
 
 ## How To Keep Docs Updated
 
