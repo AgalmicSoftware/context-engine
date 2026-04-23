@@ -1,6 +1,6 @@
-/** @file App.jsx */
+/** @file App.tsx */
 import React from "react";
-import { BrowserRouter, Routes, Route, Link } from 'react-router-dom'
+import { Routes, Route } from 'react-router-dom'
 import { Provider } from 'react-redux';
 import store from '../store.js';
 import { SERVER } from '../variables/appConfig.js';
@@ -11,8 +11,6 @@ import CEToaster from './Shared/CEToaster';
 
 import "assets/css/contextEngine.scss";
 
-import { Container, Row, Col } from "reactstrap";
-
 import withRouter from "./HooksHOC/withRouterBridge";
 import MainSite from "./MainSite/MainSite.jsx";
 import AppErrorBoundary from './ErrorBoundary/AppErrorBoundary';
@@ -22,14 +20,12 @@ import { toastTheme } from '../utilities/ui/toastTheme.js';
 import '@rainbow-me/rainbowkit/styles.css';
 
 import {
-  getDefaultWallets,
   connectorsForWallets,
   RainbowKitProvider,
 } from '@rainbow-me/rainbowkit';
 import {
-  rainbowWallet,
   metaMaskWallet,
-  coinbaseWallet } from '@rainbow-me/rainbowkit/wallets';
+} from '@rainbow-me/rainbowkit/wallets';
 import { configureChains, createClient, createStorage, WagmiConfig } from 'wagmi';
 import { noopStorage } from '@wagmi/core';
 import { goerli, localhost } from 'wagmi/chains';
@@ -42,7 +38,6 @@ import {
   optimismSepolia,
   arbitrumSepolia,
 } from '../variables/chains.js'
-import { InjectedConnector } from 'wagmi/connectors/injected';
 import {
   getFallbackRpcUrlForChain,
   getPrimaryRpcUrlForChain,
@@ -51,6 +46,28 @@ import { wasUserExplicitlyDisconnected } from '../utilities/web3/wagmiDisconnect
 import { jsonRpcProvider } from 'wagmi/providers/jsonRpc';
 
 const log = createLogger('general');
+
+type RouterLocationLike = {
+  pathname?: string;
+  search?: string;
+};
+
+type AppProps = {
+  location?: RouterLocationLike;
+  navigate?: unknown;
+  params?: Record<string, string | undefined>;
+};
+
+type AppState = {
+  serverEndpoint: string;
+  matchesAddress: string;
+  urlExtension?: string;
+};
+
+type ColdLoadSnapshot = {
+  firstVisit: boolean;
+  shouldStartOnboarding: boolean;
+};
 
 const { chains, provider, webSocketProvider } = configureChains(
   [
@@ -69,13 +86,13 @@ const { chains, provider, webSocketProvider } = configureChains(
     // We keep deterministic ordering by resolving primary/fallback RPC URLs ourselves
     // (from chains.js + chain rpcUrls public/default lists) via jsonRpcProvider.
     jsonRpcProvider({
-      rpc: (chain) => {
+      rpc: (chain: any) => {
         const url = getPrimaryRpcUrlForChain(chain);
         return url ? { http: url } : null;
       },
     }),
     jsonRpcProvider({
-      rpc: (chain) => {
+      rpc: (chain: any) => {
         const url = getFallbackRpcUrlForChain(chain);
         return url ? { http: url } : null;
       },
@@ -108,14 +125,14 @@ const wagmiClient = createClient({
   webSocketProvider
 })
 
-var socket;
-var firstVisit;
-var _coldLoadSnapshot;
+let socket: unknown;
+let firstVisit = false;
+let _coldLoadSnapshot: ColdLoadSnapshot | null = null;
 const APP_HISTORY_SYNC_EVENT = 'ce:app-history-sync';
 let historySyncListenerCount = 0;
-let restoreHistorySyncBridge = null;
-let patchedPushState = null;
-let patchedReplaceState = null;
+let restoreHistorySyncBridge: (() => void) | null = null;
+let patchedPushState: History['pushState'] | null = null;
+let patchedReplaceState: History['replaceState'] | null = null;
 
 const dispatchAppHistorySync = () => {
   if (typeof window === 'undefined' || typeof window.dispatchEvent !== 'function') return;
@@ -128,13 +145,19 @@ const ensureHistorySyncBridge = () => {
   const originalPushState = window.history.pushState;
   const originalReplaceState = window.history.replaceState;
 
-  patchedPushState = function patchedPushStateWrapper(...args) {
+  patchedPushState = function patchedPushStateWrapper(
+    this: History,
+    ...args: Parameters<History['pushState']>
+  ) {
     const result = originalPushState.apply(this, args);
     dispatchAppHistorySync();
     return result;
   };
 
-  patchedReplaceState = function patchedReplaceStateWrapper(...args) {
+  patchedReplaceState = function patchedReplaceStateWrapper(
+    this: History,
+    ...args: Parameters<History['replaceState']>
+  ) {
     const result = originalReplaceState.apply(this, args);
     dispatchAppHistorySync();
     return result;
@@ -155,7 +178,7 @@ const ensureHistorySyncBridge = () => {
   };
 };
 
-const subscribeToHistorySync = (onChange) => {
+const subscribeToHistorySync = (onChange: () => void) => {
   if (typeof window === 'undefined' || typeof window.addEventListener !== 'function') {
     return () => {};
   }
@@ -201,13 +224,14 @@ try {
   }
 }
 
-class App extends React.Component {
-  state = {
+class App extends React.Component<AppProps, AppState> {
+  state: AppState = {
     serverEndpoint: SERVER,
     matchesAddress: "",
   };
 
-  _lastSyncedRouteHeadKey = null;
+  _lastSyncedRouteHeadKey: string | null = null;
+  unsubscribeHistorySync: (() => void) | null = null;
 
   readRouteHeadKey = () => {
     if (typeof window !== 'undefined' && window.location) {
@@ -229,7 +253,6 @@ class App extends React.Component {
 
   componentDidMount() {
     document.body.classList.add("index-page");
-    const { serverEndpoint } = this.state;
 
     if (_coldLoadSnapshot?.shouldStartOnboarding) {
       store.dispatch({ type: 'SET_ONBOARDING_STEP', payload: 1 });
@@ -244,7 +267,7 @@ class App extends React.Component {
 
   }
 
-  componentDidUpdate(prevProps) {
+  componentDidUpdate(prevProps: AppProps) {
     if (
       prevProps.location?.pathname !== this.props.location?.pathname ||
       prevProps.location?.search !== this.props.location?.search
@@ -263,13 +286,11 @@ class App extends React.Component {
   }
 
   render() {
-    const params = this.props.params
-    const location = this.props.location
-    const navigate = this.props.navigate
+    const location = this.props.location || { pathname: '', search: '' }
 
-    const search = location.search
+    const search = location.search || ''
     const nftCode = search.substring(search.indexOf("=") + 1);
-    const urlPath = location.pathname.toString()
+    const urlPath = (location.pathname || '').toString()
     const viewAddress = urlPath.split('/u/')[1];
     const siteProps = {
       nftCode,

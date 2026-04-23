@@ -27,11 +27,31 @@ import {
 } from '../../utilities/session/globalSessionState.js';
 import { buildPublicRoute } from '../MainSite/urlUtils.js';
 
+type RecognitionLink = {
+  url: string;
+  text: string;
+};
+
+type RecognitionGroup = {
+  name: string;
+  description: string;
+  links: RecognitionLink[];
+  logo?: string;
+  itemClassName?: string;
+  logoClassName?: string;
+  image?: string;
+};
+
+type RecognitionIndividual = {
+  name: string;
+  url?: string;
+};
+
 const HEADER_LINKS = [
   { url: PUBLIC_WHITEPAPER_URL, text: 'Whitepaper', testId: 'ce-about-link-whitepaper' },
 ];
 
-const RECOGNITION_GROUPS = [
+const RECOGNITION_GROUPS: RecognitionGroup[] = [
   {
     name: 'Ethereum',
     logo: 'https://ethereum.org/images/assets/eth-diamond-glyph.png',
@@ -100,7 +120,7 @@ const RECOGNITION_GROUPS = [
   },
 ];
 
-const RECOGNIZED_INDIVIDUALS = [];
+const RECOGNIZED_INDIVIDUALS: RecognitionIndividual[] = [];
 
 const USE_CASES = [
   {
@@ -167,8 +187,15 @@ const USE_CASES = [
 
 const HERO_TERTIARY_LINKS = HEADER_LINKS.filter(Boolean);
 
-export const getConfiguredRecognitionIndividuals = (individuals = []) => individuals.filter(
-  (person) => typeof person?.name === 'string' && person.name.trim().length > 0
+export const getConfiguredRecognitionIndividuals = (
+  individuals: unknown[] = []
+): RecognitionIndividual[] => individuals.filter(
+  (person): person is RecognitionIndividual => (
+    !!person &&
+    typeof person === 'object' &&
+    typeof (person as { name?: unknown }).name === 'string' &&
+    (person as { name: string }).name.trim().length > 0
+  )
 );
 
 export const getAboutDemoSessionPath = (selection = readStoredGlobalSessionSelection()) => {
@@ -180,19 +207,19 @@ export const getAboutDemoSessionPath = (selection = readStoredGlobalSessionSelec
   return '/session/demo';
 };
 
-const getRecognitionSlug = (name) => name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+const getRecognitionSlug = (name: string) => name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 
-const getRecognitionFallback = (name) => name
+const getRecognitionFallback = (name: string) => name
   .split(/[^A-Za-z0-9]+/)
   .filter(Boolean)
-  .map((chunk) => chunk[0])
+  .map((chunk: string) => chunk[0])
   .join('')
   .slice(0, 2)
   .toUpperCase();
 
 const AboutPage = () => {
   const [activeUseCase, setActiveUseCase] = useState('');
-  const [activeRecognition, setActiveRecognition] = useState(null);
+  const [activeRecognition, setActiveRecognition] = useState<RecognitionGroup | null>(null);
   const [showPresent, setShowPresent] = useState(false);
   const [showRoadmap, setShowRoadmap] = useState(false);
   const [showRecognition, setShowRecognition] = useState(true);
@@ -201,11 +228,14 @@ const AboutPage = () => {
   const configuredRecognitionIndividuals = getConfiguredRecognitionIndividuals(RECOGNIZED_INDIVIDUALS);
   const hasRecognizedIndividuals = configuredRecognitionIndividuals.length > 0;
 
-  const handleUseCaseToggle = (slug) => {
+  const handleUseCaseToggle = (slug: string) => {
     setActiveUseCase((currentSlug) => (currentSlug === slug ? '' : slug));
   };
 
-  const handleSectionToggleKeyDown = (event, setSectionVisibility) => {
+  const handleSectionToggleKeyDown = (
+    event: React.KeyboardEvent<HTMLDivElement>,
+    setSectionVisibility: React.Dispatch<React.SetStateAction<boolean>>
+  ) => {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
       setSectionVisibility((currentState) => !currentState);
@@ -219,8 +249,9 @@ const AboutPage = () => {
   useEffect(() => {
     if (typeof window === 'undefined' || typeof window.addEventListener !== 'function') return undefined;
 
-    const handleGlobalSessionSelectionUpdated = (event) => {
-      setDemoSessionPath(getAboutDemoSessionPath(event?.detail || readStoredGlobalSessionSelection()));
+    const handleGlobalSessionSelectionUpdated = (event: Event) => {
+      const detail = event instanceof CustomEvent ? event.detail : null;
+      setDemoSessionPath(getAboutDemoSessionPath(detail || readStoredGlobalSessionSelection()));
     };
 
     window.addEventListener(

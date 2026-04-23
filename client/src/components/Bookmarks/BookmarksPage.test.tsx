@@ -3,7 +3,7 @@ import {
   buildBookmarkPageDataSignature,
   buildBookmarkPageSourceSignature,
   readManagedBookmarkPageEntries,
-} from './BookmarksPage.jsx';
+} from './BookmarksPage';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 
 jest.mock('../../utilities/cache/cacheScripts.js', () => ({
