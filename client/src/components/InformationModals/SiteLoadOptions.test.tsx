@@ -3,7 +3,7 @@ import { Provider } from 'react-redux';
 import { createStore } from 'redux';
 import { fireEvent, render, screen } from '@testing-library/react';
 
-import SiteLoadOptions from './SiteLoadOptions.jsx';
+import SiteLoadOptions from './SiteLoadOptions';
 
 jest.mock('./GreetingModal', () => () => <div data-testid='mock-greeting-modal' />);
 jest.mock('utilities/logging.js', () => ({
@@ -25,7 +25,7 @@ const buildStore = () => createStore((state = {
 
 const noop = () => {};
 
-const renderSiteLoadOptions = (arrowIndex, props = {}) => render(
+const renderSiteLoadOptions = (arrowIndex: number, props: Record<string, unknown> = {}) => render(
   <Provider store={buildStore()}>
     <SiteLoadOptions
       arrowIndex={arrowIndex}
@@ -38,7 +38,7 @@ const renderSiteLoadOptions = (arrowIndex, props = {}) => render(
   </Provider>
 );
 
-const SidebarHarness = ({ arrowIndex }) => {
+const SidebarHarness = ({ arrowIndex }: { arrowIndex: number }) => {
   const [sidebarOpen, setSidebarOpen] = React.useState(true);
 
   return (
