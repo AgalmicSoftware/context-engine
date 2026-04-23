@@ -19,21 +19,21 @@ const mockCallAI = jest.fn();
 
 jest.mock('../../utilities/cache/cacheScripts.js', () => ({
   __esModule: true,
-  listNamespaceEntriesSync: (...args) => mockListNamespaceEntriesSync(...args),
+  listNamespaceEntriesSync: (...args: any[]) => mockListNamespaceEntriesSync(...args),
   peekCacheSync: jest.fn(() => null),
-  subscribeCacheUpdates: (...args) => mockSubscribeCacheUpdates(...args),
+  subscribeCacheUpdates: (...args: any[]) => (mockSubscribeCacheUpdates as any)(...args),
 }));
 
 jest.mock('../../utilities/web3/contractScripts.js', () => ({
   __esModule: true,
-  getAllSessionSlugs: (...args) => mockGetAllSessionSlugs(...args),
-  getSessionConfigBySlug: (...args) => mockGetSessionConfigBySlug(...args),
-  getDemoSessionConfigBySlug: (...args) => mockGetDemoSessionConfigBySlug(...args),
+  getAllSessionSlugs: (...args: any[]) => mockGetAllSessionSlugs(...args),
+  getSessionConfigBySlug: (...args: any[]) => mockGetSessionConfigBySlug(...args),
+  getDemoSessionConfigBySlug: (...args: any[]) => mockGetDemoSessionConfigBySlug(...args),
 }));
 
 jest.mock('../../utilities/ai/aiScripts.js', () => ({
   __esModule: true,
-  callAI: (...args) => mockCallAI(...args),
+  callAI: (...args: any[]) => mockCallAI(...args),
 }));
 
 jest.mock('reactstrap', () => {
@@ -49,8 +49,8 @@ jest.mock('reactstrap', () => {
       contentClassName,
       backdropClassName,
       wrapClassName,
-    }) => {
-      const refCallback = (node) => {
+    }: any) => {
+      const refCallback = (node: HTMLDivElement | null) => {
         if (typeof innerRef === 'function') {
           innerRef(node);
         } else if (innerRef && typeof innerRef === 'object') {
@@ -71,7 +71,7 @@ jest.mock('reactstrap', () => {
         </div>
       ) : null;
     },
-    ModalHeader: ({ children, className, close, toggle }) => (
+    ModalHeader: ({ children, className, close, toggle }: any) => (
       <div data-testid="tag-modal-header" data-class={className}>
         <span>{children}</span>
         {close || (toggle ? (
@@ -81,7 +81,7 @@ jest.mock('reactstrap', () => {
         ) : null)}
       </div>
     ),
-    ModalBody: ({ children, className }) => (
+    ModalBody: ({ children, className }: any) => (
       <div data-testid="tag-modal-body" data-class={className}>
         {children}
       </div>
@@ -89,7 +89,11 @@ jest.mock('reactstrap', () => {
   };
 });
 
-const createTagPageStore = (sessionStateOverrides = {}) => createStore(
+const TagPageComponent = TagPage as React.ComponentType<any>;
+const TagModalComponent = TagModal as React.ComponentType<any>;
+const buildTagInterpretationPromptAny = buildTagInterpretationPrompt as any;
+
+const createTagPageStore = (sessionStateOverrides: Record<string, any> = {}) => createStore(
   (state = {
     profile: {
       network: { id: 84532 },
@@ -109,7 +113,7 @@ const buildQuestionsEntry = ({
   slug = 'edge',
   questions = {},
   questionResponses = {},
-} = {}) => ({
+}: Record<string, any> = {}) => ({
   namespace: 'questionsCache',
   slug,
   key: `dg:questionsCache:${slug || 'general'}`,
@@ -189,17 +193,17 @@ const demoCorpusRecords = buildDemoCorpusRecords([
       },
     ],
   },
-]);
+] as any[]) as any[];
 
 const renderTagPage = ({
   entry = '/tag/governance',
   isQuestionCacheReady = true,
   sessionState = {},
   tagPageProps = {},
-} = {}) => render(
+}: Record<string, any> = {}) => render(
   <Provider store={createTagPageStore(sessionState)}>
     <MemoryRouter initialEntries={[entry]}>
-      <TagPage
+      <TagPageComponent
         questionResponsesNonce={0}
         isQuestionCacheReady={isQuestionCacheReady}
         {...tagPageProps}
@@ -216,10 +220,10 @@ const renderTagModal = ({
   demoCorpusMode = false,
   demoCorpusRecordsOverride = [],
   toggle = jest.fn(),
-} = {}) => render(
+}: Record<string, any> = {}) => render(
   <Provider store={createTagPageStore(sessionState)}>
     <MemoryRouter initialEntries={[entry]}>
-      <TagModal
+      <TagModalComponent
         isOpen={isOpen}
         toggle={toggle}
         activeTag={activeTag}
@@ -385,7 +389,7 @@ describe('TagPage', () => {
     });
 
     const cardTitle = screen.getByRole('heading', { name: 'Comprehensive international AI framework' });
-    const card = cardTitle.closest('article');
+    const card = cardTitle.closest('article') as HTMLElement;
     expect(card).not.toBeNull();
     expect(within(card).getByText('#International Coordination')).toBeInTheDocument();
     expect(within(card).getByText('#Frontier Models')).toBeInTheDocument();
@@ -403,7 +407,7 @@ describe('TagPage', () => {
     });
 
     const cardTitle = screen.getByRole('heading', { name: 'Google on contrails' });
-    const card = cardTitle.closest('article');
+    const card = cardTitle.closest('article') as HTMLElement;
     expect(card).not.toBeNull();
     expect(within(card).queryByText('Google partnered with American Airlines to reduce contrails.')).not.toBeInTheDocument();
     expect(within(card).queryByText('View source')).not.toBeInTheDocument();
@@ -752,7 +756,7 @@ describe('TagPage', () => {
       fireEvent.click(summarizeButton);
     });
 
-    const expectedPrompt = buildTagInterpretationPrompt({
+    const expectedPrompt = buildTagInterpretationPromptAny({
       selectedTags: ['governance'],
       questions: [
         {
@@ -772,8 +776,8 @@ describe('TagPage', () => {
     jest.useFakeTimers();
     let nowMs = 1000;
     jest.spyOn(Date, 'now').mockImplementation(() => nowMs);
-    let resolveAi;
-    mockCallAI.mockImplementationOnce(() => new Promise((resolve) => {
+    let resolveAi!: (value: string) => void;
+    mockCallAI.mockImplementationOnce(() => new Promise<string>((resolve) => {
       resolveAi = resolve;
     }));
 
@@ -891,7 +895,7 @@ describe('TagModal', () => {
     rerender(
       <Provider store={createTagPageStore({})}>
         <MemoryRouter initialEntries={['/demo/corpus-viewer']}>
-          <TagModal
+          <TagModalComponent
             isOpen={true}
             toggle={toggle}
             activeTag="Open Source"
