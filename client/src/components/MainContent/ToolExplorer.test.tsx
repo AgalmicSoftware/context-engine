@@ -16,17 +16,11 @@ const originalPublicUrl = process.env.PUBLIC_URL;
 
 jest.mock('../../utilities/web3/contractScripts.js', () => ({
   __esModule: true,
-  getAllSessionSlugs: (...args) => mockGetAllSessionSlugs(...args),
-  getSessionConfigBySlug: (...args) => mockGetSessionConfigBySlug(...args),
-}));
-
-jest.mock('../SurveyTool/SurveyTool.jsx', () => ({
-  __esModule: true,
   getAllSessionSlugs: (...args: any[]) => mockGetAllSessionSlugs(...args),
   getSessionConfigBySlug: (...args: any[]) => mockGetSessionConfigBySlug(...args),
 }));
 
-jest.mock('../SurveyTool/SurveyTool', () => ({
+jest.mock('../SurveyTool/SurveyTool.jsx', () => ({
   __esModule: true,
   default: (props: any) => {
     mockSurveyTool(props);
@@ -124,16 +118,6 @@ describe('ToolExplorer session propagation', () => {
   beforeEach(() => {
     mockGetAllSessionSlugs.mockReturnValue(['edge', 'rxc']);
     mockGetSessionConfigBySlug.mockImplementation((slug: unknown) => {
-      const normalized = String(slug || '');
-      if (normalized === 'edge') return { slug: 'edge', sessionName: 'Edge Session' };
-      if (normalized === 'rxc') return { slug: 'rxc', sessionName: 'Debate Session' };
-      return {};
-    });
-  });
-
-  beforeEach(() => {
-    mockGetAllSessionSlugs.mockReturnValue(['edge', 'rxc']);
-    mockGetSessionConfigBySlug.mockImplementation((slug) => {
       const normalized = String(slug || '');
       if (normalized === 'edge') return { slug: 'edge', sessionName: 'Edge Session' };
       if (normalized === 'rxc') return { slug: 'rxc', sessionName: 'Debate Session' };
@@ -294,9 +278,10 @@ describe('ToolExplorer session propagation', () => {
     fireEvent.click(screen.getByText('Context'));
 
     expect(await screen.findByTestId('mock-audio-survey-generator')).toBeInTheDocument();
-    const headerGroup = container.querySelector(`.${styles.headerModeToggleGroup}`);
+    const headerGroup = container.querySelector(`.${styles.headerModeToggleGroup}`) as HTMLElement | null;
+    if (!headerGroup) throw new Error('Expected header mode toggle group');
     const headerButtons = Array.from(headerGroup.querySelectorAll('button')).map(
-      (node) => node.getAttribute('aria-label') || node.textContent.trim()
+      (node) => node.getAttribute('aria-label') || node.textContent?.trim()
     );
 
     expect(headerButtons).toEqual(['Add', 'View', 'Context session selector']);
