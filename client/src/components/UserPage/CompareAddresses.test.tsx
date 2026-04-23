@@ -1,10 +1,10 @@
-/** @file CompareAddresses.test.jsx */
+/** @file CompareAddresses.test.tsx */
 import {
   buildCompareSbtImageMap,
   buildCompareSbtKeySets,
   buildNicknameByAddressMap,
   readDgObjectValues,
-} from './CompareAddresses.jsx';
+} from './CompareAddresses';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 
 jest.mock('../../utilities/cache/cacheScripts.js', () => ({
