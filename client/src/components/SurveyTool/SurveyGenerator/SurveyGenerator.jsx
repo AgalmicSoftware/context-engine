@@ -251,7 +251,7 @@ export const hasDatabaseToolInputContent = ({
   return Boolean(audioFile);
 };
 
-const LazyCorpusViewer = React.lazy(() => import('../../DemoViews/CorpusViewer.jsx'));
+const LazyCorpusViewer = React.lazy(() => import('../../DemoViews/CorpusViewer'));
 
 
 export default function AudioSurveyGenerator(rawProps = {}) {

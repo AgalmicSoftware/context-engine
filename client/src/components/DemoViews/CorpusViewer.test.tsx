@@ -8,7 +8,7 @@ const mockTagPage = jest.fn();
 
 jest.mock('../TagPage/TagPage.jsx', () => ({
   __esModule: true,
-  default: (props) => {
+  default: (props: any) => {
     mockTagPage(props);
     const selectedTags = Array.isArray(props?.selectedTagsOverride) ? props.selectedTagsOverride : [];
     return (
@@ -20,8 +20,8 @@ jest.mock('../TagPage/TagPage.jsx', () => ({
 }));
 
 jest.mock('react-simple-maps', () => ({
-  ComposableMap: ({ children }) => <div data-testid="mock-composable-map">{children}</div>,
-  Geographies: ({ children }) => children({
+  ComposableMap: ({ children }: any) => <div data-testid="mock-composable-map">{children}</div>,
+  Geographies: ({ children }: any) => children({
     geographies: [
       { rsmKey: 'usa', properties: { name: 'United States of America' } },
       { rsmKey: 'gbr', properties: { name: 'United Kingdom' } },
@@ -29,7 +29,7 @@ jest.mock('react-simple-maps', () => ({
       { rsmKey: 'chn', properties: { name: 'China' } },
     ],
   }),
-  Geography: ({ children, geography }) => (
+  Geography: ({ children, geography }: any) => (
     <div data-testid={`mock-geo-${geography.properties.name}`}>
       {children}
     </div>
@@ -38,30 +38,30 @@ jest.mock('react-simple-maps', () => ({
   Graticule: () => null,
 }));
 
-import CorpusViewer from './CorpusViewer.jsx';
+import CorpusViewer from './CorpusViewer';
 import PolicyGlobe from './PolicyGlobe';
 
 const originalMatchMedia = window.matchMedia;
 
-const setMobileViewport = (matches) => {
+const setMobileViewport = (matches: boolean) => {
   Object.defineProperty(window, 'matchMedia', {
     writable: true,
-    value: jest.fn().mockImplementation((query) => {
-      const listeners = new Set();
+    value: jest.fn().mockImplementation((query: string) => {
+      const listeners = new Set<(event: Event) => void>();
 
       return {
         matches: query === '(max-width: 720px)' ? matches : false,
         media: query,
         onchange: null,
-        addEventListener: jest.fn((eventName, listener) => {
+        addEventListener: jest.fn((eventName: string, listener: (event: Event) => void) => {
           if (eventName === 'change') listeners.add(listener);
         }),
-        removeEventListener: jest.fn((eventName, listener) => {
+        removeEventListener: jest.fn((eventName: string, listener: (event: Event) => void) => {
           if (eventName === 'change') listeners.delete(listener);
         }),
-        addListener: jest.fn((listener) => listeners.add(listener)),
-        removeListener: jest.fn((listener) => listeners.delete(listener)),
-        dispatchEvent: jest.fn((event) => {
+        addListener: jest.fn((listener: (event: Event) => void) => listeners.add(listener)),
+        removeListener: jest.fn((listener: (event: Event) => void) => listeners.delete(listener)),
+        dispatchEvent: jest.fn((event: Event) => {
           listeners.forEach((listener) => listener(event));
           return true;
         }),
@@ -70,7 +70,7 @@ const setMobileViewport = (matches) => {
   });
 };
 
-const extractMediaBlock = (scss, query, requiredSnippet = '') => {
+const extractMediaBlock = (scss: string, query: string, requiredSnippet = '') => {
   let searchFrom = 0;
 
   while (searchFrom < scss.length) {
@@ -103,7 +103,7 @@ const extractMediaBlock = (scss, query, requiredSnippet = '') => {
   return null;
 };
 
-const renderPolicyGlobeHarness = (entries) => render(
+const renderPolicyGlobeHarness = (entries: any[]) => render(
   <PolicyGlobe entries={entries}>
     {({ filteredEntries, GlobeElement }) => (
       <div>
@@ -300,7 +300,7 @@ describe('CorpusViewer', () => {
     );
 
     const issueLink = screen.getAllByRole('link', { name: 'Exponential Progress Debate' })[0];
-    const tweetCard = issueLink.closest('article');
+    const tweetCard = issueLink.closest('article') as HTMLElement;
 
     expect(tweetCard).toBeTruthy();
     expect(within(tweetCard).getByRole('link', { name: 'Exponential Progress Debate' })).toBeInTheDocument();
@@ -318,7 +318,7 @@ describe('CorpusViewer', () => {
     );
 
     const issueLink = screen.getAllByRole('link', { name: 'Exponential Progress Debate' })[0];
-    const actionRow = issueLink.parentElement;
+    const actionRow = issueLink.parentElement as HTMLElement;
 
     expect(actionRow).toBeTruthy();
     expect(within(actionRow).getByRole('link', { name: 'View post' })).toBeInTheDocument();
@@ -375,7 +375,7 @@ describe('CorpusViewer', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Papers' }));
 
     const title = screen.getByText('Language Models are Few-Shot Learners');
-    const arxivCard = title.closest('article');
+    const arxivCard = title.closest('article') as HTMLElement;
 
     expect(screen.getByText('arXiv:2005.14165')).toBeInTheDocument();
     expect(arxivCard).toBeTruthy();
@@ -545,7 +545,7 @@ describe('CorpusViewer', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Insider Interviews' }));
 
-    const ai2027Card = screen.getByText('Daniel Kokotajlo & Scott Alexander').closest('article');
+    const ai2027Card = screen.getByText('Daniel Kokotajlo & Scott Alexander').closest('article') as HTMLElement;
     const interviewLinks = screen.getAllByRole('link', { name: 'View interview' });
 
     expect(ai2027Card).toBeTruthy();
@@ -571,7 +571,7 @@ describe('CorpusViewer', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Metrics' }));
 
     const previewImage = screen.getByAltText('Measuring AI Ability to Complete Long Tasks');
-    const metrCard = previewImage.closest('article');
+    const metrCard = previewImage.closest('article') as HTMLElement;
 
     expect(previewImage).toHaveAttribute(
       'src',
