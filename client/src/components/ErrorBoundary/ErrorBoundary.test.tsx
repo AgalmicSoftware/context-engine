@@ -8,7 +8,7 @@ const Thrower = () => {
 };
 
 describe('Error boundaries', () => {
-  let consoleSpy;
+  let consoleSpy: jest.SpyInstance;
 
   beforeEach(() => {
     consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
