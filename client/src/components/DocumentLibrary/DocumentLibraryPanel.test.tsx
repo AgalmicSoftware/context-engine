@@ -85,7 +85,7 @@ jest.mock('../SBTs/SBTSelector.jsx', () => ({
   },
 }));
 
-const DocumentLibraryPanel = require('./DocumentLibraryPanel.jsx').default as React.ComponentType<any>;
+const DocumentLibraryPanel = require('./DocumentLibraryPanel').default as React.ComponentType<any>;
 const TEST_SESSION_CONFIG = {
   docLibrary: {
     provider: 'arweave',

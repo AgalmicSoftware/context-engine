@@ -2,7 +2,7 @@ import React from 'react';
 import { render, screen } from '@testing-library/react';
 import SessionDocumentsPage from './SessionDocumentsPage';
 
-jest.mock('./DocumentLibraryPanel.jsx', () => () => <div data-testid="mock-doc-library-panel" />);
+jest.mock('./DocumentLibraryPanel', () => () => <div data-testid="mock-doc-library-panel" />);
 
 describe('SessionDocumentsPage', () => {
   it('uses the resolved canonical session slug for the back link instead of the raw route token', () => {

@@ -63,6 +63,11 @@ type RiskMatrixAtlasScenario = {
   counterpoint?: string;
   image?: string | null;
   imageAlt?: string;
+  historicalAnchors?: Array<{
+    name: string;
+    avatar: string;
+    role?: string;
+  }>;
 };
 
 export const RISK_MATRIX_CATEGORIES: RiskCategory[] = [
@@ -851,19 +856,31 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
                 className={styles.atlasScenarioCard}
                 data-testid="ce-risk-matrix-atlas-scenario-card"
               >
-                {scenario.image ? (
-                  <img
-                    className={styles.atlasScenarioImage}
-                    src={scenario.image}
-                    alt={scenario.imageAlt || `${scenario.title} visualization`}
-                  />
-                ) : (
-                  <div className={styles.atlasScenarioImageFallback} aria-hidden="true">
-                    <span>{scenario.atlasNodeLabel}</span>
-                  </div>
-                )}
                 <div className={styles.atlasScenarioContent}>
-                  <div className={styles.atlasScenarioMetaRow}>
+                  <div className={styles.atlasScenarioHeader}>
+                    <div className={styles.atlasScenarioHeaderMain}>
+                      {scenario.image ? (
+                        <img
+                          className={styles.atlasScenarioImage}
+                          src={scenario.image}
+                          alt={scenario.imageAlt || `${scenario.title} visualization`}
+                        />
+                      ) : (
+                        <div className={styles.atlasScenarioImageFallback} aria-hidden="true">
+                          <span>{scenario.atlasNodeLabel}</span>
+                        </div>
+                      )}
+                      <div className={styles.atlasScenarioTitleBlock}>
+                        <span className={styles.atlasScenarioNodeLabel}>{scenario.atlasNodeLabel}</span>
+                        <h4 className={styles.atlasScenarioTitle}>{scenario.title}</h4>
+                        <p className={styles.atlasScenarioSummary}>{scenario.summary}</p>
+                        <p className={styles.atlasScenarioMetaLine}>
+                          {scenario.confidence} confidence
+                          <span aria-hidden="true"> • </span>
+                          {scenario.timeHorizon}
+                        </p>
+                      </div>
+                    </div>
                     <span className={clsx(
                       styles.atlasScenarioValence,
                       scenario.valence === 'risk' && styles.atlasScenarioValenceRisk,
@@ -872,15 +889,30 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
                     )}>
                       {scenario.valence}
                     </span>
-                    <span>{scenario.confidence}</span>
-                    <span>{scenario.timeHorizon}</span>
                   </div>
-                  <h4 className={styles.atlasScenarioTitle}>{scenario.title}</h4>
-                  <p className={styles.atlasScenarioSummary}>{scenario.summary}</p>
                   <div className={styles.atlasScenarioMechanism}>
-                    <span>Mechanism</span>
+                    <span>Why it matters</span>
                     <p>{scenario.primaryMechanism}</p>
                   </div>
+                  {Array.isArray(scenario.historicalAnchors) && scenario.historicalAnchors.length > 0 && (
+                    <div className={styles.atlasScenarioAnchors} aria-label="Historical anchors">
+                      {scenario.historicalAnchors.map((anchor) => (
+                        <div key={`${scenario.id}-${anchor.name}`} className={styles.atlasScenarioAnchorChip}>
+                          <img
+                            className={styles.atlasScenarioAnchorAvatar}
+                            src={anchor.avatar}
+                            alt={anchor.name}
+                          />
+                          <div className={styles.atlasScenarioAnchorCopy}>
+                            <span className={styles.atlasScenarioAnchorName}>{anchor.name}</span>
+                            {anchor.role && (
+                              <span className={styles.atlasScenarioAnchorRole}>{anchor.role}</span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   <a className={styles.atlasScenarioLink} href={atlasHref}>
                     Open {scenario.atlasNodeLabel} in atlas
                   </a>
