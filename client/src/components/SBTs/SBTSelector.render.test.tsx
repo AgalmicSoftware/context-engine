@@ -175,6 +175,13 @@ const flushSelectorEffects = async (cycles = 4) => {
   });
 };
 
+const mockedContractScripts = contractScripts as any;
+const mockedContractScriptsUtils = contractScriptsUtils as any;
+const mockedCacheScripts = cacheScripts as any;
+const mockedSessionRegistryUtils = sessionRegistryUtils as any;
+const mockedSbtDisplayNameUtils = sbtDisplayNameUtils as any;
+const globalCe = globalThis as typeof globalThis & Record<string, any>;
+
 describe('SBTSelector rendered cold-load lifecycle', () => {
   beforeEach(() => {
     try { window.history.replaceState({}, '', '/'); } catch (_) {}
@@ -192,12 +199,6 @@ describe('SBTSelector rendered cold-load lifecycle', () => {
       mockedCacheScripts.__getSbtCacheStore()[String(slug || '')] = JSON.parse(JSON.stringify(value));
       return true;
     });
-    mockedCacheScripts.listNamespaceEntriesSync.mockImplementation(({ cloneValues = true } = {}) => (
-      Object.entries(mockedCacheScripts.__getSbtCacheStore()).map(([slug, value]) => ({
-        slug,
-        value: cloneValues ? JSON.parse(JSON.stringify(value)) : value,
-      }))
-    ));
     mockedContractScriptsUtils.getAllSessionSlugs.mockReturnValue(['edge']);
     mockedContractScriptsUtils.getSessionLists.mockReturnValue({ featured_SBTs_LIST: [], ignored_SBTs_LIST: [] });
     mockedContractScriptsUtils.getSessionChainId.mockReturnValue(84532);
