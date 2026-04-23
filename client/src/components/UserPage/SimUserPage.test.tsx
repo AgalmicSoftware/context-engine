@@ -5,7 +5,7 @@ import path from 'path';
 import SimUserPage from './SimUserPage.jsx';
 import historicalFigures from '../../variables/demo/historical_figure_users.json';
 
-jest.mock('../SurveyTool/SingleQuestionResponse.jsx', () => (props) => {
+jest.mock('../SurveyTool/SingleQuestionResponse.jsx', () => (props: any) => {
   const rawValue = props?.response?.answer?.value;
   const answerText = Array.isArray(rawValue) ? rawValue.join(' | ') : String(rawValue ?? '');
 
@@ -26,14 +26,14 @@ describe('SimUserPage', () => {
     const nativeCreateElement = document.createElement.bind(document);
     const getContext = jest.fn(() => ({ fillStyle: '', fillRect: jest.fn() }));
     const toDataURL = jest.fn(() => value);
-    const createElementSpy = jest.spyOn(document, 'createElement').mockImplementation((tagName, options) => {
+    const createElementSpy = jest.spyOn(document, 'createElement').mockImplementation((tagName: any, options?: any) => {
       if (tagName === 'canvas') {
         return {
           width: 0,
           height: 0,
           getContext,
           toDataURL,
-        };
+        } as unknown as HTMLCanvasElement;
       }
       return nativeCreateElement(tagName, options);
     });
@@ -42,9 +42,9 @@ describe('SimUserPage', () => {
   };
 
   it('renders simulated question responses through the shared response-card presentation', async () => {
-    const figure = historicalFigures.find((entry) => entry.username === 'Franklin');
-    const firstBinary = figure.questions.find((entry) => entry.questionType === 'binary');
-    const firstFreeform = figure.questions.find((entry) => entry.questionType === 'freeform');
+    const figure = historicalFigures.find((entry) => entry.username === 'Franklin') as any;
+    const firstBinary = figure.questions.find((entry: any) => entry.questionType === 'binary');
+    const firstFreeform = figure.questions.find((entry: any) => entry.questionType === 'freeform');
 
     render(<SimUserPage simUsername="Franklin" />);
 
@@ -59,7 +59,7 @@ describe('SimUserPage', () => {
     expect(screen.getByText(figure.questions[0].question)).toBeInTheDocument();
     expect(screen.getAllByText(String(firstBinary.answer.value)).length).toBeGreaterThan(0);
     expect(
-      screen.getByText((content) => content.includes(String(firstFreeform.answer.value).substring(0, 40)))
+      screen.getByText((content: string) => content.includes(String(firstFreeform.answer.value).substring(0, 40)))
     ).toBeInTheDocument();
     expect(screen.queryByText(/^Question 1$/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/^Binary$/i)).not.toBeInTheDocument();
@@ -69,7 +69,8 @@ describe('SimUserPage', () => {
 
   it('prepends PUBLIC_URL when building atlas links', async () => {
     const previousPublicUrl = process.env.PUBLIC_URL;
-    process.env.PUBLIC_URL = '/ce/';
+    const mutableEnv = process.env as Record<string, string | undefined>;
+    mutableEnv.PUBLIC_URL = '/ce/';
     try {
       render(<SimUserPage simUsername="Franklin" />);
 
@@ -81,8 +82,8 @@ describe('SimUserPage', () => {
         .filter((link) => /^\/ce\/su\//.test(link.getAttribute('href') || ''));
       expect(profileLinks.length).toBeGreaterThan(0);
     } finally {
-      if (previousPublicUrl === undefined) delete process.env.PUBLIC_URL;
-      else process.env.PUBLIC_URL = previousPublicUrl;
+      if (previousPublicUrl === undefined) delete mutableEnv.PUBLIC_URL;
+      else mutableEnv.PUBLIC_URL = previousPublicUrl;
     }
   });
 
