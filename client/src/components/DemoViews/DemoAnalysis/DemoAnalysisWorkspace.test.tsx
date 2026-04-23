@@ -1,19 +1,26 @@
 import fs from 'fs';
 import path from 'path';
 import React from 'react';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import DemoAnalysisWorkspace from './DemoAnalysisWorkspace';
 
 jest.mock('../../Shared/CheckboxMultiSelect', () => ({
   __esModule: true,
-  default: ({ inputId, onChange, options = [], value = [] }: any) => (
+  default: ({
+    inputId,
+    onChange,
+    options = [],
+    value = [],
+  }: any) => (
     <select
       data-testid={inputId}
       id={inputId}
       multiple
       onChange={(event) => {
         const selectedValues = Array.from(event.target.selectedOptions).map((option: any) => option.value);
-        onChange(options.filter((option: any) => selectedValues.includes(String(option.value))));
+        onChange(
+          options.filter((option: any) => selectedValues.includes(String(option.value)))
+        );
       }}
       value={Array.isArray(value) ? value.map((option) => option.value) : []}
     >
@@ -28,17 +35,18 @@ jest.mock('../../Shared/CheckboxMultiSelect', () => ({
 
 jest.mock('react-simple-maps', () => ({
   ComposableMap: ({ children }: any) => <div data-testid="mock-composable-map">{children}</div>,
-  Geographies: ({ children }: any) =>
-    children({
-      geographies: [
-        { rsmKey: 'usa', properties: { name: 'United States of America' } },
-        { rsmKey: 'gbr', properties: { name: 'United Kingdom' } },
-        { rsmKey: 'ind', properties: { name: 'India' } },
-        { rsmKey: 'chn', properties: { name: 'China' } },
-      ],
-    }),
+  Geographies: ({ children }: any) => children({
+    geographies: [
+      { rsmKey: 'usa', properties: { name: 'United States of America' } },
+      { rsmKey: 'gbr', properties: { name: 'United Kingdom' } },
+      { rsmKey: 'ind', properties: { name: 'India' } },
+      { rsmKey: 'chn', properties: { name: 'China' } },
+    ],
+  }),
   Geography: ({ children, geography }: any) => (
-    <div data-testid={`mock-geo-${geography.properties.name}`}>{children}</div>
+    <div data-testid={`mock-geo-${geography.properties.name}`}>
+      {children}
+    </div>
   ),
   Sphere: () => null,
   Graticule: () => null,
