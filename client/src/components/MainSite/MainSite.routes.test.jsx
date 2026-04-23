@@ -55,7 +55,7 @@ jest.mock('../Navbar/Navbar', () => () => null);
 jest.mock('../MainContent/MainAreaTabs', () => () => null);
 jest.mock('../Onboarding/OnboardingOverlay', () => () => null);
 jest.mock('../Footer/Footer', () => () => null);
-jest.mock('../UserPage/SimUserPage.jsx', () => () => null);
+jest.mock('../UserPage/SimUserPage', () => () => null);
 jest.mock('../Shared/LazyFallback', () => () => null);
 jest.mock('../E2E/DevE2eNav', () => () => null);
 jest.mock('../ErrorBoundary/RouteErrorBoundary', () => ({

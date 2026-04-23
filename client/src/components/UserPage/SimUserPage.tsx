@@ -14,29 +14,41 @@ import {
 import { buildPublicRoute } from '../../utilities/ui/publicUrl.js';
 import SingleQuestionResponse from '../SurveyTool/SingleQuestionResponse.jsx';
 
+type SimUserPageProps = {
+  simUsername?: string;
+  minimized?: boolean;
+};
+
+type SimUserPageState = {
+  userInfo: any | null;
+  showFullProfileModal: boolean;
+};
+
+const historicalFiguresData = historicalFigures as any[];
+const atlasDataByUser = atlasData as Record<string, any>;
+const treeDataNodes = treeData as any[];
+const SingleQuestionResponseComponent = SingleQuestionResponse as React.ComponentType<any>;
+
 // Build node name lookup from tree
 const nodeNames: Record<string, string> = {};
-const buildNodeNames = (nodes: TreeNode[]) => {
-  nodes.forEach((n) => {
-    const id = String(n?.id || '');
-    const name = String(n?.name || '');
-    if (id && name) nodeNames[id] = name.replace(/^\d+\.\s*/, '');
-    if (Array.isArray(n.children)) buildNodeNames(n.children);
+const buildNodeNames = (nodes: any[]) => {
+  nodes.forEach((n: any) => {
+    nodeNames[n.id] = n.name.replace(/^\d+\.\s*/, '');
+    if (n.children) buildNodeNames(n.children);
   });
 };
 buildNodeNames(treeDataNodes);
 
 // Compute vote correlations between all figures
-const computeRelatedFigures = (username: string): { allies: RelatedFigureScore[]; opponents: RelatedFigureScore[] } => {
+const computeRelatedFigures = (username: string) => {
   const myData = atlasDataByUser[username];
   if (!myData || !myData.votes) return { allies: [], opponents: [] };
 
   const myVotes = myData.votes;
-  const scores: RelatedFigureScore[] = [];
+  const scores: any[] = [];
 
-  Object.entries(atlasDataByUser).forEach(([other, data]) => {
-    const otherVotes = data.votes;
-    if (other === username || !otherVotes) return;
+  Object.entries(atlasDataByUser).forEach(([other, data]: [string, any]) => {
+    if (other === username || !data.votes) return;
     let agree = 0;
     let disagree = 0;
     let shared = 0;
@@ -45,7 +57,7 @@ const computeRelatedFigures = (username: string): { allies: RelatedFigureScore[]
       if (otherVotes[nodeId] !== undefined) {
         shared++;
         const myVal = parseInt(String(myVotes[nodeId]), 10);
-        const theirVal = parseInt(String(otherVotes[nodeId]), 10);
+        const theirVal = parseInt(String(data.votes[nodeId]), 10);
         if ((myVal > 0 && theirVal > 0) || (myVal < 0 && theirVal < 0)) {
           agree++;
         } else if ((myVal > 0 && theirVal < 0) || (myVal < 0 && theirVal > 0)) {
@@ -83,7 +95,7 @@ const computeStance = (username: string) => {
   return dimensions.map((dim) => {
     let score = 0;
     let count = 0;
-    Object.entries(data.votes || {}).forEach(([nodeId, val]) => {
+    Object.entries(data.votes as Record<string, any>).forEach(([nodeId, val]) => {
       const prefix = nodeId.substring(0, 4);
       const v = parseInt(String(val), 10);
       if (dim.positive.includes(prefix)) { score += v; count++; }
@@ -103,17 +115,11 @@ class SimUserPage extends Component<SimUserPageProps, SimUserPageState> {
 
   componentDidMount() {
     const { simUsername } = this.props;
-    this.setState(buildSimUserInfoStatePatch({
-      figures: historicalFiguresData,
-      simUsername,
-    }));
+    const userInfo = historicalFiguresData.find((figure) => figure.username === simUsername);
+    this.setState({ userInfo });
   }
 
-  closeFullProfileModal = () => {
-    this.setState(buildSimFullProfileModalStatePatch());
-  };
-
-  buildQuestionCardData = (question: SimQuestion): SimQuestionCardData => ({
+  buildQuestionCardData = (question: any) => ({
     question: {
       prompt: String(question?.question || '').trim() || 'Untitled question',
       type: String(question?.questionType || 'freeform').trim().toLowerCase() || 'freeform',
@@ -127,7 +133,7 @@ class SimUserPage extends Component<SimUserPageProps, SimUserPageState> {
     },
   });
 
-  renderQuestionResponse = (question: SimQuestion, index: number, mode = 'mini') => {
+  renderQuestionResponse = (question: any, index: number, mode = 'mini') => {
     const cardData = this.buildQuestionCardData(question);
     return (
       <SingleQuestionResponseComponent
@@ -299,7 +305,7 @@ class SimUserPage extends Component<SimUserPageProps, SimUserPageState> {
                 <div className={styles.surveySection}>
                   <h2 className={styles.screenReaderOnly}>Question Responses</h2>
                   <div className={styles.questionDeck}>
-                    {userInfo.questions.map((question, index) => this.renderQuestionResponse(question, index))}
+                    {userInfo.questions.map((question: any, index: number) => this.renderQuestionResponse(question, index))}
                   </div>
                 </div>
               </div>
@@ -400,7 +406,7 @@ class SimUserPage extends Component<SimUserPageProps, SimUserPageState> {
             <div className={styles.modalQuestions}>
               <h3>Question Responses</h3>
               <div className={styles.modalQuestionDeck}>
-                {userInfo.questions.map((question, index) => this.renderQuestionResponse(question, index, 'fullscreen'))}
+                {userInfo.questions.map((question: any, index: number) => this.renderQuestionResponse(question, index, 'fullscreen'))}
               </div>
             </div>
           </ModalBody>
