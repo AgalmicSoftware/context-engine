@@ -1,4 +1,4 @@
-import { buildHistoricalCompassPoints } from './DebateMap.jsx';
+import { buildHistoricalCompassPoints } from './DebateMap';
 import treeData from '../../variables/demo/debate_map_demo_data.json';
 import historicalFigureData from '../../variables/demo/historical_figures_tree_qs_and_votes.json';
 

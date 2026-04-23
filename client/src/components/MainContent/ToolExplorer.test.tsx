@@ -56,7 +56,7 @@ jest.mock('../SBTs/SBTsPage', () => ({
   },
 }));
 
-jest.mock('../DebateMap/DebateMap.jsx', () => ({
+jest.mock('../DebateMap/DebateMap', () => ({
   __esModule: true,
   default: (props: any) => {
     mockDebateMap(props);

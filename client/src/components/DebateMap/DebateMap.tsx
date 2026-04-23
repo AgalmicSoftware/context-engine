@@ -1,4 +1,5 @@
-/** @file DebateMap.jsx */
+/** @file DebateMap.tsx */
+// @ts-nocheck
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
