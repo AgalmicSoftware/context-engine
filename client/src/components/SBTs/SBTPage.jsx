@@ -39,6 +39,10 @@ import {
   isSbtFieldLocked,
 } from '../../utilities/sbt/sbtDisplayNames.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
+import {
+  getSbtPasswordRecoveryCodes,
+  upsertSbtPasswordRecoveryCodes,
+} from '../../utilities/sbt/sbtPasswordRecoveryStore.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { isCryptoMode, sbtBasePath, sbtsListPath, t } from '../../utilities/ui/terminology.js';
 import CETooltip from '../Shared/CETooltip';
@@ -1627,34 +1631,11 @@ class SBTPage extends Component {
   }
 
   loadCachedPasswords = () => {
-    let stored = {};
-    try { stored = JSON.parse(localStorage.getItem('createdSBTs')) || {}; } catch (e) { sbtLog.warn('SBTPage: fallback', e); }
-    const normalizedStored = {};
-    for (let k in stored) {
-      normalizedStored[k.toLowerCase()] = stored[k];
-    }
-
-    let sbtAddress;
-
-    if (Array.isArray(this.props.SBTAddress)) {
-      const foundEntry = this.props.SBTAddress.find(entry => entry.sbtAddress !== undefined);
-      sbtAddress = foundEntry ? foundEntry.sbtAddress : null;
-    } else {
-      sbtAddress = this.props.SBTAddress && this.props.SBTAddress.sbtAddress !== undefined
-        ? this.props.SBTAddress.sbtAddress
-        : this.props.SBTAddress;
-    }
-
-    if (typeof sbtAddress === 'string') {
-      sbtAddress = sbtAddress.toLowerCase();
-    }
-
-    let cached = [];
-    if (sbtAddress && normalizedStored[sbtAddress] && Array.isArray(normalizedStored[sbtAddress].passwords)) {
-      cached = normalizedStored[sbtAddress].passwords;
-    } else if (Array.isArray(normalizedStored.passwords)) { // Fallback for older structure if needed
-      cached = normalizedStored.passwords;
-    }
+    const sbtAddress = resolveSbtAddress(this.props.SBTAddress);
+    const cached = getSbtPasswordRecoveryCodes({
+      chainId: this.getActiveChainId(),
+      sbtAddress,
+    });
 
     if (this._isMounted) {
       this.setState({ cachedPasswords: cached });
@@ -3599,13 +3580,15 @@ class SBTPage extends Component {
 
       this.cacheTransactionHash(tx.transactionHash);
 
-      let createdSBTs = this.readQueuedOrStoredLocalStorageJson('createdSBTs', {});
-      const sbtAddrLower = sbtAddressOriginalCase.toLowerCase();
-      if (!createdSBTs[sbtAddrLower]) {
-        createdSBTs[sbtAddrLower] = { passwords: [] };
+      const recoveryWrite = upsertSbtPasswordRecoveryCodes({
+        chainId: this.getActiveChainId(),
+        sbtAddress: sbtAddressOriginalCase,
+        passwords: newPasswordList,
+        mode: 'append',
+      });
+      if (!recoveryWrite.ok) {
+        sbtLog.warn('Failed to persist admin invite recovery codes:', recoveryWrite.status);
       }
-      createdSBTs[sbtAddrLower].passwords = [...(createdSBTs[sbtAddrLower].passwords || []), ...newPasswordList];
-      this.queueLocalStorageJsonWrite('createdSBTs', createdSBTs, { immediate: true });
 
       if (this._isMounted) this.setState({ adminGeneratedPasswords: newPasswordList, passwordGenerationCount: '' });
       this.loadCachedPasswords();
@@ -4150,7 +4133,7 @@ renderMintButton() {
                     </li>
                   ))}
                 </ul>
-                <p>These passwords are now stored in localStorage and/or newly generated.</p>
+                <p>These passwords are stored in the local recovery cache and/or newly generated.</p>
                 <div className={styles.exportOptions}>
                   {renderIncludePreviousCheckbox && (
                     <label>

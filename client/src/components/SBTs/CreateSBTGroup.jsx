@@ -70,6 +70,7 @@ import {
   hasMeaningfulCreateSbtFormPayload,
   LEGACY_CREATE_SBT_FORM_CACHE_KEY as FORM_CACHE_KEY,
 } from '../../utilities/sbt/sbtCreateFormCache.js';
+import { upsertSbtPasswordRecoveryCodes } from '../../utilities/sbt/sbtPasswordRecoveryStore.js';
 import { isCryptoMode, t } from '../../utilities/ui/terminology.js';
 import { normalizeWorkerUrl } from '../../utilities/worker/workerAuth.js';
 
@@ -3126,10 +3127,15 @@ class CreateSBTGroup extends Component {
     if (!hasPasswordMintOnChain || !sbtAddress || !Array.isArray(codesToStore) || codesToStore.length === 0) {
       return;
     }
-    const createdSBTs = JSON.parse(localStorage.getItem('createdSBTs') || '{}');
-    if (!createdSBTs[sbtAddress]) createdSBTs[sbtAddress] = {};
-    createdSBTs[sbtAddress].passwords = codesToStore;
-    localStorage.setItem('createdSBTs', JSON.stringify(createdSBTs));
+    const result = upsertSbtPasswordRecoveryCodes({
+      chainId: this.getSelectedAuthoringChainId(),
+      sbtAddress,
+      passwords: codesToStore,
+      mode: 'replace',
+    });
+    if (!result.ok) {
+      sbtLog.warn('Failed to persist SBT password recovery codes:', result.status);
+    }
   };
 
   handleDeferredSave = async () => {
