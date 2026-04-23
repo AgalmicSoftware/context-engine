@@ -4,14 +4,71 @@ import { Avatar } from './CharacterSVG';
 import { debateData, sourceLinks } from '../../../variables/demo/debateData.js';
 import { darkTheme as T, soften, useTheme } from './debateHudTheme';
 
-export const NodeIcon = ({ type }) => {
-  const icons = {
+type DebateSideKey = 'A' | 'B';
+
+type DebateFigure = {
+  name: string;
+};
+
+type ArgumentNode = {
+  id: string;
+  claim: string;
+  type: string;
+  side: DebateSideKey;
+  source: string;
+  strength: number;
+  children?: ArgumentNode[];
+};
+
+type DebateSide = {
+  color: string;
+  figure: DebateFigure;
+  tree: ArgumentNode;
+};
+
+type Debate = {
+  id: number;
+  sideA: DebateSide;
+  sideB: DebateSide;
+};
+
+type ExpandedNodeSet = Set<string>;
+
+type NodeIconProps = {
+  type: string;
+};
+
+type TreeNodeProps = {
+  node: ArgumentNode;
+  debate: Debate;
+  onNodeClick?: (node: ArgumentNode) => void;
+  expandedNodes: ExpandedNodeSet;
+  setExpandedNodes: React.Dispatch<React.SetStateAction<ExpandedNodeSet>>;
+};
+
+type PointCounterpointProps = {
+  nodeA?: ArgumentNode | null;
+  nodeB?: ArgumentNode | null;
+  debate: Debate;
+  expandedNodes: ExpandedNodeSet;
+  setExpandedNodes: React.Dispatch<React.SetStateAction<ExpandedNodeSet>>;
+  depth?: number;
+};
+
+type ArgumentTreeViewProps = {
+  selectedDebateId?: number;
+};
+
+const sourceLinkMap = sourceLinks as Record<string, string>;
+
+export const NodeIcon = ({ type }: NodeIconProps) => {
+  const icons: Record<string, string> = {
     core: "●",
     sub: "◯"};
   return <span style={{ fontWeight: 600, opacity: 0.6 }}>{icons[type] || "•"}</span>;
 };
 
-export const TreeNode = ({ node, debate, onNodeClick, expandedNodes, setExpandedNodes }) => {
+export const TreeNode = ({ node, debate, onNodeClick, expandedNodes, setExpandedNodes }: TreeNodeProps) => {
   useTheme();
 
   const figure = node.side === "A" ? debate.sideA.figure : debate.sideB.figure;
@@ -77,8 +134,8 @@ export const TreeNode = ({ node, debate, onNodeClick, expandedNodes, setExpanded
               {node.claim}
             </div>
             <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-              {sourceLinks[node.source] ? (
-                <a href={sourceLinks[node.source]} target="_blank" rel="noopener noreferrer" style={{
+              {sourceLinkMap[node.source] ? (
+                <a href={sourceLinkMap[node.source]} target="_blank" rel="noopener noreferrer" style={{
                   fontSize: 11,
                   background: soften(color, 0.08),
                   color,
@@ -127,7 +184,7 @@ export const TreeNode = ({ node, debate, onNodeClick, expandedNodes, setExpanded
 
       {isExpanded && hasChildren && (
         <div style={{ marginLeft: 12, paddingLeft: 8, borderLeft: `1px dashed ${T.borderLight}` }}>
-          {node.children.map(child => (
+          {(node.children || []).map((child) => (
             <TreeNode
               key={child.id}
               node={child}
@@ -143,12 +200,19 @@ export const TreeNode = ({ node, debate, onNodeClick, expandedNodes, setExpanded
   );
 };
 
-export const PointCounterpoint = ({ nodeA, nodeB, debate, expandedNodes, setExpandedNodes, depth = 0 }) => {
+export const PointCounterpoint = ({
+  nodeA,
+  nodeB,
+  debate,
+  expandedNodes,
+  setExpandedNodes,
+  depth = 0,
+}: PointCounterpointProps) => {
   useTheme();
 
   const isExpanded = expandedNodes.has(`pc-${nodeA?.id}-${nodeB?.id}`);
   const pairId = `pc-${nodeA?.id}-${nodeB?.id}`;
-  const hasChildren = (nodeA?.children?.length > 0) || (nodeB?.children?.length > 0);
+  const hasChildren = ((nodeA?.children?.length || 0) > 0) || ((nodeB?.children?.length || 0) > 0);
   const childrenA = nodeA?.children || [];
   const childrenB = nodeB?.children || [];
   const maxChildren = Math.max(childrenA.length, childrenB.length);
@@ -197,8 +261,8 @@ export const PointCounterpoint = ({ nodeA, nodeB, debate, expandedNodes, setExpa
               {nodeA.claim}
             </div>
             <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
-              {sourceLinks[nodeA.source] ? (
-                <a href={sourceLinks[nodeA.source]} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={{
+              {sourceLinkMap[nodeA.source] ? (
+                <a href={sourceLinkMap[nodeA.source]} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={{
                   fontSize: 10, background: soften(debate.sideA.color, 0.08), color: debate.sideA.color,
                   padding: "2px 6px", borderRadius: 3, fontWeight: 500, textDecoration: "none",
                   borderBottom: `1px dashed ${soften(debate.sideA.color, 0.4)}`}}>{nodeA.source} ↗</a>
@@ -230,8 +294,8 @@ export const PointCounterpoint = ({ nodeA, nodeB, debate, expandedNodes, setExpa
               {nodeB.claim}
             </div>
             <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
-              {sourceLinks[nodeB.source] ? (
-                <a href={sourceLinks[nodeB.source]} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={{
+              {sourceLinkMap[nodeB.source] ? (
+                <a href={sourceLinkMap[nodeB.source]} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={{
                   fontSize: 10, background: soften(debate.sideB.color, 0.08), color: debate.sideB.color,
                   padding: "2px 6px", borderRadius: 3, fontWeight: 500, textDecoration: "none",
                   borderBottom: `1px dashed ${soften(debate.sideB.color, 0.4)}`}}>{nodeB.source} ↗</a>
@@ -265,11 +329,11 @@ export const PointCounterpoint = ({ nodeA, nodeB, debate, expandedNodes, setExpa
   );
 };
 
-const ArgumentTreeView = ({ selectedDebateId }) => {
+const ArgumentTreeView = ({ selectedDebateId }: ArgumentTreeViewProps) => {
   useTheme();
 
-  const [expandedNodes, setExpandedNodes] = useState(new Set());
-  const debate = debateData.find((item) => item.id === selectedDebateId) || debateData[0];
+  const [expandedNodes, setExpandedNodes] = useState<ExpandedNodeSet>(new Set());
+  const debate = (debateData as Debate[]).find((item) => item.id === selectedDebateId) || debateData[0] as Debate | undefined;
 
   if (!debate) return null;
 
