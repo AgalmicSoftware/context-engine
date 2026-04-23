@@ -105,6 +105,7 @@ import {
   withWorkerConfigSyncWarning,
 } from './sessionWizardSecrets.js';
 import { getSbtDisplayName } from '../../utilities/sbt/sbtDisplayNames.js';
+import { upsertSbtPasswordRecoveryCodes } from '../../utilities/sbt/sbtPasswordRecoveryStore.js';
 import { toStr } from '../../utilities/shared/primitives.js';
 import { notify } from '../../utilities/ui/notify.js';
 import { DEFAULT_REASONING_EFFORT } from '../../utilities/ai/aiSettings.js';
@@ -1298,6 +1299,40 @@ export const deploySessionWizardPendingSbtDraft = async ({
     finalizedDraft,
     receipt,
   };
+};
+
+export const persistSessionWizardSbtRecoveryCodes = ({
+  finalizedDraft = {},
+  sbtAddress = '',
+  sessionConfigForDeploy = {},
+  writeRecoveryCodes = upsertSbtPasswordRecoveryCodes,
+} = {}) => {
+  const codesToStore = finalizedDraft.usesInviteCodes
+    ? [toStr(finalizedDraft.groupPassword).trim()].filter(Boolean)
+    : (Array.isArray(finalizedDraft.passwordList) ? finalizedDraft.passwordList : [])
+      .filter((value) => toStr(value).trim());
+
+  if (finalizedDraft.hasPasswordMintOnChain !== true || codesToStore.length === 0) {
+    return {
+      ok: false,
+      status: 'empty-recovery-payload',
+      passwords: codesToStore,
+    };
+  }
+
+  const chainId = Number(
+    finalizedDraft.networkChainId ||
+    sessionConfigForDeploy?.networkChainId ||
+    sessionConfigForDeploy?.contracts?.sbtFactory?.chainId ||
+    0
+  ) || null;
+
+  return writeRecoveryCodes({
+    chainId,
+    sbtAddress,
+    passwords: codesToStore,
+    mode: 'replace',
+  });
 };
 
 const deepClone = (obj) => JSON.parse(JSON.stringify(obj || {}));
@@ -5856,15 +5891,11 @@ const SessionWizard = ({
         );
       }
 
-      const codesToStore = finalizedDraft.usesInviteCodes
-        ? [toStr(finalizedDraft.groupPassword).trim()].filter(Boolean)
-        : (Array.isArray(finalizedDraft.passwordList) ? finalizedDraft.passwordList : []).filter((value) => toStr(value).trim());
-      if (finalizedDraft.hasPasswordMintOnChain === true && codesToStore.length > 0) {
-        const createdSBTs = JSON.parse(localStorage.getItem('createdSBTs') || '{}');
-        if (!createdSBTs[sbtAddress]) createdSBTs[sbtAddress] = {};
-        createdSBTs[sbtAddress].passwords = codesToStore;
-        localStorage.setItem('createdSBTs', JSON.stringify(createdSBTs));
-      }
+      persistSessionWizardSbtRecoveryCodes({
+        finalizedDraft,
+        sbtAddress,
+        sessionConfigForDeploy,
+      });
 
       const deployedDraft = {
         ...finalizedDraft,
