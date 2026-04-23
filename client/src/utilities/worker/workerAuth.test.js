@@ -379,6 +379,9 @@ describe('workerAuth canonical session resolution', () => {
       context: authContext,
     })).resolves.toBe('token-1');
 
+    expect(new Headers(global.fetch.mock.calls[0][1].headers).get('X-Anonymous-Client-Id')).toMatch(/^[a-z0-9_-]{8,128}$/);
+    expect(new Headers(global.fetch.mock.calls[1][1].headers).get('X-Anonymous-Client-Id')).toBeNull();
+
     const cacheKey = __test__workerAuthTokenCache.buildTokenCacheKey({
       workerUrl: 'https://worker.example',
       slug: 'edge',
