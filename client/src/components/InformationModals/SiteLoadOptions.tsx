@@ -1,4 +1,4 @@
-/** @file SiteLoadOptions.jsx */
+/** @file SiteLoadOptions.tsx */
 import React, { Component } from "react";
 import PropTypes from 'prop-types';
 import { connect } from 'react-redux';
@@ -22,9 +22,39 @@ import { createLogger } from 'utilities/logging.js';
 const uiLog = createLogger('ui');
 
 
+type SiteLoadOptionsProps = {
+  fetchSessionState: () => void;
+  account?: string | null;
+  provider?: string | null;
+  arrowIndex: number;
+  sidebarOpen?: boolean;
+  closeSidebarFunction: () => void;
+  clickRightArrow: () => void;
+  clickLeftArrow?: () => void;
+};
 
-class SiteLoadOptions extends Component {
-  state = {
+type SiteLoadOptionsState = {
+  explainerModalOpen: boolean;
+  sidebarNotClosed: boolean;
+  userOptsOutMetrics: boolean;
+  metricsDetailsSelected: boolean;
+};
+
+type RootState = {
+  profile: {
+    account?: string | null;
+    provider?: string | null;
+  };
+};
+
+class SiteLoadOptions extends Component<SiteLoadOptionsProps, SiteLoadOptionsState> {
+  static propTypes = {
+    fetchSessionState: PropTypes.func.isRequired,
+    account: PropTypes.string,
+    provider: PropTypes.string,
+  };
+
+  state: SiteLoadOptionsState = {
     explainerModalOpen: false,
     sidebarNotClosed: false,
     userOptsOutMetrics: true,
@@ -40,7 +70,7 @@ class SiteLoadOptions extends Component {
 
   componentDidUpdate() {
     if (this.state.sidebarNotClosed !== this.props.sidebarOpen) {
-      this.setState({ sidebarNotClosed: this.props.sidebarOpen });
+      this.setState({ sidebarNotClosed: !!this.props.sidebarOpen });
     }
   };
 
@@ -67,7 +97,7 @@ class SiteLoadOptions extends Component {
     }
   };
 
-  toggleExplainerModal = (arrowIndex) => {
+  toggleExplainerModal = (_arrowIndex: number) => {
   };
 
   openExplainerModal = () => {
@@ -90,7 +120,7 @@ class SiteLoadOptions extends Component {
     const isTitlelessSlide = !String(currentSlide?.title || '').trim();
 
     // Create an empty array to hold JSX elements
-    let bulletPointElements = [];
+    const bulletPointElements: React.ReactNode[] = [];
     let allEmpty = true;
 
     // Loop through bulletPoints and create JSX elements
@@ -170,7 +200,7 @@ class SiteLoadOptions extends Component {
       padding: "0px",
     };
 
-    const currentSlide = getWelcomeSlide(this.props.arrowIndex);
+    const currentSlide = getWelcomeSlide(this.props.arrowIndex) as any;
     const slideLayout = currentSlide?.mediaLayout || 'default';
     const slideButtonClickHandler = this.props.arrowIndex === 0
       ? this.props.clickRightArrow
@@ -288,13 +318,7 @@ class SiteLoadOptions extends Component {
   }
 }
 
-SiteLoadOptions.propTypes = {
-  fetchSessionState: PropTypes.func.isRequired,
-  account: PropTypes.string,
-  provider: PropTypes.string,
-};
-
-const mapStateToProps = state => ({
+const mapStateToProps = (state: RootState) => ({
   account: state.profile.account,
   provider: state.profile.provider,
 });
