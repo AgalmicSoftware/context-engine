@@ -5,6 +5,7 @@ import { DEFAULT_CHAIN_ID } from '../../variables/appConfig.js';
 import { getDefaultHttpRpc, getSessionRegistryAddress } from '../../variables/chains.js';
 
 const DEFAULT_CONFIG_CHAIN_ID = DEFAULT_CHAIN_ID;
+const adminPageTestUtils = __adminPageTestUtils as any;
 
 describe('AdminPage', () => {
   it('exports a component', () => {
@@ -159,14 +160,14 @@ describe('AdminPage', () => {
         blockLimits: { start: 12345 },
       },
     });
-    const legacyPayload = __adminPageTestUtils.buildEditableSessionMetadataPayload({
+    const legacyPayload = adminPageTestUtils.buildEditableSessionMetadataPayload({
       sessionConfig: {
         slug: 'test-10',
         blockLimits: { start: 12345 },
         autoFeatureSBTsWithFeaturedSbtTags: false,
       },
     });
-    const precedencePayload = __adminPageTestUtils.buildEditableSessionMetadataPayload({
+    const precedencePayload = adminPageTestUtils.buildEditableSessionMetadataPayload({
       sessionConfig: {
         slug: 'test-10',
         blockLimits: { start: 12345 },
@@ -174,7 +175,7 @@ describe('AdminPage', () => {
         autoFeatureSBTsWithFeaturedSbtTags: false,
       },
     });
-    const overriddenPayload = __adminPageTestUtils.buildEditableSessionMetadataPayload({
+    const overriddenPayload = adminPageTestUtils.buildEditableSessionMetadataPayload({
       sessionConfig: {
         slug: 'test-10',
         blockLimits: { start: 12345 },
