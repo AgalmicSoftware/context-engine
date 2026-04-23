@@ -1,4 +1,4 @@
-/** @file ToolExplorerPluginExplainer.jsx */
+/** @file ToolExplorerPluginExplainer.tsx */
 
 import React from 'react';
 import PropTypes from 'prop-types';
@@ -8,7 +8,11 @@ import { faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
 import styles from './ToolExplorer.module.scss';
 import CETooltip from '../Shared/CETooltip';
 
-const ToolExplorerPluginExplainer = ({ explainText }) => {
+type ToolExplorerPluginExplainerProps = {
+  explainText?: string | null;
+};
+
+const ToolExplorerPluginExplainer = ({ explainText }: ToolExplorerPluginExplainerProps) => {
   const idRef = React.useRef('explorerAbout-' + Math.random().toString(36).slice(2, 9));
 
   if (!explainText) return null;
