@@ -19,6 +19,77 @@ const sbtAdminIface = new ethers.utils.Interface(SBT_ADMIN_ABI);
 const LOGIN_ORIGIN = 'https://contextengine.xyz';
 const LOGIN_DOMAIN = 'contextengine.xyz';
 
+const normalizeOrigin = (value) => {
+  const raw = String(value ?? '').trim();
+  if (!raw) return '';
+  try {
+    return new URL(raw).origin;
+  } catch {
+    return '';
+  }
+};
+
+const splitOriginListInput = (value) => {
+  const trimmed = String(value ?? '').trim();
+  if (!trimmed) return [];
+  return trimmed
+    .split(/[\n,]+/)
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+};
+
+const coerceOriginListInput = (value) => {
+  if (Array.isArray(value)) {
+    return value.flatMap((entry) => splitOriginListInput(entry));
+  }
+  return splitOriginListInput(value);
+};
+
+const getOriginDomain = (origin) => {
+  const normalized = normalizeOrigin(origin);
+  if (!normalized) return LOGIN_DOMAIN;
+  try {
+    return new URL(normalized).host;
+  } catch {
+    return LOGIN_DOMAIN;
+  }
+};
+
+const readSessionConfig = async ({ env, sessionSlug } = {}) => {
+  const slug = String(sessionSlug ?? '').trim();
+  if (!slug || typeof env?.GROUP_KV?.get !== 'function') return null;
+  const raw = await env.GROUP_KV.get(`session:${slug}:config`);
+  if (!raw) return null;
+  if (typeof raw === 'object') return raw;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+};
+
+const resolveConfiguredLoginOrigin = (config) => (
+  coerceOriginListInput(config?.allowOrigins)
+    .map((entry) => normalizeOrigin(entry))
+    .find(Boolean) || ''
+);
+
+const resolveLoginOrigin = async ({
+  env,
+  sessionSlug,
+  explicitOrigin,
+  preferConfigOrigin = true,
+} = {}) => {
+  const normalizedExplicit = normalizeOrigin(explicitOrigin);
+  if (normalizedExplicit) return normalizedExplicit;
+  if (preferConfigOrigin) {
+    const config = await readSessionConfig({ env, sessionSlug });
+    const configuredOrigin = resolveConfiguredLoginOrigin(config);
+    if (configuredOrigin) return configuredOrigin;
+  }
+  return LOGIN_ORIGIN;
+};
+
 const jsonRpcResponse = (payload) => ({
   ok: true,
   status: 200,
@@ -172,15 +243,17 @@ export const buildSiweMessage = ({
   address,
   nonce,
   chainId = 84532,
+  uri,
   issuedAt,
   expirationTime,
 }) => {
   const resolvedIssuedAt = issuedAt || new Date(Date.now() - 60 * 1000).toISOString();
   const resolvedExpirationTime = expirationTime || new Date(Date.now() + 60 * 60 * 1000).toISOString();
+  const resolvedUri = uri || `https://${domain}`;
   return `${domain} wants you to sign in with your Ethereum account:
 ${address}
 
-URI: https://${domain}
+URI: ${resolvedUri}
 Version: 1
 Chain ID: ${chainId}
 Nonce: ${nonce}
@@ -197,6 +270,8 @@ export const createSignedSiweBody = async ({
   chainId = 84532,
   adminAction,
   audience,
+  loginOrigin,
+  adminOrigin,
 }) => {
   const resolvedAdminAction = (() => {
     const explicit = String(adminAction || '').trim().toLowerCase();
@@ -210,10 +285,19 @@ export const createSignedSiweBody = async ({
   })();
 
   if (resolvedAdminAction) {
+    const resolvedAudience = await resolveLoginOrigin({
+      env,
+      sessionSlug,
+      explicitOrigin: audience || adminOrigin || loginOrigin,
+      preferConfigOrigin: false,
+    });
     const nonceResponse = await worker.fetch(
       makeJsonRequest('/auth/nonce', {
         address: wallet.address,
         sessionSlug,
+        adminAction: true,
+      }, {
+        headers: { Origin: resolvedAudience },
       }),
       env,
       {}
@@ -225,7 +309,6 @@ export const createSignedSiweBody = async ({
 
     const address = wallet.address;
     const targetSlug = String(sessionSlug || '');
-    const resolvedAudience = String(audience || 'https://worker.example');
     const unsignedBody = {
       address,
       sessionSlug: targetSlug,
@@ -258,12 +341,17 @@ export const createSignedSiweBody = async ({
     };
   }
 
+  const resolvedLoginOrigin = await resolveLoginOrigin({
+    env,
+    sessionSlug,
+    explicitOrigin: loginOrigin,
+  });
   const nonceResponse = await worker.fetch(
     makeJsonRequest('/auth/nonce', {
       address: wallet.address,
       sessionSlug,
     }, {
-      headers: { Origin: LOGIN_ORIGIN },
+      headers: { Origin: resolvedLoginOrigin },
     }),
     env,
     {}
@@ -274,7 +362,8 @@ export const createSignedSiweBody = async ({
   }
 
   const message = buildSiweMessage({
-    domain: LOGIN_DOMAIN,
+    domain: getOriginDomain(resolvedLoginOrigin),
+    uri: resolvedLoginOrigin,
     address: wallet.address,
     nonce: noncePayload.nonce,
     chainId,
@@ -304,6 +393,7 @@ export const issueWorkerLoginToken = async ({
     rpc: { sbtAddresses: [], chainId: 84532, mode: 0 },
     txGas: { sbtAddresses: [], chainId: 84532, mode: 0 },
   },
+  loginOrigin,
 }) => {
   global.fetch = buildRpcFetchMock({
     rpcUrl,
@@ -317,10 +407,16 @@ export const issueWorkerLoginToken = async ({
     env,
     wallet,
     sessionSlug,
+    loginOrigin,
+  });
+  const resolvedLoginOrigin = await resolveLoginOrigin({
+    env,
+    sessionSlug,
+    explicitOrigin: loginOrigin,
   });
   const response = await worker.fetch(
     makeJsonRequest('/auth/login', body, {
-      headers: { Origin: LOGIN_ORIGIN },
+      headers: { Origin: resolvedLoginOrigin },
     }),
     env,
     {}

@@ -18,6 +18,18 @@ describe('sessionCorsWorker auth routes', () => {
   const sessionSlug = 'test-auth';
   const protectedSbt = '0x0000000000000000000000000000000000000101';
   const wallet = new ethers.Wallet('0x59c6995e998f97a5a0044976f84ce7de5d9d7f17b2f6a6a5f76f8864c8ad88f5');
+  const loginOrigin = 'https://contextengine.xyz';
+  const loginDomain = 'contextengine.xyz';
+
+  const makeAuthJsonRequest = (path, body, origin = loginOrigin) => makeJsonRequest(path, body, {
+    headers: { Origin: origin },
+  });
+
+  const buildLoginSiweMessage = (params = {}, origin = loginOrigin) => buildSiweMessage({
+    domain: new URL(origin).host || loginDomain,
+    uri: origin,
+    ...params,
+  });
 
   beforeAll(() => {
     Object.defineProperty(global, 'crypto', {
@@ -64,7 +76,7 @@ describe('sessionCorsWorker auth routes', () => {
     const env = { GROUP_KV: kv };
 
     const response = await sessionCorsWorker.fetch(
-      makeJsonRequest('/auth/nonce', {
+      makeAuthJsonRequest('/auth/nonce', {
         address: wallet.address,
         sessionSlug,
       }),
@@ -88,7 +100,7 @@ describe('sessionCorsWorker auth routes', () => {
     const env = { GROUP_KV: kv };
 
     const response = await sessionCorsWorker.fetch(
-      makeJsonRequest('/auth/nonce', {
+      makeAuthJsonRequest('/auth/nonce', {
         address: wallet.address,
         sessionSlug: ' TeSt-Auth!!! ',
       }),
@@ -107,7 +119,7 @@ describe('sessionCorsWorker auth routes', () => {
     const env = { GROUP_KV: kv };
 
     const response = await sessionCorsWorker.fetch(
-      makeJsonRequest('/auth/nonce', {
+      makeAuthJsonRequest('/auth/nonce', {
         address: wallet.address,
         sessionSlug: 'alpha',
         groupSlug: 'beta',
@@ -225,7 +237,7 @@ describe('sessionCorsWorker auth routes', () => {
     };
 
     const nonceResponse = await sessionCorsWorker.fetch(
-      makeJsonRequest('/auth/nonce', {
+      makeAuthJsonRequest('/auth/nonce', {
         address: wallet.address,
         sessionSlug,
       }),
@@ -234,14 +246,14 @@ describe('sessionCorsWorker auth routes', () => {
     );
     const { nonce } = await nonceResponse.json();
 
-    const message = buildSiweMessage({
+    const message = buildLoginSiweMessage({
       address: wallet.address,
       nonce,
     });
     const signature = await wallet.signMessage(message);
 
     const loginResponse = await sessionCorsWorker.fetch(
-      makeJsonRequest('/auth/login', {
+      makeAuthJsonRequest('/auth/login', {
         address: wallet.address,
         sessionSlug,
         message,
@@ -294,7 +306,7 @@ describe('sessionCorsWorker auth routes', () => {
     };
 
     const nonceResponse = await sessionCorsWorker.fetch(
-      makeJsonRequest('/auth/nonce', {
+      makeAuthJsonRequest('/auth/nonce', {
         address: wallet.address,
         sessionSlug,
       }),
@@ -302,14 +314,14 @@ describe('sessionCorsWorker auth routes', () => {
       {}
     );
     const { nonce } = await nonceResponse.json();
-    const message = buildSiweMessage({
+    const message = buildLoginSiweMessage({
       address: wallet.address,
       nonce,
     });
     const signature = await wallet.signMessage(message);
 
     const firstLogin = await sessionCorsWorker.fetch(
-      makeJsonRequest('/auth/login', {
+      makeAuthJsonRequest('/auth/login', {
         address: wallet.address,
         sessionSlug,
         message,
@@ -321,7 +333,7 @@ describe('sessionCorsWorker auth routes', () => {
     expect(firstLogin.status).toBe(200);
 
     const secondLogin = await sessionCorsWorker.fetch(
-      makeJsonRequest('/auth/login', {
+      makeAuthJsonRequest('/auth/login', {
         address: wallet.address,
         sessionSlug,
         message,
@@ -333,7 +345,7 @@ describe('sessionCorsWorker auth routes', () => {
     const secondPayload = await secondLogin.json();
 
     expect(secondLogin.status).toBe(400);
-    expect(secondPayload?.error).toBe('Nonce mismatch or expired.');
+    expect(secondPayload?.error).toBe('Nonce already used.');
   });
 
   it('rejects login when the nonce has already been marked as used', async () => {
@@ -362,14 +374,14 @@ describe('sessionCorsWorker auth routes', () => {
       TOKEN_HMAC_SECRET: 'test-secret',
     };
 
-    const message = buildSiweMessage({
+    const message = buildLoginSiweMessage({
       address: wallet.address,
       nonce,
     });
     const signature = await wallet.signMessage(message);
 
     const response = await sessionCorsWorker.fetch(
-      makeJsonRequest('/auth/login', {
+      makeAuthJsonRequest('/auth/login', {
         address: wallet.address,
         sessionSlug,
         message,
@@ -386,14 +398,20 @@ describe('sessionCorsWorker auth routes', () => {
   });
 
   it('rejects login when the siwe domain does not match the uri host and preserves the nonce', async () => {
-    const kv = createMemoryKv();
+    const kv = createMemoryKv({
+      [`session:${sessionSlug}:config`]: JSON.stringify({
+        registryAddress,
+        registryChainId: 84532,
+        rpcUrl,
+      }),
+    });
     const env = {
       GROUP_KV: kv,
       TOKEN_HMAC_SECRET: 'test-secret',
     };
 
     const nonceResponse = await sessionCorsWorker.fetch(
-      makeJsonRequest('/auth/nonce', {
+      makeAuthJsonRequest('/auth/nonce', {
         address: wallet.address,
         sessionSlug,
       }),
@@ -401,14 +419,14 @@ describe('sessionCorsWorker auth routes', () => {
       {}
     );
     const { nonce } = await nonceResponse.json();
-    const message = buildSiweMessage({
+    const message = buildLoginSiweMessage({
       address: wallet.address,
       nonce,
-    }).replace('URI: https://worker.example', 'URI: https://evil.example');
+    }).replace(`URI: ${loginOrigin}`, 'URI: https://evil.example');
     const signature = await wallet.signMessage(message);
 
     const response = await sessionCorsWorker.fetch(
-      makeJsonRequest('/auth/login', {
+      makeAuthJsonRequest('/auth/login', {
         address: wallet.address,
         sessionSlug,
         message,
@@ -426,7 +444,13 @@ describe('sessionCorsWorker auth routes', () => {
   });
 
   it('rejects login when the SIWE message address does not match the request address and preserves the nonce', async () => {
-    const kv = createMemoryKv();
+    const kv = createMemoryKv({
+      [`session:${sessionSlug}:config`]: JSON.stringify({
+        registryAddress,
+        registryChainId: 84532,
+        rpcUrl,
+      }),
+    });
     const env = {
       GROUP_KV: kv,
       TOKEN_HMAC_SECRET: 'test-secret',
@@ -434,7 +458,7 @@ describe('sessionCorsWorker auth routes', () => {
     const otherAddress = '0x00000000000000000000000000000000000000bb';
 
     const nonceResponse = await sessionCorsWorker.fetch(
-      makeJsonRequest('/auth/nonce', {
+      makeAuthJsonRequest('/auth/nonce', {
         address: wallet.address,
         sessionSlug,
       }),
@@ -442,14 +466,14 @@ describe('sessionCorsWorker auth routes', () => {
       {}
     );
     const { nonce } = await nonceResponse.json();
-    const message = buildSiweMessage({
+    const message = buildLoginSiweMessage({
       address: otherAddress,
       nonce,
     });
     const signature = await wallet.signMessage(message);
 
     const response = await sessionCorsWorker.fetch(
-      makeJsonRequest('/auth/login', {
+      makeAuthJsonRequest('/auth/login', {
         address: wallet.address,
         sessionSlug,
         message,
@@ -474,7 +498,7 @@ describe('sessionCorsWorker auth routes', () => {
     };
 
     const nonceResponse = await sessionCorsWorker.fetch(
-      makeJsonRequest('/auth/nonce', {
+      makeAuthJsonRequest('/auth/nonce', {
         address: wallet.address,
         sessionSlug,
       }),
@@ -482,7 +506,7 @@ describe('sessionCorsWorker auth routes', () => {
       {}
     );
     const { nonce } = await nonceResponse.json();
-    const message = buildSiweMessage({
+    const message = buildLoginSiweMessage({
       address: wallet.address,
       nonce,
       expirationTime: '2025-03-06T00:00:00.000Z',
@@ -490,7 +514,7 @@ describe('sessionCorsWorker auth routes', () => {
     const signature = await wallet.signMessage(message);
 
     const response = await sessionCorsWorker.fetch(
-      makeJsonRequest('/auth/login', {
+      makeAuthJsonRequest('/auth/login', {
         address: wallet.address,
         sessionSlug,
         message,
@@ -507,7 +531,7 @@ describe('sessionCorsWorker auth routes', () => {
     expect(kv._dump().get(`nonce:${sessionSlug}:${wallet.address.toLowerCase()}`)).toBe(nonce);
   });
 
-  it('rejects login when session config is missing even after nonce validation passes', async () => {
+  it('rejects login when session config is missing without consuming the nonce', async () => {
     const kv = createMemoryKv();
     const env = {
       GROUP_KV: kv,
@@ -515,7 +539,7 @@ describe('sessionCorsWorker auth routes', () => {
     };
 
     const nonceResponse = await sessionCorsWorker.fetch(
-      makeJsonRequest('/auth/nonce', {
+      makeAuthJsonRequest('/auth/nonce', {
         address: wallet.address,
         sessionSlug,
       }),
@@ -523,14 +547,14 @@ describe('sessionCorsWorker auth routes', () => {
       {}
     );
     const { nonce } = await nonceResponse.json();
-    const message = buildSiweMessage({
+    const message = buildLoginSiweMessage({
       address: wallet.address,
       nonce,
     });
     const signature = await wallet.signMessage(message);
 
     const loginResponse = await sessionCorsWorker.fetch(
-      makeJsonRequest('/auth/login', {
+      makeAuthJsonRequest('/auth/login', {
         address: wallet.address,
         sessionSlug,
         message,
@@ -543,7 +567,8 @@ describe('sessionCorsWorker auth routes', () => {
 
     expect(loginResponse.status).toBe(404);
     expect(payload?.error).toBe('Session config not found.');
-    expect(kv.delete).toHaveBeenCalledWith(`nonce:${sessionSlug}:${wallet.address.toLowerCase()}`);
+    expect(kv.delete).not.toHaveBeenCalledWith(`nonce:${sessionSlug}:${wallet.address.toLowerCase()}`);
+    expect(kv._dump().get(`nonce:${sessionSlug}:${wallet.address.toLowerCase()}`)).toBe(nonce);
   });
 
   it('returns a stable 403 error when the default on-chain gate denies login access', async () => {
@@ -573,7 +598,7 @@ describe('sessionCorsWorker auth routes', () => {
     };
 
     const nonceResponse = await sessionCorsWorker.fetch(
-      makeJsonRequest('/auth/nonce', {
+      makeAuthJsonRequest('/auth/nonce', {
         address: wallet.address,
         sessionSlug,
       }),
@@ -581,14 +606,14 @@ describe('sessionCorsWorker auth routes', () => {
       {}
     );
     const { nonce } = await nonceResponse.json();
-    const message = buildSiweMessage({
+    const message = buildLoginSiweMessage({
       address: wallet.address,
       nonce,
     });
     const signature = await wallet.signMessage(message);
 
     const response = await sessionCorsWorker.fetch(
-      makeJsonRequest('/auth/login', {
+      makeAuthJsonRequest('/auth/login', {
         address: wallet.address,
         sessionSlug,
         message,
@@ -620,19 +645,19 @@ describe('sessionCorsWorker auth routes', () => {
     };
 
     const nonceResponse = await sessionCorsWorker.fetch(
-      makeJsonRequest('/auth/nonce', {
+      makeAuthJsonRequest('/auth/nonce', {
         address: wallet.address,
         sessionSlug,
-      }),
+      }, 'https://allowed.example'),
       env,
       {}
     );
     const { nonce } = await nonceResponse.json();
     const nonceKey = `nonce:${sessionSlug}:${wallet.address.toLowerCase()}`;
-    const message = buildSiweMessage({
+    const message = buildLoginSiweMessage({
       address: wallet.address,
       nonce,
-    });
+    }, 'https://allowed.example');
     const signature = await wallet.signMessage(message);
 
     const response = await sessionCorsWorker.fetch(
