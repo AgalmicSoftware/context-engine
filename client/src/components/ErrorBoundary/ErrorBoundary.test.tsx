@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
 import AppErrorBoundary from './AppErrorBoundary';
-import RouteErrorBoundary from './RouteErrorBoundary.jsx';
+import RouteErrorBoundary from './RouteErrorBoundary';
 
 const Thrower = () => {
   throw new Error('Kaboom');

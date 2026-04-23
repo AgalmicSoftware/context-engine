@@ -112,7 +112,7 @@ import OnboardingOverlay from '../Onboarding/OnboardingOverlay';
 import Footer from "../Footer/Footer";
 import LazyFallback from "../Shared/LazyFallback";
 import DevE2eNav from "../E2E/DevE2eNav";
-import RouteErrorBoundary from '../ErrorBoundary/RouteErrorBoundary.jsx';
+import RouteErrorBoundary from '../ErrorBoundary/RouteErrorBoundary';
 
 import { createLogger } from 'utilities/logging.js';
 import {
