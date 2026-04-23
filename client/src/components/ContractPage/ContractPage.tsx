@@ -27,21 +27,54 @@ import {
   resolveContractPageActiveSession,
   resolveContractPageReferrerSlug,
 } from './contractPageSessionResolution.js';
-import ContractViewer from './ContractViewer';
+import ContractViewer, { type ContractViewerContract } from './ContractViewer';
 import { normalizeContractKeyParam } from './contractMetadata.js';
 import { buildContractViewerContracts } from './contractViewerUtils.js';
 import { sbtsListPath, t } from '../../utilities/ui/terminology.js';
 import { buildPublicContractSourceUrl } from '../../variables/publicRepoMetadata.js';
 
-export const ContractPage = ({ activeSessionSlug, reduxActiveSessionSlug }) => {
+type ContractPageProps = {
+  activeSessionSlug?: string;
+  reduxActiveSessionSlug?: string;
+};
+
+type SessionContractEntry = {
+  address?: string;
+  contractAddress?: string;
+  chainId?: number;
+};
+
+type SessionContractsMap = Record<string, SessionContractEntry>;
+
+type PromptItem = {
+  id: string;
+  title: string;
+  file: string;
+  content: string;
+};
+
+const contractScriptUtils = contractScripts as typeof contractScripts & {
+  hexToBase64url: (value: string) => string;
+  base64urlToHex: (value: string) => string;
+  base64urlToBase64: (value: string) => string;
+};
+
+const buildContractsForViewer = buildContractViewerContracts as (options?: {
+  sessionContracts?: SessionContractsMap;
+  chainId?: number;
+  includeSessionRegistry?: boolean;
+  includeCustomSBT?: boolean;
+}) => ContractViewerContract[];
+
+export const ContractPage = ({ activeSessionSlug, reduxActiveSessionSlug }: ContractPageProps) => {
   // Parse potential slug/key from URL: /contracts/:slugOrKey
   const path = (typeof window !== 'undefined' ? window.location.pathname : '') || '';
   const search = (typeof window !== 'undefined' ? window.location.search : '') || '';
   const parts = path.split('/').filter(Boolean);
   const urlSlugLike = parts[0] === 'contracts' && parts.length > 1 ? parts[1] : undefined;
   const searchParams = new URLSearchParams(search);
-  const querySessionRaw = searchParams.get('session');
-  const deepLinkedContractKey = normalizeContractKeyParam(searchParams.get('contract'));
+  const querySessionRaw = searchParams.get('session') || undefined;
+  const deepLinkedContractKey = normalizeContractKeyParam(searchParams.get('contract') || '');
 
   // Fallback: derive slug from referrer (covers full-page reload from /session/:slug)
   const referrerSlug = resolveContractPageReferrerSlug(
@@ -56,7 +89,7 @@ export const ContractPage = ({ activeSessionSlug, reduxActiveSessionSlug }) => {
     reduxActiveSessionSlug,
     referrerSlug,
     resolveBySlug: getSessionConfigBySlug,
-    resolveDemoBySlug: (slug) => getDemoSessionConfigBySlug(slug, { allowDemoFallback: true }),
+    resolveDemoBySlug: (slug: string) => getDemoSessionConfigBySlug(slug, { allowDemoFallback: true }),
     getDefaultSessionConfig: () => getSessionConfigBySlugOrDefault(''),
   });
 
@@ -125,7 +158,7 @@ export const ContractPage = ({ activeSessionSlug, reduxActiveSessionSlug }) => {
   });
   const photoAnalysisPromptDisplay = buildPhotoAnalysisPrompt('<SourceFilename>');
 
-  const promptItems = useMemo(() => ([
+  const promptItems = useMemo<PromptItem[]>(() => ([
     { id: 'seedGen', title: 'Question Generation', file: 'seedGenPrompt.js', content: seedGenPrompt },
     { id: 'questionSelection', title: 'Question Selection', file: 'questionSelectionPrompt.js', content: questionSelectionPrompt },
     { id: 'audioSummary', title: 'Audio Summary', file: 'audioSummaryPrompt.js', content: audioSummaryPrompt },
@@ -137,12 +170,17 @@ export const ContractPage = ({ activeSessionSlug, reduxActiveSessionSlug }) => {
     { id: 'aiRewrite', title: 'AI Rewrite', file: 'aiRewritePrompt.js', content: aiRewritePrompt },
   ]), [clusterAnalysisPromptDisplay, compareToolkitPromptDisplay, photoAnalysisPromptDisplay, userAnalysisPromptDisplay]);
 
-  const sessionContracts = activeSession?.contracts;
+  const sessionContracts = (
+    activeSession?.contracts &&
+    typeof activeSession.contracts === 'object'
+      ? activeSession.contracts as SessionContractsMap
+      : {}
+  );
   const sessionNetworkChainId = activeSession?.networkChainId;
   const contracts = useMemo(() => {
-    const firstContract = sessionContracts ? Object.values(sessionContracts)[0] : null;
-    const chainId = Number(sessionNetworkChainId || firstContract?.chainId || 0) || null;
-    return buildContractViewerContracts({
+    const firstContract = Object.values(sessionContracts)[0] || null;
+    const chainId = Number(sessionNetworkChainId || firstContract?.chainId || 0) || undefined;
+    return buildContractsForViewer({
       sessionContracts,
       chainId,
       includeSessionRegistry: true,
@@ -169,10 +207,10 @@ export const ContractPage = ({ activeSessionSlug, reduxActiveSessionSlug }) => {
   const [utilsOpen, setUtilsOpen] = useState(true);
   const [promptsOpen, setPromptsOpen] = useState(false);
   const [jsonOpen, setJsonOpen] = useState(false);
-  const [openPromptItems, setOpenPromptItems] = useState({});
+  const [openPromptItems, setOpenPromptItems] = useState<Record<string, boolean>>({});
   const [copiedPromptKey, setCopiedPromptKey] = useState('');
   const [copiedJson, setCopiedJson] = useState(false);
-  const copyResetTimersRef = useRef(new Map());
+  const copyResetTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   // New state variables for filter deserialization utility
   const [filterUrlInput, setFilterUrlInput] = useState('');
@@ -183,7 +221,7 @@ export const ContractPage = ({ activeSessionSlug, reduxActiveSessionSlug }) => {
     copyResetTimersRef.current.clear();
   }, []);
 
-  const scheduleCopyReset = (key, resetFn, delayMs = 1500) => {
+  const scheduleCopyReset = (key: string, resetFn: () => void, delayMs = 1500) => {
     const timers = copyResetTimersRef.current;
     const existing = timers.get(key);
     if (existing) clearTimeout(existing);
@@ -195,15 +233,15 @@ export const ContractPage = ({ activeSessionSlug, reduxActiveSessionSlug }) => {
   };
 
   const handleBytes32ToBase64url = () => {
-    setBase64urlOutput(contractScripts.hexToBase64url(bytes32Input));
+    setBase64urlOutput(contractScriptUtils.hexToBase64url(bytes32Input));
   };
 
   const handleBase64urlToBytes32 = () => {
-    setBytes32Output(contractScripts.base64urlToHex(base64urlInput));
+    setBytes32Output(contractScriptUtils.base64urlToHex(base64urlInput));
   };
 
   const handleBase64urlToBase64 = () => {
-    setBase64Output(contractScripts.base64urlToBase64(base64urlInput));
+    setBase64Output(contractScriptUtils.base64urlToBase64(base64urlInput));
   };
 
   // New handler function for deserializing filter URL/param
@@ -223,7 +261,7 @@ export const ContractPage = ({ activeSessionSlug, reduxActiveSessionSlug }) => {
     setDeserializedFilterObjectOutput(jsonOutput);
   };
 
-  const handleCopyPrompt = (promptKey, content) => {
+  const handleCopyPrompt = (promptKey: string, content: string) => {
     if (!content || typeof navigator === 'undefined' || !navigator.clipboard?.writeText) return;
     navigator.clipboard.writeText(content)
       .then(() => {
@@ -234,27 +272,27 @@ export const ContractPage = ({ activeSessionSlug, reduxActiveSessionSlug }) => {
       .catch((e) => { void e; notify.warn('Copy failed'); });
   };
 
-  const handlePromptToggle = (promptId) => {
+  const handlePromptToggle = (promptId: string) => {
     setOpenPromptItems((prev) => ({
       ...prev,
       [promptId]: !prev[promptId],
     }));
   };
 
-  const handlePromptKeyDown = (event, promptId) => {
+  const handlePromptKeyDown = (event: React.KeyboardEvent<HTMLDivElement>, promptId: string) => {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
       handlePromptToggle(promptId);
     }
   };
 
-  const highlightPromptVariables = (str) => {
+  const highlightPromptVariables = (str: string): React.ReactNode => {
     if (!str) return null;
     const text = String(str);
     const re = /<([A-Za-z][A-Za-z0-9_]*)>/g;
-    const parts = [];
+    const parts: React.ReactNode[] = [];
     let lastIndex = 0;
-    let match;
+    let match: RegExpExecArray | null;
 
     while ((match = re.exec(text)) !== null) {
       if (match.index > lastIndex) parts.push(text.slice(lastIndex, match.index));
@@ -492,8 +530,8 @@ ContractPage.propTypes = {
   reduxActiveSessionSlug: PropTypes.string,
 };
 
-const mapStateToProps = state => ({
-  reduxActiveSessionSlug: state.sessionState.activeSessionSlug,
+const mapStateToProps = (state: { sessionState?: { activeSessionSlug?: string } }) => ({
+  reduxActiveSessionSlug: state.sessionState?.activeSessionSlug || '',
 });
 
 export default connect(mapStateToProps)(ContractPage);

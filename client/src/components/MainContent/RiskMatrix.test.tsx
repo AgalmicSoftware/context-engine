@@ -1,7 +1,7 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 
-import RiskMatrix from './RiskMatrix.jsx';
+import RiskMatrix from './RiskMatrix';
 
 describe('RiskMatrix', () => {
   it('adds the embedded wrapper modifier only when embedded mode is enabled', () => {

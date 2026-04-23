@@ -32,7 +32,7 @@ import styles from './ToolExplorer.module.scss';
 import plusSignImage from '../../assets/img/plus_sign.png';
 
 // Tools/plugins are lazy-loaded so chunks are fetched only on click.
-const RiskMatrix = React.lazy(() => import("../MainContent/RiskMatrix.jsx"));
+const RiskMatrix = React.lazy(() => import("../MainContent/RiskMatrix"));
 const SurveyTool = React.lazy(() => import("../SurveyTool/SurveyTool.jsx"));
 const AudioInput = React.lazy(() => import("../Shared/AudioInput/AudioInput"));
 const SBTsPage = React.lazy(() => import("../SBTs/SBTsPage.jsx"));

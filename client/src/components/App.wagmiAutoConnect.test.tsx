@@ -133,7 +133,7 @@ const mockAppDependencies = () => {
 const loadAppModule = (): any => {
   let appModule: any;
   jest.isolateModules(() => {
-    appModule = require('./App.jsx');
+    appModule = require('./App');
   });
   return appModule;
 };
