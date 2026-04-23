@@ -4,14 +4,14 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 const GENERAL_FACTORY_ADDRESS = '0x2222222222222222222222222222222222222222';
 
 jest.mock('../../utilities/cache/cacheScripts.js', () => {
-  let store = {};
+  let store: Record<string, unknown> = {};
   return {
     __esModule: true,
     __resetSbtCacheStore: () => {
       store = {};
     },
-    readCache: jest.fn(async (_namespace, slug = '') => store[String(slug || '')] || {}),
-    writeCache: jest.fn(async (_namespace, slug = '', value) => {
+    readCache: jest.fn(async (_namespace: string, slug = '') => store[String(slug || '')] || {}),
+    writeCache: jest.fn(async (_namespace: string, slug = '', value: unknown) => {
       store[String(slug || '')] = JSON.parse(JSON.stringify(value));
       return true;
     }),
@@ -24,8 +24,8 @@ jest.mock('../../utilities/cache/cacheScripts.js', () => {
 jest.mock('../../utilities/sbt/sbtDisplayNames.js', () => ({
   __esModule: true,
   getSbtMaskedFieldValue: jest.fn(() => '[encrypted]'),
-  hasSbtDisplayName: jest.fn((info) => !!String(info?.name || '').trim()),
-  hydrateSbtDisplayNameTargeted: jest.fn(async ({ address }) => ({
+  hasSbtDisplayName: jest.fn((info: any) => !!String(info?.name || '').trim()),
+  hydrateSbtDisplayNameTargeted: jest.fn(async ({ address }: { address?: string }) => ({
     info: {
       name: `Hydrated ${String(address || '').toLowerCase()}`,
       sessionSlug: 'edge',
@@ -35,7 +35,7 @@ jest.mock('../../utilities/sbt/sbtDisplayNames.js', () => ({
   })),
   isSbtFieldLocked: jest.fn(() => false),
   isTargetedSbtMetadataLookupEnabled: jest.fn(() => true),
-  resolveSbtDisplayLabel: jest.fn(({ address, sbtInfo }) => sbtInfo?.name || address || ''),
+  resolveSbtDisplayLabel: jest.fn(({ address, sbtInfo }: any) => sbtInfo?.name || address || ''),
   warmSbtDisplayNamesTargeted: jest.fn(async () => []),
 }));
 
@@ -45,13 +45,13 @@ jest.mock('../../utilities/web3/sessionRegistry.js', () => ({
 }));
 
 jest.mock('../../utilities/web3/contractScripts.js', () => {
-  const normalizeSessionSlug = (raw = '') => {
+  const normalizeSessionSlug = (raw: unknown = '') => {
     const normalized = String(raw ?? '').trim().toLowerCase();
     if (!normalized || normalized === 'general') return '';
     return normalized;
   };
 
-  const buildConfig = (slug = '') => ({
+  const buildConfig = (slug: unknown = '') => ({
     slug: normalizeSessionSlug(slug),
     sessionName: normalizeSessionSlug(slug) || 'Context Engine',
     networkChainId: 84532,
@@ -86,16 +86,22 @@ import SBTSelector from './SBTSelector.jsx';
 import * as contractScriptsUtils from '../../utilities/web3/contractScripts.js';
 import * as sessionRegistryUtils from '../../utilities/web3/sessionRegistry.js';
 
+const mockGetAllSessionSlugs = contractScriptsUtils.getAllSessionSlugs as jest.Mock;
+const mockGetSessionChainId = contractScriptsUtils.getSessionChainId as jest.Mock;
+const mockGetSessionLists = contractScriptsUtils.getSessionLists as jest.Mock;
+const mockGetSessionSlugByName = contractScriptsUtils.getSessionSlugByName as jest.Mock;
+const mockLoadSessionRegistryCache = sessionRegistryUtils.loadSessionRegistryCache as jest.Mock;
+
 describe('SBTSelector AsyncSearchSelect integration', () => {
   beforeEach(() => {
     localStorage.clear();
     sessionStorage.clear();
     jest.clearAllMocks();
-    contractScriptsUtils.getAllSessionSlugs.mockReturnValue(['edge']);
-    contractScriptsUtils.getSessionChainId.mockReturnValue(84532);
-    contractScriptsUtils.getSessionLists.mockReturnValue({ featured_SBTs_LIST: [], ignored_SBTs_LIST: [] });
-    contractScriptsUtils.getSessionSlugByName.mockReturnValue(null);
-    sessionRegistryUtils.loadSessionRegistryCache.mockResolvedValue(null);
+    mockGetAllSessionSlugs.mockReturnValue(['edge']);
+    mockGetSessionChainId.mockReturnValue(84532);
+    mockGetSessionLists.mockReturnValue({ featured_SBTs_LIST: [], ignored_SBTs_LIST: [] });
+    mockGetSessionSlugByName.mockReturnValue(null);
+    mockLoadSessionRegistryCache.mockResolvedValue(null);
   });
 
   it('supports address search, selection, and tab-close behavior with the real async select', async () => {
