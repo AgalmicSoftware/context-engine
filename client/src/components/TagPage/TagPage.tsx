@@ -31,7 +31,146 @@ import {
 import { getQuestionTagDisplayList } from '../../utilities/survey/questionTags.js';
 import styles from './TagPage.module.scss';
 
-const parseTagPath = (pathname = '') => {
+const buildTagInterpretationPromptUntyped = buildTagInterpretationPrompt as (args: {
+  selectedTags: string[];
+  questions: QuestionSummary[];
+}) => string;
+
+type FilterMode = 'all' | 'set';
+
+type NetworkLike = {
+  id?: number | string | null;
+  chainId?: number | string | null;
+  [key: string]: unknown;
+} | null;
+
+type SessionSelectionState = {
+  selectedSessionScope?: string;
+  selectedSessionSlugs?: unknown[];
+  primarySessionSlug?: string;
+  [key: string]: unknown;
+};
+
+type ScopeState = {
+  filterMode: FilterMode;
+  scopeSlugs: string[];
+};
+
+type ScopeSummary = {
+  label: string;
+  title: string;
+};
+
+type SessionSelectorOption = {
+  key: string;
+  slug: string;
+  label: string;
+  selected: boolean;
+  general: boolean;
+  primary: boolean;
+  chipTestId: string;
+  disabled?: boolean;
+};
+
+type SortTagEntriesArgs = {
+  counts?: Map<string, number>;
+  displayMap?: Map<string, string>;
+};
+
+type SortTagEntry = {
+  normalizedTag: string;
+  displayTag: string;
+};
+
+type DemoCorpusEntry = {
+  key: string;
+  title: string;
+  summary?: string;
+  tags: string[];
+  normalizedTags: string[];
+  corpusLabel: string;
+  corpusKey: string;
+  metaLine?: string;
+  url?: string;
+  [key: string]: unknown;
+};
+
+type QuestionSummary = {
+  id: string;
+  prompt: string;
+  type: string;
+  options: unknown[];
+  arweaveTxId: string;
+  responseCount: number;
+  sessionSlug: string;
+  networkId: string;
+};
+
+type SbtGroupSummary = {
+  address: string;
+  name: string;
+  image: string;
+  tags: string[];
+  sessionSlug: string;
+  networkId: string;
+};
+
+type TagPageViewProps = {
+  isQuestionCacheReady?: boolean;
+  network?: NetworkLike;
+  questionResponsesNonce?: number;
+  sessionState?: SessionSelectionState;
+  selectedTagsOverride?: string[] | string | null;
+  onSelectedTagsChange?: ((nextTags: string[]) => void) | null;
+  emptyQuestionsText?: string;
+  embedded?: boolean;
+  demoCorpusMode?: boolean;
+  demoCorpusRecords?: DemoCorpusEntry[];
+  hideEmbeddedSessionSelector?: boolean;
+};
+
+type QuestionCacheQuestion = {
+  id?: string;
+  prompt?: string;
+  type?: string;
+  options?: unknown[];
+  arweaveTxId?: string;
+  sessionSlug?: string;
+  tags?: unknown[];
+};
+
+type QuestionCacheNetworkBucket = {
+  questions?: Record<string, QuestionCacheQuestion>;
+  questionResponses?: Record<string, Record<string, unknown>>;
+};
+
+type QuestionCacheEntry = {
+  slug?: string;
+  value?: Record<string, QuestionCacheNetworkBucket>;
+};
+
+type SbtInfoRecord = {
+  private?: boolean;
+  tags?: unknown[];
+  name?: string;
+  image?: string;
+};
+
+type SbtCacheBucketEntry = {
+  sbtAddress?: string;
+  sbtInfo?: SbtInfoRecord;
+};
+
+type SbtCacheNetworkBucket = {
+  sbtList?: Record<string, SbtCacheBucketEntry>;
+};
+
+type SbtCacheEntry = {
+  slug?: string;
+  value?: Record<string, SbtCacheNetworkBucket>;
+};
+
+const parseTagPath = (pathname = ''): string[] => {
   const rawSegment = (String(pathname || '').split('/tag/')[1] || '').replace(/\/+$/, '');
   if (!rawSegment) return [];
 
@@ -48,9 +187,9 @@ const parseTagPath = (pathname = '') => {
   return getQuestionTagDisplayList(decodedSegments);
 };
 
-const dedupeSessionSlugs = (values = []) => {
+const dedupeSessionSlugs = (values: unknown[] | unknown = []): string[] => {
   const seen = new Set();
-  const out = [];
+  const out: string[] = [];
   (Array.isArray(values) ? values : [values]).forEach((value) => {
     const normalized = normalizeSessionSlug(value);
     if (normalized == null || seen.has(normalized)) return;
@@ -60,7 +199,7 @@ const dedupeSessionSlugs = (values = []) => {
   return out;
 };
 
-const buildSessionScopeLabel = (slugIn = '') => {
+const buildSessionScopeLabel = (slugIn = ''): string => {
   const slug = normalizeSessionSlug(slugIn);
   if (!slug) return 'General';
   const cfg = (
@@ -74,7 +213,7 @@ const buildSessionScopeLabel = (slugIn = '') => {
     : (sessionName || slug);
 };
 
-export const buildGlobalTagPageScope = (selection = {}) => {
+export const buildGlobalTagPageScope = (selection: SessionSelectionState = {}): ScopeState => {
   const scopeMode = String(selection?.selectedSessionScope || '').trim().toLowerCase() || 'active';
   if (scopeMode === 'all') {
     return { filterMode: 'all', scopeSlugs: [] };
@@ -99,7 +238,15 @@ export const describeScopeSummary = ({
   scopeSlugs = [],
   routePinned = false,
   localOverrideTouched = false,
-} = {}) => {
+  sessionRegistryRevision,
+}: {
+  filterMode?: FilterMode;
+  scopeSlugs?: unknown[];
+  routePinned?: boolean;
+  localOverrideTouched?: boolean;
+  sessionRegistryRevision?: number;
+} = {}): ScopeSummary => {
+  void sessionRegistryRevision;
   const normalizedScopeSlugs = dedupeSessionSlugs(scopeSlugs);
   let labelCore = 'all sessions';
   let title = 'Showing questions from all sessions.';
@@ -144,7 +291,11 @@ const buildTagPageSelectorHint = ({
   routePinned = false,
   localOverrideTouched = false,
   globalSelection = {},
-} = {}) => {
+}: {
+  routePinned?: boolean;
+  localOverrideTouched?: boolean;
+  globalSelection?: SessionSelectionState;
+} = {}): string => {
   if (routePinned) return 'This tag page is pinned to a specific session from the URL.';
   if (localOverrideTouched) return 'Using a local Tag explorer override.';
 
@@ -159,7 +310,14 @@ const buildTagPageSessionSelectorOptions = ({
   selectedSlug = null,
   primarySlug = '',
   scopedSlugs = [],
-} = {}) => {
+  sessionRegistryRevision,
+}: {
+  selectedSlug?: string | null;
+  primarySlug?: string;
+  scopedSlugs?: string[];
+  sessionRegistryRevision?: number;
+} = {}): SessionSelectorOption[] => {
+  void sessionRegistryRevision;
   const options = new Map();
   const pushOption = (slugIn = '') => {
     const slug = normalizeSessionSlug(slugIn);
@@ -186,7 +344,7 @@ const buildTagPageSessionSelectorOptions = ({
 const sortTagEntriesByCount = ({
   counts = new Map(),
   displayMap = new Map(),
-} = {}) => Array.from(counts.entries())
+}: SortTagEntriesArgs = {}): SortTagEntry[] => Array.from(counts.entries())
   .sort((left, right) => {
     if (right[1] !== left[1]) return right[1] - left[1];
     const leftLabel = displayMap.get(left[0]) || left[0];
@@ -198,7 +356,7 @@ const sortTagEntriesByCount = ({
     displayTag: displayMap.get(normalizedTag) || normalizedTag,
   }));
 
-const buildDemoCorpusEmptyText = (selectedTags = []) => {
+const buildDemoCorpusEmptyText = (selectedTags: string[] = []): string => {
   if (selectedTags.length === 1) {
     return `No demo corpus entries tagged ${selectedTags[0]} yet.`;
   }
@@ -209,10 +367,13 @@ const buildDemoCorpusEmptyText = (selectedTags = []) => {
 const buildVisibleDemoCorpusTags = ({
   entryTags = [],
   normalizedSelectedTags = [],
-} = {}) => {
+}: {
+  entryTags?: string[];
+  normalizedSelectedTags?: string[];
+} = {}): string[] => {
   const selectedTagSet = new Set(normalizedSelectedTags);
-  const selected = [];
-  const unselected = [];
+  const selected: string[] = [];
+  const unselected: string[] = [];
 
   (Array.isArray(entryTags) ? entryTags : []).forEach((tag) => {
     const normalizedTag = normalizeTagList([tag])[0];
@@ -229,7 +390,17 @@ const buildVisibleDemoCorpusTags = ({
   return [...selected, ...unselected];
 };
 
-const collectDemoCorpusData = ({ selectedTags, demoCorpusRecords = [] } = {}) => {
+const collectDemoCorpusData = ({
+  selectedTags,
+  demoCorpusRecords = [],
+}: {
+  selectedTags?: string[];
+  demoCorpusRecords?: DemoCorpusEntry[];
+} = {}): {
+  entries: DemoCorpusEntry[];
+  relatedTags: string[];
+  pickerTags: string[];
+} => {
   const normalizedSelectedTags = normalizeTagList(selectedTags);
   if (!normalizedSelectedTags.length) {
     return { entries: [], relatedTags: [], pickerTags: [] };
@@ -239,7 +410,7 @@ const collectDemoCorpusData = ({ selectedTags, demoCorpusRecords = [] } = {}) =>
   const relatedDisplay = new Map();
   const scopedCounts = new Map();
   const scopedDisplay = new Map();
-  const matchedEntries = [];
+  const matchedEntries: DemoCorpusEntry[] = [];
 
   (Array.isArray(demoCorpusRecords) ? demoCorpusRecords : []).forEach((entry) => {
     const scopedSeen = new Set();
@@ -297,19 +468,33 @@ const collectTagPageData = ({
   selectedTags,
   scopeFilterMode = 'all',
   scopeSlugs = [],
-}) => {
+  cacheVersion,
+  questionResponsesNonce,
+}: {
+  selectedTags?: string[];
+  scopeFilterMode?: FilterMode;
+  scopeSlugs?: string[];
+  cacheVersion?: number;
+  questionResponsesNonce?: number;
+} = {}): {
+  questions: QuestionSummary[];
+  relatedTags: string[];
+  pickerTags: string[];
+} => {
+  void cacheVersion;
+  void questionResponsesNonce;
   const normalizedSelectedTags = normalizeTagList(selectedTags);
   if (!normalizedSelectedTags.length) return { questions: [], relatedTags: [], pickerTags: [] };
 
-  const entries = listNamespaceEntriesSync('questionsCache', { cloneValues: false });
+  const entries = listNamespaceEntriesSync('questionsCache', { cloneValues: false }) as QuestionCacheEntry[];
   const normalizedScopeSlugs = dedupeSessionSlugs(scopeSlugs);
   const scopeFilterEnabled = scopeFilterMode === 'set';
-  const scopeSlugSet = scopeFilterEnabled ? new Set(normalizedScopeSlugs) : null;
+  const scopeSlugSet = new Set(normalizedScopeSlugs);
   const scopedEntries = scopeFilterEnabled
     ? entries.filter((entry) => scopeSlugSet.has(normalizeSessionSlug(entry?.slug)))
     : entries;
 
-  const questions = [];
+  const questions: QuestionSummary[] = [];
   const seen = new Set();
   const relatedCounts = new Map();
   const relatedDisplay = new Map();
@@ -413,26 +598,31 @@ const collectSbtGroupData = ({
   scopeFilterMode = 'all',
   scopeSlugs = [],
   cacheVersion = 0,
-}) => {
+}: {
+  selectedTags?: string[];
+  scopeFilterMode?: FilterMode;
+  scopeSlugs?: string[];
+  cacheVersion?: number;
+} = {}): SbtGroupSummary[] => {
   const normalizedSelectedTags = normalizeTagList(selectedTags);
   void cacheVersion;
   if (!normalizedSelectedTags.length) return [];
 
-  let entries = [];
+  let entries: SbtCacheEntry[] = [];
   try {
-    entries = listNamespaceEntriesSync('sbtCache', { cloneValues: false });
+    entries = listNamespaceEntriesSync('sbtCache', { cloneValues: false }) as SbtCacheEntry[];
   } catch (_) {
     return [];
   }
 
   const normalizedScopeSlugs = dedupeSessionSlugs(scopeSlugs);
   const scopeFilterEnabled = scopeFilterMode === 'set';
-  const scopeSlugSet = scopeFilterEnabled ? new Set(normalizedScopeSlugs) : null;
+  const scopeSlugSet = new Set(normalizedScopeSlugs);
   const scopedEntries = scopeFilterEnabled
     ? entries.filter((entry) => scopeSlugSet.has(normalizeSessionSlug(entry?.slug)))
     : entries;
   const seen = new Set();
-  const sbtGroups = [];
+  const sbtGroups: SbtGroupSummary[] = [];
 
   scopedEntries.forEach((entry) => {
     const sessionSlug = normalizeSessionSlug(entry?.slug || '');
@@ -451,8 +641,8 @@ const collectSbtGroupData = ({
         if (sbtInfo?.private === true) return;
 
         const rawTags = Array.isArray(sbtInfo?.tags) ? sbtInfo.tags : [];
-        const displayTags = [];
-        const normalizedGroupTags = [];
+        const displayTags: string[] = [];
+        const normalizedGroupTags: string[] = [];
         const seenTags = new Set();
 
         rawTags.forEach((tag) => {
@@ -506,7 +696,7 @@ export const TagPageView = ({
   demoCorpusMode = false,
   demoCorpusRecords = [],
   hideEmbeddedSessionSelector = false,
-}) => {
+}: TagPageViewProps = {}) => {
   const location = useLocation();
   const navigate = useNavigate();
   const [cacheVersion, setCacheVersion] = useState(0);
@@ -514,19 +704,19 @@ export const TagPageView = ({
   const [sessionRegistryRevision, setSessionRegistryRevision] = useState(0);
   const [tagPickerOpen, setTagPickerOpen] = useState(false);
   const [sessionSelectorOpen, setSessionSelectorOpen] = useState(false);
-  const [expandedDemoEntryKeys, setExpandedDemoEntryKeys] = useState({});
+  const [expandedDemoEntryKeys, setExpandedDemoEntryKeys] = useState<Record<string, boolean>>({});
   const [localSessionOverrideTouched, setLocalSessionOverrideTouched] = useState(false);
-  const [localSessionOverrideSlug, setLocalSessionOverrideSlug] = useState(null);
-  const [aiInterpretation, setAiInterpretation] = useState(null);
+  const [localSessionOverrideSlug, setLocalSessionOverrideSlug] = useState<string | null>(null);
+  const [aiInterpretation, setAiInterpretation] = useState<string | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiElapsedMs, setAiElapsedMs] = useState(0);
-  const [aiError, setAiError] = useState(null);
-  const aiCacheRef = useRef(new Map());
+  const [aiError, setAiError] = useState<string | null>(null);
+  const aiCacheRef = useRef<Map<string, string>>(new Map());
   const aiRequestKeyRef = useRef('');
-  const aiStartedAtRef = useRef(null);
+  const aiStartedAtRef = useRef<number | null>(null);
 
   useEffect(() => {
-    const unsubscribe = subscribeCacheUpdates((payload = {}) => {
+    const unsubscribe = subscribeCacheUpdates((payload: { namespace?: string } = {}) => {
       if (payload.namespace === 'questionsCache') {
         setCacheVersion((prev) => prev + 1);
       }
@@ -567,7 +757,7 @@ export const TagPageView = ({
     [location.pathname]
   );
   const hasSelectedTagsOverride = selectedTagsOverride !== null && typeof selectedTagsOverride !== 'undefined';
-  const selectedTags = useMemo(() => {
+  const selectedTags = useMemo<string[]>(() => {
     if (!hasSelectedTagsOverride) return routeSelectedTags;
 
     const overrideTags = Array.isArray(selectedTagsOverride)
@@ -589,11 +779,11 @@ export const TagPageView = ({
     parseQuestionSessionSlugFromSearch(location.search)
   ), [location.search]);
   const routePinned = queryPinnedScopeSlug !== null;
-  const globalSessionSelection = useMemo(
-    () => normalizeGlobalSessionSelection(sessionState || {}),
+  const globalSessionSelection = useMemo<SessionSelectionState>(
+    () => normalizeGlobalSessionSelection(sessionState || {}) as SessionSelectionState,
     [sessionState]
   );
-  const globalScopeState = useMemo(
+  const globalScopeState = useMemo<ScopeState>(
     () => buildGlobalTagPageScope(globalSessionSelection),
     [globalSessionSelection]
   );
@@ -601,7 +791,7 @@ export const TagPageView = ({
     () => normalizeSessionSlug(localSessionOverrideSlug),
     [localSessionOverrideSlug]
   );
-  const effectiveScopeState = useMemo(() => {
+  const effectiveScopeState = useMemo<ScopeState>(() => {
     if (routePinned) {
       return {
         filterMode: 'set',
@@ -679,7 +869,7 @@ export const TagPageView = ({
   const selectedSessionSelectorSlug = routePinned
     ? normalizeSessionSlug(queryPinnedScopeSlug)
     : (localSessionOverrideTouched ? normalizedLocalOverrideSlug : null);
-  const sessionSelectorOptions = useMemo(() => (
+  const sessionSelectorOptions = useMemo<SessionSelectorOption[]>(() => (
     isDemoCorpusContext
       ? []
       : buildTagPageSessionSelectorOptions({
@@ -748,7 +938,11 @@ export const TagPageView = ({
   }, [aiLoading]);
 
   // NOTE: Full cache scan on each update. Acceptable for current scale; add slug-indexed cache if this becomes a bottleneck.
-  const questionData = useMemo(
+  const questionData = useMemo<{
+    questions: QuestionSummary[];
+    relatedTags: string[];
+    pickerTags: string[];
+  }>(
     () => (
       isDemoCorpusContext
         ? { questions: [], relatedTags: [], pickerTags: [] }
@@ -769,7 +963,11 @@ export const TagPageView = ({
       selectedTags,
     ]
   );
-  const demoCorpusData = useMemo(
+  const demoCorpusData = useMemo<{
+    entries: DemoCorpusEntry[];
+    relatedTags: string[];
+    pickerTags: string[];
+  }>(
     () => (
       isDemoCorpusContext
         ? collectDemoCorpusData({ selectedTags, demoCorpusRecords })
@@ -781,7 +979,7 @@ export const TagPageView = ({
   const demoCorpusEntries = demoCorpusData.entries;
   const relatedTags = isDemoCorpusContext ? demoCorpusData.relatedTags : questionData.relatedTags;
   const pickerTags = isDemoCorpusContext ? demoCorpusData.pickerTags : questionData.pickerTags;
-  const sbtGroups = useMemo(
+  const sbtGroups = useMemo<SbtGroupSummary[]>(
     () => (
       isDemoCorpusContext
         ? []
@@ -805,7 +1003,7 @@ export const TagPageView = ({
       : 'Tag explorer'
   ), [selectedTags]);
 
-  const handleAddTag = (rawTag) => {
+  const handleAddTag = (rawTag: string) => {
     const displayTag = String(rawTag || '').trim();
     const normalizedTag = normalizeTagList([displayTag])[0];
     if (!normalizedTag) return false;
@@ -828,7 +1026,7 @@ export const TagPageView = ({
     return true;
   };
 
-  const handleRemoveTag = (tagToRemove) => {
+  const handleRemoveTag = (tagToRemove: string) => {
     const normalizedTarget = normalizeTagList([tagToRemove])[0];
     const remainingTags = selectedTags.filter((tag) => {
       const normalizedCurrent = normalizeTagList([tag])[0];
@@ -845,7 +1043,7 @@ export const TagPageView = ({
     navigate(`${buildTagPagePath(remainingTags)}${location.search || ''}`);
   };
 
-  const handleSessionSelect = (slugIn) => {
+  const handleSessionSelect = (slugIn: string) => {
     if (routePinned) return;
     setLocalSessionOverrideTouched(true);
     setLocalSessionOverrideSlug(normalizeSessionSlug(slugIn));
@@ -876,7 +1074,7 @@ export const TagPageView = ({
     setAiError(null);
     aiRequestKeyRef.current = aiCacheKey;
 
-    const prompt = buildTagInterpretationPrompt({ selectedTags, questions });
+    const prompt = buildTagInterpretationPromptUntyped({ selectedTags, questions });
 
     try {
       const result = await callAI(prompt, { sessionSlug: effectiveSingleScopeSlug });
@@ -899,7 +1097,7 @@ export const TagPageView = ({
     }
   };
 
-  const renderSelectedTagPills = ({ hero = false } = {}) => selectedTags.map((tag) => (
+  const renderSelectedTagPills = ({ hero = false }: { hero?: boolean } = {}) => selectedTags.map((tag) => (
     <span
       key={tag}
       className={[
@@ -925,7 +1123,7 @@ export const TagPageView = ({
     </span>
   ));
 
-  const toggleDemoEntryExpanded = (entryKey) => {
+  const toggleDemoEntryExpanded = (entryKey: string) => {
     const normalizedKey = String(entryKey || '').trim();
     if (!normalizedKey) return;
     setExpandedDemoEntryKeys((prev) => ({
@@ -1321,7 +1519,10 @@ export const TagPageView = ({
   );
 };
 
-const mapStateToProps = (state) => ({
+const mapStateToProps = (state: {
+  profile?: { network?: NetworkLike };
+  sessionState?: SessionSelectionState;
+}) => ({
   network: state?.profile?.network || null,
   sessionState: state?.sessionState || {},
 });

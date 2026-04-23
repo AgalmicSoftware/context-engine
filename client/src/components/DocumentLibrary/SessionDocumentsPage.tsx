@@ -3,7 +3,7 @@
 import React, { useMemo } from 'react';
 import styles from './SessionDocumentsPage.module.scss';
 
-import DocumentLibraryPanel from './DocumentLibraryPanel.jsx';
+import DocumentLibraryPanel from './DocumentLibraryPanel';
 import { normalizeSessionIdHex } from '../../utilities/docLibrary/tags.js';
 import { normalizeSessionSlug } from '../../utilities/session/sessionNaming.js';
 
@@ -20,7 +20,9 @@ type SessionConfig = {
 
 type SessionDocumentsPageProps = {
   provider?: unknown;
-  network?: string;
+  network?: {
+    id?: number | string | null;
+  } | null;
   account?: string;
   loginComplete?: boolean;
   toggleLoginModal?: () => void;

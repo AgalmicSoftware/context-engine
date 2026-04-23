@@ -59,7 +59,7 @@ jest.mock('../CreateQuestionsAndSurveys.jsx', () => () => (
   <div data-testid="create-questions-and-surveys" />
 ));
 
-jest.mock('../../DocumentLibrary/DocumentLibraryPanel.jsx', () => ({
+jest.mock('../../DocumentLibrary/DocumentLibraryPanel', () => ({
   __esModule: true,
   default: (props) => {
     mockDocumentLibraryPanel(props);
