@@ -666,6 +666,7 @@ class CreateSBTGroup extends Component {
       network: initialAuthoringChain.chainId || '',
       copiedLinkIndex: null,
       exportFormat: 'json',
+      savedRecoveryCodesLocally: false,
       countdown: 12,
       countdownActive: false,
       sbtSymbol: '',
@@ -3125,17 +3126,37 @@ class CreateSBTGroup extends Component {
 
   persistCreatedSbtCodes = ({ sbtAddress, hasPasswordMintOnChain, codesToStore = [] } = {}) => {
     if (!hasPasswordMintOnChain || !sbtAddress || !Array.isArray(codesToStore) || codesToStore.length === 0) {
-      return;
+      return {
+        ok: false,
+        status: 'empty-recovery-payload',
+      };
     }
-    const result = upsertSbtPasswordRecoveryCodes({
+    return upsertSbtPasswordRecoveryCodes({
       chainId: this.getSelectedAuthoringChainId(),
       sbtAddress,
       passwords: codesToStore,
       mode: 'replace',
     });
-    if (!result.ok) {
-      sbtLog.warn('Failed to persist SBT password recovery codes:', result.status);
+  };
+
+  saveCreatedSbtCodesToRecoveryCache = () => {
+    const { passwordList, sbtAddress, sbtDistribution } = this.state;
+    const hasPasswordMintOnChain = (
+      sbtDistribution?.distributionOption === 'hasPasswords'
+      || sbtDistribution?.distributionOption === 'groupPassword'
+    );
+    const result = this.persistCreatedSbtCodes({
+      sbtAddress,
+      hasPasswordMintOnChain,
+      codesToStore: passwordList,
+    });
+    if (!result?.ok) {
+      sbtLog.warn('Failed to persist SBT password recovery codes:', result?.status);
+      notify.warn('Failed to save recovery codes to the local recovery cache on this device.');
+      return;
     }
+    this.setState({ savedRecoveryCodesLocally: true });
+    notify.success('Saved recovery codes to the local recovery cache on this device.');
   };
 
   handleDeferredSave = async () => {
@@ -3553,16 +3574,14 @@ class CreateSBTGroup extends Component {
         );
       }
 
-      // Persist plaintext codes for creator (export/admin tools)
-      const codesToStore = usesInviteCodes ? [groupPassword] : finalPasswordList;
-      this.persistCreatedSbtCodes({ sbtAddress, hasPasswordMintOnChain, codesToStore });
       this.suppressFormCachePersistenceAfterSuccess();
 
       this.setState({
         sbtMinted: true,
         sbtAddress,
         currentStep: 3,
-        passwordList: usesInviteCodes ? [groupPassword] : finalPasswordList
+        passwordList: usesInviteCodes ? [groupPassword] : finalPasswordList,
+        savedRecoveryCodesLocally: false,
       });
 
       // Shareable links
@@ -3655,7 +3674,15 @@ class CreateSBTGroup extends Component {
   };
 
   exportPasswords = () => {
-    const { passwordList, sbtInviteLinks, exportFormat, sbtSymbol, sbtName, sbtDistribution } = this.state;
+    const {
+      passwordList,
+      sbtInviteLinks,
+      exportFormat,
+      sbtSymbol,
+      sbtName,
+      sbtDistribution,
+      autoJoinUrl,
+    } = this.state;
     const date = new Date().toISOString().slice(0, 10);
     let content;
     let fileName;
@@ -3667,13 +3694,13 @@ class CreateSBTGroup extends Component {
       content = JSON.stringify(passwordList.map((code, index) => ({
         index,
         [codeLabel]: code,
-        inviteLink: sbtInviteLinks[index]
+        inviteLink: sbtInviteLinks[index] || autoJoinUrl || ''
       })), null, 2);
       fileName = `${sbtSymbol}_${sbtName}_${fileLabel}_${date}.json`;
     } else if (exportFormat === 'csv') {
       content = `index,${codeLabel},inviteLink\n` +
         passwordList.map((code, index) =>
-          `${index},${code},${sbtInviteLinks[index]}`
+          `${index},${code},${sbtInviteLinks[index] || autoJoinUrl || ''}`
         ).join('\n');
       fileName = `${sbtSymbol}_${sbtName}_${fileLabel}_${date}.csv`;
     }
@@ -4037,7 +4064,9 @@ class CreateSBTGroup extends Component {
       network,
       copiedLinkIndex,
       exportFormat,
+      savedRecoveryCodesLocally,
       sbtSymbol,
+      passwordList,
       tags,
       currentTagInput,
       documentIDHashes,
@@ -4845,6 +4874,35 @@ class CreateSBTGroup extends Component {
         )}
 
         {sbtMinted &&
+          sbtDistribution.distributionOption !== 'hasPasswords' &&
+          Array.isArray(passwordList) &&
+          passwordList.length > 0 && (
+          <div className={styles.sbtInviteLinks}>
+            <h3>Password Recovery</h3>
+            <p>
+              {savedRecoveryCodesLocally
+                ? 'Saved to the local recovery cache on this device.'
+                : 'Not stored locally by default. Export or save explicitly if you want browser-side recovery on this device.'}
+            </p>
+            <div className={styles.exportOptions}>
+              <select value={exportFormat} onChange={this.handleExportFormatChange} className={styles.exportFormatSelect}>
+                <option value="json">JSON</option>
+                <option value="csv">CSV</option>
+              </select>
+              <button onClick={this.exportPasswords} className={styles.exportButton}>Export Passwords</button>
+              <button
+                type="button"
+                onClick={this.saveCreatedSbtCodesToRecoveryCache}
+                className={styles.exportButton}
+                disabled={savedRecoveryCodesLocally}
+              >
+                {savedRecoveryCodesLocally ? 'Saved to Local Recovery Cache' : 'Save to Local Recovery Cache'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {sbtMinted &&
           sbtDistribution.distributionOption === 'hasPasswords' &&
           sbtInviteLinks.length > 0 && (
           <div className={styles.sbtInviteLinks}>
@@ -4859,12 +4917,25 @@ class CreateSBTGroup extends Component {
                 </li>
               ))}
             </ul>
+            <p>
+              {savedRecoveryCodesLocally
+                ? 'Saved to the local recovery cache on this device.'
+                : 'Not stored locally by default. Export or save explicitly if you want browser-side recovery on this device.'}
+            </p>
             <div className={styles.exportOptions}>
               <select value={exportFormat} onChange={this.handleExportFormatChange} className={styles.exportFormatSelect}>
                 <option value="json">JSON</option>
                 <option value="csv">CSV</option>
               </select>
               <button onClick={this.exportPasswords} className={styles.exportButton}>Export Passwords</button>
+              <button
+                type="button"
+                onClick={this.saveCreatedSbtCodesToRecoveryCache}
+                className={styles.exportButton}
+                disabled={savedRecoveryCodesLocally}
+              >
+                {savedRecoveryCodesLocally ? 'Saved to Local Recovery Cache' : 'Save to Local Recovery Cache'}
+              </button>
             </div>
           </div>
         )}
