@@ -12,6 +12,7 @@ import treeData from '../../variables/demo/debate_map_demo_data.json';
 import historicalData from '../../variables/demo/historical_figures_tree_qs_and_votes.json';
 import loopholeHistoricalCases from '../../variables/demo/loophole_historical_cases.json';
 import loopholeHistoricalFigurePrinciples from '../../variables/demo/loophole_historical_figure_principles.json';
+import { getRiskMatrixAtlasScenariosForAtlasNode } from '../../variables/demo/riskMatrixAtlasScenarioData.js';
 import styles from './DebateMap.module.scss';
 import { createLogger } from 'utilities/logging.js';
 import {
@@ -509,6 +510,7 @@ const buildAtlasTreeData = (demoMode) => {
     let demoComments = [];
     let demoHistoricalVotes = [];
     let demoHistoricalCases = [];
+    let demoScenarioVisualizations = [];
 
     if (demoMode) {
       Object.entries(historicalData || {}).forEach(([username, figure]) => {
@@ -541,6 +543,7 @@ const buildAtlasTreeData = (demoMode) => {
       demoHistoricalCases = Array.isArray(historicalCaseMap[node.id])
         ? historicalCaseMap[node.id]
         : [];
+      demoScenarioVisualizations = getRiskMatrixAtlasScenariosForAtlasNode(node.id);
     }
 
     const currentUp = parseInt(node?.votes?.up || 0, 10) || 0;
@@ -554,6 +557,10 @@ const buildAtlasTreeData = (demoMode) => {
     const mergedHistoricalCases = [
       ...(Array.isArray(node.historicalCases) ? node.historicalCases : []),
       ...demoHistoricalCases,
+    ];
+    const mergedScenarioVisualizations = [
+      ...(Array.isArray(node.scenarioVisualizations) ? node.scenarioVisualizations : []),
+      ...demoScenarioVisualizations,
     ];
     const children = Array.isArray(node.children)
       ? node.children.map(updateNodeWithHistoricalData)
@@ -584,6 +591,9 @@ const buildAtlasTreeData = (demoMode) => {
 
     if (mergedHistoricalCases.length > 0) nextNode.historicalCases = mergedHistoricalCases;
     else delete nextNode.historicalCases;
+
+    if (mergedScenarioVisualizations.length > 0) nextNode.scenarioVisualizations = mergedScenarioVisualizations;
+    else delete nextNode.scenarioVisualizations;
 
     return nextNode;
   };

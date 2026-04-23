@@ -6,23 +6,8 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCaretDown, faCaretUp, faExternalLinkAlt, faNetworkWired } from '@fortawesome/free-solid-svg-icons';
 
 import styles from './RiskMatrix.module.scss';
-import {
-  getRiskMatrixAtlasScenarioCountForCell,
-  getRiskMatrixAtlasScenariosForCell,
-} from '../../variables/demo/riskMatrixAtlasScenarioData.js';
-import seedComments from '../../variables/demo/riskMatrixSeedComments.json';
-import {
-  enrichRiskMatrixCommentRecord,
-  getRiskMatrixCorpusSourceCitationItems,
-  type RiskMatrixCorpusRef,
-  type RiskMatrixHistoricalFigure,
-} from '../../variables/demo/riskMatrixCommentContext';
-import {
-  buildAtlasNodeRoute,
-  buildPublicUrlPath,
-  readWindowLocationPath,
-} from '../../utilities/ui/publicUrl.js';
-import { getHistoricalFigureAvatarByName } from '../../utilities/ui/historicalFigureAvatars.js';
+import { getRiskMatrixAtlasScenariosForCell } from '../../variables/demo/riskMatrixAtlasScenarioData.js';
+import { buildPublicRoute } from '../../utilities/ui/publicUrl.js';
 
 type RiskValence = 'opportunity' | 'risk';
 
@@ -59,6 +44,26 @@ type RiskMatrixState = {
   hoveredColIndex: number | null;
   hoveredSubRowIndex: number | null;
   hoveredSubColIndex: number | null;
+};
+
+type RiskMatrixAtlasScenario = {
+  id: string;
+  riskMatrixCell: string;
+  atlasNodeId: string;
+  atlasNodeLabel: string;
+  title: string;
+  shortTitle?: string;
+  summary: string;
+  valence: 'risk' | 'opportunity' | 'mixed';
+  intensity: number;
+  confidence: string;
+  timeHorizon: string;
+  primaryMechanism: string;
+  riskClaim?: string;
+  opportunityClaim?: string;
+  counterpoint?: string;
+  image?: string | null;
+  imageAlt?: string;
 };
 
 export const RISK_MATRIX_CATEGORIES: RiskCategory[] = [
@@ -924,19 +929,16 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
 
   renderAtlasScenarioCards = (scenarios: RiskMatrixAtlasScenario[]) => {
     if (!Array.isArray(scenarios) || scenarios.length === 0) return null;
-    const { onOpenAtlasNode = null } = this.props;
 
     return (
       <section className={styles.atlasScenarioRail} aria-label="Related atlas scenario visualizations">
+        <div className={styles.atlasScenarioRailHeader}>
+          <span className={styles.atlasScenarioEyebrow}>Atlas-linked scenarios</span>
+          <span className={styles.atlasScenarioCount}>{scenarios.length}</span>
+        </div>
         <div className={styles.atlasScenarioGrid}>
           {scenarios.map((scenario) => {
-            const atlasHref = buildAtlasNodeRoute(scenario.atlasNodeId, {
-              demo: true,
-              returnTo: readWindowLocationPath(),
-            });
-            const atlasLinkLabel = scenario.atlasNodeLabel;
-            const atlasLinkAriaLabel = `Open atlas node ${scenario.atlasNodeLabel}`;
-            const atlasLinkTestId = `ce-risk-matrix-atlas-link-${toTestIdFragment(scenario.id)}`;
+            const atlasHref = `${buildPublicRoute(`/atlas/${scenario.atlasNodeId}`)}?demo=1`;
 
             return (
               <article
@@ -944,34 +946,19 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
                 className={styles.atlasScenarioCard}
                 data-testid="ce-risk-matrix-atlas-scenario-card"
               >
+                {scenario.image ? (
+                  <img
+                    className={styles.atlasScenarioImage}
+                    src={scenario.image}
+                    alt={scenario.imageAlt || `${scenario.title} visualization`}
+                  />
+                ) : (
+                  <div className={styles.atlasScenarioImageFallback} aria-hidden="true">
+                    <span>{scenario.atlasNodeLabel}</span>
+                  </div>
+                )}
                 <div className={styles.atlasScenarioContent}>
-                  <div className={styles.atlasScenarioHeader}>
-                    <div className={styles.atlasScenarioHeaderMain}>
-                      {scenario.image ? (
-                        <img
-                          className={styles.atlasScenarioImage}
-                          src={resolveAtlasAssetPath(scenario.image)}
-                          alt={scenario.imageAlt || `${scenario.title} visualization`}
-                        />
-                      ) : (
-                        <div className={styles.atlasScenarioImageFallback} aria-hidden="true">
-                          <span>{scenario.atlasNodeLabel}</span>
-                        </div>
-                      )}
-                      <div className={styles.atlasScenarioTitleBlock}>
-                        <span className={styles.atlasScenarioNodeLabel}>{scenario.atlasNodeLabel}</span>
-                        <h4 className={styles.atlasScenarioTitle}>{scenario.title}</h4>
-                        <p className={styles.atlasScenarioSummary}>{scenario.summary}</p>
-                        <div className={styles.atlasScenarioMetaLine} aria-label={`${scenario.confidence} confidence, ${scenario.timeHorizon}`}>
-                          <span className={styles.atlasScenarioMetaPill}>
-                            {scenario.confidence} confidence
-                          </span>
-                          <span className={styles.atlasScenarioMetaPill}>
-                            {scenario.timeHorizon}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
+                  <div className={styles.atlasScenarioMetaRow}>
                     <span className={clsx(
                       styles.atlasScenarioValence,
                       scenario.valence === 'risk' && styles.atlasScenarioValenceRisk,
@@ -980,185 +967,23 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
                     )}>
                       {scenario.valence}
                     </span>
+                    <span>{scenario.confidence}</span>
+                    <span>{scenario.timeHorizon}</span>
                   </div>
+                  <h4 className={styles.atlasScenarioTitle}>{scenario.title}</h4>
+                  <p className={styles.atlasScenarioSummary}>{scenario.summary}</p>
                   <div className={styles.atlasScenarioMechanism}>
-                    <span>Why it matters</span>
+                    <span>Mechanism</span>
                     <p>{scenario.primaryMechanism}</p>
                   </div>
-                  {Array.isArray(scenario.historicalAnchors) && scenario.historicalAnchors.length > 0 && (
-                    <div className={styles.atlasScenarioAnchors} aria-label="Historical anchors">
-                      {scenario.historicalAnchors.map((anchor) => (
-                        <div key={`${scenario.id}-${anchor.name}`} className={styles.atlasScenarioAnchorChip}>
-                          <img
-                            className={styles.atlasScenarioAnchorAvatar}
-                            src={resolveAtlasAssetPath(anchor.avatar)}
-                            alt={anchor.name}
-                          />
-                          <div className={styles.atlasScenarioAnchorCopy}>
-                            <span className={styles.atlasScenarioAnchorName}>{anchor.name}</span>
-                            {anchor.role && (
-                              <span className={styles.atlasScenarioAnchorRole}>{anchor.role}</span>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  {typeof onOpenAtlasNode === 'function' ? (
-                    <button
-                      type="button"
-                      className={styles.atlasScenarioLink}
-                      aria-label={atlasLinkAriaLabel}
-                      data-testid={atlasLinkTestId}
-                      onClick={() => onOpenAtlasNode(scenario.atlasNodeId, this.getRestoreState())}
-                    >
-                      <FontAwesomeIcon icon={faNetworkWired} className={styles.atlasScenarioLinkIcon} />
-                      <span className={styles.atlasScenarioLinkLabel}>{atlasLinkLabel}</span>
-                      <FontAwesomeIcon icon={faExternalLinkAlt} className={styles.atlasScenarioLinkIconTrailing} />
-                    </button>
-                  ) : (
-                    <a
-                      className={styles.atlasScenarioLink}
-                      aria-label={atlasLinkAriaLabel}
-                      data-testid={atlasLinkTestId}
-                      href={atlasHref}
-                    >
-                      <FontAwesomeIcon icon={faNetworkWired} className={styles.atlasScenarioLinkIcon} />
-                      <span className={styles.atlasScenarioLinkLabel}>{atlasLinkLabel}</span>
-                      <FontAwesomeIcon icon={faExternalLinkAlt} className={styles.atlasScenarioLinkIconTrailing} />
-                    </a>
-                  )}
+                  <a className={styles.atlasScenarioLink} href={atlasHref}>
+                    Open {scenario.atlasNodeLabel} in atlas
+                  </a>
                 </div>
               </article>
             );
           })}
         </div>
-      </section>
-    );
-  };
-
-  renderCommentGroup = (
-    title: string,
-    entries: RiskCommentRecord[],
-    isAggregateSelection: boolean,
-    valence: RiskValence
-  ) => {
-    if (!Array.isArray(entries) || entries.length === 0) return null;
-
-    const isOpen = this.state.openCommentGroups[valence] !== false;
-    const listId = `ce-risk-matrix-comment-list-${valence}`;
-
-    return (
-      <section
-        className={clsx(
-          styles.commentSection,
-          valence === 'opportunity' && styles.commentSectionOpportunity,
-          valence === 'risk' && styles.commentSectionRisk
-        )}
-      >
-        <button
-          type="button"
-          className={styles.commentSectionHeader}
-          aria-expanded={isOpen}
-          aria-controls={listId}
-          onClick={() => this.toggleCommentGroup(valence)}
-        >
-          <span className={styles.commentSectionHeaderText}>
-            <FontAwesomeIcon icon={isOpen ? faCaretUp : faCaretDown} className={styles.commentSectionChevron} />
-            <span className={styles.commentSectionTitle}>{title}</span>
-          </span>
-          <span className={styles.commentSectionCount}>
-            {entries.length} note{entries.length === 1 ? '' : 's'}
-          </span>
-        </button>
-        {isOpen && (
-          <ul id={listId} className={styles.commentList} data-testid={listId}>
-          {entries.map((entry, index) => (
-            (() => {
-              const figureName = String(entry.historicalFigure?.name || '').trim();
-              const figureAvatar = figureName ? getHistoricalFigureAvatarByName(figureName) : '';
-              const corpusRefs = Array.isArray(entry.corpusRefs) ? entry.corpusRefs.filter(Boolean) : [];
-              const sourceCitations = getRiskMatrixCorpusSourceCitationItems(corpusRefs).slice(0, 2);
-
-              return (
-                <li
-                  key={`${title}-${entry.cell}-${index}`}
-                  className={clsx(
-                    styles.commentItem,
-                    entry.valence === 'opportunity' && styles.commentItemOpportunity,
-                    entry.valence === 'risk' && styles.commentItemRisk
-                  )}
-                >
-                  <div className={styles.commentHeader}>
-                    <div className={styles.commentHeaderMain}>
-                      <span className={styles.commentEyebrow}>
-                        {isAggregateSelection ? 'Sub-overlap' : 'Seeded note'}
-                      </span>
-                      <h5 className={styles.commentCardTitle}>
-                        {isAggregateSelection
-                          ? formatCellPath(entry.cell)
-                          : (entry.valence === 'opportunity' ? 'Opportunity signal' : 'Risk signal')}
-                      </h5>
-                    </div>
-                    <div className={styles.commentHeaderMeta}>
-                      <span className={styles.commentIntensity}>Intensity {entry.intensity}</span>
-                      <span className={styles.commentBadge}>
-                        {entry.valence === 'opportunity' ? 'Opportunity' : 'Risk'}
-                      </span>
-                    </div>
-                  </div>
-                  <p className={styles.commentText}>{entry.comment}</p>
-
-                  {figureName && (
-                    <div className={styles.commentFigureRow}>
-                      {figureAvatar ? (
-                        <img
-                          className={styles.commentFigureAvatar}
-                          src={figureAvatar}
-                          alt={figureName}
-                        />
-                      ) : (
-                        <div className={styles.commentFigureAvatarFallback} aria-hidden="true">
-                          {figureName.charAt(0)}
-                        </div>
-                      )}
-                      <div className={styles.commentFigureCopy}>
-                        <span className={styles.commentFigureName}>{figureName}</span>
-                        {entry.historicalFigure?.role && (
-                          <span className={styles.commentFigureRole}>{entry.historicalFigure.role}</span>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {sourceCitations.length > 0 && (
-                    <div className={styles.commentReferenceLine}>
-                      {sourceCitations.length > 1 ? 'Sources: ' : 'Source: '}
-                      {sourceCitations.map((citation, citationIndex) => (
-                        <React.Fragment key={`${citation.label}-${citation.url || citationIndex}`}>
-                          {citationIndex > 0 && <span aria-hidden="true"> • </span>}
-                          {citation.url ? (
-                            <a
-                              className={styles.commentReferenceLink}
-                              href={citation.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
-                              {citation.label}
-                            </a>
-                          ) : (
-                            <span>{citation.label}</span>
-                          )}
-                        </React.Fragment>
-                      ))}
-                    </div>
-                  )}
-                </li>
-              );
-            })()
-          ))}
-          </ul>
-        )}
       </section>
     );
   };
@@ -1176,11 +1001,7 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
     const modalTitle = formatSelectionTitle(selectedCellId);
     const atlasScenarios = getRiskMatrixAtlasScenariosForCell(selectedCellId) as RiskMatrixAtlasScenario[];
     const commentsLabel = existingComments.length === 1 ? '1 note' : `${existingComments.length} notes`;
-    const modalMeta = atlasScenarios.length > 0
-      ? `${commentsLabel} • ${atlasScenarios.length} linked atlas overlap${atlasScenarios.length === 1 ? '' : 's'}`
-      : commentsLabel;
-    const opportunityComments = existingComments.filter((entry) => entry.valence === 'opportunity');
-    const riskComments = existingComments.filter((entry) => entry.valence === 'risk');
+    const atlasScenarios = getRiskMatrixAtlasScenariosForCell(selectedCellId) as RiskMatrixAtlasScenario[];
 
     return (
       <Modal
