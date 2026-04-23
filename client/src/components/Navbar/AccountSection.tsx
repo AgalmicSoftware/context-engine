@@ -6,7 +6,7 @@ import { toggleLoginModal } from '../../actions/sessionStateActions.js';
 
 import styles from "./Navbar.module.scss";
 
-import LoginButtonRaw from 'components/Account/LoginButton.jsx';
+import LoginButtonRaw from 'components/Account/LoginButton';
 import LoginAndSettingsModalRaw from '../Account/LoginAndSettingsModal.jsx'
 import { AccountDisplayTorus } from './AccountDisplay';
 
