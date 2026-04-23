@@ -4,14 +4,14 @@ import gateLockStyles from '../Gates/GateMultiSelectLock.module.scss';
 import surveyStyles from './CreateQuestionsAndSurveys.module.scss';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
-const makeInstance = (props = {}) => {
+const makeInstance = (props: Record<string, unknown> = {}) => {
   const instance = new CreateQuestionsAndSurveys({
     network: { id: 84532 },
     activeSessionSlug: 'edge',
     ...props,
-  });
+  }) as any;
   instance._isMounted = true;
-  instance.setState = jest.fn((update, cb) => {
+  instance.setState = jest.fn((update: any, cb?: () => void) => {
     const patch = typeof update === 'function'
       ? update(instance.state, instance.props)
       : update;
@@ -60,9 +60,10 @@ describe('CreateQuestionsAndSurveys lock UI', () => {
     };
 
     const { container } = render(instance.render());
-    const titleLock = container.querySelector(`.${surveyStyles.surveyTitleLock}`);
+    const titleLock = container.querySelector(`.${surveyStyles.surveyTitleLock}`) as HTMLElement | null;
 
     expect(titleLock).not.toBeNull();
+    if (!titleLock) throw new Error('Expected survey title lock to render');
     expect(within(titleLock).getByTestId(E2E_TESTIDS.GATE_LOCK_BUTTON)).toBeInTheDocument();
     expect(within(titleLock).queryByText(/\bSBT\b/i)).not.toBeInTheDocument();
     expect(within(titleLock).queryByText(/Edge Alpha/i)).not.toBeInTheDocument();
@@ -104,9 +105,10 @@ describe('CreateQuestionsAndSurveys lock UI', () => {
     };
 
     const { container } = render(instance.render());
-    const questionLock = container.querySelector(`.${surveyStyles.questionHeaderActions}`);
+    const questionLock = container.querySelector(`.${surveyStyles.questionHeaderActions}`) as HTMLElement | null;
 
     expect(questionLock).not.toBeNull();
+    if (!questionLock) throw new Error('Expected question header lock to render');
     expect(within(questionLock).getByTestId(E2E_TESTIDS.GATE_LOCK_BUTTON)).toBeInTheDocument();
     expect(within(questionLock).queryByText(/\bSBT\b/i)).not.toBeInTheDocument();
     expect(within(questionLock).queryByText(/Edge Alpha/i)).not.toBeInTheDocument();
