@@ -6,7 +6,7 @@ jest.mock('@rainbow-me/rainbowkit', () => ({
   ConnectButton: () => null,
 }));
 
-jest.mock('../HooksHOC/withWagmiBridge.jsx', () => ({
+jest.mock('../HooksHOC/withWagmiBridge', () => ({
   WagmiHooksHOC: (Comp) => Comp,
 }));
 
