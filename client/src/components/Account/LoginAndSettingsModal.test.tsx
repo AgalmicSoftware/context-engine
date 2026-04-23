@@ -23,7 +23,7 @@ jest.mock('@rainbow-me/rainbowkit', () => ({
 }));
 
 jest.mock('../HooksHOC/withWagmiBridge', () => ({
-  WagmiHooksHOC: (Comp: any) => Comp,
+  WagmiHooksHOC: (Comp) => Comp,
 }));
 
 jest.mock('../../utilities/web3/contractScripts.js', () => ({

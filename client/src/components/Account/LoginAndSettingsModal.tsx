@@ -18,7 +18,6 @@ import {
 
 // Hooks HOC
 import { WagmiHooksHOC } from '../HooksHOC/withWagmiBridge'
-import type { WagmiInjectedProps } from '../HooksHOC/withWagmiBridge';
 
 // CSS, icons, logos
 import '../../assets/css/contextEngine.scss'
