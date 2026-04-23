@@ -215,7 +215,7 @@ Session Wizard env contract:
 - `npm run -s ai:test-sbt-contract:boundaries`
 - `npm run -s ai:test-sbt:onchain:all-functions`
 
-`ai:test-sbt-metadata-locks` covers the PRD 223 metadata-lock workflow:
+`ai:test-sbt-metadata-locks` covers the metadata-lock workflow:
 - provisions a helper gate SBT for the holder/admin wallet
 - creates a new locked SBT through the real `/sbts/<slug>` Create Group UI
 - smoke-checks the Create Group lock UX (all five lock rows, session-name gate labels, successful mint)

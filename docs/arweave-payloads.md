@@ -152,7 +152,7 @@ Notes:
 }
 ```
 
-> **Removed field:** `adminRecovery.encryptedPassword` was previously included in group-password SBT metadata but has been removed (PRD 231-F3). The field encrypted the group password using the creator's public address as the key, making it trivially recoverable by anyone who could read the tokenURI. New SBTs no longer include this field. Existing SBTs with this field in their metadata are not affected operationally (the field is ignored by the client), but the password may be recoverable from historical metadata.
+> **Removed field:** `adminRecovery.encryptedPassword` was previously included in group-password SBT metadata but has been removed. The field encrypted the group password using the creator's public address as the key, making it trivially recoverable by anyone who could read the tokenURI. New SBTs no longer include this field. Existing SBTs with this field in their metadata are not affected operationally (the field is ignored by the client), but the password may be recoverable from historical metadata.
 
 Notes:
 - Locked SBT names are not stored in plaintext in tokenURI metadata. When the name field is locked, the deployed public ERC-721 contract `name()` uses a generated placeholder such as `CE-SBT-12`.
