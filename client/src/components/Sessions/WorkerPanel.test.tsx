@@ -1,11 +1,11 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
-import WorkerPanel from './WorkerPanel.jsx';
+import WorkerPanel, { WorkerPanelProps } from './WorkerPanel';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
-const t = (key) => key;
+const t = (key: string) => key;
 
-const renderWorkerPanel = (props = {}) => render(
+const renderWorkerPanel = (props: Partial<WorkerPanelProps> = {}) => render(
   <WorkerPanel
     isNormalMode
     t={t}
