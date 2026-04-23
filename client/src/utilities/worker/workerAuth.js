@@ -534,7 +534,7 @@ export const buildSignedAdminActionAuth = async ({
     const nonceEndpoint = `${resolvedWorkerUrl}/auth/nonce`;
     const nonceResp = await fetchWorkerAuthEndpoint(nonceEndpoint, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: buildWorkerAuthNonceHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ address, sessionSlug: targetSlug, adminAction: true }),
     });
     const nonceData = await nonceResp.json().catch(() => ({}));
@@ -618,7 +618,7 @@ export const buildSignedBootstrapAdminAuth = async ({
     const nonceEndpoint = `${resolvedWorkerUrl}/auth/nonce`;
     const nonceResp = await fetchWorkerAuthEndpoint(nonceEndpoint, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: buildWorkerAuthNonceHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ address, sessionSlug: targetSlug, adminAction: true }),
     });
     const nonceData = await nonceResp.json().catch(() => ({}));
@@ -712,7 +712,7 @@ export const getWorkerSessionToken = async ({
       assertWorkerAuthRequestCurrent(signal, requestAuthEpoch, address);
       const nonceResp = await fetch(`${resolvedWorkerUrl}/auth/nonce`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: buildWorkerAuthNonceHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ address, sessionSlug: slug }),
         signal,
       });
@@ -949,6 +949,15 @@ const getAnonymousRateId = () => {
     localStorage.setItem(ANONYMOUS_RATE_ID_STORAGE_KEY, generated);
   } catch (_) {}
   return generated;
+};
+
+const buildWorkerAuthNonceHeaders = (baseHeaders) => {
+  const headers = mergeHeaders(baseHeaders, {});
+  const anonRateId = getAnonymousRateId();
+  if (anonRateId && !headers.has('X-Anonymous-Client-Id')) {
+    headers.set('X-Anonymous-Client-Id', anonRateId);
+  }
+  return headers;
 };
 
 const isStreamBody = (body) => {
