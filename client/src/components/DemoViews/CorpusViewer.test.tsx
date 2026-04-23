@@ -6,7 +6,7 @@ import { MemoryRouter } from 'react-router-dom';
 
 const mockTagPage = jest.fn();
 
-jest.mock('../TagPage/TagPage.jsx', () => ({
+jest.mock('../TagPage/TagPage', () => ({
   __esModule: true,
   default: (props: any) => {
     mockTagPage(props);

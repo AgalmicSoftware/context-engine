@@ -1,4 +1,4 @@
-/** @file DocumentLibraryPanel.jsx */
+/** @file DocumentLibraryPanel.tsx */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -53,8 +53,193 @@ import { createLogger } from '../../utilities/logging.js';
 
 const log = createLogger('DocumentLibraryPanel');
 
+type PanelMode = 'session' | 'sbt';
+type SecondaryAssociationType = 'sbt' | 'session' | null;
+type NetworkLike = { id?: number | string | null } | null;
+type SessionConfig = Record<string, unknown> | null;
 
-const copyToClipboard = async (text) => {
+type TagEntry = {
+  name: string;
+  value: string;
+};
+
+type DocTagMap = Record<string, string>;
+
+type DocData = {
+  size: number | null;
+  type: string | null;
+};
+
+type DocBlock = {
+  height?: number | null;
+  timestamp?: number | string | null;
+};
+
+type DocRecord = {
+  cursor: string | null;
+  txId: string;
+  owner: string | null;
+  tags: unknown[];
+  tagMap: DocTagMap;
+  block: DocBlock | null;
+  data: DocData | null;
+};
+
+type CustomSbtEntry = {
+  address: string;
+  name?: string;
+  chainId?: number | string | null;
+  [key: string]: unknown;
+};
+
+type ListFilter = {
+  name: string;
+  values: string[];
+};
+
+type AutoOpenDoc = {
+  txId: string;
+  tagMap: DocTagMap;
+};
+
+type OpenableDoc = Pick<DocRecord, 'txId' | 'tagMap'>;
+
+type DocUploadsGateState = {
+  gate: unknown;
+  lookupStatus: string;
+  sbtAddresses: string[];
+  chainId: number | string | null;
+  mode: string;
+  hasRecipients: boolean;
+};
+
+type LitHooks = {
+  getKey?: (...args: unknown[]) => unknown;
+  saveKey?: (...args: unknown[]) => Promise<unknown>;
+} | null;
+
+type EncryptAudience =
+  | { ok: false; error: string }
+  | { ok: true; encrypted: false }
+  | {
+      ok: true;
+      encrypted: true;
+      chainId: number | null;
+      litChain: string;
+      accessControlConditions: unknown;
+      litHooks: {
+        saveKey: (...args: unknown[]) => Promise<unknown>;
+      };
+    };
+
+type FetchArweaveBlobResult =
+  | { ok: true; blob: Blob; contentType: string }
+  | { ok: false; error: string };
+
+type UploadResult = {
+  txId?: string;
+  tagMap?: unknown;
+  data?: Partial<DocData> | null;
+};
+
+type DocumentLibraryPanelProps = {
+  provider?: unknown;
+  network?: NetworkLike;
+  account?: string | null;
+  loginComplete?: boolean;
+  toggleLoginModal?: (open?: boolean) => void;
+  sessionSlug?: string;
+  sessionConfig?: SessionConfig;
+  mode?: PanelMode;
+  sessionIdHex?: string;
+  sbtChainId?: number | string | null;
+  sbtAddress?: string;
+  secondaryAssociationType?: SecondaryAssociationType;
+  secondarySessionIdHex?: string;
+  compact?: boolean;
+  pageSize?: number;
+};
+
+const DEFAULT_DOC_UPLOADS_GATE: DocUploadsGateState = {
+  gate: null,
+  lookupStatus: '',
+  sbtAddresses: [],
+  chainId: null,
+  mode: 'any',
+  hasRecipients: false,
+};
+
+const buildSbtAccessControlConditionsUntyped = buildSbtAccessControlConditions as (args: {
+  sbtAddresses: string[];
+  chainId: number | null;
+  litChain: string;
+  mode: string;
+}) => unknown;
+
+const resolveLitChainUntyped = resolveLitChain as (args: {
+  chainId: number | null;
+}) => string;
+
+const uploadDocLibraryFileUntyped = uploadDocLibraryFile as (args: {
+  file: File;
+  sessionSlug?: string;
+  sessionConfig?: SessionConfig;
+  account?: string | null;
+  providerLike?: unknown;
+  chainId?: number | string | null;
+  tags: TagEntry[];
+  encryption?: Record<string, unknown> | null;
+}) => Promise<UploadResult>;
+
+const uploadDocLibraryUrlRecordUntyped = uploadDocLibraryUrlRecord as (args: {
+  url: string;
+  title?: string;
+  sessionSlug?: string;
+  sessionConfig?: SessionConfig;
+  account?: string | null;
+  providerLike?: unknown;
+  chainId?: number | string | null;
+  tags: TagEntry[];
+  encryption?: Record<string, unknown> | null;
+}) => Promise<UploadResult>;
+
+const getErrorMessage = (error: unknown, fallback: string) => (
+  error instanceof Error && error.message ? error.message : fallback
+);
+
+const normalizeDocTagMap = (value: unknown): DocTagMap => {
+  if (!value || typeof value !== 'object') return {};
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>).map(([key, entry]) => [key, toStr(entry)])
+  );
+};
+
+const buildTagMapFromTags = (tags: TagEntry[]): DocTagMap => (
+  Object.fromEntries(tags.map(({ name, value }) => [name, value]))
+);
+
+const buildPendingDocRecord = ({
+  txId,
+  tagMap,
+  data,
+}: {
+  txId: string;
+  tagMap?: unknown;
+  data?: Partial<DocData> | null;
+}): DocRecord => ({
+  txId,
+  cursor: null,
+  owner: null,
+  tags: [],
+  tagMap: normalizeDocTagMap(tagMap),
+  block: null,
+  data: {
+    size: data?.size ?? null,
+    type: data?.type ?? null,
+  },
+});
+
+const copyToClipboard = async (text: unknown): Promise<boolean> => {
   try {
     await navigator.clipboard.writeText(String(text || ''));
     notify.success('Copied to clipboard');
@@ -64,7 +249,7 @@ const copyToClipboard = async (text) => {
   }
 };
 
-const sanitizeHttpUrl = (raw) => {
+const sanitizeHttpUrl = (raw: unknown): string => {
   const value = toStr(raw).trim();
   if (!value) return '';
   try {
@@ -76,7 +261,7 @@ const sanitizeHttpUrl = (raw) => {
   }
 };
 
-const isTextLikeMime = (mime) => {
+const isTextLikeMime = (mime: unknown): boolean => {
   const m = toStr(mime).trim().toLowerCase();
   if (!m) return false;
   if (m.startsWith('text/')) return true;
@@ -90,31 +275,34 @@ const isTextLikeMime = (mime) => {
   ].includes(m);
 };
 
-const safeFilename = (name, fallback = 'document') => {
+const safeFilename = (name: unknown, fallback = 'document'): string => {
   const raw = toStr(name).trim();
   if (!raw) return fallback;
   return raw.replace(/[\\/:*?"<>|]+/g, '_').slice(0, 180) || fallback;
 };
 
-const isArweaveTxId = (value) => /^[a-z0-9_-]{43}$/i.test(toStr(value).trim());
+const isArweaveTxId = (value: unknown): boolean => /^[a-z0-9_-]{43}$/i.test(toStr(value).trim());
 
-const buildSessionListFilters = (sessionIdHex) => ([
+const buildSessionListFilters = (sessionIdHex: string): ListFilter[] => ([
   { name: 'CE-DocLibrary', values: ['1'] },
   { name: 'CE-SessionId', values: [normalizeSessionIdHex(sessionIdHex)] },
 ].filter((f) => f.values && f.values[0]));
 
-const buildSbtListFilters = ({ chainId, sbtAddress }) => ([
+const buildSbtListFilters = ({ chainId, sbtAddress }: { chainId?: number | string | null; sbtAddress?: string }): ListFilter[] => ([
   { name: 'CE-DocLibrary', values: ['1'] },
   { name: 'CE-SbtChainId', values: [String(Number(chainId || 0) || '')] },
   { name: 'CE-SbtAddress', values: [normalizeSbtAddress(sbtAddress)] },
 ].filter((f) => f.values && f.values[0]));
 
-const fetchArweaveBlobWithFallback = async (txId, opts = {}) => {
+const fetchArweaveBlobWithFallback = async (
+  txId: string,
+  opts: { gateways?: string[] } = {},
+): Promise<FetchArweaveBlobResult> => {
   const gateways = Array.isArray(opts.gateways) && opts.gateways.length
       ? opts.gateways
       : DOC_LIBRARY_ARWEAVE_GATEWAYS;
 
-  let lastErr = null;
+  let lastErr: unknown = null;
   for (const gw of gateways) {
     const url = arweaveScripts.buildArweaveGatewayUrl(txId, gw);
     try {
@@ -132,7 +320,7 @@ const fetchArweaveBlobWithFallback = async (txId, opts = {}) => {
       lastErr = err;
     }
   }
-  return { ok: false, error: lastErr?.message || 'Arweave fetch failed.' };
+  return { ok: false, error: getErrorMessage(lastErr, 'Arweave fetch failed.') };
 };
 
 export default function DocumentLibraryPanel({
@@ -151,7 +339,7 @@ export default function DocumentLibraryPanel({
   secondarySessionIdHex,
   compact = false,
   pageSize = 25,
-} = {}) {
+}: DocumentLibraryPanelProps = {}) {
   const normalizedSessionIdHex = useMemo(() => normalizeSessionIdHex(sessionIdHex), [sessionIdHex]);
   const normalizedSbtAddress = useMemo(() => normalizeSbtAddress(sbtAddress), [sbtAddress]);
   const normalizedSecondarySessionIdHex = useMemo(
@@ -178,20 +366,29 @@ export default function DocumentLibraryPanel({
     return '';
   }, [mode, sessionSlug, normalizedSessionIdHex, resolvedSbtChainId, normalizedSbtAddress]);
 
-  const docProvider = useMemo(
-    () => resolveDocLibraryProvider(sessionConfig),
-    [sessionConfig],
-  );
+  const docProvider = useMemo(() => toStr(resolveDocLibraryProvider(sessionConfig)).trim().toLowerCase(), [sessionConfig]);
   const graphqlUrl = useMemo(
-    () => resolveArweaveGraphqlUrl(sessionConfig),
+    () => toStr(resolveArweaveGraphqlUrl(sessionConfig)).trim(),
     [sessionConfig],
   );
 
-  const docUploadsGate = useMemo(() => resolveDocUploadsGate(sessionConfig), [sessionConfig]);
+  const docUploadsGate = useMemo<DocUploadsGateState>(() => {
+    const resolved = (resolveDocUploadsGate(sessionConfig) as Partial<DocUploadsGateState> | null) || null;
+    return {
+      gate: resolved?.gate ?? null,
+      lookupStatus: toStr(resolved?.lookupStatus).trim(),
+      sbtAddresses: Array.isArray(resolved?.sbtAddresses)
+        ? resolved.sbtAddresses.map((value) => toStr(value).trim()).filter(Boolean)
+        : [],
+      chainId: resolved?.chainId ?? null,
+      mode: toStr(resolved?.mode || 'any').trim() || 'any',
+      hasRecipients: Boolean(resolved?.hasRecipients),
+    };
+  }, [sessionConfig]);
 
   const locationSearch = typeof window !== 'undefined' ? (window.location.search || '') : '';
 
-  const autoOpenDoc = useMemo(() => {
+  const autoOpenDoc = useMemo<AutoOpenDoc | null>(() => {
     if (typeof window === 'undefined') return null;
     try {
       const qp = new URLSearchParams(locationSearch);
@@ -215,8 +412,8 @@ export default function DocumentLibraryPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [locationSearch]);
 
-  const [docs, setDocs] = useState([]);
-  const [cursor, setCursor] = useState(null);
+  const [docs, setDocs] = useState<DocRecord[]>([]);
+  const [cursor, setCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -225,9 +422,9 @@ export default function DocumentLibraryPanel({
   const listRequestSeqRef = useRef(0);
   const activeListQueryKeyRef = useRef('');
   const loadingRef = useRef(false);
-  const cursorRef = useRef(null);
+  const cursorRef = useRef<string | null>(null);
 
-  const [file, setFile] = useState(null);
+  const [file, setFile] = useState<File | null>(null);
   const [urlInput, setUrlInput] = useState('');
   const [urlTitle, setUrlTitle] = useState('');
 
@@ -237,11 +434,11 @@ export default function DocumentLibraryPanel({
   const lastContextKeyRef = useRef('');
   const [locked, setLocked] = useState(false);
   const [audienceMode, setAudienceMode] = useState('custom'); // "sessionGate" | "custom"
-  const [customSbtList, setCustomSbtList] = useState([]);
+  const [customSbtList, setCustomSbtList] = useState<CustomSbtEntry[]>([]);
   const [customGateMode, setCustomGateMode] = useState('any'); // any|all
 
   const [alsoAssociateSbt, setAlsoAssociateSbt] = useState(false);
-  const [assocSbtChainId, setAssocSbtChainId] = useState(Number(sbtChainId || network?.id || 0) || '');
+  const [assocSbtChainId, setAssocSbtChainId] = useState<number | string>(Number(sbtChainId || network?.id || 0) || '');
   const [assocSbtAddress, setAssocSbtAddress] = useState('');
 
   const [alsoAssociateSession, setAlsoAssociateSession] = useState(false);
@@ -326,7 +523,7 @@ export default function DocumentLibraryPanel({
     return false;
   }, [docProvider, mode, normalizedSessionIdHex, normalizedSbtAddress, network?.id, sbtChainId]);
 
-  const loadDocs = useCallback(async ({ reset } = {}) => {
+  const loadDocs = useCallback(async ({ reset }: { reset?: boolean } = {}) => {
     if (!canList) return;
     if (loadingRef.current && !reset) return;
     if (!reset && !cursorRef.current) return;
@@ -337,12 +534,12 @@ export default function DocumentLibraryPanel({
     setLoading(true);
     try {
       const after = reset ? null : cursorRef.current;
-      const edges = await listArweaveTransactionsByTags({
+      const edges = (await listArweaveTransactionsByTags({
         graphqlUrl,
         tags: listFilters,
         first: pageSize,
         after,
-      });
+      })) as DocRecord[];
 
       if (listRequestSeqRef.current !== requestSeq || activeListQueryKeyRef.current !== expectedQueryKey) return;
 
@@ -369,7 +566,7 @@ export default function DocumentLibraryPanel({
             ...edge,
             tags: Array.isArray(edge.tags) ? edge.tags : (Array.isArray(prevDoc.tags) ? prevDoc.tags : []),
             tagMap: edge.tagMap && typeof edge.tagMap === 'object'
-              ? edge.tagMap
+              ? normalizeDocTagMap(edge.tagMap)
               : (prevDoc.tagMap && typeof prevDoc.tagMap === 'object' ? prevDoc.tagMap : {}),
           };
         });
@@ -380,7 +577,7 @@ export default function DocumentLibraryPanel({
       setCursor(nextCursor);
     } catch (err) {
       if (listRequestSeqRef.current !== requestSeq || activeListQueryKeyRef.current !== expectedQueryKey) return;
-      setError(err?.message || 'Failed to load docs.');
+      setError(getErrorMessage(err, 'Failed to load docs.'));
     } finally {
       if (listRequestSeqRef.current !== requestSeq || activeListQueryKeyRef.current !== expectedQueryKey) return;
       loadingRef.current = false;
@@ -412,7 +609,7 @@ export default function DocumentLibraryPanel({
     setViewerMime('');
   }, []);
 
-  const openDoc = useCallback(async (doc) => {
+  const openDoc = useCallback(async (doc: OpenableDoc) => {
     const txId = toStr(doc?.txId).trim();
     if (!txId) return;
 
@@ -431,7 +628,7 @@ export default function DocumentLibraryPanel({
 
     try {
       if (isEncrypted) {
-        const litHooks = getGlobalLitHooks();
+        const litHooks = getGlobalLitHooks() as LitHooks;
         if (!litHooks || typeof litHooks.getKey !== 'function') {
           throw new Error('Connect a wallet to decrypt this document.');
         }
@@ -508,7 +705,7 @@ export default function DocumentLibraryPanel({
       setViewerLoading(false);
     } catch (err) {
       setViewerLoading(false);
-      setViewerError(err?.message || 'Failed to open document.');
+      setViewerError(getErrorMessage(err, 'Failed to open document.'));
       setViewerTitle('Error');
     }
   }, [provider, account, network?.id, panelContextKey]);
@@ -523,7 +720,7 @@ export default function DocumentLibraryPanel({
     const wantsEncrypted = storage === 'lit-arweave' || storage === 'lit';
     if (wantsEncrypted && (!loginComplete || !toStr(account).trim() || !provider)) return;
     if (wantsEncrypted) {
-      const litHooks = getGlobalLitHooks();
+      const litHooks = getGlobalLitHooks() as LitHooks;
       if (!litHooks || typeof litHooks.getKey !== 'function') return;
     }
 
@@ -540,7 +737,7 @@ export default function DocumentLibraryPanel({
     } catch (e) { log.warn('DocumentLibraryPanel: fallback', e); }
   }, [autoOpenDoc, panelContextKey, loginComplete, provider, account, openDoc]);
 
-  const addCustomSbt = useCallback((sbt) => {
+  const addCustomSbt = useCallback((sbt: CustomSbtEntry) => {
     const addr = normalizeSbtAddress(sbt?.address);
     if (!addr) return;
     setCustomSbtList((prev) => {
@@ -556,13 +753,21 @@ export default function DocumentLibraryPanel({
     });
   }, []);
 
-  const removeCustomSbt = useCallback((addr) => {
+  const removeCustomSbt = useCallback((addr: string) => {
     const target = normalizeSbtAddress(addr);
     if (!target) return;
     setCustomSbtList((prev) => (Array.isArray(prev) ? prev.filter((e) => (e?.address || '').toLowerCase() !== target) : []));
   }, []);
 
-  const resolveAssociationTags = useCallback(({ kind, storage, plaintextMeta } = {}) => {
+  const resolveAssociationTags = useCallback(({
+    kind,
+    storage,
+    plaintextMeta,
+  }: {
+    kind?: string;
+    storage?: string;
+    plaintextMeta?: TagEntry[];
+  } = {}): TagEntry[] => {
     const common = buildDocLibraryCommonTags({ kind, storage });
 
     const primarySession = (mode === 'session')
@@ -579,7 +784,7 @@ export default function DocumentLibraryPanel({
       ? buildDocLibrarySessionTags({ sessionIdHex: normalizedSecondarySessionIdHex })
       : [];
 
-    return mergeTags(common, primarySession, primarySbt, secondarySbt, secondarySession, plaintextMeta);
+    return mergeTags(common, primarySession, primarySbt, secondarySbt, secondarySession, plaintextMeta) as TagEntry[];
   }, [
     mode,
     normalizedSessionIdHex,
@@ -594,10 +799,11 @@ export default function DocumentLibraryPanel({
     normalizedSecondarySessionIdHex,
   ]);
 
-  const resolveEncryptAudience = useCallback(() => {
+  const resolveEncryptAudience = useCallback((): EncryptAudience => {
     if (!locked) return { ok: true, encrypted: false };
-    const litHooks = getGlobalLitHooks();
-    if (!litHooks || typeof litHooks.saveKey !== 'function') {
+    const litHooks = getGlobalLitHooks() as LitHooks;
+    const saveKey = litHooks?.saveKey;
+    if (!litHooks || typeof saveKey !== 'function') {
       return { ok: false, error: 'Lit hooks not initialized; connect a wallet to encrypt.' };
     }
 
@@ -606,28 +812,28 @@ export default function DocumentLibraryPanel({
         return { ok: false, error: 'Session docUploads gate is unavailable or empty.' };
       }
       const chainId = Number(docUploadsGate.chainId || network?.id || 0) || null;
-      const litChain = resolveLitChain({ chainId });
-      const acc = buildSbtAccessControlConditions({
+      const litChain = resolveLitChainUntyped({ chainId });
+      const acc = buildSbtAccessControlConditionsUntyped({
         sbtAddresses: docUploadsGate.sbtAddresses,
         chainId,
         litChain,
         mode: docUploadsGate.mode || 'any',
       });
       if (!acc) return { ok: false, error: 'Session docUploads gate has no valid SBT addresses.' };
-      return { ok: true, encrypted: true, chainId, litChain, accessControlConditions: acc, litHooks };
+      return { ok: true, encrypted: true, chainId, litChain, accessControlConditions: acc, litHooks: { saveKey } };
     }
 
     const list = (customSbtList || []).map((e) => e.address).filter(Boolean);
     const chainId = Number(sbtChainId || docUploadsGate.chainId || network?.id || 0) || null;
-    const litChain = resolveLitChain({ chainId });
-    const acc = buildSbtAccessControlConditions({
+    const litChain = resolveLitChainUntyped({ chainId });
+    const acc = buildSbtAccessControlConditionsUntyped({
       sbtAddresses: list,
       chainId,
       litChain,
       mode: customGateMode || 'any',
     });
     if (!acc) return { ok: false, error: 'Add at least one SBT address to encrypt.' };
-    return { ok: true, encrypted: true, chainId, litChain, accessControlConditions: acc, litHooks };
+    return { ok: true, encrypted: true, chainId, litChain, accessControlConditions: acc, litHooks: { saveKey } };
   }, [
     locked,
     audienceMode,
@@ -668,7 +874,7 @@ export default function DocumentLibraryPanel({
 
     try {
       if (!locked) {
-        const result = await uploadDocLibraryFile({
+        const result = await uploadDocLibraryFileUntyped({
           file,
           sessionSlug,
           sessionConfig,
@@ -677,17 +883,27 @@ export default function DocumentLibraryPanel({
           chainId: network?.id || null,
           tags,
         });
-        if (result?.txId) {
-          setDocs((prev) => [{ txId: result.txId, cursor: null, owner: null, tags: [], tagMap: result.tagMap || Object.fromEntries(tags.map((t) => [t.name, t.value])), block: null, data: result.data || { size: file.size || null, type: file.type || null } }, ...(prev || [])]);
+        const txId = toStr(result?.txId).trim();
+        if (txId) {
+          setDocs((prev) => [
+            buildPendingDocRecord({
+              txId,
+              tagMap: result.tagMap || buildTagMapFromTags(tags),
+              data: result.data || { size: file.size || null, type: file.type || null },
+            }),
+            ...prev,
+          ]);
         }
         setFile(null);
         return;
       }
 
       const audience = resolveEncryptAudience();
-      if (!audience.ok) throw new Error(audience.error || 'Encryption audience unavailable.');
+      if (!audience.ok || !audience.encrypted) {
+        throw new Error(audience.ok ? 'Encryption audience unavailable.' : audience.error || 'Encryption audience unavailable.');
+      }
 
-      const result = await uploadDocLibraryFile({
+      const result = await uploadDocLibraryFileUntyped({
         file,
         sessionSlug,
         sessionConfig,
@@ -705,12 +921,20 @@ export default function DocumentLibraryPanel({
         },
       });
 
-      if (result?.txId) {
-        setDocs((prev) => [{ txId: result.txId, cursor: null, owner: null, tags: [], tagMap: result.tagMap || Object.fromEntries(tags.map((t) => [t.name, t.value])), block: null, data: result.data || { size: null, type: 'application/json' } }, ...(prev || [])]);
+      const txId = toStr(result?.txId).trim();
+      if (txId) {
+        setDocs((prev) => [
+          buildPendingDocRecord({
+            txId,
+            tagMap: result.tagMap || buildTagMapFromTags(tags),
+            data: result.data || { size: null, type: 'application/json' },
+          }),
+          ...prev,
+        ]);
       }
       setFile(null);
     } catch (err) {
-      setError(err?.message || 'Upload failed.');
+      setError(getErrorMessage(err, 'Upload failed.'));
     }
   }, [
     docProvider,
@@ -778,7 +1002,7 @@ export default function DocumentLibraryPanel({
 
     try {
       if (!locked) {
-        const result = await uploadDocLibraryUrlRecord({
+        const result = await uploadDocLibraryUrlRecordUntyped({
           url,
           title: urlTitle,
           sessionSlug,
@@ -788,8 +1012,16 @@ export default function DocumentLibraryPanel({
           chainId: network?.id || null,
           tags,
         });
-        if (result?.txId) {
-          setDocs((prev) => [{ txId: result.txId, cursor: null, owner: null, tags: [], tagMap: result.tagMap || Object.fromEntries(tags.map((t) => [t.name, t.value])), block: null, data: result.data || { size: null, type: 'application/json' } }, ...(prev || [])]);
+        const txId = toStr(result?.txId).trim();
+        if (txId) {
+          setDocs((prev) => [
+            buildPendingDocRecord({
+              txId,
+              tagMap: result.tagMap || buildTagMapFromTags(tags),
+              data: result.data || { size: null, type: 'application/json' },
+            }),
+            ...prev,
+          ]);
         }
         setUrlInput('');
         setUrlTitle('');
@@ -797,9 +1029,11 @@ export default function DocumentLibraryPanel({
       }
 
       const audience = resolveEncryptAudience();
-      if (!audience.ok) throw new Error(audience.error || 'Encryption audience unavailable.');
+      if (!audience.ok || !audience.encrypted) {
+        throw new Error(audience.ok ? 'Encryption audience unavailable.' : audience.error || 'Encryption audience unavailable.');
+      }
 
-      const result = await uploadDocLibraryUrlRecord({
+      const result = await uploadDocLibraryUrlRecordUntyped({
         url,
         title: urlTitle,
         sessionSlug,
@@ -818,13 +1052,21 @@ export default function DocumentLibraryPanel({
         },
       });
 
-      if (result?.txId) {
-        setDocs((prev) => [{ txId: result.txId, cursor: null, owner: null, tags: [], tagMap: result.tagMap || Object.fromEntries(tags.map((t) => [t.name, t.value])), block: null, data: result.data || { size: null, type: 'application/json' } }, ...(prev || [])]);
+      const txId = toStr(result?.txId).trim();
+      if (txId) {
+        setDocs((prev) => [
+          buildPendingDocRecord({
+            txId,
+            tagMap: result.tagMap || buildTagMapFromTags(tags),
+            data: result.data || { size: null, type: 'application/json' },
+          }),
+          ...prev,
+        ]);
       }
       setUrlInput('');
       setUrlTitle('');
     } catch (err) {
-      setError(err?.message || 'Upload failed.');
+      setError(getErrorMessage(err, 'Upload failed.'));
     }
   }, [
     docProvider,

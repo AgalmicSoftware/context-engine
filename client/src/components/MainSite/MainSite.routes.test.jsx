@@ -186,7 +186,7 @@ jest.mock('../UserPage/CompareAddresses.jsx', () => {
   };
 });
 
-jest.mock('../TagPage/TagPage.jsx', () => {
+jest.mock('../TagPage/TagPage', () => {
   const React = require('react');
   return {
     __esModule: true,
