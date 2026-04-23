@@ -172,7 +172,7 @@ jest.mock('../SBTs/SBTsList.jsx', () => {
   };
 });
 
-jest.mock('../UserPage/CompareAddresses.jsx', () => {
+jest.mock('../UserPage/CompareAddresses', () => {
   const React = require('react');
   return {
     __esModule: true,
@@ -202,7 +202,7 @@ jest.mock('../TagPage/TagPage', () => {
   };
 });
 
-jest.mock('../DebateMap/DebateMap.jsx', () => {
+jest.mock('../DebateMap/DebateMap', () => {
   const React = require('react');
   return {
     __esModule: true,
