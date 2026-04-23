@@ -25,7 +25,7 @@ import PolicyGlobe, {
   POLICY_FILTERS,
   getPolicyStatusGroup,
   getPolicyStatusLabel,
-} from './PolicyGlobe.jsx';
+} from './PolicyGlobe';
 import policyStyles from './PolicyGlobe.module.scss';
 import TweetCard, { DebateMapSection, ExternalSourceLink } from './TweetCard';
 import { PUBLIC_AI_DISCOURSE_CORPUS_URL } from '../../variables/publicRepoMetadata.js';

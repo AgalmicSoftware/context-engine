@@ -39,7 +39,7 @@ jest.mock('react-simple-maps', () => ({
 }));
 
 import CorpusViewer from './CorpusViewer.jsx';
-import PolicyGlobe from './PolicyGlobe.jsx';
+import PolicyGlobe from './PolicyGlobe';
 
 const originalMatchMedia = window.matchMedia;
 
