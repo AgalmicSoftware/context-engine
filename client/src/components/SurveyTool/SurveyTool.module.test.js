@@ -4774,6 +4774,42 @@ describe('SurveyTool module', () => {
     }));
   });
 
+  it('masks locked question prompts in response json payloads', () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: true,
+      isStandalone: false,
+      surveyIndex: 0,
+      questionID: 'q1',
+      account: '0xabc',
+      loginComplete: true,
+      provider: {},
+    });
+    subject.state = {
+      ...subject.state,
+      questionPool: [{
+        id: 'q1',
+        type: 'freeform',
+        prompt: 'Secret locked prompt',
+        promptEncrypted: '{"ciphertext":"prompt-cipher"}',
+      }],
+      surveysResponseState: [{
+        answers: {
+          q1: { value: 'answer', encrypted: false, encryptionAudience: 'self' },
+        },
+        importance: {},
+        conviction: {},
+        additionalComments: {
+          q1: { value: '', encrypted: false, encryptionAudience: 'self' },
+        },
+      }],
+    };
+
+    const json = subject.prepareJsonAndHash(0);
+
+    expect(json.prompt).toBe('[encrypted]');
+    expect(JSON.stringify(json)).not.toContain('Secret locked prompt');
+  });
+
   it('allows submit click when submitted latch is active but pending edits exist', () => {
     const subject = new SurveyQuestions({
       singleQuestionMode: false,
