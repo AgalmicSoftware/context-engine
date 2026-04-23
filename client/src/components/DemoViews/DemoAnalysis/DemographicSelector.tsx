@@ -16,6 +16,23 @@ const formatPersonaCount = (count = 0) => {
   return `${normalizedCount} persona${normalizedCount === 1 ? '' : 's'}`;
 };
 
+type DemographicOption = {
+  value: string;
+  count?: number;
+};
+
+type DemographicsByCategory = Record<string, DemographicOption[]>;
+
+type DemographicSelectorProps = {
+  demographics?: DemographicsByCategory;
+  selectedSegmentKeys?: string[];
+  onToggleSegment: (segmentKey: string) => void;
+  onCategoryChange: (category: string, segmentKeys: string[]) => void;
+  onClearAll: () => void;
+  onAutoSelectCorrelation: () => void;
+  onSuggestFromSegment: (segmentKey: string) => void;
+};
+
 const DemographicSelector = ({
   demographics = {},
   selectedSegmentKeys = [],
@@ -24,7 +41,7 @@ const DemographicSelector = ({
   onClearAll,
   onAutoSelectCorrelation,
   onSuggestFromSegment,
-}) => {
+}: DemographicSelectorProps) => {
   const selectedSet = new Set(selectedSegmentKeys);
 
   return (
@@ -99,7 +116,7 @@ const DemographicSelector = ({
               isClearable
               onChange={(nextOptions) => {
                 const nextSegmentKeys = (Array.isArray(nextOptions) ? nextOptions : []).map(
-                  (option) => `${category}:${option.value}`
+                  (option) => `${category}:${String(option.value || '')}`
                 );
                 onCategoryChange(category, nextSegmentKeys);
               }}
