@@ -1,10 +1,16 @@
-/** @file UserStats.jsx */
+/** @file UserStats.tsx */
 import React from 'react';
 import { Collapse } from 'reactstrap';
 import styles from './UserPage.module.scss'; // Adjust the import path as necessary
 
-const UserStats = ({ userStats, collapseOpen, toggleCollapse }) => {
-  const renderStatItemCollapse = (statType) => {
+type UserStatsProps = {
+  userStats: Record<string, React.ReactNode>;
+  collapseOpen?: string | null;
+  toggleCollapse: (statType: string) => void;
+};
+
+const UserStats = ({ userStats, collapseOpen, toggleCollapse }: UserStatsProps) => {
+  const renderStatItemCollapse = (statType: string) => {
     switch (statType) {
       case 'mostUniqueIdea':
         return <p>More details about the most unique idea...</p>;
