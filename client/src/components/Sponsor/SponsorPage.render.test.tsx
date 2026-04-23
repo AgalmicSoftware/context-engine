@@ -5,7 +5,13 @@ import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 const ADMIN_ADDRESS = '0x00000000000000000000000000000000000000aa';
 const SESSION_REGISTRY_CACHE_UPDATED_EVENT = 'ce:session-registry-cache-updated';
 
-const buildSessionConfig = (overrides = {}) => ({
+type Deferred<T = any> = {
+  promise: Promise<T>;
+  resolve: (value: T | PromiseLike<T>) => void;
+  reject: (reason?: any) => void;
+};
+
+const buildSessionConfig = (overrides: Record<string, any> = {}) => ({
   slug: 'edge',
   sessionName: 'Edge Session',
   corsWorkerUrl: 'https://worker.example.test',
@@ -37,44 +43,44 @@ const mockNormalizeSessionIdHex = jest.fn((value = '') => (
 
 jest.mock('../../utilities/worker/corsProxy.js', () => ({
   corsProxyUtils: {
-    resolveCorsProxyUrl: (...args) => mockResolveCorsProxyUrl(...args),
+    resolveCorsProxyUrl: (...args: any[]) => mockResolveCorsProxyUrl(...args),
   },
 }));
 
 jest.mock('../../utilities/worker/workerAuth.js', () => ({
-  buildSignedBootstrapAdminAuth: (...args) => mockBuildSignedBootstrapAdminAuth(...args),
-  buildSignedAdminActionAuth: (...args) => mockBuildSignedAdminActionAuth(...args),
+  buildSignedBootstrapAdminAuth: (...args: any[]) => mockBuildSignedBootstrapAdminAuth(...args),
+  buildSignedAdminActionAuth: (...args: any[]) => mockBuildSignedAdminActionAuth(...args),
 }));
 
 jest.mock('../../utilities/crypto/cryptography.js', () => ({
   cryptoUtils: {
-    encryptWithPassword: (...args) => mockEncryptWithPassword(...args),
+    encryptWithPassword: (...args: any[]) => mockEncryptWithPassword(...args),
   },
 }));
 
 jest.mock('../../utilities/arweave/arweaveScripts.js', () => ({
   arweaveScripts: {
-    uploadDataToArweave: (...args) => mockUploadDataToArweave(...args),
+    uploadDataToArweave: (...args: any[]) => mockUploadDataToArweave(...args),
     downloadDataFromArweave: jest.fn(),
   },
 }));
 
 jest.mock('../../utilities/web3/sessionRegistry.js', () => ({
-  fetchSessionFromRegistry: (...args) => mockFetchSessionFromRegistry(...args),
-  loadSessionRegistryCache: (...args) => mockLoadSessionRegistryCache(...args),
+  fetchSessionFromRegistry: (...args: any[]) => mockFetchSessionFromRegistry(...args),
+  loadSessionRegistryCache: (...args: any[]) => mockLoadSessionRegistryCache(...args),
   SESSION_REGISTRY_CACHE_UPDATED_EVENT,
   sessionRegistryStore: {
-    getAllSessionEntries: (...args) => mockGetAllSessionEntries(...args),
+    getAllSessionEntries: (...args: any[]) => mockGetAllSessionEntries(...args),
   },
   sessionRegistryUtils: {
-    normalizeSessionIdHex: (...args) => mockNormalizeSessionIdHex(...args),
+    normalizeSessionIdHex: (...args: any[]) => mockNormalizeSessionIdHex(...args),
   },
-  upsertSessionRegistryCache: (...args) => mockUpsertSessionRegistryCache(...args),
+  upsertSessionRegistryCache: (...args: any[]) => mockUpsertSessionRegistryCache(...args),
 }));
 
 jest.mock('../../utilities/session/sessionWorkerAvailability.js', () => ({
-  getUsableSessionWorkerUrl: (...args) => mockGetUsableSessionWorkerUrl(...args),
-  hasUsableSessionWorkerConfig: (...args) => mockHasUsableSessionWorkerConfig(...args),
+  getUsableSessionWorkerUrl: (...args: any[]) => mockGetUsableSessionWorkerUrl(...args),
+  hasUsableSessionWorkerConfig: (...args: any[]) => mockHasUsableSessionWorkerConfig(...args),
 }));
 
 jest.mock('../../utilities/ui/notify.js', () => ({
@@ -84,14 +90,19 @@ jest.mock('../../utilities/ui/notify.js', () => ({
   },
 }));
 
-const SponsorPage = require('./SponsorPage.jsx').default;
+const SponsorPage = require('./SponsorPage.jsx').default as React.ComponentType<any>;
+const getFetchMock = () => global.fetch as jest.Mock;
 
 const renderSponsorPage = async ({
   account = ADMIN_ADDRESS,
   initialSessionId,
   initialRegistryChainId,
+}: {
+  account?: string;
+  initialSessionId?: string;
+  initialRegistryChainId?: string;
 } = {}) => {
-  let utils;
+  let utils: any;
   await act(async () => {
     utils = render(
       <SponsorPage
@@ -110,16 +121,20 @@ const renderSponsorPage = async ({
   return utils;
 };
 
-const getFieldInputByLabel = (labelText) => (
-  screen.getByText(labelText).parentElement.querySelector('input,textarea,select')
-);
-const getToggleCheckbox = (labelText) => (
-  screen.getByText(labelText).closest('label').querySelector('input[type="checkbox"]')
-);
-const createDeferred = () => {
-  let resolve;
-  let reject;
-  const promise = new Promise((res, rej) => {
+const getFieldInputByLabel = (labelText: string): HTMLElement => {
+  const input = screen.getByText(labelText).parentElement?.querySelector('input,textarea,select');
+  if (!input) throw new Error(`Missing input for label: ${labelText}`);
+  return input as HTMLElement;
+};
+const getToggleCheckbox = (labelText: string): HTMLInputElement => {
+  const checkbox = screen.getByText(labelText).closest('label')?.querySelector('input[type="checkbox"]');
+  if (!checkbox) throw new Error(`Missing checkbox for label: ${labelText}`);
+  return checkbox as HTMLInputElement;
+};
+const createDeferred = <T = any>(): Deferred<T> => {
+  let resolve!: Deferred<T>['resolve'];
+  let reject!: Deferred<T>['reject'];
+  const promise = new Promise<T>((res, rej) => {
     resolve = res;
     reject = rej;
   });
@@ -129,12 +144,12 @@ const createDeferred = () => {
 describe('SponsorPage', () => {
   const originalFetch = global.fetch;
   const originalCrypto = global.crypto;
-  let sessionEntries;
+  let sessionEntries: any[];
 
   beforeEach(() => {
     jest.clearAllMocks();
     localStorage.clear();
-    global.fetch = jest.fn((url) => Promise.resolve(
+    global.fetch = jest.fn((url: any): Promise<any> => Promise.resolve(
       String(url).endsWith('/auth/nonce')
         ? { ok: true, json: async () => ({ nonce: 'test-admin-nonce' }) }
         : String(url).endsWith('/admin/issue-sponsored-grants')
@@ -148,7 +163,7 @@ describe('SponsorPage', () => {
               }),
             }
         : { ok: true, json: async () => ({ ok: true }) }
-    ));
+    )) as any;
     sessionEntries = [['edge', buildSessionConfig()]];
     mockLoadSessionRegistryCache.mockResolvedValue(undefined);
     mockGetAllSessionEntries.mockImplementation(() => sessionEntries);
@@ -178,8 +193,8 @@ describe('SponsorPage', () => {
       audience: 'http://localhost',
       expiration: 4102444800,
     });
-    if (!global.crypto) global.crypto = {};
-    global.crypto.getRandomValues = jest.fn((buffer) => {
+    if (!global.crypto) (global as any).crypto = {};
+    (global.crypto as any).getRandomValues = jest.fn((buffer: any) => {
       for (let i = 0; i < buffer.length; i += 1) buffer[i] = i + 1;
       return buffer;
     });
@@ -276,7 +291,7 @@ describe('SponsorPage', () => {
 
   it('uploads an encrypted sponsored bundle and renders a share URL with tx query plus hash key', async () => {
     const expectedLitPayerAddress = '0x3AC823CA9AcDA550244C6fF4927b5e1478E70Ff7';
-    global.fetch.mockImplementation((url) => Promise.resolve(
+    getFetchMock().mockImplementation((url: any) => Promise.resolve(
       String(url).endsWith('/auth/nonce')
         ? { ok: true, json: async () => ({ nonce: 'test-admin-nonce' }) }
         : String(url).endsWith('/admin/issue-sponsored-grants')
@@ -352,7 +367,7 @@ describe('SponsorPage', () => {
       }),
     }), expect.any(String));
     expect(mockEncryptWithPassword.mock.calls[0][0]).not.toHaveProperty('cloudflareApiToken');
-    const grantCall = global.fetch.mock.calls.find(([url]) => String(url).endsWith('/admin/issue-sponsored-grants'));
+    const grantCall = getFetchMock().mock.calls.find(([url]: any[]) => String(url).endsWith('/admin/issue-sponsored-grants'));
     expect(grantCall).toBeTruthy();
     expect(JSON.parse(grantCall[1].body)).toEqual(expect.objectContaining({
       sessionSlug: 'edge',
@@ -410,7 +425,7 @@ describe('SponsorPage', () => {
       }),
     }));
 
-    const shareInput = await screen.findByLabelText('Sponsored share URL');
+    const shareInput = await screen.findByLabelText('Sponsored share URL') as HTMLInputElement;
     expect(screen.getByTestId(E2E_TESTIDS.SPONSOR_SHARE_URL)).toBe(shareInput);
     expect(shareInput.value).toMatch(/^http:\/\/localhost\/new\?sponsored=sponsor_tx_id#k=/);
     expect(shareInput.value).toContain('?sponsored=sponsor_tx_id#k=');
@@ -440,7 +455,7 @@ describe('SponsorPage', () => {
       expect(mockUploadDataToArweave).toHaveBeenCalledTimes(1);
     });
     expect(await screen.findByLabelText('Sponsored share URL')).toBeInTheDocument();
-    const grantCall = global.fetch.mock.calls.find(([url]) => String(url).endsWith('/admin/issue-sponsored-grants'));
+    const grantCall = getFetchMock().mock.calls.find(([url]: any[]) => String(url).endsWith('/admin/issue-sponsored-grants'));
     expect(grantCall).toBeTruthy();
     expect(JSON.parse(grantCall[1].body)).toEqual(expect.objectContaining({
       grantRequest: expect.objectContaining({
@@ -509,7 +524,7 @@ describe('SponsorPage', () => {
       }),
     ]];
     mockFetchSessionFromRegistry.mockResolvedValue(sessionEntries[0][1]);
-    global.fetch = jest.fn((url) => Promise.resolve(
+    global.fetch = jest.fn((url: any): Promise<any> => Promise.resolve(
       String(url).endsWith('/auth/nonce')
         ? { ok: true, json: async () => ({ nonce: 'test-admin-nonce' }) }
         : String(url).endsWith('/admin/issue-sponsored-grants')
@@ -521,7 +536,7 @@ describe('SponsorPage', () => {
               }),
             }
           : { ok: true, json: async () => ({ ok: true }) }
-    ));
+    )) as any;
 
     await renderSponsorPage();
 
@@ -545,7 +560,7 @@ describe('SponsorPage', () => {
   });
 
   it('turns sponsor grant fetch failures into an allowOrigins-focused hint', async () => {
-    global.fetch = jest.fn((url) => {
+    global.fetch = jest.fn((url: any): Promise<any> => {
       if (String(url).endsWith('/auth/nonce')) {
         return Promise.resolve({ ok: true, json: async () => ({ nonce: 'test-admin-nonce' }) });
       }
@@ -553,7 +568,7 @@ describe('SponsorPage', () => {
         return Promise.reject(new TypeError('Failed to fetch'));
       }
       return Promise.resolve({ ok: true, json: async () => ({ ok: true }) });
-    });
+    }) as any;
 
     await renderSponsorPage();
 
@@ -678,12 +693,12 @@ describe('SponsorPage', () => {
     expect(mockBuildSignedBootstrapAdminAuth).toHaveBeenCalledWith(expect.objectContaining({
       workerUrl: 'https://manual.example.test',
     }));
-    expect(global.fetch).toHaveBeenCalledWith(
+    expect(getFetchMock()).toHaveBeenCalledWith(
       'https://manual.example.test/admin/issue-sponsored-grants',
       expect.anything()
     );
-    expect(JSON.parse(global.fetch.mock.calls.find(
-      ([url]) => String(url) === 'https://manual.example.test/admin/issue-sponsored-grants'
+    expect(JSON.parse(getFetchMock().mock.calls.find(
+      ([url]: any[]) => String(url) === 'https://manual.example.test/admin/issue-sponsored-grants'
     )[1].body)).toEqual(expect.objectContaining({
       grantRequest: expect.objectContaining({
         bootstrapWorkerUrl: 'https://manual.example.test',
@@ -768,7 +783,7 @@ describe('SponsorPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Create sponsored URL' }));
 
     expect(await screen.findByText('Sponsored uploads currently require a session with a direct adminAddress.')).toBeInTheDocument();
-    expect(global.fetch).not.toHaveBeenCalled();
+    expect(getFetchMock()).not.toHaveBeenCalled();
     expect(mockUploadDataToArweave).not.toHaveBeenCalled();
   });
 
