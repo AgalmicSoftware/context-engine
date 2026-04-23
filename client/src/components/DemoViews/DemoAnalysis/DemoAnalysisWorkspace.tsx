@@ -11,18 +11,14 @@ import ComparisonReport from './ComparisonReport';
 import ComparisonSuggestions from './ComparisonSuggestions';
 import DemographicSelector from './DemographicSelector';
 import QuestionBreakdownChart from './QuestionBreakdownChart';
+import QuestionDrilldownModal from './QuestionDrilldownModal';
 import WorldResultsMap from './WorldResultsMap';
-import SingleQuestionResponse from '../../SurveyTool/SingleQuestionResponse';
-import { buildTagHref } from '../../SurveyTool/QuestionTagDropdown';
 import styles from './DemoAnalysisWorkspace.module.scss';
 
 type Question = {
   id: string;
   text: string;
   options: string[];
-  category?: string;
-  keyTension?: string;
-  sourcePromptType?: string;
 };
 
 type FlatResponse = {
@@ -73,7 +69,6 @@ type AnalysisData = {
 type DemoAnalysisWorkspaceProps = {
   demoData?: unknown;
   metadataByXid?: unknown;
-  sessionSlug?: string;
 };
 
 const getDemoAnalysisData = buildDemoAnalysisData as unknown as (demoData?: unknown, metadataByXid?: unknown) => AnalysisData;
@@ -88,7 +83,6 @@ const buildSuggestionSelectionKey = (questionId = '', segmentKeys: string[] = []
 const DemoAnalysisWorkspace = ({
   demoData = demoAnalysisData,
   metadataByXid = historicalFigureDemographics,
-  sessionSlug = '',
 }: DemoAnalysisWorkspaceProps) => {
   const analysisData = useMemo<AnalysisData>(
     () => getDemoAnalysisData(demoData, metadataByXid),
@@ -102,7 +96,7 @@ const DemoAnalysisWorkspace = ({
 
   const [selectedSegmentKeys, setSelectedSegmentKeys] = useState<string[]>([]);
   const [selectedQuestionId, setSelectedQuestionId] = useState('');
-  const [selectedReportTagIDs, setSelectedReportTagIDs] = useState<string[]>([]);
+  const [drilldownQuestionId, setDrilldownQuestionId] = useState('');
 
   useEffect(() => {
     if (selectedQuestionId && !questionMap.has(selectedQuestionId)) {
@@ -110,15 +104,19 @@ const DemoAnalysisWorkspace = ({
     }
   }, [questionMap, selectedQuestionId]);
 
+  useEffect(() => {
+    if (drilldownQuestionId && !questionMap.has(drilldownQuestionId)) {
+      setDrilldownQuestionId('');
+    }
+  }, [drilldownQuestionId, questionMap]);
+
   const comparisonGroups = useMemo(
     () => selectedSegmentKeys.map((segmentKey) => getComparisonGroup(segmentKey)),
     [selectedSegmentKeys]
   );
 
   const selectedQuestion = questionMap.get(selectedQuestionId) || null;
-  const selectedQuestionTags = selectedQuestionId
-    ? (analysisData.questionTagsData[selectedQuestionId] || [])
-    : [];
+  const drilldownQuestion = questionMap.get(drilldownQuestionId) || null;
   const activeSuggestionKey = useMemo(() => {
     if (!selectedQuestionId || selectedSegmentKeys.length < 2) return '';
     return buildSuggestionSelectionKey(selectedQuestionId, selectedSegmentKeys);
@@ -196,6 +194,12 @@ const DemoAnalysisWorkspace = ({
     handleSuggestionClick(candidateSuggestions[0]);
   };
 
+  const openDrilldown = (questionId: string | number) => {
+    const normalizedQuestionId = String(questionId || '');
+    setSelectedQuestionId(normalizedQuestionId);
+    setDrilldownQuestionId(normalizedQuestionId);
+  };
+
   return (
     <div className={styles.workspace} data-testid="demo-analysis-workspace">
       <DemographicSelector
@@ -209,45 +213,16 @@ const DemoAnalysisWorkspace = ({
       />
 
       {selectedQuestion ? (
-        <section className={styles.selectedQuestionBanner} data-testid="demo-analysis-question-banner">
-          <div className={styles.selectedQuestionFrame}>
-            <SingleQuestionResponse
-              mode="fullscreen"
-              questionOnly={true}
-              question={{
-                prompt: selectedQuestion.text,
-                type: 'binary',
-              }}
-              response={null}
-              containerClassName={styles.selectedQuestionCard}
-              bodyClassName={styles.selectedQuestionCardBody}
-              questionPromptClassName={styles.selectedQuestionCardPrompt}
-              questionPromptTestId="demo-analysis-selected-question"
-            />
-            {(selectedQuestionTags.length > 0 || selectedQuestion.keyTension) ? (
-              <div className={styles.selectedQuestionGrounding}>
-                {selectedQuestion.keyTension ? (
-                  <p className={styles.selectedQuestionTension} data-testid="demo-analysis-selected-question-tension">
-                    <strong>Key tension:</strong> {selectedQuestion.keyTension}
-                  </p>
-                ) : null}
-                {selectedQuestionTags.length > 0 ? (
-                  <div className={styles.selectedQuestionGroundingPills} data-testid="demo-analysis-selected-question-tags">
-                    {selectedQuestionTags.map((tag) => (
-                      <a
-                        key={tag.tagID}
-                        className={styles.selectedQuestionTagButton}
-                        href={buildTagHref(tag.tagName, '', sessionSlug)}
-                        title={`Open ${tag.tagName} tag page for this session`}
-                      >
-                        {tag.tagName}
-                      </a>
-                    ))}
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
+        <section className={`${styles.panel} ${styles.selectedQuestionBanner}`} data-testid="demo-analysis-question-banner">
+          <div className={styles.selectedQuestionBannerHeader}>
+            <span className={styles.selectedQuestionBannerLabel}>Current focus question</span>
+            <span className={styles.selectedQuestionBannerMeta}>
+              The suggestion card, map, and breakdown below are all keyed to this prompt.
+            </span>
           </div>
+          <p className={styles.selectedQuestionBannerText} data-testid="demo-analysis-selected-question">
+            {selectedQuestion.text}
+          </p>
         </section>
       ) : null}
 
@@ -268,6 +243,7 @@ const DemoAnalysisWorkspace = ({
         question={selectedQuestion}
         flatResponses={analysisData.flatResponses}
         comparisonGroups={comparisonGroups}
+        onOpenDrilldown={openDrilldown}
       />
 
       <ComparisonReport
@@ -275,8 +251,16 @@ const DemoAnalysisWorkspace = ({
         questions={analysisData.questions}
         comparisonGroups={comparisonGroups}
         questionTagsData={analysisData.questionTagsData}
-        selectedTagIDs={selectedReportTagIDs}
-        onSelectedTagIDsChange={setSelectedReportTagIDs}
+        onInspectQuestion={openDrilldown}
+      />
+
+      <QuestionDrilldownModal
+        isOpen={Boolean(drilldownQuestion)}
+        question={drilldownQuestion}
+        comparisonGroups={comparisonGroups}
+        flatResponses={analysisData.flatResponses}
+        questionTags={analysisData.questionTagsData[drilldownQuestionId] || []}
+        onClose={() => setDrilldownQuestionId('')}
       />
     </div>
   );

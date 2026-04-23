@@ -138,7 +138,7 @@ jest.mock('../MainContent/RiskMatrix', () => ({
     );
   },
 }));
-jest.mock('../DemoViews/DemoAnalysis/DemoAnalysisWorkspace.jsx', () => ({
+jest.mock('../DemoViews/DemoAnalysis/DemoAnalysisWorkspace', () => ({
   __esModule: true,
   default: (props) => {
     mockDemoAnalysisWorkspace(props);

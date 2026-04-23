@@ -1,7 +1,5 @@
-import fs from 'fs';
-import path from 'path';
 import React from 'react';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import DemoAnalysisWorkspace from './DemoAnalysisWorkspace';
 
 jest.mock('../../Shared/CheckboxMultiSelect', () => ({
@@ -61,18 +59,6 @@ const setMultiSelectValues = (testId: string, values: string[]) => {
 };
 
 describe('DemoAnalysisWorkspace', () => {
-  it('keeps the selected question banner readable on the light breakdown surface', () => {
-    const scssPath = path.join(__dirname, 'DemoAnalysisWorkspace.module.scss');
-    const scss = fs.readFileSync(scssPath, 'utf8');
-
-    expect(scss).toMatch(/\.selectedQuestionFrame\s*{[\s\S]*background:\s*linear-gradient\(145deg,\s*#f8fbff 0%,\s*#edf4ff 100%\);/);
-    expect(scss).toMatch(/\.selectedQuestionFrame\s*{[\s\S]*border:\s*1px solid rgba\(15,\s*94,\s*199,\s*0\.14\);/);
-    expect(scss).toMatch(/\.selectedQuestionCard\s*{[\s\S]*background:\s*transparent !important;/);
-    expect(scss).toMatch(/\.selectedQuestionCardPrompt\s*{[\s\S]*color:\s*#1f2733 !important;/);
-    expect(scss).toMatch(/\.selectedQuestionTension\s*{[\s\S]*color:\s*#364252;/);
-    expect(scss).not.toMatch(/\.selectedQuestionCardPrompt\s*{[\s\S]*color:\s*#f8fbff;/);
-  });
-
   it('starts with empty map and question breakdown states until a question is selected', () => {
     render(<DemoAnalysisWorkspace />);
 
@@ -127,76 +113,13 @@ describe('DemoAnalysisWorkspace', () => {
     });
 
     expect(screen.getByTestId('demo-analysis-selected-question').textContent).toBe(suggestionQuestionText);
-    expect(screen.queryByTestId('demo-analysis-breakdown-question')).not.toBeInTheDocument();
+    expect(screen.getByTestId('demo-analysis-breakdown-question').textContent).toBe(suggestionQuestionText);
     expect(suggestionQuestionText).toBeTruthy();
     expect(screen.getByTestId('demo-analysis-question-breakdown')).toHaveTextContent(/overall/i);
+    expect(screen.getByTestId('demo-analysis-question-breakdown')).toHaveTextContent(/personas/i);
     expect(screen.getByTestId('demo-analysis-question-breakdown')).toHaveTextContent(/modeled responses/i);
-    expect(screen.getByTestId('demo-analysis-question-breakdown')).not.toHaveTextContent(/personas\s*·/i);
     expect(screen.getByTestId('demo-analysis-report-summary').textContent).toMatch(/:/);
     expect(screen.getByTestId('demo-analysis-suggestion-0')).toHaveAttribute('aria-pressed', 'true');
-  });
-
-  it('shows corpus grounding and key tension for the selected question banner', async () => {
-    render(
-      <DemoAnalysisWorkspace
-        sessionSlug="demo"
-        demoData={{
-          comments: [
-            {
-              commentBody: 'Custom grounded question',
-              type: 'binary',
-              category: 'CUSTOM GROUNDING',
-              key_tension: 'A concrete test tension for the selected question banner.',
-              sources: 'tweets, LessWrong',
-            },
-          ],
-          participantsVotes: [
-            {
-              participant: '0xbase-ada',
-              xid: 'AdaLovelace',
-              votes: { 0: 1 },
-            },
-            {
-              participant: '0xbase-grace',
-              xid: 'GraceHopper',
-              votes: { 0: -1 },
-            },
-          ],
-        }}
-        metadataByXid={{
-          AdaLovelace: {
-            eraBucket: 'Modern',
-            region: 'Europe',
-            country: 'United Kingdom',
-            gender: 'Woman',
-            affiliation: 'Mathematics',
-            atlasCategory: 'Foundations',
-          },
-          GraceHopper: {
-            eraBucket: 'Industrial',
-            region: 'North America',
-            country: 'United States',
-            gender: 'Woman',
-            affiliation: 'Computer Science',
-            atlasCategory: 'Foundations',
-          },
-        }}
-      />
-    );
-
-    fireEvent.click(await screen.findByTestId('demo-analysis-suggestion-0'));
-
-    await waitFor(() => {
-      expect(screen.getByTestId('demo-analysis-selected-question')).toBeInTheDocument();
-    });
-
-    const banner = screen.getByTestId('demo-analysis-question-banner');
-    const customGroundingTag = within(banner).getByRole('link', { name: 'Custom Grounding' });
-    const tweetsTag = within(banner).getByRole('link', { name: 'Tweets' });
-
-    expect(screen.getByTestId('demo-analysis-selected-question-tension')).toHaveTextContent(/Key tension:/i);
-    expect(customGroundingTag).toHaveAttribute('href', '/tag/Custom%20Grounding?session=demo');
-    expect(tweetsTag).toHaveAttribute('href', '/tag/Tweets?session=demo');
   });
 
   it('auto-selects a strong correlation from the wand action', async () => {
@@ -210,7 +133,9 @@ describe('DemoAnalysisWorkspace', () => {
 
     expect(screen.getByTestId('demo-analysis-selected-question').textContent).toBeTruthy();
     expect(screen.getByTestId('demo-analysis-question-banner')).toBeInTheDocument();
-    expect(screen.queryByTestId('demo-analysis-breakdown-question')).not.toBeInTheDocument();
+    expect(screen.getByTestId('demo-analysis-breakdown-question').textContent).toBe(
+      screen.getByTestId('demo-analysis-selected-question').textContent
+    );
   });
 
   it('keeps auto-select usable after only one demographic segment is chosen', async () => {
@@ -235,19 +160,5 @@ describe('DemoAnalysisWorkspace', () => {
     setMultiSelectValues('demo-analysis-select-era', ['Modern']);
 
     expect(screen.getByTestId('demo-analysis-empty-state')).toBeInTheDocument();
-  });
-
-  it('does not expose the temporary drilldown details modal', async () => {
-    render(<DemoAnalysisWorkspace />);
-
-    fireEvent.click(await screen.findByTestId('demo-analysis-suggestion-0'));
-
-    await waitFor(() => {
-      expect(screen.getByTestId('demo-analysis-selected-question')).toBeInTheDocument();
-    });
-
-    expect(screen.queryByRole('button', { name: 'Details' })).not.toBeInTheDocument();
-    expect(screen.queryByTestId('demo-analysis-drilldown-modal')).not.toBeInTheDocument();
-    expect(screen.queryByText('Modeled respondent mix')).not.toBeInTheDocument();
   });
 });
