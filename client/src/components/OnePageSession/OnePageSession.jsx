@@ -37,7 +37,7 @@ import {
 } from '../../utilities/cache/cacheScripts.js';
 import { measureSync } from '../../utilities/ui/uiPerfStats.js';
 import { readPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
-import { hasCachedCreateSbtForm as hasCachedCreateSbtFormCache } from '../../utilities/sbt/createSbtFormCache.js';
+import { hasCachedCreateSbtForm as hasCachedCreateSbtFormCache } from '../../utilities/sbt/sbtCreateFormCache.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { getSbtDisplayName } from '../../utilities/sbt/sbtDisplayNames.js';
 import { isCryptoMode, sbtsListPath, t } from '../../utilities/ui/terminology.js';

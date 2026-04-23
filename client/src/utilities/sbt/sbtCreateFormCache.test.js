@@ -4,7 +4,7 @@ import {
   getScopedCreateSbtFormCacheKey,
   hasCachedCreateSbtForm,
   hasMeaningfulCreateSbtFormPayload,
-} from './createSbtFormCache.js';
+} from './sbtCreateFormCache.js';
 
 describe('createSbtFormCache helpers', () => {
   beforeEach(() => {
