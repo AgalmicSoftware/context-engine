@@ -93,7 +93,7 @@ jest.mock('../Sessions/SessionWizard.jsx', () => {
   };
 });
 
-jest.mock('../SurveyTool/SurveyPage.jsx', () => {
+jest.mock('../SurveyTool/SurveyPage', () => {
   const React = require('react');
   return {
     __esModule: true,

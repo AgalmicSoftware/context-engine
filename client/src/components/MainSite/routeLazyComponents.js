@@ -2,7 +2,7 @@
 
 import React from "react";
 
-export const SurveyPage = React.lazy(() => import("../SurveyTool/SurveyPage.jsx"));
+export const SurveyPage = React.lazy(() => import("../SurveyTool/SurveyPage"));
 export const SurveyTool = React.lazy(() => import("../SurveyTool/SurveyTool.jsx"));
 export const SBTPage = React.lazy(() => import("../SBTs/SBTPage.jsx"));
 export const SBTsPage = React.lazy(() => import("../SBTs/SBTsList.jsx")); // SBTsList.jsx, often referred to as SBTsPage in comments
