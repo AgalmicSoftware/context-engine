@@ -7,9 +7,57 @@ const POINT_RADIUS = 8;
 const TOOLTIP_OFFSET = 14;
 const TOOLTIP_MARGIN = 12;
 
-const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+type BeeswarmPoint = {
+  questionId?: string;
+  index?: string | number;
+  key?: string | number;
+  label?: string;
+  x?: number;
+  y?: number;
+  agrees?: number;
+  disagrees?: number;
+  unsure?: number;
+  total?: number;
+  extremity?: number;
+  [key: string]: any;
+};
 
-const TOOLTIP_VOTE_GROUPS = [
+type TooltipVoteBreakdown = {
+  agrees: number;
+  disagrees: number;
+  unsure: number;
+  total: number;
+};
+
+type TooltipLayout = {
+  left: number;
+  top: number;
+  horizontal: 'right' | 'left';
+  vertical: 'bottom' | 'top';
+};
+
+type BeeswarmPlotProps = {
+  points?: BeeswarmPoint[];
+  width?: number;
+  height?: number;
+  onHover?: (point: BeeswarmPoint | null) => void;
+  onClick?: (point: BeeswarmPoint) => void;
+  showIdleSummary?: boolean;
+};
+
+type TooltipVoteGroup = {
+  key: string;
+  label: string;
+  valueKey: keyof TooltipVoteBreakdown;
+  statClassName: string;
+  statTestId: string;
+  segmentClassName: string;
+  segmentTestId: string;
+};
+
+const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
+
+const TOOLTIP_VOTE_GROUPS: TooltipVoteGroup[] = [
   {
     key: 'agree',
     label: 'Agree',
@@ -39,26 +87,28 @@ const TOOLTIP_VOTE_GROUPS = [
   },
 ];
 
-const normalizePointPosition = (point, index, width, height) => {
+const normalizePointPosition = (point: BeeswarmPoint = {}, index: number, width: number, height: number): BeeswarmPoint => {
   const axisY = height - AXIS_BOTTOM_PADDING;
   const fallbackX = width / 2;
   const fallbackY = height / 2;
+  const pointX = Number.isFinite(point?.x) ? Number(point.x) : fallbackX;
+  const pointY = Number.isFinite(point?.y)
+    ? clamp(Number(point.y), POINT_RADIUS + 4, axisY - POINT_RADIUS - 4)
+    : fallbackY;
   return {
     ...point,
-    x: Number.isFinite(point?.x) ? point.x : fallbackX,
-    y: Number.isFinite(point?.y)
-      ? clamp(point.y, POINT_RADIUS + 4, axisY - POINT_RADIUS - 4)
-      : fallbackY,
+    x: pointX,
+    y: pointY,
     key: point?.questionId || point?.index || index,
   };
 };
 
-const normalizeBinaryVoteCount = (value) => {
+const normalizeBinaryVoteCount = (value: unknown) => {
   const numericValue = Number(value || 0);
   return Number.isFinite(numericValue) ? numericValue : 0;
 };
 
-export const normalizeTooltipVoteBreakdown = (point = {}) => {
+export const normalizeTooltipVoteBreakdown = (point: BeeswarmPoint = {}): TooltipVoteBreakdown => {
   const agrees = Math.max(0, normalizeBinaryVoteCount(point?.agrees));
   const disagrees = Math.max(0, normalizeBinaryVoteCount(point?.disagrees));
   const reportedUnsure = Math.max(0, normalizeBinaryVoteCount(point?.unsure));
@@ -82,7 +132,16 @@ export const resolveTooltipLayout = ({
   tooltipHeight = 0,
   offset = TOOLTIP_OFFSET,
   margin = TOOLTIP_MARGIN,
-} = {}) => {
+}: {
+  anchorX?: number;
+  anchorY?: number;
+  wrapperWidth?: number;
+  wrapperHeight?: number;
+  tooltipWidth?: number;
+  tooltipHeight?: number;
+  offset?: number;
+  margin?: number;
+} = {}): TooltipLayout => {
   const usableWidth = Math.max(wrapperWidth, tooltipWidth + (margin * 2));
   const usableHeight = Math.max(wrapperHeight, tooltipHeight + (margin * 2));
   const maxLeft = Math.max(margin, usableWidth - tooltipWidth - margin);
@@ -115,18 +174,18 @@ export default function BeeswarmPlot({
   onHover,
   onClick,
   showIdleSummary = true,
-}) {
-  const [hoveredIndex, setHoveredIndex] = useState(null);
+}: BeeswarmPlotProps) {
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [singlePointDeselected, setSinglePointDeselected] = useState(false);
   const [tooltipAnchor, setTooltipAnchor] = useState({ x: 0, y: 0 });
-  const [tooltipLayout, setTooltipLayout] = useState({
+  const [tooltipLayout, setTooltipLayout] = useState<TooltipLayout>({
     left: TOOLTIP_MARGIN,
     top: TOOLTIP_MARGIN,
     horizontal: 'right',
     vertical: 'bottom',
   });
-  const wrapperRef = useRef(null);
-  const tooltipRef = useRef(null);
+  const wrapperRef = useRef<HTMLDivElement | null>(null);
+  const tooltipRef = useRef<HTMLDivElement | null>(null);
 
   const hasQuestions = Array.isArray(points) && points.length > 0;
   const hasResponses = hasQuestions && points.some((point) => normalizeBinaryVoteCount(point?.total) > 0);
@@ -145,7 +204,7 @@ export default function BeeswarmPlot({
       ];
     }
 
-    return beeswarmByExtremity(points, width, height).map((point, index) =>
+    return (beeswarmByExtremity(points, width, height) as BeeswarmPoint[]).map((point, index) =>
       normalizePointPosition(point, index, width, height)
     );
   }, [hasQuestions, height, points, width]);
@@ -163,7 +222,7 @@ export default function BeeswarmPlot({
     : [];
   const tooltipSegments = tooltipVoteGroups.filter((segment) => segment.value > 0);
 
-  const updateTooltipPosition = (event, point = null) => {
+  const updateTooltipPosition = (event: any, point: BeeswarmPoint | null = null) => {
     const wrapper = wrapperRef.current;
     if (!wrapper) return;
     const wrapperRect = wrapper.getBoundingClientRect();
@@ -188,7 +247,7 @@ export default function BeeswarmPlot({
     }
 
     if (point) {
-      setTooltipAnchor({ x: point.x, y: point.y });
+      setTooltipAnchor({ x: point.x || 0, y: point.y || 0 });
     }
   };
 
@@ -217,7 +276,7 @@ export default function BeeswarmPlot({
     ));
   }, [activePoint, height, tooltipAnchor.x, tooltipAnchor.y, width]);
 
-  const handleHover = (point, index, event = null) => {
+  const handleHover = (point: BeeswarmPoint, index: number, event: any = null) => {
     setSinglePointDeselected(false);
     setHoveredIndex(index);
     updateTooltipPosition(event, point);
@@ -230,7 +289,7 @@ export default function BeeswarmPlot({
     if (typeof onHover === 'function') onHover(null);
   };
 
-  const handlePointClick = (point, index) => {
+  const handlePointClick = (point: BeeswarmPoint, index: number) => {
     if (typeof onClick === 'function') {
       onClick(point);
       return;
