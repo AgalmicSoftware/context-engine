@@ -2,7 +2,7 @@ import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import fs from 'fs';
 import path from 'path';
-import SimUserPage from './SimUserPage.jsx';
+import SimUserPage from './SimUserPage';
 import historicalFigures from '../../variables/demo/historical_figure_users.json';
 
 jest.mock('../SurveyTool/SingleQuestionResponse.jsx', () => (props: any) => {
