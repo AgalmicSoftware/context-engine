@@ -37,7 +37,7 @@ import CreateQuestionsAndSurveys from './CreateQuestionsAndSurveys';
 import SurveyResults from './SurveyResults';
 import QuestionFilter from './QuestionFilter';
 import PileHologramAssistant from './PileHologramAssistant.jsx';
-import QuestionTagDropdown from './QuestionTagDropdown.jsx';
+import QuestionTagDropdown from './QuestionTagDropdown';
 import SingleQuestionResponse from './SingleQuestionResponse';
 import { JsonButtonRow, JsonIconButton, JsonPanel, JsonToggleButton } from '../Shared/Json/JsonControls';
 import { getQuestionTagDisplayList } from '../../utilities/survey/questionTags.js';

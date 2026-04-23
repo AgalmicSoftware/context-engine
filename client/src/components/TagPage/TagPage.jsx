@@ -27,7 +27,7 @@ import SingleQuestionResponse from '../SurveyTool/SingleQuestionResponse.jsx';
 import SessionChipSelector from '../Shared/SessionChipSelector';
 import {
   buildTagPagePath,
-} from '../SurveyTool/QuestionTagDropdown.jsx';
+} from '../SurveyTool/QuestionTagDropdown';
 import { getQuestionTagDisplayList } from '../../utilities/survey/questionTags.js';
 import styles from './TagPage.module.scss';
 

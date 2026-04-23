@@ -21,7 +21,7 @@ import {
 import { buildPublicRoute } from 'utilities/ui/publicUrl.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { notify } from '../../utilities/ui/notify.js';
-import { buildTagHref } from '../SurveyTool/QuestionTagDropdown.jsx';
+import { buildTagHref } from '../SurveyTool/QuestionTagDropdown';
 
 const { hierarchy: d3Hierarchy, pack: d3Pack } = require('d3');
 

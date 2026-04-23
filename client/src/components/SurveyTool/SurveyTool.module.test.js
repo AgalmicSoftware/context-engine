@@ -30,7 +30,7 @@ import {
 } from './surveyToolUtils.js';
 import { QuestionFilter as RawQuestionFilter } from './QuestionFilter.jsx';
 import PileHologramAssistant from './PileHologramAssistant.jsx';
-import QuestionTagDropdown from './QuestionTagDropdown.jsx';
+import QuestionTagDropdown from './QuestionTagDropdown';
 import styles from './SurveyTool.module.scss';
 import { renderToStaticMarkup } from 'react-dom/server';
 import fs from 'fs';
