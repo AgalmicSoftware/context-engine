@@ -6,7 +6,7 @@ import { Modal } from 'reactstrap';
 import seedComments from './riskMatrixTestData.json';
 import styles from './RiskMatrix.module.scss';
 import { getRiskMatrixAtlasScenariosForCell } from '../../variables/demo/riskMatrixAtlasScenarioData.js';
-import { buildPublicRoute } from '../../utilities/ui/publicUrl.js';
+import { buildPublicRoute, buildPublicUrlPath } from '../../utilities/ui/publicUrl.js';
 
 type RiskValence = 'opportunity' | 'risk';
 
@@ -157,6 +157,12 @@ const formatSelectionTitle = (cellId = '') => {
 
   const [catX, subX, catY, subY] = cellId.split('.');
   return `${catX} / ${subX} vs ${catY} / ${subY}`;
+};
+
+const resolveAtlasAssetPath = (value = '') => {
+  const normalizedValue = String(value || '').trim();
+  if (!normalizedValue) return '';
+  return normalizedValue.startsWith('/') ? buildPublicUrlPath(normalizedValue) : normalizedValue;
 };
 
 class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
@@ -862,7 +868,7 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
                       {scenario.image ? (
                         <img
                           className={styles.atlasScenarioImage}
-                          src={scenario.image}
+                          src={resolveAtlasAssetPath(scenario.image)}
                           alt={scenario.imageAlt || `${scenario.title} visualization`}
                         />
                       ) : (
@@ -900,7 +906,7 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
                         <div key={`${scenario.id}-${anchor.name}`} className={styles.atlasScenarioAnchorChip}>
                           <img
                             className={styles.atlasScenarioAnchorAvatar}
-                            src={anchor.avatar}
+                            src={resolveAtlasAssetPath(anchor.avatar)}
                             alt={anchor.name}
                           />
                           <div className={styles.atlasScenarioAnchorCopy}>

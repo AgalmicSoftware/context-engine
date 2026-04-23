@@ -60,6 +60,10 @@ export const getSbtPasswordRecoveryKey = ({ chainId, sbtAddress } = {}) => {
   return `${normalizeChainId(chainId) || 'unknown'}:${address}`;
 };
 
+const getUnknownSbtPasswordRecoveryKey = ({ sbtAddress } = {}) => (
+  getSbtPasswordRecoveryKey({ chainId: null, sbtAddress })
+);
+
 const normalizeEntry = (entry, fallbackKey, now) => {
   if (!entry || typeof entry !== 'object') return null;
   const keyParts = String(fallbackKey || '').split(':');
@@ -155,13 +159,36 @@ export const getSbtPasswordRecoveryCodes = ({
   now = Date.now(),
 } = {}) => {
   const store = readSbtPasswordRecoveryStore({ storage, now });
-  const key = getSbtPasswordRecoveryKey({ chainId, sbtAddress });
+  const normalizedChainId = normalizeChainId(chainId);
+  const key = getSbtPasswordRecoveryKey({ chainId: normalizedChainId, sbtAddress });
   const entry = key ? store.entries[key] : null;
   if (entry && Array.isArray(entry.passwords) && entry.passwords.length > 0) {
     return [...entry.passwords];
   }
 
-  if (!chainId) {
+  const unknownKey = getUnknownSbtPasswordRecoveryKey({ sbtAddress });
+  const unknownEntry = unknownKey ? store.entries[unknownKey] : null;
+  if (
+    normalizedChainId &&
+    unknownEntry &&
+    Array.isArray(unknownEntry.passwords) &&
+    unknownEntry.passwords.length > 0
+  ) {
+    // Regression guard: earlier writes could land under unknown:<address>
+    // before the UI resolved a chain id. Promote that entry on first exact read.
+    store.entries[key] = {
+      ...unknownEntry,
+      chainId: normalizedChainId,
+      sbtAddress: normalizeAddress(sbtAddress),
+      updatedAt: now,
+    };
+    delete store.entries[unknownKey];
+    store.updatedAt = now;
+    writeSbtPasswordRecoveryStore(store, { storage, now });
+    return [...store.entries[key].passwords];
+  }
+
+  if (!normalizedChainId) {
     const address = normalizeAddress(sbtAddress);
     const addressEntry = Object.values(store.entries).find(
       (candidate) => candidate.sbtAddress === address
