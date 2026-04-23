@@ -53,7 +53,7 @@ jest.mock('../../utilities/ui/notify.js', () => ({
     warn: jest.fn(),
   },
 }));
-jest.mock('../DemoViews/DebateHUD/PoliticalCompassView.jsx', () => ({
+jest.mock('../DemoViews/DebateHUD/PoliticalCompassView', () => ({
   __esModule: true,
   StandalonePoliticalCompass: ({ compass }) => (
     <div data-testid="atlas-compass">{compass?.xAxis?.label || 'Political Compass'}</div>

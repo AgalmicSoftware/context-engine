@@ -2,8 +2,6 @@ import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 
 import { StandalonePoliticalCompass } from './PoliticalCompassView';
-import { debateData } from '../../../variables/demo/debateData.js';
-import historicalFigureUsers from '../../../variables/demo/historical_figure_users.json';
 
 const createCompass = () => ({
   xAxis: {
