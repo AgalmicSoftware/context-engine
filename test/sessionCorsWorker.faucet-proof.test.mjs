@@ -9,6 +9,8 @@ const RPC_URL = 'https://rpc.example';
 const ZERO_BYTES32 = `0x${'0'.repeat(64)}`;
 const SESSION_CONFIG_KEY = (slug) => `session:${slug}:config`;
 const SESSION_SECRETS_KEY = (slug) => `session:${slug}:secrets`;
+const LOGIN_ORIGIN = 'https://contextengine.xyz';
+const LOGIN_DOMAIN = 'contextengine.xyz';
 
 const registryIface = new ethers.utils.Interface([
   'function getResourceGate(string,string) view returns (address[] sbtAddresses, uint256 chainId, uint8 mode, uint256 perMemberLimit)',
@@ -34,6 +36,7 @@ const buildSessionConfig = (overrides = {}) => ({
 const makeJsonRequest = (path, body, init = {}) => new Request(`https://worker.example${path}`, {
   method: init.method || 'POST',
   headers: {
+    Origin: init.origin || LOGIN_ORIGIN,
     'Content-Type': 'application/json',
     ...(init.headers || {}),
   },
@@ -64,7 +67,7 @@ const createMemoryKv = (seed = {}) => {
 };
 
 const buildSiweMessage = ({
-  domain = 'worker.example',
+  domain = LOGIN_DOMAIN,
   address,
   nonce,
   chainId = 84532,

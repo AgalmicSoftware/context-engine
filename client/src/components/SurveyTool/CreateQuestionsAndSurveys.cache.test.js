@@ -185,7 +185,6 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
   });
 
   it('blocks submit when any question prompt is blank after trim', async () => {
-    const alertSpy = jest.spyOn(window, 'alert').mockImplementation(() => {});
     const addQuestionsSpy = jest.spyOn(contractScripts, 'addQuestions').mockResolvedValue({
       receipt: { status: 1 },
       uploadedQuestions: [],
@@ -213,112 +212,105 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
 
       await instance.createSurvey();
 
-      expect(alertSpy).toHaveBeenCalledWith('Question 1 prompt cannot be blank.');
+      expect(instance.state.formValidationError).toBe('Question 1 prompt cannot be blank.');
       expect(addQuestionsSpy).not.toHaveBeenCalled();
       expect(instance.state.isSubmitting).toBe(false);
     } finally {
-      alertSpy.mockRestore();
       addQuestionsSpy.mockRestore();
     }
   });
 
   it('accepts http(s), root-relative, Arweave, and Lit document URLs while blocking unsafe hrefs', () => {
-    const alertSpy = jest.spyOn(window, 'alert').mockImplementation(() => {});
     const txId = 'a'.repeat(43);
     const arUrl = `ar://${txId}`;
     const litUrl = `lit://arweave/${txId}`;
     const legacyLitUrl = `lit+ar://${txId}`;
     const relativeViewerUrl = `/session/0xSessionToken/docs?__ceDocTx=${txId}&__ceDocStorage=lit-arweave&__ceDocKind=link`;
 
-    try {
-      expect(sanitizeDocumentUrls([
-        'https://example.com/doc',
-        'http://example.com/alt',
-        relativeViewerUrl,
-        arUrl,
-        litUrl,
-        legacyLitUrl,
-        'javascript:alert(1)',
-        'data:text/html,<script>alert(1)</script>',
-      ])).toEqual([
-        'https://example.com/doc',
-        'http://example.com/alt',
-        relativeViewerUrl,
-        arUrl,
-        litUrl,
-        legacyLitUrl,
-      ]);
+    expect(sanitizeDocumentUrls([
+      'https://example.com/doc',
+      'http://example.com/alt',
+      relativeViewerUrl,
+      arUrl,
+      litUrl,
+      legacyLitUrl,
+      'javascript:alert(1)',
+      'data:text/html,<script>alert(1)</script>',
+    ])).toEqual([
+      'https://example.com/doc',
+      'http://example.com/alt',
+      relativeViewerUrl,
+      arUrl,
+      litUrl,
+      legacyLitUrl,
+    ]);
 
-      const allowedInstance = makeInstance();
-      allowedInstance.state = {
-        ...allowedInstance.state,
-        showAutoTool: false,
-        isStandaloneQuestion: false,
-        title: 'Survey Title',
-        questions: [],
-        documentURLs: ['https://safe.example/doc'],
-        docURLInput: relativeViewerUrl,
-      };
+    const allowedInstance = makeInstance();
+    allowedInstance.state = {
+      ...allowedInstance.state,
+      showAutoTool: false,
+      isStandaloneQuestion: false,
+      title: 'Survey Title',
+      questions: [],
+      documentURLs: ['https://safe.example/doc'],
+      docURLInput: relativeViewerUrl,
+    };
 
-      allowedInstance.addDocumentURL();
+    allowedInstance.addDocumentURL();
 
-      expect(alertSpy).not.toHaveBeenCalled();
-      expect(allowedInstance.state.documentURLs).toEqual([
-        'https://safe.example/doc',
-        relativeViewerUrl,
-      ]);
-      const allowedAnchorHrefs = collectTreeNodes(allowedInstance.render(), (node) => node?.type === 'a')
-        .map((node) => node?.props?.href)
-        .filter(Boolean);
-      expect(allowedAnchorHrefs).toContain(relativeViewerUrl);
+    expect(allowedInstance.state.docURLError).toBe('');
+    expect(allowedInstance.state.documentURLs).toEqual([
+      'https://safe.example/doc',
+      relativeViewerUrl,
+    ]);
+    const allowedAnchorHrefs = collectTreeNodes(allowedInstance.render(), (node) => node?.type === 'a')
+      .map((node) => node?.props?.href)
+      .filter(Boolean);
+    expect(allowedAnchorHrefs).toContain(relativeViewerUrl);
 
-      const instance = makeInstance();
-      instance.state = {
-        ...instance.state,
-        showAutoTool: false,
-        isStandaloneQuestion: false,
-        title: 'Survey Title',
-        questions: [],
-        documentURLs: [
-          'https://safe.example/doc',
-          arUrl,
-          litUrl,
-          legacyLitUrl,
-          'javascript:alert(1)',
-          'data:text/html,<script>alert(1)</script>',
-        ],
-        docURLInput: 'javascript:alert(1)',
-      };
-
-      alertSpy.mockClear();
-      instance.addDocumentURL();
-
-      expect(alertSpy).toHaveBeenCalledWith(
-        'Document URLs must use http://, https://, a root-relative path (/...), ar://, or a supported Lit encrypted-doc URL.'
-      );
-      expect(instance.state.documentURLs).toEqual([
+    const instance = makeInstance();
+    instance.state = {
+      ...instance.state,
+      showAutoTool: false,
+      isStandaloneQuestion: false,
+      title: 'Survey Title',
+      questions: [],
+      documentURLs: [
         'https://safe.example/doc',
         arUrl,
         litUrl,
         legacyLitUrl,
         'javascript:alert(1)',
         'data:text/html,<script>alert(1)</script>',
-      ]);
+      ],
+      docURLInput: 'javascript:alert(1)',
+    };
 
-      const markup = renderToStaticMarkup(instance.render());
-      expect(markup).toContain('href="https://safe.example/doc"');
-      expect(markup).toContain(
-        `href="${normalizeArweaveUrl(arUrl, { contextLabel: 'create_survey_document_url' })}"`
-      );
-      expect(markup).toContain(`Encrypted doc (${litUrl})`);
-      expect(markup).toContain(`Encrypted doc (${legacyLitUrl})`);
-      expect(markup).not.toContain(`href="${litUrl}"`);
-      expect(markup).not.toContain(`href="${legacyLitUrl}"`);
-      expect(markup).not.toContain('href="javascript:alert(1)"');
-      expect(markup).not.toContain('href="data:text/html');
-    } finally {
-      alertSpy.mockRestore();
-    }
+    instance.addDocumentURL();
+
+    expect(instance.state.docURLError).toBe(
+      'Document URLs must use http://, https://, a root-relative path (/...), ar://, or a supported Lit encrypted-doc URL.'
+    );
+    expect(instance.state.documentURLs).toEqual([
+      'https://safe.example/doc',
+      arUrl,
+      litUrl,
+      legacyLitUrl,
+      'javascript:alert(1)',
+      'data:text/html,<script>alert(1)</script>',
+    ]);
+
+    const markup = renderToStaticMarkup(instance.render());
+    expect(markup).toContain('href="https://safe.example/doc"');
+    expect(markup).toContain(
+      `href="${normalizeArweaveUrl(arUrl, { contextLabel: 'create_survey_document_url' })}"`
+    );
+    expect(markup).toContain(`Encrypted doc (${litUrl})`);
+    expect(markup).toContain(`Encrypted doc (${legacyLitUrl})`);
+    expect(markup).not.toContain(`href="${litUrl}"`);
+    expect(markup).not.toContain(`href="${legacyLitUrl}"`);
+    expect(markup).not.toContain('href="javascript:alert(1)"');
+    expect(markup).not.toContain('href="data:text/html');
   });
 
   it('coalesces cache update events and marks cache watch as loaded', () => {
