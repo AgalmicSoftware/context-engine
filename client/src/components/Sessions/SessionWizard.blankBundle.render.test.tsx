@@ -1,10 +1,10 @@
+/* eslint-disable import/first */
 import React from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { buildContractViewerContracts } from '../ContractPage/contractViewerUtils.js';
 
-const mockTestAdminAddress = '0x00000000000000000000000000000000000000aa';
-const TEST_ADMIN_ADDRESS = mockTestAdminAddress;
+const TEST_ADMIN_ADDRESS = '0x00000000000000000000000000000000000000aa';
 const mockSelectorSourceFactory = '0x538A48BC439A36D2A86e63114DCD9c429d2ddEcA';
 const mockSelectorSourceStartBlock = 30297069;
 const mockDownloadDataFromArweave = jest.fn();
@@ -38,7 +38,6 @@ const buildMockSponsoredBundleEnvelope = () => JSON.stringify({
 const buildMockSponsoredBundle = () => ({
   openaiKey: 'sponsored-openai',
   arweaveJwk: '{"kty":"RSA","n":"sponsored"}',
-  litAccountApiKey: 'sponsored-lit-account-key',
   faucetGrantToken: 'sponsored-faucet-grant',
   customRpcUrl: 'https://sponsored-rpc.example.test',
   deployGrantToken: 'sponsored-deploy-grant',
@@ -52,8 +51,8 @@ const buildMockSponsoredBundle = () => ({
   },
 });
 
-jest.mock('../SBTs/SBTSelector', () => () => <div data-testid="mock-wizard-sbt-selector" />);
-jest.mock('../SBTs/CreateSBTGroup', () => () => null);
+jest.mock('../SBTs/SBTSelector.jsx', () => () => <div data-testid="mock-wizard-sbt-selector" />);
+jest.mock('../SBTs/CreateSBTGroup.jsx', () => () => null);
 jest.mock('../Gates/GateMultiSelectLock', () => () => <div data-testid="mock-wizard-gate-lock" />);
 jest.mock('../Shared/Json/JsonControls', () => ({
   JsonToggleButton: () => null,
@@ -66,7 +65,7 @@ jest.mock('../ContractPage/contractViewerUtils.js', () => ({
 
 jest.mock('../../utilities/crypto/litProtocol.js', () => ({
   buildSbtAccessControlConditions: jest.fn(() => []),
-  createLitHooks: jest.fn(() => ({ saveKey: jest.fn(), getKey: jest.fn(), litNetwork: 'chipotle' })),
+  createLitHooks: jest.fn(() => ({ saveKey: jest.fn(), getKey: jest.fn(), litNetwork: 'naga-dev' })),
   resolveLitChain: jest.fn(() => 'baseSepolia'),
   getGlobalLitHooks: jest.fn(() => null),
   setGlobalLitHooks: jest.fn(),
@@ -152,13 +151,13 @@ jest.mock('../../utilities/web3/contractScripts.js', () => ({
 jest.mock('../../utilities/worker/workerAuth.js', () => ({
   buildSiweMessage: jest.fn(() => 'siwe-message'),
   buildSignedBootstrapAdminAuth: jest.fn(async ({ slug }) => ({
-    address: mockTestAdminAddress,
+    address: TEST_ADMIN_ADDRESS,
     message: 'bootstrap-siwe-message',
     signature: '0xbootstrap-admin-auth',
     sessionSlug: slug,
   })),
   buildSignedAdminActionAuth: jest.fn(async ({ action, slug, body }) => ({
-    address: mockTestAdminAddress,
+    address: TEST_ADMIN_ADDRESS,
     signature: '0xadmin-action-signature',
     action,
     slug,
@@ -179,11 +178,12 @@ jest.mock('../../variables/appConfig.js', () => {
   const actual = jest.requireActual('../../variables/appConfig.js');
   return {
     ...actual,
+    ENABLE_LIT_SESSION_PAYER_WALLET_INPUT: true,
     CLOUDFLARE_WORKER_BUNDLE_URL: '',
   };
 });
 
-import SessionWizard from './SessionWizard';
+import SessionWizard from './SessionWizard.jsx';
 
 const SessionWizardComponent = SessionWizard as React.ComponentType<any>;
 const mockedBuildContractViewerContracts = buildContractViewerContracts as jest.Mock;
@@ -318,7 +318,7 @@ describe('SessionWizard blank bundle render regression', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SPONSORED_STATUS)).toHaveTextContent(
-        'Sponsored resources applied: OpenAI key, Arweave wallet, faucet funding, RPC URL, Lit API key, deploy access.'
+        'Sponsored resources applied: OpenAI key, Arweave wallet, faucet funding, RPC URL, deploy access.'
       );
     });
 
@@ -398,7 +398,7 @@ describe('SessionWizard blank bundle render regression', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SPONSORED_STATUS)).toHaveTextContent(
-        'Sponsored resources applied: OpenAI key, Arweave wallet, faucet funding, RPC URL, Lit API key, deploy access.'
+        'Sponsored resources applied: OpenAI key, Arweave wallet, faucet funding, RPC URL, deploy access.'
       );
     });
 
