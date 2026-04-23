@@ -4,8 +4,8 @@ import path from 'path';
 import React from 'react';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { ethers } from 'ethers';
-import { TestMemoryRouter as MemoryRouter } from 'testUtils/TestMemoryRouter';
-import OnePageSession from './OnePageSession';
+import { MemoryRouter } from 'react-router-dom';
+import OnePageSession from './OnePageSession.jsx';
 import styles from './OnePageSession.module.scss';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import contractScripts from '../../utilities/web3/contractScripts.js';
@@ -1263,11 +1263,13 @@ describe('OnePageSession view gating', () => {
     const props = buildProps();
 
     render(
-      <OnePageSession
-        {...props}
-        slug="demo"
-        sessionConfig={{ ...props.sessionConfig, slug: 'demo' }}
-      />
+      <MemoryRouter initialEntries={['/session/demo']}>
+        <OnePageSession
+          {...props}
+          slug="demo"
+          sessionConfig={{ ...props.sessionConfig, slug: 'demo' }}
+        />
+      </MemoryRouter>
     );
 
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
@@ -1289,11 +1291,13 @@ describe('OnePageSession view gating', () => {
     const props = buildProps();
 
     render(
-      <OnePageSession
-        {...props}
-        slug="demo"
-        sessionConfig={{ ...props.sessionConfig, slug: 'demo' }}
-      />
+      <MemoryRouter initialEntries={['/session/demo']}>
+        <OnePageSession
+          {...props}
+          slug="demo"
+          sessionConfig={{ ...props.sessionConfig, slug: 'demo' }}
+        />
+      </MemoryRouter>
     );
 
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
@@ -1319,11 +1323,13 @@ describe('OnePageSession view gating', () => {
     const props = buildProps();
 
     render(
-      <OnePageSession
-        {...props}
-        slug="demo"
-        sessionConfig={{ ...props.sessionConfig, slug: 'demo' }}
-      />
+      <MemoryRouter initialEntries={['/session/demo']}>
+        <OnePageSession
+          {...props}
+          slug="demo"
+          sessionConfig={{ ...props.sessionConfig, slug: 'demo' }}
+        />
+      </MemoryRouter>
     );
 
     expect(await screen.findByTestId('survey-page-pile')).toBeInTheDocument();
