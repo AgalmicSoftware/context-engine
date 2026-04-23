@@ -22,19 +22,19 @@ jest.mock('../../utilities/logging.js', () => ({
 }));
 
 jest.mock('../../utilities/docLibrary/arweaveGraphql.js', () => ({
-  listArweaveTransactionsByTags: (...args) => mockListArweaveTransactionsByTags(...args),
+  listArweaveTransactionsByTags: (...args: any[]) => mockListArweaveTransactionsByTags(...args),
 }));
 
 jest.mock('../../utilities/docLibrary/config.js', () => ({
-  resolveDocLibraryProvider: (...args) => mockResolveDocLibraryProvider(...args),
-  resolveArweaveGraphqlUrl: (...args) => mockResolveArweaveGraphqlUrl(...args),
+  resolveDocLibraryProvider: (...args: any[]) => mockResolveDocLibraryProvider(...args),
+  resolveArweaveGraphqlUrl: (...args: any[]) => mockResolveArweaveGraphqlUrl(...args),
 }));
 
 jest.mock('../../utilities/crypto/litProtocol.js', () => ({
-  buildSbtAccessControlConditions: (...args) => mockBuildSbtAccessControlConditions(...args),
-  getGlobalLitHooks: (...args) => mockGetGlobalLitHooks(...args),
+  buildSbtAccessControlConditions: (...args: any[]) => mockBuildSbtAccessControlConditions(...args),
+  getGlobalLitHooks: (...args: any[]) => mockGetGlobalLitHooks(...args),
   litStorage: {
-    buildLitArweaveUrl: (txId) => `https://lit.example.test/${txId}`,
+    buildLitArweaveUrl: (txId: string) => `https://lit.example.test/${txId}`,
     downloadEncryptedArweaveData: jest.fn(),
     decodeLitPayloadToText: jest.fn(),
     decodeLitPayloadToBlob: jest.fn(),
@@ -44,20 +44,20 @@ jest.mock('../../utilities/crypto/litProtocol.js', () => ({
 
 jest.mock('../../utilities/arweave/arweaveScripts.js', () => ({
   arweaveScripts: {
-    buildArweaveGatewayUrl: (txId, gateway = 'https://arweave.example.test') => `${gateway}/${txId}`,
+    buildArweaveGatewayUrl: (txId: string, gateway = 'https://arweave.example.test') => `${gateway}/${txId}`,
     downloadDataFromArweave: jest.fn(),
   },
 }));
 
 jest.mock('../../utilities/docLibrary/uploads.js', () => ({
-  resolveDocUploadsGate: (...args) => mockResolveDocUploadsGate(...args),
-  uploadDocLibraryFile: (...args) => mockUploadDocLibraryFile(...args),
-  uploadDocLibraryUrlRecord: (...args) => mockUploadDocLibraryUrlRecord(...args),
+  resolveDocUploadsGate: (...args: any[]) => mockResolveDocUploadsGate(...args),
+  uploadDocLibraryFile: (...args: any[]) => mockUploadDocLibraryFile(...args),
+  uploadDocLibraryUrlRecord: (...args: any[]) => mockUploadDocLibraryUrlRecord(...args),
 }));
 
 jest.mock('../SBTs/SBTSelector.jsx', () => ({
   __esModule: true,
-  default: (props) => {
+  default: (props: any) => {
     mockSBTSelector(props);
     return (
       <div data-testid="mock-sbt-selector">
@@ -76,7 +76,7 @@ jest.mock('../SBTs/SBTSelector.jsx', () => ({
           Remove mock selected SBT
         </button>
         <div>
-          {(props.selectedSBTs || []).map((sbt) => (
+          {(props.selectedSBTs || []).map((sbt: any) => (
             <span key={sbt.address}>{sbt.name || sbt.address}</span>
           ))}
         </div>
@@ -85,7 +85,7 @@ jest.mock('../SBTs/SBTSelector.jsx', () => ({
   },
 }));
 
-const DocumentLibraryPanel = require('./DocumentLibraryPanel.jsx').default;
+const DocumentLibraryPanel = require('./DocumentLibraryPanel.jsx').default as React.ComponentType<any>;
 const TEST_SESSION_CONFIG = {
   docLibrary: {
     provider: 'arweave',
@@ -96,8 +96,8 @@ const TEST_SESSION_CONFIG = {
 };
 
 describe('DocumentLibraryPanel photo docs', () => {
-  let originalCreateObjectURL;
-  let originalRevokeObjectURL;
+  let originalCreateObjectURL: typeof URL.createObjectURL;
+  let originalRevokeObjectURL: typeof URL.revokeObjectURL;
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -124,7 +124,7 @@ describe('DocumentLibraryPanel photo docs', () => {
       data: { size: null, type: 'application/json' },
     });
     mockListArweaveTransactionsByTags.mockResolvedValue([]);
-    global.fetch = jest.fn();
+    global.fetch = jest.fn() as any;
     originalCreateObjectURL = URL.createObjectURL;
     originalRevokeObjectURL = URL.revokeObjectURL;
     URL.createObjectURL = jest.fn(() => 'blob:doc-library-image-preview');
@@ -132,7 +132,7 @@ describe('DocumentLibraryPanel photo docs', () => {
   });
 
   afterEach(() => {
-    delete global.fetch;
+    delete (global as any).fetch;
     URL.createObjectURL = originalCreateObjectURL;
     URL.revokeObjectURL = originalRevokeObjectURL;
   });
@@ -281,11 +281,11 @@ describe('DocumentLibraryPanel photo docs', () => {
 
   it('keeps image documents previewable and downloadable in the viewer', async () => {
     const imageBlob = new Blob([new Uint8Array([137, 80, 78, 71])], { type: 'image/png' });
-    global.fetch.mockResolvedValue({
+    (global.fetch as jest.Mock).mockResolvedValue({
       ok: true,
       blob: async () => imageBlob,
       headers: {
-        get: (name) => (name === 'content-type' ? 'image/png' : null),
+        get: (name: string) => (name === 'content-type' ? 'image/png' : null),
       },
     });
     mockListArweaveTransactionsByTags.mockResolvedValueOnce([
@@ -323,7 +323,7 @@ describe('DocumentLibraryPanel photo docs', () => {
     fireEvent.click(viewButton);
 
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalled();
+      expect(global.fetch as jest.Mock).toHaveBeenCalled();
       expect(URL.createObjectURL).toHaveBeenCalledTimes(1);
     });
     expect(await screen.findByTestId(E2E_TESTIDS.DOC_VIEWER_IMAGE)).toBeInTheDocument();
