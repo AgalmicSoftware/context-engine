@@ -1,12 +1,12 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
-import MainAreaTabs, { MAIN_AREA_TABS } from './MainAreaTabs.jsx';
+import MainAreaTabs, { MAIN_AREA_TABS } from './MainAreaTabs';
 
 const mockToolExplorer = jest.fn();
 
 jest.mock('./ToolExplorer.jsx', () => ({
   __esModule: true,
-  default: (props) => {
+  default: (props: any) => {
     mockToolExplorer(props);
     return (
       <div
@@ -27,7 +27,7 @@ jest.mock('../CommunityTab/CommunityTab.jsx', () => ({
   default: () => <div data-testid="mock-community-tab" />,
 }));
 
-const createProps = (overrides = {}) => ({
+const createProps = (overrides: Record<string, unknown> = {}) => ({
   focusedTab: MAIN_AREA_TABS.TOOLS,
   changeFocusedTab: jest.fn(),
   toggleLoginModal: jest.fn(),
