@@ -11,17 +11,25 @@ jest.mock('../../utilities/cache/cacheScripts.js', () => ({
   subscribeCacheUpdates: jest.fn(() => () => {}),
 }));
 
+const mockListNamespaceEntriesSync = cacheScripts.listNamespaceEntriesSync as jest.Mock;
+const buildSourceSignature = buildBookmarkPageSourceSignature as (payload: any) => string;
+const buildDataSignature = buildBookmarkPageDataSignature as (payload: any) => string;
+const readEntries = readManagedBookmarkPageEntries as () => {
+  bookmarkEntries: unknown[];
+  filtersEntries: unknown[];
+};
+
 describe('BookmarksPage cache scan helpers', () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
   it('reads bookmark and filter namespaces with cloneValues disabled', () => {
-    cacheScripts.listNamespaceEntriesSync
+    mockListNamespaceEntriesSync
       .mockImplementationOnce(() => [{ slug: 'edge', value: { users: [] } }])
       .mockImplementationOnce(() => [{ slug: 'edge', value: { bookmarkedFilters: [] } }]);
 
-    const result = readManagedBookmarkPageEntries();
+    const result = readEntries();
 
     expect(cacheScripts.listNamespaceEntriesSync).toHaveBeenNthCalledWith(
       1,
@@ -40,9 +48,9 @@ describe('BookmarksPage cache scan helpers', () => {
   it('builds stable source signatures for unchanged cache entry refs', () => {
     const valueA = { users: [] };
     const valueB = { users: [] };
-    const refIds = new WeakMap();
+    const refIds = new WeakMap<object, string>();
     let nextRefId = 1;
-    const getRefId = (value) => {
+    const getRefId = (value: unknown) => {
       if (!value || typeof value !== 'object') return `p:${String(value)}`;
       let ref = refIds.get(value);
       if (!ref) {
@@ -53,21 +61,21 @@ describe('BookmarksPage cache scan helpers', () => {
       return ref;
     };
 
-    const first = buildBookmarkPageSourceSignature({
+    const first = buildSourceSignature({
       bookmarkEntries: [{ key: 'dg:bookmarksCache:edge', slug: 'edge', value: valueA }],
       filtersEntries: [{ key: 'dg:filters:edge', slug: 'edge', value: valueA }],
       legacyBookmarksRaw: '{"sbts":["0x1"]}',
       atlasNodesRaw: '["node-1"]',
       getRefId,
     });
-    const second = buildBookmarkPageSourceSignature({
+    const second = buildSourceSignature({
       bookmarkEntries: [{ key: 'dg:bookmarksCache:edge', slug: 'edge', value: valueA }],
       filtersEntries: [{ key: 'dg:filters:edge', slug: 'edge', value: valueA }],
       legacyBookmarksRaw: '{"sbts":["0x1"]}',
       atlasNodesRaw: '["node-1"]',
       getRefId,
     });
-    const changed = buildBookmarkPageSourceSignature({
+    const changed = buildSourceSignature({
       bookmarkEntries: [{ key: 'dg:bookmarksCache:edge', slug: 'edge', value: valueB }],
       filtersEntries: [{ key: 'dg:filters:edge', slug: 'edge', value: valueA }],
       legacyBookmarksRaw: '{"sbts":["0x1"]}',
@@ -90,7 +98,7 @@ describe('BookmarksPage cache scan helpers', () => {
     };
     const clone = JSON.parse(JSON.stringify(base));
 
-    expect(buildBookmarkPageDataSignature(clone)).toBe(buildBookmarkPageDataSignature(base));
+    expect(buildDataSignature(clone)).toBe(buildDataSignature(base));
   });
 
   it('builds survey bookmark links without inheriting route session hints', () => {
