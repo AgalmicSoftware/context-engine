@@ -53,22 +53,58 @@ const COUNTRY_NAME_TO_ISO_A3 = Object.freeze({
   'United States': 'USA',
   Venezuela: 'VEN',
   Vietnam: 'VNM',
-});
+} as Record<string, string>);
 
 const GEOJSON_NAME_TO_ISO_A3 = Object.freeze({
   ...COUNTRY_NAME_TO_ISO_A3,
   'United States of America': 'USA',
-});
+} as Record<string, string>);
 
 const TOP_ANSWER_COLORS = Object.freeze({
   Agree: '#4dffa4',
   Unsure: '#ffd166',
   Disagree: '#ff6b6b',
-});
+} as Record<string, string>);
 
 const DEFAULT_COUNTRY_FILL = 'rgba(226, 232, 255, 0.08)';
 
-const buildFocusedCountriesSummary = (focusedCountries = []) => {
+type Question = {
+  id: string | number;
+};
+
+type ResponseRow = {
+  questionId: string | number;
+  segmentKey: string;
+  responseText: string;
+  rate?: number;
+};
+
+type CountryMapDatum = {
+  countryName: string;
+  topAnswer: string;
+  topRate?: number;
+  breakdown: ResponseRow[];
+};
+
+type GeographyDatum = {
+  rsmKey: string;
+  properties: {
+    name: string;
+  };
+};
+
+type LightweightData = Record<string, unknown>;
+
+type WorldResultsMapProps = {
+  question?: Question | null;
+  responses?: ResponseRow[];
+  focusedCountries?: string[];
+  data?: LightweightData | null;
+  colorScale?: ((value: unknown, isoCode: string | undefined, geo: GeographyDatum) => string) | null;
+  compact?: boolean;
+};
+
+const buildFocusedCountriesSummary = (focusedCountries: string[] = []) => {
   if (!Array.isArray(focusedCountries) || focusedCountries.length === 0) {
     return 'Showing all country segments in the demo corpus.';
   }
@@ -78,7 +114,7 @@ const buildFocusedCountriesSummary = (focusedCountries = []) => {
   return `Country focus: ${focusedCountries.slice(0, 5).join(', ')} +${focusedCountries.length - 5} more`;
 };
 
-export const mapCountryNamesToIsoCodes = (countryNames = []) => (
+export const mapCountryNamesToIsoCodes = (countryNames: string[] = []) => (
   (Array.isArray(countryNames) ? countryNames : [])
     .map((countryName) => COUNTRY_NAME_TO_ISO_A3[String(countryName || '').trim()])
     .filter(Boolean)
@@ -91,11 +127,11 @@ const WorldResultsMap = ({
   data = null,
   colorScale = null,
   compact = false,
-}) => {
+}: WorldResultsMapProps) => {
   const isLightweightMode = !question && typeof colorScale === 'function';
   const processedData = useMemo(() => {
     if (!question) return { mapData: {}, hasAnyData: false };
-    const mapData = {};
+    const mapData: Record<string, CountryMapDatum> = {};
 
     Object.keys(COUNTRY_NAME_TO_ISO_A3).forEach((countryName) => {
       const segmentKey = `Country:${countryName}`;
@@ -132,7 +168,7 @@ const WorldResultsMap = ({
       {compact ? null : <Sphere stroke="#E4E5E6" strokeWidth={0.5} />}
       {compact ? null : <Graticule stroke="#E4E5E6" strokeWidth={0.5} />}
       <Geographies geography={GEO_URL}>
-        {({ geographies }) => geographies.map((geo) => {
+        {({ geographies }: { geographies: GeographyDatum[] }) => geographies.map((geo) => {
           const isoCode = GEOJSON_NAME_TO_ISO_A3[geo.properties.name];
           const countryData = isoCode ? processedData.mapData[isoCode] : null;
           const isFocusMode = focusedIsoCodes.size > 0;

@@ -141,7 +141,7 @@ describe('CorpusViewer', () => {
       'utf8'
     );
     const mapJsx = fs.readFileSync(
-      path.join(__dirname, 'DemoAnalysis', 'WorldResultsMap.jsx'),
+      path.join(__dirname, 'DemoAnalysis', 'WorldResultsMap.tsx'),
       'utf8'
     );
     const compactMapMobileBlock = extractMediaBlock(mapScss, '@media (max-width: 640px)', '.panel,');
