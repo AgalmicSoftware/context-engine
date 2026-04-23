@@ -20,11 +20,8 @@ type SessionConfig = {
 
 type SessionDocumentsPageProps = {
   provider?: unknown;
-  network?: {
-    id?: number | string | null;
-  } | null;
+  network?: string;
   account?: string;
-  litHooks?: unknown;
   loginComplete?: boolean;
   toggleLoginModal?: () => void;
   sessionToken?: string;
