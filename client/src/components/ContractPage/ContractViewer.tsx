@@ -14,20 +14,45 @@ import {
 } from './contractMetadata.js';
 import styles from './ContractPage.module.scss';
 
+type ContractAddressEntry = {
+  address: string;
+  id?: number;
+  testnet?: boolean;
+  explorerUrl?: string;
+};
+
+export type ContractViewerContract = {
+  key: string;
+  name: string;
+  explainer?: React.ReactNode;
+  sourceFile?: string;
+  source?: string;
+  extraAction?: React.ReactNode;
+  addresses?: ContractAddressEntry[];
+};
+
+type ContractViewerProps = {
+  contracts?: ContractViewerContract[];
+  variant?: 'full' | 'compact';
+  autoOpenContractKey?: string;
+  renderSourceHeaderActions?: (contract: ContractViewerContract) => React.ReactNode;
+  onClose?: () => void;
+};
+
 const ContractViewer = ({
-  contracts,
-  variant,
-  autoOpenContractKey,
+  contracts = [],
+  variant = 'full',
+  autoOpenContractKey = '',
   renderSourceHeaderActions,
   onClose,
-}) => {
+}: ContractViewerProps) => {
   const isCompact = variant === 'compact';
   const [contractsOpen, setContractsOpen] = useState(true);
-  const [openContracts, setOpenContracts] = useState({});
+  const [openContracts, setOpenContracts] = useState<Record<string, boolean>>({});
   const [copiedContractKey, setCopiedContractKey] = useState('');
-  const copyResetTimersRef = useRef(new Map());
-  const sourceRefs = useRef({});
-  const cardRefs = useRef({});
+  const copyResetTimersRef = useRef<Map<string, ReturnType<typeof window.setTimeout>>>(new Map());
+  const sourceRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const cardRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const autoScrolledContractRef = useRef('');
   const normalizedAutoOpenContractKey = normalizeContractKeyParam(autoOpenContractKey);
 
@@ -38,7 +63,7 @@ const ContractViewer = ({
 
   useEffect(() => {
     if (!isCompact) return;
-    const nextOpenContracts = {};
+    const nextOpenContracts: Record<string, boolean> = {};
     contracts.forEach((contract) => {
       nextOpenContracts[contract.key] = true;
     });
@@ -82,7 +107,7 @@ const ContractViewer = ({
     };
   }, [contractsOpen, isCompact, normalizedAutoOpenContractKey, openContracts]);
 
-  const scheduleCopyReset = useCallback((key, resetFn, delayMs = 1500) => {
+  const scheduleCopyReset = useCallback((key: string, resetFn: () => void, delayMs = 1500) => {
     const timers = copyResetTimersRef.current;
     const existing = timers.get(key);
     if (existing) clearTimeout(existing);
@@ -93,7 +118,7 @@ const ContractViewer = ({
     timers.set(key, timeoutId);
   }, []);
 
-  const handleCopyContract = useCallback((contractKey, source) => {
+  const handleCopyContract = useCallback((contractKey: string, source?: string) => {
     if (!source || typeof navigator === 'undefined' || !navigator.clipboard?.writeText) return;
     navigator.clipboard.writeText(source)
       .then(() => {
@@ -107,7 +132,7 @@ const ContractViewer = ({
       });
   }, [scheduleCopyReset]);
 
-  const handleContractToggle = useCallback((contractKey) => {
+  const handleContractToggle = useCallback((contractKey: string) => {
     if (isCompact) return;
     setOpenContracts((prev) => ({
       ...prev,
@@ -115,14 +140,14 @@ const ContractViewer = ({
     }));
   }, [isCompact]);
 
-  const handleContractKeyDown = useCallback((event, contractKey) => {
+  const handleContractKeyDown = useCallback((event: React.KeyboardEvent<HTMLDivElement>, contractKey: string) => {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
       handleContractToggle(contractKey);
     }
   }, [handleContractToggle]);
 
-  const isContractOpen = useCallback((contractKey) => (
+  const isContractOpen = useCallback((contractKey: string) => (
     isCompact || !!openContracts[contractKey]
   ), [isCompact, openContracts]);
 
@@ -135,7 +160,7 @@ const ContractViewer = ({
           isOpen ? styles.contractCardOpen : '',
           isCompact ? styles.contractCardCompact : '',
         ].filter(Boolean).join(' ');
-        const interactiveProps = isCompact ? {} : {
+        const interactiveProps: React.HTMLAttributes<HTMLDivElement> = isCompact ? {} : {
           role: 'button',
           tabIndex: 0,
           onClick: () => handleContractToggle(contract.key),
@@ -156,7 +181,7 @@ const ContractViewer = ({
           >
             <div className={styles.contractTitle}>{contract.name}</div>
             <div className={styles.contractHeader}>
-              {contract.addresses.map((addressEntry, index) => (
+              {(contract.addresses || []).map((addressEntry, index) => (
                 <div
                   key={`${contract.key}-${index}`}
                   className={styles.contractAddress}
@@ -322,14 +347,6 @@ ContractViewer.propTypes = {
   autoOpenContractKey: PropTypes.string,
   renderSourceHeaderActions: PropTypes.func,
   onClose: PropTypes.func,
-};
-
-ContractViewer.defaultProps = {
-  contracts: [],
-  variant: 'full',
-  autoOpenContractKey: '',
-  renderSourceHeaderActions: undefined,
-  onClose: undefined,
 };
 
 export default ContractViewer;

@@ -125,7 +125,7 @@ import {
   normalizeSponsoredBootstrapFundingContext,
   writeSponsoredBootstrapFundingContext,
 } from '../../utilities/session/sponsoredBootstrapFunding.js';
-import ContractViewer from '../ContractPage/ContractViewer.jsx';
+import ContractViewer from '../ContractPage/ContractViewer';
 import {
   buildContractsPageHref,
   getContractExplainer,
