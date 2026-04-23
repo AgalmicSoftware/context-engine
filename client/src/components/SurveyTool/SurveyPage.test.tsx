@@ -1,10 +1,10 @@
 import React from 'react';
 import { render } from '@testing-library/react';
-import SurveyPage from './SurveyPage.jsx';
+import SurveyPage from './SurveyPage';
 
 const mockSurveyTool = jest.fn();
 
-jest.mock('components/SurveyTool/SurveyTool.jsx', () => (props) => {
+jest.mock('components/SurveyTool/SurveyTool.jsx', () => (props: any) => {
   mockSurveyTool(props);
   return null;
 });

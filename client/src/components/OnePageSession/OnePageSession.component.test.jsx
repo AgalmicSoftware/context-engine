@@ -55,7 +55,7 @@ const extractMediaBlock = (scss, query, requiredSnippet = '') => {
   return null;
 };
 
-jest.mock('../SurveyTool/SurveyPage.jsx', () => (props) => {
+jest.mock('../SurveyTool/SurveyPage', () => (props) => {
   mockSurveyPage(props);
   if (props.minifiedMode === 'pile') {
     return (

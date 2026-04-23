@@ -1,4 +1,4 @@
-/** @file SurveyPage.jsx */
+/** @file SurveyPage.tsx */
 
 import React, { Component } from "react";
 
@@ -6,7 +6,16 @@ import SurveyTool from "components/SurveyTool/SurveyTool.jsx";
 
 import styles from "./SurveyPage.module.scss";
 
-class SurveyComponent extends Component {
+type SurveyPageProps = {
+  activeSessionSlug?: string;
+  sessionSlug?: string;
+  sessionSlugPinned?: boolean;
+  sessionConfig?: unknown;
+  minifiedMode?: unknown;
+  [key: string]: any;
+};
+
+class SurveyComponent extends Component<SurveyPageProps> {
   render() {
     const effectiveActiveSessionSlug = this.props.activeSessionSlug || this.props.sessionSlug || '';
     const effectiveSessionSlug = this.props.sessionSlug || effectiveActiveSessionSlug;

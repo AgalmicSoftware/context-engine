@@ -43,7 +43,7 @@ import { getSbtDisplayName } from '../../utilities/sbt/sbtDisplayNames.js';
 import { isCryptoMode, sbtsListPath, t } from '../../utilities/ui/terminology.js';
 import { PUBLIC_AI_DISCOURSE_CORPUS_URL } from '../../variables/publicRepoMetadata.js';
 
-const SurveyPage = React.lazy(() => import('../SurveyTool/SurveyPage.jsx'));
+const SurveyPage = React.lazy(() => import('../SurveyTool/SurveyPage'));
 const MemoSurveyPage = React.memo((props) => <SurveyPage {...props} />);
 const SBTsPage = React.lazy(() => import('../SBTs/SBTsPage.jsx'));
 const PolisReport = React.lazy(() => import('../PolisReport/PolisReport.jsx'));
