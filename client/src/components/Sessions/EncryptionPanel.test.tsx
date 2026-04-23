@@ -1,15 +1,15 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
-import EncryptionPanel from './EncryptionPanel.jsx';
+import EncryptionPanel, { EncryptionPanelProps } from './EncryptionPanel';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
 jest.mock('../SBTs/SBTSelector.jsx', () => function MockSBTSelector() {
   return <div data-testid="mock-sbt-selector" />;
 });
 
-const t = (key) => key;
+const t = (key: string) => key;
 
-const renderEncryptionPanel = (props = {}) => render(
+const renderEncryptionPanel = (props: Partial<EncryptionPanelProps> = {}) => render(
   <EncryptionPanel
     isNormalMode
     t={t}
@@ -29,7 +29,7 @@ const renderEncryptionPanel = (props = {}) => render(
     focusCreateSbtTargetGate={() => {}}
     updateEncryptionGate={() => {}}
     removeEncryptionGate={() => {}}
-    normalizeSbtSelection={(value) => value}
+    normalizeSbtSelection={(value: unknown[]) => value}
     handleGateAddSbt={() => {}}
     handleGateRemoveSbt={() => {}}
     network="optimism-sepolia"
@@ -94,7 +94,7 @@ describe('EncryptionPanel', () => {
         focusCreateSbtTargetGate={() => {}}
         updateEncryptionGate={() => {}}
         removeEncryptionGate={() => {}}
-        normalizeSbtSelection={(value) => value}
+        normalizeSbtSelection={(value: unknown[]) => value}
         handleGateAddSbt={() => {}}
         handleGateRemoveSbt={() => {}}
         network="optimism-sepolia"
