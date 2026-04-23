@@ -2,7 +2,7 @@ import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
-import DevE2eNav, { buildDevNavAtlasTarget } from './DevE2eNav.jsx';
+import DevE2eNav, { buildDevNavAtlasTarget } from './DevE2eNav';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
 describe('DevE2eNav atlas routing', () => {

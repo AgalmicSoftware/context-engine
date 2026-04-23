@@ -5,7 +5,7 @@ import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { toStr } from '../../utilities/shared/primitives.js';
 import { sbtsListPath } from '../../utilities/ui/terminology.js';
 
-const readLocalStorageFlag = (key) => {
+const readLocalStorageFlag = (key: string) => {
   try {
     if (typeof window === 'undefined' || !window.localStorage) return false;
     return window.localStorage.getItem(key) === '1';
@@ -14,7 +14,7 @@ const readLocalStorageFlag = (key) => {
   }
 };
 
-const readQueryFlag = (search, key) => {
+const readQueryFlag = (search: string, key: string) => {
   try {
     const qp = new URLSearchParams(toStr(search));
     return qp.get(key) === '1';
@@ -23,7 +23,7 @@ const readQueryFlag = (search, key) => {
   }
 };
 
-const resolveSessionSlug = (search) => {
+const resolveSessionSlug = (search: string) => {
   try {
     const qp = new URLSearchParams(toStr(search));
     const fromQuery = toStr(qp.get('sessionSlug')).trim();
@@ -41,12 +41,12 @@ const resolveSessionSlug = (search) => {
   return 'general';
 };
 
-const isAgentModeEnabled = (search) => {
+const isAgentModeEnabled = (search: string) => {
   if (process.env.NODE_ENV === 'production') return false;
   return readQueryFlag(search, 'agent') || readLocalStorageFlag('ce-agent-enabled');
 };
 
-const isDevNavEnabled = (search) => {
+const isDevNavEnabled = (search: string) => {
   if (process.env.NODE_ENV === 'production') return false;
   return (
     readQueryFlag(search, 'e2eNav')
@@ -72,7 +72,7 @@ export default function DevE2eNav() {
   const canShowAgent = isAgentModeEnabled(location.search);
   const atlasTarget = buildDevNavAtlasTarget(location.pathname, location.search);
 
-  const items = [
+  const items: Array<{ testId: string; to: string; label: string }> = [
     { testId: E2E_TESTIDS.NAV_HOME, to: '/', label: 'Home' },
     { testId: E2E_TESTIDS.NAV_SURVEYS, to: '/surveys', label: 'Surveys' },
     { testId: E2E_TESTIDS.NAV_QUESTIONS, to: '/questions', label: 'Questions' },
