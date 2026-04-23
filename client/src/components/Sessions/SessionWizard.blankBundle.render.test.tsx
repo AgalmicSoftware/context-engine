@@ -9,7 +9,7 @@ const mockSelectorSourceFactory = '0x538A48BC439A36D2A86e63114DCD9c429d2ddEcA';
 const mockSelectorSourceStartBlock = 30297069;
 const mockDownloadDataFromArweave = jest.fn();
 const mockDecryptWithPassword = jest.fn();
-const createDefaultFetchMock = () => jest.fn(async (url) => {
+const createDefaultFetchMock = () => jest.fn(async (url: any, _options?: any): Promise<any> => {
   const normalizedUrl = String(url);
   if (
     normalizedUrl === 'test-file-stub' ||
@@ -18,14 +18,14 @@ const createDefaultFetchMock = () => jest.fn(async (url) => {
   ) {
     return {
       ok: true,
-      text: async () => 'export default { fetch() { return new Response("ok"); } };',
+      text: async (): Promise<string> => 'export default { fetch() { return new Response("ok"); } };',
       headers: { get: jest.fn(() => 'application/javascript') },
     };
   }
   return {
     ok: true,
     json: async () => ({ ok: true }),
-    text: async () => '',
+    text: async (): Promise<string> => '',
     headers: { get: jest.fn(() => 'application/json') },
   };
 });
@@ -74,14 +74,14 @@ jest.mock('../../utilities/crypto/litProtocol.js', () => ({
 jest.mock('../../utilities/crypto/cryptography.js', () => ({
   cryptoUtils: {
     _getProvider: jest.fn(() => ({})),
-    decryptWithPassword: (...args) => mockDecryptWithPassword(...args),
+    decryptWithPassword: (...args: any[]) => mockDecryptWithPassword(...args),
   },
 }));
 
 jest.mock('../../utilities/arweave/arweaveScripts.js', () => ({
   arweaveScripts: {
     uploadDataToArweave: jest.fn(),
-    downloadDataFromArweave: (...args) => mockDownloadDataFromArweave(...args),
+    downloadDataFromArweave: (...args: any[]) => mockDownloadDataFromArweave(...args),
     buildArweaveGatewayUrl: jest.fn((txId) => `https://arweave.example.test/${txId}`),
   },
 }));
@@ -185,8 +185,11 @@ jest.mock('../../variables/appConfig.js', () => {
 
 import SessionWizard from './SessionWizard.jsx';
 
-const renderLoggedInSessionWizard = (props = {}) => render(
-  <SessionWizard
+const SessionWizardComponent = SessionWizard as React.ComponentType<any>;
+const mockedBuildContractViewerContracts = buildContractViewerContracts as jest.Mock;
+
+const renderLoggedInSessionWizard = (props: Record<string, any> = {}) => render(
+  <SessionWizardComponent
     network={{ id: 84532 }}
     account={TEST_ADMIN_ADDRESS}
     loginComplete
@@ -194,11 +197,12 @@ const renderLoggedInSessionWizard = (props = {}) => render(
     {...props}
   />
 );
-const setControlledInputValue = (input, value) => {
-  const reactPropsKey = Object.keys(input).find((key) => key.startsWith('__reactProps$'));
+const setControlledInputValue = (input: HTMLElement, value: string) => {
+  const inputWithReactProps = input as any;
+  const reactPropsKey = Object.keys(inputWithReactProps).find((key) => key.startsWith('__reactProps$'));
   if (reactPropsKey) {
     act(() => {
-      input[reactPropsKey].onChange({ target: { value } });
+      inputWithReactProps[reactPropsKey].onChange({ target: { value } });
     });
     return;
   }
@@ -216,12 +220,12 @@ describe('SessionWizard blank bundle render regression', () => {
     window.history.replaceState({}, '', '/');
     localStorage.clear();
     sessionStorage.clear();
-    global.fetch = createDefaultFetchMock();
+    global.fetch = createDefaultFetchMock() as any;
     mockDownloadDataFromArweave.mockResolvedValue(buildMockSponsoredBundleEnvelope());
     mockDecryptWithPassword.mockResolvedValue(buildMockSponsoredBundle());
     arweaveScripts.uploadDataToArweave.mockResolvedValue('a'.repeat(43));
     registerSessionOnChain.mockResolvedValue({ txs: [] });
-    buildContractViewerContracts.mockImplementation(() => []);
+    mockedBuildContractViewerContracts.mockImplementation(() => []);
   });
 
   afterAll(() => {
@@ -257,8 +261,8 @@ describe('SessionWizard blank bundle render regression', () => {
 
   it('shows the sponsored publish override controls immediately when the hosted bundle URL default is blank', async () => {
     const manualBundleUrl = 'https://assets.example.test/sponsored-sessionCorsWorker.bundle.js';
-    let resolveSponsoredBundle;
-    const sponsoredBundleReady = new Promise((resolve) => {
+    let resolveSponsoredBundle!: (bundle: ReturnType<typeof buildMockSponsoredBundle>) => void;
+    const sponsoredBundleReady = new Promise<ReturnType<typeof buildMockSponsoredBundle>>((resolve) => {
       resolveSponsoredBundle = resolve;
     });
 
@@ -337,8 +341,8 @@ describe('SessionWizard blank bundle render regression', () => {
       type: 'text/javascript',
       text: async () => 'export default { async fetch() { return new Response("blank-default-file"); } };',
     };
-    let resolveSponsoredBundle;
-    const sponsoredBundleReady = new Promise((resolve) => {
+    let resolveSponsoredBundle!: (bundle: ReturnType<typeof buildMockSponsoredBundle>) => void;
+    const sponsoredBundleReady = new Promise<ReturnType<typeof buildMockSponsoredBundle>>((resolve) => {
       resolveSponsoredBundle = resolve;
     });
 
@@ -427,16 +431,16 @@ describe('SessionWizard blank bundle render regression', () => {
       },
     }));
 
-    global.fetch = jest.fn(async (url, options = {}) => {
+    global.fetch = jest.fn(async (url: any, options: any = {}): Promise<any> => {
       const normalizedUrl = String(url);
       if (normalizedUrl.endsWith('/deploy')) {
         return {
           ok: true,
           status: 200,
-          json: async () => ({
-            ok: true,
-            workerUrl: 'https://worker.example.test',
-            writesSessionSecrets: true,
+            json: async (): Promise<any> => ({
+              ok: true,
+              workerUrl: 'https://worker.example.test',
+              writesSessionSecrets: true,
           }),
         };
       }
@@ -447,11 +451,11 @@ describe('SessionWizard blank bundle render regression', () => {
         return {
           ok: true,
           status: 200,
-          json: async () => ({ ok: true }),
+          json: async (): Promise<any> => ({ ok: true }),
         };
       }
       return fallbackFetch(url, options);
-    });
+    }) as any;
 
     renderLoggedInSessionWizard();
 
@@ -463,7 +467,7 @@ describe('SessionWizard blank bundle render regression', () => {
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
     fireEvent.click(await screen.findByRole('button', { name: 'Use My Own' }));
 
-    const bundleModeUrlInput = await screen.findByTestId(E2E_TESTIDS.WIZARD_BUNDLE_MODE_URL);
+    const bundleModeUrlInput = await screen.findByTestId(E2E_TESTIDS.WIZARD_BUNDLE_MODE_URL) as HTMLInputElement;
     if (!bundleModeUrlInput.checked) {
       fireEvent.click(bundleModeUrlInput);
     }
@@ -504,7 +508,7 @@ describe('SessionWizard blank bundle render regression', () => {
       );
     });
     expect(
-      global.fetch.mock.calls.filter(([url]) => String(url).endsWith('/deploy'))
+      (global.fetch as jest.Mock).mock.calls.filter(([url]: any[]) => String(url).endsWith('/deploy'))
     ).toHaveLength(0);
   });
 });
