@@ -7,23 +7,77 @@ export const POLICY_FILTERS = {
   proposed: 'proposed',
   inactive: 'inactive',
   all: 'all',
+} as const;
+
+export type PolicyFilterId = typeof POLICY_FILTERS[keyof typeof POLICY_FILTERS];
+
+export type PolicyEntry = {
+  id?: string | number;
+  title?: string;
+  status?: string;
+  jurisdiction?: string;
+  date_enacted?: string | number;
+  date?: string | number;
+  created_at?: string | number;
+  updated_at?: string | number;
+  year?: string | number;
+  [key: string]: unknown;
 };
 
-const FILTER_OPTIONS = [
+type JurisdictionAnchor =
+  | 'us'
+  | 'canada'
+  | 'uk'
+  | 'eu'
+  | 'china'
+  | 'southKorea'
+  | 'japan'
+  | 'india'
+  | 'australia'
+  | 'brazil'
+  | 'asean'
+  | 'africa'
+  | 'international';
+
+type JurisdictionRule = {
+  anchor: JurisdictionAnchor;
+  flag: string;
+  patterns: RegExp[];
+};
+
+type GlobeCoordinates = {
+  x: number;
+  y: number;
+};
+
+export type PolicyGlobeRenderProps = {
+  filteredEntries: PolicyEntry[];
+  filterStatus: PolicyFilterId;
+  setFilterStatus: React.Dispatch<React.SetStateAction<PolicyFilterId>>;
+  GlobeElement: React.ReactNode;
+  FilterControlsElement: React.ReactNode;
+};
+
+export type PolicyGlobeProps = {
+  entries?: PolicyEntry[];
+  children?: React.ReactNode | ((props: PolicyGlobeRenderProps) => React.ReactNode);
+};
+
+const FILTER_OPTIONS: Array<{ id: PolicyFilterId; label: string }> = [
   { id: POLICY_FILTERS.live, label: 'Live' },
   { id: POLICY_FILTERS.proposed, label: 'Proposed' },
   { id: POLICY_FILTERS.inactive, label: 'Inactive' },
   { id: POLICY_FILTERS.all, label: 'All' },
 ];
 
-const FILTER_STYLE_CLASS_BY_ID = {
+const FILTER_STYLE_CLASS_BY_ID: Record<PolicyFilterId, string> = {
   [POLICY_FILTERS.live]: styles.filterButtonLiveOption,
   [POLICY_FILTERS.proposed]: styles.filterButtonProposedOption,
   [POLICY_FILTERS.inactive]: styles.filterButtonInactiveOption,
   [POLICY_FILTERS.all]: styles.filterButtonAllOption,
 };
 
-const FILTER_SWATCH_CLASS_BY_ID = {
+const FILTER_SWATCH_CLASS_BY_ID: Record<PolicyFilterId, string> = {
   [POLICY_FILTERS.live]: styles.filterSwatchLive,
   [POLICY_FILTERS.proposed]: styles.filterSwatchProposed,
   [POLICY_FILTERS.inactive]: styles.filterSwatchInactive,
@@ -64,7 +118,7 @@ const INACTIVE_STATUS_MATCHERS = [
   'expired',
 ];
 
-const JURISDICTION_RULES = [
+const JURISDICTION_RULES: JurisdictionRule[] = [
   {
     anchor: 'us',
     flag: '🇺🇸',
@@ -145,7 +199,7 @@ const JURISDICTION_RULES = [
   },
 ];
 
-const GLOBE_COORDINATES = {
+const GLOBE_COORDINATES: Record<JurisdictionAnchor, GlobeCoordinates> = {
   us: { x: -54, y: -12 },
   canada: { x: -60, y: -36 },
   uk: { x: -18, y: -36 },
@@ -161,20 +215,20 @@ const GLOBE_COORDINATES = {
   international: { x: 0, y: 2 },
 };
 
-const normalizeText = (value = '') => String(value).trim().toLowerCase();
-const normalizePolicyStatus = (value = '') => normalizeText(value).replace(/[_-]+/g, ' ');
+const normalizeText = (value: string | number = '') => String(value).trim().toLowerCase();
+const normalizePolicyStatus = (value: string | number = '') => normalizeText(value).replace(/[_-]+/g, ' ');
 
-const matchesPattern = (value, patterns = []) => patterns.some((pattern) => pattern.test(value));
+const matchesPattern = (value: string, patterns: RegExp[] = []) => patterns.some((pattern) => pattern.test(value));
 
-const getJurisdictionRule = (jurisdiction = '') => {
+const getJurisdictionRule = (jurisdiction: string | number = ''): JurisdictionRule => {
   const normalizedJurisdiction = normalizeText(jurisdiction);
   return JURISDICTION_RULES.find((rule) => matchesPattern(normalizedJurisdiction, rule.patterns))
-    || { anchor: 'international', flag: '🌐' };
+    || { anchor: 'international', flag: '🌐', patterns: [] };
 };
 
-export const getPolicyJurisdictionAnchor = (jurisdiction = '') => getJurisdictionRule(jurisdiction).anchor;
+export const getPolicyJurisdictionAnchor = (jurisdiction: string | number = '') => getJurisdictionRule(jurisdiction).anchor;
 
-const getPolicyTimestamp = (entry = {}) => {
+const getPolicyTimestamp = (entry: PolicyEntry = {}) => {
   const datedValue = entry.date_enacted || entry.date || entry.created_at || entry.updated_at || entry.year;
 
   if (!datedValue) return Number.NEGATIVE_INFINITY;
@@ -185,7 +239,7 @@ const getPolicyTimestamp = (entry = {}) => {
     return Number.isNaN(normalizedYear) ? Number.NEGATIVE_INFINITY : normalizedYear;
   }
 
-  const parsedTimestamp = Date.parse(datedValue);
+  const parsedTimestamp = Date.parse(String(datedValue));
   if (!Number.isNaN(parsedTimestamp)) return parsedTimestamp;
 
   const yearMatch = String(datedValue).match(/\b(19|20)\d{2}\b/);
@@ -195,7 +249,7 @@ const getPolicyTimestamp = (entry = {}) => {
   return Number.isNaN(fallbackTimestamp) ? Number.NEGATIVE_INFINITY : fallbackTimestamp;
 };
 
-export const getPolicyStatusGroup = (entry = {}) => {
+export const getPolicyStatusGroup = (entry: PolicyEntry = {}): PolicyFilterId => {
   const normalizedStatus = normalizePolicyStatus(entry.status);
 
   if (INACTIVE_STATUS_MATCHERS.some((status) => normalizedStatus.includes(status))) {
@@ -215,7 +269,7 @@ export const getPolicyStatusGroup = (entry = {}) => {
   return POLICY_FILTERS.live;
 };
 
-const getPolicySortRank = (entry = {}) => {
+const getPolicySortRank = (entry: PolicyEntry = {}) => {
   const statusGroup = getPolicyStatusGroup(entry);
 
   if (statusGroup === POLICY_FILTERS.live) return 0;
@@ -224,7 +278,7 @@ const getPolicySortRank = (entry = {}) => {
   return 3;
 };
 
-const formatStatusLabel = (status = '') => {
+const formatStatusLabel = (status: string | number = '') => {
   const cleanedStatus = String(status || '').trim();
   if (!cleanedStatus) return '';
 
@@ -235,28 +289,28 @@ const formatStatusLabel = (status = '') => {
     .join(' ');
 };
 
-export const getPolicyStatusLabel = (entry = {}) => {
+export const getPolicyStatusLabel = (entry: PolicyEntry = {}) => {
   const normalizedStatus = formatStatusLabel(entry.status);
 
   if (normalizedStatus) return normalizedStatus;
   return getPolicyStatusGroup(entry) === POLICY_FILTERS.proposed ? 'Proposed' : 'Live';
 };
 
-const getPolicyDotOffset = (statusGroup) => {
+const getPolicyDotOffset = (statusGroup: PolicyFilterId): GlobeCoordinates => {
   if (statusGroup === POLICY_FILTERS.proposed) return { x: 8, y: 6 };
   if (statusGroup === POLICY_FILTERS.inactive) return { x: -8, y: 6 };
   return { x: 0, y: 0 };
 };
 
-const getPolicyGroupTitle = (statusGroup) => {
+const getPolicyGroupTitle = (statusGroup: PolicyFilterId) => {
   if (statusGroup === POLICY_FILTERS.proposed) return 'Proposed / Pending';
   if (statusGroup === POLICY_FILTERS.inactive) return 'Inactive / Blocked';
   return 'Live / Enacted';
 };
 
-export const getJurisdictionFlag = (jurisdiction = '') => getJurisdictionRule(jurisdiction).flag;
+export const getJurisdictionFlag = (jurisdiction: string | number = '') => getJurisdictionRule(jurisdiction).flag;
 
-export const sortPolicyEntries = (entries = []) => (
+export const sortPolicyEntries = (entries: PolicyEntry[] = []) => (
   [...entries].sort((entryA, entryB) => {
     const sortRankDifference = getPolicySortRank(entryA) - getPolicySortRank(entryB);
     if (sortRankDifference !== 0) return sortRankDifference;
@@ -268,8 +322,16 @@ export const sortPolicyEntries = (entries = []) => (
   })
 );
 
-const buildGlobeDots = (entries = []) => {
-  const dotsByKey = new Map();
+type GlobeDot = {
+  key: string;
+  group: PolicyFilterId;
+  labels: string[];
+  x: number;
+  y: number;
+};
+
+const buildGlobeDots = (entries: PolicyEntry[] = []) => {
+  const dotsByKey = new Map<string, GlobeDot>();
 
   entries.forEach((entry) => {
     const statusGroup = getPolicyStatusGroup(entry);
@@ -291,7 +353,7 @@ const buildGlobeDots = (entries = []) => {
     }
 
     const dot = dotsByKey.get(dotKey);
-    dot.labels.push(label);
+    if (dot) dot.labels.push(String(label));
   });
 
   return Array.from(dotsByKey.values()).map((dot) => ({
@@ -300,8 +362,8 @@ const buildGlobeDots = (entries = []) => {
   }));
 };
 
-const PolicyGlobe = ({ entries = [], children }) => {
-  const [filterStatus, setFilterStatus] = useState(POLICY_FILTERS.all);
+const PolicyGlobe = ({ entries = [], children }: PolicyGlobeProps) => {
+  const [filterStatus, setFilterStatus] = useState<PolicyFilterId>(POLICY_FILTERS.all);
 
   const sortedEntries = useMemo(() => sortPolicyEntries(entries), [entries]);
 
