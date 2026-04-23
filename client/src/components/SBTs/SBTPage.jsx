@@ -20,7 +20,7 @@ import styles from './SBTPage.module.scss';
 import SBTFilter from '../SBTs/SBTFilter';
 import contextEngineLoadingGif from '../../assets/img/context_engine_logo_animation.gif';
 import defaultSbtImage from '../../assets/img/ce_circuit_logo.png';
-import DocumentLibraryPanel from '../DocumentLibrary/DocumentLibraryPanel.jsx';
+import DocumentLibraryPanel from '../DocumentLibrary/DocumentLibraryPanel';
 
 import { cryptoUtils } from 'utilities/crypto/cryptography.js';
 import { generateBlockieDataUrl } from 'utilities/ui/blockieAvatars.js';

@@ -23,13 +23,12 @@ import { SESSION_REGISTRY_CACHE_UPDATED_EVENT } from '../../utilities/web3/sessi
 import { normalizeGlobalSessionSelection } from '../../utilities/session/globalSessionState.js';
 import { parseQuestionSessionSlugFromSearch } from '../../utilities/survey/questionRouting.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
-import SingleQuestionResponse from '../SurveyTool/SingleQuestionResponse';
+import SingleQuestionResponse from '../SurveyTool/SingleQuestionResponse.jsx';
 import SessionChipSelector from '../Shared/SessionChipSelector';
 import {
   buildTagPagePath,
 } from '../SurveyTool/QuestionTagDropdown';
 import { getQuestionTagDisplayList } from '../../utilities/survey/questionTags.js';
-import type { RootState } from '../../reducers/index.js';
 import styles from './TagPage.module.scss';
 
 const buildTagInterpretationPromptUntyped = buildTagInterpretationPrompt as (args: {
@@ -47,8 +46,9 @@ type NetworkLike = {
 
 type SessionSelectionState = {
   selectedSessionScope?: string;
-  selectedSessionSlugs?: string[];
+  selectedSessionSlugs?: unknown[];
   primarySessionSlug?: string;
+  [key: string]: unknown;
 };
 
 type ScopeState = {
@@ -696,7 +696,7 @@ export const TagPageView = ({
   demoCorpusMode = false,
   demoCorpusRecords = [],
   hideEmbeddedSessionSelector = false,
-}: TagPageViewProps) => {
+}: TagPageViewProps = {}) => {
   const location = useLocation();
   const navigate = useNavigate();
   const [cacheVersion, setCacheVersion] = useState(0);
@@ -1519,9 +1519,12 @@ export const TagPageView = ({
   );
 };
 
-const mapStateToProps = (state: RootState): Pick<TagPageViewProps, 'network' | 'sessionState'> => ({
-  network: (state?.profile?.network || null) as NetworkLike,
-  sessionState: (state?.sessionState || {}) as SessionSelectionState,
+const mapStateToProps = (state: {
+  profile?: { network?: NetworkLike };
+  sessionState?: SessionSelectionState;
+}) => ({
+  network: state?.profile?.network || null,
+  sessionState: state?.sessionState || {},
 });
 
 export default connect(mapStateToProps)(TagPageView);

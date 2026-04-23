@@ -54,15 +54,31 @@ describe('RiskMatrix', () => {
     ).toBeInTheDocument();
   });
 
-  it('shows atlas-linked scenario fallback content without bundling a local scenario image', () => {
+  it('shows atlas-linked scenario cards with local historical avatar imagery', () => {
     render(<RiskMatrix />);
 
     fireEvent.click(screen.getByTestId('ce-risk-matrix-cell-safety-vs-capabilities'));
 
     expect(screen.getByText('Atlas-linked scenarios')).toBeInTheDocument();
-    expect(screen.getByText('Agent audits become part of the threat model')).toBeInTheDocument();
+    expect(screen.getByText('Audit-aware agents learn the shape of oversight')).toBeInTheDocument();
     expect(screen.getByText('Deceptive Alignment')).toBeInTheDocument();
-    expect(screen.queryByAltText(/ai safety audit room split between red-team probes/i)).not.toBeInTheDocument();
+    expect(screen.getByAltText(/alan turing portrait anchoring the audit-aware agents overlap/i)).toHaveAttribute(
+      'src',
+      '/historical-avatars/alanturing.jpg'
+    );
+    expect(screen.getByText('Alan Turing')).toBeInTheDocument();
+    expect(screen.getByText('Ada Lovelace')).toBeInTheDocument();
+  });
+
+  it('shows multiple linked crypto scenarios for capabilities x crypto overlaps', () => {
+    render(<RiskMatrix />);
+
+    fireEvent.click(screen.getByTestId('ce-risk-matrix-cell-capabilities-vs-crypto'));
+
+    expect(screen.getByText('Interaction: Capabilities vs Crypto')).toBeInTheDocument();
+    expect(screen.getByText('Agent key custody becomes the governance layer')).toBeInTheDocument();
+    expect(screen.getByText('Reasoning agents can accelerate post-quantum migration')).toBeInTheDocument();
+    expect(screen.getAllByTestId('ce-risk-matrix-atlas-scenario-card')).toHaveLength(2);
   });
 
   it('reveals the subgrid and rebalances a subcell after saving a new comment', () => {
