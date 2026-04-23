@@ -5,9 +5,15 @@ import styles from './OnboardingOverlay.module.scss';
 import { WELCOME_SLIDES, getWelcomeSlide } from '../MainContent/welcomeSlides.js';
 import { ONBOARDING_COMPLETE_STORAGE_KEY } from './onboardingConfig.js';
 
+type RootState = {
+  sessionState: {
+    onboardingStep?: number | null;
+  };
+};
+
 const OnboardingOverlay = () => {
   const dispatch = useDispatch();
-  const onboardingStep = useSelector((state) => state.sessionState.onboardingStep);
+  const onboardingStep = useSelector((state: RootState) => state.sessionState.onboardingStep);
   const slideIndex = onboardingStep != null ? Math.max(0, onboardingStep - 1) : 0;
   const currentSlide = getWelcomeSlide(slideIndex);
 
@@ -37,7 +43,9 @@ const OnboardingOverlay = () => {
     dispatch({ type: 'SET_ONBOARDING_STEP', payload: onboardingStep - 1 });
   };
 
-  const bulletPoints = (currentSlide.bulletPoints || []).filter((point) => point.bold || point.text);
+  const bulletPoints = (currentSlide.bulletPoints || []).filter((point: { bold?: string; text?: string }) => (
+    point.bold || point.text
+  ));
 
   return (
     <div className={styles.overlay} data-testid='ce-onboarding-overlay'>

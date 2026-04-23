@@ -108,7 +108,7 @@ import { WagmiHooksHOC } from '../HooksHOC/withWagmiBridge.jsx'
 import Navbar from "../Navbar/Navbar.jsx";
 import MainAreaTabs from "../MainContent/MainAreaTabs.jsx";
 import RightSide from '../RightSidebar/RightSide.jsx';
-import OnboardingOverlay from '../Onboarding/OnboardingOverlay.jsx';
+import OnboardingOverlay from '../Onboarding/OnboardingOverlay';
 import Footer from "../Footer/Footer.jsx";
 import LazyFallback from "../Shared/LazyFallback";
 import DevE2eNav from "../E2E/DevE2eNav";
