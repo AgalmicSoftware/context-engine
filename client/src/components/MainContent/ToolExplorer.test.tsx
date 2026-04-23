@@ -43,7 +43,7 @@ jest.mock('../Shared/AudioInput/AudioInput', () => ({
   default: () => null,
 }));
 
-jest.mock('../SBTs/SBTsPage.jsx', () => ({
+jest.mock('../SBTs/SBTsPage', () => ({
   __esModule: true,
   default: (props: any) => {
     mockSBTsPage(props);

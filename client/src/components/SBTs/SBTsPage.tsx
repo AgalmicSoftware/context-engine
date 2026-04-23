@@ -1,4 +1,4 @@
-/** @file SBTsPage.jsx */
+/** @file SBTsPage.tsx */
 
 import React, { Component } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -27,18 +27,35 @@ import { getShortenedAddress } from '../../utilities/ui/displayHelpers.js';
 import { isCryptoMode, sbtsListPath, t } from '../../utilities/ui/terminology.js';
 import defaultSbtImage from '../../assets/img/ce_circuit_logo.png';
 
+type AnyRecord = Record<string, any>;
+type MaybeRecord = AnyRecord | null;
+type MemoBucket = {
+  key: string;
+  result: any[];
+};
+
+type SBTsPageProps = AnyRecord;
+type SBTsPageState = {
+  showSBTsList: boolean;
+  showCreateGroup: boolean;
+};
+
+const SBTsListComponent = SBTsList as any;
+const CreateGroupComponent = CreateGroup as any;
+const SBTPageComponent = SBTPage as any;
+
 const sbtLog = createLogger('sbt');
 
-const normalizeFeaturedCardImageUrl = (value) => {
+const normalizeFeaturedCardImageUrl = (value: any) => {
   const raw = String(value || '').trim();
   if (!raw) return '';
   if (/^ipfs:\/\//i.test(raw)) return `https://ipfs.io/ipfs/${raw.replace(/^ipfs:\/\//i, '')}`;
   return normalizeArweaveUrl(raw, { contextLabel: 'sbt_page_featured_image' });
 };
 
-const dedupeAddressListCaseInsensitive = (list) => {
+const dedupeAddressListCaseInsensitive = (list: any) => {
   const seen = new Set();
-  const out = [];
+  const out: string[] = [];
   (Array.isArray(list) ? list : []).forEach((addr) => {
     const raw = String(addr || '').trim();
     if (!raw) return;
@@ -50,9 +67,9 @@ const dedupeAddressListCaseInsensitive = (list) => {
   return out;
 };
 
-const dedupeSessionSlugList = (list) => {
+const dedupeSessionSlugList = (list: any) => {
   const seen = new Set();
-  const out = [];
+  const out: string[] = [];
   (Array.isArray(list) ? list : []).forEach((slug) => {
     const normalized = normalizeSessionSlug(slug || '');
     if (seen.has(normalized)) return;
@@ -62,7 +79,7 @@ const dedupeSessionSlugList = (list) => {
   return out;
 };
 
-const buildFeaturedProgressSignature = (progressBySlug = {}, slugs = []) => (
+const buildFeaturedProgressSignature = (progressBySlug: AnyRecord = {}, slugs: any[] = []) => (
   dedupeSessionSlugList(slugs).map((slug) => {
     const progress = progressBySlug?.[slug];
     if (!progress || typeof progress !== 'object') return `${slug}:idle`;
@@ -79,17 +96,17 @@ const buildFeaturedProgressSignature = (progressBySlug = {}, slugs = []) => (
   }).join('|')
 );
 
-const hasOwn = (obj, key) => (
+const hasOwn = (obj: any, key: string) => (
   !!obj && typeof obj === 'object' && Object.prototype.hasOwnProperty.call(obj, key)
 );
 
-const hasAuthoritativeSessionSlug = (obj) => {
+const hasAuthoritativeSessionSlug = (obj: any) => {
   if (!hasOwn(obj, 'sessionSlug')) return false;
   const hasExplicitFlag = hasOwn(obj, 'sessionSlugExplicit');
   return obj.sessionSlugExplicit === true || !hasExplicitFlag;
 };
 
-const resolveFeaturedSbtSessionSlug = (sbt) => {
+const resolveFeaturedSbtSessionSlug = (sbt: any) => {
   const info = sbt?.sbtInfo || {};
 
   if (hasAuthoritativeSessionSlug(info)) {
@@ -136,18 +153,24 @@ const getDisplaySessionLists = (slugIn = '') => {
   };
 };
 
-const resolveAutoFeatureBySessionSlug = (metadata) => (
+const resolveAutoFeatureBySessionSlug = (metadata: MaybeRecord = null) => (
   metadata?.autoFeatureSBTsBySessionSlug !== undefined
     ? metadata.autoFeatureSBTsBySessionSlug
     : metadata?.autoFeatureSBTsWithFeaturedSbtTags
 );
 
-const isSessionAutoFeatureEnabled = (sessionConfig = null) => (
+const isSessionAutoFeatureEnabled = (sessionConfig: AnyRecord | null = null) => (
   resolveAutoFeatureBySessionSlug(sessionConfig) !== false
 );
 
-export class SBTsPage extends Component {
-  constructor(props) {
+export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
+  _featuredListMemo: MemoBucket;
+
+  _featuredEntriesMemo: MemoBucket;
+
+  _featuredCacheCardsMemo: MemoBucket;
+
+  constructor(props: SBTsPageProps) {
     super(props);
     const initialCreateGroupSessionSlug = normalizeSessionSlug(
       props.sessionSlug || props.sessionConfig?.slug || props.activeSessionSlug || ''
@@ -159,7 +182,7 @@ export class SBTsPage extends Component {
         sessionSlug: initialCreateGroupSessionSlug,
         migrateLegacyToSessionKey: true,
         clearInvalid: true,
-      }),
+      } as any),
     };
 
     this.toggleSBTsList = this.toggleSBTsList.bind(this);
@@ -170,7 +193,7 @@ export class SBTsPage extends Component {
   }
 
   toggleSBTsList() {
-    this.setState(prevState => ({ showSBTsList: !prevState.showSBTsList }));
+    this.setState((prevState) => ({ showSBTsList: !prevState.showSBTsList }));
   }
 
   toggleCreateGroup() {
@@ -178,7 +201,7 @@ export class SBTsPage extends Component {
       this.props.onCreateGroupToggleExternal();
       return;
     }
-    this.setState(prevState => ({ showCreateGroup: !prevState.showCreateGroup }));
+    this.setState((prevState) => ({ showCreateGroup: !prevState.showCreateGroup }));
   }
 
   getMemoizedFeaturedList({
@@ -188,7 +211,7 @@ export class SBTsPage extends Component {
     isSBTCacheReady,
     isAllSessionsMode = false,
     progressBySlug = {},
-  }) {
+  }: AnyRecord) {
     const baseList = dedupeAddressListCaseInsensitive(baseFeaturedList);
     const sessionSlugTarget = normalizeSessionSlug(effectiveSessionSlug || '');
     const key = [
@@ -209,11 +232,11 @@ export class SBTsPage extends Component {
       try {
         const cache = peekCacheSync('sbtCache', effectiveSessionSlug, { clone: false });
         if (cache && typeof cache === 'object') {
-          const autoFeaturedAddresses = [];
-          Object.values(cache).forEach((netNode) => {
+          const autoFeaturedAddresses: string[] = [];
+          Object.values(cache).forEach((netNode: any) => {
             const sbtList = netNode && typeof netNode === 'object' ? netNode.sbtList : null;
             if (!sbtList || typeof sbtList !== 'object') return;
-            Object.values(sbtList).forEach((sbt) => {
+            Object.values(sbtList).forEach((sbt: any) => {
               if (!sbt?.sbtAddress) return;
               if (sbt?.sbtInfo?.unlisted || sbt?.unlisted) return;
               const sbtSessionSlug = resolveFeaturedSbtSessionSlug(sbt);
@@ -243,7 +266,7 @@ export class SBTsPage extends Component {
     includeListScopeSessions = false,
     listScopeSessionSlugs = [],
     progressBySlug = {},
-  }) {
+  }: AnyRecord) {
     const normalizedEffectiveSlug = normalizeSessionSlug(effectiveSessionSlug || '');
     const scopedSessionSlugs = includeListScopeSessions
       ? dedupeSessionSlugList(listScopeSessionSlugs)
@@ -283,7 +306,7 @@ export class SBTsPage extends Component {
     }
 
     const seenAddresses = new Set();
-    const next = [];
+    const next: AnyRecord[] = [];
     orderedSessionSlugs.forEach((slug) => {
       const featuredForSlug = slug === normalizedEffectiveSlug
         ? baseList
@@ -299,7 +322,7 @@ export class SBTsPage extends Component {
         isAllSessionsMode,
         progressBySlug,
       });
-      addresses.forEach((address) => {
+      addresses.forEach((address: any) => {
         const rawAddress = String(address || '').trim();
         if (!rawAddress) return;
         const lower = rawAddress.toLowerCase();
@@ -320,7 +343,7 @@ export class SBTsPage extends Component {
     featuredEntries = [],
     isSBTCacheReady = false,
     progressBySlug = {},
-  }) {
+  }: AnyRecord) {
     const normalizedEntries = (Array.isArray(featuredEntries) ? featuredEntries : []).map((entry) => ({
       address: String(entry?.address || '').trim(),
       lowerAddress: String(entry?.address || '').trim().toLowerCase(),
@@ -340,11 +363,11 @@ export class SBTsPage extends Component {
     }
 
     const next = normalizedEntries.map((entry) => {
-      let cacheMatch = null;
+      let cacheMatch: AnyRecord | null = null;
       try {
         const cache = peekCacheSync('sbtCache', entry.sessionSlug, { clone: false });
         if (cache && typeof cache === 'object') {
-          Object.values(cache).some((netNode) => {
+          Object.values(cache).some((netNode: any) => {
             const candidate = netNode?.sbtList?.[entry.lowerAddress];
             if (!candidate?.sbtInfo) return false;
             cacheMatch = candidate;
@@ -354,11 +377,12 @@ export class SBTsPage extends Component {
       } catch (e) {
         sbtLog.warn('[SBTsPage] cache-backed featured lookup failed:', e);
       }
-      if (!cacheMatch?.sbtInfo) return null;
+      const resolvedCacheMatch = cacheMatch as AnyRecord | null;
+      if (!resolvedCacheMatch || !resolvedCacheMatch.sbtInfo) return null;
       return {
         address: entry.address,
         sessionSlug: entry.sessionSlug,
-        sbt: cacheMatch,
+        sbt: resolvedCacheMatch,
       };
     }).filter(Boolean);
 
@@ -436,7 +460,7 @@ export class SBTsPage extends Component {
               </button>
             </div>
           </div>
-          <CreateGroup
+          <CreateGroupComponent
             account={account}
             loginComplete={loginComplete}
             provider={provider}
@@ -496,7 +520,7 @@ export class SBTsPage extends Component {
       })
       : [];
     const cacheBackedFeaturedCardMap = new Map(
-      cacheBackedFeaturedCards.map((entry) => {
+      cacheBackedFeaturedCards.map((entry: any) => {
         const sessionSlug = normalizeSessionSlug(entry?.sessionSlug || '');
         const lowerAddress = String(entry?.address || '').trim().toLowerCase();
         return [`${sessionSlug}|${lowerAddress}`, entry];
@@ -515,7 +539,7 @@ export class SBTsPage extends Component {
     });
     const featuredSessionSlugs = dedupeSessionSlugList([
       effectiveSessionSlug,
-      ...actualFeaturedEntries.map(({ sessionSlug }) => sessionSlug),
+      ...actualFeaturedEntries.map(({ sessionSlug }: AnyRecord) => sessionSlug),
     ]);
     const featuredScanActive = featuredSessionSlugs.some((slug) => {
       const progress = progressBySlug[slug];
@@ -528,7 +552,7 @@ export class SBTsPage extends Component {
     const showFeaturedCornerSpinner = hasFeaturedCards && featuredScanActive;
     const showFeaturedColdStartSpinner = !hasFeaturedCards && (!isSBTCacheReady || featuredScanActive);
     const renderCreateGroupPanel = () => (
-      <CreateGroup
+      <CreateGroupComponent
         account={account}
         loginComplete={loginComplete}
         provider={provider}
@@ -567,7 +591,7 @@ export class SBTsPage extends Component {
                   />
                 )}
                 <div className={styles.sbtGrid}>
-                {featuredRenderEntries.map(({ kind, entry }, index) => {
+                {featuredRenderEntries.map(({ kind, entry }: AnyRecord, index: number) => {
                   if (kind === 'cache') {
                     const sbt = entry?.sbt || null;
                     const sbtInfo = sbt?.sbtInfo || {};
@@ -621,7 +645,7 @@ export class SBTsPage extends Component {
                   const resolvedSessionSlug = normalizeSessionSlug(sessionSlug || effectiveSessionSlug || '');
                   const sbtKey = `${resolvedSessionSlug || 'general'}:${String(sbtAddress || '').toLowerCase() || index}`;
                   return (
-                    <SBTPage
+                    <SBTPageComponent
                       key={sbtKey}
                       SBTAddress={sbtAddress}
                       account={account}
@@ -667,7 +691,7 @@ export class SBTsPage extends Component {
 
         {/* Full list (standard page) -- Rendered ONLY if we are on the dedicated /sbts route */}
         {!this.props.miniaturized && onSbtsRoute && (
-          <SBTsList
+          <SBTsListComponent
             provider={provider}
             network={network}
             account={account}
@@ -696,7 +720,7 @@ export class SBTsPage extends Component {
   }
 }
 
-const mapStateToProps = state => ({
+const mapStateToProps = (state: AnyRecord) => ({
   activeSessionSlug: state.sessionState.activeSessionSlug,
 });
 

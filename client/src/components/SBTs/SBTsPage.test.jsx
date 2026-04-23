@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
-import { SBTsPage } from './SBTsPage.jsx';
+import { SBTsPage } from './SBTsPage';
 import { peekCacheSync } from '../../utilities/cache/cacheScripts.js';
 import {
   getDemoSessionConfigBySlug,
