@@ -48,7 +48,7 @@ const MemoSurveyPage = React.memo((props) => <SurveyPage {...props} />);
 const SBTsPage = React.lazy(() => import('../SBTs/SBTsPage.jsx'));
 const PolisReport = React.lazy(() => import('../PolisReport/PolisReport.jsx'));
 const DebateMap = React.lazy(() => import('../DebateMap/DebateMap'));
-const CorpusViewer = React.lazy(() => import('../DemoViews/CorpusViewer.jsx'));
+const CorpusViewer = React.lazy(() => import('../DemoViews/CorpusViewer'));
 const RiskMatrix = React.lazy(() => import('../MainContent/RiskMatrix'));
 const DemoAnalysisWorkspace = React.lazy(() => import('../DemoViews/DemoAnalysis/DemoAnalysisWorkspace'));
 

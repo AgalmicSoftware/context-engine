@@ -67,7 +67,7 @@ jest.mock('../../DocumentLibrary/DocumentLibraryPanel.jsx', () => ({
   },
 }));
 
-jest.mock('../../DemoViews/CorpusViewer.jsx', () => ({
+jest.mock('../../DemoViews/CorpusViewer', () => ({
   __esModule: true,
   default: (() => {
     mockCorpusViewerModuleLoadCount += 1;
