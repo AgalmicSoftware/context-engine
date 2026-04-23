@@ -54,6 +54,17 @@ describe('RiskMatrix', () => {
     ).toBeInTheDocument();
   });
 
+  it('shows atlas-linked scenario fallback content without bundling a local scenario image', () => {
+    render(<RiskMatrix />);
+
+    fireEvent.click(screen.getByTestId('ce-risk-matrix-cell-safety-vs-capabilities'));
+
+    expect(screen.getByText('Atlas-linked scenarios')).toBeInTheDocument();
+    expect(screen.getByText('Agent audits become part of the threat model')).toBeInTheDocument();
+    expect(screen.getByText('Deceptive Alignment')).toBeInTheDocument();
+    expect(screen.queryByAltText(/ai safety audit room split between red-team probes/i)).not.toBeInTheDocument();
+  });
+
   it('reveals the subgrid and rebalances a subcell after saving a new comment', () => {
     render(<RiskMatrix />);
 
