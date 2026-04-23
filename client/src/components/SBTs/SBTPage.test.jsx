@@ -4004,7 +4004,7 @@ const createCachedSbtInfo = (overrides = {}) => ({
     expect(subject.state.cachedPasswords).toEqual(['scoped-code']);
   });
 
-  it('persists admin-generated invite codes to the scoped recovery store without legacy writes', async () => {
+  it('keeps admin-generated invite codes export-only until explicitly saved to the recovery cache', async () => {
     const sbtAddress = '0x0000000000000000000000000000000000000202';
     const sbtLower = sbtAddress.toLowerCase();
     const subject = createSubject({
@@ -4023,14 +4023,19 @@ const createCachedSbtInfo = (overrides = {}) => ({
 
     await subject.handleGenerateAdminInvites();
 
+    expect(localStorage.getItem(SBT_PASSWORD_RECOVERY_STORAGE_KEY)).toBeNull();
+    expect(localStorage.getItem(LEGACY_CREATED_SBTS_STORAGE_KEY)).toBeNull();
+    expect(subject.state.adminGeneratedPasswords).toEqual(['admin-one', 'admin-two']);
+    expect(subject.state.cachedPasswords).toEqual([]);
+
+    subject.saveAdminGeneratedPasswordsToRecoveryCache();
+
     const recoveryStore = JSON.parse(localStorage.getItem(SBT_PASSWORD_RECOVERY_STORAGE_KEY));
     expect(recoveryStore.entries[`84532:${sbtLower}`]).toEqual(expect.objectContaining({
       chainId: 84532,
       sbtAddress: sbtLower,
       passwords: ['admin-one', 'admin-two'],
     }));
-    expect(localStorage.getItem(LEGACY_CREATED_SBTS_STORAGE_KEY)).toBeNull();
-    expect(subject.state.adminGeneratedPasswords).toEqual(['admin-one', 'admin-two']);
     expect(subject.state.cachedPasswords).toEqual(['admin-one', 'admin-two']);
   });
 

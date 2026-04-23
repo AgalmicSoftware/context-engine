@@ -120,7 +120,7 @@ describe('CreateSBTGroup cache helpers', () => {
     expect(sessionStorage.getItem(getScopedCreateSbtFormCacheKey('test'))).toContain('"Scoped Draft"');
   });
 
-  it('persists generated password codes to the scoped recovery store without legacy createdSBTs writes', () => {
+  it('saves generated password codes to the scoped recovery store without legacy createdSBTs writes', () => {
     localStorage.clear();
     const sbtAddress = '0xABC0000000000000000000000000000000000000';
     const instance = makeInstance({
@@ -2940,6 +2940,47 @@ describe('CreateSBTGroup cache helpers', () => {
     instance.componentDidUpdate(prevProps, prevState);
 
     expect(sessionStorage.getItem(scopedKey)).toBeNull();
+  });
+
+  it('does not persist password recovery codes during mint unless explicitly saved later', async () => {
+    localStorage.clear();
+    const sbtAddress = '0x00000000000000000000000000000000000000b3';
+    const instance = makeInstance({
+      provider: 'mock-provider',
+      account: '0xCreator',
+      loginComplete: true,
+      network: { id: 84532, name: 'Base Sepolia' },
+      sessionSlug: 'edge',
+    });
+    instance.state = {
+      ...instance.state,
+      sbtName: 'Password Group',
+      tokenURI: 'ar://metadata',
+      groupPassword: 'shared-secret',
+      sbtDistribution: {
+        ...instance.state.sbtDistribution,
+        burnAuth: 'AdminOnly',
+        distributionOption: 'groupPassword',
+        isLimited: true,
+        limitedNumber: 1,
+      },
+    };
+
+    instance.getSessionConfigForNetwork = jest.fn(() => ({ slug: 'edge', networkChainId: 84532 }));
+    jest.spyOn(instance, 'generateSBTInviteLinks').mockResolvedValue(undefined);
+    jest.spyOn(contractScripts, 'countSBTCreated').mockResolvedValue(2);
+    jest.spyOn(contractScripts, 'computeGroupPasswordHash').mockReturnValue(`0x${'33'.repeat(32)}`);
+    jest.spyOn(contractScripts, 'createSBT').mockResolvedValue({
+      logs: [
+        makeFactoryReceiptLog('SBTCreated', [sbtAddress]),
+      ],
+    });
+
+    await instance.mintSBT();
+
+    expect(instance.generateSBTInviteLinks).toHaveBeenCalledWith(sbtAddress, ['shared-secret']);
+    expect(instance.state.savedRecoveryCodesLocally).toBe(false);
+    expect(localStorage.getItem(SBT_PASSWORD_RECOVERY_STORAGE_KEY)).toBeNull();
   });
 
   it('renders the open-mint URL card in the success UI for anyone-can-mint SBTs', () => {
