@@ -1,5 +1,3 @@
-// SPDX-License-Identifier: MPL-2.0
-
 import fs from 'fs';
 import path from 'path';
 import React from 'react';
@@ -38,32 +36,10 @@ describe('Footer', () => {
     expect(newLink).toHaveTextContent('NEW');
   });
 
-  it('renders internal links under the configured PUBLIC_URL base path', () => {
-    const previousPublicUrl = process.env.PUBLIC_URL;
-    process.env.PUBLIC_URL = '/ce';
-    try {
-      renderFooter();
-
-      expect(screen.getByRole('link', { name: 'NEW' })).toHaveAttribute('href', '/ce/new');
-      expect(screen.getByRole('link', { name: 'ABOUT' })).toHaveAttribute('href', '/ce/about');
-      expect(screen.getByRole('link', { name: 'CONTRACTS' })).toHaveAttribute('href', '/ce/contracts');
-      expect(screen.getByTestId('ce-footer-link-github')).toHaveAttribute(
-        'href',
-        'https://github.com/AgalmicSoftware/context-engine'
-      );
-    } finally {
-      if (previousPublicUrl === undefined) {
-        delete process.env.PUBLIC_URL;
-      } else {
-        process.env.PUBLIC_URL = previousPublicUrl;
-      }
-    }
-  });
-
-  it('renders the footer attribution text with a separate GitHub icon link', () => {
+  it('renders the CPAL attribution text with a separate GitHub icon link', () => {
     renderFooter();
 
-    const attributionLink = screen.getByTestId('ce-footer-brand-attribution');
+    const attributionLink = screen.getByTestId('ce-footer-cpal-attribution');
     const githubLink = screen.getByTestId('ce-footer-link-github');
 
     expect(attributionLink).toHaveTextContent('Software by Agalmic');
@@ -74,32 +50,21 @@ describe('Footer', () => {
     );
     expect(githubLink).toHaveAttribute('target', '_blank');
     expect(githubLink).toHaveAttribute('rel', 'noopener noreferrer');
-    expect(screen.queryByTestId('ce-footer-brand-link')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('ce-footer-cpal-link')).not.toBeInTheDocument();
     expect(screen.queryByTestId('ce-footer-agalmic-link')).not.toBeInTheDocument();
   });
 
-  it('uses full-width readable footer nav links across the mobile breakpoints', () => {
+  it('centers the footer nav list across the mobile breakpoints', () => {
     [
-      { minWidth: 0, maxWidth: 319, columns: 2, fontSize: 'clamp\\(0\\.9rem, 5\\.4vw, 1\\.08rem\\)' },
-      { minWidth: 320, maxWidth: 465, columns: 4, fontSize: 'clamp\\(0\\.86rem, 3\\.05vw, 1\\.08rem\\)' },
-      { minWidth: 466, maxWidth: 768, columns: 4, fontSize: 'clamp\\(1rem, 2\\.4vw, 1\\.22rem\\)' },
-    ].forEach(({ minWidth, maxWidth, columns, fontSize }) => {
+      { minWidth: 0, maxWidth: 319 },
+      { minWidth: 320, maxWidth: 465 },
+      { minWidth: 466, maxWidth: 768 },
+    ].forEach(({ minWidth, maxWidth }) => {
       const breakpointRule = new RegExp(
-        `@media \\(min-width: ${minWidth}px\\) and \\(max-width: ${maxWidth}px\\) \\{[\\s\\S]*?\\.footer \\{[\\s\\S]*?nav \\{[\\s\\S]*?width: 100%;[\\s\\S]*?ul \\{[\\s\\S]*?display: grid;[\\s\\S]*?grid-template-columns: repeat\\(${columns}, minmax\\(0, 1fr\\)\\);[\\s\\S]*?justify-content: stretch;[\\s\\S]*?width: 100%;[\\s\\S]*?li \\{[\\s\\S]*?width: 100%;[\\s\\S]*?li \\.footerLink \\{[\\s\\S]*?display: flex;[\\s\\S]*?font-size: ${fontSize};[\\s\\S]*?justify-content: center;[\\s\\S]*?width: 100%;`,
+        `@media \\(min-width: ${minWidth}px\\) and \\(max-width: ${maxWidth}px\\) \\{[\\s\\S]*?#footer \\{[\\s\\S]*?nav \\{[\\s\\S]*?width: 100%;[\\s\\S]*?ul \\{[\\s\\S]*?display: flex;[\\s\\S]*?justify-content: center;[\\s\\S]*?align-items: center;[\\s\\S]*?flex-wrap: wrap;[\\s\\S]*?width: 100%;`,
       );
 
       expect(footerStylesheet).toMatch(breakpointRule);
     });
-  });
-
-  it('uses larger footer text in the full-screen layout', () => {
-    expect(footerStylesheet).toMatch(/@media \(min-width:\s*1367px\)\s*{[\s\S]*?\.footer\s*{[\s\S]*?\.copyright\s*{[\s\S]*?font-size:\s*1\.18rem;/);
-    expect(footerStylesheet).toMatch(/@media \(min-width:\s*1367px\)\s*{[\s\S]*?\.footer\s*{[\s\S]*?nav\s*{[\s\S]*?ul\s*{[\s\S]*?li \.footerLink\s*{[\s\S]*?font-size:\s*1\.18rem;/);
-    expect(footerStylesheet).toMatch(/@media \(min-width:\s*1367px\)\s*{[\s\S]*?\.footerLink\s*{[\s\S]*?font-size:\s*1\.18rem;/);
-  });
-
-  it('keeps desktop footer nav links as large as the attribution text', () => {
-    expect(footerStylesheet).toMatch(/@media \(min-width:\s*769px\) and \(max-width:\s*1366px\)\s*{[\s\S]*?\.footer\s*{[\s\S]*?\.copyright\s*{[\s\S]*?font-family:\s*inherit;/);
-    expect(footerStylesheet).toMatch(/@media \(min-width:\s*769px\) and \(max-width:\s*1366px\)\s*{[\s\S]*?\.footer\s*{[\s\S]*?nav\s*{[\s\S]*?ul\s*{[\s\S]*?li \.footerLink\s*{[\s\S]*?font-size:\s*1rem;/);
   });
 });

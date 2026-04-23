@@ -21,7 +21,21 @@ type FooterProps = {
   loginModalToggled?: boolean;
 };
 
+type RootState = {
+  sessionState: {
+    focusedTab?: number;
+    loginModalToggled?: boolean;
+  };
+};
+
 class Footer extends React.Component<FooterProps> {
+  static propTypes = {
+    changeFocusedTab: PropTypes.func.isRequired,
+    toggleLoginModal: PropTypes.func.isRequired,
+    focusedTab: PropTypes.number,
+    loginModalToggled: PropTypes.bool,
+  };
+
   clickedSettingsLink = (e: React.MouseEvent<HTMLElement>) => {
     e.preventDefault();
     this.props.toggleLoginModal(true)
@@ -146,14 +160,7 @@ class Footer extends React.Component<FooterProps> {
   }
 }
 
-Footer.propTypes = {
-  changeFocusedTab: PropTypes.func.isRequired,
-  toggleLoginModal: PropTypes.func.isRequired,
-  focusedTab: PropTypes.number,
-  loginModalToggled: PropTypes.bool,
-};
-
-const mapStateToProps = state => ({
+const mapStateToProps = (state: RootState) => ({
   focusedTab: state.sessionState.focusedTab,
   loginModalToggled: state.sessionState.loginModalToggled,
 });
