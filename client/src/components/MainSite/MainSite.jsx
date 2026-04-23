@@ -107,7 +107,7 @@ import { WagmiHooksHOC } from '../HooksHOC/withWagmiBridge.jsx'
 // Components
 import Navbar from "../Navbar/Navbar";
 import MainAreaTabs from "../MainContent/MainAreaTabs";
-import RightSide from '../RightSidebar/RightSide.jsx';
+import RightSide from '../RightSidebar/RightSide';
 import OnboardingOverlay from '../Onboarding/OnboardingOverlay';
 import Footer from "../Footer/Footer";
 import LazyFallback from "../Shared/LazyFallback";
