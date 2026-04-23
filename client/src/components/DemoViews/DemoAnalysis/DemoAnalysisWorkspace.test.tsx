@@ -113,7 +113,7 @@ describe('DemoAnalysisWorkspace', () => {
     });
 
     expect(screen.getByTestId('demo-analysis-selected-question').textContent).toBe(suggestionQuestionText);
-    expect(screen.getByTestId('demo-analysis-breakdown-question').textContent).toBe(suggestionQuestionText);
+    expect(screen.queryByTestId('demo-analysis-breakdown-question')).not.toBeInTheDocument();
     expect(suggestionQuestionText).toBeTruthy();
     expect(screen.getByTestId('demo-analysis-question-breakdown')).toHaveTextContent(/overall/i);
     expect(screen.getByTestId('demo-analysis-question-breakdown')).toHaveTextContent(/personas/i);
@@ -133,9 +133,7 @@ describe('DemoAnalysisWorkspace', () => {
 
     expect(screen.getByTestId('demo-analysis-selected-question').textContent).toBeTruthy();
     expect(screen.getByTestId('demo-analysis-question-banner')).toBeInTheDocument();
-    expect(screen.getByTestId('demo-analysis-breakdown-question').textContent).toBe(
-      screen.getByTestId('demo-analysis-selected-question').textContent
-    );
+    expect(screen.queryByTestId('demo-analysis-breakdown-question')).not.toBeInTheDocument();
   });
 
   it('keeps auto-select usable after only one demographic segment is chosen', async () => {

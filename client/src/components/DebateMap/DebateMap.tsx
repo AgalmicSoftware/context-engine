@@ -254,6 +254,11 @@ interface AtlasRenderNode extends DebateNode {
   disagreementScore: number;
 }
 
+interface PackedAtlasLayoutNode {
+  y: number;
+  r: number | null;
+}
+
 interface FlattenedDebateNode extends DebateNode {
   parentPath: DebateNode[];
 }
@@ -1084,6 +1089,64 @@ const calculateAtlasPackValue = (node: DebateNode): number => {
 };
 
 const shouldAlwaysShowPackedLabel = (node: AtlasRenderNode): boolean => node.hierarchyDepth === 1;
+export const getPackedAtlasLabelFontSizePx = (
+  node: Pick<AtlasRenderNode, 'hierarchyDepth' | 'isCenter'>,
+  diameter: number,
+  alwaysVisible = false
+): number => {
+  const normalizedDiameter = Math.max(0, Number(diameter) || 0);
+  const hierarchyDepth = Math.max(0, Number(node?.hierarchyDepth) || 0);
+
+  let ratio = 0.038;
+  let minSize = 9;
+  let maxSize = 15;
+
+  if (node?.isCenter) {
+    ratio = 0.058;
+    minSize = 18;
+    maxSize = 30;
+  } else if (hierarchyDepth <= 1) {
+    ratio = 0.066;
+    minSize = 22;
+    maxSize = 34;
+  } else if (hierarchyDepth === 2) {
+    ratio = 0.05;
+    minSize = 12;
+    maxSize = 20;
+  }
+
+  const boostedSize = normalizedDiameter * ratio * (alwaysVisible ? 1.08 : 1);
+  return Math.max(minSize, Math.min(maxSize, Math.round(boostedSize * 10) / 10));
+};
+
+export const getPackedAtlasVerticalLiftPx = (
+  nodes: PackedAtlasLayoutNode[] = [],
+  desiredTopGutter = 10
+): number => {
+  if (!Array.isArray(nodes) || nodes.length === 0) return 0;
+
+  const minVisibleTop = nodes.reduce((currentMin, node) => {
+    const y = Number(node?.y) || 0;
+    const radius = Math.max(0, Number(node?.r) || 0);
+    return Math.min(currentMin, y - radius);
+  }, Number.POSITIVE_INFINITY);
+
+  if (!Number.isFinite(minVisibleTop)) return 0;
+  return Math.max(0, minVisibleTop - Math.max(0, Number(desiredTopGutter) || 0));
+};
+
+export const getPackedAtlasClickTarget = (
+  node: AtlasRenderNode | null | undefined,
+  nodesById: Map<string, AtlasRenderNode> = new Map()
+): AtlasRenderNode | null => {
+  if (!node) return null;
+  if (Number(node.hierarchyDepth || 0) <= 1) return node;
+
+  const directChildId = String(node.groupId || '').trim();
+  if (!directChildId) return node;
+  return nodesById.get(directChildId) || node;
+};
+
 const getPackedAtlasGroupId = (hierarchyNode: any): string => {
   if (!hierarchyNode) return '';
   const lineage: any[] = [];
@@ -1467,7 +1530,8 @@ const PackedAtlasView = ({
       }
       : getAtlasCenterNode(atlasRoot, data);
     const inset = isMobile ? 12 : 18;
-    const headerHeight = atlasRoot ? (isMobile ? 52 : 46) : 0;
+    const headerHeight = atlasRoot ? (isMobile ? 34 : 28) : 0;
+    const desiredTopGutter = atlasRoot ? (isMobile ? 10 : 8) : (isMobile ? 14 : 18);
     const packLayout = d3Pack()
       .size([
         Math.max(dimensions.w - (inset * 2), 1),
@@ -1485,12 +1549,15 @@ const PackedAtlasView = ({
 
     const packedRoot = packLayout(hierarchy);
 
-    const nodes: AtlasRenderNode[] = packedRoot.descendants()
-      .filter((node: any) => node.depth > 0)
+    const layoutNodes = packedRoot.descendants()
+      .filter((node: any) => node.depth > 0);
+    const verticalLift = getPackedAtlasVerticalLiftPx(layoutNodes, desiredTopGutter);
+
+    const nodes: AtlasRenderNode[] = layoutNodes
       .map((node: any) => buildAtlasRenderNode(node.data, atlasRoot, node.depth, {
         isCenter: false,
         x: node.x + inset,
-        y: node.y + inset + headerHeight,
+        y: node.y + inset + headerHeight - verticalLift,
         r: node.r,
         groupId: getPackedAtlasGroupId(node),
       }))
@@ -1501,6 +1568,9 @@ const PackedAtlasView = ({
 
     return { nodes };
   }, [atlasRoot, data, dimensions.h, dimensions.w, isMobile]);
+  const layoutNodeMap = useMemo(() => new Map(
+    layout.nodes.map((node) => [String(node.id || '').trim(), node])
+  ), [layout.nodes]);
 
   return (
     <div ref={containerRef} className={`${styles.atlasViewContainer} ${styles.packedAtlasViewContainer}`}>
@@ -1548,6 +1618,7 @@ const PackedAtlasView = ({
               : node.hierarchyDepth === 2 && showChildLabelsForGroup
           )
           : shouldAlwaysShowPackedLabel(node);
+        const labelFontSizePx = getPackedAtlasLabelFontSizePx(node, diameter, alwaysVisible);
 
         return (
           <div
@@ -1563,7 +1634,9 @@ const PackedAtlasView = ({
             data-ce-node-layout={ATLAS_LAYOUT_MODES.PACKED}
             onClick={(event) => {
               event.stopPropagation();
-              handleAtlasNodeClick(node);
+              const clickTarget = getPackedAtlasClickTarget(node, layoutNodeMap);
+              if (!clickTarget) return;
+              handleAtlasNodeClick(clickTarget);
             }}
             onMouseEnter={() => {
               setHoveredNodeId(String(node.id || '').trim() || null);
@@ -1582,7 +1655,10 @@ const PackedAtlasView = ({
               className={`${styles.nodeDot} ${styles.packedNodeDot} ${node.heat > 10 ? styles.hot : ''}`}
               style={{ width: `${diameter}px`, height: `${diameter}px` }}
             >
-              <div className={`${styles.nodeLabel} ${styles.packedNodeLabel} ${alwaysVisible ? styles.alwaysVisible : ''}`}>
+              <div
+                className={`${styles.nodeLabel} ${styles.packedNodeLabel} ${alwaysVisible ? styles.alwaysVisible : ''}`}
+                style={{ fontSize: `${labelFontSizePx}px` }}
+              >
                 {node.name}
               </div>
             </div>
@@ -1697,22 +1773,31 @@ const Modal = ({
   onCopy,
   onTagClick,
 }: ModalProps) => {
+  const modalContentRef = useRef<HTMLDivElement | null>(null);
+  const defaultArgumentData = content?.arguments && typeof content.arguments === 'object'
+    ? content.arguments
+    : null;
+  const hasDefaultArguments = Boolean(defaultArgumentData);
   const [activeVoteType, setActiveVoteType] = useState<VoteDirection | null>(null);
   const [voteCount, setVoteCount] = useState('');
   const [showVoteBreakdown, setShowVoteBreakdown] = useState(false);
   const [compassOpen, setCompassOpen] = useState(true);
-  const [argumentsOpen, setArgumentsOpen] = useState(true);
-  const [historicalCasesOpen, setHistoricalCasesOpen] = useState(true);
+  const [argumentsOpen, setArgumentsOpen] = useState(hasDefaultArguments);
+  const [historicalCasesOpen, setHistoricalCasesOpen] = useState(false);
   const [expandedHistoricalCaseId, setExpandedHistoricalCaseId] = useState('');
   const [questionsOpen, setQuestionsOpen] = useState(false);
 
   useEffect(() => {
+    if (modalContentRef.current) {
+      modalContentRef.current.scrollTop = 0;
+      modalContentRef.current.scrollLeft = 0;
+    }
     setCompassOpen(true);
-    setArgumentsOpen(false);
-    setHistoricalCasesOpen(true);
+    setArgumentsOpen(hasDefaultArguments);
+    setHistoricalCasesOpen(false);
     setExpandedHistoricalCaseId('');
     setQuestionsOpen(false);
-  }, [content?.id]);
+  }, [content?.id, hasDefaultArguments]);
 
   const getUserAvatar = (username: string) => (
     getHistoricalFigureAvatarOrBlockie(username, {
@@ -2254,7 +2339,11 @@ const Modal = ({
 
   return (
     <div className={styles.modalOverlay} onClick={onClose}>
-      <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+      <div
+        ref={modalContentRef}
+        className={styles.modalContent}
+        onClick={(e) => e.stopPropagation()}
+      >
 
         {/* --- HEADER --- */}
         <div className={styles.modalHeader}>
