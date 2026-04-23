@@ -41,6 +41,19 @@ const AudioSurveyGenerator = React.lazy(() => import("../SurveyTool/SurveyGenera
 
 const log = createLogger('ui');
 
+type ToolComponent = React.ComponentType<any> | React.LazyExoticComponent<React.ComponentType<any>>;
+
+type ToolData = {
+  name: string;
+  subtext: string;
+  explainText: string;
+  image: string;
+  headerImage?: string | null;
+  content: ToolComponent;
+  disabled: boolean;
+  status: 'live' | 'future';
+};
+
 type ExpandedComponentState = {
   component: ToolComponent;
   data: ToolData;
@@ -54,7 +67,7 @@ const ToolExplorer = (props: ToolExplorerProps) => {
   const [showEmbeddedCreateGroup, setShowEmbeddedCreateGroup] = useState(false);
   const [dataToolMode, setDataToolMode] = useState('add');
   const [showDataSessionSelector, setShowDataSessionSelector] = useState(false);
-  const [dataSessionOverrideSlug, setDataSessionOverrideSlug] = useState(null);
+  const [dataSessionOverrideSlug, setDataSessionOverrideSlug] = useState<string | null>(null);
   const [dataSessionOverrideTouched, setDataSessionOverrideTouched] = useState(false);
   const demoSurfaceEnabled = props.demoSurfaceMode !== false;
   const showDemoCards = demoSurfaceEnabled;
@@ -212,7 +225,7 @@ const ToolExplorer = (props: ToolExplorerProps) => {
     setShowEmbeddedCreateGroup((prevState) => !prevState);
   };
 
-  const handleDataSessionSelect = (slugIn) => {
+  const handleDataSessionSelect = (slugIn: unknown) => {
     setDataSessionOverrideSlug(normalizeSessionSlug(slugIn || ''));
     setDataSessionOverrideTouched(true);
   };
