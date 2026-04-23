@@ -1,3 +1,7 @@
+import {
+  validateBrowserLoginOrigin,
+} from './siweMessageValidation.js';
+
 export const resolveAuthLoginRequestAuthority = async ({
   env,
   request,
@@ -80,11 +84,43 @@ export const resolveAuthLoginRequestAuthority = async ({
   }
 
   const siwe = deps?.parseSiweMessage?.(message);
-  const siweCheck = deps?.validateSiwe?.(siwe) || {};
+  const siweCheck = deps?.validateSiwe?.(siwe, {
+    requireIssuedAt: true,
+    maxIssuedAtAgeMs: deps?.LOGIN_SIWE_MAX_AGE_MS,
+    issuedAtFutureSkewMs: deps?.LOGIN_SIWE_FUTURE_SKEW_MS,
+    now: deps?.now,
+  }) || {};
   if (!siweCheck?.ok) {
     return {
       ok: false,
       response: deps?.json?.({ error: siweCheck?.error }, 400, headers),
+    };
+  }
+
+  const config = corsState.config;
+  if (!config) {
+    return {
+      ok: false,
+      response: deps?.json?.({ error: deps?.SESSION_CONFIG_NOT_FOUND_ERROR }, 404, headers),
+    };
+  }
+
+  const loginOriginCheck = (
+    typeof deps?.validateBrowserLoginOrigin === 'function'
+      ? deps.validateBrowserLoginOrigin
+      : validateBrowserLoginOrigin
+  )({
+    request,
+    siwe,
+    env,
+    config,
+  }, {
+    resolveTrustedAdminOrigins: deps?.resolveTrustedAdminOrigins,
+  });
+  if (!loginOriginCheck?.ok) {
+    return {
+      ok: false,
+      response: deps?.json?.({ error: loginOriginCheck?.error }, 403, headers),
     };
   }
 
@@ -101,14 +137,6 @@ export const resolveAuthLoginRequestAuthority = async ({
     return {
       ok: false,
       response: deps?.json?.({ error: nonceResult?.error }, 400, headers),
-    };
-  }
-
-  const config = corsState.config;
-  if (!config) {
-    return {
-      ok: false,
-      response: deps?.json?.({ error: deps?.SESSION_CONFIG_NOT_FOUND_ERROR }, 404, headers),
     };
   }
 

@@ -110,12 +110,19 @@ export const createWorkerRouteShellWithWorkerDeps = ({
           isAddress: deps?.isAddress,
           resolveWorkerBodySlugContext: deps?.resolveWorkerBodySlugContext,
           resolveExistingSessionCors: deps?.resolveExistingSessionCors,
+          validateTrustedLoginRequestOrigin: deps?.validateTrustedLoginRequestOrigin,
+          resolveTrustedAdminOrigins: deps?.resolveTrustedAdminOrigins,
+          checkNonceRateLimit: deps?.checkNonceRateLimit,
+          now: deps?.now,
           buildNonce: deps?.buildNonce,
           base64UrlEncode: deps?.base64UrlEncode,
         },
         constants: {
           missingSlugError: constants?.missingSlugError,
           nonceTtlSeconds: constants?.nonceTtlSeconds,
+          nonceRateLimitMax: constants?.nonceRateLimitMax,
+          nonceRateLimitWindowMs: constants?.nonceRateLimitWindowMs,
+          nonceRateLimitTtlSeconds: constants?.nonceRateLimitTtlSeconds,
         },
       });
     }
@@ -136,6 +143,8 @@ export const createWorkerRouteShellWithWorkerDeps = ({
           validateRecoveredAddressMatchesRequest: deps?.validateRecoveredAddressMatchesRequest,
           parseSiweMessage: deps?.parseSiweMessage,
           validateSiwe: deps?.validateSiwe,
+          validateBrowserLoginOrigin: deps?.validateBrowserLoginOrigin,
+          resolveTrustedAdminOrigins: deps?.resolveTrustedAdminOrigins,
           validateSiweAddressMatchesRequest: deps?.validateSiweAddressMatchesRequest,
           consumeNonce: deps?.consumeNonce,
           computeScopesForLogin: deps?.computeScopesForLogin,
@@ -146,6 +155,8 @@ export const createWorkerRouteShellWithWorkerDeps = ({
         constants: {
           usedNonceTtlSeconds: constants?.usedNonceTtlSeconds,
           tokenTtlSeconds: constants?.tokenTtlSeconds,
+          loginSiweMaxAgeMs: constants?.loginSiweMaxAgeMs,
+          loginSiweFutureSkewMs: constants?.loginSiweFutureSkewMs,
           missingSlugError: constants?.missingSlugError,
           sessionConfigNotFoundError: constants?.sessionConfigNotFoundError,
         },
