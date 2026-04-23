@@ -125,6 +125,11 @@ If you deploy via the Group Wizard and a deploy-helper:
 - After that first worker deploy, later worker config/secrets adjustments are expected to flow through the signed `/admin/set-config` and `/admin/set-secrets` routes rather than the streamlined normal-mode auto-deploy banner.
 - `customRpcKey` is intentionally out of scope for this MVP and is ignored if present in a bundle payload.
 
+Temporary standard-link fixture:
+- `client/public/standard-sponsored-links.json` is a tracked public manifest for up to ten disposable sponsored setup URLs.
+- It is intentionally operator-managed and does not read back worker KV or grant state. An active fixture entry is public because the operator chose to publish that bearer URL.
+- Use it only for short-lived low-friction demos or launches. Replace it with a worker-backed claim service before treating sponsored-link inventory as durable availability infrastructure.
+
 Deploy error visibility:
 - If deploy-helper rejects the browser origin (`403 Origin not allowed`), the wizard now surfaces an explicit message:
   - `Deploy-helper rejected browser origin <origin>... Add this origin to the deploy-helper allowlist...`

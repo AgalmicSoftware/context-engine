@@ -1,0 +1,58 @@
+{
+  "version": 1,
+  "temporaryFixture": true,
+  "description": "Temporary public fixture for standard sponsored setup links. Sponsored URLs are bearer grants; only set active=true for links that are intentionally public and disposable.",
+  "replacementPrd": "docs/internal-prds/451_replace-standard-sponsored-links-fixture.md",
+  "links": [
+    {
+      "label": "Sponsored setup 1",
+      "url": "",
+      "active": false
+    },
+    {
+      "label": "Sponsored setup 2",
+      "url": "",
+      "active": false
+    },
+    {
+      "label": "Sponsored setup 3",
+      "url": "",
+      "active": false
+    },
+    {
+      "label": "Sponsored setup 4",
+      "url": "",
+      "active": false
+    },
+    {
+      "label": "Sponsored setup 5",
+      "url": "",
+      "active": false
+    },
+    {
+      "label": "Sponsored setup 6",
+      "url": "",
+      "active": false
+    },
+    {
+      "label": "Sponsored setup 7",
+      "url": "",
+      "active": false
+    },
+    {
+      "label": "Sponsored setup 8",
+      "url": "",
+      "active": false
+    },
+    {
+      "label": "Sponsored setup 9",
+      "url": "",
+      "active": false
+    },
+    {
+      "label": "Sponsored setup 10",
+      "url": "",
+      "active": false
+    }
+  ]
+}
