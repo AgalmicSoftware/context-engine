@@ -2,6 +2,21 @@ import React from 'react';
 import { act, cleanup, render } from '@testing-library/react';
 
 const mockCreateClient = jest.fn(() => ({}));
+const mockConnectorsForWallets = jest.fn(() => []);
+const mockMetaMaskWalletCreateConnector = jest.fn(() => ({
+  connector: { id: 'walletConnect-fallback' },
+}));
+const mockMetaMaskWallet = jest.fn(() => ({
+  id: 'metaMask',
+  name: 'MetaMask',
+  iconUrl: 'metamask-icon',
+  iconBackground: '#fff',
+  createConnector: mockMetaMaskWalletCreateConnector,
+}));
+const mockMetaMaskConnector = jest.fn((options: unknown) => ({
+  id: 'metaMask-injected',
+  options,
+}));
 const mockReadColdLoadOnboardingState = jest.fn((_storage?: Storage) => ({
   firstVisit: true,
   shouldStartOnboarding: false,
@@ -10,6 +25,7 @@ const mockStoreDispatch = jest.fn();
 const mockSyncPublicPageHead = jest.fn();
 const mockToaster = jest.fn((_props?: any) => null);
 let routeProps: any[] = [];
+let mockWalletConnectFallbackEnabled = false;
 
 const MockRoute = (props: any) => {
   routeProps.push(props);
@@ -49,7 +65,10 @@ const mockAppDependencies = () => {
       dispatch: mockStoreDispatch,
     },
   }));
-  jest.doMock('../variables/appConfig.js', () => ({ SERVER: 'http://localhost' }));
+  jest.doMock('../variables/appConfig.js', () => ({
+    SERVER: 'http://localhost',
+    CE_ENABLE_WALLETCONNECT_FALLBACK: mockWalletConnectFallbackEnabled,
+  }));
   jest.doMock('../utilities/ceAgent.js', () => ({ installCeAgent: jest.fn() }));
   jest.doMock('../utilities/logging', () => ({
     createLogger: () => ({
@@ -76,12 +95,12 @@ const mockAppDependencies = () => {
 
   jest.doMock('@rainbow-me/rainbowkit', () => ({
     getDefaultWallets: jest.fn(),
-    connectorsForWallets: jest.fn(() => []),
+    connectorsForWallets: mockConnectorsForWallets,
     RainbowKitProvider: ({ children }: { children: React.ReactNode }) => children,
   }));
   jest.doMock('@rainbow-me/rainbowkit/wallets', () => ({
     rainbowWallet: jest.fn(() => ({})),
-    metaMaskWallet: jest.fn(() => ({})),
+    metaMaskWallet: mockMetaMaskWallet,
     coinbaseWallet: jest.fn(() => ({})),
   }));
 
@@ -101,6 +120,9 @@ const mockAppDependencies = () => {
       setItem: jest.fn(),
       removeItem: jest.fn(),
     },
+  }));
+  jest.doMock('wagmi/connectors/metaMask', () => ({
+    MetaMaskConnector: mockMetaMaskConnector,
   }));
   jest.doMock('wagmi/chains', () => ({
     goerli: { id: 5, chainId: 5, name: 'Goerli' },
@@ -146,6 +168,22 @@ describe('App wagmi auto-connect persistence', () => {
     sessionStorage.clear();
     window.history.replaceState({}, '', '/');
     routeProps = [];
+    mockWalletConnectFallbackEnabled = false;
+    mockConnectorsForWallets.mockReturnValue([]);
+    mockMetaMaskWalletCreateConnector.mockReturnValue({
+      connector: { id: 'walletConnect-fallback' },
+    });
+    mockMetaMaskWallet.mockImplementation(() => ({
+      id: 'metaMask',
+      name: 'MetaMask',
+      iconUrl: 'metamask-icon',
+      iconBackground: '#fff',
+      createConnector: mockMetaMaskWalletCreateConnector,
+    }));
+    mockMetaMaskConnector.mockImplementation((options: unknown) => ({
+      id: 'metaMask-injected',
+      options,
+    }));
     mockSyncPublicPageHead.mockReset();
     mockReadColdLoadOnboardingState.mockReturnValue({
       firstVisit: true,
@@ -174,6 +212,42 @@ describe('App wagmi auto-connect persistence', () => {
     expect(mockCreateClient).toHaveBeenCalledWith(
       expect.objectContaining({ autoConnect: true })
     );
+  });
+
+  it('uses an injected-only MetaMask connector by default to avoid WalletConnect bridge startup', () => {
+    loadAppModule();
+
+    const walletList = mockConnectorsForWallets.mock.calls[0]?.[0];
+    const wallet = walletList?.[0]?.wallets?.[0];
+    const connectorConfig = wallet.createConnector();
+
+    expect(mockMetaMaskWallet).toHaveBeenCalledWith(
+      expect.objectContaining({ chains: expect.any(Array), shimDisconnect: true })
+    );
+    expect(mockMetaMaskWalletCreateConnector).not.toHaveBeenCalled();
+    expect(mockMetaMaskConnector).toHaveBeenCalledWith(
+      expect.objectContaining({
+        chains: expect.any(Array),
+        options: { shimDisconnect: true },
+      })
+    );
+    expect(connectorConfig.connector).toEqual(
+      expect.objectContaining({ id: 'metaMask-injected' })
+    );
+  });
+
+  it('preserves RainbowKit MetaMask WalletConnect fallback when explicitly enabled', () => {
+    mockWalletConnectFallbackEnabled = true;
+
+    loadAppModule();
+
+    const walletList = mockConnectorsForWallets.mock.calls[0]?.[0];
+    const wallet = walletList?.[0]?.wallets?.[0];
+    const connectorConfig = wallet.createConnector();
+
+    expect(mockMetaMaskWalletCreateConnector).toHaveBeenCalledTimes(1);
+    expect(mockMetaMaskConnector).not.toHaveBeenCalled();
+    expect(connectorConfig.connector).toEqual({ id: 'walletConnect-fallback' });
   });
 
   it('passes firstVisit to MainSite during the initial render', () => {
