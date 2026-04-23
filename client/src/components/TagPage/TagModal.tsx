@@ -15,9 +15,31 @@ import {
   getSessionConfigBySlug as getStrictSessionConfigBySlug,
 } from '../../utilities/web3/contractScripts.js';
 
-const dedupeSessionSlugs = (values = []) => {
-  const seen = new Set();
-  const out = [];
+type SessionScopeState = {
+  filterMode: 'all' | 'set';
+  scopeSlugs: string[];
+};
+
+type ScopeSummaryOptions = {
+  filterMode?: 'all' | 'set';
+  scopeSlugs?: unknown[];
+  routePinned?: boolean;
+  localOverrideTouched?: boolean;
+};
+
+type TagModalProps = {
+  isOpen: boolean;
+  toggle: () => void;
+  activeTag?: string | null;
+  demoCorpusMode?: boolean;
+  demoCorpusRecords?: any[];
+};
+
+const TagPageComponent = TagPage as React.ComponentType<any>;
+
+const dedupeSessionSlugs = (values: unknown[] | unknown = []): string[] => {
+  const seen = new Set<string>();
+  const out: string[] = [];
   (Array.isArray(values) ? values : [values]).forEach((value) => {
     const normalized = normalizeSessionSlug(value);
     if (normalized == null || seen.has(normalized)) return;
@@ -27,7 +49,7 @@ const dedupeSessionSlugs = (values = []) => {
   return out;
 };
 
-const buildSessionScopeLabel = (slugIn = '') => {
+const buildSessionScopeLabel = (slugIn = ''): string => {
   const slug = normalizeSessionSlug(slugIn);
   if (!slug) return 'General';
   const cfg = (
@@ -41,7 +63,7 @@ const buildSessionScopeLabel = (slugIn = '') => {
     : (sessionName || slug);
 };
 
-const buildGlobalTagPageScope = (selection = {}) => {
+const buildGlobalTagPageScope = (selection: Record<string, any> = {}): SessionScopeState => {
   const scopeMode = String(selection?.selectedSessionScope || '').trim().toLowerCase() || 'active';
   if (scopeMode === 'all') {
     return { filterMode: 'all', scopeSlugs: [] };
@@ -57,7 +79,7 @@ const buildGlobalTagPageScope = (selection = {}) => {
   }
   return {
     filterMode: 'set',
-    scopeSlugs: [normalizeSessionSlug(selection?.primarySessionSlug || '')],
+    scopeSlugs: [normalizeSessionSlug(selection?.primarySessionSlug || '') || ''],
   };
 };
 
@@ -66,7 +88,7 @@ const describeScopeSummary = ({
   scopeSlugs = [],
   routePinned = false,
   localOverrideTouched = false,
-} = {}) => {
+}: ScopeSummaryOptions = {}) => {
   const normalizedScopeSlugs = dedupeSessionSlugs(scopeSlugs);
   let labelCore = 'all sessions';
   let title = 'Showing questions from all sessions.';
@@ -107,7 +129,7 @@ const describeScopeSummary = ({
   };
 };
 
-const buildEmptyQuestionsText = (selectedTags = []) => {
+const buildEmptyQuestionsText = (selectedTags: string[] = []) => {
   if (selectedTags.length === 1) {
     return `No questions tagged ${selectedTags[0]} in this session yet.`;
   }
@@ -121,15 +143,15 @@ const TagModal = ({
   activeTag,
   demoCorpusMode = false,
   demoCorpusRecords = [],
-}) => {
+}: TagModalProps) => {
   const location = useLocation();
   const reduxContext = useContext(ReactReduxContext);
   const sessionState = reduxContext?.store?.getState?.()?.sessionState;
   const normalizedActiveTag = String(activeTag || '').trim();
-  const [selectedTags, setSelectedTags] = useState([]);
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [demoInfoOpen, setDemoInfoOpen] = useState(false);
-  const modalRef = useRef(null);
-  const scrollContainerRef = useRef(null);
+  const modalRef = useRef<HTMLDivElement | null>(null);
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     setSelectedTags(normalizedActiveTag ? [normalizedActiveTag] : []);
@@ -153,10 +175,10 @@ const TagModal = ({
     const queryPinnedScopeSlug = parseQuestionSessionSlugFromSearch(location.search);
     const routePinned = queryPinnedScopeSlug !== null;
     const globalScopeState = buildGlobalTagPageScope(globalSessionSelection);
-    const effectiveScopeState = routePinned
+    const effectiveScopeState: SessionScopeState = routePinned
       ? {
         filterMode: 'set',
-        scopeSlugs: [normalizeSessionSlug(queryPinnedScopeSlug)],
+        scopeSlugs: [normalizeSessionSlug(queryPinnedScopeSlug) || ''],
       }
       : globalScopeState;
 
@@ -172,10 +194,11 @@ const TagModal = ({
     const modalNode = modalRef.current;
     const scrollContainer = scrollContainerRef.current;
 
-    const resetScroll = (node) => {
+    const resetScroll = (node: Element | null) => {
       if (!node) return;
-      node.scrollTop = 0;
-      node.scrollLeft = 0;
+      const scrollNode = node as HTMLElement;
+      scrollNode.scrollTop = 0;
+      scrollNode.scrollLeft = 0;
     };
 
     resetScroll(modalNode);
@@ -186,7 +209,7 @@ const TagModal = ({
     }
   }, []);
 
-  const handleSelectedTagsChange = (nextTags = []) => {
+  const handleSelectedTagsChange = (nextTags: unknown[] = []) => {
     const normalizedNextTags = (Array.isArray(nextTags) ? nextTags : [])
       .map((tag) => String(tag || '').trim())
       .filter(Boolean);
@@ -284,7 +307,7 @@ const TagModal = ({
           data-testid="tag-modal-scroll-area"
         >
           {isOpen && selectedTags.length ? (
-            <TagPage
+            <TagPageComponent
               embedded={true}
               demoCorpusMode={demoCorpusMode}
               demoCorpusRecords={demoCorpusRecords}

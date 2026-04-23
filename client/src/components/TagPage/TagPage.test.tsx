@@ -6,7 +6,7 @@ import { MemoryRouter } from 'react-router-dom';
 import fs from 'fs';
 import path from 'path';
 import TagPage from './TagPage.jsx';
-import TagModal from './TagModal.jsx';
+import TagModal from './TagModal';
 import buildTagInterpretationPrompt from '../../prompts/tagInterpretationPrompt.js';
 import { buildDemoCorpusRecords } from '../../utilities/demo/demoCorpusRecords.js';
 
@@ -942,7 +942,7 @@ describe('TagModal', () => {
   it('keeps the modal framed fullscreen and the backdrop lighter than the default overlay', () => {
     const scssPath = path.join(__dirname, 'TagPage.module.scss');
     const scss = fs.readFileSync(scssPath, 'utf8');
-    const jsxPath = path.join(__dirname, 'TagModal.jsx');
+    const jsxPath = path.join(__dirname, 'TagModal.tsx');
     const jsx = fs.readFileSync(jsxPath, 'utf8');
 
     expect(scss).toMatch(/\.tagModal\s*{[\s\S]*padding:\s*16px 0 !important;[\s\S]*overflow:\s*hidden !important;/);
