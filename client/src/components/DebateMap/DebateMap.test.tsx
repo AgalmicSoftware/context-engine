@@ -55,27 +55,37 @@ jest.mock('../../utilities/ui/notify.js', () => ({
 }));
 jest.mock('../DemoViews/DebateHUD/PoliticalCompassView', () => ({
   __esModule: true,
-  StandalonePoliticalCompass: ({ compass }) => (
+  StandalonePoliticalCompass: ({ compass }: any) => (
     <div data-testid="atlas-compass">{compass?.xAxis?.label || 'Political Compass'}</div>
   ),
 }));
 
-const getCurrentDemoLeafFixture = () => {
-  const questionsById = new Map();
+const DebateMapComponent = DebateMap as React.ComponentType<any>;
+const AtlasViewComponent = AtlasView as React.ComponentType<any>;
+const buildHistoricalCaseBriefAny = buildHistoricalCaseBrief as any;
+const buildHistoricalCompassPointsAny = buildHistoricalCompassPoints as any;
+const mockedGetHistoricalFigureAvatarOrBlockie = getHistoricalFigureAvatarOrBlockie as jest.Mock;
+const treeDataFixture = treeData as any[];
+const historicalFigureDataFixture = historicalFigureData as Record<string, any>;
+const loopholeHistoricalCasesFixture = loopholeHistoricalCases as any[];
+const mutableEnv = process.env as Record<string, string | undefined>;
 
-  Object.values(historicalFigureData || {}).forEach((figure) => {
-    (figure?.questions || []).forEach((question) => {
+const getCurrentDemoLeafFixture = () => {
+  const questionsById = new Map<string, string[]>();
+
+  Object.values(historicalFigureDataFixture || {}).forEach((figure: any) => {
+    (figure?.questions || []).forEach((question: any) => {
       if (!questionsById.has(question.id)) {
         questionsById.set(question.id, []);
       }
-      questionsById.get(question.id).push(question.question);
+      questionsById.get(question.id)?.push(question.question);
     });
   });
 
-  let selectedLeaf = null;
+  let selectedLeaf: { depth: number; leafName: string; questionText: string } | null = null;
 
-  const visit = (nodes, depth = 0) => {
-    (nodes || []).forEach((node) => {
+  const visit = (nodes: any[] = [], depth = 0) => {
+    (nodes || []).forEach((node: any) => {
       expect(Array.isArray(node.children)).toBe(true);
 
       if (node.children.length > 0) {
@@ -96,75 +106,78 @@ const getCurrentDemoLeafFixture = () => {
     });
   };
 
-  visit(treeData);
+  visit(treeDataFixture);
 
   if (!selectedLeaf) {
     throw new Error('Expected a deepest atlas leaf with demo historical questions.');
   }
 
-  return selectedLeaf;
+  return selectedLeaf as { depth: number; leafName: string; questionText: string };
 };
 
-const currentDemoLeafFixture = getCurrentDemoLeafFixture();
+const currentDemoLeafFixture: { depth: number; leafName: string; questionText: string } = getCurrentDemoLeafFixture();
 const governanceCategoryNodeId = '0x3000000000000000000000000000000000000000000000000000000000000000';
-const parseHistoricalVote = (vote) => {
+const parseHistoricalVote = (vote: any) => {
   if (vote === 'up') return 1;
   if (vote === 'down') return -1;
 
   const parsedVote = parseInt(vote, 10);
   return Number.isNaN(parsedVote) ? null : parsedVote;
 };
-const getQuadrantKey = (point) => (
+const getQuadrantKey = (point: any) => (
   `${point.y > 0.5 ? 'top' : 'bottom'}-${point.x > 0.5 ? 'right' : 'left'}`
 );
-const getVoteEntriesForNode = (nodeId) => (
-  Object.entries(historicalFigureData || {}).reduce((entries, [username, figure]) => {
+const getVoteEntriesForNode = (nodeId: string) => (
+  Object.entries(historicalFigureDataFixture || {}).reduce((entries: any[], [username, figure]: [string, any]) => {
     const parsedVote = parseHistoricalVote(figure?.votes?.[nodeId]);
     if (!Number.isFinite(parsedVote)) return entries;
     return entries.concat({ username, value: parsedVote });
-  }, [])
+  }, [] as any[])
 );
-const getAtlasNodeLabel = (label) => (
-  screen.getAllByText(label).find((element) => (
+const getAtlasNodeLabel = (label: string): HTMLElement => {
+  const labelElement = screen.getAllByText(label).find((element) => (
     String(element.className || '').includes('nodeLabel')
-  ))
-);
-const getAtlasNodeDiameter = (label) => {
-  const labelElement = getAtlasNodeLabel(label);
-  expect(labelElement).toBeTruthy();
-  const dotElement = labelElement.parentElement?.querySelector('[class*="nodeDot"]');
-  expect(dotElement).toBeTruthy();
-  return parseFloat(dotElement.style.width);
+  ));
+  if (!labelElement) throw new Error(`Missing atlas node label: ${label}`);
+  return labelElement;
 };
-const getAtlasNodeElementById = (nodeId, layout = '') => (
+const getAtlasNodeDiameter = (label: string) => {
+  const labelElement = getAtlasNodeLabel(label);
+  const dotElement = labelElement.parentElement?.querySelector('[class*="nodeDot"]');
+  if (!dotElement) throw new Error(`Missing atlas node dot: ${label}`);
+  return parseFloat((dotElement as HTMLElement).style.width);
+};
+const getAtlasNodeElementById = (nodeId: string, layout = ''): HTMLElement | undefined => (
   screen.getAllByTestId(E2E_TESTIDS.ATLAS_NODE).find((element) => (
     element.getAttribute('data-ce-node-id') === nodeId
       && (!layout || element.getAttribute('data-ce-node-layout') === layout)
   ))
 );
-const getDebateViewModeButton = (mode) => (
-  screen.getAllByTestId(E2E_TESTIDS.DEBATE_VIEW_MODE).find((element) => (
+const getDebateViewModeButton = (mode: string): HTMLElement => {
+  const button = screen.getAllByTestId(E2E_TESTIDS.DEBATE_VIEW_MODE).find((element) => (
     element.getAttribute('data-ce-view-mode') === mode
-  ))
-);
-const getPackedNodeLabel = (label) => (
+  ));
+  if (!button) throw new Error(`Missing debate view mode button: ${mode}`);
+  return button;
+};
+const getPackedNodeLabel = (label: string): HTMLElement | undefined => (
   screen.getAllByText(label).find((element) => (
     String(element.className || '').includes('packedNodeLabel')
   ))
 );
-const getAtlasNodeDiameterById = (nodeId, layout = '') => {
+const getAtlasNodeDiameterById = (nodeId: string, layout = '') => {
   const nodeElement = getAtlasNodeElementById(nodeId, layout);
-  expect(nodeElement).toBeTruthy();
+  if (!nodeElement) throw new Error(`Missing atlas node: ${nodeId}`);
   const dotElement = nodeElement.querySelector('[class*="nodeDot"]');
-  expect(dotElement).toBeTruthy();
-  return parseFloat(dotElement.style.width);
+  if (!dotElement) throw new Error(`Missing atlas node dot: ${nodeId}`);
+  return parseFloat((dotElement as HTMLElement).style.width);
 };
 const privacyAndSurveillanceNodeId = '0x4320000000000000000000000000000000000000000000000000000000000000';
 const deceptiveAlignmentNodeId = '0x1110000000000000000000000000000000000000000000000000000000000000';
 const liabilityFrameworksNodeId = '0x3140000000000000000000000000000000000000000000000000000000000000';
 
-const getHistoricalCaseForNode = (nodeId) => {
-  const matchedCase = (Array.isArray(loopholeHistoricalCases) ? loopholeHistoricalCases : []).find((historicalCase) => (
+const getHistoricalCaseForNode = (nodeId: string) => {
+  const matchedCase = (Array.isArray(loopholeHistoricalCasesFixture) ? loopholeHistoricalCasesFixture : []).find((historicalCase: any) => (
     Array.isArray(historicalCase?.debate_map_issues)
       && historicalCase.debate_map_issues.includes(nodeId)
   ));
@@ -176,13 +189,13 @@ const getHistoricalCaseForNode = (nodeId) => {
   return matchedCase;
 };
 
-const renderDemoAtlasNode = (nodeId) => render(
+const renderDemoAtlasNode = (nodeId: string) => render(
   <MemoryRouter initialEntries={[`/atlas/${nodeId}`]}>
     <Routes>
       <Route
         path="/atlas/:nodeId"
         element={(
-          <DebateMap
+          <DebateMapComponent
             account=""
             provider=""
             network={{ id: 84532 }}
@@ -196,7 +209,7 @@ const renderDemoAtlasNode = (nodeId) => render(
   </MemoryRouter>
 );
 
-const openHistoricalCaseBrief = async (nodeId) => {
+const openHistoricalCaseBrief = async (nodeId: string) => {
   renderDemoAtlasNode(nodeId);
   fireEvent.click(await screen.findByRole('button', { name: 'View full brief' }));
 };
@@ -204,13 +217,13 @@ const openHistoricalCaseBrief = async (nodeId) => {
 describe('DebateMap', () => {
   afterEach(() => {
     mockNavigate.mockReset();
-    getHistoricalFigureAvatarOrBlockie.mockClear();
+    mockedGetHistoricalFigureAvatarOrBlockie.mockClear();
   });
 
   it('renders the standalone heading as Debate Map', () => {
     render(
       <MemoryRouter>
-        <DebateMap
+        <DebateMapComponent
           account=""
           provider=""
           network={{ id: 84532 }}
@@ -227,7 +240,7 @@ describe('DebateMap', () => {
   it('renders circles mode by default in DebateMap', () => {
     render(
       <MemoryRouter>
-        <DebateMap
+        <DebateMapComponent
           account=""
           provider=""
           network={{ id: 84532 }}
@@ -243,7 +256,7 @@ describe('DebateMap', () => {
   it('switches between circles and atlas from the main mode controls', () => {
     render(
       <MemoryRouter>
-        <DebateMap
+        <DebateMapComponent
           account=""
           provider=""
           network={{ id: 84532 }}
@@ -268,7 +281,7 @@ describe('DebateMap', () => {
   it('starts in atlas mode when explicitly configured', () => {
     render(
       <MemoryRouter>
-        <DebateMap
+        <DebateMapComponent
           account=""
           provider=""
           network={{ id: 84532 }}
@@ -284,7 +297,7 @@ describe('DebateMap', () => {
 
   it('builds historical compass points using the current vote for x and other votes for y', () => {
     const nodeId = '0x1130000000000000000000000000000000000000000000000000000000000000';
-    const [point] = buildHistoricalCompassPoints([{ username: 'AdaLovelace', value: 7 }], [], nodeId);
+    const [point] = buildHistoricalCompassPointsAny([{ username: 'AdaLovelace', value: 7 }], [], nodeId);
 
     expect(point).toMatchObject({
       name: 'AdaLovelace',
@@ -298,7 +311,7 @@ describe('DebateMap', () => {
   it('keeps the governance compass sample distributed across all populated quadrants', () => {
     const voteEntries = getVoteEntriesForNode(governanceCategoryNodeId);
 
-    const points = buildHistoricalCompassPoints(voteEntries, [], governanceCategoryNodeId);
+    const points = buildHistoricalCompassPointsAny(voteEntries, [], governanceCategoryNodeId) as any[];
     const quadrantKeys = new Set(points.map(getQuadrantKey));
 
     expect(points).toHaveLength(20);
@@ -313,8 +326,8 @@ describe('DebateMap', () => {
   });
 
   it('keeps every atlas compass directional label within 35 characters', () => {
-    const visit = (nodes) => {
-      (nodes || []).forEach((node) => {
+    const visit = (nodes: any[] = []) => {
+      (nodes || []).forEach((node: any) => {
         if (Array.isArray(node.children) && node.children.length > 0) {
           visit(node.children);
           return;
@@ -333,11 +346,11 @@ describe('DebateMap', () => {
       });
     };
 
-    visit(treeData);
+    visit(treeDataFixture);
   });
 
   it('normalizes enriched historical-case helpers and preserves template fallback copy', () => {
-    const enrichedBrief = buildHistoricalCaseBrief(
+    const enrichedBrief = buildHistoricalCaseBriefAny(
       {
         authors: ['Figure Alpha', 'Figure Beta'],
         category: 'Loophole Finder',
@@ -395,7 +408,7 @@ describe('DebateMap', () => {
       favoredBy: ['Figure Alpha', 'Figure Beta'],
     });
 
-    const fallbackBrief = buildHistoricalCaseBrief(
+    const fallbackBrief = buildHistoricalCaseBriefAny(
       {
         authors: ['Ada Lovelace', 'Grace Hopper'],
         category: 'Loophole Finder',
@@ -437,16 +450,16 @@ describe('DebateMap', () => {
       },
     ];
 
-    const { rerender } = render(<AtlasView data={initialData} onNodeClick={onNodeClick} />);
+    const { rerender } = render(<AtlasViewComponent data={initialData} onNodeClick={onNodeClick} />);
 
     fireEvent.click(screen.getAllByText('Parent Node').find((element) => (
       String(element.className || '').includes('nodeLabel')
-    )));
+    )) as HTMLElement);
 
     expect(screen.getByText(/Up Level/i)).toBeInTheDocument();
     expect(screen.getAllByText('Child A').length).toBeGreaterThan(0);
 
-    rerender(<AtlasView data={updatedData} onNodeClick={onNodeClick} />);
+    rerender(<AtlasViewComponent data={updatedData} onNodeClick={onNodeClick} />);
 
     expect(screen.getAllByText('Child B').length).toBeGreaterThan(0);
     expect(screen.queryAllByText('Child A')).toHaveLength(0);
@@ -454,7 +467,7 @@ describe('DebateMap', () => {
 
   it('sizes atlas nodes by disagreement instead of raw vote volume', () => {
     render(
-      <AtlasView
+      <AtlasViewComponent
         data={[
           {
             id: 'low-disagreement',
@@ -479,7 +492,7 @@ describe('DebateMap', () => {
   it('renders nested packed atlas nodes in circles mode', () => {
     render(
       <MemoryRouter>
-        <DebateMap
+        <DebateMapComponent
           account=""
           provider=""
           network={{ id: 84532 }}
@@ -497,7 +510,7 @@ describe('DebateMap', () => {
     const onNodeClick = jest.fn();
 
     render(
-      <AtlasView
+      <AtlasViewComponent
         data={[
           {
             id: 'parent-node',
@@ -512,7 +525,7 @@ describe('DebateMap', () => {
       />
     );
 
-    fireEvent.click(getAtlasNodeElementById('parent-node', 'packed'));
+    fireEvent.click(getAtlasNodeElementById('parent-node', 'packed') as HTMLElement);
 
     expect(screen.getByRole('button', { name: /up level/i })).toBeInTheDocument();
     expect(screen.getByTestId(E2E_TESTIDS.ATLAS_TITLE_ACTION)).toHaveTextContent('Parent Node');
@@ -527,7 +540,7 @@ describe('DebateMap', () => {
     const onNodeClick = jest.fn();
 
     render(
-      <AtlasView
+      <AtlasViewComponent
         data={[
           {
             id: 'parent-node',
@@ -548,7 +561,7 @@ describe('DebateMap', () => {
       />
     );
 
-    fireEvent.click(getAtlasNodeElementById('child-node', 'packed'));
+    fireEvent.click(getAtlasNodeElementById('child-node', 'packed') as HTMLElement);
 
     expect(screen.getByRole('button', { name: /up level/i })).toBeInTheDocument();
     expect(screen.getByTestId(E2E_TESTIDS.ATLAS_TITLE_ACTION)).toHaveTextContent('Child Node');
@@ -562,7 +575,7 @@ describe('DebateMap', () => {
 
   it('swaps packed root labels from parent titles to child titles when hovering within a cluster', () => {
     render(
-      <AtlasView
+      <AtlasViewComponent
         data={[
           {
             id: 'parent-node',
@@ -581,7 +594,7 @@ describe('DebateMap', () => {
     expect(String(getPackedNodeLabel('Parent Node')?.className || '')).toContain('alwaysVisible');
     expect(String(getPackedNodeLabel('Child Node A')?.className || '')).not.toContain('alwaysVisible');
 
-    fireEvent.mouseEnter(getAtlasNodeElementById('child-node-a', 'packed'));
+    fireEvent.mouseEnter(getAtlasNodeElementById('child-node-a', 'packed') as HTMLElement);
 
     expect(String(getPackedNodeLabel('Parent Node')?.className || '')).not.toContain('alwaysVisible');
     expect(String(getPackedNodeLabel('Child Node A')?.className || '')).toContain('alwaysVisible');
@@ -591,7 +604,7 @@ describe('DebateMap', () => {
   it('opens atlas leaf modals from the packed layout', async () => {
     render(
       <MemoryRouter>
-        <DebateMap
+        <DebateMapComponent
           account=""
           provider=""
           network={{ id: 84532 }}
@@ -601,14 +614,14 @@ describe('DebateMap', () => {
       </MemoryRouter>
     );
 
-    fireEvent.click(getAtlasNodeElementById(deceptiveAlignmentNodeId, 'packed'));
+    fireEvent.click(getAtlasNodeElementById(deceptiveAlignmentNodeId, 'packed') as HTMLElement);
 
     expect(await screen.findByRole('heading', { name: 'Deceptive Alignment' })).toBeInTheDocument();
   });
 
   it('sizes packed atlas nodes by disagreement instead of raw vote volume', () => {
     render(
-      <AtlasView
+      <AtlasViewComponent
         data={[
           {
             id: 'low-disagreement',
@@ -642,7 +655,7 @@ describe('DebateMap', () => {
 
     const { rerender } = render(
       <MemoryRouter>
-        <DebateMap {...baseProps} demoMode={true} />
+        <DebateMapComponent {...baseProps} demoMode={true} />
       </MemoryRouter>
     );
 
@@ -655,7 +668,7 @@ describe('DebateMap', () => {
 
     rerender(
       <MemoryRouter>
-        <DebateMap {...baseProps} demoMode={false} />
+        <DebateMapComponent {...baseProps} demoMode={false} />
       </MemoryRouter>
     );
 
@@ -675,7 +688,7 @@ describe('DebateMap', () => {
 
     render(
       <MemoryRouter>
-        <DebateMap {...baseProps} demoMode={true} />
+        <DebateMapComponent {...baseProps} demoMode={true} />
       </MemoryRouter>
     );
 
@@ -688,7 +701,7 @@ describe('DebateMap', () => {
     ).toBeInTheDocument();
 
     await waitFor(() => {
-      expect(getHistoricalFigureAvatarOrBlockie).toHaveBeenCalledWith(
+      expect(mockedGetHistoricalFigureAvatarOrBlockie).toHaveBeenCalledWith(
         expect.any(String),
         expect.objectContaining({
           preferBlockie: false,
@@ -746,11 +759,11 @@ describe('DebateMap', () => {
       element.getAttribute('data-ce-patch-kind') === 'best'
     ));
     expect(bestPatchCard).toBeTruthy();
-    expect(within(bestPatchCard).getByText('Best patch')).toBeInTheDocument();
-    expect(within(bestPatchCard).getByText('James Madison')).toBeInTheDocument();
-    expect(within(bestPatchCard).getByText('Augustus Caesar')).toBeInTheDocument();
-    expect(within(bestPatchCard).queryByText('Figure A')).not.toBeInTheDocument();
-    expect(within(bestPatchCard).queryByText('Figure B')).not.toBeInTheDocument();
+    expect(within(bestPatchCard as HTMLElement).getByText('Best patch')).toBeInTheDocument();
+    expect(within(bestPatchCard as HTMLElement).getByText('James Madison')).toBeInTheDocument();
+    expect(within(bestPatchCard as HTMLElement).getByText('Augustus Caesar')).toBeInTheDocument();
+    expect(within(bestPatchCard as HTMLElement).queryByText('Figure A')).not.toBeInTheDocument();
+    expect(within(bestPatchCard as HTMLElement).queryByText('Figure B')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Hide brief' }));
 
@@ -782,7 +795,7 @@ describe('DebateMap', () => {
           <Route
             path="/atlas/:nodeId"
             element={(
-              <DebateMap
+              <DebateMapComponent
                 account=""
                 provider=""
                 network={{ id: 84532 }}
@@ -803,10 +816,10 @@ describe('DebateMap', () => {
   });
 
   it('copies atlas deep links with PUBLIC_URL and demo mode preserved', async () => {
-    const previousPublicUrl = process.env.PUBLIC_URL;
+    const previousPublicUrl = mutableEnv.PUBLIC_URL;
     const previousClipboard = navigator.clipboard;
-    const writeText = jest.fn().mockResolvedValue();
-    process.env.PUBLIC_URL = '/ce/';
+    const writeText = jest.fn().mockResolvedValue(undefined);
+    mutableEnv.PUBLIC_URL = '/ce/';
     Object.defineProperty(navigator, 'clipboard', {
       configurable: true,
       value: { writeText },
@@ -819,7 +832,7 @@ describe('DebateMap', () => {
             <Route
               path="/atlas/:nodeId"
               element={(
-                <DebateMap
+                <DebateMapComponent
                   account=""
                   provider=""
                   network={{ id: 84532 }}
@@ -841,8 +854,8 @@ describe('DebateMap', () => {
         );
       });
     } finally {
-      if (previousPublicUrl === undefined) delete process.env.PUBLIC_URL;
-      else process.env.PUBLIC_URL = previousPublicUrl;
+      if (previousPublicUrl === undefined) delete mutableEnv.PUBLIC_URL;
+      else mutableEnv.PUBLIC_URL = previousPublicUrl;
       Object.defineProperty(navigator, 'clipboard', {
         configurable: true,
         value: previousClipboard,
@@ -857,7 +870,7 @@ describe('DebateMap', () => {
           <Route
             path="/atlas/:nodeId"
             element={(
-              <DebateMap
+              <DebateMapComponent
                 account=""
                 provider=""
                 network={{ id: 84532 }}
@@ -880,7 +893,7 @@ describe('DebateMap', () => {
 
     render(
       <MemoryRouter>
-        <DebateMap
+        <DebateMapComponent
           account=""
           provider=""
           network={{ id: 84532 }}
@@ -916,7 +929,7 @@ describe('DebateMap', () => {
 
     const { container, rerender } = render(
       <MemoryRouter>
-        <DebateMap {...baseProps} />
+        <DebateMapComponent {...baseProps} />
       </MemoryRouter>
     );
 
@@ -926,7 +939,7 @@ describe('DebateMap', () => {
 
     rerender(
       <MemoryRouter>
-        <DebateMap {...baseProps} embedded={true} />
+        <DebateMapComponent {...baseProps} embedded={true} />
       </MemoryRouter>
     );
 
