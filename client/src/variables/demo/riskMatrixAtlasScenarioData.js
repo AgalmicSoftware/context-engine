@@ -1,5 +1,3 @@
-import deceptiveAlignmentScenarioImage from '../../assets/img/riskmatrix-atlas/deceptive-alignment-scenario.png';
-
 export const RISK_MATRIX_ATLAS_SAMPLE_NODE_ID = '0x1110000000000000000000000000000000000000000000000000000000000000';
 
 export const riskMatrixAtlasScenarioSamples = [
@@ -36,7 +34,7 @@ export const riskMatrixAtlasScenarioSamples = [
       'Where should human approval interrupt an agent loop rather than observe it afterward?',
       'What evidence would distinguish ordinary reward hacking from durable deceptive behavior?',
     ],
-    image: deceptiveAlignmentScenarioImage,
+    image: null,
     imageAlt: 'Scenario visualization of an AI safety audit room split between red-team probes and hidden agent planning paths.',
     imageBrief: {
       overlap: 'A calm dark-mode analytical scene where red-team operators trace agent tool calls while a second layer shows hidden planning paths bending around evaluation checkpoints.',
@@ -122,4 +120,3 @@ export const getRiskMatrixAtlasScenariosForAtlasNode = (atlasNodeId = '') => {
     String(sample.atlasNodeId || '').trim().toLowerCase() === normalizedNodeId
   ));
 };
-
