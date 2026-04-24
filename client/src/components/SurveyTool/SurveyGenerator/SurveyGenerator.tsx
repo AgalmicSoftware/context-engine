@@ -42,7 +42,9 @@ import {
   getSessionConfigBySlug,
 } from '../../../utilities/web3/contractScripts.js';
 import AudioInput from '../../Shared/AudioInput/AudioInput';
-import CreateQuestionsAndSurveys from '../CreateQuestionsAndSurveys.jsx';
+import CompactImageChooser from '../../Shared/CompactImageChooser';
+import { readCompactImageClipboard } from '../../Shared/compactImageClipboard.js';
+import CreateQuestionsAndSurveys from '../CreateQuestionsAndSurveys';
 import SBTSelector from '../../SBTs/SBTSelector';
 import DocumentLibraryPanel from '../../DocumentLibrary/DocumentLibraryPanel';
 import SessionChipSelector from '../../Shared/SessionChipSelector';
@@ -51,6 +53,7 @@ import { seedGenPrompt } from '../../../prompts/seedGenPrompt.js';
 import {
   buildSbtAccessControlConditions,
   buildWalletAddressAccessControlConditions,
+  getUnsupportedLitContractAccessControlError,
   getGlobalLitHooks,
   resolveLitChain,
   litStorage,
@@ -86,6 +89,7 @@ import { createLogger } from 'utilities/logging.js';
 import { generateQuestionId as generateSharedQuestionId } from '../../../utilities/shared/questionUtils.mjs';
 import { toStr } from '../../../utilities/shared/primitives.js';
 import { notify } from '../../../utilities/ui/notify.js';
+import { fetchImageFromURL } from '../../../utilities/ui/imageScripts.js';
 import { E2E_TESTIDS } from '../../../utilities/e2eTestIds.js';
 
 const cacheLog = createLogger('cache');
@@ -215,6 +219,76 @@ const buildPhotoAnalysisFilename = (photoName: any = '') => {
   const withoutExtension = safeName.replace(/\.(png|jpe?g|webp|gif)$/i, '') || safeName;
   return `${withoutExtension}.analysis.md`;
 };
+
+const sanitizeFileBaseName = (value: any, fallback = 'context') => {
+  const trimmed = toStr(value).trim();
+  if (!trimmed) return fallback;
+  const normalized = trimmed
+    .replace(/\.[A-Za-z0-9]{1,12}$/g, '')
+    .replace(/[\\/:*?"<>|]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return normalized || fallback;
+};
+
+const getFileExtension = (name: any = '') => {
+  const raw = toStr(name).trim();
+  const dot = raw.lastIndexOf('.');
+  if (dot <= 0 || dot >= raw.length - 1) return '';
+  return raw.slice(dot + 1);
+};
+
+const buildUploadFilename = ({
+  title,
+  originalName,
+  fallbackBase = 'context',
+  fallbackExtension = '',
+}: any = {}) => {
+  const base = sanitizeFileBaseName(title, sanitizeFileBaseName(originalName, fallbackBase));
+  const extension = getFileExtension(originalName) || toStr(fallbackExtension).trim();
+  return extension ? `${base}.${extension}` : base;
+};
+
+const renameFileForLibraryUpload = (file: any, title: any) => {
+  if (!(file instanceof File)) return file;
+  const trimmedTitle = toStr(title).trim();
+  if (!trimmedTitle) return file;
+  const nextName = buildUploadFilename({
+    title: trimmedTitle,
+    originalName: file.name,
+    fallbackBase: 'context',
+  });
+  if (!nextName || nextName === file.name) return file;
+  return new File([file], nextName, {
+    type: file.type,
+    lastModified: Number(file.lastModified || Date.now()),
+  });
+};
+
+const buildManualLibraryTextFile = ({ title, text }: any = {}) => {
+  const body = toStr(text);
+  const looksLikeMarkdown = /(^|\n)\s*(#|\* |- |\d+\.)/.test(body);
+  const extension = looksLikeMarkdown ? 'md' : 'txt';
+  const filename = buildUploadFilename({
+    title,
+    originalName: '',
+    fallbackBase: 'context-note',
+    fallbackExtension: extension,
+  });
+  return new File([body], filename, {
+    type: looksLikeMarkdown ? 'text/markdown' : 'text/plain',
+  });
+};
+
+const isManualLibraryUploadableContent = ({
+  pastedText = '',
+  additionalUrlInput = '',
+  additionalSources = [],
+}: any = {}) => (
+  Boolean(toStr(pastedText).trim()) ||
+  Boolean(toStr(additionalUrlInput).trim()) ||
+  (Array.isArray(additionalSources) && additionalSources.length > 0)
+);
 const formatAiPromptModelLabel = (config: any = {}) => {
   const providerKey = toStr(config?.provider).trim().toLowerCase();
   const model = toStr(config?.model).trim();
@@ -314,6 +388,7 @@ export default function AudioSurveyGenerator(rawProps: any = {}) {
   const [count, setCount] = useState<any>(DEFAULT_QUESTION_COUNT);
 
   const [loading, setLoading] = useState<any>(false);
+  const [activeAction, setActiveAction] = useState<any>('');
   const [error, setError] = useState<any>('');
   const [waitingSeconds, setWaitingSeconds] = useState<any>(0);
   const waitTimerRef = React.useRef<any>(null);
@@ -343,12 +418,17 @@ export default function AudioSurveyGenerator(rawProps: any = {}) {
   const [additionalSources, setAdditionalSources] = useState<any>([]);
   const [additionalUrlInput, setAdditionalUrlInput] = useState<any>('');
   const additionalFileInputRef = useRef<any>(null);
-  const additionalPhotoInputRef = useRef<any>(null);
+  const imagePickerInputRef = useRef<any>(null);
   const uploadAudioInputRef = useRef<any>(null);
   const additionalSourceIdRef = useRef<any>(0);
   const [saveExtraSourcesToDocLibrary, setSaveExtraSourcesToDocLibrary] = useState<any>(false);
   const [saveDocAudience, setSaveDocAudience] = useState<any>('self');
   const [showSaveDocAudienceMenu, setShowSaveDocAudienceMenu] = useState<any>(false);
+  const [analyzeBeforeLibraryUpload, setAnalyzeBeforeLibraryUpload] = useState<any>(true);
+  const [imagePickerUrl, setImagePickerUrl] = useState<any>('');
+  const [imagePickerUrlMode, setImagePickerUrlMode] = useState<any>(false);
+  const [imagePickerStatusText, setImagePickerStatusText] = useState<any>('');
+  const [imagePickerStatusTone, setImagePickerStatusTone] = useState<any>('default');
 
   const [summaryGateSBTs, setSummaryGateSBTs] = useState<any>([]);
   const [summaryGateMode, setSummaryGateMode] = useState<any>('any');
@@ -420,10 +500,19 @@ export default function AudioSurveyGenerator(rawProps: any = {}) {
     () => resolvedSessionIdToken || resolvedSessionSlug || '',
     [resolvedSessionIdToken, resolvedSessionSlug],
   );
+  const networkChainId = network?.id || null;
   const docSaveGate = useMemo(
     () => resolveDocUploadsGate(resolvedSessionConfig),
     [resolvedSessionConfig],
   );
+  const docSaveSessionChainError = useMemo(() => (
+    docSaveGate.hasRecipients
+      ? getUnsupportedLitContractAccessControlError({
+        chainId: docSaveGate.chainId || networkChainId || null,
+      })
+      : ''
+  ), [docSaveGate.chainId, docSaveGate.hasRecipients, networkChainId]);
+  const docSaveSessionAudienceAvailable = docSaveGate.hasRecipients && !docSaveSessionChainError;
   const docSaveSessionLabel = useMemo(() => {
     const sessionName = toStr(resolvedSessionConfig?.sessionName).trim();
     if (sessionName) return sessionName;
@@ -431,7 +520,6 @@ export default function AudioSurveyGenerator(rawProps: any = {}) {
     if (slug) return slug;
     return 'Session';
   }, [resolvedSessionConfig, resolvedSessionSlug]);
-  const networkChainId = network?.id || null;
   const aiRequestOptions = useMemo(() => ({
     sessionSlug: resolvedSessionSlug || '',
     sessionConfig: resolvedSessionConfig,
@@ -519,7 +607,7 @@ export default function AudioSurveyGenerator(rawProps: any = {}) {
 
   useEffect(() => {
     const nextContextKey = `${toStr(resolvedSessionSlug).trim().toLowerCase()}:${resolvedSessionIdHex}`;
-    const nextDefaultAudience = docSaveGate.hasRecipients ? 'session' : 'self';
+    const nextDefaultAudience = docSaveSessionAudienceAvailable ? 'session' : 'self';
     if (docSaveContextKeyRef.current !== nextContextKey) {
       docSaveContextKeyRef.current = nextContextKey;
       docSaveAutoAudienceRef.current = nextDefaultAudience;
@@ -532,7 +620,7 @@ export default function AudioSurveyGenerator(rawProps: any = {}) {
     docSaveAutoAudienceRef.current = nextDefaultAudience;
     setSaveDocAudience(nextDefaultAudience);
     setShowSaveDocAudienceMenu(false);
-  }, [resolvedSessionSlug, resolvedSessionIdHex, docSaveGate.hasRecipients, saveDocAudience]);
+  }, [resolvedSessionSlug, resolvedSessionIdHex, docSaveSessionAudienceAvailable, saveDocAudience]);
 
   useEffect(() => {
     if (additionalSources.length > 0) return;
@@ -638,9 +726,9 @@ export default function AudioSurveyGenerator(rawProps: any = {}) {
       }
 
       setError('');
-      setSurveyTitle('');
       setShowCreateSurvey(false);
       setStatementsToUpload([]);
+      setActiveAction('generate');
       setLoading(true);
       setWaitingSeconds(0);
 
@@ -663,6 +751,13 @@ export default function AudioSurveyGenerator(rawProps: any = {}) {
             chainId: gateChainId,
             litChain: summaryGate?.litChain || summaryGate?.chain,
           });
+          const unsupportedGateError = getUnsupportedLitContractAccessControlError({
+            chainId: gateChainId,
+            litChain,
+          });
+          if (unsupportedGateError) {
+            throw new Error(unsupportedGateError);
+          }
           const selectedAddresses = (summaryGateSBTs || []).map((sbt: any) => sbt.address).filter(Boolean);
           const sbtAddresses = selectedAddresses.length ? selectedAddresses : summaryGateAddresses;
           const gateMode = summaryGateMode || summaryGateModeDefault || 'any';
@@ -727,12 +822,13 @@ export default function AudioSurveyGenerator(rawProps: any = {}) {
     } finally {
       if (!abortedRef.current) {
         setLoading(false);
+        setActiveAction('');
         setWaitingSeconds(0);
       }
     }
   }
 
-  function processAndSetQuestions(aiData: any, docs: any) {
+  function processAndSetQuestions(aiData: any, docs: any, fallbackTitle: any = surveyTitle) {
     const wantedTypes = Object.keys(questionTypes).filter((t: any) => questionTypes[t]);
     const qs = aiData.questions
       .filter((q: any) => wantedTypes.includes(q.questionType))
@@ -748,12 +844,13 @@ export default function AudioSurveyGenerator(rawProps: any = {}) {
       tags: q.tags
     }));
 
+    const resolvedTitle = toStr(aiData?.surveyTitle).trim() || toStr(fallbackTitle).trim();
     setStatementsToUpload(formatted);
-    setSurveyTitle(aiData.surveyTitle || '');
+    setSurveyTitle(resolvedTitle);
     setDocumentURLs(docs);
 
     if (typeof onQuestionsGenerated === 'function') {
-      onQuestionsGenerated(formatted, docs, aiData.surveyTitle || '');
+      onQuestionsGenerated(formatted, docs, resolvedTitle);
     }
   }
 
@@ -798,10 +895,8 @@ export default function AudioSurveyGenerator(rawProps: any = {}) {
     e.target.value = '';
   };
 
-  const handleAdditionalPhotoUpload = (e: any) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-    const selectedFiles = Array.from(files);
+  const queueAdditionalPhotoFiles = (files: any = []) => {
+    const selectedFiles = Array.isArray(files) ? files : [files];
     const validFiles = selectedFiles.filter(isSupportedPhotoFile);
     const invalidCount = selectedFiles.length - validFiles.length;
 
@@ -814,11 +909,82 @@ export default function AudioSurveyGenerator(rawProps: any = {}) {
 
     if (invalidCount > 0) {
       setError(buildUnsupportedPhotoMessage(invalidCount));
-    } else {
+    } else if (validFiles.length > 0) {
       setError('');
     }
+    return { validFiles, invalidCount };
+  };
 
+  const handleAdditionalPhotoUpload = (e: any) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    queueAdditionalPhotoFiles(Array.from(files));
     e.target.value = '';
+  };
+
+  const handleImagePickerUploadClick = () => {
+    setImagePickerUrlMode(false);
+    setImagePickerStatusText('');
+    setImagePickerStatusTone('default');
+    if (imagePickerInputRef.current) imagePickerInputRef.current.click();
+  };
+
+  const handleImagePickerToggleUrlMode = () => {
+    setImagePickerUrlMode((prev: any) => !prev);
+    setImagePickerStatusText('');
+    setImagePickerStatusTone('default');
+  };
+
+  const handleImagePickerUrlChange = (event: any) => {
+    setImagePickerUrl(event?.target?.value || '');
+    setImagePickerStatusText('');
+    setImagePickerStatusTone('default');
+  };
+
+  const handleImagePickerPaste = async () => {
+    const clipboardResult = await readCompactImageClipboard({
+      fileNamePrefix: 'clipboard-context-image',
+    });
+
+    if (clipboardResult?.kind === 'file' && clipboardResult.file) {
+      queueAdditionalPhotoFiles([clipboardResult.file]);
+      setImagePickerUrl('');
+      setImagePickerUrlMode(false);
+      setImagePickerStatusText('');
+      setImagePickerStatusTone('default');
+      return;
+    }
+
+    if (clipboardResult?.kind === 'text') {
+      setImagePickerUrlMode(true);
+      setImagePickerUrl(toStr(clipboardResult.text).trim());
+      setImagePickerStatusText('');
+      setImagePickerStatusTone('default');
+      return;
+    }
+
+    setImagePickerStatusText(clipboardResult?.error || 'Clipboard does not contain a supported image or URL.');
+    setImagePickerStatusTone('error');
+  };
+
+  const handleImagePickerUrlAdd = async () => {
+    const rawUrl = toStr(imagePickerUrl).trim();
+    if (!rawUrl) return;
+    setImagePickerStatusText('Loading preview...');
+    setImagePickerStatusTone('loading');
+    try {
+      const file = await fetchImageFromURL(rawUrl);
+      if (abortedRef.current) return;
+      queueAdditionalPhotoFiles([file]);
+      setImagePickerUrl('');
+      setImagePickerUrlMode(true);
+      setImagePickerStatusText('');
+      setImagePickerStatusTone('default');
+    } catch (err: any) {
+      if (abortedRef.current) return;
+      setImagePickerStatusText(getErrorMessage(err, 'Image preview unavailable.'));
+      setImagePickerStatusTone('error');
+    }
   };
 
   const removeAdditionalSource = (sourceId: any) => {
@@ -899,8 +1065,8 @@ export default function AudioSurveyGenerator(rawProps: any = {}) {
 
     const fallbackChainId = Number(network?.id || 0) || null;
     if (saveDocAudience === 'session') {
-      if (!docSaveGate.hasRecipients) {
-        throw new Error('Session docUploads gate is unavailable or empty.');
+      if (!docSaveSessionAudienceAvailable) {
+        throw new Error(docSaveSessionChainError || 'Session docUploads gate is unavailable or empty.');
       }
       const chainId = Number(docSaveGate.chainId || fallbackChainId || 0) || null;
       const litChain = resolveLitChain({ chainId });
@@ -928,15 +1094,14 @@ export default function AudioSurveyGenerator(rawProps: any = {}) {
     }
 
     const chainId = fallbackChainId;
-    const litChain = resolveLitChain({ chainId });
     const accessControlConditions = buildWalletAddressAccessControlConditions({
       walletAddress: account,
       chainId,
-      litChain,
     });
     if (!accessControlConditions) {
       throw new Error('Connected wallet address is unavailable for private doc save.');
     }
+    const litChain = toStr(accessControlConditions?.[0]?.chain).trim() || resolveLitChain({ chainId });
     return {
       enabled: true,
       saveKey: litHooks.saveKey,
@@ -947,19 +1112,16 @@ export default function AudioSurveyGenerator(rawProps: any = {}) {
     };
   };
 
-  const saveQueuedSourcesToDocLibrary = async (sources: any = [], photoAnalysisBySourceId: any = new Map()) => {
+  const uploadSourcesToDocLibrary = async ({
+    sources = [],
+    photoAnalysisBySourceId = new Map(),
+    includePhotoAnalysis = true,
+    titleOverride = '',
+  }: any = {}) => {
     const queuedSources = Array.isArray(sources) ? sources : [];
-    if (!saveExtraSourcesToDocLibrary || queuedSources.length === 0) return [];
-    if (!loginComplete) {
-      if (typeof toggleLoginModal === 'function') toggleLoginModal(true);
-      throw new Error('Connect a wallet to save sources to the session doc library.');
-    }
-    if (!resolvedSessionIdHex) {
-      throw new Error('Session ID is unavailable; cannot save session docs.');
-    }
-
     const encryption = resolveDocSaveEncryption();
     const savedViewerUrls: any[] = [];
+    const singleSourceTitle = queuedSources.length === 1 ? toStr(titleOverride).trim() : '';
 
     for (const source of queuedSources) {
       const isUrlSource = source?.type === 'url';
@@ -978,7 +1140,7 @@ export default function AudioSurveyGenerator(rawProps: any = {}) {
       if (isUrlSource) {
         result = await uploadDocLibraryUrlRecordUntyped({
           url: source?.value,
-          title: source?.name,
+          title: singleSourceTitle || source?.name,
           sessionSlug: resolvedSessionSlug || '',
           sessionConfig: resolvedSessionConfig,
           account,
@@ -992,7 +1154,7 @@ export default function AudioSurveyGenerator(rawProps: any = {}) {
         });
       } else {
         result = await uploadDocLibraryFileUntyped({
-          file: source?.value,
+          file: singleSourceTitle ? renameFileForLibraryUpload(source?.value, singleSourceTitle) : source?.value,
           sessionSlug: resolvedSessionSlug || '',
           sessionConfig: resolvedSessionConfig,
           account,
@@ -1008,11 +1170,11 @@ export default function AudioSurveyGenerator(rawProps: any = {}) {
         txId: result?.txId,
         storage: result?.storage || 'lit-arweave',
         kind: result?.kind || kind,
-        name: source?.name || '',
+        name: singleSourceTitle || source?.name || '',
       });
       viewerUrls.push(viewerUrl || result?.url || '');
 
-      if (isPhotoSource) {
+      if (includePhotoAnalysis && isPhotoSource) {
         const analysisText = toStr(photoAnalysisBySourceId?.get(source?.id) || source?.analysisText).trim();
         if (analysisText) {
           const analysisFile = new File(
@@ -1054,32 +1216,140 @@ export default function AudioSurveyGenerator(rawProps: any = {}) {
     return savedViewerUrls;
   };
 
+  const saveQueuedSourcesToDocLibrary = async (sources: any = [], photoAnalysisBySourceId: any = new Map()) => {
+    const queuedSources = Array.isArray(sources) ? sources : [];
+    if (!saveExtraSourcesToDocLibrary || queuedSources.length === 0) return [];
+    if (!loginComplete) {
+      if (typeof toggleLoginModal === 'function') toggleLoginModal(true);
+      throw new Error('Connect a wallet to save sources to the session doc library.');
+    }
+    if (!resolvedSessionIdHex) {
+      throw new Error('Session ID is unavailable; cannot save session docs.');
+    }
+
+    return uploadSourcesToDocLibrary({
+      sources: queuedSources,
+      photoAnalysisBySourceId,
+      includePhotoAnalysis: true,
+      titleOverride: surveyTitle,
+    });
+  };
+
+  const buildEffectiveAdditionalSources = () => {
+    const queuedAdditionalSources = [...additionalSources];
+    let effectiveSources = [...queuedAdditionalSources];
+    if (additionalUrlInput && additionalUrlInput.trim()) {
+      const pendingUrl = additionalUrlInput.trim();
+      effectiveSources = [
+        ...effectiveSources,
+        {
+          id: buildAdditionalSourceId(additionalSourceIdRef),
+          type: 'url',
+          value: pendingUrl,
+          name: pendingUrl,
+        },
+      ];
+    }
+    return { queuedAdditionalSources, effectiveSources };
+  };
+
+  const handleAddToLibrary = async () => {
+    const trimmedText = toStr(pastedText).trim();
+    const { effectiveSources } = buildEffectiveAdditionalSources();
+    if (!trimmedText && effectiveSources.length === 0) return;
+    if (!loginComplete) {
+      if (typeof toggleLoginModal === 'function') toggleLoginModal(true);
+      return;
+    }
+    if (!resolvedSessionIdHex) {
+      setError('Session ID is unavailable; cannot save session docs.');
+      return;
+    }
+
+    setError('');
+    setActiveAction('library');
+    setLoading(true);
+    setWaitingSeconds(0);
+
+    try {
+      const photoAnalysisBySourceId = analyzeBeforeLibraryUpload
+        ? await analyzeQueuedPhotoSources(effectiveSources)
+        : new Map();
+      const savedSourceDocs = await uploadSourcesToDocLibrary({
+        sources: effectiveSources,
+        photoAnalysisBySourceId,
+        includePhotoAnalysis: analyzeBeforeLibraryUpload,
+        titleOverride: surveyTitle,
+      });
+
+      const uploadedViewerUrls = savedSourceDocs.flatMap((entry: any) => (
+        Array.isArray(entry?.viewerUrls) ? entry.viewerUrls.filter(Boolean) : []
+      ));
+
+      if (trimmedText) {
+        const textFile = buildManualLibraryTextFile({
+          title: surveyTitle,
+          text: trimmedText,
+        });
+        const result = await uploadDocLibraryFileUntyped({
+          file: textFile,
+          sessionSlug: resolvedSessionSlug || '',
+          sessionConfig: resolvedSessionConfig,
+          account,
+          providerLike: provider,
+          chainId: network?.id || null,
+          tags: mergeTags(
+            buildDocLibraryCommonTags({ kind: 'file', storage: 'lit-arweave' }),
+            buildDocLibrarySessionTags({ sessionIdHex: resolvedSessionIdHex }),
+          ),
+          encryption: resolveDocSaveEncryption() as any,
+        });
+        const viewerUrl = buildSessionDocLibraryViewerUrlUntyped({
+          sessionToken: docSaveSessionToken,
+          txId: result?.txId,
+          storage: result?.storage || 'lit-arweave',
+          kind: result?.kind || 'file',
+          name: textFile.name,
+        });
+        if (viewerUrl || result?.url) uploadedViewerUrls.push(viewerUrl || result?.url || '');
+      }
+
+      setDocumentURLs(uploadedViewerUrls);
+      if (toStr(additionalUrlInput).trim()) setAdditionalUrlInput('');
+      setSaveExtraSourcesToDocLibrary(false);
+      notify.success(
+        uploadedViewerUrls.length === 1
+          ? 'Added to Session Doc Library.'
+          : `Added ${uploadedViewerUrls.length} items to Session Doc Library.`
+      );
+    } catch (err: any) {
+      if (!abortedRef.current) {
+        setError(getErrorMessage(err, 'Failed to add content to the session doc library.'));
+      }
+    } finally {
+      if (!abortedRef.current) {
+        setLoading(false);
+        setActiveAction('');
+        setWaitingSeconds(0);
+      }
+    }
+  };
+
   async function handleSubmit(e: any) {
     e.preventDefault();
     localStorage.removeItem('unfinishedSurvey');
 
     setError('');
-    setSurveyTitle('');
     setShowCreateSurvey(false);
     setStatementsToUpload([]);
     setDocumentURLs([]);
     setSummaryMd('');
+    setActiveAction('generate');
 
     let currentDocumentURLs: any[] = [];
     let content = '';
-    const queuedAdditionalSources = [...additionalSources];
-    let effectiveSources = [...queuedAdditionalSources];
-    // Auto-add pending URL from the URL input bar
-    if (additionalUrlInput && additionalUrlInput.trim()) {
-      const pendingUrl = additionalUrlInput.trim();
-      effectiveSources.push({
-        id: buildAdditionalSourceId(additionalSourceIdRef),
-        type: 'url',
-        value: pendingUrl,
-        name: pendingUrl,
-      });
-      setAdditionalUrlInput('');
-    }
+    const { queuedAdditionalSources, effectiveSources } = buildEffectiveAdditionalSources();
+    if (additionalUrlInput && additionalUrlInput.trim()) setAdditionalUrlInput('');
     let sourceTypeOverride = '';
 
     try {
@@ -1233,6 +1503,7 @@ export default function AudioSurveyGenerator(rawProps: any = {}) {
     } finally {
       if (!abortedRef.current) {
         setLoading(false);
+        setActiveAction('');
         setIsTranscribing(false);
         setWaitingSeconds(0);
       }
@@ -1361,12 +1632,19 @@ export default function AudioSurveyGenerator(rawProps: any = {}) {
     setLocalSessionOverrideSlug(null);
   };
 
-  const shouldShowGenerateButton = loading || hasDatabaseToolInputContent({
+  const hasGenerateInputContent = hasDatabaseToolInputContent({
     pastedText,
     additionalUrlInput,
     additionalSources,
     audioFile,
   });
+  const shouldShowGenerateButton = hasGenerateInputContent || (loading && activeAction === 'generate');
+  const hasAddToLibraryInputContent = isManualLibraryUploadableContent({
+    pastedText,
+    additionalUrlInput,
+    additionalSources,
+  });
+  const shouldShowAddToLibraryButton = hasAddToLibraryInputContent || (loading && activeAction === 'library');
   const queuedPhotoSources = useMemo(
     () => additionalSources.filter((source: any) => source?.type === 'photo'),
     [additionalSources],
@@ -1376,7 +1654,7 @@ export default function AudioSurveyGenerator(rawProps: any = {}) {
     [additionalSources],
   );
   const shouldShowSaveExtraSourcesControl = additionalSources.length > 0;
-  const saveDocAudienceLabel = saveDocAudience === 'session' && docSaveGate.hasRecipients
+  const saveDocAudienceLabel = saveDocAudience === 'session' && docSaveSessionAudienceAvailable
     ? docSaveSessionLabel
     : 'only me';
   const isExplorerViewMode = !minified && explorerMode === 'view';
@@ -1482,6 +1760,17 @@ export default function AudioSurveyGenerator(rawProps: any = {}) {
         <>
       <form onSubmit={handleSubmit}>
         <div className={styles.formSection}>
+          <div className={styles.titleInputRow}>
+            <Input
+              type="text"
+              value={surveyTitle}
+              onChange={(event: any) => setSurveyTitle(event.target.value)}
+              placeholder="Title"
+              className={styles.titleInput}
+              data-testid={E2E_TESTIDS.DATABASE_TITLE_INPUT}
+            />
+          </div>
+
           <div className={styles.textInputGroup}>
             <AudioInputUntyped
               placeholder={transcriptMode ? "Speak to capture transcript or Paste Text..." : "Speak or type text here..."}
@@ -1544,27 +1833,6 @@ export default function AudioSurveyGenerator(rawProps: any = {}) {
               </Button>
             </div>
 
-            <div className={styles.fileUploadWrapper}>
-              <input
-                type="file"
-                ref={additionalPhotoInputRef}
-                style={{ display: 'none' }}
-                accept={SUPPORTED_PHOTO_ACCEPT}
-                multiple
-                onChange={handleAdditionalPhotoUpload}
-              />
-              <Button
-                type="button"
-                color="secondary"
-                outline
-                className={styles.compactBtn}
-                onClick={() => additionalPhotoInputRef.current && additionalPhotoInputRef.current.click()}
-                title="Allowed: .png, .jpg, .jpeg, .webp, .gif"
-              >
-                <FontAwesomeIcon icon={faImage} style={{ opacity: '0.65' }} />
-              </Button>
-            </div>
-
             <div
               className={`${styles.transcriptToggleBtn} ${transcriptMode ? styles.active : ''}`}
               onClick={handleTranscriptModeToggle}
@@ -1607,7 +1875,49 @@ export default function AudioSurveyGenerator(rawProps: any = {}) {
             )}
           </div>
 
-          {(additionalSources.length > 0 || shouldShowSaveExtraSourcesControl || (transcriptMode && uploadSummaryToArweave && encryptSummary)) && (
+          <div className={styles.imageSourceSection}>
+            <CompactImageChooser
+              className={styles.imageChooser}
+              rootTestId={E2E_TESTIDS.DATABASE_IMAGE_CHOOSER}
+              urlButtonTestId={E2E_TESTIDS.DATABASE_IMAGE_URL_TOGGLE}
+              pasteButtonTestId={E2E_TESTIDS.DATABASE_IMAGE_PASTE}
+              uploadButtonTestId={E2E_TESTIDS.DATABASE_IMAGE_UPLOAD}
+              fileInputTestId={E2E_TESTIDS.DATABASE_IMAGE_FILE_INPUT}
+              urlInputTestId={E2E_TESTIDS.DATABASE_IMAGE_URL_INPUT}
+              isUrlMode={imagePickerUrlMode}
+              isUploadMode={!imagePickerUrlMode}
+              showUrlInput={imagePickerUrlMode}
+              urlValue={imagePickerUrl}
+              onUrlChange={handleImagePickerUrlChange}
+              onToggleUrlMode={handleImagePickerToggleUrlMode}
+              onPaste={handleImagePickerPaste}
+              onUploadClick={handleImagePickerUploadClick}
+              onFileChange={handleAdditionalPhotoUpload}
+              fileInputRef={imagePickerInputRef}
+              accept={SUPPORTED_PHOTO_ACCEPT}
+              multiple
+              urlPlaceholder="Paste image URL"
+              urlInputAriaLabel="Context image URL"
+              statusText={imagePickerStatusText}
+              statusTone={imagePickerStatusTone}
+              helpText="Add context images via upload, paste, or URL."
+            />
+            {imagePickerUrlMode ? (
+              <Button
+                type="button"
+                color="secondary"
+                outline
+                className={styles.imageUrlAddButton}
+                onClick={handleImagePickerUrlAdd}
+                disabled={!toStr(imagePickerUrl).trim() || loading}
+                data-testid={E2E_TESTIDS.DATABASE_IMAGE_URL_ADD}
+              >
+                Add Image
+              </Button>
+            ) : null}
+          </div>
+
+          {(additionalSources.length > 0 || shouldShowAddToLibraryButton || (transcriptMode && uploadSummaryToArweave && encryptSummary)) && (
             <div className={styles.additionalContextSection}>
               {queuedPhotoSources.length > 0 && (
                 <div className={styles.photoCardGrid}>
@@ -1709,76 +2019,97 @@ export default function AudioSurveyGenerator(rawProps: any = {}) {
                 </ul>
               )}
 
-              {shouldShowSaveExtraSourcesControl && (
+              {(shouldShowSaveExtraSourcesControl || shouldShowAddToLibraryButton) && (
                 <div className={styles.docSaveRow}>
-                  <label className={styles.docSaveToggle} htmlFor={E2E_TESTIDS.DATABASE_SAVE_DOCS_TOGGLE}>
-                    <input
-                      id={E2E_TESTIDS.DATABASE_SAVE_DOCS_TOGGLE}
-                      type="checkbox"
-                      checked={saveExtraSourcesToDocLibrary}
-                      onChange={(event: any) => {
-                        setSaveExtraSourcesToDocLibrary(event.target.checked);
-                        if (!event.target.checked) setShowSaveDocAudienceMenu(false);
-                      }}
-                      data-testid={E2E_TESTIDS.DATABASE_SAVE_DOCS_TOGGLE}
-                    />
-                    <span>Save to Session Doc Library</span>
-                  </label>
+                  {shouldShowSaveExtraSourcesControl ? (
+                    <label className={styles.docSaveToggle} htmlFor={E2E_TESTIDS.DATABASE_SAVE_DOCS_TOGGLE}>
+                      <input
+                        id={E2E_TESTIDS.DATABASE_SAVE_DOCS_TOGGLE}
+                        type="checkbox"
+                        checked={saveExtraSourcesToDocLibrary}
+                        onChange={(event: any) => {
+                          setSaveExtraSourcesToDocLibrary(event.target.checked);
+                          if (!event.target.checked && !shouldShowAddToLibraryButton) {
+                            setShowSaveDocAudienceMenu(false);
+                          }
+                        }}
+                        data-testid={E2E_TESTIDS.DATABASE_SAVE_DOCS_TOGGLE}
+                      />
+                      <span>Generate flow also saves to Session Doc Library</span>
+                    </label>
+                  ) : null}
 
-                  {saveExtraSourcesToDocLibrary && (
-                    <div className={styles.docSaveAudienceWrap}>
-                      <button
-                        type="button"
-                        className={styles.docSaveAudienceButton}
-                        onClick={() => setShowSaveDocAudienceMenu((value: any) => !value)}
-                        data-testid={E2E_TESTIDS.DATABASE_SAVE_DOCS_AUDIENCE_BUTTON}
-                        data-ce-doc-save-audience={saveDocAudience}
+                  <div className={styles.docSaveAudienceWrap}>
+                    <button
+                      type="button"
+                      className={styles.docSaveAudienceButton}
+                      onClick={() => setShowSaveDocAudienceMenu((value: any) => !value)}
+                      data-testid={E2E_TESTIDS.DATABASE_SAVE_DOCS_AUDIENCE_BUTTON}
+                      data-ce-doc-save-audience={saveDocAudience}
+                    >
+                      <FontAwesomeIcon icon={faLock} />
+                      <span>{saveDocAudienceLabel}</span>
+                      <FontAwesomeIcon icon={showSaveDocAudienceMenu ? faCaretUp : faCaretDown} />
+                    </button>
+
+                    {showSaveDocAudienceMenu && (
+                      <div
+                        className={styles.docSaveAudienceMenu}
+                        data-testid={E2E_TESTIDS.DATABASE_SAVE_DOCS_AUDIENCE_MENU}
                       >
-                        <FontAwesomeIcon icon={faLock} />
-                        <span>{saveDocAudienceLabel}</span>
-                        <FontAwesomeIcon icon={showSaveDocAudienceMenu ? faCaretUp : faCaretDown} />
-                      </button>
-
-                      {showSaveDocAudienceMenu && (
-                        <div
-                          className={styles.docSaveAudienceMenu}
-                          data-testid={E2E_TESTIDS.DATABASE_SAVE_DOCS_AUDIENCE_MENU}
+                        <button
+                          type="button"
+                          className={`${styles.docSaveAudienceOption} ${saveDocAudience === 'self' ? styles.active : ''}`}
+                          onClick={() => {
+                            setSaveDocAudience('self');
+                            setShowSaveDocAudienceMenu(false);
+                          }}
+                          data-testid={E2E_TESTIDS.DATABASE_SAVE_DOCS_AUDIENCE_SELF}
                         >
+                          <FontAwesomeIcon icon={faLock} />
+                          <span>only me</span>
+                        </button>
+
+                        {docSaveSessionAudienceAvailable ? (
                           <button
                             type="button"
-                            className={`${styles.docSaveAudienceOption} ${saveDocAudience === 'self' ? styles.active : ''}`}
+                            className={`${styles.docSaveAudienceOption} ${saveDocAudience === 'session' ? styles.active : ''}`}
                             onClick={() => {
-                              setSaveDocAudience('self');
+                              setSaveDocAudience('session');
                               setShowSaveDocAudienceMenu(false);
                             }}
-                            data-testid={E2E_TESTIDS.DATABASE_SAVE_DOCS_AUDIENCE_SELF}
+                            data-testid={E2E_TESTIDS.DATABASE_SAVE_DOCS_AUDIENCE_SESSION}
                           >
                             <FontAwesomeIcon icon={faLock} />
-                            <span>only me</span>
+                            <span>{docSaveSessionLabel}</span>
                           </button>
+                        ) : (
+                          <div className={styles.docSaveAudienceNote}>
+                            {docSaveSessionChainError
+                              ? docSaveSessionChainError
+                              : (
+                                <>
+                                  Session <code>docUploads</code> gate unavailable. Saved docs will stay private to your wallet.
+                                </>
+                              )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
 
-                          {docSaveGate.hasRecipients ? (
-                            <button
-                              type="button"
-                              className={`${styles.docSaveAudienceOption} ${saveDocAudience === 'session' ? styles.active : ''}`}
-                              onClick={() => {
-                                setSaveDocAudience('session');
-                                setShowSaveDocAudienceMenu(false);
-                              }}
-                              data-testid={E2E_TESTIDS.DATABASE_SAVE_DOCS_AUDIENCE_SESSION}
-                            >
-                              <FontAwesomeIcon icon={faLock} />
-                              <span>{docSaveSessionLabel}</span>
-                            </button>
-                          ) : (
-                            <div className={styles.docSaveAudienceNote}>
-                              Session <code>docUploads</code> gate unavailable. Saved docs will stay private to your wallet.
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )}
+                  {queuedPhotoSources.length > 0 ? (
+                    <label className={styles.docSaveToggle} htmlFor={E2E_TESTIDS.DATABASE_LIBRARY_ANALYZE_TOGGLE}>
+                      <input
+                        id={E2E_TESTIDS.DATABASE_LIBRARY_ANALYZE_TOGGLE}
+                        type="checkbox"
+                        checked={analyzeBeforeLibraryUpload}
+                        onChange={(event: any) => setAnalyzeBeforeLibraryUpload(event.target.checked)}
+                        data-testid={E2E_TESTIDS.DATABASE_LIBRARY_ANALYZE_TOGGLE}
+                      />
+                      <span>Analyze images before upload</span>
+                    </label>
+                  ) : null}
                 </div>
               )}
 
@@ -1909,21 +2240,44 @@ export default function AudioSurveyGenerator(rawProps: any = {}) {
           </div>
         </div>
 
-        {shouldShowGenerateButton && (
-          <Button
-            type="submit"
-            className={styles.generateButton}
-            disabled={loading}
-          >
-            {loading ? (
-              <>
-                {isTranscribing ? 'Transcribing... ' : 'Processing... '}
-                {waitingSeconds}s <FontAwesomeIcon icon={faSpinner} spin />
-              </>
-            ) : (
-              'Generate Questions'
-            )}
-          </Button>
+        {(shouldShowGenerateButton || shouldShowAddToLibraryButton) && (
+          <div className={styles.actionRow}>
+            {shouldShowGenerateButton ? (
+              <Button
+                type="submit"
+                className={styles.generateButton}
+                disabled={loading}
+              >
+                {loading && activeAction === 'generate' ? (
+                  <>
+                    {isTranscribing ? 'Transcribing... ' : 'Processing... '}
+                    {waitingSeconds}s <FontAwesomeIcon icon={faSpinner} spin />
+                  </>
+                ) : (
+                  'Generate Questions'
+                )}
+              </Button>
+            ) : null}
+
+            {shouldShowAddToLibraryButton ? (
+              <Button
+                type="button"
+                color="secondary"
+                className={styles.libraryButton}
+                onClick={handleAddToLibrary}
+                disabled={loading}
+                data-testid={E2E_TESTIDS.DATABASE_ADD_LIBRARY_BUTTON}
+              >
+                {loading && activeAction === 'library' ? (
+                  <>
+                    Adding to Library... {waitingSeconds}s <FontAwesomeIcon icon={faSpinner} spin />
+                  </>
+                ) : (
+                  'Add to Library'
+                )}
+              </Button>
+            ) : null}
+          </div>
         )}
       </form>
 
