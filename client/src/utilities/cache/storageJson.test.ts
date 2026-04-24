@@ -6,8 +6,14 @@ import {
   safeJsonWrite,
 } from './storageJson.js';
 
-const createMemoryStorage = () => {
-  const data = new Map();
+type MemoryStorage = {
+  getItem: jest.Mock<any, any>;
+  setItem: jest.Mock<any, any>;
+  removeItem: jest.Mock<any, any>;
+};
+
+const createMemoryStorage = (): MemoryStorage => {
+  const data = new Map<string, string>();
   return {
     getItem: jest.fn((key) => (data.has(key) ? data.get(key) : null)),
     setItem: jest.fn((key, value) => {
@@ -24,7 +30,7 @@ describe('storageJson primitives', () => {
     const storage = createMemoryStorage();
     storage.setItem('draft', JSON.stringify({ count: 2 }));
 
-    expect(safeJsonRead(storage, 'draft', (value) => value.count)).toEqual(expect.objectContaining({
+    expect(safeJsonRead(storage, 'draft', (value) => (value as { count: number }).count)).toEqual(expect.objectContaining({
       ok: true,
       value: 2,
       status: 'ok',
@@ -60,7 +66,7 @@ describe('storageJson primitives', () => {
         key: 'draft',
       }));
 
-    expect(JSON.parse(storage.getItem('draft'))).toEqual({ title: 'Short' });
+    expect(JSON.parse(storage.getItem('draft') as string)).toEqual({ title: 'Short' });
 
     expect(safeJsonWrite(storage, 'oversized', { body: 'x'.repeat(80) }, { maxBytes: 32 }))
       .toEqual(expect.objectContaining({
@@ -71,7 +77,7 @@ describe('storageJson primitives', () => {
   });
 
   it('reports JSON.stringify failures without throwing', () => {
-    const circular = {};
+    const circular: Record<string, unknown> = {};
     circular.self = circular;
 
     expect(boundedStringify(circular)).toEqual(expect.objectContaining({
