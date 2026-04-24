@@ -234,7 +234,7 @@ import {
   bumpSurveyPerfCounter,
 } from './surveyToolUtils.js';
 
-import { SurveySelector, QuestionsDashboard } from './SurveySelector.jsx';
+import { SurveySelector, QuestionsDashboard } from './SurveySelector';
 
 export {
   SurveySelector,

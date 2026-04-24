@@ -23,7 +23,7 @@ import SurveyTool, {
 import {
   QuestionsDashboard as DirectQuestionsDashboard,
   SurveySelector as DirectSurveySelector,
-} from './SurveySelector.jsx';
+} from './SurveySelector';
 import {
   computeSubmitLabel as directComputeSubmitLabel,
   normalizeSurveyToolFilterState as directNormalizeSurveyToolFilterState,
