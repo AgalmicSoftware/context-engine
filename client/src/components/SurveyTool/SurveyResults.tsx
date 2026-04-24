@@ -1,4 +1,4 @@
-/** @file SurveyResults.jsx */
+/** @file SurveyResults.tsx */
 
 import React, { Component } from 'react';
 import { connect } from 'react-redux';
@@ -103,7 +103,7 @@ const LOCAL_STORAGE_POLL_MID_MS = 4000;
 const LOCAL_STORAGE_POLL_MAX_MS = 12000;
 const LOCAL_STORAGE_FORCE_RESCAN_EVERY = 6;
 
-const scheduleMicrotask = (cb) => {
+const scheduleMicrotask = (cb: any) => {
   if (typeof cb !== 'function') return;
   if (typeof queueMicrotask === 'function') {
     queueMicrotask(cb);
@@ -112,26 +112,26 @@ const scheduleMicrotask = (cb) => {
   Promise.resolve().then(cb);
 };
 
-const normalizeSignatureValue = (value, trail = new WeakSet()) => {
+const normalizeSignatureValue = (value: any, trail: any = new WeakSet()): any => {
   if (value === null || value === undefined) return value;
   if (typeof value === 'bigint') return `__bigint:${value.toString(10)}`;
   if (typeof value !== 'object') return value;
   if (trail.has(value)) return '__circular__';
   trail.add(value);
   if (Array.isArray(value)) {
-    const arr = value.map((entry) => normalizeSignatureValue(entry, trail));
+    const arr: any[] = value.map((entry: any) => normalizeSignatureValue(entry, trail));
     trail.delete(value);
     return arr;
   }
-  const out = {};
-  Object.keys(value).sort().forEach((key) => {
+  const out: Record<string, any> = {};
+  Object.keys(value).sort().forEach((key: any) => {
     out[key] = normalizeSignatureValue(value[key], trail);
   });
   trail.delete(value);
   return out;
 };
 
-const stableSerializeSignatureValue = (value) => {
+const stableSerializeSignatureValue = (value: any) => {
   try {
     return JSON.stringify(normalizeSignatureValue(value));
   } catch (_) {
@@ -143,7 +143,7 @@ const stableSerializeSignatureValue = (value) => {
   }
 };
 
-const mixSurveySignatureHash = (seed, text) => {
+const mixSurveySignatureHash = (seed: any, text: any) => {
   let hash = Number(seed) >>> 0;
   const input = String(text || '');
   for (let i = 0; i < input.length; i += 1) {
@@ -152,16 +152,16 @@ const mixSurveySignatureHash = (seed, text) => {
   return hash >>> 0;
 };
 
-const buildSurveyResponderPayloadSignature = (payload) => {
+const buildSurveyResponderPayloadSignature = (payload: any) => {
   if (typeof payload === 'string') return `s:${payload}`;
   return `o:${stableSerializeSignatureValue(payload)}`;
 };
 
-const buildSurveyRespondersSignature = (surveyResponsesByResponder = {}) => {
+const buildSurveyRespondersSignature = (surveyResponsesByResponder: any = {}) => {
   const responders = Object.keys(surveyResponsesByResponder || {})
-    .sort((a, b) => String(a).localeCompare(String(b)));
+    .sort((a: any, b: any) => String(a).localeCompare(String(b)));
   let hash = 2166136261;
-  responders.forEach((responder) => {
+  responders.forEach((responder: any) => {
     const responderLower = String(responder || '').toLowerCase();
     hash = mixSurveySignatureHash(hash, responderLower);
     hash = mixSurveySignatureHash(
@@ -175,7 +175,7 @@ const buildSurveyRespondersSignature = (surveyResponsesByResponder = {}) => {
 const surveyResponderPayloadRefIds = new WeakMap();
 let surveyResponderPayloadRefSeq = 1;
 
-const getSurveyResponderPayloadRefId = (value) => {
+const getSurveyResponderPayloadRefId = (value: any) => {
   if (!value || typeof value !== 'object') {
     return `p:${typeof value}:${String(value)}`;
   }
@@ -188,11 +188,11 @@ const getSurveyResponderPayloadRefId = (value) => {
   return `o:${refId}`;
 };
 
-const buildSurveyRespondersPayloadRefSignature = (surveyResponsesByResponder = {}) => {
+const buildSurveyRespondersPayloadRefSignature = (surveyResponsesByResponder: any = {}) => {
   const responders = Object.keys(surveyResponsesByResponder || {})
-    .sort((a, b) => String(a).localeCompare(String(b)));
+    .sort((a: any, b: any) => String(a).localeCompare(String(b)));
   let hash = 2166136261;
-  responders.forEach((responder) => {
+  responders.forEach((responder: any) => {
     const responderLower = String(responder || '').toLowerCase();
     hash = mixSurveySignatureHash(hash, responderLower);
     const payload = surveyResponsesByResponder?.[responder];
@@ -203,7 +203,7 @@ const buildSurveyRespondersPayloadRefSignature = (surveyResponsesByResponder = {
     hash = mixSurveySignatureHash(hash, getSurveyResponderPayloadRefId(payload));
     const payloadResponses = Array.isArray(payload?.responses) ? payload.responses : [];
     hash = mixSurveySignatureHash(hash, `r:${payloadResponses.length}`);
-    payloadResponses.forEach((entry) => {
+    payloadResponses.forEach((entry: any) => {
       hash = mixSurveySignatureHash(hash, getSurveyResponderPayloadRefId(entry));
     });
   });
@@ -214,8 +214,8 @@ const buildSurveyRespondersPayloadRefSignature = (surveyResponsesByResponder = {
 /**
 * Helper that merges aggregator keys in lowercase, ensuring zero-response question IDs are included.
 */
-function unifyAggregatorWithAllQuestionIDs(baseAggregator, allKnownQuestionIds = []) {
-  const loweredMap = {};
+function unifyAggregatorWithAllQuestionIDs(baseAggregator: any, allKnownQuestionIds: any = []) {
+  const loweredMap: Record<string, any> = {};
   for (const key of Object.keys(baseAggregator)) {
     const lowerKey = key.toLowerCase();
     if (!loweredMap[lowerKey]) {
@@ -235,7 +235,7 @@ function unifyAggregatorWithAllQuestionIDs(baseAggregator, allKnownQuestionIds =
 
 const INVALID_RESPONSE_TIMESTAMP = Number.NEGATIVE_INFINITY;
 
-const normalizeResponseTimestampMs = (value) => {
+const normalizeResponseTimestampMs = (value: any) => {
   if (value === null || value === undefined || value === '') return INVALID_RESPONSE_TIMESTAMP;
   if (typeof value === 'number') {
     if (!Number.isFinite(value)) return INVALID_RESPONSE_TIMESTAMP;
@@ -255,19 +255,19 @@ const normalizeResponseTimestampMs = (value) => {
   return INVALID_RESPONSE_TIMESTAMP;
 };
 
-const getSurveyResponseQuestionId = (row = {}) => (
+const getSurveyResponseQuestionId = (row: any = {}) => (
   String(row?.questionID || row?.questionId || '').trim().toLowerCase()
 );
 
-const getSurveyResponseEntryTimestampMs = (row = {}) => (
+const getSurveyResponseEntryTimestampMs = (row: any = {}) => (
   normalizeResponseTimestampMs(row?.timestamp ?? row?.timeStamp)
 );
 
-const getSurveyResponsePayloadTimestampMs = (payload = {}) => (
+const getSurveyResponsePayloadTimestampMs = (payload: any = {}) => (
   normalizeResponseTimestampMs(payload?.timestamp ?? payload?.timeStamp)
 );
 
-const getSurveyResponseAggregateTimestampMs = (row = {}, payload = {}) => {
+const getSurveyResponseAggregateTimestampMs = (row: any = {}, payload: any = {}) => {
   const entryTimestamp = getSurveyResponseEntryTimestampMs(row);
   const payloadTimestamp = getSurveyResponsePayloadTimestampMs(payload);
   // Regression guard: merged survey payloads can advance the top-level recency
@@ -284,7 +284,7 @@ const getSurveyResponseAggregateTimestampMs = (row = {}, payload = {}) => {
   return Math.max(entryTimestamp, payloadTimestamp);
 };
 
-const isSurveyQuestionResponseNewer = (candidate, existing) => {
+const isSurveyQuestionResponseNewer = (candidate: any, existing: any) => {
   // Regression guard: current client edits may advance only the payload timestamp.
   // Compare effective recency first, then payload recency, and let later array
   // order win within the same payload revision so stale per-answer timestamps do
@@ -307,16 +307,16 @@ const isSurveyQuestionResponseNewer = (candidate, existing) => {
   return candidate.index >= existing.index;
 };
 
-const normalizeSurveyResponsePayloadByQuestionId = (payload) => {
+const normalizeSurveyResponsePayloadByQuestionId = (payload: any) => {
   const source = (payload && typeof payload === 'object') ? payload : null;
   if (!source) return payload;
   if (!Array.isArray(source.responses)) return { ...source };
 
   const payloadTimestampMs = getSurveyResponsePayloadTimestampMs(source);
-  const passthroughRows = [];
-  const latestByQuestionId = new Map();
+  const passthroughRows: any[] = [];
+  const latestByQuestionId: any = new Map();
 
-  source.responses.forEach((row, index) => {
+  source.responses.forEach((row: any, index: any) => {
     const clonedRow = (row && typeof row === 'object') ? { ...row } : row;
     const questionId = getSurveyResponseQuestionId(row);
     if (!questionId) {
@@ -350,8 +350,8 @@ const normalizeSurveyResponsePayloadByQuestionId = (payload) => {
     ...passthroughRows,
     ...Array.from(latestByQuestionId.values()),
   ]
-    .sort((left, right) => left.orderIndex - right.orderIndex)
-    .map((entry) => entry.row);
+    .sort((left: any, right: any) => left.orderIndex - right.orderIndex)
+    .map((entry: any) => entry.row);
 
   return {
     ...source,
@@ -360,13 +360,13 @@ const normalizeSurveyResponsePayloadByQuestionId = (payload) => {
 };
 
 /** Prefix-preserver used by SurveySelector */
-const readPathSearch = (path = '') => {
+const readPathSearch = (path: any = '') => {
   const value = String(path || '');
   const queryIndex = value.indexOf('?');
   return queryIndex >= 0 ? value.slice(queryIndex) : '';
 };
 
-const hasExplicitSessionQueryPinInPath = (path = '') => {
+const hasExplicitSessionQueryPinInPath = (path: any = '') => {
   const search = readPathSearch(path);
   return (
     parseQuestionSessionSlugFromSearch(search) !== null ||
@@ -374,13 +374,13 @@ const hasExplicitSessionQueryPinInPath = (path = '') => {
   );
 };
 
-function applyExistingGroupPrefix(newPath) {
+function applyExistingGroupPrefix(newPath: any) {
   try {
     if (hasExplicitSessionQueryPinInPath(newPath)) return newPath;
     const p = (typeof window !== 'undefined' && window.location && window.location.pathname) || '';
     const pathOnly = p.split('?')[0].split('#')[0];
     const segs = pathOnly.split('/').filter(Boolean);
-    const RESERVED = new Set(['questions','question','survey','surveys']);
+    const RESERVED: any = new Set(['questions','question','survey','surveys']);
     if (segs.length >= 2 && !RESERVED.has(segs[0])) {
       const base = `/${segs[0]}/${segs[1]}`;
       if (!newPath.startsWith(base)) {
@@ -391,7 +391,7 @@ function applyExistingGroupPrefix(newPath) {
   return newPath;
 }
 
-function resolveNetBucketReadOnly(cacheObj, netIdStr, fallbackValue) {
+function resolveNetBucketReadOnly(cacheObj: any, netIdStr: any, fallbackValue: any) {
   const fallback = fallbackValue === undefined ? {} : fallbackValue;
   if (!cacheObj || typeof cacheObj !== 'object' || !netIdStr) return fallback;
   const bucket = cacheObj[netIdStr];
@@ -405,13 +405,13 @@ const EMPTY_SCOPED_QUESTION_NETWORK_DATA = Object.freeze({
   questionResponsesLatestBlock: 0,
 });
 
-function mergeQuestionResponsesByQuestion(accumulator = {}, questionResponses = {}, options = {}) {
+function mergeQuestionResponsesByQuestion(accumulator: any = {}, questionResponses: any = {}, options: any = {}) {
   const target = (accumulator && typeof accumulator === 'object') ? accumulator : {};
   const source = (questionResponses && typeof questionResponses === 'object') ? questionResponses : {};
   const allowedQuestionIds = options.allowedQuestionIds instanceof Set
     ? options.allowedQuestionIds
     : null;
-  Object.keys(source).forEach((questionId) => {
+  Object.keys(source).forEach((questionId: any) => {
     const lowerQuestionId = String(questionId || '').trim().toLowerCase();
     if (!lowerQuestionId) return;
     if (allowedQuestionIds && !allowedQuestionIds.has(lowerQuestionId)) return;
@@ -420,18 +420,18 @@ function mergeQuestionResponsesByQuestion(accumulator = {}, questionResponses = 
     if (!target[lowerQuestionId] || typeof target[lowerQuestionId] !== 'object') {
       target[lowerQuestionId] = {};
     }
-    Object.keys(responderMap).forEach((responder) => {
+    Object.keys(responderMap).forEach((responder: any) => {
       target[lowerQuestionId][responder] = responderMap[responder];
     });
   });
   return target;
 }
 
-const hasAuthoritativeQuestionSessionSlug = (question = {}) => (
+const hasAuthoritativeQuestionSessionSlug = (question: any = {}) => (
   hasOwn(question, 'sessionSlug') && question?.sessionSlugExplicit === true
 );
 
-const resolveScopedQuestionSessionSlug = (question = {}, bucketSlug = '') => {
+const resolveScopedQuestionSessionSlug = (question: any = {}, bucketSlug: any = '') => {
   const normalizedBucketSlug = normalizeSessionSlug(bucketSlug || '');
   const normalizedQuestionSlug = normalizeSessionSlug(question?.sessionSlug || '');
   if (hasAuthoritativeQuestionSessionSlug(question)) return normalizedQuestionSlug;
@@ -446,12 +446,12 @@ const shouldKeepScopedQuestion = ({
   bucketSlug = '',
   allowedScopeSlugs = [],
   requireAuthoritativeBinding = false,
-} = {}) => {
+}: any = {}) => {
   const scopeSet = allowedScopeSlugs instanceof Set
     ? allowedScopeSlugs
     : new Set(
       (Array.isArray(allowedScopeSlugs) ? allowedScopeSlugs : [])
-        .map((slug) => normalizeSessionSlug(slug || ''))
+        .map((slug: any) => normalizeSessionSlug(slug || ''))
     );
   if (!scopeSet.size) return true;
   const normalizedQuestionSlug = normalizeSessionSlug(question?.sessionSlug || '');
@@ -461,32 +461,32 @@ const shouldKeepScopedQuestion = ({
   return scopeSet.has(resolveScopedQuestionSessionSlug(question, bucketSlug));
 };
 
-function mergeScopedQuestionNetworkData(networkEntries = [], options = {}) {
+function mergeScopedQuestionNetworkData(networkEntries: any = [], options: any = {}) {
   if (!Array.isArray(networkEntries) || networkEntries.length === 0) {
     return EMPTY_SCOPED_QUESTION_NETWORK_DATA;
   }
 
-  const mergedQuestions = {};
-  const mergedQuestionResponses = {};
+  const mergedQuestions: Record<string, any> = {};
+  const mergedQuestionResponses: Record<string, any> = {};
   const allowedScopeSlugs = options.allowedScopeSlugs instanceof Set
     ? options.allowedScopeSlugs
     : new Set(
       (Array.isArray(options.allowedScopeSlugs) ? options.allowedScopeSlugs : [])
-        .map((slug) => normalizeSessionSlug(slug || ''))
+        .map((slug: any) => normalizeSessionSlug(slug || ''))
     );
   const requireAuthoritativeBinding = options.requireAuthoritativeBinding === true;
   let questionsLatestBlock = 0;
   let questionResponsesLatestBlock = 0;
 
-  networkEntries.forEach(({ slug = '', bucket = {} }) => {
+  networkEntries.forEach(({ slug = '', bucket = {} }: any) => {
     const questionBucket = (bucket && typeof bucket === 'object') ? bucket : {};
-    const allowedQuestionIds = new Set();
+    const allowedQuestionIds: any = new Set();
     const questions = (
       questionBucket.questions && typeof questionBucket.questions === 'object'
         ? questionBucket.questions
         : {}
     );
-    Object.keys(questions).forEach((questionId) => {
+    Object.keys(questions).forEach((questionId: any) => {
       const lowerQuestionId = String(questionId || '').trim().toLowerCase();
       if (!lowerQuestionId) return;
       const question = questions[questionId];
@@ -525,17 +525,17 @@ function mergeScopedQuestionNetworkData(networkEntries = [], options = {}) {
   };
 }
 
-const normalizeNonceKey = (value) => {
+const normalizeNonceKey = (value: any) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
 };
 
-const hasOwn = (obj, key) => !!obj && Object.prototype.hasOwnProperty.call(obj, key);
+const hasOwn = (obj: any, key: any) => !!obj && Object.prototype.hasOwnProperty.call(obj, key);
 
-const normalizeGateSbtEntries = (gate = null) => {
-  const out = [];
-  const seen = new Set();
-  const push = (address, label = '') => {
+const normalizeGateSbtEntries = (gate: any = null) => {
+  const out: any[] = [];
+  const seen: any = new Set();
+  const push = (address: any, label: any = '') => {
     const normalizedAddress = typeof address === 'string'
       ? address.trim()
       : address == null
@@ -552,7 +552,7 @@ const normalizeGateSbtEntries = (gate = null) => {
   };
 
   if (Array.isArray(gate?.sbts)) {
-    gate.sbts.forEach((entry) => {
+    gate.sbts.forEach((entry: any) => {
       if (typeof entry === 'string') {
         push(entry);
         return;
@@ -565,14 +565,14 @@ const normalizeGateSbtEntries = (gate = null) => {
   }
 
   if (Array.isArray(gate?.sbtAddresses)) {
-    gate.sbtAddresses.forEach((address) => push(address));
+    gate.sbtAddresses.forEach((address: any) => push(address));
   }
   if (gate?.sbtAddress) push(gate.sbtAddress);
 
   return out;
 };
 
-const hasEnvelopeShape = (value) => {
+const hasEnvelopeShape = (value: any) => {
   if (!value || typeof value !== 'object') return false;
   return [
     'ciphertext',
@@ -583,10 +583,10 @@ const hasEnvelopeShape = (value) => {
     'chain',
     'iv',
     'salt',
-  ].some((key) => hasOwn(value, key));
+  ].some((key: any) => hasOwn(value, key));
 };
 
-const extractEnvelopeCandidate = (field) => {
+const extractEnvelopeCandidate = (field: any) => {
   if (!field || typeof field !== 'object') return null;
 
   const directEnvelope = field.encryptedPortion || field.envelope || field.encryptedEnvelope || null;
@@ -604,14 +604,14 @@ const extractEnvelopeCandidate = (field) => {
   return null;
 };
 
-const hasVisibleFieldValue = (field) => {
+const hasVisibleFieldValue = (field: any) => {
   if (!field || typeof field !== 'object' || !hasOwn(field, 'value')) return false;
   if (field.value === '*') return false;
   if (field.value === null || field.value === undefined) return false;
   return true;
 };
 
-const isLockedEncryptedField = (field) => {
+const isLockedEncryptedField = (field: any) => {
   if (!field || typeof field !== 'object') return false;
   const flaggedLocked = field.locked === true;
   const flaggedEncrypted = field.isEncrypted === true || field.encrypted === true;
@@ -621,24 +621,24 @@ const isLockedEncryptedField = (field) => {
   return !hasVisibleFieldValue(field);
 };
 
-const getFieldEncryptionAudience = (field) => (
+const getFieldEncryptionAudience = (field: any) => (
   typeof field === 'object' && field
     ? String(field.encryptionAudience || '').trim().toLowerCase()
     : ''
 );
 
-const isBannerEligibleLockedField = (field) => (
+const isBannerEligibleLockedField = (field: any) => (
   isLockedEncryptedField(field) && getFieldEncryptionAudience(field) !== 'self'
 );
 
-const normalizeGateText = (value) => {
+const normalizeGateText = (value: any) => {
   const raw = (typeof value === 'string' ? value : value == null ? '' : String(value)).trim();
   if (!raw) return '';
   if (/^\[object\s+object\]$/i.test(raw)) return '';
   return raw;
 };
 
-const buildLockedResponseSignature = (response = {}) => stableSerializeSignatureValue({
+const buildLockedResponseSignature = (response: any = {}) => stableSerializeSignatureValue({
   questionId: response?.questionID || response?.questionId || '',
   timestamp: response?.timeStamp || response?.timestamp || 0,
   answerHash: response?.answer?.hash || '',
@@ -653,14 +653,14 @@ const buildLockedResponseSignature = (response = {}) => stableSerializeSignature
   convictionEncrypted: response?.convictionEncrypted || '',
 });
 
-export const countQuestionModeResponses = (aggregatorByQuestion = {}, questionLookup = {}) => {
+export const countQuestionModeResponses = (aggregatorByQuestion: any = {}, questionLookup: any = {}) => {
   let total = 0;
-  Object.keys(aggregatorByQuestion || {}).forEach((questionId) => {
+  Object.keys(aggregatorByQuestion || {}).forEach((questionId: any) => {
     const rows = Array.isArray(aggregatorByQuestion[questionId]) ? aggregatorByQuestion[questionId] : [];
     const questionType = String(
       questionLookup?.[String(questionId || '').toLowerCase()]?.type || ''
     ).toLowerCase();
-    rows.forEach((row) => {
+    rows.forEach((row: any) => {
       const parsedResponse = row?.response;
       if (isFreeformBlankAnswer(questionType, parsedResponse)) return;
       total += 1;
@@ -669,7 +669,7 @@ export const countQuestionModeResponses = (aggregatorByQuestion = {}, questionLo
   return total;
 };
 
-export const hasAnyCountableSurveyAnswer = (parsedSurveyResponse, questionLookup = {}) => {
+export const hasAnyCountableSurveyAnswer = (parsedSurveyResponse: any, questionLookup: any = {}) => {
   const answers = Array.isArray(parsedSurveyResponse?.responses)
     ? parsedSurveyResponse.responses
     : [];
@@ -684,8 +684,8 @@ export const hasAnyCountableSurveyAnswer = (parsedSurveyResponse, questionLookup
   return false;
 };
 
-const getFilterStateSignature = (filterState) => serializeFilterState(filterState) || '';
-const areValuesEquivalentBySignature = (currentValue, nextValue) => {
+const getFilterStateSignature = (filterState: any) => serializeFilterState(filterState) || '';
+const areValuesEquivalentBySignature = (currentValue: any, nextValue: any) => {
   if (currentValue === nextValue) return true;
   if (currentValue == null || nextValue == null) return currentValue === nextValue;
   if (typeof currentValue !== 'object' && typeof nextValue !== 'object') {
@@ -694,20 +694,20 @@ const areValuesEquivalentBySignature = (currentValue, nextValue) => {
   return stableSerializeSignatureValue(currentValue) === stableSerializeSignatureValue(nextValue);
 };
 
-const getConvictionValue = (obj) => {
+const getConvictionValue = (obj: any) => {
   if (!obj || typeof obj !== 'object') return '';
   if (obj.conviction !== undefined && obj.conviction !== null) return obj.conviction;
   if (obj.importance !== undefined && obj.importance !== null) return obj.importance;
   return '';
 };
 
-const getResponseQuestionId = (obj) => String(obj?.questionID || obj?.questionId || '').trim();
+const getResponseQuestionId = (obj: any) => String(obj?.questionID || obj?.questionId || '').trim();
 
-const getResponseQuestionPrompt = (obj, questionData = null) => (
+const getResponseQuestionPrompt = (obj: any, questionData: any = null) => (
   obj?.prompt || questionData?.prompt || ''
 );
 
-const getResponseQuestionType = (obj, questionData = null) => (
+const getResponseQuestionType = (obj: any, questionData: any = null) => (
   obj?.type || questionData?.type || ''
 );
 
@@ -718,11 +718,13 @@ const getResponseQuestionType = (obj, questionData = null) => (
  *  – always lower-cases the questionId
  *  – strips characters that are invalid in an HTML id
  */
-const getQuestionCardDomId = (questionId = '') =>
+const getQuestionCardDomId = (questionId: any = '') =>
   `questionCard-${questionId.toLowerCase()}`;
 
-class SurveyResults extends Component {
-  constructor(props) {
+class SurveyResults extends Component<any, any> {
+  [key: string]: any;
+
+  constructor(props: any) {
     super(props);
 
     const initialSlug = resolveSurveyResultsExplicitSessionSlug(props) ?? '';
@@ -912,14 +914,14 @@ class SurveyResults extends Component {
     this._bookmarkFeedbackTimer = null;
   }
 
-  handleManagedCacheUpdate = (update = {}) => {
+  handleManagedCacheUpdate: any = (update: any = {}) => {
     if (!update || update.namespace !== 'surveysCache') return;
     this._surveysCacheChangeNonce += 1;
   };
 
-  getIsSyncedForState = (stateSnapshot = this.state) => {
+  getIsSyncedForState: any = (stateSnapshot: any = this.state) => {
     const netBlock = Number(stateSnapshot?.networkLatestBlock || 0);
-    const isSourceSynced = (localBlockValue, refreshTargetBlockValue) => {
+    const isSourceSynced = (localBlockValue: any, refreshTargetBlockValue: any) => {
       const localBlock = Number(localBlockValue || 0);
       const refreshTargetBlock = Number(refreshTargetBlockValue || 0);
       if (localBlock === 0 || netBlock === 0) return false;
@@ -1003,24 +1005,24 @@ class SurveyResults extends Component {
     props = this.props,
     state = this.state,
     viewMode = state?.viewMode || props?.viewMode || 'questions',
-  } = {}) {
+  }: any = {}) {
     return resolveSurveyResultsQuestionReadScope({
       pathname: (typeof window !== 'undefined' && window.location?.pathname) || '',
       search: (typeof window !== 'undefined' && window.location?.search) || '',
       sessionSlug: props.sessionSlug,
       activeSessionSlug: props.activeSessionSlug,
       viewMode,
-      readSessionScanScope,
-      readSessionScanSlugs,
-      getAllSessionSlugs,
-    });
+      readSessionScanScope: readSessionScanScope as any,
+      readSessionScanSlugs: readSessionScanSlugs as any,
+      getAllSessionSlugs: getAllSessionSlugs as any,
+    } as any);
   }
 
   resolveQuestionReadScopeContextFor({
     props = this.props,
     state = this.state,
     viewMode = state?.viewMode || props?.viewMode || 'questions',
-  } = {}) {
+  }: any = {}) {
     return this.resolveBaseQuestionReadScopeContextFor({
       props,
       state,
@@ -1028,11 +1030,11 @@ class SurveyResults extends Component {
     });
   }
 
-  getQuestionReadScopeContext(viewMode = this.state.viewMode || this.props.viewMode || 'questions') {
+  getQuestionReadScopeContext(viewMode: any = this.state.viewMode || this.props.viewMode || 'questions') {
     return this.resolveQuestionReadScopeContextFor({ viewMode });
   }
 
-  getQuestionReadSlugs(viewMode = this.state.viewMode || this.props.viewMode || 'questions') {
+  getQuestionReadSlugs(viewMode: any = this.state.viewMode || this.props.viewMode || 'questions') {
     const scopeContext = this.getQuestionReadScopeContext(viewMode);
     const scopedSlugs = Array.isArray(scopeContext?.questionReadSlugs)
       ? scopeContext.questionReadSlugs
@@ -1040,11 +1042,11 @@ class SurveyResults extends Component {
     return scopedSlugs.length > 0 ? scopedSlugs : [this.getEffectiveSlug()];
   }
 
-  getQuestionFilterStorageKeyPrefix(viewMode = this.state.viewMode || this.props.viewMode || 'questions') {
+  getQuestionFilterStorageKeyPrefix(viewMode: any = this.state.viewMode || this.props.viewMode || 'questions') {
     return this.getQuestionReadScopeContext(viewMode).storageKeyPrefix;
   }
 
-  shouldRequireAuthoritativeQuestionScope(viewMode = this.state.viewMode || this.props.viewMode || 'questions') {
+  shouldRequireAuthoritativeQuestionScope(viewMode: any = this.state.viewMode || this.props.viewMode || 'questions') {
     if (String(viewMode || '').trim().toLowerCase() !== 'questions') return false;
     if (typeof window === 'undefined') return false;
     // Embedded one-page session results already pass an explicit pinned session slug.
@@ -1070,7 +1072,7 @@ class SurveyResults extends Component {
     props = this.props,
     state = this.state,
     viewMode = state?.viewMode || props?.viewMode || 'questions',
-  } = {}) {
+  }: any = {}) {
     const scopeContext = this.resolveQuestionReadScopeContextFor({ props, state, viewMode });
     return [
       String(scopeContext?.baseSlug || ''),
@@ -1080,13 +1082,13 @@ class SurveyResults extends Component {
     ].join('::');
   }
 
-  getScopedQuestionNetworkDataSync(viewMode = this.state.viewMode || this.props.viewMode || 'questions') {
+  getScopedQuestionNetworkDataSync(viewMode: any = this.state.viewMode || this.props.viewMode || 'questions') {
     const netIdStr = String(this.props.network?.id ?? this.props.networkChainId ?? '');
     if (!netIdStr) return EMPTY_SCOPED_QUESTION_NETWORK_DATA;
     const questionReadSlugs = this.getQuestionReadSlugs(viewMode);
     const slugsKey = questionReadSlugs.join('|');
     const requireAuthoritativeBinding = this.shouldRequireAuthoritativeQuestionScope(viewMode);
-    const entries = questionReadSlugs.map((slug) => ({
+    const entries = questionReadSlugs.map((slug: any) => ({
       slug,
       bucket: resolveNetBucketReadOnly(
         peekCacheSync('questionsCache', slug, { clone: false }) || {},
@@ -1100,7 +1102,7 @@ class SurveyResults extends Component {
       ),
     }));
     const memo = this._scopedQuestionNetworkDataSyncMemo || {};
-    const bucketRefs = entries.map((entry) => entry.bucket);
+    const bucketRefs = entries.map((entry: any) => entry.bucket);
     const memoMatches = (
       memo.viewMode === viewMode &&
       memo.netIdStr === netIdStr &&
@@ -1108,7 +1110,7 @@ class SurveyResults extends Component {
       memo.requireAuthoritativeBinding === requireAuthoritativeBinding &&
       Array.isArray(memo.bucketRefs) &&
       memo.bucketRefs.length === bucketRefs.length &&
-      memo.bucketRefs.every((bucket, index) => bucket === bucketRefs[index])
+      memo.bucketRefs.every((bucket: any, index: any) => bucket === bucketRefs[index])
     );
     if (memoMatches) return memo.result || EMPTY_SCOPED_QUESTION_NETWORK_DATA;
 
@@ -1129,12 +1131,12 @@ class SurveyResults extends Component {
     return result;
   }
 
-  async getScopedQuestionNetworkData(viewMode = this.state.viewMode || this.props.viewMode || 'questions') {
+  async getScopedQuestionNetworkData(viewMode: any = this.state.viewMode || this.props.viewMode || 'questions') {
     const netIdStr = String(this.props.network?.id ?? this.props.networkChainId ?? '');
     if (!netIdStr) return EMPTY_SCOPED_QUESTION_NETWORK_DATA;
     const questionReadSlugs = this.getQuestionReadSlugs(viewMode);
     const requireAuthoritativeBinding = this.shouldRequireAuthoritativeQuestionScope(viewMode);
-    const entries = await Promise.all(questionReadSlugs.map(async (slug) => {
+    const entries = await Promise.all(questionReadSlugs.map(async (slug: any) => {
       let questionsCache = peekCacheSync('questionsCache', slug, { clone: false }) || {};
       if (!questionsCache || Object.keys(questionsCache).length === 0) {
         questionsCache = (await readCache('questionsCache', slug)) || {};
@@ -1155,7 +1157,7 @@ class SurveyResults extends Component {
     });
   }
 
-  appendSessionHintToSurveyPath = (pathIn = '') => {
+  appendSessionHintToSurveyPath: any = (pathIn: any = '') => {
     const path = String(pathIn || '');
     if (!path || hasExplicitSessionQueryPinInPath(path)) return path;
     const pathOnly = path.split('?')[0];
@@ -1171,7 +1173,7 @@ class SurveyResults extends Component {
     return `${path}${sep}session=${encodeURIComponent(slug)}`;
   };
 
-  getMemoizedQuestionFilterQuestions(networkQuestionsById = {}) {
+  getMemoizedQuestionFilterQuestions(networkQuestionsById: any = {}) {
     const questionResponsesRef = this.state.questionResponses;
     const networkQuestionsRef = networkQuestionsById;
     const questionResponsesNonceKey = normalizeNonceKey(this.props.questionResponsesNonce);
@@ -1187,7 +1189,7 @@ class SurveyResults extends Component {
       return memo.result;
     }
 
-    const next = Object.keys(questionResponsesRef || {}).map((qId) => {
+    const next = Object.keys(questionResponsesRef || {}).map((qId: any) => {
       const lower = (qId || '').toLowerCase();
       const qData = networkQuestionsById[lower];
       return qData || { id: lower || qId, creator: '', type: '', prompt: '' };
@@ -1203,7 +1205,7 @@ class SurveyResults extends Component {
     return next;
   }
 
-  notifyFilterStateCommitted(nextFilterState) {
+  notifyFilterStateCommitted(nextFilterState: any) {
     const nextSignature = getFilterStateSignature(nextFilterState);
     if (this._lastNotifiedFilterStateSignature === nextSignature) return;
     this._lastNotifiedFilterStateSignature = nextSignature;
@@ -1215,7 +1217,7 @@ class SurveyResults extends Component {
     }
   }
 
-  commitResultsFilterState(statePatch, nextFilterState) {
+  commitResultsFilterState(statePatch: any, nextFilterState: any) {
     const patch = (statePatch && typeof statePatch === 'object') ? statePatch : {};
     const normalizedFilterState =
       nextFilterState && typeof nextFilterState === 'object'
@@ -1225,7 +1227,7 @@ class SurveyResults extends Component {
       this.state.filterState,
       normalizedFilterState
     );
-    const patchChanged = Object.keys(patch).some((key) => (
+    const patchChanged = Object.keys(patch).some((key: any) => (
       !areValuesEquivalentBySignature(this.state[key], patch[key])
     ));
     if (!filterStateChanged && !patchChanged) return;
@@ -1238,7 +1240,7 @@ class SurveyResults extends Component {
     );
   }
 
-  requestFetchResponses = () => {
+  requestFetchResponses: any = () => {
     if (!this._isMounted) return;
     if (this._fetchResponsesRequestScheduled) return;
     this._fetchResponsesRequestScheduled = true;
@@ -1253,7 +1255,7 @@ class SurveyResults extends Component {
     });
   };
 
-  flushFetchResponsesRequest = async () => {
+  flushFetchResponsesRequest: any = async () => {
     if (!this._isMounted || this._fetchResponsesInFlight) return;
     this._fetchResponsesInFlight = true;
     try {
@@ -1269,7 +1271,7 @@ class SurveyResults extends Component {
     }
   };
 
-  shouldUseAnimationFrameForRefreshCoalescing = () => {
+  shouldUseAnimationFrameForRefreshCoalescing: any = () => {
     if (typeof window === 'undefined') return false;
     if (typeof window.requestAnimationFrame !== 'function') return false;
     if (this.isDocumentHidden()) return false;
@@ -1278,7 +1280,7 @@ class SurveyResults extends Component {
     return true;
   };
 
-  queueResultsRefresh = (reason = 'unknown') => {
+  queueResultsRefresh: any = (reason: any = 'unknown') => {
     if (!this._isMounted) return;
     if (reason) {
       this._queuedResultsRefreshReasons.add(String(reason));
@@ -1305,7 +1307,7 @@ class SurveyResults extends Component {
     });
   };
 
-  flushQueuedResultsRefresh = () => {
+  flushQueuedResultsRefresh: any = () => {
     if (!this._isMounted) return;
     if (this._queuedResultsRefreshReasons.size === 0) return;
     if (!this.props.isOpen) {
@@ -1318,7 +1320,7 @@ class SurveyResults extends Component {
     });
   };
 
-  updateParentWithCurrentFiltersForUrl = () => {
+  updateParentWithCurrentFiltersForUrl: any = () => {
     this.notifyFilterStateCommitted(this.state.filterState);
   }
 
@@ -1449,17 +1451,17 @@ class SurveyResults extends Component {
   }
 
 
-  componentDidUpdate(prevProps, prevState) {
-    const refreshReasons = new Set();
-    const pendingStatePatch = {};
+  componentDidUpdate(prevProps: any, prevState: any) {
+    const refreshReasons: any = new Set();
+    const pendingStatePatch: Record<string, any> = {};
     let hasPendingStatePatch = false;
-    let runPostPatchTasks = null;
+    let runPostPatchTasks: any = null;
     const clearResponseParseMemo = () => {
       if (this._responseParseMemo && typeof this._responseParseMemo.clear === 'function') {
         this._responseParseMemo.clear();
       }
     };
-    const queueStatePatch = (key, value) => {
+    const queueStatePatch = (key: any, value: any) => {
       if (this.state[key] === value) return;
       pendingStatePatch[key] = value;
       hasPendingStatePatch = true;
@@ -1638,8 +1640,8 @@ class SurveyResults extends Component {
       prevQuestionScopeSignature !== nextQuestionScopeSignature
     ) {
       clearResponseParseMemo();
-      const questionScopeResetPatch = this.buildQuestionResultsScopeResetPatch();
-      Object.keys(questionScopeResetPatch).forEach((key) => {
+      const questionScopeResetPatch: any = this.buildQuestionResultsScopeResetPatch();
+      Object.keys(questionScopeResetPatch).forEach((key: any) => {
         queueStatePatch(key, questionScopeResetPatch[key]);
       });
       refreshReasons.add('question-scope-change');
@@ -1660,7 +1662,7 @@ class SurveyResults extends Component {
 
 
   // Force-refresh handler to keep UI reactivity and progress bars current on cache updates
-  runNonceTickRefresh = async () => {
+  runNonceTickRefresh: any = async () => {
     try {
       const slug = this.getEffectiveSlug();
       const latest = await contractScripts.getLatestBlockNumber(this.props.provider, slug);
@@ -1688,7 +1690,7 @@ class SurveyResults extends Component {
     }
   };
 
-  handleNonceTick = async () => {
+  handleNonceTick: any = async () => {
     if (this._nonceTickInFlight) {
       this._nonceTickQueued = true;
       return;
@@ -1706,19 +1708,19 @@ class SurveyResults extends Component {
 
 
 
-  handleFilterActivityChange = (isActive) => {
+  handleFilterActivityChange: any = (isActive: any) => {
     if (this.state.isFilterActive === isActive) return;
     this.setState({ isFilterActive: isActive });
   };
 
-  handleClearFiltersFromParent = (e) => {
+  handleClearFiltersFromParent: any = (e: any) => {
     e.stopPropagation();
     if (this.questionFilterRef.current) {
       this.questionFilterRef.current.handleClearFilters();
     }
   };
 
-  closeModal = () => {
+  closeModal: any = () => {
     const oldPath = (typeof window !== 'undefined' && window.location && window.location.pathname) || '';
     let base = oldPath.split('/results')[0];
 
@@ -1743,11 +1745,11 @@ class SurveyResults extends Component {
   };
 
 
-  handleUrlChange = () => {
+  handleUrlChange: any = () => {
     this.handleUrlBasedView();
   };
 
-  handleUrlBasedView = () => {
+  handleUrlBasedView: any = () => {
     const path = window.location.pathname;
     let newViewMode = this.state.viewMode; // Default to current
     let newSurveyId = this.state.surveyId;  // Default to current
@@ -1779,7 +1781,7 @@ class SurveyResults extends Component {
   // -----------------------------------------
   // LOCAL STORAGE POLLING
   // -----------------------------------------
-  isDocumentHidden = () => {
+  isDocumentHidden: any = () => {
     try {
       return typeof document !== 'undefined' && document.hidden;
     } catch (_) {
@@ -1787,7 +1789,7 @@ class SurveyResults extends Component {
     }
   };
 
-  updateLocalStoragePollingState = () => {
+  updateLocalStoragePollingState: any = () => {
     if (this.props.isOpen && !this.isDocumentHidden()) {
       this.resetLocalStoragePollingBackoff('polling-state-open');
       this.startLocalStoragePolling();
@@ -1796,11 +1798,11 @@ class SurveyResults extends Component {
     }
   };
 
-  handleDocumentVisibilityChange = () => {
+  handleDocumentVisibilityChange: any = () => {
     this.updateLocalStoragePollingState();
   };
 
-  resetLocalStoragePollingBackoff = (reason = '') => {
+  resetLocalStoragePollingBackoff: any = (reason: any = '') => {
     this._localStoragePollingStableCycles = 0;
     this._localStoragePollingDelayMs = LOCAL_STORAGE_POLL_MIN_MS;
     if (reason) {
@@ -1809,7 +1811,7 @@ class SurveyResults extends Component {
     }
   };
 
-  updateLocalStoragePollingBackoff = (didObserveChange) => {
+  updateLocalStoragePollingBackoff: any = (didObserveChange: any) => {
     if (didObserveChange) {
       this.resetLocalStoragePollingBackoff();
       return;
@@ -1847,7 +1849,7 @@ class SurveyResults extends Component {
     this._localStoragePollingIntervalId = null;
   }
 
-  maybeRefreshNetworkLatestBlockFromPolling = () => {
+  maybeRefreshNetworkLatestBlockFromPolling: any = () => {
     if ((this.state.networkLatestBlock || 0) > 0) return;
     if (this._pollLatestBlockFetchInFlight) return;
     const now = Date.now();
@@ -1862,20 +1864,20 @@ class SurveyResults extends Component {
     const slug = this.getEffectiveSlug();
     contractScripts
       .getLatestBlockNumber(this.props.provider, slug)
-      .then((blk) => {
+      .then((blk: any) => {
         if (!this._isMounted) return;
         const parsed = Number(blk || 0);
         if (parsed > 0 && parsed !== Number(this.state.networkLatestBlock || 0)) {
           this.setState({ networkLatestBlock: parsed });
         }
       })
-      .catch((e) => { surveyLog.warn('SurveyResults: fallback', e); })
+      .catch((e: any) => { surveyLog.warn('SurveyResults: fallback', e); })
       .finally(() => {
         this._pollLatestBlockFetchInFlight = false;
       });
   };
 
-  getMemoizedQuestionsCountForPolling = (questionsById, options = {}) => {
+  getMemoizedQuestionsCountForPolling: any = (questionsById: any, options: any = {}) => {
     const ref = questionsById && typeof questionsById === 'object' ? questionsById : {};
     const forceScan = options && options.forceScan === true;
     const memo = this._pollQuestionCountMemo;
@@ -1893,7 +1895,7 @@ class SurveyResults extends Component {
     return nextCount;
   };
 
-  getMemoizedSurveyResponsesCountForPolling = (surveyResponsesById, surveyId, options = {}) => {
+  getMemoizedSurveyResponsesCountForPolling: any = (surveyResponsesById: any, surveyId: any, options: any = {}) => {
     const sid = String(surveyId || '').toLowerCase();
     if (!sid) {
       this._pollSurveyResponsesCountMemo = {
@@ -1953,8 +1955,8 @@ pollLocalStorageForUpdates() {
         );
 
     const questionsById = questionNetCache.questions || {};
-    let surveyNetCache = null;
-    let surveyResponsesById = {};
+    let surveyNetCache: any = null;
+    let surveyResponsesById: Record<string, any> = {};
     if (currentSurveyId) {
       const surveysCache = peekCacheSync('surveysCache', slug, { clone: false }) || {};
       surveyNetCache = resolveNetBucketReadOnly(surveysCache, netIdStr, {
@@ -2065,7 +2067,7 @@ pollLocalStorageForUpdates() {
   });
 }
 
-parseResponse = (responseData) => {
+parseResponse: any = (responseData: any) => {
 if (typeof responseData !== 'string') return responseData;
 const memo = this._responseParseMemo;
 if (memo.has(responseData)) {
@@ -2090,13 +2092,13 @@ try {
 }
 };
 
-getNetworkQuestionsForCurrentContext = () => {
+getNetworkQuestionsForCurrentContext: any = () => {
   return this.getScopedQuestionNetworkDataSync(
     this.state.viewMode || this.props.viewMode || 'questions'
   ).questions;
 };
 
-fetchResponses = async () => {
+fetchResponses: any = async () => {
 if (!this.props.network || !this.props.network.id) {
   surveyLog.error('Network ID is undefined in fetchResponses. Cannot proceed.');
   return;
@@ -2171,7 +2173,7 @@ if (this.state.viewMode === 'survey') {
       ? surveyNetCache.surveys[currentSurveyID].questionIDs
       : [];
     const questionIdsSignature = questionIDsInSurvey
-      .map((qid) => String(qid || '').toLowerCase())
+      .map((qid: any) => String(qid || '').toLowerCase())
       .join('|');
     const surveyResponsesLatestBlock = Number(
       surveyNetCache?.surveyResponsesLatestBlock?.[currentSurveyID] || 0
@@ -2206,9 +2208,9 @@ if (this.state.viewMode === 'survey') {
     this._surveyModeSourceCacheNonce = surveyCacheChangeNonce;
     this._surveyModeSourceSignature = sourceSignature;
 
-    const aggregatorMap = {};
-    const rawResponses = [];
-    allResponders.forEach((responder) => {
+    const aggregatorMap: Record<string, any> = {};
+    const rawResponses: any[] = [];
+    allResponders.forEach((responder: any) => {
       const responderLower = String(responder || '').toLowerCase();
       const rawResp = normalizeSurveyResponsePayloadByQuestionId(
         this.parseResponse(srMap[responder])
@@ -2220,7 +2222,7 @@ if (this.state.viewMode === 'survey') {
         response: rawResp,
       });
       if (!rawResp || !Array.isArray(rawResp.responses)) return;
-      rawResp.responses.forEach((ans) => {
+      rawResp.responses.forEach((ans: any) => {
         const qIdL = getSurveyResponseQuestionId(ans);
         if (!qIdL) return;
         if (!aggregatorMap[qIdL]) aggregatorMap[qIdL] = [];
@@ -2243,7 +2245,7 @@ if (this.state.viewMode === 'survey') {
 
     // Retrieve title from the correct group cache
     let foundTitle = '';
-    let foundDocURLs = [];
+    let foundDocURLs: any[] = [];
     if (surveyNetCache?.surveys?.[currentSurveyID]) {
       foundTitle = surveyNetCache.surveys[currentSurveyID].title || '';
       foundDocURLs = Array.isArray(surveyNetCache.surveys[currentSurveyID].documentURLs)
@@ -2273,15 +2275,15 @@ if (!netIdStr) return;
 const questionNetCache = await this.getScopedQuestionNetworkData('questions');
 		const allQuestions = questionNetCache?.questions || {};
 
-		const partialQR = questionNetCache?.questionResponses || {};
-	const aggregatorMap = {};
+		const partialQR: any = questionNetCache?.questionResponses || {};
+	const aggregatorMap: Record<string, any> = {};
 
-	Object.keys(partialQR).forEach((qId) => {
+	Object.keys(partialQR).forEach((qId: any) => {
 	  const lowerQ = qId.toLowerCase();
 	  aggregatorMap[lowerQ] = aggregatorMap[lowerQ] || {};
-	  const respondersMap = partialQR[qId] || {};
+		  const respondersMap: any = partialQR[qId] || {};
 
-  Object.keys(respondersMap).forEach((rAddr) => {
+  Object.keys(respondersMap).forEach((rAddr: any) => {
     const rData = respondersMap[rAddr];
     const parsed = this.parseResponse(rData);
     if (parsed) {
@@ -2347,11 +2349,11 @@ if (this.state.isFilterActive) {
 }
 
 
-generateResponsesCSV = () => {
+generateResponsesCSV: any = () => {
 const { viewMode, surveyViewMode, sbtFilteredResponses, sbtFilteredAggregatorQuestionResponses } = this.state;
 let csvContent = '';
 let header = '';
-const csvRows = [];
+const csvRows: any[] = [];
 
 if (!this.props.network || !this.props.network.id) {
   this.setState({ alertMessage: 'Network not available for fetching question data.' });
@@ -2359,14 +2361,14 @@ if (!this.props.network || !this.props.network.id) {
 }
 const networkQuestions = this.getNetworkQuestionsForCurrentContext();
 
-const formatCell = (value) => {
+const formatCell = (value: any) => {
   if (Array.isArray(value)) value = value.join(', ');
   const stringValue = String(value !== undefined && value !== null ? value : '');
   return `"${stringValue.replace(/"/g, '""')}"`;
 };
 
 // -------- timestamp helpers --------
-const normalizeTsToMs = (val) => {
+const normalizeTsToMs = (val: any) => {
   if (val == null) return NaN;
   if (typeof val === 'number') return val < 1e12 ? Math.floor(val * 1000) : val; // sec -> ms
   if (typeof val === 'string') {
@@ -2379,20 +2381,20 @@ const normalizeTsToMs = (val) => {
   }
   return NaN;
 };
-const pickTimestampMs = (primary, fallback1, fallback2) => {
+const pickTimestampMs = (primary: any, fallback1: any, fallback2: any) => {
   const candidates = [
     primary && (primary.timestamp ?? primary.timeStamp),
     primary && primary.answer && (primary.answer.timestamp ?? primary.answer.timeStamp),
     fallback1 && (fallback1.timestamp ?? fallback1.timeStamp),
     fallback2 && (fallback2.timestamp ?? fallback2.timeStamp),
-  ].filter((x) => x !== undefined && x !== null);
+  ].filter((x: any) => x !== undefined && x !== null);
   for (const c of candidates) {
     const ms = normalizeTsToMs(c);
     if (!Number.isNaN(ms)) return ms;
   }
   return -Infinity; // unknown => oldest
 };
-const formatTsForCsv = (ms) => (ms > 0 && Number.isFinite(ms) ? new Date(ms).toISOString() : '');
+const formatTsForCsv = (ms: any) => (ms > 0 && Number.isFinite(ms) ? new Date(ms).toISOString() : '');
 
 // -------- filename (prefix by mode) --------
 const tsName = new Date().toISOString().replace(/[:.]/g, '_');
@@ -2434,13 +2436,13 @@ if (viewMode === 'survey' && surveyViewMode === 'individuals') {
   header = 'responderAddress,questionID,questionPrompt,type,options,importance,answer,answerHash,additionalComments,answerEncrypted,additionalEncrypted,additionalHash,timestamp\n';
 
   // De-dupe latest per (responder|questionID)
-  const latest = new Map();
-  const passthroughRows = [];
+  const latest: any = new Map();
+  const passthroughRows: any[] = [];
 
-  (sbtFilteredResponses || []).forEach((response) => {
+  (sbtFilteredResponses || []).forEach((response: any) => {
     const parsedResponse = this.parseResponse(response.response);
     if (parsedResponse && parsedResponse.responses) {
-      parsedResponse.responses.forEach((answer) => {
+      parsedResponse.responses.forEach((answer: any) => {
         const qid = getResponseQuestionId(answer);
         const responderAddress =
           typeof response.responder === 'string'
@@ -2486,17 +2488,17 @@ if (viewMode === 'survey' && surveyViewMode === 'individuals') {
     }
   });
 
-  csvRows.push(...passthroughRows, ...Array.from(latest.values()).map(v => v.row));
+  csvRows.push(...passthroughRows, ...Array.from(latest.values()).map((v: any) => v.row));
 } else {
   // 'questions' mode or 'survey' -> 'aggregate' mode (question-centric)
   header = 'questionID,questionPrompt,type,options,responderAddress,importance,answer,answerHash,additionalComments,answerEncrypted,additionalEncrypted,additionalHash,timestamp\n';
 
   const dataToExport = sbtFilteredAggregatorQuestionResponses || {};
-  const latest = new Map();
-  const passthroughRows = [];
+  const latest: any = new Map();
+  const passthroughRows: any[] = [];
 
-  Object.values(dataToExport).forEach((responsesArray) => {
-    (responsesArray || []).forEach((respObj) => {
+  Object.values(dataToExport).forEach((responsesArray: any) => {
+    (responsesArray || []).forEach((respObj: any) => {
       const parsed = this.parseResponse(respObj.response);
       if (!parsed) return;
 
@@ -2546,14 +2548,14 @@ if (viewMode === 'survey' && surveyViewMode === 'individuals') {
     });
   });
 
-  csvRows.push(...passthroughRows, ...Array.from(latest.values()).map(v => v.row));
+  csvRows.push(...passthroughRows, ...Array.from(latest.values()).map((v: any) => v.row));
 }
 
 csvContent = header + csvRows.join('\n');
 return csvContent;
 }
 
-generateQuestionsCSV = () => {
+generateQuestionsCSV: any = () => {
 const { sbtFilteredAggregatorQuestionResponses } = this.state;
 if (!this.props.network || !this.props.network.id) {
   this.setState({ alertMessage: 'Network not available for fetching question data.' });
@@ -2562,7 +2564,7 @@ if (!this.props.network || !this.props.network.id) {
 const networkQuestions = this.getNetworkQuestionsForCurrentContext();
 
 const header = '"questionID","prompt","type","tags","options"\n';
-const csvRows = [];
+const csvRows: any[] = [];
 
 const filteredQuestionIDs = Object.keys(sbtFilteredAggregatorQuestionResponses);
 
@@ -2571,7 +2573,7 @@ if (filteredQuestionIDs.length === 0) {
   return '';
 }
 
-filteredQuestionIDs.forEach(qId => {
+filteredQuestionIDs.forEach((qId: any) => {
   const questionData = networkQuestions[qId.toLowerCase()];
   if (questionData) {
     const tags = Array.isArray(questionData.tags) ? questionData.tags.join(';') : '';
@@ -2596,7 +2598,7 @@ filteredQuestionIDs.forEach(qId => {
 return header + csvRows.join('\n');
 }
 
-downloadCSV = () => {
+downloadCSV: any = () => {
 const { exportType, viewMode, surveyId } = this.state;
 const timestamp = new Date().toISOString().replace(/[:.-]/g, '_');
 
@@ -2656,18 +2658,18 @@ a.click();
 document.body.removeChild(a);
 };
 
-handleExportTypeChange = (type) => {
+handleExportTypeChange: any = (type: any) => {
 this.setState({ exportType: type, polisReportSelected: false, alertMessage: '' });
 };
 
-scrollToPolisReport = () => {
+scrollToPolisReport: any = () => {
 const element = document.getElementById('polisReportSection');
 if (element && element.scrollIntoView) {
   element.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 };
 
-handleQuestionFilter = (filteredQuestionsOrCombined, newFilterState) => {
+handleQuestionFilter: any = (filteredQuestionsOrCombined: any, newFilterState: any) => {
   // ⛑️ Gate: don't clobber counts or bubble anything until the question cache is ready
   if (!this.props.isQuestionCacheReady) return;
 
@@ -2675,8 +2677,8 @@ handleQuestionFilter = (filteredQuestionsOrCombined, newFilterState) => {
   const isSurveyAggregate = isSurveyMode && this.state.surveyViewMode === 'aggregate';
   const isSurveyIndividuals = isSurveyMode && this.state.surveyViewMode === 'individuals';
 
-  let filteredQuestions = [];
-  let filteredResponsesByQuestion = null;
+  let filteredQuestions: any[] = [];
+  let filteredResponsesByQuestion: any = null;
   if (Array.isArray(filteredQuestionsOrCombined)) {
     filteredQuestions = filteredQuestionsOrCombined;
   } else if (
@@ -2695,7 +2697,7 @@ handleQuestionFilter = (filteredQuestionsOrCombined, newFilterState) => {
     this.props.onCountUpdate(finalFilteredQCount);
   }
 
-  const statePatch = {
+  const statePatch: any = {
     filteredQuestionsCount: finalFilteredQCount,
   };
 
@@ -2703,12 +2705,12 @@ handleQuestionFilter = (filteredQuestionsOrCombined, newFilterState) => {
     const sourceMap = isSurveyAggregate
       ? (this.state.aggregateQuestionResponses || {})
       : (this.state.aggregatorQuestionResponses || {});
-    const allowedIds = new Set(
-      filteredQuestions.map((q) => String(q?.id || '').toLowerCase())
+    const allowedIds: any = new Set(
+      filteredQuestions.map((q: any) => String(q?.id || '').toLowerCase())
     );
-    const nextFilteredAggregator = {};
+    const nextFilteredAggregator: Record<string, any> = {};
 
-    Object.keys(sourceMap).forEach((qId) => {
+    Object.keys(sourceMap).forEach((qId: any) => {
       if (!allowedIds.has(String(qId || '').toLowerCase())) return;
       if (
         filteredResponsesByQuestion &&
@@ -2725,9 +2727,9 @@ handleQuestionFilter = (filteredQuestionsOrCombined, newFilterState) => {
 
     statePatch.sbtFilteredAggregatorQuestionResponses = nextFilteredAggregator;
     if (isSurveyAggregate) {
-      const responders = new Set();
-      Object.values(nextFilteredAggregator).forEach((rows) => {
-        if (Array.isArray(rows)) rows.forEach((r) => { if (r?.responder) responders.add(r.responder.toLowerCase()); });
+      const responders: any = new Set();
+      Object.values(nextFilteredAggregator).forEach((rows: any) => {
+        if (Array.isArray(rows)) rows.forEach((r: any) => { if (r?.responder) responders.add(r.responder.toLowerCase()); });
       });
       statePatch.filteredResponsesCount = Math.min(responders.size, this.state.totalResponsesCount);
     } else {
@@ -2744,7 +2746,7 @@ handleQuestionFilter = (filteredQuestionsOrCombined, newFilterState) => {
 
 
 
-  setFilterLoading = (loading) => {
+  setFilterLoading: any = (loading: any) => {
     const nextLoading = !!loading;
     const baseline = this._pendingFilterLoadingValue != null
       ? this._pendingFilterLoadingValue
@@ -2752,7 +2754,7 @@ handleQuestionFilter = (filteredQuestionsOrCombined, newFilterState) => {
 
     if (baseline !== nextLoading) {
       this._pendingFilterLoadingValue = nextLoading;
-      this.setState((prev) => (
+      this.setState((prev: any) => (
         prev.filterLoading === nextLoading ? null : { filterLoading: nextLoading }
       ), () => {
         if (this.state.filterLoading === this._pendingFilterLoadingValue) {
@@ -2766,7 +2768,7 @@ handleQuestionFilter = (filteredQuestionsOrCombined, newFilterState) => {
     }
   };
 
-handleQuestionFilterCountUpdate = (count) => {
+handleQuestionFilterCountUpdate: any = (count: any) => {
   // ⛑️ Gate: ignore transient zero while responses/aggregators are still hydrating.
   if (!this.props.isQuestionCacheReady) return;
 
@@ -2794,7 +2796,7 @@ handleQuestionFilterCountUpdate = (count) => {
 };
 
 // SurveyResults.handleFilteredResponses(...)
-handleFilteredResponses = (filteredResponses, newSbtFilterLocalState) => {
+handleFilteredResponses: any = (filteredResponses: any, newSbtFilterLocalState: any) => {
   // ⛑️ Gate: avoid overwriting filtered maps during waiting/aborted states
   if (!this.props.isQuestionCacheReady) return;
   const nextFilterState =
@@ -2823,14 +2825,14 @@ handleFilteredResponses = (filteredResponses, newSbtFilterLocalState) => {
       // survey aggregate
       if (filteredResponses && typeof filteredResponses === 'object') {
         // 🔒 prune zero-response questions to avoid reintroducing empty keys
-        const pruned = {};
-        Object.entries(filteredResponses).forEach(([k, arr]) => {
+        const pruned: Record<string, any> = {};
+        Object.entries(filteredResponses).forEach(([k, arr]: any) => {
           if (Array.isArray(arr) && arr.length > 0) pruned[k] = arr;
         });
 
-        const responders = new Set();
-        Object.values(pruned).forEach((rows) => {
-          if (Array.isArray(rows)) rows.forEach((r) => { if (r?.responder) responders.add(r.responder.toLowerCase()); });
+        const responders: any = new Set();
+        Object.values(pruned).forEach((rows: any) => {
+          if (Array.isArray(rows)) rows.forEach((r: any) => { if (r?.responder) responders.add(r.responder.toLowerCase()); });
         });
         const finalRCount = Math.min(responders.size, this.state.totalResponsesCount);
 
@@ -2849,8 +2851,8 @@ handleFilteredResponses = (filteredResponses, newSbtFilterLocalState) => {
     // questions mode
     if (filteredResponses && typeof filteredResponses === 'object') {
       // 🔒 prune zero-response questions here as well
-      const pruned = {};
-      Object.entries(filteredResponses).forEach(([k, arr]) => {
+      const pruned: Record<string, any> = {};
+      Object.entries(filteredResponses).forEach(([k, arr]: any) => {
         if (Array.isArray(arr) && arr.length > 0) pruned[k] = arr;
       });
 
@@ -2874,8 +2876,8 @@ handleFilteredResponses = (filteredResponses, newSbtFilterLocalState) => {
 
 
 
-toggleQuestionSummary = (questionId) => {
-this.setState((prevState) => ({
+toggleQuestionSummary: any = (questionId: any) => {
+this.setState((prevState: any) => ({
   activeQuestionToggles: {
     ...prevState.activeQuestionToggles,
     [questionId]: !prevState.activeQuestionToggles[questionId]
@@ -2883,8 +2885,8 @@ this.setState((prevState) => ({
 }));
 };
 
-toggleResponse = (index) => {
-this.setState((prevState) => ({
+toggleResponse: any = (index: any) => {
+this.setState((prevState: any) => ({
   activeToggles: {
     ...prevState.activeToggles,
     [index]: !prevState.activeToggles[index]
@@ -2892,7 +2894,7 @@ this.setState((prevState) => ({
 }));
 };
 
-toggleSurveyBookmark = (surveyId) => {
+toggleSurveyBookmark: any = (surveyId: any) => {
 const slug = this.getEffectiveSlug();
 let bookmarksCache;
 const defaultCache = { surveys: [], questions: [] };
@@ -2926,13 +2928,13 @@ if (surveyIndex > -1) {
   bookmarksCache.surveys.push(surveyId);
 }
 
-void writeCache('bookmarksCache', slug, bookmarksCache).catch((error) => {
+void writeCache('bookmarksCache', slug, bookmarksCache).catch((error: any) => {
   surveyLog.error('[SurveyResults] Error saving bookmarksCache:', error);
 });
 this.setState({ bookmarkedSurveyIDs: [...bookmarksCache.surveys] });
 };
 
-toggleQuestionBookmark = (questionId) => {
+toggleQuestionBookmark: any = (questionId: any) => {
 const slug = this.getEffectiveSlug();
 let bookmarksCache;
 const defaultCache = { surveys: [], questions: [] };
@@ -2966,23 +2968,23 @@ if (questionIndex > -1) {
   bookmarksCache.questions.push(questionId);
 }
 
-void writeCache('bookmarksCache', slug, bookmarksCache).catch((error) => {
+void writeCache('bookmarksCache', slug, bookmarksCache).catch((error: any) => {
   surveyLog.error('[SurveyResults] Error saving bookmarksCache:', error);
 });
 this.setState({ bookmarkedQuestionIDs: [...bookmarksCache.questions] });
 };
 
-transformIndividualResponsesToAggregator = (individualResponses) => {
+transformIndividualResponsesToAggregator: any = (individualResponses: any) => {
   if (!individualResponses || individualResponses.length === 0) {
     return {};
   }
 
-  const aggregator = {};
+  const aggregator: Record<string, any> = {};
 
-  individualResponses.forEach(response => {
+  individualResponses.forEach((response: any) => {
     const parsedResponse = normalizeSurveyResponsePayloadByQuestionId(response.response); // Already an object
     if (parsedResponse && Array.isArray(parsedResponse.responses)) {
-      parsedResponse.responses.forEach(answerItem => {
+      parsedResponse.responses.forEach((answerItem: any) => {
         const qIdLower = getSurveyResponseQuestionId(answerItem);
         if (!qIdLower) return;
 
@@ -3003,7 +3005,7 @@ transformIndividualResponsesToAggregator = (individualResponses) => {
   return aggregator;
 }
 
-getMemoizedIndividualsAggregator = (individualResponses) => {
+getMemoizedIndividualsAggregator: any = (individualResponses: any) => {
   const responsesRef = Array.isArray(individualResponses) ? individualResponses : [];
   const memo = this._individualResponsesAggregatorMemo;
   if (memo.responsesRef === responsesRef) {
@@ -3017,7 +3019,7 @@ getMemoizedIndividualsAggregator = (individualResponses) => {
   return next;
 };
 
-getMemoizedViewableResponsesCount = (responses, questionType = '') => {
+getMemoizedViewableResponsesCount: any = (responses: any, questionType: any = '') => {
   const list = Array.isArray(responses) ? responses : [];
   const normalizedQuestionType = String(questionType || '').toLowerCase();
   const memo = this._viewableResponsesCountMemo;
@@ -3025,7 +3027,7 @@ getMemoizedViewableResponsesCount = (responses, questionType = '') => {
   if (cached && cached.questionType === normalizedQuestionType) {
     return cached.count;
   }
-  const count = this.getLatestResponsesByResponder(list).reduce((acc, row) => {
+  const count = this.getLatestResponsesByResponder(list).reduce((acc: any, row: any) => {
     const parsedResponse = row?.response;
     if (!parsedResponse || !parsedResponse.answer) {
       return acc;
@@ -3045,7 +3047,7 @@ getMemoizedViewableResponsesCount = (responses, questionType = '') => {
   return count;
 };
 
-getMemoizedAggregatorEntries = (aggregator) => {
+getMemoizedAggregatorEntries: any = (aggregator: any) => {
   const ref = (aggregator && typeof aggregator === 'object') ? aggregator : {};
   const memo = this._aggregatorEntriesMemo;
   if (memo.aggregatorRef === ref) {
@@ -3061,7 +3063,7 @@ getMemoizedAggregatorEntries = (aggregator) => {
   return entries;
 };
 
-getMemoizedPolisQuestionResponses = (polisSelected, sourceAggregator) => {
+getMemoizedPolisQuestionResponses: any = (polisSelected: any, sourceAggregator: any) => {
   if (!polisSelected) {
     this._polisQuestionResponsesMemo = {
       selected: false,
@@ -3088,7 +3090,7 @@ getMemoizedPolisQuestionResponses = (polisSelected, sourceAggregator) => {
   return result;
 };
 
-resolveSummaryQuestionType = (question = null, responses = []) => {
+resolveSummaryQuestionType: any = (question: any = null, responses: any = []) => {
   const resolvedType = String(question?.type || '').trim().toLowerCase();
   const isFreeform = resolvedType === 'freeform' || resolvedType === 'text';
   if (isFreeform) return 'freeform';
@@ -3108,10 +3110,10 @@ resolveSummaryQuestionType = (question = null, responses = []) => {
   return '';
 };
 
-getLatestResponsesByResponder = (responses = []) => {
+getLatestResponsesByResponder: any = (responses: any = []) => {
   const responseRows = Array.isArray(responses) ? responses : [];
-  const latestByResponder = new Map();
-  responseRows.forEach((row, index) => {
+  const latestByResponder: any = new Map();
+  responseRows.forEach((row: any, index: any) => {
     const responderKey = String(row?.responder || `__row_${index}`).trim().toLowerCase();
     const timestamp = getSurveyResponseAggregateTimestampMs(row?.response, row);
     const existing = latestByResponder.get(responderKey);
@@ -3123,14 +3125,14 @@ getLatestResponsesByResponder = (responses = []) => {
   return Array.from(latestByResponder.values());
 };
 
-buildFreeformSummaryModel = (responses = []) => {
+buildFreeformSummaryModel: any = (responses: any = []) => {
   const latestRows = this.getLatestResponsesByResponder(responses);
 
   let encryptedCount = 0;
   let blankCount = 0;
-  const displayedResponses = [];
+  const displayedResponses: any[] = [];
 
-  latestRows.forEach((row) => {
+  latestRows.forEach((row: any) => {
     const parsedResponse = row?.response;
     if (!parsedResponse || !parsedResponse.answer) {
       blankCount += 1;
@@ -3170,16 +3172,16 @@ buildFreeformSummaryModel = (responses = []) => {
   };
 };
 
-buildMultichoiceSummaryModel = (responses = [], question = null) => {
+buildMultichoiceSummaryModel: any = (responses: any = [], question: any = null) => {
   const latestRows = this.getLatestResponsesByResponder(responses);
-  const normalizeChoiceLabel = (choice) => {
+  const normalizeChoiceLabel = (choice: any) => {
     if (typeof choice === 'string') return choice;
     if (!choice || typeof choice !== 'object') return '';
     return choice.label ?? choice.text ?? choice.name ?? choice.value ?? '';
   };
 
-  const displayByKey = new Map();
-  const addOption = (option) => {
+  const displayByKey: any = new Map();
+  const addOption = (option: any) => {
     const label = String(normalizeChoiceLabel(option) || '').trim();
     if (!label) return;
     const key = label.toLowerCase();
@@ -3191,24 +3193,24 @@ buildMultichoiceSummaryModel = (responses = [], question = null) => {
   (Array.isArray(question?.options) ? question.options : []).forEach(addOption);
 
   if (displayByKey.size === 0) {
-    latestRows.forEach((row) => {
+    latestRows.forEach((row: any) => {
       const value = row?.response?.answer?.value;
       const items = Array.isArray(value) ? value : (value == null ? [] : [value]);
       items.forEach(addOption);
     });
   }
 
-  const countsByKey = new Map();
-  Array.from(displayByKey.keys()).forEach((key) => countsByKey.set(key, 0));
+  const countsByKey: any = new Map();
+  Array.from(displayByKey.keys()).forEach((key: any) => countsByKey.set(key, 0));
 
   let totalResponders = 0;
-  latestRows.forEach((row) => {
+  latestRows.forEach((row: any) => {
     const parsedResponse = row?.response;
     if (!parsedResponse?.answer || parsedResponse.answer.encrypted === true) return;
     const value = parsedResponse.answer.value;
     const items = Array.isArray(value) ? value : (value == null ? [] : [value]);
-    const picks = new Set();
-    items.forEach((choice) => {
+    const picks: any = new Set();
+    items.forEach((choice: any) => {
       const label = String(normalizeChoiceLabel(choice) || '').trim();
       if (!label) return;
       const key = label.toLowerCase();
@@ -3218,14 +3220,14 @@ buildMultichoiceSummaryModel = (responses = [], question = null) => {
     });
     if (picks.size === 0) return;
     totalResponders += 1;
-    picks.forEach((key) => {
+    picks.forEach((key: any) => {
       countsByKey.set(key, (countsByKey.get(key) || 0) + 1);
     });
   });
 
   return {
     totalResponders,
-    options: Array.from(displayByKey.entries()).map(([key, label]) => ({
+    options: Array.from(displayByKey.entries()).map(([key, label]: any) => ({
       key,
       label,
       count: countsByKey.get(key) || 0,
@@ -3233,7 +3235,7 @@ buildMultichoiceSummaryModel = (responses = [], question = null) => {
   };
 };
 
-renderFreeformAggregatorSummary = (responses = []) => {
+renderFreeformAggregatorSummary: any = (responses: any = []) => {
   const summary = this.buildFreeformSummaryModel(responses);
   const panelClassName = `${styles.surveyResultsAggregatorPanel} ${styles.surveyResultsAggregatorText}`;
   if (summary.totalResponses === 0 && summary.encryptedCount === 0 && summary.blankCount === 0) {
@@ -3255,7 +3257,7 @@ renderFreeformAggregatorSummary = (responses = []) => {
   return (
     <div className={panelClassName}>
       <p className={styles.surveyResultsAggregatorParagraph}>{parts.join(' ')}</p>
-      {summary.displayedResponses.map((item, index) => (
+      {summary.displayedResponses.map((item: any, index: any) => (
         <div
           key={`freeform-${item.responder || ''}-${index}`}
           className={styles.surveyResultsFreeformAnswer}
@@ -3272,7 +3274,7 @@ renderFreeformAggregatorSummary = (responses = []) => {
   );
 };
 
-renderMultichoiceAggregatorSummary = (responses = [], question = null) => {
+renderMultichoiceAggregatorSummary: any = (responses: any = [], question: any = null) => {
   const summary = this.buildMultichoiceSummaryModel(responses, question);
   const panelClassName = `${styles.surveyResultsAggregatorPanel} ${styles.surveyResultsAggregatorText}`;
   if (summary.options.length === 0) {
@@ -3298,7 +3300,7 @@ renderMultichoiceAggregatorSummary = (responses = [], question = null) => {
       <p className={styles.surveyResultsAggregatorParagraph}>
         {summary.totalResponders} total responders to this multichoice question.
       </p>
-      {summary.options.map((option) => {
+      {summary.options.map((option: any) => {
         const percent = ((option.count / summary.totalResponders) * 100).toFixed(2);
         return (
           <div
@@ -3316,7 +3318,7 @@ renderMultichoiceAggregatorSummary = (responses = [], question = null) => {
   );
 };
 
-getSurveyResultsResponseCardProps = () => ({
+getSurveyResultsResponseCardProps: any = () => ({
   containerClassName: styles.surveyResultsResponseCard,
   bodyClassName: styles.surveyResultsResponseCardBody,
   linksContainerClassName: styles.surveyResultsResponseCardLinks,
@@ -3327,23 +3329,24 @@ getSurveyResultsResponseCardProps = () => ({
   aggregatorFreeformAnswerClassName: styles.surveyResultsFreeformAnswer,
 });
 
-getDecryptLitHooks = () => {
-  if (this.props.lit && typeof this.props.lit === 'object') return this.props.lit;
-  if (this.props.litHooks && typeof this.props.litHooks === 'object') return this.props.litHooks;
-  if (typeof window === 'undefined') return null;
-  return window.__litHooks || window.litHooks || null;
-};
+	getDecryptLitHooks: any = () => {
+	  if (this.props.lit && typeof this.props.lit === 'object') return this.props.lit;
+	  if (this.props.litHooks && typeof this.props.litHooks === 'object') return this.props.litHooks;
+	  if (typeof window === 'undefined') return null;
+	  const windowWithLitHooks = window as any;
+	  return windowWithLitHooks.__litHooks || windowWithLitHooks.litHooks || null;
+	};
 
-getQuestionEncryptionGates = (question = null) => {
+getQuestionEncryptionGates: any = (question: any = null) => {
   const encryption = question?.encryption;
   if (!encryption || typeof encryption !== 'object' || encryption.enabled === false) return [];
   const list = Array.isArray(encryption.gates)
     ? encryption.gates
     : (encryption.gate && typeof encryption.gate === 'object' ? [encryption.gate] : []);
-  return list.filter((gate) => gate && typeof gate === 'object');
+  return list.filter((gate: any) => gate && typeof gate === 'object');
 };
 
-getLockedResponseKey = ({ responder = '', questionId = '', surveyId = '', response = null } = {}) => {
+getLockedResponseKey: any = ({ responder = '', questionId = '', surveyId = '', response = null }: any = {}) => {
   const responderLower = String(responder || '').trim().toLowerCase();
   const qidLower = String(questionId || response?.questionID || response?.questionId || '').trim().toLowerCase();
   const surveyKey = String(surveyId || '').trim().toLowerCase();
@@ -3355,13 +3358,13 @@ getLockedResponseKey = ({ responder = '', questionId = '', surveyId = '', respon
   ].join('|');
 };
 
-getDecryptedResponseOverride = (key = '') => {
+getDecryptedResponseOverride: any = (key: any = '') => {
   if (!key) return null;
   const overrides = this.state.decryptedResponseOverrides || {};
   return overrides[key] || null;
 };
 
-applyDecryptedOverrideToResponse = ({ response = null, key = '' } = {}) => {
+applyDecryptedOverrideToResponse: any = ({ response = null, key = '' }: any = {}) => {
   if (!response || typeof response !== 'object' || !key) return response;
   const override = this.getDecryptedResponseOverride(key);
   if (!override || typeof override !== 'object') return response;
@@ -3389,7 +3392,7 @@ applyDecryptedOverrideToResponse = ({ response = null, key = '' } = {}) => {
   return changed ? next : response;
 };
 
-buildLockedGateDetails = (lockedRows = [], questionLookup = {}) => {
+buildLockedGateDetails: any = (lockedRows: any = [], questionLookup: any = {}) => {
   const rows = Array.isArray(lockedRows) ? lockedRows : [];
   if (rows.length === 0) {
     return { gateDetails: [], hasGenericGateMessage: false };
@@ -3405,8 +3408,8 @@ buildLockedGateDetails = (lockedRows = [], questionLookup = {}) => {
     baseSessionConfig?.__registry?.chainId ||
     0
   ) || null;
-  const sessionContextMemo = new Map();
-  const readSessionGateContext = (questionSlug = '') => {
+  const sessionContextMemo: any = new Map();
+  const readSessionGateContext = (questionSlug: any = '') => {
     const requestedSlug = String(questionSlug || '').trim() || baseSlug;
     if (sessionContextMemo.has(requestedSlug)) {
       return sessionContextMemo.get(requestedSlug);
@@ -3444,10 +3447,10 @@ buildLockedGateDetails = (lockedRows = [], questionLookup = {}) => {
     return nextContext;
   };
 
-  const detailsByAddress = new Map();
+  const detailsByAddress: any = new Map();
   let hasGenericGateMessage = false;
 
-  const addGate = (gate = {}, gateContext = readSessionGateContext()) => {
+  const addGate = (gate: any = {}, gateContext: any = readSessionGateContext()) => {
     const configuredGate = gateContext.configuredGateMap[
       normalizeGateText(gate?.gateId || gate?.id)
     ] || null;
@@ -3459,7 +3462,7 @@ buildLockedGateDetails = (lockedRows = [], questionLookup = {}) => {
       hasGenericGateMessage = true;
       return;
     }
-    gateEntries.forEach(({ address, label }) => {
+    gateEntries.forEach(({ address, label }: any) => {
       const key = String(address || '').toLowerCase();
       if (!key) return;
       if (detailsByAddress.has(key)) return;
@@ -3477,19 +3480,19 @@ buildLockedGateDetails = (lockedRows = [], questionLookup = {}) => {
     });
   };
 
-  rows.forEach((row) => {
+  rows.forEach((row: any) => {
     const qid = String(row?.questionId || '').trim().toLowerCase();
     const question = questionLookup?.[qid] || null;
     const gateContext = readSessionGateContext(question?.sessionSlug || baseSlug);
     const questionGates = this.getQuestionEncryptionGates(question);
     if (questionGates.length > 0) {
       const beforeSize = detailsByAddress.size;
-      questionGates.forEach((gate) => addGate(gate, gateContext));
+      questionGates.forEach((gate: any) => addGate(gate, gateContext));
       if (detailsByAddress.size > beforeSize) return;
     }
     if (Array.isArray(gateContext.defaultPolicy?.gates) && gateContext.defaultPolicy.gates.length > 0) {
       const beforeSize = detailsByAddress.size;
-      gateContext.defaultPolicy.gates.forEach((gate) => addGate(gate, gateContext));
+      gateContext.defaultPolicy.gates.forEach((gate: any) => addGate(gate, gateContext));
       if (detailsByAddress.size > beforeSize) return;
     }
     hasGenericGateMessage = true;
@@ -3501,7 +3504,7 @@ buildLockedGateDetails = (lockedRows = [], questionLookup = {}) => {
   };
 };
 
-getMemoizedLockedResponsesModel = (questionLookup = {}) => {
+getMemoizedLockedResponsesModel: any = (questionLookup: any = {}) => {
   const {
     viewMode,
     surveyViewMode,
@@ -3523,16 +3526,16 @@ getMemoizedLockedResponsesModel = (questionLookup = {}) => {
     return memo.result;
   }
 
-  const lockedRows = [];
+  const lockedRows: any[] = [];
 
   if (viewMode === 'survey' && surveyViewMode === 'individuals') {
-    (Array.isArray(sbtFilteredResponses) ? sbtFilteredResponses : []).forEach((surveyResponse) => {
+    (Array.isArray(sbtFilteredResponses) ? sbtFilteredResponses : []).forEach((surveyResponse: any) => {
       const responder = String(surveyResponse?.responder || '').trim().toLowerCase();
       const surveyId = String(surveyResponse?.surveyId || this.state.surveyId || '').trim().toLowerCase();
       const answers = Array.isArray(surveyResponse?.response?.responses)
         ? surveyResponse.response.responses
         : [];
-      answers.forEach((answerItem) => {
+      answers.forEach((answerItem: any) => {
         const questionId = String(answerItem?.questionID || answerItem?.questionId || '').trim().toLowerCase();
         if (!questionId) return;
         const key = this.getLockedResponseKey({
@@ -3562,8 +3565,8 @@ getMemoizedLockedResponsesModel = (questionLookup = {}) => {
       });
     });
   } else {
-    Object.entries(sbtFilteredAggregatorQuestionResponses || {}).forEach(([questionId, rows]) => {
-      (Array.isArray(rows) ? rows : []).forEach((row) => {
+    Object.entries(sbtFilteredAggregatorQuestionResponses || {}).forEach(([questionId, rows]: any) => {
+      (Array.isArray(rows) ? rows : []).forEach((row: any) => {
         const responder = String(row?.responder || '').trim().toLowerCase();
         const key = this.getLockedResponseKey({
           responder,
@@ -3613,7 +3616,7 @@ getMemoizedLockedResponsesModel = (questionLookup = {}) => {
   return result;
 };
 
-decryptFieldValue = async (field = null) => {
+decryptFieldValue: any = async (field: any = null) => {
   if (!field || typeof field !== 'object') return { ok: false };
   const envelope = extractEnvelopeCandidate(field);
   if (!envelope) return { ok: false };
@@ -3636,7 +3639,7 @@ decryptFieldValue = async (field = null) => {
   }
 };
 
-handleDecryptLockedResponses = async () => {
+handleDecryptLockedResponses: any = async () => {
   if (this.state.lockedResponsesDecrypting) return;
   if (!this.props.loginComplete || !this.props.account) {
     this.setState({ alertMessage: 'Login required to decrypt locked responses.' });
@@ -3721,13 +3724,13 @@ handleDecryptLockedResponses = async () => {
   });
 };
 
-toggleLockedResponseDetails = () => {
-  this.setState((prev) => ({
+toggleLockedResponseDetails: any = () => {
+  this.setState((prev: any) => ({
     lockedResponseDetailsOpen: !prev.lockedResponseDetailsOpen,
   }));
 };
 
-renderLockedResponsesToggle = (lockedModel = null) => {
+renderLockedResponsesToggle: any = (lockedModel: any = null) => {
   const lockedCount = Number(lockedModel?.lockedCount || 0);
   if (lockedCount <= 0) return null;
 
@@ -3754,7 +3757,7 @@ renderLockedResponsesToggle = (lockedModel = null) => {
   );
 };
 
-renderLockedResponsesBanner = (lockedModel = null) => {
+renderLockedResponsesBanner: any = (lockedModel: any = null) => {
   const lockedCount = Number(lockedModel?.lockedCount || 0);
   if (lockedCount <= 0) return null;
 
@@ -3801,7 +3804,7 @@ renderLockedResponsesBanner = (lockedModel = null) => {
               {`Required ${gateDetails.length === 1 ? t('sbt') : t('sbts')} for decryption`}
             </p>
             <div className={styles.lockedBannerGateList}>
-              {gateDetails.map((detail) => (
+              {gateDetails.map((detail: any) => (
                 <a
                   key={detail.address}
                   href={detail.href}
@@ -3826,7 +3829,7 @@ renderLockedResponsesBanner = (lockedModel = null) => {
 };
 
 
-renderQuestionSummary = (questionId, responses, preNetworkQuestions) => {
+renderQuestionSummary: any = (questionId: any, responses: any, preNetworkQuestions: any) => {
   const domId = getQuestionCardDomId(questionId);
   const lowerQId = questionId.toLowerCase();
 
@@ -3837,7 +3840,7 @@ renderQuestionSummary = (questionId, responses, preNetworkQuestions) => {
   }
   const question = networkQuestions[lowerQId];
   const questionPrompt = question?.prompt || `Unknown question: ${questionId}`;
-  const displayResponses = (Array.isArray(responses) ? responses : []).map((row) => {
+  const displayResponses = (Array.isArray(responses) ? responses : []).map((row: any) => {
     const key = this.getLockedResponseKey({
       responder: row?.responder,
       questionId,
@@ -3880,7 +3883,7 @@ return (
         <FontAwesomeIcon
           icon={faBookmark}
           className={styles.biggerIcon}
-          onClick={(e) => {
+          onClick={(e: any) => {
             e.stopPropagation();
             this.toggleQuestionBookmark(questionId);
           }}
@@ -3928,7 +3931,7 @@ return (
 );
 };
 
-getStableFallbackQuestion = (questionId, mode = 'summary') => {
+getStableFallbackQuestion: any = (questionId: any, mode: any = 'summary') => {
 const cacheKey = String(questionId || '');
 if (!this._stableFallbackQuestions || typeof this._stableFallbackQuestions !== 'object') {
   this._stableFallbackQuestions = {
@@ -3955,7 +3958,7 @@ bucket.set(cacheKey, fallback);
 return fallback;
 };
 
-getMemoizedQuestionTableEntries = (questionMap = {}, networkQuestions = {}) => {
+getMemoizedQuestionTableEntries: any = (questionMap: any = {}, networkQuestions: any = {}) => {
 const { questionIdSortBy, questionIdSortAsc } = this.state;
 const memo = this._questionTableEntriesMemo;
 if (
@@ -3967,7 +3970,7 @@ if (
   return memo.result;
 }
 
-const entries = Object.keys(questionMap || {}).map((qId) => {
+const entries = Object.keys(questionMap || {}).map((qId: any) => {
   const responses = questionMap[qId] || [];
   const lowerQ = qId.toLowerCase();
   const qData = networkQuestions[lowerQ] || {};
@@ -3980,7 +3983,7 @@ const entries = Object.keys(questionMap || {}).map((qId) => {
   };
 });
 
-entries.sort((a, b) => {
+entries.sort((a: any, b: any) => {
   let cmp = 0;
   if (questionIdSortBy === 'responses') {
     cmp = a.responsesCount - b.responsesCount;
@@ -4002,7 +4005,7 @@ this._questionTableEntriesMemo = {
 return entries;
 };
 
-renderQuestionIDsTable = (questionMap, preNetworkQuestions) => {
+renderQuestionIDsTable: any = (questionMap: any, preNetworkQuestions: any) => {
 if (!this.props.network || !this.props.network.id) return null;
 const networkQuestions = preNetworkQuestions || this.getNetworkQuestionsForCurrentContext();
 const questionEntries = this.getMemoizedQuestionTableEntries(questionMap, networkQuestions);
@@ -4037,7 +4040,7 @@ return (
         </tr>
       </thead>
       <tbody>
-        {questionEntries.map((entry) => {
+        {questionEntries.map((entry: any) => {
           const shortened = getShortenedQuestionID(entry.questionId, false);
           const bookmarked = this.state.bookmarkedQuestionIDs.includes(entry.questionId);
           return (
@@ -4069,7 +4072,7 @@ return (
                   onClick={() => {
                     // Use setState with a callback to guarantee the scroll happens after the render.
                     // This ensures the card is expanded before we attempt to scroll to it.
-                    this.setState(prevState => ({
+                    this.setState((prevState: any) => ({
                       activeQuestionToggles: {
                         ...prevState.activeQuestionToggles,
                         [entry.questionId]: true
@@ -4093,12 +4096,12 @@ return (
 };
 
 // Add this helper inside the SurveyResults class
-stringifyAggregatorResponses = (aggregatorObj) => {
-const out = {};
+stringifyAggregatorResponses: any = (aggregatorObj: any) => {
+const out: Record<string, any> = {};
 if (!aggregatorObj || typeof aggregatorObj !== 'object') return out;
-Object.keys(aggregatorObj).forEach((qId) => {
+Object.keys(aggregatorObj).forEach((qId: any) => {
   const arr = Array.isArray(aggregatorObj[qId]) ? aggregatorObj[qId] : [];
-  out[qId] = arr.map((item) => ({
+  out[qId] = arr.map((item: any) => ({
     ...item,
     response:
       typeof item.response === 'string'
@@ -4110,7 +4113,7 @@ return out;
 };
 
 
-scrollToQuestion = (questionId) => {
+scrollToQuestion: any = (questionId: any) => {
 const domId = getQuestionCardDomId(questionId);
 const cleanupScrollWatcher = () => {
   if (this._scrollToQuestionRetryTimer) {
@@ -4158,8 +4161,8 @@ this._scrollToQuestionRetryTimer = setTimeout(() => {
 }, 2000);
 };
 
-changeQuestionIdSort = (column) => {
-this.setState((prevState) => {
+changeQuestionIdSort: any = (column: any) => {
+this.setState((prevState: any) => {
   let newAsc = true;
   if (prevState.questionIdSortBy === column) {
     newAsc = !prevState.questionIdSortAsc;
@@ -4171,30 +4174,30 @@ this.setState((prevState) => {
 });
 };
 
-  toggleQuestionFilter = () => {
-this.setState((prevState) => ({ showQuestionFilter: !prevState.showQuestionFilter }));
+  toggleQuestionFilter: any = () => {
+this.setState((prevState: any) => ({ showQuestionFilter: !prevState.showQuestionFilter }));
 };
 
-toggleSurveyViewMode = (mode) => {
+toggleSurveyViewMode: any = (mode: any) => {
 this.setState({ surveyViewMode: mode });
 };
 
-handleSurveyViewModeToggle = () => {
+handleSurveyViewModeToggle: any = () => {
 this.toggleSurveyViewMode(this.state.surveyViewMode === 'individuals' ? 'aggregate' : 'individuals');
 };
 
-handleSurveyViewModeKeyDown = (event) => {
+handleSurveyViewModeKeyDown: any = (event: any) => {
 if (event.key === 'Enter' || event.key === ' ') {
   event.preventDefault();
   this.handleSurveyViewModeToggle();
 }
 };
 
-toggleExportArea = () => {
-this.setState((prevState) => ({ exportAreaOpen: !prevState.exportAreaOpen }));
+toggleExportArea: any = () => {
+this.setState((prevState: any) => ({ exportAreaOpen: !prevState.exportAreaOpen }));
 };
 
-handleManualRefresh = async () => {
+handleManualRefresh: any = async () => {
 try {
   const slug = this.getEffectiveSlug();
   const latestOnChain = await contractScripts.getLatestBlockNumber(this.props.provider, slug);
@@ -4231,7 +4234,7 @@ try {
 }
 };
 
-handleBookmarkFilter = async () => {
+handleBookmarkFilter: any = async () => {
 if (!this._isMounted) return;
 
 const filterToBookmark = this.state.filterState;
@@ -4243,7 +4246,7 @@ if (!filtersCache || typeof filtersCache !== 'object') {
 } else {
   filtersCache = { ...filtersCache };
 }
-let bookmarks = [];
+let bookmarks: any[] = [];
 try {
   const parsed = filtersCache?.bookmarkedFilters;
   if (Array.isArray(parsed)) {
@@ -4348,7 +4351,7 @@ const clampedRefreshTargetSurveyBlock =
   refreshTargetSurveyBlock > 0 ? Math.min(refreshTargetSurveyBlock, netBlock) : 0;
 
 let questionDifference = 0;
-let questionBarText = '';
+let questionBarText: any = '';
 let questionProgress = 0;
 let showQuestionSpinner = false;
 
@@ -4389,7 +4392,7 @@ if (viewMode === 'questions') {
 }
 
 let showResponseSpinner = false;
-let responseBarText = '';
+let responseBarText: any = '';
 let responseProgress = 0;
 let difference = 0;
 
@@ -4539,7 +4542,7 @@ return (
             <FontAwesomeIcon
               icon={faBookmark}
               className={styles.biggerIcon}
-              onClick={(e) => {
+              onClick={(e: any) => {
                 e.stopPropagation();
                 this.toggleSurveyBookmark(currentSurveyId);
               }}
@@ -4553,7 +4556,7 @@ return (
         )}
         {viewMode === 'survey' && Array.isArray(surveyDocumentURLs) && surveyDocumentURLs.length > 0 && (
           <div className={styles.surveyDocUrls}>
-            {surveyDocumentURLs.map((url, idx) => (
+            {surveyDocumentURLs.map((url: any, idx: any) => (
               <a
                 key={idx}
                 href={url}
@@ -4576,7 +4579,7 @@ return (
             type="button"
             className={styles.syncStatus__simple}
             onClick={() =>
-              this.setState((prevState) => ({ syncDetailsOpen: !prevState.syncDetailsOpen }))
+              this.setState((prevState: any) => ({ syncDetailsOpen: !prevState.syncDetailsOpen }))
             }
             aria-expanded={!!this.state.syncDetailsOpen}
             aria-label="Toggle sync details"
@@ -4967,7 +4970,7 @@ return (
             {sbtFilteredResponses.length === 0 && !filterLoading ? (
               <p>No results yet.</p>
             ) : (
-              sbtFilteredResponses.map((response, index) => {
+              sbtFilteredResponses.map((response: any, index: any) => {
                 const parsedResponse = response.response; // Already an object
                 const openToggle = !!this.state.activeToggles[index];
                 return (
@@ -4980,7 +4983,7 @@ return (
                         <a
                           href={`/u/${encodeURIComponent(response.responder)}`}
                           className={styles.responderLink}
-                          onClick={(e) => e.stopPropagation()}
+                          onClick={(e: any) => e.stopPropagation()}
                         >
                           {getShortenedAddress(response.responder, false)}
                         </a>
@@ -5003,7 +5006,7 @@ return (
                         {parsedResponse &&
                         parsedResponse.responses &&
                         parsedResponse.responses.length > 0 ? (
-	                          parsedResponse.responses.map((answerItem, aIndex) => {
+	                          parsedResponse.responses.map((answerItem: any, aIndex: any) => {
 	                            const questionId = getSurveyResponseQuestionId(answerItem);
 	                            const questionData = preNetworkQuestions[questionId] || this.getStableFallbackQuestion(questionId, 'individual');
                               const responseKey = this.getLockedResponseKey({
@@ -5053,7 +5056,7 @@ return (
       {viewMode === 'survey' && surveyViewMode === 'aggregate' && (
         <>
 	          <div className={styles.questionSummaries}>
-	            {surveyAggregateEntries.map(([qId, arr]) => (
+	            {surveyAggregateEntries.map(([qId, arr]: any) => (
 	              <div key={qId}>{this.renderQuestionSummary(qId, arr, preNetworkQuestions)}</div>
 	            ))}
             {surveyAggregateEntries.length === 0 &&
@@ -5064,7 +5067,7 @@ return (
 
 	      {viewMode === 'questions' && (
 	        <div className={styles.questionSummaries}>
-	          {questionModeEntries.map(([qId, arr]) => (
+	          {questionModeEntries.map(([qId, arr]: any) => (
 	            <div key={qId}>{this.renderQuestionSummary(qId, arr, preNetworkQuestions)}</div>
 	          ))}
           {questionModeEntries.length === 0 &&
@@ -5101,7 +5104,7 @@ return (
 }
 }
 
- const mapStateToProps = (state) => {
+ const mapStateToProps = (state: any) => {
    const activeSessionSlug = state?.sessionState?.activeSessionSlug || '';
    return {
      activeSessionSlug,
