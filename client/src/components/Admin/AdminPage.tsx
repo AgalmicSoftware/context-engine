@@ -50,7 +50,7 @@ import {
 import { buildSponsoredFlagFields as buildSponsoredSessionFlagFields } from '../../utilities/session/sponsoredFlags.js';
 import { toStr, normalizeSlug as _canonicalizeSlug } from '../../utilities/shared/primitives.js';
 import AudioInput from '../Shared/AudioInput/AudioInput';
-import SBTSelector from '../SBTs/SBTSelector.jsx';
+import SBTSelector from '../SBTs/SBTSelector';
 import { JsonPanel } from '../Shared/Json/JsonControls';
 import { sanitizeSessionWizardMetadataPayload } from '../Sessions/sessionWizardWriteNormalization.js';
 import CETooltip from '../Shared/CETooltip';

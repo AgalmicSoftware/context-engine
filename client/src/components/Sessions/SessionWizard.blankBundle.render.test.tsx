@@ -51,8 +51,8 @@ const buildMockSponsoredBundle = () => ({
   },
 });
 
-jest.mock('../SBTs/SBTSelector.jsx', () => () => <div data-testid="mock-wizard-sbt-selector" />);
-jest.mock('../SBTs/CreateSBTGroup.jsx', () => () => null);
+jest.mock('../SBTs/SBTSelector', () => () => <div data-testid="mock-wizard-sbt-selector" />);
+jest.mock('../SBTs/CreateSBTGroup', () => () => null);
 jest.mock('../Gates/GateMultiSelectLock', () => () => <div data-testid="mock-wizard-gate-lock" />);
 jest.mock('../Shared/Json/JsonControls', () => ({
   JsonToggleButton: () => null,

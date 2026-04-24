@@ -91,7 +91,7 @@ jest.mock('../../utilities/crypto/litProtocol.js', () => ({
 }));
 
 jest.mock('../Shared/AudioInput/AudioInput', () => () => <div data-testid="mock-admin-audio-input" />);
-jest.mock('../SBTs/SBTSelector.jsx', () => () => <div data-testid="mock-admin-sbt-selector" />);
+jest.mock('../SBTs/SBTSelector', () => () => <div data-testid="mock-admin-sbt-selector" />);
 
 const AdminPage = require('./AdminPage').default;
 

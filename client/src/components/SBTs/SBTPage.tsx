@@ -2,537 +2,224 @@
 
 import React, { Component } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCopy, faCheck, faSpinner, faExternalLinkAlt } from '@fortawesome/free-solid-svg-icons';
+import { faQuestionCircle, faLock, faCopy, faCheck, faBookmark, faExpand, faChevronUp, faChevronDown, faUser, faSpinner, faArrowLeft, faInfinity, faTimes, faExternalLinkAlt, faInfoCircle, faCircle, faExclamationTriangle } from '@fortawesome/free-solid-svg-icons';
+import { Modal, ModalHeader, ModalBody, Alert } from 'reactstrap';
 import { ethers } from 'ethers';
 import contractScripts from '../../utilities/web3/contractScripts.js';
 import {
+  getChainLabelById,
   getDemoSessionConfigBySlug,
+  getSessionSlugByName,
   getSessionChainId,
   getSessionConfigBySlugOrDefault,
   normalizeSessionSlug,
 } from '../../utilities/web3/contractScripts.js';
 import { getChainBlockTimeMs } from '../../variables/chains.js';
-import { getShortenedAddress } from '../../utilities/ui/displayHelpers.js';
+import { getShortenedAddress, getShortenedTransactionHash } from '../../utilities/ui/displayHelpers.js';
 import styles from './SBTPage.module.scss';
+import SBTFilter from '../SBTs/SBTFilter';
+import contextEngineLoadingGif from '../../assets/img/context_engine_logo_animation.gif';
 import defaultSbtImage from '../../assets/img/ce_circuit_logo.png';
+import DocumentLibraryPanel from '../DocumentLibrary/DocumentLibraryPanel';
 
 import { cryptoUtils } from 'utilities/crypto/cryptography.js';
+import { generateBlockieDataUrl } from 'utilities/ui/blockieAvatars.js';
 import { getGlobalLitHooks, litStorage } from 'utilities/crypto/litProtocol.js';
 import { createLogger } from 'utilities/logging.js';
+import { sessionRegistryStore } from '../../utilities/web3/sessionRegistry.js';
+import { buildArweaveGatewayUrlCandidates, normalizeArweaveUrl } from '../../utilities/arweave/arweaveUrls.js';
 import { listNamespaceEntriesSync, peekCacheSync, readCache, writeCache } from '../../utilities/cache/cacheScripts.js';
 import { measureSync } from '../../utilities/ui/uiPerfStats.js';
-import { buildPublicRoute, readPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
+import { readPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
 import { notify } from '../../utilities/ui/notify.js';
-import { getSbtDisplayName } from '../../utilities/sbt/sbtDisplayNames.js';
+import {
+  getSbtDescriptionText,
+  getSbtDisplayName,
+  getSbtMaskedFieldValue,
+  isSbtFieldLocked,
+} from '../../utilities/sbt/sbtDisplayNames.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import {
   getSbtPasswordRecoveryCodes,
   upsertSbtPasswordRecoveryCodes,
 } from '../../utilities/sbt/sbtPasswordRecoveryStore.js';
+import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { isCryptoMode, sbtBasePath, sbtsListPath, t } from '../../utilities/ui/terminology.js';
-import SbtPageAdminActions from './SbtPageAdminActions';
-import {
-  renderSbtPageFullActionSurfaces,
-  type SbtPageFullActionSurfaces,
-} from './SbtPageFullActionButtons';
-import { renderSbtPageFullView, renderSbtPageFullViewLoading } from './SbtPageFullView';
-import SbtPageMiniCard from './SbtPageMiniCard';
-import SbtPageRelevantInfo from './SbtPageRelevantInfo';
-import {
-  buildSbtPageMiniCardActionHandlers,
-} from './sbtPageActionController';
-import {
-  appendSbtPageBookmark,
-  appendSbtPageTransactionHash,
-  applySbtPageHistorySummaryFallback,
-  buildSessionRoutePath,
-  buildSbtPageAddressListSignatureMemoState,
-  buildSbtPageAddressChangeResetMintUiPatch,
-  buildSbtPageAdminFallbackPatch,
-  buildSbtPageAdminInviteSuccessPatch,
-  buildSbtPageBookmarkedPatch,
-  buildSbtPageBooleanTogglePatch,
-  buildSbtPageBurnFailurePatch,
-  buildSbtPageBurnPendingPatch,
-  buildSbtPageBurnSearchInputPatch,
-  buildSbtPageBurnSearchResultPatch,
-  buildSbtPageBurnSuccessPatch,
-  buildSbtPageCachedPasswordsPatch,
-  buildSbtPageInitialState,
-  buildSbtPageHolderListSignature,
-  buildSbtPageIntervalIdPatch,
-  buildSbtPageLoadingMintersBurnersPatch,
-  buildSbtPageNetworkUpdatePatch,
-  buildSbtPageLogScanProgressPatch,
-  buildSbtPageLocalBurnSuccessPatch,
-  buildSbtPageLocalMintSuccessPatch,
-  buildSbtPageNextFilteredHolderRows,
-  buildSbtPageNetHoldersMemoState,
-  buildSbtPageLoadInfoLoadingStartPatch,
-  buildSbtPageLoadInfoRequestKey,
-  buildSbtPageAutoMintCleanPath,
-  buildSbtPageDetailsPayload,
-  buildSbtPageClaimCountdownCompletePatch,
-  buildSbtPageClaimCountdownTickPatch,
-  buildSbtPageCopiedAddressPatch,
-  buildSbtPageCopiedErrorPatch,
-  buildSbtPageDirectMetadataContext,
-  buildSbtPageDocModalContentPatch,
-  buildSbtPageDocModalErrorPatch,
-  buildSbtPageDocModalOpenPatch,
-  buildSbtPageDocModalResetPatch,
-  buildSbtPageEncryptedMetadataDecryptPlan,
-  buildSbtPageErrorPatch,
-  buildSbtPageExportFormatPatch,
-  buildSbtPageExplorerUrl,
-  buildSbtPageModalFilteredMintedUsersPatch,
-  buildSbtPageIncludePreviousPasswordsPatch,
-  buildSbtPageMiniPasswordInputPatch,
-  buildSbtPageMintedModalInitialFilterPatch,
-  buildSbtPageMintCountdownPatch,
-  buildSbtPageMintFailurePatch,
-  buildSbtPageMintedModalVisibilityPatch,
-  buildSbtPageMintPendingPatch,
-  buildSbtPageMintSuccessPatch,
-  buildSbtPageOpenMintAutoJoinUrl,
-  buildSbtPageEffectiveHolderScanProgress,
-  buildSbtPageParentSessionScanProgress,
-  buildSbtPagePasswordExportFile,
-  buildSbtPagePasswordExportRows,
-  buildSbtPagePasswordInputValuePatch,
-  buildSbtPageMintPasswordClearPatch,
-  buildSbtPageMintPasswordPrefillPatch,
-  buildSbtPagePasswordClaimStartSuccessPatch,
-  buildSbtPagePasswordGenerationCountPatch,
-  buildSbtPagePasswordMintInputPatch,
-  buildSbtPageAccountDerivedStatePatch,
-  buildSbtPagePrimaryMetadataStatePatch,
-  buildSbtPageRefreshOptions,
-  buildSbtPageRelevantInfoPatch,
-  buildSbtPageResolvedSessionSlugPatch,
-  buildSbtPageSbtInfoPatch,
-  buildSbtPageSessionSbtAddressesMemoState,
-  buildSbtPageLoadInfoStartLogContext,
-  coerceSbtPageEpochSeconds,
-  coerceSbtPageStringArrayValue,
-  computeSbtPageNetHoldersList,
-  deriveSbtPageCacheNetKey,
-  decodeSbtPageInviteInput,
-  encodeSbtPageGroupPasswordForUrl,
-  expandSbtPageAddressListFromCountMap,
-  findSbtPageCachedEntryAcrossGroups,
-  findNestedInteractiveElement,
-  generateSbtPageRandomPasswords,
-  getDisplayImageFallbackCandidateCount,
-  getErrorMessage,
-  getExplicitSbtPageSessionSlug,
-  hasSbtPageAutoMintFlag,
-  getNextDisplayImageFallbackState,
-  isActiveSbtPageScanProgress,
-  isRecord,
-  normalizeSbtPageLoadInfoOptions,
-  normalizeSbtPageHistorySummary,
-  needsSbtPageDirectMetadataHydration,
-  needsSbtPageTokenUriFields,
-  readSbtPageCacheBySlug,
-  readSbtPageQueuedOrStoredLocalStorageJson,
-  serializeSbtPageLocalStorageJsonWrite,
-  resolveSbtPageLocalStorageJsonWriteDecision,
-  resolveSbtPageSessionSlugFromInfo,
-  resolveSbtPageActiveBlockTimeMs,
-  resolveSbtPageActiveChainId,
-  resolveSbtPageAdminActionDisplayPlan,
-  resolveSbtPageAddressLinkState,
-  resolveSbtPageCopyableErrorText,
-  resolveSbtPageCopyIconState,
-  resolveSbtPageEffectiveSessionSlug,
-  resolveSbtPageFullActionDisplayPlan,
-  resolveSbtPageFullViewShellState,
-  resolveSbtPageHolderScanActive,
-  resolveSbtPageIdentityPanelDisplayState,
-  resolveSbtPageInteractiveCursorStyle,
-  resolveSbtPageLoadInfoPendingQueuePlan,
-  resolveSbtPageMetadataHydrationMode,
-  resolveSbtPageMiniCardDisplayState,
-  resolveSbtPageOwnerLookupFallbackDecision,
-  resolveSbtPageOwnerLookupTokenCount,
-  resolveSbtPagePasswordExportSelection,
-  resolveSbtPageRecoveryCacheChainId,
-  resolveSbtPageRelevantInfoDisplayState,
-  resolveSbtPageRelevantInfoLists,
-  resolveSbtPageRefreshLifecyclePlan,
-  reconcileSbtPageHolderRefreshState,
-  resolveSbtPageCacheRevisionReloadPlan,
-  resolveSbtPageCachedGroupPasswordHash,
-  resolveSbtPageChainMetadataReadNeeds,
-  resolveSbtPageGroupPasswordMintState,
-  resolveSbtPageSessionDisplayConfig,
-  resolveSbtPageSessionDisplayLabel,
-  resolveSbtPageShouldRefreshCounts,
-  resolveSbtPageUrlAutoMintIntent,
-  resolveSbtPageUserAdminStatus,
-  resolveSbtAddress,
-  resolveSbtAddressString,
-  sanitizeSbtPageMintedTokensOverride,
-  shouldRunSbtPagePropListAutoMint,
-  shouldRunSbtPagePropPasswordAutoMint,
-} from './sbtPageHelpers';
-import type {
-  ReconcileSbtPageHolderRefreshStateArgs,
-  ReconciledSbtPageHolderRefreshState,
-  SbtPageFullActionDisplayPlan,
-  SbtPageDecodedInviteInput,
-  SbtPageUrlAutoMintIntent,
-} from './sbtPageHelpers';
+import CETooltip from '../Shared/CETooltip';
 
 const sbtLog = createLogger('sbt');
 const inviteLog = createLogger('inviteDebug');
-const encodeSbtPageGroupPassword = (code: string): string => (
-  encodeSbtPageGroupPasswordForUrl(code, cryptoUtils)
+const contractScriptsUntyped = contractScripts as any;
+const getSbtPasswordRecoveryCodesUntyped = getSbtPasswordRecoveryCodes as any;
+const upsertSbtPasswordRecoveryCodesUntyped = upsertSbtPasswordRecoveryCodes as any;
+const getErrorMessage = (error: any, fallback = 'Unknown error') => (
+  error instanceof Error && error.message ? error.message : String(error?.message || error || fallback)
 );
-type SbtPageContractScripts = {
-  computeGroupPasswordHash: (input: unknown) => string;
-  getGroupPasswordHash: (...args: unknown[]) => Promise<string>;
-  getMintedTokens: (...args: unknown[]) => Promise<unknown>;
-  getOwnerByTokenId: (...args: unknown[]) => Promise<unknown>;
-  getSBTTokenIdByOwner: (...args: unknown[]) => Promise<unknown>;
-  getSbtHistorySummary: (...args: unknown[]) => Promise<unknown>;
-  getSbtMetadata: (...args: unknown[]) => Promise<Record<string, unknown> | null | undefined>;
-  isPasswordValid: (...args: unknown[]) => Promise<boolean>;
+const buildSessionRoutePath = (slugRaw: any = '', basePath: any = '') => {
+  const slug = normalizeSessionSlug(slugRaw || '');
+  const normalizedBasePath = String(basePath || '').replace(/\/+$/, '');
+  return normalizedBasePath + (slug ? `/session/${encodeURIComponent(slug)}` : '/session');
 };
-const contractScriptsUntyped = contractScripts as unknown as SbtPageContractScripts;
-type SbtPasswordRecoveryCodeLookupArgs = {
-  chainId?: unknown;
-  sbtAddress?: unknown;
+
+
+const resolveSbtAddress = (input: any) => {
+  if (Array.isArray(input)) {
+    const found = input.find((entry: any) => entry && entry.sbtAddress !== undefined);
+    return found ? found.sbtAddress : null;
+  }
+  if (input && input.sbtAddress !== undefined) return input.sbtAddress;
+  return input || null;
 };
-type SbtPasswordRecoveryUpsertArgs = {
-  chainId?: unknown;
-  sbtAddress?: unknown;
-  passwords?: unknown;
-  mode?: 'replace' | 'append' | string;
-};
-type SbtPasswordRecoveryUpsertResult = Record<string, unknown> & {
-  ok: boolean;
-  status: string;
-  key?: string;
-  passwords?: string[];
-  expiresAt?: number;
-  write?: unknown;
-};
-const getSbtPasswordRecoveryCodesTyped = getSbtPasswordRecoveryCodes as unknown as (
-  args?: SbtPasswordRecoveryCodeLookupArgs
-) => string[];
-const upsertSbtPasswordRecoveryCodesTyped = upsertSbtPasswordRecoveryCodes as unknown as (
-  args?: SbtPasswordRecoveryUpsertArgs
-) => SbtPasswordRecoveryUpsertResult;
-type QueueLocalStorageJsonWriteOptions = {
-  immediate?: boolean;
-};
-type SbtPageInviteClaimPayload = SbtPageDecodedInviteInput;
-type SbtPageInviteClaimOptions = {
-  accountLowerOverride?: unknown;
-  chainIdOverride?: unknown;
-  suppressErrors?: boolean;
-  sessionSlugOverride?: unknown;
-};
-type SbtPageGroupPasswordClaimOptions = SbtPageInviteClaimOptions & {
-  groupPasswordHashOverride?: unknown;
-};
-type SbtPageAutoMintOptions = SbtPageInviteClaimOptions & {
-  sbtInfoOverride?: unknown;
-};
-type SbtPageManualMintOptions = SbtPageInviteClaimOptions & {
-  passwordOverride?: unknown;
-  sbtAddressOverride?: unknown;
-};
-type SbtPageHandleMintOptions = SbtPageInviteClaimOptions & {
-  sbtAddressOverride?: unknown;
-  sbtInfoOverride?: unknown;
-};
-type SbtPageTransactionResult = Record<string, unknown> & {
-  transactionHash?: string;
-};
-type SbtPageInviteClaimResult =
-  | { ok: true; tx: SbtPageTransactionResult }
-  | { ok: false; error: unknown };
-type BookmarkStorageCache = {
-  sbts?: string[];
-};
-type TransactionStorageCache = Record<string, string[]>;
-type SbtAddressPropsLike = {
-  SBTAddress?: unknown;
-  loginComplete?: boolean;
-};
-type SessionSlugPropsLike = {
-  sessionSlug?: unknown;
-  slug?: unknown;
-};
-type SessionDisplayConfig = Record<string, unknown> & {
-  sessionName?: unknown;
-  blockLimits?: Record<string, unknown>;
-};
-type ScanProgressRecord = Record<string, unknown> & {
-  currentBlock?: unknown;
-  latestBlock?: unknown;
-  totalBlocks?: unknown;
-  scannedBlocks?: unknown;
-  remainingBlocks?: unknown;
-  phase?: unknown;
-};
-type BuildNextFilteredHolderRowsArgs = {
-  prevFilteredRows?: unknown;
-  prevNetHolders?: unknown;
-  nextNetHolders?: unknown;
-  replaceRows?: boolean;
-};
-type HolderRefreshStateLike = Record<string, unknown> & {
-  mintedAddresses?: unknown;
-  burnedAddresses?: unknown;
-  nextMintedAddresses?: unknown;
-  holdersMetaKey?: unknown;
-  showModal?: unknown;
-  mintingAddressesFilterInitialized?: unknown;
-  filteredMintedUsers?: unknown;
-  filteredMintedUsersSignature?: unknown;
-  countsLoaded?: unknown;
-  mintedTokensOverride?: unknown;
-  showFullImage?: unknown;
-};
-type SbtPageLoadInfoOptions = {
-  forceEventFetch: boolean;
-  preferCountsOnly: boolean;
-};
-type SbtPageNetHoldersMemo = {
-  mintedRef: unknown[] | null;
-  burnedRef: unknown[] | null;
-  mintedSignature: string;
-  burnedSignature: string;
-  result: string[];
-};
-type SbtPageAddressSignatureMemo = {
-  listRef: unknown[] | null;
-  listToken: string;
-  signature: string;
-};
-type SbtPageDisplayImageErrorArgs = {
-  sourceKey?: string;
-  activeIndex?: number;
-  candidates?: string[];
-};
-type SbtPageBurnSearchResult = Record<string, unknown> & {
-  address?: unknown;
-  tokenId?: unknown;
-};
-type SbtPagePreviousProps = Record<string, unknown> & {
-  SBTAddress?: unknown;
-  account?: unknown;
-  network?: {
-    id?: unknown;
+
+const resolveSbtChainId = (input: any) => {
+  const readChainId = (value: any) => {
+    const chainId = Number(value?.chainId || value?.chainID || 0);
+    return chainId > 0 ? chainId : null;
   };
-  sessionSlug?: unknown;
-  slug?: unknown;
+
+  if (Array.isArray(input)) {
+    const found = input.find((entry: any) => readChainId(entry));
+    return readChainId(found);
+  }
+
+  if (input && typeof input === 'object') {
+    return readChainId(input);
+  }
+
+  return null;
 };
-type SbtPageOwnerLookupScripts = {
-  getOwnerByTokenId: (
-    mode: unknown,
-    sbtAddress: unknown,
-    tokenId: unknown,
-    sessionSlug: unknown
-  ) => Promise<unknown>;
-};
-type SbtPageReadProviderScripts = {
-  getReadProviderForGroup: (
-    slug: unknown,
-    options?: unknown
-  ) => unknown;
-};
-type SbtPageMetadataInfoLike = Record<string, unknown> & {
-  admin?: unknown;
-  admin_?: unknown;
-  burnAuth?: unknown;
-  deployer?: unknown;
-  encryptedFields?: unknown;
-  encryptedImage?: unknown;
-  hasPasswordMint?: unknown;
-  image?: unknown;
-  imageEncrypted?: unknown;
-  imageLocked?: unknown;
-  maxTokens?: unknown;
-  mintingEndTime?: unknown;
-  tokenURI?: unknown;
-  tokenUri?: unknown;
-};
-type SbtPageCachedSbtEntry = Record<string, unknown> & {
-  burnedAddresses?: unknown;
-  burnedCountByAddress?: unknown;
-  burnedEventCount?: unknown;
-  blockNumber?: unknown;
-  countsLoaded?: unknown;
-  creationBlock?: unknown;
-  mintedAddresses?: unknown;
-  mintedCountByAddress?: unknown;
-  mintedEventCount?: unknown;
-  sbtInfo?: SbtPageMetadataInfoLike | null;
-  slug?: unknown;
-};
-type SbtPageCacheNetNode = Record<string, unknown> & {
-  sbtList?: Record<string, SbtPageCachedSbtEntry | null | undefined>;
-};
-type SbtPageCacheByNet = Record<string, SbtPageCacheNetNode | undefined>;
-type SbtPageCachedEntryHit = {
-  entry: SbtPageCachedSbtEntry;
-  netKey: string;
-  slug: string;
-};
-type SbtPageCacheLookupArgs = {
-  excludeSlug?: unknown;
-};
-type SbtPageDirectMetadataContext = {
-  networkChainId?: number;
-  slug?: string;
-};
-type SbtPageLitHooks = Record<string, unknown> & {
-  getKey?: (...args: unknown[]) => unknown;
-};
-type SbtPageScanProgress = Record<string, unknown>;
-type SbtPageRefreshOptions = {
-  countsOnly?: boolean;
-  forceCounts: boolean;
-  onProgress?: (progress: SbtPageScanProgress) => void;
-};
-type SbtPagePrimaryMetadataState = Record<string, unknown> & {
-  sbtInfo?: unknown;
-};
-type SbtPageInfoState = Record<string, unknown> & {
-  burnAuth?: unknown;
-  chainID?: unknown;
-  hasPasswordMint?: boolean;
-  image?: unknown;
-  maxTokens?: unknown;
-  tokenURI?: unknown;
-  tokenUri?: unknown;
-};
-type SbtPageNetworkState = Record<string, unknown> & {
-  id?: unknown;
-};
-type SbtPageState = Record<string, unknown> & {
-  adminGeneratedPasswords: string[];
-  bookmarked: boolean;
-  burnedAddresses: unknown[];
-  burningStatus: string;
-  burnSearchInput: string;
-  burnSearchResult: SbtPageBurnSearchResult | null;
-  cachedPasswords: string[];
-  claimCountdown: number;
-  countsLoaded: boolean;
-  copiedAddress: unknown;
-  copiedError?: unknown;
-  displayImageFallbackIndex?: unknown;
-  displayImageFallbackKey?: unknown;
-  docModalContent: string;
-  docModalError: string;
-  docModalLoading: boolean;
-  docModalName: string;
-  docModalOpen: boolean;
-  docModalBlobUrl: string;
-  error: React.ReactNode;
-  exportFormat: string;
-  filteredMintedUsers: unknown[];
-  groupPasswordHash: unknown;
-  groupPasswordHashLoaded: boolean;
-  groupPasswordInput: string;
-  hasGroupPasswordMint: boolean;
-  hasInviteMint: boolean;
-  includePreviousPasswords: boolean;
-  intervalId: ReturnType<typeof setInterval> | null;
-  lastBurnTxHash: string | null;
-  lastMintTxHash: string | null;
-  loadingMintedFilter: boolean;
-  loadingMintersBurners: boolean;
-  manualPasswordInput: string;
-  mintCountdown: React.ReactNode;
-  mintingStatus: string;
-  mintPassword: string;
-  mintStep: number;
-  mintedAddresses: unknown[];
-  mintedTokensOverride: unknown;
-  network: SbtPageNetworkState | null;
-  passwordGenerationCount: string | number;
-  resolvedSessionSlug: string | null;
-  sbtInfo: SbtPageInfoState | null;
-  showActions: boolean;
-  showAdminSection: boolean;
-  showDocsSection: boolean;
-  showFullImage: boolean;
-  showModal: boolean;
-  showMoreDetails: boolean;
-  showPasswordAlert: boolean;
-  showStats: boolean;
-  showMiniPasswordInput: boolean;
-  transactionHash: string | null;
-  userHasSBT: boolean;
-  userIsSbtAdmin: boolean;
-};
+
 class SBTPage extends Component<any, any> {
-  _isMounted = false;
-  hasAttemptedListMint = false; // Flag for sequential minting
-  _attemptedListMintTargetKey = '';
+  [key: string]: any;
+
+  _isMounted: any = false;
+  hasAttemptedListMint: any = false; // Flag for sequential minting
   // Per-instance guards (no background loops)
-  _metaHydrationTried: Record<string, boolean> = {};     // key: `${netId}:${addrLower}` => true
-  _eventScanTried: Record<string, boolean> = {};         // key: `${netId}:${addrLower}` => true
-  _descDecryptTried: Record<string, boolean> = {};       // key: `${netId}:${addrLower}:${account}` => true
-  _activeScanKey: string | null = null;
-  _loadSbtInfoInFlight = false;
-  _loadSbtInfoPending = false;
-  _loadSbtInfoPendingForce = false;
-  _loadSbtInfoPendingOptions: SbtPageLoadInfoOptions | null = null;
-  _latestLoadSbtInfoRequestKey = '';
-  _localStorageWriteCache: Record<string, string> = {};
-  _queuedLocalStorageWrites = new Map<string, string>();
-  _localStorageWriteTimer: ReturnType<typeof setTimeout> | null = null;
-  _netHoldersMemo: SbtPageNetHoldersMemo = {
+  _metaHydrationTried: any = {};     // key: `${netId}:${addrLower}` => true
+  _eventScanTried: any = {};         // key: `${netId}:${addrLower}` => true
+  _descDecryptTried: any = {};       // key: `${netId}:${addrLower}:${account}` => true
+  _activeScanKey: any = null;
+  _loadSbtInfoInFlight: any = false;
+  _loadSbtInfoPending: any = false;
+  _loadSbtInfoPendingForce: any = false;
+  _loadSbtInfoPendingOptions: any = null;
+  _latestLoadSbtInfoRequestKey: any = '';
+  _localStorageWriteCache: any = {};
+  _queuedLocalStorageWrites: any = new Map();
+  _localStorageWriteTimer: any = null;
+  _netHoldersMemo: any = {
     mintedRef: null,
     burnedRef: null,
     mintedSignature: '',
     burnedSignature: '',
     result: [],
   };
-  _filteredMintedUsersSignatureMemo: SbtPageAddressSignatureMemo = {
+  _filteredMintedUsersSignatureMemo: any = {
     listRef: null,
     listToken: '',
     signature: '',
   };
-  _sessionSBTAddressesKey = '';
-  _sessionSBTAddressesValue: string[] = [];
-  _decryptedImageBlobUrl = '';
-  _burnSearchTimer: ReturnType<typeof setTimeout> | null = null;
-  _activeMintPendingTargetKey = '';
+  _sessionSBTAddressesKey: any = '';
+  _sessionSBTAddressesValue: any = [];
+  _decryptedImageBlobUrl: any = '';
 
-  state: SbtPageState = buildSbtPageInitialState({ network: this.props.network }) as SbtPageState;
-
-  getRecoveryCacheChainId = (): number | null => {
-    return resolveSbtPageRecoveryCacheChainId({
-      getSessionChainId,
-      propNetwork: this.props?.network,
-      propSBTAddress: this.props?.SBTAddress,
-      sbtInfo: this.state?.sbtInfo,
-      sessionSlug: this.getEffectiveSessionSlug(),
-      stateNetwork: this.state?.network,
-    });
+  state: any = {
+    sbtInfo: null,
+    userHasSBT: false,
+    userIsSbtAdmin: false,
+    claimCountdown: 5,
+    error: null,
+    copiedAddress: null,
+    network: this.props.network,
+    bookmarked: false,
+    showModal: false,
+    showFullImage: false,
+    mintedAddresses: [],
+    burnedAddresses: [],
+    countsLoaded: false,
+    // Guards stale-while-revalidate holder preservation so we never carry counts across a different SBT/network.
+    holdersMetaKey: null,
+    mintedTokensOverride: null,
+    showStats: true,
+    showActions: true,
+    showMoreDetails: false,
+    showAdminSection: false,
+    showDocsSection: true,
+    intervalId: null,
+    loadingMintersBurners: true,
+    mintingStatus: 'idle',
+    burningStatus: 'idle',
+    mintPassword: '',
+    groupPasswordInput: '',
+    mintStep: 0,
+    relevantQuestions: [],
+    relevantDocuments: [],
+    showPasswordAlert: false,
+    mintCountdown: null,
+    transactionHash: null,
+    burnSearchInput: '',
+    burnSearchResult: null,
+    burnSearchType: null,
+    filteredMintedUsers: [],
+    filteredMintedUsersSignature: '',
+    loadingMintedFilter: false,
+    lastTransactionType: null,
+    adminInvitesToGenerate: '',
+    adminGeneratedPasswords: [],
+    manualPasswordInput: '',
+    createGroupMode: false,
+    passwordGenerationCount: '',
+    mintingAddressesFilterInitialized: false,
+    includePreviousPasswords: false,
+    exportFormat: 'json',
+    cachedPasswords: [],
+    newPasswords: [],
+    lastMintTxHash: null,
+    lastBurnTxHash: null,
+    showMiniPasswordInput: false,
+    hasGroupPasswordMint: false,
+    hasInviteMint: false,
+    groupPasswordHash: null,
+    groupPasswordHashLoaded: false,
+    docModalOpen: false,
+    docModalLoading: false,
+    docModalError: '',
+    docModalContent: '',
+    docModalName: '',
+    docModalBlobUrl: '',
+    resolvedSessionSlug: null,
+    logScanProgress: null,
+    displayImageFallbackKey: '',
+    displayImageFallbackIndex: 0,
   };
 
-  getActiveBlockTimeMs = (multiplier: unknown = 1): number => {
-    return resolveSbtPageActiveBlockTimeMs({
-      activeChainId: resolveSbtPageActiveChainId({
-        getSessionChainId,
-        propNetwork: this.props?.network,
-        sbtInfo: this.state?.sbtInfo,
-        sessionSlug: this.getEffectiveSessionSlug(),
-        stateNetwork: this.state?.network,
-      }),
-      getChainBlockTimeMs,
-      multiplier,
-    });
+  getActiveChainId: any = () => {
+    const networkChainId = Number(this.state?.network?.id || this.props?.network?.id || 0);
+    if (networkChainId > 0) return networkChainId;
+    const sbtChainId = Number(this.state?.sbtInfo?.chainID || this.state?.sbtInfo?.chainId || 0);
+    if (sbtChainId > 0) return sbtChainId;
+    const sessionChainId = Number(getSessionChainId(this.getEffectiveSessionSlug()) || 0);
+    return sessionChainId > 0 ? sessionChainId : null;
+  };
+
+  getRecoveryCacheChainId: any = () => {
+    const sbtChainId = Number(this.state?.sbtInfo?.chainID || this.state?.sbtInfo?.chainId || 0);
+    if (sbtChainId > 0) return sbtChainId;
+
+    const propChainId = resolveSbtChainId(this.props?.SBTAddress);
+    if ((propChainId ?? 0) > 0) return propChainId;
+
+    const sessionChainId = Number(getSessionChainId(this.getEffectiveSessionSlug()) || 0);
+    if (sessionChainId > 0) return sessionChainId;
+
+    const networkChainId = Number(this.state?.network?.id || this.props?.network?.id || 0);
+    return networkChainId > 0 ? networkChainId : null;
+  };
+
+  getActiveBlockTimeMs: any = (multiplier: any = 1) => {
+    const factor = Number(multiplier || 1);
+    const safeFactor = Number.isFinite(factor) && factor > 0 ? factor : 1;
+    return Math.round(getChainBlockTimeMs(this.getActiveChainId()) * safeFactor);
   };
 
   componentDidMount() {
@@ -548,22 +235,11 @@ class SBTPage extends Component<any, any> {
       this.loadCachedPasswords();
 
       // Demo/modern auto-mint (prop-driven)
-      if (shouldRunSbtPagePropPasswordAutoMint({
-        autoMintingMode: this.props.autoMintingMode,
-        mintingStatus: this.state.mintingStatus,
-        sbtInfo: this.state.sbtInfo,
-        sbtMintPassword: this.props.sbtMintPassword,
-        userHasSBT: this.state.userHasSBT,
-      })) {
+      if (this.props.autoMintingMode && typeof this.props.sbtMintPassword === 'string' && !this.state.userHasSBT && this.state.mintingStatus === 'idle' && this.state.sbtInfo) {
         this.handleMint();
       }
-      if (shouldRunSbtPagePropListAutoMint({
-        autoMintingMode: this.props.autoMintingMode,
-        hasAttemptedListMint: this.hasAttemptedListMintForCurrentTarget(),
-        loginComplete: this.props.loginComplete,
-        sbtMintPassword: this.props.sbtMintPassword,
-      })) {
-        this.markAttemptedListMintForCurrentTarget();
+      if (this.props.loginComplete && this.props.autoMintingMode && Array.isArray(this.props.sbtMintPassword) && !this.hasAttemptedListMint) {
+        this.hasAttemptedListMint = true;
         this.attemptMintWithPasswordList(this.props.sbtMintPassword);
       }
 
@@ -572,10 +248,10 @@ class SBTPage extends Component<any, any> {
       } catch (err) {
         sbtLog.warn("Error parsing auto-mint params:", err);
       }
-    })().catch((e: unknown) => sbtLog.warn('componentDidMount async error:', e));
+    })().catch((e: any) => sbtLog.warn('componentDidMount async error:', e));
   }
 
-  componentDidUpdate(prevProps: SbtPagePreviousProps): void {
+  componentDidUpdate(prevProps: any, prevState: any) {
     const { SBTAddress, network, sbtMintPassword, account, sbtCacheRevision, autoMintingMode, loginComplete } = this.props;
 
     const prevAddress = resolveSbtAddress(prevProps.SBTAddress);
@@ -584,18 +260,23 @@ class SBTPage extends Component<any, any> {
       String(prevAddress || '').toLowerCase() !== String(nextAddress || '').toLowerCase();
 
     if (sbtAddressChanged || (network?.id !== prevProps.network?.id)) {
-      this._activeMintPendingTargetKey = '';
       if (this._isMounted) {
-        const resetMintUiState = buildSbtPageAddressChangeResetMintUiPatch({
-          forceReset: network?.id !== prevProps.network?.id,
-          sbtAddressChanged,
-        });
+        const resetMintUiState = sbtAddressChanged ? {
+          showMiniPasswordInput: false,
+          mintStep: 0,
+          mintingStatus: 'idle',
+          burningStatus: 'idle',
+          manualPasswordInput: '',
+          groupPasswordInput: '',
+          mintPassword: '',
+          showPasswordAlert: false,
+          error: null
+        } : null;
 
         if (network && network.id !== this.state.network?.id) {
-          this.setState(buildSbtPageNetworkUpdatePatch({ resetMintUiState, network }), () => {
+          this.setState({ ...(resetMintUiState || {}), network: network }, () => {
             if (this._isMounted) {
               this.loadSBTInfo();
-              this.restartMintingEndCountdown();
               this.checkForMintPassword();
             }
           });
@@ -604,7 +285,6 @@ class SBTPage extends Component<any, any> {
             this.setState(resetMintUiState);
           }
           this.loadSBTInfo();
-          this.restartMintingEndCountdown();
           this.checkForMintPassword();
         }
       }
@@ -614,76 +294,50 @@ class SBTPage extends Component<any, any> {
     const prevSessionSlug = prevProps.sessionSlug ?? prevProps.slug ?? '';
     const nextSessionSlug = this.props.sessionSlug ?? this.props.slug ?? '';
     if (prevSessionSlug !== nextSessionSlug) {
-      this._activeMintPendingTargetKey = '';
-      const resetMintUiState = buildSbtPageAddressChangeResetMintUiPatch({
-        forceReset: true,
-      });
       if (nextSessionSlug) {
         if (this._isMounted) {
-          this.setState({
-            ...(resetMintUiState || {}),
-            ...buildSbtPageResolvedSessionSlugPatch({ slug: nextSessionSlug }),
-          }, () => {
-            if (this._isMounted) {
-              this.loadSBTInfo();
-              this.restartMintingEndCountdown();
-            }
+          this.setState({ resolvedSessionSlug: nextSessionSlug }, () => {
+            if (this._isMounted) this.loadSBTInfo();
           });
         } else {
           this.loadSBTInfo();
         }
-      } else if (this._isMounted) {
-        if (resetMintUiState) this.setState(resetMintUiState);
-        if (this.state.resolvedSessionSlug == null) {
-          this.loadSBTInfo();
-          this.restartMintingEndCountdown();
-        }
+      } else if (this.state.resolvedSessionSlug == null) {
+        if (this._isMounted) this.loadSBTInfo();
       }
       return;
     }
 
     if (account !== prevProps.account) {
-      this._activeMintPendingTargetKey = '';
       if (this._isMounted) {
         // Avoid briefly showing the prior account's holder-derived flags while the refresh is in-flight.
+        const nextLower = (account || '').toLowerCase();
         try {
-          const resetMintUiState = buildSbtPageAddressChangeResetMintUiPatch({
-            forceReset: true,
-          });
-          const nextPatch = buildSbtPageAccountDerivedStatePatch({ account, state: this.state });
-          const mergedPatch = {
-            ...(resetMintUiState || {}),
-            ...(nextPatch || {}),
-          };
-          if (Object.keys(mergedPatch).length > 0) this.setState(mergedPatch);
+          const minted = Array.isArray(this.state?.mintedAddresses) ? this.state.mintedAddresses : [];
+          const burned = Array.isArray(this.state?.burnedAddresses) ? this.state.burnedAddresses : [];
+          const net = this.computeNetCounts(minted, burned);
+          const nextUserHasSBT = nextLower ? ((net.get(nextLower) || 0) > 0) : false;
+          const adminAddr = this.state?.sbtInfo ? (this.state.sbtInfo.admin || this.state.sbtInfo.admin_ || '') : '';
+          const nextUserIsAdmin = nextLower && adminAddr && (nextLower === String(adminAddr).toLowerCase());
+          if (nextUserHasSBT !== this.state.userHasSBT || nextUserIsAdmin !== this.state.userIsSbtAdmin) {
+            this.setState({ userHasSBT: nextUserHasSBT, userIsSbtAdmin: nextUserIsAdmin });
+          }
         } catch (e) { sbtLog.warn('SBTPage: fallback', e); }
         this.loadSBTInfo();
-        this.restartMintingEndCountdown();
       }
       try {
-        this.handleUrlAutoMintIntent().catch((e: unknown) => {
-          const message = e instanceof Error && e.message
-            ? e.message
-            : (isRecord(e) && typeof e.message === 'string' && e.message ? e.message : 'Auto-mint failed.');
-          if (this._isMounted) this.setState(buildSbtPageMintFailurePatch({ error: message }));
+        this.handleUrlAutoMintIntent().catch((e: any) => {
+          if (this._isMounted) this.setState({ error: e?.message || 'Auto-mint failed.', mintingStatus: 'failure' });
         });
       } catch (e) { sbtLog.warn('SBTPage: fallback', e); }
       return;
     }
 
-    const cacheRevisionReloadPlan = resolveSbtPageCacheRevisionReloadPlan({
-      isMounted: this._isMounted,
-      nextSbtAddress: SBTAddress,
-      nextSbtCacheRevision: sbtCacheRevision,
-      prevSbtCacheRevision: prevProps.sbtCacheRevision,
-    });
-    if (cacheRevisionReloadPlan.cacheRevisionChanged) {
-      if (cacheRevisionReloadPlan.shouldResetMetaHydrationTried) {
-        this._metaHydrationTried = {};
-      }
-      if (cacheRevisionReloadPlan.shouldReloadSbtInfo) {
+    if (sbtCacheRevision !== prevProps.sbtCacheRevision) {
+      if (this._isMounted && SBTAddress) {
         // Re-attempt centralized meta hydration on a new cache revision; no event scan here.
-        this.loadSBTInfo(cacheRevisionReloadPlan.loadOptions);
+        this._metaHydrationTried = {};
+        this.loadSBTInfo(false);
       }
       return;
     }
@@ -693,22 +347,11 @@ class SBTPage extends Component<any, any> {
     }
 
     // Demo/modern auto-mint (prop-driven)
-    if (shouldRunSbtPagePropPasswordAutoMint({
-      autoMintingMode,
-      mintingStatus: this.state.mintingStatus,
-      sbtInfo: this.state.sbtInfo,
-      sbtMintPassword,
-      userHasSBT: this.state.userHasSBT,
-    })) {
+    if (autoMintingMode && typeof sbtMintPassword === 'string' && !this.state.userHasSBT && this.state.mintingStatus === 'idle' && this.state.sbtInfo) {
       this.handleMint();
     }
-    if (shouldRunSbtPagePropListAutoMint({
-      autoMintingMode,
-      hasAttemptedListMint: this.hasAttemptedListMintForCurrentTarget(),
-      loginComplete,
-      sbtMintPassword,
-    })) {
-      this.markAttemptedListMintForCurrentTarget();
+    if (loginComplete && autoMintingMode && Array.isArray(sbtMintPassword) && !this.hasAttemptedListMint) {
+      this.hasAttemptedListMint = true;
       this.attemptMintWithPasswordList(sbtMintPassword);
     }
   }
@@ -731,59 +374,51 @@ class SBTPage extends Component<any, any> {
     this.flushQueuedLocalStorageWrites();
   }
 
-  releaseDecryptedImageBlobUrl = (): void => {
+  releaseDecryptedImageBlobUrl: any = () => {
     const blobUrl = this._decryptedImageBlobUrl;
     if (!blobUrl || typeof URL === 'undefined') return;
-    try { URL.revokeObjectURL(blobUrl); } catch (e: unknown) { sbtLog.warn('SBTPage: cleanup', e); }
+    try { URL.revokeObjectURL(blobUrl); } catch (e) { sbtLog.warn('SBTPage: cleanup', e); }
     this._decryptedImageBlobUrl = '';
   };
 
-  flushQueuedLocalStorageWrites = (): void => {
+  flushQueuedLocalStorageWrites: any = () => {
     if (typeof localStorage === 'undefined') return;
     if (!this._queuedLocalStorageWrites || this._queuedLocalStorageWrites.size === 0) return;
-    this._queuedLocalStorageWrites.forEach((nextJson: string, key: string) => {
+    this._queuedLocalStorageWrites.forEach((nextJson: any, key: any) => {
       try {
         const cached = this._localStorageWriteCache[key];
+        if (cached === nextJson) return;
         const currentRaw = localStorage.getItem(key) || '';
-        const decision = resolveSbtPageLocalStorageJsonWriteDecision({
-          cachedJson: cached,
-          currentRaw,
-          nextJson,
-        });
-        if (decision === 'skip') return;
-        if (decision === 'adopt') {
+        if (currentRaw === nextJson) {
           this._localStorageWriteCache[key] = nextJson;
           return;
         }
         localStorage.setItem(key, nextJson);
         this._localStorageWriteCache[key] = nextJson;
-      } catch (e: unknown) { sbtLog.warn('SBTPage: fallback', e); }
+      } catch (e) { sbtLog.warn('SBTPage: fallback', e); }
     });
     this._queuedLocalStorageWrites.clear();
   };
 
-  queueLocalStorageJsonWrite = (
-    key: unknown,
-    value: unknown,
-    options: QueueLocalStorageJsonWriteOptions = {}
-  ): boolean => {
+  queueLocalStorageJsonWrite: any = (key: any, value: any, options: any = {}) => {
     if (typeof localStorage === 'undefined') return false;
-    const serialized = serializeSbtPageLocalStorageJsonWrite({ key, value });
-    if (!serialized) return false;
-    const { storageKey, nextJson } = serialized;
+    const storageKey = String(key || '');
+    if (!storageKey) return false;
+    let nextJson = '';
     try {
+      nextJson = JSON.stringify(value);
+    } catch (_) {
+      return false;
+    }
+    if (typeof nextJson !== 'string') return false;
+    try {
+      if (this._localStorageWriteCache[storageKey] === nextJson) return false;
       const currentRaw = localStorage.getItem(storageKey) || '';
-      const decision = resolveSbtPageLocalStorageJsonWriteDecision({
-        cachedJson: this._localStorageWriteCache[storageKey],
-        currentRaw,
-        nextJson,
-      });
-      if (decision === 'skip') return false;
-      if (decision === 'adopt') {
+      if (currentRaw === nextJson) {
         this._localStorageWriteCache[storageKey] = nextJson;
         return false;
       }
-    } catch (e: unknown) { sbtLog.warn('SBTPage: fallback', e); }
+    } catch (e) { sbtLog.warn('SBTPage: fallback', e); }
 
     this._queuedLocalStorageWrites.set(storageKey, nextJson);
     if (options?.immediate === true) {
@@ -798,57 +433,197 @@ class SBTPage extends Component<any, any> {
     return true;
   };
 
-  readQueuedOrStoredLocalStorageJson = <T extends Record<string, unknown>>(
-    key: unknown,
-    fallback: T
-  ): T => {
-    return readSbtPageQueuedOrStoredLocalStorageJson({
-      fallback,
-      key,
-      queuedWrites: this._queuedLocalStorageWrites,
-      storageRef: typeof localStorage !== 'undefined' ? localStorage : null,
-    });
+  readQueuedOrStoredLocalStorageJson: any = (key: any, fallback: any = {}) => {
+    if (typeof localStorage === 'undefined') return fallback;
+    const storageKey = String(key || '');
+    if (!storageKey) return fallback;
+    try {
+      const pendingRaw = this._queuedLocalStorageWrites.get(storageKey);
+      const raw = (typeof pendingRaw === 'string' ? pendingRaw : localStorage.getItem(storageKey)) || '';
+      if (!raw) return fallback;
+      const parsed = JSON.parse(raw);
+      return (parsed && typeof parsed === 'object') ? parsed : fallback;
+    } catch (_) {
+      return fallback;
+    }
   };
 
-  clearAutoMintUrlIntent = (): void => {
+  isAutoHashEnabled() {
     try {
-      const search = (typeof window !== 'undefined' && window.location.search)
-        ? window.location.search
+      const qs = (typeof window !== 'undefined' && window.location.search)
+        ? window.location.search.replace(/^\?/, '')
         : '';
-      if (hasSbtPageAutoMintFlag(search)) {
+      const qp = new URLSearchParams(qs);
+      if (qp.get('auto') === '1') return true;
+      for (const key of qp.keys()) {
+        if (/^auto\d+$/.test(key) && qp.get(key) === '1') return true;
+      }
+      return false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  clearAutoMintUrlIntent: any = () => {
+    try {
+      if (this.isAutoHashEnabled()) {
         if (typeof window !== 'undefined' && window.history && window.history.replaceState) {
-          const cleanUrl = buildSbtPageAutoMintCleanPath(window.location.href);
-          if (cleanUrl) window.history.replaceState(null, '', cleanUrl);
+          const url = new URL(window.location.href);
+          const params = url.searchParams;
+          let changed = false;
+
+          const hasAutoFlag = (() => {
+            if (params.get('auto') === '1') return true;
+            for (const k of params.keys()) {
+              if (/^auto\d+$/.test(k) && params.get(k) === '1') return true;
+            }
+            return false;
+          })();
+
+          if (hasAutoFlag) {
+            params.delete('auto');
+            params.delete('sbt');
+            params.delete('gp');
+            params.delete('inv');
+            Array.from(params.keys()).forEach((k: any) => {
+              if (/^(sbt|gp|inv|auto)\d+$/.test(k)) params.delete(k);
+            });
+            changed = true;
+          }
+
+          if (changed) {
+            const qs = params.toString();
+            const cleanUrl = url.pathname + (qs ? `?${qs}` : '');
+            window.history.replaceState(null, '', cleanUrl);
+          }
         }
       }
-    } catch (e: unknown) { sbtLog.warn('SBTPage: fallback', e); }
+    } catch (e) { sbtLog.warn('SBTPage: fallback', e); }
   };
 
-  decodeInviteInput = (raw: unknown): SbtPageDecodedInviteInput | null => (
-    decodeSbtPageInviteInput(raw, cryptoUtils.decodeInvite)
-  );
+  normalizeInviteCode: any = (raw: any) => {
+    const trimmed = String(raw || '').trim();
+    if (!trimmed) return '';
+    const lower = trimmed.toLowerCase();
+    if (lower.startsWith('inv:')) return trimmed.slice(4).trim();
+    if (lower.startsWith('invite:')) return trimmed.slice(7).trim();
+    return trimmed;
+  };
 
-  resolveUrlAutoMintIntent = (
-    searchRaw: unknown = null,
-    propsIn: SbtAddressPropsLike = this.props
-  ): SbtPageUrlAutoMintIntent | null => {
-    return resolveSbtPageUrlAutoMintIntent({
-      chainId: this.props.network?.id || this.props.networkChainId,
-      propsIn,
-      searchRaw,
-      sessionSlug: this.getEffectiveSessionSlug(),
-      sessionStorageRef: (typeof window !== 'undefined' && window.sessionStorage)
-        ? window.sessionStorage
-        : null,
-      state: this.state,
-      windowSearch: (typeof window !== 'undefined' && window.location.search)
-        ? window.location.search
-        : '',
-    }) as SbtPageUrlAutoMintIntent | null;
+  decodeInviteInput: any = (raw: any) => {
+    const normalized = this.normalizeInviteCode(raw);
+    if (!normalized) return null;
+    const payload = cryptoUtils.decodeInvite(normalized);
+    if (!payload) return null;
+    return { ...payload, inviteCode: normalized };
+  };
+
+  getCurrentSbtAddressInfo: any = (propsIn: any = this.props) => {
+    const prop = propsIn?.SBTAddress;
+    const original = Array.isArray(prop)
+      ? (prop.find((entry: any) => entry && entry.sbtAddress !== undefined)?.sbtAddress || '')
+      : ((prop && prop.sbtAddress !== undefined ? prop.sbtAddress : prop) || '');
+    return {
+      original,
+      lower: String(original || '').toLowerCase(),
+    };
+  };
+
+  collectAutoMintPairsFromSearchParams: any = (searchParams: any) => {
+    const sp = searchParams instanceof URLSearchParams ? searchParams : new URLSearchParams(searchParams || '');
+    const globalAuto = sp.get('auto') === '1';
+    const pairs: any[] = [];
+
+    if (sp.has('sbt')) {
+      pairs.push({
+        sbt: sp.get('sbt'),
+        gp: sp.get('gp'),
+        inv: sp.get('inv'),
+        auto: globalAuto,
+      });
+    }
+
+    for (const key of sp.keys()) {
+      const match = key.match(/^sbt(\d+)$/);
+      if (!match) continue;
+      const idx = match[1];
+      const sbtVal = sp.get(key);
+      if (!sbtVal) continue;
+      pairs.push({
+        sbt: sbtVal,
+        gp: sp.get(`gp${idx}`),
+        inv: sp.get(`inv${idx}`),
+        auto: globalAuto || sp.get(`auto${idx}`) === '1',
+      });
+    }
+
+    return { pairs, globalAuto };
+  };
+
+  resolveUrlAutoMintIntent: any = (searchRaw: any = null, propsIn: any = this.props) => {
+    const { original: currentSbtAddress, lower: currentSbtAddrLower } = this.getCurrentSbtAddressInfo(propsIn);
+    if (!currentSbtAddress) return null;
+
+    const qs = typeof searchRaw === 'string'
+      ? searchRaw.replace(/^\?/, '')
+      : ((typeof window !== 'undefined' && window.location.search)
+        ? window.location.search.replace(/^\?/, '')
+        : '');
+    if (!qs) return null;
+
+    const sp = new URLSearchParams(qs);
+    const { pairs, globalAuto } = this.collectAutoMintPairsFromSearchParams(sp);
+    const matchedPair = pairs.find((pair: any) => (pair.sbt || '').toLowerCase() === currentSbtAddrLower);
+
+    let targetInvite: any = null;
+    let targetPassword: any = null;
+    let shouldAutoMint = false;
+
+    if (matchedPair) {
+      targetInvite = matchedPair.inv || null;
+      targetPassword = matchedPair.gp || null;
+      shouldAutoMint = matchedPair.auto;
+    } else if (pairs.length === 0) {
+      const legacyInv = sp.get('inv');
+      const legacyGp = sp.get('gp');
+      if (legacyInv && !sp.has('sbt')) {
+        targetInvite = legacyInv;
+        shouldAutoMint = globalAuto;
+      } else if (legacyGp && !sp.has('sbt')) {
+        targetPassword = legacyGp;
+        shouldAutoMint = globalAuto;
+      } else if (globalAuto) {
+        shouldAutoMint = true;
+      }
+    }
+
+    const targetCode = targetInvite || targetPassword;
+    const autoKey = currentSbtAddrLower ? `autoMint:${currentSbtAddrLower}` : null;
+    const alreadyTried = !!(
+      autoKey &&
+      typeof window !== 'undefined' &&
+      window.sessionStorage &&
+      window.sessionStorage.getItem(autoKey) === 'done'
+    );
+
+    return {
+      currentSbtAddress,
+      targetInvite,
+      targetPassword,
+      targetCode,
+      shouldAttemptAuto: (
+        shouldAutoMint &&
+        propsIn.loginComplete &&
+        !this.state.userHasSBT &&
+        this.state.mintingStatus === 'idle' &&
+        !alreadyTried
+      ),
+      autoKey,
+    };
   };
 
   // Keep mount/update auto-mint routing centralized so query handling stays consistent.
-  handleUrlAutoMintIntent = async (propsIn: SbtAddressPropsLike = this.props): Promise<boolean> => {
+  handleUrlAutoMintIntent: any = async (propsIn: any = this.props) => {
     const intent = this.resolveUrlAutoMintIntent(null, propsIn);
     if (!intent) return false;
 
@@ -860,16 +635,9 @@ class SBTPage extends Component<any, any> {
       shouldAttemptAuto,
       autoKey,
     } = intent;
-    const markAutoMintSuccess = () => {
-      if (autoKey && typeof window !== 'undefined' && window.sessionStorage) {
-        window.sessionStorage.setItem(autoKey, 'done');
-      }
-    };
 
     if (targetCode && !shouldAttemptAuto) {
-      if (this._isMounted) this.setState(buildSbtPagePasswordInputValuePatch({
-        inputValue: targetCode,
-      }));
+      if (this._isMounted) this.setState({ groupPasswordInput: targetCode });
       return false;
     }
 
@@ -877,180 +645,291 @@ class SBTPage extends Component<any, any> {
       return false;
     }
 
-    // Regression guard: URL auto-mint must keep using the address/session captured
-    // from the original intent even if routing props change during metadata awaits.
-    const targetSlug = this.getEffectiveSessionSlug();
-    const targetAccountLower = String(this.props.account || '').trim().toLowerCase();
-    const targetChainId = this.getMintTargetChainId();
-    const isUrlAutoMintTargetCurrent = () => this.isMintTargetContextCurrent({
-      accountLower: targetAccountLower,
-      chainId: targetChainId,
-      sbtAddress: currentSbtAddress,
-      sessionSlug: targetSlug,
-    });
-
-    if (!isUrlAutoMintTargetCurrent()) return false;
-
-    if (!targetCode) {
-      const minted = await this.autoMintPublicIfAllowed(currentSbtAddress, {
-        accountLowerOverride: targetAccountLower,
-        chainIdOverride: targetChainId,
-        sessionSlugOverride: targetSlug,
-      });
-      if (minted) markAutoMintSuccess();
-      return minted;
+    if (autoKey && typeof window !== 'undefined' && window.sessionStorage) {
+      window.sessionStorage.setItem(autoKey, 'done');
     }
 
-    if (!isUrlAutoMintTargetCurrent()) return false;
-    await new Promise<void>((resolve) => {
+    if (!targetCode) {
+      await this.autoMintPublicIfAllowed(currentSbtAddress);
+      return true;
+    }
+
+    await new Promise((resolve: any) => {
       if (this._isMounted) {
-        this.setState(buildSbtPagePasswordInputValuePatch({
-          inputValue: targetCode,
-        }), resolve);
+        this.setState({ groupPasswordInput: targetCode }, resolve);
       } else {
         resolve();
       }
     });
 
     if (targetInvite) {
-      const minted = await this.claimWithInviteCode(targetInvite, currentSbtAddress, {
-        accountLowerOverride: targetAccountLower,
-        chainIdOverride: targetChainId,
-        sessionSlugOverride: targetSlug,
-      });
-      if (minted) markAutoMintSuccess();
-      return minted;
+      await this.claimWithInviteCode(targetInvite, currentSbtAddress);
+      return true;
     }
 
-    const slug = targetSlug;
-    let sbtInfo: SbtPageInfoState | null = this.state.sbtInfo;
+    const slug = this.getEffectiveSessionSlug();
+    let sbtInfo = this.state.sbtInfo;
     if (!sbtInfo || typeof sbtInfo !== 'object') {
       try {
-        sbtInfo = await contractScriptsUntyped.getSbtMetadata('none', currentSbtAddress, slug) as SbtPageInfoState | null;
+        sbtInfo = await contractScriptsUntyped.getSbtMetadata('none', currentSbtAddress, slug);
       } catch (_) {
         sbtInfo = null;
       }
-      if (!isUrlAutoMintTargetCurrent()) return false;
       if (sbtInfo && this._isMounted) {
-        this.setState(buildSbtPageSbtInfoPatch({ sbtInfo }));
+        this.setState({ sbtInfo });
       }
     }
 
-    if (!isUrlAutoMintTargetCurrent()) return false;
     if (sbtInfo?.hasPasswordMint) {
-      const minted = await this.claimWithGroupPassword(targetPassword, currentSbtAddress, {
-        accountLowerOverride: targetAccountLower,
-        chainIdOverride: targetChainId,
-        sessionSlugOverride: slug,
-      });
-      if (minted) markAutoMintSuccess();
-      return minted;
+      await this.claimWithGroupPassword(targetPassword, currentSbtAddress);
+      return true;
     }
 
     const onchainGph = await contractScriptsUntyped.getGroupPasswordHash('none', currentSbtAddress, slug);
-    if (!isUrlAutoMintTargetCurrent()) return false;
     if (onchainGph && onchainGph !== ethers.constants.HashZero) {
-      const minted = await this.mintUnlimitedWithGroupPassword({
-        accountLowerOverride: targetAccountLower,
-        chainIdOverride: targetChainId,
-        passwordOverride: targetPassword,
-        sbtAddressOverride: currentSbtAddress,
-        sessionSlugOverride: slug,
-      });
-      if (minted) markAutoMintSuccess();
-      return minted;
+      await this.mintUnlimitedWithGroupPassword();
+      return true;
     }
 
-    if (!isUrlAutoMintTargetCurrent()) return false;
     if (this._isMounted) {
-      this.setState(buildSbtPageMintFailurePatch({ error: `Invite code required for this ${t('sbt')}.` }));
+      this.setState({ error: `Invite code required for this ${t('sbt')}.`, mintingStatus: 'failure' });
     }
     return false;
   };
 
-  resolveSessionSlugFromInfo = (info: unknown): string | null => {
-    return resolveSbtPageSessionSlugFromInfo(info);
+  resolveSessionSlugFromInfo: any = (info: any) => {
+    if (info && Object.prototype.hasOwnProperty.call(info, 'sessionSlug')) {
+      const hasExplicitFlag = Object.prototype.hasOwnProperty.call(info, 'sessionSlugExplicit');
+      const isExplicitSessionSlug = info.sessionSlugExplicit === true;
+      // Authoritatively route by sessionSlug only when metadata marked it explicit.
+      if (isExplicitSessionSlug || !hasExplicitFlag) {
+        return normalizeSessionSlug(info.sessionSlug || '');
+      }
+    }
+    // Legacy fallback for historical metadata that linked by display name only.
+    const name = String(info?.sessionName || '').trim();
+    if (!name) return null;
+    return getSessionSlugByName(name);
   };
 
-  getExplicitSessionSlug = (props: SessionSlugPropsLike = this.props): string | null => {
-    return getExplicitSbtPageSessionSlug(props);
+  hasExplicitSessionSlugProp: any = (props: any = this.props) => (
+    !!props && (
+      Object.prototype.hasOwnProperty.call(props, 'sessionSlug') ||
+      Object.prototype.hasOwnProperty.call(props, 'slug')
+    )
+  );
+
+  getExplicitSessionSlug: any = (props: any = this.props) => {
+    if (!this.hasExplicitSessionSlugProp(props)) return null;
+    const raw = Object.prototype.hasOwnProperty.call(props || {}, 'sessionSlug')
+      ? props?.sessionSlug
+      : props?.slug;
+    return normalizeSessionSlug(raw || '');
   };
 
-  getEffectiveSessionSlug = (): string => {
-    return resolveSbtPageEffectiveSessionSlug({
-      props: this.props,
-      resolvedSessionSlug: this.state.resolvedSessionSlug,
-      sbtInfo: this.state.sbtInfo,
-    });
+  getEffectiveSessionSlug: any = () => {
+    const explicitSlug = this.getExplicitSessionSlug();
+    if (explicitSlug != null) return explicitSlug;
+    if (this.state.resolvedSessionSlug != null) return this.state.resolvedSessionSlug;
+    const fromInfo = this.resolveSessionSlugFromInfo(this.state.sbtInfo);
+    if (fromInfo != null) return fromInfo;
+    return this.props.sessionSlug || this.props.slug || '';
   };
 
-  getSessionDisplayConfig = (
-    sessionSlugRaw: unknown = this.getEffectiveSessionSlug()
-  ): SessionDisplayConfig | null => {
-    return resolveSbtPageSessionDisplayConfig({
-      getDemoSessionConfigBySlug,
-      getSessionConfigBySlugOrDefault,
-      sessionSlugRaw,
-    }) as SessionDisplayConfig | null;
+  getSessionDisplayConfig: any = (sessionSlugRaw: any = this.getEffectiveSessionSlug()) => {
+    const sessionSlug = normalizeSessionSlug(sessionSlugRaw || '');
+    try {
+      return (
+        getSessionConfigBySlugOrDefault(sessionSlug || '')
+        || getDemoSessionConfigBySlug(sessionSlug || '', { allowDemoFallback: true })
+        || null
+      );
+    } catch (_) {
+      return null;
+    }
   };
 
-  getSessionDisplayLabel = (sessionSlugRaw: unknown = this.getEffectiveSessionSlug()): string => {
-    return resolveSbtPageSessionDisplayLabel({
-      sessionConfig: this.getSessionDisplayConfig(sessionSlugRaw),
-      sessionSlugRaw,
-    });
+  getSessionDisplayLabel: any = (sessionSlugRaw: any = this.getEffectiveSessionSlug()) => {
+    const sessionSlug = normalizeSessionSlug(sessionSlugRaw || '');
+    const sessionConfig = this.getSessionDisplayConfig(sessionSlug);
+    const sessionName = String(sessionConfig?.sessionName || '').trim();
+    if (!sessionSlug) return sessionName || 'General';
+    return sessionName || sessionSlug;
   };
 
-  getParentSessionScanProgress = (): ScanProgressRecord | null => {
-    const progress = isRecord(this.props?.sbtScanProgress)
+  hasUsableScanProgress: any = (progress: any) => {
+    if (!progress || typeof progress !== 'object') return false;
+    const totalBlocks = Number(progress?.totalBlocks || 0);
+    const currentBlock = Number(progress?.currentBlock || 0);
+    const latestBlock = Number(progress?.latestBlock || 0);
+    const remainingBlocks = Number(progress?.remainingBlocks);
+    return (
+      (Number.isFinite(totalBlocks) && totalBlocks > 0) ||
+      (
+        Number.isFinite(currentBlock) &&
+        currentBlock >= 0 &&
+        Number.isFinite(latestBlock) &&
+        latestBlock > 0 &&
+        latestBlock >= currentBlock
+      ) ||
+      (Number.isFinite(remainingBlocks) && remainingBlocks >= 0)
+    );
+  };
+
+  isActiveScanProgress: any = (progress: any) => {
+    if (!this.hasUsableScanProgress(progress)) return false;
+    const remainingBlocks = Number(progress?.remainingBlocks);
+    if (Number.isFinite(remainingBlocks)) return remainingBlocks > 0;
+
+    const totalBlocks = Number(progress?.totalBlocks || 0);
+    const scannedBlocks = Number(progress?.scannedBlocks);
+    if (
+      Number.isFinite(totalBlocks) &&
+      totalBlocks > 0 &&
+      Number.isFinite(scannedBlocks)
+    ) {
+      return scannedBlocks < totalBlocks;
+    }
+
+    const currentBlock = Number(progress?.currentBlock || 0);
+    const latestBlock = Number(progress?.latestBlock || 0);
+    return (
+      Number.isFinite(currentBlock) &&
+      currentBlock >= 0 &&
+      Number.isFinite(latestBlock) &&
+      latestBlock > currentBlock
+    );
+  };
+
+  getParentSessionScanProgress: any = () => {
+    const progress = (this.props?.sbtScanProgress && typeof this.props.sbtScanProgress === 'object')
       ? this.props.sbtScanProgress
       : null;
     if (!progress) return null;
 
     const sessionSlug = this.getEffectiveSessionSlug();
-    return buildSbtPageParentSessionScanProgress({
-      progress,
-      sessionConfig: this.getSessionDisplayConfig(sessionSlug),
-      sessionLabel: this.getSessionDisplayLabel(sessionSlug),
-      sessionSlug,
-    }) as ScanProgressRecord | null;
-  };
+    const currentBlock = Math.max(0, Math.floor(Number(progress?.currentBlock || 0)));
+    const latestBlock = Math.max(currentBlock, Math.floor(Number(progress?.latestBlock || 0)));
+    if (!Number.isFinite(currentBlock) || !Number.isFinite(latestBlock) || latestBlock <= 0) {
+      return null;
+    }
 
-  getEffectiveHolderScanProgress = (): ScanProgressRecord | null => {
-    return buildSbtPageEffectiveHolderScanProgress({
-      getParentProgress: this.getParentSessionScanProgress,
-      getSessionLabel: () => this.getSessionDisplayLabel(),
-      getSessionSlug: this.getEffectiveSessionSlug,
-      localProgress: this.state?.logScanProgress,
-    }) as ScanProgressRecord | null;
-  };
-
-  isHolderScanActive = (): boolean => resolveSbtPageHolderScanActive({
-    hasActiveScanProgress: isActiveSbtPageScanProgress(this.getEffectiveHolderScanProgress()),
-    loadingMintersBurners: this.state.loadingMintersBurners,
-    loadingMintedFilter: this.state.loadingMintedFilter,
-    sbtScanInProgress: this.props.sbtScanInProgress,
-    sbtScanPending: this.props.sbtScanPending,
-  });
-
-  getSessionSBTAddresses = (): string[] => {
-    const sessionSlug = this.getEffectiveSessionSlug();
     const sessionConfig = this.getSessionDisplayConfig(sessionSlug);
-    const nextCache = buildSbtPageSessionSbtAddressesMemoState({
-      previousAddresses: this._sessionSBTAddressesValue,
-      previousCacheKey: this._sessionSBTAddressesKey,
-      propSBTAddress: this.props?.SBTAddress,
-      routeSbtAddress: this.props?.match?.params?.address,
-      sessionConfig,
+    const startCandidate = Math.floor(Number(sessionConfig?.blockLimits?.start || 0));
+    const hasStartBlock = Number.isFinite(startCandidate) && startCandidate > 0;
+    const startBlock = hasStartBlock ? Math.min(startCandidate, latestBlock) : 0;
+    const totalBlocks = hasStartBlock
+      ? Math.max(1, latestBlock - startBlock + 1)
+      : null;
+    const scannedBlocks = totalBlocks != null
+      ? Math.max(0, Math.min(totalBlocks, currentBlock - startBlock + 1))
+      : null;
+
+    return {
+      ...progress,
+      source: 'session',
+      phase: progress?.phase || 'activity',
+      currentBlock,
+      latestBlock,
+      fromBlock: hasStartBlock ? startBlock : undefined,
+      toBlock: latestBlock,
+      totalBlocks: totalBlocks != null ? totalBlocks : undefined,
+      scannedBlocks: scannedBlocks != null ? scannedBlocks : undefined,
+      remainingBlocks: Math.max(0, latestBlock - currentBlock),
       sessionSlug,
-      stateSbtAddress: this.state?.sbtAddress,
-    });
-    this._sessionSBTAddressesKey = nextCache.cacheKey;
-    this._sessionSBTAddressesValue = nextCache.addresses;
-    return nextCache.addresses;
+      sessionLabel: this.getSessionDisplayLabel(sessionSlug),
+    };
   };
 
-  refreshSbtDataWithSlug = (sbtAddress: unknown, options?: unknown, slugOverride: unknown = null): unknown | null => {
+  getEffectiveHolderScanProgress: any = () => {
+    const localProgress = (this.state?.logScanProgress && typeof this.state.logScanProgress === 'object')
+      ? this.state.logScanProgress
+      : null;
+    if (this.hasUsableScanProgress(localProgress)) {
+      return {
+        sessionSlug: this.getEffectiveSessionSlug(),
+        sessionLabel: this.getSessionDisplayLabel(),
+        ...localProgress,
+      };
+    }
+    const parentProgress = this.getParentSessionScanProgress();
+    if (this.hasUsableScanProgress(parentProgress)) return parentProgress;
+    return null;
+  };
+
+  isHolderScanActive: any = () => (
+    this.isActiveScanProgress(this.getEffectiveHolderScanProgress()) ||
+    this.state.loadingMintersBurners ||
+    this.state.loadingMintedFilter ||
+    this.props.sbtScanInProgress ||
+    this.props.sbtScanPending
+  );
+
+  getSbtDetailPath: any = (sbtAddress: any) => (
+    buildSbtDetailPath(sbtAddress, this.getEffectiveSessionSlug())
+  );
+
+  getSessionSBTAddresses: any = () => {
+    const pushAddress = (input: any, out: any, seen: any) => {
+      const raw = String(input || '').trim();
+      if (!raw || !ethers.utils.isAddress(raw)) return;
+      const lower = raw.toLowerCase();
+      if (seen.has(lower)) return;
+      seen.add(lower);
+      out.push(lower);
+    };
+    const listSignature = (input: any) => {
+      if (!Array.isArray(input)) return '';
+      return input
+        .map((entry: any) => String(entry || '').trim().toLowerCase())
+        .filter(Boolean)
+        .join(',');
+    };
+
+    const sessionSlug = this.getEffectiveSessionSlug();
+    let sessionConfig: any = null;
+    try {
+      sessionConfig = (
+        getSessionConfigBySlugOrDefault(sessionSlug || '')
+        || getDemoSessionConfigBySlug(sessionSlug || '', { allowDemoFallback: true })
+        || null
+      );
+    } catch (_) {
+      sessionConfig = null;
+    }
+    const sessionConfigDefaultFeaturedSignature = listSignature(sessionConfig?.defaultFeaturedSBTs);
+    const sessionConfigFeaturedListSignature = listSignature(sessionConfig?.featured_SBTs_LIST);
+    const cacheKey = [
+      String(this.state?.sbtAddress || '').trim().toLowerCase(),
+      String(this.props?.match?.params?.address || '').trim().toLowerCase(),
+      String(resolveSbtAddress(this.props?.SBTAddress) || '').trim().toLowerCase(),
+      String(sessionSlug || '').trim().toLowerCase(),
+      sessionConfigDefaultFeaturedSignature,
+      sessionConfigFeaturedListSignature,
+    ].join('|');
+    if (this._sessionSBTAddressesKey === cacheKey) {
+      return this._sessionSBTAddressesValue;
+    }
+
+    const addresses: any[] = [];
+    const seen: any = new Set();
+
+    pushAddress(this.state?.sbtAddress, addresses, seen);
+    pushAddress(this.props?.match?.params?.address, addresses, seen);
+    pushAddress(resolveSbtAddress(this.props?.SBTAddress), addresses, seen);
+
+    const fromSession = [
+      ...(Array.isArray(sessionConfig?.defaultFeaturedSBTs) ? sessionConfig.defaultFeaturedSBTs : []),
+      ...(Array.isArray(sessionConfig?.featured_SBTs_LIST) ? sessionConfig.featured_SBTs_LIST : []),
+    ];
+    fromSession.forEach((address: any) => pushAddress(address, addresses, seen));
+
+    this._sessionSBTAddressesKey = cacheKey;
+    this._sessionSBTAddressesValue = addresses;
+    return addresses;
+  };
+
+  refreshSbtDataWithSlug: any = (sbtAddress: any, options: any, slugOverride: any = null) => {
     if (!sbtAddress) return null;
     const slug = slugOverride != null ? slugOverride : this.getEffectiveSessionSlug();
     try {
@@ -1060,265 +939,52 @@ class SBTPage extends Component<any, any> {
     }
   };
 
-  isMintTargetContextCurrent = ({
-    accountLower = '',
-    chainId = null,
-    sbtAddress = '',
-    sessionSlug = null,
-  }: {
-    accountLower?: unknown;
-    chainId?: unknown;
-    sbtAddress?: unknown;
-    sessionSlug?: unknown;
-  } = {}): boolean => {
-    const targetAddress = resolveSbtAddressString(sbtAddress);
-    const currentAddress = resolveSbtAddressString(this.props.SBTAddress);
-    if (!targetAddress || !currentAddress) return false;
-    if (String(targetAddress).toLowerCase() !== String(currentAddress).toLowerCase()) return false;
-
-    if (sessionSlug != null) {
-      const targetSlug = String(sessionSlug || '');
-      const currentSlug = String(this.getEffectiveSessionSlug() || '');
-      if (targetSlug !== currentSlug) return false;
-    }
-
-    const targetAccount = String(accountLower || '').trim().toLowerCase();
-    if (targetAccount) {
-      const currentAccount = String(this.props.account || '').trim().toLowerCase();
-      if (targetAccount !== currentAccount) return false;
-    }
-
-    if (chainId != null) {
-      const targetChainId = String(chainId || '').trim();
-      const currentChainId = this.getMintTargetChainId();
-      if (!targetChainId || !currentChainId || targetChainId !== currentChainId) return false;
-    }
-
-    return true;
-  };
-
-  getMintTargetChainId = (): string => String(
-    this.props.network?.id ||
-    this.props.networkChainId ||
-    ''
-  ).trim();
-
-  buildMintTargetKey = ({
-    accountLower = '',
-    chainId = null,
-    sbtAddress = '',
-    sessionSlug = null,
-  }: {
-    accountLower?: unknown;
-    chainId?: unknown;
-    sbtAddress?: unknown;
-    sessionSlug?: unknown;
-  } = {}): string => [
-    String(accountLower || '').trim().toLowerCase(),
-    chainId == null ? '' : String(chainId || '').trim(),
-    String(resolveSbtAddressString(sbtAddress) || '').trim().toLowerCase(),
-    sessionSlug == null ? '' : String(sessionSlug || ''),
-  ].join('|');
-
-  buildListAutoMintTargetKey = (): string => this.buildMintTargetKey({
-    accountLower: String(this.props.account || '').trim().toLowerCase(),
-    chainId: this.getMintTargetChainId(),
-    sbtAddress: this.props.SBTAddress,
-    sessionSlug: this.getEffectiveSessionSlug(),
-  });
-
-  hasAttemptedListMintForCurrentTarget = (): boolean => {
-    const targetKey = this.buildListAutoMintTargetKey();
-    return !!targetKey && this.hasAttemptedListMint && this._attemptedListMintTargetKey === targetKey;
-  };
-
-  markAttemptedListMintForCurrentTarget = (): void => {
-    this._attemptedListMintTargetKey = this.buildListAutoMintTargetKey();
-    this.hasAttemptedListMint = !!this._attemptedListMintTargetKey;
-  };
-
-  setMintPendingForTarget = ({
-    accountLower = '',
-    chainId = null,
-    clearError = false,
-    sbtAddress = '',
-    sessionSlug = null,
-  }: {
-    accountLower?: unknown;
-    chainId?: unknown;
-    clearError?: unknown;
-    sbtAddress?: unknown;
-    sessionSlug?: unknown;
-  } = {}): void => {
-    this._activeMintPendingTargetKey = this.buildMintTargetKey({ accountLower, chainId, sbtAddress, sessionSlug });
-    if (this._isMounted) this.setState(buildSbtPageMintPendingPatch({ clearError }));
-  };
-
-  clearMintPendingForTarget = ({
-    accountLower = '',
-    chainId = null,
-    sbtAddress = '',
-    sessionSlug = null,
-  }: {
-    accountLower?: unknown;
-    chainId?: unknown;
-    sbtAddress?: unknown;
-    sessionSlug?: unknown;
-  } = {}): void => {
-    const targetKey = this.buildMintTargetKey({ accountLower, chainId, sbtAddress, sessionSlug });
-    if (!targetKey || this._activeMintPendingTargetKey !== targetKey) return;
-    this._activeMintPendingTargetKey = '';
-    if (this._isMounted && this.state.mintingStatus === 'pending') {
-      this.setState({ mintingStatus: 'idle' });
-    }
-  };
-
-  // Regression guard: URL auto-mint transactions can finish after the route,
-  // session, or wallet changes; only the captured target may receive local UI state.
-  completeMintSuccessForTarget = async ({
-    accountLower = '',
-    chainId = null,
-    clearManualPassword = false,
-    forceEventRefreshOnSuccess = true,
-    mintStep,
-    sbtAddress = '',
-    sessionSlug = null,
-    txHash = '',
-  }: {
-    accountLower?: unknown;
-    chainId?: unknown;
-    clearManualPassword?: boolean;
-    forceEventRefreshOnSuccess?: unknown;
-    mintStep?: number;
-    sbtAddress?: unknown;
-    sessionSlug?: unknown;
-    txHash?: unknown;
-  } = {}): Promise<void> => {
-    const txHashString = String(txHash || '');
-    const isCurrentTarget = () => this.isMintTargetContextCurrent({
-      accountLower,
-      chainId,
-      sbtAddress,
-      sessionSlug,
-    });
-
-    if (isCurrentTarget()) {
-      await this.loadSBTInfo(forceEventRefreshOnSuccess);
-    }
-
-    if (isCurrentTarget()) {
-      if (this._isMounted) {
-        this.setState(buildSbtPageMintSuccessPatch({
-          clearManualPassword,
-          mintStep,
-          txHash: txHashString,
-        }));
-      }
-      this.applyLocalMintSuccess(accountLower);
-      this.clearAutoMintUrlIntent();
-      this._activeMintPendingTargetKey = '';
-    } else {
-      this.clearMintPendingForTarget({ accountLower, chainId, sbtAddress, sessionSlug });
-    }
-
-    this.refreshSbtDataWithSlug(sbtAddress, undefined, sessionSlug);
-
-    try {
-      window.dispatchEvent(new CustomEvent('sbt-mint-success', {
-        detail: { sbtAddress, txHash: txHashString },
-      }));
-    } catch (e) { sbtLog.warn('SBTPage: telemetry', e); }
-  };
-
-  autoMintPublicIfAllowed = async (sbtAddress: unknown, options: SbtPageAutoMintOptions = {}): Promise<boolean> => {
+  autoMintPublicIfAllowed: any = async (sbtAddress: any) => {
     if (!sbtAddress) return false;
 
-    const slug = options?.sessionSlugOverride != null
-      ? String(options.sessionSlugOverride || '')
-      : this.getEffectiveSessionSlug();
-    const mintAccountLower = options?.accountLowerOverride != null
-      ? String(options.accountLowerOverride || '').trim().toLowerCase()
-      : String(this.props.account || '').trim().toLowerCase();
-    const mintChainId = options?.chainIdOverride != null
-      ? String(options.chainIdOverride || '').trim()
-      : this.getMintTargetChainId();
-    const isCurrentTarget = () => this.isMintTargetContextCurrent({
-      accountLower: mintAccountLower,
-      chainId: mintChainId,
-      sbtAddress,
-      sessionSlug: slug,
-    });
-    if (!isCurrentTarget()) return false;
-
-    const currentPropAddress = resolveSbtAddressString(this.props.SBTAddress);
-    let sbtInfo: unknown = (
-      currentPropAddress &&
-      String(currentPropAddress).toLowerCase() === String(sbtAddress).toLowerCase()
-    ) ? this.state.sbtInfo : null;
+    const slug = this.getEffectiveSessionSlug();
+    let sbtInfo = this.state.sbtInfo;
     if (!sbtInfo || typeof sbtInfo !== 'object') {
       try {
         sbtInfo = await contractScriptsUntyped.getSbtMetadata('none', sbtAddress, slug);
       } catch (_) {
         sbtInfo = null;
       }
-      if (!isCurrentTarget()) return false;
-      if (sbtInfo && this._isMounted) this.setState(buildSbtPageSbtInfoPatch({ sbtInfo }));
+      if (sbtInfo && this._isMounted) this.setState({ sbtInfo });
     }
 
     if (!sbtInfo) {
-      if (!isCurrentTarget()) return false;
-      if (this._isMounted) this.setState(buildSbtPageMintFailurePatch({ error: `Unable to load ${t('sbt')} metadata.` }));
+      if (this._isMounted) this.setState({ error: `Unable to load ${t('sbt')} metadata.`, mintingStatus: 'failure' });
       return false;
     }
 
-    const sbtInfoRecord = isRecord(sbtInfo) ? sbtInfo : {};
-    let onchainGph: unknown = null;
+    let onchainGph: any = null;
     try {
       onchainGph = await contractScriptsUntyped.getGroupPasswordHash('none', sbtAddress, slug);
     } catch (_) {
       onchainGph = null;
     }
-    if (!isCurrentTarget()) return false;
 
-    if (sbtInfoRecord.hasPasswordMint) {
-      if (this._isMounted) this.setState(buildSbtPageMintFailurePatch({ error: `Password required for this ${t('sbt')}.` }));
+    if (sbtInfo.hasPasswordMint) {
+      if (this._isMounted) this.setState({ error: `Password required for this ${t('sbt')}.`, mintingStatus: 'failure' });
       return false;
     }
     if (onchainGph && onchainGph !== ethers.constants.HashZero) {
-      if (this._isMounted) this.setState(buildSbtPageMintFailurePatch({ error: `Group password required for this ${t('sbt')}.` }));
+      if (this._isMounted) this.setState({ error: `Group password required for this ${t('sbt')}.`, mintingStatus: 'failure' });
       return false;
     }
 
-    return await this.handleMint(true, {
-      accountLowerOverride: options?.accountLowerOverride,
-      chainIdOverride: mintChainId,
-      sbtAddressOverride: sbtAddress,
-      sessionSlugOverride: slug,
-      sbtInfoOverride: sbtInfo,
-    });
+    await this.handleMint(true);
+    return true;
   };
 
-  handleGroupPasswordInputChange = (event: React.ChangeEvent<HTMLInputElement>): void => {
-    const value = event.target.value.replace(/\s+/g, '');
-    this.setState(buildSbtPagePasswordInputValuePatch({ inputValue: value }));
+  handleGroupPasswordInputChange: any = (event: any) => {
+    const raw = event?.target?.value;
+    const value = typeof raw === 'string' ? raw.replace(/\s+/g, '') : raw;
+    this.setState({ groupPasswordInput: value });
   };
 
-  handleManualPasswordInputChange = (event: React.ChangeEvent<HTMLInputElement>): void => {
-    this.setState(buildSbtPagePasswordInputValuePatch({
-      inputField: 'manualPasswordInput',
-      inputValue: event.target.value,
-    }));
-  };
-
-  claimWithInvitePayload = async (
-    payload: SbtPageInviteClaimPayload | null | undefined,
-    sbtOverride?: unknown,
-    options: SbtPageInviteClaimOptions = {}
-  ): Promise<SbtPageInviteClaimResult> => {
-    let sbt = '';
-    let slug = '';
-    let mintAccountLower = '';
-    let mintChainId = '';
+  claimWithInvitePayload: any = async (payload: any, sbtOverride: any, options: any = {}) => {
     try {
       if (!this.props.account) {
         this.props.toggleLoginModal(true);
@@ -1326,112 +992,78 @@ class SBTPage extends Component<any, any> {
       }
       if (!payload || payload.nonce == null || !payload.signature) {
         if (this._isMounted && !options.suppressErrors) {
-          this.setState(buildSbtPageMintFailurePatch({ error: 'Invalid invite code.' }));
+          this.setState({ error: 'Invalid invite code.', mintingStatus: 'failure' });
         }
         return { ok: false, error: new Error('Invalid invite code.') };
       }
 
-      sbt = String(sbtOverride || resolveSbtAddressString(this.props.SBTAddress) || '');
+      const { SBTAddress: SBTAddressProp } = this.props;
+      const sbt = sbtOverride || (Array.isArray(SBTAddressProp)
+        ? SBTAddressProp.find((e: any) => e.sbtAddress !== undefined)?.sbtAddress
+        : (SBTAddressProp && SBTAddressProp.sbtAddress !== undefined ? SBTAddressProp.sbtAddress : SBTAddressProp));
 
       if (!sbt) return { ok: false, error: new Error(`Missing ${t('sbt')} address`) };
 
-      slug = options?.sessionSlugOverride != null
-        ? String(options.sessionSlugOverride || '')
-        : this.getEffectiveSessionSlug();
-      mintAccountLower = options?.accountLowerOverride != null
-        ? String(options.accountLowerOverride || '').trim().toLowerCase()
-        : String(this.props.account || '').trim().toLowerCase();
-      mintChainId = options?.chainIdOverride != null
-        ? String(options.chainIdOverride || '').trim()
-        : this.getMintTargetChainId();
+      if (this._isMounted) this.setState({ mintingStatus: 'pending', lastTransactionType: 'mint', error: null });
+      const tx = await contractScripts.claimWithInvite(this.props.provider, sbt, payload.nonce, payload.signature);
 
-      if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, chainId: mintChainId, sbtAddress: sbt, sessionSlug: slug })) {
-        return { ok: false, error: new Error('Mint context changed before send.') };
+      await this.loadSBTInfo(true);
+      if (this._isMounted) {
+        this.setState({
+          mintingStatus: 'success',
+          transactionHash: tx.transactionHash,
+          lastTransactionType: 'mint',
+          lastMintTxHash: tx.transactionHash
+        });
       }
-      this.setMintPendingForTarget({
-        accountLower: mintAccountLower,
-        chainId: mintChainId,
-        clearError: true,
-        sbtAddress: sbt,
-        sessionSlug: slug,
-      });
-      const tx = await contractScripts.claimWithInvite(
-        this.props.provider,
-        sbt,
-        payload.nonce,
-        payload.signature
-      ) as SbtPageTransactionResult;
 
-      await this.completeMintSuccessForTarget({
-        accountLower: mintAccountLower,
-        chainId: mintChainId,
-        forceEventRefreshOnSuccess: true,
-        sbtAddress: sbt,
-        sessionSlug: slug,
-        txHash: tx.transactionHash,
-      });
+      const meLower = this.props.account.toLowerCase();
+      this.applyLocalMintSuccess(meLower);
+      this.refreshSbtDataWithSlug(sbt);
+
+      this.clearAutoMintUrlIntent();
+
+      try {
+        window.dispatchEvent(new CustomEvent('sbt-mint-success', { detail: { sbtAddress: sbt, txHash: tx.transactionHash } }));
+      } catch (e) { sbtLog.warn('SBTPage: telemetry', e); }
       return { ok: true, tx };
     } catch (error) {
       inviteLog.error('[INVITE] claimWithInvite failed:', error);
-      if (
-        this._isMounted &&
-        !options.suppressErrors &&
-        this.isMintTargetContextCurrent({ accountLower: mintAccountLower, chainId: mintChainId, sbtAddress: sbt, sessionSlug: slug })
-      ) {
-        this.setState(buildSbtPageMintFailurePatch({ error: getErrorMessage(error, 'Invite claim failed.') }));
+      if (this._isMounted && !options.suppressErrors) {
+        this.setState({ error: getErrorMessage(error, 'Invite claim failed.'), mintingStatus: 'failure' });
       }
       return { ok: false, error };
     }
   };
 
-  claimWithGroupPassword = async (
-    rawPassword: unknown,
-    sbtOverride?: unknown,
-    options: SbtPageGroupPasswordClaimOptions = {}
-  ): Promise<boolean> => {
-    let sbt = '';
-    let slug = '';
-    let mintAccountLower = '';
-    let mintChainId = '';
+  claimWithGroupPassword: any = async (rawPassword: any, sbtOverride: any) => {
     try {
       if (!this.props.account) {
         this.props.toggleLoginModal(true);
-        return false;
+        return;
       }
       const password = cryptoUtils.normalizeGroupPasswordInput(rawPassword);
       if (!password) {
-        if (this._isMounted) this.setState(buildSbtPageMintFailurePatch({ error: 'Group password is required.' }));
-        return false;
+        if (this._isMounted) this.setState({ error: 'Group password is required.', mintingStatus: 'failure' });
+        return;
       }
 
-      sbt = String(sbtOverride || resolveSbtAddressString(this.props.SBTAddress) || '');
+      const { SBTAddress: SBTAddressProp } = this.props;
+      const sbt = sbtOverride || (Array.isArray(SBTAddressProp)
+        ? SBTAddressProp.find((e: any) => e.sbtAddress !== undefined)?.sbtAddress
+        : (SBTAddressProp && SBTAddressProp.sbtAddress !== undefined ? SBTAddressProp.sbtAddress : SBTAddressProp));
 
-      if (!sbt) return false;
+      if (!sbt) return;
 
-      slug = options?.sessionSlugOverride != null
-        ? String(options.sessionSlugOverride || '')
-        : this.getEffectiveSessionSlug();
-      mintAccountLower = options?.accountLowerOverride != null
-        ? String(options.accountLowerOverride || '').trim().toLowerCase()
-        : String(this.props.account || '').trim().toLowerCase();
-      mintChainId = options?.chainIdOverride != null
-        ? String(options.chainIdOverride || '').trim()
-        : this.getMintTargetChainId();
+      const slug = this.getEffectiveSessionSlug();
       let sbtInfo = this.state.sbtInfo;
       if (!sbtInfo || typeof sbtInfo !== 'object') sbtInfo = {};
 
-      if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, chainId: mintChainId, sbtAddress: sbt, sessionSlug: slug })) {
-        return false;
-      }
-
-      let onchainHash = options?.groupPasswordHashOverride || (sbtOverride ? null : this.state.groupPasswordHash) || null;
+      let onchainHash = this.state.groupPasswordHash || null;
       if (!onchainHash) {
         try { onchainHash = await contractScriptsUntyped.getGroupPasswordHash('none', sbt, slug); } catch (e) { sbtLog.warn('SBTPage: fallback', e); }
       }
-      if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, chainId: mintChainId, sbtAddress: sbt, sessionSlug: slug })) {
-        return false;
-      }
-      let walletScopeSbtAddress: string | null = sbt;
+      let walletScopeSbtAddress = sbt;
       if (onchainHash && onchainHash !== ethers.constants.HashZero) {
         walletScopeSbtAddress = cryptoUtils.resolveGroupPasswordWalletScopeAddress({
           password,
@@ -1448,13 +1080,13 @@ class SBTPage extends Component<any, any> {
         inviteLog.log('[INVITE_DEBUG v4] on-chain groupPasswordHash:', onchainHash);
         if (!localHash || String(localHash).toLowerCase() !== String(onchainHash).toLowerCase()) {
           if (this._isMounted) {
-            this.setState(buildSbtPageMintFailurePatch({ error: 'Group password mismatch.' }));
+            this.setState({ error: 'Group password mismatch.', mintingStatus: 'failure' });
           }
-          return false;
+          return;
         }
       }
 
-      let maxTokens: ethers.BigNumber | null = null;
+      let maxTokens: any = null;
       try {
         const rawMax = sbtInfo?.maxTokens;
         if (rawMax !== undefined && rawMax !== null && rawMax !== '' && rawMax !== '0') {
@@ -1465,28 +1097,22 @@ class SBTPage extends Component<any, any> {
       }
 
       const maxAttempts = 3;
-      let lastError: unknown = null;
+      let lastError: any = null;
 
       for (let attempt = 0; attempt < maxAttempts; attempt++) {
-        if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, chainId: mintChainId, sbtAddress: sbt, sessionSlug: slug })) {
-          return false;
-        }
-        let mintedTokens: unknown = null;
+        let mintedTokens: any = null;
         try {
           mintedTokens = await contractScriptsUntyped.getMintedTokens('none', sbt, slug);
         } catch (_) {
           mintedTokens = null;
         }
-        if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, chainId: mintChainId, sbtAddress: sbt, sessionSlug: slug })) {
-          return false;
-        }
 
         if (mintedTokens === null) {
-          if (this._isMounted) this.setState(buildSbtPageMintFailurePatch({ error: 'Unable to load minted count.' }));
-          return false;
+          if (this._isMounted) this.setState({ error: 'Unable to load minted count.', mintingStatus: 'failure' });
+          return;
         }
 
-        let mintedBig: ethers.BigNumber | null = null;
+        let mintedBig: any = null;
         try {
           mintedBig = ethers.BigNumber.from(mintedTokens);
         } catch (_) {
@@ -1494,13 +1120,13 @@ class SBTPage extends Component<any, any> {
         }
 
         if (mintedBig === null) {
-          if (this._isMounted) this.setState(buildSbtPageMintFailurePatch({ error: 'Unable to parse minted count.' }));
-          return false;
+          if (this._isMounted) this.setState({ error: 'Unable to parse minted count.', mintingStatus: 'failure' });
+          return;
         }
 
         if (maxTokens && mintedBig.gte(maxTokens)) {
-          if (this._isMounted) this.setState(buildSbtPageMintFailurePatch({ error: 'Group limit reached.' }));
-          return false;
+          if (this._isMounted) this.setState({ error: 'Group limit reached.', mintingStatus: 'failure' });
+          return;
         }
 
         const nonce = mintedBig.add(1).toString();
@@ -1510,224 +1136,457 @@ class SBTPage extends Component<any, any> {
           nonces: [nonce],
           walletScopeSbtAddress
         });
-        if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, chainId: mintChainId, sbtAddress: sbt, sessionSlug: slug })) {
-          return false;
-        }
         const payload = invites && invites[0];
         if (!payload) {
-          if (this._isMounted) this.setState(buildSbtPageMintFailurePatch({ error: 'Failed to generate invite.' }));
-          return false;
+          if (this._isMounted) this.setState({ error: 'Failed to generate invite.', mintingStatus: 'failure' });
+          return;
         }
 
         const suppressErrors = attempt < maxAttempts - 1;
-        const result = await this.claimWithInvitePayload(payload, sbt, {
-          accountLowerOverride: mintAccountLower,
-          chainIdOverride: mintChainId,
-          suppressErrors,
-          sessionSlugOverride: slug,
-        });
-        if (result && result.ok) return true;
+        const result = await this.claimWithInvitePayload(payload, sbt, { suppressErrors });
+        if (result && result.ok) return;
 
         lastError = result?.error || new Error('Invite claim failed.');
-        if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, chainId: mintChainId, sbtAddress: sbt, sessionSlug: slug })) {
-          return false;
-        }
 
-        let mintedAfter: unknown = null;
+        let mintedAfter: any = null;
         try {
           mintedAfter = await contractScriptsUntyped.getMintedTokens('none', sbt, slug);
         } catch (_) {
           mintedAfter = null;
         }
 
-        let mintedAfterBig: ethers.BigNumber | null = null;
+        let mintedAfterBig: any = null;
         try {
           mintedAfterBig = mintedAfter !== null ? ethers.BigNumber.from(mintedAfter) : null;
         } catch (_) {
           mintedAfterBig = null;
         }
-        if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, chainId: mintChainId, sbtAddress: sbt, sessionSlug: slug })) {
-          return false;
-        }
 
         if (mintedAfterBig === null || mintedAfterBig.lte(mintedBig)) {
           if (this._isMounted && suppressErrors) {
-            this.setState(buildSbtPageMintFailurePatch({ error: getErrorMessage(lastError, 'Invite claim failed.') }));
+            this.setState({ error: lastError?.message || 'Invite claim failed.', mintingStatus: 'failure' });
           }
-          return false;
+          return;
         }
       }
     } catch (error) {
       inviteLog.error('[INVITE] claimWithGroupPassword failed:', error);
-      if (
-        this._isMounted &&
-        this.isMintTargetContextCurrent({
-          accountLower: mintAccountLower,
-          chainId: mintChainId,
-          sbtAddress: sbt,
-          sessionSlug: slug,
-        })
-      ) {
-        this.setState(buildSbtPageMintFailurePatch({ error: getErrorMessage(error, 'Invite claim failed.') }));
-      }
-      return false;
+      if (this._isMounted) this.setState({ error: getErrorMessage(error, 'Invite claim failed.'), mintingStatus: 'failure' });
     }
-    return false;
   };
 
-  claimWithInviteCode = async (
-    rawCode: unknown,
-    sbtOverride?: unknown,
-    options: SbtPageGroupPasswordClaimOptions = {}
-  ): Promise<boolean> => {
+  claimWithInviteCode: any = async (rawCode: any, sbtOverride: any) => {
     const payload = this.decodeInviteInput(rawCode);
     if (payload) {
-      const result = await this.claimWithInvitePayload(payload, sbtOverride, options);
-      return !!result?.ok;
+      await this.claimWithInvitePayload(payload, sbtOverride);
+      return;
     }
-    return await this.claimWithGroupPassword(rawCode, sbtOverride, options);
+    await this.claimWithGroupPassword(rawCode, sbtOverride);
   };
 
   // Helpers
-  getMemoizedNetHoldersList = (mintsArr: unknown = [], burnsArr: unknown = []): string[] => {
-    const { memo, netHolders } = buildSbtPageNetHoldersMemoState({
-      buildHolderListSignature: buildSbtPageHolderListSignature,
-      burnedAddresses: burnsArr,
-      computeNetHoldersList: (mintedRef, burnedRef) => measureSync(
-        'ce.sbtPage.computeNetHoldersList',
-        () => computeSbtPageNetHoldersList(mintedRef, burnedRef)
-      ),
-      memo: this._netHoldersMemo,
-      mintedAddresses: mintsArr,
-    });
-    this._netHoldersMemo = memo;
-    return netHolders;
+  sanitizeMintedTokensOverride: any = (value: any) => {
+    if (value == null) return null;
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed) || parsed < 0 || !Number.isInteger(parsed)) return null;
+    return String(parsed);
   };
 
-  buildAddressListSignature = (list: unknown = []): string => {
-    const { memo, signature } = buildSbtPageAddressListSignatureMemoState({
-      buildAddressListSignature: (entries) => measureSync(
-        'ce.sbtPage.filteredMintedUsersSignature',
-        () => buildSbtPageHolderListSignature(entries)
-      ),
-      list,
-      memo: this._filteredMintedUsersSignatureMemo,
+  normalizeCountMap: any = (value: any = null) => {
+    const out: Record<string, any> = {};
+    Object.entries(value || {}).forEach(([addrRaw, countRaw]: any) => {
+      const addr = String(addrRaw || '').toLowerCase();
+      if (!addr) return;
+      const count = Math.max(0, Math.floor(Number(countRaw || 0)));
+      if (count <= 0) return;
+      out[addr] = count;
     });
-    this._filteredMintedUsersSignatureMemo = memo;
+    return out;
+  };
+
+  expandAddressListFromCountMap: any = (countMapIn: any = null, fallbackList: any = []) => {
+    const hasStructuredCountMap =
+      !!countMapIn &&
+      typeof countMapIn === 'object' &&
+      !Array.isArray(countMapIn);
+    if (!hasStructuredCountMap) {
+      return (Array.isArray(fallbackList) ? fallbackList : []).map((addr: any) => String(addr || '').toLowerCase());
+    }
+    const normalized = this.normalizeCountMap(countMapIn);
+    if (!Object.keys(normalized).length && Array.isArray(fallbackList) && fallbackList.length > 0) {
+      return fallbackList.map((addr: any) => String(addr || '').toLowerCase());
+    }
+    const expanded: any[] = [];
+    Object.entries(normalized).forEach(([addr, count]: any) => {
+      for (let i = 0; i < count; i += 1) {
+        expanded.push(addr);
+      }
+    });
+    return expanded;
+  };
+
+  buildAddressOccurrenceMap: any = (list: any = []) => {
+    const counts: any = new Map();
+    (Array.isArray(list) ? list : []).forEach((entry: any) => {
+      const normalized = String(entry || '').toLowerCase();
+      if (!normalized) return;
+      counts.set(normalized, (counts.get(normalized) || 0) + 1);
+    });
+    return counts;
+  };
+
+  computeNetCounts: any = (mintsArr: any = [], burnsArr: any = []) => {
+    const counts: any = new Map();
+    (mintsArr || []).forEach((a: any) => {
+      const k = (a || '').toLowerCase();
+      counts.set(k, (counts.get(k) || 0) + 1);
+    });
+    (burnsArr || []).forEach((a: any) => {
+      const k = (a || '').toLowerCase();
+      counts.set(k, (counts.get(k) || 0) - 1);
+    });
+    return counts; // Map<addressLower, netCount>
+  };
+
+  computeNetHoldersList: any = (mintsArr: any = [], burnsArr: any = []) => {
+    const counts = this.computeNetCounts(mintsArr, burnsArr);
+    return Array.from(counts.entries())
+      .filter(([, v]: any) => v > 0)
+      .map(([k]: any) => k);
+  };
+
+  buildHolderListSignature: any = (list: any = []) => {
+    const entries = Array.isArray(list) ? list : [];
+    let hash = 2166136261;
+    for (let i = 0; i < entries.length; i += 1) {
+      const normalized = String(entries[i] || '').toLowerCase();
+      for (let j = 0; j < normalized.length; j += 1) {
+        hash ^= normalized.charCodeAt(j);
+        hash = Math.imul(hash, 16777619);
+      }
+      hash ^= 124;
+      hash = Math.imul(hash, 16777619);
+    }
+    return `${entries.length}:${hash >>> 0}`;
+  };
+
+  getMemoizedNetHoldersList: any = (mintsArr: any = [], burnsArr: any = []) => {
+    const mintedRef = Array.isArray(mintsArr) ? mintsArr : [];
+    const burnedRef = Array.isArray(burnsArr) ? burnsArr : [];
+    const memo = this._netHoldersMemo;
+    if (memo.mintedRef === mintedRef && memo.burnedRef === burnedRef) {
+      return memo.result;
+    }
+    const mintedSignature = this.buildHolderListSignature(mintedRef);
+    const burnedSignature = this.buildHolderListSignature(burnedRef);
+    if (
+      memo.mintedSignature === mintedSignature &&
+      memo.burnedSignature === burnedSignature
+    ) {
+      this._netHoldersMemo = {
+        ...memo,
+        mintedRef,
+        burnedRef,
+      };
+      return memo.result;
+    }
+    const next = measureSync('ce.sbtPage.computeNetHoldersList', () =>
+      this.computeNetHoldersList(mintedRef, burnedRef)
+    );
+    this._netHoldersMemo = {
+      mintedRef,
+      burnedRef,
+      mintedSignature,
+      burnedSignature,
+      result: next,
+    };
+    return next;
+  };
+
+  buildAddressListSignature: any = (list: any = []) => {
+    const entries = Array.isArray(list) ? list : [];
+    const listToken = Array.isArray(entries)
+      ? entries.map((entry: any) => String(entry || '').toLowerCase()).join('|')
+      : '';
+    const memo = this._filteredMintedUsersSignatureMemo;
+    if (
+      memo.listRef === entries &&
+      memo.listToken === listToken &&
+      typeof memo.signature === 'string'
+    ) {
+      return memo.signature;
+    }
+    const signature = measureSync('ce.sbtPage.filteredMintedUsersSignature', () => {
+      let hash = 2166136261;
+      for (let i = 0; i < entries.length; i += 1) {
+        const normalized = String(entries[i] || '').toLowerCase();
+        for (let j = 0; j < normalized.length; j += 1) {
+          hash ^= normalized.charCodeAt(j);
+          hash = Math.imul(hash, 16777619);
+        }
+        hash ^= 124;
+        hash = Math.imul(hash, 16777619);
+      }
+      return `${entries.length}:${hash >>> 0}`;
+    });
+    this._filteredMintedUsersSignatureMemo = {
+      listRef: entries,
+      listToken,
+      signature,
+    };
     return signature;
   };
 
-  buildNextFilteredHolderRows = ({
+  buildNextFilteredHolderRows: any = ({
     prevFilteredRows = [],
     prevNetHolders = [],
     nextNetHolders = [],
     replaceRows = false,
-  }: BuildNextFilteredHolderRowsArgs = {}): string[] => {
-    return buildSbtPageNextFilteredHolderRows({
-      prevFilteredRows,
-      prevNetHolders,
-      nextNetHolders,
-      replaceRows,
-    }, this.buildAddressListSignature);
+  }: any = {}) => {
+    const prevFiltered = (Array.isArray(prevFilteredRows) ? prevFilteredRows : [])
+      .map((entry: any) => String(entry || '').toLowerCase())
+      .filter(Boolean);
+    const nextRows = (Array.isArray(nextNetHolders) ? nextNetHolders : [])
+      .map((entry: any) => String(entry || '').toLowerCase())
+      .filter(Boolean);
+    if (replaceRows) {
+      const prevWasFullHolderSet =
+        this.buildAddressListSignature(prevFiltered) === this.buildAddressListSignature(prevNetHolders);
+      if (prevWasFullHolderSet) {
+        return nextRows;
+      }
+    }
+    const nextSet: any = new Set(nextRows);
+    return prevFiltered.filter((entry: any) => nextSet.has(entry));
+  };
+
+  mergeBurnEvidenceIntoPreservedHolderState: any = (
+    prevMinted: any = [],
+    prevBurned: any = [],
+    nextMinted: any = [],
+    nextBurned: any = []
+  ) => {
+    const preservedMinted = Array.isArray(prevMinted) ? prevMinted.map((entry: any) => String(entry || '').toLowerCase()) : [];
+    const preservedBurned = Array.isArray(prevBurned) ? prevBurned.map((entry: any) => String(entry || '').toLowerCase()) : [];
+    const nextMintedSafe = Array.isArray(nextMinted) ? nextMinted : [];
+    const nextBurnedSafe = Array.isArray(nextBurned) ? nextBurned : [];
+    const prevNetCounts = this.computeNetCounts(preservedMinted, preservedBurned);
+    const nextNetCounts = this.computeNetCounts(nextMintedSafe, nextBurnedSafe);
+    const prevBurnCounts = this.buildAddressOccurrenceMap(preservedBurned);
+    const nextBurnCounts = this.buildAddressOccurrenceMap(nextBurnedSafe);
+    let burnDiscovered = false;
+
+    prevNetCounts.forEach((prevNetCount: any, addr: any) => {
+      if (prevNetCount <= 0) return;
+      const prevBurnCount = prevBurnCounts.get(addr) || 0;
+      const nextBurnCount = nextBurnCounts.get(addr) || 0;
+      const nextNetCount = nextNetCounts.get(addr) || 0;
+      if (nextBurnCount <= prevBurnCount || nextNetCount >= prevNetCount) return;
+      const burnDelta = nextBurnCount - prevBurnCount;
+      for (let i = 0; i < burnDelta; i += 1) {
+        preservedBurned.push(addr);
+      }
+      burnDiscovered = true;
+    });
+
+    return {
+      mintedAddresses: preservedMinted,
+      burnedAddresses: preservedBurned,
+      burnDiscovered,
+    };
   };
 
   // Regression guard: once holder rows are visible for the active SBT/network, only a
   // resolved replacement set or per-address burn evidence may remove them.
-  reconcileHolderRefreshState = (
-    args: ReconcileSbtPageHolderRefreshStateArgs
-  ): ReconciledSbtPageHolderRefreshState => reconcileSbtPageHolderRefreshState({
-    ...args,
-    buildAddressListSignature: this.buildAddressListSignature,
-    buildNextFilteredHolderRows: this.buildNextFilteredHolderRows,
-  });
+  reconcileHolderRefreshState: any = ({
+    prevState,
+    nextMintedAddresses,
+    nextBurnedAddresses,
+    nextCountsLoaded,
+    nextHoldersMetaKey,
+    nextMintedTokensOverride,
+    userLower,
+  }: any) => {
+    const prev = prevState || {};
+    const prevMinted = Array.isArray(prev.mintedAddresses) ? prev.mintedAddresses : [];
+    const prevBurned = Array.isArray(prev.burnedAddresses) ? prev.burnedAddresses : [];
+    const nextMinted = Array.isArray(nextMintedAddresses) ? nextMintedAddresses : [];
+    const nextBurned = Array.isArray(nextBurnedAddresses) ? nextBurnedAddresses : [];
+    const nextCountsLoadedFlag = nextCountsLoaded === true;
+    const sameHoldersKey =
+      !!nextHoldersMetaKey &&
+      !!prev?.holdersMetaKey &&
+      String(prev.holdersMetaKey) === String(nextHoldersMetaKey);
+    const prevNetHolders = this.computeNetHoldersList(prevMinted, prevBurned);
+    const nextNetHolders = this.computeNetHoldersList(nextMinted, nextBurned);
+    const hasResolvedReplacement = nextCountsLoadedFlag && nextNetHolders.length > 0;
+    const shouldPreserveExisting =
+      sameHoldersKey &&
+      prevNetHolders.length > 0 &&
+      !hasResolvedReplacement;
+    const shouldManageVisibleRows =
+      prev.showModal === true ||
+      prev.mintingAddressesFilterInitialized === true ||
+      (Array.isArray(prev.filteredMintedUsers) && prev.filteredMintedUsers.length > 0);
 
-  handleModalFilteredMintedUsers = (filtered: unknown): void => {
-    if (!this._isMounted) return;
-    const nextPatch = buildSbtPageModalFilteredMintedUsersPatch({
-      buildAddressListSignature: this.buildAddressListSignature,
-      filtered,
-      isHolderScanActive: this.isHolderScanActive(),
-      state: this.state,
-    });
-    if (nextPatch) this.setState(nextPatch);
-  };
+    let mintedAddresses = nextMinted;
+    let burnedAddresses = nextBurned;
+    let filteredMintedUsers = Array.isArray(prev.filteredMintedUsers) ? prev.filteredMintedUsers : [];
 
-  applyLocalMintSuccess = (addrLower: unknown): void => {
-    const addr = String(addrLower || '').toLowerCase();
-    if (!this._isMounted || !addr) return;
-    this.setState((prev: HolderRefreshStateLike) => {
-      const nextPatch = buildSbtPageLocalMintSuccessPatch({ addrLower: addr, prevState: prev });
-      return nextPatch || {};
-    });
-  };
-
-  applyLocalBurnSuccess = (addrLower: unknown): void => {
-    const addr = String(addrLower || '').toLowerCase();
-    if (!this._isMounted || !addr) return;
-    this.setState((prev: HolderRefreshStateLike) => {
-      const nextPatch = buildSbtPageLocalBurnSuccessPatch({
-        addrLower: addr,
-        buildAddressListSignature: this.buildAddressListSignature,
-        buildNextFilteredHolderRows: this.buildNextFilteredHolderRows,
-        prevState: prev,
+    if (shouldPreserveExisting) {
+      const merged = this.mergeBurnEvidenceIntoPreservedHolderState(
+        prevMinted,
+        prevBurned,
+        nextMinted,
+        nextBurned
+      );
+      mintedAddresses = merged.mintedAddresses;
+      burnedAddresses = merged.burnedAddresses;
+      if (shouldManageVisibleRows && merged.burnDiscovered) {
+        const nextVisibleHolders = this.computeNetHoldersList(mintedAddresses, burnedAddresses);
+        filteredMintedUsers = this.buildNextFilteredHolderRows({
+          prevFilteredRows: filteredMintedUsers,
+          prevNetHolders,
+          nextNetHolders: nextVisibleHolders,
+          replaceRows: false,
+        });
+      }
+    } else if (shouldManageVisibleRows) {
+      filteredMintedUsers = this.buildNextFilteredHolderRows({
+        prevFilteredRows: filteredMintedUsers,
+        prevNetHolders,
+        nextNetHolders,
+        replaceRows: true,
       });
-      return nextPatch || {};
-    });
+    }
+
+    const effectiveNetCounts = this.computeNetCounts(mintedAddresses, burnedAddresses);
+    const prevMintedTokensOverride = this.sanitizeMintedTokensOverride(prev.mintedTokensOverride);
+    const incomingMintedTokensOverride = this.sanitizeMintedTokensOverride(nextMintedTokensOverride);
+    const shouldKeepPrevApproximation =
+      !nextCountsLoadedFlag ||
+      nextNetHolders.length > 0;
+
+    return {
+      mintedAddresses,
+      burnedAddresses,
+      countsLoaded: shouldPreserveExisting
+        ? (prev.countsLoaded === true || nextCountsLoadedFlag)
+        : nextCountsLoadedFlag,
+      mintedTokensOverride: shouldPreserveExisting
+        ? (incomingMintedTokensOverride != null ? incomingMintedTokensOverride : prevMintedTokensOverride)
+        : (
+          incomingMintedTokensOverride != null
+            ? incomingMintedTokensOverride
+            : (shouldKeepPrevApproximation ? prevMintedTokensOverride : null)
+        ),
+      userHasSBT: userLower ? ((effectiveNetCounts.get(userLower) || 0) > 0) : false,
+      filteredMintedUsers,
+      filteredMintedUsersSignature: shouldManageVisibleRows
+        ? this.buildAddressListSignature(filteredMintedUsers)
+        : (
+          typeof prev.filteredMintedUsersSignature === 'string'
+            ? prev.filteredMintedUsersSignature
+            : this.buildAddressListSignature(filteredMintedUsers)
+        ),
+    };
   };
 
-  toggleFullImage = (): void => {
-    if (this._isMounted) {
-      this.setState((prevState: HolderRefreshStateLike) => buildSbtPageBooleanTogglePatch({
-        state: prevState,
-        stateKey: 'showFullImage',
-      }));
+  handleModalFilteredMintedUsers: any = (filtered: any) => {
+    if (!this._isMounted) return;
+    const safeFiltered = Array.isArray(filtered) ? filtered : [];
+    const preserveDuringRefresh =
+      safeFiltered.length === 0 &&
+      this.isHolderScanActive() &&
+      Array.isArray(this.state.filteredMintedUsers) &&
+      this.state.filteredMintedUsers.length > 0;
+    if (preserveDuringRefresh) {
+      if (this.state.loadingMintedFilter) {
+        this.setState({ loadingMintedFilter: false });
+      }
+      return;
+    }
+    const nextSignature = this.buildAddressListSignature(safeFiltered);
+    if (nextSignature !== this.state.filteredMintedUsersSignature) {
+      this.setState({
+        filteredMintedUsers: safeFiltered,
+        filteredMintedUsersSignature: nextSignature,
+        loadingMintedFilter: false,
+      });
+      return;
+    }
+    if (this.state.loadingMintedFilter) {
+      this.setState({ loadingMintedFilter: false });
     }
   };
 
-  async attemptMintWithPasswordList(passwordList: unknown): Promise<void> {
-    let sbtAddressOriginalCase = '';
-    let targetSlug = '';
-    let targetAccountLower = '';
-    let targetChainId = '';
-    const isCurrentTarget = () => this.isMintTargetContextCurrent({
-      accountLower: targetAccountLower,
-      chainId: targetChainId,
-      sbtAddress: sbtAddressOriginalCase,
-      sessionSlug: targetSlug,
+  applyLocalMintSuccess: any = (addrLower: any) => {
+    if (!this._isMounted || !addrLower) return;
+    this.setState((prev: any) => {
+      const minted = (prev.mintedAddresses || []).concat(addrLower);
+      const burned = Array.isArray(prev.burnedAddresses) ? [...prev.burnedAddresses] : [];
+      const idx = burned.indexOf(addrLower);
+      if (idx !== -1) burned.splice(idx, 1); // cancel out one prior burn if present
+      const net = this.computeNetCounts(minted, burned);
+      return {
+        mintedAddresses: minted,
+        burnedAddresses: burned,
+        userHasSBT: (net.get(addrLower) || 0) > 0
+      };
     });
-    const applyMintInputForTarget = (inputField: string, inputValue: string) => new Promise<boolean>((resolve) => {
-      if (!this._isMounted || !isCurrentTarget()) {
-        resolve(false);
-        return;
-      }
-      this.setState(buildSbtPagePasswordMintInputPatch({
-        inputField,
-        inputValue,
-      }), () => resolve(isCurrentTarget()));
-    });
+  };
 
+  applyLocalBurnSuccess: any = (addrLower: any) => {
+    if (!this._isMounted || !addrLower) return;
+    this.setState((prev: any) => {
+      const minted = Array.isArray(prev.mintedAddresses) ? prev.mintedAddresses : [];
+      const burned = (prev.burnedAddresses || []).concat(addrLower);
+      const net = this.computeNetCounts(minted, burned);
+      const prevNetHolders = this.computeNetHoldersList(prev.mintedAddresses, prev.burnedAddresses);
+      const nextNetHolders = this.computeNetHoldersList(minted, burned);
+      const shouldManageVisibleRows =
+        prev.showModal === true ||
+        prev.mintingAddressesFilterInitialized === true ||
+        (Array.isArray(prev.filteredMintedUsers) && prev.filteredMintedUsers.length > 0);
+      const filteredMintedUsers = shouldManageVisibleRows
+        ? this.buildNextFilteredHolderRows({
+          prevFilteredRows: prev.filteredMintedUsers,
+          prevNetHolders,
+          nextNetHolders,
+          replaceRows: false,
+        })
+        : (Array.isArray(prev.filteredMintedUsers) ? prev.filteredMintedUsers : []);
+      return {
+        burnedAddresses: burned,
+        userHasSBT: (net.get(addrLower) || 0) > 0,
+        filteredMintedUsers,
+        filteredMintedUsersSignature: shouldManageVisibleRows
+          ? this.buildAddressListSignature(filteredMintedUsers)
+          : prev.filteredMintedUsersSignature,
+      };
+    });
+  };
+
+  toggleFullImage: any = () => {
+    if (this._isMounted) {
+      this.setState((prevState: any) => ({ showFullImage: !prevState.showFullImage }));
+    }
+  };
+
+  async attemptMintWithPasswordList(passwordList: any) {
     try {
       if (!Array.isArray(passwordList) || passwordList.length === 0) return;
-      const passwordTokens = passwordList as string[];
 
-      const { provider } = this.props;
-      sbtAddressOriginalCase = resolveSbtAddressString(this.props.SBTAddress);
-      targetSlug = this.getEffectiveSessionSlug();
-      targetAccountLower = String(this.props.account || '').trim().toLowerCase();
-      targetChainId = this.getMintTargetChainId();
+      const { SBTAddress: SBTAddressProp, provider } = this.props;
+      const sbtAddressOriginalCase = Array.isArray(SBTAddressProp)
+        ? SBTAddressProp.find((entry: any) => entry.sbtAddress !== undefined)?.sbtAddress
+        : (SBTAddressProp && SBTAddressProp.sbtAddress !== undefined ? SBTAddressProp.sbtAddress : SBTAddressProp);
 
-      if (!sbtAddressOriginalCase || !provider || !targetAccountLower || !targetChainId) return;
-      if (!isCurrentTarget()) return;
+      if (!sbtAddressOriginalCase || !provider) return;
 
-      const targetOptions = {
-        accountLowerOverride: targetAccountLower,
-        chainIdOverride: targetChainId,
-        sessionSlugOverride: targetSlug,
-      };
-
-      let chosen: string | null = null;
-      let inviteToken: string | null = null;
-      for (const token of passwordTokens) {
+      let chosen: any = null;
+      let inviteToken: any = null;
+      for (const token of passwordList) {
         const payload = this.decodeInviteInput(token);
         if (payload) {
           inviteToken = token;
@@ -1736,82 +1595,103 @@ class SBTPage extends Component<any, any> {
       }
 
       if (inviteToken) {
-        const didApply = await applyMintInputForTarget('groupPasswordInput', inviteToken);
-        if (!didApply) return;
+        await new Promise((resolve: any) => {
+          if (this._isMounted) {
+            this.setState({
+              groupPasswordInput: inviteToken,
+              mintingStatus: 'idle',
+              mintStep: 0,
+              error: null
+            }, resolve);
+          } else {
+            resolve();
+          }
+        });
 
-        if (!isCurrentTarget()) return;
-        await this.claimWithInviteCode(inviteToken, sbtAddressOriginalCase, targetOptions);
+        await this.claimWithInviteCode(inviteToken, sbtAddressOriginalCase);
         return;
       }
 
       if (this.state.hasInviteMint) {
-        const fallbackPassword = passwordTokens[0];
+        const fallbackPassword = passwordList[0];
         if (fallbackPassword) {
-          const didApply = await applyMintInputForTarget('groupPasswordInput', fallbackPassword);
-          if (!didApply) return;
-          if (!isCurrentTarget()) return;
-          await this.claimWithGroupPassword(fallbackPassword, sbtAddressOriginalCase, targetOptions);
+          await new Promise((resolve: any) => {
+            if (this._isMounted) {
+              this.setState({
+                groupPasswordInput: fallbackPassword,
+                mintingStatus: 'idle',
+                mintStep: 0,
+                error: null
+              }, resolve);
+            } else {
+              resolve();
+            }
+          });
+          await this.claimWithGroupPassword(fallbackPassword, sbtAddressOriginalCase);
           return;
         }
       }
 
-      for (const token of passwordTokens) {
+      for (const token of passwordList) {
         const hashed = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(token));
         let ok = false;
         try {
-          ok = await contractScriptsUntyped.isPasswordValid(provider, sbtAddressOriginalCase, hashed, targetSlug);
+          ok = await contractScripts.isPasswordValid(provider, sbtAddressOriginalCase, hashed, this.getEffectiveSessionSlug());
         } catch {
           ok = false;
         }
-        if (!isCurrentTarget()) return;
         if (ok) { chosen = token; break; }
       }
 
       if (!chosen) {
-        if (this._isMounted && isCurrentTarget()) {
-          this.setState(buildSbtPageErrorPatch({ error: "All claim codes have been used." }));
-        }
+        if (this._isMounted) this.setState({ error: "All claim codes have been used." });
         return;
       }
 
-      const didApply = await applyMintInputForTarget('manualPasswordInput', chosen);
-      if (!didApply) return;
-
-      if (!isCurrentTarget()) return;
-      await this.handleMint(false, {
-        ...targetOptions,
-        sbtAddressOverride: sbtAddressOriginalCase,
+      await new Promise((resolve: any) => {
+        if (this._isMounted) {
+          this.setState({
+            manualPasswordInput: chosen,
+            mintingStatus: 'idle',
+            mintStep: 0,
+            error: null
+          }, resolve);
+        } else {
+          resolve();
+        }
       });
+
+      await this.handleMint(false);
       if (this.state.mintingStatus !== 'success') {
         // Rare race: if it failed after check, fall through silently (the UI already shows error)
       }
     } catch (err) {
-      if (this._isMounted && isCurrentTarget()) {
-        this.setState(buildSbtPageErrorPatch({ error: getErrorMessage(err, 'Failed to mint with provided codes.') }));
-      }
+      if (this._isMounted) this.setState({ error: getErrorMessage(err, 'Failed to mint with provided codes.') });
     }
   }
 
-  loadCachedPasswords = (): void => {
+  loadCachedPasswords: any = () => {
     const sbtAddress = resolveSbtAddress(this.props.SBTAddress);
-    const cached = getSbtPasswordRecoveryCodesTyped({
+    const cached = getSbtPasswordRecoveryCodesUntyped({
       chainId: this.getRecoveryCacheChainId(),
       sbtAddress,
     });
 
     if (this._isMounted) {
-      this.setState(buildSbtPageCachedPasswordsPatch({ cachedPasswords: cached }));
+      this.setState({ cachedPasswords: cached });
     }
   };
 
-  openMintedModal = (): void => {
-    if (this._isMounted) this.setState(buildSbtPageMintedModalVisibilityPatch({ visible: true }), () => {
+  openMintedModal: any = () => {
+    if (this._isMounted) this.setState({ showModal: true }, () => {
       if (this._isMounted) {
         const netHolders = this.getMemoizedNetHoldersList(this.state.mintedAddresses, this.state.burnedAddresses);
-        this.setState(buildSbtPageMintedModalInitialFilterPatch({
-          buildAddressListSignature: this.buildAddressListSignature,
-          netHolders,
-        }));
+        this.setState({
+          filteredMintedUsers: netHolders,
+          filteredMintedUsersSignature: this.buildAddressListSignature(netHolders),
+          mintingAddressesFilterInitialized: true,
+          loadingMintedFilter: false
+        });
       }
       // One-shot explicit event scan when the user opens the holders modal.
       // This triggers 'loadingMintersBurners' -> true, updating the spinner state in header.
@@ -1820,45 +1700,55 @@ class SBTPage extends Component<any, any> {
   };
 
 
-  closeModal = (): void => {
-    if (this._isMounted) this.setState(buildSbtPageMintedModalVisibilityPatch());
+  closeModal: any = () => {
+    if (this._isMounted) this.setState({ showModal: false });
     // Allow another one-shot scan next time modal is opened
     this._eventScanTried = {};
   };
 
-  closeDocModal = (): void => {
+  closeDocModal: any = () => {
     const blobUrl = this.state.docModalBlobUrl;
     if (blobUrl && typeof URL !== 'undefined') {
       try { URL.revokeObjectURL(blobUrl); } catch (e) { sbtLog.warn('SBTPage: cleanup', e); }
     }
     if (this._isMounted) {
-      this.setState(buildSbtPageDocModalResetPatch());
+      this.setState({
+        docModalOpen: false,
+        docModalLoading: false,
+        docModalError: '',
+        docModalContent: '',
+        docModalName: '',
+        docModalBlobUrl: '',
+      });
     }
   };
 
-  getActiveLitHooks = (): SbtPageLitHooks | null => (
-    (this.props.litHooks && typeof this.props.litHooks === 'object' ? this.props.litHooks : null) ||
-    getGlobalLitHooks()
-  ) as SbtPageLitHooks | null;
-
-  openEncryptedDoc = async (url: unknown): Promise<void> => {
+  openEncryptedDoc: any = async (url: any) => {
     if (!litStorage.isLitArweaveUrl(url)) return;
-    const litHooks = this.getActiveLitHooks();
+    const litHooks = getGlobalLitHooks();
     if (!litHooks || typeof litHooks.getKey !== 'function') {
       if (this._isMounted) {
-        this.setState(buildSbtPageDocModalOpenPatch({
-          error: `Connect a ${t('walletLower')} to decrypt this document.`,
-          name: 'Encrypted document',
-        }));
+        this.setState({
+          docModalOpen: true,
+          docModalLoading: false,
+          docModalError: `Connect a ${t('walletLower')} to decrypt this document.`,
+          docModalContent: '',
+          docModalName: 'Encrypted document',
+          docModalBlobUrl: '',
+        });
       }
       return;
     }
 
     if (this._isMounted) {
-      this.setState(buildSbtPageDocModalOpenPatch({
-        loading: true,
-        name: 'Decrypting…',
-      }));
+      this.setState({
+        docModalOpen: true,
+        docModalLoading: true,
+        docModalError: '',
+        docModalContent: '',
+        docModalName: 'Decrypting…',
+        docModalBlobUrl: '',
+      });
     }
 
     try {
@@ -1881,69 +1771,57 @@ class SBTPage extends Component<any, any> {
       }
 
       if (this._isMounted) {
-        this.setState(buildSbtPageDocModalContentPatch({
-          error: (!text && !blobUrl) ? 'Unable to decode encrypted document.' : '',
-          content: text || '',
-          name,
-          blobUrl,
-        }));
+        this.setState({
+          docModalLoading: false,
+          docModalError: (!text && !blobUrl) ? 'Unable to decode encrypted document.' : '',
+          docModalContent: text || '',
+          docModalName: name,
+          docModalBlobUrl: blobUrl,
+        });
       }
     } catch (err) {
       if (this._isMounted) {
-        this.setState(buildSbtPageDocModalErrorPatch({
-          error: getErrorMessage(err, 'Failed to decrypt document.'),
-        }));
+        this.setState({
+          docModalLoading: false,
+          docModalError: getErrorMessage(err, 'Failed to decrypt document.'),
+        });
       }
     }
   };
 
-  toggleStats = (): void => {
-    if (this._isMounted) this.setState((prevState: { showStats?: unknown }) => buildSbtPageBooleanTogglePatch({
-      state: prevState,
-      stateKey: 'showStats',
-    }));
+  toggleStats: any = () => {
+    if (this._isMounted) this.setState((prevState: any) => ({ showStats: !prevState.showStats }));
   };
 
-  toggleActions = (): void => {
-    if (this._isMounted) this.setState((prevState: { showActions?: unknown }) => buildSbtPageBooleanTogglePatch({
-      state: prevState,
-      stateKey: 'showActions',
-    }));
+  toggleActions: any = () => {
+    if (this._isMounted) this.setState((prevState: any) => ({ showActions: !prevState.showActions }));
   };
 
-  toggleMoreDetails = (): void => {
-    if (this._isMounted) this.setState((prevState: { showMoreDetails?: unknown }) => buildSbtPageBooleanTogglePatch({
-      state: prevState,
-      stateKey: 'showMoreDetails',
-    }));
+  toggleMoreDetails: any = () => {
+    if (this._isMounted) this.setState((prevState: any) => ({ showMoreDetails: !prevState.showMoreDetails }));
   };
 
-  toggleAdminSection = (): void => {
-    if (this._isMounted) this.setState((prevState: { showAdminSection?: unknown }) => buildSbtPageBooleanTogglePatch({
-      state: prevState,
-      stateKey: 'showAdminSection',
-    }));
+  toggleAdminSection: any = () => {
+    if (this._isMounted) this.setState((prevState: any) => ({ showAdminSection: !prevState.showAdminSection }));
   };
 
-  renderAddressLink = (address: unknown, key = 'contract'): React.ReactNode => {
-    const { isRenderable, normalized } = resolveSbtPageAddressLinkState({
-      address,
-      zeroAddress: ethers.constants.AddressZero,
-    });
-    if (!isRenderable) return "N/A";
+  toggleDocsSection: any = () => {
+    if (this._isMounted) this.setState((prevState: any) => ({ showDocsSection: !prevState.showDocsSection }));
+  };
+
+  renderAddressLink: any = (address: any, key: any = 'contract') => {
+    const normalized = String(address || '').trim();
+    const isZeroAddress =
+      normalized.toLowerCase() === String(ethers.constants.AddressZero || '').toLowerCase();
+    if (!normalized || isZeroAddress || !ethers.utils.isAddress(normalized)) return "N/A";
     const shortenedAddress = getShortenedAddress(normalized, false);
-    const copyIconState = resolveSbtPageCopyIconState({
-      copiedAddress: this.state.copiedAddress,
-      targetKey: key,
-    });
     return (
       <>
-        <a href={buildPublicRoute(`/u/${normalized}`)} target="_blank" rel="noopener noreferrer">
+        <a href={`/u/${normalized}`} target="_blank" rel="noopener noreferrer">
           {shortenedAddress}
         </a>
         <button onClick={() => this.copyToClipboard(normalized, key)} className={styles.copyButton}>
-          {copyIconState.shouldRenderCopiedIcon && <FontAwesomeIcon icon={faCheck} />}
-          {copyIconState.shouldRenderDefaultIcon && <FontAwesomeIcon icon={faCopy} />}
+          <FontAwesomeIcon icon={this.state.copiedAddress === key ? faCheck : faCopy} />
         </button>
         <a href={this.getExplorerUrl(normalized)} target="_blank" rel="noopener noreferrer" className={styles.expandButton}>
           <FontAwesomeIcon icon={faExternalLinkAlt} />
@@ -1952,58 +1830,199 @@ class SBTPage extends Component<any, any> {
     );
   };
 
-  getOpenMintAutoJoinUrl = (addressOverride: unknown = null): string => {
+  getOpenMintAutoJoinUrl: any = (addressOverride: any = null) => {
+    const sbtAddress = String(addressOverride || resolveSbtAddress(this.props.SBTAddress) || '').trim();
+    if (!sbtAddress || !ethers.utils.isAddress(sbtAddress)) return '';
+
+    const { sbtInfo, hasInviteMint, hasGroupPasswordMint, groupPasswordHash } = this.state;
+    const normalizedHash = String(groupPasswordHash || '').trim().toLowerCase();
+    const zeroHash = String(ethers.constants.HashZero || '').toLowerCase();
+    const hasGroupHash = !!normalizedHash && normalizedHash !== zeroHash;
+    if (sbtInfo?.hasPasswordMint || hasInviteMint || hasGroupPasswordMint || hasGroupHash) {
+      return '';
+    }
+
     const origin = (typeof window !== 'undefined' && window.location?.origin)
       ? String(window.location.origin).replace(/\/+$/, '')
       : '';
-    return buildSbtPageOpenMintAutoJoinUrl({
-      addressOverride,
-      basePath: readPublicUrlBasePath(),
-      groupPasswordHash: this.state.groupPasswordHash,
-      hasGroupPasswordMint: this.state.hasGroupPasswordMint,
-      hasInviteMint: this.state.hasInviteMint,
-      origin,
-      propSBTAddress: this.props.SBTAddress,
-      sbtInfo: this.state.sbtInfo,
-      sessionSlug: this.getEffectiveSessionSlug(),
-    });
+    if (!origin) return '';
+
+    const basePath = readPublicUrlBasePath();
+    const demoPath = buildSessionRoutePath(this.getEffectiveSessionSlug(), basePath);
+    return `${origin}${demoPath}?sbt=${encodeURIComponent(sbtAddress)}&auto=1`;
+  };
+
+  decodeJsonDataUri: any = (uriRaw: any) => {
+    const raw = String(uriRaw || '').trim();
+    if (!/^data:application\/json/i.test(raw)) return null;
+    const commaIndex = raw.indexOf(',');
+    if (commaIndex < 0) return null;
+    const header = raw.slice(0, commaIndex).toLowerCase();
+    const payload = raw.slice(commaIndex + 1);
+    if (!payload) return null;
+    let text = '';
+    try {
+      if (header.includes(';base64')) {
+        if (typeof Buffer !== 'undefined') {
+          text = Buffer.from(payload, 'base64').toString('utf8');
+        } else if (typeof window !== 'undefined' && typeof window.atob === 'function') {
+          text = decodeURIComponent(escape(window.atob(payload)));
+        }
+      } else {
+        text = decodeURIComponent(payload);
+      }
+    } catch (_) {
+      return null;
+    }
+    if (!text) return null;
+    try {
+      const parsed = JSON.parse(text);
+      return parsed && typeof parsed === 'object' ? parsed : null;
+    } catch (_) {
+      return null;
+    }
+  };
+
+  isImageLikeUri: any = (uriRaw: any) => {
+    const raw = String(uriRaw || '').trim();
+    if (!raw) return false;
+    if (/^data:image\//i.test(raw)) return true;
+    try {
+      const parsed = new URL(raw);
+      const path = String(parsed.pathname || '').toLowerCase();
+      if (/\.(png|jpe?g|gif|webp|svg|bmp|avif|ico|tiff?)$/i.test(path)) return true;
+      const extHint = String(
+        parsed.searchParams.get('ext') ||
+        parsed.searchParams.get('format') ||
+        ''
+      ).toLowerCase();
+      if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'avif', 'ico', 'tif', 'tiff'].includes(extHint)) {
+        return true;
+      }
+    } catch (_) {
+      return false;
+    }
+    return false;
+  };
+
+  resolveDisplayImageHref: any = (sbtInfo: any) => {
+    const candidates = this.getDisplayImageUrlCandidates(sbtInfo);
+    const candidate = candidates[0] || '';
+    return candidate || defaultSbtImage;
+  };
+
+  getDisplayImageUrlCandidates: any = (sbtInfo: any) => {
+    const imageValue = sbtInfo?.image;
+    return buildArweaveGatewayUrlCandidates(imageValue, { gateway: '' });
+  };
+
+  getDisplayImageRenderState: any = (sbtInfo: any) => {
+    const sourceKey = String(sbtInfo?.image || '').trim();
+    const candidates = this.getDisplayImageUrlCandidates(sbtInfo);
+    const activeIndex = this.state.displayImageFallbackKey === sourceKey
+      ? Math.max(0, Number(this.state.displayImageFallbackIndex || 0))
+      : 0;
+    const src = candidates[activeIndex] || defaultSbtImage;
+    return {
+      sourceKey,
+      candidates,
+      activeIndex,
+      src,
+      canRetry: activeIndex < candidates.length,
+    };
   };
 
   // Keep SBT artwork resilient when the preferred Arweave gateway flakes out mid-load.
-  handleDisplayImageError = ({
-    sourceKey = '',
-    activeIndex = 0,
-    candidates = [],
-  }: SbtPageDisplayImageErrorArgs = {}): void => {
-    const maxIndex = getDisplayImageFallbackCandidateCount(candidates);
+  handleDisplayImageError: any = ({ sourceKey = '', activeIndex = 0, candidates = [] }: any = {}) => {
+    const maxIndex = Array.isArray(candidates) ? candidates.length : 0;
     if (activeIndex >= maxIndex) return;
-    this.setState((prevState: {
-      displayImageFallbackKey?: unknown;
-      displayImageFallbackIndex?: unknown;
-    }) => getNextDisplayImageFallbackState({ activeIndex, maxIndex, sourceKey }, prevState));
-  };
-
-  getLoadSbtInfoRequestKey = (): string => {
-    const activeSlug = this.getExplicitSessionSlug() ?? '';
-    const currentNetwork = this.state.network || this.props.network;
-    return buildSbtPageLoadInfoRequestKey({
-      account: this.props.account,
-      activeSlug,
-      network: currentNetwork,
-      sbtAddressInput: this.props.SBTAddress,
-      sbtCacheRevision: this.props.sbtCacheRevision,
+    this.setState((prevState: any) => {
+      const currentIndex = prevState.displayImageFallbackKey === sourceKey
+        ? Math.max(0, Number(prevState.displayImageFallbackIndex || 0))
+        : 0;
+      if (currentIndex !== activeIndex) return null;
+      return {
+        displayImageFallbackKey: sourceKey,
+        displayImageFallbackIndex: Math.min(activeIndex + 1, maxIndex),
+      };
     });
   };
 
-  isCurrentLoadSbtInfoRequest = (requestKey: unknown): boolean => (
+  normalizeCanonicalMetadataHref: any = (candidateRaw: any) => {
+    const candidate = String(candidateRaw || '').trim();
+    if (!candidate) return '';
+    const normalized = normalizeArweaveUrl(candidate, { contextLabel: 'sbt_page_token_uri' });
+    if (!normalized || /^data:/i.test(normalized)) return '';
+    if (this.isImageLikeUri(normalized)) return '';
+    return normalized;
+  };
+
+  resolveTokenMetadataHref: any = (tokenUriRaw: any) => {
+    const raw = String(tokenUriRaw || '').trim();
+    if (!raw) return '';
+
+    const normalizedDirect = this.normalizeCanonicalMetadataHref(raw);
+    if (normalizedDirect) return normalizedDirect;
+    if (!/^data:application\/json/i.test(raw)) return '';
+
+    // For embedded JSON tokenURI, prefer explicit SBT token URI fields first.
+    // Some payloads also include session-level metadataUri fields; those should
+    // not override a concrete SBT token URI.
+    const decoded = this.decodeJsonDataUri(raw);
+    if (!decoded) return '';
+    const candidates = [
+      decoded.tokenURI,
+      decoded.tokenUri,
+      decoded.token_uri,
+      decoded.uri,
+      decoded.sbtTokenURI,
+      decoded.sbtTokenUri,
+      decoded.sbt_token_uri,
+      decoded.metadataUri,
+      decoded.metadataURI,
+      decoded.metadata_uri,
+      decoded.arweaveUri,
+      decoded.arweaveURL,
+      (typeof decoded.arweaveTxId === 'string' ? `ar://${decoded.arweaveTxId}` : null),
+    ];
+    for (const candidate of candidates) {
+      const normalized = this.normalizeCanonicalMetadataHref(candidate);
+      if (normalized) return normalized;
+    }
+    return '';
+  };
+
+  getLoadSbtInfoRequestKey: any = () => {
+    const sbtAddress = resolveSbtAddress(this.props.SBTAddress);
+    const activeSlug = this.getExplicitSessionSlug() ?? '';
+    const currentNetwork = this.state.network || this.props.network;
+    return [
+      String(sbtAddress || '').trim().toLowerCase(),
+      normalizeSessionSlug(activeSlug || ''),
+      String(Number(currentNetwork?.id || 0) || 0),
+      String(this.props.account || '').trim().toLowerCase(),
+      String(Number(this.props.sbtCacheRevision || 0) || 0),
+    ].join('|');
+  };
+
+  normalizeLoadSbtInfoOptions: any = (optionsOrForce: any = false) => {
+    if (optionsOrForce && typeof optionsOrForce === 'object' && !Array.isArray(optionsOrForce)) {
+      return {
+        forceEventFetch: optionsOrForce.forceEventFetch === true || optionsOrForce.force === true,
+        preferCountsOnly: optionsOrForce.preferCountsOnly === true || optionsOrForce.countsOnly === true,
+      };
+    }
+    return {
+      forceEventFetch: optionsOrForce === true,
+      preferCountsOnly: false,
+    };
+  };
+
+  isCurrentLoadSbtInfoRequest: any = (requestKey: any) => (
     !!requestKey && requestKey === this._latestLoadSbtInfoRequestKey
   );
 
-  fetchHolderAddressesByTokenOwnership = async (
-    sbtAddress: unknown,
-    sessionSlug: unknown,
-    mintedCountRaw: unknown
-  ): Promise<string[]> => {
+  fetchHolderAddressesByTokenOwnership: any = async (sbtAddress: any, sessionSlug: any, mintedCountRaw: any) => {
     const mintedCount = Math.floor(Number(mintedCountRaw || 0));
     if (!Number.isFinite(mintedCount) || mintedCount <= 0) return [];
     const MAX_OWNER_LOOKUPS = 512;
@@ -2016,12 +2035,11 @@ class SBTPage extends Component<any, any> {
       return [];
     }
     const zero = String(ethers.constants.AddressZero || '').toLowerCase();
-    const holders = new Set<string>();
-    const ownerLookupScripts = contractScripts as unknown as SbtPageOwnerLookupScripts;
-    const probeOwnerByTokenId = async (tokenId: number): Promise<void> => {
-      let owner: unknown = null;
+    const holders: any = new Set();
+    const probeOwnerByTokenId = async (tokenId: any) => {
+      let owner: any = null;
       try {
-        owner = await ownerLookupScripts.getOwnerByTokenId('none', sbtAddress, tokenId, sessionSlug);
+        owner = await contractScriptsUntyped.getOwnerByTokenId('none', sbtAddress, tokenId, sessionSlug);
       } catch (_) {
         owner = null;
       }
@@ -2033,7 +2051,7 @@ class SBTPage extends Component<any, any> {
     // Probe canonical one-based ids first (CustomSBT), then also probe tokenId 0 for zero-based legacy contracts.
     const BATCH_SIZE = 10;
     for (let i = 1; i <= mintedCount; i += BATCH_SIZE) {
-      const batch: Promise<void>[] = [];
+      const batch: any[] = [];
       for (let j = i; j < Math.min(i + BATCH_SIZE, mintedCount + 1); j += 1) {
         batch.push(probeOwnerByTokenId(j));
       }
@@ -2046,32 +2064,36 @@ class SBTPage extends Component<any, any> {
   // Load SBT info. Always signal loading state so render() can decide whether
   // to show a full placeholder (first load) or a subtle indicator (refresh).
 
-  async loadSBTInfo(optionsOrForce: unknown = false): Promise<void> {
-    const loadOptions = normalizeSbtPageLoadInfoOptions(optionsOrForce);
+  async loadSBTInfo(optionsOrForce: any = false) {
+    const loadOptions = this.normalizeLoadSbtInfoOptions(optionsOrForce);
     const { forceEventFetch, preferCountsOnly } = loadOptions;
+    const { SBTAddress: SBTAddressProp } = this.props;
     const currentNetwork = this.state.network || this.props.network;
 
     // Resolve address
-    const sbtAddressOriginalCase = resolveSbtAddressString(this.props.SBTAddress);
+    const sbtAddressOriginalCase = Array.isArray(SBTAddressProp)
+      ? SBTAddressProp.find((entry: any) => entry?.sbtAddress !== undefined)?.sbtAddress
+      : (SBTAddressProp && SBTAddressProp.sbtAddress !== undefined ? SBTAddressProp.sbtAddress : SBTAddressProp);
     const requestKey = this.getLoadSbtInfoRequestKey();
     this._latestLoadSbtInfoRequestKey = requestKey;
     const isCurrentLoad = () => this.isCurrentLoadSbtInfoRequest(requestKey);
 
     if (this._loadSbtInfoInFlight) {
-      const pendingQueuePlan = resolveSbtPageLoadInfoPendingQueuePlan({
-        forceEventFetch,
-        pendingForce: this._loadSbtInfoPendingForce,
-        pendingOptions: this._loadSbtInfoPendingOptions,
-        preferCountsOnly,
-      });
-      this._loadSbtInfoPending = pendingQueuePlan.shouldQueueLoad;
-      this._loadSbtInfoPendingOptions = pendingQueuePlan.pendingOptions;
-      this._loadSbtInfoPendingForce = pendingQueuePlan.pendingForce;
+      this._loadSbtInfoPending = true;
+      const pendingOptions = this._loadSbtInfoPendingOptions || {
+        forceEventFetch: false,
+        preferCountsOnly: false,
+      };
+      this._loadSbtInfoPendingOptions = {
+        forceEventFetch: pendingOptions.forceEventFetch || forceEventFetch,
+        preferCountsOnly: pendingOptions.preferCountsOnly || preferCountsOnly,
+      };
+      if (forceEventFetch) this._loadSbtInfoPendingForce = true;
       return;
     }
 
     if (!sbtAddressOriginalCase) {
-      if (this._isMounted) this.setState(buildSbtPageLoadingMintersBurnersPatch());
+      if (this._isMounted) this.setState({ loadingMintersBurners: false });
       return;
     }
     this._loadSbtInfoInFlight = true;
@@ -2079,49 +2101,75 @@ class SBTPage extends Component<any, any> {
     const normalizedExplicitSlug = this.getExplicitSessionSlug();
     const hasExplicitSlug = normalizedExplicitSlug != null;
     const initialSlug = hasExplicitSlug ? normalizedExplicitSlug : this.getEffectiveSessionSlug();
-    const logContext = buildSbtPageLoadInfoStartLogContext({
-      account: this.props.account,
+    const logContext = {
+      address: sbtAddressOriginalCase,
       addrLower,
-      forceEventFetch,
+      explicitSlug: normalizedExplicitSlug,
       initialSlug,
-      network: currentNetwork,
-      normalizedExplicitSlug,
+      forceEventFetch,
       preferCountsOnly,
-      sbtAddressOriginalCase,
-    });
+      account: this.props.account ? this.props.account.toLowerCase() : null,
+      networkId: currentNetwork?.id ?? null
+    };
     sbtLog.info('[SBTPage] loadSBTInfo:start', logContext);
 
-    const fillFromChainIfMissing = async (
-      infoIn: unknown,
-      addr: unknown,
-      slugForRead: unknown
-    ): Promise<SbtPageMetadataInfoLike> => {
-      const info = isRecord(infoIn) ? { ...infoIn } as SbtPageMetadataInfoLike : {};
+    const toSec = (v: any) => {
+      const n = Number(v || 0);
+      if (!Number.isFinite(n) || n < 0) return 0;
+      return n > 1e12 ? Math.floor(n / 1000) : n;
+    };
+    const normalizeHistorySummary = (value: any) => {
+      if (!value || typeof value !== 'object') return null;
+      const normalizeField = (fieldValue: any) => {
+        const raw = String(fieldValue ?? '').trim();
+        if (!/^\d+$/.test(raw)) return null;
+        return raw.replace(/^0+(?=\d)/, '') || '0';
+      };
+      const totalMinted = normalizeField(value.totalMinted);
+      const totalBurned = normalizeField(value.totalBurned);
+      const activeSupply = normalizeField(value.activeSupply);
+      const currentHolderCount = normalizeField(value.currentHolderCount);
+      const historicalHolderCount = normalizeField(value.historicalHolderCount);
+      if (
+        totalMinted == null ||
+        totalBurned == null ||
+        activeSupply == null ||
+        currentHolderCount == null ||
+        historicalHolderCount == null
+      ) {
+        return null;
+      }
+      return {
+        totalMinted,
+        totalBurned,
+        activeSupply,
+        currentHolderCount,
+        historicalHolderCount,
+      };
+    };
+
+    const fillFromChainIfMissing = async (infoIn: any, addr: any, slugForRead: any) => {
+      const info = { ...(infoIn || {}) };
       const zeroAddress = String(ethers.constants.AddressZero || '').toLowerCase();
-      const {
-        needAdmin,
-        needBurn,
-        needEnd,
-        needHasPw,
-        needMax,
-        shouldRead,
-      } = resolveSbtPageChainMetadataReadNeeds({ info, zeroAddress });
-      const withSoftReadTimeout = (
-        task: unknown,
-        fallbackValue: unknown = null,
-        timeoutMs: number = 750
-      ): Promise<unknown> => new Promise((resolve) => {
+      const adminRaw = String(info.admin || info.admin_ || '').trim();
+      const needMax = (info.maxTokens == null);
+      // Keep fully hydrated cache entries on the fast path. Only re-read burnAuth when
+      // it is missing or a caller explicitly flags the cached value as stale.
+      const needBurn = info.burnAuthNeedsOnChainRefresh === true || !Number.isFinite(Number(info.burnAuth));
+      const needEnd = !(Number(info.mintingEndTime) >= 0);
+      const needHasPw = (typeof info.hasPasswordMint !== 'boolean');
+      const needAdmin = !adminRaw || adminRaw.toLowerCase() === zeroAddress;
+      const withSoftReadTimeout = (task: any, fallbackValue: any = null, timeoutMs: any = 750) => new Promise((resolve: any) => {
         let settled = false;
-        let timer: ReturnType<typeof setTimeout>;
-        const finish = (value: unknown) => {
+        const finish = (value: any) => {
           if (settled) return;
           settled = true;
           clearTimeout(timer);
           resolve(value);
         };
-        timer = setTimeout(() => finish(fallbackValue), timeoutMs);
+        const timer = setTimeout(() => finish(fallbackValue), timeoutMs);
         Promise.resolve(task)
-          .then((value: unknown) => finish(value))
+          .then((value: any) => finish(value))
           .catch(() => finish(fallbackValue));
       });
       const SBT_ABI_FRAG = [
@@ -2132,13 +2180,12 @@ class SBTPage extends Component<any, any> {
         "function admin() view returns (address)",
         "function owner() view returns (address)"
       ];
-      if (!shouldRead) {
+      if (!needMax && !needBurn && !needEnd && !needHasPw && !needAdmin) {
         return info;
       }
       try {
-        const readProviderScripts = contractScripts as unknown as SbtPageReadProviderScripts;
-        const ro = readProviderScripts.getReadProviderForGroup(slugForRead, { contractKey: 'sbtFactory' });
-        const c = new ethers.Contract(String(addr || ''), SBT_ABI_FRAG, ro as ethers.providers.Provider);
+        const ro = contractScriptsUntyped.getReadProviderForGroup(slugForRead, { contractKey: 'sbtFactory' });
+        const c = new ethers.Contract(addr, SBT_ABI_FRAG, ro);
         const [max, burn, end, hasPw, adminAddr, ownerAddr] = await Promise.all([
           needMax ? withSoftReadTimeout(c.maxTokens(), null) : null,
           needBurn ? withSoftReadTimeout(c.collectionBurnAuth(), null) : null,
@@ -2153,84 +2200,123 @@ class SBTPage extends Component<any, any> {
           info.burnAuthVerifiedOnChain = true;
           delete info.burnAuthNeedsOnChainRefresh;
         }
-        if (end != null) {
-          info.mintingEndTime = coerceSbtPageEpochSeconds(
-            ethers.BigNumber.isBigNumber(end) ? end.toNumber() : Number(end)
-          );
-        }
+        if (end != null) info.mintingEndTime = toSec(ethers.BigNumber.isBigNumber(end) ? end.toNumber() : Number(end));
         if (hasPw != null) info.hasPasswordMint = !!hasPw;
-        Object.assign(info, buildSbtPageAdminFallbackPatch({
-          adminAddress: adminAddr,
-          existingCreator: info.creator,
-          existingDeployer: info.deployer,
-          ownerAddress: ownerAddr,
-          zeroAddress,
-        }));
+        const nextAdmin = [adminAddr, ownerAddr]
+          .map((value: any) => String(value || '').trim())
+          .find((value: any) => value && value.toLowerCase() !== zeroAddress);
+        if (nextAdmin) {
+          info.admin = nextAdmin;
+          info.admin_ = nextAdmin;
+          if (!info.deployer) info.deployer = nextAdmin;
+          if (!info.creator) info.creator = nextAdmin;
+        }
       } catch (e) { sbtLog.warn('SBTPage: fallback', e); }
       return info;
     };
 
-    const readCacheForSlug = async (
-      slugForCache: unknown,
-      netKeyForCache: unknown
-    ): Promise<SbtPageCacheByNet> => {
-      return readSbtPageCacheBySlug({
-        netKeyForCache,
-        readCache,
-        slugForCache,
-      }) as Promise<SbtPageCacheByNet>;
+    const readCacheForSlug = async (slugForCache: any, netKeyForCache: any) => {
+      try {
+        const parsedRaw = await readCache('sbtCache', slugForCache);
+        let parsed = (parsedRaw && typeof parsedRaw === 'object') ? parsedRaw : {};
+        if (parsed[netKeyForCache] == null) {
+          const legacy = Object.keys(parsed || {}).find((k: any) => k !== netKeyForCache && Number(k) === Number(netKeyForCache));
+          if (legacy) parsed[netKeyForCache] = { ...(parsed[netKeyForCache] || {}), ...(parsed[legacy] || {}) };
+        }
+        return parsed;
+      } catch { return {}; }
     };
 
-    const needsTokenUriFields = needsSbtPageTokenUriFields;
-    const needsDirectMetadataHydration = needsSbtPageDirectMetadataHydration;
-
-    const findCachedEntryAcrossGroups = ({
-      excludeSlug = null,
-    }: SbtPageCacheLookupArgs = {}): SbtPageCachedEntryHit | null => {
-      return findSbtPageCachedEntryAcrossGroups({
-        addressLower: addrLower,
-        excludeSlug,
-        listNamespaceEntriesSync,
-      }) as SbtPageCachedEntryHit | null;
+    const needsTokenUriFields = (i: any) => {
+      if (!i || typeof i !== 'object') return true;
+      const has = (value: any) => value !== undefined && value !== null && String(value).trim() !== '';
+      const tokenUri = i.tokenURI ?? i.tokenUri ?? null;
+      const image = i.image ?? null;
+      const hasImageMetadata =
+        has(image) ||
+        i?.imageLocked === true ||
+        !!i?.imageEncrypted ||
+        !!i?.encryptedImage ||
+        !!(i?.encryptedFields && typeof i.encryptedFields === 'object' && i.encryptedFields.image);
+      const endOk = Number.isFinite(Number(i.mintingEndTime));
+      const burnOk = Number.isFinite(Number(i.burnAuth));
+      const hasPw = (typeof i.hasPasswordMint === 'boolean');
+      const maxTok = has(i.maxTokens);
+      const adminAddress = String(i.admin || i.admin_ || i.deployer || '').trim();
+      const adminOk =
+        !!adminAddress &&
+        adminAddress.toLowerCase() !== String(ethers.constants.AddressZero || '').toLowerCase();
+      return !(has(tokenUri) && hasImageMetadata && endOk && burnOk && hasPw && maxTok && adminOk);
+    };
+    const needsDirectMetadataHydration = (i: any) => {
+      if (!i || typeof i !== 'object') return true;
+      return Object.keys(i).length === 0;
     };
 
-    const deriveNetKeyForSlug = (
-      slugForCache: unknown,
-      netKeyHint: unknown = null,
-      infoHint: unknown = null
-    ): string => deriveSbtPageCacheNetKey({
-      currentNetwork,
-      getSessionChainId,
-      infoHint,
-      netKeyHint,
-      slugForCache,
-    });
-    const buildDirectMetadataContext = (
-      slugForRead: unknown,
-      netKeyHint: unknown = null,
-      infoHint: unknown = null
-    ): SbtPageDirectMetadataContext | string => buildSbtPageDirectMetadataContext({
-      currentNetwork,
-      getSessionChainId,
-      infoHint,
-      netKeyHint,
-      slugForRead,
-    }) as SbtPageDirectMetadataContext | string;
+    const findCachedEntryAcrossGroups = ({ excludeSlug = null }: any = {}) => {
+      const excludedSlug = normalizeSessionSlug(excludeSlug || '');
+      try {
+        const entries = listNamespaceEntriesSync('sbtCache', { cloneValues: false });
+        for (const item of entries) {
+          const s = item?.slug || '';
+          const normalizedSourceSlug = normalizeSessionSlug(s);
+          if (excludedSlug && normalizedSourceSlug === excludedSlug) continue;
+          const parsed = (item?.value && typeof item.value === 'object') ? item.value : {};
+          for (const netKey of Object.keys(parsed || {})) {
+            const entry = parsed?.[netKey]?.sbtList?.[addrLower];
+            if (entry) {
+              const candidateSlug = normalizeSessionSlug(entry.slug != null ? entry.slug : s);
+              if (excludedSlug && candidateSlug === excludedSlug) continue;
+              return {
+                slug: candidateSlug,
+                entry,
+                netKey: String(netKey)
+              };
+            }
+          }
+        }
+      } catch (e) { sbtLog.warn('SBTPage: fallback', e); }
+      return null;
+    };
 
-    const syncResolvedSessionSlug = (slugToSync: unknown): void => {
+    const deriveNetKeyForSlug = (slugForCache: any, netKeyHint: any = null, infoHint: any = null) => {
+      const chainIdHint =
+        infoHint?.chainID ||
+        infoHint?.chainId ||
+        netKeyHint;
+      const chainId =
+        getSessionChainId(slugForCache) ||
+        (chainIdHint != null ? Number(chainIdHint) : null) ||
+        currentNetwork?.id ||
+        null;
+      return chainId != null ? String(chainId) : '';
+    };
+    const buildDirectMetadataContext = (slugForRead: any, netKeyHint: any = null, infoHint: any = null) => {
+      const normalizedSlug = normalizeSessionSlug(slugForRead || '');
+      const chainId =
+        Number(getSessionChainId(normalizedSlug) || infoHint?.chainID || infoHint?.chainId || netKeyHint || currentNetwork?.id || 0)
+        || null;
+      const ctx: Record<string, any> = {};
+      if (normalizedSlug) ctx.slug = normalizedSlug;
+      if (chainId) ctx.networkChainId = chainId;
+      return Object.keys(ctx).length ? ctx : (normalizedSlug || '');
+    };
+
+    const syncResolvedSessionSlug = (slugToSync: any) => {
       if (!this._isMounted || !isCurrentLoad()) return;
       const targetSlug = hasExplicitSlug ? normalizedExplicitSlug : slugToSync;
       if (this.state.resolvedSessionSlug !== targetSlug) {
-        this.setState(buildSbtPageResolvedSessionSlugPatch({ slug: targetSlug }));
+        this.setState({ resolvedSessionSlug: targetSlug });
       }
     };
 
     // Signal loading start (allows render() to choose between placeholder or subtle spinner)
     if (this._isMounted) {
-      this.setState(buildSbtPageLoadInfoLoadingStartPatch({
-        hasExplicitSlug,
-        normalizedExplicitSlug,
-      }));
+      this.setState({
+        loadingMintersBurners: true,
+        logScanProgress: null,
+        ...(hasExplicitSlug ? { resolvedSessionSlug: normalizedExplicitSlug } : {}),
+      });
     }
 
     try {
@@ -2286,47 +2372,43 @@ class SBTPage extends Component<any, any> {
         sbtInfoSessionName: entry?.sbtInfo?.sessionName ?? null
       });
       const canReportProgress = !this.props.miniaturized;
-      const makeProgressHandler = (slugForProgress: unknown): ((progress: SbtPageScanProgress) => void) | null => {
+      const makeProgressHandler = (slugForProgress: any) => {
         if (!canReportProgress || !isCurrentLoad()) return null;
         const scanKey = `${String(slugForProgress || '')}:${addrLower}:${Date.now()}`;
         this._activeScanKey = scanKey;
-        return (progress: SbtPageScanProgress) => {
+        return (progress: any) => {
           if (!this._isMounted || this._activeScanKey !== scanKey || !isCurrentLoad()) return;
-          this.setState(buildSbtPageLogScanProgressPatch({ progress, slug: slugForProgress }));
+          this.setState({ logScanProgress: { ...progress, slug: slugForProgress } });
         };
       };
 
-      const buildRefreshOptions = (
-        _countsLoadedFlag: unknown,
-        slugForProgress: unknown
-      ): SbtPageRefreshOptions | undefined => {
-        const onProgress = forceEventFetch ? makeProgressHandler(slugForProgress) : null;
-        return buildSbtPageRefreshOptions({
-          forceEventFetch,
-          onProgress,
-          preferCountsOnly,
-        }) as SbtPageRefreshOptions | undefined;
+      const buildRefreshOptions = (_countsLoadedFlag: any, slugForProgress: any) => {
+        if (!forceEventFetch) return undefined;
+        const onProgress = makeProgressHandler(slugForProgress);
+        const refreshOptions: any = onProgress ? { forceCounts: true, onProgress } : { forceCounts: true };
+        if (preferCountsOnly) refreshOptions.countsOnly = true;
+        return refreshOptions;
       };
       let refreshOptions = buildRefreshOptions(entry?.countsLoaded, resolvedSlug);
-      const applyPrimaryMetadataState = (
-        nextSbtInfo: unknown,
-        extraState: Record<string, unknown> = {}
-      ): void => {
+      const applyPrimaryMetadataState = (nextSbtInfo: any, extraState: any = {}) => {
         if (!this._isMounted || !isCurrentLoad()) return;
-        this.setState((prev: SbtPagePrimaryMetadataState) => buildSbtPagePrimaryMetadataStatePatch({
-          account: this.props.account,
-          extraState,
-          nextSbtInfo,
-          prevSbtInfo: prev.sbtInfo,
+        const adminAddr = nextSbtInfo ? (nextSbtInfo.admin || nextSbtInfo.admin_ || '') : '';
+        const nextUserLower = String(this.props.account || '').toLowerCase();
+        const nextUserIsAdmin = nextUserLower && adminAddr && (nextUserLower === String(adminAddr).toLowerCase());
+        this.setState((prev: any) => ({
+          sbtInfo: nextSbtInfo || prev.sbtInfo || null,
+          userIsSbtAdmin: nextUserIsAdmin,
+          ...extraState,
         }));
       };
 
       // Centralized metadata hydration
-      const { usingCentralHydration, parentOwnsInitialRefresh } = resolveSbtPageMetadataHydrationMode({
-        forceEventFetch,
-        isSBTCacheReady: this.props.isSBTCacheReady,
-        refreshSbtData: this.props.refreshSbtData,
-      });
+      const usingCentralHydration = (typeof this.props.refreshSbtData === 'function');
+      const parentOwnsInitialRefresh = (
+        usingCentralHydration &&
+        forceEventFetch !== true &&
+        this.props.isSBTCacheReady === false
+      );
       let metaKey = `${normalizeSessionSlug(resolvedSlug || '')}:${netIdStr}:${addrLower}`;
       if (
         usingCentralHydration &&
@@ -2434,34 +2516,69 @@ class SBTPage extends Component<any, any> {
       }
 
       sbtInfo = await fillFromChainIfMissing(sbtInfo || {}, sbtAddressOriginalCase, resolvedSlug);
-      sbtInfo = isRecord(sbtInfo) ? sbtInfo as SbtPageMetadataInfoLike : {};
       if (!isCurrentLoad()) return;
       applyPrimaryMetadataState(sbtInfo);
 
       const resolvedChainId = Number(getSessionChainId(resolvedSlug) || sbtInfo?.chainID || currentNetwork?.id || 0) || null;
-      const litHooks = this.getActiveLitHooks();
+      const encryptedFields = (sbtInfo?.encryptedFields && typeof sbtInfo.encryptedFields === 'object')
+        ? sbtInfo.encryptedFields
+        : {};
+      const nameEnvelope =
+        encryptedFields?.name ||
+        sbtInfo?.nameEncrypted ||
+        sbtInfo?.encryptedName ||
+        null;
+      const descriptionEnvelope =
+        encryptedFields?.description ||
+        sbtInfo?.descriptionEncrypted ||
+        sbtInfo?.encryptedDescription ||
+        null;
+      const tagsEnvelope =
+        encryptedFields?.tags ||
+        sbtInfo?.tagsEncrypted ||
+        sbtInfo?.encryptedTags ||
+        null;
+      const documentUrlsEnvelope =
+        encryptedFields?.documentURLs ||
+        sbtInfo?.documentURLsEncrypted ||
+        sbtInfo?.docUrlsEncrypted ||
+        null;
+      const imageEnvelope =
+        encryptedFields?.image ||
+        sbtInfo?.imageEncrypted ||
+        sbtInfo?.encryptedImage ||
+        null;
+      const litHooks = getGlobalLitHooks();
       const lit = litHooks && typeof litHooks.getKey === 'function'
         ? { getKey: litHooks.getKey }
         : null;
       const activeAccount = this.props.account;
-      const metadataDecryptPlan = buildSbtPageEncryptedMetadataDecryptPlan({
-        activeAccount,
-        decryptTriedByKey: this._descDecryptTried,
-        hasLitKey: !!lit,
-        metaKey,
-        sbtInfo,
-      });
-      const {
-        decryptKey,
-        descriptionEnvelope,
-        documentUrlsEnvelope,
-        imageEnvelope,
-        nameEnvelope,
-        tagsEnvelope,
-      } = metadataDecryptPlan;
-      if (metadataDecryptPlan.shouldEnterDecryptBoundary) {
+      const envelopeFingerprint = [
+        nameEnvelope ? 'n' : '',
+        descriptionEnvelope ? 'd' : '',
+        tagsEnvelope ? 't' : '',
+        documentUrlsEnvelope ? 'u' : '',
+        imageEnvelope ? 'i' : '',
+      ].join('');
+      const decryptKey = `${metaKey}:${activeAccount || ''}:${envelopeFingerprint}`;
+      if ((nameEnvelope || descriptionEnvelope || tagsEnvelope || documentUrlsEnvelope || imageEnvelope) && !this._descDecryptTried[decryptKey]) {
         if (!isCurrentLoad()) return;
-        if (metadataDecryptPlan.canAttemptDecrypt && lit && activeAccount) {
+        const coerceStringArray = (value: any) => {
+          if (Array.isArray(value)) return value.map((entry: any) => String(entry));
+          if (typeof value === 'string') {
+            const trimmed = value.trim();
+            if (!trimmed) return [];
+            if (trimmed.startsWith('[')) {
+              try {
+                const parsed = JSON.parse(trimmed);
+                if (Array.isArray(parsed)) return parsed.map((entry: any) => String(entry));
+              } catch (_) {}
+            }
+            return [trimmed];
+          }
+          return [];
+        };
+        if (lit && activeAccount) {
           let allFieldsOk = true;
           if (nameEnvelope) {
             try {
@@ -2503,7 +2620,7 @@ class SBTPage extends Component<any, any> {
               });
               if (!isCurrentLoad()) return;
               if (decrypted != null && decrypted !== '') {
-                sbtInfo.tags = coerceSbtPageStringArrayValue(decrypted);
+                sbtInfo.tags = coerceStringArray(decrypted);
                 sbtInfo.tagsDecrypted = true;
               }
             } catch (e) { allFieldsOk = false; sbtLog.warn('SBTPage: tags decrypt fallback', e); }
@@ -2518,7 +2635,7 @@ class SBTPage extends Component<any, any> {
               });
               if (!isCurrentLoad()) return;
               if (decrypted != null && decrypted !== '') {
-                sbtInfo.documentURLs = coerceSbtPageStringArrayValue(decrypted);
+                sbtInfo.documentURLs = coerceStringArray(decrypted);
                 sbtInfo.documentURLsDecrypted = true;
               }
             } catch (e) { allFieldsOk = false; sbtLog.warn('SBTPage: documentURLs decrypt fallback', e); }
@@ -2526,7 +2643,8 @@ class SBTPage extends Component<any, any> {
           if (imageEnvelope) {
             try {
               if (
-                isRecord(imageEnvelope) &&
+                imageEnvelope &&
+                typeof imageEnvelope === 'object' &&
                 (
                   imageEnvelope.storage === 'lit-arweave' ||
                   imageEnvelope.txId ||
@@ -2573,52 +2691,40 @@ class SBTPage extends Component<any, any> {
       }
       applyPrimaryMetadataState(sbtInfo);
 
-      const {
-        groupPasswordHash: cachedGroupPasswordHash,
-        shouldReuseCachedGroupPasswordHash,
-      } = resolveSbtPageCachedGroupPasswordHash({
-        preferCountsOnly,
-        groupPasswordHashLoaded: this.state.groupPasswordHashLoaded,
-        groupPasswordHash: this.state.groupPasswordHash,
-      });
+      const shouldReuseCachedGroupPasswordHash =
+        preferCountsOnly &&
+        this.state.groupPasswordHashLoaded === true;
       const groupPasswordHash = shouldReuseCachedGroupPasswordHash
-        ? cachedGroupPasswordHash
+        ? this.state.groupPasswordHash
         : await contractScriptsUntyped.getGroupPasswordHash('none', sbtAddressOriginalCase, resolvedSlug);
       if (!isCurrentLoad()) return;
-      const {
-        hasGroupHash,
-        hasInviteMint,
-        hasGroupPasswordMint,
-      } = resolveSbtPageGroupPasswordMintState({
-        groupPasswordHash,
-        hashZero: ethers.constants.HashZero,
-        hasPasswordMint: sbtInfo?.hasPasswordMint,
-      });
+      const hasGroupHash = !!groupPasswordHash && groupPasswordHash !== ethers.constants.HashZero;
+      const hasInviteMint = hasGroupHash && !!sbtInfo?.hasPasswordMint;
+      const hasGroupPasswordMint = hasGroupHash && !sbtInfo?.hasPasswordMint;
 
-      let historySummary = normalizeSbtPageHistorySummary(entry?.historySummary);
-      let mintedAddresses = expandSbtPageAddressListFromCountMap(
+      let historySummary = normalizeHistorySummary(entry?.historySummary);
+      let mintedAddresses = this.expandAddressListFromCountMap(
         entry?.mintedCountByAddress,
         entry?.mintedAddresses
       );
-      let burnedAddresses = expandSbtPageAddressListFromCountMap(
+      let burnedAddresses = this.expandAddressListFromCountMap(
         entry?.burnedCountByAddress,
         entry?.burnedAddresses
       );
       let countsLoaded = entry?.countsLoaded === true;
-      let mintedTokensOverride: string | null = null;
-      let mintedTokensSource: string | null = null;
-      let ownerLookupUpperBound: string | null = null;
-      const setSummaryFallbacks = (summaryValue: unknown, sourceLabel: string): void => {
-        const nextFallbackState = applySbtPageHistorySummaryFallback({
-          mintedTokensOverride,
-          mintedTokensSource,
-          ownerLookupUpperBound,
-          sourceLabel,
-          summaryValue,
-        });
-        mintedTokensOverride = nextFallbackState.mintedTokensOverride;
-        mintedTokensSource = nextFallbackState.mintedTokensSource;
-        ownerLookupUpperBound = nextFallbackState.ownerLookupUpperBound;
+      let mintedTokensOverride: any = null;
+      let mintedTokensSource: any = null;
+      let ownerLookupUpperBound: any = null;
+      const setSummaryFallbacks = (summaryValue: any, sourceLabel: any) => {
+        const holderCount = this.sanitizeMintedTokensOverride(summaryValue?.currentHolderCount);
+        const totalMinted = this.sanitizeMintedTokensOverride(summaryValue?.totalMinted);
+        if (holderCount != null) {
+          mintedTokensOverride = holderCount;
+          mintedTokensSource = sourceLabel;
+        }
+        if (totalMinted != null) {
+          ownerLookupUpperBound = totalMinted;
+        }
       };
       if (!countsLoaded || mintedAddresses.length === 0) {
         setSummaryFallbacks(historySummary, 'summary-cache');
@@ -2626,7 +2732,7 @@ class SBTPage extends Component<any, any> {
           try {
             const summaryRaw = await contractScriptsUntyped.getSbtHistorySummary('none', sbtAddressOriginalCase, resolvedSlug);
             if (!isCurrentLoad()) return;
-            historySummary = normalizeSbtPageHistorySummary(summaryRaw) || historySummary;
+            historySummary = normalizeHistorySummary(summaryRaw) || historySummary;
             setSummaryFallbacks(historySummary, 'summary-group');
             sbtLog.info('[SBTPage] history summary load via group', {
               resolvedSlug,
@@ -2642,7 +2748,7 @@ class SBTPage extends Component<any, any> {
             const fallbackCfg = { networkChainId: Number(sbtInfo.chainID) };
             const summaryRaw = await contractScriptsUntyped.getSbtHistorySummary('none', sbtAddressOriginalCase, fallbackCfg);
             if (!isCurrentLoad()) return;
-            historySummary = normalizeSbtPageHistorySummary(summaryRaw) || historySummary;
+            historySummary = normalizeHistorySummary(summaryRaw) || historySummary;
             setSummaryFallbacks(historySummary, 'summary-chainId');
             sbtLog.info('[SBTPage] history summary fallback via chainID', {
               resolvedSlug,
@@ -2662,7 +2768,7 @@ class SBTPage extends Component<any, any> {
           try {
             const mintedTokensRaw = await contractScriptsUntyped.getMintedTokens('none', sbtAddressOriginalCase, resolvedSlug);
             if (!isCurrentLoad()) return;
-            mintedTokensOverride = sanitizeSbtPageMintedTokensOverride(mintedTokensRaw);
+            mintedTokensOverride = this.sanitizeMintedTokensOverride(mintedTokensRaw);
             if (mintedTokensOverride != null) {
               mintedTokensSource = 'mintedTokens-group';
               ownerLookupUpperBound = mintedTokensOverride;
@@ -2676,7 +2782,7 @@ class SBTPage extends Component<any, any> {
             const fallbackCfg = { networkChainId: Number(sbtInfo.chainID) };
             const mintedTokensRaw = await contractScriptsUntyped.getMintedTokens('none', sbtAddressOriginalCase, fallbackCfg);
             if (!isCurrentLoad()) return;
-            mintedTokensOverride = sanitizeSbtPageMintedTokensOverride(mintedTokensRaw);
+            mintedTokensOverride = this.sanitizeMintedTokensOverride(mintedTokensRaw);
             if (mintedTokensOverride != null) {
               mintedTokensSource = 'mintedTokens-chainId';
               ownerLookupUpperBound = mintedTokensOverride;
@@ -2721,21 +2827,19 @@ class SBTPage extends Component<any, any> {
           }
         }
       }
-      const ownerLookupTokenCount = resolveSbtPageOwnerLookupTokenCount({
-        mintedTokensOverride,
-        ownerLookupUpperBound,
-      });
+      let ownerLookupTokenCount = ownerLookupUpperBound != null ? Number(ownerLookupUpperBound) : NaN;
+      if (!Number.isFinite(ownerLookupTokenCount) && mintedTokensOverride != null) {
+        ownerLookupTokenCount = Number(mintedTokensOverride);
+      }
       if (
         !usingCentralHydration &&
         forceEventFetch === true &&
-        resolveSbtPageOwnerLookupFallbackDecision({
-          burnedAddresses,
-          countsLoaded,
-          mintedAddresses,
-          ownerLookupTokenCount,
-          preferCountsOnly,
-          requireCountsNotLoaded: true,
-        })
+        !preferCountsOnly &&
+        countsLoaded !== true &&
+        mintedAddresses.length === 0 &&
+        burnedAddresses.length === 0 &&
+        Number.isFinite(ownerLookupTokenCount) &&
+        ownerLookupTokenCount > 0
       ) {
         const ownerFallback = await this.fetchHolderAddressesByTokenOwnership(
           sbtAddressOriginalCase,
@@ -2751,7 +2855,7 @@ class SBTPage extends Component<any, any> {
           mintedTokensSource = 'ownerOf-fallback';
         }
       }
-      const sanitizedMintedTokensOverride = sanitizeSbtPageMintedTokensOverride(mintedTokensOverride);
+      const sanitizedMintedTokensOverride = this.sanitizeMintedTokensOverride(mintedTokensOverride);
       sbtLog.info('[SBTPage] counts snapshot', {
         resolvedSlug,
         countsLoaded,
@@ -2763,12 +2867,10 @@ class SBTPage extends Component<any, any> {
       const userLower = String(this.props.account || '').toLowerCase();
 
       // Calculate Admin Status
-      const userIsSbtAdmin = resolveSbtPageUserAdminStatus({
-        account: userLower,
-        sbtInfo,
-      });
+      const adminAddr = sbtInfo ? (sbtInfo.admin || sbtInfo.admin_ || '') : '';
+      const userIsSbtAdmin = userLower && adminAddr && (userLower === adminAddr.toLowerCase());
       if (this._isMounted && isCurrentLoad()) {
-        this.setState((prev: HolderRefreshStateLike) => {
+        this.setState((prev: any) => {
           const nextHoldersMetaKey = metaKey || null;
           const holderState = this.reconcileHolderRefreshState({
             prevState: prev,
@@ -2804,13 +2906,14 @@ class SBTPage extends Component<any, any> {
       }
 
       // Optional one-shot event scan (counts refresh or user-initiated)
-      const shouldRefreshCounts = resolveSbtPageShouldRefreshCounts({
-        burnedAddresses,
-        countsLoaded,
-        forceEventFetch,
-        mintedAddresses,
-        mintedTokensOverride,
-      });
+      const shouldRefreshCounts =
+        forceEventFetch === true ||
+        (
+          !countsLoaded &&
+          mintedAddresses.length === 0 &&
+          burnedAddresses.length === 0 &&
+          mintedTokensOverride == null
+        );
       // Regression guard: MainSite already owns the initial cold-load refresh for /sbt.
       // Kicking off another forced refresh here doubles the same log scan before cache lands.
       sbtLog.info('[SBTPage] refresh decision', {
@@ -2823,18 +2926,21 @@ class SBTPage extends Component<any, any> {
         burnedAddresses: burnedAddresses.length,
         mintedTokensOverride
       });
-      const refreshLifecyclePlan = resolveSbtPageRefreshLifecyclePlan({
-        eventScanTried: this._eventScanTried[metaKey],
-        parentOwnsInitialRefresh,
-        refreshOptions,
-        shouldRefreshCounts,
-        usingCentralHydration,
-      });
-      if (refreshLifecyclePlan.shouldPromoteToForcedCountsRefresh) {
+      if (
+        shouldRefreshCounts &&
+        usingCentralHydration &&
+        !parentOwnsInitialRefresh &&
+        (!refreshOptions || !refreshOptions.forceCounts)
+      ) {
         const onProgress = makeProgressHandler(resolvedSlug);
         refreshOptions = onProgress ? { forceCounts: true, onProgress } : { forceCounts: true };
       }
-      if (refreshLifecyclePlan.shouldRunEventScanRefresh) {
+      if (
+        shouldRefreshCounts &&
+        usingCentralHydration &&
+        !parentOwnsInitialRefresh &&
+        !this._eventScanTried[metaKey]
+      ) {
         if (!isCurrentLoad()) return;
         this._eventScanTried[metaKey] = true;
         try { await this.refreshSbtDataWithSlug(sbtAddressOriginalCase, refreshOptions, resolvedSlug); } catch (e) { sbtLog.warn('SBTPage: fallback', e); }
@@ -2842,21 +2948,21 @@ class SBTPage extends Component<any, any> {
         cache = await readCacheForSlug(resolvedSlug, netIdStr);
         if (!isCurrentLoad()) return;
         entry = cache[netIdStr]?.sbtList?.[addrLower] || entry;
-        let minted2 = expandSbtPageAddressListFromCountMap(
+        let minted2 = this.expandAddressListFromCountMap(
           entry?.mintedCountByAddress,
           entry?.mintedAddresses || mintedAddresses
         );
-        let burned2 = expandSbtPageAddressListFromCountMap(
+        let burned2 = this.expandAddressListFromCountMap(
           entry?.burnedCountByAddress,
           entry?.burnedAddresses || burnedAddresses
         );
         let refreshedCountsLoaded = entry?.countsLoaded === true;
-        const needsOwnerFallback = resolveSbtPageOwnerLookupFallbackDecision({
-          burnedAddresses: burned2,
-          mintedAddresses: minted2,
-          ownerLookupTokenCount,
-          preferCountsOnly,
-        });
+        const hasMintedCountHint = Number.isFinite(ownerLookupTokenCount) && ownerLookupTokenCount > 0;
+        const needsOwnerFallback =
+          !preferCountsOnly &&
+          minted2.length === 0 &&
+          burned2.length === 0 &&
+          hasMintedCountHint;
         if (needsOwnerFallback) {
           const ownerFallback = await this.fetchHolderAddressesByTokenOwnership(
             sbtAddressOriginalCase,
@@ -2874,7 +2980,7 @@ class SBTPage extends Component<any, any> {
           delete this._eventScanTried[metaKey];
         }
         if (this._isMounted && isCurrentLoad()) {
-          this.setState((prev: HolderRefreshStateLike) => {
+          this.setState((prev: any) => {
             const nextHoldersMetaKey = metaKey || null;
             const holderState = this.reconcileHolderRefreshState({
               prevState: prev,
@@ -2914,7 +3020,7 @@ class SBTPage extends Component<any, any> {
       const rerunOptions = this._loadSbtInfoPendingOptions;
       const rerunForce = this._loadSbtInfoPendingForce === true;
       if (this._isMounted && (isCurrentRequest || !shouldRerun)) {
-        this.setState(buildSbtPageLoadingMintersBurnersPatch());
+        this.setState({ loadingMintersBurners: false });
       }
       this._loadSbtInfoPending = false;
       this._loadSbtInfoPendingForce = false;
@@ -2929,20 +3035,6 @@ class SBTPage extends Component<any, any> {
   }
 
 
-
-  clearMintingEndCountdown() {
-    const { intervalId } = this.state;
-    if (intervalId) {
-      clearInterval(intervalId);
-      if (this._isMounted) this.setState(buildSbtPageIntervalIdPatch({ intervalId: null }));
-    }
-  }
-
-  restartMintingEndCountdown() {
-    if (!this._isMounted) return;
-    this.clearMintingEndCountdown();
-    this.startMintingEndCountdown();
-  }
 
   startMintingEndCountdown() {
     const pollingIntervalMs = Math.max(1000, this.getActiveBlockTimeMs(1));
@@ -2960,29 +3052,24 @@ class SBTPage extends Component<any, any> {
 
         if (distance <= 0) {
           clearInterval(intervalId);
-          if (this._isMounted && this.state.intervalId === intervalId) {
-            this.setState({
-              ...buildSbtPageMintCountdownPatch(),
-              ...buildSbtPageIntervalIdPatch({ intervalId: null }),
-            });
-          }
+          if (this._isMounted) this.setState({ mintCountdown: null });
         } else {
           const days = Math.floor(distance / (1000 * 60 * 60 * 24));
           const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
           const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
           const seconds = Math.floor((distance % (1000 * 60)) / 1000);
-          if (this._isMounted) this.setState(buildSbtPageMintCountdownPatch({
-            countdown: `${days}d ${hours}h ${minutes}m ${seconds}s`,
-          }));
+          if (this._isMounted) this.setState({
+            mintCountdown: `${days}d ${hours}h ${minutes}m ${seconds}s`,
+          });
         }
       }
     }, pollingIntervalMs);
 
-    if (this._isMounted) this.setState(buildSbtPageIntervalIdPatch({ intervalId }));
+    if (this._isMounted) this.setState({ intervalId });
   }
 
 
-  checkForMintPassword = (): void => {
+  checkForMintPassword: any = () => {
     const { sbtMintPassword } = this.props;
     const finalPasswordToUse = sbtMintPassword;
 
@@ -2992,64 +3079,49 @@ class SBTPage extends Component<any, any> {
         ? this.decodeInviteInput(finalPasswordToUse)
         : null;
 
-      this.setState(buildSbtPageMintPasswordPrefillPatch({
-        currentGroupPasswordInput: this.state.groupPasswordInput || '',
-        finalPasswordToUse,
-        invitePayload,
-        isList,
-      }));
+      this.setState({
+        mintPassword: (isList || invitePayload) ? '' : finalPasswordToUse,
+        manualPasswordInput: (isList || invitePayload) ? '' : finalPasswordToUse,
+        groupPasswordInput: invitePayload ? invitePayload.inviteCode : (this.state.groupPasswordInput || ''),
+        mintStep: 0,
+        showPasswordAlert: !isList && !invitePayload
+      });
     } else if (!finalPasswordToUse && (this.state.mintPassword || this.state.manualPasswordInput) && this._isMounted) {
-      this.setState(buildSbtPageMintPasswordClearPatch());
+      this.setState({
+        mintPassword: '',
+        manualPasswordInput: '',
+        showPasswordAlert: false
+      });
     }
   };
 
-  async mintUnlimitedWithGroupPassword(options: SbtPageManualMintOptions = {}): Promise<boolean> {
+  async mintUnlimitedWithGroupPassword() {
     sbtLog.log('[MANUAL-MINT] Starting manual mint...');
-    let sbt: string | null = null;
-    let slug = '';
-    let mintAccountLower = '';
-    let mintChainId = '';
     try {
       if (!this.props.account) {
         this.props.toggleLoginModal(true);
-        return false;
+        return;
       }
-      const password = cryptoUtils.normalizeGroupPasswordInput(
-        options?.passwordOverride != null ? options.passwordOverride : this.state.groupPasswordInput
-      );
+      const password = cryptoUtils.normalizeGroupPasswordInput(this.state.groupPasswordInput);
       if (!password) {
-        this.setState(buildSbtPageErrorPatch({ error: 'Enter group password first.' }));
-        return false;
+        this.setState({ error: 'Enter group password first.' });
+        return;
       }
 
-      sbt = resolveSbtAddressString(options?.sbtAddressOverride || this.props.SBTAddress);
-      if (!sbt) return false;
+      const { SBTAddress: SBTAddressProp } = this.props;
+      const sbt = Array.isArray(SBTAddressProp)
+        ? SBTAddressProp.find((e: any) => e.sbtAddress !== undefined)?.sbtAddress
+        : (SBTAddressProp && SBTAddressProp.sbtAddress !== undefined ? SBTAddressProp.sbtAddress : SBTAddressProp);
 
       sbtLog.log('[MANUAL-MINT] Preparing mint for', sbt, '...');
-      slug = options?.sessionSlugOverride != null
-        ? String(options.sessionSlugOverride || '')
-        : this.getEffectiveSessionSlug();
-      mintAccountLower = options?.accountLowerOverride != null
-        ? String(options.accountLowerOverride || '').trim().toLowerCase()
-        : String(this.props.account || '').trim().toLowerCase();
-      mintChainId = options?.chainIdOverride != null
-        ? String(options.chainIdOverride || '').trim()
-        : this.getMintTargetChainId();
-      const mintAccount = this.props.account;
-
-      if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, chainId: mintChainId, sbtAddress: sbt, sessionSlug: slug })) {
-        return false;
-      }
+      const slug = this.getEffectiveSessionSlug();
 
       sbtLog.log('[MANUAL-MINT] Reading on-chain groupPasswordHash...');
       const onchain = await contractScriptsUntyped.getGroupPasswordHash('none', sbt, slug);
       sbtLog.log('[MANUAL-MINT] On-chain groupPasswordHash:', onchain);
-      if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, chainId: mintChainId, sbtAddress: sbt, sessionSlug: slug })) {
-        return false;
-      }
       if (!onchain || onchain === ethers.constants.HashZero) {
-        this.setState(buildSbtPageErrorPatch({ error: `This ${t('sbt')} does not support group-password signature ${t('mintLower')}.` }));
-        return false;
+        this.setState({ error: `This ${t('sbt')} does not support group-password signature ${t('mintLower')}.` });
+        return;
       }
 
       const walletScopeSbtAddress = cryptoUtils.resolveGroupPasswordWalletScopeAddress({
@@ -3062,125 +3134,97 @@ class SBTPage extends Component<any, any> {
         : contractScriptsUntyped.computeGroupPasswordHash({
             password,
             sbtAddress: walletScopeSbtAddress
-      });
+          });
       if (!local || local.toLowerCase() !== onchain.toLowerCase()) {
         sbtLog.error('[MANUAL-MINT] Sanity check FAILED', { expected: onchain, computed: local });
-        if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, chainId: mintChainId, sbtAddress: sbt, sessionSlug: slug })) {
-          return false;
-        }
-        this.setState(buildSbtPageErrorPatch({ error: 'Incorrect group password.' }));
-        return false;
+        this.setState({ error: 'Incorrect group password.' });
+        return;
       }
 
-      if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, chainId: mintChainId, sbtAddress: sbt, sessionSlug: slug })) {
-        return false;
-      }
-      this.setMintPendingForTarget({
-        accountLower: mintAccountLower,
-        chainId: mintChainId,
-        sbtAddress: sbt,
-        sessionSlug: slug,
-      });
+      this.setState({ mintingStatus: 'pending', lastTransactionType: 'mint' });
 
       sbtLog.log('[MANUAL-MINT] Signing authorization...');
       const sig = await contractScripts.signGroupMintAuthorization({
         password,
         sbtAddress: sbt,
-        userAddress: mintAccount,
+        userAddress: this.props.account,
         walletScopeSbtAddress,
       });
       sbtLog.log('[MANUAL-MINT] Signature:', sig);
 
-      if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, chainId: mintChainId, sbtAddress: sbt, sessionSlug: slug })) {
-        return false;
-      }
       sbtLog.log('[MANUAL-MINT] Sending transaction...');
       const tx = await contractScripts.mintWithGroupSignature(this.props.provider, sbt, sig);
       sbtLog.log('[MANUAL-MINT] Tx hash:', tx.transactionHash);
 
-      await this.completeMintSuccessForTarget({
-        accountLower: mintAccountLower,
-        chainId: mintChainId,
-        forceEventRefreshOnSuccess: true,
-        sbtAddress: sbt,
-        sessionSlug: slug,
-        txHash: tx.transactionHash,
+      await this.loadSBTInfo(true);
+      this.setState({
+        mintingStatus: 'success',
+        transactionHash: tx.transactionHash,
+        lastTransactionType: 'mint',
+        lastMintTxHash: tx.transactionHash
       });
-      return true;
+
+      // Optimistic + parent refresh to ensure counters update everywhere
+      const meLower = this.props.account.toLowerCase();
+      this.applyLocalMintSuccess(meLower);
+      this.refreshSbtDataWithSlug(sbt);
+
+      // Cleanup auto-mint intent to prevent loop on refresh
+      this.clearAutoMintUrlIntent();
+
+      try {
+        window.dispatchEvent(new CustomEvent('sbt-mint-success', { detail: { sbtAddress: sbt, txHash: tx.transactionHash } }));
+      } catch (e) { sbtLog.warn('SBTPage: telemetry', e); }
     } catch (error) {
       sbtLog.error('Manual mint flow failed:', error);
-      if (this.isMintTargetContextCurrent({ accountLower: mintAccountLower, chainId: mintChainId, sbtAddress: sbt, sessionSlug: slug })) {
-        this.setState(buildSbtPageMintFailurePatch({ error: getErrorMessage(error, `${t('mint')} failed.`) }));
-      }
-      return false;
+      this.setState({ error: getErrorMessage(error, `${t('mint')} failed.`), mintingStatus: 'failure' });
     }
   }
 
-  fetchRelevantInfo = (): void => {
-    if (this._isMounted) this.setState(buildSbtPageRelevantInfoPatch({
-      sbtLabel: t('sbt'),
-    }));
+  fetchRelevantInfo: any = () => {
+    if (this._isMounted) this.setState({
+      relevantQuestions: [`What is the purpose of this ${t('sbt')}?`, `How can I use this ${t('sbt')}?`],
+      relevantDocuments: [`${t('sbt')} Whitepaper`, 'Community Guidelines'],
+    });
   };
 
-  handleMint = async (
-    forceEventRefreshOnSuccess: boolean = true,
-    options: SbtPageHandleMintOptions = {}
-  ): Promise<boolean> => {
+  handleMint: any = async (forceEventRefreshOnSuccess: any = true) => {
     if (!this.props.account) {
       this.props.toggleLoginModal(true);
-      return false;
+      return;
     }
 
-    const sbtAddressOriginalCase = resolveSbtAddressString(options?.sbtAddressOverride || this.props.SBTAddress);
+    const { SBTAddress: SBTAddressProp } = this.props;
+    const sbtAddressOriginalCase = Array.isArray(SBTAddressProp)
+        ? SBTAddressProp.find((entry: any) => entry.sbtAddress !== undefined)?.sbtAddress
+        : (SBTAddressProp && SBTAddressProp.sbtAddress !== undefined ? SBTAddressProp.sbtAddress : SBTAddressProp);
 
-    if (!sbtAddressOriginalCase) return false;
+    if (!sbtAddressOriginalCase) return;
 
-    const {
-      mintPassword,
-      mintStep,
-      manualPasswordInput,
-    } = this.state;
-    const sbtInfo = (options?.sbtInfoOverride || this.state.sbtInfo || {}) as SbtPageInfoState;
-    const slug = options?.sessionSlugOverride != null
-      ? String(options.sessionSlugOverride || '')
-      : this.getEffectiveSessionSlug();
-    const mintAccountLower = options?.accountLowerOverride != null
-      ? String(options.accountLowerOverride || '').trim().toLowerCase()
-      : String(this.props.account || '').trim().toLowerCase();
-    const mintChainId = options?.chainIdOverride != null
-      ? String(options.chainIdOverride || '').trim()
-      : this.getMintTargetChainId();
-    const mintAccount = this.props.account;
-
-    if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, chainId: mintChainId, sbtAddress: sbtAddressOriginalCase, sessionSlug: slug })) {
-      return false;
-    }
+    const { sbtInfo, mintPassword, mintStep, manualPasswordInput } = this.state;
 
     try {
       if (sbtInfo.hasPasswordMint) {
         const effectivePassword = (mintPassword && mintPassword.trim() !== '' ? mintPassword : (manualPasswordInput || '').trim());
         if (effectivePassword === '') {
-          if (this._isMounted) this.setState(buildSbtPageMintFailurePatch({ error: `Password is required for this ${t('sbt')}.` }));
-          return false;
+          if (this._isMounted) this.setState({ error: `Password is required for this ${t('sbt')}.`, mintingStatus: 'failure' });
+          return;
         }
 
         if (mintStep === 0) {
-          // Pre-validate password before spending gas on startClaim().
-          // isPasswordValid() is a free view call and saves two wasted txs on bad passwords.
+          // PRD 137: Pre-validate password before spending gas on startClaim().
+          // isPasswordValid() is a free view call — saves two wasted txs on bad passwords.
           const hashedPassword = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(effectivePassword));
           try {
-            const isValid = await contractScriptsUntyped.isPasswordValid(
+            const isValid = await contractScripts.isPasswordValid(
               this.props.provider,
               sbtAddressOriginalCase,
               hashedPassword,
-              slug
+              this.getEffectiveSessionSlug()
             );
             if (!isValid) {
-              if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, chainId: mintChainId, sbtAddress: sbtAddressOriginalCase, sessionSlug: slug })) {
-                return false;
-              }
-              if (this._isMounted) this.setState(buildSbtPageMintFailurePatch({ error: 'Invalid password.' }));
-              return false;
+              if (this._isMounted) this.setState({ error: 'Invalid password.', mintingStatus: 'failure' });
+              return;
             }
           } catch (preCheckErr) {
             // If the view call fails (e.g. network issue), proceed with the mint anyway —
@@ -3188,101 +3232,82 @@ class SBTPage extends Component<any, any> {
             sbtLog.warn('[SBTPage] Password pre-validation call failed, proceeding with mint:', preCheckErr);
           }
 
-          if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, chainId: mintChainId, sbtAddress: sbtAddressOriginalCase, sessionSlug: slug })) {
-            return false;
-          }
-          this.setMintPendingForTarget({
-            accountLower: mintAccountLower,
-            chainId: mintChainId,
-            sbtAddress: sbtAddressOriginalCase,
-            sessionSlug: slug,
-          });
+          if (this._isMounted) this.setState({ mintingStatus: 'pending', lastTransactionType: 'mint' });
 
           const userCommit = ethers.utils.solidityKeccak256(
             ["string", "address"],
-            [effectivePassword, mintAccount]
+            [effectivePassword, this.props.account]
           );
 
           const tx = await contractScripts.startClaim(this.props.provider, sbtAddressOriginalCase, userCommit);
-          if (
-            this._isMounted &&
-            this.isMintTargetContextCurrent({ accountLower: mintAccountLower, chainId: mintChainId, sbtAddress: sbtAddressOriginalCase, sessionSlug: slug })
-          ) {
-            this.setState(buildSbtPagePasswordClaimStartSuccessPatch({
-              txHash: tx.transactionHash,
-            }));
-            this.startClaimCountdown();
-            this._activeMintPendingTargetKey = '';
-          } else {
-            this.clearMintPendingForTarget({
-              accountLower: mintAccountLower,
-              chainId: mintChainId,
-              sbtAddress: sbtAddressOriginalCase,
-              sessionSlug: slug,
-            });
-          }
-          this.cacheTransactionHash(tx.transactionHash, mintAccountLower);
-          return true;
+          if (this._isMounted) this.setState({
+            mintStep: 1,
+            mintingStatus: 'idle',
+            transactionHash: tx.transactionHash
+          });
+          this.startClaimCountdown();
+          this.cacheTransactionHash(tx.transactionHash);
         } else if (mintStep === 2) {
-          if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, chainId: mintChainId, sbtAddress: sbtAddressOriginalCase, sessionSlug: slug })) {
-            return false;
-          }
-          this.setMintPendingForTarget({
-            accountLower: mintAccountLower,
-            chainId: mintChainId,
-            sbtAddress: sbtAddressOriginalCase,
-            sessionSlug: slug,
-          });
+          if (this._isMounted) this.setState({ mintingStatus: 'pending', lastTransactionType: 'mint' });
           const tx = await contractScripts.claimWithPassword(this.props.provider, sbtAddressOriginalCase, effectivePassword);
-          this.cacheTransactionHash(tx.transactionHash, mintAccountLower);
-          await this.completeMintSuccessForTarget({
-            accountLower: mintAccountLower,
-            chainId: mintChainId,
-            clearManualPassword: true,
-            forceEventRefreshOnSuccess,
+          if (this._isMounted) this.setState({
             mintStep: 3,
-            sbtAddress: sbtAddressOriginalCase,
-            sessionSlug: slug,
-            txHash: tx.transactionHash,
+            manualPasswordInput: '',
+            mintingStatus: 'success',
+            transactionHash: tx.transactionHash,
+            lastTransactionType: 'mint',
+            lastMintTxHash: tx.transactionHash
           });
-          return true;
+          await this.loadSBTInfo(forceEventRefreshOnSuccess);
+          this.cacheTransactionHash(tx.transactionHash);
+
+          // Optimistic + parent refresh
+          const meLower = this.props.account.toLowerCase();
+          this.applyLocalMintSuccess(meLower);
+          this.refreshSbtDataWithSlug(sbtAddressOriginalCase);
+
+          // Cleanup auto-mint intent to prevent loop on refresh
+          this.clearAutoMintUrlIntent();
+
+          try {
+            window.dispatchEvent(new CustomEvent('sbt-mint-success', {
+              detail: { sbtAddress: sbtAddressOriginalCase, txHash: tx.transactionHash }
+            }));
+          } catch (e) { sbtLog.warn('SBTPage: telemetry', e); }
         }
       } else {
-        if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, chainId: mintChainId, sbtAddress: sbtAddressOriginalCase, sessionSlug: slug })) {
-          return false;
-        }
-        this.setMintPendingForTarget({
-          accountLower: mintAccountLower,
-          chainId: mintChainId,
-          sbtAddress: sbtAddressOriginalCase,
-          sessionSlug: slug,
-        });
+        if (this._isMounted) this.setState({ mintingStatus: 'pending', lastTransactionType: 'mint' });
         const tx = await contractScripts.claim(this.props.provider, sbtAddressOriginalCase);
-        this.cacheTransactionHash(tx.transactionHash, mintAccountLower);
-        await this.completeMintSuccessForTarget({
-          accountLower: mintAccountLower,
-          chainId: mintChainId,
-          forceEventRefreshOnSuccess,
-          sbtAddress: sbtAddressOriginalCase,
-          sessionSlug: slug,
-          txHash: tx.transactionHash,
+        if (this._isMounted) this.setState({
+          mintingStatus: 'success',
+          transactionHash: tx.transactionHash,
+          lastTransactionType: 'mint',
+          lastMintTxHash: tx.transactionHash
         });
-        return true;
+        await this.loadSBTInfo(forceEventRefreshOnSuccess);
+        this.cacheTransactionHash(tx.transactionHash);
+
+        // Optimistic + parent refresh
+        const meLower = this.props.account.toLowerCase();
+        this.applyLocalMintSuccess(meLower);
+        this.refreshSbtDataWithSlug(sbtAddressOriginalCase);
+
+        // Cleanup auto-mint intent to prevent loop on refresh
+        this.clearAutoMintUrlIntent();
+
+        try {
+          window.dispatchEvent(new CustomEvent('sbt-mint-success', {
+            detail: { sbtAddress: sbtAddressOriginalCase, txHash: tx.transactionHash }
+          }));
+        } catch (e) { sbtLog.warn('SBTPage: telemetry', e); }
       }
     } catch (error) {
       sbtLog.error("Minting failed in handleMint:", error);
-      if (
-        this._isMounted &&
-        this.isMintTargetContextCurrent({ accountLower: mintAccountLower, chainId: mintChainId, sbtAddress: sbtAddressOriginalCase, sessionSlug: slug })
-      ) {
-        this.setState(buildSbtPageMintFailurePatch({ error: getErrorMessage(error, `${t('minting')} failed.`) }));
-      }
-      return false;
+      if (this._isMounted) this.setState({ error: getErrorMessage(error, `${t('minting')} failed.`), mintingStatus: 'failure' });
     }
-    return false;
   };
 
-  miniMintHandler = async (): Promise<void> => {
+  miniMintHandler: any = async () => {
     if (!this.props.account) {
       this.props.toggleLoginModal(true);
       return;
@@ -3290,27 +3315,35 @@ class SBTPage extends Component<any, any> {
     await this.handleMint(true); // Pass true to force event refresh on success
   };
 
-  miniBurnHandler = async (): Promise<void> => {
+  miniBurnHandler: any = async () => {
     if (!this.props.account) {
       this.props.toggleLoginModal(true);
       return;
     }
     try {
-      if (this._isMounted) this.setState(buildSbtPageBurnPendingPatch());
+      if (this._isMounted) this.setState({ burningStatus: 'pending', lastTransactionType: 'burn' });
 
-      const sbtAddressOriginalCase = resolveSbtAddressString(this.props.SBTAddress);
+      const { SBTAddress: SBTAddressProp } = this.props;
+      const sbtAddressOriginalCase = Array.isArray(SBTAddressProp)
+        ? SBTAddressProp.find((entry: any) => entry.sbtAddress !== undefined)?.sbtAddress
+        : (SBTAddressProp && SBTAddressProp.sbtAddress !== undefined ? SBTAddressProp.sbtAddress : SBTAddressProp);
 
       if (!sbtAddressOriginalCase) return;
 
-      const tokenIdToBurn = await contractScriptsUntyped.getSBTTokenIdByOwner('none', sbtAddressOriginalCase, this.props.account, this.getEffectiveSessionSlug());
+      const tokenIdToBurn = await contractScriptsUntyped.getSBTTokenIdByOwner(this.props.provider, sbtAddressOriginalCase, this.props.account, this.getEffectiveSessionSlug());
       if (!tokenIdToBurn) {
-        if (this._isMounted) this.setState(buildSbtPageBurnFailurePatch({ error: "No valid token ID found" }));
+        if (this._isMounted) this.setState({ error: "No valid token ID found", burningStatus: 'failure' });
         return;
       }
 
       const tx = await contractScripts.burnToken(this.props.provider, sbtAddressOriginalCase, tokenIdToBurn);
       await this.loadSBTInfo(true);
-      if (this._isMounted) this.setState(buildSbtPageBurnSuccessPatch({ txHash: tx.transactionHash }));
+      if (this._isMounted) this.setState({
+        burningStatus: 'success',
+        transactionHash: tx.transactionHash,
+        lastTransactionType: 'burn',
+        lastBurnTxHash: tx.transactionHash
+      });
       this.cacheTransactionHash(tx.transactionHash);
 
       // Optimistic + parent refresh
@@ -3318,16 +3351,20 @@ class SBTPage extends Component<any, any> {
       this.refreshSbtDataWithSlug(sbtAddressOriginalCase);
     } catch (error) {
       sbtLog.error("Burn failed in miniBurnHandler:", error);
-      if (this._isMounted) this.setState(buildSbtPageBurnFailurePatch({ error: getErrorMessage(error) }));
+      if (this._isMounted) this.setState({ error: getErrorMessage(error), burningStatus: 'failure' });
     }
   };
 
 
-  handleBurnSearchChange = (event: React.ChangeEvent<HTMLInputElement>): void => {
+  handleBurnSearchChange: any = (event: any) => {
     const input = event.target.value;
 
     if (this._isMounted) {
-      this.setState(buildSbtPageBurnSearchInputPatch({ input }));
+      this.setState({
+        burnSearchInput: input,
+        burnSearchResult: null,
+        burnSearchType: null,
+      });
     }
 
     // Clear any in-flight debounce
@@ -3346,44 +3383,48 @@ class SBTPage extends Component<any, any> {
   };
 
   // Extracted the actual RPC logic so it can be debounced
-  performBurnSearch = async (rawInput: unknown): Promise<void> => {
-    const input = String(rawInput || '').trim();
+  performBurnSearch: any = async (rawInput: any) => {
+    const input = (rawInput || '').trim();
     if (!input) return;
 
-    const sbtAddressOriginalCase = resolveSbtAddressString(this.props.SBTAddress);
+    const { SBTAddress: SBTAddressProp } = this.props;
+    const sbtAddressOriginalCase = Array.isArray(SBTAddressProp)
+      ? SBTAddressProp.find((entry: any) => entry.sbtAddress !== undefined)?.sbtAddress
+      : (SBTAddressProp && SBTAddressProp.sbtAddress !== undefined
+          ? SBTAddressProp.sbtAddress
+          : SBTAddressProp);
+
     if (!sbtAddressOriginalCase) return;
 
     try {
       // Full address search
       if (input.startsWith('0x') && input.length === 42) {
         const tokenId = await contractScriptsUntyped.getSBTTokenIdByOwner(
-          'none',
+          this.props.provider,
           sbtAddressOriginalCase,
           input,
           this.getEffectiveSessionSlug()
         );
         if (tokenId && this._isMounted) {
-          this.setState(buildSbtPageBurnSearchResultPatch({
-            address: input,
-            resultType: 'address',
-            tokenId,
-          }));
+          this.setState({
+            burnSearchResult: { address: input, tokenId },
+            burnSearchType: 'address',
+          });
         }
       }
       // Numeric tokenId search
       else if (/^\d+$/.test(input)) {
         const address = await contractScriptsUntyped.getOwnerByTokenId(
-          'none',
+          this.props.provider,
           sbtAddressOriginalCase,
           input,
           this.getEffectiveSessionSlug()
         );
         if (address && this._isMounted) {
-          this.setState(buildSbtPageBurnSearchResultPatch({
-            address,
-            resultType: 'tokenId',
-            tokenId: input,
-          }));
+          this.setState({
+            burnSearchResult: { address, tokenId: input },
+            burnSearchType: 'tokenId',
+          });
         }
       }
     } catch (error) {
@@ -3392,190 +3433,190 @@ class SBTPage extends Component<any, any> {
   };
 
 
-  handleBurn = async (): Promise<void> => {
+  handleBurn: any = async () => {
     if (!this.props.account) {
       this.props.toggleLoginModal(true);
       return;
     }
 
-    const sbtAddressOriginalCase = resolveSbtAddressString(this.props.SBTAddress);
+    const { SBTAddress: SBTAddressProp } = this.props;
+    const sbtAddressOriginalCase = Array.isArray(SBTAddressProp)
+        ? SBTAddressProp.find((entry: any) => entry.sbtAddress !== undefined)?.sbtAddress
+        : (SBTAddressProp && SBTAddressProp.sbtAddress !== undefined ? SBTAddressProp.sbtAddress : SBTAddressProp);
     if (!sbtAddressOriginalCase) return;
 
     const { sbtInfo, burnSearchResult } = this.state;
-    const sbtInfoRecord = isRecord(sbtInfo) ? sbtInfo : {};
-    const burnSearchResultRecord = isRecord(burnSearchResult)
-      ? burnSearchResult as SbtPageBurnSearchResult
-      : null;
 
     const userAddress = this.props.account.toLowerCase();
-    const adminAddr = String(sbtInfoRecord.admin || sbtInfoRecord.admin_ || '');
-    const burnAuthNumber = Number(sbtInfoRecord.burnAuth);
-    const burnAuth = Number.isFinite(burnAuthNumber) ? burnAuthNumber : Number.NaN;
-    const isAdminBurn = this.state.userIsSbtAdmin && (burnAuth === 0 || burnAuth === 2);
+    const adminAddr = sbtInfo.admin || sbtInfo.admin_;
+    const isAdminBurn = this.state.userIsSbtAdmin && (sbtInfo.burnAuth === 0 || sbtInfo.burnAuth === 2);
     const isOwnerBurn = this.state.userHasSBT &&
       (
-        burnAuth === 1 ||
-        burnAuth === 2 ||
-        (burnAuth === 0 && adminAddr && adminAddr.toLowerCase() === userAddress)
+        sbtInfo.burnAuth === 1 ||
+        sbtInfo.burnAuth === 2 ||
+        (sbtInfo.burnAuth === 0 && adminAddr && adminAddr.toLowerCase() === userAddress) ||
+        (sbtInfo.burnAuth === 1 && this.state.userHasSBT)
       );
 
-    let tokenIdToBurn: unknown;
-    let burnedAddrLower: string | null = null;
+    let tokenIdToBurn;
+    let burnedAddrLower: any = null;
 
-    if (isAdminBurn && burnSearchResultRecord && burnSearchResultRecord.tokenId) {
-      tokenIdToBurn = burnSearchResultRecord.tokenId;
-      burnedAddrLower = burnSearchResultRecord.address ? String(burnSearchResultRecord.address).toLowerCase() : null;
+    if (isAdminBurn && burnSearchResult && burnSearchResult.tokenId) {
+      tokenIdToBurn = burnSearchResult.tokenId;
+      burnedAddrLower = burnSearchResult.address ? burnSearchResult.address.toLowerCase() : null;
     } else if (isOwnerBurn) {
-      tokenIdToBurn = await contractScriptsUntyped.getSBTTokenIdByOwner('none', sbtAddressOriginalCase, this.props.account, this.getEffectiveSessionSlug());
+      tokenIdToBurn = await contractScriptsUntyped.getSBTTokenIdByOwner(this.props.provider, sbtAddressOriginalCase, this.props.account, this.getEffectiveSessionSlug());
       burnedAddrLower = userAddress;
       if (!tokenIdToBurn) {
-        if (this._isMounted) this.setState(buildSbtPageBurnFailurePatch({ error: "No valid token ID found" }));
+        if (this._isMounted) this.setState({ error: "No valid token ID found", burningStatus: 'failure' });
         return;
       }
-    } else if (this.state.userIsSbtAdmin && (burnAuth === 0 || burnAuth === 2) && !burnSearchResult) {
-      if (this._isMounted) this.setState(buildSbtPageBurnFailurePatch({ error: "Admin burn requires specifying token ID or owner." }));
+    } else if (this.state.userIsSbtAdmin && (sbtInfo.burnAuth === 0 || sbtInfo.burnAuth === 2) && !burnSearchResult) {
+      if (this._isMounted) this.setState({ error: "Admin burn requires specifying token ID or owner.", burningStatus: 'failure' });
       return;
     } else {
-      if (this._isMounted) this.setState(buildSbtPageBurnFailurePatch({ error: `You are not authorized to ${t('burnLower')} this ${t('sbt')}.` }));
+      if (this._isMounted) this.setState({ error: `You are not authorized to ${t('burnLower')} this ${t('sbt')}.`, burningStatus: 'failure' });
       return;
     }
 
     try {
-      if (this._isMounted) this.setState(buildSbtPageBurnPendingPatch());
+      if (this._isMounted) this.setState({ burningStatus: 'pending', lastTransactionType: 'burn' });
       const tx = await contractScripts.burnToken(this.props.provider, sbtAddressOriginalCase, tokenIdToBurn);
       await this.loadSBTInfo(true);
-      if (this._isMounted) this.setState(buildSbtPageBurnSuccessPatch({
-        resetBurnSearch: true,
-        txHash: tx.transactionHash,
-      }));
+      if (this._isMounted) this.setState({
+        burningStatus: 'success',
+        transactionHash: tx.transactionHash,
+        burnSearchInput: '',
+        burnSearchResult: null,
+        burnSearchType: null,
+        lastTransactionType: 'burn',
+        lastBurnTxHash: tx.transactionHash
+      });
       this.cacheTransactionHash(tx.transactionHash);
 
       // Optimistic + parent refresh
       if (burnedAddrLower) this.applyLocalBurnSuccess(burnedAddrLower);
       this.refreshSbtDataWithSlug(sbtAddressOriginalCase);
     } catch (error) {
-      if (this._isMounted) this.setState(buildSbtPageBurnFailurePatch({
+      if (this._isMounted) this.setState({
         error: getErrorMessage(error),
-        resetBurnSearch: true,
-      }));
+        burningStatus: 'failure',
+        burnSearchInput: '',
+        burnSearchResult: null,
+        burnSearchType: null
+      });
     }
   };
 
 
-  startClaimCountdown = (): void => {
+  startClaimCountdown: any = () => {
     const confirmationBlocks = 5;
     const intervalMs = Math.max(1000, this.getActiveBlockTimeMs(1));
     const waitMs = this.getActiveBlockTimeMs(confirmationBlocks);
+    const toDisplaySeconds = (remainingMs: any) => Math.max(0, Math.ceil(Number(remainingMs || 0) / 1000));
     let remainingMs = waitMs;
-    if (this._isMounted) this.setState(buildSbtPageClaimCountdownTickPatch({ remainingMs }));
+    if (this._isMounted) this.setState({ claimCountdown: toDisplaySeconds(remainingMs) });
     const countdownInterval = setInterval(() => {
       if (!this._isMounted) {
         clearInterval(countdownInterval);
         return;
       }
       remainingMs = Math.max(0, remainingMs - intervalMs);
-      if (this._isMounted) this.setState(buildSbtPageClaimCountdownTickPatch({ remainingMs }));
+      if (this._isMounted) this.setState({ claimCountdown: toDisplaySeconds(remainingMs) });
       if (remainingMs === 0) {
         clearInterval(countdownInterval);
-        if (this._isMounted) {
-          this.setState(buildSbtPageClaimCountdownCompletePatch({ waitMs }));
-        }
+        if (this._isMounted) this.setState({ mintStep: 2, claimCountdown: toDisplaySeconds(waitMs) }); // CHANGED reset
       }
     }, intervalMs);
   };
 
 
-  copyToClipboard = async (text: unknown, addressType: unknown): Promise<void> => {
-    try {
-      if (!navigator.clipboard?.writeText) throw new Error('Clipboard write is unavailable');
-      await navigator.clipboard.writeText(String(text ?? ''));
+  copyToClipboard: any = (text: any, addressType: any) => {
+    navigator.clipboard.writeText(text).then(() => {
       notify.success('Copied to clipboard');
-      if (this._isMounted) this.setState(buildSbtPageCopiedAddressPatch({ addressType }), () => {
-        setTimeout(() => { if (this._isMounted) this.setState(buildSbtPageCopiedAddressPatch()) }, 2500);
+      if (this._isMounted) this.setState({ copiedAddress: addressType }, () => {
+        setTimeout(() => { if (this._isMounted) this.setState({ copiedAddress: null }) }, 2500);
       });
-    } catch (error: unknown) {
-      sbtLog.warn('SBTPage clipboard write failed', error);
-      notify.warn('Copy failed');
-    }
+    });
   };
 
-  bookmarkSBT = (): void => {
-    const sbtAddressOriginalCase = resolveSbtAddressString(this.props.SBTAddress);
+  bookmarkSBT: any = () => {
+    const { SBTAddress: SBTAddressProp } = this.props;
+    const sbtAddressOriginalCase = Array.isArray(SBTAddressProp)
+        ? SBTAddressProp.find((entry: any) => entry.sbtAddress !== undefined)?.sbtAddress
+        : (SBTAddressProp && SBTAddressProp.sbtAddress !== undefined ? SBTAddressProp.sbtAddress : SBTAddressProp);
     if (!sbtAddressOriginalCase) return;
     const sbtAddressLower = String(sbtAddressOriginalCase || '').toLowerCase();
     const bookmarksSlug = String(
       this.state?.resolvedSessionSlug ??
       this.props?.activeSessionSlug ??
+      this.props?.activeSessionSlug ??
       this.props?.sessionSlug ??
-      this.props?.slug ??
+      this.props?.sessionSlug ??
       ''
     );
 
     try {
       const existingManaged = peekCacheSync('bookmarksCache', bookmarksSlug, { clone: false });
-      const baseManaged = isRecord(existingManaged) ? existingManaged : {};
-      const managedBookmarks: Record<string, unknown> & { sbts: string[] } = {
+      const baseManaged = (existingManaged && typeof existingManaged === 'object') ? existingManaged : {};
+      const managedBookmarks = {
         ...baseManaged,
-        sbts: Array.isArray(baseManaged.sbts) ? baseManaged.sbts.map((entry) => String(entry || '')) : [],
+        sbts: Array.isArray(baseManaged.sbts) ? [...baseManaged.sbts] : [],
       };
-      const alreadyManaged = managedBookmarks.sbts.some((entry) => String(entry || '').toLowerCase() === sbtAddressLower);
+      const alreadyManaged = managedBookmarks.sbts.some((entry: any) => String(entry || '').toLowerCase() === sbtAddressLower);
       if (!alreadyManaged) {
         managedBookmarks.sbts.push(sbtAddressLower);
-        void (writeCache as unknown as (
-          namespace: string,
-          slug?: string,
-          value?: unknown
-        ) => Promise<unknown>)('bookmarksCache', bookmarksSlug, managedBookmarks).catch((e: unknown) => { sbtLog.warn('SBTPage: fallback', e); });
+        void writeCache('bookmarksCache', bookmarksSlug, managedBookmarks).catch((e: any) => { sbtLog.warn('SBTPage: fallback', e); });
       }
     } catch (e) { sbtLog.warn('SBTPage: fallback', e); }
 
     try {
-      const bookmarks = this.readQueuedOrStoredLocalStorageJson<BookmarkStorageCache>('bookmarks', {});
-      const next = appendSbtPageBookmark({
-        bookmarksObj: bookmarks,
-        sbtAddress: sbtAddressOriginalCase,
-      });
-      if (next.shouldWrite) {
-        this.queueLocalStorageJsonWrite('bookmarks', next.bookmarks as BookmarkStorageCache);
-        if (this._isMounted) this.setState(buildSbtPageBookmarkedPatch({ bookmarked: true }));
+      const bookmarks = this.readQueuedOrStoredLocalStorageJson('bookmarks', {});
+      if (!bookmarks.sbts) bookmarks.sbts = [];
+      if (!bookmarks.sbts.includes(sbtAddressOriginalCase)) {
+        bookmarks.sbts.push(sbtAddressOriginalCase);
+        this.queueLocalStorageJsonWrite('bookmarks', bookmarks);
+        if (this._isMounted) this.setState({ bookmarked: true });
       }
     } catch (e) { sbtLog.warn('SBTPage: fallback', e); }
     this.storeSBTDetails();
   };
 
-  storeSBTDetails = (): void => {
-    const sbtAddressOriginalCase = resolveSbtAddressString(this.props.SBTAddress);
+  storeSBTDetails: any = () => {
+    const { SBTAddress: SBTAddressProp } = this.props;
+    const sbtAddressOriginalCase = Array.isArray(SBTAddressProp)
+        ? SBTAddressProp.find((entry: any) => entry.sbtAddress !== undefined)?.sbtAddress
+        : (SBTAddressProp && SBTAddressProp.sbtAddress !== undefined ? SBTAddressProp.sbtAddress : SBTAddressProp);
     if (!sbtAddressOriginalCase) return;
 
     try {
-      const sbtDetails = buildSbtPageDetailsPayload({
-        sbtInfo: this.state.sbtInfo,
-        address: sbtAddressOriginalCase,
-      });
+      const sbtDetails = { ...this.state.sbtInfo, address: sbtAddressOriginalCase };
       this.queueLocalStorageJsonWrite('sbtDetails', sbtDetails);
     } catch (e) { sbtLog.warn('SBTPage: fallback', e); }
   };
 
-  getExplorerUrl = (address: unknown): string => {
+  getExplorerUrl: any = (address: any) => {
     const currentNetwork = this.state.network || this.props.network;
-    return buildSbtPageExplorerUrl({ network: currentNetwork, value: address, kind: 'address' });
+    return currentNetwork?.blockExplorers?.default?.url ? `${currentNetwork.blockExplorers.default.url}/address/${address}` : `https://sepolia.etherscan.io/address/${address}`;
   };
 
-  getExplorerLink = (hash: unknown): string => {
+  getExplorerLink: any = (hash: any) => {
     const currentNetwork = this.state.network || this.props.network;
-    return buildSbtPageExplorerUrl({ network: currentNetwork, value: hash, kind: 'tx' });
+    return currentNetwork?.blockExplorers?.default?.url ? `${currentNetwork.blockExplorers.default.url}/tx/${hash}` : `https://sepolia.etherscan.io/tx/${hash}`;
   };
 
-  handleGenerateAdminInvites = async (): Promise<void> => {
-    const passwordGenerationCount = this.state.passwordGenerationCount;
-    if (!passwordGenerationCount || Number(passwordGenerationCount) <= 0) return;
+  handleGenerateAdminInvites: any = async () => {
+    if (!this.state.passwordGenerationCount || this.state.passwordGenerationCount <= 0) return;
 
-    const newPasswordList = this.generateRandomPasswords(passwordGenerationCount);
+    const newPasswordList = this.generateRandomPasswords(this.state.passwordGenerationCount);
 
-    const hashedPasswords = newPasswordList.map((password) => ethers.utils.keccak256(ethers.utils.toUtf8Bytes(password)));
+    const hashedPasswords = newPasswordList.map((password: any) => ethers.utils.keccak256(ethers.utils.toUtf8Bytes(password)));
 
     try {
-      const sbtAddressOriginalCase = resolveSbtAddressString(this.props.SBTAddress);
+      const { SBTAddress: SBTAddressProp } = this.props;
+      const sbtAddressOriginalCase = Array.isArray(SBTAddressProp)
+        ? SBTAddressProp.find((entry: any) => entry.sbtAddress !== undefined)?.sbtAddress
+        : (SBTAddressProp && SBTAddressProp.sbtAddress !== undefined ? SBTAddressProp.sbtAddress : SBTAddressProp);
       if (!sbtAddressOriginalCase) return;
 
       const tx = await contractScripts.addHashedPasswords(this.props.provider, sbtAddressOriginalCase, hashedPasswords);
@@ -3583,7 +3624,7 @@ class SBTPage extends Component<any, any> {
 
       this.cacheTransactionHash(tx.transactionHash);
 
-      const recoveryWrite = upsertSbtPasswordRecoveryCodesTyped({
+      const recoveryWrite = upsertSbtPasswordRecoveryCodesUntyped({
         chainId: this.getRecoveryCacheChainId(),
         sbtAddress: sbtAddressOriginalCase,
         passwords: newPasswordList,
@@ -3593,320 +3634,634 @@ class SBTPage extends Component<any, any> {
         sbtLog.warn('Failed to persist admin invite recovery codes:', recoveryWrite.status);
       }
 
-      if (this._isMounted) this.setState(buildSbtPageAdminInviteSuccessPatch({
-        passwordList: newPasswordList,
-      }));
+      if (this._isMounted) this.setState({ adminGeneratedPasswords: newPasswordList, passwordGenerationCount: '' });
       this.loadCachedPasswords();
     } catch (error) {
       sbtLog.error("Error adding hashed passwords:", error);
-      if (this._isMounted) this.setState(buildSbtPageErrorPatch({ error: getErrorMessage(error) }));
+      if (this._isMounted) this.setState({ error: getErrorMessage(error) });
     }
   };
 
 
-  generateRandomPasswords = (count: unknown): string[] => {
-    return generateSbtPageRandomPasswords({
-      count,
-      getRandomValues: (
-        typeof window !== 'undefined' &&
-        window.crypto &&
-        typeof window.crypto.getRandomValues === 'function'
-      )
-        ? (arr: Uint8Array) => window.crypto.getRandomValues(arr)
-        : null,
-      randomBytes: ethers.utils.randomBytes,
-    });
+  generateRandomPasswords: any = (count: any) => {
+    const generated: any = new Set();
+    while (generated.size < count) {
+      // 16 bytes => 32 hex chars (128-bit)
+      let arr;
+      if (typeof window !== 'undefined' && window.crypto && window.crypto.getRandomValues) {
+        arr = new Uint8Array(16);
+        window.crypto.getRandomValues(arr);
+      } else {
+        arr = ethers.utils.randomBytes(16);
+      }
+      const token = Array.from(arr).map((b: any) => b.toString(16).padStart(2, '0')).join('');
+      generated.add(token);
+    }
+    return Array.from(generated);
   };
 
-  exportPasswords = (): void => {
+  exportPasswords: any = () => {
     const { exportFormat, includePreviousPasswords, cachedPasswords, adminGeneratedPasswords } = this.state;
+    const { SBTAddress: SBTAddressProp } = this.props;
     const isInvite = !!this.state.hasInviteMint;
     const codeLabel = isInvite ? 'groupPassword' : 'password';
     const fileLabel = isInvite ? 'group-passwords' : 'passwords';
 
-    const sbtAddr = resolveSbtAddressString(this.props.SBTAddress).toLowerCase();
+    let sbtAddr = Array.isArray(SBTAddressProp)
+      ? SBTAddressProp.find((entry: any) => entry.sbtAddress !== undefined)?.sbtAddress
+      : (SBTAddressProp && SBTAddressProp.sbtAddress !== undefined ? SBTAddressProp.sbtAddress : SBTAddressProp);
 
-    if (!sbtAddr) {
+    if (typeof sbtAddr === 'string') {
+      sbtAddr = sbtAddr.toLowerCase();
+    } else {
         sbtLog.error("SBT Address for export is undefined.");
         return;
     }
 
-    const { passwordsToExport } = resolveSbtPagePasswordExportSelection({
-      adminGeneratedPasswords,
-      cachedPasswords,
-      includePreviousPasswords,
-    });
+    const combinedPasswords = [...(cachedPasswords || []), ...(adminGeneratedPasswords || [])];
+    const onlyCachedPasswords = (adminGeneratedPasswords.length === 0 && combinedPasswords.length > 0);
+    const effectiveIncludePreviousPasswords = onlyCachedPasswords ? true : includePreviousPasswords;
+    let passwordsToExport;
+    if (adminGeneratedPasswords.length > 0) {
+      passwordsToExport = effectiveIncludePreviousPasswords ? combinedPasswords : adminGeneratedPasswords;
+    } else {
+      passwordsToExport = combinedPasswords;
+    }
 
     const baseUrl = window.location.origin;
-    const demoPath = buildSessionRoutePath(this.getEffectiveSessionSlug(), readPublicUrlBasePath());
-    const inviteLinks = buildSbtPagePasswordExportRows({
-      baseUrl,
-      codeLabel,
-      demoPath,
-      encodeGroupPassword: encodeSbtPageGroupPassword,
-      isInvite,
-      passwordsToExport,
-      sbtAddr,
-      sbtBasePathValue: sbtBasePath(),
-    });
+    const demoPath = buildSessionRoutePath(this.getEffectiveSessionSlug());
+    const encodeGroupPassword = (code: any) => {
+      const normalized = cryptoUtils.normalizeGroupPasswordInput(code);
+      return cryptoUtils.encodeGroupPasswordForUrl(normalized) || '';
+    };
+    const inviteLinks = passwordsToExport.map((code: any) => ({
+      [codeLabel]: code,
+      inviteLink: isInvite
+        ? `${baseUrl}${demoPath}?auto=1&sbt=${encodeURIComponent(sbtAddr)}&gp=${encodeURIComponent(encodeGroupPassword(code))}`
+        : `${baseUrl}${sbtBasePath()}/${sbtAddr}/${code}`
+    }));
 
     const date = new Date().toISOString().slice(0, 10);
     const sbtSymbolOrName = getSbtDisplayName(this.state.sbtInfo) || t('sbt');
-    const exportFile = buildSbtPagePasswordExportFile({
-      codeLabel,
-      date,
-      fileLabel,
-      format: exportFormat,
-      rows: inviteLinks,
-      sbtSymbolOrName,
-    });
-    if (!exportFile) return;
 
-    const blob = new Blob([exportFile.content], { type: exportFile.mimeType });
+    let content;
+    let fileName;
+    if (exportFormat === 'json') {
+      content = JSON.stringify(inviteLinks, null, 2);
+      fileName = `${sbtSymbolOrName}_${fileLabel}_${date}.json`;
+    } else if (exportFormat === 'csv') {
+      content = `index,${codeLabel},inviteLink\n` +
+        inviteLinks.map((item: any, index: any) => `${index},${item[codeLabel]},${item.inviteLink}`).join('\n');
+      fileName = `${sbtSymbolOrName}_${fileLabel}_${date}.csv`;
+    } else {
+        return;
+    }
+
+    const blob = new Blob([content], { type: exportFormat === 'json' ? 'application/json' : 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = exportFile.fileName;
+    a.download = fileName;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   };
 
-  resolveFullActionDisplayPlan = (): SbtPageFullActionDisplayPlan => {
-    const {
-      burningStatus,
-      claimCountdown,
-      groupPasswordInput,
-      lastMintTxHash,
-      manualPasswordInput,
-      mintingStatus,
-      mintStep,
-      sbtInfo,
-      userHasSBT,
-    } = this.state;
+renderMintButton() {
+  const { sbtInfo, mintStep, claimCountdown, mintingStatus, userHasSBT, burningStatus, manualPasswordInput, lastMintTxHash } = this.state;
+  if (userHasSBT && burningStatus !== 'success') return null;
+  if (!sbtInfo) return null;
 
-    return resolveSbtPageFullActionDisplayPlan({
-      account: this.props.account,
-      actionClassName: styles.actionButton,
-      burnedLabel: t('burned'),
-      burningStatus,
-      burnButtonClassName: styles.burnButton,
-      burnLabel: t('burn'),
-      claimCountdown,
-      groupPasswordInput,
-      hasGroupPasswordMint: this.state.hasGroupPasswordMint,
-      hasInviteMint: this.state.hasInviteMint,
-      lastMintTxHash,
-      manualPasswordInput,
-      mintedLabel: t('minted'),
-      mintButtonClassName: styles.mintButton,
-      mintLowerLabel: t('mintLower'),
-      mintingStatus,
-      mintStep,
-      nowSeconds: Math.floor(Date.now() / 1000),
-      sbtInfo,
-      sbtMintedSuccessLabel: `${t('sbt')} successfully ${t('mintedLower')}!`,
-      userHasSBT,
-    });
-  };
+  const now = Math.floor(Date.now() / 1000);
+  if (sbtInfo.mintingEndTime !== 0 && sbtInfo.mintingEndTime < now) return null;
 
-  renderFullActionSurfaces = (
-    actionDisplayPlan: SbtPageFullActionDisplayPlan = this.resolveFullActionDisplayPlan()
-  ): SbtPageFullActionSurfaces => {
-    const { groupPasswordInput, lastMintTxHash } = this.state;
+  // Unlimited (signature) path - hide inputs after success
+  if (this.state.hasGroupPasswordMint) {
+    if (mintingStatus === 'success') return null;
+    return (
+      <div id={styles.mintButtonArea}>
+        <div className={styles.passwordEntry}>
+          <input
+            type="password"
+            className={styles.input}
+            value={this.state.groupPasswordInput || ''}
+            onChange={this.handleGroupPasswordInputChange}
+            placeholder="Group Password"
+          />
+        </div>
+        <button
+          onClick={() => this.mintUnlimitedWithGroupPassword()}
+          disabled={mintingStatus === 'pending' || !((this.state.groupPasswordInput || '').trim())}
+          className={`${styles.actionButton} ${styles.mintButton}`}
+        >
+          {mintingStatus === 'pending' ? <FontAwesomeIcon icon={faSpinner} spin /> : 'Join'}
+        </button>
+      </div>
+    );
+  }
 
-    return renderSbtPageFullActionSurfaces({
-      actionDisplayPlan,
-      burnExecution: {
-        onBurn: this.handleBurn,
-      },
-      groupPasswordInput: groupPasswordInput || '',
-      mintExecution: {
-        onClaimWithInviteCode: this.claimWithInviteCode,
-        onGroupPasswordInputChange: this.handleGroupPasswordInputChange,
-        onManualPasswordInputChange: this.handleManualPasswordInputChange,
-        onMint: this.handleMint,
-        onMintUnlimitedWithGroupPassword: this.mintUnlimitedWithGroupPassword,
-        onOpenMintTransaction: () => window.open(
-          this.getExplorerLink(lastMintTxHash),
-          '_blank',
-          'noopener,noreferrer'
-        ),
-      },
-    });
-  };
+  // Limited group-password - hide inputs after success
+  if (this.state.hasInviteMint) {
+    if (mintingStatus === 'success') return null;
+    return (
+      <div id={styles.mintButtonArea}>
+        <div className={styles.passwordEntry}>
+          <input
+            type="password"
+            className={styles.input}
+            value={this.state.groupPasswordInput || ''}
+            onChange={this.handleGroupPasswordInputChange}
+            placeholder="Group Password"
+          />
+        </div>
+        <button
+          onClick={() => this.claimWithInviteCode(this.state.groupPasswordInput)}
+          disabled={mintingStatus === 'pending' || !((this.state.groupPasswordInput || '').trim())}
+          className={`${styles.actionButton} ${styles.mintButton}`}
+        >
+          {mintingStatus === 'pending' ? <FontAwesomeIcon icon={faSpinner} spin /> : 'Join'}
+        </button>
+      </div>
+    );
+  }
 
-  renderRelevantInfo = (): React.ReactNode => {
-    const { sbtInfo } = this.state;
-    const {
-      documentIDHashes,
-      documentURLs,
-      tags,
-    } = resolveSbtPageRelevantInfoLists({ sbtInfo });
-    const relevantInfoDisplayState = resolveSbtPageRelevantInfoDisplayState({
-      documentIDHashes,
-      documentURLs,
-      tags,
-    });
+  // Legacy per-claim-code flow
+  if (!sbtInfo.hasPasswordMint) {
+    const isMinted = mintingStatus === 'success' && burningStatus !== 'success';
+    const canOpenMintTx = !!(isMinted && lastMintTxHash);
+    return (
+      <div>
+        <button
+          onClick={() => {
+            if (canOpenMintTx) {
+              window.open(this.getExplorerLink(lastMintTxHash), '_blank', 'noopener,noreferrer');
+              return;
+            }
+            this.handleMint(true);
+          }}
+          disabled={mintingStatus === 'pending' || (isMinted && !canOpenMintTx)}
+          className={`${styles.actionButton} ${styles.mintButton}`}
+          title={canOpenMintTx ? `View ${t('mintLower')} transaction` : undefined}
+        >
+          {mintingStatus === 'idle' && 'Join'}
+          {mintingStatus === 'pending' && <FontAwesomeIcon icon={faSpinner} spin />}
+          {isMinted && <>{t('minted')} <FontAwesomeIcon icon={faCheck} /></>}
+          {mintingStatus === 'failure' && <>Failed <FontAwesomeIcon icon={faTimes} /></>}
+        </button>
+      </div>
+    );
+  }
+
+  switch (mintStep) {
+    case 0:
+      return (
+        <div id={styles.mintButtonArea}>
+          <div className={styles.passwordEntry}>
+            <input
+              type="text"
+              className={styles.input}
+              value={manualPasswordInput || ''}
+              onChange={(e: any) => this.setState({ manualPasswordInput: e.target.value })}
+              placeholder="Claim Code"
+            />
+          </div>
+          <button
+            onClick={() => this.handleMint(true)}
+            disabled={(mintingStatus === 'pending') || ((manualPasswordInput || '').trim() === '')}
+            className={`${styles.actionButton} ${styles.mintButton}`}
+          >
+            {mintingStatus === 'pending' ? <FontAwesomeIcon icon={faSpinner} spin /> : 'Start Claim'}
+          </button>
+        </div>
+      );
+    case 1:
+      return (
+        <div className={styles.mintProcess}>
+          <p className={styles.claimCountdown}>Waiting period: {claimCountdown} seconds</p>
+        </div>
+      );
+    case 2:
+      return (
+        <div id={styles.mintButtonArea}>
+          <div className={styles.passwordEntry}>
+            <input
+              type="text"
+              className={styles.input}
+              value={manualPasswordInput || ''}
+              onChange={(e: any) => this.setState({ manualPasswordInput: e.target.value })}
+              placeholder="Claim Code"
+            />
+          </div>
+          <button
+            onClick={() => this.handleMint(true)}
+            disabled={(mintingStatus === 'pending') || ((manualPasswordInput || '').trim() === '')}
+            className={`${styles.actionButton} ${styles.mintButton}`}
+          >
+            {mintingStatus === 'pending' ? <FontAwesomeIcon icon={faSpinner} spin /> : 'Finish Claim'}
+          </button>
+        </div>
+      );
+    case 3:
+      return <div className={styles.mintProcess}><p className={styles.mintSuccess}>{`${t('sbt')} successfully ${t('mintedLower')}!`}</p></div>;
+    default:
+      return null;
+  }
+}
+
+
+
+
+  renderBurnButton: any = () => {
+    const { sbtInfo, userHasSBT, burningStatus } = this.state;
+    if (!sbtInfo) return null;
+
+    const userAddressLower = this.props.account ? this.props.account.toLowerCase() : null;
+    const adminAddr = sbtInfo.admin || sbtInfo.admin_;
+    const canOwnerBurn = userHasSBT && (
+      sbtInfo.burnAuth === 1 || // OwnerOnly
+      sbtInfo.burnAuth === 2 || // Both
+      (sbtInfo.burnAuth === 0 && adminAddr && adminAddr.toLowerCase() === userAddressLower) ||
+      (sbtInfo.burnAuth === 1 && userHasSBT)
+    );
+
+    if (!userHasSBT || !canOwnerBurn) {
+      return null;
+    }
 
     return (
-      <SbtPageRelevantInfo
-        documentIDHashes={documentIDHashes}
-        documentURLs={documentURLs}
-        onOpenEncryptedDoc={this.openEncryptedDoc}
-        shouldRenderDocumentIdHashes={relevantInfoDisplayState.shouldRenderDocumentIdHashes}
-        shouldRenderDocumentUrls={relevantInfoDisplayState.shouldRenderDocumentUrls}
-        shouldRenderTags={relevantInfoDisplayState.shouldRenderTags}
-        tags={tags}
-      />
+      <div>
+        <button
+          onClick={this.handleBurn}
+          disabled={burningStatus !== 'idle' && burningStatus !== 'success' && burningStatus !== 'failure'}
+          className={`${styles.actionButton} ${styles.burnButton}`}
+        >
+          {burningStatus === 'idle' && t('burn')}
+          {burningStatus === 'pending' && <FontAwesomeIcon icon={faSpinner} spin />}
+          {burningStatus === 'success' && <>{t('burned')} <FontAwesomeIcon icon={faCheck} /></>}
+          {burningStatus === 'failure' && <>Failed <FontAwesomeIcon icon={faTimes} /></>}
+        </button>
+      </div>
+    );
+  };
+
+  renderRelevantInfo: any = () => {
+    const { sbtInfo } = this.state;
+    const documentURLs = sbtInfo && sbtInfo.documentURLs ? sbtInfo.documentURLs : [];
+    const tags = sbtInfo && sbtInfo.tags ? sbtInfo.tags : [];
+    const documentIDHashes = sbtInfo && sbtInfo.documentIDHashes ? sbtInfo.documentIDHashes : [];
+
+    return (
+      <div className={styles.relevantInfo}>
+        <Alert color="info">
+          <FontAwesomeIcon icon={faInfoCircle} style={{opacity:0.5}}/>
+          This section shows relevant documents, URLs, tags, and IDs.
+        </Alert>
+        {documentURLs.length > 0 && (
+          <div className={styles.docUrlsSection}>
+            <h4>Document URLs:</h4>
+            <ul className={styles.docUrlList}>
+              {documentURLs.map((url: any, index: any) => {
+                const litDoc = litStorage.isLitArweaveUrl(url);
+                return (
+                  <li key={index} className={styles.docUrlItem}>
+                    <span className={styles.docUrlBadge}>
+                      {litDoc ? 'Encrypted Doc' : 'Doc URL'}
+                    </span>
+                    {litDoc ? (
+                      <button
+                        type="button"
+                        className={styles.docUrlButton}
+                        onClick={() => this.openEncryptedDoc(url)}
+                      >
+                        Decrypt and view
+                      </button>
+                    ) : (
+                      <a href={url} target="_blank" rel="noopener noreferrer">
+                        {url}
+                      </a>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
+        {documentIDHashes.length > 0 && (
+          <div className={styles.docIDsSection}>
+            <h4>Document ID Hashes:</h4>
+            <ul className={styles.docIdList}>
+              {documentIDHashes.map((hash: any, index: any) => {
+                const docHash = encodeURIComponent(hash);
+                return (
+                  <li key={index} className={styles.docIdItem}>
+                    <span className={styles.docIdBadge}>Doc ID</span>
+                    <a href={`${window.location.origin}/doc/${docHash}`} target="_blank" rel="noopener noreferrer">
+                      {hash}
+                    </a>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
+        {tags.length > 0 && (
+          <div className={styles.tagsSection}>
+            <h4>Tags:</h4>
+            <ul className={styles.tagList}>
+              {tags.map((tag: any, index: any) => {
+                const tagEnc = encodeURIComponent(tag);
+                return (
+                  <li key={index} className={styles.tagItem}>
+                    <span className={styles.tagBadge}>Tag</span>
+                    <a href={`${window.location.origin}/tag/${tagEnc}`} target="_blank" rel="noopener noreferrer">
+                      {tag}
+                    </a>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
+      </div>
     );
   };
 
 
-  cacheTransactionHash = (txHash: string, accountOverride: unknown = null): void => {
-    const userAddress = String(accountOverride || this.props.account || '').trim().toLowerCase();
+  cacheTransactionHash: any = (txHash: any) => {
+    const userAddress = this.props.account?.toLowerCase();
     if (!userAddress) return;
     try {
-      const txCache = this.readQueuedOrStoredLocalStorageJson<TransactionStorageCache>('transactions', {});
-      const next = appendSbtPageTransactionHash({
-        cacheObj: txCache,
-        txHash,
-        userAddress,
-      });
-      if (next.shouldWrite) {
-        this.queueLocalStorageJsonWrite('transactions', next.txCache as TransactionStorageCache);
-      }
+      let txCache = this.readQueuedOrStoredLocalStorageJson('transactions', {});
+      if (!txCache[userAddress]) txCache[userAddress] = [];
+      txCache[userAddress].push(txHash);
+      this.queueLocalStorageJsonWrite('transactions', txCache);
     } catch (e) { sbtLog.warn('SBTPage: fallback', e); }
   };
 
-  handleExportFormatChange = (event: React.ChangeEvent<HTMLSelectElement>): void => {
-    if (this._isMounted) this.setState(buildSbtPageExportFormatPatch({
-      exportFormat: event.target.value,
-    }));
+  handleExportFormatChange: any = (event: any) => {
+    if (this._isMounted) this.setState({ exportFormat: event.target.value });
   };
 
-  handleIncludePreviousPasswordsChange = (event: React.ChangeEvent<HTMLInputElement>): void => {
-    if (this._isMounted) this.setState(buildSbtPageIncludePreviousPasswordsPatch({
-      includePreviousPasswords: event.target.checked,
-    }));
+  handleIncludePreviousPasswordsChange: any = (event: any) => {
+    if (this._isMounted) this.setState({ includePreviousPasswords: event.target.checked });
   };
 
-  handlePasswordGenerationCountChange = (event: React.ChangeEvent<HTMLInputElement>): void => {
-    if (this._isMounted) this.setState(buildSbtPagePasswordGenerationCountPatch({
-      value: event.target.value,
-    }));
-  };
-
-  handleAdminBurn = async (): Promise<void> => {
-    const { burnSearchResult } = this.state;
-    const burnSearchResultRecord = isRecord(burnSearchResult)
-      ? burnSearchResult as SbtPageBurnSearchResult
-      : null;
-
-    if (!burnSearchResult) {
-      if (this._isMounted) this.setState(buildSbtPageErrorPatch({ error: "No token selected to burn" }));
-      return;
-    }
-    if (this._isMounted) this.setState(buildSbtPageBurnPendingPatch());
-
-    const sbtAddressOriginalCaseForAdminBurn = resolveSbtAddressString(this.props.SBTAddress);
-    if (!sbtAddressOriginalCaseForAdminBurn) {
-      if (this._isMounted) this.setState(buildSbtPageBurnFailurePatch({ error: `${t('sbt')} address not found for admin ${t('burnLower')}.` }));
-      return;
-    }
-
-    const tx = await contractScripts.burnToken(this.props.provider, sbtAddressOriginalCaseForAdminBurn, burnSearchResultRecord?.tokenId);
-    await this.loadSBTInfo(true);
-    if (this._isMounted) this.setState(buildSbtPageBurnSuccessPatch({
-      resetBurnSearch: true,
-      txHash: tx.transactionHash,
-    }));
-    this.cacheTransactionHash(tx.transactionHash);
-  };
-
-  renderAdminActions = (): React.ReactNode => {
-    const { userIsSbtAdmin, sbtInfo, burnSearchInput, burnSearchResult, burningStatus, adminGeneratedPasswords, cachedPasswords, includePreviousPasswords, exportFormat, passwordGenerationCount } = this.state;
+  renderAdminActions: any = () => {
+    const { userIsSbtAdmin, sbtInfo, burnSearchInput, burnSearchResult, burningStatus, adminGeneratedPasswords, cachedPasswords, includePreviousPasswords, exportFormat } = this.state;
     if (!userIsSbtAdmin || !sbtInfo) return null;
 
-    const burnSearchResultRecord = isRecord(burnSearchResult)
-      ? burnSearchResult as SbtPageBurnSearchResult
-      : null;
-    const adminActionDisplayPlan = resolveSbtPageAdminActionDisplayPlan({
-      account: this.props.account,
-      adminGeneratedPasswords,
-      burnedLabel: t('burned'),
-      burningStatus,
-      burnLabel: t('burn'),
-      burnSearchResult,
-      cachedPasswords,
-      hasInviteMint: this.state.hasInviteMint,
-      includePreviousPasswords,
-      passwordGenerationCount,
-      sbtInfo,
-      sbtLabel: t('sbt'),
-    });
-    const { isInvite } = adminActionDisplayPlan;
+    const isInvite = !!this.state.hasInviteMint;
+    const adminAddr = sbtInfo.admin || sbtInfo.admin_;
+    const canAdminBurn = (sbtInfo.burnAuth === 0 || sbtInfo.burnAuth === 2) && adminAddr?.toLowerCase() === this.props.account?.toLowerCase();
+    const showPasswordGen = (sbtInfo.hasPasswordMint && sbtInfo.maxTokens === "0");
+    const showNoMoreInvites = (sbtInfo.hasPasswordMint && sbtInfo.maxTokens !== "0");
 
-    const resolvedSbtAddress = resolveSbtAddress(this.props.SBTAddress);
-    const sbtAddr = typeof resolvedSbtAddress === 'string'
-      ? resolvedSbtAddress.toLowerCase()
-      : "unknown_sbt";
+    const combinedPasswords = [...(cachedPasswords || []), ...(adminGeneratedPasswords || [])];
+
+    const { SBTAddress: SBTAddressProp } = this.props;
+    let sbtAddr = Array.isArray(SBTAddressProp)
+      ? SBTAddressProp.find((entry: any) => entry.sbtAddress !== undefined)?.sbtAddress
+      : (SBTAddressProp && SBTAddressProp.sbtAddress !== undefined ? SBTAddressProp.sbtAddress : SBTAddressProp);
+
+    if (typeof sbtAddr === 'string') {
+      sbtAddr = sbtAddr.toLowerCase();
+    } else {
+        sbtAddr = "unknown_sbt";
+    }
 
     const baseUrl = window.location.origin;
-    const demoPath = buildSessionRoutePath(this.getEffectiveSessionSlug(), readPublicUrlBasePath());
-    const passwordInviteLinkContext = {
-      baseUrl,
-      demoPath,
-      encodeGroupPassword: encodeSbtPageGroupPassword,
-      isInvite,
-      sbtAddr,
-      sbtBasePathValue: sbtBasePath(),
+    const demoPath = buildSessionRoutePath(this.getEffectiveSessionSlug());
+    const encodeGroupPassword = (code: any) => {
+      const normalized = cryptoUtils.normalizeGroupPasswordInput(code);
+      return cryptoUtils.encodeGroupPasswordForUrl(normalized) || '';
     };
+    const buildInviteLink = (code: any) => (
+      isInvite
+        ? `${baseUrl}${demoPath}?auto=1&sbt=${encodeURIComponent(sbtAddr)}&gp=${encodeURIComponent(encodeGroupPassword(code))}`
+        : `${baseUrl}${sbtBasePath()}/${sbtAddr}/${code}`
+    );
     const openMintAutoJoinUrl = this.getOpenMintAutoJoinUrl(sbtAddr);
-    const openMintUrlCopyIconState = resolveSbtPageCopyIconState({
-      copiedAddress: this.state.copiedAddress,
-      targetKey: 'open-mint-url',
-    });
+    const justGeneratedPasswords = adminGeneratedPasswords.length > 0;
+    const onlyCachedPasswords = (adminGeneratedPasswords.length === 0 && combinedPasswords.length > 0);
+    const renderIncludePreviousCheckbox = justGeneratedPasswords;
+    const effectiveIncludePreviousPasswords = onlyCachedPasswords ? true : includePreviousPasswords;
 
-    return SbtPageAdminActions({
-      burnLabel: t('burn'),
-      burnSearchInput,
-      burnSearchResultRecord,
-      displayPlan: adminActionDisplayPlan,
-      exportFormat,
-      onAdminBurn: this.handleAdminBurn,
-      onBurnSearchChange: this.handleBurnSearchChange,
-      onCopyOpenMintUrl: () => this.copyToClipboard(openMintAutoJoinUrl, 'open-mint-url'),
-      onExportFormatChange: this.handleExportFormatChange,
-      onExportPasswords: this.exportPasswords,
-      onGenerateAdminInvites: this.handleGenerateAdminInvites,
-      onIncludePreviousPasswordsChange: this.handleIncludePreviousPasswordsChange,
-      onPasswordGenerationCountChange: this.handlePasswordGenerationCountChange,
-      openMintAutoJoinUrl,
-      openMintUrlCopyIconState,
-      passwordInviteLinkContext,
-      passwordGenerationCount,
-      sbtLabel: t('sbt'),
-    });
+    return (
+      <div className={styles.adminActions}>
+        {openMintAutoJoinUrl && (
+          <div className={styles.autoMintUrlCard} data-testid={E2E_TESTIDS.SBT_PAGE_OPEN_MINT_URL}>
+            <h4>URL Where Anyone Can Join</h4>
+            <p className={styles.autoMintUrlHelp}>
+              Share this session link to trigger the open-mint flow for this group.
+            </p>
+            <div className={styles.autoMintUrlRow}>
+              <span className={styles.autoMintUrlText} title={openMintAutoJoinUrl}>
+                {openMintAutoJoinUrl}
+              </span>
+              <button
+                type="button"
+                className={styles.autoMintUrlButton}
+                onClick={() => this.copyToClipboard(openMintAutoJoinUrl, 'open-mint-url')}
+                aria-label="Copy open mint URL"
+                title="Copy open mint URL"
+              >
+                <FontAwesomeIcon icon={this.state.copiedAddress === 'open-mint-url' ? faCheck : faCopy} />
+              </button>
+              <a
+                href={openMintAutoJoinUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={styles.autoMintUrlButton}
+                aria-label="Open open mint URL"
+                title="Open open mint URL"
+              >
+                <FontAwesomeIcon icon={faExternalLinkAlt} />
+              </a>
+            </div>
+          </div>
+        )}
+        {canAdminBurn && (
+          <div className={styles.adminBurnSection}>
+            <h4>{`${t('burn')} ${t('sbt')}`}</h4>
+            <div className={styles.burnInputGroup}>
+              <input
+                type="text"
+                value={burnSearchInput}
+                onChange={this.handleBurnSearchChange}
+                placeholder="Enter Address (0x...) or Token ID"
+                className={styles.input}
+              />
+              {burnSearchResult && (
+                <div className={styles.burnSearchResult}>
+                  {burnSearchResult.tokenId && (
+                    <p>Token ID: {burnSearchResult.tokenId}</p>
+                  )}
+                  {burnSearchResult.address && (
+                    <p>Owner: {getShortenedAddress(burnSearchResult.address, false)}</p>
+                  )}
+                </div>
+              )}
+              <button
+                onClick={async () => {
+                  if (!burnSearchResult) {
+                    if (this._isMounted) this.setState({ error: "No token selected to burn" });
+                    return;
+                  }
+                  if (this._isMounted) this.setState({ burningStatus: 'pending', lastTransactionType: 'burn' });
+                  // Ensure sbtAddr (original case) is used for contract interaction
+                  const sbtAddressOriginalCaseForAdminBurn = Array.isArray(SBTAddressProp)
+                    ? SBTAddressProp.find((entry: any) => entry.sbtAddress !== undefined)?.sbtAddress
+                    : (SBTAddressProp && SBTAddressProp.sbtAddress !== undefined ? SBTAddressProp.sbtAddress : SBTAddressProp);
+
+                  if (!sbtAddressOriginalCaseForAdminBurn) {
+                    if (this._isMounted) this.setState({ error: `${t('sbt')} address not found for admin ${t('burnLower')}.`, burningStatus: 'failure' });
+                    return;
+                  }
+
+                  const tx = await contractScripts.burnToken(this.props.provider, sbtAddressOriginalCaseForAdminBurn, burnSearchResult.tokenId);
+                  await this.loadSBTInfo(true); // Force event fetch after admin burn
+                  if (this._isMounted) this.setState({
+                    burningStatus: 'success',
+                    transactionHash: tx.transactionHash,
+                    burnSearchInput: '',
+                    burnSearchResult: null,
+                    burnSearchType: null,
+                    lastTransactionType: 'burn',
+                    lastBurnTxHash: tx.transactionHash
+                  });
+                  this.cacheTransactionHash(tx.transactionHash);
+                }}
+                className={styles.actionButton}
+                disabled={(burningStatus !== 'idle' && burningStatus !== 'success' && burningStatus !== 'failure') || !burnSearchResult}
+              >
+                {burningStatus === 'idle' && `${t('burn')} ${t('sbt')}`}
+                {burningStatus === 'pending' && <FontAwesomeIcon icon={faSpinner} spin />}
+                {burningStatus === 'success' && <>{t('burned')} <FontAwesomeIcon icon={faCheck} /></>}
+                {burningStatus === 'failure' && <>Failed <FontAwesomeIcon icon={faTimes} /></>}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {showPasswordGen && (
+          <div className={styles.inviteGenerationSection}>
+            <h4>Generate Additional Password Invites</h4>
+            <p>Since there's no max token limit, you can generate more password-based invites as admin.</p>
+            <div className={styles.inviteGenerationControls}>
+              <input
+                type="number"
+                value={this.state.passwordGenerationCount || ''}
+                onChange={(e: any) => {
+                  const val = parseInt(e.target.value);
+                  if (this._isMounted) this.setState({ passwordGenerationCount: isNaN(val) ? '' : val });
+                }}
+                placeholder="Number of additional passwords"
+                className={styles.input}
+              />
+              <button
+                onClick={this.handleGenerateAdminInvites}
+                className={styles.actionButton}
+                disabled={!this.state.passwordGenerationCount || this.state.passwordGenerationCount <= 0}
+              >
+                Generate Invites
+              </button>
+            </div>
+            {(combinedPasswords && combinedPasswords.length > 0) ? (
+              <div className={styles.generatedPasswordsList}>
+                <h5>Generated Passwords (including cached):</h5>
+                <ul>
+                  {combinedPasswords.map((pw: any, idx: any) => (
+                    <li key={idx}>
+                      {pw} - <a href={buildInviteLink(pw)} target="_blank" rel="noopener noreferrer">{buildInviteLink(pw)}</a>
+                    </li>
+                  ))}
+                </ul>
+                <p>These passwords are stored in the local recovery cache and/or newly generated.</p>
+                <div className={styles.exportOptions}>
+                  {renderIncludePreviousCheckbox && (
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={effectiveIncludePreviousPasswords}
+                        onChange={this.handleIncludePreviousPasswordsChange}
+                      />
+                      Include previous passwords
+                    </label>
+                  )}
+                  {!renderIncludePreviousCheckbox && onlyCachedPasswords && (
+                    <p style={{fontStyle:'italic'}}>All previously cached passwords are included.</p>
+                  )}
+                  <select value={exportFormat} onChange={this.handleExportFormatChange} className={styles.exportFormatSelect}>
+                    <option value="json">JSON</option>
+                    <option value="csv">CSV</option>
+                  </select>
+                  <button onClick={this.exportPasswords} className={styles.exportButton}>Export Passwords</button>
+                </div>
+              </div>
+            ) : null}
+          </div>
+        )}
+
+        {showNoMoreInvites && combinedPasswords.length > 0 && (
+          <div className={styles.inviteGenerationSection}>
+            <h4>Previously Generated Password Invites</h4>
+            <p>{`These were previously cached or generated passwords from when the ${t('sbt')} was created:`}</p>
+            <ul>
+              {combinedPasswords.map((pw: any, idx: any) => (
+                <li key={idx}>
+                  {pw} - <a href={buildInviteLink(pw)} target="_blank" rel="noopener noreferrer">{buildInviteLink(pw)}</a>
+                </li>
+              ))}
+            </ul>
+            <div className={styles.exportOptions}>
+              {adminGeneratedPasswords.length > 0 && (
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={effectiveIncludePreviousPasswords}
+                    onChange={this.handleIncludePreviousPasswordsChange}
+                  />
+                  Include previous passwords
+                </label>
+              )}
+              {adminGeneratedPasswords.length === 0 && combinedPasswords.length > 0 && (
+                <p style={{fontStyle:'italic'}}>All previously cached passwords are included.</p>
+              )}
+              <select value={exportFormat} onChange={this.handleExportFormatChange} className={styles.exportFormatSelect}>
+                <option value="json">JSON</option>
+                <option value="csv">CSV</option>
+              </select>
+              <button onClick={this.exportPasswords} className={styles.exportButton}>Export Passwords</button>
+            </div>
+          </div>
+        )}
+
+        {showNoMoreInvites && combinedPasswords.length === 0 && (
+          <div className={styles.inviteGenerationSection}>
+            <h4>No Additional Password Invites</h4>
+            <p>Max tokens are set, so all invites should have been created initially. No more invites can be generated, and there are no cached passwords found.</p>
+          </div>
+        )}
+      </div>
+    );
   };
 
-  copyErrorToClipboard = async (): Promise<void> => {
-    const raw = resolveSbtPageCopyableErrorText(this.state.error);
+  copyErrorToClipboard: any = () => {
+    const raw = (typeof this.state.error === 'string' && this.state.error)
+      ? this.state.error
+      : (this.state.error && this.state.error.message ? this.state.error.message : '');
     if (!raw) return;
     try {
-      if (!navigator.clipboard?.writeText) throw new Error('Clipboard write is unavailable');
-      await navigator.clipboard.writeText(raw);
-      notify.success('Copied to clipboard');
-      if (this._isMounted) {
-        this.setState(buildSbtPageCopiedErrorPatch({ copied: true }), () => {
-          setTimeout(() => { if (this._isMounted) this.setState(buildSbtPageCopiedErrorPatch()); }, 2000);
-        });
-      }
-    } catch (error: unknown) {
-      sbtLog.warn('SBTPage error clipboard write failed', error);
-      notify.warn('Copy failed');
-    }
+      navigator.clipboard.writeText(raw).then(() => {
+        notify.success('Copied to clipboard');
+        if (this._isMounted) {
+          this.setState({ copiedError: true }, () => {
+            setTimeout(() => { if (this._isMounted) this.setState({ copiedError: false }); }, 2000);
+          });
+        }
+      });
+    } catch (e) { void e; notify.warn('Copy failed'); }
   };
 
 
@@ -3920,7 +4275,6 @@ class SBTPage extends Component<any, any> {
       error,
       bookmarked,
       showModal,
-      showFullImage,
       mintedAddresses,
       burnedAddresses,
       countsLoaded,
@@ -3948,17 +4302,13 @@ class SBTPage extends Component<any, any> {
       docModalBlobUrl,
     } = this.state;
 
-    const sbtAddressForDisplay = resolveSbtAddressString(SBTAddressProp);
-    const sbtDetailPath = buildSbtDetailPath(sbtAddressForDisplay, this.getEffectiveSessionSlug());
-    const identityPanelDisplayState = resolveSbtPageIdentityPanelDisplayState({
-      defaultImage: defaultSbtImage,
-      fallbackState: this.state,
-      sbtInfo,
-      unnamedLabel: `Unnamed ${t('sbt')}`,
-    });
-    const sbtNameText = identityPanelDisplayState.nameText;
-    const displayImageState = identityPanelDisplayState.displayImageState;
-    const imageUrl = identityPanelDisplayState.imageUrl;
+    const sbtAddressForDisplay = Array.isArray(SBTAddressProp)
+      ? SBTAddressProp.find((entry: any) => entry.sbtAddress !== undefined)?.sbtAddress
+      : (SBTAddressProp && SBTAddressProp.sbtAddress !== undefined ? SBTAddressProp.sbtAddress : SBTAddressProp);
+    const sbtNameText = getSbtDisplayName(sbtInfo) || `Unnamed ${t('sbt')}`;
+    const sbtDescriptionText = getSbtDescriptionText(sbtInfo);
+    const displayImageState = sbtInfo ? this.getDisplayImageRenderState(sbtInfo) : null;
+    const imageUrl = displayImageState?.src || defaultSbtImage;
     const imageErrorHandler = displayImageState?.canRetry
       ? () => this.handleDisplayImageError(displayImageState)
       : undefined;
@@ -3975,238 +4325,926 @@ class SBTPage extends Component<any, any> {
         return <div className={styles.error}>Error: {error}</div>;
       }
 
+      const sbtName = sbtNameText;
       const showMiniSbtAddress = isCryptoMode();
-      const {
-        hasTokenMini,
-        isMintingActive,
-        mintStatusId,
-        miniActionFailureState,
-        miniActionFailureStatusDisplayState,
-        miniActionStatusDisplayState,
-        miniBurnActionButtonClassName,
-        miniBurnActionPlan,
-        miniBurnButtonState,
-        miniBurnContentState,
-        miniControlDisplayState,
-        miniInviteControlDisplayState,
-        miniManualClaimActionRequest,
-        miniMintActionButtonClassName,
-        miniMintActionPlan,
-        miniOpenMintButtonState,
-        miniPasswordControlDisplayState,
-        miniPasswordJoinButtonState,
-        miniPasswordJoinContentState,
-        miniTokenActionDisplayState,
-        shouldRenderEndedIndicator,
-        shouldRenderLiveIndicator,
-      } = resolveSbtPageMiniCardDisplayState({
-        account: this.props.account,
-        actionClassName: styles.actionButton,
-        burnButtonClassName: styles.burnButton,
-        burnLabel: t('burn'),
-        burningStatus,
-        claimCountdown,
-        groupPasswordInput: this.state.groupPasswordInput,
-        hasGroupPasswordMint: this.state.hasGroupPasswordMint,
-        hasInviteMint: this.state.hasInviteMint,
-        manualPasswordInput,
-        mintedLabel: t('minted'),
-        miniButtonClassName: styles.miniButton,
-        miniMintable,
-        mintButtonClassName: styles.mintButton,
-        mintingStatus,
-        nowSec: Math.floor(Date.now() / 1000),
-        sbtAddress: sbtAddressForDisplay,
-        sbtInfo,
-        mintStep,
-        showMiniPasswordInput: this.state.showMiniPasswordInput,
-        userHasSBT,
-        userIsSbtAdmin,
-      });
-      const miniCardActionHandlers = buildSbtPageMiniCardActionHandlers({
-        groupPasswordInput: this.state.groupPasswordInput,
-        miniBurnActionPlan,
-        miniBurnDisabled: !!miniBurnButtonState?.disabled,
-        miniMintActionPlan,
-        ports: {
-          dispatchGroupPasswordMint: this.mintUnlimitedWithGroupPassword,
-          dispatchInviteCodeMint: this.claimWithInviteCode,
-          dispatchMiniBurn: this.miniBurnHandler,
-          dispatchMiniMint: this.miniMintHandler,
-          dispatchShowPasswordInput: () => this.setState(buildSbtPageMiniPasswordInputPatch({ visible: true })),
-        },
-      });
+      const now = Math.floor(Date.now() / 1000);
+      const isMintingActive = (sbtInfo.mintingEndTime === 0 || sbtInfo.mintingEndTime > now);
+      const mintStatusId = `mintStatus-${(sbtAddressForDisplay || '').toLowerCase()}`;
+
+      const justJoined = (mintingStatus === 'success' && burningStatus !== 'success');
+      const hasTokenMini = userHasSBT || justJoined;
+
+      let miniMintArea: any = null;
+
+      if (!hasTokenMini) {
+        if (!isMintingActive) {
+          miniMintArea = null;
+        } else if (miniMintable) {
+          if (this.state.hasGroupPasswordMint) {
+            if (!this.state.showMiniPasswordInput) {
+              miniMintArea = (
+                <button
+                  onClick={() => this.setState({ showMiniPasswordInput: true })}
+                  className={`${styles.actionButton} ${styles.mintButton} ${styles.miniButton}`}
+                  style={{ marginTop: '10px' }}
+                >
+                  Join
+                </button>
+              );
+            } else {
+              miniMintArea = (
+                <div className={styles.miniMintPasswordArea} style={{ marginTop: '10px' }}>
+                  <input
+                    type="password"
+                    className={styles.miniPasswordInput}
+                    value={this.state.groupPasswordInput || ''}
+                    onChange={this.handleGroupPasswordInputChange}
+                    placeholder="Password"
+                    disabled={mintingStatus === 'pending'}
+                    style={{ maxWidth: '100px' }}
+                  />
+                  <button
+                    onClick={() => this.mintUnlimitedWithGroupPassword()}
+                    disabled={mintingStatus === 'pending' || !((this.state.groupPasswordInput || '').trim())}
+                    className={`${styles.actionButton} ${styles.mintButton} ${styles.miniButton}`}
+                  >
+                    {mintingStatus === 'pending' ? <FontAwesomeIcon icon={faSpinner} spin /> : 'Join'}
+                  </button>
+                </div>
+              );
+            }
+          }
+          else if (this.state.hasInviteMint) {
+            if (!this.state.showMiniPasswordInput) {
+              miniMintArea = (
+                <button
+                  onClick={() => this.setState({ showMiniPasswordInput: true })}
+                  className={`${styles.actionButton} ${styles.mintButton} ${styles.miniButton}`}
+                  style={{ marginTop: '10px' }}
+                >
+                  Join
+                </button>
+              );
+            } else {
+              miniMintArea = (
+                <div className={styles.miniMintPasswordArea} style={{ marginTop: '10px' }}>
+                  <input
+                    type="password"
+                    className={styles.miniPasswordInput}
+                    value={this.state.groupPasswordInput || ''}
+                    onChange={this.handleGroupPasswordInputChange}
+                    placeholder="Invite Code"
+                    disabled={mintingStatus === 'pending'}
+                    style={{ maxWidth: '140px' }}
+                  />
+                  <button
+                    onClick={() => this.claimWithInviteCode(this.state.groupPasswordInput)}
+                    disabled={mintingStatus === 'pending' || !((this.state.groupPasswordInput || '').trim())}
+                    className={`${styles.actionButton} ${styles.mintButton} ${styles.miniButton}`}
+                  >
+                    {mintingStatus === 'pending' ? <FontAwesomeIcon icon={faSpinner} spin /> : 'Join'}
+                  </button>
+                </div>
+              );
+            }
+          }
+          else if (sbtInfo.hasPasswordMint) {
+            if (mintStep === 0 && !this.state.showMiniPasswordInput) {
+              miniMintArea = (
+                <button
+                  onClick={() => this.setState({ showMiniPasswordInput: true })}
+                  className={`${styles.actionButton} ${styles.mintButton} ${styles.miniButton}`}
+                  style={{ marginTop: '10px' }}
+                >
+                  Join
+                </button>
+              );
+            } else if (mintStep === 0) {
+              miniMintArea = (
+                <div className={styles.miniMintPasswordArea} style={{ marginTop: '10px' }}>
+                  <input
+                    type="text"
+                    className={styles.miniPasswordInput}
+                    value={manualPasswordInput}
+                    onChange={(e: any) => this.setState({ manualPasswordInput: e.target.value })}
+                    placeholder="Password"
+                    disabled={mintingStatus === 'pending'}
+                    style={{ maxWidth: '100px' }}
+                  />
+                  <button
+                    onClick={this.miniMintHandler}
+                    disabled={mintingStatus === 'pending' || (manualPasswordInput || '').trim() === ""}
+                    className={`${styles.actionButton} ${styles.mintButton} ${styles.miniButton}`}
+                  >
+                    {mintingStatus === 'pending' ? <FontAwesomeIcon icon={faSpinner} spin /> : 'Join'}
+                  </button>
+                </div>
+              );
+            } else if (mintStep === 1) {
+              miniMintArea = (
+                <div className={styles.miniActionStatus} style={{ marginTop: '10px' }}>
+                  Wait: {claimCountdown}s
+                </div>
+              );
+            } else if (mintStep === 2) {
+              miniMintArea = (
+                <div className={styles.miniMintPasswordArea} style={{ marginTop: '10px' }}>
+                  <input
+                    type="text"
+                    className={styles.miniPasswordInput}
+                    value={manualPasswordInput}
+                    onChange={(e: any) => this.setState({ manualPasswordInput: e.target.value })}
+                    placeholder="Password"
+                    disabled={mintingStatus === 'pending'}
+                  />
+                  <button
+                    onClick={this.miniMintHandler}
+                    disabled={mintingStatus === 'pending' || (manualPasswordInput || '').trim() === ""}
+                    className={`${styles.actionButton} ${styles.mintButton} ${styles.miniButton}`}
+                  >
+                    {mintingStatus === 'pending' ? <FontAwesomeIcon icon={faSpinner} spin /> : 'Finish'}
+                  </button>
+                </div>
+              );
+            } else if (mintStep >= 3) {
+              miniMintArea = <div className={styles.miniActionStatus} style={{ marginTop: '10px' }}>{`${t('minted')}!`}</div>;
+            }
+          }
+          else {
+            miniMintArea = (
+              <button
+                onClick={this.miniMintHandler}
+                className={`${styles.actionButton} ${styles.mintButton} ${styles.miniButton}`}
+                style={{ marginTop: '10px' }}
+                disabled={mintingStatus === 'pending'}
+              >
+                {mintingStatus === 'idle' && 'Join'}
+                {mintingStatus === 'pending' && <FontAwesomeIcon icon={faSpinner} spin />}
+                {mintingStatus === 'failure' && <>Failed <FontAwesomeIcon icon={faTimes} /></>}
+                {mintingStatus === 'success' && <>{t('minted')} <FontAwesomeIcon icon={faCheck} /></>}
+              </button>
+            );
+          }
+        }
+      } else {
+        const userAddressLower = this.props.account ? this.props.account.toLowerCase() : null;
+        const adminAddr = sbtInfo.admin || sbtInfo.admin_;
+        const canOwnerBurn =
+          (sbtInfo.burnAuth === 1) ||
+          (sbtInfo.burnAuth === 2) ||
+          (sbtInfo.burnAuth === 0 && adminAddr && adminAddr.toLowerCase() === userAddressLower);
+        const canAdminBurn = userIsSbtAdmin && (sbtInfo.burnAuth === 0 || sbtInfo.burnAuth === 2);
+        const canBurnMini = canOwnerBurn || canAdminBurn;
+
+        if (burningStatus === 'success') {
+          miniMintArea = <div className={styles.miniActionStatus} style={{ marginTop: '10px' }}>{`${t('burned')}!`}</div>;
+        } else if (canBurnMini) {
+          miniMintArea = (
+            <button
+              onClick={this.miniBurnHandler}
+              className={`${styles.actionButton} ${styles.burnButton} ${styles.miniButton}`}
+              style={{ marginTop: '10px' }}
+              disabled={burningStatus === 'pending'}
+            >
+              {burningStatus === 'pending' ? <FontAwesomeIcon icon={faSpinner} spin /> : t('burn')}
+            </button>
+          );
+        } else {
+          miniMintArea = <div className={styles.miniActionStatus} style={{ marginTop: '10px' }}>Joined!</div>;
+        }
+      }
+
+      if (mintingStatus === 'failure' && !hasTokenMini) {
+        miniMintArea = <div className={styles.miniActionStatus} style={{ marginTop: '10px', color: 'red' }}>{`${t('mint')} Failed`}</div>;
+      }
+      if (burningStatus === 'failure' && hasTokenMini) {
+        miniMintArea = <div className={styles.miniActionStatus} style={{ marginTop: '10px', color: 'red' }}>{`${t('burn')} Failed`}</div>;
+      }
 
       return (
-        <SbtPageMiniCard
-          burnLabel={t('burn')}
-          burnedLabel={t('burned')}
-          cardStyle={resolveSbtPageInteractiveCursorStyle()}
-          groupPasswordInput={this.state.groupPasswordInput || ''}
-          hasTokenMini={hasTokenMini}
-          imageUrl={imageUrl}
-          isMintingActive={isMintingActive}
-          miniActionFailureState={miniActionFailureState}
-          miniActionFailureStatusStyle={miniActionFailureStatusDisplayState.style}
-          miniActionStatusStyle={miniActionStatusDisplayState.style}
-          miniBurnActionButtonClassName={miniBurnActionButtonClassName}
-          miniBurnButtonState={miniBurnButtonState}
-          miniBurnContentState={miniBurnContentState}
-          miniControlTopMarginStyle={miniControlDisplayState.topMarginStyle}
-          miniInviteInputStyle={miniInviteControlDisplayState.inputStyle}
-          miniManualClaimActionRequest={miniManualClaimActionRequest}
-          miniMintActionPlan={miniMintActionPlan}
-          miniMintActionButtonClassName={miniMintActionButtonClassName}
-          miniOpenMintButtonState={miniOpenMintButtonState}
-          miniPasswordControlInputStyle={miniPasswordControlDisplayState.inputStyle}
-          miniPasswordJoinButtonState={miniPasswordJoinButtonState}
-          miniPasswordJoinContentState={miniPasswordJoinContentState}
-          miniTokenActionDisplayState={miniTokenActionDisplayState}
-          mintFailedLabel={`${t('mint')} Failed`}
-          mintStatusId={mintStatusId}
-          mintedLabel={t('minted')}
-          mintingLabel={t('minting')}
-          onCardClick={(event: React.MouseEvent<HTMLDivElement>) => {
-            const interactiveAncestor = findNestedInteractiveElement(event.target);
+        <div
+          className={styles.sbtItem}
+          style={{ cursor: 'pointer' }}
+          role='button'
+          tabIndex={0}
+          onClick={(event: any) => {
+            const interactiveAncestor = event.target?.closest?.('button, a, input, [role="button"]');
             if (interactiveAncestor && interactiveAncestor !== event.currentTarget) return;
             event.preventDefault();
             event.stopPropagation();
-            window.open(`${window.location.origin}${sbtDetailPath}`, '_blank', 'noopener,noreferrer');
+            window.open(`${window.location.origin}${this.getSbtDetailPath(sbtAddressForDisplay)}`, '_blank', 'noopener,noreferrer');
           }}
-          onCardKeyDown={(event: React.KeyboardEvent<HTMLDivElement>) => {
+          onKeyDown={(event: any) => {
             if (event.key !== 'Enter' && event.key !== ' ') return;
-            const interactiveAncestor = findNestedInteractiveElement(event.target);
+            const interactiveAncestor = event.target?.closest?.('button, a, input, [role="button"]');
             if (interactiveAncestor && interactiveAncestor !== event.currentTarget) return;
             event.preventDefault();
-            window.open(`${window.location.origin}${sbtDetailPath}`, '_blank', 'noopener,noreferrer');
+            window.open(`${window.location.origin}${this.getSbtDetailPath(sbtAddressForDisplay)}`, '_blank', 'noopener,noreferrer');
           }}
-          onClaimWithInviteCode={miniCardActionHandlers.onClaimWithInviteCode}
-          onGroupPasswordInputChange={this.handleGroupPasswordInputChange}
-          onImageError={imageErrorHandler}
-          onManualPasswordInputChange={this.handleManualPasswordInputChange}
-          onMiniBurn={miniCardActionHandlers.onMiniBurn}
-          onMiniMint={miniCardActionHandlers.onMiniMint}
-          onMintUnlimitedWithGroupPassword={miniCardActionHandlers.onMintUnlimitedWithGroupPassword}
-          onShowMiniPasswordInput={miniCardActionHandlers.onShowMiniPasswordInput}
-          sbtAddress={sbtAddressForDisplay}
-          sbtName={sbtNameText}
-          shouldRenderEndedIndicator={shouldRenderEndedIndicator}
-          shouldRenderLiveIndicator={shouldRenderLiveIndicator}
-          showLockIcon={!!(sbtInfo.hasPasswordMint || this.state.hasGroupPasswordMint)}
-          showMiniSbtAddress={showMiniSbtAddress}
-        />
+        >
+          <div className={styles.iconOverlay}>
+            {isMintingActive
+              ? <div className={styles.liveIndicator} id={mintStatusId} aria-label={`${t('minting')} Live`}></div>
+              : <div className={styles.endedIndicator} id={mintStatusId} aria-label={`${t('minting')} Ended`}></div>
+            }
+            <CETooltip
+              placement="top"
+              target={mintStatusId}
+              trigger="hover focus click"
+              className={styles.tooltipBubble}
+              innerClassName={styles.tooltipInner}
+            >
+              {isMintingActive ? `${t('minting')} Live` : `${t('minting')} Ended`}
+            </CETooltip>
+            {(sbtInfo.hasPasswordMint || this.state.hasGroupPasswordMint) && (
+              <FontAwesomeIcon icon={faLock} className={styles.lockIcon} />
+            )}
+          </div>
+          <div
+            className={styles.miniImageContainer}
+            data-featured-card-ignore-nav="true"
+          >
+            <img
+              src={imageUrl}
+              alt={sbtName}
+              className={styles.sbtImage}
+              data-testid={E2E_TESTIDS.SBT_PAGE_IMAGE}
+              onError={imageErrorHandler}
+            />
+          </div>
+          <p id={styles.miniSbtName}>{sbtName}</p>
+          {showMiniSbtAddress ? (
+            <p id={styles.miniSbtAddress}>{getShortenedAddress(sbtAddressForDisplay, false)}</p>
+          ) : null}
+          {miniMintArea}
+        </div>
       );
     }
 
     // Full page view
-    const fullViewShellState = resolveSbtPageFullViewShellState({
-      error,
-      hasSbtAddress: !!sbtAddressForDisplay,
-      sbtInfo,
-    });
-    if (fullViewShellState.shouldRenderMissingAddress) {
+    if (!sbtAddressForDisplay) {
       return null;
     }
-    if (fullViewShellState.shouldRenderError) {
+    if (error && !sbtInfo) {
       return <div className={styles.error}>Error: {error}</div>;
     }
-    if (fullViewShellState.shouldRenderLoading) {
-      return renderSbtPageFullViewLoading({ sbtLabel: t('sbt') });
+    const loadingScreen = (
+      <div className={styles.loadingPage}>
+        <img
+          src={contextEngineLoadingGif}
+          alt="Context Engine loading"
+          className={styles.loadingLogo}
+        />
+        <div className={styles.loadingTitle}>{`Loading ${t('sbt')} Details`}</div>
+      </div>
+    );
+    if (!sbtInfo && !error) {
+      return loadingScreen;
     }
+
+    let mintEndDisplay;
+    let fullMintEndDate = '';
+    if (sbtInfo && sbtInfo.mintingEndTime) {
+      const endTime = sbtInfo.mintingEndTime * 1000;
+      fullMintEndDate = new Date(endTime).toLocaleString('en-US', {
+        month: 'long', day: 'numeric', year: 'numeric'
+      });
+      const unixTS = sbtInfo.mintingEndTime;
+
+      if (endTime > Date.now()) {
+        mintEndDisplay = (
+          <p>
+            <span className={styles.label}>{`${t('minting')} ends:`}</span>
+            <span>{mintCountdown || "Calculating..."}</span>
+          </p>
+        );
+      } else {
+        mintEndDisplay = (
+          <p>
+            <span className={styles.label}>{`${t('minting')} Expired`}</span>:
+            <span
+              className={styles.expiredTime}
+              id="mintExpiredTooltip"
+              style={{ cursor: 'pointer' }}
+              onClick={() => this.copyToClipboard(unixTS.toString(), 'time')}
+            >
+              {fullMintEndDate}
+            </span>
+            <FontAwesomeIcon
+              icon={faQuestionCircle}
+              style={{ marginLeft: '5px', color: '#00ff9d', cursor: 'pointer', opacity: 0.5 }}
+              id="expiredTimeQuestionMark"
+            />
+            <CETooltip
+              placement="right"
+              target="expiredTimeQuestionMark"
+              delay={{ show: 0, hide: 2500 }}
+              className={styles.tooltipBubble}
+              innerClassName={styles.tooltipInner}
+            >
+              Click date to copy Unix timestamp: {unixTS}
+            </CETooltip>
+          </p>
+        );
+      }
+    } else if (sbtInfo && sbtInfo.mintingEndTime === 0) {
+      mintEndDisplay = (
+        <p>
+          <span className={styles.label}>{`${t('minting')} ends:`}</span>
+          <span><FontAwesomeIcon icon={faInfinity} /> Never</span>
+        </p>
+      );
+    }
+
+    const burnAuthLabels = ["Admin Only", "Owner Only", "Both", "Neither"];
+    const addressDisplay = getShortenedAddress(sbtAddressForDisplay, false);
+
     const netHolders = this.getMemoizedNetHoldersList(mintedAddresses, burnedAddresses);
+    // For the holders modal, treat any non-empty holders list as "ready" even if the
+    // latest refresh pass temporarily flips countsLoaded back to false.
+    const hasComputedHolders = netHolders.length > 0;
+    const hasFilteredHolders = this.state.filteredMintedUsers.length > 0;
+    const mintedTokensOverride = this.sanitizeMintedTokensOverride(this.state.mintedTokensOverride);
     const scanProgress = this.getEffectiveHolderScanProgress();
+    const hasScanProgress = this.hasUsableScanProgress(scanProgress);
+    const hasActiveScanProgress = this.isActiveScanProgress(scanProgress);
+    const isScanActive = this.isHolderScanActive();
+    // If the refresh has fully settled without counts or a mintedTokens fallback,
+    // render the empty state instead of treating the modal/page as perpetually loading.
+    const terminalEmptyHoldersState =
+      !loadingMintersBurners &&
+      !this.state.loadingMintedFilter &&
+      !isScanActive &&
+      mintedTokensOverride == null &&
+      !hasComputedHolders &&
+      !hasFilteredHolders;
+    const holdersReady =
+      countsLoaded === true ||
+      hasComputedHolders ||
+      hasFilteredHolders ||
+      terminalEmptyHoldersState;
+    const shouldOverrideMinted =
+      mintedTokensOverride != null &&
+      (!countsLoaded || netHolders.length === 0);
+    const netMinted = shouldOverrideMinted ? String(mintedTokensOverride) : String(netHolders.length);
+
+    // STALE-WHILE-REVALIDATE LOGIC:
+    // 1. Initial Load: If counts aren't confirmed yet, show a big spinner.
+    //    We also check global scan status from MainSite to prevent flash of '0' during retries.
+    const countsReady = countsLoaded === true || mintedTokensOverride != null || terminalEmptyHoldersState;
+    const isGlobalLoading = this.props.sbtScanInProgress || (this.props.sbtScanPending && !countsReady);
+    const isLocalLoading = loadingMintersBurners || !countsReady;
+    const effectiveLoading = isLocalLoading || isGlobalLoading;
+
+    const _burnMap: Record<string, number> = { AdminOnly: 0, OwnerOnly: 1, Both: 2, Neither: 3 };
+    const burnIdx = (typeof sbtInfo.burnAuth === 'string')
+      ? (_burnMap[sbtInfo.burnAuth] ?? undefined)
+      : (sbtInfo.burnAuth != null ? Number(sbtInfo.burnAuth) : undefined);
+    const normalizedBurnIdx = Number.isInteger(burnIdx) ? Number(burnIdx) : -1;
+    const burnLabel = (normalizedBurnIdx >= 0 && normalizedBurnIdx < burnAuthLabels.length)
+      ? burnAuthLabels[normalizedBurnIdx]
+      : '?';
+
+    const maxTokensDisplay = (sbtInfo.maxTokens === "0")
+      ? "∞"
+      : (sbtInfo.maxTokens != null ? String(sbtInfo.maxTokens) : "-");
+
+    const tokenUriRaw = sbtInfo?.tokenURI || sbtInfo?.tokenUri || '';
+    const tokenUriHref = this.resolveTokenMetadataHref(tokenUriRaw);
+    const adminAddress = sbtInfo?.admin || sbtInfo?.admin_ || sbtInfo?.deployer || '';
+    const creatorAddress = sbtInfo?.creator || adminAddress || sbtInfo?.deployer || sbtInfo?.admin_ || '';
+
+    const isInitialLoading = !countsReady && effectiveLoading;
+
+    // 2. Refreshing: If we have data (netMinted > 0) AND we are loading, show Data + Small Spinner.
+    const isRefreshing = (!isInitialLoading) && effectiveLoading;
+    const rawRemainingBlocksCount = hasScanProgress
+      ? Math.max(
+        0,
+        Number.isFinite(Number(scanProgress?.remainingBlocks))
+          ? Number(scanProgress?.remainingBlocks)
+          : (Number(scanProgress?.totalBlocks || 0) - Number(scanProgress?.scannedBlocks || 0))
+      )
+      : 0;
+    const showScanProgress = hasActiveScanProgress && (effectiveLoading || rawRemainingBlocksCount > 0);
+    const addressesNeedResolutionHint =
+      mintedTokensOverride != null &&
+      Number(mintedTokensOverride) > 0 &&
+      mintedAddresses.length === 0;
+    const addressesAreResolving =
+      addressesNeedResolutionHint &&
+      (loadingMintersBurners || this.state.loadingMintedFilter || isRefreshing || showScanProgress);
+    const holdersDisplayCount = shouldOverrideMinted
+      ? `~${mintedTokensOverride}`
+      : String(netHolders.length);
+    const formatBlockCount = (n: any) => (Number.isFinite(Number(n)) ? Number(n).toLocaleString() : '-');
+    const scanPhaseLabel = 'Scanning mint/burn history';
+    const remainingBlocksCount = showScanProgress ? rawRemainingBlocksCount : 0;
+    const scanProgressText = showScanProgress
+      ? `${scanPhaseLabel}: ${formatBlockCount(remainingBlocksCount)} blocks remaining`
+      : null;
+    const scanProgressSessionText = showScanProgress
+      ? `Session: ${String(scanProgress?.sessionLabel || this.getSessionDisplayLabel(scanProgress?.sessionSlug || this.getEffectiveSessionSlug()) || '').trim()}`
+      : null;
+    const scanProgressPct = showScanProgress
+      ? (
+        Number.isFinite(Number(scanProgress?.totalBlocks)) &&
+        Number(scanProgress?.totalBlocks) > 0 &&
+        Number.isFinite(Number(scanProgress?.scannedBlocks))
+          ? Math.max(
+            0,
+            Math.min(
+              100,
+              Math.round(
+                (Number(scanProgress.scannedBlocks || 0) / Number(scanProgress.totalBlocks || 1)) * 100
+              )
+            )
+          )
+          : 0
+      )
+      : 0;
+    const keepStaleFilterRowsWhileRefreshing =
+      hasFilteredHolders &&
+      !hasComputedHolders &&
+      isScanActive;
+    const holderItemsForFilter = hasComputedHolders
+      ? netHolders
+      : (keepStaleFilterRowsWhileRefreshing ? this.state.filteredMintedUsers : []);
+
+    // Filter Logic for Modal
+    const showEmptyStateInModal =
+      !hasFilteredHolders &&
+      !hasComputedHolders &&
+      !isInitialLoading &&
+      !this.state.loadingMintedFilter &&
+      !addressesAreResolving &&
+      holdersReady &&
+      !shouldOverrideMinted;
+    const waitingForHolderDetails =
+      addressesAreResolving ||
+      (
+        shouldOverrideMinted &&
+        !hasFilteredHolders &&
+        !hasComputedHolders &&
+        (
+          loadingMintersBurners ||
+          this.state.loadingMintedFilter ||
+          isRefreshing ||
+          showScanProgress
+        )
+      );
+    const showApproximateCountHint =
+      !hasFilteredHolders &&
+      !hasComputedHolders &&
+      !showEmptyStateInModal &&
+      !addressesAreResolving &&
+      !isScanActive &&
+      shouldOverrideMinted;
+    const showSpinnerInModalBody =
+      !hasFilteredHolders &&
+      !hasComputedHolders &&
+      !showEmptyStateInModal &&
+      (waitingForHolderDetails || !holdersReady || isInitialLoading || this.state.loadingMintedFilter);
+    const showScanProgressInModal =
+      showModal &&
+      hasActiveScanProgress &&
+      (
+        showScanProgress ||
+        showSpinnerInModalBody ||
+        this.state.loadingMintedFilter ||
+        hasActiveScanProgress
+      );
+    const showCornerSpinner =
+      (
+        hasActiveScanProgress ||
+        this.state.loadingMintedFilter ||
+        (loadingMintersBurners && (holdersReady || hasFilteredHolders)) ||
+        (isRefreshing && hasActiveScanProgress)
+      ) &&
+      (holdersReady || hasFilteredHolders);
+    const showHeaderCount = holdersReady || shouldOverrideMinted;
+    const mintedCountTitle =
+      shouldOverrideMinted
+        ? 'Holder list not loaded yet; showing an on-chain holder count estimate.'
+        : undefined;
     const filterNetwork = this.state.network || this.props.network || null;
-    const fullActionDisplayPlan = this.resolveFullActionDisplayPlan();
-    const actionSurfaces = this.renderFullActionSurfaces(fullActionDisplayPlan);
-    return renderSbtPageFullView({
-      actionLabels: {
-        burn: t('burn'),
-        burnedLower: t('burnedLower'),
-        mint: t('mint'),
-        mintedLower: t('mintedLower'),
-        minting: t('minting'),
-      },
-      actionSurfaces,
-      adminActions: this.renderAdminActions(),
-      callbacks: {
-        bookmarkSBT: this.bookmarkSBT,
-        closeDocModal: this.closeDocModal,
-        closeModal: this.closeModal,
-        copyErrorToClipboard: this.copyErrorToClipboard,
-        copyToClipboard: this.copyToClipboard,
-        getExplorerLink: this.getExplorerLink,
-        getExplorerUrl: this.getExplorerUrl,
-        handleModalFilteredMintedUsers: this.handleModalFilteredMintedUsers,
-        onBackToList: () => { window.location.href = sbtsListPath(); },
-        openMintedModal: this.openMintedModal,
-        renderAddressLink: this.renderAddressLink,
-        toggleActions: this.toggleActions,
-        toggleAdminSection: this.toggleAdminSection,
-        toggleFullImage: this.toggleFullImage,
-        toggleMoreDetails: this.toggleMoreDetails,
-        toggleStats: this.toggleStats,
-      },
-      defaultFeaturedSBTs: this.getSessionSBTAddresses(),
-      filterNetwork,
-      identityPanelDisplayState,
-      imageErrorHandler,
-      imageUrl,
-      isHolderScanActive: this.isHolderScanActive(),
-      isSBTCacheReady: this.props.isSBTCacheReady,
-      mintedLabel: t('minted'),
-      netHolders,
-      networkId: this.state.network?.id,
-      provider: this.props.provider,
-      relevantInfo: this.renderRelevantInfo(),
-      resolveScanProgressSessionLabel: (progress: { sessionLabel?: string; sessionSlug?: string } | null) => (
-        progress?.sessionLabel ||
-        this.getSessionDisplayLabel(progress?.sessionSlug || this.getEffectiveSessionSlug()) ||
-        ''
-      ),
-      sbtAddressForDisplay,
-      sbtCacheRevision: this.props.sbtCacheRevision,
-      sbtInfo: sbtInfo as Record<string, unknown> | null,
-      sbtLabel: t('sbt'),
-      sbtMintPassword: this.props.sbtMintPassword,
-      scanProgress,
-      sessionSlug: this.getEffectiveSessionSlug(),
-      state: {
-        bookmarked,
-        burnedAddresses,
-        burningStatus,
-        copiedAddress: this.state.copiedAddress,
-        copiedError: this.state.copiedError,
-        countsLoaded,
-        docModalBlobUrl,
-        docModalContent,
-        docModalError,
-        docModalLoading,
-        docModalName,
-        docModalOpen,
-        error,
-        filteredMintedUsers: this.state.filteredMintedUsers,
-        lastBurnTxHash,
-        lastMintTxHash,
-        loadingMintersBurners,
-        loadingMintedFilter: this.state.loadingMintedFilter,
-        mintCountdown,
-        mintedAddresses,
-        mintedTokensOverride: this.state.mintedTokensOverride,
-        mintingStatus,
-        mintPassword,
-        showActions,
-        showAdminSection,
-        showFullImage,
-        showModal,
-        showMoreDetails,
-        showPasswordAlert,
-        showStats,
-        transactionHash,
-        userIsSbtAdmin,
-      },
-      workerScanInProgress: this.props.sbtScanInProgress,
-      workerScanPending: this.props.sbtScanPending,
-    });
+    const holdersModalClose = (
+      <button
+        type="button"
+        className={styles.modalCloseButton}
+        onClick={this.closeModal}
+        aria-label="Close holders"
+      >
+        <FontAwesomeIcon icon={faTimes} />
+      </button>
+    );
+
+    return (
+      <div className={styles.sbtPage}>
+        <button onClick={() => window.location.href = sbtsListPath()} className={styles.backButton}>
+          <FontAwesomeIcon icon={faArrowLeft} /> {`${t('sbt')} list`}
+        </button>
+        {showPasswordAlert && (mintPassword || this.props.sbtMintPassword) && (
+          <Alert color="info" className={styles.passwordAlert}>
+            Password detected – click "start claim" to mint
+          </Alert>
+        )}
+        {sbtInfo ? (
+          <>
+            <div className={styles.sbtInfo}>
+              <div className={styles.leftColumn}>
+                <div className={styles.bookmarkIcon}>
+                  <button
+                    onClick={this.bookmarkSBT}
+                    className={styles.bookmarkButton}
+                    style={{ color: bookmarked ? '#FFD700' : undefined }}
+                  >
+                    <FontAwesomeIcon icon={faBookmark} />
+                  </button>
+                  <a
+                    href={this.getExplorerUrl(sbtAddressForDisplay)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={styles.contractLink}
+                  >
+                    {addressDisplay}
+                  </a>
+                  <button
+                    onClick={() => this.copyToClipboard(sbtAddressForDisplay, 'contract')}
+                    className={styles.copyButton}
+                  >
+                    <FontAwesomeIcon icon={this.state.copiedAddress === 'contract' ? faCheck : faCopy} />
+                  </button>
+                  {tokenUriHref && (
+                    <a
+                      href={tokenUriHref}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={styles.copyButton}
+                      title="Open token metadata"
+                    >
+                      <FontAwesomeIcon icon={faExternalLinkAlt} />
+                    </a>
+                  )}
+                </div>
+                <div className={styles.image}>
+                  <div className={styles.imageWrapper} onClick={this.toggleFullImage}>
+                    <img
+                      src={imageUrl}
+                      alt={sbtNameText}
+                      data-testid={E2E_TESTIDS.SBT_PAGE_IMAGE}
+                      onError={imageErrorHandler}
+                    />
+                    <div className={styles.expandOverlay}>
+                      <FontAwesomeIcon icon={faExpand} />
+                    </div>
+                  </div>
+                </div>
+                <div className={styles.description}>
+                  <h1 data-testid={E2E_TESTIDS.SBT_PAGE_NAME}>{sbtNameText}</h1>
+                  {sbtDescriptionText ? (
+                    <p data-testid={E2E_TESTIDS.SBT_PAGE_DESCRIPTION}>
+                      {isSbtFieldLocked(sbtInfo, 'description') && !String(sbtInfo?.description || '').trim() ? (
+                        <FontAwesomeIcon icon={faLock} style={{ marginRight: '6px' }} />
+                      ) : null}
+                      {sbtDescriptionText}
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+              <div className={styles.rightColumn}>
+                <div className={styles.statsSection}>
+                  <h2 className={`${styles.sectionHeader} ${styles.roundedHeader}`} onClick={this.toggleStats}>
+                    STATS <FontAwesomeIcon icon={showStats ? faChevronUp : faChevronDown} />
+                  </h2>
+                  {showStats && (
+                    <div className={styles.stats}>
+                      <p>
+                        <span className={styles.label}>{`${t('minted')}:`}</span>
+                        {/* Logic: Show spinner ONLY if we have no data and are loading. Else show count. */}
+                        {isInitialLoading ? (
+                          <FontAwesomeIcon icon={faSpinner} spin />
+                        ) : (
+                          <span title={mintedCountTitle}>
+                            {`${netMinted} / ${maxTokensDisplay}`}
+                          </span>
+                        )}
+                        {/* Logic: Show subtle spinner if we have data BUT are refreshing. */}
+                        {isRefreshing && (
+                          <span style={{ marginLeft: '10px', fontSize: '0.8em', opacity: 0.7 }} title="Refreshing...">
+                            <FontAwesomeIcon icon={faSpinner} spin />
+                          </span>
+                        )}
+
+                        <button onClick={this.openMintedModal} className={styles.expandButton}>
+                          <FontAwesomeIcon icon={faUser} />
+                        </button>
+                      </p>
+                      {showScanProgress && (
+                        <div className={styles.scanProgress}>
+                          <FontAwesomeIcon icon={faSpinner} spin className={styles.scanSpinner} />
+                          <div className={styles.scanProgressContent}>
+                            <span className={styles.scanProgressText}>{scanProgressText}</span>
+                            {scanProgressSessionText ? (
+                              <span className={styles.scanProgressSession}>{scanProgressSessionText}</span>
+                            ) : null}
+                            <div
+                              className={styles.scanProgressBar}
+                              role="progressbar"
+                              aria-valuenow={scanProgressPct}
+                              aria-valuemin={0}
+                              aria-valuemax={100}
+                            >
+                              <div className={styles.scanProgressFill} style={{ width: `${scanProgressPct}%` }} />
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      {mintEndDisplay}
+                      <p>
+                        <span className={styles.label}>Burnable by:</span> {burnLabel}
+                        <FontAwesomeIcon
+                          icon={faQuestionCircle}
+                          className={styles.tooltip}
+                          id="burnAuthQuestionMark"
+                          style={{ marginLeft: '5px', color: '#00ff9d', cursor: 'pointer', opacity: 0.5 }}
+                        />
+                        <CETooltip
+                          placement="right"
+                          target="burnAuthQuestionMark"
+                          delay={{ show: 0, hide: 2500 }}
+                          className={styles.tooltipBubble}
+                          innerClassName={styles.tooltipInner}
+                        >
+                          Specify who can burn the token: Admin Only, Owner Only, Both, or Neither.
+                        </CETooltip>
+                      </p>
+                      <p>
+                        <span className={styles.label}>Network:</span>{' '}
+                        {getChainLabelById(sbtInfo?.chainID || this.state.network?.id)}
+                      </p>
+
+                      <p>
+                        <span className={styles.label}>Admin:</span> {this.renderAddressLink(adminAddress, 'admin')}
+                      </p>
+                      <p>
+                        <span className={styles.label}>Creator:</span> {this.renderAddressLink(creatorAddress, 'creator')}
+                      </p>
+                    </div>
+                  )}
+                </div>
+                <div className={styles.actionsSection}>
+                  <h2 className={`${styles.sectionHeader} ${styles.roundedHeader}`} onClick={this.toggleActions}>
+                    ACTIONS <FontAwesomeIcon icon={showActions ? faChevronUp : faChevronDown} />
+                  </h2>
+                  {showActions && (
+                    <div className={styles.actions}>
+                      {this.renderMintButton()}
+                      {this.renderBurnButton()}
+                      {mintingStatus === 'success' && lastMintTxHash && burningStatus !== 'success' && (
+                        <div className={styles.mintProcess}>
+                          <p className={styles.mintSuccess}>
+                            {`${t('sbt')} successfully ${t('mintedLower')}!`}
+                            <br />
+                            {`${t('mint')} Tx Hash:`}{' '}
+                            <a
+                              href={this.getExplorerLink(lastMintTxHash)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              {getShortenedTransactionHash(lastMintTxHash)}
+                            </a>
+                          </p>
+                        </div>
+                      )}
+                      {burningStatus === 'success' && lastBurnTxHash && (
+                        <div className={styles.mintProcess}>
+                          <p className={styles.mintSuccess}>
+                            {`${t('sbt')} successfully ${t('burnedLower')}!`}
+                            <br />
+                            {`${t('burn')} Tx Hash:`}{' '}
+                            <a
+                              href={this.getExplorerLink(lastBurnTxHash)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              {getShortenedTransactionHash(lastBurnTxHash)}
+                            </a>
+                          </p>
+                        </div>
+                      )}
+                      {error && (mintingStatus === 'failure' || burningStatus === 'failure') && (
+                        <Alert color="danger" className={styles.txErrorAlert}>
+                          <FontAwesomeIcon icon={faExclamationTriangle} /> Transaction Failed: {this.state.error}
+                          <button
+                            onClick={this.copyErrorToClipboard}
+                            aria-label="Copy error message"
+                            title="Copy error message"
+                            style={{ background: 'transparent', border: 'none', marginLeft: '8px', cursor: 'pointer' }}
+                          >
+                            <FontAwesomeIcon icon={this.state.copiedError ? faCheck : faCopy} />
+                          </button>
+                          {transactionHash && (
+                            <>
+                              <br />
+                              Tx Hash:{' '}
+                              <a href={this.getExplorerLink(transactionHash)} target="_blank" rel="noopener noreferrer">
+                                {getShortenedTransactionHash(transactionHash)}
+                              </a>
+                            </>
+                          )}
+                        </Alert>
+                      )}
+                    </div>
+                  )}
+                </div>
+                {userIsSbtAdmin && (
+                  <div className={styles.adminSection}>
+                    <h2 className={`${styles.sectionHeader} ${styles.roundedHeader}`} onClick={this.toggleAdminSection}>
+                      ADMIN <FontAwesomeIcon icon={showAdminSection ? faChevronUp : faChevronDown} />
+                    </h2>
+                    {showAdminSection && (
+                      <div className={styles.adminContainer}>
+                        {this.renderAdminActions()}
+                      </div>
+                    )}
+                  </div>
+                )}
+                <div className={styles.moreDetailsSection}>
+                  <h2 className={`${styles.sectionHeader} ${styles.roundedHeader}`} onClick={this.toggleMoreDetails}>
+                    MORE <FontAwesomeIcon icon={showMoreDetails ? faChevronUp : faChevronDown} />
+                  </h2>
+                  {showMoreDetails && this.renderRelevantInfo()}
+                </div>
+              </div>
+            </div>
+          </>
+        ) : (
+          !error && loadingScreen
+        )}
+
+        <Modal
+          isOpen={showModal}
+          toggle={this.closeModal}
+          className={styles.modal}
+          contentClassName={styles.modalContent} // Applies dark theme via SCSS
+          size="lg"
+          centered
+        >
+          <ModalHeader toggle={this.closeModal} close={holdersModalClose} className={styles.modalHeader}>
+            <div className={styles.modalTitleStack}>
+              <span className={styles.modalTitle}>
+                Holders
+                {showHeaderCount && (
+                  <span className={styles.modalTitleCount}>({holdersDisplayCount})</span>
+                )}
+              </span>
+              {showCornerSpinner && (
+                <span className={styles.modalTitleSpinnerRow}>
+                  <FontAwesomeIcon icon={faSpinner} spin className={styles.cornerSpinner} title="Refreshing holders..." />
+                </span>
+              )}
+            </div>
+          </ModalHeader>
+          <ModalBody className={styles.modalBody}>
+            <div>
+              <SBTFilter
+                items={holderItemsForFilter}
+                mode="addresses"
+                provider={this.props.provider}
+                network={filterNetwork}
+                sessionSlug={this.getEffectiveSessionSlug()}
+                defaultFeaturedSBTs={this.getSessionSBTAddresses()}
+                onFilter={this.handleModalFilteredMintedUsers}
+                autoExpand={false}
+                isSBTCacheReady={this.props.isSBTCacheReady}
+                sbtCacheRevision={this.props.sbtCacheRevision}
+              />
+
+              {this.state.loadingMintedFilter && !hasFilteredHolders && !hasComputedHolders && (
+                <div className={styles.filteringStatus}>Filtering...</div>
+              )}
+              <div className={styles.userList}>
+                {showScanProgressInModal && (
+                  <div className={styles.scanProgress}>
+                    <FontAwesomeIcon icon={faSpinner} spin className={styles.scanSpinner} />
+                    <div className={styles.scanProgressContent}>
+                      <span className={styles.scanProgressText}>{scanProgressText}</span>
+                      {scanProgressSessionText ? (
+                        <span className={styles.scanProgressSession}>{scanProgressSessionText}</span>
+                      ) : null}
+                      <div
+                        className={styles.scanProgressBar}
+                        role="progressbar"
+                        aria-valuenow={scanProgressPct}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                      >
+                        <div className={styles.scanProgressFill} style={{ width: `${scanProgressPct}%` }} />
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {/* Body logic: Only show empty state if NOT initial loading */}
+                {showEmptyStateInModal && (
+                  <div className={styles.emptyState}>No holders found.</div>
+                )}
+                {showApproximateCountHint && (
+                  <div className={styles.emptyState}>Holder addresses not available yet. Showing approximate count only.</div>
+                )}
+                {/* Body logic: Show spinner if initial loading */}
+                {showSpinnerInModalBody && (
+                  <div className={styles.emptyState}><FontAwesomeIcon icon={faSpinner} spin size="2x" /></div>
+                )}
+
+                {this.state.filteredMintedUsers.map((address: any, index: any) => {
+                  const seed = String(address || 'contextengine-default-seed').toLowerCase();
+                  const blockieUrl = generateBlockieDataUrl(seed, 8, 4);
+                  return (
+                    <div key={index} className={styles.userItem}>
+                      <div className={styles.userItemLeft}>
+                        {blockieUrl ? (
+                          <img
+                            src={blockieUrl}
+                            alt=""
+                            className={styles.userBlockie}
+                          />
+                        ) : null}
+                        <a href={`/u/${address}`} target="_blank" rel="noopener noreferrer" className={styles.userAddressLink}>
+                          {getShortenedAddress(address, false)}
+                        </a>
+                      </div>
+                      <div className={styles.userItemActions}>
+                        <button onClick={() => this.copyToClipboard(address, `modal-addr-${index}`)} className={styles.copyButtonSmall}>
+                          <FontAwesomeIcon icon={this.state.copiedAddress === `modal-addr-${index}` ? faCheck : faCopy} />
+                        </button>
+                        <a href={this.getExplorerUrl(address)} target="_blank" rel="noopener noreferrer" className={styles.explorerLinkSmall}>
+                          <FontAwesomeIcon icon={faExternalLinkAlt} />
+                        </a>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </ModalBody>
+        </Modal>
+
+        {/* Full Image Modal */}
+        <Modal
+          isOpen={this.state.showFullImage}
+          toggle={this.toggleFullImage}
+          centered
+          size="xl"
+          contentClassName={styles.imageModalContent}
+        >
+          <ModalBody className={styles.imageModalBody} onClick={this.toggleFullImage}>
+            {sbtInfo && (
+              <img
+                src={imageUrl}
+                alt={sbtNameText}
+                onError={imageErrorHandler}
+              />
+            )}
+          </ModalBody>
+        </Modal>
+
+        <Modal
+          isOpen={docModalOpen}
+          toggle={this.closeDocModal}
+          className={styles.modal}
+          contentClassName={styles.modalContent}
+          size="lg"
+        >
+          <ModalHeader toggle={this.closeDocModal} className={styles.modalHeader}>
+            <span className={styles.modalTitle}>{docModalName || 'Encrypted document'}</span>
+            {docModalLoading && (
+              <FontAwesomeIcon icon={faSpinner} spin className={styles.headerSpinner} />
+            )}
+          </ModalHeader>
+          <ModalBody className={styles.modalBody}>
+            {docModalError && (
+              <div className={styles.modalError}>{docModalError}</div>
+            )}
+            {!docModalError && docModalLoading && (
+              <div className={styles.modalLoading}>
+                <FontAwesomeIcon icon={faSpinner} spin /> Decrypting…
+              </div>
+            )}
+            {!docModalError && !docModalLoading && docModalContent && (
+              <pre className={styles.docModalContent}>{docModalContent}</pre>
+            )}
+            {!docModalError && !docModalLoading && !docModalContent && docModalBlobUrl && (
+              <div className={styles.docModalDownload}>
+                <a href={docModalBlobUrl} download={docModalName || 'document'}>
+                  Download decrypted file
+                </a>
+              </div>
+            )}
+          </ModalBody>
+        </Modal>
+      </div>
+    );
   }
 }
 

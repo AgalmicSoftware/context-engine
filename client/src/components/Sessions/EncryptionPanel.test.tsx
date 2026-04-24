@@ -3,7 +3,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import EncryptionPanel, { EncryptionPanelProps } from './EncryptionPanel';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
-jest.mock('../SBTs/SBTSelector.jsx', () => function MockSBTSelector() {
+jest.mock('../SBTs/SBTSelector', () => function MockSBTSelector() {
   return <div data-testid="mock-sbt-selector" />;
 });
 
