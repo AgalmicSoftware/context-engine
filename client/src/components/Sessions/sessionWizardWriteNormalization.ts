@@ -13,13 +13,19 @@ import {
   getVisibleSessionWizardContractKeys,
   sanitizeSessionWizardContracts,
 } from './sessionWizardContracts.js';
+import type {
+  AnyRecord,
+  ChainIdLike,
+  SessionContractLike,
+  SessionContractsLike,
+} from '../shellTypes';
 
-const isObj = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
-const trimString = (value) => toStr(value).trim();
-const cloneValue = (value) => {
+const isObj = (value: unknown): value is AnyRecord => !!value && typeof value === 'object' && !Array.isArray(value);
+const trimString = (value: unknown): string => toStr(value).trim();
+const cloneValue = (value: any): any => {
   if (Array.isArray(value)) return value.map((entry) => cloneValue(entry));
   if (isObj(value)) {
-    return Object.keys(value).reduce((acc, key) => {
+    return Object.keys(value).reduce<AnyRecord>((acc, key) => {
       acc[key] = cloneValue(value[key]);
       return acc;
     }, {});
@@ -41,9 +47,9 @@ export const SESSION_WIZARD_ONCHAIN_COMPAT_FIELD_PATHS = Object.freeze({
   corsWorkerUrl: ['corsWorkerUrl'],
 });
 
-const orderMetadataFields = (metadata, fieldOrder = []) => {
+const orderMetadataFields = (metadata: AnyRecord, fieldOrder: string[] = []): AnyRecord => {
   if (!isObj(metadata)) return metadata;
-  const ordered = {};
+  const ordered: AnyRecord = {};
   (Array.isArray(fieldOrder) ? fieldOrder : []).forEach((key) => {
     if (Object.prototype.hasOwnProperty.call(metadata, key)) {
       ordered[key] = metadata[key];
@@ -57,7 +63,7 @@ const orderMetadataFields = (metadata, fieldOrder = []) => {
   return ordered;
 };
 
-const stripWorkerOnlyMetadataFields = (metadata) => {
+const stripWorkerOnlyMetadataFields = (metadata: AnyRecord): AnyRecord => {
   if (!isObj(metadata)) return metadata;
   const next = cloneValue(metadata);
   [...AUTHORITY_MATRIX.workerConfig.fields, ...WORKER_METADATA_ALIAS_KEYS].forEach((key) => {
@@ -66,32 +72,43 @@ const stripWorkerOnlyMetadataFields = (metadata) => {
   return next;
 };
 
-const defaultNormalizeAiProvider = (value, fallback = 'openai') => {
+const defaultNormalizeAiProvider = (value: unknown, fallback = 'openai'): string => {
   const lowered = trimString(value).toLowerCase();
   return lowered || fallback;
 };
 
-const defaultNormalizeAiModels = (raw = {}) => (
+const defaultNormalizeAiModels = (raw: AnyRecord = {}): AnyRecord => (
   isObj(raw) ? cloneValue(raw) : {}
 );
 
-const defaultNormalizeAiModelForProvider = (_modelType, _providerValue, modelValue) => trimString(modelValue);
+const defaultNormalizeAiModelForProvider = (
+  _modelType: string,
+  _providerValue: string,
+  modelValue: unknown
+): string => trimString(modelValue);
 
-export const sanitizeSessionWizardMetadataPayload = (metadata, {
+export const sanitizeSessionWizardMetadataPayload = (metadata: AnyRecord, {
   fieldOrder = [],
   sanitizeContracts = sanitizeSessionWizardContracts,
   normalizeAiProvider = defaultNormalizeAiProvider,
   normalizeAiModels = defaultNormalizeAiModels,
   normalizeAiModelForProvider = defaultNormalizeAiModelForProvider,
   defaultAiModels = {},
-} = {}) => {
+}: {
+  fieldOrder?: string[];
+  sanitizeContracts?: (contracts: SessionContractsLike) => SessionContractsLike;
+  normalizeAiProvider?: (value: unknown, fallback?: string) => string;
+  normalizeAiModels?: (raw?: AnyRecord, fallbackProvider?: string, transcription?: unknown) => AnyRecord;
+  normalizeAiModelForProvider?: (modelType: string, providerValue: string, modelValue: unknown) => string;
+  defaultAiModels?: AnyRecord;
+} = {}): AnyRecord => {
   if (!isObj(metadata)) return metadata;
 
-  let next = cloneValue(metadata);
-  next = stripAuthoritativeSessionGateFields(next);
-  next = stripWorkerOnlyMetadataFields(next);
-  next = normalizeLitMetadataNetwork(next);
-  next = normalizeSessionNaming(next);
+  let next = cloneValue(metadata) as AnyRecord;
+  next = stripAuthoritativeSessionGateFields(next) as AnyRecord;
+  next = stripWorkerOnlyMetadataFields(next) as AnyRecord;
+  next = normalizeLitMetadataNetwork(next) as AnyRecord;
+  next = normalizeSessionNaming(next) as AnyRecord;
   next.sessionName = trimString(next.sessionName);
   next.sessionInfo = trimString(next.sessionInfo);
   if (!next.sessionName) delete next.sessionName;
@@ -157,7 +174,12 @@ export const sanitizeSessionWizardMetadataPayload = (metadata, {
       throw new Error('Session config requires blockLimits.start (positive block number).');
     }
     next.blockLimits.start = start;
-    next.blockLimits.end = Number.isFinite(end) && end > 0 && end >= start ? end : null;
+    next.blockLimits.end = (
+      typeof end === 'number' &&
+      Number.isFinite(end) &&
+      end > 0 &&
+      end >= start
+    ) ? end : null;
   } else if (Object.prototype.hasOwnProperty.call(next, 'blockLimits')) {
     throw new Error('Session config requires blockLimits.start (positive block number).');
   }
@@ -173,8 +195,12 @@ export const buildSessionWizardRegistrySessionFields = ({
   onChainFields = {},
   sponsoredFields = {},
   compatibilityFieldPaths = SESSION_WIZARD_ONCHAIN_COMPAT_FIELD_PATHS,
-} = {}) => {
-  const next = {};
+}: {
+  onChainFields?: AnyRecord;
+  sponsoredFields?: AnyRecord;
+  compatibilityFieldPaths?: Record<string, string[]>;
+} = {}): AnyRecord => {
+  const next: AnyRecord = {};
   const compatPaths = isObj(compatibilityFieldPaths) ? compatibilityFieldPaths : {};
   const rawOnChainFields = isObj(onChainFields) ? onChainFields : {};
 
@@ -213,13 +239,30 @@ export const buildSessionWizardWorkerConfigPayload = ({
   normalizeBlockLimits = normalizeBlockLimitsForConfig,
   getContractDefaults = getSessionWizardContractDefaults,
   getVisibleContractKeys = getVisibleSessionWizardContractKeys,
-} = {}) => {
+}: {
+  slug?: string;
+  draft?: AnyRecord;
+  deployPayload?: AnyRecord;
+  account?: string;
+  registryAddress?: string;
+  registryChainId?: ChainIdLike;
+  networkChainId?: ChainIdLike;
+  sessionId?: string;
+  latestChainBlock?: number | null;
+  workerUrl?: string;
+  resolveWorkerFaucetConfig?: () => AnyRecord;
+  normalizeBlockLimits?: (blockLimits: unknown, latestBlock?: number | null) => AnyRecord | null;
+  getContractDefaults?: (chainId: number) => AnyRecord;
+  getVisibleContractKeys?: () => string[];
+} = {}): AnyRecord => {
   const resolvedDraft = isObj(draft) ? draft : {};
   const resolvedDeployPayload = isObj(deployPayload) ? deployPayload : {};
   const chainId = Number(registryChainId || resolvedDraft.networkChainId || networkChainId || 0) || 0;
-  const normalizedContracts = {};
-  const defaults = getContractDefaults(chainId);
-  const draftContracts = isObj(resolvedDraft.contracts) ? resolvedDraft.contracts : {};
+  const normalizedContracts: SessionContractsLike = {};
+  const defaults = (getContractDefaults(chainId) || {}) as Record<string, SessionContractLike>;
+  const draftContracts = isObj(resolvedDraft.contracts)
+    ? (resolvedDraft.contracts as SessionContractsLike)
+    : {};
 
   getVisibleContractKeys().forEach((key) => {
     const fromDraft = isObj(draftContracts[key]) ? draftContracts[key] : {};
@@ -232,7 +275,7 @@ export const buildSessionWizardWorkerConfigPayload = ({
     };
   });
 
-  const next = {
+  const next: AnyRecord = {
     slug: trimString(slug),
     adminAddress: trimString(resolvedDeployPayload.adminAddress || account),
     registryAddress: trimString(resolvedDeployPayload.registryAddress || registryAddress),

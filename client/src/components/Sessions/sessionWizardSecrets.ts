@@ -1,10 +1,22 @@
 import { toStr } from '../../utilities/shared/primitives.js';
+import type {
+  AnyRecord,
+  WorkerSecretSyncResult,
+  WorkerSecretsLike,
+  WorkerSecretsRefLike,
+} from '../shellTypes';
+
+type AsyncShellCallback = (input?: AnyRecord) => Promise<any>;
 
 export const resolveWorkerSecretsSnapshot = ({
   workerSecretsRef = null,
   workerSecrets = null,
   defaults = null,
-} = {}) => {
+}: {
+  workerSecretsRef?: WorkerSecretsRefLike;
+  workerSecrets?: WorkerSecretsLike | null;
+  defaults?: WorkerSecretsLike | null;
+} = {}): WorkerSecretsLike => {
   const fallbackSecrets = defaults && typeof defaults === 'object' ? defaults : {};
   const stateSecrets = workerSecrets && typeof workerSecrets === 'object' ? workerSecrets : {};
   const refSecrets = (
@@ -21,13 +33,15 @@ export const resolveWorkerSecretsSnapshot = ({
   };
 };
 
-export const buildWorkerSecretsPayload = (workerSecrets = {}) => (
+export const buildWorkerSecretsPayload = (
+  workerSecrets: WorkerSecretsLike = {}
+): Record<string, string> => (
   Object.entries(workerSecrets || {}).reduce((acc, [key, value]) => {
     const trimmed = toStr(value).trim();
     if (!trimmed) return acc;
     acc[key] = trimmed;
     return acc;
-  }, {})
+  }, {} as Record<string, string>)
 );
 
 const TRANSIENT_SYNC_ERROR_PATTERNS = [
@@ -48,23 +62,23 @@ const CONFIG_SYNC_ERROR_PATTERNS = [
   'session config not found',
 ];
 
-const defaultWait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const defaultWait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
-const toErrorMessage = (err) => toStr(err?.message || err).trim();
+const toErrorMessage = (err: unknown) => toStr((err as AnyRecord)?.message || err).trim();
 
-export const isTransientSecretsSyncError = (err) => {
+export const isTransientSecretsSyncError = (err: unknown): boolean => {
   const message = toErrorMessage(err).toLowerCase();
   if (!message) return false;
   return TRANSIENT_SYNC_ERROR_PATTERNS.some((pattern) => message.includes(pattern));
 };
 
-export const isSecretsSyncConfigError = (err) => {
+export const isSecretsSyncConfigError = (err: unknown): boolean => {
   const message = toErrorMessage(err).toLowerCase();
   if (!message) return false;
   return CONFIG_SYNC_ERROR_PATTERNS.some((pattern) => message.includes(pattern));
 };
 
-export const isSecretsSyncConfigBootstrapError = (err) => {
+export const isSecretsSyncConfigBootstrapError = (err: unknown): boolean => {
   const message = toErrorMessage(err).toLowerCase();
   if (!message) return false;
   return (
@@ -84,7 +98,18 @@ export const syncWorkerSecretsAfterDeploy = async ({
   helperWritesSecrets = true,
   retryDelaysMs = [350, 700, 1400, 2200],
   wait = defaultWait,
-} = {}) => {
+}: {
+  workerUrl?: string;
+  account?: string;
+  slug?: string;
+  deploySecrets?: WorkerSecretsLike | null;
+  signAdminAction?: AsyncShellCallback;
+  postSecrets?: AsyncShellCallback;
+  ensureSessionConfig?: AsyncShellCallback;
+  helperWritesSecrets?: boolean;
+  retryDelaysMs?: number[];
+  wait?: (ms: number) => Promise<void>;
+} = {}): Promise<WorkerSecretSyncResult> => {
   const secrets = deploySecrets && typeof deploySecrets === 'object' ? deploySecrets : {};
   if (!Object.keys(secrets).length) {
     return { warning: '', note: '', synced: false, skipped: true };
@@ -117,23 +142,23 @@ export const syncWorkerSecretsAfterDeploy = async ({
     };
   }
 
-  let lastErr = null;
+  let lastErr: unknown = null;
   let configSeedAttempted = false;
   const delays = Array.isArray(retryDelaysMs) ? retryDelaysMs : [];
   const attemptCount = delays.length + 1;
   for (let attempt = 0; attempt < attemptCount; attempt += 1) {
     try {
-      const requestBody = {
+      const requestBody: AnyRecord = {
         sessionSlug: slug,
         secrets,
       };
-      const auth = await signAdminAction({
+      const auth = await signAdminAction?.({
         action: 'set-secrets',
         body: requestBody,
         targetSlug: slug,
         workerUrl: resolvedWorkerUrl,
       });
-      await postSecrets({ auth, secrets, body: requestBody, workerUrl: resolvedWorkerUrl, slug });
+      await postSecrets?.({ auth, secrets, body: requestBody, workerUrl: resolvedWorkerUrl, slug });
       return { warning: '', note: '', synced: true, attempts: attempt + 1 };
     } catch (err) {
       lastErr = err;
@@ -176,9 +201,23 @@ export const syncWorkerConfigAfterPartialDeploy = async ({
   account = '',
   slug = '',
   ensureSessionConfig,
-} = {}) => {
+}: {
+  deployResponse?: AnyRecord | null;
+  workerUrl?: string;
+  account?: string;
+  slug?: string;
+  ensureSessionConfig?: AsyncShellCallback;
+} = {}): Promise<WorkerSecretSyncResult> => {
   if (deployResponse?.partial !== true) {
     return { warning: '', note: '', synced: false, skipped: true };
+  }
+
+  if (typeof ensureSessionConfig !== 'function') {
+    return {
+      warning: 'Worker config sync callback unavailable after partial deploy.',
+      note: '',
+      synced: false,
+    };
   }
 
   try {
@@ -194,21 +233,24 @@ export const syncWorkerConfigAfterPartialDeploy = async ({
   }
 };
 
-export const withSecretsSyncWarning = (baseStatus = '', warning = '') => {
+export const withSecretsSyncWarning = (baseStatus = '', warning = ''): string => {
   const status = toStr(baseStatus).trim();
   const note = toStr(warning).trim();
   if (!note) return status;
   return `${status || 'Worker deployed.'} Secrets sync warning: ${note}`;
 };
 
-export const withWorkerConfigSyncWarning = (baseStatus = '', warning = '') => {
+export const withWorkerConfigSyncWarning = (baseStatus = '', warning = ''): string => {
   const status = toStr(baseStatus).trim();
   const note = toStr(warning).trim();
   if (!note) return status;
   return `${status || 'Worker deployed.'} Config sync warning: ${note}`;
 };
 
-export const withSecretsSyncStatus = (baseStatus = '', { warning = '', note = '' } = {}) => {
+export const withSecretsSyncStatus = (
+  baseStatus = '',
+  { warning = '', note = '' }: Partial<WorkerSecretSyncResult> = {}
+): string => {
   const status = toStr(baseStatus).trim();
   const warningText = toStr(warning).trim();
   const noteText = toStr(note).trim();

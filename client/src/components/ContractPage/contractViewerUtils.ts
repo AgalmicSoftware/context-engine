@@ -6,8 +6,16 @@ import {
   getContractSourceFileName,
 } from './contractMetadata.js';
 import { getContractSourceDefinitions } from './contractSourceLoader.js';
+import type {
+  AnyRecord,
+  ChainIdLike,
+  ContractViewerAddressLike,
+  ContractViewerContractLike,
+  SessionContractLike,
+  SessionContractsLike,
+} from '../shellTypes';
 
-export const getExplorerAddressUrl = (address, chainId) => {
+export const getExplorerAddressUrl = (address: string, chainId: ChainIdLike): string => {
   const chain = getChainById(chainId);
   const explorerBase = chain?.blockExplorers?.default?.url;
   if (explorerBase) return `${explorerBase.replace(/\/$/, '')}/address/${address}`;
@@ -34,7 +42,13 @@ export const getExplorerAddressUrl = (address, chainId) => {
   return `https://etherscan.io/address/${address}`;
 };
 
-const buildContractAddresses = ({ address = '', chainId = null } = {}) => {
+const buildContractAddresses = ({
+  address = '',
+  chainId = null,
+}: {
+  address?: string;
+  chainId?: ChainIdLike;
+} = {}): ContractViewerAddressLike[] => {
   const normalizedAddress = toStr(address).trim();
   const normalizedChainId = Number(chainId || 0) || null;
   if (!normalizedAddress) return [];
@@ -42,7 +56,7 @@ const buildContractAddresses = ({ address = '', chainId = null } = {}) => {
   const chain = normalizedChainId ? getChainById(normalizedChainId) : null;
   return [{
     address: normalizedAddress,
-    id: normalizedChainId,
+    ...(normalizedChainId ? { id: normalizedChainId } : {}),
     testnet: chain ? isTestnetChain(chain) : false,
     explorerUrl: normalizedChainId
       ? getExplorerAddressUrl(normalizedAddress, normalizedChainId)
@@ -55,13 +69,18 @@ export const buildContractViewerContracts = ({
   chainId = null,
   includeSessionRegistry = true,
   includeCustomSBT = true,
-} = {}) => {
-  const sourceDefinitions = getContractSourceDefinitions();
+}: {
+  sessionContracts?: SessionContractsLike | null;
+  chainId?: ChainIdLike;
+  includeSessionRegistry?: boolean;
+  includeCustomSBT?: boolean;
+} = {}): ContractViewerContractLike[] => {
+  const sourceDefinitions = getContractSourceDefinitions() as Record<string, AnyRecord>;
   const normalizedContracts = sessionContracts && typeof sessionContracts === 'object'
     ? sessionContracts
     : {};
-  const entries = Object.entries(normalizedContracts).map(([contractKey, contractInfo]) => {
-    const info = contractInfo && typeof contractInfo === 'object' ? contractInfo : {};
+  const entries: ContractViewerContractLike[] = Object.entries(normalizedContracts).map(([contractKey, contractInfo]) => {
+    const info = (contractInfo && typeof contractInfo === 'object' ? contractInfo : {}) as SessionContractLike;
     const contractChainId = Number(info.chainId || chainId || 0) || null;
     const sourceDefinition = sourceDefinitions[contractKey] || {};
 
@@ -78,7 +97,7 @@ export const buildContractViewerContracts = ({
     };
   });
 
-  const firstContract = Object.values(normalizedContracts)[0];
+  const firstContract = Object.values(normalizedContracts)[0] as SessionContractLike | undefined;
   const resolvedChainId = Number(
     chainId ||
     firstContract?.chainId ||
