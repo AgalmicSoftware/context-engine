@@ -3121,6 +3121,48 @@ describe('SurveyResults filter state synchronization', () => {
   });
 });
 
+describe('SurveyResults bookmark cache writes', () => {
+  it('uses clone:false reads when mutating survey/question bookmarks in results view', async () => {
+    const peekSpy = jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue({
+      surveys: [],
+      questions: [],
+    });
+    const writeSpy = jest.spyOn(cacheScripts, 'writeCache').mockResolvedValue(true);
+
+    const subject = attachStateHarness(createSubject({
+      activeSessionSlug: 'edge',
+    }));
+    subject.getEffectiveSlug = jest.fn(() => 'edge');
+
+    subject.toggleSurveyBookmark('s1');
+    subject.toggleQuestionBookmark('q1');
+    await Promise.resolve();
+
+    expect(peekSpy).toHaveBeenCalledWith('bookmarksCache', 'edge', { clone: false });
+    expect(writeSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not mutate live bookmarkedFilters cache when filter write fails', async () => {
+    const liveCache = { bookmarkedFilters: ['existing-filter'] };
+    jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue(liveCache);
+    jest.spyOn(cacheScripts, 'writeCache').mockRejectedValue(new Error('write failed'));
+
+    const subject = createSubject({
+      activeSessionSlug: 'edge',
+    });
+    subject._isMounted = true;
+    subject.getEffectiveSlug = jest.fn(() => 'edge');
+    subject.state = {
+      ...subject.state,
+      filterState: { types: ['radio'] },
+    };
+
+    await subject.handleBookmarkFilter();
+
+    expect(liveCache.bookmarkedFilters).toEqual(['existing-filter']);
+  });
+});
+
 describe('SurveyResults modal and polling behavior', () => {
   afterEach(() => {
     jest.restoreAllMocks();
