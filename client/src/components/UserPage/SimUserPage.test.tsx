@@ -5,7 +5,7 @@ import path from 'path';
 import SimUserPage from './SimUserPage';
 import historicalFigures from '../../variables/demo/historical_figure_users.json';
 
-jest.mock('../SurveyTool/SingleQuestionResponse.jsx', () => (props: any) => {
+jest.mock('../SurveyTool/SingleQuestionResponse', () => (props: any) => {
   const rawValue = props?.response?.answer?.value;
   const answerText = Array.isArray(rawValue) ? rawValue.join(' | ') : String(rawValue ?? '');
 

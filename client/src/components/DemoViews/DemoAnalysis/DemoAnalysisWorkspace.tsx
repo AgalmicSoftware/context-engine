@@ -13,7 +13,7 @@ import DemographicSelector from './DemographicSelector';
 import QuestionBreakdownChart from './QuestionBreakdownChart';
 import QuestionDrilldownModal from './QuestionDrilldownModal';
 import WorldResultsMap from './WorldResultsMap';
-import SingleQuestionResponse from '../../SurveyTool/SingleQuestionResponse.jsx';
+import SingleQuestionResponse from '../../SurveyTool/SingleQuestionResponse';
 import styles from './DemoAnalysisWorkspace.module.scss';
 
 type Question = {
