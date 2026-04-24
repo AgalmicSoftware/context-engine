@@ -22,7 +22,33 @@ import { createLogger } from '../logging.js';
 
 const cacheLog = createLogger('cache');
 
-const defaultEmptyFilterState = {
+type FilterStateResponseStatus = {
+  responded: boolean;
+  notResponded: boolean;
+} | null;
+
+export type SurveyFilterState = {
+  topQuestions: number | null;
+  questionTypes: string[];
+  sbtFilter: unknown;
+  aiFilter: string | null;
+  aiTopN: number | null;
+  aiCombine: boolean;
+  selectedTags: string[];
+  responseStatus: FilterStateResponseStatus;
+};
+
+type FilterStateRecord = Record<string, unknown>;
+
+const hasOwn = (value: FilterStateRecord, key: keyof SurveyFilterState | string): boolean => (
+  Object.prototype.hasOwnProperty.call(value, key)
+);
+
+const isRecord = (value: unknown): value is FilterStateRecord => (
+  !!value && typeof value === 'object' && !Array.isArray(value)
+);
+
+const defaultEmptyFilterState: SurveyFilterState = {
   topQuestions: null,
   questionTypes: [],
   sbtFilter: null,
@@ -41,7 +67,7 @@ const defaultEmptyFilterState = {
  * @param {object} filterStateObj - The filter state object to check. Assumed to be non-null.
  * @returns {boolean} True if the object is effectively empty, false otherwise.
  */
-function isEffectivelyEmpty(filterStateObj) {
+function isEffectivelyEmpty(filterStateObj: FilterStateRecord): boolean {
   // This function assumes filterStateObj is a non-null, actual object,
   // as serializeFilterState handles null/undefined checks before calling this.
 
@@ -53,11 +79,11 @@ function isEffectivelyEmpty(filterStateObj) {
   // and that properties defined in defaultEmptyFilterState but missing in filterStateObj
   // are consistent with their defaults (e.g., a missing 'topQuestions' is fine if default is null).
   for (const key in defaultEmptyFilterState) {
-    if (defaultEmptyFilterState.hasOwnProperty(key)) {
+    if (hasOwn(defaultEmptyFilterState as unknown as FilterStateRecord, key)) {
       const valueInObj = filterStateObj[key];
-      const defaultValue = defaultEmptyFilterState[key];
+      const defaultValue = defaultEmptyFilterState[key as keyof SurveyFilterState];
 
-      if (filterStateObj.hasOwnProperty(key)) {
+      if (hasOwn(filterStateObj, key)) {
         // If the key exists in filterStateObj, its value must match the default.
         // JSON.stringify is used for simple deep comparison of values.
         if (JSON.stringify(valueInObj) !== JSON.stringify(defaultValue)) {
@@ -73,7 +99,7 @@ function isEffectivelyEmpty(filterStateObj) {
 
   // Check for any keys in filterStateObj that are not part of the default structure.
   for (const key in filterStateObj) {
-    if (filterStateObj.hasOwnProperty(key) && !defaultEmptyFilterState.hasOwnProperty(key)) {
+    if (hasOwn(filterStateObj, key) && !hasOwn(defaultEmptyFilterState as unknown as FilterStateRecord, key)) {
       return false; // Found an extraneous key not in defaultEmptyFilterState
     }
   }
@@ -88,7 +114,7 @@ function isEffectivelyEmpty(filterStateObj) {
  * @returns {string} The Base64URL encoded string, or an empty string if
  *                   filterStateObj is null, undefined, or effectively empty.
  */
-export function serializeFilterState(filterStateObj) {
+export function serializeFilterState(filterStateObj: FilterStateRecord | null | undefined): string {
   if (filterStateObj === null || filterStateObj === undefined) {
     return '';
   }
@@ -113,7 +139,7 @@ export function serializeFilterState(filterStateObj) {
 
     return base64UrlString;
   } catch (error) {
-    cacheLog.error("Error serializing filter state:", error);
+    cacheLog.error('Error serializing filter state:', error);
     return ''; // Return empty string on error as a fallback
   }
 }
@@ -125,12 +151,12 @@ export function serializeFilterState(filterStateObj) {
  * @returns {object} The filter state object. Returns a new instance of the default
  *                   empty filter state if the string is invalid or an error occurs.
  */
-export function deserializeFilterState(base64UrlString) {
+export function deserializeFilterState(base64UrlString: string | null | undefined): SurveyFilterState {
   // Create a new instance of the default state for fallback, ensuring arrays are new instances.
-  const newDefaultStateInstance = {
+  const newDefaultStateInstance: SurveyFilterState = {
     ...defaultEmptyFilterState,
     questionTypes: [...defaultEmptyFilterState.questionTypes],
-    selectedTags: [...defaultEmptyFilterState.selectedTags]
+    selectedTags: [...defaultEmptyFilterState.selectedTags],
   };
 
   if (base64UrlString === null || base64UrlString === undefined || base64UrlString.trim() === '') {
@@ -158,15 +184,19 @@ export function deserializeFilterState(base64UrlString) {
     // 2. escape to convert Latin1 string (with multi-byte chars as single chars) to %xx sequences.
     // 3. decodeURIComponent to correctly interpret these %xx sequences as UTF-8.
     const jsonString = decodeURIComponent(escape(window.atob(base64String)));
-    const parsedObj = JSON.parse(jsonString);
+    const parsedValue: unknown = JSON.parse(jsonString);
+    if (!isRecord(parsedValue)) {
+      return newDefaultStateInstance;
+    }
+    const parsedObj = parsedValue;
 
     const aiFilter = (
-      parsedObj.hasOwnProperty('aiFilter') && typeof parsedObj.aiFilter === 'string'
+      hasOwn(parsedObj, 'aiFilter') && typeof parsedObj.aiFilter === 'string'
     )
       ? parsedObj.aiFilter
       : defaultEmptyFilterState.aiFilter;
     const parsedAiTopN = Number.parseInt(
-      String(parsedObj.hasOwnProperty('aiTopN') ? parsedObj.aiTopN : ''),
+      String(hasOwn(parsedObj, 'aiTopN') ? parsedObj.aiTopN : ''),
       10
     );
     const normalizedAiTopN = Number.isFinite(parsedAiTopN) && parsedAiTopN > 0
@@ -181,16 +211,25 @@ export function deserializeFilterState(base64UrlString) {
 
     // Ensure the parsed object conforms to the filterState structure by merging with defaults.
     // This provides defaults for any missing keys and ensures correct types (e.g., arrays).
-    const finalState = {
-      topQuestions: parsedObj.hasOwnProperty('topQuestions') ? parsedObj.topQuestions : defaultEmptyFilterState.topQuestions,
-      questionTypes: parsedObj.hasOwnProperty('questionTypes') && Array.isArray(parsedObj.questionTypes) ? parsedObj.questionTypes : [...defaultEmptyFilterState.questionTypes],
-      sbtFilter: parsedObj.hasOwnProperty('sbtFilter') ? parsedObj.sbtFilter : defaultEmptyFilterState.sbtFilter,
+    const finalState: SurveyFilterState = {
+      topQuestions: hasOwn(parsedObj, 'topQuestions')
+        ? (parsedObj.topQuestions as number | null)
+        : defaultEmptyFilterState.topQuestions,
+      questionTypes: hasOwn(parsedObj, 'questionTypes') && Array.isArray(parsedObj.questionTypes)
+        ? (parsedObj.questionTypes as string[])
+        : [...defaultEmptyFilterState.questionTypes],
+      sbtFilter: hasOwn(parsedObj, 'sbtFilter')
+        ? parsedObj.sbtFilter
+        : defaultEmptyFilterState.sbtFilter,
       aiFilter,
       aiTopN,
       aiCombine,
-      selectedTags: parsedObj.hasOwnProperty('selectedTags') && Array.isArray(parsedObj.selectedTags) ? parsedObj.selectedTags : [...defaultEmptyFilterState.selectedTags],
+      selectedTags: hasOwn(parsedObj, 'selectedTags') && Array.isArray(parsedObj.selectedTags)
+        ? (parsedObj.selectedTags as string[])
+        : [...defaultEmptyFilterState.selectedTags],
       responseStatus:
-        parsedObj.hasOwnProperty('responseStatus') && parsedObj.responseStatus && typeof parsedObj.responseStatus === 'object'
+        hasOwn(parsedObj, 'responseStatus') &&
+        isRecord(parsedObj.responseStatus)
           ? {
             responded: !!parsedObj.responseStatus.responded,
             notResponded: !!parsedObj.responseStatus.notResponded,
@@ -200,14 +239,14 @@ export function deserializeFilterState(base64UrlString) {
 
     // Ensure no extraneous keys are carried over if not part of defaultEmptyFilterState
     for (const key in finalState) {
-        if (!defaultEmptyFilterState.hasOwnProperty(key)) {
-            delete finalState[key];
-        }
+      if (!hasOwn(defaultEmptyFilterState as unknown as FilterStateRecord, key)) {
+        delete (finalState as FilterStateRecord)[key];
+      }
     }
 
     return finalState;
   } catch (error) {
-    cacheLog.error("Error deserializing filter state:", error);
+    cacheLog.error('Error deserializing filter state:', error);
     return newDefaultStateInstance;
   }
 }
