@@ -50,6 +50,7 @@ import { getSbtDisplayName } from '../../utilities/sbt/sbtDisplayNames.js';
 import { isDemoSessionSlug } from '../../utilities/session/demoSessionSlugs.js';
 import { isCryptoMode, sbtsListPath, t } from '../../utilities/ui/terminology.js';
 import { PUBLIC_AI_DISCOURSE_CORPUS_URL } from '../../variables/publicRepoMetadata.js';
+import type { RiskMatrixRestoreState } from '../MainContent/RiskMatrix';
 
 const SurveyPage = React.lazy(() => import('../SurveyTool/SurveyPage'));
 const MemoSurveyPage = React.memo((props: any) => <SurveyPage {...props} />);
@@ -389,6 +390,7 @@ class OnePageSession extends Component<any, any> {
       autoOpenResults: routeUiState.autoOpenResults,
       embeddedAtlasNodeId: null,
       embeddedAtlasReturnState: null,
+      riskMatrixRestoreState: null,
       aggregatorData: {},
       disclaimersActive: true,
       filterState: initialFilterState,
@@ -443,6 +445,7 @@ class OnePageSession extends Component<any, any> {
     this.handleResultsModalClose = this.handleResultsModalClose.bind(this);
     this.handleCorpusAtlasIssueOpen = this.handleCorpusAtlasIssueOpen.bind(this);
     this.handleEmbeddedAtlasModalClose = this.handleEmbeddedAtlasModalClose.bind(this);
+    this.handleRiskMatrixRestoreApplied = this.handleRiskMatrixRestoreApplied.bind(this);
     this.resetDemoURL = this.resetDemoURL.bind(this);
     this.toggleQuestions = this.toggleQuestions.bind(this);
     this.toggleGroups = this.toggleGroups.bind(this);
@@ -1935,7 +1938,7 @@ class OnePageSession extends Component<any, any> {
     this.setState({ autoOpenResults: false }, () => this.resetDemoURL());
   }
 
-  handleCorpusAtlasIssueOpen(nodeId: any) {
+  handleCorpusAtlasIssueOpen(nodeId: any, riskMatrixRestoreState: RiskMatrixRestoreState | null = null) {
     const normalizedNodeId = String(nodeId || '').trim();
     if (!normalizedNodeId) return;
 
@@ -1944,6 +1947,7 @@ class OnePageSession extends Component<any, any> {
       embeddedAtlasReturnState: prevState.embeddedAtlasReturnState || {
         showResults: prevState.showResults,
         resultsViewMode: prevState.resultsViewMode,
+        riskMatrixRestoreState: riskMatrixRestoreState || null,
       },
       showResults: true,
       resultsViewMode: 'debateAtlas',
@@ -1956,10 +1960,18 @@ class OnePageSession extends Component<any, any> {
       return {
         embeddedAtlasNodeId: null,
         embeddedAtlasReturnState: null,
+        riskMatrixRestoreState: returnState?.resultsViewMode === 'riskMatrix'
+          ? (returnState?.riskMatrixRestoreState || null)
+          : null,
         showResults: returnState ? returnState.showResults : prevState.showResults,
         resultsViewMode: returnState?.resultsViewMode || prevState.resultsViewMode,
       };
     });
+  }
+
+  handleRiskMatrixRestoreApplied() {
+    if (!this.state.riskMatrixRestoreState) return;
+    this.setState({ riskMatrixRestoreState: null });
   }
 
 

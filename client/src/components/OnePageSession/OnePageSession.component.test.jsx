@@ -1316,7 +1316,61 @@ describe('OnePageSession view gating', () => {
     expect(riskMatrixCalls.length).toBeGreaterThan(0);
     expect(riskMatrixCalls[riskMatrixCalls.length - 1]).toMatchObject({
       embedded: true,
+      onOpenAtlasNode: expect.any(Function),
+      onRestoreApplied: expect.any(Function),
     });
+  });
+
+  it('opens linked atlas nodes from the embedded risk matrix and returns to risk matrix when the atlas modal closes', async () => {
+    const props = buildProps();
+
+    render(
+      <MemoryRouter initialEntries={['/session/demo']}>
+        <OnePageSession
+          {...props}
+          slug="demo"
+          sessionConfig={{ ...props.sessionConfig, slug: 'demo' }}
+        />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Risk Matrix/i })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /Risk Matrix/i }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('risk-matrix-view')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId('risk-matrix-open-atlas-node'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('ai-policy-atlas')).toBeInTheDocument();
+    });
+
+    const atlasCalls = mockDebateMap.mock.calls.map((args) => args[0]).filter(Boolean);
+    expect(atlasCalls[atlasCalls.length - 1]).toMatchObject({
+      embedded: true,
+      requestedModalNodeId: '0x4110000000000000000000000000000000000000000000000000000000000000',
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close Atlas Modal' }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('risk-matrix-view')).toBeInTheDocument();
+    });
+
+    const riskMatrixCalls = mockRiskMatrix.mock.calls.map((args) => args[0]).filter(Boolean);
+    expect(riskMatrixCalls.some((props) => (
+      props?.restoreState?.modal === true
+      && props?.restoreState?.selectedCellId === 'Capabilities_vs_Labor'
+      && props?.restoreState?.comment === 'Return here after checking the atlas node.'
+    ))).toBe(true);
+    expect(screen.queryByTestId('ai-policy-atlas')).not.toBeInTheDocument();
   });
 
   it('restores the one-page session view after closing an atlas node opened from Context', async () => {

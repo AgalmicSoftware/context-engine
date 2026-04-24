@@ -13,11 +13,6 @@ export type RiskMatrixCorpusRef = {
   url?: string;
 };
 
-export type RiskMatrixCorpusSourceCitation = {
-  label: string;
-  url?: string;
-};
-
 type RiskMatrixCommentContextEntry = {
   historicalFigure?: RiskMatrixHistoricalFigure | null;
   corpusRefs?: RiskMatrixCorpusRef[];
@@ -36,34 +31,10 @@ type EnrichableRiskCommentRecord = {
 };
 
 type CorpusEntryRecord = {
-  author?: unknown;
-  title?: unknown;
-  summary?: unknown;
-  url?: unknown;
-};
-
-type CorpusMetaRecord = {
-  label?: unknown;
-};
-
-type CorpusRecord = {
-  entries?: unknown;
-};
-
-type CorpusSampleData = {
-  meta?: {
-    corpuses?: Record<string, CorpusMetaRecord>;
-  };
-  corpuses?: Record<string, CorpusRecord>;
-};
-
-type UnknownRecord = Record<string, unknown>;
-
-type CorpusRefInput = {
-  corpusId?: unknown;
-  label?: unknown;
-  note?: unknown;
-  url?: unknown;
+  author?: string;
+  title?: string;
+  summary?: string;
+  url?: string;
 };
 
 const {
@@ -73,30 +44,23 @@ const {
 } = riskMatrixCommentContextData as RiskMatrixCommentContextData;
 
 const hasText = (value: unknown): value is string => typeof value === 'string' && value.trim().length > 0;
-const isRecord = (value: unknown): value is UnknownRecord => (
-  typeof value === 'object' && value !== null
-);
-
-const isCorpusEntryRecord = (value: unknown): value is CorpusEntryRecord => isRecord(value);
-
-const corpusSampleData = corpusSample as CorpusSampleData;
 
 const RISK_MATRIX_CORPUS_LABEL_BY_ID = Object.freeze(
-  Object.entries(corpusSampleData.meta?.corpuses || {}).reduce((acc, [corpusId, corpusEntry]) => {
-    const label = hasText(corpusEntry.label)
-      ? corpusEntry.label.trim()
+  Object.entries((corpusSample as any)?.meta?.corpuses || {}).reduce((acc, [corpusId, corpusEntry]) => {
+    const label = hasText((corpusEntry as { label?: string })?.label)
+      ? String((corpusEntry as { label?: string }).label).trim()
       : '';
     if (label) acc[corpusId] = label;
     return acc;
   }, {} as Record<string, string>)
 );
 
-const normalizeCorpusUrl = (value: unknown = '') => String(value || '').trim().replace(/\/+$/g, '');
+const normalizeCorpusUrl = (value = '') => String(value || '').trim().replace(/\/+$/g, '');
 
 const CORPUS_ENTRY_BY_URL = Object.freeze(
-  Object.entries(corpusSampleData.corpuses || {}).reduce((acc, [corpusId, corpusEntry]) => {
-    const entries = Array.isArray(corpusEntry.entries)
-      ? corpusEntry.entries.filter(isCorpusEntryRecord)
+  Object.entries((corpusSample as any)?.corpuses || {}).reduce((acc, [corpusId, corpusEntry]) => {
+    const entries = Array.isArray((corpusEntry as { entries?: unknown[] })?.entries)
+      ? (corpusEntry as { entries?: CorpusEntryRecord[] }).entries || []
       : [];
 
     entries.forEach((entry) => {
@@ -113,9 +77,10 @@ const CORPUS_ENTRY_BY_URL = Object.freeze(
   }, {} as Record<string, { corpusId: string; entry: CorpusEntryRecord }>)
 );
 
-const isValidCorpusRef = (ref: unknown): ref is CorpusRefInput => (
-  isRecord(ref)
-  && (hasText(ref.label) || hasText(ref.corpusId))
+const isValidCorpusRef = (ref: unknown): ref is RiskMatrixCorpusRef => (
+  Boolean(ref)
+  && typeof ref === 'object'
+  && (hasText((ref as RiskMatrixCorpusRef).label) || hasText((ref as RiskMatrixCorpusRef).corpusId))
 );
 
 const normalizeCorpusRefs = (refs: unknown): RiskMatrixCorpusRef[] => {
@@ -186,37 +151,17 @@ const getSpecificCorpusCitation = (ref: RiskMatrixCorpusRef): string | null => {
   return hasText(documentLine) ? compactSourceText(documentLine) : null;
 };
 
-const getSafeExternalCorpusUrl = (value: unknown = '') => {
-  const normalizedUrl = normalizeCorpusUrl(value);
-  if (!/^https?:\/\//i.test(normalizedUrl)) return '';
-  return normalizedUrl;
-};
-
-export const getRiskMatrixCorpusSourceCitationItems = (
-  refs: RiskMatrixCorpusRef[] = []
-): RiskMatrixCorpusSourceCitation[] => {
+export const getRiskMatrixCorpusSourceCitations = (refs: RiskMatrixCorpusRef[] = []) => {
   const seen = new Set<string>();
 
-  return refs.reduce<RiskMatrixCorpusSourceCitation[]>((acc, ref) => {
-    const label = getSpecificCorpusCitation(ref);
-    if (!label) return acc;
-
-    const url = getSafeExternalCorpusUrl(ref?.url || '');
-    const key = `${label}::${url}`;
-    if (seen.has(key)) return acc;
-
-    seen.add(key);
-    acc.push({
-      label,
-      ...(url ? { url } : {}),
-    });
+  return refs.reduce<string[]>((acc, ref) => {
+    const citation = getSpecificCorpusCitation(ref);
+    if (!citation || seen.has(citation)) return acc;
+    seen.add(citation);
+    acc.push(citation);
     return acc;
   }, []);
 };
-
-export const getRiskMatrixCorpusSourceCitations = (refs: RiskMatrixCorpusRef[] = []) => (
-  getRiskMatrixCorpusSourceCitationItems(refs).map((citation) => citation.label)
-);
 
 export const enrichRiskMatrixCommentRecord = <T extends EnrichableRiskCommentRecord>(
   entry: T
