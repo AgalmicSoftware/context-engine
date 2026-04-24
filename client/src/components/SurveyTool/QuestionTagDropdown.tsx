@@ -13,6 +13,7 @@ type QuestionTagDropdownProps = {
   tags?: unknown[];
   baseUrl?: string;
   sessionSlug?: string;
+  onTagSelect?: ((tag: string) => void) | null;
 };
 
 const resolveTagRouteBaseUrl = (baseUrl = '') => {
@@ -49,7 +50,12 @@ export const buildTagHref = (tag: unknown, baseUrl = '', sessionSlug = '') => {
     : path;
 };
 
-const QuestionTagDropdown = ({ tags = [], baseUrl = '', sessionSlug = '' }: QuestionTagDropdownProps) => {
+const QuestionTagDropdown = ({
+  tags = [],
+  baseUrl = '',
+  sessionSlug = '',
+  onTagSelect = null,
+}: QuestionTagDropdownProps) => {
   const displayTags = getQuestionTagDisplayList(tags);
 
   if (!displayTags.length) return null;
@@ -67,17 +73,27 @@ const QuestionTagDropdown = ({ tags = [], baseUrl = '', sessionSlug = '' }: Ques
         <FontAwesomeIcon icon={faHashtag} />
       </DropdownToggle>
       <DropdownMenu end className={styles.menu}>
-        {displayTags.map((tag) => (
-          <DropdownItem
-            key={tag}
-            tag={Link}
-            to={buildTagHref(tag, baseUrl, sessionSlug)}
-            className={styles.item}
-            onClick={(event: React.MouseEvent<HTMLElement>) => event.stopPropagation()}
-          >
-            #{tag}
-          </DropdownItem>
-        ))}
+        {displayTags.map((tag) => {
+          const usesModalSelect = typeof onTagSelect === 'function';
+
+          return (
+            <DropdownItem
+              key={tag}
+              tag={usesModalSelect ? 'button' : Link}
+              type={usesModalSelect ? 'button' : undefined}
+              to={usesModalSelect ? undefined : buildTagHref(tag, baseUrl, sessionSlug)}
+              className={styles.item}
+              onClick={(event: React.MouseEvent<HTMLElement>) => {
+                event.stopPropagation();
+                if (!usesModalSelect) return;
+                event.preventDefault();
+                onTagSelect(tag);
+              }}
+            >
+              #{tag}
+            </DropdownItem>
+          );
+        })}
       </DropdownMenu>
     </UncontrolledDropdown>
   );

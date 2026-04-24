@@ -4,6 +4,10 @@ $page-text-color: tokens.$ce-white;
 $card-bg: tokens.$ce-card-bg;
 $card-border: tokens.$ce-card-border;
 $card-shadow: tokens.$ce-card-shadow;
+$tag-route-bg: #20204e;
+$tag-route-bg-deep: tokens.$ce-panel-bg;
+$tag-route-accent: tokens.$ce-info;
+$tag-route-accent-alt: tokens.$ce-indigo;
 
 .page {
   min-height: 100vh;
@@ -153,8 +157,9 @@ $card-shadow: tokens.$ce-card-shadow;
 
 .tagModalContent {
   background:
-    radial-gradient(circle at top right, rgba(77, 255, 164, 0.08), transparent 32%),
-    linear-gradient(180deg, rgba(12, 18, 34, 0.98), rgba(8, 12, 24, 0.98));
+    radial-gradient(circle at top right, rgba($tag-route-accent, 0.18), transparent 34%),
+    radial-gradient(circle at top left, rgba($tag-route-accent-alt, 0.16), transparent 30%),
+    linear-gradient(180deg, rgba($tag-route-bg, 0.985), rgba($tag-route-bg-deep, 0.985));
   border: 1px solid rgba(255, 255, 255, 0.1) !important;
   border-radius: 22px !important;
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45) !important;
@@ -168,6 +173,9 @@ $card-shadow: tokens.$ce-card-shadow;
   height: 100%;
   pointer-events: auto;
   position: relative;
+
+  /* Match the fullscreen tag route's blue app surface inside the modal shell. */
+  background-color: $tag-route-bg;
 }
 
 .tagModalBackdrop {
@@ -188,8 +196,10 @@ $card-shadow: tokens.$ce-card-shadow;
   display: flex;
   width: 100%;
   justify-content: space-between;
-  background: rgba(255, 255, 255, 0.03);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    linear-gradient(180deg, rgba($tag-route-accent-alt, 0.16), rgba($tag-route-bg, 0.1)),
+    rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   flex: 0 0 auto;
   min-height: 68px;
   padding: 16px 20px;
@@ -255,7 +265,9 @@ $card-shadow: tokens.$ce-card-shadow;
   padding: 14px;
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 16px;
-  background: rgba(31, 37, 79, 0.98);
+  background:
+    linear-gradient(180deg, rgba($tag-route-accent-alt, 0.14), rgba($tag-route-bg-deep, 0.14)),
+    rgba($tag-route-bg, 0.98);
   box-shadow: 0 22px 42px rgba(0, 0, 0, 0.34);
   text-transform: none;
   letter-spacing: normal;

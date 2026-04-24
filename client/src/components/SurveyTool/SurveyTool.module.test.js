@@ -21,6 +21,7 @@ import {
 import { QuestionFilter as RawQuestionFilter } from './QuestionFilter';
 import PileHologramAssistant from './PileHologramAssistant';
 import QuestionTagDropdown from './QuestionTagDropdown';
+import TagModal from '../TagPage/TagModal';
 import styles from './SurveyTool.module.scss';
 import { renderToStaticMarkup } from 'react-dom/server';
 import fs from 'fs';
@@ -8703,6 +8704,72 @@ describe('SurveyTool module', () => {
 
     expect(dropdown).toBeTruthy();
     expect(dropdown.props.tags).toEqual(['governance']);
+    expect(typeof dropdown.props.onTagSelect).toBe('function');
+  });
+
+  it('opens the shared tag modal from full-question tag dropdown selections', () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+    });
+
+    subject.state = {
+      ...subject.state,
+      questionPool: [{
+        id: 'q1',
+        type: 'freeform',
+        prompt: 'Question prompt',
+        tags: ['governance'],
+      }],
+      decryptionNonce: 0,
+      isLoadingResponse: false,
+      bookmarkedQuestions: new Set(),
+      decryptingByKey: {},
+      isSubmitting: false,
+      autoDecryptEnabled: false,
+      showComments: {},
+      sliderToggleExpandedByQuestion: {},
+      surveysResponseState: [{
+        answers: {},
+        additionalComments: {},
+        importance: {},
+        conviction: {},
+      }],
+      activeTagModalTag: '',
+    };
+    subject.handleBookmarkToggle = jest.fn();
+    subject.renderBullhornToggleButton = jest.fn(() => null);
+    subject.renderAnswerLockControl = jest.fn(() => null);
+    subject._getEffectiveDraftSlug = () => 'edge';
+    subject.setState = (updates) => {
+      const nextState = typeof updates === 'function'
+        ? updates(subject.state, subject.props)
+        : updates;
+      subject.state = { ...subject.state, ...nextState };
+    };
+
+    const dropdown = subject.renderQuestionTagDropdown({
+      id: 'q1',
+      prompt: 'Question prompt',
+      tags: ['governance'],
+    });
+
+    dropdown.props.onTagSelect('governance');
+
+    const tree = subject.render();
+    const modal = findElement(
+      tree,
+      (node) => node?.type === TagModal
+    );
+
+    expect(subject.state.activeTagModalTag).toBe('governance');
+    expect(modal).toBeTruthy();
+    expect(modal.props.isOpen).toBe(true);
+    expect(modal.props.activeTag).toBe('governance');
   });
 
   it('omits QuestionTagDropdown from pile cards even when tags are present', () => {

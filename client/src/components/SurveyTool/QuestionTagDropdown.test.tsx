@@ -85,6 +85,17 @@ describe('QuestionTagDropdown', () => {
     expect(screen.getByRole('link', { name: '#AI Policy' })).toHaveAttribute('href', '/tag/AI%20Policy');
   });
 
+  it('calls onTagSelect and keeps tag items as buttons when modal mode is enabled', () => {
+    const onTagSelect = jest.fn();
+    renderDropdown({ tags: ['governance', 'AI Policy'], onTagSelect });
+
+    fireEvent.click(screen.getByRole('button', { name: /show question tags/i }));
+    fireEvent.click(screen.getByRole('button', { name: '#governance' }));
+
+    expect(onTagSelect).toHaveBeenCalledWith('governance');
+    expect(screen.queryByRole('link', { name: '#governance' })).not.toBeInTheDocument();
+  });
+
   it('preserves explicit session pins in tag links', () => {
     renderDropdown({ tags: ['governance'], sessionSlug: 'edge' });
 
