@@ -8,10 +8,11 @@ import {
 } from './sessionWizardContracts.js';
 
 const DEFAULT_CONFIG_CHAIN_ID = DEFAULT_CHAIN_ID;
+type SessionWizardContractsInput = Record<string, unknown>;
 
 describe('sessionWizardContracts', () => {
   test('defaults include session registry address from chains config', () => {
-    const chainContracts = getSessionContractsForChain(DEFAULT_CONFIG_CHAIN_ID);
+    const chainContracts = getSessionContractsForChain(DEFAULT_CONFIG_CHAIN_ID) as SessionWizardContractsInput;
     const defaults = getSessionWizardContractDefaults(DEFAULT_CONFIG_CHAIN_ID);
 
     expect(defaults.surveys).toBe(chainContracts.surveys);
@@ -45,7 +46,7 @@ describe('sessionWizardContracts', () => {
   });
 
   test('sanitize keeps visible contracts and drops hidden entries', () => {
-    const contracts = {
+    const contracts: SessionWizardContractsInput = {
       surveys: { address: '0x111', chainId: 84532 },
       sbtFactory: { address: '0x222', chainId: 84532 },
       sessionRegistry: { address: '0x333', chainId: 84532 },
