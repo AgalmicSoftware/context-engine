@@ -1,5 +1,5 @@
 import { render, screen, within } from '@testing-library/react';
-import CreateQuestionsAndSurveys from './CreateQuestionsAndSurveys.jsx';
+import CreateQuestionsAndSurveys from './CreateQuestionsAndSurveys';
 import gateLockStyles from '../Gates/GateMultiSelectLock.module.scss';
 import surveyStyles from './CreateQuestionsAndSurveys.module.scss';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
