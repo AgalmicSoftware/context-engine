@@ -1,5 +1,5 @@
 /** @file DebateMap.tsx */
-import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useMemo, useEffect, useLayoutEffect, useRef } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faThumbsUp, faChevronRight, faBookmark, faTimes, faComment, faLink, faCheck,
@@ -334,6 +334,8 @@ interface TreeNodeProps {
   onBookmark: (nodeId: string) => void;
   bookmarkedNodes: string[];
   onSuggestNode: (node: DebateNode, parentPath: DebateNode[]) => void;
+  staggerOffsetPx?: number;
+  branchSpan?: number;
 }
 
 const atlasTreeData = treeData as DebateNode[];
@@ -938,6 +940,80 @@ const calculateNetUpvotes = (votes?: DebateVoteTotals | null): number => {
   const up = parseInt(String(votes.up || 0), 10);
   const down = parseInt(String(votes.down || 0), 10);
   return up - down;
+};
+
+const TREE_LABEL_REPLACEMENTS: Array<[RegExp, string]> = [
+  [/\bPre-deployment\b/gi, 'Pre-deploy.'],
+  [/\bEvaluations\b/gi, 'Evals'],
+  [/\bEvaluation\b/gi, 'Eval'],
+  [/\bBenchmarks\b/gi, 'Bench.'],
+  [/\bInternational\b/gi, 'Intl.'],
+  [/\bCoordination\b/gi, 'Coord.'],
+  [/\bInterpretability\b/gi, 'Interp.'],
+  [/\bMisinformation\b/gi, 'Misinfo.'],
+  [/\bSurveillance\b/gi, 'Surveil.'],
+  [/\bProductivity\b/gi, 'Prod.'],
+  [/\bDisclosure\b/gi, 'Discl.'],
+  [/\bDemocratization\b/gi, 'Democratiz.'],
+  [/\bConcentration\b/gi, 'Concen.'],
+];
+
+export const getCompactTreeNodeLabel = (rawName: unknown): string => {
+  let label = cleanAtlasCategoryName(rawName).replace(/\s+/g, ' ').trim();
+  if (!label) return '';
+
+  label = label.replace(/\s+and\s+/gi, ' & ');
+  TREE_LABEL_REPLACEMENTS.forEach(([pattern, replacement]) => {
+    label = label.replace(pattern, replacement);
+  });
+
+  return label;
+};
+
+export const getTreeChildColumnCount = (depth: number, childCount: number): number => {
+  if (childCount <= 1) return childCount;
+  if (depth === 0 && childCount === 2) return 2;
+  return Math.min(2, childCount);
+};
+
+export const getTreeSubtreeSpan = (node: DebateNode | null | undefined): number => {
+  const children = Array.isArray(node?.children) ? node.children : [];
+  if (children.length === 0) return 1;
+
+  return children.reduce((sum, child) => sum + getTreeSubtreeSpan(child), 0);
+};
+
+export const getTreeChildStaggerPx = (depth: number, index: number, columnCount: number): number => {
+  if (index <= 0) return 0;
+
+  const safeColumns = Math.max(1, columnCount);
+  const rowIndex = Math.floor(index / safeColumns);
+  const columnIndex = index % safeColumns;
+  const depthBias = Math.min(depth, 3) * 3;
+
+  return (rowIndex * 10) + (columnIndex * (12 + depthBias));
+};
+
+export const getTreeViewportFitScale = (
+  viewportWidth: number,
+  contentWidth: number,
+  horizontalPadding = 32
+): number => {
+  const safeViewportWidth = Number(viewportWidth) || 0;
+  const safeContentWidth = Number(contentWidth) || 0;
+  if (safeViewportWidth <= 0 || safeContentWidth <= 0) return 1;
+
+  const availableWidth = Math.max(0, safeViewportWidth - horizontalPadding);
+  if (availableWidth <= 0) return 1;
+
+  return Math.min(1, availableWidth / safeContentWidth);
+};
+
+export const getTreeViewportFitHeight = (contentHeight: number, scale: number): number => {
+  const safeHeight = Number(contentHeight) || 0;
+  const safeScale = Number(scale) || 1;
+  if (safeHeight <= 0) return 0;
+  return Math.max(0, safeHeight * safeScale);
 };
 
 const getAtlasVoteTotals = (node: DebateNode) => {
@@ -2649,15 +2725,45 @@ const SuggestNodeModal = ({ isOpen, onClose, parentNode, parentPath = [], onSubm
 };
 
 // 5. Tree Node (With Collapsibility)
-const TreeNode = ({ node, depth = 0, parentPath = [], onNodeClick, onBookmark, bookmarkedNodes, onSuggestNode }: TreeNodeProps) => {
+const TreeNode = ({
+  node,
+  depth = 0,
+  parentPath = [],
+  onNodeClick,
+  onBookmark,
+  bookmarkedNodes,
+  onSuggestNode,
+  staggerOffsetPx = 0,
+  branchSpan = 1,
+}: TreeNodeProps) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const hasChildren = node.children && node.children.length > 0;
   const netUpvotes = calculateNetUpvotes(node.votes);
   const nodeId = String(node.id || '').trim();
   const isBookmarked = nodeId ? bookmarkedNodes.includes(nodeId) : false;
+  const fullLabel = cleanAtlasCategoryName(node.name);
+  const compactLabel = getCompactTreeNodeLabel(node.name);
+  const sortedChildren = hasChildren
+    ? [...(node.children || [])].sort((a, b) => calculateNetUpvotes(b.votes) - calculateNetUpvotes(a.votes))
+    : [];
+  const childColumns = getTreeChildColumnCount(depth, sortedChildren.length);
+  const childBranchSpans = sortedChildren.map((child) => getTreeSubtreeSpan(child));
+  const totalChildColumns = childBranchSpans.reduce((sum, span) => sum + span, 0);
+  const wrapperStyle = {
+    '--ce-tree-node-stagger': `${staggerOffsetPx}px`,
+    '--ce-tree-branch-span': String(branchSpan),
+  } as React.CSSProperties;
+  const childrenRowStyle = {
+    '--ce-org-total-columns': String(totalChildColumns || 1),
+  } as React.CSSProperties;
 
   return (
-    <div className={styles.orgNodeWrapper}>
+    <div
+      className={styles.orgNodeWrapper}
+      style={wrapperStyle}
+      data-ce-tree-depth={depth}
+      data-ce-tree-stagger={staggerOffsetPx}
+    >
       <div
         className={`
           ${styles.orgCard}
@@ -2666,9 +2772,10 @@ const TreeNode = ({ node, depth = 0, parentPath = [], onNodeClick, onBookmark, b
           ${isCollapsed ? styles.collapsed : ''}
         `}
         onClick={() => onNodeClick(node)}
+        title={fullLabel || undefined}
       >
          <div className={styles.cardHeader}>
-             <span className={styles.nodeTitle}>{node.name}</span>
+             <span className={styles.nodeTitle}>{compactLabel || fullLabel}</span>
          </div>
          <div className={styles.cardStats}>
              <span><FontAwesomeIcon icon={faThumbsUp} /> {netUpvotes}</span>
@@ -2703,8 +2810,12 @@ const TreeNode = ({ node, depth = 0, parentPath = [], onNodeClick, onBookmark, b
 
       {hasChildren && !isCollapsed && (
         <div className={styles.orgChildrenContainer}>
-           <div className={styles.orgChildrenRow}>
-              {[...(node.children || [])].sort((a, b) => calculateNetUpvotes(b.votes) - calculateNetUpvotes(a.votes)).map((child: DebateNode, i: number) => (
+           <div
+             className={styles.orgChildrenRow}
+             style={childrenRowStyle}
+             data-ce-org-total-columns={totalChildColumns || 1}
+           >
+              {sortedChildren.map((child: DebateNode, i: number) => (
                 <TreeNode
                   key={i}
                   node={child}
@@ -2714,6 +2825,8 @@ const TreeNode = ({ node, depth = 0, parentPath = [], onNodeClick, onBookmark, b
                   onBookmark={onBookmark}
                   bookmarkedNodes={bookmarkedNodes}
                   onSuggestNode={onSuggestNode}
+                  staggerOffsetPx={getTreeChildStaggerPx(depth + 1, i, childColumns)}
+                  branchSpan={childBranchSpans[i] || 1}
                 />
               ))}
            </div>
@@ -2763,11 +2876,11 @@ const DebateMap = ({
   const [suggestNodeParent, setSuggestNodeParent] = useState<DebateNode | null>(null);
   const [suggestNodePath, setSuggestNodePath] = useState<DebateNode[]>([]);
 
-  // Drag-to-Scroll State for Tree View
+  // Tree viewport fit state
   const treeContainerRef = useRef<HTMLDivElement | null>(null);
-  const [treeIsDragging, setTreeIsDragging] = useState(false);
-  const [treeStartX, setTreeStartX] = useState(0);
-  const [treeScrollLeft, setTreeScrollLeft] = useState(0);
+  const treeContentRef = useRef<HTMLDivElement | null>(null);
+  const [treeFitScale, setTreeFitScale] = useState(1);
+  const [treeFitHeight, setTreeFitHeight] = useState<number | null>(null);
 
   // Ref to track if we've already handled the deep link for the current ID
   const hasHandledDeepLink = useRef(false);
@@ -2930,29 +3043,54 @@ const DebateMap = ({
       .sort((a, b) => orderByUpvotes ? (calculateNetUpvotes(b.votes) - calculateNetUpvotes(a.votes)) : 0);
   }, [treeDataState, orderByUpvotes, flattenTree, nodeTypeFilter, visualMode]);
 
-  // -- Tree View Drag Scroll Handlers --
-  const onTreeMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!treeContainerRef.current) return;
-    setTreeIsDragging(true);
-    setTreeStartX(e.pageX - treeContainerRef.current.offsetLeft);
-    setTreeScrollLeft(treeContainerRef.current.scrollLeft);
-  };
+  const updateTreeFit = useCallback(() => {
+    if (visualMode !== DEBATE_VISUAL_MODES.TREE || !selectedCategory) {
+      setTreeFitScale(1);
+      setTreeFitHeight(null);
+      return;
+    }
 
-  const onTreeMouseLeave = () => {
-    setTreeIsDragging(false);
-  };
+    const viewportWidth = treeContainerRef.current?.clientWidth || 0;
+    const contentWidth = treeContentRef.current?.scrollWidth || treeContentRef.current?.offsetWidth || 0;
+    const contentHeight = treeContentRef.current?.offsetHeight || 0;
 
-  const onTreeMouseUp = () => {
-    setTreeIsDragging(false);
-  };
+    const nextScale = getTreeViewportFitScale(viewportWidth, contentWidth);
+    const nextHeight = getTreeViewportFitHeight(contentHeight, nextScale);
 
-  const onTreeMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!treeIsDragging || !treeContainerRef.current) return;
-    e.preventDefault();
-    const x = e.pageX - treeContainerRef.current.offsetLeft;
-    const walk = (x - treeStartX) * 1.5; // Scroll-fast multiplier
-    treeContainerRef.current.scrollLeft = treeScrollLeft - walk;
-  };
+    setTreeFitScale((prev) => (Math.abs(prev - nextScale) < 0.001 ? prev : nextScale));
+    setTreeFitHeight(nextHeight > 0 ? nextHeight : null);
+  }, [selectedCategory, visualMode]);
+
+  useLayoutEffect(() => {
+    updateTreeFit();
+  }, [updateTreeFit]);
+
+  useEffect(() => {
+    if (visualMode !== DEBATE_VISUAL_MODES.TREE || !selectedCategory) return undefined;
+
+    const handleResize = () => {
+      if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+        window.requestAnimationFrame(updateTreeFit);
+        return;
+      }
+      updateTreeFit();
+    };
+
+    handleResize();
+    window.addEventListener('resize', handleResize);
+
+    let resizeObserver: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver(handleResize);
+      if (treeContainerRef.current) resizeObserver.observe(treeContainerRef.current);
+      if (treeContentRef.current) resizeObserver.observe(treeContentRef.current);
+    }
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      resizeObserver?.disconnect();
+    };
+  }, [selectedCategory, updateTreeFit, visualMode]);
 
   const wrapperClassName = [
     styles.debateMapWrapper,
@@ -2963,6 +3101,13 @@ const DebateMap = ({
     : ATLAS_LAYOUT_MODES.PACKED;
   const isAtlasVisualMode = visualMode === DEBATE_VISUAL_MODES.CIRCLES
     || visualMode === DEBATE_VISUAL_MODES.ATLAS;
+  const treeRootClassName = [
+    styles.orgChartRoot,
+    treeFitScale < 0.86 ? styles.compactTreeFit : '',
+  ].filter(Boolean).join(' ');
+  const treeRootStyle = {
+    transform: `scale(${treeFitScale})`,
+  } as React.CSSProperties;
 
   return (
     <div className={wrapperClassName}>
@@ -3083,23 +3228,28 @@ const DebateMap = ({
              <div
                className={styles.orgChartContainer}
                ref={treeContainerRef}
-               onMouseDown={onTreeMouseDown}
-               onMouseLeave={onTreeMouseLeave}
-               onMouseUp={onTreeMouseUp}
-               onMouseMove={onTreeMouseMove}
-               style={{ cursor: treeIsDragging ? 'grabbing' : 'grab' }}
              >
                 {selectedCategory ? (
-                   <div className={styles.orgChartRoot}>
-                     <TreeNode
-                        node={selectedCategory}
-                        depth={0}
-                        parentPath={[]}
-                        onNodeClick={handleNodeClick}
-                        onBookmark={handleBookmark}
-                        bookmarkedNodes={bookmarkedNodes}
-                        onSuggestNode={handleSuggestNode}
-                     />
+                   <div
+                     className={styles.orgChartFitStage}
+                     style={treeFitHeight ? { height: treeFitHeight } : undefined}
+                   >
+                     <div
+                       ref={treeContentRef}
+                       className={treeRootClassName}
+                       style={treeRootStyle}
+                       data-ce-tree-scale={treeFitScale.toFixed(3)}
+                     >
+                       <TreeNode
+                          node={selectedCategory}
+                          depth={0}
+                          parentPath={[]}
+                          onNodeClick={handleNodeClick}
+                          onBookmark={handleBookmark}
+                          bookmarkedNodes={bookmarkedNodes}
+                          onSuggestNode={handleSuggestNode}
+                       />
+                     </div>
                    </div>
                 ) : (
                    <div className={styles.emptyState}>Select a category above to view the Policy Org Chart</div>

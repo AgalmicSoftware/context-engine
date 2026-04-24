@@ -5,9 +5,15 @@ import DebateMap, {
   AtlasView,
   buildHistoricalCaseBrief,
   buildHistoricalCompassPoints,
+  getCompactTreeNodeLabel,
   getPackedAtlasClickTarget,
   getPackedAtlasLabelFontSizePx,
   getPackedAtlasVerticalLiftPx,
+  getTreeChildColumnCount,
+  getTreeChildStaggerPx,
+  getTreeSubtreeSpan,
+  getTreeViewportFitHeight,
+  getTreeViewportFitScale,
 } from './DebateMap';
 import treeData from '../../variables/demo/debate_map_demo_data.json';
 import historicalFigureData from '../../variables/demo/historical_figures_tree_qs_and_votes.json';
@@ -71,9 +77,15 @@ const DebateMapComponent = DebateMap as React.ComponentType<any>;
 const AtlasViewComponent = AtlasView as React.ComponentType<any>;
 const buildHistoricalCaseBriefAny = buildHistoricalCaseBrief as any;
 const buildHistoricalCompassPointsAny = buildHistoricalCompassPoints as any;
+const getCompactTreeNodeLabelAny = getCompactTreeNodeLabel as any;
 const getPackedAtlasClickTargetAny = getPackedAtlasClickTarget as any;
 const getPackedAtlasLabelFontSizePxAny = getPackedAtlasLabelFontSizePx as any;
 const getPackedAtlasVerticalLiftPxAny = getPackedAtlasVerticalLiftPx as any;
+const getTreeChildColumnCountAny = getTreeChildColumnCount as any;
+const getTreeChildStaggerPxAny = getTreeChildStaggerPx as any;
+const getTreeSubtreeSpanAny = getTreeSubtreeSpan as any;
+const getTreeViewportFitHeightAny = getTreeViewportFitHeight as any;
+const getTreeViewportFitScaleAny = getTreeViewportFitScale as any;
 const mockedGetHistoricalFigureAvatarOrBlockie = getHistoricalFigureAvatarOrBlockie as jest.Mock;
 const treeDataFixture = treeData as any[];
 const historicalFigureDataFixture = historicalFigureData as Record<string, any>;
@@ -451,6 +463,25 @@ describe('DebateMap', () => {
     expect(fallbackBrief.decisionPrompt).toMatch(/What patch closes the exploit in Privacy & Surveillance/i);
   });
 
+  it('compacts long tree labels and child layouts for denser debate branches', () => {
+    expect(getCompactTreeNodeLabelAny('3. AI Governance & Policy')).toBe('AI Governance & Policy');
+    expect(getCompactTreeNodeLabelAny('International Coordination')).toBe('Intl. Coord.');
+    expect(getCompactTreeNodeLabelAny('Pre-deployment Testing')).toBe('Pre-deploy. Testing');
+    expect(getTreeChildColumnCountAny(1, 4)).toBe(2);
+    expect(getTreeChildColumnCountAny(0, 2)).toBe(2);
+    expect(getTreeSubtreeSpanAny({
+      children: [
+        { children: [{}, {}] },
+        {},
+      ],
+    })).toBe(3);
+    expect(getTreeChildStaggerPxAny(2, 1, 2)).toBeGreaterThan(getTreeChildStaggerPxAny(2, 0, 2));
+    expect(getTreeChildStaggerPxAny(2, 3, 2)).toBeGreaterThan(getTreeChildStaggerPxAny(2, 1, 2));
+    expect(getTreeViewportFitScaleAny(320, 960)).toBeCloseTo(0.3, 1);
+    expect(getTreeViewportFitScaleAny(1024, 800)).toBe(1);
+    expect(getTreeViewportFitHeightAny(1200, 0.5)).toBe(600);
+  });
+
   it('refreshes the drilled atlas node immediately when the data prop changes', () => {
     const onNodeClick = jest.fn();
     const initialData = [
@@ -651,6 +682,35 @@ describe('DebateMap', () => {
     fireEvent.click(getAtlasNodeElementById(deceptiveAlignmentNodeId, 'packed') as HTMLElement);
 
     expect(await screen.findByRole('heading', { name: 'Deceptive Alignment' })).toBeInTheDocument();
+  });
+
+  it('renders tree mode with abbreviated labels and wrapped child columns', () => {
+    const { container } = render(
+      <MemoryRouter>
+        <DebateMapComponent
+          account=""
+          provider=""
+          network={{ id: 84532 }}
+          activeSessionSlug=""
+          toggleLoginModal={jest.fn()}
+        />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(getDebateViewModeButton('tree'));
+    fireEvent.click(screen.getByRole('button', { name: 'AI Governance & Policy' }));
+
+    const orgChart = container.querySelector('[class*="orgChartContainer"]') as HTMLElement;
+    const treeRoot = container.querySelector('[data-ce-tree-scale]') as HTMLElement;
+
+    expect(within(orgChart).getByText('AI Governance & Policy')).toBeInTheDocument();
+    expect(within(orgChart).getByText('Intl. Coord.')).toBeInTheDocument();
+    expect(within(orgChart).getByText('Licensing & Compute Controls')).toBeInTheDocument();
+    expect(treeRoot).toBeTruthy();
+
+    const compactRows = Array.from(container.querySelectorAll('[data-ce-org-total-columns]'));
+    expect(compactRows.length).toBeGreaterThan(0);
+    expect(compactRows.some((element) => Number(element.getAttribute('data-ce-org-total-columns')) > 2)).toBe(true);
   });
 
   it('sizes packed atlas nodes by disagreement instead of raw vote volume', () => {

@@ -42,6 +42,9 @@
 
 .selectedQuestionCard {
   margin-bottom: 0;
+  background: linear-gradient(145deg, #f8fbff 0%, #edf4ff 100%) !important;
+  border: 1px solid rgba(15, 94, 199, 0.14) !important;
+  box-shadow: 0 16px 38px rgba(15, 94, 199, 0.14) !important;
 }
 
 .selectedQuestionCardBody {
@@ -49,10 +52,11 @@
 }
 
 .selectedQuestionCardPrompt {
-  color: #f8fbff;
+  color: #1f2733 !important;
   font-size: clamp(1.6rem, 2.25vw, 2.16rem);
   line-height: 1.42;
   max-width: 48rem;
+  text-shadow: none;
 }
 
 .heatmapPanel,
