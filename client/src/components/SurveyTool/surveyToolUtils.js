@@ -1,11 +1,5 @@
 /** @file surveyToolUtils.js */
 
-import { createLogger } from 'utilities/logging.js';
-import {
-  formatQuestionScanBlockCount,
-  isSurveyToolFilterStateActive,
-  serializeSurveyToolFilterState,
-} from './surveyToolViewState.js';
 export {
   buildRatingEnvelopeQidSetFromUserAnswers,
   clampSliderValue,
@@ -77,8 +71,11 @@ export {
 export {
   buildQuestionScanProgressDisplay,
   doesQuestionProgressMatchSlug,
+  formatQuestionScanBlockCount,
+  isSurveyToolFilterStateActive,
   normalizeQuestionProgressSlug,
   normalizeSurveyToolFilterState,
+  serializeSurveyToolFilterState,
   shouldShowPileFullLoadingState,
 } from './surveyToolViewState.js';
 export {
@@ -118,87 +115,14 @@ export {
   resolveUpdateCacheContext,
   shouldInheritResolvedTagSessionScope,
 } from './surveyToolScope.js';
-
-const surveyLog = createLogger('surveys');
-const GATE_SBT_HYDRATION_RETRY_MS = 45 * 1000;
-const SURVEY_TOOL_PERF_SCOPE = 'surveyTool';
-// Keep this dormant toggle path for PRD 135 voice-only interview mode.
-// The pile hologram avatar is intentionally hidden for now, but the render/state
-// plumbing stays in place so future voice-mode work can re-enable it cleanly.
-const SHOW_PILE_HOLOGRAM_TOGGLE = false;
-const QUESTION_TAG_DROPDOWN_ROW_STYLE = {
-  display: 'flex',
-  justifyContent: 'flex-end',
-  marginTop: '12px',
-};
-
-const isSurveyPerfCountersEnabled = () => {
-  try {
-    return typeof globalThis !== 'undefined' && (
-      globalThis.ENABLE_CE_UI_PERF_STATS === true ||
-      globalThis.ENABLE_CE_DEBUG_COUNTERS === true ||
-      globalThis.__CE_DEBUG_COUNTERS__ === true
-    );
-  } catch (_) {
-    return false;
-  }
-};
-
-const bumpSurveyPerfCounter = (key, inc = 1) => {
-  if (!isSurveyPerfCountersEnabled()) return;
-  try {
-    if (!globalThis.__CE_PERF_COUNTERS__ || typeof globalThis.__CE_PERF_COUNTERS__ !== 'object') {
-      globalThis.__CE_PERF_COUNTERS__ = {};
-    }
-    if (
-      !globalThis.__CE_PERF_COUNTERS__[SURVEY_TOOL_PERF_SCOPE] ||
-      typeof globalThis.__CE_PERF_COUNTERS__[SURVEY_TOOL_PERF_SCOPE] !== 'object'
-    ) {
-      globalThis.__CE_PERF_COUNTERS__[SURVEY_TOOL_PERF_SCOPE] = {};
-    }
-    const scope = globalThis.__CE_PERF_COUNTERS__[SURVEY_TOOL_PERF_SCOPE];
-    scope[key] = Number(scope[key] || 0) + Number(inc || 0);
-  } catch (e) { void e; /* fallback: perf counter update. */ }
-};
-
-const scheduleMicrotask = (cb) => {
-  if (typeof cb !== 'function') return;
-  if (typeof queueMicrotask === 'function') {
-    queueMicrotask(cb);
-    return;
-  }
-  Promise.resolve().then(cb);
-};
-
-/**
- * Compute the submit button label in a baseline-aware way.
- * - Base label is always "Submit" (no "Encrypt /" prefix on mobile).
- * - Adds " (N)" only when N > 0.
- * - Accepts an optional suffix (e.g., "Response" / "Responses") which is appended to the base label.
- *
- * @param {{ getPendingEditStats?: Function, state?: { modifiedCount?: number, hasEncryptedChanges?: boolean } }} ctx
- * @param {{ suffix?: string }} opts
- * @returns {string} label
- */
-
-
-
-
-
-const DEBUG_PREFILL = false; // set true to enable verbose local-cache prefill logs
-const EMPTY_QUESTION_POOL = [];
-
 export {
-  surveyLog,
-  GATE_SBT_HYDRATION_RETRY_MS,
-  SHOW_PILE_HOLOGRAM_TOGGLE,
-  QUESTION_TAG_DROPDOWN_ROW_STYLE,
-  isSurveyPerfCountersEnabled,
   bumpSurveyPerfCounter,
-  scheduleMicrotask,
-  formatQuestionScanBlockCount,
-  serializeSurveyToolFilterState,
-  isSurveyToolFilterStateActive,
   DEBUG_PREFILL,
   EMPTY_QUESTION_POOL,
-};
+  GATE_SBT_HYDRATION_RETRY_MS,
+  isSurveyPerfCountersEnabled,
+  QUESTION_TAG_DROPDOWN_ROW_STYLE,
+  scheduleMicrotask,
+  SHOW_PILE_HOLOGRAM_TOGGLE,
+  surveyLog,
+} from './surveyToolRuntimeSupport.js';
