@@ -193,6 +193,12 @@ describe('SBTSelector rendered cold-load lifecycle', () => {
       mockedCacheScripts.__getSbtCacheStore()[String(slug || '')] = JSON.parse(JSON.stringify(value));
       return true;
     });
+    mockedCacheScripts.listNamespaceEntriesSync.mockImplementation(({ cloneValues = true } = {}) => (
+      Object.entries(mockedCacheScripts.__getSbtCacheStore()).map(([slug, value]) => ({
+        slug,
+        value: cloneValues ? JSON.parse(JSON.stringify(value)) : value,
+      }))
+    ));
     mockedContractScriptsUtils.getAllSessionSlugs.mockReturnValue(['edge']);
     mockedContractScriptsUtils.getSessionLists.mockReturnValue({ featured_SBTs_LIST: [], ignored_SBTs_LIST: [] });
     mockedContractScriptsUtils.getSessionChainId.mockReturnValue(84532);
@@ -385,7 +391,7 @@ describe('SBTSelector rendered cold-load lifecycle', () => {
       );
 
       await waitFor(() => {
-        expect(screen.getByText(linkedAddress)).toBeInTheDocument();
+        expect(screen.getByText('Linked Demo Badge')).toBeInTheDocument();
       });
       expect(screen.queryByText('No Groups')).not.toBeInTheDocument();
     } finally {
@@ -451,9 +457,9 @@ describe('SBTSelector rendered cold-load lifecycle', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText(demoAddress)).toBeInTheDocument();
+      expect(screen.getByText('Demo Badge')).toBeInTheDocument();
     });
-    expect(screen.queryByText(edgeAddress)).not.toBeInTheDocument();
+    expect(screen.queryByText('Edge Badge')).not.toBeInTheDocument();
 
     const edgeButton = await screen.findByTestId('ce-sbt-selector-session-source-edge');
     await act(async () => {
@@ -463,8 +469,8 @@ describe('SBTSelector rendered cold-load lifecycle', () => {
     });
 
     await waitFor(() => {
-      expect(screen.queryByText(demoAddress)).not.toBeInTheDocument();
-      expect(screen.getByText(edgeAddress)).toBeInTheDocument();
+      expect(screen.queryByText('Demo Badge')).not.toBeInTheDocument();
+      expect(screen.getByText('Edge Badge')).toBeInTheDocument();
       expect(screen.getByTestId('ce-sbt-selector-session-source-active')).toBeInTheDocument();
       expect(screen.queryByTestId('ce-sbt-selector-session-source-edge')).not.toBeInTheDocument();
     });
@@ -510,7 +516,7 @@ describe('SBTSelector rendered cold-load lifecycle', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText(demoAddress)).toBeInTheDocument();
+      expect(screen.getByText('Demo Badge')).toBeInTheDocument();
     });
     expect(screen.queryByTestId('ce-sbt-selector-session-source-edge')).not.toBeInTheDocument();
   });

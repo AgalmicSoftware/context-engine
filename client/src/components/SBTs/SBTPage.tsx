@@ -3,7 +3,7 @@
 import React, { Component } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faQuestionCircle, faLock, faCopy, faCheck, faBookmark, faExpand, faChevronUp, faChevronDown, faUser, faSpinner, faArrowLeft, faInfinity, faTimes, faExternalLinkAlt, faInfoCircle, faCircle, faExclamationTriangle } from '@fortawesome/free-solid-svg-icons';
-import { Modal, ModalHeader, ModalBody, Alert } from 'reactstrap';
+import { Alert } from 'reactstrap';
 import { ethers } from 'ethers';
 import contractScripts from '../../utilities/web3/contractScripts.js';
 import {
@@ -16,13 +16,11 @@ import {
 import { getChainBlockTimeMs } from '../../variables/chains.js';
 import { getShortenedAddress, getShortenedTransactionHash } from '../../utilities/ui/displayHelpers.js';
 import styles from './SBTPage.module.scss';
-import SBTFilter from '../SBTs/SBTFilter';
 import contextEngineLoadingGif from '../../assets/img/context_engine_logo_animation.gif';
 import defaultSbtImage from '../../assets/img/ce_circuit_logo.png';
 import DocumentLibraryPanel from '../DocumentLibrary/DocumentLibraryPanel';
 
 import { cryptoUtils } from 'utilities/crypto/cryptography.js';
-import { generateBlockieDataUrl } from 'utilities/ui/blockieAvatars.js';
 import { getGlobalLitHooks, litStorage } from 'utilities/crypto/litProtocol.js';
 import { createLogger } from 'utilities/logging.js';
 import { sessionRegistryStore } from '../../utilities/web3/sessionRegistry.js';
@@ -44,6 +42,11 @@ import {
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { isCryptoMode, sbtBasePath, sbtsListPath, t } from '../../utilities/ui/terminology.js';
 import CETooltip from '../Shared/CETooltip';
+import {
+  renderSbtPageDocModal,
+  renderSbtPageFullImageModal,
+  renderSbtPageHolderModal,
+} from './SBTPageModals';
 import {
   appendSbtPageBookmark,
   appendSbtPageTransactionHash,
@@ -281,7 +284,10 @@ type QueueLocalStorageJsonWriteOptions = {
 };
 type SbtPageInviteClaimPayload = SbtPageDecodedInviteInput;
 type SbtPageInviteClaimOptions = {
+  accountLowerOverride?: unknown;
+  chainIdOverride?: unknown;
   suppressErrors?: boolean;
+  sessionSlugOverride?: unknown;
 };
 type SbtPageTransactionResult = Record<string, unknown> & {
   transactionHash?: string;
@@ -463,6 +469,7 @@ type SbtPagePrimaryMetadataState = Record<string, unknown> & {
 class SBTPage extends Component<any, any> {
   _isMounted = false;
   hasAttemptedListMint = false; // Flag for sequential minting
+  _attemptedListMintTargetKey = '';
   // Per-instance guards (no background loops)
   _metaHydrationTried: Record<string, boolean> = {};     // key: `${netId}:${addrLower}` => true
   _eventScanTried: Record<string, boolean> = {};         // key: `${netId}:${addrLower}` => true
@@ -492,6 +499,7 @@ class SBTPage extends Component<any, any> {
   _sessionSBTAddressesValue: string[] = [];
   _decryptedImageBlobUrl = '';
   _burnSearchTimer: ReturnType<typeof setTimeout> | null = null;
+  _activeMintPendingTargetKey = '';
 
   state: any = buildSbtPageInitialState({ network: this.props.network });
 
@@ -544,11 +552,11 @@ class SBTPage extends Component<any, any> {
       }
       if (shouldRunSbtPagePropListAutoMint({
         autoMintingMode: this.props.autoMintingMode,
-        hasAttemptedListMint: this.hasAttemptedListMint,
+        hasAttemptedListMint: this.hasAttemptedListMintForCurrentTarget(),
         loginComplete: this.props.loginComplete,
         sbtMintPassword: this.props.sbtMintPassword,
       })) {
-        this.hasAttemptedListMint = true;
+        this.markAttemptedListMintForCurrentTarget();
         this.attemptMintWithPasswordList(this.props.sbtMintPassword);
       }
 
@@ -569,8 +577,10 @@ class SBTPage extends Component<any, any> {
       String(prevAddress || '').toLowerCase() !== String(nextAddress || '').toLowerCase();
 
     if (sbtAddressChanged || (network?.id !== prevProps.network?.id)) {
+      this._activeMintPendingTargetKey = '';
       if (this._isMounted) {
         const resetMintUiState = buildSbtPageAddressChangeResetMintUiPatch({
+          forceReset: network?.id !== prevProps.network?.id,
           sbtAddressChanged,
         });
 
@@ -595,26 +605,42 @@ class SBTPage extends Component<any, any> {
     const prevSessionSlug = prevProps.sessionSlug ?? prevProps.slug ?? '';
     const nextSessionSlug = this.props.sessionSlug ?? this.props.slug ?? '';
     if (prevSessionSlug !== nextSessionSlug) {
+      this._activeMintPendingTargetKey = '';
+      const resetMintUiState = buildSbtPageAddressChangeResetMintUiPatch({
+        forceReset: true,
+      });
       if (nextSessionSlug) {
         if (this._isMounted) {
-          this.setState(buildSbtPageResolvedSessionSlugPatch({ slug: nextSessionSlug }), () => {
+          this.setState({
+            ...(resetMintUiState || {}),
+            ...buildSbtPageResolvedSessionSlugPatch({ slug: nextSessionSlug }),
+          }, () => {
             if (this._isMounted) this.loadSBTInfo();
           });
         } else {
           this.loadSBTInfo();
         }
-      } else if (this.state.resolvedSessionSlug == null) {
-        if (this._isMounted) this.loadSBTInfo();
+      } else if (this._isMounted) {
+        if (resetMintUiState) this.setState(resetMintUiState);
+        if (this.state.resolvedSessionSlug == null) this.loadSBTInfo();
       }
       return;
     }
 
     if (account !== prevProps.account) {
+      this._activeMintPendingTargetKey = '';
       if (this._isMounted) {
         // Avoid briefly showing the prior account's holder-derived flags while the refresh is in-flight.
         try {
+          const resetMintUiState = buildSbtPageAddressChangeResetMintUiPatch({
+            forceReset: true,
+          });
           const nextPatch = buildSbtPageAccountDerivedStatePatch({ account, state: this.state });
-          if (nextPatch) this.setState(nextPatch);
+          const mergedPatch = {
+            ...(resetMintUiState || {}),
+            ...(nextPatch || {}),
+          };
+          if (Object.keys(mergedPatch).length > 0) this.setState(mergedPatch);
         } catch (e) { sbtLog.warn('SBTPage: fallback', e); }
         this.loadSBTInfo();
       }
@@ -654,11 +680,11 @@ class SBTPage extends Component<any, any> {
     }
     if (shouldRunSbtPagePropListAutoMint({
       autoMintingMode,
-      hasAttemptedListMint: this.hasAttemptedListMint,
+      hasAttemptedListMint: this.hasAttemptedListMintForCurrentTarget(),
       loginComplete,
       sbtMintPassword,
     })) {
-      this.hasAttemptedListMint = true;
+      this.markAttemptedListMintForCurrentTarget();
       this.attemptMintWithPasswordList(sbtMintPassword);
     }
   }
@@ -783,8 +809,10 @@ class SBTPage extends Component<any, any> {
     propsIn: SbtAddressPropsLike = this.props
   ): SbtPageUrlAutoMintIntent | null => {
     return resolveSbtPageUrlAutoMintIntent({
+      chainId: this.props.network?.id || this.props.networkChainId,
       propsIn,
       searchRaw,
+      sessionSlug: this.getEffectiveSessionSlug(),
       sessionStorageRef: (typeof window !== 'undefined' && window.sessionStorage)
         ? window.sessionStorage
         : null,
@@ -808,6 +836,11 @@ class SBTPage extends Component<any, any> {
       shouldAttemptAuto,
       autoKey,
     } = intent;
+    const markAutoMintSuccess = () => {
+      if (autoKey && typeof window !== 'undefined' && window.sessionStorage) {
+        window.sessionStorage.setItem(autoKey, 'done');
+      }
+    };
 
     if (targetCode && !shouldAttemptAuto) {
       if (this._isMounted) this.setState(buildSbtPagePasswordInputValuePatch({
@@ -820,15 +853,31 @@ class SBTPage extends Component<any, any> {
       return false;
     }
 
-    if (autoKey && typeof window !== 'undefined' && window.sessionStorage) {
-      window.sessionStorage.setItem(autoKey, 'done');
-    }
+    // Regression guard: URL auto-mint must keep using the address/session captured
+    // from the original intent even if routing props change during metadata awaits.
+    const targetSlug = this.getEffectiveSessionSlug();
+    const targetAccountLower = String(this.props.account || '').trim().toLowerCase();
+    const targetChainId = this.getMintTargetChainId();
+    const isUrlAutoMintTargetCurrent = () => this.isMintTargetContextCurrent({
+      accountLower: targetAccountLower,
+      chainId: targetChainId,
+      sbtAddress: currentSbtAddress,
+      sessionSlug: targetSlug,
+    });
+
+    if (!isUrlAutoMintTargetCurrent()) return false;
 
     if (!targetCode) {
-      await this.autoMintPublicIfAllowed(currentSbtAddress);
-      return true;
+      const minted = await this.autoMintPublicIfAllowed(currentSbtAddress, {
+        accountLowerOverride: targetAccountLower,
+        chainIdOverride: targetChainId,
+        sessionSlugOverride: targetSlug,
+      });
+      if (minted) markAutoMintSuccess();
+      return minted;
     }
 
+    if (!isUrlAutoMintTargetCurrent()) return false;
     await new Promise<void>((resolve) => {
       if (this._isMounted) {
         this.setState(buildSbtPagePasswordInputValuePatch({
@@ -840,11 +889,16 @@ class SBTPage extends Component<any, any> {
     });
 
     if (targetInvite) {
-      await this.claimWithInviteCode(targetInvite, currentSbtAddress);
-      return true;
+      const minted = await this.claimWithInviteCode(targetInvite, currentSbtAddress, {
+        accountLowerOverride: targetAccountLower,
+        chainIdOverride: targetChainId,
+        sessionSlugOverride: targetSlug,
+      });
+      if (minted) markAutoMintSuccess();
+      return minted;
     }
 
-    const slug = this.getEffectiveSessionSlug();
+    const slug = targetSlug;
     let sbtInfo = this.state.sbtInfo;
     if (!sbtInfo || typeof sbtInfo !== 'object') {
       try {
@@ -852,22 +906,38 @@ class SBTPage extends Component<any, any> {
       } catch (_) {
         sbtInfo = null;
       }
+      if (!isUrlAutoMintTargetCurrent()) return false;
       if (sbtInfo && this._isMounted) {
         this.setState(buildSbtPageSbtInfoPatch({ sbtInfo }));
       }
     }
 
+    if (!isUrlAutoMintTargetCurrent()) return false;
     if (sbtInfo?.hasPasswordMint) {
-      await this.claimWithGroupPassword(targetPassword, currentSbtAddress);
-      return true;
+      const minted = await this.claimWithGroupPassword(targetPassword, currentSbtAddress, {
+        accountLowerOverride: targetAccountLower,
+        chainIdOverride: targetChainId,
+        sessionSlugOverride: slug,
+      });
+      if (minted) markAutoMintSuccess();
+      return minted;
     }
 
     const onchainGph = await contractScriptsUntyped.getGroupPasswordHash('none', currentSbtAddress, slug);
+    if (!isUrlAutoMintTargetCurrent()) return false;
     if (onchainGph && onchainGph !== ethers.constants.HashZero) {
-      await this.mintUnlimitedWithGroupPassword();
-      return true;
+      const minted = await this.mintUnlimitedWithGroupPassword({
+        accountLowerOverride: targetAccountLower,
+        chainIdOverride: targetChainId,
+        passwordOverride: targetPassword,
+        sbtAddressOverride: currentSbtAddress,
+        sessionSlugOverride: slug,
+      });
+      if (minted) markAutoMintSuccess();
+      return minted;
     }
 
+    if (!isUrlAutoMintTargetCurrent()) return false;
     if (this._isMounted) {
       this.setState(buildSbtPageMintFailurePatch({ error: `Invite code required for this ${t('sbt')}.` }));
     }
@@ -966,21 +1036,213 @@ class SBTPage extends Component<any, any> {
     }
   };
 
-  autoMintPublicIfAllowed = async (sbtAddress: unknown): Promise<boolean> => {
+  isMintTargetContextCurrent = ({
+    accountLower = '',
+    chainId = null,
+    sbtAddress = '',
+    sessionSlug = null,
+  }: {
+    accountLower?: unknown;
+    chainId?: unknown;
+    sbtAddress?: unknown;
+    sessionSlug?: unknown;
+  } = {}): boolean => {
+    const targetAddress = resolveSbtAddressString(sbtAddress);
+    const currentAddress = resolveSbtAddressString(this.props.SBTAddress);
+    if (!targetAddress || !currentAddress) return false;
+    if (String(targetAddress).toLowerCase() !== String(currentAddress).toLowerCase()) return false;
+
+    if (sessionSlug != null) {
+      const targetSlug = String(sessionSlug || '');
+      const currentSlug = String(this.getEffectiveSessionSlug() || '');
+      if (targetSlug !== currentSlug) return false;
+    }
+
+    const targetAccount = String(accountLower || '').trim().toLowerCase();
+    if (targetAccount) {
+      const currentAccount = String(this.props.account || '').trim().toLowerCase();
+      if (targetAccount !== currentAccount) return false;
+    }
+
+    if (chainId != null) {
+      const targetChainId = String(chainId || '').trim();
+      const currentChainId = this.getMintTargetChainId();
+      if (!targetChainId || !currentChainId || targetChainId !== currentChainId) return false;
+    }
+
+    return true;
+  };
+
+  getMintTargetChainId = (): string => String(
+    this.props.network?.id ||
+    this.props.networkChainId ||
+    ''
+  ).trim();
+
+  buildMintTargetKey = ({
+    accountLower = '',
+    chainId = null,
+    sbtAddress = '',
+    sessionSlug = null,
+  }: {
+    accountLower?: unknown;
+    chainId?: unknown;
+    sbtAddress?: unknown;
+    sessionSlug?: unknown;
+  } = {}): string => [
+    String(accountLower || '').trim().toLowerCase(),
+    chainId == null ? '' : String(chainId || '').trim(),
+    String(resolveSbtAddressString(sbtAddress) || '').trim().toLowerCase(),
+    sessionSlug == null ? '' : String(sessionSlug || ''),
+  ].join('|');
+
+  buildListAutoMintTargetKey = (): string => this.buildMintTargetKey({
+    accountLower: String(this.props.account || '').trim().toLowerCase(),
+    chainId: this.getMintTargetChainId(),
+    sbtAddress: this.props.SBTAddress,
+    sessionSlug: this.getEffectiveSessionSlug(),
+  });
+
+  hasAttemptedListMintForCurrentTarget = (): boolean => {
+    const targetKey = this.buildListAutoMintTargetKey();
+    return !!targetKey && this.hasAttemptedListMint && this._attemptedListMintTargetKey === targetKey;
+  };
+
+  markAttemptedListMintForCurrentTarget = (): void => {
+    this._attemptedListMintTargetKey = this.buildListAutoMintTargetKey();
+    this.hasAttemptedListMint = !!this._attemptedListMintTargetKey;
+  };
+
+  setMintPendingForTarget = ({
+    accountLower = '',
+    chainId = null,
+    clearError = false,
+    sbtAddress = '',
+    sessionSlug = null,
+  }: {
+    accountLower?: unknown;
+    chainId?: unknown;
+    clearError?: unknown;
+    sbtAddress?: unknown;
+    sessionSlug?: unknown;
+  } = {}): void => {
+    this._activeMintPendingTargetKey = this.buildMintTargetKey({ accountLower, chainId, sbtAddress, sessionSlug });
+    if (this._isMounted) this.setState(buildSbtPageMintPendingPatch({ clearError }));
+  };
+
+  clearMintPendingForTarget = ({
+    accountLower = '',
+    chainId = null,
+    sbtAddress = '',
+    sessionSlug = null,
+  }: {
+    accountLower?: unknown;
+    chainId?: unknown;
+    sbtAddress?: unknown;
+    sessionSlug?: unknown;
+  } = {}): void => {
+    const targetKey = this.buildMintTargetKey({ accountLower, chainId, sbtAddress, sessionSlug });
+    if (!targetKey || this._activeMintPendingTargetKey !== targetKey) return;
+    this._activeMintPendingTargetKey = '';
+    if (this._isMounted && this.state.mintingStatus === 'pending') {
+      this.setState({ mintingStatus: 'idle' });
+    }
+  };
+
+  // Regression guard: URL auto-mint transactions can finish after the route,
+  // session, or wallet changes; only the captured target may receive local UI state.
+  completeMintSuccessForTarget = async ({
+    accountLower = '',
+    chainId = null,
+    clearManualPassword = false,
+    forceEventRefreshOnSuccess = true,
+    mintStep,
+    sbtAddress = '',
+    sessionSlug = null,
+    txHash = '',
+  }: {
+    accountLower?: unknown;
+    chainId?: unknown;
+    clearManualPassword?: boolean;
+    forceEventRefreshOnSuccess?: unknown;
+    mintStep?: number;
+    sbtAddress?: unknown;
+    sessionSlug?: unknown;
+    txHash?: unknown;
+  } = {}): Promise<void> => {
+    const txHashString = String(txHash || '');
+    const isCurrentTarget = () => this.isMintTargetContextCurrent({
+      accountLower,
+      chainId,
+      sbtAddress,
+      sessionSlug,
+    });
+
+    if (isCurrentTarget()) {
+      await this.loadSBTInfo(forceEventRefreshOnSuccess);
+    }
+
+    if (isCurrentTarget()) {
+      if (this._isMounted) {
+        this.setState(buildSbtPageMintSuccessPatch({
+          clearManualPassword,
+          mintStep,
+          txHash: txHashString,
+        }));
+      }
+      this.applyLocalMintSuccess(accountLower);
+      this.clearAutoMintUrlIntent();
+      this._activeMintPendingTargetKey = '';
+    } else {
+      this.clearMintPendingForTarget({ accountLower, chainId, sbtAddress, sessionSlug });
+    }
+
+    this.refreshSbtDataWithSlug(sbtAddress, undefined, sessionSlug);
+
+    try {
+      window.dispatchEvent(new CustomEvent('sbt-mint-success', {
+        detail: { sbtAddress, txHash: txHashString },
+      }));
+    } catch (e) { sbtLog.warn('SBTPage: telemetry', e); }
+  };
+
+  autoMintPublicIfAllowed = async (sbtAddress: unknown, options: any = {}): Promise<boolean> => {
     if (!sbtAddress) return false;
 
-    const slug = this.getEffectiveSessionSlug();
-    let sbtInfo: unknown = this.state.sbtInfo;
+    const slug = options?.sessionSlugOverride != null
+      ? String(options.sessionSlugOverride || '')
+      : this.getEffectiveSessionSlug();
+    const mintAccountLower = options?.accountLowerOverride != null
+      ? String(options.accountLowerOverride || '').trim().toLowerCase()
+      : String(this.props.account || '').trim().toLowerCase();
+    const mintChainId = options?.chainIdOverride != null
+      ? String(options.chainIdOverride || '').trim()
+      : this.getMintTargetChainId();
+    const isCurrentTarget = () => this.isMintTargetContextCurrent({
+      accountLower: mintAccountLower,
+      chainId: mintChainId,
+      sbtAddress,
+      sessionSlug: slug,
+    });
+    if (!isCurrentTarget()) return false;
+
+    const currentPropAddress = resolveSbtAddressString(this.props.SBTAddress);
+    let sbtInfo: unknown = (
+      currentPropAddress &&
+      String(currentPropAddress).toLowerCase() === String(sbtAddress).toLowerCase()
+    ) ? this.state.sbtInfo : null;
     if (!sbtInfo || typeof sbtInfo !== 'object') {
       try {
         sbtInfo = await contractScriptsUntyped.getSbtMetadata('none', sbtAddress, slug);
       } catch (_) {
         sbtInfo = null;
       }
+      if (!isCurrentTarget()) return false;
       if (sbtInfo && this._isMounted) this.setState(buildSbtPageSbtInfoPatch({ sbtInfo }));
     }
 
     if (!sbtInfo) {
+      if (!isCurrentTarget()) return false;
       if (this._isMounted) this.setState(buildSbtPageMintFailurePatch({ error: `Unable to load ${t('sbt')} metadata.` }));
       return false;
     }
@@ -992,6 +1254,7 @@ class SBTPage extends Component<any, any> {
     } catch (_) {
       onchainGph = null;
     }
+    if (!isCurrentTarget()) return false;
 
     if (sbtInfoRecord.hasPasswordMint) {
       if (this._isMounted) this.setState(buildSbtPageMintFailurePatch({ error: `Password required for this ${t('sbt')}.` }));
@@ -1002,8 +1265,13 @@ class SBTPage extends Component<any, any> {
       return false;
     }
 
-    await this.handleMint(true);
-    return true;
+    return await this.handleMint(true, {
+      accountLowerOverride: options?.accountLowerOverride,
+      chainIdOverride: mintChainId,
+      sbtAddressOverride: sbtAddress,
+      sessionSlugOverride: slug,
+      sbtInfoOverride: sbtInfo,
+    });
   };
 
   handleGroupPasswordInputChange = (event: React.ChangeEvent<HTMLInputElement>): void => {
@@ -1023,6 +1291,10 @@ class SBTPage extends Component<any, any> {
     sbtOverride?: unknown,
     options: SbtPageInviteClaimOptions = {}
   ): Promise<SbtPageInviteClaimResult> => {
+    let sbt = '';
+    let slug = '';
+    let mintAccountLower = '';
+    let mintChainId = '';
     try {
       if (!this.props.account) {
         this.props.toggleLoginModal(true);
@@ -1035,11 +1307,30 @@ class SBTPage extends Component<any, any> {
         return { ok: false, error: new Error('Invalid invite code.') };
       }
 
-      const sbt = String(sbtOverride || resolveSbtAddressString(this.props.SBTAddress) || '');
+      sbt = String(sbtOverride || resolveSbtAddressString(this.props.SBTAddress) || '');
 
       if (!sbt) return { ok: false, error: new Error(`Missing ${t('sbt')} address`) };
 
-      if (this._isMounted) this.setState(buildSbtPageMintPendingPatch({ clearError: true }));
+      slug = options?.sessionSlugOverride != null
+        ? String(options.sessionSlugOverride || '')
+        : this.getEffectiveSessionSlug();
+      mintAccountLower = options?.accountLowerOverride != null
+        ? String(options.accountLowerOverride || '').trim().toLowerCase()
+        : String(this.props.account || '').trim().toLowerCase();
+      mintChainId = options?.chainIdOverride != null
+        ? String(options.chainIdOverride || '').trim()
+        : this.getMintTargetChainId();
+
+      if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, chainId: mintChainId, sbtAddress: sbt, sessionSlug: slug })) {
+        return { ok: false, error: new Error('Mint context changed before send.') };
+      }
+      this.setMintPendingForTarget({
+        accountLower: mintAccountLower,
+        chainId: mintChainId,
+        clearError: true,
+        sbtAddress: sbt,
+        sessionSlug: slug,
+      });
       const tx = await contractScripts.claimWithInvite(
         this.props.provider,
         sbt,
@@ -1047,53 +1338,74 @@ class SBTPage extends Component<any, any> {
         payload.signature
       ) as SbtPageTransactionResult;
 
-      await this.loadSBTInfo(true);
-      if (this._isMounted) {
-        this.setState(buildSbtPageMintSuccessPatch({ txHash: tx.transactionHash }));
-      }
-
-      const meLower = this.props.account.toLowerCase();
-      this.applyLocalMintSuccess(meLower);
-      this.refreshSbtDataWithSlug(sbt);
-
-      this.clearAutoMintUrlIntent();
-
-      try {
-        window.dispatchEvent(new CustomEvent('sbt-mint-success', { detail: { sbtAddress: sbt, txHash: tx.transactionHash } }));
-      } catch (e) { sbtLog.warn('SBTPage: telemetry', e); }
+      await this.completeMintSuccessForTarget({
+        accountLower: mintAccountLower,
+        chainId: mintChainId,
+        forceEventRefreshOnSuccess: true,
+        sbtAddress: sbt,
+        sessionSlug: slug,
+        txHash: tx.transactionHash,
+      });
       return { ok: true, tx };
     } catch (error) {
       inviteLog.error('[INVITE] claimWithInvite failed:', error);
-      if (this._isMounted && !options.suppressErrors) {
+      if (
+        this._isMounted &&
+        !options.suppressErrors &&
+        this.isMintTargetContextCurrent({ accountLower: mintAccountLower, chainId: mintChainId, sbtAddress: sbt, sessionSlug: slug })
+      ) {
         this.setState(buildSbtPageMintFailurePatch({ error: getErrorMessage(error, 'Invite claim failed.') }));
       }
       return { ok: false, error };
     }
   };
 
-  claimWithGroupPassword = async (rawPassword: unknown, sbtOverride?: unknown): Promise<void> => {
+  claimWithGroupPassword = async (
+    rawPassword: unknown,
+    sbtOverride?: unknown,
+    options: any = {}
+  ): Promise<boolean> => {
+    let sbt = '';
+    let slug = '';
+    let mintAccountLower = '';
+    let mintChainId = '';
     try {
       if (!this.props.account) {
         this.props.toggleLoginModal(true);
-        return;
+        return false;
       }
       const password = cryptoUtils.normalizeGroupPasswordInput(rawPassword);
       if (!password) {
         if (this._isMounted) this.setState(buildSbtPageMintFailurePatch({ error: 'Group password is required.' }));
-        return;
+        return false;
       }
 
-      const sbt = String(sbtOverride || resolveSbtAddressString(this.props.SBTAddress) || '');
+      sbt = String(sbtOverride || resolveSbtAddressString(this.props.SBTAddress) || '');
 
-      if (!sbt) return;
+      if (!sbt) return false;
 
-      const slug = this.getEffectiveSessionSlug();
+      slug = options?.sessionSlugOverride != null
+        ? String(options.sessionSlugOverride || '')
+        : this.getEffectiveSessionSlug();
+      mintAccountLower = options?.accountLowerOverride != null
+        ? String(options.accountLowerOverride || '').trim().toLowerCase()
+        : String(this.props.account || '').trim().toLowerCase();
+      mintChainId = options?.chainIdOverride != null
+        ? String(options.chainIdOverride || '').trim()
+        : this.getMintTargetChainId();
       let sbtInfo = this.state.sbtInfo;
       if (!sbtInfo || typeof sbtInfo !== 'object') sbtInfo = {};
 
-      let onchainHash = this.state.groupPasswordHash || null;
+      if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, chainId: mintChainId, sbtAddress: sbt, sessionSlug: slug })) {
+        return false;
+      }
+
+      let onchainHash = options?.groupPasswordHashOverride || (sbtOverride ? null : this.state.groupPasswordHash) || null;
       if (!onchainHash) {
         try { onchainHash = await contractScriptsUntyped.getGroupPasswordHash('none', sbt, slug); } catch (e) { sbtLog.warn('SBTPage: fallback', e); }
+      }
+      if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, chainId: mintChainId, sbtAddress: sbt, sessionSlug: slug })) {
+        return false;
       }
       let walletScopeSbtAddress: string | null = sbt;
       if (onchainHash && onchainHash !== ethers.constants.HashZero) {
@@ -1114,7 +1426,7 @@ class SBTPage extends Component<any, any> {
           if (this._isMounted) {
             this.setState(buildSbtPageMintFailurePatch({ error: 'Group password mismatch.' }));
           }
-          return;
+          return false;
         }
       }
 
@@ -1132,16 +1444,22 @@ class SBTPage extends Component<any, any> {
       let lastError: unknown = null;
 
       for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, chainId: mintChainId, sbtAddress: sbt, sessionSlug: slug })) {
+          return false;
+        }
         let mintedTokens: unknown = null;
         try {
           mintedTokens = await contractScriptsUntyped.getMintedTokens('none', sbt, slug);
         } catch (_) {
           mintedTokens = null;
         }
+        if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, chainId: mintChainId, sbtAddress: sbt, sessionSlug: slug })) {
+          return false;
+        }
 
         if (mintedTokens === null) {
           if (this._isMounted) this.setState(buildSbtPageMintFailurePatch({ error: 'Unable to load minted count.' }));
-          return;
+          return false;
         }
 
         let mintedBig: ethers.BigNumber | null = null;
@@ -1153,12 +1471,12 @@ class SBTPage extends Component<any, any> {
 
         if (mintedBig === null) {
           if (this._isMounted) this.setState(buildSbtPageMintFailurePatch({ error: 'Unable to parse minted count.' }));
-          return;
+          return false;
         }
 
         if (maxTokens && mintedBig.gte(maxTokens)) {
           if (this._isMounted) this.setState(buildSbtPageMintFailurePatch({ error: 'Group limit reached.' }));
-          return;
+          return false;
         }
 
         const nonce = mintedBig.add(1).toString();
@@ -1168,17 +1486,28 @@ class SBTPage extends Component<any, any> {
           nonces: [nonce],
           walletScopeSbtAddress
         });
+        if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, chainId: mintChainId, sbtAddress: sbt, sessionSlug: slug })) {
+          return false;
+        }
         const payload = invites && invites[0];
         if (!payload) {
           if (this._isMounted) this.setState(buildSbtPageMintFailurePatch({ error: 'Failed to generate invite.' }));
-          return;
+          return false;
         }
 
         const suppressErrors = attempt < maxAttempts - 1;
-        const result = await this.claimWithInvitePayload(payload, sbt, { suppressErrors });
-        if (result && result.ok) return;
+        const result = await this.claimWithInvitePayload(payload, sbt, {
+          accountLowerOverride: mintAccountLower,
+          chainIdOverride: mintChainId,
+          suppressErrors,
+          sessionSlugOverride: slug,
+        });
+        if (result && result.ok) return true;
 
         lastError = result?.error || new Error('Invite claim failed.');
+        if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, chainId: mintChainId, sbtAddress: sbt, sessionSlug: slug })) {
+          return false;
+        }
 
         let mintedAfter: unknown = null;
         try {
@@ -1193,27 +1522,42 @@ class SBTPage extends Component<any, any> {
         } catch (_) {
           mintedAfterBig = null;
         }
+        if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, chainId: mintChainId, sbtAddress: sbt, sessionSlug: slug })) {
+          return false;
+        }
 
         if (mintedAfterBig === null || mintedAfterBig.lte(mintedBig)) {
           if (this._isMounted && suppressErrors) {
             this.setState(buildSbtPageMintFailurePatch({ error: getErrorMessage(lastError, 'Invite claim failed.') }));
           }
-          return;
+          return false;
         }
       }
     } catch (error) {
       inviteLog.error('[INVITE] claimWithGroupPassword failed:', error);
-      if (this._isMounted) this.setState(buildSbtPageMintFailurePatch({ error: getErrorMessage(error, 'Invite claim failed.') }));
+      if (
+        this._isMounted &&
+        this.isMintTargetContextCurrent({
+          accountLower: mintAccountLower,
+          chainId: mintChainId,
+          sbtAddress: sbt,
+          sessionSlug: slug,
+        })
+      ) {
+        this.setState(buildSbtPageMintFailurePatch({ error: getErrorMessage(error, 'Invite claim failed.') }));
+      }
+      return false;
     }
+    return false;
   };
 
-  claimWithInviteCode = async (rawCode: unknown, sbtOverride?: unknown): Promise<void> => {
+  claimWithInviteCode = async (rawCode: unknown, sbtOverride?: unknown, options: any = {}): Promise<boolean> => {
     const payload = this.decodeInviteInput(rawCode);
     if (payload) {
-      await this.claimWithInvitePayload(payload, sbtOverride);
-      return;
+      const result = await this.claimWithInvitePayload(payload, sbtOverride, options);
+      return !!result?.ok;
     }
-    await this.claimWithGroupPassword(rawCode, sbtOverride);
+    return await this.claimWithGroupPassword(rawCode, sbtOverride, options);
   };
 
   // Helpers
@@ -1414,14 +1758,45 @@ class SBTPage extends Component<any, any> {
   };
 
   async attemptMintWithPasswordList(passwordList: unknown): Promise<void> {
+    let sbtAddressOriginalCase = '';
+    let targetSlug = '';
+    let targetAccountLower = '';
+    let targetChainId = '';
+    const isCurrentTarget = () => this.isMintTargetContextCurrent({
+      accountLower: targetAccountLower,
+      chainId: targetChainId,
+      sbtAddress: sbtAddressOriginalCase,
+      sessionSlug: targetSlug,
+    });
+    const applyMintInputForTarget = (inputField: string, inputValue: string) => new Promise<boolean>((resolve) => {
+      if (!this._isMounted || !isCurrentTarget()) {
+        resolve(false);
+        return;
+      }
+      this.setState(buildSbtPagePasswordMintInputPatch({
+        inputField,
+        inputValue,
+      }), () => resolve(isCurrentTarget()));
+    });
+
     try {
       if (!Array.isArray(passwordList) || passwordList.length === 0) return;
       const passwordTokens = passwordList as string[];
 
       const { provider } = this.props;
-      const sbtAddressOriginalCase = resolveSbtAddressString(this.props.SBTAddress);
+      sbtAddressOriginalCase = resolveSbtAddressString(this.props.SBTAddress);
+      targetSlug = this.getEffectiveSessionSlug();
+      targetAccountLower = String(this.props.account || '').trim().toLowerCase();
+      targetChainId = this.getMintTargetChainId();
 
-      if (!sbtAddressOriginalCase || !provider) return;
+      if (!sbtAddressOriginalCase || !provider || !targetAccountLower || !targetChainId) return;
+      if (!isCurrentTarget()) return;
+
+      const targetOptions = {
+        accountLowerOverride: targetAccountLower,
+        chainIdOverride: targetChainId,
+        sessionSlugOverride: targetSlug,
+      };
 
       let chosen: string | null = null;
       let inviteToken: string | null = null;
@@ -1434,35 +1809,21 @@ class SBTPage extends Component<any, any> {
       }
 
       if (inviteToken) {
-        await new Promise<void>((resolve) => {
-          if (this._isMounted) {
-            this.setState(buildSbtPagePasswordMintInputPatch({
-              inputField: 'groupPasswordInput',
-              inputValue: inviteToken,
-            }), resolve);
-          } else {
-            resolve();
-          }
-        });
+        const didApply = await applyMintInputForTarget('groupPasswordInput', inviteToken);
+        if (!didApply) return;
 
-        await this.claimWithInviteCode(inviteToken, sbtAddressOriginalCase);
+        if (!isCurrentTarget()) return;
+        await this.claimWithInviteCode(inviteToken, sbtAddressOriginalCase, targetOptions);
         return;
       }
 
       if (this.state.hasInviteMint) {
         const fallbackPassword = passwordTokens[0];
         if (fallbackPassword) {
-          await new Promise<void>((resolve) => {
-            if (this._isMounted) {
-              this.setState(buildSbtPagePasswordMintInputPatch({
-                inputField: 'groupPasswordInput',
-                inputValue: fallbackPassword,
-              }), resolve);
-            } else {
-              resolve();
-            }
-          });
-          await this.claimWithGroupPassword(fallbackPassword, sbtAddressOriginalCase);
+          const didApply = await applyMintInputForTarget('groupPasswordInput', fallbackPassword);
+          if (!didApply) return;
+          if (!isCurrentTarget()) return;
+          await this.claimWithGroupPassword(fallbackPassword, sbtAddressOriginalCase, targetOptions);
           return;
         }
       }
@@ -1471,35 +1832,36 @@ class SBTPage extends Component<any, any> {
         const hashed = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(token));
         let ok = false;
         try {
-          ok = await contractScriptsUntyped.isPasswordValid(provider, sbtAddressOriginalCase, hashed, this.getEffectiveSessionSlug());
+          ok = await contractScriptsUntyped.isPasswordValid(provider, sbtAddressOriginalCase, hashed, targetSlug);
         } catch {
           ok = false;
         }
+        if (!isCurrentTarget()) return;
         if (ok) { chosen = token; break; }
       }
 
       if (!chosen) {
-        if (this._isMounted) this.setState(buildSbtPageErrorPatch({ error: "All claim codes have been used." }));
+        if (this._isMounted && isCurrentTarget()) {
+          this.setState(buildSbtPageErrorPatch({ error: "All claim codes have been used." }));
+        }
         return;
       }
 
-      await new Promise<void>((resolve) => {
-        if (this._isMounted) {
-          this.setState(buildSbtPagePasswordMintInputPatch({
-            inputField: 'manualPasswordInput',
-            inputValue: chosen,
-          }), resolve);
-        } else {
-          resolve();
-        }
-      });
+      const didApply = await applyMintInputForTarget('manualPasswordInput', chosen);
+      if (!didApply) return;
 
-      await this.handleMint(false);
+      if (!isCurrentTarget()) return;
+      await this.handleMint(false, {
+        ...targetOptions,
+        sbtAddressOverride: sbtAddressOriginalCase,
+      });
       if (this.state.mintingStatus !== 'success') {
         // Rare race: if it failed after check, fall through silently (the UI already shows error)
       }
     } catch (err) {
-      if (this._isMounted) this.setState(buildSbtPageErrorPatch({ error: getErrorMessage(err, 'Failed to mint with provided codes.') }));
+      if (this._isMounted && isCurrentTarget()) {
+        this.setState(buildSbtPageErrorPatch({ error: getErrorMessage(err, 'Failed to mint with provided codes.') }));
+      }
     }
   }
 
@@ -2731,30 +3093,53 @@ class SBTPage extends Component<any, any> {
     }
   };
 
-  async mintUnlimitedWithGroupPassword() {
+  async mintUnlimitedWithGroupPassword(options: any = {}): Promise<boolean> {
     sbtLog.log('[MANUAL-MINT] Starting manual mint...');
+    let sbt: string | null = null;
+    let slug = '';
+    let mintAccountLower = '';
+    let mintChainId = '';
     try {
       if (!this.props.account) {
         this.props.toggleLoginModal(true);
-        return;
+        return false;
       }
-      const password = cryptoUtils.normalizeGroupPasswordInput(this.state.groupPasswordInput);
+      const password = cryptoUtils.normalizeGroupPasswordInput(
+        options?.passwordOverride != null ? options.passwordOverride : this.state.groupPasswordInput
+      );
       if (!password) {
         this.setState(buildSbtPageErrorPatch({ error: 'Enter group password first.' }));
-        return;
+        return false;
       }
 
-      const sbt = resolveSbtAddressString(this.props.SBTAddress);
+      sbt = resolveSbtAddressString(options?.sbtAddressOverride || this.props.SBTAddress);
+      if (!sbt) return false;
 
       sbtLog.log('[MANUAL-MINT] Preparing mint for', sbt, '...');
-      const slug = this.getEffectiveSessionSlug();
+      slug = options?.sessionSlugOverride != null
+        ? String(options.sessionSlugOverride || '')
+        : this.getEffectiveSessionSlug();
+      mintAccountLower = options?.accountLowerOverride != null
+        ? String(options.accountLowerOverride || '').trim().toLowerCase()
+        : String(this.props.account || '').trim().toLowerCase();
+      mintChainId = options?.chainIdOverride != null
+        ? String(options.chainIdOverride || '').trim()
+        : this.getMintTargetChainId();
+      const mintAccount = this.props.account;
+
+      if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, chainId: mintChainId, sbtAddress: sbt, sessionSlug: slug })) {
+        return false;
+      }
 
       sbtLog.log('[MANUAL-MINT] Reading on-chain groupPasswordHash...');
       const onchain = await contractScriptsUntyped.getGroupPasswordHash('none', sbt, slug);
       sbtLog.log('[MANUAL-MINT] On-chain groupPasswordHash:', onchain);
+      if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, chainId: mintChainId, sbtAddress: sbt, sessionSlug: slug })) {
+        return false;
+      }
       if (!onchain || onchain === ethers.constants.HashZero) {
         this.setState(buildSbtPageErrorPatch({ error: `This ${t('sbt')} does not support group-password signature ${t('mintLower')}.` }));
-        return;
+        return false;
       }
 
       const walletScopeSbtAddress = cryptoUtils.resolveGroupPasswordWalletScopeAddress({
@@ -2770,42 +3155,54 @@ class SBTPage extends Component<any, any> {
       });
       if (!local || local.toLowerCase() !== onchain.toLowerCase()) {
         sbtLog.error('[MANUAL-MINT] Sanity check FAILED', { expected: onchain, computed: local });
+        if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, chainId: mintChainId, sbtAddress: sbt, sessionSlug: slug })) {
+          return false;
+        }
         this.setState(buildSbtPageErrorPatch({ error: 'Incorrect group password.' }));
-        return;
+        return false;
       }
 
-      this.setState(buildSbtPageMintPendingPatch());
+      if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, chainId: mintChainId, sbtAddress: sbt, sessionSlug: slug })) {
+        return false;
+      }
+      this.setMintPendingForTarget({
+        accountLower: mintAccountLower,
+        chainId: mintChainId,
+        sbtAddress: sbt,
+        sessionSlug: slug,
+      });
 
       sbtLog.log('[MANUAL-MINT] Signing authorization...');
       const sig = await contractScripts.signGroupMintAuthorization({
         password,
         sbtAddress: sbt,
-        userAddress: this.props.account,
+        userAddress: mintAccount,
         walletScopeSbtAddress,
       });
       sbtLog.log('[MANUAL-MINT] Signature:', sig);
 
+      if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, chainId: mintChainId, sbtAddress: sbt, sessionSlug: slug })) {
+        return false;
+      }
       sbtLog.log('[MANUAL-MINT] Sending transaction...');
       const tx = await contractScripts.mintWithGroupSignature(this.props.provider, sbt, sig);
       sbtLog.log('[MANUAL-MINT] Tx hash:', tx.transactionHash);
 
-      await this.loadSBTInfo(true);
-      this.setState(buildSbtPageMintSuccessPatch({ txHash: tx.transactionHash }));
-
-      // Optimistic + parent refresh to ensure counters update everywhere
-      const meLower = this.props.account.toLowerCase();
-      this.applyLocalMintSuccess(meLower);
-      this.refreshSbtDataWithSlug(sbt);
-
-      // Cleanup auto-mint intent to prevent loop on refresh
-      this.clearAutoMintUrlIntent();
-
-      try {
-        window.dispatchEvent(new CustomEvent('sbt-mint-success', { detail: { sbtAddress: sbt, txHash: tx.transactionHash } }));
-      } catch (e) { sbtLog.warn('SBTPage: telemetry', e); }
+      await this.completeMintSuccessForTarget({
+        accountLower: mintAccountLower,
+        chainId: mintChainId,
+        forceEventRefreshOnSuccess: true,
+        sbtAddress: sbt,
+        sessionSlug: slug,
+        txHash: tx.transactionHash,
+      });
+      return true;
     } catch (error) {
       sbtLog.error('Manual mint flow failed:', error);
-      this.setState(buildSbtPageMintFailurePatch({ error: getErrorMessage(error, `${t('mint')} failed.`) }));
+      if (this.isMintTargetContextCurrent({ accountLower: mintAccountLower, chainId: mintChainId, sbtAddress: sbt, sessionSlug: slug })) {
+        this.setState(buildSbtPageMintFailurePatch({ error: getErrorMessage(error, `${t('mint')} failed.`) }));
+      }
+      return false;
     }
   }
 
@@ -2815,24 +3212,43 @@ class SBTPage extends Component<any, any> {
     }));
   };
 
-  handleMint = async (forceEventRefreshOnSuccess: boolean = true): Promise<void> => {
+  handleMint = async (forceEventRefreshOnSuccess: boolean = true, options: any = {}): Promise<boolean> => {
     if (!this.props.account) {
       this.props.toggleLoginModal(true);
-      return;
+      return false;
     }
 
-    const sbtAddressOriginalCase = resolveSbtAddressString(this.props.SBTAddress);
+    const sbtAddressOriginalCase = resolveSbtAddressString(options?.sbtAddressOverride || this.props.SBTAddress);
 
-    if (!sbtAddressOriginalCase) return;
+    if (!sbtAddressOriginalCase) return false;
 
-    const { sbtInfo, mintPassword, mintStep, manualPasswordInput } = this.state;
+    const {
+      mintPassword,
+      mintStep,
+      manualPasswordInput,
+    } = this.state;
+    const sbtInfo = options?.sbtInfoOverride || this.state.sbtInfo || {};
+    const slug = options?.sessionSlugOverride != null
+      ? String(options.sessionSlugOverride || '')
+      : this.getEffectiveSessionSlug();
+    const mintAccountLower = options?.accountLowerOverride != null
+      ? String(options.accountLowerOverride || '').trim().toLowerCase()
+      : String(this.props.account || '').trim().toLowerCase();
+    const mintChainId = options?.chainIdOverride != null
+      ? String(options.chainIdOverride || '').trim()
+      : this.getMintTargetChainId();
+    const mintAccount = this.props.account;
+
+    if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, chainId: mintChainId, sbtAddress: sbtAddressOriginalCase, sessionSlug: slug })) {
+      return false;
+    }
 
     try {
       if (sbtInfo.hasPasswordMint) {
         const effectivePassword = (mintPassword && mintPassword.trim() !== '' ? mintPassword : (manualPasswordInput || '').trim());
         if (effectivePassword === '') {
           if (this._isMounted) this.setState(buildSbtPageMintFailurePatch({ error: `Password is required for this ${t('sbt')}.` }));
-          return;
+          return false;
         }
 
         if (mintStep === 0) {
@@ -2844,11 +3260,14 @@ class SBTPage extends Component<any, any> {
               this.props.provider,
               sbtAddressOriginalCase,
               hashedPassword,
-              this.getEffectiveSessionSlug()
+              slug
             );
             if (!isValid) {
+              if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, chainId: mintChainId, sbtAddress: sbtAddressOriginalCase, sessionSlug: slug })) {
+                return false;
+              }
               if (this._isMounted) this.setState(buildSbtPageMintFailurePatch({ error: 'Invalid password.' }));
-              return;
+              return false;
             }
           } catch (preCheckErr) {
             // If the view call fails (e.g. network issue), proceed with the mint anyway —
@@ -2856,69 +3275,98 @@ class SBTPage extends Component<any, any> {
             sbtLog.warn('[SBTPage] Password pre-validation call failed, proceeding with mint:', preCheckErr);
           }
 
-          if (this._isMounted) this.setState(buildSbtPageMintPendingPatch());
+          if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, chainId: mintChainId, sbtAddress: sbtAddressOriginalCase, sessionSlug: slug })) {
+            return false;
+          }
+          this.setMintPendingForTarget({
+            accountLower: mintAccountLower,
+            chainId: mintChainId,
+            sbtAddress: sbtAddressOriginalCase,
+            sessionSlug: slug,
+          });
 
           const userCommit = ethers.utils.solidityKeccak256(
             ["string", "address"],
-            [effectivePassword, this.props.account]
+            [effectivePassword, mintAccount]
           );
 
           const tx = await contractScripts.startClaim(this.props.provider, sbtAddressOriginalCase, userCommit);
-          if (this._isMounted) this.setState(buildSbtPagePasswordClaimStartSuccessPatch({
-            txHash: tx.transactionHash,
-          }));
-          this.startClaimCountdown();
-          this.cacheTransactionHash(tx.transactionHash);
-        } else if (mintStep === 2) {
-          if (this._isMounted) this.setState(buildSbtPageMintPendingPatch());
-          const tx = await contractScripts.claimWithPassword(this.props.provider, sbtAddressOriginalCase, effectivePassword);
-          if (this._isMounted) this.setState(buildSbtPageMintSuccessPatch({
-            clearManualPassword: true,
-            mintStep: 3,
-            txHash: tx.transactionHash,
-          }));
-          await this.loadSBTInfo(forceEventRefreshOnSuccess);
-          this.cacheTransactionHash(tx.transactionHash);
-
-          // Optimistic + parent refresh
-          const meLower = this.props.account.toLowerCase();
-          this.applyLocalMintSuccess(meLower);
-          this.refreshSbtDataWithSlug(sbtAddressOriginalCase);
-
-          // Cleanup auto-mint intent to prevent loop on refresh
-          this.clearAutoMintUrlIntent();
-
-          try {
-            window.dispatchEvent(new CustomEvent('sbt-mint-success', {
-              detail: { sbtAddress: sbtAddressOriginalCase, txHash: tx.transactionHash }
+          if (
+            this._isMounted &&
+            this.isMintTargetContextCurrent({ accountLower: mintAccountLower, chainId: mintChainId, sbtAddress: sbtAddressOriginalCase, sessionSlug: slug })
+          ) {
+            this.setState(buildSbtPagePasswordClaimStartSuccessPatch({
+              txHash: tx.transactionHash,
             }));
-          } catch (e) { sbtLog.warn('SBTPage: telemetry', e); }
+            this.startClaimCountdown();
+            this._activeMintPendingTargetKey = '';
+          } else {
+            this.clearMintPendingForTarget({
+              accountLower: mintAccountLower,
+              chainId: mintChainId,
+              sbtAddress: sbtAddressOriginalCase,
+              sessionSlug: slug,
+            });
+          }
+          this.cacheTransactionHash(tx.transactionHash, mintAccountLower);
+          return true;
+        } else if (mintStep === 2) {
+          if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, chainId: mintChainId, sbtAddress: sbtAddressOriginalCase, sessionSlug: slug })) {
+            return false;
+          }
+          this.setMintPendingForTarget({
+            accountLower: mintAccountLower,
+            chainId: mintChainId,
+            sbtAddress: sbtAddressOriginalCase,
+            sessionSlug: slug,
+          });
+          const tx = await contractScripts.claimWithPassword(this.props.provider, sbtAddressOriginalCase, effectivePassword);
+          this.cacheTransactionHash(tx.transactionHash, mintAccountLower);
+          await this.completeMintSuccessForTarget({
+            accountLower: mintAccountLower,
+            chainId: mintChainId,
+            clearManualPassword: true,
+            forceEventRefreshOnSuccess,
+            mintStep: 3,
+            sbtAddress: sbtAddressOriginalCase,
+            sessionSlug: slug,
+            txHash: tx.transactionHash,
+          });
+          return true;
         }
       } else {
-        if (this._isMounted) this.setState(buildSbtPageMintPendingPatch());
+        if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, chainId: mintChainId, sbtAddress: sbtAddressOriginalCase, sessionSlug: slug })) {
+          return false;
+        }
+        this.setMintPendingForTarget({
+          accountLower: mintAccountLower,
+          chainId: mintChainId,
+          sbtAddress: sbtAddressOriginalCase,
+          sessionSlug: slug,
+        });
         const tx = await contractScripts.claim(this.props.provider, sbtAddressOriginalCase);
-        if (this._isMounted) this.setState(buildSbtPageMintSuccessPatch({ txHash: tx.transactionHash }));
-        await this.loadSBTInfo(forceEventRefreshOnSuccess);
-        this.cacheTransactionHash(tx.transactionHash);
-
-        // Optimistic + parent refresh
-        const meLower = this.props.account.toLowerCase();
-        this.applyLocalMintSuccess(meLower);
-        this.refreshSbtDataWithSlug(sbtAddressOriginalCase);
-
-        // Cleanup auto-mint intent to prevent loop on refresh
-        this.clearAutoMintUrlIntent();
-
-        try {
-          window.dispatchEvent(new CustomEvent('sbt-mint-success', {
-            detail: { sbtAddress: sbtAddressOriginalCase, txHash: tx.transactionHash }
-          }));
-        } catch (e) { sbtLog.warn('SBTPage: telemetry', e); }
+        this.cacheTransactionHash(tx.transactionHash, mintAccountLower);
+        await this.completeMintSuccessForTarget({
+          accountLower: mintAccountLower,
+          chainId: mintChainId,
+          forceEventRefreshOnSuccess,
+          sbtAddress: sbtAddressOriginalCase,
+          sessionSlug: slug,
+          txHash: tx.transactionHash,
+        });
+        return true;
       }
     } catch (error) {
       sbtLog.error("Minting failed in handleMint:", error);
-      if (this._isMounted) this.setState(buildSbtPageMintFailurePatch({ error: getErrorMessage(error, `${t('minting')} failed.`) }));
+      if (
+        this._isMounted &&
+        this.isMintTargetContextCurrent({ accountLower: mintAccountLower, chainId: mintChainId, sbtAddress: sbtAddressOriginalCase, sessionSlug: slug })
+      ) {
+        this.setState(buildSbtPageMintFailurePatch({ error: getErrorMessage(error, `${t('minting')} failed.`) }));
+      }
+      return false;
     }
+    return false;
   };
 
   miniMintHandler = async (): Promise<void> => {
@@ -3574,7 +4022,7 @@ renderMintButton() {
 
     return (
       <div className={styles.relevantInfo}>
-        <Alert color="info">
+        <Alert color="info" fade={false}>
           <FontAwesomeIcon icon={faInfoCircle} style={resolveSbtPageMutedInfoIconStyle()}/>
           This section shows relevant documents, URLs, tags, and IDs.
         </Alert>
@@ -3649,8 +4097,8 @@ renderMintButton() {
   };
 
 
-  cacheTransactionHash = (txHash: string): void => {
-    const userAddress = this.props.account?.toLowerCase();
+  cacheTransactionHash = (txHash: string, accountOverride: unknown = null): void => {
+    const userAddress = String(accountOverride || this.props.account || '').trim().toLowerCase();
     if (!userAddress) return;
     try {
       const txCache = this.readQueuedOrStoredLocalStorageJson<TransactionStorageCache>('transactions', {});
@@ -4573,16 +5021,6 @@ renderMintButton() {
       showScanProgress,
     });
     const filterNetwork = this.state.network || this.props.network || null;
-    const holdersModalClose = (
-      <button
-        type="button"
-        className={styles.modalCloseButton}
-        onClick={this.closeModal}
-        aria-label="Close holders"
-      >
-        <FontAwesomeIcon icon={faTimes} />
-      </button>
-    );
     const passwordAlertState = resolveSbtPagePasswordAlertState({
       mintPassword,
       sbtMintPassword: this.props.sbtMintPassword,
@@ -4621,7 +5059,7 @@ renderMintButton() {
           <FontAwesomeIcon icon={faArrowLeft} /> {`${t('sbt')} list`}
         </button>
         {passwordAlertState.showDetectedPasswordAlert && (
-          <Alert color="info" className={styles.passwordAlert}>
+          <Alert color="info" className={styles.passwordAlert} fade={false}>
             Password detected – click "start claim" to mint
           </Alert>
         )}
@@ -4815,7 +5253,7 @@ renderMintButton() {
                         </div>
                       )}
                       {actionFeedbackState.showTransactionError && (
-                        <Alert color="danger" className={styles.txErrorAlert}>
+                        <Alert color="danger" className={styles.txErrorAlert} fade={false}>
                           <FontAwesomeIcon icon={faExclamationTriangle} /> Transaction Failed: {this.state.error}
                           <button
                             onClick={this.copyErrorToClipboard}
@@ -4869,172 +5307,55 @@ renderMintButton() {
           !error && loadingScreen
         )}
 
-        <Modal
-          isOpen={showModal}
-          toggle={this.closeModal}
-          className={styles.modal}
-          contentClassName={styles.modalContent} // Applies dark theme via SCSS
-          size="lg"
-          centered
-        >
-          <ModalHeader toggle={this.closeModal} close={holdersModalClose} className={styles.modalHeader}>
-            <div className={styles.modalTitleStack}>
-              <span className={styles.modalTitle}>
-                Holders
-                {showHeaderCount && (
-                  <span className={styles.modalTitleCount}>({holdersDisplayCount})</span>
-                )}
-              </span>
-              {showCornerSpinner && (
-                <span className={styles.modalTitleSpinnerRow}>
-                  <FontAwesomeIcon icon={faSpinner} spin className={styles.cornerSpinner} title="Refreshing holders..." />
-                </span>
-              )}
-            </div>
-          </ModalHeader>
-          <ModalBody className={styles.modalBody}>
-            <div>
-              <SBTFilter
-                items={holderItemsForFilter}
-                mode="addresses"
-                provider={this.props.provider}
-                network={filterNetwork}
-                sessionSlug={this.getEffectiveSessionSlug()}
-                defaultFeaturedSBTs={this.getSessionSBTAddresses()}
-                onFilter={this.handleModalFilteredMintedUsers}
-                autoExpand={false}
-                isSBTCacheReady={this.props.isSBTCacheReady}
-                sbtCacheRevision={this.props.sbtCacheRevision}
-              />
+        {renderSbtPageHolderModal({
+          isOpen: showModal,
+          onClose: this.closeModal,
+          showHeaderCount,
+          holdersDisplayCount,
+          showCornerSpinner,
+          holderItemsForFilter,
+          provider: this.props.provider,
+          network: filterNetwork,
+          sessionSlug: this.getEffectiveSessionSlug(),
+          defaultFeaturedSBTs: this.getSessionSBTAddresses(),
+          onFilter: this.handleModalFilteredMintedUsers,
+          isSBTCacheReady: this.props.isSBTCacheReady,
+          sbtCacheRevision: this.props.sbtCacheRevision,
+          loadingMintedFilter: this.state.loadingMintedFilter,
+          hasFilteredHolders,
+          hasComputedHolders,
+          showScanProgressInModal,
+          scanProgressText,
+          scanProgressSessionText,
+          scanProgressPct,
+          scanProgressFillStyle,
+          showEmptyStateInModal,
+          showApproximateCountHint,
+          showSpinnerInModalBody,
+          filteredMintedUsers,
+          copiedAddress: this.state.copiedAddress,
+          copyToClipboard: this.copyToClipboard,
+          getExplorerUrl: this.getExplorerUrl,
+        })}
 
-              {this.state.loadingMintedFilter && !hasFilteredHolders && !hasComputedHolders && (
-                <div className={styles.filteringStatus}>Filtering...</div>
-              )}
-              <div className={styles.userList}>
-                {showScanProgressInModal && (
-                  <div className={styles.scanProgress}>
-                    <FontAwesomeIcon icon={faSpinner} spin className={styles.scanSpinner} />
-                    <div className={styles.scanProgressContent}>
-                      <span className={styles.scanProgressText}>{scanProgressText}</span>
-                      {scanProgressSessionText ? (
-                        <span className={styles.scanProgressSession}>{scanProgressSessionText}</span>
-                      ) : null}
-                      <div
-                        className={styles.scanProgressBar}
-                        role="progressbar"
-                        aria-valuenow={scanProgressPct}
-                        aria-valuemin={0}
-                        aria-valuemax={100}
-                      >
-                        <div className={styles.scanProgressFill} style={scanProgressFillStyle} />
-                      </div>
-                    </div>
-                  </div>
-                )}
-                {/* Body logic: Only show empty state if NOT initial loading */}
-                {showEmptyStateInModal && (
-                  <div className={styles.emptyState}>No holders found.</div>
-                )}
-                {showApproximateCountHint && (
-                  <div className={styles.emptyState}>Holder addresses not available yet. Showing approximate count only.</div>
-                )}
-                {/* Body logic: Show spinner if initial loading */}
-                {showSpinnerInModalBody && (
-                  <div className={styles.emptyState}><FontAwesomeIcon icon={faSpinner} spin size="2x" /></div>
-                )}
+        {renderSbtPageFullImageModal({
+          isOpen: this.state.showFullImage,
+          onToggle: this.toggleFullImage,
+          shouldRenderImage: !!sbtInfo,
+          imageUrl,
+          alt: sbtNameText,
+          onImageError: imageErrorHandler,
+        })}
 
-                {filteredMintedUsers.map((address: unknown, index: number) => {
-                  const copyAddressKey = `modal-addr-${index}`;
-                  const modalAddressCopyIconState = resolveSbtPageCopyIconState({
-                    copiedAddress: this.state.copiedAddress,
-                    targetKey: copyAddressKey,
-                  });
-                  const seed = String(address || 'contextengine-default-seed').toLowerCase();
-                  const blockieUrl = generateBlockieDataUrl(seed, 8, 4);
-                  return (
-                    <div key={index} className={styles.userItem}>
-                      <div className={styles.userItemLeft}>
-                        {blockieUrl ? (
-                          <img
-                            src={blockieUrl}
-                            alt=""
-                            className={styles.userBlockie}
-                          />
-                        ) : null}
-                        <a href={`/u/${address}`} target="_blank" rel="noopener noreferrer" className={styles.userAddressLink}>
-                          {getShortenedAddress(address, false)}
-                        </a>
-                      </div>
-                      <div className={styles.userItemActions}>
-                        <button onClick={() => this.copyToClipboard(address, copyAddressKey)} className={styles.copyButtonSmall}>
-                          {modalAddressCopyIconState.shouldRenderCopiedIcon && <FontAwesomeIcon icon={faCheck} />}
-                          {modalAddressCopyIconState.shouldRenderDefaultIcon && <FontAwesomeIcon icon={faCopy} />}
-                        </button>
-                        <a href={this.getExplorerUrl(address)} target="_blank" rel="noopener noreferrer" className={styles.explorerLinkSmall}>
-                          <FontAwesomeIcon icon={faExternalLinkAlt} />
-                        </a>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </ModalBody>
-        </Modal>
-
-        {/* Full Image Modal */}
-        <Modal
-          isOpen={this.state.showFullImage}
-          toggle={this.toggleFullImage}
-          centered
-          size="xl"
-          contentClassName={styles.imageModalContent}
-        >
-          <ModalBody className={styles.imageModalBody} onClick={this.toggleFullImage}>
-            {sbtInfo && (
-              <img
-                src={imageUrl}
-                alt={sbtNameText}
-                onError={imageErrorHandler}
-              />
-            )}
-          </ModalBody>
-        </Modal>
-
-        <Modal
-          isOpen={docModalOpen}
-          toggle={this.closeDocModal}
-          className={styles.modal}
-          contentClassName={styles.modalContent}
-          size="lg"
-        >
-          <ModalHeader toggle={this.closeDocModal} className={styles.modalHeader}>
-            <span className={styles.modalTitle}>{docModalName || 'Encrypted document'}</span>
-            {docModalLoading && (
-              <FontAwesomeIcon icon={faSpinner} spin className={styles.headerSpinner} />
-            )}
-          </ModalHeader>
-          <ModalBody className={styles.modalBody}>
-            {docModalError && (
-              <div className={styles.modalError}>{docModalError}</div>
-            )}
-            {!docModalError && docModalLoading && (
-              <div className={styles.modalLoading}>
-                <FontAwesomeIcon icon={faSpinner} spin /> Decrypting…
-              </div>
-            )}
-            {!docModalError && !docModalLoading && docModalContent && (
-              <pre className={styles.docModalContent}>{docModalContent}</pre>
-            )}
-            {!docModalError && !docModalLoading && !docModalContent && docModalBlobUrl && (
-              <div className={styles.docModalDownload}>
-                <a href={docModalBlobUrl} download={docModalName || 'document'}>
-                  Download decrypted file
-                </a>
-              </div>
-            )}
-          </ModalBody>
-        </Modal>
+        {renderSbtPageDocModal({
+          isOpen: docModalOpen,
+          onClose: this.closeDocModal,
+          loading: docModalLoading,
+          error: docModalError,
+          content: docModalContent,
+          name: docModalName,
+          blobUrl: docModalBlobUrl,
+        })}
       </div>
     );
   }
