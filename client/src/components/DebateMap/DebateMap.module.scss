@@ -809,16 +809,16 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
   /* --- ORG CHART VIEW --- */
   .orgChartContainer {
     width: 100%;
-    overflow-x: auto;
-    padding: 30px 10px;
+    overflow: hidden;
+    padding: 24px 10px 32px;
     background: radial-gradient(circle at center, rgba(30, 41, 59, 0.3) 0%, rgba(11, 17, 32, 0.6) 100%);
     border-radius: var(--ce-radius-16);
     border: $border-glass;
     min-height: 70vh;
     display: flex;
+    justify-content: center;
     align-items: flex-start;
-    cursor: grab;
-    touch-action: pan-x pan-y;
+    touch-action: pan-y;
     &::-webkit-scrollbar {
       height: 8px;
       width: 8px;
@@ -829,12 +829,60 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
     }
   }
 
+  .orgChartFitStage {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    transition: height 0.2s ease;
+  }
+
   .orgChartRoot {
     display: flex;
     justify-content: center;
     min-width: max-content;
-    padding: 20px;
+    padding: 12px 8px 20px;
     margin: 0 auto;
+    transform-origin: top center;
+    transition: transform 0.2s ease;
+    will-change: transform;
+  }
+
+  .compactTreeFit {
+    .orgCard {
+      width: clamp(102px, 12vw, 124px);
+      min-width: 102px;
+      max-width: 124px;
+      padding: 6px 7px;
+      border-radius: var(--ce-radius-5);
+    }
+
+    .cardHeader {
+      margin-bottom: 3px;
+      .nodeTitle {
+        font-size: 0.68rem;
+        line-height: 1.08;
+      }
+    }
+
+    .cardStats {
+      gap: 7px;
+      font-size: 0.62rem;
+    }
+
+    .orgChildrenRow {
+      grid-template-columns: repeat(var(--ce-org-total-columns, 1), minmax(102px, 124px));
+      column-gap: 8px;
+      row-gap: 6px;
+    }
+
+    .suggestBtn,
+    .collapseBtn {
+      width: 18px;
+      height: 18px;
+      bottom: -9px;
+      font-size: 0.62rem;
+    }
   }
 
   .emptyState {
@@ -850,16 +898,19 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
     flex-direction: column;
     align-items: center;
     position: relative;
-    padding: 0 6px;
+    padding: 0 4px;
+    padding-top: var(--ce-tree-node-stagger, 0);
+    min-width: 0;
   }
 
   /* The Card itself */
   .orgCard {
     @include glass-panel;
-    padding: 8px 10px;
+    padding: 8px 9px;
     border-radius: var(--ce-radius-6);
-    min-width: 120px;
-    max-width: 180px;
+    width: clamp(132px, 14vw, 164px);
+    min-width: 132px;
+    max-width: 164px;
     text-align: center;
     position: relative;
     z-index: 5;
@@ -889,9 +940,12 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
       margin-bottom: 4px;
       .nodeTitle {
         font-weight: 600;
-        font-size: 0.85rem;
-        line-height: 1.2;
+        font-size: 0.8rem;
+        line-height: 1.15;
         color: var(--ce-color-white);
+        display: block;
+        overflow-wrap: anywhere;
+        text-wrap: balance;
       }
     }
 
@@ -993,7 +1047,7 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
     display: flex;
     justify-content: center;
     position: relative;
-    padding-top: 15px;
+    padding-top: 18px;
     width: 100%;
     &::before {
       content: '';
@@ -1001,49 +1055,54 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
       top: 0;
       left: 50%;
       width: 1px;
-      height: 15px;
+      height: 18px;
       background: rgba(255, 255, 255, 0.2);
     }
   }
 
   .orgChildrenRow {
-    display: flex;
+    display: inline-grid;
     position: relative;
     justify-content: center;
+    grid-template-columns: repeat(var(--ce-org-total-columns, 1), minmax(132px, 164px));
+    align-items: start;
+    column-gap: 10px;
+    row-gap: 8px;
+    padding-top: 14px;
+
+    &::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 12px;
+      right: 12px;
+      height: 1px;
+      background: linear-gradient(
+        90deg,
+        rgba(255, 255, 255, 0.08) 0%,
+        rgba(255, 255, 255, 0.24) 14%,
+        rgba(255, 255, 255, 0.24) 86%,
+        rgba(255, 255, 255, 0.08) 100%
+      );
+    }
+
     > .orgNodeWrapper {
       position: relative;
-      padding-top: 15px;
+      grid-column: span var(--ce-tree-branch-span, 1);
+      padding-top: calc(16px + var(--ce-tree-node-stagger, 0px));
       &::before {
         content: '';
         position: absolute;
         top: 0;
         left: 50%;
         width: 1px;
-        height: 15px;
+        height: calc(16px + var(--ce-tree-node-stagger, 0px));
         background: rgba(255, 255, 255, 0.2);
       }
+    }
 
-      &::after {
-        content: '';
-        position: absolute;
-        top: 0;
-        height: 1px;
-        width: 100%;
-        left: 0;
-        background: rgba(255, 255, 255, 0.2);
-      }
-
-      &:first-child::after {
-        left: 50%;
-        width: 50%;
-      }
-      &:last-child::after {
-        width: 50%;
-        left: 0;
-      }
-      &:only-child::after {
-        display: none;
-      }
+    @media (max-width: 900px) {
+      column-gap: 8px;
     }
   }
 
