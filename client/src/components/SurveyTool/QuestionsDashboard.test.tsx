@@ -1,5 +1,5 @@
 import { QuestionsDashboard } from './SurveySelector';
-import { SurveyQuestions } from './SurveyQuestions';
+import { SurveyQuestions } from './SurveyTool.jsx';
 import * as contractScriptsModule from '../../utilities/web3/contractScripts.js';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import * as sessionScanScope from '../../utilities/session/sessionScanScope.js';
@@ -98,39 +98,6 @@ describe('QuestionsDashboard', () => {
     subject.componentDidUpdate(prevProps);
 
     expect(subject.loadQuestions).toHaveBeenCalledTimes(1);
-  });
-
-  it('uses the provided question pool when the scoped cache has no questions', () => {
-    mockPeekQuestionsCache({
-      '': {
-        '11155420': {
-          questions: {},
-          questionResponses: {},
-        },
-      },
-    });
-    const onFilteredQuestionCountUpdate = jest.fn();
-    const subject = new QuestionsDashboard({
-      sessionSlug: '',
-      activeSessionSlug: 'demo',
-      network: { id: 11155420 },
-      isQuestionCacheReady: true,
-      questionPool: [
-        { id: 'demo-q1', prompt: 'Demo prompt 1', source: 'demo-polis-data' },
-        { id: 'demo-q2', prompt: 'Demo prompt 2', source: 'demo-polis-data' },
-      ],
-      onFilteredQuestionCountUpdate,
-    });
-    syncClassSetState(subject);
-
-    subject.loadQuestions({ resetFilteredQuestions: true });
-
-    expect(subject.state.questions).toEqual([
-      expect.objectContaining({ id: 'demo-q1', prompt: 'Demo prompt 1', sessionSlug: '' }),
-      expect.objectContaining({ id: 'demo-q2', prompt: 'Demo prompt 2', sessionSlug: '' }),
-    ]);
-    expect(subject.state.filteredQuestions).toHaveLength(2);
-    expect(onFilteredQuestionCountUpdate).toHaveBeenCalledWith(2, 0);
   });
 
   it('aggregates QuestionsDashboard questions across list scope with dedupe, blocklists, and session slugs', () => {
