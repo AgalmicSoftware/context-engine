@@ -2982,6 +2982,7 @@ describe('SurveyResults export/view controls', () => {
 describe('SurveyResults modal and polling behavior', () => {
   afterEach(() => {
     jest.restoreAllMocks();
+    jest.useRealTimers();
   });
 
   it('clears response parse memo when the modal closes', () => {
@@ -3107,5 +3108,127 @@ describe('SurveyResults modal and polling behavior', () => {
     expect(subject.state.cachedQuestionsCount).toBe(2);
     expect(subject.queueResultsRefresh).toHaveBeenCalledWith('poll-local-storage-change');
     peekSpy.mockRestore();
+  });
+
+  it('resolves locked-response gate labels against each question session in aggregated results', () => {
+    const gateSbt = '0x9999999999999999999999999999999999999999';
+    const displaySpy = jest.spyOn(sbtDisplayNameUtils, 'resolveSbtDisplayLabel')
+      .mockImplementation(({ preferredSlug, address }: any) => `${preferredSlug}:${address}`);
+
+    const subject = createSubject({
+      activeSessionSlug: 'edge',
+      network: { id: 84532 },
+      networkChainId: 84532,
+    });
+    subject.state = {
+      ...subject.state,
+      viewMode: 'questions',
+    };
+
+    const details = subject.buildLockedGateDetails(
+      [{ questionId: 'q2' }],
+      {
+        q2: {
+          id: 'q2',
+          sessionSlug: 'alpha',
+          encryption: {
+            enabled: true,
+            gates: [{ label: 'Alpha Gate', sbtAddress: gateSbt }],
+          },
+        },
+      }
+    );
+
+    expect(details).toEqual({
+      gateDetails: [
+        {
+          address: gateSbt,
+          label: `alpha:${gateSbt}`,
+          href: buildSbtDetailPath(gateSbt, 'alpha'),
+        },
+      ],
+      hasGenericGateMessage: false,
+    });
+    expect(displaySpy).toHaveBeenCalledWith(expect.objectContaining({
+      address: gateSbt,
+      preferredSlug: 'alpha',
+      chainId: 84532,
+      fallback: 'short',
+    }));
+  });
+
+  it('coalesces queued results refreshes into one fetch request per tick', async () => {
+    const subject = createSubject({
+      isOpen: true,
+      network: { id: 84532 },
+    });
+    subject._isMounted = true;
+    subject.requestFetchResponses = jest.fn();
+    subject.isDocumentHidden = jest.fn(() => true);
+
+    subject.queueResultsRefresh('a');
+    subject.queueResultsRefresh('b');
+    subject.queueResultsRefresh('c');
+    await Promise.resolve();
+
+    expect(subject.requestFetchResponses).toHaveBeenCalledTimes(1);
+  });
+
+  it('drops queued RAF refresh when the results modal closes before frame flush', async () => {
+    const subject = createSubject({
+      isOpen: true,
+      network: { id: 84532 },
+    });
+    const rafCallbacks: Array<(timestamp: number) => void> = [];
+    const rafSpy = jest
+      .spyOn(window, 'requestAnimationFrame')
+      .mockImplementation((cb: any) => {
+        rafCallbacks.push(cb);
+        return rafCallbacks.length;
+      });
+
+    subject._isMounted = true;
+    subject.requestFetchResponses = jest.fn();
+    subject.shouldUseAnimationFrameForRefreshCoalescing = jest.fn(() => true);
+
+    subject.queueResultsRefresh('queued-while-open');
+    await Promise.resolve();
+
+    expect(rafSpy).toHaveBeenCalledTimes(1);
+    expect(rafCallbacks).toHaveLength(1);
+
+    subject.props = { ...subject.props, isOpen: false };
+    rafCallbacks[0](0);
+
+    expect(subject.requestFetchResponses).not.toHaveBeenCalled();
+    expect(subject._queuedResultsRefreshReasons.size).toBe(0);
+  });
+
+  it('backs off polling from 2s to 4s to 12s and resets after a detected change', () => {
+    const subject = createSubject({
+      isOpen: true,
+      network: { id: 84532 },
+    });
+
+    jest.useFakeTimers();
+    const setTimeoutSpy = jest.spyOn(global, 'setTimeout');
+    let pollCount = 0;
+    subject._isMounted = true;
+    subject.isDocumentHidden = jest.fn(() => false);
+    subject.pollLocalStorageForUpdates = jest.fn(() => {
+      pollCount += 1;
+      return pollCount === 3;
+    });
+
+    subject.startLocalStoragePolling();
+    jest.advanceTimersByTime(2000);
+    jest.advanceTimersByTime(4000);
+    jest.advanceTimersByTime(12000);
+
+    const delays = setTimeoutSpy.mock.calls.map((args) => Number(args[1]));
+    expect(delays).toContain(2000);
+    expect(delays).toContain(4000);
+    expect(delays).toContain(12000);
+    expect(delays[delays.length - 1]).toBe(2000);
   });
 });
