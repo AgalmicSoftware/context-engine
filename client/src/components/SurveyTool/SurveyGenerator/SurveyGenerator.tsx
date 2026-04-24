@@ -14,7 +14,6 @@ import {
   faPlus,
   faSquare,
   faCheckSquare,
-  faUpload,
   faImage
 } from '@fortawesome/free-solid-svg-icons';
 import {
@@ -110,8 +109,11 @@ const DEFAULT_QUESTION_COUNT = 10;
 const QUESTION_COUNT_STEP = 5;
 const MIN_QUESTION_COUNT = 5;
 const MAX_QUESTION_COUNT = 50;
+const SUPPORTED_SOURCE_FILE_EXTENSIONS = /\.(pdf|md|txt|csv|ppt|pptx|json)$/i;
+const SUPPORTED_SOURCE_FILE_ACCEPT = '.pdf,.md,.txt,.csv,.ppt,.pptx,.json';
 const SUPPORTED_PHOTO_EXTENSIONS = /\.(png|jpe?g|webp|gif)$/i;
-const SUPPORTED_PHOTO_ACCEPT = 'image/png,image/jpeg,image/webp,image/gif';
+const SUPPORTED_PHOTO_ACCEPT = '.png,.jpg,.jpeg,.webp,.gif,image/png,image/jpeg,image/webp,image/gif';
+const SUPPORTED_SOURCE_UPLOAD_ACCEPT = `${SUPPORTED_SOURCE_FILE_ACCEPT},${SUPPORTED_PHOTO_ACCEPT}`;
 const PHOTO_ANALYSIS_STATUS_LABELS: Record<string, string> = Object.freeze({
   queued: 'Queued for analysis',
   loading: 'Analyzing photo...',
@@ -137,6 +139,34 @@ const isSupportedPhotoFile = (file: any) => (
   )
 );
 
+const isSupportedAdditionalFile = (file: any) => (
+  Boolean(file) &&
+  (
+    /^(application\/pdf|text\/markdown|text\/plain|text\/csv|application\/json|application\/vnd\.ms-powerpoint|application\/vnd\.openxmlformats-officedocument\.presentationml\.presentation)$/i
+      .test(String(file?.type || '').trim()) ||
+    SUPPORTED_SOURCE_FILE_EXTENSIONS.test(String(file?.name || '').trim())
+  )
+);
+
+const buildQueuedFileSource = (file: any, ref: any) => ({
+  id: buildAdditionalSourceId(ref),
+  type: 'file',
+  value: file,
+  name: file.name,
+});
+
+const isLikelyImageUrl = (value: any = '') => {
+  const raw = toStr(value).trim();
+  if (!raw) return false;
+  try {
+    const parsed = new URL(raw);
+    const pathname = toStr(parsed.pathname).trim();
+    return SUPPORTED_PHOTO_EXTENSIONS.test(pathname);
+  } catch (_) {
+    return false;
+  }
+};
+
 const buildQueuedPhotoSource = (file: any, ref: any) => ({
   id: buildAdditionalSourceId(ref),
   type: 'photo',
@@ -150,6 +180,10 @@ const buildQueuedPhotoSource = (file: any, ref: any) => ({
 
 const buildUnsupportedPhotoMessage = (count: any = 0) => (
   `Skipped ${count} unsupported photo${count === 1 ? '' : 's'}. Use png, jpg, jpeg, webp, or gif.`
+);
+
+const buildUnsupportedSourceMessage = (count: any = 0) => (
+  `Skipped ${count} unsupported file${count === 1 ? '' : 's'}. Use pdf, md, txt, csv, ppt, pptx, json, png, jpg, jpeg, webp, or gif.`
 );
 
 const getPhotoStatusLabel = (source: any = {}) => {
@@ -417,7 +451,6 @@ export default function AudioSurveyGenerator(rawProps: any = {}) {
   // Multi-source State
   const [additionalSources, setAdditionalSources] = useState<any>([]);
   const [additionalUrlInput, setAdditionalUrlInput] = useState<any>('');
-  const additionalFileInputRef = useRef<any>(null);
   const imagePickerInputRef = useRef<any>(null);
   const uploadAudioInputRef = useRef<any>(null);
   const additionalSourceIdRef = useRef<any>(0);
@@ -425,8 +458,6 @@ export default function AudioSurveyGenerator(rawProps: any = {}) {
   const [saveDocAudience, setSaveDocAudience] = useState<any>('self');
   const [showSaveDocAudienceMenu, setShowSaveDocAudienceMenu] = useState<any>(false);
   const [analyzeBeforeLibraryUpload, setAnalyzeBeforeLibraryUpload] = useState<any>(true);
-  const [imagePickerUrl, setImagePickerUrl] = useState<any>('');
-  const [imagePickerUrlMode, setImagePickerUrlMode] = useState<any>(false);
   const [imagePickerStatusText, setImagePickerStatusText] = useState<any>('');
   const [imagePickerStatusTone, setImagePickerStatusTone] = useState<any>('default');
 
@@ -828,7 +859,7 @@ export default function AudioSurveyGenerator(rawProps: any = {}) {
     }
   }
 
-  function processAndSetQuestions(aiData: any, docs: any, fallbackTitle: any = surveyTitle) {
+  function processAndSetQuestions(aiData: any, docs: any, fallbackTitle: any = effectiveSurveyTitle) {
     const wantedTypes = Object.keys(questionTypes).filter((t: any) => questionTypes[t]);
     const qs = aiData.questions
       .filter((q: any) => wantedTypes.includes(q.questionType))
@@ -854,18 +885,37 @@ export default function AudioSurveyGenerator(rawProps: any = {}) {
     }
   }
 
-  const addAdditionalUrl = () => {
-    if (!additionalUrlInput.trim()) return;
+  const addAdditionalUrl = async () => {
+    const rawUrl = toStr(additionalUrlInput).trim();
+    if (!rawUrl) return;
+
+    if (isLikelyImageUrl(rawUrl)) {
+      try {
+        const file = await fetchImageFromURL(rawUrl);
+        if (abortedRef.current) return;
+        queueAdditionalPhotoFiles([file]);
+        setAdditionalUrlInput('');
+        setImagePickerStatusText('');
+        setImagePickerStatusTone('default');
+        return;
+      } catch (err: any) {
+        setError(getErrorMessage(err, 'Image URL could not be loaded.'));
+        return;
+      }
+    }
+
     setAdditionalSources((prev: any) => [
       ...prev,
       {
         id: buildAdditionalSourceId(additionalSourceIdRef),
         type: 'url',
-        value: additionalUrlInput.trim(),
-        name: additionalUrlInput.trim(),
+        value: rawUrl,
+        name: rawUrl,
       }
     ]);
     setAdditionalUrlInput('');
+    setImagePickerStatusText('');
+    setImagePickerStatusTone('default');
   };
 
   const handleUrlKeyDown = (e: any) => {
@@ -877,22 +927,6 @@ export default function AudioSurveyGenerator(rawProps: any = {}) {
 
   const adjustQuestionCount = (delta: any) => {
     setCount((previousCount: any) => clampQuestionCount(previousCount + delta));
-  };
-
-  const handleAdditionalFileUpload = (e: any) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-    const file = files[0];
-    setAdditionalSources((prev: any) => [
-      ...prev,
-      {
-        id: buildAdditionalSourceId(additionalSourceIdRef),
-        type: 'file',
-        value: file,
-        name: file.name,
-      }
-    ]);
-    e.target.value = '';
   };
 
   const queueAdditionalPhotoFiles = (files: any = []) => {
@@ -915,30 +949,47 @@ export default function AudioSurveyGenerator(rawProps: any = {}) {
     return { validFiles, invalidCount };
   };
 
-  const handleAdditionalPhotoUpload = (e: any) => {
+  const queueAdditionalUploadedFiles = (files: any = []) => {
+    const selectedFiles = Array.isArray(files) ? files : [files];
+    const nextSources: any[] = [];
+    let invalidCount = 0;
+
+    selectedFiles.forEach((file: any) => {
+      if (isSupportedPhotoFile(file)) {
+        nextSources.push(buildQueuedPhotoSource(file, additionalSourceIdRef));
+        return;
+      }
+      if (isSupportedAdditionalFile(file)) {
+        nextSources.push(buildQueuedFileSource(file, additionalSourceIdRef));
+        return;
+      }
+      invalidCount += 1;
+    });
+
+    if (nextSources.length > 0) {
+      setAdditionalSources((prev: any) => [...prev, ...nextSources]);
+    }
+
+    if (invalidCount > 0) {
+      setError(buildUnsupportedSourceMessage(invalidCount));
+    } else if (nextSources.length > 0) {
+      setError('');
+    }
+
+    return { nextSources, invalidCount };
+  };
+
+  const handleAdditionalSourceUpload = (e: any) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
-    queueAdditionalPhotoFiles(Array.from(files));
+    queueAdditionalUploadedFiles(Array.from(files));
     e.target.value = '';
   };
 
   const handleImagePickerUploadClick = () => {
-    setImagePickerUrlMode(false);
     setImagePickerStatusText('');
     setImagePickerStatusTone('default');
     if (imagePickerInputRef.current) imagePickerInputRef.current.click();
-  };
-
-  const handleImagePickerToggleUrlMode = () => {
-    setImagePickerUrlMode((prev: any) => !prev);
-    setImagePickerStatusText('');
-    setImagePickerStatusTone('default');
-  };
-
-  const handleImagePickerUrlChange = (event: any) => {
-    setImagePickerUrl(event?.target?.value || '');
-    setImagePickerStatusText('');
-    setImagePickerStatusTone('default');
   };
 
   const handleImagePickerPaste = async () => {
@@ -948,43 +999,20 @@ export default function AudioSurveyGenerator(rawProps: any = {}) {
 
     if (clipboardResult?.kind === 'file' && clipboardResult.file) {
       queueAdditionalPhotoFiles([clipboardResult.file]);
-      setImagePickerUrl('');
-      setImagePickerUrlMode(false);
       setImagePickerStatusText('');
       setImagePickerStatusTone('default');
       return;
     }
 
     if (clipboardResult?.kind === 'text') {
-      setImagePickerUrlMode(true);
-      setImagePickerUrl(toStr(clipboardResult.text).trim());
-      setImagePickerStatusText('');
+      setAdditionalUrlInput(toStr(clipboardResult.text).trim());
+      setImagePickerStatusText('Pasted URL into Add URL.');
       setImagePickerStatusTone('default');
       return;
     }
 
     setImagePickerStatusText(clipboardResult?.error || 'Clipboard does not contain a supported image or URL.');
     setImagePickerStatusTone('error');
-  };
-
-  const handleImagePickerUrlAdd = async () => {
-    const rawUrl = toStr(imagePickerUrl).trim();
-    if (!rawUrl) return;
-    setImagePickerStatusText('Loading preview...');
-    setImagePickerStatusTone('loading');
-    try {
-      const file = await fetchImageFromURL(rawUrl);
-      if (abortedRef.current) return;
-      queueAdditionalPhotoFiles([file]);
-      setImagePickerUrl('');
-      setImagePickerUrlMode(true);
-      setImagePickerStatusText('');
-      setImagePickerStatusTone('default');
-    } catch (err: any) {
-      if (abortedRef.current) return;
-      setImagePickerStatusText(getErrorMessage(err, 'Image preview unavailable.'));
-      setImagePickerStatusTone('error');
-    }
   };
 
   const removeAdditionalSource = (sourceId: any) => {
@@ -1231,7 +1259,7 @@ export default function AudioSurveyGenerator(rawProps: any = {}) {
       sources: queuedSources,
       photoAnalysisBySourceId,
       includePhotoAnalysis: true,
-      titleOverride: surveyTitle,
+      titleOverride: effectiveSurveyTitle,
     });
   };
 
@@ -1279,7 +1307,7 @@ export default function AudioSurveyGenerator(rawProps: any = {}) {
         sources: effectiveSources,
         photoAnalysisBySourceId,
         includePhotoAnalysis: analyzeBeforeLibraryUpload,
-        titleOverride: surveyTitle,
+        titleOverride: effectiveSurveyTitle,
       });
 
       const uploadedViewerUrls = savedSourceDocs.flatMap((entry: any) => (
@@ -1288,7 +1316,7 @@ export default function AudioSurveyGenerator(rawProps: any = {}) {
 
       if (trimmedText) {
         const textFile = buildManualLibraryTextFile({
-          title: surveyTitle,
+          title: effectiveSurveyTitle,
           text: trimmedText,
         });
         const result = await uploadDocLibraryFileUntyped({
@@ -1516,7 +1544,7 @@ export default function AudioSurveyGenerator(rawProps: any = {}) {
 
   function renderCreateSurveyComponent() {
     if (!showCreateSurvey || statementsToUpload.length === 0) return null;
-    const preformedSurvey = surveyTitle ? { title: surveyTitle } : null;
+    const preformedSurvey = effectiveSurveyTitle ? { title: effectiveSurveyTitle } : null;
 
     return (
       <div className={styles.createSurveyContainer}>
@@ -1653,6 +1681,11 @@ export default function AudioSurveyGenerator(rawProps: any = {}) {
     () => additionalSources.filter((source: any) => source?.type !== 'photo'),
     [additionalSources],
   );
+  const hasUploadedFileSources = useMemo(
+    () => Boolean(audioFile) || additionalSources.some((source: any) => source?.type === 'file' || source?.type === 'photo'),
+    [additionalSources, audioFile],
+  );
+  const effectiveSurveyTitle = hasUploadedFileSources ? toStr(surveyTitle).trim() : '';
   const shouldShowSaveExtraSourcesControl = additionalSources.length > 0;
   const saveDocAudienceLabel = saveDocAudience === 'session' && docSaveSessionAudienceAvailable
     ? docSaveSessionLabel
@@ -1703,6 +1736,7 @@ export default function AudioSurveyGenerator(rawProps: any = {}) {
             sessionIdHex={resolvedSessionIdHex}
             compact={false}
             pageSize={10}
+            showUploadControls={false}
           />
         ) : (
           <div className={styles.viewModeEmptyState}>
@@ -1760,16 +1794,18 @@ export default function AudioSurveyGenerator(rawProps: any = {}) {
         <>
       <form onSubmit={handleSubmit}>
         <div className={styles.formSection}>
-          <div className={styles.titleInputRow}>
-            <Input
-              type="text"
-              value={surveyTitle}
-              onChange={(event: any) => setSurveyTitle(event.target.value)}
-              placeholder="Title"
-              className={styles.titleInput}
-              data-testid={E2E_TESTIDS.DATABASE_TITLE_INPUT}
-            />
-          </div>
+          {hasUploadedFileSources ? (
+            <div className={styles.titleInputRow}>
+              <Input
+                type="text"
+                value={surveyTitle}
+                onChange={(event: any) => setSurveyTitle(event.target.value)}
+                placeholder="Title"
+                className={styles.titleInput}
+                data-testid={E2E_TESTIDS.DATABASE_TITLE_INPUT}
+              />
+            </div>
+          ) : null}
 
           <div className={styles.textInputGroup}>
             <AudioInputUntyped
@@ -1798,7 +1834,11 @@ export default function AudioSurveyGenerator(rawProps: any = {}) {
                 type="url"
                 placeholder="Add URL"
                 value={additionalUrlInput}
-                onChange={(e: any) => setAdditionalUrlInput(e.target.value)}
+                onChange={(e: any) => {
+                  setAdditionalUrlInput(e.target.value);
+                  setImagePickerStatusText('');
+                  setImagePickerStatusTone('default');
+                }}
                 onKeyDown={handleUrlKeyDown}
                 className={styles.urlInputField}
               />
@@ -1811,26 +1851,6 @@ export default function AudioSurveyGenerator(rawProps: any = {}) {
               >
                 <FontAwesomeIcon icon={faPlus} />
               </button>
-            </div>
-
-            <div className={styles.fileUploadWrapper}>
-              <input
-                type="file"
-                ref={additionalFileInputRef}
-                style={{ display: 'none' }}
-                accept=".pdf, .md, .txt, .csv, .ppt, .pptx, .json"
-                onChange={handleAdditionalFileUpload}
-              />
-              <Button
-                type="button"
-                color="secondary"
-                outline
-                className={styles.compactBtn}
-                onClick={() => additionalFileInputRef.current && additionalFileInputRef.current.click()}
-                title="Allowed: .pdf, .md, .txt, .csv, .ppt"
-              >
-                <FontAwesomeIcon icon={faUpload} style={{ opacity: '0.5' }} />
-              </Button>
             </div>
 
             <div
@@ -1879,42 +1899,23 @@ export default function AudioSurveyGenerator(rawProps: any = {}) {
             <CompactImageChooser
               className={styles.imageChooser}
               rootTestId={E2E_TESTIDS.DATABASE_IMAGE_CHOOSER}
-              urlButtonTestId={E2E_TESTIDS.DATABASE_IMAGE_URL_TOGGLE}
               pasteButtonTestId={E2E_TESTIDS.DATABASE_IMAGE_PASTE}
               uploadButtonTestId={E2E_TESTIDS.DATABASE_IMAGE_UPLOAD}
               fileInputTestId={E2E_TESTIDS.DATABASE_IMAGE_FILE_INPUT}
-              urlInputTestId={E2E_TESTIDS.DATABASE_IMAGE_URL_INPUT}
-              isUrlMode={imagePickerUrlMode}
-              isUploadMode={!imagePickerUrlMode}
-              showUrlInput={imagePickerUrlMode}
-              urlValue={imagePickerUrl}
-              onUrlChange={handleImagePickerUrlChange}
-              onToggleUrlMode={handleImagePickerToggleUrlMode}
+              showUrlModeButton={false}
+              isUrlMode={false}
+              isUploadMode
+              showUrlInput={false}
               onPaste={handleImagePickerPaste}
               onUploadClick={handleImagePickerUploadClick}
-              onFileChange={handleAdditionalPhotoUpload}
+              onFileChange={handleAdditionalSourceUpload}
               fileInputRef={imagePickerInputRef}
-              accept={SUPPORTED_PHOTO_ACCEPT}
+              accept={SUPPORTED_SOURCE_UPLOAD_ACCEPT}
               multiple
-              urlPlaceholder="Paste image URL"
-              urlInputAriaLabel="Context image URL"
               statusText={imagePickerStatusText}
               statusTone={imagePickerStatusTone}
-              helpText="Add context images via upload, paste, or URL."
+              uploadAriaLabel="Upload file or image"
             />
-            {imagePickerUrlMode ? (
-              <Button
-                type="button"
-                color="secondary"
-                outline
-                className={styles.imageUrlAddButton}
-                onClick={handleImagePickerUrlAdd}
-                disabled={!toStr(imagePickerUrl).trim() || loading}
-                data-testid={E2E_TESTIDS.DATABASE_IMAGE_URL_ADD}
-              >
-                Add Image
-              </Button>
-            ) : null}
           </div>
 
           {(additionalSources.length > 0 || shouldShowAddToLibraryButton || (transcriptMode && uploadSummaryToArweave && encryptSummary)) && (
