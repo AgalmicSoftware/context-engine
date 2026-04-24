@@ -6,13 +6,6 @@ import {
 } from '../../utilities/web3/contractScripts.js';
 import { createLogger } from 'utilities/logging.js';
 import {
-  parseQuestionSessionIdFromSearch,
-  parseQuestionSessionSlugFromSearch,
-} from '../../utilities/survey/questionRouting.js';
-import {
-  normalizeSessionSlug,
-} from '../../utilities/session/sessionNaming.js';
-import {
   peekCacheSync,
   readCache,
   writeCacheOptimistic,
@@ -30,6 +23,12 @@ import {
   resolveEffectiveSlug,
   resolveIdLookupContext,
 } from './surveyToolScope.js';
+export {
+  appendExplicitSessionHintToPath,
+  applyExistingGroupPrefix,
+  hasExplicitSessionQueryPinInPath,
+  readPathSearch,
+} from './surveyToolNavigation.js';
 export {
   buildSurveyDraftSemanticSignature,
   computeSubmitLabel,
@@ -140,51 +139,6 @@ const scheduleMicrotask = (cb) => {
   Promise.resolve().then(cb);
 };
 
-const readPathSearch = (path = '') => {
-  const value = String(path || '');
-  const queryIndex = value.indexOf('?');
-  return queryIndex >= 0 ? value.slice(queryIndex) : '';
-};
-
-const hasExplicitSessionQueryPinInPath = (path = '') => {
-  const search = readPathSearch(path);
-  return (
-    parseQuestionSessionSlugFromSearch(search) !== null ||
-    parseQuestionSessionIdFromSearch(search) !== null
-  );
-};
-
-const appendExplicitSessionHintToPath = (pathIn = '', sessionSlugIn = '') => {
-  const path = String(pathIn || '');
-  const sessionSlug = normalizeSessionSlug(sessionSlugIn);
-  if (!path || !sessionSlug || hasExplicitSessionQueryPinInPath(path)) return path;
-  const sep = path.includes('?') ? '&' : '?';
-  return `${path}${sep}session=${encodeURIComponent(sessionSlug)}`;
-};
-
-
-
-
-
-// Preserve an existing group prefix like "/<prefix>/<slug>" (e.g., "/session/edge")
-// for any new app-relative path we want to push/replace into history.
-function applyExistingGroupPrefix(newPath) {
-  try {
-    if (hasExplicitSessionQueryPinInPath(newPath)) return newPath;
-    const p = (typeof window !== 'undefined' && window.location && window.location.pathname) || '';
-    const pathOnly = p.split('?')[0].split('#')[0];
-    const segs = pathOnly.split('/').filter(Boolean);
-    // Do not treat base app routes as group prefixes.
-    const RESERVED = new Set(['questions','question','survey','surveys']);
-    if (segs.length >= 2 && !RESERVED.has(segs[0])) {
-      const base = `/${segs[0]}/${segs[1]}`;
-      if (!newPath.startsWith(base)) {
-        return `${base}${newPath.startsWith('/') ? '' : '/'}${newPath}`;
-      }
-    }
-  } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
-  return newPath;
-}
 
 export const areEnvelopesEquivalent = (envA, envB, isEncryptedA = false, isEncryptedB = false) => {
   const a = typeof envA === 'string' ? envA : '';
@@ -836,10 +790,6 @@ export {
   isSurveyPerfCountersEnabled,
   bumpSurveyPerfCounter,
   scheduleMicrotask,
-  readPathSearch,
-  hasExplicitSessionQueryPinInPath,
-  appendExplicitSessionHintToPath,
-  applyExistingGroupPrefix,
   mergeDecryptedViewedResponse,
   toNumberOrNull,
   getNormalizedUiRatingValue,
