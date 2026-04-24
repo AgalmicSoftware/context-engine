@@ -37,7 +37,7 @@ const SurveyTool = React.lazy(() => import("../SurveyTool/SurveyTool.jsx"));
 const AudioInput = React.lazy(() => import("../Shared/AudioInput/AudioInput"));
 const SBTsPage = React.lazy(() => import("../SBTs/SBTsPage"));
 const DebateMap = React.lazy(() => import("../DebateMap/DebateMap"));
-const AudioSurveyGenerator = React.lazy(() => import("../SurveyTool/SurveyGenerator/SurveyGenerator.jsx"));
+const AudioSurveyGenerator = React.lazy(() => import("../SurveyTool/SurveyGenerator/SurveyGenerator"));
 
 const log = createLogger('ui');
 

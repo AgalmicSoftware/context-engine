@@ -1,4 +1,4 @@
-import { isSingleHttpUrlInput } from './SurveyGenerator.jsx';
+import { isSingleHttpUrlInput } from './SurveyGenerator';
 
 describe('AudioSurveyGenerator URL detection', () => {
   it('detects a single URL string', () => {
