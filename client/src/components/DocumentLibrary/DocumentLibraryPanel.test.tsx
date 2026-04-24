@@ -8,6 +8,7 @@ const mockGetGlobalLitHooks = jest.fn();
 const mockListArweaveTransactionsByTags = jest.fn();
 const mockResolveDocLibraryProvider = jest.fn();
 const mockResolveArweaveGraphqlUrl = jest.fn();
+const mockResolveArweaveGraphqlUrls = jest.fn();
 const mockResolveDocUploadsGate = jest.fn();
 const mockUploadDocLibraryFile = jest.fn();
 const mockUploadDocLibraryUrlRecord = jest.fn();
@@ -28,10 +29,12 @@ jest.mock('../../utilities/docLibrary/arweaveGraphql.js', () => ({
 jest.mock('../../utilities/docLibrary/config.js', () => ({
   resolveDocLibraryProvider: (...args: any[]) => mockResolveDocLibraryProvider(...args),
   resolveArweaveGraphqlUrl: (...args: any[]) => mockResolveArweaveGraphqlUrl(...args),
+  resolveArweaveGraphqlUrls: (...args: any[]) => mockResolveArweaveGraphqlUrls(...args),
 }));
 
 jest.mock('../../utilities/crypto/litProtocol.js', () => ({
   buildSbtAccessControlConditions: (...args: any[]) => mockBuildSbtAccessControlConditions(...args),
+  getUnsupportedLitContractAccessControlError: jest.fn(() => ''),
   getGlobalLitHooks: (...args: any[]) => mockGetGlobalLitHooks(...args),
   litStorage: {
     buildLitArweaveUrl: (txId: string) => `https://lit.example.test/${txId}`,
@@ -103,6 +106,7 @@ describe('DocumentLibraryPanel photo docs', () => {
     jest.clearAllMocks();
     mockResolveDocLibraryProvider.mockReturnValue('arweave');
     mockResolveArweaveGraphqlUrl.mockReturnValue('https://arweave.example.test/graphql');
+    mockResolveArweaveGraphqlUrls.mockReturnValue(['https://arweave.example.test/graphql']);
     mockResolveDocUploadsGate.mockReturnValue({
       gate: null,
       lookupStatus: '',
@@ -328,5 +332,66 @@ describe('DocumentLibraryPanel photo docs', () => {
     });
     expect(await screen.findByTestId(E2E_TESTIDS.DOC_VIEWER_IMAGE)).toBeInTheDocument();
     expect(screen.getByTestId(E2E_TESTIDS.DOC_VIEWER_DOWNLOAD)).toBeInTheDocument();
+  });
+
+  it('renders image thumbnails directly in the document list', async () => {
+    mockListArweaveTransactionsByTags.mockResolvedValueOnce([
+      {
+        cursor: 'cursor-d',
+        txId: 'D'.repeat(43),
+        owner: 'owner',
+        tags: [],
+        tagMap: {
+          'CE-DocStorage': 'arweave',
+          'CE-DocKind': 'file',
+          'CE-DocName': 'briefing-board.png',
+          'CE-DocMime': 'image/png',
+        },
+        data: { size: 4, type: 'image/png' },
+        block: { height: 1, timestamp: 1710000003 },
+      },
+    ]);
+
+    render(
+      <DocumentLibraryPanel
+        provider={{}}
+        network={{ id: 84532 }}
+        account="0x123"
+        loginComplete
+        toggleLoginModal={jest.fn()}
+        sessionSlug="edge"
+        sessionConfig={TEST_SESSION_CONFIG}
+        mode="session"
+        sessionIdHex={`0x${'4'.repeat(32)}`}
+      />
+    );
+
+    const preview = await screen.findByTestId(E2E_TESTIDS.DOC_ROW_IMAGE_PREVIEW);
+    const image = preview.querySelector('img');
+    expect(image).toBeTruthy();
+    expect(image?.getAttribute('src')).toBe(`https://arweave.example.test/${'D'.repeat(43)}`);
+  });
+
+  it('can render the browse list without upload controls', async () => {
+    render(
+      <DocumentLibraryPanel
+        provider={{}}
+        network={{ id: 84532 }}
+        account="0x123"
+        loginComplete
+        toggleLoginModal={jest.fn()}
+        sessionSlug="edge"
+        sessionConfig={TEST_SESSION_CONFIG}
+        mode="session"
+        sessionIdHex={`0x${'5'.repeat(32)}`}
+        showUploadControls={false}
+      />
+    );
+
+    await waitFor(() => {
+      expect(mockListArweaveTransactionsByTags).toHaveBeenCalled();
+    });
+    expect(screen.queryByTestId(E2E_TESTIDS.DOC_UPLOAD_FILE_INPUT)).not.toBeInTheDocument();
+    expect(screen.queryByTestId(E2E_TESTIDS.DOC_URL_INPUT)).not.toBeInTheDocument();
   });
 });

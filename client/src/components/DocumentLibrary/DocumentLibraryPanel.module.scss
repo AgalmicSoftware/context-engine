@@ -210,7 +210,7 @@
 
 .docRow {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 10px;
   padding: 10px;
@@ -219,8 +219,34 @@
   background: rgba(0, 0, 0, 0.14);
 }
 
+.docSummary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex: 1;
+}
+
+.docPreview {
+  width: 64px;
+  height: 64px;
+  flex-shrink: 0;
+  overflow: hidden;
+  border-radius: var(--ce-radius-10);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.docPreviewImage {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 .docMeta {
   min-width: 0;
+  flex: 1;
 }
 
 .docName {
@@ -228,7 +254,6 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 62vw;
 }
 
 .docSub {

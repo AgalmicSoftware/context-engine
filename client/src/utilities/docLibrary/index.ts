@@ -1,4 +1,4 @@
-/** @file index.js */
+/** @file index.ts */
 
 export * from './config.js';
 export * from './arweaveGraphql.js';
