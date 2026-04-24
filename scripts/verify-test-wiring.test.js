@@ -76,8 +76,6 @@ test('public-release style copies without .git still pass wiring checks', () => 
     );
 
     [
-      'client/src/utilities/web3/contractScripts.surveys-sbt.proxy.test.js',
-      'client/src/utilities/worker/sessionCorsWorker.root-suite.proxy.test.js',
       'test/deployHelperOrigins.test.mjs',
       'scripts/worker-bundle.mjs',
       'scripts/deploy-helper-deploy.mjs',

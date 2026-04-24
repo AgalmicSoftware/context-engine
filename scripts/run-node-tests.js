@@ -39,7 +39,6 @@ function collectNodeTestFiles(rootDir = path.resolve(__dirname, '..')) {
       .filter((relativePath) => ROOT_PRIVATE_STRIPPED_TEST_FILE_RE.test(relativePath)),
   );
   files.push(...readOptionalTestDir(rootDir, 'scripts'));
-  files.push(...readOptionalTestDir(rootDir, path.join('scripts', 'lib', 'e2e')));
 
   return files;
 }

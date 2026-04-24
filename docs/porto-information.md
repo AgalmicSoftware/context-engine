@@ -195,7 +195,7 @@ Common env vars for the new CE E2E runners:
 Porto uses the active group network as its chain source:
 
 - `getGroupNetwork()` resolves the chain from group config.
-- `LoginAndSettingsModal.jsx` calls `setPortoChain()` with that chain.
+- `LoginAndSettingsModal.tsx` calls `setPortoChain()` with that chain.
 - `portoFunctions.ts` creates a viem wallet client using the resolved chain
   and `getPortoRelayUrl()` from `chains.js`.
 

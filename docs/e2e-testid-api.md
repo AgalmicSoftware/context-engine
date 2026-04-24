@@ -32,7 +32,7 @@ Component: `client/src/components/E2E/DevE2eNav.tsx`
 
 ## Page Roots (Route Readiness)
 
-Route branches in `client/src/components/MainSite/MainSite.tsx` wrap their rendered output with a stable page-root TestID. E2E should prefer waiting on these roots instead of `networkidle`.
+Route branches in `client/src/components/MainSite/MainSite.jsx` wrap their rendered output with a stable page-root TestID. E2E should prefer waiting on these roots instead of `networkidle`.
 The `/about` route renders `client/src/components/About/AboutPage.tsx`.
 The `/` home route renders `client/src/components/MainContent/MainAreaTabs.tsx`, which now mounts `ToolExplorer.tsx` as the tool-launcher tab and `OnboardingWalkthrough.tsx` as the welcome tab.
 
@@ -58,7 +58,7 @@ The `/` home route renders `client/src/components/MainContent/MainAreaTabs.tsx`,
 
 ## DebateMap / Atlas
 
-Component: `client/src/components/DebateMap/DebateMap.jsx`
+Component: `client/src/components/DebateMap/DebateMap.tsx`
 
 | `data-testid` | Meaning / When Present | TestID API | Disambiguators |
 | --- | --- | --- | --- |
@@ -92,22 +92,22 @@ The navbar-mounted account/login/settings surface that owns the shared modal liv
 
 | `data-testid` | Component path(s) | Meaning / When Present | TestID API | Disambiguators |
 | --- | --- | --- | --- | --- |
-| `ce-wizard-mode-normal` | `client/src/components/Sessions/SessionWizard.jsx` | Wizard mode toggle button for Normal mode. | yes |  |
-| `ce-wizard-mode-advanced` | `client/src/components/Sessions/SessionWizard.jsx` | Wizard mode toggle button for Advanced mode. | yes |  |
-| `ce-wizard-metadata-panel-toggle` | `client/src/components/Sessions/SessionWizard.jsx` | Collapsible panel toggle for the advanced-mode "Session Information" section. | yes |  |
-| `ce-wizard-session-header-url-toggle` | `client/src/components/Sessions/SessionWizard.jsx` | Compact Image field `URL` toggle used in Normal mode to reveal the header URL input. | yes |  |
-| `ce-wizard-session-header-paste` | `client/src/components/Sessions/SessionWizard.jsx` | Compact Image field `Paste` button used in Normal mode to pull an image blob or URL from the clipboard. | yes |  |
-| `ce-wizard-worker-mode-toggle` | `client/src/components/Sessions/SessionWizard.jsx` | Wrapper around the default/custom worker mode pills in the worker panel. | yes |  |
-| `ce-wizard-worker-mode-button` | `client/src/components/Sessions/SessionWizard.jsx` | Individual worker mode pill button. | yes | `data-ce-worker-mode` (`default` or `custom`) |
-| `ce-wizard-worker-panel-toggle` | `client/src/components/Sessions/SessionWizard.jsx` | Collapsible panel toggle for "Worker deployment & secrets". | yes |  |
-| `ce-wizard-bundle-mode-upload` | `client/src/components/Sessions/SessionWizard.jsx` | Advanced-mode radio that switches worker deployment to local file upload. | yes |  |
-| `ce-wizard-bundle-mode-url` | `client/src/components/Sessions/SessionWizard.jsx` | Advanced-mode radio that switches worker deployment to remote bundle URL mode. | yes |  |
-| `ce-wizard-bundle-file-input` | `client/src/components/Sessions/SessionWizard.jsx` | Worker bundle file input used in both normal-mode upload and advanced upload-mode deploys. | yes |  |
-| `ce-wizard-add-gate` | `client/src/components/Sessions/SessionWizard.jsx` | Add-encryption-gate button in the Encryption panel (main button and ghost card variant). | yes | `data-ce-gate-add-kind` (`panel` or `ghost`) |
-| `ce-wizard-create-sbt` | `client/src/components/Sessions/SessionWizard.jsx` | Opens the inline CreateSBTGroup modal from `/session/new`. | yes | `data-ce-sbt-target` (`defaultFeaturedSBTs` or gate id) |
-| `ce-wizard-pending-sbt` | `client/src/components/Sessions/SessionWizard.jsx` | Pending SBT draft card shown in the Privacy panel before Publish. | yes | `data-ce-sbt-address` |
-| `ce-wizard-resource-card` | `client/src/components/Sessions/SessionWizard.jsx` | Resource-gate card container used for per-resource lock selection. | yes | `data-ce-resource-key` (for example `ai`, `docUploads`) |
-| `ce-wizard-sponsored-status` | `client/src/components/Sessions/SessionWizard.jsx` | Sponsored-bundle status note shown while `/new?sponsored=...#k=...` loads, applies, or fails. | yes |  |
+| `ce-wizard-mode-normal` | `client/src/components/Sessions/SessionWizard.tsx` | Wizard mode toggle button for Normal mode. | yes |  |
+| `ce-wizard-mode-advanced` | `client/src/components/Sessions/SessionWizard.tsx` | Wizard mode toggle button for Advanced mode. | yes |  |
+| `ce-wizard-metadata-panel-toggle` | `client/src/components/Sessions/SessionWizard.tsx` | Collapsible panel toggle for the advanced-mode "Session Information" section. | yes |  |
+| `ce-wizard-session-header-url-toggle` | `client/src/components/Sessions/SessionWizard.tsx` | Compact Image field `URL` toggle used in Normal mode to reveal the header URL input. | yes |  |
+| `ce-wizard-session-header-paste` | `client/src/components/Sessions/SessionWizard.tsx` | Compact Image field `Paste` button used in Normal mode to pull an image blob or URL from the clipboard. | yes |  |
+| `ce-wizard-worker-mode-toggle` | `client/src/components/Sessions/SessionWizard.tsx` | Wrapper around the default/custom worker mode pills in the worker panel. | yes |  |
+| `ce-wizard-worker-mode-button` | `client/src/components/Sessions/SessionWizard.tsx` | Individual worker mode pill button. | yes | `data-ce-worker-mode` (`default` or `custom`) |
+| `ce-wizard-worker-panel-toggle` | `client/src/components/Sessions/SessionWizard.tsx` | Collapsible panel toggle for "Worker deployment & secrets". | yes |  |
+| `ce-wizard-bundle-mode-upload` | `client/src/components/Sessions/SessionWizard.tsx` | Advanced-mode radio that switches worker deployment to local file upload. | yes |  |
+| `ce-wizard-bundle-mode-url` | `client/src/components/Sessions/SessionWizard.tsx` | Advanced-mode radio that switches worker deployment to remote bundle URL mode. | yes |  |
+| `ce-wizard-bundle-file-input` | `client/src/components/Sessions/SessionWizard.tsx` | Worker bundle file input used in both normal-mode upload and advanced upload-mode deploys. | yes |  |
+| `ce-wizard-add-gate` | `client/src/components/Sessions/SessionWizard.tsx` | Add-encryption-gate button in the Encryption panel (main button and ghost card variant). | yes | `data-ce-gate-add-kind` (`panel` or `ghost`) |
+| `ce-wizard-create-sbt` | `client/src/components/Sessions/SessionWizard.tsx` | Opens the inline CreateSBTGroup modal from `/session/new`. | yes | `data-ce-sbt-target` (`defaultFeaturedSBTs` or gate id) |
+| `ce-wizard-pending-sbt` | `client/src/components/Sessions/SessionWizard.tsx` | Pending SBT draft card shown in the Privacy panel before Publish. | yes | `data-ce-sbt-address` |
+| `ce-wizard-resource-card` | `client/src/components/Sessions/SessionWizard.tsx` | Resource-gate card container used for per-resource lock selection. | yes | `data-ce-resource-key` (for example `ai`, `docUploads`) |
+| `ce-wizard-sponsored-status` | `client/src/components/Sessions/SessionWizard.tsx` | Sponsored-bundle status note shown while `/new?sponsored=...#k=...` loads, applies, or fails. | yes |  |
 
 ## SponsorPage (`/sponsor`)
 
@@ -155,7 +155,6 @@ The navbar-mounted account/login/settings surface that owns the shared modal liv
 ## Agent Mode (Dev/E2E)
 
 Agent Mode is a dev/e2e-only global interface `window.__ceAgent` (installed from `client/src/components/App.tsx` and implemented in `client/src/utilities/ceAgent.js`).
-Use `window.__ceAgent.describe()` when you want the current supported action/tool contract and canonical doc paths for this surface.
 
 Agent page UI: `client/src/components/Agent/AgentPage.tsx`
 
@@ -175,28 +174,28 @@ Agent page UI: `client/src/components/Agent/AgentPage.tsx`
 | `ce-survey-locked-banner` | `client/src/components/SurveyTool/SurveyTool.jsx` | Locked-questions banner shown when masked gated questions exist in full mode. | yes |  |
 | `ce-survey-locked-banner-caret` | `client/src/components/SurveyTool/SurveyTool.jsx` | Caret toggle at the bottom-right of the locked banner that expands/collapses gate/SBT requirements. | yes |  |
 | `ce-survey-locked-decrypt` | `client/src/components/SurveyTool/SurveyTool.jsx` | Locked-banner decrypt action button (manual gated prompt retry). | yes |  |
-| `ce-survey-answer-input` | `client/src/components/Shared/AudioInput/AudioInput.jsx` (wired from `SurveyTool.jsx`) | Textarea used for a freeform question answer. | yes | `data-ce-question-id` |
+| `ce-survey-answer-input` | `client/src/components/Shared/AudioInput/AudioInput.tsx` (wired from `SurveyTool.jsx`) | Textarea used for a freeform question answer. | yes | `data-ce-question-id` |
 | `ce-survey-submit` | `client/src/components/SurveyTool/SurveyTool.jsx` | Primary submit button (header, footer, or pile view). | yes |  |
 | `ce-survey-create-toggle` | `client/src/components/SurveyTool/SurveyTool.jsx` | Header create icon toggle (open/close CreateQuestionsAndSurveys panel). | yes |  |
 | `ce-survey-create-toggle-pile` | `client/src/components/SurveyTool/SurveyTool.jsx` | Pile view create icon toggle (open/close create interface). | yes |  |
 | `ce-survey-view-all` | `client/src/components/SurveyTool/SurveyTool.jsx` | Pile view "View All Questions" control. | yes |  |
 | `ce-survey-pile-hologram-toggle` | `client/src/components/SurveyTool/SurveyTool.jsx` | Reserved top-right pile-view hologram toggle for the future voice-only avatar mode. The test ID remains stable, but the button is currently hidden in the UI. | yes |  |
-| `ce-survey-pile-hologram-panel` | `client/src/components/SurveyTool/PileHologramAssistant.jsx` | Full-card light-blue hologram face takeover rendered while the pile hologram toggle is active. | yes |  |
+| `ce-survey-pile-hologram-panel` | `client/src/components/SurveyTool/PileHologramAssistant.tsx` | Full-card light-blue hologram face takeover rendered while the pile hologram toggle is active. | yes |  |
 | `ce-survey-additional-toggle` | `client/src/components/SurveyTool/SurveyTool.jsx` | Toggle that opens/closes the "Additional comments" section for a question. | yes | `data-ce-question-id` |
-| `ce-survey-additional-input` | `client/src/components/Shared/AudioInput/AudioInput.jsx` (wired from `SurveyTool.jsx`) | Textarea used for additional comments. | yes | `data-ce-question-id` |
+| `ce-survey-additional-input` | `client/src/components/Shared/AudioInput/AudioInput.tsx` (wired from `SurveyTool.jsx`) | Textarea used for additional comments. | yes | `data-ce-question-id` |
 | `ce-survey-existing-response-notice` | `client/src/components/SurveyTool/SurveyTool.jsx` | Wrapper shown when the connected wallet already has a submitted response (single-question mode or answer view). Contains Start Fresh / Decrypt-Edit / Exit Editing controls. | yes |  |
 | `ce-survey-submitted-indicator` | `client/src/components/SurveyTool/SurveyTool.jsx` | Submitted-state indicator shown after a successful submit (full + pile views) until any new edit is made. | yes |  |
 | `ce-survey-start-fresh` | `client/src/components/SurveyTool/SurveyTool.jsx` | Clears the current draft and lets the user submit a new response even when one already exists. | yes |  |
 | `ce-survey-decrypt-edit-all` | `client/src/components/SurveyTool/SurveyTool.jsx` | Decrypts all encrypted fields in the existing response and enters editing mode (when supported). | yes |  |
 | `ce-survey-exit-editing` | `client/src/components/SurveyTool/SurveyTool.jsx` | Exits editing mode and returns to viewing the existing submitted response. | yes |  |
 | `ce-survey-filter-toggle` | `client/src/components/SurveyTool/SurveyTool.jsx` | Opens/closes the QuestionFilter panel (header + pile action bar). | yes |  |
-| `ce-question-filter-modal` | `client/src/components/SurveyTool/QuestionFilter.jsx` | Root wrapper for the QuestionFilter panel (inline and modal variants). | yes |  |
-| `ce-question-filter-section-ai` | `client/src/components/SurveyTool/QuestionFilter.jsx` | Collapsible section header for AI filter controls. | yes |  |
-| `ce-question-filter-section-sbt` | `client/src/components/SurveyTool/QuestionFilter.jsx` | Collapsible section header for SBT filter controls. | yes |  |
-| `ce-question-filter-ai-query` | `client/src/components/SurveyTool/QuestionFilter.jsx` (via `AudioInput.jsx`) | AI filter query textarea. | yes |  |
-| `ce-question-filter-ai-top-n` | `client/src/components/SurveyTool/QuestionFilter.jsx` | Top-N numeric input for AI question ranking. | yes |  |
-| `ce-question-filter-ai-apply` | `client/src/components/SurveyTool/QuestionFilter.jsx` | Apply button for AI filter ranking. | yes |  |
-| `ce-question-filter-clear-all` | `client/src/components/SurveyTool/QuestionFilter.jsx` | Clears all active question filters. | yes |  |
+| `ce-question-filter-modal` | `client/src/components/SurveyTool/QuestionFilter.tsx` | Root wrapper for the QuestionFilter panel (inline and modal variants). | yes |  |
+| `ce-question-filter-section-ai` | `client/src/components/SurveyTool/QuestionFilter.tsx` | Collapsible section header for AI filter controls. | yes |  |
+| `ce-question-filter-section-sbt` | `client/src/components/SurveyTool/QuestionFilter.tsx` | Collapsible section header for SBT filter controls. | yes |  |
+| `ce-question-filter-ai-query` | `client/src/components/SurveyTool/QuestionFilter.tsx` (via `AudioInput.tsx`) | AI filter query textarea. | yes |  |
+| `ce-question-filter-ai-top-n` | `client/src/components/SurveyTool/QuestionFilter.tsx` | Top-N numeric input for AI question ranking. | yes |  |
+| `ce-question-filter-ai-apply` | `client/src/components/SurveyTool/QuestionFilter.tsx` | Apply button for AI filter ranking. | yes |  |
+| `ce-question-filter-clear-all` | `client/src/components/SurveyTool/QuestionFilter.tsx` | Clears all active question filters. | yes |  |
 
 ## SBTSelector (QuestionFilter + Other SBT Flows)
 
@@ -221,54 +220,54 @@ Agent page UI: `client/src/components/Agent/AgentPage.tsx`
 
 | `data-testid` | Component path(s) | Meaning / When Present | TestID API | Disambiguators |
 | --- | --- | --- | --- | --- |
-| `ce-create-panel` | `client/src/components/SurveyTool/CreateQuestionsAndSurveys.jsx` | Root element of the CreateQuestionsAndSurveys panel. | yes |  |
-| `ce-create-mode-switch` | `client/src/components/SurveyTool/CreateQuestionsAndSurveys.jsx` | Switch between Manual and "from URL / Content" modes (when available). | yes |  |
-| `ce-create-clear` | `client/src/components/SurveyTool/CreateQuestionsAndSurveys.jsx` | Clear form button (when visible). | yes |  |
-| `ce-create-title` | `client/src/components/SurveyTool/CreateQuestionsAndSurveys.jsx` | Title input for Survey mode. | yes |  |
-| `ce-create-question` | `client/src/components/SurveyTool/CreateQuestionsAndSurveys.jsx` | Per-question container in the authoring form. | yes | `data-ce-question-index` |
-| `ce-create-question-prompt` | `client/src/components/SurveyTool/CreateQuestionsAndSurveys.jsx` | Question prompt textarea within a question container. | yes |  |
-| `ce-create-question-tag-input` | `client/src/components/SurveyTool/CreateQuestionsAndSurveys.jsx` | Tag input within a question container. | yes |  |
-| `ce-create-question-add-tag` | `client/src/components/SurveyTool/CreateQuestionsAndSurveys.jsx` | "Add Tag" control (checkmark) within a question container (only visible when input is non-empty). | yes |  |
-| `ce-create-question-add-option` | `client/src/components/SurveyTool/CreateQuestionsAndSurveys.jsx` | "Add Option" control for multichoice questions. | yes |  |
-| `ce-create-question-single-select` | `client/src/components/SurveyTool/CreateQuestionsAndSurveys.jsx` | Checkbox that enables single-select multichoice mode. | yes |  |
-| `ce-create-submit` | `client/src/components/SurveyTool/CreateQuestionsAndSurveys.jsx` | Primary submit button for Create Questions / Create Survey. | yes |  |
-| `ce-create-success` | `client/src/components/SurveyTool/CreateQuestionsAndSurveys.jsx` | Success confirmation wrapper shown after authoring submit completes. | yes |  |
-| `ce-create-uploaded-questions` | `client/src/components/SurveyTool/CreateQuestionsAndSurveys.jsx` | Wrapper around the list of uploaded questions (when present). | yes |  |
-| `ce-create-uploaded-question` | `client/src/components/SurveyTool/CreateQuestionsAndSurveys.jsx` | Per-uploaded-question list item in the success UI (when present). | yes | `data-ce-question-id` |
+| `ce-create-panel` | `client/src/components/SurveyTool/CreateQuestionsAndSurveys.tsx` | Root element of the CreateQuestionsAndSurveys panel. | yes |  |
+| `ce-create-mode-switch` | `client/src/components/SurveyTool/CreateQuestionsAndSurveys.tsx` | Switch between Manual and "from URL / Content" modes (when available). | yes |  |
+| `ce-create-clear` | `client/src/components/SurveyTool/CreateQuestionsAndSurveys.tsx` | Clear form button (when visible). | yes |  |
+| `ce-create-title` | `client/src/components/SurveyTool/CreateQuestionsAndSurveys.tsx` | Title input for Survey mode. | yes |  |
+| `ce-create-question` | `client/src/components/SurveyTool/CreateQuestionsAndSurveys.tsx` | Per-question container in the authoring form. | yes | `data-ce-question-index` |
+| `ce-create-question-prompt` | `client/src/components/SurveyTool/CreateQuestionsAndSurveys.tsx` | Question prompt textarea within a question container. | yes |  |
+| `ce-create-question-tag-input` | `client/src/components/SurveyTool/CreateQuestionsAndSurveys.tsx` | Tag input within a question container. | yes |  |
+| `ce-create-question-add-tag` | `client/src/components/SurveyTool/CreateQuestionsAndSurveys.tsx` | "Add Tag" control (checkmark) within a question container (only visible when input is non-empty). | yes |  |
+| `ce-create-question-add-option` | `client/src/components/SurveyTool/CreateQuestionsAndSurveys.tsx` | "Add Option" control for multichoice questions. | yes |  |
+| `ce-create-question-single-select` | `client/src/components/SurveyTool/CreateQuestionsAndSurveys.tsx` | Checkbox that enables single-select multichoice mode. | yes |  |
+| `ce-create-submit` | `client/src/components/SurveyTool/CreateQuestionsAndSurveys.tsx` | Primary submit button for Create Questions / Create Survey. | yes |  |
+| `ce-create-success` | `client/src/components/SurveyTool/CreateQuestionsAndSurveys.tsx` | Success confirmation wrapper shown after authoring submit completes. | yes |  |
+| `ce-create-uploaded-questions` | `client/src/components/SurveyTool/CreateQuestionsAndSurveys.tsx` | Wrapper around the list of uploaded questions (when present). | yes |  |
+| `ce-create-uploaded-question` | `client/src/components/SurveyTool/CreateQuestionsAndSurveys.tsx` | Per-uploaded-question list item in the success UI (when present). | yes | `data-ce-question-id` |
 
 ## SBT Create / View
 
 | `data-testid` | Component path(s) | Meaning / When Present | TestID API | Disambiguators |
 | --- | --- | --- | --- | --- |
-| `ce-sbts-create-toggle` | `client/src/components/SBTs/SBTsPage.jsx` | Button that toggles the inline Create Group panel on `/sbts/:slug`. | yes |  |
-| `ce-sbt-create-name-lock-row` | `client/src/components/SBTs/CreateSBTGroup.jsx` | Lockable row containing the SBT name input and gate lock. | yes |  |
-| `ce-sbt-create-description-lock-row` | `client/src/components/SBTs/CreateSBTGroup.jsx` | Lockable row containing the SBT description textarea and gate lock. | yes |  |
-| `ce-sbt-create-image-lock-row` | `client/src/components/SBTs/CreateSBTGroup.jsx` | Lockable section for the SBT image controls and image gate lock. | yes |  |
-| `ce-sbt-create-docs-lock-row` | `client/src/components/SBTs/CreateSBTGroup.jsx` | Lockable row containing the document URL input/add button and gate lock. | yes |  |
-| `ce-sbt-create-tags-lock-row` | `client/src/components/SBTs/CreateSBTGroup.jsx` | Lockable section for tags and the tags gate lock. | yes |  |
-| `ce-sbt-create-name-input` | `client/src/components/SBTs/CreateSBTGroup.jsx` | SBT name input in the Create Group form. | yes |  |
-| `ce-sbt-create-description-input` | `client/src/components/SBTs/CreateSBTGroup.jsx` | SBT description textarea in the Create Group form. | yes |  |
-| `ce-sbt-create-image-file-input` | `client/src/components/SBTs/CreateSBTGroup.jsx` | Hidden file input used for image upload mode. | yes |  |
-| `ce-sbt-create-image-paste` | `client/src/components/SBTs/CreateSBTGroup.jsx` | Compact Image field `Paste` button used to pull an SBT image blob or URL from the clipboard. | yes |  |
-| `ce-sbt-create-image-url-input` | `client/src/components/SBTs/CreateSBTGroup.jsx` | URL input used when image URL mode is selected. | yes |  |
-| `ce-sbt-create-doc-url-input` | `client/src/components/SBTs/CreateSBTGroup.jsx` | Pending document URL input. | yes |  |
-| `ce-sbt-create-doc-url-add` | `client/src/components/SBTs/CreateSBTGroup.jsx` | Button that appends the pending document URL to the list. | yes |  |
-| `ce-sbt-create-tag-input` | `client/src/components/SBTs/CreateSBTGroup.jsx` | Pending tag input. | yes |  |
-| `ce-sbt-create-tag-add` | `client/src/components/SBTs/CreateSBTGroup.jsx` | Button that appends the pending tag to the tag list. | yes |  |
-| `ce-sbt-create-section-header` | `client/src/components/SBTs/CreateSBTGroup.jsx` | Collapsible section header button inside the Create SBT modal/form. | yes | `data-ce-section-key` (`tokenInfoCollapsed`, `mintOptionsCollapsed`, `distributionOptionsCollapsed`) |
-| `ce-sbt-create-error` | `client/src/components/SBTs/CreateSBTGroup.jsx` | Visible error banner for deferred-draft, upload, or mint validation failures. | yes |  |
-| `ce-sbt-create-predictable-toggle` | `client/src/components/SBTs/CreateSBTGroup.jsx` | Toggle that enables predictable-before-deploy CREATE2 planning (forced on in deferred session mode). | yes |  |
-| `ce-sbt-create-predicted-address` | `client/src/components/SBTs/CreateSBTGroup.jsx` | Predicted deterministic SBT address preview. | yes |  |
-| `ce-sbt-create-salt-input` | `client/src/components/SBTs/CreateSBTGroup.jsx` | Advanced/custom salt input shown when the predictable-address card is expanded. | yes |  |
-| `ce-sbt-create-submit` | `client/src/components/SBTs/CreateSBTGroup.jsx` | Primary create/mint button for the Create Group flow. | yes |  |
-| `ce-sbt-create-success` | `client/src/components/SBTs/CreateSBTGroup.jsx` | Success confirmation wrapper shown after the SBT contract is created. | yes |  |
-| `ce-sbt-create-success-page-link` | `client/src/components/SBTs/CreateSBTGroup.jsx` | Success action link that opens `/sbt/:address`. | yes |  |
-| `ce-sbt-create-success-arweave-link` | `client/src/components/SBTs/CreateSBTGroup.jsx` | Success action link that opens the tokenURI metadata on Arweave. | yes |  |
-| `ce-sbt-create-open-mint-url` | `client/src/components/SBTs/CreateSBTGroup.jsx` | Open-mint success card showing the `/session/:slug?sbt=:address&auto=1` URL for public no-password SBTs. | yes |  |
-| `ce-sbt-page-name` | `client/src/components/SBTs/SBTPage.jsx` | Primary SBT display name heading on the detail page. | yes |  |
-| `ce-sbt-page-description` | `client/src/components/SBTs/SBTPage.jsx` | Primary SBT description text on the detail page, including masked locked copy. | yes |  |
-| `ce-sbt-page-image` | `client/src/components/SBTs/SBTPage.jsx` | Main SBT image element used for placeholder/decrypted image assertions. | yes |  |
-| `ce-sbt-page-open-mint-url` | `client/src/components/SBTs/SBTPage.jsx` | Admin-only info card showing the open-mint auto-join URL for eligible public no-password SBTs. | yes |  |
+| `ce-sbts-create-toggle` | `client/src/components/SBTs/SBTsPage.tsx` | Button that toggles the inline Create Group panel on `/sbts/:slug`. | yes |  |
+| `ce-sbt-create-name-lock-row` | `client/src/components/SBTs/CreateSBTGroup.tsx` | Lockable row containing the SBT name input and gate lock. | yes |  |
+| `ce-sbt-create-description-lock-row` | `client/src/components/SBTs/CreateSBTGroup.tsx` | Lockable row containing the SBT description textarea and gate lock. | yes |  |
+| `ce-sbt-create-image-lock-row` | `client/src/components/SBTs/CreateSBTGroup.tsx` | Lockable section for the SBT image controls and image gate lock. | yes |  |
+| `ce-sbt-create-docs-lock-row` | `client/src/components/SBTs/CreateSBTGroup.tsx` | Lockable row containing the document URL input/add button and gate lock. | yes |  |
+| `ce-sbt-create-tags-lock-row` | `client/src/components/SBTs/CreateSBTGroup.tsx` | Lockable section for tags and the tags gate lock. | yes |  |
+| `ce-sbt-create-name-input` | `client/src/components/SBTs/CreateSBTGroup.tsx` | SBT name input in the Create Group form. | yes |  |
+| `ce-sbt-create-description-input` | `client/src/components/SBTs/CreateSBTGroup.tsx` | SBT description textarea in the Create Group form. | yes |  |
+| `ce-sbt-create-image-file-input` | `client/src/components/SBTs/CreateSBTGroup.tsx` | Hidden file input used for image upload mode. | yes |  |
+| `ce-sbt-create-image-paste` | `client/src/components/SBTs/CreateSBTGroup.tsx` | Compact Image field `Paste` button used to pull an SBT image blob or URL from the clipboard. | yes |  |
+| `ce-sbt-create-image-url-input` | `client/src/components/SBTs/CreateSBTGroup.tsx` | URL input used when image URL mode is selected. | yes |  |
+| `ce-sbt-create-doc-url-input` | `client/src/components/SBTs/CreateSBTGroup.tsx` | Pending document URL input. | yes |  |
+| `ce-sbt-create-doc-url-add` | `client/src/components/SBTs/CreateSBTGroup.tsx` | Button that appends the pending document URL to the list. | yes |  |
+| `ce-sbt-create-tag-input` | `client/src/components/SBTs/CreateSBTGroup.tsx` | Pending tag input. | yes |  |
+| `ce-sbt-create-tag-add` | `client/src/components/SBTs/CreateSBTGroup.tsx` | Button that appends the pending tag to the tag list. | yes |  |
+| `ce-sbt-create-section-header` | `client/src/components/SBTs/CreateSBTGroup.tsx` | Collapsible section header button inside the Create SBT modal/form. | yes | `data-ce-section-key` (`tokenInfoCollapsed`, `mintOptionsCollapsed`, `distributionOptionsCollapsed`) |
+| `ce-sbt-create-error` | `client/src/components/SBTs/CreateSBTGroup.tsx` | Visible error banner for deferred-draft, upload, or mint validation failures. | yes |  |
+| `ce-sbt-create-predictable-toggle` | `client/src/components/SBTs/CreateSBTGroup.tsx` | Toggle that enables predictable-before-deploy CREATE2 planning (forced on in deferred session mode). | yes |  |
+| `ce-sbt-create-predicted-address` | `client/src/components/SBTs/CreateSBTGroup.tsx` | Predicted deterministic SBT address preview. | yes |  |
+| `ce-sbt-create-salt-input` | `client/src/components/SBTs/CreateSBTGroup.tsx` | Advanced/custom salt input shown when the predictable-address card is expanded. | yes |  |
+| `ce-sbt-create-submit` | `client/src/components/SBTs/CreateSBTGroup.tsx` | Primary create/mint button for the Create Group flow. | yes |  |
+| `ce-sbt-create-success` | `client/src/components/SBTs/CreateSBTGroup.tsx` | Success confirmation wrapper shown after the SBT contract is created. | yes |  |
+| `ce-sbt-create-success-page-link` | `client/src/components/SBTs/CreateSBTGroup.tsx` | Success action link that opens `/sbt/:address`. | yes |  |
+| `ce-sbt-create-success-arweave-link` | `client/src/components/SBTs/CreateSBTGroup.tsx` | Success action link that opens the tokenURI metadata on Arweave. | yes |  |
+| `ce-sbt-create-open-mint-url` | `client/src/components/SBTs/CreateSBTGroup.tsx` | Open-mint success card showing the `/session/:slug?sbt=:address&auto=1` URL for public no-password SBTs. | yes |  |
+| `ce-sbt-page-name` | `client/src/components/SBTs/SBTPage.tsx` | Primary SBT display name heading on the detail page. | yes |  |
+| `ce-sbt-page-description` | `client/src/components/SBTs/SBTPage.tsx` | Primary SBT description text on the detail page, including masked locked copy. | yes |  |
+| `ce-sbt-page-image` | `client/src/components/SBTs/SBTPage.tsx` | Main SBT image element used for placeholder/decrypted image assertions. | yes |  |
+| `ce-sbt-page-open-mint-url` | `client/src/components/SBTs/SBTPage.tsx` | Admin-only info card showing the open-mint auto-join URL for eligible public no-password SBTs. | yes |  |
 
 ## Gate Lock Popover
 
@@ -283,19 +282,19 @@ Agent page UI: `client/src/components/Agent/AgentPage.tsx`
 
 | `data-testid` | Component path(s) | Meaning / When Present | TestID API | Disambiguators |
 | --- | --- | --- | --- | --- |
-| `ce-tool-explorer-data-add` | `client/src/components/MainContent/ToolExplorer.jsx` | Header action that switches the expanded Tool Explorer `Data` card into add/create mode. | yes |  |
-| `ce-tool-explorer-data-view` | `client/src/components/MainContent/ToolExplorer.jsx` | Header action that switches the expanded Tool Explorer `Data` card into view/library mode. | yes |  |
-| `ce-database-view-demo-toggle` | `client/src/components/SurveyTool/SurveyGenerator/SurveyGenerator.jsx` | Local checkbox inside Tool Explorer `Data` view mode that toggles between demo corpus and real session docs when demo surfaces are enabled. | yes |  |
-| `ce-database-view-panel` | `client/src/components/SurveyTool/SurveyGenerator/SurveyGenerator.jsx` | Root wrapper for the Tool Explorer `Data` view-mode content shell. | yes |  |
-| `ce-database-photo-source-card` | `client/src/components/SurveyTool/SurveyGenerator/SurveyGenerator.jsx` | Compact queued-photo card shown in Tool Explorer `Data` add mode for each uploaded image. | yes | `data-ce-source-id` |
-| `ce-database-photo-source-preview` | `client/src/components/SurveyTool/SurveyGenerator/SurveyGenerator.jsx` | Thumbnail preview image rendered inside a queued photo card. | yes | `data-ce-source-id` |
-| `ce-database-photo-source-analysis-toggle` | `client/src/components/SurveyTool/SurveyGenerator/SurveyGenerator.jsx` | Ready-state `Analysis complete` toggle button that expands or collapses inline photo analysis beneath a queued photo card. | yes | `data-ce-source-id` |
-| `ce-database-photo-source-analysis-body` | `client/src/components/SurveyTool/SurveyGenerator/SurveyGenerator.jsx` | Expanded inline analysis body for a queued photo card after photo analysis completes. | yes | `data-ce-source-id` |
-| `ce-database-save-docs-toggle` | `client/src/components/SurveyTool/SurveyGenerator/SurveyGenerator.jsx` | Checkbox shown in Tool Explorer `Data` add mode once queued extra URL/file/photo sources exist; enables saving those queued sources into the session doc library on Generate. | yes |  |
-| `ce-database-save-docs-audience-button` | `client/src/components/SurveyTool/SurveyGenerator/SurveyGenerator.jsx` | Compact lock/audience button shown when queued extra sources are set to save into the session doc library. | yes | `data-ce-doc-save-audience` (`self` or `session`) |
-| `ce-database-save-docs-audience-menu` | `client/src/components/SurveyTool/SurveyGenerator/SurveyGenerator.jsx` | Audience popover for Tool Explorer saved extra sources. | yes |  |
-| `ce-database-save-docs-audience-self` | `client/src/components/SurveyTool/SurveyGenerator/SurveyGenerator.jsx` | Audience option that saves queued extra sources as private `only me` doc-library entries. | yes |  |
-| `ce-database-save-docs-audience-session` | `client/src/components/SurveyTool/SurveyGenerator/SurveyGenerator.jsx` | Audience option that saves queued extra sources with the session `docUploads` gate when available. | yes |  |
+| `ce-tool-explorer-data-add` | `client/src/components/MainContent/ToolExplorer.tsx` | Header action that switches the expanded Tool Explorer `Data` card into add/create mode. | yes |  |
+| `ce-tool-explorer-data-view` | `client/src/components/MainContent/ToolExplorer.tsx` | Header action that switches the expanded Tool Explorer `Data` card into view/library mode. | yes |  |
+| `ce-database-view-demo-toggle` | `client/src/components/SurveyTool/SurveyGenerator/SurveyGenerator.tsx` | Local checkbox inside Tool Explorer `Data` view mode that toggles between demo corpus and real session docs when demo surfaces are enabled. | yes |  |
+| `ce-database-view-panel` | `client/src/components/SurveyTool/SurveyGenerator/SurveyGenerator.tsx` | Root wrapper for the Tool Explorer `Data` view-mode content shell. | yes |  |
+| `ce-database-photo-source-card` | `client/src/components/SurveyTool/SurveyGenerator/SurveyGenerator.tsx` | Compact queued-photo card shown in Tool Explorer `Data` add mode for each uploaded image. | yes | `data-ce-source-id` |
+| `ce-database-photo-source-preview` | `client/src/components/SurveyTool/SurveyGenerator/SurveyGenerator.tsx` | Thumbnail preview image rendered inside a queued photo card. | yes | `data-ce-source-id` |
+| `ce-database-photo-source-analysis-toggle` | `client/src/components/SurveyTool/SurveyGenerator/SurveyGenerator.tsx` | Ready-state `Analysis complete` toggle button that expands or collapses inline photo analysis beneath a queued photo card. | yes | `data-ce-source-id` |
+| `ce-database-photo-source-analysis-body` | `client/src/components/SurveyTool/SurveyGenerator/SurveyGenerator.tsx` | Expanded inline analysis body for a queued photo card after photo analysis completes. | yes | `data-ce-source-id` |
+| `ce-database-save-docs-toggle` | `client/src/components/SurveyTool/SurveyGenerator/SurveyGenerator.tsx` | Checkbox shown in Tool Explorer `Data` add mode once queued extra URL/file/photo sources exist; enables saving those queued sources into the session doc library on Generate. | yes |  |
+| `ce-database-save-docs-audience-button` | `client/src/components/SurveyTool/SurveyGenerator/SurveyGenerator.tsx` | Compact lock/audience button shown when queued extra sources are set to save into the session doc library. | yes | `data-ce-doc-save-audience` (`self` or `session`) |
+| `ce-database-save-docs-audience-menu` | `client/src/components/SurveyTool/SurveyGenerator/SurveyGenerator.tsx` | Audience popover for Tool Explorer saved extra sources. | yes |  |
+| `ce-database-save-docs-audience-self` | `client/src/components/SurveyTool/SurveyGenerator/SurveyGenerator.tsx` | Audience option that saves queued extra sources as private `only me` doc-library entries. | yes |  |
+| `ce-database-save-docs-audience-session` | `client/src/components/SurveyTool/SurveyGenerator/SurveyGenerator.tsx` | Audience option that saves queued extra sources with the session `docUploads` gate when available. | yes |  |
 
 ## Doc Library
 

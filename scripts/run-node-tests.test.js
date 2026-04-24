@@ -23,7 +23,7 @@ function withTempRepo(run) {
   }
 }
 
-test('collectNodeTestFiles includes static, script, and e2e helper tests when present', () => {
+test('collectNodeTestFiles keeps the public node lane scoped to tracked root tests', () => {
   withTempRepo((rootDir) => {
     writeFile(rootDir, 'test/arweave-metadata-uri.test.js');
     writeFile(rootDir, 'test/client.package.test.js');
@@ -50,9 +50,6 @@ test('collectNodeTestFiles includes static, script, and e2e helper tests when pr
       'test/private-runtime.private.test.mjs',
       path.join('scripts', 'run-node-tests.test.js'),
       path.join('scripts', 'verify-test-wiring.test.js'),
-      path.join('scripts', 'lib', 'e2e', 'network-default-consumers.test.js'),
-      path.join('scripts', 'lib', 'e2e', 'tx.test.js'),
-      path.join('scripts', 'lib', 'e2e', 'worker-auth.test.js'),
     ]);
   });
 });
