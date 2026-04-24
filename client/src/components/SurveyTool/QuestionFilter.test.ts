@@ -1,14 +1,7 @@
-import { QuestionFilter } from './QuestionFilter';
+import { QuestionFilter as QuestionFilterComponent } from './QuestionFilter';
 import GateTooltip from '../Gates/GateTooltip';
-import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
-import {
-  initCacheManager,
-  listNamespaceEntriesSync,
-  readCache,
-  removeCache,
-  writeCache,
-} from '../../utilities/cache/cacheScripts.js';
-import { serializeFilterState } from '../../utilities/survey/filterStateUtils.js';
+import * as cacheScriptsModule from '../../utilities/cache/cacheScripts.js';
+import { serializeFilterState as serializeFilterStateStrict } from '../../utilities/survey/filterStateUtils.js';
 import { isFreeformBlankAnswer } from '../../utilities/survey/freeformAnswerUtils.js';
 import * as aiScripts from '../../utilities/ai/aiScripts.js';
 import * as aiSettings from '../../utilities/ai/aiSettings.js';
@@ -18,6 +11,21 @@ import * as sponsoredAccess from '../../utilities/web3/sponsoredAccess.js';
 
 jest.mock('../SBTs/SBTFilter', () => () => null);
 jest.mock('../Shared/AudioInput/AudioInput', () => () => null);
+
+type TreeNode = any;
+type TreePredicate = (node: TreeNode) => boolean;
+type QuestionFilterProps = Record<string, any>;
+const QuestionFilter: any = QuestionFilterComponent;
+const cacheScripts: any = cacheScriptsModule;
+const {
+  initCacheManager,
+  listNamespaceEntriesSync,
+  readCache,
+  removeCache,
+  writeCache,
+} = cacheScripts as any;
+const serializeFilterState: any = serializeFilterStateStrict;
+const sponsoredAccessAny: any = sponsoredAccess;
 
 const MANAGED_NAMESPACES = [
   'questionsCache',
@@ -32,13 +40,13 @@ const clearManagedCaches = async () => {
   await initCacheManager();
   for (const namespace of MANAGED_NAMESPACES) {
     const entries = listNamespaceEntriesSync(namespace);
-    await Promise.all(entries.map((entry) => removeCache(namespace, entry?.slug || '')));
+    await Promise.all(entries.map((entry: any) => removeCache(namespace, entry?.slug || '')));
     await removeCache(namespace, '');
   }
 };
 
-const findElement = (node, predicate) => {
-  const stack = [node];
+const findElement = (node: TreeNode, predicate: TreePredicate): TreeNode | null => {
+  const stack: TreeNode[] = [node];
   while (stack.length > 0) {
     const current = stack.pop();
     if (!current) continue;
@@ -56,7 +64,7 @@ const findElement = (node, predicate) => {
   return null;
 };
 
-const getNodeText = (node) => {
+const getNodeText = (node: TreeNode): string => {
   if (node == null || typeof node === 'boolean') return '';
   if (typeof node === 'string' || typeof node === 'number') return String(node);
   if (Array.isArray(node)) return node.map(getNodeText).join('');
@@ -165,7 +173,7 @@ describe('QuestionFilter cache helpers', () => {
     );
 
     expect(merged).toHaveLength(2);
-    expect(merged.find((q) => q.id === 'q2')).toBeTruthy();
+    expect(merged.find((q: any) => q.id === 'q2')).toBeTruthy();
 
     const stored = await readCache('questionsCache', '');
     expect(stored['1']).toBeDefined();
@@ -322,8 +330,8 @@ describe('QuestionFilter cache helpers', () => {
   it('does not re-run expensive question/response sync when nonces and refs are unchanged', () => {
     const sharedQuestions = [{ id: 'q1', prompt: 'Q1' }];
     const sharedResponses = { q1: { '0x1': '{"type":"binary","answer":{"value":"yes"}}' } };
-    const sharedTypes = [];
-    const sharedTags = [];
+    const sharedTypes: any[] = [];
+    const sharedTags: any[] = [];
 
     const instance = new QuestionFilter({
       questions: sharedQuestions,
@@ -375,8 +383,8 @@ describe('QuestionFilter cache helpers', () => {
     const sharedResponses = { q1: { '0x1': '{"type":"binary","answer":{"value":"yes"}}' } };
     const currentQuestions = [{ id: 'q1', prompt: 'Q1 (current)' }];
     const prevQuestions = [{ id: 'q1', prompt: 'Q1 (prev)' }];
-    const sharedTypes = [];
-    const sharedTags = [];
+    const sharedTypes: any[] = [];
+    const sharedTags: any[] = [];
 
     const instance = new QuestionFilter({
       questions: prevQuestions,
@@ -426,8 +434,8 @@ describe('QuestionFilter cache helpers', () => {
     const sharedResponses = { q1: { '0x1': '{"type":"binary","answer":{"value":"yes"}}' } };
     const currentQuestions = [{ id: 'q1', prompt: 'Q1' }];
     const prevQuestions = [{ id: 'q1', prompt: 'Q1' }];
-    const sharedTypes = [];
-    const sharedTags = [];
+    const sharedTypes: any[] = [];
+    const sharedTags: any[] = [];
 
     const instance = new QuestionFilter({
       questions: currentQuestions,
@@ -479,8 +487,8 @@ describe('QuestionFilter cache helpers', () => {
     const sharedQuestions = [{ id: 'q1', prompt: 'Q1' }];
     const currentResponses = { q1: { '0x1': '{"type":"binary","answer":{"value":"yes"}}' } };
     const prevResponses = { q1: { '0x1': '{"type":"binary","answer":{"value":"yes"}}' } };
-    const sharedTypes = [];
-    const sharedTags = [];
+    const sharedTypes: any[] = [];
+    const sharedTags: any[] = [];
 
     const instance = new QuestionFilter({
       questions: sharedQuestions,
@@ -731,8 +739,8 @@ describe('QuestionFilter cache helpers', () => {
       { id: 'q2', prompt: 'Q2' },
     ];
     const sharedResponses = {};
-    const sharedTypes = [];
-    const sharedTags = [];
+    const sharedTypes: any[] = [];
+    const sharedTags: any[] = [];
 
     const instance = new QuestionFilter({
       questions: sharedQuestions,
@@ -857,8 +865,8 @@ describe('QuestionFilter cache helpers', () => {
     };
 
     const topByResponses = instance.buildFilterPipelineResult(false);
-    expect(topByResponses.finalQuestions.map((q) => q.id)).toEqual(['q1', 'q2']);
-    expect(topByResponses.finalQuestions.map((q) => q.totalResponses)).toEqual([7, 7]);
+    expect(topByResponses.finalQuestions.map((q: any) => q.id)).toEqual(['q1', 'q2']);
+    expect(topByResponses.finalQuestions.map((q: any) => q.totalResponses)).toEqual([7, 7]);
 
     instance.state = {
       ...instance.state,
@@ -869,8 +877,8 @@ describe('QuestionFilter cache helpers', () => {
     instance._filterPipelineMemo = null;
 
     const sortedByImportance = instance.buildFilterPipelineResult(false);
-    expect(sortedByImportance.finalQuestions.map((q) => q.id)).toEqual(['q1', 'q2', 'q3']);
-    expect(sortedByImportance.finalQuestions.map((q) => q.totalImportance)).toEqual([9, 9, 3]);
+    expect(sortedByImportance.finalQuestions.map((q: any) => q.id)).toEqual(['q1', 'q2', 'q3']);
+    expect(sortedByImportance.finalQuestions.map((q: any) => q.totalImportance)).toEqual([9, 9, 3]);
   });
 
   it('ignores AI subset when Top X mode is active', () => {
@@ -910,16 +918,16 @@ describe('QuestionFilter cache helpers', () => {
     };
 
     const topByResponses = instance.buildFilterPipelineResult(false);
-    expect(topByResponses.finalQuestions.map((q) => q.id)).toEqual(['q1', 'q3']);
-    expect(topByResponses.finalQuestions.map((q) => q.totalResponses)).toEqual([9, 8]);
+    expect(topByResponses.finalQuestions.map((q: any) => q.id)).toEqual(['q1', 'q3']);
+    expect(topByResponses.finalQuestions.map((q: any) => q.totalResponses)).toEqual([9, 8]);
   });
 
   it('skips response sync when questionResponsesNonce changes but response-driven filters are inactive', () => {
     const sharedQuestions = [{ id: 'q1', prompt: 'Q1' }];
     const currentResponses = { q1: { '0x1': '{"type":"binary","answer":{"value":"yes"}}' } };
     const prevResponses = { q1: { '0x1': '{"type":"binary","answer":{"value":"no"}}' } };
-    const sharedTypes = [];
-    const sharedTags = [];
+    const sharedTypes: any[] = [];
+    const sharedTags: any[] = [];
 
     const instance = new QuestionFilter({
       questions: sharedQuestions,
@@ -1201,8 +1209,8 @@ describe('QuestionFilter cache helpers', () => {
   it('syncs external filter state when payloads are larger than compare cap', () => {
     const sharedQuestions = [{ id: 'q1', prompt: 'Q1' }];
     const sharedResponses = {};
-    const sharedTypes = [];
-    const sharedTags = [];
+    const sharedTypes: any[] = [];
+    const sharedTags: any[] = [];
     const largeTagsPrev = Array.from({ length: 900 }, (_, idx) => `tag-${idx}`);
     const largeTagsNext = [...largeTagsPrev];
     largeTagsNext[largeTagsNext.length - 1] = 'tag-final-updated';
@@ -1263,8 +1271,8 @@ describe('QuestionFilter cache helpers', () => {
   it('syncs external filter state when the parent mutates the same filterState object in place', () => {
     const sharedQuestions = [{ id: 'q1', prompt: 'Q1' }];
     const sharedResponses = {};
-    const sharedTypes = [];
-    const sharedTags = [];
+    const sharedTypes: any[] = [];
+    const sharedTags: any[] = [];
     const sharedFilterState = {
       selectedTags: ['alpha'],
       sbtFilter: { includedSBTs: ['0xabc'], excludedSBTs: [], onlyVerifiedHumans: false },
@@ -1707,7 +1715,7 @@ describe('QuestionFilter cache helpers', () => {
   });
 
   it('enables AI filter when sponsored gate is available or local key exists', () => {
-    const gateSpy = jest.spyOn(sponsoredAccess, 'resolveSponsoredGateStateForResource');
+    const gateSpy = jest.spyOn(sponsoredAccessAny, 'resolveSponsoredGateStateForResource');
     const localSpy = jest.spyOn(aiSettings, 'getLocalAiSettings');
     const instance = new QuestionFilter({ activeSessionSlug: 'edge' });
 
@@ -1738,7 +1746,7 @@ describe('QuestionFilter cache helpers', () => {
   });
 
   it('applies AI ranking against full available pool and keeps ranked order', async () => {
-    const gateSpy = jest.spyOn(sponsoredAccess, 'resolveSponsoredGateStateForResource')
+    const gateSpy = jest.spyOn(sponsoredAccessAny, 'resolveSponsoredGateStateForResource')
       .mockReturnValue({ status: sponsoredAccess.SPONSORED_GATE_STATES.OPEN });
     const localSpy = jest.spyOn(aiSettings, 'getLocalAiSettings').mockReturnValue({ providers: {} });
     const rankSpy = jest.spyOn(aiScripts, 'rankQuestionsAI').mockResolvedValue(['q3', 'q1']);
@@ -1804,7 +1812,7 @@ describe('QuestionFilter cache helpers', () => {
       aiRankedQuestionIds: ['q3', 'q1'],
     };
     const result = instance.buildFilterPipelineResult(true);
-    expect(result.finalQuestions.map((q) => q.id)).toEqual(['q3', 'q1']);
+    expect(result.finalQuestions.map((q: any) => q.id)).toEqual(['q3', 'q1']);
 
     gateSpy.mockRestore();
     localSpy.mockRestore();
@@ -1840,19 +1848,19 @@ describe('QuestionFilter cache helpers', () => {
     };
 
     const overrideResult = instance.buildFilterPipelineResult(true);
-    expect(overrideResult.finalQuestions.map((q) => q.id)).toEqual(['q4', 'q3']);
+    expect(overrideResult.finalQuestions.map((q: any) => q.id)).toEqual(['q4', 'q3']);
 
     instance.state = {
       ...instance.state,
       aiCombineWithOtherFilters: true,
     };
     const combinedResult = instance.buildFilterPipelineResult(true);
-    expect(combinedResult.finalQuestions.map((q) => q.id)).toEqual(['q3', 'q1']);
+    expect(combinedResult.finalQuestions.map((q: any) => q.id)).toEqual(['q3', 'q1']);
   });
 
   it('auto-reapplies AI when external filter state carries aiFilter + aiTopN', async () => {
     jest.useFakeTimers();
-    const gateSpy = jest.spyOn(sponsoredAccess, 'resolveSponsoredGateStateForResource')
+    const gateSpy = jest.spyOn(sponsoredAccessAny, 'resolveSponsoredGateStateForResource')
       .mockReturnValue({ status: sponsoredAccess.SPONSORED_GATE_STATES.OPEN });
     const localSpy = jest.spyOn(aiSettings, 'getLocalAiSettings').mockReturnValue({ providers: {} });
     const rankSpy = jest.spyOn(aiScripts, 'rankQuestionsAI').mockResolvedValue(['q1']);
@@ -1902,7 +1910,7 @@ describe('QuestionFilter cache helpers', () => {
 
   it('re-applies AI ranking when candidate questions change under same query/topN', async () => {
     jest.useFakeTimers();
-    const gateSpy = jest.spyOn(sponsoredAccess, 'resolveSponsoredGateStateForResource')
+    const gateSpy = jest.spyOn(sponsoredAccessAny, 'resolveSponsoredGateStateForResource')
       .mockReturnValue({ status: sponsoredAccess.SPONSORED_GATE_STATES.OPEN });
     const localSpy = jest.spyOn(aiSettings, 'getLocalAiSettings').mockReturnValue({ providers: {} });
     const rankSpy = jest.spyOn(aiScripts, 'rankQuestionsAI')
@@ -1973,7 +1981,7 @@ describe('QuestionFilter cache helpers', () => {
 
   it('preserves applied AI subset on equivalent external filter sync', async () => {
     jest.useFakeTimers();
-    const gateSpy = jest.spyOn(sponsoredAccess, 'resolveSponsoredGateStateForResource')
+    const gateSpy = jest.spyOn(sponsoredAccessAny, 'resolveSponsoredGateStateForResource')
       .mockReturnValue({ status: sponsoredAccess.SPONSORED_GATE_STATES.OPEN });
     const localSpy = jest.spyOn(aiSettings, 'getLocalAiSettings').mockReturnValue({ providers: {} });
     const rankSpy = jest.spyOn(aiScripts, 'rankQuestionsAI').mockResolvedValue(['q2']);
@@ -2041,7 +2049,7 @@ describe('QuestionFilter cache helpers', () => {
   });
 
   it('defers AI apply on empty candidates and auto-reapplies after question sync', async () => {
-    const gateSpy = jest.spyOn(sponsoredAccess, 'resolveSponsoredGateStateForResource')
+    const gateSpy = jest.spyOn(sponsoredAccessAny, 'resolveSponsoredGateStateForResource')
       .mockReturnValue({ status: sponsoredAccess.SPONSORED_GATE_STATES.OPEN });
     const localSpy = jest.spyOn(aiSettings, 'getLocalAiSettings').mockReturnValue({ providers: {} });
     const rankSpy = jest.spyOn(aiScripts, 'rankQuestionsAI').mockResolvedValue(['q1']);
@@ -2118,12 +2126,12 @@ describe('QuestionFilter cache helpers', () => {
   });
 
   it('ignores in-flight AI responses after empty-candidate apply', async () => {
-    const gateSpy = jest.spyOn(sponsoredAccess, 'resolveSponsoredGateStateForResource')
+    const gateSpy = jest.spyOn(sponsoredAccessAny, 'resolveSponsoredGateStateForResource')
       .mockReturnValue({ status: sponsoredAccess.SPONSORED_GATE_STATES.OPEN });
     const localSpy = jest.spyOn(aiSettings, 'getLocalAiSettings').mockReturnValue({ providers: {} });
 
-    let resolveRank;
-    const rankPromise = new Promise((resolve) => { resolveRank = resolve; });
+    let resolveRank: ((value: any) => void) | null = null;
+    const rankPromise = new Promise((resolve) => { resolveRank = resolve as (value: any) => void; });
     const rankSpy = jest.spyOn(aiScripts, 'rankQuestionsAI')
       .mockImplementationOnce(() => rankPromise);
 
@@ -2177,7 +2185,7 @@ describe('QuestionFilter cache helpers', () => {
     expect(instance.state.aiRankedQuestionIds).toEqual([]);
     expect(instance.state.aiApplying).toBe(false);
 
-    resolveRank(['q1']);
+    (resolveRank as any)?.(['q1']);
     await firstRun;
 
     expect(instance.state.aiSearchQuery).toBe('second query');
@@ -2192,14 +2200,14 @@ describe('QuestionFilter cache helpers', () => {
   });
 
   it('ignores stale AI responses from superseded apply requests', async () => {
-    const gateSpy = jest.spyOn(sponsoredAccess, 'resolveSponsoredGateStateForResource')
+    const gateSpy = jest.spyOn(sponsoredAccessAny, 'resolveSponsoredGateStateForResource')
       .mockReturnValue({ status: sponsoredAccess.SPONSORED_GATE_STATES.OPEN });
     const localSpy = jest.spyOn(aiSettings, 'getLocalAiSettings').mockReturnValue({ providers: {} });
 
-    let resolveFirst;
-    let resolveSecond;
-    const firstPromise = new Promise((resolve) => { resolveFirst = resolve; });
-    const secondPromise = new Promise((resolve) => { resolveSecond = resolve; });
+    let resolveFirst: ((value: any) => void) | null = null;
+    let resolveSecond: ((value: any) => void) | null = null;
+    const firstPromise = new Promise((resolve) => { resolveFirst = resolve as (value: any) => void; });
+    const secondPromise = new Promise((resolve) => { resolveSecond = resolve as (value: any) => void; });
     const rankSpy = jest.spyOn(aiScripts, 'rankQuestionsAI')
       .mockImplementationOnce(() => firstPromise)
       .mockImplementationOnce(() => secondPromise);
@@ -2243,12 +2251,12 @@ describe('QuestionFilter cache helpers', () => {
       source: 'second',
     });
 
-    resolveSecond(['q2']);
+    (resolveSecond as any)?.(['q2']);
     await secondRun;
     expect(instance.state.aiSearchQuery).toBe('second query');
     expect(instance.state.aiRankedQuestionIds).toEqual(['q2']);
 
-    resolveFirst(['q1']);
+    (resolveFirst as any)?.(['q1']);
     await firstRun;
     expect(instance.state.aiSearchQuery).toBe('second query');
     expect(instance.state.aiRankedQuestionIds).toEqual(['q2']);
@@ -2261,12 +2269,12 @@ describe('QuestionFilter cache helpers', () => {
   });
 
   it('ignores in-flight AI responses after external sync clears AI filter', async () => {
-    const gateSpy = jest.spyOn(sponsoredAccess, 'resolveSponsoredGateStateForResource')
+    const gateSpy = jest.spyOn(sponsoredAccessAny, 'resolveSponsoredGateStateForResource')
       .mockReturnValue({ status: sponsoredAccess.SPONSORED_GATE_STATES.OPEN });
     const localSpy = jest.spyOn(aiSettings, 'getLocalAiSettings').mockReturnValue({ providers: {} });
 
-    let resolveRank;
-    const rankPromise = new Promise((resolve) => { resolveRank = resolve; });
+    let resolveRank: ((value: any) => void) | null = null;
+    const rankPromise = new Promise((resolve) => { resolveRank = resolve as (value: any) => void; });
     const rankSpy = jest.spyOn(aiScripts, 'rankQuestionsAI')
       .mockImplementationOnce(() => rankPromise);
 
@@ -2320,7 +2328,7 @@ describe('QuestionFilter cache helpers', () => {
     expect(instance.state.aiRankedQuestionIds).toEqual([]);
     expect(instance.state.aiApplying).toBe(false);
 
-    resolveRank(['q1']);
+    (resolveRank as any)?.(['q1']);
     await applyRun;
 
     expect(instance.state.aiSearchQuery).toBe('');
@@ -2335,12 +2343,12 @@ describe('QuestionFilter cache helpers', () => {
   });
 
   it('keeps filters cleared when an in-flight AI apply resolves later', async () => {
-    const gateSpy = jest.spyOn(sponsoredAccess, 'resolveSponsoredGateStateForResource')
+    const gateSpy = jest.spyOn(sponsoredAccessAny, 'resolveSponsoredGateStateForResource')
       .mockReturnValue({ status: sponsoredAccess.SPONSORED_GATE_STATES.OPEN });
     const localSpy = jest.spyOn(aiSettings, 'getLocalAiSettings').mockReturnValue({ providers: {} });
 
-    let resolveRank;
-    const rankPromise = new Promise((resolve) => { resolveRank = resolve; });
+    let resolveRank: ((value: any) => void) | null = null;
+    const rankPromise = new Promise((resolve) => { resolveRank = resolve as (value: any) => void; });
     const rankSpy = jest.spyOn(aiScripts, 'rankQuestionsAI')
       .mockImplementationOnce(() => rankPromise);
 
@@ -2386,7 +2394,7 @@ describe('QuestionFilter cache helpers', () => {
     expect(instance.state.aiRankedQuestionIds).toEqual([]);
     expect(instance.state.aiApplying).toBe(false);
 
-    resolveRank(['q1']);
+    (resolveRank as any)?.(['q1']);
     await applyRun;
 
     expect(instance.state.aiSearchQuery).toBe('');
@@ -2401,7 +2409,7 @@ describe('QuestionFilter cache helpers', () => {
   });
 
   it('keeps previous AI subset when AI apply fails', async () => {
-    const gateSpy = jest.spyOn(sponsoredAccess, 'resolveSponsoredGateStateForResource')
+    const gateSpy = jest.spyOn(sponsoredAccessAny, 'resolveSponsoredGateStateForResource')
       .mockReturnValue({ status: sponsoredAccess.SPONSORED_GATE_STATES.OPEN });
     const localSpy = jest.spyOn(aiSettings, 'getLocalAiSettings').mockReturnValue({ providers: {} });
     const rankSpy = jest.spyOn(aiScripts, 'rankQuestionsAI').mockRejectedValue(new Error('boom'));
@@ -2474,7 +2482,7 @@ describe('QuestionFilter cache helpers', () => {
     };
 
     const first = instance.buildFilterPipelineResult(true);
-    expect(first.finalQuestions.map((q) => q.id)).toEqual(['q1']);
+    expect(first.finalQuestions.map((q: any) => q.id)).toEqual(['q1']);
 
     instance.state = {
       ...instance.state,
@@ -2482,7 +2490,7 @@ describe('QuestionFilter cache helpers', () => {
     };
     const second = instance.buildFilterPipelineResult(true);
     expect(second).not.toBe(first);
-    expect(second.finalQuestions.map((q) => q.id)).toEqual(['q2']);
+    expect(second.finalQuestions.map((q: any) => q.id)).toEqual(['q2']);
   });
 
   it('includes aiTopN in built filter state when AI filter is active', () => {
@@ -2512,10 +2520,10 @@ describe('QuestionFilter cache helpers', () => {
       return patch;
     });
 
-    let intervalCallback = null;
+    let intervalCallback: (() => void) | null = null;
     const intervalSpy = jest.spyOn(global, 'setInterval').mockImplementation((fn) => {
       intervalCallback = fn;
-      return 1234;
+      return 1234 as any;
     });
     const clearIntervalSpy = jest.spyOn(global, 'clearInterval').mockImplementation(() => {});
     const nowSpy = jest.spyOn(Date, 'now');
@@ -2532,7 +2540,7 @@ describe('QuestionFilter cache helpers', () => {
     expect(typeof intervalCallback).toBe('function');
 
     nowSpy.mockReturnValue(3900);
-    intervalCallback();
+    (intervalCallback as any)?.();
     expect(instance.state.aiApplyingElapsedSec).toBe(2);
 
     instance.state = {
@@ -2673,7 +2681,7 @@ describe('QuestionFilter encrypted count gate tooltip integration', () => {
     }));
 
     const summaryItems = instance.getFilterSummaryItems();
-    const respondedItem = summaryItems.find((item) => item.label === 'Responded');
+    const respondedItem = summaryItems.find((item: any) => item.label === 'Responded');
     const tree = instance.render();
     const responseStatusHeader = findElement(
       tree,
@@ -2719,7 +2727,7 @@ describe('QuestionFilter encrypted count gate tooltip integration', () => {
     }));
 
     const summaryItems = instance.getFilterSummaryItems();
-    const respondedItem = summaryItems.find((item) => item.label === 'Responded');
+    const respondedItem = summaryItems.find((item: any) => item.label === 'Responded');
     const tree = instance.render();
     const responseStatusHeader = findElement(
       tree,
