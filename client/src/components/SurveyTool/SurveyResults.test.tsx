@@ -2979,6 +2979,148 @@ describe('SurveyResults export/view controls', () => {
   });
 });
 
+describe('SurveyResults filter state synchronization', () => {
+  it('suppresses duplicate filter commit callbacks for no-op patches', () => {
+    const onFilterChange = jest.fn();
+    const onUrlUpdate = jest.fn();
+    const subject = attachStateHarness(createSubject({
+      onFilterChange,
+      onFilterStateChangeForUrlUpdate: onUrlUpdate,
+      isQuestionCacheReady: true,
+    }));
+
+    subject.commitResultsFilterState(
+      { filteredQuestionsCount: subject.state.filteredQuestionsCount },
+      {}
+    );
+    expect(subject.setState).not.toHaveBeenCalled();
+    expect(onFilterChange).not.toHaveBeenCalled();
+    expect(onUrlUpdate).not.toHaveBeenCalled();
+
+    subject.commitResultsFilterState(
+      { filteredQuestionsCount: 3 },
+      { questionTypes: ['binary'] }
+    );
+    expect(onFilterChange).toHaveBeenCalledTimes(1);
+    expect(onUrlUpdate).toHaveBeenCalledTimes(1);
+
+    subject.commitResultsFilterState(
+      { filteredQuestionsCount: 3 },
+      { questionTypes: ['binary'] }
+    );
+    expect(onFilterChange).toHaveBeenCalledTimes(1);
+    expect(onUrlUpdate).toHaveBeenCalledTimes(1);
+  });
+
+  it('re-notifies URL filter state when results modal reopens with unchanged filters', () => {
+    const onFilterChange = jest.fn();
+    const onUrlUpdate = jest.fn();
+    const filterState = { questionTypes: ['binary'] };
+    const subject = attachStateHarness(createSubject({
+      onFilterChange,
+      onFilterStateChangeForUrlUpdate: onUrlUpdate,
+      isQuestionCacheReady: true,
+      isResponsesCacheReady: true,
+      isOpen: true,
+      filterState,
+      preventUrlChange: true,
+    }));
+    subject.resetLocalStoragePollingBackoff = jest.fn();
+    subject.updateLocalStoragePollingState = jest.fn();
+    subject.queueResultsRefresh = jest.fn();
+
+    subject.notifyFilterStateCommitted(filterState);
+    expect(onUrlUpdate).toHaveBeenCalledTimes(1);
+
+    const prevProps = { ...subject.props, isOpen: false, filterState };
+    subject.props = { ...subject.props, isOpen: true, filterState };
+
+    subject.componentDidUpdate(prevProps, subject.state);
+
+    expect(onUrlUpdate).toHaveBeenCalledTimes(2);
+  });
+
+  it('coalesces modal-open state writes for filter sync and count updates', () => {
+    const subject = createSubject({
+      onFilterStateChangeForUrlUpdate: jest.fn(),
+      filteredQuestionsCount: 3,
+      filterState: { questionTypes: ['binary'] },
+      isQuestionCacheReady: true,
+      isResponsesCacheReady: true,
+      isOpen: true,
+      preventUrlChange: true,
+    });
+    subject.state = {
+      ...subject.state,
+      filteredQuestionsCount: 1,
+      filterState: { questionTypes: ['rating'] },
+      viewMode: 'questions',
+      surveyId: '',
+    };
+    attachStateHarness(subject);
+    subject.resetLocalStoragePollingBackoff = jest.fn();
+    subject.updateLocalStoragePollingState = jest.fn();
+    subject.updateParentWithCurrentFiltersForUrl = jest.fn();
+    subject.queueResultsRefresh = jest.fn();
+
+    const prevProps = {
+      ...subject.props,
+      isOpen: false,
+      filteredQuestionsCount: 1,
+      filterState: { questionTypes: ['rating'] },
+      isQuestionCacheReady: true,
+      isResponsesCacheReady: true,
+    };
+
+    subject.componentDidUpdate(prevProps, subject.state);
+
+    expect(subject.setState).toHaveBeenCalledTimes(1);
+    expect(subject.setState.mock.calls[0][0]).toMatchObject({
+      filteredQuestionsCount: 3,
+      filterState: { questionTypes: ['binary'] },
+    });
+    expect(subject.updateParentWithCurrentFiltersForUrl).toHaveBeenCalledTimes(1);
+    expect(subject.queueResultsRefresh).toHaveBeenCalledTimes(1);
+    expect(subject.queueResultsRefresh.mock.calls[0][0]).toContain('modal-open');
+  });
+
+  it('queues one combined refresh when modal-open and cache-ready reasons arrive together', () => {
+    const subject = createSubject({
+      filterState: {},
+      isQuestionCacheReady: true,
+      isResponsesCacheReady: true,
+      isOpen: true,
+      preventUrlChange: true,
+    });
+    subject.state = {
+      ...subject.state,
+      viewMode: 'questions',
+      surveyId: '',
+    };
+    attachStateHarness(subject);
+    subject.resetLocalStoragePollingBackoff = jest.fn();
+    subject.updateLocalStoragePollingState = jest.fn();
+    subject.updateParentWithCurrentFiltersForUrl = jest.fn();
+    subject.queueResultsRefresh = jest.fn();
+
+    const prevProps = {
+      ...subject.props,
+      isOpen: false,
+      isQuestionCacheReady: false,
+      isResponsesCacheReady: false,
+      filterState: {},
+    };
+
+    subject.componentDidUpdate(prevProps, subject.state);
+
+    expect(subject.queueResultsRefresh).toHaveBeenCalledTimes(1);
+    const reason = subject.queueResultsRefresh.mock.calls[0][0];
+    expect(reason).toContain('modal-open');
+    expect(reason).toContain('cache-ready');
+    expect(reason).toContain('responses-cache-ready');
+  });
+});
+
 describe('SurveyResults modal and polling behavior', () => {
   afterEach(() => {
     jest.restoreAllMocks();
