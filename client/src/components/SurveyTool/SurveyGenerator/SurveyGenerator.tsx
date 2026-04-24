@@ -1,4 +1,4 @@
-
+/** @file SurveyGenerator.tsx */
 import React, { Suspense, useState, useEffect, useRef, useMemo } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
@@ -89,7 +89,13 @@ import { notify } from '../../../utilities/ui/notify.js';
 import { E2E_TESTIDS } from '../../../utilities/e2eTestIds.js';
 
 const cacheLog = createLogger('cache');
-const AI_PROVIDER_LABELS = Object.freeze({
+const AudioInputUntyped = AudioInput as any;
+const SessionChipSelectorUntyped = SessionChipSelector as any;
+const uploadDocLibraryFileUntyped = uploadDocLibraryFile as any;
+const uploadDocLibraryUrlRecordUntyped = uploadDocLibraryUrlRecord as any;
+const buildSessionDocLibraryViewerUrlUntyped = buildSessionDocLibraryViewerUrl as any;
+const getEffectiveAiConfigUntyped = getEffectiveAiConfig as any;
+const AI_PROVIDER_LABELS: Record<string, string> = Object.freeze({
   anthropic: 'Anthropic',
   openai: 'OpenAI',
   openrouter: 'OpenRouter',
@@ -102,21 +108,24 @@ const MIN_QUESTION_COUNT = 5;
 const MAX_QUESTION_COUNT = 50;
 const SUPPORTED_PHOTO_EXTENSIONS = /\.(png|jpe?g|webp|gif)$/i;
 const SUPPORTED_PHOTO_ACCEPT = 'image/png,image/jpeg,image/webp,image/gif';
-const PHOTO_ANALYSIS_STATUS_LABELS = Object.freeze({
+const PHOTO_ANALYSIS_STATUS_LABELS: Record<string, string> = Object.freeze({
   queued: 'Queued for analysis',
   loading: 'Analyzing photo...',
   ready: 'Analysis complete',
   error: 'Analysis failed',
 });
+const getErrorMessage = (error: any, fallback = 'Unknown error') => (
+  typeof error?.message === 'string' && error.message.trim() ? error.message : fallback
+);
 
-const clampQuestionCount = (value) => Math.min(MAX_QUESTION_COUNT, Math.max(MIN_QUESTION_COUNT, value));
+const clampQuestionCount = (value: any) => Math.min(MAX_QUESTION_COUNT, Math.max(MIN_QUESTION_COUNT, value));
 
-const buildAdditionalSourceId = (ref) => {
+const buildAdditionalSourceId = (ref: any) => {
   ref.current += 1;
   return `database-source-${ref.current}`;
 };
 
-const isSupportedPhotoFile = (file) => (
+const isSupportedPhotoFile = (file: any) => (
   Boolean(file) &&
   (
     /^image\/(png|jpeg|webp|gif)$/i.test(String(file?.type || '').trim()) ||
@@ -124,7 +133,7 @@ const isSupportedPhotoFile = (file) => (
   )
 );
 
-const buildQueuedPhotoSource = (file, ref) => ({
+const buildQueuedPhotoSource = (file: any, ref: any) => ({
   id: buildAdditionalSourceId(ref),
   type: 'photo',
   value: file,
@@ -135,11 +144,11 @@ const buildQueuedPhotoSource = (file, ref) => ({
   analysisExpanded: false,
 });
 
-const buildUnsupportedPhotoMessage = (count = 0) => (
+const buildUnsupportedPhotoMessage = (count: any = 0) => (
   `Skipped ${count} unsupported photo${count === 1 ? '' : 's'}. Use png, jpg, jpeg, webp, or gif.`
 );
 
-const getPhotoStatusLabel = (source = {}) => {
+const getPhotoStatusLabel = (source: any = {}) => {
   const status = toStr(source?.analysisStatus || 'queued').trim().toLowerCase();
   if (status === 'error') {
     return toStr(source?.analysisError).trim() || PHOTO_ANALYSIS_STATUS_LABELS.error;
@@ -147,15 +156,15 @@ const getPhotoStatusLabel = (source = {}) => {
   return PHOTO_ANALYSIS_STATUS_LABELS[status] || PHOTO_ANALYSIS_STATUS_LABELS.queued;
 };
 
-const buildPhotoPreviewUrl = (file) => {
+const buildPhotoPreviewUrl = (file: any) => {
   if (!file || typeof URL === 'undefined' || typeof URL.createObjectURL !== 'function') {
     return '';
   }
   return URL.createObjectURL(file);
 };
 
-function QueuedPhotoPreview({ file, photoName, sourceId }) {
-  const [previewSrc] = useState(() => buildPhotoPreviewUrl(file));
+function QueuedPhotoPreview({ file, photoName, sourceId }: any) {
+  const [previewSrc] = useState<any>(() => buildPhotoPreviewUrl(file));
 
   useEffect(() => {
     return () => {
@@ -189,7 +198,7 @@ function QueuedPhotoPreview({ file, photoName, sourceId }) {
   );
 }
 
-const buildPhotoAnalysisMarkdown = ({ photoName, analysisText } = {}) => {
+const buildPhotoAnalysisMarkdown = ({ photoName, analysisText }: any = {}) => {
   const safeName = toStr(photoName).trim() || 'uploaded photo';
   const body = toStr(analysisText).trim();
   return [
@@ -201,12 +210,12 @@ const buildPhotoAnalysisMarkdown = ({ photoName, analysisText } = {}) => {
   ].join('\n');
 };
 
-const buildPhotoAnalysisFilename = (photoName = '') => {
+const buildPhotoAnalysisFilename = (photoName: any = '') => {
   const safeName = toStr(photoName).trim() || 'photo';
   const withoutExtension = safeName.replace(/\.(png|jpe?g|webp|gif)$/i, '') || safeName;
   return `${withoutExtension}.analysis.md`;
 };
-const formatAiPromptModelLabel = (config = {}) => {
+const formatAiPromptModelLabel = (config: any = {}) => {
   const providerKey = toStr(config?.provider).trim().toLowerCase();
   const model = toStr(config?.model).trim();
   const provider =
@@ -222,29 +231,29 @@ const formatAiPromptModelLabel = (config = {}) => {
 
 
 // Dev-only logger
-const debug = (...args) => {
+const debug = (...args: any[]) => {
   if (process.env.NODE_ENV !== 'production') cacheLog.log(...args);
 };
 
 // Helper function to normalize defaultTags prop
-const normalizeTags = (dTags) => {
+const normalizeTags = (dTags: any) => {
   if (!dTags) return [];
-  if (Array.isArray(dTags)) return dTags.filter(Boolean).map(t => t.trim());
+  if (Array.isArray(dTags)) return dTags.filter(Boolean).map((t: any) => t.trim());
   if (typeof dTags === 'string')
     return dTags
       .split(',')
-      .map((t) => t.trim())
+      .map((t: any) => t.trim())
       .filter(Boolean);
   return [];
 };
 
-export const isSingleHttpUrlInput = (value = '') => /^https?:\/\/\S+$/.test(String(value).trim());
+export const isSingleHttpUrlInput = (value: any = '') => /^https?:\/\/\S+$/.test(String(value).trim());
 export const hasDatabaseToolInputContent = ({
   pastedText = '',
   additionalUrlInput = '',
   additionalSources = [],
   audioFile = null,
-} = {}) => {
+}: any = {}) => {
   if (toStr(pastedText).trim()) return true;
   if (toStr(additionalUrlInput).trim()) return true;
   if (Array.isArray(additionalSources) && additionalSources.length > 0) return true;
@@ -254,7 +263,7 @@ export const hasDatabaseToolInputContent = ({
 const LazyCorpusViewer = React.lazy(() => import('../../DemoViews/CorpusViewer'));
 
 
-export default function AudioSurveyGenerator(rawProps = {}) {
+export default function AudioSurveyGenerator(rawProps: any = {}) {
   const {
     provider,
     network,
@@ -275,75 +284,75 @@ export default function AudioSurveyGenerator(rawProps = {}) {
     hideInternalSessionSelector,
   } = rawProps;
   // UI Modes
-  const [transcriptMode, setTranscriptMode] = useState(false);
+  const [transcriptMode, setTranscriptMode] = useState<any>(false);
   // NEW: Toggle for Arweave upload
-  const [uploadSummaryToArweave, setUploadSummaryToArweave] = useState(true);
-  const [encryptSummary, setEncryptSummary] = useState(false);
+  const [uploadSummaryToArweave, setUploadSummaryToArweave] = useState<any>(true);
+  const [encryptSummary, setEncryptSummary] = useState<any>(false);
 
   // Input States
-  const [pastedText, setPastedText] = useState('');
-  const [textEncrypted, setTextEncrypted] = useState(false);
+  const [pastedText, setPastedText] = useState<any>('');
+  const [textEncrypted, setTextEncrypted] = useState<any>(false);
 
   // Audio specific
-  const [audioFile, setAudioFile] = useState(null);
-  const [isTranscribing, setIsTranscribing] = useState(false);
+  const [audioFile, setAudioFile] = useState<any>(null);
+  const [isTranscribing, setIsTranscribing] = useState<any>(false);
 
   // AI Prompt Panel State
-  const [showAIPrompt, setShowAIPrompt] = useState(false);
-  const [aiPromptText, setAiPromptText] = useState('');
-  const [aiPromptLoaded, setAiPromptLoaded] = useState(false);
-  const [aiPromptCopySuccess, setAiPromptCopySuccess] = useState(false);
-  const [aiPromptModelLabel, setAiPromptModelLabel] = useState('Configured model');
+  const [showAIPrompt, setShowAIPrompt] = useState<any>(false);
+  const [aiPromptText, setAiPromptText] = useState<any>('');
+  const [aiPromptLoaded, setAiPromptLoaded] = useState<any>(false);
+  const [aiPromptCopySuccess, setAiPromptCopySuccess] = useState<any>(false);
+  const [aiPromptModelLabel, setAiPromptModelLabel] = useState<any>('Configured model');
 
-  const [questionTypes, setQuestionTypes] = useState({
+  const [questionTypes, setQuestionTypes] = useState<any>({
     // defaults
     binary: true,
     multichoice: true,
     rating: false,
     freeform: false,
   });
-  const [count, setCount] = useState(DEFAULT_QUESTION_COUNT);
+  const [count, setCount] = useState<any>(DEFAULT_QUESTION_COUNT);
 
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [waitingSeconds, setWaitingSeconds] = useState(0);
-  const waitTimerRef = React.useRef(null);
-  const [surveyTitle, setSurveyTitle] = useState('');
-  const [statementsToUpload, setStatementsToUpload] = useState([]);
-  const [prefilledAnswers, setPrefilledAnswers] = useState([]);
-  const [showCreateSurvey, setShowCreateSurvey] = useState(false);
-  const [documentURLs, setDocumentURLs] = useState([]);
+  const [loading, setLoading] = useState<any>(false);
+  const [error, setError] = useState<any>('');
+  const [waitingSeconds, setWaitingSeconds] = useState<any>(0);
+  const waitTimerRef = React.useRef<any>(null);
+  const [surveyTitle, setSurveyTitle] = useState<any>('');
+  const [statementsToUpload, setStatementsToUpload] = useState<any>([]);
+  const [prefilledAnswers, setPrefilledAnswers] = useState<any>([]);
+  const [showCreateSurvey, setShowCreateSurvey] = useState<any>(false);
+  const [documentURLs, setDocumentURLs] = useState<any>([]);
 
   // AUDIO summary-first flow state
-  const [summaryMd, setSummaryMd] = useState('');
-  const [summaryCollapsed, setSummaryCollapsed] = useState(true);
-  const [summaryArweaveTxId, setSummaryArweaveTxId] = useState('');
-  const [summaryDocURL, setSummaryDocURL] = useState('');
+  const [summaryMd, setSummaryMd] = useState<any>('');
+  const [summaryCollapsed, setSummaryCollapsed] = useState<any>(true);
+  const [summaryArweaveTxId, setSummaryArweaveTxId] = useState<any>('');
+  const [summaryDocURL, setSummaryDocURL] = useState<any>('');
 
-  const [showSessionSelector, setShowSessionSelector] = useState(false);
-  const [localSessionOverrideSlug, setLocalSessionOverrideSlug] = useState(null);
-  const [localSessionOverrideTouched, setLocalSessionOverrideTouched] = useState(false);
+  const [showSessionSelector, setShowSessionSelector] = useState<any>(false);
+  const [localSessionOverrideSlug, setLocalSessionOverrideSlug] = useState<any>(null);
+  const [localSessionOverrideTouched, setLocalSessionOverrideTouched] = useState<any>(false);
   const hasControlledSessionOverride =
     Object.prototype.hasOwnProperty.call(rawProps, 'sessionOverrideSlug') ||
     Object.prototype.hasOwnProperty.call(rawProps, 'sessionOverrideTouched') ||
     Object.prototype.hasOwnProperty.call(rawProps, 'hideInternalSessionSelector');
   const demoSurfaceEnabled = demoSurfaceMode !== false;
-  const [showDemoCorpusView, setShowDemoCorpusView] = useState(demoSurfaceEnabled);
+  const [showDemoCorpusView, setShowDemoCorpusView] = useState<any>(demoSurfaceEnabled);
 
   // Multi-source State
-  const [additionalSources, setAdditionalSources] = useState([]);
-  const [additionalUrlInput, setAdditionalUrlInput] = useState('');
-  const additionalFileInputRef = useRef(null);
-  const additionalPhotoInputRef = useRef(null);
-  const uploadAudioInputRef = useRef(null);
-  const additionalSourceIdRef = useRef(0);
-  const [saveExtraSourcesToDocLibrary, setSaveExtraSourcesToDocLibrary] = useState(false);
-  const [saveDocAudience, setSaveDocAudience] = useState('self');
-  const [showSaveDocAudienceMenu, setShowSaveDocAudienceMenu] = useState(false);
+  const [additionalSources, setAdditionalSources] = useState<any>([]);
+  const [additionalUrlInput, setAdditionalUrlInput] = useState<any>('');
+  const additionalFileInputRef = useRef<any>(null);
+  const additionalPhotoInputRef = useRef<any>(null);
+  const uploadAudioInputRef = useRef<any>(null);
+  const additionalSourceIdRef = useRef<any>(0);
+  const [saveExtraSourcesToDocLibrary, setSaveExtraSourcesToDocLibrary] = useState<any>(false);
+  const [saveDocAudience, setSaveDocAudience] = useState<any>('self');
+  const [showSaveDocAudienceMenu, setShowSaveDocAudienceMenu] = useState<any>(false);
 
-  const [summaryGateSBTs, setSummaryGateSBTs] = useState([]);
-  const [summaryGateMode, setSummaryGateMode] = useState('any');
-  const lastSummaryGateKeyRef = useRef('');
+  const [summaryGateSBTs, setSummaryGateSBTs] = useState<any>([]);
+  const [summaryGateMode, setSummaryGateMode] = useState<any>('any');
+  const lastSummaryGateKeyRef = useRef<any>('');
   const controlledSessionTouched = Boolean(sessionOverrideTouched);
 
   const effectiveSessionSlugInput = useMemo(() => (
@@ -385,11 +394,11 @@ export default function AudioSurveyGenerator(rawProps = {}) {
     sessionSlug: effectiveSessionSlugInput,
     sessionConfig: effectiveSessionConfigInput,
   }, {
-    resolveBySlug: (slug) => getSessionConfigBySlug(slug),
+    resolveBySlug: (slug: any) => getSessionConfigBySlug(slug),
   }), [effectiveSessionConfigInput, effectiveSessionSlugInput]);
   const resolvedSessionSlug = resolvedSessionAliases.sessionSlug;
-  const resolvedSessionConfig = useMemo(() => {
-    const cfg = resolvedSessionAliases.sessionConfig || {};
+  const resolvedSessionConfig: any = useMemo(() => {
+    const cfg: any = resolvedSessionAliases.sessionConfig || {};
     const slug = normalizeSessionSlug(cfg.slug || resolvedSessionAliases.sessionSlug || '');
     return {
       ...cfg,
@@ -445,18 +454,18 @@ export default function AudioSurveyGenerator(rawProps = {}) {
   }, [resolvedSessionConfig]);
   const summaryGateAddresses = useMemo(() => getGateSbtAddresses(summaryGate), [summaryGate]);
   const summaryGateModeDefault = useMemo(() => normalizeGateMode(summaryGate), [summaryGate]);
-  const summaryGateKey = summaryGateAddresses.map((addr) => addr.toLowerCase()).sort().join('|');
+  const summaryGateKey = summaryGateAddresses.map((addr: any) => addr.toLowerCase()).sort().join('|');
   const activeSessionKey = useMemo(() => {
     const hasExplicit = typeof effectiveSessionSlugInput === 'string';
     if (!hasExplicit) return null;
     return normalizeSessionSlug(effectiveSessionSlugInput ?? '');
   }, [effectiveSessionSlugInput]);
-  const sessionSelectorOptions = useMemo(() => {
+  const sessionSelectorOptions: any[] = useMemo(() => {
     const selectedSlug = normalizeSessionSlug(resolvedSessionSlug || activeSessionSlug || '');
-    const options = new Map();
-    const pushOption = (slugIn = '') => {
+    const options: any = new Map();
+    const pushOption = (slugIn: any = '') => {
       const slug = normalizeSessionSlug(slugIn || '');
-      const cfg = getSessionConfigBySlug(slug) || {};
+      const cfg: any = getSessionConfigBySlug(slug) || {};
       const sessionName = toStr(cfg?.sessionName || '').trim();
       const slugLabel = slug || 'General';
       const label = sessionName && sessionName.toLowerCase() !== slugLabel.toLowerCase()
@@ -486,9 +495,9 @@ export default function AudioSurveyGenerator(rawProps = {}) {
     ? activeSessionKey
     : (configSessionKey != null ? configSessionKey : '');
   const summaryGateMismatch = activeSessionKey != null && configSessionKey != null && activeSessionKey !== configSessionKey;
-  const summaryGateSessionKeyRef = useRef(summaryGateSessionKey);
-  const docSaveContextKeyRef = useRef('');
-  const docSaveAutoAudienceRef = useRef(docSaveGate.hasRecipients ? 'session' : 'self');
+  const summaryGateSessionKeyRef = useRef<any>(summaryGateSessionKey);
+  const docSaveContextKeyRef = useRef<any>('');
+  const docSaveAutoAudienceRef = useRef<any>(docSaveGate.hasRecipients ? 'session' : 'self');
 
   useEffect(() => {
     if (summaryGateSessionKeyRef.current === summaryGateSessionKey) return;
@@ -504,7 +513,7 @@ export default function AudioSurveyGenerator(rawProps = {}) {
     if (summaryGateSBTs.length > 0) return;
     if (lastSummaryGateKeyRef.current === summaryGateKey) return;
     lastSummaryGateKeyRef.current = summaryGateKey;
-    setSummaryGateSBTs(summaryGateAddresses.map((addr) => ({ address: addr, name: addr })));
+    setSummaryGateSBTs(summaryGateAddresses.map((addr: any) => ({ address: addr, name: addr })));
     if (summaryGateModeDefault) setSummaryGateMode(summaryGateModeDefault);
   }, [summaryGateAddresses, summaryGateKey, summaryGateModeDefault, summaryGateSBTs.length, summaryGateMismatch]);
 
@@ -531,7 +540,7 @@ export default function AudioSurveyGenerator(rawProps = {}) {
     setShowSaveDocAudienceMenu(false);
   }, [additionalSources.length]);
 
-  const abortedRef = React.useRef(false);
+  const abortedRef = React.useRef<any>(false);
   useEffect(() => {
     abortedRef.current = false; return () => { abortedRef.current = true; };
   }, []);
@@ -539,7 +548,7 @@ export default function AudioSurveyGenerator(rawProps = {}) {
   useEffect(() => {
     if (loading && !waitTimerRef.current) {
       setWaitingSeconds(0);
-      waitTimerRef.current = setInterval(() => setWaitingSeconds((s) => s + 1), 1000);
+      waitTimerRef.current = setInterval(() => setWaitingSeconds((s: any) => s + 1), 1000);
     } else if (!loading && waitTimerRef.current) {
       clearInterval(waitTimerRef.current);
       waitTimerRef.current = null;
@@ -554,7 +563,7 @@ export default function AudioSurveyGenerator(rawProps = {}) {
 
   // Handle Transcript Mode Toggle
   const handleTranscriptModeToggle = () => {
-    setTranscriptMode(prev => {
+    setTranscriptMode((prev: any) => {
       const newVal = !prev;
       if (!newVal) {
         setAudioFile(null);
@@ -565,11 +574,11 @@ export default function AudioSurveyGenerator(rawProps = {}) {
     });
   };
 
-  function buildSinglePrompt(sourceDocContent, overrides = {}) {
+  function buildSinglePrompt(sourceDocContent: any, overrides: any = {}) {
     const allowed = normalizeTags(defaultTags);
     const defaultTagsStr = allowed.length > 0 ? allowed.join(', ') : '';
 
-    const selectedTypes = Object.keys(questionTypes).filter(t => questionTypes[t]);
+    const selectedTypes = Object.keys(questionTypes).filter((t: any) => questionTypes[t]);
     const typesStr =
       selectedTypes.length > 0 ? selectedTypes.join(',') : 'binary,rating,freeform,multichoice';
 
@@ -596,7 +605,7 @@ export default function AudioSurveyGenerator(rawProps = {}) {
     return finalPrompt;
   }
 
-  async function makeSingleAiCall(sourceDocContent, overrides = {}, requestedCount = count) {
+  async function makeSingleAiCall(sourceDocContent: any, overrides: any = {}, requestedCount: any = count) {
     const prompt = buildSinglePrompt(sourceDocContent, overrides);
     const raw    = await callAI(prompt, aiRequestOptions);
     const match  = raw.match(/\{[\s\S]*\}/);
@@ -654,7 +663,7 @@ export default function AudioSurveyGenerator(rawProps = {}) {
             chainId: gateChainId,
             litChain: summaryGate?.litChain || summaryGate?.chain,
           });
-          const selectedAddresses = (summaryGateSBTs || []).map((sbt) => sbt.address).filter(Boolean);
+          const selectedAddresses = (summaryGateSBTs || []).map((sbt: any) => sbt.address).filter(Boolean);
           const sbtAddresses = selectedAddresses.length ? selectedAddresses : summaryGateAddresses;
           const gateMode = summaryGateMode || summaryGateModeDefault || 'any';
           const accessControlConditions = buildSbtAccessControlConditions({
@@ -684,8 +693,8 @@ export default function AudioSurveyGenerator(rawProps = {}) {
             },
           });
           if (abortedRef.current) return;
-          txId = result.txId;
-          url = result.url;
+          txId = result?.txId || '';
+          url = result?.url || '';
         } else {
           const result = await uploadMarkdownSummaryToArweave(summaryMd, {
             sessionSlug: resolvedSessionSlug || '',
@@ -694,8 +703,8 @@ export default function AudioSurveyGenerator(rawProps = {}) {
             context: { account, providerLike: provider, chainId: network?.id },
           });
           if (abortedRef.current) return;
-          txId = result.txId;
-          url = result.url;
+          txId = result?.txId || '';
+          url = result?.url || '';
         }
       }
 
@@ -711,9 +720,9 @@ export default function AudioSurveyGenerator(rawProps = {}) {
 
       processAndSetQuestions(aiData, url ? [url] : []);
       setShowCreateSurvey(true);
-    } catch (err) {
+    } catch (err: any) {
       if (!abortedRef.current) {
-        setError(err.message || 'Failed to upload summary or generate questions.');
+        setError(getErrorMessage(err, 'Failed to upload summary or generate questions.'));
       }
     } finally {
       if (!abortedRef.current) {
@@ -723,15 +732,15 @@ export default function AudioSurveyGenerator(rawProps = {}) {
     }
   }
 
-  function processAndSetQuestions(aiData, docs) {
-    const wantedTypes = Object.keys(questionTypes).filter(t => questionTypes[t]);
+  function processAndSetQuestions(aiData: any, docs: any) {
+    const wantedTypes = Object.keys(questionTypes).filter((t: any) => questionTypes[t]);
     const qs = aiData.questions
-      .filter(q => wantedTypes.includes(q.questionType))
+      .filter((q: any) => wantedTypes.includes(q.questionType))
       .slice(0, count);
 
-    qs.forEach(q => { q.tags = q.tags || []; });
+    qs.forEach((q: any) => { q.tags = q.tags || []; });
 
-    const formatted = qs.map(q => ({
+    const formatted = qs.map((q: any) => ({
       id: generateQuestionId(q.questionType, q.prompt, q.options || []),
       type: q.questionType,
       prompt: q.prompt,
@@ -750,7 +759,7 @@ export default function AudioSurveyGenerator(rawProps = {}) {
 
   const addAdditionalUrl = () => {
     if (!additionalUrlInput.trim()) return;
-    setAdditionalSources(prev => [
+    setAdditionalSources((prev: any) => [
       ...prev,
       {
         id: buildAdditionalSourceId(additionalSourceIdRef),
@@ -762,22 +771,22 @@ export default function AudioSurveyGenerator(rawProps = {}) {
     setAdditionalUrlInput('');
   };
 
-  const handleUrlKeyDown = (e) => {
+  const handleUrlKeyDown = (e: any) => {
     if (e.key === 'Enter') {
       e.preventDefault();
       addAdditionalUrl();
     }
   };
 
-  const adjustQuestionCount = (delta) => {
-    setCount((previousCount) => clampQuestionCount(previousCount + delta));
+  const adjustQuestionCount = (delta: any) => {
+    setCount((previousCount: any) => clampQuestionCount(previousCount + delta));
   };
 
-  const handleAdditionalFileUpload = (e) => {
+  const handleAdditionalFileUpload = (e: any) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
     const file = files[0];
-    setAdditionalSources(prev => [
+    setAdditionalSources((prev: any) => [
       ...prev,
       {
         id: buildAdditionalSourceId(additionalSourceIdRef),
@@ -789,7 +798,7 @@ export default function AudioSurveyGenerator(rawProps = {}) {
     e.target.value = '';
   };
 
-  const handleAdditionalPhotoUpload = (e) => {
+  const handleAdditionalPhotoUpload = (e: any) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
     const selectedFiles = Array.from(files);
@@ -797,9 +806,9 @@ export default function AudioSurveyGenerator(rawProps = {}) {
     const invalidCount = selectedFiles.length - validFiles.length;
 
     if (validFiles.length > 0) {
-      setAdditionalSources((prev) => [
+      setAdditionalSources((prev: any) => [
         ...prev,
-        ...validFiles.map((file) => buildQueuedPhotoSource(file, additionalSourceIdRef)),
+        ...validFiles.map((file: any) => buildQueuedPhotoSource(file, additionalSourceIdRef)),
       ]);
     }
 
@@ -812,13 +821,13 @@ export default function AudioSurveyGenerator(rawProps = {}) {
     e.target.value = '';
   };
 
-  const removeAdditionalSource = (sourceId) => {
-    setAdditionalSources((prev) => prev.filter((source) => source?.id !== sourceId));
+  const removeAdditionalSource = (sourceId: any) => {
+    setAdditionalSources((prev: any) => prev.filter((source: any) => source?.id !== sourceId));
   };
 
-  const updateAdditionalSourceById = (sourceId, patch) => {
-    setAdditionalSources((prev) => (
-      (Array.isArray(prev) ? prev : []).map((source) => (
+  const updateAdditionalSourceById = (sourceId: any, patch: any) => {
+    setAdditionalSources((prev: any) => (
+      (Array.isArray(prev) ? prev : []).map((source: any) => (
         source?.id === sourceId
           ? {
               ...source,
@@ -829,9 +838,9 @@ export default function AudioSurveyGenerator(rawProps = {}) {
     ));
   };
 
-  const analyzeQueuedPhotoSources = async (sources = []) => {
+  const analyzeQueuedPhotoSources = async (sources: any = []) => {
     const queuedSources = Array.isArray(sources) ? sources : [];
-    const analysisBySourceId = new Map();
+    const analysisBySourceId: any = new Map();
     for (const source of queuedSources) {
       if (source?.type !== 'photo') continue;
       const cachedAnalysis = toStr(source?.analysisText).trim();
@@ -863,8 +872,8 @@ export default function AudioSurveyGenerator(rawProps = {}) {
           analysisError: '',
           analysisText,
         });
-      } catch (err) {
-        const message = err?.message || 'Photo analysis failed.';
+      } catch (err: any) {
+        const message = getErrorMessage(err, 'Photo analysis failed.');
         updateAdditionalSourceById(source.id, {
           analysisStatus: 'error',
           analysisError: message,
@@ -876,8 +885,8 @@ export default function AudioSurveyGenerator(rawProps = {}) {
     return analysisBySourceId;
   };
 
-  const togglePhotoAnalysisExpanded = (sourceId) => {
-    updateAdditionalSourceById(sourceId, (source) => ({
+  const togglePhotoAnalysisExpanded = (sourceId: any) => {
+    updateAdditionalSourceById(sourceId, (source: any) => ({
       analysisExpanded: !source?.analysisExpanded,
     }));
   };
@@ -938,7 +947,7 @@ export default function AudioSurveyGenerator(rawProps = {}) {
     };
   };
 
-  const saveQueuedSourcesToDocLibrary = async (sources = [], photoAnalysisBySourceId = new Map()) => {
+  const saveQueuedSourcesToDocLibrary = async (sources: any = [], photoAnalysisBySourceId: any = new Map()) => {
     const queuedSources = Array.isArray(sources) ? sources : [];
     if (!saveExtraSourcesToDocLibrary || queuedSources.length === 0) return [];
     if (!loginComplete) {
@@ -950,7 +959,7 @@ export default function AudioSurveyGenerator(rawProps = {}) {
     }
 
     const encryption = resolveDocSaveEncryption();
-    const savedViewerUrls = [];
+    const savedViewerUrls: any[] = [];
 
     for (const source of queuedSources) {
       const isUrlSource = source?.type === 'url';
@@ -964,10 +973,10 @@ export default function AudioSurveyGenerator(rawProps = {}) {
           : [],
       );
 
-      let result = null;
-      const viewerUrls = [];
+      let result: any = null;
+      const viewerUrls: any[] = [];
       if (isUrlSource) {
-        result = await uploadDocLibraryUrlRecord({
+        result = await uploadDocLibraryUrlRecordUntyped({
           url: source?.value,
           title: source?.name,
           sessionSlug: resolvedSessionSlug || '',
@@ -979,10 +988,10 @@ export default function AudioSurveyGenerator(rawProps = {}) {
           encryption: {
             ...encryption,
             contextLabel: `doc-link:${resolvedSessionSlug || ''}`,
-          },
+          } as any,
         });
       } else {
-        result = await uploadDocLibraryFile({
+        result = await uploadDocLibraryFileUntyped({
           file: source?.value,
           sessionSlug: resolvedSessionSlug || '',
           sessionConfig: resolvedSessionConfig,
@@ -990,11 +999,11 @@ export default function AudioSurveyGenerator(rawProps = {}) {
           providerLike: provider,
           chainId: network?.id || null,
           tags: baseTags,
-          encryption,
+          encryption: encryption as any,
         });
       }
 
-      const viewerUrl = buildSessionDocLibraryViewerUrl({
+      const viewerUrl = buildSessionDocLibraryViewerUrlUntyped({
         sessionToken: docSaveSessionToken,
         txId: result?.txId,
         storage: result?.storage || 'lit-arweave',
@@ -1019,7 +1028,7 @@ export default function AudioSurveyGenerator(rawProps = {}) {
               derivedFromTxId: result?.txId,
             }),
           );
-          const analysisResult = await uploadDocLibraryFile({
+          const analysisResult = await uploadDocLibraryFileUntyped({
             file: analysisFile,
             sessionSlug: resolvedSessionSlug || '',
             sessionConfig: resolvedSessionConfig,
@@ -1027,9 +1036,9 @@ export default function AudioSurveyGenerator(rawProps = {}) {
             providerLike: provider,
             chainId: network?.id || null,
             tags: analysisTags,
-            encryption,
+            encryption: encryption as any,
           });
-          const analysisViewerUrl = buildSessionDocLibraryViewerUrl({
+          const analysisViewerUrl = buildSessionDocLibraryViewerUrlUntyped({
             sessionToken: docSaveSessionToken,
             txId: analysisResult?.txId,
             storage: analysisResult?.storage || 'lit-arweave',
@@ -1045,7 +1054,7 @@ export default function AudioSurveyGenerator(rawProps = {}) {
     return savedViewerUrls;
   };
 
-  async function handleSubmit(e) {
+  async function handleSubmit(e: any) {
     e.preventDefault();
     localStorage.removeItem('unfinishedSurvey');
 
@@ -1056,7 +1065,7 @@ export default function AudioSurveyGenerator(rawProps = {}) {
     setDocumentURLs([]);
     setSummaryMd('');
 
-    let currentDocumentURLs = [];
+    let currentDocumentURLs: any[] = [];
     let content = '';
     const queuedAdditionalSources = [...additionalSources];
     let effectiveSources = [...queuedAdditionalSources];
@@ -1110,12 +1119,12 @@ export default function AudioSurveyGenerator(rawProps = {}) {
 
       // 2. Process Additional Sources
       if (effectiveSources.length > 0) {
-        const photoSources = effectiveSources.filter((src) => src?.type === 'photo');
-        const nonPhotoSources = effectiveSources.filter((src) => src?.type !== 'photo');
-        const additionalContentSections = [];
+        const photoSources = effectiveSources.filter((src: any) => src?.type === 'photo');
+        const nonPhotoSources = effectiveSources.filter((src: any) => src?.type !== 'photo');
+        const additionalContentSections: any[] = [];
 
         if (photoSources.length > 0) {
-          photoSources.forEach((src) => {
+          photoSources.forEach((src: any) => {
             const analysisText = toStr(photoAnalysisBySourceId.get(src?.id)).trim();
             if (!analysisText) return;
             additionalContentSections.push(`--- Photo Source: ${src.name} ---\n\n${analysisText}`);
@@ -1135,7 +1144,7 @@ export default function AudioSurveyGenerator(rawProps = {}) {
             content = mergedAdditionalContent;
           }
         }
-        effectiveSources.forEach((src, idx) => {
+        effectiveSources.forEach((src: any, idx: any) => {
           const queuedSource = idx < queuedAdditionalSources.length ? queuedAdditionalSources[idx] : null;
           const savedRef = idx < savedDocRefs.length ? savedDocRefs[idx] : null;
           if (savedRef?.viewerUrls?.length && queuedSource === src) {
@@ -1145,7 +1154,7 @@ export default function AudioSurveyGenerator(rawProps = {}) {
           if (src.type === 'url') currentDocumentURLs.push(src.value);
         });
         const hasPrimaryTextInput = Boolean(pastedText && pastedText.trim().length > 0);
-        const additionalSourcesAreAllUrls = effectiveSources.every((src) => src.type === 'url');
+        const additionalSourcesAreAllUrls = effectiveSources.every((src: any) => src.type === 'url');
         if (!transcriptMode && !hasPrimaryTextInput && additionalSourcesAreAllUrls) {
           sourceTypeOverride = 'webpage';
         }
@@ -1217,9 +1226,9 @@ export default function AudioSurveyGenerator(rawProps = {}) {
       processAndSetQuestions(aiData, finalDocUrls);
       setShowCreateSurvey(true);
 
-    } catch (err) {
+    } catch (err: any) {
       if (!abortedRef.current) {
-        setError(err.message || 'Generation failed.');
+        setError(getErrorMessage(err, 'Generation failed.'));
       }
     } finally {
       if (!abortedRef.current) {
@@ -1230,7 +1239,7 @@ export default function AudioSurveyGenerator(rawProps = {}) {
     }
   }
 
-  function generateQuestionId(type, prompt, options = []) {
+  function generateQuestionId(type: any, prompt: any, options: any = []) {
     return generateSharedQuestionId(type, prompt, options);
   }
 
@@ -1255,7 +1264,7 @@ export default function AudioSurveyGenerator(rawProps = {}) {
           toggleLoginModal={toggleLoginModal}
           defaultTags={defaultTags}
           documentURLs={documentURLs}
-          onUploadComplete={(surveyHash) => {
+          onUploadComplete={(surveyHash: any) => {
             setShowCreateSurvey(false);
             setStatementsToUpload([]);
             setSurveyTitle('');
@@ -1273,13 +1282,13 @@ export default function AudioSurveyGenerator(rawProps = {}) {
     );
   }
 
-  const toggleQuestionType = (type) => {
-    setQuestionTypes((prev) => ({ ...prev, [type]: !prev[type] }));
+  const toggleQuestionType = (type: any) => {
+    setQuestionTypes((prev: any) => ({ ...prev, [type]: !prev[type] }));
   };
 
   const refreshAIPromptModelLabel = React.useCallback(async () => {
     try {
-      const aiCfg = await getEffectiveAiConfig({
+      const aiCfg = await getEffectiveAiConfigUntyped({
         sessionSlug: aiRequestOptions.sessionSlug,
         context: aiRequestOptions.context,
         resolveSecrets: false,
@@ -1298,7 +1307,7 @@ export default function AudioSurveyGenerator(rawProps = {}) {
   }, [showAIPrompt, refreshAIPromptModelLabel]);
 
   const toggleAIPrompt = () => {
-    setShowAIPrompt(prev => {
+    setShowAIPrompt((prev: any) => {
       const nextOpen = !prev;
       if (nextOpen && !aiPromptLoaded) {
         setAiPromptText(seedGenPrompt);
@@ -1317,14 +1326,14 @@ export default function AudioSurveyGenerator(rawProps = {}) {
         setAiPromptCopySuccess(true);
         setTimeout(() => setAiPromptCopySuccess(false), 1500);
       })
-      .catch((e) => { void e; notify.warn('Copy failed'); });
+      .catch((e: any) => { void e; notify.warn('Copy failed'); });
   };
 
-  const highlightPromptVariables = (str) => {
+  const highlightPromptVariables = (str: any) => {
     if (!str) return null;
     const text = String(str);
     const re = /<([A-Za-z][A-Za-z0-9_]*)>/g;
-    const parts = [];
+    const parts: any[] = [];
     let lastIndex = 0;
     let match;
 
@@ -1342,7 +1351,7 @@ export default function AudioSurveyGenerator(rawProps = {}) {
     return parts;
   };
 
-  const handleDatabaseSessionSelect = (slugIn) => {
+  const handleDatabaseSessionSelect = (slugIn: any) => {
     setLocalSessionOverrideTouched(true);
     setLocalSessionOverrideSlug(normalizeSessionSlug(slugIn || ''));
   };
@@ -1359,11 +1368,11 @@ export default function AudioSurveyGenerator(rawProps = {}) {
     audioFile,
   });
   const queuedPhotoSources = useMemo(
-    () => additionalSources.filter((source) => source?.type === 'photo'),
+    () => additionalSources.filter((source: any) => source?.type === 'photo'),
     [additionalSources],
   );
   const queuedNonPhotoSources = useMemo(
-    () => additionalSources.filter((source) => source?.type !== 'photo'),
+    () => additionalSources.filter((source: any) => source?.type !== 'photo'),
     [additionalSources],
   );
   const shouldShowSaveExtraSourcesControl = additionalSources.length > 0;
@@ -1389,7 +1398,7 @@ export default function AudioSurveyGenerator(rawProps = {}) {
                 id={E2E_TESTIDS.DATABASE_VIEW_DEMO_TOGGLE}
                 type="checkbox"
                 checked={showDemoCorpusView}
-                onChange={(event) => setShowDemoCorpusView(event.target.checked)}
+                onChange={(event: any) => setShowDemoCorpusView(event.target.checked)}
                 data-testid={E2E_TESTIDS.DATABASE_VIEW_DEMO_TOGGLE}
               />
               <span>Demo corpus</span>
@@ -1443,7 +1452,7 @@ export default function AudioSurveyGenerator(rawProps = {}) {
             className={styles.sessionSelectorToggle}
             aria-label="AudioSurveyGenerator session selector"
             data-testid="ce-database-session-selector-toggle"
-            onClick={() => setShowSessionSelector((value) => !value)}
+            onClick={() => setShowSessionSelector((value: any) => !value)}
           >
             <FontAwesomeIcon icon={faCog} />
           </button>
@@ -1461,7 +1470,7 @@ export default function AudioSurveyGenerator(rawProps = {}) {
                   </Button>
                 ) : null}
               </div>
-              <SessionChipSelector
+              <SessionChipSelectorUntyped
                 options={sessionSelectorOptions}
                 onToggle={handleDatabaseSessionSelect}
               />
@@ -1474,15 +1483,15 @@ export default function AudioSurveyGenerator(rawProps = {}) {
       <form onSubmit={handleSubmit}>
         <div className={styles.formSection}>
           <div className={styles.textInputGroup}>
-            <AudioInput
+            <AudioInputUntyped
               placeholder={transcriptMode ? "Speak to capture transcript or Paste Text..." : "Speak or type text here..."}
               recordingDisabled={transcriptMode}
               longFormMode={transcriptMode}
               showRecorderControlsInTextbox={transcriptMode}
               showRecordingTimerInTextbox={transcriptMode}
               enableDownloads={transcriptMode}
-              updateFunction={(val) => setPastedText(val)}
-              toggleEncryption={(bool) => setTextEncrypted(bool)}
+              updateFunction={(val: any) => setPastedText(val)}
+              toggleEncryption={(bool: any) => setTextEncrypted(bool)}
               value={pastedText}
               encrypted={textEncrypted}
               hideEncryption={hideEncryption}
@@ -1500,7 +1509,7 @@ export default function AudioSurveyGenerator(rawProps = {}) {
                 type="url"
                 placeholder="Add URL"
                 value={additionalUrlInput}
-                onChange={(e) => setAdditionalUrlInput(e.target.value)}
+                onChange={(e: any) => setAdditionalUrlInput(e.target.value)}
                 onKeyDown={handleUrlKeyDown}
                 className={styles.urlInputField}
               />
@@ -1602,7 +1611,7 @@ export default function AudioSurveyGenerator(rawProps = {}) {
             <div className={styles.additionalContextSection}>
               {queuedPhotoSources.length > 0 && (
                 <div className={styles.photoCardGrid}>
-                  {queuedPhotoSources.map((item) => {
+                  {queuedPhotoSources.map((item: any) => {
                     const statusKey = toStr(item?.analysisStatus || 'queued').trim().toLowerCase();
                     const statusLabel = getPhotoStatusLabel(item);
                     const analysisBodyId = `database-photo-analysis-${item?.id || 'unknown'}`;
@@ -1681,7 +1690,7 @@ export default function AudioSurveyGenerator(rawProps = {}) {
 
               {queuedNonPhotoSources.length > 0 && (
                 <ul className={styles.sourceList}>
-                  {queuedNonPhotoSources.map((item) => (
+                  {queuedNonPhotoSources.map((item: any) => (
                     <li key={item?.id} className={styles.sourceItem}>
                       <span className={styles.sourceTypeLabel}>[{item.type}]</span>
                       <div className={styles.sourceMeta}>
@@ -1707,7 +1716,7 @@ export default function AudioSurveyGenerator(rawProps = {}) {
                       id={E2E_TESTIDS.DATABASE_SAVE_DOCS_TOGGLE}
                       type="checkbox"
                       checked={saveExtraSourcesToDocLibrary}
-                      onChange={(event) => {
+                      onChange={(event: any) => {
                         setSaveExtraSourcesToDocLibrary(event.target.checked);
                         if (!event.target.checked) setShowSaveDocAudienceMenu(false);
                       }}
@@ -1721,7 +1730,7 @@ export default function AudioSurveyGenerator(rawProps = {}) {
                       <button
                         type="button"
                         className={styles.docSaveAudienceButton}
-                        onClick={() => setShowSaveDocAudienceMenu((value) => !value)}
+                        onClick={() => setShowSaveDocAudienceMenu((value: any) => !value)}
                         data-testid={E2E_TESTIDS.DATABASE_SAVE_DOCS_AUDIENCE_BUTTON}
                         data-ce-doc-save-audience={saveDocAudience}
                       >
@@ -1779,15 +1788,15 @@ export default function AudioSurveyGenerator(rawProps = {}) {
                     id="summary-encryption"
                     label="SBTs that can decrypt the summary"
                     selectedSBTs={summaryGateSBTs}
-                    onAddSBT={(sbt) => setSummaryGateSBTs((prev) => [...prev, sbt])}
-                    onRemoveSBT={(address) =>
-                      setSummaryGateSBTs((prev) =>
-                        prev.filter((item) => String(item.address || '').toLowerCase() !== String(address || '').toLowerCase())
+                    onAddSBT={(sbt: any) => setSummaryGateSBTs((prev: any) => [...prev, sbt])}
+                    onRemoveSBT={(address: any) =>
+                      setSummaryGateSBTs((prev: any) =>
+                        prev.filter((item: any) => String(item.address || '').toLowerCase() !== String(address || '').toLowerCase())
                       )
                     }
                     network={network}
                     sessionSlug={resolvedSessionSlug || ''}
-                    defaultFeaturedSBTs={resolvedSessionConfig?.defaultFeaturedSBTs || []}
+                    defaultFeaturedSBTs={(resolvedSessionConfig as any)?.defaultFeaturedSBTs || []}
                     enableGroupSelect
                     variant="create"
                   />
@@ -1796,7 +1805,7 @@ export default function AudioSurveyGenerator(rawProps = {}) {
                     <Input
                       type="select"
                       value={summaryGateMode}
-                      onChange={(e) => setSummaryGateMode(e.target.value)}
+                      onChange={(e: any) => setSummaryGateMode(e.target.value)}
                     >
                       <option value="any">Any (OR)</option>
                       <option value="all">All (AND)</option>

@@ -69,7 +69,7 @@ jest.mock('../DebateMap/DebateMap', () => ({
   },
 }));
 
-jest.mock('../SurveyTool/SurveyGenerator/SurveyGenerator.jsx', () => ({
+jest.mock('../SurveyTool/SurveyGenerator/SurveyGenerator', () => ({
   __esModule: true,
   default: (props: any) => {
     mockAudioSurveyGenerator(props);
