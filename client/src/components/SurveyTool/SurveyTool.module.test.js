@@ -1,24 +1,7 @@
 import {
-  applyDecryptedQuestionResponseValues,
-  applyDecryptedQuestionStateToSurveySlice,
-  buildQuestionDecryptExecutionContext,
-  buildQuestionDecryptFailureState,
-  buildQuestionDecryptStartState,
-  buildSelfQuestionDecryptBaseline,
-  buildViewedResponseDecryptBaseline,
-  clearQuestionFieldBusyMap,
-  decryptQuestionRatingEnvelopes,
-  ensureQuestionDecryptSliceShape,
-  getQuestionFieldDecryptSelection,
-  getQuestionFieldTaskKey,
-  getQuestionFieldTaskKeys,
-  getQuestionRatingEnvelopes,
-  markQuestionFieldBusyMap,
-  mergeLatestEncryptedQuestionFields,
-  mergeQuestionRatingEnvelopeState,
-  mergeQuestionResponseOverrideIntoDecryptSlice,
-  syncDecryptedQuestionIntoBaseline,
-} from './surveyToolDecryptFlow.js';
+  QuestionsDashboard as DirectQuestionsDashboard,
+  SurveySelector as DirectSurveySelector,
+} from './SurveySelector';
 import {
   computeSubmitLabel as directComputeSubmitLabel,
   normalizeSurveyToolFilterState as directNormalizeSurveyToolFilterState,
