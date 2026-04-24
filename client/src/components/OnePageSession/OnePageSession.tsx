@@ -52,7 +52,7 @@ import { isCryptoMode, sbtsListPath, t } from '../../utilities/ui/terminology.js
 import { PUBLIC_AI_DISCOURSE_CORPUS_URL } from '../../variables/publicRepoMetadata.js';
 
 const SurveyPage = React.lazy(() => import('../SurveyTool/SurveyPage'));
-const MemoSurveyPage = React.memo((props) => <SurveyPage {...props} />);
+const MemoSurveyPage = React.memo((props: any) => <SurveyPage {...props} />);
 const SBTsPage = React.lazy(() => import('../SBTs/SBTsPage'));
 const PolisReport = React.lazy(() => import('../PolisReport/PolisReport'));
 const DebateMap = React.lazy(() => import('../DebateMap/DebateMap'));
@@ -64,8 +64,17 @@ const demoLog = createLogger('demo');
 const ONE_PAGE_DEMO_PERF_SCOPE = 'onePageDemo';
 const SBT_TOOLTIP_LABEL = isCryptoMode() ? 'Soulbound tokens (SBTs)' : `${t('sbtFull')}s`;
 const DEMO_CORPUS_GITHUB_URL = PUBLIC_AI_DISCOURSE_CORPUS_URL;
+const globalState: any = globalThis as any;
+const contractScriptsAny: any = contractScripts as any;
+const DebateMapAny: any = DebateMap;
 
-const resolveAutoFeatureBySessionSlug = (metadata) => (
+const getErrorMessage = (error: any, fallback = 'Unknown error') => (
+  error && typeof error === 'object' && typeof error.message === 'string'
+    ? error.message
+    : fallback
+);
+
+const resolveAutoFeatureBySessionSlug = (metadata: any) => (
   metadata?.autoFeatureSBTsBySessionSlug !== undefined
     ? metadata.autoFeatureSBTsBySessionSlug
     : metadata?.autoFeatureSBTsWithFeaturedSbtTags
@@ -100,6 +109,88 @@ const bumpPerfCounter = (key: any, inc: any = 1) => {
   } catch (e) { void e; /* fallback: perf counter update. */ }
 };
 
+const hashMix = (seed: any, text: any) => {
+  let h = Number(seed) >>> 0;
+  const str = String(text || '');
+  for (let i = 0; i < str.length; i += 1) {
+    h = Math.imul(h ^ str.charCodeAt(i), 16777619) >>> 0;
+  }
+  return h >>> 0;
+};
+
+const computeAggregatorDataSignature = (map: any = {}) => {
+  if (!map || typeof map !== 'object') return '0:0:0';
+  const qids = Object.keys(map).sort();
+  if (qids.length === 0) return '0:0:0';
+  let hash = 2166136261;
+  let totalEntries = 0;
+  qids.forEach((qid: any) => {
+    hash = hashMix(hash, qid);
+    const rows = Array.isArray(map[qid]) ? map[qid] : [];
+    const rowSignatures = rows
+      .map((row: any) => `${row?.responder || ''}|${row?.response || ''}`)
+      .sort();
+    totalEntries += rowSignatures.length;
+    rowSignatures.forEach((rowSig: any) => {
+      hash = hashMix(hash, rowSig);
+    });
+  });
+  return `${qids.length}:${totalEntries}:${hash >>> 0}`;
+};
+
+const computeAggregatorDataSignatureFromRows = (qids: any = [], rowSignaturesByQuestion: any = {}) => {
+  const normalizedQids = Array.isArray(qids) ? qids.filter(Boolean).sort() : [];
+  if (normalizedQids.length === 0) return '0:0:0';
+  let hash = 2166136261;
+  let totalEntries = 0;
+  normalizedQids.forEach((qid: any) => {
+    hash = hashMix(hash, qid);
+    const rowSignatures = Array.isArray(rowSignaturesByQuestion?.[qid])
+      ? [...rowSignaturesByQuestion[qid]].sort()
+      : [];
+    totalEntries += rowSignatures.length;
+    rowSignatures.forEach((rowSig: any) => {
+      hash = hashMix(hash, rowSig);
+    });
+  });
+  return `${normalizedQids.length}:${totalEntries}:${hash >>> 0}`;
+};
+
+const computeAggregatorSourceSnapshotSignature = (questionResponses: any = {}) => {
+  if (!questionResponses || typeof questionResponses !== 'object') return '0:0:0';
+  const qids = Object.keys(questionResponses);
+  if (qids.length === 0) return '0:0:0';
+
+  let hash = 2166136261;
+  let totalEntries = 0;
+
+  qids.forEach((qid: any) => {
+    hash = hashMix(hash, qid);
+    const responderMap = questionResponses[qid];
+    if (!responderMap || typeof responderMap !== 'object') return;
+    const responders = Object.keys(responderMap);
+    totalEntries += responders.length;
+    responders.forEach((resAddr: any) => {
+      hash = hashMix(hash, resAddr);
+      const rawResponse = responderMap[resAddr];
+      if (typeof rawResponse === 'string') {
+        hash = hashMix(hash, rawResponse);
+        return;
+      }
+      const answer = rawResponse?.answer;
+      hash = hashMix(hash, rawResponse?.type || '');
+      hash = hashMix(hash, answer?.value ?? '');
+      hash = hashMix(hash, answer?.encrypted ? '1' : '0');
+      hash = hashMix(hash, answer?.encryptedPortion || '');
+      // Include rating fields so results recompute when score inputs change.
+      hash = hashMix(hash, rawResponse?.importance ?? '');
+      hash = hashMix(hash, rawResponse?.conviction ?? '');
+    });
+  });
+
+  return `${qids.length}:${totalEntries}:${hash >>> 0}`;
+};
+
 const buildOnePageSessionEmptyFilterState = () => ({
   topQuestions: null,
   questionTypes: [],
@@ -128,126 +219,6 @@ const serializeOnePageSessionFilterState = (value: any = {}) => (
 const normalizeOnePageSessionSlug = (value: any = '') => {
   const normalized = String(value || '').trim().toLowerCase();
   return normalized === 'general' ? '' : normalized;
-};
-
-const hasOwn = (value: any, key: string) => (
-  !!value && typeof value === 'object' && Object.prototype.hasOwnProperty.call(value, key)
-);
-
-const resolveOnePageSessionSurveySlug = (props: any = '') => {
-  if (hasOwn(props, 'questionSessionSlug')) {
-    return normalizeOnePageSessionSlug(props.questionSessionSlug);
-  }
-  if (hasOwn(props.sessionConfig, 'slug')) {
-    return normalizeOnePageSessionSlug(props.sessionConfig.slug);
-  }
-  return normalizeOnePageSessionSlug(props.slug || '');
-};
-
-const getUniqueAggregatorCandidateSlugs = (...slugs: any[]) => {
-  const seen = new Set<string>();
-  return slugs
-    .map((value) => normalizeOnePageSessionSlug(value))
-    .filter((value) => {
-      const key = value || '__general__';
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-};
-
-const shouldUseBuiltInDemoAggregatorFallback = (displaySlug: any = '', questionSourceSlug: any = '') => {
-  const normalizedDisplaySlug = normalizeOnePageSessionSlug(displaySlug);
-  const normalizedQuestionSourceSlug = normalizeOnePageSessionSlug(questionSourceSlug);
-  return normalizedDisplaySlug === 'demo' && (
-    normalizedQuestionSourceSlug === '' ||
-    normalizedQuestionSourceSlug === 'demo'
-  );
-};
-
-const buildAggregatorFallbackQuestions = (questionPool: any[] = [], sessionSlug: any = '') => {
-  const out: Record<string, any> = {};
-  const normalizedSessionSlug = normalizeOnePageSessionSlug(sessionSlug);
-  (Array.isArray(questionPool) ? questionPool : []).forEach((entry: any) => {
-    const questionId = String(entry?.id || '').trim();
-    if (!questionId) return;
-    out[questionId.toLowerCase()] = {
-      creator: '',
-      tags: [],
-      ...entry,
-      id: questionId,
-      sessionSlug: normalizedSessionSlug,
-      sessionSlugExplicit: true,
-    };
-  });
-  return out;
-};
-
-const scopeAggregatorNetworkNodeToQuestionPool = (
-  networkNode: any = {},
-  fallbackQuestions: Record<string, any> = {},
-  sessionSlug: any = '',
-) => {
-  const fallbackQuestionPool = Object.values(fallbackQuestions || {});
-  const scope = resolveAuthoritativeQuestionPoolScope(fallbackQuestionPool, sessionSlug);
-  if (!scope) return networkNode;
-
-  const nextQuestions: Record<string, any> = {};
-  const sourceQuestions = networkNode?.questions || {};
-  Object.keys(sourceQuestions).forEach((qid) => {
-    const question = sourceQuestions[qid];
-    if (!isQuestionAllowedByAuthoritativePool(question, qid, scope)) return;
-    const questionId = String(question?.id || qid || '').trim();
-    if (!questionId) return;
-    nextQuestions[questionId.toLowerCase()] = {
-      ...question,
-      id: questionId,
-    };
-  });
-  Object.keys(fallbackQuestions || {}).forEach((qid) => {
-    const questionId = normalizeAuthoritativeQuestionPoolId(qid);
-    if (!questionId || nextQuestions[questionId]) return;
-    nextQuestions[questionId] = fallbackQuestions[qid];
-  });
-
-  const nextQuestionResponses: Record<string, any> = {};
-  const sourceQuestionResponses = networkNode?.questionResponses || {};
-  Object.keys(sourceQuestionResponses).forEach((qid) => {
-    const questionId = normalizeAuthoritativeQuestionPoolId(qid);
-    if (!questionId || !nextQuestions[questionId]) return;
-    nextQuestionResponses[qid] = sourceQuestionResponses[qid];
-  });
-
-  return {
-    ...networkNode,
-    questions: nextQuestions,
-    questionResponses: nextQuestionResponses,
-  };
-};
-
-const mergeAggregatorResultRows = (target: Record<string, any[]> = {}, source: any = {}) => {
-  const nextTarget = target && typeof target === 'object' ? target : {};
-  if (!source || typeof source !== 'object') return nextTarget;
-
-  Object.keys(source).forEach((qid) => {
-    const rows = Array.isArray(source[qid]) ? source[qid] : [];
-    if (rows.length === 0) {
-      if (!nextTarget[qid]) nextTarget[qid] = [];
-      return;
-    }
-    nextTarget[qid] = Array.isArray(nextTarget[qid]) ? nextTarget[qid] : [];
-    const seenRows = new Set(
-      nextTarget[qid].map((row: any) => `${row?.responder || ''}|${row?.response || ''}`)
-    );
-    rows.forEach((row: any) => {
-      const key = `${row?.responder || ''}|${row?.response || ''}`;
-      if (seenRows.has(key)) return;
-      seenRows.add(key);
-      nextTarget[qid].push(row);
-    });
-  });
-
-  return nextTarget;
 };
 
 const resolveOnePageSessionRouteUiState = (props: any = {}) => {
@@ -300,6 +271,77 @@ function hasCachedCreateSbtForm(slug: any = '') {
     migrateLegacyToSessionKey: true,
     clearInvalid: true,
   } as any);
+}
+
+// Top-level helper (outside the class)
+function buildAggregatorFromLocalCache(networkObj: any, opts: any = {}) {
+  if (!networkObj) return { map: {}, dirty: false };
+  const parseMemo = opts?.parseMemo instanceof Map ? opts.parseMemo : null;
+  const questionResponses = networkObj.questionResponses || {};
+  const aggregatorMap: Record<string, any> = {};
+  const rowSignaturesByQuestion: Record<string, any> = {};
+  let dirty = false;
+
+  Object.keys(questionResponses).forEach((qId: any) => {
+    const responderMap = questionResponses[qId] || {};
+    aggregatorMap[qId] = [];
+    rowSignaturesByQuestion[qId] = [];
+    Object.keys(responderMap).forEach((resAddr: any) => {
+      let parsed;
+      let rawResponseString = '';
+      try {
+        const rawResponse = responderMap[resAddr];
+        if (typeof rawResponse === 'string') {
+          rawResponseString = rawResponse;
+          if (parseMemo && parseMemo.has(rawResponse)) {
+            parsed = parseMemo.get(rawResponse);
+            parseMemo.delete(rawResponse);
+            parseMemo.set(rawResponse, parsed);
+          } else {
+            parsed = JSON.parse(rawResponse);
+            if (parseMemo) {
+              parseMemo.set(rawResponse, parsed);
+              while (parseMemo.size > AGGREGATOR_PARSE_MEMO_MAX) {
+                const oldest = parseMemo.keys().next().value;
+                if (!oldest) break;
+                parseMemo.delete(oldest);
+              }
+            }
+          }
+        } else {
+          parsed = rawResponse;
+        }
+      } catch {
+        try { delete responderMap[resAddr]; dirty = true; } catch (e) { demoLog.warn('OnePageSession: fallback', e); }
+        parsed = null;
+      }
+      if (!parsed) return;
+
+      const isBinary = parsed?.type === 'binary';
+      const ans = parsed?.answer;
+      const isEnc = !!(ans?.encrypted || ans?.encryptedPortion);
+      const isMasked = ans?.value === '*';
+
+      if (isBinary && ans && !isEnc && !isMasked) {
+        const responseJson = rawResponseString || JSON.stringify(parsed);
+        aggregatorMap[qId].push({
+          responder: resAddr,
+          questionId: qId,
+          response: responseJson,
+        });
+        rowSignaturesByQuestion[qId].push(`${resAddr}|${responseJson}`);
+      }
+    });
+  });
+
+  return {
+    map: aggregatorMap,
+    dirty,
+    signature: computeAggregatorDataSignatureFromRows(
+      Object.keys(aggregatorMap),
+      rowSignaturesByQuestion,
+    ),
+  };
 }
 
 export {
@@ -608,43 +650,6 @@ class OnePageSession extends Component<any, any> {
     return resolved;
   }
 
-  resolveScopedLitHooks(sessionConfig: any = {}) {
-    if (this.props.litHooks && typeof this.props.litHooks === 'object') {
-      return this.props.litHooks;
-    }
-    const {
-      chainId,
-      litNetwork,
-      litChain,
-      accessControlConditions,
-      userMaxPrice,
-      chipotle,
-    } = resolveMainSiteLitSessionConfig({
-      sessionConfig,
-      networkChainIdFallback: (
-        this.props.networkChainId ||
-        this.props.network?.id ||
-        this.props.network?.chainId ||
-        null
-      ),
-    });
-    if (!chipotle) return null;
-    const sessionSlug = normalizeOnePageSessionSlug(sessionConfig?.slug || this.props.slug || '');
-    return createLitHooks({
-      providerLike: this.props.provider,
-      account: this.props.account,
-      chainId,
-      litChain,
-      litNetwork,
-      userMaxPrice,
-      accessControlConditions: accessControlConditions || undefined,
-      chipotle: {
-        ...chipotle,
-        sessionSlug,
-      },
-    });
-  }
-
   componentDidUpdate(prevProps: any, prevState: any) {
     const prevSlug = normalizeOnePageSessionSlug(prevProps.slug || prevProps.sessionConfig?.slug || '');
     const nextSlug = normalizeOnePageSessionSlug(this.props.slug || this.props.sessionConfig?.slug || '');
@@ -867,7 +872,7 @@ class OnePageSession extends Component<any, any> {
   }
 
 
-  buildAggregator = () => measureSync('ce.onePageDemo.buildAggregator', () => {
+  buildAggregator: any = () => measureSync('ce.onePageDemo.buildAggregator', () => {
     if (!this.state.showResults) return;
     bumpPerfCounter('aggregatorBuildCount');
     const applyAggregatorData = (nextMap: any, providedSig: any = '', sourceSigKey: any = '') => {
@@ -983,7 +988,7 @@ class OnePageSession extends Component<any, any> {
     if (typeof this.props.toggleLoginModal === 'function') {
       try { this.props.toggleLoginModal(false); } catch (e) { demoLog.warn('OnePageSession: callback', e); }
     }
-    this.setState((prevState: Readonly<OnePageSession['state']>) => {
+    this.setState((prevState: any) => {
       const prevTargets = Array.isArray(prevState.autoMintTargets) ? prevState.autoMintTargets : [];
       const nextTargets = successfulSbtKey
         ? prevTargets.filter((target: any) => String(target?.sbt || '').trim().toLowerCase() !== successfulSbtKey)
@@ -1087,7 +1092,7 @@ class OnePageSession extends Component<any, any> {
 
       // Set immediate cache hits to UI
       if (Object.keys(cachedNames).length > 0 || Object.keys(cachedImages).length > 0) {
-        this.setState((prev: Readonly<OnePageSession['state']>) => {
+        this.setState((prev: any) => {
           const updates: Record<string, any> = {};
           if (Object.keys(cachedNames).length > 0) {
             updates.sbtNames = { ...(prev.sbtNames || {}), ...cachedNames };
@@ -1121,7 +1126,7 @@ class OnePageSession extends Component<any, any> {
         }
 
         if (Object.keys(fetchedNames).length > 0 || Object.keys(fetchedImages).length > 0) {
-          this.setState((prev: Readonly<OnePageSession['state']>) => {
+          this.setState((prev: any) => {
             const updates: Record<string, any> = {};
             if (Object.keys(fetchedNames).length > 0) {
               updates.sbtNames = { ...(prev.sbtNames || {}), ...fetchedNames };
@@ -1389,7 +1394,7 @@ class OnePageSession extends Component<any, any> {
     } catch (e) { demoLog.warn('OnePageSession: callback', e); }
   }
 
-  handleFilterChange = (newFilterState: any) => {
+  handleFilterChange: any = (newFilterState: any) => {
     // Requirement: Internal Updates: Update local state WITHOUT modifying the URL.
     const nextFilterState = normalizeOnePageSessionFilterState(newFilterState || {});
     const nextSig = serializeOnePageSessionFilterState(nextFilterState);
@@ -1429,7 +1434,7 @@ class OnePageSession extends Component<any, any> {
       Object.keys(queuedNameUpdates).forEach((k: any) => { delete queuedNameUpdates[k]; });
       Object.keys(queuedImageUpdates).forEach((k: any) => { delete queuedImageUpdates[k]; });
 
-      this.setState((prev: Readonly<OnePageSession['state']>) => {
+      this.setState((prev: any) => {
         const updates: Record<string, any> = {};
         if (shouldFlushStatuses) {
           updates.autoMintStatuses = { ...statuses };
@@ -1805,8 +1810,8 @@ class OnePageSession extends Component<any, any> {
         } else {
           updateStatus(sbtKey, { status: 'info', name: 'Skipped (unknown path)' });
         }
-      } catch (e) {
-        const msg = (e.message || e.toString() || '').toLowerCase();
+	      } catch (e: any) {
+	        const msg = (getErrorMessage(e, String(e || '')) || String(e || '')).toLowerCase();
 
         if (msg.includes("already owns") || msg.includes("already joined") || msg.includes("user already has")) {
            // Graceful handling of "already owned" revert
@@ -1930,11 +1935,11 @@ class OnePageSession extends Component<any, any> {
     this.setState({ autoOpenResults: false }, () => this.resetDemoURL());
   }
 
-  handleCorpusAtlasIssueOpen(nodeId) {
+  handleCorpusAtlasIssueOpen(nodeId: any) {
     const normalizedNodeId = String(nodeId || '').trim();
     if (!normalizedNodeId) return;
 
-    this.setState((prevState) => ({
+    this.setState((prevState: any) => ({
       embeddedAtlasNodeId: normalizedNodeId,
       embeddedAtlasReturnState: prevState.embeddedAtlasReturnState || {
         showResults: prevState.showResults,
@@ -1946,7 +1951,7 @@ class OnePageSession extends Component<any, any> {
   }
 
   handleEmbeddedAtlasModalClose() {
-    this.setState((prevState) => {
+    this.setState((prevState: any) => {
       const returnState = prevState.embeddedAtlasReturnState;
       return {
         embeddedAtlasNodeId: null,
@@ -1972,7 +1977,7 @@ class OnePageSession extends Component<any, any> {
 
   toggleQuestions() {
     this.setState(
-      (prevState: Readonly<OnePageSession['state']>) => ({ showQuestions: !prevState.showQuestions }),
+      (prevState: any) => ({ showQuestions: !prevState.showQuestions }),
       () => {
         if (!this.state.showQuestions) {
           this.setState({ autoOpenResults: false });
@@ -1984,7 +1989,7 @@ class OnePageSession extends Component<any, any> {
 
   toggleGroups() {
     this.setState(
-      (prevState: Readonly<OnePageSession['state']>) => ({ showGroups: !prevState.showGroups }),
+      (prevState: any) => ({ showGroups: !prevState.showGroups }),
       () => this.resetDemoURL()
     );
   }
@@ -1994,7 +1999,7 @@ class OnePageSession extends Component<any, any> {
       event.preventDefault();
       event.stopPropagation();
     }
-    this.setState((prevState: Readonly<OnePageSession['state']>) => ({
+    this.setState((prevState: any) => ({
       showEmbeddedCreateGroup: !prevState.showEmbeddedCreateGroup,
     }));
   }
@@ -2042,9 +2047,9 @@ class OnePageSession extends Component<any, any> {
     this.navigateToInternalPath(sbtsListPath());
   }
 
-  handlePileSubmitRailVisibilityChange(visible) {
+  handlePileSubmitRailVisibilityChange(visible: any) {
     const nextVisible = !!visible;
-    this.setState((prevState) => (
+    this.setState((prevState: any) => (
       prevState.pileSubmitRailVisible === nextVisible
         ? null
         : { pileSubmitRailVisible: nextVisible }
@@ -2052,22 +2057,22 @@ class OnePageSession extends Component<any, any> {
   }
 
   toggleGroupsAbout() {
-    this.setState((prevState: Readonly<OnePageSession['state']>) => ({ showGroupsAbout: !prevState.showGroupsAbout }));
+    this.setState((prevState: any) => ({ showGroupsAbout: !prevState.showGroupsAbout }));
   }
 
   toggleResults() {
     this.setState(
-      (prevState: Readonly<OnePageSession['state']>) => ({ showResults: !prevState.showResults }),
+      (prevState: any) => ({ showResults: !prevState.showResults }),
       () => this.resetDemoURL()
     );
   }
 
   toggleDocuments() {
-    this.setState((prevState: Readonly<OnePageSession['state']>) => ({ showDocuments: !prevState.showDocuments }));
+    this.setState((prevState: any) => ({ showDocuments: !prevState.showDocuments }));
   }
 
   toggleResultsAbout() {
-    this.setState((prevState: Readonly<OnePageSession['state']>) => ({ showResultsAbout: !prevState.showResultsAbout }));
+    this.setState((prevState: any) => ({ showResultsAbout: !prevState.showResultsAbout }));
   }
 
   /* =======================
@@ -2086,14 +2091,14 @@ class OnePageSession extends Component<any, any> {
   }
   dismissStatusItem(addrKey: any) {
     const key = (addrKey || '').toLowerCase();
-    this.setState((prev: Readonly<OnePageSession['state']>) => ({
+    this.setState((prev: any) => ({
       dismissedStatusItems: { ...(prev.dismissedStatusItems || {}), [key]: true }
     }));
   }
 
   toggleStatusImagePreview(addrKey: any) {
     const key = (addrKey || '').toLowerCase();
-    this.setState((prev: Readonly<OnePageSession['state']>) => ({
+    this.setState((prev: any) => ({
       expandedImages: {
         ...prev.expandedImages,
         [key]: !prev.expandedImages[key]
@@ -2660,7 +2665,7 @@ class OnePageSession extends Component<any, any> {
                   <span className={`${styles.sectionHeaderMeta} ${styles.documentsSectionHeaderMeta}`.trim()}>
                     <div
                       className={`${styles.tooltip} ${styles.sectionHeaderTooltip}`}
-                      onClick={(e) => e.stopPropagation()}
+                      onClick={(e: any) => e.stopPropagation()}
                     >
                       <FontAwesomeIcon icon={faQuestionCircle} />
                       <span className={styles.tooltiptext}>
@@ -2672,7 +2677,7 @@ class OnePageSession extends Component<any, any> {
                       target="_blank"
                       rel="noopener noreferrer"
                       className={styles.sectionHeaderLink}
-                      onClick={(e) => e.stopPropagation()}
+                      onClick={(e: any) => e.stopPropagation()}
                     >
                       <FontAwesomeIcon icon={faExternalLinkAlt} />
                       <span>GitHub</span>
@@ -2747,10 +2752,7 @@ class OnePageSession extends Component<any, any> {
 
               {this.state.showResults && (
                 <div className={`${styles.sectionHeaderActionsScroller} ${styles.resultsModeActionsScroller}`}>
-                  <div
-                    className={`${styles.sectionHeaderActions} ${styles.resultsModeActions}`}
-                    data-testid="ce-session-results-view-nav"
-                  >
+                  <div className={`${styles.sectionHeaderActions} ${styles.resultsModeActions}`}>
                     {resultsViewOptions.map(({ key, label, icon }: any) => {
                       const isSelected = resultsViewMode === key;
                       return (
@@ -2834,7 +2836,7 @@ class OnePageSession extends Component<any, any> {
                           embedded={true}
                           requestedModalNodeId={this.state.embeddedAtlasNodeId}
                           onModalClose={this.state.embeddedAtlasReturnState ? this.handleEmbeddedAtlasModalClose : null}
-                        />
+	                        />
                       </div>
                     </Suspense>
                   )}
