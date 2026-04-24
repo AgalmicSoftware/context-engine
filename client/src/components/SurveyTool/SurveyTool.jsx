@@ -39,6 +39,7 @@ import QuestionFilter from './QuestionFilter';
 import PileHologramAssistant from './PileHologramAssistant';
 import QuestionTagDropdown from './QuestionTagDropdown';
 import SingleQuestionResponse from './SingleQuestionResponse';
+import TagModal from '../TagPage/TagModal';
 import { JsonButtonRow, JsonIconButton, JsonPanel, JsonToggleButton } from '../Shared/Json/JsonControls';
 import { getQuestionTagDisplayList } from '../../utilities/survey/questionTags.js';
 
@@ -1078,6 +1079,7 @@ export class SurveyQuestions extends Component {
       lockAudienceGateDetailsByQuestion: {},
       sliderModeByQuestion: {},
       sliderToggleExpandedByQuestion: {},
+      activeTagModalTag: '',
       // Defer prefill when login happens before caches are ready
       prefillQueuedAfterCache: false,
       // Visual indicator for account-specific prior-response hydration
@@ -2855,6 +2857,8 @@ export class SurveyQuestions extends Component {
   renderQuestionTagDropdown = (question) => {
     if (!getQuestionTagDisplayList(question?.tags).length) return null;
 
+    const useTagModal = !this.props.singleQuestionMode && !this.props.isStandalone;
+
     return (
       <QuestionTagDropdown
         tags={question.tags}
@@ -2863,8 +2867,19 @@ export class SurveyQuestions extends Component {
           state: this.state,
           getEffectiveDraftSlug: this._getEffectiveDraftSlug,
         })}
+        onTagSelect={useTagModal ? this.handleQuestionTagSelect : null}
       />
     );
+  };
+
+  handleQuestionTagSelect = (tag) => {
+    const normalizedTag = String(tag || '').trim();
+    if (!normalizedTag) return;
+    this.setState({ activeTagModalTag: normalizedTag });
+  };
+
+  closeQuestionTagModal = () => {
+    this.setState({ activeTagModalTag: '' });
   };
 
   renderQuestionTagDropdownRow = (question) => {
@@ -13085,6 +13100,10 @@ export class SurveyQuestions extends Component {
       : genericShowInlineSubmit;
     const showTopInlineSubmit = showInlineSubmit && !isSingleQuestionView;
     const showBottomInlineSubmit = showInlineSubmit;
+    const useTagModal = !this.props.singleQuestionMode && !this.props.isStandalone;
+    const activeTagModalTag = useTagModal
+      ? String(this.state.activeTagModalTag || '').trim()
+      : '';
     const surveyPageClassName = [
       isSingleQuestionView ? styles.singleQuestionPage : '',
       isSingleQuestionView && viewingAnswers ? styles.singleQuestionReadPage : '',
@@ -13293,6 +13312,13 @@ export class SurveyQuestions extends Component {
                 </JsonPanel>
             )}
         </div>
+        )}
+        {useTagModal && (
+          <TagModal
+            isOpen={!!activeTagModalTag}
+            toggle={this.closeQuestionTagModal}
+            activeTag={activeTagModalTag || null}
+          />
         )}
       </div>
     );
