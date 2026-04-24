@@ -2913,6 +2913,55 @@ describe('SurveyResults export/view controls', () => {
     expect(typeof exported.exportedAt).toBe('string');
   });
 
+  it('downloads current json exports through the active download path', () => {
+    const subject = attachStateHarness(createSubject({
+      viewMode: 'questions',
+    }));
+
+    subject.state = {
+      ...subject.state,
+      viewMode: 'questions',
+      exportType: '.json',
+      alertMessage: '',
+    };
+    subject.getExportBaseFileName = jest.fn(() => 'contextEngine_questionResults');
+    subject.generateResultsJSON = jest.fn(() => '{"ok":true}');
+
+    const originalCreateObjectURL = window.URL.createObjectURL;
+    const createObjectURLMock = jest.fn(() => 'blob:test-export');
+    window.URL.createObjectURL = createObjectURLMock as any;
+    const appendChildSpy = jest.spyOn(document.body, 'appendChild');
+    const removeChildSpy = jest.spyOn(document.body, 'removeChild');
+    const originalCreateElement = document.createElement.bind(document);
+    const anchor = originalCreateElement('a');
+    const anchorClickSpy = jest.spyOn(anchor, 'click').mockImplementation(() => {});
+    const createElementSpy = jest.spyOn(document, 'createElement').mockImplementation(((tagName: any) => (
+      String(tagName).toLowerCase() === 'a' ? anchor : originalCreateElement(tagName)
+    )) as any);
+
+    subject.downloadCSV();
+
+    expect(subject.generateResultsJSON).toHaveBeenCalledTimes(1);
+    expect(subject.setState).not.toHaveBeenCalled();
+    expect(createObjectURLMock).toHaveBeenCalledTimes(1);
+    expect(anchor.getAttribute('href')).toBe('blob:test-export');
+    expect(anchor.getAttribute('download')).toMatch(/^contextEngine_questionResults_.*\.json$/);
+    expect(anchorClickSpy).toHaveBeenCalledTimes(1);
+    expect(appendChildSpy).toHaveBeenCalledWith(anchor);
+    expect(removeChildSpy).toHaveBeenCalledWith(anchor);
+    expect(subject.state.alertMessage).toBe('');
+
+    createElementSpy.mockRestore();
+    anchorClickSpy.mockRestore();
+    removeChildSpy.mockRestore();
+    appendChildSpy.mockRestore();
+    if (originalCreateObjectURL) {
+      window.URL.createObjectURL = originalCreateObjectURL;
+    } else {
+      delete (window.URL as any).createObjectURL;
+    }
+  });
+
   it('rejects unknown export types through the invalid-export fallback', () => {
     const subject = attachStateHarness(createSubject({
       viewMode: 'questions',
@@ -2927,5 +2976,136 @@ describe('SurveyResults export/view controls', () => {
     subject.downloadCSV();
 
     expect(subject.state.alertMessage).toBe('Invalid export type selected.');
+  });
+});
+
+describe('SurveyResults modal and polling behavior', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('clears response parse memo when the modal closes', () => {
+    const subject = createSubject({
+      isOpen: false,
+      preventUrlChange: true,
+    });
+    subject._isMounted = true;
+    subject._responseParseMemo.set('payload', { answer: 'cached' });
+    subject.stopLocalStoragePolling = jest.fn();
+    subject.resetLocalStoragePollingBackoff = jest.fn();
+    subject.updateLocalStoragePollingState = jest.fn();
+    subject.queueResultsRefresh = jest.fn();
+    subject.handleNonceTick = jest.fn();
+    attachStateHarness(subject);
+
+    const prevProps = { ...subject.props, isOpen: true };
+    const prevState = { ...subject.state };
+    subject.componentDidUpdate(prevProps, prevState);
+
+    expect(subject._responseParseMemo.size).toBe(0);
+  });
+
+  it('keeps latest-block retries active when coarse polling signature is unchanged', () => {
+    const subject = createSubject({
+      isOpen: true,
+      network: { id: 84532 },
+    });
+
+    const questionBucket: any = {
+      questionsLatestBlock: 5,
+      questionResponsesLatestBlock: 7,
+      questions: { q1: { id: 'q1' } },
+      questionResponses: {},
+    };
+    const surveyBucket: any = {
+      surveyResponses: {},
+      surveyResponsesLatestBlock: {},
+    };
+
+    const peekSpy = jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace: any) => {
+      if (namespace === 'questionsCache') return { '84532': questionBucket };
+      if (namespace === 'surveysCache') return { '84532': surveyBucket };
+      return {};
+    });
+
+    subject._isMounted = true;
+    subject.state = {
+      ...subject.state,
+      viewMode: 'questions',
+      surveyId: '',
+      networkLatestBlock: 0,
+      questionLocalBlock: 5,
+      responseLocalBlock: 7,
+      surveyLocalBlock: 0,
+      cachedQuestionsCount: 1,
+      cachedSurveyResponsesCount: 0,
+    };
+    subject.maybeRefreshNetworkLatestBlockFromPolling = jest.fn();
+    subject._lastPolledQuestionsRef = questionBucket.questions;
+    subject._lastPolledSurveyResponsesRef = surveyBucket.surveyResponses;
+    subject._lastPolledQuestionRefVersion = 2;
+    subject._lastPolledSurveyResponsesRefVersion = 3;
+    subject._lastLocalStoragePollCoarseSignature = 'questions||5|7|0|2|3';
+    subject._lastLocalStoragePollDetailedSignature = 'questions||5|7|0|2|3|1|0|0';
+
+    const changed = subject.pollLocalStorageForUpdates();
+
+    expect(changed).toBe(false);
+    expect(subject.maybeRefreshNetworkLatestBlockFromPolling).toHaveBeenCalledTimes(1);
+    peekSpy.mockRestore();
+  });
+
+  it('detects in-place question count mutations on forced stable-cycle rescans', () => {
+    const subject = attachStateHarness(createSubject({
+      isOpen: true,
+      network: { id: 84532 },
+    }));
+
+    const questionBucket: any = {
+      questionsLatestBlock: 5,
+      questionResponsesLatestBlock: 7,
+      questions: { q1: { id: 'q1' } },
+      questionResponses: {},
+    };
+    const surveyBucket: any = {
+      surveyResponses: {},
+      surveyResponsesLatestBlock: {},
+    };
+
+    const peekSpy = jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace: any) => {
+      if (namespace === 'questionsCache') return { '84532': questionBucket };
+      if (namespace === 'surveysCache') return { '84532': surveyBucket };
+      return {};
+    });
+
+    subject.queueResultsRefresh = jest.fn();
+    subject.maybeRefreshNetworkLatestBlockFromPolling = jest.fn();
+    subject._isMounted = true;
+    subject.state = {
+      ...subject.state,
+      viewMode: 'questions',
+      surveyId: '',
+      networkLatestBlock: 0,
+      questionLocalBlock: 5,
+      responseLocalBlock: 7,
+      surveyLocalBlock: 0,
+      cachedQuestionsCount: 1,
+      cachedSurveyResponsesCount: 0,
+    };
+    subject._lastPolledQuestionsRef = questionBucket.questions;
+    subject._lastPolledSurveyResponsesRef = surveyBucket.surveyResponses;
+    subject._lastPolledQuestionRefVersion = 2;
+    subject._lastPolledSurveyResponsesRefVersion = 3;
+    subject._localStoragePollingStableCycles = 6;
+    subject._lastLocalStoragePollCoarseSignature = 'questions||5|7|0|2|3';
+    subject._lastLocalStoragePollDetailedSignature = 'questions||5|7|0|2|3|1|0|0';
+
+    questionBucket.questions.q2 = { id: 'q2' };
+    const changed = subject.pollLocalStorageForUpdates();
+
+    expect(changed).toBe(true);
+    expect(subject.state.cachedQuestionsCount).toBe(2);
+    expect(subject.queueResultsRefresh).toHaveBeenCalledWith('poll-local-storage-change');
+    peekSpy.mockRestore();
   });
 });
