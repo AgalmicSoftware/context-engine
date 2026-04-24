@@ -1,6 +1,12 @@
-import { serializeFilterState, deserializeFilterState } from './filterStateUtils';
+import {
+  deserializeFilterState,
+  serializeFilterState,
+  type SurveyFilterState,
+} from './filterStateUtils';
 
-const defaultState = {
+type SurveyFilterStateInput = Partial<SurveyFilterState> & Record<string, unknown>;
+
+const defaultState: SurveyFilterState = {
   topQuestions: null,
   questionTypes: [],
   sbtFilter: null,
@@ -86,7 +92,12 @@ describe('filterStateUtils', () => {
   });
 
   it('round-trips responseStatus with canonical normalization', () => {
-    const normalizeResponseStatus = (responseStatus) => {
+    const normalizeResponseStatus = (
+      responseStatus:
+        | { responded?: boolean; notResponded?: boolean }
+        | null
+        | undefined
+    ): SurveyFilterState['responseStatus'] => {
       const responded = responseStatus?.responded === true;
       const notResponded = responseStatus?.notResponded === true;
       if ((responded && notResponded) || (!responded && !notResponded)) {
@@ -94,7 +105,12 @@ describe('filterStateUtils', () => {
       }
       return { responded, notResponded };
     };
-    const roundTripResponseStatus = (responseStatus) => {
+    const roundTripResponseStatus = (
+      responseStatus:
+        | { responded?: boolean; notResponded?: boolean }
+        | null
+        | undefined
+    ): SurveyFilterState['responseStatus'] => {
       const encoded = serializeFilterState({
         ...defaultState,
         responseStatus: normalizeResponseStatus(responseStatus),
@@ -111,7 +127,7 @@ describe('filterStateUtils', () => {
   });
 
   it('drops extraneous keys during deserialization', () => {
-    const withExtra = {
+    const withExtra: SurveyFilterStateInput = {
       ...defaultState,
       extra: 'ignore-me',
     };
@@ -120,7 +136,7 @@ describe('filterStateUtils', () => {
     const decoded = deserializeFilterState(encoded);
 
     expect(decoded).toEqual(defaultState);
-    expect(decoded.extra).toBeUndefined();
+    expect((decoded as SurveyFilterStateInput).extra).toBeUndefined();
   });
 
   it('falls back to defaults for invalid input', () => {
