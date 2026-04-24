@@ -1,26 +1,11 @@
 /** @file surveyToolUtils.js */
 
-import {
-  getAllSessionSlugs,
-  getSessionSlugByName,
-} from '../../utilities/web3/contractScripts.js';
 import { createLogger } from 'utilities/logging.js';
 import {
   formatQuestionScanBlockCount,
   isSurveyToolFilterStateActive,
   serializeSurveyToolFilterState,
 } from './surveyToolViewState.js';
-import {
-  resolveEffectiveSlug,
-  resolveIdLookupContext,
-} from './surveyToolScope.js';
-import {
-  readQuestionsCacheRef,
-  readSurveysCacheRef,
-} from './surveyToolCacheState.js';
-import {
-  normalizeQuestionIdKey,
-} from './surveyToolSignatures.js';
 export {
   buildRatingEnvelopeQidSetFromUserAnswers,
   clampSliderValue,
@@ -72,6 +57,9 @@ export {
   hasExplicitSessionQueryPinInPath,
   readPathSearch,
 } from './surveyToolNavigation.js';
+export {
+  resolveSlugForIds,
+} from './surveyToolSlugLookup.js';
 export {
   buildSurveyDraftSemanticSignature,
   computeSubmitLabel,
@@ -181,96 +169,6 @@ const scheduleMicrotask = (cb) => {
   }
   Promise.resolve().then(cb);
 };
-
-
-const hasQuestionMapValue = (map = {}, questionId = '') => {
-  if (!map || typeof map !== 'object') return false;
-  const rawKey = String(questionId || '');
-  const normalizedKey = normalizeQuestionIdKey(questionId);
-  const candidates = rawKey && normalizedKey && rawKey !== normalizedKey
-    ? [rawKey, normalizedKey]
-    : [rawKey || normalizedKey];
-  for (const key of candidates) {
-    if (!key) continue;
-    if (!Object.prototype.hasOwnProperty.call(map, key)) continue;
-    const value = map[key];
-    if (value === undefined || value === null) continue;
-    return true;
-  }
-  return false;
-};
-
-/**
- * Cross-cache slug discovery for question/survey IDs.
- * Prefers explicit sessionName → slug; else scans per-group caches on current network; else falls back.
- *
- * @param {{ sessionName?: string|null, questionId?: string|null, surveyId?: string|null,
- *           props?: any, network?: any }} args
- * @returns {string} slug ('' = general)
- */
-export function resolveSlugForIds({ sessionName, questionId, surveyId, props, network }) {
-  const sessionNameOrLegacy = sessionName;
-  // 1) Explicit group name mapping
-  const byName = getSessionSlugByName(sessionNameOrLegacy);
-  if (byName !== null && byName !== undefined) return byName;
-
-  const qLower = questionId ? String(questionId).toLowerCase() : null;
-  const sLower = surveyId ? String(surveyId).toLowerCase() : null;
-
-  // Fast path: if no explicit IDs were provided, trust current route/session context.
-  if (!qLower && !sLower) {
-    return resolveEffectiveSlug(props);
-  }
-
-  // Candidate slugs: every group entry's .slug (or key), plus '' (general)
-  const candSet = new Set(getAllSessionSlugs().map((s) => String(s).toLowerCase()));
-
-  for (const slug of candSet) {
-    const idLookupContext = resolveIdLookupContext({ props, network, sessionSlug: slug });
-    const netIdStr = idLookupContext.networkIdStr || '';
-
-    // Questions cache lookup
-    const qc = readQuestionsCacheRef(slug) || {};
-    const netQ = netIdStr ? (qc?.[netIdStr] || null) : null;
-    if (qLower && netQ && netQ.questions && netQ.questions[qLower]) {
-      return slug;
-    }
-
-    // Surveys cache lookup
-    const sc = readSurveysCacheRef(slug) || {};
-    const netS = netIdStr ? (sc?.[netIdStr] || null) : null;
-    if (netS && netS.surveys) {
-      // exact survey
-      if (sLower && netS.surveys[sLower]) {
-        const mapped = getSessionSlugByName(netS.surveys[sLower]?.sessionName);
-        return (mapped ?? slug);
-      }
-      // any survey referencing the question
-      if (!sLower && qLower) {
-        for (const sv of Object.values(netS.surveys)) {
-          const ids = Array.isArray(sv?.questionIDs)
-            ? sv.questionIDs.map((x) => String(x).toLowerCase())
-            : [];
-          if (ids.includes(qLower)) {
-            const mapped = getSessionSlugByName(sv?.sessionName);
-            return (mapped ?? slug);
-          }
-        }
-      }
-    }
-  }
-
-  // Fallback to effective context slug (URL/Redux/prop)
-  return resolveEffectiveSlug(props);
-}
-
-
-
-
-
-
-
-
 
 /**
  * Compute the submit button label in a baseline-aware way.
