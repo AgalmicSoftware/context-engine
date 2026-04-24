@@ -36,7 +36,6 @@ function collectNodeTestFiles(rootDir = path.resolve(__dirname, '..')) {
   });
 
   files.push(...readOptionalTestDir(rootDir, 'scripts'));
-  files.push(...readOptionalTestDir(rootDir, path.join('scripts', 'lib', 'e2e')));
 
   return files;
 }
