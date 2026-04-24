@@ -1,10 +1,10 @@
 import { normalizeTagList } from '../defaultTags.js';
 
-export const getQuestionTagDisplayList = (tags) => {
+export const getQuestionTagDisplayList = (tags: unknown): string[] => {
   if (!Array.isArray(tags)) return [];
 
   const seen = new Set();
-  const out = [];
+  const out: string[] = [];
 
   tags.forEach((rawTag) => {
     const displayTag = String(rawTag ?? '').trim();
