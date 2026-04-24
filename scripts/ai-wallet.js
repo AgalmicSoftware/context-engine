@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 const { ethers } = require('ethers');
-const { loadClientDefaults } = require('./lib/e2e/network-defaults.js');
+const { loadClientDefaults } = require('./lib/network-defaults.js');
 const { getPublicRpcUrls } = require('../client/src/variables/rpcDefaults.js');
 
 const DEFAULT_CHAIN_ID = Number(loadClientDefaults()?.defaultChainId || 0);

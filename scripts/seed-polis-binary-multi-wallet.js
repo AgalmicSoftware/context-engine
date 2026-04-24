@@ -13,8 +13,8 @@ const {
   resolveRunTag,
   toStr,
   writeJson,
-} = require('./lib/e2e/common');
-const { resolveChainDefaults } = require('./lib/e2e/network-defaults');
+} = require('./lib/common');
+const { resolveChainDefaults } = require('./lib/network-defaults');
 const {
   buildWalletFromPasskey,
   DEFAULT_PASSKEY_A,
