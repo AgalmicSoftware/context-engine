@@ -15,12 +15,17 @@ Docs can be associated with:
   - When `:token` is a session id, the app keeps the URL stable (no rewrite to slug) on this subroute.
 - Tool Explorer `Data` panel:
   - `Add` keeps the existing question-generation ingest flow.
+  - In `Add`, manual ingest now has both `Generate Questions` and `Add to Library`.
+  - When one or more files/images are uploaded in `Add`, a title field appears at the top of the ingest surface and is reused as the doc title / filename when possible.
+  - Files and images share a single upload control in `Add`; image paste stays in the shared compact chooser, the main `Add URL` field is the only URL entry path, and queued images render previews before question generation or library upload.
   - In `Add`, queued extra URL/file sources can optionally be saved into the session Doc Library on `Generate Questions`.
   - Saved Tool Explorer sources are written as Lit-encrypted session docs with an audience of either `only me` or the session `docUploads` gate when that gate exists.
   - When the save option is enabled, generated surveys store doc-library viewer URLs for those saved extra sources instead of the raw source URLs.
   - `View` defaults to the sample demo corpus viewer used on `/session/demo` when demo surfaces are enabled.
   - The local `Demo corpus` checkbox starts checked in demo-enabled mode; unchecking it switches the panel to the real session Doc Library when a session context is available.
   - When demo surfaces are disabled globally, `View` opens directly to the real session Doc Library or its empty state, and the local demo toggle is hidden.
+  - In `View`, the session Doc Library is browse-only: upload/link entry controls stay in `Add`.
+  - Image docs render inline thumbnails in the browse list, and opening them still shows the full preview/download viewer.
 - SBT detail page: `SBTPage` shows a “Docs” section for the current SBT group.
 
 ## Storage Provider Abstraction (Per Session)
@@ -31,7 +36,7 @@ Session metadata may include a non-authoritative `docLibrary` config:
 {
   "docLibrary": {
     "provider": "arweave",
-    "arweave": { "index": "graphql", "graphqlUrl": "https://arweave.net/graphql" },
+    "arweave": { "index": "graphql", "graphqlUrl": "https://permagate.io/graphql" },
     "ipfs": {},
     "local": {}
   }
@@ -42,7 +47,7 @@ Defaults:
 - If missing, provider defaults to `arweave`.
 - `ipfs` and `local` providers are currently stubbed (UI disables list/upload with a “not implemented” notice).
 
-Note: GraphQL here refers to Arweave’s public indexing API (`https://arweave.net/graphql`). It is not something the session worker needs to run; the client queries it directly.
+Note: GraphQL here refers to Arweave’s public indexing API. The client now prefers `https://permagate.io/graphql`, then falls back to `https://g8way.io/graphql`, and only then to `https://arweave.net/graphql`, so a single flaky gateway does not blank the Doc Library.
 
 ## Tag Schema (Arweave Index)
 
@@ -86,6 +91,7 @@ For the main Doc Library panel, encryption is based on SBT conditions:
 
 - If SessionRegistry’s `docUploads` gate has at least one SBT address:
   - upload defaults to **Locked (Encrypted)** using that gate’s SBT set (Any/All).
+  - If that gate resolves to a Lit-unsupported chain (currently OP Sepolia for contract-gated ACCs), the UI falls back away from the session gate instead of surfacing a low-level Lit validator error.
 - If the `docUploads` gate is empty or unavailable:
   - upload defaults to **Unlocked (Plaintext)**.
   - users can still encrypt by selecting **Custom SBT(s)** manually.
@@ -94,7 +100,7 @@ For the main Doc Library panel, encryption is based on SBT conditions:
 For Tool Explorer `Data -> Add` saved extra sources:
 - saves are always encrypted
 - the audience can be `only me` or the session `docUploads` gate
-- when the session `docUploads` gate is unavailable, Tool Explorer falls back to `only me`
+- when the session `docUploads` gate is unavailable or Lit cannot honor that gate on the current chain, Tool Explorer falls back to `only me`
 
 ## “Add URL” Link Records
 

@@ -42,6 +42,27 @@ describe('litProtocol access control helpers', () => {
     ]);
   });
 
+  it('falls back to sepolia for wallet-only access control on OP Sepolia', () => {
+    const litProtocol = loadLitProtocol();
+
+    expect(litProtocol.buildWalletAddressAccessControlConditions({
+      walletAddress: '0x00000000000000000000000000000000000000Aa',
+      chainId: 11155420,
+    })).toEqual([
+      {
+        contractAddress: '',
+        standardContractType: '',
+        chain: 'sepolia',
+        method: '',
+        parameters: [':userAddress'],
+        returnValueTest: {
+          comparator: '=',
+          value: '0x00000000000000000000000000000000000000aa',
+        },
+      },
+    ]);
+  });
+
   it('returns null for an invalid wallet address', () => {
     const litProtocol = loadLitProtocol();
 
