@@ -1,4 +1,4 @@
-/** @file CommunityTab.jsx */
+/** @file CommunityTab.tsx */
 import React, { Component } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faUsers, faVoteYea, faSpinner, faScroll, faUsersCog, faChevronDown, faChevronUp, faExclamationTriangle, faCog } from '@fortawesome/free-solid-svg-icons';
@@ -40,8 +40,9 @@ import { getPolisDemoDatasetForSlug } from '../PolisReport/PolisReport.jsx';
 
 const uiLog = createLogger('ui');
 const COMMUNITY_BEESWARM_DEMO_SLUG = 'demo';
+const contractScriptsUntyped = contractScripts as any;
 
-const getDisplaySessionLists = (slugIn = '') => {
+const getDisplaySessionLists = (slugIn: any = '') => {
   const strictLists = getSessionLists(slugIn) || {};
   const hasStrictLists = [
     strictLists.featured_SBTs_LIST,
@@ -50,7 +51,7 @@ const getDisplaySessionLists = (slugIn = '') => {
     strictLists.BLOCKED_QUESTION_IDS,
     strictLists.HIGHLIGHTED_SURVEY_IDS,
     strictLists.BLOCKED_SURVEY_IDS,
-  ].some((value) => Array.isArray(value) && value.length > 0);
+  ].some((value: any) => Array.isArray(value) && value.length > 0);
   if (hasStrictLists) return strictLists;
 
   const demoCfg = getDemoSessionConfigBySlug(slugIn, { allowDemoFallback: true }) || {};
@@ -64,7 +65,7 @@ const getDisplaySessionLists = (slugIn = '') => {
   };
 };
 
-const getDisplaySessionChainId = (slugIn = '') => {
+const getDisplaySessionChainId = (slugIn: any = '') => {
   const strictChainId = getSessionChainId(slugIn);
   if (strictChainId != null) return strictChainId;
 
@@ -79,8 +80,10 @@ const getDisplaySessionChainId = (slugIn = '') => {
 };
 
 
-class CommunityTab extends Component {
-  constructor(props) {
+class CommunityTab extends Component<any, any> {
+  [key: string]: any;
+
+  constructor(props: any) {
     super(props);
     this.state = {
       showModal: false,
@@ -143,11 +146,11 @@ class CommunityTab extends Component {
   }
 
   // === Universe helpers (encapsulated) ===
-  _readGlobalSelection = () => readStoredGlobalSessionSelection();
+  _readGlobalSelection: any = () => readStoredGlobalSessionSelection();
 
-  _isUniverseEnabled = () => this._readGlobalSelection().selectedSessionScope === 'all';
+  _isUniverseEnabled: any = () => this._readGlobalSelection().selectedSessionScope === 'all';
 
-  _resolveRouteSlug = () => {
+  _resolveRouteSlug: any = () => {
     if (typeof this.props.activeSessionSlug === 'string') return this.props.activeSessionSlug;
     try {
       const p = (typeof window !== 'undefined' ? window.location.pathname : '') || '';
@@ -160,7 +163,7 @@ class CommunityTab extends Component {
     return '';                            // general (empty)
   }
 
-  _hasPinnedRouteSession = () => {
+  _hasPinnedRouteSession: any = () => {
     try {
       const p = (typeof window !== 'undefined' ? window.location.pathname : '') || '';
       return p.startsWith('/session/');
@@ -168,7 +171,7 @@ class CommunityTab extends Component {
     return false;
   }
 
-  _currentSlug = () => {
+  _currentSlug: any = () => {
     if (!this._isUniverseEnabled()) {
       const selected = this._getSelectedSessionSlugs();
       if (selected.length > 0) {
@@ -178,10 +181,10 @@ class CommunityTab extends Component {
     return this._resolveRouteSlug();
   }
 
-  _dedupeNormalizedSlugs = (slugs = []) => {
-    const seen = new Set();
-    const out = [];
-    slugs.forEach((slugIn) => {
+  _dedupeNormalizedSlugs: any = (slugs: any = []) => {
+    const seen: any = new Set();
+    const out: any[] = [];
+    slugs.forEach((slugIn: any) => {
       const slug = normalizeSessionSlug(slugIn || '');
       if (seen.has(slug)) return;
       seen.add(slug);
@@ -190,17 +193,17 @@ class CommunityTab extends Component {
     return out;
   }
 
-  _buildSessionSlugSignature = (slugs = []) => (
+  _buildSessionSlugSignature: any = (slugs: any = []) => (
     this._dedupeNormalizedSlugs(slugs).join('|')
   );
 
-  _sortSlugsByKnownOrder = (slugs = [], orderedUniverse = []) => {
+  _sortSlugsByKnownOrder: any = (slugs: any = [], orderedUniverse: any = []) => {
     const normalizedUniverse = this._dedupeNormalizedSlugs(orderedUniverse);
-    const order = new Map();
-    normalizedUniverse.forEach((slug, index) => {
+    const order: any = new Map();
+    normalizedUniverse.forEach((slug: any, index: any) => {
       order.set(normalizeSessionSlug(slug || ''), index);
     });
-    return this._dedupeNormalizedSlugs(slugs).sort((aRaw, bRaw) => {
+    return this._dedupeNormalizedSlugs(slugs).sort((aRaw: any, bRaw: any) => {
       const a = normalizeSessionSlug(aRaw || '');
       const b = normalizeSessionSlug(bRaw || '');
       const ai = order.has(a) ? order.get(a) : Number.MAX_SAFE_INTEGER;
@@ -210,14 +213,14 @@ class CommunityTab extends Component {
     });
   }
 
-  _labelForSessionSlug = (slugIn) => {
+  _labelForSessionSlug: any = (slugIn: any) => {
     const slug = normalizeSessionSlug(slugIn || '');
     return slug || 'General';
   }
 
-  _getDefaultSelectedSessionSlugs = () => {
-    const availableSlugs = this._getSessionSelectorOptions().map((option) => option.value);
-    const availableSet = new Set(availableSlugs);
+  _getDefaultSelectedSessionSlugs: any = () => {
+    const availableSlugs = this._getSessionSelectorOptions().map((option: any) => option.value);
+    const availableSet: any = new Set(availableSlugs);
     const routeSlug = normalizeSessionSlug(this._resolveRouteSlug() || '');
     if (this._hasPinnedRouteSession() && availableSet.has(routeSlug)) {
       return [routeSlug];
@@ -235,7 +238,7 @@ class CommunityTab extends Component {
         primarySessionSlug: fallbackPrimarySlug,
       });
     const filteredDefaults = this._dedupeNormalizedSlugs(scopedDefaults)
-      .filter((slug) => availableSet.has(slug));
+      .filter((slug: any) => availableSet.has(slug));
     if (filteredDefaults.length > 0) {
       return this._sortSlugsByKnownOrder(filteredDefaults, availableSlugs);
     }
@@ -244,20 +247,20 @@ class CommunityTab extends Component {
     return availableSlugs.length > 0 ? [availableSlugs[0]] : [];
   }
 
-  _getSessionSelectorOptions = () => this._dedupeNormalizedSlugs([
+  _getSessionSelectorOptions: any = () => this._dedupeNormalizedSlugs([
     this._resolveRouteSlug(),
     '',
     ...this.listAllSlugs(),
-  ]).map((slug) => ({
+  ]).map((slug: any) => ({
     value: slug,
     label: this._labelForSessionSlug(slug),
   }));
 
-  _getSelectedSessionSlugs = () => {
-    const availableSlugs = this._getSessionSelectorOptions().map((option) => option.value);
-    const availableSet = new Set(availableSlugs);
+  _getSelectedSessionSlugs: any = () => {
+    const availableSlugs = this._getSessionSelectorOptions().map((option: any) => option.value);
+    const availableSet: any = new Set(availableSlugs);
     const defaultSelected = this._getDefaultSelectedSessionSlugs()
-      .filter((slug) => availableSet.has(slug));
+      .filter((slug: any) => availableSet.has(slug));
     if (defaultSelected.length > 0) {
       return this._sortSlugsByKnownOrder(defaultSelected, availableSlugs);
     }
@@ -265,11 +268,11 @@ class CommunityTab extends Component {
     return this._sortSlugsByKnownOrder(availableSlugs, availableSlugs);
   };
 
-  toggleLeaderboardControls = () => {
-    this.setState((prevState) => ({ showLeaderboardControls: !prevState.showLeaderboardControls }));
+  toggleLeaderboardControls: any = () => {
+    this.setState((prevState: any) => ({ showLeaderboardControls: !prevState.showLeaderboardControls }));
   }
 
-  listAllSlugs = () => {
+  listAllSlugs: any = () => {
     if (readSessionScanScope() === 'list') {
       const scopedSlugs = this._dedupeNormalizedSlugs(readSessionScanSlugs());
       if (scopedSlugs.length > 0) return scopedSlugs;
@@ -283,7 +286,7 @@ class CommunityTab extends Component {
     ]);
   }
 
-  _resolveNetKeyForSlug = (slug) => {
+  _resolveNetKeyForSlug: any = (slug: any) => {
     try {
       const id = getDisplaySessionChainId(slug);
       return id != null ? String(id) : '';
@@ -292,13 +295,13 @@ class CommunityTab extends Component {
     }
   }
 
-  _readCache = (cacheName, slug, options = {}) => {
+  _readCache: any = (cacheName: any, slug: any, options: any = {}) => {
     const shouldClone = options?.clone === true;
     const obj = peekCacheSync(cacheName, slug, { clone: shouldClone }) || {};
     return (obj && typeof obj === 'object') ? obj : {};
   }
 
-  _getObjectRefId = (value) => {
+  _getObjectRefId: any = (value: any) => {
     if (!value || typeof value !== 'object') return 'na';
     let id = this._cacheRefIds.get(value);
     if (!id) {
@@ -309,7 +312,7 @@ class CommunityTab extends Component {
     return id;
   }
 
-  _pickNet = (cacheObj, netKey) => {
+  _pickNet: any = (cacheObj: any, netKey: any) => {
     if (!cacheObj || typeof cacheObj !== 'object') return {};
     if (netKey && cacheObj[netKey]) return cacheObj[netKey] || {};
     const ks = Object.keys(cacheObj || {});
@@ -317,9 +320,9 @@ class CommunityTab extends Component {
     return netKey && cacheObj[netKey] ? (cacheObj[netKey] || {}) : {};
   }
 
-  _buildScopeEntriesFromSlugs = (slugs = [], options = {}) => {
-    const out = [];
-    this._dedupeNormalizedSlugs(slugs).forEach((slug) => {
+  _buildScopeEntriesFromSlugs: any = (slugs: any = [], options: any = {}) => {
+    const out: any[] = [];
+    this._dedupeNormalizedSlugs(slugs).forEach((slug: any) => {
       const netKey = this._resolveNetKeyForSlug(slug);
       const surveysCacheAll = this._readCache('surveysCache', slug, options);
       const questionsCacheAll = this._readCache('questionsCache', slug, options);
@@ -335,11 +338,11 @@ class CommunityTab extends Component {
     return out;
   }
 
-  _iterUniverse = (options = {}) => {
+  _iterUniverse: any = (options: any = {}) => {
     return this._buildScopeEntriesFromSlugs(this.listAllSlugs(), options);
   }
 
-  _iterScopeCaches = (options = {}) => {
+  _iterScopeCaches: any = (options: any = {}) => {
     if (this._isUniverseEnabled()) return this._iterUniverse(options);
     const selectedSlugs = this._getSelectedSessionSlugs();
     if (selectedSlugs.length > 0) {
@@ -348,7 +351,7 @@ class CommunityTab extends Component {
     return this._buildScopeEntriesFromSlugs([this._currentSlug()], options);
   }
 
-  _hydrateSbtHoldersForUsersModal = async () => {
+  _hydrateSbtHoldersForUsersModal: any = async () => {
     if (this._holdersHydrationPromise) return this._holdersHydrationPromise;
     this._holdersHydrationInFlight = true;
     this._holdersHydrationAbort = false;
@@ -359,7 +362,7 @@ class CommunityTab extends Component {
       const CONC = 2;
       for (let i = 0; i < slugs.length; i += CONC) {
         const chunk = slugs.slice(i, i + CONC);
-        await Promise.all(chunk.map((slug) => this._hydrateSbtHoldersForSlug(slug)));
+        await Promise.all(chunk.map((slug: any) => this._hydrateSbtHoldersForSlug(slug)));
         if (this._holdersHydrationAbort) break;
       }
     })();
@@ -374,7 +377,7 @@ class CommunityTab extends Component {
     await this._refreshCommunityStats({ force: true, markLoading: false });
   };
 
-  _hydrateSbtHoldersForSlug = async (slug) => {
+  _hydrateSbtHoldersForSlug: any = async (slug: any) => {
     const netKey = this._resolveNetKeyForSlug(slug);
     if (!netKey) return;
 
@@ -383,7 +386,7 @@ class CommunityTab extends Component {
     if (!cacheObj[netKey]) cacheObj[netKey] = { sbtList: {} };
     const sbtList = cacheObj[netKey].sbtList || {};
 
-    const needsCounts = (entry) => {
+    const needsCounts = (entry: any) => {
       if (!entry || !entry.sbtAddress) return false;
       if (entry.countsLoaded === true) return false;
       const hasMinted = Array.isArray(entry.mintedAddresses) && entry.mintedAddresses.length > 0;
@@ -398,7 +401,7 @@ class CommunityTab extends Component {
     for (let i = 0; i < entries.length; i += BATCH) {
       if (this._holdersHydrationAbort) break;
       const batch = entries.slice(i, i + BATCH);
-      const results = await Promise.all(batch.map(async (entry) => {
+      const results = await Promise.all(batch.map(async (entry: any) => {
         try {
           const addr = entry.sbtAddress;
           const lower = String(addr || '').toLowerCase();
@@ -414,8 +417,8 @@ class CommunityTab extends Component {
           if (counts && counts.ok === false) {
             return { lower, addr, countsOk: false };
           }
-          const mintedAddresses = Object.keys(counts.mintedCountByAddress || {}).map(a => a.toLowerCase());
-          const burnedAddresses = Object.keys(counts.burnedCountByAddress || {}).map(a => a.toLowerCase());
+          const mintedAddresses = Object.keys(counts.mintedCountByAddress || {}).map((a: any) => a.toLowerCase());
+          const burnedAddresses = Object.keys(counts.burnedCountByAddress || {}).map((a: any) => a.toLowerCase());
           return {
             lower,
             addr,
@@ -430,7 +433,7 @@ class CommunityTab extends Component {
       }));
 
       let changed = false;
-      results.forEach((res) => {
+      results.forEach((res: any) => {
         if (!res || res.countsOk === false) return;
         const existing = sbtList[res.lower] || {};
         sbtList[res.lower] = {
@@ -456,40 +459,40 @@ class CommunityTab extends Component {
         await writeCache('sbtCache', slug, cacheObj);
       }
       if (i + BATCH < entries.length) {
-        await new Promise(r => setTimeout(r, 75));
+        await new Promise((r: any) => setTimeout(r, 75));
       }
     }
   };
 
-  _shouldCountSbt = (entry, slug) => {
+  _shouldCountSbt: any = (entry: any, slug: any) => {
     if (!entry || !entry.sbtAddress) return false;
     const info = entry.sbtInfo || {};
     if (info.hidden === true) return false;
 
-    let ignored = [], featured = [];
+    let ignored: any[] = [], featured: any[] = [];
     const lists = getDisplaySessionLists(slug);
     ignored  = (lists.ignored_SBTs_LIST || []);
     featured = (lists.featured_SBTs_LIST || []);
     const addrLower = String(entry.sbtAddress || '').toLowerCase();
-    const ignoredSet  = new Set(ignored.map(a => (a || '').toLowerCase()));
-    const featuredSet = new Set(featured.map(a => (a || '').toLowerCase()));
+    const ignoredSet: any  = new Set(ignored.map((a: any) => (a || '').toLowerCase()));
+    const featuredSet: any = new Set(featured.map((a: any) => (a || '').toLowerCase()));
     if (ignoredSet.has(addrLower)) return false;
     if (info.unlisted === true && !featuredSet.has(addrLower)) return false;
     return true;
   }
 
-  _countKeys = (value) => {
+  _countKeys: any = (value: any) => {
     if (!value || typeof value !== 'object') return 0;
     return Object.keys(value).length;
   }
 
-  _summarizeNestedResponseKeys = (value) => {
+  _summarizeNestedResponseKeys: any = (value: any) => {
     if (!value || typeof value !== 'object') {
       return { totalKeys: 0, hash: 0 };
     }
     let totalKeys = 0;
     let hash = 2166136261;
-    const mix = (input) => {
+    const mix = (input: any) => {
       const text = String(input || '');
       for (let i = 0; i < text.length; i += 1) {
         hash ^= text.charCodeAt(i);
@@ -497,7 +500,7 @@ class CommunityTab extends Component {
       }
       hash >>>= 0;
     };
-    Object.entries(value).forEach(([outerKey, inner]) => {
+    Object.entries(value).forEach(([outerKey, inner]: any) => {
       mix(String(outerKey || '').toLowerCase());
       if (!inner || typeof inner !== 'object') {
         mix('0');
@@ -506,20 +509,20 @@ class CommunityTab extends Component {
       const nestedKeys = Object.keys(inner);
       totalKeys += nestedKeys.length;
       mix(String(nestedKeys.length));
-      nestedKeys.forEach((nestedKey) => {
+      nestedKeys.forEach((nestedKey: any) => {
         mix(String(nestedKey || '').toLowerCase());
       });
     });
     return { totalKeys, hash: hash >>> 0 };
   }
 
-  _summarizeSurveyMetadata = (surveysMap) => {
+  _summarizeSurveyMetadata: any = (surveysMap: any) => {
     if (!surveysMap || typeof surveysMap !== 'object') {
       return { totalSurveys: 0, hash: 0 };
     }
     let totalSurveys = 0;
     let hash = 2166136261;
-    const mix = (input) => {
+    const mix = (input: any) => {
       const text = String(input || '');
       for (let i = 0; i < text.length; i += 1) {
         hash ^= text.charCodeAt(i);
@@ -528,7 +531,7 @@ class CommunityTab extends Component {
       hash >>>= 0;
     };
 
-    Object.entries(surveysMap).forEach(([surveyId, survey]) => {
+    Object.entries(surveysMap).forEach(([surveyId, survey]: any) => {
       totalSurveys += 1;
       const safeSurvey = survey && typeof survey === 'object' ? survey : {};
       const questionIDs = Array.isArray(safeSurvey.questionIDs) ? safeSurvey.questionIDs : [];
@@ -536,7 +539,7 @@ class CommunityTab extends Component {
       mix(String(safeSurvey.title || ''));
       mix(String(safeSurvey.creator || '').toLowerCase());
       mix(String(questionIDs.length));
-      questionIDs.forEach((qid) => {
+      questionIDs.forEach((qid: any) => {
         mix(String(qid || '').toLowerCase());
       });
     });
@@ -544,13 +547,13 @@ class CommunityTab extends Component {
     return { totalSurveys, hash: hash >>> 0 };
   }
 
-  _summarizeQuestionMetadata = (questionsMap) => {
+  _summarizeQuestionMetadata: any = (questionsMap: any) => {
     if (!questionsMap || typeof questionsMap !== 'object') {
       return { totalQuestions: 0, hash: 0 };
     }
     let totalQuestions = 0;
     let hash = 2166136261;
-    const mix = (input) => {
+    const mix = (input: any) => {
       const text = String(input || '');
       for (let i = 0; i < text.length; i += 1) {
         hash ^= text.charCodeAt(i);
@@ -559,7 +562,7 @@ class CommunityTab extends Component {
       hash >>>= 0;
     };
 
-    Object.entries(questionsMap).forEach(([questionId, question]) => {
+    Object.entries(questionsMap).forEach(([questionId, question]: any) => {
       totalQuestions += 1;
       const safeQuestion = question && typeof question === 'object' ? question : {};
       mix(String(questionId || '').toLowerCase());
@@ -569,14 +572,14 @@ class CommunityTab extends Component {
     return { totalQuestions, hash: hash >>> 0 };
   }
 
-  _summarizeSbtHolderMembers = (sbtListMap) => {
+  _summarizeSbtHolderMembers: any = (sbtListMap: any) => {
     if (!sbtListMap || typeof sbtListMap !== 'object') {
       return { totalEntries: 0, totalMembers: 0, hash: 0 };
     }
     let totalEntries = 0;
     let totalMembers = 0;
     let hash = 2166136261;
-    const mix = (input) => {
+    const mix = (input: any) => {
       const text = String(input || '');
       for (let i = 0; i < text.length; i += 1) {
         hash ^= text.charCodeAt(i);
@@ -585,7 +588,7 @@ class CommunityTab extends Component {
       hash >>>= 0;
     };
 
-    Object.entries(sbtListMap).forEach(([entryKey, entryValue]) => {
+    Object.entries(sbtListMap).forEach(([entryKey, entryValue]: any) => {
       totalEntries += 1;
       const entry = entryValue && typeof entryValue === 'object' ? entryValue : {};
       const info = entry?.sbtInfo && typeof entry.sbtInfo === 'object' ? entry.sbtInfo : {};
@@ -603,11 +606,11 @@ class CommunityTab extends Component {
       mix(`u:${unlisted}`);
       mix(String(minted.length));
       mix(String(burned.length));
-      minted.forEach((addr) => {
+      minted.forEach((addr: any) => {
         totalMembers += 1;
         mix(`m:${String(addr || '').toLowerCase()}`);
       });
-      burned.forEach((addr) => {
+      burned.forEach((addr: any) => {
         totalMembers += 1;
         mix(`b:${String(addr || '').toLowerCase()}`);
       });
@@ -616,8 +619,8 @@ class CommunityTab extends Component {
     return { totalEntries, totalMembers, hash: hash >>> 0 };
   }
 
-  _buildCoarseCacheSignature = (scopeEntries = []) => {
-    const parts = [];
+  _buildCoarseCacheSignature: any = (scopeEntries: any = []) => {
+    const parts: any[] = [];
     for (const { slug, netKey, surveysCache, questionsCache, sbtCache } of scopeEntries) {
       const surveyBlock =
         Number(surveysCache?.surveysLatestBlock) ||
@@ -666,8 +669,8 @@ class CommunityTab extends Component {
     return parts.join('|');
   }
 
-  _buildCacheSignature = (scopeEntries = []) => measureSync('ce.communityTab.cacheSignature', () => {
-    const parts = [];
+  _buildCacheSignature: any = (scopeEntries: any = []) => measureSync('ce.communityTab.cacheSignature', () => {
+    const parts: any[] = [];
     for (const { slug, netKey, surveysCache, questionsCache, sbtCache } of scopeEntries) {
       const surveyBlock =
         Number(surveysCache?.surveysLatestBlock) ||
@@ -722,8 +725,8 @@ class CommunityTab extends Component {
     return parts.join('|');
   })
 
-  _buildStatsArray = (prevStats, counts = {}) => (
-    (prevStats || []).map((stat) => {
+  _buildStatsArray: any = (prevStats: any, counts: any = {}) => (
+    (prevStats || []).map((stat: any) => {
       if (stat.label === 'Users') return { ...stat, count: Number(counts.users || 0) };
       if (stat.label === 'Questions') return { ...stat, count: Number(counts.questions || 0) };
       if (stat.label === 'Surveys') return { ...stat, count: Number(counts.surveys || 0) };
@@ -732,7 +735,7 @@ class CommunityTab extends Component {
     })
   )
 
-  _areAddressListsEqual = (left = [], right = []) => {
+  _areAddressListsEqual: any = (left: any = [], right: any = []) => {
     if (!Array.isArray(left) || !Array.isArray(right)) return false;
     if (left.length !== right.length) return false;
     for (let i = 0; i < left.length; i += 1) {
@@ -743,14 +746,14 @@ class CommunityTab extends Component {
     return true;
   }
 
-  _computeUniverseStatsSnapshot = (scopeEntries = []) => measureSync('ce.communityTab.computeUniverseStats', () => {
-    const surveyIdSet = new Set();
-    const questionIdSet = new Set();
-    const userSet = new Set();
-    const sbtAddressSet = new Set();
-    const surveyTitleMap = {};
-    const surveySlugMap = {};
-    const surveyRespondersMap = {};
+  _computeUniverseStatsSnapshot: any = (scopeEntries: any = []) => measureSync('ce.communityTab.computeUniverseStats', () => {
+    const surveyIdSet: any = new Set();
+    const questionIdSet: any = new Set();
+    const userSet: any = new Set();
+    const sbtAddressSet: any = new Set();
+    const surveyTitleMap: Record<string, any> = {};
+    const surveySlugMap: Record<string, any> = {};
+    const surveyRespondersMap: Record<string, any> = {};
 
     for (const { slug, surveysCache, questionsCache, sbtCache } of scopeEntries) {
       const surveysData = surveysCache?.surveys || {};
@@ -759,7 +762,7 @@ class CommunityTab extends Component {
       const questionResponsesData = questionsCache?.questionResponses || {};
       const sbtList = sbtCache?.sbtList || {};
 
-      Object.keys(surveysData || {}).forEach((sId) => {
+      Object.keys(surveysData || {}).forEach((sId: any) => {
         const sid = String(sId || '').toLowerCase();
         if (!sid) return;
         surveyIdSet.add(sid);
@@ -773,11 +776,11 @@ class CommunityTab extends Component {
         if (creator) userSet.add(String(creator).toLowerCase());
       });
 
-      Object.keys(surveyResponsesData || {}).forEach((sId) => {
+      Object.keys(surveyResponsesData || {}).forEach((sId: any) => {
         const sid = String(sId || '').toLowerCase();
         const responders = Object.keys(surveyResponsesData[sId] || {});
         if (!surveyRespondersMap[sid]) surveyRespondersMap[sid] = new Set();
-        responders.forEach((r) => {
+        responders.forEach((r: any) => {
           const rl = String(r || '').toLowerCase();
           if (!rl) return;
           surveyRespondersMap[sid].add(rl);
@@ -785,7 +788,7 @@ class CommunityTab extends Component {
         });
       });
 
-      Object.keys(questionsData || {}).forEach((qId) => {
+      Object.keys(questionsData || {}).forEach((qId: any) => {
         const qid = String(qId || '').toLowerCase();
         if (!qid) return;
         questionIdSet.add(qid);
@@ -793,15 +796,15 @@ class CommunityTab extends Component {
         if (creator) userSet.add(String(creator).toLowerCase());
       });
 
-      Object.keys(questionResponsesData || {}).forEach((qId) => {
+      Object.keys(questionResponsesData || {}).forEach((qId: any) => {
         const responders = Object.keys(questionResponsesData[qId] || {});
-        responders.forEach((r) => {
+        responders.forEach((r: any) => {
           const rl = String(r || '').toLowerCase();
           if (rl) userSet.add(rl);
         });
       });
 
-      Object.keys(sbtList || {}).forEach((addrLower) => {
+      Object.keys(sbtList || {}).forEach((addrLower: any) => {
         const entry = sbtList[addrLower];
         if (!entry || !entry.sbtAddress) return;
 
@@ -812,11 +815,11 @@ class CommunityTab extends Component {
         const info = entry.sbtInfo || {};
         if (info.creator) userSet.add(String(info.creator).toLowerCase());
         if (info.admin) userSet.add(String(info.admin).toLowerCase());
-        (entry.mintedAddresses || []).forEach((a) => {
+        (entry.mintedAddresses || []).forEach((a: any) => {
           const al = String(a || '').toLowerCase();
           if (al) userSet.add(al);
         });
-        (entry.burnedAddresses || []).forEach((a) => {
+        (entry.burnedAddresses || []).forEach((a: any) => {
           const al = String(a || '').toLowerCase();
           if (al) userSet.add(al);
         });
@@ -824,11 +827,11 @@ class CommunityTab extends Component {
     }
 
     let surveyResponsesCount = 0;
-    Object.values(surveyRespondersMap).forEach((set) => {
+    Object.values(surveyRespondersMap).forEach((set: any) => {
       surveyResponsesCount += set ? set.size : 0;
     });
 
-    const surveysList = Array.from(surveyIdSet).map((sid) => ({
+    const surveysList = Array.from(surveyIdSet).map((sid: any) => ({
       id: sid,
       title: surveyTitleMap[sid] || 'Untitled Survey',
       responsesCount: (surveyRespondersMap[sid] && surveyRespondersMap[sid].size) || 0,
@@ -846,7 +849,7 @@ class CommunityTab extends Component {
     };
   })
 
-  _computeSingleScopeStatsSnapshot = (scopeEntry) => measureSync('ce.communityTab.computeSingleScopeStats', () => {
+  _computeSingleScopeStatsSnapshot: any = (scopeEntry: any) => measureSync('ce.communityTab.computeSingleScopeStats', () => {
     if (!scopeEntry || !scopeEntry.netKey) {
       return {
         uniqueUsers: [],
@@ -872,7 +875,7 @@ class CommunityTab extends Component {
       surveyResponsesCount += Object.keys(surveyResponsesData[sId] || {}).length;
     }
 
-    const uniqueUsersSet = new Set();
+    const uniqueUsersSet: any = new Set();
     for (const sId in surveysData) {
       if (surveysData[sId]?.creator) {
         uniqueUsersSet.add(String(surveysData[sId].creator).toLowerCase());
@@ -880,7 +883,7 @@ class CommunityTab extends Component {
     }
     for (const sId in surveyResponsesData) {
       const responders = Object.keys(surveyResponsesData[sId] || {});
-      responders.forEach((r) => uniqueUsersSet.add(String(r || '').toLowerCase()));
+      responders.forEach((r: any) => uniqueUsersSet.add(String(r || '').toLowerCase()));
     }
     for (const qId in questionsData) {
       if (questionsData[qId]?.creator) {
@@ -889,7 +892,7 @@ class CommunityTab extends Component {
     }
     for (const qId in questionResponsesData) {
       const responders = Object.keys(questionResponsesData[qId] || {});
-      responders.forEach((r) => uniqueUsersSet.add(String(r || '').toLowerCase()));
+      responders.forEach((r: any) => uniqueUsersSet.add(String(r || '').toLowerCase()));
     }
 
     let sbtsCreatedCount = 0;
@@ -903,11 +906,11 @@ class CommunityTab extends Component {
       if (sbtItem.sbtInfo?.admin) {
         uniqueUsersSet.add(String(sbtItem.sbtInfo.admin).toLowerCase());
       }
-      (sbtItem.mintedAddresses || []).forEach((addr) => uniqueUsersSet.add(String(addr || '').toLowerCase()));
-      (sbtItem.burnedAddresses || []).forEach((addr) => uniqueUsersSet.add(String(addr || '').toLowerCase()));
+      (sbtItem.mintedAddresses || []).forEach((addr: any) => uniqueUsersSet.add(String(addr || '').toLowerCase()));
+      (sbtItem.burnedAddresses || []).forEach((addr: any) => uniqueUsersSet.add(String(addr || '').toLowerCase()));
     }
 
-    const surveysList = Object.keys(surveysData).map((sId) => {
+    const surveysList = Object.keys(surveysData).map((sId: any) => {
       const survey = surveysData[sId] || {};
       const questionIDs = Array.isArray(survey.questionIDs) ? survey.questionIDs : [];
       const responsesCount = Object.keys(surveyResponsesData[sId] || {}).length;
@@ -930,14 +933,14 @@ class CommunityTab extends Component {
     };
   })
 
-  _computeStatsSnapshot = (scopeEntries = []) => {
+  _computeStatsSnapshot: any = (scopeEntries: any = []) => {
     if (Array.isArray(scopeEntries) && scopeEntries.length === 1) {
       return this._computeSingleScopeStatsSnapshot(scopeEntries[0]);
     }
     return this._computeUniverseStatsSnapshot(scopeEntries);
   }
 
-  checkIfInitialLoadDone = async () => {
+  checkIfInitialLoadDone: any = async () => {
     // This function checks if the initial load is done by comparing the caches' lastBlock to the latest chain block
     const scopeEntries = this._iterScopeCaches({ clone: false });
     if (scopeEntries.length > 1) {
@@ -946,7 +949,7 @@ class CommunityTab extends Component {
           // Determine latest block (group-aware)
           let latestBlockNumber = 0;
           try {
-            const { toBlock } = await contractScripts.getRelevantBlockWindowForFilter(slug);
+            const { toBlock } = await contractScriptsUntyped.getRelevantBlockWindowForFilter(slug);
             latestBlockNumber = Number(toBlock || 0);
           } catch (_) {
             try {
@@ -1002,7 +1005,7 @@ class CommunityTab extends Component {
     let latestBlockNumber;
     const activeSlug = normalizeSessionSlug(scopeEntry.slug || this._currentSlug());
     try {
-      const { toBlock } = await contractScripts.getRelevantBlockWindowForFilter(activeSlug);
+      const { toBlock } = await contractScriptsUntyped.getRelevantBlockWindowForFilter(activeSlug);
       latestBlockNumber = Number(toBlock || 0);
     } catch (err) {
       try {
@@ -1016,7 +1019,7 @@ class CommunityTab extends Component {
     return minLastBlock >= latestBlockNumber;
   }
 
-  _computeNextPollDelayMs = () => {
+  _computeNextPollDelayMs: any = () => {
     const elapsed = Math.max(0, Date.now() - Number(this._statsPollStartedAtMs || 0));
     if (elapsed >= 120000) {
       return 60000;
@@ -1030,7 +1033,7 @@ class CommunityTab extends Component {
     return 30000;
   }
 
-  _isDocumentHidden = () => {
+  _isDocumentHidden: any = () => {
     if (typeof document === 'undefined') return false;
     try {
       return document.hidden === true || document.visibilityState === 'hidden';
@@ -1039,27 +1042,27 @@ class CommunityTab extends Component {
     }
   }
 
-  _computeFallbackPollDelayMs = () => {
+  _computeFallbackPollDelayMs: any = () => {
     if (this._isDocumentHidden()) return 120000;
     if (!this.state.initialLoadDone) return 15000;
     return 60000;
   }
 
-  _clearStatsPollTimer = () => {
+  _clearStatsPollTimer: any = () => {
     if (this._statsPollTimer) {
       clearTimeout(this._statsPollTimer);
       this._statsPollTimer = null;
     }
   }
 
-  _flushQueuedCacheUpdateRefresh = () => {
+  _flushQueuedCacheUpdateRefresh: any = () => {
     if (this._isUnmounted || this._isDocumentHidden()) return;
     const force = !!this._cacheUpdateRefreshQueuedForce;
     this._cacheUpdateRefreshQueuedForce = false;
     this._refreshCommunityStats({ force, markLoading: false });
   }
 
-  _queueCacheDrivenRefresh = ({ force = false } = {}) => {
+  _queueCacheDrivenRefresh: any = ({ force = false }: any = {}) => {
     if (this._isUnmounted || this._isDocumentHidden()) return;
     this._cacheUpdateRefreshQueuedForce = this._cacheUpdateRefreshQueuedForce || !!force;
     if (this._statsCacheRefreshCoalescer) {
@@ -1069,7 +1072,7 @@ class CommunityTab extends Component {
     this._flushQueuedCacheUpdateRefresh();
   }
 
-  _scheduleNextStatsPoll = (delayMs = null) => {
+  _scheduleNextStatsPoll: any = (delayMs: any = null) => {
     if (this._isUnmounted) return;
     this._clearStatsPollTimer();
     const fallbackDelay = this._computeFallbackPollDelayMs();
@@ -1086,7 +1089,7 @@ class CommunityTab extends Component {
     }, safeDelay);
   }
 
-  _runStatsRefreshCycle = async ({ force = false, markLoading = false } = {}) => {
+  _runStatsRefreshCycle: any = async ({ force = false, markLoading = false }: any = {}) => {
     if (this._isUnmounted) return { changed: false };
 
     if (markLoading && (!this.state.loadingSbtsCreated || !this.state.loadingSurveyData)) {
@@ -1094,7 +1097,7 @@ class CommunityTab extends Component {
     }
 
     let changed = false;
-    let snapshot = null;
+    let snapshot: any = null;
 
     const scopeEntries = this._iterScopeCaches({ clone: false });
     const coarseSignature = this._buildCoarseCacheSignature(scopeEntries);
@@ -1124,8 +1127,8 @@ class CommunityTab extends Component {
       }
     }
 
-    this.setState((prevState) => {
-      const next = {};
+    this.setState((prevState: any) => {
+      const next: Record<string, any> = {};
       if (changed && snapshot) {
         next.uniqueUsers = snapshot.uniqueUsers;
         next.surveysCreatedCount = snapshot.surveysCreatedCount;
@@ -1160,7 +1163,7 @@ class CommunityTab extends Component {
     return { changed };
   }
 
-  _refreshCommunityStats = async ({ force = false, markLoading = false } = {}) => {
+  _refreshCommunityStats: any = async ({ force = false, markLoading = false }: any = {}) => {
     if (this._isUnmounted) return { changed: false };
     if (this._statsRefreshInFlight) {
       this._statsRefreshQueued = true;
@@ -1210,7 +1213,7 @@ class CommunityTab extends Component {
     this._statsCacheRefreshCoalescer = createCacheUpdateCoalescer(() => {
       this._flushQueuedCacheUpdateRefresh();
     }, { delayMs: 24 });
-    this._cacheUpdateUnsubscribe = subscribeCacheUpdates((evt) => {
+    this._cacheUpdateUnsubscribe = subscribeCacheUpdates((evt: any) => {
       const ns = String(evt?.namespace || '');
       if (ns === 'surveysCache' || ns === 'questionsCache' || ns === 'sbtCache') {
         this._queueCacheDrivenRefresh({ force: false });
@@ -1271,11 +1274,11 @@ class CommunityTab extends Component {
     this._globalSessionSelectionListener = null;
   }
 
-  updateStatsPeriodically = async () => {
+  updateStatsPeriodically: any = async () => {
     await this._refreshCommunityStats({ force: false, markLoading: false });
   }
 
-  componentDidUpdate(prevProps, prevState) {
+  componentDidUpdate(prevProps: any, prevState: any) {
     const cacheInputsChanged =
       prevProps.network?.id !== this.props.network?.id ||
       prevProps.provider !== this.props.provider ||
@@ -1296,19 +1299,19 @@ class CommunityTab extends Component {
   }
 
   // --- UPDATED: wrappers keep existing call sites stable while sharing one refresh pass ---
-  fetchSbtsCreatedCount = async () => {
+  fetchSbtsCreatedCount: any = async () => {
     await this._refreshCommunityStats({ force: true, markLoading: true });
   };
 
-  fetchSurveyDataFromCache = async () => {
+  fetchSurveyDataFromCache: any = async () => {
     await this._refreshCommunityStats({ force: true, markLoading: true });
   };
 
-  updateSbtGroupsCountFromCache = () => {
+  updateSbtGroupsCountFromCache: any = () => {
     this._queueCacheDrivenRefresh({ force: false });
   }
 
-  handleUserClick = (user) => {
+  handleUserClick: any = (user: any) => {
     if (user.username.startsWith('0x')) {
       window.open(`/u/${user.username}`, '_blank');
     } else {
@@ -1317,7 +1320,7 @@ class CommunityTab extends Component {
   }
 
   // --- Updated handleStatClick to initialize filteredUsers ---
-  handleStatClick = (stat) => {
+  handleStatClick: any = (stat: any) => {
     const labelKey = String(stat.label || '').toLowerCase().replace(/\s+/g, '');
     if (labelKey === 'users') {
       this.setState({
@@ -1343,21 +1346,21 @@ class CommunityTab extends Component {
   }
 
   // Helper to toggle modal visibility
-  toggleModal = () => {
-    this.setState(prevState => ({
+  toggleModal: any = () => {
+    this.setState((prevState: any) => ({
       showModal: !prevState.showModal,
       modalType: !prevState.showModal ? prevState.modalType : null,
       modalTitle: !prevState.showModal ? prevState.modalTitle : '',
     }));
   }
 
-  _buildLeaderboardUsersSignature = (users = []) => (
+  _buildLeaderboardUsersSignature: any = (users: any = []) => (
     Array.isArray(users)
-      ? users.map((value) => String(value || '')).join('|')
+      ? users.map((value: any) => String(value || '')).join('|')
       : ''
   );
 
-  getMemoizedLeaderboardData = () => {
+  getMemoizedLeaderboardData: any = () => {
     const { uniqueUsers, hideSimulatedUsers, hideHumanUsers } = this.state;
     const uniqueUsersList = Array.isArray(uniqueUsers) ? uniqueUsers : [];
     const memo = this._leaderboardMemo || {};
@@ -1372,16 +1375,16 @@ class CommunityTab extends Component {
       return memo.result || [];
     }
 
-    const byUsername = new Map();
+    const byUsername: any = new Map();
     if (!hideSimulatedUsers) {
-      historicalFigures.forEach((user) => {
+      historicalFigures.forEach((user: any) => {
         const username = String(user?.username || '');
         if (!username || byUsername.has(username)) return;
         byUsername.set(username, user);
       });
     }
     if (!hideHumanUsers) {
-      uniqueUsersList.forEach((address) => {
+      uniqueUsersList.forEach((address: any) => {
         const username = String(address || '');
         if (!username || byUsername.has(username)) return;
         byUsername.set(username, {
@@ -1392,7 +1395,7 @@ class CommunityTab extends Component {
     }
 
     const result = Array.from(byUsername.values());
-    result.sort((a, b) => String(a?.name || '').localeCompare(String(b?.name || '')));
+    result.sort((a: any, b: any) => String(a?.name || '').localeCompare(String(b?.name || '')));
 
     this._leaderboardMemo = {
       uniqueUsersRef: uniqueUsersList,
@@ -1405,7 +1408,7 @@ class CommunityTab extends Component {
     return result;
   }
 
-  _parseCachedJson = (value) => {
+  _parseCachedJson: any = (value: any) => {
     if (!value) return null;
     if (typeof value === 'string') {
       try {
@@ -1417,7 +1420,7 @@ class CommunityTab extends Component {
     return typeof value === 'object' ? value : null;
   }
 
-  _normalizeBinaryVoteValue = (value) => {
+  _normalizeBinaryVoteValue: any = (value: any) => {
     if (value === 1 || value === '1' || value === true) return 1;
     if (value === -1 || value === '-1' || value === false) return -1;
     if (value === 0 || value === '0') return 0;
@@ -1429,7 +1432,7 @@ class CommunityTab extends Component {
     return null;
   }
 
-  _extractBinaryVoteRecord = (rawResponse, fallbackQuestion = {}) => {
+  _extractBinaryVoteRecord: any = (rawResponse: any, fallbackQuestion: any = {}) => {
     const response = this._parseCachedJson(rawResponse);
     if (!response || typeof response !== 'object') return null;
 
@@ -1451,7 +1454,7 @@ class CommunityTab extends Component {
     };
   }
 
-  _rememberBeeswarmQuestion = (questionMap, questionId, question = {}) => {
+  _rememberBeeswarmQuestion: any = (questionMap: any, questionId: any, question: any = {}) => {
     const qid = String(questionId || '').toLowerCase();
     if (!qid) return;
 
@@ -1463,7 +1466,7 @@ class CommunityTab extends Component {
     });
   }
 
-  _shouldUseDemoBeeswarmData = () => {
+  _shouldUseDemoBeeswarmData: any = () => {
     const scopeEntries = this._iterScopeCaches({ clone: false });
     if (!Array.isArray(scopeEntries) || scopeEntries.length !== 1) return false;
     const activeSlug = normalizeSessionSlug(scopeEntries[0]?.slug || this._currentSlug() || '');
@@ -1472,19 +1475,19 @@ class CommunityTab extends Component {
     if (readSessionScanScope() !== 'list') return false;
     return Array.isArray(POLIS_DEMO_DATA_AUTOLOAD_SLUGS)
       && POLIS_DEMO_DATA_AUTOLOAD_SLUGS
-        .map((slug) => normalizeSessionSlug(slug))
+        .map((slug: any) => normalizeSessionSlug(slug))
         .includes(COMMUNITY_BEESWARM_DEMO_SLUG);
   }
 
-  _buildDemoBeeswarmPoints = () => {
+  _buildDemoBeeswarmPoints: any = () => {
     const dataset = getPolisDemoDatasetForSlug(COMMUNITY_BEESWARM_DEMO_SLUG, { allowFallback: false });
     const comments = Array.isArray(dataset?.comments) ? dataset.comments : [];
-    const binaryComments = comments.filter((c) => {
+    const binaryComments = comments.filter((c: any) => {
       const t = String(c?.type || '').trim().toLowerCase();
       return !t || t === 'binary';
     });
-    const binaryIndexMap = [];
-    comments.forEach((c, i) => {
+    const binaryIndexMap: any[] = [];
+    comments.forEach((c: any, i: any) => {
       const t = String(c?.type || '').trim().toLowerCase();
       if (!t || t === 'binary') binaryIndexMap.push(i);
     });
@@ -1492,9 +1495,9 @@ class CommunityTab extends Component {
     if (!binaryComments.length || !participants.length) return [];
 
     const ratingMatrix = binaryComments.map(() => Array(participants.length).fill(null));
-    participants.forEach((participant, participantIndex) => {
+    participants.forEach((participant: any, participantIndex: any) => {
       const votes = participant?.votes && typeof participant.votes === 'object' ? participant.votes : {};
-      binaryIndexMap.forEach((originalIndex, filteredIndex) => {
+      binaryIndexMap.forEach((originalIndex: any, filteredIndex: any) => {
         const rawVote = votes[String(originalIndex)];
         if (rawVote === undefined) return;
         const vote = this._normalizeBinaryVoteValue(rawVote);
@@ -1503,10 +1506,10 @@ class CommunityTab extends Component {
       });
     });
 
-    return computeQuestionDivisiveness(ratingMatrix).map((result) => {
+    return computeQuestionDivisiveness(ratingMatrix).map((result: any) => {
       const comment = binaryComments[result.commentIndex] || {};
       const rowVotes = Array.isArray(ratingMatrix[result.commentIndex]) ? ratingMatrix[result.commentIndex] : [];
-      const unsure = rowVotes.filter((vote) => vote === 0).length;
+      const unsure = rowVotes.filter((vote: any) => vote === 0).length;
       const total = result.agrees + result.disagrees + unsure;
       return {
         index: result.commentIndex,
@@ -1521,30 +1524,30 @@ class CommunityTab extends Component {
     });
   }
 
-  _buildCommunityBeeswarmPoints = (scopeEntriesOverride = null) => {
+  _buildCommunityBeeswarmPoints: any = (scopeEntriesOverride: any = null) => {
     if (this._shouldUseDemoBeeswarmData()) {
       return this._buildDemoBeeswarmPoints();
     }
 
-    const questionMap = new Map();
-    const combinedResponses = new Map();
+    const questionMap: any = new Map();
+    const combinedResponses: any = new Map();
     const scopeEntries = Array.isArray(scopeEntriesOverride)
       ? scopeEntriesOverride
       : this._iterScopeCaches({ clone: false });
 
-    scopeEntries.forEach(({ questionsCache }) => {
-      Object.entries(questionsCache?.questions || {}).forEach(([questionId, question]) => {
+    scopeEntries.forEach(({ questionsCache }: any) => {
+      Object.entries(questionsCache?.questions || {}).forEach(([questionId, question]: any) => {
         this._rememberBeeswarmQuestion(questionMap, questionId, question);
       });
     });
 
-    scopeEntries.forEach(({ questionsCache }) => {
-      Object.entries(questionsCache?.questionResponses || {}).forEach(([questionId, perQuestionResponses]) => {
+    scopeEntries.forEach(({ questionsCache }: any) => {
+      Object.entries(questionsCache?.questionResponses || {}).forEach(([questionId, perQuestionResponses]: any) => {
         const qid = String(questionId || '').toLowerCase();
         if (!qid) return;
 
         const knownQuestion = questionMap.get(qid) || {};
-        Object.entries(perQuestionResponses || {}).forEach(([responderAddress, rawResponse]) => {
+        Object.entries(perQuestionResponses || {}).forEach(([responderAddress, rawResponse]: any) => {
           const responder = String(responderAddress || '').toLowerCase();
           if (!responder) return;
 
@@ -1563,14 +1566,14 @@ class CommunityTab extends Component {
       });
     });
 
-    scopeEntries.forEach(({ surveysCache }) => {
-      Object.values(surveysCache?.surveyResponses || {}).forEach((responsesByResponder) => {
-        Object.entries(responsesByResponder || {}).forEach(([responderAddress, rawSurveyResponse]) => {
+    scopeEntries.forEach(({ surveysCache }: any) => {
+      Object.values(surveysCache?.surveyResponses || {}).forEach((responsesByResponder: any) => {
+        Object.entries(responsesByResponder || {}).forEach(([responderAddress, rawSurveyResponse]: any) => {
           const responder = String(responderAddress || '').toLowerCase();
           const parsedSurveyResponse = this._parseCachedJson(rawSurveyResponse);
           if (!responder || !parsedSurveyResponse || !Array.isArray(parsedSurveyResponse.responses)) return;
 
-          parsedSurveyResponse.responses.forEach((responseEntry) => {
+          parsedSurveyResponse.responses.forEach((responseEntry: any) => {
             const qid = String(
               responseEntry?.questionID ||
               responseEntry?.questionId ||
@@ -1597,26 +1600,26 @@ class CommunityTab extends Component {
     });
 
     const binaryQuestionIds = Array.from(questionMap.entries())
-      .filter(([, question]) => String(question?.type || '').trim().toLowerCase() === 'binary')
-      .map(([questionId]) => questionId)
-      .sort((left, right) => String(left).localeCompare(String(right)));
+      .filter(([, question]: any) => String(question?.type || '').trim().toLowerCase() === 'binary')
+      .map(([questionId]: any) => questionId)
+      .sort((left: any, right: any) => String(left).localeCompare(String(right)));
 
     if (!binaryQuestionIds.length) return [];
 
     const responders = Array.from(
-      binaryQuestionIds.reduce((set, questionId) => {
-        Object.keys(combinedResponses.get(questionId) || {}).forEach((responder) => set.add(responder));
+      binaryQuestionIds.reduce((set: any, questionId: any) => {
+        Object.keys(combinedResponses.get(questionId) || {}).forEach((responder: any) => set.add(responder));
         return set;
       }, new Set())
-    ).sort((left, right) => String(left).localeCompare(String(right)));
+    ).sort((left: any, right: any) => String(left).localeCompare(String(right)));
 
-    const participantIndexMap = new Map(
-      responders.map((responder, index) => [responder, index])
+    const participantIndexMap: any = new Map(
+      responders.map((responder: any, index: any) => [responder, index])
     );
     const ratingMatrix = binaryQuestionIds.map(() => Array(responders.length).fill(null));
 
-    binaryQuestionIds.forEach((questionId, rowIndex) => {
-      Object.entries(combinedResponses.get(questionId) || {}).forEach(([responder, vote]) => {
+    binaryQuestionIds.forEach((questionId: any, rowIndex: any) => {
+      Object.entries(combinedResponses.get(questionId) || {}).forEach(([responder, vote]: any) => {
         const participantIndex = participantIndexMap.get(responder);
         if (participantIndex !== undefined) {
           ratingMatrix[rowIndex][participantIndex] = vote;
@@ -1624,11 +1627,11 @@ class CommunityTab extends Component {
       });
     });
 
-    return computeQuestionDivisiveness(ratingMatrix).map((result) => {
+    return computeQuestionDivisiveness(ratingMatrix).map((result: any) => {
       const questionId = binaryQuestionIds[result.commentIndex];
       const question = questionMap.get(questionId) || {};
       const rowVotes = Array.isArray(ratingMatrix[result.commentIndex]) ? ratingMatrix[result.commentIndex] : [];
-      const unsure = rowVotes.filter((vote) => vote === 0).length;
+      const unsure = rowVotes.filter((vote: any) => vote === 0).length;
       const total = result.agrees + result.disagrees + unsure;
       return {
         index: result.commentIndex,
@@ -1652,11 +1655,11 @@ class CommunityTab extends Component {
     const remainingEntries = uniqueLeaderboardData.slice(topEntries);
 
     // Consistent blockie generator using shared utility and stable lowercase seed
-    const getBlockieUrl = (seedStr) => {
+    const getBlockieUrl = (seedStr: any) => {
       const seed = String(seedStr || 'contextengine-default-seed').toLowerCase();
       return generateBlockieDataUrl(seed, 8, 4);
     };
-    const resolveLeaderboardAvatar = (user) => {
+    const resolveLeaderboardAvatar = (user: any) => {
       const username = String(user?.username || '').trim();
       const isSimulatedUser = username && !username.startsWith('0x');
       if (isSimulatedUser) {
@@ -1667,7 +1670,7 @@ class CommunityTab extends Component {
       }
       return getBlockieUrl(username);
     };
-    const handleLeaderboardAvatarError = (event, user) => {
+    const handleLeaderboardAvatarError = (event: any, user: any) => {
       const target = event?.currentTarget;
       const username = String(user?.username || '').trim();
       if (!target || !username) return;
@@ -1684,7 +1687,7 @@ class CommunityTab extends Component {
 
     return (
       <>
-        {topDisplayed.map((user, index) => {
+        {topDisplayed.map((user: any, index: any) => {
           const imgSrc = resolveLeaderboardAvatar(user);
 
           return (
@@ -1698,7 +1701,7 @@ class CommunityTab extends Component {
                   src={imgSrc}
                   alt={user.name}
                   className={styles.avatar}
-                  onError={(event) => handleLeaderboardAvatarError(event, user)}
+                  onError={(event: any) => handleLeaderboardAvatarError(event, user)}
                 />
               ) : null}
               <span className={styles.name}>
@@ -1724,7 +1727,7 @@ class CommunityTab extends Component {
         })}
 
         <Collapse isOpen={showMoreLeaderboard}>
-          {remainingEntries.map((user, index) => {
+          {remainingEntries.map((user: any, index: any) => {
             const imgSrc = resolveLeaderboardAvatar(user);
 
             return (
@@ -1738,7 +1741,7 @@ class CommunityTab extends Component {
                     src={imgSrc}
                     alt={user.name}
                     className={styles.avatar}
-                    onError={(event) => handleLeaderboardAvatarError(event, user)}
+                    onError={(event: any) => handleLeaderboardAvatarError(event, user)}
                   />
                 ) : null}
                 <span className={styles.name}>
@@ -1773,7 +1776,7 @@ class CommunityTab extends Component {
         {uniqueLeaderboardData.length > topEntries && (
           <button
             onClick={() =>
-              this.setState(prevState => ({
+              this.setState((prevState: any) => ({
                 showMoreLeaderboard: !prevState.showMoreLeaderboard
               }))
             }
@@ -1804,7 +1807,7 @@ class CommunityTab extends Component {
     );
   }
 
-  _getQuestionSwarmPoints = () => {
+  _getQuestionSwarmPoints: any = () => {
     if (this._shouldUseDemoBeeswarmData()) {
       return this._buildCommunityBeeswarmPoints();
     }
@@ -1814,7 +1817,7 @@ class CommunityTab extends Component {
     return this._buildCommunityBeeswarmPoints();
   }
 
-  renderQuestionsModalContent = () => {
+  renderQuestionsModalContent: any = () => {
     const points = this._getQuestionSwarmPoints();
     return (
       <div className={styles.questionsModalContent}>
@@ -1858,7 +1861,7 @@ class CommunityTab extends Component {
                 <input
                   type="checkbox"
                   checked={hideSimulatedUsers}
-                  onChange={() => this.setState((prevState) => ({ hideSimulatedUsers: !prevState.hideSimulatedUsers }))}
+                  onChange={() => this.setState((prevState: any) => ({ hideSimulatedUsers: !prevState.hideSimulatedUsers }))}
                   className={styles.toggleCheckbox}
                   data-testid="ce-community-hide-simulated-users"
                 />
@@ -1868,7 +1871,7 @@ class CommunityTab extends Component {
                 <input
                   type="checkbox"
                   checked={hideHumanUsers}
-                  onChange={() => this.setState((prevState) => ({ hideHumanUsers: !prevState.hideHumanUsers }))}
+                  onChange={() => this.setState((prevState: any) => ({ hideHumanUsers: !prevState.hideHumanUsers }))}
                   className={styles.toggleCheckbox}
                   data-testid="ce-community-hide-users"
                 />
@@ -1881,7 +1884,7 @@ class CommunityTab extends Component {
     );
   }
 
-  renderModalContent = () => {
+  renderModalContent: any = () => {
     const { modalType, surveysList, filteredUsers, loadingFilter } = this.state;
     const { provider, network, account, loginComplete, toggleLoginModal } = this.props;
 
@@ -1918,11 +1921,11 @@ class CommunityTab extends Component {
               provider={provider}
               network={network}
               sessionSlug={this._currentSlug()}
-              onFilter={(newFilteredUsers) => {
+              onFilter={(newFilteredUsers: any) => {
                   // This setState call now reliably updates the filtered list
                   this.setState({ filteredUsers: newFilteredUsers, loadingFilter: false });
               }}
-              setFilterLoading={(isLoading) => this.setState({ loadingFilter: isLoading })} // Pass loading state setter
+              setFilterLoading={(isLoading: any) => this.setState({ loadingFilter: isLoading })} // Pass loading state setter
               autoExpand={false} // Changed this to false to allow internal button toggle
               expandToSbtHolders={true}
 
@@ -1937,7 +1940,7 @@ class CommunityTab extends Component {
               </div>
             ) : (
               <div className={styles.userList}>
-                {filteredUsers.map((address, index) => {
+                {filteredUsers.map((address: any, index: any) => {
                   const seed = String(address || 'contextengine-default-seed').toLowerCase();
                   const blockieUrl = generateBlockieDataUrl(seed, 8, 4);
                   return (
@@ -1968,7 +1971,7 @@ class CommunityTab extends Component {
         // Render survey list
         return (
           <div className={styles.surveyList}>
-            {surveysList.map((survey, index) => {
+            {surveysList.map((survey: any, index: any) => {
               const slug = normalizeSessionSlug(String(survey?.slug || this._currentSlug() || ''));
               const sessionQuery = slug ? `?session=${encodeURIComponent(slug)}` : '';
               return (
@@ -2037,7 +2040,7 @@ class CommunityTab extends Component {
               </div>
             </div>
             <div className={styles.statsGrid}>
-              {stats.map((stat, index) => (
+              {stats.map((stat: any, index: any) => (
                 <div key={index} className={styles.statItem} onClick={() => this.handleStatClick(stat)}>
                   <FontAwesomeIcon icon={stat.icon} size="2x" className={styles.statIcon} />
                   <span className={styles.statCount}>

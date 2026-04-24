@@ -22,7 +22,7 @@ jest.mock('./OnboardingWalkthrough', () => ({
   default: () => <div data-testid="mock-onboarding-walkthrough" />,
 }));
 
-jest.mock('../CommunityTab/CommunityTab.jsx', () => ({
+jest.mock('../CommunityTab/CommunityTab', () => ({
   __esModule: true,
   default: () => <div data-testid="mock-community-tab" />,
 }));
