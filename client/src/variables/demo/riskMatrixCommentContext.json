@@ -1,0 +1,978 @@
+{
+  "SUBCATEGORY_CONTEXT": {
+    "Alignment": {
+      "historicalFigure": {
+        "name": "Alan Turing",
+        "role": "Alignment warning"
+      },
+      "corpusRefs": [
+        {
+          "label": "AI Discourse Tweets",
+          "note": "PalisadeAI on o3 shutdown sabotage",
+          "url": "https://x.com/PalisadeAI/status/1926084635903025621",
+          "corpusId": "tweets"
+        },
+        {
+          "label": "AI Discourse Tweets",
+          "note": "Anthropic on persona vectors and hidden steering risk",
+          "url": "https://x.com/AnthropicAI/status/1951317898313466361",
+          "corpusId": "tweets"
+        }
+      ]
+    },
+    "Evaluations": {
+      "historicalFigure": {
+        "name": "Ada Lovelace",
+        "role": "Formal verification instinct"
+      },
+      "corpusRefs": [
+        {
+          "label": "METR Evals & Metrics",
+          "note": "More realistic evaluation regimes and capability benchmarks",
+          "url": "",
+          "corpusId": "metr_evals_metrics"
+        },
+        {
+          "label": "Insider Interviews",
+          "note": "Deployment gates, eval coverage, and release thresholds",
+          "url": "",
+          "corpusId": "dwarkesh_lab_insiders"
+        }
+      ]
+    },
+    "Red Teaming": {
+      "historicalFigure": {
+        "name": "Grace Hopper",
+        "role": "Systems debugging lens"
+      },
+      "corpusRefs": [
+        {
+          "label": "METR Evals & Metrics",
+          "note": "Adversarial testing, audits, and practical capability checks",
+          "url": "",
+          "corpusId": "metr_evals_metrics"
+        },
+        {
+          "label": "AI Discourse Tweets",
+          "note": "Public discussion of red-team findings before release",
+          "url": "",
+          "corpusId": "tweets"
+        }
+      ]
+    },
+    "Containment": {
+      "historicalFigure": {
+        "name": "J. Robert Oppenheimer",
+        "role": "Containment caution"
+      },
+      "corpusRefs": [
+        {
+          "label": "Insider Interviews",
+          "note": "Frontier labs debating bounded deployment and rollback authority",
+          "url": "",
+          "corpusId": "dwarkesh_lab_insiders"
+        },
+        {
+          "label": "AI in Sci-Fi",
+          "note": "Containment failure as a recurring institutional theme",
+          "url": "",
+          "corpusId": "ai_scifi_books"
+        }
+      ]
+    },
+    "Scaling": {
+      "historicalFigure": {
+        "name": "Andrew Carnegie",
+        "role": "Scale and concentration"
+      },
+      "corpusRefs": [
+        {
+          "label": "AI Discourse Tweets",
+          "note": "Sam Altman on compute concentration and industrial scale",
+          "url": "https://x.com/sama/status/1983584366547829073",
+          "corpusId": "tweets"
+        },
+        {
+          "label": "METR Evals & Metrics",
+          "note": "Compute, trendlines, and deployment pressure around scale",
+          "url": "",
+          "corpusId": "metr_evals_metrics"
+        }
+      ]
+    },
+    "Agents": {
+      "historicalFigure": {
+        "name": "Grace Hopper",
+        "role": "Automation systems design"
+      },
+      "corpusRefs": [
+        {
+          "label": "Insider Interviews",
+          "note": "Agent loops, tool use, and bounded autonomy",
+          "url": "",
+          "corpusId": "dwarkesh_lab_insiders"
+        },
+        {
+          "label": "METR Evals & Metrics",
+          "note": "Task automation and operational failure surfaces",
+          "url": "",
+          "corpusId": "metr_evals_metrics"
+        }
+      ]
+    },
+    "Reasoning": {
+      "historicalFigure": {
+        "name": "Vannevar Bush",
+        "role": "Knowledge coordination"
+      },
+      "corpusRefs": [
+        {
+          "label": "Insider Interviews",
+          "note": "Reasoning gains, planning scaffolds, and strategic-use debates",
+          "url": "",
+          "corpusId": "dwarkesh_lab_insiders"
+        },
+        {
+          "label": "Insider Interviews",
+          "note": "Arguments about reasoning systems compressing expert work",
+          "url": "",
+          "corpusId": "dwarkesh_lab_insiders"
+        }
+      ]
+    },
+    "Multimodal": {
+      "historicalFigure": {
+        "name": "Alexander Graham Bell",
+        "role": "Signal fusion and communication"
+      },
+      "corpusRefs": [
+        {
+          "label": "AI Discourse Tweets",
+          "note": "Deepfake, voice, and visual manipulation concerns in public discourse",
+          "url": "",
+          "corpusId": "tweets"
+        },
+        {
+          "label": "METR Evals & Metrics",
+          "note": "Capabilities that combine modalities into new operational risks",
+          "url": "",
+          "corpusId": "metr_evals_metrics"
+        }
+      ]
+    },
+    "Regulation": {
+      "historicalFigure": {
+        "name": "James Madison",
+        "role": "Institutional design"
+      },
+      "corpusRefs": [
+        {
+          "label": "AI Laws & Policy",
+          "note": "Statutory proposals, disclosure duties, and regulatory scope",
+          "url": "",
+          "corpusId": "ai_laws_policy"
+        },
+        {
+          "label": "AI Laws & Policy",
+          "note": "How visible incidents create openings for governance",
+          "url": "",
+          "corpusId": "ai_laws_policy"
+        }
+      ]
+    },
+    "Licensing": {
+      "historicalFigure": {
+        "name": "Justinian I",
+        "role": "Codified legal authority"
+      },
+      "corpusRefs": [
+        {
+          "label": "AI Laws & Policy",
+          "note": "Licensing, reporting, and pre-deployment review frameworks",
+          "url": "",
+          "corpusId": "ai_laws_policy"
+        },
+        {
+          "label": "Insider Interviews",
+          "note": "Debates over frontier thresholds and model-release controls",
+          "url": "",
+          "corpusId": "dwarkesh_lab_insiders"
+        }
+      ]
+    },
+    "International": {
+      "historicalFigure": {
+        "name": "Eleanor Roosevelt",
+        "role": "International norms"
+      },
+      "corpusRefs": [
+        {
+          "label": "AI Laws & Policy",
+          "note": "Cross-border coordination, declarations, and harmonization pressure",
+          "url": "",
+          "corpusId": "ai_laws_policy"
+        },
+        {
+          "label": "AI Discourse Tweets",
+          "note": "National competition narratives that complicate coordination",
+          "url": "",
+          "corpusId": "tweets"
+        }
+      ]
+    },
+    "Liability": {
+      "historicalFigure": {
+        "name": "Hammurabi",
+        "role": "Liability and remedy"
+      },
+      "corpusRefs": [
+        {
+          "label": "AI Laws & Policy",
+          "note": "Liability models, negligence standards, and downstream accountability",
+          "url": "",
+          "corpusId": "ai_laws_policy"
+        },
+        {
+          "label": "AI Laws & Policy",
+          "note": "When post-harm remedies arrive too late to change incentives",
+          "url": "",
+          "corpusId": "ai_laws_policy"
+        }
+      ]
+    },
+    "Weight Release": {
+      "historicalFigure": {
+        "name": "Rachel Carson",
+        "role": "External scrutiny"
+      },
+      "corpusRefs": [
+        {
+          "label": "Cross-Corpus Debates",
+          "note": "Release debates, replication benefits, and dangerous diffusion",
+          "url": "",
+          "corpusId": "cross_corpus"
+        },
+        {
+          "label": "AI Laws & Policy",
+          "note": "Open-weight restrictions, audit demands, and governance tradeoffs",
+          "url": "",
+          "corpusId": "ai_laws_policy"
+        }
+      ]
+    },
+    "Democratization": {
+      "historicalFigure": {
+        "name": "Benjamin Franklin",
+        "role": "Distributed civic capacity"
+      },
+      "corpusRefs": [
+        {
+          "label": "Cross-Corpus Debates",
+          "note": "Broader participation versus concentrated capability control",
+          "url": "",
+          "corpusId": "cross_corpus"
+        },
+        {
+          "label": "AI Laws & Policy",
+          "note": "Who gets access to powerful models and who sets the defaults",
+          "url": "",
+          "corpusId": "ai_laws_policy"
+        }
+      ]
+    },
+    "Safety Tradeoffs": {
+      "historicalFigure": {
+        "name": "Rachel Carson",
+        "role": "Precaution under uncertainty"
+      },
+      "corpusRefs": [
+        {
+          "label": "Cross-Corpus Debates",
+          "note": "Auditability versus broad diffusion of dangerous capability",
+          "url": "",
+          "corpusId": "cross_corpus"
+        },
+        {
+          "label": "Insider Interviews",
+          "note": "Release-stage disagreements about safety and openness",
+          "url": "",
+          "corpusId": "dwarkesh_lab_insiders"
+        }
+      ]
+    },
+    "Automation": {
+      "historicalFigure": {
+        "name": "Henry Ford",
+        "role": "Automation scale"
+      },
+      "corpusRefs": [
+        {
+          "label": "AI Discourse Tweets",
+          "note": "William Bryk on compressed automation timelines",
+          "url": "https://x.com/WilliamBryk/status/1871946968148439260",
+          "corpusId": "tweets"
+        },
+        {
+          "label": "Cross-Corpus Debates",
+          "note": "Operational substitution and labor bargaining effects",
+          "url": "",
+          "corpusId": "cross_corpus"
+        }
+      ]
+    },
+    "Productivity": {
+      "historicalFigure": {
+        "name": "Franklin D. Roosevelt",
+        "role": "Shared-gains politics"
+      },
+      "corpusRefs": [
+        {
+          "label": "AI Discourse Tweets",
+          "note": "William Bryk on knowledge-work compression",
+          "url": "https://x.com/WilliamBryk/status/1871946968148439260",
+          "corpusId": "tweets"
+        },
+        {
+          "label": "Insider Interviews",
+          "note": "Arguments about uneven productivity gains and firm capture",
+          "url": "",
+          "corpusId": "dwarkesh_lab_insiders"
+        }
+      ]
+    },
+    "Inequality": {
+      "historicalFigure": {
+        "name": "Franklin D. Roosevelt",
+        "role": "Distribution and labor power"
+      },
+      "corpusRefs": [
+        {
+          "label": "Cross-Corpus Debates",
+          "note": "Who captures gains when automation moves faster than bargaining",
+          "url": "",
+          "corpusId": "cross_corpus"
+        },
+        {
+          "label": "AI Discourse Tweets",
+          "note": "Public concern about concentrated upside and wage pressure",
+          "url": "",
+          "corpusId": "tweets"
+        }
+      ]
+    },
+    "Retraining": {
+      "historicalFigure": {
+        "name": "Benjamin Franklin",
+        "role": "Civic education"
+      },
+      "corpusRefs": [
+        {
+          "label": "AI Laws & Policy",
+          "note": "Transition assistance, workforce adaptation, and timing mismatches",
+          "url": "",
+          "corpusId": "ai_laws_policy"
+        },
+        {
+          "label": "Cross-Corpus Debates",
+          "note": "How retraining lags behind deployment incentives",
+          "url": "",
+          "corpusId": "cross_corpus"
+        }
+      ]
+    },
+    "Cyber Offense": {
+      "historicalFigure": {
+        "name": "Grace Hopper",
+        "role": "Attack and defense systems"
+      },
+      "corpusRefs": [
+        {
+          "label": "METR Evals & Metrics",
+          "note": "Operational capability gains in offensive workflows",
+          "url": "",
+          "corpusId": "metr_evals_metrics"
+        },
+        {
+          "label": "Insider Interviews",
+          "note": "Agentic exploitation, fuzzing, and rapid patch loops",
+          "url": "",
+          "corpusId": "dwarkesh_lab_insiders"
+        }
+      ]
+    },
+    "Biosecurity": {
+      "historicalFigure": {
+        "name": "Marie Curie",
+        "role": "Scientific risk boundaries"
+      },
+      "corpusRefs": [
+        {
+          "label": "Insider Interviews",
+          "note": "Dual-use scientific acceleration and model access concerns",
+          "url": "",
+          "corpusId": "dwarkesh_lab_insiders"
+        },
+        {
+          "label": "METR Evals & Metrics",
+          "note": "Capability thresholds that justify extra review",
+          "url": "",
+          "corpusId": "metr_evals_metrics"
+        }
+      ]
+    },
+    "Surveillance": {
+      "historicalFigure": {
+        "name": "Rosa Parks",
+        "role": "Civil-liberties warning"
+      },
+      "corpusRefs": [
+        {
+          "label": "AI Laws & Policy",
+          "note": "Privacy, biometric tracking, and oversight requirements",
+          "url": "",
+          "corpusId": "ai_laws_policy"
+        },
+        {
+          "label": "AI Laws & Policy",
+          "note": "Public-safety justification versus civil-liberties constraints",
+          "url": "",
+          "corpusId": "ai_laws_policy"
+        }
+      ]
+    },
+    "Deepfakes": {
+      "historicalFigure": {
+        "name": "Frederick Douglass",
+        "role": "Public testimony and credibility"
+      },
+      "corpusRefs": [
+        {
+          "label": "AI Discourse Tweets",
+          "note": "William Bryk on synthetic media, confusion, and trust collapse",
+          "url": "https://x.com/WilliamBryk/status/1871946968148439260",
+          "corpusId": "tweets"
+        },
+        {
+          "label": "Cross-Corpus Debates",
+          "note": "Provenance, authentication, and liar\u2019s-dividend pressure",
+          "url": "",
+          "corpusId": "cross_corpus"
+        }
+      ]
+    },
+    "Autonomous Weapons": {
+      "historicalFigure": {
+        "name": "J. Robert Oppenheimer",
+        "role": "Weaponization caution"
+      },
+      "corpusRefs": [
+        {
+          "label": "AI Laws & Policy",
+          "note": "Meaningful human control and deployment restraint debates",
+          "url": "",
+          "corpusId": "ai_laws_policy"
+        },
+        {
+          "label": "AI in Sci-Fi",
+          "note": "Autonomy compressing command and accountability",
+          "url": "",
+          "corpusId": "ai_scifi_books"
+        }
+      ]
+    },
+    "Escalation": {
+      "historicalFigure": {
+        "name": "John F. Kennedy",
+        "role": "Crisis restraint"
+      },
+      "corpusRefs": [
+        {
+          "label": "AI Laws & Policy",
+          "note": "Compressed timelines and false-confidence escalation risk",
+          "url": "",
+          "corpusId": "ai_laws_policy"
+        },
+        {
+          "label": "Insider Interviews",
+          "note": "Reasoning systems in strategic or military decision support",
+          "url": "",
+          "corpusId": "dwarkesh_lab_insiders"
+        }
+      ]
+    },
+    "Arms Control": {
+      "historicalFigure": {
+        "name": "John F. Kennedy",
+        "role": "Arms-control precedent"
+      },
+      "corpusRefs": [
+        {
+          "label": "AI Laws & Policy",
+          "note": "Shared compute declarations, treaty analogies, and inspection logic",
+          "url": "",
+          "corpusId": "ai_laws_policy"
+        },
+        {
+          "label": "AI Laws & Policy",
+          "note": "Why transparency matters before capability races harden",
+          "url": "",
+          "corpusId": "ai_laws_policy"
+        }
+      ]
+    },
+    "Compute": {
+      "historicalFigure": {
+        "name": "Andrew Carnegie",
+        "role": "Industrial infrastructure"
+      },
+      "corpusRefs": [
+        {
+          "label": "AI Discourse Tweets",
+          "note": "Sam Altman on compute concentration and power demand",
+          "url": "https://x.com/sama/status/1983584366547829073",
+          "corpusId": "tweets"
+        },
+        {
+          "label": "METR Evals & Metrics",
+          "note": "Compute chokepoints, clusters, and scaling predictability",
+          "url": "",
+          "corpusId": "metr_evals_metrics"
+        }
+      ]
+    },
+    "Energy": {
+      "historicalFigure": {
+        "name": "Nikola Tesla",
+        "role": "Power systems"
+      },
+      "corpusRefs": [
+        {
+          "label": "AI Discourse Tweets",
+          "note": "Compute demand as a physical infrastructure constraint",
+          "url": "https://x.com/sama/status/1983584366547829073",
+          "corpusId": "tweets"
+        },
+        {
+          "label": "Cross-Corpus Debates",
+          "note": "Training growth colliding with local energy planning",
+          "url": "",
+          "corpusId": "cross_corpus"
+        }
+      ]
+    },
+    "Data Centers": {
+      "historicalFigure": {
+        "name": "Andrew Carnegie",
+        "role": "Infrastructure buildout"
+      },
+      "corpusRefs": [
+        {
+          "label": "Cross-Corpus Debates",
+          "note": "Inference clusters, deployment geography, and capital concentration",
+          "url": "",
+          "corpusId": "cross_corpus"
+        },
+        {
+          "label": "AI Laws & Policy",
+          "note": "Where compute access becomes a governance lever",
+          "url": "",
+          "corpusId": "ai_laws_policy"
+        }
+      ]
+    },
+    "Supply Chain": {
+      "historicalFigure": {
+        "name": "Nikola Tesla",
+        "role": "Industrial systems dependency"
+      },
+      "corpusRefs": [
+        {
+          "label": "Cross-Corpus Debates",
+          "note": "GPU, sensor, and hardware chokepoints shaping frontier access",
+          "url": "",
+          "corpusId": "cross_corpus"
+        },
+        {
+          "label": "AI Laws & Policy",
+          "note": "Why physical supply chains still constrain digital acceleration",
+          "url": "",
+          "corpusId": "ai_laws_policy"
+        }
+      ]
+    },
+    "Media": {
+      "historicalFigure": {
+        "name": "Benjamin Franklin",
+        "role": "Media infrastructure"
+      },
+      "corpusRefs": [
+        {
+          "label": "Cross-Corpus Debates",
+          "note": "Agenda-setting, media panic, and institutional trust",
+          "url": "",
+          "corpusId": "cross_corpus"
+        },
+        {
+          "label": "AI Discourse Tweets",
+          "note": "How visible AI incidents shape narrative framing",
+          "url": "",
+          "corpusId": "tweets"
+        }
+      ]
+    },
+    "Narratives": {
+      "historicalFigure": {
+        "name": "Frederick Douglass",
+        "role": "Narrative power"
+      },
+      "corpusRefs": [
+        {
+          "label": "Cross-Corpus Debates",
+          "note": "Nationalist and civilizational framing inside AI politics",
+          "url": "",
+          "corpusId": "cross_corpus"
+        },
+        {
+          "label": "AI in Sci-Fi",
+          "note": "Futures narratives steering governance imagination",
+          "url": "",
+          "corpusId": "ai_scifi_books"
+        }
+      ]
+    },
+    "Trust": {
+      "historicalFigure": {
+        "name": "Rosa Parks",
+        "role": "Credible witness under pressure"
+      },
+      "corpusRefs": [
+        {
+          "label": "Cross-Corpus Debates",
+          "note": "Institutional trust, evidence standards, and public legitimacy",
+          "url": "",
+          "corpusId": "cross_corpus"
+        },
+        {
+          "label": "AI Discourse Tweets",
+          "note": "Synthetic media making authentic evidence easier to deny",
+          "url": "https://x.com/WilliamBryk/status/1871946968148439260",
+          "corpusId": "tweets"
+        }
+      ]
+    },
+    "Misinformation": {
+      "historicalFigure": {
+        "name": "Frederick Douglass",
+        "role": "Information credibility"
+      },
+      "corpusRefs": [
+        {
+          "label": "Cross-Corpus Debates",
+          "note": "Platform incentives, narrative warfare, and provenance responses",
+          "url": "",
+          "corpusId": "cross_corpus"
+        },
+        {
+          "label": "AI Discourse Tweets",
+          "note": "Synthetic media and trust-collapse concerns",
+          "url": "https://x.com/WilliamBryk/status/1871946968148439260",
+          "corpusId": "tweets"
+        }
+      ]
+    },
+    "ZK Proofs": {
+      "historicalFigure": {
+        "name": "Ada Lovelace",
+        "role": "Formal proof culture"
+      },
+      "corpusRefs": [
+        {
+          "label": "Cross-Corpus Debates",
+          "note": "Portable attestations for safety evidence and bounded claims",
+          "url": "",
+          "corpusId": "cross_corpus"
+        },
+        {
+          "label": "Cross-Corpus Debates",
+          "note": "Verifiability without exposing the full benchmark stack",
+          "url": "",
+          "corpusId": "cross_corpus"
+        }
+      ]
+    },
+    "Trustless Agreements": {
+      "historicalFigure": {
+        "name": "Benjamin Franklin",
+        "role": "Institutional trust design"
+      },
+      "corpusRefs": [
+        {
+          "label": "Cross-Corpus Debates",
+          "note": "Governance without a single trusted intermediary",
+          "url": "",
+          "corpusId": "cross_corpus"
+        },
+        {
+          "label": "AI Laws & Policy",
+          "note": "Smart-contract style delegation and enforceability questions",
+          "url": "",
+          "corpusId": "ai_laws_policy"
+        }
+      ]
+    },
+    "Post-Quantum": {
+      "historicalFigure": {
+        "name": "Nikola Tesla",
+        "role": "Infrastructure transition"
+      },
+      "corpusRefs": [
+        {
+          "label": "Cross-Corpus Debates",
+          "note": "Migration planning, brittle dependencies, and staged rollouts",
+          "url": "",
+          "corpusId": "cross_corpus"
+        },
+        {
+          "label": "Insider Interviews",
+          "note": "Reasoning agents helping map long migration programs",
+          "url": "",
+          "corpusId": "dwarkesh_lab_insiders"
+        }
+      ]
+    },
+    "Key Management": {
+      "historicalFigure": {
+        "name": "Alexander Graham Bell",
+        "role": "Secure communications"
+      },
+      "corpusRefs": [
+        {
+          "label": "Cross-Corpus Debates",
+          "note": "Signing authority, delegation, and wallet governance",
+          "url": "",
+          "corpusId": "cross_corpus"
+        },
+        {
+          "label": "Insider Interviews",
+          "note": "Tool-using agents turning auth mistakes into action mistakes",
+          "url": "",
+          "corpusId": "dwarkesh_lab_insiders"
+        }
+      ]
+    }
+  },
+  "CATEGORY_CONTEXT": {
+    "Safety": {
+      "historicalFigure": {
+        "name": "Alan Turing",
+        "role": "Alignment warning"
+      },
+      "corpusRefs": [
+        {
+          "label": "AI Discourse Tweets",
+          "note": "PalisadeAI on o3 shutdown sabotage",
+          "url": "https://x.com/PalisadeAI/status/1926084635903025621",
+          "corpusId": "tweets"
+        },
+        {
+          "label": "AI Discourse Tweets",
+          "note": "Anthropic on persona vectors and hidden steering risk",
+          "url": "https://x.com/AnthropicAI/status/1951317898313466361",
+          "corpusId": "tweets"
+        }
+      ]
+    },
+    "Capabilities": {
+      "historicalFigure": {
+        "name": "Grace Hopper",
+        "role": "Automation systems design"
+      },
+      "corpusRefs": [
+        {
+          "label": "Insider Interviews",
+          "note": "Agent loops, tool use, and bounded autonomy",
+          "url": "",
+          "corpusId": "dwarkesh_lab_insiders"
+        },
+        {
+          "label": "METR Evals & Metrics",
+          "note": "Task automation and operational failure surfaces",
+          "url": "",
+          "corpusId": "metr_evals_metrics"
+        }
+      ]
+    },
+    "Governance": {
+      "historicalFigure": {
+        "name": "James Madison",
+        "role": "Institutional design"
+      },
+      "corpusRefs": [
+        {
+          "label": "AI Laws & Policy",
+          "note": "Statutory proposals, disclosure duties, and regulatory scope",
+          "url": "",
+          "corpusId": "ai_laws_policy"
+        },
+        {
+          "label": "AI Laws & Policy",
+          "note": "How visible incidents create openings for governance",
+          "url": "",
+          "corpusId": "ai_laws_policy"
+        }
+      ]
+    },
+    "Open Source": {
+      "historicalFigure": {
+        "name": "Rachel Carson",
+        "role": "External scrutiny"
+      },
+      "corpusRefs": [
+        {
+          "label": "Cross-Corpus Debates",
+          "note": "Release debates, replication benefits, and dangerous diffusion",
+          "url": "",
+          "corpusId": "cross_corpus"
+        },
+        {
+          "label": "AI Laws & Policy",
+          "note": "Open-weight restrictions, audit demands, and governance tradeoffs",
+          "url": "",
+          "corpusId": "ai_laws_policy"
+        }
+      ]
+    },
+    "Labor": {
+      "historicalFigure": {
+        "name": "Henry Ford",
+        "role": "Automation scale"
+      },
+      "corpusRefs": [
+        {
+          "label": "AI Discourse Tweets",
+          "note": "William Bryk on compressed automation timelines",
+          "url": "https://x.com/WilliamBryk/status/1871946968148439260",
+          "corpusId": "tweets"
+        },
+        {
+          "label": "Cross-Corpus Debates",
+          "note": "Operational substitution and labor bargaining effects",
+          "url": "",
+          "corpusId": "cross_corpus"
+        }
+      ]
+    },
+    "Security": {
+      "historicalFigure": {
+        "name": "Grace Hopper",
+        "role": "Attack and defense systems"
+      },
+      "corpusRefs": [
+        {
+          "label": "METR Evals & Metrics",
+          "note": "Operational capability gains in offensive workflows",
+          "url": "",
+          "corpusId": "metr_evals_metrics"
+        },
+        {
+          "label": "Insider Interviews",
+          "note": "Agentic exploitation, fuzzing, and rapid patch loops",
+          "url": "",
+          "corpusId": "dwarkesh_lab_insiders"
+        }
+      ]
+    },
+    "Military": {
+      "historicalFigure": {
+        "name": "John F. Kennedy",
+        "role": "Crisis restraint"
+      },
+      "corpusRefs": [
+        {
+          "label": "AI Laws & Policy",
+          "note": "Compressed timelines and false-confidence escalation risk",
+          "url": "",
+          "corpusId": "ai_laws_policy"
+        },
+        {
+          "label": "Insider Interviews",
+          "note": "Reasoning systems in strategic or military decision support",
+          "url": "",
+          "corpusId": "dwarkesh_lab_insiders"
+        }
+      ]
+    },
+    "Infra": {
+      "historicalFigure": {
+        "name": "Andrew Carnegie",
+        "role": "Industrial infrastructure"
+      },
+      "corpusRefs": [
+        {
+          "label": "AI Discourse Tweets",
+          "note": "Sam Altman on compute concentration and power demand",
+          "url": "https://x.com/sama/status/1983584366547829073",
+          "corpusId": "tweets"
+        },
+        {
+          "label": "METR Evals & Metrics",
+          "note": "Compute chokepoints, clusters, and scaling predictability",
+          "url": "",
+          "corpusId": "metr_evals_metrics"
+        }
+      ]
+    },
+    "Discourse": {
+      "historicalFigure": {
+        "name": "Rosa Parks",
+        "role": "Credible witness under pressure"
+      },
+      "corpusRefs": [
+        {
+          "label": "Cross-Corpus Debates",
+          "note": "Institutional trust, evidence standards, and public legitimacy",
+          "url": "",
+          "corpusId": "cross_corpus"
+        },
+        {
+          "label": "AI Discourse Tweets",
+          "note": "Synthetic media making authentic evidence easier to deny",
+          "url": "https://x.com/WilliamBryk/status/1871946968148439260",
+          "corpusId": "tweets"
+        }
+      ]
+    },
+    "Crypto": {
+      "historicalFigure": {
+        "name": "Alexander Graham Bell",
+        "role": "Secure communications"
+      },
+      "corpusRefs": [
+        {
+          "label": "Cross-Corpus Debates",
+          "note": "Signing authority, delegation, and wallet governance",
+          "url": "",
+          "corpusId": "cross_corpus"
+        },
+        {
+          "label": "Insider Interviews",
+          "note": "Tool-using agents turning auth mistakes into action mistakes",
+          "url": "",
+          "corpusId": "dwarkesh_lab_insiders"
+        }
+      ]
+    }
+  },
+  "CONTEXT_CATEGORY_PRIORITY": [
+    "Labor",
+    "Discourse",
+    "Security",
+    "Military",
+    "Crypto",
+    "Open Source",
+    "Governance",
+    "Safety",
+    "Infra",
+    "Capabilities"
+  ]
+}

@@ -102,7 +102,39 @@ jest.mock('../MainContent/RiskMatrix', () => ({
   __esModule: true,
   default: (props) => {
     mockRiskMatrix(props);
-    return <div data-testid="risk-matrix-view">Risk Matrix</div>;
+    return (
+      <div data-testid="risk-matrix-view">
+        Risk Matrix
+        {typeof props.onOpenAtlasNode === 'function' ? (
+          <button
+            type="button"
+            data-testid="risk-matrix-open-atlas-node"
+            onClick={() => props.onOpenAtlasNode(
+              '0x4110000000000000000000000000000000000000000000000000000000000000',
+              {
+                modal: true,
+                selectedCellId: 'Capabilities_vs_Labor',
+                activeCategoryX: 'Capabilities',
+                activeCategoryY: 'Labor',
+                comment: 'Return here after checking the atlas node.',
+                valence: 'risk',
+                intensity: 6,
+                comments: [
+                  {
+                    cell: 'Capabilities.Reasoning.Labor.Productivity',
+                    comment: 'Capability gains can compress reporting, research, and drafting cycles.',
+                    valence: 'opportunity',
+                    intensity: 5,
+                  },
+                ],
+              }
+            )}
+          >
+            Open linked atlas node
+          </button>
+        ) : null}
+      </div>
+    );
   },
 }));
 jest.mock('../DemoViews/DemoAnalysis/DemoAnalysisWorkspace', () => ({
@@ -918,7 +950,61 @@ describe('OnePageSession view gating', () => {
     expect(riskMatrixCalls.length).toBeGreaterThan(0);
     expect(riskMatrixCalls[riskMatrixCalls.length - 1]).toMatchObject({
       embedded: true,
+      onOpenAtlasNode: expect.any(Function),
+      onRestoreApplied: expect.any(Function),
     });
+  });
+
+  it('opens linked atlas nodes from the embedded risk matrix and returns to risk matrix when the atlas modal closes', async () => {
+    const props = buildProps();
+
+    render(
+      <MemoryRouter initialEntries={['/session/demo']}>
+        <OnePageSession
+          {...props}
+          slug="demo"
+          sessionConfig={{ ...props.sessionConfig, slug: 'demo' }}
+        />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Risk Matrix/i })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /Risk Matrix/i }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('risk-matrix-view')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId('risk-matrix-open-atlas-node'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('ai-policy-atlas')).toBeInTheDocument();
+    });
+
+    const atlasCalls = mockDebateMap.mock.calls.map((args) => args[0]).filter(Boolean);
+    expect(atlasCalls[atlasCalls.length - 1]).toMatchObject({
+      embedded: true,
+      requestedModalNodeId: '0x4110000000000000000000000000000000000000000000000000000000000000',
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close Atlas Modal' }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('risk-matrix-view')).toBeInTheDocument();
+    });
+
+    const riskMatrixCalls = mockRiskMatrix.mock.calls.map((args) => args[0]).filter(Boolean);
+    expect(riskMatrixCalls.some((props) => (
+      props?.restoreState?.modal === true
+      && props?.restoreState?.selectedCellId === 'Capabilities_vs_Labor'
+      && props?.restoreState?.comment === 'Return here after checking the atlas node.'
+    ))).toBe(true);
+    expect(screen.queryByTestId('ai-policy-atlas')).not.toBeInTheDocument();
   });
 
   it('restores the one-page session view after closing an atlas node opened from Context', async () => {
