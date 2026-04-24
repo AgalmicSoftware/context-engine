@@ -42,7 +42,7 @@ import { getEffectiveArweaveKey } from '../../utilities/session/resourceKeys.js'
 import { sessionRegistryUtils } from '../../utilities/web3/sessionRegistry.js';
 import { ethers } from 'ethers';
 import sha256 from 'crypto-js/sha256';
-import AudioSurveyGenerator from './SurveyGenerator/SurveyGenerator.jsx';
+import AudioSurveyGenerator from './SurveyGenerator/SurveyGenerator';
 import { callAI } from '../../utilities/ai/aiScripts.js';
 import { getEffectiveAiConfig } from '../../utilities/ai/aiSettings.js';
 import { seedGenPrompt } from '../../prompts/seedGenPrompt.js';
