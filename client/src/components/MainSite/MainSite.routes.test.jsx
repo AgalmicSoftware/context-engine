@@ -74,7 +74,7 @@ jest.mock('../Sponsor/SponsorPage', () => {
   };
 });
 
-jest.mock('../Sessions/SessionWizard.jsx', () => {
+jest.mock('../Sessions/SessionWizard', () => {
   const React = require('react');
   return {
     __esModule: true,
