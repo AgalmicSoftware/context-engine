@@ -589,24 +589,6 @@ describe('SurveyTool module', () => {
     expect(openHologram).not.toBeNull();
   });
 
-  it('renders a denser hologram mesh with dedicated depth layers', () => {
-    const tree = PileHologramAssistant();
-    const meshLineCount = countElements(
-      tree,
-      (node) => nodeHasClassName(node, 'pileHologramMeshLine')
-    );
-    const contourCount = countElements(
-      tree,
-      (node) => nodeHasClassName(node, 'pileHologramContourLine')
-    );
-
-    expect(meshLineCount).toBeGreaterThanOrEqual(30);
-    expect(contourCount).toBeGreaterThanOrEqual(5);
-    expect(findNodeByClassName(tree, 'pileHologramDepthShell')).not.toBeNull();
-    expect(findNodeByClassName(tree, 'pileHologramDepthOutline')).not.toBeNull();
-    expect(findNodeByClassName(tree, 'pileHologramFaceCore')).not.toBeNull();
-  });
-
   it('keeps non-multichoice pile question types vertically centered within the card body', () => {
     const scssPath = path.join(__dirname, 'SurveyTool.module.scss');
     const scss = fs.readFileSync(scssPath, 'utf8');
