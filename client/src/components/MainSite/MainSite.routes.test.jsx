@@ -58,7 +58,7 @@ jest.mock('../Admin/AdminPage.jsx', () => {
   };
 });
 
-jest.mock('../Sponsor/SponsorPage.jsx', () => {
+jest.mock('../Sponsor/SponsorPage', () => {
   const React = require('react');
   return {
     __esModule: true,
