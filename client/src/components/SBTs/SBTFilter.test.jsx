@@ -1,4 +1,4 @@
-import SBTFilter from './SBTFilter.jsx';
+import SBTFilter from './SBTFilter';
 import contractScripts, {
   getSessionChainId,
   getSessionSlugByName,
@@ -6,7 +6,7 @@ import contractScripts, {
 } from '../../utilities/web3/contractScripts.js';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 
-jest.mock('./SBTSelector.jsx', () => () => null);
+jest.mock('./SBTSelector', () => () => null);
 
 jest.mock('../../utilities/web3/contractScripts.js', () => ({
   __esModule: true,

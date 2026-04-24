@@ -1,4 +1,4 @@
-import SBTSelector from './SBTSelector.jsx';
+import SBTSelector from './SBTSelector';
 import * as sbtDisplayNameUtils from '../../utilities/sbt/sbtDisplayNames.js';
 import * as contractScriptsUtils from '../../utilities/web3/contractScripts.js';
 import * as sessionRegistryUtils from '../../utilities/web3/sessionRegistry.js';

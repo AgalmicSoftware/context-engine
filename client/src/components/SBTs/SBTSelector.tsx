@@ -1,4 +1,4 @@
-/** @file SBTSelector.jsx */
+/** @file SBTSelector */
 
 import React from 'react';
 import { Button, FormGroup, Label, Input } from 'reactstrap';
@@ -48,6 +48,9 @@ import { getCanonicalSessionFeaturedSBTs } from '../../utilities/sbt/sessionFeat
 import { resolveSbtSelectorSelectedSessionContext } from './sbtSelectorSessionResolution.js';
 
 const sbtLog = createLogger('sbt');
+const contractScriptsUntyped = contractScripts as any;
+const globalRuntime = globalThis as any;
+const sbtLogUntyped = sbtLog as any;
 const MASKED_SBT_LABEL = String(getSbtMaskedFieldValue() || '').trim().toLowerCase();
 const ALLOW_DEMO_SESSION_FALLBACK = !USE_ONCHAIN_SESSION_REGISTRY;
 
@@ -59,7 +62,7 @@ const SHARED_LIGHT_UNIVERSE_KICKOFF_TTL_MS = 60 * 1000;
 const SBT_SELECTOR_DEBUG_STORAGE_KEY = 'ce:sbtSelectorDebug';
 const SBT_SELECTOR_DEBUG_QUERY_KEY = 'ceSbtSelectorDebug';
 
-const readBoolishDebugFlag = (value) => {
+const readBoolishDebugFlag = (value: any) => {
   if (value === true) return true;
   if (value === false || value == null) return false;
   const normalized = String(value).trim().toLowerCase();
@@ -68,7 +71,7 @@ const readBoolishDebugFlag = (value) => {
 
 const isForcedSbtSelectorDebugEnabled = () => {
   try {
-    if (typeof globalThis !== 'undefined' && readBoolishDebugFlag(globalThis.CE_SBT_SELECTOR_DEBUG)) {
+    if (typeof globalThis !== 'undefined' && readBoolishDebugFlag(globalRuntime.CE_SBT_SELECTOR_DEBUG)) {
       return true;
     }
   } catch (_) {
@@ -105,9 +108,9 @@ const shouldAutoSearchOtherSelectorSessions = () => {
   try {
     if (
       typeof globalThis !== 'undefined' &&
-      typeof globalThis.CE_SBT_SELECTOR_AUTO_SEARCH_OTHER_SESSIONS !== 'undefined'
+      typeof globalRuntime.CE_SBT_SELECTOR_AUTO_SEARCH_OTHER_SESSIONS !== 'undefined'
     ) {
-      return readBoolishDebugFlag(globalThis.CE_SBT_SELECTOR_AUTO_SEARCH_OTHER_SESSIONS);
+      return readBoolishDebugFlag(globalRuntime.CE_SBT_SELECTOR_AUTO_SEARCH_OTHER_SESSIONS);
     }
   } catch (_) {
     return CE_SBT_SELECTOR_AUTO_SEARCH_OTHER_SESSIONS;
@@ -115,8 +118,10 @@ const shouldAutoSearchOtherSelectorSessions = () => {
   return CE_SBT_SELECTOR_AUTO_SEARCH_OTHER_SESSIONS;
 };
 
-const emitSbtSelectorDebug = (level, message, payload) => {
-  const loggerMethod = typeof sbtLog?.[level] === 'function' ? sbtLog[level].bind(sbtLog) : sbtLog.log.bind(sbtLog);
+const emitSbtSelectorDebug = (level: any, message: any, payload: any) => {
+  const loggerMethod = typeof sbtLogUntyped?.[level] === 'function'
+    ? sbtLogUntyped[level].bind(sbtLog)
+    : sbtLogUntyped.log.bind(sbtLog);
   if (isForcedSbtSelectorDebugEnabled()) {
     if (typeof payload === 'undefined') {
       emitForcedLog(level, message);
@@ -132,13 +137,13 @@ const emitSbtSelectorDebug = (level, message, payload) => {
   }
 };
 
-const getNameLookupDelayMs = (attempts) => {
+const getNameLookupDelayMs = (attempts: any) => {
   const safeAttempts = Number(attempts || 0);
   const exponent = Math.min(Math.max(safeAttempts - 1, 0), NAME_LOOKUP_MAX_EXPONENT);
   return Math.min(NAME_LOOKUP_BASE_DELAY_MS * (2 ** exponent), NAME_LOOKUP_MAX_DELAY_MS);
 };
 
-const ensureNameLookupState = (sbtCache, netKey) => {
+const ensureNameLookupState = (sbtCache: any, netKey: any) => {
   if (!sbtCache[netKey] || typeof sbtCache[netKey] !== 'object') {
     sbtCache[netKey] = { sbtList: {}, nameLookupState: {} };
   }
@@ -148,12 +153,12 @@ const ensureNameLookupState = (sbtCache, netKey) => {
   return sbtCache[netKey].nameLookupState;
 };
 
-const canRetryNameLookup = (nameLookupState, addressLower, now = Date.now()) => {
+const canRetryNameLookup = (nameLookupState: any, addressLower: any, now: any = Date.now()) => {
   const retryAt = Number(nameLookupState?.[addressLower]?.nextRetryAt || 0);
   return !Number.isFinite(retryAt) || retryAt <= now;
 };
 
-const markNameLookupFailure = (nameLookupState, addressLower, now = Date.now()) => {
+const markNameLookupFailure = (nameLookupState: any, addressLower: any, now: any = Date.now()) => {
   const prevAttempts = Number(nameLookupState?.[addressLower]?.attempts || 0) || 0;
   const attempts = prevAttempts + 1;
   const delayMs = getNameLookupDelayMs(attempts);
@@ -164,48 +169,48 @@ const markNameLookupFailure = (nameLookupState, addressLower, now = Date.now()) 
   };
 };
 
-const clearNameLookupFailure = (nameLookupState, addressLower) => {
+const clearNameLookupFailure = (nameLookupState: any, addressLower: any) => {
   if (!nameLookupState || !addressLower) return;
   delete nameLookupState[addressLower];
 };
 
-const normalizeAddressListForSig = (addresses) => (
+const normalizeAddressListForSig = (addresses: any) => (
   Array.from(new Set(
     (Array.isArray(addresses) ? addresses : [])
-      .map((value) => String(value || '').trim().toLowerCase())
+      .map((value: any) => String(value || '').trim().toLowerCase())
       .filter(Boolean)
   )).sort()
 );
 
-const normalizeSessionSlugListForSig = (slugs) => (
+const normalizeSessionSlugListForSig = (slugs: any) => (
   Array.from(new Set(
     (Array.isArray(slugs) ? slugs : [])
-      .map((value) => normalizeSessionSlug(value || ''))
-      .filter((value) => value != null)
+      .map((value: any) => normalizeSessionSlug(value || ''))
+      .filter((value: any) => value != null)
   ))
 );
 
-const buildSessionSlugSignature = (slugs) => (
+const buildSessionSlugSignature = (slugs: any) => (
   normalizeSessionSlugListForSig(slugs).join(',')
 );
 
-const buildFeaturedEntrySignature = (entries) => (
+const buildFeaturedEntrySignature = (entries: any) => (
   (Array.isArray(entries) ? entries : [])
-    .map((entry) => {
+    .map((entry: any) => {
       const slug = normalizeSessionSlug(entry?.slug || '');
       const address = String(entry?.address || '').trim().toLowerCase();
       return `${slug}:${address}`;
     })
-    .filter((value) => value !== ':')
+    .filter((value: any) => value !== ':')
     .join(',')
 );
 
-const normalizeChainValue = (value) => {
+const normalizeChainValue = (value: any) => {
   const parsed = Number(value || 0);
   return parsed || null;
 };
 
-const resolveSbtEntryChainId = (entry, fallbackChainId = null) => (
+const resolveSbtEntryChainId = (entry: any, fallbackChainId: any = null) => (
   normalizeChainValue(
     entry?.chainId ||
     entry?.sbtInfo?.chainId ||
@@ -214,14 +219,14 @@ const resolveSbtEntryChainId = (entry, fallbackChainId = null) => (
   )
 );
 
-const buildSbtLookupKey = ({ address, chainId } = {}) => {
+const buildSbtLookupKey = ({ address, chainId }: any = {}) => {
   const lowerAddress = String(address || '').trim().toLowerCase();
   if (!lowerAddress) return '';
   const normalizedChainId = normalizeChainValue(chainId);
   return normalizedChainId ? `${normalizedChainId}:${lowerAddress}` : lowerAddress;
 };
 
-const buildScopedSbtIgnoreKey = ({ slug, address } = {}) => {
+const buildScopedSbtIgnoreKey = ({ slug, address }: any = {}) => {
   const lowerAddress = String(address || '').trim().toLowerCase();
   if (!lowerAddress) return '';
   return `${pickNormalizedSessionSlug(slug)}|${lowerAddress}`;
@@ -229,11 +234,11 @@ const buildScopedSbtIgnoreKey = ({ slug, address } = {}) => {
 
 const DEFAULT_FALLBACK_CHAIN_ID = normalizeChainValue(DEFAULT_CHAIN_ID);
 
-const getNormalizedNetworkChainValue = (network) => (
+const getNormalizedNetworkChainValue = (network: any) => (
   normalizeChainValue(network?.id || network?.chainId || 0)
 );
 
-const buildSessionConfigSig = (sessionConfig) => {
+const buildSessionConfigSig = (sessionConfig: any) => {
   const config = sessionConfig && typeof sessionConfig === 'object'
     ? sessionConfig
     : null;
@@ -258,7 +263,7 @@ const buildSbtOptionsRequestSignature = ({
   targetSlugChainSig,
   featuredEntries,
   ignoredFromConfig,
-}) => {
+}: any) => {
   return [
     String(slug || ''),
     String(cacheRevision ?? ''),
@@ -269,7 +274,7 @@ const buildSbtOptionsRequestSignature = ({
   ].join('|');
 };
 
-const pickNormalizedSessionSlug = (...values) => {
+const pickNormalizedSessionSlug = (...values: any[]) => {
   for (const value of values) {
     if (value === undefined || value === null) continue;
     const normalized = normalizeSessionSlug(value);
@@ -278,7 +283,7 @@ const pickNormalizedSessionSlug = (...values) => {
   return '';
 };
 
-const pickOptionalNormalizedSessionSlug = (...values) => {
+const pickOptionalNormalizedSessionSlug = (...values: any[]) => {
   for (const value of values) {
     if (value === undefined || value === null) continue;
     const normalized = normalizeSessionSlug(value);
@@ -287,19 +292,19 @@ const pickOptionalNormalizedSessionSlug = (...values) => {
   return null;
 };
 
-const hasOwn = (value, key) => (
+const hasOwn = (value: any, key: any) => (
   !!value &&
   typeof value === 'object' &&
   Object.prototype.hasOwnProperty.call(value, key)
 );
 
-const hasAuthoritativeSessionSlug = (value) => {
+const hasAuthoritativeSessionSlug = (value: any) => {
   if (!hasOwn(value, 'sessionSlug')) return false;
   const hasExplicitFlag = hasOwn(value, 'sessionSlugExplicit');
   return value?.sessionSlugExplicit === true || !hasExplicitFlag;
 };
 
-const resolveAuthoritativeSbtSessionBindingSlug = (sbt) => {
+const resolveAuthoritativeSbtSessionBindingSlug = (sbt: any) => {
   const sbtInfo = sbt?.sbtInfo || {};
 
   if (hasAuthoritativeSessionSlug(sbtInfo)) {
@@ -316,7 +321,7 @@ const resolveAuthoritativeSbtSessionBindingSlug = (sbt) => {
   return null;
 };
 
-const resolveDeclaredSbtSessionSlug = (sbt) => {
+const resolveDeclaredSbtSessionSlug = (sbt: any) => {
   const sbtInfo = sbt?.sbtInfo || {};
   if (hasOwn(sbtInfo, 'sessionSlug')) {
     return normalizeSessionSlug(sbtInfo?.sessionSlug || '');
@@ -327,7 +332,7 @@ const resolveDeclaredSbtSessionSlug = (sbt) => {
   return null;
 };
 
-const resolveConcreteSbtSessionBindingSlug = (sbt) => {
+const resolveConcreteSbtSessionBindingSlug = (sbt: any) => {
   const authoritativeSlug = resolveAuthoritativeSbtSessionBindingSlug(sbt);
   if (authoritativeSlug != null) return authoritativeSlug;
 
@@ -351,7 +356,7 @@ const resolveConcreteSbtSessionBindingSlug = (sbt) => {
   return normalizeSessionSlug(mappedSlug);
 };
 
-const decorateScopedSbtEntry = (entry, fallbackSlug = '') => {
+const decorateScopedSbtEntry = (entry: any, fallbackSlug: any = '') => {
   const next = (entry && typeof entry === 'object') ? { ...entry } : {};
   const sourceSlug = pickNormalizedSessionSlug(
     hasOwn(next, '__sourceSessionSlug') ? next.__sourceSessionSlug : undefined,
@@ -375,7 +380,7 @@ const decorateScopedSbtEntry = (entry, fallbackSlug = '') => {
   };
 };
 
-const resolvePropSessionSlug = (props = {}) => {
+const resolvePropSessionSlug = (props: any = {}) => {
   const hasExplicitSessionSlug = !!(
     props &&
     Object.prototype.hasOwnProperty.call(props, 'sessionSlug')
@@ -386,7 +391,7 @@ const resolvePropSessionSlug = (props = {}) => {
   );
 };
 
-const mergeScopedSbtEntry = (existingEntry, incomingEntry, fallbackSlug = '') => {
+const mergeScopedSbtEntry = (existingEntry: any, incomingEntry: any, fallbackSlug: any = '') => {
   const existing = (existingEntry && typeof existingEntry === 'object')
     ? decorateScopedSbtEntry(existingEntry, fallbackSlug)
     : null;
@@ -397,7 +402,7 @@ const mergeScopedSbtEntry = (existingEntry, incomingEntry, fallbackSlug = '') =>
     hasOwn(existing, 'sessionBindingSlug') ? existing.sessionBindingSlug : undefined,
     hasOwn(incoming, 'sessionBindingSlug') ? incoming.sessionBindingSlug : undefined
   );
-  const finalizeEntry = (entry) => {
+  const finalizeEntry = (entry: any) => {
     if (!entry) return null;
     return {
       ...entry,
@@ -438,11 +443,11 @@ const mergeScopedSbtEntry = (existingEntry, incomingEntry, fallbackSlug = '') =>
   return finalizeEntry(existing);
 };
 
-const isMaskedSbtOptionLabel = (value) => (
+const isMaskedSbtOptionLabel = (value: any) => (
   String(value || '').trim().toLowerCase() === MASKED_SBT_LABEL
 );
 
-const isMaskedHiddenTitle = ({ label = '', sbtInfo = null } = {}) => {
+const isMaskedHiddenTitle = ({ label = '', sbtInfo = null }: any = {}) => {
   if (!isMaskedSbtOptionLabel(label)) return false;
   if (!sbtInfo || typeof sbtInfo !== 'object') return true;
   const visibleName = (
@@ -455,13 +460,13 @@ const isMaskedHiddenTitle = ({ label = '', sbtInfo = null } = {}) => {
   return isSbtFieldLocked(sbtInfo, 'name');
 };
 
-const isUnresolvedSessionConfig = (config) => (
+const isUnresolvedSessionConfig = (config: any) => (
   !!config &&
   typeof config === 'object' &&
   config.__unresolved === true
 );
 
-const areSbtOptionsEqual = (left, right) => {
+const areSbtOptionsEqual = (left: any, right: any) => {
   const a = Array.isArray(left) ? left : [];
   const b = Array.isArray(right) ? right : [];
   if (a.length !== b.length) return false;
@@ -484,12 +489,14 @@ const areSbtOptionsEqual = (left, right) => {
 };
 
 
-class SBTSelector extends React.Component {
-  static _universeMemo = {};
-  static _universeInflight = {};
-  static _sharedLightUniverseKickoffMemo = {};
+class SBTSelector extends React.Component<any, any> {
+  [key: string]: any;
 
-  constructor(props) {
+  static _universeMemo: any = {};
+  static _universeInflight: any = {};
+  static _sharedLightUniverseKickoffMemo: any = {};
+
+  constructor(props: any) {
     super(props);
     this.state = {
       customSBTAddress: '',
@@ -526,7 +533,7 @@ class SBTSelector extends React.Component {
     this._pendingSelectedSbtKeys = new Set();
   }
 
-  refreshScopedUniverse = ({ forceDiscover = false } = {}) => {
+  refreshScopedUniverse: any = ({ forceDiscover = false }: any = {}) => {
     const discoveryPromise = this.ensureSbtUniverse({ force: forceDiscover });
     this.loadSBTOptions({ force: true });
     Promise.resolve(discoveryPromise).then(() => {
@@ -581,7 +588,7 @@ class SBTSelector extends React.Component {
     this._sbtOptionsByAddressMemo = { source: null, value: new Map() };
   }
 
-  componentDidUpdate(prevProps, prevState) {
+  componentDidUpdate(prevProps: any, prevState: any) {
     const prevNetworkId = getNormalizedNetworkChainValue(prevProps.network);
     const nextNetworkId = getNormalizedNetworkChainValue(this.props.network);
     const networkChanged = prevNetworkId !== nextNetworkId;
@@ -626,20 +633,20 @@ class SBTSelector extends React.Component {
     }
   }
 
-  getEffectiveSessionSlug = () => {
+  getEffectiveSessionSlug: any = () => {
     if (this.state.groupOverride) {
       return this.state.sourceSessionSlug ?? '';
     }
     return this.getPropSessionSlug(this.props);
   };
 
-  getPropSessionSlug = (props = this.props) => resolvePropSessionSlug(props);
+  getPropSessionSlug: any = (props: any = this.props) => resolvePropSessionSlug(props);
 
-  normalizeDiscoverySlugs = (slugs, { allowEmpty = true } = {}) => {
+  normalizeDiscoverySlugs: any = (slugs: any, { allowEmpty = true }: any = {}) => {
     const values = Array.isArray(slugs) ? slugs : [slugs];
-    const seen = new Set();
-    const out = [];
-    values.forEach((value) => {
+    const seen: any = new Set();
+    const out: any[] = [];
+    values.forEach((value: any) => {
       const normalized = normalizeSessionSlug(value || '');
       if (!allowEmpty && !normalized) return;
       if (seen.has(normalized)) return;
@@ -649,28 +656,28 @@ class SBTSelector extends React.Component {
     return out;
   };
 
-  buildSlugListSignature = (slugs) => buildSessionSlugSignature(
+  buildSlugListSignature: any = (slugs: any) => buildSessionSlugSignature(
     this.normalizeDiscoverySlugs(slugs, { allowEmpty: true })
   );
 
-  getNormalizedDiscoveryOverride = (props = this.props) => {
+  getNormalizedDiscoveryOverride: any = (props: any = this.props) => {
     if (!Array.isArray(props?.discoverySessionSlugs) || props.discoverySessionSlugs.length === 0) {
       return [];
     }
     return this.normalizeDiscoverySlugs(props.discoverySessionSlugs, { allowEmpty: true });
   };
 
-  getDiscoveryOverrideSignature = (props = this.props) => (
+  getDiscoveryOverrideSignature: any = (props: any = this.props) => (
     this.buildSlugListSignature(this.getNormalizedDiscoveryOverride(props))
   );
 
-  getResolvedScopeMode = () => {
+  getResolvedScopeMode: any = () => {
     if (this.state.groupOverride) return 'override';
     if (this.getNormalizedDiscoveryOverride().length > 0) return 'explicit';
     return readSessionScanScope();
   };
 
-  getDirectlyInvokedTargetSlugs = () => {
+  getDirectlyInvokedTargetSlugs: any = () => {
     const explicitOverride = this.getNormalizedDiscoveryOverride();
     if (explicitOverride.length > 0) return explicitOverride;
 
@@ -686,7 +693,7 @@ class SBTSelector extends React.Component {
     return this.normalizeDiscoverySlugs([effectiveSlug], { allowEmpty: true });
   };
 
-  getResolvedTargetSlugs = ({ slugOverride } = {}) => {
+  getResolvedTargetSlugs: any = ({ slugOverride }: any = {}) => {
     if (slugOverride !== undefined) {
       return this.normalizeDiscoverySlugs([slugOverride], { allowEmpty: true });
     }
@@ -696,13 +703,13 @@ class SBTSelector extends React.Component {
     return this.getDirectlyInvokedTargetSlugs();
   };
 
-  shouldWarmRegistryCacheForTargets = ({ slugOverride } = {}) => {
+  shouldWarmRegistryCacheForTargets: any = ({ slugOverride }: any = {}) => {
     const targetSlugs = this.getResolvedTargetSlugs({ slugOverride });
     if (!targetSlugs.length) return true;
-    return targetSlugs.some((targetSlug) => !this.shouldUsePropsSessionConfigForSlug(targetSlug));
+    return targetSlugs.some((targetSlug: any) => !this.shouldUsePropsSessionConfigForSlug(targetSlug));
   };
 
-  shouldUsePropsSessionConfigForSlug = (slugIn) => {
+  shouldUsePropsSessionConfigForSlug: any = (slugIn: any) => {
     const sessionConfig = this.props.sessionConfig;
     if (!sessionConfig || typeof sessionConfig !== 'object') return false;
     const requestedSlug = normalizeSessionSlug(
@@ -714,7 +721,7 @@ class SBTSelector extends React.Component {
   };
 
   // Selector discovery/name hydration is display-only, so demo fallback stays local here.
-  getDisplayLookupSessionConfig = (slugIn) => {
+  getDisplayLookupSessionConfig: any = (slugIn: any) => {
     const slug = slugIn !== undefined ? slugIn : this.getEffectiveSessionSlug();
     const strictLookupConfig = getSessionConfigBySlugOrDefault(slug);
     if (strictLookupConfig && !isUnresolvedSessionConfig(strictLookupConfig)) {
@@ -731,7 +738,7 @@ class SBTSelector extends React.Component {
     );
   };
 
-  getSessionNetworkId = (slug) => {
+  getSessionNetworkId: any = (slug: any) => {
     const sessionConfig = this.shouldUsePropsSessionConfigForSlug(slug) && this.props.sessionConfig && typeof this.props.sessionConfig === 'object'
       ? this.props.sessionConfig
       : null;
@@ -755,7 +762,7 @@ class SBTSelector extends React.Component {
     return DEFAULT_FALLBACK_CHAIN_ID;
   };
 
-  getMetadataLookupConfig = (slugIn) => {
+  getMetadataLookupConfig: any = (slugIn: any) => {
     const slug = slugIn !== undefined ? slugIn : this.getEffectiveSessionSlug();
     const baseCfg = this.getDisplayLookupSessionConfig(slug) || {};
     const propsCfg = this.shouldUsePropsSessionConfigForSlug(slug) && this.props.sessionConfig && typeof this.props.sessionConfig === 'object'
@@ -783,7 +790,7 @@ class SBTSelector extends React.Component {
     return next;
   };
 
-  getDiscoverySessionRef = (slugIn) => {
+  getDiscoverySessionRef: any = (slugIn: any) => {
     const slug = slugIn !== undefined ? slugIn : this.getEffectiveSessionSlug();
     const metadataLookupCfg = this.getMetadataLookupConfig(slug);
     return {
@@ -792,7 +799,7 @@ class SBTSelector extends React.Component {
     };
   };
 
-  getSessionLabel = (slug) => {
+  getSessionLabel: any = (slug: any) => {
     const cfg = this.getDisplayLookupSessionConfig(slug);
     const sessionName = cfg?.sessionName || '';
     if (!slug) return sessionName || 'General';
@@ -800,26 +807,26 @@ class SBTSelector extends React.Component {
     return sessionName || slug;
   };
 
-  readSbtCacheBySlug = async (slug) => {
+  readSbtCacheBySlug: any = async (slug: any) => {
     const parsed = await readCache('sbtCache', slug);
     return (parsed && typeof parsed === 'object') ? parsed : {};
   };
 
-  beginDiscovering = () => {
+  beginDiscovering: any = () => {
     this._discoveringRuns += 1;
     if (this._isMounted && this._discoveringRuns === 1) {
       this.setState({ discovering: true });
     }
   };
 
-  endDiscovering = () => {
+  endDiscovering: any = () => {
     this._discoveringRuns = Math.max(0, this._discoveringRuns - 1);
     if (this._isMounted && this._discoveringRuns === 0) {
       this.setState({ discovering: false });
     }
   };
 
-  scheduleSelectedSbtHydrationRetry = () => {
+  scheduleSelectedSbtHydrationRetry: any = () => {
     if (!this._isMounted) return;
     if (this._selectedSbtHydrationRetryTimer) return;
     this._selectedSbtHydrationRetryTimer = setTimeout(() => {
@@ -829,13 +836,13 @@ class SBTSelector extends React.Component {
     }, SELECTED_SBT_HYDRATION_RETRY_MS);
   };
 
-  clearSelectedSbtHydrationRetry = () => {
+  clearSelectedSbtHydrationRetry: any = () => {
     if (!this._selectedSbtHydrationRetryTimer) return;
     clearTimeout(this._selectedSbtHydrationRetryTimer);
     this._selectedSbtHydrationRetryTimer = null;
   };
 
-  scheduleProgressiveOptionsReload = ({ force = false } = {}) => {
+  scheduleProgressiveOptionsReload: any = ({ force = false }: any = {}) => {
     this._progressiveOptionsReloadForce = this._progressiveOptionsReloadForce || force;
     if (this._progressiveOptionsReloadTimer) return;
     this._progressiveOptionsReloadTimer = setTimeout(() => {
@@ -847,7 +854,7 @@ class SBTSelector extends React.Component {
     }, 0);
   };
 
-  clearProgressiveOptionsReload = () => {
+  clearProgressiveOptionsReload: any = () => {
     if (this._progressiveOptionsReloadTimer) {
       clearTimeout(this._progressiveOptionsReloadTimer);
       this._progressiveOptionsReloadTimer = null;
@@ -855,13 +862,13 @@ class SBTSelector extends React.Component {
     this._progressiveOptionsReloadForce = false;
   };
 
-  hydrateSelectedSbtNames = async ({ force = false } = {}) => {
+  hydrateSelectedSbtNames: any = async ({ force = false }: any = {}) => {
     const selected = Array.isArray(this.props.selectedSBTs) ? this.props.selectedSBTs : [];
     const addresses = Array.from(new Set(
       selected
-        .map((entry) => String(entry?.address || '').trim())
-        .filter((value) => ethers.utils.isAddress(value))
-        .map((value) => ethers.utils.getAddress(value))
+        .map((entry: any) => String(entry?.address || '').trim())
+        .filter((value: any) => ethers.utils.isAddress(value))
+        .map((value: any) => ethers.utils.getAddress(value))
     ));
     const slug = this.getEffectiveSessionSlug();
     const networkID = this.getSessionNetworkId(slug);
@@ -876,7 +883,7 @@ class SBTSelector extends React.Component {
     this._selectedSbtHydrationSig = sig;
 
     try {
-      const hits = await warmSbtDisplayNamesTargeted({
+      const hits = await (warmSbtDisplayNamesTargeted as any)({
         addresses,
         preferredSlug: slug,
         metadataLookupConfig: metadataLookupCfg,
@@ -885,13 +892,13 @@ class SBTSelector extends React.Component {
       });
       const targetedLookupEnabled = isTargetedSbtMetadataLookupEnabled();
       if (!this._isMounted) return;
-      const resolvedAddresses = new Set(
+      const resolvedAddresses: any = new Set(
         (Array.isArray(hits) ? hits : [])
-          .map((entry) => String(entry?.address || '').trim().toLowerCase())
+          .map((entry: any) => String(entry?.address || '').trim().toLowerCase())
           .filter(Boolean)
       );
       const hasUnresolvedAddresses = addresses.some(
-        (address) => !resolvedAddresses.has(String(address || '').trim().toLowerCase())
+        (address: any) => !resolvedAddresses.has(String(address || '').trim().toLowerCase())
       );
       if (!Array.isArray(hits) || !hits.length) {
         if (!targetedLookupEnabled) {
@@ -923,7 +930,7 @@ class SBTSelector extends React.Component {
     }
   };
 
-  normalizeSbtCacheForNet = (cacheIn, netKey) => {
+  normalizeSbtCacheForNet: any = (cacheIn: any, netKey: any) => {
     const cacheObj = (cacheIn && typeof cacheIn === 'object') ? { ...cacheIn } : {};
     if (!cacheObj[netKey] || typeof cacheObj[netKey] !== 'object') {
       cacheObj[netKey] = { sbtList: {} };
@@ -934,13 +941,13 @@ class SBTSelector extends React.Component {
     return cacheObj;
   };
 
-  getTargetSlugChainSignature = (targetSlugs = []) => (
+  getTargetSlugChainSignature: any = (targetSlugs: any = []) => (
     this.normalizeDiscoverySlugs(targetSlugs, { allowEmpty: true })
-      .map((targetSlug) => `${targetSlug}:${Number(this.getSessionNetworkId(targetSlug) || 0)}`)
+      .map((targetSlug: any) => `${targetSlug}:${Number(this.getSessionNetworkId(targetSlug) || 0)}`)
       .join('|')
   );
 
-  getIgnoredAddressSet = ({ effectiveSlug, scopeMode, targetSlugs = [] } = {}) => {
+  getIgnoredAddressSet: any = ({ effectiveSlug, scopeMode, targetSlugs = [] }: any = {}) => {
     const resolvedEffectiveSlug = normalizeSessionSlug(effectiveSlug || '');
     const slugsToRead = this.normalizeDiscoverySlugs(
       Array.isArray(targetSlugs) && targetSlugs.length > 0
@@ -948,11 +955,11 @@ class SBTSelector extends React.Component {
         : [((scopeMode === 'general' && resolvedEffectiveSlug !== '') ? '' : resolvedEffectiveSlug)],
       { allowEmpty: true }
     );
-    const ignored = new Set();
-    slugsToRead.forEach((targetSlug) => {
+    const ignored: any = new Set();
+    slugsToRead.forEach((targetSlug: any) => {
       const listSlug = (scopeMode === 'general' && targetSlug !== '') ? '' : targetSlug;
       const { ignored_SBTs_LIST = [] } = getSessionLists(listSlug);
-      (Array.isArray(ignored_SBTs_LIST) ? ignored_SBTs_LIST : []).forEach((address) => {
+      (Array.isArray(ignored_SBTs_LIST) ? ignored_SBTs_LIST : []).forEach((address: any) => {
         const scopedKey = buildScopedSbtIgnoreKey({ slug: targetSlug, address });
         if (scopedKey) ignored.add(scopedKey);
       });
@@ -960,12 +967,12 @@ class SBTSelector extends React.Component {
     return ignored;
   };
 
-  getScopeFeaturedEntries = ({ targetSlugs = [], effectiveSlug = '' } = {}) => {
+  getScopeFeaturedEntries: any = ({ targetSlugs = [], effectiveSlug = '' }: any = {}) => {
     const resolvedEffectiveSlug = normalizeSessionSlug(effectiveSlug || '');
-    const seen = new Set();
-    const out = [];
-    const addEntries = (addresses = [], slug = resolvedEffectiveSlug) => {
-      (Array.isArray(addresses) ? addresses : []).forEach((address) => {
+    const seen: any = new Set();
+    const out: any[] = [];
+    const addEntries = (addresses: any = [], slug: any = resolvedEffectiveSlug) => {
+      (Array.isArray(addresses) ? addresses : []).forEach((address: any) => {
         const rawAddress = String(address || '').trim();
         if (!rawAddress) return;
         const lower = rawAddress.toLowerCase();
@@ -979,7 +986,7 @@ class SBTSelector extends React.Component {
     };
 
     addEntries(this.props.defaultFeaturedSBTs || [], resolvedEffectiveSlug);
-    this.normalizeDiscoverySlugs(targetSlugs, { allowEmpty: true }).forEach((targetSlug) => {
+    this.normalizeDiscoverySlugs(targetSlugs, { allowEmpty: true }).forEach((targetSlug: any) => {
       const displayLookupCfg = this.getDisplayLookupSessionConfig(targetSlug);
       const propsFeatured = this.shouldUsePropsSessionConfigForSlug(targetSlug)
         ? getCanonicalSessionFeaturedSBTs(this.props.sessionConfig)
@@ -995,9 +1002,9 @@ class SBTSelector extends React.Component {
     return out;
   };
 
-  readScopedCacheContexts = async (targetSlugs = []) => {
-    const contexts = [];
-    const contextBySlug = new Map();
+  readScopedCacheContexts: any = async (targetSlugs: any = []) => {
+    const contexts: any[] = [];
+    const contextBySlug: any = new Map();
     const orderedTargetSlugs = this.normalizeDiscoverySlugs(targetSlugs, { allowEmpty: true });
     for (const targetSlug of orderedTargetSlugs) {
       const chainId = Number(this.getSessionNetworkId(targetSlug) || 0) || null;
@@ -1025,11 +1032,11 @@ class SBTSelector extends React.Component {
     return { contexts, contextBySlug };
   };
 
-  buildAggregatedSbtListFromContexts = (contexts = []) => {
-    const out = {};
-    (Array.isArray(contexts) ? contexts : []).forEach((context) => {
+  buildAggregatedSbtListFromContexts: any = (contexts: any = []) => {
+    const out: Record<string, any> = {};
+    (Array.isArray(contexts) ? contexts : []).forEach((context: any) => {
       const fallbackSlug = normalizeSessionSlug(context?.slug || '');
-      Object.entries(context?.sbtList || {}).forEach(([address, entry]) => {
+      Object.entries(context?.sbtList || {}).forEach(([address, entry]: any) => {
         const decoratedEntry = decorateScopedSbtEntry({
           ...(entry && typeof entry === 'object' ? entry : {}),
           sbtAddress: entry?.sbtAddress || address,
@@ -1050,27 +1057,27 @@ class SBTSelector extends React.Component {
     return out;
   };
 
-  buildLinkedScopedSbtListFromKnownCache = ({ targetSlugs = [], fallbackSlug = '', requireConcreteBinding = false } = {}) => {
-    const targetSlugSet = new Set(
+  buildLinkedScopedSbtListFromKnownCache: any = ({ targetSlugs = [], fallbackSlug = '', requireConcreteBinding = false }: any = {}) => {
+    const targetSlugSet: any = new Set(
       this.normalizeDiscoverySlugs(targetSlugs, { allowEmpty: true })
     );
     if (targetSlugSet.size === 0) return {};
 
-    const out = {};
+    const out: Record<string, any> = {};
     const knownEntries = listNamespaceEntriesSync('sbtCache', { cloneValues: false });
-    (Array.isArray(knownEntries) ? knownEntries : []).forEach(({ slug: cacheSlug, value }) => {
+    (Array.isArray(knownEntries) ? knownEntries : []).forEach(({ slug: cacheSlug, value }: any) => {
       const sourceSlug = normalizeSessionSlug(cacheSlug || '');
       const cacheValue = (value && typeof value === 'object') ? value : null;
       if (!cacheValue) return;
 
-      Object.entries(cacheValue).forEach(([netKey, netNode]) => {
+      Object.entries(cacheValue).forEach(([netKey, netNode]: any) => {
         const sbtList = (netNode && typeof netNode === 'object' && netNode.sbtList && typeof netNode.sbtList === 'object')
           ? netNode.sbtList
           : null;
         if (!sbtList) return;
         const cachedChainId = normalizeChainValue(netKey);
 
-        Object.entries(sbtList).forEach(([cacheAddress, entry]) => {
+        Object.entries(sbtList).forEach(([cacheAddress, entry]: any) => {
           const scopedEntry = decorateScopedSbtEntry({
             ...(entry && typeof entry === 'object' ? entry : {}),
             sbtAddress: entry?.sbtAddress || cacheAddress,
@@ -1115,36 +1122,36 @@ class SBTSelector extends React.Component {
     return out;
   };
 
-  writeCacheContext = async (context) => {
+  writeCacheContext: any = async (context: any) => {
     if (!context || !context.netKey) return;
     context.cache[context.netKey].sbtList = context.sbtList;
     context.cache[context.netKey].nameLookupState = context.nameLookupState;
     await writeCache('sbtCache', context.slug, context.cache);
   };
 
-  buildSbtOptions = ({
+  buildSbtOptions: any = ({
     sbtList = {},
     featuredEntries = [],
     ignoredSet = new Set(),
     fallbackSlug = '',
     scopeMode = 'active',
     targetSlugs = [],
-  } = {}) => {
-    const featuredOrder = new Map();
+  }: any = {}) => {
+    const featuredOrder: any = new Map();
     const listScopeTargetSlugSet = scopeMode === 'list'
       ? new Set(this.normalizeDiscoverySlugs(
         Array.isArray(targetSlugs) && targetSlugs.length > 0 ? targetSlugs : [fallbackSlug],
         { allowEmpty: true }
       ))
       : null;
-    (Array.isArray(featuredEntries) ? featuredEntries : []).forEach((entry, index) => {
+    (Array.isArray(featuredEntries) ? featuredEntries : []).forEach((entry: any, index: any) => {
       const lower = String(entry?.address || '').trim().toLowerCase();
       if (!lower || featuredOrder.has(lower)) return;
       featuredOrder.set(lower, index);
     });
 
-    const sbtOptionsMap = new Map();
-    Object.values(sbtList || {}).forEach((sbt) => {
+    const sbtOptionsMap: any = new Map();
+    Object.values(sbtList || {}).forEach((sbt: any) => {
       if (!sbt) return;
       const sbtInfo = sbt.sbtInfo;
       const sbtAddressOrNull = sbt.sbtAddress;
@@ -1191,7 +1198,7 @@ class SBTSelector extends React.Component {
       });
     });
 
-    return Array.from(sbtOptionsMap.values()).sort((left, right) => {
+    return Array.from(sbtOptionsMap.values()).sort((left: any, right: any) => {
       const leftMasked = left?.maskedTitleHidden === true;
       const rightMasked = right?.maskedTitleHidden === true;
       if (leftMasked !== rightMasked) return leftMasked ? 1 : -1;
@@ -1210,7 +1217,7 @@ class SBTSelector extends React.Component {
     });
   };
 
-  applySbtOptions = ({
+  applySbtOptions: any = ({
     sbtList = {},
     featuredEntries = [],
     ignoredSet = new Set(),
@@ -1218,7 +1225,7 @@ class SBTSelector extends React.Component {
     loadingOptions,
     scopeMode = 'active',
     targetSlugs = [],
-  } = {}) => {
+  }: any = {}) => {
     const sbtOptions = this.buildSbtOptions({
       sbtList,
       featuredEntries,
@@ -1228,18 +1235,18 @@ class SBTSelector extends React.Component {
       targetSlugs,
     });
     if (!this._isMounted) return sbtOptions;
-    const nextPatch = {};
+    const nextPatch: Record<string, any> = {};
     const optionsChanged = !areSbtOptionsEqual(this.state.sbtOptions, sbtOptions);
     if (optionsChanged) nextPatch.sbtOptions = sbtOptions;
     const scopeFeaturedAddresses = (Array.isArray(featuredEntries) ? featuredEntries : [])
-      .map((entry) => String(entry?.address || '').trim().toLowerCase())
+      .map((entry: any) => String(entry?.address || '').trim().toLowerCase())
       .filter(Boolean);
     const prevFeatured = Array.isArray(this.state.scopeFeaturedAddresses)
       ? this.state.scopeFeaturedAddresses
       : [];
     const featuredChanged = (
       scopeFeaturedAddresses.length !== prevFeatured.length ||
-      scopeFeaturedAddresses.some((address, index) => address !== prevFeatured[index])
+      scopeFeaturedAddresses.some((address: any, index: any) => address !== prevFeatured[index])
     );
     if (featuredChanged) nextPatch.scopeFeaturedAddresses = scopeFeaturedAddresses;
     if (typeof loadingOptions === 'boolean' && this.state.loadingOptions !== loadingOptions) {
@@ -1251,13 +1258,13 @@ class SBTSelector extends React.Component {
     return sbtOptions;
   };
 
-  hydrateScopedEntries = async ({
+  hydrateScopedEntries: any = async ({
     entries = [],
     contextBySlug,
     aggregatedSbtList,
     fallbackSlug = '',
     onProgress,
-  } = {}) => {
+  }: any = {}) => {
     const lookupEntries = Array.isArray(entries) ? entries : [];
     if (!lookupEntries.length) return;
     const orderedContexts = Array.from((contextBySlug instanceof Map ? contextBySlug : new Map()).values());
@@ -1267,7 +1274,7 @@ class SBTSelector extends React.Component {
     const BATCH = 4;
     for (let i = 0; i < lookupEntries.length; i += BATCH) {
       const batch = lookupEntries.slice(i, i + BATCH);
-      const results = await Promise.all(batch.map(async (entry) => {
+      const results = await Promise.all(batch.map(async (entry: any) => {
         const rawAddress = String(entry?.address || '').trim();
         if (!rawAddress || !ethers.utils.isAddress(rawAddress)) return null;
         const lower = rawAddress.toLowerCase();
@@ -1310,9 +1317,9 @@ class SBTSelector extends React.Component {
         }
       }));
 
-      const touchedContexts = new Set();
+      const touchedContexts: any = new Set();
       const batchNow = Date.now();
-      results.forEach((result) => {
+      results.forEach((result: any) => {
         if (!result) return;
         const { address, lower, slug, context, sbtInfo } = result;
         const aggregatedKey = buildSbtLookupKey({ address, chainId: context.chainId });
@@ -1339,7 +1346,7 @@ class SBTSelector extends React.Component {
       });
 
       if (touchedContexts.size > 0) {
-        await Promise.all(Array.from(touchedContexts).map((context) => this.writeCacheContext(context)));
+        await Promise.all(Array.from(touchedContexts).map((context: any) => this.writeCacheContext(context)));
         if (typeof onProgress === 'function') {
           onProgress({
             completedCount: Math.min(lookupEntries.length, i + batch.length),
@@ -1351,35 +1358,35 @@ class SBTSelector extends React.Component {
     }
   };
 
-  refreshGroupOptions = () => {
+  refreshGroupOptions: any = () => {
     const slugs = getAllSessionSlugs();
-    const opts = slugs.map((slug) => ({
+    const opts = slugs.map((slug: any) => ({
       value: slug,
       label: this.getSessionLabel(slug),
     }));
     this.setState({ groupOptions: opts });
   };
 
-  shouldAutoDiscover = () => this.props.autoDiscover !== false;
+  shouldAutoDiscover: any = () => this.props.autoDiscover !== false;
 
-  getSelectorLogContext = (extra = {}) => ({
+  getSelectorLogContext: any = (extra: any = {}) => ({
     selectorId: String(this.props.id || this.props.label || '').trim() || 'unnamed-selector',
     effectiveSessionSlug: normalizeSessionSlug(this.getEffectiveSessionSlug()),
     ...extra,
   });
 
-  buildSharedLightUniverseKickoffSignature = (slugs = []) => {
+  buildSharedLightUniverseKickoffSignature: any = (slugs: any = []) => {
     const normalized = this.normalizeDiscoverySlugs(slugs, { allowEmpty: true })
       .slice()
-      .sort((left, right) => String(left || '').localeCompare(String(right || '')));
+      .sort((left: any, right: any) => String(left || '').localeCompare(String(right || '')));
     return `${normalized.length}:${normalized.join(',')}`;
   };
 
-  getSharedLightUniverseKickoffSlugs = ({ slugOverride } = {}) => (
+  getSharedLightUniverseKickoffSlugs: any = ({ slugOverride }: any = {}) => (
     this.getResolvedTargetSlugs({ slugOverride })
   );
 
-  kickoffSharedLightUniverseIfNeeded = ({ slugOverride } = {}) => {
+  kickoffSharedLightUniverseIfNeeded: any = ({ slugOverride }: any = {}) => {
     if (!this.shouldAutoDiscover()) {
       if (sbtLog.isEnabled('debug') || isForcedSbtSelectorDebugEnabled()) {
         emitSbtSelectorDebug('debug', '[SBTSelector] shared light-universe kickoff skipped (autoDiscover disabled)', this.getSelectorLogContext());
@@ -1436,7 +1443,7 @@ class SBTSelector extends React.Component {
         this.endDiscovering();
       });
       if (result && typeof result.catch === 'function') {
-        result.catch((error) => {
+        result.catch((error: any) => {
           delete SBTSelector._sharedLightUniverseKickoffMemo[kickoffSig];
           emitSbtSelectorDebug('warn', 'SBTSelector shared light-universe kickoff failed:', error);
         });
@@ -1449,7 +1456,7 @@ class SBTSelector extends React.Component {
     }
   };
 
-  ensureSbtUniverseForSlug = async ({ slug, force } = {}) => {
+  ensureSbtUniverseForSlug: any = async ({ slug, force }: any = {}) => {
     const resolvedSlug = normalizeSessionSlug(slug || '');
     const discoveryRef = this.getDiscoverySessionRef(resolvedSlug);
     const networkID = this.getSessionNetworkId(resolvedSlug);
@@ -1512,7 +1519,7 @@ class SBTSelector extends React.Component {
             netKey
           );
           const latestSbtList = { ...(latestCache[netKey]?.sbtList || {}) };
-          Object.entries(latestSbtList).forEach(([address, entry]) => {
+          Object.entries(latestSbtList).forEach(([address, entry]: any) => {
             sbtList[address] = mergeScopedSbtEntry(
               sbtList[address],
               decorateScopedSbtEntry(entry, resolvedSlug),
@@ -1535,14 +1542,14 @@ class SBTSelector extends React.Component {
         };
 
         let progressiveCacheFlush = Promise.resolve();
-        const queueDiscoveredAddresses = (addresses = []) => {
+        const queueDiscoveredAddresses = (addresses: any = []) => {
           const uniqueDiscovered = Array.from(new Set(
             (Array.isArray(addresses) ? addresses : [])
-              .map((value) => String(value || '').trim())
-              .filter((value) => ethers.utils.isAddress(value))
+              .map((value: any) => String(value || '').trim())
+              .filter((value: any) => ethers.utils.isAddress(value))
           ));
           let mutated = false;
-          uniqueDiscovered.forEach((address) => {
+          uniqueDiscovered.forEach((address: any) => {
             const lower = address.toLowerCase();
             const existing = sbtList[lower] || null;
             const nextEntry = mergeScopedSbtEntry(
@@ -1569,13 +1576,13 @@ class SBTSelector extends React.Component {
             .then(async () => {
               await persistProgressiveCache();
             })
-            .catch((error) => {
+            .catch((error: any) => {
               sbtLog.warn('SBTSelector progressive cache write failed:', error);
             });
         };
 
-        const addrs = await contractScripts.getAllSbtAddressesCached('none', discoveryRef, {
-          onDiscoveredAddresses: ({ addresses = [] }) => {
+        const addrs = await contractScriptsUntyped.getAllSbtAddressesCached('none', discoveryRef, {
+          onDiscoveredAddresses: ({ addresses = [] }: any) => {
             queueDiscoveredAddresses(addresses);
           },
         });
@@ -1595,9 +1602,9 @@ class SBTSelector extends React.Component {
           addressCount: addrs.length,
         });
 
-        const uniqueAddrs = Array.from(new Set(addrs.map((address) => String(address || '').trim()).filter(Boolean)));
+        const uniqueAddrs = Array.from(new Set(addrs.map((address: any) => String(address || '').trim()).filter(Boolean)));
         const lookupNow = Date.now();
-        const toFetch = uniqueAddrs.filter((address) => {
+        const toFetch = uniqueAddrs.filter((address: any) => {
           const lower = address.toLowerCase();
           const entry = sbtList[lower] || null;
           if (hasSbtDisplayName(entry?.sbtInfo || null)) {
@@ -1610,7 +1617,7 @@ class SBTSelector extends React.Component {
         const BATCH = 6;
         for (let i = 0; i < toFetch.length; i += BATCH) {
           const batch = toFetch.slice(i, i + BATCH);
-          const results = await Promise.all(batch.map(async (address) => {
+          const results = await Promise.all(batch.map(async (address: any) => {
             try {
               const lookup = await hydrateSbtDisplayNameTargeted({
                 address,
@@ -1666,7 +1673,7 @@ class SBTSelector extends React.Component {
     return run;
   };
 
-  ensureSbtUniverse = async ({ slugOverride, force } = {}) => {
+  ensureSbtUniverse: any = async ({ slugOverride, force }: any = {}) => {
     if (!this.shouldAutoDiscover()) return null;
     if (typeof window === 'undefined') return null;
 
@@ -1693,15 +1700,15 @@ class SBTSelector extends React.Component {
     return null;
   };
 
-  isOptionsLoading = () => !!(this.state.loadingOptions || this.state.discovering);
+  isOptionsLoading: any = () => !!(this.state.loadingOptions || this.state.discovering);
 
-  getNoOptionsMessage = () => (this.isOptionsLoading() ? null : `No ${t('sbts')}`);
+  getNoOptionsMessage: any = () => (this.isOptionsLoading() ? null : `No ${t('sbts')}`);
 
-  getLoadingOptionCount = () => (
+  getLoadingOptionCount: any = () => (
     Math.max(0, Array.isArray(this.state.sbtOptions) ? this.state.sbtOptions.length : 0)
   );
 
-  getLoadingStatusText = ({ compact = false } = {}) => {
+  getLoadingStatusText: any = ({ compact = false }: any = {}) => {
     const count = this.getLoadingOptionCount();
     const hasCount = count > 0;
     return compact
@@ -1709,7 +1716,7 @@ class SBTSelector extends React.Component {
       : (hasCount ? `Loading ${count}` : 'Loading');
   };
 
-  renderLoadingStatus = ({ compact = false, includeTestId = false } = {}) => {
+  renderLoadingStatus: any = ({ compact = false, includeTestId = false }: any = {}) => {
     const text = this.getLoadingStatusText({ compact });
     return (
       <span
@@ -1727,9 +1734,9 @@ class SBTSelector extends React.Component {
     );
   };
 
-  getLoadingMessage = () => this.renderLoadingStatus({ includeTestId: true });
+  getLoadingMessage: any = () => this.renderLoadingStatus({ includeTestId: true });
 
-  loadSBTOptions = async ({ force = false } = {}) => {
+  loadSBTOptions: any = async ({ force = false }: any = {}) => {
     const slug = normalizeSessionSlug(this.getEffectiveSessionSlug());
     const scopeMode = this.getResolvedScopeMode();
     const targetSlugs = this.getResolvedTargetSlugs();
@@ -1796,7 +1803,7 @@ class SBTSelector extends React.Component {
           fallbackSlug: slug,
           requireConcreteBinding: true,
         });
-        Object.entries(linkedScopedSbtList).forEach(([address, entry]) => {
+        Object.entries(linkedScopedSbtList).forEach(([address, entry]: any) => {
           sbtList[address] = mergeScopedSbtEntry(sbtList[address], entry, slug);
         });
         emitSbtSelectorDebug('info', '[SBTSelector] loadSBTOptions linked cache merge complete', {
@@ -1857,7 +1864,7 @@ class SBTSelector extends React.Component {
         contextBySlug,
         aggregatedSbtList: sbtList,
         fallbackSlug: slug,
-        onProgress: (progress) => {
+        onProgress: (progress: any) => {
           emitSbtSelectorDebug('info', '[SBTSelector] loadSBTOptions featured hydration progress', {
             ...requestContext,
             ...progress,
@@ -1875,7 +1882,7 @@ class SBTSelector extends React.Component {
       });
 
       const entriesNeedingName = Object.values(sbtList || {})
-        .map((entry) => ({
+        .map((entry: any) => ({
           address: String(entry?.sbtAddress || '').trim(),
           slug: pickNormalizedSessionSlug(
             hasOwn(entry, 'sessionBindingSlug') ? entry.sessionBindingSlug : undefined,
@@ -1883,8 +1890,8 @@ class SBTSelector extends React.Component {
             slug
           ),
         }))
-        .filter((entry) => entry.address && ethers.utils.isAddress(entry.address))
-        .filter((entry) => {
+        .filter((entry: any) => entry.address && ethers.utils.isAddress(entry.address))
+        .filter((entry: any) => {
           const info = sbtList[String(entry.address || '').toLowerCase()]?.sbtInfo || null;
           return !hasSbtDisplayName(info);
         });
@@ -1898,7 +1905,7 @@ class SBTSelector extends React.Component {
         contextBySlug,
         aggregatedSbtList: sbtList,
         fallbackSlug: slug,
-        onProgress: (progress) => {
+        onProgress: (progress: any) => {
           emitSbtSelectorDebug('info', '[SBTSelector] loadSBTOptions name hydration progress', {
             ...requestContext,
             ...progress,
@@ -1963,7 +1970,7 @@ class SBTSelector extends React.Component {
     return null;
   };
 
-  handleSBTSelection = async (selectedOption) => {
+  handleSBTSelection: any = async (selectedOption: any) => {
     if (!selectedOption) return;
     const selectedAddress = this.normalizeSelectableAddress(selectedOption.value);
     const selectedKey = this.getSelectableSbtKey(selectedOption) || selectedAddress;
@@ -1978,7 +1985,7 @@ class SBTSelector extends React.Component {
         ...this.normalizeAdditionalSBTOptions(),
       ];
       let selectedSBT = selectableOptions.find(
-        (sbt) => {
+        (sbt: any) => {
           const optionKey = this.getSelectableSbtKey(sbt);
           return optionKey
             ? optionKey === selectedKey
@@ -2052,14 +2059,14 @@ class SBTSelector extends React.Component {
     }
   };
 
-  handleCustomSBTAddressInput = (e) => {
+  handleCustomSBTAddressInput: any = (e: any) => {
     this.setState({
       customSBTAddress: e.target.value,
       manualInputWarning: '',
     });
   };
 
-  handleAddCustomSBT = async () => {
+  handleAddCustomSBT: any = async () => {
     const { customSBTAddress } = this.state;
     const customAddressLower = this.normalizeSelectableAddress(customSBTAddress);
     if (!customAddressLower) return;
@@ -2077,8 +2084,8 @@ class SBTSelector extends React.Component {
 
       // Fetch metadata
       let sbtName = customAddressLower;
-      let sbtImage = null;
-      let sbtInfo = null;
+      let sbtImage: any = null;
+      let sbtInfo: any = null;
       let resolvedSlug = this.getEffectiveSessionSlug();
       try {
         const lookup = await hydrateSbtDisplayNameTargeted({
@@ -2146,18 +2153,18 @@ class SBTSelector extends React.Component {
     }
   };
 
-  toggleManualInput = () => {
-    this.setState(prevState => ({
+  toggleManualInput: any = () => {
+    this.setState((prevState: any) => ({
       showManualInput: !prevState.showManualInput,
       manualInputWarning: '',
     }));
   };
 
-  toggleGroupPicker = () => {
-    this.setState(prevState => ({ showGroupPicker: !prevState.showGroupPicker }));
+  toggleGroupPicker: any = () => {
+    this.setState((prevState: any) => ({ showGroupPicker: !prevState.showGroupPicker }));
   };
 
-  applyGroupSourceSelection = (next) => {
+  applyGroupSourceSelection: any = (next: any) => {
     const active = this.getPropSessionSlug();
     if (next === '__active__') {
       this.setState(
@@ -2176,29 +2183,29 @@ class SBTSelector extends React.Component {
     );
   };
 
-  handleGroupSelect = (e) => {
+  handleGroupSelect: any = (e: any) => {
     this.applyGroupSourceSelection(e.target.value);
   };
 
-  getAutoSearchSessionOptions = () => {
+  getAutoSearchSessionOptions: any = () => {
     if (!this.props.enableGroupSelect) return [];
     if (!shouldAutoSearchOtherSelectorSessions()) return [];
-    const hiddenSlugSet = new Set(this.getDirectlyInvokedTargetSlugs());
+    const hiddenSlugSet: any = new Set(this.getDirectlyInvokedTargetSlugs());
     if (this.state.groupOverride) {
       hiddenSlugSet.add(normalizeSessionSlug(this.state.sourceSessionSlug));
     }
     return (Array.isArray(this.state.groupOptions) ? this.state.groupOptions : [])
-      .map((option) => ({
+      .map((option: any) => ({
         ...option,
         value: normalizeSessionSlug(option?.value || ''),
       }))
-      .filter((option) => !hiddenSlugSet.has(option.value));
+      .filter((option: any) => !hiddenSlugSet.has(option.value));
   };
 
-  normalizeAdditionalSBTOptions = (optionsInput = this.props.additionalSBTOptions) => (
+  normalizeAdditionalSBTOptions: any = (optionsInput: any = this.props.additionalSBTOptions) => (
     Array.isArray(optionsInput)
       ? optionsInput
-          .map((entry) => {
+          .map((entry: any) => {
             const address = String(entry?.address || entry?.sbtAddress || entry?.value || '').trim();
             if (!address) return null;
             return {
@@ -2211,21 +2218,21 @@ class SBTSelector extends React.Component {
       : []
   );
 
-  formatOptionLabel = ({ label, image, value }) => (
+  formatOptionLabel: any = ({ label, image, value }: any) => (
     <div className={styles.optionLabel}>
       {image && <img src={normalizeArweaveUrl(image, { contextLabel: 'sbt_selector_image' })} alt="" className={styles.optionImage} />}
       <span>{label}</span>
     </div>
   );
 
-  formatValueLabel = ({ label, image, value }) => (
+  formatValueLabel: any = ({ label, image, value }: any) => (
     <div className={styles.selectedValueLabel}>
       {image && <img src={normalizeArweaveUrl(image, { contextLabel: 'sbt_selector_image' })} alt="" className={styles.optionImage} />}
       <span className={styles.selectedValueText}>{label || value}</span>
     </div>
   );
 
-  resolveSbtLabel = (sbtInfo, address, preferredSlug = this.getEffectiveSessionSlug()) => {
+  resolveSbtLabel: any = (sbtInfo: any, address: any, preferredSlug: any = this.getEffectiveSessionSlug()) => {
     return (
       resolveSbtDisplayLabel({
         address,
@@ -2238,14 +2245,14 @@ class SBTSelector extends React.Component {
     );
   };
 
-  getSbtOptionsByAddress = (sbtOptionsInput) => {
+  getSbtOptionsByAddress: any = (sbtOptionsInput: any) => {
     const sbtOptions = Array.isArray(sbtOptionsInput) ? sbtOptionsInput : [];
     const memo = this._sbtOptionsByAddressMemo || {};
     if (memo.source === sbtOptions && memo.value instanceof Map) {
       return memo.value;
     }
-    const byAddress = new Map();
-    sbtOptions.forEach((entry) => {
+    const byAddress: any = new Map();
+    sbtOptions.forEach((entry: any) => {
       const key = String(entry?.address || '').toLowerCase();
       if (!key || byAddress.has(key)) return;
       byAddress.set(key, entry);
@@ -2254,14 +2261,14 @@ class SBTSelector extends React.Component {
     return byAddress;
   };
 
-  getSbtOptionsBySelectionKey = (sbtOptionsInput) => {
+  getSbtOptionsBySelectionKey: any = (sbtOptionsInput: any) => {
     const sbtOptions = Array.isArray(sbtOptionsInput) ? sbtOptionsInput : [];
     const memo = this._sbtOptionsBySelectionKeyMemo || {};
     if (memo.source === sbtOptions && memo.value instanceof Map) {
       return memo.value;
     }
-    const bySelectionKey = new Map();
-    sbtOptions.forEach((entry) => {
+    const bySelectionKey: any = new Map();
+    sbtOptions.forEach((entry: any) => {
       const key = this.getSelectableSbtKey(entry);
       if (!key || bySelectionKey.has(key)) return;
       bySelectionKey.set(key, entry);
@@ -2270,13 +2277,13 @@ class SBTSelector extends React.Component {
     return bySelectionKey;
   };
 
-  normalizeSelectableAddress = (value) => {
+  normalizeSelectableAddress: any = (value: any) => {
     const rawAddress = String(value || '').trim();
     if (!rawAddress || !ethers.utils.isAddress(rawAddress)) return '';
     return ethers.utils.getAddress(rawAddress).toLowerCase();
   };
 
-  getSelectableSbtKey = (value) => {
+  getSelectableSbtKey: any = (value: any) => {
     if (value && typeof value === 'object') {
       const explicit = String(value.selectionKey || '').trim();
       if (explicit) return explicit;
@@ -2293,39 +2300,39 @@ class SBTSelector extends React.Component {
     return this.normalizeSelectableAddress(raw);
   };
 
-  getSelectOptionValue = (option) => (
+  getSelectOptionValue: any = (option: any) => (
     this.getSelectableSbtKey(option) || String(option?.value || '')
   );
 
-  getSelectedSbtKeySet = () => (
+  getSelectedSbtKeySet: any = () => (
     new Set(
       (Array.isArray(this.props.selectedSBTs) ? this.props.selectedSBTs : [])
-        .map((sbt) => this.getSelectableSbtKey(sbt))
+        .map((sbt: any) => this.getSelectableSbtKey(sbt))
         .filter(Boolean)
     )
   );
 
-  getSelectedSbtAddressSet = () => (
+  getSelectedSbtAddressSet: any = () => (
     new Set(
       (Array.isArray(this.props.selectedSBTs) ? this.props.selectedSBTs : [])
-        .map((sbt) => this.normalizeSelectableAddress(sbt?.address))
+        .map((sbt: any) => this.normalizeSelectableAddress(sbt?.address))
         .filter(Boolean)
     )
   );
 
-  getEffectiveFeaturedAddressSet = () => (
+  getEffectiveFeaturedAddressSet: any = () => (
     new Set(
       (
         Array.isArray(this.state.scopeFeaturedAddresses) && this.state.scopeFeaturedAddresses.length > 0
           ? this.state.scopeFeaturedAddresses
           : (Array.isArray(this.props.defaultFeaturedSBTs) ? this.props.defaultFeaturedSBTs : [])
       )
-        .map((address) => this.normalizeSelectableAddress(address))
+        .map((address: any) => this.normalizeSelectableAddress(address))
       .filter(Boolean)
     )
   );
 
-  getSbtDetailLinkSessionSlug = (sbt, fallbackSlug = this.getEffectiveSessionSlug()) => {
+  getSbtDetailLinkSessionSlug: any = (sbt: any, fallbackSlug: any = this.getEffectiveSessionSlug()) => {
     const explicitBindingSlug = pickOptionalNormalizedSessionSlug(
       hasOwn(sbt, 'sessionBindingSlug') ? sbt.sessionBindingSlug : undefined,
       hasAuthoritativeSessionSlug(sbt?.sbtInfo)
@@ -2353,13 +2360,13 @@ class SBTSelector extends React.Component {
     return pickNormalizedSessionSlug(fallbackSlug);
   };
 
-  hasSelectedOrPendingSbtAddress = (address) => {
+  hasSelectedOrPendingSbtAddress: any = (address: any) => {
     const normalizedAddress = this.normalizeSelectableAddress(address);
     if (!normalizedAddress) return false;
     return this.getSelectedSbtAddressSet().has(normalizedAddress) || this._pendingSelectedSbtAddresses.has(normalizedAddress);
   };
 
-  hasSelectedOrPendingSbtKey = (value) => {
+  hasSelectedOrPendingSbtKey: any = (value: any) => {
     const normalizedKey = this.getSelectableSbtKey(value);
     if (!normalizedKey) return false;
     return this.getSelectedSbtKeySet().has(normalizedKey) || this._pendingSelectedSbtKeys.has(normalizedKey);
@@ -2386,8 +2393,8 @@ class SBTSelector extends React.Component {
     const additionalOptions = this.normalizeAdditionalSBTOptions();
     const mergedSbtOptions = [
       ...sbtOptions,
-      ...additionalOptions.filter((entry) => (
-        !sbtOptions.some((existing) => String(existing?.address || '').toLowerCase() === entry.address.toLowerCase())
+      ...additionalOptions.filter((entry: any) => (
+        !sbtOptions.some((existing: any) => String(existing?.address || '').toLowerCase() === entry.address.toLowerCase())
       )),
     ];
     const sbtOptionsBySelectionKey = this.getSbtOptionsBySelectionKey(mergedSbtOptions);
@@ -2404,12 +2411,12 @@ class SBTSelector extends React.Component {
     // Filter options based on props
     let displayOptions = mergedSbtOptions;
     if (hasFeaturedSBTs && limitToFeatured === true) {
-      const featuredLower = new Set(effectiveFeatured.map((addr) => String(addr || '').toLowerCase()));
-      displayOptions = mergedSbtOptions.filter((opt) => featuredLower.has(String(opt?.address || '').toLowerCase()));
+      const featuredLower: any = new Set(effectiveFeatured.map((addr: any) => String(addr || '').toLowerCase()));
+      displayOptions = mergedSbtOptions.filter((opt: any) => featuredLower.has(String(opt?.address || '').toLowerCase()));
     }
 
     // Map filtered options for the Select component
-    const selectOptions = displayOptions.map((sbt) => ({
+    const selectOptions = displayOptions.map((sbt: any) => ({
       value: sbt.address,
       selectionKey: this.getSelectableSbtKey(sbt),
       label: sbt.name,
@@ -2417,7 +2424,7 @@ class SBTSelector extends React.Component {
       chainId: sbt.chainId,
     }));
 
-    const selectedDisplay = (this.props.selectedSBTs || []).map((sbt) => {
+    const selectedDisplay = (this.props.selectedSBTs || []).map((sbt: any) => {
       const address = String(sbt?.address || '').toLowerCase();
       if (!address) return sbt;
       const fromOptions = (
@@ -2507,7 +2514,7 @@ class SBTSelector extends React.Component {
                 className={styles.groupSelect}
               >
                 <option value="__active__">Active group: {this.getSessionLabel(activeSessionSlug)}</option>
-                {groupOptions.map((opt) => (
+                {groupOptions.map((opt: any) => (
                   <option key={opt.value || 'general'} value={opt.value}>
                     {opt.label}
                   </option>
@@ -2558,7 +2565,7 @@ class SBTSelector extends React.Component {
                     Scope results
                   </Button>
                 )}
-                {autoSearchSessionOptions.map((opt) => (
+                {autoSearchSessionOptions.map((opt: any) => (
                   <Button
                     key={opt.value || 'general'}
                     type="button"
@@ -2586,7 +2593,7 @@ class SBTSelector extends React.Component {
               value={customSBTAddress}
               onChange={this.handleCustomSBTAddressInput}
               data-testid={E2E_TESTIDS.SBT_SELECTOR_MANUAL_INPUT}
-              onKeyDown={(e) => {
+              onKeyDown={(e: any) => {
                 if (e.key === 'Enter') {
                   e.preventDefault();
                   this.handleAddCustomSBT();
@@ -2614,7 +2621,7 @@ class SBTSelector extends React.Component {
         {/* Render the currently selected SBTs (if any) with remove icon and external link */}
         {this.props.selectedSBTs && this.props.selectedSBTs.length > 0 && (
           <div className={styles.selectedAddresses}>
-            {selectedDisplay.map((sbt) => (
+            {selectedDisplay.map((sbt: any) => (
               <div
                 key={this.getSelectableSbtKey(sbt) || sbt.address}
                 className={styles.addressTag}

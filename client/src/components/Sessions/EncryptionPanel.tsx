@@ -4,7 +4,7 @@ import { Input } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCaretDown, faCaretUp, faPlus, faTrash } from '@fortawesome/free-solid-svg-icons';
 import styles from './SessionWizard.module.scss';
-import SBTSelector from '../SBTs/SBTSelector.jsx';
+import SBTSelector from '../SBTs/SBTSelector';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { toStr } from '../../utilities/shared/primitives.js';
 

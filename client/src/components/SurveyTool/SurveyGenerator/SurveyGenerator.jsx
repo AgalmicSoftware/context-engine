@@ -43,7 +43,7 @@ import {
 } from '../../../utilities/web3/contractScripts.js';
 import AudioInput from '../../Shared/AudioInput/AudioInput';
 import CreateQuestionsAndSurveys from '../CreateQuestionsAndSurveys.jsx';
-import SBTSelector from '../../SBTs/SBTSelector.jsx';
+import SBTSelector from '../../SBTs/SBTSelector';
 import DocumentLibraryPanel from '../../DocumentLibrary/DocumentLibraryPanel';
 import SessionChipSelector from '../../Shared/SessionChipSelector';
 

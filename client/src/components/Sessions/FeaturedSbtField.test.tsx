@@ -18,7 +18,7 @@ type MockSbtSelectorProps = {
   onRemoveSBT?: (address: string) => void;
 };
 
-jest.mock('../SBTs/SBTSelector.jsx', () => (props: MockSbtSelectorProps) => {
+jest.mock('../SBTs/SBTSelector', () => (props: MockSbtSelectorProps) => {
   const selectedSBTs = Array.isArray(props.selectedSBTs) ? props.selectedSBTs : [];
   return (
     <div

@@ -55,7 +55,7 @@ jest.mock('../../utilities/docLibrary/uploads.js', () => ({
   uploadDocLibraryUrlRecord: (...args: any[]) => mockUploadDocLibraryUrlRecord(...args),
 }));
 
-jest.mock('../SBTs/SBTSelector.jsx', () => ({
+jest.mock('../SBTs/SBTSelector', () => ({
   __esModule: true,
   default: (props: any) => {
     mockSBTSelector(props);
