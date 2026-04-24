@@ -6,7 +6,7 @@ import {
   computeSubmitLabel as directComputeSubmitLabel,
   normalizeSurveyToolFilterState as directNormalizeSurveyToolFilterState,
 } from './surveyToolUtils.js';
-import { QuestionFilter as RawQuestionFilter } from './QuestionFilter.jsx';
+import { QuestionFilter as RawQuestionFilter } from './QuestionFilter';
 import PileHologramAssistant from './PileHologramAssistant';
 import QuestionTagDropdown from './QuestionTagDropdown';
 import styles from './SurveyTool.module.scss';
