@@ -1376,6 +1376,270 @@ describe('SurveyResults survey-mode source signature', () => {
     expect(readySignature.split('::')[3]).toBe('1');
     expect(readySignature).not.toBe(notReadySignature);
   });
+
+  it('parses each survey responder payload once while building survey-mode views', async () => {
+    const surveyId = 'survey-parse-once';
+    const surveyCache = {
+      '84532': {
+        surveys: {
+          [surveyId]: {
+            title: 'Perf Survey',
+            questionIDs: ['q1', 'q2'],
+          },
+        },
+        surveyResponses: {
+          [surveyId]: {
+            '0xAa': JSON.stringify({
+              timeStamp: 10,
+              responses: [{ questionID: 'q1', answer: { value: 'a1' } }],
+            }),
+            '0xBb': JSON.stringify({
+              timeStamp: 20,
+              responses: [
+                { questionID: 'q1', answer: { value: 'b1' } },
+                { questionID: 'q2', answer: { value: 'b2' } },
+              ],
+            }),
+          },
+        },
+        surveyResponsesLatestBlock: { [surveyId]: 7 },
+        surveysLatestBlock: 9,
+      },
+    };
+    const bookmarksCache = { surveys: [], questions: [] };
+    jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace: any) => {
+      if (namespace === 'surveysCache') return surveyCache;
+      if (namespace === 'bookmarksCache') return bookmarksCache;
+      return {};
+    });
+    jest.spyOn(cacheScripts, 'readCache').mockResolvedValue({});
+
+    const subject = createSubject({
+      provider: {},
+      surveyId,
+      viewMode: 'survey',
+    });
+    subject._isMounted = true;
+    subject.getEffectiveSlug = jest.fn(() => 'edge');
+    subject.state = {
+      ...subject.state,
+      surveyId,
+      viewMode: 'survey',
+    };
+    attachStateHarness(subject);
+    const parseSpy = jest.spyOn(subject, 'parseResponse');
+
+    await subject.fetchSurveyModeResponses();
+
+    expect(parseSpy).toHaveBeenCalledTimes(2);
+    expect(subject.state.responses).toHaveLength(2);
+    expect(subject.state.aggregateQuestionResponses.q1).toHaveLength(2);
+    expect(subject.state.aggregateQuestionResponses.q2).toHaveLength(1);
+  });
+
+  it('skips survey-mode rebuild when source signature is unchanged', async () => {
+    const surveyId = 'survey-noop-signature';
+    const surveyCache = {
+      '84532': {
+        surveys: {
+          [surveyId]: {
+            title: 'Stable Survey',
+            questionIDs: ['q1'],
+          },
+        },
+        surveyResponses: {
+          [surveyId]: {
+            '0xAa': JSON.stringify({
+              timeStamp: 10,
+              responses: [{ questionID: 'q1', answer: { value: 'a1' } }],
+            }),
+          },
+        },
+        surveyResponsesLatestBlock: { [surveyId]: 3 },
+        surveysLatestBlock: 4,
+      },
+    };
+    const bookmarksCache = { surveys: [], questions: [] };
+    jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace: any) => {
+      if (namespace === 'surveysCache') return surveyCache;
+      if (namespace === 'bookmarksCache') return bookmarksCache;
+      return {};
+    });
+    jest.spyOn(cacheScripts, 'readCache').mockResolvedValue({});
+
+    const subject = createSubject({
+      provider: {},
+      surveyId,
+      viewMode: 'survey',
+    });
+    subject._isMounted = true;
+    subject.getEffectiveSlug = jest.fn(() => 'edge');
+    subject.state = {
+      ...subject.state,
+      surveyId,
+      viewMode: 'survey',
+    };
+    attachStateHarness(subject);
+    const parseSpy = jest.spyOn(subject, 'parseResponse');
+
+    await subject.fetchSurveyModeResponses();
+    subject.setState.mockClear();
+    parseSpy.mockClear();
+
+    await subject.fetchSurveyModeResponses();
+
+    expect(parseSpy).not.toHaveBeenCalled();
+    expect(subject.setState).not.toHaveBeenCalled();
+  });
+
+  it('rebuilds survey-mode responses when payload changes under same metadata', async () => {
+    const surveyId = 'survey-signature-payload-change';
+    const responder = '0xAa';
+    const surveyCache = {
+      '84532': {
+        surveys: {
+          [surveyId]: {
+            title: 'Mutable Survey',
+            questionIDs: ['q1'],
+          },
+        },
+        surveyResponses: {
+          [surveyId]: {
+            [responder]: {
+              timeStamp: 10,
+              responses: [{ questionID: 'q1', answer: { value: 'a1' } }],
+            },
+          },
+        },
+        surveyResponsesLatestBlock: { [surveyId]: 3 },
+        surveysLatestBlock: 4,
+      },
+    };
+    const bookmarksCache = { surveys: [], questions: [] };
+    jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace: any) => {
+      if (namespace === 'surveysCache') return surveyCache;
+      if (namespace === 'bookmarksCache') return bookmarksCache;
+      return {};
+    });
+    jest.spyOn(cacheScripts, 'readCache').mockResolvedValue({});
+
+    const subject = createSubject({
+      provider: {},
+      surveyId,
+      viewMode: 'survey',
+    });
+    subject._isMounted = true;
+    subject.getEffectiveSlug = jest.fn(() => 'edge');
+    subject.state = {
+      ...subject.state,
+      surveyId,
+      viewMode: 'survey',
+    };
+    attachStateHarness(subject);
+    const parseSpy = jest.spyOn(subject, 'parseResponse');
+
+    await subject.fetchSurveyModeResponses();
+    subject.setState.mockClear();
+    parseSpy.mockClear();
+
+    surveyCache['84532'].surveyResponses[surveyId][responder] = {
+      timeStamp: 10,
+      responses: [{ questionID: 'q1', answer: { value: 'b1' } }],
+    };
+
+    await subject.fetchSurveyModeResponses();
+
+    expect(parseSpy).toHaveBeenCalledTimes(1);
+    expect(subject.setState).toHaveBeenCalled();
+    expect(subject.state.aggregateQuestionResponses.q1[0].response.answer.value).toBe('b1');
+  });
+
+  it('rebuilds survey-mode responses when payload mutates deeply in place under stable refs', async () => {
+    const surveyId = 'survey-signature-deep-mutation';
+    const responder = '0xAa';
+    const responderPayload = {
+      timeStamp: 10,
+      responses: [{ questionID: 'q1', answer: { value: 'a1' } }],
+    };
+    const surveyCache = {
+      '84532': {
+        surveys: {
+          [surveyId]: {
+            title: 'Mutable Survey',
+            questionIDs: ['q1'],
+          },
+        },
+        surveyResponses: {
+          [surveyId]: {
+            [responder]: responderPayload,
+          },
+        },
+        surveyResponsesLatestBlock: { [surveyId]: 3 },
+        surveysLatestBlock: 4,
+      },
+    };
+    const bookmarksCache = { surveys: [], questions: [] };
+    jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace: any) => {
+      if (namespace === 'surveysCache') return surveyCache;
+      if (namespace === 'bookmarksCache') return bookmarksCache;
+      return {};
+    });
+    jest.spyOn(cacheScripts, 'readCache').mockResolvedValue({});
+
+    const subject = createSubject({
+      provider: {},
+      surveyId,
+      viewMode: 'survey',
+    });
+    subject._isMounted = true;
+    subject.getEffectiveSlug = jest.fn(() => 'edge');
+    subject.state = {
+      ...subject.state,
+      surveyId,
+      viewMode: 'survey',
+    };
+    attachStateHarness(subject);
+    const parseSpy = jest.spyOn(subject, 'parseResponse');
+
+    await subject.fetchSurveyModeResponses();
+    subject.setState.mockClear();
+    parseSpy.mockClear();
+
+    responderPayload.responses[0].answer.value = 'b2';
+
+    await subject.fetchSurveyModeResponses();
+
+    expect(parseSpy).toHaveBeenCalledTimes(1);
+    expect(subject.setState).toHaveBeenCalled();
+    expect(subject.state.aggregateQuestionResponses.q1[0].response.answer.value).toBe('b2');
+  });
+
+  it('invalidates survey source signature when toggling away from survey mode', () => {
+    const subject = createSubject({
+      provider: {},
+      surveyId: '0xabc',
+      viewMode: 'survey',
+      isOpen: false,
+    });
+
+    subject._isMounted = true;
+    subject._surveyModeSourceSignature = 'edge::84532::0xabc::stable';
+    subject.state = {
+      ...subject.state,
+      viewMode: 'questions',
+      surveyId: '0xabc',
+      filterState: {},
+    };
+    subject.requestFetchResponses = jest.fn();
+    attachStateHarness(subject);
+
+    const prevProps = { ...subject.props };
+    const prevState = { ...subject.state, viewMode: 'survey' };
+
+    subject.componentDidUpdate(prevProps, prevState);
+
+    expect(subject._surveyModeSourceSignature).toBe('');
+  });
 });
 
 describe('SurveyResults survey document URLs', () => {
@@ -3359,6 +3623,28 @@ describe('SurveyResults bookmark cache writes', () => {
     await subject.handleBookmarkFilter();
 
     expect(liveCache.bookmarkedFilters).toEqual(['existing-filter']);
+  });
+});
+
+describe('SurveyResults fallback questions', () => {
+  it('reuses stable fallback question objects per question and mode', () => {
+    const subject = createSubject({});
+
+    const summaryA = subject.getStableFallbackQuestion('q-missing', 'summary');
+    const summaryB = subject.getStableFallbackQuestion('q-missing', 'summary');
+    const individualA = subject.getStableFallbackQuestion('q-missing', 'individual');
+    const individualB = subject.getStableFallbackQuestion('q-missing', 'individual');
+
+    expect(summaryA).toBe(summaryB);
+    expect(summaryA).toEqual({ id: 'q-missing', prompt: 'Unknown question' });
+    expect(individualA).toBe(individualB);
+    expect(individualA).toEqual({
+      id: 'q-missing',
+      creator: '',
+      type: '',
+      prompt: '',
+    });
+    expect(individualA).not.toBe(summaryA);
   });
 });
 
