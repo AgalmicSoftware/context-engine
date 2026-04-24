@@ -8116,70 +8116,195 @@ describe('SurveyTool module', () => {
     }
   });
 
-  it('resolves locked-response gate labels against each question session in aggregated results', () => {
+  it('coalesces rapid nonce ticks to at most one queued rerun', async () => {
     const SurveyResults = ConnectedSurveyResults.WrappedComponent;
-    const gateSbt = '0x9999999999999999999999999999999999999999';
-    const displaySpy = jest.spyOn(sbtDisplayNameUtils, 'resolveSbtDisplayLabel')
-      .mockImplementation(({ preferredSlug, address }) => `${preferredSlug}:${address}`);
-
     const subject = new SurveyResults({
-      activeSessionSlug: 'edge',
+      isOpen: true,
+      provider: {},
+      network: { id: 84532 },
+      questionResponsesNonce: 1,
+    });
+
+    subject._isMounted = true;
+    subject.getEffectiveSlug = jest.fn(() => 'edge');
+    subject.pollLocalStorageForUpdates = jest.fn();
+    subject.requestFetchResponses = jest.fn();
+    subject.setState = jest.fn((next, cb) => {
+      const patch = typeof next === 'function' ? next(subject.state, subject.props) : next;
+      subject.state = { ...subject.state, ...(patch || {}) };
+      if (typeof cb === 'function') cb();
+      return patch;
+    });
+
+    const first = createDeferred();
+    let inFlight = 0;
+    let maxInFlight = 0;
+    const latestSpy = jest
+      .spyOn(contractScripts, 'getLatestBlockNumber')
+      .mockImplementationOnce(() => {
+        inFlight += 1;
+        maxInFlight = Math.max(maxInFlight, inFlight);
+        return first.promise.finally(() => {
+          inFlight -= 1;
+        });
+      })
+      .mockImplementationOnce(() => {
+        inFlight += 1;
+        maxInFlight = Math.max(maxInFlight, inFlight);
+        return Promise.resolve(102).finally(() => {
+          inFlight -= 1;
+        });
+      });
+
+    const firstRunPromise = subject.handleNonceTick();
+    subject.handleNonceTick();
+    subject.handleNonceTick();
+    expect(latestSpy).toHaveBeenCalledTimes(1);
+
+    first.resolve(101);
+    await firstRunPromise;
+
+    expect(latestSpy).toHaveBeenCalledTimes(2);
+    expect(maxInFlight).toBe(1);
+    expect(subject.pollLocalStorageForUpdates).toHaveBeenCalledTimes(2);
+    expect(subject.requestFetchResponses).toHaveBeenCalledTimes(2);
+  });
+
+  it('uses clone-free questions cache reads in SurveyQuestions.handleFilter', () => {
+    const peekSpy = jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace) => {
+      if (namespace === 'questionsCache') {
+        return {
+          '84532': {
+            questionResponses: {
+              q1: {
+                '0xaa': '{"type":"binary","answer":{"value":"yes"}}',
+              },
+            },
+          },
+        };
+      }
+      return {};
+    });
+
+    const shell = new SurveyTool({
+      minifiedMode: 'pile',
       network: { id: 84532 },
       networkChainId: 84532,
+      account: '',
+      questionResponsesNonce: 5,
+      onFilterChange: jest.fn(),
     });
+    const pileElement = shell.render();
+    const PileViewModeClass = pileElement.type;
+    const subject = new PileViewModeClass(pileElement.props);
+
     subject.state = {
       ...subject.state,
-      viewMode: 'questions',
+      allQuestionsForFilter: [],
+      pileQuestions: [],
+      activePileIndex: 0,
+      filterState: {},
+      hasHiddenGatedQuestions: false,
+      autoDecryptEnabled: false,
+      autoDecryptAttempted: {},
+      decryptingByKey: {},
     };
+    subject.initializeResponseState = jest.fn((cb) => {
+      if (typeof cb === 'function') cb();
+    });
+    subject.rehydrateLocalCacheAnswersForRenderedIds = jest.fn((cb) => {
+      if (typeof cb === 'function') cb();
+    });
+    subject.rehydrateDraftForRenderedIds = jest.fn();
+    subject.setState = jest.fn((next, cb) => {
+      const patch = typeof next === 'function' ? next(subject.state, subject.props) : next;
+      subject.state = { ...subject.state, ...(patch || {}) };
+      if (typeof cb === 'function') cb();
+      return patch;
+    });
 
-    const details = subject.buildLockedGateDetails(
-      [{ questionId: 'q2' }],
-      {
-        q2: {
-          id: 'q2',
-          sessionSlug: 'alpha',
-          encryption: {
-            enabled: true,
-            gates: [{ label: 'Alpha Gate', sbtAddress: gateSbt }],
+    subject.handleFilter([{ id: 'q1', type: 'binary', prompt: 'Q1' }], {});
+
+    const questionCacheCalls = peekSpy.mock.calls.filter((args) => args[0] === 'questionsCache');
+    expect(questionCacheCalls.length).toBeGreaterThan(0);
+    expect(questionCacheCalls.some((args) => args[2]?.clone === false)).toBe(true);
+  });
+
+  it('avoids redundant pile wrapper state updates when answering', () => {
+    const shell = new SurveyTool({
+      minifiedMode: 'pile',
+      network: { id: 84532 },
+      networkChainId: 84532,
+      account: '',
+      questionResponsesNonce: 5,
+      onFilterChange: jest.fn(),
+    });
+    const pileElement = shell.render();
+    const PileViewModeClass = pileElement.type;
+    const subject = new PileViewModeClass(pileElement.props);
+
+    subject.handleAnswer = jest.fn();
+    subject.setState = jest.fn();
+
+    subject.handleAnswerPile('q1', 'value');
+
+    expect(subject.handleAnswer).toHaveBeenCalledWith(0, 'q1', 'value', {});
+    expect(subject.setState).not.toHaveBeenCalled();
+  });
+
+  it('passes cache-backed question responses into pile filters so responded status works in embedded pile mode', () => {
+    jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace) => {
+      if (namespace !== 'questionsCache') return {};
+      return {
+        '84532': {
+          questionResponses: {
+            q1: {
+              '0xabc': { answer: { value: 'yes' } },
+            },
           },
         },
-      }
+      };
+    });
+
+    const shell = new SurveyTool({
+      minifiedMode: 'pile',
+      network: { id: 84532 },
+      networkChainId: 84532,
+      account: '0xabc',
+      sessionSlug: 'edge',
+      questionResponsesNonce: 2,
+      onFilterChange: jest.fn(),
+    });
+    const pileElement = shell.render();
+    const PileViewModeClass = pileElement.type;
+    const subject = new PileViewModeClass(pileElement.props);
+    const visibleQuestions = [
+      { id: 'q1', type: 'binary', prompt: 'Q1' },
+      { id: 'q2', type: 'binary', prompt: 'Q2' },
+    ];
+
+    subject.state = {
+      ...subject.state,
+      allQuestionsForFilter: visibleQuestions,
+      pileQuestions: visibleQuestions,
+      activePileIndex: 0,
+      filterModalOpen: true,
+      loading: false,
+      showHologramAssistant: false,
+    };
+
+    const tree = subject.render();
+    const questionFilterNode = findElement(
+      tree,
+      (node) =>
+        node?.props?.onFilter === subject.handleFilter &&
+        node?.props?.currentViewModeForUrl === 'questions'
     );
 
-    expect(details).toEqual({
-      gateDetails: [
-        {
-          address: gateSbt,
-          label: `alpha:${gateSbt}`,
-          href: buildSbtDetailPath(gateSbt, 'alpha'),
-        },
-      ],
-      hasGenericGateMessage: false,
-    });
-    expect(displaySpy).toHaveBeenCalledWith(expect.objectContaining({
-      address: gateSbt,
-      preferredSlug: 'alpha',
-      chainId: 84532,
-      surveyId: 'survey-1',
-      questionPool: [{ id: 'pool-q' }],
-      target: {
-        providerKind: 'browser',
-        chainId: 84532,
-        surveyId: 'survey-1',
-        questionId: 'q1',
-        fieldToDecrypt: 'both',
-      },
-      lit: { getKey: litHooks.getKey },
-      opts: {
-        providerKind: 'browser',
-        provider,
-        account: '0xabc',
-        chainId: 84532,
-        surveyId: 'survey-1',
-        questionPool: [{ id: 'pool-q' }],
-        lit: { getKey: litHooks.getKey },
-        hasher: 'hash-worker',
-        throwOnError: true,
+    expect(questionFilterNode).toBeTruthy();
+    expect(questionFilterNode.props.questionResponses).toEqual({
+      q1: {
+        '0xabc': { answer: { value: 'yes' } },
       },
     });
 
