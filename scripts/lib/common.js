@@ -3,7 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const ROOT = path.resolve(__dirname, '..', '..', '..');
+const ROOT = path.resolve(__dirname, '..', '..');
 
 const toStr = (value) => (typeof value === 'string' ? value : value == null ? '' : String(value));
 

@@ -8,7 +8,7 @@
 - Practical hierarchy: **4 primary UI components** + `PileViewMode` subclass (`extends SurveyQuestions`)
 - Method inventory: **276 class methods/properties** + **73 top-level helper functions**
 - Summary: This file implements the full survey/question runtime: mode selection, survey list + filters, question dashboards, response editing/decrypting, draft persistence, encryption audience/gate logic, chain submission, and the pile-card interaction mode. `SurveyQuestions` is the core state machine; other classes are orchestration/adapters around it.
-- Shared dependency: audio capture/transcription now lives at `client/src/components/Shared/AudioInput/AudioInput.jsx` and is consumed by `SurveyTool`, `SurveySelector`, and `QuestionFilter`.
+- Shared dependency: audio capture/transcription now lives at `client/src/components/Shared/AudioInput/AudioInput.tsx` and is consumed by `SurveyTool`, `SurveySelector`, and `QuestionFilter`.
 
 ## Component Hierarchy
 
