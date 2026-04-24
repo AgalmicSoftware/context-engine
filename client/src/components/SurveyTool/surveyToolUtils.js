@@ -2,10 +2,8 @@
 
 import {
   getAllSessionSlugs,
-  getSessionConfigBySlug as getStrictSessionConfigBySlug,
   getSessionSlugByName,
 } from '../../utilities/web3/contractScripts.js';
-import { serializeFilterState } from '../../utilities/survey/filterStateUtils.js';
 import { createLogger } from 'utilities/logging.js';
 import {
   parseQuestionSessionIdFromSearch,
@@ -13,38 +11,7 @@ import {
 } from '../../utilities/survey/questionRouting.js';
 import {
   normalizeSessionSlug,
-  resolveSessionAliases,
-  resolveSessionSlugFromPathname,
 } from '../../utilities/session/sessionNaming.js';
-import {
-  resolveSurveyToolDecryptHydrationContext,
-  resolveSurveyToolDraftSessionContext,
-  resolveSurveyToolDraftStorageContext,
-  resolveSurveyToolEffectiveSlug,
-  resolveSurveyToolEnsureQuestionCachedContext,
-  resolveSurveyToolExplicitSessionContext,
-  resolveSurveyToolIdLookupContext,
-  resolveSurveyToolLockAudienceSessionNameContext,
-  resolveSurveyToolQuestionConfigContext,
-  resolveSurveyToolQuestionCountContext,
-  resolveSurveyToolQuestionPayloadCacheWriteContext,
-  resolveSurveyToolQuestionsDashboardLoadContext,
-  resolveSurveyToolPileFilterContext,
-  resolveSurveyToolPileLoadContext,
-  resolveSurveyToolPileWarmSeedContext,
-  resolveSurveyToolPileResponseReadContext,
-  resolveSurveyToolQuestionReadCacheContext,
-  resolveSurveyToolQuestionBootstrapContext,
-  resolveSurveyToolResponseJsonContext,
-  resolveSurveyToolResponseHydrationContext,
-  resolveSurveyToolSubmittedCacheWriteContext,
-  resolveSurveyToolSurveyReadContext,
-  resolveSurveyToolUpdateCacheContext,
-} from './surveyToolSessionResolution.js';
-import {
-  readSessionScanScope,
-  readSessionScanSlugs,
-} from '../../utilities/session/sessionScanScope.js';
 import {
   peekCacheSync,
   readCache,
@@ -54,6 +21,73 @@ import {
   normalizeRatingValue,
   RATING_MIN,
 } from '../../utilities/survey/ratingValue.js';
+import {
+  formatQuestionScanBlockCount,
+  isSurveyToolFilterStateActive,
+  serializeSurveyToolFilterState,
+} from './surveyToolViewState.js';
+import {
+  resolveEffectiveSlug,
+  resolveIdLookupContext,
+} from './surveyToolScope.js';
+export {
+  buildSurveyDraftSemanticSignature,
+  computeSubmitLabel,
+  getPendingStatsSnapshotFromState,
+  hasConvictionOrImportanceValueForQuestion,
+  hasMeaningfulFieldValue,
+  shouldAutoEncryptAdditionalOnAudienceChange,
+  shouldEncryptResponseFieldForSubmit,
+  shouldForceOverwriteDraftValues,
+  shouldRenderInlineSubmitButton,
+  shouldRenderSubmittedIndicator,
+  shouldShowSingleQuestionResponseLookupSpinner,
+  updateSubmittedSinceLastEdit,
+} from './surveyToolDraftState.js';
+export {
+  buildQuestionScanProgressDisplay,
+  doesQuestionProgressMatchSlug,
+  normalizeQuestionProgressSlug,
+  normalizeSurveyToolFilterState,
+  shouldShowPileFullLoadingState,
+} from './surveyToolViewState.js';
+export {
+  buildQuestionCountScopeContextKey,
+  buildQuestionDashboardLoadContextSignature,
+  buildQuestionFilterStorageKeyPrefix,
+  dedupeQuestionReadSlugs,
+  getActiveSessionSlugFromProps,
+  getBlockedQuestionIdsSet,
+  getExtraQuestionReadSlugs,
+  getHighlightedQuestionIdsSet,
+  getSessionSlugHintFromProps,
+  getSessionSlugPinnedFromProps,
+  normalizeSessionSlugValue,
+  resolveCurrentTagSessionSlug,
+  resolveDecryptHydrationContext,
+  resolveDraftSessionContext,
+  resolveDraftStorageContext,
+  resolveEffectiveSlug,
+  resolveEnsureQuestionCachedContext,
+  resolveExplicitSessionContext,
+  resolveIdLookupContext,
+  resolveLockAudienceSessionNameContext,
+  resolvePileFilterContext,
+  resolvePileLoadContext,
+  resolvePileResponseReadContext,
+  resolvePileWarmSeedContext,
+  resolveQuestionBootstrapContext,
+  resolveQuestionCountContext,
+  resolveQuestionPayloadCacheWriteContext,
+  resolveQuestionReadCacheContext,
+  resolveQuestionsDashboardLoadContext,
+  resolveResponseHydrationContext,
+  resolveResponseJsonContext,
+  resolveSubmittedCacheWriteContext,
+  resolveSurveyReadContext,
+  resolveUpdateCacheContext,
+  shouldInheritResolvedTagSessionScope,
+} from './surveyToolScope.js';
 
 const surveyLog = createLogger('surveys');
 const GATE_SBT_HYDRATION_RETRY_MS = 45 * 1000;
@@ -343,109 +377,6 @@ const isSingleSelectMultichoice = (question) => {
   return !!(question.singleSelect || question.oneSelectionOnly || question.singleChoice);
 };
 
-export const hasMeaningfulFieldValue = (field = {}) => {
-  if (!field || typeof field !== 'object') return false;
-  const val = field.value;
-  if (val === '*') return true;
-  if (typeof val === 'boolean') return true;
-  if (typeof val === 'number') return true;
-  if (Array.isArray(val)) return val.length > 0;
-  if (val && typeof val === 'object') return Object.keys(val).length > 0;
-  if (typeof val === 'string') return val.trim().length > 0;
-  return false;
-};
-
-const buildStableDraftValueSignature = (value) => {
-  if (value === undefined) return 'u';
-  if (value === null) return 'n';
-  if (typeof value === 'string') return `s:${value}`;
-  if (typeof value === 'number') return `d:${Number.isNaN(value) ? 'NaN' : String(value)}`;
-  if (typeof value === 'boolean') return value ? 'b:1' : 'b:0';
-  if (Array.isArray(value)) {
-    return `a:[${value.map((item) => buildStableDraftValueSignature(item)).join(',')}]`;
-  }
-  if (typeof value === 'object') {
-    const keys = Object.keys(value).sort();
-    return `o:{${keys.map((key) => `${key}:${buildStableDraftValueSignature(value[key])}`).join('|')}}`;
-  }
-  return `${typeof value}:${String(value)}`;
-};
-
-export const buildSurveyDraftSemanticSignature = (payload = {}) => {
-  const meta = (payload && typeof payload === 'object' && payload.meta && typeof payload.meta === 'object')
-    ? payload.meta
-    : {};
-  const answers = (payload && typeof payload === 'object' && payload.answers && typeof payload.answers === 'object')
-    ? payload.answers
-    : {};
-  const baseline = (payload && typeof payload === 'object' && payload.baseline && typeof payload.baseline === 'object')
-    ? payload.baseline
-    : {};
-  const questionIds = Object.keys(answers)
-    .map((qid) => String(qid || ''))
-    .filter(Boolean)
-    .sort();
-  // Regression guard: baseline-only changes must alter draft signature too.
-  // If we hash only answers, decrypt-only refresh can remask baseline and show false pending edits.
-  const baselineIds = Object.keys(baseline)
-    .map((qid) => String(qid || ''))
-    .filter(Boolean)
-    .sort();
-  const parts = [
-    `network:${meta.networkId == null ? '' : String(meta.networkId)}`,
-    `survey:${meta.surveyId == null ? '' : String(meta.surveyId)}`,
-    `count:${questionIds.length}`,
-    `bcount:${baselineIds.length}`,
-  ];
-  questionIds.forEach((qid) => {
-    const answerEntry = (answers[qid] && typeof answers[qid] === 'object') ? answers[qid] : {};
-    parts.push(`qid:${qid}`);
-    parts.push(`value:${buildStableDraftValueSignature(answerEntry.value)}`);
-    parts.push(`answerEncrypted:${buildStableDraftValueSignature(answerEntry.answerEncrypted)}`);
-    parts.push(`answerAudience:${buildStableDraftValueSignature(answerEntry.answerEncryptionAudience)}`);
-    parts.push(`answerGateId:${buildStableDraftValueSignature(answerEntry.answerEncryptionGateId)}`);
-    parts.push(`answerAudienceMode:${buildStableDraftValueSignature(answerEntry.answerAudienceMode)}`);
-    parts.push(`answerEncryptedPortion:${buildStableDraftValueSignature(answerEntry.answerEncryptedPortion)}`);
-    parts.push(`additional:${buildStableDraftValueSignature(answerEntry.additional)}`);
-    parts.push(`additionalEncrypted:${buildStableDraftValueSignature(answerEntry.additionalEncrypted)}`);
-    parts.push(`additionalAudience:${buildStableDraftValueSignature(answerEntry.additionalEncryptionAudience)}`);
-    parts.push(`additionalGateId:${buildStableDraftValueSignature(answerEntry.additionalEncryptionGateId)}`);
-    parts.push(`additionalAudienceMode:${buildStableDraftValueSignature(answerEntry.additionalAudienceMode)}`);
-    parts.push(`additionalEncryptedPortion:${buildStableDraftValueSignature(answerEntry.additionalEncryptedPortion)}`);
-    parts.push(`importance:${buildStableDraftValueSignature(answerEntry.importance)}`);
-    parts.push(`conviction:${buildStableDraftValueSignature(answerEntry.conviction)}`);
-  });
-  baselineIds.forEach((qid) => {
-    const baselineEntry = (baseline[qid] && typeof baseline[qid] === 'object') ? baseline[qid] : {};
-    parts.push(`bqid:${qid}`);
-    parts.push(`bvalue:${buildStableDraftValueSignature(baselineEntry.value)}`);
-    parts.push(`banswerEncryptedPortion:${buildStableDraftValueSignature(baselineEntry.answerEncryptedPortion)}`);
-    parts.push(`badditional:${buildStableDraftValueSignature(baselineEntry.additional)}`);
-    parts.push(`badditionalEncryptedPortion:${buildStableDraftValueSignature(baselineEntry.additionalEncryptedPortion)}`);
-  });
-  return parts.join('||');
-};
-
-export const shouldForceOverwriteDraftValues = ({
-  forceOverwrite = false,
-  isDirty = false,
-  pendingTotal = 0,
-  submittedStateActive = false,
-} = {}) => (
-  !!forceOverwrite && (
-    !!isDirty ||
-    Number(pendingTotal || 0) > 0 ||
-    !submittedStateActive
-  )
-);
-
-export const updateSubmittedSinceLastEdit = (prevValue = false, transition = '') => {
-  const mode = String(transition || '').trim().toLowerCase();
-  if (mode === 'submit_success') return true;
-  if (mode === 'user_edit' || mode === 'reset' || mode === 'submit_error') return false;
-  return !!prevValue;
-};
-
 const normalizeQuestionIdKey = (value) => String(value || '').trim().toLowerCase();
 
 const mixFnvHashText = (hash, input) => {
@@ -593,23 +524,6 @@ const hasQuestionMapValue = (map = {}, questionId = '') => {
   return false;
 };
 
-export const hasConvictionOrImportanceValueForQuestion = (slice = {}, questionId = '') => (
-  hasQuestionMapValue(slice?.conviction || {}, questionId) ||
-  hasQuestionMapValue(slice?.importance || {}, questionId)
-);
-
-export const shouldAutoEncryptAdditionalOnAudienceChange = (field = {}) => (
-  hasMeaningfulFieldValue(field)
-);
-
-export const shouldEncryptResponseFieldForSubmit = (field = {}) => (
-  !!field &&
-  field.encrypted === true &&
-  field.value !== '*' &&
-  hasMeaningfulFieldValue(field)
-);
-
-
 /**
  * Cross-cache slug discovery for question/survey IDs.
  * Prefers explicit sessionName → slug; else scans per-group caches on current network; else falls back.
@@ -676,368 +590,8 @@ export function resolveSlugForIds({ sessionName, questionId, surveyId, props, ne
 
 
 
-const normalizeSessionSlugValue = (rawSlug) => normalizeSessionSlug(rawSlug);
 
-const getSessionSlugHintFromProps = (props = {}) => (
-  resolveSessionAliases(props).sessionSlug
-);
 
-const getActiveSessionSlugFromProps = (props = {}) => (
-  resolveSessionAliases(props).activeSessionSlug
-);
-
-const getSessionSlugPinnedFromProps = (props = {}) => (
-  resolveSessionAliases(props).sessionSlugPinned
-);
-
-const shouldInheritResolvedTagSessionScope = (props = {}) => {
-  if (getSessionSlugPinnedFromProps(props)) return true;
-
-  const pathname = (
-    typeof window !== 'undefined' && window.location && typeof window.location.pathname === 'string'
-      ? window.location.pathname
-      : ''
-  );
-  if (resolveSessionSlugFromPathname(pathname) !== null) return true;
-  if (props.singleQuestionMode) return false;
-
-  return String(props.surveyID || props.surveyId || '').trim() !== '';
-};
-
-const resolveCurrentTagSessionSlug = ({ props = {}, state = {}, getEffectiveDraftSlug = null } = {}) => {
-  if (getSessionSlugPinnedFromProps(props)) {
-    return normalizeSessionSlugValue(props.sessionSlug || '');
-  }
-  if (state?.localSessionOverrideTouched) {
-    return normalizeSessionSlugValue(state.localSessionOverrideSlug);
-  }
-  const explicitQuerySessionSlug = (
-    typeof window !== 'undefined'
-      ? parseQuestionSessionSlugFromSearch(window.location?.search || '')
-      : null
-  );
-  if (explicitQuerySessionSlug !== null) {
-    return normalizeSessionSlugValue(explicitQuerySessionSlug);
-  }
-  // Keep survey/session-resolved pages local, but avoid pinning generic
-  // /questions views just because they inherited the global primary session.
-  if (!shouldInheritResolvedTagSessionScope(props)) return '';
-
-  return normalizeSessionSlugValue(
-    resolveEffectiveSlug(props) ||
-    (typeof getEffectiveDraftSlug === 'function' ? getEffectiveDraftSlug() : '') ||
-    ''
-  );
-};
-
-/** Resolve effective session slug:
- * Priority: URL /session/:slug → props.sessionSlug (falling back to activeSessionSlug) → '' (general)
- */
-export function resolveEffectiveSlug(props = {}) {
-  return resolveSurveyToolEffectiveSlug({
-    pathname: (typeof window !== 'undefined' && window.location && window.location.pathname) || '',
-    activeSessionSlug: props.activeSessionSlug,
-    sessionSlug: props.sessionSlug,
-  });
-}
-
-const resolveDraftSessionContext = (props = {}, effectiveDraftSlug = '') => (
-  resolveSurveyToolDraftSessionContext({
-    pathname: (typeof window !== 'undefined' && window.location && window.location.pathname) || '',
-    activeSessionSlug: props.activeSessionSlug,
-    sessionSlug: props.sessionSlug,
-    effectiveDraftSlug,
-    resolveBySlug: getStrictSessionConfigBySlug,
-  })
-);
-
-const resolveExplicitSessionContext = (sessionSlug = '') => (
-  resolveSurveyToolExplicitSessionContext({
-    sessionSlug,
-    resolveBySlug: getStrictSessionConfigBySlug,
-  })
-);
-
-const resolveDraftStorageContext = (props = {}, sessionSlug = '') => (
-  resolveSurveyToolDraftStorageContext({
-    sessionSlug,
-    network: props.network,
-    networkChainId: props.networkChainId,
-    resolveBySlug: getStrictSessionConfigBySlug,
-  })
-);
-
-const resolveResponseHydrationContext = (props = {}, sessionSlug = '') => (
-  resolveSurveyToolResponseHydrationContext({
-    sessionSlug,
-    network: props.network,
-    networkChainId: props.networkChainId,
-    resolveBySlug: getStrictSessionConfigBySlug,
-  })
-);
-
-const resolveQuestionBootstrapContext = (props = {}, sessionSlug = '') => (
-  resolveSurveyToolQuestionBootstrapContext({
-    sessionSlug,
-    network: props.network,
-    networkChainId: props.networkChainId,
-    resolveBySlug: getStrictSessionConfigBySlug,
-  })
-);
-
-const resolveDecryptHydrationContext = (props = {}, sessionSlug = '') => (
-  resolveSurveyToolDecryptHydrationContext({
-    sessionSlug,
-    network: props.network,
-    networkChainId: props.networkChainId,
-    resolveBySlug: getStrictSessionConfigBySlug,
-  })
-);
-
-const resolveResponseJsonContext = (props = {}, sessionSlug = '') => (
-  resolveSurveyToolResponseJsonContext({
-    sessionSlug,
-    network: props.network,
-    networkChainId: props.networkChainId,
-    resolveBySlug: getStrictSessionConfigBySlug,
-  })
-);
-
-const resolveQuestionReadCacheContext = (props = {}, sessionSlug = '') => (
-  resolveSurveyToolQuestionReadCacheContext({
-    sessionSlug,
-    network: props.network,
-    networkChainId: props.networkChainId,
-    resolveBySlug: getStrictSessionConfigBySlug,
-  })
-);
-
-const resolveQuestionsDashboardLoadContext = (props = {}, sessionSlug = '') => (
-  resolveSurveyToolQuestionsDashboardLoadContext({
-    sessionSlug,
-    network: props.network,
-    networkChainId: props.networkChainId,
-    resolveBySlug: getStrictSessionConfigBySlug,
-    fallbackSessionSlugs: getExtraQuestionReadSlugs(props, sessionSlug),
-  })
-);
-
-const resolveQuestionPayloadCacheWriteContext = (props = {}, sessionSlug = '') => (
-  resolveSurveyToolQuestionPayloadCacheWriteContext({
-    sessionSlug,
-    network: props.network,
-    networkChainId: props.networkChainId,
-    resolveBySlug: getStrictSessionConfigBySlug,
-  })
-);
-
-const resolveEnsureQuestionCachedContext = (props = {}, sessionSlug = '') => (
-  resolveSurveyToolEnsureQuestionCachedContext({
-    sessionSlug,
-    network: props.network,
-    networkChainId: props.networkChainId,
-    resolveBySlug: getStrictSessionConfigBySlug,
-  })
-);
-
-const resolveQuestionCountContext = (props = {}, sessionSlug = '') => (
-  resolveSurveyToolQuestionCountContext({
-    sessionSlug,
-    network: props.network,
-    networkChainId: props.networkChainId,
-    resolveBySlug: getStrictSessionConfigBySlug,
-    fallbackSessionSlugs: getExtraQuestionReadSlugs(props, sessionSlug),
-  })
-);
-
-const resolveIdLookupContext = ({
-  props = {},
-  network = null,
-  sessionSlug = '',
-} = {}) => (
-  resolveSurveyToolIdLookupContext({
-    sessionSlug,
-    network: (
-      (network?.id != null || props?.network?.id != null)
-        ? { id: network?.id ?? props?.network?.id }
-        : null
-    ),
-    networkChainId: props?.networkChainId,
-    resolveBySlug: getStrictSessionConfigBySlug,
-  })
-);
-
-const resolveSurveyReadContext = (props = {}, sessionSlug = '') => (
-  resolveSurveyToolSurveyReadContext({
-    sessionSlug,
-    network: props.network,
-    networkChainId: props.networkChainId,
-    resolveBySlug: getStrictSessionConfigBySlug,
-  })
-);
-
-const resolveUpdateCacheContext = (props = {}, sessionSlug = '') => (
-  resolveSurveyToolUpdateCacheContext({
-    sessionSlug,
-    network: props.network,
-    networkChainId: props.networkChainId,
-    resolveBySlug: getStrictSessionConfigBySlug,
-  })
-);
-
-const resolveSubmittedCacheWriteContext = (props = {}, sessionSlug = '') => (
-  resolveSurveyToolSubmittedCacheWriteContext({
-    sessionSlug,
-    network: props.network,
-    networkChainId: props.networkChainId,
-    resolveBySlug: getStrictSessionConfigBySlug,
-  })
-);
-
-const resolvePileWarmSeedContext = (props = {}, sessionSlug = '') => (
-  resolveSurveyToolPileWarmSeedContext({
-    sessionSlug,
-    network: props.network,
-    networkChainId: props.networkChainId,
-    resolveBySlug: getStrictSessionConfigBySlug,
-  })
-);
-
-const resolvePileLoadContext = (props = {}, sessionSlug = '') => (
-  resolveSurveyToolPileLoadContext({
-    sessionSlug,
-    network: props.network,
-    networkChainId: props.networkChainId,
-    resolveBySlug: getStrictSessionConfigBySlug,
-  })
-);
-
-const resolvePileResponseReadContext = (props = {}, sessionSlug = '') => (
-  resolveSurveyToolPileResponseReadContext({
-    sessionSlug,
-    network: props.network,
-    networkChainId: props.networkChainId,
-    resolveBySlug: getStrictSessionConfigBySlug,
-  })
-);
-
-const resolvePileFilterContext = (props = {}, sessionSlug = '') => (
-  resolveSurveyToolPileFilterContext({
-    sessionSlug,
-    network: props.network,
-    networkChainId: props.networkChainId,
-    resolveBySlug: getStrictSessionConfigBySlug,
-  })
-);
-
-const dedupeQuestionReadSlugs = (values = []) => {
-  const out = [];
-  const seen = new Set();
-  values.forEach((value) => {
-    const normalized = normalizeSessionSlugValue(value);
-    if (seen.has(normalized)) return;
-    seen.add(normalized);
-    out.push(normalized);
-  });
-  return out;
-};
-
-const hasExplicitQuestionReadLocationPin = () => {
-  const pathname = (typeof window !== 'undefined' && window.location && window.location.pathname) || '';
-  const lowerPath = String(pathname || '').toLowerCase();
-  const fromPath = resolveSessionSlugFromPathname(pathname);
-  if (fromPath !== null) return true;
-  if (!lowerPath.includes('/question/') && !lowerPath.includes('/survey/')) {
-    return false;
-  }
-
-  try {
-    const search = (typeof window !== 'undefined' && window.location && window.location.search) || '';
-    if (lowerPath.includes('/question/')) {
-      return (
-        parseQuestionSessionSlugFromSearch(search) !== null ||
-        parseQuestionSessionIdFromSearch(search) != null
-      );
-    }
-    const params = new URLSearchParams(search);
-    return (
-      params.get('session') != null ||
-      params.get('sessionSlug') != null ||
-      params.get('s') != null ||
-      params.get('sessionId') != null ||
-      params.get('sessionID') != null
-    );
-  } catch (_) {
-    return false;
-  }
-};
-
-const getExtraQuestionReadSlugs = (props = {}, baseSlug = '') => {
-  const normalizedBaseSlug = normalizeSessionSlugValue(baseSlug);
-  if (
-    getSessionSlugPinnedFromProps(props) ||
-    hasExplicitQuestionReadLocationPin()
-  ) {
-    return [];
-  }
-
-  const scopeMode = readSessionScanScope();
-  if (scopeMode === 'list') {
-    return dedupeQuestionReadSlugs(
-      readSessionScanSlugs().filter((slug) => normalizeSessionSlugValue(slug) !== normalizedBaseSlug)
-    );
-  }
-  if (scopeMode === 'all') {
-    return dedupeQuestionReadSlugs(
-      getAllSessionSlugs().filter((slug) => normalizeSessionSlugValue(slug) !== normalizedBaseSlug)
-    );
-  }
-  return [];
-};
-
-const GENERAL_SCOPE_STORAGE_TOKEN = '__general__';
-const MULTI_SCOPE_STORAGE_PREFIX = '__scope__:';
-
-const encodeQuestionFilterScopeStorageToken = (slug = '') => {
-  const normalized = normalizeSessionSlugValue(slug);
-  return normalized === '' ? GENERAL_SCOPE_STORAGE_TOKEN : normalized;
-};
-
-const buildQuestionCountScopeContextKey = (slugs = [], networkID = '') => {
-  const scopeKey = dedupeQuestionReadSlugs(slugs)
-    .map((slug) => encodeQuestionFilterScopeStorageToken(slug))
-    .sort()
-    .join('|');
-  return `${scopeKey}|${String(networkID || '')}`;
-};
-
-const buildQuestionDashboardLoadContextSignature = ({
-  effectiveSlug = '',
-  scopedSessionSlugs = [],
-  networkID = '',
-} = {}) => {
-  const readSlugs = dedupeQuestionReadSlugs(
-    Array.isArray(scopedSessionSlugs) && scopedSessionSlugs.length > 0
-      ? scopedSessionSlugs
-      : [effectiveSlug]
-  );
-  return `${normalizeSessionSlugValue(effectiveSlug)}|${buildQuestionCountScopeContextKey(readSlugs, networkID)}`;
-};
-
-const buildQuestionFilterStorageKeyPrefix = (props = {}, baseSlug = '') => {
-  const normalizedBaseSlug = normalizeSessionSlugValue(baseSlug || resolveEffectiveSlug(props));
-  const scopeSlugs = dedupeQuestionReadSlugs([
-    normalizedBaseSlug,
-    ...getExtraQuestionReadSlugs(props, normalizedBaseSlug),
-  ]);
-  const storageSlug = scopeSlugs.length <= 1
-    ? normalizedBaseSlug
-    : `${MULTI_SCOPE_STORAGE_PREFIX}${scopeSlugs
-      .map((slug) => encodeQuestionFilterScopeStorageToken(slug))
-      .sort()
-      .join('|')}`;
-  return `dg:filters:${storageSlug}`;
-};
 
 
 
@@ -1125,190 +679,6 @@ function canUseRecentQuestionPayloadForAccount(payload, account) {
 function hasCacheHydratedFlag(props) {
   return !!props?.cacheHasLoaded;
 }
-
-export const normalizeQuestionProgressSlug = (rawSlug = '') => {
-  const normalized = String(rawSlug || '').trim().toLowerCase();
-  return normalized === 'general' ? '' : normalized;
-};
-
-export const doesQuestionProgressMatchSlug = (progressSlug = '', currentSlug = '') => (
-  normalizeQuestionProgressSlug(progressSlug) === normalizeQuestionProgressSlug(currentSlug)
-);
-
-const formatQuestionScanBlockCount = (value) => {
-  const numericValue = Number(value);
-  if (!Number.isFinite(numericValue)) return '0';
-  return Math.max(0, Math.floor(numericValue)).toLocaleString();
-};
-
-export const buildQuestionScanProgressDisplay = (questionScanProgress = null) => {
-  const totalBlocks = Math.max(0, Number(questionScanProgress?.totalBlocks || 0));
-  const requestedTotalBlocks = Math.max(
-    totalBlocks,
-    Number(questionScanProgress?.requestedTotalBlocks || totalBlocks || 0)
-  );
-  const wasCapped = questionScanProgress?.wasCapped === true && requestedTotalBlocks > totalBlocks;
-  const progressTotalBlocks = wasCapped ? requestedTotalBlocks : totalBlocks;
-  const remainingBlocksRaw = Number(questionScanProgress?.remainingBlocks);
-  const scannedBlocksFallback = progressTotalBlocks > 0
-    ? Math.max(0, progressTotalBlocks - Math.max(0, Number.isFinite(remainingBlocksRaw) ? remainingBlocksRaw : progressTotalBlocks))
-    : 0;
-  const scannedBlocks = progressTotalBlocks > 0
-    ? Math.max(
-      0,
-      Math.min(
-        progressTotalBlocks,
-        Number.isFinite(Number(questionScanProgress?.scannedBlocks))
-          ? Number(questionScanProgress?.scannedBlocks)
-          : scannedBlocksFallback
-      )
-    )
-    : 0;
-  const remainingBlocks = progressTotalBlocks > 0
-    ? Math.max(
-      0,
-      Math.min(
-        progressTotalBlocks,
-        Number.isFinite(remainingBlocksRaw)
-          ? remainingBlocksRaw
-          : (progressTotalBlocks - scannedBlocks)
-      )
-    )
-    : 0;
-  const percentComplete = progressTotalBlocks > 0
-    ? Math.max(0, Math.min(100, Math.round((scannedBlocks / progressTotalBlocks) * 100)))
-    : 0;
-
-  return {
-    totalBlocks,
-    requestedTotalBlocks,
-    wasCapped,
-    scannedBlocks,
-    remainingBlocks,
-    percentComplete,
-    metaLeftText: `${formatQuestionScanBlockCount(remainingBlocks)} blocks left`,
-    metaRightText: `${formatQuestionScanBlockCount(scannedBlocks)} / ${formatQuestionScanBlockCount(progressTotalBlocks)}`,
-  };
-};
-
-export const shouldShowPileFullLoadingState = ({
-  loading = false,
-  hasVisibleQuestions = false,
-  firstBoot = false,
-  isQuestionCacheReady = false,
-  recentRateLimit = false,
-  hasScanOrHydrationWork = false,
-  allowUnreadyEmptySettlement = false,
-  allowFilteredEmptySettlement = false,
-  hasTerminalScanError = false,
-} = {}) => {
-  if (hasVisibleQuestions) return false;
-  if (hasTerminalScanError) return false;
-  if (allowUnreadyEmptySettlement) return false;
-  if (allowFilteredEmptySettlement) return false;
-  if (loading) return true;
-  if (hasScanOrHydrationWork) return true;
-  return !!(firstBoot || !isQuestionCacheReady || recentRateLimit);
-};
-
-const isPlainObject = (value) => (
-  !!value && typeof value === 'object' && !Array.isArray(value)
-);
-
-const normalizeSbtFilterState = (rawSbtFilter) => {
-  if (!isPlainObject(rawSbtFilter)) return null;
-  const normalized = {};
-  Object.keys(rawSbtFilter).forEach((key) => {
-    const value = rawSbtFilter[key];
-    if (Array.isArray(value)) {
-      const compacted = value.filter((entry) => entry != null && String(entry).trim() !== '');
-      if (compacted.length > 0) normalized[key] = compacted;
-      return;
-    }
-    if (typeof value === 'string') {
-      const trimmed = value.trim();
-      if (trimmed) normalized[key] = trimmed;
-      return;
-    }
-    if (typeof value === 'boolean') {
-      if (value) normalized[key] = true;
-      return;
-    }
-    if (value != null) {
-      normalized[key] = value;
-    }
-  });
-  return Object.keys(normalized).length > 0 ? normalized : null;
-};
-
-const buildCanonicalSurveyToolFilterState = (rawFilterState) => {
-  const state = isPlainObject(rawFilterState) ? rawFilterState : {};
-  const topQuestions = Object.prototype.hasOwnProperty.call(state, 'topQuestions')
-    ? state.topQuestions
-    : null;
-  const questionTypes = Array.isArray(state.questionTypes)
-    ? [...state.questionTypes]
-    : (Array.isArray(state.types) ? [...state.types] : []);
-  const selectedTags = Array.isArray(state.selectedTags)
-    ? [...state.selectedTags]
-    : (Array.isArray(state.tags) ? [...state.tags] : []);
-  const legacyTopLevelSbt = (
-    Array.isArray(state.includedSBTs) ||
-    Array.isArray(state.excludedSBTs) ||
-    state.onlyVerifiedHumans === true
-  )
-    ? {
-        includedSBTs: Array.isArray(state.includedSBTs) ? [...state.includedSBTs] : [],
-        excludedSBTs: Array.isArray(state.excludedSBTs) ? [...state.excludedSBTs] : [],
-        onlyVerifiedHumans: state.onlyVerifiedHumans === true,
-      }
-    : null;
-  const sbtFilter = normalizeSbtFilterState(state.sbtFilter || legacyTopLevelSbt);
-  const aiFilter = (typeof state.aiFilter === 'string')
-    ? (state.aiFilter.trim() || null)
-    : (state.aiFilter ?? null);
-  const aiTopNRaw = Object.prototype.hasOwnProperty.call(state, 'aiTopN') ? state.aiTopN : null;
-  const aiTopN = aiFilter == null
-    ? null
-    : (() => {
-      const parsed = Number.parseInt(String(aiTopNRaw ?? ''), 10);
-      return Number.isFinite(parsed) && parsed > 0 ? parsed : 10;
-    })();
-  const aiCombine = aiFilter == null
-    ? false
-    : state.aiCombine === true;
-
-  const rawResponseStatus = state.responseStatus || null;
-  const responded = rawResponseStatus?.responded === true;
-  const notResponded = rawResponseStatus?.notResponded === true;
-  const responseStatus = (responded || notResponded) && !(responded && notResponded)
-    ? { responded, notResponded }
-    : null;
-
-  return {
-    topQuestions,
-    questionTypes,
-    sbtFilter,
-    aiFilter,
-    aiTopN,
-    aiCombine,
-    selectedTags,
-    responseStatus,
-  };
-};
-
-export const normalizeSurveyToolFilterState = (rawFilterState) => {
-  const canonical = buildCanonicalSurveyToolFilterState(rawFilterState);
-  return serializeFilterState(canonical) ? canonical : {};
-};
-
-const serializeSurveyToolFilterState = (filterState) => (
-  serializeFilterState(buildCanonicalSurveyToolFilterState(filterState))
-);
-
-const isSurveyToolFilterStateActive = (filterState) => (
-  !!serializeSurveyToolFilterState(filterState)
-);
 
 function areQuestionPayloadsEquivalent(a, b) {
   if (a === b) return true;
@@ -1421,28 +791,6 @@ const mergeSurveyResponsePayloads = (existingPayload, incomingPayload) => {
   return merged;
 };
 
-/** Per-group list helpers (return LOWERCASED Sets; treat missing as []) */
-const resolveQuestionConfigContext = (sessionSlug = '') => (
-  resolveSurveyToolQuestionConfigContext({
-    sessionSlug,
-    resolveBySlug: getStrictSessionConfigBySlug,
-  })
-);
-
-const resolveLockAudienceSessionNameContext = (sessionSlug = '') => (
-  resolveSurveyToolLockAudienceSessionNameContext({
-    sessionSlug,
-    resolveBySlug: getStrictSessionConfigBySlug,
-  })
-);
-
-function getBlockedQuestionIdsSet(slug) {
-  return new Set(resolveQuestionConfigContext(slug).blockedQuestionIds || []);
-}
-function getHighlightedQuestionIdsSet(slug) {
-  return new Set(resolveQuestionConfigContext(slug).highlightedQuestionIds || []);
-}
-
 /**
  * Compute the submit button label in a baseline-aware way.
  * - Base label is always "Submit" (no "Encrypt /" prefix on mobile).
@@ -1453,69 +801,6 @@ function getHighlightedQuestionIdsSet(slug) {
  * @param {{ suffix?: string }} opts
  * @returns {string} label
  */
-export function getPendingStatsSnapshotFromState(state = {}) {
-  return {
-    total: Number((state && state.modifiedCount) || 0),
-    encrypted: Number((state && state.encryptedModifiedCount) || 0),
-  };
-}
-
-export function computeSubmitLabel(ctx = {}, opts = {}) {
-  const providedStats = (
-    opts &&
-    typeof opts === 'object' &&
-    opts.pendingStats &&
-    typeof opts.pendingStats === 'object'
-  ) ? opts.pendingStats : null;
-  const stats =
-    providedStats ||
-    (typeof ctx.getPendingEditStats === 'function' && ctx.getPendingEditStats()) ||
-    getPendingStatsSnapshotFromState(ctx.state);
-
-  const pendingCount = Number(stats.total || 0);
-  const pendingEncrypted = Number(stats.encrypted || 0);
-
-  const base = 'Submit';
-  const suffix = opts.suffix ? ` ${opts.suffix}` : '';
-  const baseWithSuffix = `${base}${suffix}`;
-
-  return pendingCount > 0 ? `${baseWithSuffix} (${pendingCount})` : baseWithSuffix;
-}
-
-export function shouldShowSingleQuestionResponseLookupSpinner({
-  singleQuestionMode = false,
-  isLoadingResponse = false,
-  account = '',
-  viewAddress = '',
-  responderAddress = '',
-} = {}) {
-  if (!singleQuestionMode || !isLoadingResponse) return false;
-  const probeAddress = String(responderAddress || viewAddress || account || '').trim();
-  return !!probeAddress;
-}
-
-export function shouldRenderSubmittedIndicator({
-  submittedStateActive = false,
-  isLoadingResponse = false,
-} = {}) {
-  return !!submittedStateActive && !isLoadingResponse;
-}
-
-export function shouldRenderInlineSubmitButton({
-  useHeaderSubmit = false,
-  canEditQuestions = false,
-  hasPendingEdits = false,
-  submittedStateActive = false,
-  isLoadingResponse = false,
-} = {}) {
-  if (useHeaderSubmit) return false;
-  const submittedIndicatorActive = shouldRenderSubmittedIndicator({
-    submittedStateActive,
-    isLoadingResponse,
-  });
-  if (canEditQuestions) return !!hasPendingEdits || submittedIndicatorActive;
-  return submittedIndicatorActive;
-}
 
 
 
@@ -1570,37 +855,6 @@ export {
   normalizeQuestionIdKey,
   buildSliceToken,
   buildSurveyResponseSliceSignature,
-  normalizeSessionSlugValue,
-  getSessionSlugHintFromProps,
-  getActiveSessionSlugFromProps,
-  getSessionSlugPinnedFromProps,
-  shouldInheritResolvedTagSessionScope,
-  resolveCurrentTagSessionSlug,
-  resolveDraftSessionContext,
-  resolveExplicitSessionContext,
-  resolveDraftStorageContext,
-  resolveResponseHydrationContext,
-  resolveQuestionBootstrapContext,
-  resolveDecryptHydrationContext,
-  resolveResponseJsonContext,
-  resolveQuestionReadCacheContext,
-  resolveQuestionsDashboardLoadContext,
-  resolveQuestionPayloadCacheWriteContext,
-  resolveEnsureQuestionCachedContext,
-  resolveQuestionCountContext,
-  resolveIdLookupContext,
-  resolveSurveyReadContext,
-  resolveUpdateCacheContext,
-  resolveSubmittedCacheWriteContext,
-  resolvePileWarmSeedContext,
-  resolvePileLoadContext,
-  resolvePileResponseReadContext,
-  resolvePileFilterContext,
-  dedupeQuestionReadSlugs,
-  getExtraQuestionReadSlugs,
-  buildQuestionCountScopeContextKey,
-  buildQuestionDashboardLoadContextSignature,
-  buildQuestionFilterStorageKeyPrefix,
   readQuestionsCache,
   readQuestionsCacheRef,
   readQuestionsCacheAsync,
@@ -1623,9 +877,6 @@ export {
   isIncomingResponseMetaNewer,
   stampResponsePayloadWithMeta,
   mergeSurveyResponsePayloads,
-  resolveLockAudienceSessionNameContext,
-  getBlockedQuestionIdsSet,
-  getHighlightedQuestionIdsSet,
   DEBUG_PREFILL,
   EMPTY_QUESTION_POOL,
   buildRenderedIdsSignature,
