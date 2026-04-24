@@ -1,6 +1,6 @@
 /** @file AdminPage.test.tsx */
 import { ethers } from 'ethers';
-import AdminPage, { __adminPageTestUtils } from './AdminPage.jsx';
+import AdminPage, { __adminPageTestUtils } from './AdminPage';
 import { DEFAULT_CHAIN_ID } from '../../variables/appConfig.js';
 import { getDefaultHttpRpc, getSessionRegistryAddress } from '../../variables/chains.js';
 
