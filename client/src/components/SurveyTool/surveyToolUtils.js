@@ -6,11 +6,6 @@ import {
 } from '../../utilities/web3/contractScripts.js';
 import { createLogger } from 'utilities/logging.js';
 import {
-  peekCacheSync,
-  readCache,
-  writeCacheOptimistic,
-} from '../../utilities/cache/cacheScripts.js';
-import {
   normalizeRatingValue,
   RATING_MIN,
 } from '../../utilities/survey/ratingValue.js';
@@ -23,6 +18,31 @@ import {
   resolveEffectiveSlug,
   resolveIdLookupContext,
 } from './surveyToolScope.js';
+import {
+  readQuestionsCacheRef,
+  readSurveysCacheRef,
+} from './surveyToolCacheState.js';
+export {
+  areQuestionPayloadsEquivalent,
+  canUseRecentQuestionPayloadForAccount,
+  ensureQuestionsNet,
+  ensureSurveysNet,
+  hasCacheHydratedFlag,
+  isIncomingResponseMetaNewer,
+  mergeQuestionResponses,
+  mergeSurveyResponsePayloads,
+  readQuestionsCache,
+  readQuestionsCacheAsync,
+  readQuestionsCacheRef,
+  readRecentQuestionPayload,
+  readSurveysCache,
+  readSurveysCacheAsync,
+  readSurveysCacheRef,
+  stampResponsePayloadWithMeta,
+  toResponseRecencyMeta,
+  writeQuestionsCache,
+  writeSurveysCache,
+} from './surveyToolCacheState.js';
 export {
   appendExplicitSessionHintToPath,
   applyExistingGroupPrefix,
@@ -550,201 +570,6 @@ export function resolveSlugForIds({ sessionName, questionId, surveyId, props, ne
 
 
 
-/** Cache keys (per-group) */
-const qKey = (slug) => `dg:questionsCache:${slug || ''}`;
-const sKey = (slug) => `dg:surveysCache:${slug || ''}`;
-const RECENT_QUESTION_PAYLOADS_KEY = 'dg:recentQuestionPayloads';
-const RECENT_QUESTION_PAYLOADS_TTL_MS = 12 * 60 * 60 * 1000;
-
-/** LocalStorage helpers (per-group) */
-function readQuestionsCache(slug) {
-  return peekCacheSync('questionsCache', slug) || {};
-}
-function readQuestionsCacheRef(slug) {
-  return peekCacheSync('questionsCache', slug, { clone: false }) || {};
-}
-async function readQuestionsCacheAsync(slug) {
-  const value = await readCache('questionsCache', slug);
-  return (value && typeof value === 'object') ? value : (readQuestionsCache(slug) || {});
-}
-function mergeQuestionResponses(target = {}, source = {}) {
-  const nextTarget = (target && typeof target === 'object') ? target : {};
-  if (!source || typeof source !== 'object') return nextTarget;
-  Object.keys(source).forEach((rawQuestionId) => {
-    const normalizedQuestionId = normalizeQuestionIdKey(rawQuestionId);
-    const responderMap = source[rawQuestionId];
-    if (!normalizedQuestionId || !responderMap || typeof responderMap !== 'object') return;
-    nextTarget[normalizedQuestionId] = nextTarget[normalizedQuestionId] || {};
-    Object.keys(responderMap).forEach((rawResponderAddress) => {
-      const responderAddress = String(rawResponderAddress || '').trim().toLowerCase();
-      if (!responderAddress) return;
-      nextTarget[normalizedQuestionId][responderAddress] = responderMap[rawResponderAddress];
-    });
-  });
-  return nextTarget;
-}
-function writeQuestionsCache(slug, obj) {
-  return writeCacheOptimistic('questionsCache', slug, obj || {});
-}
-function readSurveysCache(slug) {
-  return peekCacheSync('surveysCache', slug) || {};
-}
-function readSurveysCacheRef(slug) {
-  return peekCacheSync('surveysCache', slug, { clone: false }) || {};
-}
-async function readSurveysCacheAsync(slug) {
-  const value = await readCache('surveysCache', slug);
-  return (value && typeof value === 'object') ? value : (readSurveysCache(slug) || {});
-}
-function writeSurveysCache(slug, obj) {
-  return writeCacheOptimistic('surveysCache', slug, obj || {});
-}
-
-function readRecentQuestionPayload(questionId) {
-  const qid = String(questionId || '').trim().toLowerCase();
-  if (!qid) return null;
-  if (typeof window === 'undefined' || !window.sessionStorage) return null;
-  try {
-    const raw = window.sessionStorage.getItem(RECENT_QUESTION_PAYLOADS_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
-    const entry = parsed[qid];
-    if (!entry || typeof entry !== 'object') return null;
-    const ts = Number(entry.savedAtMs || 0);
-    if (!ts || (Date.now() - ts) > RECENT_QUESTION_PAYLOADS_TTL_MS) return null;
-    const payload = { ...entry };
-    delete payload.savedAtMs;
-    payload.id = qid;
-    return payload;
-  } catch (_) {
-    return null;
-  }
-}
-
-function canUseRecentQuestionPayloadForAccount(payload, account) {
-  if (!payload || typeof payload !== 'object') return false;
-  const accountLower = String(account || '').trim().toLowerCase();
-  const creatorLower = String(payload.creator || '').trim().toLowerCase();
-  if (!accountLower || !creatorLower) return false;
-  return creatorLower === accountLower;
-}
-
-function hasCacheHydratedFlag(props) {
-  return !!props?.cacheHasLoaded;
-}
-
-function areQuestionPayloadsEquivalent(a, b) {
-  if (a === b) return true;
-  try {
-    return JSON.stringify(a || null) === JSON.stringify(b || null);
-  } catch (_) {
-    return false;
-  }
-}
-
-function ensureQuestionsNet(cache, netIdStr) {
-  if (!cache || typeof cache !== 'object') cache = {};
-  if (!cache[netIdStr]) {
-    cache[netIdStr] = {
-      questionsLatestBlock: 0,
-      questions: {},
-      questionResponses: {},
-      questionResponsesLatestBlock: 0
-    };
-  }
-  return cache;
-}
-function ensureSurveysNet(cache, netIdStr) {
-  if (!cache || typeof cache !== 'object') cache = {};
-  if (!cache[netIdStr]) {
-    cache[netIdStr] = {
-      surveysLatestBlock: 0,
-      surveys: {},
-      surveyResponses: {},
-      surveyResponsesLatestBlock: {}
-    };
-  }
-  return cache;
-}
-
-const toResponseRecencyMeta = (source = null) => {
-  const row = (source && typeof source === 'object') ? source : {};
-  const nowTs = Math.floor(Date.now() / 1000);
-  return {
-    bn: Math.max(0, Number(row.blockNumber ?? row.bn ?? 0) || 0),
-    txi: Math.max(0, Number(row.transactionIndex ?? row.txIndex ?? row.txi ?? 0) || 0),
-    li: Math.max(0, Number(row.logIndex ?? row.li ?? 0) || 0),
-    ts: Math.max(0, Number(row.timestamp ?? row.ts ?? 0) || nowTs),
-    transactionHash: String(row.transactionHash || row.txHash || row.hash || '').trim(),
-  };
-};
-
-const isIncomingResponseMetaNewer = (incoming = null, existing = null) => {
-  const next = toResponseRecencyMeta(incoming);
-  const prev = toResponseRecencyMeta(existing);
-  return (
-    next.bn > prev.bn ||
-    (
-      next.bn === prev.bn &&
-      (
-        next.txi > prev.txi ||
-        (
-          next.txi === prev.txi &&
-          (
-            next.li > prev.li ||
-            (
-              next.li === prev.li &&
-              next.ts >= prev.ts
-            )
-          )
-        )
-      )
-    )
-  );
-};
-
-const stampResponsePayloadWithMeta = (payload, meta = null) => {
-  if (!payload || typeof payload !== 'object') return payload;
-  const recency = toResponseRecencyMeta(meta);
-  return {
-    ...payload,
-    ...(recency.bn > 0 ? { blockNumber: recency.bn } : {}),
-    transactionIndex: recency.txi,
-    logIndex: recency.li,
-    ...(recency.ts > 0 ? { timestamp: recency.ts } : {}),
-    ...(recency.transactionHash ? { transactionHash: recency.transactionHash } : {}),
-  };
-};
-
-const mergeSurveyResponsePayloads = (existingPayload, incomingPayload) => {
-  const existing = (existingPayload && typeof existingPayload === 'object') ? existingPayload : null;
-  const incoming = (incomingPayload && typeof incomingPayload === 'object') ? incomingPayload : null;
-  if (!existing) return incoming;
-  if (!incoming) return existing;
-
-  const merged = { ...existing, ...incoming };
-  const existingResponses = Array.isArray(existing.responses) ? existing.responses : [];
-  const incomingResponses = Array.isArray(incoming.responses) ? incoming.responses : [];
-
-  if (existingResponses.length > 0 || incomingResponses.length > 0) {
-    const responsesByQuestionId = new Map();
-    existingResponses.forEach((row) => {
-      const qid = normalizeQuestionIdKey(row?.questionID || row?.questionId);
-      if (!qid) return;
-      responsesByQuestionId.set(qid, row);
-    });
-    incomingResponses.forEach((row) => {
-      const qid = normalizeQuestionIdKey(row?.questionID || row?.questionId);
-      if (!qid) return;
-      responsesByQuestionId.set(qid, row);
-    });
-    merged.responses = Array.from(responsesByQuestionId.values());
-  }
-
-  return merged;
-};
-
 /**
  * Compute the submit button label in a baseline-aware way.
  * - Base label is always "Submit" (no "Encrypt /" prefix on mobile).
@@ -805,28 +630,9 @@ export {
   normalizeQuestionIdKey,
   buildSliceToken,
   buildSurveyResponseSliceSignature,
-  readQuestionsCache,
-  readQuestionsCacheRef,
-  readQuestionsCacheAsync,
-  mergeQuestionResponses,
-  writeQuestionsCache,
-  readSurveysCache,
-  readSurveysCacheRef,
-  readSurveysCacheAsync,
-  writeSurveysCache,
-  readRecentQuestionPayload,
-  canUseRecentQuestionPayloadForAccount,
-  hasCacheHydratedFlag,
   formatQuestionScanBlockCount,
   serializeSurveyToolFilterState,
   isSurveyToolFilterStateActive,
-  areQuestionPayloadsEquivalent,
-  ensureQuestionsNet,
-  ensureSurveysNet,
-  toResponseRecencyMeta,
-  isIncomingResponseMetaNewer,
-  stampResponsePayloadWithMeta,
-  mergeSurveyResponsePayloads,
   DEBUG_PREFILL,
   EMPTY_QUESTION_POOL,
   buildRenderedIdsSignature,
