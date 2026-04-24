@@ -6,8 +6,14 @@ import {
   writeSessionWizardDraftCache,
 } from './sessionWizardDraftCache.js';
 
-const createMemoryStorage = () => {
-  const data = new Map();
+type MemoryStorage = {
+  getItem: jest.Mock<any, any>;
+  setItem: jest.Mock<any, any>;
+  removeItem: jest.Mock<any, any>;
+};
+
+const createMemoryStorage = (): MemoryStorage => {
+  const data = new Map<string, string>();
   return {
     getItem: jest.fn((key) => (data.has(key) ? data.get(key) : null)),
     setItem: jest.fn((key, value) => {
