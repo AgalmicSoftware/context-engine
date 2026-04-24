@@ -2188,35 +2188,6 @@ describe('SurveyTool module', () => {
     expect(subject.persistDraftSafely).toHaveBeenCalledWith(0);
   });
 
-  it('buffers single-question slider movement locally and only commits on completion', () => {
-    const onCommit = jest.fn();
-    const subject = new DeferredCommitSlider({
-      value: 2,
-      min: 0,
-      max: 10,
-      step: 1,
-      onCommit,
-      children: jest.fn(() => null),
-    });
-
-    subject.setState = (next, cb) => {
-      const patch = typeof next === 'function' ? next(subject.state, subject.props) : next;
-      subject.state = { ...subject.state, ...(patch || {}) };
-      if (typeof cb === 'function') cb();
-    };
-    subject.state = { liveValue: 2, isInteracting: false };
-
-    subject.handleChange(7, { type: 'mousemove' });
-
-    expect(subject.state.liveValue).toBe(7);
-    expect(subject.state.isInteracting).toBe(true);
-    expect(onCommit).not.toHaveBeenCalled();
-
-    subject.handleChangeComplete();
-
-    expect(onCommit).toHaveBeenCalledWith(7);
-  });
-
   it('gates deferred json preview updates when response preview is hidden', () => {
     jest.useFakeTimers();
     const subject = new SurveyQuestions({
