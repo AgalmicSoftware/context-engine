@@ -171,7 +171,7 @@ export const uploadDocLibraryFile = async ({
 
   return {
     txId,
-    url: txId ? arweaveScripts.buildArweaveGatewayUrl(txId, 'https://arweave.net') : '',
+    url: txId ? arweaveScripts.buildArweaveGatewayUrl(txId) : '',
     storage: 'arweave',
     kind: 'file',
     tagMap: buildTagMap(normalizedTags),
@@ -230,7 +230,7 @@ export const uploadDocLibraryUrlRecord = async ({
 
   return {
     txId,
-    url: txId ? arweaveScripts.buildArweaveGatewayUrl(txId, 'https://arweave.net') : '',
+    url: txId ? arweaveScripts.buildArweaveGatewayUrl(txId) : '',
     storage: 'arweave',
     kind: 'link',
     tagMap: buildTagMap(normalizedTags),

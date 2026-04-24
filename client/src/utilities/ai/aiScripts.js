@@ -1848,7 +1848,7 @@ export async function generateAudioDiscussionSummary(transcript, opts = {}) {
 /**
  * uploadMarkdownSummaryToArweave(markdown)
  * - Uploads the given Markdown to Arweave via arweaveScripts.
- * - Returns { txId, url } (url is a plain https://arweave.net/<txId>).
+ * - Returns { txId, url }.
  * - Throws on empty input or upload failures with a clear message.
  *
  * Note: Tries "md" format first as requested. If the helper does not support
@@ -1896,7 +1896,7 @@ export async function uploadMarkdownSummaryToArweave(markdown, opts = {}) {
       throw new Error('Upload failed: missing transaction ID.');
     }
 
-    const url = `https://arweave.net/${txId}`;
+    const url = arweaveScripts.buildArweaveGatewayUrl(txId);
     const mdUrl = `[${url}](${url})`;
     return { txId, url, mdUrl };
   } catch (err) {
