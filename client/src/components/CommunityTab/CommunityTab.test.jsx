@@ -1,5 +1,5 @@
 import CommunityTab from './CommunityTab';
-import * as polisReportModule from '../PolisReport/PolisReport.jsx';
+import * as polisReportModule from '../PolisReport/PolisReport';
 import {
   initCacheManager,
   listNamespaceEntriesSync,

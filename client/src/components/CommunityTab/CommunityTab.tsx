@@ -36,7 +36,7 @@ import {
 } from '../../utilities/session/globalSessionState.js';
 import { t } from '../../utilities/ui/terminology.js';
 import { POLIS_DEMO_DATA_AUTOLOAD_SLUGS } from '../../variables/appConfig.js';
-import { getPolisDemoDatasetForSlug } from '../PolisReport/PolisReport.jsx';
+import { getPolisDemoDatasetForSlug } from '../PolisReport/PolisReport';
 
 const uiLog = createLogger('ui');
 const COMMUNITY_BEESWARM_DEMO_SLUG = 'demo';

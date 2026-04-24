@@ -1,4 +1,4 @@
-/** @file PolisReport.jsx */
+/** @file PolisReport.tsx */
 import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import * as d3 from 'd3';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -64,6 +64,13 @@ import {
 import { createLogger } from 'utilities/logging.js';
 
 const surveyLog = createLogger('surveys');
+const d3Untyped = d3 as any;
+const doUMAPUntyped = doUMAP as any;
+const clusterUMAPPointsKmeansUntyped = clusterUMAPPointsKmeans as any;
+const analyzeClusterOpinionsUntyped = analyzeClusterOpinions as any;
+const getErrorMessage = (error: any, fallback = 'Unknown error') => (
+  typeof error?.message === 'string' && error.message.trim() ? error.message : fallback
+);
 
 
 
@@ -71,7 +78,7 @@ const surveyLog = createLogger('surveys');
 /**************************************************************
  * Helper: parse JSON safely
  **************************************************************/
-function safeJsonParse(str) {
+function safeJsonParse(str: any) {
   if (!str) return null;
   try {
     return JSON.parse(str);
@@ -90,12 +97,12 @@ const BUILT_IN_POLIS_DEMO_DATASETS_BY_SLUG = Object.freeze({
   demo: DEFAULT_POLIS_DEMO_DATA,
 });
 
-function buildPolisDemoDatasetsBySlug(demoDataBySlug = null) {
-  const out = { ...BUILT_IN_POLIS_DEMO_DATASETS_BY_SLUG };
+function buildPolisDemoDatasetsBySlug(demoDataBySlug: any = null) {
+  const out: Record<string, any> = { ...BUILT_IN_POLIS_DEMO_DATASETS_BY_SLUG };
   if (!demoDataBySlug || typeof demoDataBySlug !== 'object' || Array.isArray(demoDataBySlug)) {
     return out;
   }
-  Object.entries(demoDataBySlug).forEach(([rawSlug, value]) => {
+  Object.entries(demoDataBySlug).forEach(([rawSlug, value]: any) => {
     const slug = normalizeSessionSlug(rawSlug);
     if (!slug || !value || typeof value !== 'object') return;
     out[slug] = value;
@@ -103,17 +110,17 @@ function buildPolisDemoDatasetsBySlug(demoDataBySlug = null) {
   return out;
 }
 
-function resolvePolisDemoDatasetsBySlug(options = {}) {
+function resolvePolisDemoDatasetsBySlug(options: any = {}) {
   if (options?.datasetsBySlug && typeof options.datasetsBySlug === 'object' && !Array.isArray(options.datasetsBySlug)) {
     return options.datasetsBySlug;
   }
   return buildPolisDemoDatasetsBySlug(options?.demoDataBySlug);
 }
 
-const dedupePolisReadSlugs = (values = []) => {
-  const seen = new Set();
-  const out = [];
-  (Array.isArray(values) ? values : []).forEach((value) => {
+const dedupePolisReadSlugs = (values: any = []) => {
+  const seen: any = new Set();
+  const out: any[] = [];
+  (Array.isArray(values) ? values : []).forEach((value: any) => {
     const normalized = normalizeSessionSlug(value);
     if (seen.has(normalized)) return;
     seen.add(normalized);
@@ -122,7 +129,7 @@ const dedupePolisReadSlugs = (values = []) => {
   return out;
 };
 
-const resolvePolisReadSlugs = (baseSlug = '') => {
+const resolvePolisReadSlugs = (baseSlug: any = '') => {
   const normalizedBaseSlug = normalizeSessionSlug(baseSlug);
   let isSessionRoute = false;
   try {
@@ -143,13 +150,13 @@ const resolvePolisReadSlugs = (baseSlug = '') => {
   return [normalizedBaseSlug];
 };
 
-const POLIS_DEMO_AUTOLOAD_SLUG_SET = new Set(
+const POLIS_DEMO_AUTOLOAD_SLUG_SET: any = new Set(
   Array.isArray(POLIS_DEMO_DATA_AUTOLOAD_SLUGS)
-    ? POLIS_DEMO_DATA_AUTOLOAD_SLUGS.map((slug) => normalizeSessionSlug(slug))
+    ? POLIS_DEMO_DATA_AUTOLOAD_SLUGS.map((slug: any) => normalizeSessionSlug(slug))
     : []
 );
 
-export function getPolisHistoricalParticipantAvatar(displayName = '', fallbackSeed = '') {
+export function getPolisHistoricalParticipantAvatar(displayName: any = '', fallbackSeed: any = '') {
   const normalizedDisplayName = String(displayName || '').trim();
   if (!normalizedDisplayName) return '';
   return getHistoricalFigureAvatarOrBlockie(normalizedDisplayName, {
@@ -158,7 +165,7 @@ export function getPolisHistoricalParticipantAvatar(displayName = '', fallbackSe
   });
 }
 
-export function getPolisHistoricalParticipantBlockie(displayName = '', fallbackSeed = '') {
+export function getPolisHistoricalParticipantBlockie(displayName: any = '', fallbackSeed: any = '') {
   const normalizedDisplayName = String(displayName || '').trim();
   if (!normalizedDisplayName) return generateBlockieDataUrl(String(fallbackSeed || '').toLowerCase(), 8, 4);
   return getHistoricalFigureBlockie(normalizedDisplayName, {
@@ -166,7 +173,7 @@ export function getPolisHistoricalParticipantBlockie(displayName = '', fallbackS
   });
 }
 
-const SUPERSCRIPT_DIGITS = Object.freeze({
+const SUPERSCRIPT_DIGITS: Record<string, string> = Object.freeze({
   0: '⁰',
   1: '¹',
   2: '²',
@@ -179,21 +186,21 @@ const SUPERSCRIPT_DIGITS = Object.freeze({
   9: '⁹',
 });
 
-function formatSuperscriptNumber(value) {
+function formatSuperscriptNumber(value: any) {
   return String(value ?? '')
     .split('')
-    .map((char) => SUPERSCRIPT_DIGITS[char] || char)
+    .map((char: any) => SUPERSCRIPT_DIGITS[char] || char)
     .join('');
 }
 
-export function hasPolisDemoDatasetForSlug(slugIn = '', options = {}) {
+export function hasPolisDemoDatasetForSlug(slugIn: any = '', options: any = {}) {
   const datasetsBySlug = resolvePolisDemoDatasetsBySlug(options);
   const slug = normalizeSessionSlug(slugIn);
   if (!slug) return false;
   return Object.prototype.hasOwnProperty.call(datasetsBySlug, slug);
 }
 
-export function getPolisDemoDatasetForSlug(slugIn = '', options = {}) {
+export function getPolisDemoDatasetForSlug(slugIn: any = '', options: any = {}) {
   const datasetsBySlug = resolvePolisDemoDatasetsBySlug(options);
   const allowFallback = options?.allowFallback !== false;
   const slug = normalizeSessionSlug(slugIn);
@@ -201,7 +208,7 @@ export function getPolisDemoDatasetForSlug(slugIn = '', options = {}) {
   return allowFallback ? DEFAULT_POLIS_DEMO_DATA : null;
 }
 
-export function shouldAutoEnablePolisDemoData(input = {}) {
+export function shouldAutoEnablePolisDemoData(input: any = {}) {
   const slug = normalizeSessionSlug(input?.slug ?? input?.sessionSlug ?? '');
   if (input?.demoDataFirstLoad) {
     return slug === 'demo' || hasPolisDemoDatasetForSlug(slug, input);
@@ -218,13 +225,13 @@ export function buildClusterAnalysisDataKey({
   questionResponsesNonce = 0,
   questionPrompts = {},
   allQuestions = [],
-} = {}) {
-  const assignmentHash = (Array.isArray(activeClusterAssignments) ? activeClusterAssignments : []).reduce((acc, val) => {
+}: any = {}) {
+  const assignmentHash = (Array.isArray(activeClusterAssignments) ? activeClusterAssignments : []).reduce((acc: any, val: any) => {
     return (acc * 31 + (val + 1)) % 1000000007;
   }, 7);
   const promptEntries = Object.entries(questionPrompts || {});
   let promptsHash = 0;
-  promptEntries.forEach(([key, value]) => {
+  promptEntries.forEach(([key, value]: any) => {
     const text = `${key}:${value || ''}`;
     for (let i = 0; i < text.length; i += 31) {
       promptsHash = (promptsHash * 33 + text.charCodeAt(i)) % 1000000007;
@@ -253,7 +260,7 @@ export function buildClusterAnalysisDataKey({
  *  - If caches are missing/partial, we skip that filter step gracefully.
  *  - We DO NOT read demo mode here; caller bypasses filtering when demo is on.
  **************************************************************/
-export function applyFilterStateToAggregator(questionResponses, network, filterState, sessionSlug) {
+export function applyFilterStateToAggregator(questionResponses: any, network: any, filterState: any, sessionSlug: any) {
   if (!questionResponses || typeof questionResponses !== 'object') return {};
 
   const netId = network?.id != null ? String(network.id) : null;
@@ -279,9 +286,9 @@ export function applyFilterStateToAggregator(questionResponses, network, filterS
   const readSlugs = resolvePolisReadSlugs(slug);
 
   // Safe cache reads (group-aware dg:* keys)
-  const qMap = {};
-  const sbtList = {};
-  readSlugs.forEach((readSlug) => {
+  const qMap: Record<string, any> = {};
+  const sbtList: Record<string, any> = {};
+  readSlugs.forEach((readSlug: any) => {
     const qParsed = peekCacheSync('questionsCache', readSlug, { clone: false });
     const sParsed = peekCacheSync('sbtCache', readSlug, { clone: false });
     const qCache = qParsed || null;
@@ -293,7 +300,7 @@ export function applyFilterStateToAggregator(questionResponses, network, filterS
       netId && sCache && sCache[netId] && sCache[netId].sbtList
     ) ? sCache[netId].sbtList : {};
 
-    Object.keys(scopedQuestions).forEach((questionId) => {
+    Object.keys(scopedQuestions).forEach((questionId: any) => {
       const lowerQuestionId = String(questionId || '').toLowerCase();
       if (!lowerQuestionId || Object.prototype.hasOwnProperty.call(qMap, lowerQuestionId)) return;
       qMap[lowerQuestionId] = scopedQuestions[questionId];
@@ -302,61 +309,61 @@ export function applyFilterStateToAggregator(questionResponses, network, filterS
   });
 
   // ---- Build combined tag set (lowercased) ----
-  const combinedTagSet = new Set();
+  const combinedTagSet: any = new Set();
   if (Array.isArray(filterState?.selectedTags)) {
     filterState.selectedTags
-      .map(t => String(t).trim().toLowerCase())
+      .map((t: any) => String(t).trim().toLowerCase())
       .filter(Boolean)
-      .forEach(t => combinedTagSet.add(t));
+      .forEach((t: any) => combinedTagSet.add(t));
   }
   // ---- NEW: accept additional tag filter shapes (comma-strings or arrays) ----
   if (typeof filterState?.tag === 'string' && filterState.tag.trim() !== '') {
     filterState.tag
       .split(',')
-      .map(t => t.trim().toLowerCase())
+      .map((t: any) => t.trim().toLowerCase())
       .filter(Boolean)
-      .forEach(t => combinedTagSet.add(t));
+      .forEach((t: any) => combinedTagSet.add(t));
   }
   if (Array.isArray(filterState?.tags)) {
     filterState.tags
-      .map(t => String(t).trim().toLowerCase())
+      .map((t: any) => String(t).trim().toLowerCase())
       .filter(Boolean)
-      .forEach(t => combinedTagSet.add(t));
+      .forEach((t: any) => combinedTagSet.add(t));
   }
   if (typeof filterState?.tags === 'string' && filterState.tags.trim() !== '') {
     filterState.tags
       .split(',')
-      .map(t => t.trim().toLowerCase())
+      .map((t: any) => t.trim().toLowerCase())
       .filter(Boolean)
-      .forEach(t => combinedTagSet.add(t));
+      .forEach((t: any) => combinedTagSet.add(t));
   }
   if (Array.isArray(filterState?.includeTags)) {
     filterState.includeTags
-      .map(t => String(t).trim().toLowerCase())
+      .map((t: any) => String(t).trim().toLowerCase())
       .filter(Boolean)
-      .forEach(t => combinedTagSet.add(t));
+      .forEach((t: any) => combinedTagSet.add(t));
   }
   if (typeof filterState?.includeTags === 'string' && filterState.includeTags.trim() !== '') {
     filterState.includeTags
       .split(',')
-      .map(t => t.trim().toLowerCase())
+      .map((t: any) => t.trim().toLowerCase())
       .filter(Boolean)
-      .forEach(t => combinedTagSet.add(t));
+      .forEach((t: any) => combinedTagSet.add(t));
   }
 
   // ---- Question types set (lowercased) ----
-  const typesSet = new Set(
+  const typesSet: any = new Set(
     Array.isArray(filterState?.questionTypes)
-      ? filterState.questionTypes.map(s => String(s).toLowerCase())
+      ? filterState.questionTypes.map((s: any) => String(s).toLowerCase())
       : []
   );
 
   // ---- SBT helpers ----
   const sbtFilter = filterState?.sbtFilter || null;
-  const toLowerAddr = (x) => (x && x.address ? String(x.address).toLowerCase() : '').trim();
-  const normalizeAddressCountMap = (value = null) => {
-    const out = {};
-    Object.entries(value || {}).forEach(([addrRaw, countRaw]) => {
+  const toLowerAddr = (x: any) => (x && x.address ? String(x.address).toLowerCase() : '').trim();
+  const normalizeAddressCountMap = (value: any = null) => {
+    const out: Record<string, any> = {};
+    Object.entries(value || {}).forEach(([addrRaw, countRaw]: any) => {
       const addr = String(addrRaw || '').toLowerCase().trim();
       if (!addr) return;
       const count = Math.max(0, Math.floor(Number(countRaw || 0)));
@@ -366,7 +373,7 @@ export function applyFilterStateToAggregator(questionResponses, network, filterS
     return out;
   };
 
-  function isAddrInSbt(sbtAddrLower, personLower) {
+  function isAddrInSbt(sbtAddrLower: any, personLower: any) {
     if (!sbtAddrLower || !personLower) return false;
     const entry = sbtList[sbtAddrLower];
     if (!entry) return false;
@@ -387,7 +394,7 @@ export function applyFilterStateToAggregator(questionResponses, network, filterS
     return inMinted && !inBurned;
   }
 
-  function isMemberOfAny(personLower, groupListLower) {
+  function isMemberOfAny(personLower: any, groupListLower: any) {
     if (!personLower || !Array.isArray(groupListLower) || groupListLower.length === 0) return false;
     for (const g of groupListLower) {
       if (!g) continue;
@@ -420,20 +427,20 @@ export function applyFilterStateToAggregator(questionResponses, network, filterS
     : [];
 
   // --- Build filtered aggregator ---
-  let filteredAgg = {};
+  let filteredAgg: Record<string, any> = {};
 
-  Object.entries(questionResponses).forEach(([qId, arr]) => {
+  Object.entries(questionResponses).forEach(([qId, arr]: any) => {
     const qIdLower = String(qId || '').toLowerCase();
 
     // Question metadata (may be missing)
     const qMeta = qMap[qIdLower] || null;
-    const qTagsLower = Array.isArray(qMeta?.tags) ? qMeta.tags.map(t => String(t).toLowerCase()) : null;
+    const qTagsLower = Array.isArray(qMeta?.tags) ? qMeta.tags.map((t: any) => String(t).toLowerCase()) : null;
     const qTypeLower = qMeta?.type ? String(qMeta.type).toLowerCase() : null;
     const creatorLower = qMeta?.creator ? String(qMeta.creator).toLowerCase() : null;
 
     // 1) Tags: if we have tags in cache AND combined set is non-empty, require intersection.
     if (combinedTagSet.size > 0 && Array.isArray(qTagsLower) && qTagsLower.length > 0) {
-      const hasAny = qTagsLower.some(t => combinedTagSet.has(t));
+      const hasAny = qTagsLower.some((t: any) => combinedTagSet.has(t));
       if (!hasAny) return; // skip this question
     }
     // If tags missing from cache, skip gating (graceful).
@@ -459,7 +466,7 @@ export function applyFilterStateToAggregator(questionResponses, network, filterS
     }
 
     // 4) Responder SBT rules: filter per-response
-    const nextArr = [];
+    const nextArr: any[] = [];
     const originalArr = Array.isArray(arr) ? arr : [];
     for (const respObj of originalArr) {
       const responderLower = respObj?.responder ? String(respObj.responder).toLowerCase() : '';
@@ -494,7 +501,7 @@ export function applyFilterStateToAggregator(questionResponses, network, filterS
       : (top?.by === 'conviction' || top?.by === 'importance' ? 'importance' : null);
 
   if (topBy && topCount > 0) {
-    const scored = Object.entries(filteredAgg).map(([qId, arr]) => {
+    const scored = Object.entries(filteredAgg).map(([qId, arr]: any) => {
       let score = 0;
       for (const r of arr) {
         const parsed = safeJsonParse(r?.response);
@@ -517,13 +524,13 @@ export function applyFilterStateToAggregator(questionResponses, network, filterS
     });
 
     // Sort descending by score
-    scored.sort((a, b) => b.score - a.score);
+    scored.sort((a: any, b: any) => b.score - a.score);
 
-    const keep = scored.slice(0, Math.min(topCount, scored.length)).map(s => s.qId);
-    const keepSet = new Set(keep);
+    const keep = scored.slice(0, Math.min(topCount, scored.length)).map((s: any) => s.qId);
+    const keepSet: any = new Set(keep);
 
-    const limited = {};
-    Object.keys(filteredAgg).forEach((qid) => {
+    const limited: Record<string, any> = {};
+    Object.keys(filteredAgg).forEach((qid: any) => {
       if (keepSet.has(qid)) limited[qid] = filteredAgg[qid];
     });
     filteredAgg = limited;
@@ -546,17 +553,17 @@ export function applyFilterStateToAggregator(questionResponses, network, filterS
  * NOTE: Non-answers (null/undefined) are ignored in both counts
  * and width calculations; no "white" segment is rendered.
  ***************************************************************/
-function PolisBoxPlot({ votes }) {
+function PolisBoxPlot({ votes }: any) {
   // Keep only concrete answers
   const concreteVotes = Array.isArray(votes)
-    ? votes.filter(v => v === 1 || v === 0 || v === -1)
+    ? votes.filter((v: any) => v === 1 || v === 0 || v === -1)
     : [];
 
   const totalConcrete = concreteVotes.length;
 
-  const agrees = concreteVotes.filter(v => v === 1).length;
-  const disagrees = concreteVotes.filter(v => v === -1).length;
-  const unsures = concreteVotes.filter(v => v === 0).length;
+  const agrees = concreteVotes.filter((v: any) => v === 1).length;
+  const disagrees = concreteVotes.filter((v: any) => v === -1).length;
+  const unsures = concreteVotes.filter((v: any) => v === 0).length;
 
   // Dimensions for the mini bar
   const svgWidth = 200;
@@ -620,14 +627,14 @@ function PolisBoxPlot({ votes }) {
   );
 }
 
-function PolisQuestionHoverCard({ label, prompt, votes = [], metaLabel = '' }) {
+function PolisQuestionHoverCard({ label, prompt, votes = [], metaLabel = '' }: any) {
   const concreteVotes = Array.isArray(votes)
-    ? votes.filter((v) => v === 1 || v === 0 || v === -1)
+    ? votes.filter((v: any) => v === 1 || v === 0 || v === -1)
     : [];
 
-  const agrees = concreteVotes.filter((v) => v === 1).length;
-  const disagrees = concreteVotes.filter((v) => v === -1).length;
-  const unsures = concreteVotes.filter((v) => v === 0).length;
+  const agrees = concreteVotes.filter((v: any) => v === 1).length;
+  const disagrees = concreteVotes.filter((v: any) => v === -1).length;
+  const unsures = concreteVotes.filter((v: any) => v === 0).length;
 
   return (
     <div>
@@ -664,22 +671,22 @@ function PolisQuestionHoverCard({ label, prompt, votes = [], metaLabel = '' }) {
  * We only consider question responses of type 'binary'.
  *   That means we only parse if r.response has { type: 'binary' } and answer { value: 'Agree' | 'Disagree' | 'Unsure' }
  ***************************************************************/
-function buildRatingMatrixFromRealData(realQR) {
+function buildRatingMatrixFromRealData(realQR: any) {
   if (!realQR || typeof realQR !== 'object') {
     return { matrix: null, responders: [], questions: [], promptsMap: {} };
   }
 
   // Collect binary questions deterministically and gather prompts
-  const participantsSet = new Set();
-  const binaryQuestions = []; // [{ qId, prompt }]
-  const promptsMap = {};
+  const participantsSet: any = new Set();
+  const binaryQuestions: any[] = []; // [{ qId, prompt }]
+  const promptsMap: Record<string, any> = {};
 
-  Object.entries(realQR).forEach(([qId, arr]) => {
+  Object.entries(realQR).forEach(([qId, arr]: any) => {
     if (!Array.isArray(arr) || arr.length === 0) return;
 
     // Find the first parsed response with a declared type to decide if it's binary
-    let firstType = null;
-    let firstPrompt = null;
+    let firstType: any = null;
+    let firstPrompt: any = null;
     for (const r of arr) {
       const parsed = safeJsonParse(r?.response);
       if (parsed && typeof parsed === 'object' && parsed.type) {
@@ -708,21 +715,21 @@ function buildRatingMatrixFromRealData(realQR) {
 
   // Deterministic ordering
   const questionsSorted = binaryQuestions
-    .map(({ qId }) => qId)
-    .sort((a, b) => String(a).localeCompare(String(b)));
+    .map(({ qId }: any) => qId)
+    .sort((a: any, b: any) => String(a).localeCompare(String(b)));
 
-  const respondersSorted = Array.from(participantsSet).sort((a, b) =>
+  const respondersSorted = Array.from(participantsSet).sort((a: any, b: any) =>
     String(a).localeCompare(String(b))
   );
 
   // Build index maps
-  const questionIndexMap = {};
-  questionsSorted.forEach((qId, idx) => {
+  const questionIndexMap: Record<string, any> = {};
+  questionsSorted.forEach((qId: any, idx: any) => {
     questionIndexMap[qId] = idx;
   });
 
-  const participantIndexMap = {};
-  respondersSorted.forEach((addr, idx) => {
+  const participantIndexMap: Record<string, any> = {};
+  respondersSorted.forEach((addr: any, idx: any) => {
     participantIndexMap[addr] = idx;
   });
 
@@ -732,7 +739,7 @@ function buildRatingMatrixFromRealData(realQR) {
   const matrix = Array.from({ length: numQ }, () => Array(numP).fill(null));
 
   // Fill matrix with -1 / 0 / 1 for Disagree / Unsure / Agree
-  questionsSorted.forEach((qId) => {
+  questionsSorted.forEach((qId: any) => {
     const rowIndex = questionIndexMap[qId];
     const arr = realQR[qId] || [];
     for (const r of arr) {
@@ -741,7 +748,7 @@ function buildRatingMatrixFromRealData(realQR) {
       if (parsed?.answer?.encrypted) continue;
 
       const ans = parsed?.answer?.value;
-      let val = null;
+      let val: any = null;
       if (ans === 'Agree') val = 1;
       else if (ans === 'Disagree') val = -1;
       else if (ans === 'Unsure') val = 0;
@@ -761,7 +768,7 @@ function buildRatingMatrixFromRealData(realQR) {
   };
 }
 
-export function buildRatingMatrixFromDemo(demoDataSource = DEFAULT_POLIS_DEMO_DATA) {
+export function buildRatingMatrixFromDemo(demoDataSource: any = DEFAULT_POLIS_DEMO_DATA) {
   const commentsArr = demoDataSource?.comments || [];
   const participantsArr = demoDataSource?.participantsVotes || [];
 
@@ -769,37 +776,37 @@ export function buildRatingMatrixFromDemo(demoDataSource = DEFAULT_POLIS_DEMO_DA
     return { matrix: null, responders: [], questions: [], promptsMap: {}, displayNamesMap: {} };
   }
 
-  const binaryComments = commentsArr.filter((c) => {
+  const binaryComments = commentsArr.filter((c: any) => {
     const t = String(c?.type || '').trim().toLowerCase();
     return !t || t === 'binary';
   });
-  const binaryOriginalIndices = [];
-  commentsArr.forEach((c, i) => {
+  const binaryOriginalIndices: any[] = [];
+  commentsArr.forEach((c: any, i: any) => {
     const t = String(c?.type || '').trim().toLowerCase();
     if (!t || t === 'binary') binaryOriginalIndices.push(i);
   });
 
-  const promptsMap = {};
-  const questionList = [];
-  binaryComments.forEach((comment) => {
+  const promptsMap: Record<string, any> = {};
+  const questionList: any[] = [];
+  binaryComments.forEach((comment: any) => {
     questionList.push(comment.commentId);
     promptsMap[comment.commentId] = comment.commentBody || '(No prompt)';
   });
 
-  const participantsSet = new Set();
-  participantsArr.forEach((p) => {
+  const participantsSet: any = new Set();
+  participantsArr.forEach((p: any) => {
     participantsSet.add(p.participant);
   });
 
   const participantArray = Array.from(participantsSet);
-  const participantIndexMap = {};
-  participantArray.forEach((addr, i) => {
+  const participantIndexMap: Record<string, any> = {};
+  participantArray.forEach((addr: any, i: any) => {
     participantIndexMap[addr] = i;
   });
 
   // Build display names map from xid field (e.g. historical figure usernames)
-  const displayNamesMap = {};
-  participantsArr.forEach((p) => {
+  const displayNamesMap: Record<string, any> = {};
+  participantsArr.forEach((p: any) => {
     if (p.xid && p.participant) {
       displayNamesMap[p.participant] = p.xid;
     }
@@ -807,16 +814,16 @@ export function buildRatingMatrixFromDemo(demoDataSource = DEFAULT_POLIS_DEMO_DA
 
   const numC = binaryComments.length;
   const numP = participantArray.length;
-  const matrix = [];
+  const matrix: any[] = [];
   for (let i = 0; i < numC; i++) {
     matrix.push(new Array(numP).fill(null));
   }
 
-  participantsArr.forEach((p) => {
+  participantsArr.forEach((p: any) => {
     const pIdx = participantIndexMap[p.participant];
     if (pIdx === undefined) return;
     const vs = p.votes || {};
-    binaryOriginalIndices.forEach((origIdx, filteredIdx) => {
+    binaryOriginalIndices.forEach((origIdx: any, filteredIdx: any) => {
       const val = vs[String(origIdx)];
       if (val !== undefined && filteredIdx < numC) {
         matrix[filteredIdx][pIdx] = val;
@@ -833,7 +840,7 @@ export function buildRatingMatrixFromDemo(demoDataSource = DEFAULT_POLIS_DEMO_DA
   };
 }
 
-export function buildPrecomputedDemoClusterState(demoDataSource = DEFAULT_POLIS_DEMO_DATA) {
+export function buildPrecomputedDemoClusterState(demoDataSource: any = DEFAULT_POLIS_DEMO_DATA) {
   if (Number(demoDataSource?.clusterAnalysisVersion) !== POLIS_DEMO_CLUSTER_ANALYSIS_VERSION) {
     return null;
   }
@@ -846,9 +853,9 @@ export function buildPrecomputedDemoClusterState(demoDataSource = DEFAULT_POLIS_
 
   if (!clusterAnalysis.length || !participantsArr.length) return null;
 
-  const participantOrder = [];
-  const participantGroupIdByAddress = {};
-  participantsArr.forEach((participant) => {
+  const participantOrder: any[] = [];
+  const participantGroupIdByAddress: Record<string, any> = {};
+  participantsArr.forEach((participant: any) => {
     const address = String(participant?.participant || '').trim();
     const groupId = Number(participant?.groupId);
     if (!address || !Number.isInteger(groupId)) return;
@@ -860,25 +867,25 @@ export function buildPrecomputedDemoClusterState(demoDataSource = DEFAULT_POLIS_
   const uniqueGroupIds = Array.from(
     new Set(
       participantOrder
-        .map((address) => participantGroupIdByAddress[address])
-        .filter((groupId) => Number.isInteger(groupId))
+        .map((address: any) => participantGroupIdByAddress[address])
+        .filter((groupId: any) => Number.isInteger(groupId))
     )
-  ).sort((a, b) => a - b);
+  ).sort((a: any, b: any) => a - b);
 
   if (!uniqueGroupIds.length || uniqueGroupIds.length !== clusterAnalysis.length) return null;
 
-  const clusterIndexByGroupId = new Map(uniqueGroupIds.map((groupId, index) => [groupId, index]));
-  const clusterAssignments = participantOrder.map((address) => clusterIndexByGroupId.get(participantGroupIdByAddress[address]));
-  if (clusterAssignments.some((clusterIndex) => !Number.isInteger(clusterIndex))) return null;
+  const clusterIndexByGroupId: any = new Map(uniqueGroupIds.map((groupId: any, index: any) => [groupId, index]));
+  const clusterAssignments = participantOrder.map((address: any) => clusterIndexByGroupId.get(participantGroupIdByAddress[address]));
+  if (clusterAssignments.some((clusterIndex: any) => !Number.isInteger(clusterIndex))) return null;
 
-  const repQuestions = {};
-  const clusterCollapseState = {};
-  const analysisCacheByClusterIndex = {};
+  const repQuestions: Record<string, any> = {};
+  const clusterCollapseState: Record<string, any> = {};
+  const analysisCacheByClusterIndex: Record<string, any> = {};
 
-  clusterAnalysis.forEach((cluster, clusterIndex) => {
+  clusterAnalysis.forEach((cluster: any, clusterIndex: any) => {
     const topStatements = Array.isArray(cluster?.topStatements) ? cluster.topStatements : [];
     repQuestions[clusterIndex] = topStatements
-      .map((statement) => {
+      .map((statement: any) => {
         const questionIndex = Number(statement?.questionIndex);
         if (!Number.isInteger(questionIndex) || questionIndex < 0) return null;
         const differenceFromData = Number(statement?.differenceScore);
@@ -900,8 +907,8 @@ export function buildPrecomputedDemoClusterState(demoDataSource = DEFAULT_POLIS_
     clusterCollapseState[clusterIndex] = true;
 
     const participantCount = Number(cluster?.participantCount);
-    const topLabels = repQuestions[clusterIndex].map((statement) => statement.label);
-    const details = [];
+    const topLabels = repQuestions[clusterIndex].map((statement: any) => statement.label);
+    const details: any[] = [];
     if (Number.isFinite(participantCount) && participantCount > 0) {
       details.push(`${participantCount} demo participants.`);
     }
@@ -925,10 +932,10 @@ export function buildPrecomputedDemoClusterState(demoDataSource = DEFAULT_POLIS_
   };
 }
 
-export function getRenderableParticipantList(responders = [], displayNames = {}) {
-  const isEth = (value) => typeof value === 'string' && /^0x[0-9a-fA-F]{40}$/.test(value);
+export function getRenderableParticipantList(responders: any = [], displayNames: any = {}) {
+  const isEth = (value: any) => typeof value === 'string' && /^0x[0-9a-fA-F]{40}$/.test(value);
   const hasDisplayNames = !!(displayNames && Object.keys(displayNames).length > 0);
-  const unique = Array.from(new Set(Array.isArray(responders) ? responders : [])).filter((addr) => {
+  const unique = Array.from(new Set(Array.isArray(responders) ? responders : [])).filter((addr: any) => {
     const displayName = displayNames?.[addr];
     return !!displayName || isEth(addr);
   });
@@ -940,7 +947,7 @@ export function getRenderableParticipantList(responders = [], displayNames = {})
   return unique;
 }
 
-export function formatBlockchainNetworkLabel(network = null, fallbackChainId = null) {
+export function formatBlockchainNetworkLabel(network: any = null, fallbackChainId: any = null) {
   const networkChainId = Number(
     network?.id ??
     network?.chainId ??
@@ -1001,20 +1008,20 @@ export default function PolisReport({
   networkChainId = null,
   slug = '',
   sessionSlug = '',
-}) {
-  const [ratingMatrix, setRatingMatrix] = useState(null);
-  const [allResponders, setAllResponders] = useState([]);
-  const [allQuestions, setAllQuestions] = useState([]);
-  const [stats, setStats] = useState(null);
-  const [demoDisplayNames, setDemoDisplayNames] = useState({});
+}: any) {
+  const [ratingMatrix, setRatingMatrix] = useState<any>(null);
+  const [allResponders, setAllResponders] = useState<any>([]);
+  const [allQuestions, setAllQuestions] = useState<any>([]);
+  const [stats, setStats] = useState<any>(null);
+  const [demoDisplayNames, setDemoDisplayNames] = useState<any>({});
 
   // Single SVD-based approach (statements + participants):
-  const [participantCoords, setParticipantCoords] = useState([]);
-  const [statementCoords, setStatementCoords] = useState([]);
-  const [umapParticipantCoords, setUmapParticipantCoords] = useState([]);
+  const [participantCoords, setParticipantCoords] = useState<any>([]);
+  const [statementCoords, setStatementCoords] = useState<any>([]);
+  const [umapParticipantCoords, setUmapParticipantCoords] = useState<any>([]);
 
-  const [questionPrompts, setQuestionPrompts] = useState({});
-  const [questionLabels, setQuestionLabels] = useState([]);
+  const [questionPrompts, setQuestionPrompts] = useState<any>({});
+  const [questionLabels, setQuestionLabels] = useState<any>([]);
   const resolvedSessionName = sessionName;
   const resolvedSessionInfo = sessionInfo;
   const activeReportSlug = normalizeSessionSlug(slug || sessionSlug || '');
@@ -1042,7 +1049,7 @@ export default function PolisReport({
   // Keep the canonical built-in demo aligned with other demo datasets by
   // starting in the shared exploratory UMAP view instead of special-casing
   // a first-load Polis Auto mode.
-  const defaultEmbeddingChoice = 'UMAP';
+  const defaultEmbeddingChoice: string = 'UMAP';
   const defaultManualClusterCount = String(DEFAULT_EXPLORATORY_CLUSTER_COUNT);
   const currentPathname = typeof window !== 'undefined' && window.location?.pathname
     ? window.location.pathname
@@ -1056,7 +1063,7 @@ export default function PolisReport({
       ? window.location.origin
       : '';
     // Strip auth/claim params that should never appear in exported PDFs
-    const SENSITIVE_PARAMS = new Set(['gp', 'password', 'inv', 'sbt', 'auto']);
+    const SENSITIVE_PARAMS: any = new Set(['gp', 'password', 'inv', 'sbt', 'auto']);
     const params = new URLSearchParams(currentSearch);
     for (const key of [...params.keys()]) {
       if (SENSITIVE_PARAMS.has(key) || /^(?:sbt|gp|inv|auto)\d+$/.test(key)) params.delete(key);
@@ -1065,16 +1072,16 @@ export default function PolisReport({
     return `${origin}${currentPathname}${sanitizedSearch}`;
   }, [currentPathname, currentSearch, resolvedSessionSlug]);
 
-  const containerRef = useRef(null);
-  const footnoteTextsRef = useRef([]);
-  const footnoteIndexByTextRef = useRef(new Map());
+  const containerRef = useRef<any>(null);
+  const footnoteTextsRef = useRef<any>([]);
+  const footnoteIndexByTextRef = useRef<any>(new Map());
   const footnoteTexts = footnoteTextsRef.current;
   const footnoteIndexByText = footnoteIndexByTextRef.current;
   footnoteTexts.length = 0;
   footnoteIndexByText.clear();
 
   // Toggling between demo data or real data
-  const [useDemoData, setUseDemoData] = useState(() => autoUseDemoData);
+  const [useDemoData, setUseDemoData] = useState<any>(() => autoUseDemoData);
   const scopedQuestionScanProgress = useMemo(() => {
     if (!questionScanProgress) return null;
     return doesQuestionProgressMatchSlug(questionScanProgress.slug, reportProgressSlug)
@@ -1085,39 +1092,39 @@ export default function PolisReport({
     () => buildQuestionScanProgressDisplay(scopedQuestionScanProgress),
     [scopedQuestionScanProgress]
   );
-  const autoUseDemoDataSignatureRef = useRef(`${activeReportSlug}|${autoUseDemoData ? '1' : '0'}`);
-  const precomputedDemoClusterState = useMemo(() => {
+  const autoUseDemoDataSignatureRef = useRef<any>(`${activeReportSlug}|${autoUseDemoData ? '1' : '0'}`);
+  const precomputedDemoClusterState: any = useMemo(() => {
     if (!useDemoData) return null;
     return buildPrecomputedDemoClusterState(activeDemoData);
   }, [activeDemoData, useDemoData]);
 
   // For cluster assignments
-  const [clusterCount, setClusterCount] = useState(0);
-  const [clusterAssignments, setClusterAssignments] = useState([]);
-  const [embeddingChoice, setEmbeddingChoice] = useState(() => defaultEmbeddingChoice);
-  const [manualClusterCount, setManualClusterCount] = useState(() => defaultManualClusterCount);
-  const [exploratoryClusterAssignments, setExploratoryClusterAssignments] = useState([]);
-  const [exploratoryRepQuestions, setExploratoryRepQuestions] = useState({});
+  const [clusterCount, setClusterCount] = useState<any>(0);
+  const [clusterAssignments, setClusterAssignments] = useState<any>([]);
+  const [embeddingChoice, setEmbeddingChoice] = useState<any>(() => defaultEmbeddingChoice);
+  const [manualClusterCount, setManualClusterCount] = useState<any>(() => defaultManualClusterCount);
+  const [exploratoryClusterAssignments, setExploratoryClusterAssignments] = useState<any>([]);
+  const [exploratoryRepQuestions, setExploratoryRepQuestions] = useState<any>({});
 
   // Representative questions
-  const [repQuestions, setRepQuestions] = useState({});
+  const [repQuestions, setRepQuestions] = useState<any>({});
 
   // Collapsible states
-  const [beeswarmOpen, setBeeswarmOpen] = useState(true);
-  const [participantsGraphOpen, setParticipantsGraphOpen] = useState(true);
-  const [allQuestionsOpen, setAllQuestionsOpen] = useState(true);
-  const [statsOpen, setStatsOpen] = useState(true);
-  const [participantsListOpen, setParticipantsListOpen] = useState(true); // NEW: List of Participants section toggle
+  const [beeswarmOpen, setBeeswarmOpen] = useState<any>(true);
+  const [participantsGraphOpen, setParticipantsGraphOpen] = useState<any>(true);
+  const [allQuestionsOpen, setAllQuestionsOpen] = useState<any>(true);
+  const [statsOpen, setStatsOpen] = useState<any>(true);
+  const [participantsListOpen, setParticipantsListOpen] = useState<any>(true); // NEW: List of Participants section toggle
 
   // Collapsible clusters
-  const [clusterCollapseState, setClusterCollapseState] = useState({});
+  const [clusterCollapseState, setClusterCollapseState] = useState<any>({});
 
   // Show/hide tooltips
-  const [enableTooltips, setEnableTooltips] = useState(true);
-  const [hoveredContent, setHoveredContent] = useState(null);
-  const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
-  const hideTimerRef = useRef(null);
-  const checkScrollableTimeoutRef = useRef(null);
+  const [enableTooltips, setEnableTooltips] = useState<any>(true);
+  const [hoveredContent, setHoveredContent] = useState<any>(null);
+  const [tooltipPos, setTooltipPos] = useState<any>({ x: 0, y: 0 });
+  const hideTimerRef = useRef<any>(null);
+  const checkScrollableTimeoutRef = useRef<any>(null);
   const cancelTooltipHide = useCallback(() => {
     if (hideTimerRef.current) {
       clearTimeout(hideTimerRef.current);
@@ -1130,7 +1137,7 @@ export default function PolisReport({
       checkScrollableTimeoutRef.current = null;
     }
   }, []);
-  const scheduleTooltipHide = useCallback((delay = 400) => {
+  const scheduleTooltipHide = useCallback((delay: any = 400) => {
     cancelTooltipHide();
     hideTimerRef.current = setTimeout(() => setHoveredContent(null), delay);
   }, [cancelTooltipHide]);
@@ -1142,7 +1149,7 @@ export default function PolisReport({
     };
   }, [cancelCheckScrollableTimeout, cancelTooltipHide]);
 
-  const registerFootnote = (text) => {
+  const registerFootnote = (text: any) => {
     const normalizedText = typeof text === 'string' ? text.trim() : '';
     if (!normalizedText) return null;
     if (!footnoteIndexByText.has(normalizedText)) {
@@ -1152,7 +1159,7 @@ export default function PolisReport({
     return footnoteIndexByText.get(normalizedText);
   };
 
-  const renderTooltipReference = (text, options = {}) => {
+  const renderTooltipReference = (text: any, options: any = {}) => {
     const footnoteNumber = registerFootnote(text);
     const {
       ariaLabel,
@@ -1189,21 +1196,21 @@ export default function PolisReport({
   };
 
   // Show/hide the top settings row
-  const [showSettingsRow, setShowSettingsRow] = useState(() => activeReportSlug === 'demo');
-  const [reportStyle, setReportStyle] = useState('original');
-  const embeddingDefaultSignatureRef = useRef(
+  const [showSettingsRow, setShowSettingsRow] = useState<any>(() => activeReportSlug === 'demo');
+  const [reportStyle, setReportStyle] = useState<any>('original');
+  const embeddingDefaultSignatureRef = useRef<any>(
     `${activeReportSlug}|${defaultEmbeddingChoice}|${defaultManualClusterCount}`
   );
 
   // Toggles for participant graph
-  const [showAxes, setShowAxes] = useState(true);
-  const [showRadialAxes, setShowRadialAxes] = useState(true);
-  const [showComments, setShowComments] = useState(false);
-  const [showParticipants, setShowParticipants] = useState(true);
-  const [showGroupOutline, setShowGroupOutline] = useState(true);
+  const [showAxes, setShowAxes] = useState<any>(true);
+  const [showRadialAxes, setShowRadialAxes] = useState<any>(true);
+  const [showComments, setShowComments] = useState<any>(false);
+  const [showParticipants, setShowParticipants] = useState<any>(true);
+  const [showGroupOutline, setShowGroupOutline] = useState<any>(true);
 
   // NEW: toggle for showing Ethereum addresses in participant graph (non-demo only)
-  const [showAddresses, setShowAddresses] = useState(() => {
+  const [showAddresses, setShowAddresses] = useState<any>(() => {
     try { localStorage.setItem('ceReport_showAddresses', localStorage.getItem('ceReport_showAddresses') || 'false'); return localStorage.getItem('ceReport_showAddresses') === 'true'; } catch { return false; }
   });
   useEffect(() => {
@@ -1211,25 +1218,25 @@ export default function PolisReport({
   }, [showAddresses]);
 
   // PDF capture ref
-  const reportRef = useRef(null);
+  const reportRef = useRef<any>(null);
 
   // Circle hovered
-  const [hoveredCircleIndex, setHoveredCircleIndex] = useState(null);
+  const [hoveredCircleIndex, setHoveredCircleIndex] = useState<any>(null);
 
   // Error handling
-  const [errorMessage, setErrorMessage] = useState(null);
+  const [errorMessage, setErrorMessage] = useState<any>(null);
 
   // Local state for toggling PDF link in the heading
-  const [isPdfModeActive, setIsPdfModeActive] = useState(false);
+  const [isPdfModeActive, setIsPdfModeActive] = useState<any>(false);
 
   // ADDED: Ref and state for Bee Swarm scroller buttons
-  const swarmContainerRef = useRef(null);
-  const [isSwarmScrollable, setIsSwarmScrollable] = useState(false);
+  const swarmContainerRef = useRef<any>(null);
+  const [isSwarmScrollable, setIsSwarmScrollable] = useState<any>(false);
 
   // 🔐 Deterministic seed for embeddings & clustering
   const DETERMINISTIC_SEED = 42;
-  const [polisMathResult, setPolisMathResult] = useState(null);
-  const [polisMathError, setPolisMathError] = useState(null);
+  const [polisMathResult, setPolisMathResult] = useState<any>(null);
+  const [polisMathError, setPolisMathError] = useState<any>(null);
   useEffect(() => {
     if (!ratingMatrix || !ratingMatrix.length) {
       setPolisMathResult(null);
@@ -1365,12 +1372,12 @@ export default function PolisReport({
   }, [DETERMINISTIC_SEED, polisMathError, polisMathResult, precomputedDemoClusterState, ratingMatrix]);
 
   // ====== NEW: AI Cluster Analysis State ======
-  const analysisStartTimesRef = useRef({}); // { [clusterIndex]: startMs }
-  const [analysisTicker, setAnalysisTicker] = useState(0); // triggers re-render for timers
-  const [analysisLoadingKey, setAnalysisLoadingKey] = useState(null); // string | null (current analysis key)
-  const [analysisCacheByKey, setAnalysisCacheByKey] = useState({}); // { [key]: { [clusterIndex]: {short,long} } }
-  const [analysisErrorsByKey, setAnalysisErrorsByKey] = useState({}); // { [key]: { [clusterIndex]: string } }
-  const [isDocumentHidden, setIsDocumentHidden] = useState(() => {
+  const analysisStartTimesRef = useRef<any>({}); // { [clusterIndex]: startMs }
+  const [analysisTicker, setAnalysisTicker] = useState<any>(0); // triggers re-render for timers
+  const [analysisLoadingKey, setAnalysisLoadingKey] = useState<any>(null); // string | null (current analysis key)
+  const [analysisCacheByKey, setAnalysisCacheByKey] = useState<any>({}); // { [key]: { [clusterIndex]: {short,long} } }
+  const [analysisErrorsByKey, setAnalysisErrorsByKey] = useState<any>({}); // { [key]: { [clusterIndex]: string } }
+  const [isDocumentHidden, setIsDocumentHidden] = useState<any>(() => {
     try {
       return typeof document !== 'undefined' && !!document.hidden;
     } catch (_) {
@@ -1414,12 +1421,12 @@ export default function PolisReport({
   // Tick elapsed timers while analyzing
   useEffect(() => {
     if (!analysisLoadingKey || isDocumentHidden) return;
-    const iv = setInterval(() => setAnalysisTicker((t) => (t + 1) % 1_000_000), 500);
+    const iv = setInterval(() => setAnalysisTicker((t: any) => (t + 1) % 1_000_000), 500);
     return () => clearInterval(iv);
   }, [analysisLoadingKey, isDocumentHidden]);
 
   // Utility: format elapsed mm:ss
-  const formatElapsed = (startMs) => {
+  const formatElapsed = (startMs: any) => {
     if (!startMs) return '00:00';
     const s = Math.max(0, Math.floor((Date.now() - startMs) / 1000));
     const mm = String(Math.floor(s / 60)).padStart(2, '0');
@@ -1437,8 +1444,8 @@ export default function PolisReport({
     setStatsOpen(false);
     setParticipantsListOpen(false);
 
-    const newObj = {};
-    Object.keys(activeRepQuestions || {}).forEach((c) => { newObj[c] = false; });
+    const newObj: Record<string, any> = {};
+    Object.keys(activeRepQuestions || {}).forEach((c: any) => { newObj[c] = false; });
     setClusterCollapseState(newObj);
   }
 
@@ -1449,24 +1456,24 @@ export default function PolisReport({
     setStatsOpen(true);
     setParticipantsListOpen(true);
 
-    const newObj = {};
-    Object.keys(activeRepQuestions || {}).forEach((c) => { newObj[c] = true; });
+    const newObj: Record<string, any> = {};
+    Object.keys(activeRepQuestions || {}).forEach((c: any) => { newObj[c] = true; });
     setClusterCollapseState(newObj);
   }
 
   function handleCollapseAllClusters() {
-    const newObj = {};
-    Object.keys(activeRepQuestions || {}).forEach((c) => { newObj[c] = false; });
+    const newObj: Record<string, any> = {};
+    Object.keys(activeRepQuestions || {}).forEach((c: any) => { newObj[c] = false; });
     setClusterCollapseState(newObj);
   }
 
   function handleExpandAllClusters() {
-    const newObj = {};
-    Object.keys(activeRepQuestions || {}).forEach((c) => { newObj[c] = true; });
+    const newObj: Record<string, any> = {};
+    Object.keys(activeRepQuestions || {}).forEach((c: any) => { newObj[c] = true; });
     setClusterCollapseState(newObj);
   }
 
-  const handleManualClusterCountChange = (nextValue) => {
+  const handleManualClusterCountChange = (nextValue: any) => {
     if (nextValue === '') {
       setManualClusterCount('');
       return;
@@ -1487,7 +1494,7 @@ export default function PolisReport({
     setManualClusterCount(String(parsed));
   };
 
-  const stepManualClusterCount = (delta) => {
+  const stepManualClusterCount = (delta: any) => {
     const base = Math.max(
       activeClusterCount || clusterCount || 0,
       DEFAULT_EXPLORATORY_CLUSTER_COUNT
@@ -1495,7 +1502,7 @@ export default function PolisReport({
     setManualClusterCount(String(Math.max(2, base + delta)));
   };
 
-  const handleEmbeddingChoiceChange = (nextChoice) => {
+  const handleEmbeddingChoiceChange = (nextChoice: any) => {
     setEmbeddingChoice(nextChoice);
     if (nextChoice === 'POLIS') {
       setManualClusterCount('');
@@ -1512,7 +1519,7 @@ export default function PolisReport({
    ***************************************************************/
   useEffect(() => {
     setErrorMessage(null);
-    let buildResult;
+    let buildResult: any;
     try {
       if (!useDemoData) {
         // Apply the upstream filterState BEFORE building the matrix
@@ -1548,10 +1555,10 @@ export default function PolisReport({
       setQuestionPrompts(buildResult.promptsMap);
       setDemoDisplayNames(buildResult.displayNamesMap || {});
 
-      const labels = buildResult.questions.map((q, idx) => `#${idx + 1}`);
+      const labels = buildResult.questions.map((q: any, idx: any) => `#${idx + 1}`);
       setQuestionLabels(labels);
-    } catch (e) {
-      setErrorMessage(`Error building rating matrix: ${e.message}`);
+    } catch (e: any) {
+      setErrorMessage(`Error building rating matrix: ${getErrorMessage(e)}`);
     }
   }, [questionResponses, useDemoData, filterState, network, questionResponsesNonce, activeReportSlug, activeDemoData]);
 
@@ -1595,8 +1602,8 @@ export default function PolisReport({
       setClusterCount(polisMathResult.clusterCount);
       setClusterAssignments(polisMathResult.clusterAssignments);
       setRepQuestions(polisMathResult.repQuestions);
-      const nextCollapseState = {};
-      Object.keys(polisMathResult.repQuestions || {}).forEach((clusterKey) => {
+      const nextCollapseState: Record<string, any> = {};
+      Object.keys(polisMathResult.repQuestions || {}).forEach((clusterKey: any) => {
         nextCollapseState[clusterKey] = false;
       });
       setClusterCollapseState(nextCollapseState);
@@ -1617,9 +1624,9 @@ export default function PolisReport({
         return;
       }
 
-      const participantData = [];
+      const participantData: any[] = [];
       for (let participantIndex = 0; participantIndex < nParticipants; participantIndex += 1) {
-        const row = [];
+        const row: any[] = [];
         for (let commentIndex = 0; commentIndex < nComments; commentIndex += 1) {
           row.push(ratingMatrix[commentIndex][participantIndex] ?? 0);
         }
@@ -1627,18 +1634,18 @@ export default function PolisReport({
       }
 
       const nNeighbors = Math.max(2, Math.min(15, nParticipants - 1));
-      const embedding = doUMAP(participantData, nNeighbors, DETERMINISTIC_SEED);
+      const embedding = doUMAPUntyped(participantData, nNeighbors, DETERMINISTIC_SEED);
       setUmapParticipantCoords(
-        embedding.map((point, index) => ({
+        embedding.map((point: any, index: any) => ({
           x: point[0],
           y: point[1],
           index,
         }))
       );
-    } catch (e) {
+    } catch (e: any) {
       surveyLog.error('UMAP error caught:', e);
       if (embeddingChoice === 'UMAP') {
-        setErrorMessage(`UMAP error: ${e.message}`);
+        setErrorMessage(`UMAP error: ${getErrorMessage(e)}`);
       }
       setUmapParticipantCoords([]);
     }
@@ -1676,7 +1683,7 @@ export default function PolisReport({
     }
 
     try {
-      const assigned = clusterUMAPPointsKmeans(pointsToUse, nextClusterCount, DETERMINISTIC_SEED);
+      const assigned = clusterUMAPPointsKmeansUntyped(pointsToUse, nextClusterCount, DETERMINISTIC_SEED);
       const nextRepQuestions = findRepresentativeQuestions(
         ratingMatrix,
         assigned,
@@ -1685,17 +1692,17 @@ export default function PolisReport({
       );
       setExploratoryClusterAssignments(assigned);
       setExploratoryRepQuestions(nextRepQuestions);
-      setClusterCollapseState((prev) => {
+      setClusterCollapseState((prev: any) => {
         const next = { ...prev };
-        Object.keys(nextRepQuestions || {}).forEach((clusterKey) => {
+        Object.keys(nextRepQuestions || {}).forEach((clusterKey: any) => {
           if (!Object.prototype.hasOwnProperty.call(next, clusterKey)) {
             next[clusterKey] = false;
           }
         });
         return next;
       });
-    } catch (e) {
-      setErrorMessage(`Exploratory clustering error: ${e.message}`);
+    } catch (e: any) {
+      setErrorMessage(`Exploratory clustering error: ${getErrorMessage(e)}`);
       setExploratoryClusterAssignments([]);
       setExploratoryRepQuestions({});
     }
@@ -1713,11 +1720,11 @@ export default function PolisReport({
   useEffect(() => {
     if (!shouldUsePrecomputedDemoClusters) return;
     setAnalysisLoadingKey(null);
-    setAnalysisErrorsByKey((prev) => ({
+    setAnalysisErrorsByKey((prev: any) => ({
       ...prev,
       [currentAnalysisKey]: {}
     }));
-    setAnalysisCacheByKey((prev) => ({
+    setAnalysisCacheByKey((prev: any) => ({
       ...prev,
       [currentAnalysisKey]: {
         ...(prev[currentAnalysisKey] || {}),
@@ -1760,7 +1767,7 @@ export default function PolisReport({
   /***************************************************************
    * ADDED: Handler for Bee Swarm scroll buttons
    ***************************************************************/
-  const handleSwarmScroll = (direction) => {
+  const handleSwarmScroll = (direction: any) => {
     if (swarmContainerRef.current) {
       const container = swarmContainerRef.current;
       if (direction === 'left') {
@@ -1792,8 +1799,8 @@ export default function PolisReport({
 
     // === NEW: ensure clusters expanded for PDF capture ===
     const prevClusterState = { ...clusterCollapseState };
-    const expandAllForPdf = {};
-    Object.keys(activeRepQuestions || {}).forEach((c) => { expandAllForPdf[c] = true; });
+    const expandAllForPdf: Record<string, any> = {};
+    Object.keys(activeRepQuestions || {}).forEach((c: any) => { expandAllForPdf[c] = true; });
     setClusterCollapseState(expandAllForPdf);
 
     // === NEW: ensure "All Questions" is open during PDF capture ===
@@ -1801,22 +1808,22 @@ export default function PolisReport({
     setAllQuestionsOpen(true);
 
     // allow reflow
-    await new Promise(r => setTimeout(r, 100));
+    await new Promise((r: any) => setTimeout(r, 100));
 
     // Hide any floating tooltips
     const tooltipEls = document.querySelectorAll(`.${styles.beeTooltip}`);
-    tooltipEls.forEach(el => {
+    tooltipEls.forEach((el: any) => {
       el.style.display = 'none';
       el.style.visibility = 'hidden';
     });
 
     try {
       // Lazy-load heavy PDF deps with retry for chunk loading failures
-      const loadWithRetry = async (importFn, retries = 2) => {
+      const loadWithRetry = async (importFn: any, retries: any = 2) => {
         for (let i = 0; i <= retries; i++) {
           try { return await importFn(); } catch (e) {
             if (i === retries) throw e;
-            await new Promise(resolve => setTimeout(resolve, 500));
+            await new Promise((resolve: any) => setTimeout(resolve, 500));
           }
         }
       };
@@ -1834,7 +1841,7 @@ export default function PolisReport({
         scrollY: -window.scrollY,
         windowWidth: input.scrollWidth,
         windowHeight: input.scrollHeight,
-        ignoreElements: (el) => el.classList && el.classList.contains(styles.pdfIgnore),
+        ignoreElements: (el: any) => el.classList && el.classList.contains(styles.pdfIgnore),
       });
 
       // Build multi-page A4 in points, compressed JPEG to reduce size
@@ -1866,7 +1873,7 @@ export default function PolisReport({
       setErrorMessage('PDF export failed — please try refreshing the page and downloading again.');
     } finally {
       // Restore tooltips
-      tooltipEls.forEach(el => {
+      tooltipEls.forEach((el: any) => {
         el.style.display = '';
         el.style.visibility = '';
       });
@@ -1887,7 +1894,7 @@ export default function PolisReport({
   /***************************************************************
    * Mouse move for tooltips
    ***************************************************************/
-  function handleContainerMouseMove(e) {
+  function handleContainerMouseMove(e: any) {
     if (containerRef.current && enableTooltips) {
       const rect = containerRef.current.getBoundingClientRect();
       setTooltipPos({
@@ -1912,16 +1919,16 @@ export default function PolisReport({
       );
     }
     const barData = getCommentBarData(ratingMatrix) || [];
-    const lines = barData.map((bar, i) => {
+    const lines = barData.map((bar: any, i: any) => {
       const label = questionLabels[i] || `#${i + 1}`;
       const originalId = allQuestions[i];
       const prompt = questionPrompts[originalId] || '(No prompt)';
       const votes = ratingMatrix[i];
 
-      const agrees = votes.filter(v => v === 1).length;
-      const disagrees = votes.filter(v => v === -1).length;
-      const unsures = votes.filter(v => v === 0).length;
-      const noresp = votes.filter(v => v === null || v === undefined).length;
+      const agrees = votes.filter((v: any) => v === 1).length;
+      const disagrees = votes.filter((v: any) => v === -1).length;
+      const unsures = votes.filter((v: any) => v === 0).length;
+      const noresp = votes.filter((v: any) => v === null || v === undefined).length;
       const total = votes.length;
 
       return (
@@ -1960,8 +1967,8 @@ export default function PolisReport({
   /***************************************************************
    * NEW: Build "List of Participants" with blockies + full address
    ***************************************************************/
-  const blockieCacheRef = useRef({});
-  function getBlockieFor(addr) {
+  const blockieCacheRef = useRef<any>({});
+  function getBlockieFor(addr: any) {
     const key = String(addr || '').toLowerCase();
     if (!blockieCacheRef.current[key]) {
       blockieCacheRef.current[key] = generateBlockieDataUrl(key, 8, 4);
@@ -1995,7 +2002,7 @@ export default function PolisReport({
 
     return (
       <div className={styles.participantsList}>
-        {unique.map((addr, idx) => {
+        {unique.map((addr: any, idx: any) => {
           const displayName = demoDisplayNames[addr];
           const isEth = typeof addr === 'string' && /^0x[0-9a-fA-F]{40}$/.test(addr);
           const imgSrc = displayName
@@ -2022,7 +2029,7 @@ export default function PolisReport({
                   height={24}
                   className={styles.participantBlockie}
                   data-testid={displayName ? `ce-polis-participant-avatar-${displayName}` : undefined}
-                  onError={(event) => {
+                  onError={(event: any) => {
                     const fallbackSrc = displayName
                       ? getPolisHistoricalParticipantBlockie(displayName, addr)
                       : getBlockieFor(addr);
@@ -2067,7 +2074,7 @@ export default function PolisReport({
   /***************************************************************
    * getVotesForQuestionInCluster
    ***************************************************************/
-  function getVotesForQuestionInCluster(questionIndex, clusterIndex, rMatrix, assignments) {
+  function getVotesForQuestionInCluster(questionIndex: any, clusterIndex: any, rMatrix: any, assignments: any) {
     // Safely handle edge cases
     if (!rMatrix || !rMatrix.length) return [];
     if (questionIndex < 0 || questionIndex >= rMatrix.length) return [];
@@ -2075,7 +2082,7 @@ export default function PolisReport({
     if (!assignments) return [];
 
     const nParticipants = rMatrix[questionIndex].length;
-    const votes = [];
+    const votes: any[] = [];
     for (let p = 0; p < nParticipants; p++) {
       if (assignments[p] === clusterIndex) {
         const val = (rMatrix[questionIndex][p] !== undefined && rMatrix[questionIndex][p] !== null)
@@ -2090,9 +2097,9 @@ export default function PolisReport({
   /***************************************************************
    * Helpers for AI payload construction
    ***************************************************************/
-  const countVotes = (votesArr) => {
+  const countVotes = (votesArr: any) => {
     const res = { agree: 0, disagree: 0, unsure: 0, responded: 0 };
-    (votesArr || []).forEach((v) => {
+    (votesArr || []).forEach((v: any) => {
       if (v === 1) { res.agree += 1; res.responded += 1; }
       else if (v === -1) { res.disagree += 1; res.responded += 1; }
       else if (v === 0) { res.unsure += 1; res.responded += 1; }
@@ -2105,12 +2112,12 @@ export default function PolisReport({
     };
   };
 
-  const buildClusterPayload = (clusterIndex, uniqueClusters) => {
-    const clusterSize = activeClusterAssignments.filter((c) => c === clusterIndex).length;
+  const buildClusterPayload = (clusterIndex: any, uniqueClusters: any) => {
+    const clusterSize = activeClusterAssignments.filter((c: any) => c === clusterIndex).length;
     const totalClusters = uniqueClusters.length;
 
     const reps = Array.isArray(activeRepQuestions[clusterIndex]) ? activeRepQuestions[clusterIndex].slice(0, 5) : [];
-    const topStatements = reps.map((rq) => {
+    const topStatements = reps.map((rq: any) => {
       const qIdx = rq.questionIndex;
       const promptKey = allQuestions[qIdx];
       const prompt = (questionPrompts[promptKey] || rq.prompt || '').trim();
@@ -2138,50 +2145,51 @@ export default function PolisReport({
       if (!activeClusterAssignments || activeClusterAssignments.length === 0) return;
 
       const key = currentAnalysisKey;
-      const uniqueClusters = Array.from(new Set(activeClusterAssignments)).sort((a, b) => a - b);
+      const uniqueClusters = Array.from(new Set(activeClusterAssignments)).sort((a: any, b: any) => a - b);
       if (uniqueClusters.length === 0) return;
 
       const cacheForKey = analysisCacheByKey[key] || {};
       const errorsForKey = analysisErrorsByKey[key] || {};
-      const hasAllClusters = uniqueClusters.every((c) => cacheForKey[c]);
-      const hasErrors = uniqueClusters.some((c) => errorsForKey[c]);
+      const hasAllClusters = uniqueClusters.every((c: any) => cacheForKey[c]);
+      const hasErrors = uniqueClusters.some((c: any) => errorsForKey[c]);
       if (hasAllClusters && !hasErrors) {
         // Already have cached results for this k – nothing to re-fetch
         return;
       }
 
-      const clustersToAnalyze = uniqueClusters.filter((c) => !cacheForKey[c] || errorsForKey[c]);
+      const clustersToAnalyze = uniqueClusters.filter((c: any) => !cacheForKey[c] || errorsForKey[c]);
       if (clustersToAnalyze.length === 0) return;
 
       // Reset start times; we'll set each cluster's start at call time
       analysisStartTimesRef.current = {};
 
       // Prepare fresh error bucket and mark as loading for this key
-      setAnalysisErrorsByKey((prev) => ({ ...prev, [key]: {} }));
+      setAnalysisErrorsByKey((prev: any) => ({ ...prev, [key]: {} }));
       setAnalysisLoadingKey(key);
 
       // Optional all-clusters context (sizes only) for the template
-      const clusterSizes = {};
-      uniqueClusters.forEach((c) => {
-        clusterSizes[c] = activeClusterAssignments.filter((x) => x === c).length;
+      const clusterSizes: Record<string, any> = {};
+      uniqueClusters.forEach((c: any) => {
+        clusterSizes[c] = activeClusterAssignments.filter((x: any) => x === c).length;
       });
       const baseAllClustersData = { clusterCount: uniqueClusters.length, sizes: clusterSizes };
 
       // Track names we’ve already accepted to guarantee uniqueness
-      const usedNames = [];
-      uniqueClusters.forEach((c) => {
+      const usedNames: any[] = [];
+      uniqueClusters.forEach((c: any) => {
         const cachedName = cacheForKey[c]?.name;
         if (cachedName) {
           usedNames.push(cachedName);
         }
       });
 
-      // Sequentially analyze each missing/failed cluster
-      for (const c of clustersToAnalyze) {
-        // Set this cluster's timer start at call time
-        analysisStartTimesRef.current[c] = Date.now();
+	      // Sequentially analyze each missing/failed cluster
+	      for (const c of clustersToAnalyze) {
+	        const clusterKey = c as any;
+	        // Set this cluster's timer start at call time
+	        analysisStartTimesRef.current[clusterKey] = Date.now();
 
-        const payload = buildClusterPayload(c, uniqueClusters);
+	        const payload = buildClusterPayload(c, uniqueClusters);
 
         try {
           // Pass prior names to instruct the AI to choose a distinct title
@@ -2191,7 +2199,7 @@ export default function PolisReport({
             nameUniqueness: true
           };
 
-          const aiRes = await analyzeClusterOpinions(payload, allClustersDataWithNames, { sessionSlug: activeReportSlug });
+          const aiRes = await analyzeClusterOpinionsUntyped(payload, allClustersDataWithNames, { sessionSlug: activeReportSlug });
 
           // Enforce uniqueness in UI even if AI repeats a name
           const baseNameCandidate = (aiRes && (aiRes.name || aiRes.short))
@@ -2199,7 +2207,7 @@ export default function PolisReport({
             : '';
 
           let proposed = baseNameCandidate || `Group ${usedNames.length + 1}`;
-          const seenLower = new Set(usedNames.map(n => n.toLowerCase()));
+          const seenLower: any = new Set(usedNames.map((n: any) => n.toLowerCase()));
           if (seenLower.has(proposed.toLowerCase())) {
             let suffix = 2;
             let candidate = `${proposed} (${suffix})`;
@@ -2211,22 +2219,22 @@ export default function PolisReport({
           }
           usedNames.push(proposed);
 
-          setAnalysisCacheByKey((prev) => ({
-            ...prev,
-            [key]: {
-              ...(prev[key] || {}),
-              [c]: { short: aiRes.short, long: aiRes.long, name: proposed }
-            }
-          }));
-        } catch (err) {
-          setAnalysisErrorsByKey((prev) => ({
-            ...prev,
-            [key]: {
-              ...(prev[key] || {}),
-              [c]: err?.message || 'AI request failed'
-            }
-          }));
-        }
+	          setAnalysisCacheByKey((prev: any) => ({
+	            ...prev,
+	            [key]: {
+	              ...(prev[key] || {}),
+	              [clusterKey]: { short: aiRes.short, long: aiRes.long, name: proposed }
+	            }
+	          }));
+	        } catch (err: any) {
+	          setAnalysisErrorsByKey((prev: any) => ({
+	            ...prev,
+	            [key]: {
+	              ...(prev[key] || {}),
+	              [clusterKey]: getErrorMessage(err, 'AI request failed')
+	            }
+	          }));
+	        }
       }
     } catch (e) {
       surveyLog.error('Analyze clusters failed:', e);
@@ -2239,7 +2247,7 @@ export default function PolisReport({
   /***************************************************************
    * renderClusterRepresentativesFor
    ***************************************************************/
-  function renderClusterRepresentativesFor(clusterIndex) {
+  function renderClusterRepresentativesFor(clusterIndex: any) {
     if (!activeRepQuestions[clusterIndex] || !activeRepQuestions[clusterIndex].length) {
       return (
         <p style={{ marginLeft: '20px', marginTop: '6px' }}>
@@ -2248,12 +2256,12 @@ export default function PolisReport({
       );
     }
     const arr = activeRepQuestions[clusterIndex].slice(0, 3);
-    const uniqueClusters = Array.from(new Set(activeClusterAssignments)).sort((a,b)=>a-b);
-    const colorScale = d3.scaleOrdinal(d3.schemeCategory10);
+    const uniqueClusters = Array.from(new Set(activeClusterAssignments)).sort((a: any,b: any)=>a-b);
+    const colorScale = d3Untyped.scaleOrdinal(d3Untyped.schemeCategory10);
 
     return (
       <div style={{ marginTop: '6px' }}>
-        {arr.map((rq, idx) => {
+        {arr.map((rq: any, idx: any) => {
           const qIndex = rq.questionIndex;
           const questionPrompt = rq.prompt;
           const clusterVotes = getVotesForQuestionInCluster(
@@ -2291,7 +2299,7 @@ export default function PolisReport({
                     gap: '8px'
                   }}
                 >
-                  {uniqueClusters.map((cl) => {
+                  {uniqueClusters.map((cl: any) => {
                     if (cl === clusterIndex) return null;
                     const otherClusterVotes = getVotesForQuestionInCluster(
                       qIndex,
@@ -2333,22 +2341,22 @@ export default function PolisReport({
   /***************************************************************
    * buildClusterHulls
    ***************************************************************/
-  function buildClusterHulls(points, assignments) {
-    const grouped = {};
-    points.forEach((pt) => {
+  function buildClusterHulls(points: any, assignments: any) {
+    const grouped: Record<string, any> = {};
+    points.forEach((pt: any) => {
       const cl = assignments[pt.index];
       if (!grouped[cl]) grouped[cl] = [];
       grouped[cl].push([pt.x, pt.y]);
     });
 
-    const hulls = [];
-    Object.keys(grouped).forEach((clstr) => {
+    const hulls: any[] = [];
+    Object.keys(grouped).forEach((clstr: any) => {
       const arr = grouped[clstr];
       if (arr.length < 3) {
         hulls.push({ cluster: +clstr, path: null });
         return;
       }
-      const hull = d3.polygonHull(arr);
+      const hull = d3Untyped.polygonHull(arr);
       hulls.push({ cluster: +clstr, path: hull });
     });
     return hulls;
@@ -2359,8 +2367,8 @@ export default function PolisReport({
    ***************************************************************/
   function renderClusterLegend() {
     if (!activeClusterAssignments || !activeClusterAssignments.length) return null;
-    const uniqueClusters = Array.from(new Set(activeClusterAssignments)).sort((a,b)=>a-b);
-    const colorScale = d3.scaleOrdinal(d3.schemeCategory10);
+    const uniqueClusters = Array.from(new Set(activeClusterAssignments)).sort((a: any,b: any)=>a-b);
+    const colorScale = d3Untyped.scaleOrdinal(d3Untyped.schemeCategory10);
 
     const cacheForKey = analysisCacheByKey[currentAnalysisKey] || {};
     const errorsForKey = analysisErrorsByKey[currentAnalysisKey] || {};
@@ -2382,11 +2390,11 @@ export default function PolisReport({
             marginTop: '6px'
           }}
         >
-          {uniqueClusters.map((c) => {
+          {uniqueClusters.map((c: any) => {
             const cColor = colorScale(c);
             const clusterIsOpen = clusterCollapseState[c];
             const handleToggleCluster = () => {
-              setClusterCollapseState(prev => ({
+              setClusterCollapseState((prev: any) => ({
                 ...prev,
                 [c]: !prev[c]
               }));
@@ -2500,22 +2508,22 @@ export default function PolisReport({
       }
 
       const statementPoints = showComments ? activeStatementCoords : [];
-      const allXs = pointsToUse.map((d) => d.x).concat(statementPoints.map((d) => d.x));
-      const allYs = pointsToUse.map((d) => d.y).concat(statementPoints.map((d) => d.y));
+      const allXs = pointsToUse.map((d: any) => d.x).concat(statementPoints.map((d: any) => d.x));
+      const allYs = pointsToUse.map((d: any) => d.y).concat(statementPoints.map((d: any) => d.y));
 
-      const minx = d3.min(allXs) ?? 0;
-      const maxx = d3.max(allXs) ?? 1;
-      const miny = d3.min(allYs) ?? 0;
-      const maxy = d3.max(allYs) ?? 1;
+      const minx = d3Untyped.min(allXs) ?? 0;
+      const maxx = d3Untyped.max(allXs) ?? 1;
+      const miny = d3Untyped.min(allYs) ?? 0;
+      const maxy = d3Untyped.max(allYs) ?? 1;
 
       const w = 500;
       const h = 400;
       const pad = 40;
-      const xScale = d3.scaleLinear().domain([minx, maxx]).range([-(w / 2 - pad), (w / 2 - pad)]);
-      const yScale = d3.scaleLinear().domain([miny, maxy]).range([(h / 2 - pad), -(h / 2 - pad)]);
+      const xScale = d3Untyped.scaleLinear().domain([minx, maxx]).range([-(w / 2 - pad), (w / 2 - pad)]);
+      const yScale = d3Untyped.scaleLinear().domain([miny, maxy]).range([(h / 2 - pad), -(h / 2 - pad)]);
 
       const hulls = buildClusterHulls(pointsToUse, activeClusterAssignments);
-      const colorScale = d3.scaleOrdinal(d3.schemeCategory10);
+      const colorScale = d3Untyped.scaleOrdinal(d3Untyped.schemeCategory10);
 
       const centerX = w / 2;
       const centerY = h / 2;
@@ -2575,12 +2583,12 @@ export default function PolisReport({
                 </g>
               )}
 
-              {showGroupOutline && hulls.map((hullObj, i) => {
+              {showGroupOutline && hulls.map((hullObj: any, i: any) => {
                 if (!hullObj.path) return null;
                 const cColor = colorScale(hullObj.cluster); // BUGFIX: reuse existing colorScale; do not re-instantiate
-                const lineGenerator = d3.line();
+                const lineGenerator = d3Untyped.line();
                 const pathStr = lineGenerator(
-                    hullObj.path.map(pt => [xScale(pt[0]), yScale(pt[1])])
+                    hullObj.path.map((pt: any) => [xScale(pt[0]), yScale(pt[1])])
                   ) + "Z";
                 return (
                   <path
@@ -2595,7 +2603,7 @@ export default function PolisReport({
                 );
               })}
 
-              {showParticipants && pointsToUse.map((d, i) => {
+              {showParticipants && pointsToUse.map((d: any, i: any) => {
                 const c = activeClusterAssignments[d.index] ?? 0;
                 const col = colorScale(c);
                 const px = xScale(d.x);
@@ -2694,17 +2702,17 @@ export default function PolisReport({
                 );
               })}
 
-              {showComments && activeStatementCoords.map((d, i) => {
+              {showComments && activeStatementCoords.map((d: any, i: any) => {
                 const label = questionLabels[d.index] || `#${d.index + 1}`;
                 const promptKey = allQuestions[d.index];
                 const prompt = questionPrompts[promptKey] || '(No prompt)';
                 const px = xScale(d.x);
                 const py = yScale(d.y);
                 const votesForThis = ratingMatrix[d.index] || [];
-                const agrees = votesForThis.filter(v => v === 1).length;
-                const disagrees = votesForThis.filter(v => v === -1).length;
-                const unsures = votesForThis.filter(v => v === 0).length;
-                const noresps = votesForThis.filter(v => v === null || v === undefined).length;
+                const agrees = votesForThis.filter((v: any) => v === 1).length;
+                const disagrees = votesForThis.filter((v: any) => v === -1).length;
+                const unsures = votesForThis.filter((v: any) => v === 0).length;
+                const noresps = votesForThis.filter((v: any) => v === null || v === undefined).length;
 
                 const rowVotes = ratingMatrix[d.index];
                 const statementHoverContent = (
@@ -2743,10 +2751,10 @@ export default function PolisReport({
           </svg>
         </div>
       );
-    } catch (err) {
+    } catch (err: any) {
       return (
         <p style={{ color: 'red', marginLeft: '10px' }}>
-          Error rendering participant graph: {err.message}
+          Error rendering participant graph: {getErrorMessage(err)}
         </p>
       );
     }
@@ -2773,7 +2781,7 @@ export default function PolisReport({
         throw memoizedCommentSwarmResult.error;
       }
 
-      const points = memoizedCommentSwarmResult.commentStats.map(item => {
+      const points = memoizedCommentSwarmResult.commentStats.map((item: any) => {
         return {
           index: item.commentIndex,
           extremity: item.extremity,
@@ -2815,14 +2823,14 @@ export default function PolisReport({
                 Difference
               </text>
 
-              {swarmed.map((d, i) => {
+              {swarmed.map((d: any, i: any) => {
                 const cIndex = d.index;
                 const promptKey = allQuestions[cIndex];
                 const label = questionLabels[cIndex] || `#${cIndex + 1}`;
                 const rowVotes = ratingMatrix[cIndex] || [];
-                const agrees = rowVotes.filter(v => v === 1).length;
-                const disagrees = rowVotes.filter(v => v === -1).length;
-                const unsures = rowVotes.filter(v => v === 0).length;
+                const agrees = rowVotes.filter((v: any) => v === 1).length;
+                const disagrees = rowVotes.filter((v: any) => v === -1).length;
+                const unsures = rowVotes.filter((v: any) => v === 0).length;
                 const prompt = questionPrompts[promptKey] || '(No prompt)';
 
                 const tooltipContent = (
@@ -2902,10 +2910,10 @@ export default function PolisReport({
           )}
         </div>
       );
-    } catch (err) {
+    } catch (err: any) {
       return (
         <p style={{ color: 'red', marginLeft: '10px' }}>
-          Error rendering Bee Swarm: {err.message}
+          Error rendering Bee Swarm: {getErrorMessage(err)}
         </p>
       );
     }
@@ -2931,7 +2939,7 @@ export default function PolisReport({
         topQuestions
     } = filterState;
 
-    const activeFilterElements = [];
+    const activeFilterElements: any[] = [];
 
     // 1. Verified Humans
     if (onlyVerifiedHumans) {
@@ -2966,13 +2974,13 @@ export default function PolisReport({
     if (selectedTags && selectedTags.length > 0) {
         activeFilterElements.push(
             <div key="tags">
-                <strong>Tags:</strong> {selectedTags.map(t => `#${t}`).join(', ')}
+                <strong>Tags:</strong> {selectedTags.map((t: any) => `#${t}`).join(', ')}
             </div>
         );
     }
 
     // 5. SBT Filters
-    const renderSBTList = (sbtArr) => sbtArr.map(sbt => sbt.name || `${sbt.address.slice(0, 6)}...`).join(', ');
+    const renderSBTList = (sbtArr: any) => sbtArr.map((sbt: any) => sbt.name || `${sbt.address.slice(0, 6)}...`).join(', ');
 
     if (sbtFilter) {
         if (sbtFilter.selectedSBTGroupsCreator?.length) {
@@ -3117,7 +3125,7 @@ export default function PolisReport({
                 type="checkbox"
                 data-testid={E2E_TESTIDS.POLIS_DEMO_DATA_TOGGLE}
                 checked={useDemoData}
-                onChange={e => setUseDemoData(e.target.checked)}
+                onChange={(e: any) => setUseDemoData(e.target.checked)}
                 className={styles.demoToggleCheckbox}
               />
               Demo Data
@@ -3129,7 +3137,7 @@ export default function PolisReport({
               <input
                 type="checkbox"
                 checked={enableTooltips}
-                onChange={e => setEnableTooltips(e.target.checked)}
+                onChange={(e: any) => setEnableTooltips(e.target.checked)}
                 style={{ marginRight: '4px', cursor: 'pointer' }}
               />
               Show Explainers
@@ -3148,7 +3156,7 @@ export default function PolisReport({
               id="report-style-select"
               className={styles.reportStyleSelect}
               value={reportStyle}
-              onChange={(e) => setReportStyle(e.target.value)}
+              onChange={(e: any) => setReportStyle(e.target.value)}
             >
               <option value="original">Original</option>
               <option value="modern">Modern</option>
@@ -3421,7 +3429,7 @@ export default function PolisReport({
                       <select
                         id="embedding-choice-select"
                         value={embeddingChoice}
-                        onChange={(e) => handleEmbeddingChoiceChange(e.target.value)}
+                        onChange={(e: any) => handleEmbeddingChoiceChange(e.target.value)}
                         style={{ padding: '4px' }}
                       >
                         <option value="UMAP">UMAP</option>
@@ -3447,7 +3455,7 @@ export default function PolisReport({
                           id="cluster-count-input"
                           type="number"
                           value={manualClusterCount === '' ? String(activeClusterCount || 0) : manualClusterCount}
-                          onChange={(e) => handleManualClusterCountChange(e.target.value)}
+                          onChange={(e: any) => handleManualClusterCountChange(e.target.value)}
                           onBlur={handleManualClusterCountBlur}
                           className={styles.clusterNumberInput}
                           min="2"
@@ -3639,7 +3647,7 @@ export default function PolisReport({
               <div className={`${styles.showWhenPdf} ${styles.footnotesSection}`}>
                 <h5 className={styles.footnotesHeading}>Footnotes</h5>
                 <ol className={styles.footnotesList}>
-                  {footnoteTexts.map((text, index) => (
+                  {footnoteTexts.map((text: any, index: any) => (
                     <li key={`polis-footnote-${index + 1}`}>
                       {text}
                     </li>

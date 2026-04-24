@@ -43,7 +43,7 @@ The main consumers of this folder are:
 - [`demoAnalysisAdapter.js`](../../utilities/demo/demoAnalysisAdapter.js)
 - [`demoAvatars.js`](../../utilities/ui/demoAvatars.js)
 - [`sessionSourceResolver.js`](../../utilities/session/sessionSourceResolver.js)
-- [`PolisReport.jsx`](../../components/PolisReport/PolisReport.jsx)
+- [`PolisReport.tsx`](../../components/PolisReport/PolisReport.tsx)
 - [`DebateMap.jsx`](../../components/DebateMap/DebateMap.jsx)
 - [`PoliticalCompassView.tsx`](../../components/DemoViews/DebateHUD/PoliticalCompassView.tsx)
 - [`DebateSelector.tsx`](../../components/DemoViews/DebateHUD/DebateSelector.tsx)
