@@ -25,6 +25,8 @@ import {
   resolveSurveyToolUpdateCacheContext,
 } from './surveyToolSessionResolution.js';
 
+const makeResolveBySlug = (resolver: (slug: string) => any) => jest.fn(resolver);
+
 describe('surveyToolSessionResolution', () => {
   it('canonicalizes explicit general routes and preserves SurveyTool prop precedence', () => {
     expect(resolveSurveyToolEffectiveSlug({
@@ -41,7 +43,7 @@ describe('surveyToolSessionResolution', () => {
   });
 
   it('prefers explicit route or prop session context over inferred draft slugs', () => {
-    const resolveBySlug = jest.fn((slug) => (
+    const resolveBySlug = makeResolveBySlug((slug) => (
       slug === 'edge'
         ? { slug: 'edge', networkChainId: 84532 }
         : null
@@ -64,7 +66,7 @@ describe('surveyToolSessionResolution', () => {
   });
 
   it('does not inherit the general session config for unknown non-general slugs', () => {
-    const resolveBySlug = jest.fn((slug) => (
+    const resolveBySlug = makeResolveBySlug((slug) => (
       slug === ''
         ? { slug: '', networkChainId: 84532 }
         : null
@@ -97,7 +99,7 @@ describe('surveyToolSessionResolution', () => {
   });
 
   it('keeps response-gate overlays without borrowing general config for unresolved explicit slugs', () => {
-    const resolveBySlug = jest.fn((slug) => (
+    const resolveBySlug = makeResolveBySlug((slug) => (
       slug === ''
         ? {
             slug: '',
@@ -138,7 +140,7 @@ describe('surveyToolSessionResolution', () => {
   });
 
   it('keeps unresolved question-config slugs off borrowed general blocked/highlighted ids', () => {
-    const resolveBySlug = jest.fn((slug) => (
+    const resolveBySlug = makeResolveBySlug((slug) => (
       slug === ''
         ? {
             slug: '',
@@ -165,7 +167,7 @@ describe('surveyToolSessionResolution', () => {
   });
 
   it('keeps unresolved lock-audience-session-name slugs off borrowed general labels', () => {
-    const resolveBySlug = jest.fn((slug) => (
+    const resolveBySlug = makeResolveBySlug((slug) => (
       slug === ''
         ? {
             slug: '',
@@ -190,7 +192,7 @@ describe('surveyToolSessionResolution', () => {
   });
 
   it('keeps unresolved draft-storage slugs on pending network scope unless props provide the chain id', () => {
-    const resolveBySlug = jest.fn((slug) => (
+    const resolveBySlug = makeResolveBySlug((slug) => (
       slug === ''
         ? { slug: '', networkChainId: 84532 }
         : null
@@ -225,7 +227,7 @@ describe('surveyToolSessionResolution', () => {
   });
 
   it('keeps unresolved response-hydration slugs off cache scope unless props provide the chain id', () => {
-    const resolveBySlug = jest.fn((slug) => (
+    const resolveBySlug = makeResolveBySlug((slug) => (
       slug === ''
         ? { slug: '', networkChainId: 84532 }
         : null
@@ -260,7 +262,7 @@ describe('surveyToolSessionResolution', () => {
   });
 
   it('keeps unresolved question-bootstrap slugs off bootstrap network scope unless props provide the chain id', () => {
-    const resolveBySlug = jest.fn((slug) => (
+    const resolveBySlug = makeResolveBySlug((slug) => (
       slug === ''
         ? { slug: '', networkChainId: 84532 }
         : null
@@ -295,7 +297,7 @@ describe('surveyToolSessionResolution', () => {
   });
 
   it('keeps unresolved question-read-cache slugs off cache/network scope unless props provide the chain id', () => {
-    const resolveBySlug = jest.fn((slug) => (
+    const resolveBySlug = makeResolveBySlug((slug) => (
       slug === ''
         ? { slug: '', networkChainId: 84532 }
         : null
@@ -330,7 +332,7 @@ describe('surveyToolSessionResolution', () => {
   });
 
   it('prefers __registry.registryChainId over the wallet-facing network when session config omits networkChainId', () => {
-    const resolveBySlug = jest.fn((slug) => (
+    const resolveBySlug = makeResolveBySlug((slug) => (
       slug === 'edge'
         ? {
             slug: 'edge',
@@ -361,7 +363,7 @@ describe('surveyToolSessionResolution', () => {
   });
 
   it('keeps unresolved questions-dashboard-load slugs off cache/network scope unless props provide the chain id', () => {
-    const resolveBySlug = jest.fn((slug) => (
+    const resolveBySlug = makeResolveBySlug((slug) => (
       slug === ''
         ? { slug: '', networkChainId: 84532 }
         : null
@@ -396,7 +398,7 @@ describe('surveyToolSessionResolution', () => {
   });
 
   it('recovers questions-dashboard network scope from fallback list slugs when bare /questions has no base session config', () => {
-    const resolveBySlug = jest.fn((slug) => (
+    const resolveBySlug = makeResolveBySlug((slug) => (
       slug === 'alpha'
         ? { slug: 'alpha', networkChainId: 84532 }
         : null
@@ -421,7 +423,7 @@ describe('surveyToolSessionResolution', () => {
   });
 
   it('keeps unresolved question-payload-cache-write slugs off cache/network scope unless props provide the chain id', () => {
-    const resolveBySlug = jest.fn((slug) => (
+    const resolveBySlug = makeResolveBySlug((slug) => (
       slug === ''
         ? { slug: '', networkChainId: 84532 }
         : null
@@ -456,7 +458,7 @@ describe('surveyToolSessionResolution', () => {
   });
 
   it('keeps unresolved ensure-question-cached slugs off cache/network scope unless props provide the chain id', () => {
-    const resolveBySlug = jest.fn((slug) => (
+    const resolveBySlug = makeResolveBySlug((slug) => (
       slug === ''
         ? { slug: '', networkChainId: 84532 }
         : null
@@ -491,7 +493,7 @@ describe('surveyToolSessionResolution', () => {
   });
 
   it('keeps unresolved question-count slugs off cache/network scope unless props provide the chain id', () => {
-    const resolveBySlug = jest.fn((slug) => (
+    const resolveBySlug = makeResolveBySlug((slug) => (
       slug === ''
         ? { slug: '', networkChainId: 84532 }
         : null
@@ -526,7 +528,7 @@ describe('surveyToolSessionResolution', () => {
   });
 
   it('recovers question-count network scope from fallback list slugs when bare /questions has no base session config', () => {
-    const resolveBySlug = jest.fn((slug) => (
+    const resolveBySlug = makeResolveBySlug((slug) => (
       slug === 'alpha'
         ? { slug: 'alpha', networkChainId: 84532 }
         : null
@@ -551,7 +553,7 @@ describe('surveyToolSessionResolution', () => {
   });
 
   it('keeps unresolved id-lookup slugs off cache/network scope unless props provide the chain id', () => {
-    const resolveBySlug = jest.fn((slug) => (
+    const resolveBySlug = makeResolveBySlug((slug) => (
       slug === ''
         ? { slug: '', networkChainId: 84532 }
         : null
@@ -586,7 +588,7 @@ describe('surveyToolSessionResolution', () => {
   });
 
   it('keeps unresolved survey-read slugs off cache/network scope unless props provide the chain id', () => {
-    const resolveBySlug = jest.fn((slug) => (
+    const resolveBySlug = makeResolveBySlug((slug) => (
       slug === ''
         ? { slug: '', networkChainId: 84532 }
         : null
@@ -621,7 +623,7 @@ describe('surveyToolSessionResolution', () => {
   });
 
   it('keeps unresolved update-cache slugs off cache/network scope unless props provide the chain id', () => {
-    const resolveBySlug = jest.fn((slug) => (
+    const resolveBySlug = makeResolveBySlug((slug) => (
       slug === ''
         ? { slug: '', networkChainId: 84532 }
         : null
@@ -656,7 +658,7 @@ describe('surveyToolSessionResolution', () => {
   });
 
   it('keeps unresolved submitted-cache-write slugs off cache/network scope unless props provide the chain id', () => {
-    const resolveBySlug = jest.fn((slug) => (
+    const resolveBySlug = makeResolveBySlug((slug) => (
       slug === ''
         ? { slug: '', networkChainId: 84532 }
         : null
@@ -691,7 +693,7 @@ describe('surveyToolSessionResolution', () => {
   });
 
   it('keeps unresolved pile-warm-seed slugs off cache/network scope unless props provide the chain id', () => {
-    const resolveBySlug = jest.fn((slug) => (
+    const resolveBySlug = makeResolveBySlug((slug) => (
       slug === ''
         ? { slug: '', networkChainId: 84532 }
         : null
@@ -726,7 +728,7 @@ describe('surveyToolSessionResolution', () => {
   });
 
   it('keeps unresolved pile-load slugs off cache/network scope unless props provide the chain id', () => {
-    const resolveBySlug = jest.fn((slug) => (
+    const resolveBySlug = makeResolveBySlug((slug) => (
       slug === ''
         ? { slug: '', networkChainId: 84532 }
         : null
@@ -761,7 +763,7 @@ describe('surveyToolSessionResolution', () => {
   });
 
   it('keeps unresolved pile-response-read slugs off cache/network scope unless props provide the chain id', () => {
-    const resolveBySlug = jest.fn((slug) => (
+    const resolveBySlug = makeResolveBySlug((slug) => (
       slug === ''
         ? { slug: '', networkChainId: 84532 }
         : null
@@ -796,7 +798,7 @@ describe('surveyToolSessionResolution', () => {
   });
 
   it('prefers the resolved session chain over wallet-facing network props for pile cache contexts', () => {
-    const resolveBySlug = jest.fn((slug) => (
+    const resolveBySlug = makeResolveBySlug((slug) => (
       slug === 'edge'
         ? {
             slug: 'edge',
@@ -834,7 +836,7 @@ describe('surveyToolSessionResolution', () => {
   });
 
   it('keeps unresolved pile-filter slugs off cache/config scope unless props provide the chain id', () => {
-    const resolveBySlug = jest.fn((slug) => (
+    const resolveBySlug = makeResolveBySlug((slug) => (
       slug === ''
         ? {
             slug: '',
@@ -878,7 +880,7 @@ describe('surveyToolSessionResolution', () => {
   });
 
   it('keeps unresolved decrypt-hydration slugs off cache scope unless props provide the chain id', () => {
-    const resolveBySlug = jest.fn((slug) => (
+    const resolveBySlug = makeResolveBySlug((slug) => (
       slug === ''
         ? { slug: '', networkChainId: 84532 }
         : null
@@ -913,7 +915,7 @@ describe('surveyToolSessionResolution', () => {
   });
 
   it('keeps unresolved response-json slugs off metadata scope unless props provide the chain id', () => {
-    const resolveBySlug = jest.fn((slug) => (
+    const resolveBySlug = makeResolveBySlug((slug) => (
       slug === ''
         ? { slug: '', networkChainId: 84532, sessionName: 'General Session' }
         : null

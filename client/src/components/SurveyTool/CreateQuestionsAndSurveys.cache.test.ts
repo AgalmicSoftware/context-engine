@@ -23,13 +23,19 @@ jest.mock('../../utilities/cache/cacheScripts.js', () => ({
 }));
 
 const REGISTRY_CACHE_KEY = 'dg:sessionRegistryCache:v1';
+type TreeNode = any;
+type TreePredicate = (node: TreeNode) => boolean;
+type CreateQuestionsAndSurveysProps = Record<string, any>;
+const peekCacheSyncMock = cacheScripts.peekCacheSync as jest.Mock;
+const subscribeCacheUpdatesMock = cacheScripts.subscribeCacheUpdates as jest.Mock;
+const writeCacheOptimisticMock = cacheScripts.writeCacheOptimistic as jest.Mock;
 
-const makeInstance = (props = {}) => {
+const makeInstance = (props: CreateQuestionsAndSurveysProps = {}): any => {
   const instance = new CreateQuestionsAndSurveys({
     network: { id: 84532 },
     activeSessionSlug: 'edge',
     ...props,
-  });
+  }) as any;
   instance._isMounted = true;
   instance.setState = jest.fn((update, cb) => {
     const patch = typeof update === 'function'
@@ -43,7 +49,7 @@ const makeInstance = (props = {}) => {
   return instance;
 };
 
-const collectTreeNodes = (node, predicate, acc = []) => {
+const collectTreeNodes = (node: TreeNode, predicate: TreePredicate, acc: TreeNode[] = []): TreeNode[] => {
   if (node == null) return acc;
   if (Array.isArray(node)) {
     node.forEach((child) => collectTreeNodes(child, predicate, acc));
@@ -54,7 +60,7 @@ const collectTreeNodes = (node, predicate, acc = []) => {
   return collectTreeNodes(node?.props?.children, predicate, acc);
 };
 
-const treeHasText = (node, text) => {
+const treeHasText = (node: TreeNode, text: string): boolean => {
   if (node == null) return false;
   if (Array.isArray(node)) return node.some((child) => treeHasText(child, text));
   if (typeof node === 'string' || typeof node === 'number') {
@@ -64,7 +70,7 @@ const treeHasText = (node, text) => {
   return treeHasText(node?.props?.children, text);
 };
 
-const nodeHasClassName = (node, className) => {
+const nodeHasClassName = (node: TreeNode, className: string): boolean => {
   const raw = node?.props?.className;
   if (!raw) return false;
   return String(raw).split(/\s+/).includes(className);
@@ -76,13 +82,13 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
   });
 
   afterEach(() => {
-    try { delete globalThis.CE_ARWEAVE_GATEWAY_URL; } catch (_) {}
-    try { delete globalThis.CE_ARWEAVE_AR_IO_URL; } catch (_) {}
-    try { delete globalThis.CE_ARWEAVE_DIRECT_TO_AR_IO; } catch (_) {}
+    try { delete (globalThis as any).CE_ARWEAVE_GATEWAY_URL; } catch (_) {}
+    try { delete (globalThis as any).CE_ARWEAVE_AR_IO_URL; } catch (_) {}
+    try { delete (globalThis as any).CE_ARWEAVE_DIRECT_TO_AR_IO; } catch (_) {}
   });
 
   it('reads managed cache snapshots with clone disabled', () => {
-    cacheScripts.peekCacheSync.mockReturnValue({ surveys: ['a'] });
+    peekCacheSyncMock.mockReturnValue({ surveys: ['a'] });
 
     const snapshot = readManagedCacheSnapshot('bookmarksCache', 'edge');
 
@@ -95,7 +101,7 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
   });
 
   it('selects a network bucket with numeric-key fallback', () => {
-    cacheScripts.peekCacheSync.mockReturnValue({
+    peekCacheSyncMock.mockReturnValue({
       84532: {
         surveys: {
           a: { id: 'a' },
@@ -113,7 +119,7 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
   });
 
   it('checks submitted resources in managed cache for survey and question flows', () => {
-    cacheScripts.peekCacheSync.mockReturnValue({
+    peekCacheSyncMock.mockReturnValue({
       '84532': {
         surveys: { '0xsurvey': { id: '0xsurvey' } },
         questions: { q1: { id: 'q1' }, q2: { id: 'q2' } },
@@ -315,13 +321,13 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
 
   it('coalesces cache update events and marks cache watch as loaded', () => {
     jest.useFakeTimers();
-    let onUpdate = null;
-    cacheScripts.subscribeCacheUpdates.mockImplementation((handler) => {
+    let onUpdate: ((event: any) => void) | null = null;
+    subscribeCacheUpdatesMock.mockImplementation((handler: (event: any) => void) => {
       onUpdate = handler;
       return () => {};
     });
     let reads = 0;
-    cacheScripts.peekCacheSync.mockImplementation(() => {
+    peekCacheSyncMock.mockImplementation(() => {
       reads += 1;
       if (reads < 2) {
         return {
@@ -354,7 +360,10 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
     expect(instance.state.cacheLoaded).toBe(false);
     expect(typeof onUpdate).toBe('function');
 
-    onUpdate({ namespace: 'surveysCache', slug: 'edge', action: 'write' });
+    const updateHandler = onUpdate as ((event: any) => void) | null;
+    if (updateHandler) {
+      updateHandler({ namespace: 'surveysCache', slug: 'edge', action: 'write' });
+    }
     if (instance._cacheWatchCoalescer && typeof instance._cacheWatchCoalescer.flushNow === 'function') {
       instance._cacheWatchCoalescer.flushNow();
     } else {
@@ -369,9 +378,9 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
 
   it('keeps polling fallback active when subscription events are absent', () => {
     jest.useFakeTimers();
-    cacheScripts.subscribeCacheUpdates.mockImplementation(() => () => {});
+    subscribeCacheUpdatesMock.mockImplementation(() => () => {});
     let reads = 0;
-    cacheScripts.peekCacheSync.mockImplementation(() => {
+    peekCacheSyncMock.mockImplementation(() => {
       reads += 1;
       if (reads < 3) {
         return {
@@ -413,14 +422,14 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
   });
 
   it('treats question cache seeding as best-effort when write-through fails', async () => {
-    cacheScripts.peekCacheSync.mockReturnValue({
+    peekCacheSyncMock.mockReturnValue({
       '84532': {
         questions: {},
         questionResponses: {},
         questionResponsesMeta: {},
       },
     });
-    cacheScripts.writeCacheOptimistic
+    writeCacheOptimisticMock
       .mockRejectedValueOnce(new Error('quota exceeded'))
       .mockResolvedValue(undefined);
 
@@ -443,18 +452,18 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
       ],
     })).resolves.toBe(false);
 
-    expect(cacheScripts.writeCacheOptimistic).toHaveBeenCalled();
+    expect(writeCacheOptimisticMock).toHaveBeenCalled();
   });
 
   it('keeps question cache write-through scoped to unresolved non-general slugs', async () => {
-    cacheScripts.peekCacheSync.mockReturnValue({
+    peekCacheSyncMock.mockReturnValue({
       '84532': {
         questions: {},
         questionResponses: {},
         questionResponsesMeta: {},
       },
     });
-    cacheScripts.writeCacheOptimistic.mockResolvedValue(undefined);
+    writeCacheOptimisticMock.mockResolvedValue(undefined);
 
     const instance = makeInstance({
       activeSessionSlug: 'missing-session',
@@ -479,12 +488,12 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
       ],
     })).resolves.toBe(true);
 
-    expect(cacheScripts.writeCacheOptimistic).toHaveBeenCalledWith(
+    expect(writeCacheOptimisticMock).toHaveBeenCalledWith(
       'questionsCache',
       'missing-session',
       expect.any(Object)
     );
-    expect(cacheScripts.writeCacheOptimistic).not.toHaveBeenCalledWith(
+    expect(writeCacheOptimisticMock).not.toHaveBeenCalledWith(
       'questionsCache',
       '',
       expect.anything()
@@ -492,14 +501,14 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
   });
 
   it('still writes question cache through the general bucket for general-session authoring', async () => {
-    cacheScripts.peekCacheSync.mockReturnValue({
+    peekCacheSyncMock.mockReturnValue({
       '84532': {
         questions: {},
         questionResponses: {},
         questionResponsesMeta: {},
       },
     });
-    cacheScripts.writeCacheOptimistic.mockResolvedValue(undefined);
+    writeCacheOptimisticMock.mockResolvedValue(undefined);
 
     const instance = makeInstance({
       activeSessionSlug: '',
@@ -524,7 +533,7 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
       ],
     })).resolves.toBe(true);
 
-    expect(cacheScripts.writeCacheOptimistic).toHaveBeenCalledWith(
+    expect(writeCacheOptimisticMock).toHaveBeenCalledWith(
       'questionsCache',
       '',
       expect.any(Object)
@@ -532,14 +541,14 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
   });
 
   it('seeds question cache only for the primary authoring slug when stale slug hints exist', async () => {
-    cacheScripts.peekCacheSync.mockReturnValue({
+    peekCacheSyncMock.mockReturnValue({
       '84532': {
         questions: {},
         questionResponses: {},
         questionResponsesMeta: {},
       },
     });
-    cacheScripts.writeCacheOptimistic.mockResolvedValue(undefined);
+    writeCacheOptimisticMock.mockResolvedValue(undefined);
 
     const instance = makeInstance({
       activeSessionSlug: 'primary-session',
@@ -565,8 +574,8 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
       ],
     })).resolves.toBe(true);
 
-    expect(cacheScripts.writeCacheOptimistic).toHaveBeenCalledTimes(1);
-    expect(cacheScripts.writeCacheOptimistic).toHaveBeenCalledWith(
+    expect(writeCacheOptimisticMock).toHaveBeenCalledTimes(1);
+    expect(writeCacheOptimisticMock).toHaveBeenCalledWith(
       'questionsCache',
       'primary-session',
       expect.any(Object)
@@ -742,7 +751,7 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
     });
     const keySpy = jest.spyOn(resourceKeys, 'getEffectiveArweaveKey').mockResolvedValue({
       arweaveJwk: '{"kty":"RSA"}',
-    });
+    } as any);
     const uploadSpy = jest.spyOn(arweaveScripts, 'uploadDataToArweave').mockRejectedValue(new Error('upload failed'));
 
     try {
@@ -806,10 +815,10 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
     });
     const keySpy = jest.spyOn(resourceKeys, 'getEffectiveArweaveKey').mockResolvedValue({
       arweaveJwk: '{"kty":"RSA"}',
-    });
+    } as any);
     const uploadSpy = jest.spyOn(arweaveScripts, 'uploadDataToArweave').mockResolvedValue('survey-arweave-tx');
-    cacheScripts.writeCacheOptimistic.mockResolvedValue(undefined);
-    cacheScripts.peekCacheSync.mockReturnValue({});
+    writeCacheOptimisticMock.mockResolvedValue(undefined);
+    peekCacheSyncMock.mockReturnValue({});
 
     try {
       const instance = makeInstance({
@@ -859,11 +868,11 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
       await instance.createSurvey();
 
       expect(addSurveySpy).toHaveBeenCalled();
-      const questionsWrite = cacheScripts.writeCacheOptimistic.mock.calls.find(
-        ([namespace]) => namespace === 'questionsCache'
+      const questionsWrite = writeCacheOptimisticMock.mock.calls.find(
+        (args: any[]) => args[0] === 'questionsCache'
       );
-      const surveysWrite = cacheScripts.writeCacheOptimistic.mock.calls.find(
-        ([namespace]) => namespace === 'surveysCache'
+      const surveysWrite = writeCacheOptimisticMock.mock.calls.find(
+        (args: any[]) => args[0] === 'surveysCache'
       );
 
       expect(questionsWrite).toBeTruthy();
@@ -908,7 +917,7 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
   });
 
   it('watches the resolved session chain bucket after submit when wallet-facing network props differ', () => {
-    cacheScripts.peekCacheSync.mockImplementation((namespace) => {
+    peekCacheSyncMock.mockImplementation((namespace: any) => {
       if (namespace !== 'surveysCache') return {};
       return {
         '84532': {
@@ -1185,11 +1194,11 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
   });
 
   it('adds the missing wallet network with a non-PATH RPC URL', async () => {
-    const originalEthereum = window.ethereum;
+    const originalEthereum = (window as any).ethereum;
     const request = jest.fn()
       .mockRejectedValueOnce({ code: 4902 })
       .mockResolvedValueOnce(undefined);
-    window.ethereum = { request };
+    (window as any).ethereum = { request } as any;
     try {
       const instance = makeInstance({ provider: 'wagmi' });
       instance.resolveSessionChainId = jest.fn(() => 84532);
@@ -1370,8 +1379,8 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
 
   it('renders uploaded-question Arweave links against ar.io when direct mode is enabled', () => {
     const txId = '8_2VRRP5Ka0b5F9yiq_nm2hJto8qnQazZ2EtfLJ0viE';
-    globalThis.CE_ARWEAVE_DIRECT_TO_AR_IO = true;
-    globalThis.CE_ARWEAVE_AR_IO_URL = 'https://ar-io.example.test';
+    (globalThis as any).CE_ARWEAVE_DIRECT_TO_AR_IO = true;
+    (globalThis as any).CE_ARWEAVE_AR_IO_URL = 'https://ar-io.example.test';
 
     const instance = makeInstance();
     instance.state = {
@@ -1400,8 +1409,8 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
 
   it('renders submitted-survey Arweave links against ar.io when direct mode is enabled', () => {
     const txId = '8_2VRRP5Ka0b5F9yiq_nm2hJto8qnQazZ2EtfLJ0viE';
-    globalThis.CE_ARWEAVE_DIRECT_TO_AR_IO = true;
-    globalThis.CE_ARWEAVE_AR_IO_URL = 'https://ar-io.example.test';
+    (globalThis as any).CE_ARWEAVE_DIRECT_TO_AR_IO = true;
+    (globalThis as any).CE_ARWEAVE_AR_IO_URL = 'https://ar-io.example.test';
 
     const instance = makeInstance();
     instance.state = {
@@ -1430,7 +1439,7 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
   });
 
   it('canonicalizes submitted-survey display links for reserved session aliases', () => {
-    const buildSurveyLinks = (activeSessionSlug) => {
+    const buildSurveyLinks = (activeSessionSlug: string) => {
       const instance = makeInstance({ activeSessionSlug });
       instance.state = {
         ...instance.state,
