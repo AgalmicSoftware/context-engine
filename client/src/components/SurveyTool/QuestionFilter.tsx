@@ -1,4 +1,4 @@
-/** @file QuestionFilter.jsx */
+/** @file QuestionFilter.tsx */
 
 import React, { Component } from 'react';
 import { connect } from 'react-redux';
@@ -64,6 +64,9 @@ import {
 
 const questionFilterLog = createLogger('questionFilter');
 const FILTER_STORAGE_KEY_PREFIX = 'dg:filters:';
+const getErrorMessage = (error: any, fallback = 'Unknown error') => (
+  typeof error?.message === 'string' && error.message.trim() ? error.message : fallback
+);
 
 
 /**
@@ -90,7 +93,7 @@ const modalStyles = {
 /** Resolve effective session slug:
  * Priority: URL /session/:slug → Redux activeSessionSlug → props.sessionSlug → '' (general)
  */
-function resolveEffectiveSlug(props = {}) {
+function resolveEffectiveSlug(props: any = {}) {
   return resolveQuestionFilterEffectiveSlug({
     pathname: (typeof window !== 'undefined' && window.location?.pathname) || '',
     activeSessionSlug: props.activeSessionSlug,
@@ -98,7 +101,7 @@ function resolveEffectiveSlug(props = {}) {
   });
 }
 
-function resolveEffectiveSessionContext(props = {}) {
+function resolveEffectiveSessionContext(props: any = {}) {
   return resolveQuestionFilterSessionContext({
     pathname: (typeof window !== 'undefined' && window.location?.pathname) || '',
     activeSessionSlug: props.activeSessionSlug,
@@ -107,7 +110,7 @@ function resolveEffectiveSessionContext(props = {}) {
   });
 }
 
-function resolveFilterStorageSlug(props = {}) {
+function resolveFilterStorageSlug(props: any = {}) {
   const prefix = String(props?.storageKeyPrefix || '').trim();
   if (prefix.startsWith(FILTER_STORAGE_KEY_PREFIX)) {
     return prefix.slice(FILTER_STORAGE_KEY_PREFIX.length);
@@ -115,11 +118,11 @@ function resolveFilterStorageSlug(props = {}) {
   return resolveEffectiveSlug(props);
 }
 
-const readQuestionsCacheSync = (slug) => peekCacheSync('questionsCache', slug, { clone: false }) || {};
+const readQuestionsCacheSync = (slug: any) => peekCacheSync('questionsCache', slug, { clone: false }) || {};
 
-const toLowerId = (value) => String(value || '').trim().toLowerCase();
+const toLowerId = (value: any) => String(value || '').trim().toLowerCase();
 
-const areQuestionListsEquivalentById = (a, b) => {
+const areQuestionListsEquivalentById = (a: any, b: any) => {
   const aa = Array.isArray(a) ? a : [];
   const bb = Array.isArray(b) ? b : [];
   if (aa === bb) return true;
@@ -132,7 +135,7 @@ const areQuestionListsEquivalentById = (a, b) => {
   return true;
 };
 
-const hashNormalizedString = (value = '') => {
+const hashNormalizedString = (value: any = '') => {
   let hash = 2166136261;
   const input = String(value || '');
   for (let i = 0; i < input.length; i += 1) {
@@ -142,16 +145,16 @@ const hashNormalizedString = (value = '') => {
   return (hash >>> 0).toString(16).padStart(8, '0');
 };
 
-const stableSerializeSmallObject = (value, maxLen = 4096) => {
-  const normalize = (input, seen = new WeakSet()) => {
+const stableSerializeSmallObject = (value: any, maxLen: any = 4096) => {
+  const normalize = (input: any, seen: any = new WeakSet()): any => {
     if (input == null || typeof input !== 'object') return input;
     if (seen.has(input)) return null;
     seen.add(input);
     if (Array.isArray(input)) {
-      return input.map((item) => normalize(item, seen));
+      return input.map((item: any) => normalize(item, seen));
     }
-    const out = {};
-    Object.keys(input).sort().forEach((key) => {
+    const out: Record<string, any> = {};
+    Object.keys(input).sort().forEach((key: any) => {
       out[key] = normalize(input[key], seen);
     });
     return out;
@@ -167,7 +170,7 @@ const stableSerializeSmallObject = (value, maxLen = 4096) => {
   }
 };
 
-const buildQuestionIdListSignature = (questions = []) => {
+const buildQuestionIdListSignature = (questions: any = []) => {
   // Content-aware signature to prevent stale parent state when question objects
   // change but IDs remain the same.
   return stableSerializeSmallObject(
@@ -176,12 +179,12 @@ const buildQuestionIdListSignature = (questions = []) => {
   );
 };
 
-const buildFilteredResponsesByQuestionSignature = (responsesByQuestion = {}) => {
+const buildFilteredResponsesByQuestionSignature = (responsesByQuestion: any = {}) => {
   if (!responsesByQuestion || typeof responsesByQuestion !== 'object') return '';
   return stableSerializeSmallObject(responsesByQuestion, 65536);
 };
 
-const buildFilterPayloadSignature = (payload) => {
+const buildFilterPayloadSignature = (payload: any) => {
   if (Array.isArray(payload)) {
     return `arr:${buildQuestionIdListSignature(payload)}`;
   }
@@ -196,22 +199,22 @@ const buildFilterPayloadSignature = (payload) => {
   return `prim:${String(payload)}`;
 };
 
-const normalizeNonceKey = (value) => {
+const normalizeNonceKey = (value: any) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
 };
 
-const normalizePositiveInt = (value, fallback = DEFAULT_AI_TOP_N) => {
+const normalizePositiveInt = (value: any, fallback: any = DEFAULT_AI_TOP_N) => {
   const parsed = Number.parseInt(String(value ?? ''), 10);
   if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
   return parsed;
 };
 
-const normalizeAiIdList = (ids = []) => {
+const normalizeAiIdList = (ids: any = []) => {
   const source = Array.isArray(ids) ? ids : [];
-  const seen = new Set();
-  const out = [];
-  source.forEach((id) => {
+  const seen: any = new Set();
+  const out: any[] = [];
+  source.forEach((id: any) => {
     const text = String(id || '').trim();
     if (!text) return;
     const lower = text.toLowerCase();
@@ -222,10 +225,10 @@ const normalizeAiIdList = (ids = []) => {
   return out;
 };
 
-const buildAiCandidateSignature = (questions = []) => {
+const buildAiCandidateSignature = (questions: any = []) => {
   const input = Array.isArray(questions) ? questions : [];
   return stableSerializeSmallObject(
-    input.map((q) => ({
+    input.map((q: any) => ({
       id: String(q?.id || '').toLowerCase(),
       prompt: String(q?.prompt || ''),
     })),
@@ -237,7 +240,7 @@ const normalizeResponseStatusFilterState = ({
   filterByResponded = false,
   filterByNotResponded = false,
   account = '',
-} = {}) => {
+}: any = {}) => {
   // Intentional: response-status filters are wallet-scoped. When no wallet is
   // connected we fail closed and drop them instead of keeping a latent filter
   // that would silently change the visible question set after reconnect.
@@ -255,8 +258,10 @@ const normalizeResponseStatusFilterState = ({
 
 let QUESTION_FILTER_INSTANCE_SEQ = 0;
 
-class QuestionFilter extends React.Component {
-  constructor(props) {
+class QuestionFilter extends React.Component<any, any> {
+  [key: string]: any;
+
+  constructor(props: any) {
     super(props);
 
     QUESTION_FILTER_INSTANCE_SEQ += 1;
@@ -386,11 +391,11 @@ class QuestionFilter extends React.Component {
 
   /* -------------------------- LIFECYCLE METHODS -------------------------- */
 
-  getEffectiveSessionConfig = (propsIn = this.props) => {
+  getEffectiveSessionConfig: any = (propsIn: any = this.props) => {
     return resolveEffectiveSessionContext(propsIn).sessionConfig || {};
   };
 
-  buildAiRequestOptions = (propsIn = this.props) => {
+  buildAiRequestOptions: any = (propsIn: any = this.props) => {
     const resolvedSession = resolveEffectiveSessionContext(propsIn);
     const slug = resolvedSession.sessionSlug || '';
     const sessionConfig = resolvedSession.sessionConfig || {};
@@ -405,13 +410,13 @@ class QuestionFilter extends React.Component {
     };
   };
 
-  hasConfiguredLocalAiKey = () => {
+  hasConfiguredLocalAiKey: any = () => {
     try {
-      const local = getLocalAiSettings();
+      const local: any = getLocalAiSettings();
       const providers = local?.providers && typeof local.providers === 'object'
         ? local.providers
         : {};
-      return Object.values(providers).some((entry) => {
+      return Object.values(providers).some((entry: any) => {
         if (!entry || typeof entry !== 'object') return false;
         const plain = String(entry.apiKey || '').trim();
         const encrypted = String(entry.encryptedApiKey || '').trim();
@@ -422,7 +427,7 @@ class QuestionFilter extends React.Component {
     }
   };
 
-  syncAiApplyingElapsedTimer = () => {
+  syncAiApplyingElapsedTimer: any = () => {
     if (this.state.aiApplying) {
       if (!this._aiApplyingStartedAtMs) this._aiApplyingStartedAtMs = Date.now();
       if (!this._aiApplyingElapsedTimer) {
@@ -447,7 +452,7 @@ class QuestionFilter extends React.Component {
     }
   };
 
-  getAiAccessState = (propsIn = this.props) => {
+  getAiAccessState: any = (propsIn: any = this.props) => {
     const cfg = this.getEffectiveSessionConfig(propsIn);
     const gateState = resolveSponsoredGateStateForResource(cfg, 'ai');
     const sponsoredStatus = gateState?.status || SPONSORED_GATE_STATES.UNAVAILABLE;
@@ -464,7 +469,7 @@ class QuestionFilter extends React.Component {
     };
   };
 
-  getEncryptedQuestionGateTooltipProps = (propsIn = this.props) => {
+  getEncryptedQuestionGateTooltipProps: any = (propsIn: any = this.props) => {
     const sessionConfig = this.getEffectiveSessionConfig(propsIn);
     const gateConfig =
       resolveEncryptionGate(sessionConfig) ||
@@ -483,7 +488,7 @@ class QuestionFilter extends React.Component {
     };
   };
 
-  getQuestionsSubsetBeforeAi = (usePendingState = true) => {
+  getQuestionsSubsetBeforeAi: any = (usePendingState: any = true) => {
     const mergedQuestions = Array.isArray(this.state.mergedQuestions)
       ? this.state.mergedQuestions
       : [];
@@ -497,22 +502,22 @@ class QuestionFilter extends React.Component {
     const selectedTags = this.state.selectedTags || [];
 
     if (sbtFilteredQuestions !== null) {
-      const sbtIds = new Set(
-        (sbtFilteredQuestions || []).map((q) => String(q.id || '').toLowerCase())
+      const sbtIds: any = new Set(
+        (sbtFilteredQuestions || []).map((q: any) => String(q.id || '').toLowerCase())
       );
-      subset = subset.filter((q) => sbtIds.has(String(q.id || '').toLowerCase()));
+      subset = subset.filter((q: any) => sbtIds.has(String(q.id || '').toLowerCase()));
     }
 
     if (Array.isArray(selectedTypes) && selectedTypes.length > 0) {
-      const selectedTypesSet = new Set(selectedTypes);
-      subset = subset.filter((q) => selectedTypesSet.has(q.type));
+      const selectedTypesSet: any = new Set(selectedTypes);
+      subset = subset.filter((q: any) => selectedTypesSet.has(q.type));
     }
 
     if (Array.isArray(selectedTags) && selectedTags.length > 0) {
-      const selectedTagsLC = new Set(selectedTags.map((t) => String(t).toLowerCase()));
-      subset = subset.filter((q) => {
+      const selectedTagsLC: any = new Set(selectedTags.map((t: any) => String(t).toLowerCase()));
+      subset = subset.filter((q: any) => {
         if (!Array.isArray(q.tags)) return false;
-        return q.tags.some((tag) => selectedTagsLC.has(String(tag).toLowerCase()));
+        return q.tags.some((tag: any) => selectedTagsLC.has(String(tag).toLowerCase()));
       });
     }
 
@@ -523,13 +528,13 @@ class QuestionFilter extends React.Component {
       const userAddress = String(this.props.account || '').toLowerCase();
       const relevantResponses = this.props.questionResponses || this.state.cachedQuestionResponses || {};
       if (userAddress) {
-        subset = subset.filter((q) => {
+        subset = subset.filter((q: any) => {
           const qId = String(q?.id || '');
           const respondersObj = relevantResponses[qId] || relevantResponses[qId.toLowerCase()] || {};
           const hasResponded = (
             respondersObj &&
             typeof respondersObj === 'object' &&
-            Object.keys(respondersObj).some((addressKey) => String(addressKey).toLowerCase() === userAddress)
+            Object.keys(respondersObj).some((addressKey: any) => String(addressKey).toLowerCase() === userAddress)
           );
           return filterByResponded ? hasResponded : !hasResponded;
         });
@@ -539,16 +544,16 @@ class QuestionFilter extends React.Component {
     return subset;
   };
 
-  getAiRankingCandidates = () => (
+  getAiRankingCandidates: any = () => (
     Array.isArray(this.state.mergedQuestions) ? this.state.mergedQuestions : []
   );
 
-  buildAiApplySignature = ({
+  buildAiApplySignature: any = ({
     stateIn = this.state,
     propsIn = this.props,
     queryOverride = null,
     candidateQuestions = null,
-  } = {}) => {
+  }: any = {}) => {
     const state = stateIn && typeof stateIn === 'object' ? stateIn : {};
     const query = String(
       queryOverride != null ? queryOverride : state.aiSearchQuery
@@ -562,7 +567,7 @@ class QuestionFilter extends React.Component {
     return `${slug}|${query}|${candidateSignature}`;
   };
 
-  queueAutoApplyAiFilter = (reason = 'auto') => {
+  queueAutoApplyAiFilter: any = (reason: any = 'auto') => {
     const query = String(this.state.aiSearchQuery || '').trim();
     if (!query) return;
     const candidateQuestions = this.getAiRankingCandidates();
@@ -604,11 +609,12 @@ class QuestionFilter extends React.Component {
     if (shouldApplyDefaultFilterState) {
 		      questionFilterLog.log('Received defaultFilterState:', this.props.defaultFilterState);
 		      // Example: Parse "tag=AI&sort=recent"
-		      const params = new URLSearchParams(this.props.defaultFilterState);
-	      const tagsFromDefaultFilterState = params.get('tag') ? params.get('tag').split(',') : [];
+			      const params = new URLSearchParams(this.props.defaultFilterState);
+		      const tagParam = params.get('tag');
+		      const tagsFromDefaultFilterState = tagParam ? tagParam.split(',') : [];
 	      const defaultSort = params.get('sort'); // 'recent', 'importance', etc.
 
-	      const newDefaultState = {};
+	      const newDefaultState: Record<string, any> = {};
 	      if (tagsFromDefaultFilterState.length > 0) {
 	        newDefaultState.selectedTags = tagsFromDefaultFilterState;
 	      }
@@ -630,7 +636,7 @@ class QuestionFilter extends React.Component {
     // This overrides localStorage and defaultFilterState string.
     if (hasUrlFilterState) {
       const urlFilterState = this.props.filterState;
-      const newStateFromUrl = {};
+      const newStateFromUrl: Record<string, any> = {};
 
       // Map questionTypes
       if (urlFilterState.questionTypes !== undefined) {
@@ -756,7 +762,7 @@ class QuestionFilter extends React.Component {
     this._allowFilterStateAutosave = true;
   } // End of componentDidMount
 
-  buildAutosaveSignature = (propsIn = this.props, stateIn = this.state) => {
+  buildAutosaveSignature: any = (propsIn: any = this.props, stateIn: any = this.state) => {
     const state = stateIn && typeof stateIn === 'object' ? stateIn : {};
     const props = propsIn && typeof propsIn === 'object' ? propsIn : {};
     return stableSerializeSmallObject({
@@ -778,7 +784,7 @@ class QuestionFilter extends React.Component {
     });
   };
 
-  hasResponseDrivenFilterState = ({ usePendingState = true, stateIn = this.state } = {}) => {
+  hasResponseDrivenFilterState: any = ({ usePendingState = true, stateIn = this.state }: any = {}) => {
     const state = stateIn && typeof stateIn === 'object' ? stateIn : {};
     const hasResponseStatusFilter = this.hasActiveResponseStatusFilter({ stateIn: state });
     const showTopQuestions = usePendingState
@@ -799,7 +805,7 @@ class QuestionFilter extends React.Component {
     );
   };
 
-  hasActiveResponseStatusFilter = ({ stateIn = this.state } = {}) => {
+  hasActiveResponseStatusFilter: any = ({ stateIn = this.state }: any = {}) => {
     const state = stateIn && typeof stateIn === 'object' ? stateIn : {};
     const filterByResponded = !!state.filterByResponded;
     const filterByNotResponded = !!state.filterByNotResponded;
@@ -809,7 +815,7 @@ class QuestionFilter extends React.Component {
     );
   };
 
-  hasExternalFilterState = (propsIn = this.props) => (
+  hasExternalFilterState: any = (propsIn: any = this.props) => (
     !!(
       propsIn?.filterState &&
       typeof propsIn.filterState === 'object' &&
@@ -817,24 +823,24 @@ class QuestionFilter extends React.Component {
     )
   );
 
-  shouldApplyDefaultFilterState = (propsIn = this.props) => (
+  shouldApplyDefaultFilterState: any = (propsIn: any = this.props) => (
     !!propsIn?.defaultFilterState && !this.hasExternalFilterState(propsIn)
   );
 
-  shouldUseLocalStorageBackedFilterState = (propsIn = this.props) => (
+  shouldUseLocalStorageBackedFilterState: any = (propsIn: any = this.props) => (
     !!propsIn?.enableLocalStorage &&
     !this.shouldApplyDefaultFilterState(propsIn) &&
     !this.hasExternalFilterState(propsIn)
   );
 
-  getFilterPersistenceScopeSignature = (propsIn = this.props) => (
+  getFilterPersistenceScopeSignature: any = (propsIn: any = this.props) => (
     [
       propsIn?.filterType === 'results' ? 'results' : 'questions',
       String(resolveFilterStorageSlug(propsIn) || ''),
     ].join('|')
   );
 
-  getMemoizedStableSerialize = (value, maxLen = 4096) => {
+  getMemoizedStableSerialize: any = (value: any, maxLen: any = 4096) => {
     if (!value || typeof value !== 'object') {
       return stableSerializeSmallObject(value, maxLen);
     }
@@ -851,7 +857,7 @@ class QuestionFilter extends React.Component {
     return serialized;
   };
 
-  shouldAutosaveFilterState = (prevProps, prevState) => {
+  shouldAutosaveFilterState: any = (prevProps: any, prevState: any) => {
     if (
       !this.props.enableLocalStorage ||
       !this._allowFilterStateAutosave ||
@@ -886,7 +892,7 @@ class QuestionFilter extends React.Component {
     return prevSig !== nextSig;
   };
 
-  componentDidUpdate(prevProps, prevState) {
+  componentDidUpdate(prevProps: any, prevState: any) {
     measureSync('ce.questionFilter.componentDidUpdate', () => {
       this.syncAiApplyingElapsedTimer();
       const filterPersistenceScopeChanged =
@@ -898,7 +904,7 @@ class QuestionFilter extends React.Component {
       if (shouldRestoreScopedLocalFilterState) {
         this.invalidatePendingAiApply();
         void this.loadFilterStateFromLocalStorage({ resetIfMissing: true })
-          .then((didRestoreState) => {
+          .then((didRestoreState: any) => {
             if (!didRestoreState || !this._isMounted) return;
             this.handleApplyFilters(true);
             this.checkIfCurrentFilterIsBookmarked();
@@ -954,7 +960,7 @@ class QuestionFilter extends React.Component {
         stateIn: this.state,
       });
 
-      const statePatch = {};
+      const statePatch: Record<string, any> = {};
       let shouldApplyFiltersAfterPatch = false;
       let nextMergedQuestionsSyncSignature = this._mergedQuestionsSyncSignature;
       let nextCachedQuestionResponsesSignature = this._cachedQuestionResponsesSignature;
@@ -1050,7 +1056,7 @@ class QuestionFilter extends React.Component {
   // ----------------------------------------------------------------------------------
   // BOOKMARK LOGIC
   // ----------------------------------------------------------------------------------
-  checkIfCurrentFilterIsBookmarked = () => {
+  checkIfCurrentFilterIsBookmarked: any = () => {
     const currentFilterString = serializeFilterState(this.buildFilterState());
     if (!currentFilterString) {
       if (this._isMounted && this.state.isCurrentFilterBookmarked !== false) {
@@ -1060,7 +1066,7 @@ class QuestionFilter extends React.Component {
     }
 
     const slug = resolveFilterStorageSlug(this.props);
-    let bookmarksCache = {};
+    let bookmarksCache: Record<string, any> = {};
     try {
       const filtersCache = peekCacheSync('filters', slug, { clone: false }) || {};
       bookmarksCache = (filtersCache && typeof filtersCache === 'object') ? filtersCache : {};
@@ -1079,7 +1085,7 @@ class QuestionFilter extends React.Component {
     }
   };
 
-  handleBookmarkCurrentFilter = () => {
+  handleBookmarkCurrentFilter: any = () => {
     if (!this._isMounted) return;
 
     const currentFilterString = serializeFilterState(this.buildFilterState());
@@ -1089,7 +1095,7 @@ class QuestionFilter extends React.Component {
     }
 
     const slug = resolveFilterStorageSlug(this.props);
-    let bookmarksCacheObject = {};
+    let bookmarksCacheObject: Record<string, any> = {};
 
     try {
       const parsedCache = peekCacheSync('filters', slug, { clone: false });
@@ -1114,32 +1120,38 @@ class QuestionFilter extends React.Component {
       bookmarksCacheObject.bookmarkedFilters.push(currentFilterString);
     }
 
-    void writeCache('filters', slug, bookmarksCacheObject)
-      .then((ok) => {
-        if (!ok) {
-          questionFilterLog.warn('Failed to persist bookmarked filter state');
-          return;
-        }
-        this.setState({ filterBookmarkedFeedback: true }, () => {
-          this.checkIfCurrentFilterIsBookmarked();
-        });
+	    const writeResult: any = writeCache('filters', slug, bookmarksCacheObject);
+	    const handleSuccess = (ok: any) => {
+	      if (!ok) {
+	        questionFilterLog.warn('Failed to persist bookmarked filter state');
+	        return;
+	      }
+	      this.setState({ filterBookmarkedFeedback: true }, () => {
+	        this.checkIfCurrentFilterIsBookmarked();
+	      });
 
-        clearTimeout(this.bookmarkFeedbackTimeout);
-        this.bookmarkFeedbackTimeout = setTimeout(() => {
-          if (this._isMounted) {
-            this.setState({ filterBookmarkedFeedback: false });
-          }
-        }, 2000);
-      })
-      .catch((e) => {
-        questionFilterLog.error("Error saving bookmarksCache to local cache:", e);
-      });
+	      clearTimeout(this.bookmarkFeedbackTimeout);
+	      this.bookmarkFeedbackTimeout = setTimeout(() => {
+	        if (this._isMounted) {
+	          this.setState({ filterBookmarkedFeedback: false });
+	        }
+	      }, 2000);
+	    };
+	    if (writeResult && typeof writeResult.then === 'function') {
+	      void writeResult
+	        .then(handleSuccess)
+	        .catch((e: any) => {
+	          questionFilterLog.error("Error saving bookmarksCache to local cache:", e);
+	        });
+	    } else {
+	      handleSuccess(writeResult);
+	    }
   };
 
   // ----------------------------------------------------------------------------------
   // LOCAL STORAGE FOR FILTER STATE
   // ----------------------------------------------------------------------------------
-  getDefaultFilterStatePatch = () => ({
+  getDefaultFilterStatePatch: any = () => ({
     selectedTypes: [],
     selectedTags: [],
     sortByImportance: false,
@@ -1170,7 +1182,7 @@ class QuestionFilter extends React.Component {
     filterUrlInput: '',
   });
 
-  async loadFilterStateFromLocalStorage(options = {}) {
+  async loadFilterStateFromLocalStorage(options: any = {}) {
     const { resetIfMissing = false } = options;
     this._loadingFilterStateFromCache = true;
     let didRestoreState = false;
@@ -1180,7 +1192,7 @@ class QuestionFilter extends React.Component {
         this.props.filterType === 'results'
           ? 'questionFilterState_results'
           : 'questionFilterState_questions';
-      let saved = null;
+      let saved: any = null;
       const filtersCacheSync = peekCacheSync('filters', slug, { clone: false });
       if (filtersCacheSync && typeof filtersCacheSync === 'object') {
         saved = filtersCacheSync?.[modeKey] ? JSON.stringify(filtersCacheSync[modeKey]) : null;
@@ -1202,12 +1214,12 @@ class QuestionFilter extends React.Component {
           account: this.props.account,
         });
         didRestoreState = true;
-        await new Promise((resolve) => {
+        await new Promise((resolve: any) => {
           if (!this._isMounted) {
             resolve();
             return;
           }
-          this.setState((prevState) => ({
+          this.setState((prevState: any) => ({
             selectedTypes: Array.isArray(parsed.selectedTypes) ? parsed.selectedTypes : prevState.selectedTypes,
             sortByImportance:
               typeof parsed.sortByImportance === 'boolean'
@@ -1265,7 +1277,7 @@ class QuestionFilter extends React.Component {
         });
       } else if (resetIfMissing) {
         didRestoreState = true;
-        await new Promise((resolve) => {
+        await new Promise((resolve: any) => {
           if (!this._isMounted) {
             resolve();
             return;
@@ -1336,21 +1348,27 @@ class QuestionFilter extends React.Component {
       const next = (existing && typeof existing === 'object')
         ? { ...existing, [modeKey]: dataToStore }
         : { [modeKey]: dataToStore };
-      void writeCache('filters', slug, next)
-        .then((ok) => {
-          if (ok !== false) {
-            this._lastSavedFilterStateSignature = persistenceSignature;
-          }
-        })
-        .catch((error) => {
-          questionFilterLog.error('Error saving filter state to cache:', error);
-        });
+      const writeResult: any = writeCache('filters', slug, next);
+      const handleSuccess = (ok: any) => {
+        if (ok !== false) {
+          this._lastSavedFilterStateSignature = persistenceSignature;
+        }
+      };
+      if (writeResult && typeof writeResult.then === 'function') {
+        void writeResult
+          .then(handleSuccess)
+          .catch((error: any) => {
+            questionFilterLog.error('Error saving filter state to cache:', error);
+          });
+      } else {
+        handleSuccess(writeResult);
+      }
     } catch (error) {
       questionFilterLog.error('Error saving filter state to cache:', error);
     }
   }
 
-  syncExternalFilterState(nextFilterState) {
+  syncExternalFilterState(nextFilterState: any) {
     if (!nextFilterState || typeof nextFilterState !== 'object') {
       return;
     }
@@ -1462,7 +1480,7 @@ class QuestionFilter extends React.Component {
   // ----------------------------------------------------------------------------------
   // MERGE QUESTIONS WITH CACHE & LOAD RESPONSES FROM LOCAL
   // ----------------------------------------------------------------------------------
-  mergeQuestionsWithCache(sourceQuestions) {
+  mergeQuestionsWithCache(sourceQuestions: any) {
     if (!sourceQuestions || !Array.isArray(sourceQuestions)) return sourceQuestions || [];
 
     const resolvedSession = resolveEffectiveSessionContext(this.props);
@@ -1478,10 +1496,10 @@ class QuestionFilter extends React.Component {
     if (!net || !net.questions) return sourceQuestions;
 
     const allCacheQIDs = Object.keys(net.questions);
-    const existingIDs = new Set(sourceQuestions.map((q) => (q.id || '').toLowerCase()));
+    const existingIDs: any = new Set(sourceQuestions.map((q: any) => (q.id || '').toLowerCase()));
     const merged = [...sourceQuestions];
 
-    allCacheQIDs.forEach((qIdLower) => {
+    allCacheQIDs.forEach((qIdLower: any) => {
       if (!existingIDs.has(qIdLower)) {
         const qObj = net.questions[qIdLower];
         if (qObj) {
@@ -1517,7 +1535,7 @@ class QuestionFilter extends React.Component {
     }
   }
 
-  parseResponse = (responseData) => {
+  parseResponse: any = (responseData: any) => {
     if (typeof responseData !== 'string') return responseData;
     const memo = this._responseParseMemo;
     if (memo.has(responseData)) {
@@ -1548,10 +1566,10 @@ class QuestionFilter extends React.Component {
   };
 
   getMemoizedQuestionResponseStats(
-    relevantResponses = {},
-    mergedQuestions = [],
-    questionResponsesNonceKey = null,
-    questionsCacheNonceKey = null
+    relevantResponses: any = {},
+    mergedQuestions: any = [],
+    questionResponsesNonceKey: any = null,
+    questionsCacheNonceKey: any = null
   ) {
     const memo = this._questionResponseStatsMemo;
     if (
@@ -1563,22 +1581,22 @@ class QuestionFilter extends React.Component {
       return memo.result;
     }
 
-    const questionTypeById = {};
-    (Array.isArray(mergedQuestions) ? mergedQuestions : []).forEach((question) => {
+    const questionTypeById: Record<string, any> = {};
+    (Array.isArray(mergedQuestions) ? mergedQuestions : []).forEach((question: any) => {
       const qLower = toLowerId(question?.id);
       if (!qLower) return;
       questionTypeById[qLower] = String(question?.type || '').toLowerCase();
     });
 
-    const statsByQuestion = new Map();
-    Object.keys(relevantResponses || {}).forEach((qId) => {
+    const statsByQuestion: any = new Map();
+    Object.keys(relevantResponses || {}).forEach((qId: any) => {
       const qLower = String(qId || '').toLowerCase();
       const respondersObj = relevantResponses[qId] || {};
       const responderKeys = Object.keys(respondersObj || {});
       let totalImportance = 0;
       let responseCount = 0;
       const questionType = questionTypeById[qLower];
-      responderKeys.forEach((resp) => {
+      responderKeys.forEach((resp: any) => {
         const parsed = this.parseResponse(respondersObj[resp]);
         const next = Number(parsed?.conviction ?? parsed?.importance ?? 0);
         if (Number.isFinite(next)) totalImportance += next;
@@ -1605,14 +1623,14 @@ class QuestionFilter extends React.Component {
   // ----------------------------------------------------------------------------------
   // FILTER LOGIC
   // ----------------------------------------------------------------------------------
-  setFilterLoading = (loading) => {
+  setFilterLoading: any = (loading: any) => {
     this.setState({ filterLoading: loading });
     if (this.props.setFilterLoading) {
       this.props.setFilterLoading(loading);
     }
   };
 
-  emitCountUpdate = (count, encryptedCount) => {
+  emitCountUpdate: any = (count: any, encryptedCount: any) => {
     if (!this.props.onCountUpdate || !this.props.isQuestionCacheReady) return;
     const safeEncrypted = Number.isFinite(encryptedCount) ? encryptedCount : 0;
     if (this._lastEmittedCount === count && this._lastEmittedEncryptedCount === safeEncrypted) return;
@@ -1621,14 +1639,14 @@ class QuestionFilter extends React.Component {
     this.props.onCountUpdate(count, safeEncrypted);
   };
 
-  emitFilterActivityChange = (isFilterActive) => {
+  emitFilterActivityChange: any = (isFilterActive: any) => {
     if (!this.props.onFilterActivityChange) return;
     if (this._lastEmittedFilterActivity === isFilterActive) return;
     this._lastEmittedFilterActivity = isFilterActive;
     this.props.onFilterActivityChange(isFilterActive);
   };
 
-  emitFilterCallbacks(filteredPayload, filterStateForCallback) {
+  emitFilterCallbacks(filteredPayload: any, filterStateForCallback: any) {
     const payloadSignature = buildFilterPayloadSignature(filteredPayload);
     const filterStateSignature = serializeFilterState(filterStateForCallback) || '';
     if (
@@ -1651,7 +1669,7 @@ class QuestionFilter extends React.Component {
     }
   }
 
-  buildFilterPipelineResult(usePendingState = false) {
+  buildFilterPipelineResult(usePendingState: any = false) {
     const mergedQuestions = Array.isArray(this.state.mergedQuestions)
       ? this.state.mergedQuestions
       : [];
@@ -1805,43 +1823,43 @@ class QuestionFilter extends React.Component {
     if (showTopQuestions || showTopQuestionsByResponses) {
       const topLimit = Number(topQuestionsCount);
       if (showTopQuestionsByResponses) {
-        const rankedByResponses = finalQuestions.map((q, idx) => {
+        const rankedByResponses = finalQuestions.map((q: any, idx: any) => {
           const qLower = (q.id || '').toLowerCase();
           const score = Number(statsByQuestion?.get(qLower)?.responseCount || 0);
           return [q, idx, score];
         });
-        rankedByResponses.sort((a, b) => {
+        rankedByResponses.sort((a: any, b: any) => {
           const diff = b[2] - a[2];
           return diff !== 0 ? diff : (a[1] - b[1]);
         });
         finalQuestions = rankedByResponses
           .slice(0, topLimit)
-          .map(([q, , score]) => ({ ...q, totalResponses: score }));
+          .map(([q, , score]: any) => ({ ...q, totalResponses: score }));
       } else {
-        const rankedByImportance = finalQuestions.map((q, idx) => {
+        const rankedByImportance = finalQuestions.map((q: any, idx: any) => {
           const qLower = (q.id || '').toLowerCase();
           const score = Number(statsByQuestion?.get(qLower)?.totalImportance || 0);
           return [q, idx, score];
         });
-        rankedByImportance.sort((a, b) => {
+        rankedByImportance.sort((a: any, b: any) => {
           const diff = b[2] - a[2];
           return diff !== 0 ? diff : (a[1] - b[1]);
         });
         finalQuestions = rankedByImportance
           .slice(0, topLimit)
-          .map(([q, , score]) => ({ ...q, totalImportance: score }));
+          .map(([q, , score]: any) => ({ ...q, totalImportance: score }));
       }
     } else if (sortByImportance) {
-      const rankedByImportance = finalQuestions.map((q, idx) => {
+      const rankedByImportance = finalQuestions.map((q: any, idx: any) => {
         const qLower = (q.id || '').toLowerCase();
         const score = Number(statsByQuestion?.get(qLower)?.totalImportance || 0);
         return [q, idx, score];
       });
-      rankedByImportance.sort((a, b) => {
+      rankedByImportance.sort((a: any, b: any) => {
         const diff = b[2] - a[2];
         return diff !== 0 ? diff : (a[1] - b[1]);
       });
-      finalQuestions = rankedByImportance.map(([q, , score]) => ({ ...q, totalImportance: score }));
+      finalQuestions = rankedByImportance.map(([q, , score]: any) => ({ ...q, totalImportance: score }));
     }
 
     const result = {
@@ -1875,10 +1893,10 @@ class QuestionFilter extends React.Component {
     return result;
   }
 
-  handleFilteredQuestions = (filtered, newSbtFilterLocalState) => {
+  handleFilteredQuestions: any = (filtered: any, newSbtFilterLocalState: any) => {
     // "filtered" can be an array or an object { filteredQuestions, filteredResponsesByQuestion }
-    let realFilteredQuestions = [];
-    let filteredResponsesByQuestion = {};
+    let realFilteredQuestions: any[] = [];
+    let filteredResponsesByQuestion: Record<string, any> = {};
 
     if (Array.isArray(filtered)) {
       realFilteredQuestions = filtered;
@@ -1947,7 +1965,7 @@ class QuestionFilter extends React.Component {
     };
   }
 
-  applyAISearchFilter(questions, aiSearchQuery, aiRankedQuestionIds = [], topN = DEFAULT_AI_TOP_N) {
+  applyAISearchFilter(questions: any, aiSearchQuery: any, aiRankedQuestionIds: any = [], topN: any = DEFAULT_AI_TOP_N) {
     if (!aiSearchQuery.trim()) {
       return questions;
     }
@@ -1955,15 +1973,15 @@ class QuestionFilter extends React.Component {
     if (!orderedIds.length) return [];
     const limit = normalizePositiveInt(topN, DEFAULT_AI_TOP_N);
 
-    const orderById = new Map();
-    orderedIds.forEach((id, idx) => {
+    const orderById: any = new Map();
+    orderedIds.forEach((id: any, idx: any) => {
       const key = String(id || '').toLowerCase();
       if (!orderById.has(key)) orderById.set(key, idx);
     });
 
     return (Array.isArray(questions) ? questions : [])
-      .filter((q) => orderById.has(String(q?.id || '').toLowerCase()))
-      .sort((a, b) => {
+      .filter((q: any) => orderById.has(String(q?.id || '').toLowerCase()))
+      .sort((a: any, b: any) => {
         const aIdx = orderById.get(String(a?.id || '').toLowerCase());
         const bIdx = orderById.get(String(b?.id || '').toLowerCase());
         return (aIdx ?? 0) - (bIdx ?? 0);
@@ -1971,14 +1989,14 @@ class QuestionFilter extends React.Component {
       .slice(0, limit);
   }
 
-  handleAiDraftQueryChange = (nextValue) => {
+  handleAiDraftQueryChange: any = (nextValue: any) => {
     this.setState({
       aiDraftQuery: String(nextValue || ''),
       aiApplyError: '',
     });
   };
 
-  handleAiTopNChange = (event) => {
+  handleAiTopNChange: any = (event: any) => {
     const raw = event?.target?.value;
     const next = normalizePositiveInt(raw, DEFAULT_AI_TOP_N);
     this.setState({
@@ -1987,7 +2005,7 @@ class QuestionFilter extends React.Component {
     });
   };
 
-  handleAiCombineWithFiltersChange = (event) => {
+  handleAiCombineWithFiltersChange: any = (event: any) => {
     const checked = event?.target?.checked === true;
     this.setState({
       aiCombineWithOtherFilters: checked,
@@ -1999,19 +2017,19 @@ class QuestionFilter extends React.Component {
     });
   };
 
-  invalidatePendingAiApply = () => {
+  invalidatePendingAiApply: any = () => {
     this._aiApplyRequestSeq += 1;
     this._aiLatestRequestSeq = this._aiApplyRequestSeq;
     this._aiAutoApplyInFlightSignature = '';
     this._aiAutoApplyQueuedSignature = '';
   };
 
-  handleApplyAIFilter = async ({
+  handleApplyAIFilter: any = async ({
     auto = false,
     queryOverride,
     topNOverride,
     source = 'manual',
-  } = {}) => {
+  }: any = {}) => {
     const aiAccess = this.getAiAccessState();
     if (!aiAccess.enabled) {
       if (!auto) {
@@ -2128,14 +2146,14 @@ class QuestionFilter extends React.Component {
         this.handleApplyFilters(true);
       });
       return true;
-    } catch (error) {
-      questionFilterLog.error('Failed applying AI filter', { source, error });
-      if (!this._isMounted) return false;
-      if (requestSeq !== this._aiLatestRequestSeq) return false;
-      this.setState({
-        aiApplying: false,
-        aiApplyError: error?.message || 'AI filter request failed. Previous AI results were kept.',
-      });
+	    } catch (error: any) {
+	      questionFilterLog.error('Failed applying AI filter', { source, error });
+	      if (!this._isMounted) return false;
+	      if (requestSeq !== this._aiLatestRequestSeq) return false;
+	      this.setState({
+	        aiApplying: false,
+	        aiApplyError: getErrorMessage(error, 'AI filter request failed. Previous AI results were kept.'),
+	      });
       return false;
     } finally {
       if (auto && this._aiAutoApplyInFlightSignature === applySignature) {
@@ -2144,7 +2162,7 @@ class QuestionFilter extends React.Component {
     }
   };
 
-  handleApplyFilters(immediate = false) {
+  handleApplyFilters(immediate: any = false) {
     // Notify parent if filters are active/inactive
     const isFilterActive = !this.isFilterStateDefault(this.buildFilterState());
     this.emitFilterActivityChange(isFilterActive);
@@ -2217,7 +2235,7 @@ class QuestionFilter extends React.Component {
       () => {
         const filterStateForCallback = this.buildFilterState();
         this.emitFilterCallbacks(pipelineResult.finalQuestions, filterStateForCallback);
-        const encCount = pipelineResult.finalQuestions.filter(q => String(q?.prompt || '').trim() === '[encrypted]').length;
+        const encCount = pipelineResult.finalQuestions.filter((q: any) => String(q?.prompt || '').trim() === '[encrypted]').length;
         this.emitCountUpdate(pipelineResult.count, encCount);
         this.checkIfCurrentFilterIsBookmarked();
       }
@@ -2227,7 +2245,7 @@ class QuestionFilter extends React.Component {
 
 
   buildFilterState() {
-    let topQuestionsValue = null;
+    let topQuestionsValue: any = null;
     if (this.state.showTopQuestions) { // Use current state, not pending
       topQuestionsValue = { count: this.state.topQuestionsCount, by: 'importance' };
     } else if (this.state.showTopQuestionsByResponses) { // Use current state
@@ -2260,7 +2278,7 @@ class QuestionFilter extends React.Component {
     };
   }
 
-  isFilterStateDefault = (filterStateToTest) => {
+  isFilterStateDefault: any = (filterStateToTest: any) => {
     if (!filterStateToTest) {
       return true;
     }
@@ -2309,7 +2327,7 @@ class QuestionFilter extends React.Component {
            isResponseStatusDefault;
   }
 
-  handleCopyFilterUrl = () => {
+  handleCopyFilterUrl: any = () => {
     const { currentViewModeForUrl, currentSurveyIdForUrl } = this.props;
 
     // Validate context props
@@ -2349,13 +2367,13 @@ class QuestionFilter extends React.Component {
           }
         }, 2000);
       })
-      .catch(err => {
+      .catch((err: any) => {
         questionFilterLog.error('Failed to copy filter URL to clipboard:', err);
       });
   }
 
-  toggleSection = (section) => {
-    this.setState((prevState) => ({
+  toggleSection: any = (section: any) => {
+    this.setState((prevState: any) => ({
       expandedSections: {
         ...prevState.expandedSections,
         [section]: !prevState.expandedSections[section]
@@ -2374,7 +2392,7 @@ class QuestionFilter extends React.Component {
     }
 
     const pipeResult = this.buildFilterPipelineResult(true);
-    const encCount = pipeResult.finalQuestions.filter(q => String(q?.prompt || '').trim() === '[encrypted]').length;
+    const encCount = pipeResult.finalQuestions.filter((q: any) => String(q?.prompt || '').trim() === '[encrypted]').length;
     this.emitCountUpdate(pipeResult.count, encCount);
     const { count: newLength } = pipeResult;
     if (this.state.filteredQuestionsCount !== newLength) {
@@ -2382,10 +2400,10 @@ class QuestionFilter extends React.Component {
     }
   }
 
-  handleTypeSelection = (type) => {
+  handleTypeSelection: any = (type: any) => {
     let newSelectedTypes = [...this.state.pendingSelectedTypes];
     if (newSelectedTypes.includes(type)) {
-      newSelectedTypes = newSelectedTypes.filter((t) => t !== type);
+      newSelectedTypes = newSelectedTypes.filter((t: any) => t !== type);
     } else {
       newSelectedTypes.push(type);
     }
@@ -2394,13 +2412,13 @@ class QuestionFilter extends React.Component {
     });
   };
 
-  handleTagSelection = (tag) => {
+  handleTagSelection: any = (tag: any) => {
     const tagLower = String(tag).toLowerCase();
     // Store and compare tags in lowercase for case-insensitive matching
-    let updatedTags = this.state.selectedTags.map((t) => String(t).toLowerCase());
+    let updatedTags = this.state.selectedTags.map((t: any) => String(t).toLowerCase());
 
     if (updatedTags.includes(tagLower)) {
-      updatedTags = updatedTags.filter((t) => t !== tagLower);
+      updatedTags = updatedTags.filter((t: any) => t !== tagLower);
     } else {
       updatedTags.push(tagLower);
     }
@@ -2412,16 +2430,16 @@ class QuestionFilter extends React.Component {
   };
 
 
-  handleSortByImportance = () => {
+  handleSortByImportance: any = () => {
     this.setState(
-      (prevState) => ({ pendingSortByImportance: !prevState.pendingSortByImportance }),
+      (prevState: any) => ({ pendingSortByImportance: !prevState.pendingSortByImportance }),
       () => {
         this.handleApplyFilters(true);
       }
     );
   };
 
-  handleCancelFilters = () => {
+  handleCancelFilters: any = () => {
     // Revert pending changes
     this.setState(
       {
@@ -2445,10 +2463,10 @@ class QuestionFilter extends React.Component {
     );
   };
 
-  toggleShowTopQuestions = (byResponses = false) => {
+  toggleShowTopQuestions: any = (byResponses: any = false) => {
     if (byResponses) {
       this.setState(
-        (prev) => ({
+        (prev: any) => ({
           pendingShowTopQuestionsByResponses: !prev.pendingShowTopQuestionsByResponses,
           pendingShowTopQuestions: false // Ensure the other top questions mode is off
         }),
@@ -2458,7 +2476,7 @@ class QuestionFilter extends React.Component {
       );
     } else { // by importance
       this.setState(
-        (prev) => ({
+        (prev: any) => ({
           pendingShowTopQuestions: !prev.pendingShowTopQuestions,
           pendingShowTopQuestionsByResponses: false // Ensure the other top questions mode is off
         }),
@@ -2469,7 +2487,7 @@ class QuestionFilter extends React.Component {
     }
   };
 
-  handleClearFilters = () => {
+  handleClearFilters: any = () => {
     this.invalidatePendingAiApply();
     const defaultState = this.getDefaultFilterStatePatch();
     this.setState(defaultState, () => {
@@ -2477,7 +2495,7 @@ class QuestionFilter extends React.Component {
     });
   };
 
-handleLoadFilter = () => {
+handleLoadFilter: any = () => {
     let input = this.state.filterUrlInput.trim();
     if (!input) return;
 
@@ -2504,12 +2522,12 @@ handleLoadFilter = () => {
     }
 
     try {
-      const deserializedState = deserializeFilterState(filterString);
+	      const deserializedState: any = deserializeFilterState(filterString);
       if (!deserializedState) {
         throw new Error("Invalid filter string.");
       }
 
-      const newState = {};
+      const newState: Record<string, any> = {};
       // Map deserialized state to component's state structure
       if (deserializedState.questionTypes) {
         newState.selectedTypes = deserializedState.questionTypes;
@@ -2587,8 +2605,8 @@ handleLoadFilter = () => {
     }
   };
 
-  toggleShowAllTags = () => {
-    this.setState(prevState => ({ showAllTags: !prevState.showAllTags }));
+  toggleShowAllTags: any = () => {
+    this.setState((prevState: any) => ({ showAllTags: !prevState.showAllTags }));
   };
 
   // ----------------------------------------------------------------------------------
@@ -2603,25 +2621,25 @@ handleLoadFilter = () => {
     }
 
     // Aggregate tags case-insensitively to avoid duplicates like "RXC" vs "rxc"
-    const tagCounts = new Map();
-    mergedQuestions.forEach((q) => {
+    const tagCounts: any = new Map();
+    mergedQuestions.forEach((q: any) => {
       if (q.tags && Array.isArray(q.tags)) {
-        q.tags.forEach((tag) => {
+        q.tags.forEach((tag: any) => {
           const tagLower = String(tag).toLowerCase();
           tagCounts.set(tagLower, (tagCounts.get(tagLower) || 0) + 1);
         });
       }
     });
     const tags = Array.from(tagCounts.entries())
-      .sort(([, countA], [, countB]) => countB - countA)
-      .map(([tagLower]) => tagLower);
+      .sort(([, countA]: any, [, countB]: any) => countB - countA)
+      .map(([tagLower]: any) => tagLower);
     this._allTagsMemo = { mergedQuestionsRef: mergedQuestions, tags };
     return tags;
   }
 
 
-  removeTypeFilter = (type) => {
-    const newPending = this.state.pendingSelectedTypes.filter((t) => t !== type);
+  removeTypeFilter: any = (type: any) => {
+    const newPending = this.state.pendingSelectedTypes.filter((t: any) => t !== type);
     this.setState(
       {
         pendingSelectedTypes: newPending
@@ -2632,8 +2650,8 @@ handleLoadFilter = () => {
     );
   };
 
-  removeTagFilter = (tag) => {
-    const newTags = this.state.selectedTags.filter((t) => t !== tag);
+  removeTagFilter: any = (tag: any) => {
+    const newTags = this.state.selectedTags.filter((t: any) => t !== tag);
     this.setState(
       {
         selectedTags: newTags
@@ -2644,7 +2662,7 @@ handleLoadFilter = () => {
     );
   };
 
-  removeAiFilter = () => {
+  removeAiFilter: any = () => {
     this.invalidatePendingAiApply();
     this.setState({
       aiSearchQuery: '',
@@ -2661,7 +2679,7 @@ handleLoadFilter = () => {
     });
   };
 
-  removeTopQuestionsFilter = () => {
+  removeTopQuestionsFilter: any = () => {
     this.setState(
       {
         pendingShowTopQuestions: false,
@@ -2673,34 +2691,34 @@ handleLoadFilter = () => {
     );
   };
 
-  removeSBTFilterItem = (item) => {
+  removeSBTFilterItem: any = (item: any) => {
     const { role, sbtAddress } = item;
     const localState = this.state.sbtFilterLocalState || {};
     let updatedState = { ...localState };
 
     if (role === 'creatorInclude' && updatedState.selectedSBTGroupsCreator) {
         updatedState.selectedSBTGroupsCreator = updatedState.selectedSBTGroupsCreator.filter(
-            (x) => x.address.toLowerCase() !== sbtAddress.toLowerCase()
+            (x: any) => x.address.toLowerCase() !== sbtAddress.toLowerCase()
         );
     } else if (role === 'creatorExclude' && updatedState.excludedSBTGroupsCreator) {
         updatedState.excludedSBTGroupsCreator = updatedState.excludedSBTGroupsCreator.filter(
-            (x) => x.address.toLowerCase() !== sbtAddress.toLowerCase()
+            (x: any) => x.address.toLowerCase() !== sbtAddress.toLowerCase()
         );
     } else if (role === 'responderInclude' && updatedState.selectedSBTGroupsResponder) {
         updatedState.selectedSBTGroupsResponder = updatedState.selectedSBTGroupsResponder.filter(
-            (x) => x.address.toLowerCase() !== sbtAddress.toLowerCase()
+            (x: any) => x.address.toLowerCase() !== sbtAddress.toLowerCase()
         );
     } else if (role === 'responderExclude' && updatedState.excludedSBTGroupsResponder) {
         updatedState.excludedSBTGroupsResponder = updatedState.excludedSBTGroupsResponder.filter(
-            (x) => x.address.toLowerCase() !== sbtAddress.toLowerCase()
+            (x: any) => x.address.toLowerCase() !== sbtAddress.toLowerCase()
         );
     } else if (role === 'include' && updatedState.selectedSBTGroups) {
         updatedState.selectedSBTGroups = updatedState.selectedSBTGroups.filter(
-            (x) => x.address.toLowerCase() !== sbtAddress.toLowerCase()
+            (x: any) => x.address.toLowerCase() !== sbtAddress.toLowerCase()
         );
     } else if (role === 'exclude' && updatedState.excludedSBTGroups) {
         updatedState.excludedSBTGroups = updatedState.excludedSBTGroups.filter(
-            (x) => x.address.toLowerCase() !== sbtAddress.toLowerCase()
+            (x: any) => x.address.toLowerCase() !== sbtAddress.toLowerCase()
         );
     }
 
@@ -2708,7 +2726,7 @@ handleLoadFilter = () => {
   };
 
   getFilterSummaryItems() {
-    const items = [];
+    const items: any[] = [];
     const stateToUse = { // Use pending states for UI consistency where they exist
         showTopQuestions: this.state.pendingShowTopQuestions,
         topQuestionsCount: this.state.pendingTopQuestionsCount,
@@ -2736,7 +2754,7 @@ handleLoadFilter = () => {
     }
 
     // 2) Show question types
-    (stateToUse.selectedTypes || []).forEach((t) => {
+    (stateToUse.selectedTypes || []).forEach((t: any) => {
       items.push({
         type: 'questionType',
         label: `${t}`,
@@ -2745,7 +2763,7 @@ handleLoadFilter = () => {
     });
 
     // 3) Show tags
-    (stateToUse.selectedTags || []).forEach((tag) => {
+    (stateToUse.selectedTags || []).forEach((tag: any) => {
       items.push({
         type: 'tag',
         label: `#${tag}`,
@@ -2783,7 +2801,7 @@ handleLoadFilter = () => {
     const st = stateToUse.sbtFilterLocalState || {};
     // creator includes
     if (Array.isArray(st.selectedSBTGroupsCreator)) {
-      st.selectedSBTGroupsCreator.forEach((obj) => {
+      st.selectedSBTGroupsCreator.forEach((obj: any) => {
         items.push({
           type: 'sbt',
           label: `Creator+ ${obj.name || obj.address}`,
@@ -2797,7 +2815,7 @@ handleLoadFilter = () => {
     }
     // creator excludes
     if (Array.isArray(st.excludedSBTGroupsCreator)) {
-      st.excludedSBTGroupsCreator.forEach((obj) => {
+      st.excludedSBTGroupsCreator.forEach((obj: any) => {
         items.push({
           type: 'sbt',
           label: `Creator- ${obj.name || obj.address}`,
@@ -2811,7 +2829,7 @@ handleLoadFilter = () => {
     }
     // responder includes
     if (Array.isArray(st.selectedSBTGroupsResponder)) {
-      st.selectedSBTGroupsResponder.forEach((obj) => {
+      st.selectedSBTGroupsResponder.forEach((obj: any) => {
         items.push({
           type: 'sbt',
           label: `Responder+ ${obj.name || obj.address}`,
@@ -2825,7 +2843,7 @@ handleLoadFilter = () => {
     }
     // responder excludes
     if (Array.isArray(st.excludedSBTGroupsResponder)) {
-      st.excludedSBTGroupsResponder.forEach((obj) => {
+      st.excludedSBTGroupsResponder.forEach((obj: any) => {
         items.push({
           type: 'sbt',
           label: `Responder- ${obj.name || obj.address}`,
@@ -2839,7 +2857,7 @@ handleLoadFilter = () => {
     }
     // addresses mode includes
     if (Array.isArray(st.selectedSBTGroups)) {
-      st.selectedSBTGroups.forEach((obj) => {
+      st.selectedSBTGroups.forEach((obj: any) => {
         items.push({
           type: 'sbt',
           label: `Include: ${obj.name || obj.address}`,
@@ -2853,7 +2871,7 @@ handleLoadFilter = () => {
     }
     // addresses mode excludes
     if (Array.isArray(st.excludedSBTGroups)) {
-      st.excludedSBTGroups.forEach((obj) => {
+      st.excludedSBTGroups.forEach((obj: any) => {
         items.push({
           type: 'sbt',
           label: `Exclude: ${obj.name || obj.address}`,
@@ -2872,7 +2890,7 @@ handleLoadFilter = () => {
   // ----------------------------------------------------------------------------------
   // RENDER
   // ----------------------------------------------------------------------------------
-  renderCollapsibleSection(title, sectionKey, icon, content, disabled = false, headerTestId = '') {
+  renderCollapsibleSection(title: any, sectionKey: any, icon: any, content: any, disabled: any = false, headerTestId: any = '') {
     const { expandedSections } = this.state;
     const isOpen = expandedSections[sectionKey];
     const clickable = !disabled;
@@ -2905,7 +2923,7 @@ handleLoadFilter = () => {
     );
   }
 
-  renderFilterActionsIcons = () => {
+  renderFilterActionsIcons: any = () => {
     const currentFilterStateForIcon = this.buildFilterState();
     const isDefault = this.isFilterStateDefault(currentFilterStateForIcon);
 
@@ -3000,9 +3018,9 @@ handleLoadFilter = () => {
       : 'Apply';
     const pipelineForRender = this.buildFilterPipelineResult(false);
     const encryptedCount = pipelineForRender.finalQuestions
-      .filter(q => String(q?.prompt || '').trim() === '[encrypted]').length;
+      .filter((q: any) => String(q?.prompt || '').trim() === '[encrypted]').length;
     const encryptedQuestionGateTooltip = this.getEncryptedQuestionGateTooltipProps();
-    const renderEncryptedCountBadge = (marginLeft = '8px') => {
+    const renderEncryptedCountBadge = (marginLeft: any = '8px') => {
       if (encryptedCount <= 0) return null;
       return (
         <GateTooltip
@@ -3049,7 +3067,7 @@ handleLoadFilter = () => {
                   type="number"
                   min="1"
                   value={pendingTopQuestionsCount}
-                  onChange={(e) => {
+                  onChange={(e: any) => {
                     const val = e.target.value ? parseInt(e.target.value, 10) : 1;
                     this.setState({ pendingTopQuestionsCount: val }, () => {
                       if (this.state.pendingShowTopQuestions || this.state.pendingShowTopQuestionsByResponses) { // Use this.state for check
@@ -3078,7 +3096,7 @@ handleLoadFilter = () => {
                   type="number"
                   min="1"
                   value={pendingTopQuestionsCount}
-                  onChange={(e) => {
+                  onChange={(e: any) => {
                     const val = e.target.value ? parseInt(e.target.value, 10) : 1;
                     this.setState({ pendingTopQuestionsCount: val }, () => {
                       if (this.state.pendingShowTopQuestions || this.state.pendingShowTopQuestionsByResponses) { // Use this.state for check
@@ -3110,7 +3128,7 @@ handleLoadFilter = () => {
 		                icon={faQuestionCircle}
 		                className={styles.tooltip}
 		                id={this._tagsTooltipId}
-		                onClick={(e) => e.stopPropagation()}
+		                onClick={(e: any) => e.stopPropagation()}
 		              />
 		              <CETooltip
 		                placement="right"
@@ -3135,7 +3153,7 @@ handleLoadFilter = () => {
                 return (
                   <>
                     <div className={styles.tagsContainer}>
-                      {tagsToDisplay.map((tag) => {
+                      {tagsToDisplay.map((tag: any) => {
                         const isSelected = selectedTags.includes(tag);
                         return (
                           <div
@@ -3248,7 +3266,7 @@ handleLoadFilter = () => {
                   type='checkbox'
                   checked={this.state.filterByResponded}
                   onChange={() => this.setState(
-                    prev => ({ filterByResponded: !prev.filterByResponded }),
+                    (prev: any) => ({ filterByResponded: !prev.filterByResponded }),
                     () => this.handleApplyFilters(true)
                   )}
                   disabled={isOtherFiltersDisabled}
@@ -3260,7 +3278,7 @@ handleLoadFilter = () => {
                   type='checkbox'
                   checked={this.state.filterByNotResponded}
                   onChange={() => this.setState(
-                    prev => ({ filterByNotResponded: !prev.filterByNotResponded }),
+                    (prev: any) => ({ filterByNotResponded: !prev.filterByNotResponded }),
                     () => this.handleApplyFilters(true)
                   )}
                   disabled={isOtherFiltersDisabled}
@@ -3424,7 +3442,7 @@ handleLoadFilter = () => {
         </div>
 
         <div className={styles.summaryItemsRow}>
-          {summaryItems.map((item, idx) => (
+          {summaryItems.map((item: any, idx: any) => (
             <div key={idx} className={styles.filterBubble} onClick={item.onRemove}>
               <span>{item.label}</span>
               <FontAwesomeIcon icon={faTimes} className={styles.removeIcon} />
@@ -3440,7 +3458,7 @@ handleLoadFilter = () => {
                 type="text"
                 bsSize="sm"
                 value={filterUrlInput}
-                onChange={(e) => this.setState({ filterUrlInput: e.target.value })}
+                onChange={(e: any) => this.setState({ filterUrlInput: e.target.value })}
                 placeholder="Load filter from URL/string..."
                 className={styles.loadFilterInput}
               />
@@ -3527,7 +3545,7 @@ handleLoadFilter = () => {
                         type="text"
                         bsSize="sm"
                         value={filterUrlInput}
-                        onChange={(e) => this.setState({ filterUrlInput: e.target.value })}
+                        onChange={(e: any) => this.setState({ filterUrlInput: e.target.value })}
                         placeholder="Load filter from URL/string..."
                         className={styles.loadFilterInput}
                       />
@@ -3561,7 +3579,7 @@ handleLoadFilter = () => {
   }
 }
 
-const mapStateToProps = (state) => {
+const mapStateToProps = (state: any) => {
   const activeSessionSlug = state?.sessionState?.activeSessionSlug || '';
   return {
     activeSessionSlug,
