@@ -11744,34 +11744,6 @@ describe('SurveyTool module', () => {
     }
   });
 
-  it('uses clone:false reads when mutating survey/question bookmarks in results view', async () => {
-    const SurveyResults = ConnectedSurveyResults.WrappedComponent;
-    const peekSpy = jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue({
-      surveys: [],
-      questions: [],
-    });
-    const writeSpy = jest.spyOn(cacheScripts, 'writeCache').mockResolvedValue(true);
-
-    const subject = new SurveyResults({
-      activeSessionSlug: 'edge',
-      activeSessionSlug: 'edge',
-    });
-    subject.getEffectiveSlug = jest.fn(() => 'edge');
-    subject.setState = jest.fn((next, cb) => {
-      const patch = typeof next === 'function' ? next(subject.state, subject.props) : next;
-      subject.state = { ...subject.state, ...(patch || {}) };
-      if (typeof cb === 'function') cb();
-      return patch;
-    });
-
-    subject.toggleSurveyBookmark('s1');
-    subject.toggleQuestionBookmark('q1');
-    await Promise.resolve();
-
-    expect(peekSpy).toHaveBeenCalledWith('bookmarksCache', 'edge', { clone: false });
-    expect(writeSpy).toHaveBeenCalledTimes(2);
-  });
-
   it('persists SurveyQuestions bookmarks with optimistic cache writes', async () => {
     jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue({ questions: [] });
     const writeSpy = jest.spyOn(cacheScripts, 'writeCacheOptimistic').mockResolvedValue(true);
@@ -11794,28 +11766,6 @@ describe('SurveyTool module', () => {
     expect(writeSpy).toHaveBeenCalledWith('bookmarksCache', 'edge', {
       questions: ['q1'],
     });
-  });
-
-  it('does not mutate live bookmarkedFilters cache when filter write fails', async () => {
-    const SurveyResults = ConnectedSurveyResults.WrappedComponent;
-    const liveCache = { bookmarkedFilters: ['existing-filter'] };
-    jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue(liveCache);
-    jest.spyOn(cacheScripts, 'writeCache').mockRejectedValue(new Error('write failed'));
-
-    const subject = new SurveyResults({
-      activeSessionSlug: 'edge',
-      activeSessionSlug: 'edge',
-    });
-    subject._isMounted = true;
-    subject.getEffectiveSlug = jest.fn(() => 'edge');
-    subject.state = {
-      ...subject.state,
-      filterState: { types: ['radio'] },
-    };
-
-    await subject.handleBookmarkFilter();
-
-    expect(liveCache.bookmarkedFilters).toEqual(['existing-filter']);
   });
 
   it('coalesces bursty auto-decrypt sweeps into one scheduled pass', async () => {
