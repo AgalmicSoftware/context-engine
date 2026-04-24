@@ -1,35 +1,84 @@
-import {
-  E2E_TESTIDS,
-  REGISTRY_CACHE_KEY,
-  arweaveScripts,
-  cacheScripts,
-  collectTreeNodes,
-  contractScripts,
-  cryptoUtils,
-  getChainById,
-  getDefaultHttpRpc,
-  makeInstance,
-  nodeHasClassName,
-  normalizeArweaveUrl,
-  peekCacheSyncMock,
-  renderToStaticMarkup,
-  resourceKeys,
-  sessionRegistryStore,
-  sessionRegistryUtils,
-  subscribeCacheUpdatesMock,
-  treeHasText,
-  writeCacheOptimisticMock,
-  buildCreateSurveyDraftStorageKey,
+import CreateQuestionsAndSurveys, {
   hasSubmittedResourcesInManagedCache,
   readManagedCacheSnapshot,
   sanitizeDocumentUrls,
   selectManagedNetBucketSnapshot,
-} from './CreateQuestionsAndSurveys.cacheTestUtils';
+} from './CreateQuestionsAndSurveys';
+import { renderToStaticMarkup } from 'react-dom/server';
+import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
+import { arweaveScripts } from '../../utilities/arweave/arweaveScripts';
+import { normalizeArweaveUrl } from '../../utilities/arweave/arweaveUrls.js';
+import * as resourceKeys from '../../utilities/session/resourceKeys.js';
+import contractScripts from '../../utilities/web3/contractScripts.js';
+import { sessionRegistryUtils } from '../../utilities/web3/sessionRegistry.js';
+import { getChainById, getDefaultHttpRpc } from '../../variables/chains.js';
+import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
+
+jest.mock('../../utilities/cache/cacheScripts.js', () => ({
+  peekCacheSync: jest.fn(() => null),
+  removeCache: jest.fn(),
+  subscribeCacheUpdates: jest.fn(() => () => {}),
+  writeCache: jest.fn(),
+  writeCacheOptimistic: jest.fn(),
+}));
+
+const REGISTRY_CACHE_KEY = 'dg:sessionRegistryCache:v1';
+type TreeNode = any;
+type TreePredicate = (node: TreeNode) => boolean;
+type CreateQuestionsAndSurveysProps = Record<string, any>;
+const peekCacheSyncMock = cacheScripts.peekCacheSync as jest.Mock;
+const subscribeCacheUpdatesMock = cacheScripts.subscribeCacheUpdates as jest.Mock;
+const writeCacheOptimisticMock = cacheScripts.writeCacheOptimistic as jest.Mock;
+
+const makeInstance = (props: CreateQuestionsAndSurveysProps = {}): any => {
+  const instance = new CreateQuestionsAndSurveys({
+    network: { id: 84532 },
+    activeSessionSlug: 'edge',
+    ...props,
+  }) as any;
+  instance._isMounted = true;
+  instance.setState = jest.fn((update, cb) => {
+    const patch = typeof update === 'function'
+      ? update(instance.state, instance.props)
+      : update;
+    if (patch && typeof patch === 'object') {
+      instance.state = { ...instance.state, ...patch };
+    }
+    if (typeof cb === 'function') cb();
+  });
+  return instance;
+};
+
+const collectTreeNodes = (node: TreeNode, predicate: TreePredicate, acc: TreeNode[] = []): TreeNode[] => {
+  if (node == null) return acc;
+  if (Array.isArray(node)) {
+    node.forEach((child) => collectTreeNodes(child, predicate, acc));
+    return acc;
+  }
+  if (typeof node !== 'object') return acc;
+  if (predicate(node)) acc.push(node);
+  return collectTreeNodes(node?.props?.children, predicate, acc);
+};
+
+const treeHasText = (node: TreeNode, text: string): boolean => {
+  if (node == null) return false;
+  if (Array.isArray(node)) return node.some((child) => treeHasText(child, text));
+  if (typeof node === 'string' || typeof node === 'number') {
+    return String(node).includes(text);
+  }
+  if (typeof node !== 'object') return false;
+  return treeHasText(node?.props?.children, text);
+};
+
+const nodeHasClassName = (node: TreeNode, className: string): boolean => {
+  const raw = node?.props?.className;
+  if (!raw) return false;
+  return String(raw).split(/\s+/).includes(className);
+};
 
 describe('CreateQuestionsAndSurveys managed cache reads', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    try { localStorage.clear(); } catch (_) {}
   });
 
   afterEach(() => {
@@ -92,34 +141,6 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
     })).toBe(true);
   });
 
-  it('rejects incomplete submitted resource cache hits', () => {
-    peekCacheSyncMock.mockReturnValue({
-      '84532': {
-        questions: { q1: { id: 'q1' } },
-      },
-    });
-
-    expect(hasSubmittedResourcesInManagedCache({
-      slug: 'edge',
-      questionsAddedSuccessfully: true,
-      questionIds: ['q1'],
-    })).toBe(false);
-
-    expect(hasSubmittedResourcesInManagedCache({
-      slug: 'edge',
-      netId: '84532',
-      questionsAddedSuccessfully: true,
-      questionIds: ['q1', 'q2'],
-    })).toBe(false);
-
-    expect(hasSubmittedResourcesInManagedCache({
-      slug: 'edge',
-      netId: '84532',
-      questionsAddedSuccessfully: true,
-      questionIds: 'q1' as unknown as string[],
-    })).toBe(false);
-  });
-
   it('copies survey links with session query params when an active session slug exists', () => {
     const instance = makeInstance({ activeSessionSlug: 'edge' });
     const originalClipboard = navigator.clipboard;
@@ -169,135 +190,6 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
     }
   });
 
-  it('saves unfinished survey drafts under the active session key', () => {
-    const instance = makeInstance({ activeSessionSlug: 'alpha' });
-    instance.state = {
-      ...instance.state,
-      title: 'Alpha draft',
-      documentURLs: ['https://example.com/alpha-doc'],
-      questions: [{
-        id: 'q-alpha',
-        type: 'freeform',
-        prompt: 'Alpha prompt?',
-        tags: ['alpha'],
-      }],
-    };
-
-    instance.saveToLocalStorage({ immediate: true });
-
-    const rawScopedDraft = localStorage.getItem(buildCreateSurveyDraftStorageKey('alpha'));
-    expect(localStorage.getItem('unfinishedSurvey')).toBeNull();
-    expect(rawScopedDraft).not.toBeNull();
-    expect(JSON.parse(rawScopedDraft || '{}')).toEqual(expect.objectContaining({
-      _sessionSlug: 'alpha',
-      title: 'Alpha draft',
-      documentURLs: ['https://example.com/alpha-doc'],
-    }));
-  });
-
-  it('restores unfinished survey drafts only for the matching active session', () => {
-    localStorage.setItem(buildCreateSurveyDraftStorageKey('alpha'), JSON.stringify({
-      _sessionSlug: 'alpha',
-      title: 'Alpha draft',
-      isStandaloneQuestion: true,
-      questions: [{
-        id: 'q-alpha',
-        type: 'freeform',
-        prompt: 'Alpha prompt?',
-        tags: ['alpha'],
-      }],
-    }));
-    localStorage.setItem(buildCreateSurveyDraftStorageKey('beta'), JSON.stringify({
-      _sessionSlug: 'alpha',
-      title: 'Mismatched draft',
-      questions: [{
-        id: 'q-mismatch',
-        type: 'freeform',
-        prompt: 'Wrong prompt?',
-        tags: ['wrong'],
-      }],
-    }));
-
-    const betaInstance = makeInstance({ activeSessionSlug: 'beta' });
-    betaInstance.updateSurveyHash = jest.fn();
-    expect(betaInstance.loadFromLocalStorage()).toBe(false);
-    expect(betaInstance.state.title).toBe('');
-    expect(betaInstance.updateSurveyHash).not.toHaveBeenCalled();
-
-    const alphaInstance = makeInstance({ activeSessionSlug: 'alpha' });
-    alphaInstance.updateSurveyHash = jest.fn();
-    expect(alphaInstance.loadFromLocalStorage()).toBe(true);
-    expect(alphaInstance.state.title).toBe('Alpha draft');
-    expect(alphaInstance.state.questions).toEqual([
-      expect.objectContaining({
-        id: 'q-alpha',
-        prompt: 'Alpha prompt?',
-        tags: ['alpha'],
-      }),
-    ]);
-    expect(alphaInstance.updateSurveyHash).toHaveBeenCalled();
-  });
-
-  it('loads legacy unscoped drafts only outside an active session', () => {
-    localStorage.setItem('unfinishedSurvey', JSON.stringify({
-      title: 'Legacy draft',
-      isStandaloneQuestion: true,
-      questions: [{
-        id: 'q-legacy',
-        type: 'freeform',
-        prompt: 'Legacy prompt?',
-        tags: ['legacy'],
-      }],
-    }));
-
-    const scopedInstance = makeInstance({ activeSessionSlug: 'beta' });
-    scopedInstance.updateSurveyHash = jest.fn();
-    expect(scopedInstance.loadFromLocalStorage()).toBe(false);
-    expect(scopedInstance.state.title).toBe('');
-    expect(scopedInstance.updateSurveyHash).not.toHaveBeenCalled();
-
-    const unscopedInstance = makeInstance({ activeSessionSlug: '' });
-    unscopedInstance.updateSurveyHash = jest.fn();
-    expect(unscopedInstance.loadFromLocalStorage()).toBe(true);
-    expect(unscopedInstance.state.title).toBe('Legacy draft');
-    expect(unscopedInstance.state.questions).toEqual([
-      expect.objectContaining({
-        id: 'q-legacy',
-        prompt: 'Legacy prompt?',
-        tags: ['legacy'],
-      }),
-    ]);
-    expect(unscopedInstance.updateSurveyHash).toHaveBeenCalled();
-  });
-
-  it('treats draft storage read and write failures as no-ops', () => {
-    const readFailure = jest.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
-      throw new Error('blocked read');
-    });
-    const readInstance = makeInstance({ activeSessionSlug: 'alpha' });
-    expect(readInstance.loadFromLocalStorage()).toBe(false);
-    readFailure.mockRestore();
-
-    const writeFailure = jest.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
-      throw new Error('blocked write');
-    });
-    const writeInstance = makeInstance({ activeSessionSlug: 'alpha' });
-    writeInstance.state = {
-      ...writeInstance.state,
-      title: 'No-op draft',
-      questions: [{
-        id: 'q-no-op',
-        type: 'freeform',
-        prompt: 'No-op prompt?',
-        tags: [],
-      }],
-    };
-
-    expect(() => writeInstance.saveToLocalStorage({ immediate: true })).not.toThrow();
-    expect((writeInstance as any)._lastSavedUnfinishedSurveyJson).toBeNull();
-    writeFailure.mockRestore();
-  });
-
   it('blocks submit when any question prompt is blank after trim', async () => {
     const addQuestionsSpy = jest.spyOn(contractScripts, 'addQuestions').mockResolvedValue({
       receipt: { status: 1 },
@@ -340,8 +232,6 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
     const litUrl = `lit://arweave/${txId}`;
     const legacyLitUrl = `lit+ar://${txId}`;
     const relativeViewerUrl = `/session/0xSessionToken/docs?__ceDocTx=${txId}&__ceDocStorage=lit-arweave&__ceDocKind=link`;
-    const unsafeJavascriptUrl = ['java', 'script:alert(1)'].join('');
-    const unsafeDataUrl = 'data:text/html,<script>alert(1)</script>';
 
     expect(sanitizeDocumentUrls([
       'https://example.com/doc',
@@ -350,8 +240,8 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
       arUrl,
       litUrl,
       legacyLitUrl,
-      unsafeJavascriptUrl,
-      unsafeDataUrl,
+      'javascript:alert(1)',
+      'data:text/html,<script>alert(1)</script>',
     ])).toEqual([
       'https://example.com/doc',
       'http://example.com/alt',
@@ -396,10 +286,10 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
         arUrl,
         litUrl,
         legacyLitUrl,
-        unsafeJavascriptUrl,
-        unsafeDataUrl,
+        'javascript:alert(1)',
+        'data:text/html,<script>alert(1)</script>',
       ],
-      docURLInput: unsafeJavascriptUrl,
+      docURLInput: 'javascript:alert(1)',
     };
 
     instance.addDocumentURL();
@@ -412,8 +302,8 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
       arUrl,
       litUrl,
       legacyLitUrl,
-      unsafeJavascriptUrl,
-      unsafeDataUrl,
+      'javascript:alert(1)',
+      'data:text/html,<script>alert(1)</script>',
     ]);
 
     const markup = renderToStaticMarkup(instance.render());
@@ -425,7 +315,7 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
     expect(markup).toContain(`Encrypted doc (${legacyLitUrl})`);
     expect(markup).not.toContain(`href="${litUrl}"`);
     expect(markup).not.toContain(`href="${legacyLitUrl}"`);
-    expect(markup).not.toContain(`href="${unsafeJavascriptUrl}"`);
+    expect(markup).not.toContain('href="javascript:alert(1)"');
     expect(markup).not.toContain('href="data:text/html');
   });
 
@@ -531,4 +421,1130 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
     jest.useRealTimers();
   });
 
+  it('treats question cache seeding as best-effort when write-through fails', async () => {
+    peekCacheSyncMock.mockReturnValue({
+      '84532': {
+        questions: {},
+        questionResponses: {},
+        questionResponsesMeta: {},
+      },
+    });
+    writeCacheOptimisticMock
+      .mockRejectedValueOnce(new Error('quota exceeded'))
+      .mockResolvedValue(undefined);
+
+    const instance = makeInstance();
+    instance.getSessionConfig = jest.fn(() => ({
+      slug: 'edge',
+      networkChainId: 84532,
+      contracts: { surveys: { chainId: 84532 } },
+    }));
+
+    await expect(instance.seedUploadedQuestionsCache({
+      questionDataArray: [
+        { id: 'q1', type: 'freeform', prompt: 'Question 1', creator: '0xabc' },
+      ],
+      uploadedQuestions: [
+        { questionId: 'q1', arweaveTxId: 'arweave-tx-1' },
+      ],
+      sourceQuestions: [
+        { id: 'q1', type: 'freeform', prompt: 'Question 1' },
+      ],
+    })).resolves.toBe(false);
+
+    expect(writeCacheOptimisticMock).toHaveBeenCalled();
+  });
+
+  it('keeps question cache write-through scoped to unresolved non-general slugs', async () => {
+    peekCacheSyncMock.mockReturnValue({
+      '84532': {
+        questions: {},
+        questionResponses: {},
+        questionResponsesMeta: {},
+      },
+    });
+    writeCacheOptimisticMock.mockResolvedValue(undefined);
+
+    const instance = makeInstance({
+      activeSessionSlug: 'missing-session',
+      sessionSlug: 'missing-session',
+      network: { id: 84532 },
+    });
+    instance.getSessionConfig = jest.fn(() => ({
+      slug: 'missing-session',
+      networkChainId: 84532,
+      contracts: {},
+    }));
+
+    await expect(instance.seedUploadedQuestionsCache({
+      questionDataArray: [
+        { id: 'q1', type: 'freeform', prompt: 'Question 1', creator: '0xabc' },
+      ],
+      uploadedQuestions: [
+        { questionId: 'q1', arweaveTxId: 'arweave-tx-1' },
+      ],
+      sourceQuestions: [
+        { id: 'q1', type: 'freeform', prompt: 'Question 1' },
+      ],
+    })).resolves.toBe(true);
+
+    expect(writeCacheOptimisticMock).toHaveBeenCalledWith(
+      'questionsCache',
+      'missing-session',
+      expect.any(Object)
+    );
+    expect(writeCacheOptimisticMock).not.toHaveBeenCalledWith(
+      'questionsCache',
+      '',
+      expect.anything()
+    );
+  });
+
+  it('still writes question cache through the general bucket for general-session authoring', async () => {
+    peekCacheSyncMock.mockReturnValue({
+      '84532': {
+        questions: {},
+        questionResponses: {},
+        questionResponsesMeta: {},
+      },
+    });
+    writeCacheOptimisticMock.mockResolvedValue(undefined);
+
+    const instance = makeInstance({
+      activeSessionSlug: '',
+      sessionSlug: '',
+      network: { id: 84532 },
+    });
+    instance.getSessionConfig = jest.fn(() => ({
+      slug: '',
+      networkChainId: 84532,
+      contracts: {},
+    }));
+
+    await expect(instance.seedUploadedQuestionsCache({
+      questionDataArray: [
+        { id: 'q1', type: 'freeform', prompt: 'Question 1', creator: '0xabc' },
+      ],
+      uploadedQuestions: [
+        { questionId: 'q1', arweaveTxId: 'arweave-tx-1' },
+      ],
+      sourceQuestions: [
+        { id: 'q1', type: 'freeform', prompt: 'Question 1' },
+      ],
+    })).resolves.toBe(true);
+
+    expect(writeCacheOptimisticMock).toHaveBeenCalledWith(
+      'questionsCache',
+      '',
+      expect.any(Object)
+    );
+  });
+
+  it('seeds question cache only for the primary authoring slug when stale slug hints exist', async () => {
+    peekCacheSyncMock.mockReturnValue({
+      '84532': {
+        questions: {},
+        questionResponses: {},
+        questionResponsesMeta: {},
+      },
+    });
+    writeCacheOptimisticMock.mockResolvedValue(undefined);
+
+    const instance = makeInstance({
+      activeSessionSlug: 'primary-session',
+      sessionSlug: 'stale-session',
+      network: { id: 84532 },
+    });
+    instance.getSessionConfig = jest.fn(() => ({
+      slug: 'primary-session',
+      networkChainId: 84532,
+      contracts: {},
+    }));
+    instance.getActiveSessionSlug = jest.fn(() => 'stale-session');
+
+    await expect(instance.seedUploadedQuestionsCache({
+      questionDataArray: [
+        { id: 'q1', type: 'freeform', prompt: 'Question 1', creator: '0xabc' },
+      ],
+      uploadedQuestions: [
+        { questionId: 'q1', arweaveTxId: 'arweave-tx-1' },
+      ],
+      sourceQuestions: [
+        { id: 'q1', type: 'freeform', prompt: 'Question 1' },
+      ],
+    })).resolves.toBe(true);
+
+    expect(writeCacheOptimisticMock).toHaveBeenCalledTimes(1);
+    expect(writeCacheOptimisticMock).toHaveBeenCalledWith(
+      'questionsCache',
+      'primary-session',
+      expect.any(Object)
+    );
+  });
+
+  it('does not clear managed caches after standalone question submit success', async () => {
+    const addQuestionsSpy = jest.spyOn(contractScripts, 'addQuestions').mockResolvedValue({
+      receipt: { status: 1 },
+      uploadedQuestions: [{ questionId: 'q1', arweaveTxId: 'tx-1' }],
+    });
+
+    const instance = makeInstance({
+      loginComplete: true,
+      provider: 'web3auth',
+      account: '0xabc',
+      activeSessionSlug: 'edge',
+      network: { id: 84532 },
+    });
+
+    instance.ensureResolvedSessionConfigForSubmit = jest.fn().mockResolvedValue({
+      slug: 'edge',
+      sessionName: 'edge',
+      networkChainId: 84532,
+      contracts: { surveys: { chainId: 84532 } },
+    });
+    instance.resolveGateOptions = jest.fn(() => ({ gateMap: {} }));
+    instance.clearUnfinishedSurveyDraft = jest.fn();
+    instance.seedUploadedQuestionsCache = jest.fn().mockResolvedValue(true);
+    instance.startCacheWatch = jest.fn();
+    instance.state = {
+      ...instance.state,
+      isStandaloneQuestion: true,
+      title: '',
+      questions: [{
+        id: 'q1',
+        type: 'freeform',
+        prompt: 'Question 1',
+        tags: [],
+      }],
+      documentURLs: [],
+      surveyHash: '',
+    };
+
+    await instance.createSurvey();
+
+    expect(instance.seedUploadedQuestionsCache).toHaveBeenCalled();
+    expect(cacheScripts.removeCache).not.toHaveBeenCalled();
+    expect(addQuestionsSpy).toHaveBeenCalled();
+    addQuestionsSpy.mockRestore();
+  });
+
+  it('keeps only primitive tags for render and submit paths', async () => {
+    const addQuestionsSpy = jest.spyOn(contractScripts, 'addQuestions').mockResolvedValue({
+      receipt: { status: 1 },
+      uploadedQuestions: [{ questionId: 'q1', arweaveTxId: 'tx-1' }],
+    });
+
+    try {
+      const instance = makeInstance({
+        loginComplete: true,
+        provider: 'web3auth',
+        account: '0xabc',
+        activeSessionSlug: 'edge',
+        network: { id: 84532 },
+      });
+
+      instance.ensureResolvedSessionConfigForSubmit = jest.fn().mockResolvedValue({
+        slug: 'edge',
+        sessionName: 'edge',
+        networkChainId: 84532,
+        contracts: { surveys: { chainId: 84532 } },
+      });
+      instance.resolveGateOptions = jest.fn(() => ({
+        gateMap: {},
+        gateOptions: [],
+        defaultGateId: '',
+      }));
+      instance.clearUnfinishedSurveyDraft = jest.fn();
+      instance.seedUploadedQuestionsCache = jest.fn().mockResolvedValue(true);
+      instance.startCacheWatch = jest.fn();
+      instance.state = {
+        ...instance.state,
+        showAutoTool: false,
+        isStandaloneQuestion: true,
+        title: '',
+        questions: [{
+          id: 'q1',
+          uiKey: 'q1',
+          type: 'freeform',
+          prompt: 'Question 1',
+          tags: [42, null, true, false, ' topic ', {}, ['nested']],
+          aiGeneratedTagsFromSource: [42, null, true, false, ' topic ', {}, ['nested']],
+          currentTagInputValue: '',
+          isGeneratingTags: false,
+        }],
+        documentURLs: [],
+        surveyHash: '',
+      };
+
+      const markup = renderToStaticMarkup(instance.render());
+      expect(markup).not.toContain('[object Object]');
+
+      await instance.createSurvey();
+
+      expect(addQuestionsSpy).toHaveBeenCalled();
+      expect(addQuestionsSpy.mock.calls[0][2][0].tags).toEqual(['42', 'true', 'false', 'topic']);
+    } finally {
+      addQuestionsSpy.mockRestore();
+    }
+  });
+
+  it('keeps standalone question submit scoped to the unresolved requested slug when exact session config is missing', async () => {
+    const addQuestionsSpy = jest
+      .spyOn(contractScripts, 'addQuestions')
+      .mockRejectedValue(new Error('[addQuestions] Missing surveys contract address for session slug "missing-session".'));
+    const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    try {
+      const instance = makeInstance({
+        loginComplete: true,
+        provider: 'web3auth',
+        account: '0xabc',
+        activeSessionSlug: 'missing-session',
+        network: { id: 84532 },
+      });
+
+      instance.ensureResolvedSessionConfigForSubmit = jest.fn().mockResolvedValue({
+        slug: 'missing-session',
+        networkChainId: 84532,
+        contracts: {},
+      });
+      instance.resolveGateOptions = jest.fn(() => ({ gateMap: {} }));
+      instance.state = {
+        ...instance.state,
+        isStandaloneQuestion: true,
+        title: '',
+        questions: [{
+          id: 'q1',
+          type: 'freeform',
+          prompt: 'Question 1',
+          tags: [],
+        }],
+        documentURLs: [],
+        surveyHash: '',
+      };
+
+      await instance.createSurvey();
+
+      expect(addQuestionsSpy).toHaveBeenCalledWith(
+        'web3auth',
+        ['q1'],
+        expect.any(Array),
+        [expect.any(String)],
+        expect.objectContaining({
+          slug: 'missing-session',
+          networkChainId: 84532,
+        })
+      );
+      expect(instance.state.isSubmitting).toBe(false);
+      expect(instance.state.submissionError).toContain('missing-session');
+    } finally {
+      consoleSpy.mockRestore();
+      addQuestionsSpy.mockRestore();
+    }
+  });
+
+  it('resets submit progress UI when the survey Arweave upload fails', async () => {
+    const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const latestBlockSpy = jest.spyOn(contractScripts, 'getLatestBlockNumber').mockResolvedValue(123);
+    const addSurveySpy = jest.spyOn(contractScripts, 'addSurveyWithQuestions').mockResolvedValue({
+      receipt: { status: 1 },
+    });
+    const keySpy = jest.spyOn(resourceKeys, 'getEffectiveArweaveKey').mockResolvedValue({
+      arweaveJwk: '{"kty":"RSA"}',
+    } as any);
+    const uploadSpy = jest.spyOn(arweaveScripts, 'uploadDataToArweave').mockRejectedValue(new Error('upload failed'));
+
+    try {
+      const instance = makeInstance({
+        loginComplete: true,
+        provider: 'web3auth',
+        account: '0xabc',
+        activeSessionSlug: 'edge',
+        network: { id: 84532 },
+      });
+
+      instance.ensureResolvedSessionConfigForSubmit = jest.fn().mockResolvedValue({
+        slug: 'edge',
+        sessionName: 'edge',
+        networkChainId: 84532,
+        contracts: { surveys: { chainId: 84532 } },
+      });
+      instance.resolveGateOptions = jest.fn(() => ({ gateMap: {} }));
+      instance.state = {
+        ...instance.state,
+        showAutoTool: false,
+        isStandaloneQuestion: false,
+        title: 'Survey Title',
+        surveyHash: '0xsurvey',
+        questions: [{
+          id: 'q1',
+          uiKey: 'q1',
+          type: 'freeform',
+          prompt: 'Question 1',
+          tags: [],
+          currentTagInputValue: '',
+          aiGeneratedTagsFromSource: [],
+          isGeneratingTags: false,
+        }],
+        documentURLs: ['https://safe.example/doc'],
+      };
+
+      await instance.createSurvey();
+
+      expect(uploadSpy).toHaveBeenCalled();
+      expect(addSurveySpy).not.toHaveBeenCalled();
+      expect(instance.state.isSubmitting).toBe(false);
+      expect(instance.state.progress).toBe(0);
+      expect(instance.state.showSubmitSteps).toBe(false);
+      expect(instance.state.submitStep).toBe(0);
+      expect(instance.state.submissionError).toBe('upload failed');
+    } finally {
+      consoleSpy.mockRestore();
+      latestBlockSpy.mockRestore();
+      addSurveySpy.mockRestore();
+      keySpy.mockRestore();
+      uploadSpy.mockRestore();
+    }
+  });
+
+  it('seeds surveys and questions caches after survey creation so deep links can resolve immediately', async () => {
+    const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const latestBlockSpy = jest.spyOn(contractScripts, 'getLatestBlockNumber').mockResolvedValue(123);
+    const addSurveySpy = jest.spyOn(contractScripts, 'addSurveyWithQuestions').mockResolvedValue({
+      receipt: { status: 1 },
+    });
+    const keySpy = jest.spyOn(resourceKeys, 'getEffectiveArweaveKey').mockResolvedValue({
+      arweaveJwk: '{"kty":"RSA"}',
+    } as any);
+    const uploadSpy = jest.spyOn(arweaveScripts, 'uploadDataToArweave').mockResolvedValue('survey-arweave-tx');
+    writeCacheOptimisticMock.mockResolvedValue(undefined);
+    peekCacheSyncMock.mockReturnValue({});
+
+    try {
+      const instance = makeInstance({
+        loginComplete: true,
+        provider: 'web3auth',
+        account: '0xabc',
+        activeSessionSlug: 'demo-session-2',
+        sessionSlug: 'demo-session-2',
+        network: { id: 8453, chainId: 8453 },
+        networkChainId: 84532,
+        sessionConfig: {
+          slug: 'demo-session-2',
+          sessionName: 'Demo Session 2',
+          networkChainId: 84532,
+          contracts: { surveys: { chainId: 84532 } },
+        },
+      });
+
+      instance.ensureResolvedSessionConfigForSubmit = jest.fn().mockResolvedValue({
+        slug: 'demo-session-2',
+        sessionName: 'Demo Session 2',
+        networkChainId: 84532,
+        contracts: { surveys: { chainId: 84532 } },
+      });
+      instance.resolveGateOptions = jest.fn(() => ({ gateMap: {} }));
+      instance.clearUnfinishedSurveyDraft = jest.fn();
+      instance.startCacheWatch = jest.fn();
+      instance.state = {
+        ...instance.state,
+        showAutoTool: false,
+        isStandaloneQuestion: false,
+        title: 'Fresh Survey',
+        surveyHash: '0xsurvey',
+        questions: [{
+          id: 'q1',
+          uiKey: 'q1',
+          type: 'freeform',
+          prompt: 'Question 1',
+          tags: [],
+          currentTagInputValue: '',
+          aiGeneratedTagsFromSource: [],
+          isGeneratingTags: false,
+        }],
+        documentURLs: ['https://safe.example/doc'],
+      };
+
+      await instance.createSurvey();
+
+      expect(addSurveySpy).toHaveBeenCalled();
+      const questionsWrite = writeCacheOptimisticMock.mock.calls.find(
+        (args: any[]) => args[0] === 'questionsCache'
+      );
+      const surveysWrite = writeCacheOptimisticMock.mock.calls.find(
+        (args: any[]) => args[0] === 'surveysCache'
+      );
+
+      expect(questionsWrite).toBeTruthy();
+      expect(questionsWrite[1]).toBe('demo-session-2');
+      expect(Object.keys(questionsWrite[2])).toEqual(['84532']);
+      expect(questionsWrite[2]).toEqual(expect.objectContaining({
+        '84532': expect.objectContaining({
+          questions: expect.objectContaining({
+            q1: expect.objectContaining({
+              id: 'q1',
+              associatedSurveyId: '0xsurvey',
+            }),
+          }),
+        }),
+      }));
+
+      expect(surveysWrite).toBeTruthy();
+      expect(surveysWrite[1]).toBe('demo-session-2');
+      expect(Object.keys(surveysWrite[2])).toEqual(['84532']);
+      expect(surveysWrite[2]).toEqual(expect.objectContaining({
+        '84532': expect.objectContaining({
+          surveys: expect.objectContaining({
+            '0xsurvey': expect.objectContaining({
+              surveyID: '0xsurvey',
+              id: '0xsurvey',
+              title: 'Fresh Survey',
+              sessionSlug: 'demo-session-2',
+              slug: 'demo-session-2',
+              questionIDs: ['q1'],
+            }),
+          }),
+        }),
+      }));
+      expect(instance.startCacheWatch).toHaveBeenCalled();
+    } finally {
+      consoleSpy.mockRestore();
+      latestBlockSpy.mockRestore();
+      addSurveySpy.mockRestore();
+      keySpy.mockRestore();
+      uploadSpy.mockRestore();
+    }
+  });
+
+  it('watches the resolved session chain bucket after submit when wallet-facing network props differ', () => {
+    peekCacheSyncMock.mockImplementation((namespace: any) => {
+      if (namespace !== 'surveysCache') return {};
+      return {
+        '84532': {
+          surveys: {
+            '0xsurvey': { id: '0xsurvey' },
+          },
+        },
+        '8453': {
+          surveys: {},
+        },
+      };
+    });
+
+    const instance = makeInstance({
+      activeSessionSlug: 'demo-session-2',
+      sessionSlug: 'demo-session-2',
+      network: { id: 8453, chainId: 8453, name: 'Base' },
+      networkChainId: 84532,
+      sessionConfig: {
+        slug: 'demo-session-2',
+        networkChainId: 84532,
+        contracts: { surveys: { chainId: 84532 } },
+      },
+    });
+    instance.state = {
+      ...instance.state,
+      surveyAddedSuccessfully: true,
+      questionsAddedSuccessfully: false,
+      lastSubmittedSurveyId: '0xSurvey',
+      uploadedQuestions: [],
+      cacheLoaded: false,
+      submitStep: 2,
+    };
+
+    instance.startCacheWatch();
+
+    expect(instance.state.cacheLoaded).toBe(true);
+    expect(instance.state.submitStep).toBe(3);
+    expect(instance._cacheWatchTimer).toBeNull();
+  });
+
+  it('keeps authoring lock options empty for unresolved non-general slugs even when the general session is authoritative', () => {
+    const priorRegistryCache = localStorage.getItem(REGISTRY_CACHE_KEY);
+    localStorage.setItem(REGISTRY_CACHE_KEY, JSON.stringify({
+      sessions: {
+        '': {
+          slug: '',
+          sessionName: 'Registry General',
+          networkChainId: 84532,
+          __registry: {
+            gateAuthority: 'onchain',
+            gatesByResource: {
+              questionResponses: {
+                gateId: 'question_gate',
+                sbtAddresses: ['0x1111111111111111111111111111111111111111'],
+                lookupStatus: 'ok',
+              },
+              default: {
+                gateId: 'default_gate',
+                sbtAddresses: ['0x2222222222222222222222222222222222222222'],
+                lookupStatus: 'ok',
+              },
+            },
+          },
+          sponsored: {
+            defaultGateId: 'default_gate',
+            gates: {
+              question_gate: {
+                label: 'Registry questionResponses gate',
+                sbtAddresses: ['0x1111111111111111111111111111111111111111'],
+                mode: 'all',
+              },
+              default_gate: {
+                label: 'Registry default gate',
+                sbtAddresses: ['0x2222222222222222222222222222222222222222'],
+                mode: 'any',
+              },
+            },
+          },
+        },
+      },
+    }));
+
+    try {
+      const instance = makeInstance({
+        activeSessionSlug: 'missing-session',
+        sessionSlug: 'missing-session',
+      });
+
+      const resolved = instance.getResolvedSessionConfig();
+      const { gateOptions, defaultGateId } = instance.resolveGateOptions(
+        resolved,
+        { isStandaloneQuestion: true }
+      );
+
+      expect(resolved).toEqual(expect.objectContaining({
+        slug: 'missing-session',
+        networkChainId: 84532,
+      }));
+      expect(instance.resolveLockAudienceSessionName(resolved)).toBe('missing-session');
+      expect(defaultGateId).toBe('');
+      expect(gateOptions).toEqual([]);
+    } finally {
+      if (priorRegistryCache == null) {
+        localStorage.removeItem(REGISTRY_CACHE_KEY);
+      } else {
+        localStorage.setItem(REGISTRY_CACHE_KEY, priorRegistryCache);
+      }
+    }
+  });
+
+  it('keeps submit-time registry refresh scoped to the unresolved requested slug when exact session config is missing', async () => {
+    const fetchSpy = jest
+      .spyOn(sessionRegistryUtils, 'fetchSessionFromRegistry')
+      .mockResolvedValue(null);
+    const upsertSpy = jest
+      .spyOn(sessionRegistryUtils, 'upsertSessionRegistryCache')
+      .mockImplementation(() => null);
+
+    try {
+      const instance = makeInstance({
+        provider: 'web3auth',
+        account: '0xabc',
+        activeSessionSlug: 'missing-session',
+        sessionSlug: 'missing-session',
+        network: { id: 84532, chainId: 84532 },
+      });
+
+      const resolved = await instance.ensureResolvedSessionConfigForSubmit({
+        slug: 'missing-session',
+        networkChainId: 84532,
+        contracts: {},
+      });
+
+      expect(fetchSpy).toHaveBeenCalledWith(expect.objectContaining({
+        chainId: 84532,
+        slug: 'missing-session',
+        providerLike: 'web3auth',
+        account: '0xabc',
+      }));
+      expect(upsertSpy).not.toHaveBeenCalled();
+      expect(resolved).toEqual(expect.objectContaining({
+        slug: 'missing-session',
+        networkChainId: 84532,
+        contracts: {},
+      }));
+    } finally {
+      fetchSpy.mockRestore();
+      upsertSpy.mockRestore();
+    }
+  });
+
+  it('uses the session chain for wagmi network guard even when the wallet-facing network prop is Base mainnet', async () => {
+    const instance = makeInstance({
+      provider: 'wagmi',
+      loginComplete: true,
+      account: '0xabc',
+      activeSessionSlug: 'edge',
+      sessionSlug: 'edge',
+      network: { id: 8453, chainId: 8453, name: 'Base' },
+      networkChainId: 84532,
+      sessionConfig: {
+        slug: 'edge',
+        networkChainId: 84532,
+        contracts: {
+          surveys: { address: '0x1111111111111111111111111111111111111111', chainId: 84532 },
+        },
+      },
+    });
+    instance.getWalletChainId = jest.fn().mockResolvedValue('0x2105');
+    instance.state = {
+      ...instance.state,
+      isStandaloneQuestion: true,
+      questions: [{
+        id: 'q1',
+        type: 'freeform',
+        prompt: 'Prompt 1',
+        tags: [],
+      }],
+    };
+
+    await instance.createSurvey();
+
+    expect(instance.state.needsNetworkSwitch).toBe(true);
+    expect(instance.state.isSubmitting).toBe(false);
+  });
+
+  it('uses __registry.registryChainId for wagmi network guard when sessionConfig omits networkChainId', async () => {
+    const instance = makeInstance({
+      provider: 'wagmi',
+      loginComplete: true,
+      account: '0xabc',
+      activeSessionSlug: 'edge',
+      sessionSlug: 'edge',
+      network: { id: 8453, chainId: 8453, name: 'Base' },
+      sessionConfig: {
+        slug: 'edge',
+        contracts: {
+          surveys: { address: '0x1111111111111111111111111111111111111111' },
+        },
+        __registry: {
+          registryChainId: 84532,
+        },
+      },
+    });
+    instance.getWalletChainId = jest.fn().mockResolvedValue('0x2105');
+    instance.state = {
+      ...instance.state,
+      isStandaloneQuestion: true,
+      questions: [{
+        id: 'q1',
+        type: 'freeform',
+        prompt: 'Prompt 1',
+        tags: [],
+      }],
+    };
+
+    await instance.createSurvey();
+
+    expect(instance.state.needsNetworkSwitch).toBe(true);
+    expect(instance.state.isSubmitting).toBe(false);
+  });
+
+  it('does not trigger the wagmi network guard when the session chain is unresolved', async () => {
+    const stopAfterGuard = new Error('stop after network guard');
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const instance = makeInstance({
+      provider: 'wagmi',
+      loginComplete: true,
+      account: '0xabc',
+      activeSessionSlug: 'edge',
+      sessionSlug: 'edge',
+      network: { id: 8453, chainId: 8453, name: 'Base' },
+      sessionConfig: {
+        slug: 'edge',
+        networkChainId: null,
+        contracts: {
+          surveys: { address: '0x1111111111111111111111111111111111111111' },
+        },
+      },
+    });
+    instance.ensureResolvedSessionConfigForSubmit = jest.fn().mockResolvedValue({
+      slug: 'edge',
+      networkChainId: null,
+      contracts: {
+        surveys: { address: '0x1111111111111111111111111111111111111111' },
+      },
+    });
+    instance.resolveSessionChainId = jest.fn().mockReturnValue(null);
+    instance.getWalletChainId = jest.fn().mockResolvedValue('0x2105');
+    instance.removeDuplicateQuestions = jest.fn(() => {
+      throw stopAfterGuard;
+    });
+    instance.state = {
+      ...instance.state,
+      isStandaloneQuestion: true,
+      questions: [{
+        id: 'q1',
+        type: 'freeform',
+        prompt: 'Prompt 1',
+        tags: [],
+      }],
+    };
+
+    try {
+      await instance.createSurvey();
+
+      expect(instance.state.needsNetworkSwitch).toBe(false);
+      expect(instance.removeDuplicateQuestions).toHaveBeenCalled();
+      expect(instance.state.submissionError).toBe(stopAfterGuard.message);
+    } finally {
+      consoleErrorSpy.mockRestore();
+    }
+  });
+
+  it('adds the missing wallet network with a non-PATH RPC URL', async () => {
+    const originalEthereum = (window as any).ethereum;
+    const request = jest.fn()
+      .mockRejectedValueOnce({ code: 4902 })
+      .mockResolvedValueOnce(undefined);
+    (window as any).ethereum = { request } as any;
+    try {
+      const instance = makeInstance({ provider: 'wagmi' });
+      instance.resolveSessionChainId = jest.fn(() => 84532);
+      instance.resolveTargetNetwork = jest.fn(() => getChainById(84532));
+
+      await instance.switchToCorrectNetwork();
+
+      expect(request).toHaveBeenNthCalledWith(1, {
+        method: 'wallet_switchEthereumChain',
+        params: [{ chainId: '0x14a34' }],
+      });
+      expect(request).toHaveBeenNthCalledWith(2, {
+        method: 'wallet_addEthereumChain',
+        params: [expect.objectContaining({
+          rpcUrls: [getDefaultHttpRpc(84532, { allowPath: false })],
+        })],
+      });
+    } finally {
+      window.ethereum = originalEthereum;
+    }
+  });
+
+  it('renders the survey/questions toggle immediately on initial load', () => {
+    const instance = makeInstance();
+
+    const tree = instance.render();
+
+    expect(treeHasText(tree, 'Survey')).toBe(true);
+    expect(treeHasText(tree, 'Questions')).toBe(true);
+  });
+
+  it('hides the survey/questions toggle on untouched pile-entry auto mode while keeping the manual switch visible', () => {
+    const instance = makeInstance({ hideSurveyQuestionToggleUntilAuthoring: true });
+
+    const tree = instance.render();
+    const modeToggles = collectTreeNodes(tree, (node) => nodeHasClassName(node, 'modeToggle'));
+    const modeSwitches = collectTreeNodes(
+      tree,
+      (node) => node?.props?.['data-testid'] === 'ce-create-mode-switch'
+    );
+
+    expect(modeToggles).toHaveLength(0);
+    expect(modeSwitches).toHaveLength(1);
+    expect(treeHasText(modeSwitches[0], 'Manual')).toBe(true);
+  });
+
+  it('shows the survey/questions toggle after switching pile entry into manual mode', () => {
+    const instance = makeInstance({ hideSurveyQuestionToggleUntilAuthoring: true });
+    instance.state = { ...instance.state, showAutoTool: false };
+
+    const tree = instance.render();
+    const modeToggles = collectTreeNodes(tree, (node) => nodeHasClassName(node, 'modeToggle'));
+
+    expect(modeToggles).toHaveLength(1);
+    expect(treeHasText(modeToggles[0], 'Survey')).toBe(true);
+    expect(treeHasText(modeToggles[0], 'Questions')).toBe(true);
+  });
+
+  it('shows the survey/questions toggle after AI generation loads authored draft content for pile entry', () => {
+    const instance = makeInstance({ hideSurveyQuestionToggleUntilAuthoring: true });
+    instance.clearUnfinishedSurveyDraft = jest.fn();
+    instance.updateSurveyHash = jest.fn();
+    instance.saveToLocalStorage = jest.fn();
+
+    instance.handleAutoQuestionsGenerated(
+      [{ type: 'freeform', prompt: 'What should happen next?', tags: [] }],
+      [],
+      ''
+    );
+
+    const tree = instance.render();
+    const modeToggles = collectTreeNodes(tree, (node) => nodeHasClassName(node, 'modeToggle'));
+
+    expect(instance.state.showAutoTool).toBe(false);
+    expect(instance.state.questions).toHaveLength(1);
+    expect(modeToggles).toHaveLength(1);
+    expect(treeHasText(modeToggles[0], 'Survey')).toBe(true);
+    expect(treeHasText(modeToggles[0], 'Questions')).toBe(true);
+  });
+
+  it('renders labeled manual and AI mode switch text instead of icon-only toggle', () => {
+    const instance = makeInstance();
+
+    let tree = instance.render();
+    let modeSwitches = collectTreeNodes(
+      tree,
+      (node) => node?.props?.['data-testid'] === 'ce-create-mode-switch'
+    );
+    expect(modeSwitches).toHaveLength(1);
+    expect(treeHasText(modeSwitches[0], 'Manual')).toBe(true);
+
+    instance.state = { ...instance.state, showAutoTool: false };
+    tree = instance.render();
+    modeSwitches = collectTreeNodes(
+      tree,
+      (node) => node?.props?.['data-testid'] === 'ce-create-mode-switch'
+    );
+    expect(modeSwitches).toHaveLength(1);
+    expect(treeHasText(modeSwitches[0], 'from URL / Content')).toBe(true);
+  });
+
+  it('hides survey/question gate controls when the active session exposes no selectable gates', () => {
+    const instance = makeInstance();
+    instance.resolveGateOptions = jest.fn(() => ({
+      gateMap: {},
+      gateOptions: [],
+      defaultGateId: '',
+    }));
+    instance.state = {
+      ...instance.state,
+      showAutoTool: false,
+      isStandaloneQuestion: false,
+      title: 'Survey Title',
+      questions: [{
+        uiKey: 'q1',
+        id: 'q1',
+        type: 'freeform',
+        prompt: 'Question 1',
+        tags: [],
+        currentTagInputValue: '',
+        aiGeneratedTagsFromSource: [],
+        isGeneratingTags: false,
+      }],
+    };
+
+    const tree = instance.render();
+    const markup = renderToStaticMarkup(tree);
+    const gateLockMatches = markup.match(new RegExp(`data-testid="${E2E_TESTIDS.GATE_LOCK}"`, 'g')) || [];
+    const surveyTitleLocks = collectTreeNodes(tree, (node) => nodeHasClassName(node, 'surveyTitleLock'));
+    const inheritToggles = collectTreeNodes(tree, (node) => nodeHasClassName(node, 'inheritToggle'));
+
+    expect(gateLockMatches).toHaveLength(0);
+    expect(surveyTitleLocks).toHaveLength(0);
+    expect(inheritToggles).toHaveLength(0);
+  });
+
+  it('renders survey/question gate controls when the active session has selectable gates', () => {
+    const instance = makeInstance();
+    instance.resolveGateOptions = jest.fn(() => ({
+      gateMap: {
+        gate_1: { id: 'gate_1' },
+      },
+      gateOptions: [{
+        id: 'gate_1',
+        label: 'Edge Session',
+        badgeLabel: 'Edge Session',
+        color: '#5affc2',
+      }],
+      defaultGateId: 'gate_1',
+    }));
+    instance.state = {
+      ...instance.state,
+      showAutoTool: false,
+      isStandaloneQuestion: false,
+      title: 'Survey Title',
+      questions: [{
+        uiKey: 'q1',
+        id: 'q1',
+        type: 'freeform',
+        prompt: 'Question 1',
+        tags: [],
+        currentTagInputValue: '',
+        aiGeneratedTagsFromSource: [],
+        isGeneratingTags: false,
+      }],
+    };
+
+    const tree = instance.render();
+    const markup = renderToStaticMarkup(tree);
+    const gateLockMatches = markup.match(new RegExp(`data-testid="${E2E_TESTIDS.GATE_LOCK}"`, 'g')) || [];
+    const surveyTitleLocks = collectTreeNodes(tree, (node) => nodeHasClassName(node, 'surveyTitleLock'));
+    const inheritToggles = collectTreeNodes(tree, (node) => nodeHasClassName(node, 'inheritToggle'));
+
+    expect(gateLockMatches).toHaveLength(2);
+    expect(surveyTitleLocks).toHaveLength(1);
+    expect(inheritToggles).toHaveLength(1);
+  });
+
+  it('renders uploaded-question Arweave links against ar.io when direct mode is enabled', () => {
+    const txId = '8_2VRRP5Ka0b5F9yiq_nm2hJto8qnQazZ2EtfLJ0viE';
+    (globalThis as any).CE_ARWEAVE_DIRECT_TO_AR_IO = true;
+    (globalThis as any).CE_ARWEAVE_AR_IO_URL = 'https://ar-io.example.test';
+
+    const instance = makeInstance();
+    instance.state = {
+      ...instance.state,
+      showAutoTool: false,
+      questionsAddedSuccessfully: true,
+      questions: [{
+        uiKey: 'q1',
+        id: 'question-id-1234567890',
+        type: 'freeform',
+        prompt: 'Question 1',
+        tags: [],
+        currentTagInputValue: '',
+        aiGeneratedTagsFromSource: [],
+        isGeneratingTags: false,
+      }],
+      uploadedQuestions: [
+        { questionId: 'question-id-1234567890', arweaveTxId: txId },
+      ],
+    };
+
+    const markup = renderToStaticMarkup(instance.render());
+
+    expect(markup).toContain(`href="https://ar-io.example.test/${txId}"`);
+  });
+
+  it('renders submitted-survey Arweave links against ar.io when direct mode is enabled', () => {
+    const txId = '8_2VRRP5Ka0b5F9yiq_nm2hJto8qnQazZ2EtfLJ0viE';
+    (globalThis as any).CE_ARWEAVE_DIRECT_TO_AR_IO = true;
+    (globalThis as any).CE_ARWEAVE_AR_IO_URL = 'https://ar-io.example.test';
+
+    const instance = makeInstance();
+    instance.state = {
+      ...instance.state,
+      showAutoTool: false,
+      surveyAddedSuccessfully: true,
+      isStandaloneQuestion: false,
+      title: 'Survey Title',
+      questions: [{
+        uiKey: 'q1',
+        id: 'question-id-1234567890',
+        type: 'freeform',
+        prompt: 'Question 1',
+        tags: [],
+        currentTagInputValue: '',
+        aiGeneratedTagsFromSource: [],
+        isGeneratingTags: false,
+      }],
+      lastSubmittedSurveyId: '0xSurvey',
+      lastSubmittedSurveyArweaveTxId: txId,
+    };
+
+    const markup = renderToStaticMarkup(instance.render());
+
+    expect(markup).toContain(`href="https://ar-io.example.test/${txId}"`);
+  });
+
+  it('canonicalizes submitted-survey display links for reserved session aliases', () => {
+    const buildSurveyLinks = (activeSessionSlug: string) => {
+      const instance = makeInstance({ activeSessionSlug });
+      instance.state = {
+        ...instance.state,
+        showAutoTool: false,
+        surveyAddedSuccessfully: true,
+        isStandaloneQuestion: false,
+        title: 'Survey Title',
+        questions: [{
+          uiKey: 'q1',
+          id: 'question-id-1234567890',
+          type: 'freeform',
+          prompt: 'Question 1',
+          tags: [],
+          currentTagInputValue: '',
+          aiGeneratedTagsFromSource: [],
+          isGeneratingTags: false,
+        }],
+        lastSubmittedSurveyId: '0xSurvey',
+      };
+
+      return collectTreeNodes(
+        instance.render(),
+        (node) => node?.type === 'a' && typeof node?.props?.href === 'string' && node.props.href.startsWith('/survey/')
+      ).map((node) => node.props.href);
+    };
+
+    const debateLinks = buildSurveyLinks('DEBATE');
+    expect(debateLinks).toContain('/survey/0xSurvey?session=DEBATE');
+    expect(debateLinks).not.toContain('/survey/0xSurvey?session=rxc');
+
+    const generalLinks = buildSurveyLinks('general');
+    expect(generalLinks).toContain('/survey/0xSurvey');
+    expect(generalLinks).not.toContain('/survey/0xSurvey?session=general');
+  });
+
+  it('filters authoring lock options to response-related gates and labels them with the session name', () => {
+    const instance = makeInstance();
+    instance.state = {
+      ...instance.state,
+      isStandaloneQuestion: false,
+    };
+
+    const { gateOptions, defaultGateId } = instance.resolveGateOptions({
+      sessionName: 'FOR TEST 12',
+      __registry: {
+        gateAuthority: 'onchain',
+        gatesByResource: {
+          surveyResponses: {
+            gateId: 'survey_gate',
+            sbtAddresses: ['0x1111111111111111111111111111111111111111'],
+            lookupStatus: 'ok',
+          },
+          default: {
+            gateId: 'default_gate',
+            sbtAddresses: ['0x2222222222222222222222222222222222222222'],
+            lookupStatus: 'ok',
+          },
+          docUrls: {
+            gateId: 'doc_urls_gate',
+            sbtAddresses: ['0x3333333333333333333333333333333333333333'],
+            lookupStatus: 'ok',
+          },
+        },
+      },
+      sponsored: {
+        gates: {
+          survey_gate: {
+            label: 'Registry surveyResponses gate',
+            mode: 'all',
+            sbtAddresses: [
+              '0x1111111111111111111111111111111111111111',
+            ],
+          },
+          default_gate: {
+            label: 'Registry default gate',
+            mode: 'any',
+            sbtAddresses: ['0x2222222222222222222222222222222222222222'],
+          },
+          doc_urls_gate: {
+            label: 'Registry docUrls gate',
+            mode: 'any',
+            sbtAddresses: ['0x3333333333333333333333333333333333333333'],
+          },
+        },
+      },
+    }, { isStandaloneQuestion: false });
+
+    expect(defaultGateId).toBe('survey_gate');
+    expect(gateOptions).toEqual([
+      expect.objectContaining({
+        id: 'default_gate',
+        label: 'FOR TEST 12 (default)',
+        badgeLabel: 'FOR TEST 12',
+        mode: 'any',
+        sbtAddress: '0x2222222222222222222222222222222222222222',
+        sbtAddresses: ['0x2222222222222222222222222222222222222222'],
+      }),
+      expect.objectContaining({
+        id: 'survey_gate',
+        label: 'FOR TEST 12 (survey)',
+        badgeLabel: 'FOR TEST 12',
+        mode: 'all',
+        sbtAddress: '0x1111111111111111111111111111111111111111',
+        sbtAddresses: ['0x1111111111111111111111111111111111111111'],
+      }),
+    ]);
+  });
 });

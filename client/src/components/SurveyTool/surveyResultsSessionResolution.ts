@@ -5,9 +5,7 @@ import {
 import { parseQuestionSessionSlugFromSearch } from '../../utilities/survey/questionRouting.js';
 import { resolveSessionSlugFromPathname } from '../../utilities/session/sessionNaming.js';
 import { toStr } from '../../utilities/shared/primitives.js';
-import type { ResolveSessionConfigBySlug, SessionResolutionResult } from '../shellTypes';
-
-type UnknownRecord = Record<string, unknown>;
+import type { AnyRecord, ResolveSessionConfigBySlug, SessionResolutionResult } from '../shellTypes';
 
 type SurveyResultsExplicitSessionSource = {
   sessionSlug?: string;
@@ -23,7 +21,6 @@ type SurveyResultsSessionInput = {
 type SurveyResultsQuestionReadScopeInput = SurveyResultsSessionInput & {
   pathname?: unknown;
   questionReadSlugsOverride?: unknown;
-  sessionSlugPinned?: unknown;
   viewMode?: unknown;
   readSessionScanScope?: () => unknown;
   readSessionScanSlugs?: () => unknown;
@@ -48,8 +45,8 @@ type SurveyResultsQuestionReadScope = {
   storageKeyPrefix: string;
 };
 
-type SurveyCacheBucket = UnknownRecord & {
-  surveys?: UnknownRecord;
+type SurveyCacheBucket = AnyRecord & {
+  surveys?: AnyRecord;
 };
 
 type SurveyCacheEntry = {
@@ -57,7 +54,7 @@ type SurveyCacheEntry = {
   value?: unknown;
 };
 
-const isObj = (value: unknown): value is UnknownRecord => !!value && typeof value === 'object' && !Array.isArray(value);
+const isObj = (value: unknown): value is AnyRecord => !!value && typeof value === 'object' && !Array.isArray(value);
 const GENERAL_SCOPE_STORAGE_TOKEN = '__general__';
 const MULTI_SCOPE_STORAGE_PREFIX = '__scope__:';
 
