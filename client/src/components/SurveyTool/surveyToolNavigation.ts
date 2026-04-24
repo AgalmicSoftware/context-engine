@@ -3,10 +3,6 @@ import {
   parseQuestionSessionSlugFromSearch,
 } from '../../utilities/survey/questionRouting.js';
 import { normalizeSessionSlug } from '../../utilities/session/sessionNaming.js';
-import {
-  buildPublicRoute,
-  stripPublicUrlBasePath,
-} from '../../utilities/ui/publicUrl.js';
 import { createLogger } from 'utilities/logging.js';
 
 const surveyLog = createLogger('surveys');
@@ -35,24 +31,20 @@ export const appendExplicitSessionHintToPath = (pathIn = '', sessionSlugIn = '')
 
 export function applyExistingGroupPrefix(newPath: string): string {
   try {
-    const appNewPath = stripPublicUrlBasePath(newPath);
-    if (hasExplicitSessionQueryPinInPath(appNewPath)) {
-      return buildPublicRoute(appNewPath);
-    }
+    if (hasExplicitSessionQueryPinInPath(newPath)) return newPath;
     const pathname = (typeof window !== 'undefined' && window.location && window.location.pathname) || '';
-    const pathOnly = stripPublicUrlBasePath(pathname.split('?')[0].split('#')[0]);
+    const pathOnly = pathname.split('?')[0].split('#')[0];
     const segs = pathOnly.split('/').filter(Boolean);
     const RESERVED = new Set(['questions', 'question', 'survey', 'surveys']);
-    let nextPath = appNewPath;
     if (segs.length >= 2 && !RESERVED.has(segs[0])) {
       const base = `/${segs[0]}/${segs[1]}`;
-      if (!nextPath.startsWith(base)) {
-        nextPath = `${base}${nextPath.startsWith('/') ? '' : '/'}${nextPath}`;
+      if (!newPath.startsWith(base)) {
+        return `${base}${newPath.startsWith('/') ? '' : '/'}${newPath}`;
       }
     }
-    return buildPublicRoute(nextPath);
   } catch (e) {
     surveyLog.warn('SurveyTool: fallback', e);
     return newPath;
   }
+  return newPath;
 }
