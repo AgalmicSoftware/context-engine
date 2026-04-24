@@ -14,7 +14,7 @@ import PolisReport, {
   REPORT_DEFAULT_EMBEDDING_LABEL,
   REPORT_DEFAULT_EMBEDDING_TOOLTIP_TEXT,
   shouldAutoEnablePolisDemoData,
-} from './PolisReport.jsx';
+} from './PolisReport';
 import { getCommentBarData } from '../../utilities/survey/polisMath';
 import { computePolisCommentStats, computePolisConversationMath } from '../../utilities/survey/polisReportMath.js';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';

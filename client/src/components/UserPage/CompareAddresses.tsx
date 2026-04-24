@@ -31,7 +31,7 @@ import {
   encodeStancesForUser,
 } from 'utilities/survey/compareUsers.js';
 
-import { PolisQuestionHoverCard } from '../PolisReport/PolisReport.jsx';
+import { PolisQuestionHoverCard } from '../PolisReport/PolisReport';
 import { createLogger } from 'utilities/logging.js';
 import { normalizeArweaveUrl } from 'utilities/arweave/arweaveUrls.js';
 import { getSbtDisplayName } from '../../utilities/sbt/sbtDisplayNames.js';
