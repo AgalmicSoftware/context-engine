@@ -21,17 +21,17 @@ Use it for new files, refactors, and cleanup PRs. Legacy exceptions stay listed 
 ## 2. React Component Structure
 
 - Under `client/src/components/`, directories that represent UI features or shared component groups use PascalCase.
-- Keep feature directories concise and let the component filename carry the full screen name when useful; for example, use `client/src/components/About/` with `AboutPage.jsx` inside it.
+- Keep feature directories concise and let the component filename carry the full screen name when useful; for example, use `client/src/components/About/` with `AboutPage.tsx` inside it.
 - Account/login/settings UI belongs under `client/src/components/Account/`; avoid vague compound legacy directory names for new work.
-- Session creation UI belongs under `client/src/components/Sessions/`; keep `SessionWizard.jsx` and its helper/test modules co-located there.
-- Session page shell UI belongs under `client/src/components/OnePageSession/`; keep `OnePageSession.jsx` and its helper/test modules co-located there.
+- Session creation UI belongs under `client/src/components/Sessions/`; keep `SessionWizard.tsx` and its helper/test modules co-located there.
+- Session page shell UI belongs under `client/src/components/OnePageSession/`; keep `OnePageSession.tsx` and its helper/test modules co-located there.
 - Demo-only route views belong under `client/src/components/DemoViews/`; keep reusable demo subareas grouped there instead of under generic catch-all names.
-- Session doc-library UI belongs under `client/src/components/DocumentLibrary/`; keep `SessionDocumentsPage.jsx` and `DocumentLibraryPanel.jsx` together there.
+- Session doc-library UI belongs under `client/src/components/DocumentLibrary/`; keep `SessionDocumentsPage.tsx` and `DocumentLibraryPanel.tsx` together there.
 - Rendered React component files use PascalCase filenames. Existing JavaScript components may stay `.jsx`; TypeScript migration slices should use `.tsx`.
 - Component-specific styles are co-located as `<ComponentName>.module.scss`.
 - Component-specific tests are co-located beside the source component.
 - Preferred component test naming is `<ComponentName>.test.jsx` for JavaScript tests and `<ComponentName>.test.tsx` once the test itself is converted.
-- Prefer purpose-led component names over legacy tab-label placeholders; for example, `client/src/components/MainContent/ToolExplorer.jsx` and `OnboardingWalkthrough.jsx` are clearer than generic `*Tab` filenames.
+- Prefer purpose-led component names over legacy tab-label placeholders; for example, `client/src/components/MainContent/ToolExplorer.tsx` and `OnboardingWalkthrough.tsx` are clearer than generic `*Tab` filenames.
 - Descriptive test qualifiers are allowed before `.test` when needed: `<ComponentName>.render.test.jsx`, `<ComponentName>.routes.test.jsx`.
 - Cross-workflow reusable UI extracted from feature folders belongs under `client/src/components/Shared/` (for example `client/src/components/Shared/AudioInput/` and `client/src/components/Shared/Json/`).
 - Do not create new lowercase component directories under `client/src/components/`.
@@ -65,7 +65,7 @@ Use it for new files, refactors, and cleanup PRs. Legacy exceptions stay listed 
 ## 6. Canonical Acronyms
 
 - Canonical acronyms in this repo are `SBT`, `AI`, `RPC`, and `UX`.
-- In PascalCase names, keep the acronym uppercase: `SBTSelector.jsx`, `DebateMap.jsx`.
+- In PascalCase names, keep the acronym uppercase: `SBTSelector.tsx`, `DebateMap.tsx`.
 - In camelCase module names, a leading acronym may be lowercase to satisfy camelCase: `sbtDisplayNames.js`, `sbtCreateFormCache.js`, `rpcSelection.js`.
 - In lowercase-only naming schemes such as kebab-case script filenames, use lowercase segments: `test-sbt-auto-mint.ui.js`, `run-ux-workflows.js`, `rpc-errors.js`.
 - Do not mix title-cased acronym fragments such as `Sbt`, `Ai`, `Rpc`, or `Ux` inside mixed-case filenames.

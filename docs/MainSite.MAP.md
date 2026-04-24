@@ -2,12 +2,12 @@
 
 ## Quick Reference
 - File: `client/src/components/MainSite/MainSite.jsx`
-- About route lazy view: `client/src/components/About/AboutPage.jsx` (via `routeLazyComponents.js`)
-- Session wizard lazy view: `client/src/components/Sessions/SessionWizard.jsx` (via `routeLazyComponents.js`)
-- Session page lazy view: `client/src/components/OnePageSession/OnePageSession.jsx` (via `routeLazyComponents.js`)
-- Session docs lazy view: `client/src/components/DocumentLibrary/SessionDocumentsPage.jsx` (via `routeLazyComponents.js`)
-- Demo route lazy views: `client/src/components/DemoViews/DemosIndex.jsx`, `client/src/components/DemoViews/RiskMatrixDemo.jsx` (via `routeLazyComponents.js`)
-- Navbar account modal surface: `client/src/components/Account/LoginAndSettingsModal.jsx` (mounted by `client/src/components/Navbar/AccountSection.jsx`, outside the route-lazy map)
+- About route lazy view: `client/src/components/About/AboutPage.tsx` (via `routeLazyComponents.js`)
+- Session wizard lazy view: `client/src/components/Sessions/SessionWizard.tsx` (via `routeLazyComponents.js`)
+- Session page lazy view: `client/src/components/OnePageSession/OnePageSession.tsx` (via `routeLazyComponents.js`)
+- Session docs lazy view: `client/src/components/DocumentLibrary/SessionDocumentsPage.tsx` (via `routeLazyComponents.js`)
+- Demo route lazy views: `client/src/components/DemoViews/DemosIndex.tsx`, `client/src/components/DemoViews/RiskMatrixDemo.tsx` (via `routeLazyComponents.js`)
+- Navbar account modal surface: `client/src/components/Account/LoginAndSettingsModal.tsx` (mounted by `client/src/components/Navbar/AccountSection.tsx`, outside the route-lazy map)
 - Current length: **12,870 lines**
 - Component type: **React class component** (`MainSite extends Component`)
 - Component count in file: **1 class component** (`MainSite`)
