@@ -1573,7 +1573,7 @@ class SBTPage extends Component<any, any> {
     }
   };
 
-  async attemptMintWithPasswordList(passwordList) {
+  async attemptMintWithPasswordList(passwordList: any) {
     try {
       if (!Array.isArray(passwordList) || passwordList.length === 0) return;
 

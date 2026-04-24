@@ -488,7 +488,6 @@ const SBTsList = ({
 
   const [globalSessionSelectionRevision, setGlobalSessionSelectionRevision] = useState<any>(0);
   const [sessionConfigRevision, setSessionConfigRevision] = useState<any>(0);
-  const [activeTag, setActiveTag] = useState<any>('');
   const [activeSessionSlug, setActiveGroupSlug] = useState<any>(() => {
     const globalPrimarySessionSlug = normalizeSessionSlug(readStoredGlobalSessionSelection().primarySessionSlug || '');
     try {
@@ -946,10 +945,10 @@ const SBTsList = ({
     migrateLegacyToSessionKey: true,
     clearInvalid: true,
   }));
-  const [showAdminButtons, setShowAdminButtons] = useState(false);
-  const [showLocalSessionSettings, setShowLocalSessionSettings] = useState(false);
-  const [expandedSbtAddresses, setExpandedSbtAddresses] = useState(() => new Set());
-  const [isUniverseCollapsed, setIsUniverseCollapsed] = useState(() => {
+  const [showAdminButtons, setShowAdminButtons] = useState<any>(false);
+  const [showLocalSessionSettings, setShowLocalSessionSettings] = useState<any>(false);
+  const [expandedSbtAddresses, setExpandedSbtAddresses] = useState<any>(() => new Set());
+  const [isUniverseCollapsed, setIsUniverseCollapsed] = useState<any>(() => {
     try {
       if (typeof window === 'undefined' || !window.localStorage) return false;
       return window.localStorage.getItem('dg:sbtUniverseCollapsed') === 'true';
@@ -1026,7 +1025,7 @@ const SBTsList = ({
   const sessionSelectorPanelId = 'session-selector-panel';
   const hideSessionUniverseSummary = miniaturized && viewMode === 'modal' && communityTabCompactSettings;
 
-  const clearChipProgressVisibilityTimeout = useCallback((slugIn) => {
+  const clearChipProgressVisibilityTimeout = useCallback((slugIn: any) => {
     const slug = normalizeSessionSlug(slugIn || '');
     const meta = chipProgressVisibilityMetaRef.current[slug];
     if (!meta?.timerId) return;
@@ -3121,46 +3120,16 @@ const SBTsList = ({
             </div>
           </div>
         )}
-      </div>
-    );
-  };
-
-  const handleTagChipClick = (event: any, tag: any) => {
-    if (event?.preventDefault) event.preventDefault();
-    if (event?.stopPropagation) event.stopPropagation();
-    const normalizedTag = String(tag || '').trim();
-    if (!normalizedTag) return;
-    setActiveTag(normalizedTag);
-  };
-
-  const renderSbtMetaRow = (sbt: any, details: any, detailsId: any, buttonLabel: any) => {
-    const tags = Array.isArray(details?.tags) ? details.tags : [];
-    const hasTags = tags.length > 0;
-    const hasDetailsToggle = !miniaturized && !!details?.hasDetails;
-    if (!hasTags && !hasDetailsToggle) return null;
-
-    const sbtAddressLower = String(sbt?.sbtAddress || '').toLowerCase();
-    const isExpanded = expandedSbtAddresses.has(sbtAddressLower);
-    const metaRowClassName = [
-      styles.sbtMetaRow,
-      hasTags ? styles.sbtMetaRowWithTags : styles.sbtMetaRowToggleOnly,
-    ].filter(Boolean).join(' ');
-
-    return (
-      <div className={metaRowClassName}>
-        {hasTags && (
-          <div className={styles.sbtTagList}>
-            {tags.map((tag: any) => (
-              <button
-                key={tag}
-                type="button"
-                className={styles.sbtTagChip}
-                aria-label={`Open tag explorer for ${tag}`}
-                onClick={(event: any) => handleTagChipClick(event, tag)}
-              >
-                #{tag}
-              </button>
-            ))}
+        {details.tags.length > 0 && (
+          <div className={styles.sbtDetailsSection}>
+            <span className={styles.sbtDetailsHeading}>Tags</span>
+            <div className={styles.sbtTagList}>
+              {details.tags.map((tag: any) => (
+                <span key={tag} className={styles.sbtTagChip}>
+                  {tag}
+                </span>
+              ))}
+            </div>
           </div>
         )}
         {hasDetailsToggle && (
@@ -3178,6 +3147,26 @@ const SBTsList = ({
             />
           </button>
         )}
+      </div>
+    );
+  };
+
+  const renderSbtDetailsToggle = (sbt: any, details: any, detailsId: any, buttonLabel: any) => {
+    if (miniaturized || !details?.hasDetails) return null;
+    const sbtAddressLower = String(sbt?.sbtAddress || '').toLowerCase();
+    const isExpanded = expandedSbtAddresses.has(sbtAddressLower);
+    return (
+      <div className={styles.sbtDetailsFooter}>
+        <button
+          type="button"
+          className={styles.sbtDetailsToggle}
+          aria-controls={detailsId}
+          aria-expanded={isExpanded}
+          aria-label={`${isExpanded ? 'Hide' : 'Show'} details for ${buttonLabel}`}
+          onClick={() => toggleExpandedSbt(sbt?.sbtAddress)}
+        >
+          <FontAwesomeIcon icon={isExpanded ? faChevronUp : faChevronDown} />
+        </button>
       </div>
     );
   };
@@ -3385,12 +3374,12 @@ const SBTsList = ({
   const renderSessionUniverseSelector = () => {
     if (!allSessionsMode) return null;
     const publicBasePath = readPublicUrlBasePath();
-    const withPublicBasePath = (pathIn) => {
+    const withPublicBasePath = (pathIn: any) => {
       const normalizedPath = String(pathIn || '').trim();
       if (!normalizedPath) return publicBasePath || '/';
       return `${publicBasePath}${normalizedPath.startsWith('/') ? normalizedPath : `/${normalizedPath}`}` || normalizedPath;
     };
-    const buildSessionRouteHref = (slugRaw) => {
+    const buildSessionRouteHref = (slugRaw: any) => {
       const normalized = normalizeSessionSlug(slugRaw || '');
       if (isSyntheticNoSessionSlug(normalized)) return '';
       const cfg = getDisplaySessionConfig(normalized);
@@ -3406,7 +3395,7 @@ const SBTsList = ({
       return withPublicBasePath(`/session/${encodeURIComponent(normalized)}`);
     };
 
-    const handleOpenSessionChip = (slugRaw, optionOrEvent, maybeEvent) => {
+    const handleOpenSessionChip = (slugRaw: any, optionOrEvent: any = null, maybeEvent: any = null) => {
       const event = maybeEvent && typeof maybeEvent === 'object'
         ? maybeEvent
         : optionOrEvent;
@@ -3436,7 +3425,7 @@ const SBTsList = ({
       : [normalizeSessionSlug(listSlug || '')];
     const collapsedSummaryPreview = collapsedSummarySlugs.slice(0, 4);
     const collapsedSummaryOverflow = Math.max(0, collapsedSummarySlugs.length - collapsedSummaryPreview.length);
-    const renderCollapsedSummary = (testId) => (
+    const renderCollapsedSummary = (testId: any) => (
       <div
         className={styles.sessionUniverseCollapsedSummary}
         data-testid={testId}
@@ -3445,7 +3434,7 @@ const SBTsList = ({
           Selected ({collapsedSummarySlugs.length})
         </span>
         <div className={styles.sessionUniverseCollapsedChips}>
-          {collapsedSummaryPreview.map((slugRaw) => {
+          {collapsedSummaryPreview.map((slugRaw: any) => {
             const normalized = normalizeSessionSlug(slugRaw || '');
             const sessionLabel = labelForSessionSlug(normalized);
             const isLoading = !!chipProgressVisibilityBySlug[normalized];
@@ -3484,7 +3473,7 @@ const SBTsList = ({
                     data-testid={`session-collapsed-chip-open-${normalized || 'general'}`}
                     aria-label={`Open session ${sessionLabel} in new tab`}
                     title={`Open session ${sessionLabel} in new tab`}
-                    onClick={(event) => handleOpenSessionChip(normalized, event)}
+                    onClick={(event: any) => handleOpenSessionChip(normalized, event)}
                   >
                     <FontAwesomeIcon icon={faExternalLinkAlt} />
                   </button>
@@ -3506,7 +3495,7 @@ const SBTsList = ({
       </div>
     );
 
-    const renderHeaderActions = ({ isOpen }) => (
+    const renderHeaderActions = ({ isOpen }: any) => (
       <div className={styles.sessionUniverseHeaderActions}>
         {showUniverseSpinner && (
           <FontAwesomeIcon
@@ -3524,7 +3513,7 @@ const SBTsList = ({
             aria-controls={sessionSelectorPanelId}
             aria-expanded={isOpen}
             data-testid="session-selector-toggle"
-            onClick={() => setShowLocalSessionSettings((prev) => !prev)}
+            onClick={() => setShowLocalSessionSettings((prev: any) => !prev)}
           >
             <FontAwesomeIcon icon={faCog} />
           </button>
@@ -3535,7 +3524,7 @@ const SBTsList = ({
             className={styles.sessionUniverseToggle}
             aria-label={isUniverseCollapsed ? 'Expand session universe' : 'Collapse session universe'}
             aria-expanded={!isUniverseCollapsed}
-            onClick={() => setIsUniverseCollapsed((prev) => !prev)}
+            onClick={() => setIsUniverseCollapsed((prev: any) => !prev)}
           >
             <FontAwesomeIcon icon={isUniverseCollapsed ? faChevronDown : faChevronUp} />
             <span>{isUniverseCollapsed ? 'Expand' : 'Collapse'}</span>

@@ -748,16 +748,16 @@ class CreateSBTGroup extends Component<any, any> {
     return new Blob([arr], { type: mime });
   };
 
-  getNormalizedDocumentUrlDraft = (value = this.state.documentUrl) => (
+  getNormalizedDocumentUrlDraft: any = (value: any = this.state.documentUrl) => (
     String(value || '').trim()
   );
 
-  getEffectiveDocumentURLs = ({
+  getEffectiveDocumentURLs: any = ({
     documentURLs = this.state.documentURLs,
     documentUrl = this.state.documentUrl,
-  } = {}) => {
+  }: any = {}) => {
     const nextDocumentUrls = Array.isArray(documentURLs)
-      ? documentURLs.map((url) => String(url || '').trim()).filter(Boolean)
+      ? documentURLs.map((url: any) => String(url || '').trim()).filter(Boolean)
       : [];
     const pendingDocumentUrl = this.getNormalizedDocumentUrlDraft(documentUrl);
     if (pendingDocumentUrl && nextDocumentUrls.length < 10) {
@@ -766,16 +766,16 @@ class CreateSBTGroup extends Component<any, any> {
     return nextDocumentUrls;
   };
 
-  resumeFormCachePersistence = () => {
+  resumeFormCachePersistence: any = () => {
     this._suppressFormCachePersistence = false;
   };
 
-  suppressFormCachePersistenceAfterSuccess = () => {
+  suppressFormCachePersistenceAfterSuccess: any = () => {
     this._suppressFormCachePersistence = true;
     this.clearFormCache();
   };
 
-  buildCachePayload = () => {
+  buildCachePayload: any = () => {
     const {
       sbtName, sbtDescription, sbtImageUrl, useImageUrl, sbtDistribution,
       tags, documentIDHashes, documentURLs, documentUrl, groupPassword, numInviteLinks,
@@ -2281,7 +2281,7 @@ class CreateSBTGroup extends Component<any, any> {
     });
   };
 
-  resetFormStateForEdit = () => {
+  resetFormStateForEdit: any = () => {
     this.resumeFormCachePersistence();
     if (this.state.sbtMinted) {
       this.setState({
@@ -2418,125 +2418,9 @@ class CreateSBTGroup extends Component<any, any> {
   };
 
 
-  handleImageUpload = (event) => {
+  handleImageUpload: any = (event: any) => {
     const file = event.target.files[0];
     this.applySelectedImageFile(file);
-  };
-
-  applySelectedImageFile = (file, {
-    useImageUrl = false,
-    statusText = '',
-    statusTone = 'default',
-  } = {}) => {
-    if (file && file.size > 10 * 1024 * 1024) {
-      sbtLog.error("Image too large (>10MB)");
-      if (statusText) {
-        this.setState({
-          imageChooserStatusText: statusText,
-          imageChooserStatusTone: statusTone,
-        });
-      }
-      return false;
-    }
-    this.resetFormStateForEdit();
-    this.setState(
-      {
-        useImageUrl: !!useImageUrl,
-        sbtImageFile: file,
-        sbtImageUrl: '',
-        imageLoadError: false,
-        imageChooserStatusText: statusText,
-        imageChooserStatusTone: statusText ? statusTone : 'default',
-        lockedImageAsset: null,
-      },
-      () => { this.updateGroupHash(); this.persistFormCache(); }
-    );
-    return true;
-  };
-
-  getFetchableImageUrl = (value) => {
-    const normalizedValue = normalizeArweaveUrl(String(value || '').trim());
-    if (!normalizedValue) return '';
-    try {
-      const urlObj = new URL(normalizedValue);
-      return (urlObj.protocol === 'http:' || urlObj.protocol === 'https:') ? normalizedValue : '';
-    } catch (_) {
-      return '';
-    }
-  };
-
-  getCanonicalMetadataImageUrl = (value) => {
-    const trimmedValue = String(value || '').trim();
-    if (!trimmedValue) return '';
-    const txId = parseArweaveTxId(trimmedValue);
-    if (txId && txId === trimmedValue) {
-      return `ar://${txId}`;
-    }
-    return trimmedValue;
-  };
-
-  handlePasteImage = async () => {
-    const clipboardResult = await readCompactImageClipboard({
-      fileNamePrefix: 'clipboard-sbt-image',
-    });
-
-    if (clipboardResult?.kind === 'file' && clipboardResult.file) {
-      const applied = this.applySelectedImageFile(clipboardResult.file, {
-        useImageUrl: false,
-      });
-      if (!applied) {
-        this.setState({
-          imageChooserStatusText: 'Image too large (>10MB)',
-          imageChooserStatusTone: 'error',
-        });
-      }
-      return;
-    }
-
-    if (clipboardResult?.kind === 'text') {
-      const pastedUrl = String(clipboardResult.text || '').trim();
-      const fetchableUrl = this.getFetchableImageUrl(pastedUrl);
-      if (!fetchableUrl) {
-        this.setState({
-          imageChooserStatusText: clipboardResult?.error || 'Clipboard does not contain a supported image or URL.',
-          imageChooserStatusTone: 'error',
-        });
-        return;
-      }
-
-      this.setState({
-        imageChooserStatusText: 'Loading preview...',
-        imageChooserStatusTone: 'loading',
-      });
-
-      try {
-        const file = await fetchImageFromURL(fetchableUrl);
-        this.resetFormStateForEdit();
-        await this.setStateAsync({
-          useImageUrl: true,
-          sbtImageUrl: pastedUrl,
-          sbtImageFile: file,
-          imageLoadError: false,
-          imageChooserStatusText: '',
-          imageChooserStatusTone: 'default',
-          lockedImageAsset: null,
-        });
-        this.updateGroupHash();
-        this.persistFormCache();
-      } catch (error) {
-        sbtLog.error("Failed to fetch pasted image via worker:", error);
-        this.setState({
-          imageChooserStatusText: error?.message || 'Image preview unavailable.',
-          imageChooserStatusTone: 'error',
-        });
-      }
-      return;
-    }
-
-    this.setState({
-      imageChooserStatusText: clipboardResult?.error || 'Clipboard does not contain a supported image or URL.',
-      imageChooserStatusTone: 'error',
-    });
   };
 
   applySelectedImageFile: any = (file: any, {
@@ -2877,7 +2761,6 @@ class CreateSBTGroup extends Component<any, any> {
   };
 
 
-
   generateRandomString: any = (length: any) => {
     const bytes = Math.ceil(length / 2);
     let arr;
@@ -3035,8 +2918,8 @@ class CreateSBTGroup extends Component<any, any> {
       const { burnAuth, network } = sbtDistribution;
       const { gateMap, defaultGateId } = this.resolveLockGateOptions();
       const validGateIds = Object.keys(gateMap || {});
-      const knownGateIds = new Set(validGateIds);
-      const scrubGateIds = (ids) => normalizeGateIds(ids).filter((gateId) => knownGateIds.has(gateId));
+      const knownGateIds: any = new Set(validGateIds);
+      const scrubGateIds = (ids: any) => normalizeGateIds(ids).filter((gateId: any) => knownGateIds.has(gateId));
       const finalDocURLs = this.getEffectiveDocumentURLs();
 
       // Use tags array directly (ensure no empty strings)
@@ -3367,10 +3250,10 @@ class CreateSBTGroup extends Component<any, any> {
     const chainID = this.getSelectedAuthoringChainId();
     const { gateMap, defaultGateId } = this.resolveLockGateOptions();
     const validGateIds = Object.keys(gateMap || {});
-    const previewEncryptedFieldGates = {};
-    const previewEncryptedFields = {};
+    const previewEncryptedFieldGates: Record<string, any> = {};
+    const previewEncryptedFields: Record<string, any> = {};
     const previewDocURLs = this.getEffectiveDocumentURLs();
-    const previewTags = (Array.isArray(tags) ? tags : []).filter((tag) => (tag || '').trim().length > 0);
+    const previewTags = (Array.isArray(tags) ? tags : []).filter((tag: any) => (tag || '').trim().length > 0);
 
     let previewName = sbtName || '';
     let previewDescription = sbtDescription || '';
@@ -3931,24 +3814,20 @@ class CreateSBTGroup extends Component<any, any> {
     }
   }
 
-  commitPendingDocumentUrl = async ({ persist = true } = {}) => {
+  commitPendingDocumentUrl: any = async ({ persist = true }: any = {}) => {
     this.resetFormStateForEdit();
     const pendingDocumentUrl = this.getNormalizedDocumentUrlDraft();
     if (!pendingDocumentUrl || this.state.documentURLs.length >= 10) {
       return false;
     }
 
-    await this.setStateAsync((prevState) => ({
+    await this.setStateAsync((prevState: any) => ({
       documentURLs: [...prevState.documentURLs, pendingDocumentUrl],
       documentUrl: '',
     }));
     this.updateGroupHash();
     if (persist) this.persistFormCache();
     return true;
-  };
-
-  addDocumentURL = () => {
-    void this.commitPendingDocumentUrl();
   };
 
   addDocumentURL: any = () => {
@@ -4067,7 +3946,7 @@ class CreateSBTGroup extends Component<any, any> {
     const highResQrId = `${qrId}_high_res`;
 
     // Robust hiding style: keeps element in render tree so XMLSerializer captures dimensions correctly
-    const hiddenStyle = {
+    const hiddenStyle: React.CSSProperties = {
       position: 'absolute',
       opacity: 0,
       pointerEvents: 'none',
@@ -4265,7 +4144,7 @@ class CreateSBTGroup extends Component<any, any> {
         : showImagePreviewError
           ? 'error'
           : 'default';
-    const renderFieldLock = (lockKey, fieldKey, selectedGateIds) => (
+    const renderFieldLock = (lockKey: any, fieldKey: any, selectedGateIds: any) => (
       <GateMultiSelectLock
         gateOptions={gateOptions}
         selectedGateIds={selectedGateIds}
@@ -4403,7 +4282,7 @@ class CreateSBTGroup extends Component<any, any> {
                       onPaste={this.handlePasteImage}
                       onUploadClick={this.openImageUploadPicker}
                       onFileChange={this.handleImageUpload}
-                      fileInputRef={(fileInput) => { this.fileInput = fileInput; }}
+                      fileInputRef={(fileInput: any) => { this.fileInput = fileInput; }}
                       fileInputTestId={E2E_TESTIDS.SBT_CREATE_IMAGE_FILE_INPUT}
                       pasteButtonTestId={E2E_TESTIDS.SBT_CREATE_IMAGE_PASTE}
                       urlInputTestId={E2E_TESTIDS.SBT_CREATE_IMAGE_URL_INPUT}
