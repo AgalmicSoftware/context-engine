@@ -10,6 +10,11 @@ import {
   shouldRetryMaskedQuestionRefresh,
 } from './questionRouting.js';
 
+type KnownSessionConfig = {
+  slug: string;
+  __unresolved?: boolean;
+};
+
 describe('questionRouting session query helpers', () => {
   it('parses slug-based session hints from query params', () => {
     const legacySearch = `?${['group', 'EDGE_PRIVATE'].join('=')}`;
@@ -112,16 +117,24 @@ describe('questionRouting helper regressions', () => {
     };
 
     const upgraded = pickBetterQuestionPayload(masked, decrypted);
+    expect(upgraded).not.toBeNull();
+    if (!upgraded) {
+      throw new Error('Expected upgraded payload');
+    }
     expect(isMaskedQuestionPayload(upgraded)).toBe(false);
     expect(upgraded.prompt).toBe('Decrypted prompt');
 
     const downgraded = pickBetterQuestionPayload(upgraded, masked);
+    expect(downgraded).not.toBeNull();
+    if (!downgraded) {
+      throw new Error('Expected downgraded payload');
+    }
     expect(downgraded.prompt).toBe('Decrypted prompt');
     expect(downgraded.promptDecrypted).toBe(true);
   });
 
   it('does not treat unknown query slugs as pinnable', () => {
-    const getSessionConfigBySlug = (slug) => (
+    const getSessionConfigBySlug = (slug: string | null): KnownSessionConfig | null => (
       slug === 'test-65'
         ? { slug: 'test-65' }
         : null
