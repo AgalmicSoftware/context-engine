@@ -1,9 +1,4 @@
-import {
-  areSbtListArraysEqual as __test__areSbtListArraysEqual,
-  buildSbtListRenderBuckets as __test__buildSbtRenderBuckets,
-  getSbtCardDetails as __test__getSbtCardDetails,
-  readSbtListCacheMetaSnapshot as readSbtCacheMetaSnapshot,
-} from './sbtListHelpers';
+import { __test__areSbtListArraysEqual, readSbtCacheMetaSnapshot } from './SBTsList';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import { normalizeSessionSlug } from '../../utilities/web3/chainGateway.js';
 

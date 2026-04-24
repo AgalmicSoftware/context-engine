@@ -4,6 +4,7 @@ import React from 'react';
 import { connect } from 'react-redux';
 import { Button, Modal, ModalHeader, ModalBody, ModalFooter } from 'reactstrap';
 import styles from './QuestionFilter.module.scss';
+import SBTFilter from '../SBTs/SBTFilter';
 import GateTooltip from '../Gates/GateTooltip';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faSpinner, faLock, faPlus } from '@fortawesome/free-solid-svg-icons';
