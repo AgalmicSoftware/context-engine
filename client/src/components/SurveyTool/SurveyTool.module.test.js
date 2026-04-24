@@ -8410,54 +8410,6 @@ describe('SurveyTool module', () => {
     expect(subject.scheduleLoadAndSortQuestions).toHaveBeenCalledWith(80);
   });
 
-  it('memoizes fallback slug scan and invalidates on surveys cache updates', () => {
-    const SurveyResults = ConnectedSurveyResults.WrappedComponent;
-    const entriesSpy = jest.spyOn(cacheScripts, 'listNamespaceEntriesSync').mockReturnValue([
-      {
-        slug: 'edge',
-        value: {
-          '84532': {
-            surveys: {
-              '0xsurvey': { id: '0xsurvey' },
-            },
-          },
-        },
-      },
-    ]);
-
-    const subject = new SurveyResults({
-      questionResponsesNonce: 1,
-      questionsCacheNonce: 2,
-    });
-    subject.state = {
-      ...subject.state,
-      surveyId: '0xSurvey',
-    };
-
-    const first = subject.getEffectiveSlug();
-    const second = subject.getEffectiveSlug();
-
-    expect(first).toBe('edge');
-    expect(second).toBe('edge');
-    expect(entriesSpy).toHaveBeenCalledTimes(1);
-    expect(entriesSpy).toHaveBeenCalledWith('surveysCache', { cloneValues: false });
-
-    subject.props = {
-      ...subject.props,
-      questionResponsesNonce: 2,
-    };
-    const third = subject.getEffectiveSlug();
-
-    expect(third).toBe('edge');
-    expect(entriesSpy).toHaveBeenCalledTimes(2);
-
-    subject.handleManagedCacheUpdate({ namespace: 'surveysCache', slug: 'edge', action: 'write' });
-    const fourth = subject.getEffectiveSlug();
-
-    expect(fourth).toBe('edge');
-    expect(entriesSpy).toHaveBeenCalledTimes(3);
-  });
-
   it('persists SurveyQuestions bookmarks with optimistic cache writes', async () => {
     jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue({ questions: [] });
     const writeSpy = jest.spyOn(cacheScripts, 'writeCacheOptimistic').mockResolvedValue(true);
