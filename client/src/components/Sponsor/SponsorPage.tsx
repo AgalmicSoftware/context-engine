@@ -56,35 +56,6 @@ const countSessionsForChain = (entries: any = [], chainId: any = null) => {
     return cfgChainId === chainId;
   }).length;
 };
-const stableCreateContextValue = (value: any, seen = new WeakSet<object>()): any => {
-  if (value == null) return value;
-  const valueType = typeof value;
-  if (valueType === 'bigint') return value.toString();
-  if (valueType !== 'object') return value;
-  if (seen.has(value)) return '[Circular]';
-  seen.add(value);
-  if (Array.isArray(value)) {
-    const result = value.map((entry) => stableCreateContextValue(entry, seen));
-    seen.delete(value);
-    return result;
-  }
-  const result = Object.keys(value).sort().reduce((acc: Record<string, any>, key) => {
-    const nextValue = value[key];
-    if (typeof nextValue !== 'function' && typeof nextValue !== 'undefined') {
-      acc[key] = stableCreateContextValue(nextValue, seen);
-    }
-    return acc;
-  }, {});
-  seen.delete(value);
-  return result;
-};
-const buildCreateConfigSignature = (sessionConfig: any = null) => {
-  try {
-    return JSON.stringify(stableCreateContextValue(sessionConfig || null));
-  } catch (_) {
-    return '';
-  }
-};
 const shortAddress = (addr: any) => {
   const value = toStr(addr).trim();
   if (!value) return '';
@@ -292,7 +263,7 @@ const SponsorPage = ({
   const [sessionsRefreshBusy, setSessionsRefreshBusy] = useState<any>(false);
   const [workerUrl, setWorkerUrl] = useState<any>('');
   const [workerUrlEditable, setWorkerUrlEditable] = useState<any>(false);
-  const [persistBundleDraft, setPersistBundleDraft] = useState<any>(initialCache.persistBundleDraft);
+  const [persistBundleSecrets, setPersistBundleSecrets] = useState<any>(initialCache.persistBundleSecrets);
   const [bundleForm, setBundleForm] = useState<any>(initialCache.bundleForm);
   const [expiresAt, setExpiresAt] = useState<any>(initialCache.expiresAt);
   const [createBusy, setCreateBusy] = useState<any>(false);
@@ -310,7 +281,6 @@ const SponsorPage = ({
   const requestedAutoRefreshKeyRef = useRef<any>('');
   const prevSelectedSlugRef = useRef<any>('');
   const workerUrlOverrideDirtyRef = useRef<any>(false);
-  const createRequestSeqRef = useRef(0);
   const requestedSessionRaw = toStr(initialSessionId).trim();
   const requestedSessionIdHex = sessionRegistryUtils.normalizeSessionIdHex(requestedSessionRaw);
   const requestedSessionSlug = requestedSessionIdHex ? '' : normalizeSlug(requestedSessionRaw);
@@ -661,7 +631,17 @@ const SponsorPage = ({
   const canAdmin = !!account && !!selectedConfig && !missingSupportedAdminConfig && isAdminForSelected && hasRegistryEntry;
 
   const updateBundleField = useCallback((key: any, value: any) => {
-    setBundleForm((prev: any) => ({ ...prev, [key]: value }));
+    setBundleForm((prev: any) => {
+      if (key === 'litPayerPrivateKey') {
+        const nextStatus = getLitPayerWalletStatus(value);
+        return {
+          ...prev,
+          litPayerPrivateKey: value,
+          litPayerAddress: nextStatus.address || '',
+        };
+      }
+      return { ...prev, [key]: value };
+    });
   }, []);
 
   const buildBootstrapUploadAuth = useCallback(async ({ workerUrl: overrideWorkerUrl }: any = {}) => {
@@ -835,7 +815,6 @@ const SponsorPage = ({
       setCreateStatusIfCurrent('Uploading sponsored bundle…');
 
       const adminAuth = await buildBootstrapUploadAuth({ workerUrl: resolvedWorkerUrl });
-      if (!isCurrentCreateRequest()) return;
       const result = await uploadSponsoredBundleUntyped({
         secret,
         label,
@@ -859,9 +838,7 @@ const SponsorPage = ({
       setShareTxId(result.txId);
       setCreateStatus('Sponsored URL ready.');
     } catch (error) {
-      if (isCurrentCreateRequest()) {
-        setCreateStatus(getErrorMessage(error, 'Failed to create sponsored URL.'));
-      }
+      setCreateStatus(getErrorMessage(error, 'Failed to create sponsored URL.'));
     } finally {
       if (isCurrentCreateRequest()) setCreateBusy(false);
     }
@@ -990,8 +967,8 @@ const SponsorPage = ({
               <Label className={styles.workerToggle}>
                 <Input
                   type="checkbox"
-                  checked={persistBundleDraft}
-                  onChange={(e: any) => setPersistBundleDraft(!!e.target.checked)}
+                  checked={persistBundleSecrets}
+                  onChange={(e: any) => setPersistBundleSecrets(!!e.target.checked)}
                 />
                 <span>Remember non-secret draft fields</span>
               </Label>
@@ -1033,6 +1010,22 @@ const SponsorPage = ({
                       <div className={styles.statusNote}>
                         Uses sponsoring worker: {deploySponsoringWorkerUrl || 'Select a session with a usable worker URL.'}
                       </div>
+                    ) : null}
+                    {group.key === 'lit' ? (
+                      <Button
+                        color="secondary"
+                        outline
+                        onClick={() => {
+                          const nextWallet = createLitPayerWallet();
+                          setBundleForm((prev: any) => ({
+                            ...prev,
+                            litPayerPrivateKey: nextWallet.privateKey,
+                            litPayerAddress: nextWallet.address,
+                          }));
+                        }}
+                      >
+                        Generate Lit payer wallet
+                      </Button>
                     ) : null}
                     {group.notice ? <div className={styles.warningNote}>{group.notice}</div> : null}
                   </div>
