@@ -23,6 +23,10 @@ import {
   readSurveysCacheRef,
 } from './surveyToolCacheState.js';
 export {
+  areEnvelopesEquivalent,
+  mergeDecryptedViewedResponse,
+} from './surveyToolResponseMerge.js';
+export {
   areQuestionPayloadsEquivalent,
   canUseRecentQuestionPayloadForAccount,
   ensureQuestionsNet,
@@ -159,100 +163,6 @@ const scheduleMicrotask = (cb) => {
   Promise.resolve().then(cb);
 };
 
-
-export const areEnvelopesEquivalent = (envA, envB, isEncryptedA = false, isEncryptedB = false) => {
-  const a = typeof envA === 'string' ? envA : '';
-  const b = typeof envB === 'string' ? envB : '';
-  if (a && b) return a === b;
-  if (!a && !b) return !!isEncryptedA && !!isEncryptedB;
-  return false;
-};
-
-function mergeDecryptedViewedResponseField(prevResp, latestResp, fieldKey) {
-  const prev = (prevResp && typeof prevResp === 'object') ? prevResp : null;
-  const next = (latestResp && typeof latestResp === 'object') ? latestResp : null;
-  if (!prev || !next) return latestResp;
-
-  const prevField = (prev[fieldKey] && typeof prev[fieldKey] === 'object') ? prev[fieldKey] : {};
-  const nextField = (next[fieldKey] && typeof next[fieldKey] === 'object') ? next[fieldKey] : {};
-
-  // Preserve decrypted display values if a later refresh reintroduces the masked '*' payload.
-  // We only do this when the ciphertext/envelope matches, so we don't show stale decrypted data.
-  const prevValue = prevField.value;
-  const nextValue = nextField.value;
-  const prevEnv = typeof prevField.encryptedPortion === 'string' ? prevField.encryptedPortion : '';
-  const nextEnv = typeof nextField.encryptedPortion === 'string' ? nextField.encryptedPortion : '';
-  const prevIsDecrypted = prevValue !== '*' && prevValue !== undefined && prevValue !== null;
-  const nextIsMasked = nextValue === '*' && (!!nextField.encrypted || !!nextEnv);
-
-  if (!prevIsDecrypted || !nextIsMasked) return latestResp;
-  if (!areEnvelopesEquivalent(prevEnv, nextEnv, prevField.encrypted, nextField.encrypted)) return latestResp;
-
-  return {
-    ...latestResp,
-    [fieldKey]: {
-      ...nextField,
-      value: prevValue,
-    },
-  };
-}
-
-function mergeDecryptedViewedResponseRating(prevResp, latestResp, ratingKey, envelopeKey) {
-  const prev = (prevResp && typeof prevResp === 'object') ? prevResp : null;
-  const next = (latestResp && typeof latestResp === 'object') ? latestResp : null;
-  if (!prev || !next) return latestResp;
-
-  const prevValue = prev[ratingKey];
-  const nextValue = next[ratingKey];
-  const prevEnv = typeof prev[envelopeKey] === 'string' ? prev[envelopeKey] : '';
-  const nextEnv = typeof next[envelopeKey] === 'string' ? next[envelopeKey] : '';
-
-  const prevIsDecrypted =
-    prevValue !== '*' &&
-    prevValue !== undefined &&
-    prevValue !== null &&
-    typeof prevValue !== 'object';
-  const nextIsMasked =
-    (nextValue === '*' || nextValue === undefined || nextValue === null) &&
-    !!nextEnv;
-
-  if (!prevIsDecrypted || !nextIsMasked) return latestResp;
-  if (!prevEnv || !nextEnv || prevEnv !== nextEnv) return latestResp;
-
-  return { ...latestResp, [ratingKey]: prevValue };
-}
-
-function mergeDecryptedViewedResponse(prevViewed, latestViewed) {
-  const prev = (prevViewed && typeof prevViewed === 'object') ? prevViewed : null;
-  const next = (latestViewed && typeof latestViewed === 'object') ? latestViewed : null;
-  if (!prev || !next) return latestViewed;
-
-  // Survey responses: merge per-question entries.
-  if (Array.isArray(next.responses) && Array.isArray(prev.responses)) {
-    const prevByQid = new Map();
-    prev.responses.forEach((r) => {
-      const id = String(r?.questionID || r?.questionId || '').trim().toLowerCase();
-      if (id) prevByQid.set(id, r);
-    });
-    const mergedResponses = next.responses.map((r) => {
-      const id = String(r?.questionID || r?.questionId || '').trim().toLowerCase();
-      const prevResp = id ? prevByQid.get(id) : null;
-      let merged = mergeDecryptedViewedResponseField(prevResp, r, 'answer');
-      merged = mergeDecryptedViewedResponseField(prevResp, merged, 'additional');
-      merged = mergeDecryptedViewedResponseRating(prevResp, merged, 'importance', 'importanceEncrypted');
-      merged = mergeDecryptedViewedResponseRating(prevResp, merged, 'conviction', 'convictionEncrypted');
-      return merged;
-    });
-    return { ...next, responses: mergedResponses };
-  }
-
-  // Single question response object.
-  let merged = mergeDecryptedViewedResponseField(prev, next, 'answer');
-  merged = mergeDecryptedViewedResponseField(prev, merged, 'additional');
-  merged = mergeDecryptedViewedResponseRating(prev, merged, 'importance', 'importanceEncrypted');
-  merged = mergeDecryptedViewedResponseRating(prev, merged, 'conviction', 'convictionEncrypted');
-  return merged;
-}
 
 const toNumberOrNull = (value) => {
   if (value === undefined || value === null) return null;
@@ -615,7 +525,6 @@ export {
   isSurveyPerfCountersEnabled,
   bumpSurveyPerfCounter,
   scheduleMicrotask,
-  mergeDecryptedViewedResponse,
   toNumberOrNull,
   getNormalizedUiRatingValue,
   clampSliderValue,
