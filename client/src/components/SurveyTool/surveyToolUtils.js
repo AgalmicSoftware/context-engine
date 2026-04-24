@@ -18,6 +18,9 @@ import {
   readQuestionsCacheRef,
   readSurveysCacheRef,
 } from './surveyToolCacheState.js';
+import {
+  normalizeQuestionIdKey,
+} from './surveyToolSignatures.js';
 export {
   buildRatingEnvelopeQidSetFromUserAnswers,
   clampSliderValue,
@@ -35,6 +38,13 @@ export {
   areEnvelopesEquivalent,
   mergeDecryptedViewedResponse,
 } from './surveyToolResponseMerge.js';
+export {
+  buildQuestionIdScopeSignature,
+  buildRenderedIdsSignature,
+  buildSliceToken,
+  buildSurveyResponseSliceSignature,
+  normalizeQuestionIdKey,
+} from './surveyToolSignatures.js';
 export {
   areQuestionPayloadsEquivalent,
   canUseRecentQuestionPayloadForAccount,
@@ -173,136 +183,6 @@ const scheduleMicrotask = (cb) => {
 };
 
 
-const normalizeQuestionIdKey = (value) => String(value || '').trim().toLowerCase();
-
-const mixFnvHashText = (hash, input) => {
-  let next = hash >>> 0;
-  const text = String(input || '');
-  for (let i = 0; i < text.length; i += 1) {
-    next ^= text.charCodeAt(i);
-    next = Math.imul(next, 16777619);
-  }
-  return next >>> 0;
-};
-
-const SLICE_TOKEN_HASH_SEED_PRIMARY = 2166136261;
-const SLICE_TOKEN_HASH_SEED_SECONDARY = 2246822519;
-const SLICE_TOKEN_MAX_DEPTH = 24;
-
-const buildTextHashToken = (prefix, value) => {
-  const text = String(value || '');
-  const primary = mixFnvHashText(SLICE_TOKEN_HASH_SEED_PRIMARY, text);
-  const secondary = mixFnvHashText(
-    SLICE_TOKEN_HASH_SEED_SECONDARY,
-    `${text.length}|${text}`
-  );
-  return `${prefix}:${text.length}:${primary >>> 0}:${secondary >>> 0}`;
-};
-
-const buildSliceTokenInternal = (value, depth, traversal) => {
-  if (value === undefined) return 'u';
-  if (value === null) return 'n';
-  if (typeof value === 'string') {
-    return buildTextHashToken('s', value);
-  }
-  if (typeof value === 'number') return `d:${Number.isNaN(value) ? 'NaN' : String(value)}`;
-  if (typeof value === 'boolean') return value ? 'b:1' : 'b:0';
-  if (typeof value === 'bigint') return `bi:${String(value)}`;
-  if (value instanceof Date) return `dt:${Number(value.getTime() || 0)}`;
-  if (Array.isArray(value)) {
-    if (depth >= SLICE_TOKEN_MAX_DEPTH) {
-      return `a:${value.length}:max-depth`;
-    }
-    let primary = SLICE_TOKEN_HASH_SEED_PRIMARY;
-    let secondary = SLICE_TOKEN_HASH_SEED_SECONDARY;
-    for (let i = 0; i < value.length; i += 1) {
-      const entryToken = buildSliceTokenInternal(value[i], depth + 1, traversal);
-      primary = mixFnvHashText(primary, `i:${i}`);
-      primary = mixFnvHashText(primary, entryToken);
-      secondary = mixFnvHashText(secondary, entryToken);
-      secondary = mixFnvHashText(secondary, `i:${i}:${entryToken.length}`);
-    }
-    return `a:${value.length}:${primary >>> 0}:${secondary >>> 0}`;
-  }
-  if (typeof value === 'object') {
-    if (traversal.seen.has(value)) return 'c';
-    if (depth >= SLICE_TOKEN_MAX_DEPTH) {
-      const keysAtDepth = Object.keys(value).sort();
-      return buildTextHashToken('o-depth', keysAtDepth.join('|'));
-    }
-    traversal.seen.add(value);
-    try {
-      const keys = Object.keys(value).sort();
-      let primary = SLICE_TOKEN_HASH_SEED_PRIMARY;
-      let secondary = SLICE_TOKEN_HASH_SEED_SECONDARY;
-      for (let i = 0; i < keys.length; i += 1) {
-        const key = keys[i];
-        const entryToken = buildSliceTokenInternal(value[key], depth + 1, traversal);
-        primary = mixFnvHashText(primary, `k:${key}`);
-        primary = mixFnvHashText(primary, entryToken);
-        secondary = mixFnvHashText(secondary, `${key}:${entryToken.length}`);
-        secondary = mixFnvHashText(secondary, entryToken);
-      }
-      return `o:${keys.length}:${primary >>> 0}:${secondary >>> 0}`;
-    } finally {
-      traversal.seen.delete(value);
-    }
-  }
-  return `${typeof value}:${String(value)}`;
-};
-
-const buildSliceToken = (value) => (
-  buildSliceTokenInternal(value, 0, { seen: new WeakSet() })
-);
-
-const buildResponseFieldToken = (field) => {
-  if (!field || typeof field !== 'object') {
-    return `p:${buildSliceToken(field)}`;
-  }
-  return [
-    `v:${buildSliceToken(field.value)}`,
-    `e:${field.encrypted ? 1 : 0}`,
-    `ep:${buildSliceToken(field.encryptedPortion)}`,
-    `a:${buildSliceToken(field.encryptionAudience)}`,
-    `g:${buildSliceToken(field.encryptionGateId)}`,
-    `m:${buildSliceToken(field.audienceMode)}`,
-  ].join('|');
-};
-
-const buildQuestionMapSignature = (map, { responseField = false, normalizedIdFilter = null } = {}) => {
-  if (!map || typeof map !== 'object') return '0:0:0';
-  const keys = Object.keys(map).sort();
-  if (keys.length === 0) return '0:0:0';
-  const filterSet = normalizedIdFilter instanceof Set ? normalizedIdFilter : null;
-  let hash = 2166136261;
-  let hashSecondary = 2246822519;
-  let includedCount = 0;
-  for (let i = 0; i < keys.length; i += 1) {
-    const rawKey = keys[i];
-    const normalizedKey = normalizeQuestionIdKey(rawKey);
-    if (filterSet && (!normalizedKey || !filterSet.has(normalizedKey))) continue;
-    includedCount += 1;
-    hash = mixFnvHashText(hash, normalizedKey);
-    hashSecondary = mixFnvHashText(hashSecondary, `${normalizedKey.length}:${normalizedKey}`);
-    const value = map[rawKey];
-    const token = responseField ? buildResponseFieldToken(value) : buildSliceToken(value);
-    hash = mixFnvHashText(hash, token);
-    hashSecondary = mixFnvHashText(hashSecondary, `${token.length}:${token}`);
-  }
-  if (includedCount === 0) return '0:0:0';
-  return `${includedCount}:${hash >>> 0}:${hashSecondary >>> 0}`;
-};
-
-const buildSurveyResponseSliceSignature = (slice = {}, { normalizedIdFilter = null } = {}) => {
-  const safeSlice = (slice && typeof slice === 'object') ? slice : {};
-  return [
-    buildQuestionMapSignature(safeSlice.answers, { responseField: true, normalizedIdFilter }),
-    buildQuestionMapSignature(safeSlice.additionalComments, { responseField: true, normalizedIdFilter }),
-    buildQuestionMapSignature(safeSlice.importance, { normalizedIdFilter }),
-    buildQuestionMapSignature(safeSlice.conviction, { normalizedIdFilter }),
-  ].join('|');
-};
-
 const hasQuestionMapValue = (map = {}, questionId = '') => {
   if (!map || typeof map !== 'object') return false;
   const rawKey = String(questionId || '');
@@ -410,25 +290,6 @@ export function resolveSlugForIds({ sessionName, questionId, surveyId, props, ne
 const DEBUG_PREFILL = false; // set true to enable verbose local-cache prefill logs
 const EMPTY_QUESTION_POOL = [];
 
-const buildRenderedIdsSignature = (ids = []) => (
-  Array.isArray(ids)
-    ? ids
-      .map((id) => normalizeQuestionIdKey(id))
-      .filter(Boolean)
-      .join('|')
-    : ''
-);
-
-const buildQuestionIdScopeSignature = (list = []) => (
-  Array.isArray(list)
-    ? Array.from(new Set(
-      list
-        .map((question) => String(question?.id || '').trim().toLowerCase())
-        .filter(Boolean)
-    )).sort().join('|')
-    : ''
-);
-
 export {
   surveyLog,
   GATE_SBT_HYDRATION_RETRY_MS,
@@ -437,18 +298,9 @@ export {
   isSurveyPerfCountersEnabled,
   bumpSurveyPerfCounter,
   scheduleMicrotask,
-  normalizeQuestionIdKey,
-  buildSliceToken,
-  buildSurveyResponseSliceSignature,
   formatQuestionScanBlockCount,
   serializeSurveyToolFilterState,
   isSurveyToolFilterStateActive,
   DEBUG_PREFILL,
   EMPTY_QUESTION_POOL,
-  GATE_SBT_HYDRATION_RETRY_MS,
-  isSurveyPerfCountersEnabled,
-  QUESTION_TAG_DROPDOWN_ROW_STYLE,
-  scheduleMicrotask,
-  SHOW_PILE_HOLOGRAM_TOGGLE,
-  surveyLog,
-} from './surveyToolRuntimeSupport.js';
+};
