@@ -1,4 +1,4 @@
-/** @file SBTsList.jsx */
+/** @file SBTsList */
 
 import React, { useEffect, useLayoutEffect, useState, useRef, useMemo, useCallback } from 'react';
 import contractScripts, {
@@ -55,6 +55,9 @@ import { getDemoSessionMap } from '../../utilities/session/sessionDemoCompat.js'
 import { t } from '../../utilities/ui/terminology.js';
 
 const sbtLog = createLogger('sbt');
+const contractScriptsUntyped = contractScripts as any;
+const hasCachedCreateSbtFormUntyped = hasCachedCreateSbtForm as any;
+const runtimeGlobal = globalThis as any;
 const DEMO_SESSION_MAP = getDemoSessionMap();
 
 const SESSION_ID_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -75,17 +78,17 @@ const FEATURED_CARD_INTERACTIVE_SELECTOR = [
   '[data-featured-card-ignore-nav="true"]',
 ].join(', ');
 
-const hasOwn = (obj, key) => (
+const hasOwn = (obj: any, key: any) => (
   !!obj && typeof obj === 'object' && Object.prototype.hasOwnProperty.call(obj, key)
 );
 
-const hasAuthoritativeSessionSlug = (obj) => {
+const hasAuthoritativeSessionSlug = (obj: any) => {
   if (!hasOwn(obj, 'sessionSlug')) return false;
   const hasExplicitFlag = hasOwn(obj, 'sessionSlugExplicit');
   return obj.sessionSlugExplicit === true || !hasExplicitFlag;
 };
 
-const hasExplicitNoSessionAssociation = (sbt) => {
+const hasExplicitNoSessionAssociation = (sbt: any) => {
   const info = sbt?.sbtInfo;
   if (hasAuthoritativeSessionSlug(info)) {
     return String(info?.sessionSlug ?? '').trim() === '';
@@ -96,20 +99,20 @@ const hasExplicitNoSessionAssociation = (sbt) => {
   return false;
 };
 
-const hasMetadataSessionSlugField = (sbt) => (
+const hasMetadataSessionSlugField = (sbt: any) => (
   hasOwn(sbt?.sbtInfo, 'sessionSlug') || hasOwn(sbt, 'sessionSlug')
 );
 
-const hasMissingOrEmptySessionSlug = (sbt) => {
+const hasMissingOrEmptySessionSlug = (sbt: any) => {
   if (!hasMetadataSessionSlugField(sbt)) return true;
   return String(sbt?.sbtInfo?.sessionSlug ?? sbt?.sessionSlug ?? '').trim() === '';
 };
 
-const isSyntheticNoSessionSlug = (slugIn) => (
+const isSyntheticNoSessionSlug = (slugIn: any) => (
   normalizeSessionSlug(slugIn || '') === NO_SESSION_UNIVERSE_SLUG
 );
 
-const isSessionIdLikeSlug = (raw) => {
+const isSessionIdLikeSlug = (raw: any) => {
   const value = String(raw || '').trim();
   if (!value) return false;
   return (
@@ -119,10 +122,10 @@ const isSessionIdLikeSlug = (raw) => {
   );
 };
 
-const getVisibleSessionSlugsFromEntries = (entries = []) => {
-  const out = [];
-  const seen = new Set();
-  (Array.isArray(entries) ? entries : []).forEach((entry) => {
+const getVisibleSessionSlugsFromEntries = (entries: any = []) => {
+  const out: any[] = [];
+  const seen: any = new Set();
+  (Array.isArray(entries) ? entries : []).forEach((entry: any) => {
     const [key, cfg] = Array.isArray(entry) ? entry : [undefined, undefined];
     const rawSlug = (typeof cfg?.slug === 'string' ? cfg.slug : key) || '';
     const trimmed = String(rawSlug || '').trim();
@@ -138,7 +141,7 @@ const getVisibleSessionSlugsFromEntries = (entries = []) => {
   return out;
 };
 
-const areStringArraysEqual = (a = [], b = []) => {
+const areStringArraysEqual = (a: any = [], b: any = []) => {
   if (a === b) return true;
   if (!Array.isArray(a) || !Array.isArray(b)) return false;
   if (a.length !== b.length) return false;
@@ -148,10 +151,10 @@ const areStringArraysEqual = (a = [], b = []) => {
   return true;
 };
 
-const dedupeNormalizedSlugs = (list = []) => {
-  const out = [];
-  const seen = new Set();
-  (Array.isArray(list) ? list : []).forEach((raw) => {
+const dedupeNormalizedSlugs = (list: any = []) => {
+  const out: any[] = [];
+  const seen: any = new Set();
+  (Array.isArray(list) ? list : []).forEach((raw: any) => {
     const slug = normalizeSessionSlug(raw);
     if (isSessionIdLikeSlug(slug || raw)) return;
     if (seen.has(slug)) return;
@@ -161,7 +164,7 @@ const dedupeNormalizedSlugs = (list = []) => {
   return out;
 };
 
-const pickNormalizedSessionSlug = (...values) => {
+const pickNormalizedSessionSlug = (...values: any[]) => {
   for (const value of values) {
     if (value === undefined || value === null) continue;
     const normalized = normalizeSessionSlug(value);
@@ -170,11 +173,11 @@ const pickNormalizedSessionSlug = (...values) => {
   return '';
 };
 
-const mergeSbtListsByAddress = (...lists) => {
-  const out = [];
-  const seen = new Set();
-  lists.forEach((list) => {
-    (Array.isArray(list) ? list : []).forEach((item) => {
+const mergeSbtListsByAddress = (...lists: any[]) => {
+  const out: any[] = [];
+  const seen: any = new Set();
+  lists.forEach((list: any) => {
+    (Array.isArray(list) ? list : []).forEach((item: any) => {
       const addrLower = String(item?.sbtAddress || '').trim().toLowerCase();
       if (!addrLower || seen.has(addrLower)) return;
       seen.add(addrLower);
@@ -185,7 +188,7 @@ const mergeSbtListsByAddress = (...lists) => {
 };
 
 const LIST_MODE_SELECTION_STORAGE_KEY = 'dg:sbtListModeSelectedSessions';
-const DG_MANAGED_CACHE_NAMES = new Set([
+const DG_MANAGED_CACHE_NAMES: any = new Set([
   'questionsCache',
   'surveysCache',
   'bookmarksCache',
@@ -193,7 +196,7 @@ const DG_MANAGED_CACHE_NAMES = new Set([
   'sbtCache',
   'userCache',
 ]);
-const isManagedDgCacheName = (name) => DG_MANAGED_CACHE_NAMES.has(String(name || ''));
+const isManagedDgCacheName = (name: any) => DG_MANAGED_CACHE_NAMES.has(String(name || ''));
 
 const readStoredListModeSelectedSessionSlugs = () => {
   try {
@@ -207,13 +210,13 @@ const readStoredListModeSelectedSessionSlugs = () => {
   }
 };
 
-const sortSlugsByUniverseOrder = (slugs = [], universeSlugs = []) => {
+const sortSlugsByUniverseOrder = (slugs: any = [], universeSlugs: any = []) => {
   const normalizedUniverse = dedupeNormalizedSlugs(universeSlugs);
-  const order = new Map();
-  normalizedUniverse.forEach((slug, index) => {
+  const order: any = new Map();
+  normalizedUniverse.forEach((slug: any, index: any) => {
     order.set(normalizeSessionSlug(slug), index);
   });
-  return dedupeNormalizedSlugs(slugs).sort((aRaw, bRaw) => {
+  return dedupeNormalizedSlugs(slugs).sort((aRaw: any, bRaw: any) => {
     const a = normalizeSessionSlug(aRaw);
     const b = normalizeSessionSlug(bRaw);
     const aOrder = order.has(a) ? order.get(a) : Number.MAX_SAFE_INTEGER;
@@ -223,7 +226,7 @@ const sortSlugsByUniverseOrder = (slugs = [], universeSlugs = []) => {
   });
 };
 
-const getSbtNetHolderCount = (item = {}) => {
+const getSbtNetHolderCount = (item: any = {}) => {
   const summaryCount = Number(item?.historySummary?.currentHolderCount);
   if (Number.isFinite(summaryCount) && summaryCount >= 0) {
     return Math.floor(summaryCount);
@@ -234,10 +237,10 @@ const getSbtNetHolderCount = (item = {}) => {
   );
 };
 
-const normalizeSbtItems = (items = []) => (
+const normalizeSbtItems = (items: any = []) => (
   (Array.isArray(items) ? items : [])
-    .filter((item) => item && item.sbtAddress && item.sbtInfo)
-    .sort((a, b) => {
+    .filter((item: any) => item && item.sbtAddress && item.sbtInfo)
+    .sort((a: any, b: any) => {
       const netA = getSbtNetHolderCount(a);
       const netB = getSbtNetHolderCount(b);
       if (netB !== netA) return netB - netA;
@@ -247,9 +250,9 @@ const normalizeSbtItems = (items = []) => (
     })
 );
 
-const getSbtComparableText = (value) => String(value ?? '').trim();
+const getSbtComparableText = (value: any) => String(value ?? '').trim();
 
-const getSbtListItemSignature = (item = {}) => {
+const getSbtListItemSignature = (item: any = {}) => {
   const info = item?.sbtInfo || {};
   return [
     String(item?.sbtAddress || '').toLowerCase(),
@@ -266,7 +269,7 @@ const getSbtListItemSignature = (item = {}) => {
   ].join('|');
 };
 
-export const __test__areSbtListArraysEqual = (a = [], b = []) => {
+export const __test__areSbtListArraysEqual = (a: any = [], b: any = []) => {
   if (a === b) return true;
   if (!Array.isArray(a) || !Array.isArray(b)) return false;
   if (a.length !== b.length) return false;
@@ -280,8 +283,8 @@ const areSbtListArraysEqual = __test__areSbtListArraysEqual;
 
 const readShowDemoSessions = () => {
   try {
-    if (typeof globalThis !== 'undefined' && typeof globalThis.SHOW_DEMO_SESSIONS !== 'undefined') {
-      return !!globalThis.SHOW_DEMO_SESSIONS;
+    if (typeof globalThis !== 'undefined' && typeof runtimeGlobal.SHOW_DEMO_SESSIONS !== 'undefined') {
+      return !!runtimeGlobal.SHOW_DEMO_SESSIONS;
     }
   } catch (e) { void e; /* fallback: demo visibility lookup. */ }
   return !!SHOW_DEMO_SESSIONS;
@@ -291,9 +294,9 @@ const readSbtSyncBarResearchBlockStep = () => {
   try {
     if (
       typeof globalThis !== 'undefined' &&
-      typeof globalThis.CE_SBT_SYNC_BAR_RESEARCH_BLOCK_STEP !== 'undefined'
+      typeof runtimeGlobal.CE_SBT_SYNC_BAR_RESEARCH_BLOCK_STEP !== 'undefined'
     ) {
-      const runtimeValue = Number(globalThis.CE_SBT_SYNC_BAR_RESEARCH_BLOCK_STEP);
+      const runtimeValue = Number(runtimeGlobal.CE_SBT_SYNC_BAR_RESEARCH_BLOCK_STEP);
       if (Number.isFinite(runtimeValue) && runtimeValue > 0) {
         return Math.max(1, Math.floor(runtimeValue));
       }
@@ -308,7 +311,7 @@ const readSbtSyncBarResearchBlockStep = () => {
 };
 
 // Minimal helpers (cache-first; do not hydrate tokenURI here)
-const normalizeGatewayUri = (uri, contextLabel = 'sbt_list_asset') => {
+const normalizeGatewayUri = (uri: any, contextLabel: any = 'sbt_list_asset') => {
   if (!uri) return null;
   const s = String(uri).trim();
   if (!s) return null;
@@ -316,13 +319,13 @@ const normalizeGatewayUri = (uri, contextLabel = 'sbt_list_asset') => {
   return normalizeArweaveUrl(s, { contextLabel });
 };
 
-const normalizeTokenUri = (uri) => normalizeGatewayUri(uri, 'sbt_list_image');
-const normalizeDocumentHref = (uri) => normalizeGatewayUri(uri, 'sbt_list_document');
+const normalizeTokenUri = (uri: any) => normalizeGatewayUri(uri, 'sbt_list_image');
+const normalizeDocumentHref = (uri: any) => normalizeGatewayUri(uri, 'sbt_list_document');
 
-const dedupeCaseInsensitiveStrings = (values = []) => {
-  const out = [];
-  const seen = new Set();
-  (Array.isArray(values) ? values : []).forEach((value) => {
+const dedupeCaseInsensitiveStrings = (values: any = []) => {
+  const out: any[] = [];
+  const seen: any = new Set();
+  (Array.isArray(values) ? values : []).forEach((value: any) => {
     const trimmed = String(value || '').trim();
     if (!trimmed) return;
     const normalized = trimmed.toLowerCase();
@@ -333,9 +336,9 @@ const dedupeCaseInsensitiveStrings = (values = []) => {
   return out;
 };
 
-const collectSbtTagValues = (...candidates) => {
-  const values = [];
-  const visit = (candidate) => {
+const collectSbtTagValues = (...candidates: any[]) => {
+  const values: any[] = [];
+  const visit = (candidate: any) => {
     if (candidate == null) return;
     if (Array.isArray(candidate)) {
       candidate.forEach(visit);
@@ -344,9 +347,9 @@ const collectSbtTagValues = (...candidates) => {
     if (typeof candidate === 'string') {
       candidate
         .split(',')
-        .map((entry) => entry.trim())
+        .map((entry: any) => entry.trim())
         .filter(Boolean)
-        .forEach((entry) => values.push(entry));
+        .forEach((entry: any) => values.push(entry));
       return;
     }
     if (typeof candidate === 'object') {
@@ -355,7 +358,7 @@ const collectSbtTagValues = (...candidates) => {
         candidate.name,
         candidate.value,
         candidate.tag,
-      ].find((value) => typeof value === 'string' && value.trim().length > 0);
+      ].find((value: any) => typeof value === 'string' && value.trim().length > 0);
       if (objectText) values.push(objectText);
     }
   };
@@ -363,9 +366,9 @@ const collectSbtTagValues = (...candidates) => {
   return dedupeCaseInsensitiveStrings(values);
 };
 
-const collectSbtDocumentUrls = (...candidates) => {
-  const values = [];
-  const visit = (candidate) => {
+const collectSbtDocumentUrls = (...candidates: any[]) => {
+  const values: any[] = [];
+  const visit = (candidate: any) => {
     if (candidate == null) return;
     if (Array.isArray(candidate)) {
       candidate.forEach(visit);
@@ -385,7 +388,7 @@ const collectSbtDocumentUrls = (...candidates) => {
         candidate.docURL,
         candidate.docUrl,
         candidate.value,
-      ].find((value) => typeof value === 'string' && value.trim().length > 0);
+      ].find((value: any) => typeof value === 'string' && value.trim().length > 0);
       if (documentHref) values.push(documentHref);
     }
   };
@@ -393,7 +396,7 @@ const collectSbtDocumentUrls = (...candidates) => {
   return dedupeCaseInsensitiveStrings(values);
 };
 
-const getSbtCardDetails = (sbt) => {
+const getSbtCardDetails = (sbt: any) => {
   const sbtInfo = sbt?.sbtInfo || {};
   const tags = collectSbtTagValues(
     sbtInfo.tags,
@@ -412,7 +415,7 @@ const getSbtCardDetails = (sbt) => {
     sbt.documentUrls,
     sbt.docURLs,
     sbt.documents,
-  ).map((rawHref) => ({
+  ).map((rawHref: any) => ({
     href: normalizeDocumentHref(rawHref) || rawHref,
     label: rawHref,
   }));
@@ -423,13 +426,13 @@ const getSbtCardDetails = (sbt) => {
     hasDetails: tags.length > 0 || documentUrls.length > 0,
   };
 };
-const coerceMintEndSeconds = (v) => {
+const coerceMintEndSeconds = (v: any) => {
   const n = Number(v);
   if (!Number.isFinite(n) || n < 0) return 0;
   return n > 1e12 ? Math.floor(n / 1000) : Math.floor(n);
 };
 
-export const readSbtCacheMetaSnapshot = (slug, netKey) => {
+export const readSbtCacheMetaSnapshot = (slug: any, netKey: any) => {
   if (!netKey) return null;
   try {
     const cache = peekCacheSync('sbtCache', slug, { clone: false });
@@ -470,7 +473,7 @@ const SBTsList = ({
   embeddedMode = false,
   communityTabCompactSettings = false,
   interactiveMiniCards = false,
-}) => {
+}: any) => {
   const routeSlug = normalizeSessionSlug(sessionSlug || '');
   // Determine if we should enumerate ALL groups (route-based fallback + explicit prop)
   const allSessionsMode = useMemo(() => {
@@ -482,9 +485,9 @@ const SBTsList = ({
     } catch (_) { return false; }
   }, [allSessionsModeProp]);
 
-  const [globalSessionSelectionRevision, setGlobalSessionSelectionRevision] = useState(0);
-  const [sessionConfigRevision, setSessionConfigRevision] = useState(0);
-  const [activeSessionSlug, setActiveGroupSlug] = useState(() => {
+  const [globalSessionSelectionRevision, setGlobalSessionSelectionRevision] = useState<any>(0);
+  const [sessionConfigRevision, setSessionConfigRevision] = useState<any>(0);
+  const [activeSessionSlug, setActiveGroupSlug] = useState<any>(() => {
     const globalPrimarySessionSlug = normalizeSessionSlug(readStoredGlobalSessionSelection().primarySessionSlug || '');
     try {
       if (typeof window === 'undefined' || !window.localStorage) return normalizeSessionSlug(routeSlug);
@@ -502,7 +505,7 @@ const SBTsList = ({
     const showDemoSessions = readShowDemoSessions();
     const customDemoEntries = getCustomDemoSessionEntries(DEMO_SESSION_MAP);
     let registryEntryCount = 0;
-    let registryEntries = [];
+    let registryEntries: any[] = [];
     try {
       registryEntries = sessionRegistryStore.getAllSessionEntries();
       registryEntryCount = Array.isArray(registryEntries) ? registryEntries.length : 0;
@@ -535,7 +538,7 @@ const SBTsList = ({
 
   const syncSessionUniverseFromCache = useCallback(() => {
     const next = readSessionUniverseSnapshot();
-    setAvailableSessionUniverse((prev) => {
+    setAvailableSessionUniverse((prev: any) => {
       const prevSlugs = Array.isArray(prev?.slugs) ? prev.slugs : [];
       const nextSlugs = Array.isArray(next?.slugs) ? next.slugs : [];
       const prevRegistryCount = Number(prev?.registryEntryCount || 0);
@@ -557,10 +560,10 @@ const SBTsList = ({
     return next;
   }, [readSessionUniverseSnapshot]);
 
-  const [availableSessionUniverse, setAvailableSessionUniverse] = useState(() => readSessionUniverseSnapshot());
-  const [showMoreSessions, setShowMoreSessions] = useState(false);
-  const [showMoreSessionsLoading, setShowMoreSessionsLoading] = useState(false);
-  const [hasNoSessionUniverseItems, setHasNoSessionUniverseItems] = useState(false);
+  const [availableSessionUniverse, setAvailableSessionUniverse] = useState<any>(() => readSessionUniverseSnapshot());
+  const [showMoreSessions, setShowMoreSessions] = useState<any>(false);
+  const [showMoreSessionsLoading, setShowMoreSessionsLoading] = useState<any>(false);
+  const [hasNoSessionUniverseItems, setHasNoSessionUniverseItems] = useState<any>(false);
   const availableSessionSlugs = availableSessionUniverse.slugs;
   const registryEntryCount = Number(availableSessionUniverse.registryEntryCount || 0);
   const fallbackEntryCount = Number(availableSessionUniverse.fallbackEntryCount || 0);
@@ -602,18 +605,18 @@ const SBTsList = ({
       : listModeConfiguredSessionSlugs
   ), [availableSessionSlugs, isListModeScopeEnabled, listModeConfiguredSessionSlugs]);
 
-  const [selectedSessionSlugs, setSelectedSessionSlugs] = useState(() => (
+  const [selectedSessionSlugs, setSelectedSessionSlugs] = useState<any>(() => (
     readStoredListModeSelectedSessionSlugs()
   ));
 
   const hiddenRegistrySessionSlugs = useMemo(() => {
     if (!isListModeScopeEnabled) return [];
-    const baseSet = new Set(baseSessionUniverseSlugs.map((s) => normalizeSessionSlug(s)));
+    const baseSet: any = new Set(baseSessionUniverseSlugs.map((s: any) => normalizeSessionSlug(s)));
     const discoverable = dedupeNormalizedSlugs([
       ...availableSessionSlugs,
       ...registrySessionUniverseSlugs,
     ]);
-    return discoverable.filter((slug) => !baseSet.has(normalizeSessionSlug(slug)));
+    return discoverable.filter((slug: any) => !baseSet.has(normalizeSessionSlug(slug)));
   }, [
     availableSessionSlugs,
     baseSessionUniverseSlugs,
@@ -623,16 +626,16 @@ const SBTsList = ({
 
   const selectedHiddenRegistrySessionSlugs = useMemo(() => {
     if (!isListModeScopeEnabled) return [];
-    const hiddenSet = new Set(dedupeNormalizedSlugs(hiddenRegistrySessionSlugs));
+    const hiddenSet: any = new Set(dedupeNormalizedSlugs(hiddenRegistrySessionSlugs));
     return dedupeNormalizedSlugs(selectedSessionSlugs)
-      .filter((slug) => hiddenSet.has(normalizeSessionSlug(slug)));
+      .filter((slug: any) => hiddenSet.has(normalizeSessionSlug(slug)));
   }, [hiddenRegistrySessionSlugs, isListModeScopeEnabled, selectedSessionSlugs]);
 
   const remainingHiddenRegistrySessionSlugs = useMemo(() => {
     if (!isListModeScopeEnabled) return [];
-    const selectedSet = new Set(selectedHiddenRegistrySessionSlugs.map((s) => normalizeSessionSlug(s)));
+    const selectedSet: any = new Set(selectedHiddenRegistrySessionSlugs.map((s: any) => normalizeSessionSlug(s)));
     return dedupeNormalizedSlugs(hiddenRegistrySessionSlugs)
-      .filter((slug) => !selectedSet.has(normalizeSessionSlug(slug)));
+      .filter((slug: any) => !selectedSet.has(normalizeSessionSlug(slug)));
   }, [hiddenRegistrySessionSlugs, isListModeScopeEnabled, selectedHiddenRegistrySessionSlugs]);
 
   const displayedSessionUniverseSlugs = useMemo(() => {
@@ -665,14 +668,14 @@ const SBTsList = ({
 
   const defaultListModeSelectedSessionSlugs = useMemo(() => {
     if (!isListModeScopeEnabled) return [];
-    const displayedSet = new Set(displayedSessionUniverseSlugsNormalized);
+    const displayedSet: any = new Set(displayedSessionUniverseSlugsNormalized);
     const configured = dedupeNormalizedSlugs(listModeConfiguredSessionSlugs)
-      .filter((slug) => displayedSet.has(slug));
+      .filter((slug: any) => displayedSet.has(slug));
     if (configured.length > 0) {
       return sortSlugsByUniverseOrder(configured, displayedSessionUniverseSlugsNormalized);
     }
     const fallbackWithoutNoSession = displayedSessionUniverseSlugsNormalized.filter(
-      (slug) => !isSyntheticNoSessionSlug(slug)
+      (slug: any) => !isSyntheticNoSessionSlug(slug)
     );
     const fallbackSelection = fallbackWithoutNoSession.length > 0
       ? fallbackWithoutNoSession
@@ -689,9 +692,9 @@ const SBTsList = ({
 
   const selectedSessionUniverseSlugs = useMemo(() => {
     if (!allSessionsMode || !isListModeScopeEnabled) return [];
-    const displayedSet = new Set(displayedSessionUniverseSlugsNormalized);
+    const displayedSet: any = new Set(displayedSessionUniverseSlugsNormalized);
     const userSelected = dedupeNormalizedSlugs(selectedSessionSlugs)
-      .filter((slug) => displayedSet.has(slug));
+      .filter((slug: any) => displayedSet.has(slug));
     if (userSelected.length > 0) {
       return sortSlugsByUniverseOrder(userSelected, displayedSessionUniverseSlugsNormalized);
     }
@@ -740,16 +743,16 @@ const SBTsList = ({
       return;
     }
     if (!displayedSessionUniverseSlugsNormalized.length) return;
-    const discoverableSet = new Set(dedupeNormalizedSlugs([
+    const discoverableSet: any = new Set(dedupeNormalizedSlugs([
       ...displayedSessionUniverseSlugsNormalized,
       ...availableSessionSlugs,
       ...registrySessionUniverseSlugs,
       ...hiddenRegistrySessionSlugs,
       ...listModeConfiguredSessionSlugs,
     ]));
-    setSelectedSessionSlugs((prev) => {
+    setSelectedSessionSlugs((prev: any) => {
       const normalized = dedupeNormalizedSlugs(prev);
-      const clamped = normalized.filter((slug) => discoverableSet.has(slug));
+      const clamped = normalized.filter((slug: any) => discoverableSet.has(slug));
       return areStringArraysEqual(normalized, clamped) ? prev : clamped;
     });
   }, [
@@ -799,12 +802,12 @@ const SBTsList = ({
     }
     const handleRegistryCacheUpdated = () => {
       if (!isMounted.current) return;
-      setSessionConfigRevision((value) => value + 1);
+      setSessionConfigRevision((value: any) => value + 1);
       syncSessionUniverseFromCache();
     };
     const handleGlobalSessionSelectionUpdated = () => {
       if (!isMounted.current) return;
-      setGlobalSessionSelectionRevision((value) => value + 1);
+      setGlobalSessionSelectionRevision((value: any) => value + 1);
     };
     window.addEventListener(SESSION_REGISTRY_CACHE_UPDATED_EVENT, handleRegistryCacheUpdated);
     window.addEventListener(GLOBAL_SESSION_SELECTION_UPDATED_EVENT, handleGlobalSessionSelectionUpdated);
@@ -819,7 +822,7 @@ const SBTsList = ({
     let cancelled = false;
     let attempt = 0;
     const maxAttempts = 4;
-    let retryTimerId = null;
+    let retryTimerId: any = null;
     const runRetry = () => {
       if (cancelled || !isMounted.current) return;
       const next = syncSessionUniverseFromCache();
@@ -914,37 +917,37 @@ const SBTsList = ({
 
   const actionableUniverseSessionSlugs = useMemo(() => (
     dedupeNormalizedSlugs(displayedSessionUniverseSlugs).filter(
-      (slug) => !isSyntheticNoSessionSlug(slug)
+      (slug: any) => !isSyntheticNoSessionSlug(slug)
     )
   ), [displayedSessionUniverseSlugs]);
 
   const actionableSectionSessionSlugs = useMemo(() => (
     dedupeNormalizedSlugs(sectionSessionSlugs).filter(
-      (slug) => !isSyntheticNoSessionSlug(slug)
+      (slug: any) => !isSyntheticNoSessionSlug(slug)
     )
   ), [sectionSessionSlugs]);
 
   const resolvedListSlugForGroupLists = isSyntheticNoSessionSlug(listSlug) ? '' : listSlug;
   const { featured_SBTs_LIST = [], ignored_SBTs_LIST = [] } = getSessionLists(resolvedListSlugForGroupLists);
 
-  const [sbtListBySlug, setSbtListBySlug] = useState({});
-  const [sessionLoadStateBySlug, setSessionLoadStateBySlug] = useState({});
-  const [sessionHasLoadedOnceBySlug, setSessionHasLoadedOnceBySlug] = useState({});
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [revisionSyncPending, setRevisionSyncPending] = useState(false);
+  const [sbtListBySlug, setSbtListBySlug] = useState<any>({});
+  const [sessionLoadStateBySlug, setSessionLoadStateBySlug] = useState<any>({});
+  const [sessionHasLoadedOnceBySlug, setSessionHasLoadedOnceBySlug] = useState<any>({});
+  const [loading, setLoading] = useState<any>(true);
+  const [refreshing, setRefreshing] = useState<any>(false);
+  const [revisionSyncPending, setRevisionSyncPending] = useState<any>(false);
 
-  const [excludePasswordLocked, setExcludePasswordLocked] = useState(false);
+  const [excludePasswordLocked, setExcludePasswordLocked] = useState<any>(false);
   // initialize Create Group panel open based on cache presence (idempotent: only initial)
-  const [showCreateGroup, setShowCreateGroup] = useState(() => hasCachedCreateSbtForm({
+  const [showCreateGroup, setShowCreateGroup] = useState<any>(() => hasCachedCreateSbtFormUntyped({
     sessionSlug: listSlug,
     migrateLegacyToSessionKey: true,
     clearInvalid: true,
   }));
-  const [showAdminButtons, setShowAdminButtons] = useState(false);
-  const [showLocalSessionSettings, setShowLocalSessionSettings] = useState(false);
-  const [expandedSbtAddresses, setExpandedSbtAddresses] = useState(() => new Set());
-  const [isUniverseCollapsed, setIsUniverseCollapsed] = useState(() => {
+  const [showAdminButtons, setShowAdminButtons] = useState<any>(false);
+  const [showLocalSessionSettings, setShowLocalSessionSettings] = useState<any>(false);
+  const [expandedSbtAddresses, setExpandedSbtAddresses] = useState<any>(() => new Set());
+  const [isUniverseCollapsed, setIsUniverseCollapsed] = useState<any>(() => {
     try {
       if (typeof window === 'undefined' || !window.localStorage) return false;
       return window.localStorage.getItem('dg:sbtUniverseCollapsed') === 'true';
@@ -954,33 +957,33 @@ const SBTsList = ({
   });
 
   /** tracks addresses with a non-zero on-chain groupPasswordHash (unlimited group-password mint) */
-  const [groupPasswordMap, setGroupPasswordMap] = useState({}); // {[addrLower]: boolean}
+  const [groupPasswordMap, setGroupPasswordMap] = useState<any>({}); // {[addrLower]: boolean}
 
-  const [latestBlockBySlug, setLatestBlockBySlug] = useState({});
-  const [chipProgressVisibilityBySlug, setChipProgressVisibilityBySlug] = useState({});
-  const [sessionCacheMetaBySlug, setSessionCacheMetaBySlug] = useState({});
-  const [emptySectionSpinnerActive, setEmptySectionSpinnerActive] = useState(false);
-  const [recentLiveProgressNowMs, setRecentLiveProgressNowMs] = useState(() => Date.now());
+  const [latestBlockBySlug, setLatestBlockBySlug] = useState<any>({});
+  const [chipProgressVisibilityBySlug, setChipProgressVisibilityBySlug] = useState<any>({});
+  const [sessionCacheMetaBySlug, setSessionCacheMetaBySlug] = useState<any>({});
+  const [emptySectionSpinnerActive, setEmptySectionSpinnerActive] = useState<any>(false);
+  const [recentLiveProgressNowMs, setRecentLiveProgressNowMs] = useState<any>(() => Date.now());
 
-  const isMounted = useRef(true);
-  const refreshSafetyTimeoutRef = useRef(null);
-  const emptySectionSpinnerTimeoutRef = useRef(null);
-  const recentLiveProgressTimeoutRef = useRef(null);
+  const isMounted = useRef<any>(true);
+  const refreshSafetyTimeoutRef = useRef<any>(null);
+  const emptySectionSpinnerTimeoutRef = useRef<any>(null);
+  const recentLiveProgressTimeoutRef = useRef<any>(null);
 
-  const sessionFetchRunBySlugRef = useRef({});
-  const sessionHasLoadedOnceRef = useRef(sessionHasLoadedOnceBySlug);
-  const sbtListBySlugRef = useRef(sbtListBySlug);
-  const listModeUniverseRefreshRequestedRef = useRef(false);
-  const recentLiveProgressBySlugRef = useRef({});
-  const chipProgressVisibilityMetaRef = useRef({});
-  const chipProgressDesiredBySlugRef = useRef({});
-  const passiveLatestLookupStateBySlugRef = useRef({});
-  const passiveLatestLookupInFlightBySlugRef = useRef({});
+  const sessionFetchRunBySlugRef = useRef<any>({});
+  const sessionHasLoadedOnceRef = useRef<any>(sessionHasLoadedOnceBySlug);
+  const sbtListBySlugRef = useRef<any>(sbtListBySlug);
+  const listModeUniverseRefreshRequestedRef = useRef<any>(false);
+  const recentLiveProgressBySlugRef = useRef<any>({});
+  const chipProgressVisibilityMetaRef = useRef<any>({});
+  const chipProgressDesiredBySlugRef = useRef<any>({});
+  const passiveLatestLookupStateBySlugRef = useRef<any>({});
+  const passiveLatestLookupInFlightBySlugRef = useRef<any>({});
 
   /** tracks if the component has *ever* completed a successful load */
-  const initialLoadCompletedRef = useRef(false);
+  const initialLoadCompletedRef = useRef<any>(false);
 
-  const lastInitDepsRef = useRef({
+  const lastInitDepsRef = useRef<any>({
     listSlug: listSlug,
     allSessionsMode: allSessionsMode,
     selectedSessionSignature: '',
@@ -1021,7 +1024,7 @@ const SBTsList = ({
   const sessionSelectorPanelId = 'session-selector-panel';
   const hideSessionUniverseSummary = miniaturized && viewMode === 'modal' && communityTabCompactSettings;
 
-  const clearChipProgressVisibilityTimeout = useCallback((slugIn) => {
+  const clearChipProgressVisibilityTimeout = useCallback((slugIn: any) => {
     const slug = normalizeSessionSlug(slugIn || '');
     const meta = chipProgressVisibilityMetaRef.current[slug];
     if (!meta?.timerId) return;
@@ -1033,14 +1036,14 @@ const SBTsList = ({
   }, []);
 
   const clearAllChipProgressVisibilityTimeouts = useCallback(() => {
-    Object.keys(chipProgressVisibilityMetaRef.current || {}).forEach((slug) => {
+    Object.keys(chipProgressVisibilityMetaRef.current || {}).forEach((slug: any) => {
       clearChipProgressVisibilityTimeout(slug);
     });
   }, [clearChipProgressVisibilityTimeout]);
 
-  const pruneRecentLiveProgress = useCallback((nowMs = Date.now(), activeSlugs = new Set()) => {
+  const pruneRecentLiveProgress = useCallback((nowMs: any = Date.now(), activeSlugs: any = new Set()) => {
     let changed = false;
-    Object.keys(recentLiveProgressBySlugRef.current).forEach((slug) => {
+    Object.keys(recentLiveProgressBySlugRef.current).forEach((slug: any) => {
       if (activeSlugs.has(slug)) return;
       const ageMs = nowMs - Number(recentLiveProgressBySlugRef.current[slug]?.updatedAtMs || 0);
       if (ageMs > SBT_LIVE_PROGRESS_BRIDGE_MS) {
@@ -1082,8 +1085,8 @@ const SBTsList = ({
   }, [sbtListBySlug]);
 
   const hasNoSessionCards = useMemo(() => (
-    Object.values(sbtListBySlug || {}).some((list) => (
-      Array.isArray(list) && list.some((item) => (
+    Object.values(sbtListBySlug || {}).some((list: any) => (
+      Array.isArray(list) && list.some((item: any) => (
         hasExplicitNoSessionAssociation(item) || (
           allSessionsMode &&
           isListModeScopeEnabled &&
@@ -1098,7 +1101,7 @@ const SBTsList = ({
       if (hasNoSessionUniverseItems) setHasNoSessionUniverseItems(false);
       return;
     }
-    setHasNoSessionUniverseItems((prev) => (
+    setHasNoSessionUniverseItems((prev: any) => (
       prev === hasNoSessionCards ? prev : hasNoSessionCards
     ));
   }, [allSessionsMode, hasNoSessionCards, hasNoSessionUniverseItems]);
@@ -1109,9 +1112,9 @@ const SBTsList = ({
       typeof sbtScanProgressBySlug === 'object'
     ) ? sbtScanProgressBySlug : {};
     const nowMs = Date.now();
-    const nextSeen = new Set();
+    const nextSeen: any = new Set();
 
-    Object.entries(liveProgressBySlug).forEach(([slugRaw, progressRaw]) => {
+    Object.entries(liveProgressBySlug).forEach(([slugRaw, progressRaw]: any) => {
       const slug = normalizeSessionSlug(slugRaw || '');
       if (isSyntheticNoSessionSlug(slug)) return;
       const progress = (progressRaw && typeof progressRaw === 'object') ? progressRaw : null;
@@ -1142,22 +1145,22 @@ const SBTsList = ({
   useEffect(() => {
     clearRecentLiveProgressTimeout();
 
-    const activeSlugs = new Set(
+    const activeSlugs: any = new Set(
       Object.keys(
         (sbtScanProgressBySlug && typeof sbtScanProgressBySlug === 'object')
           ? sbtScanProgressBySlug
           : {}
       )
-        .map((slugRaw) => normalizeSessionSlug(slugRaw || ''))
-        .filter((slug) => slug && !isSyntheticNoSessionSlug(slug))
+        .map((slugRaw: any) => normalizeSessionSlug(slugRaw || ''))
+        .filter((slug: any) => slug && !isSyntheticNoSessionSlug(slug))
     );
     const nowMs = Date.now();
     if (pruneRecentLiveProgress(nowMs, activeSlugs)) {
       setRecentLiveProgressNowMs(nowMs);
     }
 
-    let soonestExpiryAtMs = null;
-    Object.keys(recentLiveProgressBySlugRef.current).forEach((slug) => {
+    let soonestExpiryAtMs: any = null;
+    Object.keys(recentLiveProgressBySlugRef.current).forEach((slug: any) => {
       if (activeSlugs.has(slug)) return;
       const updatedAtMs = Number(recentLiveProgressBySlugRef.current[slug]?.updatedAtMs || 0);
       if (!updatedAtMs) return;
@@ -1180,7 +1183,7 @@ const SBTsList = ({
     return clearRecentLiveProgressTimeout;
   }, [clearRecentLiveProgressTimeout, pruneRecentLiveProgress, sbtScanProgressBySlug]);
 
-  const getDisplaySessionConfig = useCallback((slugIn) => {
+  const getDisplaySessionConfig = useCallback((slugIn: any) => {
     const slug = normalizeSessionSlug(slugIn || '');
     if (isSyntheticNoSessionSlug(slug)) return null;
     return (
@@ -1190,7 +1193,7 @@ const SBTsList = ({
     );
   }, []);
 
-  const labelForSessionSlug = useCallback((slugIn) => {
+  const labelForSessionSlug = useCallback((slugIn: any) => {
     const normalized = normalizeSessionSlug(slugIn || '');
     if (isSyntheticNoSessionSlug(normalized)) return 'No Session';
     if (!normalized) return 'General';
@@ -1201,8 +1204,8 @@ const SBTsList = ({
   const embeddedCreateGroupLockGateSources = useMemo(() => {
     if (!allSessionsMode || !isListModeScopeEnabled) return [];
     return dedupeNormalizedSlugs(selectedSessionUniverseSlugs)
-      .filter((slug) => !isSyntheticNoSessionSlug(slug))
-      .map((slug) => {
+      .filter((slug: any) => !isSyntheticNoSessionSlug(slug))
+      .map((slug: any) => {
         const sessionConfig = getDisplaySessionConfig(slug);
         if (!sessionConfig || typeof sessionConfig !== 'object') return null;
         return {
@@ -1219,7 +1222,7 @@ const SBTsList = ({
   ]);
 
   // Derive netKey from group config (not wallet) - helper used for cache watermark UI
-  const deriveGroupNetKey = useCallback((slugIn) => {
+  const deriveGroupNetKey = useCallback((slugIn: any) => {
     if (isSyntheticNoSessionSlug(slugIn)) return '';
     try {
       const chainId = getSessionChainId(slugIn);
@@ -1229,7 +1232,7 @@ const SBTsList = ({
     }
   }, []);
 
-  const deriveCacheNetKeyForSlug = useCallback((slugIn) => {
+  const deriveCacheNetKeyForSlug = useCallback((slugIn: any) => {
     if (isSyntheticNoSessionSlug(slugIn)) return '';
     try {
       const chainId = getSessionChainId(slugIn);
@@ -1238,12 +1241,12 @@ const SBTsList = ({
     return String(network?.id || '');
   }, [network?.id]);
 
-  const formatBlockCount = useCallback((value) => {
+  const formatBlockCount = useCallback((value: any) => {
     const n = Number(value);
     return Number.isFinite(n) ? n.toLocaleString() : '-';
   }, []);
 
-  const updateSessionCacheMeta = useCallback((slugIn, metaIn = null) => {
+  const updateSessionCacheMeta = useCallback((slugIn: any, metaIn: any = null) => {
     const slug = normalizeSessionSlug(slugIn || '');
     if (!slug && slug !== '') return;
     if (!metaIn || typeof metaIn !== 'object') return;
@@ -1253,7 +1256,7 @@ const SBTsList = ({
       sbtCount: Math.max(0, Number(metaIn?.sbtCount || 0)),
     };
 
-    setSessionCacheMetaBySlug((prev) => {
+    setSessionCacheMetaBySlug((prev: any) => {
       const existing = prev[slug];
       if (
         existing &&
@@ -1266,7 +1269,7 @@ const SBTsList = ({
     });
   }, []);
 
-  const readSbtCacheMeta = useCallback((slug) => {
+  const readSbtCacheMeta = useCallback((slug: any) => {
     try {
       const netKey = deriveGroupNetKey(slug);
       const syncMeta = readSbtCacheMetaSnapshot(slug, netKey);
@@ -1289,7 +1292,7 @@ const SBTsList = ({
     }
   }, [deriveGroupNetKey, sessionCacheMetaBySlug]);
 
-  const hasResolvableSessionWorker = useCallback((slugIn) => {
+  const hasResolvableSessionWorker = useCallback((slugIn: any) => {
     const slug = normalizeSessionSlug(slugIn || '');
     if (isSyntheticNoSessionSlug(slug)) return true;
     return hasUsableSessionWorkerConfig({
@@ -1299,7 +1302,7 @@ const SBTsList = ({
     });
   }, [getDisplaySessionConfig]);
 
-  const readBooleanFlag = useCallback((name, slug) => {
+  const readBooleanFlag = useCallback((name: any, slug: any) => {
     try {
       if (typeof window === 'undefined' || !window.localStorage) return false;
       if (isManagedDgCacheName(name)) return false;
@@ -1320,7 +1323,7 @@ const SBTsList = ({
     }
   }, [hasResolvableSessionWorker]);
 
-  const resolveConcreteSessionBindingSlug = useCallback((sbt) => {
+  const resolveConcreteSessionBindingSlug = useCallback((sbt: any) => {
     const sbtInfo = sbt?.sbtInfo || {};
 
     if (hasAuthoritativeSessionSlug(sbtInfo)) {
@@ -1353,7 +1356,7 @@ const SBTsList = ({
     return normalizeSessionSlug(mappedSlug);
   }, []);
 
-  const resolveSbtSessionSlug = useCallback((sbt) => {
+  const resolveSbtSessionSlug = useCallback((sbt: any) => {
     const sbtInfo = sbt?.sbtInfo || {};
     const sourceSlug = normalizeSessionSlug(
       sbt?.__sourceSessionSlug ?? sbt?.slug ?? sbt?.sessionSlug ?? ''
@@ -1414,11 +1417,11 @@ const SBTsList = ({
     return normalizeSessionSlug(listSlug || '');
   }, [allSessionsMode, isListModeScopeEnabled, listSlug, resolveConcreteSessionBindingSlug]);
 
-  const collectLinkedScopedSbtEntries = useCallback((targetSlugs = [], options = {}) => {
-    const targetSlugSet = new Set(dedupeNormalizedSlugs(targetSlugs));
+  const collectLinkedScopedSbtEntries = useCallback((targetSlugs: any = [], options: any = {}) => {
+    const targetSlugSet: any = new Set(dedupeNormalizedSlugs(targetSlugs));
     if (targetSlugSet.size === 0) return [];
 
-    let knownEntries = [];
+    let knownEntries: any[] = [];
     try {
       knownEntries = listNamespaceEntriesSync('sbtCache', { cloneValues: false });
     } catch (_) {
@@ -1426,15 +1429,15 @@ const SBTsList = ({
     }
 
     const requireConcreteBinding = options?.requireConcreteBinding === true;
-    const out = [];
-    const seen = new Set();
+    const out: any[] = [];
+    const seen: any = new Set();
 
-    (Array.isArray(knownEntries) ? knownEntries : []).forEach(({ slug: cacheSlug, value }) => {
+    (Array.isArray(knownEntries) ? knownEntries : []).forEach(({ slug: cacheSlug, value }: any) => {
       const sourceSlug = normalizeSessionSlug(cacheSlug || '');
       const cacheValue = (value && typeof value === 'object') ? value : null;
       if (!cacheValue) return;
 
-      Object.values(cacheValue).forEach((netNode) => {
+      Object.values(cacheValue).forEach((netNode: any) => {
         const scopedList = (
           netNode &&
           typeof netNode === 'object' &&
@@ -1443,7 +1446,7 @@ const SBTsList = ({
         ) ? netNode.sbtList : null;
         if (!scopedList) return;
 
-        Object.entries(scopedList).forEach(([cacheAddress, entry]) => {
+        Object.entries(scopedList).forEach(([cacheAddress, entry]: any) => {
           const rawEntry = (entry && typeof entry === 'object') ? entry : {};
           const entryWithSource = {
             ...rawEntry,
@@ -1484,11 +1487,11 @@ const SBTsList = ({
     if (!allSessionsMode || !isListModeScopeEnabled) {
       const slug = normalizeSessionSlug(listSlug || '');
       if (allSessionsMode && isSyntheticNoSessionSlug(slug)) {
-        const deduped = [];
-        const seen = new Set();
-        Object.entries(sbtListBySlug || {}).forEach(([bucketSlug, bucketItems]) => {
+        const deduped: any[] = [];
+        const seen: any = new Set();
+        Object.entries(sbtListBySlug || {}).forEach(([bucketSlug, bucketItems]: any) => {
           const normalizedBucketSlug = normalizeSessionSlug(bucketSlug || '');
-          (Array.isArray(bucketItems) ? bucketItems : []).forEach((item) => {
+          (Array.isArray(bucketItems) ? bucketItems : []).forEach((item: any) => {
             const itemWithSource = (
               item && item.__sourceSessionSlug === normalizedBucketSlug
                 ? item
@@ -1511,7 +1514,7 @@ const SBTsList = ({
       const rawList = Array.isArray(list) ? list : [];
       if (!allSessionsMode && slug && !isSyntheticNoSessionSlug(slug)) {
         return mergeSbtListsByAddress(
-          rawList.filter((item) => resolveConcreteSessionBindingSlug(item) === slug),
+          rawList.filter((item: any) => resolveConcreteSessionBindingSlug(item) === slug),
           collectLinkedScopedSbtEntries([slug], { requireConcreteBinding: true })
         );
       }
@@ -1522,17 +1525,17 @@ const SBTsList = ({
     }
     const selectedSlugs = dedupeNormalizedSlugs(sectionSessionSlugs);
     if (!selectedSlugs.length) return [];
-    const selectedSlugSet = new Set(selectedSlugs.map((slug) => normalizeSessionSlug(slug)));
+    const selectedSlugSet: any = new Set(selectedSlugs.map((slug: any) => normalizeSessionSlug(slug)));
     const bucketsToScan = dedupeNormalizedSlugs([
       ...selectedSlugs,
       ...Object.keys(sbtListBySlug || {}),
     ]);
-    const deduped = [];
-    const seen = new Set();
-    bucketsToScan.forEach((slug) => {
+    const deduped: any[] = [];
+    const seen: any = new Set();
+    bucketsToScan.forEach((slug: any) => {
       const normalized = normalizeSessionSlug(slug || '');
       const list = Array.isArray(sbtListBySlug[normalized]) ? sbtListBySlug[normalized] : [];
-      list.forEach((item) => {
+      list.forEach((item: any) => {
         const itemWithSource = (
           item && item.__sourceSessionSlug === normalized
             ? item
@@ -1593,7 +1596,7 @@ const SBTsList = ({
     listSlug,
   ]);
 
-  const getScopeBypassSessionRef = useCallback((slugIn) => {
+  const getScopeBypassSessionRef = useCallback((slugIn: any) => {
     const slug = normalizeSessionSlug(slugIn);
     if (!allSessionsMode) return slug;
     const cfg = getDisplaySessionConfig(slug);
@@ -1604,14 +1607,14 @@ const SBTsList = ({
     };
   }, [allSessionsMode, getDisplaySessionConfig]);
 
-  const refreshLatestBlocks = useCallback(async (slugs, force = false) => {
+  const refreshLatestBlocks = useCallback(async (slugs: any, force: any = false) => {
     const targets = Array.from(new Set(
-      (Array.isArray(slugs) ? slugs : [listSlug]).map((slug) => normalizeSessionSlug(slug))
+      (Array.isArray(slugs) ? slugs : [listSlug]).map((slug: any) => normalizeSessionSlug(slug))
     ));
     if (!targets.length) return;
 
-    const updates = {};
-    await Promise.all(targets.map(async (slug) => {
+    const updates: Record<string, any> = {};
+    await Promise.all(targets.map(async (slug: any) => {
       if (!force && !isMounted.current) return;
       try {
         const scopeRef = getScopeBypassSessionRef(slug);
@@ -1622,7 +1625,7 @@ const SBTsList = ({
               : { slug, __forceLatestBlock: true }
           )
           : scopeRef;
-        const { toBlock } = await contractScripts.getRelevantBlockWindowForFilter(
+        const { toBlock } = await contractScriptsUntyped.getRelevantBlockWindowForFilter(
           blockWindowRef
         );
         const latest = Number(toBlock || 0);
@@ -1634,10 +1637,10 @@ const SBTsList = ({
 
     if (!isMounted.current) return;
     if (!Object.keys(updates).length) return;
-    setLatestBlockBySlug((prev) => {
+    setLatestBlockBySlug((prev: any) => {
       let changed = false;
       const next = { ...prev };
-      Object.entries(updates).forEach(([slug, block]) => {
+      Object.entries(updates).forEach(([slug, block]: any) => {
         if (Number(next[slug] || 0) !== Number(block || 0)) {
           next[slug] = Number(block);
           changed = true;
@@ -1647,7 +1650,7 @@ const SBTsList = ({
     });
   }, [listSlug, getScopeBypassSessionRef]);
 
-  const getSessionProgressSnapshot = useCallback((slugIn) => {
+  const getSessionProgressSnapshot = useCallback((slugIn: any) => {
     const slug = normalizeSessionSlug(slugIn || '');
     if (isSyntheticNoSessionSlug(slug)) return null;
 
@@ -1745,7 +1748,7 @@ const SBTsList = ({
     sbtScanProgressBySlug,
   ]);
 
-  const deriveSessionLoadingStatus = useCallback((slugIn, options = {}) => {
+  const deriveSessionLoadingStatus = useCallback((slugIn: any, options: any = {}) => {
     const { forceShow = false, alwaysShow = false } = options || {};
     const slug = normalizeSessionSlug(slugIn || '');
     if (isSyntheticNoSessionSlug(slug)) return null;
@@ -1770,21 +1773,24 @@ const SBTsList = ({
       sessionLabel && sessionLabel.toLowerCase() !== slugLabel.toLowerCase()
         ? `${sessionLabel} (${slugLabel})`
         : sessionLabel;
-    const totalBlocks = hasLatest ? Math.max(1, latestForGroup - startBlock + 1) : null;
+    const numericLatestForGroup = Number(latestForGroup || 0);
+    const numericStartBlock = Number(startBlock || 0);
+    const numericRemainingBlocks = Number(remainingBlocks || 0);
+    const totalBlocks = hasLatest ? Math.max(1, numericLatestForGroup - numericStartBlock + 1) : null;
     const scannedBlocks = hasLatest
-      ? Math.max(0, Math.min(totalBlocks, displayCurrentBlock - startBlock + 1))
+      ? Math.max(0, Math.min(totalBlocks || 0, displayCurrentBlock - numericStartBlock + 1))
       : 0;
     const progressPct = hasLatest
-      ? Math.max(0, Math.min(100, Math.round((scannedBlocks / totalBlocks) * 100)))
+      ? Math.max(0, Math.min(100, Math.round((scannedBlocks / (totalBlocks || 1)) * 100)))
       : 0;
     const progressText = hasLatest
-      ? (remainingBlocks === 0
-        ? `In Sync (Current: ${formatBlockCount(displayCurrentBlock)} / Latest: ${formatBlockCount(latestForGroup)})`
-        : `Remaining Blocks: ${formatBlockCount(remainingBlocks)} (Current: ${formatBlockCount(displayCurrentBlock)} / Latest: ${formatBlockCount(latestForGroup)})`)
+      ? (numericRemainingBlocks === 0
+        ? `In Sync (Current: ${formatBlockCount(displayCurrentBlock)} / Latest: ${formatBlockCount(numericLatestForGroup)})`
+        : `Remaining Blocks: ${formatBlockCount(numericRemainingBlocks)} (Current: ${formatBlockCount(displayCurrentBlock)} / Latest: ${formatBlockCount(numericLatestForGroup)})`)
       : `Loading latest block... (Current: ${formatBlockCount(displayCurrentBlock)})`;
     const chipRemainingText = hasLatest
-      ? (remainingBlocks > 0
-        ? `${formatBlockCount(remainingBlocks)} remaining`
+      ? (numericRemainingBlocks > 0
+        ? `${formatBlockCount(numericRemainingBlocks)} remaining`
         : 'Synced')
       : 'Syncing';
     const chipBlockProgressText = hasLatest
@@ -1824,9 +1830,9 @@ const SBTsList = ({
     if (typeof window === 'undefined') return [];
     const uniqueSlugs = loaderSessionSlugs;
     const statuses = uniqueSlugs
-      .map((slug) => deriveSessionLoadingStatus(slug))
+      .map((slug: any) => deriveSessionLoadingStatus(slug))
       .filter(Boolean)
-      .map((status) => ({ ...status, slug: status.slugLabel }));
+      .map((status: any) => ({ ...status, slug: status.slugLabel }));
     const fallbackSlug = normalizeSessionSlug(listSlug || '');
     if (!statuses.length && fallbackSlug) {
       const fallback = deriveSessionLoadingStatus(fallbackSlug, { forceShow: true });
@@ -1841,9 +1847,9 @@ const SBTsList = ({
 
   const chipLoadingStatusBySlug = useMemo(() => {
     if (!allSessionsMode) return {};
-    const out = {};
+    const out: Record<string, any> = {};
     const chipSlugs = dedupeNormalizedSlugs(displayedSessionUniverseSlugs);
-    chipSlugs.forEach((slug) => {
+    chipSlugs.forEach((slug: any) => {
       const normalizedSlug = normalizeSessionSlug(slug || '');
       if (
         isListModeScopeEnabled &&
@@ -1866,12 +1872,12 @@ const SBTsList = ({
 
   const sessionChipStateBySlug = useMemo(() => {
     if (!allSessionsMode) return {};
-    const out = {};
-    displayedSessionUniverseSlugs.forEach((slugRaw) => {
+    const out: Record<string, any> = {};
+    displayedSessionUniverseSlugs.forEach((slugRaw: any) => {
       const slug = normalizeSessionSlug(slugRaw || '');
       if (isSyntheticNoSessionSlug(slug)) {
         const hasLoadedOnce = Object.values(sessionHasLoadedOnceBySlug).some(Boolean);
-        const anySessionLoading = Object.values(sessionLoadStateBySlug).some((state) => state === 'loading');
+        const anySessionLoading = Object.values(sessionLoadStateBySlug).some((state: any) => state === 'loading');
         const hasCards = hasNoSessionCards;
         const isLoading = refreshing || (!hasCards && (!hasLoadedOnce || anySessionLoading));
         const isLoaded = hasCards || (hasLoadedOnce && !isLoading);
@@ -1911,8 +1917,8 @@ const SBTsList = ({
 
   const chipProgressDesiredVisibilityBySlug = useMemo(() => {
     if (!allSessionsMode) return {};
-    const out = {};
-    Object.entries(chipLoadingStatusBySlug).forEach(([slugRaw, status]) => {
+    const out: Record<string, any> = {};
+    Object.entries(chipLoadingStatusBySlug).forEach(([slugRaw, status]: any) => {
       const slug = normalizeSessionSlug(slugRaw || '');
       if (isSyntheticNoSessionSlug(slug) || !status) return;
       const chipState = sessionChipStateBySlug[slug] || {};
@@ -1921,7 +1927,7 @@ const SBTsList = ({
     return out;
   }, [allSessionsMode, chipLoadingStatusBySlug, sessionChipStateBySlug]);
 
-  const commitChipProgressVisibility = useCallback((slugIn, visible, nowMs = Date.now()) => {
+  const commitChipProgressVisibility = useCallback((slugIn: any, visible: any, nowMs: any = Date.now()) => {
     const slug = normalizeSessionSlug(slugIn || '');
     if (isSyntheticNoSessionSlug(slug)) return;
 
@@ -1934,7 +1940,7 @@ const SBTsList = ({
       lastModeChangeAtMs: Math.max(0, Number(nowMs || Date.now()) || 0),
       timerId: null,
     };
-    setChipProgressVisibilityBySlug((prev) => {
+    setChipProgressVisibilityBySlug((prev: any) => {
       const currentlyVisible = !!prev?.[slug];
       if (currentlyVisible === !!visible) {
         if (!!visible === false && !Object.prototype.hasOwnProperty.call(prev || {}, slug)) {
@@ -1951,19 +1957,19 @@ const SBTsList = ({
 
   useEffect(() => {
     chipProgressDesiredBySlugRef.current = chipProgressDesiredVisibilityBySlug;
-    const desiredSlugs = new Set(Object.keys(chipProgressDesiredVisibilityBySlug || {}));
-    const knownSlugs = new Set([
+    const desiredSlugs: any = new Set(Object.keys(chipProgressDesiredVisibilityBySlug || {}));
+    const knownSlugs: any = new Set([
       ...Object.keys(chipProgressVisibilityMetaRef.current || {}),
       ...desiredSlugs,
     ]);
     const nowMs = Date.now();
 
-    knownSlugs.forEach((slug) => {
+    knownSlugs.forEach((slug: any) => {
       const normalizedSlug = normalizeSessionSlug(slug || '');
       if (!desiredSlugs.has(normalizedSlug)) {
         clearChipProgressVisibilityTimeout(normalizedSlug);
         delete chipProgressVisibilityMetaRef.current[normalizedSlug];
-        setChipProgressVisibilityBySlug((prev) => {
+        setChipProgressVisibilityBySlug((prev: any) => {
           if (!Object.prototype.hasOwnProperty.call(prev || {}, normalizedSlug)) return prev;
           const next = { ...(prev || {}) };
           delete next[normalizedSlug];
@@ -1982,7 +1988,7 @@ const SBTsList = ({
           timerId: null,
         };
         if (desiredVisible) {
-          setChipProgressVisibilityBySlug((prev) => {
+          setChipProgressVisibilityBySlug((prev: any) => {
             if (prev?.[normalizedSlug]) return prev;
             return { ...(prev || {}), [normalizedSlug]: true };
           });
@@ -2030,7 +2036,7 @@ const SBTsList = ({
 
   const sectionSessionDiscoveryPending = useMemo(() => {
     if (!sectionSessionSlugs.length) return false;
-    return sectionSessionSlugs.some((slugRaw) => {
+    return sectionSessionSlugs.some((slugRaw: any) => {
       const slug = normalizeSessionSlug(slugRaw || '');
       if (isSyntheticNoSessionSlug(slug)) {
         const anySessionLoaded = Object.values(sessionHasLoadedOnceBySlug).some(Boolean);
@@ -2071,7 +2077,7 @@ const SBTsList = ({
   ]);
 
   const sectionSessionSearchFlag = useMemo(() => (
-    sectionSessionSlugs.some((slugRaw) => {
+    sectionSessionSlugs.some((slugRaw: any) => {
       const slug = normalizeSessionSlug(slugRaw || '');
       const snapshot = getSessionProgressSnapshot(slug);
       return !!(snapshot?.scanInProgress || snapshot?.deferred);
@@ -2102,7 +2108,7 @@ const SBTsList = ({
     emptySectionSpinnerTimeoutRef.current = setTimeout(() => {
       emptySectionSpinnerTimeoutRef.current = null;
       if (isMounted.current) {
-        setEmptySectionSpinnerActive((prev) => (prev ? false : prev));
+        setEmptySectionSpinnerActive((prev: any) => (prev ? false : prev));
       }
     }, SECTION_SPINNER_HIDE_DELAY_MS);
   }, [
@@ -2111,16 +2117,16 @@ const SBTsList = ({
     shouldKeepSectionSpinnersOn,
   ]);
 
-  const primeSbtCardsFromSyncCache = useCallback((slugList = []) => {
+  const primeSbtCardsFromSyncCache = useCallback((slugList: any = []) => {
     const targets = dedupeNormalizedSlugs(slugList);
     let primed = false;
 
-    targets.forEach((slug) => {
+    targets.forEach((slug: any) => {
       if (isSyntheticNoSessionSlug(slug)) return;
       const netKey = deriveCacheNetKeyForSlug(slug);
       if (!netKey) return;
 
-      let cache = null;
+      let cache: any = null;
       try {
         cache = peekCacheSync('sbtCache', slug, { clone: false });
       } catch (_) {
@@ -2139,15 +2145,15 @@ const SBTsList = ({
       });
 
       primed = true;
-      setSbtListBySlug((prev) => {
+      setSbtListBySlug((prev: any) => {
         const existing = Array.isArray(prev[slug]) ? prev[slug] : [];
         if (areSbtListArraysEqual(existing, hydrated)) return prev;
         return { ...prev, [slug]: hydrated };
       });
-      setSessionHasLoadedOnceBySlug((prev) => (
+      setSessionHasLoadedOnceBySlug((prev: any) => (
         prev[slug] ? prev : { ...prev, [slug]: true }
       ));
-      setSessionLoadStateBySlug((prev) => {
+      setSessionLoadStateBySlug((prev: any) => {
         if (prev[slug] === 'loading') return prev;
         if (prev[slug] === 'loaded') return prev;
         return { ...prev, [slug]: 'loaded' };
@@ -2187,7 +2193,7 @@ const SBTsList = ({
     );
     const shouldShowBlockingLoader = !revisionOnlyTick;
     if (!revisionOnlyTick) {
-      setRevisionSyncPending((prev) => (prev ? false : prev));
+      setRevisionSyncPending((prev: any) => (prev ? false : prev));
     }
 
     const init = async () => {
@@ -2221,7 +2227,7 @@ const SBTsList = ({
         try {
           // Let MainSite own tokenURI hydration during light discovery
           if (shouldShowLoaderForThisRun && typeof ensureLightSbtDiscovery === 'function') {
-            await Promise.all(targets.map(async (slug) => {
+            await Promise.all(targets.map(async (slug: any) => {
               try {
                 await ensureLightSbtDiscovery(
                   slug,
@@ -2230,7 +2236,7 @@ const SBTsList = ({
               } catch (e) { sbtLog.warn('SBTsList: fallback', e); }
             }));
           }
-          await Promise.all(targets.map((slug) => fetchSBTs(false, false, slug)));
+          await Promise.all(targets.map((slug: any) => fetchSBTs(false, false, slug)));
         } finally {
           if (shouldShowLoaderForThisRun && isMounted.current) setLoading(false);
         }
@@ -2275,7 +2281,7 @@ const SBTsList = ({
       sbtScanProgressBySlug &&
       typeof sbtScanProgressBySlug === 'object'
     ) ? sbtScanProgressBySlug : {};
-    const hasRelevantScan = targets.some((slug) => (
+    const hasRelevantScan = targets.some((slug: any) => (
       !isSyntheticNoSessionSlug(slug) && !!liveProgressBySlug[slug]
     ));
     if (!hasRelevantScan) return;
@@ -2313,11 +2319,11 @@ const SBTsList = ({
      If you need a strict zero-call policy, remove this and rely on
      sbtInfo.hasPasswordMint from tokenURI.
      --------------------------------- */
-  const ensureGroupPasswordFlags = useCallback(async (items) => {
+  const ensureGroupPasswordFlags = useCallback(async (items: any) => {
     if (!Array.isArray(items) || items.length === 0) return;
     // Only check unknown ones to minimize RPC calls
     const toCheck = items.filter(
-      (s) =>
+      (s: any) =>
         s &&
         s.sbtAddress &&
         groupPasswordMap[s.sbtAddress.toLowerCase()] === undefined
@@ -2326,7 +2332,7 @@ const SBTsList = ({
 
     try {
       const results = await Promise.all(
-        toCheck.map(async (s) => {
+        toCheck.map(async (s: any) => {
           try {
             // Per-item slug awareness
             const sSlug = (s && s.slug != null) ? s.slug : listSlug;
@@ -2339,16 +2345,16 @@ const SBTsList = ({
         })
       );
       if (!isMounted.current) return;
-      const updates = {};
-      results.forEach(([k, v]) => {
+      const updates: Record<string, any> = {};
+      results.forEach(([k, v]: any) => {
         updates[k] = v;
       });
-      setGroupPasswordMap((prev) => ({ ...prev, ...updates }));
+      setGroupPasswordMap((prev: any) => ({ ...prev, ...updates }));
     } catch (e) { sbtLog.warn('SBTsList: fallback', e); }
   }, [groupPasswordMap, listSlug]);
 
   // Helper: fetchSBTs (reads cache) - single-group mode
-  const fetchSBTs = useCallback(async (forceRefresh = false, showLoadingIndicator = true, slugOverride = null) => {
+  const fetchSBTs = useCallback(async (forceRefresh: any = false, showLoadingIndicator: any = true, slugOverride: any = null) => {
     const targetSlug = normalizeSessionSlug(slugOverride != null ? slugOverride : listSlug);
     if (isSyntheticNoSessionSlug(targetSlug)) return;
     if (!isMounted.current) return;
@@ -2363,7 +2369,7 @@ const SBTsList = ({
 
     const runId = Number(sessionFetchRunBySlugRef.current[targetSlug] || 0) + 1;
     sessionFetchRunBySlugRef.current[targetSlug] = runId;
-    setSessionLoadStateBySlug((prev) => {
+    setSessionLoadStateBySlug((prev: any) => {
       if (prev[targetSlug] === 'loading') return prev;
       return { ...prev, [targetSlug]: 'loading' };
     });
@@ -2374,8 +2380,8 @@ const SBTsList = ({
 
       if (!netKey) {
         if (sessionFetchRunBySlugRef.current[targetSlug] === runId) {
-          setSessionLoadStateBySlug((prev) => ({ ...prev, [targetSlug]: 'error' }));
-          setSessionHasLoadedOnceBySlug((prev) => (
+          setSessionLoadStateBySlug((prev: any) => ({ ...prev, [targetSlug]: 'error' }));
+          setSessionHasLoadedOnceBySlug((prev: any) => (
             prev[targetSlug] ? prev : { ...prev, [targetSlug]: true }
           ));
         }
@@ -2413,7 +2419,7 @@ const SBTsList = ({
       }
 
       if (!shouldKeepExistingCards) {
-        setSbtListBySlug((prev) => {
+        setSbtListBySlug((prev: any) => {
           const existing = Array.isArray(prev[targetSlug]) ? prev[targetSlug] : [];
           if (areSbtListArraysEqual(existing, hydrated)) return prev;
           return { ...prev, [targetSlug]: hydrated };
@@ -2423,18 +2429,18 @@ const SBTsList = ({
       if (hydrated.length > 0) {
         // PASSWORD-LOCK FLAGS WITH CORRECT SLUG CONTEXT
         await ensureGroupPasswordFlags(
-          hydrated.map((x) => (x && x.slug == null ? { ...x, slug: targetSlug } : x))
+          hydrated.map((x: any) => (x && x.slug == null ? { ...x, slug: targetSlug } : x))
         );
       }
-      setSessionLoadStateBySlug((prev) => ({ ...prev, [targetSlug]: 'loaded' }));
-      setSessionHasLoadedOnceBySlug((prev) => (
+      setSessionLoadStateBySlug((prev: any) => ({ ...prev, [targetSlug]: 'loaded' }));
+      setSessionHasLoadedOnceBySlug((prev: any) => (
         prev[targetSlug] ? prev : { ...prev, [targetSlug]: true }
       ));
     } catch (error) {
       sbtLog.error("Error reading SBTs from cache:", error);
       if (sessionFetchRunBySlugRef.current[targetSlug] === runId) {
-        setSessionLoadStateBySlug((prev) => ({ ...prev, [targetSlug]: 'error' }));
-        setSessionHasLoadedOnceBySlug((prev) => (
+        setSessionLoadStateBySlug((prev: any) => ({ ...prev, [targetSlug]: 'error' }));
+        setSessionHasLoadedOnceBySlug((prev: any) => (
           prev[targetSlug] ? prev : { ...prev, [targetSlug]: true }
         ));
       }
@@ -2484,7 +2490,7 @@ const SBTsList = ({
   }, [allSessionsMode, cacheLastBlock, latestBlockNumber, singleSessionProgressSnapshot]);
 
   // SBTPage-compatible logic (tolerate strings/ms; treat 0 or missing as live)
-  const isMintingLive = useCallback((sbt) => {
+  const isMintingLive = useCallback((sbt: any) => {
     const endSec = coerceMintEndSeconds(sbt?.sbtInfo?.mintingEndTime);
     const nowSec = Math.floor(Date.now() / 1000);
     if (endSec === 0) return true;
@@ -2492,13 +2498,13 @@ const SBTsList = ({
   }, []);
 
   const ignoredSBTAddressesLower_single = useMemo(
-    () => ignored_SBTs_LIST.map(addr => addr.toLowerCase()),
+    () => ignored_SBTs_LIST.map((addr: any) => addr.toLowerCase()),
     [ignored_SBTs_LIST]
   );
 
   /** unified predicate for “password-locked” (commit-reveal OR unlimited) */
   const isPasswordLocked = useCallback(
-    (sbt) => {
+    (sbt: any) => {
       if (!sbt || !sbt.sbtAddress || !sbt.sbtInfo) return false;
       const addrLower = sbt.sbtAddress.toLowerCase();
       return !!(sbt.sbtInfo.hasPasswordMint || groupPasswordMap[addrLower]);
@@ -2531,11 +2537,11 @@ const SBTsList = ({
               : (actionableUniverseSessionSlugs.length > 0 ? actionableUniverseSessionSlugs : [targetSlug])
           );
           if (typeof ensureLightSbtDiscovery === 'function') {
-            await Promise.all(refreshSlugs.map((slug) => (
-              ensureLightSbtDiscovery(slug, { force: true, forceScopeSlug: slug }).catch((e) => { sbtLog.warn('SBTsList: fallback', e); })
+            await Promise.all(refreshSlugs.map((slug: any) => (
+              ensureLightSbtDiscovery(slug, { force: true, forceScopeSlug: slug }).catch((e: any) => { sbtLog.warn('SBTsList: fallback', e); })
             )));
           }
-          await Promise.all(refreshSlugs.map((slug) => fetchSBTs(false, false, slug)));
+          await Promise.all(refreshSlugs.map((slug: any) => fetchSBTs(false, false, slug)));
         } else {
           refreshSlugs = nextSlugs.length ? nextSlugs : loaderSessionSlugs;
           if (typeof ensureLightSbtDiscovery === 'function' && targetSlug != null) {
@@ -2573,32 +2579,32 @@ const SBTsList = ({
         ? (actionableSectionSessionSlugs.length > 0 ? actionableSectionSessionSlugs : actionableUniverseSessionSlugs)
         : (isSyntheticNoSessionSlug(listSlug) ? actionableUniverseSessionSlugs : [listSlug])
     );
-    await Promise.all(clearTargetSlugs.map((slug) => removeCache('sbtCache', slug)));
+    await Promise.all(clearTargetSlugs.map((slug: any) => removeCache('sbtCache', slug)));
     if (isMounted.current) {
-      setSessionCacheMetaBySlug((prev) => {
+      setSessionCacheMetaBySlug((prev: any) => {
         const next = { ...prev };
-        clearTargetSlugs.forEach((slug) => {
+        clearTargetSlugs.forEach((slug: any) => {
           next[normalizeSessionSlug(slug || '')] = { lastBlock: 0, sbtCount: 0 };
         });
         return next;
       });
-      setSbtListBySlug((prev) => {
+      setSbtListBySlug((prev: any) => {
         const next = { ...prev };
-        clearTargetSlugs.forEach((slug) => {
+        clearTargetSlugs.forEach((slug: any) => {
           next[slug] = [];
         });
         return next;
       });
-      setSessionLoadStateBySlug((prev) => {
+      setSessionLoadStateBySlug((prev: any) => {
         const next = { ...prev };
-        clearTargetSlugs.forEach((slug) => {
+        clearTargetSlugs.forEach((slug: any) => {
           next[slug] = 'idle';
         });
         return next;
       });
-      setSessionHasLoadedOnceBySlug((prev) => {
+      setSessionHasLoadedOnceBySlug((prev: any) => {
         const next = { ...prev };
-        clearTargetSlugs.forEach((slug) => {
+        clearTargetSlugs.forEach((slug: any) => {
           next[slug] = false;
         });
         return next;
@@ -2620,11 +2626,11 @@ const SBTsList = ({
               : (actionableUniverseSessionSlugs.length > 0 ? actionableUniverseSessionSlugs : [targetSlug])
           );
           if (typeof ensureLightSbtDiscovery === 'function') {
-            await Promise.all(targetSlugs.map((slug) => (
-              ensureLightSbtDiscovery(slug, { force: true, forceScopeSlug: slug }).catch((e) => { sbtLog.warn('SBTsList: fallback', e); })
+            await Promise.all(targetSlugs.map((slug: any) => (
+              ensureLightSbtDiscovery(slug, { force: true, forceScopeSlug: slug }).catch((e: any) => { sbtLog.warn('SBTsList: fallback', e); })
             )));
           }
-          await Promise.all(targetSlugs.map((slug) => fetchSBTs(false, false, slug)));
+          await Promise.all(targetSlugs.map((slug: any) => fetchSBTs(false, false, slug)));
         } else {
           if (typeof ensureLightSbtDiscovery === 'function' && targetSlug != null) {
             await ensureLightSbtDiscovery(targetSlug, { force: true, forceScopeSlug: targetSlug });
@@ -2653,13 +2659,13 @@ const SBTsList = ({
   const handleShowMoreSessions = useCallback(async () => {
     if (!isListModeScopeEnabled || showMoreSessions || showMoreSessionsLoading) return;
     const extraRegistrySlugs = dedupeNormalizedSlugs(remainingHiddenRegistrySessionSlugs);
-    const configuredSet = new Set(
-      dedupeNormalizedSlugs(listModeConfiguredSessionSlugs).map((slug) => normalizeSessionSlug(slug))
+    const configuredSet: any = new Set(
+      dedupeNormalizedSlugs(listModeConfiguredSessionSlugs).map((slug: any) => normalizeSessionSlug(slug))
     );
-    const triggerUniverseDiscovery = (slugsIn = []) => {
+    const triggerUniverseDiscovery = (slugsIn: any = []) => {
       const slugs = dedupeNormalizedSlugs(slugsIn);
       if (typeof ensureLightSbtUniverse !== 'function' || !slugs.length) return;
-      void ensureLightSbtUniverse(slugs, { force: true }).catch((e) => { sbtLog.warn('SBTsList: fallback', e); });
+      void ensureLightSbtUniverse(slugs, { force: true }).catch((e: any) => { sbtLog.warn('SBTsList: fallback', e); });
     };
     if (isMounted.current) {
       setShowMoreSessions(true);
@@ -2677,7 +2683,7 @@ const SBTsList = ({
 
       const postRefreshSlugs = dedupeNormalizedSlugs(
         Array.isArray(nextUniverse?.slugs) ? nextUniverse.slugs : []
-      ).filter((slug) => !configuredSet.has(normalizeSessionSlug(slug)));
+      ).filter((slug: any) => !configuredSet.has(normalizeSessionSlug(slug)));
       if (postRefreshSlugs.length > 0) {
         triggerUniverseDiscovery(postRefreshSlugs);
       }
@@ -2697,7 +2703,7 @@ const SBTsList = ({
     readSessionUniverseSnapshot,
   ]);
 
-  const handleSessionChipClick = useCallback((slugRaw) => {
+  const handleSessionChipClick = useCallback((slugRaw: any) => {
     const normalized = normalizeSessionSlug(slugRaw || '');
     if (!allSessionsMode) return;
     if (!isListModeScopeEnabled) {
@@ -2710,11 +2716,11 @@ const SBTsList = ({
         void (async () => {
           try {
             if (typeof ensureLightSbtDiscovery === 'function') {
-              await Promise.all(targets.map((slug) => (
-                ensureLightSbtDiscovery(slug, { force: true, forceScopeSlug: slug }).catch((e) => { sbtLog.warn('SBTsList: fallback', e); })
+              await Promise.all(targets.map((slug: any) => (
+                ensureLightSbtDiscovery(slug, { force: true, forceScopeSlug: slug }).catch((e: any) => { sbtLog.warn('SBTsList: fallback', e); })
               )));
             }
-            await Promise.all(targets.map((slug) => fetchSBTs(false, false, slug)));
+            await Promise.all(targets.map((slug: any) => fetchSBTs(false, false, slug)));
           } catch (e) { sbtLog.warn('SBTsList: fallback', e); }
         })();
       }
@@ -2722,12 +2728,12 @@ const SBTsList = ({
     }
 
     const wasSelected = selectedSessionUniverseSlugSet.has(normalized);
-    setSelectedSessionSlugs((prev) => {
-      const displayedSet = new Set(displayedSessionUniverseSlugsNormalized);
-      const normalizedPrev = dedupeNormalizedSlugs(prev).filter((slug) => displayedSet.has(slug));
+    setSelectedSessionSlugs((prev: any) => {
+      const displayedSet: any = new Set(displayedSessionUniverseSlugsNormalized);
+      const normalizedPrev = dedupeNormalizedSlugs(prev).filter((slug: any) => displayedSet.has(slug));
       const effectivePrev = normalizedPrev.length > 0 ? normalizedPrev : defaultListModeSelectedSessionSlugs;
       if (wasSelected) {
-        const next = effectivePrev.filter((slug) => slug !== normalized);
+        const next = effectivePrev.filter((slug: any) => slug !== normalized);
         const clamped = next.length > 0 ? next : [normalized];
         return sortSlugsByUniverseOrder(clamped, displayedSessionUniverseSlugsNormalized);
       }
@@ -2747,11 +2753,11 @@ const SBTsList = ({
             const targets = actionableUniverseSessionSlugs;
             if (!targets.length) return;
             if (typeof ensureLightSbtDiscovery === 'function') {
-              await Promise.all(targets.map((slug) => (
-                ensureLightSbtDiscovery(slug, { force: true, forceScopeSlug: slug }).catch((e) => { sbtLog.warn('SBTsList: fallback', e); })
+              await Promise.all(targets.map((slug: any) => (
+                ensureLightSbtDiscovery(slug, { force: true, forceScopeSlug: slug }).catch((e: any) => { sbtLog.warn('SBTsList: fallback', e); })
               )));
             }
-            await Promise.all(targets.map((slug) => fetchSBTs(false, false, slug)));
+            await Promise.all(targets.map((slug: any) => fetchSBTs(false, false, slug)));
             return;
           }
           if (typeof ensureLightSbtDiscovery === 'function') {
@@ -2779,18 +2785,18 @@ const SBTsList = ({
     displayedFeatured,
     featuredItemKeySet,
   } = useMemo(() => {
-    const base = [];
-    const live = [];
-    const expired = [];
-    const featuredSet = new Set();
-    const baseKeySet = new Set();
-    const byAddrSingle = new Map();
-    const featuredLowerSingle = new Set((featured_SBTs_LIST || []).map((addr) => String(addr || '').toLowerCase()));
-    const featuredAllGroups = [];
+    const base: any[] = [];
+    const live: any[] = [];
+    const expired: any[] = [];
+    const featuredSet: any = new Set();
+    const baseKeySet: any = new Set();
+    const byAddrSingle: any = new Map();
+    const featuredLowerSingle: any = new Set((featured_SBTs_LIST || []).map((addr: any) => String(addr || '').toLowerCase()));
+    const featuredAllGroups: any[] = [];
     const activeSessionSlug = normalizeSessionSlug(listSlug || '');
-    const selectedSessionSet = new Set(sectionSessionSlugs.map((slug) => normalizeSessionSlug(slug || '')));
+    const selectedSessionSet: any = new Set(sectionSessionSlugs.map((slug: any) => normalizeSessionSlug(slug || '')));
 
-    const buildItemKey = (sbt) => {
+    const buildItemKey = (sbt: any) => {
       const addrLower = String(sbt?.sbtAddress || '').toLowerCase();
       const slugForKey = allSessionsMode
         ? String(resolveSbtSessionSlug(sbt) || '')
@@ -2819,10 +2825,10 @@ const SBTsList = ({
         const lists = isSyntheticNoSessionSlug(itemSlug)
           ? { featured_SBTs_LIST: [], ignored_SBTs_LIST: [] }
           : getSessionLists(itemSlug);
-        const ignoredSet = new Set((lists.ignored_SBTs_LIST || []).map((a) => String(a || '').toLowerCase()));
+        const ignoredSet: any = new Set((lists.ignored_SBTs_LIST || []).map((a: any) => String(a || '').toLowerCase()));
         if (ignoredSet.has(addrLower)) continue;
         isFeaturedForItem = (lists.featured_SBTs_LIST || []).some(
-          (f) => String(f || '').toLowerCase() === addrLower
+          (f: any) => String(f || '').toLowerCase() === addrLower
         );
         if (sbt.sbtInfo.unlisted && !isFeaturedForItem) continue;
       }
@@ -2841,20 +2847,20 @@ const SBTsList = ({
       }
     }
 
-    let featured = [];
+    let featured: any[] = [];
     if (allSessionsMode) {
       featured = featuredAllGroups;
     } else {
-      const seen = new Set();
+      const seen: any = new Set();
       featured = (featured_SBTs_LIST || [])
-        .map((addr) => {
+        .map((addr: any) => {
           const addrLower = String(addr || '').toLowerCase();
           if (!addrLower) return null;
           if (seen.has(addrLower)) return null;
           seen.add(addrLower);
           return byAddrSingle.get(addrLower) || null;
         })
-        .filter((sbt) => {
+        .filter((sbt: any) => {
           if (!sbt) return false;
           const itemKey = buildItemKey(sbt);
           if (!baseKeySet.has(itemKey)) return false;
@@ -2884,7 +2890,7 @@ const SBTsList = ({
     sbtList,
   ]);
 
-  const buildSbtItemKey = useCallback((sbt) => {
+  const buildSbtItemKey = useCallback((sbt: any) => {
     const addrLower = String(sbt?.sbtAddress || '').toLowerCase();
     const slugForKey = allSessionsMode
       ? String(resolveSbtSessionSlug(sbt) || '')
@@ -2893,11 +2899,11 @@ const SBTsList = ({
   }, [allSessionsMode, listSlug, resolveSbtSessionSlug]);
 
   const mintingLiveListWithoutFeatured = useMemo(() => (
-    mintingLiveList.filter((sbt) => !featuredItemKeySet.has(buildSbtItemKey(sbt)))
+    mintingLiveList.filter((sbt: any) => !featuredItemKeySet.has(buildSbtItemKey(sbt)))
   ), [buildSbtItemKey, featuredItemKeySet, mintingLiveList]);
 
   const expiredListWithoutFeatured = useMemo(() => (
-    expiredList.filter((sbt) => !featuredItemKeySet.has(buildSbtItemKey(sbt)))
+    expiredList.filter((sbt: any) => !featuredItemKeySet.has(buildSbtItemKey(sbt)))
   ), [buildSbtItemKey, expiredList, featuredItemKeySet]);
 
   const sectionHeaderSpinnerVisible = emptySectionSpinnerActive;
@@ -2924,7 +2930,7 @@ const SBTsList = ({
 
   useEffect(() => {
     const researchStep = readSbtSyncBarResearchBlockStep();
-    const loadingTargets = Object.entries(chipLoadingStatusBySlug || {}).reduce((acc, [slugRaw, status]) => {
+    const loadingTargets = Object.entries(chipLoadingStatusBySlug || {}).reduce((acc: any, [slugRaw, status]: any) => {
       const slug = normalizeSessionSlug(slugRaw || '');
       if (isSyntheticNoSessionSlug(slug)) return acc;
       if (!status) return acc;
@@ -2943,14 +2949,14 @@ const SBTsList = ({
       return acc;
     }, {});
 
-    const loadingSlugs = new Set(Object.keys(loadingTargets));
-    Object.keys(passiveLatestLookupStateBySlugRef.current || {}).forEach((slug) => {
+    const loadingSlugs: any = new Set(Object.keys(loadingTargets));
+    Object.keys(passiveLatestLookupStateBySlugRef.current || {}).forEach((slug: any) => {
       if (loadingSlugs.has(slug)) return;
       delete passiveLatestLookupStateBySlugRef.current[slug];
       delete passiveLatestLookupInFlightBySlugRef.current[slug];
     });
 
-    Object.entries(loadingTargets).forEach(([slug, currentWatermark]) => {
+    Object.entries(loadingTargets).forEach(([slug, currentWatermark]: any) => {
       const lookupState = passiveLatestLookupStateBySlugRef.current[slug] || null;
       const lastRequestedAtBlock = Number(lookupState?.lastRequestedAtBlock || 0);
       const needsInitialLookup = lookupState == null;
@@ -2966,7 +2972,7 @@ const SBTsList = ({
       };
       passiveLatestLookupInFlightBySlugRef.current[slug] = true;
       Promise.resolve(refreshLatestBlocks([slug], false))
-        .catch((e) => { sbtLog.warn('SBTsList: fallback', e); })
+        .catch((e: any) => { sbtLog.warn('SBTsList: fallback', e); })
         .finally(() => {
           delete passiveLatestLookupInFlightBySlugRef.current[slug];
         });
@@ -2994,7 +3000,7 @@ const SBTsList = ({
         </div>
         {loadingSessionStatuses.length > 0 && (
           <div className={styles.loadingGroupList}>
-            {loadingSessionStatuses.map((group) => (
+            {loadingSessionStatuses.map((group: any) => (
               <div key={group.slug} className={styles.loadingGroupRow}>
                 <div className={styles.loadingGroupHeader}>
                   <span className={styles.loadingGroupName}>{group.displayName}</span>
@@ -3016,8 +3022,8 @@ const SBTsList = ({
                   className={styles.loadingProgressBar}
                   role="progressbar"
                   aria-valuenow={group.hasLatest ? group.progressPct : 0}
-                  aria-valuemin="0"
-                  aria-valuemax="100"
+                  aria-valuemin={0}
+                  aria-valuemax={100}
                 >
                   <div
                     className={`${styles.loadingProgressFill} ${
@@ -3034,18 +3040,18 @@ const SBTsList = ({
     );
   }
 
-  const buildSbtHref = (sbtAddress, sessionSlug = '') => (
+  const buildSbtHref = (sbtAddress: any, sessionSlug: any = '') => (
     buildSbtDetailPath(
       sbtAddress,
       isSyntheticNoSessionSlug(sessionSlug) ? '' : sessionSlug
     )
   );
 
-  const isModifiedPointerNavigation = (event) => (
+  const isModifiedPointerNavigation = (event: any) => (
     !!(event && (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button === 1))
   );
 
-  const handleSbtLinkClick = (event, sbtAddress, sessionSlug = '') => {
+  const handleSbtLinkClick = (event: any, sbtAddress: any, sessionSlug: any = '') => {
     if (!sbtAddress || event?.defaultPrevented) return;
     if (typeof onNavigateToSbt !== 'function') return;
     if (isModifiedPointerNavigation(event)) return;
@@ -3053,7 +3059,7 @@ const SBTsList = ({
     onNavigateToSbt(sbtAddress, buildSbtHref(sbtAddress, sessionSlug));
   };
 
-  const handleFeaturedCardClick = (event, sbtAddress, sessionSlug = '') => {
+  const handleFeaturedCardClick = (event: any, sbtAddress: any, sessionSlug: any = '') => {
     if (!sbtAddress) return;
     if (event?.defaultPrevented) return;
     const target = event?.target;
@@ -3076,11 +3082,11 @@ const SBTsList = ({
     handleSbtLinkClick(event, sbtAddress, sessionSlug);
   };
 
-  const toggleExpandedSbt = (sbtAddress) => {
+  const toggleExpandedSbt = (sbtAddress: any) => {
     const normalized = String(sbtAddress || '').trim().toLowerCase();
     if (!normalized) return;
-    setExpandedSbtAddresses((prev) => {
-      const next = new Set(prev);
+    setExpandedSbtAddresses((prev: any) => {
+      const next: any = new Set(prev);
       if (next.has(normalized)) {
         next.delete(normalized);
       } else {
@@ -3090,7 +3096,7 @@ const SBTsList = ({
     });
   };
 
-  const renderSbtDetailsPanel = (details, detailsId) => {
+  const renderSbtDetailsPanel = (details: any, detailsId: any) => {
     if (!details?.hasDetails) return null;
     return (
       <div id={detailsId} className={styles.sbtDetailsPanel}>
@@ -3098,7 +3104,7 @@ const SBTsList = ({
           <div className={styles.sbtDetailsSection}>
             <span className={styles.sbtDetailsHeading}>Documents</span>
             <div className={styles.sbtDocumentList}>
-              {details.documentUrls.map((documentUrl) => (
+              {details.documentUrls.map((documentUrl: any) => (
                 <a
                   key={documentUrl.href}
                   className={styles.sbtDocumentLink}
@@ -3117,7 +3123,7 @@ const SBTsList = ({
           <div className={styles.sbtDetailsSection}>
             <span className={styles.sbtDetailsHeading}>Tags</span>
             <div className={styles.sbtTagList}>
-              {details.tags.map((tag) => (
+              {details.tags.map((tag: any) => (
                 <span key={tag} className={styles.sbtTagChip}>
                   {tag}
                 </span>
@@ -3129,7 +3135,7 @@ const SBTsList = ({
     );
   };
 
-  const renderSbtDetailsToggle = (sbt, details, detailsId, buttonLabel) => {
+  const renderSbtDetailsToggle = (sbt: any, details: any, detailsId: any, buttonLabel: any) => {
     if (miniaturized || !details?.hasDetails) return null;
     const sbtAddressLower = String(sbt?.sbtAddress || '').toLowerCase();
     const isExpanded = expandedSbtAddresses.has(sbtAddressLower);
@@ -3149,7 +3155,7 @@ const SBTsList = ({
     );
   };
 
-  const renderCompactSbtLinkCard = (sbt, keyPrefix = 'sbt') => {
+  const renderCompactSbtLinkCard = (sbt: any, keyPrefix: any = 'sbt') => {
     if (!sbt || !sbt.sbtAddress || !sbt.sbtInfo) return null;
     const { image } = sbt.sbtInfo;
     const name = getSbtDisplayName(sbt.sbtInfo) || `Unnamed ${t('sbt')}`;
@@ -3166,11 +3172,11 @@ const SBTsList = ({
         key={`${keyPrefix}-${resolveSbtSessionSlug(sbt)}|${sbtAddressLower}`}
         className={compactCardClassName}
         href={buildSbtHref(sbt.sbtAddress, resolveSbtSessionSlug(sbt))}
-        onClick={(event) => handleSbtLinkClick(event, sbt.sbtAddress, resolveSbtSessionSlug(sbt))}
+        onClick={(event: any) => handleSbtLinkClick(event, sbt.sbtAddress, resolveSbtSessionSlug(sbt))}
       >
         <div className={styles.sbtImage} style={{ position: 'relative' }}>
           {/* {locked && <FontAwesomeIcon icon={faLock} className={styles.inlineLock} />} */}
-          {image && <img src={normalizeTokenUri(image)} alt={`${t('sbt')} Thumbnail`} />}
+          {image && <img src={normalizeTokenUri(image) || undefined} alt={`${t('sbt')} Thumbnail`} />}
         </div>
         <div className={styles.sbtInfo}>
           <p className={styles.sbtName}>
@@ -3183,7 +3189,7 @@ const SBTsList = ({
     );
   };
 
-  const renderInteractiveMiniSbtCard = (sbt, keyPrefix = 'sbt') => {
+  const renderInteractiveMiniSbtCard = (sbt: any, keyPrefix: any = 'sbt') => {
     if (!sbt || !sbt.sbtAddress) return null;
     const sessionSlug = resolveSbtSessionSlug(sbt);
     const sbtAddress = String(sbt.sbtAddress || '').trim();
@@ -3209,7 +3215,7 @@ const SBTsList = ({
     );
   };
 
-  const renderFeaturedSBTCard = (sbt) => {
+  const renderFeaturedSBTCard = (sbt: any) => {
     if (!sbt || !sbt.sbtAddress) return null;
     const sbtAddress = sbt.sbtAddress;
     const sessionSlug = resolveSbtSessionSlug(sbt);
@@ -3230,7 +3236,7 @@ const SBTsList = ({
         href={buildSbtHref(sbtAddress, sessionSlug)}
         data-testid={`featured-sbt-link-${sbtAddressLower}`}
         aria-label={`Open ${t('sbt')} details for ${linkLabel}`}
-        onClick={(event) => handleFeaturedCardClick(event, sbtAddress, sessionSlug)}
+        onClick={(event: any) => handleFeaturedCardClick(event, sbtAddress, sessionSlug)}
       >
         <SBTPage
           miniaturized
@@ -3280,7 +3286,7 @@ const SBTsList = ({
     );
   };
 
-  const renderSectionTitle = (label, spinnerId) => (
+  const renderSectionTitle = (label: any, spinnerId: any) => (
     <div className={styles.sectionTitleRow}>
       <h2 className={styles.sectionTitle}>{label}</h2>
       {sectionHeaderSpinnerVisible && (
@@ -3303,7 +3309,7 @@ const SBTsList = ({
     </div>
   );
 
-  const renderSBTButton = (sbt) => {
+  const renderSBTButton = (sbt: any) => {
     if (!sbt || !sbt.sbtAddress || !sbt.sbtInfo) return null;
     const { image } = sbt.sbtInfo;
     const name = getSbtDisplayName(sbt.sbtInfo) || `Unnamed ${t('sbt')}`;
@@ -3329,11 +3335,11 @@ const SBTsList = ({
         <a
           className={styles.standardCardBodyLink}
           href={buildSbtHref(sbt.sbtAddress, resolveSbtSessionSlug(sbt))}
-          onClick={(event) => handleSbtLinkClick(event, sbt.sbtAddress, resolveSbtSessionSlug(sbt))}
+          onClick={(event: any) => handleSbtLinkClick(event, sbt.sbtAddress, resolveSbtSessionSlug(sbt))}
         >
           <div className={styles.standardCardImage} style={{ position: 'relative' }}>
             {/* {locked && <FontAwesomeIcon icon={faLock} className={styles.inlineLock} />} */}
-            {image && <img src={normalizeTokenUri(image)} alt={`${t('sbt')} Thumbnail`} />}
+            {image && <img src={normalizeTokenUri(image) || undefined} alt={`${t('sbt')} Thumbnail`} />}
           </div>
           <div className={styles.standardCardInfo}>
             <p className={styles.standardCardName}>
@@ -3352,12 +3358,12 @@ const SBTsList = ({
   const renderSessionUniverseSelector = () => {
     if (!allSessionsMode) return null;
     const publicBasePath = readPublicUrlBasePath();
-    const withPublicBasePath = (pathIn) => {
+    const withPublicBasePath = (pathIn: any) => {
       const normalizedPath = String(pathIn || '').trim();
       if (!normalizedPath) return publicBasePath || '/';
       return `${publicBasePath}${normalizedPath.startsWith('/') ? normalizedPath : `/${normalizedPath}`}` || normalizedPath;
     };
-    const buildSessionRouteHref = (slugRaw) => {
+    const buildSessionRouteHref = (slugRaw: any) => {
       const normalized = normalizeSessionSlug(slugRaw || '');
       if (isSyntheticNoSessionSlug(normalized)) return '';
       const cfg = getDisplaySessionConfig(normalized);
@@ -3373,7 +3379,7 @@ const SBTsList = ({
       return withPublicBasePath(`/session/${encodeURIComponent(normalized)}`);
     };
 
-    const handleOpenSessionChip = (slugRaw, optionOrEvent, maybeEvent) => {
+    const handleOpenSessionChip = (slugRaw: any, optionOrEvent: any = null, maybeEvent: any = null) => {
       const event = maybeEvent && typeof maybeEvent === 'object'
         ? maybeEvent
         : optionOrEvent;
@@ -3403,7 +3409,7 @@ const SBTsList = ({
       : [normalizeSessionSlug(listSlug || '')];
     const collapsedSummaryPreview = collapsedSummarySlugs.slice(0, 4);
     const collapsedSummaryOverflow = Math.max(0, collapsedSummarySlugs.length - collapsedSummaryPreview.length);
-    const renderCollapsedSummary = (testId) => (
+    const renderCollapsedSummary = (testId: any) => (
       <div
         className={styles.sessionUniverseCollapsedSummary}
         data-testid={testId}
@@ -3412,7 +3418,7 @@ const SBTsList = ({
           Selected ({collapsedSummarySlugs.length})
         </span>
         <div className={styles.sessionUniverseCollapsedChips}>
-          {collapsedSummaryPreview.map((slugRaw) => {
+          {collapsedSummaryPreview.map((slugRaw: any) => {
             const normalized = normalizeSessionSlug(slugRaw || '');
             const sessionLabel = labelForSessionSlug(normalized);
             const isLoading = !!chipProgressVisibilityBySlug[normalized];
@@ -3451,7 +3457,7 @@ const SBTsList = ({
                     data-testid={`session-collapsed-chip-open-${normalized || 'general'}`}
                     aria-label={`Open session ${sessionLabel} in new tab`}
                     title={`Open session ${sessionLabel} in new tab`}
-                    onClick={(event) => handleOpenSessionChip(normalized, event)}
+                    onClick={(event: any) => handleOpenSessionChip(normalized, event)}
                   >
                     <FontAwesomeIcon icon={faExternalLinkAlt} />
                   </button>
@@ -3473,7 +3479,7 @@ const SBTsList = ({
       </div>
     );
 
-    const renderHeaderActions = ({ isOpen }) => (
+    const renderHeaderActions = ({ isOpen }: any) => (
       <div className={styles.sessionUniverseHeaderActions}>
         {showUniverseSpinner && (
           <FontAwesomeIcon
@@ -3491,7 +3497,7 @@ const SBTsList = ({
             aria-controls={sessionSelectorPanelId}
             aria-expanded={isOpen}
             data-testid="session-selector-toggle"
-            onClick={() => setShowLocalSessionSettings((prev) => !prev)}
+            onClick={() => setShowLocalSessionSettings((prev: any) => !prev)}
           >
             <FontAwesomeIcon icon={faCog} />
           </button>
@@ -3502,7 +3508,7 @@ const SBTsList = ({
             className={styles.sessionUniverseToggle}
             aria-label={isUniverseCollapsed ? 'Expand session universe' : 'Collapse session universe'}
             aria-expanded={!isUniverseCollapsed}
-            onClick={() => setIsUniverseCollapsed((prev) => !prev)}
+            onClick={() => setIsUniverseCollapsed((prev: any) => !prev)}
           >
             <FontAwesomeIcon icon={isUniverseCollapsed ? faChevronDown : faChevronUp} />
             <span>{isUniverseCollapsed ? 'Expand' : 'Collapse'}</span>
@@ -3537,7 +3543,7 @@ const SBTsList = ({
         {!isUniverseCollapsed && (
           <div className={styles.sessionUniverseChips}>
             <SessionChipSelector
-              options={displayedSessionUniverseSlugs.map((s) => {
+              options={displayedSessionUniverseSlugs.map((s: any) => {
                 const normalized = normalizeSessionSlug(s);
                 const isSelected = isListModeScopeEnabled
                   ? selectedSessionUniverseSlugSet.has(normalized)
@@ -3608,7 +3614,7 @@ const SBTsList = ({
     );
   };
 
-  const renderCreateGroupControl = (className = styles.createGroupButton) => (
+  const renderCreateGroupControl = (className: any = styles.createGroupButton) => (
     <Button
       className={className}
       onClick={() => setShowCreateGroup(!showCreateGroup)}

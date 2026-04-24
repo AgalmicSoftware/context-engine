@@ -1,6 +1,6 @@
 import React, { act } from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import SBTsList from './SBTsList.jsx';
+import SBTsList from './SBTsList';
 import { writeGlobalSessionSelection } from '../../utilities/session/globalSessionState.js';
 import { upsertCachedSessionWorkerConfig } from '../../utilities/session/sessionWorkerConfigCache.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';

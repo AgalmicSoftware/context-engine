@@ -58,7 +58,7 @@ import contractScripts, {
   getSessionConfigBySlug,
 } from '../../utilities/web3/contractScripts.js';
 import { getShortenedAddress, getShortenedQuestionID, getShortenedSurveyID } from 'utilities/ui/displayHelpers.js';
-import SBTFilter from '../SBTs/SBTFilter.jsx';
+import SBTFilter from '../SBTs/SBTFilter';
 import QuestionFilter from './QuestionFilter';
 import PolisReport from '../PolisReport/PolisReport';
 import SingleQuestionResponse from './SingleQuestionResponse';

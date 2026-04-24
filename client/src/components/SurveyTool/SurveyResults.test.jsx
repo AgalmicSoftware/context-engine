@@ -15,7 +15,7 @@ import { resolveSurveyResultsQuestionReadScope } from './surveyResultsSessionRes
 import { sbtBasePath } from '../../utilities/ui/terminology.js';
 
 const mockSbtFilter = jest.fn(() => null);
-jest.mock('../SBTs/SBTFilter.jsx', () => (props) => {
+jest.mock('../SBTs/SBTFilter', () => (props) => {
   mockSbtFilter(props);
   return null;
 });

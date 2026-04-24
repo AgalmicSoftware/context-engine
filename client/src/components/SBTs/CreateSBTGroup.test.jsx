@@ -3242,7 +3242,7 @@ describe('CreateSBTGroup cache helpers', () => {
 
   it('scopes the shared final CTA styling to the primary create button and keeps start-fresh secondary', () => {
     const scssPath = path.join(__dirname, 'CreateSBTGroup.module.scss');
-    const jsxPath = path.join(__dirname, 'CreateSBTGroup.jsx');
+    const jsxPath = path.join(__dirname, 'CreateSBTGroup.tsx');
     const scss = fs.readFileSync(scssPath, 'utf8');
     const jsx = fs.readFileSync(jsxPath, 'utf8');
     const mintingStart = scss.indexOf('.mintingSteps {');
