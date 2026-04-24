@@ -177,7 +177,7 @@ $input-border: tokens.$ce-input-border;
       grid-area: count;
     }
 
-    .generateButton {
+    .actionRow {
       grid-area: button;
       width: 100%;
       margin-top: 10px;
@@ -200,6 +200,21 @@ $input-border: tokens.$ce-input-border;
     }
   }
 
+  .titleInputRow {
+    margin-bottom: 12px;
+  }
+
+  .titleInput {
+    background: rgba(255, 255, 255, 0.05) !important;
+    color: var(--ce-color-white) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    height: 42px;
+
+    &::placeholder {
+      color: rgba(255, 255, 255, 0.4);
+    }
+  }
+
   .generateButton {
     padding: 15px;
     background-color: #2a63ca !important;
@@ -218,6 +233,34 @@ $input-border: tokens.$ce-input-border;
     &:disabled {
       opacity: 0.5;
       cursor: not-allowed;
+    }
+  }
+
+  .libraryButton {
+    padding: 15px;
+    min-height: 58px;
+    border-radius: var(--ce-radius-4);
+    font-family: inherit;
+    font-size: 1.1rem;
+    font-weight: 700;
+    border: 1px solid rgba(255, 255, 255, 0.18) !important;
+    background: rgba(255, 255, 255, 0.08) !important;
+    color: var(--ce-color-white) !important;
+
+    &:hover:not(:disabled) {
+      background: rgba(255, 255, 255, 0.16) !important;
+      border-color: rgba(255, 255, 255, 0.3) !important;
+    }
+  }
+
+  .actionRow {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+
+    .generateButton,
+    .libraryButton {
+      flex: 1 1 260px;
     }
   }
 
@@ -568,6 +611,17 @@ $input-border: tokens.$ce-input-border;
     margin-top: 10px;
   }
 
+  .imageSourceSection {
+    margin-top: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .imageChooser {
+    width: 100%;
+  }
+
   @media (max-width: 640px) {
     .photoCardTop {
       flex-direction: column;
@@ -597,10 +651,6 @@ $input-border: tokens.$ce-input-border;
     align-items: center;
     position: relative;
     min-width: 120px;
-  }
-
-  .fileUploadWrapper {
-    flex: 0 0 auto;
   }
 
   .compactBtn {
@@ -835,7 +885,9 @@ $input-border: tokens.$ce-input-border;
 
     .compactBtn,
     .transcriptToggleBtn,
-    .docSaveAudienceButton {
+    .docSaveAudienceButton,
+    .libraryButton,
+    .generateButton {
       width: 100%;
       justify-content: center;
     }

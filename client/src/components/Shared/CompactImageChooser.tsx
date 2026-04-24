@@ -14,6 +14,7 @@ type CompactImageStatusTone = 'default' | 'loading' | 'error';
 type CompactImageChooserProps = {
   className?: string;
   rootTestId?: string;
+  showUrlModeButton?: boolean;
   urlButtonTestId?: string;
   pasteButtonTestId?: string;
   uploadButtonTestId?: string;
@@ -31,6 +32,7 @@ type CompactImageChooserProps = {
   onFileChange?: React.ChangeEventHandler<HTMLInputElement>;
   fileInputRef?: React.Ref<HTMLInputElement>;
   accept?: string;
+  multiple?: boolean;
   urlPlaceholder?: string;
   urlInputAriaLabel?: string;
   selectedFileLabel?: string;
@@ -61,6 +63,7 @@ const resolveStatusIcon = (tone: CompactImageStatusTone) => {
 const CompactImageChooser = ({
   className = '',
   rootTestId,
+  showUrlModeButton = true,
   urlButtonTestId,
   pasteButtonTestId,
   uploadButtonTestId,
@@ -78,6 +81,7 @@ const CompactImageChooser = ({
   onFileChange,
   fileInputRef,
   accept = 'image/*',
+  multiple = false,
   urlPlaceholder = 'Paste image URL',
   urlInputAriaLabel = 'Image URL',
   selectedFileLabel = '',
@@ -136,15 +140,17 @@ const CompactImageChooser = ({
         {...(rootTestId ? { 'data-testid': rootTestId } : {})}
       >
         <div className={styles.modeRow}>
-          <button
-            type="button"
-            className={joinClassNames(styles.modeButton, isUrlMode ? styles.modeButtonActive : '')}
-            onClick={onToggleUrlMode}
-            aria-pressed={isUrlMode}
-            {...(urlButtonTestId ? { 'data-testid': urlButtonTestId } : {})}
-          >
-            URL
-          </button>
+          {showUrlModeButton ? (
+            <button
+              type="button"
+              className={joinClassNames(styles.modeButton, isUrlMode ? styles.modeButtonActive : '')}
+              onClick={onToggleUrlMode}
+              aria-pressed={isUrlMode}
+              {...(urlButtonTestId ? { 'data-testid': urlButtonTestId } : {})}
+            >
+              URL
+            </button>
+          ) : null}
           <button
             type="button"
             className={styles.modeButton}
@@ -166,6 +172,7 @@ const CompactImageChooser = ({
           <input
             type="file"
             accept={accept}
+            multiple={multiple}
             onChange={onFileChange}
             ref={fileInputRef}
             className={styles.fileInput}
