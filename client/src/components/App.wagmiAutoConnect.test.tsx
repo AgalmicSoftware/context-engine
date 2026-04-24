@@ -27,6 +27,16 @@ const mockToaster = jest.fn((_props?: any) => null);
 let routeProps: any[] = [];
 let mockWalletConnectFallbackEnabled = false;
 
+type WalletGroup = {
+  wallets?: Array<{
+    createConnector: () => {
+      connector: {
+        id: string;
+      };
+    };
+  }>;
+};
+
 const MockRoute = (props: any) => {
   routeProps.push(props);
   return null;
@@ -217,8 +227,10 @@ describe('App wagmi auto-connect persistence', () => {
   it('uses an injected-only MetaMask connector by default to avoid WalletConnect bridge startup', () => {
     loadAppModule();
 
-    const walletList = mockConnectorsForWallets.mock.calls[0]?.[0];
-    const wallet = walletList?.[0]?.wallets?.[0];
+    const connectorCalls = mockConnectorsForWallets.mock.calls as unknown as Array<[WalletGroup[]]>;
+    const walletGroups = connectorCalls[0]?.[0] ?? [];
+    const wallet = walletGroups[0]?.wallets?.[0];
+    if (!wallet) throw new Error('Expected injected MetaMask wallet in connectorsForWallets call.');
     const connectorConfig = wallet.createConnector();
 
     expect(mockMetaMaskWallet).toHaveBeenCalledWith(
@@ -241,8 +253,10 @@ describe('App wagmi auto-connect persistence', () => {
 
     loadAppModule();
 
-    const walletList = mockConnectorsForWallets.mock.calls[0]?.[0];
-    const wallet = walletList?.[0]?.wallets?.[0];
+    const connectorCalls = mockConnectorsForWallets.mock.calls as unknown as Array<[WalletGroup[]]>;
+    const walletGroups = connectorCalls[0]?.[0] ?? [];
+    const wallet = walletGroups[0]?.wallets?.[0];
+    if (!wallet) throw new Error('Expected MetaMask wallet fallback in connectorsForWallets call.');
     const connectorConfig = wallet.createConnector();
 
     expect(mockMetaMaskWalletCreateConnector).toHaveBeenCalledTimes(1);

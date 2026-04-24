@@ -31,7 +31,13 @@ type SessionConfig = {
 export type EncryptionPanelProps = {
   isNormalMode: boolean;
   t?: (key: string) => string;
-  renderSessionWizardInfoTooltip?: (props: Record<string, unknown>) => React.ReactNode;
+  renderSessionWizardInfoTooltip?: (props: {
+    id?: string;
+    content?: React.ReactNode;
+    placement?: string;
+    testId?: string;
+    ariaLabel?: string;
+  }) => React.ReactNode;
   isCollapsed: boolean;
   onToggleCollapsed: () => void;
   launchCreateSbtModal: (payload: { targetType: string; gateId: string }) => void;
@@ -44,13 +50,13 @@ export type EncryptionPanelProps = {
   normalizeSbtSelection?: (value: unknown[]) => unknown[];
   handleGateAddSbt: (gateId: string, sbt: unknown) => void;
   handleGateRemoveSbt: (gateId: string, address: string) => void;
-  network?: string;
+  network?: unknown;
   pendingSbtSelectorOptions?: unknown[];
-  selectorSourceChainId?: number | string;
+  selectorSourceChainId?: number | string | null;
   selectorSourceSessionConfig?: SessionConfig | null;
   resolvedActiveSessionSlug?: string;
-  sbtCacheRevision?: number;
-  ensureLightSbtUniverse?: () => unknown;
+  sbtCacheRevision?: unknown;
+  ensureLightSbtUniverse?: (() => unknown) | null;
   addEncryptionGate: () => void;
   pendingSbtDrafts?: PendingSbtDraft[];
   removePendingSbtDraft: (address?: string) => void;

@@ -183,7 +183,7 @@ jest.mock('../../variables/appConfig.js', () => {
   };
 });
 
-import SessionWizard from './SessionWizard.jsx';
+import SessionWizard from './SessionWizard';
 
 const SessionWizardComponent = SessionWizard as React.ComponentType<any>;
 const mockedBuildContractViewerContracts = buildContractViewerContracts as jest.Mock;
