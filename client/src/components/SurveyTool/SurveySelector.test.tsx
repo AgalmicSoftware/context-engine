@@ -1,0 +1,442 @@
+import { SurveySelector } from './SurveySelector';
+import { normalizeSurveyToolFilterState } from './surveyToolUtils.js';
+import * as contractScriptsModule from '../../utilities/web3/contractScripts.js';
+import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
+
+const syncClassSetState = (subject: any) => {
+  subject.setState = jest.fn((next: any, cb?: () => void) => {
+    const patch = typeof next === 'function' ? next(subject.state, subject.props) : next;
+    if (patch && typeof patch === 'object') {
+      subject.state = { ...subject.state, ...patch };
+    }
+    if (typeof cb === 'function') cb();
+    return patch;
+  });
+  return subject.setState;
+};
+
+describe('SurveySelector', () => {
+  afterEach(() => {
+    jest.clearAllMocks();
+    jest.restoreAllMocks();
+    jest.useRealTimers();
+  });
+
+  it('coalesces SurveySelector auto-open and filter-state sync into one state patch', () => {
+    const subject = new SurveySelector({
+      autoOpenResults: true,
+      filterState: { questionTypes: ['rating'] },
+      isQuestionCacheReady: true,
+      isSurveyCacheReady: true,
+      singleQuestionMode: false,
+      network: { id: 84532 },
+      activeSessionSlug: 'edge',
+      questionsCacheNonce: 4,
+    });
+    subject.fetchSurveys = jest.fn();
+    subject.computeFilteredQuestionCount = jest.fn();
+    subject.state = {
+      ...subject.state,
+      showResults: false,
+      filterState: { questionTypes: ['binary'] },
+      showLongLoading: false,
+      loading: false,
+    };
+    subject._filterStateSig = '';
+    syncClassSetState(subject);
+
+    const prevProps = {
+      ...subject.props,
+      autoOpenResults: false,
+      filterState: { questionTypes: ['binary'] },
+      questionsCacheNonce: 4,
+    };
+
+    subject.componentDidUpdate(prevProps, subject.state);
+
+    expect(subject.setState).toHaveBeenCalledTimes(1);
+    const patch = (subject.setState as jest.Mock).mock.calls[0][0];
+    expect(patch).toMatchObject({ showResults: true });
+    expect(patch.filterState).toEqual(
+      normalizeSurveyToolFilterState({ questionTypes: ['rating'] })
+    );
+  });
+
+  it('does not read SurveySelector survey list from a borrowed general network when the slug is unresolved', async () => {
+    const generalCfg = {
+      slug: '',
+      networkChainId: 84532,
+    };
+    const strictLookup = (slug: unknown) => (
+      String(slug || '').trim().toLowerCase() === ''
+        ? generalCfg
+        : null
+    );
+    jest.spyOn(contractScriptsModule, 'getSessionConfigBySlug').mockImplementation(strictLookup as any);
+    jest.spyOn(contractScriptsModule, 'getSessionConfigBySlugOrDefault').mockImplementation((slug: any) => (
+      (strictLookup(slug) || generalCfg) as any
+    ));
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    const readCacheSpy = jest.spyOn(cacheScripts, 'readCache').mockImplementation(async (namespace: string) => {
+      if (namespace === 'surveysCache') {
+        return {
+          '84532': {
+            surveys: {
+              '0xsurvey': {
+                id: '0xsurvey',
+                surveyID: '0xsurvey',
+                title: 'Borrowed Survey',
+                questionIDs: ['q1'],
+              },
+            },
+          },
+        };
+      }
+      return null as any;
+    });
+
+    const subject = new SurveySelector({
+      autoOpenResults: false,
+      filterState: {},
+      isQuestionCacheReady: true,
+      isSurveyCacheReady: true,
+      singleQuestionMode: false,
+      sessionSlug: 'missing-session-slug',
+      activeSessionSlug: '',
+    });
+    subject.updateSelectedSurvey = jest.fn();
+    subject.state = {
+      ...subject.state,
+      surveys: [{ id: 'stale-survey', title: 'Stale Survey', questionIDs: ['q1'] }],
+      showLongLoading: false,
+      loading: false,
+    };
+    syncClassSetState(subject);
+    readCacheSpy.mockClear();
+
+    await subject.fetchSurveys();
+
+    expect(readCacheSpy).not.toHaveBeenCalled();
+    expect(subject.state.surveys).toEqual([]);
+    expect(subject.state.loading).toBe(false);
+    expect(subject.updateSelectedSurvey).not.toHaveBeenCalled();
+  });
+
+  it('ignores semantically unchanged external filter props after a local clear so header clear does not snap back', () => {
+    const activeFilter = { responseStatus: { responded: true, notResponded: false } };
+    const subject = new SurveySelector({
+      autoOpenResults: false,
+      filterState: activeFilter,
+      isQuestionCacheReady: true,
+      isSurveyCacheReady: true,
+      singleQuestionMode: false,
+      network: { id: 84532 },
+      activeSessionSlug: 'edge',
+      questionsCacheNonce: 4,
+      questionResponsesNonce: 2,
+    });
+    subject.fetchSurveys = jest.fn();
+    subject.computeFilteredQuestionCount = jest.fn();
+    subject.state = {
+      ...subject.state,
+      showResults: false,
+      showLongLoading: false,
+      loading: false,
+      filterState: {},
+    };
+    subject._filterStateSig = '';
+    syncClassSetState(subject);
+
+    const prevProps = {
+      ...subject.props,
+      filterState: { responseStatus: { responded: true, notResponded: false } },
+    };
+    Object.defineProperty(subject, 'props', {
+      configurable: true,
+      value: {
+        ...subject.props,
+        filterState: { responseStatus: { responded: true, notResponded: false } },
+      },
+    });
+
+    subject.componentDidUpdate(prevProps, subject.state);
+
+    expect(subject.setState).not.toHaveBeenCalled();
+    expect(subject.state.filterState).toEqual({});
+    expect(subject._filterStateSig).toBe('');
+  });
+
+  it('forces SurveySelector results closed via closeShowResults when currently open', () => {
+    const subject = new SurveySelector({
+      autoOpenResults: false,
+      filterState: {},
+      isQuestionCacheReady: true,
+      isSurveyCacheReady: true,
+      singleQuestionMode: false,
+      network: { id: 84532 },
+      activeSessionSlug: 'edge',
+      questionsCacheNonce: 4,
+      preventUrlChange: true,
+    });
+    subject.fetchSurveys = jest.fn();
+    subject.computeFilteredQuestionCount = jest.fn();
+    subject.state = {
+      ...subject.state,
+      showResults: true,
+      viewMode: 'questions',
+    };
+    syncClassSetState(subject);
+
+    subject.closeShowResults();
+
+    expect(subject.setState).toHaveBeenCalledTimes(1);
+    expect(subject.setState).toHaveBeenCalledWith({ showResults: false });
+    expect(subject.state.showResults).toBe(false);
+  });
+
+  it('appends session query when SurveySelector pushes survey URLs', () => {
+    const priorUrl = window.location.href;
+    const pushStateSpy = jest.spyOn(window.history, 'pushState');
+    try {
+      window.history.replaceState({}, '', '/surveys');
+      const subject = new SurveySelector({
+        autoOpenResults: false,
+        filterState: {},
+        isQuestionCacheReady: true,
+        isSurveyCacheReady: true,
+        singleQuestionMode: false,
+        network: { id: 84532 },
+        activeSessionSlug: 'edge',
+        preventUrlChange: false,
+      });
+
+      subject.updateURL('0xABC');
+
+      expect(pushStateSpy).toHaveBeenLastCalledWith({}, '', '/survey/0xabc?session=edge');
+    } finally {
+      window.history.replaceState({}, '', priorUrl);
+    }
+  });
+
+  it('canonicalizes reserved session aliases when SurveySelector pushes survey URLs', () => {
+    const priorUrl = window.location.href;
+    const pushStateSpy = jest.spyOn(window.history, 'pushState');
+    try {
+      window.history.replaceState({}, '', '/surveys');
+
+      const debateSubject = new SurveySelector({
+        autoOpenResults: false,
+        filterState: {},
+        isQuestionCacheReady: true,
+        isSurveyCacheReady: true,
+        singleQuestionMode: false,
+        network: { id: 84532 },
+        activeSessionSlug: 'DEBATE',
+        preventUrlChange: false,
+      });
+      debateSubject.updateURL('0xABC');
+      expect(pushStateSpy).toHaveBeenLastCalledWith({}, '', '/survey/0xabc?session=DEBATE');
+
+      const generalSubject = new SurveySelector({
+        autoOpenResults: false,
+        filterState: {},
+        isQuestionCacheReady: true,
+        isSurveyCacheReady: true,
+        singleQuestionMode: false,
+        network: { id: 84532 },
+        activeSessionSlug: 'general',
+        preventUrlChange: false,
+      });
+      generalSubject.updateURL('0xABC');
+      expect(pushStateSpy).toHaveBeenLastCalledWith({}, '', '/survey/0xabc');
+    } finally {
+      window.history.replaceState({}, '', priorUrl);
+    }
+  });
+
+  it('no-ops SurveySelector closeShowResults when results are already closed', () => {
+    const priorUrl = window.location.href;
+    window.history.replaceState({}, '', '/questions/results');
+    const pathnameBefore = window.location.pathname;
+    const pushStateSpy = jest.spyOn(window.history, 'pushState');
+    try {
+      const subject = new SurveySelector({
+        autoOpenResults: false,
+        filterState: {},
+        isQuestionCacheReady: true,
+        isSurveyCacheReady: true,
+        singleQuestionMode: false,
+        network: { id: 84532 },
+        activeSessionSlug: 'edge',
+        questionsCacheNonce: 4,
+        preventUrlChange: false,
+      });
+      subject.fetchSurveys = jest.fn();
+      subject.computeFilteredQuestionCount = jest.fn();
+      subject.state = {
+        ...subject.state,
+        showResults: false,
+        viewMode: 'questions',
+      };
+      syncClassSetState(subject);
+
+      subject.closeShowResults();
+
+      expect(subject.state.showResults).toBe(false);
+      expect(subject.setState).not.toHaveBeenCalled();
+      expect(pushStateSpy).not.toHaveBeenCalled();
+      expect(window.location.pathname).toBe(pathnameBefore);
+    } finally {
+      window.history.replaceState({}, '', priorUrl);
+    }
+  });
+
+  it('canonicalizes reserved session aliases in SurveySelector survey results URLs', () => {
+    const priorUrl = window.location.href;
+    const pushStateSpy = jest.spyOn(window.history, 'pushState');
+    try {
+      window.history.replaceState({}, '', '/surveys');
+
+      const buildSubject = (activeSessionSlug: string) => {
+        const subject = new SurveySelector({
+          autoOpenResults: false,
+          filterState: {},
+          isQuestionCacheReady: true,
+          isSurveyCacheReady: true,
+          singleQuestionMode: false,
+          network: { id: 84532 },
+          activeSessionSlug,
+          preventUrlChange: false,
+        });
+        subject.state = {
+          ...subject.state,
+          showResults: false,
+          viewMode: 'survey',
+          selectedSurveyIndex: 0,
+          surveys: [{ id: '0xABC', title: 'Alias Survey' }],
+        };
+        syncClassSetState(subject);
+        return subject;
+      };
+
+      const debateSubject = buildSubject('DEBATE');
+      debateSubject.toggleShowResults();
+      expect(pushStateSpy).toHaveBeenLastCalledWith({}, '', '/survey/0xabc/results?session=DEBATE');
+      debateSubject.closeShowResults();
+      expect(pushStateSpy).toHaveBeenLastCalledWith({}, '', '/survey/0xabc?session=DEBATE');
+
+      const generalSubject = buildSubject('general');
+      generalSubject.toggleShowResults();
+      expect(pushStateSpy).toHaveBeenLastCalledWith({}, '', '/survey/0xabc/results');
+      generalSubject.closeShowResults();
+      expect(pushStateSpy).toHaveBeenLastCalledWith({}, '', '/survey/0xabc');
+    } finally {
+      window.history.replaceState({}, '', priorUrl);
+    }
+  });
+
+  it('uses query-pinned question results URLs instead of session-prefixed hardcoded routes', () => {
+    const priorUrl = window.location.href;
+    const pushStateSpy = jest.spyOn(window.history, 'pushState');
+    try {
+      window.history.replaceState({}, '', '/session/rxc');
+
+      const subject = new SurveySelector({
+        autoOpenResults: false,
+        filterState: {},
+        isQuestionCacheReady: true,
+        isSurveyCacheReady: true,
+        singleQuestionMode: false,
+        network: { id: 84532 },
+        activeSessionSlug: 'rxc',
+        preventUrlChange: false,
+      });
+      subject.state = {
+        ...subject.state,
+        showResults: false,
+        viewMode: 'questions',
+      };
+      syncClassSetState(subject);
+
+      subject.toggleShowResults();
+      expect(pushStateSpy).toHaveBeenLastCalledWith({}, '', '/questions/results?session=rxc');
+
+      subject.closeShowResults();
+      expect(pushStateSpy).toHaveBeenLastCalledWith({}, '', '/questions?session=rxc');
+    } finally {
+      window.history.replaceState({}, '', priorUrl);
+    }
+  });
+
+  it('auto-opens SurveySelector results when ?results=true is present', () => {
+    const priorUrl = window.location.href;
+    window.history.replaceState({}, '', '/surveys?results=true');
+    try {
+      const subject = new SurveySelector({
+        autoOpenResults: false,
+        filterState: {},
+        isQuestionCacheReady: true,
+        isSurveyCacheReady: true,
+        singleQuestionMode: false,
+        network: { id: 84532 },
+        activeSessionSlug: 'edge',
+        questionsCacheNonce: 4,
+      });
+      subject.fetchSurveys = jest.fn();
+      subject.computeFilteredQuestionCount = jest.fn();
+      subject.state = {
+        ...subject.state,
+        showResults: false,
+      };
+      syncClassSetState(subject);
+
+      subject.componentDidMount();
+
+      expect(subject.state.showResults).toBe(true);
+      expect(subject.setState).toHaveBeenCalledTimes(1);
+      expect(subject.setState).toHaveBeenCalledWith(expect.objectContaining({ showResults: true }));
+      subject.componentWillUnmount();
+    } finally {
+      window.history.replaceState({}, '', priorUrl);
+    }
+  });
+
+  it('keeps SurveySelector showLongLoading clear semantics when cache is ready and loading is false', () => {
+    const priorUrl = window.location.href;
+    window.history.replaceState({}, '', '/surveys');
+    try {
+      const subject = new SurveySelector({
+        autoOpenResults: false,
+        filterState: {},
+        isQuestionCacheReady: false,
+        isSurveyCacheReady: true,
+        singleQuestionMode: false,
+        network: { id: 84532 },
+        activeSessionSlug: 'edge',
+        questionsCacheNonce: 4,
+      });
+      subject.fetchSurveys = jest.fn();
+      subject.computeFilteredQuestionCount = jest.fn();
+      subject.state = {
+        ...subject.state,
+        showLongLoading: true,
+        loading: false,
+      };
+      subject._filterStateSig = '';
+      syncClassSetState(subject);
+
+      const prevProps = {
+        ...subject.props,
+        filterState: subject.props.filterState,
+        questionsCacheNonce: subject.props.questionsCacheNonce,
+      };
+
+      subject.componentDidUpdate(prevProps, subject.state);
+
+      expect(subject.setState).toHaveBeenCalledTimes(1);
+      expect((subject.setState as jest.Mock).mock.calls[0][0]).toEqual({ showLongLoading: false });
+    } finally {
+      window.history.replaceState({}, '', priorUrl);
+    }
+  });
+});
