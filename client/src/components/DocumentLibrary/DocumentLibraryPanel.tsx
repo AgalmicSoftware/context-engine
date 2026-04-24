@@ -46,6 +46,7 @@ import {
   uploadDocLibraryFile,
   uploadDocLibraryUrlRecord,
 } from '../../utilities/docLibrary/uploads.js';
+import SBTSelector from '../SBTs/SBTSelector';
 import { toStr } from '../../utilities/shared/primitives.js';
 import { createLogger } from '../../utilities/logging.js';
 import {

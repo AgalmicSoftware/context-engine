@@ -327,8 +327,8 @@ type CreateSbtSessionConfigSources = {
   resolvedSessionConfig: CreateSbtSessionConfig | null;
 };
 type CreateSbtChainOption = Record<string, unknown> & {
-  id?: string | number;
-  name?: string;
+  id: string | number;
+  name: string;
 };
 type ResolveAuthoringChainIdArgs = {
   selectedChainId?: unknown;
@@ -3303,7 +3303,7 @@ class CreateSBTGroup extends Component<any, any> {
     const distribution = (sbtDistribution || {}) as CreateSbtDistributionState;
     const isInvite = distribution.isLimited && distribution.distributionOption === 'groupPassword';
     const base = window.location.origin;
-    const demoPath = buildSessionRoutePath(this.getEffectiveSessionSlug());
+    const demoPath = buildSessionRoutePath(this.getEffectiveSessionSlug(), readPublicUrlBasePath());
     const encodeGroupPassword = (code: unknown) => {
       const normalized = cryptoUtils.normalizeGroupPasswordInput(code);
       return cryptoUtils.encodeGroupPasswordForUrl(normalized) || '';
@@ -3903,7 +3903,7 @@ class CreateSBTGroup extends Component<any, any> {
     };
 
     return (
-      <div id={styles.createGroupExpanded} style={rootSurfaceStyle}>
+      <div className={styles.createGroupExpanded} style={rootSurfaceStyle}>
         <div className={styles.headerContainer}>
           <h1 className={styles.createGroupTitle}>{headerTitle}</h1>
           <FontAwesomeIcon icon={faQuestionCircle} className={styles.tooltip} id="learnMoreTooltip" style={resolveCreateSbtTooltipIconStyle()} />
@@ -4014,7 +4014,7 @@ class CreateSBTGroup extends Component<any, any> {
 
               <div className={styles.tokenInfoMetaGrid}>
                 <div className={styles.tokenInfoMetaCard} data-testid={E2E_TESTIDS.SBT_CREATE_DOCS_LOCK_ROW}>
-                  <div id={styles.addDocUrlSection} className={styles.docUrlField}>
+                  <div className={`${styles.addDocUrlSection} ${styles.docUrlField}`}>
                     <input
                       type="text"
                       name="documentUrl"
@@ -4032,7 +4032,7 @@ class CreateSBTGroup extends Component<any, any> {
                       className={styles.addDocUrlActionButton}
                       data-testid={E2E_TESTIDS.SBT_CREATE_DOC_URL_ADD}
                     >
-                      <FontAwesomeIcon icon={faPlus} id={styles.addDocUrlButton} />
+                      <FontAwesomeIcon icon={faPlus} className={styles.addDocUrlButton} />
                     </button>
                     <div className={inlineFieldLockClassName}>
                       {renderFieldLock('docs', 'documentURLs', docsSelectedGateIds)}

@@ -169,6 +169,15 @@ jest.mock('../../utilities/web3/contractScripts.js', () => {
   };
 });
 
+import SBTSelector from './SBTSelector';
+import contractScripts, * as contractScriptsUtils from '../../utilities/web3/contractScripts.js';
+import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
+import * as sessionRegistryUtils from '../../utilities/web3/sessionRegistry.js';
+import * as sbtDisplayNameUtils from '../../utilities/sbt/sbtDisplayNames.js';
+import * as sessionScanScopeUtils from '../../utilities/session/sessionScanScope.js';
+import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
+import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
+
 const mockedContractScripts = contractScripts as any;
 const mockedContractScriptsUtils = contractScriptsUtils as any;
 const mockedCacheScripts = cacheScripts as any;

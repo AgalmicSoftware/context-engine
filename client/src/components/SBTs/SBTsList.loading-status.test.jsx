@@ -1,26 +1,10 @@
-import {
-  React,
-  act,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-  SBTsList,
-  writeGlobalSessionSelection,
-  sbtsListPath,
-  mockGetRelevantBlockWindowForFilter,
-  mockGetAllSessionEntries,
-  mockGetSessionChainId,
-  mockSessionRegistryGetAllSessionEntries,
-  mockReadSessionScanScope,
-  mockReadSessionScanSlugs,
-  mockPeekCacheSync,
-  mockReadCache,
-  openSessionSelector,
-  buildSBTsListProps,
-  renderSBTsList,
-  setupSBTsListLoadingStatusTestLifecycle,
-} from './SBTsList.loadingStatus.testUtils';
+import React, { act } from 'react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import SBTsList from './SBTsList';
+import { writeGlobalSessionSelection } from '../../utilities/session/globalSessionState.js';
+import { upsertCachedSessionWorkerConfig } from '../../utilities/session/sessionWorkerConfigCache.js';
+import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
+import { sbtsListPath } from '../../utilities/ui/terminology.js';
 
 var mockGetRelevantBlockWindowForFilter = jest.fn();
 var mockGetGroupPasswordHash = jest.fn();

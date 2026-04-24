@@ -1,5 +1,9 @@
 import SBTFilter from './SBTFilter';
-import contractScripts from '../../utilities/web3/contractScripts.js';
+import contractScripts, {
+  getSessionChainId,
+  getSessionSlugByName,
+  normalizeSessionSlug,
+} from '../../utilities/web3/contractScripts.js';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 
 jest.mock('./SBTSelector', () => () => null);

@@ -1,4 +1,4 @@
-import SBTPage from './SBTPage.jsx';
+import SBTPage from './SBTPage';
 import styles from './SBTPage.module.scss';
 import { ethers } from 'ethers';
 import contractScripts from '../../utilities/web3/contractScripts.js';
