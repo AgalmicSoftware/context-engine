@@ -14,9 +14,17 @@ describe('ContractPage session resolution', () => {
     ref: { slug: 'ref', sessionName: 'Referrer Session' },
   };
 
-  const createReaders = ({ strictConfigs = sessionConfigs, demoConfigs = {} } = {}) => ({
-    resolveBySlug: jest.fn((slug) => strictConfigs[slug] || null),
-    resolveDemoBySlug: jest.fn((slug) => demoConfigs[slug] || null),
+  type SessionConfigMap = Record<string, { slug: string; sessionName: string }>;
+
+  const createReaders = ({
+    strictConfigs = sessionConfigs,
+    demoConfigs = {},
+  }: {
+    strictConfigs?: SessionConfigMap;
+    demoConfigs?: SessionConfigMap;
+  } = {}) => ({
+    resolveBySlug: jest.fn((slug: string) => strictConfigs[slug] || null),
+    resolveDemoBySlug: jest.fn((slug: string) => demoConfigs[slug] || null),
     getDefaultSessionConfig: jest.fn(() => sessionConfigs['']),
   });
 
