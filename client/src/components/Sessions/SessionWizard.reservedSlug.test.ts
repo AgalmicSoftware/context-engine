@@ -6,7 +6,7 @@ import {
   hasInvalidSessionSlugFormat,
   isMissingSessionSlug,
   isReservedSessionSlug,
-} from './sessionWizardSlugValidation';
+} from './SessionWizard';
 
 describe('SessionWizard reserved slug validation', () => {
   it('marks "general" as reserved regardless of case or surrounding whitespace', () => {

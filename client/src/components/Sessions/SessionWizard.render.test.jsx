@@ -295,7 +295,7 @@ import SessionWizard, {
   resolveSessionWizardSelectorSourceConfig,
   resolveSessionWizardLitPaymentDelegation,
   resolveSessionWizardWorkerBaseUrl,
-} from './SessionWizard.jsx';
+} from './SessionWizard';
 
 const renderSessionWizard = (props = {}) => render(<SessionWizard network={{ id: 84532 }} {...props} />);
 const createTooltipStore = (tooltipsEnabled = true) => createStore(
@@ -3202,16 +3202,8 @@ describe('SessionWizard rendered validation', () => {
   });
 
   it('uses noopener noreferrer on every blank-target anchor in the source', () => {
-    const sourceFiles = [
-      './SessionWizard',
-      './SessionPublishSummary',
-      './SessionPublishResultLinks',
-      './SessionWizardModals',
-    ];
-    const anchors = sourceFiles.flatMap((ref) => {
-      const source = fs.readFileSync(require.resolve(ref), 'utf8');
-      return source.match(/<a[\s\S]*?<\/a>/g) || [];
-    });
+    const source = fs.readFileSync(require.resolve('./SessionWizard'), 'utf8');
+    const anchors = source.match(/<a[\s\S]*?<\/a>/g) || [];
     const blankTargetAnchors = anchors.filter((anchor) => anchor.includes('target="_blank"'));
 
     expect(blankTargetAnchors.length).toBeGreaterThan(0);

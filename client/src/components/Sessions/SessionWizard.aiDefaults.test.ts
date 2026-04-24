@@ -1,4 +1,4 @@
-import { __test__getSessionWizardDefaultAiSettings } from './sessionWizardConfig';
+import { __test__getSessionWizardDefaultAiSettings } from './SessionWizard';
 
 describe('SessionWizard AI defaults', () => {
   it('seeds new sessions with GPT-5 and low reasoning effort', () => {

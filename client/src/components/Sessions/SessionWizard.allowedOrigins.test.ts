@@ -1,4 +1,4 @@
-import { buildSessionWizardDefaultAllowedOrigins } from './sessionWizardWorkerDefaults';
+import { buildSessionWizardDefaultAllowedOrigins } from './SessionWizard';
 
 describe('SessionWizard default allowOrigins', () => {
   it('prepends the current browser origin for worker initialization', () => {

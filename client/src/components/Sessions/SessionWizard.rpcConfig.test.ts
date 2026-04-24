@@ -3,7 +3,7 @@ import {
   buildSessionWizardWorkerRpcUrlMap,
   getSessionWizardWorkerDeployValidationError,
   resolveFallbackRpcUrl,
-} from './sessionWizardWorkerRpc';
+} from './SessionWizard';
 
 const { getPathRpcUrl } = rpcDefaults;
 
