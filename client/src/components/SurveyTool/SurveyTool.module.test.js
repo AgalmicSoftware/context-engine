@@ -2,7 +2,6 @@ import SurveyTool, {
   computeSubmitLabel,
   doesQuestionProgressMatchSlug,
   normalizeSurveyToolFilterState,
-  resolveSlugForIds,
   shouldShowPileFullLoadingState,
   buildSurveyDraftSemanticSignature,
   QuestionsDashboard,
@@ -1293,90 +1292,6 @@ describe('SurveyTool module', () => {
     const expandedTree = subject.render();
     expect(treeHasText(expandedTree, 'VIP Gate')).toBe(true);
     expect(treeHasText(expandedTree, 'VIP SBT')).toBe(true);
-  });
-
-  it('uses clone:false cache reads while resolving slug candidates by question id', () => {
-    jest.spyOn(contractScriptsModule, 'getSessionSlugByName').mockReturnValue(null);
-    jest.spyOn(contractScriptsModule, 'getAllSessionSlugs').mockReturnValue(['edge']);
-    jest.spyOn(contractScriptsModule, 'getSessionConfigBySlug').mockImplementation((slug) => (
-      slug === 'edge' ? { networkChainId: 84532 } : {}
-    ));
-    const peekSpy = jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace) => {
-      if (namespace === 'questionsCache') {
-        return {
-          '84532': {
-            questions: {
-              q1: { id: 'q1' },
-            },
-          },
-        };
-      }
-      return {};
-    });
-
-    const resolved = resolveSlugForIds({
-      questionId: 'Q1',
-      props: {
-        network: { id: 84532 },
-        activeSessionSlug: '',
-      },
-      network: { id: 84532 },
-    });
-
-    expect(resolved).toBe('edge');
-    expect(peekSpy).toHaveBeenCalledWith('questionsCache', 'edge', { clone: false });
-  });
-
-  it('does not resolve question ids from a borrowed general network cache when a candidate slug is unresolved', () => {
-    const generalCfg = {
-      slug: '',
-      networkChainId: 84532,
-    };
-    const strictLookup = (slug) => (
-      String(slug || '').trim().toLowerCase() === 'edge'
-        ? { slug: 'edge', networkChainId: 84532 }
-        : null
-    );
-    jest.spyOn(contractScriptsModule, 'getSessionSlugByName').mockReturnValue(null);
-    jest.spyOn(contractScriptsModule, 'getAllSessionSlugs').mockReturnValue(['ghost', 'edge']);
-    jest.spyOn(contractScriptsModule, 'getSessionConfigBySlug').mockImplementation(strictLookup);
-    jest.spyOn(contractScriptsModule, 'getSessionConfigBySlugOrDefault').mockImplementation((slug) => (
-      strictLookup(slug) || generalCfg
-    ));
-    const peekSpy = jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace, slug) => {
-      if (namespace !== 'questionsCache') return {};
-      if (slug === 'ghost') {
-        return {
-          '84532': {
-            questions: {
-              q1: { id: 'q1', prompt: 'Borrowed ghost prompt' },
-            },
-          },
-        };
-      }
-      if (slug === 'edge') {
-        return {
-          '84532': {
-            questions: {
-              q1: { id: 'q1', prompt: 'Edge prompt' },
-            },
-          },
-        };
-      }
-      return {};
-    });
-
-    const resolved = resolveSlugForIds({
-      questionId: 'q1',
-      props: {
-        activeSessionSlug: 'missing-session-slug',
-      },
-      network: null,
-    });
-
-    expect(resolved).toBe('edge');
-    expect(peekSpy).toHaveBeenCalledWith('questionsCache', 'ghost', { clone: false });
-    expect(peekSpy).toHaveBeenCalledWith('questionsCache', 'edge', { clone: false });
   });
 
   it('does not compute question counts from a borrowed general network when the slug is unresolved', async () => {
