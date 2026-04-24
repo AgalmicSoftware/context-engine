@@ -100,7 +100,7 @@ jest.mock('../../utilities/cache/cacheScripts.js', () => ({
   removeCache: jest.fn(async () => true),
 }));
 
-import { LoginAndSettingsModal } from './LoginAndSettingsModal.jsx';
+import { LoginAndSettingsModal } from './LoginAndSettingsModal';
 import contractScripts from '../../utilities/web3/contractScripts.js';
 import * as portoFunctions from '../../utilities/web3/portoFunctions.js';
 import { saveLocalAiSettings } from '../../utilities/ai/aiSettings.js';
@@ -172,7 +172,7 @@ const loadIsolatedSettingsModal = () => {
 
   jest.isolateModules(() => {
     loaded = {
-      LoginAndSettingsModal: require('./LoginAndSettingsModal.jsx').LoginAndSettingsModal,
+      LoginAndSettingsModal: require('./LoginAndSettingsModal').LoginAndSettingsModal,
       getAllSessionSlugs: require('../../utilities/web3/contractScripts.js').getAllSessionSlugs,
       getSessionConfigBySlugOrDefault: require('../../utilities/web3/contractScripts.js').getSessionConfigBySlugOrDefault,
       checkSponsoredAccess: require('../../utilities/web3/sponsoredAccess.js').checkSponsoredAccess,

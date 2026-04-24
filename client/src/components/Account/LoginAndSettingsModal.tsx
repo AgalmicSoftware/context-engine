@@ -1,4 +1,4 @@
-/** @file LoginAndSettingsModal.jsx */
+/** @file LoginAndSettingsModal.tsx */
 import React, { Component } from "react";
 import PropTypes from 'prop-types';
 import { connect } from 'react-redux';
@@ -92,25 +92,28 @@ import { chainHexId, chainHttpRpc, chainHttpRpcNoPath, chainCurrency, getChainBy
 import { createLogger } from 'utilities/logging.js';
 
 const accountLog = createLogger('account');
-const normalizeSettingsSessionSlug = (value) => {
+const normalizeSettingsSessionSlug = (value: any) => {
   const raw = toStr(value).trim().toLowerCase();
   return raw === 'general' ? '' : raw;
 };
-const formatSettingsSessionSlug = (value) => {
+const formatSettingsSessionSlug = (value: any) => {
   const normalized = normalizeSettingsSessionSlug(value);
   return normalized || 'general';
 };
-const buildSettingsSessionHref = (slugIn = '') => {
+const buildSettingsSessionHref = (slugIn: any = '') => {
   const normalizedBasePath = toStr(readPublicUrlBasePath()).trim().replace(/\/+$/, '');
   const slug = normalizeSettingsSessionSlug(slugIn);
   return `${normalizedBasePath}${slug ? `/session/${encodeURIComponent(slug)}` : '/session'}`;
 };
-const uniqueList = (values = []) => Array.from(new Set((Array.isArray(values) ? values : []).filter((value) => value !== undefined && value !== null)));
-const getSponsoredKeyAliases = (resourceKey = '') => {
+const getErrorCode = (error: any) => (
+  error && typeof error === 'object' ? (error as any).code : undefined
+);
+const uniqueList = (values: any = []) => Array.from(new Set((Array.isArray(values) ? values : []).filter((value: any) => value !== undefined && value !== null)));
+const getSponsoredKeyAliases = (resourceKey: any = '') => {
   if (resourceKey === 'txGas') return ['faucet', 'txGas'];
   return [resourceKey];
 };
-const formatSponsoredStatusMeta = (entry, hasActiveSponsor = false) => {
+const formatSponsoredStatusMeta = (entry: any, hasActiveSponsor: any = false) => {
   const status = entry?.status === 'unresolved'
     ? 'error'
     : (entry?.status || 'no-gate');
@@ -138,15 +141,15 @@ const formatSponsoredStatusMeta = (entry, hasActiveSponsor = false) => {
   return { label: 'Not sponsored', tone: 'muted', detail: 'No sponsor key is configured for the active session.' };
 };
 
-const AI_PRESET_LABELS = Object.freeze({
+const AI_PRESET_LABELS: Record<string, { label: string; badgeLabel: string }> = Object.freeze({
   'gpt-5': { label: 'GPT-5 (default)', badgeLabel: 'GPT-5' },
   'gpt-4o': { label: 'GPT-4o', badgeLabel: 'GPT-4o' },
   'claude-sonnet': { label: 'Claude Sonnet 4.6', badgeLabel: 'Claude Sonnet 4.6' },
   'claude-opus': { label: 'Claude Opus 4.6', badgeLabel: 'Claude Opus 4.6' },
 });
 
-const AI_PRESET_OPTIONS = Object.freeze([
-  ...Object.entries(AI_PRESET_CONFIGS).map(([key, config]) => Object.freeze({
+const AI_PRESET_OPTIONS: readonly any[] = Object.freeze([
+  ...Object.entries(AI_PRESET_CONFIGS).map(([key, config]: any) => Object.freeze({
     key,
     label: AI_PRESET_LABELS[key]?.label || key,
     badgeLabel: AI_PRESET_LABELS[key]?.badgeLabel || key,
@@ -169,7 +172,7 @@ const AI_TASK_REASONING_ROWS = Object.freeze([
   { key: 'rank', label: 'Filter Ranking', hint: 'Uses the global setting unless overridden.' },
 ]);
 
-const AI_PROVIDER_LABELS = Object.freeze({
+const AI_PROVIDER_LABELS: Record<string, string> = Object.freeze({
   anthropic: 'Anthropic',
   openai: 'OpenAI',
   openrouter: 'OpenRouter',
@@ -177,18 +180,18 @@ const AI_PROVIDER_LABELS = Object.freeze({
   local: 'Local',
 });
 
-const deriveAiPresetKey = (settings = {}) => deriveAiPreset({
+const deriveAiPresetKey = (settings: any = {}) => deriveAiPreset({
   mode: settings?.mode,
   models: settings?.models,
   modelProviders: settings?.modelProviders,
 });
 
-const getAiPresetMeta = (presetKey = '') => (
-  AI_PRESET_OPTIONS.find((entry) => entry.key === presetKey) ||
+const getAiPresetMeta = (presetKey: any = ''): any => (
+  AI_PRESET_OPTIONS.find((entry: any) => entry.key === presetKey) ||
   AI_PRESET_OPTIONS[AI_PRESET_OPTIONS.length - 1]
 );
 
-const formatAiPresetBadgeLabel = (settings = {}) => {
+const formatAiPresetBadgeLabel = (settings: any = {}) => {
   const hasModelShape = !!(
     settings?.models?.fast ||
     settings?.models?.thinking ||
@@ -204,14 +207,16 @@ const formatAiPresetBadgeLabel = (settings = {}) => {
   return toStr(settings?.models?.thinking || settings?.models?.fast || settings?.mode || 'Custom model') || 'Custom model';
 };
 
-const settingsSupportReasoning = (settings = {}) => (
+const settingsSupportReasoning = (settings: any = {}) => (
   [settings?.models?.fast, settings?.models?.thinking]
-    .map((model) => toModelLeaf(model))
-    .some((modelLeaf) => /^(gpt-5|o[13])/.test(modelLeaf))
+    .map((model: any) => toModelLeaf(model))
+    .some((modelLeaf: any) => /^(gpt-5|o[13])/.test(modelLeaf))
 );
 
-export class LoginAndSettingsModal extends Component {
-  state = (() => {
+export class LoginAndSettingsModal extends Component<any, any> {
+  [key: string]: any;
+
+  state: any = (() => {
     const initialSessionScanSlugs = normalizeSessionScanSlugs(
       this.props.selectedSessionSlugs || readSessionScanSlugs()
     );
@@ -250,27 +255,27 @@ export class LoginAndSettingsModal extends Component {
         Array.isArray(initialSessionScanSlugs)
           ? initialSessionScanSlugs
           : []
-      ).map((slug) => (slug ? slug : 'general')).join(', '),
+      ).map((slug: any) => (slug ? slug : 'general')).join(', '),
       sessionScanStatus: '',
       preLoginSettingsOpen: false,
       preLoginConfigOpen: false,
       walletBalanceWei: null,
     };
   })();
-  _isMounted = false;
-  _autoCloseTimer = null;
-  _sponsoredReqId = 0;
-  _cacheClearInFlight = false;
-  _testFundsRequestId = 0;
+  _isMounted: any = false;
+  _autoCloseTimer: any = null;
+  _sponsoredReqId: any = 0;
+  _cacheClearInFlight: any = false;
+  _testFundsRequestId: any = 0;
 
-  getListModePrimarySessionSlug = (state = this.state) => {
+  getListModePrimarySessionSlug: any = (state: any = this.state) => {
     const scope = this.getSessionScanScopeValue(state);
     if (scope !== 'list') return '';
     const listSlugs = this.getConfiguredSessionScanSlugs(state);
     return derivePrimarySessionSlugFromList(listSlugs);
   };
 
-  getActiveSessionSlug = (props = this.props, state = this.state) => {
+  getActiveSessionSlug: any = (props: any = this.props, state: any = this.state) => {
     const resolvedSlug = normalizeSettingsSessionSlug(
       resolveActiveSessionSlug({
         activeSessionSlug: props.activeSessionSlug,
@@ -288,7 +293,7 @@ export class LoginAndSettingsModal extends Component {
     const normalizedPropList = normalizeSessionScanSlugs(props.selectedSessionSlugs || []);
     const propListPrimary = Array.isArray(normalizedPropList)
       ? normalizedPropList[0]
-      : String(normalizedPropList || '').split(',').map((slug) => slug.trim()).filter(Boolean)[0];
+      : String(normalizedPropList || '').split(',').map((slug: any) => slug.trim()).filter(Boolean)[0];
     const effectiveListPrimary = listModePrimary || normalizeSettingsSessionSlug(propListPrimary);
     const listIncludesGeneral = configuredScopeSlugs.includes('') || (
       Array.isArray(normalizedPropList) && normalizedPropList.includes('')
@@ -303,7 +308,7 @@ export class LoginAndSettingsModal extends Component {
       : effectiveListPrimary;
   };
 
-  getTargetNetwork = () => {
+  getTargetNetwork: any = () => {
     const slug = this.getActiveSessionSlug();
     const ch = getSessionNetwork(slug);
     if (ch) return ch;
@@ -323,7 +328,7 @@ export class LoginAndSettingsModal extends Component {
     };
   };
 
-  syncPortoChain = (targetNetwork = null) => {
+  syncPortoChain: any = (targetNetwork: any = null) => {
     const tn = targetNetwork || this.getTargetNetwork();
     portoFunctions.setPortoChain(tn);
     if (typeof portoFunctions.getPortoChain === 'function') {
@@ -332,7 +337,7 @@ export class LoginAndSettingsModal extends Component {
     return tn;
   };
 
-  getPortoNetwork = (targetNetwork = null) => {
+  getPortoNetwork: any = (targetNetwork: any = null) => {
     const tn = this.syncPortoChain(targetNetwork);
     if (!tn) return tn;
     const chainId = Number(tn?.id ?? tn?.chainId ?? 0);
@@ -387,7 +392,7 @@ export class LoginAndSettingsModal extends Component {
     }
   }
 
-  setStateIfMounted = (nextState, cb) => {
+  setStateIfMounted: any = (nextState: any, cb: any) => {
     if (!this._isMounted) return;
     if (
       nextState &&
@@ -395,7 +400,7 @@ export class LoginAndSettingsModal extends Component {
       !Array.isArray(nextState)
     ) {
       const keys = Object.keys(nextState);
-      const changed = keys.some((key) => this.state[key] !== nextState[key]);
+      const changed = keys.some((key: any) => this.state[key] !== nextState[key]);
       if (!changed) {
         if (typeof cb === 'function') cb();
         return;
@@ -404,7 +409,7 @@ export class LoginAndSettingsModal extends Component {
     this.setState(nextState, cb);
   };
 
-  getWalletChainId = (props = this.props) => (
+  getWalletChainId: any = (props: any = this.props) => (
     Number(
       props.provider === 'wagmi'
         ? (props.wagmiNetwork?.id ?? props.wagmiNetwork?.chainId ?? props.network?.id ?? props.network?.chainId ?? 0)
@@ -412,11 +417,11 @@ export class LoginAndSettingsModal extends Component {
     ) || null
   );
 
-  getWagmiBalanceInput = (props = this.props) => (
+  getWagmiBalanceInput: any = (props: any = this.props) => (
     props.wagmiBalance?.data?.value ?? props.wagmiBalance?.value ?? null
   );
 
-  areWalletBalanceInputsEqual = (leftBalance, rightBalance) => {
+  areWalletBalanceInputsEqual: any = (leftBalance: any, rightBalance: any) => {
     if (leftBalance === rightBalance) return true;
     if (leftBalance == null || rightBalance == null) return leftBalance == null && rightBalance == null;
     try {
@@ -433,7 +438,7 @@ export class LoginAndSettingsModal extends Component {
     }
   };
 
-  getWalletAccount = (props = this.props) => (
+  getWalletAccount: any = (props: any = this.props) => (
     (() => {
       if (props.provider === 'wagmi') {
         const hasWagmiAddressProp = Object.prototype.hasOwnProperty.call(props, 'wagmiAddress');
@@ -444,31 +449,31 @@ export class LoginAndSettingsModal extends Component {
     })()
   );
 
-  getWalletBalanceContextKey = (props = this.props) => {
+  getWalletBalanceContextKey: any = (props: any = this.props) => {
     const provider = toStr(props.provider).trim();
     const account = this.getWalletAccount(props).toLowerCase();
     const chainId = this.getWalletChainId(props);
     return `${provider}|${account}|${chainId == null ? 'null' : chainId}`;
   };
 
-  getWalletRequestContext = (props = this.props) => ({
+  getWalletRequestContext: any = (props: any = this.props) => ({
     account: this.getWalletAccount(props),
     providerLike: toStr(props.provider).trim() || 'wagmi',
     chainId: this.getWalletChainId(props),
   });
 
-  getTestFundsRequestContextKey = (props = this.props, state = this.state) => (
+  getTestFundsRequestContextKey: any = (props: any = this.props, state: any = this.state) => (
     `${this.getWalletBalanceContextKey(props)}|${this.getActiveSessionSlug(props, state)}`
   );
 
-  normalizeWalletBalance = (rawBalance) => {
+  normalizeWalletBalance: any = (rawBalance: any) => {
     if (rawBalance == null) return null;
     if (ethers.BigNumber.isBigNumber(rawBalance)) return rawBalance;
     if (typeof rawBalance === 'bigint') return ethers.BigNumber.from(String(rawBalance));
     return ethers.BigNumber.from(String(rawBalance));
   };
 
-  readWalletBalance = async (props = this.props) => {
+  readWalletBalance: any = async (props: any = this.props) => {
     const walletAccount = this.getWalletAccount(props);
     if (!props.loginComplete || !walletAccount) return null;
 
@@ -499,9 +504,9 @@ export class LoginAndSettingsModal extends Component {
     return null;
   };
 
-  syncWalletBalance = async (props = this.props) => {
+  syncWalletBalance: any = async (props: any = this.props) => {
     const balanceContextKey = this.getWalletBalanceContextKey(props);
-    let nextBalance = null;
+    let nextBalance: any = null;
 
     try {
       nextBalance = await this.readWalletBalance(props);
@@ -529,21 +534,21 @@ export class LoginAndSettingsModal extends Component {
     return { balance: nextBalance, stale: false };
   };
 
-  clearAutoCloseTimer = () => {
+  clearAutoCloseTimer: any = () => {
     if (this._autoCloseTimer) {
       clearTimeout(this._autoCloseTimer);
       this._autoCloseTimer = null;
     }
   };
 
-  buildTestFundsSuccessMessage = (result = {}) => {
+  buildTestFundsSuccessMessage: any = (result: any = {}) => {
     const amountEth = toStr(result?.amountEth).trim();
     const networkName = this.getTargetNetwork()?.name || 'the session network';
     if (amountEth) return `Test gas sent: ${amountEth} ETH on ${networkName}.`;
     return `Test gas sent on ${networkName}.`;
   };
 
-  buildTestFundsErrorMessage = (error, { source = 'manual' } = {}) => {
+  buildTestFundsErrorMessage: any = (error: any, { source = 'manual' }: any = {}) => {
     const prefix = source === 'auto' ? 'Auto-funding failed' : 'Get test gas failed';
     const baseMessage = toStr(error?.message).trim() || 'Failed to request test gas.';
     const status = Number(error?.status || 0) || 0;
@@ -553,7 +558,7 @@ export class LoginAndSettingsModal extends Component {
     return `${prefix}: ${baseMessage}`;
   };
 
-  requestTestFunds = async ({ source = 'manual' } = {}) => {
+  requestTestFunds: any = async ({ source = 'manual' }: any = {}) => {
     if (this.state.sendingTestFunds) return null;
     const walletAccount = this.getWalletAccount();
     if (!walletAccount) return null;
@@ -608,13 +613,13 @@ export class LoginAndSettingsModal extends Component {
     }
   };
 
-  handleManualTestFundsRequest = async () => {
+  handleManualTestFundsRequest: any = async () => {
     await this.requestTestFunds({ source: 'manual' });
   };
 
   // Porto / passkey handlers
 
-  handlePortoSignUp = async () => {
+  handlePortoSignUp: any = async () => {
     this.props.updateLoginInfo({
       loginInProgress: true,
       loginComplete: false,
@@ -631,7 +636,7 @@ export class LoginAndSettingsModal extends Component {
     }
   };
 
-  handlePortoSignIn = async () => {
+  handlePortoSignIn: any = async () => {
     this.props.updateLoginInfo({
       loginInProgress: true,
       loginComplete: false,
@@ -648,7 +653,7 @@ export class LoginAndSettingsModal extends Component {
     }
   };
 
-  _finalizePortoLogin = (address, targetNetwork = null) => {
+  _finalizePortoLogin: any = (address: any, targetNetwork: any = null) => {
       const portoNetwork = this.getPortoNetwork(targetNetwork);
       const web3info = {
         account: address,
@@ -665,7 +670,7 @@ export class LoginAndSettingsModal extends Component {
       });
   };
 
-  handleLogout = async () => {
+  handleLogout: any = async () => {
     if (this.props.provider === 'porto_passkey') {
        portoFunctions.logoutPorto();
     }
@@ -688,7 +693,7 @@ export class LoginAndSettingsModal extends Component {
     clearAllWorkerSessionTokens();
   };
 
-  componentDidUpdate(prevProps, prevState) {
+  componentDidUpdate(prevProps: any, prevState: any) {
     let needsBalanceCheck = false;
     const activeSessionChanged = (
       this.getActiveSessionSlug(this.props, this.state) !== this.getActiveSessionSlug(prevProps, prevState)
@@ -730,7 +735,7 @@ export class LoginAndSettingsModal extends Component {
 
     if ((!this.props.loginComplete && prevProps.loginComplete) || testFundsContextChanged) {
       this._testFundsRequestId += 1;
-      const resetState = {};
+      const resetState: Record<string, any> = {};
       if (this.state.autoSendTriggered) resetState.autoSendTriggered = false;
       if (this.state.sendingTestFunds) resetState.sendingTestFunds = false;
       if (this.state.sentTxHash) resetState.sentTxHash = '';
@@ -763,10 +768,10 @@ export class LoginAndSettingsModal extends Component {
     }
   }
 
-  checkAndSendTestFundsIfNeeded = async () => {
+  checkAndSendTestFundsIfNeeded: any = async () => {
     const walletAccount = this.getWalletAccount();
     if (!this.props.loginComplete || !walletAccount) {
-      const resetState = {};
+      const resetState: Record<string, any> = {};
       if (this.state.autoSendTriggered) resetState.autoSendTriggered = false;
       if (this.state.walletBalanceWei !== null) resetState.walletBalanceWei = null;
       if (Object.keys(resetState).length) this.setStateIfMounted(resetState);
@@ -803,11 +808,11 @@ export class LoginAndSettingsModal extends Component {
     }
   };
 
-  autoSendTestFunds = async () => {
+  autoSendTestFunds: any = async () => {
     await this.requestTestFunds({ source: 'auto' });
   };
 
-  ensureWorkerSessionToken = async () => {
+  ensureWorkerSessionToken: any = async () => {
     if (!this.props.loginComplete || !this.props.account) return;
     try {
       const chainId = this.props.network?.id || this.props.network?.chainId || null;
@@ -825,7 +830,7 @@ export class LoginAndSettingsModal extends Component {
     }
   };
 
-  addCorrectNetwork = async () => {
+  addCorrectNetwork: any = async () => {
     if (window.ethereum && this.props.provider === "wagmi") {
       try {
         const tn = this.getTargetNetwork();
@@ -849,7 +854,7 @@ export class LoginAndSettingsModal extends Component {
     }
   };
 
-  switchToCorrectNetwork = async () => {
+  switchToCorrectNetwork: any = async () => {
     if (window.ethereum && this.props.provider === "wagmi") {
       try {
         const tn = this.getTargetNetwork();
@@ -858,8 +863,8 @@ export class LoginAndSettingsModal extends Component {
           method: 'wallet_switchEthereumChain',
           params: [{ chainId: chainIdHex }],
         });
-      } catch (error) {
-        if (error.code === 4902) {
+      } catch (error: any) {
+        if (getErrorCode(error) === 4902) {
           await this.addCorrectNetwork();
         } else {
           accountLog.error("Error switching network:", error);
@@ -868,13 +873,13 @@ export class LoginAndSettingsModal extends Component {
     }
   };
 
-  reloadPage = () => {
+  reloadPage: any = () => {
     if (typeof window !== 'undefined' && window.location && typeof window.location.reload === 'function') {
       window.location.reload();
     }
   };
 
-  handleClearAllCaches = async () => {
+  handleClearAllCaches: any = async () => {
     if (this._cacheClearInFlight) return;
     this._cacheClearInFlight = true;
     accountLog.log("Clearing all application caches...");
@@ -890,12 +895,12 @@ export class LoginAndSettingsModal extends Component {
       await initCacheManager();
       for (const namespace of managedNamespaces) {
         const entries = listNamespaceEntriesSync(namespace, { cloneValues: false });
-        const slugs = new Set(
+        const slugs: any = new Set(
           entries
-            .map((entry) => String(entry?.slug || ''))
-            .filter((slug) => slug)
+            .map((entry: any) => String(entry?.slug || ''))
+            .filter((slug: any) => slug)
         );
-        await Promise.all(Array.from(slugs).map((slug) => removeCache(namespace, slug)));
+        await Promise.all(Array.from(slugs).map((slug: any) => removeCache(namespace, slug)));
         await removeCache(namespace, '');
       }
     } catch (error) {
@@ -912,7 +917,7 @@ export class LoginAndSettingsModal extends Component {
       for (let i = localStorage.length - 1; i >= 0; i -= 1) {
         const key = localStorage.key(i);
         if (!key) continue;
-        if (tinyFlagPrefixes.some((prefix) => key.startsWith(prefix))) {
+        if (tinyFlagPrefixes.some((prefix: any) => key.startsWith(prefix))) {
           localStorage.removeItem(key);
         }
       }
@@ -921,7 +926,7 @@ export class LoginAndSettingsModal extends Component {
     this.reloadPage();
   };
 
-  cloneAiSettings = (src) => {
+  cloneAiSettings: any = (src: any) => {
     const baseCandidate = src || getLocalAiSettings() || {};
     const base = (baseCandidate && typeof baseCandidate === 'object') ? baseCandidate : {};
     return {
@@ -941,7 +946,7 @@ export class LoginAndSettingsModal extends Component {
     };
   };
 
-  applyAiPreset = (settings, presetKey) => {
+  applyAiPreset: any = (settings: any, presetKey: any) => {
     const current = this.cloneAiSettings(settings);
     const nextPreset = toStr(presetKey || '').trim() || 'custom';
     if (nextPreset === 'custom') {
@@ -975,7 +980,7 @@ export class LoginAndSettingsModal extends Component {
     };
   };
 
-  cloneResourceKeys = (src) => {
+  cloneResourceKeys: any = (src: any) => {
     const baseCandidate = src || getLocalSessionResourceKeys(this.getActiveSessionSlug()) || {};
     const base = (baseCandidate && typeof baseCandidate === 'object') ? baseCandidate : {};
     return {
@@ -984,7 +989,7 @@ export class LoginAndSettingsModal extends Component {
     };
   };
 
-  loadAiSettings = () => {
+  loadAiSettings: any = () => {
     const sessionSlug = this.getActiveSessionSlug();
     const aiSettings = getLocalAiSettings();
     const aiGroupSettings = getSessionAiSettings(sessionSlug);
@@ -996,7 +1001,7 @@ export class LoginAndSettingsModal extends Component {
     });
   };
 
-  loadResourceKeys = () => {
+  loadResourceKeys: any = () => {
     const resourceKeys = getLocalSessionResourceKeys(this.getActiveSessionSlug());
     this.setStateIfMounted({
       resourceKeys,
@@ -1005,18 +1010,18 @@ export class LoginAndSettingsModal extends Component {
     });
   };
 
-  formatSessionScanSlugsInput = (slugsIn = []) => {
+  formatSessionScanSlugsInput: any = (slugsIn: any = []) => {
     const list = Array.isArray(slugsIn) ? slugsIn : [];
-    return list.map((slug) => (slug ? slug : 'general')).join(', ');
+    return list.map((slug: any) => (slug ? slug : 'general')).join(', ');
   };
 
-  getSessionScanScopeValue = (state = this.state) => normalizeSessionScanScope(
+  getSessionScanScopeValue: any = (state: any = this.state) => normalizeSessionScanScope(
     state?.sessionScanScope ??
     this.props.selectedSessionScope ??
     readSessionScanScope()
   );
 
-  getConfiguredSessionScanSlugs = (state = this.state) => (
+  getConfiguredSessionScanSlugs: any = (state: any = this.state) => (
     uniqueList((() => {
       const rawSource =
         Array.isArray(state?.sessionScanSlugs)
@@ -1031,13 +1036,13 @@ export class LoginAndSettingsModal extends Component {
         ? normalized
         : String(normalized || '')
           .split(',')
-          .map((slug) => slug.trim())
-          .filter((slug) => slug.length > 0);
-      return list.map((slug) => normalizeSettingsSessionSlug(slug));
+          .map((slug: any) => slug.trim())
+          .filter((slug: any) => slug.length > 0);
+      return list.map((slug: any) => normalizeSettingsSessionSlug(slug));
     })())
   );
 
-  loadSessionScanSettings = () => {
+  loadSessionScanSettings: any = () => {
     const rawScope = this.props.selectedSessionScope || readSessionScanScope();
     const rawSlugs = this.props.selectedSessionSlugs || readSessionScanSlugs();
     const scope = normalizeSessionScanScope(rawScope);
@@ -1052,7 +1057,7 @@ export class LoginAndSettingsModal extends Component {
     });
   };
 
-  loadSponsoredAccess = async () => {
+  loadSponsoredAccess: any = async () => {
     const slug = this.getActiveSessionSlug();
     const cfg = getSessionConfigBySlugOrDefault(slug) || {};
     const account = this.props.account || '';
@@ -1061,7 +1066,7 @@ export class LoginAndSettingsModal extends Component {
     try {
       const keys = ['ai', 'arweave', 'rpc', 'txGas'];
       const results = await Promise.all(
-        keys.map((resourceKey) =>
+        keys.map((resourceKey: any) =>
           checkSponsoredAccess({
             sessionConfig: cfg,
             sessionSlug: slug,
@@ -1084,24 +1089,24 @@ export class LoginAndSettingsModal extends Component {
     }
   };
 
-  updateAiSettings = (updater) => {
-    this.setState((prev) => {
+  updateAiSettings: any = (updater: any) => {
+    this.setState((prev: any) => {
       const current = this.cloneAiSettings(prev.aiSettings);
       const next = updater ? updater(current) : current;
       return { aiSettings: next, aiSettingsDirty: true, aiSettingsStatus: '' };
     });
   };
 
-  updateResourceKeys = (updater) => {
-    this.setState((prev) => {
+  updateResourceKeys: any = (updater: any) => {
+    this.setState((prev: any) => {
       const current = this.cloneResourceKeys(prev.resourceKeys);
       const next = updater ? updater(current) : current;
       return { resourceKeys: next, resourceKeysDirty: true, resourceKeysStatus: '' };
     });
   };
 
-  updateResourceKeyField = (resource, field, value) => {
-    this.updateResourceKeys((s) => ({
+  updateResourceKeyField: any = (resource: any, field: any, value: any) => {
+    this.updateResourceKeys((s: any) => ({
       ...s,
       [resource]: {
         ...(s[resource] || {}),
@@ -1110,9 +1115,9 @@ export class LoginAndSettingsModal extends Component {
     }));
   };
 
-  handleResourceToggleLocal = (resource, event) => {
+  handleResourceToggleLocal: any = (resource: any, event: any) => {
     const useLocal = !!event?.target?.checked;
-    this.updateResourceKeys((s) => ({
+    this.updateResourceKeys((s: any) => ({
       ...s,
       [resource]: {
         ...(s[resource] || {}),
@@ -1121,8 +1126,8 @@ export class LoginAndSettingsModal extends Component {
     }));
   };
 
-  updateAiProviderField = (provider, field, value) => {
-    this.updateAiSettings((s) => ({
+  updateAiProviderField: any = (provider: any, field: any, value: any) => {
+    this.updateAiSettings((s: any) => ({
       ...s,
       providers: {
         ...(s.providers || {}),
@@ -1134,8 +1139,8 @@ export class LoginAndSettingsModal extends Component {
     }));
   };
 
-  updateAiModelField = (modelType, value) => {
-    this.updateAiSettings((s) => {
+  updateAiModelField: any = (modelType: any, value: any) => {
+    this.updateAiSettings((s: any) => {
       const next = {
         ...s,
         models: {
@@ -1150,8 +1155,8 @@ export class LoginAndSettingsModal extends Component {
     });
   };
 
-  updateAiTaskReasoningField = (taskType, value) => {
-    this.updateAiSettings((s) => ({
+  updateAiTaskReasoningField: any = (taskType: any, value: any) => {
+    this.updateAiSettings((s: any) => ({
       ...s,
       taskReasoningEffort: {
         ...(s.taskReasoningEffort || {}),
@@ -1160,8 +1165,8 @@ export class LoginAndSettingsModal extends Component {
     }));
   };
 
-  updateAiTranscriptionField = (field, value) => {
-    this.updateAiSettings((s) => ({
+  updateAiTranscriptionField: any = (field: any, value: any) => {
+    this.updateAiSettings((s: any) => ({
       ...s,
       transcription: {
         ...(s.transcription || {}),
@@ -1170,9 +1175,9 @@ export class LoginAndSettingsModal extends Component {
     }));
   };
 
-  handleAiModeChange = (event) => {
+  handleAiModeChange: any = (event: any) => {
     const nextMode = toStr(event?.target?.value || '').trim().toLowerCase() || 'openai';
-    this.updateAiSettings((s) => {
+    this.updateAiSettings((s: any) => {
       const next = {
         ...s,
         mode: nextMode,
@@ -1189,11 +1194,11 @@ export class LoginAndSettingsModal extends Component {
     });
   };
 
-  handleAiPresetChange = (event) => {
+  handleAiPresetChange: any = (event: any) => {
     const presetKey = toStr(event?.target?.value || '').trim() || 'custom';
-    this.updateAiSettings((s) => this.applyAiPreset(s, presetKey));
+    this.updateAiSettings((s: any) => this.applyAiPreset(s, presetKey));
     if (presetKey === 'custom') {
-      this.setState((prevState) => ({
+      this.setState((prevState: any) => ({
         aiSettingsSectionsOpen: {
           ...(prevState.aiSettingsSectionsOpen || {}),
           aiAdvanced: true,
@@ -1202,12 +1207,12 @@ export class LoginAndSettingsModal extends Component {
     }
   };
 
-  handleAiToggleLocal = (event) => {
+  handleAiToggleLocal: any = (event: any) => {
     const useLocal = !!event?.target?.checked;
-    this.updateAiSettings((s) => ({ ...s, useLocal }));
+    this.updateAiSettings((s: any) => ({ ...s, useLocal }));
   };
 
-  handleSaveAiSettings = () => {
+  handleSaveAiSettings: any = () => {
     const saved = saveLocalAiSettings(this.state.aiSettings || {});
     this.setState({
       aiSettings: saved,
@@ -1216,7 +1221,7 @@ export class LoginAndSettingsModal extends Component {
     });
   };
 
-  handleSaveResourceKeys = () => {
+  handleSaveResourceKeys: any = () => {
     const saved = saveLocalResourceKeys(this.getActiveSessionSlug(), this.state.resourceKeys || {});
     this.setState({
       resourceKeys: saved,
@@ -1225,7 +1230,7 @@ export class LoginAndSettingsModal extends Component {
     });
   };
 
-  handleClearAiSettings = () => {
+  handleClearAiSettings: any = () => {
     clearLocalAiSettings();
     const aiSettings = getLocalAiSettings();
     this.setState({
@@ -1235,7 +1240,7 @@ export class LoginAndSettingsModal extends Component {
     });
   };
 
-  handleClearResourceKeys = () => {
+  handleClearResourceKeys: any = () => {
     const sessionSlug = this.getActiveSessionSlug();
     clearLocalResourceKeys(sessionSlug);
     const resourceKeys = getLocalSessionResourceKeys(sessionSlug);
@@ -1246,8 +1251,8 @@ export class LoginAndSettingsModal extends Component {
     });
   };
 
-  togglePreLoginSettingsPanel = () => {
-    this.setState((prevState) => {
+  togglePreLoginSettingsPanel: any = () => {
+    this.setState((prevState: any) => {
       const preLoginSettingsOpen = !prevState.preLoginSettingsOpen;
       return {
         preLoginSettingsOpen,
@@ -1258,13 +1263,13 @@ export class LoginAndSettingsModal extends Component {
     });
   };
 
-  togglePreLoginConfigPanel = () => {
-    this.setState((prevState) => ({
+  togglePreLoginConfigPanel: any = () => {
+    this.setState((prevState: any) => ({
       preLoginConfigOpen: !prevState.preLoginConfigOpen,
     }));
   };
 
-  getDisplaySessionConfig = (slugIn = '', cfgIn = null) => {
+  getDisplaySessionConfig: any = (slugIn: any = '', cfgIn: any = null) => {
     const slug = normalizeSettingsSessionSlug(slugIn || cfgIn?.slug || '');
     return (
       cfgIn
@@ -1274,7 +1279,7 @@ export class LoginAndSettingsModal extends Component {
     );
   };
 
-  handlePreLoginAiEndpointChange = (event) => {
+  handlePreLoginAiEndpointChange: any = (event: any) => {
     const rpcUrl = toStr(event?.target?.value || '');
     const current = this.cloneAiSettings(this.state.aiSettings || getLocalAiSettings());
     const saved = saveLocalAiSettings({
@@ -1294,7 +1299,7 @@ export class LoginAndSettingsModal extends Component {
     });
   };
 
-  handlePreLoginAiProviderKeyChange = (provider, event) => {
+  handlePreLoginAiProviderKeyChange: any = (provider: any, event: any) => {
     const current = this.cloneAiSettings(this.state.aiSettings || getLocalAiSettings());
     const saved = saveLocalAiSettings(applyPreLoginAiProviderKeyChange(current, {
       provider,
@@ -1307,9 +1312,9 @@ export class LoginAndSettingsModal extends Component {
     });
   };
 
-  toggleAiSettingsSection = (sectionKey) => {
+  toggleAiSettingsSection: any = (sectionKey: any) => {
     if (!sectionKey) return;
-    this.setState((prevState) => ({
+    this.setState((prevState: any) => ({
       aiSettingsSectionsOpen: {
         ...(prevState.aiSettingsSectionsOpen || {}),
         [sectionKey]: !prevState.aiSettingsSectionsOpen?.[sectionKey],
@@ -1317,7 +1322,7 @@ export class LoginAndSettingsModal extends Component {
     }));
   };
 
-  isAiSettingsSectionOpen = (sectionKey) => {
+  isAiSettingsSectionOpen: any = (sectionKey: any) => {
     const sections = this.state.aiSettingsSectionsOpen || {};
     if (Object.prototype.hasOwnProperty.call(sections, sectionKey)) {
       return !!sections[sectionKey];
@@ -1325,10 +1330,10 @@ export class LoginAndSettingsModal extends Component {
     return sectionKey === 'aiConfig';
   };
 
-  toggleSupportedResourceSessions = (resourceKey) => {
+  toggleSupportedResourceSessions: any = (resourceKey: any) => {
     const key = toStr(resourceKey).trim();
     if (!key) return;
-    this.setState((prevState) => ({
+    this.setState((prevState: any) => ({
       expandedSponsorResources: {
         ...(prevState.expandedSponsorResources || {}),
         [key]: !prevState.expandedSponsorResources?.[key],
@@ -1336,7 +1341,7 @@ export class LoginAndSettingsModal extends Component {
     }));
   };
 
-  getSessionDescriptor = (slugIn = '', cfgIn = null, activeSlugIn = this.getActiveSessionSlug()) => {
+  getSessionDescriptor: any = (slugIn: any = '', cfgIn: any = null, activeSlugIn: any = this.getActiveSessionSlug()) => {
     const slug = normalizeSettingsSessionSlug(slugIn || cfgIn?.slug || '');
     const cfg = this.getDisplaySessionConfig(slug, cfgIn);
     const slugKey = toStr(slug).trim();
@@ -1353,10 +1358,10 @@ export class LoginAndSettingsModal extends Component {
     };
   };
 
-  getSettingsSessionOptions = (activeSlugIn = this.getActiveSessionSlug()) => {
+  getSettingsSessionOptions: any = (activeSlugIn: any = this.getActiveSessionSlug()) => {
     const activeSlug = normalizeSettingsSessionSlug(activeSlugIn);
-    const options = new Map();
-    const pushSession = (slugIn = '') => {
+    const options: any = new Map();
+    const pushSession = (slugIn: any = '') => {
       const descriptor = this.getSessionDescriptor(slugIn, null, activeSlug);
       options.set(descriptor.slug, descriptor);
     };
@@ -1365,7 +1370,7 @@ export class LoginAndSettingsModal extends Component {
     pushSession(activeSlug);
     pushSession('');
 
-    return Array.from(options.values()).sort((left, right) => {
+    return Array.from(options.values()).sort((left: any, right: any) => {
       if (left.slug === activeSlug && right.slug !== activeSlug) return -1;
       if (left.slug !== activeSlug && right.slug === activeSlug) return 1;
       if (!left.slug && right.slug) return -1;
@@ -1374,7 +1379,7 @@ export class LoginAndSettingsModal extends Component {
     });
   };
 
-  formatSettingsSessionOptionLabel = (descriptor = {}) => {
+  formatSettingsSessionOptionLabel: any = (descriptor: any = {}) => {
     const slug = normalizeSettingsSessionSlug(descriptor.slug);
     if (!slug) return 'General';
     if (descriptor.sessionName && descriptor.sessionName.toLowerCase() !== descriptor.slugLabel) {
@@ -1383,11 +1388,11 @@ export class LoginAndSettingsModal extends Component {
     return descriptor.label || descriptor.slugLabel || 'General';
   };
 
-  renderConfigToggleControl = ({
+  renderConfigToggleControl: any = ({
     expanded = false,
     onToggle = null,
     testId = '',
-  } = {}) => (
+  }: any = {}) => (
     <Button
       type="button"
       onClick={onToggle}
@@ -1403,7 +1408,7 @@ export class LoginAndSettingsModal extends Component {
     </Button>
   );
 
-  renderSessionSummary = (activeSessionIn = null) => {
+  renderSessionSummary: any = (activeSessionIn: any = null) => {
     const activeSession = activeSessionIn || this.getSessionDescriptor(this.getActiveSessionSlug());
     const sessionSummaryHref = buildSettingsSessionHref(activeSession.slug);
 
@@ -1428,7 +1433,7 @@ export class LoginAndSettingsModal extends Component {
     );
   };
 
-  renderSettingsControlRow = ({
+  renderSettingsControlRow: any = ({
     activeSession = this.getSessionDescriptor(this.getActiveSessionSlug()),
     configOpen = false,
     onToggleConfig = null,
@@ -1440,7 +1445,7 @@ export class LoginAndSettingsModal extends Component {
     tooltipPlacement = 'top',
     containerClassName = '',
     rowClassName = '',
-  } = {}) => (
+  }: any = {}) => (
     <div className={[styles.settingsContainer, containerClassName].filter(Boolean).join(' ')}>
       <div className={[styles.settingsRow, rowClassName].filter(Boolean).join(' ')}>
         {beforeConfig}
@@ -1461,7 +1466,7 @@ export class LoginAndSettingsModal extends Component {
     </div>
   );
 
-  handleActiveSessionChange = (event) => {
+  handleActiveSessionChange: any = (event: any) => {
     const nextSlug = normalizeSettingsSessionSlug(event?.target?.value || '');
     if (nextSlug === this.getActiveSessionSlug()) return;
     this.props.updateGlobalSessionSelection?.({
@@ -1469,16 +1474,16 @@ export class LoginAndSettingsModal extends Component {
     });
   };
 
-  getScanScopeSessionSlugs = ({
+  getScanScopeSessionSlugs: any = ({
     activeSlug = this.getActiveSessionSlug(),
     sessionScanScope = this.getSessionScanScopeValue(),
     sessionScanSlugs = this.state.sessionScanSlugs,
     sessionScanSlugsInput = this.state.sessionScanSlugsInput,
     knownSlugs = [],
-  } = {}) => {
+  }: any = {}) => {
     const active = normalizeSettingsSessionSlug(activeSlug);
     const available = uniqueList([
-      ...knownSlugs.map((slug) => normalizeSettingsSessionSlug(slug)),
+      ...knownSlugs.map((slug: any) => normalizeSettingsSessionSlug(slug)),
       active,
       '',
     ]);
@@ -1487,7 +1492,7 @@ export class LoginAndSettingsModal extends Component {
       sessionScanSlugs,
       sessionScanSlugsInput,
     });
-    let selected = [];
+    let selected: any[] = [];
     if (scope === 'all') {
       selected = available;
     } else if (scope === 'active') {
@@ -1497,18 +1502,18 @@ export class LoginAndSettingsModal extends Component {
     } else {
       selected = [''];
     }
-    return uniqueList(selected.filter((slug) => available.includes(slug)));
+    return uniqueList(selected.filter((slug: any) => available.includes(slug)));
   };
 
-  getSponsoredSessionSources = ({
+  getSponsoredSessionSources: any = ({
     activeSlug = this.getActiveSessionSlug(),
     sessionScanScope = this.getSessionScanScopeValue(),
     sessionScanSlugs = this.state.sessionScanSlugs,
     sessionScanSlugsInput = this.state.sessionScanSlugsInput,
-  } = {}) => {
+  }: any = {}) => {
     const active = normalizeSettingsSessionSlug(activeSlug);
-    const entries = new Map();
-    const pushSession = (slugIn) => {
+    const entries: any = new Map();
+    const pushSession = (slugIn: any) => {
       const slug = normalizeSettingsSessionSlug(slugIn);
       if (entries.has(slug)) return;
       const cfg = this.getDisplaySessionConfig(slug);
@@ -1524,7 +1529,7 @@ export class LoginAndSettingsModal extends Component {
     pushSession('');
 
     const allSessions = Array.from(entries.values());
-    const knownSlugs = allSessions.map((entry) => entry.slug);
+    const knownSlugs = allSessions.map((entry: any) => entry.slug);
     const rpcScopeSlugs = this.getScanScopeSessionSlugs({
       activeSlug: active,
       sessionScanScope,
@@ -1533,15 +1538,15 @@ export class LoginAndSettingsModal extends Component {
       knownSlugs,
     });
 
-    const byResource = ['ai', 'arweave', 'rpc', 'txGas'].reduce((acc, resourceKey) => {
+    const byResource = ['ai', 'arweave', 'rpc', 'txGas'].reduce((acc: any, resourceKey: any) => {
       const sponsoredKeyAliases = getSponsoredKeyAliases(resourceKey);
       acc[resourceKey] = allSessions
-        .filter((entry) => sponsoredKeyAliases.some((alias) => !!entry.sponsoredKeys?.[alias]))
-        .map((entry) => ({
+        .filter((entry: any) => sponsoredKeyAliases.some((alias: any) => !!entry.sponsoredKeys?.[alias]))
+        .map((entry: any) => ({
           ...entry,
           inRpcScope: rpcScopeSlugs.includes(entry.slug),
         }))
-        .sort((left, right) => {
+        .sort((left: any, right: any) => {
           if (left.isActive && !right.isActive) return -1;
           if (!left.isActive && right.isActive) return 1;
           return left.label.localeCompare(right.label);
@@ -1551,17 +1556,17 @@ export class LoginAndSettingsModal extends Component {
 
     return {
       byResource,
-      rpcScope: byResource.rpc.filter((entry) => rpcScopeSlugs.includes(entry.slug)),
+      rpcScope: byResource.rpc.filter((entry: any) => rpcScopeSlugs.includes(entry.slug)),
     };
   };
 
-  toggleAiSettingsPanel = () => {
-    this.setState((prevState) => ({
+  toggleAiSettingsPanel: any = () => {
+    this.setState((prevState: any) => ({
       aiSettingsOpen: !prevState.aiSettingsOpen,
     }));
   };
 
-  handleSessionScanScopeChange = (event) => {
+  handleSessionScanScopeChange: any = (event: any) => {
     const nextScope = normalizeSessionScanScope(event?.target?.value || '');
     this.setState({
       sessionScanScope: nextScope,
@@ -1569,12 +1574,12 @@ export class LoginAndSettingsModal extends Component {
     });
   };
 
-  handleSessionScanSlugToggle = (slugIn) => {
+  handleSessionScanSlugToggle: any = (slugIn: any) => {
     const slug = normalizeSettingsSessionSlug(slugIn);
-    this.setState((prevState) => {
+    this.setState((prevState: any) => {
       const current = this.getConfiguredSessionScanSlugs(prevState);
       const next = current.includes(slug)
-        ? current.filter((entry) => entry !== slug)
+        ? current.filter((entry: any) => entry !== slug)
         : [...current, slug];
       return {
         sessionScanSlugs: next,
@@ -1584,7 +1589,7 @@ export class LoginAndSettingsModal extends Component {
     });
   };
 
-  handleSaveSessionScanSettings = () => {
+  handleSaveSessionScanSettings: any = () => {
     const desiredScope = normalizeSessionScanScope(
       this.state?.sessionScanScope ??
       this.props.selectedSessionScope ??
@@ -1623,7 +1628,7 @@ export class LoginAndSettingsModal extends Component {
     });
   };
 
-  handleResetSessionScanSettings = () => {
+  handleResetSessionScanSettings: any = () => {
     this.props.updateGlobalSessionSelection?.({
       selectedSessionScope: 'general',
       selectedSessionSlugs: [],
@@ -1636,13 +1641,13 @@ export class LoginAndSettingsModal extends Component {
     });
   };
 
-  buildSessionScopeChipOptions = ({
+  buildSessionScopeChipOptions: any = ({
     dataTestIdPrefix = 'ce-web3modal-session-scope',
     includePrimaryBadge = false,
-  } = {}) => {
+  }: any = {}) => {
     const activeSessionSlug = this.getActiveSessionSlug();
-    const selectedSet = new Set(this.getConfiguredSessionScanSlugs());
-    return this.getSettingsSessionOptions(activeSessionSlug).map((descriptor) => ({
+    const selectedSet: any = new Set(this.getConfiguredSessionScanSlugs());
+    return this.getSettingsSessionOptions(activeSessionSlug).map((descriptor: any) => ({
       key: `${dataTestIdPrefix}-${descriptor.slug || 'general'}`,
       slug: descriptor.slug,
       label: this.formatSettingsSessionOptionLabel(descriptor),
@@ -1657,15 +1662,15 @@ export class LoginAndSettingsModal extends Component {
     }));
   };
 
-  renderSessionScopeChips = ({
+  renderSessionScopeChips: any = ({
     dataTestIdPrefix = 'ce-web3modal-session-scope',
     includePrimaryBadge = false,
-  } = {}) => (
+  }: any = {}) => (
     <SessionChipSelector
       options={this.buildSessionScopeChipOptions({
         dataTestIdPrefix,
         includePrimaryBadge,
-      }).map((option) => ({
+      }).map((option: any) => ({
         ...option,
         onToggle: this.handleSessionScanSlugToggle,
       }))}
@@ -1677,11 +1682,11 @@ export class LoginAndSettingsModal extends Component {
     />
   );
 
-  renderGlobalSessionSettings = ({
+  renderGlobalSessionSettings: any = ({
     compact = false,
     sessionSelectTestId = 'ce-web3modal-session-select',
     scopePrefix = 'ce-web3modal-session-scope',
-  } = {}) => {
+  }: any = {}) => {
     const sessionOptions = this.getSettingsSessionOptions();
     const activeSessionSlug = this.getActiveSessionSlug();
     const sessionScanScope = this.getSessionScanScopeValue();
@@ -1690,8 +1695,8 @@ export class LoginAndSettingsModal extends Component {
       dataTestIdPrefix: scopePrefix,
       includePrimaryBadge: true,
     })
-      .filter((option) => selectedSessionSlugs.includes(option.slug))
-      .map((option) => option.label);
+      .filter((option: any) => selectedSessionSlugs.includes(option.slug))
+      .map((option: any) => option.label);
     const shouldShowListValidation = sessionScanScope === 'list' && selectedSessionLabels.length === 0;
 
     return (
@@ -1707,7 +1712,7 @@ export class LoginAndSettingsModal extends Component {
             onChange={this.handleActiveSessionChange}
             data-testid={sessionSelectTestId}
           >
-            {sessionOptions.map((descriptor) => (
+            {sessionOptions.map((descriptor: any) => (
               <option key={descriptor.slug || 'general'} value={descriptor.slug}>
                 {this.formatSettingsSessionOptionLabel(descriptor)}
               </option>
@@ -1766,7 +1771,7 @@ export class LoginAndSettingsModal extends Component {
     );
   };
 
-  renderPreLoginConfigPanel = () => {
+  renderPreLoginConfigPanel: any = () => {
     const aiSettings = this.state.aiSettings || getLocalAiSettings() || {};
     const openAiApiKey = toStr(aiSettings?.providers?.openai?.apiKey || '');
     const anthropicApiKey = toStr(aiSettings?.providers?.anthropic?.apiKey || '');
@@ -1786,7 +1791,7 @@ export class LoginAndSettingsModal extends Component {
             type="password"
             className={styles.preLoginSettingsInput}
             value={openAiApiKey}
-            onChange={(event) => this.handlePreLoginAiProviderKeyChange('openai', event)}
+            onChange={(event: any) => this.handlePreLoginAiProviderKeyChange('openai', event)}
             placeholder="sk-..."
           />
         </label>
@@ -1796,7 +1801,7 @@ export class LoginAndSettingsModal extends Component {
             type="password"
             className={styles.preLoginSettingsInput}
             value={anthropicApiKey}
-            onChange={(event) => this.handlePreLoginAiProviderKeyChange('anthropic', event)}
+            onChange={(event: any) => this.handlePreLoginAiProviderKeyChange('anthropic', event)}
             placeholder="sk-ant-..."
           />
         </label>
@@ -1817,7 +1822,7 @@ export class LoginAndSettingsModal extends Component {
     );
   };
 
-  getSettingsOverviewContext = () => {
+  getSettingsOverviewContext: any = () => {
     const walletNet = (this.props.provider === 'wagmi' ? this.props.wagmiNetwork : this.props.network);
     const tn = this.getTargetNetwork();
     const targetNetworkName = tn?.name || 'not configured';
@@ -1831,10 +1836,10 @@ export class LoginAndSettingsModal extends Component {
     const activeSession = this.getSessionDescriptor(sessionSlug, sessionConfig);
     const sponsoredAccess = this.state.sponsoredAccess || {};
     const sponsorSessions = this.getSponsoredSessionSources({ activeSlug: sessionSlug });
-    const buildSponsorshipCard = (key, title) => {
+    const buildSponsorshipCard = (key: any, title: any) => {
       const sessions = sponsorSessions.byResource[key] || [];
-      const activeSponsorSession = sessions.find((entry) => entry?.isActive) || null;
-      const otherSponsorSessions = sessions.filter((entry) => !entry?.isActive);
+      const activeSponsorSession = sessions.find((entry: any) => entry?.isActive) || null;
+      const otherSponsorSessions = sessions.filter((entry: any) => !entry?.isActive);
       return {
         key,
         title,
@@ -1866,12 +1871,12 @@ export class LoginAndSettingsModal extends Component {
     };
   };
 
-  renderInlineNetworkSummary = ({
+  renderInlineNetworkSummary: any = ({
     targetNetworkName = 'not configured',
     walletNetworkName = 'not connected',
     showWalletNetwork = false,
     tooltipId = 'networkInfoTooltipInline',
-  } = {}) => {
+  }: any = {}) => {
     const detail = `The active session targets ${targetNetworkName}. If your wallet shows a different chain, switch before submitting.`;
 
     return (
@@ -1901,14 +1906,14 @@ export class LoginAndSettingsModal extends Component {
     );
   };
 
-  renderPanelNetworkSummary = ({
+  renderPanelNetworkSummary: any = ({
     targetNetwork = null,
     targetNetworkName = 'not configured',
     walletNetworkName = 'not connected',
     showWalletNetwork = false,
     needsNetworkSwitch = false,
     tooltipId = 'networkInfoTooltipPanel',
-  } = {}) => {
+  }: any = {}) => {
     const detail = `The active session targets ${targetNetworkName}. If your wallet shows a different chain, switch before submitting.`;
 
     return (
@@ -1961,13 +1966,13 @@ export class LoginAndSettingsModal extends Component {
     );
   };
 
-  renderSessionPills = (sessions = [], emptyText = 'No sponsor sessions configured.') => {
+  renderSessionPills: any = (sessions: any = [], emptyText: any = 'No sponsor sessions configured.') => {
     if (!sessions.length) {
       return <div className={styles.aiSettingsHintStrong}>{emptyText}</div>;
     }
     return (
       <div className={styles.sessionPills}>
-        {sessions.map((sessionEntry) => (
+        {sessions.map((sessionEntry: any) => (
           <span
             key={`${sessionEntry.slug}:${sessionEntry.label}`}
             className={`${styles.sessionPill} ${sessionEntry.isActive ? styles.sessionPillActive : ''}`}
@@ -1982,40 +1987,40 @@ export class LoginAndSettingsModal extends Component {
     );
   };
 
-  getPrimarySponsorSession = (sessions = []) => {
+  getPrimarySponsorSession: any = (sessions: any = []) => {
     const list = Array.isArray(sessions) ? sessions : [];
-    return list.find((entry) => entry?.isActive) || list[0] || null;
+    return list.find((entry: any) => entry?.isActive) || list[0] || null;
   };
 
-  formatResourceSponsorHint = ({
+  formatResourceSponsorHint: any = ({
     resourceKey = '',
     resourceLabel = '',
     sponsoredKeys = {},
     sponsorSessions = {},
-  } = {}) => {
+  }: any = {}) => {
     const label = resourceLabel || resourceKey || 'resource';
     const activeHasSponsor = getSponsoredKeyAliases(resourceKey)
-      .some((alias) => !!sponsoredKeys?.[alias]);
+      .some((alias: any) => !!sponsoredKeys?.[alias]);
     const otherSessions = (sponsorSessions?.byResource?.[resourceKey] || [])
-      .filter((entry) => !entry?.isActive);
+      .filter((entry: any) => !entry?.isActive);
     if (activeHasSponsor) {
       if (!otherSessions.length) {
         return `${label} sponsor is configured for the active session.`;
       }
-      return `${label} sponsor is configured for the active session. Other sessions also sponsor ${label}: ${otherSessions.map((entry) => entry.label).join(', ')}.`;
+      return `${label} sponsor is configured for the active session. Other sessions also sponsor ${label}: ${otherSessions.map((entry: any) => entry.label).join(', ')}.`;
     }
     if (otherSessions.length) {
-      return `No active-session ${label} sponsor. Other sessions with ${label}: ${otherSessions.map((entry) => entry.label).join(', ')}. Switch sessions to use one.`;
+      return `No active-session ${label} sponsor. Other sessions with ${label}: ${otherSessions.map((entry: any) => entry.label).join(', ')}. Switch sessions to use one.`;
     }
     return `No active-session ${label} sponsor configured.`;
   };
 
-  renderSupportedResourceCard = (card) => {
+  renderSupportedResourceCard: any = (card: any) => {
     const activeSession = card?.activeSession || this.getSessionDescriptor(this.getActiveSessionSlug());
     const activeSponsorSession = card?.activeSponsorSession || null;
     const extraSessions = Array.isArray(card?.otherSponsorSessions)
       ? card.otherSponsorSessions
-      : (Array.isArray(card?.sessions) ? card.sessions.filter((entry) => !entry?.isActive) : []);
+      : (Array.isArray(card?.sessions) ? card.sessions.filter((entry: any) => !entry?.isActive) : []);
     const extrasExpanded = !!this.state.expandedSponsorResources?.[card.key];
     const extraCount = extraSessions.length;
 
@@ -2070,11 +2075,11 @@ export class LoginAndSettingsModal extends Component {
     );
   };
 
-  renderStaticSettingsSection = ({
+  renderStaticSettingsSection: any = ({
     title = '',
     summary = '',
     children = null,
-  } = {}) => (
+  }: any = {}) => (
     <div className={styles.settingsSectionCard}>
       <div className={styles.settingsSectionToggle}>
         <span className={styles.settingsSectionTitleGroup}>
@@ -2088,12 +2093,12 @@ export class LoginAndSettingsModal extends Component {
     </div>
   );
 
-  renderSettingsOverviewPanel = ({
+  renderSettingsOverviewPanel: any = ({
     overview = this.getSettingsOverviewContext(),
     extraContent = null,
     networkTooltipId = 'networkInfoTooltipPanel',
     showPanelNetwork = !overview.cryptoTerminology,
-  } = {}) => (
+  }: any = {}) => (
     <div className={styles.aiSettingsPanel}>
       {showPanelNetwork ? this.renderPanelNetworkSummary({
         targetNetwork: overview.targetNetwork,
@@ -2110,7 +2115,7 @@ export class LoginAndSettingsModal extends Component {
     </div>
   );
 
-  getSettingsDisplay = () => {
+  getSettingsDisplay: any = () => {
     const overview = this.getSettingsOverviewContext();
     const {
       activeSession,
@@ -2189,7 +2194,7 @@ export class LoginAndSettingsModal extends Component {
       )
       : '';
 
-    const renderSection = ({ key, title, summary, children }) => {
+    const renderSection = ({ key, title, summary, children }: any) => {
       const isOpen = this.isAiSettingsSectionOpen(key);
       return (
         <div className={styles.settingsSectionCard}>
@@ -2297,7 +2302,7 @@ export class LoginAndSettingsModal extends Component {
                         onChange={this.handleAiPresetChange}
                         disabled={!useLocalAi}
                       >
-                        {AI_PRESET_OPTIONS.map((option) => (
+                        {AI_PRESET_OPTIONS.map((option: any) => (
                           <option key={option.key} value={option.key}>{option.label}</option>
                         ))}
                       </select>
@@ -2313,7 +2318,7 @@ export class LoginAndSettingsModal extends Component {
                         type="password"
                         value={useLocalAi ? (providerLocalEntry.apiKey || '') : ''}
                         placeholder={keyPlaceholder}
-                        onChange={(e) => this.updateAiProviderField(localProvider, 'apiKey', e.target.value)}
+                        onChange={(e: any) => this.updateAiProviderField(localProvider, 'apiKey', e.target.value)}
                         disabled={!useLocalAi}
                       />
                       {providerKeyHint ? <div className={styles.aiSettingsHint}>{providerKeyHint}</div> : null}
@@ -2325,12 +2330,12 @@ export class LoginAndSettingsModal extends Component {
                       <div className={styles.aiReasoningControl}>
                         <label className={styles.aiSettingsLabel}>Reasoning effort</label>
                         <div className={styles.aiReasoningButtons}>
-                          {AI_REASONING_LEVELS.map((level) => (
+                          {AI_REASONING_LEVELS.map((level: any) => (
                             <button
                               key={level}
                               type="button"
                               className={`${styles.aiReasoningBtn} ${reasoningEffort === level ? styles.aiReasoningBtnActive : ''}`}
-                              onClick={() => this.updateAiSettings((s) => ({ ...s, reasoningEffort: level }))}
+                              onClick={() => this.updateAiSettings((s: any) => ({ ...s, reasoningEffort: level }))}
                               disabled={!useLocalAi}
                               aria-pressed={reasoningEffort === level}
                             >
@@ -2358,7 +2363,7 @@ export class LoginAndSettingsModal extends Component {
                         </button>
                         {isPerTaskOpen && (
                           <div className={styles.aiSettingsGrid}>
-                            {AI_TASK_REASONING_ROWS.map((row) => (
+                            {AI_TASK_REASONING_ROWS.map((row: any) => (
                               <div key={row.key} className={styles.aiPerTaskRow}>
                                 <div>
                                   <label className={styles.aiSettingsLabel}>{row.label}</label>
@@ -2367,7 +2372,7 @@ export class LoginAndSettingsModal extends Component {
                                 <select
                                   className={styles.aiSettingsSelect}
                                   value={taskReasoningEffort?.[row.key] || ''}
-                                  onChange={(e) => this.updateAiTaskReasoningField(row.key, e.target.value)}
+                                  onChange={(e: any) => this.updateAiTaskReasoningField(row.key, e.target.value)}
                                   disabled={!useLocalAi}
                                 >
                                   <option value="">Global default</option>
@@ -2419,7 +2424,7 @@ export class LoginAndSettingsModal extends Component {
                             className={styles.aiSettingsInput}
                             type="text"
                             value={aiDisplay.models?.fast || ''}
-                            onChange={(e) => this.updateAiModelField('fast', e.target.value)}
+                            onChange={(e: any) => this.updateAiModelField('fast', e.target.value)}
                             disabled={!useLocalAi}
                           />
                         </div>
@@ -2430,7 +2435,7 @@ export class LoginAndSettingsModal extends Component {
                             className={styles.aiSettingsInput}
                             type="text"
                             value={aiDisplay.models?.thinking || ''}
-                            onChange={(e) => this.updateAiModelField('thinking', e.target.value)}
+                            onChange={(e: any) => this.updateAiModelField('thinking', e.target.value)}
                             disabled={!useLocalAi}
                           />
                         </div>
@@ -2443,7 +2448,7 @@ export class LoginAndSettingsModal extends Component {
                                 className={styles.aiSettingsInput}
                                 type="text"
                                 value={aiDisplay.providers?.custom?.rpcUrl || ''}
-                                onChange={(e) => this.updateAiProviderField('custom', 'rpcUrl', e.target.value)}
+                                onChange={(e: any) => this.updateAiProviderField('custom', 'rpcUrl', e.target.value)}
                                 disabled={!useLocalAi}
                               />
                             </div>
@@ -2452,7 +2457,7 @@ export class LoginAndSettingsModal extends Component {
                               <textarea
                                 className={styles.aiSettingsTextarea}
                                 value={aiDisplay.providers?.custom?.functions || ''}
-                                onChange={(e) => this.updateAiProviderField('custom', 'functions', e.target.value)}
+                                onChange={(e: any) => this.updateAiProviderField('custom', 'functions', e.target.value)}
                                 disabled={!useLocalAi}
                               />
                             </div>
@@ -2464,7 +2469,7 @@ export class LoginAndSettingsModal extends Component {
                           <select
                             className={styles.aiSettingsSelect}
                             value={aiDisplay.transcription?.provider || 'openai'}
-                            onChange={(e) => this.updateAiTranscriptionField('provider', e.target.value)}
+                            onChange={(e: any) => this.updateAiTranscriptionField('provider', e.target.value)}
                             disabled={!useLocalAi}
                           >
                             <option value="openai">OpenAI</option>
@@ -2479,7 +2484,7 @@ export class LoginAndSettingsModal extends Component {
                             className={styles.aiSettingsInput}
                             type="text"
                             value={aiDisplay.transcription?.model || ''}
-                            onChange={(e) => this.updateAiTranscriptionField('model', e.target.value)}
+                            onChange={(e: any) => this.updateAiTranscriptionField('model', e.target.value)}
                             disabled={!useLocalAi}
                           />
                         </div>
@@ -2491,7 +2496,7 @@ export class LoginAndSettingsModal extends Component {
                               className={styles.aiSettingsInput}
                               type="text"
                               value={aiDisplay.transcription?.rpcUrl || ''}
-                              onChange={(e) => this.updateAiTranscriptionField('rpcUrl', e.target.value)}
+                              onChange={(e: any) => this.updateAiTranscriptionField('rpcUrl', e.target.value)}
                               disabled={!useLocalAi}
                             />
                           </div>
@@ -2540,7 +2545,7 @@ export class LoginAndSettingsModal extends Component {
                         className={styles.aiSettingsInput}
                         type="password"
                         value={useLocalRpc ? (resourceKeys?.rpc?.apiKey || '') : ''}
-                        onChange={(e) => this.updateResourceKeyField('rpc', 'apiKey', e.target.value)}
+                        onChange={(e: any) => this.updateResourceKeyField('rpc', 'apiKey', e.target.value)}
                         disabled={!useLocalRpc}
                         placeholder={useLocalRpc ? 'Enter RPC API key' : (sponsoredKeys.rpc ? 'Sponsored key configured' : 'No sponsored key set')}
                       />
@@ -2548,7 +2553,7 @@ export class LoginAndSettingsModal extends Component {
                         <input
                           type="checkbox"
                           checked={useLocalRpc}
-                          onChange={(e) => this.handleResourceToggleLocal('rpc', e)}
+                          onChange={(e: any) => this.handleResourceToggleLocal('rpc', e)}
                         />
                         <span>Use local override</span>
                       </label>
@@ -2567,7 +2572,7 @@ export class LoginAndSettingsModal extends Component {
                       <textarea
                         className={styles.aiSettingsTextarea}
                         value={useLocalArweave ? (resourceKeys?.arweave?.jwk || '') : ''}
-                        onChange={(e) => this.updateResourceKeyField('arweave', 'jwk', e.target.value)}
+                        onChange={(e: any) => this.updateResourceKeyField('arweave', 'jwk', e.target.value)}
                         disabled={!useLocalArweave}
                         placeholder={useLocalArweave ? '{ "kty": "...", ... }' : (sponsoredKeys.arweave ? 'Sponsored key configured' : 'No sponsored key set')}
                       />
@@ -2575,7 +2580,7 @@ export class LoginAndSettingsModal extends Component {
                         <input
                           type="checkbox"
                           checked={useLocalArweave}
-                          onChange={(e) => this.handleResourceToggleLocal('arweave', e)}
+                          onChange={(e: any) => this.handleResourceToggleLocal('arweave', e)}
                         />
                         <span>Use local override</span>
                       </label>
@@ -2624,7 +2629,7 @@ export class LoginAndSettingsModal extends Component {
     );
   };
 
-  shouldComponentUpdate(nextProps, nextState) {
+  shouldComponentUpdate(nextProps: any, nextState: any) {
     const wagmiBalanceChanged = !this.areWalletBalanceInputsEqual(
       this.getWagmiBalanceInput(nextProps),
       this.getWagmiBalanceInput(this.props)
@@ -2648,12 +2653,12 @@ export class LoginAndSettingsModal extends Component {
     );
   }
 
-  openLoginModal = () => {
+  openLoginModal: any = () => {
     document.body.classList.add('modal-open');
     this.props.toggleLoginModal(true);
   };
 
-  closeLoginModal = () => {
+  closeLoginModal: any = () => {
     document.body.classList.remove('modal-open');
     this.props.toggleLoginModal(false);
     if (this.state.firstModalAfterLogin === true) {
@@ -2661,7 +2666,7 @@ export class LoginAndSettingsModal extends Component {
     }
   };
 
-  updateStateUponWagmiLogin = async () => {
+  updateStateUponWagmiLogin: any = async () => {
     const wagmiAddr = (this.props.wagmiAddress || '').toLowerCase();
     const reduxAddr = (this.props.account || '').toLowerCase();
     const reduxIsWagmi = this.props.provider === 'wagmi' && this.props.loginComplete === true;
@@ -2697,7 +2702,7 @@ export class LoginAndSettingsModal extends Component {
     }
   };
 
-  openCryptoModal = () => {
+  openCryptoModal: any = () => {
     const { openConnectModal, openAccountModal, wagmiAddress, loginComplete } = this.props;
     try {
       if (wagmiAddress || loginComplete) {
@@ -2711,7 +2716,7 @@ export class LoginAndSettingsModal extends Component {
     }
   };
 
-  renderTooltipsToggleControl = ({ infoId, tooltipPlacement = 'top' }) => {
+  renderTooltipsToggleControl: any = ({ infoId, tooltipPlacement = 'top' }: any) => {
     const tooltipsEnabled = this.props.tooltipsEnabled !== false;
 
     return (
@@ -2749,7 +2754,7 @@ export class LoginAndSettingsModal extends Component {
     );
   };
 
-  renderDemoSurfaceToggleControl = () => {
+  renderDemoSurfaceToggleControl: any = () => {
     const demoSurfaceEnabled = this.props.demoSurfaceMode !== false;
 
     return (
@@ -2766,7 +2771,7 @@ export class LoginAndSettingsModal extends Component {
     );
   };
 
-  getPreLoginSettingsDisplay = () => {
+  getPreLoginSettingsDisplay: any = () => {
     const overview = this.getSettingsOverviewContext();
     const { activeSession, cryptoTerminology } = overview;
 
@@ -2817,14 +2822,14 @@ export class LoginAndSettingsModal extends Component {
     );
   };
 
-  openBookmarks = () => {
+  openBookmarks: any = () => {
     this.closeLoginModal();
     if (typeof window !== 'undefined') {
       window.location.href = '/bookmarks';
     }
   };
 
-  getModalDisplay = () => {
+  getModalDisplay: any = () => {
     const activeChain = this.props.wagmiNetwork || this.props.network || this.getTargetNetwork();
     const showTestnetOnly = !!activeChain?.testnet;
 
@@ -2924,7 +2929,7 @@ export class LoginAndSettingsModal extends Component {
     return <CardBody><p>Please log in.</p></CardBody>;
   }
 
-  getModalTitle = () => {
+  getModalTitle: any = () => {
     if (!this.props.loginComplete && !this.props.loginInProgress) return "LOGIN";
     if (this.props.loginInProgress) return "ACCOUNT";
     if (this.props.loginComplete) return "ACCOUNT";
@@ -2978,9 +2983,9 @@ export class LoginAndSettingsModal extends Component {
   }
 }
 
-LoginAndSettingsModal.displayName = 'LoginAndSettingsModal';
+(LoginAndSettingsModal as any).displayName = 'LoginAndSettingsModal';
 
-LoginAndSettingsModal.propTypes = {
+(LoginAndSettingsModal as any).propTypes = {
   loginModalToggled: PropTypes.bool,
   loginInProgress: PropTypes.bool,
   loginComplete: PropTypes.bool,
@@ -3011,7 +3016,7 @@ LoginAndSettingsModal.propTypes = {
   updateGlobalSessionSelection: PropTypes.func,
 };
 
-LoginAndSettingsModal.defaultProps = {
+(LoginAndSettingsModal as any).defaultProps = {
   setDemoSurfaceMode: () => {},
   toggleTooltips: () => {},
   tooltipsEnabled: true,
@@ -3023,7 +3028,7 @@ LoginAndSettingsModal.defaultProps = {
   selectedSessionSlugs: [],
 };
 
-const mapStateToProps = state => ({
+const mapStateToProps = (state: any) => ({
   provider: state.profile.provider,
   network: state.profile.network,
   account: state.profile.account,
@@ -3041,7 +3046,7 @@ const mapStateToProps = state => ({
 });
 
 const LoginAndSettingsModalWithWagmiHooks = WagmiHooksHOC(LoginAndSettingsModal);
-LoginAndSettingsModalWithWagmiHooks.displayName = 'LoginAndSettingsModal';
+(LoginAndSettingsModalWithWagmiHooks as any).displayName = 'LoginAndSettingsModal';
 
 export default connect(mapStateToProps, {
   changeAccount,
