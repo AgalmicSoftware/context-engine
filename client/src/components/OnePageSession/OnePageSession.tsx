@@ -2561,31 +2561,36 @@ class OnePageSession extends Component<any, any> {
                   ) : (
                     <FontAwesomeIcon icon={faCaretDown} className={styles.sectionToggleIcon} />
                   )}
-                  {renderSectionHeading('Context', 'View')}
-                </span>
-                {this.state.showDocuments && (
-                  <span className={`${styles.sectionHeaderMeta} ${styles.documentsSectionHeaderMeta}`.trim()}>
-                    <div
-                      className={`${styles.tooltip} ${styles.sectionHeaderTooltip}`}
-                      onClick={(e: any) => e.stopPropagation()}
-                    >
-                      <FontAwesomeIcon icon={faQuestionCircle} />
-                      <span className={styles.tooltiptext}>
-                        {documentsSectionTooltip}
-                      </span>
-                    </div>
-                    <a
-                      href={DEMO_CORPUS_GITHUB_URL}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className={styles.sectionHeaderLink}
-                      onClick={(e: any) => e.stopPropagation()}
-                    >
-                      <FontAwesomeIcon icon={faExternalLinkAlt} />
-                      <span>GitHub</span>
-                    </a>
+                  <span className={`${styles.sectionHeaderText} ${styles.documentsSectionHeaderText}`.trim()}>
+                    <span className={styles.documentsSectionHeaderTitleRow}>
+                      <span className={styles.sectionHeaderTitle}>Context</span>
+                      {this.state.showDocuments && (
+                        <span className={`${styles.sectionHeaderMeta} ${styles.documentsSectionHeaderMeta}`.trim()}>
+                          <div
+                            className={`${styles.tooltip} ${styles.sectionHeaderTooltip}`}
+                            onClick={(e: any) => e.stopPropagation()}
+                          >
+                            <FontAwesomeIcon icon={faQuestionCircle} />
+                            <span className={styles.tooltiptext}>
+                              {documentsSectionTooltip}
+                            </span>
+                          </div>
+                          <a
+                            href={DEMO_CORPUS_GITHUB_URL}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={styles.sectionHeaderLink}
+                            onClick={(e: any) => e.stopPropagation()}
+                          >
+                            <FontAwesomeIcon icon={faExternalLinkAlt} />
+                            <span>GitHub</span>
+                          </a>
+                        </span>
+                      )}
+                    </span>
+                    <span className={styles.sectionHeaderSubtitle}>View</span>
                   </span>
-                )}
+                </span>
               </h2>
             </div>
               {this.state.showDocuments && (
