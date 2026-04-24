@@ -3,6 +3,7 @@ import {
   normalizeRatingValue,
   RATING_MIN,
 } from '../../utilities/survey/ratingValue.js';
+import { normalizeQuestionIdKey } from './surveyToolSignatures.js';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -24,7 +25,6 @@ type MultichoiceQuestion = {
 } & UnknownRecord;
 
 const surveyLog = createLogger('surveys');
-const normalizeQuestionIdKey = (value: unknown): string => String(value || '').trim().toLowerCase();
 
 export const toNumberOrNull = (value: unknown): number | null => {
   if (value === undefined || value === null) return null;

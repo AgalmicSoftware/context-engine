@@ -1,3 +1,5 @@
+import { normalizeQuestionIdKey } from './surveyToolSignatures.js';
+
 type UnknownRecord = Record<string, unknown>;
 
 type SurveyDraftField = {
@@ -182,8 +184,6 @@ export const updateSubmittedSinceLastEdit = (prevValue = false, transition = '')
   if (mode === 'user_edit' || mode === 'reset' || mode === 'submit_error') return false;
   return !!prevValue;
 };
-
-const normalizeQuestionIdKey = (value: unknown): string => String(value || '').trim().toLowerCase();
 
 const hasQuestionMapValue = (
   map: Record<string, unknown> | null | undefined = {},

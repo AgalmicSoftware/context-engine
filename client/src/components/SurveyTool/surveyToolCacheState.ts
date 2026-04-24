@@ -3,6 +3,7 @@ import {
   readCache,
   writeCacheOptimistic,
 } from '../../utilities/cache/cacheScripts.js';
+import { normalizeQuestionIdKey } from './surveyToolSignatures.js';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -31,8 +32,6 @@ export type ResponseRecencyMeta = {
 
 const RECENT_QUESTION_PAYLOADS_KEY = 'dg:recentQuestionPayloads';
 const RECENT_QUESTION_PAYLOADS_TTL_MS = 12 * 60 * 60 * 1000;
-const normalizeQuestionIdKey = (value: unknown): string => String(value || '').trim().toLowerCase();
-
 export function readQuestionsCache(slug: string) {
   return peekCacheSync('questionsCache', slug) || {};
 }
