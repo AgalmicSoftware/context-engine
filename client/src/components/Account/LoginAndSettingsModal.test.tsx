@@ -1,5 +1,5 @@
 import { ethers } from 'ethers';
-import { LoginAndSettingsModal } from './LoginAndSettingsModal.jsx';
+import { LoginAndSettingsModal } from './LoginAndSettingsModal';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import * as portoFunctions from '../../utilities/web3/portoFunctions.js';
 import { checkSponsoredAccess } from '../../utilities/web3/sponsoredAccess.js';
