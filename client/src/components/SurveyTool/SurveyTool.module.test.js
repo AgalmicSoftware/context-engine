@@ -35,7 +35,7 @@ import styles from './SurveyTool.module.scss';
 import { renderToStaticMarkup } from 'react-dom/server';
 import fs from 'fs';
 import path from 'path';
-import ConnectedSurveyResults from './SurveyResults.jsx';
+import ConnectedSurveyResults from './SurveyResults';
 import contractScripts, * as contractScriptsModule from '../../utilities/web3/contractScripts.js';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import * as sessionScanScope from '../../utilities/session/sessionScanScope.js';

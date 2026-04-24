@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import ConnectedSurveyResults, {
   countQuestionModeResponses,
   hasAnyCountableSurveyAnswer,
-} from './SurveyResults.jsx';
+} from './SurveyResults';
 import styles from './SurveyResults.module.scss';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import * as contractScriptsModule from '../../utilities/web3/contractScripts.js';
