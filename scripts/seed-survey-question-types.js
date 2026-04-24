@@ -23,7 +23,7 @@ const {
   getPathRpcUrl,
   getPublicRpcUrls,
 } = require('../client/src/variables/rpcDefaults.js');
-const { resolveChainDefaults } = require('./lib/e2e/network-defaults');
+const { resolveChainDefaults } = require('./lib/network-defaults');
 const { resolveSeedPasskeyRawId } = require('./lib/e2e/passkey-env');
 const {
   launchBrowserWithRetry,

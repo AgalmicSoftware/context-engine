@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 
 const { ethers } = require('ethers');
-const { nowHumanTag } = require('./lib/e2e/common');
-const { normalizeRequiredMetadataUri } = require('./lib/e2e/arweave-metadata');
-const { resolveChainDefaults } = require('./lib/e2e/network-defaults');
+const { nowHumanTag } = require('./lib/common');
+const { normalizeRequiredMetadataUri } = require('./lib/arweave-metadata');
+const { resolveChainDefaults } = require('./lib/network-defaults');
 
 const DEFAULT_PASSKEY_RAW_ID_B64URL = 'AQIDBAUGBwgJCgsMDQ4PEA';
 const DEFAULT_GROUP_PASSWORD = 'browserUse';

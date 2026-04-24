@@ -6,7 +6,7 @@ const assert = require('node:assert/strict');
 const {
   parseArweaveTxId,
   normalizeRequiredMetadataUri,
-} = require('../scripts/lib/e2e/arweave-metadata');
+} = require('../scripts/lib/arweave-metadata');
 
 const TX_ID = 'Sng0VG2vetgNPITw5mtvt6om-fBCNu3KI5GZAYeEttY';
 const CANONICAL_ARWEAVE_GATEWAY = 'https://arweave.net'; // intentional: real URL — tests allowlist enforcement
