@@ -1,6 +1,5 @@
 import {
   deserializeFilterState,
-  deserializeFilterStateStrict,
   serializeFilterState,
   type SurveyFilterState,
 } from './filterStateUtils';
