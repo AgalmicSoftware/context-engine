@@ -1,4 +1,4 @@
-/** @file AdminPage.jsx */
+/** @file AdminPage.tsx */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button, Input, Label, FormGroup, FormText } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -64,35 +64,38 @@ import { createLogger } from '../../utilities/logging';
 import { notify } from '../../utilities/ui/notify.js';
 
 const log = createLogger('general');
+const getErrorMessage = (error: any, fallback = 'Unknown error') => (
+  typeof error?.message === 'string' && error.message.trim() ? error.message : fallback
+);
 
-const getChainName = (value) => {
+const getChainName = (value: any) => {
   const id = Number(value || 0);
   if (!id) return '';
   const chain = getChainById(id);
   return toStr(chain?.name).trim();
 };
 
-const normalizeSlug = (raw) => {
+const normalizeSlug = (raw: any) => {
   const slug = _canonicalizeSlug(raw);
   return slug === 'general' ? '' : slug;
 };
 
-const countSessionsForChain = (entries = [], chainId = null) => {
+const countSessionsForChain = (entries: any = [], chainId: any = null) => {
   const list = Array.isArray(entries) ? entries : [];
   if (!chainId) return list.length;
-  return list.filter(([, cfg]) => {
+  return list.filter(([, cfg]: any) => {
     const cfgChainId = Number(cfg?.__registry?.registryChainId || cfg?.__registry?.chainId || 0) || 0;
     return cfgChainId === chainId;
   }).length;
 };
 
-const normalizeWorkerUrl = (url) => normalizeBaseUrl(url);
-const normalizeAiProvider = (raw, fallback = 'openai') => {
+const normalizeWorkerUrl = (url: any) => normalizeBaseUrl(url);
+const normalizeAiProvider = (raw: any, fallback: any = 'openai') => {
   const provider = toStr(raw).trim().toLowerCase();
   if (['openai', 'anthropic', 'openrouter', 'custom'].includes(provider)) return provider;
   return fallback;
 };
-const inferAiProviderFromModel = (modelRaw) => {
+const inferAiProviderFromModel = (modelRaw: any) => {
   const model = toStr(modelRaw).trim().toLowerCase();
   if (!model) return '';
   if (model.startsWith('claude')) return 'anthropic';
@@ -100,19 +103,19 @@ const inferAiProviderFromModel = (modelRaw) => {
   if (model.includes('/')) return 'openrouter';
   return '';
 };
-const buildTxExplorerUrl = (hash, chainId) => {
+const buildTxExplorerUrl = (hash: any, chainId: any) => {
   const base = toStr(getChainById(chainId)?.blockExplorers?.default?.url).trim();
   if (!base || !hash) return '';
   return `${base.replace(/\/+$/, '')}/tx/${hash}`;
 };
-const buildSessionUrl = (slug, { allowGeneral = false } = {}) => {
+const buildSessionUrl = (slug: any, { allowGeneral = false }: any = {}) => {
   const hasExplicitSlug = slug !== undefined && slug !== null;
   const normalized = normalizeSlug(slug);
   const base = typeof window !== 'undefined' && window.location ? window.location.origin : '';
   if (!normalized) return allowGeneral && hasExplicitSlug ? `${base}/session` : '';
   return `${base}/session/${encodeURIComponent(normalized)}`;
 };
-const renderTestResult = (entry) => {
+const renderTestResult = (entry: any) => {
   if (!entry) return 'Not run';
   if (typeof entry === 'string') return entry;
   const label = toStr(entry?.label || entry?.text).trim();
@@ -127,7 +130,7 @@ const renderTestResult = (entry) => {
   return label || 'OK';
 };
 
-const shortAddress = (addr) => {
+const shortAddress = (addr: any) => {
   const s = toStr(addr);
   if (!s) return '';
   return `${s.slice(0, 6)}…${s.slice(-4)}`;
@@ -139,13 +142,13 @@ const getCurrentOrigin = () => {
     return '';
   }
 };
-const buildAdminWorkerCorsMessage = (workerBase, detail = '') => {
+const buildAdminWorkerCorsMessage = (workerBase: any, detail: any = '') => {
   const origin = getCurrentOrigin() || '<current-origin>';
   const worker = toStr(workerBase).trim() || 'session worker';
   const suffix = detail ? ` (${detail})` : '';
   return `Worker request could not reach ${worker}${suffix}. This is usually CORS or worker availability; ensure ${origin} is in that worker session's allowOrigins. If this session still resolves an older worker URL, finish deploy/config sync or edit the worker URL override first.`;
 };
-const normalizeAdminWorkerFetchError = ({ error, workerBase, responseStatus = 0, responseError = '' } = {}) => {
+const normalizeAdminWorkerFetchError = ({ error, workerBase, responseStatus = 0, responseError = '' }: any = {}) => {
   const raw = toStr(error?.message || error).trim();
   const lowered = raw.toLowerCase();
   const detail = toStr(responseError).trim();
@@ -162,28 +165,28 @@ const normalizeAdminWorkerFetchError = ({ error, workerBase, responseStatus = 0,
   return raw || 'Failed to update worker allowOrigins.';
 };
 const ADMIN_ACTION_NONCE_RETRY_ATTEMPTS = 3;
-const isRetryableAdminNonceFailure = ({ responseStatus = 0, responseError = '' } = {}) => {
+const isRetryableAdminNonceFailure = ({ responseStatus = 0, responseError = '' }: any = {}) => {
   const status = Number(responseStatus || 0);
   const detail = toStr(responseError).trim().toLowerCase();
   if (status !== 400 || !detail) return false;
   return detail.includes('nonce mismatch or expired') || detail.includes('nonce already used');
 };
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const sleep = (ms: any) => new Promise((resolve: any) => setTimeout(resolve, ms));
 
-const deepClone = (value) => JSON.parse(JSON.stringify(value || {}));
+const deepClone = (value: any) => JSON.parse(JSON.stringify(value || {}));
 
-const getAdminSessionDisplayUrl = ({ selectedSlug, selectedConfig, groupMetadata } = {}) => {
+const getAdminSessionDisplayUrl = ({ selectedSlug, selectedConfig, groupMetadata }: any = {}) => {
   if (!selectedConfig && !groupMetadata) return '';
   const resolvedSlug = selectedConfig?.slug ?? groupMetadata?.slug ?? selectedSlug;
   return buildSessionUrl(resolvedSlug, { allowGeneral: true });
 };
 
-const collectEncryptedEntries = (metadata) => {
-  const entries = {};
+const collectEncryptedEntries = (metadata: any) => {
+  const entries: Record<string, any> = {};
   if (!metadata || typeof metadata !== 'object') return entries;
   const fields = metadata.encryptedFields;
   if (fields && typeof fields === 'object') {
-    Object.entries(fields).forEach(([key, value]) => {
+    Object.entries(fields).forEach(([key, value]: any) => {
       if (value == null || value === '') return;
       entries[key] = value;
     });
@@ -194,7 +197,7 @@ const collectEncryptedEntries = (metadata) => {
   }
   const aiProviders = metadata.ai?.providers;
   if (aiProviders && typeof aiProviders === 'object') {
-    Object.entries(aiProviders).forEach(([key, cfg]) => {
+    Object.entries(aiProviders).forEach(([key, cfg]: any) => {
       const encrypted = cfg?.encryptedApiKey;
       if (!encrypted) return;
       const path = `ai.providers.${key}.apiKey`;
@@ -203,7 +206,7 @@ const collectEncryptedEntries = (metadata) => {
   }
   const rpcProviders = metadata.rpc?.providers;
   if (rpcProviders && typeof rpcProviders === 'object') {
-    Object.entries(rpcProviders).forEach(([key, cfg]) => {
+    Object.entries(rpcProviders).forEach(([key, cfg]: any) => {
       const encrypted = cfg?.encryptedApiKey;
       if (!encrypted) return;
       const path = `rpc.providers.${key}.apiKey`;
@@ -217,7 +220,7 @@ const collectEncryptedEntries = (metadata) => {
   return entries;
 };
 
-const formatPreviewValue = (value, limit = 180) => {
+const formatPreviewValue = (value: any, limit: any = 180) => {
   const raw = toStr(value);
   if (!raw) return '';
   if (raw.length <= limit) return raw;
@@ -236,10 +239,10 @@ const ADMIN_AI_PROVIDER_OPTIONS = Object.freeze([
   { value: 'custom', label: 'Custom RPC' },
 ]);
 
-const dedupeTrimmedList = (values = []) => {
-  const out = [];
-  const seen = new Set();
-  (Array.isArray(values) ? values : []).forEach((value) => {
+const dedupeTrimmedList = (values: any = []) => {
+  const out: any[] = [];
+  const seen: any = new Set();
+  (Array.isArray(values) ? values : []).forEach((value: any) => {
     const trimmed = toStr(value).trim();
     if (!trimmed) return;
     const lower = trimmed.toLowerCase();
@@ -250,11 +253,11 @@ const dedupeTrimmedList = (values = []) => {
   return out;
 };
 
-const formatDelimitedDraftList = (value) => (
+const formatDelimitedDraftList = (value: any) => (
   Array.isArray(value) ? dedupeTrimmedList(value).join('\n') : ''
 );
 
-const parseDelimitedDraftList = (raw) => {
+const parseDelimitedDraftList = (raw: any) => {
   if (Array.isArray(raw)) return dedupeTrimmedList(raw);
   const trimmed = toStr(raw).trim();
   if (!trimmed) return [];
@@ -267,21 +270,21 @@ const parseDelimitedDraftList = (raw) => {
   return dedupeTrimmedList(trimmed.split(/[\n,]+/));
 };
 
-const splitAllowOriginsInput = (value) => {
+const splitAllowOriginsInput = (value: any): any[] => {
   if (Array.isArray(value)) {
-    return value.flatMap((entry) => splitAllowOriginsInput(entry));
+    return value.flatMap((entry: any) => splitAllowOriginsInput(entry));
   }
   return toStr(value)
     .split(/[\n,]+/)
-    .map((entry) => entry.trim())
+    .map((entry: any) => entry.trim())
     .filter(Boolean);
 };
 
-const parseAllowOriginsDraft = (raw) => normalizeOriginList(splitAllowOriginsInput(raw));
+const parseAllowOriginsDraft = (raw: any) => normalizeOriginList(splitAllowOriginsInput(raw));
 
-const formatAllowOriginsDraft = (value) => parseAllowOriginsDraft(value).join('\n');
+const formatAllowOriginsDraft = (value: any) => parseAllowOriginsDraft(value).join('\n');
 
-const formatDefaultFilterStateDraft = (value) => {
+const formatDefaultFilterStateDraft = (value: any) => {
   if (value == null || value === '') return '';
   if (typeof value === 'string') return value;
   try {
@@ -291,7 +294,7 @@ const formatDefaultFilterStateDraft = (value) => {
   }
 };
 
-const parseDefaultFilterStateDraft = (raw) => {
+const parseDefaultFilterStateDraft = (raw: any) => {
   const trimmed = toStr(raw).trim();
   if (!trimmed) return null;
   if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
@@ -304,7 +307,7 @@ const parseDefaultFilterStateDraft = (raw) => {
   return trimmed;
 };
 
-const buildUserPageUrl = (address) => {
+const buildUserPageUrl = (address: any) => {
   const trimmed = toStr(address).trim();
   if (!trimmed) return '';
   return `/u/${encodeURIComponent(trimmed)}`;
@@ -316,11 +319,11 @@ const ADMIN_EDITABLE_CONTRACT_FIELDS = Object.freeze([
   { contractKey: 'sessionRegistry', draftKey: 'contractSessionRegistryAddress', label: 'SessionRegistry contract' },
 ]);
 
-const ADMIN_EDITABLE_CONTRACT_KEY_SET = new Set(
-  ADMIN_EDITABLE_CONTRACT_FIELDS.map(({ contractKey }) => contractKey)
+const ADMIN_EDITABLE_CONTRACT_KEY_SET: any = new Set(
+  ADMIN_EDITABLE_CONTRACT_FIELDS.map(({ contractKey }: any) => contractKey)
 );
 
-const getAdminContractChainIdFallback = (metadata = {}, contractKey = '') => {
+const getAdminContractChainIdFallback = (metadata: any = {}, contractKey: any = '') => {
   const existingChainId = Number(metadata?.contracts?.[contractKey]?.chainId || 0) || 0;
   if (existingChainId) return existingChainId;
   if (contractKey === 'sessionRegistry') {
@@ -340,7 +343,7 @@ const getAdminContractChainIdFallback = (metadata = {}, contractKey = '') => {
   ) || 0;
 };
 
-const normalizeAdminContractAddress = (raw, label) => {
+const normalizeAdminContractAddress = (raw: any, label: any) => {
   const trimmed = toStr(raw).trim();
   if (!trimmed) return '';
   try {
@@ -350,7 +353,7 @@ const normalizeAdminContractAddress = (raw, label) => {
   }
 };
 
-const buildAdminMetadataDraft = (metadata = {}) => {
+const buildAdminMetadataDraft = (metadata: any = {}) => {
   const fastModel = toStr(
     metadata?.ai?.models?.fast?.model ||
     metadata?.ai?.model ||
@@ -408,14 +411,14 @@ const buildAdminMetadataDraft = (metadata = {}) => {
   };
 };
 
-const applyAdminMetadataDraft = (metadata = {}, draft = {}) => {
+const applyAdminMetadataDraft = (metadata: any = {}, draft: any = {}) => {
   const next = deepClone(metadata && typeof metadata === 'object' ? metadata : {});
 
   next.defaultTags = toStr(draft.defaultTags).trim();
   next.questionsGenPrompt = toStr(draft.questionsGenPrompt).trim();
   next.defaultSbtTags = toStr(draft.defaultSbtTags).trim();
   next.defaultFilterState = parseDefaultFilterStateDraft(draft.defaultFilterState);
-  next.defaultFeaturedSBTs = dedupeSbtSelections(draft.defaultFeaturedSBTs || []).map((entry) => entry.address);
+  next.defaultFeaturedSBTs = dedupeSbtSelections(draft.defaultFeaturedSBTs || []).map((entry: any) => entry.address);
   next.HIGHLIGHTED_QUESTION_IDS = parseDelimitedDraftList(draft.highlightedQuestionIds);
   next.BLOCKED_QUESTION_IDS = parseDelimitedDraftList(draft.blockedQuestionIds);
   next.HIGHLIGHTED_SURVEY_IDS = parseDelimitedDraftList(draft.highlightedSurveyIds);
@@ -426,7 +429,7 @@ const applyAdminMetadataDraft = (metadata = {}, draft = {}) => {
   const existingContracts = next.contracts && typeof next.contracts === 'object'
     ? { ...next.contracts }
     : {};
-  ADMIN_EDITABLE_CONTRACT_FIELDS.forEach(({ contractKey, draftKey, label }) => {
+  ADMIN_EDITABLE_CONTRACT_FIELDS.forEach(({ contractKey, draftKey, label }: any) => {
     const normalizedAddress = normalizeAdminContractAddress(draft[draftKey], label);
     if (!normalizedAddress) return;
     const existingEntry = existingContracts[contractKey] && typeof existingContracts[contractKey] === 'object'
@@ -489,14 +492,14 @@ const applyAdminMetadataDraft = (metadata = {}, draft = {}) => {
   return next;
 };
 
-const parseResourceDisplayAmount = (display) => {
+const parseResourceDisplayAmount = (display: any) => {
   const match = toStr(display).trim().match(/^([0-9]+(?:\.[0-9]+)?)\s+(AR|ETH)$/i);
   if (!match) return null;
   const amount = Number(match[1]);
   return Number.isFinite(amount) ? amount : null;
 };
 
-const shouldShowInlineResourceSummary = (resource = {}) => {
+const shouldShowInlineResourceSummary = (resource: any = {}) => {
   if (resource?.manualRefreshAvailable === true) return true;
   const display = toStr(resource?.display).trim();
   if (!display) return false;
@@ -506,10 +509,10 @@ const shouldShowInlineResourceSummary = (resource = {}) => {
   return amount != null && amount > 0;
 };
 
-const normalizeSbtSelection = (value) => {
+const normalizeSbtSelection = (value: any) => {
   if (Array.isArray(value)) {
     return value
-      .map((entry) => {
+      .map((entry: any) => {
         if (!entry) return null;
         if (typeof entry === 'string') {
           const address = entry.trim();
@@ -528,17 +531,17 @@ const normalizeSbtSelection = (value) => {
   if (typeof value === 'string' && value.trim()) {
     return value
       .split(/[\n,]+/)
-      .map((addr) => addr.trim())
+      .map((addr: any) => addr.trim())
       .filter(Boolean)
-      .map((addr) => ({ address: addr, name: addr }));
+      .map((addr: any) => ({ address: addr, name: addr }));
   }
   return [];
 };
 
-const dedupeSbtSelections = (value) => {
-  const out = [];
-  const seen = new Set();
-  normalizeSbtSelection(value).forEach((entry) => {
+const dedupeSbtSelections = (value: any) => {
+  const out: any[] = [];
+  const seen: any = new Set();
+  normalizeSbtSelection(value).forEach((entry: any) => {
     if (!ethers.utils.isAddress(entry.address)) return;
     const checksum = ethers.utils.getAddress(entry.address);
     const lower = checksum.toLowerCase();
@@ -549,34 +552,34 @@ const dedupeSbtSelections = (value) => {
   return out;
 };
 
-const normalizeGateMode = (raw) => {
+const normalizeGateMode = (raw: any) => {
   const mode = toStr(raw).trim().toLowerCase();
   if (mode === 'all' || mode === 'and') return 'all';
   return 'any';
 };
 
-const parseChainIdInput = (raw) => {
+const parseChainIdInput = (raw: any) => {
   const matches = toStr(raw).match(/\d+/g);
   if (!matches || !matches.length) return 0;
   return Number(matches[matches.length - 1]) || 0;
 };
-const normalizeRpcUrlList = (value) => {
+const normalizeRpcUrlList = (value: any) => {
   if (Array.isArray(value)) {
-    return value.map((entry) => toStr(entry).trim()).filter(Boolean);
+    return value.map((entry: any) => toStr(entry).trim()).filter(Boolean);
   }
   const trimmed = toStr(value).trim();
   return trimmed ? [trimmed] : [];
 };
-const sanitizeRpcUrlMap = (value) => {
+const sanitizeRpcUrlMap = (value: any) => {
   if (!value || typeof value !== 'object') return {};
-  const out = {};
-  Object.entries(value).forEach(([chainKey, urls]) => {
+  const out: Record<string, any> = {};
+  Object.entries(value).forEach(([chainKey, urls]: any) => {
     const normalized = normalizeRpcUrlList(urls);
     if (normalized.length) out[String(chainKey)] = normalized;
   });
   return out;
 };
-const pickFirstNonEmptyRpcUrlMap = (...candidates) => candidates.reduce((found, candidate) => {
+const pickFirstNonEmptyRpcUrlMap = (...candidates: any[]) => candidates.reduce((found: any, candidate: any) => {
   if (found && Object.keys(found).length > 0) return found;
   const sanitized = sanitizeRpcUrlMap(candidate);
   return Object.keys(sanitized).length > 0 ? sanitized : found;
@@ -584,7 +587,7 @@ const pickFirstNonEmptyRpcUrlMap = (...candidates) => candidates.reduce((found, 
 const getSessionReadRpcConfig = ({
   sessionConfig,
   fallbackChainId,
-} = {}) => {
+}: any = {}) => {
   const cfg = sessionConfig && typeof sessionConfig === 'object' ? sessionConfig : {};
   const rpcRoot = cfg.rpc && typeof cfg.rpc === 'object' ? cfg.rpc : {};
   const rpcProviders = rpcRoot.providers && typeof rpcRoot.providers === 'object' ? rpcRoot.providers : {};
@@ -625,8 +628,8 @@ const buildWorkerSessionConfigPayload = ({
   sessionConfig,
   account,
   fallbackChainId,
-} = {}) => {
-  const normalizeContractEntry = (entry, chainIdFallback) => {
+}: any = {}) => {
+  const normalizeContractEntry = (entry: any, chainIdFallback: any) => {
     if (!entry || typeof entry !== 'object') return null;
     const address = toStr(entry.address || entry.contractAddress || '').trim();
     const chainId = Number(entry.chainId || entry.networkChainId || chainIdFallback || 0) || 0;
@@ -673,16 +676,16 @@ const buildWorkerSessionConfigPayload = ({
   }
   const allowOriginsRaw = cfg.allowOrigins;
   const allowOrigins = Array.isArray(allowOriginsRaw)
-    ? allowOriginsRaw.map((entry) => toStr(entry).trim()).filter(Boolean)
+    ? allowOriginsRaw.map((entry: any) => toStr(entry).trim()).filter(Boolean)
     : toStr(allowOriginsRaw)
       .split(/[\n,]+/)
-      .map((entry) => entry.trim())
+      .map((entry: any) => entry.trim())
       .filter(Boolean);
   const limits = cfg.limits && typeof cfg.limits === 'object' ? cfg.limits : {};
   const scopes = cfg.scopes && typeof cfg.scopes === 'object' ? cfg.scopes : {};
   const faucetCfg = cfg.faucet && typeof cfg.faucet === 'object' ? cfg.faucet : {};
 
-  const out = {
+  const out: any = {
     adminAddress: toStr(registry.adminAddress || cfg.adminAddress || account).trim(),
   };
   const slug = normalizeSlug(cfg.slug || '');
@@ -713,15 +716,15 @@ const buildWorkerSessionConfigPayload = ({
   if (blockLimits) out.blockLimits = blockLimits;
 
   const contractsObj = cfg.contracts && typeof cfg.contracts === 'object' ? cfg.contracts : {};
-  const normalizedContracts = {};
-  Object.entries(contractsObj).forEach(([key, value]) => {
+  const normalizedContracts: Record<string, any> = {};
+  Object.entries(contractsObj).forEach(([key, value]: any) => {
     const normalized = normalizeContractEntry(value, cfg.networkChainId || fallbackChainId);
     if (!normalized) return;
     normalizedContracts[key] = normalized;
   });
   if (Object.keys(normalizedContracts).length) out.contracts = normalizedContracts;
 
-  const faucet = {};
+  const faucet: Record<string, any> = {};
   const faucetRpcUrl = normalizeRpcUrlList(faucetCfg.rpcUrl)[0] || resolvedRpcUrl;
   const faucetAmountEth = toStr(faucetCfg.amountEth).trim();
   const faucetBalanceThresholdEth = toStr(faucetCfg.balanceThresholdEth).trim();
@@ -733,7 +736,7 @@ const buildWorkerSessionConfigPayload = ({
   return out;
 };
 
-const resolveAutoFeatureBySessionSlug = (metadata) => (
+const resolveAutoFeatureBySessionSlug = (metadata: any) => (
   metadata?.autoFeatureSBTsBySessionSlug !== undefined
     ? metadata.autoFeatureSBTsBySessionSlug
     : metadata?.autoFeatureSBTsWithFeaturedSbtTags
@@ -747,7 +750,7 @@ const buildEditableSessionMetadataPayload = ({
   autoFeatureSBTsWithFeaturedSbtTags,
   hasAutoFeatureOverride = false,
   advancedDraft = null,
-} = {}) => {
+}: any = {}) => {
   const metadata = deepClone(sessionConfig && typeof sessionConfig === 'object' ? sessionConfig : {});
   delete metadata.__registry;
   delete metadata.sponsoredKeys;
@@ -784,14 +787,14 @@ const buildEditableSessionMetadataPayload = ({
   }
   return sanitized;
 };
-const addSessionConfigHint = (message) => {
+const addSessionConfigHint = (message: any) => {
   const raw = toStr(message).trim();
   if (!raw) return 'Worker session config is missing. Run the AI test again as admin to seed it, or re-deploy for this slug.';
   if (!raw.toLowerCase().includes('session config not found')) return raw;
   return `${raw} Re-run this test while connected as the admin wallet to seed worker config, then verify the worker URL and selected session slug match.`;
 };
 
-const shouldSeedWorkerConfigFromError = (message) => {
+const shouldSeedWorkerConfigFromError = (message: any) => {
   const raw = toStr(message).toLowerCase();
   if (!raw) return false;
   if (raw.includes('session config not found')) return true;
@@ -802,7 +805,7 @@ const buildHealthAuthMismatchState = ({
   unauthStatus,
   unauthError = '',
   authError = '',
-} = {}) => {
+}: any = {}) => {
   const status = Number(unauthStatus || 0) || 0;
   const authMsg = toStr(authError).toLowerCase();
   const unsupportedAuthRoute = (
@@ -832,17 +835,17 @@ export const __adminPageTestUtils = {
   getSessionReadRpcConfig,
 };
 
-const resolveDefaultGateFromConfig = (cfg = {}) => {
+const resolveDefaultGateFromConfig = (cfg: any = {}) => {
   const sponsored = cfg?.sponsored && typeof cfg.sponsored === 'object' ? cfg.sponsored : {};
   const gates = sponsored.gates && typeof sponsored.gates === 'object' ? sponsored.gates : {};
   const defaultGateId = toStr(sponsored.defaultGateId || sponsored.defaultGate).trim();
   const gate = defaultGateId ? gates[defaultGateId] : null;
-  const rawAddresses = [];
+  const rawAddresses: any[] = [];
   if (Array.isArray(gate?.sbtAddresses)) rawAddresses.push(...gate.sbtAddresses);
   if (gate?.sbtAddress) rawAddresses.push(gate.sbtAddress);
   if (!rawAddresses.length && Array.isArray(sponsored?.sbtAddresses)) rawAddresses.push(...sponsored.sbtAddresses);
   if (!rawAddresses.length && sponsored?.sbtAddress) rawAddresses.push(sponsored.sbtAddress);
-  const sbtAddresses = dedupeSbtSelections(rawAddresses).map((entry) => entry.address);
+  const sbtAddresses = dedupeSbtSelections(rawAddresses).map((entry: any) => entry.address);
   const chainId = Number(
     gate?.chainId ||
     sponsored?.chainId ||
@@ -867,76 +870,76 @@ const AdminPage = ({
   ensureLightSbtUniverse,
   initialSessionId,
   initialRegistryChainId,
-}) => {
-  const [sessions, setSessions] = useState([]);
-  const [selectedSlug, setSelectedSlug] = useState('');
-  const [ignoreRequestedSession, setIgnoreRequestedSession] = useState(false);
-  const [workerUrl, setWorkerUrl] = useState('');
-  const [workerUrlEditable, setWorkerUrlEditable] = useState(false);
-  const [workerStatus, setWorkerStatus] = useState('');
-  const [workerDebug, setWorkerDebug] = useState('');
-  const [corsPatchStatus, setCorsPatchStatus] = useState('');
-  const [corsPatchBusy, setCorsPatchBusy] = useState(false);
-  const [allowOriginsDraft, setAllowOriginsDraft] = useState('');
-  const [allowOriginsDraftDirty, setAllowOriginsDraftDirty] = useState(false);
-  const [showAllowlistEditor, setShowAllowlistEditor] = useState(false);
-  const [saveStatus, setSaveStatus] = useState('');
-  const [chainStatus, setChainStatus] = useState('');
-  const [testStatus, setTestStatus] = useState('');
-  const [testResults, setTestResults] = useState({
+}: any) => {
+  const [sessions, setSessions] = useState<any>([]);
+  const [selectedSlug, setSelectedSlug] = useState<any>('');
+  const [ignoreRequestedSession, setIgnoreRequestedSession] = useState<any>(false);
+  const [workerUrl, setWorkerUrl] = useState<any>('');
+  const [workerUrlEditable, setWorkerUrlEditable] = useState<any>(false);
+  const [workerStatus, setWorkerStatus] = useState<any>('');
+  const [workerDebug, setWorkerDebug] = useState<any>('');
+  const [corsPatchStatus, setCorsPatchStatus] = useState<any>('');
+  const [corsPatchBusy, setCorsPatchBusy] = useState<any>(false);
+  const [allowOriginsDraft, setAllowOriginsDraft] = useState<any>('');
+  const [allowOriginsDraftDirty, setAllowOriginsDraftDirty] = useState<any>(false);
+  const [showAllowlistEditor, setShowAllowlistEditor] = useState<any>(false);
+  const [saveStatus, setSaveStatus] = useState<any>('');
+  const [chainStatus, setChainStatus] = useState<any>('');
+  const [testStatus, setTestStatus] = useState<any>('');
+  const [testResults, setTestResults] = useState<any>({
     health: '',
     ai: '',
     arweave: '',
     faucet: '',
     transcribe: '',
   });
-  const [testBusy, setTestBusy] = useState(false);
-  const [litTestValue, setLitTestValue] = useState('lit-test');
-  const [litTestEnvelope, setLitTestEnvelope] = useState('');
-  const [litTestDecrypted, setLitTestDecrypted] = useState('');
-  const [litTestStatus, setLitTestStatus] = useState('');
-  const [litTestBusy, setLitTestBusy] = useState(false);
-  const [deniedStatus, setDeniedStatus] = useState('');
-  const [deniedResults, setDeniedResults] = useState({
+  const [testBusy, setTestBusy] = useState<any>(false);
+  const [litTestValue, setLitTestValue] = useState<any>('lit-test');
+  const [litTestEnvelope, setLitTestEnvelope] = useState<any>('');
+  const [litTestDecrypted, setLitTestDecrypted] = useState<any>('');
+  const [litTestStatus, setLitTestStatus] = useState<any>('');
+  const [litTestBusy, setLitTestBusy] = useState<any>(false);
+  const [deniedStatus, setDeniedStatus] = useState<any>('');
+  const [deniedResults, setDeniedResults] = useState<any>({
     login: '',
     ai: '',
     arweave: '',
     transcribe: '',
     faucet: '',
   });
-  const [deniedBusy, setDeniedBusy] = useState(false);
-  const [transcribeText, setTranscribeText] = useState('');
-  const [openSection, setOpenSection] = useState('');
-  const [showTestsPanel, setShowTestsPanel] = useState(false);
-  const [encryptedFields, setEncryptedFields] = useState({});
-  const [decryptedFields, setDecryptedFields] = useState({});
-  const [sessionLookupStatus, setSessionLookupStatus] = useState('');
-  const [sessionsRefreshStatus, setSessionsRefreshStatus] = useState('');
-  const [sessionsRefreshBusy, setSessionsRefreshBusy] = useState(false);
-  const [defaultGateTouched, setDefaultGateTouched] = useState(false);
-  const [gateConfigDirty, setGateConfigDirty] = useState(false);
-  const [metadataBlockLimitsDraft, setMetadataBlockLimitsDraft] = useState({ start: '', end: '' });
-  const [metadataDraftTouched, setMetadataDraftTouched] = useState(false);
-  const [metadataAutoFeatureDraft, setMetadataAutoFeatureDraft] = useState(true);
-  const [metadataAutoFeatureTouched, setMetadataAutoFeatureTouched] = useState(false);
-  const [metadataConfigDraft, setMetadataConfigDraft] = useState(() => buildAdminMetadataDraft({}));
-  const [metadataContractDraftTouched, setMetadataContractDraftTouched] = useState(false);
-  const [metadataContractsVerified, setMetadataContractsVerified] = useState(false);
-  const [metadataLatestBlock, setMetadataLatestBlock] = useState(null);
-  const [metadataLatestBlockStatus, setMetadataLatestBlockStatus] = useState('');
-  const [metadataUpdateBusy, setMetadataUpdateBusy] = useState(false);
-  const [metadataUpdateStatus, setMetadataUpdateStatus] = useState('');
-  const [copiedRawMetadataJson, setCopiedRawMetadataJson] = useState(false);
-  const [heroHeaderImageReady, setHeroHeaderImageReady] = useState(false);
-  const [defaultGateDraft, setDefaultGateDraft] = useState({
+  const [deniedBusy, setDeniedBusy] = useState<any>(false);
+  const [transcribeText, setTranscribeText] = useState<any>('');
+  const [openSection, setOpenSection] = useState<any>('');
+  const [showTestsPanel, setShowTestsPanel] = useState<any>(false);
+  const [encryptedFields, setEncryptedFields] = useState<any>({});
+  const [decryptedFields, setDecryptedFields] = useState<any>({});
+  const [sessionLookupStatus, setSessionLookupStatus] = useState<any>('');
+  const [sessionsRefreshStatus, setSessionsRefreshStatus] = useState<any>('');
+  const [sessionsRefreshBusy, setSessionsRefreshBusy] = useState<any>(false);
+  const [defaultGateTouched, setDefaultGateTouched] = useState<any>(false);
+  const [gateConfigDirty, setGateConfigDirty] = useState<any>(false);
+  const [metadataBlockLimitsDraft, setMetadataBlockLimitsDraft] = useState<any>({ start: '', end: '' });
+  const [metadataDraftTouched, setMetadataDraftTouched] = useState<any>(false);
+  const [metadataAutoFeatureDraft, setMetadataAutoFeatureDraft] = useState<any>(true);
+  const [metadataAutoFeatureTouched, setMetadataAutoFeatureTouched] = useState<any>(false);
+  const [metadataConfigDraft, setMetadataConfigDraft] = useState<any>(() => buildAdminMetadataDraft({}));
+  const [metadataContractDraftTouched, setMetadataContractDraftTouched] = useState<any>(false);
+  const [metadataContractsVerified, setMetadataContractsVerified] = useState<any>(false);
+  const [metadataLatestBlock, setMetadataLatestBlock] = useState<any>(null);
+  const [metadataLatestBlockStatus, setMetadataLatestBlockStatus] = useState<any>('');
+  const [metadataUpdateBusy, setMetadataUpdateBusy] = useState<any>(false);
+  const [metadataUpdateStatus, setMetadataUpdateStatus] = useState<any>('');
+  const [copiedRawMetadataJson, setCopiedRawMetadataJson] = useState<any>(false);
+  const [heroHeaderImageReady, setHeroHeaderImageReady] = useState<any>(false);
+  const [defaultGateDraft, setDefaultGateDraft] = useState<any>({
     sbts: [],
     mode: 'any',
     chainId: '',
   });
-  const [gateSyncStatus, setGateSyncStatus] = useState('');
-  const [gateSyncResult, setGateSyncResult] = useState(null);
-  const [gateSyncBusy, setGateSyncBusy] = useState(false);
-  const [secrets, setSecrets] = useState({
+  const [gateSyncStatus, setGateSyncStatus] = useState<any>('');
+  const [gateSyncResult, setGateSyncResult] = useState<any>(null);
+  const [gateSyncBusy, setGateSyncBusy] = useState<any>(false);
+  const [secrets, setSecrets] = useState<any>({
     openaiKey: '',
     anthropicKey: '',
     openrouterKey: '',
@@ -946,71 +949,71 @@ const AdminPage = ({
     faucetPrivateKey: '',
     litPayerPrivateKey: '',
   });
-  const [workerSecretsDirty, setWorkerSecretsDirty] = useState(false);
-  const [clearedSecretKeys, setClearedSecretKeys] = useState(() => new Set());
-  const [openSecretCards, setOpenSecretCards] = useState({ ai: false, rpc: false, arweave: false, faucet: false, lit: false });
-  const [arweaveResource, setArweaveResource] = useState({
+  const [workerSecretsDirty, setWorkerSecretsDirty] = useState<any>(false);
+  const [clearedSecretKeys, setClearedSecretKeys] = useState<any>(() => new Set());
+  const [openSecretCards, setOpenSecretCards] = useState<any>({ ai: false, rpc: false, arweave: false, faucet: false, lit: false });
+  const [arweaveResource, setArweaveResource] = useState<any>({
     address: '',
     display: 'No JWK entered',
     meta: 'Enter a JWK above to read the public wallet balance.',
     loading: false,
   });
-  const [faucetResource, setFaucetResource] = useState({
+  const [faucetResource, setFaucetResource] = useState<any>({
     address: '',
     display: 'No faucet key entered',
     meta: 'Enter a faucet private key above to read the wallet balance.',
     loading: false,
   });
-  const [litResource, setLitResource] = useState({
+  const [litResource, setLitResource] = useState<any>({
     address: '',
     display: 'No Lit payer key entered',
     meta: 'Enter a Lit payer private key above or save one to the worker, then refresh status.',
     loading: false,
     manualRefreshAvailable: false,
   });
-  const arweaveResourceRequestRef = useRef(0);
-  const faucetResourceRequestRef = useRef(0);
-  const litResourceRequestRef = useRef(0);
-  const rawMetadataCopyResetRef = useRef(null);
-  const prevSelectedSlugForDraftRef = useRef(selectedSlug);
-  const prevSelectedSlugForAllowOriginsDraftRef = useRef(selectedSlug);
+  const arweaveResourceRequestRef = useRef<any>(0);
+  const faucetResourceRequestRef = useRef<any>(0);
+  const litResourceRequestRef = useRef<any>(0);
+  const rawMetadataCopyResetRef = useRef<any>(null);
+  const prevSelectedSlugForDraftRef = useRef<any>(selectedSlug);
+  const prevSelectedSlugForAllowOriginsDraftRef = useRef<any>(selectedSlug);
 
-  const handleSecretChange = useCallback((key, value) => {
-    setSecrets((prev) => ({ ...prev, [key]: value }));
+  const handleSecretChange = useCallback((key: any, value: any) => {
+    setSecrets((prev: any) => ({ ...prev, [key]: value }));
     setWorkerSecretsDirty(true);
-    setClearedSecretKeys((prev) => {
+    setClearedSecretKeys((prev: any) => {
       if (!prev.has(key)) return prev;
-      const next = new Set(prev);
+      const next: any = new Set(prev);
       next.delete(key);
       return next;
     });
   }, []);
 
-  const handleClearSecret = useCallback((key) => {
-    setSecrets((prev) => ({ ...prev, [key]: '' }));
+  const handleClearSecret = useCallback((key: any) => {
+    setSecrets((prev: any) => ({ ...prev, [key]: '' }));
     setWorkerSecretsDirty(true);
-    setClearedSecretKeys((prev) => {
-      const next = new Set(prev);
+    setClearedSecretKeys((prev: any) => {
+      const next: any = new Set(prev);
       next.add(key);
       return next;
     });
   }, []);
 
-  const updateMetadataConfigDraft = useCallback((key, value) => {
+  const updateMetadataConfigDraft = useCallback((key: any, value: any) => {
     setMetadataDraftTouched(true);
     if (key === 'contractSurveysAddress' || key === 'contractSbtFactoryAddress' || key === 'contractSessionRegistryAddress') {
       setMetadataContractDraftTouched(true);
       setMetadataContractsVerified(false);
     }
-    setMetadataConfigDraft((prev) => ({ ...prev, [key]: value }));
+    setMetadataConfigDraft((prev: any) => ({ ...prev, [key]: value }));
   }, []);
 
   const requestedSessionRaw = toStr(initialSessionId).trim();
   const requestedSessionIdHex = sessionRegistryUtils.normalizeSessionIdHex(requestedSessionRaw);
   const requestedSessionSlug = requestedSessionIdHex ? '' : normalizeSlug(requestedSessionRaw);
   const requestedChainId = parseChainIdInput(initialRegistryChainId) || null;
-  const requestedFetchKeyRef = useRef('');
-  const requestedAutoRefreshKeyRef = useRef('');
+  const requestedFetchKeyRef = useRef<any>('');
+  const requestedAutoRefreshKeyRef = useRef<any>('');
   // Avoid any automatic wallet RPC calls in /admin (some wallets show connect popups even for
   // "read-only" methods). Treat wallet as "ready" only if the app believes login is complete.
   const walletReady = !!account && (loginComplete !== false);
@@ -1026,12 +1029,12 @@ const AdminPage = ({
     return nextSessions;
   }, []);
 
-  const loadSessions = useCallback(async ({ forceOnChain } = {}) => {
+  const loadSessions = useCallback(async ({ forceOnChain }: any = {}) => {
     const cached = syncSessionsFromRegistryCache();
 
     const chainIds = requestedChainId ? [requestedChainId] : undefined;
     const shouldForceRegistryRead = !USE_ONCHAIN_SESSION_REGISTRY || !!forceOnChain;
-    const runRegistryLoad = async (bootstrapRpc) => {
+    const runRegistryLoad = async (bootstrapRpc: any) => {
       try {
         return await loadSessionRegistryCache({
           ...(chainIds ? { chainIds } : {}),
@@ -1047,7 +1050,7 @@ const AdminPage = ({
       }
     };
 
-    const primaryResult = await runRegistryLoad(true);
+    const primaryResult: any = await runRegistryLoad(true);
     let refreshed = syncSessionsFromRegistryCache();
     const primaryCount = countSessionsForChain(refreshed, requestedChainId);
     const primaryLoadHadErrors = (
@@ -1071,7 +1074,7 @@ const AdminPage = ({
       requestedFetchKeyRef.current = '';
       await loadSessions({ forceOnChain: true });
       if (!ignoreRequestedSession && requestedSessionRaw && requestedChainId) {
-        const config = await fetchSessionFromRegistry({
+        const config: any = await fetchSessionFromRegistry({
           chainId: requestedChainId,
           sessionId: requestedSessionIdHex || '',
           slug: requestedSessionSlug || '',
@@ -1089,8 +1092,8 @@ const AdminPage = ({
         }
       }
       setSessionsRefreshStatus('Session list updated.');
-    } catch (err) {
-      setSessionsRefreshStatus(err?.message || 'Failed to refresh sessions.');
+    } catch (err: any) {
+      setSessionsRefreshStatus(getErrorMessage(err, 'Failed to refresh sessions.'));
     } finally {
       setSessionsRefreshBusy(false);
     }
@@ -1120,7 +1123,7 @@ const AdminPage = ({
 
   const sessionsForChain = useMemo(() => {
     if (!requestedChainId) return sessions || [];
-    return (sessions || []).filter(([, cfg]) => {
+    return (sessions || []).filter(([, cfg]: any) => {
       const chainId = Number(cfg?.__registry?.registryChainId || cfg?.__registry?.chainId || 0) || 0;
       return chainId === requestedChainId;
     });
@@ -1130,12 +1133,12 @@ const AdminPage = ({
   const requestedSessionMatch = useMemo(() => {
     if (!requestedSessionRaw) return null;
     if (requestedSessionIdHex) {
-      return availableSessions.find(([, cfg]) => {
+      return availableSessions.find(([, cfg]: any) => {
         const cfgId = sessionRegistryUtils.normalizeSessionIdHex(cfg?.__registry?.sessionIdHex || cfg?.sessionId);
         return cfgId && cfgId === requestedSessionIdHex;
       }) || null;
     }
-    return availableSessions.find(([slug]) => slug === requestedSessionSlug) || null;
+    return availableSessions.find(([slug]: any) => slug === requestedSessionSlug) || null;
   }, [availableSessions, requestedSessionRaw, requestedSessionIdHex, requestedSessionSlug]);
 
   useEffect(() => {
@@ -1178,7 +1181,7 @@ const AdminPage = ({
       setSelectedSlug(availableSessions[0][0] || '');
       return;
     }
-    const hasSelected = availableSessions.some(([slug]) => slug === selectedSlug);
+    const hasSelected = availableSessions.some(([slug]: any) => slug === selectedSlug);
     if (!hasSelected) setSelectedSlug(availableSessions[0][0] || '');
   }, [
     availableSessions,
@@ -1201,7 +1204,7 @@ const AdminPage = ({
     const run = async () => {
       setSessionLookupStatus(`Fetching session from chain ${requestedChainId}…`);
       try {
-        const config = await fetchSessionFromRegistry({
+        const config: any = await fetchSessionFromRegistry({
           chainId: requestedChainId,
           sessionId: requestedSessionIdHex || '',
           slug: requestedSessionSlug || '',
@@ -1220,9 +1223,9 @@ const AdminPage = ({
         setSessions(refreshed || []);
         setSelectedSlug(normalizeSlug(config.slug));
         setSessionLookupStatus('');
-      } catch (err) {
+      } catch (err: any) {
         if (!cancelled) {
-          const message = err?.message || `Session not found on chain ${requestedChainId}: ${requestedSessionRaw}`;
+          const message = getErrorMessage(err, `Session not found on chain ${requestedChainId}: ${requestedSessionRaw}`);
           setSessionLookupStatus(message);
           notify.error(message);
         }
@@ -1241,13 +1244,13 @@ const AdminPage = ({
     ignoreRequestedSession,
   ]);
 
-  const selectedConfig = useMemo(() => {
-    const match = availableSessions.find(([slug]) => slug === selectedSlug);
+  const selectedConfig: any = useMemo(() => {
+    const match = availableSessions.find(([slug]: any) => slug === selectedSlug);
     return match ? match[1] : null;
   }, [availableSessions, selectedSlug]);
   const effectiveWorkerAllowOrigins = useMemo(() => {
     if (!selectedConfig) return [];
-    const cachedWorkerConfig = getCachedSessionWorkerConfig({
+    const cachedWorkerConfig: any = getCachedSessionWorkerConfig({
       slug: selectedSlug,
       sessionConfig: selectedConfig,
     }) || {};
@@ -1385,7 +1388,7 @@ const AdminPage = ({
       name: `chain-${relevantSessionChainId}`,
     });
     readProvider.getBlockNumber()
-      .then((blockNumber) => {
+      .then((blockNumber: any) => {
         if (cancelled) return;
         setMetadataLatestBlock(blockNumber);
         setMetadataLatestBlockStatus('');
@@ -1406,7 +1409,7 @@ const AdminPage = ({
     if (Number.isFinite(existingStart) && existingStart > 0) return;
     const latestBlock = Number(metadataLatestBlock || 0);
     if (!Number.isFinite(latestBlock) || latestBlock <= 0) return;
-    setMetadataBlockLimitsDraft((prev) => {
+    setMetadataBlockLimitsDraft((prev: any) => {
       const currentStart = Number(prev?.start || 0);
       if (Number.isFinite(currentStart) && currentStart > 0) return prev;
       return {
@@ -1420,7 +1423,7 @@ const AdminPage = ({
     if (!groupMetadata || defaultGateTouched) return;
     const resolved = resolveDefaultGateFromConfig(groupMetadata);
     setDefaultGateDraft({
-      sbts: resolved.sbtAddresses.map((address) => ({ address, name: address })),
+      sbts: resolved.sbtAddresses.map((address: any) => ({ address, name: address })),
       mode: resolved.mode || 'any',
       chainId: resolved.chainId ? String(resolved.chainId) : '',
     });
@@ -1434,8 +1437,8 @@ const AdminPage = ({
       return;
     }
     // Do not auto-decrypt in /admin; decrypting triggers wallet popups. Users can decrypt on demand.
-    const next = {};
-    Object.entries(entries).forEach(([key, envelope]) => {
+    const next: Record<string, any> = {};
+    Object.entries(entries).forEach(([key, envelope]: any) => {
       next[key] = {
         value: '',
         status: walletReady ? 'locked' : 'wallet-required',
@@ -1446,7 +1449,7 @@ const AdminPage = ({
     setDecryptedFields(next);
   }, [groupMetadata, walletReady]);
 
-  const [decryptFieldsBusy, setDecryptFieldsBusy] = useState(false);
+  const [decryptFieldsBusy, setDecryptFieldsBusy] = useState<any>(false);
   const handleDecryptEncryptedFields = useCallback(async () => {
     if (!groupMetadata) return;
     if (!walletReady) {
@@ -1463,7 +1466,7 @@ const AdminPage = ({
     ) || 0;
     setDecryptFieldsBusy(true);
     try {
-      const next = {};
+      const next: Record<string, any> = {};
       for (const [key, envelope] of Object.entries(entries)) {
         // Wallet popups (signature prompts) are expected here: user explicitly clicked Decrypt.
         const resolved = await encryptedFieldsUtils.resolveEncryptedValue(envelope, {
@@ -1528,10 +1531,10 @@ const AdminPage = ({
           // Never auto-decrypt worker URLs here; keep wallet prompts behind user actions.
           context: { account: '', providerLike: null },
         });
-      } catch (e) {
+      } catch (e: any) {
         if (!cancelled) {
           setWorkerUrl('');
-          setWorkerDebug(`error=${e?.message || e}`);
+          setWorkerDebug(`error=${getErrorMessage(e, String(e || 'unknown error'))}`);
           setWorkerStatus('Failed to resolve worker URL');
         }
         return;
@@ -1716,7 +1719,7 @@ const AdminPage = ({
     body = {},
     chainId: chainIdOverride = null,
     workerUrl: overrideWorkerUrl,
-  } = {}) => {
+  }: any = {}) => {
     if (!account) {
       if (toggleLoginModal) toggleLoginModal(true);
       throw new Error('Connect a wallet to sign admin requests.');
@@ -1762,11 +1765,11 @@ const AdminPage = ({
     chainId: chainIdOverride = null,
     workerUrl: overrideWorkerUrl,
     retryAttempts = ADMIN_ACTION_NONCE_RETRY_ATTEMPTS,
-  } = {}) => {
+  }: any = {}) => {
     const baseUrl = normalizeWorkerUrl(overrideWorkerUrl || workerUrl || selectedConfigWorkerUrl);
     if (!baseUrl) throw new Error('Worker URL is missing.');
 
-    let lastError = null;
+    let lastError: any = null;
     for (let attempt = 1; attempt <= retryAttempts; attempt += 1) {
       const auth = await signAdminAction({
         action,
@@ -1821,7 +1824,7 @@ const AdminPage = ({
     workerUrl,
   ]);
 
-  const refreshLitResource = useCallback(async ({ includeSignedStatus = true } = {}) => {
+  const refreshLitResource = useCallback(async ({ includeSignedStatus = true }: any = {}) => {
     const requestId = litResourceRequestRef.current + 1;
     litResourceRequestRef.current = requestId;
     const payerStatus = getLitPayerWalletStatus(secrets.litPayerPrivateKey);
@@ -1925,12 +1928,12 @@ const AdminPage = ({
         loading: false,
         manualRefreshAvailable: true,
       });
-    } catch (error) {
+    } catch (error: any) {
       if (requestId !== litResourceRequestRef.current) return;
       setLitResource({
         address: payerStatus.address,
         display: 'Unable to load status',
-        meta: toStr(error?.message || 'Failed to load Lit payer status.'),
+        meta: getErrorMessage(error, 'Failed to load Lit payer status.'),
         loading: false,
         manualRefreshAvailable: true,
       });
@@ -1951,7 +1954,7 @@ const AdminPage = ({
     };
   }, [refreshLitResource]);
 
-  const resolveSuggestedAllowOrigins = (extraOrigins = normalizedAllowOriginsDraft) => {
+  const resolveSuggestedAllowOrigins = (extraOrigins: any = normalizedAllowOriginsDraft) => {
     let currentOrigin = '';
     try {
       if (typeof window !== 'undefined' && window.location?.origin) {
@@ -1964,7 +1967,7 @@ const AdminPage = ({
     });
   };
 
-  const handleAllowOriginsDraftChange = (event) => {
+  const handleAllowOriginsDraftChange = (event: any) => {
     setAllowOriginsDraft(event.target.value);
     setAllowOriginsDraftDirty(true);
   };
@@ -2052,7 +2055,7 @@ const AdminPage = ({
       const baseUrl = normalizeWorkerUrl(workerUrl);
       if (!baseUrl) throw new Error('Worker URL is missing.');
       // Only send non-empty fields — blank fields are skipped to avoid overwriting existing secrets.
-      const secretsPayload = Object.entries(secrets).reduce((acc, [key, value]) => {
+      const secretsPayload = Object.entries(secrets).reduce((acc: any, [key, value]: any) => {
         const trimmed = toStr(value).trim();
         if (trimmed) {
           acc[key] = trimmed;
@@ -2101,8 +2104,8 @@ const AdminPage = ({
       await loadSessions();
       setClearedSecretKeys(new Set());
       setWorkerSecretsDirty(false);
-    } catch (err) {
-      const msg = err?.message || 'Failed to update secrets.';
+    } catch (err: any) {
+      const msg = getErrorMessage(err, 'Failed to update secrets.');
       if (msg.toLowerCase().includes('flag')) {
         setChainStatus(msg);
       } else if (saveStatus) {
@@ -2152,28 +2155,28 @@ const AdminPage = ({
     return { loginResp, loginData };
   };
 
-  const runDeniedAccessTest = async (key) => {
+  const runDeniedAccessTest = async (key: any) => {
     setDeniedBusy(true);
     setDeniedStatus(`Testing ${key} (expect 403)…`);
     try {
       const { loginResp, loginData } = await attemptWorkerLogin();
       if (loginResp.status === 403) {
         const detail = toStr(loginData?.error || 'Forbidden').trim();
-        setDeniedResults((prev) => ({ ...prev, [key]: `OK (403 ${detail})` }));
+        setDeniedResults((prev: any) => ({ ...prev, [key]: `OK (403 ${detail})` }));
         setDeniedStatus(`Expected 403 for ${key}.`);
         return;
       }
       if (loginResp.ok) {
-        setDeniedResults((prev) => ({ ...prev, [key]: 'FAILED (login succeeded)' }));
+        setDeniedResults((prev: any) => ({ ...prev, [key]: 'FAILED (login succeeded)' }));
         setDeniedStatus('Unexpectedly allowed login; gating may be misconfigured.');
         return;
       }
       const detail = toStr(loginData?.error || `Login failed (${loginResp.status})`).trim();
-      setDeniedResults((prev) => ({ ...prev, [key]: `FAILED (${detail})` }));
+      setDeniedResults((prev: any) => ({ ...prev, [key]: `FAILED (${detail})` }));
       setDeniedStatus(detail);
-    } catch (err) {
-      const msg = err?.message || 'Denied test failed.';
-      setDeniedResults((prev) => ({ ...prev, [key]: `FAILED (${msg})` }));
+    } catch (err: any) {
+      const msg = getErrorMessage(err, 'Denied test failed.');
+      setDeniedResults((prev: any) => ({ ...prev, [key]: `FAILED (${msg})` }));
       setDeniedStatus(msg);
     } finally {
       setDeniedBusy(false);
@@ -2195,7 +2198,7 @@ const AdminPage = ({
       ) || 0;
       if (!registryChainId) throw new Error('Registry chain id is missing.');
       const registrySlug = sessionRegistryUtils.toRegistrySlug(selectedSlug);
-      const sbtAddresses = dedupeSbtSelections(defaultGateDraft.sbts || []).map((entry) => entry.address);
+      const sbtAddresses = dedupeSbtSelections(defaultGateDraft.sbts || []).map((entry: any) => entry.address);
       if (!sbtAddresses.length) throw new Error('Provide at least one SBT address.');
       const gateChainId = parseChainIdInput(defaultGateDraft.chainId) ||
         Number(
@@ -2226,9 +2229,9 @@ const AdminPage = ({
       }
       setGateConfigDirty(false);
       setGateSyncStatus('Default gate updated on-chain.');
-    } catch (err) {
+    } catch (err: any) {
       setGateSyncResult(null);
-      setGateSyncStatus(err?.message || 'Failed to update default gate.');
+      setGateSyncStatus(getErrorMessage(err, 'Failed to update default gate.'));
     } finally {
       setGateSyncBusy(false);
     }
@@ -2257,7 +2260,7 @@ const AdminPage = ({
     sessionConfigOverride,
     action = 'set-config',
     workerUrl: workerUrlOverride,
-  } = {}) => {
+  }: any = {}) => {
     const sessionConfigForSync = sessionConfigOverride || selectedConfig;
     if (!sessionConfigForSync) throw new Error('Select a session first.');
     if (!account) {
@@ -2305,11 +2308,11 @@ const AdminPage = ({
     testChainId,
     toggleLoginModal,
   ]);
-  const withSessionConfigRetry = useCallback(async (run) => {
+  const withSessionConfigRetry = useCallback(async (run: any) => {
     try {
       return await run();
-    } catch (err) {
-      const message = toStr(err?.message).toLowerCase();
+    } catch (err: any) {
+      const message = toStr(getErrorMessage(err, '')).toLowerCase();
       if (!shouldSeedWorkerConfigFromError(message)) throw err;
       setTestStatus('Worker config missing; seeding from selected session…');
       await ensureWorkerSessionConfig();
@@ -2333,7 +2336,7 @@ const AdminPage = ({
       unauthStatus = Number(unauthResp.status || 0) || 0;
       unauthError = toStr(unauthData?.error).trim();
       if (unauthResp.ok) {
-        setTestResults((prev) => ({ ...prev, health: `OK (${unauthData?.ts ? new Date(unauthData.ts).toISOString() : 'healthy'})` }));
+        setTestResults((prev: any) => ({ ...prev, health: `OK (${unauthData?.ts ? new Date(unauthData.ts).toISOString() : 'healthy'})` }));
         setTestStatus('Health check succeeded.');
         return;
       }
@@ -2342,14 +2345,14 @@ const AdminPage = ({
         const suffix = detail ? `: ${detail}` : '';
         if (defaultGateIsEmpty) {
           if (!walletReady) {
-            setTestResults((prev) => ({ ...prev, health: `Auth required${suffix}` }));
+            setTestResults((prev: any) => ({ ...prev, health: `Auth required${suffix}` }));
             setTestStatus('Health requires authentication; connect a wallet to verify.');
             return;
           }
           // Fall through to authenticated /health (some deployments always gate /health).
         }
         if (!walletReady) {
-          setTestResults((prev) => ({ ...prev, health: `Auth required${suffix}` }));
+          setTestResults((prev: any) => ({ ...prev, health: `Auth required${suffix}` }));
           setTestStatus('Connect a wallet to test /health for gated sessions.');
           return;
         }
@@ -2374,21 +2377,21 @@ const AdminPage = ({
         if (!resp.ok) throw new Error(payload?.error || `Health check failed (${resp.status})`);
         return payload;
       });
-      setTestResults((prev) => ({ ...prev, health: `OK (${data?.ts ? new Date(data.ts).toISOString() : 'healthy'})` }));
+      setTestResults((prev: any) => ({ ...prev, health: `OK (${data?.ts ? new Date(data.ts).toISOString() : 'healthy'})` }));
       setTestStatus('Health check succeeded.');
-    } catch (err) {
+    } catch (err: any) {
       const authMismatch = buildHealthAuthMismatchState({
         unauthStatus,
         unauthError,
-        authError: err?.message || '',
+        authError: getErrorMessage(err, ''),
       });
       if (authMismatch) {
-        setTestResults((prev) => ({ ...prev, health: authMismatch.healthLabel }));
+        setTestResults((prev: any) => ({ ...prev, health: authMismatch.healthLabel }));
         setTestStatus(authMismatch.statusMessage);
         return;
       }
-      const message = addSessionConfigHint(err?.message || 'Health check failed.');
-      setTestResults((prev) => ({ ...prev, health: message }));
+      const message = addSessionConfigHint(getErrorMessage(err, 'Health check failed.'));
+      setTestResults((prev: any) => ({ ...prev, health: message }));
       setTestStatus(message);
     } finally {
       setTestBusy(false);
@@ -2470,11 +2473,11 @@ const AdminPage = ({
         return parsed;
       });
       const preview = data?.completion || data?.content?.[0]?.text || 'ok';
-      setTestResults((prev) => ({ ...prev, ai: `OK (${preview.slice(0, 80)})` }));
+      setTestResults((prev: any) => ({ ...prev, ai: `OK (${preview.slice(0, 80)})` }));
       setTestStatus('AI test succeeded.');
-    } catch (err) {
-      const msg = addSessionConfigHint(err?.message || 'AI test failed.');
-      setTestResults((prev) => ({ ...prev, ai: msg }));
+    } catch (err: any) {
+      const msg = addSessionConfigHint(getErrorMessage(err, 'AI test failed.'));
+      setTestResults((prev: any) => ({ ...prev, ai: msg }));
       setTestStatus(msg);
     } finally {
       setTestBusy(false);
@@ -2508,11 +2511,11 @@ const AdminPage = ({
       const tx = String(txId || '').trim();
       const txLabel = tx ? `OK (tx ${tx.slice(0, 12)}…)` : 'OK';
       const txUrl = tx ? arweaveScripts.buildArweaveGatewayUrl(tx) : '';
-      setTestResults((prev) => ({ ...prev, arweave: { label: txLabel, href: txUrl } }));
+      setTestResults((prev: any) => ({ ...prev, arweave: { label: txLabel, href: txUrl } }));
       setTestStatus('Arweave upload succeeded.');
-    } catch (err) {
-      const msg = addSessionConfigHint(err?.message || 'Arweave test failed.');
-      setTestResults((prev) => ({ ...prev, arweave: msg }));
+    } catch (err: any) {
+      const msg = addSessionConfigHint(getErrorMessage(err, 'Arweave test failed.'));
+      setTestResults((prev: any) => ({ ...prev, arweave: msg }));
       setTestStatus(msg);
     } finally {
       setTestBusy(false);
@@ -2565,11 +2568,11 @@ const AdminPage = ({
         ? `OK (tx ${hash.slice(0, 12)}…)`
         : `OK (sent to ${shortAddress(burnAddress)})`;
       const txUrl = hash ? buildTxExplorerUrl(hash, testChainId) : '';
-      setTestResults((prev) => ({ ...prev, faucet: { label, href: txUrl } }));
+      setTestResults((prev: any) => ({ ...prev, faucet: { label, href: txUrl } }));
       setTestStatus('Faucet test succeeded.');
-    } catch (err) {
-      const msg = addSessionConfigHint(err?.message || 'Faucet test failed.');
-      setTestResults((prev) => ({ ...prev, faucet: msg }));
+    } catch (err: any) {
+      const msg = addSessionConfigHint(getErrorMessage(err, 'Faucet test failed.'));
+      setTestResults((prev: any) => ({ ...prev, faucet: msg }));
       setTestStatus(msg);
     } finally {
       setTestBusy(false);
@@ -2623,8 +2626,8 @@ const AdminPage = ({
       });
       setLitTestEnvelope(envelope);
       setLitTestStatus('Encrypted. Click decrypt to verify.');
-    } catch (err) {
-      setLitTestStatus(err?.message || 'Lit encryption failed.');
+    } catch (err: any) {
+      setLitTestStatus(getErrorMessage(err, 'Lit encryption failed.'));
     } finally {
       setLitTestBusy(false);
     }
@@ -2658,8 +2661,8 @@ const AdminPage = ({
       const text = decrypted == null ? '' : String(decrypted);
       setLitTestDecrypted(text);
       setLitTestStatus(text ? 'Decrypted.' : 'Decrypted (empty).');
-    } catch (err) {
-      setLitTestStatus(err?.message || 'Lit decrypt failed.');
+    } catch (err: any) {
+      setLitTestStatus(getErrorMessage(err, 'Lit decrypt failed.'));
     } finally {
       setLitTestBusy(false);
     }
@@ -2672,7 +2675,7 @@ const AdminPage = ({
     { key: 'faucet', label: 'Faucet', fields: ['faucetPrivateKey'] },
     { key: 'lit', label: 'Lit', fields: ['litPayerPrivateKey'] },
   ];
-  const cardHasValue = (fields) => fields.some((f) => toStr(secrets[f]).trim());
+  const cardHasValue = (fields: any) => fields.some((f: any) => toStr(secrets[f]).trim());
   const currentBlockSummary = Number.isFinite(Number(metadataLatestBlock)) && Number(metadataLatestBlock) > 0
     ? `Current block on ${relevantSessionChainLabel || 'selected chain'}: ${Number(metadataLatestBlock).toLocaleString()}`
     : metadataLatestBlockStatus;
@@ -2681,7 +2684,7 @@ const AdminPage = ({
     const nextStart = Number(metadataLatestBlock || 0);
     if (!Number.isFinite(nextStart) || nextStart <= 0) return;
     setMetadataDraftTouched(true);
-    setMetadataBlockLimitsDraft((prev) => ({
+    setMetadataBlockLimitsDraft((prev: any) => ({
       ...(prev || {}),
       start: String(nextStart),
     }));
@@ -2757,12 +2760,12 @@ const AdminPage = ({
 	        } else {
 	          workerSyncSuffix = ' Worker config sync skipped (worker URL missing).';
 	        }
-      } catch (syncError) {
-        workerSyncSuffix = ` Worker config sync failed: ${syncError?.message || 'unknown error'}`;
+      } catch (syncError: any) {
+        workerSyncSuffix = ` Worker config sync failed: ${getErrorMessage(syncError, 'unknown error')}`;
       }
       setMetadataUpdateStatus(`${baseSuccessStatus}${workerSyncSuffix}`);
-    } catch (err) {
-      setMetadataUpdateStatus(err?.message || 'Failed to update session metadata.');
+    } catch (err: any) {
+      setMetadataUpdateStatus(getErrorMessage(err, 'Failed to update session metadata.'));
     } finally {
       setMetadataUpdateBusy(false);
     }
@@ -2820,7 +2823,7 @@ const AdminPage = ({
   const metadataLoadState = toStr(groupMetadata?.__registry?.metadataLoadState).trim() || (metadataUriValue ? 'loaded' : 'none');
   const metadataDefaultedContractKeys = Array.isArray(groupMetadata?.__registry?.metadataDefaultedContractKeys)
     ? groupMetadata.__registry.metadataDefaultedContractKeys
-        .map((key) => toStr(key).trim())
+        .map((key: any) => toStr(key).trim())
         .filter(Boolean)
     : [];
   const metadataContractsNeedVerification = (
@@ -2828,7 +2831,7 @@ const AdminPage = ({
     metadataDefaultedContractKeys.length > 0
   );
   const metadataDefaultedEditableContractKeys = metadataDefaultedContractKeys
-    .filter((key) => ADMIN_EDITABLE_CONTRACT_KEY_SET.has(key));
+    .filter((key: any) => ADMIN_EDITABLE_CONTRACT_KEY_SET.has(key));
   const metadataContractsReadyForSave = (
     !metadataContractsNeedVerification ||
     metadataDefaultedEditableContractKeys.length === 0 ||
@@ -2843,9 +2846,9 @@ const AdminPage = ({
   const metadataContracts = groupMetadata?.contracts && typeof groupMetadata.contracts === 'object'
     ? groupMetadata.contracts
     : {};
-  const visibleMetadataContracts = Object.entries(metadataContracts).filter(([, value]) => value && typeof value === 'object');
+  const visibleMetadataContracts = Object.entries(metadataContracts).filter(([, value]: any) => value && typeof value === 'object');
   const readonlyMetadataContracts = visibleMetadataContracts.filter(
-    ([key]) => !ADMIN_EDITABLE_CONTRACT_KEY_SET.has(key)
+    ([key]: any) => !ADMIN_EDITABLE_CONTRACT_KEY_SET.has(key)
   );
   const sessionCardTone = selectedConfig ? 'ready' : (availableSessions.length ? 'idle' : 'warning');
   const showHeroMedia = !!resolvedSessionHeader && heroHeaderImageReady;
@@ -2853,10 +2856,10 @@ const AdminPage = ({
   const defaultGateOpen = openSection === 'defaultGate';
   const workerSecretsOpen = openSection === 'workerSecrets';
   const testsOpen = openSection === 'tests';
-  const toggleSection = (key) => {
-    setOpenSection((prev) => (prev === key ? '' : key));
+  const toggleSection = (key: any) => {
+    setOpenSection((prev: any) => (prev === key ? '' : key));
   };
-  const renderInfoTooltip = (id, content) => {
+  const renderInfoTooltip = (id: any, content: any) => {
     if (!content) return null;
     return (
       <>
@@ -2872,7 +2875,7 @@ const AdminPage = ({
       </>
     );
   };
-  const renderInlineResourceSummary = ({ key, label, resource, onRefresh, refreshLabel }) => {
+  const renderInlineResourceSummary = ({ key, label, resource, onRefresh, refreshLabel }: any) => {
     if (!shouldShowInlineResourceSummary(resource)) return null;
     return (
       <div key={key} className={styles.inlineResourceCard}>
@@ -2944,7 +2947,7 @@ const AdminPage = ({
                       value={selectedSlug}
                       data-testid={E2E_TESTIDS.ADMIN_SESSION_SELECT}
                       className={styles.heroCardSelect}
-                      onChange={(e) => {
+                      onChange={(e: any) => {
                         setIgnoreRequestedSession(true);
                         setSelectedSlug(e.target.value);
                       }}
@@ -2954,7 +2957,7 @@ const AdminPage = ({
                           Requested: {requestedSessionRaw}
                         </option>
                       )}
-                      {availableSessions.map(([slug, cfg]) => (
+                      {availableSessions.map(([slug, cfg]: any) => (
                         <option key={slug} value={slug}>
                           {slug || 'general'}{cfg?.sessionName ? ` — ${cfg?.sessionName}` : ''}
                         </option>
@@ -3010,7 +3013,7 @@ const AdminPage = ({
                             placeholder="https://<worker-name>.<account-subdomain>.workers.dev/"
                             className={styles.heroCardInput}
                             readOnly={!workerUrlEditable}
-                            onChange={workerUrlEditable ? (e) => setWorkerUrl(e.target.value) : undefined}
+                            onChange={workerUrlEditable ? (e: any) => setWorkerUrl(e.target.value) : undefined}
                           />
                           <div className={styles.heroCardInputActions}>
                             {workerUrl && (
@@ -3043,7 +3046,7 @@ const AdminPage = ({
                               <button
                                 type="button"
                                 className={`${styles.heroCardInputActionButton} ${styles.heroCardInputIconButton}`}
-                                onClick={() => setWorkerUrlEditable((prev) => !prev)}
+                                onClick={() => setWorkerUrlEditable((prev: any) => !prev)}
                                 title={workerUrlEditable ? 'Lock worker URL' : 'Edit worker URL'}
                                 aria-label={workerUrlEditable ? 'Lock worker URL' : 'Edit worker URL'}
                               >
@@ -3059,7 +3062,7 @@ const AdminPage = ({
                           color="secondary"
                           outline
                           className={`${styles.actionButton} ${styles.subtleActionButton}`}
-                          onClick={() => setShowAllowlistEditor((prev) => !prev)}
+                          onClick={() => setShowAllowlistEditor((prev: any) => !prev)}
                           title={showAllowlistEditor ? 'Hide the CORS allowlist editor' : 'Show the CORS allowlist editor'}
                         >
                           Allowlist <FontAwesomeIcon icon={showAllowlistEditor ? faCaretUp : faCaretDown} />
@@ -3270,7 +3273,7 @@ const AdminPage = ({
                         <Input
                           value={metadataConfigDraft.defaultTags}
                           placeholder="ai, governance, survey"
-                          onChange={(e) => updateMetadataConfigDraft('defaultTags', e.target.value)}
+                          onChange={(e: any) => updateMetadataConfigDraft('defaultTags', e.target.value)}
                         />
                       </FormGroup>
                       <FormGroup>
@@ -3278,7 +3281,7 @@ const AdminPage = ({
                         <Input
                           value={metadataConfigDraft.defaultSbtTags}
                           placeholder="member, contributor"
-                          onChange={(e) => updateMetadataConfigDraft('defaultSbtTags', e.target.value)}
+                          onChange={(e: any) => updateMetadataConfigDraft('defaultSbtTags', e.target.value)}
                         />
                       </FormGroup>
                     </div>
@@ -3289,7 +3292,7 @@ const AdminPage = ({
                         rows={4}
                         value={metadataConfigDraft.questionsGenPrompt}
                         placeholder="Optional prompt used when auto-generating questions"
-                        onChange={(e) => updateMetadataConfigDraft('questionsGenPrompt', e.target.value)}
+                        onChange={(e: any) => updateMetadataConfigDraft('questionsGenPrompt', e.target.value)}
                       />
                     </FormGroup>
                     <FormGroup className={styles.metadataTextAreaGroup}>
@@ -3299,7 +3302,7 @@ const AdminPage = ({
                         rows={4}
                         value={metadataConfigDraft.defaultFilterState}
                         placeholder='{"sort":"recent"} or tag=ai&sort=recent'
-                        onChange={(e) => updateMetadataConfigDraft('defaultFilterState', e.target.value)}
+                        onChange={(e: any) => updateMetadataConfigDraft('defaultFilterState', e.target.value)}
                       />
                     </FormGroup>
                     <FormGroup check className={styles.metadataToggle}>
@@ -3307,7 +3310,7 @@ const AdminPage = ({
                         <Input
                           type="checkbox"
                           checked={metadataAutoFeatureDraft}
-                          onChange={(e) => {
+                          onChange={(e: any) => {
                             setMetadataDraftTouched(true);
                             setMetadataAutoFeatureTouched(true);
                             setMetadataAutoFeatureDraft(!!e.target.checked);
@@ -3322,17 +3325,17 @@ const AdminPage = ({
                         id="admin-default-featured-sbts"
                         label=""
                         selectedSBTs={metadataConfigDraft.defaultFeaturedSBTs}
-                        onAddSBT={(sbt) => {
+                        onAddSBT={(sbt: any) => {
                           updateMetadataConfigDraft(
                             'defaultFeaturedSBTs',
                             dedupeSbtSelections([...(metadataConfigDraft.defaultFeaturedSBTs || []), sbt])
                           );
                         }}
-                        onRemoveSBT={(address) => {
+                        onRemoveSBT={(address: any) => {
                           updateMetadataConfigDraft(
                             'defaultFeaturedSBTs',
                             dedupeSbtSelections(metadataConfigDraft.defaultFeaturedSBTs || []).filter(
-                              (entry) => toStr(entry.address).toLowerCase() !== toStr(address).toLowerCase()
+                              (entry: any) => toStr(entry.address).toLowerCase() !== toStr(address).toLowerCase()
                             )
                           );
                         }}
@@ -3341,7 +3344,7 @@ const AdminPage = ({
                         sessionSlug={normalizeSlug(selectedSlug)}
                         variant="admin"
                         ensureLightSbtUniverse={ensureLightSbtUniverse}
-                        defaultFeaturedSBTs={(metadataConfigDraft.defaultFeaturedSBTs || []).map((entry) => entry.address)}
+                        defaultFeaturedSBTs={(metadataConfigDraft.defaultFeaturedSBTs || []).map((entry: any) => entry.address)}
                       />
                     </FormGroup>
                   </div>
@@ -3354,9 +3357,9 @@ const AdminPage = ({
                         <Input
                           type="select"
                           value={metadataConfigDraft.aiFastProvider}
-                          onChange={(e) => updateMetadataConfigDraft('aiFastProvider', e.target.value)}
+                          onChange={(e: any) => updateMetadataConfigDraft('aiFastProvider', e.target.value)}
                         >
-                          {ADMIN_AI_PROVIDER_OPTIONS.map((option) => (
+                          {ADMIN_AI_PROVIDER_OPTIONS.map((option: any) => (
                             <option key={option.value} value={option.value}>{option.label}</option>
                           ))}
                         </Input>
@@ -3365,7 +3368,7 @@ const AdminPage = ({
                         <Label>Fast model</Label>
                         <Input
                           value={metadataConfigDraft.aiFastModel}
-                          onChange={(e) => updateMetadataConfigDraft('aiFastModel', e.target.value)}
+                          onChange={(e: any) => updateMetadataConfigDraft('aiFastModel', e.target.value)}
                         />
                       </FormGroup>
                       <FormGroup>
@@ -3373,9 +3376,9 @@ const AdminPage = ({
                         <Input
                           type="select"
                           value={metadataConfigDraft.aiThinkingProvider}
-                          onChange={(e) => updateMetadataConfigDraft('aiThinkingProvider', e.target.value)}
+                          onChange={(e: any) => updateMetadataConfigDraft('aiThinkingProvider', e.target.value)}
                         >
-                          {ADMIN_AI_PROVIDER_OPTIONS.map((option) => (
+                          {ADMIN_AI_PROVIDER_OPTIONS.map((option: any) => (
                             <option key={option.value} value={option.value}>{option.label}</option>
                           ))}
                         </Input>
@@ -3384,7 +3387,7 @@ const AdminPage = ({
                         <Label>Thinking model</Label>
                         <Input
                           value={metadataConfigDraft.aiThinkingModel}
-                          onChange={(e) => updateMetadataConfigDraft('aiThinkingModel', e.target.value)}
+                          onChange={(e: any) => updateMetadataConfigDraft('aiThinkingModel', e.target.value)}
                         />
                       </FormGroup>
                       <FormGroup>
@@ -3392,7 +3395,7 @@ const AdminPage = ({
                         <Input
                           type="select"
                           value={metadataConfigDraft.aiTranscriptionProvider}
-                          onChange={(e) => updateMetadataConfigDraft('aiTranscriptionProvider', e.target.value)}
+                          onChange={(e: any) => updateMetadataConfigDraft('aiTranscriptionProvider', e.target.value)}
                         >
                           <option value="openai">OpenAI</option>
                         </Input>
@@ -3401,7 +3404,7 @@ const AdminPage = ({
                         <Label>Transcription model</Label>
                         <Input
                           value={metadataConfigDraft.aiTranscriptionModel}
-                          onChange={(e) => updateMetadataConfigDraft('aiTranscriptionModel', e.target.value)}
+                          onChange={(e: any) => updateMetadataConfigDraft('aiTranscriptionModel', e.target.value)}
                         />
                       </FormGroup>
                     </div>
@@ -3415,9 +3418,9 @@ const AdminPage = ({
                         <Input
                           type="number"
                           value={metadataBlockLimitsDraft.start}
-                          onChange={(e) => {
+                          onChange={(e: any) => {
                             setMetadataDraftTouched(true);
-                            setMetadataBlockLimitsDraft((prev) => ({
+                            setMetadataBlockLimitsDraft((prev: any) => ({
                               ...(prev || {}),
                               start: e.target.value,
                             }));
@@ -3430,9 +3433,9 @@ const AdminPage = ({
                           type="number"
                           value={metadataBlockLimitsDraft.end}
                           placeholder="Optional"
-                          onChange={(e) => {
+                          onChange={(e: any) => {
                             setMetadataDraftTouched(true);
-                            setMetadataBlockLimitsDraft((prev) => ({
+                            setMetadataBlockLimitsDraft((prev: any) => ({
                               ...(prev || {}),
                               end: e.target.value,
                             }));
@@ -3444,7 +3447,7 @@ const AdminPage = ({
                         <Input
                           value={metadataConfigDraft.faucetAmountEth}
                           placeholder="0.0002"
-                          onChange={(e) => updateMetadataConfigDraft('faucetAmountEth', e.target.value)}
+                          onChange={(e: any) => updateMetadataConfigDraft('faucetAmountEth', e.target.value)}
                         />
                       </FormGroup>
                       <FormGroup>
@@ -3452,7 +3455,7 @@ const AdminPage = ({
                         <Input
                           value={metadataConfigDraft.faucetBalanceThresholdEth}
                           placeholder="0.001"
-                          onChange={(e) => updateMetadataConfigDraft('faucetBalanceThresholdEth', e.target.value)}
+                          onChange={(e: any) => updateMetadataConfigDraft('faucetBalanceThresholdEth', e.target.value)}
                         />
                       </FormGroup>
                     </div>
@@ -3479,7 +3482,7 @@ const AdminPage = ({
                         <Input
                           value={metadataConfigDraft.contractSurveysAddress}
                           placeholder="0x..."
-                          onChange={(e) => updateMetadataConfigDraft('contractSurveysAddress', e.target.value)}
+                          onChange={(e: any) => updateMetadataConfigDraft('contractSurveysAddress', e.target.value)}
                         />
                         <FormText color="muted">
                           Chain: {relevantSessionChainLabel || 'Uses session chain'}
@@ -3490,7 +3493,7 @@ const AdminPage = ({
                         <Input
                           value={metadataConfigDraft.contractSbtFactoryAddress}
                           placeholder="0x..."
-                          onChange={(e) => updateMetadataConfigDraft('contractSbtFactoryAddress', e.target.value)}
+                          onChange={(e: any) => updateMetadataConfigDraft('contractSbtFactoryAddress', e.target.value)}
                         />
                         <FormText color="muted">
                           Chain: {relevantSessionChainLabel || 'Uses session chain'}
@@ -3501,7 +3504,7 @@ const AdminPage = ({
                         <Input
                           value={metadataConfigDraft.contractSessionRegistryAddress}
                           placeholder="0x..."
-                          onChange={(e) => updateMetadataConfigDraft('contractSessionRegistryAddress', e.target.value)}
+                          onChange={(e: any) => updateMetadataConfigDraft('contractSessionRegistryAddress', e.target.value)}
                         />
                         <FormText color="muted">
                           Chain: {relevantRegistryChainLabel || relevantSessionChainLabel || 'Uses registry chain'}
@@ -3514,7 +3517,7 @@ const AdminPage = ({
                           <Input
                             type="checkbox"
                             checked={metadataContractsVerified}
-                            onChange={(e) => setMetadataContractsVerified(!!e.target.checked)}
+                            onChange={(e: any) => setMetadataContractsVerified(!!e.target.checked)}
                           />
                           I verified these fallback defaults and want to publish them if I save metadata
                         </Label>
@@ -3527,7 +3530,7 @@ const AdminPage = ({
                     )}
                     {readonlyMetadataContracts.length ? (
                       <div className={styles.metadataReadonlyGrid}>
-                        {readonlyMetadataContracts.map(([key, value]) => (
+                        {readonlyMetadataContracts.map(([key, value]: any) => (
                           <div key={key} className={styles.metadataReadonlyItem}>
                             <span>{key}</span>
                             <strong>{toStr(value?.address).trim() || '—'}</strong>
@@ -3552,7 +3555,7 @@ const AdminPage = ({
                         rows={3}
                         value={metadataConfigDraft.highlightedQuestionIds}
                         placeholder="One question id per line"
-                        onChange={(e) => updateMetadataConfigDraft('highlightedQuestionIds', e.target.value)}
+                        onChange={(e: any) => updateMetadataConfigDraft('highlightedQuestionIds', e.target.value)}
                       />
                     </FormGroup>
                     <FormGroup className={styles.metadataTextAreaGroup}>
@@ -3562,7 +3565,7 @@ const AdminPage = ({
                         rows={3}
                         value={metadataConfigDraft.blockedQuestionIds}
                         placeholder="One question id per line"
-                        onChange={(e) => updateMetadataConfigDraft('blockedQuestionIds', e.target.value)}
+                        onChange={(e: any) => updateMetadataConfigDraft('blockedQuestionIds', e.target.value)}
                       />
                     </FormGroup>
                     <FormGroup className={styles.metadataTextAreaGroup}>
@@ -3572,7 +3575,7 @@ const AdminPage = ({
                         rows={3}
                         value={metadataConfigDraft.highlightedSurveyIds}
                         placeholder="One survey id per line"
-                        onChange={(e) => updateMetadataConfigDraft('highlightedSurveyIds', e.target.value)}
+                        onChange={(e: any) => updateMetadataConfigDraft('highlightedSurveyIds', e.target.value)}
                       />
                     </FormGroup>
                     <FormGroup className={styles.metadataTextAreaGroup}>
@@ -3582,7 +3585,7 @@ const AdminPage = ({
                         rows={3}
                         value={metadataConfigDraft.blockedSurveyIds}
                         placeholder="One survey id per line"
-                        onChange={(e) => updateMetadataConfigDraft('blockedSurveyIds', e.target.value)}
+                        onChange={(e: any) => updateMetadataConfigDraft('blockedSurveyIds', e.target.value)}
                       />
                     </FormGroup>
                     <FormGroup className={styles.metadataTextAreaGroup}>
@@ -3592,7 +3595,7 @@ const AdminPage = ({
                         rows={3}
                         value={metadataConfigDraft.ignoredSbtsList}
                         placeholder="One SBT address per line"
-                        onChange={(e) => updateMetadataConfigDraft('ignoredSbtsList', e.target.value)}
+                        onChange={(e: any) => updateMetadataConfigDraft('ignoredSbtsList', e.target.value)}
                       />
                     </FormGroup>
                     <FormGroup className={styles.metadataTextAreaGroup}>
@@ -3602,7 +3605,7 @@ const AdminPage = ({
                         rows={3}
                         value={metadataConfigDraft.featuredSbtsList}
                         placeholder="One SBT address per line"
-                        onChange={(e) => updateMetadataConfigDraft('featuredSbtsList', e.target.value)}
+                        onChange={(e: any) => updateMetadataConfigDraft('featuredSbtsList', e.target.value)}
                       />
                     </FormGroup>
                   </div>
@@ -3659,7 +3662,7 @@ const AdminPage = ({
             </div>
           )}
           <div className={styles.grid}>
-            {Object.entries(encryptedFields).map(([key, envelope]) => {
+            {Object.entries(encryptedFields).map(([key, envelope]: any) => {
                 const resolved = decryptedFields[key] || {};
                 const status = resolved.status || 'locked';
                 const decrypted = toStr(resolved.value);
@@ -3714,10 +3717,10 @@ const AdminPage = ({
                     type="select"
                     value={defaultGateDraft.mode}
                     data-testid={E2E_TESTIDS.ADMIN_GATE_MODE_SELECT}
-                    onChange={(e) => {
+                    onChange={(e: any) => {
                       setDefaultGateTouched(true);
                       setGateConfigDirty(true);
-                      setDefaultGateDraft((prev) => ({ ...prev, mode: e.target.value }));
+                      setDefaultGateDraft((prev: any) => ({ ...prev, mode: e.target.value }));
                     }}
                     className={styles.gateModeSelect}
                   >
@@ -3729,21 +3732,21 @@ const AdminPage = ({
                   id="admin-default-gate-sbts"
                   label=""
                   selectedSBTs={dedupeSbtSelections(defaultGateDraft.sbts || [])}
-                  onAddSBT={(sbt) => {
+                  onAddSBT={(sbt: any) => {
                     setDefaultGateTouched(true);
                     setGateConfigDirty(true);
-                    setDefaultGateDraft((prev) => ({
+                    setDefaultGateDraft((prev: any) => ({
                       ...prev,
                       sbts: dedupeSbtSelections([...(prev.sbts || []), sbt]),
                     }));
                   }}
-                  onRemoveSBT={(address) => {
+                  onRemoveSBT={(address: any) => {
                     setDefaultGateTouched(true);
                     setGateConfigDirty(true);
-                    setDefaultGateDraft((prev) => ({
+                    setDefaultGateDraft((prev: any) => ({
                       ...prev,
                       sbts: dedupeSbtSelections(prev.sbts || []).filter(
-                        (entry) => toStr(entry.address).toLowerCase() !== toStr(address).toLowerCase()
+                        (entry: any) => toStr(entry.address).toLowerCase() !== toStr(address).toLowerCase()
                       ),
                     }));
                   }}
@@ -3803,7 +3806,7 @@ const AdminPage = ({
         {workerSecretsOpen && (
           <>
             <div className={styles.secretOptionsGrid}>
-              {SECRET_CARDS.map((card) => {
+              {SECRET_CARDS.map((card: any) => {
                 const isOpen = openSecretCards[card.key];
                 const hasValue = cardHasValue(card.fields);
                 return (
@@ -3812,7 +3815,7 @@ const AdminPage = ({
                       type="button"
                       className={styles.secretOptionHeader}
                       aria-label={card.label}
-                      onClick={() => setOpenSecretCards((p) => ({ ...p, [card.key]: !p[card.key] }))}
+                      onClick={() => setOpenSecretCards((p: any) => ({ ...p, [card.key]: !p[card.key] }))}
                       aria-expanded={isOpen}
                     >
                       <FontAwesomeIcon icon={hasValue ? faLock : faLockOpen} style={{ opacity: hasValue ? 0.9 : 0.4, marginRight: 8 }} />
@@ -3824,10 +3827,11 @@ const AdminPage = ({
                     </button>
                     {isOpen && (
                       <div className={styles.secretOptionBody}>
-                        {card.fields.map((fieldKey) => {
-                          const isTextarea = fieldKey === 'arweaveJwk';
-                          const isPassword = !isTextarea && fieldKey !== 'customRpcUrl';
-                          const label = {
+                        {card.fields.map((fieldKey: any) => {
+                          const secretFieldKey = String(fieldKey);
+                          const isTextarea = secretFieldKey === 'arweaveJwk';
+                          const isPassword = !isTextarea && secretFieldKey !== 'customRpcUrl';
+                          const secretFieldLabels: Record<string, string> = {
                             openaiKey: 'OpenAI API key',
                             anthropicKey: 'Anthropic API key',
                             openrouterKey: 'OpenRouter API key',
@@ -3836,33 +3840,34 @@ const AdminPage = ({
                             arweaveJwk: 'Arweave JWK (JSON)',
                             faucetPrivateKey: 'Faucet private key',
                             litPayerPrivateKey: 'Lit payer private key',
-                          }[fieldKey] || fieldKey;
-                          const litPayerStatus = fieldKey === 'litPayerPrivateKey'
+                          };
+                          const label = secretFieldLabels[secretFieldKey] || secretFieldKey;
+                          const litPayerStatus = secretFieldKey === 'litPayerPrivateKey'
                             ? getLitPayerWalletStatus(secrets.litPayerPrivateKey)
                             : null;
                           return (
-                            <FormGroup key={fieldKey}>
+                            <FormGroup key={secretFieldKey}>
                               <Label>{label}</Label>
                               <div className={`${styles.secretInputRow}${isTextarea ? ` ${styles.secretInputRowMultiline}` : ''}`}>
                                 <Input
                                   type={isTextarea ? 'textarea' : isPassword ? 'password' : 'text'}
                                   rows={isTextarea ? 3 : undefined}
-                                  value={secrets[fieldKey]}
-                                  onChange={(e) => handleSecretChange(fieldKey, e.target.value)}
+                                  value={secrets[secretFieldKey]}
+                                  onChange={(e: any) => handleSecretChange(secretFieldKey, e.target.value)}
                                   className={styles.secretInput}
                                 />
                                 <button
                                   type="button"
-                                  className={`${styles.secretRemoveButton}${clearedSecretKeys.has(fieldKey) ? ` ${styles.secretRemoveButtonActive}` : ''}`}
-                                  onClick={() => handleClearSecret(fieldKey)}
+                                  className={`${styles.secretRemoveButton}${clearedSecretKeys.has(secretFieldKey) ? ` ${styles.secretRemoveButtonActive}` : ''}`}
+                                  onClick={() => handleClearSecret(secretFieldKey)}
                                   title={`Clear ${label} on next save`}
                                   aria-label={`Clear ${label}`}
-                                  data-testid={`ce-admin-secret-remove-${fieldKey.replace(/([A-Z])/g, '-$1').toLowerCase()}`}
+                                  data-testid={`ce-admin-secret-remove-${secretFieldKey.replace(/([A-Z])/g, '-$1').toLowerCase()}`}
                                 >
                                   <FontAwesomeIcon icon={faTimes} />
                                 </button>
                               </div>
-                              {fieldKey === 'litPayerPrivateKey' ? (
+                              {secretFieldKey === 'litPayerPrivateKey' ? (
                                 <>
                                   <div className={styles.secretInputRow} style={{ marginTop: 8 }}>
                                     <Input
@@ -3959,7 +3964,7 @@ const AdminPage = ({
             className={styles.collapseToggle}
             onClick={() => {
               setShowTestsPanel(false);
-              setOpenSection((prev) => (prev === 'tests' ? '' : prev));
+              setOpenSection((prev: any) => (prev === 'tests' ? '' : prev));
             }}
             aria-label="Toggle Tests section"
           >
@@ -3981,7 +3986,7 @@ const AdminPage = ({
             type="textarea"
             rows="2"
             value={litTestValue}
-            onChange={(e) => setLitTestValue(e.target.value)}
+            onChange={(e: any) => setLitTestValue(e.target.value)}
             placeholder="Type a short test string"
           />
         </FormGroup>
@@ -4028,10 +4033,10 @@ const AdminPage = ({
           {canRunTests ? (
             <AudioInput
               placeholder="Record a short clip to test /transcribe…"
-              updateFunction={(next) => {
+              updateFunction={(next: any) => {
                 setTranscribeText(next);
                 const trimmed = toStr(next).trim();
-                setTestResults((prev) => ({ ...prev, transcribe: trimmed ? `OK (${trimmed.slice(0, 80)})` : '' }));
+                setTestResults((prev: any) => ({ ...prev, transcribe: trimmed ? `OK (${trimmed.slice(0, 80)})` : '' }));
               }}
               toggleEncryption={() => {}}
               value={transcribeText}
@@ -4055,7 +4060,7 @@ const AdminPage = ({
               }}
               role={canRunHealthTest ? 'button' : undefined}
               tabIndex={canRunHealthTest ? 0 : -1}
-              onKeyDown={(e) => {
+              onKeyDown={(e: any) => {
                 if (e.key === 'Enter' && !testBusy && canRunHealthTest) runWorkerHealthTest();
               }}
               title={(() => {
@@ -4085,7 +4090,7 @@ const AdminPage = ({
             }}
             role={account ? 'button' : undefined}
             tabIndex={account ? 0 : -1}
-            onKeyDown={(e) => { if (e.key === 'Enter' && !testBusy && account) runWorkerAiTest(); }}
+            onKeyDown={(e: any) => { if (e.key === 'Enter' && !testBusy && account) runWorkerAiTest(); }}
             title="Click to test AI"
           >
             <span>AI</span>
@@ -4098,7 +4103,7 @@ const AdminPage = ({
             }}
             role={account ? 'button' : undefined}
             tabIndex={account ? 0 : -1}
-            onKeyDown={(e) => { if (e.key === 'Enter' && !testBusy && account) runWorkerArweaveTest(); }}
+            onKeyDown={(e: any) => { if (e.key === 'Enter' && !testBusy && account) runWorkerArweaveTest(); }}
             title="Click to test Arweave upload"
           >
             <span>Arweave</span>
@@ -4111,7 +4116,7 @@ const AdminPage = ({
             }}
             role={account ? 'button' : undefined}
             tabIndex={account ? 0 : -1}
-            onKeyDown={(e) => { if (e.key === 'Enter' && !testBusy && account) runWorkerFaucetTest(); }}
+            onKeyDown={(e: any) => { if (e.key === 'Enter' && !testBusy && account) runWorkerFaucetTest(); }}
             title="Click to test faucet (0.0000001)"
           >
             <span>Faucet</span>
@@ -4138,7 +4143,7 @@ const AdminPage = ({
             }}
             role={!deniedBusy ? 'button' : undefined}
             tabIndex={!deniedBusy ? 0 : -1}
-            onKeyDown={(e) => {
+            onKeyDown={(e: any) => {
               if (e.key === 'Enter' && !deniedBusy) runDeniedAccessTest('login');
             }}
             title="Click to test login denied"
@@ -4154,7 +4159,7 @@ const AdminPage = ({
             }}
             role={!deniedBusy ? 'button' : undefined}
             tabIndex={!deniedBusy ? 0 : -1}
-            onKeyDown={(e) => {
+            onKeyDown={(e: any) => {
               if (e.key === 'Enter' && !deniedBusy) runDeniedAccessTest('ai');
             }}
             title="Click to test AI denied"
@@ -4170,7 +4175,7 @@ const AdminPage = ({
             }}
             role={!deniedBusy ? 'button' : undefined}
             tabIndex={!deniedBusy ? 0 : -1}
-            onKeyDown={(e) => {
+            onKeyDown={(e: any) => {
               if (e.key === 'Enter' && !deniedBusy) runDeniedAccessTest('arweave');
             }}
             title="Click to test Arweave denied"
@@ -4186,7 +4191,7 @@ const AdminPage = ({
             }}
             role={!deniedBusy ? 'button' : undefined}
             tabIndex={!deniedBusy ? 0 : -1}
-            onKeyDown={(e) => {
+            onKeyDown={(e: any) => {
               if (e.key === 'Enter' && !deniedBusy) runDeniedAccessTest('transcribe');
             }}
             title="Click to test transcription denied"
@@ -4202,7 +4207,7 @@ const AdminPage = ({
             }}
             role={!deniedBusy ? 'button' : undefined}
             tabIndex={!deniedBusy ? 0 : -1}
-            onKeyDown={(e) => {
+            onKeyDown={(e: any) => {
               if (e.key === 'Enter' && !deniedBusy) runDeniedAccessTest('faucet');
             }}
             title="Click to test faucet denied"
