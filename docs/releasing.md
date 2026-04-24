@@ -61,6 +61,7 @@ Both workflows remove these paths from the public result:
 | `contextEngine-cc/` | Claude Code extension (local dev tool) |
 | `CLAUDE.md` | Maintainer AI instructions |
 | `.claude/`, `.codex/` | AI agent skills and settings |
+| `video-clickthrough-local/` | Durable local video workflow scripts and handoff notes |
 | `artifacts/` | Local test artifacts |
 | `Demo Integration Package/` | Raw source data |
 | `scripts/test-*.js`, `scripts/lib/e2e/` | E2E test layer |
