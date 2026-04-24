@@ -352,11 +352,8 @@ export const uploadDocLibraryFile = async ({
 
   return {
     txId,
-    url: storage === STORAGE_BACKENDS.CLOUDFLARE
-      ? toStr(result?.storageRef?.uri).trim()
-      : (txId ? arweaveScripts.buildArweaveGatewayUrl(txId) : ''),
-    storage,
-    storageRef: result?.storageRef || null,
+    url: txId ? arweaveScripts.buildArweaveGatewayUrl(txId) : '',
+    storage: 'arweave',
     kind: 'file',
     tagMap: buildTagMap(normalizedTags),
     data: { size: file.size || null, type: file.type || null },
@@ -429,11 +426,8 @@ export const uploadDocLibraryUrlRecord = async ({
 
   return {
     txId,
-    url: storage === STORAGE_BACKENDS.CLOUDFLARE
-      ? toStr(result?.storageRef?.uri).trim()
-      : (txId ? arweaveScripts.buildArweaveGatewayUrl(txId) : ''),
-    storage,
-    storageRef: result?.storageRef || null,
+    url: txId ? arweaveScripts.buildArweaveGatewayUrl(txId) : '',
+    storage: 'arweave',
     kind: 'link',
     tagMap: buildTagMap(normalizedTags),
     data: { size: null, type: 'application/json' },

@@ -22,6 +22,7 @@ import { DOC_LIBRARY_ARWEAVE_GATEWAYS } from '../../variables/arweaveGateways.js
 import { arweaveScripts } from '../../utilities/arweave/arweaveScripts.js';
 import {
   buildSbtAccessControlConditions,
+  getUnsupportedLitContractAccessControlError,
   getGlobalLitHooks,
   litStorage,
   resolveLitChain,
@@ -38,6 +39,7 @@ import {
 } from '../../utilities/docLibrary/tags.js';
 import {
   resolveArweaveGraphqlUrl,
+  resolveArweaveGraphqlUrls,
   resolveDocLibraryProvider,
 } from '../../utilities/docLibrary/config.js';
 import { listArweaveTransactionsByTags } from '../../utilities/docLibrary/arweaveGraphql.js';
@@ -158,6 +160,7 @@ type DocumentLibraryPanelProps = {
   secondarySessionIdHex?: string;
   compact?: boolean;
   pageSize?: number;
+  showUploadControls?: boolean;
 };
 
 const DEFAULT_DOC_UPLOADS_GATE: DocUploadsGateState = {
@@ -178,6 +181,11 @@ const buildSbtAccessControlConditionsUntyped = buildSbtAccessControlConditions a
 
 const resolveLitChainUntyped = resolveLitChain as (args: {
   chainId: number | null;
+}) => string;
+
+const getUnsupportedLitContractAccessControlErrorUntyped = getUnsupportedLitContractAccessControlError as (args: {
+  chainId: number | null;
+  litChain?: string | null;
 }) => string;
 
 const uploadDocLibraryFileUntyped = uploadDocLibraryFile as (args: {
@@ -323,6 +331,113 @@ const fetchArweaveBlobWithFallback = async (
   return { ok: false, error: getErrorMessage(lastErr, 'Arweave fetch failed.') };
 };
 
+type DocRowImagePreviewProps = {
+  txId: string;
+  name: string;
+  isEncryptedStorage: boolean;
+  arweaveUrl: string;
+  provider?: unknown;
+  account?: string | null;
+  chainId?: number | string | null;
+  panelContextKey?: string;
+};
+
+const DocRowImagePreview = ({
+  txId,
+  name,
+  isEncryptedStorage,
+  arweaveUrl,
+  provider,
+  account,
+  chainId,
+  panelContextKey,
+}: DocRowImagePreviewProps) => {
+  const [encryptedPreviewUrl, setEncryptedPreviewUrl] = useState('');
+
+  useEffect(() => {
+    if (!isEncryptedStorage) {
+      setEncryptedPreviewUrl('');
+      return undefined;
+    }
+    if (!txId) {
+      setEncryptedPreviewUrl('');
+      return undefined;
+    }
+
+    const litHooks = getGlobalLitHooks() as LitHooks;
+    if (!litHooks || typeof litHooks.getKey !== 'function' || !provider || !toStr(account).trim()) {
+      setEncryptedPreviewUrl('');
+      return undefined;
+    }
+
+    let cancelled = false;
+    let objectUrl = '';
+
+    const loadEncryptedPreview = async () => {
+      try {
+        const { payload } = await litStorage.downloadEncryptedArweaveData({
+          url: litStorage.buildLitArweaveUrl(txId),
+          providerLike: provider,
+          account,
+          chainId: chainId || null,
+          lit: { getKey: litHooks.getKey },
+          arweave: {
+            debugContext: {
+              category: 'doc_lit_preview',
+              caller: 'DocumentLibraryPanel.DocRowImagePreview',
+              slug: panelContextKey || '',
+              chainId: Number(chainId || 0) || null,
+            },
+          },
+        });
+
+        const blob = litStorage.decodeLitPayloadToBlob(payload);
+        if (!blob || !toStr(blob.type).trim().toLowerCase().startsWith('image/')) {
+          throw new Error('Encrypted image preview unavailable.');
+        }
+        if (typeof URL === 'undefined' || typeof URL.createObjectURL !== 'function') return;
+
+        objectUrl = URL.createObjectURL(blob);
+        if (cancelled) {
+          if (objectUrl && typeof URL.revokeObjectURL === 'function') {
+            URL.revokeObjectURL(objectUrl);
+          }
+          return;
+        }
+        setEncryptedPreviewUrl(objectUrl);
+      } catch (_) {
+        if (!cancelled) setEncryptedPreviewUrl('');
+      }
+    };
+
+    loadEncryptedPreview();
+
+    return () => {
+      cancelled = true;
+      if (objectUrl && typeof URL !== 'undefined' && typeof URL.revokeObjectURL === 'function') {
+        try {
+          URL.revokeObjectURL(objectUrl);
+        } catch (e) {
+          log.warn('DocumentLibraryPanel: preview cleanup', e);
+        }
+      }
+    };
+  }, [account, chainId, isEncryptedStorage, panelContextKey, provider, txId]);
+
+  const previewSrc = isEncryptedStorage ? encryptedPreviewUrl : arweaveUrl;
+  if (!previewSrc) return null;
+
+  return (
+    <div className={styles.docPreview} data-testid={E2E_TESTIDS.DOC_ROW_IMAGE_PREVIEW}>
+      <img
+        src={previewSrc}
+        alt={`${name || 'Document'} preview`}
+        className={styles.docPreviewImage}
+      />
+    </div>
+  );
+};
+
 export default function DocumentLibraryPanel({
   provider,
   network,
@@ -339,6 +454,7 @@ export default function DocumentLibraryPanel({
   secondarySessionIdHex,
   compact = false,
   pageSize = 25,
+  showUploadControls = true,
 }: DocumentLibraryPanelProps = {}) {
   const normalizedSessionIdHex = useMemo(() => normalizeSessionIdHex(sessionIdHex), [sessionIdHex]);
   const normalizedSbtAddress = useMemo(() => normalizeSbtAddress(sbtAddress), [sbtAddress]);
@@ -371,6 +487,10 @@ export default function DocumentLibraryPanel({
     () => toStr(resolveArweaveGraphqlUrl(sessionConfig)).trim(),
     [sessionConfig],
   );
+  const graphqlUrls = useMemo(
+    () => resolveArweaveGraphqlUrls(sessionConfig),
+    [sessionConfig],
+  );
 
   const docUploadsGate = useMemo<DocUploadsGateState>(() => {
     const resolved = (resolveDocUploadsGate(sessionConfig) as Partial<DocUploadsGateState> | null) || null;
@@ -385,6 +505,13 @@ export default function DocumentLibraryPanel({
       hasRecipients: Boolean(resolved?.hasRecipients),
     };
   }, [sessionConfig]);
+  const sessionGateUnsupportedMessage = useMemo(() => (
+    docUploadsGate.hasRecipients
+      ? getUnsupportedLitContractAccessControlErrorUntyped({
+        chainId: Number(docUploadsGate.chainId || network?.id || 0) || null,
+      })
+      : ''
+  ), [docUploadsGate.chainId, docUploadsGate.hasRecipients, network?.id]);
 
   const locationSearch = typeof window !== 'undefined' ? (window.location.search || '') : '';
 
@@ -479,11 +606,11 @@ export default function DocumentLibraryPanel({
   }, [panelContextKey, mode, normalizedSbtAddress]);
 
   useEffect(() => {
-    const shouldLock = !!docUploadsGate.hasRecipients;
+    const shouldLock = !!docUploadsGate.hasRecipients && !sessionGateUnsupportedMessage;
     if (userEncryptionOverrideRef.current) return;
     setLocked(shouldLock);
     setAudienceMode(shouldLock ? 'sessionGate' : 'custom');
-  }, [docUploadsGate.hasRecipients, panelContextKey]);
+  }, [docUploadsGate.hasRecipients, panelContextKey, sessionGateUnsupportedMessage]);
 
   useEffect(() => {
     if (mode !== 'sbt' || !normalizedSbtAddress) return;
@@ -512,9 +639,10 @@ export default function DocumentLibraryPanel({
     JSON.stringify({
       provider: docProvider,
       graphqlUrl,
+      graphqlUrls,
       listFilters,
     })
-  ), [docProvider, graphqlUrl, listFilters]);
+  ), [docProvider, graphqlUrl, graphqlUrls, listFilters]);
 
   const canList = useMemo(() => {
     if (docProvider !== 'arweave') return false;
@@ -536,6 +664,7 @@ export default function DocumentLibraryPanel({
       const after = reset ? null : cursorRef.current;
       const edges = (await listArweaveTransactionsByTags({
         graphqlUrl,
+        graphqlUrls,
         tags: listFilters,
         first: pageSize,
         after,
@@ -583,7 +712,7 @@ export default function DocumentLibraryPanel({
       loadingRef.current = false;
       setLoading(false);
     }
-  }, [canList, graphqlUrl, listFilters, pageSize, listQueryKey]);
+  }, [canList, graphqlUrl, graphqlUrls, listFilters, pageSize, listQueryKey]);
 
   useEffect(() => {
     activeListQueryKeyRef.current = listQueryKey;
@@ -808,8 +937,8 @@ export default function DocumentLibraryPanel({
     }
 
     if (audienceMode === 'sessionGate') {
-      if (!docUploadsGate.hasRecipients) {
-        return { ok: false, error: 'Session docUploads gate is unavailable or empty.' };
+      if (!docUploadsGate.hasRecipients || sessionGateUnsupportedMessage) {
+        return { ok: false, error: sessionGateUnsupportedMessage || 'Session docUploads gate is unavailable or empty.' };
       }
       const chainId = Number(docUploadsGate.chainId || network?.id || 0) || null;
       const litChain = resolveLitChainUntyped({ chainId });
@@ -826,6 +955,10 @@ export default function DocumentLibraryPanel({
     const list = (customSbtList || []).map((e) => e.address).filter(Boolean);
     const chainId = Number(sbtChainId || docUploadsGate.chainId || network?.id || 0) || null;
     const litChain = resolveLitChainUntyped({ chainId });
+    const customUnsupportedMessage = getUnsupportedLitContractAccessControlErrorUntyped({ chainId, litChain });
+    if (customUnsupportedMessage) {
+      return { ok: false, error: customUnsupportedMessage };
+    }
     const acc = buildSbtAccessControlConditionsUntyped({
       sbtAddresses: list,
       chainId,
@@ -844,6 +977,7 @@ export default function DocumentLibraryPanel({
     network?.id,
     customSbtList,
     customGateMode,
+    sessionGateUnsupportedMessage,
     sbtChainId,
   ]);
 
@@ -1228,7 +1362,8 @@ export default function DocumentLibraryPanel({
 
       {!!error && <div className={styles.error}>{error}</div>}
 
-      <div className={styles.uploadBox}>
+      {showUploadControls ? (
+        <div className={styles.uploadBox}>
         <div className={styles.uploadRow}>
           <div className={styles.uploadLabel}>File</div>
           <input
@@ -1302,6 +1437,12 @@ export default function DocumentLibraryPanel({
               <span className={styles.lockLabel}>{locked ? 'Locked (Encrypted)' : 'Unlocked (Plaintext)'}</span>
             </button>
           </div>
+
+          {sessionGateUnsupportedMessage ? (
+            <div className={styles.noticeInline}>
+              {sessionGateUnsupportedMessage}
+            </div>
+          ) : null}
 
           {locked && (
             <div className={styles.encryptControls}>
@@ -1438,7 +1579,8 @@ export default function DocumentLibraryPanel({
             </label>
           </div>
         )}
-      </div>
+        </div>
+      ) : null}
 
       <div className={styles.list}>
         {!docs.length && !loading && canList && (
@@ -1454,7 +1596,7 @@ export default function DocumentLibraryPanel({
           const name = toStr(tagMap['CE-DocName']).trim() || (kind === 'link' ? 'Link record' : (storage === 'lit-arweave' ? 'Encrypted document' : 'Document'));
           const txId = toStr(doc?.txId).trim();
           const isEncryptedStorage = storage === 'lit-arweave' || storage === 'lit';
-          const arweaveUrl = txId ? arweaveScripts.buildArweaveGatewayUrl(txId, 'https://arweave.net') : '';
+          const arweaveUrl = txId ? arweaveScripts.buildArweaveGatewayUrl(txId) : '';
           const litUrl = txId ? litStorage.buildLitArweaveUrl(txId) : '';
           const ts = doc?.block?.timestamp ? Number(doc.block.timestamp) * 1000 : null;
           const indexStatus = !doc?.block ? 'pending' : (ts ? 'indexed' : 'unconfirmed');
@@ -1472,15 +1614,29 @@ export default function DocumentLibraryPanel({
               data-ce-doc-kind={kind || ''}
               data-ce-index-status={indexStatus}
             >
-              <div className={styles.docMeta}>
-                <div className={styles.docName}>{name}</div>
-                <div className={styles.docSub}>
-                  {showPhotoRoleBadge && <span className={styles.badge}>photo</span>}
-                  {showPhotoAnalysisRoleBadge && <span className={styles.badge}>photo analysis</span>}
-                  {!showPhotoRoleBadge && isImageDoc && <span className={styles.badge}>image</span>}
-                  <span className={styles.badge}>{kind || 'file'}</span>
-                  <span className={styles.badge}>{storage || 'arweave'}</span>
-                  <span className={styles.time}>{timeLabel}</span>
+              <div className={styles.docSummary}>
+                {isImageDoc ? (
+                  <DocRowImagePreview
+                    txId={txId}
+                    name={name}
+                    isEncryptedStorage={isEncryptedStorage}
+                    arweaveUrl={arweaveUrl}
+                    provider={provider}
+                    account={account}
+                    chainId={network?.id || null}
+                    panelContextKey={panelContextKey}
+                  />
+                ) : null}
+                <div className={styles.docMeta}>
+                  <div className={styles.docName}>{name}</div>
+                  <div className={styles.docSub}>
+                    {showPhotoRoleBadge && <span className={styles.badge}>photo</span>}
+                    {showPhotoAnalysisRoleBadge && <span className={styles.badge}>photo analysis</span>}
+                    {!showPhotoRoleBadge && isImageDoc && <span className={styles.badge}>image</span>}
+                    <span className={styles.badge}>{kind || 'file'}</span>
+                    <span className={styles.badge}>{storage || 'arweave'}</span>
+                    <span className={styles.time}>{timeLabel}</span>
+                  </div>
                 </div>
               </div>
               <div className={styles.docActions}>

@@ -15,11 +15,11 @@ Docs can be associated with:
   - When `:token` is a session id, the app keeps the URL stable (no rewrite to slug) on this subroute.
 - Tool Explorer `Data` panel:
   - `Add` keeps the existing question-generation ingest flow.
-  - In `Add`, manual ingest creates questions through `Generate Questions`; the older direct `Add to Library` action is not shown in this surface.
+  - In `Add`, manual ingest now has both `Generate Questions` and `Add to Library`.
   - When one or more files/images are uploaded in `Add`, a title field appears at the top of the ingest surface and is reused as the doc title / filename when possible.
-  - Files and images share a single upload control in `Add`; image paste stays in the shared compact chooser, the main `Add URL` field is the only URL entry path, and queued images render previews before question generation or context save.
-  - In `Add`, typed or queued extra URL/file/photo sources can optionally be saved into session context on `Generate Questions`.
-  - Saved Tool Explorer sources are written as encrypted session docs with an audience of either `only me` or the session `docUploads` gate when that gate exists. The closed UI shows this audience behind a lock icon. `only me` uses the local `self-eip712-v1` recipient envelope and does not require Lit hooks; the session audience uses the Chipotle/Lit SBT-gated path.
+  - Files and images share a single upload control in `Add`; image paste stays in the shared compact chooser, the main `Add URL` field is the only URL entry path, and queued images render previews before question generation or library upload.
+  - In `Add`, queued extra URL/file sources can optionally be saved into the session Doc Library on `Generate Questions`.
+  - Saved Tool Explorer sources are written as Lit-encrypted session docs with an audience of either `only me` or the session `docUploads` gate when that gate exists.
   - When the save option is enabled, generated surveys store doc-library viewer URLs for those saved extra sources instead of the raw source URLs.
   - `View` defaults to the sample demo corpus viewer used on `/session/demo` when demo surfaces are enabled.
   - The demo corpus viewer now exposes the full curated tab set, including `LessWrong` and `Cross-Corpus Debates`, instead of keeping those slices hidden.
@@ -50,7 +50,9 @@ Session metadata can select a backend-owned session storage profile. This is sto
   },
   "docLibrary": {
     "provider": "arweave",
-    "arweave": { "index": "graphql", "graphqlUrl": "https://permagate.io/graphql" }
+    "arweave": { "index": "graphql", "graphqlUrl": "https://permagate.io/graphql" },
+    "ipfs": {},
+    "local": {}
   }
 }
 ```
@@ -61,27 +63,7 @@ Defaults:
 - `cloudflare` routes plaintext session docs/context through the session worker `/storage/*` routes and keeps Cloudflare object identifiers private. Lit-encrypted Cloudflare document upload/read is intentionally blocked until the encrypted-envelope path is implemented.
 - `ipfs` and `local` `docLibrary.provider` values remain stubbed (UI disables list/upload with a “not implemented” notice).
 
-Storage records normalize to:
-
-```json
-{
-  "storageRef": {
-    "backend": "arweave",
-    "id": "<opaque-id-or-arweave-tx-id>",
-    "uri": "ar://<tx-id>",
-    "contentType": "application/json",
-    "encrypted": false,
-    "gate": "docUploads",
-    "resource": "docsContext",
-    "createdAt": "2026-05-08T00:00:00.000Z"
-  },
-  "arweaveTxId": "<legacy-compatible-tx-id>"
-}
-```
-
-Cloudflare `storageRef` values must stay opaque: do not expose account IDs, bucket names, raw R2 object keys, worker tokens, long-lived signed URLs, or secrets.
-
-Note: GraphQL here refers to Arweave’s public indexing API. The client now prefers `https://permagate.io/graphql`, then falls back to `https://g8way.io/graphql`, and only then to `https://arweave.net/graphql`, so a single flaky gateway does not blank the Arweave/Lit-Arweave Doc Library.
+Note: GraphQL here refers to Arweave’s public indexing API. The client now prefers `https://permagate.io/graphql`, then falls back to `https://g8way.io/graphql`, and only then to `https://arweave.net/graphql`, so a single flaky gateway does not blank the Doc Library.
 
 ## Tag Schema (Arweave Index)
 
@@ -127,7 +109,7 @@ For the main Doc Library panel, encryption is based on SBT conditions:
 
 - If SessionRegistry’s `docUploads` gate has at least one SBT address:
   - upload defaults to **Locked (Encrypted)** using that gate’s SBT set (Any/All).
-  - Lit contract-gated access conditions use the gate’s configured EVM chain; OP Sepolia is the default E2E target, not a Lit limitation.
+  - If that gate resolves to a Lit-unsupported chain (currently OP Sepolia for contract-gated ACCs), the UI falls back away from the session gate instead of surfacing a low-level Lit validator error.
 - If the `docUploads` gate is empty or unavailable:
   - upload defaults to **Unlocked (Plaintext)**.
   - users can still encrypt by selecting **Custom SBT(s)** manually.
@@ -136,9 +118,7 @@ For the main Doc Library panel, encryption is based on SBT conditions:
 For Tool Explorer `Data -> Add` saved extra sources:
 - saves are always encrypted
 - the audience can be `only me` or the session `docUploads` gate
-- `only me` wraps the content encryption key with the existing `self-eip712-v1` recipient, so private saves can upload and reopen with the connected wallet without Lit/Chipotle hooks
-- the session `docUploads` audience stays on the Chipotle/Lit SBT-gated recipient path
-- when the session `docUploads` gate is unavailable, Tool Explorer falls back to `only me`
+- when the session `docUploads` gate is unavailable or Lit cannot honor that gate on the current chain, Tool Explorer falls back to `only me`
 
 ## “Add URL” Link Records
 
