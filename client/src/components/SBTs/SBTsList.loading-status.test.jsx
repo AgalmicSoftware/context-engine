@@ -21,6 +21,7 @@ var mockReadSessionScanScope = jest.fn();
 var mockReadSessionScanSlugs = jest.fn();
 var mockCreateGroup = jest.fn();
 const mockSBTPage = jest.fn();
+const mockTagModal = jest.fn();
 
 var mockPeekCacheSync = jest.fn();
 var mockReadCache = jest.fn();
@@ -51,6 +52,15 @@ jest.mock('./CreateSBTGroup', () => {
     mockCreateGroup(props);
     return React.createElement('div', { 'data-testid': 'create-group-panel' }, 'Create Group Panel');
   };
+});
+jest.mock('../TagPage/TagModal', () => (props) => {
+  mockTagModal(props);
+  if (!props.isOpen) return null;
+  return (
+    <div data-testid="mock-tag-modal">
+      {props.activeTag}
+    </div>
+  );
 });
 
 jest.mock('../../utilities/web3/contractScripts.js', () => ({
@@ -4485,7 +4495,7 @@ describe('SBTsList per-session loader countdown', () => {
     expect(liveCardLink).toHaveAttribute('href', buildSbtDetailPath(alphaAddress, 'alpha'));
   });
 
-  it('toggles standard-card details from tag and document fallbacks only when present', async () => {
+  it('renders inline tag chips, opens the tag modal, and keeps document toggles only for docs', async () => {
     const alphaAddress = '0x00000000000000000000000000000000000000b1';
     const betaAddress = '0x00000000000000000000000000000000000000b2';
     mockGetSessionLists.mockReturnValue({
@@ -4519,9 +4529,10 @@ describe('SBTsList per-session loader countdown', () => {
             [betaAddress.toLowerCase()]: {
               sbtAddress: betaAddress,
               slug: 'alpha',
+              featuredSbtTags: ['Culture'],
               sbtInfo: {
-                name: 'Beta Plain Badge',
-                description: 'no expandable details',
+                name: 'Beta Tagged Badge',
+                description: 'tags only',
                 sessionSlug: 'alpha',
                 mintingEndTime: 0,
               },
@@ -4555,8 +4566,13 @@ describe('SBTsList per-session loader countdown', () => {
     );
 
     const toggleButton = await screen.findByRole('button', { name: /show details for Alpha Detailed Badge/i });
-    expect(screen.queryByRole('button', { name: /show details for Beta Plain Badge/i })).not.toBeInTheDocument();
-    expect(screen.queryByText('Governance')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /show details for Beta Tagged Badge/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /open tag explorer for Governance/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /open tag explorer for Research/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /open tag explorer for Culture/i })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /open tag explorer for Governance/i }));
+    expect(screen.getByTestId('mock-tag-modal')).toHaveTextContent('Governance');
 
     fireEvent.click(toggleButton);
 
@@ -4564,14 +4580,73 @@ describe('SBTsList per-session loader countdown', () => {
     expect(docLink).toHaveAttribute('href', 'https://example.com/docs/alpha-blueprint');
     expect(docLink).toHaveAttribute('target', '_blank');
     expect(docLink).toHaveAttribute('rel', 'noopener noreferrer');
-    expect(screen.getByText('Governance')).toBeInTheDocument();
-    expect(screen.getByText('Research')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /open tag explorer for Governance/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /open tag explorer for Research/i })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /hide details for Alpha Detailed Badge/i }));
 
     await waitFor(() => {
-      expect(screen.queryByText('Governance')).not.toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: /alpha-blueprint/i })).not.toBeInTheDocument();
     });
+  });
+
+  it('renders featured-card tag chips inline and opens the shared tag modal', async () => {
+    const alphaAddress = '0x00000000000000000000000000000000000000c1';
+    mockGetSessionLists.mockReturnValue({
+      featured_SBTs_LIST: [alphaAddress],
+      ignored_SBTs_LIST: [],
+    });
+    mockReadCache.mockImplementation(async (_namespace, slug) => {
+      const normalized = String(slug || '').trim().toLowerCase();
+      if (normalized !== 'alpha') {
+        return { '84532': { sbtList: {}, lastBlock: 0 } };
+      }
+      return {
+        '84532': {
+          sbtList: {
+            [alphaAddress.toLowerCase()]: {
+              sbtAddress: alphaAddress,
+              slug: 'alpha',
+              featuredSbtTags: ['Governance'],
+              sbtInfo: {
+                name: 'Alpha Featured Badge',
+                description: 'featured tag modal launch',
+                sessionSlug: 'alpha',
+                mintingEndTime: 0,
+              },
+              mintedAddresses: [],
+              burnedAddresses: [],
+              countsLoaded: true,
+              blockNumber: 1200,
+            },
+          },
+          lastBlock: 1200,
+        },
+      };
+    });
+
+    render(
+      <SBTsList
+        provider="mock"
+        network={{ id: 84532, name: 'Base Sepolia' }}
+        account=""
+        sessionSlug="alpha"
+        loginComplete
+        miniaturized={false}
+        toggleLoginModal={jest.fn()}
+        sbtCacheRevision={0}
+        onRequestSbtCacheRefresh={jest.fn()}
+        isSBTCacheReady
+        refreshSbtData={jest.fn()}
+        latestBlockNumber={0}
+        ensureLightSbtDiscovery={jest.fn()}
+      />
+    );
+
+    const featuredTagButton = await screen.findByRole('button', { name: /open tag explorer for Governance/i });
+    fireEvent.click(featuredTagButton);
+
+    expect(screen.getByTestId('mock-tag-modal')).toHaveTextContent('Governance');
   });
 
   it('renders modal featured cards as anchor cards instead of nested mini SBT pages', async () => {

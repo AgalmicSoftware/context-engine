@@ -12,10 +12,11 @@ import contractScripts, {
 } from '../../utilities/web3/contractScripts.js';
 import styles from './SBTsList.module.scss';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faSpinner, faSync, faTrash, faPlus, faLock, faCog, faChevronUp, faChevronDown, faExternalLinkAlt } from '@fortawesome/free-solid-svg-icons';
+import { faSpinner, faSync, faTrash, faPlus, faLock, faCog, faChevronUp, faChevronDown, faExternalLinkAlt, faCaretUp, faCaretDown } from '@fortawesome/free-solid-svg-icons';
 import { Button } from 'reactstrap';
 import SBTPage from './SBTPage';
 import CreateGroup from './CreateSBTGroup';
+import TagModal from '../TagPage/TagModal';
 import SessionChipSelector from '../Shared/SessionChipSelector';
 import { ethers } from 'ethers';
 import { createLogger } from '../../utilities/logging.js';
@@ -423,7 +424,7 @@ const getSbtCardDetails = (sbt: any) => {
   return {
     tags,
     documentUrls,
-    hasDetails: tags.length > 0 || documentUrls.length > 0,
+    hasDetails: documentUrls.length > 0,
   };
 };
 const coerceMintEndSeconds = (v: any) => {
@@ -487,6 +488,7 @@ const SBTsList = ({
 
   const [globalSessionSelectionRevision, setGlobalSessionSelectionRevision] = useState<any>(0);
   const [sessionConfigRevision, setSessionConfigRevision] = useState<any>(0);
+  const [activeTag, setActiveTag] = useState<any>('');
   const [activeSessionSlug, setActiveGroupSlug] = useState<any>(() => {
     const globalPrimarySessionSlug = normalizeSessionSlug(readStoredGlobalSessionSelection().primarySessionSlug || '');
     try {
@@ -3119,38 +3121,63 @@ const SBTsList = ({
             </div>
           </div>
         )}
-        {details.tags.length > 0 && (
-          <div className={styles.sbtDetailsSection}>
-            <span className={styles.sbtDetailsHeading}>Tags</span>
-            <div className={styles.sbtTagList}>
-              {details.tags.map((tag: any) => (
-                <span key={tag} className={styles.sbtTagChip}>
-                  {tag}
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
     );
   };
 
-  const renderSbtDetailsToggle = (sbt: any, details: any, detailsId: any, buttonLabel: any) => {
-    if (miniaturized || !details?.hasDetails) return null;
+  const handleTagChipClick = (event: any, tag: any) => {
+    if (event?.preventDefault) event.preventDefault();
+    if (event?.stopPropagation) event.stopPropagation();
+    const normalizedTag = String(tag || '').trim();
+    if (!normalizedTag) return;
+    setActiveTag(normalizedTag);
+  };
+
+  const renderSbtMetaRow = (sbt: any, details: any, detailsId: any, buttonLabel: any) => {
+    const tags = Array.isArray(details?.tags) ? details.tags : [];
+    const hasTags = tags.length > 0;
+    const hasDetailsToggle = !miniaturized && !!details?.hasDetails;
+    if (!hasTags && !hasDetailsToggle) return null;
+
     const sbtAddressLower = String(sbt?.sbtAddress || '').toLowerCase();
     const isExpanded = expandedSbtAddresses.has(sbtAddressLower);
+    const metaRowClassName = [
+      styles.sbtMetaRow,
+      hasTags ? styles.sbtMetaRowWithTags : styles.sbtMetaRowToggleOnly,
+    ].filter(Boolean).join(' ');
+
     return (
-      <div className={styles.sbtDetailsFooter}>
-        <button
-          type="button"
-          className={styles.sbtDetailsToggle}
-          aria-controls={detailsId}
-          aria-expanded={isExpanded}
-          aria-label={`${isExpanded ? 'Hide' : 'Show'} details for ${buttonLabel}`}
-          onClick={() => toggleExpandedSbt(sbt?.sbtAddress)}
-        >
-          <FontAwesomeIcon icon={isExpanded ? faChevronUp : faChevronDown} />
-        </button>
+      <div className={metaRowClassName}>
+        {hasTags && (
+          <div className={styles.sbtTagList}>
+            {tags.map((tag: any) => (
+              <button
+                key={tag}
+                type="button"
+                className={styles.sbtTagChip}
+                aria-label={`Open tag explorer for ${tag}`}
+                onClick={(event: any) => handleTagChipClick(event, tag)}
+              >
+                #{tag}
+              </button>
+            ))}
+          </div>
+        )}
+        {hasDetailsToggle && (
+          <button
+            type="button"
+            className={styles.sbtDetailsToggle}
+            aria-controls={detailsId}
+            aria-expanded={isExpanded}
+            aria-label={`${isExpanded ? 'Hide' : 'Show'} details for ${buttonLabel}`}
+            onClick={() => toggleExpandedSbt(sbt?.sbtAddress)}
+          >
+            <FontAwesomeIcon
+              icon={isExpanded ? faCaretUp : faCaretDown}
+              className={styles.sbtDetailsToggleIcon}
+            />
+          </button>
+        )}
       </div>
     );
   };
@@ -3258,7 +3285,7 @@ const SBTsList = ({
     if (miniaturized && viewMode === 'modal') {
       return renderCompactSbtLinkCard(sbt, 'featured-modal');
     }
-    if (miniaturized || !details.hasDetails) {
+    if (miniaturized || (!details.hasDetails && details.tags.length <= 0)) {
       return featuredCardLink;
     }
 
@@ -3268,7 +3295,7 @@ const SBTsList = ({
         className={`${styles.featuredCardShell} ${isExpanded ? styles.featuredCardShellExpanded : ''}`}
       >
         {featuredCardLink}
-        {renderSbtDetailsToggle(sbt, details, detailsId, linkLabel)}
+        {renderSbtMetaRow(sbt, details, detailsId, linkLabel)}
         {isExpanded && renderSbtDetailsPanel(details, detailsId)}
       </article>
     );
@@ -3349,7 +3376,7 @@ const SBTsList = ({
             <p className={styles.standardCardDescription}>{description || 'No description.'}</p>
           </div>
         </a>
-        {renderSbtDetailsToggle(sbt, details, detailsId, name || sbt.sbtAddress || t('sbt'))}
+        {renderSbtMetaRow(sbt, details, detailsId, name || sbt.sbtAddress || t('sbt'))}
         {isExpanded && renderSbtDetailsPanel(details, detailsId)}
       </article>
     );
@@ -3865,6 +3892,11 @@ const SBTsList = ({
       ) : (
         <div className={styles.sectionEmptyHint}>{`No expired ${t('sbtsLower')}.`}</div>
       )}
+      <TagModal
+        isOpen={!!activeTag}
+        toggle={() => setActiveTag('')}
+        activeTag={activeTag || null}
+      />
     </div>
   );
 };

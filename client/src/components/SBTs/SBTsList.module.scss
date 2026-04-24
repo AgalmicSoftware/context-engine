@@ -670,37 +670,48 @@ $filter-pill-active-border: rgba(0, 255, 157, 0.6);
     filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.55));
   }
 
-  .sbtDetailsFooter {
+  .sbtMetaRow {
     display: flex;
-    justify-content: flex-end;
+    align-items: center;
+    gap: 10px;
     padding: 0 14px 12px;
+  }
+
+  .sbtMetaRowWithTags {
+    justify-content: space-between;
+  }
+
+  .sbtMetaRowToggleOnly {
+    justify-content: flex-end;
   }
 
   .sbtDetailsToggle {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 34px;
-    height: 34px;
-    border-radius: var(--ce-radius-round);
-    border: 1px solid rgba(255, 255, 255, 0.22);
-    background: rgba(0, 0, 0, 0.25);
-    color: rgba(255, 255, 255, 0.88);
+    flex: 0 0 auto;
+    min-width: clamp(28px, 5vw, 56px);
+    min-height: clamp(28px, 5vw, 56px);
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.8);
     cursor: pointer;
     transition:
-      background-color 0.2s ease,
-      border-color 0.2s ease,
       color 0.2s ease,
       transform 0.2s ease;
 
     &:hover,
     &:focus-visible {
-      background: rgba($clickable-color, 0.16);
-      border-color: rgba($clickable-color, 0.55);
       color: var(--ce-color-white);
       transform: translateY(-1px);
       outline: none;
     }
+  }
+
+  .sbtDetailsToggleIcon {
+    font-size: clamp(2.5rem, 1.35rem + 3.9vw, 5rem);
+    line-height: 1;
   }
 
   .sbtDetailsPanel {
@@ -715,10 +726,6 @@ $filter-pill-active-border: rgba(0, 255, 157, 0.6);
     display: flex;
     flex-direction: column;
     gap: 8px;
-
-    & + .sbtDetailsSection {
-      margin-top: 12px;
-    }
   }
 
   .sbtDetailsHeading {
@@ -752,13 +759,16 @@ $filter-pill-active-border: rgba(0, 255, 157, 0.6);
 
   .sbtTagList {
     display: flex;
+    flex: 1 1 auto;
     flex-wrap: wrap;
     gap: 8px;
+    min-width: 0;
   }
 
   .sbtTagChip {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     padding: 4px 10px;
     border-radius: var(--ce-radius-pill);
     background: rgba($clickable-color, 0.12);
@@ -766,6 +776,22 @@ $filter-pill-active-border: rgba(0, 255, 157, 0.6);
     color: rgba(255, 255, 255, 0.92);
     font-size: 0.78rem;
     line-height: 1.2;
+    font-family: inherit;
+    cursor: pointer;
+    transition:
+      background-color 0.2s ease,
+      border-color 0.2s ease,
+      color 0.2s ease,
+      transform 0.2s ease;
+
+    &:hover,
+    &:focus-visible {
+      background: rgba($clickable-color, 0.2);
+      border-color: rgba($clickable-color, 0.5);
+      color: var(--ce-color-white);
+      transform: translateY(-1px);
+      outline: none;
+    }
   }
 
   .featuredCardShell {
@@ -1016,6 +1042,20 @@ $filter-pill-active-border: rgba(0, 255, 157, 0.6);
 
     .standardCardDescription {
       font-size: 0.9rem;
+    }
+
+    .sbtMetaRow {
+      gap: 8px;
+      padding: 0 12px 10px;
+    }
+
+    .sbtTagList {
+      gap: 6px;
+    }
+
+    .sbtTagChip {
+      font-size: 0.74rem;
+      padding: 4px 9px;
     }
 
     .featuredCardShell {
