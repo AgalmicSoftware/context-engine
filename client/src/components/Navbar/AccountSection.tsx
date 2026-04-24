@@ -7,7 +7,7 @@ import type { RootState } from '../../reducers/index.js';
 import styles from "./Navbar.module.scss";
 
 import LoginButtonRaw from 'components/Account/LoginButton';
-import LoginAndSettingsModalRaw from '../Account/LoginAndSettingsModal.jsx'
+import LoginAndSettingsModalRaw from '../Account/LoginAndSettingsModal'
 import { AccountDisplayTorus } from './AccountDisplay';
 
 import { generateBlockieDataUrl } from 'utilities/ui/blockieAvatars.js';
