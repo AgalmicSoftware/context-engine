@@ -102,6 +102,8 @@ broadcast/
 /artifacts/*
 !/artifacts/.gitkeep
 /artifacts/llm-handoff-prompts/
+# Durable local UX/video workflow files
+/video-clickthrough-local/
 
 # Local scratch
 /.tmp/

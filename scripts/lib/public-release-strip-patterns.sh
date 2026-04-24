@@ -11,6 +11,7 @@ local-private-version
 CLAUDE.md
 .claude
 .codex
+video-clickthrough-local
 scripts/test-*.js
 scripts/test-*.ui.js
 scripts/lib/e2e
@@ -34,6 +35,7 @@ ce_public_release_strip_assert_absent_patterns() {
   cat <<'EOF'
 CLAUDE.md
 .claude
+video-clickthrough-local
 local-private-version
 scripts/test-*.js
 scripts/test-*.ui.js
