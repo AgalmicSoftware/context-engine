@@ -6,10 +6,6 @@ import {
 } from '../../utilities/web3/contractScripts.js';
 import { createLogger } from 'utilities/logging.js';
 import {
-  normalizeRatingValue,
-  RATING_MIN,
-} from '../../utilities/survey/ratingValue.js';
-import {
   formatQuestionScanBlockCount,
   isSurveyToolFilterStateActive,
   serializeSurveyToolFilterState,
@@ -22,6 +18,19 @@ import {
   readQuestionsCacheRef,
   readSurveysCacheRef,
 } from './surveyToolCacheState.js';
+export {
+  buildRatingEnvelopeQidSetFromUserAnswers,
+  clampSliderValue,
+  getConvictionFromResponse,
+  getConvictionFromSlice,
+  getConvictionFromSliceStrict,
+  getImportanceFromResponse,
+  getImportanceFromSlice,
+  getNormalizedUiRatingValue,
+  isSingleSelectMultichoice,
+  normalizeMultichoiceValue,
+  toNumberOrNull,
+} from './surveyToolResponseState.js';
 export {
   areEnvelopesEquivalent,
   mergeDecryptedViewedResponse,
@@ -163,103 +172,6 @@ const scheduleMicrotask = (cb) => {
   Promise.resolve().then(cb);
 };
 
-
-const toNumberOrNull = (value) => {
-  if (value === undefined || value === null) return null;
-  const num = Number(value);
-  return Number.isNaN(num) ? null : num;
-};
-
-const getNormalizedUiRatingValue = (value) => {
-  const normalizedValue = normalizeRatingValue(value, RATING_MIN);
-  return normalizedValue == null ? RATING_MIN : normalizedValue;
-};
-
-const clampSliderValue = (value, min, max) => {
-  const numericValue = Number(value);
-  if (!Number.isFinite(numericValue)) return min;
-  return Math.min(max, Math.max(min, numericValue));
-};
-
-const getConvictionFromResponse = (resp) => {
-  if (!resp || typeof resp !== 'object') return null;
-  if (resp.conviction !== undefined && resp.conviction !== null) {
-    return toNumberOrNull(resp.conviction);
-  }
-  if (resp.importance !== undefined && resp.importance !== null) {
-    return toNumberOrNull(resp.importance);
-  }
-  return null;
-};
-
-const getImportanceFromResponse = (resp) => {
-  if (!resp || typeof resp !== 'object') return null;
-  if (resp.importance !== undefined && resp.importance !== null) {
-    return toNumberOrNull(resp.importance);
-  }
-  return null;
-};
-
-// Build a set of qids whose on-chain payload already stores rating fields in envelopes.
-// This is needed so UI "encrypted change" stats match submit behavior, which preserves
-// and re-encrypts rating envelopes even when answer/additional are plaintext.
-const buildRatingEnvelopeQidSetFromUserAnswers = (userAnswers) => {
-  const out = new Set();
-  try {
-    const src = (userAnswers && typeof userAnswers === 'object') ? userAnswers : null;
-    const list = src
-      ? (Array.isArray(src.responses) ? src.responses : [src])
-      : [];
-    list.forEach((r) => {
-      const id = String(r?.questionID || r?.questionId || r?.questionIDHash || '').trim().toLowerCase();
-      if (!id) return;
-      const impEnv = (typeof r?.importanceEncrypted === 'string') ? r.importanceEncrypted : '';
-      const convEnv = (typeof r?.convictionEncrypted === 'string') ? r.convictionEncrypted : '';
-      if (impEnv || convEnv) out.add(id);
-    });
-  } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
-  return out;
-};
-
-const getConvictionFromSlice = (slice, qid) => {
-  if (!slice || !qid) return null;
-  if (slice.conviction && Object.prototype.hasOwnProperty.call(slice.conviction, qid)) {
-    return toNumberOrNull(slice.conviction[qid]);
-  }
-  if (slice.importance && Object.prototype.hasOwnProperty.call(slice.importance, qid)) {
-    return toNumberOrNull(slice.importance[qid]);
-  }
-  return null;
-};
-
-const getConvictionFromSliceStrict = (slice, qid) => {
-  if (!slice || !qid) return null;
-  if (slice.conviction && Object.prototype.hasOwnProperty.call(slice.conviction, qid)) {
-    return toNumberOrNull(slice.conviction[qid]);
-  }
-  return null;
-};
-
-const getImportanceFromSlice = (slice, qid) => {
-  if (!slice || !qid) return null;
-  if (slice.importance && Object.prototype.hasOwnProperty.call(slice.importance, qid)) {
-    return toNumberOrNull(slice.importance[qid]);
-  }
-  return null;
-};
-
-// Multichoice answers may be stored as a string or array; normalize for UI logic.
-const normalizeMultichoiceValue = (value) => {
-  if (Array.isArray(value)) return value;
-  if (value === undefined || value === null || value === '') return [];
-  return [value];
-};
-
-// singleSelect enforces one option even though the UI uses checkboxes for consistency.
-const isSingleSelectMultichoice = (question) => {
-  if (!question || question.type !== 'multichoice') return false;
-  return !!(question.singleSelect || question.oneSelectionOnly || question.singleChoice);
-};
 
 const normalizeQuestionIdKey = (value) => String(value || '').trim().toLowerCase();
 
@@ -525,17 +437,6 @@ export {
   isSurveyPerfCountersEnabled,
   bumpSurveyPerfCounter,
   scheduleMicrotask,
-  toNumberOrNull,
-  getNormalizedUiRatingValue,
-  clampSliderValue,
-  getConvictionFromResponse,
-  getImportanceFromResponse,
-  buildRatingEnvelopeQidSetFromUserAnswers,
-  getConvictionFromSlice,
-  getConvictionFromSliceStrict,
-  getImportanceFromSlice,
-  normalizeMultichoiceValue,
-  isSingleSelectMultichoice,
   normalizeQuestionIdKey,
   buildSliceToken,
   buildSurveyResponseSliceSignature,
