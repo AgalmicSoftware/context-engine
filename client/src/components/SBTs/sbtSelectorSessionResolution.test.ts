@@ -5,7 +5,7 @@ import {
 
 describe('sbtSelectorSessionResolution', () => {
   it('prefers a resolved session slug from sessionName without alias collapsing', () => {
-    const resolveSessionSlugByName = jest.fn((name) => (
+    const resolveSessionSlugByName = jest.fn((name: string) => (
       name === 'Weyl v. Yarvin Debate' ? 'debate' : null
     ));
 
@@ -39,7 +39,7 @@ describe('sbtSelectorSessionResolution', () => {
     expect(resolveSbtSelectorSelectedSessionContext({
       sessionName: ' Context Engine ',
       activeSessionSlug: 'edge',
-      resolveSessionSlugByName: (name) => (name.trim() === 'Context Engine' ? '' : null),
+      resolveSessionSlugByName: (name: string) => (name.trim() === 'Context Engine' ? '' : null),
     })).toEqual({
       sessionName: 'Context Engine',
       sessionSlug: '',
