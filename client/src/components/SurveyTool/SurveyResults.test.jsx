@@ -1,6 +1,8 @@
 import fs from 'fs';
 import path from 'path';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { MemoryRouter } from 'react-router-dom';
 import ConnectedSurveyResults, {
   countQuestionModeResponses,
   hasAnyCountableSurveyAnswer,
@@ -30,6 +32,43 @@ jest.mock('./SingleQuestionResponse', () => (props) => {
   mockSingleQuestionResponse(props);
   return null;
 });
+const mockDemoAnalysisWorkspace = jest.fn(() => null);
+jest.mock('../DemoViews/DemoAnalysis/DemoAnalysisWorkspace', () => ({
+  __esModule: true,
+  default: (props) => {
+    mockDemoAnalysisWorkspace(props);
+    return <div data-testid="surveyresults-demo-breakdown-view">Demo Breakdown View</div>;
+  },
+}));
+const mockDebateMap = jest.fn(() => null);
+jest.mock('../DebateMap/DebateMap', () => ({
+  __esModule: true,
+  default: (props) => {
+    mockDebateMap(props);
+    return (
+      <div data-testid="surveyresults-demo-atlas-view">
+        Demo Atlas View
+        {props?.requestedModalNodeId ? `:${props.requestedModalNodeId}` : ''}
+      </div>
+    );
+  },
+}));
+const mockRiskMatrix = jest.fn(() => null);
+jest.mock('../MainContent/RiskMatrix', () => ({
+  __esModule: true,
+  default: (props) => {
+    mockRiskMatrix(props);
+    return (
+      <button
+        type="button"
+        data-testid="surveyresults-demo-risk-matrix-view"
+        onClick={() => props?.onOpenAtlasNode?.('atlas-node-1')}
+      >
+        Demo Risk Matrix View
+      </button>
+    );
+  },
+}));
 
 const SurveyResults = ConnectedSurveyResults.WrappedComponent;
 
@@ -85,10 +124,21 @@ const normalizeChildren = (children) => {
   return [children].filter(Boolean);
 };
 
+const renderSubjectTree = (subject) => (
+  render(
+    <MemoryRouter>
+      {subject.render()}
+    </MemoryRouter>
+  )
+);
+
 beforeEach(() => {
   mockSbtFilter.mockClear();
   mockPolisReport.mockClear();
   mockSingleQuestionResponse.mockClear();
+  mockDemoAnalysisWorkspace.mockClear();
+  mockDebateMap.mockClear();
+  mockRiskMatrix.mockClear();
 });
 
 const treeHasText = (node, text) => {
@@ -661,16 +711,17 @@ describe('SurveyResults session resolution', () => {
       tree,
       (node) => typeof node?.props?.className === 'string' && node.props.className.includes('modalHeaderCornerActions')
     );
-    const controlChildren = normalizeChildren(controls?.props?.children);
-    const syncStatusIndex = controlChildren.findIndex(
+    const syncStatus = findElement(
+      controls,
       (child) => typeof child?.props?.className === 'string' && child.props.className.includes('syncStatusContainer')
     );
-    const selectorInControls = controlChildren.findIndex(
+    const selectorInControls = findElement(
+      controls,
       (child) => child?.props?.['data-testid'] === 'ce-surveyresults-session-selector'
     );
 
-    expect(syncStatusIndex).toBeGreaterThanOrEqual(0);
-    expect(selectorInControls).toBe(-1);
+    expect(syncStatus).toBeTruthy();
+    expect(selectorInControls).toBeNull();
     expect(cornerActions).toBeNull();
   });
 
@@ -1023,6 +1074,7 @@ describe('SurveyResults module styles', () => {
     expect(scss).toMatch(/\.aggregatorSummaryCard\s*{[\s\S]*?background-color:\s*var\(--ce-color-surface\) !important;/);
     expect(scss).not.toMatch(/\.aggregatorSummaryCard\s*{[\s\S]*?background-color:\s*#dce3f7 !important;/);
     expect(scss).toMatch(/\.surveyResultsResponseCard\s*{[\s\S]*?background:\s*rgba\(50,\s*56,\s*117,\s*0\.96\) !important;/);
+    expect(scss).toMatch(/\.surveyResultsResponseCardBody\s*{[\s\S]*?padding:\s*0 !important;/);
     expect(scss).toMatch(/\.surveyResultsAggregatorPanel\s*{[\s\S]*?background:\s*rgba\(30,\s*36,\s*94,\s*0\.92\);/);
     expect(scss).toMatch(/\.lockedBanner\s*{[\s\S]*?background:\s*rgba\(23,\s*25,\s*65,\s*0\.96\);[\s\S]*?border-left:\s*4px solid rgba\(77,\s*255,\s*164,\s*0\.7\);[\s\S]*?color:\s*(?:var\(--ce-color-panel-text\)|#f4f7ff);/);
     expect(scss).toMatch(/\.lockedBannerCaret\s*{[\s\S]*?margin:\s*8px 0 0 auto;[\s\S]*?padding:\s*0;/);
@@ -1038,6 +1090,9 @@ describe('SurveyResults module styles', () => {
     expect(scss).toMatch(/\.exportAndFilterContainer\s*{[\s\S]*?background:\s*#f3f5f9;/);
     expect(scss).toMatch(/#questionFilterButton\s*{[\s\S]*?background-color:\s*#1f2733 !important;[\s\S]*?color:\s*#f8fafc !important;/);
     expect(scss).toMatch(/\.filterSummaryBox\s*{[\s\S]*?color:\s*#4b5563;/);
+    expect(scss).toMatch(/\.demoResultsAtlasSurface\s*{[\s\S]*?padding:\s*1rem;/);
+    expect(scss).toMatch(/\.demoResultsAtlasSurface\s*{[\s\S]*?border:\s*1px solid rgba\(19,\s*34,\s*86,\s*0\.2\);/);
+    expect(scss).toMatch(/\.demoResultsAtlasSurface\s*{[^}]*background:\s*[^;]*rgba\(18,\s*28,\s*67,\s*0\.96\)[^;]*rgba\(8,\s*12,\s*28,\s*0\.995\)[^;]*;/);
   });
 });
 
@@ -1820,6 +1875,264 @@ describe('SurveyResults question table counts', () => {
   });
 });
 
+describe('SurveyResults filter summary counts', () => {
+  it('shows hydrated filtered counts while question-mode sync is still catching up', () => {
+    const subject = createSubject({
+      isOpen: true,
+      viewMode: 'questions',
+      isQuestionCacheReady: false,
+      isResponsesCacheReady: false,
+    });
+
+    subject.state = {
+      ...subject.state,
+      viewMode: 'questions',
+      totalQuestionsCount: 33,
+      totalResponsesCount: 88,
+      filteredQuestionsCount: 17,
+      filteredResponsesCount: 29,
+      questionResultsHydrated: true,
+      networkLatestBlock: 100,
+      questionLocalBlock: 40,
+      responseLocalBlock: 25,
+      questionResponses: {
+        q1: {
+          '0xaaa': { answer: { value: 'Visible answer' } },
+        },
+      },
+      aggregatorQuestionResponses: {
+        q1: [
+          {
+            responder: '0xaaa',
+            response: { answer: { value: 'Visible answer' } },
+          },
+        ],
+      },
+      sbtFilteredAggregatorQuestionResponses: {
+        q1: [
+          {
+            responder: '0xaaa',
+            response: { answer: { value: 'Visible answer' } },
+          },
+        ],
+      },
+    };
+
+    const tree = subject.render();
+    const summaryNode = findElement(
+      tree,
+      (element) =>
+        typeof element?.props?.className === 'string' &&
+        element.props.className.includes('filterSummaryText')
+    );
+    const spinnerNodes = collectTreeNodes(
+      summaryNode,
+      (element) => element?.props?.icon?.iconName === 'spinner'
+    );
+
+    expect(summaryNode).toBeTruthy();
+    expect(treeHasText(summaryNode, '17')).toBe(true);
+    expect(treeHasText(summaryNode, '29')).toBe(true);
+    expect(spinnerNodes).toHaveLength(0);
+  });
+
+  it('keeps the summary spinners while counts have not hydrated yet', () => {
+    const subject = createSubject({
+      isOpen: true,
+      viewMode: 'questions',
+      isQuestionCacheReady: false,
+      isResponsesCacheReady: false,
+    });
+
+    subject.state = {
+      ...subject.state,
+      viewMode: 'questions',
+      totalQuestionsCount: 0,
+      totalResponsesCount: 0,
+      filteredQuestionsCount: null,
+      filteredResponsesCount: 0,
+      questionResultsHydrated: false,
+      networkLatestBlock: 100,
+      questionLocalBlock: 0,
+      responseLocalBlock: 0,
+      questionResponses: {},
+      aggregatorQuestionResponses: {},
+      sbtFilteredAggregatorQuestionResponses: {},
+    };
+
+    const tree = subject.render();
+    const summaryNode = findElement(
+      tree,
+      (element) =>
+        typeof element?.props?.className === 'string' &&
+        element.props.className.includes('filterSummaryText')
+    );
+    const spinnerNodes = collectTreeNodes(
+      summaryNode,
+      (element) => element?.props?.icon?.iconName === 'spinner'
+    );
+
+    expect(summaryNode).toBeTruthy();
+    expect(spinnerNodes).toHaveLength(2);
+  });
+});
+
+describe('SurveyResults demo results views', () => {
+  it('shows the demo results switcher only for demo question results', () => {
+    const nonDemoSubject = createSubject({
+      isOpen: true,
+      viewMode: 'questions',
+      sessionSlug: 'edge',
+    });
+    nonDemoSubject.state = {
+      ...nonDemoSubject.state,
+      viewMode: 'questions',
+    };
+
+    const nonDemoTree = nonDemoSubject.render();
+    const nonDemoNav = findElement(
+      nonDemoTree,
+      (element) => element?.props?.['data-testid'] === 'ce-surveyresults-demo-view-nav'
+    );
+    expect(nonDemoNav).toBeNull();
+
+    const demoSubject = createSubject({
+      isOpen: true,
+      viewMode: 'questions',
+      sessionSlug: 'demo',
+    });
+    demoSubject.state = {
+      ...demoSubject.state,
+      viewMode: 'questions',
+    };
+
+    const demoTree = demoSubject.render();
+    const demoNav = findElement(
+      demoTree,
+      (element) => element?.props?.['data-testid'] === 'ce-surveyresults-demo-view-nav'
+    );
+    const headerControls = findElement(
+      demoTree,
+      (element) =>
+        typeof element?.props?.className === 'string' &&
+        element.props.className.includes('modalHeaderControls')
+    );
+    const headerControlChildren = normalizeChildren(headerControls?.props?.children);
+    const syncIndex = headerControlChildren.findIndex(
+      (child) =>
+        typeof child?.props?.className === 'string' &&
+        child.props.className.includes('syncStatusContainer')
+    );
+    const demoNavIndex = headerControlChildren.findIndex(
+      (child) => child?.props?.['data-testid'] === 'ce-surveyresults-demo-view-nav'
+    );
+
+    expect(demoNav).toBeTruthy();
+    expect(treeHasText(demoNav, 'Report')).toBe(true);
+    expect(treeHasText(demoNav, 'Breakdown')).toBe(true);
+    expect(treeHasText(demoNav, 'Atlas')).toBe(true);
+    expect(treeHasText(demoNav, 'Risk Matrix')).toBe(true);
+    expect(syncIndex).toBeGreaterThanOrEqual(0);
+    expect(demoNavIndex).toBeGreaterThan(syncIndex);
+  });
+
+  it('switches the demo modal surface from the top bar buttons and maps report to Polis', async () => {
+    const subject = attachStateHarness(createSubject({
+      isOpen: true,
+      viewMode: 'questions',
+      sessionSlug: 'demo',
+    }));
+
+    subject.state = {
+      ...subject.state,
+      viewMode: 'questions',
+      totalQuestionsCount: 4,
+      totalResponsesCount: 7,
+      filteredQuestionsCount: 4,
+      filteredResponsesCount: 7,
+      questionResultsHydrated: true,
+      networkLatestBlock: 50,
+      questionLocalBlock: 50,
+      responseLocalBlock: 50,
+      questionResponses: {
+        q1: {
+          '0xaaa': { answer: { value: 'Visible answer' } },
+        },
+      },
+      aggregatorQuestionResponses: {
+        q1: [
+          {
+            responder: '0xaaa',
+            response: { answer: { value: 'Visible answer' } },
+          },
+        ],
+      },
+      sbtFilteredAggregatorQuestionResponses: {
+        q1: [
+          {
+            responder: '0xaaa',
+            response: { answer: { value: 'Visible answer' } },
+          },
+        ],
+      },
+    };
+
+    const { rerender } = renderSubjectTree(subject);
+    const rerenderSubject = () => rerender(
+      <MemoryRouter>
+        {subject.render()}
+      </MemoryRouter>
+    );
+
+    expect(screen.getByTestId('ce-surveyresults-demo-view-report')).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.queryByTestId('ce-surveyresults-demo-surface-report')).not.toBeInTheDocument();
+    expect(mockPolisReport).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByTestId('ce-surveyresults-demo-view-report'));
+    rerenderSubject();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('ce-surveyresults-demo-surface-report')).toBeInTheDocument();
+    });
+    expect(mockPolisReport).toHaveBeenCalled();
+    expect(subject.state.demoResultsViewMode).toBe('report');
+    expect(screen.getByTestId('ce-surveyresults-demo-view-report')).toHaveAttribute('aria-pressed', 'true');
+
+    fireEvent.click(screen.getByTestId('ce-surveyresults-demo-view-report'));
+    rerenderSubject();
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('ce-surveyresults-demo-surface-report')).not.toBeInTheDocument();
+    });
+    expect(subject.state.demoResultsViewMode).toBe('raw');
+    expect(screen.getByTestId('ce-surveyresults-demo-view-report')).toHaveAttribute('aria-pressed', 'false');
+
+    fireEvent.click(screen.getByTestId('ce-surveyresults-demo-view-breakdown'));
+    rerenderSubject();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('surveyresults-demo-breakdown-view')).toBeInTheDocument();
+    });
+    expect(subject.state.demoResultsViewMode).toBe('breakdown');
+
+    fireEvent.click(screen.getByTestId('ce-surveyresults-demo-view-riskMatrix'));
+    rerenderSubject();
+
+    const riskMatrixView = await screen.findByTestId('surveyresults-demo-risk-matrix-view');
+    expect(riskMatrixView).toBeInTheDocument();
+    expect(subject.state.demoResultsViewMode).toBe('riskMatrix');
+
+    fireEvent.click(riskMatrixView);
+    rerenderSubject();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('surveyresults-demo-atlas-view')).toHaveTextContent('atlas-node-1');
+    });
+    expect(subject.state.demoResultsViewMode).toBe('atlas');
+    expect(screen.getByTestId('ce-surveyresults-demo-view-atlas')).toHaveAttribute('aria-pressed', 'true');
+  });
+});
+
 describe('SurveyResults.resolveSummaryQuestionType', () => {
   it('infers freeform from response.answer.type when question metadata is missing', () => {
     const subject = createSubject();
@@ -1930,12 +2243,14 @@ describe('SurveyResults Polis report props', () => {
       isQuestionCacheReady: false,
       isResponsesCacheReady: false,
       questionScanProgress: progress,
-      sessionSlug: 'edge',
-      activeSessionSlug: 'edge',
+      sessionSlug: 'demo',
+      activeSessionSlug: 'demo',
+      viewMode: 'questions',
     });
     subject.state = {
       ...subject.state,
-      polisReportSelected: true,
+      viewMode: 'questions',
+      demoResultsViewMode: 'report',
       aggregatorQuestionResponses: {},
       sbtFilteredAggregatorQuestionResponses: {},
     };
@@ -2370,7 +2685,7 @@ describe('SurveyResults export/view controls', () => {
       ...subject.state,
       viewMode: 'questions',
       exportAreaOpen: true,
-      exportType: 'CSV (Responses)',
+      exportType: '.csv',
       aggregateQuestionResponses: {},
       sbtFilteredAggregatorQuestionResponses: {},
       responses: [],
@@ -2379,9 +2694,11 @@ describe('SurveyResults export/view controls', () => {
 
     const tree = subject.render();
 
-    expect(treeHasText(tree, 'CSV (Responses)')).toBe(true);
-    expect(treeHasText(tree, 'CSV (Questions)')).toBe(true);
-    expect(treeHasText(tree, 'Polis Report')).toBe(true);
+    expect(treeHasText(tree, '.csv')).toBe(true);
+    expect(treeHasText(tree, '.json')).toBe(true);
+    expect(treeHasText(tree, 'CSV (Responses)')).toBe(false);
+    expect(treeHasText(tree, 'CSV (Questions)')).toBe(false);
+    expect(treeHasText(tree, 'Polis Report')).toBe(false);
   });
 
   it('exports survey-response CSV from current individual payloads with metadata fallbacks and latest-row dedupe', () => {
@@ -2513,36 +2830,76 @@ describe('SurveyResults export/view controls', () => {
     expect(lines).toHaveLength(2);
   });
 
-  it('exports filtered question metadata CSV for the current question set', () => {
+  it('exports results JSON for the current filtered question view', () => {
     const subject = attachStateHarness(createSubject({
       viewMode: 'questions',
+      sessionSlug: 'demo',
     }));
 
     subject.state = {
       ...subject.state,
       viewMode: 'questions',
+      surveyTitle: 'Demo Survey',
+      totalQuestionsCount: 2,
+      filteredQuestionsCount: 1,
+      totalResponsesCount: 5,
+      filteredResponsesCount: 2,
+      filterState: {
+        sbtFilter: {
+          selectedTraits: ['builder'],
+        },
+      },
       sbtFilteredAggregatorQuestionResponses: {
         q1: [{ responder: '0xabc', response: { answer: { value: 'Agree' } } }],
-        q2: [{ responder: '0xdef', response: { answer: { value: 'Disagree' } } }],
       },
+      sbtFilteredResponses: [
+        {
+          responder: '0xabc',
+          response: {
+            responses: [{ questionId: 'q1', answer: { value: 'Agree' } }],
+          },
+        },
+      ],
     };
 
     subject.getNetworkQuestionsForCurrentContext = jest.fn(() => ({
       q1: {
         id: 'Q1',
-        prompt: 'Prompt "One"',
+        prompt: 'Prompt One',
         type: 'multichoice',
         tags: ['governance', 'ai'],
         options: ['Alpha', 'Beta'],
       },
     }));
 
-    const csv = subject.generateQuestionsCSV();
-    const lines = csv.split('\n');
+    const exported = JSON.parse(subject.generateResultsJSON());
 
-    expect(lines[0]).toBe('"questionID","prompt","type","tags","options"');
-    expect(lines[1]).toBe('"Q1","Prompt ""One""","multichoice","governance;ai","Alpha;Beta"');
-    expect(lines[2]).toBe('"q2","(Metadata not found)","","",""');
+    expect(exported.sessionSlug).toBe('demo');
+    expect(exported.viewMode).toBe('questions');
+    expect(exported.surveyTitle).toBe('Demo Survey');
+    expect(exported.counts).toEqual({
+      totalQuestions: 2,
+      filteredQuestions: 1,
+      totalResponses: 5,
+      filteredResponses: 2,
+    });
+    expect(exported.filterState).toEqual({
+      sbtFilter: {
+        selectedTraits: ['builder'],
+      },
+    });
+    expect(exported.filteredQuestions).toEqual([
+      {
+        id: 'Q1',
+        prompt: 'Prompt One',
+        type: 'multichoice',
+        tags: ['governance', 'ai'],
+        options: ['Alpha', 'Beta'],
+      },
+    ]);
+    expect(exported.filteredQuestionResponses.q1).toHaveLength(1);
+    expect(exported.filteredResponses).toHaveLength(1);
+    expect(typeof exported.exportedAt).toBe('string');
   });
 
   it('rejects unknown export types through the invalid-export fallback', () => {

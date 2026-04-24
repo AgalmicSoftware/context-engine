@@ -83,6 +83,13 @@
   gap: 10px;
 }
 
+.modalHeaderTitleBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  min-width: 0;
+}
+
 .modalHeaderControls {
   display: flex;
   align-items: center;
@@ -97,6 +104,71 @@
   font-weight: bold;
   margin: 0;
   color: var(--ce-color-black);
+}
+
+.demoResultsViewNav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.demoResultsViewButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border: 1px solid rgba(15, 94, 199, 0.18);
+  background: rgba(15, 94, 199, 0.08);
+  color: #1a4e94;
+  border-radius: var(--ce-radius-pill);
+  padding: 0.45rem 0.85rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1;
+  transition:
+    background-color 0.18s ease,
+    border-color 0.18s ease,
+    color 0.18s ease,
+    transform 0.18s ease;
+
+  &:hover,
+  &:focus {
+    background: rgba(15, 94, 199, 0.14);
+    border-color: rgba(15, 94, 199, 0.28);
+    color: #0e3d79;
+    transform: translateY(-1px);
+  }
+}
+
+.demoResultsViewButtonActive {
+  background: #0f5ec7;
+  border-color: #0f5ec7;
+  color: var(--ce-color-white);
+  box-shadow: 0 10px 24px rgba(15, 94, 199, 0.2);
+
+  &:hover,
+  &:focus {
+    background: #0b4da6;
+    border-color: #0b4da6;
+    color: var(--ce-color-white);
+  }
+}
+
+.demoResultsSurface {
+  min-height: 32rem;
+}
+
+.demoResultsAtlasSurface {
+  max-height: 72vh;
+  overflow-y: auto;
+  padding: 1rem;
+  border: 1px solid rgba(19, 34, 86, 0.2);
+  border-radius: var(--ce-radius-20);
+  background:
+    radial-gradient(circle at top, rgba(77, 116, 228, 0.16) 0%, rgba(18, 28, 67, 0.96) 36%, rgba(8, 12, 28, 0.995) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 20px 44px rgba(6, 10, 24, 0.24);
 }
 
 .closeButton {
@@ -531,6 +603,15 @@
     justify-content: flex-start;
   }
 
+  .demoResultsViewNav {
+    width: 100%;
+  }
+
+  .demoResultsViewButton {
+    flex: 1 1 calc(50% - 0.55rem);
+    justify-content: center;
+  }
+
   .lockedSummaryToggle {
     order: -1;
   }
@@ -676,7 +757,7 @@
 }
 
 .surveyResultsResponseCardBody {
-  padding: 28px 28px 30px !important;
+  padding: 0 !important;
 }
 
 .surveyResultsResponseCardLinks {
@@ -1734,6 +1815,10 @@ grey background, white text, bigger icons, etc.
     flex-direction: row;
     flex-wrap: wrap;
     align-items: center;
+  }
+
+  .modalHeaderTitleBlock {
+    width: 100%;
   }
 
   .modalTitle {

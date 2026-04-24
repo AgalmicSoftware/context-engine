@@ -1,6 +1,6 @@
 /** @file SurveyResults.tsx */
 
-import React, { Component } from 'react';
+import React, { Component, Suspense } from 'react';
 import { connect } from 'react-redux';
 import {
   Button,
@@ -83,6 +83,7 @@ import { resolveSbtDisplayLabel } from '../../utilities/sbt/sbtDisplayNames.js';
 import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { t } from '../../utilities/ui/terminology.js';
+import LazyFallback from '../Shared/LazyFallback';
 import {
   resolveSurveyResultsExplicitSessionSlug,
   resolveSurveyResultsQuestionReadScope,
@@ -96,6 +97,10 @@ import {
 } from '../../utilities/session/sessionScanScope.js';
 
 const surveyLog = createLogger('surveys');
+const DemoAnalysisWorkspace = React.lazy(() => import('../DemoViews/DemoAnalysis/DemoAnalysisWorkspace'));
+const DebateMap = React.lazy(() => import('../DebateMap/DebateMap'));
+const RiskMatrix = React.lazy(() => import('../MainContent/RiskMatrix'));
+const DebateMapAny: any = DebateMap;
 const LATEST_BLOCK_POLL_THROTTLE_MS = 8000;
 const RESPONSE_PARSE_MEMO_MAX_SIZE = 500;
 const LOCAL_STORAGE_POLL_MIN_MS = 2000;
@@ -754,7 +759,7 @@ class SurveyResults extends Component<any, any> {
       responses: [],
       sbtFilteredResponses: [],
       csvData: '',
-      exportType: 'Polis Report',
+      exportType: '.csv',
       alertMessage: '',
       loading: false,
       surveyTitle: '',
@@ -780,7 +785,8 @@ class SurveyResults extends Component<any, any> {
       surveyViewMode: 'individuals', // aggregator vs. individuals
       exportAreaOpen: false,
       aggregateQuestionResponses: {},
-      polisReportSelected: false,
+      questionResultsHydrated: false,
+      surveyResultsHydrated: false,
 
       // chunk-based progress placeholders (not fully used)
       questionPartialLoading: false,
@@ -813,6 +819,8 @@ class SurveyResults extends Component<any, any> {
       lockedResponseDetailsOpen: false,
       lockedResponsesDecrypting: false,
       decryptedResponseOverrides: {},
+      demoResultsViewMode: 'raw',
+      demoResultsAtlasNodeId: null,
     };
 
     this.questionIdTableRef = React.createRef();
@@ -910,7 +918,6 @@ class SurveyResults extends Component<any, any> {
     this._unsubscribeCacheUpdates = null;
     this._lastNotifiedFilterStateSignature = null;
     this._pendingFilterLoadingValue = null;
-    this._scrollToPolisReportTimer = null;
     this._bookmarkFeedbackTimer = null;
   }
 
@@ -1065,6 +1072,7 @@ class SurveyResults extends Component<any, any> {
       totalResponsesCount: 0,
       filteredResponsesCount: 0,
       filteredQuestionsCount: 0,
+      questionResultsHydrated: false,
     };
   }
 
@@ -1410,10 +1418,6 @@ class SurveyResults extends Component<any, any> {
       this._unsubscribeCacheUpdates();
     }
     this._unsubscribeCacheUpdates = null;
-    if (this._scrollToPolisReportTimer) {
-      clearTimeout(this._scrollToPolisReportTimer);
-      this._scrollToPolisReportTimer = null;
-    }
     if (this._scrollToQuestionRetryTimer) {
       clearTimeout(this._scrollToQuestionRetryTimer);
       this._scrollToQuestionRetryTimer = null;
@@ -1485,6 +1489,10 @@ class SurveyResults extends Component<any, any> {
     // If the modal just closed, revert the URL and stop polling
     if (prevProps.isOpen && !this.props.isOpen) {
       clearResponseParseMemo();
+      queueStatePatch('questionResultsHydrated', false);
+      queueStatePatch('surveyResultsHydrated', false);
+      queueStatePatch('demoResultsViewMode', 'raw');
+      queueStatePatch('demoResultsAtlasNodeId', null);
       if (!this.props.preventUrlChange) {
         let basePath;
         if (this.state.viewMode === 'questions') {
@@ -1505,6 +1513,13 @@ class SurveyResults extends Component<any, any> {
     // If the modal just opened
     if (!prevProps.isOpen && this.props.isOpen) {
       this.resetLocalStoragePollingBackoff('modal-open');
+      if (String(this.state.viewMode || '').trim().toLowerCase() === 'questions') {
+        queueStatePatch('questionResultsHydrated', false);
+      } else {
+        queueStatePatch('surveyResultsHydrated', false);
+      }
+      queueStatePatch('demoResultsViewMode', 'raw');
+      queueStatePatch('demoResultsAtlasNodeId', null);
       // Reset then re-seed sync timer if currently loading
       const isSyncedOnOpen = this.getIsSyncedForState(this.state);
       this._syncLoadingStartedAt = isSyncedOnOpen ? null : Date.now();
@@ -1572,6 +1587,12 @@ class SurveyResults extends Component<any, any> {
           refreshTargetQuestionBlock: 0,
           refreshTargetResponseBlock: 0,
           refreshTargetSurveyBlock: 0,
+          questionResultsHydrated:
+            this.state.viewMode === 'questions' ? false : this.state.questionResultsHydrated,
+          surveyResultsHydrated:
+            this.state.viewMode === 'survey' ? false : this.state.surveyResultsHydrated,
+          demoResultsViewMode: 'raw',
+          demoResultsAtlasNodeId: null,
           // If switching to questions, clear surveyId
           surveyId: this.state.viewMode === 'questions' ? '' : this.state.surveyId,
         },
@@ -1592,6 +1613,9 @@ class SurveyResults extends Component<any, any> {
             viewMode: 'survey',
             surveyLocalBlock: 0,
             refreshTargetSurveyBlock: 0,
+            surveyResultsHydrated: false,
+            demoResultsViewMode: 'raw',
+            demoResultsAtlasNodeId: null,
           },
           () => {
             this.resetLocalStoragePollingBackoff('survey-id-prop-change');
@@ -1603,6 +1627,9 @@ class SurveyResults extends Component<any, any> {
           {
             surveyLocalBlock: 0,
             refreshTargetSurveyBlock: 0,
+            surveyResultsHydrated: false,
+            demoResultsViewMode: 'raw',
+            demoResultsAtlasNodeId: null,
           },
           () => {
             this.resetLocalStoragePollingBackoff('survey-id-state-change');
@@ -1711,6 +1738,97 @@ class SurveyResults extends Component<any, any> {
   handleFilterActivityChange: any = (isActive: any) => {
     if (this.state.isFilterActive === isActive) return;
     this.setState({ isFilterActive: isActive });
+  };
+
+  getIsDemoQuestionResultsContext: any = () => (
+    String(this.state.viewMode || '').trim().toLowerCase() === 'questions' &&
+    normalizeSessionSlug(this.getEffectiveSlug()) === 'demo'
+  );
+
+  handleDemoResultsViewSelect: any = (nextView: any = 'report') => {
+    const allowedViews = new Set(['report', 'breakdown', 'atlas', 'riskMatrix']);
+    const normalizedView = allowedViews.has(nextView) ? nextView : 'report';
+    this.setState((prevState: any) => ({
+      demoResultsViewMode:
+        prevState.demoResultsViewMode === normalizedView ? 'raw' : normalizedView,
+      demoResultsAtlasNodeId:
+        normalizedView === 'atlas' ? prevState.demoResultsAtlasNodeId : null,
+    }));
+  };
+
+  handleDemoAtlasOpen: any = (nodeId: any = '') => {
+    const normalizedNodeId = String(nodeId || '').trim();
+    this.setState({
+      demoResultsViewMode: 'atlas',
+      demoResultsAtlasNodeId: normalizedNodeId || null,
+    });
+  };
+
+  handleDemoAtlasModalClose: any = () => {
+    if (!this.state.demoResultsAtlasNodeId) return;
+    this.setState({ demoResultsAtlasNodeId: null });
+  };
+
+  renderDemoResultsSurface: any = (viewKey: any = 'report') => {
+    const activeSlug = this.getEffectiveSlug();
+    if (viewKey === 'report') {
+      return (
+        <div id="polisReportSection">
+          <PolisReport
+            questionResponses={this.getMemoizedPolisQuestionResponses(
+              true,
+              this.state.viewMode === 'survey' && this.state.surveyViewMode === 'individuals'
+                ? this.getMemoizedIndividualsAggregator(this.state.sbtFilteredResponses)
+                : (this.state.sbtFilteredAggregatorQuestionResponses || {})
+            )}
+            network={this.props.network}
+            networkChainId={this.props.networkChainId}
+            disclaimersActive={true}
+            filterState={this.props.filterState || this.state.filterState}
+            defaultTags={this.props.defaultTags}
+            isQuestionCacheReady={this.props.isQuestionCacheReady}
+            isResponsesCacheReady={this.props.isResponsesCacheReady}
+            questionScanProgress={this.props.questionScanProgress}
+            questionResponsesNonce={this.props.questionResponsesNonce}
+            slug={activeSlug}
+          />
+        </div>
+      );
+    }
+
+    if (viewKey === 'breakdown') {
+      return (
+        <Suspense fallback={<LazyFallback label="Loading Breakdown..." minHeight="30vh" />}>
+          <DemoAnalysisWorkspace />
+        </Suspense>
+      );
+    }
+
+    if (viewKey === 'atlas') {
+      return (
+        <Suspense fallback={<LazyFallback label="Loading Atlas..." minHeight="30vh" />}>
+          <div className={styles.demoResultsAtlasSurface}>
+            <DebateMapAny
+              activeSessionSlug={activeSlug}
+              demoMode={true}
+              embedded={true}
+              requestedModalNodeId={this.state.demoResultsAtlasNodeId}
+              onModalClose={this.state.demoResultsAtlasNodeId ? this.handleDemoAtlasModalClose : null}
+            />
+          </div>
+        </Suspense>
+      );
+    }
+
+    if (viewKey === 'riskMatrix') {
+      return (
+        <Suspense fallback={<LazyFallback label="Loading Risk Matrix..." minHeight="30vh" />}>
+          <RiskMatrix embedded={true} onOpenAtlasNode={this.handleDemoAtlasOpen} />
+        </Suspense>
+      );
+    }
+
+    return null;
   };
 
   handleClearFiltersFromParent: any = (e: any) => {
@@ -2160,7 +2278,8 @@ if (this.state.viewMode === 'survey') {
         surveyDocumentURLs: [],
         totalQuestionsCount: 0,
         totalResponsesCount: 0,
-        filteredResponsesCount: 0
+        filteredResponsesCount: 0,
+        surveyResultsHydrated: true,
       });
       return;
     }
@@ -2263,7 +2382,8 @@ if (this.state.viewMode === 'survey') {
       totalQuestionsCount: totalQCount,
       totalResponsesCount: totalRespondersCount,
       responses: rawResponses,
-      filteredResponsesCount: rawResponses.length
+      filteredResponsesCount: rawResponses.length,
+      surveyResultsHydrated: true,
     });
   }
 
@@ -2324,7 +2444,8 @@ if (this.state.isFilterActive) {
       filteredResponsesCount:
         typeof this.state.filteredResponsesCount === 'number'
           ? this.state.filteredResponsesCount
-          : initialFilteredCount
+          : initialFilteredCount,
+      questionResultsHydrated: true
     },
     () => {
       // ask the QuestionFilter to re-apply its pipeline on the fresh data
@@ -2343,7 +2464,8 @@ if (this.state.isFilterActive) {
     questionResponses: partialQR,
     totalQuestionsCount: totalQ,
     totalResponsesCount: totalResponseCount,
-    filteredResponsesCount: initialFilteredCount
+    filteredResponsesCount: initialFilteredCount,
+    questionResultsHydrated: true
   });
 }
 }
@@ -2555,99 +2677,112 @@ csvContent = header + csvRows.join('\n');
 return csvContent;
 }
 
-generateQuestionsCSV: any = () => {
-const { sbtFilteredAggregatorQuestionResponses } = this.state;
-if (!this.props.network || !this.props.network.id) {
-  this.setState({ alertMessage: 'Network not available for fetching question data.' });
-  return '';
-}
+generateResultsJSON: any = () => {
+const {
+  viewMode,
+  surveyViewMode,
+  surveyId,
+  surveyTitle,
+  totalQuestionsCount,
+  totalResponsesCount,
+  filteredQuestionsCount,
+  filteredResponsesCount,
+  filterState,
+  sbtFilteredResponses,
+  sbtFilteredAggregatorQuestionResponses,
+} = this.state;
+
 const networkQuestions = this.getNetworkQuestionsForCurrentContext();
+const filteredQuestionIDs = Object.keys(sbtFilteredAggregatorQuestionResponses || {});
+const filteredQuestions = filteredQuestionIDs.map((qId: any) => {
+  const normalizedQuestionId = typeof qId === 'string' ? qId.toLowerCase() : qId;
+  const questionData = networkQuestions[normalizedQuestionId] || networkQuestions[qId] || {};
 
-const header = '"questionID","prompt","type","tags","options"\n';
-const csvRows: any[] = [];
-
-const filteredQuestionIDs = Object.keys(sbtFilteredAggregatorQuestionResponses);
-
-if (filteredQuestionIDs.length === 0) {
-  this.setState({ alertMessage: 'No filtered questions to export.' });
-  return '';
-}
-
-filteredQuestionIDs.forEach((qId: any) => {
-  const questionData = networkQuestions[qId.toLowerCase()];
-  if (questionData) {
-    const tags = Array.isArray(questionData.tags) ? questionData.tags.join(';') : '';
-    let optionsString = '';
-    if (questionData.type === 'multichoice' && Array.isArray(questionData.options)) {
-        optionsString = questionData.options.join(';');
-    }
-    const row = [
-      `"${questionData.id || qId}"`,
-      `"${(questionData.prompt || '').replace(/"/g, '""')}"`,
-      `"${questionData.type || ''}"`,
-      `"${tags.replace(/"/g, '""')}"`,
-      `"${optionsString.replace(/"/g, '""')}"`
-    ].join(',');
-    csvRows.push(row);
-  } else {
-    const row = [`"${qId}"`, '"(Metadata not found)"', '""', '""', '""'].join(',');
-    csvRows.push(row);
-  }
+  return {
+    id: questionData.id || qId,
+    prompt: questionData.prompt || '',
+    type: questionData.type || '',
+    tags: Array.isArray(questionData.tags) ? [...questionData.tags] : [],
+    options: Array.isArray(questionData.options) ? [...questionData.options] : [],
+  };
 });
 
-return header + csvRows.join('\n');
+return JSON.stringify(
+  {
+    exportedAt: new Date().toISOString(),
+    sessionSlug: this.getEffectiveSlug() || '',
+    viewMode,
+    surveyViewMode,
+    surveyId: surveyId || null,
+    surveyTitle: surveyTitle || '',
+    counts: {
+      totalQuestions: totalQuestionsCount,
+      filteredQuestions: filteredQuestionsCount,
+      totalResponses: totalResponsesCount,
+      filteredResponses: filteredResponsesCount,
+    },
+    filterState: filterState || {},
+    filteredQuestions,
+    filteredQuestionResponses: sbtFilteredAggregatorQuestionResponses || {},
+    filteredResponses: sbtFilteredResponses || [],
+  },
+  null,
+  2
+);
+}
+
+getExportBaseFileName: any = () => {
+const { viewMode, surveyId } = this.state;
+
+if (viewMode === 'survey') {
+  const surveyIdShort = surveyId
+    ? getShortenedSurveyID(surveyId, false, null, true)
+    : 'all';
+  return `contextEngine_surveyResults_${surveyIdShort}`;
+}
+
+return 'contextEngine_questionResults';
 }
 
 downloadCSV: any = () => {
-const { exportType, viewMode, surveyId } = this.state;
+const { exportType } = this.state;
 const timestamp = new Date().toISOString().replace(/[:.-]/g, '_');
-
-if (exportType === 'Polis Report') {
-  this.setState({
-    alertMessage: 'Generated Polis Report below.',
-    polisReportSelected: true,
-  }, () => {
-    if (this._scrollToPolisReportTimer) {
-      clearTimeout(this._scrollToPolisReportTimer);
-      this._scrollToPolisReportTimer = null;
-    }
-    this._scrollToPolisReportTimer = setTimeout(() => {
-      this._scrollToPolisReportTimer = null;
-      this.scrollToPolisReport();
-    }, 300);
-  });
-  return;
-}
-
-let csvContent = '';
+let fileContent = '';
 let filename = '';
+let mimeType = 'text/plain;charset=utf-8;';
+const baseFileName = this.getExportBaseFileName();
 
 switch (exportType) {
-  case 'CSV (Responses)':
-    csvContent = this.generateResponsesCSV();
-    const forCSVName = true;
-    const surveyIdShort = surveyId ? getShortenedSurveyID(surveyId, false, null, forCSVName) : 'all';
-    surveyLog.log('surveyIdShort:', surveyIdShort);
-    const responseFileLabel = viewMode === 'survey' ? `contextEngine_surveyResponses_${surveyIdShort}` : 'contextEngine_questionsResponses';
-    filename = `${responseFileLabel}_${timestamp}.csv`;
+  case '.csv':
+    fileContent = this.generateResponsesCSV();
+    filename = `${baseFileName}_${timestamp}.csv`;
+    mimeType = 'text/csv;charset=utf-8;';
     break;
-  case 'CSV (Questions)':
-    csvContent = this.generateQuestionsCSV();
-    filename = `contextEngine_filteredQuestions_${timestamp}.csv`;
+  case '.json':
+    fileContent = this.generateResultsJSON();
+    filename = `${baseFileName}_${timestamp}.json`;
+    mimeType = 'application/json;charset=utf-8;';
     break;
   default:
     this.setState({ alertMessage: 'Invalid export type selected.' });
     return;
 }
 
-if (!csvContent || !csvContent.trim() || csvContent.split('\n').length < 2) {
+if (!fileContent || !fileContent.trim()) {
   if (!this.state.alertMessage) {
     this.setState({ alertMessage: 'No data available to download for this export type.' });
   }
   return;
 }
 
-const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+if (exportType === '.csv' && fileContent.split('\n').length < 2) {
+  if (!this.state.alertMessage) {
+    this.setState({ alertMessage: 'No data available to download for this export type.' });
+  }
+  return;
+}
+
+const blob = new Blob([fileContent], { type: mimeType });
 const url = window.URL.createObjectURL(blob);
 const a = document.createElement('a');
 a.setAttribute('hidden', '');
@@ -2659,14 +2794,7 @@ document.body.removeChild(a);
 };
 
 handleExportTypeChange: any = (type: any) => {
-this.setState({ exportType: type, polisReportSelected: false, alertMessage: '' });
-};
-
-scrollToPolisReport: any = () => {
-const element = document.getElementById('polisReportSection');
-if (element && element.scrollIntoView) {
-  element.scrollIntoView({ behavior: 'smooth', block: 'start' });
-}
+this.setState({ exportType: type, alertMessage: '' });
 };
 
 handleQuestionFilter: any = (filteredQuestionsOrCombined: any, newFilterState: any) => {
@@ -4301,7 +4429,6 @@ const {
   sbtFilteredAggregatorQuestionResponses,
   surveyTitle,
   surveyDocumentURLs,
-  polisReportSelected,
   viewMode,
   filteredQuestionsCount,
   isFilterActive,
@@ -4321,15 +4448,6 @@ const lockedResponsesModel = this.getMemoizedLockedResponsesModel(preNetworkQues
 const surveyAggregateEntries =
   (viewMode === 'survey' && surveyViewMode === 'aggregate') ? aggregatorEntries : [];
 const questionModeEntries = viewMode === 'questions' ? aggregatorEntries : [];
-const shouldUseIndividualsAggregator =
-  viewMode === 'survey' && surveyViewMode === 'individuals';
-const polisSourceAggregator = shouldUseIndividualsAggregator
-  ? this.getMemoizedIndividualsAggregator(sbtFilteredResponses)
-  : (sbtFilteredAggregatorQuestionResponses || {});
-const polisQuestionResponses = this.getMemoizedPolisQuestionResponses(
-  polisReportSelected,
-  polisSourceAggregator
-);
 
 const netBlock = this.state.networkLatestBlock || 0;
 const { questionLocalBlock, responseLocalBlock, surveyLocalBlock } = this.state;
@@ -4477,6 +4595,23 @@ const isSynced = (viewMode === 'questions' ? questionColor === 'success' && resp
 const surveyIdAbbreviation = currentSurveyId
   ? getShortenedSurveyID(currentSurveyId, false, null, false)
   : null;
+const areSummaryCountsHydrated =
+  viewMode === 'survey'
+    ? !!this.state.surveyResultsHydrated
+    : !!this.state.questionResultsHydrated;
+const isDemoQuestionResults = this.getIsDemoQuestionResultsContext();
+const demoResultsViewMode = isDemoQuestionResults
+  ? this.state.demoResultsViewMode || 'raw'
+  : 'raw';
+const isDemoAlternateResultsView = isDemoQuestionResults && demoResultsViewMode !== 'raw';
+const demoResultsViewOptions = isDemoQuestionResults
+  ? [
+      { key: 'report', label: 'Report' },
+      { key: 'breakdown', label: 'Breakdown' },
+      { key: 'atlas', label: 'Atlas' },
+      { key: 'riskMatrix', label: 'Risk Matrix' },
+    ]
+  : [];
 
 // Compute a context-aware filtered questions count for display
 let displayedFilteredQuestionsCount;
@@ -4522,11 +4657,13 @@ return (
   >
     <ModalHeader toggle={this.closeModal} className={styles.modalHeader}>
       <div className={styles.modalHeaderContent}>
-        <h2 className={styles.modalTitle}>
-          {viewMode === 'survey'
-           ? `${surveyTitle ? `${surveyTitle}` : 'Survey Results'}`
-            : 'Question Results'}
-        </h2>
+        <div className={styles.modalHeaderTitleBlock}>
+          <h2 className={styles.modalTitle}>
+            {viewMode === 'survey'
+             ? `${surveyTitle ? `${surveyTitle}` : 'Survey Results'}`
+              : 'Question Results'}
+          </h2>
+        </div>
 
         {viewMode === 'survey' && currentSurveyId && (
           <div className={styles.modalSubtitle}>
@@ -4662,10 +4799,45 @@ return (
             </div>
           </div>
         </div>
+        {isDemoQuestionResults && (
+          <div
+            className={styles.demoResultsViewNav}
+            aria-label="Demo results views"
+            data-testid="ce-surveyresults-demo-view-nav"
+          >
+            {demoResultsViewOptions.map((option: any) => {
+              const isActiveView = demoResultsViewMode === option.key;
+              return (
+                <button
+                  key={option.key}
+                  type="button"
+                  className={[
+                    styles.demoResultsViewButton,
+                    isActiveView ? styles.demoResultsViewButtonActive : '',
+                  ].filter(Boolean).join(' ')}
+                  aria-pressed={isActiveView}
+                  data-testid={`ce-surveyresults-demo-view-${option.key}`}
+                  onClick={() => this.handleDemoResultsViewSelect(option.key)}
+                >
+                  {option.label}
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
     </ModalHeader>
 
     <ModalBody className={styles.modalBody}>
+      {isDemoAlternateResultsView ? (
+        <div
+          className={styles.demoResultsSurface}
+          data-testid={`ce-surveyresults-demo-surface-${demoResultsViewMode}`}
+        >
+          {this.renderDemoResultsSurface(demoResultsViewMode)}
+        </div>
+      ) : (
+        <>
       {alertMessage && !filterLoading && (
         <Alert color="info" className={styles.alertMessage}>
           {alertMessage}
@@ -4787,7 +4959,7 @@ return (
         <p className={styles.filterSummaryText}>
           Questions: <strong>{totalQuestionsCount}</strong> ‎  Filtered:{' '}
           <strong>
-            {this.state.filterLoading || !isSynced ? (
+            {filterLoading || !areSummaryCountsHydrated ? (
               <FontAwesomeIcon icon={faSpinner} spin />
             ) : (
               // Context-aware filtered questions count:
@@ -4797,7 +4969,7 @@ return (
           <br />
           Responses: <strong>{totalResponsesCount}</strong> ‎  Filtered:{' '}
           <strong>
-            {this.state.filterLoading || !isSynced ? (
+            {filterLoading || !areSummaryCountsHydrated ? (
               <FontAwesomeIcon icon={faSpinner} spin />
             ) : (
               filteredResponsesCount
@@ -4944,19 +5116,16 @@ return (
                     {exportType}
                   </DropdownToggle>
                   <DropdownMenu>
-                    <DropdownItem onClick={() => this.handleExportTypeChange('CSV (Responses)')}>
-                      CSV (Responses)
+                    <DropdownItem onClick={() => this.handleExportTypeChange('.csv')}>
+                      .csv
                     </DropdownItem>
-                    <DropdownItem onClick={() => this.handleExportTypeChange('CSV (Questions)')}>
-                      CSV (Questions)
-                    </DropdownItem>
-                    <DropdownItem onClick={() => this.handleExportTypeChange('Polis Report')}>
-                      Polis Report
+                    <DropdownItem onClick={() => this.handleExportTypeChange('.json')}>
+                      .json
                     </DropdownItem>
                   </DropdownMenu>
                 </UncontrolledDropdown>
                 <Button onClick={this.downloadCSV} className={styles.downloadButton}>
-                  {exportType === 'Polis Report' ? 'Generate' : 'Download'}
+                  Download
                 </Button>
               </div>
             </div>
@@ -5074,25 +5243,8 @@ return (
             !filterLoading && <p>No results yet.</p>}
         </div>
       )}
-
-    {polisReportSelected && (
-      <div id="polisReportSection">
-        <PolisReport
-          questionResponses={polisQuestionResponses}
-          network={this.props.network}
-          networkChainId={this.props.networkChainId}
-          disclaimersActive={true}
-          filterState={this.props.filterState || this.state.filterState}
-          defaultTags={this.props.defaultTags}
-          isQuestionCacheReady={this.props.isQuestionCacheReady}
-          isResponsesCacheReady={this.props.isResponsesCacheReady}
-          questionScanProgress={this.props.questionScanProgress}
-           questionResponsesNonce={this.props.questionResponsesNonce}
-           slug={this.getEffectiveSlug()}
-
-        />
-      </div>
-    )}
+        </>
+      )}
 
     </ModalBody>
 
