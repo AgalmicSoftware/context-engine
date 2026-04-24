@@ -78,7 +78,7 @@ jest.mock('../SBTs/SBTsPage', () => (props) => {
     </div>
   );
 });
-jest.mock('../PolisReport/PolisReport.jsx', () => (props) => {
+jest.mock('../PolisReport/PolisReport', () => (props) => {
   mockPolisReport(props);
   return <div data-testid="polis-report">Polis</div>;
 });
