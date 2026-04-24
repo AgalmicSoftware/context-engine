@@ -1,4 +1,7 @@
 import {
+  areEnvelopesEquivalent,
+  buildQuestionScanProgressDisplay,
+  buildSurveyDraftSemanticSignature,
   doesQuestionProgressMatchSlug,
   normalizeSurveyToolFilterState,
   shouldShowPileFullLoadingState,
@@ -12,6 +15,8 @@ import {
   shouldRenderSubmittedIndicator,
 } from './surveyToolUtils.js';
 import { serializeFilterState } from '../../utilities/survey/filterStateUtils.js';
+
+const buildQuestionScanProgressDisplayAny: any = buildQuestionScanProgressDisplay;
 
 describe('surveyToolUtils helper coverage', () => {
   it('matches pile progress slugs across general alias and empty scope', () => {
@@ -221,5 +226,117 @@ describe('surveyToolUtils helper coverage', () => {
       submittedStateActive: true,
       isLoadingResponse: false,
     })).toBe(true);
+  });
+
+  it('keeps draft semantic signature stable when only meta timestamp changes', () => {
+    const base = {
+      meta: { networkId: 84532, surveyId: 'questions', ts: 100 },
+      answers: {
+        q1: {
+          value: 'hello',
+          answerEncrypted: false,
+          answerEncryptionAudience: 'self',
+          additional: '',
+          additionalEncrypted: false,
+          additionalEncryptionAudience: 'self',
+          importance: null,
+          conviction: null,
+        },
+      },
+    };
+    const next = {
+      ...base,
+      meta: { ...base.meta, ts: 999999 },
+    };
+
+    expect(buildSurveyDraftSemanticSignature(next)).toBe(buildSurveyDraftSemanticSignature(base));
+  });
+
+  it('treats encrypted-portion changes as semantic draft changes', () => {
+    const base = {
+      meta: { networkId: 84532, surveyId: 'questions', ts: 100 },
+      answers: {
+        q1: {
+          value: '',
+          answerEncrypted: true,
+          answerEncryptionAudience: 'gate',
+          additional: '',
+          additionalEncrypted: true,
+          additionalEncryptionAudience: 'gate',
+          importance: null,
+          conviction: null,
+        },
+      },
+    };
+    const next = {
+      ...base,
+      answers: {
+        q1: {
+          ...base.answers.q1,
+          answerEncryptedPortion: 'ans-env-1',
+          additionalEncryptedPortion: 'add-env-1',
+        },
+      },
+    };
+
+    expect(buildSurveyDraftSemanticSignature(next)).not.toBe(buildSurveyDraftSemanticSignature(base));
+  });
+
+  it('treats baseline changes as semantic draft changes', () => {
+    const base = {
+      meta: { networkId: 84532, surveyId: 'questions', ts: 100 },
+      answers: {
+        q1: {
+          value: 'hello',
+          answerEncrypted: false,
+          answerEncryptionAudience: 'self',
+          additional: '',
+          additionalEncrypted: false,
+          additionalEncryptionAudience: 'self',
+          importance: null,
+          conviction: null,
+        },
+      },
+    };
+    const next = {
+      ...base,
+      baseline: {
+        q1: {
+          value: 'hello',
+          answerEncrypted: true,
+          answerEncryptionAudience: 'gate',
+          answerEncryptedPortion: 'ans-base-1',
+          additional: '',
+          additionalEncrypted: false,
+          additionalEncryptionAudience: 'self',
+          importance: null,
+          conviction: null,
+        },
+      },
+    };
+
+    expect(buildSurveyDraftSemanticSignature(next)).not.toBe(buildSurveyDraftSemanticSignature(base));
+  });
+
+  it('treats empty envelopes as equivalent only when both sides are encrypted', () => {
+    expect(areEnvelopesEquivalent('env-a', 'env-a', true, true)).toBe(true);
+    expect(areEnvelopesEquivalent('env-a', 'env-b', true, true)).toBe(false);
+    expect(areEnvelopesEquivalent('', '', true, true)).toBe(true);
+    expect(areEnvelopesEquivalent('', '', true, false)).toBe(false);
+    expect(areEnvelopesEquivalent('env-a', '', true, true)).toBe(false);
+  });
+
+  it('formats capped question scan progress against the requested total range', () => {
+    const display = buildQuestionScanProgressDisplayAny({
+      totalBlocks: 50000,
+      requestedTotalBlocks: 234000,
+      wasCapped: true,
+      scannedBlocks: 50000,
+      remainingBlocks: 184000,
+    });
+
+    expect(display.metaLeftText).toBe('184,000 blocks left');
+    expect(display.metaRightText).toBe('50,000 / 234,000');
+    expect(display.percentComplete).toBe(21);
   });
 });
