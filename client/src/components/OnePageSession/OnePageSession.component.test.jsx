@@ -5,7 +5,7 @@ import React from 'react';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { ethers } from 'ethers';
 import { MemoryRouter } from 'react-router-dom';
-import OnePageSession from './OnePageSession.jsx';
+import OnePageSession from './OnePageSession';
 import styles from './OnePageSession.module.scss';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import contractScripts from '../../utilities/web3/contractScripts.js';
