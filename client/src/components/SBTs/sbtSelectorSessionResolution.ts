@@ -1,12 +1,24 @@
 import { canonicalizeSessionSlug } from '../../utilities/session/canonicalSessionContext.js';
 import { toStr } from '../../utilities/shared/primitives.js';
 
+type ResolveSbtSelectorSelectedSessionOptions = {
+  sessionName?: unknown;
+  sessionSlug?: unknown;
+  activeSessionSlug?: unknown;
+  resolveSessionSlugByName?: ((sessionName: string) => unknown) | null;
+};
+
+type ResolvedSbtSelectorSelectedSessionContext = {
+  sessionName: string | null;
+  sessionSlug: string;
+};
+
 export const resolveSbtSelectorSelectedSessionSlug = ({
   sessionName,
   sessionSlug,
   activeSessionSlug,
   resolveSessionSlugByName,
-} = {}) => {
+}: ResolveSbtSelectorSelectedSessionOptions = {}): string => {
   const trimmedSessionName = toStr(sessionName).trim();
   if (trimmedSessionName && typeof resolveSessionSlugByName === 'function') {
     const resolvedByName = resolveSessionSlugByName(trimmedSessionName);
@@ -24,7 +36,7 @@ export const resolveSbtSelectorSelectedSessionContext = ({
   sessionSlug,
   activeSessionSlug,
   resolveSessionSlugByName,
-} = {}) => ({
+}: ResolveSbtSelectorSelectedSessionOptions = {}): ResolvedSbtSelectorSelectedSessionContext => ({
   sessionName: toStr(sessionName).trim() || null,
   sessionSlug: resolveSbtSelectorSelectedSessionSlug({
     sessionName,
