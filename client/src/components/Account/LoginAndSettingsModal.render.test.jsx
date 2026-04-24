@@ -11,13 +11,7 @@ jest.mock('../HooksHOC/withWagmiBridge', () => ({
 }));
 
 jest.mock('components/UserPage/UserPage', () => (props) => (
-  <div
-    data-testid="mock-user-page"
-    data-view-address={props.viewAddress || ''}
-    data-active-session-slug={props.activeSessionSlug || ''}
-    data-network-chain-id={props.networkChainId || ''}
-    data-session-config-chain-id={props.sessionConfig?.networkChainId || ''}
-  />
+  <div data-testid="mock-user-page" data-view-address={props.viewAddress || ''} />
 ));
 
 jest.mock('../Shared/CETooltip', () => ({

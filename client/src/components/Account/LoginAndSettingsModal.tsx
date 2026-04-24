@@ -40,6 +40,7 @@ import MetaMaskLogo from "assets/img/metamask_icon_white.png";
 // Reactstrap components
 import { Button, Card, CardHeader, CardBody, CardFooter, Modal } from "reactstrap";
 
+import UserPage from "components/UserPage/UserPage";
 import CETooltip from '../Shared/CETooltip';
 import SessionChipSelector from '../Shared/SessionChipSelector';
 
