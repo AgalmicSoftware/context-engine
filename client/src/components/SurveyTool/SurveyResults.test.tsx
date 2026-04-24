@@ -1,3 +1,4 @@
+import React from 'react';
 import fs from 'fs';
 import path from 'path';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
@@ -8,42 +9,48 @@ import ConnectedSurveyResults, {
   hasAnyCountableSurveyAnswer,
 } from './SurveyResults';
 import styles from './SurveyResults.module.scss';
-import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
+import * as cacheScriptsModule from '../../utilities/cache/cacheScripts.js';
 import * as contractScriptsModule from '../../utilities/web3/contractScripts.js';
 import * as sbtDisplayNameUtils from '../../utilities/sbt/sbtDisplayNames.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
-import * as sessionScanScope from '../../utilities/session/sessionScanScope.js';
+import * as sessionScanScopeModule from '../../utilities/session/sessionScanScope.js';
 import { resolveSurveyResultsQuestionReadScope } from './surveyResultsSessionResolution.js';
 import { sbtBasePath } from '../../utilities/ui/terminology.js';
 
-const mockSbtFilter = jest.fn(() => null);
-jest.mock('../SBTs/SBTFilter', () => (props) => {
+type TreeNode = any;
+type TreePredicate = (node: TreeNode) => boolean;
+type SurveyResultsProps = Record<string, any>;
+const cacheScripts: any = cacheScriptsModule;
+const sessionScanScope: any = sessionScanScopeModule;
+
+const mockSbtFilter = jest.fn((..._args: any[]) => null);
+jest.mock('../SBTs/SBTFilter', () => (props: any) => {
   mockSbtFilter(props);
   return null;
 });
 jest.mock('./QuestionFilter', () => () => null);
-const mockPolisReport = jest.fn();
-jest.mock('../PolisReport/PolisReport', () => (props) => {
+const mockPolisReport = jest.fn((..._args: any[]) => null);
+jest.mock('../PolisReport/PolisReport', () => (props: any) => {
   mockPolisReport(props);
   return null;
 });
-const mockSingleQuestionResponse = jest.fn(() => null);
-jest.mock('./SingleQuestionResponse', () => (props) => {
+const mockSingleQuestionResponse = jest.fn((..._args: any[]) => null);
+jest.mock('./SingleQuestionResponse', () => (props: any) => {
   mockSingleQuestionResponse(props);
   return null;
 });
-const mockDemoAnalysisWorkspace = jest.fn(() => null);
+const mockDemoAnalysisWorkspace = jest.fn((..._args: any[]) => null);
 jest.mock('../DemoViews/DemoAnalysis/DemoAnalysisWorkspace', () => ({
   __esModule: true,
-  default: (props) => {
+  default: (props: any) => {
     mockDemoAnalysisWorkspace(props);
     return <div data-testid="surveyresults-demo-breakdown-view">Demo Breakdown View</div>;
   },
 }));
-const mockDebateMap = jest.fn(() => null);
+const mockDebateMap = jest.fn((..._args: any[]) => null);
 jest.mock('../DebateMap/DebateMap', () => ({
   __esModule: true,
-  default: (props) => {
+  default: (props: any) => {
     mockDebateMap(props);
     return (
       <div data-testid="surveyresults-demo-atlas-view">
@@ -53,10 +60,10 @@ jest.mock('../DebateMap/DebateMap', () => ({
     );
   },
 }));
-const mockRiskMatrix = jest.fn(() => null);
+const mockRiskMatrix = jest.fn((..._args: any[]) => null);
 jest.mock('../MainContent/RiskMatrix', () => ({
   __esModule: true,
-  default: (props) => {
+  default: (props: any) => {
     mockRiskMatrix(props);
     return (
       <button
@@ -70,15 +77,15 @@ jest.mock('../MainContent/RiskMatrix', () => ({
   },
 }));
 
-const SurveyResults = ConnectedSurveyResults.WrappedComponent;
+const SurveyResults: any = (ConnectedSurveyResults as any).WrappedComponent;
 
-const createSubject = (props = {}) =>
+const createSubject = (props: SurveyResultsProps = {}): any =>
   new SurveyResults({
     network: { id: 84532 },
     ...props,
   });
 
-const attachStateHarness = (subject) => {
+const attachStateHarness = (subject: any): any => {
   subject.setState = jest.fn((updater, cb) => {
     const patch = typeof updater === 'function' ? updater(subject.state, subject.props) : updater;
     subject.state = { ...subject.state, ...(patch || {}) };
@@ -88,8 +95,8 @@ const attachStateHarness = (subject) => {
   return subject;
 };
 
-const findElement = (node, predicate) => {
-  const stack = [node];
+const findElement = (node: TreeNode, predicate: TreePredicate): TreeNode | null => {
+  const stack: TreeNode[] = [node];
   while (stack.length > 0) {
     const current = stack.pop();
     if (!current) continue;
@@ -107,7 +114,11 @@ const findElement = (node, predicate) => {
   return null;
 };
 
-const collectTreeNodes = (node, predicate, acc = []) => {
+const collectTreeNodes = (
+  node: TreeNode,
+  predicate: TreePredicate,
+  acc: TreeNode[] = []
+): TreeNode[] => {
   if (node == null) return acc;
   if (Array.isArray(node)) {
     node.forEach((child) => collectTreeNodes(child, predicate, acc));
@@ -118,13 +129,13 @@ const collectTreeNodes = (node, predicate, acc = []) => {
   return collectTreeNodes(node?.props?.children, predicate, acc);
 };
 
-const normalizeChildren = (children) => {
+const normalizeChildren = (children: TreeNode): TreeNode[] => {
   if (children == null) return [];
   if (Array.isArray(children)) return children.filter(Boolean);
   return [children].filter(Boolean);
 };
 
-const renderSubjectTree = (subject) => (
+const renderSubjectTree = (subject: any) => (
   render(
     <MemoryRouter>
       {subject.render()}
@@ -141,7 +152,7 @@ beforeEach(() => {
   mockRiskMatrix.mockClear();
 });
 
-const treeHasText = (node, text) => {
+const treeHasText = (node: TreeNode, text: string): boolean => {
   if (node == null) return false;
   if (Array.isArray(node)) return node.some((child) => treeHasText(child, text));
   if (typeof node === 'string' || typeof node === 'number') {
@@ -533,8 +544,8 @@ describe('SurveyResults session resolution', () => {
     const priorUrl = window.location.href;
     window.history.replaceState({}, '', '/questions/results?session=demo');
     try {
-      let resolveLatestBlock;
-      const latestBlockPromise = new Promise((resolve) => {
+      let resolveLatestBlock: ((value: number) => void) | null = null;
+      const latestBlockPromise = new Promise<number>((resolve) => {
         resolveLatestBlock = resolve;
       });
       jest.spyOn(contractScriptsModule.default, 'getLatestBlockNumber')
@@ -594,7 +605,7 @@ describe('SurveyResults session resolution', () => {
       expect(subject.state.totalResponsesCount).toBe(1);
       expect(subject.state.networkLatestBlock).toBe(0);
 
-      resolveLatestBlock(12345);
+      (resolveLatestBlock as any)?.(12345);
       await Promise.resolve();
       await Promise.resolve();
 
@@ -727,7 +738,7 @@ describe('SurveyResults session resolution', () => {
 
   it('canonicalizes survey display links for reserved session aliases', () => {
     const responder = '0x1111111111111111111111111111111111111111';
-    const collectSurveyLinks = (sessionSlug) => {
+    const collectSurveyLinks = (sessionSlug: string) => {
       const subject = createSubject({ sessionSlug, isOpen: true, viewMode: 'survey' });
       subject.state = {
         ...subject.state,
@@ -1446,7 +1457,7 @@ describe('SurveyResults survey-mode dedupe', () => {
 
     expect(subject.state.responses).toHaveLength(1);
     expect(
-      subject.state.responses[0].response.responses.map((row) => row.questionID || row.questionId)
+      subject.state.responses[0].response.responses.map((row: any) => row.questionID || row.questionId)
     ).toEqual(['q1', 'q2']);
     expect(subject.state.responses[0].response.responses[0]).toEqual(expect.objectContaining({
       questionID: 'q1',
@@ -1516,7 +1527,7 @@ describe('SurveyResults survey-mode dedupe', () => {
       q1: { type: 'freeform' },
       q2: { type: 'freeform' },
     }));
-    subject.parseResponse = jest.fn((response) => response);
+    subject.parseResponse = jest.fn((response: any) => response);
 
     jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace) => {
       if (namespace === 'surveysCache') return surveysCache;
@@ -1529,7 +1540,7 @@ describe('SurveyResults survey-mode dedupe', () => {
     expect(subject.state.responses).toHaveLength(1);
     expect(
       subject.state.responses[0].response.responses.map(
-        (row) => row.questionID || row.questionId || row.kind
+        (row: any) => row.questionID || row.questionId || row.kind
       )
     ).toEqual(['q1', 'legacyMeta', 'q2']);
     expect(subject.state.responses[0].response.responses[0]).toEqual(expect.objectContaining({
