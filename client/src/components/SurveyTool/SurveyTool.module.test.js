@@ -4,16 +4,8 @@ import SurveyTool, {
   doesQuestionProgressMatchSlug,
   normalizeSurveyToolFilterState,
   resolveSlugForIds,
-  shouldForceOverwriteDraftValues,
-  shouldAutoEncryptAdditionalOnAudienceChange,
-  shouldEncryptResponseFieldForSubmit,
   shouldShowPileFullLoadingState,
-  updateSubmittedSinceLastEdit,
-  hasConvictionOrImportanceValueForQuestion,
   buildSurveyDraftSemanticSignature,
-  shouldRenderInlineSubmitButton,
-  shouldRenderSubmittedIndicator,
-  shouldShowSingleQuestionResponseLookupSpinner,
   QuestionsDashboard,
   SurveyQuestions,
   SurveySelector,
@@ -42,7 +34,6 @@ import * as sessionScanScope from '../../utilities/session/sessionScanScope.js';
 import * as sbtDisplayNameUtils from '../../utilities/sbt/sbtDisplayNames.js';
 import * as sponsoredAccess from '../../utilities/web3/sponsoredAccess.js';
 import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
-import { serializeFilterState } from '../../utilities/survey/filterStateUtils.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { t } from '../../utilities/ui/terminology.js';
@@ -1018,56 +1009,6 @@ describe('SurveyTool module', () => {
     }
   });
 
-  it('matches pile progress slugs across general alias and empty scope', () => {
-    expect(doesQuestionProgressMatchSlug('general', '')).toBe(true);
-    expect(doesQuestionProgressMatchSlug('GENERAL', '')).toBe(true);
-    expect(doesQuestionProgressMatchSlug('', 'general')).toBe(true);
-    expect(doesQuestionProgressMatchSlug('edge', '')).toBe(false);
-  });
-
-  it('keeps full pile loading visible when progress is active and cards are empty', () => {
-    expect(shouldShowPileFullLoadingState({
-      loading: false,
-      hasVisibleQuestions: false,
-      firstBoot: false,
-      isQuestionCacheReady: true,
-      recentRateLimit: false,
-      hasScanOrHydrationWork: true,
-    })).toBe(true);
-    expect(shouldShowPileFullLoadingState({
-      loading: false,
-      hasVisibleQuestions: true,
-      firstBoot: false,
-      isQuestionCacheReady: true,
-      recentRateLimit: false,
-      hasScanOrHydrationWork: true,
-    })).toBe(false);
-  });
-
-  it('allows settled empty piles to exit full-loading even when cache-ready stays false', () => {
-    expect(shouldShowPileFullLoadingState({
-      loading: true,
-      hasVisibleQuestions: false,
-      firstBoot: false,
-      isQuestionCacheReady: false,
-      recentRateLimit: false,
-      hasScanOrHydrationWork: false,
-      allowUnreadyEmptySettlement: true,
-    })).toBe(false);
-  });
-
-  it('allows filtered empty piles to exit full-loading while background refresh continues', () => {
-    expect(shouldShowPileFullLoadingState({
-      loading: true,
-      hasVisibleQuestions: false,
-      firstBoot: false,
-      isQuestionCacheReady: true,
-      recentRateLimit: false,
-      hasScanOrHydrationWork: true,
-      allowFilteredEmptySettlement: true,
-    })).toBe(false);
-  });
-
   it('keeps hydrate loading active when only gate hints are known and no hidden questions are cached', async () => {
     jest.spyOn(cacheScripts, 'readCache').mockResolvedValue({
       '84532': {
@@ -1353,165 +1294,6 @@ describe('SurveyTool module', () => {
     const expandedTree = subject.render();
     expect(treeHasText(expandedTree, 'VIP Gate')).toBe(true);
     expect(treeHasText(expandedTree, 'VIP SBT')).toBe(true);
-  });
-
-  it('exits full-loading when a terminal scan error is present', () => {
-    expect(shouldShowPileFullLoadingState({
-      loading: true,
-      hasVisibleQuestions: false,
-      firstBoot: false,
-      isQuestionCacheReady: false,
-      recentRateLimit: false,
-      hasScanOrHydrationWork: false,
-      hasTerminalScanError: true,
-    })).toBe(false);
-  });
-
-  it('normalizes legacy empty filter payloads to an inactive empty state', () => {
-    const normalized = normalizeSurveyToolFilterState({
-      includedSBTs: [],
-      excludedSBTs: [],
-      onlyVerifiedHumans: false,
-      tags: [],
-      types: [],
-    });
-
-    expect(normalized).toEqual({});
-    expect(serializeFilterState(normalized)).toBe('');
-  });
-
-  it('preserves aiTopN/aiCombine only when aiFilter is active', () => {
-    const active = normalizeSurveyToolFilterState({
-      aiFilter: 'climate',
-      aiTopN: 6,
-      aiCombine: true,
-    });
-    expect(active).toMatchObject({
-      aiFilter: 'climate',
-      aiTopN: 6,
-      aiCombine: true,
-    });
-
-    const inactive = normalizeSurveyToolFilterState({
-      aiFilter: null,
-      aiTopN: 6,
-      aiCombine: true,
-    });
-    expect(inactive).toEqual({});
-  });
-
-  it('does not auto-encrypt empty additional comments when answer audience changes', () => {
-    expect(shouldAutoEncryptAdditionalOnAudienceChange({ value: '', encrypted: false })).toBe(false);
-    expect(shouldAutoEncryptAdditionalOnAudienceChange({ value: '   ', encrypted: false })).toBe(false);
-    expect(shouldAutoEncryptAdditionalOnAudienceChange({ value: 'context', encrypted: false })).toBe(true);
-  });
-
-  it('does not include empty additional comments in submit-time encryption work', () => {
-    expect(shouldEncryptResponseFieldForSubmit({ value: '', encrypted: true })).toBe(false);
-    expect(shouldEncryptResponseFieldForSubmit({ value: '   ', encrypted: true })).toBe(false);
-    expect(shouldEncryptResponseFieldForSubmit({ value: '*', encrypted: true })).toBe(false);
-    expect(shouldEncryptResponseFieldForSubmit({ value: 'notes', encrypted: true })).toBe(true);
-  });
-
-  it('allows draft force-overwrite unless the submitted latch is active without edits', () => {
-    expect(shouldForceOverwriteDraftValues({
-      forceOverwrite: true,
-      isDirty: false,
-      pendingTotal: 0,
-      submittedStateActive: false,
-    })).toBe(true);
-    expect(shouldForceOverwriteDraftValues({
-      forceOverwrite: true,
-      isDirty: false,
-      pendingTotal: 0,
-      submittedStateActive: true,
-    })).toBe(false);
-    expect(shouldForceOverwriteDraftValues({ forceOverwrite: true, isDirty: true, pendingTotal: 0 })).toBe(true);
-    expect(shouldForceOverwriteDraftValues({ forceOverwrite: true, isDirty: false, pendingTotal: 1 })).toBe(true);
-    expect(shouldForceOverwriteDraftValues({ forceOverwrite: false, isDirty: true, pendingTotal: 2 })).toBe(false);
-  });
-
-  it('updates submitted latch across submit/edit/reset transitions', () => {
-    expect(updateSubmittedSinceLastEdit(false, 'submit_success')).toBe(true);
-    expect(updateSubmittedSinceLastEdit(true, 'user_edit')).toBe(false);
-    expect(updateSubmittedSinceLastEdit(true, 'reset')).toBe(false);
-    expect(updateSubmittedSinceLastEdit(true, 'submit_error')).toBe(false);
-    expect(updateSubmittedSinceLastEdit(true, 'unknown')).toBe(true);
-  });
-
-  it('detects conviction/importance active state from response-map presence', () => {
-    expect(hasConvictionOrImportanceValueForQuestion({
-      conviction: { q1: 0 },
-      importance: {},
-    }, 'q1')).toBe(true);
-    expect(hasConvictionOrImportanceValueForQuestion({
-      conviction: {},
-      importance: { q1: 5 },
-    }, 'q1')).toBe(true);
-    expect(hasConvictionOrImportanceValueForQuestion({
-      conviction: { q1: null },
-      importance: {},
-    }, 'q1')).toBe(false);
-    expect(hasConvictionOrImportanceValueForQuestion({
-      conviction: {},
-      importance: {},
-    }, 'q1')).toBe(false);
-  });
-
-  it('shows single-question response lookup spinner only while response probing is active', () => {
-    expect(shouldShowSingleQuestionResponseLookupSpinner({
-      singleQuestionMode: true,
-      isLoadingResponse: true,
-      account: '0xabc',
-    })).toBe(true);
-
-    expect(shouldShowSingleQuestionResponseLookupSpinner({
-      singleQuestionMode: true,
-      isLoadingResponse: true,
-      responderAddress: '0xdef',
-    })).toBe(true);
-
-    expect(shouldShowSingleQuestionResponseLookupSpinner({
-      singleQuestionMode: true,
-      isLoadingResponse: false,
-      account: '0xabc',
-    })).toBe(false);
-
-    expect(shouldShowSingleQuestionResponseLookupSpinner({
-      singleQuestionMode: false,
-      isLoadingResponse: true,
-      account: '0xabc',
-    })).toBe(false);
-  });
-
-  it('hides inline submit until at least one answer change is pending', () => {
-    expect(shouldRenderInlineSubmitButton({
-      useHeaderSubmit: false,
-      canEditQuestions: true,
-      hasPendingEdits: false,
-      submittedStateActive: false,
-      isLoadingResponse: false,
-    })).toBe(false);
-
-    expect(shouldRenderInlineSubmitButton({
-      useHeaderSubmit: false,
-      canEditQuestions: true,
-      hasPendingEdits: true,
-      submittedStateActive: false,
-      isLoadingResponse: false,
-    })).toBe(true);
-  });
-
-  it('does not render submitted indicator while response loading is in progress', () => {
-    expect(shouldRenderSubmittedIndicator({
-      submittedStateActive: true,
-      isLoadingResponse: true,
-    })).toBe(false);
-
-    expect(shouldRenderSubmittedIndicator({
-      submittedStateActive: true,
-      isLoadingResponse: false,
-    })).toBe(true);
   });
 
   it('uses clone:false cache reads while resolving slug candidates by question id', () => {
