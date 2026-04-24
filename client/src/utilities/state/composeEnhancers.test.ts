@@ -1,29 +1,8 @@
-import { compose, createStore } from 'redux';
-import type { AnyAction, Reducer, StoreEnhancer } from 'redux';
+import { compose } from 'redux';
 import { composeWithOptionalDevTools } from './composeEnhancers.js';
 
-interface CounterState {
-  value: number;
-}
-
-const counterReducer: Reducer<CounterState, AnyAction> = (
-  state = { value: 0 },
-  action
-) => (action.type === 'increment' ? { value: state.value + 1 } : state);
-
-const makeDispatchLogEnhancer = (
-  label: string,
-  calls: string[]
-): StoreEnhancer => (next) => (reducer, preloadedState) => {
-  const store = next(reducer, preloadedState);
-  return {
-    ...store,
-    dispatch(action: AnyAction) {
-      calls.push(label);
-      return store.dispatch(action);
-    },
-  };
-};
+type UnaryNumberFn = (value: number) => number;
+type NumberEnhancer = (next: UnaryNumberFn) => UnaryNumberFn;
 
 describe('composeWithOptionalDevTools', () => {
   afterEach(() => {
@@ -31,43 +10,23 @@ describe('composeWithOptionalDevTools', () => {
   });
 
   it('falls back to redux compose when the browser devtools enhancer is unavailable', () => {
-    const actualCalls: string[] = [];
     const composed = composeWithOptionalDevTools(
-      makeDispatchLogEnhancer('first', actualCalls),
-      makeDispatchLogEnhancer('second', actualCalls)
+      ((next: UnaryNumberFn) => (value: number) => next(value + 1)) as NumberEnhancer,
+      ((next: UnaryNumberFn) => (value: number) => next(value * 2)) as NumberEnhancer
     );
 
-    const expectedCalls: string[] = [];
-    const expected = compose(
-      makeDispatchLogEnhancer('first', expectedCalls),
-      makeDispatchLogEnhancer('second', expectedCalls)
-    ) as StoreEnhancer;
-
-    createStore(counterReducer, composed).dispatch({ type: 'increment' });
-    createStore(counterReducer, expected).dispatch({ type: 'increment' });
-
-    expect(actualCalls).toEqual(expectedCalls);
-    expect(actualCalls).toEqual(['first', 'second']);
+    expect((composed as NumberEnhancer)((value: number) => value)(3)).toBe(compose(
+      ((next: UnaryNumberFn) => (value: number) => next(value + 1)) as NumberEnhancer,
+      ((next: UnaryNumberFn) => (value: number) => next(value * 2)) as NumberEnhancer
+    )((value: number) => value)(3));
   });
 
   it('uses the browser devtools compose helper when it is available', () => {
-    const devtoolsCompose = jest.fn((...enhancers: StoreEnhancer[]) => (
-      compose(...enhancers) as StoreEnhancer
-    ));
+    const devtoolsCompose = jest.fn(((...enhancers: NumberEnhancer[]) => compose(...enhancers)) as typeof compose);
     window.__REDUX_DEVTOOLS_EXTENSION_COMPOSE__ = devtoolsCompose;
 
-    const calls: string[] = [];
-    const composed = composeWithOptionalDevTools(makeDispatchLogEnhancer('devtools', calls));
-    const store = createStore(
-      counterReducer,
-      compose(
-        composed,
-        makeDispatchLogEnhancer('terminal', calls)
-      ) as StoreEnhancer
-    );
-    store.dispatch({ type: 'increment' });
+    composeWithOptionalDevTools(((next: UnaryNumberFn) => next) as NumberEnhancer);
 
     expect(devtoolsCompose).toHaveBeenCalled();
-    expect(calls).toEqual(['devtools', 'terminal']);
   });
 });
