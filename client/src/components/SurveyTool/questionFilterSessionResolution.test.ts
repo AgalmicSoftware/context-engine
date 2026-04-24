@@ -27,7 +27,7 @@ describe('questionFilterSessionResolution', () => {
   });
 
   it('does not silently resolve unknown non-general slugs to general config', () => {
-    const resolveBySlug = jest.fn((slug) => {
+    const resolveBySlug = jest.fn((slug: string) => {
       if (slug === '') return { slug: '', sessionName: 'General' };
       return null;
     });
