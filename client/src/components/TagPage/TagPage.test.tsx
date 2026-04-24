@@ -970,4 +970,14 @@ describe('TagModal', () => {
     expect(jsx).not.toMatch(/import\s+\{\s*[^}]*\bModalHeader\b/);
     expect(jsx).not.toMatch(/<ModalHeader\b/);
   });
+
+  it('uses the fullscreen tag route blue palette for the modal shell', () => {
+    const scssPath = path.join(__dirname, 'TagPage.module.scss');
+    const scss = fs.readFileSync(scssPath, 'utf8');
+
+    expect(scss).toMatch(/\$tag-route-bg:\s*#20204e;/);
+    expect(scss).toMatch(/\.tagModalContent\s*{[\s\S]*radial-gradient\(circle at top right,\s*rgba\(\$tag-route-accent,\s*0\.18\),\s*transparent 34%\),[\s\S]*linear-gradient\(180deg,\s*rgba\(\$tag-route-bg,\s*0\.985\),\s*rgba\(\$tag-route-bg-deep,\s*0\.985\)\);[\s\S]*background-color:\s*\$tag-route-bg;/);
+    expect(scss).toMatch(/\.tagModalHeaderBar\s*{[\s\S]*linear-gradient\(180deg,\s*rgba\(\$tag-route-accent-alt,\s*0\.16\),\s*rgba\(\$tag-route-bg,\s*0\.1\)\),/);
+    expect(scss).toMatch(/\.tagModalChromePopover\s*{[\s\S]*linear-gradient\(180deg,\s*rgba\(\$tag-route-accent-alt,\s*0\.14\),\s*rgba\(\$tag-route-bg-deep,\s*0\.14\)\),[\s\S]*rgba\(\$tag-route-bg,\s*0\.98\);/);
+  });
 });
