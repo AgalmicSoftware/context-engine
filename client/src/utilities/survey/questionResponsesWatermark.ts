@@ -5,7 +5,12 @@
  *
  * Key exports: resolvePersistedQuestionResponsesWatermark
  */
-const toFiniteNumberOr = (value, fallback = 0) => {
+type PersistedQuestionResponsesWatermarkInput = {
+  floorBlock?: number | string | null;
+  processedToBlock?: number | string | null;
+};
+
+const toFiniteNumberOr = (value: unknown, fallback = 0): number => {
   const num = Number(value);
   return Number.isFinite(num) ? num : fallback;
 };
@@ -14,8 +19,7 @@ const toFiniteNumberOr = (value, fallback = 0) => {
 export const resolvePersistedQuestionResponsesWatermark = ({
   floorBlock = 0,
   processedToBlock = 0,
-} = {}) => Math.max(
+}: PersistedQuestionResponsesWatermarkInput = {}): number => Math.max(
   toFiniteNumberOr(floorBlock, 0),
   toFiniteNumberOr(processedToBlock, 0)
 );
-
