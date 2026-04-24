@@ -1,4 +1,4 @@
-import { PopperContent } from 'reactstrap';
+const PopperContent = require('reactstrap/lib/PopperContent').default;
 
 describe('reactstrap tooltip defaults', () => {
   it('keeps PopperContent transition timeout defined for default tooltips', () => {

@@ -3,16 +3,28 @@ import { useEffect, useMemo, useState } from 'react';
 import { ethers } from 'ethers';
 import { createLogger } from '../../../utilities/logging';
 import { toStr } from '../../../utilities/shared/primitives.js';
+import type { AnyRecord } from '../../shellTypes';
 
 const log = createLogger('general');
 
 export const SESSION_WIZARD_PENDING_SBT_DRAFTS_KEY = 'ce:sessionWizardPendingSbtDrafts:v1';
 
-export const normalizePendingSbtDrafts = (value) => {
+export type PendingSbtDraft = AnyRecord & {
+  id?: string;
+  predictedAddress?: string;
+  address?: string;
+  displayName?: string;
+  name?: string;
+  tokenURI?: string;
+  metadataUploadStatus?: string;
+  deployed?: boolean;
+};
+
+export const normalizePendingSbtDrafts = (value: unknown): PendingSbtDraft[] => {
   if (!Array.isArray(value)) return [];
   const seen = new Set();
   return value
-    .map((entry) => {
+    .map((entry): PendingSbtDraft | null => {
       const predictedAddress = toStr(entry?.predictedAddress || entry?.address).trim();
       if (!predictedAddress || !ethers.utils.isAddress(predictedAddress)) return null;
       const key = predictedAddress.toLowerCase();
@@ -30,10 +42,10 @@ export const normalizePendingSbtDrafts = (value) => {
         ),
       };
     })
-    .filter(Boolean);
+    .filter((entry): entry is PendingSbtDraft => !!entry);
 };
 
-export const readSessionWizardPendingSbtDraftsCache = () => {
+export const readSessionWizardPendingSbtDraftsCache = (): PendingSbtDraft[] => {
   if (typeof window === 'undefined' || !window.sessionStorage) return [];
   try {
     const raw = sessionStorage.getItem(SESSION_WIZARD_PENDING_SBT_DRAFTS_KEY);
@@ -43,7 +55,7 @@ export const readSessionWizardPendingSbtDraftsCache = () => {
   }
 };
 
-export const writeSessionWizardPendingSbtDraftsCache = (payload = []) => {
+export const writeSessionWizardPendingSbtDraftsCache = (payload: PendingSbtDraft[] = []): void => {
   if (typeof window === 'undefined' || !window.sessionStorage) return;
   try {
     const normalized = normalizePendingSbtDrafts(payload);
@@ -55,7 +67,7 @@ export const writeSessionWizardPendingSbtDraftsCache = (payload = []) => {
   } catch (e) { log.warn('SessionWizard: fallback', e); }
 };
 
-export const clearSessionWizardPendingSbtDraftsCache = () => {
+export const clearSessionWizardPendingSbtDraftsCache = (): void => {
   if (typeof window === 'undefined' || !window.sessionStorage) return;
   try {
     sessionStorage.removeItem(SESSION_WIZARD_PENDING_SBT_DRAFTS_KEY);
@@ -63,7 +75,7 @@ export const clearSessionWizardPendingSbtDraftsCache = () => {
 };
 
 const usePendingSbtDrafts = () => {
-  const [pendingSbtDrafts, setPendingSbtDrafts] = useState(() => readSessionWizardPendingSbtDraftsCache());
+  const [pendingSbtDrafts, setPendingSbtDrafts] = useState<PendingSbtDraft[]>(() => readSessionWizardPendingSbtDraftsCache());
   const normalizedPendingSbtDrafts = useMemo(
     () => normalizePendingSbtDrafts(pendingSbtDrafts),
     [pendingSbtDrafts]
