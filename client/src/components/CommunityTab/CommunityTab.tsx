@@ -147,11 +147,11 @@ class CommunityTab extends Component<any, any> {
   }
 
   // === Universe helpers (encapsulated) ===
-  _readGlobalSelection = () => readStoredGlobalSessionSelection();
+  _readGlobalSelection: any = () => readStoredGlobalSessionSelection();
 
-  _isUniverseEnabled = () => this._readGlobalSelection().selectedSessionScope === 'all';
+  _isUniverseEnabled: any = () => this._readGlobalSelection().selectedSessionScope === 'all';
 
-  _resolveRouteSlug = () => {
+  _resolveRouteSlug: any = () => {
     if (typeof this.props.activeSessionSlug === 'string') return this.props.activeSessionSlug;
     try {
       const p = (typeof window !== 'undefined' ? window.location.pathname : '') || '';
@@ -164,7 +164,7 @@ class CommunityTab extends Component<any, any> {
     return '';                            // general (empty)
   }
 
-  _hasPinnedRouteSession = () => {
+  _hasPinnedRouteSession: any = () => {
     try {
       const p = (typeof window !== 'undefined' ? window.location.pathname : '') || '';
       return p.startsWith('/session/');
@@ -172,7 +172,7 @@ class CommunityTab extends Component<any, any> {
     return false;
   }
 
-  _currentSlug = () => {
+  _currentSlug: any = () => {
     if (!this._isUniverseEnabled()) {
       const selected = this._getSelectedSessionSlugs();
       if (selected.length > 0) {
@@ -182,7 +182,7 @@ class CommunityTab extends Component<any, any> {
     return this._resolveRouteSlug();
   }
 
-  _dedupeNormalizedSlugs = (slugs: any = []) => {
+  _dedupeNormalizedSlugs: any = (slugs: any = []) => {
     const seen: any = new Set();
     const out: any[] = [];
     slugs.forEach((slugIn: any) => {
@@ -194,11 +194,11 @@ class CommunityTab extends Component<any, any> {
     return out;
   }
 
-  _buildSessionSlugSignature = (slugs: any = []) => (
+  _buildSessionSlugSignature: any = (slugs: any = []) => (
     this._dedupeNormalizedSlugs(slugs).join('|')
   );
 
-  _sortSlugsByKnownOrder = (slugs: any = [], orderedUniverse: any = []) => {
+  _sortSlugsByKnownOrder: any = (slugs: any = [], orderedUniverse: any = []) => {
     const normalizedUniverse = this._dedupeNormalizedSlugs(orderedUniverse);
     const order: any = new Map();
     normalizedUniverse.forEach((slug: any, index: any) => {
@@ -214,12 +214,12 @@ class CommunityTab extends Component<any, any> {
     });
   }
 
-  _labelForSessionSlug = (slugIn: any) => {
+  _labelForSessionSlug: any = (slugIn: any) => {
     const slug = normalizeSessionSlug(slugIn || '');
     return slug || 'General';
   }
 
-  _getDefaultSelectedSessionSlugs = () => {
+  _getDefaultSelectedSessionSlugs: any = () => {
     const availableSlugs = this._getSessionSelectorOptions().map((option: any) => option.value);
     const availableSet: any = new Set(availableSlugs);
     const routeSlug = normalizeSessionSlug(this._resolveRouteSlug() || '');
@@ -248,7 +248,7 @@ class CommunityTab extends Component<any, any> {
     return availableSlugs.length > 0 ? [availableSlugs[0]] : [];
   }
 
-  _getSessionSelectorOptions = () => this._dedupeNormalizedSlugs([
+  _getSessionSelectorOptions: any = () => this._dedupeNormalizedSlugs([
     this._resolveRouteSlug(),
     '',
     ...this.listAllSlugs(),
@@ -257,7 +257,7 @@ class CommunityTab extends Component<any, any> {
     label: this._labelForSessionSlug(slug),
   }));
 
-  _getSelectedSessionSlugs = () => {
+  _getSelectedSessionSlugs: any = () => {
     const availableSlugs = this._getSessionSelectorOptions().map((option: any) => option.value);
     const availableSet: any = new Set(availableSlugs);
     const defaultSelected = this._getDefaultSelectedSessionSlugs()
@@ -269,11 +269,11 @@ class CommunityTab extends Component<any, any> {
     return this._sortSlugsByKnownOrder(availableSlugs, availableSlugs);
   };
 
-  toggleLeaderboardControls = () => {
-    this.setState((prevState: Readonly<CommunityTab['state']>) => ({ showLeaderboardControls: !prevState.showLeaderboardControls }));
+  toggleLeaderboardControls: any = () => {
+    this.setState((prevState: any) => ({ showLeaderboardControls: !prevState.showLeaderboardControls }));
   }
 
-  listAllSlugs = () => {
+  listAllSlugs: any = () => {
     if (readSessionScanScope() === 'list') {
       const scopedSlugs = this._dedupeNormalizedSlugs(readSessionScanSlugs());
       if (scopedSlugs.length > 0) return scopedSlugs;
@@ -287,7 +287,7 @@ class CommunityTab extends Component<any, any> {
     ]);
   }
 
-  _resolveNetKeyForSlug = (slug: any) => {
+  _resolveNetKeyForSlug: any = (slug: any) => {
     try {
       const id = getDisplaySessionChainId(slug);
       return id != null ? String(id) : '';
@@ -296,13 +296,13 @@ class CommunityTab extends Component<any, any> {
     }
   }
 
-  _readCache = (cacheName: any, slug: any, options: any = {}) => {
+  _readCache: any = (cacheName: any, slug: any, options: any = {}) => {
     const shouldClone = options?.clone === true;
     const obj = peekCacheSync(cacheName, slug, { clone: shouldClone }) || {};
     return (obj && typeof obj === 'object') ? obj : {};
   }
 
-  _getObjectRefId = (value: any) => {
+  _getObjectRefId: any = (value: any) => {
     if (!value || typeof value !== 'object') return 'na';
     let id = this._cacheRefIds.get(value);
     if (!id) {
@@ -313,7 +313,7 @@ class CommunityTab extends Component<any, any> {
     return id;
   }
 
-  _pickNet = (cacheObj: any, netKey: any) => {
+  _pickNet: any = (cacheObj: any, netKey: any) => {
     if (!cacheObj || typeof cacheObj !== 'object') return {};
     if (netKey && cacheObj[netKey]) return cacheObj[netKey] || {};
     const ks = Object.keys(cacheObj || {});
@@ -321,7 +321,7 @@ class CommunityTab extends Component<any, any> {
     return netKey && cacheObj[netKey] ? (cacheObj[netKey] || {}) : {};
   }
 
-  _buildScopeEntriesFromSlugs = (slugs: any = [], options: any = {}) => {
+  _buildScopeEntriesFromSlugs: any = (slugs: any = [], options: any = {}) => {
     const out: any[] = [];
     this._dedupeNormalizedSlugs(slugs).forEach((slug: any) => {
       const netKey = this._resolveNetKeyForSlug(slug);
@@ -339,11 +339,11 @@ class CommunityTab extends Component<any, any> {
     return out;
   }
 
-  _iterUniverse = (options: any = {}) => {
+  _iterUniverse: any = (options: any = {}) => {
     return this._buildScopeEntriesFromSlugs(this.listAllSlugs(), options);
   }
 
-  _iterScopeCaches = (options: any = {}) => {
+  _iterScopeCaches: any = (options: any = {}) => {
     if (this._isUniverseEnabled()) return this._iterUniverse(options);
     const selectedSlugs = this._getSelectedSessionSlugs();
     if (selectedSlugs.length > 0) {
@@ -352,7 +352,7 @@ class CommunityTab extends Component<any, any> {
     return this._buildScopeEntriesFromSlugs([this._currentSlug()], options);
   }
 
-  _hydrateSbtHoldersForUsersModal = async () => {
+  _hydrateSbtHoldersForUsersModal: any = async () => {
     if (this._holdersHydrationPromise) return this._holdersHydrationPromise;
     this._holdersHydrationInFlight = true;
     this._holdersHydrationAbort = false;
@@ -378,7 +378,7 @@ class CommunityTab extends Component<any, any> {
     await this._refreshCommunityStats({ force: true, markLoading: false });
   };
 
-  _hydrateSbtHoldersForSlug = async (slug: any) => {
+  _hydrateSbtHoldersForSlug: any = async (slug: any) => {
     const netKey = this._resolveNetKeyForSlug(slug);
     if (!netKey) return;
 
@@ -465,7 +465,7 @@ class CommunityTab extends Component<any, any> {
     }
   };
 
-  _shouldCountSbt = (entry: any, slug: any) => {
+  _shouldCountSbt: any = (entry: any, slug: any) => {
     if (!entry || !entry.sbtAddress) return false;
     const info = entry.sbtInfo || {};
     if (info.hidden === true) return false;
@@ -482,12 +482,12 @@ class CommunityTab extends Component<any, any> {
     return true;
   }
 
-  _countKeys = (value: any) => {
+  _countKeys: any = (value: any) => {
     if (!value || typeof value !== 'object') return 0;
     return Object.keys(value).length;
   }
 
-  _summarizeNestedResponseKeys = (value: any) => {
+  _summarizeNestedResponseKeys: any = (value: any) => {
     if (!value || typeof value !== 'object') {
       return { totalKeys: 0, hash: 0 };
     }
@@ -517,7 +517,7 @@ class CommunityTab extends Component<any, any> {
     return { totalKeys, hash: hash >>> 0 };
   }
 
-  _summarizeSurveyMetadata = (surveysMap: any) => {
+  _summarizeSurveyMetadata: any = (surveysMap: any) => {
     if (!surveysMap || typeof surveysMap !== 'object') {
       return { totalSurveys: 0, hash: 0 };
     }
@@ -548,7 +548,7 @@ class CommunityTab extends Component<any, any> {
     return { totalSurveys, hash: hash >>> 0 };
   }
 
-  _summarizeQuestionMetadata = (questionsMap: any) => {
+  _summarizeQuestionMetadata: any = (questionsMap: any) => {
     if (!questionsMap || typeof questionsMap !== 'object') {
       return { totalQuestions: 0, hash: 0 };
     }
@@ -573,7 +573,7 @@ class CommunityTab extends Component<any, any> {
     return { totalQuestions, hash: hash >>> 0 };
   }
 
-  _summarizeSbtHolderMembers = (sbtListMap: any) => {
+  _summarizeSbtHolderMembers: any = (sbtListMap: any) => {
     if (!sbtListMap || typeof sbtListMap !== 'object') {
       return { totalEntries: 0, totalMembers: 0, hash: 0 };
     }
@@ -620,7 +620,7 @@ class CommunityTab extends Component<any, any> {
     return { totalEntries, totalMembers, hash: hash >>> 0 };
   }
 
-  _buildCoarseCacheSignature = (scopeEntries: any = []) => {
+  _buildCoarseCacheSignature: any = (scopeEntries: any = []) => {
     const parts: any[] = [];
     for (const { slug, netKey, surveysCache, questionsCache, sbtCache } of scopeEntries) {
       const surveyBlock =
@@ -670,7 +670,7 @@ class CommunityTab extends Component<any, any> {
     return parts.join('|');
   }
 
-  _buildCacheSignature = (scopeEntries: any = []) => measureSync('ce.communityTab.cacheSignature', () => {
+  _buildCacheSignature: any = (scopeEntries: any = []) => measureSync('ce.communityTab.cacheSignature', () => {
     const parts: any[] = [];
     for (const { slug, netKey, surveysCache, questionsCache, sbtCache } of scopeEntries) {
       const surveyBlock =
@@ -726,7 +726,7 @@ class CommunityTab extends Component<any, any> {
     return parts.join('|');
   })
 
-  _buildStatsArray = (prevStats: any, counts: any = {}) => (
+  _buildStatsArray: any = (prevStats: any, counts: any = {}) => (
     (prevStats || []).map((stat: any) => {
       if (stat.label === 'Users') return { ...stat, count: Number(counts.users || 0) };
       if (stat.label === 'Questions') return { ...stat, count: Number(counts.questions || 0) };
@@ -736,7 +736,7 @@ class CommunityTab extends Component<any, any> {
     })
   )
 
-  _areAddressListsEqual = (left: any = [], right: any = []) => {
+  _areAddressListsEqual: any = (left: any = [], right: any = []) => {
     if (!Array.isArray(left) || !Array.isArray(right)) return false;
     if (left.length !== right.length) return false;
     for (let i = 0; i < left.length; i += 1) {
@@ -747,7 +747,7 @@ class CommunityTab extends Component<any, any> {
     return true;
   }
 
-  _computeUniverseStatsSnapshot = (scopeEntries: any = []) => measureSync('ce.communityTab.computeUniverseStats', () => {
+  _computeUniverseStatsSnapshot: any = (scopeEntries: any = []) => measureSync('ce.communityTab.computeUniverseStats', () => {
     const surveyIdSet: any = new Set();
     const questionIdSet: any = new Set();
     const userSet: any = new Set();
@@ -850,7 +850,7 @@ class CommunityTab extends Component<any, any> {
     };
   })
 
-  _computeSingleScopeStatsSnapshot = (scopeEntry: any) => measureSync('ce.communityTab.computeSingleScopeStats', () => {
+  _computeSingleScopeStatsSnapshot: any = (scopeEntry: any) => measureSync('ce.communityTab.computeSingleScopeStats', () => {
     if (!scopeEntry || !scopeEntry.netKey) {
       return {
         uniqueUsers: [],
@@ -934,14 +934,14 @@ class CommunityTab extends Component<any, any> {
     };
   })
 
-  _computeStatsSnapshot = (scopeEntries: any = []) => {
+  _computeStatsSnapshot: any = (scopeEntries: any = []) => {
     if (Array.isArray(scopeEntries) && scopeEntries.length === 1) {
       return this._computeSingleScopeStatsSnapshot(scopeEntries[0]);
     }
     return this._computeUniverseStatsSnapshot(scopeEntries);
   }
 
-  checkIfInitialLoadDone = async () => {
+  checkIfInitialLoadDone: any = async () => {
     // This function checks if the initial load is done by comparing the caches' lastBlock to the latest chain block
     const scopeEntries = this._iterScopeCaches({ clone: false });
     if (scopeEntries.length > 1) {
@@ -1020,7 +1020,7 @@ class CommunityTab extends Component<any, any> {
     return minLastBlock >= latestBlockNumber;
   }
 
-  _computeNextPollDelayMs = () => {
+  _computeNextPollDelayMs: any = () => {
     const elapsed = Math.max(0, Date.now() - Number(this._statsPollStartedAtMs || 0));
     if (elapsed >= 120000) {
       return 60000;
@@ -1034,7 +1034,7 @@ class CommunityTab extends Component<any, any> {
     return 30000;
   }
 
-  _isDocumentHidden = () => {
+  _isDocumentHidden: any = () => {
     if (typeof document === 'undefined') return false;
     try {
       return document.hidden === true || document.visibilityState === 'hidden';
@@ -1043,27 +1043,27 @@ class CommunityTab extends Component<any, any> {
     }
   }
 
-  _computeFallbackPollDelayMs = () => {
+  _computeFallbackPollDelayMs: any = () => {
     if (this._isDocumentHidden()) return 120000;
     if (!this.state.initialLoadDone) return 15000;
     return 60000;
   }
 
-  _clearStatsPollTimer = () => {
+  _clearStatsPollTimer: any = () => {
     if (this._statsPollTimer) {
       clearTimeout(this._statsPollTimer);
       this._statsPollTimer = null;
     }
   }
 
-  _flushQueuedCacheUpdateRefresh = () => {
+  _flushQueuedCacheUpdateRefresh: any = () => {
     if (this._isUnmounted || this._isDocumentHidden()) return;
     const force = !!this._cacheUpdateRefreshQueuedForce;
     this._cacheUpdateRefreshQueuedForce = false;
     this._refreshCommunityStats({ force, markLoading: false });
   }
 
-  _queueCacheDrivenRefresh = ({ force = false }: any = {}) => {
+  _queueCacheDrivenRefresh: any = ({ force = false }: any = {}) => {
     if (this._isUnmounted || this._isDocumentHidden()) return;
     this._cacheUpdateRefreshQueuedForce = this._cacheUpdateRefreshQueuedForce || !!force;
     if (this._statsCacheRefreshCoalescer) {
@@ -1073,7 +1073,7 @@ class CommunityTab extends Component<any, any> {
     this._flushQueuedCacheUpdateRefresh();
   }
 
-  _scheduleNextStatsPoll = (delayMs: any = null) => {
+  _scheduleNextStatsPoll: any = (delayMs: any = null) => {
     if (this._isUnmounted) return;
     this._clearStatsPollTimer();
     const fallbackDelay = this._computeFallbackPollDelayMs();
@@ -1090,7 +1090,7 @@ class CommunityTab extends Component<any, any> {
     }, safeDelay);
   }
 
-  _runStatsRefreshCycle = async ({ force = false, markLoading = false }: any = {}) => {
+  _runStatsRefreshCycle: any = async ({ force = false, markLoading = false }: any = {}) => {
     if (this._isUnmounted) return { changed: false };
 
     if (markLoading && (!this.state.loadingSbtsCreated || !this.state.loadingSurveyData)) {
@@ -1128,7 +1128,7 @@ class CommunityTab extends Component<any, any> {
       }
     }
 
-    this.setState((prevState: Readonly<CommunityTab['state']>) => {
+    this.setState((prevState: any) => {
       const next: Record<string, any> = {};
       if (changed && snapshot) {
         next.uniqueUsers = snapshot.uniqueUsers;
@@ -1164,7 +1164,7 @@ class CommunityTab extends Component<any, any> {
     return { changed };
   }
 
-  _refreshCommunityStats = async ({ force = false, markLoading = false }: any = {}) => {
+  _refreshCommunityStats: any = async ({ force = false, markLoading = false }: any = {}) => {
     if (this._isUnmounted) return { changed: false };
     if (this._statsRefreshInFlight) {
       this._statsRefreshQueued = true;
@@ -1275,7 +1275,7 @@ class CommunityTab extends Component<any, any> {
     this._globalSessionSelectionListener = null;
   }
 
-  updateStatsPeriodically = async () => {
+  updateStatsPeriodically: any = async () => {
     await this._refreshCommunityStats({ force: false, markLoading: false });
   }
 
@@ -1300,19 +1300,19 @@ class CommunityTab extends Component<any, any> {
   }
 
   // --- UPDATED: wrappers keep existing call sites stable while sharing one refresh pass ---
-  fetchSbtsCreatedCount = async () => {
+  fetchSbtsCreatedCount: any = async () => {
     await this._refreshCommunityStats({ force: true, markLoading: true });
   };
 
-  fetchSurveyDataFromCache = async () => {
+  fetchSurveyDataFromCache: any = async () => {
     await this._refreshCommunityStats({ force: true, markLoading: true });
   };
 
-  updateSbtGroupsCountFromCache = () => {
+  updateSbtGroupsCountFromCache: any = () => {
     this._queueCacheDrivenRefresh({ force: false });
   }
 
-  handleUserClick = (user: any) => {
+  handleUserClick: any = (user: any) => {
     if (user.username.startsWith('0x')) {
       window.open(buildPublicRoute(`/u/${user.username}`), '_blank');
     } else {
@@ -1321,7 +1321,7 @@ class CommunityTab extends Component<any, any> {
   }
 
   // --- Updated handleStatClick to initialize filteredUsers ---
-  handleStatClick = (stat: any) => {
+  handleStatClick: any = (stat: any) => {
     const labelKey = String(stat.label || '').toLowerCase().replace(/\s+/g, '');
     if (labelKey === 'users') {
       this.setState({
@@ -1347,21 +1347,21 @@ class CommunityTab extends Component<any, any> {
   }
 
   // Helper to toggle modal visibility
-  toggleModal = () => {
-    this.setState((prevState: Readonly<CommunityTab['state']>) => ({
+  toggleModal: any = () => {
+    this.setState((prevState: any) => ({
       showModal: !prevState.showModal,
       modalType: !prevState.showModal ? prevState.modalType : null,
       modalTitle: !prevState.showModal ? prevState.modalTitle : '',
     }));
   }
 
-  _buildLeaderboardUsersSignature = (users: any = []) => (
+  _buildLeaderboardUsersSignature: any = (users: any = []) => (
     Array.isArray(users)
       ? users.map((value: any) => String(value || '')).join('|')
       : ''
   );
 
-  getMemoizedLeaderboardData = () => {
+  getMemoizedLeaderboardData: any = () => {
     const { uniqueUsers, hideSimulatedUsers, hideHumanUsers } = this.state;
     const uniqueUsersList = Array.isArray(uniqueUsers) ? uniqueUsers : [];
     const memo = this._leaderboardMemo || {};
@@ -1409,7 +1409,7 @@ class CommunityTab extends Component<any, any> {
     return result;
   }
 
-  _parseCachedJson = (value: any) => {
+  _parseCachedJson: any = (value: any) => {
     if (!value) return null;
     if (typeof value === 'string') {
       try {
@@ -1421,7 +1421,7 @@ class CommunityTab extends Component<any, any> {
     return typeof value === 'object' ? value : null;
   }
 
-  _normalizeBinaryVoteValue = (value: any) => {
+  _normalizeBinaryVoteValue: any = (value: any) => {
     if (value === 1 || value === '1' || value === true) return 1;
     if (value === -1 || value === '-1' || value === false) return -1;
     if (value === 0 || value === '0') return 0;
@@ -1433,7 +1433,7 @@ class CommunityTab extends Component<any, any> {
     return null;
   }
 
-  _extractBinaryVoteRecord = (rawResponse: any, fallbackQuestion: any = {}) => {
+  _extractBinaryVoteRecord: any = (rawResponse: any, fallbackQuestion: any = {}) => {
     const response = this._parseCachedJson(rawResponse);
     if (!response || typeof response !== 'object') return null;
 
@@ -1455,7 +1455,7 @@ class CommunityTab extends Component<any, any> {
     };
   }
 
-  _rememberBeeswarmQuestion = (questionMap: any, questionId: any, question: any = {}) => {
+  _rememberBeeswarmQuestion: any = (questionMap: any, questionId: any, question: any = {}) => {
     const qid = String(questionId || '').toLowerCase();
     if (!qid) return;
 
@@ -1467,7 +1467,7 @@ class CommunityTab extends Component<any, any> {
     });
   }
 
-  _shouldUseDemoBeeswarmData = () => {
+  _shouldUseDemoBeeswarmData: any = () => {
     const scopeEntries = this._iterScopeCaches({ clone: false });
     if (!Array.isArray(scopeEntries) || scopeEntries.length !== 1) return false;
     const activeSlug = normalizeSessionSlug(scopeEntries[0]?.slug || this._currentSlug() || '');
@@ -1480,11 +1480,8 @@ class CommunityTab extends Component<any, any> {
         .includes(COMMUNITY_BEESWARM_DEMO_SLUG);
   }
 
-  _buildDemoBeeswarmPoints = () => {
-    const dataset = getPolisDemoDatasetForSlug(COMMUNITY_BEESWARM_DEMO_SLUG, { allowFallback: false }) as {
-      comments?: unknown[];
-      participantsVotes?: unknown[];
-    } | null;
+  _buildDemoBeeswarmPoints: any = () => {
+    const dataset = getPolisDemoDatasetForSlug(COMMUNITY_BEESWARM_DEMO_SLUG, { allowFallback: false });
     const comments = Array.isArray(dataset?.comments) ? dataset.comments : [];
     const binaryComments = comments.filter((c: any) => {
       const t = String(c?.type || '').trim().toLowerCase();
@@ -1511,10 +1508,7 @@ class CommunityTab extends Component<any, any> {
     });
 
     return computeQuestionDivisiveness(ratingMatrix).map((result: any) => {
-      const comment = (binaryComments[result.commentIndex] || {}) as {
-        commentId?: unknown;
-        commentBody?: unknown;
-      };
+      const comment = binaryComments[result.commentIndex] || {};
       const rowVotes = Array.isArray(ratingMatrix[result.commentIndex]) ? ratingMatrix[result.commentIndex] : [];
       const unsure = rowVotes.filter((vote: any) => vote === 0).length;
       const total = result.agrees + result.disagrees + unsure;
@@ -1531,7 +1525,7 @@ class CommunityTab extends Component<any, any> {
     });
   }
 
-  _buildCommunityBeeswarmPoints = (scopeEntriesOverride: any = null) => {
+  _buildCommunityBeeswarmPoints: any = (scopeEntriesOverride: any = null) => {
     if (this._shouldUseDemoBeeswarmData()) {
       return this._buildDemoBeeswarmPoints();
     }
@@ -1783,7 +1777,7 @@ class CommunityTab extends Component<any, any> {
         {uniqueLeaderboardData.length > topEntries && (
           <button
             onClick={() =>
-              this.setState((prevState: Readonly<CommunityTab['state']>) => ({
+              this.setState((prevState: any) => ({
                 showMoreLeaderboard: !prevState.showMoreLeaderboard
               }))
             }
@@ -1814,7 +1808,7 @@ class CommunityTab extends Component<any, any> {
     );
   }
 
-  _getQuestionSwarmPoints = () => {
+  _getQuestionSwarmPoints: any = () => {
     if (this._shouldUseDemoBeeswarmData()) {
       return this._buildCommunityBeeswarmPoints();
     }
@@ -1824,7 +1818,7 @@ class CommunityTab extends Component<any, any> {
     return this._buildCommunityBeeswarmPoints();
   }
 
-  renderQuestionsModalContent = () => {
+  renderQuestionsModalContent: any = () => {
     const points = this._getQuestionSwarmPoints();
     return (
       <div className={styles.questionsModalContent}>
@@ -1868,7 +1862,7 @@ class CommunityTab extends Component<any, any> {
                 <input
                   type="checkbox"
                   checked={hideSimulatedUsers}
-                  onChange={() => this.setState((prevState: Readonly<CommunityTab['state']>) => ({ hideSimulatedUsers: !prevState.hideSimulatedUsers }))}
+                  onChange={() => this.setState((prevState: any) => ({ hideSimulatedUsers: !prevState.hideSimulatedUsers }))}
                   className={styles.toggleCheckbox}
                   data-testid="ce-community-hide-simulated-users"
                 />
@@ -1878,7 +1872,7 @@ class CommunityTab extends Component<any, any> {
                 <input
                   type="checkbox"
                   checked={hideHumanUsers}
-                  onChange={() => this.setState((prevState: Readonly<CommunityTab['state']>) => ({ hideHumanUsers: !prevState.hideHumanUsers }))}
+                  onChange={() => this.setState((prevState: any) => ({ hideHumanUsers: !prevState.hideHumanUsers }))}
                   className={styles.toggleCheckbox}
                   data-testid="ce-community-hide-users"
                 />
@@ -1891,7 +1885,7 @@ class CommunityTab extends Component<any, any> {
     );
   }
 
-  renderModalContent = () => {
+  renderModalContent: any = () => {
     const { modalType, surveysList, filteredUsers, loadingFilter } = this.state;
     const { provider, network, account, loginComplete, toggleLoginModal } = this.props;
 

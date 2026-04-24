@@ -25,7 +25,7 @@ const log = createLogger('ui');
 // Lazy tabs: load on first activation.
 const ToolExplorer = React.lazy(() => import("./ToolExplorer"));
 const OnboardingWalkthrough = React.lazy(() => import("./OnboardingWalkthrough"));
-const CommunityTab = React.lazy(() => import("../CommunityTab/CommunityTab.jsx"));
+const CommunityTab = React.lazy(() => import("../CommunityTab/CommunityTab"));
 
 export const MAIN_AREA_TABS = Object.freeze({
   LATEST: 1,
