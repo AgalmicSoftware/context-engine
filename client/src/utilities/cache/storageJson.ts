@@ -1,6 +1,79 @@
 const DEFAULT_MAX_JSON_BYTES = 256 * 1024;
 
-const byteLength = (value) => {
+type StorageLike = {
+  getItem?: (key: string) => string | null;
+  setItem?: (key: string, value: string) => void;
+  removeItem?: (key: string) => void;
+};
+
+type BoundedStringifyOptions = {
+  maxBytes?: unknown;
+  replacer?: ((this: any, key: string, value: any) => any) | Array<number | string> | null;
+  space?: string | number;
+};
+
+type SafeJsonReadOptions = {
+  clearInvalid?: boolean;
+};
+
+export type BoundedStringifyResult =
+  | {
+      ok: true;
+      value: string;
+      bytes: number;
+      maxBytes: number;
+    }
+  | {
+      ok: false;
+      error: string;
+      status: 'not-serializable' | 'too-large' | 'stringify-failed';
+      bytes?: number;
+      maxBytes?: number;
+    };
+
+export type SafeJsonReadResult<T = unknown> =
+  | {
+      ok: true;
+      value: T;
+      raw: string;
+      status: 'ok';
+    }
+  | {
+      ok: false;
+      value: null;
+      status: 'missing-storage' | 'read-failed' | 'missing' | 'parse-failed';
+      error?: string;
+      raw?: string | null;
+    };
+
+export type SafeJsonWriteResult =
+  | {
+      ok: true;
+      bytes: number;
+      key: string;
+      status: 'ok';
+    }
+  | {
+      ok: false;
+      error: string;
+      status: 'missing-storage' | 'not-serializable' | 'too-large' | 'stringify-failed' | 'write-failed';
+      bytes?: number;
+      maxBytes?: number;
+    };
+
+export type RemoveKeysResult = {
+  ok: boolean;
+  removed: number;
+  failed: number;
+  status: 'ok' | 'partial-failure' | 'missing-storage';
+};
+
+export type StorageNamespace = {
+  base: string;
+  key: (name?: string) => string;
+};
+
+const byteLength = (value: unknown): number => {
   const text = String(value || '');
   if (typeof TextEncoder !== 'undefined') {
     return new TextEncoder().encode(text).length;
@@ -8,25 +81,35 @@ const byteLength = (value) => {
   return text.length;
 };
 
-const errorMessage = (error) => (
-  error && typeof error === 'object' && error.message
-    ? error.message
+const errorMessage = (error: unknown): string => (
+  error && typeof error === 'object' && 'message' in error && error.message
+    ? String(error.message)
     : String(error || 'Storage operation failed.')
 );
 
-const normalizeKeyList = (keys) => (
+const normalizeKeyList = (keys: string | string[] | null | undefined): string[] => (
   Array.isArray(keys)
     ? keys.map((key) => String(key || '').trim()).filter(Boolean)
     : [String(keys || '').trim()].filter(Boolean)
 );
 
-export const boundedStringify = (payload, options = {}) => {
+export const boundedStringify = (
+  payload: unknown,
+  options: BoundedStringifyOptions = {}
+): BoundedStringifyResult => {
   const maxBytes = Number.isFinite(Number(options.maxBytes))
     ? Number(options.maxBytes)
     : DEFAULT_MAX_JSON_BYTES;
+  const replacer = options.replacer as
+    | ((this: any, key: string, value: any) => any)
+    | Array<number | string>
+    | null
+    | undefined;
 
   try {
-    const value = JSON.stringify(payload, options.replacer, options.space);
+    const value = typeof replacer === 'function'
+      ? JSON.stringify(payload, replacer, options.space)
+      : JSON.stringify(payload, replacer ?? null, options.space);
     if (typeof value !== 'string') {
       return {
         ok: false,
@@ -61,7 +144,12 @@ export const boundedStringify = (payload, options = {}) => {
   }
 };
 
-export const safeJsonRead = (storage, key, parser = null, options = {}) => {
+export const safeJsonRead = <T = unknown>(
+  storage: StorageLike | null | undefined,
+  key: unknown,
+  parser: ((value: unknown) => T) | null = null,
+  options: SafeJsonReadOptions = {}
+): SafeJsonReadResult<T> => {
   const normalizedKey = String(key || '').trim();
   if (!storage || !normalizedKey || typeof storage.getItem !== 'function') {
     return {
@@ -117,7 +205,12 @@ export const safeJsonRead = (storage, key, parser = null, options = {}) => {
   }
 };
 
-export const safeJsonWrite = (storage, key, payload, options = {}) => {
+export const safeJsonWrite = (
+  storage: StorageLike | null | undefined,
+  key: unknown,
+  payload: unknown,
+  options: BoundedStringifyOptions = {}
+): SafeJsonWriteResult => {
   const normalizedKey = String(key || '').trim();
   if (!storage || !normalizedKey || typeof storage.setItem !== 'function') {
     return {
@@ -147,9 +240,13 @@ export const safeJsonWrite = (storage, key, payload, options = {}) => {
   }
 };
 
-export const removeKeys = (storage, keys) => {
+export const removeKeys = (
+  storage: StorageLike | null | undefined,
+  keys: string | string[] | null | undefined
+): RemoveKeysResult => {
   const normalizedKeys = normalizeKeyList(keys);
-  if (!storage || typeof storage.removeItem !== 'function') {
+  const removeItem = storage?.removeItem;
+  if (!storage || typeof removeItem !== 'function') {
     return {
       ok: false,
       removed: 0,
@@ -162,7 +259,7 @@ export const removeKeys = (storage, keys) => {
   let failed = 0;
   normalizedKeys.forEach((key) => {
     try {
-      storage.removeItem(key);
+      removeItem(key);
       removed += 1;
     } catch (_) {
       failed += 1;
@@ -177,7 +274,13 @@ export const removeKeys = (storage, keys) => {
   };
 };
 
-export const createStorageNamespace = ({ prefix, version = 1 } = {}) => {
+export const createStorageNamespace = ({
+  prefix,
+  version = 1,
+}: {
+  prefix?: unknown;
+  version?: unknown;
+} = {}): StorageNamespace => {
   const normalizedPrefix = String(prefix || '').trim().replace(/:+$/g, '');
   const normalizedVersion = String(version || 1).trim().replace(/^v/i, '');
   const base = `${normalizedPrefix}:v${normalizedVersion}`;
@@ -191,7 +294,13 @@ export const createStorageNamespace = ({ prefix, version = 1 } = {}) => {
   };
 };
 
-const storageJson = {
+const storageJson: {
+  boundedStringify: typeof boundedStringify;
+  createStorageNamespace: typeof createStorageNamespace;
+  removeKeys: typeof removeKeys;
+  safeJsonRead: typeof safeJsonRead;
+  safeJsonWrite: typeof safeJsonWrite;
+} = {
   boundedStringify,
   createStorageNamespace,
   removeKeys,
