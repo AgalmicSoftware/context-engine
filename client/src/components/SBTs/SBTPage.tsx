@@ -1,4 +1,4 @@
-/** @file SBTPage.jsx */
+/** @file SBTPage */
 
 import React, { Component } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -49,30 +49,36 @@ import CETooltip from '../Shared/CETooltip';
 
 const sbtLog = createLogger('sbt');
 const inviteLog = createLogger('inviteDebug');
-const buildSessionRoutePath = (slugRaw = '', basePath = '') => {
+const contractScriptsUntyped = contractScripts as any;
+const getSbtPasswordRecoveryCodesUntyped = getSbtPasswordRecoveryCodes as any;
+const upsertSbtPasswordRecoveryCodesUntyped = upsertSbtPasswordRecoveryCodes as any;
+const getErrorMessage = (error: any, fallback = 'Unknown error') => (
+  error instanceof Error && error.message ? error.message : String(error?.message || error || fallback)
+);
+const buildSessionRoutePath = (slugRaw: any = '', basePath: any = '') => {
   const slug = normalizeSessionSlug(slugRaw || '');
   const normalizedBasePath = String(basePath || '').replace(/\/+$/, '');
   return normalizedBasePath + (slug ? `/session/${encodeURIComponent(slug)}` : '/session');
 };
 
 
-const resolveSbtAddress = (input) => {
+const resolveSbtAddress = (input: any) => {
   if (Array.isArray(input)) {
-    const found = input.find(entry => entry && entry.sbtAddress !== undefined);
+    const found = input.find((entry: any) => entry && entry.sbtAddress !== undefined);
     return found ? found.sbtAddress : null;
   }
   if (input && input.sbtAddress !== undefined) return input.sbtAddress;
   return input || null;
 };
 
-const resolveSbtChainId = (input) => {
-  const readChainId = (value) => {
+const resolveSbtChainId = (input: any) => {
+  const readChainId = (value: any) => {
     const chainId = Number(value?.chainId || value?.chainID || 0);
     return chainId > 0 ? chainId : null;
   };
 
   if (Array.isArray(input)) {
-    const found = input.find((entry) => readChainId(entry));
+    const found = input.find((entry: any) => readChainId(entry));
     return readChainId(found);
   }
 
@@ -83,39 +89,41 @@ const resolveSbtChainId = (input) => {
   return null;
 };
 
-class SBTPage extends Component {
-  _isMounted = false;
-  hasAttemptedListMint = false; // Flag for sequential minting
+class SBTPage extends Component<any, any> {
+  [key: string]: any;
+
+  _isMounted: any = false;
+  hasAttemptedListMint: any = false; // Flag for sequential minting
   // Per-instance guards (no background loops)
-  _metaHydrationTried = {};     // key: `${netId}:${addrLower}` => true
-  _eventScanTried = {};         // key: `${netId}:${addrLower}` => true
-  _descDecryptTried = {};       // key: `${netId}:${addrLower}:${account}` => true
-  _activeScanKey = null;
-  _loadSbtInfoInFlight = false;
-  _loadSbtInfoPending = false;
-  _loadSbtInfoPendingForce = false;
-  _loadSbtInfoPendingOptions = null;
-  _latestLoadSbtInfoRequestKey = '';
-  _localStorageWriteCache = {};
-  _queuedLocalStorageWrites = new Map();
-  _localStorageWriteTimer = null;
-  _netHoldersMemo = {
+  _metaHydrationTried: any = {};     // key: `${netId}:${addrLower}` => true
+  _eventScanTried: any = {};         // key: `${netId}:${addrLower}` => true
+  _descDecryptTried: any = {};       // key: `${netId}:${addrLower}:${account}` => true
+  _activeScanKey: any = null;
+  _loadSbtInfoInFlight: any = false;
+  _loadSbtInfoPending: any = false;
+  _loadSbtInfoPendingForce: any = false;
+  _loadSbtInfoPendingOptions: any = null;
+  _latestLoadSbtInfoRequestKey: any = '';
+  _localStorageWriteCache: any = {};
+  _queuedLocalStorageWrites: any = new Map();
+  _localStorageWriteTimer: any = null;
+  _netHoldersMemo: any = {
     mintedRef: null,
     burnedRef: null,
     mintedSignature: '',
     burnedSignature: '',
     result: [],
   };
-  _filteredMintedUsersSignatureMemo = {
+  _filteredMintedUsersSignatureMemo: any = {
     listRef: null,
     listToken: '',
     signature: '',
   };
-  _sessionSBTAddressesKey = '';
-  _sessionSBTAddressesValue = [];
-  _decryptedImageBlobUrl = '';
+  _sessionSBTAddressesKey: any = '';
+  _sessionSBTAddressesValue: any = [];
+  _decryptedImageBlobUrl: any = '';
 
-  state = {
+  state: any = {
     sbtInfo: null,
     userHasSBT: false,
     userIsSbtAdmin: false,
@@ -185,7 +193,7 @@ class SBTPage extends Component {
     displayImageFallbackIndex: 0,
   };
 
-  getActiveChainId = () => {
+  getActiveChainId: any = () => {
     const networkChainId = Number(this.state?.network?.id || this.props?.network?.id || 0);
     if (networkChainId > 0) return networkChainId;
     const sbtChainId = Number(this.state?.sbtInfo?.chainID || this.state?.sbtInfo?.chainId || 0);
@@ -194,12 +202,12 @@ class SBTPage extends Component {
     return sessionChainId > 0 ? sessionChainId : null;
   };
 
-  getRecoveryCacheChainId = () => {
+  getRecoveryCacheChainId: any = () => {
     const sbtChainId = Number(this.state?.sbtInfo?.chainID || this.state?.sbtInfo?.chainId || 0);
     if (sbtChainId > 0) return sbtChainId;
 
     const propChainId = resolveSbtChainId(this.props?.SBTAddress);
-    if (propChainId > 0) return propChainId;
+    if ((propChainId ?? 0) > 0) return propChainId;
 
     const sessionChainId = Number(getSessionChainId(this.getEffectiveSessionSlug()) || 0);
     if (sessionChainId > 0) return sessionChainId;
@@ -208,7 +216,7 @@ class SBTPage extends Component {
     return networkChainId > 0 ? networkChainId : null;
   };
 
-  getActiveBlockTimeMs = (multiplier = 1) => {
+  getActiveBlockTimeMs: any = (multiplier: any = 1) => {
     const factor = Number(multiplier || 1);
     const safeFactor = Number.isFinite(factor) && factor > 0 ? factor : 1;
     return Math.round(getChainBlockTimeMs(this.getActiveChainId()) * safeFactor);
@@ -240,10 +248,10 @@ class SBTPage extends Component {
       } catch (err) {
         sbtLog.warn("Error parsing auto-mint params:", err);
       }
-    })().catch(e => sbtLog.warn('componentDidMount async error:', e));
+    })().catch((e: any) => sbtLog.warn('componentDidMount async error:', e));
   }
 
-  componentDidUpdate(prevProps, prevState) {
+  componentDidUpdate(prevProps: any, prevState: any) {
     const { SBTAddress, network, sbtMintPassword, account, sbtCacheRevision, autoMintingMode, loginComplete } = this.props;
 
     const prevAddress = resolveSbtAddress(prevProps.SBTAddress);
@@ -318,7 +326,7 @@ class SBTPage extends Component {
         this.loadSBTInfo();
       }
       try {
-        this.handleUrlAutoMintIntent().catch((e) => {
+        this.handleUrlAutoMintIntent().catch((e: any) => {
           if (this._isMounted) this.setState({ error: e?.message || 'Auto-mint failed.', mintingStatus: 'failure' });
         });
       } catch (e) { sbtLog.warn('SBTPage: fallback', e); }
@@ -366,17 +374,17 @@ class SBTPage extends Component {
     this.flushQueuedLocalStorageWrites();
   }
 
-  releaseDecryptedImageBlobUrl = () => {
+  releaseDecryptedImageBlobUrl: any = () => {
     const blobUrl = this._decryptedImageBlobUrl;
     if (!blobUrl || typeof URL === 'undefined') return;
     try { URL.revokeObjectURL(blobUrl); } catch (e) { sbtLog.warn('SBTPage: cleanup', e); }
     this._decryptedImageBlobUrl = '';
   };
 
-  flushQueuedLocalStorageWrites = () => {
+  flushQueuedLocalStorageWrites: any = () => {
     if (typeof localStorage === 'undefined') return;
     if (!this._queuedLocalStorageWrites || this._queuedLocalStorageWrites.size === 0) return;
-    this._queuedLocalStorageWrites.forEach((nextJson, key) => {
+    this._queuedLocalStorageWrites.forEach((nextJson: any, key: any) => {
       try {
         const cached = this._localStorageWriteCache[key];
         if (cached === nextJson) return;
@@ -392,7 +400,7 @@ class SBTPage extends Component {
     this._queuedLocalStorageWrites.clear();
   };
 
-  queueLocalStorageJsonWrite = (key, value, options = {}) => {
+  queueLocalStorageJsonWrite: any = (key: any, value: any, options: any = {}) => {
     if (typeof localStorage === 'undefined') return false;
     const storageKey = String(key || '');
     if (!storageKey) return false;
@@ -425,7 +433,7 @@ class SBTPage extends Component {
     return true;
   };
 
-  readQueuedOrStoredLocalStorageJson = (key, fallback = {}) => {
+  readQueuedOrStoredLocalStorageJson: any = (key: any, fallback: any = {}) => {
     if (typeof localStorage === 'undefined') return fallback;
     const storageKey = String(key || '');
     if (!storageKey) return fallback;
@@ -456,7 +464,7 @@ class SBTPage extends Component {
     }
   }
 
-  clearAutoMintUrlIntent = () => {
+  clearAutoMintUrlIntent: any = () => {
     try {
       if (this.isAutoHashEnabled()) {
         if (typeof window !== 'undefined' && window.history && window.history.replaceState) {
@@ -477,7 +485,7 @@ class SBTPage extends Component {
             params.delete('sbt');
             params.delete('gp');
             params.delete('inv');
-            Array.from(params.keys()).forEach((k) => {
+            Array.from(params.keys()).forEach((k: any) => {
               if (/^(sbt|gp|inv|auto)\d+$/.test(k)) params.delete(k);
             });
             changed = true;
@@ -493,7 +501,7 @@ class SBTPage extends Component {
     } catch (e) { sbtLog.warn('SBTPage: fallback', e); }
   };
 
-  normalizeInviteCode = (raw) => {
+  normalizeInviteCode: any = (raw: any) => {
     const trimmed = String(raw || '').trim();
     if (!trimmed) return '';
     const lower = trimmed.toLowerCase();
@@ -502,7 +510,7 @@ class SBTPage extends Component {
     return trimmed;
   };
 
-  decodeInviteInput = (raw) => {
+  decodeInviteInput: any = (raw: any) => {
     const normalized = this.normalizeInviteCode(raw);
     if (!normalized) return null;
     const payload = cryptoUtils.decodeInvite(normalized);
@@ -510,10 +518,10 @@ class SBTPage extends Component {
     return { ...payload, inviteCode: normalized };
   };
 
-  getCurrentSbtAddressInfo = (propsIn = this.props) => {
+  getCurrentSbtAddressInfo: any = (propsIn: any = this.props) => {
     const prop = propsIn?.SBTAddress;
     const original = Array.isArray(prop)
-      ? (prop.find((entry) => entry && entry.sbtAddress !== undefined)?.sbtAddress || '')
+      ? (prop.find((entry: any) => entry && entry.sbtAddress !== undefined)?.sbtAddress || '')
       : ((prop && prop.sbtAddress !== undefined ? prop.sbtAddress : prop) || '');
     return {
       original,
@@ -521,10 +529,10 @@ class SBTPage extends Component {
     };
   };
 
-  collectAutoMintPairsFromSearchParams = (searchParams) => {
+  collectAutoMintPairsFromSearchParams: any = (searchParams: any) => {
     const sp = searchParams instanceof URLSearchParams ? searchParams : new URLSearchParams(searchParams || '');
     const globalAuto = sp.get('auto') === '1';
-    const pairs = [];
+    const pairs: any[] = [];
 
     if (sp.has('sbt')) {
       pairs.push({
@@ -552,7 +560,7 @@ class SBTPage extends Component {
     return { pairs, globalAuto };
   };
 
-  resolveUrlAutoMintIntent = (searchRaw = null, propsIn = this.props) => {
+  resolveUrlAutoMintIntent: any = (searchRaw: any = null, propsIn: any = this.props) => {
     const { original: currentSbtAddress, lower: currentSbtAddrLower } = this.getCurrentSbtAddressInfo(propsIn);
     if (!currentSbtAddress) return null;
 
@@ -565,10 +573,10 @@ class SBTPage extends Component {
 
     const sp = new URLSearchParams(qs);
     const { pairs, globalAuto } = this.collectAutoMintPairsFromSearchParams(sp);
-    const matchedPair = pairs.find((pair) => (pair.sbt || '').toLowerCase() === currentSbtAddrLower);
+    const matchedPair = pairs.find((pair: any) => (pair.sbt || '').toLowerCase() === currentSbtAddrLower);
 
-    let targetInvite = null;
-    let targetPassword = null;
+    let targetInvite: any = null;
+    let targetPassword: any = null;
     let shouldAutoMint = false;
 
     if (matchedPair) {
@@ -615,7 +623,7 @@ class SBTPage extends Component {
   };
 
   // Keep mount/update auto-mint routing centralized so query handling stays consistent.
-  handleUrlAutoMintIntent = async (propsIn = this.props) => {
+  handleUrlAutoMintIntent: any = async (propsIn: any = this.props) => {
     const intent = this.resolveUrlAutoMintIntent(null, propsIn);
     if (!intent) return false;
 
@@ -646,7 +654,7 @@ class SBTPage extends Component {
       return true;
     }
 
-    await new Promise((resolve) => {
+    await new Promise((resolve: any) => {
       if (this._isMounted) {
         this.setState({ groupPasswordInput: targetCode }, resolve);
       } else {
@@ -663,7 +671,7 @@ class SBTPage extends Component {
     let sbtInfo = this.state.sbtInfo;
     if (!sbtInfo || typeof sbtInfo !== 'object') {
       try {
-        sbtInfo = await contractScripts.getSbtMetadata('none', currentSbtAddress, slug);
+        sbtInfo = await contractScriptsUntyped.getSbtMetadata('none', currentSbtAddress, slug);
       } catch (_) {
         sbtInfo = null;
       }
@@ -677,7 +685,7 @@ class SBTPage extends Component {
       return true;
     }
 
-    const onchainGph = await contractScripts.getGroupPasswordHash('none', currentSbtAddress, slug);
+    const onchainGph = await contractScriptsUntyped.getGroupPasswordHash('none', currentSbtAddress, slug);
     if (onchainGph && onchainGph !== ethers.constants.HashZero) {
       await this.mintUnlimitedWithGroupPassword();
       return true;
@@ -689,7 +697,7 @@ class SBTPage extends Component {
     return false;
   };
 
-  resolveSessionSlugFromInfo = (info) => {
+  resolveSessionSlugFromInfo: any = (info: any) => {
     if (info && Object.prototype.hasOwnProperty.call(info, 'sessionSlug')) {
       const hasExplicitFlag = Object.prototype.hasOwnProperty.call(info, 'sessionSlugExplicit');
       const isExplicitSessionSlug = info.sessionSlugExplicit === true;
@@ -704,14 +712,14 @@ class SBTPage extends Component {
     return getSessionSlugByName(name);
   };
 
-  hasExplicitSessionSlugProp = (props = this.props) => (
+  hasExplicitSessionSlugProp: any = (props: any = this.props) => (
     !!props && (
       Object.prototype.hasOwnProperty.call(props, 'sessionSlug') ||
       Object.prototype.hasOwnProperty.call(props, 'slug')
     )
   );
 
-  getExplicitSessionSlug = (props = this.props) => {
+  getExplicitSessionSlug: any = (props: any = this.props) => {
     if (!this.hasExplicitSessionSlugProp(props)) return null;
     const raw = Object.prototype.hasOwnProperty.call(props || {}, 'sessionSlug')
       ? props?.sessionSlug
@@ -719,7 +727,7 @@ class SBTPage extends Component {
     return normalizeSessionSlug(raw || '');
   };
 
-  getEffectiveSessionSlug = () => {
+  getEffectiveSessionSlug: any = () => {
     const explicitSlug = this.getExplicitSessionSlug();
     if (explicitSlug != null) return explicitSlug;
     if (this.state.resolvedSessionSlug != null) return this.state.resolvedSessionSlug;
@@ -728,7 +736,7 @@ class SBTPage extends Component {
     return this.props.sessionSlug || this.props.slug || '';
   };
 
-  getSessionDisplayConfig = (sessionSlugRaw = this.getEffectiveSessionSlug()) => {
+  getSessionDisplayConfig: any = (sessionSlugRaw: any = this.getEffectiveSessionSlug()) => {
     const sessionSlug = normalizeSessionSlug(sessionSlugRaw || '');
     try {
       return (
@@ -741,7 +749,7 @@ class SBTPage extends Component {
     }
   };
 
-  getSessionDisplayLabel = (sessionSlugRaw = this.getEffectiveSessionSlug()) => {
+  getSessionDisplayLabel: any = (sessionSlugRaw: any = this.getEffectiveSessionSlug()) => {
     const sessionSlug = normalizeSessionSlug(sessionSlugRaw || '');
     const sessionConfig = this.getSessionDisplayConfig(sessionSlug);
     const sessionName = String(sessionConfig?.sessionName || '').trim();
@@ -749,7 +757,7 @@ class SBTPage extends Component {
     return sessionName || sessionSlug;
   };
 
-  hasUsableScanProgress = (progress) => {
+  hasUsableScanProgress: any = (progress: any) => {
     if (!progress || typeof progress !== 'object') return false;
     const totalBlocks = Number(progress?.totalBlocks || 0);
     const currentBlock = Number(progress?.currentBlock || 0);
@@ -768,7 +776,7 @@ class SBTPage extends Component {
     );
   };
 
-  isActiveScanProgress = (progress) => {
+  isActiveScanProgress: any = (progress: any) => {
     if (!this.hasUsableScanProgress(progress)) return false;
     const remainingBlocks = Number(progress?.remainingBlocks);
     if (Number.isFinite(remainingBlocks)) return remainingBlocks > 0;
@@ -793,7 +801,7 @@ class SBTPage extends Component {
     );
   };
 
-  getParentSessionScanProgress = () => {
+  getParentSessionScanProgress: any = () => {
     const progress = (this.props?.sbtScanProgress && typeof this.props.sbtScanProgress === 'object')
       ? this.props.sbtScanProgress
       : null;
@@ -833,7 +841,7 @@ class SBTPage extends Component {
     };
   };
 
-  getEffectiveHolderScanProgress = () => {
+  getEffectiveHolderScanProgress: any = () => {
     const localProgress = (this.state?.logScanProgress && typeof this.state.logScanProgress === 'object')
       ? this.state.logScanProgress
       : null;
@@ -849,7 +857,7 @@ class SBTPage extends Component {
     return null;
   };
 
-  isHolderScanActive = () => (
+  isHolderScanActive: any = () => (
     this.isActiveScanProgress(this.getEffectiveHolderScanProgress()) ||
     this.state.loadingMintersBurners ||
     this.state.loadingMintedFilter ||
@@ -857,12 +865,12 @@ class SBTPage extends Component {
     this.props.sbtScanPending
   );
 
-  getSbtDetailPath = (sbtAddress) => (
+  getSbtDetailPath: any = (sbtAddress: any) => (
     buildSbtDetailPath(sbtAddress, this.getEffectiveSessionSlug())
   );
 
-  getSessionSBTAddresses = () => {
-    const pushAddress = (input, out, seen) => {
+  getSessionSBTAddresses: any = () => {
+    const pushAddress = (input: any, out: any, seen: any) => {
       const raw = String(input || '').trim();
       if (!raw || !ethers.utils.isAddress(raw)) return;
       const lower = raw.toLowerCase();
@@ -870,16 +878,16 @@ class SBTPage extends Component {
       seen.add(lower);
       out.push(lower);
     };
-    const listSignature = (input) => {
+    const listSignature = (input: any) => {
       if (!Array.isArray(input)) return '';
       return input
-        .map((entry) => String(entry || '').trim().toLowerCase())
+        .map((entry: any) => String(entry || '').trim().toLowerCase())
         .filter(Boolean)
         .join(',');
     };
 
     const sessionSlug = this.getEffectiveSessionSlug();
-    let sessionConfig = null;
+    let sessionConfig: any = null;
     try {
       sessionConfig = (
         getSessionConfigBySlugOrDefault(sessionSlug || '')
@@ -903,8 +911,8 @@ class SBTPage extends Component {
       return this._sessionSBTAddressesValue;
     }
 
-    const addresses = [];
-    const seen = new Set();
+    const addresses: any[] = [];
+    const seen: any = new Set();
 
     pushAddress(this.state?.sbtAddress, addresses, seen);
     pushAddress(this.props?.match?.params?.address, addresses, seen);
@@ -914,14 +922,14 @@ class SBTPage extends Component {
       ...(Array.isArray(sessionConfig?.defaultFeaturedSBTs) ? sessionConfig.defaultFeaturedSBTs : []),
       ...(Array.isArray(sessionConfig?.featured_SBTs_LIST) ? sessionConfig.featured_SBTs_LIST : []),
     ];
-    fromSession.forEach((address) => pushAddress(address, addresses, seen));
+    fromSession.forEach((address: any) => pushAddress(address, addresses, seen));
 
     this._sessionSBTAddressesKey = cacheKey;
     this._sessionSBTAddressesValue = addresses;
     return addresses;
   };
 
-  refreshSbtDataWithSlug = (sbtAddress, options, slugOverride = null) => {
+  refreshSbtDataWithSlug: any = (sbtAddress: any, options: any, slugOverride: any = null) => {
     if (!sbtAddress) return null;
     const slug = slugOverride != null ? slugOverride : this.getEffectiveSessionSlug();
     try {
@@ -931,14 +939,14 @@ class SBTPage extends Component {
     }
   };
 
-  autoMintPublicIfAllowed = async (sbtAddress) => {
+  autoMintPublicIfAllowed: any = async (sbtAddress: any) => {
     if (!sbtAddress) return false;
 
     const slug = this.getEffectiveSessionSlug();
     let sbtInfo = this.state.sbtInfo;
     if (!sbtInfo || typeof sbtInfo !== 'object') {
       try {
-        sbtInfo = await contractScripts.getSbtMetadata('none', sbtAddress, slug);
+        sbtInfo = await contractScriptsUntyped.getSbtMetadata('none', sbtAddress, slug);
       } catch (_) {
         sbtInfo = null;
       }
@@ -950,9 +958,9 @@ class SBTPage extends Component {
       return false;
     }
 
-    let onchainGph = null;
+    let onchainGph: any = null;
     try {
-      onchainGph = await contractScripts.getGroupPasswordHash('none', sbtAddress, slug);
+      onchainGph = await contractScriptsUntyped.getGroupPasswordHash('none', sbtAddress, slug);
     } catch (_) {
       onchainGph = null;
     }
@@ -970,13 +978,13 @@ class SBTPage extends Component {
     return true;
   };
 
-  handleGroupPasswordInputChange = (event) => {
+  handleGroupPasswordInputChange: any = (event: any) => {
     const raw = event?.target?.value;
     const value = typeof raw === 'string' ? raw.replace(/\s+/g, '') : raw;
     this.setState({ groupPasswordInput: value });
   };
 
-  claimWithInvitePayload = async (payload, sbtOverride, options = {}) => {
+  claimWithInvitePayload: any = async (payload: any, sbtOverride: any, options: any = {}) => {
     try {
       if (!this.props.account) {
         this.props.toggleLoginModal(true);
@@ -991,7 +999,7 @@ class SBTPage extends Component {
 
       const { SBTAddress: SBTAddressProp } = this.props;
       const sbt = sbtOverride || (Array.isArray(SBTAddressProp)
-        ? SBTAddressProp.find(e => e.sbtAddress !== undefined)?.sbtAddress
+        ? SBTAddressProp.find((e: any) => e.sbtAddress !== undefined)?.sbtAddress
         : (SBTAddressProp && SBTAddressProp.sbtAddress !== undefined ? SBTAddressProp.sbtAddress : SBTAddressProp));
 
       if (!sbt) return { ok: false, error: new Error(`Missing ${t('sbt')} address`) };
@@ -1022,13 +1030,13 @@ class SBTPage extends Component {
     } catch (error) {
       inviteLog.error('[INVITE] claimWithInvite failed:', error);
       if (this._isMounted && !options.suppressErrors) {
-        this.setState({ error: error?.message || 'Invite claim failed.', mintingStatus: 'failure' });
+        this.setState({ error: getErrorMessage(error, 'Invite claim failed.'), mintingStatus: 'failure' });
       }
       return { ok: false, error };
     }
   };
 
-  claimWithGroupPassword = async (rawPassword, sbtOverride) => {
+  claimWithGroupPassword: any = async (rawPassword: any, sbtOverride: any) => {
     try {
       if (!this.props.account) {
         this.props.toggleLoginModal(true);
@@ -1042,7 +1050,7 @@ class SBTPage extends Component {
 
       const { SBTAddress: SBTAddressProp } = this.props;
       const sbt = sbtOverride || (Array.isArray(SBTAddressProp)
-        ? SBTAddressProp.find(e => e.sbtAddress !== undefined)?.sbtAddress
+        ? SBTAddressProp.find((e: any) => e.sbtAddress !== undefined)?.sbtAddress
         : (SBTAddressProp && SBTAddressProp.sbtAddress !== undefined ? SBTAddressProp.sbtAddress : SBTAddressProp));
 
       if (!sbt) return;
@@ -1053,7 +1061,7 @@ class SBTPage extends Component {
 
       let onchainHash = this.state.groupPasswordHash || null;
       if (!onchainHash) {
-        try { onchainHash = await contractScripts.getGroupPasswordHash('none', sbt, slug); } catch (e) { sbtLog.warn('SBTPage: fallback', e); }
+        try { onchainHash = await contractScriptsUntyped.getGroupPasswordHash('none', sbt, slug); } catch (e) { sbtLog.warn('SBTPage: fallback', e); }
       }
       let walletScopeSbtAddress = sbt;
       if (onchainHash && onchainHash !== ethers.constants.HashZero) {
@@ -1064,7 +1072,7 @@ class SBTPage extends Component {
         });
         const localHash = walletScopeSbtAddress === null
           ? null
-          : contractScripts.computeGroupPasswordHash({
+          : contractScriptsUntyped.computeGroupPasswordHash({
               password,
               sbtAddress: walletScopeSbtAddress
             });
@@ -1078,7 +1086,7 @@ class SBTPage extends Component {
         }
       }
 
-      let maxTokens = null;
+      let maxTokens: any = null;
       try {
         const rawMax = sbtInfo?.maxTokens;
         if (rawMax !== undefined && rawMax !== null && rawMax !== '' && rawMax !== '0') {
@@ -1089,12 +1097,12 @@ class SBTPage extends Component {
       }
 
       const maxAttempts = 3;
-      let lastError = null;
+      let lastError: any = null;
 
       for (let attempt = 0; attempt < maxAttempts; attempt++) {
-        let mintedTokens = null;
+        let mintedTokens: any = null;
         try {
-          mintedTokens = await contractScripts.getMintedTokens('none', sbt, slug);
+          mintedTokens = await contractScriptsUntyped.getMintedTokens('none', sbt, slug);
         } catch (_) {
           mintedTokens = null;
         }
@@ -1104,7 +1112,7 @@ class SBTPage extends Component {
           return;
         }
 
-        let mintedBig = null;
+        let mintedBig: any = null;
         try {
           mintedBig = ethers.BigNumber.from(mintedTokens);
         } catch (_) {
@@ -1140,14 +1148,14 @@ class SBTPage extends Component {
 
         lastError = result?.error || new Error('Invite claim failed.');
 
-        let mintedAfter = null;
+        let mintedAfter: any = null;
         try {
-          mintedAfter = await contractScripts.getMintedTokens('none', sbt, slug);
+          mintedAfter = await contractScriptsUntyped.getMintedTokens('none', sbt, slug);
         } catch (_) {
           mintedAfter = null;
         }
 
-        let mintedAfterBig = null;
+        let mintedAfterBig: any = null;
         try {
           mintedAfterBig = mintedAfter !== null ? ethers.BigNumber.from(mintedAfter) : null;
         } catch (_) {
@@ -1163,11 +1171,11 @@ class SBTPage extends Component {
       }
     } catch (error) {
       inviteLog.error('[INVITE] claimWithGroupPassword failed:', error);
-      if (this._isMounted) this.setState({ error: error?.message || 'Invite claim failed.', mintingStatus: 'failure' });
+      if (this._isMounted) this.setState({ error: getErrorMessage(error, 'Invite claim failed.'), mintingStatus: 'failure' });
     }
   };
 
-  claimWithInviteCode = async (rawCode, sbtOverride) => {
+  claimWithInviteCode: any = async (rawCode: any, sbtOverride: any) => {
     const payload = this.decodeInviteInput(rawCode);
     if (payload) {
       await this.claimWithInvitePayload(payload, sbtOverride);
@@ -1177,16 +1185,16 @@ class SBTPage extends Component {
   };
 
   // Helpers
-  sanitizeMintedTokensOverride = (value) => {
+  sanitizeMintedTokensOverride: any = (value: any) => {
     if (value == null) return null;
     const parsed = Number(value);
     if (!Number.isFinite(parsed) || parsed < 0 || !Number.isInteger(parsed)) return null;
     return String(parsed);
   };
 
-  normalizeCountMap = (value = null) => {
-    const out = {};
-    Object.entries(value || {}).forEach(([addrRaw, countRaw]) => {
+  normalizeCountMap: any = (value: any = null) => {
+    const out: Record<string, any> = {};
+    Object.entries(value || {}).forEach(([addrRaw, countRaw]: any) => {
       const addr = String(addrRaw || '').toLowerCase();
       if (!addr) return;
       const count = Math.max(0, Math.floor(Number(countRaw || 0)));
@@ -1196,20 +1204,20 @@ class SBTPage extends Component {
     return out;
   };
 
-  expandAddressListFromCountMap = (countMapIn = null, fallbackList = []) => {
+  expandAddressListFromCountMap: any = (countMapIn: any = null, fallbackList: any = []) => {
     const hasStructuredCountMap =
       !!countMapIn &&
       typeof countMapIn === 'object' &&
       !Array.isArray(countMapIn);
     if (!hasStructuredCountMap) {
-      return (Array.isArray(fallbackList) ? fallbackList : []).map((addr) => String(addr || '').toLowerCase());
+      return (Array.isArray(fallbackList) ? fallbackList : []).map((addr: any) => String(addr || '').toLowerCase());
     }
     const normalized = this.normalizeCountMap(countMapIn);
     if (!Object.keys(normalized).length && Array.isArray(fallbackList) && fallbackList.length > 0) {
-      return fallbackList.map((addr) => String(addr || '').toLowerCase());
+      return fallbackList.map((addr: any) => String(addr || '').toLowerCase());
     }
-    const expanded = [];
-    Object.entries(normalized).forEach(([addr, count]) => {
+    const expanded: any[] = [];
+    Object.entries(normalized).forEach(([addr, count]: any) => {
       for (let i = 0; i < count; i += 1) {
         expanded.push(addr);
       }
@@ -1217,9 +1225,9 @@ class SBTPage extends Component {
     return expanded;
   };
 
-  buildAddressOccurrenceMap = (list = []) => {
-    const counts = new Map();
-    (Array.isArray(list) ? list : []).forEach((entry) => {
+  buildAddressOccurrenceMap: any = (list: any = []) => {
+    const counts: any = new Map();
+    (Array.isArray(list) ? list : []).forEach((entry: any) => {
       const normalized = String(entry || '').toLowerCase();
       if (!normalized) return;
       counts.set(normalized, (counts.get(normalized) || 0) + 1);
@@ -1227,27 +1235,27 @@ class SBTPage extends Component {
     return counts;
   };
 
-  computeNetCounts = (mintsArr = [], burnsArr = []) => {
-    const counts = new Map();
-    (mintsArr || []).forEach(a => {
+  computeNetCounts: any = (mintsArr: any = [], burnsArr: any = []) => {
+    const counts: any = new Map();
+    (mintsArr || []).forEach((a: any) => {
       const k = (a || '').toLowerCase();
       counts.set(k, (counts.get(k) || 0) + 1);
     });
-    (burnsArr || []).forEach(a => {
+    (burnsArr || []).forEach((a: any) => {
       const k = (a || '').toLowerCase();
       counts.set(k, (counts.get(k) || 0) - 1);
     });
     return counts; // Map<addressLower, netCount>
   };
 
-  computeNetHoldersList = (mintsArr = [], burnsArr = []) => {
+  computeNetHoldersList: any = (mintsArr: any = [], burnsArr: any = []) => {
     const counts = this.computeNetCounts(mintsArr, burnsArr);
     return Array.from(counts.entries())
-      .filter(([, v]) => v > 0)
-      .map(([k]) => k);
+      .filter(([, v]: any) => v > 0)
+      .map(([k]: any) => k);
   };
 
-  buildHolderListSignature = (list = []) => {
+  buildHolderListSignature: any = (list: any = []) => {
     const entries = Array.isArray(list) ? list : [];
     let hash = 2166136261;
     for (let i = 0; i < entries.length; i += 1) {
@@ -1262,7 +1270,7 @@ class SBTPage extends Component {
     return `${entries.length}:${hash >>> 0}`;
   };
 
-  getMemoizedNetHoldersList = (mintsArr = [], burnsArr = []) => {
+  getMemoizedNetHoldersList: any = (mintsArr: any = [], burnsArr: any = []) => {
     const mintedRef = Array.isArray(mintsArr) ? mintsArr : [];
     const burnedRef = Array.isArray(burnsArr) ? burnsArr : [];
     const memo = this._netHoldersMemo;
@@ -1295,10 +1303,10 @@ class SBTPage extends Component {
     return next;
   };
 
-  buildAddressListSignature = (list = []) => {
+  buildAddressListSignature: any = (list: any = []) => {
     const entries = Array.isArray(list) ? list : [];
     const listToken = Array.isArray(entries)
-      ? entries.map((entry) => String(entry || '').toLowerCase()).join('|')
+      ? entries.map((entry: any) => String(entry || '').toLowerCase()).join('|')
       : '';
     const memo = this._filteredMintedUsersSignatureMemo;
     if (
@@ -1329,17 +1337,17 @@ class SBTPage extends Component {
     return signature;
   };
 
-  buildNextFilteredHolderRows = ({
+  buildNextFilteredHolderRows: any = ({
     prevFilteredRows = [],
     prevNetHolders = [],
     nextNetHolders = [],
     replaceRows = false,
-  } = {}) => {
+  }: any = {}) => {
     const prevFiltered = (Array.isArray(prevFilteredRows) ? prevFilteredRows : [])
-      .map((entry) => String(entry || '').toLowerCase())
+      .map((entry: any) => String(entry || '').toLowerCase())
       .filter(Boolean);
     const nextRows = (Array.isArray(nextNetHolders) ? nextNetHolders : [])
-      .map((entry) => String(entry || '').toLowerCase())
+      .map((entry: any) => String(entry || '').toLowerCase())
       .filter(Boolean);
     if (replaceRows) {
       const prevWasFullHolderSet =
@@ -1348,18 +1356,18 @@ class SBTPage extends Component {
         return nextRows;
       }
     }
-    const nextSet = new Set(nextRows);
-    return prevFiltered.filter((entry) => nextSet.has(entry));
+    const nextSet: any = new Set(nextRows);
+    return prevFiltered.filter((entry: any) => nextSet.has(entry));
   };
 
-  mergeBurnEvidenceIntoPreservedHolderState = (
-    prevMinted = [],
-    prevBurned = [],
-    nextMinted = [],
-    nextBurned = []
+  mergeBurnEvidenceIntoPreservedHolderState: any = (
+    prevMinted: any = [],
+    prevBurned: any = [],
+    nextMinted: any = [],
+    nextBurned: any = []
   ) => {
-    const preservedMinted = Array.isArray(prevMinted) ? prevMinted.map((entry) => String(entry || '').toLowerCase()) : [];
-    const preservedBurned = Array.isArray(prevBurned) ? prevBurned.map((entry) => String(entry || '').toLowerCase()) : [];
+    const preservedMinted = Array.isArray(prevMinted) ? prevMinted.map((entry: any) => String(entry || '').toLowerCase()) : [];
+    const preservedBurned = Array.isArray(prevBurned) ? prevBurned.map((entry: any) => String(entry || '').toLowerCase()) : [];
     const nextMintedSafe = Array.isArray(nextMinted) ? nextMinted : [];
     const nextBurnedSafe = Array.isArray(nextBurned) ? nextBurned : [];
     const prevNetCounts = this.computeNetCounts(preservedMinted, preservedBurned);
@@ -1368,7 +1376,7 @@ class SBTPage extends Component {
     const nextBurnCounts = this.buildAddressOccurrenceMap(nextBurnedSafe);
     let burnDiscovered = false;
 
-    prevNetCounts.forEach((prevNetCount, addr) => {
+    prevNetCounts.forEach((prevNetCount: any, addr: any) => {
       if (prevNetCount <= 0) return;
       const prevBurnCount = prevBurnCounts.get(addr) || 0;
       const nextBurnCount = nextBurnCounts.get(addr) || 0;
@@ -1390,7 +1398,7 @@ class SBTPage extends Component {
 
   // Regression guard: once holder rows are visible for the active SBT/network, only a
   // resolved replacement set or per-address burn evidence may remove them.
-  reconcileHolderRefreshState = ({
+  reconcileHolderRefreshState: any = ({
     prevState,
     nextMintedAddresses,
     nextBurnedAddresses,
@@ -1398,7 +1406,7 @@ class SBTPage extends Component {
     nextHoldersMetaKey,
     nextMintedTokensOverride,
     userLower,
-  }) => {
+  }: any) => {
     const prev = prevState || {};
     const prevMinted = Array.isArray(prev.mintedAddresses) ? prev.mintedAddresses : [];
     const prevBurned = Array.isArray(prev.burnedAddresses) ? prev.burnedAddresses : [];
@@ -1484,7 +1492,7 @@ class SBTPage extends Component {
     };
   };
 
-  handleModalFilteredMintedUsers = (filtered) => {
+  handleModalFilteredMintedUsers: any = (filtered: any) => {
     if (!this._isMounted) return;
     const safeFiltered = Array.isArray(filtered) ? filtered : [];
     const preserveDuringRefresh =
@@ -1512,9 +1520,9 @@ class SBTPage extends Component {
     }
   };
 
-  applyLocalMintSuccess = (addrLower) => {
+  applyLocalMintSuccess: any = (addrLower: any) => {
     if (!this._isMounted || !addrLower) return;
-    this.setState(prev => {
+    this.setState((prev: any) => {
       const minted = (prev.mintedAddresses || []).concat(addrLower);
       const burned = Array.isArray(prev.burnedAddresses) ? [...prev.burnedAddresses] : [];
       const idx = burned.indexOf(addrLower);
@@ -1528,9 +1536,9 @@ class SBTPage extends Component {
     });
   };
 
-  applyLocalBurnSuccess = (addrLower) => {
+  applyLocalBurnSuccess: any = (addrLower: any) => {
     if (!this._isMounted || !addrLower) return;
-    this.setState(prev => {
+    this.setState((prev: any) => {
       const minted = Array.isArray(prev.mintedAddresses) ? prev.mintedAddresses : [];
       const burned = (prev.burnedAddresses || []).concat(addrLower);
       const net = this.computeNetCounts(minted, burned);
@@ -1559,25 +1567,25 @@ class SBTPage extends Component {
     });
   };
 
-  toggleFullImage = () => {
+  toggleFullImage: any = () => {
     if (this._isMounted) {
-      this.setState(prevState => ({ showFullImage: !prevState.showFullImage }));
+      this.setState((prevState: any) => ({ showFullImage: !prevState.showFullImage }));
     }
   };
 
-  async attemptMintWithPasswordList(passwordList) {
+  async attemptMintWithPasswordList(passwordList: any) {
     try {
       if (!Array.isArray(passwordList) || passwordList.length === 0) return;
 
       const { SBTAddress: SBTAddressProp, provider } = this.props;
       const sbtAddressOriginalCase = Array.isArray(SBTAddressProp)
-        ? SBTAddressProp.find(entry => entry.sbtAddress !== undefined)?.sbtAddress
+        ? SBTAddressProp.find((entry: any) => entry.sbtAddress !== undefined)?.sbtAddress
         : (SBTAddressProp && SBTAddressProp.sbtAddress !== undefined ? SBTAddressProp.sbtAddress : SBTAddressProp);
 
       if (!sbtAddressOriginalCase || !provider) return;
 
-      let chosen = null;
-      let inviteToken = null;
+      let chosen: any = null;
+      let inviteToken: any = null;
       for (const token of passwordList) {
         const payload = this.decodeInviteInput(token);
         if (payload) {
@@ -1587,7 +1595,7 @@ class SBTPage extends Component {
       }
 
       if (inviteToken) {
-        await new Promise(resolve => {
+        await new Promise((resolve: any) => {
           if (this._isMounted) {
             this.setState({
               groupPasswordInput: inviteToken,
@@ -1607,7 +1615,7 @@ class SBTPage extends Component {
       if (this.state.hasInviteMint) {
         const fallbackPassword = passwordList[0];
         if (fallbackPassword) {
-          await new Promise(resolve => {
+          await new Promise((resolve: any) => {
             if (this._isMounted) {
               this.setState({
                 groupPasswordInput: fallbackPassword,
@@ -1640,7 +1648,7 @@ class SBTPage extends Component {
         return;
       }
 
-      await new Promise(resolve => {
+      await new Promise((resolve: any) => {
         if (this._isMounted) {
           this.setState({
             manualPasswordInput: chosen,
@@ -1658,13 +1666,13 @@ class SBTPage extends Component {
         // Rare race: if it failed after check, fall through silently (the UI already shows error)
       }
     } catch (err) {
-      if (this._isMounted) this.setState({ error: err.message || 'Failed to mint with provided codes.' });
+      if (this._isMounted) this.setState({ error: getErrorMessage(err, 'Failed to mint with provided codes.') });
     }
   }
 
-  loadCachedPasswords = () => {
+  loadCachedPasswords: any = () => {
     const sbtAddress = resolveSbtAddress(this.props.SBTAddress);
-    const cached = getSbtPasswordRecoveryCodes({
+    const cached = getSbtPasswordRecoveryCodesUntyped({
       chainId: this.getRecoveryCacheChainId(),
       sbtAddress,
     });
@@ -1674,7 +1682,7 @@ class SBTPage extends Component {
     }
   };
 
-  openMintedModal = () => {
+  openMintedModal: any = () => {
     if (this._isMounted) this.setState({ showModal: true }, () => {
       if (this._isMounted) {
         const netHolders = this.getMemoizedNetHoldersList(this.state.mintedAddresses, this.state.burnedAddresses);
@@ -1692,13 +1700,13 @@ class SBTPage extends Component {
   };
 
 
-  closeModal = () => {
+  closeModal: any = () => {
     if (this._isMounted) this.setState({ showModal: false });
     // Allow another one-shot scan next time modal is opened
     this._eventScanTried = {};
   };
 
-  closeDocModal = () => {
+  closeDocModal: any = () => {
     const blobUrl = this.state.docModalBlobUrl;
     if (blobUrl && typeof URL !== 'undefined') {
       try { URL.revokeObjectURL(blobUrl); } catch (e) { sbtLog.warn('SBTPage: cleanup', e); }
@@ -1715,7 +1723,7 @@ class SBTPage extends Component {
     }
   };
 
-  openEncryptedDoc = async (url) => {
+  openEncryptedDoc: any = async (url: any) => {
     if (!litStorage.isLitArweaveUrl(url)) return;
     const litHooks = getGlobalLitHooks();
     if (!litHooks || typeof litHooks.getKey !== 'function') {
@@ -1775,33 +1783,33 @@ class SBTPage extends Component {
       if (this._isMounted) {
         this.setState({
           docModalLoading: false,
-          docModalError: err?.message || 'Failed to decrypt document.',
+          docModalError: getErrorMessage(err, 'Failed to decrypt document.'),
         });
       }
     }
   };
 
-  toggleStats = () => {
-    if (this._isMounted) this.setState(prevState => ({ showStats: !prevState.showStats }));
+  toggleStats: any = () => {
+    if (this._isMounted) this.setState((prevState: any) => ({ showStats: !prevState.showStats }));
   };
 
-  toggleActions = () => {
-    if (this._isMounted) this.setState(prevState => ({ showActions: !prevState.showActions }));
+  toggleActions: any = () => {
+    if (this._isMounted) this.setState((prevState: any) => ({ showActions: !prevState.showActions }));
   };
 
-  toggleMoreDetails = () => {
-    if (this._isMounted) this.setState(prevState => ({ showMoreDetails: !prevState.showMoreDetails }));
+  toggleMoreDetails: any = () => {
+    if (this._isMounted) this.setState((prevState: any) => ({ showMoreDetails: !prevState.showMoreDetails }));
   };
 
-  toggleAdminSection = () => {
-    if (this._isMounted) this.setState(prevState => ({ showAdminSection: !prevState.showAdminSection }));
+  toggleAdminSection: any = () => {
+    if (this._isMounted) this.setState((prevState: any) => ({ showAdminSection: !prevState.showAdminSection }));
   };
 
-  toggleDocsSection = () => {
-    if (this._isMounted) this.setState(prevState => ({ showDocsSection: !prevState.showDocsSection }));
+  toggleDocsSection: any = () => {
+    if (this._isMounted) this.setState((prevState: any) => ({ showDocsSection: !prevState.showDocsSection }));
   };
 
-  renderAddressLink = (address, key = 'contract') => {
+  renderAddressLink: any = (address: any, key: any = 'contract') => {
     const normalized = String(address || '').trim();
     const isZeroAddress =
       normalized.toLowerCase() === String(ethers.constants.AddressZero || '').toLowerCase();
@@ -1822,7 +1830,7 @@ class SBTPage extends Component {
     );
   };
 
-  getOpenMintAutoJoinUrl = (addressOverride = null) => {
+  getOpenMintAutoJoinUrl: any = (addressOverride: any = null) => {
     const sbtAddress = String(addressOverride || resolveSbtAddress(this.props.SBTAddress) || '').trim();
     if (!sbtAddress || !ethers.utils.isAddress(sbtAddress)) return '';
 
@@ -1844,7 +1852,7 @@ class SBTPage extends Component {
     return `${origin}${demoPath}?sbt=${encodeURIComponent(sbtAddress)}&auto=1`;
   };
 
-  decodeJsonDataUri = (uriRaw) => {
+  decodeJsonDataUri: any = (uriRaw: any) => {
     const raw = String(uriRaw || '').trim();
     if (!/^data:application\/json/i.test(raw)) return null;
     const commaIndex = raw.indexOf(',');
@@ -1875,7 +1883,7 @@ class SBTPage extends Component {
     }
   };
 
-  isImageLikeUri = (uriRaw) => {
+  isImageLikeUri: any = (uriRaw: any) => {
     const raw = String(uriRaw || '').trim();
     if (!raw) return false;
     if (/^data:image\//i.test(raw)) return true;
@@ -1897,18 +1905,18 @@ class SBTPage extends Component {
     return false;
   };
 
-  resolveDisplayImageHref = (sbtInfo) => {
+  resolveDisplayImageHref: any = (sbtInfo: any) => {
     const candidates = this.getDisplayImageUrlCandidates(sbtInfo);
     const candidate = candidates[0] || '';
     return candidate || defaultSbtImage;
   };
 
-  getDisplayImageUrlCandidates = (sbtInfo) => {
+  getDisplayImageUrlCandidates: any = (sbtInfo: any) => {
     const imageValue = sbtInfo?.image;
     return buildArweaveGatewayUrlCandidates(imageValue, { gateway: '' });
   };
 
-  getDisplayImageRenderState = (sbtInfo) => {
+  getDisplayImageRenderState: any = (sbtInfo: any) => {
     const sourceKey = String(sbtInfo?.image || '').trim();
     const candidates = this.getDisplayImageUrlCandidates(sbtInfo);
     const activeIndex = this.state.displayImageFallbackKey === sourceKey
@@ -1925,10 +1933,10 @@ class SBTPage extends Component {
   };
 
   // Keep SBT artwork resilient when the preferred Arweave gateway flakes out mid-load.
-  handleDisplayImageError = ({ sourceKey = '', activeIndex = 0, candidates = [] } = {}) => {
+  handleDisplayImageError: any = ({ sourceKey = '', activeIndex = 0, candidates = [] }: any = {}) => {
     const maxIndex = Array.isArray(candidates) ? candidates.length : 0;
     if (activeIndex >= maxIndex) return;
-    this.setState((prevState) => {
+    this.setState((prevState: any) => {
       const currentIndex = prevState.displayImageFallbackKey === sourceKey
         ? Math.max(0, Number(prevState.displayImageFallbackIndex || 0))
         : 0;
@@ -1940,7 +1948,7 @@ class SBTPage extends Component {
     });
   };
 
-  normalizeCanonicalMetadataHref = (candidateRaw) => {
+  normalizeCanonicalMetadataHref: any = (candidateRaw: any) => {
     const candidate = String(candidateRaw || '').trim();
     if (!candidate) return '';
     const normalized = normalizeArweaveUrl(candidate, { contextLabel: 'sbt_page_token_uri' });
@@ -1949,7 +1957,7 @@ class SBTPage extends Component {
     return normalized;
   };
 
-  resolveTokenMetadataHref = (tokenUriRaw) => {
+  resolveTokenMetadataHref: any = (tokenUriRaw: any) => {
     const raw = String(tokenUriRaw || '').trim();
     if (!raw) return '';
 
@@ -1984,7 +1992,7 @@ class SBTPage extends Component {
     return '';
   };
 
-  getLoadSbtInfoRequestKey = () => {
+  getLoadSbtInfoRequestKey: any = () => {
     const sbtAddress = resolveSbtAddress(this.props.SBTAddress);
     const activeSlug = this.getExplicitSessionSlug() ?? '';
     const currentNetwork = this.state.network || this.props.network;
@@ -1997,7 +2005,7 @@ class SBTPage extends Component {
     ].join('|');
   };
 
-  normalizeLoadSbtInfoOptions = (optionsOrForce = false) => {
+  normalizeLoadSbtInfoOptions: any = (optionsOrForce: any = false) => {
     if (optionsOrForce && typeof optionsOrForce === 'object' && !Array.isArray(optionsOrForce)) {
       return {
         forceEventFetch: optionsOrForce.forceEventFetch === true || optionsOrForce.force === true,
@@ -2010,11 +2018,11 @@ class SBTPage extends Component {
     };
   };
 
-  isCurrentLoadSbtInfoRequest = (requestKey) => (
+  isCurrentLoadSbtInfoRequest: any = (requestKey: any) => (
     !!requestKey && requestKey === this._latestLoadSbtInfoRequestKey
   );
 
-  fetchHolderAddressesByTokenOwnership = async (sbtAddress, sessionSlug, mintedCountRaw) => {
+  fetchHolderAddressesByTokenOwnership: any = async (sbtAddress: any, sessionSlug: any, mintedCountRaw: any) => {
     const mintedCount = Math.floor(Number(mintedCountRaw || 0));
     if (!Number.isFinite(mintedCount) || mintedCount <= 0) return [];
     const MAX_OWNER_LOOKUPS = 512;
@@ -2027,11 +2035,11 @@ class SBTPage extends Component {
       return [];
     }
     const zero = String(ethers.constants.AddressZero || '').toLowerCase();
-    const holders = new Set();
-    const probeOwnerByTokenId = async (tokenId) => {
-      let owner = null;
+    const holders: any = new Set();
+    const probeOwnerByTokenId = async (tokenId: any) => {
+      let owner: any = null;
       try {
-        owner = await contractScripts.getOwnerByTokenId('none', sbtAddress, tokenId, sessionSlug);
+        owner = await contractScriptsUntyped.getOwnerByTokenId('none', sbtAddress, tokenId, sessionSlug);
       } catch (_) {
         owner = null;
       }
@@ -2043,7 +2051,7 @@ class SBTPage extends Component {
     // Probe canonical one-based ids first (CustomSBT), then also probe tokenId 0 for zero-based legacy contracts.
     const BATCH_SIZE = 10;
     for (let i = 1; i <= mintedCount; i += BATCH_SIZE) {
-      const batch = [];
+      const batch: any[] = [];
       for (let j = i; j < Math.min(i + BATCH_SIZE, mintedCount + 1); j += 1) {
         batch.push(probeOwnerByTokenId(j));
       }
@@ -2056,7 +2064,7 @@ class SBTPage extends Component {
   // Load SBT info. Always signal loading state so render() can decide whether
   // to show a full placeholder (first load) or a subtle indicator (refresh).
 
-  async loadSBTInfo(optionsOrForce = false) {
+  async loadSBTInfo(optionsOrForce: any = false) {
     const loadOptions = this.normalizeLoadSbtInfoOptions(optionsOrForce);
     const { forceEventFetch, preferCountsOnly } = loadOptions;
     const { SBTAddress: SBTAddressProp } = this.props;
@@ -2064,7 +2072,7 @@ class SBTPage extends Component {
 
     // Resolve address
     const sbtAddressOriginalCase = Array.isArray(SBTAddressProp)
-      ? SBTAddressProp.find(entry => entry?.sbtAddress !== undefined)?.sbtAddress
+      ? SBTAddressProp.find((entry: any) => entry?.sbtAddress !== undefined)?.sbtAddress
       : (SBTAddressProp && SBTAddressProp.sbtAddress !== undefined ? SBTAddressProp.sbtAddress : SBTAddressProp);
     const requestKey = this.getLoadSbtInfoRequestKey();
     this._latestLoadSbtInfoRequestKey = requestKey;
@@ -2105,14 +2113,14 @@ class SBTPage extends Component {
     };
     sbtLog.info('[SBTPage] loadSBTInfo:start', logContext);
 
-    const toSec = (v) => {
+    const toSec = (v: any) => {
       const n = Number(v || 0);
       if (!Number.isFinite(n) || n < 0) return 0;
       return n > 1e12 ? Math.floor(n / 1000) : n;
     };
-    const normalizeHistorySummary = (value) => {
+    const normalizeHistorySummary = (value: any) => {
       if (!value || typeof value !== 'object') return null;
-      const normalizeField = (fieldValue) => {
+      const normalizeField = (fieldValue: any) => {
         const raw = String(fieldValue ?? '').trim();
         if (!/^\d+$/.test(raw)) return null;
         return raw.replace(/^0+(?=\d)/, '') || '0';
@@ -2140,7 +2148,7 @@ class SBTPage extends Component {
       };
     };
 
-    const fillFromChainIfMissing = async (infoIn, addr, slugForRead) => {
+    const fillFromChainIfMissing = async (infoIn: any, addr: any, slugForRead: any) => {
       const info = { ...(infoIn || {}) };
       const zeroAddress = String(ethers.constants.AddressZero || '').toLowerCase();
       const adminRaw = String(info.admin || info.admin_ || '').trim();
@@ -2151,9 +2159,9 @@ class SBTPage extends Component {
       const needEnd = !(Number(info.mintingEndTime) >= 0);
       const needHasPw = (typeof info.hasPasswordMint !== 'boolean');
       const needAdmin = !adminRaw || adminRaw.toLowerCase() === zeroAddress;
-      const withSoftReadTimeout = (task, fallbackValue = null, timeoutMs = 750) => new Promise((resolve) => {
+      const withSoftReadTimeout = (task: any, fallbackValue: any = null, timeoutMs: any = 750) => new Promise((resolve: any) => {
         let settled = false;
-        const finish = (value) => {
+        const finish = (value: any) => {
           if (settled) return;
           settled = true;
           clearTimeout(timer);
@@ -2161,7 +2169,7 @@ class SBTPage extends Component {
         };
         const timer = setTimeout(() => finish(fallbackValue), timeoutMs);
         Promise.resolve(task)
-          .then((value) => finish(value))
+          .then((value: any) => finish(value))
           .catch(() => finish(fallbackValue));
       });
       const SBT_ABI_FRAG = [
@@ -2176,7 +2184,7 @@ class SBTPage extends Component {
         return info;
       }
       try {
-        const ro = contractScripts.getReadProviderForGroup(slugForRead, { contractKey: 'sbtFactory' });
+        const ro = contractScriptsUntyped.getReadProviderForGroup(slugForRead, { contractKey: 'sbtFactory' });
         const c = new ethers.Contract(addr, SBT_ABI_FRAG, ro);
         const [max, burn, end, hasPw, adminAddr, ownerAddr] = await Promise.all([
           needMax ? withSoftReadTimeout(c.maxTokens(), null) : null,
@@ -2195,8 +2203,8 @@ class SBTPage extends Component {
         if (end != null) info.mintingEndTime = toSec(ethers.BigNumber.isBigNumber(end) ? end.toNumber() : Number(end));
         if (hasPw != null) info.hasPasswordMint = !!hasPw;
         const nextAdmin = [adminAddr, ownerAddr]
-          .map((value) => String(value || '').trim())
-          .find((value) => value && value.toLowerCase() !== zeroAddress);
+          .map((value: any) => String(value || '').trim())
+          .find((value: any) => value && value.toLowerCase() !== zeroAddress);
         if (nextAdmin) {
           info.admin = nextAdmin;
           info.admin_ = nextAdmin;
@@ -2207,21 +2215,21 @@ class SBTPage extends Component {
       return info;
     };
 
-    const readCacheForSlug = async (slugForCache, netKeyForCache) => {
+    const readCacheForSlug = async (slugForCache: any, netKeyForCache: any) => {
       try {
         const parsedRaw = await readCache('sbtCache', slugForCache);
         let parsed = (parsedRaw && typeof parsedRaw === 'object') ? parsedRaw : {};
         if (parsed[netKeyForCache] == null) {
-          const legacy = Object.keys(parsed || {}).find(k => k !== netKeyForCache && Number(k) === Number(netKeyForCache));
+          const legacy = Object.keys(parsed || {}).find((k: any) => k !== netKeyForCache && Number(k) === Number(netKeyForCache));
           if (legacy) parsed[netKeyForCache] = { ...(parsed[netKeyForCache] || {}), ...(parsed[legacy] || {}) };
         }
         return parsed;
       } catch { return {}; }
     };
 
-    const needsTokenUriFields = (i) => {
+    const needsTokenUriFields = (i: any) => {
       if (!i || typeof i !== 'object') return true;
-      const has = (value) => value !== undefined && value !== null && String(value).trim() !== '';
+      const has = (value: any) => value !== undefined && value !== null && String(value).trim() !== '';
       const tokenUri = i.tokenURI ?? i.tokenUri ?? null;
       const image = i.image ?? null;
       const hasImageMetadata =
@@ -2240,12 +2248,12 @@ class SBTPage extends Component {
         adminAddress.toLowerCase() !== String(ethers.constants.AddressZero || '').toLowerCase();
       return !(has(tokenUri) && hasImageMetadata && endOk && burnOk && hasPw && maxTok && adminOk);
     };
-    const needsDirectMetadataHydration = (i) => {
+    const needsDirectMetadataHydration = (i: any) => {
       if (!i || typeof i !== 'object') return true;
       return Object.keys(i).length === 0;
     };
 
-    const findCachedEntryAcrossGroups = ({ excludeSlug = null } = {}) => {
+    const findCachedEntryAcrossGroups = ({ excludeSlug = null }: any = {}) => {
       const excludedSlug = normalizeSessionSlug(excludeSlug || '');
       try {
         const entries = listNamespaceEntriesSync('sbtCache', { cloneValues: false });
@@ -2271,7 +2279,7 @@ class SBTPage extends Component {
       return null;
     };
 
-    const deriveNetKeyForSlug = (slugForCache, netKeyHint = null, infoHint = null) => {
+    const deriveNetKeyForSlug = (slugForCache: any, netKeyHint: any = null, infoHint: any = null) => {
       const chainIdHint =
         infoHint?.chainID ||
         infoHint?.chainId ||
@@ -2283,18 +2291,18 @@ class SBTPage extends Component {
         null;
       return chainId != null ? String(chainId) : '';
     };
-    const buildDirectMetadataContext = (slugForRead, netKeyHint = null, infoHint = null) => {
+    const buildDirectMetadataContext = (slugForRead: any, netKeyHint: any = null, infoHint: any = null) => {
       const normalizedSlug = normalizeSessionSlug(slugForRead || '');
       const chainId =
         Number(getSessionChainId(normalizedSlug) || infoHint?.chainID || infoHint?.chainId || netKeyHint || currentNetwork?.id || 0)
         || null;
-      const ctx = {};
+      const ctx: Record<string, any> = {};
       if (normalizedSlug) ctx.slug = normalizedSlug;
       if (chainId) ctx.networkChainId = chainId;
       return Object.keys(ctx).length ? ctx : (normalizedSlug || '');
     };
 
-    const syncResolvedSessionSlug = (slugToSync) => {
+    const syncResolvedSessionSlug = (slugToSync: any) => {
       if (!this._isMounted || !isCurrentLoad()) return;
       const targetSlug = hasExplicitSlug ? normalizedExplicitSlug : slugToSync;
       if (this.state.resolvedSessionSlug !== targetSlug) {
@@ -2364,30 +2372,30 @@ class SBTPage extends Component {
         sbtInfoSessionName: entry?.sbtInfo?.sessionName ?? null
       });
       const canReportProgress = !this.props.miniaturized;
-      const makeProgressHandler = (slugForProgress) => {
+      const makeProgressHandler = (slugForProgress: any) => {
         if (!canReportProgress || !isCurrentLoad()) return null;
         const scanKey = `${String(slugForProgress || '')}:${addrLower}:${Date.now()}`;
         this._activeScanKey = scanKey;
-        return (progress) => {
+        return (progress: any) => {
           if (!this._isMounted || this._activeScanKey !== scanKey || !isCurrentLoad()) return;
           this.setState({ logScanProgress: { ...progress, slug: slugForProgress } });
         };
       };
 
-      const buildRefreshOptions = (_countsLoadedFlag, slugForProgress) => {
+      const buildRefreshOptions = (_countsLoadedFlag: any, slugForProgress: any) => {
         if (!forceEventFetch) return undefined;
         const onProgress = makeProgressHandler(slugForProgress);
-        const refreshOptions = onProgress ? { forceCounts: true, onProgress } : { forceCounts: true };
+        const refreshOptions: any = onProgress ? { forceCounts: true, onProgress } : { forceCounts: true };
         if (preferCountsOnly) refreshOptions.countsOnly = true;
         return refreshOptions;
       };
       let refreshOptions = buildRefreshOptions(entry?.countsLoaded, resolvedSlug);
-      const applyPrimaryMetadataState = (nextSbtInfo, extraState = {}) => {
+      const applyPrimaryMetadataState = (nextSbtInfo: any, extraState: any = {}) => {
         if (!this._isMounted || !isCurrentLoad()) return;
         const adminAddr = nextSbtInfo ? (nextSbtInfo.admin || nextSbtInfo.admin_ || '') : '';
         const nextUserLower = String(this.props.account || '').toLowerCase();
         const nextUserIsAdmin = nextUserLower && adminAddr && (nextUserLower === String(adminAddr).toLowerCase());
-        this.setState((prev) => ({
+        this.setState((prev: any) => ({
           sbtInfo: nextSbtInfo || prev.sbtInfo || null,
           userIsSbtAdmin: nextUserIsAdmin,
           ...extraState,
@@ -2425,7 +2433,7 @@ class SBTPage extends Component {
       ) {
         if (!isCurrentLoad()) return;
         try {
-          const directMetadata = await contractScripts.getSbtMetadata(
+          const directMetadata = await contractScriptsUntyped.getSbtMetadata(
             'none',
             sbtAddressOriginalCase,
             buildDirectMetadataContext(resolvedSlug, netIdStr, sbtInfo)
@@ -2482,7 +2490,7 @@ class SBTPage extends Component {
         ) {
           if (!isCurrentLoad()) return;
           try {
-            const directMetadata = await contractScripts.getSbtMetadata(
+            const directMetadata = await contractScriptsUntyped.getSbtMetadata(
               'none',
               sbtAddressOriginalCase,
               buildDirectMetadataContext(resolvedSlug, netIdStr, sbtInfo)
@@ -2555,15 +2563,15 @@ class SBTPage extends Component {
       const decryptKey = `${metaKey}:${activeAccount || ''}:${envelopeFingerprint}`;
       if ((nameEnvelope || descriptionEnvelope || tagsEnvelope || documentUrlsEnvelope || imageEnvelope) && !this._descDecryptTried[decryptKey]) {
         if (!isCurrentLoad()) return;
-        const coerceStringArray = (value) => {
-          if (Array.isArray(value)) return value.map((entry) => String(entry));
+        const coerceStringArray = (value: any) => {
+          if (Array.isArray(value)) return value.map((entry: any) => String(entry));
           if (typeof value === 'string') {
             const trimmed = value.trim();
             if (!trimmed) return [];
             if (trimmed.startsWith('[')) {
               try {
                 const parsed = JSON.parse(trimmed);
-                if (Array.isArray(parsed)) return parsed.map((entry) => String(entry));
+                if (Array.isArray(parsed)) return parsed.map((entry: any) => String(entry));
               } catch (_) {}
             }
             return [trimmed];
@@ -2688,7 +2696,7 @@ class SBTPage extends Component {
         this.state.groupPasswordHashLoaded === true;
       const groupPasswordHash = shouldReuseCachedGroupPasswordHash
         ? this.state.groupPasswordHash
-        : await contractScripts.getGroupPasswordHash('none', sbtAddressOriginalCase, resolvedSlug);
+        : await contractScriptsUntyped.getGroupPasswordHash('none', sbtAddressOriginalCase, resolvedSlug);
       if (!isCurrentLoad()) return;
       const hasGroupHash = !!groupPasswordHash && groupPasswordHash !== ethers.constants.HashZero;
       const hasInviteMint = hasGroupHash && !!sbtInfo?.hasPasswordMint;
@@ -2704,10 +2712,10 @@ class SBTPage extends Component {
         entry?.burnedAddresses
       );
       let countsLoaded = entry?.countsLoaded === true;
-      let mintedTokensOverride = null;
-      let mintedTokensSource = null;
-      let ownerLookupUpperBound = null;
-      const setSummaryFallbacks = (summaryValue, sourceLabel) => {
+      let mintedTokensOverride: any = null;
+      let mintedTokensSource: any = null;
+      let ownerLookupUpperBound: any = null;
+      const setSummaryFallbacks = (summaryValue: any, sourceLabel: any) => {
         const holderCount = this.sanitizeMintedTokensOverride(summaryValue?.currentHolderCount);
         const totalMinted = this.sanitizeMintedTokensOverride(summaryValue?.totalMinted);
         if (holderCount != null) {
@@ -2722,7 +2730,7 @@ class SBTPage extends Component {
         setSummaryFallbacks(historySummary, 'summary-cache');
         if (mintedTokensOverride == null) {
           try {
-            const summaryRaw = await contractScripts.getSbtHistorySummary('none', sbtAddressOriginalCase, resolvedSlug);
+            const summaryRaw = await contractScriptsUntyped.getSbtHistorySummary('none', sbtAddressOriginalCase, resolvedSlug);
             if (!isCurrentLoad()) return;
             historySummary = normalizeHistorySummary(summaryRaw) || historySummary;
             setSummaryFallbacks(historySummary, 'summary-group');
@@ -2732,13 +2740,13 @@ class SBTPage extends Component {
               mintedTokensOverride
             });
           } catch (err) {
-            sbtLog.warn('[SBTPage] history summary fallback failed', { resolvedSlug, error: err?.message || err });
+            sbtLog.warn('[SBTPage] history summary fallback failed', { resolvedSlug, error: getErrorMessage(err) });
           }
         }
         if (mintedTokensOverride == null && sbtInfo?.chainID != null) {
           try {
             const fallbackCfg = { networkChainId: Number(sbtInfo.chainID) };
-            const summaryRaw = await contractScripts.getSbtHistorySummary('none', sbtAddressOriginalCase, fallbackCfg);
+            const summaryRaw = await contractScriptsUntyped.getSbtHistorySummary('none', sbtAddressOriginalCase, fallbackCfg);
             if (!isCurrentLoad()) return;
             historySummary = normalizeHistorySummary(summaryRaw) || historySummary;
             setSummaryFallbacks(historySummary, 'summary-chainId');
@@ -2752,13 +2760,13 @@ class SBTPage extends Component {
             sbtLog.warn('[SBTPage] history summary chain fallback failed', {
               resolvedSlug,
               chainID: sbtInfo.chainID,
-              error: err?.message || err
+              error: getErrorMessage(err)
             });
           }
         }
         if (mintedTokensOverride == null) {
           try {
-            const mintedTokensRaw = await contractScripts.getMintedTokens('none', sbtAddressOriginalCase, resolvedSlug);
+            const mintedTokensRaw = await contractScriptsUntyped.getMintedTokens('none', sbtAddressOriginalCase, resolvedSlug);
             if (!isCurrentLoad()) return;
             mintedTokensOverride = this.sanitizeMintedTokensOverride(mintedTokensRaw);
             if (mintedTokensOverride != null) {
@@ -2772,7 +2780,7 @@ class SBTPage extends Component {
         if (mintedTokensOverride == null && sbtInfo?.chainID != null) {
           try {
             const fallbackCfg = { networkChainId: Number(sbtInfo.chainID) };
-            const mintedTokensRaw = await contractScripts.getMintedTokens('none', sbtAddressOriginalCase, fallbackCfg);
+            const mintedTokensRaw = await contractScriptsUntyped.getMintedTokens('none', sbtAddressOriginalCase, fallbackCfg);
             if (!isCurrentLoad()) return;
             mintedTokensOverride = this.sanitizeMintedTokensOverride(mintedTokensRaw);
             if (mintedTokensOverride != null) {
@@ -2788,7 +2796,7 @@ class SBTPage extends Component {
             sbtLog.warn('[SBTPage] mintedTokens fallback failed', {
               resolvedSlug,
               chainID: sbtInfo.chainID,
-              error: err?.message || err
+              error: getErrorMessage(err)
             });
           }
         }
@@ -2862,7 +2870,7 @@ class SBTPage extends Component {
       const adminAddr = sbtInfo ? (sbtInfo.admin || sbtInfo.admin_ || '') : '';
       const userIsSbtAdmin = userLower && adminAddr && (userLower === adminAddr.toLowerCase());
       if (this._isMounted && isCurrentLoad()) {
-        this.setState((prev) => {
+        this.setState((prev: any) => {
           const nextHoldersMetaKey = metaKey || null;
           const holderState = this.reconcileHolderRefreshState({
             prevState: prev,
@@ -2972,7 +2980,7 @@ class SBTPage extends Component {
           delete this._eventScanTried[metaKey];
         }
         if (this._isMounted && isCurrentLoad()) {
-          this.setState((prev) => {
+          this.setState((prev: any) => {
             const nextHoldersMetaKey = metaKey || null;
             const holderState = this.reconcileHolderRefreshState({
               prevState: prev,
@@ -3061,7 +3069,7 @@ class SBTPage extends Component {
   }
 
 
-  checkForMintPassword = () => {
+  checkForMintPassword: any = () => {
     const { sbtMintPassword } = this.props;
     const finalPasswordToUse = sbtMintPassword;
 
@@ -3102,14 +3110,14 @@ class SBTPage extends Component {
 
       const { SBTAddress: SBTAddressProp } = this.props;
       const sbt = Array.isArray(SBTAddressProp)
-        ? SBTAddressProp.find(e => e.sbtAddress !== undefined)?.sbtAddress
+        ? SBTAddressProp.find((e: any) => e.sbtAddress !== undefined)?.sbtAddress
         : (SBTAddressProp && SBTAddressProp.sbtAddress !== undefined ? SBTAddressProp.sbtAddress : SBTAddressProp);
 
       sbtLog.log('[MANUAL-MINT] Preparing mint for', sbt, '...');
       const slug = this.getEffectiveSessionSlug();
 
       sbtLog.log('[MANUAL-MINT] Reading on-chain groupPasswordHash...');
-      const onchain = await contractScripts.getGroupPasswordHash('none', sbt, slug);
+      const onchain = await contractScriptsUntyped.getGroupPasswordHash('none', sbt, slug);
       sbtLog.log('[MANUAL-MINT] On-chain groupPasswordHash:', onchain);
       if (!onchain || onchain === ethers.constants.HashZero) {
         this.setState({ error: `This ${t('sbt')} does not support group-password signature ${t('mintLower')}.` });
@@ -3123,7 +3131,7 @@ class SBTPage extends Component {
       });
       const local = walletScopeSbtAddress === null
         ? null
-        : contractScripts.computeGroupPasswordHash({
+        : contractScriptsUntyped.computeGroupPasswordHash({
             password,
             sbtAddress: walletScopeSbtAddress
           });
@@ -3169,18 +3177,18 @@ class SBTPage extends Component {
       } catch (e) { sbtLog.warn('SBTPage: telemetry', e); }
     } catch (error) {
       sbtLog.error('Manual mint flow failed:', error);
-      this.setState({ error: error?.message || `${t('mint')} failed.`, mintingStatus: 'failure' });
+      this.setState({ error: getErrorMessage(error, `${t('mint')} failed.`), mintingStatus: 'failure' });
     }
   }
 
-  fetchRelevantInfo = () => {
+  fetchRelevantInfo: any = () => {
     if (this._isMounted) this.setState({
       relevantQuestions: [`What is the purpose of this ${t('sbt')}?`, `How can I use this ${t('sbt')}?`],
       relevantDocuments: [`${t('sbt')} Whitepaper`, 'Community Guidelines'],
     });
   };
 
-  handleMint = async (forceEventRefreshOnSuccess = true) => {
+  handleMint: any = async (forceEventRefreshOnSuccess: any = true) => {
     if (!this.props.account) {
       this.props.toggleLoginModal(true);
       return;
@@ -3188,7 +3196,7 @@ class SBTPage extends Component {
 
     const { SBTAddress: SBTAddressProp } = this.props;
     const sbtAddressOriginalCase = Array.isArray(SBTAddressProp)
-        ? SBTAddressProp.find(entry => entry.sbtAddress !== undefined)?.sbtAddress
+        ? SBTAddressProp.find((entry: any) => entry.sbtAddress !== undefined)?.sbtAddress
         : (SBTAddressProp && SBTAddressProp.sbtAddress !== undefined ? SBTAddressProp.sbtAddress : SBTAddressProp);
 
     if (!sbtAddressOriginalCase) return;
@@ -3295,11 +3303,11 @@ class SBTPage extends Component {
       }
     } catch (error) {
       sbtLog.error("Minting failed in handleMint:", error);
-      if (this._isMounted) this.setState({ error: error.message || `${t('minting')} failed.`, mintingStatus: 'failure' });
+      if (this._isMounted) this.setState({ error: getErrorMessage(error, `${t('minting')} failed.`), mintingStatus: 'failure' });
     }
   };
 
-  miniMintHandler = async () => {
+  miniMintHandler: any = async () => {
     if (!this.props.account) {
       this.props.toggleLoginModal(true);
       return;
@@ -3307,7 +3315,7 @@ class SBTPage extends Component {
     await this.handleMint(true); // Pass true to force event refresh on success
   };
 
-  miniBurnHandler = async () => {
+  miniBurnHandler: any = async () => {
     if (!this.props.account) {
       this.props.toggleLoginModal(true);
       return;
@@ -3317,12 +3325,12 @@ class SBTPage extends Component {
 
       const { SBTAddress: SBTAddressProp } = this.props;
       const sbtAddressOriginalCase = Array.isArray(SBTAddressProp)
-        ? SBTAddressProp.find(entry => entry.sbtAddress !== undefined)?.sbtAddress
+        ? SBTAddressProp.find((entry: any) => entry.sbtAddress !== undefined)?.sbtAddress
         : (SBTAddressProp && SBTAddressProp.sbtAddress !== undefined ? SBTAddressProp.sbtAddress : SBTAddressProp);
 
       if (!sbtAddressOriginalCase) return;
 
-      const tokenIdToBurn = await contractScripts.getSBTTokenIdByOwner(this.props.provider, sbtAddressOriginalCase, this.props.account, this.getEffectiveSessionSlug());
+      const tokenIdToBurn = await contractScriptsUntyped.getSBTTokenIdByOwner(this.props.provider, sbtAddressOriginalCase, this.props.account, this.getEffectiveSessionSlug());
       if (!tokenIdToBurn) {
         if (this._isMounted) this.setState({ error: "No valid token ID found", burningStatus: 'failure' });
         return;
@@ -3343,12 +3351,12 @@ class SBTPage extends Component {
       this.refreshSbtDataWithSlug(sbtAddressOriginalCase);
     } catch (error) {
       sbtLog.error("Burn failed in miniBurnHandler:", error);
-      if (this._isMounted) this.setState({ error: error.message, burningStatus: 'failure' });
+      if (this._isMounted) this.setState({ error: getErrorMessage(error), burningStatus: 'failure' });
     }
   };
 
 
-  handleBurnSearchChange = (event) => {
+  handleBurnSearchChange: any = (event: any) => {
     const input = event.target.value;
 
     if (this._isMounted) {
@@ -3375,13 +3383,13 @@ class SBTPage extends Component {
   };
 
   // Extracted the actual RPC logic so it can be debounced
-  performBurnSearch = async (rawInput) => {
+  performBurnSearch: any = async (rawInput: any) => {
     const input = (rawInput || '').trim();
     if (!input) return;
 
     const { SBTAddress: SBTAddressProp } = this.props;
     const sbtAddressOriginalCase = Array.isArray(SBTAddressProp)
-      ? SBTAddressProp.find(entry => entry.sbtAddress !== undefined)?.sbtAddress
+      ? SBTAddressProp.find((entry: any) => entry.sbtAddress !== undefined)?.sbtAddress
       : (SBTAddressProp && SBTAddressProp.sbtAddress !== undefined
           ? SBTAddressProp.sbtAddress
           : SBTAddressProp);
@@ -3391,7 +3399,7 @@ class SBTPage extends Component {
     try {
       // Full address search
       if (input.startsWith('0x') && input.length === 42) {
-        const tokenId = await contractScripts.getSBTTokenIdByOwner(
+        const tokenId = await contractScriptsUntyped.getSBTTokenIdByOwner(
           this.props.provider,
           sbtAddressOriginalCase,
           input,
@@ -3406,7 +3414,7 @@ class SBTPage extends Component {
       }
       // Numeric tokenId search
       else if (/^\d+$/.test(input)) {
-        const address = await contractScripts.getOwnerByTokenId(
+        const address = await contractScriptsUntyped.getOwnerByTokenId(
           this.props.provider,
           sbtAddressOriginalCase,
           input,
@@ -3425,7 +3433,7 @@ class SBTPage extends Component {
   };
 
 
-  handleBurn = async () => {
+  handleBurn: any = async () => {
     if (!this.props.account) {
       this.props.toggleLoginModal(true);
       return;
@@ -3433,7 +3441,7 @@ class SBTPage extends Component {
 
     const { SBTAddress: SBTAddressProp } = this.props;
     const sbtAddressOriginalCase = Array.isArray(SBTAddressProp)
-        ? SBTAddressProp.find(entry => entry.sbtAddress !== undefined)?.sbtAddress
+        ? SBTAddressProp.find((entry: any) => entry.sbtAddress !== undefined)?.sbtAddress
         : (SBTAddressProp && SBTAddressProp.sbtAddress !== undefined ? SBTAddressProp.sbtAddress : SBTAddressProp);
     if (!sbtAddressOriginalCase) return;
 
@@ -3451,13 +3459,13 @@ class SBTPage extends Component {
       );
 
     let tokenIdToBurn;
-    let burnedAddrLower = null;
+    let burnedAddrLower: any = null;
 
     if (isAdminBurn && burnSearchResult && burnSearchResult.tokenId) {
       tokenIdToBurn = burnSearchResult.tokenId;
       burnedAddrLower = burnSearchResult.address ? burnSearchResult.address.toLowerCase() : null;
     } else if (isOwnerBurn) {
-      tokenIdToBurn = await contractScripts.getSBTTokenIdByOwner(this.props.provider, sbtAddressOriginalCase, this.props.account, this.getEffectiveSessionSlug());
+      tokenIdToBurn = await contractScriptsUntyped.getSBTTokenIdByOwner(this.props.provider, sbtAddressOriginalCase, this.props.account, this.getEffectiveSessionSlug());
       burnedAddrLower = userAddress;
       if (!tokenIdToBurn) {
         if (this._isMounted) this.setState({ error: "No valid token ID found", burningStatus: 'failure' });
@@ -3491,7 +3499,7 @@ class SBTPage extends Component {
       this.refreshSbtDataWithSlug(sbtAddressOriginalCase);
     } catch (error) {
       if (this._isMounted) this.setState({
-        error: error.message,
+        error: getErrorMessage(error),
         burningStatus: 'failure',
         burnSearchInput: '',
         burnSearchResult: null,
@@ -3501,11 +3509,11 @@ class SBTPage extends Component {
   };
 
 
-  startClaimCountdown = () => {
+  startClaimCountdown: any = () => {
     const confirmationBlocks = 5;
     const intervalMs = Math.max(1000, this.getActiveBlockTimeMs(1));
     const waitMs = this.getActiveBlockTimeMs(confirmationBlocks);
-    const toDisplaySeconds = (remainingMs) => Math.max(0, Math.ceil(Number(remainingMs || 0) / 1000));
+    const toDisplaySeconds = (remainingMs: any) => Math.max(0, Math.ceil(Number(remainingMs || 0) / 1000));
     let remainingMs = waitMs;
     if (this._isMounted) this.setState({ claimCountdown: toDisplaySeconds(remainingMs) });
     const countdownInterval = setInterval(() => {
@@ -3523,7 +3531,7 @@ class SBTPage extends Component {
   };
 
 
-  copyToClipboard = (text, addressType) => {
+  copyToClipboard: any = (text: any, addressType: any) => {
     navigator.clipboard.writeText(text).then(() => {
       notify.success('Copied to clipboard');
       if (this._isMounted) this.setState({ copiedAddress: addressType }, () => {
@@ -3532,10 +3540,10 @@ class SBTPage extends Component {
     });
   };
 
-  bookmarkSBT = () => {
+  bookmarkSBT: any = () => {
     const { SBTAddress: SBTAddressProp } = this.props;
     const sbtAddressOriginalCase = Array.isArray(SBTAddressProp)
-        ? SBTAddressProp.find(entry => entry.sbtAddress !== undefined)?.sbtAddress
+        ? SBTAddressProp.find((entry: any) => entry.sbtAddress !== undefined)?.sbtAddress
         : (SBTAddressProp && SBTAddressProp.sbtAddress !== undefined ? SBTAddressProp.sbtAddress : SBTAddressProp);
     if (!sbtAddressOriginalCase) return;
     const sbtAddressLower = String(sbtAddressOriginalCase || '').toLowerCase();
@@ -3555,10 +3563,10 @@ class SBTPage extends Component {
         ...baseManaged,
         sbts: Array.isArray(baseManaged.sbts) ? [...baseManaged.sbts] : [],
       };
-      const alreadyManaged = managedBookmarks.sbts.some((entry) => String(entry || '').toLowerCase() === sbtAddressLower);
+      const alreadyManaged = managedBookmarks.sbts.some((entry: any) => String(entry || '').toLowerCase() === sbtAddressLower);
       if (!alreadyManaged) {
         managedBookmarks.sbts.push(sbtAddressLower);
-        void writeCache('bookmarksCache', bookmarksSlug, managedBookmarks).catch((e) => { sbtLog.warn('SBTPage: fallback', e); });
+        void writeCache('bookmarksCache', bookmarksSlug, managedBookmarks).catch((e: any) => { sbtLog.warn('SBTPage: fallback', e); });
       }
     } catch (e) { sbtLog.warn('SBTPage: fallback', e); }
 
@@ -3574,10 +3582,10 @@ class SBTPage extends Component {
     this.storeSBTDetails();
   };
 
-  storeSBTDetails = () => {
+  storeSBTDetails: any = () => {
     const { SBTAddress: SBTAddressProp } = this.props;
     const sbtAddressOriginalCase = Array.isArray(SBTAddressProp)
-        ? SBTAddressProp.find(entry => entry.sbtAddress !== undefined)?.sbtAddress
+        ? SBTAddressProp.find((entry: any) => entry.sbtAddress !== undefined)?.sbtAddress
         : (SBTAddressProp && SBTAddressProp.sbtAddress !== undefined ? SBTAddressProp.sbtAddress : SBTAddressProp);
     if (!sbtAddressOriginalCase) return;
 
@@ -3587,27 +3595,27 @@ class SBTPage extends Component {
     } catch (e) { sbtLog.warn('SBTPage: fallback', e); }
   };
 
-  getExplorerUrl = (address) => {
+  getExplorerUrl: any = (address: any) => {
     const currentNetwork = this.state.network || this.props.network;
     return currentNetwork?.blockExplorers?.default?.url ? `${currentNetwork.blockExplorers.default.url}/address/${address}` : `https://sepolia.etherscan.io/address/${address}`;
   };
 
-  getExplorerLink = (hash) => {
+  getExplorerLink: any = (hash: any) => {
     const currentNetwork = this.state.network || this.props.network;
     return currentNetwork?.blockExplorers?.default?.url ? `${currentNetwork.blockExplorers.default.url}/tx/${hash}` : `https://sepolia.etherscan.io/tx/${hash}`;
   };
 
-  handleGenerateAdminInvites = async () => {
+  handleGenerateAdminInvites: any = async () => {
     if (!this.state.passwordGenerationCount || this.state.passwordGenerationCount <= 0) return;
 
     const newPasswordList = this.generateRandomPasswords(this.state.passwordGenerationCount);
 
-    const hashedPasswords = newPasswordList.map(password => ethers.utils.keccak256(ethers.utils.toUtf8Bytes(password)));
+    const hashedPasswords = newPasswordList.map((password: any) => ethers.utils.keccak256(ethers.utils.toUtf8Bytes(password)));
 
     try {
       const { SBTAddress: SBTAddressProp } = this.props;
       const sbtAddressOriginalCase = Array.isArray(SBTAddressProp)
-        ? SBTAddressProp.find(entry => entry.sbtAddress !== undefined)?.sbtAddress
+        ? SBTAddressProp.find((entry: any) => entry.sbtAddress !== undefined)?.sbtAddress
         : (SBTAddressProp && SBTAddressProp.sbtAddress !== undefined ? SBTAddressProp.sbtAddress : SBTAddressProp);
       if (!sbtAddressOriginalCase) return;
 
@@ -3616,7 +3624,7 @@ class SBTPage extends Component {
 
       this.cacheTransactionHash(tx.transactionHash);
 
-      const recoveryWrite = upsertSbtPasswordRecoveryCodes({
+      const recoveryWrite = upsertSbtPasswordRecoveryCodesUntyped({
         chainId: this.getRecoveryCacheChainId(),
         sbtAddress: sbtAddressOriginalCase,
         passwords: newPasswordList,
@@ -3630,13 +3638,13 @@ class SBTPage extends Component {
       this.loadCachedPasswords();
     } catch (error) {
       sbtLog.error("Error adding hashed passwords:", error);
-      if (this._isMounted) this.setState({ error: error.message });
+      if (this._isMounted) this.setState({ error: getErrorMessage(error) });
     }
   };
 
 
-  generateRandomPasswords = (count) => {
-    const generated = new Set();
+  generateRandomPasswords: any = (count: any) => {
+    const generated: any = new Set();
     while (generated.size < count) {
       // 16 bytes => 32 hex chars (128-bit)
       let arr;
@@ -3646,13 +3654,13 @@ class SBTPage extends Component {
       } else {
         arr = ethers.utils.randomBytes(16);
       }
-      const token = Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('');
+      const token = Array.from(arr).map((b: any) => b.toString(16).padStart(2, '0')).join('');
       generated.add(token);
     }
     return Array.from(generated);
   };
 
-  exportPasswords = () => {
+  exportPasswords: any = () => {
     const { exportFormat, includePreviousPasswords, cachedPasswords, adminGeneratedPasswords } = this.state;
     const { SBTAddress: SBTAddressProp } = this.props;
     const isInvite = !!this.state.hasInviteMint;
@@ -3660,7 +3668,7 @@ class SBTPage extends Component {
     const fileLabel = isInvite ? 'group-passwords' : 'passwords';
 
     let sbtAddr = Array.isArray(SBTAddressProp)
-      ? SBTAddressProp.find(entry => entry.sbtAddress !== undefined)?.sbtAddress
+      ? SBTAddressProp.find((entry: any) => entry.sbtAddress !== undefined)?.sbtAddress
       : (SBTAddressProp && SBTAddressProp.sbtAddress !== undefined ? SBTAddressProp.sbtAddress : SBTAddressProp);
 
     if (typeof sbtAddr === 'string') {
@@ -3682,11 +3690,11 @@ class SBTPage extends Component {
 
     const baseUrl = window.location.origin;
     const demoPath = buildSessionRoutePath(this.getEffectiveSessionSlug());
-    const encodeGroupPassword = (code) => {
+    const encodeGroupPassword = (code: any) => {
       const normalized = cryptoUtils.normalizeGroupPasswordInput(code);
       return cryptoUtils.encodeGroupPasswordForUrl(normalized) || '';
     };
-    const inviteLinks = passwordsToExport.map((code) => ({
+    const inviteLinks = passwordsToExport.map((code: any) => ({
       [codeLabel]: code,
       inviteLink: isInvite
         ? `${baseUrl}${demoPath}?auto=1&sbt=${encodeURIComponent(sbtAddr)}&gp=${encodeURIComponent(encodeGroupPassword(code))}`
@@ -3703,7 +3711,7 @@ class SBTPage extends Component {
       fileName = `${sbtSymbolOrName}_${fileLabel}_${date}.json`;
     } else if (exportFormat === 'csv') {
       content = `index,${codeLabel},inviteLink\n` +
-        inviteLinks.map((item, index) => `${index},${item[codeLabel]},${item.inviteLink}`).join('\n');
+        inviteLinks.map((item: any, index: any) => `${index},${item[codeLabel]},${item.inviteLink}`).join('\n');
       fileName = `${sbtSymbolOrName}_${fileLabel}_${date}.csv`;
     } else {
         return;
@@ -3814,7 +3822,7 @@ renderMintButton() {
               type="text"
               className={styles.input}
               value={manualPasswordInput || ''}
-              onChange={(e) => this.setState({ manualPasswordInput: e.target.value })}
+              onChange={(e: any) => this.setState({ manualPasswordInput: e.target.value })}
               placeholder="Claim Code"
             />
           </div>
@@ -3841,7 +3849,7 @@ renderMintButton() {
               type="text"
               className={styles.input}
               value={manualPasswordInput || ''}
-              onChange={(e) => this.setState({ manualPasswordInput: e.target.value })}
+              onChange={(e: any) => this.setState({ manualPasswordInput: e.target.value })}
               placeholder="Claim Code"
             />
           </div>
@@ -3864,7 +3872,7 @@ renderMintButton() {
 
 
 
-  renderBurnButton = () => {
+  renderBurnButton: any = () => {
     const { sbtInfo, userHasSBT, burningStatus } = this.state;
     if (!sbtInfo) return null;
 
@@ -3897,7 +3905,7 @@ renderMintButton() {
     );
   };
 
-  renderRelevantInfo = () => {
+  renderRelevantInfo: any = () => {
     const { sbtInfo } = this.state;
     const documentURLs = sbtInfo && sbtInfo.documentURLs ? sbtInfo.documentURLs : [];
     const tags = sbtInfo && sbtInfo.tags ? sbtInfo.tags : [];
@@ -3913,7 +3921,7 @@ renderMintButton() {
           <div className={styles.docUrlsSection}>
             <h4>Document URLs:</h4>
             <ul className={styles.docUrlList}>
-              {documentURLs.map((url, index) => {
+              {documentURLs.map((url: any, index: any) => {
                 const litDoc = litStorage.isLitArweaveUrl(url);
                 return (
                   <li key={index} className={styles.docUrlItem}>
@@ -3943,7 +3951,7 @@ renderMintButton() {
           <div className={styles.docIDsSection}>
             <h4>Document ID Hashes:</h4>
             <ul className={styles.docIdList}>
-              {documentIDHashes.map((hash, index) => {
+              {documentIDHashes.map((hash: any, index: any) => {
                 const docHash = encodeURIComponent(hash);
                 return (
                   <li key={index} className={styles.docIdItem}>
@@ -3961,7 +3969,7 @@ renderMintButton() {
           <div className={styles.tagsSection}>
             <h4>Tags:</h4>
             <ul className={styles.tagList}>
-              {tags.map((tag, index) => {
+              {tags.map((tag: any, index: any) => {
                 const tagEnc = encodeURIComponent(tag);
                 return (
                   <li key={index} className={styles.tagItem}>
@@ -3980,7 +3988,7 @@ renderMintButton() {
   };
 
 
-  cacheTransactionHash = (txHash) => {
+  cacheTransactionHash: any = (txHash: any) => {
     const userAddress = this.props.account?.toLowerCase();
     if (!userAddress) return;
     try {
@@ -3991,15 +3999,15 @@ renderMintButton() {
     } catch (e) { sbtLog.warn('SBTPage: fallback', e); }
   };
 
-  handleExportFormatChange = (event) => {
+  handleExportFormatChange: any = (event: any) => {
     if (this._isMounted) this.setState({ exportFormat: event.target.value });
   };
 
-  handleIncludePreviousPasswordsChange = (event) => {
+  handleIncludePreviousPasswordsChange: any = (event: any) => {
     if (this._isMounted) this.setState({ includePreviousPasswords: event.target.checked });
   };
 
-  renderAdminActions = () => {
+  renderAdminActions: any = () => {
     const { userIsSbtAdmin, sbtInfo, burnSearchInput, burnSearchResult, burningStatus, adminGeneratedPasswords, cachedPasswords, includePreviousPasswords, exportFormat } = this.state;
     if (!userIsSbtAdmin || !sbtInfo) return null;
 
@@ -4013,7 +4021,7 @@ renderMintButton() {
 
     const { SBTAddress: SBTAddressProp } = this.props;
     let sbtAddr = Array.isArray(SBTAddressProp)
-      ? SBTAddressProp.find(entry => entry.sbtAddress !== undefined)?.sbtAddress
+      ? SBTAddressProp.find((entry: any) => entry.sbtAddress !== undefined)?.sbtAddress
       : (SBTAddressProp && SBTAddressProp.sbtAddress !== undefined ? SBTAddressProp.sbtAddress : SBTAddressProp);
 
     if (typeof sbtAddr === 'string') {
@@ -4024,11 +4032,11 @@ renderMintButton() {
 
     const baseUrl = window.location.origin;
     const demoPath = buildSessionRoutePath(this.getEffectiveSessionSlug());
-    const encodeGroupPassword = (code) => {
+    const encodeGroupPassword = (code: any) => {
       const normalized = cryptoUtils.normalizeGroupPasswordInput(code);
       return cryptoUtils.encodeGroupPasswordForUrl(normalized) || '';
     };
-    const buildInviteLink = (code) => (
+    const buildInviteLink = (code: any) => (
       isInvite
         ? `${baseUrl}${demoPath}?auto=1&sbt=${encodeURIComponent(sbtAddr)}&gp=${encodeURIComponent(encodeGroupPassword(code))}`
         : `${baseUrl}${sbtBasePath()}/${sbtAddr}/${code}`
@@ -4103,7 +4111,7 @@ renderMintButton() {
                   if (this._isMounted) this.setState({ burningStatus: 'pending', lastTransactionType: 'burn' });
                   // Ensure sbtAddr (original case) is used for contract interaction
                   const sbtAddressOriginalCaseForAdminBurn = Array.isArray(SBTAddressProp)
-                    ? SBTAddressProp.find(entry => entry.sbtAddress !== undefined)?.sbtAddress
+                    ? SBTAddressProp.find((entry: any) => entry.sbtAddress !== undefined)?.sbtAddress
                     : (SBTAddressProp && SBTAddressProp.sbtAddress !== undefined ? SBTAddressProp.sbtAddress : SBTAddressProp);
 
                   if (!sbtAddressOriginalCaseForAdminBurn) {
@@ -4144,7 +4152,7 @@ renderMintButton() {
               <input
                 type="number"
                 value={this.state.passwordGenerationCount || ''}
-                onChange={(e) => {
+                onChange={(e: any) => {
                   const val = parseInt(e.target.value);
                   if (this._isMounted) this.setState({ passwordGenerationCount: isNaN(val) ? '' : val });
                 }}
@@ -4163,7 +4171,7 @@ renderMintButton() {
               <div className={styles.generatedPasswordsList}>
                 <h5>Generated Passwords (including cached):</h5>
                 <ul>
-                  {combinedPasswords.map((pw, idx) => (
+                  {combinedPasswords.map((pw: any, idx: any) => (
                     <li key={idx}>
                       {pw} - <a href={buildInviteLink(pw)} target="_blank" rel="noopener noreferrer">{buildInviteLink(pw)}</a>
                     </li>
@@ -4200,7 +4208,7 @@ renderMintButton() {
             <h4>Previously Generated Password Invites</h4>
             <p>{`These were previously cached or generated passwords from when the ${t('sbt')} was created:`}</p>
             <ul>
-              {combinedPasswords.map((pw, idx) => (
+              {combinedPasswords.map((pw: any, idx: any) => (
                 <li key={idx}>
                   {pw} - <a href={buildInviteLink(pw)} target="_blank" rel="noopener noreferrer">{buildInviteLink(pw)}</a>
                 </li>
@@ -4239,7 +4247,7 @@ renderMintButton() {
     );
   };
 
-  copyErrorToClipboard = () => {
+  copyErrorToClipboard: any = () => {
     const raw = (typeof this.state.error === 'string' && this.state.error)
       ? this.state.error
       : (this.state.error && this.state.error.message ? this.state.error.message : '');
@@ -4295,7 +4303,7 @@ renderMintButton() {
     } = this.state;
 
     const sbtAddressForDisplay = Array.isArray(SBTAddressProp)
-      ? SBTAddressProp.find(entry => entry.sbtAddress !== undefined)?.sbtAddress
+      ? SBTAddressProp.find((entry: any) => entry.sbtAddress !== undefined)?.sbtAddress
       : (SBTAddressProp && SBTAddressProp.sbtAddress !== undefined ? SBTAddressProp.sbtAddress : SBTAddressProp);
     const sbtNameText = getSbtDisplayName(sbtInfo) || `Unnamed ${t('sbt')}`;
     const sbtDescriptionText = getSbtDescriptionText(sbtInfo);
@@ -4326,7 +4334,7 @@ renderMintButton() {
       const justJoined = (mintingStatus === 'success' && burningStatus !== 'success');
       const hasTokenMini = userHasSBT || justJoined;
 
-      let miniMintArea = null;
+      let miniMintArea: any = null;
 
       if (!hasTokenMini) {
         if (!isMintingActive) {
@@ -4418,7 +4426,7 @@ renderMintButton() {
                     type="text"
                     className={styles.miniPasswordInput}
                     value={manualPasswordInput}
-                    onChange={(e) => this.setState({ manualPasswordInput: e.target.value })}
+                    onChange={(e: any) => this.setState({ manualPasswordInput: e.target.value })}
                     placeholder="Password"
                     disabled={mintingStatus === 'pending'}
                     style={{ maxWidth: '100px' }}
@@ -4445,7 +4453,7 @@ renderMintButton() {
                     type="text"
                     className={styles.miniPasswordInput}
                     value={manualPasswordInput}
-                    onChange={(e) => this.setState({ manualPasswordInput: e.target.value })}
+                    onChange={(e: any) => this.setState({ manualPasswordInput: e.target.value })}
                     placeholder="Password"
                     disabled={mintingStatus === 'pending'}
                   />
@@ -4519,14 +4527,14 @@ renderMintButton() {
           style={{ cursor: 'pointer' }}
           role='button'
           tabIndex={0}
-          onClick={(event) => {
+          onClick={(event: any) => {
             const interactiveAncestor = event.target?.closest?.('button, a, input, [role="button"]');
             if (interactiveAncestor && interactiveAncestor !== event.currentTarget) return;
             event.preventDefault();
             event.stopPropagation();
             window.open(`${window.location.origin}${this.getSbtDetailPath(sbtAddressForDisplay)}`, '_blank', 'noopener,noreferrer');
           }}
-          onKeyDown={(event) => {
+          onKeyDown={(event: any) => {
             if (event.key !== 'Enter' && event.key !== ' ') return;
             const interactiveAncestor = event.target?.closest?.('button, a, input, [role="button"]');
             if (interactiveAncestor && interactiveAncestor !== event.currentTarget) return;
@@ -4688,12 +4696,13 @@ renderMintButton() {
     const isLocalLoading = loadingMintersBurners || !countsReady;
     const effectiveLoading = isLocalLoading || isGlobalLoading;
 
-    const _burnMap = { AdminOnly: 0, OwnerOnly: 1, Both: 2, Neither: 3 };
+    const _burnMap: Record<string, number> = { AdminOnly: 0, OwnerOnly: 1, Both: 2, Neither: 3 };
     const burnIdx = (typeof sbtInfo.burnAuth === 'string')
       ? (_burnMap[sbtInfo.burnAuth] ?? undefined)
       : (sbtInfo.burnAuth != null ? Number(sbtInfo.burnAuth) : undefined);
-    const burnLabel = (Number.isInteger(burnIdx) && burnIdx >= 0 && burnIdx < burnAuthLabels.length)
-      ? burnAuthLabels[burnIdx]
+    const normalizedBurnIdx = Number.isInteger(burnIdx) ? Number(burnIdx) : -1;
+    const burnLabel = (normalizedBurnIdx >= 0 && normalizedBurnIdx < burnAuthLabels.length)
+      ? burnAuthLabels[normalizedBurnIdx]
       : '?';
 
     const maxTokensDisplay = (sbtInfo.maxTokens === "0")
@@ -4728,7 +4737,7 @@ renderMintButton() {
     const holdersDisplayCount = shouldOverrideMinted
       ? `~${mintedTokensOverride}`
       : String(netHolders.length);
-    const formatBlockCount = (n) => (Number.isFinite(Number(n)) ? Number(n).toLocaleString() : '-');
+    const formatBlockCount = (n: any) => (Number.isFinite(Number(n)) ? Number(n).toLocaleString() : '-');
     const scanPhaseLabel = 'Scanning mint/burn history';
     const remainingBlocksCount = showScanProgress ? rawRemainingBlocksCount : 0;
     const scanProgressText = showScanProgress
@@ -4943,8 +4952,8 @@ renderMintButton() {
                               className={styles.scanProgressBar}
                               role="progressbar"
                               aria-valuenow={scanProgressPct}
-                              aria-valuemin="0"
-                              aria-valuemax="100"
+                              aria-valuemin={0}
+                              aria-valuemax={100}
                             >
                               <div className={styles.scanProgressFill} style={{ width: `${scanProgressPct}%` }} />
                             </div>
@@ -5128,8 +5137,8 @@ renderMintButton() {
                         className={styles.scanProgressBar}
                         role="progressbar"
                         aria-valuenow={scanProgressPct}
-                        aria-valuemin="0"
-                        aria-valuemax="100"
+                        aria-valuemin={0}
+                        aria-valuemax={100}
                       >
                         <div className={styles.scanProgressFill} style={{ width: `${scanProgressPct}%` }} />
                       </div>
@@ -5148,7 +5157,7 @@ renderMintButton() {
                   <div className={styles.emptyState}><FontAwesomeIcon icon={faSpinner} spin size="2x" /></div>
                 )}
 
-                {this.state.filteredMintedUsers.map((address, index) => {
+                {this.state.filteredMintedUsers.map((address: any, index: any) => {
                   const seed = String(address || 'contextengine-default-seed').toLowerCase();
                   const blockieUrl = generateBlockieDataUrl(seed, 8, 4);
                   return (

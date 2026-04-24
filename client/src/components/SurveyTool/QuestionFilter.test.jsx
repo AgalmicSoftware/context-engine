@@ -16,7 +16,7 @@ import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import * as contractScriptsModule from '../../utilities/web3/contractScripts.js';
 import * as sponsoredAccess from '../../utilities/web3/sponsoredAccess.js';
 
-jest.mock('../SBTs/SBTFilter.jsx', () => () => null);
+jest.mock('../SBTs/SBTFilter', () => () => null);
 jest.mock('../Shared/AudioInput/AudioInput', () => () => null);
 
 const MANAGED_NAMESPACES = [

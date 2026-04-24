@@ -90,7 +90,7 @@ const buildMockPendingSbtDraft = ({
 });
 let mockCreateSbtDraftQueue = [];
 
-jest.mock('../SBTs/SBTSelector.jsx', () => (props) => {
+jest.mock('../SBTs/SBTSelector', () => (props) => {
   const selectedEntries = Array.isArray(props.selectedSBTs) ? props.selectedSBTs : [];
   return (
     <div
@@ -131,7 +131,7 @@ jest.mock('../SBTs/SBTSelector.jsx', () => (props) => {
     </div>
   );
 });
-jest.mock('../SBTs/CreateSBTGroup.jsx', () => ({
+jest.mock('../SBTs/CreateSBTGroup', () => ({
   __esModule: true,
   default: (props) => (
     <div

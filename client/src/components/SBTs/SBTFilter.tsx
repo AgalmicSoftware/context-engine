@@ -1,9 +1,9 @@
-/** @file SBTFilter.jsx */
+/** @file SBTFilter */
 
 import React from 'react';
 import { FormGroup, Label, Input, Button } from 'reactstrap';
 import styles from './SBTSelector.module.scss';
-import SBTSelector from './SBTSelector.jsx';
+import SBTSelector from './SBTSelector';
 import contractScripts, { getSessionChainId, getSessionSlugByName, normalizeSessionSlug } from '../../utilities/web3/contractScripts.js';
 import { resolveSbtDisplayLabel } from '../../utilities/sbt/sbtDisplayNames.js';
 
@@ -22,16 +22,16 @@ const QUICK_CHIP_GATE_COLORS = ['#5affc2', '#5b8cff', '#ffb347', '#ff6bcb', '#ff
  * so zero-response or standalone questions won't get dropped.
  * The logic is used when mode indicates question-based filtering.
  */
-const readQuestionsCacheBySlug = (slug) => peekCacheSync('questionsCache', slug || '', { clone: false }) || {};
-const readSbtCacheBySlug = (slug) => peekCacheSync('sbtCache', slug || '', { clone: false }) || {};
+const readQuestionsCacheBySlug = (slug: any) => peekCacheSync('questionsCache', slug || '', { clone: false }) || {};
+const readSbtCacheBySlug = (slug: any) => peekCacheSync('sbtCache', slug || '', { clone: false }) || {};
 
-const asCacheObject = (value) => ((value && typeof value === 'object') ? value : {});
+const asCacheObject = (value: any) => ((value && typeof value === 'object') ? value : {});
 
-const readQuestionsNetBucketBySlug = (slug, netKey) => (
+const readQuestionsNetBucketBySlug = (slug: any, netKey: any) => (
   asCacheObject(asCacheObject(readQuestionsCacheBySlug(slug))[String(netKey || '')])
 );
 
-const normalizeIncomingFilterState = (state = {}) => ({
+const normalizeIncomingFilterState = (state: any = {}) => ({
   selectedSBTGroupsCreator: Array.isArray(state.selectedSBTGroupsCreator) ? state.selectedSBTGroupsCreator : [],
   excludedSBTGroupsCreator: Array.isArray(state.excludedSBTGroupsCreator) ? state.excludedSBTGroupsCreator : [],
   selectedSBTGroupsResponder: Array.isArray(state.selectedSBTGroupsResponder) ? state.selectedSBTGroupsResponder : [],
@@ -41,7 +41,7 @@ const normalizeIncomingFilterState = (state = {}) => ({
   onlyVerifiedHumans: !!state.onlyVerifiedHumans,
 });
 
-const buildSbtEntrySignature = (entry) => {
+const buildSbtEntrySignature = (entry: any) => {
   if (!entry) return '';
   if (typeof entry === 'string') return entry.trim().toLowerCase();
   if (typeof entry !== 'object') return String(entry || '').trim().toLowerCase();
@@ -51,7 +51,7 @@ const buildSbtEntrySignature = (entry) => {
   return `${addr}|${slug}|${chain}`;
 };
 
-const buildSbtListSignature = (list) => (
+const buildSbtListSignature = (list: any) => (
   Array.isArray(list)
     ? list
       .map(buildSbtEntrySignature)
@@ -61,7 +61,7 @@ const buildSbtListSignature = (list) => (
     : ''
 );
 
-const buildSbtFilterStateSignature = (state = {}) => {
+const buildSbtFilterStateSignature = (state: any = {}) => {
   const normalized = normalizeIncomingFilterState(state);
   return [
     buildSbtListSignature(normalized.selectedSBTGroupsCreator),
@@ -78,7 +78,7 @@ const ITEMS_SOURCE_SIG_MAX_DEPTH = 2;
 const ITEMS_SOURCE_SIG_HASH_SEED = 2166136261;
 const ITEMS_SOURCE_OBJECT_MAX_DEPTH = 4;
 
-const hashIdentityPart = (seed, value) => {
+const hashIdentityPart = (seed: any, value: any) => {
   const input = String(value || '');
   let hash = seed >>> 0;
   for (let i = 0; i < input.length; i += 1) {
@@ -88,7 +88,7 @@ const hashIdentityPart = (seed, value) => {
   return hash >>> 0;
 };
 
-const normalizeIdentityPrimitive = (value) => {
+const normalizeIdentityPrimitive = (value: any) => {
   if (value == null) return '';
   if (typeof value === 'string') return String(value);
   if (typeof value === 'number') return Number.isFinite(value) ? String(value) : 'nan';
@@ -98,7 +98,7 @@ const normalizeIdentityPrimitive = (value) => {
   return String(value);
 };
 
-const normalizeCappedIdentityValue = (value, trail = new WeakSet()) => {
+const normalizeCappedIdentityValue = (value: any, trail: any = new WeakSet()): any => {
   if (value === undefined) return '__undefined__';
   if (value === null) return null;
   if (typeof value === 'string') return String(value);
@@ -109,22 +109,22 @@ const normalizeCappedIdentityValue = (value, trail = new WeakSet()) => {
   if (trail.has(value)) return '__circular__';
   trail.add(value);
   if (Array.isArray(value)) {
-    const normalizedArray = value.map((entry) => normalizeCappedIdentityValue(entry, trail));
+    const normalizedArray = value.map((entry: any) => normalizeCappedIdentityValue(entry, trail));
     trail.delete(value);
     return normalizedArray;
   }
-  const normalizedObject = {};
+  const normalizedObject: Record<string, any> = {};
   const entries = Object.entries(value)
-    .map(([key, nextValue]) => [String(key || '').trim().toLowerCase(), nextValue])
-    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
-  entries.forEach(([key, nextValue]) => {
+    .map(([key, nextValue]: any) => [String(key || '').trim().toLowerCase(), nextValue])
+    .sort(([a]: any, [b]: any) => (a < b ? -1 : a > b ? 1 : 0));
+  entries.forEach(([key, nextValue]: any) => {
     normalizedObject[key] = normalizeCappedIdentityValue(nextValue, trail);
   });
   trail.delete(value);
   return normalizedObject;
 };
 
-const buildCappedNestedHash = (value) => {
+const buildCappedNestedHash = (value: any) => {
   try {
     const normalized = normalizeCappedIdentityValue(value);
     return hashIdentityPart(ITEMS_SOURCE_SIG_HASH_SEED, JSON.stringify(normalized) || '');
@@ -133,7 +133,7 @@ const buildCappedNestedHash = (value) => {
   }
 };
 
-const buildNestedIdentitySignature = (value, depth = 0) => {
+const buildNestedIdentitySignature = (value: any, depth: any = 0) => {
   if (value == null || typeof value !== 'object') {
     return `p:${normalizeIdentityPrimitive(value)}`;
   }
@@ -147,7 +147,7 @@ const buildNestedIdentitySignature = (value, depth = 0) => {
 
   if (Array.isArray(value)) {
     let hash = hashIdentityPart(ITEMS_SOURCE_SIG_HASH_SEED, `a:${value.length}`);
-    value.forEach((entry, index) => {
+    value.forEach((entry: any, index: any) => {
       hash = hashIdentityPart(hash, String(index));
       hash = hashIdentityPart(hash, buildNestedIdentitySignature(entry, depth + 1));
     });
@@ -155,17 +155,17 @@ const buildNestedIdentitySignature = (value, depth = 0) => {
   }
 
   const entries = Object.entries(value)
-    .map(([key, nextValue]) => [String(key || '').trim().toLowerCase(), nextValue])
-    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+    .map(([key, nextValue]: any) => [String(key || '').trim().toLowerCase(), nextValue])
+    .sort(([a]: any, [b]: any) => (a < b ? -1 : a > b ? 1 : 0));
   let hash = hashIdentityPart(ITEMS_SOURCE_SIG_HASH_SEED, `o:${entries.length}`);
-  entries.forEach(([key, nextValue]) => {
+  entries.forEach(([key, nextValue]: any) => {
     hash = hashIdentityPart(hash, key);
     hash = hashIdentityPart(hash, buildNestedIdentitySignature(nextValue, depth + 1));
   });
   return `o:${entries.length}:${hash >>> 0}`;
 };
 
-const buildEntryResponseIdentityPayload = (entry) => {
+const buildEntryResponseIdentityPayload = (entry: any) => {
   if (!entry || typeof entry !== 'object') return null;
   if (Object.prototype.hasOwnProperty.call(entry, 'response')) {
     return entry.response;
@@ -203,7 +203,7 @@ const buildEntryResponseIdentityPayload = (entry) => {
   return null;
 };
 
-const buildEntryIdentityToken = (entry) => {
+const buildEntryIdentityToken = (entry: any) => {
   if (entry == null || typeof entry !== 'object') return normalizeIdentityPrimitive(entry);
   const id = normalizeIdentityPrimitive(entry.id || entry.questionId || entry.questionID);
   const responder = normalizeIdentityPrimitive(entry.responder);
@@ -219,20 +219,20 @@ const buildEntryIdentityToken = (entry) => {
   const dense = [id, responder, creator, address, slug, chain, timestamp].filter(Boolean).join('|');
   if (dense) return `${dense}|${responseSig}`;
 
-  const keys = Object.keys(entry).sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+  const keys = Object.keys(entry).sort((a: any, b: any) => (a < b ? -1 : a > b ? 1 : 0));
   const preview = keys
     .slice(0, 6)
-    .map((key) => `${key}:${buildNestedIdentitySignature(entry[key])}`)
+    .map((key: any) => `${key}:${buildNestedIdentitySignature(entry[key])}`)
     .join(',');
   return `obj:${keys.length}:${preview}|${responseSig}`;
 };
 
-const buildAllIndexes = (size) => {
+const buildAllIndexes = (size: any) => {
   const total = Math.max(0, Number(size) || 0);
-  return Array.from({ length: total }, (_, i) => i);
+  return Array.from({ length: total }, (_: any, i: any) => i);
 };
 
-const buildValueIdentitySignature = (value, depth = 0) => {
+const buildValueIdentitySignature = (value: any, depth: any = 0) => {
   if (value == null || typeof value !== 'object') {
     return `p:${normalizeIdentityPrimitive(value)}`;
   }
@@ -244,7 +244,7 @@ const buildValueIdentitySignature = (value, depth = 0) => {
   if (Array.isArray(value)) {
     const indexes = buildAllIndexes(value.length);
     let hash = ITEMS_SOURCE_SIG_HASH_SEED;
-    indexes.forEach((index) => {
+    indexes.forEach((index: any) => {
       hash = hashIdentityPart(hash, String(index));
       hash = hashIdentityPart(hash, buildValueIdentitySignature(value[index], depth + 1));
     });
@@ -252,11 +252,11 @@ const buildValueIdentitySignature = (value, depth = 0) => {
   }
 
   const entries = Object.entries(value)
-    .map(([key, nextValue]) => [String(key || '').trim().toLowerCase(), nextValue])
-    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+    .map(([key, nextValue]: any) => [String(key || '').trim().toLowerCase(), nextValue])
+    .sort(([a]: any, [b]: any) => (a < b ? -1 : a > b ? 1 : 0));
   const indexes = buildAllIndexes(entries.length);
   let hash = ITEMS_SOURCE_SIG_HASH_SEED;
-  indexes.forEach((idx) => {
+  indexes.forEach((idx: any) => {
     const [key, nextValue] = entries[idx];
     hash = hashIdentityPart(hash, key);
     hash = hashIdentityPart(hash, buildValueIdentitySignature(nextValue, depth + 1));
@@ -264,9 +264,9 @@ const buildValueIdentitySignature = (value, depth = 0) => {
   return `o:${entries.length}:${indexes.length}:${hash >>> 0}:${buildEntryIdentityToken(value)}`;
 };
 
-const buildItemsSourceSignature = (items) => buildValueIdentitySignature(items, 0);
+const buildItemsSourceSignature = (items: any) => buildValueIdentitySignature(items, 0);
 
-const scheduleMicrotask = (cb) => {
+const scheduleMicrotask = (cb: any) => {
   if (typeof cb !== 'function') return;
   if (typeof queueMicrotask === 'function') {
     queueMicrotask(cb);
@@ -277,9 +277,9 @@ const scheduleMicrotask = (cb) => {
 
 const HOLDER_SET_MEMO_MAX_ENTRIES = 500;
 
-const normalizeAddressCountMap = (value = null) => {
-  const out = {};
-  Object.entries(value || {}).forEach(([addrRaw, countRaw]) => {
+const normalizeAddressCountMap = (value: any = null) => {
+  const out: Record<string, any> = {};
+  Object.entries(value || {}).forEach(([addrRaw, countRaw]: any) => {
     const addr = String(addrRaw || '').toLowerCase();
     if (!addr) return;
     const count = Math.max(0, Math.floor(Number(countRaw || 0)));
@@ -289,12 +289,12 @@ const normalizeAddressCountMap = (value = null) => {
   return out;
 };
 
-const countMapFingerprint = (value = null) => {
+const countMapFingerprint = (value: any = null) => {
   const entries = Object.entries(normalizeAddressCountMap(value))
-    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+    .sort(([a]: any, [b]: any) => (a < b ? -1 : a > b ? 1 : 0));
   if (!entries.length) return 'nil';
   let hash = 0;
-  entries.forEach(([addr, count]) => {
+  entries.forEach(([addr, count]: any) => {
     const token = `${addr}:${count}`;
     for (let i = 0; i < token.length; i += 1) {
       hash = ((hash * 31) + token.charCodeAt(i)) | 0;
@@ -309,15 +309,15 @@ const buildHistorySummaryFromCounts = ({
   burnedCountByAddress = {},
   mintedEventCount = 0,
   burnedEventCount = 0,
-} = {}) => {
+}: any = {}) => {
   const mintedMap = normalizeAddressCountMap(mintedCountByAddress);
   const burnedMap = normalizeAddressCountMap(burnedCountByAddress);
-  const sumCounts = (value = {}) => Object.values(value).reduce((sum, count) => (
+  const sumCounts = (value: any = {}) => Object.values(value).reduce((sum: any, count: any) => (
     sum + Math.max(0, Math.floor(Number(count || 0)))
   ), 0);
   let activeSupply = 0;
   let currentHolderCount = 0;
-  Object.keys(mintedMap).forEach((addr) => {
+  Object.keys(mintedMap).forEach((addr: any) => {
     const minted = Math.max(0, Math.floor(Number(mintedMap[addr] || 0)));
     const burned = Math.max(0, Math.floor(Number(burnedMap[addr] || 0)));
     const net = Math.max(0, minted - burned);
@@ -333,12 +333,12 @@ const buildHistorySummaryFromCounts = ({
   };
 };
 
-const buildNetHoldersSet = (mintedAddresses = [], burnedAddresses = []) => {
-  const burnedSet = new Set(
-    (Array.isArray(burnedAddresses) ? burnedAddresses : []).map((addr) => String(addr || '').toLowerCase())
+const buildNetHoldersSet = (mintedAddresses: any = [], burnedAddresses: any = []) => {
+  const burnedSet: any = new Set(
+    (Array.isArray(burnedAddresses) ? burnedAddresses : []).map((addr: any) => String(addr || '').toLowerCase())
   );
-  const holders = new Set();
-  (Array.isArray(mintedAddresses) ? mintedAddresses : []).forEach((addr) => {
+  const holders: any = new Set();
+  (Array.isArray(mintedAddresses) ? mintedAddresses : []).forEach((addr: any) => {
     const lower = String(addr || '').toLowerCase();
     if (!lower || burnedSet.has(lower)) return;
     holders.add(lower);
@@ -346,11 +346,11 @@ const buildNetHoldersSet = (mintedAddresses = [], burnedAddresses = []) => {
   return holders;
 };
 
-const buildNetHoldersSetFromCounts = (mintedCountByAddress = {}, burnedCountByAddress = {}) => {
+const buildNetHoldersSetFromCounts = (mintedCountByAddress: any = {}, burnedCountByAddress: any = {}) => {
   const mintedMap = normalizeAddressCountMap(mintedCountByAddress);
   const burnedMap = normalizeAddressCountMap(burnedCountByAddress);
-  const holders = new Set();
-  Object.keys(mintedMap).forEach((addr) => {
+  const holders: any = new Set();
+  Object.keys(mintedMap).forEach((addr: any) => {
     const minted = Math.max(0, Math.floor(Number(mintedMap[addr] || 0)));
     const burned = Math.max(0, Math.floor(Number(burnedMap[addr] || 0)));
     if ((minted - burned) > 0) {
@@ -360,7 +360,7 @@ const buildNetHoldersSetFromCounts = (mintedCountByAddress = {}, burnedCountByAd
   return holders;
 };
 
-function unifyAggregatorWithAllLocalQuestions(baseItems, networkID, mode, slug) {
+function unifyAggregatorWithAllLocalQuestions(baseItems: any, networkID: any, mode: any, slug: any) {
   const netKey = String(networkID || '');
   if (!netKey) return baseItems;
 
@@ -381,9 +381,9 @@ function unifyAggregatorWithAllLocalQuestions(baseItems, networkID, mode, slug) 
     mode === 'responder'
   ) {
     if (Array.isArray(baseItems)) {
-      const existingIDs = new Set(baseItems.map((q) => (q.id || '').toLowerCase()));
+      const existingIDs: any = new Set(baseItems.map((q: any) => (q.id || '').toLowerCase()));
       const newArray = [...baseItems];
-      allKnownQIDs.forEach((qIdLower) => {
+      allKnownQIDs.forEach((qIdLower: any) => {
         if (!existingIDs.has(qIdLower)) {
           const qObj = questionNetCache.questions[qIdLower];
           if (qObj) newArray.push({ ...qObj });
@@ -392,7 +392,7 @@ function unifyAggregatorWithAllLocalQuestions(baseItems, networkID, mode, slug) 
       return newArray;
     } else if (typeof baseItems === 'object' && baseItems !== null) {
       const newObj = { ...baseItems };
-      allKnownQIDs.forEach((qIdLower) => {
+      allKnownQIDs.forEach((qIdLower: any) => {
         if (!newObj[qIdLower]) {
           newObj[qIdLower] = [];
         }
@@ -405,8 +405,10 @@ function unifyAggregatorWithAllLocalQuestions(baseItems, networkID, mode, slug) 
 }
 
 
-class SBTFilter extends React.Component {
-  constructor(props) {
+class SBTFilter extends React.Component<any, any> {
+  [key: string]: any;
+
+  constructor(props: any) {
     super(props);
     // We store all local filter states in one object. If parent passes `externalSBTFilterState`, restore them here.
     this.state = {
@@ -463,7 +465,7 @@ class SBTFilter extends React.Component {
   }
 
 
-  componentDidUpdate(prevProps, prevState) {
+  componentDidUpdate(prevProps: any, prevState: any) {
     // Determine readiness based on mode.
     const prevNeedsQuestionCache = (
       prevProps.mode === 'creator' ||
@@ -592,11 +594,11 @@ class SBTFilter extends React.Component {
     return buildSbtFilterStateSignature(this.getLocalFilterState());
   }
 
-  isLatestApplyRun = (runId) => (
+  isLatestApplyRun: any = (runId: any) => (
     Number(runId || 0) === Number(this._activeApplyFilterRunId || 0)
   );
 
-  getEffectiveNetwork = () => {
+  getEffectiveNetwork: any = () => {
     const raw = this.props.network;
     const sessionChainId = Number(getSessionChainId(this.props.sessionSlug || '') || 0) || null;
     const chainId = Number(
@@ -614,7 +616,7 @@ class SBTFilter extends React.Component {
     return { id: chainId, chainId };
   };
 
-  setFilterLoading = (loading) => {
+  setFilterLoading: any = (loading: any) => {
     const next = !!loading;
     if (this._isMounted && this.state.loading !== next) {
       this.setState({ loading: next });
@@ -624,7 +626,7 @@ class SBTFilter extends React.Component {
     }
   };
 
-  setHolderSetMemo = (key, value) => {
+  setHolderSetMemo: any = (key: any, value: any) => {
     const memoKey = String(key || '');
     if (!memoKey) return;
     if (this._holderSetMemo.has(memoKey)) {
@@ -638,7 +640,7 @@ class SBTFilter extends React.Component {
     this._holderSetMemo.set(memoKey, value);
   };
 
-  scheduleApplyFilter = (reason = 'scheduled') => {
+  scheduleApplyFilter: any = (reason: any = 'scheduled') => {
     this._lastScheduledApplyReason = String(reason || 'scheduled');
     if (this._applyFilterScheduled) return;
     this._applyFilterScheduled = true;
@@ -649,7 +651,7 @@ class SBTFilter extends React.Component {
     });
   };
 
-  runApplyFilter = async (reason = 'manual') => {
+  runApplyFilter: any = async (reason: any = 'manual') => {
     const previousActiveRunId = Number(this._activeApplyFilterRunId || 0);
     const runId = Number(this._applyFilterRunSeq || 0) + 1;
     this._applyFilterRunSeq = runId;
@@ -661,7 +663,7 @@ class SBTFilter extends React.Component {
     return result;
   };
 
-  applyFilter = async (runId, reason = 'manual') => {
+  applyFilter: any = async (runId: any, reason: any = 'manual') => {
     const effectiveRunId = runId != null
       ? Number(runId)
       : (Number(this._applyFilterRunSeq || 0) + 1);
@@ -793,8 +795,8 @@ class SBTFilter extends React.Component {
         ...excludedSBTGroups
       ].filter(Boolean);
 
-      const uniqueSbtEntries = new Map();
-      allSbtEntries.forEach((sbt) => {
+      const uniqueSbtEntries: any = new Map();
+      allSbtEntries.forEach((sbt: any) => {
         const addr = (sbt?.address || '').toLowerCase();
         if (!addr) return;
         const existing = uniqueSbtEntries.get(addr);
@@ -812,7 +814,7 @@ class SBTFilter extends React.Component {
         }
       });
 
-      const resolveGroupSlugForSbt = (sbt) => {
+      const resolveGroupSlugForSbt = (sbt: any) => {
         if (!sbt) return slug;
         const direct = sbt.sessionSlug || sbt.slug || sbt.group;
         if (direct != null && String(direct).trim() !== '') return normalizeSessionSlug(direct);
@@ -823,14 +825,14 @@ class SBTFilter extends React.Component {
         return slug;
       };
 
-      const resolveChainIdForSbt = (sbtSlug, sbt) => {
+      const resolveChainIdForSbt = (sbtSlug: any, sbt: any) => {
         const fromEntry = sbt?.chainId || sbt?.chainID;
         const chainId = getSessionChainId(sbtSlug) || fromEntry || networkID || null;
         return chainId != null ? Number(chainId) : null;
       };
 
-      const cacheBySlug = new Map();
-      const readRawCacheForSlug = (slugForCache) => {
+      const cacheBySlug: any = new Map();
+      const readRawCacheForSlug = (slugForCache: any) => {
         const cacheKey = `dg:sbtCache:${slugForCache || ''}`;
         if (cacheBySlug.has(cacheKey)) return cacheBySlug.get(cacheKey);
         const parsed = asCacheObject(readSbtCacheBySlug(slugForCache));
@@ -838,11 +840,11 @@ class SBTFilter extends React.Component {
         return parsed;
       };
 
-      const readNetCacheForSlug = (slugForCache, netKeyForCache) => (
+      const readNetCacheForSlug = (slugForCache: any, netKeyForCache: any) => (
         asCacheObject(asCacheObject(readRawCacheForSlug(slugForCache))[String(netKeyForCache || '')])
       );
 
-      const writeSbtEntryForSlug = (slugForCache, netKeyForCache, sbtAddress, entryPatch = {}) => {
+      const writeSbtEntryForSlug = (slugForCache: any, netKeyForCache: any, sbtAddress: any, entryPatch: any = {}) => {
         const cacheKey = `dg:sbtCache:${slugForCache || ''}`;
         const netKey = String(netKeyForCache || '');
         if (!netKey) return null;
@@ -868,7 +870,7 @@ class SBTFilter extends React.Component {
         return nextCache;
       };
 
-      const computeHolderListFingerprint = (addresses) => {
+      const computeHolderListFingerprint = (addresses: any) => {
         if (!Array.isArray(addresses)) return 'nil';
         let hash = 0;
         for (let i = 0; i < addresses.length; i += 1) {
@@ -882,7 +884,7 @@ class SBTFilter extends React.Component {
       };
 
       // Build a map of SBT -> set of minted holders (minus burned)
-      const sbtHoldersMap = {};
+      const sbtHoldersMap: Record<string, any> = {};
       for (const [sbtAddress, sbt] of uniqueSbtEntries.entries()) {
         const sbtSlug = resolveGroupSlugForSbt(sbt);
         const chainId = resolveChainIdForSbt(sbtSlug, sbt);
@@ -1070,14 +1072,14 @@ class SBTFilter extends React.Component {
       sbtLog.log('sbtHoldersMap:', sbtHoldersMap);
       if (!this.isLatestApplyRun(effectiveRunId)) return;
 
-      const buildHolderUnionSet = (sbtEntries = []) => {
-        const union = new Set();
-        (Array.isArray(sbtEntries) ? sbtEntries : []).forEach((sbt) => {
+      const buildHolderUnionSet = (sbtEntries: any = []) => {
+        const union: any = new Set();
+        (Array.isArray(sbtEntries) ? sbtEntries : []).forEach((sbt: any) => {
           const sbtAddr = String(sbt?.address || '').toLowerCase();
           if (!sbtAddr) return;
           const holders = sbtHoldersMap[sbtAddr];
           if (!holders || holders.size === 0) return;
-          holders.forEach((holder) => union.add(holder));
+          holders.forEach((holder: any) => union.add(holder));
         });
         return union;
       };
@@ -1089,7 +1091,7 @@ class SBTFilter extends React.Component {
       const selectedAddressHolderSet = buildHolderUnionSet(selectedSBTGroups);
       const excludedAddressHolderSet = buildHolderUnionSet(excludedSBTGroups);
 
-      const doesAddressPassHolderSets = (address, includeSet, hasIncludeGroups, excludeSet) => {
+      const doesAddressPassHolderSets = (address: any, includeSet: any, hasIncludeGroups: any, excludeSet: any) => {
         if (!address) return true;
         const lowerAddr = String(address || '').toLowerCase();
         if (excludeSet && excludeSet.size > 0 && excludeSet.has(lowerAddr)) {
@@ -1102,7 +1104,7 @@ class SBTFilter extends React.Component {
       };
 
       // Helper to check address vs. include/exclude sets
-      const doesAddressPassFilters = (address, selectedSBTs, excludedSBTs) => {
+      const doesAddressPassFilters = (address: any, selectedSBTs: any, excludedSBTs: any) => {
         if (selectedSBTs === selectedSBTGroupsCreator && excludedSBTs === excludedSBTGroupsCreator) {
           return doesAddressPassHolderSets(
             address,
@@ -1185,8 +1187,8 @@ class SBTFilter extends React.Component {
         }
 
         if (Array.isArray(items)) {
-          let filteredQuestions = [];
-          let filteredResponsesByQuestion = {};
+          let filteredQuestions: any[] = [];
+          let filteredResponsesByQuestion: Record<string, any> = {};
 
           const networkIDLocal = String(networkID);
           const questionNetCache = readQuestionsNetBucketBySlug(slug, networkIDLocal);
@@ -1206,7 +1208,7 @@ class SBTFilter extends React.Component {
           // Build question->responses from cache
           for (let qObj of filteredQuestions) {
             const qID = qObj.id?.toLowerCase();
-            let qResponses = [];
+            let qResponses: any[] = [];
             if (
               questionNetCache.questionResponses &&
               questionNetCache.questionResponses[qID]
@@ -1225,7 +1227,7 @@ class SBTFilter extends React.Component {
               }
             }
 
-          let finalFilteredResponses = [];
+          let finalFilteredResponses: any[] = [];
           for (let resp of qResponses) {
             if (
               doesAddressPassFilters(
@@ -1267,14 +1269,14 @@ class SBTFilter extends React.Component {
         else if (typeof items === 'object' && items !== null) {
           const unifiedAgg = unifyAggregatorWithAllLocalQuestions(items, networkID, 'creatorAndResponder', slug);
 
-          let finalAggregator = {};
+          let finalAggregator: Record<string, any> = {};
           const questionNetCache = readQuestionsNetBucketBySlug(slug, networkID);
 
-          let filteredQuestions = [];
+          let filteredQuestions: any[] = [];
 
           for (let qId of Object.keys(unifiedAgg)) {
             const rawArray = unifiedAgg[qId] || [];
-            let questionCreator = null;
+            let questionCreator: any = null;
             if (
               questionNetCache.questions &&
               questionNetCache.questions[qId]
@@ -1299,7 +1301,7 @@ class SBTFilter extends React.Component {
               filteredQuestions.push(questionNetCache.questions[qId]);
             }
 
-            const keptEntries = rawArray.filter((entryObj) => {
+            const keptEntries = rawArray.filter((entryObj: any) => {
               if (
                 entryObj.responder &&
                 !doesAddressPassFilters(
@@ -1325,7 +1327,7 @@ class SBTFilter extends React.Component {
             this.props.onFilterCreators(filteredQuestions, this.getLocalFilterState());
           }
           if (this.props.onFilterResponders) {
-            const byQuestion = {};
+            const byQuestion: Record<string, any> = {};
             for (const qId of Object.keys(finalAggregator)) {
               byQuestion[qId] = finalAggregator[qId];
             }
@@ -1359,16 +1361,16 @@ class SBTFilter extends React.Component {
       ) {
         const unifiedAgg = unifyAggregatorWithAllLocalQuestions(items, networkID, mode, slug);
 
-        let finalAggregator = {};
+        let finalAggregator: Record<string, any> = {};
         const questionNetCache = readQuestionsNetBucketBySlug(slug, networkID);
 
-        let filteredQuestions = [];
+        let filteredQuestions: any[] = [];
 
         for (let qId of Object.keys(unifiedAgg)) {
           let rawVal = unifiedAgg[qId];
           let rawArray = Array.isArray(rawVal)
             ? rawVal
-            : Object.keys(rawVal).map((respAddr) => {
+            : Object.keys(rawVal).map((respAddr: any) => {
                 const potentialObj = rawVal[respAddr];
                 if (potentialObj && typeof potentialObj === 'object' && potentialObj.responder) {
                   return potentialObj;
@@ -1383,7 +1385,7 @@ class SBTFilter extends React.Component {
           // For "creator" or "questions" modes, check question creator
           let keepThisQuestion = true;
           if (mode === 'creator' || mode === 'questions') {
-            let questionCreator = null;
+            let questionCreator: any = null;
             if (
               questionNetCache.questions &&
               questionNetCache.questions[qId]
@@ -1413,7 +1415,7 @@ class SBTFilter extends React.Component {
           // For "responder" or "questionResponses", filter the array by entryObj.responder
           let keptEntries = rawArray;
           if (mode === 'responder' || mode === 'questionResponses') {
-            keptEntries = rawArray.filter((entryObj) => {
+            keptEntries = rawArray.filter((entryObj: any) => {
               if (
                 entryObj.responder &&
                 !doesAddressPassFilters(
@@ -1441,7 +1443,7 @@ class SBTFilter extends React.Component {
           this.props.onFilterCreators(filteredQuestions, this.getLocalFilterState());
         }
         if ((mode === 'responder' || mode === 'questionResponses') && this.props.onFilterResponders) {
-          const byQuestion = {};
+          const byQuestion: Record<string, any> = {};
           for (const qId of Object.keys(finalAggregator)) {
             byQuestion[qId] = finalAggregator[qId];
           }
@@ -1472,17 +1474,17 @@ class SBTFilter extends React.Component {
         let itemsToFilter = items;
         if (shouldExpandAddresses) {
           const inputAddresses = Array.isArray(items) ? items : [];
-          const expanded = new Set();
-          inputAddresses.forEach((addr) => {
+          const expanded: any = new Set();
+          inputAddresses.forEach((addr: any) => {
             if (typeof addr === 'string' && addr.trim()) {
               expanded.add(addr.toLowerCase());
             }
           });
-          selectedAddressHolderSet.forEach((holder) => expanded.add(holder));
+          selectedAddressHolderSet.forEach((holder: any) => expanded.add(holder));
           itemsToFilter = Array.from(expanded);
         }
 
-        const filterItem = (item) => {
+        const filterItem = (item: any) => {
           if (!item) return false;
 
           if (mode === 'addresses') {
@@ -1505,8 +1507,8 @@ class SBTFilter extends React.Component {
             return true;
           } else {
             // question-based item or aggregator sub-item
-            let addressToCheckCreator = null;
-            let addressToCheckResponder = null;
+            let addressToCheckCreator: any = null;
+            let addressToCheckResponder: any = null;
 
             if (item.creator) {
               addressToCheckCreator = item.creator.toLowerCase();
@@ -1555,16 +1557,16 @@ class SBTFilter extends React.Component {
           );
         } else if (typeof items === 'object') {
           filteredResult = measureSync('ce.sbtFilter.filter.object', () => {
-            const newObj = {};
+            const newObj: Record<string, any> = {};
             for (const [key, val] of Object.entries(items)) {
               if (Array.isArray(val)) {
-                const filteredArr = val.filter((subItem) => filterItem(subItem));
+                const filteredArr = val.filter((subItem: any) => filterItem(subItem));
                 if (filteredArr.length > 0) newObj[key] = filteredArr;
               } else {
-                const entries = Object.entries(val);
-                const filteredPairs = entries.filter(([resp, respVal]) => filterItem(respVal));
+                const entries = Object.entries(val || {}) as Array<[string, any]>;
+                const filteredPairs = entries.filter(([resp, respVal]: any) => filterItem(respVal));
                 if (filteredPairs.length > 0) {
-                  const recon = {};
+                  const recon: Record<string, any> = {};
                   for (let [k, v] of filteredPairs) {
                     recon[k] = v;
                   }
@@ -1594,122 +1596,122 @@ class SBTFilter extends React.Component {
   };
 
   // Handlers for adding/removing SBT “include” or “exclude”
-  handleAddSBTIncludeCreator = (sbtObject) => {
+  handleAddSBTIncludeCreator: any = (sbtObject: any) => {
     const { address } = sbtObject;
-    if (!this.state.selectedSBTGroupsCreator.find((sbt) => sbt.address === address)) {
-      this.setState((prev) => ({
+    if (!this.state.selectedSBTGroupsCreator.find((sbt: any) => sbt.address === address)) {
+      this.setState((prev: any) => ({
         selectedSBTGroupsCreator: [...prev.selectedSBTGroupsCreator, sbtObject]
       }));
     }
   };
-  handleRemoveSBTIncludeCreator = (address) => {
-    this.setState((prev) => ({
-      selectedSBTGroupsCreator: prev.selectedSBTGroupsCreator.filter((sbt) => sbt.address !== address)
+  handleRemoveSBTIncludeCreator: any = (address: any) => {
+    this.setState((prev: any) => ({
+      selectedSBTGroupsCreator: prev.selectedSBTGroupsCreator.filter((sbt: any) => sbt.address !== address)
     }));
   };
 
-  handleAddSBTExcludeCreator = (sbtObject) => {
+  handleAddSBTExcludeCreator: any = (sbtObject: any) => {
     const { address } = sbtObject;
-    if (!this.state.excludedSBTGroupsCreator.find((sbt) => sbt.address === address)) {
-      this.setState((prev) => ({
+    if (!this.state.excludedSBTGroupsCreator.find((sbt: any) => sbt.address === address)) {
+      this.setState((prev: any) => ({
         excludedSBTGroupsCreator: [...prev.excludedSBTGroupsCreator, sbtObject]
       }));
     }
   };
-  handleRemoveSBTExcludeCreator = (address) => {
-    this.setState((prev) => ({
-      excludedSBTGroupsCreator: prev.excludedSBTGroupsCreator.filter((sbt) => sbt.address !== address)
+  handleRemoveSBTExcludeCreator: any = (address: any) => {
+    this.setState((prev: any) => ({
+      excludedSBTGroupsCreator: prev.excludedSBTGroupsCreator.filter((sbt: any) => sbt.address !== address)
     }));
   };
 
-  handleAddSBTIncludeResponder = (sbtObject) => {
+  handleAddSBTIncludeResponder: any = (sbtObject: any) => {
     const { address } = sbtObject;
-    if (!this.state.selectedSBTGroupsResponder.find((sbt) => sbt.address === address)) {
-      this.setState((prev) => ({
+    if (!this.state.selectedSBTGroupsResponder.find((sbt: any) => sbt.address === address)) {
+      this.setState((prev: any) => ({
         selectedSBTGroupsResponder: [...prev.selectedSBTGroupsResponder, sbtObject]
       }));
     }
   };
-  handleRemoveSBTIncludeResponder = (address) => {
-    this.setState((prev) => ({
-      selectedSBTGroupsResponder: prev.selectedSBTGroupsResponder.filter((sbt) => sbt.address !== address)
+  handleRemoveSBTIncludeResponder: any = (address: any) => {
+    this.setState((prev: any) => ({
+      selectedSBTGroupsResponder: prev.selectedSBTGroupsResponder.filter((sbt: any) => sbt.address !== address)
     }));
   };
 
-  handleAddSBTExcludeResponder = (sbtObject) => {
+  handleAddSBTExcludeResponder: any = (sbtObject: any) => {
     const { address } = sbtObject;
-    if (!this.state.excludedSBTGroupsResponder.find((sbt) => sbt.address === address)) {
-      this.setState((prev) => ({
+    if (!this.state.excludedSBTGroupsResponder.find((sbt: any) => sbt.address === address)) {
+      this.setState((prev: any) => ({
         excludedSBTGroupsResponder: [...prev.excludedSBTGroupsResponder, sbtObject]
       }));
     }
   };
-  handleRemoveSBTExcludeResponder = (address) => {
-    this.setState((prev) => ({
-      excludedSBTGroupsResponder: prev.excludedSBTGroupsResponder.filter((sbt) => sbt.address !== address)
+  handleRemoveSBTExcludeResponder: any = (address: any) => {
+    this.setState((prev: any) => ({
+      excludedSBTGroupsResponder: prev.excludedSBTGroupsResponder.filter((sbt: any) => sbt.address !== address)
     }));
   };
 
-  handleAddSBTInclude = (sbtObject) => {
+  handleAddSBTInclude: any = (sbtObject: any) => {
     const { address } = sbtObject;
-    if (!this.state.selectedSBTGroups.find((sbt) => sbt.address === address)) {
-      this.setState((prev) => ({
+    if (!this.state.selectedSBTGroups.find((sbt: any) => sbt.address === address)) {
+      this.setState((prev: any) => ({
         selectedSBTGroups: [...prev.selectedSBTGroups, sbtObject]
       }));
     }
   };
-  handleRemoveSBTInclude = (address) => {
-    this.setState((prev) => ({
-      selectedSBTGroups: prev.selectedSBTGroups.filter((sbt) => sbt.address !== address)
+  handleRemoveSBTInclude: any = (address: any) => {
+    this.setState((prev: any) => ({
+      selectedSBTGroups: prev.selectedSBTGroups.filter((sbt: any) => sbt.address !== address)
     }));
   };
 
-  handleAddSBTExclude = (sbtObject) => {
+  handleAddSBTExclude: any = (sbtObject: any) => {
     const { address } = sbtObject;
-    if (!this.state.excludedSBTGroups.find((sbt) => sbt.address === address)) {
-      this.setState((prev) => ({
+    if (!this.state.excludedSBTGroups.find((sbt: any) => sbt.address === address)) {
+      this.setState((prev: any) => ({
         excludedSBTGroups: [...prev.excludedSBTGroups, sbtObject]
       }));
     }
   };
-  handleRemoveSBTExclude = (address) => {
-    this.setState((prev) => ({
-      excludedSBTGroups: prev.excludedSBTGroups.filter((sbt) => sbt.address !== address)
+  handleRemoveSBTExclude: any = (address: any) => {
+    this.setState((prev: any) => ({
+      excludedSBTGroups: prev.excludedSBTGroups.filter((sbt: any) => sbt.address !== address)
     }));
   };
 
-  toggleVerifiedHumans = () => {
-    this.setState((prev) => ({
+  toggleVerifiedHumans: any = () => {
+    this.setState((prev: any) => ({
       onlyVerifiedHumans: !prev.onlyVerifiedHumans
     }));
   };
 
-  toggleFilterOptions = () => {
-    this.setState((prev) => ({
+  toggleFilterOptions: any = () => {
+    this.setState((prev: any) => ({
       showFilterOptions: !prev.showFilterOptions
     }));
   };
 
-  toggleShowAllSBTs = () => {
-    this.setState(prevState => ({
+  toggleShowAllSBTs: any = () => {
+    this.setState((prevState: any) => ({
       showAllSBTs: !prevState.showAllSBTs
     }));
     // No need to call applyFilter here, as this only affects the options in the dropdown
   }
 
-  renderQuickSelectChips = (selectedSBTs, onAddHandler, filterKey) => {
+  renderQuickSelectChips: any = (selectedSBTs: any, onAddHandler: any, filterKey: any) => {
     const { defaultFeaturedSBTs, sessionSlug } = this.props;
     if (!Array.isArray(defaultFeaturedSBTs) || defaultFeaturedSBTs.length === 0) {
       return null;
     }
 
-    const selectedSet = new Set(
+    const selectedSet: any = new Set(
       (Array.isArray(selectedSBTs) ? selectedSBTs : [])
-        .map((entry) => String(entry?.address || '').trim().toLowerCase())
+        .map((entry: any) => String(entry?.address || '').trim().toLowerCase())
         .filter(Boolean)
     );
 
-    const shortenAddress = (address) => {
+    const shortenAddress = (address: any) => {
       const text = String(address || '').trim();
       if (!text) return '';
       if (text.length <= 13) return text;
@@ -1718,7 +1720,7 @@ class SBTFilter extends React.Component {
 
     return (
       <div className={styles.quickSelectRow}>
-        {defaultFeaturedSBTs.map((featuredAddress, index) => {
+        {defaultFeaturedSBTs.map((featuredAddress: any, index: any) => {
           const address = String(featuredAddress || '').trim();
           if (!address) return null;
 

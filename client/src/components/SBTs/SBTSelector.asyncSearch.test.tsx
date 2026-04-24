@@ -82,7 +82,7 @@ jest.mock('../../utilities/web3/contractScripts.js', () => {
   };
 });
 
-import SBTSelector from './SBTSelector.jsx';
+import SBTSelector from './SBTSelector';
 import * as contractScriptsUtils from '../../utilities/web3/contractScripts.js';
 import * as sessionRegistryUtils from '../../utilities/web3/sessionRegistry.js';
 

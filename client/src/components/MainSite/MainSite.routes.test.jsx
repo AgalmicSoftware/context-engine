@@ -140,7 +140,7 @@ jest.mock('../OnePageSession/OnePageSession.jsx', () => {
   };
 });
 
-jest.mock('../SBTs/SBTPage.jsx', () => {
+jest.mock('../SBTs/SBTPage', () => {
   const React = require('react');
   return {
     __esModule: true,
@@ -156,7 +156,7 @@ jest.mock('../SBTs/SBTPage.jsx', () => {
   };
 });
 
-jest.mock('../SBTs/SBTsList.jsx', () => {
+jest.mock('../SBTs/SBTsList', () => {
   const React = require('react');
   return {
     __esModule: true,
