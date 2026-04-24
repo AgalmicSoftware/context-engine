@@ -6,11 +6,9 @@ type StorageLike = {
   removeItem?: (key: string) => void;
 };
 
-type JsonStringifyReplacer = Parameters<typeof JSON.stringify>[1];
-
 type BoundedStringifyOptions = {
   maxBytes?: unknown;
-  replacer?: JsonStringifyReplacer;
+  replacer?: ((this: any, key: string, value: any) => any) | Array<number | string> | null;
   space?: string | number;
 };
 
@@ -102,7 +100,11 @@ export const boundedStringify = (
   const maxBytes = Number.isFinite(Number(options.maxBytes))
     ? Number(options.maxBytes)
     : DEFAULT_MAX_JSON_BYTES;
-  const replacer = options.replacer;
+  const replacer = options.replacer as
+    | ((this: any, key: string, value: any) => any)
+    | Array<number | string>
+    | null
+    | undefined;
 
   try {
     const value = typeof replacer === 'function'
