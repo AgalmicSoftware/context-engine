@@ -5,21 +5,48 @@ import {
 } from '../../utilities/session/sessionNaming.js';
 import { toStr } from '../../utilities/shared/primitives.js';
 
-const resolveBySlugReader = (resolveBySlug) => (
+type SessionConfigLike = {
+  __unresolved?: boolean;
+  slug?: string;
+  sessionName?: string;
+} & Record<string, unknown>;
+
+type ResolveBySlug = ((slug: string) => SessionConfigLike | null | undefined) | null | undefined;
+type GetDefaultSessionConfig = (() => SessionConfigLike | null | undefined) | null | undefined;
+
+type ResolveContractPageSessionConfigOptions = {
+  allowGeneral?: boolean;
+  resolveBySlug?: ResolveBySlug;
+  resolveDemoBySlug?: ResolveBySlug;
+  getDefaultSessionConfig?: GetDefaultSessionConfig;
+};
+
+type ResolveContractPageActiveSessionOptions = {
+  urlSlugLike?: unknown;
+  querySessionRaw?: unknown;
+  activeSessionSlug?: unknown;
+  reduxActiveSessionSlug?: unknown;
+  referrerSlug?: unknown;
+  resolveBySlug?: ResolveBySlug;
+  resolveDemoBySlug?: ResolveBySlug;
+  getDefaultSessionConfig?: GetDefaultSessionConfig;
+};
+
+const resolveBySlugReader = (resolveBySlug: ResolveBySlug): ResolveBySlug => (
   typeof resolveBySlug === 'function'
-    ? (slug) => {
+    ? (slug: string) => {
         const sessionConfig = resolveBySlug(slug);
         return sessionConfig && !sessionConfig.__unresolved ? sessionConfig : null;
       }
     : null
 );
 
-export const resolveContractPageSessionConfig = (slugLike, {
+export const resolveContractPageSessionConfig = (slugLike: unknown, {
   allowGeneral = false,
   resolveBySlug,
   resolveDemoBySlug,
   getDefaultSessionConfig,
-} = {}) => {
+}: ResolveContractPageSessionConfigOptions = {}): SessionConfigLike | null => {
   const sessionSlug = canonicalizeSessionSlug(slugLike);
   if (!sessionSlug && !allowGeneral) return null;
 
@@ -27,20 +54,20 @@ export const resolveContractPageSessionConfig = (slugLike, {
   const resolved = resolveSessionConfigAliases(
     { sessionSlug },
     { resolveBySlug: resolveBySlugReader(resolveBySlug) }
-  );
-  if (resolved.sessionConfig) return resolved.sessionConfig;
+  ) as { sessionConfig: unknown; sessionSlug: string };
+  if (resolved.sessionConfig) return resolved.sessionConfig as SessionConfigLike;
 
   if (!sessionSlug) {
     if (typeof getDefaultSessionConfig === 'function') {
       const defaultSessionConfig = getDefaultSessionConfig();
       if (defaultSessionConfig) return defaultSessionConfig;
     }
-    return readDemoBySlug ? readDemoBySlug('') : null;
+    return readDemoBySlug ? (readDemoBySlug('') ?? null) : null;
   }
-  return readDemoBySlug ? readDemoBySlug(resolved.sessionSlug || sessionSlug) : null;
+  return readDemoBySlug ? (readDemoBySlug(resolved.sessionSlug || sessionSlug) ?? null) : null;
 };
 
-export const resolveContractPageReferrerSlug = (referrer = '') => {
+export const resolveContractPageReferrerSlug = (referrer: unknown = ''): string => {
   const value = toStr(referrer).trim();
   if (!value) return '';
 
@@ -60,16 +87,19 @@ export const resolveContractPageActiveSession = ({
   resolveBySlug,
   resolveDemoBySlug,
   getDefaultSessionConfig,
-} = {}) => {
-  let cachedDefaultSessionConfig;
-  const readDefaultSessionConfig = () => {
+}: ResolveContractPageActiveSessionOptions = {}): SessionConfigLike | null => {
+  let cachedDefaultSessionConfig: SessionConfigLike | null | undefined;
+  const readDefaultSessionConfig = (): SessionConfigLike | null => {
     if (typeof getDefaultSessionConfig !== 'function') return null;
     if (typeof cachedDefaultSessionConfig === 'undefined') {
       cachedDefaultSessionConfig = getDefaultSessionConfig();
     }
-    return cachedDefaultSessionConfig;
+    return cachedDefaultSessionConfig ?? null;
   };
-  const resolveSessionConfig = (slugLike, options = {}) => resolveContractPageSessionConfig(slugLike, {
+  const resolveSessionConfig = (
+    slugLike: unknown,
+    options: Pick<ResolveContractPageSessionConfigOptions, 'allowGeneral'> = {}
+  ): SessionConfigLike | null => resolveContractPageSessionConfig(slugLike, {
     ...options,
     resolveBySlug,
     resolveDemoBySlug,
