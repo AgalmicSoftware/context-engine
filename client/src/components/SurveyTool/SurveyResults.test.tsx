@@ -540,6 +540,195 @@ describe('SurveyResults session resolution', () => {
     }
   });
 
+  it('aggregates question-mode reads across list scope on /session routes', async () => {
+    const priorUrl = window.location.href;
+    window.history.replaceState({}, '', '/session/edge');
+    try {
+      jest.spyOn(sessionScanScope, 'readSessionScanScope').mockReturnValue('list');
+      jest.spyOn(sessionScanScope, 'readSessionScanSlugs').mockReturnValue(['edge', 'alpha', 'beta']);
+
+      const questionCachesBySlug: Record<string, any> = {
+        edge: {
+          '84532': {
+            questionsLatestBlock: 11,
+            questionResponsesLatestBlock: 12,
+            questions: {
+              q1: { id: 'q1', prompt: 'Edge 1', type: 'freeform' },
+            },
+            questionResponses: {
+              q1: {
+                '0xedge': { answer: { value: 'edge', encrypted: false } },
+              },
+            },
+          },
+        },
+        alpha: {
+          '84532': {
+            questionsLatestBlock: 21,
+            questionResponsesLatestBlock: 22,
+            questions: {
+              q2: { id: 'q2', prompt: 'Alpha 2', type: 'freeform' },
+            },
+            questionResponses: {
+              q2: {
+                '0xalpha': { answer: { value: 'alpha', encrypted: false } },
+              },
+            },
+          },
+        },
+        beta: {
+          '84532': {
+            questionsLatestBlock: 31,
+            questionResponsesLatestBlock: 32,
+            questions: {
+              q3: { id: 'q3', prompt: 'Beta 3', type: 'freeform' },
+            },
+            questionResponses: {
+              q3: {
+                '0xbeta': { answer: { value: 'beta', encrypted: false } },
+              },
+            },
+          },
+        },
+      };
+
+      const peekSpy = jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace, slug) => {
+        if (namespace === 'bookmarksCache') return { surveys: [], questions: [] };
+        if (namespace !== 'questionsCache') return {};
+        return questionCachesBySlug[String(slug)] || {};
+      });
+
+      const subject = createSubject({
+        activeSessionSlug: 'edge',
+        isQuestionCacheReady: true,
+        isResponsesCacheReady: true,
+      });
+      attachStateHarness(subject);
+      subject.questionFilterRef = { current: { handleApplyFilters: jest.fn() } };
+      subject.state = {
+        ...subject.state,
+        viewMode: 'questions',
+      };
+
+      await subject.fetchQuestionModeResponses();
+
+      expect(Object.keys(subject.state.aggregatorQuestionResponses).sort()).toEqual(['q1', 'q2', 'q3']);
+      expect(Object.keys(subject.state.questionResponses).sort()).toEqual(['q1', 'q2', 'q3']);
+      expect(subject.state.totalQuestionsCount).toBe(3);
+      expect(subject.state.totalResponsesCount).toBe(3);
+      expect(subject.getNetworkQuestionsForCurrentContext()).toMatchObject({
+        q1: expect.objectContaining({ sessionSlug: 'edge', prompt: 'Edge 1' }),
+        q2: expect.objectContaining({ sessionSlug: 'alpha', prompt: 'Alpha 2' }),
+        q3: expect.objectContaining({ sessionSlug: 'beta', prompt: 'Beta 3' }),
+      });
+      expect(peekSpy).toHaveBeenCalledWith('questionsCache', 'edge', { clone: false });
+      expect(peekSpy).toHaveBeenCalledWith('questionsCache', 'alpha', { clone: false });
+      expect(peekSpy).toHaveBeenCalledWith('questionsCache', 'beta', { clone: false });
+    } finally {
+      window.history.replaceState({}, '', priorUrl);
+    }
+  });
+
+  it('passes the list-scope results filter storage bucket on aggregated /session question results', () => {
+    const priorUrl = window.location.href;
+    window.history.replaceState({}, '', '/session/edge');
+    try {
+      jest.spyOn(sessionScanScope, 'readSessionScanScope').mockReturnValue('list');
+      jest.spyOn(sessionScanScope, 'readSessionScanSlugs').mockReturnValue(['edge', 'alpha', 'beta']);
+      jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace, slug) => {
+        if (namespace === 'bookmarksCache') return { surveys: [], questions: [] };
+        if (namespace !== 'questionsCache') return {};
+        if (slug === 'edge') {
+          return {
+            '84532': {
+              questions: {
+                q1: { id: 'q1', prompt: 'Edge 1', type: 'freeform' },
+              },
+              questionResponses: {},
+            },
+          };
+        }
+        if (slug === 'alpha') {
+          return {
+            '84532': {
+              questions: {
+                q2: { id: 'q2', prompt: 'Alpha 2', type: 'freeform' },
+              },
+              questionResponses: {},
+            },
+          };
+        }
+        if (slug === 'beta') {
+          return {
+            '84532': {
+              questions: {
+                q3: { id: 'q3', prompt: 'Beta 3', type: 'freeform' },
+              },
+              questionResponses: {},
+            },
+          };
+        }
+        return {};
+      });
+
+      const subject = createSubject({
+        activeSessionSlug: 'edge',
+        isOpen: true,
+        isQuestionCacheReady: true,
+        isResponsesCacheReady: true,
+      });
+      subject.state = {
+        ...subject.state,
+        viewMode: 'questions',
+        showQuestionFilter: true,
+        questionResponses: {
+          q2: {
+            '0xalpha': { answer: { value: 'alpha', encrypted: false } },
+          },
+        },
+        aggregatorQuestionResponses: {
+          q2: [
+            {
+              responder: '0xalpha',
+              questionId: 'q2',
+              response: { answer: { value: 'alpha', encrypted: false } },
+            },
+          ],
+        },
+        sbtFilteredAggregatorQuestionResponses: {
+          q2: [
+            {
+              responder: '0xalpha',
+              questionId: 'q2',
+              response: { answer: { value: 'alpha', encrypted: false } },
+            },
+          ],
+        },
+        totalQuestionsCount: 1,
+        totalResponsesCount: 1,
+      };
+
+      const tree = subject.render();
+      const questionFilterNode = findElement(
+        tree,
+        (node) =>
+          node?.props?.resultsMode === true &&
+          node?.props?.onFilter === subject.handleQuestionFilter
+      );
+
+      expect(questionFilterNode?.props?.storageKeyPrefix).toBe('dg:filters:__scope__:alpha|beta|edge');
+      expect(questionFilterNode?.props?.questions).toEqual([
+        expect.objectContaining({
+          id: 'q2',
+          prompt: 'Alpha 2',
+          sessionSlug: 'alpha',
+        }),
+      ]);
+    } finally {
+      window.history.replaceState({}, '', priorUrl);
+    }
+  });
+
   it('hydrates question results from cache before latest-block lookups resolve', async () => {
     const priorUrl = window.location.href;
     window.history.replaceState({}, '', '/questions/results?session=demo');
