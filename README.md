@@ -98,7 +98,7 @@ The default public deployment supports hundreds to low thousands of concurrent p
 
 ## Documentation
 
-- Project framing: [Whitepaper/whitepaper.md](Whitepaper/whitepaper.md)
+- Project framing: [whitepaper/whitepaper.md](whitepaper/whitepaper.md)
 - System design, data flows, and file map: [ARCHITECTURE.md](ARCHITECTURE.md)
 - Docs index: [docs/README.md](docs/README.md)
 - User guide / end-to-end session setup: [docs/session-creation-guide.md](docs/session-creation-guide.md)
