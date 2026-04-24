@@ -1,11 +1,30 @@
 /** @file useSessionSlugState.js */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toStr } from '../../../utilities/shared/primitives.js';
+import type { ChainIdLike } from '../../shellTypes';
 
 export const SESSION_SLUG_AVAILABILITY_DEBOUNCE_MS = 300;
 
-const defaultIsReservedSlug = () => false;
-const defaultSessionExists = async () => false;
+type SlugAvailabilityState = {
+  status: 'idle' | 'checking' | 'taken' | 'available' | 'error';
+};
+
+type SessionExistsArgs = {
+  registryChainId?: ChainIdLike;
+  slug: string;
+};
+
+type UseSessionSlugStateArgs = {
+  slug?: string;
+  privateSlugMode?: boolean;
+  registryChainId?: ChainIdLike;
+  debounceMs?: number;
+  isReservedSlug?: (slug: string) => boolean;
+  sessionExists?: (args: SessionExistsArgs) => Promise<boolean>;
+};
+
+const defaultIsReservedSlug = (_slug: string) => false;
+const defaultSessionExists = async (_args: SessionExistsArgs) => false;
 
 const useSessionSlugState = ({
   slug = '',
@@ -14,9 +33,9 @@ const useSessionSlugState = ({
   debounceMs = SESSION_SLUG_AVAILABILITY_DEBOUNCE_MS,
   isReservedSlug = defaultIsReservedSlug,
   sessionExists = defaultSessionExists,
-} = {}) => {
-  const [slugAvailability, setSlugAvailability] = useState({ status: 'idle' });
-  const slugCheckTimerRef = useRef(null);
+}: UseSessionSlugStateArgs = {}) => {
+  const [slugAvailability, setSlugAvailability] = useState<SlugAvailabilityState>({ status: 'idle' });
+  const slugCheckTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const slugCheckIdRef = useRef(0);
 
   const resetSlugAvailability = useCallback(() => {

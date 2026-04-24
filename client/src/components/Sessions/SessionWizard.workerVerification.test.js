@@ -1,4 +1,4 @@
-import { resolveSessionWizardWorkerVerificationUiState } from './SessionWizard.jsx';
+import { resolveSessionWizardWorkerVerificationUiState } from './SessionWizard';
 
 describe('SessionWizard worker verification UI state', () => {
   it('keeps the verified deploy URL authoritative while deployComplete is still true', () => {

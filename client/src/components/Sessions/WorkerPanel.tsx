@@ -31,7 +31,13 @@ type DeployForm = {
 export type WorkerPanelProps = {
   isNormalMode: boolean;
   t?: (key: string) => string;
-  renderSessionWizardInfoTooltip?: (props: Record<string, unknown>) => React.ReactNode;
+  renderSessionWizardInfoTooltip?: (props: {
+    id?: string;
+    content?: React.ReactNode;
+    placement?: string;
+    testId?: string;
+    ariaLabel?: string;
+  }) => React.ReactNode;
   isCollapsed: boolean;
   onToggleCollapsed: () => void;
   showSharedWorkerChoice: boolean;
@@ -87,7 +93,7 @@ export type WorkerPanelProps = {
   deployStatusIsError: boolean;
   showWorkerUrlField: boolean;
   displayedWorkerUrl: string;
-  renderField: (...args: unknown[]) => React.ReactNode;
+  renderField: (key: any, value: any, path: any, opts?: Record<string, unknown>) => React.ReactNode;
   workerUrlAutoFilled: boolean;
 };
 
