@@ -98,7 +98,7 @@ describe('surveyResultsSessionResolution', () => {
   });
 
   it('fails closed for unresolved explicit session aliases', () => {
-    const resolveBySlug = jest.fn((slug) => (
+    const resolveBySlug = jest.fn((slug: string) => (
       slug === 'rxc'
         ? { slug: 'rxc', networkChainId: 84532 }
         : null
@@ -117,7 +117,7 @@ describe('surveyResultsSessionResolution', () => {
   });
 
   it('does not inherit the general session config for unknown cache-scanned slugs', () => {
-    const resolveBySlug = jest.fn((slug) => (
+    const resolveBySlug = jest.fn((slug: string) => (
       slug === ''
         ? { slug: '', networkChainId: 84532 }
         : null

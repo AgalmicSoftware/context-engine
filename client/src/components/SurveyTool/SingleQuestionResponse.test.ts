@@ -6,7 +6,12 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import fs from 'fs';
 import path from 'path';
 
-const createSubject = (props = {}) => new SingleQuestionResponse({
+type TreeNode = any;
+type TreePredicate = (node: TreeNode) => boolean;
+type SingleQuestionResponseProps = Record<string, any>;
+const asCacheEntries = (entries: any[]): any => entries;
+
+const createSubject = (props: SingleQuestionResponseProps = {}) => new SingleQuestionResponse({
   network: { id: 84532 },
   questionsCacheNonce: 1,
   questionResponsesNonce: 1,
@@ -14,8 +19,8 @@ const createSubject = (props = {}) => new SingleQuestionResponse({
   ...props,
 });
 
-const findElement = (node, predicate) => {
-  const stack = [node];
+const findElement = (node: TreeNode, predicate: TreePredicate): TreeNode | null => {
+  const stack: TreeNode[] = [node];
   while (stack.length > 0) {
     const current = stack.pop();
     if (!current) continue;
@@ -33,7 +38,7 @@ const findElement = (node, predicate) => {
   return null;
 };
 
-const nodeHasClassName = (node, className) => {
+const nodeHasClassName = (node: TreeNode, className: string): boolean => {
   const value = node?.props?.className;
   if (typeof value !== 'string') return false;
   return value.split(/\s+/).includes(className);
@@ -205,10 +210,10 @@ describe('SingleQuestionResponse option lookup memoization', () => {
   });
 
   it('memoizes multichoice fallback resolution for the same cache context', () => {
-    const listSpy = jest.spyOn(cacheScripts, 'listNamespaceEntriesSync').mockReturnValue([
+    const listSpy = jest.spyOn(cacheScripts, 'listNamespaceEntriesSync').mockReturnValue(asCacheEntries([
       { slug: '', value: { '84532': { questions: {} } } },
       { slug: 'alpha', value: { '84532': { questions: { q1: { options: ['Yes', 'No'] } } } } },
-    ]);
+    ]));
     jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue(null);
 
     const subject = createSubject();
@@ -222,17 +227,17 @@ describe('SingleQuestionResponse option lookup memoization', () => {
   });
 
   it('invalidates option memo when cache nonce props change', () => {
-    const listSpy = jest.spyOn(cacheScripts, 'listNamespaceEntriesSync').mockReturnValue([
+    const listSpy = jest.spyOn(cacheScripts, 'listNamespaceEntriesSync').mockReturnValue(asCacheEntries([
       { slug: '', value: { '84532': { questions: {} } } },
       { slug: 'alpha', value: { '84532': { questions: { q1: { options: ['A', 'B'] } } } } },
-    ]);
+    ]));
     jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue(null);
 
     const subject = createSubject({ questionsCacheNonce: 2 });
     subject.getMultichoiceOptions({ id: 'q1', type: 'multichoice' });
 
     const prevProps = { ...subject.props };
-    subject.props = { ...subject.props, questionsCacheNonce: 3 };
+    (subject as any).props = { ...subject.props, questionsCacheNonce: 3 };
     subject.componentDidUpdate(prevProps);
     subject.getMultichoiceOptions({ id: 'q1', type: 'multichoice' });
 
@@ -240,17 +245,17 @@ describe('SingleQuestionResponse option lookup memoization', () => {
   });
 
   it('keeps option memo warm when only response nonce changes', () => {
-    const listSpy = jest.spyOn(cacheScripts, 'listNamespaceEntriesSync').mockReturnValue([
+    const listSpy = jest.spyOn(cacheScripts, 'listNamespaceEntriesSync').mockReturnValue(asCacheEntries([
       { slug: '', value: { '84532': { questions: {} } } },
       { slug: 'alpha', value: { '84532': { questions: { q1: { options: ['A', 'B'] } } } } },
-    ]);
+    ]));
     jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue(null);
 
     const subject = createSubject({ questionResponsesNonce: 7 });
     const first = subject.getMultichoiceOptions({ id: 'q1', type: 'multichoice' });
 
     const prevProps = { ...subject.props };
-    subject.props = { ...subject.props, questionResponsesNonce: 8 };
+    (subject as any).props = { ...subject.props, questionResponsesNonce: 8 };
     subject.componentDidUpdate(prevProps);
     const second = subject.getMultichoiceOptions({ id: 'q1', type: 'multichoice' });
 
@@ -259,9 +264,9 @@ describe('SingleQuestionResponse option lookup memoization', () => {
   });
 
   it('memoizes group-cache map discovery within the same lookup context', () => {
-    const listSpy = jest.spyOn(cacheScripts, 'listNamespaceEntriesSync').mockReturnValue([
+    const listSpy = jest.spyOn(cacheScripts, 'listNamespaceEntriesSync').mockReturnValue(asCacheEntries([
       { slug: '', value: { '84532': { questions: { q1: { id: 'q1' } } } } },
-    ]);
+    ]));
     jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue(null);
 
     const subject = createSubject();
@@ -275,10 +280,10 @@ describe('SingleQuestionResponse option lookup memoization', () => {
   });
 
   it('does not rerun cross-group scan after memo warmup in the same context', () => {
-    const listSpy = jest.spyOn(cacheScripts, 'listNamespaceEntriesSync').mockReturnValue([
+    const listSpy = jest.spyOn(cacheScripts, 'listNamespaceEntriesSync').mockReturnValue(asCacheEntries([
       { slug: '', value: { '84532': { questions: {} } } },
       { slug: 'alpha', value: { '84532': { questions: { q1: { options: ['Yes', 'No'] } } } } },
-    ]);
+    ]));
     jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue(null);
 
     const subject = createSubject();
@@ -301,7 +306,7 @@ describe('SingleQuestionResponse aggregator memoization', () => {
       question: { id: 'q1', type: 'freeform' },
       allResponses,
     });
-    const freeformSpy = jest.fn(() => null);
+    const freeformSpy = jest.fn((responses: any[]) => null);
     subject.renderFreeformAggregator = freeformSpy;
 
     subject.renderAggregatorByType();

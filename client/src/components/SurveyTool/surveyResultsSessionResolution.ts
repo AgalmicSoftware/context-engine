@@ -5,16 +5,64 @@ import {
 import { parseQuestionSessionSlugFromSearch } from '../../utilities/survey/questionRouting.js';
 import { resolveSessionSlugFromPathname } from '../../utilities/session/sessionNaming.js';
 import { toStr } from '../../utilities/shared/primitives.js';
+import type { AnyRecord, ResolveSessionConfigBySlug, SessionResolutionResult } from '../shellTypes';
 
-const isObj = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
+type SurveyResultsExplicitSessionSource = {
+  sessionSlug?: string;
+  activeSessionSlug?: string;
+};
+
+type SurveyResultsSessionInput = {
+  search?: unknown;
+  sessionSlug?: unknown;
+  activeSessionSlug?: unknown;
+};
+
+type SurveyResultsQuestionReadScopeInput = SurveyResultsSessionInput & {
+  pathname?: unknown;
+  questionReadSlugsOverride?: unknown;
+  viewMode?: unknown;
+  readSessionScanScope?: () => unknown;
+  readSessionScanSlugs?: () => unknown;
+  getAllSessionSlugs?: () => unknown;
+};
+
+type ResolveSurveyResultsSessionContextInput = SurveyResultsSessionInput & {
+  surveyId?: unknown;
+  surveyCacheEntries?: unknown;
+  resolveBySlug?: ResolveSessionConfigBySlug;
+};
+
+type ScanSurveyResultsSessionSlugFromCacheInput = {
+  surveyId?: unknown;
+  surveyCacheEntries?: unknown;
+};
+
+type SurveyResultsQuestionReadScope = {
+  baseSlug: string;
+  questionReadSlugs: string[];
+  extraQuestionReadSlugs: string[];
+  storageKeyPrefix: string;
+};
+
+type SurveyCacheBucket = AnyRecord & {
+  surveys?: AnyRecord;
+};
+
+type SurveyCacheEntry = {
+  slug?: unknown;
+  value?: unknown;
+};
+
+const isObj = (value: unknown): value is AnyRecord => !!value && typeof value === 'object' && !Array.isArray(value);
 const GENERAL_SCOPE_STORAGE_TOKEN = '__general__';
 const MULTI_SCOPE_STORAGE_PREFIX = '__scope__:';
 
-const readExplicitSessionSlug = (value) => {
+const readExplicitSessionSlug = (value: unknown): string | null => {
   const raw = toStr(value).trim();
   return raw ? canonicalizeSessionSlug(raw) : null;
 };
-const hasExplicitSessionQueryPin = (search = '') => {
+const hasExplicitSessionQueryPin = (search: unknown = ''): boolean => {
   const raw = toStr(search).trim();
   if (!raw) return false;
   try {
@@ -31,10 +79,11 @@ const hasExplicitSessionQueryPin = (search = '') => {
     return false;
   }
 };
-const dedupeSessionSlugs = (values = []) => {
-  const seen = new Set();
-  const out = [];
-  values.forEach((value) => {
+const dedupeSessionSlugs = (values: unknown = []): string[] => {
+  const source = Array.isArray(values) ? values : [values];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  source.forEach((value) => {
     const normalized = canonicalizeSessionSlug(value);
     if (seen.has(normalized)) return;
     seen.add(normalized);
@@ -42,11 +91,14 @@ const dedupeSessionSlugs = (values = []) => {
   });
   return out;
 };
-const encodeQuestionFilterScopeStorageToken = (slug = '') => {
+const encodeQuestionFilterScopeStorageToken = (slug: unknown = ''): string => {
   const normalized = canonicalizeSessionSlug(slug);
   return normalized === '' ? GENERAL_SCOPE_STORAGE_TOKEN : normalized;
 };
-const buildQuestionFilterStorageKeyPrefix = (questionReadSlugs = [], baseSlug = '') => {
+const buildQuestionFilterStorageKeyPrefix = (
+  questionReadSlugs: unknown = [],
+  baseSlug: unknown = ''
+): string => {
   const normalizedBaseSlug = canonicalizeSessionSlug(baseSlug);
   const scopeSlugs = dedupeSessionSlugs([
     normalizedBaseSlug,
@@ -65,8 +117,8 @@ const buildSurveyResultsExplicitSessionSource = ({
   search = '',
   sessionSlug,
   activeSessionSlug,
-} = {}) => {
-  const explicitQuerySessionSlug = parseQuestionSessionSlugFromSearch(search);
+}: SurveyResultsSessionInput = {}): SurveyResultsExplicitSessionSource | null => {
+  const explicitQuerySessionSlug = parseQuestionSessionSlugFromSearch(toStr(search));
   if (explicitQuerySessionSlug !== null) {
     return { sessionSlug: explicitQuerySessionSlug };
   }
@@ -84,7 +136,7 @@ const buildSurveyResultsExplicitSessionSource = ({
   return null;
 };
 
-export const resolveSurveyResultsExplicitSessionSlug = (input = {}) => {
+export const resolveSurveyResultsExplicitSessionSlug = (input: SurveyResultsSessionInput = {}): string | null => {
   const source = buildSurveyResultsExplicitSessionSource(input);
   if (!source) return null;
   return resolveCanonicalSessionConfig({ source }).sessionSlug || '';
@@ -100,7 +152,7 @@ export const resolveSurveyResultsQuestionReadScope = ({
   readSessionScanScope = () => 'active',
   readSessionScanSlugs = () => [],
   getAllSessionSlugs = () => [],
-} = {}) => {
+}: SurveyResultsQuestionReadScopeInput = {}): SurveyResultsQuestionReadScope => {
   const routeSlug = resolveSessionSlugFromPathname(pathname);
   const baseSlug = canonicalizeSessionSlug(
     resolveSurveyResultsExplicitSessionSlug({
@@ -116,7 +168,7 @@ export const resolveSurveyResultsQuestionReadScope = ({
     String(viewMode || '').trim().toLowerCase() === 'questions'
   );
 
-  let extraQuestionReadSlugs = [];
+  let extraQuestionReadSlugs: string[] = [];
   const normalizedOverrideSlugs = Array.isArray(questionReadSlugsOverride)
     ? dedupeSessionSlugs(questionReadSlugsOverride).filter((slug) => slug !== baseSlug)
     : null;
@@ -146,17 +198,19 @@ export const resolveSurveyResultsQuestionReadScope = ({
 export const scanSurveyResultsSessionSlugFromCache = ({
   surveyId,
   surveyCacheEntries,
-} = {}) => {
+}: ScanSurveyResultsSessionSlugFromCacheInput = {}): string => {
   const sid = toStr(surveyId).trim().toLowerCase();
   if (!sid) return '';
 
-  const entries = Array.isArray(surveyCacheEntries) ? surveyCacheEntries : [];
+  const entries = Array.isArray(surveyCacheEntries)
+    ? surveyCacheEntries as SurveyCacheEntry[]
+    : [];
   for (const entry of entries) {
     const slug = canonicalizeSessionSlug(entry?.slug || '');
     const cache = isObj(entry?.value) ? entry.value : {};
     for (const netKey in cache) {
       if (!Object.prototype.hasOwnProperty.call(cache, netKey)) continue;
-      const bucket = isObj(cache[netKey]) ? cache[netKey] : null;
+      const bucket = isObj(cache[netKey]) ? cache[netKey] as SurveyCacheBucket : null;
       if (!bucket || !isObj(bucket.surveys)) continue;
       if (Object.prototype.hasOwnProperty.call(bucket.surveys, sid)) {
         return slug;
@@ -172,7 +226,12 @@ export const resolveSurveyResultsEffectiveSlug = ({
   activeSessionSlug,
   surveyId,
   surveyCacheEntries,
-} = {}) => {
+}: {
+  sessionSlug?: unknown;
+  activeSessionSlug?: unknown;
+  surveyId?: unknown;
+  surveyCacheEntries?: unknown;
+} = {}): string => {
   return resolveSurveyResultsSessionContext({
     surveyId,
     surveyCacheEntries,
@@ -184,7 +243,7 @@ export const resolveSurveyResultsEffectiveSlug = ({
 export const resolveSurveyResultsSessionContext = ({
   resolveBySlug,
   ...input
-} = {}) => {
+}: ResolveSurveyResultsSessionContextInput = {}): SessionResolutionResult => {
   const source = (
     buildSurveyResultsExplicitSessionSource(input) ||
     {
@@ -198,5 +257,5 @@ export const resolveSurveyResultsSessionContext = ({
   return resolveCanonicalSessionConfig({
     source,
     resolveBySlug,
-  });
+  }) as SessionResolutionResult;
 };

@@ -1,8 +1,24 @@
 import { resolveCanonicalSessionConfig } from '../../utilities/session/canonicalSessionContext.js';
 import { resolveSessionSlugFromPathname } from '../../utilities/session/sessionNaming.js';
 import { toStr } from '../../utilities/shared/primitives.js';
+import type { ResolveSessionConfigBySlug, SessionResolutionResult } from '../shellTypes';
 
-const readPrioritizedPropSlug = (rawSlug) => {
+type QuestionFilterSessionSource = {
+  sessionSlug?: string;
+  activeSessionSlug?: string;
+};
+
+type QuestionFilterSessionInput = {
+  pathname?: unknown;
+  activeSessionSlug?: unknown;
+  sessionSlug?: unknown;
+};
+
+type ResolveQuestionFilterSessionContextInput = QuestionFilterSessionInput & {
+  resolveBySlug?: ResolveSessionConfigBySlug;
+};
+
+const readPrioritizedPropSlug = (rawSlug: unknown): string => {
   const value = toStr(rawSlug).trim();
   if (!value) return '';
   const resolved = resolveCanonicalSessionConfig({
@@ -15,7 +31,7 @@ const buildQuestionFilterSessionSource = ({
   pathname,
   activeSessionSlug,
   sessionSlug,
-} = {}) => {
+}: QuestionFilterSessionInput = {}): QuestionFilterSessionSource => {
   const routeSlug = resolveSessionSlugFromPathname(pathname);
   if (routeSlug !== null) {
     return { sessionSlug: routeSlug };
@@ -34,7 +50,7 @@ const buildQuestionFilterSessionSource = ({
   return {};
 };
 
-export const resolveQuestionFilterEffectiveSlug = (input = {}) => (
+export const resolveQuestionFilterEffectiveSlug = (input: QuestionFilterSessionInput = {}): string => (
   resolveCanonicalSessionConfig({
     source: buildQuestionFilterSessionSource(input),
   }).sessionSlug || ''
@@ -43,7 +59,7 @@ export const resolveQuestionFilterEffectiveSlug = (input = {}) => (
 export const resolveQuestionFilterSessionContext = ({
   resolveBySlug,
   ...input
-} = {}) => resolveCanonicalSessionConfig({
+}: ResolveQuestionFilterSessionContextInput = {}): SessionResolutionResult => resolveCanonicalSessionConfig({
   source: buildQuestionFilterSessionSource(input),
   resolveBySlug,
-});
+}) as SessionResolutionResult;
