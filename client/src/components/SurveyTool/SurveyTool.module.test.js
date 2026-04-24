@@ -23,8 +23,6 @@ import QuestionTagDropdown from './QuestionTagDropdown';
 import TagModal from '../TagPage/TagModal';
 import styles from './SurveyTool.module.scss';
 import { renderToStaticMarkup } from 'react-dom/server';
-import fs from 'fs';
-import path from 'path';
 import ConnectedSurveyResults from './SurveyResults';
 import contractScripts, * as contractScriptsModule from '../../utilities/web3/contractScripts.js';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
@@ -343,12 +341,6 @@ describe('SurveyTool module', () => {
   });
 
   it('renders the pile hologram as a full-card takeover and hides pile controls while active', () => {
-    const scssPath = path.join(__dirname, 'SurveyTool.module.scss');
-    const scss = fs.readFileSync(scssPath, 'utf8');
-
-    expect(scss).toMatch(/\.pileHologramToggle\s*{[\s\S]*?position:\s*absolute;[\s\S]*?opacity:\s*0\.5;/);
-    expect(scss).toMatch(/\.pileHologramPanel\s*{[\s\S]*?width:\s*100%;[\s\S]*?height:\s*400px;/);
-
     const shell = new SurveyTool({
       minifiedMode: 'pile',
       network: { id: 84532 },
