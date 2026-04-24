@@ -134,7 +134,7 @@ describe('AudioSurveyGenerator', () => {
     });
   };
   const addAdditionalFile = (file = new File(['file-source'], 'notes.txt', { type: 'text/plain' })) => {
-    const fileInput = container.querySelector('input[type="file"][accept*=".pdf"]');
+    const fileInput = container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_IMAGE_FILE_INPUT}"]`);
     Object.defineProperty(fileInput, 'files', {
       configurable: true,
       value: [file],
@@ -407,10 +407,11 @@ describe('AudioSurveyGenerator', () => {
     expect(findGenerateQuestionsButton()).toBeTruthy();
   });
 
-  it('queues only valid photos from a mixed selection and shows one concise validation error', async () => {
+  it('queues valid docs and photos from a mixed upload selection and skips unsupported files', async () => {
     const validPng = new File(['photo-one'], 'memo.png', { type: 'image/png' });
-    const invalidPdf = new File(['not-a-photo'], 'notes.pdf', { type: 'application/pdf' });
+    const validPdf = new File(['doc-one'], 'notes.pdf', { type: 'application/pdf' });
     const validGif = new File(['photo-two'], 'diagram.gif', { type: 'image/gif' });
+    const invalidSvg = new File(['not-supported'], 'vector.svg', { type: 'image/svg+xml' });
 
     await renderSubject(
       <AudioSurveyGenerator
@@ -422,13 +423,13 @@ describe('AudioSurveyGenerator', () => {
       />
     );
 
-    addAdditionalPhoto([validPng, invalidPdf, validGif]);
+    addAdditionalPhoto([validPng, validPdf, validGif, invalidSvg]);
 
     expect(getPhotoCards()).toHaveLength(2);
-    expect(container.textContent).toContain('Skipped 1 unsupported photo. Use png, jpg, jpeg, webp, or gif.');
+    expect(container.textContent).toContain('Skipped 1 unsupported file. Use pdf, md, txt, csv, ppt, pptx, json, png, jpg, jpeg, webp, or gif.');
     expect(container.textContent).toContain('memo.png');
     expect(container.textContent).toContain('diagram.gif');
-    expect(container.textContent).not.toContain('notes.pdf');
+    expect(container.textContent).toContain('notes.pdf');
   });
 
   it('does not expose inline photo analysis while a queued photo is not ready', async () => {
@@ -812,7 +813,7 @@ describe('AudioSurveyGenerator', () => {
     expect(container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_SAVE_DOCS_TOGGLE}"]`)).toBeTruthy();
   });
 
-  it('queues image URLs through the shared image chooser', async () => {
+  it('queues image URLs through the shared Add URL field', async () => {
     await renderSubject(
       <AudioSurveyGenerator
         provider={{}}
@@ -823,18 +824,69 @@ describe('AudioSurveyGenerator', () => {
       />
     );
 
-    toggleCheckbox(container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_IMAGE_URL_TOGGLE}"]`));
-    setInputValue(`[data-testid="${E2E_TESTIDS.DATABASE_IMAGE_URL_INPUT}"]`, 'https://example.com/context.png');
+    setInputValue('input[placeholder="Add URL"]', 'https://example.com/context.png');
 
     await act(async () => {
       container
-        .querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_IMAGE_URL_ADD}"]`)
+        .querySelector('button[title="Add URL"]')
         .dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
 
     expect(mockFetchImageFromURL).toHaveBeenCalledWith('https://example.com/context.png');
     expect(getPhotoCards()).toHaveLength(1);
     expect(container.textContent).toContain('remote_image.png');
+  });
+
+  it('keeps Add mode on a single URL entry path', async () => {
+    await renderSubject(
+      <AudioSurveyGenerator
+        provider={{}}
+        network={{ id: 84532 }}
+        account="0x123"
+        loginComplete
+        toggleLoginModal={jest.fn()}
+      />
+    );
+
+    expect(container.querySelectorAll('input[placeholder="Add URL"]')).toHaveLength(1);
+    expect(
+      Array.from(container.querySelectorAll('button')).filter((node) => node.textContent.trim() === 'URL')
+    ).toHaveLength(0);
+  });
+
+  it('shows the title field only after an uploaded file source is queued', async () => {
+    await renderSubject(
+      <AudioSurveyGenerator
+        provider={{}}
+        network={{ id: 84532 }}
+        account="0x123"
+        loginComplete
+        toggleLoginModal={jest.fn()}
+      />
+    );
+
+    expect(container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_TITLE_INPUT}"]`)).toBeNull();
+
+    addAdditionalPhoto(new File(['photo-source'], 'briefing.jpeg', { type: 'image/jpeg' }));
+
+    expect(container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_TITLE_INPUT}"]`)).toBeTruthy();
+  });
+
+  it('accepts both docs and jpeg images in the shared upload chooser', async () => {
+    await renderSubject(
+      <AudioSurveyGenerator
+        provider={{}}
+        network={{ id: 84532 }}
+        account="0x123"
+        loginComplete
+        toggleLoginModal={jest.fn()}
+      />
+    );
+
+    const fileInput = container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_IMAGE_FILE_INPUT}"]`);
+    expect(fileInput.getAttribute('accept')).toContain('.pdf');
+    expect(fileInput.getAttribute('accept')).toContain('.jpeg');
+    expect(fileInput.getAttribute('accept')).toContain('.jpg');
   });
 
   it('adds typed notes to the session doc library without generating questions', async () => {
@@ -853,7 +905,7 @@ describe('AudioSurveyGenerator', () => {
       />
     );
 
-    setInputValue(`[data-testid="${E2E_TESTIDS.DATABASE_TITLE_INPUT}"]`, 'Policy Notes');
+    expect(container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_TITLE_INPUT}"]`)).toBeNull();
     setAudioInputValue('These are durable context notes that should be uploaded into the library without creating survey questions.');
 
     await act(async () => {
@@ -865,7 +917,7 @@ describe('AudioSurveyGenerator', () => {
     expect(mockUploadDocLibraryFile).toHaveBeenCalledTimes(1);
     expect(mockUploadDocLibraryFile.mock.calls[0][0]).toEqual(expect.objectContaining({
       file: expect.objectContaining({
-        name: 'Policy Notes.txt',
+        name: 'context-note.txt',
         type: 'text/plain',
       }),
     }));
@@ -1536,6 +1588,7 @@ describe('AudioSurveyGenerator', () => {
       mode: 'session',
       compact: false,
       pageSize: 10,
+      showUploadControls: false,
     }));
   });
 
@@ -1568,6 +1621,7 @@ describe('AudioSurveyGenerator', () => {
       mode: 'session',
       compact: false,
       pageSize: 10,
+      showUploadControls: false,
     }));
   });
 
@@ -1682,6 +1736,7 @@ describe('AudioSurveyGenerator', () => {
       sessionSlug: 'rxc',
       mode: 'session',
       sessionIdHex: `0x${'3'.repeat(32)}`,
+      showUploadControls: false,
     }));
   });
 });
