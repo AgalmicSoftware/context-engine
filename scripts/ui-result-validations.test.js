@@ -6,7 +6,7 @@ const assert = require('node:assert/strict');
 const {
   evaluateDocLibrarySbtUiReport,
   evaluateSbtMetadataLocksUiResult,
-} = require('./lib/e2e/ui-result-validations');
+} = require('./lib/ui-result-validations');
 
 test('evaluateSbtMetadataLocksUiResult passes when all holder decrypt flags are true', () => {
   const result = evaluateSbtMetadataLocksUiResult({
