@@ -1,3 +1,5 @@
+import fs from 'fs';
+import path from 'path';
 import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import DemoAnalysisWorkspace from './DemoAnalysisWorkspace';
@@ -59,6 +61,16 @@ const setMultiSelectValues = (testId: string, values: string[]) => {
 };
 
 describe('DemoAnalysisWorkspace', () => {
+  it('keeps the selected question banner readable on the light breakdown surface', () => {
+    const scssPath = path.join(__dirname, 'DemoAnalysisWorkspace.module.scss');
+    const scss = fs.readFileSync(scssPath, 'utf8');
+
+    expect(scss).toMatch(/\.selectedQuestionCard\s*{[\s\S]*background:\s*linear-gradient\(145deg,\s*#f8fbff 0%,\s*#edf4ff 100%\) !important;/);
+    expect(scss).toMatch(/\.selectedQuestionCard\s*{[\s\S]*border:\s*1px solid rgba\(15,\s*94,\s*199,\s*0\.14\) !important;/);
+    expect(scss).toMatch(/\.selectedQuestionCardPrompt\s*{[\s\S]*color:\s*#1f2733 !important;/);
+    expect(scss).not.toMatch(/\.selectedQuestionCardPrompt\s*{[\s\S]*color:\s*#f8fbff;/);
+  });
+
   it('starts with empty map and question breakdown states until a question is selected', () => {
     render(<DemoAnalysisWorkspace />);
 
