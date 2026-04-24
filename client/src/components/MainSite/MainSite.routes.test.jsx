@@ -42,7 +42,7 @@ jest.mock('../ErrorBoundary/RouteErrorBoundary', () => ({
   default: ({ children }) => children,
 }));
 
-jest.mock('../Admin/AdminPage.jsx', () => {
+jest.mock('../Admin/AdminPage', () => {
   const React = require('react');
   return {
     __esModule: true,
@@ -125,7 +125,7 @@ jest.mock('../DocumentLibrary/SessionDocumentsPage', () => {
   };
 });
 
-jest.mock('../OnePageSession/OnePageSession.jsx', () => {
+jest.mock('../OnePageSession/OnePageSession', () => {
   const React = require('react');
   return {
     __esModule: true,
