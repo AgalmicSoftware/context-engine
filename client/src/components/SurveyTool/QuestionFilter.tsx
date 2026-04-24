@@ -1214,7 +1214,7 @@ class QuestionFilter extends React.Component<any, any> {
       bookmarksCacheObject.bookmarkedFilters.push(currentFilterString);
     }
 
-	    const writeResult: any = writeCache('filters', slug, bookmarksCacheObject);
+	    const writeResult: any = writeCache('filters', slug, bookmarksCacheObject as any);
 	    const handleSuccess = (ok: any) => {
 	      if (!ok) {
 	        questionFilterLog.warn('Failed to persist bookmarked filter state');

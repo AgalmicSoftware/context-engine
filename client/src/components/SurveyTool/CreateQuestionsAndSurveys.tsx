@@ -1,4 +1,4 @@
-/** @file CreateQuestionsAndSurveys.jsx */
+/** @file CreateQuestionsAndSurveys.tsx */
 
 import React, { Component } from 'react';
 import {
@@ -41,7 +41,7 @@ import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 import { getEffectiveArweaveKey } from '../../utilities/session/resourceKeys.js';
 import { sessionRegistryUtils } from '../../utilities/web3/sessionRegistry.js';
 import { ethers } from 'ethers';
-import sha256 from 'crypto-js/sha256';
+const sha256: any = require('crypto-js/sha256');
 import AudioSurveyGenerator from './SurveyGenerator/SurveyGenerator';
 import { callAI } from '../../utilities/ai/aiScripts.js';
 import { getEffectiveAiConfig } from '../../utilities/ai/aiSettings.js';
@@ -79,17 +79,17 @@ const surveyLog = createLogger('surveys');
 
 
 // Helper function to construct the AI prompt for single question tag generation
-const generateSingleQuestionTagsPrompt = (questionText, questionType, questionOptions, defaultTagsList) => {
+const generateSingleQuestionTagsPrompt = (questionText: any, questionType: any, questionOptions: any, defaultTagsList: any) => {
   let prompt = `Analyze the following survey question and generate 2-5 relevant tags.
 Question Prompt: "${questionText}"
 Question Type: "${questionType}"`;
 
   if (questionType === 'multichoice' && questionOptions && questionOptions.length > 0) {
-    prompt += `\nQuestion Options: ${questionOptions.map(opt => `"${opt}"`).join(', ')}`;
+    prompt += `\nQuestion Options: ${questionOptions.map((opt: any) => `"${opt}"`).join(', ')}`;
   }
 
   if (defaultTagsList && defaultTagsList.length > 0) {
-    prompt += `\n\nIf any of the following default tags are relevant, prioritize using them: [${defaultTagsList.map(tag => `"${tag}"`).join(', ')}]. Otherwise, generate new appropriate tags.`;
+    prompt += `\n\nIf any of the following default tags are relevant, prioritize using them: [${defaultTagsList.map((tag: any) => `"${tag}"`).join(', ')}]. Otherwise, generate new appropriate tags.`;
   } else {
     prompt += `\n\nGenerate new appropriate tags.`;
   }
@@ -98,12 +98,12 @@ Question Type: "${questionType}"`;
   return prompt;
 };
 
-const isPlainObject = (value) => (
+const isPlainObject = (value: any) => (
   !!value && typeof value === 'object' && !Array.isArray(value)
 );
 
 const ENCRYPTION_GATE_COLORS = ['#5affc2', '#5b8cff', '#ffb347', '#ff6bcb', '#ffd166'];
-const stableGateColor = (gateId) => {
+const stableGateColor = (gateId: any) => {
   const str = String(gateId || '');
   let hash = 0;
   for (let i = 0; i < str.length; i += 1) {
@@ -112,25 +112,25 @@ const stableGateColor = (gateId) => {
   return ENCRYPTION_GATE_COLORS[hash % ENCRYPTION_GATE_COLORS.length];
 };
 
-const normalizeGateIds = (value) => {
+const normalizeGateIds = (value: any) => {
   if (Array.isArray(value)) {
-    return value.map((id) => String(id || '').trim()).filter(Boolean);
+    return value.map((id: any) => String(id || '').trim()).filter(Boolean);
   }
   const raw = typeof value === 'string' ? value.trim() : '';
   return raw ? [raw] : [];
 };
 
-const normalizeGateText = (value) => {
+const normalizeGateText = (value: any) => {
   const text = String(value || '').trim();
   if (!text) return '';
   if (/^\[object\s+object\]$/i.test(text)) return '';
   return text;
 };
 
-const normalizeAddressList = (values = []) => {
-  const out = [];
-  const seen = new Set();
-  (Array.isArray(values) ? values : []).forEach((value) => {
+const normalizeAddressList = (values: any = []) => {
+  const out: any[] = [];
+  const seen: any = new Set();
+  (Array.isArray(values) ? values : []).forEach((value: any) => {
     const address = String(value || '').trim();
     if (!address) return;
     const key = address.toLowerCase();
@@ -141,9 +141,9 @@ const normalizeAddressList = (values = []) => {
   return out;
 };
 
-const normalizeTagList = (values = []) => (
+const normalizeTagList = (values: any = []) => (
   (Array.isArray(values) ? values : [])
-    .filter((tag) => (
+    .filter((tag: any) => (
       tag != null &&
       (
         typeof tag === 'string' ||
@@ -151,13 +151,13 @@ const normalizeTagList = (values = []) => (
         typeof tag === 'boolean'
       )
     ))
-    .map((tag) => String(tag).trim())
-    .filter((tag) => tag && tag !== '[object Object]')
+    .map((tag: any) => String(tag).trim())
+    .filter((tag: any) => tag && tag !== '[object Object]')
 );
 
 const DOCUMENT_URL_ERROR_TEXT = 'Document URLs must use http://, https://, a root-relative path (/...), ar://, or a supported Lit encrypted-doc URL.';
 
-const normalizeDocumentUrl = (value) => {
+const normalizeDocumentUrl = (value: any) => {
   const trimmed = String(value || '').trim();
   if (!trimmed) return '';
   if (litStorage.isLitArweaveUrl(trimmed)) return trimmed;
@@ -176,10 +176,10 @@ const normalizeDocumentUrl = (value) => {
   }
 };
 
-export const sanitizeDocumentUrls = (values = []) => {
-  const out = [];
-  const seen = new Set();
-  (Array.isArray(values) ? values : []).forEach((value) => {
+export const sanitizeDocumentUrls = (values: any = []) => {
+  const out: any[] = [];
+  const seen: any = new Set();
+  (Array.isArray(values) ? values : []).forEach((value: any) => {
     const normalized = normalizeDocumentUrl(value);
     if (!normalized) return;
     const key = normalized.toLowerCase();
@@ -190,23 +190,33 @@ export const sanitizeDocumentUrls = (values = []) => {
   return out;
 };
 
-const findFirstBlankQuestionPromptIndex = (questions = []) => (
+const findFirstBlankQuestionPromptIndex = (questions: any = []) => (
   (Array.isArray(questions) ? questions : []).findIndex(
-    (question) => String(question?.prompt || '').trim() === ''
+    (question: any) => String(question?.prompt || '').trim() === ''
   )
 );
 
-const AUTHORING_GATE_RESOURCE_LABELS = Object.freeze({
+const AUTHORING_GATE_RESOURCE_LABELS: Record<string, string> = Object.freeze({
   default: 'default',
   questionResponses: 'questions',
   surveyResponses: 'survey',
 });
 
-export const readManagedCacheSnapshot = (namespace, slug = '') => {
+const getErrorMessage = (error: any, fallback = 'Unknown error') => (
+  error && typeof error === 'object' && typeof error.message === 'string'
+    ? error.message
+    : fallback
+);
+
+const getErrorCode = (error: any) => (
+  error && typeof error === 'object' ? error.code : undefined
+);
+
+export const readManagedCacheSnapshot = (namespace: any, slug: any = '') => {
   return peekCacheSync(namespace, slug, { clone: false });
 };
 
-export const selectManagedNetBucketSnapshot = (namespace, slug, netKey) => {
+export const selectManagedNetBucketSnapshot = (namespace: any, slug: any, netKey: any) => {
   const obj = readManagedCacheSnapshot(namespace, slug);
   if (!obj || !netKey) return null;
   return obj[netKey] || null;
@@ -219,13 +229,13 @@ export const hasSubmittedResourcesInManagedCache = ({
   questionsAddedSuccessfully = false,
   surveyId = '',
   questionIds = [],
-} = {}) => {
+}: any = {}) => {
   const netKey = String(netId || '');
   if (!netKey) return false;
 
   const surveyIdLower = String(surveyId || '').toLowerCase();
   const questionIdsLower = (Array.isArray(questionIds) ? questionIds : [])
-    .map((id) => String(id || '').toLowerCase())
+    .map((id: any) => String(id || '').toLowerCase())
     .filter(Boolean);
 
   if (surveyAddedSuccessfully && surveyIdLower) {
@@ -236,13 +246,13 @@ export const hasSubmittedResourcesInManagedCache = ({
   if (questionsAddedSuccessfully && questionIdsLower.length > 0) {
     const netBucket = selectManagedNetBucketSnapshot('questionsCache', slug, netKey);
     const map = (netBucket && netBucket.questions) || {};
-    return questionIdsLower.every((id) => !!map[id]);
+    return questionIdsLower.every((id: any) => !!map[id]);
   }
 
   return false;
 };
 
-const ensureManagedSurveysNet = (current = {}, netId = '') => {
+const ensureManagedSurveysNet = (current: any = {}, netId: any = '') => {
   const next = (current && typeof current === 'object') ? { ...current } : {};
   const netKey = String(netId || '').trim();
   if (!netKey) return next;
@@ -268,8 +278,8 @@ const RECENT_QUESTION_PAYLOADS_TTL_MS = 12 * 60 * 60 * 1000;
 // Keep a stable reference when no session config was provided. Returning a new `{}` on
 // every access causes `componentDidUpdate` to think the config changed and can create
 // an infinite update loop.
-const EMPTY_SESSION_CONFIG = {};
-const AI_PROVIDER_LABELS = Object.freeze({
+const EMPTY_SESSION_CONFIG: Record<string, any> = {};
+const AI_PROVIDER_LABELS: Record<string, string> = Object.freeze({
   anthropic: 'Anthropic',
   openai: 'OpenAI',
   openrouter: 'OpenRouter',
@@ -283,7 +293,7 @@ const CREATE_SURVEY_COPY_SUCCESS_KEYS = Object.freeze([
   'copyJsonSuccess',
   'aiPromptCopySuccess',
 ]);
-const formatAiPromptModelLabel = (config = {}) => {
+const formatAiPromptModelLabel = (config: any = {}) => {
   const providerKey = String(config?.provider || '').trim().toLowerCase();
   const model = String(config?.model || '').trim();
   const provider =
@@ -293,8 +303,10 @@ const formatAiPromptModelLabel = (config = {}) => {
   return model || provider || 'Configured model';
 };
 
-class CreateQuestionsAndSurveys extends Component {
-  constructor(props) {
+class CreateQuestionsAndSurveys extends Component<any, any> {
+  [key: string]: any;
+
+  constructor(props: any) {
     super(props);
     this.state = {
       title: '',
@@ -357,9 +369,9 @@ class CreateQuestionsAndSurveys extends Component {
     this._promptRefs = {};
     this._encryptionGateTouched = false;
 
-    let initialQuestions = [];
+    let initialQuestions: any[] = [];
     if (props.preformedQuestions && props.preformedQuestions.length > 0) {
-      initialQuestions = props.preformedQuestions.map((q, index) => {
+      initialQuestions = props.preformedQuestions.map((q: any, index: any) => {
         const aiTags = normalizeTagList(q.tags);
         const singleSelect = !!(q.singleSelect || q.oneSelectionOnly);
         return {
@@ -375,17 +387,18 @@ class CreateQuestionsAndSurveys extends Component {
         };
       });
 
+      const nextState = this.state as any;
       if (props.preformedSurvey && props.preformedSurvey.title) {
-        this.state.title = props.preformedSurvey.title;
-        this.state.isStandaloneQuestion = false;
+        nextState.title = props.preformedSurvey.title;
+        nextState.isStandaloneQuestion = false;
       } else {
-        this.state.isStandaloneQuestion = !props.preformedSurvey?.title;
+        nextState.isStandaloneQuestion = !props.preformedSurvey?.title;
       }
-      this.state.documentURLs = sanitizeDocumentUrls(props.documentURLs || []);
+      nextState.documentURLs = sanitizeDocumentUrls(props.documentURLs || []);
       // If props provided URLs, we don't necessarily want to pre-fill the input buffer, just the list
-      this.state.docURLInput = '';
+      nextState.docURLInput = '';
     }
-    this.state.questions = initialQuestions;
+    (this.state as any).questions = initialQuestions;
     this._cacheWatchTimer = null;
     this._cacheWatchUnsubscribe = null;
     this._cacheWatchCoalescer = null;
@@ -439,12 +452,12 @@ class CreateQuestionsAndSurveys extends Component {
     }
   }
 
-  clearUnfinishedSurveyDraft = () => {
+  clearUnfinishedSurveyDraft: any = () => {
     localStorage.removeItem('unfinishedSurvey');
     this._lastSavedUnfinishedSurveyJson = null;
   };
 
-  clearCopySuccessTimer = (stateKey) => {
+  clearCopySuccessTimer: any = (stateKey: any) => {
     if (!stateKey) return;
     const timeoutId = this._copySuccessResetTimers?.[stateKey];
     if (!timeoutId) return;
@@ -452,8 +465,8 @@ class CreateQuestionsAndSurveys extends Component {
     this._copySuccessResetTimers[stateKey] = null;
   };
 
-  clearCopySuccessTimers = () => {
-    CREATE_SURVEY_COPY_SUCCESS_KEYS.forEach((stateKey) => {
+  clearCopySuccessTimers: any = () => {
+    CREATE_SURVEY_COPY_SUCCESS_KEYS.forEach((stateKey: any) => {
       const timeoutId = this._copySuccessResetTimers?.[stateKey];
       if (!timeoutId) return;
       clearTimeout(timeoutId);
@@ -461,7 +474,7 @@ class CreateQuestionsAndSurveys extends Component {
     });
   };
 
-  setCopySuccessState = (stateKey, durationMs = 1500) => {
+  setCopySuccessState: any = (stateKey: any, durationMs: any = 1500) => {
     if (!CREATE_SURVEY_COPY_SUCCESS_KEYS.includes(stateKey)) return;
     this.clearCopySuccessTimer(stateKey);
     if (!this._isMounted) return;
@@ -473,13 +486,13 @@ class CreateQuestionsAndSurveys extends Component {
     }, Math.max(0, Number(durationMs) || 0));
   };
 
-  getSessionConfig = (props = this.props) => (
+  getSessionConfig: any = (props: any = this.props) => (
     (props.sessionConfig && typeof props.sessionConfig === 'object')
       ? props.sessionConfig
       : EMPTY_SESSION_CONFIG
   );
 
-  getResolvedSessionConfig = (props = this.props) => {
+  getResolvedSessionConfig: any = (props: any = this.props) => {
     const propConfig = this.getSessionConfig(props);
     const propsSlug = resolveActiveSessionSlug({
       activeSessionSlug: props.activeSessionSlug,
@@ -523,7 +536,7 @@ class CreateQuestionsAndSurveys extends Component {
     };
   };
 
-  resolveSessionChainId = (sessionConfigIn = null, props = this.props) => {
+  resolveSessionChainId: any = (sessionConfigIn: any = null, props: any = this.props) => {
     const sessionConfig =
       sessionConfigIn && typeof sessionConfigIn === 'object'
         ? sessionConfigIn
@@ -541,7 +554,7 @@ class CreateQuestionsAndSurveys extends Component {
     ) || null;
   };
 
-  resolveTargetNetwork = (sessionConfigIn = null, props = this.props) => {
+  resolveTargetNetwork: any = (sessionConfigIn: any = null, props: any = this.props) => {
     const chainId = this.resolveSessionChainId(sessionConfigIn, props);
     const propNetworkChainId = Number(props.network?.id || props.network?.chainId || 0) || null;
     if (!chainId) return props.network || null;
@@ -549,7 +562,7 @@ class CreateQuestionsAndSurveys extends Component {
     return getChainById(chainId) || props.network || null;
   };
 
-  resolveLockAudienceSessionName = (cfgIn = this.getResolvedSessionConfig()) => {
+  resolveLockAudienceSessionName: any = (cfgIn: any = this.getResolvedSessionConfig()) => {
     const cfg = (cfgIn && typeof cfgIn === 'object') ? cfgIn : {};
     const direct = normalizeGateText(cfg.sessionName || cfg.slug);
     if (direct) return direct;
@@ -557,7 +570,7 @@ class CreateQuestionsAndSurveys extends Component {
     return activeSlug || 'session';
   };
 
-  resolveGateOptions = (cfgIn = this.getResolvedSessionConfig(), { isStandaloneQuestion = this.state?.isStandaloneQuestion } = {}) => {
+  resolveGateOptions: any = (cfgIn: any = this.getResolvedSessionConfig(), { isStandaloneQuestion = this.state?.isStandaloneQuestion }: any = {}) => {
     const cfg = (cfgIn && typeof cfgIn === 'object') ? cfgIn : {};
     const fullEncryptionGateMap = isPlainObject(cfg?.encryption?.gates) ? cfg.encryption.gates : null;
     const fullSponsoredGateMap = isPlainObject(cfg?.sponsored?.gates) ? cfg.sponsored.gates : null;
@@ -566,33 +579,33 @@ class CreateQuestionsAndSurveys extends Component {
       : (fullSponsoredGateMap && Object.keys(fullSponsoredGateMap).length ? fullSponsoredGateMap : {});
     const primaryResource = isStandaloneQuestion ? 'questionResponses' : 'surveyResponses';
     const sessionLabel = this.resolveLockAudienceSessionName(cfg);
-    const relevantGates = [];
-    const seenGateIds = new Set();
-    const seenGateKeys = new Set();
+    const relevantGates: any[] = [];
+    const seenGateIds: any = new Set();
+    const seenGateKeys: any = new Set();
 
-    const pushRelevantGate = (seedGate = null, resourceKey = '') => {
+    const pushRelevantGate = (seedGate: any = null, resourceKey: any = '') => {
       if (!seedGate || typeof seedGate !== 'object') return;
 
       const candidateIds = [
         seedGate.gateId,
         seedGate.id,
-      ].map((value) => normalizeGateText(value)).filter(Boolean);
+      ].map((value: any) => normalizeGateText(value)).filter(Boolean);
       const seedAddresses = normalizeAddressList([
         ...(Array.isArray(seedGate.sbtAddresses) ? seedGate.sbtAddresses : []),
         seedGate.sbtAddress,
       ]);
-      const seedAddressKey = seedAddresses.map((address) => address.toLowerCase()).sort().join('|');
+      const seedAddressKey = seedAddresses.map((address: any) => address.toLowerCase()).sort().join('|');
 
       let resolvedGateId = candidateIds[0] || '';
       let resolvedGate = resolvedGateId ? fullGateMap?.[resolvedGateId] : null;
 
       if (!resolvedGate && seedAddressKey) {
-        Object.entries(fullGateMap || {}).some(([gateId, gate]) => {
+        Object.entries(fullGateMap || {}).some(([gateId, gate]: any) => {
           const gateAddresses = normalizeAddressList([
             ...(Array.isArray(gate?.sbtAddresses) ? gate.sbtAddresses : []),
             gate?.sbtAddress,
           ]);
-          const gateAddressKey = gateAddresses.map((address) => address.toLowerCase()).sort().join('|');
+          const gateAddressKey = gateAddresses.map((address: any) => address.toLowerCase()).sort().join('|');
           if (!gateAddressKey || gateAddressKey !== seedAddressKey) return false;
           resolvedGateId = normalizeGateText(gateId);
           resolvedGate = gate;
@@ -618,7 +631,7 @@ class CreateQuestionsAndSurveys extends Component {
       const dedupeKey = JSON.stringify({
         gateId: finalGateId.toLowerCase(),
         resourceKey: mergedGate.resourceKey.toLowerCase(),
-        sbtAddresses: mergedAddresses.map((address) => address.toLowerCase()).sort(),
+        sbtAddresses: mergedAddresses.map((address: any) => address.toLowerCase()).sort(),
       });
       if (seenGateIds.has(finalGateId.toLowerCase()) || seenGateKeys.has(dedupeKey)) return;
       seenGateIds.add(finalGateId.toLowerCase());
@@ -656,22 +669,22 @@ class CreateQuestionsAndSurveys extends Component {
         defaultResourceCfg.gateId,
         cfg?.sponsored?.defaultGateId,
       ]
-        .map((value) => normalizeGateText(value))
+        .map((value: any) => normalizeGateText(value))
         .filter(Boolean);
-      fallbackIds.forEach((gateId) => {
+      fallbackIds.forEach((gateId: any) => {
         const resourceKey = gateId === normalizeGateText(cfg?.sponsored?.defaultGateId) ? 'default' : primaryResource;
         pushRelevantGate({ gateId, resourceKey }, resourceKey);
       });
     }
 
-    const gateMap = {};
-    relevantGates.forEach((gate) => {
+    const gateMap: Record<string, any> = {};
+    relevantGates.forEach((gate: any) => {
       if (!gate?.id) return;
       gateMap[gate.id] = gate;
     });
     const gateIds = Object.keys(gateMap || {}).filter(Boolean).sort();
     const multipleGateOptions = gateIds.length > 1;
-    const gateOptions = gateIds.map((gateId) => {
+    const gateOptions = gateIds.map((gateId: any) => {
       const gate = gateMap[gateId] || {};
       const color = String(gate.color || stableGateColor(gateId));
       const sbtAddresses = normalizeAddressList([
@@ -712,14 +725,14 @@ class CreateQuestionsAndSurveys extends Component {
         : '',
       gateOptions[0]?.id,
     ]
-      .map((val) => normalizeGateText(val))
+      .map((val: any) => normalizeGateText(val))
       .filter(Boolean);
-    const defaultGateId = candidateDefaults.find((gateId) => gateIds.includes(gateId)) || (gateOptions[0]?.id || '');
+    const defaultGateId = candidateDefaults.find((gateId: any) => gateIds.includes(gateId)) || (gateOptions[0]?.id || '');
 
     return { gateMap, gateOptions, defaultGateId };
   };
 
-  ensureResolvedSessionConfigForSubmit = async (sessionConfigIn = this.getResolvedSessionConfig()) => {
+  ensureResolvedSessionConfigForSubmit: any = async (sessionConfigIn: any = this.getResolvedSessionConfig()) => {
     const baseConfig = (sessionConfigIn && typeof sessionConfigIn === 'object') ? sessionConfigIn : {};
     const slug = normalizeSessionSlug(baseConfig.slug || this.getActiveSessionSlug() || '');
     const mergedBase = {
@@ -742,7 +755,7 @@ class CreateQuestionsAndSurveys extends Component {
     if (!registryChainId) return mergedBase;
 
     try {
-      const fetched = await sessionRegistryUtils.fetchSessionFromRegistry({
+      const fetched: any = await sessionRegistryUtils.fetchSessionFromRegistry({
         chainId: registryChainId,
         slug,
         providerLike: this.props.provider,
@@ -772,7 +785,7 @@ class CreateQuestionsAndSurveys extends Component {
     }
   };
 
-  getActiveSessionSlug = (props = this.props) => {
+  getActiveSessionSlug: any = (props: any = this.props) => {
     const sessionConfig = this.getSessionConfig(props);
     const hasSessionSlugAlias =
       Object.prototype.hasOwnProperty.call(props, 'activeSessionSlug') ||
@@ -790,7 +803,7 @@ class CreateQuestionsAndSurveys extends Component {
     return '';
   };
 
-  buildAiRequestOptions = (props = this.props) => {
+  buildAiRequestOptions: any = (props: any = this.props) => {
     const resolvedSessionConfig = this.getResolvedSessionConfig(props);
     const sessionSlug = this.getActiveSessionSlug(props);
     return {
@@ -804,14 +817,14 @@ class CreateQuestionsAndSurveys extends Component {
     };
   };
 
-  refreshAIPromptModelLabel = async (props = this.props) => {
+  refreshAIPromptModelLabel: any = async (props: any = this.props) => {
     try {
       const options = this.buildAiRequestOptions(props);
       const aiCfg = await getEffectiveAiConfig({
         sessionSlug: options.sessionSlug,
         context: options.context,
         resolveSecrets: false,
-      });
+      } as any);
       if (!this._isMounted) return;
       this.setState({ aiPromptModelLabel: formatAiPromptModelLabel(aiCfg) });
     } catch {
@@ -820,7 +833,7 @@ class CreateQuestionsAndSurveys extends Component {
     }
   };
 
-  componentDidUpdate(prevProps, prevState) {
+  componentDidUpdate(prevProps: any, prevState: any) {
     // Keep documentURLs synced from props if they change externally (e.g. AudioSurveyGenerator generation)
     if (prevProps.documentURLs !== this.props.documentURLs && Array.isArray(this.props.documentURLs)) {
       // If props update, we overwrite local state to match
@@ -869,10 +882,10 @@ class CreateQuestionsAndSurveys extends Component {
     const sessionConfigChanged = prevSessionConfig !== nextSessionConfig;
 
     if (sessionSlugChanged) {
-      this.setState((prev) => ({
+      this.setState((prev: any) => ({
         surveyLockGateIds: [],
         openLockKey: '',
-        questions: (Array.isArray(prev.questions) ? prev.questions : []).map((q) => ({
+        questions: (Array.isArray(prev.questions) ? prev.questions : []).map((q: any) => ({
           ...(q || {}),
           lockGateIds: prev.isStandaloneQuestion ? [] : null,
         })),
@@ -896,19 +909,19 @@ class CreateQuestionsAndSurveys extends Component {
     }
   }
 
-  loadBookmarksIntoState = () => {
+  loadBookmarksIntoState: any = () => {
     try {
       const slug = this.getActiveSessionSlug() || '';
       const parsed = readManagedCacheSnapshot('bookmarksCache', slug) || { surveys: [], questions: [] };
-      const s = new Set(Array.isArray(parsed.surveys) ? parsed.surveys.map(x => String(x).toLowerCase()) : []);
-      const q = new Set(Array.isArray(parsed.questions) ? parsed.questions.map(x => String(x).toLowerCase()) : []);
+      const s: any = new Set(Array.isArray(parsed.surveys) ? parsed.surveys.map((x: any) => String(x).toLowerCase()) : []);
+      const q: any = new Set(Array.isArray(parsed.questions) ? parsed.questions.map((x: any) => String(x).toLowerCase()) : []);
       this.setState({ bookmarkedSurveysSet: s, bookmarkedQuestionsSet: q });
     } catch {
       this.setState({ bookmarkedSurveysSet: new Set(), bookmarkedQuestionsSet: new Set() });
     }
   };
 
-  loadFromLocalStorage = () => {
+  loadFromLocalStorage: any = () => {
     const savedSurvey = localStorage.getItem('unfinishedSurvey');
     if (savedSurvey) {
       try {
@@ -928,13 +941,13 @@ class CreateQuestionsAndSurveys extends Component {
         if (parsedSurvey.questions && Array.isArray(parsedSurvey.questions)) {
           const isStandalone = !!parsedSurvey.isStandaloneQuestion;
 
-          parsedSurvey.questions = parsedSurvey.questions.map((q, index) => {
+          parsedSurvey.questions = parsedSurvey.questions.map((q: any, index: any) => {
             const aiTags = normalizeTagList(q.aiGeneratedTagsFromSource);
             const singleSelect = !!(q.singleSelect || q.oneSelectionOnly);
             let currentTags = normalizeTagList(q.tags);
             if (autoPopulateState) {
-              const currentSet = new Set(currentTags);
-              const missingFromSource = aiTags.filter(tag => !currentSet.has(tag));
+              const currentSet: any = new Set(currentTags);
+              const missingFromSource = aiTags.filter((tag: any) => !currentSet.has(tag));
               currentTags = [...currentTags, ...missingFromSource];
             }
             return {
@@ -990,7 +1003,7 @@ class CreateQuestionsAndSurveys extends Component {
     return false;
   };
 
-  queueSaveToLocalStorage = (delayMs = CREATE_SURVEY_DRAFT_SAVE_DEBOUNCE_MS) => {
+  queueSaveToLocalStorage: any = (delayMs: any = CREATE_SURVEY_DRAFT_SAVE_DEBOUNCE_MS) => {
     if (this._draftSaveTimer) {
       clearTimeout(this._draftSaveTimer);
       this._draftSaveTimer = null;
@@ -1001,7 +1014,7 @@ class CreateQuestionsAndSurveys extends Component {
     }, Math.max(0, Number(delayMs) || 0));
   };
 
-  saveToLocalStorage = (options = {}) => {
+  saveToLocalStorage: any = (options: any = {}) => {
     const immediate = options && options.immediate === true;
     if (!immediate) {
       this.queueSaveToLocalStorage();
@@ -1014,7 +1027,7 @@ class CreateQuestionsAndSurveys extends Component {
     if (!this.props.preformedQuestions || this.props.preformedQuestions.length === 0) {
       const stateToSave = { ...this.state };
       if (stateToSave.questions && Array.isArray(stateToSave.questions)) {
-        stateToSave.questions = stateToSave.questions.map(question => {
+        stateToSave.questions = stateToSave.questions.map((question: any) => {
           const { uiKey, aiGeneratedTagsFromSource, ...restOfQuestion } = question;
           return restOfQuestion;
         });
@@ -1039,22 +1052,22 @@ class CreateQuestionsAndSurveys extends Component {
     }
   };
 
-  generateQuestionId = (type, prompt, options = [], singleSelect = false) => {
+  generateQuestionId: any = (type: any, prompt: any, options: any = [], singleSelect: any = false) => {
     return generateSharedQuestionId(type, prompt, options, singleSelect);
   };
 
-  handleTitleChange = (event) => {
+  handleTitleChange: any = (event: any) => {
     this.setState({ title: event.target.value, formValidationError: '' }, () => {
       this.updateSurveyHash();
       this.saveToLocalStorage();
     });
   };
 
-  handleDocURLInputChange = (e) => {
+  handleDocURLInputChange: any = (e: any) => {
     this.setState({ docURLInput: e.target.value, docURLError: '' });
   };
 
-  addDocumentURL = () => {
+  addDocumentURL: any = () => {
     const { docURLInput, documentURLs } = this.state;
     const trimmed = String(docURLInput || '').trim();
     if (!trimmed) return;
@@ -1066,7 +1079,7 @@ class CreateQuestionsAndSurveys extends Component {
     const safeDocumentUrls = sanitizeDocumentUrls(documentURLs);
 
     // Prevent duplicates
-    if (safeDocumentUrls.some((url) => url.toLowerCase() === normalizedUrl.toLowerCase())) {
+    if (safeDocumentUrls.some((url: any) => url.toLowerCase() === normalizedUrl.toLowerCase())) {
       this.setState({ docURLInput: '', docURLError: '' });
       return;
     }
@@ -1084,18 +1097,18 @@ class CreateQuestionsAndSurveys extends Component {
     );
   };
 
-  handleDocUrlKeyDown = (e) => {
+  handleDocUrlKeyDown: any = (e: any) => {
     if (e.key === 'Enter') {
       e.preventDefault();
       this.addDocumentURL();
     }
   };
 
-  quickAdd = (type) => {
+  quickAdd: any = (type: any) => {
     this.setState({ addingQuestionType: type }, this.addQuestion);
   };
 
-  addQuestion = () => {
+  addQuestion: any = () => {
     const type = this.state.addingQuestionType;
     if (!type || type === 'Question Type') return;
 
@@ -1117,7 +1130,7 @@ class CreateQuestionsAndSurveys extends Component {
       lockGateIds: this.state.isStandaloneQuestion ? [] : null,
     };
 
-    this.setState(prevState => ({
+    this.setState((prevState: any) => ({
       questions: [...prevState.questions, newQuestionData],
       addingQuestionType: 'Question Type',
       focusTargetUiKey: newUiKey // Set focus target instead of scroll
@@ -1127,7 +1140,7 @@ class CreateQuestionsAndSurveys extends Component {
     });
   };
 
-  handleQuestionChange = (index, key, value) => {
+  handleQuestionChange: any = (index: any, key: any, value: any) => {
     const { questions } = this.state;
     const updatedQuestions = [...questions];
     const questionToUpdate = { ...updatedQuestions[index] };
@@ -1150,7 +1163,7 @@ class CreateQuestionsAndSurveys extends Component {
     });
   };
 
-  handleOptionChange = (qIdx, optIdx, val) => {
+  handleOptionChange: any = (qIdx: any, optIdx: any, val: any) => {
     const { questions } = this.state;
     const updatedQuestions = [...questions];
     const questionToUpdate = { ...updatedQuestions[qIdx] };
@@ -1172,7 +1185,7 @@ class CreateQuestionsAndSurveys extends Component {
     this.setState({ questions: updatedQuestions }, this.saveToLocalStorage);
   };
 
-  addOption = (questionIndex) => {
+  addOption: any = (questionIndex: any) => {
     const { questions } = this.state;
     const updatedQuestions = [...questions];
     const q = { ...updatedQuestions[questionIndex] };
@@ -1186,13 +1199,13 @@ class CreateQuestionsAndSurveys extends Component {
     this.setState({ questions: updatedQuestions }, this.saveToLocalStorage);
   };
 
-  removeOption = (questionIndex, optionIndex) => {
+  removeOption: any = (questionIndex: any, optionIndex: any) => {
     const { questions } = this.state;
     const updatedQuestions = [...questions];
     const q = { ...updatedQuestions[questionIndex] };
 
     if (!Array.isArray(q.options)) q.options = [];
-    const newOptions = q.options.filter((_, i) => i !== optionIndex);
+    const newOptions = q.options.filter((_: any, i: any) => i !== optionIndex);
     q.options = newOptions;
     q.id = this.generateQuestionId(q.type, q.prompt, q.options, q.singleSelect);
 
@@ -1200,15 +1213,15 @@ class CreateQuestionsAndSurveys extends Component {
     this.setState({ questions: updatedQuestions }, this.saveToLocalStorage);
   };
 
-  removeQuestion = (index) => {
-    const updated = this.state.questions.filter((_, i) => i !== index);
+  removeQuestion: any = (index: any) => {
+    const updated = this.state.questions.filter((_: any, i: any) => i !== index);
     this.setState({ questions: updated }, () => {
       this.updateSurveyHash();
       this.saveToLocalStorage();
     });
   };
 
-  bookmarkQuestion = (questionId) => {
+  bookmarkQuestion: any = (questionId: any) => {
     const slug = this.getActiveSessionSlug() || '';
     let bookmarksCache;
     try {
@@ -1233,20 +1246,20 @@ class CreateQuestionsAndSurveys extends Component {
     }
 
     const idL = String(questionId).toLowerCase();
-    const set = new Set(this.state.bookmarkedQuestionsSet);
+    const set: any = new Set(this.state.bookmarkedQuestionsSet);
     if (set.has(idL)) {
       set.delete(idL);
-      bookmarksCache.questions = (bookmarksCache.questions || []).filter(x => String(x).toLowerCase() !== idL);
+      bookmarksCache.questions = (bookmarksCache.questions || []).filter((x: any) => String(x).toLowerCase() !== idL);
     } else {
       set.add(idL);
       bookmarksCache.questions = Array.from(new Set([...(bookmarksCache.questions || []), idL]));
     }
 
-    void writeCache('bookmarksCache', slug, bookmarksCache).catch((e) => { surveyLog.warn('CreateQuestionsAndSurveys: fallback', e); });
+    void writeCache('bookmarksCache', slug, bookmarksCache).catch((e: any) => { surveyLog.warn('CreateQuestionsAndSurveys: fallback', e); });
     this.setState({ bookmarkedQuestionsSet: set });
   };
 
-  bookmarkSurvey = (surveyId) => {
+  bookmarkSurvey: any = (surveyId: any) => {
     const slug = this.getActiveSessionSlug() || '';
     let bookmarksCache;
     try {
@@ -1271,20 +1284,20 @@ class CreateQuestionsAndSurveys extends Component {
     }
 
     const idL = String(surveyId).toLowerCase();
-    const set = new Set(this.state.bookmarkedSurveysSet);
+    const set: any = new Set(this.state.bookmarkedSurveysSet);
     if (set.has(idL)) {
       set.delete(idL);
-      bookmarksCache.surveys = (bookmarksCache.surveys || []).filter(x => String(x).toLowerCase() !== idL);
+      bookmarksCache.surveys = (bookmarksCache.surveys || []).filter((x: any) => String(x).toLowerCase() !== idL);
     } else {
       set.add(idL);
       bookmarksCache.surveys = Array.from(new Set([...(bookmarksCache.surveys || []), idL]));
     }
 
-    void writeCache('bookmarksCache', slug, bookmarksCache).catch((e) => { surveyLog.warn('CreateQuestionsAndSurveys: fallback', e); });
+    void writeCache('bookmarksCache', slug, bookmarksCache).catch((e: any) => { surveyLog.warn('CreateQuestionsAndSurveys: fallback', e); });
     this.setState({ bookmarkedSurveysSet: set });
   };
 
-  updateSurveyHash = () => {
+  updateSurveyHash: any = () => {
     const { title, isStandaloneQuestion, documentURLs } = this.state;
     if (isStandaloneQuestion) {
       this.setState({ surveyHash: '' });
@@ -1296,7 +1309,7 @@ class CreateQuestionsAndSurveys extends Component {
     }
   };
 
-  getEncryptionConfig = () => {
+  getEncryptionConfig: any = () => {
     const {
       encryptSurvey,
       encryptQuestions,
@@ -1320,7 +1333,7 @@ class CreateQuestionsAndSurveys extends Component {
     const sessionConfig = this.getResolvedSessionConfig();
     const chainId = this.resolveSessionChainId(sessionConfig);
     const manualSbtAddresses = (Array.isArray(encryptionGateSBTs) ? encryptionGateSBTs : [])
-      .map((sbt) => sbt.address)
+      .map((sbt: any) => sbt.address)
       .filter(Boolean);
     const manualGate = manualSbtAddresses.length
       ? {
@@ -1353,7 +1366,7 @@ class CreateQuestionsAndSurveys extends Component {
     };
   };
 
-  seedEncryptionGateFromConfig = (props = this.props, options = {}) => {
+  seedEncryptionGateFromConfig: any = (props: any = this.props, options: any = {}) => {
     const preferDefault = !!options.preferDefault;
     const sessionConfig = this.getSessionConfig(props);
     const activeSlug = this.getActiveSessionSlug(props);
@@ -1374,7 +1387,7 @@ class CreateQuestionsAndSurveys extends Component {
         ? ['questionResponses', 'default', 'lit']
         : ['surveyResponses', 'docUrls', 'default', 'lit'];
     }
-    let fallbackGate = null;
+    let fallbackGate: any = null;
     let encounteredExplicitOpen = false;
     for (const resourceKey of preferredResources) {
       const gateState = resolveSponsoredGateStateForResource(cfg, resourceKey);
@@ -1394,15 +1407,15 @@ class CreateQuestionsAndSurveys extends Component {
     if (!addresses.length) return;
     const nextMode = normalizeGateMode(gate) || 'any';
     this.setState({
-      encryptionGateSBTs: addresses.map((addr) => ({ address: addr, name: addr })),
+      encryptionGateSBTs: addresses.map((addr: any) => ({ address: addr, name: addr })),
       encryptionGateMode: nextMode
     }, this.saveToLocalStorage);
   };
 
-  toggleStandaloneQuestion = () => {
-    this.setState((prev) => {
+  toggleStandaloneQuestion: any = () => {
+    this.setState((prev: any) => {
       const nextStandalone = !prev.isStandaloneQuestion;
-      const nextQuestions = (Array.isArray(prev.questions) ? prev.questions : []).map((q) => {
+      const nextQuestions = (Array.isArray(prev.questions) ? prev.questions : []).map((q: any) => {
         const current = q || {};
         const currentLock = current.lockGateIds;
         if (nextStandalone) {
@@ -1434,7 +1447,7 @@ class CreateQuestionsAndSurveys extends Component {
     });
   };
 
-  handleEncryptionToggle = (event) => {
+  handleEncryptionToggle: any = (event: any) => {
     const { name, checked } = event.target;
     this.setState({ [name]: !!checked }, () => {
       this.saveToLocalStorage();
@@ -1449,40 +1462,40 @@ class CreateQuestionsAndSurveys extends Component {
     });
   };
 
-  handleAddEncryptionGateSbt = (sbt) => {
+  handleAddEncryptionGateSbt: any = (sbt: any) => {
     if (!sbt || !sbt.address) return;
     this._encryptionGateTouched = true;
-    this.setState((prev) => ({
+    this.setState((prev: any) => ({
       encryptionGateSBTs: [...(prev.encryptionGateSBTs || []), sbt],
     }), this.saveToLocalStorage);
   };
 
-  handleRemoveEncryptionGateSbt = (address) => {
+  handleRemoveEncryptionGateSbt: any = (address: any) => {
     if (!address) return;
     const addrLower = String(address).toLowerCase();
     this._encryptionGateTouched = true;
-    this.setState((prev) => ({
+    this.setState((prev: any) => ({
       encryptionGateSBTs: (prev.encryptionGateSBTs || []).filter(
-        (sbt) => String(sbt.address || '').toLowerCase() !== addrLower
+        (sbt: any) => String(sbt.address || '').toLowerCase() !== addrLower
       ),
     }), this.saveToLocalStorage);
   };
 
-  handleEncryptionGateModeChange = (event) => {
+  handleEncryptionGateModeChange: any = (event: any) => {
     const next = event.target.value;
     this._encryptionGateTouched = true;
     this.setState({ encryptionGateMode: next }, this.saveToLocalStorage);
   };
 
-  handleAssociatedSurveyIdChange = (index, val) => {
+  handleAssociatedSurveyIdChange: any = (index: any, val: any) => {
     const updated = [...this.state.questions];
     updated[index] = { ...updated[index], associatedSurveyId: val };
     this.setState({ questions: updated }, this.saveToLocalStorage);
   };
 
-  removeDuplicateQuestions = (questions) => {
-    const unique = [];
-    const setIds = new Set();
+  removeDuplicateQuestions: any = (questions: any) => {
+    const unique: any[] = [];
+    const setIds: any = new Set();
     for (const q of questions) {
       if (!setIds.has(q.id)) {
         unique.push(q);
@@ -1492,7 +1505,7 @@ class CreateQuestionsAndSurveys extends Component {
     return unique;
   };
 
-  resolveManagedCacheSeedTargets = () => {
+  resolveManagedCacheSeedTargets: any = () => {
     const resolveRouteSlug = () => {
       try {
         const pathname = (typeof window !== 'undefined' && window.location && window.location.pathname)
@@ -1513,8 +1526,8 @@ class CreateQuestionsAndSurveys extends Component {
       this.props.sessionSlug,
       this.getActiveSessionSlug(),
       resolveRouteSlug(),
-    ].map((slug) => normalizeSessionSlug(slug || ''))));
-    const slugCandidates = rawSlugCandidates.filter((slug) => slug !== '');
+    ].map((slug: any) => normalizeSessionSlug(slug || ''))));
+    const slugCandidates = rawSlugCandidates.filter((slug: any) => slug !== '');
     const primarySlug = slugCandidates[0] || '';
     const cfgForNet = getSessionConfigBySlug(primarySlug) || sessionConfig || {};
 
@@ -1526,13 +1539,13 @@ class CreateQuestionsAndSurveys extends Component {
       this.props.networkChainId,
       this.props.network?.id,
       this.props.network?.chainId,
-    ].map((value) => String(value ?? '').trim()).filter(Boolean)));
+    ].map((value: any) => String(value ?? '').trim()).filter(Boolean)));
 
     if (!netIdCandidates.length) {
-      ['questionsCache', 'surveysCache'].forEach((namespace) => {
+      ['questionsCache', 'surveysCache'].forEach((namespace: any) => {
         const existing = readManagedCacheSnapshot(namespace, primarySlug);
         if (!existing || typeof existing !== 'object') return;
-        Object.keys(existing).forEach((key) => {
+        Object.keys(existing).forEach((key: any) => {
           const normalized = String(key || '').trim();
           if (normalized) netIdCandidates.push(normalized);
         });
@@ -1541,8 +1554,8 @@ class CreateQuestionsAndSurveys extends Component {
 
     const normalizedNetIds = Array.from(new Set(
       netIdCandidates
-        .map((value) => String(value || '').trim())
-        .filter((value) => value && value !== 'undefined' && value !== 'null')
+        .map((value: any) => String(value || '').trim())
+        .filter((value: any) => value && value !== 'undefined' && value !== 'null')
     ));
 
     return {
@@ -1551,20 +1564,20 @@ class CreateQuestionsAndSurveys extends Component {
     };
   };
 
-  seedUploadedQuestionsCache = async ({ questionDataArray = [], uploadedQuestions = [], sourceQuestions = [] } = {}) => {
+  seedUploadedQuestionsCache: any = async ({ questionDataArray = [], uploadedQuestions = [], sourceQuestions = [] }: any = {}) => {
     try {
       const { primarySlug, primaryNetId } = this.resolveManagedCacheSeedTargets();
 
       const uploadedRows = Array.isArray(uploadedQuestions) ? uploadedQuestions : [];
-      const uploadedById = new Map();
-      uploadedRows.forEach((row) => {
+      const uploadedById: any = new Map();
+      uploadedRows.forEach((row: any) => {
         const qid = String(row?.questionId || row?.id || '').trim().toLowerCase();
         if (!qid) return;
         uploadedById.set(qid, row);
       });
 
       const normalizedRows = (Array.isArray(questionDataArray) ? questionDataArray : [])
-        .map((row, idx) => {
+        .map((row: any, idx: any) => {
           const uploadedByIndex = uploadedRows[idx] || null;
           const fallbackQid = String(row?.id || '').trim().toLowerCase();
           const uploadedQid = String(
@@ -1586,7 +1599,7 @@ class CreateQuestionsAndSurveys extends Component {
       if (!normalizedRows.length) return false;
 
       const sourceRows = Array.isArray(sourceQuestions) ? sourceQuestions : [];
-      const recentRows = normalizedRows.map((row, idx) => {
+      const recentRows = normalizedRows.map((row: any, idx: any) => {
         const source = sourceRows[idx] || null;
         const promptMasked = String(row?.prompt || '').trim() === '[encrypted]';
         const sourcePrompt = source?.prompt == null ? '' : String(source.prompt);
@@ -1615,7 +1628,7 @@ class CreateQuestionsAndSurveys extends Component {
             ? { ...parsed }
             : {};
 
-          Object.keys(nextRecent).forEach((key) => {
+          Object.keys(nextRecent).forEach((key: any) => {
             const entry = nextRecent[key];
             const ts = Number(entry?.savedAtMs || 0);
             if (!ts || (now - ts) > RECENT_QUESTION_PAYLOADS_TTL_MS) {
@@ -1623,7 +1636,7 @@ class CreateQuestionsAndSurveys extends Component {
             }
           });
 
-          recentRows.forEach((row) => {
+          recentRows.forEach((row: any) => {
             nextRecent[row.id] = {
               ...row,
               id: row.id,
@@ -1631,10 +1644,10 @@ class CreateQuestionsAndSurveys extends Component {
             };
           });
 
-          const sortedKeys = Object.keys(nextRecent).sort((a, b) => (
+          const sortedKeys = Object.keys(nextRecent).sort((a: any, b: any) => (
             Number(nextRecent[b]?.savedAtMs || 0) - Number(nextRecent[a]?.savedAtMs || 0)
           ));
-          sortedKeys.slice(RECENT_QUESTION_PAYLOADS_LIMIT).forEach((key) => {
+          sortedKeys.slice(RECENT_QUESTION_PAYLOADS_LIMIT).forEach((key: any) => {
             delete nextRecent[key];
           });
 
@@ -1655,7 +1668,7 @@ class CreateQuestionsAndSurveys extends Component {
         ? { ...netBucket.questions }
         : {};
 
-      normalizedRows.forEach((row) => {
+      normalizedRows.forEach((row: any) => {
         questions[row.id] = { ...(questions[row.id] || {}), ...row };
       });
 
@@ -1675,29 +1688,29 @@ class CreateQuestionsAndSurveys extends Component {
       // Best-effort write-through: failures here must not fail successful on-chain submits.
       try {
         await writeCacheOptimistic('questionsCache', primarySlug, next);
-      } catch (error) {
+      } catch (error: any) {
         surveyLog.warn('[CreateQuestionsAndSurveys] Failed to seed questions cache write-through', {
           slug: primarySlug,
-          error: error?.message || String(error),
+          error: getErrorMessage(error, String(error)),
         });
         return false;
       }
 
       return true;
-    } catch (error) {
+    } catch (error: any) {
       surveyLog.warn('[CreateQuestionsAndSurveys] Failed to seed uploaded questions cache', {
-        error: error?.message || String(error),
+        error: getErrorMessage(error, String(error)),
       });
       return false;
     }
   };
 
-  seedSubmittedSurveyCache = async ({
+  seedSubmittedSurveyCache: any = async ({
     surveyData = null,
     surveyId = '',
     sourceTitle = '',
     sourceDocumentUrls = [],
-  } = {}) => {
+  }: any = {}) => {
     try {
       const sid = String(surveyId || surveyData?.surveyID || surveyData?.id || '').trim().toLowerCase();
       if (!sid) return false;
@@ -1743,24 +1756,24 @@ class CreateQuestionsAndSurveys extends Component {
 
       try {
         await writeCacheOptimistic('surveysCache', primarySlug, next);
-      } catch (error) {
+      } catch (error: any) {
         surveyLog.warn('[CreateQuestionsAndSurveys] Failed to seed surveys cache write-through', {
           slug: primarySlug,
-          error: error?.message || String(error),
+          error: getErrorMessage(error, String(error)),
         });
         return false;
       }
 
       return true;
-    } catch (error) {
+    } catch (error: any) {
       surveyLog.warn('[CreateQuestionsAndSurveys] Failed to seed submitted survey cache', {
-        error: error?.message || String(error),
+        error: getErrorMessage(error, String(error)),
       });
       return false;
     }
   };
 
-  clearCacheWatch = () => {
+  clearCacheWatch: any = () => {
     if (this._cacheWatchTimer) {
       clearInterval(this._cacheWatchTimer);
       this._cacheWatchTimer = null;
@@ -1778,7 +1791,7 @@ class CreateQuestionsAndSurveys extends Component {
     this._cacheWatchCheckNow = null;
   };
 
-  startCacheWatch = () => {
+  startCacheWatch: any = () => {
     this.clearCacheWatch();
 
     const { primarySlug, primaryNetId } = this.resolveManagedCacheSeedTargets();
@@ -1788,7 +1801,7 @@ class CreateQuestionsAndSurveys extends Component {
 
     const surveyIdLower = String(this.state.lastSubmittedSurveyId || '').toLowerCase();
     const questionIdsLower = (this.state.uploadedQuestions || [])
-      .map((u) => String(u.questionId || '').toLowerCase())
+      .map((u: any) => String(u.questionId || '').toLowerCase())
       .filter(Boolean);
     if (!surveyIdLower && questionIdsLower.length === 0) return;
 
@@ -1798,7 +1811,7 @@ class CreateQuestionsAndSurveys extends Component {
         ? 'questionsCache'
         : null;
     let pollAttempts = 0;
-    this._cacheWatchCheckNow = ({ countPollAttempt = false } = {}) => {
+    this._cacheWatchCheckNow = ({ countPollAttempt = false }: any = {}) => {
       if (countPollAttempt) {
         pollAttempts += 1;
       }
@@ -1837,7 +1850,7 @@ class CreateQuestionsAndSurveys extends Component {
     });
 
     if (watchedNamespace) {
-      this._cacheWatchUnsubscribe = subscribeCacheUpdates((event) => {
+      this._cacheWatchUnsubscribe = subscribeCacheUpdates((event: any) => {
         if (!event || event.namespace !== watchedNamespace) return;
         if (String(event.slug || '') !== String(slug || '')) return;
         if (this._cacheWatchCoalescer) {
@@ -1856,7 +1869,7 @@ class CreateQuestionsAndSurveys extends Component {
   };
 
   // Wagmi-only helpers for network guard
-  getWalletChainId = async () => {
+  getWalletChainId: any = async () => {
     try {
       if (typeof window === 'undefined' || !window.ethereum) return null;
       const hex = await window.ethereum.request({ method: 'eth_chainId' });
@@ -1866,7 +1879,7 @@ class CreateQuestionsAndSurveys extends Component {
     }
   };
 
-  updateNeedsNetworkSwitch = async () => {
+  updateNeedsNetworkSwitch: any = async () => {
     try {
       const targetId = this.resolveSessionChainId();
       if (!(this.props.provider === 'wagmi' && this.props.loginComplete && Number.isFinite(targetId))) {
@@ -1882,7 +1895,7 @@ class CreateQuestionsAndSurveys extends Component {
     } catch (e) { surveyLog.warn('CreateQuestionsAndSurveys: fallback', e); }
   };
 
-  switchToCorrectNetwork = async () => {
+  switchToCorrectNetwork: any = async () => {
     if (!(window && window.ethereum) || this.props.provider !== 'wagmi') return;
     try {
       const targetId = this.resolveSessionChainId();
@@ -1893,8 +1906,8 @@ class CreateQuestionsAndSurveys extends Component {
         params: [{ chainId: chainIdHex }],
       });
       this.setState({ needsNetworkSwitch: false });
-    } catch (error) {
-      if (error && error.code === 4902) {
+    } catch (error: any) {
+      if (getErrorCode(error) === 4902) {
         try {
           const ch = this.resolveTargetNetwork() || {};
           const rpcUrl = chainHttpRpcNoPath(ch) || chainHttpRpc(ch);
@@ -1919,15 +1932,15 @@ class CreateQuestionsAndSurveys extends Component {
   };
 
   // Handle clearing the form
-  handleClearForm = () => {
+  handleClearForm: any = () => {
     this.setState({ showClearFormConfirm: true });
   };
 
-  cancelClearForm = () => {
+  cancelClearForm: any = () => {
     this.setState({ showClearFormConfirm: false });
   };
 
-  confirmClearForm = () => {
+  confirmClearForm: any = () => {
     // Reset state
     this.setState({
       title: '',
@@ -1955,7 +1968,7 @@ class CreateQuestionsAndSurveys extends Component {
     });
   };
 
-  createSurvey = async () => {
+  createSurvey: any = async () => {
     // Early validation per spec: block empty survey titles before setting submitting state
     if (!this.state.isStandaloneQuestion) {
       if (!this.state.title || !this.state.title.trim()) {
@@ -2024,17 +2037,17 @@ class CreateQuestionsAndSurveys extends Component {
     } = this.state;
 
     const { gateMap } = this.resolveGateOptions(sessionConfig, { isStandaloneQuestion });
-    const knownGateIds = new Set(Object.keys(gateMap || {}));
+    const knownGateIds: any = new Set(Object.keys(gateMap || {}));
 
-    const normalizeKnownGateIds = (value) => (
-      normalizeGateIds(value).filter((gateId) => knownGateIds.has(gateId))
+    const normalizeKnownGateIds = (value: any) => (
+      normalizeGateIds(value).filter((gateId: any) => knownGateIds.has(gateId))
     );
 
     const resolvedSurveyLockGateIds = !isStandaloneQuestion
       ? normalizeKnownGateIds(surveyLockGateIds)
       : [];
 
-    const questionNeedsEncryption = (q) => {
+    const questionNeedsEncryption = (q: any) => {
       if (!q) return false;
       const raw = isStandaloneQuestion
         ? q.lockGateIds
@@ -2072,13 +2085,13 @@ class CreateQuestionsAndSurveys extends Component {
       }
     }
 
-    const buildGateObjectsAndRecipients = (gateIdsIn) => {
+    const buildGateObjectsAndRecipients = (gateIdsIn: any) => {
       const gateIds = normalizeKnownGateIds(gateIdsIn);
-      const gates = [];
-      const recipients = [];
-      const dedupe = new Set();
+      const gates: any[] = [];
+      const recipients: any[] = [];
+      const dedupe: any = new Set();
 
-      gateIds.forEach((gateId) => {
+      gateIds.forEach((gateId: any) => {
         const rawGate = gateMap?.[gateId];
         if (!rawGate || typeof rawGate !== 'object') return;
 
@@ -2127,7 +2140,7 @@ class CreateQuestionsAndSurveys extends Component {
       return { gates, recipients };
     };
 
-    const requireRecipientsForGateSelection = ({ gateIds, recipients, scopeLabel } = {}) => {
+    const requireRecipientsForGateSelection = ({ gateIds, recipients, scopeLabel }: any = {}) => {
       const selectedGateIds = normalizeKnownGateIds(gateIds);
       if (!selectedGateIds.length) return;
       if (Array.isArray(recipients) && recipients.length > 0) return;
@@ -2136,7 +2149,7 @@ class CreateQuestionsAndSurveys extends Component {
       );
     };
 
-    const buildEncryptionPayload = ({ gates, targets }) => ({
+    const buildEncryptionPayload = ({ gates, targets }: any) => ({
       enabled: true,
       status: 'lit-v1',
       gate: gates?.[0] || null,
@@ -2151,7 +2164,7 @@ class CreateQuestionsAndSurveys extends Component {
       surveyId,
       qId,
       recipients,
-    }) => {
+    }: any) => {
       const isEmpty =
         value === undefined ||
         value === null ||
@@ -2166,8 +2179,8 @@ class CreateQuestionsAndSurveys extends Component {
         throw new Error(`Selected ${t('gateLower')} does not provide any Lit recipients.`);
       }
 
-      const combinedAccessControlConditions = [];
-      recipients.forEach((recipient) => {
+      const combinedAccessControlConditions: any[] = [];
+      recipients.forEach((recipient: any) => {
         const conditions = recipient?.accessControlConditions;
         if (!Array.isArray(conditions) || conditions.length === 0) return;
         if (combinedAccessControlConditions.length > 0) {
@@ -2208,10 +2221,10 @@ class CreateQuestionsAndSurveys extends Component {
         const uniqueQuestions = this.removeDuplicateQuestions(questions);
 
         const questionDataArray = await Promise.all(
-          uniqueQuestions.map(async (q) => {
+          uniqueQuestions.map(async (q: any) => {
             // FILTER: clean options here too
             const validOptions = (q.type === 'multichoice' && Array.isArray(q.options))
-              ? q.options.filter(o => o && o.trim() !== '')
+              ? q.options.filter((o: any) => o && o.trim() !== '')
               : undefined;
 
             const surveyContextId = q.associatedSurveyId || ethers.constants.HashZero;
@@ -2219,9 +2232,9 @@ class CreateQuestionsAndSurveys extends Component {
             let promptValue = q.prompt;
             let optionsValue = validOptions;
             let tagsValue = cleanTags;
-            let promptEncrypted = null;
-            let optionsEncrypted = null;
-            let tagsEncrypted = null;
+            let promptEncrypted: any = null;
+            let optionsEncrypted: any = null;
+            let tagsEncrypted: any = null;
 
             const effectiveGateIds = normalizeKnownGateIds(q.lockGateIds);
             const questionEncryption = effectiveGateIds.length
@@ -2274,7 +2287,7 @@ class CreateQuestionsAndSurveys extends Component {
               }
             }
 
-            const qD = {
+            const qD: any = {
               id: q.id,
               type: q.type,
               prompt: promptValue,
@@ -2297,20 +2310,20 @@ class CreateQuestionsAndSurveys extends Component {
             return qD;
           })
         );
-        questionDataArray.forEach((questionData, index) => {
+        questionDataArray.forEach((questionData: any, index: any) => {
           validateNoLockedPlaintextInPayload(questionData, {
             family: 'question_metadata',
             path: `question metadata[${index}]`,
           });
         });
         const surveyIdsForContract = uniqueQuestions.map(
-          (q) => q.associatedSurveyId || ethers.constants.HashZero
+          (q: any) => q.associatedSurveyId || ethers.constants.HashZero
         );
 
         // Step 2: contracts submit
         this.setState({ progress: 50, submitStep: 2 });
 
-        const questionIdsForContract = uniqueQuestions.map(q => q.id);
+        const questionIdsForContract = uniqueQuestions.map((q: any) => q.id);
         const addQuestionsResult = await contractScripts.addQuestions(
           this.props.provider,
           questionIdsForContract,
@@ -2384,19 +2397,19 @@ class CreateQuestionsAndSurveys extends Component {
         const uniqueQuestions = this.removeDuplicateQuestions(questions);
 
         const questionDataArray = await Promise.all(
-          uniqueQuestions.map(async (q) => {
+          uniqueQuestions.map(async (q: any) => {
             // FILTER: clean options
             const validOptions = (q.type === 'multichoice' && Array.isArray(q.options))
-              ? q.options.filter(o => o && o.trim() !== '')
+              ? q.options.filter((o: any) => o && o.trim() !== '')
               : undefined;
             const cleanTags = normalizeTagList(q.tags);
 
             let promptValue = q.prompt;
             let optionsValue = validOptions;
             let tagsValue = cleanTags;
-            let promptEncrypted = null;
-            let optionsEncrypted = null;
-            let tagsEncrypted = null;
+            let promptEncrypted: any = null;
+            let optionsEncrypted: any = null;
+            let tagsEncrypted: any = null;
 
             const effectiveGateIds = (() => {
               if (q && Object.prototype.hasOwnProperty.call(q, 'lockGateIds')) {
@@ -2455,7 +2468,7 @@ class CreateQuestionsAndSurveys extends Component {
               }
             }
 
-            const base = {
+            const base: any = {
               id: q.id,
               type: q.type,
               prompt: promptValue,
@@ -2478,13 +2491,13 @@ class CreateQuestionsAndSurveys extends Component {
             return base;
           })
         );
-        questionDataArray.forEach((questionData, index) => {
+        questionDataArray.forEach((questionData: any, index: any) => {
           validateNoLockedPlaintextInPayload(questionData, {
             family: 'question_metadata',
             path: `question metadata[${index}]`,
           });
         });
-        const questionIdsForContract = uniqueQuestions.map(q => q.id);
+        const questionIdsForContract = uniqueQuestions.map((q: any) => q.id);
 
         // Fetch current block number for creationBlock optimization
         let creationBlock = 0;
@@ -2495,9 +2508,9 @@ class CreateQuestionsAndSurveys extends Component {
         }
 
         let surveyTitleValue = title;
-        let surveyTitleEncrypted = null;
+        let surveyTitleEncrypted: any = null;
         let docUrlsValue = sanitizeDocumentUrls(documentURLs);
-        let docUrlsEncrypted = null;
+        let docUrlsEncrypted: any = null;
 
         const surveyEncryption = resolvedSurveyLockGateIds.length
           ? buildGateObjectsAndRecipients(resolvedSurveyLockGateIds)
@@ -2534,7 +2547,7 @@ class CreateQuestionsAndSurveys extends Component {
           docUrlsEncrypted = docsResult.encrypted;
         }
 
-        const completeSurveyData = {
+        const completeSurveyData: any = {
           surveyID: surveyIDForUpload,
           title: surveyTitleValue,
           questionIDs: questionIdsForContract,
@@ -2571,7 +2584,7 @@ class CreateQuestionsAndSurveys extends Component {
         const surveyDataString = JSON.stringify(completeSurveyData);
         let surveyArweaveTxId = '';
         try {
-          surveyArweaveTxId =
+          surveyArweaveTxId = String(
             await arweaveScripts.uploadDataToArweave(surveyDataString, 'json', {
               arweaveJwk: arweaveKey?.arweaveJwk || '',
               sessionSlug,
@@ -2581,8 +2594,9 @@ class CreateQuestionsAndSurveys extends Component {
                 providerLike: this.props.provider,
                 chainId: chainIdFallback,
               },
-            });
-        } catch (error) {
+            }) || ''
+          );
+        } catch (error: any) {
           if (error && typeof error === 'object') {
             error.resetSubmitProgress = true;
           }
@@ -2605,7 +2619,7 @@ class CreateQuestionsAndSurveys extends Component {
         const { receipt } = addSurveyResult;
         await this.seedUploadedQuestionsCache({
           questionDataArray,
-          uploadedQuestions: questionIdsForContract.map((questionId) => ({ questionId })),
+          uploadedQuestions: questionIdsForContract.map((questionId: any) => ({ questionId })),
           sourceQuestions: uniqueQuestions,
         });
         await this.seedSubmittedSurveyCache({
@@ -2649,13 +2663,13 @@ class CreateQuestionsAndSurveys extends Component {
           });
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       surveyLog.error("[CreateQuestionsAndSurveys] Failed to create survey/questions:", error);
       const shouldResetSubmitProgress = !!error?.resetSubmitProgress;
       this.setState({
         isSubmitting: false,
         progress: 0,
-        submissionError: error.message || 'An error occurred during submission.',
+        submissionError: getErrorMessage(error, 'An error occurred during submission.'),
         showSubmitSteps: shouldResetSubmitProgress ? false : this.state.showSubmitSteps,
         submitStep: shouldResetSubmitProgress
           ? 0
@@ -2664,39 +2678,39 @@ class CreateQuestionsAndSurveys extends Component {
     }
   };
 
-  handleSubmitButtonClick = () => {
+  handleSubmitButtonClick: any = () => {
     const { isSubmitting, submissionError } = this.state;
     if (isSubmitting) return;
     if (submissionError) {
       navigator.clipboard.writeText(submissionError).then(() => {
         notify.success('Copied to clipboard');
-      }).catch((e) => { void e; notify.warn('Copy failed'); });
+      }).catch((e: any) => { void e; notify.warn('Copy failed'); });
       return;
     }
     this.createSurvey();
   };
 
-  toggleShowJson = () => {
-    this.setState(prev => ({ showJson: !prev.showJson }));
+  toggleShowJson: any = () => {
+    this.setState((prev: any) => ({ showJson: !prev.showJson }));
   };
 
-  copyQuestionIdToClipboard = (qid) => {
+  copyQuestionIdToClipboard: any = (qid: any) => {
     navigator.clipboard.writeText(qid).then(() => {
       notify.success('Copied to clipboard');
-    }).catch((e) => { void e; notify.warn('Copy failed'); });
+    }).catch((e: any) => { void e; notify.warn('Copy failed'); });
   };
 
-  copySurveyIdToClipboard = (surveyID) => {
+  copySurveyIdToClipboard: any = (surveyID: any) => {
     if (!surveyID) return;
     navigator.clipboard.writeText(surveyID)
       .then(() => {
         notify.success('Copied to clipboard');
         this.setCopySuccessState('copySurveyIdSuccess', 2000);
       })
-      .catch((e) => { void e; notify.warn('Copy failed'); });
+      .catch((e: any) => { void e; notify.warn('Copy failed'); });
   };
 
-  copySurveyLinkToClipboard = (surveyID = null) => {
+  copySurveyLinkToClipboard: any = (surveyID: any = null) => {
     let finalID = surveyID || this.state.lastSubmittedSurveyId || this.state.surveyHash;
     if (!finalID) return;
     const slug = this.getActiveSessionSlug();
@@ -2706,13 +2720,13 @@ class CreateQuestionsAndSurveys extends Component {
         notify.success('Copied to clipboard');
         this.setCopySuccessState('copySurveyLinkSuccess', 2000);
       })
-      .catch((e) => { void e; notify.warn('Copy failed'); });
+      .catch((e: any) => { void e; notify.warn('Copy failed'); });
   };
 
-  handleAutoQuestionsGenerated = (questionsArray, docURLs, aiTitle) => {
+  handleAutoQuestionsGenerated: any = (questionsArray: any, docURLs: any, aiTitle: any) => {
     this.clearUnfinishedSurveyDraft();
 
-    const built = questionsArray.map((q, index) => {
+    const built = questionsArray.map((q: any, index: any) => {
       const aiTags = normalizeTagList(q.tags);
       const tagsToSet = this.state.autoPopulateAiTags
         ? [...new Set(aiTags)]
@@ -2755,15 +2769,15 @@ class CreateQuestionsAndSurveys extends Component {
     });
   };
 
-  handleAutoPopulateAiTagsToggle = () => {
-    this.setState(prevState => {
+  handleAutoPopulateAiTagsToggle: any = () => {
+    this.setState((prevState: any) => {
       const newAutoPopulateState = !prevState.autoPopulateAiTags;
-      const updatedQuestions = prevState.questions.map(q => {
+      const updatedQuestions = prevState.questions.map((q: any) => {
         let newTags = normalizeTagList(q.tags);
         if (newAutoPopulateState) {
           const sourceTags = normalizeTagList(q.aiGeneratedTagsFromSource);
-          const currentTagSet = new Set(newTags);
-          sourceTags.forEach(tag => {
+          const currentTagSet: any = new Set(newTags);
+          sourceTags.forEach((tag: any) => {
             if (!currentTagSet.has(tag)) {
               newTags.push(tag);
             }
@@ -2778,11 +2792,11 @@ class CreateQuestionsAndSurveys extends Component {
     }, this.saveToLocalStorage);
   };
 
-  suggestTagsForQuestion = async (qIndex) => {
+  suggestTagsForQuestion: any = async (qIndex: any) => {
     const question = this.state.questions[qIndex];
     if (!question || question.isGeneratingTags) return;
 
-    this.setState(prevState => {
+    this.setState((prevState: any) => {
       const updatedQuestions = [...prevState.questions];
       updatedQuestions[qIndex] = { ...updatedQuestions[qIndex], isGeneratingTags: true };
       return { questions: updatedQuestions };
@@ -2790,11 +2804,11 @@ class CreateQuestionsAndSurveys extends Component {
 
     try {
       const defaultTagsRaw = this.props.defaultTags;
-      let defaultTagsForAI = [];
+      let defaultTagsForAI: any[] = [];
       if (Array.isArray(defaultTagsRaw)) {
-        defaultTagsForAI = defaultTagsRaw.filter(Boolean).map(t => t.trim());
+        defaultTagsForAI = defaultTagsRaw.filter(Boolean).map((t: any) => t.trim());
       } else if (typeof defaultTagsRaw === 'string') {
-        defaultTagsForAI = defaultTagsRaw.split(',').map(t => t.trim()).filter(Boolean);
+        defaultTagsForAI = defaultTagsRaw.split(',').map((t: any) => t.trim()).filter(Boolean);
       }
 
       const prompt = generateSingleQuestionTagsPrompt(
@@ -2808,9 +2822,9 @@ class CreateQuestionsAndSurveys extends Component {
       const match = rawResponse.match(/\{[\s\S]*\}/);
       if (!match) throw new Error('No JSON object found in AI response for tags.');
       const parsedResponse = JSON.parse(match[0]);
-      const newAiTags = (parsedResponse.tags || []).map(tag => String(tag || '').trim()).filter(Boolean);
+      const newAiTags = (parsedResponse.tags || []).map((tag: any) => String(tag || '').trim()).filter(Boolean);
 
-      this.setState(prevState => {
+      this.setState((prevState: any) => {
         const updated = [...prevState.questions];
         updated[qIndex] = {
           ...updated[qIndex],
@@ -2822,7 +2836,7 @@ class CreateQuestionsAndSurveys extends Component {
       }, this.saveToLocalStorage);
 
     } catch (error) {
-      this.setState(prevState => {
+      this.setState((prevState: any) => {
         const updated = [...prevState.questions];
         updated[qIndex] = { ...updated[qIndex], isGeneratingTags: false };
         return { questions: updated };
@@ -2831,34 +2845,34 @@ class CreateQuestionsAndSurveys extends Component {
     }
   };
 
-  removeTagFromQuestion = (qIndex, tagIndexToRemove) => {
-    this.setState(prevState => {
+  removeTagFromQuestion: any = (qIndex: any, tagIndexToRemove: any) => {
+    this.setState((prevState: any) => {
       const updatedQuestions = [...prevState.questions];
       const questionToUpdate = { ...updatedQuestions[qIndex] };
       const currentTags = normalizeTagList(questionToUpdate.tags);
-      questionToUpdate.tags = currentTags.filter((_, i) => i !== tagIndexToRemove);
+      questionToUpdate.tags = currentTags.filter((_: any, i: any) => i !== tagIndexToRemove);
       updatedQuestions[qIndex] = questionToUpdate;
       return { questions: updatedQuestions };
     }, this.saveToLocalStorage);
   };
 
-  handleCurrentTagInputChange = (qIndex, value) => {
-    this.setState(prevState => {
+  handleCurrentTagInputChange: any = (qIndex: any, value: any) => {
+    this.setState((prevState: any) => {
       const updatedQuestions = [...prevState.questions];
       updatedQuestions[qIndex] = { ...updatedQuestions[qIndex], currentTagInputValue: value };
       return { questions: updatedQuestions };
     });
   };
 
-  handleTagInputKeyDown = (qIndex, event) => {
+  handleTagInputKeyDown: any = (qIndex: any, event: any) => {
     if (event.key === 'Enter' || event.key === ',') {
       event.preventDefault();
       this.processTagInput(qIndex);
     }
   };
 
-  processTagInput = (qIndex) => {
-    this.setState(prevState => {
+  processTagInput: any = (qIndex: any) => {
+    this.setState((prevState: any) => {
       const updatedQuestions = [...prevState.questions];
       const q = { ...updatedQuestions[qIndex] };
       const currentTags = normalizeTagList(q.tags);
@@ -2874,9 +2888,9 @@ class CreateQuestionsAndSurveys extends Component {
     }, this.saveToLocalStorage);
   };
 
-  removeDocumentURL = (indexToRemove) => {
-    this.setState(prevState => {
-      const next = prevState.documentURLs.filter((_, index) => index !== indexToRemove);
+  removeDocumentURL: any = (indexToRemove: any) => {
+    this.setState((prevState: any) => {
+      const next = prevState.documentURLs.filter((_: any, index: any) => index !== indexToRemove);
       return {
         documentURLs: next,
         // docURLInput remains separate buffer
@@ -2887,7 +2901,7 @@ class CreateQuestionsAndSurveys extends Component {
     });
   };
 
-  copyJsonPreview = (jsonData) => {
+  copyJsonPreview: any = (jsonData: any) => {
     try {
       const str = JSON.stringify(jsonData, null, 2);
       navigator.clipboard.writeText(str).then(() => {
@@ -2898,8 +2912,8 @@ class CreateQuestionsAndSurveys extends Component {
   };
 
   // AI prompt panel handlers
-  toggleAIPrompt = () => {
-    this.setState(prev => {
+  toggleAIPrompt: any = () => {
+    this.setState((prev: any) => {
       const nextOpen = !prev.showAIPrompt;
       return {
         showAIPrompt: nextOpen,
@@ -2911,7 +2925,7 @@ class CreateQuestionsAndSurveys extends Component {
     });
   };
 
-  copyAIPromptToClipboard = () => {
+  copyAIPromptToClipboard: any = () => {
     const text = this.state.aiPromptText || '';
     if (!text) return;
     navigator.clipboard.writeText(text)
@@ -2919,15 +2933,15 @@ class CreateQuestionsAndSurveys extends Component {
         notify.success('Copied to clipboard');
         this.setCopySuccessState('aiPromptCopySuccess', 1500);
       })
-      .catch((e) => { void e; notify.warn('Copy failed'); });
+      .catch((e: any) => { void e; notify.warn('Copy failed'); });
   };
 
   /** Highlight <Variables> using React nodes (no HTML injection) */
-  highlightPromptVariables = (str) => {
+  highlightPromptVariables: any = (str: any) => {
     if (!str) return null;
     const text = String(str);
     const re = /<([A-Za-z][A-Za-z0-9_]*)>/g;
-    const parts = [];
+    const parts: any[] = [];
     let lastIndex = 0;
     let match;
 
@@ -2945,10 +2959,10 @@ class CreateQuestionsAndSurveys extends Component {
     return parts;
   };
 
-  renderTypePreview = (type) => {
+  renderTypePreview: any = (type: any) => {
     if (!type || type === 'Question Type') return null;
     const box = { border: '1px dashed #b0c4ff', padding: 10, borderRadius: 6, marginTop: 6, background: '#f6f8ff' };
-    const pill = (txt) => <span key={txt} style={{ display:'inline-block', padding:'3px 8px', border:'1px solid #ccd', borderRadius:12, marginRight:6, marginTop:4 }}>{txt}</span>;
+    const pill = (txt: any) => <span key={txt} style={{ display:'inline-block', padding:'3px 8px', border:'1px solid #ccd', borderRadius:12, marginRight:6, marginTop:4 }}>{txt}</span>;
     if (type === 'binary') {
       return <div style={box}>
         <div style={{ fontWeight: 600, marginBottom: 6 }}>Example:</div>
@@ -2974,7 +2988,7 @@ class CreateQuestionsAndSurveys extends Component {
   };
 
   // Visual type selector
-  renderTypeSelector = () => {
+  renderTypeSelector: any = () => {
     return (
       <div className={styles.typeSelectorBlock}>
         <div className={styles.typeSelectorLabel}>Choose Question Type</div>
@@ -3069,29 +3083,29 @@ class CreateQuestionsAndSurveys extends Component {
     const resolvedSessionConfig = this.getResolvedSessionConfig();
     const { gateOptions, defaultGateId } = this.resolveGateOptions(resolvedSessionConfig, { isStandaloneQuestion });
     const hasSelectableGateOptions = Array.isArray(gateOptions) && gateOptions.length > 0;
-    const gateIdSet = new Set((Array.isArray(gateOptions) ? gateOptions : []).map((opt) => opt.id));
+    const gateIdSet: any = new Set((Array.isArray(gateOptions) ? gateOptions : []).map((opt: any) => opt.id));
     const resolvedContracts = mergeSessionContractMaps(
       resolvedSessionConfig?.contracts,
       this.props.contracts,
       sessionConfig?.contracts
     );
 
-    const normalizeSelectedGateIds = (value) => (
-      normalizeGateIds(value).filter((gateId) => gateIdSet.has(gateId))
+    const normalizeSelectedGateIds = (value: any) => (
+      normalizeGateIds(value).filter((gateId: any) => gateIdSet.has(gateId))
     );
     const surveySelectedGateIds = !isStandaloneQuestion
       ? normalizeSelectedGateIds(surveyLockGateIds)
       : [];
 
     // JSON preview (only questions; no questionIDs)
-    let jsonData = {};
+    let jsonData: Record<string, any> = {};
     if (isStandaloneQuestion) {
       jsonData = {
-        questions: questions.map(q => ({
+        questions: questions.map((q: any) => ({
           id: q.id,
           type: q.type,
           prompt: q.prompt,
-          options: q.type === "multichoice" ? (q.options || []).filter(o => o && o.trim() !== '') : undefined,
+          options: q.type === "multichoice" ? (q.options || []).filter((o: any) => o && o.trim() !== '') : undefined,
           singleSelect: q.type === "multichoice" ? !!q.singleSelect : undefined,
           tags: normalizeTagList(q.tags),
           associatedSurveyId: q.associatedSurveyId || '',
@@ -3102,11 +3116,11 @@ class CreateQuestionsAndSurveys extends Component {
         surveyID: this.state.surveyHash,
         title: title,
         documentURLs: safeDocumentUrls,
-        questions: questions.map(q => ({
+        questions: questions.map((q: any) => ({
           id: q.id,
           type: q.type,
           prompt: q.prompt,
-          options: q.type === "multichoice" ? (q.options || []).filter(o => o && o.trim() !== '') : undefined,
+          options: q.type === "multichoice" ? (q.options || []).filter((o: any) => o && o.trim() !== '') : undefined,
           singleSelect: q.type === "multichoice" ? !!q.singleSelect : undefined,
           tags: normalizeTagList(q.tags),
         }))
@@ -3131,7 +3145,7 @@ class CreateQuestionsAndSurveys extends Component {
                 <GateMultiSelectLock
                   gateOptions={gateOptions}
                   selectedGateIds={surveySelectedGateIds}
-                  onChangeSelectedGateIds={(nextIds) => {
+                  onChangeSelectedGateIds={(nextIds: any) => {
                     const normalized = normalizeSelectedGateIds(nextIds);
                     this.setState({ surveyLockGateIds: normalized }, this.saveToLocalStorage);
                     if (!normalized.length) {
@@ -3139,7 +3153,7 @@ class CreateQuestionsAndSurveys extends Component {
                     }
                   }}
                   open={openLockKey === 'survey'}
-                  onToggleOpen={(nextOpen) => {
+                  onToggleOpen={(nextOpen: any) => {
                     if (nextOpen && surveySelectedGateIds.length === 0 && defaultGateId) {
                       this.setState({ surveyLockGateIds: [defaultGateId] }, this.saveToLocalStorage);
                     }
@@ -3198,7 +3212,7 @@ class CreateQuestionsAndSurveys extends Component {
               <div className={styles.documentUrlDisplay}>
                 <strong>Attached Document URL(s):</strong>
                 <ul>
-                  {safeDocumentUrls.map((url, idx) => (
+                  {safeDocumentUrls.map((url: any, idx: any) => (
                     <li key={idx} className={styles.documentUrlItem}>
                       {litStorage.isLitArweaveUrl(url) ? (
                         <span className={styles.documentUrlEncrypted}>
@@ -3238,14 +3252,14 @@ class CreateQuestionsAndSurveys extends Component {
           </div>
         )}
 
-        {questions.map((question, qIndex) => {
+        {questions.map((question: any, qIndex: any) => {
           const questionTags = normalizeTagList(question.tags);
           const aiSourceTags = normalizeTagList(question.aiGeneratedTagsFromSource);
           // Logic to determine if the "Magic Wand" (Generate Tags) button should be visible
           // It hides if tags are already fully populated from AI source
           const hasAiSourceTags = aiSourceTags.length > 0;
           const aiSourceTagsFullyInQuestionTags = hasAiSourceTags &&
-            aiSourceTags.every((aiTag) => questionTags.includes(aiTag)) &&
+            aiSourceTags.every((aiTag: any) => questionTags.includes(aiTag)) &&
             questionTags.length === aiSourceTags.length;
 
           let showGenerateTagsButton = false;
@@ -3286,9 +3300,9 @@ class CreateQuestionsAndSurveys extends Component {
                             <input
                               type="checkbox"
                               checked={inheritsSurvey}
-                              onChange={(e) => {
+                              onChange={(e: any) => {
                                 const checked = !!e.target.checked;
-                                this.setState((prev) => {
+                                this.setState((prev: any) => {
                                   const updated = Array.isArray(prev.questions) ? [...prev.questions] : [];
                                   const nextQ = { ...(updated[qIndex] || {}) };
                                   if (checked) {
@@ -3309,9 +3323,9 @@ class CreateQuestionsAndSurveys extends Component {
                         <GateMultiSelectLock
                           gateOptions={gateOptions}
                           selectedGateIds={selectedGateIds}
-                          onChangeSelectedGateIds={(nextIds) => {
+                          onChangeSelectedGateIds={(nextIds: any) => {
                             const normalized = normalizeSelectedGateIds(nextIds);
-                            this.setState((prev) => {
+                            this.setState((prev: any) => {
                               const updated = Array.isArray(prev.questions) ? [...prev.questions] : [];
                               const nextQ = { ...(updated[qIndex] || {}) };
                               nextQ.lockGateIds = normalized;
@@ -3323,12 +3337,12 @@ class CreateQuestionsAndSurveys extends Component {
                             }, this.saveToLocalStorage);
                           }}
                           open={openLockKey === lockKey}
-                          onToggleOpen={(nextOpen) => {
+                          onToggleOpen={(nextOpen: any) => {
                             if (nextOpen && selectedGateIds.length === 0 && defaultGateId) {
                               if (!isStandaloneQuestion && inheritsSurvey) {
                                 this.setState({ surveyLockGateIds: [defaultGateId] }, this.saveToLocalStorage);
                               } else {
-                                this.setState((prev) => {
+                                this.setState((prev: any) => {
                                   const updated = Array.isArray(prev.questions) ? [...prev.questions] : [];
                                   const nextQ = { ...(updated[qIndex] || {}) };
                                   nextQ.lockGateIds = [defaultGateId];
@@ -3354,24 +3368,24 @@ class CreateQuestionsAndSurveys extends Component {
 
               {/* Ref attached to the prompt textarea for auto-focus */}
               <Input
-                innerRef={el => { this._promptRefs[question.uiKey] = el; }}
+                innerRef={(el: any) => { this._promptRefs[question.uiKey] = el; }}
                 type="textarea"
                 rows="2"
                 className={styles.questionPromptInput}
                 placeholder="Question prompt"
                 data-testid={E2E_TESTIDS.CREATE_QUESTION_PROMPT}
                 value={question.prompt || ''}
-                onChange={e => this.handleQuestionChange(qIndex, 'prompt', e.target.value)}
+                onChange={(e: any) => this.handleQuestionChange(qIndex, 'prompt', e.target.value)}
               />
 
               {question.type === "multichoice" && (
                 <div className={styles.optionsContainer}>
-                  {(question.options || []).map((option, oIndex) => (
+                  {(question.options || []).map((option: any, oIndex: any) => (
                     <div key={`option-${question.uiKey || qIndex}-${oIndex}`} className={styles.optionItem}>
                       <Input
                         placeholder={`Option ${oIndex + 1}`}
                         value={option}
-                        onChange={e => this.handleOptionChange(qIndex, oIndex, e.target.value)}
+                        onChange={(e: any) => this.handleOptionChange(qIndex, oIndex, e.target.value)}
                         className={styles.optionInput}
                       />
                       <Button className={styles.removeOptionButton} onClick={() => this.removeOption(qIndex, oIndex)}>
@@ -3395,7 +3409,7 @@ class CreateQuestionsAndSurveys extends Component {
                         type="checkbox"
                         data-testid={E2E_TESTIDS.CREATE_QUESTION_SINGLE_SELECT}
                         checked={!!question.singleSelect}
-                        onChange={(e) => this.handleQuestionChange(qIndex, 'singleSelect', e.target.checked)}
+                        onChange={(e: any) => this.handleQuestionChange(qIndex, 'singleSelect', e.target.checked)}
                       />
                       <span>One Selection Only</span>
                       <FontAwesomeIcon
@@ -3418,7 +3432,7 @@ class CreateQuestionsAndSurveys extends Component {
               <div className={styles.questionMetadata}>
                 <div className={styles.tagsManagerContainer}>
                   <div className={styles.tagsContainer}>
-                    {questionTags.map((tag, tagIndex) => (
+                    {questionTags.map((tag: any, tagIndex: any) => (
                       <span key={`${qIndex}-${tagIndex}-${tag}`} className={styles.filterBubble}>
                         {tag}
                         <FontAwesomeIcon
@@ -3436,8 +3450,8 @@ class CreateQuestionsAndSurveys extends Component {
 	                        placeholder="Add tag"
 	                        data-testid={E2E_TESTIDS.CREATE_QUESTION_TAG_INPUT}
 	                        value={question.currentTagInputValue || ''}
-	                        onChange={e => this.handleCurrentTagInputChange(qIndex, e.target.value)}
-	                        onKeyDown={e => this.handleTagInputKeyDown(qIndex, e)}
+	                        onChange={(e: any) => this.handleCurrentTagInputChange(qIndex, e.target.value)}
+	                        onKeyDown={(e: any) => this.handleTagInputKeyDown(qIndex, e)}
 	                        className={styles.tagInputField}
 	                      />
 
@@ -3494,7 +3508,7 @@ class CreateQuestionsAndSurveys extends Component {
                 isSubmitting ||
                 ((this.state.needsNetworkSwitch && this.props.provider === 'wagmi' && this.props.loginComplete)
                   ? false
-                  : (submissionError ? false : ((!isStandaloneQuestion && !title.trim()) || questions.some(q => q.isGeneratingTags))))
+                  : (submissionError ? false : ((!isStandaloneQuestion && !title.trim()) || questions.some((q: any) => q.isGeneratingTags))))
               }
               aria-busy={isSubmitting ? 'true' : 'false'}
               title={submissionError ? 'Click to copy error' : undefined}
@@ -3565,7 +3579,7 @@ class CreateQuestionsAndSurveys extends Component {
               <div className={styles.uploadedQuestionsList} data-testid={E2E_TESTIDS.CREATE_UPLOADED_QUESTIONS}>
                 <h4>Uploaded Questions:</h4>
                 <ul>
-                  {uploadedQuestions.map(({ questionId, arweaveTxId }, index) => {
+                  {uploadedQuestions.map(({ questionId, arweaveTxId }: any, index: any) => {
                     const idL = String(questionId).toLowerCase();
                     const bookmarked = this.state.bookmarkedQuestionsSet.has(idL);
                     const sessionSlug = this.getActiveSessionSlug();

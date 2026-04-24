@@ -3,7 +3,7 @@ import CreateQuestionsAndSurveys, {
   readManagedCacheSnapshot,
   sanitizeDocumentUrls,
   selectManagedNetBucketSnapshot,
-} from './CreateQuestionsAndSurveys.jsx';
+} from './CreateQuestionsAndSurveys';
 import { renderToStaticMarkup } from 'react-dom/server';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import { arweaveScripts } from '../../utilities/arweave/arweaveScripts';

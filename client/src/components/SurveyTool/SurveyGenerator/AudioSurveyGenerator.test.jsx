@@ -11,6 +11,8 @@ const mockDocumentLibraryPanel = jest.fn();
 const mockCorpusViewer = jest.fn();
 const mockUploadDocLibraryFile = jest.fn();
 const mockUploadDocLibraryUrlRecord = jest.fn();
+const mockFetchImageFromURL = jest.fn();
+const mockReadCompactImageClipboard = jest.fn();
 let mockCorpusViewerModuleLoadCount = 0;
 let originalCreateObjectURL;
 let originalRevokeObjectURL;
@@ -24,6 +26,14 @@ jest.mock('../../../utilities/ai/aiScripts.js', () => ({
   processAdditionalSources: (...args) => mockProcessAdditionalSources(...args),
   fetchContentFromURL: (...args) => mockFetchContentFromURL(...args),
   analyzePhotoForQuestionGeneration: (...args) => mockAnalyzePhotoForQuestionGeneration(...args),
+}));
+
+jest.mock('../../../utilities/ui/imageScripts.js', () => ({
+  fetchImageFromURL: (...args) => mockFetchImageFromURL(...args),
+}));
+
+jest.mock('../../Shared/compactImageClipboard.js', () => ({
+  readCompactImageClipboard: (...args) => mockReadCompactImageClipboard(...args),
 }));
 
 jest.mock('../../../utilities/web3/contractScripts.js', () => ({
@@ -55,7 +65,7 @@ jest.mock('../../Shared/AudioInput/AudioInput', () => (props) => (
   />
 ));
 
-jest.mock('../CreateQuestionsAndSurveys.jsx', () => () => (
+jest.mock('../CreateQuestionsAndSurveys', () => () => (
   <div data-testid="create-questions-and-surveys" />
 ));
 
@@ -136,7 +146,7 @@ describe('AudioSurveyGenerator', () => {
   };
   const addAdditionalPhoto = (files = [new File(['photo-source'], 'memo.png', { type: 'image/png' })]) => {
     const normalizedFiles = Array.isArray(files) ? files : [files];
-    const fileInput = container.querySelector('input[type="file"][accept*="image/png"]');
+    const fileInput = container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_IMAGE_FILE_INPUT}"]`);
     Object.defineProperty(fileInput, 'files', {
       configurable: true,
       value: normalizedFiles,
@@ -220,6 +230,8 @@ describe('AudioSurveyGenerator', () => {
     mockCorpusViewer.mockReset();
     mockUploadDocLibraryFile.mockReset();
     mockUploadDocLibraryUrlRecord.mockReset();
+    mockFetchImageFromURL.mockReset();
+    mockReadCompactImageClipboard.mockReset();
     mockGetAllSessionSlugs.mockReturnValue(['edge', 'rxc']);
     mockGetSessionConfigBySlug.mockImplementation((slug) => {
       const normalized = String(slug || '');
@@ -255,6 +267,8 @@ describe('AudioSurveyGenerator', () => {
       tagMap: {},
       data: { size: null, type: 'application/json' },
     });
+    mockFetchImageFromURL.mockResolvedValue(new File(['remote-image'], 'remote_image.png', { type: 'image/png' }));
+    mockReadCompactImageClipboard.mockResolvedValue({ error: 'Clipboard does not contain a supported image or URL.' });
   });
 
   afterEach(() => {
@@ -806,6 +820,136 @@ describe('AudioSurveyGenerator', () => {
     addAdditionalUrl('https://example.com/source');
 
     expect(container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_SAVE_DOCS_TOGGLE}"]`)).toBeTruthy();
+  });
+
+  it('queues image URLs through the shared image chooser', async () => {
+    await renderSubject(
+      <AudioSurveyGenerator
+        provider={{}}
+        network={{ id: 84532 }}
+        account="0x123"
+        loginComplete
+        toggleLoginModal={jest.fn()}
+      />
+    );
+
+    toggleCheckbox(container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_IMAGE_URL_TOGGLE}"]`));
+    setInputValue(`[data-testid="${E2E_TESTIDS.DATABASE_IMAGE_URL_INPUT}"]`, 'https://example.com/context.png');
+
+    await act(async () => {
+      container
+        .querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_IMAGE_URL_ADD}"]`)
+        .dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(mockFetchImageFromURL).toHaveBeenCalledWith('https://example.com/context.png');
+    expect(getPhotoCards()).toHaveLength(1);
+    expect(container.textContent).toContain('remote_image.png');
+  });
+
+  it('adds typed notes to the session doc library without generating questions', async () => {
+    await renderSubject(
+      <AudioSurveyGenerator
+        provider={{ request: jest.fn() }}
+        network={{ id: 84532 }}
+        account="0x123"
+        loginComplete
+        toggleLoginModal={jest.fn()}
+        activeSessionSlug="edge"
+        sessionConfig={makeSessionConfig({
+          sessionId: '0xSessionToken',
+          sessionIdHex: `0x${'8'.repeat(32)}`,
+        })}
+      />
+    );
+
+    setInputValue(`[data-testid="${E2E_TESTIDS.DATABASE_TITLE_INPUT}"]`, 'Policy Notes');
+    setAudioInputValue('These are durable context notes that should be uploaded into the library without creating survey questions.');
+
+    await act(async () => {
+      container
+        .querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_ADD_LIBRARY_BUTTON}"]`)
+        .dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(mockUploadDocLibraryFile).toHaveBeenCalledTimes(1);
+    expect(mockUploadDocLibraryFile.mock.calls[0][0]).toEqual(expect.objectContaining({
+      file: expect.objectContaining({
+        name: 'Policy Notes.txt',
+        type: 'text/plain',
+      }),
+    }));
+    expect(mockCallAI).not.toHaveBeenCalled();
+  });
+
+  it('defaults direct library uploads to only-me when the session doc gate uses OP Sepolia', async () => {
+    await renderSubject(
+      <AudioSurveyGenerator
+        provider={{ request: jest.fn() }}
+        network={{ id: 11155420 }}
+        account="0x0000000000000000000000000000000000000123"
+        loginComplete
+        toggleLoginModal={jest.fn()}
+        activeSessionSlug="edge"
+        sessionConfig={makeSessionConfig({
+          sessionIdHex: `0x${'8'.repeat(32)}`,
+          docUploadsGate: {
+            lookupStatus: 'ok',
+            sbtAddresses: ['0x00000000000000000000000000000000000000aa'],
+            chainId: 11155420,
+            mode: 0,
+          },
+        })}
+      />
+    );
+
+    setAudioInputValue('Private encrypted context on OP Sepolia should fall back to only-me instead of failing with an unsupported gate error.');
+
+    expect(
+      container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_SAVE_DOCS_AUDIENCE_BUTTON}"]`).textContent
+    ).toContain('only me');
+
+    await act(async () => {
+      container
+        .querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_ADD_LIBRARY_BUTTON}"]`)
+        .dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(mockUploadDocLibraryFile).toHaveBeenCalledTimes(1);
+    expect(mockUploadDocLibraryFile.mock.calls[0][0].encryption).toEqual(expect.objectContaining({
+      litChain: 'sepolia',
+      contextLabel: 'doc-self:edge',
+    }));
+  });
+
+  it('can skip photo analysis when adding images to the library directly', async () => {
+    const photo = new File(['photo-source'], 'briefing.png', { type: 'image/png' });
+
+    await renderSubject(
+      <AudioSurveyGenerator
+        provider={{ request: jest.fn() }}
+        network={{ id: 84532 }}
+        account="0x123"
+        loginComplete
+        toggleLoginModal={jest.fn()}
+        activeSessionSlug="edge"
+        sessionConfig={makeSessionConfig({
+          sessionIdHex: `0x${'8'.repeat(32)}`,
+        })}
+      />
+    );
+
+    addAdditionalPhoto(photo);
+    toggleCheckbox(container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_LIBRARY_ANALYZE_TOGGLE}"]`));
+
+    await act(async () => {
+      container
+        .querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_ADD_LIBRARY_BUTTON}"]`)
+        .dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(mockAnalyzePhotoForQuestionGeneration).not.toHaveBeenCalled();
+    expect(mockUploadDocLibraryFile).toHaveBeenCalledTimes(1);
   });
 
   it('resolves the active session config by slug before saving extra doc sources', async () => {
