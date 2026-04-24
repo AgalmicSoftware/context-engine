@@ -7,12 +7,60 @@
  */
 import { normalizeSessionSlug } from '../session/sessionNaming.js';
 
-const normalizeSlug = (rawSlug) => normalizeSessionSlug(rawSlug);
+type SessionConfig = {
+  __unresolved?: boolean;
+} & Record<string, unknown>;
 
-export const normalizeQuestionRouteSessionSlug = (rawSlug) => normalizeSlug(rawSlug);
+type SessionConfigResolver = ((slug: string) => SessionConfig | null | undefined) | null | undefined;
+type StrictValueResolver<T> = ((slug: string) => T) | null | undefined;
+
+type QuestionRouteOptions = {
+  responderAddress?: unknown;
+  sessionId?: unknown;
+  sessionID?: unknown;
+  sessionSlug?: unknown;
+};
+
+type QuestionPayload = {
+  prompt?: unknown;
+  options?: unknown;
+  tags?: unknown;
+  optionsEncrypted?: unknown;
+  encryptedOptions?: unknown;
+  tagsEncrypted?: unknown;
+  encryptedTags?: unknown;
+  promptDecrypted?: unknown;
+  optionsDecrypted?: unknown;
+  tagsDecrypted?: unknown;
+} & Record<string, unknown>;
+
+type LitHooks = {
+  getKey?: unknown;
+} | null | undefined;
+
+type RetryContext = {
+  account?: unknown;
+  provider?: unknown;
+  loginComplete?: unknown;
+  litHooks?: LitHooks;
+  sbtCacheRevision?: unknown;
+};
+
+type MaskedQuestionRefreshArgs = {
+  masked?: unknown;
+  prev?: RetryContext | null;
+  next?: RetryContext | null;
+};
+
+const normalizeSlug = (rawSlug: unknown): string => normalizeSessionSlug(rawSlug);
+
+export const normalizeQuestionRouteSessionSlug = (rawSlug: unknown): string => normalizeSlug(rawSlug);
 
 
-export const isKnownOrGeneralSessionSlug = (slugIn, getSessionConfigBySlug) => {
+export const isKnownOrGeneralSessionSlug = (
+  slugIn: unknown,
+  getSessionConfigBySlug: SessionConfigResolver
+): boolean => {
   const slug = normalizeSlug(slugIn);
   if (!slug) return true;
   if (typeof getSessionConfigBySlug !== 'function') return false;
@@ -21,13 +69,17 @@ export const isKnownOrGeneralSessionSlug = (slugIn, getSessionConfigBySlug) => {
 };
 
 
-export const resolveStrictSessionValue = (slugIn, getSessionConfigBySlug, resolverFn) => {
+export const resolveStrictSessionValue = <T>(
+  slugIn: unknown,
+  getSessionConfigBySlug: SessionConfigResolver,
+  resolverFn: StrictValueResolver<T>
+): T | null => {
   const slug = normalizeSlug(slugIn);
   if (!isKnownOrGeneralSessionSlug(slug, getSessionConfigBySlug)) return null;
   return typeof resolverFn === 'function' ? resolverFn(slug) : null;
 };
 
-export const parseQuestionSessionSlugFromSearch = (search = '') => {
+export const parseQuestionSessionSlugFromSearch = (search = ''): string | null => {
   const params = new URLSearchParams(String(search || ''));
   const raw =
     params.get('session') ??
@@ -37,7 +89,7 @@ export const parseQuestionSessionSlugFromSearch = (search = '') => {
   return normalizeSlug(raw);
 };
 
-export const parseQuestionSessionIdFromSearch = (search = '') => {
+export const parseQuestionSessionIdFromSearch = (search = ''): string | null => {
   const params = new URLSearchParams(String(search || ''));
   const raw =
     params.get('sessionId') ??
@@ -49,16 +101,22 @@ export const parseQuestionSessionIdFromSearch = (search = '') => {
 };
 
 
-export const isPinnableQuestionRouteSlug = (slugIn, getSessionConfigBySlug) => (
+export const isPinnableQuestionRouteSlug = (
+  slugIn: unknown,
+  getSessionConfigBySlug: SessionConfigResolver
+): boolean => (
   slugIn != null && isKnownOrGeneralSessionSlug(slugIn, getSessionConfigBySlug)
 );
 
-export const isPinnableQuestionRouteSearchSlug = (search = '', getSessionConfigBySlug) => {
+export const isPinnableQuestionRouteSearchSlug = (
+  search = '',
+  getSessionConfigBySlug: SessionConfigResolver
+): boolean => {
   const slug = parseQuestionSessionSlugFromSearch(search);
   return isPinnableQuestionRouteSlug(slug, getSessionConfigBySlug);
 };
 
-export const buildQuestionRoutePath = (questionId, opts = {}) => {
+export const buildQuestionRoutePath = (questionId: unknown, opts: QuestionRouteOptions = {}): string => {
   const qid = String(questionId || '').trim().toLowerCase();
   if (!qid) return '/questions';
   const responder = String(opts.responderAddress || '').trim().toLowerCase();
@@ -75,23 +133,27 @@ export const buildQuestionRoutePath = (questionId, opts = {}) => {
   return params.toString() ? `${base}?${params.toString()}` : base;
 };
 
-export const isMaskedQuestionPayload = (question) => {
+export const isMaskedQuestionPayload = (question: unknown): question is QuestionPayload => {
   if (!question || typeof question !== 'object') return false;
-  if (question.prompt === '[encrypted]') return true;
-  const hasEncryptedOptions = !!(question.optionsEncrypted || question.encryptedOptions);
-  const hasEncryptedTags = !!(question.tagsEncrypted || question.encryptedTags);
-  if (hasEncryptedOptions && Array.isArray(question.options) && question.options.length === 0) return true;
-  if (hasEncryptedTags && (!Array.isArray(question.tags) || question.tags.length === 0)) return true;
+  const payload = question as QuestionPayload;
+  if (payload.prompt === '[encrypted]') return true;
+  const hasEncryptedOptions = !!(payload.optionsEncrypted || payload.encryptedOptions);
+  const hasEncryptedTags = !!(payload.tagsEncrypted || payload.encryptedTags);
+  if (hasEncryptedOptions && Array.isArray(payload.options) && payload.options.length === 0) return true;
+  if (hasEncryptedTags && (!Array.isArray(payload.tags) || payload.tags.length === 0)) return true;
   return false;
 };
 
-export const hasQuestionDecryption = (question) => !!(
-  question &&
-  typeof question === 'object' &&
-  (question.promptDecrypted || question.optionsDecrypted || question.tagsDecrypted)
-);
+export const hasQuestionDecryption = (question: unknown): question is QuestionPayload => {
+  if (!question || typeof question !== 'object') return false;
+  const payload = question as QuestionPayload;
+  return !!(payload.promptDecrypted || payload.optionsDecrypted || payload.tagsDecrypted);
+};
 
-export const pickBetterQuestionPayload = (existingQuestion, incomingQuestion) => {
+export const pickBetterQuestionPayload = (
+  existingQuestion: QuestionPayload | null | undefined,
+  incomingQuestion: QuestionPayload | null | undefined
+): QuestionPayload | null => {
   if (!incomingQuestion) return existingQuestion || null;
   if (!existingQuestion) return incomingQuestion;
 
@@ -110,9 +172,9 @@ export const pickBetterQuestionPayload = (existingQuestion, incomingQuestion) =>
   return { ...existingQuestion, ...incomingQuestion };
 };
 
-export const litReady = (litHooks) => !!(litHooks && typeof litHooks.getKey === 'function');
+export const litReady = (litHooks: LitHooks): boolean => !!(litHooks && typeof litHooks.getKey === 'function');
 
-export const shouldRetryMaskedQuestionRefresh = ({ masked, prev, next }) => {
+export const shouldRetryMaskedQuestionRefresh = ({ masked, prev, next }: MaskedQuestionRefreshArgs): boolean => {
   if (!masked) return false;
   const loggedIn = !!(next?.loginComplete && next?.account);
   if (!loggedIn) return false;
