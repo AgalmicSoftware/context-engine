@@ -10,7 +10,7 @@ jest.mock('../HooksHOC/withWagmiBridge', () => ({
   WagmiHooksHOC: (Comp) => Comp,
 }));
 
-jest.mock('components/UserPage/UserPage.jsx', () => (props) => (
+jest.mock('components/UserPage/UserPage', () => (props) => (
   <div data-testid="mock-user-page" data-view-address={props.viewAddress || ''} />
 ));
 

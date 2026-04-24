@@ -1,5 +1,5 @@
 /** @file UserPage.test.jsx */
-import UserPage from './UserPage.jsx';
+import UserPage from './UserPage';
 import styles from './UserPage.module.scss';
 import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 import { checkSponsoredAccess } from '../../utilities/web3/sponsoredAccess.js';
