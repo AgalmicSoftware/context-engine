@@ -37,29 +37,35 @@ import {
   getLitPayerWalletStatus,
 } from '../../utilities/crypto/litPayerWallet.js';
 
-const normalizeSlug = (raw) => {
+const buildSignedBootstrapAdminAuthUntyped = buildSignedBootstrapAdminAuth as any;
+const uploadSponsoredBundleUntyped = uploadSponsoredBundle as any;
+const getErrorMessage = (error: any, fallback = 'Unknown error') => (
+  error instanceof Error && error.message ? error.message : String(error?.message || error || fallback)
+);
+
+const normalizeSlug = (raw: any) => {
   const slug = canonicalizeSlug(raw);
   return slug === 'general' ? '' : slug;
 };
-const parseChainIdInput = (raw) => {
+const parseChainIdInput = (raw: any) => {
   const matches = toStr(raw).match(/\d+/g);
   if (!matches || !matches.length) return 0;
   return Number(matches[matches.length - 1]) || 0;
 };
-const countSessionsForChain = (entries = [], chainId = null) => {
+const countSessionsForChain = (entries: any = [], chainId: any = null) => {
   const list = Array.isArray(entries) ? entries : [];
   if (!chainId) return list.length;
-  return list.filter(([, cfg]) => {
+  return list.filter(([, cfg]: any) => {
     const cfgChainId = Number(cfg?.__registry?.registryChainId || cfg?.__registry?.chainId || 0) || 0;
     return cfgChainId === chainId;
   }).length;
 };
-const shortAddress = (addr) => {
+const shortAddress = (addr: any) => {
   const value = toStr(addr).trim();
   if (!value) return '';
   return `${value.slice(0, 6)}…${value.slice(-4)}`;
 };
-const normalizeExpiryToIso = (raw) => {
+const normalizeExpiryToIso = (raw: any) => {
   const now = Date.now();
   if (raw instanceof Date) {
     const ts = raw.getTime();
@@ -89,9 +95,9 @@ const buildEmptyBundleForm = () => ({
   litPayerAddress: '',
   cloudflareApiToken: '',
 });
-const normalizeSponsorBundleForm = (raw = {}) => {
-  const next = buildEmptyBundleForm();
-  Object.keys(next).forEach((key) => {
+const normalizeSponsorBundleForm = (raw: any = {}) => {
+  const next: Record<string, string> = buildEmptyBundleForm();
+  Object.keys(next).forEach((key: any) => {
     next[key] = toStr(raw?.[key] || '').trim();
   });
   if (next.litPayerPrivateKey) {
@@ -128,7 +134,7 @@ const writeSponsorPageCache = ({
   persistBundleSecrets = DEV_PERSIST_SPONSOR_BUNDLE_FIELDS,
   bundleForm = {},
   expiresAt = null,
-} = {}) => {
+}: any = {}) => {
   if (typeof window === 'undefined' || !window.localStorage) return;
   try {
     window.localStorage.setItem(SPONSOR_PAGE_CACHE_KEY, JSON.stringify({
@@ -146,7 +152,7 @@ const getCurrentOrigin = () => (
     ? toStr(window.location.origin).trim()
     : ''
 );
-const buildSponsorGrantCorsMessage = (workerBase, detail = '') => {
+const buildSponsorGrantCorsMessage = (workerBase: any, detail: any = '') => {
   const origin = getCurrentOrigin() || '<current-origin>';
   const worker = toStr(workerBase).trim() || 'sponsoring worker';
   const suffix = detail ? ` (${detail})` : '';
@@ -157,7 +163,7 @@ const normalizeSponsorGrantErrorMessage = ({
   workerBase,
   responseStatus = 0,
   responseError = '',
-} = {}) => {
+}: any = {}) => {
   const raw = toStr(error?.message || error).trim();
   const lowered = raw.toLowerCase();
   const detail = toStr(responseError).trim();
@@ -236,38 +242,38 @@ const SponsorPage = ({
   toggleLoginModal,
   initialSessionId,
   initialRegistryChainId,
-}) => {
-  const initialCacheRef = useRef(null);
+}: any) => {
+  const initialCacheRef = useRef<any>(null);
   if (!initialCacheRef.current) {
     initialCacheRef.current = readSponsorPageCache();
   }
   const initialCache = initialCacheRef.current;
-  const [sessions, setSessions] = useState([]);
-  const [selectedSlug, setSelectedSlug] = useState('');
-  const [ignoreRequestedSession, setIgnoreRequestedSession] = useState(false);
-  const [sessionLookupStatus, setSessionLookupStatus] = useState('');
-  const [sessionsRefreshStatus, setSessionsRefreshStatus] = useState('');
-  const [sessionsRefreshBusy, setSessionsRefreshBusy] = useState(false);
-  const [workerUrl, setWorkerUrl] = useState('');
-  const [workerUrlEditable, setWorkerUrlEditable] = useState(false);
-  const [persistBundleSecrets, setPersistBundleSecrets] = useState(initialCache.persistBundleSecrets);
-  const [bundleForm, setBundleForm] = useState(initialCache.bundleForm);
-  const [expiresAt, setExpiresAt] = useState(initialCache.expiresAt);
-  const [createBusy, setCreateBusy] = useState(false);
-  const [createStatus, setCreateStatus] = useState('');
-  const [shareUrl, setShareUrl] = useState('');
-  const [shareTxId, setShareTxId] = useState('');
+  const [sessions, setSessions] = useState<any>([]);
+  const [selectedSlug, setSelectedSlug] = useState<any>('');
+  const [ignoreRequestedSession, setIgnoreRequestedSession] = useState<any>(false);
+  const [sessionLookupStatus, setSessionLookupStatus] = useState<any>('');
+  const [sessionsRefreshStatus, setSessionsRefreshStatus] = useState<any>('');
+  const [sessionsRefreshBusy, setSessionsRefreshBusy] = useState<any>(false);
+  const [workerUrl, setWorkerUrl] = useState<any>('');
+  const [workerUrlEditable, setWorkerUrlEditable] = useState<any>(false);
+  const [persistBundleSecrets, setPersistBundleSecrets] = useState<any>(initialCache.persistBundleSecrets);
+  const [bundleForm, setBundleForm] = useState<any>(initialCache.bundleForm);
+  const [expiresAt, setExpiresAt] = useState<any>(initialCache.expiresAt);
+  const [createBusy, setCreateBusy] = useState<any>(false);
+  const [createStatus, setCreateStatus] = useState<any>('');
+  const [shareUrl, setShareUrl] = useState<any>('');
+  const [shareTxId, setShareTxId] = useState<any>('');
   const shareTxUrl = shareTxId
     ? (() => {
         const normalized = normalizeArweaveUrl(shareTxId);
         return normalized === shareTxId ? `https://ar-io.dev/${shareTxId}` : normalized;
       })()
     : '';
-  const [workerUrlOverrideDirty, setWorkerUrlOverrideDirty] = useState(false);
-  const requestedFetchKeyRef = useRef('');
-  const requestedAutoRefreshKeyRef = useRef('');
-  const prevSelectedSlugRef = useRef('');
-  const workerUrlOverrideDirtyRef = useRef(false);
+  const [workerUrlOverrideDirty, setWorkerUrlOverrideDirty] = useState<any>(false);
+  const requestedFetchKeyRef = useRef<any>('');
+  const requestedAutoRefreshKeyRef = useRef<any>('');
+  const prevSelectedSlugRef = useRef<any>('');
+  const workerUrlOverrideDirtyRef = useRef<any>(false);
   const requestedSessionRaw = toStr(initialSessionId).trim();
   const requestedSessionIdHex = sessionRegistryUtils.normalizeSessionIdHex(requestedSessionRaw);
   const requestedSessionSlug = requestedSessionIdHex ? '' : normalizeSlug(requestedSessionRaw);
@@ -285,7 +291,7 @@ const SponsorPage = ({
     });
   }, [persistBundleSecrets, bundleForm, expiresAt]);
 
-  const syncSessionsFromRegistryCache = useCallback(({ isCancelled } = {}) => {
+  const syncSessionsFromRegistryCache = useCallback(({ isCancelled }: any = {}) => {
     const cached = sessionRegistryStore.getAllSessionEntries();
     const nextSessions = Array.isArray(cached) ? cached : [];
     if (typeof isCancelled === 'function' && isCancelled()) return nextSessions;
@@ -293,12 +299,12 @@ const SponsorPage = ({
     return nextSessions;
   }, []);
 
-  const loadSessions = useCallback(async ({ forceOnChain, isCancelled } = {}) => {
+  const loadSessions = useCallback(async ({ forceOnChain, isCancelled }: any = {}) => {
     const cached = syncSessionsFromRegistryCache({ isCancelled });
 
     const chainIds = requestedChainId ? [requestedChainId] : undefined;
     const shouldForceRegistryRead = !USE_ONCHAIN_SESSION_REGISTRY || !!forceOnChain;
-    const runRegistryLoad = async (bootstrapRpc) => {
+    const runRegistryLoad = async (bootstrapRpc: any) => {
       try {
         return await loadSessionRegistryCache({
           ...(chainIds ? { chainIds } : {}),
@@ -313,7 +319,7 @@ const SponsorPage = ({
       }
     };
 
-    const primaryResult = await runRegistryLoad(true);
+    const primaryResult: any = await runRegistryLoad(true);
     let refreshed = syncSessionsFromRegistryCache({ isCancelled });
     if (typeof isCancelled === 'function' && isCancelled()) return refreshed;
     const primaryCount = countSessionsForChain(refreshed, requestedChainId);
@@ -349,12 +355,12 @@ const SponsorPage = ({
           upsertSessionRegistryCache({ config });
           const refreshed = sessionRegistryStore.getAllSessionEntries();
           setSessions(refreshed || []);
-          setSelectedSlug(normalizeSlug(config.slug));
+          setSelectedSlug(normalizeSlug((config as any).slug));
         }
       }
       setSessionsRefreshStatus('Session list updated.');
     } catch (error) {
-      setSessionsRefreshStatus(error?.message || 'Failed to refresh sessions.');
+      setSessionsRefreshStatus(getErrorMessage(error, 'Failed to refresh sessions.'));
     } finally {
       setSessionsRefreshBusy(false);
     }
@@ -388,7 +394,7 @@ const SponsorPage = ({
 
   const sessionsForChain = useMemo(() => {
     if (!requestedChainId) return sessions || [];
-    return (sessions || []).filter(([, cfg]) => {
+    return (sessions || []).filter(([, cfg]: any) => {
       const chainId = Number(cfg?.__registry?.registryChainId || cfg?.__registry?.chainId || 0) || 0;
       return chainId === requestedChainId;
     });
@@ -397,12 +403,12 @@ const SponsorPage = ({
   const requestedSessionMatch = useMemo(() => {
     if (!requestedSessionRaw) return null;
     if (requestedSessionIdHex) {
-      return sessionsForChain.find(([, cfg]) => {
+      return sessionsForChain.find(([, cfg]: any) => {
         const cfgId = sessionRegistryUtils.normalizeSessionIdHex(cfg?.__registry?.sessionIdHex || cfg?.sessionId);
         return cfgId && cfgId === requestedSessionIdHex;
       }) || null;
     }
-    return sessionsForChain.find(([slug]) => slug === requestedSessionSlug) || null;
+    return sessionsForChain.find(([slug]: any) => slug === requestedSessionSlug) || null;
   }, [requestedSessionIdHex, requestedSessionRaw, requestedSessionSlug, sessionsForChain]);
 
   useEffect(() => {
@@ -445,7 +451,7 @@ const SponsorPage = ({
       setSelectedSlug(sessionsForChain[0][0] || '');
       return;
     }
-    const hasSelected = sessionsForChain.some(([slug]) => slug === selectedSlug);
+    const hasSelected = sessionsForChain.some(([slug]: any) => slug === selectedSlug);
     if (!hasSelected) setSelectedSlug(sessionsForChain[0][0] || '');
   }, [
     ignoreRequestedSession,
@@ -482,11 +488,11 @@ const SponsorPage = ({
         const refreshed = sessionRegistryStore.getAllSessionEntries();
         if (cancelled) return;
         setSessions(refreshed || []);
-        setSelectedSlug(normalizeSlug(config.slug));
+        setSelectedSlug(normalizeSlug((config as any).slug));
         setSessionLookupStatus('');
       } catch (error) {
         if (!cancelled) {
-          const message = error?.message || `Session not found on chain ${requestedChainId}: ${requestedSessionRaw}`;
+          const message = getErrorMessage(error, `Session not found on chain ${requestedChainId}: ${requestedSessionRaw}`);
           setSessionLookupStatus(message);
           notify.error(message);
         }
@@ -506,7 +512,7 @@ const SponsorPage = ({
   ]);
 
   const selectedConfig = useMemo(() => {
-    const match = sessionsForChain.find(([slug]) => slug === selectedSlug);
+    const match = sessionsForChain.find(([slug]: any) => slug === selectedSlug);
     return match ? match[1] : null;
   }, [selectedSlug, sessionsForChain]);
   const relevantSessionChainId = useMemo(() => (
@@ -590,8 +596,8 @@ const SponsorPage = ({
   const isAdminForSelected = !!accountLower && !!adminAddress && adminAddress === accountLower;
   const canAdmin = !!account && !!selectedConfig && !missingSupportedAdminConfig && isAdminForSelected && hasRegistryEntry;
 
-  const updateBundleField = useCallback((key, value) => {
-    setBundleForm((prev) => {
+  const updateBundleField = useCallback((key: any, value: any) => {
+    setBundleForm((prev: any) => {
       if (key === 'litPayerPrivateKey') {
         const nextStatus = getLitPayerWalletStatus(value);
         return {
@@ -604,7 +610,7 @@ const SponsorPage = ({
     });
   }, []);
 
-  const buildBootstrapUploadAuth = useCallback(async ({ workerUrl: overrideWorkerUrl } = {}) => {
+  const buildBootstrapUploadAuth = useCallback(async ({ workerUrl: overrideWorkerUrl }: any = {}) => {
     if (!account) {
       if (toggleLoginModal) toggleLoginModal(true);
       throw new Error('Connect a wallet to sign admin requests.');
@@ -613,7 +619,7 @@ const SponsorPage = ({
     const baseUrl = normalizeWorkerUrl(overrideWorkerUrl || workerUrl || selectedConfigWorkerUrl);
     if (!baseUrl) throw new Error('Worker URL is missing.');
     const chainId = Number(selectedConfig?.__registry?.chainId || selectedConfig?.networkChainId || network?.id || 1) || 1;
-    return buildSignedBootstrapAdminAuth({
+    return buildSignedBootstrapAdminAuthUntyped({
       slug,
       workerUrl: baseUrl,
       statement: 'Admin request: bootstrap arweave upload',
@@ -625,7 +631,7 @@ const SponsorPage = ({
     });
   }, [account, network?.id, provider, selectedConfig, selectedConfigWorkerUrl, selectedSlug, toggleLoginModal, workerUrl]);
 
-  const buildGrantIssueAuth = useCallback(async ({ workerUrl: overrideWorkerUrl, body } = {}) => {
+  const buildGrantIssueAuth = useCallback(async ({ workerUrl: overrideWorkerUrl, body }: any = {}) => {
     if (!account) {
       if (toggleLoginModal) toggleLoginModal(true);
       throw new Error('Connect a wallet to sign admin requests.');
@@ -757,7 +763,7 @@ const SponsorPage = ({
       setCreateStatus('Uploading sponsored bundle…');
 
       const adminAuth = await buildBootstrapUploadAuth({ workerUrl: resolvedWorkerUrl });
-      const result = await uploadSponsoredBundle({
+      const result = await uploadSponsoredBundleUntyped({
         secret,
         label,
         expiresAt: normalizedExpiry,
@@ -779,7 +785,7 @@ const SponsorPage = ({
       setShareTxId(result.txId);
       setCreateStatus('Sponsored URL ready.');
     } catch (error) {
-      setCreateStatus(error?.message || 'Failed to create sponsored URL.');
+      setCreateStatus(getErrorMessage(error, 'Failed to create sponsored URL.'));
     } finally {
       setCreateBusy(false);
     }
@@ -800,7 +806,7 @@ const SponsorPage = ({
     workerUrl,
   ]);
 
-  const handleCopy = useCallback(async (value, successLabel) => {
+  const handleCopy = useCallback(async (value: any, successLabel: any) => {
     const text = toStr(value).trim();
     if (!text || !navigator?.clipboard?.writeText) return;
     try {
@@ -845,7 +851,7 @@ const SponsorPage = ({
                       value={selectedSlug}
                       className={styles.heroCardSelect}
                       data-testid={E2E_TESTIDS.ADMIN_SESSION_SELECT}
-                      onChange={(e) => {
+                      onChange={(e: any) => {
                         setIgnoreRequestedSession(true);
                         setSelectedSlug(e.target.value);
                       }}
@@ -855,7 +861,7 @@ const SponsorPage = ({
                           Requested: {requestedSessionRaw}
                         </option>
                       ) : null}
-                      {sessionsForChain.map(([slug, cfg]) => (
+                      {sessionsForChain.map(([slug, cfg]: any) => (
                         <option key={slug || 'general'} value={slug}>
                           {toStr(cfg?.sessionName || slug || 'General session').trim() || 'Untitled session'}
                         </option>
@@ -909,7 +915,7 @@ const SponsorPage = ({
                 <Input
                   type="checkbox"
                   checked={persistBundleSecrets}
-                  onChange={(e) => setPersistBundleSecrets(!!e.target.checked)}
+                  onChange={(e: any) => setPersistBundleSecrets(!!e.target.checked)}
                 />
                 <span>Dev: keep secrets on refresh</span>
               </Label>
@@ -919,8 +925,8 @@ const SponsorPage = ({
             </div>
           </div>
           <div className={styles.secretOptionsGrid}>
-            {SPONSORED_FIELD_GROUPS.map((group) => {
-              const hasValue = group.fields.some((field) => toStr(bundleForm[field.key]).trim());
+            {SPONSORED_FIELD_GROUPS.map((group: any) => {
+              const hasValue = group.fields.some((field: any) => toStr(bundleForm[field.key]).trim());
               return (
                 <div key={group.key} className={`${styles.secretOptionCard} ${styles.activeOption}`}>
                   <div className={styles.secretOptionHeader}>
@@ -931,7 +937,7 @@ const SponsorPage = ({
                     </span>
                   </div>
                   <div className={styles.secretOptionBody}>
-                    {group.fields.map((field) => {
+                    {group.fields.map((field: any) => {
                       const isTextarea = field.type === 'textarea';
                       return (
                         <FormGroup key={field.key}>
@@ -942,7 +948,7 @@ const SponsorPage = ({
                             value={bundleForm[field.key]}
                             placeholder={field.placeholder || ''}
                             readOnly={field.readOnly === true}
-                            onChange={(e) => updateBundleField(field.key, e.target.value)}
+                            onChange={(e: any) => updateBundleField(field.key, e.target.value)}
                           />
                         </FormGroup>
                       );
@@ -958,7 +964,7 @@ const SponsorPage = ({
                         outline
                         onClick={() => {
                           const nextWallet = createLitPayerWallet();
-                          setBundleForm((prev) => ({
+                          setBundleForm((prev: any) => ({
                             ...prev,
                             litPayerPrivateKey: nextWallet.privateKey,
                             litPayerAddress: nextWallet.address,
@@ -989,7 +995,7 @@ const SponsorPage = ({
             <Input
               value={bundleForm.label}
               placeholder="Launch week sponsor bundle"
-              onChange={(e) => updateBundleField('label', e.target.value)}
+              onChange={(e: any) => updateBundleField('label', e.target.value)}
             />
           </FormGroup>
           <FormGroup>
@@ -997,7 +1003,7 @@ const SponsorPage = ({
             <CEDateTimeInput
               data-testid="ce-sponsor-expiry-input"
               selected={expiresAt}
-              onChange={(date) => setExpiresAt(date)}
+              onChange={(date: any) => setExpiresAt(date)}
               minDate={new Date()}
               isClearable
               showTimeSelect
@@ -1021,7 +1027,7 @@ const SponsorPage = ({
                 color="secondary"
                 outline
                 className={styles.actionButton}
-                onClick={() => setWorkerUrlEditable((prev) => !prev)}
+                onClick={() => setWorkerUrlEditable((prev: any) => !prev)}
                 data-testid={E2E_TESTIDS.SPONSOR_WORKER_URL_TOGGLE}
               >
                 {workerUrlEditable ? 'Hide upload worker' : 'Edit upload worker URL'}
@@ -1037,7 +1043,7 @@ const SponsorPage = ({
                 className={styles.heroCardInput}
                 readOnly={!workerUrlEditable}
                 data-testid={E2E_TESTIDS.SPONSOR_WORKER_URL}
-                onChange={workerUrlEditable ? (e) => {
+                onChange={workerUrlEditable ? (e: any) => {
                   workerUrlOverrideDirtyRef.current = true;
                   setWorkerUrlOverrideDirty(true);
                   setWorkerUrl(e.target.value);

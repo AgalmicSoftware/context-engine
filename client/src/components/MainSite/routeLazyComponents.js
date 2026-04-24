@@ -8,7 +8,7 @@ export const SBTPage = React.lazy(() => import("../SBTs/SBTPage"));
 export const SBTsPage = React.lazy(() => import("../SBTs/SBTsList")); // SBTsList, often referred to as SBTsPage in comments
 export const DebateMap = React.lazy(() => import("../DebateMap/DebateMap"));
 export const AdminPage = React.lazy(() => import("../Admin/AdminPage.jsx"));
-export const SponsorPage = React.lazy(() => import("../Sponsor/SponsorPage.jsx"));
+export const SponsorPage = React.lazy(() => import("../Sponsor/SponsorPage"));
 export const SessionWizard = React.lazy(() => import("../Sessions/SessionWizard.jsx"));
 export const OnePageSession = React.lazy(() => import("../OnePageSession/OnePageSession.jsx"));
 export const DemosIndex = React.lazy(() => import("../DemoViews/DemosIndex"));
