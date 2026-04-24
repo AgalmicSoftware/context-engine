@@ -44,7 +44,7 @@ describe('AboutPage', () => {
     expect(within(hero).getByTestId('ce-about-link-whitepaper')).toBeVisible();
     expect(within(hero).getByTestId('ce-about-link-whitepaper')).toHaveAttribute(
       'href',
-      'https://github.com/AgalmicSoftware/context-engine/blob/main/Whitepaper/whitepaper.md'
+      'https://github.com/AgalmicSoftware/context-engine/blob/main/whitepaper/whitepaper.md'
     );
     expect(within(hero).getByLabelText(/view context engine on github/i)).toBeVisible();
     expect(within(hero).getByTestId('ce-about-link-github')).toHaveAttribute(

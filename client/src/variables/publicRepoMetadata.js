@@ -29,8 +29,8 @@ export const PUBLIC_README_URL = buildPublicRepoRawUrl('README.md');
 export const PUBLIC_ARCHITECTURE_URL = buildPublicRepoRawUrl('ARCHITECTURE.md');
 export const PUBLIC_CONTRIBUTING_URL = buildPublicRepoBlobUrl('CONTRIBUTING.md');
 export const PUBLIC_LICENSE_URL = buildPublicRepoBlobUrl('LICENSE');
-export const PUBLIC_WHITEPAPER_URL = buildPublicRepoBlobUrl('Whitepaper/whitepaper.md');
-export const PUBLIC_WHITEPAPER_RAW_URL = buildPublicRepoRawUrl('Whitepaper/whitepaper.md');
+export const PUBLIC_WHITEPAPER_URL = buildPublicRepoBlobUrl('whitepaper/whitepaper.md');
+export const PUBLIC_WHITEPAPER_RAW_URL = buildPublicRepoRawUrl('whitepaper/whitepaper.md');
 export const PUBLIC_CONTRACTS_SOURCE_BASE_URL = buildPublicRepoBlobUrl('contracts');
 export const PUBLIC_AI_DISCOURSE_CORPUS_URL = buildPublicRepoTreeUrl('ai-discourse-corpus');
 
