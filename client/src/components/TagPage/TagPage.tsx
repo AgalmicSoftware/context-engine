@@ -23,7 +23,7 @@ import { SESSION_REGISTRY_CACHE_UPDATED_EVENT } from '../../utilities/web3/sessi
 import { normalizeGlobalSessionSelection } from '../../utilities/session/globalSessionState.js';
 import { parseQuestionSessionSlugFromSearch } from '../../utilities/survey/questionRouting.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
-import SingleQuestionResponse from '../SurveyTool/SingleQuestionResponse.jsx';
+import SingleQuestionResponse from '../SurveyTool/SingleQuestionResponse';
 import SessionChipSelector from '../Shared/SessionChipSelector';
 import {
   buildTagPagePath,

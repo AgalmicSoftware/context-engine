@@ -12,7 +12,7 @@ import {
   getHistoricalFigureBlockie,
 } from '../../utilities/ui/historicalFigureAvatars.js';
 import { buildPublicRoute } from '../../utilities/ui/publicUrl.js';
-import SingleQuestionResponse from '../SurveyTool/SingleQuestionResponse.jsx';
+import SingleQuestionResponse from '../SurveyTool/SingleQuestionResponse';
 
 type SimUserPageProps = {
   simUsername?: string;

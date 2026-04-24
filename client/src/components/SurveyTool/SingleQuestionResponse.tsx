@@ -1,4 +1,4 @@
-/** @file SingleQuestionResponse.jsx */
+/** @file SingleQuestionResponse.tsx */
 
 import React, { Component } from 'react';
 import { Card, CardBody, Button } from 'reactstrap';
@@ -36,13 +36,13 @@ import {
 
 const questionLog = createLogger('questions');
 
-const normalizeText = (value) => String(value || '').trim();
-const joinClassNames = (...parts) => parts.filter(Boolean).join(' ');
+const normalizeText = (value: any) => String(value || '').trim();
+const joinClassNames = (...parts: any[]) => parts.filter(Boolean).join(' ');
 
-const collectGateAddresses = (gates = [], directAddresses = []) => {
-  const out = [];
-  const seen = new Set();
-  const push = (value) => {
+const collectGateAddresses = (gates: any = [], directAddresses: any = []) => {
+  const out: any[] = [];
+  const seen: any = new Set();
+  const push = (value: any) => {
     const address = normalizeText(value);
     if (!address) return;
     const key = address.toLowerCase();
@@ -52,7 +52,7 @@ const collectGateAddresses = (gates = [], directAddresses = []) => {
   };
 
   (Array.isArray(directAddresses) ? directAddresses : []).forEach(push);
-  (Array.isArray(gates) ? gates : []).forEach((gate) => {
+  (Array.isArray(gates) ? gates : []).forEach((gate: any) => {
     (Array.isArray(gate?.sbtAddresses) ? gate.sbtAddresses : []).forEach(push);
     push(gate?.sbtAddress);
   });
@@ -60,7 +60,7 @@ const collectGateAddresses = (gates = [], directAddresses = []) => {
   return out;
 };
 
-const normalizeGateMode = (gate = null, fallbackMode = '') => {
+const normalizeGateMode = (gate: any = null, fallbackMode: any = '') => {
   const raw = normalizeText(fallbackMode || gate?.mode || gate?.operator || gate?.gateMode).toLowerCase();
   if (gate?.requireAll === true || raw === 'all' || raw === 'and') return 'all';
   return raw === 'any' || !raw ? 'any' : raw;
@@ -73,7 +73,7 @@ const resolvePromptGateTooltipProps = ({
   gateMode = '',
   sbtAddresses = [],
   userHeldSBTs = [],
-} = {}) => {
+}: any = {}) => {
   const questionGateList = Array.isArray(question?.encryption?.gates)
     ? question.encryption.gates
     : Array.isArray(question?.gates)
@@ -142,8 +142,10 @@ const resolvePromptGateTooltipProps = ({
  * SCSS is in SingleQuestionResponse.module.scss
  */
 
-class SingleQuestionResponse extends Component {
-  constructor(props) {
+class SingleQuestionResponse extends Component<any, any> {
+  [key: string]: any;
+
+  constructor(props: any) {
     super(props);
     this.state = {
       miniExpanded: false, // used only if mode="mini"
@@ -169,7 +171,7 @@ class SingleQuestionResponse extends Component {
     this.clearQuestionLookupMemo();
   }
 
-  componentDidUpdate(prevProps) {
+  componentDidUpdate(prevProps: any) {
     if (this.props.question?.id !== prevProps.question?.id) {
       this.checkBookmarkStatus();
     }
@@ -186,13 +188,13 @@ class SingleQuestionResponse extends Component {
     }
   }
 
-  clearQuestionLookupMemo = () => {
+  clearQuestionLookupMemo: any = () => {
     this._questionsMapMemo = { key: '', value: {} };
     this._crossGroupQuestionMemo.clear();
     this._multichoiceOptionsMemo.clear();
   };
 
-  trimMemoMap = (map, maxEntries = 128) => {
+  trimMemoMap: any = (map: any, maxEntries: any = 128) => {
     if (!map || typeof map.size !== 'number') return;
     while (map.size > maxEntries) {
       const firstKey = map.keys().next().value;
@@ -200,7 +202,7 @@ class SingleQuestionResponse extends Component {
     }
   };
 
-  getQuestionLookupContextKey = () => {
+  getQuestionLookupContextKey: any = () => {
     const slug = this.resolveGroupSlug();
     const netIdStr = String(
       this.props?.network?.id ??
@@ -213,12 +215,12 @@ class SingleQuestionResponse extends Component {
       this.props?.cacheNonce,
       this.props?.cacheRevision,
     ]
-      .map((part) => (part == null ? '' : String(part)))
+      .map((part: any) => (part == null ? '' : String(part)))
       .join(':');
     return `${slug}|${netIdStr}|${nonceParts}`;
   };
 
-  buildAggregatorResponseSignature = (allResponses = []) => {
+  buildAggregatorResponseSignature: any = (allResponses: any = []) => {
     const total = Array.isArray(allResponses) ? allResponses.length : 0;
     if (total <= 0) return '0';
     const first = allResponses[0] || {};
@@ -232,7 +234,7 @@ class SingleQuestionResponse extends Component {
     ].join('|');
   };
 
-  getLatestAnsweredResponses = (allResponses = []) => {
+  getLatestAnsweredResponses: any = (allResponses: any = []) => {
     if (!Array.isArray(allResponses) || allResponses.length === 0) {
       return [];
     }
@@ -242,8 +244,8 @@ class SingleQuestionResponse extends Component {
       return memo.value;
     }
 
-    const responderMap = new Map();
-    allResponses.forEach((r) => {
+    const responderMap: any = new Map();
+    allResponses.forEach((r: any) => {
       const existing = responderMap.get(r.responder);
       const existingTs = existing ? parseInt(existing.timestamp, 10) : 0;
       const newTs = parseInt(r.timestamp, 10);
@@ -251,13 +253,13 @@ class SingleQuestionResponse extends Component {
         responderMap.set(r.responder, r);
       }
     });
-    const uniqueResps = Array.from(responderMap.values()).map((r) => r.response);
+    const uniqueResps = Array.from(responderMap.values()).map((r: any) => r.response);
     const answered = uniqueResps.filter(Boolean);
     this._aggregatorAnsweredMemo = { responsesRef: allResponses, signature, value: answered };
     return answered;
   };
 
-  checkBookmarkStatus = () => {
+  checkBookmarkStatus: any = () => {
     const { question } = this.props;
     if (!question || !question.id) return;
 
@@ -276,7 +278,7 @@ class SingleQuestionResponse extends Component {
     }
   };
 
-  handleBookmarkClick = () => {
+  handleBookmarkClick: any = () => {
     const { question } = this.props;
     if (!question || !question.id) return;
 
@@ -320,13 +322,13 @@ class SingleQuestionResponse extends Component {
       this.setState({ bookmarkSuccess: false });
     }, 1500); // Feedback for 1.5s
 
-    void writeCache('bookmarksCache', slug, bookmarksCache).catch((error) => {
+    void writeCache('bookmarksCache', slug, bookmarksCache).catch((error: any) => {
       questionLog.error('[SingleQuestionResponse] Error saving bookmarksCache:', error);
     });
   };
 
   // For aggregator mode (allResponses array). We compute summary stats & display them.
-  renderAggregatorByType = () => {
+  renderAggregatorByType: any = () => {
     const { question, allResponses } = this.props;
 
     // If question is missing, we provide a fallback so we don't just show "Loading question/response..."
@@ -367,7 +369,7 @@ class SingleQuestionResponse extends Component {
     }
   };
 
-  getAggregatorClassNames = () => ({
+  getAggregatorClassNames: any = () => ({
     aggregatorContainerClassName: joinClassNames(
       styles.aggregatorContainer,
       this.props.aggregatorContainerClassName,
@@ -392,7 +394,7 @@ class SingleQuestionResponse extends Component {
    * - Summarizes them in one line, e.g. "2 total responses. 0 encrypted responses not shown, 1 blank not shown."
    * - Displays non-empty, unencrypted answers in a simple list
    */
-  renderFreeformAggregator = (parsedResponses) => {
+  renderFreeformAggregator: any = (parsedResponses: any) => {
     const {
       aggregatorContainerClassName,
       aggregatorParagraphClassName,
@@ -409,9 +411,9 @@ class SingleQuestionResponse extends Component {
 
     let encryptedCount = 0;
     let blankCount = 0;
-    let displayedResponses = [];
+    let displayedResponses: any[] = [];
 
-    parsedResponses.forEach((respObj) => {
+    parsedResponses.forEach((respObj: any) => {
       if (!respObj || !respObj.answer) return;
       const val = respObj.answer.value;
 
@@ -444,7 +446,7 @@ class SingleQuestionResponse extends Component {
         <p className={aggregatorParagraphClassName}>{parts.join(' ')}</p>
         {displayedResponses.length > 0 && (
           <div className={styles.freeformAggregatorList}>
-            {displayedResponses.map((val, index) => (
+            {displayedResponses.map((val: any, index: any) => (
               <div key={index} className={aggregatorFreeformAnswerClassName}>
                 {typeof val === 'string' ? val : JSON.stringify(val)}
               </div>
@@ -456,11 +458,11 @@ class SingleQuestionResponse extends Component {
   };
 
   // For aggregator binary
-  renderBinaryAggregator = (parsedResponses) => {
+  renderBinaryAggregator: any = (parsedResponses: any) => {
     const { aggregatorContainerClassName, aggregatorParagraphClassName } = this.getAggregatorClassNames();
-    let counts = { Agree: 0, Unsure: 0, Disagree: 0 };
+    let counts: Record<string, number> = { Agree: 0, Unsure: 0, Disagree: 0 };
     let total = 0;
-    parsedResponses.forEach((resp) => {
+    parsedResponses.forEach((resp: any) => {
       if (resp && resp.answer && resp.answer.value) {
         const val = resp.answer.value;
         if (['Agree', 'Unsure', 'Disagree'].includes(val)) {
@@ -476,7 +478,7 @@ class SingleQuestionResponse extends Component {
         </div>
       );
     }
-    const percent = (num) => ((num / total) * 100).toFixed(2);
+    const percent = (num: any) => ((num / total) * 100).toFixed(2);
 
     return (
       <div className={aggregatorContainerClassName}>
@@ -498,10 +500,10 @@ class SingleQuestionResponse extends Component {
   };
 
   // For aggregator rating
-  renderRatingAggregator = (parsedResponses) => {
+  renderRatingAggregator: any = (parsedResponses: any) => {
     const { aggregatorContainerClassName, aggregatorParagraphClassName } = this.getAggregatorClassNames();
-    const values = [];
-    parsedResponses.forEach((resp) => {
+    const values: any[] = [];
+    parsedResponses.forEach((resp: any) => {
       const ratingValue = normalizeRatingValue(resp?.answer?.value, null);
       if (ratingValue !== null) values.push(ratingValue);
     });
@@ -512,9 +514,9 @@ class SingleQuestionResponse extends Component {
         </div>
       );
     }
-    const sum = values.reduce((acc, v) => acc + v, 0);
+    const sum = values.reduce((acc: any, v: any) => acc + v, 0);
     const avg = sum / values.length;
-    const sorted = [...values].sort((a, b) => a - b);
+    const sorted = [...values].sort((a: any, b: any) => a - b);
     let median = 0;
     const mid = Math.floor(sorted.length / 2);
     if (sorted.length % 2 === 0) {
@@ -536,7 +538,7 @@ class SingleQuestionResponse extends Component {
   };
 
   // For aggregator multichoice (UPDATED: robust option detection + group-aware cache)
-  renderMultichoiceAggregator = (parsedResponses, aggregatorQuestion) => {
+  renderMultichoiceAggregator: any = (parsedResponses: any, aggregatorQuestion: any) => {
     const { aggregatorContainerClassName, aggregatorParagraphClassName } = this.getAggregatorClassNames();
     // Prefer options on the object; otherwise consult caches
     let allOptions = this.extractOptionsFromCandidate(aggregatorQuestion);
@@ -546,17 +548,17 @@ class SingleQuestionResponse extends Component {
 
     // If still no options, derive them from the answers so we can show *something*
     if (!allOptions.length) {
-      const deriveLabel = (choice) => {
+      const deriveLabel = (choice: any) => {
         if (typeof choice === 'string') return choice;
         if (!choice || typeof choice !== 'object') return '';
         return choice.label ?? choice.text ?? choice.name ?? choice.value ?? '';
       };
-      const bag = new Set();
-      (parsedResponses || []).forEach((resp) => {
+      const bag: any = new Set();
+      (parsedResponses || []).forEach((resp: any) => {
         if (!resp?.answer || resp.answer.encrypted) return;
         const v = resp.answer.value;
         const arr = Array.isArray(v) ? v : (v != null ? [v] : []);
-        arr.map(deriveLabel).map((s) => String(s).trim()).filter(Boolean).forEach((s) => bag.add(s));
+        arr.map(deriveLabel).map((s: any) => String(s).trim()).filter(Boolean).forEach((s: any) => bag.add(s));
       });
       allOptions = Array.from(bag);
     }
@@ -572,19 +574,19 @@ class SingleQuestionResponse extends Component {
     }
 
     // Canonicalize labels for case-insensitive matching while preserving display casing
-    const canon = (s) => String(s).trim().toLowerCase();
-    const displayByKey = {};
-    allOptions.forEach((opt) => {
+    const canon = (s: any) => String(s).trim().toLowerCase();
+    const displayByKey: Record<string, any> = {};
+    allOptions.forEach((opt: any) => {
       const label = String(opt || '').trim();
       if (!label) return;
       const k = canon(label);
       if (!(k in displayByKey)) displayByKey[k] = label; // first one wins
     });
 
-    const counts = {};
-    Object.values(displayByKey).forEach((label) => { counts[label] = 0; });
+    const counts: Record<string, any> = {};
+    Object.values(displayByKey).forEach((label: any) => { counts[label] = 0; });
 
-    const labelFromChoice = (x) => {
+    const labelFromChoice = (x: any) => {
       if (typeof x === 'string') return x;
       if (!x || typeof x !== 'object') return '';
       return x.label ?? x.text ?? x.name ?? x.value ?? '';
@@ -592,13 +594,13 @@ class SingleQuestionResponse extends Component {
 
     let totalResponders = 0;
 
-    (parsedResponses || []).forEach((resp) => {
+    (parsedResponses || []).forEach((resp: any) => {
       if (!resp?.answer || resp.answer.encrypted) return;
       const v = resp.answer.value;
 
       // Collect this responder’s unique picks (no double-counting same label)
-      const picks = new Set();
-      const addPick = (raw) => {
+      const picks: any = new Set();
+      const addPick = (raw: any) => {
         const lbl = String(labelFromChoice(raw)).trim();
         if (!lbl) return;
         const key = canon(lbl);
@@ -613,7 +615,7 @@ class SingleQuestionResponse extends Component {
 
       if (picks.size > 0) {
         totalResponders += 1;
-        picks.forEach((disp) => { counts[disp] += 1; });
+        picks.forEach((disp: any) => { counts[disp] += 1; });
       }
     });
 
@@ -624,14 +626,14 @@ class SingleQuestionResponse extends Component {
         </div>
       );
     }
-    const percent = (num) => ((num / totalResponders) * 100).toFixed(2);
+    const percent = (num: any) => ((num / totalResponders) * 100).toFixed(2);
 
     return (
       <div className={aggregatorContainerClassName}>
         <p className={aggregatorParagraphClassName}>
           {totalResponders} total responders to this multichoice question.
         </p>
-        {Object.values(displayByKey).map((label) => (
+        {Object.values(displayByKey).map((label: any) => (
           <div key={label} className={styles.multiChoiceOption}>
             <span className={styles.optionLabel}>{label}</span>
             <span className={styles.optionStats}>
@@ -644,7 +646,7 @@ class SingleQuestionResponse extends Component {
   };
 
   /* Tiny helper: accept string or object; return true only for CEK envelope */
-  isEnvelopeAesGcm256 = (encryptedPortion) => {
+  isEnvelopeAesGcm256: any = (encryptedPortion: any) => {
     try {
       const env = typeof encryptedPortion === 'string'
         ? JSON.parse(encryptedPortion)
@@ -660,7 +662,7 @@ class SingleQuestionResponse extends Component {
    * delegate to the parent onDecryptQuestion(question.id, field). For mini/profile views,
    * redirect to the full question page instead of decrypting in-place.
    */
-  handleDecryptClick = (field) => {
+  handleDecryptClick: any = (field: any) => {
     const {
       question,
       response,
@@ -706,7 +708,7 @@ class SingleQuestionResponse extends Component {
     } catch (e) { questionLog.warn('SingleQuestionResponse: fallback', e); }
   };
 
-  handlePromptReloadClick = () => {
+  handlePromptReloadClick: any = () => {
     const { question, onReloadQuestionPrompt } = this.props;
     if (!question?.id || typeof onReloadQuestionPrompt !== 'function') return;
     try {
@@ -715,16 +717,16 @@ class SingleQuestionResponse extends Component {
   };
 
 
-  toggleMiniExpand = () => {
-    this.setState((prev) => ({ miniExpanded: !prev.miniExpanded }));
+  toggleMiniExpand: any = () => {
+    this.setState((prev: any) => ({ miniExpanded: !prev.miniExpanded }));
   };
 
   /** Pick a stable id for cache lookups */
-  getQuestionId = (q) =>
+  getQuestionId: any = (q: any) =>
     q?.id ?? q?._id ?? q?.questionId ?? q?.uuid ?? q?.key ?? q?.slug ?? '';
 
   /** Resolve active session slug ('' = general) from canonical session props. */
-  resolveGroupSlug = () => {
+  resolveGroupSlug: any = () => {
     const fromPath = resolveSessionSlugFromPathname(
       (typeof window !== 'undefined' && window.location?.pathname) ? window.location.pathname : ''
     );
@@ -739,7 +741,7 @@ class SingleQuestionResponse extends Component {
   };
 
   /** Read the per-group questions map from cache mirror using the canonical string network ID. */
-  readQuestionsMapFromGroupCache = () => {
+  readQuestionsMapFromGroupCache: any = () => {
     const memoKey = `group:${this.getQuestionLookupContextKey()}`;
     if (this._questionsMapMemo.key === memoKey && this._questionsMapMemo.value) {
       return this._questionsMapMemo.value;
@@ -755,7 +757,7 @@ class SingleQuestionResponse extends Component {
     let parsed = peekCacheSync('questionsCache', slug, { clone: false });
     if (!parsed || typeof parsed !== 'object') {
       const generalEntry = listNamespaceEntriesSync('questionsCache', { cloneValues: false })
-        .find((entry) => String(entry?.slug || '') === '');
+        .find((entry: any) => String(entry?.slug || '') === '');
       parsed = (generalEntry && typeof generalEntry.value === 'object') ? generalEntry.value : null;
       if (!parsed || typeof parsed !== 'object') return {};
     }
@@ -763,7 +765,7 @@ class SingleQuestionResponse extends Component {
     // Prefer exact network; otherwise fall back to the first network that has questions
     let bag = (netIdStr && parsed?.[netIdStr]?.questions) ? parsed[netIdStr].questions : null;
     if (!bag) {
-      const firstKey = Object.keys(parsed || {}).find(k => parsed[k]?.questions);
+      const firstKey = Object.keys(parsed || {}).find((k: any) => parsed[k]?.questions);
       bag = firstKey ? parsed[firstKey].questions : null;
     }
     const result = bag || {};
@@ -772,7 +774,7 @@ class SingleQuestionResponse extends Component {
   };
 
   /** Normalize any "options" shape into a string array (deduped, trimmed) */
-  extractOptionsFromCandidate = (candidate) => {
+  extractOptionsFromCandidate: any = (candidate: any) => {
     if (!candidate) return [];
 
     const raw =
@@ -787,7 +789,7 @@ class SingleQuestionResponse extends Component {
       candidate.optionsMap ??
       candidate.options_by_id;
 
-    const toLabel = (x) => {
+    const toLabel = (x: any) => {
       if (typeof x === 'string') return x;
       if (!x || typeof x !== 'object') return '';
       return (
@@ -800,7 +802,7 @@ class SingleQuestionResponse extends Component {
       );
     };
 
-    let arr = [];
+    let arr: any[] = [];
     if (Array.isArray(raw)) {
       arr = raw.map(toLabel);
     } else if (raw && typeof raw === 'object') {
@@ -808,16 +810,16 @@ class SingleQuestionResponse extends Component {
       arr = Object.values(raw).map(toLabel);
     }
 
-    const seen = new Set();
+    const seen: any = new Set();
     return arr
       .map(String)
-      .map((s) => s.trim())
+      .map((s: any) => s.trim())
       .filter(Boolean)
-      .filter((s) => (seen.has(s) ? false : (seen.add(s), true)));
+      .filter((s: any) => (seen.has(s) ? false : (seen.add(s), true)));
   };
 
   /** Search ALL `dg:questionsCache:<slug>` caches for a question entry by id (lowercased); return first hit. */
-  readQuestionEntryAcrossAllGroups = (idLower) => {
+  readQuestionEntryAcrossAllGroups: any = (idLower: any) => {
     if (!idLower) return null;
     const memoKey = `cross:${idLower}|${this.getQuestionLookupContextKey()}`;
     if (this._crossGroupQuestionMemo.has(memoKey)) {
@@ -830,7 +832,7 @@ class SingleQuestionResponse extends Component {
       this.props?.networkChainId ??
       ''
     );
-    const remember = (value) => {
+    const remember = (value: any) => {
       this._crossGroupQuestionMemo.set(memoKey, value || null);
       this.trimMemoMap(this._crossGroupQuestionMemo, 256);
       return value || null;
@@ -842,7 +844,7 @@ class SingleQuestionResponse extends Component {
         const parsed = (entries[i] && typeof entries[i].value === 'object') ? entries[i].value : null;
         if (!parsed || typeof parsed !== 'object') continue;
 
-        let netObj = null;
+        let netObj: any = null;
         if (netIdStr) {
           netObj = parsed[netIdStr] || null;
         }
@@ -857,7 +859,7 @@ class SingleQuestionResponse extends Component {
         if (direct) return remember(direct);
 
         // Defensive: tolerate unexpected casing by scanning keys
-        const hitKey = Object.keys(qMap).find(qk => String(qk || '').toLowerCase() === idLower);
+        const hitKey = Object.keys(qMap).find((qk: any) => String(qk || '').toLowerCase() === idLower);
         if (hitKey) return remember(qMap[hitKey]);
       }
     } catch (e) { questionLog.warn('SingleQuestionResponse: fallback', e); }
@@ -866,7 +868,7 @@ class SingleQuestionResponse extends Component {
   };
 
   /** Resolve multichoice options by checking inline, then caches, then storage (group-aware questions cache), and finally across all groups. */
-  getMultichoiceOptions = (question) => {
+  getMultichoiceOptions: any = (question: any) => {
     const id = String(this.getQuestionId(question) || '').toLowerCase();
     if (!id) return [];
 
@@ -877,7 +879,7 @@ class SingleQuestionResponse extends Component {
     const memoKey = `options:${id}|${this.getQuestionLookupContextKey()}`;
     const memoHit = this._multichoiceOptionsMemo.get(memoKey);
     if (memoHit) return memoHit;
-    const remember = (options) => {
+    const remember = (options: any) => {
       const normalized = Array.isArray(options) ? options : [];
       this._multichoiceOptionsMemo.set(memoKey, normalized);
       this.trimMemoMap(this._multichoiceOptionsMemo, 256);
@@ -922,7 +924,7 @@ class SingleQuestionResponse extends Component {
     }
 
     // 4) Global runtime caches that might be hydrated elsewhere
-    const w = typeof window !== 'undefined' ? window : undefined;
+    const w: any = typeof window !== 'undefined' ? window : undefined;
     const globals = [
       w?.__SURVEY_CACHE__?.questionsById,
       w?.__SURVEY_CACHE__,
@@ -998,7 +1000,7 @@ class SingleQuestionResponse extends Component {
       } catch (e) { questionLog.warn('SingleQuestionResponse: fallback', e); }
     };
 
-    const onKeyDown = (e) => {
+    const onKeyDown = (e: any) => {
       const k = e?.key;
       if (k === 'Enter' || k === ' ' || k === 'Spacebar') {
         e.preventDefault();
@@ -1006,14 +1008,14 @@ class SingleQuestionResponse extends Component {
       }
     };
 
-    const stopCardNavigation = (e) => {
+    const stopCardNavigation = (e: any) => {
       e.stopPropagation();
     };
 
     const type = String(question.type || '').toLowerCase();
 
     // Non-interactive affordance by type
-    let affordance = null;
+    let affordance: any = null;
 
     if (type === 'binary') {
       // For binary, we render the row of pills inside the card
@@ -1029,7 +1031,7 @@ class SingleQuestionResponse extends Component {
       const options = this.getMultichoiceOptions(question) || [];
       affordance = options.length ? (
         <div className={styles.readOnlyMultichoice} aria-hidden="true">
-          {options.map((opt, idx) => (
+          {options.map((opt: any, idx: any) => (
             <span key={`${opt}-${idx}`} className={styles.choiceItem}>{opt}</span>
           ))}
         </div>
@@ -1110,7 +1112,7 @@ class SingleQuestionResponse extends Component {
   }
 
 
-  renderSinglePersonView = () => {
+  renderSinglePersonView: any = () => {
     const {
       question,
       response,
@@ -1170,7 +1172,7 @@ class SingleQuestionResponse extends Component {
       userHeldSBTs: this.props.userHeldSBTs,
     });
     const decryptCtaClassName = styles.decryptCta;
-    const wrapCompactDecryptCta = (buttonNode, field = '') => {
+    const wrapCompactDecryptCta = (buttonNode: any, field: any = '') => {
       if (!compactEncryptedAnswerCta || !stackCompactDecryptCta) return buttonNode;
       return (
         <div className={styles.compactDecryptCtaStack} data-ce-decrypt-field={field}>
@@ -1229,7 +1231,7 @@ class SingleQuestionResponse extends Component {
       );
     };
 
-    const wrapMaskedPromptLabel = (content) => {
+    const wrapMaskedPromptLabel = (content: any) => {
       if (!isPromptMasked) return content;
       return (
         <GateTooltip
@@ -1259,7 +1261,7 @@ class SingleQuestionResponse extends Component {
 
     const showFullDetail = mode === 'fullscreen' || miniExpanded;
 
-    let externalLink = null;
+    let externalLink: any = null;
     if (responderAddress && id) {
       externalLink = buildQuestionRoutePath(id, {
         responderAddress,
@@ -1522,26 +1524,26 @@ class SingleQuestionResponse extends Component {
   }
 
   // For single-person display: renders the answer portion by question type (UPDATED for multichoice)
-  renderAnswerByType = (type, value) => {
+  renderAnswerByType: any = (type: any, value: any) => {
     if (value === null || value === undefined || value === '') {
       return <div className={styles.freeformAnswer}>No answer provided.</div>;
     }
 
     switch (type) {
       case 'multichoice': {
-        const toLabel = (x) => {
+        const toLabel = (x: any) => {
           if (typeof x === 'string') return x;
           if (!x || typeof x !== 'object') return '';
           return x.label ?? x.text ?? x.name ?? x.value ?? '';
         };
         const raw = Array.isArray(value) ? value : (value != null ? [value] : []);
-        const labels = raw.map(toLabel).map((s) => String(s).trim()).filter(Boolean);
+        const labels = raw.map(toLabel).map((s: any) => String(s).trim()).filter(Boolean);
         if (!labels.length) {
           return <div className={styles.freeformAnswer}>No answer provided.</div>;
         }
         return (
           <div className={styles.readOnlyMultichoice}>
-            {labels.map((option, idx) => (
+            {labels.map((option: any, idx: any) => (
               <div key={`${option}-${idx}`} className={styles.choiceItem}>
                 {option}
               </div>

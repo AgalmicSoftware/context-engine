@@ -25,7 +25,7 @@ import { Collapse, Modal, ModalHeader, ModalBody } from 'reactstrap';
 import CETooltip from '../Shared/CETooltip';
 
 // NEW IMPORT: for mini question display
-import SingleQuestionResponse from '../SurveyTool/SingleQuestionResponse.jsx';
+import SingleQuestionResponse from '../SurveyTool/SingleQuestionResponse';
 
 import { analyzeUserOpinions } from 'utilities/ai/aiScripts.js';
 import { getEffectiveAiConfig } from 'utilities/ai/aiSettings.js';
