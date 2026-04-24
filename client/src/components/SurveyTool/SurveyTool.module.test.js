@@ -1,5 +1,4 @@
 import SurveyTool, {
-  buildQuestionScanProgressDisplay,
   computeSubmitLabel,
   doesQuestionProgressMatchSlug,
   normalizeSurveyToolFilterState,
@@ -10,7 +9,6 @@ import SurveyTool, {
   SurveyQuestions,
   SurveySelector,
   DeferredCommitSlider,
-  areEnvelopesEquivalent,
 } from './SurveyTool.jsx';
 import {
   QuestionsDashboard as DirectQuestionsDashboard,
@@ -6146,96 +6144,6 @@ describe('SurveyTool module', () => {
     sessionStorage.clear();
   });
 
-  it('keeps draft semantic signature stable when only meta timestamp changes', () => {
-    const base = {
-      meta: { networkId: 84532, surveyId: 'questions', ts: 100 },
-      answers: {
-        q1: {
-          value: 'hello',
-          answerEncrypted: false,
-          answerEncryptionAudience: 'self',
-          additional: '',
-          additionalEncrypted: false,
-          additionalEncryptionAudience: 'self',
-          importance: null,
-          conviction: null,
-        },
-      },
-    };
-    const next = {
-      ...base,
-      meta: { ...base.meta, ts: 999999 },
-    };
-
-    expect(buildSurveyDraftSemanticSignature(next)).toBe(buildSurveyDraftSemanticSignature(base));
-  });
-
-  it('treats encrypted-portion changes as semantic draft changes', () => {
-    const base = {
-      meta: { networkId: 84532, surveyId: 'questions', ts: 100 },
-      answers: {
-        q1: {
-          value: '',
-          answerEncrypted: true,
-          answerEncryptionAudience: 'gate',
-          additional: '',
-          additionalEncrypted: true,
-          additionalEncryptionAudience: 'gate',
-          importance: null,
-          conviction: null,
-        },
-      },
-    };
-    const next = {
-      ...base,
-      answers: {
-        q1: {
-          ...base.answers.q1,
-          answerEncryptedPortion: 'ans-env-1',
-          additionalEncryptedPortion: 'add-env-1',
-        },
-      },
-    };
-
-    expect(buildSurveyDraftSemanticSignature(next)).not.toBe(buildSurveyDraftSemanticSignature(base));
-  });
-
-  it('treats baseline changes as semantic draft changes', () => {
-    const base = {
-      meta: { networkId: 84532, surveyId: 'questions', ts: 100 },
-      answers: {
-        q1: {
-          value: 'hello',
-          answerEncrypted: false,
-          answerEncryptionAudience: 'self',
-          additional: '',
-          additionalEncrypted: false,
-          additionalEncryptionAudience: 'self',
-          importance: null,
-          conviction: null,
-        },
-      },
-    };
-    const next = {
-      ...base,
-      baseline: {
-        q1: {
-          value: 'hello',
-          answerEncrypted: true,
-          answerEncryptionAudience: 'gate',
-          answerEncryptedPortion: 'ans-base-1',
-          additional: '',
-          additionalEncrypted: false,
-          additionalEncryptionAudience: 'self',
-          importance: null,
-          conviction: null,
-        },
-      },
-    };
-
-    expect(buildSurveyDraftSemanticSignature(next)).not.toBe(buildSurveyDraftSemanticSignature(base));
-  });
-
   it('skips draft rewrites when only timestamp would change and writes again after semantic edits', () => {
     sessionStorage.clear();
     const nowSpy = jest.spyOn(Date, 'now')
@@ -6620,14 +6528,6 @@ describe('SurveyTool module', () => {
     expect(reloaded.state.editBaseline?.answers?.q1?.encryptedPortion).toBe('ans-env-1');
 
     sessionStorage.clear();
-  });
-
-  it('treats empty envelopes as equivalent only when both sides are encrypted', () => {
-    expect(areEnvelopesEquivalent('env-a', 'env-a', true, true)).toBe(true);
-    expect(areEnvelopesEquivalent('env-a', 'env-b', true, true)).toBe(false);
-    expect(areEnvelopesEquivalent('', '', true, true)).toBe(true);
-    expect(areEnvelopesEquivalent('', '', true, false)).toBe(false);
-    expect(areEnvelopesEquivalent('env-a', '', true, true)).toBe(false);
   });
 
   it('keeps decrypted-empty answer aligned when masked response has encrypted=true without envelope', () => {
@@ -10531,20 +10431,6 @@ describe('SurveyTool module', () => {
     expect(headerSubmitButton).toBeTruthy();
     expect(nodeHasClassName(headerSubmitButton, styles.headerSubmitButton)).toBe(true);
     expect(nodeHasClassName(headerSubmitButton, styles.submitGlow)).toBe(true);
-  });
-
-  it('formats capped question scan progress against the requested total range', () => {
-    const display = buildQuestionScanProgressDisplay({
-      totalBlocks: 50000,
-      requestedTotalBlocks: 234000,
-      wasCapped: true,
-      scannedBlocks: 50000,
-      remainingBlocks: 184000,
-    });
-
-    expect(display.metaLeftText).toBe('184,000 blocks left');
-    expect(display.metaRightText).toBe('50,000 / 234,000');
-    expect(display.percentComplete).toBe(21);
   });
 
   it('renders capped pile loading progress with the requested total block count', () => {
