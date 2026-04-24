@@ -41,7 +41,6 @@ import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 import { getEffectiveArweaveKey } from '../../utilities/session/resourceKeys.js';
 import { sessionRegistryUtils } from '../../utilities/web3/sessionRegistry.js';
 import { ethers } from 'ethers';
-const sha256: any = require('crypto-js/sha256');
 import AudioSurveyGenerator from './SurveyGenerator/SurveyGenerator';
 import { callAI } from '../../utilities/ai/aiScripts.js';
 import { getEffectiveAiConfig } from '../../utilities/ai/aiSettings.js';
@@ -74,6 +73,7 @@ import { t } from '../../utilities/ui/terminology.js';
 import { canonicalizeLegacySessionAlias } from '../../utilities/session/sessionDemoCompat.js';
 import { chainHttpRpc, chainHttpRpcNoPath, getChainById } from '../../variables/chains.js';
 
+const sha256: any = require('crypto-js/sha256');
 const surveyLog = createLogger('surveys');
 
 
