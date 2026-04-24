@@ -94,6 +94,7 @@ jest.mock('../Shared/AudioInput/AudioInput', () => () => <div data-testid="mock-
 jest.mock('../SBTs/SBTSelector', () => () => <div data-testid="mock-admin-sbt-selector" />);
 
 const AdminPage = require('./AdminPage').default;
+const Arweave = require('arweave');
 
 const renderAdminPage = async ({
   account = ADMIN_ADDRESS,
@@ -1539,7 +1540,7 @@ describe('AdminPage rendered interactions', () => {
 
 describe('AdminPage metadata draft helpers', () => {
   it('does not inject default AI metadata when the source has no ai field and draft is untouched', () => {
-    const { applyAdminMetadataDraft, buildAdminMetadataDraft } = require('./AdminPage.jsx').__adminPageTestUtils;
+    const { applyAdminMetadataDraft, buildAdminMetadataDraft } = require('./AdminPage').__adminPageTestUtils;
     const sourceMetadata = {
       slug: 'legacy-session',
       sessionName: 'Legacy Session',
@@ -1555,7 +1556,7 @@ describe('AdminPage metadata draft helpers', () => {
   });
 
   it('applies AI metadata when the admin changes a model field even if source had no ai', () => {
-    const { applyAdminMetadataDraft, buildAdminMetadataDraft } = require('./AdminPage.jsx').__adminPageTestUtils;
+    const { applyAdminMetadataDraft, buildAdminMetadataDraft } = require('./AdminPage').__adminPageTestUtils;
     const sourceMetadata = { slug: 'legacy-session' };
     const draft = buildAdminMetadataDraft(sourceMetadata);
     draft.aiThinkingProvider = 'anthropic';
@@ -1569,7 +1570,7 @@ describe('AdminPage metadata draft helpers', () => {
   });
 
   it('preserves unknown contract keys through metadata save round-trip', () => {
-    const { buildEditableSessionMetadataPayload } = require('./AdminPage.jsx').__adminPageTestUtils;
+    const { buildEditableSessionMetadataPayload } = require('./AdminPage').__adminPageTestUtils;
     const sessionConfig = {
       slug: 'edge',
       networkChainId: 84532,
