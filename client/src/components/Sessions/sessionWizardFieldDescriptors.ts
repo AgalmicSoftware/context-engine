@@ -1,18 +1,6 @@
-import type { ReactNode } from 'react';
 import { t } from '../../utilities/ui/terminology.js';
 
 type DraftLike = Record<string, unknown>;
-
-export type SessionWizardRenderFieldOptions = {
-  forceShow?: boolean;
-};
-
-export type SessionWizardRenderField = (
-  key: string,
-  value: unknown,
-  path: string[],
-  opts?: SessionWizardRenderFieldOptions
-) => ReactNode;
 
 type SessionWizardFieldVisibilityOptions = {
   forceShow?: boolean;
@@ -46,9 +34,7 @@ const TOP_LEVEL_FIELD_ORDER = [
   'slug',
   'sessionName',
   'sessionInfo',
-  'telegramOnly',
   'sessionHeader',
-  'storageProfile',
   'contracts',
   'blockLimits',
   'sponsored',
@@ -82,10 +68,8 @@ const FIELD_TOOLTIPS: Record<string, string> = {
   slug: 'This becomes the session URL. Leave it unlocked if you want to choose the URL yourself, or lock it to use the generated session ID as a more private link.',
   sessionName: 'The main name people will see for this session across the app.',
   sessionInfo: 'A short description people will see on the session page, cards, and headers.',
-  telegramOnly: 'Marks this session as a Telegram-only session. The web client shows a Telegram-only notice instead of the normal session page, and the Telegram bridge only lists sessions with this flag.',
   corsWorkerUrl: 'Base URL for the worker (AI, transcription, Arweave uploads, faucet).',
   sessionHeader: 'The banner image for this session. Paste an image URL or upload a file.',
-  storageProfile: 'Advanced: choose the session-owned storage profile for documents, context, and media payloads.',
   defaultTags: 'Suggested tags for AI-assisted question tagging. They guide the model, but they do not limit which questions or surveys appear.',
   defaultSbtTags: `Suggested tags for ${t('sbts')} created from this session. Matching tags are prefilled in the Create ${t('sbt')} flow, and you can still change them.`,
   questionsGenPrompt: 'Extra instructions for the AI when it generates questions for this session.',
@@ -113,10 +97,8 @@ const FIELD_LABELS: Record<string, string> = {
   slug: 'URL',
   sessionName: 'Session Name',
   sessionInfo: 'Session Description',
-  telegramOnly: 'Telegram-only session',
   corsWorkerUrl: 'Worker URL',
   sessionHeader: 'Header Image',
-  storageProfile: 'Session Storage',
   defaultTags: 'Default Tag Suggestions',
   defaultFeaturedSBTs: `Default ${t('sbts')}`,
   autoFeatureSBTsBySessionSlug: `Auto-feature Session ${t('sbts')}`,
@@ -140,7 +122,6 @@ export const SESSION_WIZARD_HIDDEN_FIELDS = new Set([
   'perMemberSpendLimits',
   'corsWorkerUrl',
   'fieldEditors',
-  'telegramOnly',
   'sessionInfoEncrypted',
   'networkChainId',
   'rpc',
@@ -168,7 +149,7 @@ export const getSessionWizardFieldTooltip = (path: string[], value: unknown): st
     return 'API key for this provider. Lock to store as Lit-encrypted.';
   }
   if (lastKey === 'rpcUrl' || lastKey === 'rpcUrlsByChainId') {
-    return 'Private RPC endpoint(s) used by worker deploy and runtime. Credential-bearing URLs stay in worker config and are not published to the session registry.';
+    return 'RPC endpoint(s) used by this provider. Required for worker deploy (include key in URL).';
   }
   if (lastKey === 'address') return 'Contract address for this resource.';
   if (lastKey === 'chainId') return 'Chain id for this contract or provider.';

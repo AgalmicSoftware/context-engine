@@ -3202,8 +3202,15 @@ describe('SessionWizard rendered validation', () => {
   });
 
   it('uses noopener noreferrer on every blank-target anchor in the source', () => {
-    const source = fs.readFileSync(require.resolve('./SessionWizard'), 'utf8');
-    const anchors = source.match(/<a[\s\S]*?<\/a>/g) || [];
+    const sourceFiles = [
+      './SessionWizard',
+      './SessionPublishSummary',
+      './SessionWizardModals',
+    ];
+    const anchors = sourceFiles.flatMap((ref) => {
+      const source = fs.readFileSync(require.resolve(ref), 'utf8');
+      return source.match(/<a[\s\S]*?<\/a>/g) || [];
+    });
     const blankTargetAnchors = anchors.filter((anchor) => anchor.includes('target="_blank"'));
 
     expect(blankTargetAnchors.length).toBeGreaterThan(0);

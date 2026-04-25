@@ -4,7 +4,7 @@
 // unblocked while we restore strict typing in smaller, reviewable slices.
 import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { ethers } from 'ethers';
-import { Button, Input, Label, FormGroup, Modal, ModalBody, ModalHeader } from 'reactstrap';
+import { Button, Input, Label, FormGroup } from 'reactstrap';
 import { ReactReduxContext } from 'react-redux';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCaretDown, faCaretUp, faCheck, faCog, faCopy, faExclamationCircle, faExternalLinkAlt, faImage, faQuestionCircle, faRedoAlt, faSpinner, faTimes, faUpload } from '@fortawesome/free-solid-svg-icons';
@@ -16,9 +16,8 @@ import FeaturedSbtField from './FeaturedSbtField';
 import ContractsSection from './ContractsSection';
 import EncryptionPanel from './EncryptionPanel';
 import WorkerPanel, { type WorkerPanelProps } from './WorkerPanel';
-import CreateSBTGroup, { finalizeDeferredCreateSbtDraftUpload } from '../SBTs/CreateSBTGroup';
+import { finalizeDeferredCreateSbtDraftUpload } from '../SBTs/CreateSBTGroup';
 import GateMultiSelectLock from '../Gates/GateMultiSelectLock';
-import { JsonToggleButton, JsonPanel, JsonButtonRow } from '../Shared/Json/JsonControls';
 import { readCompactImageClipboard } from '../Shared/compactImageClipboard.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import {
@@ -129,14 +128,12 @@ import {
   normalizeSponsoredBootstrapFundingContext,
   writeSponsoredBootstrapFundingContext,
 } from '../../utilities/session/sponsoredBootstrapFunding.js';
-import ContractViewer from '../ContractPage/ContractViewer';
 import {
   buildContractsPageHref,
   getContractExplainer,
   getSessionWizardContractModalTriggerTestId,
   getSessionWizardContractRowTestId,
   getSessionWizardContractTooltipTestId,
-  WIZARD_CONTRACT_MODAL_TESTID,
 } from '../ContractPage/contractMetadata.js';
 import { buildContractViewerContracts } from '../ContractPage/contractViewerUtils.js';
 import { normalizeRoutePath as normalizeMainSiteRoutePath } from '../MainSite/routePathHelpers.js';
@@ -145,6 +142,16 @@ import usePendingSbtDrafts, {
   normalizePendingSbtDrafts,
 } from './hooks/usePendingSbtDrafts.js';
 import useSessionSlugState from './hooks/useSessionSlugState.js';
+import SessionMetadataEditor from './SessionMetadataEditor';
+import SessionWizardModals from './SessionWizardModals';
+import SessionPublishSummary from './SessionPublishSummary';
+import {
+  getSessionWizardFieldLabel,
+  getSessionWizardFieldTooltip,
+  getSessionWizardOrderedDraftEntries,
+  shouldHideSessionWizardField,
+  splitSessionWizardDraftEntries,
+} from './sessionWizardFieldDescriptors';
 import {
   clearSessionWizardDraftCache,
   readSessionWizardDraftCache,
@@ -1229,18 +1236,6 @@ const METADATA_FIELD_ORDER = [
   'sessionInfoEncrypted',
   'fieldEditors',
 ];
-const MORE_OPTIONS_FIELDS = new Set([
-  'defaultTags',
-  'defaultSbtTags',
-  'defaultFeaturedSBTs',
-  'autoFeatureSBTsBySessionSlug',
-  'questionsGenPrompt',
-  'defaultFilterState',
-  'sponsoredSbtAddress',
-]);
-const WORKER_ONLY_DRAFT_FIELDS = new Set([
-  'embeddedDeployHelperEnabled',
-]);
 const CONTRACT_LABELS: Record<string, string> = {
   surveys: 'Surveys',
   sbtFactory: `${t('sbt')} Factory`,
@@ -2350,93 +2345,6 @@ const normalizeAiModelForProvider = (modelType, providerValue, modelValue) => {
 };
 const ONCHAIN_FIELD_PATHS = SESSION_WIZARD_ONCHAIN_COMPAT_FIELD_PATHS;
 const ONCHAIN_FIELD_KEYS = new Set(Object.keys(ONCHAIN_FIELD_PATHS));
-// Admin-only lists should move to a post-create admin UI (keep hidden in /new).
-const ADMIN_ONLY_FIELDS = new Set([
-  'HIGHLIGHTED_QUESTION_IDS',
-  'BLOCKED_QUESTION_IDS',
-  'HIGHLIGHTED_SURVEY_IDS',
-  'BLOCKED_SURVEY_IDS',
-  'ignored_SBTs_LIST',
-  'featured_SBTs_LIST',
-]);
-// Future feature: per-member spend limits should stay hidden until enforced per provider.
-const HIDDEN_FIELDS = new Set([
-  'perMemberSpendLimits',
-  'corsWorkerUrl',
-  'fieldEditors',
-  'sessionInfoEncrypted',
-  'networkChainId',
-  'rpc',
-  'sponsored',
-  'arweave',
-  'litCredentials',
-]);
-const ENCRYPTED_FIELD_KEYS = new Set(['encryptedApiKey', 'encryptedJwk', 'encryptedPrivateKey']);
-
-const FIELD_TOOLTIPS = {
-  slug: 'This becomes the session URL. Leave it unlocked if you want to choose the URL yourself, or lock it to use the generated session ID as a more private link.',
-  sessionName: 'The main name people will see for this session across the app.',
-  sessionInfo: 'A short description people will see on the session page, cards, and headers.',
-  corsWorkerUrl: 'Base URL for the worker (AI, transcription, Arweave uploads, faucet).',
-  sessionHeader: 'The banner image for this session. Paste an image URL or upload a file.',
-  defaultTags: 'Suggested tags for AI-assisted question tagging. They guide the model, but they do not limit which questions or surveys appear.',
-  defaultSbtTags: `Suggested tags for ${t('sbts')} created from this session. Matching tags are prefilled in the Create ${t('sbt')} flow, and you can still change them.`,
-  questionsGenPrompt: 'Extra instructions for the AI when it generates questions for this session.',
-  defaultFilterState: 'Advanced: a saved starting state for the question filter UI. Most sessions can leave this alone unless you want the page to open with a specific preset.',
-  defaultFeaturedSBTs: `Manually feature specific ${t('sbtsLower')} for this session. These are surfaced first in ${t('sbt')} selectors and featured session views.`,
-  autoFeatureSBTsBySessionSlug: `Automatically show ${t('sbtsLower')} created for this session in featured Groups areas when their metadata points to this session slug. In list scope, this session can also contribute those ${t('sbtsLower')} to the shared featured strip.`,
-  sponsoredSbtAddress: `Legacy default ${t('sbt')} gate address. Most sessions should configure Privacy & Access instead.`,
-  networkChainId: 'Primary chain id for the session.',
-  contracts: 'Contract addresses + chain ids for this session.',
-  blockLimits: 'Optional start and end limits for indexing this session. Use this when the session should only read activity from a certain block range or time window.',
-  perMemberSpendLimits: 'Reserved for per-member budgeting by resource.',
-  arweave: 'Arweave upload credentials (can be locked).',
-  rpc: 'RPC provider settings for reads.',
-  faucet: 'Testnet faucet signer config (can be locked).',
-  'faucet.rpcUrl': 'RPC endpoint for faucet balance checks + transfers.',
-  'faucet.amountEth': 'ETH amount to send for faucet requests.',
-  'faucet.balanceThresholdEth': 'Max balance eligible for faucet transfers (ETH string).',
-  'faucet.privateKey': 'Private key for the faucet signer. Lock to store as Lit-encrypted.',
-  'faucet.encryptedPrivateKey': 'Lit-encrypted faucet private key (written when the field is locked).',
-  ai: 'AI provider settings and API keys.',
-  litCredentials: 'Lit integration credentials (optional).',
-};
-
-const FIELD_LABELS = {
-  slug: 'URL',
-  sessionName: 'Session Name',
-  sessionInfo: 'Session Description',
-  corsWorkerUrl: 'Worker URL',
-  sessionHeader: 'Header Image',
-  defaultTags: 'Default Tag Suggestions',
-  defaultFeaturedSBTs: `Default ${t('sbts')}`,
-  autoFeatureSBTsBySessionSlug: `Auto-feature Session ${t('sbts')}`,
-  sponsoredSbtAddress: `Sponsored ${t('sbt')} Address`,
-  contracts: 'Smart Contracts',
-  blockLimits: 'Time Limits',
-};
-
-const TOP_LEVEL_FIELD_ORDER = [
-  'networkChainId',
-  'slug',
-  'sessionName',
-  'sessionInfo',
-  'sessionHeader',
-  'contracts',
-  'blockLimits',
-  'sponsored',
-  'faucet',
-  'arweave',
-  'ai',
-  'litCredentials',
-  'defaultTags',
-  'defaultSbtTags',
-  'defaultFeaturedSBTs',
-  'autoFeatureSBTsBySessionSlug',
-  'questionsGenPrompt',
-  'defaultFilterState',
-];
-
 const buildDefaultGateState = (chainId: ChainIdLike): AnyRecord => {
   const gates: AnyRecord = {};
   DEFAULT_GATE_KEYS.forEach((key) => {
@@ -2576,24 +2484,6 @@ const buildEncryptionGate = (index: number): AnyRecord => ({
   sbts: [],
   mode: 'all',
 });
-
-const getFieldTooltip = (path: string[], value: unknown): string => {
-  const keyString = pathKey(path);
-  const lastKey = path[path.length - 1];
-  if (FIELD_TOOLTIPS[keyString]) return FIELD_TOOLTIPS[keyString];
-  if (FIELD_TOOLTIPS[lastKey]) return FIELD_TOOLTIPS[lastKey];
-  if (lastKey === 'apiKey') {
-    return 'API key for this provider. Lock to store as Lit-encrypted.';
-  }
-  if (lastKey === 'rpcUrl' || lastKey === 'rpcUrlsByChainId') {
-    return 'RPC endpoint(s) used by this provider. Required for worker deploy (include key in URL).';
-  }
-  if (lastKey === 'address') return 'Contract address for this resource.';
-  if (lastKey === 'chainId') return 'Chain id for this contract or provider.';
-  if (Array.isArray(value)) return 'List of values for this setting.';
-  if (typeof value === 'boolean') return 'Toggle for this setting.';
-  return `Config value for ${keyString}. See docs/session-registry.md for details.`;
-};
 
 export const resolveSessionWizardSelectorSourceConfig = ({
   activeSessionSlug = '',
@@ -4887,51 +4777,20 @@ const SessionWizard = ({
 
   const renderField = (key, value, path, opts = {}) => {
     const forceShow = !!opts.forceShow;
-    if (!forceShow && path.length === 0 && (ADMIN_ONLY_FIELDS.has(key) || HIDDEN_FIELDS.has(key))) {
-      return null;
-    }
-    if (!forceShow && ENCRYPTED_FIELD_KEYS.has(key)) {
-      return null;
-    }
     const currentPath = [...path, key];
+    if (shouldHideSessionWizardField({
+      forceShow,
+      key,
+      path,
+      currentPath,
+      wizardMode,
+    })) {
+      return null;
+    }
     const keyString = pathKey(currentPath);
     const isSlugField = keyString === 'slug';
     const isNormalMode = wizardMode !== 'advanced';
-    if (!forceShow && isNormalMode && path.length === 0 && (
-      key === 'slug' ||
-      key === 'contracts' ||
-      key === 'blockLimits' ||
-      key === 'faucet' ||
-      key === 'ai' ||
-      key === 'lit'
-    )) {
-      return null;
-    }
-    if (!forceShow && key === 'chainId') {
-      return null;
-    }
-    if (!forceShow && keyString === 'rpc.provider') {
-      return null;
-    }
-    if (!forceShow && keyString === 'ai.models.transcription.rpcUrl') {
-      return null;
-    }
-    if (!forceShow && keyString === 'rpc.providers.path.rpcUrl') {
-      return null;
-    }
-    if (!forceShow && keyString === 'rpc.providers.path.rpcUrlsByChainId') {
-      return null;
-    }
-    if (!forceShow && key === 'litChain') {
-      return null;
-    }
-    if (!forceShow && currentPath.length >= 2 && currentPath[0] === 'ai' && currentPath[1] === 'providers') {
-      return null;
-    }
-    if (!forceShow && keyString === 'faucet.rpcUrl') {
-      return null;
-    }
-    const displayLabel = FIELD_LABELS[keyString] || FIELD_LABELS[key] || key;
+    const displayLabel = getSessionWizardFieldLabel(keyString, key);
     const isSecretPath = isSecretFieldPath(currentPath);
     const canLock = shouldLockable(value) && (!isSecretPath || !workerSecretsEnabled);
     if (!forceShow && isSecretPath && workerSecretsEnabled) return null;
@@ -4988,7 +4847,7 @@ const SessionWizard = ({
       }
     };
     const tooltipId = `gw-tip-${keyString.replace(/[^a-z0-9_-]/gi, '-')}`;
-    const tooltipText = getFieldTooltip(currentPath, value);
+    const tooltipText = getSessionWizardFieldTooltip(currentPath, value);
     const chainName = /chainid$/i.test(keyString) ? getChainName(value) : '';
     const displayLabelText = chainName ? `${displayLabel} (${chainName})` : displayLabel;
     const fieldTooltipControl = renderSessionWizardInfoTooltip({
@@ -7528,14 +7387,10 @@ const SessionWizard = ({
     </FormGroup>
   );
 
-  const orderedDraftEntries = useMemo(() => {
-    const keys = Object.keys(draft || {}).filter((key) => !WORKER_ONLY_DRAFT_FIELDS.has(key));
-    const ordered = [
-      ...TOP_LEVEL_FIELD_ORDER.filter((key) => keys.includes(key)),
-      ...keys.filter((key) => !TOP_LEVEL_FIELD_ORDER.includes(key)),
-    ];
-    return ordered.map((key) => [key, draft[key]]);
-  }, [draft]);
+  const orderedDraftEntries = useMemo(
+    () => getSessionWizardOrderedDraftEntries(draft),
+    [draft]
+  );
 
   const effectiveMetadataUrl = normalizeArweaveUri(manualMetadataUrl) || metadataUrl;
   const effectiveMetadataTxId = parseArweaveTxId(effectiveMetadataUrl);
@@ -7551,37 +7406,10 @@ const SessionWizard = ({
   const hasConfiguredDeployHelperUrl = !!normalizeWorkerAuthUrl(toStr(CLOUDFLARE_DEPLOY_HELPER_URL).trim());
   const shouldShowDeployHelperUrlInput = !isNormalMode || !hasConfiguredDeployHelperUrl;
 
-  const primaryDraftEntries = useMemo(
-    () => orderedDraftEntries.filter(([key]) => !MORE_OPTIONS_FIELDS.has(key) && !(isNormalMode && key === 'blockLimits')),
+  const { primaryEntries: primaryDraftEntries, moreOptionsEntries } = useMemo(
+    () => splitSessionWizardDraftEntries(orderedDraftEntries, isNormalMode),
     [isNormalMode, orderedDraftEntries]
   );
-  const moreOptionsEntries = useMemo(
-    () => orderedDraftEntries.filter(([key]) => MORE_OPTIONS_FIELDS.has(key) || (isNormalMode && key === 'blockLimits')),
-    [isNormalMode, orderedDraftEntries]
-  );
-
-  const renderMoreOptionsSection = () => {
-    if (moreOptionsEntries.length === 0) return null;
-    const toggleLabel = wizardMode === 'advanced' ? 'More options' : 'Optional details';
-    return (
-      <div className={styles.moreOptionsSection}>
-        <button
-          type="button"
-          className={styles.moreOptionsToggle}
-          onClick={() => setMoreOptionsOpen((prev) => !prev)}
-        >
-          {toggleLabel} <FontAwesomeIcon icon={moreOptionsOpen ? faCaretUp : faCaretDown} style={{ marginLeft: 6 }} />
-        </button>
-        {moreOptionsOpen && (
-          <div className={styles.moreOptionsBody}>
-            {moreOptionsEntries.map(([key, value]) => (
-              renderField(key, value, [], isNormalMode && key === 'blockLimits' ? { forceShow: true } : undefined)
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  };
 
   const resolvedWorkerBaseUrl = resolveWorkerBaseUrl();
   const configuredWorkerUrl = normalizeWorkerUrl(toStr(draft.corsWorkerUrl).trim());
@@ -7998,6 +7826,31 @@ const SessionWizard = ({
     }
   }, [hasSponsoredBundleLink, newSessionBannerDismissalContextKey]);
 
+  const sessionMetadataHeaderAccessory = wizardMode === 'advanced' && sessionIdDisplay ? (
+    <span className={styles.sessionIdBadge} title={sessionIdDisplay}>
+      {sessionIdDisplay.length > 14 ? sessionIdDisplay.slice(0, 14) + '…' : sessionIdDisplay}
+      <button
+        type="button"
+        className={styles.iconButton}
+        onClick={handleRegenerateSessionId}
+        title="Generate a new session ID"
+        aria-label="Generate a new session ID"
+      >
+        <FontAwesomeIcon icon={faRedoAlt} spin={isSessionIdRegenerating} />
+      </button>
+      <button type="button" className={styles.iconButton} onClick={handleCopySessionId} title="Copy session ID" aria-label="Copy session ID">
+        <FontAwesomeIcon icon={faCopy} />
+      </button>
+      {renderSessionWizardInfoTooltip({
+        id: 'gw-session-id',
+        content: 'On-chain session identifier. Use with /admin?sessionId=<uuid>&chainId=<id>.',
+        placement: 'bottom',
+        testId: 'ce-wizard-tooltip-gw-session-id',
+        ariaLabel: 'Session ID info',
+      })}
+    </span>
+  ) : null;
+
   return (
     <div className={styles.groupWizard}>
       <header className={styles.header}>
@@ -8210,104 +8063,23 @@ const SessionWizard = ({
       )}
 
       {(!isNormalMode || !collapsedSections.metadata) && (
-      <section id="session-wizard-section-metadata" className={styles.panel}>
-        {wizardMode === 'advanced' && (
-          <div className={styles.panelHeaderRow}>
-            <button
-              type="button"
-              className={styles.panelHeader}
-              onClick={() => toggleSection('metadata')}
-              data-testid={E2E_TESTIDS.WIZARD_METADATA_PANEL_TOGGLE}
-            >
-              <span className={styles.panelTitle}>Session Information</span>
-              <FontAwesomeIcon icon={collapsedSections.metadata ? faCaretDown : faCaretUp} />
-            </button>
-            {sessionIdDisplay && (
-              <span className={styles.sessionIdBadge} title={sessionIdDisplay}>
-                {sessionIdDisplay.length > 14 ? sessionIdDisplay.slice(0, 14) + '…' : sessionIdDisplay}
-                <button
-                  type="button"
-                  className={styles.iconButton}
-                  onClick={handleRegenerateSessionId}
-                  title="Generate a new session ID"
-                  aria-label="Generate a new session ID"
-                >
-                  <FontAwesomeIcon icon={faRedoAlt} spin={isSessionIdRegenerating} />
-                </button>
-                <button type="button" className={styles.iconButton} onClick={handleCopySessionId} title="Copy session ID" aria-label="Copy session ID">
-                  <FontAwesomeIcon icon={faCopy} />
-                </button>
-                {renderSessionWizardInfoTooltip({
-                  id: 'gw-session-id',
-                  content: 'On-chain session identifier. Use with /admin?sessionId=<uuid>&chainId=<id>.',
-                  placement: 'bottom',
-                  testId: 'ce-wizard-tooltip-gw-session-id',
-                  ariaLabel: 'Session ID info',
-                })}
-              </span>
-            )}
-          </div>
-        )}
-        {(isNormalMode || !collapsedSections.metadata) && (
-          <div className={styles.panelBody}>
-            <div className={styles.objectBody}>
-              {/* Admin-only lists should be moved to a post-create admin UI. */}
-              {primaryDraftEntries.map(([key, value]) => {
-                if (key === 'blockLimits') return null; // rendered below sessionHeader
-                if (isNormalMode && key === 'sessionName') {
-                  return (
-                    <div key={`${key}-row`} className={styles.sessionIdentityRow}>
-                      <div className={styles.sessionIdentityPrimary}>
-                        {renderField(key, value, [])}
-                      </div>
-                      <div className={styles.sessionIdentitySecondary}>
-                        {renderField('sessionHeader', draft?.sessionHeader ?? '', [])}
-                      </div>
-                    </div>
-                  );
-                }
-                if (isNormalMode && key === 'sessionHeader') {
-                  return (
-                    <React.Fragment key={`${key}-options`}>
-                      {renderMoreOptionsSection()}
-                    </React.Fragment>
-                  );
-                }
-                if (key === 'sessionHeader') {
-                  const blockLimitsValue = draft?.blockLimits;
-                  return (
-                    <React.Fragment key={`${key}-block`}>
-                      {renderField(key, value, [])}
-                      {blockLimitsValue !== undefined && renderField('blockLimits', blockLimitsValue, [])}
-                      {renderMoreOptionsSection()}
-                    </React.Fragment>
-                  );
-                }
-                return renderField(key, value, []);
-              })}
-            </div>
-            {wizardMode === 'advanced' && (
-              <JsonButtonRow>
-                <JsonToggleButton
-                  label="view .json"
-                  active={showJsonPreview}
-                  onClick={() => setShowJsonPreview((prev) => !prev)}
-                  title="Preview session metadata JSON"
-                />
-              </JsonButtonRow>
-            )}
-            {wizardMode === 'advanced' && showJsonPreview && (
-              <JsonPanel
-                onCopy={handleCopyDraftJson}
-                copied={jsonCopied}
-                as="pre"
-              >
-                {JSON.stringify(draft, null, 2)}
-              </JsonPanel>
-            )}
-          </div>
-        )}
-      </section>
+        <SessionMetadataEditor
+          isNormalMode={isNormalMode}
+          wizardMode={wizardMode}
+          isCollapsed={collapsedSections.metadata}
+          onToggleCollapsed={() => toggleSection('metadata')}
+          headerAccessory={sessionMetadataHeaderAccessory}
+          primaryEntries={primaryDraftEntries}
+          moreOptionsEntries={moreOptionsEntries}
+          moreOptionsOpen={moreOptionsOpen}
+          onToggleMoreOptions={() => setMoreOptionsOpen((prev) => !prev)}
+          renderField={renderField}
+          draft={draft}
+          showJsonPreview={showJsonPreview}
+          onToggleJsonPreview={() => setShowJsonPreview((prev) => !prev)}
+          onCopyDraftJson={handleCopyDraftJson}
+          jsonCopied={jsonCopied}
+        />
       )}
 
       {(!isNormalMode || (showNormalModeWorkerStep && !collapsedSections.worker)) && (
@@ -8376,452 +8148,88 @@ const SessionWizard = ({
       )}
 
       {(!isNormalMode || !collapsedSections.publish) && (
-      <section id="session-wizard-section-publish" className={styles.panel}>
-        {wizardMode === 'advanced' && (
-          <button type="button" className={styles.panelHeader} onClick={() => toggleSection('publish')}>
-            <span className={styles.panelTitle}>Publish</span>
-            <FontAwesomeIcon icon={collapsedSections.publish ? faCaretDown : faCaretUp} />
-          </button>
-        )}
-        {(isNormalMode || !collapsedSections.publish) && (
-          <div className={styles.panelBody}>
-            {isNormalMode ? (
-              <div className={styles.publishHero}>
-                <div className={styles.publishSummaryGrid}>
-                  {normalModePublishSummary.map((item) => (
-                    <div key={item.label} className={styles.publishSummaryCard}>
-                      <span className={styles.publishSummaryLabel}>{item.label}</span>
-                      <span className={styles.publishSummaryValue}>{item.value}</span>
-                    </div>
-                  ))}
-                </div>
-                <div className={styles.publishActionCluster}>
-                  <Button
-                    onClick={handlePublish}
-                    className={styles.publishPrimaryButton}
-                    data-testid={E2E_TESTIDS.WIZARD_PUBLISH}
-                    disabled={publishBusy || !canPublishNow}
-                  >
-                    {publishBusy ? (
-                      <>
-                        <FontAwesomeIcon icon={faSpinner} spin /> Publishing…
-                      </>
-                    ) : (
-                      <>
-                        <FontAwesomeIcon icon={faUpload} /> Deploy Session
-                      </>
-                    )}
-                  </Button>
-                  <button
-                    type="button"
-                    className={`${styles.publishSettingsButton} ${publishAdvancedOpen ? styles.publishSettingsButtonActive : ''}`}
-                    onClick={() => setPublishAdvancedOpen((prev) => !prev)}
-                    title="Advanced publish settings"
-                    aria-label="Advanced publish settings"
-                  >
-                    <FontAwesomeIcon icon={faCog} />
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className={styles.publishRow}>
-	                <Button
-	                  onClick={handlePublish}
-	                  className={styles.primaryButton}
-	                  data-testid={E2E_TESTIDS.WIZARD_PUBLISH}
-	                  disabled={publishBusy || !canPublishNow}
-	                >
-                  {publishBusy ? (
-                    <>
-                      <FontAwesomeIcon icon={faSpinner} spin /> Publishing…
-                    </>
-                  ) : (
-                    <>
-                      <FontAwesomeIcon icon={faUpload} /> Publish
-                    </>
-                  )}
-                </Button>
-                <button
-                  type="button"
-                  className={`${styles.iconButton} ${publishAdvancedOpen ? styles.iconButtonActive : ''}`}
-                  onClick={() => setPublishAdvancedOpen((prev) => !prev)}
-                  title="Advanced publish settings"
-                  aria-label="Advanced publish settings"
-                >
-                  <FontAwesomeIcon icon={faCog} />
-                </button>
-              </div>
-            )}
-            {showSponsoredBundleFallbackInput && (
-              <>
-                <FormGroup className={styles.fieldGroup}>
-                  <Label>Manual bundle URL override (optional)</Label>
-                  <Input
-                    type="url"
-                    value={normalModeBundleUrlOverride}
-                    placeholder="https://github.com/<org>/<repo>/releases/download/<tag>/sessionCorsWorker.bundle.js"
-                    data-testid={E2E_TESTIDS.WIZARD_BUNDLE_URL_OVERRIDE}
-                    invalid={!!normalModeBundleUrlOverrideValidationError}
-                    onChange={(e) => setNormalModeBundleUrlOverride(e.target.value)}
-                  />
-                  <div className={styles.helperText}>
-                    {MANUAL_BUNDLE_URL_OVERRIDE_HELP}
-                  </div>
-                  {normalModeBundleUrlOverrideValidationError && (
-                    <div className={styles.errorText}>{normalModeBundleUrlOverrideValidationError}</div>
-                  )}
-                </FormGroup>
-                <FormGroup className={styles.fieldGroup}>
-                  <Label>Worker bundle fallback (optional)</Label>
-                  <div className={styles.bundleFileInputRow}>
-                    <Input
-                      type="file"
-                      accept=".js,.mjs,.txt"
-                      innerRef={sponsoredPublishBundleFileInputRef}
-                      data-testid={E2E_TESTIDS.WIZARD_BUNDLE_FILE_INPUT}
-                      onChange={(e) => {
-                        const file = e.target.files && e.target.files[0];
-                        setBundleFile(file || null);
-                      }}
-                    />
-                    <Button
-                      type="button"
-                      className={styles.secondaryButton}
-                      onClick={clearSelectedBundleFile}
-                      data-testid={E2E_TESTIDS.WIZARD_CLEAR_BUNDLE_FILE_PUBLISH}
-                      disabled={!bundleFile}
-                    >
-                      Clear bundle file
-                    </Button>
-                  </div>
-                  <div className={styles.helperText}>
-                    {SPONSORED_MANUAL_BUNDLE_RETRY_MESSAGE}
-                  </div>
-                  {bundleFile && (
-                    <div className={styles.helperText}>
-                      Using {bundleFile.name || LOCAL_WORKER_BUNDLE_FALLBACK_FILE_PATH} for this publish.
-                    </div>
-                  )}
-                </FormGroup>
-              </>
-            )}
-            {(publishBusy || publishStep > 0) && (
-              <div className={styles.publishProgressCard} data-testid="ce-wizard-publish-progress">
-                <div className={styles.publishProgressHeader}>
-                  <div className={styles.publishProgressCopy}>
-                    <span className={styles.publishProgressEyebrow}>
-                      {publishBusy ? 'Publishing Session' : 'Publish Complete'}
-                    </span>
-                    <strong className={styles.publishProgressStage}>
-                      {activePublishProgressStep?.label || 'Preparing'}
-                    </strong>
-                  </div>
-                  <span className={styles.publishProgressPercent}>{publishProgressPercentRounded}%</span>
-                </div>
-                <div
-                  className={styles.publishProgressBar}
-                  role="progressbar"
-                  aria-valuemin={0}
-                  aria-valuemax={100}
-                  aria-valuenow={publishProgressPercentRounded}
-                  aria-valuetext={`${publishProgressPercentRounded}% ${activePublishProgressStep?.label || 'Preparing'}`}
-                >
-                  <div
-                    className={styles.publishProgressFill}
-                    style={{ width: `${publishProgressPercent}%` }}
-                  />
-                </div>
-                <div className={styles.progressIndicator}>
-                  {publishProgressSteps.map((step, index) => {
-                    const stepNumber = index + 1;
-                    const isActive = publishStep === stepNumber && (publishBusy || step.key !== 'done');
-                    const isComplete = publishStep > stepNumber || (step.key === 'done' && publishStep >= stepNumber);
-                    return (
-                      <div
-                        key={step.key}
-                        className={`${publishStep >= stepNumber ? styles.stepCompleted : styles.step} ${isActive ? styles.stepActive : ''}`}
-                      >
-                        <FontAwesomeIcon
-                          icon={isActive ? faSpinner : isComplete ? faCheck : faExclamationCircle}
-                          spin={isActive}
-                        />
-                        <span>{step.label}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-            {!canPublishNow &&
-              !hasManualMetadata &&
-              !hasUploadedMetadata && (
-              <div className={styles.statusNote}>
-                {uploadBlockedReason}
-              </div>
-            )}
-            {publishAdvancedOpen && (
-              <>
-                <div className={styles.statusNote}>
-                  Arweave upload worker: {resolvedWorkerBaseUrl || 'Not set'} ({workerUrlSource})
-                </div>
-                <FormGroup className={styles.fieldGroup}>
-                  <Label>Manual metadata URI (optional)</Label>
-                  <Input
-                    type="text"
-                    value={manualMetadataUrl}
-                    placeholder="ar://<txId> or https://arweave.net/<txId>"
-                    onChange={(e) => setManualMetadataUrl(e.target.value)}
-                  />
-                </FormGroup>
-                <FormGroup className={styles.fieldGroup}>
-                  <Label className={styles.fieldLabelRow}>
-                    <span>Gas limit override</span>
-                    {renderSessionWizardInfoTooltip({
-                      id: 'gw-tip-gas-limit',
-                      content: 'Optional. Observed gas: createSession ~350k, setSessionFields ~275k (gates vary with count).',
-                      placement: 'right',
-                      testId: 'ce-wizard-worker-tooltip-gw-tip-gas-limit',
-                      ariaLabel: 'Gas limit override info',
-                    })}
-                  </Label>
-                  <Input
-                    type="number"
-                    value={manualGasLimit}
-                    placeholder="1000000"
-                    onChange={(e) => setManualGasLimit(e.target.value)}
-                  />
-                </FormGroup>
-                <FormGroup className={styles.fieldGroup}>
-                  <Label className={styles.fieldLabelRow}>
-                    <span>Gas price override (gwei, legacy)</span>
-                    {renderSessionWizardInfoTooltip({
-                      id: 'gw-tip-gas-price',
-                      content: 'Optional. Forces a legacy gas price (type 0). Some wallets may ignore this on EIP-1559 networks.',
-                      placement: 'right',
-                      testId: 'ce-wizard-worker-tooltip-gw-tip-gas-price',
-                      ariaLabel: 'Gas price override info',
-                    })}
-                  </Label>
-                  <Input
-                    type="number"
-                    step="any"
-                    value={manualGasPriceGwei}
-                    placeholder="(leave blank)"
-                    onChange={(e) => setManualGasPriceGwei(e.target.value)}
-                  />
-                </FormGroup>
-                <FormGroup className={styles.fieldGroup}>
-                  <Label className={styles.fieldLabelRow}>
-                    <span>Max fee per gas (gwei)</span>
-                    {renderSessionWizardInfoTooltip({
-                      id: 'gw-tip-max-fee',
-                      content: 'Optional. EIP-1559 maxFeePerGas override. Use this (and priority fee) to bump a stuck/pending tx when you hit "replacement fee too low". Leave blank to use wallet defaults.',
-                      placement: 'right',
-                      testId: 'ce-wizard-worker-tooltip-gw-tip-max-fee',
-                      ariaLabel: 'Max fee per gas info',
-                    })}
-                  </Label>
-                  <Input
-                    type="number"
-                    step="any"
-                    value={manualMaxFeePerGasGwei}
-                    placeholder="(leave blank)"
-                    onChange={(e) => setManualMaxFeePerGasGwei(e.target.value)}
-                  />
-                </FormGroup>
-                <FormGroup className={styles.fieldGroup}>
-                  <Label className={styles.fieldLabelRow}>
-                    <span>Max priority fee per gas (gwei)</span>
-                    {renderSessionWizardInfoTooltip({
-                      id: 'gw-tip-max-priority',
-                      content: 'Optional. EIP-1559 maxPriorityFeePerGas override (tip). Leave blank to use wallet defaults.',
-                      placement: 'right',
-                      testId: 'ce-wizard-worker-tooltip-gw-tip-max-priority',
-                      ariaLabel: 'Max priority fee per gas info',
-                    })}
-                  </Label>
-                  <Input
-                    type="number"
-                    step="any"
-                    value={manualMaxPriorityFeePerGasGwei}
-                    placeholder="(leave blank)"
-                    onChange={(e) => setManualMaxPriorityFeePerGasGwei(e.target.value)}
-                  />
-                </FormGroup>
-              </>
-            )}
-            {metadataUrl && !manualMetadataUrl && (
-              <div className={styles.linkRow}>
-                <span className={styles.linkLabel}>Metadata URI:</span>
-                <span data-testid={E2E_TESTIDS.WIZARD_METADATA_URI}>{metadataUrl}</span>
-              </div>
-            )}
-            {metadataUrl && manualMetadataUrl && (
-              <div className={styles.linkRow}>
-                <span className={styles.linkLabel}>Uploaded metadata URI:</span>
-                <span data-testid={E2E_TESTIDS.WIZARD_METADATA_URI}>{metadataUrl}</span>
-              </div>
-            )}
-            {manualMetadataUrl && (
-              <div className={styles.linkRow}>
-                <span className={styles.linkLabel}>Manual metadata URI:</span>
-                <span>{normalizeArweaveUri(manualMetadataUrl)}</span>
-              </div>
-            )}
-            {effectiveMetadataTxId && (
-              <div className={styles.linkRow}>
-                <span className={styles.linkLabel}>Arweave tx:</span>
-                <a href={effectiveMetadataGatewayUrl} target="_blank" rel="noopener noreferrer">
-                  {effectiveMetadataGatewayUrl}
-                </a>
-              </div>
-            )}
-            {registerTxs.length > 0 && (
-              <div>
-                <div className={styles.linkRow}>
-                  <span className={styles.linkLabel}>Register txs:</span>
-                  <span>{registerTxs.length}</span>
-                </div>
-	                {registerTxs.map((entry) => {
-	                  const txUrl = registerExplorerBaseUrl
-	                    ? `${registerExplorerBaseUrl}/tx/${entry.hash}`
-	                    : '';
-	                  return (
-	                    <div
-	                      key={entry.hash}
-	                      className={styles.linkRow}
-	                      data-testid={E2E_TESTIDS.WIZARD_REGISTER_TX}
-	                      data-ce-tx-hash={entry.hash}
-	                      data-ce-tx-action={entry.action}
-	                    >
-	                      <span className={styles.linkLabel}>{entry.action}:</span>
-	                      {txUrl ? (
-	                        <a href={txUrl} target="_blank" rel="noopener noreferrer">{txUrl}</a>
-	                      ) : (
-                        <span>{entry.hash}</span>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-            {sessionUrl && (
-              <div className={styles.linkRow}>
-                <span className={styles.linkLabel}>Session URL:</span>
-                <a href={sessionUrl} target="_blank" rel="noopener noreferrer">{sessionUrl}</a>
-              </div>
-            )}
-	            {adminUrl && (
-	              <div className={styles.linkRow}>
-	                <span className={styles.linkLabel}>Admin URL:</span>
-	                <a href={adminUrl} target="_blank" rel="noopener noreferrer" data-testid={E2E_TESTIDS.WIZARD_ADMIN_URL}>{adminUrl}</a>
-	                <Button type="button" size="sm" className={styles.actionButton} onClick={handleCopyAdminUrl}>
-	                  <FontAwesomeIcon icon={faCopy} /> Copy
-	                </Button>
-              </div>
-            )}
-            {adminUrlStatus && <div className={styles.copyStatus}>{adminUrlStatus}</div>}
-            {status && <div className={styles.statusNote}>{status}</div>}
-          </div>
-        )}
-      </section>
+        <SessionPublishSummary
+          isNormalMode={isNormalMode}
+          wizardMode={wizardMode}
+          isCollapsed={collapsedSections.publish}
+          onToggleCollapsed={() => toggleSection('publish')}
+          normalModePublishSummary={normalModePublishSummary}
+          onPublish={handlePublish}
+          publishBusy={publishBusy}
+          canPublishNow={canPublishNow}
+          publishAdvancedOpen={publishAdvancedOpen}
+          onTogglePublishAdvanced={() => setPublishAdvancedOpen((prev) => !prev)}
+          showSponsoredBundleFallbackInput={showSponsoredBundleFallbackInput}
+          normalModeBundleUrlOverride={normalModeBundleUrlOverride}
+          onNormalModeBundleUrlOverrideChange={setNormalModeBundleUrlOverride}
+          normalModeBundleUrlOverrideValidationError={normalModeBundleUrlOverrideValidationError}
+          manualBundleUrlOverrideHelp={MANUAL_BUNDLE_URL_OVERRIDE_HELP}
+          bundleFileInputRef={sponsoredPublishBundleFileInputRef}
+          onBundleFileChange={setBundleFile}
+          onClearBundleFile={clearSelectedBundleFile}
+          bundleFile={bundleFile}
+          localWorkerBundleFallbackFilePath={LOCAL_WORKER_BUNDLE_FALLBACK_FILE_PATH}
+          sponsoredManualBundleRetryMessage={SPONSORED_MANUAL_BUNDLE_RETRY_MESSAGE}
+          showPublishProgress={publishBusy || publishStep > 0}
+          activePublishProgressStepLabel={activePublishProgressStep?.label || 'Preparing'}
+          publishProgressPercent={publishProgressPercent}
+          publishProgressPercentRounded={publishProgressPercentRounded}
+          publishStep={publishStep}
+          publishProgressSteps={publishProgressSteps}
+          uploadBlockedReason={uploadBlockedReason}
+          hasManualMetadata={hasManualMetadata}
+          hasUploadedMetadata={hasUploadedMetadata}
+          renderInfoTooltip={renderSessionWizardInfoTooltip}
+          resolvedWorkerBaseUrl={resolvedWorkerBaseUrl}
+          workerUrlSource={workerUrlSource}
+          manualMetadataUrl={manualMetadataUrl}
+          onManualMetadataUrlChange={setManualMetadataUrl}
+          manualGasLimit={manualGasLimit}
+          onManualGasLimitChange={setManualGasLimit}
+          manualGasPriceGwei={manualGasPriceGwei}
+          onManualGasPriceGweiChange={setManualGasPriceGwei}
+          manualMaxFeePerGasGwei={manualMaxFeePerGasGwei}
+          onManualMaxFeePerGasGweiChange={setManualMaxFeePerGasGwei}
+          manualMaxPriorityFeePerGasGwei={manualMaxPriorityFeePerGasGwei}
+          onManualMaxPriorityFeePerGasGweiChange={setManualMaxPriorityFeePerGasGwei}
+          metadataUrl={metadataUrl}
+          effectiveMetadataTxId={effectiveMetadataTxId}
+          effectiveMetadataGatewayUrl={effectiveMetadataGatewayUrl}
+          registerTxs={registerTxs}
+          registerExplorerBaseUrl={registerExplorerBaseUrl}
+          sessionUrl={sessionUrl}
+          adminUrl={adminUrl}
+          onCopyAdminUrl={handleCopyAdminUrl}
+          adminUrlStatus={adminUrlStatus}
+          status={status}
+          normalizeArweaveUri={normalizeArweaveUri}
+        />
       )}
-      <Modal
-        isOpen={createSbtModalState.open}
-        toggle={closeCreateSbtModal}
-        className={styles.createSbtModal}
-        size="xl"
-        scrollable
-      >
-        <ModalHeader toggle={closeCreateSbtModal} className={styles.createSbtModalHeader}>
-          {`Add ${t('sbt')} to Session`}
-        </ModalHeader>
-        <ModalBody className={styles.createSbtModalBody}>
-          <CreateSBTGroup
-            account={account}
-            provider={provider}
-            network={createSbtModalNetwork}
-            loginComplete={!!account}
-            toggleLoginModal={toggleLoginModal}
-            sessionSlug={createSbtModalSessionSlug}
-            sessionConfigOverride={{
-              ...(draft && typeof draft === 'object' ? draft : {}),
-              slug: createSbtModalSessionSlug,
-              networkChainId: createSbtModalChainId,
-              contracts: (draft && typeof draft.contracts === 'object') ? draft.contracts : {},
-            }}
-            arweaveJwkOverride={createSbtModalArweaveJwkOverride}
-            encryptionGates={encryptionGates.map((gate) => ({
-              id: gate.id,
-              gateId: gate.id,
-              label: gate.label,
-              name: gate.label,
-              color: gate.color,
-              mode: gate.mode,
-              requireAll: gate.mode === 'all',
-              sbtAddresses: normalizeSbtSelection(gate.sbts || []).map((entry) => entry.address),
-              chainId: createSbtModalChainId,
-            }))}
-            defaultGateId={defaultGateId || encryptionGates[0]?.id || ''}
-            defaultSbtTags={draft?.defaultSbtTags || ''}
-            deferredDeploy={true}
-            attemptImmediateDeferredUpload={false}
-            hideNetworkSelector={true}
-            signAdminAction={signBootstrapAdminAction}
-            onSaveDraft={handleSavePendingSbtDraft}
-          />
-        </ModalBody>
-      </Modal>
-      <Modal
-        isOpen={contractViewerModalState.open && !!selectedWizardContract}
-        toggle={closeContractViewerModal}
-        className={styles.contractViewerModal}
-        contentClassName={styles.contractViewerModalContent}
-        centered
-      >
-        <ModalBody
-          className={styles.contractViewerModalBody}
-          data-testid={WIZARD_CONTRACT_MODAL_TESTID}
-        >
-          {selectedWizardContract && (
-            <ContractViewer
-              variant="compact"
-              contracts={[selectedWizardContract]}
-              onClose={closeContractViewerModal}
-              renderSourceHeaderActions={(contract) => (
-                <a
-                  href={selectedWizardContractHref}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={styles.contractViewerFullPageLink}
-                  aria-label={`Open full Contracts page for ${contract.name}`}
-                  title={`Open full Contracts page for ${contract.name}`}
-                  data-testid="ce-wizard-contract-modal-full-link"
-                >
-                  <FontAwesomeIcon icon={faExternalLinkAlt} />
-                  <span>Full page</span>
-                </a>
-              )}
-            />
-          )}
-        </ModalBody>
-      </Modal>
-      <Modal
-        isOpen={sessionHeaderPreviewModalOpen}
-        toggle={() => setSessionHeaderPreviewModalOpen(false)}
-        centered
-        size="xl"
-        contentClassName={styles.sessionHeaderPreviewModalContent}
-      >
-        <ModalBody
-          className={styles.sessionHeaderPreviewModalBody}
-          onClick={() => setSessionHeaderPreviewModalOpen(false)}
-        >
-          {sessionHeaderPreviewSrc && (
-            <img src={sessionHeaderPreviewSrc} alt="Expanded session header preview" />
-          )}
-        </ModalBody>
-      </Modal>
+      <SessionWizardModals
+        account={account}
+        provider={provider}
+        createSbtModalState={createSbtModalState}
+        closeCreateSbtModal={closeCreateSbtModal}
+        createSbtModalNetwork={createSbtModalNetwork}
+        toggleLoginModal={toggleLoginModal}
+        createSbtModalSessionSlug={createSbtModalSessionSlug}
+        draft={draft}
+        createSbtModalChainId={createSbtModalChainId}
+        createSbtModalArweaveJwkOverride={createSbtModalArweaveJwkOverride}
+        encryptionGates={encryptionGates}
+        normalizeSbtSelection={normalizeSbtSelection}
+        defaultGateId={defaultGateId}
+        signBootstrapAdminAction={signBootstrapAdminAction}
+        handleSavePendingSbtDraft={handleSavePendingSbtDraft}
+        contractViewerModalState={contractViewerModalState}
+        selectedWizardContract={selectedWizardContract}
+        closeContractViewerModal={closeContractViewerModal}
+        selectedWizardContractHref={selectedWizardContractHref}
+        sessionHeaderPreviewModalOpen={sessionHeaderPreviewModalOpen}
+        onCloseSessionHeaderPreviewModal={() => setSessionHeaderPreviewModalOpen(false)}
+        sessionHeaderPreviewSrc={sessionHeaderPreviewSrc}
+        t={t}
+      />
     </div>
   );
 };
