@@ -30,7 +30,7 @@ import {
   ENABLE_TARGETED_SBT_METADATA_LOOKUP,
   PREFER_PATH_RPC,
   SHOW_DEMO_SESSIONS,
-} from '../../variables/appConfig.js';
+} from '../../variables/appConfig';
 
 type RuntimeGlobals = Record<string, any>;
 

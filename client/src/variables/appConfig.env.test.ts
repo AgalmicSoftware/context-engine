@@ -1,3 +1,8 @@
+export {};
+
+const processEnv = process.env as Record<string, string | undefined>;
+const runtimeGlobals = globalThis as Record<string, unknown>;
+
 const ENV_KEYS = [
   'REACT_APP_DEFAULT_AUTO_REQUEST_TESTNET_FUNDS',
   'REACT_APP_CE_DEMO_SURFACE_MODE_DEFAULT',
@@ -64,8 +69,8 @@ const RUNTIME_GLOBAL_KEYS = [
   'CE_ARWEAVE_PREFLIGHT_RESPONSE_PAYLOADS',
 ];
 
-const ORIGINAL_ENV = ENV_KEYS.reduce((acc, key) => {
-  acc[key] = process.env[key];
+const ORIGINAL_ENV = ENV_KEYS.reduce<Record<string, string | undefined>>((acc, key) => {
+  acc[key] = processEnv[key];
   return acc;
 }, {});
 
@@ -80,7 +85,7 @@ const clearEnv = () => {
 const clearRuntimeGlobals = () => {
   RUNTIME_GLOBAL_KEYS.forEach((key) => {
     try {
-      delete globalThis[key];
+      delete runtimeGlobals[key];
     } catch (_) {}
   });
 };
@@ -104,7 +109,7 @@ describe('appConfig env-backed config', () => {
         delete process.env[key];
         return;
       }
-      process.env[key] = ORIGINAL_ENV[key];
+      processEnv[key] = ORIGINAL_ENV[key];
     });
   });
 

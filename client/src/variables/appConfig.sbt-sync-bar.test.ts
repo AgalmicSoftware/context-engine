@@ -1,8 +1,11 @@
+export {};
+
 const GLOBAL_KEY = 'CE_SBT_SYNC_BAR_RESEARCH_BLOCK_STEP';
+const runtimeGlobals = globalThis as Record<string, unknown>;
 
 const clearGlobal = () => {
   try {
-    delete globalThis[GLOBAL_KEY];
+    delete runtimeGlobals[GLOBAL_KEY];
   } catch (_) {}
 };
 
@@ -22,16 +25,16 @@ describe('appConfig SBT sync bar research step boot defaults', () => {
       require('./appConfig.js');
     });
 
-    expect(globalThis[GLOBAL_KEY]).toBe(50);
+    expect(runtimeGlobals[GLOBAL_KEY]).toBe(50);
   });
 
   it('preserves an explicit runtime override', () => {
-    globalThis[GLOBAL_KEY] = 75;
+    runtimeGlobals[GLOBAL_KEY] = 75;
 
     jest.isolateModules(() => {
       require('./appConfig.js');
     });
 
-    expect(globalThis[GLOBAL_KEY]).toBe(75);
+    expect(runtimeGlobals[GLOBAL_KEY]).toBe(75);
   });
 });

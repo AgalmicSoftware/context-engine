@@ -1,3 +1,7 @@
+export {};
+
+const processEnv = process.env as Record<string, string | undefined>;
+
 const ENV_KEYS = [
   'REACT_APP_CE_SHARED_WORKER_URL',
   'REACT_APP_CE_DEPLOY_HELPER_URL',
@@ -7,7 +11,7 @@ const ENV_KEYS = [
 ];
 
 const ORIGINAL_ENV = ENV_KEYS.reduce<Record<string, string | undefined>>((acc, key) => {
-  acc[key] = process.env[key];
+  acc[key] = processEnv[key];
   return acc;
 }, {});
 
@@ -39,7 +43,7 @@ describe('publicDeploymentConfig', () => {
         delete process.env[key];
         return;
       }
-      process.env[key] = ORIGINAL_ENV[key];
+      processEnv[key] = ORIGINAL_ENV[key];
     });
   });
 
