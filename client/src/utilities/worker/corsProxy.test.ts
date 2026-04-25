@@ -1,6 +1,5 @@
 import { CLOUDFLARE_CORS_WORKER_URL } from '../../variables/appConfig.js';
 import demoSessions from '../../variables/demo/demo_sessions.json';
-import { normalizeBaseUrl } from '../urlUtils.js';
 import { resolveCorsProxyUrl } from './corsProxy.js';
 import { upsertCachedSessionWorkerConfig } from '../session/sessionWorkerConfigCache.js';
 

@@ -1,3 +1,8 @@
+export {};
+
+const processEnv = process.env as Record<string, string | undefined>;
+const runtimeGlobals = globalThis as Record<string, unknown>;
+
 const ENV_KEYS = [
   'REACT_APP_CE_USE_INFURA_RPC',
   'REACT_APP_CE_RPC_PROVIDER_MODE',
@@ -16,8 +21,8 @@ const GLOBAL_KEYS = [
   'CE_OP_SEPOLIA_PAID_RPC_URL_WSS',
 ];
 
-const ORIGINAL_ENV = ENV_KEYS.reduce((acc, key) => {
-  acc[key] = process.env[key];
+const ORIGINAL_ENV = ENV_KEYS.reduce<Record<string, string | undefined>>((acc, key) => {
+  acc[key] = processEnv[key];
   return acc;
 }, {});
 
@@ -32,7 +37,7 @@ const clearEnv = () => {
 const clearGlobals = () => {
   GLOBAL_KEYS.forEach((key) => {
     try {
-      delete globalThis[key];
+      delete runtimeGlobals[key];
     } catch (_) {}
   });
 };
@@ -56,7 +61,7 @@ describe('chains paid RPC env wiring', () => {
         delete process.env[key];
         return;
       }
-      process.env[key] = ORIGINAL_ENV[key];
+      processEnv[key] = ORIGINAL_ENV[key];
     });
   });
 
