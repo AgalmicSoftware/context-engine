@@ -9,13 +9,13 @@ import {
 } from './sbtPasswordRecoveryStore.js';
 
 const createMemoryStorage = () => {
-  const data = new Map();
+  const data = new Map<string, string>();
   return {
-    getItem: jest.fn((key) => (data.has(key) ? data.get(key) : null)),
-    setItem: jest.fn((key, value) => {
+    getItem: jest.fn((key: string) => (data.has(key) ? data.get(key) || null : null)),
+    setItem: jest.fn((key: string, value: unknown) => {
       data.set(key, String(value));
     }),
-    removeItem: jest.fn((key) => {
+    removeItem: jest.fn((key: string) => {
       data.delete(key);
     }),
   };
@@ -42,7 +42,7 @@ describe('sbtPasswordRecoveryStore', () => {
       expiresAt: now + SBT_PASSWORD_RECOVERY_DEFAULT_TTL_MS,
     }));
 
-    const stored = JSON.parse(storage.getItem(SBT_PASSWORD_RECOVERY_STORAGE_KEY));
+    const stored = JSON.parse(storage.getItem(SBT_PASSWORD_RECOVERY_STORAGE_KEY) || '{}');
     expect(stored).toEqual(expect.objectContaining({
       v: 1,
       kind: SBT_PASSWORD_RECOVERY_KIND,
@@ -144,7 +144,7 @@ describe('sbtPasswordRecoveryStore', () => {
       now,
     })).toEqual(['migrated-code']);
 
-    const stored = JSON.parse(storage.getItem(SBT_PASSWORD_RECOVERY_STORAGE_KEY));
+    const stored = JSON.parse(storage.getItem(SBT_PASSWORD_RECOVERY_STORAGE_KEY) || '{}');
     expect(stored.entries[unknownKey]).toBeUndefined();
     expect(stored.entries[scopedKey]).toEqual(expect.objectContaining({
       chainId: 84532,
