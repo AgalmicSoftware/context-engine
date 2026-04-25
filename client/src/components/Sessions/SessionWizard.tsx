@@ -227,6 +227,12 @@ import {
   normalizeSessionWizardDraftShape as normalizeDraftShape,
 } from './sessionWizardDraftState';
 import {
+  RESOURCE_LABELS,
+  RESOURCE_SECTION_TOOLTIPS,
+  resolveSessionWizardAiModelProviders,
+  resolveSessionWizardResourceSecretFields,
+} from './sessionWizardResourceConfig';
+import {
   buildSessionWizardNewSessionBannerDismissalContextKey,
   isNewSessionWizardPathname,
   readSessionWizardNewSessionBannerDismissed,
@@ -639,48 +645,6 @@ const clearSessionWizardCache = () => {
 const DEFAULT_TEMPLATE: DraftState = buildSessionWizardDefaultTemplate() as DraftState;
 
 export const __test__getSessionWizardDefaultAiSettings = (): AnyRecord => deepClone(DEFAULT_TEMPLATE.ai || {});
-
-const RESOURCE_LABELS = {
-  default: 'DEFAULT',
-  questionResponses: 'QUESTION RESPONSES',
-  surveyResponses: 'SURVEY RESPONSES',
-  docUploads: 'DOC UPLOADS',
-  docUrls: 'DOC URLS',
-  ai: 'AI',
-  arweave: 'ARWEAVE',
-  rpc: 'RPC',
-  txGas: 'TXGAS',
-  lit: 'LIT',
-};
-const RESOURCE_SECTION_TOOLTIPS = Object.freeze({
-  ai: 'Session-funded API keys used for AI inference and transcription.',
-  rpc: 'Authenticated RPC endpoint used by the worker for chain reads and related operations.',
-  arweave: `${t('wallet')} used to pay for Arweave uploads and storage.`,
-  txGas: 'Faucet signer used to send small testnet funding grants.',
-  lit: `Payer ${t('walletLower')} used to sponsor Lit operations for this session.`,
-});
-const RESOURCE_SECRET_FIELDS = {
-  ai: [
-    { key: 'openaiKey', label: 'OpenAI key', type: 'password', required: true },
-  ],
-  rpc: [
-    { key: 'customRpcUrl', label: 'Custom RPC URL', type: 'text', placeholder: 'https://...' },
-    // Intentionally hidden until PATH gateway auth is supported (tracked in PRD 198 / 354).
-    // { key: 'customRpcKey', label: 'Custom RPC key', type: 'password' },
-  ],
-  arweave: [
-    { key: 'arweaveJwk', label: 'Arweave JWK', type: 'textarea', rows: 3, required: true },
-  ],
-  txGas: [
-    { key: 'faucetPrivateKey', label: 'Faucet private key', type: 'password' },
-  ],
-  default: [],
-  lit: [
-    { key: 'litPayerPrivateKey', label: 'Lit payer private key', type: 'password' },
-  ],
-};
-const ANTHROPIC_AI_SECRET_FIELD = { key: 'anthropicKey', label: 'Anthropic key', type: 'password', required: true };
-const OPENROUTER_AI_SECRET_FIELD = { key: 'openrouterKey', label: 'OpenRouter key', type: 'password' };
 
 const pathKey = (path: string[]): string => path.join('.');
 const ONCHAIN_FIELD_PATHS = SESSION_WIZARD_ONCHAIN_COMPAT_FIELD_PATHS;
@@ -4674,19 +4638,8 @@ const SessionWizard = ({
     return normalized.length ? normalized : normalizeOriginList(DEFAULT_WORKER_ALLOWED_ORIGINS);
   };
 
-  const getAiModelProviders = () => {
-    const fastProvider = normalizeAiProvider(draft?.ai?.models?.fast?.provider || 'openai');
-    const thinkingProvider = normalizeAiProvider(draft?.ai?.models?.thinking?.provider || 'openai');
-    return { fastProvider, thinkingProvider };
-  };
-
   const getResourceSecretFields = (resourceKey) => {
-    if (resourceKey !== 'ai') return RESOURCE_SECRET_FIELDS[resourceKey] || [];
-    const { fastProvider, thinkingProvider } = getAiModelProviders();
-    const fields = [...RESOURCE_SECRET_FIELDS.ai];
-    if (fastProvider === 'anthropic' || thinkingProvider === 'anthropic') fields.push(ANTHROPIC_AI_SECRET_FIELD);
-    if (fastProvider === 'openrouter' || thinkingProvider === 'openrouter') fields.push(OPENROUTER_AI_SECRET_FIELD);
-    return fields;
+    return resolveSessionWizardResourceSecretFields(resourceKey, draft?.ai);
   };
 
   const buildSponsoredFlagFields = (secretsSnapshot = getCurrentWorkerSecrets()) => {
@@ -4744,7 +4697,7 @@ const SessionWizard = ({
 
   const getMissingWorkerSecretsForDeploy = (secretsSnapshot = getCurrentWorkerSecrets()) => {
     const missing = [];
-    const { fastProvider, thinkingProvider } = getAiModelProviders();
+    const { fastProvider, thinkingProvider } = resolveSessionWizardAiModelProviders(draft?.ai);
     if ((fastProvider === 'openai' || thinkingProvider === 'openai') && !toStr(secretsSnapshot.openaiKey).trim()) {
       missing.push('OpenAI key');
     }
