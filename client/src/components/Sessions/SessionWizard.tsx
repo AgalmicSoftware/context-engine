@@ -119,7 +119,6 @@ import {
 } from '../ContractPage/contractMetadata.js';
 import { buildContractViewerContracts } from '../ContractPage/contractViewerUtils.js';
 import usePendingSbtDrafts, {
-  clearSessionWizardPendingSbtDraftsCache,
   normalizePendingSbtDrafts,
 } from './hooks/usePendingSbtDrafts.js';
 import useSessionSlugState from './hooks/useSessionSlugState.js';
@@ -242,6 +241,12 @@ import {
   mergeDeep,
 } from './sessionWizardCoreUtils';
 import {
+  clearSessionWizardCache,
+  readSessionWizardCache,
+  useStableSerializedObject,
+  writeSessionWizardCache,
+} from './sessionWizardLocalStateSupport';
+import {
   RESOURCE_LABELS,
   RESOURCE_SECTION_TOOLTIPS,
   resolveSessionWizardAiModelProviders,
@@ -272,11 +277,6 @@ import {
   shouldHideSessionWizardField,
   splitSessionWizardDraftEntries,
 } from './sessionWizardFieldDescriptors';
-import {
-  clearSessionWizardDraftCache,
-  readSessionWizardDraftCache,
-  writeSessionWizardDraftCache,
-} from './sessionWizardDraftCache.js';
 import type {
   AnyRecord,
   ChainIdLike,
@@ -485,46 +485,6 @@ const METADATA_FIELD_ORDER = [
   'sessionInfoEncrypted',
   'fieldEditors',
 ];
-const normalizeStableObjectValue = (value: unknown): AnyRecord => (
-  value && typeof value === 'object' && !Array.isArray(value) ? value : {}
-);
-
-const getStableObjectSignature = (value: AnyRecord = {}): string => {
-  try {
-    return JSON.stringify(normalizeStableObjectValue(value));
-  } catch (_) {
-    return '';
-  }
-};
-
-const useStableSerializedObject = (value: AnyRecord | null | undefined): AnyRecord => {
-  const normalizedValue = normalizeStableObjectValue(value);
-  const signature = getStableObjectSignature(normalizedValue);
-  const stableRef = useRef({ signature, value: normalizedValue });
-  if (stableRef.current.signature !== signature) {
-    stableRef.current = { signature, value: normalizedValue };
-  }
-  return stableRef.current.value;
-};
-
-const readSessionWizardCache = () => {
-  return readSessionWizardDraftCache();
-};
-
-const writeSessionWizardCache = (payload) => {
-  const result = writeSessionWizardDraftCache(payload);
-  if (!result.ok) log.warn('SessionWizard: fallback', result.error || result.status);
-};
-
-const clearSessionWizardCache = () => {
-  const result = clearSessionWizardDraftCache({
-    clearPendingSbtDrafts: clearSessionWizardPendingSbtDraftsCache,
-  });
-  if (!result.ok && result.status !== 'missing-storage') {
-    log.warn('SessionWizard: fallback', result.status);
-  }
-};
-
 const DEFAULT_TEMPLATE: DraftState = buildSessionWizardDefaultTemplate() as DraftState;
 
 export const __test__getSessionWizardDefaultAiSettings = (): AnyRecord => deepClone(DEFAULT_TEMPLATE.ai || {});
