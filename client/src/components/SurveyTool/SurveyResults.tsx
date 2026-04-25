@@ -107,6 +107,34 @@ const LOCAL_STORAGE_POLL_MIN_MS = 2000;
 const LOCAL_STORAGE_POLL_MID_MS = 4000;
 const LOCAL_STORAGE_POLL_MAX_MS = 12000;
 const LOCAL_STORAGE_FORCE_RESCAN_EVERY = 6;
+const EXPORT_TYPES = Object.freeze({
+  CSV_QUESTIONS: 'csv-questions',
+  CSV_QUESTIONS_AND_RESPONSES: 'csv-questions-and-responses',
+  JSON_QUESTIONS: 'json-questions',
+  JSON_QUESTIONS_AND_RESPONSES: 'json-questions-and-responses',
+});
+const EXPORT_TYPE_LABELS: Record<string, string> = Object.freeze({
+  [EXPORT_TYPES.CSV_QUESTIONS]: 'CSV: Questions',
+  [EXPORT_TYPES.CSV_QUESTIONS_AND_RESPONSES]: 'CSV: Questions + Responses',
+  [EXPORT_TYPES.JSON_QUESTIONS]: 'JSON: Questions',
+  [EXPORT_TYPES.JSON_QUESTIONS_AND_RESPONSES]: 'JSON: Questions + Responses',
+});
+const EXPORT_OPTIONS = Object.freeze([
+  { value: EXPORT_TYPES.CSV_QUESTIONS, label: EXPORT_TYPE_LABELS[EXPORT_TYPES.CSV_QUESTIONS] },
+  {
+    value: EXPORT_TYPES.CSV_QUESTIONS_AND_RESPONSES,
+    label: EXPORT_TYPE_LABELS[EXPORT_TYPES.CSV_QUESTIONS_AND_RESPONSES],
+  },
+  { value: EXPORT_TYPES.JSON_QUESTIONS, label: EXPORT_TYPE_LABELS[EXPORT_TYPES.JSON_QUESTIONS] },
+  {
+    value: EXPORT_TYPES.JSON_QUESTIONS_AND_RESPONSES,
+    label: EXPORT_TYPE_LABELS[EXPORT_TYPES.JSON_QUESTIONS_AND_RESPONSES],
+  },
+]);
+
+const getExportTypeLabel = (value: any = '') => (
+  EXPORT_TYPE_LABELS[String(value || '').trim()] || String(value || '').trim()
+);
 
 const scheduleMicrotask = (cb: any) => {
   if (typeof cb !== 'function') return;
@@ -759,7 +787,7 @@ class SurveyResults extends Component<any, any> {
       responses: [],
       sbtFilteredResponses: [],
       csvData: '',
-      exportType: '.csv',
+      exportType: EXPORT_TYPES.CSV_QUESTIONS_AND_RESPONSES,
       alertMessage: '',
       loading: false,
       surveyTitle: '',
@@ -2692,20 +2720,7 @@ const {
   sbtFilteredAggregatorQuestionResponses,
 } = this.state;
 
-const networkQuestions = this.getNetworkQuestionsForCurrentContext();
-const filteredQuestionIDs = Object.keys(sbtFilteredAggregatorQuestionResponses || {});
-const filteredQuestions = filteredQuestionIDs.map((qId: any) => {
-  const normalizedQuestionId = typeof qId === 'string' ? qId.toLowerCase() : qId;
-  const questionData = networkQuestions[normalizedQuestionId] || networkQuestions[qId] || {};
-
-  return {
-    id: questionData.id || qId,
-    prompt: questionData.prompt || '',
-    type: questionData.type || '',
-    tags: Array.isArray(questionData.tags) ? [...questionData.tags] : [],
-    options: Array.isArray(questionData.options) ? [...questionData.options] : [],
-  };
-});
+const filteredQuestions = this.getFilteredQuestionsForExport();
 
 return JSON.stringify(
   {
@@ -2731,17 +2746,121 @@ return JSON.stringify(
 );
 }
 
-getExportBaseFileName: any = () => {
+getFilteredQuestionIdsForExport: any = () => {
+const questionIds: any = new Set();
+
+Object.keys(this.state.sbtFilteredAggregatorQuestionResponses || {}).forEach((qId: any) => {
+  const normalized = String(qId || '').trim().toLowerCase();
+  if (normalized) questionIds.add(normalized);
+});
+
+(this.state.sbtFilteredResponses || []).forEach((response: any) => {
+  const parsedResponse = this.parseResponse(response?.response);
+  const responseRows = Array.isArray(parsedResponse?.responses) ? parsedResponse.responses : [];
+  responseRows.forEach((answer: any) => {
+    const normalized = getResponseQuestionId(answer);
+    if (normalized) questionIds.add(String(normalized).toLowerCase());
+  });
+});
+
+return Array.from(questionIds);
+}
+
+getFilteredQuestionsForExport: any = () => {
+const networkQuestions = this.getNetworkQuestionsForCurrentContext();
+return this.getFilteredQuestionIdsForExport().map((qId: any) => {
+  const normalizedQuestionId = typeof qId === 'string' ? qId.toLowerCase() : qId;
+  const questionData = networkQuestions[normalizedQuestionId] || networkQuestions[qId] || {};
+
+  return {
+    id: questionData.id || qId,
+    prompt: questionData.prompt || '',
+    type: questionData.type || '',
+    tags: Array.isArray(questionData.tags) ? [...questionData.tags] : [],
+    options: Array.isArray(questionData.options) ? [...questionData.options] : [],
+  };
+});
+}
+
+generateQuestionsJSON: any = () => {
+const {
+  viewMode,
+  surveyViewMode,
+  surveyId,
+  surveyTitle,
+  totalQuestionsCount,
+  totalResponsesCount,
+  filteredQuestionsCount,
+  filteredResponsesCount,
+  filterState,
+} = this.state;
+
+return JSON.stringify(
+  {
+    exportedAt: new Date().toISOString(),
+    sessionSlug: this.getEffectiveSlug() || '',
+    viewMode,
+    surveyViewMode,
+    surveyId: surveyId || null,
+    surveyTitle: surveyTitle || '',
+    counts: {
+      totalQuestions: totalQuestionsCount,
+      filteredQuestions: filteredQuestionsCount,
+      totalResponses: totalResponsesCount,
+      filteredResponses: filteredResponsesCount,
+    },
+    filterState: filterState || {},
+    filteredQuestions: this.getFilteredQuestionsForExport(),
+  },
+  null,
+  2
+);
+}
+
+generateQuestionsCSV: any = () => {
+if (!this.props.network || !this.props.network.id) {
+  this.setState({ alertMessage: 'Network not available for fetching question data.' });
+  return '';
+}
+
+const filteredQuestions = this.getFilteredQuestionsForExport();
+if (!filteredQuestions.length) {
+  this.setState({ alertMessage: 'No filtered questions to export.' });
+  return '';
+}
+
+const header = '"questionID","prompt","type","tags","options"\n';
+const csvRows = filteredQuestions.map((question: any) => {
+  const tags = Array.isArray(question?.tags) ? question.tags.join(';') : '';
+  const options = Array.isArray(question?.options) ? question.options.join(';') : '';
+  return [
+    `"${String(question?.id || '').replace(/"/g, '""')}"`,
+    `"${String(question?.prompt || '').replace(/"/g, '""')}"`,
+    `"${String(question?.type || '').replace(/"/g, '""')}"`,
+    `"${String(tags).replace(/"/g, '""')}"`,
+    `"${String(options).replace(/"/g, '""')}"`,
+  ].join(',');
+});
+
+return header + csvRows.join('\n');
+}
+
+getExportBaseFileName: any = (exportType: any = this.state.exportType) => {
 const { viewMode, surveyId } = this.state;
+const questionsOnly =
+  exportType === EXPORT_TYPES.CSV_QUESTIONS ||
+  exportType === EXPORT_TYPES.JSON_QUESTIONS;
 
 if (viewMode === 'survey') {
   const surveyIdShort = surveyId
     ? getShortenedSurveyID(surveyId, false, null, true)
     : 'all';
-  return `contextEngine_surveyResults_${surveyIdShort}`;
+  return questionsOnly
+    ? `contextEngine_surveyQuestions_${surveyIdShort}`
+    : `contextEngine_surveyResults_${surveyIdShort}`;
 }
 
-return 'contextEngine_questionResults';
+return questionsOnly ? 'contextEngine_filteredQuestions' : 'contextEngine_questionResults';
 }
 
 downloadCSV: any = () => {
@@ -2750,15 +2869,25 @@ const timestamp = new Date().toISOString().replace(/[:.-]/g, '_');
 let fileContent = '';
 let filename = '';
 let mimeType = 'text/plain;charset=utf-8;';
-const baseFileName = this.getExportBaseFileName();
+const baseFileName = this.getExportBaseFileName(exportType);
 
 switch (exportType) {
-  case '.csv':
+  case EXPORT_TYPES.CSV_QUESTIONS:
+    fileContent = this.generateQuestionsCSV();
+    filename = `${baseFileName}_${timestamp}.csv`;
+    mimeType = 'text/csv;charset=utf-8;';
+    break;
+  case EXPORT_TYPES.CSV_QUESTIONS_AND_RESPONSES:
     fileContent = this.generateResponsesCSV();
     filename = `${baseFileName}_${timestamp}.csv`;
     mimeType = 'text/csv;charset=utf-8;';
     break;
-  case '.json':
+  case EXPORT_TYPES.JSON_QUESTIONS:
+    fileContent = this.generateQuestionsJSON();
+    filename = `${baseFileName}_${timestamp}.json`;
+    mimeType = 'application/json;charset=utf-8;';
+    break;
+  case EXPORT_TYPES.JSON_QUESTIONS_AND_RESPONSES:
     fileContent = this.generateResultsJSON();
     filename = `${baseFileName}_${timestamp}.json`;
     mimeType = 'application/json;charset=utf-8;';
@@ -2775,7 +2904,10 @@ if (!fileContent || !fileContent.trim()) {
   return;
 }
 
-if (exportType === '.csv' && fileContent.split('\n').length < 2) {
+if (
+  (exportType === EXPORT_TYPES.CSV_QUESTIONS || exportType === EXPORT_TYPES.CSV_QUESTIONS_AND_RESPONSES) &&
+  fileContent.split('\n').length < 2
+) {
   if (!this.state.alertMessage) {
     this.setState({ alertMessage: 'No data available to download for this export type.' });
   }
@@ -5112,16 +5244,15 @@ return (
               </div>
               <div id={styles.exportOptions}>
                 <UncontrolledDropdown direction="down" className={styles.exportDropdownBox}>
-                  <DropdownToggle caret className={styles.exportDropdown}>
-                    {exportType}
+                    <DropdownToggle caret className={styles.exportDropdown}>
+                    {getExportTypeLabel(exportType)}
                   </DropdownToggle>
                   <DropdownMenu>
-                    <DropdownItem onClick={() => this.handleExportTypeChange('.csv')}>
-                      .csv
-                    </DropdownItem>
-                    <DropdownItem onClick={() => this.handleExportTypeChange('.json')}>
-                      .json
-                    </DropdownItem>
+                    {EXPORT_OPTIONS.map((option: any) => (
+                      <DropdownItem key={option.value} onClick={() => this.handleExportTypeChange(option.value)}>
+                        {option.label}
+                      </DropdownItem>
+                    ))}
                   </DropdownMenu>
                 </UncontrolledDropdown>
                 <Button onClick={this.downloadCSV} className={styles.downloadButton}>

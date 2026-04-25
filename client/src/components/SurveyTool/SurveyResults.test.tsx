@@ -3206,7 +3206,7 @@ describe('SurveyResults export/view controls', () => {
       ...subject.state,
       viewMode: 'questions',
       exportAreaOpen: true,
-      exportType: '.csv',
+      exportType: 'csv-questions-and-responses',
       aggregateQuestionResponses: {},
       sbtFilteredAggregatorQuestionResponses: {},
       responses: [],
@@ -3215,10 +3215,10 @@ describe('SurveyResults export/view controls', () => {
 
     const tree = subject.render();
 
-    expect(treeHasText(tree, '.csv')).toBe(true);
-    expect(treeHasText(tree, '.json')).toBe(true);
-    expect(treeHasText(tree, 'CSV (Responses)')).toBe(false);
-    expect(treeHasText(tree, 'CSV (Questions)')).toBe(false);
+    expect(treeHasText(tree, 'CSV: Questions')).toBe(true);
+    expect(treeHasText(tree, 'CSV: Questions + Responses')).toBe(true);
+    expect(treeHasText(tree, 'JSON: Questions')).toBe(true);
+    expect(treeHasText(tree, 'JSON: Questions + Responses')).toBe(true);
     expect(treeHasText(tree, 'Polis Report')).toBe(false);
   });
 
@@ -3423,6 +3423,72 @@ describe('SurveyResults export/view controls', () => {
     expect(typeof exported.exportedAt).toBe('string');
   });
 
+  it('exports question-only JSON without response payloads', () => {
+    const subject = attachStateHarness(createSubject({
+      viewMode: 'questions',
+      sessionSlug: 'edge',
+    }));
+
+    subject.state = {
+      ...subject.state,
+      viewMode: 'questions',
+      surveyTitle: 'Edge Survey',
+      totalQuestionsCount: 3,
+      filteredQuestionsCount: 2,
+      totalResponsesCount: 7,
+      filteredResponsesCount: 4,
+      sbtFilteredAggregatorQuestionResponses: {
+        q1: [{ responder: '0xabc', response: { answer: { value: 'Agree' } } }],
+      },
+      sbtFilteredResponses: [
+        {
+          responder: '0xdef',
+          response: {
+            responses: [{ questionId: 'q2', answer: { value: 'Disagree' } }],
+          },
+        },
+      ],
+    };
+
+    subject.getNetworkQuestionsForCurrentContext = jest.fn(() => ({
+      q1: {
+        id: 'Q1',
+        prompt: 'Prompt One',
+        type: 'binary',
+        tags: ['governance'],
+        options: [],
+      },
+      q2: {
+        id: 'Q2',
+        prompt: 'Prompt Two',
+        type: 'freeform',
+        tags: ['safety'],
+        options: [],
+      },
+    }));
+
+    const exported = JSON.parse(subject.generateQuestionsJSON());
+
+    expect(exported.filteredQuestions).toEqual([
+      {
+        id: 'Q1',
+        prompt: 'Prompt One',
+        type: 'binary',
+        tags: ['governance'],
+        options: [],
+      },
+      {
+        id: 'Q2',
+        prompt: 'Prompt Two',
+        type: 'freeform',
+        tags: ['safety'],
+        options: [],
+      },
+    ]);
+    expect(exported.filteredQuestionResponses).toBeUndefined();
+    expect(exported.filteredResponses).toBeUndefined();
+  });
+
   it('downloads current json exports through the active download path', () => {
     const subject = attachStateHarness(createSubject({
       viewMode: 'questions',
@@ -3431,7 +3497,7 @@ describe('SurveyResults export/view controls', () => {
     subject.state = {
       ...subject.state,
       viewMode: 'questions',
-      exportType: '.json',
+      exportType: 'json-questions-and-responses',
       alertMessage: '',
     };
     subject.getExportBaseFileName = jest.fn(() => 'contextEngine_questionResults');
@@ -3456,6 +3522,55 @@ describe('SurveyResults export/view controls', () => {
     expect(createObjectURLMock).toHaveBeenCalledTimes(1);
     expect(anchor.getAttribute('href')).toBe('blob:test-export');
     expect(anchor.getAttribute('download')).toMatch(/^contextEngine_questionResults_.*\.json$/);
+    expect(anchorClickSpy).toHaveBeenCalledTimes(1);
+    expect(appendChildSpy).toHaveBeenCalledWith(anchor);
+    expect(removeChildSpy).toHaveBeenCalledWith(anchor);
+    expect(subject.state.alertMessage).toBe('');
+
+    createElementSpy.mockRestore();
+    anchorClickSpy.mockRestore();
+    removeChildSpy.mockRestore();
+    appendChildSpy.mockRestore();
+    if (originalCreateObjectURL) {
+      window.URL.createObjectURL = originalCreateObjectURL;
+    } else {
+      delete (window.URL as any).createObjectURL;
+    }
+  });
+
+  it('downloads question-only csv exports through the active download path', () => {
+    const subject = attachStateHarness(createSubject({
+      viewMode: 'questions',
+    }));
+
+    subject.state = {
+      ...subject.state,
+      viewMode: 'questions',
+      exportType: 'csv-questions',
+      alertMessage: '',
+    };
+    subject.getExportBaseFileName = jest.fn(() => 'contextEngine_filteredQuestions');
+    subject.generateQuestionsCSV = jest.fn(() => '"questionID","prompt","type","tags","options"\n"q1","Prompt","binary","",""');
+
+    const originalCreateObjectURL = window.URL.createObjectURL;
+    const createObjectURLMock = jest.fn(() => 'blob:test-export');
+    window.URL.createObjectURL = createObjectURLMock as any;
+    const appendChildSpy = jest.spyOn(document.body, 'appendChild');
+    const removeChildSpy = jest.spyOn(document.body, 'removeChild');
+    const originalCreateElement = document.createElement.bind(document);
+    const anchor = originalCreateElement('a');
+    const anchorClickSpy = jest.spyOn(anchor, 'click').mockImplementation(() => {});
+    const createElementSpy = jest.spyOn(document, 'createElement').mockImplementation(((tagName: any) => (
+      String(tagName).toLowerCase() === 'a' ? anchor : originalCreateElement(tagName)
+    )) as any);
+
+    subject.downloadCSV();
+
+    expect(subject.generateQuestionsCSV).toHaveBeenCalledTimes(1);
+    expect(subject.setState).not.toHaveBeenCalled();
+    expect(createObjectURLMock).toHaveBeenCalledTimes(1);
+    expect(anchor.getAttribute('href')).toBe('blob:test-export');
+    expect(anchor.getAttribute('download')).toMatch(/^contextEngine_filteredQuestions_.*\.csv$/);
     expect(anchorClickSpy).toHaveBeenCalledTimes(1);
     expect(appendChildSpy).toHaveBeenCalledWith(anchor);
     expect(removeChildSpy).toHaveBeenCalledWith(anchor);
