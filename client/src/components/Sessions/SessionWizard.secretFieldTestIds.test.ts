@@ -1,5 +1,5 @@
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
-import { getSessionWizardSecretFieldTestId } from './SessionWizard';
+import { getSessionWizardSecretFieldTestId } from './sessionWizardUiSupport';
 
 describe('SessionWizard secret field test ids', () => {
   it('maps supported worker secret keys to stable E2E test ids', () => {

@@ -255,6 +255,11 @@ import {
   writeSessionWizardNewSessionBannerDismissed,
 } from './sessionWizardRouteState';
 import {
+  getSessionWizardSecretFieldTestId,
+  readSessionWizardTooltipsEnabled,
+  resolveSessionHeaderImageFormat,
+} from './sessionWizardUiSupport';
+import {
   buildSessionWizardWorkerRpcUrlMap,
   getSessionWizardWorkerDeployValidationError,
   resolveFallbackRpcUrl,
@@ -313,6 +318,7 @@ export {
   RESERVED_SESSION_SLUG_ERROR,
   RESERVED_SESSION_SLUGS,
 } from './sessionWizardSlugValidation';
+export { getSessionWizardSecretFieldTestId } from './sessionWizardUiSupport';
 export {
   deploySessionWizardPendingSbtDraft,
   finalizeSessionWizardPendingSbtDraft,
@@ -418,16 +424,6 @@ type MetadataObjectCollapsedState = Record<string, boolean> & {
 type SessionHeaderUploadStatusTone = SessionHeaderFieldProps['sessionHeaderUploadStatusTone'] | string;
 
 const log = createLogger('general');
-
-const readSessionWizardTooltipsEnabled = (reduxStore: AnyRecord | null | undefined): boolean => (
-  reduxStore?.getState?.()?.sessionState?.tooltipsEnabled !== false
-);
-const SESSION_HEADER_IMAGE_MIME_TO_EXT = Object.freeze({
-  'image/png': 'png',
-  'image/jpeg': 'jpeg',
-  'image/jpg': 'jpg',
-  'image/gif': 'gif',
-});
 const LOCAL_WORKER_BUNDLE_BUILD_COMMAND = 'nvm use 20 && npm run worker:bundle';
 const LOCAL_WORKER_BUNDLE_GENERATE_HELP =
   `Run ${LOCAL_WORKER_BUNDLE_BUILD_COMMAND} from the repo root, then choose ${LOCAL_WORKER_BUNDLE_FALLBACK_FILE_PATH}.`;
@@ -443,23 +439,6 @@ const NORMAL_MODE_MISSING_HOSTED_BUNDLE_MESSAGE = (
 const NORMAL_MODE_MANUAL_BUNDLE_RETRY_MESSAGE = (
   `Normal mode still defaults to the GitHub-hosted bundle. Retry with a manual bundle URL or upload a bundle file. ${LOCAL_WORKER_BUNDLE_OPTIONAL_FALLBACK_HELP}`
 );
-const resolveSessionHeaderImageFormat = (fileLike: AnyRecord | File | null | undefined): string => {
-  const fileName = toStr(fileLike?.name).trim().toLowerCase();
-  const fromName = fileName.split('.').pop()?.trim() || '';
-  if (['png', 'jpg', 'jpeg', 'gif'].includes(fromName)) return fromName;
-  const mime = toStr(fileLike?.type).trim().toLowerCase();
-  return (SESSION_HEADER_IMAGE_MIME_TO_EXT as Record<string, string>)[mime] || '';
-};
-export const getSessionWizardSecretFieldTestId = (fieldKey: string): string | undefined => {
-  if (fieldKey === 'openaiKey') return E2E_TESTIDS.WIZARD_SECRET_OPENAI_KEY;
-  if (fieldKey === 'anthropicKey') return E2E_TESTIDS.WIZARD_SECRET_ANTHROPIC_KEY;
-  if (fieldKey === 'openrouterKey') return E2E_TESTIDS.WIZARD_SECRET_OPENROUTER_KEY;
-  if (fieldKey === 'arweaveJwk') return E2E_TESTIDS.WIZARD_SECRET_ARWEAVE_JWK;
-  if (fieldKey === 'faucetPrivateKey') return E2E_TESTIDS.WIZARD_SECRET_FAUCET_PRIVATE_KEY;
-  if (fieldKey === 'litPayerPrivateKey') return E2E_TESTIDS.WIZARD_SECRET_LIT_PAYER_PRIVATE_KEY;
-  if (fieldKey === 'litPayerAddress') return E2E_TESTIDS.WIZARD_SECRET_LIT_PAYER_ADDRESS;
-  return undefined;
-};
 // Normal-mode `/new` should stay bring-your-own-worker until the dedicated
 // shared hosted worker product is implemented.
 const NORMAL_MODE_SHARED_HOSTED_WORKER_ENABLED = false;
