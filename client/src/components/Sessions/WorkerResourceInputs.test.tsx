@@ -1,8 +1,10 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import WorkerResourceInputs from './WorkerResourceInputs';
+import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
 const buildSecretFieldTestId = (fieldKey: string) => `secret-${fieldKey}`;
+const VALID_LIT_PRIVATE_KEY = '0x59c6995e998f97a5a0044976f1d8fa9f2b5f0d2cfc1fd8d7a4ee0f85df9b6f4a';
 
 describe('WorkerResourceInputs', () => {
   it('renders generic resource fields with stable test ids and RPC fallback placeholders', () => {
@@ -17,8 +19,11 @@ describe('WorkerResourceInputs', () => {
         isNormalMode
         showSponsoredFaucetNotice={false}
         effectiveDefaultWorkerRpcUrl="https://rpc.example"
+        walletLabel="Wallet"
         getSecretFieldTestId={buildSecretFieldTestId}
         onUpdateSecret={onUpdateSecret}
+        onGenerateLitPayer={() => {}}
+        onCopyLitPayerAddress={() => {}}
       />
     );
 
@@ -29,59 +34,34 @@ describe('WorkerResourceInputs', () => {
     expect(onUpdateSecret).toHaveBeenCalledWith('customRpcUrl', 'https://rpc.next');
   });
 
-  it('renders only the Chipotle Lit API key field with a stable test id', () => {
-    const onUpdateSecret = jest.fn();
+  it('renders lit payer controls with stable test ids and callbacks', () => {
+    const onGenerateLitPayer = jest.fn();
+    const onCopyLitPayerAddress = jest.fn();
 
     render(
       <WorkerResourceInputs
         resourceKey="lit"
-        fields={[{ key: 'litAccountApiKey', label: 'Lit API key', type: 'password' }]}
-        workerSecrets={{
-          litApiBase: 'https://api.chipotle.litprotocol.com',
-          litGroupId: 'group_123',
-          litPkpId: 'pkp_123',
-          litActionCid: 'bafy123',
-          litAccountApiKey: 'account-secret',
-          litUsageApiKey: 'lit-secret',
-        }}
+        fields={[{ key: 'litPayerPrivateKey', label: 'Private key', type: 'password' }]}
+        workerSecrets={{ litPayerPrivateKey: VALID_LIT_PRIVATE_KEY, litPayerAddress: '' }}
         workerSecretsEnabled
         isNormalMode={false}
         showSponsoredFaucetNotice={false}
         effectiveDefaultWorkerRpcUrl=""
-        getSecretFieldTestId={buildSecretFieldTestId}
-        onUpdateSecret={onUpdateSecret}
-      />
-    );
-
-    expect(screen.getByTestId('secret-litAccountApiKey')).toHaveValue('account-secret');
-    expect(screen.queryByTestId('secret-litApiBase')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('secret-litGroupId')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('secret-litPkpId')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('secret-litActionCid')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('secret-litUsageApiKey')).not.toBeInTheDocument();
-    expect(screen.queryByText(/derives the Lit group, PKP, usage key, and CE action/i)).not.toBeInTheDocument();
-
-    fireEvent.change(screen.getByTestId('secret-litAccountApiKey'), { target: { value: 'lit-next' } });
-    expect(onUpdateSecret).toHaveBeenCalledWith('litAccountApiKey', 'lit-next');
-  });
-
-  it('hides scoped-runtime and legacy payer wallet controls from the simplified Lit card', () => {
-    render(
-      <WorkerResourceInputs
-        resourceKey="lit"
-        fields={[{ key: 'litAccountApiKey', label: 'Lit API key', type: 'password' }]}
-        workerSecrets={{ litUsageApiKey: 'lit-secret', litAccountApiKey: 'account-secret' }}
-        workerSecretsEnabled
-        isNormalMode={false}
-        showSponsoredFaucetNotice={false}
-        effectiveDefaultWorkerRpcUrl=""
+        walletLabel="Wallet"
         getSecretFieldTestId={buildSecretFieldTestId}
         onUpdateSecret={() => {}}
+        onGenerateLitPayer={onGenerateLitPayer}
+        onCopyLitPayerAddress={onCopyLitPayerAddress}
       />
     );
 
-    expect(screen.getByTestId('secret-litAccountApiKey')).toBeInTheDocument();
-    expect(screen.queryByTestId('secret-litUsageApiKey')).not.toBeInTheDocument();
-    expect(screen.queryByDisplayValue(/0x/i)).not.toBeInTheDocument();
+    expect(screen.getByTestId('secret-litPayerPrivateKey')).toBeInTheDocument();
+    expect(screen.getByTestId('secret-litPayerAddress')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Generate' }));
+    expect(onGenerateLitPayer).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_COPY_LIT_PAYER_ADDRESS));
+    expect(onCopyLitPayerAddress).toHaveBeenCalledWith(expect.stringMatching(/^0x[a-fA-F0-9]{40}$/));
   });
 });

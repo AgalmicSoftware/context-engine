@@ -16,8 +16,9 @@ import FeaturedSbtField from './FeaturedSbtField';
 import ContractsSection from './ContractsSection';
 import EncryptionPanel from './EncryptionPanel';
 import WorkerPanel, { type WorkerPanelProps } from './WorkerPanel';
+import WorkerResourceCard from './WorkerResourceCard';
+import WorkerResourceInputs from './WorkerResourceInputs';
 import { finalizeDeferredCreateSbtDraftUpload } from '../SBTs/CreateSBTGroup';
-import GateMultiSelectLock from '../Gates/GateMultiSelectLock';
 import { readCompactImageClipboard } from '../Shared/compactImageClipboard.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import {
@@ -6426,6 +6427,15 @@ const SessionWizard = ({
     }
   };
 
+  const handleGenerateLitPayer = () => {
+    const nextWallet = createLitPayerWallet();
+    applyWorkerSecretsUpdate((prev: WorkerSecretsLike) => ({
+      ...prev,
+      litPayerPrivateKey: nextWallet.privateKey,
+      litPayerAddress: nextWallet.address,
+    }));
+  };
+
   const handleRegenerateSessionId = () => {
     if (slugPinnedByPendingSbtDrafts && privateSlugMode) {
       setSessionIdStatus('Remove queued SBT drafts before changing the session URL.');
@@ -7205,113 +7215,23 @@ const SessionWizard = ({
 
   const renderResourceInputs = (resourceKey: string) => {
     const fields = getResourceSecretFields(resourceKey);
-    if (!fields.length) {
-      return null;
-    }
-    if (resourceKey === 'lit') {
-      const payerPrivateKey = toStr(workerSecrets.litPayerPrivateKey).trim();
-      const hasLitPayerPrivateKey = !!payerPrivateKey;
-      const payerStatus = getLitPayerWalletStatus(payerPrivateKey);
-      const payerAddress = payerStatus.address || toStr(workerSecrets.litPayerAddress).trim();
-      return (
-        <div className={styles.resourceFields}>
-          <div className={styles.litCompactRow}>
-            <FormGroup className={`${styles.resourceInput} ${styles.inlineLabelInput} ${styles.litCompactField}`}>
-              <Label>Private key</Label>
-              <Input
-                type="password"
-                value={workerSecrets.litPayerPrivateKey || ''}
-                placeholder="0x..."
-                onChange={(e) => {
-                  applyWorkerSecretsUpdate((prev: WorkerSecretsLike) => ({
-                    ...prev,
-                    litPayerPrivateKey: e.target.value,
-                  }));
-                }}
-                disabled={!workerSecretsEnabled}
-                data-testid={getSessionWizardSecretFieldTestId('litPayerPrivateKey')}
-              />
-            </FormGroup>
-            <Button
-              type="button"
-              className={styles.secondaryButton}
-              onClick={() => {
-                const nextWallet = createLitPayerWallet();
-                applyWorkerSecretsUpdate((prev: WorkerSecretsLike) => ({
-                  ...prev,
-                  litPayerPrivateKey: nextWallet.privateKey,
-                  litPayerAddress: nextWallet.address,
-                }));
-              }}
-              disabled={!workerSecretsEnabled}
-            >
-              Generate
-            </Button>
-          </div>
-          {hasLitPayerPrivateKey && payerAddress && (
-            <FormGroup className={`${styles.resourceInput} ${styles.inlineLabelInput} ${styles.litCompactField}`}>
-              <Label>{t('wallet')}</Label>
-              <div className={styles.copyFieldRow}>
-                <Input
-                  type="text"
-                  value={payerAddress}
-                  readOnly
-                  data-testid={getSessionWizardSecretFieldTestId('litPayerAddress')}
-                />
-                <Button
-                  type="button"
-                  size="sm"
-                  className={styles.secondaryButton}
-                  onClick={() => handleCopyLitPayerAddress(payerAddress)}
-                  data-testid={E2E_TESTIDS.WIZARD_COPY_LIT_PAYER_ADDRESS}
-                  aria-label="Copy Lit payer address"
-                >
-                  <FontAwesomeIcon icon={faCopy} /> Copy
-                </Button>
-              </div>
-            </FormGroup>
-          )}
-        </div>
-      );
-    }
     return (
-      <div className={styles.resourceInputGrid}>
-        {fields.map((field: AnyRecord) => {
-          const value = workerSecrets[field.key] ?? '';
-          const label = `${field.label}${field.required ? ' *' : ''}`;
-          const isTextarea = field.type === 'textarea';
-          const placeholder = (
-            resourceKey === 'rpc' &&
-            field.key === 'customRpcUrl' &&
-            !toStr(value).trim()
-          )
-            ? (effectiveDefaultWorkerRpcUrl || field.placeholder || '')
-            : (field.placeholder || '');
-          return (
-            <FormGroup key={field.key} className={`${styles.resourceInput} ${!isTextarea ? styles.inlineLabelInput : ''}`}>
-              <Label>{label}</Label>
-              <Input
-                type={isTextarea ? 'textarea' : field.type}
-                rows={isTextarea ? field.rows || 3 : undefined}
-                value={value}
-                placeholder={placeholder}
-                  onChange={(e) => {
-                    const nextValue = e.target.value;
-                    applyWorkerSecretsUpdate((prev: WorkerSecretsLike) => ({ ...prev, [field.key]: nextValue }));
-                  }}
-	                disabled={!workerSecretsEnabled}
-                required={workerSecretsEnabled && field.required}
-                data-testid={getSessionWizardSecretFieldTestId(field.key)}
-              />
-              {!isNormalMode && field.key === 'faucetPrivateKey' && showSponsoredFaucetNotice && (
-                <div className={styles.helperText}>
-                  Faucet funding is currently provided by the sponsored bundle. Enter a private key here to override it.
-                </div>
-              )}
-            </FormGroup>
-          );
-        })}
-      </div>
+      <WorkerResourceInputs
+        resourceKey={resourceKey}
+        fields={fields}
+        workerSecrets={workerSecrets}
+        workerSecretsEnabled={workerSecretsEnabled}
+        isNormalMode={isNormalMode}
+        showSponsoredFaucetNotice={showSponsoredFaucetNotice}
+        effectiveDefaultWorkerRpcUrl={effectiveDefaultWorkerRpcUrl}
+        walletLabel={t('wallet')}
+        getSecretFieldTestId={getSessionWizardSecretFieldTestId}
+        onUpdateSecret={(fieldKey: string, nextValue: string) => {
+          applyWorkerSecretsUpdate((prev: WorkerSecretsLike) => ({ ...prev, [fieldKey]: nextValue }));
+        }}
+        onGenerateLitPayer={handleGenerateLitPayer}
+        onCopyLitPayerAddress={handleCopyLitPayerAddress}
+      />
     );
   };
 
@@ -7322,47 +7242,29 @@ const SessionWizard = ({
     const selectedGateIds = normalizeGateIds(gateId)
       .filter((id) => resourceGateOptionValues.includes(id))
       .filter(Boolean);
-    const resourceTooltipText = RESOURCE_SECTION_TOOLTIPS[resourceKey] || '';
-    const resourceTooltipId = `gw-resource-secret-tip-${resourceKey}`;
     return (
-      <div
+      <WorkerResourceCard
         key={resourceKey}
-        className={styles.gateCard}
-        data-testid={E2E_TESTIDS.WIZARD_RESOURCE_CARD}
-        data-ce-resource-key={resourceKey}
+        resourceKey={resourceKey}
+        label={RESOURCE_LABELS[resourceKey] || resourceKey}
+        tooltipText={RESOURCE_SECTION_TOOLTIPS[resourceKey] || ''}
+        renderInfoTooltip={renderSessionWizardInfoTooltip}
+        gateOptions={gateOptions}
+        selectedGateIds={selectedGateIds}
+        onChangeSelectedGateIds={(nextIds: unknown) => {
+          const nextGateIds = normalizeGateIds(nextIds).filter((id) => resourceGateOptionValues.includes(id));
+          if (!nextGateIds.length) {
+            updateResourceGate(resourceKey, fallbackGateId || '');
+            return;
+          }
+          updateResourceGate(resourceKey, nextGateIds.length === 1 ? nextGateIds[0] : nextGateIds);
+        }}
+        open={openResourceGateKey === resourceKey}
+        onToggleOpen={(nextOpen) => setOpenResourceGateKey(nextOpen ? resourceKey : '')}
+        disabled={resourceGateOptions.length <= 1}
       >
-        <div className={styles.gateHeader}>
-          <div className={styles.gateTitleRow}>
-            <div className={styles.gateTitle}>{RESOURCE_LABELS[resourceKey] || resourceKey}</div>
-            {renderSessionWizardInfoTooltip({
-              id: resourceTooltipId,
-              content: resourceTooltipText,
-              placement: 'right',
-              testId: `ce-wizard-resource-tooltip-${resourceKey}`,
-              ariaLabel: `${RESOURCE_LABELS[resourceKey] || resourceKey} info`,
-            })}
-          </div>
-          <GateMultiSelectLock
-            gateOptions={gateOptions}
-            selectedGateIds={selectedGateIds}
-            onChangeSelectedGateIds={(nextIds: unknown) => {
-              const nextGateIds = normalizeGateIds(nextIds).filter((id) => resourceGateOptionValues.includes(id));
-              if (!nextGateIds.length) {
-                updateResourceGate(resourceKey, fallbackGateId || '');
-                return;
-              }
-              updateResourceGate(resourceKey, nextGateIds.length === 1 ? nextGateIds[0] : nextGateIds);
-            }}
-            open={openResourceGateKey === resourceKey}
-            onToggleOpen={(nextOpen) => setOpenResourceGateKey(nextOpen ? resourceKey : '')}
-            disabled={resourceGateOptions.length <= 1}
-            showDots={false}
-          />
-        </div>
-        <div className={styles.resourceFields}>
-          {renderResourceInputs(resourceKey)}
-        </div>
-      </div>
+        {renderResourceInputs(resourceKey)}
+      </WorkerResourceCard>
     );
   };
 

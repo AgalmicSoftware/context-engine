@@ -3,14 +3,11 @@ import React from 'react';
 import styles from './SessionWizard.module.scss';
 import GateMultiSelectLock from '../Gates/GateMultiSelectLock';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
-import type { SessionWizardTooltipRenderOptions } from './SessionWizardInfoTooltip';
-
-type GateLockProps = React.ComponentProps<typeof GateMultiSelectLock>;
 
 type RenderInfoTooltip = (props: {
   id?: string;
   content?: React.ReactNode;
-  placement?: SessionWizardTooltipRenderOptions['placement'];
+  placement?: string;
   testId?: string;
   ariaLabel?: string;
 }) => React.ReactNode;
@@ -20,11 +17,11 @@ export type WorkerResourceCardProps = {
   label: string;
   tooltipText?: React.ReactNode;
   renderInfoTooltip?: RenderInfoTooltip;
-  gateOptions?: GateLockProps['gateOptions'];
-  selectedGateIds?: GateLockProps['selectedGateIds'];
-  onChangeSelectedGateIds: NonNullable<GateLockProps['onChangeSelectedGateIds']>;
-  open: GateLockProps['open'];
-  onToggleOpen: NonNullable<GateLockProps['onToggleOpen']>;
+  gateOptions?: unknown[];
+  selectedGateIds?: string[];
+  onChangeSelectedGateIds: (nextIds: unknown) => void;
+  open: boolean;
+  onToggleOpen: (nextOpen: boolean) => void;
   disabled: boolean;
   children?: React.ReactNode;
 };
