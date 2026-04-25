@@ -1851,7 +1851,9 @@ class SurveyResults extends Component<any, any> {
     if (viewKey === 'riskMatrix') {
       return (
         <Suspense fallback={<LazyFallback label="Loading Risk Matrix..." minHeight="30vh" />}>
-          <RiskMatrix embedded={true} onOpenAtlasNode={this.handleDemoAtlasOpen} />
+          <div className={styles.demoResultsRiskMatrixSurface}>
+            <RiskMatrix embedded={true} onOpenAtlasNode={this.handleDemoAtlasOpen} />
+          </div>
         </Suspense>
       );
     }
@@ -2468,6 +2470,10 @@ if (this.state.isFilterActive) {
       questionResponses: partialQR,
       totalQuestionsCount: totalQ,
       totalResponsesCount: totalResponseCount,
+      filteredQuestionsCount:
+        typeof this.state.filteredQuestionsCount === 'number'
+          ? Math.min(this.state.filteredQuestionsCount, totalQ)
+          : totalQ,
       // keep the previous filtered count so the header doesn't jump
       filteredResponsesCount:
         typeof this.state.filteredResponsesCount === 'number'
@@ -2492,6 +2498,7 @@ if (this.state.isFilterActive) {
     questionResponses: partialQR,
     totalQuestionsCount: totalQ,
     totalResponsesCount: totalResponseCount,
+    filteredQuestionsCount: totalQ,
     filteredResponsesCount: initialFilteredCount,
     questionResultsHydrated: true
   });
@@ -4762,6 +4769,16 @@ if (viewMode === 'survey') {
       ? filteredQuestionsCount
       : fallbackLen;
 }
+const displayedTotalQuestionsCount = Math.max(0, Number(totalQuestionsCount) || 0);
+const displayedTotalResponsesCount = Math.max(0, Number(totalResponsesCount) || 0);
+const normalizedFilteredQuestionsCount = Math.min(
+  displayedTotalQuestionsCount,
+  Math.max(0, Number(displayedFilteredQuestionsCount) || 0)
+);
+const normalizedFilteredResponsesCount = Math.min(
+  displayedTotalResponsesCount,
+  Math.max(0, Number(filteredResponsesCount) || 0)
+);
 
 // Compact sync status display
 let syncStatusText = '';
@@ -5089,22 +5106,21 @@ return (
 
       <div className={styles.filterSummaryBox}>
         <p className={styles.filterSummaryText}>
-          Questions: <strong>{totalQuestionsCount}</strong> ‎  Filtered:{' '}
+          Questions: <strong>{displayedTotalQuestionsCount}</strong> ‎  Filtered:{' '}
           <strong>
             {filterLoading || !areSummaryCountsHydrated ? (
               <FontAwesomeIcon icon={faSpinner} spin />
             ) : (
-              // Context-aware filtered questions count:
-	              displayedFilteredQuestionsCount
-	            )}
-	          </strong>
+              normalizedFilteredQuestionsCount
+            )}
+          </strong>
           <br />
-          Responses: <strong>{totalResponsesCount}</strong> ‎  Filtered:{' '}
+          Responses: <strong>{displayedTotalResponsesCount}</strong> ‎  Filtered:{' '}
           <strong>
             {filterLoading || !areSummaryCountsHydrated ? (
               <FontAwesomeIcon icon={faSpinner} spin />
             ) : (
-              filteredResponsesCount
+              normalizedFilteredResponsesCount
             )}
           </strong>
         </p>

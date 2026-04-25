@@ -597,6 +597,34 @@ describe('SurveyResults session resolution', () => {
     }
   });
 
+  it('resets stale filtered question counts when unfiltered question results refresh', async () => {
+    const subject = attachStateHarness(createSubject({
+      isOpen: true,
+      viewMode: 'questions',
+    }));
+
+    subject.state = {
+      ...subject.state,
+      viewMode: 'questions',
+      isFilterActive: false,
+      filteredQuestionsCount: 42,
+      filteredResponsesCount: 9,
+      questionResultsHydrated: false,
+    };
+    subject.getScopedQuestionNetworkData = jest.fn().mockResolvedValue({
+      questions: {},
+      questionResponses: {},
+    });
+
+    await subject.fetchQuestionModeResponses();
+
+    expect(subject.state.totalQuestionsCount).toBe(0);
+    expect(subject.state.totalResponsesCount).toBe(0);
+    expect(subject.state.filteredQuestionsCount).toBe(0);
+    expect(subject.state.filteredResponsesCount).toBe(0);
+    expect(subject.state.questionResultsHydrated).toBe(true);
+  });
+
   it('aggregates question-mode reads across list scope on /session routes', async () => {
     const priorUrl = window.location.href;
     window.history.replaceState({}, '', '/session/edge');
@@ -1347,9 +1375,11 @@ describe('SurveyResults module styles', () => {
     expect(scss).toMatch(/\.exportAndFilterContainer\s*{[\s\S]*?background:\s*#f3f5f9;/);
     expect(scss).toMatch(/#questionFilterButton\s*{[\s\S]*?background-color:\s*#1f2733 !important;[\s\S]*?color:\s*#f8fafc !important;/);
     expect(scss).toMatch(/\.filterSummaryBox\s*{[\s\S]*?color:\s*#4b5563;/);
-    expect(scss).toMatch(/\.demoResultsAtlasSurface\s*{[\s\S]*?padding:\s*1rem;/);
-    expect(scss).toMatch(/\.demoResultsAtlasSurface\s*{[\s\S]*?border:\s*1px solid rgba\(19,\s*34,\s*86,\s*0\.2\);/);
-    expect(scss).toMatch(/\.demoResultsAtlasSurface\s*{[^}]*background:\s*[^;]*rgba\(18,\s*28,\s*67,\s*0\.96\)[^;]*rgba\(8,\s*12,\s*28,\s*0\.995\)[^;]*;/);
+    expect(scss).toMatch(/\.demoResultsAtlasSurface,\s*\.demoResultsRiskMatrixSurface\s*{[\s\S]*?padding:\s*1rem;/);
+    expect(scss).toMatch(/\.demoResultsAtlasSurface,\s*\.demoResultsRiskMatrixSurface\s*{[\s\S]*?border:\s*1px solid rgba\(19,\s*34,\s*86,\s*0\.2\);/);
+    expect(scss).toMatch(/\.demoResultsAtlasSurface\s*{[^}]*background:\s*[^;]*linear-gradient\(180deg,[^;]*rgba\(21,\s*31,\s*74,\s*0\.98\)[^;]*rgba\(8,\s*12,\s*28,\s*0\.995\)[^;]*;/);
+    expect(scss).not.toMatch(/\.demoResultsAtlasSurface\s*{[^}]*radial-gradient\(circle at top/);
+    expect(scss).toMatch(/\.demoResultsRiskMatrixSurface\s*{[^}]*background:\s*[^;]*linear-gradient\(180deg,[^;]*rgba\(23,\s*25,\s*65,\s*0\.98\)[^;]*rgba\(9,\s*13,\s*30,\s*0\.995\)[^;]*;/);
   });
 });
 
@@ -2496,6 +2526,44 @@ describe('SurveyResults filter summary counts', () => {
     expect(summaryNode).toBeTruthy();
     expect(spinnerNodes).toHaveLength(2);
   });
+
+  it('clamps stale filtered summary counts so they never exceed the visible totals', () => {
+    const subject = createSubject({
+      isOpen: true,
+      viewMode: 'questions',
+      isQuestionCacheReady: true,
+      isResponsesCacheReady: true,
+    });
+
+    subject.state = {
+      ...subject.state,
+      viewMode: 'questions',
+      totalQuestionsCount: 0,
+      totalResponsesCount: 0,
+      filteredQuestionsCount: 42,
+      filteredResponsesCount: 7,
+      questionResultsHydrated: true,
+      networkLatestBlock: 100,
+      questionLocalBlock: 100,
+      responseLocalBlock: 100,
+      questionResponses: {},
+      aggregatorQuestionResponses: {},
+      sbtFilteredAggregatorQuestionResponses: {},
+    };
+
+    const tree = subject.render();
+    const summaryNode = findElement(
+      tree,
+      (element) =>
+        typeof element?.props?.className === 'string' &&
+        element.props.className.includes('filterSummaryText')
+    );
+    expect(summaryNode).toBeTruthy();
+    expect(treeHasText(summaryNode, 'Questions:')).toBe(true);
+    expect(treeHasText(summaryNode, 'Responses:')).toBe(true);
+    expect(treeHasText(summaryNode, '42')).toBe(false);
+    expect(treeHasText(summaryNode, '7')).toBe(false);
+  });
 });
 
 describe('SurveyResults demo results views', () => {
@@ -2641,6 +2709,7 @@ describe('SurveyResults demo results views', () => {
 
     const riskMatrixView = await screen.findByTestId('surveyresults-demo-risk-matrix-view');
     expect(riskMatrixView).toBeInTheDocument();
+    expect(riskMatrixView.closest(`.${styles.demoResultsRiskMatrixSurface}`)).not.toBeNull();
     expect(subject.state.demoResultsViewMode).toBe('riskMatrix');
 
     fireEvent.click(riskMatrixView);
