@@ -30,7 +30,6 @@ export type PendingSbtDraftLike = AnyRecord & {
   limitedNumber?: number | string;
   adminAddress?: string;
   mintingEndTimeUnix?: number | string;
-  mintModeOnChain?: number | string;
   hasPasswordMintOnChain?: boolean;
   burnAuthEnum?: number | string;
   hashedPasswords?: string[];
@@ -73,7 +72,7 @@ export const normalizeSbtSelection = (value: unknown): SbtSelection[] => {
 };
 
 export const serializeDefaultFeaturedSbtSelections = (
-  value: unknown = []
+  value: unknown[] = []
 ): Array<string | AnyRecord> => {
   const seen = new Set();
   // Keep pending featured selections marked in the cached draft so a refresh can
@@ -98,7 +97,7 @@ export const serializeDefaultFeaturedSbtSelections = (
     .filter(Boolean) as Array<string | AnyRecord>;
 };
 
-export const dedupeSbtSelection = (value: unknown = []): SbtSelection[] => {
+export const dedupeSbtSelection = (value: unknown[] = []): SbtSelection[] => {
   const seen = new Set();
   return normalizeSbtSelection(value).filter((entry) => {
     const address = toStr(entry?.address).trim();
@@ -141,8 +140,8 @@ export const promotePendingSbtSelectionsAfterDeploy = ({
   selections = [],
   deployedDrafts = [],
 }: {
-  selections?: unknown;
-  deployedDrafts?: unknown;
+  selections?: unknown[];
+  deployedDrafts?: unknown[];
 } = {}): SbtSelection[] => {
   const promotedByAddress = new Map<string, SbtSelection>();
   normalizePendingSbtDrafts(deployedDrafts).forEach((draftEntry: PendingSbtDraftLike) => {
