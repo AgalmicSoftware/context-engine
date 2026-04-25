@@ -26,7 +26,8 @@ describe('cacheUpdateCoalescer', () => {
 
   it('coalesces bursty schedule calls into a single flush', () => {
     jest.useFakeTimers();
-    setAnimationFrameGlobals(undefined, undefined);
+    (window as any).requestAnimationFrame = undefined;
+    (window as any).cancelAnimationFrame = undefined;
 
     const flush = jest.fn();
     const coalescer = createCacheUpdateCoalescer(flush, { delayMs: 12 });
@@ -43,7 +44,8 @@ describe('cacheUpdateCoalescer', () => {
 
   it('cancels queued flushes', () => {
     jest.useFakeTimers();
-    setAnimationFrameGlobals(undefined, undefined);
+    (window as any).requestAnimationFrame = undefined;
+    (window as any).cancelAnimationFrame = undefined;
 
     const flush = jest.fn();
     const coalescer = createCacheUpdateCoalescer(flush, { delayMs: 10 });
