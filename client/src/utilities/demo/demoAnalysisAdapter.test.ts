@@ -9,18 +9,21 @@ import buildDemoAnalysisData, {
 } from './demoAnalysisAdapter.js';
 
 describe('demoAnalysisAdapter', () => {
-  const analysisData = buildDemoAnalysisData(demoPolisData, historicalFigureDemographics);
+  const analysisData: any = buildDemoAnalysisData(
+    demoPolisData,
+    historicalFigureDemographics as Record<string, any>
+  );
 
   it('resolves every demo participant xid to canonical demographics', () => {
     const unresolved = (demoPolisData?.participantsVotes || [])
       .map((participant) => participant?.xid)
-      .filter((xid) => xid && !historicalFigureDemographics[xid]);
+      .filter((xid) => xid && !(historicalFigureDemographics as Record<string, any>)[xid]);
     expect(unresolved).toEqual([]);
   });
 
   it('builds complete Agree/Unsure/Disagree aggregates for every question segment', () => {
     const rowsByQuestionAndSegment = new Map();
-    analysisData.flatResponses.forEach((row) => {
+    analysisData.flatResponses.forEach((row: any) => {
       const key = `${row.questionId}::${row.segmentKey}`;
       if (!rowsByQuestionAndSegment.has(key)) {
         rowsByQuestionAndSegment.set(key, []);
@@ -28,20 +31,20 @@ describe('demoAnalysisAdapter', () => {
       rowsByQuestionAndSegment.get(key).push(row);
     });
 
-    analysisData.questions.forEach((question) => {
+    analysisData.questions.forEach((question: any) => {
       const segmentKeys = Object.keys(analysisData.segmentCounts[question.id] || {});
       expect(segmentKeys.length).toBeGreaterThan(0);
       segmentKeys.forEach((segmentKey) => {
-        const rows = rowsByQuestionAndSegment.get(`${question.id}::${segmentKey}`) || [];
+        const rows: any[] = rowsByQuestionAndSegment.get(`${question.id}::${segmentKey}`) || [];
         expect(rows).toHaveLength(DEMO_ANALYSIS_RESPONSE_OPTIONS.length);
-        expect(rows.map((row) => row.responseText).sort()).toEqual(DEMO_ANALYSIS_RESPONSE_OPTIONS.slice().sort());
+        expect(rows.map((row: any) => row.responseText).sort()).toEqual(DEMO_ANALYSIS_RESPONSE_OPTIONS.slice().sort());
       });
     });
   });
 
   it('keeps per-question segment rates normalized to the participants who voted on that question', () => {
     const rowsByQuestionAndSegment = new Map();
-    analysisData.flatResponses.forEach((row) => {
+    analysisData.flatResponses.forEach((row: any) => {
       const key = `${row.questionId}::${row.segmentKey}`;
       if (!rowsByQuestionAndSegment.has(key)) {
         rowsByQuestionAndSegment.set(key, []);
@@ -49,10 +52,10 @@ describe('demoAnalysisAdapter', () => {
       rowsByQuestionAndSegment.get(key).push(row);
     });
 
-    rowsByQuestionAndSegment.forEach((rows, key) => {
+    rowsByQuestionAndSegment.forEach((rows: any[], key) => {
       const totalVotes = rows[0]?.totalVotes || 0;
       const expectedCount = Object.values(
-        demoPolisData.participantsVotes.reduce((acc, participant) => {
+        demoPolisData.participantsVotes.reduce((acc: { count?: number }, participant: any) => {
           const questionId = key.split('::')[0];
           if (participant?.votes?.[questionId] === undefined) {
             return acc;
@@ -66,15 +69,15 @@ describe('demoAnalysisAdapter', () => {
         expect(totalVotes).toBe(Number(expectedCount || 0));
       }
 
-      const totalRate = rows.reduce((sum, row) => sum + row.rate, 0);
+      const totalRate = rows.reduce((sum: number, row: any) => sum + row.rate, 0);
       expect(totalRate).toBeCloseTo(totalVotes > 0 ? 1 : 0, 8);
     });
   });
 
   it('derives question tags from current demo comment categories and sources', () => {
-    const firstQuestionTags = analysisData.questionTagsData['0'] || [];
-    const tagIds = firstQuestionTags.map((tag) => tag.tagID);
-    const tagNames = firstQuestionTags.map((tag) => tag.tagName);
+    const firstQuestionTags: any[] = analysisData.questionTagsData['0'] || [];
+    const tagIds = firstQuestionTags.map((tag: any) => tag.tagID);
+    const tagNames = firstQuestionTags.map((tag: any) => tag.tagName);
 
     expect(tagIds).toContain('category:existential-risk-safety-foundations');
     expect(tagIds).toContain('source:tweets');
@@ -149,11 +152,11 @@ describe('demoAnalysisAdapter', () => {
 
     const syntheticAnalysisData = buildDemoAnalysisData(sourceData, metadataByXid);
     const overallRows = syntheticAnalysisData.flatResponses.filter(
-      (row) => row.questionId === '0' && row.segmentKey === 'All'
+      (row: any) => row.questionId === '0' && row.segmentKey === 'All'
     );
 
     expect(syntheticAnalysisData.questions[0].participationCount).toBe(2);
-    expect(syntheticAnalysisData.demographics.Era).toEqual([
+    expect((syntheticAnalysisData.demographics as any).Era).toEqual([
       { value: 'Modern', count: 2 },
     ]);
     expect(overallRows[0]?.participantCount).toBe(2);
@@ -161,7 +164,7 @@ describe('demoAnalysisAdapter', () => {
   });
 
   it('keeps the adapter free of a baked-in demo polis fixture import', () => {
-    const adapterSource = fs.readFileSync(path.join(__dirname, 'demoAnalysisAdapter.js'), 'utf8');
+    const adapterSource = fs.readFileSync(path.join(__dirname, 'demoAnalysisAdapter.ts'), 'utf8');
 
     expect(adapterSource).not.toMatch(/demo_polis_data\.json/);
   });
