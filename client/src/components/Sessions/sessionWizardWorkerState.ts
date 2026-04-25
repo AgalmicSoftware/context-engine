@@ -1,9 +1,6 @@
 import { normalizeWorkerUrl as normalizeWorkerAuthUrl } from '../../utilities/worker/workerAuth.js';
 import { toStr } from '../../utilities/shared/primitives.js';
-
-type SessionWizardConfigSyncStatus = Record<string, unknown> & {
-  synced?: unknown;
-};
+import type { AnyRecord } from '../shellTypes';
 
 export const resolveDeployWorkerState = ({
   responseWorkerUrl,
@@ -76,7 +73,7 @@ export const shouldCacheSessionWorkerConfigAfterDeploy = ({
   workerUrl,
 }: {
   deployStatusCode?: unknown;
-  configSyncStatus?: SessionWizardConfigSyncStatus | null;
+  configSyncStatus?: AnyRecord | null;
   workerUrl?: unknown;
 } = {}) => (
   !!normalizeWorkerAuthUrl(toStr(workerUrl).trim()) && (
