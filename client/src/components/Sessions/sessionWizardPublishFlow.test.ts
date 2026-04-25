@@ -11,6 +11,7 @@ import {
   resolveSessionWizardSponsoredAutoDeployReadiness,
   resolveSponsoredBundleDeployReadiness,
   resolveSessionWizardShouldAutoDeployWorker,
+  shouldForceSessionWizardNormalModeManualBundleRetry,
 } from './sessionWizardPublishFlow';
 
 describe('sessionWizardPublishFlow', () => {
@@ -183,6 +184,44 @@ describe('sessionWizardPublishFlow', () => {
     } as File)).rejects.toThrow(
       `Selected worker bundle file is missing the expected worker module export. Choose ${LOCAL_WORKER_BUNDLE_FALLBACK_FILE_PATH} and retry.`
     );
+  });
+
+  it('offers a manual normal-mode bundle retry only for URL-mode hosted bundle failures', () => {
+    expect(shouldForceSessionWizardNormalModeManualBundleRetry({
+      err: {
+        message: 'Worker deploy failed.',
+        responseError: 'Failed to fetch bundle (404).',
+      },
+      wizardMode: 'normal',
+      effectiveBundleMode: 'url',
+      hasBundleFile: false,
+    })).toBe(true);
+
+    expect(shouldForceSessionWizardNormalModeManualBundleRetry({
+      err: {
+        message: 'Worker deploy failed.',
+        responseError: 'The uploaded script has no registered event handlers.',
+        responseBundleDiagnostics: {
+          source: 'remote-url',
+          length: 216,
+          hasAnyExport: true,
+          hasFetchHandler: false,
+        },
+      },
+      wizardMode: 'normal',
+      effectiveBundleMode: 'url',
+      hasBundleFile: false,
+    })).toBe(true);
+
+    expect(shouldForceSessionWizardNormalModeManualBundleRetry({
+      err: {
+        message: 'Worker deploy failed.',
+        responseError: 'Failed to fetch bundle (404).',
+      },
+      wizardMode: 'advanced',
+      effectiveBundleMode: 'url',
+      hasBundleFile: false,
+    })).toBe(false);
   });
 
   it('fills publish progress within an active step and completes at 100 once done', () => {

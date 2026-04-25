@@ -148,6 +148,8 @@ import SessionMetadataEditor from './SessionMetadataEditor';
 import SessionWizardModals from './SessionWizardModals';
 import SessionPublishSummary from './SessionPublishSummary';
 import {
+  CLOUDFLARE_MISSING_HANDLER_ERROR,
+  DEPLOY_HELPER_BUNDLE_FETCH_ERROR,
   LOCAL_WORKER_BUNDLE_FALLBACK_FILE_PATH,
   buildSessionWizardPublishPlan,
   buildSessionWizardPublishStepNumbers,
@@ -159,6 +161,7 @@ import {
   resolveSessionWizardSponsoredAutoDeployReadiness,
   resolveSponsoredBundleDeployReadiness,
   resolveSessionWizardShouldAutoDeployWorker,
+  shouldForceSessionWizardNormalModeManualBundleRetry,
 } from './sessionWizardPublishFlow';
 import {
   getSessionWizardFieldLabel,
@@ -193,6 +196,7 @@ export {
   resolveSessionWizardSponsoredAutoDeployReadiness,
   resolveSponsoredBundleDeployReadiness,
   resolveSessionWizardShouldAutoDeployWorker,
+  shouldForceSessionWizardNormalModeManualBundleRetry,
 } from './sessionWizardPublishFlow';
 
 type DeployFormState = NonNullable<WorkerPanelProps['deployForm']> & {
@@ -644,66 +648,8 @@ const formatDeployBundleDiagnostics = (bundleDiagnostics: AnyRecord = {}): strin
   ];
   return parts.join(' ');
 };
-const CLOUDFLARE_MISSING_HANDLER_ERROR = 'no registered event handlers';
-const DEPLOY_HELPER_BUNDLE_FETCH_ERROR = 'failed to fetch bundle';
 const SPONSORED_MANUAL_BUNDLE_RETRY_MESSAGE = (
   `Sponsored publish still defaults to the GitHub-hosted bundle. Retry with a manual bundle URL or upload a bundle file. ${LOCAL_WORKER_BUNDLE_OPTIONAL_FALLBACK_HELP}`
-);
-const hasSessionWizardBundleDiagnostics = (bundleDiagnostics = null) => (
-  !!bundleDiagnostics &&
-  typeof bundleDiagnostics === 'object' &&
-  Object.keys(bundleDiagnostics).length > 0
-);
-const isSessionWizardRemoteBundleUrlFetchFailure = ({
-  err,
-  effectiveBundleMode = 'upload',
-}: {
-  err?: AnyRecord | null;
-  effectiveBundleMode?: string;
-} = {}) => {
-  if (effectiveBundleMode !== 'url') {
-    return false;
-  }
-  const combined = `${toStr(err?.message).trim()} ${toStr(err?.responseError).trim()}`.toLowerCase();
-  return combined.includes(DEPLOY_HELPER_BUNDLE_FETCH_ERROR);
-};
-const isSessionWizardRemoteBundleUrlMissingHandlerFailure = ({
-  err,
-  effectiveBundleMode = 'upload',
-}: {
-  err?: AnyRecord | null;
-  effectiveBundleMode?: string;
-} = {}) => {
-  if (effectiveBundleMode !== 'url') {
-    return false;
-  }
-  const combined = `${toStr(err?.message).trim()} ${toStr(err?.responseError).trim()}`.toLowerCase();
-  return combined.includes(CLOUDFLARE_MISSING_HANDLER_ERROR) &&
-    hasSessionWizardBundleDiagnostics(err?.responseBundleDiagnostics);
-};
-export const shouldForceSessionWizardNormalModeManualBundleRetry = ({
-  err,
-  wizardMode = 'normal',
-  effectiveBundleMode = 'upload',
-  hasBundleFile = false,
-}: {
-  err?: AnyRecord | null;
-  wizardMode?: string;
-  effectiveBundleMode?: string;
-  hasBundleFile?: boolean;
-} = {}) => (
-  wizardMode === 'normal' &&
-  !hasBundleFile &&
-  (
-    isSessionWizardRemoteBundleUrlFetchFailure({
-      err,
-      effectiveBundleMode,
-    }) ||
-    isSessionWizardRemoteBundleUrlMissingHandlerFailure({
-      err,
-      effectiveBundleMode,
-    })
-  )
 );
 const normalizeDeployErrorMessage = ({
   err,
