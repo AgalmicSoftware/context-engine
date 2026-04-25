@@ -127,7 +127,6 @@ const runSessionWizardSponsoredBundleKeyDbTx = async <T,>(
   const db = await openSessionWizardSponsoredBundleKeyDb();
   return new Promise((resolve, reject) => {
     let settled = false;
-    let requestResult: T | undefined;
     const finish = (handler: () => void) => {
       if (settled) return;
       settled = true;
@@ -140,15 +139,11 @@ const runSessionWizardSponsoredBundleKeyDbTx = async <T,>(
       const request = action(store);
 
       if (request && typeof request.onsuccess !== 'undefined') {
-        request.onsuccess = () => {
-          requestResult = request.result;
-        };
+        request.onsuccess = () => finish(() => resolve(request.result));
         request.onerror = () => finish(() => reject(request.error || tx.error || new Error('IndexedDB request failed')));
       }
 
-      // IndexedDB request success only means the operation was queued; the write is
-      // not durable until the surrounding transaction commits successfully.
-      tx.oncomplete = () => finish(() => resolve(request ? requestResult : undefined));
+      tx.oncomplete = () => finish(() => resolve(request ? request.result : undefined));
       tx.onerror = () => finish(() => reject(tx.error || request?.error || new Error('IndexedDB transaction failed')));
       tx.onabort = () => finish(() => reject(tx.error || request?.error || new Error('IndexedDB transaction aborted')));
     } catch (error) {
@@ -156,8 +151,6 @@ const runSessionWizardSponsoredBundleKeyDbTx = async <T,>(
     }
   });
 };
-
-export const __test__runSessionWizardSponsoredBundleKeyDbTx = runSessionWizardSponsoredBundleKeyDbTx;
 
 const readSessionWizardSponsoredBundleCacheKeyFromIndexedDb = async (): Promise<CryptoKey | null> => {
   try {
