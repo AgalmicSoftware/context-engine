@@ -181,6 +181,23 @@ import {
   resolveSessionWizardAutoFeatureBySessionSlug,
 } from './sessionWizardAiConfig';
 import {
+  buildPendingSbtSelection,
+  dedupeSbtSelection,
+  normalizeSbtSelection,
+  promotePendingSbtSelectionsAfterDeploy,
+  serializeDefaultFeaturedSbtSelections,
+} from './sessionWizardSbtSelections';
+import type { PendingSbtDraftLike } from './sessionWizardSbtSelections';
+import {
+  FEATURED_DRAFT_GATE_AUTO_LINK_GATE_ID,
+  FEATURED_DRAFT_GATE_AUTO_LINK_SOURCE,
+  buildPendingSbtDeployContextSignature,
+  deploySessionWizardPendingSbtDraft,
+  finalizeSessionWizardPendingSbtDraft,
+  normalizeFeaturedDraftGateAutoLink,
+  persistSessionWizardSbtRecoveryCodes,
+} from './sessionWizardPendingSbtPublish';
+import {
   buildSessionWizardWorkerRpcUrlMap,
   getSessionWizardWorkerDeployValidationError,
   resolveFallbackRpcUrl,
@@ -228,6 +245,12 @@ export {
   shouldCacheSessionWorkerConfigAfterDeploy,
 } from './sessionWizardWorkerState';
 export { buildSessionWizardDefaultAllowedOrigins } from './sessionWizardWorkerDefaults';
+export { promotePendingSbtSelectionsAfterDeploy } from './sessionWizardSbtSelections';
+export {
+  deploySessionWizardPendingSbtDraft,
+  finalizeSessionWizardPendingSbtDraft,
+  persistSessionWizardSbtRecoveryCodes,
+} from './sessionWizardPendingSbtPublish';
 export {
   buildSessionWizardWorkerRpcUrlMap,
   getSessionWizardWorkerDeployValidationError,
@@ -318,43 +341,6 @@ type MetadataObjectCollapsedState = Record<string, boolean> & {
 };
 
 type SessionHeaderUploadStatusTone = SessionHeaderFieldProps['sessionHeaderUploadStatusTone'] | string;
-
-type SbtSelection = AnyRecord & {
-  address?: string;
-  sbtAddress?: string;
-  value?: string;
-  name?: string;
-  label?: string;
-  pending?: boolean;
-  metadataPreview?: AnyRecord | null;
-};
-
-type PendingSbtDraftLike = AnyRecord & {
-  predictedAddress?: string;
-  deployedAddress?: string;
-  address?: string;
-  displayName?: string;
-  name?: string;
-  metadataPreview?: AnyRecord | null;
-  authoringPayload?: AnyRecord | null;
-  sessionConfigOverride?: AnyRecord | null;
-  tokenURI?: string;
-  contractName?: string;
-  symbol?: string;
-  limitedNumber?: number | string;
-  adminAddress?: string;
-  mintingEndTimeUnix?: number | string;
-  hasPasswordMintOnChain?: boolean;
-  burnAuthEnum?: number | string;
-  hashedPasswords?: string[];
-  finalGroupPasswordHash?: string;
-  create2Salt?: string;
-  createOptions?: AnyRecord;
-  usesInviteCodes?: boolean;
-  groupPassword?: string;
-  passwordList?: string[];
-  networkChainId?: ChainIdLike;
-};
 
 const { getPathRpcUrl } = rpcDefaults;
 const log = createLogger('general');
@@ -607,152 +593,6 @@ const formatContractLabel = (key: string): string => {
     .replace(/\b\w/g, (c) => c.toUpperCase());
 };
 
-const normalizeSbtSelection = (value: unknown): SbtSelection[] => {
-  if (Array.isArray(value)) {
-    return value
-      .map((entry) => {
-        if (!entry) return null;
-        if (typeof entry === 'string') {
-          const address = entry.trim();
-          if (!address) return null;
-          return { address, name: address };
-        }
-        if (typeof entry === 'object') {
-          const address = toStr(entry.address || entry.sbtAddress || entry.value).trim();
-          if (!address) return null;
-          return { ...entry, address, name: entry.name || entry.label || address } as SbtSelection;
-        }
-        return null;
-      })
-      .filter((entry): entry is SbtSelection => !!entry);
-  }
-  if (typeof value === 'string' && value.trim()) {
-    return value
-      .split(/[\n,]+/)
-      .map((addr) => addr.trim())
-      .filter(Boolean)
-      .map((addr) => ({ address: addr, name: addr }));
-  }
-  return [];
-};
-
-const serializeDefaultFeaturedSbtSelections = (value: unknown[] = []): Array<string | AnyRecord> => {
-  const seen = new Set();
-  // Keep pending featured selections marked in the cached draft so a refresh can
-  // safely re-bind or prune undeployed placeholder addresses without persisting
-  // the full pending draft secrets to localStorage.
-  return normalizeSbtSelection(value)
-    .map((entry) => {
-      const address = toStr(entry?.address).trim();
-      if (!address) return null;
-      const lower = address.toLowerCase();
-      if (seen.has(lower)) return null;
-      seen.add(lower);
-      if (entry?.pending === true) {
-        return {
-          address,
-          name: toStr(entry?.name || entry?.label || address).trim() || address,
-          pending: true,
-        };
-      }
-      return address;
-    })
-    .filter((entry): entry is string | AnyRecord => !!entry);
-};
-
-const dedupeSbtSelection = (value: unknown[] = []): SbtSelection[] => {
-  const seen = new Set();
-  return normalizeSbtSelection(value).filter((entry) => {
-    const address = toStr(entry?.address).trim();
-    if (!address) return false;
-    const lower = address.toLowerCase();
-    if (seen.has(lower)) return false;
-    seen.add(lower);
-    return true;
-  });
-};
-
-const buildPendingSbtSelection = (draftEntry: PendingSbtDraftLike = {}): SbtSelection | null => {
-  const address = toStr(draftEntry?.predictedAddress || draftEntry?.address).trim();
-  if (!address) return null;
-  const displayName = toStr(draftEntry?.displayName || draftEntry?.name || address).trim() || address;
-  return {
-    address,
-    name: `${displayName} (Pending)`,
-    pending: true,
-    metadataPreview: draftEntry?.metadataPreview || null,
-  };
-};
-
-const buildDeployedSbtSelection = (draftEntry: PendingSbtDraftLike = {}): SbtSelection | null => {
-  const address = toStr(draftEntry?.deployedAddress || draftEntry?.predictedAddress || draftEntry?.address).trim();
-  if (!address) return null;
-  const displayName = toStr(draftEntry?.displayName || draftEntry?.name || address).trim() || address;
-  return {
-    address,
-    name: displayName,
-    metadataPreview: draftEntry?.metadataPreview || null,
-  };
-};
-
-export const promotePendingSbtSelectionsAfterDeploy = ({
-  selections = [],
-  deployedDrafts = [],
-}: {
-  selections?: unknown[];
-  deployedDrafts?: unknown[];
-} = {}): SbtSelection[] => {
-  const promotedByAddress = new Map<string, SbtSelection>();
-  normalizePendingSbtDrafts(deployedDrafts).forEach((draftEntry: PendingSbtDraftLike) => {
-    const selection = buildDeployedSbtSelection(draftEntry);
-    const addressLower = toStr(selection?.address).trim().toLowerCase();
-    if (!addressLower || !selection) return;
-    promotedByAddress.set(addressLower, selection);
-  });
-  if (!promotedByAddress.size) {
-    return dedupeSbtSelection(normalizeSbtSelection(selections));
-  }
-  return dedupeSbtSelection(normalizeSbtSelection(selections).map((entry) => {
-    const addressLower = toStr(entry?.address).trim().toLowerCase();
-    if (!addressLower || entry?.pending !== true) return entry;
-    return promotedByAddress.get(addressLower) || entry;
-  }));
-};
-
-const FEATURED_DRAFT_GATE_AUTO_LINK_GATE_ID = 'gate-1';
-const FEATURED_DRAFT_GATE_AUTO_LINK_SOURCE = 'defaultFeaturedSBTs';
-
-const normalizeFeaturedDraftGateAutoLink = (value: AnyRecord | null = null): AnyRecord | null => {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
-  const address = toStr(value?.address).trim();
-  if (!address || !ethers.utils.isAddress(address)) return null;
-  return {
-    gateId: toStr(value?.gateId).trim() || FEATURED_DRAFT_GATE_AUTO_LINK_GATE_ID,
-    address,
-    dismissed: value?.dismissed === true,
-    source: toStr(value?.source).trim() || FEATURED_DRAFT_GATE_AUTO_LINK_SOURCE,
-  };
-};
-
-const buildPendingSbtDeployContextSignature = (
-  sessionLike: AnyRecord = {},
-  fallbackChainId: ChainIdLike = null
-): string => {
-  // PRD 422 tracks stronger invalidation and slug-finalization rules for linked pending SBT drafts.
-  const chainId = Number(
-    sessionLike?.networkChainId ||
-    sessionLike?.contracts?.sbtFactory?.chainId ||
-    fallbackChainId ||
-    0
-  ) || 0;
-  const sbtFactoryAddress = toStr(
-    sessionLike?.contracts?.sbtFactory?.address ||
-    sessionLike?.sbtFactoryAddress ||
-    ''
-  ).trim().toLowerCase();
-  return `${chainId}|${sbtFactoryAddress}`;
-};
-
 const buildSponsoredSbtLookupContextKey = ({
   address = '',
   slug = '',
@@ -808,147 +648,6 @@ const useStableSerializedObject = (value: AnyRecord | null | undefined): AnyReco
     stableRef.current = { signature, value: normalizedValue };
   }
   return stableRef.current.value;
-};
-
-export const finalizeSessionWizardPendingSbtDraft = async ({
-  draftEntry = {},
-  workerUrlOverride = '',
-  createSbtComponentProps = {},
-  finalizeDeferredDraftUpload = finalizeDeferredCreateSbtDraftUpload,
-}: {
-  draftEntry?: PendingSbtDraftLike;
-  workerUrlOverride?: string;
-  createSbtComponentProps?: AnyRecord;
-  finalizeDeferredDraftUpload?: (args?: AnyRecord) => Promise<AnyRecord>;
-} = {}): Promise<PendingSbtDraftLike> => {
-  const existingTokenUri = toStr(draftEntry?.tokenURI).trim();
-  if (existingTokenUri) {
-    return {
-      ...draftEntry,
-      tokenURI: existingTokenUri,
-      metadataUploadStatus: 'ready',
-    };
-  }
-
-  const displayName = toStr(draftEntry?.displayName || draftEntry?.predictedAddress || 'pending SBT').trim();
-  const authoringPayload = draftEntry?.authoringPayload;
-  if (!authoringPayload || typeof authoringPayload !== 'object') {
-    throw new Error(`Pending SBT draft ${displayName} is missing authoring data required for publish-time upload.`);
-  }
-
-  const existingSessionConfig = (
-    createSbtComponentProps?.sessionConfigOverride &&
-    typeof createSbtComponentProps.sessionConfigOverride === 'object'
-  ) ? createSbtComponentProps.sessionConfigOverride : {};
-  const effectiveWorkerUrl = normalizeWorkerAuthUrl(
-    toStr(workerUrlOverride || existingSessionConfig?.corsWorkerUrl).trim()
-  );
-  const finalizedUpload = await finalizeDeferredDraftUpload({
-    authoringPayload,
-    componentProps: {
-      ...createSbtComponentProps,
-      sessionConfigOverride: {
-        ...existingSessionConfig,
-        ...(effectiveWorkerUrl ? { corsWorkerUrl: effectiveWorkerUrl } : {}),
-      },
-    },
-  });
-  const finalizedTokenUri = toStr(finalizedUpload?.tokenURI).trim();
-  if (!finalizedTokenUri) {
-    throw new Error(`Pending SBT draft ${displayName} could not finalize its metadata upload.`);
-  }
-
-  return {
-    ...draftEntry,
-    tokenURI: finalizedTokenUri,
-    metadataUploadStatus: 'ready',
-    metadataPreview: finalizedUpload?.metadataPreview || draftEntry?.metadataPreview || null,
-    authoringPayload: finalizedUpload?.authoringPayload || draftEntry?.authoringPayload,
-  };
-};
-
-export const deploySessionWizardPendingSbtDraft = async ({
-  sbtDraft = {},
-  providerLike,
-  sessionConfigForDeploy = {},
-  workerUrlOverride = '',
-  createSbtComponentProps = {},
-  finalizePendingDraft = finalizeSessionWizardPendingSbtDraft,
-  createSBT = contractScripts.createSBT,
-}: {
-  sbtDraft?: PendingSbtDraftLike;
-  providerLike?: unknown;
-  sessionConfigForDeploy?: AnyRecord;
-  workerUrlOverride?: string;
-  createSbtComponentProps?: AnyRecord;
-  finalizePendingDraft?: (args?: AnyRecord) => Promise<PendingSbtDraftLike>;
-  createSBT?: (...args: any[]) => Promise<any>;
-} = {}) => {
-  const finalizedDraft = await finalizePendingDraft({
-    draftEntry: sbtDraft,
-    workerUrlOverride,
-    createSbtComponentProps,
-  });
-  const receipt = await createSBT(
-    providerLike,
-    finalizedDraft.contractName,
-    finalizedDraft.symbol,
-    Number(finalizedDraft.limitedNumber || 0) || 0,
-    finalizedDraft.adminAddress,
-    Number(finalizedDraft.mintingEndTimeUnix || 0) || 0,
-    finalizedDraft.hasPasswordMintOnChain === true,
-    Number(finalizedDraft.burnAuthEnum || 0),
-    Array.isArray(finalizedDraft.hashedPasswords) ? finalizedDraft.hashedPasswords : [],
-    toStr(finalizedDraft.tokenURI).trim(),
-    toStr(finalizedDraft.finalGroupPasswordHash).trim() || ethers.constants.HashZero,
-    sessionConfigForDeploy,
-    toStr(finalizedDraft.create2Salt).trim(),
-    finalizedDraft.createOptions || {}
-  );
-
-  return {
-    finalizedDraft,
-    receipt,
-  };
-};
-
-export const persistSessionWizardSbtRecoveryCodes = ({
-  finalizedDraft = {},
-  sbtAddress = '',
-  sessionConfigForDeploy = {},
-  writeRecoveryCodes = upsertSbtPasswordRecoveryCodes,
-}: {
-  finalizedDraft?: PendingSbtDraftLike;
-  sbtAddress?: string;
-  sessionConfigForDeploy?: AnyRecord;
-  writeRecoveryCodes?: (args?: AnyRecord) => AnyRecord;
-} = {}) => {
-  const codesToStore = finalizedDraft.usesInviteCodes
-    ? [toStr(finalizedDraft.groupPassword).trim()].filter(Boolean)
-    : (Array.isArray(finalizedDraft.passwordList) ? finalizedDraft.passwordList : [])
-      .filter((value) => toStr(value).trim());
-
-  if (finalizedDraft.hasPasswordMintOnChain !== true || codesToStore.length === 0) {
-    return {
-      ok: false,
-      status: 'empty-recovery-payload',
-      passwords: codesToStore,
-    };
-  }
-
-  const chainId = Number(
-    finalizedDraft.networkChainId ||
-    sessionConfigForDeploy?.networkChainId ||
-    sessionConfigForDeploy?.contracts?.sbtFactory?.chainId ||
-    0
-  ) || null;
-
-  return writeRecoveryCodes({
-    chainId,
-    sbtAddress,
-    passwords: codesToStore,
-    mode: 'replace',
-  });
 };
 
 const deepClone = <T,>(obj: T): T => JSON.parse(JSON.stringify(obj ?? {}));
