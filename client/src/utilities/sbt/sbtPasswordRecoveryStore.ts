@@ -3,44 +3,14 @@ import {
   safeJsonWrite,
 } from '../cache/storageJson.js';
 
+type LooseRecord = Record<string, any>;
+
 export const SBT_PASSWORD_RECOVERY_STORAGE_KEY = 'ce:sbtPasswordRecovery:v1';
 export const SBT_PASSWORD_RECOVERY_ENVELOPE_VERSION = 1;
 export const SBT_PASSWORD_RECOVERY_KIND = 'sbt-password-recovery';
 export const SBT_PASSWORD_RECOVERY_DEFAULT_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
-type StorageLike = {
-  getItem?: (key: string) => string | null;
-  setItem?: (key: string, value: string) => void;
-  removeItem?: (key: string) => void;
-};
-
-type SbtPasswordRecoveryEntry = {
-  chainId: number | null;
-  sbtAddress: string;
-  passwords: string[];
-  createdAt: number;
-  updatedAt: number;
-  expiresAt: number;
-};
-
-type SbtPasswordRecoveryStoreEnvelope = {
-  v: typeof SBT_PASSWORD_RECOVERY_ENVELOPE_VERSION;
-  kind: typeof SBT_PASSWORD_RECOVERY_KIND;
-  updatedAt: number;
-  entries: Record<string, SbtPasswordRecoveryEntry>;
-};
-
-const isRecord = (value: unknown): value is Record<string, unknown> => (
-  !!value && typeof value === 'object'
-);
-
-const errorMessage = (error: unknown, fallback: string): string => (
-  error && typeof error === 'object' && 'message' in error && error.message
-    ? String(error.message)
-    : String(error || fallback)
-);
-
-const getLocalStorage = (storageIn?: StorageLike | null): StorageLike | null => {
+const getLocalStorage = (storageIn: any) => {
   if (storageIn !== undefined) return storageIn;
   try {
     if (typeof window !== 'undefined' && window.localStorage) return window.localStorage;
@@ -79,7 +49,7 @@ const normalizePasswords = (passwords: unknown): string[] => {
     });
 };
 
-const buildEmptyStore = (now: number): SbtPasswordRecoveryStoreEnvelope => ({
+const buildEmptyStore = (now: number): LooseRecord => ({
   v: SBT_PASSWORD_RECOVERY_ENVELOPE_VERSION,
   kind: SBT_PASSWORD_RECOVERY_KIND,
   updatedAt: now,
@@ -96,12 +66,8 @@ const getUnknownSbtPasswordRecoveryKey = ({ sbtAddress }: { sbtAddress?: unknown
   getSbtPasswordRecoveryKey({ chainId: null, sbtAddress })
 );
 
-const normalizeEntry = (
-  entry: unknown,
-  fallbackKey: string,
-  now: number
-): SbtPasswordRecoveryEntry | null => {
-  if (!isRecord(entry)) return null;
+const normalizeEntry = (entry: any, fallbackKey: string, now: number) => {
+  if (!entry || typeof entry !== 'object') return null;
   const keyParts = String(fallbackKey || '').split(':');
   const chainId = normalizeChainId(entry.chainId) || normalizeChainId(keyParts[0]);
   const sbtAddress = normalizeAddress(entry.sbtAddress || keyParts.slice(1).join(':'));
@@ -121,8 +87,8 @@ const normalizeEntry = (
   };
 };
 
-const normalizeStore = (parsed: unknown, now: number): SbtPasswordRecoveryStoreEnvelope => {
-  if (!isRecord(parsed)) {
+const normalizeStore = (parsed: any, now: number): LooseRecord => {
+  if (!parsed || typeof parsed !== 'object') {
     throw new Error('SBT password recovery store must be a JSON object.');
   }
   if (
@@ -132,9 +98,8 @@ const normalizeStore = (parsed: unknown, now: number): SbtPasswordRecoveryStoreE
     throw new Error('Unsupported SBT password recovery store envelope.');
   }
 
-  const sourceEntries = isRecord(parsed.entries) ? parsed.entries : {};
-  const entries: Record<string, SbtPasswordRecoveryEntry> = {};
-  Object.entries(sourceEntries).forEach(([key, entry]) => {
+  const entries: Record<string, any> = {};
+  Object.entries(parsed.entries || {}).forEach(([key, entry]) => {
     const normalized = normalizeEntry(entry, key, now);
     if (!normalized) return;
     entries[getSbtPasswordRecoveryKey({
@@ -156,14 +121,14 @@ export const readSbtPasswordRecoveryStore = ({
   now = Date.now(),
   clearInvalid = true,
 }: {
-  storage?: StorageLike | null;
+  storage?: any;
   now?: number;
   clearInvalid?: boolean;
-} = {}): SbtPasswordRecoveryStoreEnvelope => {
+} = {}): LooseRecord => {
   const storageRef = getLocalStorage(storage);
   if (!storageRef) return buildEmptyStore(now);
 
-  const result = safeJsonRead<SbtPasswordRecoveryStoreEnvelope>(
+  const result = safeJsonRead(
     storageRef,
     SBT_PASSWORD_RECOVERY_STORAGE_KEY,
     (parsed) => normalizeStore(parsed, now),
@@ -174,12 +139,12 @@ export const readSbtPasswordRecoveryStore = ({
 };
 
 export const writeSbtPasswordRecoveryStore = (
-  store: unknown,
+  store: any,
   {
     storage,
     now = Date.now(),
   }: {
-    storage?: StorageLike | null;
+    storage?: any;
     now?: number;
   } = {}
 ) => {
@@ -192,20 +157,15 @@ export const writeSbtPasswordRecoveryStore = (
   }
   let normalizedStore;
   try {
-    normalizedStore = normalizeStore(
-      isRecord(store)
-        ? {
-            ...store,
-            updatedAt: now,
-          }
-        : store,
-      now
-    );
-  } catch (error) {
+    normalizedStore = normalizeStore({
+      ...store,
+      updatedAt: now,
+    }, now);
+  } catch (error: any) {
     return {
       ok: false,
       status: 'invalid-store',
-      error: errorMessage(error, 'Invalid SBT password recovery store.'),
+      error: error?.message || String(error || 'Invalid SBT password recovery store.'),
     };
   }
   return safeJsonWrite(storageRef, SBT_PASSWORD_RECOVERY_STORAGE_KEY, normalizedStore);
@@ -219,7 +179,7 @@ export const getSbtPasswordRecoveryCodes = ({
 }: {
   chainId?: unknown;
   sbtAddress?: unknown;
-  storage?: StorageLike | null;
+  storage?: any;
   now?: number;
 } = {}): string[] => {
   const store = readSbtPasswordRecoveryStore({ storage, now });
@@ -255,9 +215,9 @@ export const getSbtPasswordRecoveryCodes = ({
   if (!normalizedChainId) {
     const address = normalizeAddress(sbtAddress);
     const addressEntry = Object.values(store.entries).find(
-      (candidate) => candidate.sbtAddress === address
+      (candidate: any) => candidate.sbtAddress === address
     );
-    if (addressEntry && addressEntry.passwords.length > 0) return [...addressEntry.passwords];
+    if ((addressEntry as any)?.passwords?.length > 0) return [...(addressEntry as any).passwords];
   }
 
   return [];
@@ -276,7 +236,7 @@ export const upsertSbtPasswordRecoveryCodes = ({
   sbtAddress?: unknown;
   passwords?: unknown;
   mode?: string;
-  storage?: StorageLike | null;
+  storage?: any;
   now?: number;
   ttlMs?: unknown;
 } = {}) => {
