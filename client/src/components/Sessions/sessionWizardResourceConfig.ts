@@ -1,31 +1,17 @@
 import { t } from '../../utilities/ui/terminology.js';
 import { normalizeAiProvider } from './sessionWizardAiConfig';
-
-type SessionWizardSecretFieldType = 'password' | 'text' | 'textarea';
+import type { AnyRecord } from '../shellTypes';
 
 type SessionWizardSecretField = {
   key: string;
   label: string;
-  type: SessionWizardSecretFieldType;
+  type: string;
   placeholder?: string;
   required?: boolean;
   rows?: number;
 };
 
-type SessionWizardResourceRecord = Record<string, unknown>;
-
-const isResourceRecord = (value: unknown): value is SessionWizardResourceRecord => (
-  value !== null && typeof value === 'object'
-);
-
-const readAiModelProvider = (ai: unknown, modelKey: string): string => {
-  const aiRecord = isResourceRecord(ai) ? ai : {};
-  const models = isResourceRecord(aiRecord.models) ? aiRecord.models : {};
-  const model = isResourceRecord(models[modelKey]) ? models[modelKey] : {};
-  return normalizeAiProvider(model.provider || 'openai');
-};
-
-export const RESOURCE_LABELS: Record<string, string> = {
+export const RESOURCE_LABELS = {
   default: 'DEFAULT',
   questionResponses: 'QUESTION RESPONSES',
   surveyResponses: 'SURVEY RESPONSES',
@@ -38,12 +24,12 @@ export const RESOURCE_LABELS: Record<string, string> = {
   lit: 'LIT',
 };
 
-export const RESOURCE_SECTION_TOOLTIPS: Readonly<Record<string, string>> = Object.freeze({
-  ai: 'Session-funded OpenAI key used for text generation and transcription.',
+export const RESOURCE_SECTION_TOOLTIPS = Object.freeze({
+  ai: 'Session-funded API keys used for AI inference and transcription.',
   rpc: 'Authenticated RPC endpoint used by the worker for chain reads and related operations.',
   arweave: `${t('wallet')} used to pay for Arweave uploads and storage.`,
   txGas: 'Faucet signer used to send small testnet funding grants.',
-  lit: 'Worker-mediated Lit Chipotle setup. Paste one Lit API key; the worker derives the scoped group, PKP, and CE action after deploy.',
+  lit: `Payer ${t('walletLower')} used to sponsor Lit operations for this session.`,
 });
 
 const RESOURCE_SECRET_FIELDS: Record<string, SessionWizardSecretField[]> = Object.freeze({
@@ -52,7 +38,7 @@ const RESOURCE_SECRET_FIELDS: Record<string, SessionWizardSecretField[]> = Objec
   ],
   rpc: [
     { key: 'customRpcUrl', label: 'Custom RPC URL', type: 'text', placeholder: 'https://...' },
-    // Intentionally hidden until PATH gateway auth is supported.
+    // Intentionally hidden until PATH gateway auth is supported (tracked in PRD 198 / 354).
     // { key: 'customRpcKey', label: 'Custom RPC key', type: 'password' },
   ],
   arweave: [
@@ -63,24 +49,39 @@ const RESOURCE_SECRET_FIELDS: Record<string, SessionWizardSecretField[]> = Objec
   ],
   default: [],
   lit: [
-    { key: 'litAccountApiKey', label: 'Lit API key', type: 'password' },
+    { key: 'litPayerPrivateKey', label: 'Lit payer private key', type: 'password' },
   ],
 });
 
-export const resolveSessionWizardAiModelProviders = (ai: unknown): {
+const ANTHROPIC_AI_SECRET_FIELD: SessionWizardSecretField = {
+  key: 'anthropicKey',
+  label: 'Anthropic key',
+  type: 'password',
+  required: true,
+};
+const OPENROUTER_AI_SECRET_FIELD: SessionWizardSecretField = {
+  key: 'openrouterKey',
+  label: 'OpenRouter key',
+  type: 'password',
+};
+
+export const resolveSessionWizardAiModelProviders = (ai: AnyRecord | null | undefined): {
   fastProvider: string;
   thinkingProvider: string;
 } => {
-  const fastProvider = readAiModelProvider(ai, 'fast');
-  const thinkingProvider = readAiModelProvider(ai, 'thinking');
+  const fastProvider = normalizeAiProvider(ai?.models?.fast?.provider || 'openai');
+  const thinkingProvider = normalizeAiProvider(ai?.models?.thinking?.provider || 'openai');
   return { fastProvider, thinkingProvider };
 };
 
 export const resolveSessionWizardResourceSecretFields = (
   resourceKey: string,
-  ai: unknown,
+  ai: AnyRecord | null | undefined,
 ): SessionWizardSecretField[] => {
-  void ai;
   if (resourceKey !== 'ai') return [...(RESOURCE_SECRET_FIELDS[resourceKey] || [])];
-  return [...RESOURCE_SECRET_FIELDS.ai];
+  const { fastProvider, thinkingProvider } = resolveSessionWizardAiModelProviders(ai);
+  const fields = [...RESOURCE_SECRET_FIELDS.ai];
+  if (fastProvider === 'anthropic' || thinkingProvider === 'anthropic') fields.push(ANTHROPIC_AI_SECRET_FIELD);
+  if (fastProvider === 'openrouter' || thinkingProvider === 'openrouter') fields.push(OPENROUTER_AI_SECRET_FIELD);
+  return fields;
 };
