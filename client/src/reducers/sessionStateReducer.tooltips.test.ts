@@ -28,10 +28,10 @@ describe('sessionStateReducer tooltip preference', () => {
 
     const disabled = reducer(initial, { type: TOGGLE_TOOLTIPS });
     expect(disabled.tooltipsEnabled).toBe(false);
-    expect(JSON.parse(localStorage.getItem('ce:tooltipsEnabled'))).toBe(false);
+    expect(JSON.parse(localStorage.getItem('ce:tooltipsEnabled') || 'null')).toBe(false);
 
     const enabled = reducer(disabled, { type: TOGGLE_TOOLTIPS });
     expect(enabled.tooltipsEnabled).toBe(true);
-    expect(JSON.parse(localStorage.getItem('ce:tooltipsEnabled'))).toBe(true);
+    expect(JSON.parse(localStorage.getItem('ce:tooltipsEnabled') || 'null')).toBe(true);
   });
 });
