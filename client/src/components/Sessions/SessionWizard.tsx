@@ -106,9 +106,6 @@ import {
   sanitizeSessionWizardMetadataPayload,
 } from './sessionWizardWriteNormalization.js';
 import {
-  getReservedLegacySessionSlugs,
-} from '../../utilities/session/sessionDemoCompat.js';
-import {
   clearSponsoredBootstrapFundingContext,
   normalizeSponsoredBootstrapFundingContext,
   writeSponsoredBootstrapFundingContext,
@@ -227,6 +224,16 @@ import {
   normalizeSessionWizardDraftShape as normalizeDraftShape,
 } from './sessionWizardDraftState';
 import {
+  getSessionSlugValidationError,
+  hasInvalidSessionSlugFormat,
+  INVALID_SESSION_SLUG_FORMAT_ERROR,
+  isMissingSessionSlug,
+  isReservedSessionSlug,
+  REQUIRED_SESSION_SLUG_ERROR,
+  RESERVED_SESSION_SLUG_ERROR,
+  RESERVED_SESSION_SLUGS,
+} from './sessionWizardSlugValidation';
+import {
   buildSponsoredSbtLookupContextKey,
   deepClone,
   formatContractLabel,
@@ -296,6 +303,16 @@ export {
 } from './sessionWizardWorkerState';
 export { buildSessionWizardDefaultAllowedOrigins } from './sessionWizardWorkerDefaults';
 export { promotePendingSbtSelectionsAfterDeploy } from './sessionWizardSbtSelections';
+export {
+  getSessionSlugValidationError,
+  hasInvalidSessionSlugFormat,
+  INVALID_SESSION_SLUG_FORMAT_ERROR,
+  isMissingSessionSlug,
+  isReservedSessionSlug,
+  REQUIRED_SESSION_SLUG_ERROR,
+  RESERVED_SESSION_SLUG_ERROR,
+  RESERVED_SESSION_SLUGS,
+} from './sessionWizardSlugValidation';
 export {
   deploySessionWizardPendingSbtDraft,
   finalizeSessionWizardPendingSbtDraft,
@@ -401,17 +418,10 @@ type MetadataObjectCollapsedState = Record<string, boolean> & {
 type SessionHeaderUploadStatusTone = SessionHeaderFieldProps['sessionHeaderUploadStatusTone'] | string;
 
 const log = createLogger('general');
-export const RESERVED_SESSION_SLUGS = getReservedLegacySessionSlugs();
-export const REQUIRED_SESSION_SLUG_ERROR = 'A session slug is required.';
-const RESERVED_SESSION_SLUG_LIST = Array.from(RESERVED_SESSION_SLUGS)
-  .map((slug) => `"${slug}"`)
-  .join(', ');
 
 const readSessionWizardTooltipsEnabled = (reduxStore: AnyRecord | null | undefined): boolean => (
   reduxStore?.getState?.()?.sessionState?.tooltipsEnabled !== false
 );
-export const RESERVED_SESSION_SLUG_ERROR =
-  `This slug is reserved for the default session or legacy compatibility aliases (${RESERVED_SESSION_SLUG_LIST}). Please choose a different slug.`;
 const SESSION_HEADER_IMAGE_MIME_TO_EXT = Object.freeze({
   'image/png': 'png',
   'image/jpeg': 'jpeg',
@@ -433,25 +443,6 @@ const NORMAL_MODE_MISSING_HOSTED_BUNDLE_MESSAGE = (
 const NORMAL_MODE_MANUAL_BUNDLE_RETRY_MESSAGE = (
   `Normal mode still defaults to the GitHub-hosted bundle. Retry with a manual bundle URL or upload a bundle file. ${LOCAL_WORKER_BUNDLE_OPTIONAL_FALLBACK_HELP}`
 );
-export const isMissingSessionSlug = (slug: unknown): boolean => toStr(slug).trim() === '';
-export const INVALID_SESSION_SLUG_FORMAT_ERROR =
-  'Session slugs must use lowercase letters, numbers, "_" or "-".';
-const VALID_SESSION_SLUG_REGEX = /^[a-z0-9_-]+$/;
-export const isReservedSessionSlug = (slug: unknown): boolean => {
-  const normalized = toStr(slug).trim().toLowerCase();
-  return RESERVED_SESSION_SLUGS.has(normalized);
-};
-export const hasInvalidSessionSlugFormat = (slug: unknown): boolean => {
-  const raw = toStr(slug).trim();
-  if (!raw) return false;
-  return !VALID_SESSION_SLUG_REGEX.test(raw);
-};
-export const getSessionSlugValidationError = (slug: unknown): string => {
-  if (isMissingSessionSlug(slug)) return REQUIRED_SESSION_SLUG_ERROR;
-  if (hasInvalidSessionSlugFormat(slug)) return INVALID_SESSION_SLUG_FORMAT_ERROR;
-  if (isReservedSessionSlug(slug)) return RESERVED_SESSION_SLUG_ERROR;
-  return '';
-};
 const resolveSessionHeaderImageFormat = (fileLike: AnyRecord | File | null | undefined): string => {
   const fileName = toStr(fileLike?.name).trim().toLowerCase();
   const fromName = fileName.split('.').pop()?.trim() || '';
