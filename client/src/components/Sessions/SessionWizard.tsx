@@ -47,7 +47,6 @@ import { sessionRegistryUtils, registerSessionOnChain } from '../../utilities/we
 import contractScripts from '../../utilities/web3/contractScripts.js';
 import { seedGenPrompt } from '../../prompts/seedGenPrompt.js';
 import {
-  DEFAULT_SESSION_SLUG,
   CLOUDFLARE_DEPLOY_HELPER_URL,
   CLOUDFLARE_WORKER_BUNDLE_URL,
   CE_DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED,
@@ -79,7 +78,6 @@ import { t } from '../../utilities/ui/terminology.js';
 import {
   buildSponsoredFlagFields as buildSponsoredSessionFlagFields,
 } from '../../utilities/session/sponsoredFlags.js';
-import rpcDefaults from '../../variables/rpcDefaults.js';
 import { createLogger } from '../../utilities/logging';
 import { wrapEthersJsonRpcSend } from '../../utilities/web3/rpcReadCache.js';
 import {
@@ -100,7 +98,6 @@ import { getSbtDisplayName } from '../../utilities/sbt/sbtDisplayNames.js';
 import { upsertSbtPasswordRecoveryCodes } from '../../utilities/sbt/sbtPasswordRecoveryStore.js';
 import { toStr } from '../../utilities/shared/primitives.js';
 import { notify } from '../../utilities/ui/notify.js';
-import { DEFAULT_REASONING_EFFORT } from '../../utilities/ai/aiSettings.js';
 import CETooltip from '../Shared/CETooltip';
 import {
   SESSION_WIZARD_ONCHAIN_COMPAT_FIELD_PATHS,
@@ -109,7 +106,6 @@ import {
   sanitizeSessionWizardMetadataPayload,
 } from './sessionWizardWriteNormalization.js';
 import {
-  getDemoTemplateSeed,
   getReservedLegacySessionSlugs,
 } from '../../utilities/session/sessionDemoCompat.js';
 import {
@@ -227,6 +223,10 @@ import {
   sanitizeSessionWizardSponsoredFieldSnapshotForLitMode,
   sanitizeSessionWizardWorkerSecretsForLitMode,
 } from './sessionWizardWorkerSecretSupport';
+import {
+  buildSessionWizardDefaultTemplate,
+  normalizeSessionWizardDraftShape as normalizeDraftShape,
+} from './sessionWizardDraftState';
 import {
   buildSessionWizardWorkerRpcUrlMap,
   getSessionWizardWorkerDeployValidationError,
@@ -380,7 +380,6 @@ type MetadataObjectCollapsedState = Record<string, boolean> & {
 
 type SessionHeaderUploadStatusTone = SessionHeaderFieldProps['sessionHeaderUploadStatusTone'] | string;
 
-const { getPathRpcUrl } = rpcDefaults;
 const log = createLogger('general');
 export const RESERVED_SESSION_SLUGS = getReservedLegacySessionSlugs();
 export const REQUIRED_SESSION_SLUG_ERROR = 'A session slug is required.';
@@ -461,7 +460,6 @@ export const __test__isSessionWizardDevMode = (
 ): boolean => toStr(proc?.env?.NODE_ENV).trim().toLowerCase() !== 'production';
 
 const DEV_PERSIST_WORKER_SECRETS = __test__isSessionWizardDevMode();
-const DEFAULT_NEW_SESSION_SBT_TAGS = 'group, event, idea, demographic, location';
 const METADATA_FIELD_ORDER = [
   'networkChainId',
   'sessionId',
@@ -678,138 +676,7 @@ const clearSessionWizardCache = () => {
   }
 };
 
-const normalizeDraftShape = (draftIn: AnyRecord = {}): DraftState => {
-  const draft = normalizeSessionNaming(draftIn && typeof draftIn === 'object' ? draftIn : {}) as DraftState;
-  const chainId = Number(draft.networkChainId || DEFAULT_CHAIN_ID || 0) || DEFAULT_CHAIN_ID;
-  draft.sessionName = toStr(draft.sessionName || '').trim();
-  draft.sessionInfo = toStr(draft.sessionInfo || '').trim();
-  if (!draft.sessionInfoEncrypted) {
-    delete draft.sessionInfoEncrypted;
-  }
-
-  const headerCandidate = toStr(draft.sessionHeader || draft.sessionHeaderImg).trim();
-  if (headerCandidate) {
-    draft.sessionHeader = headerCandidate;
-  }
-  delete draft.sessionHeaderImg;
-  delete draft.orgHeader;
-  delete draft.orgHeaderImg;
-  delete draft.orderHeaderImg;
-
-  const ai = (draft.ai && typeof draft.ai === 'object') ? draft.ai : {};
-  const fallbackProvider = normalizeAiProvider(ai.mode || ai.provider || 'openai');
-  ai.models = normalizeAiModels(ai.models, fallbackProvider, ai.transcription);
-  delete ai.mode;
-  delete ai.provider;
-  delete ai.providers;
-  delete ai.transcription;
-  draft.ai = ai;
-
-  if (!draft.rpc || typeof draft.rpc !== 'object') {
-    draft.rpc = {
-      provider: 'default',
-      providers: {
-        path: {
-          rpcUrl: '',
-          rpcUrlsByChainId: {},
-          apiKey: '',
-          encryptedApiKey: '',
-        },
-      },
-    };
-  }
-  const pathProvider = draft.rpc?.providers?.path || draft.rpc?.path || {};
-  if (!toStr(pathProvider.rpcUrl).trim()) {
-    pathProvider.rpcUrl = getPathRpcUrl(chainId);
-  }
-  if (!draft.rpc.providers) draft.rpc.providers = {};
-  draft.rpc.providers.path = pathProvider;
-
-  if (!draft.faucet || typeof draft.faucet !== 'object') {
-    draft.faucet = {
-      rpcUrl: '',
-      amountEth: '0.0002',
-      balanceThresholdEth: '0.001',
-      privateKey: '',
-      encryptedPrivateKey: '',
-    };
-  }
-  if (!toStr(draft.faucet.rpcUrl).trim()) {
-    draft.faucet.rpcUrl = getDefaultHttpRpc(chainId) || draft.faucet.rpcUrl;
-  }
-  const resolvedAutoFeature = resolveSessionWizardAutoFeatureBySessionSlug(draft);
-  delete draft.autoFeatureSBTsWithFeaturedSbtTags;
-  if (typeof resolvedAutoFeature !== 'boolean') {
-    draft.autoFeatureSBTsBySessionSlug = true;
-  } else {
-    draft.autoFeatureSBTsBySessionSlug = resolvedAutoFeature;
-  }
-  if (typeof draft.embeddedDeployHelperEnabled !== 'boolean') {
-    draft.embeddedDeployHelperEnabled = CE_DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED !== false;
-  }
-
-  return normalizeLitMetadataNetwork(draft);
-};
-
-const DEFAULT_TEMPLATE: DraftState = (() => {
-  const base = getDemoTemplateSeed('wizardBase') as DraftState;
-  const draft = deepClone(base) as DraftState;
-  draft.slug = DEFAULT_SESSION_SLUG;
-  draft.sessionName = '';
-  draft.sessionInfo = '';
-  draft.sessionHeader = '';
-  delete draft.sessionHeaderImg;
-  delete draft.sessionInfoEncrypted;
-  draft.corsWorkerUrl = '';
-  draft.defaultTags = '';
-  draft.defaultSbtTags = DEFAULT_NEW_SESSION_SBT_TAGS;
-  draft.questionsGenPrompt = '';
-  draft.defaultFilterState = draft.defaultFilterState ?? null;
-  // The wizard seed reuses the default-session demo config, but fresh `/new`
-  // drafts should start with session-group auto-feature enabled.
-  delete draft.autoFeatureSBTsWithFeaturedSbtTags;
-  draft.autoFeatureSBTsBySessionSlug = true;
-  draft.embeddedDeployHelperEnabled = CE_DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED !== false;
-  draft.litCredentials = {};
-  draft.perMemberSpendLimits = draft.perMemberSpendLimits || { ai: '', arweave: '', txGas: '' };
-  draft.arweave = draft.arweave || { jwk: '', encryptedJwk: '' };
-  draft.faucet = draft.faucet || {
-    rpcUrl: '',
-    amountEth: '0.0002',
-    balanceThresholdEth: '0.001',
-    privateKey: '',
-    encryptedPrivateKey: '',
-  };
-  delete draft.sponsoredSbtAddress;
-  draft.sponsored = {
-    ...(draft.sponsored && typeof draft.sponsored === 'object' ? draft.sponsored : {}),
-    defaultGateId: 'gate-1',
-    gates: {},
-    resources: {},
-  };
-  const aiModels = (draft.ai?.models && typeof draft.ai.models === 'object') ? draft.ai.models : {};
-  draft.ai = {
-    ...(draft.ai && typeof draft.ai === 'object' ? draft.ai : {}),
-    reasoningEffort: DEFAULT_REASONING_EFFORT,
-    models: {
-      ...aiModels,
-      fast: {
-        ...(aiModels.fast && typeof aiModels.fast === 'object' ? aiModels.fast : {}),
-        provider: 'openai',
-        model: DEFAULT_AI_MODELS.fast,
-      },
-      thinking: {
-        ...(aiModels.thinking && typeof aiModels.thinking === 'object' ? aiModels.thinking : {}),
-        provider: 'openai',
-        model: DEFAULT_AI_MODELS.thinking,
-      },
-    },
-  };
-  if (draft.lit && typeof draft.lit === 'object') {
-    draft.lit.defaultGateId = 'gate-1';
-  }
-  return normalizeDraftShape(draft);
-})();
+const DEFAULT_TEMPLATE: DraftState = buildSessionWizardDefaultTemplate() as DraftState;
 
 export const __test__getSessionWizardDefaultAiSettings = (): AnyRecord => deepClone(DEFAULT_TEMPLATE.ai || {});
 
