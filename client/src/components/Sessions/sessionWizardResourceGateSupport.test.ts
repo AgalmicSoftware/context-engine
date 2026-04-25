@@ -1,0 +1,67 @@
+import {
+  buildSessionWizardGateOptions,
+  normalizeSessionWizardGateIds,
+  resolveSessionWizardResourceGate,
+  resolveSessionWizardResourceGateIds,
+} from './sessionWizardResourceGateSupport';
+
+describe('sessionWizardResourceGateSupport', () => {
+  const gates = [
+    {
+      id: 'gate-1',
+      label: 'Gate 1',
+      color: '#111111',
+      mode: 'any',
+      chainId: 84532,
+      perMemberLimit: 2,
+      sbts: [{ address: '0xaaa', name: 'A' }],
+    },
+    {
+      id: 'gate-2',
+      label: 'Gate 2',
+      color: '#222222',
+      mode: 'all',
+      chainId: 11155420,
+      perMemberLimit: 4,
+      sbts: [{ address: '0xbbb', name: 'B' }],
+    },
+  ];
+
+  it('builds gate option labels for selectors', () => {
+    expect(buildSessionWizardGateOptions(gates)).toEqual([
+      { id: 'gate-1', label: 'Gate 1', color: '#111111' },
+      { id: 'gate-2', label: 'Gate 2', color: '#222222' },
+    ]);
+  });
+
+  it('normalizes gate ids and falls back to available/default gates', () => {
+    expect(normalizeSessionWizardGateIds([' gate-1 ', '', null])).toEqual(['gate-1']);
+    expect(normalizeSessionWizardGateIds(' gate-2 ')).toEqual(['gate-2']);
+    expect(resolveSessionWizardResourceGateIds(['missing'], 'gate-2', gates)).toEqual(['gate-2']);
+    expect(resolveSessionWizardResourceGateIds([], '', gates)).toEqual(['gate-1']);
+  });
+
+  it('resolves resource gates and reports conflicts across multiple gates', () => {
+    expect(resolveSessionWizardResourceGate(['gate-1', 'gate-2'], 'gate-1', gates)).toEqual({
+      gateId: 'gate-1',
+      gateIds: ['gate-1', 'gate-2'],
+      sbts: [
+        { address: '0xaaa', name: '0xaaa' },
+        { address: '0xbbb', name: '0xbbb' },
+      ],
+      mode: 'any',
+      chainId: 84532,
+      perMemberLimit: 2,
+      hasConflicts: true,
+      conflictSummary: {
+        modeConflicts: true,
+        chainIdConflicts: true,
+        perMemberLimitConflicts: true,
+      },
+    });
+  });
+
+  it('returns null when no gate can be resolved', () => {
+    expect(resolveSessionWizardResourceGate([], '', [])).toBeNull();
+  });
+});
