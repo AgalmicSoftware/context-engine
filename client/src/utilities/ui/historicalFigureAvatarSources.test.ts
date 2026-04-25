@@ -15,7 +15,7 @@ const APPROVED_REMOTE_PREFIXES = [
   'https://upload.wikimedia.org/wikipedia/commons/', // intentional: real URL - verifies approved Wikimedia avatar source allowlist
 ];
 
-const getDuplicateTopLevelManifestKeys = (manifestFilename) => {
+const getDuplicateTopLevelManifestKeys = (manifestFilename: string): string[] => {
   const manifestPath = path.resolve(__dirname, manifestFilename);
   const manifestRaw = fs.readFileSync(manifestPath, 'utf8');
   const topLevelKeyPattern = /^  "([^"]+)": \{$/gm;
@@ -32,7 +32,7 @@ const getDuplicateTopLevelManifestKeys = (manifestFilename) => {
     .map(([key]) => key);
 };
 
-const expectApprovedAvatarSource = (value) => {
+const expectApprovedAvatarSource = (value: unknown) => {
   const src = String(value || '').trim();
   expect(src).toBeTruthy();
   expect(src).not.toMatch(/^[A-Z]{4,}_[A-Z]+:/);
