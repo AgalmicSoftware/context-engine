@@ -11,7 +11,7 @@ const ENV_KEYS = [
 ];
 
 const ORIGINAL_ENV = ENV_KEYS.reduce<Record<string, string | undefined>>((acc, key) => {
-  acc[key] = processEnv[key];
+  acc[key] = process.env[key];
   return acc;
 }, {});
 
