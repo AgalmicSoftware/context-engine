@@ -1,5 +1,37 @@
 import { toStr } from '../../utilities/shared/primitives.js';
+import { CLOUDFLARE_WORKER_BUNDLE_URL } from '../../variables/appConfig.js';
+import {
+  hasSponsoredBundleFields,
+  normalizeSparseSponsoredBundlePayload,
+} from '../../utilities/arweave/sponsoredBundles.js';
+import { normalizeWorkerUrl as normalizeWorkerAuthUrl } from '../../utilities/worker/workerAuth.js';
 import type { AnyRecord } from '../shellTypes';
+
+export const getSessionWizardNormalModeBundleUrlOverrideValidationError = (value: unknown = ''): string => {
+  const raw = toStr(value).trim();
+  if (!raw) return '';
+  try {
+    const parsed = new URL(raw);
+    if (parsed.protocol !== 'https:') {
+      return 'Manual bundle URL override must use an https:// URL.';
+    }
+  } catch (_) {
+    return 'Manual bundle URL override must use an https:// URL.';
+  }
+  return '';
+};
+
+const getValidSessionWizardNormalModeBundleUrlOverride = (value: unknown = ''): string => (
+  getSessionWizardNormalModeBundleUrlOverrideValidationError(value)
+    ? ''
+    : toStr(value).trim()
+);
+
+const resolveSponsoredBundleBootstrapWorkerUrl = (bundle: AnyRecord = {}): string => normalizeWorkerAuthUrl(toStr(
+  bundle?.bootstrapWorkerUrl ||
+  bundle?.meta?.sourceWorkerUrl ||
+  ''
+).trim());
 
 export const resolveSessionWizardShouldAutoDeployWorker = ({
   workerMode = 'default',
@@ -33,12 +65,121 @@ export const buildSessionWizardPublishPlan = ({
   return steps;
 };
 
+export const resolveSessionWizardBundleUrlForMode = ({
+  wizardMode = 'advanced',
+  bundleUrl = '',
+  normalModeBundleUrlOverride = '',
+  normalModeDefaultBundleUrl = CLOUDFLARE_WORKER_BUNDLE_URL,
+}: {
+  wizardMode?: string;
+  bundleUrl?: unknown;
+  normalModeBundleUrlOverride?: unknown;
+  normalModeDefaultBundleUrl?: unknown;
+} = {}) => {
+  const normalizedBundleUrl = toStr(bundleUrl).trim();
+  if (wizardMode !== 'normal') return normalizedBundleUrl;
+  const normalizedNormalModeBundleUrlOverride = getValidSessionWizardNormalModeBundleUrlOverride(
+    normalModeBundleUrlOverride
+  );
+  return normalizedNormalModeBundleUrlOverride ||
+    toStr(normalModeDefaultBundleUrl).trim();
+};
+
+export const resolveSponsoredBundleDeployReadiness = ({
+  wizardMode = 'advanced',
+  sponsoredBundle = {},
+  deployForm = {},
+  workerSecretsEnabled = true,
+  missingWorkerSecrets = [],
+  hasBundleFile = false,
+  normalModeBundleUrlOverride = '',
+  normalModeDefaultBundleUrl = CLOUDFLARE_WORKER_BUNDLE_URL,
+}: {
+  wizardMode?: string;
+  sponsoredBundle?: AnyRecord;
+  deployForm?: AnyRecord;
+  workerSecretsEnabled?: boolean;
+  missingWorkerSecrets?: unknown[];
+  hasBundleFile?: boolean;
+  normalModeBundleUrlOverride?: unknown;
+  normalModeDefaultBundleUrl?: unknown;
+} = {}) => {
+  const normalizedBundle = normalizeSparseSponsoredBundlePayload(sponsoredBundle) as AnyRecord;
+  const hasAppliedSponsoredBundle = hasSponsoredBundleFields(normalizedBundle);
+  const workerName = toStr(deployForm?.workerName || '').trim();
+  const bundleUrl = resolveSessionWizardBundleUrlForMode({
+    wizardMode,
+    bundleUrl: deployForm?.bundleUrl,
+    normalModeBundleUrlOverride,
+    normalModeDefaultBundleUrl,
+  });
+  const hasWorkerBundleSource = !!bundleUrl || !!hasBundleFile;
+  const bootstrapWorkerUrl = resolveSponsoredBundleBootstrapWorkerUrl(normalizedBundle);
+  const deployGrantToken = toStr(normalizedBundle?.deployGrantToken || '').trim();
+  const normalizedMissingWorkerSecrets = Array.isArray(missingWorkerSecrets)
+    ? missingWorkerSecrets.map((value) => toStr(value).trim()).filter(Boolean)
+    : [];
+  const missing: string[] = [];
+  if (!hasAppliedSponsoredBundle) missing.push('Sponsored bundle');
+  if (!workerSecretsEnabled) missing.push('Worker secrets mode');
+  if (!workerName) missing.push('Worker name');
+  if (!bootstrapWorkerUrl) missing.push('Bootstrap worker URL');
+  if (!deployGrantToken) missing.push('Deploy grant token');
+  if (!hasWorkerBundleSource) missing.push('Worker bundle URL');
+  missing.push(...normalizedMissingWorkerSecrets);
+  return {
+    active: hasAppliedSponsoredBundle,
+    ready: hasAppliedSponsoredBundle && missing.length === 0,
+    missing,
+  };
+};
+
 export const buildSessionWizardPublishStepNumbers = (options: AnyRecord = {}): Record<string, number> => (
   buildSessionWizardPublishPlan(options).reduce<Record<string, number>>((acc, stepKey, index) => {
     acc[stepKey] = index + 1;
     return acc;
   }, {})
 );
+
+export const resolveSessionWizardSponsoredAutoDeployReadiness = ({
+  wizardMode = 'advanced',
+  sponsoredBundle = {},
+  deployForm = {},
+  workerSecretsEnabled = true,
+  currentWorkerSecrets = {},
+  getMissingWorkerSecretsForDeploy = () => [],
+  hasBundleFile = false,
+  normalModeBundleUrlOverride = '',
+  normalModeDefaultBundleUrl = CLOUDFLARE_WORKER_BUNDLE_URL,
+}: {
+  wizardMode?: string;
+  sponsoredBundle?: AnyRecord;
+  deployForm?: AnyRecord;
+  workerSecretsEnabled?: boolean;
+  currentWorkerSecrets?: AnyRecord;
+  getMissingWorkerSecretsForDeploy?: ((secretsSnapshot?: AnyRecord) => string[]) | null;
+  hasBundleFile?: boolean;
+  normalModeBundleUrlOverride?: unknown;
+  normalModeDefaultBundleUrl?: unknown;
+} = {}) => {
+  const resolveMissingWorkerSecrets = (
+    typeof getMissingWorkerSecretsForDeploy === 'function'
+      ? getMissingWorkerSecretsForDeploy
+      : () => []
+  );
+  return resolveSponsoredBundleDeployReadiness({
+    wizardMode,
+    sponsoredBundle,
+    deployForm,
+    workerSecretsEnabled,
+    missingWorkerSecrets: workerSecretsEnabled
+      ? resolveMissingWorkerSecrets(currentWorkerSecrets)
+      : [],
+    hasBundleFile,
+    normalModeBundleUrlOverride,
+    normalModeDefaultBundleUrl,
+  });
+};
 
 export const getSessionWizardPublishProgressPercent = ({
   publishStep = 0,
