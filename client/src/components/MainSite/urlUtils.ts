@@ -2,18 +2,23 @@
  * @module components/MainSite/urlUtils
  */
 
-import {
-  buildPublicRoute as buildSharedPublicRoute,
-  readPublicUrlBasePath,
-  stripPublicUrlBasePath,
-} from '../../utilities/ui/publicUrl.js';
+import { buildPublicRoute as buildSharedPublicRoute, readPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
 import { isRouteResponderAddress } from './mainSiteUtils.js';
 
 export const getConfiguredPublicBasePath = (): string => readPublicUrlBasePath();
 
 export const buildPublicRoute = (pathname = ''): string => buildSharedPublicRoute(pathname);
 
-export const stripConfiguredPublicBasePath = (pathname = ''): string => stripPublicUrlBasePath(pathname);
+export const stripConfiguredPublicBasePath = (pathname = ''): string => {
+  const rawPath = String(pathname || '').trim();
+  const basePath = getConfiguredPublicBasePath();
+  if (!rawPath || !basePath || basePath === '/') return rawPath;
+  if (rawPath === basePath || rawPath === `${basePath}/`) return '/';
+  if (rawPath.startsWith(`${basePath}/`)) {
+    return rawPath.slice(basePath.length) || '/';
+  }
+  return rawPath;
+};
 
 export const buildPublicUrl = (pathname = '', search = '', hash = ''): string => {
   const normalizedSearch = search
@@ -25,11 +30,7 @@ export const buildPublicUrl = (pathname = '', search = '', hash = ''): string =>
   return `${buildPublicRoute(pathname)}${normalizedSearch}${normalizedHash}`;
 };
 
-export const replaceRouteResponderQueryParam = (
-  pathname: string | null | undefined,
-  responder: unknown,
-  search = ''
-): void => {
+export const replaceRouteResponderQueryParam = (pathname: any, responder: any, search = ''): void => {
   if (typeof window === 'undefined' || !pathname || !isRouteResponderAddress(responder)) return;
   const params = new URLSearchParams(String(search || ''));
   params.set('responder', String(responder || '').trim());
