@@ -278,6 +278,15 @@ import {
   resolveSessionHeaderImageFormat,
 } from './sessionWizardUiSupport';
 import {
+  buildSessionWizardAdminUrl as buildAdminUrl,
+  buildSessionWizardSessionUrl as buildSessionUrl,
+  getSessionWizardExplorerBaseUrl as getExplorerBaseUrl,
+  normalizeSessionWizardArweaveUri as normalizeArweaveUri,
+  normalizeSessionWizardSlug as normalizeSlug,
+  normalizeSessionWizardWorkerUrl as normalizeWorkerUrl,
+  parseSessionWizardArweaveTxId as parseArweaveTxId,
+} from './sessionWizardUrlSupport';
+import {
   buildSessionWizardWorkerRpcUrlMap,
   getSessionWizardWorkerDeployValidationError,
   resolveFallbackRpcUrl,
@@ -4251,38 +4260,6 @@ const SessionWizard = ({
     scheduleAdminUrlStatusReset();
   };
 
-  const isArweaveTxId = (value) => /^[a-z0-9_-]{43}$/i.test(value);
-  const isArweaveGatewayHost = (host) => host.endsWith('arweave.net') || host.endsWith('arweave.dev') || host.endsWith('arweave.app');
-  const extractArweaveTxId = (raw) => {
-    const value = toStr(raw).trim();
-    if (!value) return '';
-    if (value.startsWith('ar://')) {
-      const txId = value.slice(5).trim();
-      return isArweaveTxId(txId) ? txId : '';
-    }
-    try {
-      const parsed = new URL(value);
-      const host = parsed.hostname.toLowerCase();
-      const segments = parsed.pathname.split('/').filter(Boolean);
-      const candidate = segments[segments.length - 1] || '';
-      if (isArweaveGatewayHost(host) && isArweaveTxId(candidate)) {
-        return candidate;
-      }
-    } catch (e) { log.warn('SessionWizard: fallback', e); }
-    return isArweaveTxId(value) ? value : '';
-  };
-
-  const parseArweaveTxId = (raw) => extractArweaveTxId(raw);
-
-  const normalizeArweaveUri = (raw) => {
-    const value = toStr(raw).trim();
-    if (!value) return '';
-    if (value.startsWith('ar://')) return value;
-    const txId = extractArweaveTxId(value);
-    if (txId) return `ar://${txId}`;
-    return value;
-  };
-
   const sessionIdHex = sessionRegistryUtils.normalizeSessionIdHex(sessionId);
   const sessionIdDisplay = sessionRegistryUtils.formatSessionId(sessionId) || toStr(sessionId).trim();
 
@@ -4349,28 +4326,6 @@ const SessionWizard = ({
       setJsonCopied(true);
       scheduleJsonCopiedReset();
     }).catch((e) => { void e; notify.warn('Copy failed'); });
-  };
-
-  const getExplorerBaseUrl = (chainId) => {
-    const chain = getChainById(Number(chainId || 0));
-    return toStr(chain?.blockExplorers?.default?.url).trim();
-  };
-
-  const normalizeSlug = (slug) => sessionRegistryUtils.normalizeSlug(slug);
-  const normalizeWorkerUrl = (url) => normalizeWorkerAuthUrl(url);
-  const buildSessionUrl = ({ slug }) => {
-    const normalizedSlug = normalizeSlug(slug);
-    if (!normalizedSlug) return '';
-    const base = typeof window !== 'undefined' && window.location ? window.location.origin : '';
-    return `${base}/session/${encodeURIComponent(normalizedSlug)}`;
-  };
-  const buildAdminUrl = ({ sessionId, chainId }) => {
-    const params = new URLSearchParams();
-    if (sessionId) params.set('sessionId', sessionId);
-    if (chainId) params.set('chainId', String(chainId));
-    const base = typeof window !== 'undefined' && window.location ? window.location.origin : '';
-    const query = params.toString();
-    return `${base}/admin${query ? `?${query}` : ''}`;
   };
 
   const resolveWorkerBaseUrl = () => {
