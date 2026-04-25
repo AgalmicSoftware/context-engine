@@ -1,17 +1,20 @@
 const LOCKED_FIELD_MASK = '[encrypted]';
 
-type UnknownRecord = Record<string, unknown>;
-
-const isObj = (value: unknown): value is UnknownRecord =>
-  value !== null && typeof value === 'object' && !Array.isArray(value);
+const isObj = (value: unknown): value is Record<string, any> => (
+  value !== null &&
+  typeof value === 'object' &&
+  !Array.isArray(value)
+);
 
 const hasOwn = (obj: unknown, key: string): boolean => Object.prototype.hasOwnProperty.call(obj || {}, key);
 
-const getTargets = (payload: unknown): UnknownRecord =>
-  isObj(payload) && isObj(payload.encryption) && isObj(payload.encryption.targets) ? payload.encryption.targets : {};
+const getTargets = (payload: any): Record<string, any> => (
+  isObj(payload?.encryption?.targets) ? payload.encryption.targets : {}
+);
 
-const getEncryptedFields = (payload: unknown): UnknownRecord =>
-  isObj(payload) && isObj(payload.encryptedFields) ? payload.encryptedFields : {};
+const getEncryptedFields = (payload: any): Record<string, any> => (
+  isObj(payload?.encryptedFields) ? payload.encryptedFields : {}
+);
 
 const hasEnvelope = (value: unknown): boolean => {
   if (value === undefined || value === null || value === false) return false;
@@ -21,15 +24,13 @@ const hasEnvelope = (value: unknown): boolean => {
   return true;
 };
 
-const stringOrEmpty = (value: unknown): string => (typeof value === 'string' ? value : '');
+const isTargetEnabled = (targets: Record<string, any>, aliases: string[]): boolean => (
+  aliases.some((alias) => targets?.[alias] === true)
+);
 
-const stringOrNull = (value: unknown): string | null => (typeof value === 'string' ? value : null);
-
-const isTargetEnabled = (targets: UnknownRecord, aliases: string[]): boolean =>
-  aliases.some((alias) => targets?.[alias] === true);
-
-const hasAliasEnvelope = (payload: unknown, aliases: string[]): boolean =>
-  isObj(payload) && aliases.some((alias) => hasEnvelope(payload[alias]));
+const hasAliasEnvelope = (payload: any, aliases: string[]): boolean => (
+  aliases.some((alias) => hasEnvelope(payload?.[alias]))
+);
 
 const isNeutralLockedValue = (value: unknown): boolean => {
   if (value === undefined || value === null) return true;
@@ -43,8 +44,9 @@ const isNeutralLockedValue = (value: unknown): boolean => {
 
 const formatPath = (path: string, field: string): string => (path ? `${path}.${field}` : field);
 
-const buildLeakError = (path: string, field: string): Error =>
-  new Error(`Locked payload plaintext leak: ${formatPath(path, field)} must be neutral when encrypted.`);
+const buildLeakError = (path: string, field: string): Error => (
+  new Error(`Locked payload plaintext leak: ${formatPath(path, field)} must be neutral when encrypted.`)
+);
 
 const assertNeutralWhenLocked = ({
   payload,
@@ -54,7 +56,7 @@ const assertNeutralWhenLocked = ({
   encryptedAliases = [],
   targetAliases = [field],
 }: {
-  payload: unknown;
+  payload: any;
   field: string;
   path: string;
   encryptedField?: string;
@@ -74,7 +76,7 @@ const assertNeutralWhenLocked = ({
   }
 };
 
-const assertResponseFieldNoLeak = (field: unknown, path: string): void => {
+const assertResponseFieldNoLeak = (field: any, path: string): void => {
   if (!isObj(field)) return;
   const encrypted = field.encrypted === true || hasEnvelope(field.encryptedPortion);
   if (!encrypted) return;
@@ -83,7 +85,7 @@ const assertResponseFieldNoLeak = (field: unknown, path: string): void => {
   }
 };
 
-const assertResponseEntryNoLeak = (entry: unknown, path: string): void => {
+const assertResponseEntryNoLeak = (entry: any, path: string): void => {
   if (!isObj(entry)) return;
   assertResponseFieldNoLeak(entry.answer, formatPath(path, 'answer'));
   assertResponseFieldNoLeak(entry.additional, formatPath(path, 'additional'));
@@ -98,7 +100,7 @@ const assertResponseEntryNoLeak = (entry: unknown, path: string): void => {
   });
 };
 
-const validateSurveyMetadataNoLeak = (payload: unknown, path: string): void => {
+const validateSurveyMetadataNoLeak = (payload: any, path: string): void => {
   assertNeutralWhenLocked({
     payload,
     field: 'title',
@@ -117,7 +119,7 @@ const validateSurveyMetadataNoLeak = (payload: unknown, path: string): void => {
   });
 };
 
-const validateQuestionMetadataNoLeak = (payload: unknown, path: string): void => {
+const validateQuestionMetadataNoLeak = (payload: any, path: string): void => {
   assertNeutralWhenLocked({
     payload,
     field: 'prompt',
@@ -152,16 +154,14 @@ const validateQuestionMetadataNoLeak = (payload: unknown, path: string): void =>
   });
 };
 
-const validateSbtMetadataNoLeak = (payload: unknown, path: string): void => {
-  (
-    [
-      ['name', ['nameEncrypted', 'encryptedName']],
-      ['description', ['descriptionEncrypted', 'encryptedDescription']],
-      ['tags', ['tagsEncrypted', 'encryptedTags']],
-      ['documentURLs', ['documentURLsEncrypted', 'docUrlsEncrypted', 'encryptedDocumentURLs', 'encryptedDocUrls']],
-      ['image', ['imageEncrypted', 'encryptedImage']],
-    ] as Array<[string, string[]]>
-  ).forEach(([field, aliases]) => {
+const validateSbtMetadataNoLeak = (payload: any, path: string): void => {
+  ([
+    ['name', ['nameEncrypted', 'encryptedName']],
+    ['description', ['descriptionEncrypted', 'encryptedDescription']],
+    ['tags', ['tagsEncrypted', 'encryptedTags']],
+    ['documentURLs', ['documentURLsEncrypted', 'docUrlsEncrypted', 'encryptedDocumentURLs', 'encryptedDocUrls']],
+    ['image', ['imageEncrypted', 'encryptedImage']],
+  ] as Array<[string, string[]]>).forEach(([field, aliases]) => {
     assertNeutralWhenLocked({
       payload,
       field,
@@ -174,8 +174,8 @@ const validateSbtMetadataNoLeak = (payload: unknown, path: string): void => {
 };
 
 export const validateNoLockedPlaintextInPayload = (
-  payload: unknown,
-  { family = 'auto', path = 'payload' }: { family?: string; path?: string } = {},
+  payload: any,
+  { family = 'auto', path = 'payload' }: { family?: string; path?: string } = {}
 ) => {
   if (!isObj(payload)) return payload;
 
@@ -183,8 +183,7 @@ export const validateNoLockedPlaintextInPayload = (
     if (family && family !== 'auto') return family;
     if (Array.isArray(payload.responses)) return 'survey_response_payload';
     if (isObj(payload.answer) || isObj(payload.additional)) return 'question_response_payload';
-    if (hasOwn(payload, 'surveyID') || hasOwn(payload, 'questionIDs') || hasOwn(payload, 'title'))
-      return 'survey_metadata';
+    if (hasOwn(payload, 'surveyID') || hasOwn(payload, 'questionIDs') || hasOwn(payload, 'title')) return 'survey_metadata';
     if (hasOwn(payload, 'prompt') || hasOwn(payload, 'options')) return 'question_metadata';
     if (isObj(payload.encryptedFields)) return 'sbt_metadata';
     return 'generic';
@@ -209,31 +208,29 @@ export const validateNoLockedPlaintextInPayload = (
 };
 
 export const sanitizeQuestionPromptForResponsePayload = (
-  question: unknown,
-  { isLocked = false }: { isLocked?: boolean } = {},
-): string => {
-  const source = isObj(question) ? question : {};
+  question: any,
+  { isLocked = false }: { isLocked?: boolean } = {}
+) => {
   const locked =
     isLocked ||
-    hasEnvelope(source.promptEncrypted) ||
-    hasEnvelope(source.encryptedPrompt) ||
-    isTargetEnabled(getTargets(source), ['questions', 'prompt']);
+    hasEnvelope(question?.promptEncrypted) ||
+    hasEnvelope(question?.encryptedPrompt) ||
+    isTargetEnabled(getTargets(question), ['questions', 'prompt']);
   if (locked) return LOCKED_FIELD_MASK;
-  return stringOrEmpty(source.prompt);
+  return question?.prompt ?? '';
 };
 
 export const sanitizeSurveyTitleForResponsePayload = (
-  survey: unknown,
-  { isLocked = false }: { isLocked?: boolean } = {},
-): string | null => {
-  const source = isObj(survey) ? survey : {};
+  survey: any,
+  { isLocked = false }: { isLocked?: boolean } = {}
+) => {
   const locked =
     isLocked ||
-    hasEnvelope(source.titleEncrypted) ||
-    hasEnvelope(source.encryptedTitle) ||
-    isTargetEnabled(getTargets(source), ['survey', 'title']);
+    hasEnvelope(survey?.titleEncrypted) ||
+    hasEnvelope(survey?.encryptedTitle) ||
+    isTargetEnabled(getTargets(survey), ['survey', 'title']);
   if (locked) return LOCKED_FIELD_MASK;
-  return stringOrNull(source.title);
+  return survey?.title ?? null;
 };
 
 export { LOCKED_FIELD_MASK };

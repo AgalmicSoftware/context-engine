@@ -6,48 +6,31 @@ import {
   PUBLIC_REPO_URL,
 } from '../../variables/publicRepoMetadata.js';
 
-type LocationLike =
-  | {
-      origin?: unknown;
-      pathname?: unknown;
-      search?: unknown;
-    }
-  | undefined;
+type LocationLike = {
+  origin?: unknown;
+  pathname?: unknown;
+  search?: unknown;
+} | undefined;
 
-type StructuredDataNode = Record<string, unknown>;
-
-type PublicPageStructuredData = {
-  '@context': 'https://schema.org';
-  '@graph': StructuredDataNode[];
-};
-
-export type PublicPageHeadState = {
-  title: string;
-  description: string;
-  image: string;
-  ogType: string;
-  twitterCard: string;
-  canonicalUrl: string;
-  ogUrl: string;
-};
-
-export const DEFAULT_PUBLIC_PAGE_TITLE = 'Context Engine | Deliberation Toolkit';
+export const DEFAULT_PUBLIC_PAGE_TITLE =
+  'Context Engine | Deliberation Toolkit';
 
 export const DEFAULT_PUBLIC_PAGE_DESCRIPTION =
   'Context Engine is a toolkit for AI-enhanced deliberation and sensemaking in large groups, with public and private participation, permanent records, and cryptographic access control.';
 
-export const DEFAULT_PUBLIC_PAGE_IMAGE = 'https://contextengine.sh/assets/img/context-engine-social-preview-square.png';
+export const DEFAULT_PUBLIC_PAGE_IMAGE = 'https://contextengine.xyz/android-chrome-512x512.png';
 export const DEFAULT_PUBLIC_SITE_NAME = 'Context Engine';
-export const DEFAULT_PUBLIC_SITE_URL = 'https://contextengine.sh/';
+export const DEFAULT_PUBLIC_SITE_URL = 'https://contextengine.xyz/';
 
 const PUBLIC_ORGANIZATION_ID = `${DEFAULT_PUBLIC_SITE_URL}#organization`;
 const PUBLIC_SOURCE_CODE_ID = `${DEFAULT_PUBLIC_SITE_URL}#source`;
 const PUBLIC_WEBSITE_ID = `${DEFAULT_PUBLIC_SITE_URL}#website`;
-const STRUCTURED_DATA_SELECTOR = 'script[type="application/ld+json"][data-ce-structured-data="public-page"]';
+const STRUCTURED_DATA_SELECTOR =
+  'script[type="application/ld+json"][data-ce-structured-data="public-page"]';
 
 const toStr = (value: unknown): string => String(value ?? '').trim();
 
-const ensureHeadNode = (selector: string, tagName: string, attrs: Record<string, string> = {}): HTMLElement => {
+const ensureHeadNode = (selector: string, tagName: string, attrs: Record<string, string> = {}) => {
   let node = document.head.querySelector(selector) as HTMLElement | null;
   if (node) return node;
   node = document.createElement(tagName) as HTMLElement;
@@ -58,13 +41,13 @@ const ensureHeadNode = (selector: string, tagName: string, attrs: Record<string,
   return node;
 };
 
-const setMetaContent = (selector: string, attrs: Record<string, string>, content: string): HTMLElement => {
+const setMetaContent = (selector: string, attrs: Record<string, string>, content: string) => {
   const node = ensureHeadNode(selector, 'meta', attrs);
   node.setAttribute('content', content);
   return node;
 };
 
-const setStructuredDataContent = (selector: string, attrs: Record<string, string>, content: string): HTMLElement => {
+const setStructuredDataContent = (selector: string, attrs: Record<string, string>, content: string) => {
   const node = ensureHeadNode(selector, 'script', attrs);
   node.textContent = content;
   return node;
@@ -120,7 +103,7 @@ const buildCanonicalSearch = (search: unknown, pathname = ''): string => {
 
   const params = new URLSearchParams(raw.startsWith('?') ? raw : `?${raw}`);
   const canonicalParams = new URLSearchParams();
-  const setCanonicalParam = (canonicalKey: string, aliases: string[] = []): void => {
+  const setCanonicalParam = (canonicalKey: string, aliases: string[] = []) => {
     for (const alias of aliases) {
       if (!params.has(alias)) continue;
       const normalizedValue = normalizeCanonicalParamValue(params.get(alias));
@@ -153,7 +136,7 @@ const buildCanonicalSearch = (search: unknown, pathname = ''): string => {
 };
 
 export const buildCanonicalPublicUrl = (
-  locationLike: LocationLike = typeof window !== 'undefined' ? window.location : undefined,
+  locationLike: LocationLike = (typeof window !== 'undefined' ? window.location : undefined)
 ): string => {
   const windowLocation = typeof window !== 'undefined' ? window.location : undefined;
   const origin = toStr(locationLike?.origin) || toStr(windowLocation?.origin);
@@ -164,13 +147,15 @@ export const buildCanonicalPublicUrl = (
 
 export const buildDeploymentDiscoveryUrl = (
   assetPath: unknown,
-  locationLike: LocationLike = typeof window !== 'undefined' ? window.location : undefined,
+  locationLike: LocationLike = (typeof window !== 'undefined' ? window.location : undefined)
 ): string => {
   const windowLocation = typeof window !== 'undefined' ? window.location : undefined;
   const origin = toStr(locationLike?.origin) || toStr(windowLocation?.origin);
   const basePath = readPublicUrlBasePath();
   const normalizedAssetPath = toStr(assetPath).startsWith('/') ? toStr(assetPath) : `/${toStr(assetPath)}`;
-  return origin ? `${origin}${basePath}${normalizedAssetPath}` : `${basePath}${normalizedAssetPath}`;
+  return origin
+    ? `${origin}${basePath}${normalizedAssetPath}`
+    : `${basePath}${normalizedAssetPath}`;
 };
 
 const buildPublicPageStructuredData = ({
@@ -183,7 +168,7 @@ const buildPublicPageStructuredData = ({
   description?: string;
   canonicalUrl?: string;
   location?: LocationLike;
-} = {}): PublicPageStructuredData => ({
+} = {}) => ({
   '@context': 'https://schema.org',
   '@graph': [
     {
@@ -228,12 +213,10 @@ const buildPublicPageStructuredData = ({
 });
 
 export const syncPublicPageHead = ({
-  location = typeof window !== 'undefined' ? window.location : undefined,
+  location = (typeof window !== 'undefined' ? window.location : undefined),
   title = DEFAULT_PUBLIC_PAGE_TITLE,
   description = DEFAULT_PUBLIC_PAGE_DESCRIPTION,
   image = DEFAULT_PUBLIC_PAGE_IMAGE,
-  ogType = 'website',
-  twitterCard = 'summary',
   canonicalUrl,
   ogUrl,
 }: {
@@ -241,31 +224,35 @@ export const syncPublicPageHead = ({
   title?: unknown;
   description?: unknown;
   image?: unknown;
-  ogType?: unknown;
-  twitterCard?: unknown;
   canonicalUrl?: unknown;
   ogUrl?: unknown;
-} = {}): PublicPageHeadState | null => {
+} = {}) => {
   if (typeof document === 'undefined') return null;
 
   const resolvedTitle = toStr(title) || DEFAULT_PUBLIC_PAGE_TITLE;
   const resolvedDescription = toStr(description) || DEFAULT_PUBLIC_PAGE_DESCRIPTION;
   const resolvedImage = toStr(image) || DEFAULT_PUBLIC_PAGE_IMAGE;
-  const resolvedOgType = toStr(ogType) || 'website';
-  const resolvedTwitterCard = toStr(twitterCard) || 'summary';
   const resolvedCanonicalUrl = toStr(canonicalUrl) || buildCanonicalPublicUrl(location);
   const resolvedOgUrl = toStr(ogUrl) || resolvedCanonicalUrl;
 
   document.title = resolvedTitle;
   setMetaContent('meta[name="description"]', { name: 'description' }, resolvedDescription);
-  setMetaContent('meta[property="og:type"]', { property: 'og:type' }, resolvedOgType);
+  setMetaContent('meta[property="og:type"]', { property: 'og:type' }, 'website');
   setMetaContent('meta[property="og:url"]', { property: 'og:url' }, resolvedOgUrl);
   setMetaContent('meta[property="og:title"]', { property: 'og:title' }, resolvedTitle);
-  setMetaContent('meta[property="og:description"]', { property: 'og:description' }, resolvedDescription);
+  setMetaContent(
+    'meta[property="og:description"]',
+    { property: 'og:description' },
+    resolvedDescription
+  );
   setMetaContent('meta[property="og:image"]', { property: 'og:image' }, resolvedImage);
-  setMetaContent('meta[name="twitter:card"]', { name: 'twitter:card' }, resolvedTwitterCard);
+  setMetaContent('meta[name="twitter:card"]', { name: 'twitter:card' }, 'summary');
   setMetaContent('meta[name="twitter:title"]', { name: 'twitter:title' }, resolvedTitle);
-  setMetaContent('meta[name="twitter:description"]', { name: 'twitter:description' }, resolvedDescription);
+  setMetaContent(
+    'meta[name="twitter:description"]',
+    { name: 'twitter:description' },
+    resolvedDescription
+  );
   setMetaContent('meta[name="twitter:image"]', { name: 'twitter:image' }, resolvedImage);
 
   if (resolvedCanonicalUrl) {
@@ -285,16 +272,14 @@ export const syncPublicPageHead = ({
         description: resolvedDescription,
         canonicalUrl: resolvedCanonicalUrl || DEFAULT_PUBLIC_SITE_URL,
         location,
-      }),
-    ),
+      })
+    )
   );
 
   return {
     title: resolvedTitle,
     description: resolvedDescription,
     image: resolvedImage,
-    ogType: resolvedOgType,
-    twitterCard: resolvedTwitterCard,
     canonicalUrl: resolvedCanonicalUrl,
     ogUrl: resolvedOgUrl,
   };
