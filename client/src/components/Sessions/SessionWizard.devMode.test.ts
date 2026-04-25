@@ -1,4 +1,4 @@
-import { __test__isSessionWizardDevMode } from './sessionWizardConfig';
+import { __test__isSessionWizardDevMode } from './SessionWizard';
 
 describe('SessionWizard dev mode detection', () => {
   it('treats missing process globals as non-production', () => {
@@ -8,6 +8,6 @@ describe('SessionWizard dev mode detection', () => {
   it('disables dev-only persistence in production', () => {
     expect(__test__isSessionWizardDevMode({
       env: { NODE_ENV: 'production', PUBLIC_URL: '' },
-    })).toBe(false);
+    } as any)).toBe(false);
   });
 });

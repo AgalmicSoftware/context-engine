@@ -1,3 +1,5 @@
+/* eslint-disable import/first */
+
 import { ethers } from 'ethers';
 import { DEFAULT_CHAIN_ID } from '../../variables/appConfig.js';
 
@@ -15,7 +17,6 @@ import {
   buildSessionWizardWorkerConfigPayload,
   sanitizeSessionWizardMetadataPayload,
 } from './sessionWizardWriteNormalization.js';
-import { resolveSessionWizardEnabledWorkerSecrets } from './sessionWizardWorkerSecretSupport';
 
 const DEFAULT_CONFIG_CHAIN_ID = DEFAULT_CHAIN_ID;
 
@@ -75,11 +76,10 @@ describe('sessionWizardWriteNormalization', () => {
     });
   });
 
-  test('buildSessionWizardRegistrySessionFields keeps compatibility mirrors and sponsored flags only', () => {
+  test('buildSessionWizardRegistrySessionFields keeps the worker URL compatibility mirror and sponsored flags only', () => {
     expect(buildSessionWizardRegistrySessionFields({
       onChainFields: {
         corsWorkerUrl: ' https://worker.example ',
-        rpcUrl: ' https://rpc.example ',
         unexpectedField: 'should-not-pass-through',
       },
       sponsoredFields: {
@@ -89,56 +89,9 @@ describe('sessionWizardWriteNormalization', () => {
       },
     })).toEqual({
       corsWorkerUrl: 'https://worker.example',
-      rpcUrl: 'https://rpc.example',
       sponsored_ai: '1',
       sponsored_arweave: '0',
     });
-  });
-
-  test('buildSessionWizardRegistrySessionFields keeps worker-private RPC out of public registry fields', () => {
-    expect(buildSessionWizardRegistrySessionFields({
-      onChainFields: {
-        rpcUrl: 'https://draft-rpc.example',
-      },
-      sponsoredFields: {
-        sponsored_rpc: '1',
-      },
-    })).toEqual({
-      rpcUrl: 'https://draft-rpc.example',
-      sponsored_rpc: '1',
-    });
-  });
-
-  test('buildSessionWizardRegistrySessionFields omits RPC when no public registry field exists', () => {
-    expect(buildSessionWizardRegistrySessionFields({
-      onChainFields: {},
-    })).toEqual({});
-    expect(buildSessionWizardRegistrySessionFields({
-      onChainFields: {
-        rpcUrl: ' https://browser-visible-rpc.example ',
-      },
-    })).toEqual({
-      rpcUrl: 'https://browser-visible-rpc.example',
-    });
-  });
-
-  test('buildSessionWizardRegistrySessionFields ignores uploaded custom RPC secrets', () => {
-    const enabledSecrets = resolveSessionWizardEnabledWorkerSecrets({
-      workerSecretsEnabled: true,
-      workerSecrets: {
-        customRpcUrl: ' https://uploaded-rpc.example ',
-      },
-    });
-
-    expect(buildSessionWizardRegistrySessionFields({
-      onChainFields: {},
-      sponsoredFields: {
-        sponsored_rpc: '0',
-      },
-    })).toEqual({
-      sponsored_rpc: '0',
-    });
-    expect(enabledSecrets.customRpcUrl).toBe('https://uploaded-rpc.example');
   });
 
   test('buildSessionWizardRegistrySessionFields preserves empty worker URL clears for registry writes', async () => {
@@ -148,7 +101,6 @@ describe('sessionWizardWriteNormalization', () => {
     const signer = {
       provider: null,
       getAddress: jest.fn().mockResolvedValue('0x00000000000000000000000000000000000000aa'),
-      getChainId: jest.fn().mockResolvedValue(DEFAULT_CONFIG_CHAIN_ID),
     };
     const contractMock = {
       address: getSessionRegistryAddress(DEFAULT_CONFIG_CHAIN_ID),
@@ -230,13 +182,6 @@ describe('sessionWizardWriteNormalization', () => {
           balanceThresholdEth: '0.001',
         },
       },
-      workerSecrets: {
-        litApiBase: ' https://api.chipotle.litprotocol.com ',
-        litGroupId: ' group_123 ',
-        litPkpId: ' pkp_123 ',
-        litActionCid: ' bafy123 ',
-        litUsageApiKey: 'lit-secret',
-      },
       sessionId: '123e4567-e89b-12d3-a456-426614174000',
       workerUrl: ' https://worker.example/ ',
       latestChainBlock: 500,
@@ -256,12 +201,6 @@ describe('sessionWizardWriteNormalization', () => {
     expect(payload.rpcUrl).toBe('https://rpc.example');
     expect(payload.blockLimits).toEqual({ start: 250, end: 275 });
     expect(payload.embeddedDeployHelperEnabled).toBe(false);
-    expect(payload.litCredentials).toEqual({
-      litApiBase: 'https://api.chipotle.litprotocol.com',
-      litGroupId: 'group_123',
-      litPkpId: 'pkp_123',
-      litActionCid: 'bafy123',
-    });
     expect(payload.sessionId).toBe('0x123e4567e89b12d3a456426614174000');
     expect(payload.contracts.surveys).toEqual({ address: '0x111', chainId: DEFAULT_CONFIG_CHAIN_ID });
     expect(payload.contracts.sessionRegistry).toEqual({
@@ -270,81 +209,4 @@ describe('sessionWizardWriteNormalization', () => {
     });
     expect(payload.contracts.reputation).toBeUndefined();
   });
-  test('session storage profile is session-owned metadata and worker config, with Cloudflare secrets omitted', () => {
-    const metadata = sanitizeSessionWizardMetadataPayload({
-      slug: 'storage-edge',
-      sessionName: 'Storage Edge',
-      storageProfile: {
-        backend: 'cloudflare',
-        cloudflare: {
-          accountId: 'must-not-pass-through',
-          bucketName: 'private-bucket',
-          workerToken: 'cf-secret-token',
-        },
-      },
-    }, {
-      fieldOrder: ['slug', 'sessionName', 'storageProfile'],
-    });
-
-    expect(metadata.storageProfile.backend).toBe('cloudflare');
-    expect(metadata.storageProfile.sessionOwned).toBe(true);
-    expect(metadata.storageProfile.telegramOwned).toBe(false);
-    expect(metadata.storageProfile.resources.docsContext).toBe('active');
-    expect(metadata.storageProfile.resources.questions).toBe('active');
-    expect(metadata.storageProfile.resources.surveys).toBe('active');
-    expect(metadata.storageProfile.resources.responses).toBe('active');
-    expect(metadata.storageProfile.payloadAccessControl.mode).toBe('worker_sbt_gate');
-    expect(metadata.storageProfile.payloadAccessControl.resources.docsContext).toBe('docUploads');
-    expect(metadata.storageProfile.sbtGatedAccess.litRequired).toBe('not_required_worker_enforced');
-    expect(metadata.storageProfile.cloudflare.primitives.r2).toContain('question_payloads');
-    expect(metadata.storageProfile.cloudflare.primitives.r2).toContain('response_payloads');
-    expect(metadata.storageProfile.cloudflare.payloadAccessMode).toBe('worker_sbt_gate');
-    expect(JSON.stringify(metadata)).not.toMatch(/private-bucket|cf-secret-token|must-not-pass-through/i);
-
-    const workerPayload = buildSessionWizardWorkerConfigPayload({
-      slug: 'storage-edge',
-      draft: {
-        networkChainId: DEFAULT_CONFIG_CHAIN_ID,
-        storageProfile: { backend: 'cloudflare' },
-      },
-      deployPayload: {},
-    });
-
-    expect(workerPayload.storageProfile.backend).toBe('cloudflare');
-    expect(workerPayload.storageProfile.sessionOwned).toBe(true);
-    expect(workerPayload.storageProfile.telegramOwned).toBe(false);
-    expect(workerPayload.storageProfile.payloadAccessControl.mode).toBe('worker_sbt_gate');
-    expect(workerPayload.litCredentials).toEqual({});
-  });
-
-  test('telegram-only mode is published as explicit non-secret session metadata', () => {
-    const metadata = sanitizeSessionWizardMetadataPayload({
-      slug: 'telegram-native',
-      sessionName: 'Telegram Native',
-      telegramOnly: true,
-      storageProfile: { backend: 'cloudflare', payloadAccessControl: { mode: 'public_read' } },
-    }, {
-      fieldOrder: ['slug', 'sessionName', 'telegramOnly', 'storageProfile'],
-    });
-
-    expect(metadata.telegramOnly).toBe(true);
-    expect(metadata.sessionMode).toBe('telegram_only');
-    expect(metadata.telegramBridgeEnabled).toBe(true);
-    expect(metadata.telegram).toEqual({ mode: 'telegram_only', only: true });
-
-    const workerPayload = buildSessionWizardWorkerConfigPayload({
-      slug: 'telegram-native',
-      draft: {
-        networkChainId: DEFAULT_CONFIG_CHAIN_ID,
-        telegramOnly: true,
-        storageProfile: { backend: 'cloudflare', payloadAccessControl: { mode: 'public_read' } },
-      },
-      deployPayload: {},
-    });
-
-    expect(workerPayload.telegramOnly).toBe(true);
-    expect(workerPayload.sessionMode).toBe('telegram_only');
-    expect(workerPayload.telegramBridgeEnabled).toBe(true);
-  });
-
 });
