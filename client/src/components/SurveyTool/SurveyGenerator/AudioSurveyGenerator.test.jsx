@@ -126,10 +126,10 @@ describe('AudioSurveyGenerator', () => {
   const setAudioInputValue = (value) => {
     setInputValue('textarea[data-testid="audio-input"]', value);
   };
-  const addAdditionalUrl = (value = 'https://example.com/article') => {
+  const addAdditionalUrl = async (value = 'https://example.com/article') => {
     setInputValue('input[placeholder="Add URL"]', value);
     const addUrlButton = container.querySelector('button[title="Add URL"]');
-    act(() => {
+    await act(async () => {
       addUrlButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
   };
@@ -267,7 +267,7 @@ describe('AudioSurveyGenerator', () => {
       tagMap: {},
       data: { size: null, type: 'application/json' },
     });
-    mockFetchImageFromURL.mockResolvedValue(new File(['remote-image'], 'remote_image.png', { type: 'image/png' }));
+    mockFetchImageFromURL.mockRejectedValue(new Error('Invalid image type'));
     mockReadCompactImageClipboard.mockResolvedValue({ error: 'Clipboard does not contain a supported image or URL.' });
   });
 
@@ -818,7 +818,7 @@ describe('AudioSurveyGenerator', () => {
 
     expect(container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_SAVE_DOCS_TOGGLE}"]`)).toBeNull();
 
-    addAdditionalUrl('https://example.com/source');
+    await addAdditionalUrl('https://example.com/source');
 
     expect(container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_SAVE_DOCS_TOGGLE}"]`)).toBeTruthy();
   });
@@ -834,6 +834,9 @@ describe('AudioSurveyGenerator', () => {
       />
     );
 
+    mockFetchImageFromURL.mockResolvedValueOnce(
+      new File(['remote-image'], 'remote_image.png', { type: 'image/png' })
+    );
     setInputValue('input[placeholder="Add URL"]', 'https://example.com/context.png');
 
     await act(async () => {
@@ -845,6 +848,33 @@ describe('AudioSurveyGenerator', () => {
     expect(mockFetchImageFromURL).toHaveBeenCalledWith('https://example.com/context.png');
     expect(getPhotoCards()).toHaveLength(1);
     expect(container.textContent).toContain('remote_image.png');
+  });
+
+  it('treats extensionless image URLs as photos when the fetched content is an image', async () => {
+    await renderSubject(
+      <AudioSurveyGenerator
+        provider={{}}
+        network={{ id: 84532 }}
+        account="0x123"
+        loginComplete
+        toggleLoginModal={jest.fn()}
+      />
+    );
+
+    mockFetchImageFromURL.mockResolvedValueOnce(
+      new File(['remote-image'], 'remote_asset.webp', { type: 'image/webp' })
+    );
+    setInputValue('input[placeholder="Add URL"]', 'https://example.com/assets/render?id=123');
+
+    await act(async () => {
+      container
+        .querySelector('button[title="Add URL"]')
+        .dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(mockFetchImageFromURL).toHaveBeenCalledWith('https://example.com/assets/render?id=123');
+    expect(getPhotoCards()).toHaveLength(1);
+    expect(container.textContent).toContain('remote_asset.webp');
   });
 
   it('keeps Add mode on a single URL entry path', async () => {
@@ -1043,7 +1073,7 @@ describe('AudioSurveyGenerator', () => {
       />
     );
 
-    addAdditionalUrl('https://example.com/slug-only');
+    await addAdditionalUrl('https://example.com/slug-only');
     toggleCheckbox(container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_SAVE_DOCS_TOGGLE}"]`));
 
     const form = container.querySelector('form');
@@ -1276,7 +1306,7 @@ describe('AudioSurveyGenerator', () => {
       />
     );
 
-    addAdditionalUrl('https://example.com/source');
+    await addAdditionalUrl('https://example.com/source');
     toggleCheckbox(container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_SAVE_DOCS_TOGGLE}"]`));
 
     const audienceButton = container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_SAVE_DOCS_AUDIENCE_BUTTON}"]`);
@@ -1303,7 +1333,7 @@ describe('AudioSurveyGenerator', () => {
       />
     );
 
-    addAdditionalUrl('https://example.com/private');
+    await addAdditionalUrl('https://example.com/private');
     toggleCheckbox(container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_SAVE_DOCS_TOGGLE}"]`));
 
     const audienceButton = container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_SAVE_DOCS_AUDIENCE_BUTTON}"]`);
@@ -1334,7 +1364,7 @@ describe('AudioSurveyGenerator', () => {
       />
     );
 
-    addAdditionalUrl('https://example.com/delayed-gate');
+    await addAdditionalUrl('https://example.com/delayed-gate');
     toggleCheckbox(container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_SAVE_DOCS_TOGGLE}"]`));
 
     expect(
@@ -1398,7 +1428,7 @@ describe('AudioSurveyGenerator', () => {
       />
     );
 
-    addAdditionalUrl('https://example.com/to-save');
+    await addAdditionalUrl('https://example.com/to-save');
     toggleCheckbox(container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_SAVE_DOCS_TOGGLE}"]`));
 
     const form = container.querySelector('form');
@@ -1447,7 +1477,7 @@ describe('AudioSurveyGenerator', () => {
       />
     );
 
-    addAdditionalUrl('https://example.com/raw-source');
+    await addAdditionalUrl('https://example.com/raw-source');
 
     const form = container.querySelector('form');
     await act(async () => {
@@ -1484,7 +1514,7 @@ describe('AudioSurveyGenerator', () => {
       />
     );
 
-    addAdditionalUrl('https://example.com/fails');
+    await addAdditionalUrl('https://example.com/fails');
     toggleCheckbox(container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_SAVE_DOCS_TOGGLE}"]`));
 
     const form = container.querySelector('form');
