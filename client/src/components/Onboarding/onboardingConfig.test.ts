@@ -5,11 +5,11 @@ import {
   readColdLoadOnboardingState,
 } from './onboardingConfig.js';
 
-const createStorageMock = (seed = {}) => {
-  const values = { ...seed };
+const createStorageMock = (seed: Record<string, string> = {}) => {
+  const values: Record<string, string> = { ...seed };
   return {
-    getItem: jest.fn((key) => (Object.prototype.hasOwnProperty.call(values, key) ? values[key] : null)),
-    setItem: jest.fn((key, value) => {
+    getItem: jest.fn((key: string) => (Object.prototype.hasOwnProperty.call(values, key) ? values[key] : null)),
+    setItem: jest.fn((key: string, value: string) => {
       values[key] = String(value);
     }),
     values,
