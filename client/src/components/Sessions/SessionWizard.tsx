@@ -148,6 +148,12 @@ import SessionMetadataEditor from './SessionMetadataEditor';
 import SessionWizardModals from './SessionWizardModals';
 import SessionPublishSummary from './SessionPublishSummary';
 import {
+  buildSessionWizardPublishPlan,
+  buildSessionWizardPublishStepNumbers,
+  getSessionWizardPublishProgressPercent,
+  resolveSessionWizardShouldAutoDeployWorker,
+} from './sessionWizardPublishFlow';
+import {
   getSessionWizardFieldLabel,
   getSessionWizardFieldTooltip,
   getSessionWizardOrderedDraftEntries,
@@ -167,6 +173,13 @@ import type {
   SessionContractsLike,
   WorkerSecretsLike,
 } from '../shellTypes';
+
+export {
+  buildSessionWizardPublishPlan,
+  buildSessionWizardPublishStepNumbers,
+  getSessionWizardPublishProgressPercent,
+  resolveSessionWizardShouldAutoDeployWorker,
+} from './sessionWizardPublishFlow';
 
 type DeployFormState = NonNullable<WorkerPanelProps['deployForm']> & {
   accountId?: string;
@@ -615,19 +628,6 @@ export const resolveSessionWizardDeployBundleMode = ({
         : bundleMode
   );
 };
-export const resolveSessionWizardShouldAutoDeployWorker = ({
-  workerMode = 'default',
-  sponsoredAutoDeployReady = false,
-  deployComplete = false,
-}: {
-  workerMode?: unknown;
-  sponsoredAutoDeployReady?: boolean;
-  deployComplete?: boolean;
-} = {}) => (
-  toStr(workerMode).trim() !== 'default' &&
-  sponsoredAutoDeployReady &&
-  !deployComplete
-);
 export const resolveSessionWizardDeployBundlePayload = async ({
   effectiveBundleMode = 'upload',
   bundleFile = null,
@@ -654,55 +654,6 @@ export const resolveSessionWizardDeployBundlePayload = async ({
     bundleUrl: normalizedBundleUrl,
     bundleSource: normalizedBundleUrl ? 'url' : 'url-missing',
   };
-};
-export const buildSessionWizardPublishPlan = ({
-  shouldAutoDeployWorker = false,
-  hasPendingDrafts = false,
-  hasManualMetadata = false,
-}: {
-  shouldAutoDeployWorker?: boolean;
-  hasPendingDrafts?: boolean;
-  hasManualMetadata?: boolean;
-} = {}) => {
-  const steps: string[] = [];
-  if (shouldAutoDeployWorker) steps.push('deploy-worker');
-  if (hasPendingDrafts) steps.push('deploy-sbts');
-  if (!hasManualMetadata) steps.push('upload-metadata');
-  steps.push('register-session');
-  steps.push('done');
-  return steps;
-};
-export const buildSessionWizardPublishStepNumbers = (options: AnyRecord = {}): Record<string, number> => (
-  buildSessionWizardPublishPlan(options).reduce<Record<string, number>>((acc, stepKey, index) => {
-    acc[stepKey] = index + 1;
-    return acc;
-  }, {})
-);
-export const getSessionWizardPublishProgressPercent = ({
-  publishStep = 0,
-  publishBusy = false,
-  totalSteps = 0,
-  elapsedMs = 0,
-}: {
-  publishStep?: number;
-  publishBusy?: boolean;
-  totalSteps?: number;
-  elapsedMs?: number;
-} = {}) => {
-  const steps = Math.max(0, Number(totalSteps || 0));
-  const currentStep = Math.max(0, Number(publishStep || 0));
-  if (!steps || currentStep <= 0) return 0;
-  const clampedStep = Math.min(currentStep, steps);
-  const stepSize = 100 / steps;
-  if (!publishBusy) {
-    return Math.min(100, Math.max(0, clampedStep * stepSize));
-  }
-  const base = Math.max(0, (clampedStep - 1) * stepSize);
-  const cap = clampedStep >= steps ? 100 : base + (stepSize * 0.82);
-  const durationMs = 2600;
-  const ratio = Math.max(0, Math.min(1, Number(elapsedMs || 0) / durationMs));
-  const eased = 1 - Math.pow(1 - ratio, 2);
-  return Math.min(99, Math.max(base + (stepSize * 0.18), base + ((cap - base) * eased)));
 };
 export const resolveSessionWizardWorkerBaseUrl = ({
   configuredWorkerUrl = '',
