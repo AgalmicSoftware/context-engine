@@ -8,6 +8,8 @@ import { normalizeWorkerUrl as normalizeWorkerAuthUrl } from '../../utilities/wo
 import type { AnyRecord } from '../shellTypes';
 
 export const LOCAL_WORKER_BUNDLE_FALLBACK_FILE_PATH = '/dist/sessionCorsWorker.bundle.js';
+export const CLOUDFLARE_MISSING_HANDLER_ERROR = 'no registered event handlers';
+export const DEPLOY_HELPER_BUNDLE_FETCH_ERROR = 'failed to fetch bundle';
 
 export const getSessionWizardNormalModeBundleUrlOverrideValidationError = (value: unknown = ''): string => {
   const raw = toStr(value).trim();
@@ -309,6 +311,66 @@ export const resolveSessionWizardDeployBundlePayload = async ({
     bundleSource: normalizedBundleUrl ? 'url' : 'url-missing',
   };
 };
+
+const hasSessionWizardBundleDiagnostics = (bundleDiagnostics: unknown = null): boolean => (
+  !!bundleDiagnostics &&
+  typeof bundleDiagnostics === 'object' &&
+  Object.keys(bundleDiagnostics).length > 0
+);
+
+const isSessionWizardRemoteBundleUrlFetchFailure = ({
+  err,
+  effectiveBundleMode = 'upload',
+}: {
+  err?: AnyRecord | null;
+  effectiveBundleMode?: string;
+} = {}) => {
+  if (effectiveBundleMode !== 'url') {
+    return false;
+  }
+  const combined = `${toStr(err?.message).trim()} ${toStr(err?.responseError).trim()}`.toLowerCase();
+  return combined.includes(DEPLOY_HELPER_BUNDLE_FETCH_ERROR);
+};
+
+const isSessionWizardRemoteBundleUrlMissingHandlerFailure = ({
+  err,
+  effectiveBundleMode = 'upload',
+}: {
+  err?: AnyRecord | null;
+  effectiveBundleMode?: string;
+} = {}) => {
+  if (effectiveBundleMode !== 'url') {
+    return false;
+  }
+  const combined = `${toStr(err?.message).trim()} ${toStr(err?.responseError).trim()}`.toLowerCase();
+  return combined.includes(CLOUDFLARE_MISSING_HANDLER_ERROR) &&
+    hasSessionWizardBundleDiagnostics(err?.responseBundleDiagnostics);
+};
+
+export const shouldForceSessionWizardNormalModeManualBundleRetry = ({
+  err,
+  wizardMode = 'normal',
+  effectiveBundleMode = 'upload',
+  hasBundleFile = false,
+}: {
+  err?: AnyRecord | null;
+  wizardMode?: string;
+  effectiveBundleMode?: string;
+  hasBundleFile?: boolean;
+} = {}) => (
+  wizardMode === 'normal' &&
+  !hasBundleFile &&
+  (
+    isSessionWizardRemoteBundleUrlFetchFailure({
+      err,
+      effectiveBundleMode,
+    }) ||
+    isSessionWizardRemoteBundleUrlMissingHandlerFailure({
+      err,
+      effectiveBundleMode,
+    })
+  )
+);
 
 export const getSessionWizardPublishProgressPercent = ({
   publishStep = 0,
