@@ -219,9 +219,22 @@ import {
   sanitizeSessionWizardWorkerSecretsForLitMode,
 } from './sessionWizardWorkerSecretSupport';
 import {
-  buildSessionWizardDefaultTemplate,
   normalizeSessionWizardDraftShape as normalizeDraftShape,
 } from './sessionWizardDraftState';
+import {
+  __test__getSessionWizardDefaultAiSettings,
+  __test__isSessionWizardDevMode,
+  DEV_PERSIST_WORKER_SECRETS,
+  LOCAL_WORKER_BUNDLE_FALLBACK_PICKER_HELP,
+  LOCAL_WORKER_BUNDLE_OPTIONAL_FALLBACK_HELP,
+  MANUAL_BUNDLE_URL_OVERRIDE_HELP,
+  METADATA_FIELD_ORDER,
+  NORMAL_MODE_MANUAL_BUNDLE_RETRY_MESSAGE,
+  NORMAL_MODE_MISSING_HOSTED_BUNDLE_MESSAGE,
+  NORMAL_MODE_SHARED_HOSTED_WORKER_ENABLED,
+  SESSION_WIZARD_DEFAULT_TEMPLATE,
+  SPONSORED_MANUAL_BUNDLE_RETRY_MESSAGE,
+} from './sessionWizardConfig';
 import {
   getSessionSlugValidationError,
   hasInvalidSessionSlugFormat,
@@ -319,6 +332,10 @@ export {
   RESERVED_SESSION_SLUGS,
 } from './sessionWizardSlugValidation';
 export { getSessionWizardSecretFieldTestId } from './sessionWizardUiSupport';
+export {
+  __test__getSessionWizardDefaultAiSettings,
+  __test__isSessionWizardDevMode,
+} from './sessionWizardConfig';
 export {
   deploySessionWizardPendingSbtDraft,
   finalizeSessionWizardPendingSbtDraft,
@@ -424,70 +441,7 @@ type MetadataObjectCollapsedState = Record<string, boolean> & {
 type SessionHeaderUploadStatusTone = SessionHeaderFieldProps['sessionHeaderUploadStatusTone'] | string;
 
 const log = createLogger('general');
-const LOCAL_WORKER_BUNDLE_BUILD_COMMAND = 'nvm use 20 && npm run worker:bundle';
-const LOCAL_WORKER_BUNDLE_GENERATE_HELP =
-  `Run ${LOCAL_WORKER_BUNDLE_BUILD_COMMAND} from the repo root, then choose ${LOCAL_WORKER_BUNDLE_FALLBACK_FILE_PATH}.`;
-const LOCAL_WORKER_BUNDLE_OPTIONAL_FALLBACK_HELP =
-  `Optional fallback: ${LOCAL_WORKER_BUNDLE_GENERATE_HELP}`;
-const MANUAL_BUNDLE_URL_OVERRIDE_HELP =
-  'Paste a direct worker bundle URL here if the GitHub-hosted asset is temporarily unavailable.';
-const LOCAL_WORKER_BUNDLE_FALLBACK_PICKER_HELP =
-  `Automatic hosted bundle fetch failed. ${LOCAL_WORKER_BUNDLE_OPTIONAL_FALLBACK_HELP}`;
-const NORMAL_MODE_MISSING_HOSTED_BUNDLE_MESSAGE = (
-  `No default hosted worker bundle URL is configured for normal mode. Provide a manual bundle URL or upload a bundle file below. ${LOCAL_WORKER_BUNDLE_OPTIONAL_FALLBACK_HELP}`
-);
-const NORMAL_MODE_MANUAL_BUNDLE_RETRY_MESSAGE = (
-  `Normal mode still defaults to the GitHub-hosted bundle. Retry with a manual bundle URL or upload a bundle file. ${LOCAL_WORKER_BUNDLE_OPTIONAL_FALLBACK_HELP}`
-);
-// Normal-mode `/new` should stay bring-your-own-worker until the dedicated
-// shared hosted worker product is implemented.
-const NORMAL_MODE_SHARED_HOSTED_WORKER_ENABLED = false;
-const SPONSORED_MANUAL_BUNDLE_RETRY_MESSAGE = (
-  `Sponsored publish still defaults to the GitHub-hosted bundle. Retry with a manual bundle URL or upload a bundle file. ${LOCAL_WORKER_BUNDLE_OPTIONAL_FALLBACK_HELP}`
-);
-export const __test__isSessionWizardDevMode = (
-  proc = (typeof process !== 'undefined' ? process : undefined)
-): boolean => toStr(proc?.env?.NODE_ENV).trim().toLowerCase() !== 'production';
-
-const DEV_PERSIST_WORKER_SECRETS = __test__isSessionWizardDevMode();
-const METADATA_FIELD_ORDER = [
-  'networkChainId',
-  'sessionId',
-  'sessionIdHex',
-  'slug',
-  'sessionName',
-  'sessionInfo',
-  'sessionHeaderImg',
-  'corsWorkerUrl',
-  'defaultTags',
-  'questionsGenPrompt',
-  'defaultSbtTags',
-  'defaultFilterState',
-  'defaultFeaturedSBTs',
-  'autoFeatureSBTsBySessionSlug',
-  'HIGHLIGHTED_QUESTION_IDS',
-  'BLOCKED_QUESTION_IDS',
-  'HIGHLIGHTED_SURVEY_IDS',
-  'BLOCKED_SURVEY_IDS',
-  'ignored_SBTs_LIST',
-  'featured_SBTs_LIST',
-  'contracts',
-  'blockLimits',
-  'faucet',
-  'ai',
-  'sponsored',
-  'lit',
-  'litCredentials',
-  'perMemberSpendLimits',
-  'encryption',
-  'encryptedFields',
-  'encryptedFieldGates',
-  'sessionInfoEncrypted',
-  'fieldEditors',
-];
-const DEFAULT_TEMPLATE: DraftState = buildSessionWizardDefaultTemplate() as DraftState;
-
-export const __test__getSessionWizardDefaultAiSettings = (): AnyRecord => deepClone(DEFAULT_TEMPLATE.ai || {});
+const DEFAULT_TEMPLATE: DraftState = SESSION_WIZARD_DEFAULT_TEMPLATE as DraftState;
 
 const pathKey = (path: string[]): string => path.join('.');
 const ONCHAIN_FIELD_PATHS = SESSION_WIZARD_ONCHAIN_COMPAT_FIELD_PATHS;
