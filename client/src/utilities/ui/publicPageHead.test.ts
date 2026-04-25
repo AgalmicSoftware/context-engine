@@ -13,6 +13,7 @@ import {
 } from '../../variables/publicRepoMetadata.js';
 
 describe('publicPageHead', () => {
+  const env = process.env as Record<string, string | undefined>;
   beforeEach(() => {
     document.head.innerHTML = '';
     document.title = '';
@@ -87,8 +88,8 @@ describe('publicPageHead', () => {
   });
 
   it('keeps route-defining params for PUBLIC_URL-prefixed contracts and wizard routes', () => {
-    const priorPublicUrl = process.env.PUBLIC_URL;
-    process.env.PUBLIC_URL = '/ce/';
+    const priorPublicUrl = env.PUBLIC_URL;
+    env.PUBLIC_URL = '/ce/';
 
     try {
       expect(
@@ -103,9 +104,9 @@ describe('publicPageHead', () => {
       ).toBe('https://contextengine.xyz/ce/session/new?sessionId=edge-session-id&chainId=84532&sponsored=bundle-1');
     } finally {
       if (typeof priorPublicUrl === 'undefined') {
-        delete process.env.PUBLIC_URL;
+        delete env.PUBLIC_URL;
       } else {
-        process.env.PUBLIC_URL = priorPublicUrl;
+        env.PUBLIC_URL = priorPublicUrl;
       }
     }
   });
@@ -142,7 +143,7 @@ describe('publicPageHead', () => {
         'script[type="application/ld+json"][data-ce-structured-data="public-page"]'
       )?.textContent || '{}'
     );
-    const webPage = structuredData['@graph']?.find?.((entry) => entry?.['@type'] === 'WebPage');
+    const webPage = structuredData['@graph']?.find?.((entry: any) => entry?.['@type'] === 'WebPage');
 
     expect(webPage?.significantLink).toEqual(
       expect.arrayContaining([
@@ -162,7 +163,7 @@ describe('publicPageHead', () => {
         'script[type="application/ld+json"][data-ce-structured-data="public-page"]'
       )?.textContent || '{}'
     );
-    const webPage = structuredData['@graph']?.find?.((entry) => entry?.['@type'] === 'WebPage');
+    const webPage = structuredData['@graph']?.find?.((entry: any) => entry?.['@type'] === 'WebPage');
 
     expect(webPage?.significantLink).toEqual(
       expect.arrayContaining([
@@ -173,10 +174,10 @@ describe('publicPageHead', () => {
   });
 
   it('respects PUBLIC_URL when building deployment discovery significantLink URLs', () => {
-    const priorPublicUrl = process.env.PUBLIC_URL;
+    const priorPublicUrl = env.PUBLIC_URL;
     const location = { origin: 'https://preview.example.test', pathname: '/', search: '' };
 
-    process.env.PUBLIC_URL = '/ce/';
+    env.PUBLIC_URL = '/ce/';
 
     try {
       syncPublicPageHead({ location });
@@ -186,7 +187,7 @@ describe('publicPageHead', () => {
           'script[type="application/ld+json"][data-ce-structured-data="public-page"]'
         )?.textContent || '{}'
       );
-      const webPage = structuredData['@graph']?.find?.((entry) => entry?.['@type'] === 'WebPage');
+      const webPage = structuredData['@graph']?.find?.((entry: any) => entry?.['@type'] === 'WebPage');
 
       expect(webPage?.significantLink).toEqual(
         expect.arrayContaining([
@@ -196,9 +197,9 @@ describe('publicPageHead', () => {
       );
     } finally {
       if (typeof priorPublicUrl === 'undefined') {
-        delete process.env.PUBLIC_URL;
+        delete env.PUBLIC_URL;
       } else {
-        process.env.PUBLIC_URL = priorPublicUrl;
+        env.PUBLIC_URL = priorPublicUrl;
       }
     }
   });
@@ -280,7 +281,7 @@ describe('publicPageHead', () => {
         'script[type="application/ld+json"][data-ce-structured-data="public-page"]'
       )?.textContent || '{}'
     );
-    const webPage = structuredData['@graph']?.find?.((entry) => entry?.['@type'] === 'WebPage');
+    const webPage = structuredData['@graph']?.find?.((entry: any) => entry?.['@type'] === 'WebPage');
     expect(webPage?.url).toBe('https://contextengine.xyz/session/demo');
   });
 });
