@@ -1,3 +1,9 @@
+jest.mock('./arweaveScripts.js', () => ({
+  arweaveScripts: {
+    registerTxContext: jest.fn(),
+  },
+}));
+
 import {
   buildArweaveGatewayUrlCandidates,
   getDefaultArweaveGateways,
@@ -6,12 +12,6 @@ import {
   normalizeArweaveUrl,
   parseArweaveTxId,
 } from './arweaveUrls';
-
-jest.mock('./arweaveScripts.js', () => ({
-  arweaveScripts: {
-    registerTxContext: jest.fn(),
-  },
-}));
 
 describe('arweaveUrls helpers', () => {
   const txId = '8_2VRRP5Ka0b5F9yiq_nm2hJto8qnQazZ2EtfLJ0viE';
@@ -59,15 +59,7 @@ describe('arweaveUrls helpers', () => {
     expect(normalizeArweaveUrl('https://example.example.test/foo.png')).toBe('https://example.example.test/foo.png');
   });
 
-  it('defaults to direct AR.IO-only gateway routing', () => {
-    expect(getDefaultArweaveGateways()).toEqual([
-      defaultArIoGateway,
-    ]);
-  });
-
-  it('keeps legacy gateway fanout available when direct-to-AR.IO mode is disabled', () => {
-    (globalThis as Record<string, unknown>).CE_ARWEAVE_DIRECT_TO_AR_IO = false;
-
+  it('defaults to AR.IO-first gateway fanout unless direct-to-AR.IO mode is explicitly enabled', () => {
     expect(getDefaultArweaveGateways()).toEqual([
       defaultArIoGateway,
       canonicalArweaveGateway,
