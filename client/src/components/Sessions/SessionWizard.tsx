@@ -164,6 +164,12 @@ import {
   shouldForceSessionWizardNormalModeManualBundleRetry,
 } from './sessionWizardPublishFlow';
 import {
+  resolveDeployWorkerState,
+  resolveSessionWizardWorkerBaseUrl,
+  resolveSessionWizardWorkerVerificationUiState,
+  shouldCacheSessionWorkerConfigAfterDeploy,
+} from './sessionWizardWorkerState';
+import {
   getSessionWizardFieldLabel,
   getSessionWizardFieldTooltip,
   getSessionWizardOrderedDraftEntries,
@@ -198,6 +204,12 @@ export {
   resolveSessionWizardShouldAutoDeployWorker,
   shouldForceSessionWizardNormalModeManualBundleRetry,
 } from './sessionWizardPublishFlow';
+export {
+  resolveDeployWorkerState,
+  resolveSessionWizardWorkerBaseUrl,
+  resolveSessionWizardWorkerVerificationUiState,
+  shouldCacheSessionWorkerConfigAfterDeploy,
+} from './sessionWizardWorkerState';
 
 type DeployFormState = NonNullable<WorkerPanelProps['deployForm']> & {
   accountId?: string;
@@ -390,21 +402,6 @@ export const getSessionWizardSecretFieldTestId = (fieldKey: string): string | un
   if (fieldKey === 'litPayerAddress') return E2E_TESTIDS.WIZARD_SECRET_LIT_PAYER_ADDRESS;
   return undefined;
 };
-export const resolveDeployWorkerState = ({
-  responseWorkerUrl,
-  configuredWorkerUrl,
-}: {
-  responseWorkerUrl?: unknown;
-  configuredWorkerUrl?: unknown;
-} = {}) => {
-  const resolvedDeployWorkerUrl = normalizeWorkerAuthUrl(toStr(responseWorkerUrl).trim());
-  const displayWorkerUrl = resolvedDeployWorkerUrl || normalizeWorkerAuthUrl(toStr(configuredWorkerUrl).trim());
-  return {
-    resolvedDeployWorkerUrl,
-    displayWorkerUrl,
-    deployComplete: !!resolvedDeployWorkerUrl,
-  };
-};
 const resolveSponsoredBundleBootstrapWorkerUrl = (bundle: SponsoredBundleLike = {}): string => normalizeWorkerAuthUrl(toStr(
   bundle?.bootstrapWorkerUrl ||
   bundle?.meta?.sourceWorkerUrl ||
@@ -464,67 +461,6 @@ const resolveSponsoredBundleAdvancedFieldNotices = ({
 // Normal-mode `/new` should stay bring-your-own-worker until the dedicated
 // shared hosted worker product is implemented.
 const NORMAL_MODE_SHARED_HOSTED_WORKER_ENABLED = false;
-export const resolveSessionWizardWorkerBaseUrl = ({
-  configuredWorkerUrl = '',
-  deployWorkerUrl = '',
-  fallbackWorkerUrl = '',
-  workerMode = 'default',
-}: {
-  configuredWorkerUrl?: unknown;
-  deployWorkerUrl?: unknown;
-  fallbackWorkerUrl?: unknown;
-  workerMode?: unknown;
-} = {}) => {
-  const configured = normalizeWorkerAuthUrl(toStr(configuredWorkerUrl).trim());
-  if (configured) return configured;
-  const deployed = normalizeWorkerAuthUrl(toStr(deployWorkerUrl).trim());
-  if (deployed) return deployed;
-  return toStr(workerMode).trim().toLowerCase() === 'default'
-    ? normalizeWorkerAuthUrl(toStr(fallbackWorkerUrl).trim())
-    : '';
-};
-export const resolveSessionWizardWorkerVerificationUiState = ({
-  configuredWorkerUrl = '',
-  deployWorkerUrl = '',
-  defaultWorkerUrl = '',
-  deployComplete = false,
-  normalModeRequiresCustomWorker = false,
-}: {
-  configuredWorkerUrl?: unknown;
-  deployWorkerUrl?: unknown;
-  defaultWorkerUrl?: unknown;
-  deployComplete?: boolean;
-  normalModeRequiresCustomWorker?: boolean;
-} = {}) => {
-  const configured = normalizeWorkerAuthUrl(toStr(configuredWorkerUrl).trim());
-  const deployed = normalizeWorkerAuthUrl(toStr(deployWorkerUrl).trim());
-  const fallback = normalizeWorkerAuthUrl(toStr(defaultWorkerUrl).trim());
-  const deployVerifiedInUi = !!deployComplete;
-  const effectiveConfiguredWorkerUrl = (
-    deployVerifiedInUi &&
-    !!normalModeRequiresCustomWorker &&
-    !!deployed &&
-    (!configured || (configured && fallback && configured === fallback))
-  ) ? deployed : configured;
-  return {
-    deployVerifiedInUi,
-    effectiveConfiguredWorkerUrl,
-  };
-};
-export const shouldCacheSessionWorkerConfigAfterDeploy = ({
-  deployStatusCode,
-  configSyncStatus,
-  workerUrl,
-}: {
-  deployStatusCode?: unknown;
-  configSyncStatus?: AnyRecord | null;
-  workerUrl?: unknown;
-} = {}) => (
-  !!normalizeWorkerAuthUrl(toStr(workerUrl).trim()) && (
-    Number(deployStatusCode || 0) === 200 ||
-    configSyncStatus?.synced === true
-  )
-);
 export const cacheSessionWorkerConfigAfterDeploy = ({
   deployStatusCode,
   configSyncStatus,
