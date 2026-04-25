@@ -4,7 +4,6 @@ import {
   resolveSessionWizardWorkerFaucetConfigFromDraft,
   resolveSessionWizardWorkerRpcUrlFromDraft,
   resolveSessionWizardWorkerRpcUrlMapFromDraft,
-  resolveSessionWizardWorkerUrlSourceState,
 } from './sessionWizardWorkerRuntimeSupport';
 import { getSessionWizardDefaultWorkerUrl } from './sessionWizardWorkerDefaults';
 
@@ -16,53 +15,6 @@ describe('sessionWizardWorkerRuntimeSupport', () => {
       deployComplete: false,
       workerMode: 'default',
     })).toBe('');
-  });
-
-  it('describes worker URL source display without owning deploy execution', () => {
-    expect(resolveSessionWizardWorkerUrlSourceState({
-      resolvedWorkerBaseUrl: '',
-    })).toEqual({
-      deployWorkerMatchesConfiguredUrl: false,
-      usesDefaultWorkerUrl: false,
-      workerUrlSource: 'missing (set worker URL)',
-    });
-
-    expect(resolveSessionWizardWorkerUrlSourceState({
-      defaultWorkerUrl: 'https://default.example',
-      resolvedWorkerBaseUrl: 'https://default.example',
-      visibleConfiguredWorkerUrl: 'https://default.example',
-      workerMode: 'custom',
-    })).toEqual({
-      deployWorkerMatchesConfiguredUrl: false,
-      usesDefaultWorkerUrl: true,
-      workerUrlSource: 'default worker',
-    });
-
-    expect(resolveSessionWizardWorkerUrlSourceState({
-      deployedWorkerUrl: 'https://deployed.example',
-      deployVerifiedInUi: true,
-      resolvedWorkerBaseUrl: 'https://deployed.example',
-      visibleConfiguredWorkerUrl: 'https://deployed.example',
-      workerMode: 'custom',
-    })).toEqual({
-      deployWorkerMatchesConfiguredUrl: true,
-      usesDefaultWorkerUrl: false,
-      workerUrlSource: 'deployed worker URL (verified this run)',
-    });
-
-    expect(resolveSessionWizardWorkerUrlSourceState({
-      deployedWorkerUrl: 'https://old-deploy.example',
-      deployVerifiedInUi: true,
-      resolvedWorkerBaseUrl: 'https://custom.example',
-      visibleConfiguredWorkerUrl: 'https://custom.example',
-      workerMode: 'custom',
-    }).workerUrlSource).toBe('custom worker URL changed after deploy (re-deploy to verify)');
-
-    expect(resolveSessionWizardWorkerUrlSourceState({
-      resolvedWorkerBaseUrl: 'https://custom.example',
-      visibleConfiguredWorkerUrl: 'https://custom.example',
-      workerMode: 'custom',
-    }).workerUrlSource).toBe('custom worker URL (not verified in this run)');
   });
 
   it('resolves worker rpc urls and url maps from draft path providers', () => {
@@ -98,44 +50,6 @@ describe('sessionWizardWorkerRuntimeSupport', () => {
     })).toEqual(expect.objectContaining({
       '84532': expect.arrayContaining(['https://rpc.example', 'https://rpc-backup.example']),
     }));
-  });
-
-  it('prefers uploaded custom RPC secrets for worker runtime config', () => {
-    const draft = {
-      networkChainId: 84532,
-      rpc: {
-        providers: {
-          path: {
-            rpcUrl: 'https://draft-rpc.example',
-            rpcUrlsByChainId: {
-              84532: ['https://draft-rpc.example', 'https://rpc-backup.example'],
-            },
-          },
-        },
-      },
-      faucet: {},
-    };
-    const workerSecrets = { customRpcUrl: ' https://uploaded-rpc.example ' };
-
-    expect(resolveSessionWizardWorkerRpcUrlFromDraft({
-      draft,
-      workerSecrets,
-    })).toBe('https://uploaded-rpc.example');
-
-    const rpcUrlMap = resolveSessionWizardWorkerRpcUrlMapFromDraft({
-      draft,
-      workerSecrets,
-    });
-    expect(rpcUrlMap['84532'].slice(0, 3)).toEqual([
-      'https://uploaded-rpc.example',
-      'https://draft-rpc.example',
-      'https://rpc-backup.example',
-    ]);
-
-    expect(resolveSessionWizardWorkerFaucetConfigFromDraft({
-      draft,
-      workerSecrets,
-    }).rpcUrl).toBe('https://uploaded-rpc.example');
   });
 
   it('resolves faucet defaults from rpc fallbacks when values are unset', () => {

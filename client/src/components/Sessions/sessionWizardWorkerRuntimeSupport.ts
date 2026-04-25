@@ -24,19 +24,6 @@ type WorkerBaseUrlParams = {
   networkId?: unknown;
   allowNormalModeSharedHostedWorker?: boolean;
 };
-type ResolveSessionWizardWorkerUrlSourceStateArgs = {
-  defaultWorkerUrl?: unknown;
-  deployedWorkerUrl?: unknown;
-  deployVerifiedInUi?: unknown;
-  resolvedWorkerBaseUrl?: unknown;
-  visibleConfiguredWorkerUrl?: unknown;
-  workerMode?: unknown;
-};
-export type SessionWizardWorkerUrlSourceState = {
-  deployWorkerMatchesConfiguredUrl: boolean;
-  usesDefaultWorkerUrl: boolean;
-  workerUrlSource: string;
-};
 
 export const resolveSessionWizardWorkerBaseUrlFromDraft = ({
   draft,
@@ -64,37 +51,6 @@ export const resolveSessionWizardWorkerBaseUrlFromDraft = ({
   });
 };
 
-export const resolveSessionWizardWorkerUrlSourceState = ({
-  defaultWorkerUrl = '',
-  deployedWorkerUrl = '',
-  deployVerifiedInUi = false,
-  resolvedWorkerBaseUrl = '',
-  visibleConfiguredWorkerUrl = '',
-  workerMode = '',
-}: ResolveSessionWizardWorkerUrlSourceStateArgs = {}): SessionWizardWorkerUrlSourceState => {
-  const usesDefaultWorkerUrl = !!visibleConfiguredWorkerUrl &&
-    !!defaultWorkerUrl &&
-    visibleConfiguredWorkerUrl === defaultWorkerUrl;
-  const deployWorkerMatchesConfiguredUrl = !!visibleConfiguredWorkerUrl &&
-    !!deployedWorkerUrl &&
-    visibleConfiguredWorkerUrl === deployedWorkerUrl;
-  const workerUrlSource = !resolvedWorkerBaseUrl
-    ? 'missing (set worker URL)'
-    : (workerMode === 'default' || usesDefaultWorkerUrl)
-      ? 'default worker'
-      : deployVerifiedInUi && deployWorkerMatchesConfiguredUrl
-        ? 'deployed worker URL (verified this run)'
-        : deployVerifiedInUi && !deployWorkerMatchesConfiguredUrl
-          ? 'custom worker URL changed after deploy (re-deploy to verify)'
-          : 'custom worker URL (not verified in this run)';
-
-  return {
-    deployWorkerMatchesConfiguredUrl,
-    usesDefaultWorkerUrl,
-    workerUrlSource,
-  };
-};
-
 const resolveSessionWizardWorkerRuntimeChainId = ({
   draft,
   registryChainId,
@@ -111,15 +67,11 @@ export const resolveSessionWizardWorkerRpcUrlFromDraft = ({
   draft,
   registryChainId,
   networkId,
-  workerSecrets = null,
 }: {
   draft?: AnyRecord | null;
   registryChainId?: unknown;
   networkId?: unknown;
-  workerSecrets?: AnyRecord | null;
 } = {}): string => {
-  const secretRpcUrl = toStr(workerSecrets?.customRpcUrl).trim();
-  if (secretRpcUrl) return secretRpcUrl;
   const chainId = resolveSessionWizardWorkerRuntimeChainId({ draft, registryChainId, networkId });
   const providers = draft?.rpc?.providers || {};
   const pathProvider = providers.path || draft?.rpc?.path || {};
@@ -134,44 +86,25 @@ export const resolveSessionWizardWorkerRpcUrlMapFromDraft = ({
   draft,
   registryChainId,
   networkId,
-  workerSecrets = null,
 }: {
   draft?: AnyRecord | null;
   registryChainId?: unknown;
   networkId?: unknown;
-  workerSecrets?: AnyRecord | null;
 } = {}): Record<string, string[]> => {
   const providers = draft?.rpc?.providers || {};
   const pathProvider = providers.path || draft?.rpc?.path || {};
   const chainId = resolveSessionWizardWorkerRuntimeChainId({ draft, registryChainId, networkId });
-  const map = buildSessionWizardWorkerRpcUrlMap({ chainId, pathProvider });
-  const secretRpcUrl = toStr(workerSecrets?.customRpcUrl).trim();
-  if (!secretRpcUrl || !chainId) return map;
-  const key = String(chainId);
-  const existing = Array.isArray(map[key]) ? map[key] : [];
-  const seen = new Set<string>();
-  const merged = [secretRpcUrl, ...existing].filter((url) => {
-    const cleaned = toStr(url).trim();
-    if (!cleaned || seen.has(cleaned)) return false;
-    seen.add(cleaned);
-    return true;
-  });
-  return {
-    ...map,
-    [key]: merged,
-  };
+  return buildSessionWizardWorkerRpcUrlMap({ chainId, pathProvider });
 };
 
 export const resolveSessionWizardWorkerFaucetConfigFromDraft = ({
   draft,
   registryChainId,
   networkId,
-  workerSecrets = null,
 }: {
   draft?: AnyRecord | null;
   registryChainId?: unknown;
   networkId?: unknown;
-  workerSecrets?: AnyRecord | null;
 } = {}): {
   rpcUrl: string;
   amountEth: string;
@@ -183,7 +116,7 @@ export const resolveSessionWizardWorkerFaucetConfigFromDraft = ({
     return cleaned ? cleaned : toStr(fallback).trim();
   };
   const chainId = resolveSessionWizardWorkerRuntimeChainId({ draft, registryChainId, networkId });
-  const defaultRpcUrl = resolveSessionWizardWorkerRpcUrlFromDraft({ draft, registryChainId, networkId, workerSecrets })
+  const defaultRpcUrl = resolveSessionWizardWorkerRpcUrlFromDraft({ draft, registryChainId, networkId })
     || getDefaultHttpRpc(chainId)
     || resolveFallbackRpcUrl(chainId);
   return {

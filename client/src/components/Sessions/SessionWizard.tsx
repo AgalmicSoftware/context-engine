@@ -72,8 +72,7 @@ import {
 } from '../../utilities/session/sessionMetadata.js';
 import { normalizeArweaveUrl } from '../../utilities/arweave/arweaveUrls.js';
 import { normalizeBlockLimitsForConfig } from '../../utilities/session/blockLimits.js';
-import { normalizeBaseUrl, normalizeOriginList } from '../../utilities/urlUtils.js';
-import { DEFAULT_WORKER_ALLOWED_ORIGINS } from '../../utilities/worker/workerCorsOrigins.js';
+import { normalizeBaseUrl } from '../../utilities/urlUtils.js';
 import { t } from '../../utilities/ui/terminology.js';
 import {
   buildSponsoredFlagFields as buildSponsoredSessionFlagFields,
@@ -287,10 +286,14 @@ import {
   parseSessionWizardArweaveTxId as parseArweaveTxId,
 } from './sessionWizardUrlSupport';
 import {
-  buildSessionWizardWorkerRpcUrlMap,
+  parseSessionWizardAllowOriginsInput,
+  resolveSessionWizardWorkerBaseUrlFromDraft,
+  resolveSessionWizardWorkerFaucetConfigFromDraft,
+  resolveSessionWizardWorkerRpcUrlFromDraft,
+  resolveSessionWizardWorkerRpcUrlMapFromDraft,
+} from './sessionWizardWorkerRuntimeSupport';
+import {
   getSessionWizardWorkerDeployValidationError,
-  resolveFallbackRpcUrl,
-  resolveSessionWizardWorkerRpcUrl,
 } from './sessionWizardWorkerRpc';
 import {
   getSessionWizardFieldLabel,
@@ -4328,67 +4331,36 @@ const SessionWizard = ({
     }).catch((e) => { void e; notify.warn('Copy failed'); });
   };
 
-  const resolveWorkerBaseUrl = () => {
-    const fallbackWorkerUrl = getSessionWizardDefaultWorkerUrl();
-    const configuredWorkerUrl = toStr(draft.corsWorkerUrl).trim();
-    const effectiveConfiguredWorkerUrl = (
-      wizardMode === 'normal' &&
-      !NORMAL_MODE_SHARED_HOSTED_WORKER_ENABLED &&
-      !deployComplete &&
-      isSessionWizardDefaultWorkerPlaceholderUrl(configuredWorkerUrl, fallbackWorkerUrl)
-    )
-      ? ''
-      : configuredWorkerUrl;
-    return resolveSessionWizardWorkerBaseUrl({
-      configuredWorkerUrl: effectiveConfiguredWorkerUrl,
-      deployWorkerUrl: deployComplete ? deployWorkerUrl : '',
-      fallbackWorkerUrl,
-      workerMode: (wizardMode === 'normal' && !NORMAL_MODE_SHARED_HOSTED_WORKER_ENABLED) ? 'custom' : workerMode,
-    });
-  };
+  const resolveWorkerBaseUrl = () => resolveSessionWizardWorkerBaseUrlFromDraft({
+    draft,
+    wizardMode,
+    deployComplete,
+    deployWorkerUrl,
+    workerMode,
+    allowNormalModeSharedHostedWorker: NORMAL_MODE_SHARED_HOSTED_WORKER_ENABLED,
+  });
 
-  const resolveWorkerRpcUrl = () => {
-    const chainId = Number(registryChainId || draft.networkChainId || network?.id || 0) || null;
-    const providers = draft?.rpc?.providers || {};
-    const pathProvider = providers.path || draft?.rpc?.path || {};
-    return resolveSessionWizardWorkerRpcUrl({
-      chainId,
-      pathProvider,
-      faucetRpcUrl: draft?.faucet?.rpcUrl,
-    });
-  };
+  const resolveWorkerRpcUrl = () => resolveSessionWizardWorkerRpcUrlFromDraft({
+    draft,
+    registryChainId,
+    networkId: network?.id,
+  });
 
-  const resolveWorkerRpcUrlMap = () => {
-    const providers = draft?.rpc?.providers || {};
-    const pathProvider = providers.path || draft?.rpc?.path || {};
-    const chainId = Number(registryChainId || draft.networkChainId || network?.id || 0) || null;
-    return buildSessionWizardWorkerRpcUrlMap({ chainId, pathProvider });
-  };
+  const resolveWorkerRpcUrlMap = () => resolveSessionWizardWorkerRpcUrlMapFromDraft({
+    draft,
+    registryChainId,
+    networkId: network?.id,
+  });
 
-  const resolveWorkerFaucetConfig = () => {
-    const faucetCfg = draft?.faucet || {};
-    const fallbackIfUnset = (val, fallback) => {
-      const cleaned = toStr(val).trim();
-      return cleaned ? cleaned : toStr(fallback).trim();
-    };
-    const chainId = Number(registryChainId || draft.networkChainId || network?.id || 0) || null;
-    const defaultRpcUrl = resolveWorkerRpcUrl() || getDefaultHttpRpc(chainId) || resolveFallbackRpcUrl(chainId);
-    return {
-      rpcUrl: fallbackIfUnset(faucetCfg.rpcUrl, defaultRpcUrl),
-      amountEth: fallbackIfUnset(faucetCfg.amountEth, '0.0002'),
-      balanceThresholdEth: fallbackIfUnset(faucetCfg.balanceThresholdEth, '0.001'),
-    };
-  };
+  const resolveWorkerFaucetConfig = () => resolveSessionWizardWorkerFaucetConfigFromDraft({
+    draft,
+    registryChainId,
+    networkId: network?.id,
+  });
   const effectiveDefaultWorkerRpcUrl = toStr(resolveWorkerRpcUrl()).trim();
   const resolvedWorkerBaseUrlForDelegation = resolveWorkerBaseUrl();
 
-  const parseAllowOriginsInput = () => {
-    const raw = toStr(workerAllowOrigins).trim();
-    if (!raw) return [];
-    const entries = raw.split(/[\n,]+/).map((s) => s.trim()).filter(Boolean);
-    const normalized = normalizeOriginList(entries);
-    return normalized.length ? normalized : normalizeOriginList(DEFAULT_WORKER_ALLOWED_ORIGINS);
-  };
+  const parseAllowOriginsInput = () => parseSessionWizardAllowOriginsInput(workerAllowOrigins);
 
   const getResourceSecretFields = (resourceKey) => {
     return resolveSessionWizardResourceSecretFields(resourceKey, draft?.ai);
