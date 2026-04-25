@@ -6,7 +6,7 @@ import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 jest.mock('../Gates/GateMultiSelectLock', () => ({
   __esModule: true,
   default: ({ onChangeSelectedGateIds, onToggleOpen }: {
-    onChangeSelectedGateIds: (nextIds: unknown) => void;
+    onChangeSelectedGateIds: (nextIds: string[]) => void;
     onToggleOpen: (nextOpen: boolean) => void;
   }) => (
     <div data-testid="mock-resource-gate-lock">
@@ -31,7 +31,7 @@ describe('WorkerResourceCard', () => {
         label="AI"
         tooltipText="AI info"
         renderInfoTooltip={({ testId }) => <button type="button" data-testid={testId} />}
-        gateOptions={[{ value: 'gate-a' }, { value: 'gate-b' }]}
+        gateOptions={[{ id: 'gate-a' }, { id: 'gate-b' }]}
         selectedGateIds={['gate-a']}
         onChangeSelectedGateIds={onChangeSelectedGateIds}
         open={false}

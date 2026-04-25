@@ -11,7 +11,7 @@ import { toStr } from '../../utilities/shared/primitives.js';
 type ResourceSecretField = {
   key: string;
   label: string;
-  type?: string;
+  type?: React.ComponentProps<typeof Input>['type'];
   required?: boolean;
   placeholder?: string;
   rows?: number;
@@ -69,7 +69,7 @@ const WorkerResourceInputs = ({
             <Label>Private key</Label>
             <Input
               type="password"
-              value={workerSecrets.litPayerPrivateKey || ''}
+              value={toStr(workerSecrets.litPayerPrivateKey)}
               placeholder="0x..."
               onChange={(e) => onUpdateSecret('litPayerPrivateKey', e.target.value)}
               disabled={!workerSecretsEnabled}
@@ -115,7 +115,7 @@ const WorkerResourceInputs = ({
   return (
     <div className={styles.resourceInputGrid}>
       {fields.map((field) => {
-        const value = workerSecrets[field.key] ?? '';
+        const value = toStr(workerSecrets[field.key]);
         const label = `${field.label}${field.required ? ' *' : ''}`;
         const isTextarea = field.type === 'textarea';
         const placeholder = (
