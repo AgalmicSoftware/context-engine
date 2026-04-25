@@ -84,7 +84,7 @@ describe('sessionWizardSecrets', () => {
         sessionSlug: 'test-5',
       });
     const postSecrets = jest.fn(async () => ({}));
-    const wait = jest.fn(async () => ({}));
+    const wait = jest.fn(async () => undefined);
 
     const result = await syncWorkerSecretsAfterDeploy({
       workerUrl: 'https://worker.example',
@@ -119,7 +119,7 @@ describe('sessionWizardSecrets', () => {
       signAdminAction,
       postSecrets,
       retryDelaysMs: [1],
-      wait: jest.fn(async () => ({})),
+      wait: jest.fn(async () => undefined),
       helperWritesSecrets: true,
     });
 
