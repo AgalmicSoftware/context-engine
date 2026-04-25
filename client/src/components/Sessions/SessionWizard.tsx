@@ -293,6 +293,12 @@ import {
   resolveSessionWizardWorkerRpcUrlMapFromDraft,
 } from './sessionWizardWorkerRuntimeSupport';
 import {
+  buildSessionWizardGateOptions,
+  normalizeSessionWizardGateIds as normalizeGateIds,
+  resolveSessionWizardResourceGate as resolveResourceGate,
+  resolveSessionWizardResourceGateIds,
+} from './sessionWizardResourceGateSupport';
+import {
   getSessionWizardWorkerDeployValidationError,
 } from './sessionWizardWorkerRpc';
 import {
@@ -1623,7 +1629,7 @@ const SessionWizard = ({
       let changed = false;
       const next = { ...prev };
       workerResourceKeys.forEach((key) => {
-        const resourceGate = resolveResourceGate(resourceGateMap[key], encryptionGates[0]?.id);
+        const resourceGate = resolveResourceGate(resourceGateMap[key], encryptionGates[0]?.id, encryptionGates);
         if (!resourceGate) return;
         const sbts = resourceGate.sbts;
         const mode = resourceGate.mode || 'any';
@@ -1667,7 +1673,7 @@ const SessionWizard = ({
       });
       const resources = {};
       workerResourceKeys.forEach((key) => {
-        const resourceGate = resolveResourceGate(resourceGateMap[key], resolvedDefaultGateId);
+        const resourceGate = resolveResourceGate(resourceGateMap[key], resolvedDefaultGateId, encryptionGates);
         if (!resourceGate) return;
         resources[key] = {
           gateId: resourceGate.gateId,
@@ -2159,86 +2165,8 @@ const SessionWizard = ({
   }, [createSbtTargetGateId, defaultGateId, encryptionGates]);
 
   const gateOptions = useMemo(() => (
-    allEncryptionGates.map((gate) => ({
-      id: gate.id,
-      label: gate.label,
-      color: gate.color,
-    }))
+    buildSessionWizardGateOptions(allEncryptionGates)
   ), [allEncryptionGates]);
-
-  const normalizeGateIds = (value) => {
-    if (Array.isArray(value)) {
-      return value.map((id) => toStr(id).trim()).filter(Boolean);
-    }
-    const raw = toStr(value).trim();
-    return raw ? [raw] : [];
-  };
-
-  const resolveResourceGateIds = (value, fallbackGateId) => {
-    const availableGateIds = encryptionGates.map((gate) => toStr(gate?.id).trim()).filter(Boolean);
-    const requestedGateIds = normalizeGateIds(value).filter((id) => availableGateIds.includes(id));
-    const fallback = toStr(fallbackGateId).trim();
-    if (requestedGateIds.length > 0) return requestedGateIds;
-    if (fallback && availableGateIds.includes(fallback)) return [fallback];
-    return availableGateIds[0] ? [availableGateIds[0]] : [];
-  };
-
-  const resolveResourceGate = (value, fallbackGateId) => {
-    const gateIds = resolveResourceGateIds(value, fallbackGateId);
-    if (!gateIds.length) return null;
-    const gatesById = new Map();
-    gateIds.forEach((gateId) => {
-      const gate = encryptionGates.find((entry) => toStr(entry?.id).trim() === gateId);
-      if (!gate) return;
-      gatesById.set(gateId, gate);
-    });
-    const resolvedGateIds = Array.from(gatesById.keys());
-    const selectedGates = Array.from(gatesById.values());
-    if (!selectedGates.length) return null;
-
-    const sbtAddressSet = new Set();
-    selectedGates.forEach((gate) => {
-      normalizeSbtSelection(gate.sbts || []).forEach((entry) => {
-        const address = toStr(entry?.address).trim();
-        if (address) sbtAddressSet.add(address);
-      });
-    });
-    const sbtAddresses = Array.from(sbtAddressSet);
-
-    const primaryGate = selectedGates[0];
-    const gateId = toStr(primaryGate?.id).trim();
-    const modeSet = new Set(
-      selectedGates.map((gate) => (toStr(gate?.mode).trim() === 'all' ? 'all' : 'any')),
-    );
-    const chainIdSet = new Set(
-      selectedGates.map((gate) => Number(gate?.chainId || 0) || null),
-    );
-    const perMemberLimitSet = new Set(
-      selectedGates.map((gate) => Number(gate?.perMemberLimit || 0) || 0),
-    );
-    const modeConflicts = modeSet.size > 1;
-    const chainIdConflicts = chainIdSet.size > 1;
-    const perMemberLimitConflicts = perMemberLimitSet.size > 1;
-    const hasConflicts = modeConflicts || chainIdConflicts || perMemberLimitConflicts;
-    const mode = toStr(primaryGate?.mode).trim() === 'all' ? 'all' : 'any';
-    const chainId = Number(primaryGate?.chainId || 0) || null;
-    const perMemberLimit = Number(primaryGate?.perMemberLimit || 0) || 0;
-    const sbts = sbtAddresses.map((address) => ({ address, name: address }));
-    return {
-      gateId,
-      gateIds: resolvedGateIds,
-      sbts,
-      mode,
-      chainId,
-      perMemberLimit,
-      hasConflicts,
-      conflictSummary: {
-        modeConflicts,
-        chainIdConflicts,
-        perMemberLimitConflicts,
-      },
-    };
-  };
 
   const togglePrivateSlugMode = () => {
     if (slugPinnedByPendingSbtDrafts) return;
@@ -4397,7 +4325,7 @@ const SessionWizard = ({
     const resolvedDefaultGateId = defaultGateId || encryptionGates[0]?.id || '';
     const snapshot = {};
     workerResourceKeys.forEach((key) => {
-      const gate = resolveResourceGate(resourceGateMap[key], resolvedDefaultGateId);
+      const gate = resolveResourceGate(resourceGateMap[key], resolvedDefaultGateId, encryptionGates);
       if (!gate) return;
       if (gate.hasConflicts) {
         const reason = [

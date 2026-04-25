@@ -1,68 +1,8 @@
 import { toStr } from '../../utilities/shared/primitives.js';
 import { normalizeSbtSelection } from './sessionWizardSbtSelections';
+import type { AnyRecord } from '../shellTypes';
 
-type SessionWizardResourceGate = Record<string, unknown> & {
-  id?: unknown;
-  label?: unknown;
-  color?: unknown;
-  mode?: unknown;
-  chainId?: unknown;
-  perMemberLimit?: unknown;
-  sbts?: unknown;
-};
-
-type SessionWizardGateOption = {
-  id: unknown;
-  label: unknown;
-  color: unknown;
-};
-
-export type SessionWizardResourceGateSelectionState = string | string[];
-
-type SessionWizardResourceGateOptionLike = Record<string, unknown> & {
-  id?: unknown;
-  value?: unknown;
-};
-
-type SessionWizardResourceGateSelectionInput = {
-  value?: unknown;
-  fallbackGateId?: unknown;
-  gateOptions?: SessionWizardResourceGateOptionLike[];
-};
-
-type SessionWizardResourceGateSelectionStatePlan = {
-  availableGateIds: string[];
-  disabled: boolean;
-  fallbackGateId: string;
-  selectedGateIds: string[];
-};
-
-type SessionWizardResourceGateSelectionUpdateInput = {
-  nextIds?: unknown;
-  availableGateIds?: string[];
-  fallbackGateId?: unknown;
-};
-
-type SessionWizardResolvedResourceGate = {
-  gateId: string;
-  gateIds: string[];
-  sbts: Array<{ address: string; name: string }>;
-  mode: 'all' | 'any';
-  chainId: number | null;
-  perMemberLimit: number;
-  hasConflicts: boolean;
-  conflictSummary: {
-    modeConflicts: boolean;
-    chainIdConflicts: boolean;
-    perMemberLimitConflicts: boolean;
-  };
-  registryRepresentable: boolean;
-  registryUnsupportedReason: string;
-};
-
-export const buildSessionWizardGateOptions = (
-  gates: SessionWizardResourceGate[] = []
-): SessionWizardGateOption[] => (
+export const buildSessionWizardGateOptions = (gates: AnyRecord[] = []): AnyRecord[] => (
   gates.map((gate) => ({
     id: gate.id,
     label: gate.label,
@@ -78,45 +18,10 @@ export const normalizeSessionWizardGateIds = (value: unknown): string[] => {
   return raw ? [raw] : [];
 };
 
-const getSessionWizardGateOptionValue = (
-  option: SessionWizardResourceGateOptionLike
-): string => toStr(option?.value ?? option?.id).trim();
-
-export const resolveSessionWizardResourceGateSelectionState = ({
-  value = '',
-  fallbackGateId = '',
-  gateOptions = [],
-}: SessionWizardResourceGateSelectionInput = {}): SessionWizardResourceGateSelectionStatePlan => {
-  const availableGateIds = gateOptions
-    .map((option) => getSessionWizardGateOptionValue(option))
-    .filter(Boolean);
-  const resolvedFallbackGateId = toStr(fallbackGateId).trim() || availableGateIds[0] || '';
-  const selectedGateIds = normalizeSessionWizardGateIds(value || resolvedFallbackGateId)
-    .filter((id) => availableGateIds.includes(id));
-
-  return {
-    availableGateIds,
-    disabled: availableGateIds.length <= 1,
-    fallbackGateId: resolvedFallbackGateId,
-    selectedGateIds,
-  };
-};
-
-export const resolveSessionWizardResourceGateSelectionUpdate = ({
-  nextIds = [],
-  availableGateIds = [],
-  fallbackGateId = '',
-}: SessionWizardResourceGateSelectionUpdateInput = {}): SessionWizardResourceGateSelectionState => {
-  const filteredGateIds = normalizeSessionWizardGateIds(nextIds)
-    .filter((id) => availableGateIds.includes(id));
-  if (!filteredGateIds.length) return toStr(fallbackGateId).trim() || '';
-  return filteredGateIds.length === 1 ? filteredGateIds[0] : filteredGateIds;
-};
-
 export const resolveSessionWizardResourceGateIds = (
   value: unknown,
   fallbackGateId: unknown,
-  encryptionGates: SessionWizardResourceGate[] = [],
+  encryptionGates: AnyRecord[] = [],
 ): string[] => {
   const availableGateIds = encryptionGates.map((gate) => toStr(gate?.id).trim()).filter(Boolean);
   const requestedGateIds = normalizeSessionWizardGateIds(value).filter((id) => availableGateIds.includes(id));
@@ -129,11 +34,11 @@ export const resolveSessionWizardResourceGateIds = (
 export const resolveSessionWizardResourceGate = (
   value: unknown,
   fallbackGateId: unknown,
-  encryptionGates: SessionWizardResourceGate[] = [],
-): SessionWizardResolvedResourceGate | null => {
+  encryptionGates: AnyRecord[] = [],
+): AnyRecord | null => {
   const gateIds = resolveSessionWizardResourceGateIds(value, fallbackGateId, encryptionGates);
   if (!gateIds.length) return null;
-  const gatesById = new Map<string, SessionWizardResourceGate>();
+  const gatesById = new Map<string, AnyRecord>();
   gateIds.forEach((gateId) => {
     const gate = encryptionGates.find((entry) => toStr(entry?.id).trim() === gateId);
     if (!gate) return;
@@ -167,8 +72,6 @@ export const resolveSessionWizardResourceGate = (
   const chainIdConflicts = chainIdSet.size > 1;
   const perMemberLimitConflicts = perMemberLimitSet.size > 1;
   const hasConflicts = modeConflicts || chainIdConflicts || perMemberLimitConflicts;
-  const hasAllMode = modeSet.has('all');
-  const hasUnrepresentableAllGroup = resolvedGateIds.length > 1 && hasAllMode;
   const mode = toStr(primaryGate?.mode).trim() === 'all' ? 'all' : 'any';
   const chainId = Number(primaryGate?.chainId || 0) || null;
   const perMemberLimit = Number(primaryGate?.perMemberLimit || 0) || 0;
@@ -186,9 +89,5 @@ export const resolveSessionWizardResourceGate = (
       chainIdConflicts,
       perMemberLimitConflicts,
     },
-    registryRepresentable: !hasConflicts && !hasUnrepresentableAllGroup,
-    registryUnsupportedReason: hasUnrepresentableAllGroup
-      ? 'multiple gates with All semantics cannot be encoded as one registry gate'
-      : '',
   };
 };
