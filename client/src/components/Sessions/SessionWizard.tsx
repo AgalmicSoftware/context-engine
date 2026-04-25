@@ -64,7 +64,6 @@ import {
   getChainById,
   getChainBlockTimeMs,
   getDefaultHttpRpc,
-  isChainWithFaucetRpcFallback,
   getSessionRegistryAddress,
   getSessionRegistryChains,
 } from '../../variables/chains.js';
@@ -148,8 +147,6 @@ import SessionMetadataEditor from './SessionMetadataEditor';
 import SessionWizardModals from './SessionWizardModals';
 import SessionPublishSummary from './SessionPublishSummary';
 import {
-  CLOUDFLARE_MISSING_HANDLER_ERROR,
-  DEPLOY_HELPER_BUNDLE_FETCH_ERROR,
   LOCAL_WORKER_BUNDLE_FALLBACK_FILE_PATH,
   buildSessionWizardPublishPlan,
   buildSessionWizardPublishStepNumbers,
@@ -164,11 +161,21 @@ import {
   shouldForceSessionWizardNormalModeManualBundleRetry,
 } from './sessionWizardPublishFlow';
 import {
+  normalizeSessionWizardDeployErrorMessage,
+  withSessionWizardDeployHelperWorkersDevStatus,
+} from './sessionWizardDeployErrors';
+import {
   resolveDeployWorkerState,
   resolveSessionWizardWorkerBaseUrl,
   resolveSessionWizardWorkerVerificationUiState,
   shouldCacheSessionWorkerConfigAfterDeploy,
 } from './sessionWizardWorkerState';
+import {
+  buildSessionWizardWorkerRpcUrlMap,
+  getSessionWizardWorkerDeployValidationError,
+  resolveFallbackRpcUrl,
+  resolveSessionWizardWorkerRpcUrl,
+} from './sessionWizardWorkerRpc';
 import {
   getSessionWizardFieldLabel,
   getSessionWizardFieldTooltip,
@@ -210,6 +217,12 @@ export {
   resolveSessionWizardWorkerVerificationUiState,
   shouldCacheSessionWorkerConfigAfterDeploy,
 } from './sessionWizardWorkerState';
+export {
+  buildSessionWizardWorkerRpcUrlMap,
+  getSessionWizardWorkerDeployValidationError,
+  resolveFallbackRpcUrl,
+  resolveSessionWizardWorkerRpcUrl,
+} from './sessionWizardWorkerRpc';
 
 type DeployFormState = NonNullable<WorkerPanelProps['deployForm']> & {
   accountId?: string;
@@ -512,246 +525,14 @@ export const buildSessionWizardDefaultAllowedOrigins = (currentOrigin = getCurre
     extraOrigins: DEFAULT_WORKER_ALLOWED_ORIGINS,
   })
 );
-const buildDeployHelperCorsMessage = (helperBase: unknown, detail = ''): string => {
-  const origin = getCurrentOrigin() || '<current-origin>';
-  const helper = toStr(helperBase).trim() || 'deploy-helper';
-  const suffix = detail ? ` (${detail})` : '';
-  return `Deploy-helper rejected browser origin ${origin}${suffix}. Add this origin to the deploy-helper allowlist at ${helper} and retry.`;
-};
-const buildDeployHelperWorkersDevStatusMessage = (deployResponse: AnyRecord = {}): string => {
-  const response: AnyRecord = deployResponse && typeof deployResponse === 'object' ? deployResponse : {};
-  const subdomain = toStr(response?.subdomain).trim();
-  const subdomainStatus = toStr(response?.subdomainStatus).trim();
-  const subdomainError = toStr(response?.subdomainError).trim();
-  const scriptSubdomainError = toStr(response?.scriptSubdomainError).trim();
-  const hasAccountSignal = (
-    subdomain ||
-    subdomainStatus ||
-    subdomainError ||
-    Object.prototype.hasOwnProperty.call(response, 'subdomainEnabled')
-  );
-  const hasScriptSignal = (
-    scriptSubdomainError ||
-    Object.prototype.hasOwnProperty.call(response, 'scriptSubdomainEnabled')
-  );
-  if (!hasAccountSignal && !hasScriptSignal) return '';
-
-  let accountSummary = '';
-  if (subdomainError) {
-    accountSummary = subdomain
-      ? `account issue (${subdomain}): ${subdomainError}`
-      : `account issue: ${subdomainError}`;
-  } else if (subdomainStatus) {
-    accountSummary = subdomain
-      ? `account ${subdomainStatus} (${subdomain})`
-      : `account ${subdomainStatus}`;
-  } else if (subdomain) {
-    accountSummary = `account ready (${subdomain})`;
-  }
-
-  let scriptSummary = '';
-  if (scriptSubdomainError) {
-    scriptSummary = `script issue: ${scriptSubdomainError}`;
-  } else if (response?.scriptSubdomainEnabled === true) {
-    scriptSummary = 'script enabled';
-  } else if (
-    Object.prototype.hasOwnProperty.call(response, 'scriptSubdomainEnabled') &&
-    (subdomain || toStr(response?.workerUrl).trim())
-  ) {
-    scriptSummary = 'script not confirmed';
-  }
-
-  const summary = [accountSummary, scriptSummary].filter(Boolean).join('; ');
-  return summary ? `workers.dev status: ${summary}.` : '';
-};
-const withDeployHelperWorkersDevStatus = (message = '', deployResponse: AnyRecord = {}): string => {
-  const base = toStr(message).trim();
-  const workersDevStatus = buildDeployHelperWorkersDevStatusMessage(deployResponse);
-  if (!workersDevStatus) return base;
-  return base ? `${base} ${workersDevStatus}` : workersDevStatus;
-};
-const formatDeployBundleDiagnostics = (bundleDiagnostics: AnyRecord = {}): string => {
-  const sha256 = toStr(bundleDiagnostics?.sha256).trim();
-  const parts = [
-    `source=${toStr(bundleDiagnostics?.source).trim() || 'unknown'}`,
-    `len=${Number(bundleDiagnostics?.length || 0) || 0}`,
-    `sha256=${sha256 ? sha256.slice(0, 16) : 'n/a'}`,
-    `export=${bundleDiagnostics?.hasAnyExport === true ? '1' : '0'}`,
-    `default=${bundleDiagnostics?.hasExportDefault === true ? '1' : '0'}`,
-    `namedDefault=${bundleDiagnostics?.hasNamedDefaultExport === true ? '1' : '0'}`,
-    `fetch=${bundleDiagnostics?.hasFetchHandler === true ? '1' : '0'}`,
-    `swFetch=${bundleDiagnostics?.hasServiceWorkerFetch === true ? '1' : '0'}`,
-  ];
-  return parts.join(' ');
-};
 const SPONSORED_MANUAL_BUNDLE_RETRY_MESSAGE = (
   `Sponsored publish still defaults to the GitHub-hosted bundle. Retry with a manual bundle URL or upload a bundle file. ${LOCAL_WORKER_BUNDLE_OPTIONAL_FALLBACK_HELP}`
 );
-const normalizeDeployErrorMessage = ({
-  err,
-  helperBase,
-}: {
-  err?: AnyRecord | null;
-  helperBase?: unknown;
-} = {}): string => {
-  const raw = toStr(err?.message).trim();
-  const lowered = raw.toLowerCase();
-  const statusCode = Number(err?.statusCode || 0);
-  const responseError = toStr(err?.responseError).trim();
-  const responseLower = responseError.toLowerCase();
-  const bundleDiagnostics = err?.responseBundleDiagnostics;
-  const diagnosticsSummary = bundleDiagnostics ? formatDeployBundleDiagnostics(bundleDiagnostics) : '';
-
-  if ((statusCode === 403 && responseLower.includes('origin')) || responseLower.includes('origin not allowed')) {
-    return buildDeployHelperCorsMessage(helperBase, responseError || 'Origin not allowed');
-  }
-  if (lowered.includes('origin not allowed')) {
-    return buildDeployHelperCorsMessage(helperBase, raw);
-  }
-  if (lowered.includes(DEPLOY_HELPER_BUNDLE_FETCH_ERROR) || responseLower.includes(DEPLOY_HELPER_BUNDLE_FETCH_ERROR)) {
-    return raw || responseError;
-  }
-  if (lowered.includes('failed to fetch') || lowered.includes('networkerror')) {
-    const helper = toStr(helperBase).trim() || 'deploy-helper';
-    const origin = getCurrentOrigin() || '<current-origin>';
-    return `Deploy request could not reach ${helper}. This is usually CORS or helper availability; ensure ${origin} is allowed and retry.`;
-  }
-  if ((lowered.includes(CLOUDFLARE_MISSING_HANDLER_ERROR) || responseLower.includes(CLOUDFLARE_MISSING_HANDLER_ERROR)) && diagnosticsSummary) {
-    const base = raw || responseError || 'Worker deploy failed.';
-    return `${base} Bundle diagnostics: ${diagnosticsSummary}`;
-  }
-  if (raw) return raw;
-  if (statusCode > 0) return `Worker deploy failed (${statusCode}).`;
-  return 'Worker deploy failed.';
-};
 export const __test__isSessionWizardDevMode = (
   proc = (typeof process !== 'undefined' ? process : undefined)
 ): boolean => toStr(proc?.env?.NODE_ENV).trim().toLowerCase() !== 'production';
 
 const DEV_PERSIST_WORKER_SECRETS = __test__isSessionWizardDevMode();
-const DEFAULT_RPC_FALLBACKS = {
-  [DEFAULT_CHAIN_ID]: getDefaultHttpRpc(DEFAULT_CHAIN_ID, { allowPath: false }) || '',
-};
-export const resolveFallbackRpcUrl = (chainId: ChainIdLike): string => {
-  const resolvedChainId = Number(chainId || 0) || 0;
-  if (!resolvedChainId) {
-    return DEFAULT_RPC_FALLBACKS[DEFAULT_CHAIN_ID] || '';
-  }
-  return (
-    DEFAULT_RPC_FALLBACKS[resolvedChainId] ||
-    getDefaultHttpRpc(resolvedChainId, { allowPath: false }) ||
-    getPathRpcUrl(resolvedChainId) ||
-    ''
-  );
-};
-const normalizeRpcUrlList = (value: unknown): string[] => {
-  if (Array.isArray(value)) {
-    return value.map((url) => toStr(url).trim()).filter(Boolean);
-  }
-  const str = toStr(value).trim();
-  return str ? [str] : [];
-};
-const mergeRpcUrlLists = (...lists: unknown[]): string[] => {
-  const seen = new Set();
-  const merged: string[] = [];
-  lists.forEach((list) => {
-    if (!Array.isArray(list)) return;
-    list.forEach((url) => {
-      const trimmed = toStr(url).trim();
-      if (!trimmed || seen.has(trimmed)) return;
-      seen.add(trimmed);
-      merged.push(trimmed);
-    });
-  });
-  return merged;
-};
-const getDefaultWorkerRpcUrlsForChain = (chainId: ChainIdLike): string[] => {
-  if (!chainId) return [];
-  const pathDefault = normalizeRpcUrlList(getPathRpcUrl(chainId));
-  const fallbackDefault = normalizeRpcUrlList(resolveFallbackRpcUrl(chainId));
-  return isChainWithFaucetRpcFallback(chainId)
-    ? mergeRpcUrlLists(fallbackDefault, pathDefault)
-    : mergeRpcUrlLists(pathDefault, fallbackDefault);
-};
-export const buildSessionWizardWorkerRpcUrlMap = ({
-  chainId,
-  pathProvider,
-}: {
-  chainId?: ChainIdLike;
-  pathProvider?: AnyRecord | null;
-} = {}): Record<string, string[]> => {
-  const provider: AnyRecord = pathProvider && typeof pathProvider === 'object' ? pathProvider : {};
-  const rawMap = provider.rpcUrlsByChainId;
-  const normalized: Record<string, string[]> = {};
-  if (rawMap && typeof rawMap === 'object') {
-    Object.entries(rawMap).forEach(([key, value]) => {
-      const list = normalizeRpcUrlList(value);
-      if (list.length) normalized[key] = list;
-    });
-  }
-  const resolvedChainId = Number(chainId || 0) || null;
-  if (!resolvedChainId) return normalized;
-  const configured = mergeRpcUrlLists(
-    normalizeRpcUrlList(normalized[resolvedChainId] || normalized[String(resolvedChainId)]),
-    normalizeRpcUrlList(provider.rpcUrl),
-  );
-  const defaults = getDefaultWorkerRpcUrlsForChain(resolvedChainId);
-  const merged = configured.length
-    ? mergeRpcUrlLists(configured, defaults)
-    : defaults;
-  if (merged.length) {
-    normalized[String(resolvedChainId)] = merged;
-  }
-  return normalized;
-};
-export const resolveSessionWizardWorkerRpcUrl = ({
-  chainId,
-  pathProvider,
-  faucetRpcUrl,
-}: {
-  chainId?: ChainIdLike;
-  pathProvider?: AnyRecord | null;
-  faucetRpcUrl?: unknown;
-} = {}): string => {
-  const resolvedChainId = Number(chainId || 0) || null;
-  const map = buildSessionWizardWorkerRpcUrlMap({ chainId: resolvedChainId, pathProvider });
-  const byChain = resolvedChainId ? (map[resolvedChainId] || map[String(resolvedChainId)]) : '';
-  const ordered = mergeRpcUrlLists(
-    normalizeRpcUrlList(byChain),
-    normalizeRpcUrlList(pathProvider?.rpcUrl),
-    normalizeRpcUrlList(faucetRpcUrl),
-  );
-  return ordered[0] || '';
-};
-export const getSessionWizardWorkerDeployValidationError = ({
-  registryAddress,
-  registryChainId,
-  networkChainId,
-  pathProvider,
-  faucetRpcUrl,
-}: {
-  registryAddress?: unknown;
-  registryChainId?: ChainIdLike;
-  networkChainId?: ChainIdLike;
-  pathProvider?: AnyRecord | null;
-  faucetRpcUrl?: unknown;
-} = {}) => {
-  const chainId = Number(registryChainId || networkChainId || 0) || 0;
-  if (!toStr(registryAddress).trim()) {
-    return 'Registry address is required before deploying a worker.';
-  }
-  const rpcUrl = resolveSessionWizardWorkerRpcUrl({
-    chainId,
-    pathProvider,
-    faucetRpcUrl,
-  });
-  if (!rpcUrl) {
-    return chainId
-      ? `RPC URL is required for chain ${chainId} before deploying a worker.`
-      : 'RPC URL is required before deploying a worker.';
-  }
-  return '';
-};
 const normalizeAiProvider = (value: unknown, fallback = 'openai'): string => {
   const lowered = toStr(value).trim().toLowerCase();
   return lowered || fallback;
@@ -6714,7 +6495,7 @@ const SessionWizard = ({
         });
       }
       setDeployWorkerUrl(displayWorkerUrl);
-      const baseDeployStatus = withDeployHelperWorkersDevStatus(
+      const baseDeployStatus = withSessionWizardDeployHelperWorkersDevStatus(
         data?.workerUrl ? 'Worker deployed.' : 'Worker deployed (URL unavailable).',
         data,
       );
@@ -6743,7 +6524,7 @@ const SessionWizard = ({
       })) {
         setForceManualBundleFile(true);
       }
-      const errorMessage = normalizeDeployErrorMessage({ err, helperBase });
+      const errorMessage = normalizeSessionWizardDeployErrorMessage({ err, helperBase });
       setDeployStatus(errorMessage);
       return {
         ok: false,
