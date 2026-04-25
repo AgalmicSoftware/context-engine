@@ -1,9 +1,6 @@
 /* eslint-env commonjs */
 
-type ChainIdInput = unknown;
-type RpcUrlMap = Record<string, unknown>;
-
-const toStr = (value: unknown): string => (
+const toStr = (value: any): string => (
   typeof value === 'string'
     ? value
     : value == null
@@ -11,33 +8,33 @@ const toStr = (value: unknown): string => (
       : String(value)
 );
 
-const normalizeUrl = (value: unknown): string => toStr(value).trim();
+const normalizeUrl = (value: any): string => toStr(value).trim();
 
-const freezeUrlList = (value: unknown): readonly string[] => Object.freeze(
+const freezeUrlList = (value: any): readonly string[] => Object.freeze(
   (Array.isArray(value) ? value : [value])
     .map((entry) => normalizeUrl(entry))
     .filter(Boolean)
 );
 
-const freezeUrlListMap = (map: RpcUrlMap): Readonly<Record<string, readonly string[]>> => Object.freeze(
+const freezeUrlListMap = (map: Record<string, any>): Readonly<Record<string, readonly string[]>> => Object.freeze(
   Object.fromEntries(
     Object.entries(map || {}).map(([key, value]) => [Number(key), freezeUrlList(value)])
   )
 ) as Readonly<Record<string, readonly string[]>>;
 
-const freezeUrlMap = (map: RpcUrlMap): Readonly<Record<string, string>> => Object.freeze(
+const freezeUrlMap = (map: Record<string, any>): Readonly<Record<string, string>> => Object.freeze(
   Object.fromEntries(
     Object.entries(map || {}).map(([key, value]) => [Number(key), normalizeUrl(value)])
   )
 ) as Readonly<Record<string, string>>;
 
-const readChainValue = (map: Record<string, unknown>, chainId: ChainIdInput): unknown => {
+const readChainValue = (map: Record<string, any>, chainId: any): any => {
   const id = Number(chainId || 0);
   if (!id) return undefined;
   return map[id] || map[String(id)];
 };
 
-const cloneUrlList = (list: unknown): string[] => (Array.isArray(list) ? [...list] : []);
+const cloneUrlList = (list: any): string[] => (Array.isArray(list) ? [...list] : []);
 
 const publicRpcUrlsByChainId = freezeUrlListMap({
   1: [
@@ -78,11 +75,11 @@ const publicRpcUrlsByChainId = freezeUrlListMap({
     'https://sepolia.base.org',
   ],
   11155420: [
-    'https://optimism-sepolia.gateway.tenderly.co',
-    'https://optimism-sepolia.drpc.org',
     'https://sepolia.optimism.io',
     'https://optimism-sepolia.publicnode.com',
     'https://optimism-sepolia-rpc.publicnode.com',
+    'https://optimism-sepolia.gateway.tenderly.co',
+    'https://optimism-sepolia.drpc.org',
   ],
   42161: [
     'https://arb1.arbitrum.io/rpc',
@@ -133,7 +130,7 @@ const faucetFallbackRpcUrlsByChainId = freezeUrlListMap({
   ],
 });
 
-const getPublicRpcUrls = (chainId: ChainIdInput, overrides: RpcUrlMap | null = null): string[] => {
+const getPublicRpcUrls = (chainId: any, overrides: Record<string, any> | null = null): string[] => {
   const base = readChainValue(publicRpcUrlsByChainId, chainId);
   const override = overrides && typeof overrides === 'object'
     ? readChainValue(overrides, chainId)
@@ -141,14 +138,14 @@ const getPublicRpcUrls = (chainId: ChainIdInput, overrides: RpcUrlMap | null = n
   return cloneUrlList(Array.isArray(override) ? freezeUrlList(override) : base);
 };
 
-const getPathRpcUrl = (chainId: ChainIdInput, overrides: RpcUrlMap | null = null): string => {
+const getPathRpcUrl = (chainId: any, overrides: Record<string, any> | null = null): string => {
   const override = overrides && typeof overrides === 'object'
     ? readChainValue(overrides, chainId)
     : undefined;
   return normalizeUrl(override || readChainValue(pathRpcUrlsByChainId, chainId) || '');
 };
 
-const getFaucetFallbackRpcUrls = (chainId: ChainIdInput, overrides: RpcUrlMap | null = null): string[] => {
+const getFaucetFallbackRpcUrls = (chainId: any, overrides: Record<string, any> | null = null): string[] => {
   const base = readChainValue(faucetFallbackRpcUrlsByChainId, chainId);
   const override = overrides && typeof overrides === 'object'
     ? readChainValue(overrides, chainId)

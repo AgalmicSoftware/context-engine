@@ -7,19 +7,16 @@ export const WORKER_ENDPOINT_SUFFIXES = Object.freeze([
   '/admin/set-config',
   '/admin/set-secrets',
   '/admin/set-limits',
-  '/admin/secret-presence',
-  '/admin/lit-chipotle-provision',
   '/transcribe',
   '/ai',
   '/arweave/upload',
-  '/lit/chipotle-action',
   '/fetch_url',
   '/fetch_image',
   '/fetch',
   '/health',
 ]);
 
-export const stripWorkerEndpointSuffix = (rawPath: unknown): string => {
+export const stripWorkerEndpointSuffix = (rawPath: any): string => {
   const base = toStr(rawPath).trim();
   if (!base) return '';
   const cleaned = base.split('?')[0].split('#')[0].replace(/\/+$/, '');
@@ -33,7 +30,7 @@ export const stripWorkerEndpointSuffix = (rawPath: unknown): string => {
   return cleaned;
 };
 
-export const normalizeWorkerUrl = (url: unknown): string => {
+export const normalizeWorkerUrl = (url: any): string => {
   const ensured = ensureHttpUrl(url);
   const raw = toStr(ensured || url).trim();
   if (!raw || raw.startsWith('/')) return '';
