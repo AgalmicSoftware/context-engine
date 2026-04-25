@@ -8,52 +8,6 @@
 const MAX_SAMPLES_PER_LABEL = 200;
 const SLOW_MS_THRESHOLD = 5;
 
-type UiPerfLabelStats = {
-  count: number;
-  totalMs: number;
-  minMs: number;
-  maxMs: number;
-  lastMs: number;
-  over5msCount: number;
-  samples: number[];
-};
-
-type UiPerfLabelSnapshot = {
-  count: number;
-  totalMs: number;
-  avgMs: number;
-  minMs: number;
-  maxMs: number;
-  lastMs: number;
-  p95Ms: number;
-  over5msCount: number;
-};
-
-type UiPerfSnapshot = {
-  enabled: boolean;
-  ts: number;
-  byLabel: Record<string, UiPerfLabelSnapshot>;
-};
-
-type UiPerfStore = {
-  labels: Record<string, UiPerfLabelStats>;
-};
-
-type UiPerfGlobalApi = {
-  snapshot: () => UiPerfSnapshot;
-  reset: () => void;
-};
-
-type UiPerfRuntimeGlobal = typeof globalThis & {
-  ENABLE_CE_UI_PERF_STATS?: unknown;
-  __CE_UI_PERF_STORE__?: unknown;
-  __CE_UI_PERF__?: UiPerfGlobalApi;
-};
-
-const getRuntimeGlobal = (): UiPerfRuntimeGlobal | null => (
-  typeof globalThis === 'undefined' ? null : globalThis as UiPerfRuntimeGlobal
-);
-
 const nowMs = (): number => {
   try {
     if (typeof performance !== 'undefined' && typeof performance.now === 'function') {
@@ -65,22 +19,22 @@ const nowMs = (): number => {
 
 const isCeUiPerfEnabled = (): boolean => {
   try {
-    const runtimeGlobals = getRuntimeGlobal();
-    return Boolean(runtimeGlobals && runtimeGlobals.ENABLE_CE_UI_PERF_STATS === true);
+    const runtimeGlobals = globalThis as Record<string, any>;
+    return typeof globalThis !== 'undefined' && runtimeGlobals.ENABLE_CE_UI_PERF_STATS === true;
   } catch (_) {
     return false;
   }
 };
 
-const getStore = (): UiPerfStore => {
-  const runtimeGlobals = getRuntimeGlobal();
-  if (!runtimeGlobals) {
+const getStore = (): Record<string, any> => {
+  if (typeof globalThis === 'undefined') {
     return { labels: {} };
   }
+  const runtimeGlobals = globalThis as Record<string, any>;
   if (!runtimeGlobals.__CE_UI_PERF_STORE__ || typeof runtimeGlobals.__CE_UI_PERF_STORE__ !== 'object') {
     runtimeGlobals.__CE_UI_PERF_STORE__ = { labels: {} };
   }
-  return runtimeGlobals.__CE_UI_PERF_STORE__ as UiPerfStore;
+  return runtimeGlobals.__CE_UI_PERF_STORE__;
 };
 
 const computeP95 = (samples: number[] = []): number => {
@@ -91,7 +45,7 @@ const computeP95 = (samples: number[] = []): number => {
   return Number.isFinite(value) ? Number(value.toFixed(3)) : 0;
 };
 
-const ensureLabelStats = (label: unknown): UiPerfLabelStats => {
+const ensureLabelStats = (label: any): Record<string, any> => {
   const key = String(label || 'unknown');
   const store = getStore();
   if (!store.labels[key]) {
@@ -108,7 +62,7 @@ const ensureLabelStats = (label: unknown): UiPerfLabelStats => {
   return store.labels[key];
 };
 
-const recordSample = (label: unknown, durationMs: number): void => {
+const recordSample = (label: any, durationMs: number): void => {
   const stats = ensureLabelStats(label);
   const ms = Number.isFinite(durationMs) ? Number(durationMs.toFixed(3)) : 0;
   stats.count += 1;
@@ -123,22 +77,23 @@ const recordSample = (label: unknown, durationMs: number): void => {
   }
 };
 
-const ceUiPerfSnapshot = (): UiPerfSnapshot => {
+const ceUiPerfSnapshot = (): Record<string, any> => {
   const store = getStore();
-  const byLabel: Record<string, UiPerfLabelSnapshot> = {};
+  const byLabel: Record<string, any> = {};
   Object.entries(store.labels || {}).forEach(([label, stats]) => {
-    const count = Number(stats.count || 0);
-    const totalMs = Number((stats.totalMs || 0).toFixed(3));
+    const typedStats = stats as Record<string, any>;
+    const count = Number(typedStats.count || 0);
+    const totalMs = Number((typedStats.totalMs || 0).toFixed(3));
     const avgMs = count > 0 ? Number((totalMs / count).toFixed(3)) : 0;
     byLabel[label] = {
       count,
       totalMs,
       avgMs,
-      minMs: count > 0 ? Number((stats.minMs || 0).toFixed(3)) : 0,
-      maxMs: Number((stats.maxMs || 0).toFixed(3)),
-      lastMs: Number((stats.lastMs || 0).toFixed(3)),
-      p95Ms: computeP95(stats.samples || []),
-      over5msCount: Number(stats.over5msCount || 0),
+      minMs: count > 0 ? Number((typedStats.minMs || 0).toFixed(3)) : 0,
+      maxMs: Number((typedStats.maxMs || 0).toFixed(3)),
+      lastMs: Number((typedStats.lastMs || 0).toFixed(3)),
+      p95Ms: computeP95(typedStats.samples || []),
+      over5msCount: Number(typedStats.over5msCount || 0),
     };
   });
   return {
@@ -155,8 +110,7 @@ const resetCeUiPerfStats = (): void => {
 
 const installGlobalApi = (): void => {
   if (typeof globalThis === 'undefined') return;
-  const runtimeGlobals = getRuntimeGlobal();
-  if (!runtimeGlobals) return;
+  const runtimeGlobals = globalThis as Record<string, any>;
   runtimeGlobals.__CE_UI_PERF__ = {
     snapshot: ceUiPerfSnapshot,
     reset: resetCeUiPerfStats,
@@ -165,7 +119,7 @@ const installGlobalApi = (): void => {
 
 installGlobalApi();
 
-const measureSync = <T = unknown>(label: unknown, fn: (() => T) | null | undefined): T | undefined => {
+const measureSync = <T = any>(label: any, fn: (() => T) | null | undefined): T | undefined => {
   if (typeof fn !== 'function') return undefined;
   if (!isCeUiPerfEnabled()) return fn();
   const start = nowMs();

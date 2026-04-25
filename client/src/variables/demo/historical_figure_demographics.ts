@@ -12,27 +12,7 @@ export const DEMO_ANALYSIS_DEMOGRAPHIC_FIELDS = Object.freeze([
   'gender',
   'affiliation',
   'atlasCategory',
-] as const);
-
-type DemoAnalysisDemographicField = typeof DEMO_ANALYSIS_DEMOGRAPHIC_FIELDS[number];
-
-export type HistoricalFigureDemographicsEntry = Record<DemoAnalysisDemographicField, string>;
-
-type SourceDemographicsEntry = Omit<HistoricalFigureDemographicsEntry, 'region'> & {
-  region?: string;
-};
-
-type UnknownRecord = Record<string, unknown>;
-
-const isRecord = (value: unknown): value is UnknownRecord => (
-  typeof value === 'object' && value !== null
-);
-
-const getRecordEntries = (value: unknown): [string, UnknownRecord][] => (
-  isRecord(value)
-    ? Object.entries(value).filter((entry): entry is [string, UnknownRecord] => isRecord(entry[1]))
-    : []
-);
+]);
 
 const COUNTRY_OVERRIDES = Object.freeze({
   USA: 'United States',
@@ -484,21 +464,20 @@ const MANUAL_DEMOGRAPHICS = Object.freeze({
   },
 });
 
-const normalizeCountry = (value: unknown = ''): string => (
+const normalizeCountry = (value = ''): string => (
   (COUNTRY_OVERRIDES as Record<string, string>)[String(value || '').trim()] || String(value || '').trim()
 );
 
-const normalizeEraBucket = (value: unknown = ''): string => {
+const normalizeEraBucket = (value = ''): string => {
   const normalized = String(value || '').trim();
   return normalized;
 };
 
-const buildMergedFigureLookup = (): Map<string, UnknownRecord> => {
-  const mergedData = historicalFiguresMerged as { figures?: unknown };
-  const figures = Array.isArray(mergedData.figures)
-    ? mergedData.figures.filter(isRecord)
+const buildMergedFigureLookup = (): Map<string, any> => {
+  const figures = Array.isArray(historicalFiguresMerged?.figures)
+    ? historicalFiguresMerged.figures
     : [];
-  const lookup = new Map<string, UnknownRecord>();
+  const lookup = new Map<string, any>();
   figures.forEach((figure) => {
     const keys = [
       String(figure?.username || '').trim(),
@@ -515,22 +494,18 @@ const buildMergedFigureLookup = (): Map<string, UnknownRecord> => {
 
 const MERGED_FIGURE_LOOKUP = buildMergedFigureLookup();
 
-const ADDITIONAL_FIGURE_LOOKUP = new Map<string, UnknownRecord>(
-  getRecordEntries(additionalHistoricalFigures)
-    .map(([key, value]) => [String(key || '').trim(), value] as [string, UnknownRecord])
+const ADDITIONAL_FIGURE_LOOKUP = new Map<string, any>(
+  (Object.entries(additionalHistoricalFigures || {}) as [string, any][])
+    .map(([key, value]) => [String(key || '').trim(), value] as [string, any])
 );
 
-const historicalUserRecords = Array.isArray(historicalFigureUsers)
-  ? historicalFigureUsers.filter(isRecord)
-  : [];
-
-const HISTORICAL_USER_LOOKUP = new Map<string, UnknownRecord>(
-  historicalUserRecords
-    .map((entry) => [String(entry?.username || '').trim(), entry] as [string, UnknownRecord])
+const HISTORICAL_USER_LOOKUP = new Map<string, any>(
+  (Array.isArray(historicalFigureUsers) ? historicalFigureUsers : [])
+    .map((entry: any) => [String(entry?.username || '').trim(), entry] as [string, any])
     .filter(([key]) => key)
 );
 
-const buildSourceBackedEntry = (xid = ''): SourceDemographicsEntry | null => {
+const buildSourceBackedEntry = (xid = ''): Record<string, any> | null => {
   const mergedFigure = MERGED_FIGURE_LOOKUP.get(xid);
   const additionalFigure = ADDITIONAL_FIGURE_LOOKUP.get(xid);
   const historicalUser = HISTORICAL_USER_LOOKUP.get(xid);
@@ -556,7 +531,7 @@ const buildSourceBackedEntry = (xid = ''): SourceDemographicsEntry | null => {
   };
 };
 
-const withRegion = (entry: SourceDemographicsEntry): HistoricalFigureDemographicsEntry => {
+const withRegion = (entry: any = {}): Record<string, any> => {
   const country = normalizeCountry(entry.country);
   return {
     ...entry,
@@ -565,8 +540,8 @@ const withRegion = (entry: SourceDemographicsEntry): HistoricalFigureDemographic
   };
 };
 
-const buildCanonicalEntry = (xid = ''): HistoricalFigureDemographicsEntry | null => {
-  const manualEntry = (MANUAL_DEMOGRAPHICS as Readonly<Record<string, SourceDemographicsEntry>>)[xid];
+const buildCanonicalEntry = (xid = ''): Record<string, any> | null => {
+  const manualEntry = (MANUAL_DEMOGRAPHICS as Record<string, any>)[xid];
   if (manualEntry) {
     return withRegion(manualEntry);
   }
@@ -584,7 +559,7 @@ const DEMO_PARTICIPANT_XIDS = Object.freeze(
 );
 
 const HISTORICAL_FIGURE_DEMOGRAPHICS = Object.freeze(
-  DEMO_PARTICIPANT_XIDS.reduce((acc, xid) => {
+  DEMO_PARTICIPANT_XIDS.reduce<Record<string, Record<string, any>>>((acc, xid) => {
     if (!xid || acc[xid]) {
       return acc;
     }
