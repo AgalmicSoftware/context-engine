@@ -19,31 +19,23 @@
 export const CLUSTER_ANALYSIS_SYSTEM_PROMPT =
   "You are an expert survey analyst. You write neutral, helpful summaries of opinion clusters.";
 
-type UnknownRecord = Record<string, unknown>;
-
-const isRecord = (value: unknown): value is UnknownRecord => (
-  typeof value === 'object' && value !== null
-);
-
 /**
  * Build a user prompt for the model.
  * @param {object} clusterData - { clusterIndex, clusterSize, totalClusters, topStatements: [ {label, questionIndex, prompt, cluster:{agree,disagree,unsure,responded,agreeRate,disagreeRate,unsureRate}, overall:{...}, differenceScore} ] }
  * @param {object} allClustersData - { clusterCount, sizes: { [idx]: size } }
  */
-export default function buildClusterAnalysisPrompt(clusterData: unknown, allClustersData: unknown = null): string {
+export default function buildClusterAnalysisPrompt(clusterData: any, allClustersData: any = null): string {
   const safe = (obj: unknown): string => JSON.stringify(obj ?? {}, null, 2);
-  const clusterRecord = isRecord(clusterData) ? clusterData : {};
-  const allClustersRecord = isRecord(allClustersData) ? allClustersData : {};
 
   return `
-We have grouped participants into ${allClustersRecord.clusterCount ?? 'N'} opinion clusters.
+We have grouped participants into ${allClustersData?.clusterCount ?? 'N'} opinion clusters.
 Each cluster represents people whose voting patterns on statements are similar.
 
-You are analyzing cluster #${clusterRecord.clusterIndex ?? '?'} of size ${clusterRecord.clusterSize ?? '?'}.
+You are analyzing cluster #${clusterData?.clusterIndex ?? '?'} of size ${clusterData?.clusterSize ?? '?'}.
 For this cluster, here are the most representative statements (with per-cluster vs overall agreement):
 
 Top statements (JSON):
-${safe(clusterRecord.topStatements)}
+${safe(clusterData?.topStatements)}
 
 All-clusters context (JSON, optional):
 ${safe(allClustersData)}
