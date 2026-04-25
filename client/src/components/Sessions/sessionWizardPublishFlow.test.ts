@@ -1,9 +1,13 @@
 import {
+  LOCAL_WORKER_BUNDLE_FALLBACK_FILE_PATH,
   buildSessionWizardPublishPlan,
   buildSessionWizardPublishStepNumbers,
   getSessionWizardNormalModeBundleUrlOverrideValidationError,
   getSessionWizardPublishProgressPercent,
+  readSessionWizardBundleFileText,
   resolveSessionWizardBundleUrlForMode,
+  resolveSessionWizardDeployBundleMode,
+  resolveSessionWizardDeployBundlePayload,
   resolveSessionWizardSponsoredAutoDeployReadiness,
   resolveSponsoredBundleDeployReadiness,
   resolveSessionWizardShouldAutoDeployWorker,
@@ -106,6 +110,79 @@ describe('sessionWizardPublishFlow', () => {
       ready: false,
       missing: expect.arrayContaining(['Worker name', 'OpenAI key']),
     }));
+  });
+
+  it('resolves deploy bundle mode from normal-mode overrides and manual fallback choices', () => {
+    expect(resolveSessionWizardDeployBundleMode({
+      wizardMode: 'normal',
+      bundleMode: 'upload',
+      bundleUrl: '',
+      sponsoredAutoDeployReady: false,
+      normalModeBundleUrlOverride: 'https://override.example/bundle.js',
+      normalModeDefaultBundleUrl: '',
+    })).toBe('url');
+
+    expect(resolveSessionWizardDeployBundleMode({
+      wizardMode: 'normal',
+      bundleMode: 'url',
+      sponsoredAutoDeployReady: false,
+      forceManualBundleFile: true,
+      hasBundleFile: true,
+    })).toBe('upload');
+
+    expect(resolveSessionWizardDeployBundleMode({
+      wizardMode: 'advanced',
+      bundleMode: 'upload',
+      sponsoredAutoDeployReady: true,
+    })).toBe('upload');
+  });
+
+  it('resolves deploy bundle payloads for URL and validated upload modes', async () => {
+    await expect(resolveSessionWizardDeployBundlePayload({
+      effectiveBundleMode: 'url',
+      bundleUrl: ' https://bundles.example.test/sessionCorsWorker.bundle.js ',
+    })).resolves.toEqual({
+      bundleText: '',
+      bundleUrl: 'https://bundles.example.test/sessionCorsWorker.bundle.js',
+      bundleSource: 'url',
+    });
+
+    await expect(resolveSessionWizardDeployBundlePayload({
+      effectiveBundleMode: 'upload',
+      bundleFile: {
+        text: async () => 'export default { fetch() { return new Response("ok"); } };',
+      } as File,
+    })).resolves.toEqual({
+      bundleText: 'export default { fetch() { return new Response("ok"); } };',
+      bundleUrl: undefined,
+      bundleSource: 'upload',
+    });
+  });
+
+  it('rejects empty, html, wrapped, and invalid bundle uploads with the fallback guidance', async () => {
+    await expect(readSessionWizardBundleFileText({
+      text: async () => '',
+    } as File)).rejects.toThrow(
+      `Selected worker bundle file was empty. Choose ${LOCAL_WORKER_BUNDLE_FALLBACK_FILE_PATH} and retry.`
+    );
+
+    await expect(readSessionWizardBundleFileText({
+      text: async () => '<!doctype html><html><body>oops</body></html>',
+    } as File)).rejects.toThrow(
+      `Selected worker bundle file resolved to HTML instead of a worker script. Choose ${LOCAL_WORKER_BUNDLE_FALLBACK_FILE_PATH} and retry.`
+    );
+
+    await expect(readSessionWizardBundleFileText({
+      text: async () => 'export default "worker-bytes";',
+    } as File)).rejects.toThrow(
+      `Selected worker bundle file resolved to a JavaScript string wrapper instead of raw worker bytes. Choose ${LOCAL_WORKER_BUNDLE_FALLBACK_FILE_PATH} and retry.`
+    );
+
+    await expect(readSessionWizardBundleFileText({
+      text: async () => 'export default { notFetch() { return "nope"; } };',
+    } as File)).rejects.toThrow(
+      `Selected worker bundle file is missing the expected worker module export. Choose ${LOCAL_WORKER_BUNDLE_FALLBACK_FILE_PATH} and retry.`
+    );
   });
 
   it('fills publish progress within an active step and completes at 100 once done', () => {
