@@ -43,38 +43,6 @@ const DEFAULT_LOGGING_CONFIG = {
 const GLOBAL_KEY = 'CE_LOGGING';
 const GUIDE_SHOWN_KEY = '__CE_LOGGING_GUIDE_SHOWN__';
 
-type LoggingConfig = {
-  enabled: boolean;
-  categories: Record<string, boolean>;
-  levels: Record<string, boolean>;
-};
-
-type PartialLoggingConfig = {
-  enabled?: unknown;
-  categories?: Record<string, unknown>;
-  levels?: Record<string, unknown>;
-  [key: string]: unknown;
-};
-
-type LoggerOptions = {
-  prefix?: unknown;
-};
-
-type Logger = {
-  log: (...args: unknown[]) => void;
-  info: (...args: unknown[]) => void;
-  debug: (...args: unknown[]) => void;
-  warn: (...args: unknown[]) => void;
-  error: (...args: unknown[]) => void;
-  isEnabled: (level?: string) => boolean;
-};
-
-type LoggingRuntimeWindow = Window & {
-  CE_LOGGING_HELP?: () => void;
-  ENABLE_RPC_DEBUG_LOGGING?: unknown;
-} & Record<typeof GLOBAL_KEY, PartialLoggingConfig | LoggingConfig | undefined>
-  & Record<typeof GUIDE_SHOWN_KEY, unknown>;
-
 const CE_ASCII = [
   '  _____  ______   CE LOGGING',
   ' / ____| |  ____|  window.CE_LOGGING.enabled = true',
@@ -86,63 +54,57 @@ const CE_ASCII = [
 const defaultCategories = DEFAULT_LOGGING_CONFIG.categories as Record<string, boolean>;
 const defaultLevels = DEFAULT_LOGGING_CONFIG.levels as Record<string, boolean>;
 
-const getRuntimeWindow = (): LoggingRuntimeWindow | null => (
-  typeof window === 'undefined' ? null : window as unknown as LoggingRuntimeWindow
-);
-
-const cloneDefaults = (): LoggingConfig => ({
+const cloneDefaults = (): any => ({
   enabled: DEFAULT_LOGGING_CONFIG.enabled,
   categories: { ...DEFAULT_LOGGING_CONFIG.categories },
   levels: { ...DEFAULT_LOGGING_CONFIG.levels }
 });
 
-const applyDefaults = (cfg: unknown): LoggingConfig => {
+const applyDefaults = (cfg: any): any => {
   if (!cfg || typeof cfg !== 'object') return cloneDefaults();
-  const mutableCfg = cfg as PartialLoggingConfig;
 
-  if (typeof mutableCfg.enabled !== 'boolean') mutableCfg.enabled = DEFAULT_LOGGING_CONFIG.enabled;
+  if (typeof cfg.enabled !== 'boolean') cfg.enabled = DEFAULT_LOGGING_CONFIG.enabled;
 
-  if (!mutableCfg.categories || typeof mutableCfg.categories !== 'object') mutableCfg.categories = {};
+  if (!cfg.categories || typeof cfg.categories !== 'object') cfg.categories = {};
   Object.keys(defaultCategories).forEach((key) => {
-    if (typeof mutableCfg.categories?.[key] !== 'boolean') {
-      mutableCfg.categories![key] = defaultCategories[key];
+    if (typeof cfg.categories[key] !== 'boolean') {
+      cfg.categories[key] = defaultCategories[key];
     }
   });
 
-  if (!mutableCfg.levels || typeof mutableCfg.levels !== 'object') mutableCfg.levels = {};
+  if (!cfg.levels || typeof cfg.levels !== 'object') cfg.levels = {};
   Object.keys(defaultLevels).forEach((key) => {
-    if (typeof mutableCfg.levels?.[key] !== 'boolean') {
-      mutableCfg.levels![key] = defaultLevels[key];
+    if (typeof cfg.levels[key] !== 'boolean') {
+      cfg.levels[key] = defaultLevels[key];
     }
   });
 
-  return mutableCfg as LoggingConfig;
+  return cfg;
 };
 
-export const getLoggingConfig = (): LoggingConfig => {
-  const runtimeWindow = getRuntimeWindow();
-  if (!runtimeWindow) return cloneDefaults();
+export const getLoggingConfig = (): any => {
+  if (typeof window === 'undefined') return cloneDefaults();
+  const runtimeWindow = window as any;
   if (!runtimeWindow[GLOBAL_KEY]) runtimeWindow[GLOBAL_KEY] = cloneDefaults();
   return applyDefaults(runtimeWindow[GLOBAL_KEY]);
 };
 
-const isLegacyCategoryEnabled = (category: unknown): boolean => {
-  const runtimeWindow = getRuntimeWindow();
-  if (!runtimeWindow) return false;
+const isLegacyCategoryEnabled = (category: any): boolean => {
+  if (typeof window === 'undefined') return false;
+  const runtimeWindow = window as any;
   if (category === 'rpc' && runtimeWindow.ENABLE_RPC_DEBUG_LOGGING === true) return true;
   return false;
 };
 
-const isCategoryEnabled = (cfg: LoggingConfig | null | undefined, category: unknown): boolean => {
+const isCategoryEnabled = (cfg: any, category: any): boolean => {
   if (!cfg) return false;
   if (cfg.categories?.all) return true;
-  const categoryKey = String(category || '');
-  if (categoryKey && cfg.categories?.[categoryKey]) return true;
+  if (category && cfg.categories?.[category]) return true;
   if (!category && cfg.categories?.general) return true;
   return isLegacyCategoryEnabled(category);
 };
 
-export const shouldLog = (category: unknown, level = 'log'): boolean => {
+export const shouldLog = (category: any, level = 'log'): boolean => {
   const cfg = getLoggingConfig();
   if (!cfg?.levels?.[level]) return false;
   if (level === 'error') return true;
@@ -150,12 +112,12 @@ export const shouldLog = (category: unknown, level = 'log'): boolean => {
   return isCategoryEnabled(cfg, category);
 };
 
-const buildArgs = (prefix: string, args: unknown[]): unknown[] => {
+const buildArgs = (prefix: string, args: any[]): any[] => {
   if (!prefix) return args;
   return [prefix, ...args];
 };
 
-export const emitForcedLog = (level: unknown, ...args: unknown[]): void => {
+export const emitForcedLog = (level: any, ...args: any[]): void => {
   const consoleMethod = (
     level === 'warn' ? console.warn :
     level === 'error' ? console.error :
@@ -164,26 +126,26 @@ export const emitForcedLog = (level: unknown, ...args: unknown[]): void => {
   consoleMethod(...args);
 };
 
-export const createLogger = (category: unknown, options: LoggerOptions = {}): Logger => {
+export const createLogger = (category: any, options: any = {}) => {
   const prefix =
     typeof options.prefix === 'string'
       ? options.prefix
       : (category ? `[${category}]` : '');
 
   return {
-    log: (...args: unknown[]) => {
+    log: (...args: any[]) => {
       if (shouldLog(category, 'log')) console.log(...buildArgs(prefix, args));
     },
-    info: (...args: unknown[]) => {
+    info: (...args: any[]) => {
       if (shouldLog(category, 'info')) console.info(...buildArgs(prefix, args));
     },
-    debug: (...args: unknown[]) => {
+    debug: (...args: any[]) => {
       if (shouldLog(category, 'debug')) console.debug(...buildArgs(prefix, args));
     },
-    warn: (...args: unknown[]) => {
+    warn: (...args: any[]) => {
       if (shouldLog(category, 'warn')) console.warn(...buildArgs(prefix, args));
     },
-    error: (...args: unknown[]) => {
+    error: (...args: any[]) => {
       if (shouldLog(category, 'error')) console.error(...buildArgs(prefix, args));
     },
     isEnabled: (level = 'log') => shouldLog(category, level)
@@ -214,17 +176,17 @@ const buildGuideMessage = (): string => {
   ].join('\n');
 };
 
-export const printLoggingGuide = ({ force = false }: { force?: boolean } = {}): void => {
-  const runtimeWindow = getRuntimeWindow();
-  if (!runtimeWindow) return;
+export const printLoggingGuide = ({ force = false }: any = {}): void => {
+  if (typeof window === 'undefined') return;
+  const runtimeWindow = window as any;
   if (!force && runtimeWindow[GUIDE_SHOWN_KEY]) return;
   runtimeWindow[GUIDE_SHOWN_KEY] = true;
   console.info(buildGuideMessage());
 };
 
-export const initLogging = ({ showGuide = true }: { showGuide?: boolean } = {}): LoggingConfig | null => {
-  const runtimeWindow = getRuntimeWindow();
-  if (!runtimeWindow) return null;
+export const initLogging = ({ showGuide = true }: any = {}): any => {
+  if (typeof window === 'undefined') return null;
+  const runtimeWindow = window as any;
   const cfg = getLoggingConfig();
 
   if (typeof runtimeWindow.CE_LOGGING_HELP !== 'function') {
