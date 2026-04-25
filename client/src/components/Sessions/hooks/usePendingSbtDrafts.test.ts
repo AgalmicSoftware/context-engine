@@ -56,7 +56,7 @@ describe('usePendingSbtDrafts', () => {
       SESSION_WIZARD_PENDING_SBT_DRAFTS_KEY,
       expect.stringContaining(PENDING_ADDRESS)
     );
-    expect(JSON.parse(sessionStorage.getItem(SESSION_WIZARD_PENDING_SBT_DRAFTS_KEY))).toEqual([
+    expect(JSON.parse(sessionStorage.getItem(SESSION_WIZARD_PENDING_SBT_DRAFTS_KEY) || '[]')).toEqual([
       expect.objectContaining({
         predictedAddress: PENDING_ADDRESS,
         displayName: 'Pending Access',
