@@ -35,7 +35,7 @@ const renderWorkerPanel = (props: Partial<WorkerPanelProps> = {}) => render(
     defaultAllowedOrigins="https://app.example"
     shouldUseSponsoredAutoDeployFlow={false}
     deployForm={{}}
-    renderEmbeddedDeployHelperToggle={() => null}
+    deployHelperToggle={null}
     shouldShowDeployHelperUrlInput={false}
     deployHelperUrl=""
     setDeployHelperUrl={() => {}}
