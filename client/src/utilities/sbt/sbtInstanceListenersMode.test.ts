@@ -8,7 +8,7 @@ describe('sbtInstanceListenersMode helpers', () => {
   beforeEach(() => {
     try { window.history.replaceState({}, '', '/'); } catch (_) {}
     try { localStorage.removeItem('ce:sbtInstanceListenersMode'); } catch (_) {}
-    try { delete globalThis.CE_SBT_INSTANCE_LISTENERS_MODE; } catch (_) {}
+    try { delete (globalThis as Record<string, unknown>).CE_SBT_INSTANCE_LISTENERS_MODE; } catch (_) {}
   });
 
   it('normalizes bad inputs to "auto"', () => {
@@ -24,7 +24,7 @@ describe('sbtInstanceListenersMode helpers', () => {
 
   it('prefers URL param over localStorage and globalThis', () => {
     localStorage.setItem('ce:sbtInstanceListenersMode', 'off');
-    globalThis.CE_SBT_INSTANCE_LISTENERS_MODE = 'on';
+    (globalThis as Record<string, unknown>).CE_SBT_INSTANCE_LISTENERS_MODE = 'on';
 
     window.history.replaceState({}, '', '/?ceSbtInstanceListenersMode=auto');
     expect(readSbtInstanceListenersMode()).toBe('auto');
@@ -35,7 +35,7 @@ describe('sbtInstanceListenersMode helpers', () => {
   });
 
   it('falls back to localStorage then globalThis', () => {
-    globalThis.CE_SBT_INSTANCE_LISTENERS_MODE = 'off';
+    (globalThis as Record<string, unknown>).CE_SBT_INSTANCE_LISTENERS_MODE = 'off';
     expect(readSbtInstanceListenersMode()).toBe('off');
 
     localStorage.setItem('ce:sbtInstanceListenersMode', 'on');
@@ -49,7 +49,6 @@ describe('sbtInstanceListenersMode helpers', () => {
   it('writeSbtInstanceListenersMode writes localStorage and globalThis without reload', () => {
     expect(writeSbtInstanceListenersMode('off')).toBe('off');
     expect(localStorage.getItem('ce:sbtInstanceListenersMode')).toBe('off');
-    expect(globalThis.CE_SBT_INSTANCE_LISTENERS_MODE).toBe('off');
+    expect((globalThis as Record<string, unknown>).CE_SBT_INSTANCE_LISTENERS_MODE).toBe('off');
   });
 });
-
