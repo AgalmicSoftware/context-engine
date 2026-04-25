@@ -1,4 +1,4 @@
-import { __test__isSessionWizardDevMode } from './SessionWizard';
+import { __test__isSessionWizardDevMode } from './sessionWizardConfig';
 
 describe('SessionWizard dev mode detection', () => {
   it('treats missing process globals as non-production', () => {
