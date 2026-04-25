@@ -38,7 +38,7 @@ type SbtLiveProgressEntry = {
   currentBlock?: number;
   latestBlock?: number;
   updatedAtMs?: number;
-  [key: string]: unknown;
+  [key: string]: any;
 };
 
 type MergeSbtLiveProgressArgs = {
@@ -50,7 +50,7 @@ type MergeSbtLiveProgressArgs = {
 type QuestionReadyPrevState = {
   questionResponsesNonce?: number;
   questionScanProgress?: QuestionScanProgressLike | null;
-  [key: string]: unknown;
+  [key: string]: any;
 };
 
 type BuildQuestionReadyArgs = {
@@ -59,12 +59,12 @@ type BuildQuestionReadyArgs = {
   incrementNonce?: boolean;
 };
 
-export type QuestionScanProgressLike = {
+type QuestionScanProgressLike = {
   phase?: string;
   pendingMetadataCount?: number;
   discoveredQuestions?: number;
   hydratedQuestions?: number;
-  [key: string]: unknown;
+  [key: string]: any;
 };
 
 type FinalizeQuestionProgressArgs = {
