@@ -3,22 +3,7 @@ import {
   CLOUDFLARE_MISSING_HANDLER_ERROR,
   DEPLOY_HELPER_BUNDLE_FETCH_ERROR,
 } from './sessionWizardPublishFlow';
-
-type SessionWizardDeployRecord = Record<string, unknown>;
-type ResolveSessionWizardDeployStatusDisplayStateArgs = {
-  deployInFlight?: unknown;
-  deployStatus?: unknown;
-  deployVerifiedInUi?: unknown;
-};
-export type SessionWizardDeployStatusDisplayState = {
-  deployButtonDisabled: boolean;
-  deployStatusText: string;
-  isError: boolean;
-};
-
-const asDeployRecord = (value: unknown): SessionWizardDeployRecord => (
-  value !== null && typeof value === 'object' ? value as SessionWizardDeployRecord : {}
-);
+import type { AnyRecord } from '../shellTypes';
 
 const resolveCurrentOrigin = (value: unknown = undefined): string => {
   const override = toStr(value).trim();
@@ -46,9 +31,9 @@ export const buildSessionWizardDeployHelperCorsMessage = ({
 };
 
 export const buildSessionWizardDeployHelperWorkersDevStatusMessage = (
-  deployResponse: unknown = {}
+  deployResponse: AnyRecord = {}
 ): string => {
-  const response = asDeployRecord(deployResponse);
+  const response: AnyRecord = deployResponse && typeof deployResponse === 'object' ? deployResponse : {};
   const subdomain = toStr(response?.subdomain).trim();
   const subdomainStatus = toStr(response?.subdomainStatus).trim();
   const subdomainError = toStr(response?.subdomainError).trim();
@@ -96,7 +81,7 @@ export const buildSessionWizardDeployHelperWorkersDevStatusMessage = (
 
 export const withSessionWizardDeployHelperWorkersDevStatus = (
   message = '',
-  deployResponse: unknown = {}
+  deployResponse: AnyRecord = {}
 ): string => {
   const base = toStr(message).trim();
   const workersDevStatus = buildSessionWizardDeployHelperWorkersDevStatusMessage(deployResponse);
@@ -104,35 +89,17 @@ export const withSessionWizardDeployHelperWorkersDevStatus = (
   return base ? `${base} ${workersDevStatus}` : workersDevStatus;
 };
 
-export const resolveSessionWizardDeployStatusDisplayState = ({
-  deployInFlight = false,
-  deployStatus = '',
-  deployVerifiedInUi = false,
-}: ResolveSessionWizardDeployStatusDisplayStateArgs = {}): SessionWizardDeployStatusDisplayState => {
-  const deployStatusText = toStr(deployStatus);
-  const deployStatusLower = deployStatusText.toLowerCase();
-  return {
-    deployButtonDisabled: !!deployInFlight,
-    deployStatusText,
-    isError: !!deployStatusText &&
-      !deployInFlight &&
-      !deployVerifiedInUi &&
-      !deployStatusLower.includes('worker deployed'),
-  };
-};
-
-export const formatSessionWizardDeployBundleDiagnostics = (bundleDiagnostics: unknown = {}): string => {
-  const diagnostics = asDeployRecord(bundleDiagnostics);
-  const sha256 = toStr(diagnostics?.sha256).trim();
+export const formatSessionWizardDeployBundleDiagnostics = (bundleDiagnostics: AnyRecord = {}): string => {
+  const sha256 = toStr(bundleDiagnostics?.sha256).trim();
   const parts = [
-    `source=${toStr(diagnostics?.source).trim() || 'unknown'}`,
-    `len=${Number(diagnostics?.length || 0) || 0}`,
+    `source=${toStr(bundleDiagnostics?.source).trim() || 'unknown'}`,
+    `len=${Number(bundleDiagnostics?.length || 0) || 0}`,
     `sha256=${sha256 ? sha256.slice(0, 16) : 'n/a'}`,
-    `export=${diagnostics?.hasAnyExport === true ? '1' : '0'}`,
-    `default=${diagnostics?.hasExportDefault === true ? '1' : '0'}`,
-    `namedDefault=${diagnostics?.hasNamedDefaultExport === true ? '1' : '0'}`,
-    `fetch=${diagnostics?.hasFetchHandler === true ? '1' : '0'}`,
-    `swFetch=${diagnostics?.hasServiceWorkerFetch === true ? '1' : '0'}`,
+    `export=${bundleDiagnostics?.hasAnyExport === true ? '1' : '0'}`,
+    `default=${bundleDiagnostics?.hasExportDefault === true ? '1' : '0'}`,
+    `namedDefault=${bundleDiagnostics?.hasNamedDefaultExport === true ? '1' : '0'}`,
+    `fetch=${bundleDiagnostics?.hasFetchHandler === true ? '1' : '0'}`,
+    `swFetch=${bundleDiagnostics?.hasServiceWorkerFetch === true ? '1' : '0'}`,
   ];
   return parts.join(' ');
 };
@@ -142,20 +109,16 @@ export const normalizeSessionWizardDeployErrorMessage = ({
   helperBase,
   currentOrigin,
 }: {
-  err?: unknown;
+  err?: AnyRecord | null;
   helperBase?: unknown;
   currentOrigin?: unknown;
 } = {}): string => {
-  const error = asDeployRecord(err);
-  const raw = toStr(
-    error?.message ||
-    (typeof err === 'string' || typeof err === 'number' ? err : '')
-  ).trim();
+  const raw = toStr(err?.message).trim();
   const lowered = raw.toLowerCase();
-  const statusCode = Number(error?.statusCode || 0);
-  const responseError = toStr(error?.responseError).trim();
+  const statusCode = Number(err?.statusCode || 0);
+  const responseError = toStr(err?.responseError).trim();
   const responseLower = responseError.toLowerCase();
-  const bundleDiagnostics = error?.responseBundleDiagnostics;
+  const bundleDiagnostics = err?.responseBundleDiagnostics;
   const diagnosticsSummary = bundleDiagnostics
     ? formatSessionWizardDeployBundleDiagnostics(bundleDiagnostics)
     : '';

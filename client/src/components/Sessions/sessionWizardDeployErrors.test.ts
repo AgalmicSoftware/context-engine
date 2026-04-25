@@ -3,7 +3,6 @@ import {
   buildSessionWizardDeployHelperWorkersDevStatusMessage,
   formatSessionWizardDeployBundleDiagnostics,
   normalizeSessionWizardDeployErrorMessage,
-  resolveSessionWizardDeployStatusDisplayState,
   withSessionWizardDeployHelperWorkersDevStatus,
 } from './sessionWizardDeployErrors';
 
@@ -31,44 +30,6 @@ describe('sessionWizardDeployErrors', () => {
     })).toBe(
       'Worker deployed. workers.dev status: account issue: subdomain unavailable; script issue: script missing route.'
     );
-  });
-
-  it('classifies deploy status display errors without owning deploy execution', () => {
-    expect(resolveSessionWizardDeployStatusDisplayState()).toEqual({
-      deployButtonDisabled: false,
-      deployStatusText: '',
-      isError: false,
-    });
-    expect(resolveSessionWizardDeployStatusDisplayState({
-      deployInFlight: true,
-      deployStatus: 'Uploading worker...',
-    })).toEqual({
-      deployButtonDisabled: true,
-      deployStatusText: 'Uploading worker...',
-      isError: false,
-    });
-    expect(resolveSessionWizardDeployStatusDisplayState({
-      deployStatus: 'Worker deployed.',
-    })).toEqual({
-      deployButtonDisabled: false,
-      deployStatusText: 'Worker deployed.',
-      isError: false,
-    });
-    expect(resolveSessionWizardDeployStatusDisplayState({
-      deployStatus: 'Missing API token.',
-    })).toEqual({
-      deployButtonDisabled: false,
-      deployStatusText: 'Missing API token.',
-      isError: true,
-    });
-    expect(resolveSessionWizardDeployStatusDisplayState({
-      deployStatus: 'Custom URL changed after deploy.',
-      deployVerifiedInUi: true,
-    })).toEqual({
-      deployButtonDisabled: false,
-      deployStatusText: 'Custom URL changed after deploy.',
-      isError: false,
-    });
   });
 
   it('formats bundle diagnostics as a compact summary', () => {
@@ -138,14 +99,6 @@ describe('sessionWizardDeployErrors', () => {
     expect(normalizeSessionWizardDeployErrorMessage({
       err: { statusCode: 503 },
     })).toBe('Worker deploy failed (503).');
-
-    expect(normalizeSessionWizardDeployErrorMessage({
-      err: 'Failed to fetch',
-      helperBase: 'https://helper.example.test',
-      currentOrigin: 'https://app.example.test',
-    })).toBe(
-      'Deploy request could not reach https://helper.example.test. This is usually CORS or helper availability; ensure https://app.example.test is allowed and retry.'
-    );
 
     expect(normalizeSessionWizardDeployErrorMessage()).toBe('Worker deploy failed.');
   });
