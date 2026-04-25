@@ -4,7 +4,7 @@ const mockGetRegistrySessionConfig = jest.fn();
 jest.mock('../../store.js', () => ({
   __esModule: true,
   default: {
-    getState: (...args) => mockGetState(...args),
+    getState: (...args: unknown[]) => mockGetState(...args),
   },
 }));
 
@@ -13,7 +13,7 @@ jest.mock('../../variables/appConfig.js', () => ({
 }));
 
 jest.mock('../session/sessionRegistryReader.js', () => ({
-  getRegistrySessionConfig: (...args) => mockGetRegistrySessionConfig(...args),
+  getRegistrySessionConfig: (...args: unknown[]) => mockGetRegistrySessionConfig(...args),
 }));
 
 jest.mock('../../variables/demo/demo_sessions.json', () => ({

@@ -23,7 +23,7 @@ describe('workerCorsOrigins helpers', () => {
       'http://127.0.0.1:3000',
       'http://127.0.0.1:3001',
     ]));
-    expect(out.filter((x) => x === 'http://localhost:3001')).toHaveLength(1);
+    expect(out.filter((x: string) => x === 'http://localhost:3001')).toHaveLength(1);
   });
 
   it('buildWorkerAllowOrigins treats legacy string allowOrigins inputs as lists', () => {
