@@ -8,13 +8,26 @@ import test from 'node:test';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SERVICE_WORKER_PATH = resolve(__dirname, '..', 'contextEngine-cc', 'public', 'sw.js');
 const SERVICE_WORKER_SOURCE = readFileSync(SERVICE_WORKER_PATH, 'utf8');
+const SERVICE_WORKER_ORIGIN = 'http://localhost:7391';
+
+const toCacheKey = (request) => {
+  if (typeof request === 'string') {
+    return new URL(request, SERVICE_WORKER_ORIGIN).toString();
+  }
+  return request?.url;
+};
 
 const buildServiceWorkerHarness = ({ fetchImpl = async () => new Response('ok') } = {}) => {
   const listeners = new Map();
   const cachedResponses = new Map();
 
   const cacheApi = {
-    addAll: async () => {},
+    addAll: async (entries) => {
+      for (const entry of entries) {
+        const key = toCacheKey(entry);
+        cachedResponses.set(key, new Response(`precache:${key}`, { status: 200 }));
+      }
+    },
     put: async (request, response) => {
       cachedResponses.set(request.url, response);
     },
@@ -27,13 +40,13 @@ const buildServiceWorkerHarness = ({ fetchImpl = async () => new Response('ok') 
     Promise,
     caches: {
       open: async () => cacheApi,
-      match: async (request) => cachedResponses.get(request.url),
+      match: async (request) => cachedResponses.get(toCacheKey(request)),
       keys: async () => [],
       delete: async () => true,
     },
     fetch: fetchImpl,
     self: {
-      location: new URL('http://localhost:7391'),
+      location: new URL(SERVICE_WORKER_ORIGIN),
       skipWaiting: () => {},
       clients: {
         claim: () => {},
@@ -48,6 +61,17 @@ const buildServiceWorkerHarness = ({ fetchImpl = async () => new Response('ok') 
 
   return {
     cachedResponses,
+    async dispatchInstall() {
+      const handler = listeners.get('install');
+      assert.equal(typeof handler, 'function');
+      await new Promise((resolveInstall, rejectInstall) => {
+        handler({
+          waitUntil(promise) {
+            Promise.resolve(promise).then(resolveInstall, rejectInstall);
+          },
+        });
+      });
+    },
     async dispatchFetch(request) {
       const handler = listeners.get('fetch');
       assert.equal(typeof handler, 'function');
@@ -105,4 +129,22 @@ test('service worker falls back to cached assets when the network fails', async 
 
   const response = await harness.dispatchFetch(request);
   assert.equal(await response.text(), 'cached-body');
+});
+
+test('service worker falls back to the cached shell for offline navigation requests', async () => {
+  const harness = buildServiceWorkerHarness({
+    fetchImpl: async () => {
+      throw new Error('network down');
+    },
+  });
+  await harness.dispatchInstall();
+
+  const navigationRequest = {
+    url: 'http://localhost:7391/questions',
+    method: 'GET',
+    mode: 'navigate',
+  };
+
+  const response = await harness.dispatchFetch(navigationRequest);
+  assert.equal(await response.text(), 'precache:http://localhost:7391/index.html');
 });
