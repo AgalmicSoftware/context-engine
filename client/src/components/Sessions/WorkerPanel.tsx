@@ -5,6 +5,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCaretDown, faCaretUp, faExternalLinkAlt } from '@fortawesome/free-solid-svg-icons';
 import styles from './SessionWizard.module.scss';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
+import WorkerConnectionSection from './WorkerConnectionSection';
 import WorkerDeploySection from './WorkerDeploySection';
 import WorkerSecretsSection from './WorkerSecretsSection';
 import {
@@ -307,43 +308,18 @@ const WorkerPanel = ({
             deployStatusIsError={deployStatusIsError}
           />
 
-          {showWorkerUrlField ? (
-            <div className={styles.corsFieldRow}>
-              <div className={styles.corsFieldBlock}>
-                {renderField('corsWorkerUrl', displayedWorkerUrl, [], { forceShow: true })}
-                {workerUrlAutoFilled && (
-                  <div className={styles.corsFieldBadgeRow}>
-                    <div className={styles.corsFieldBadge}>
-                      Auto-filled from deploy-helper
-                    </div>
-                    {renderInfoTooltip({
-                      id: 'gw-worker-autofill-tip',
-                      content: 'You can still edit this field manually if you want to point to a different worker.',
-                      placement: 'right',
-                      testId: 'ce-wizard-worker-tooltip-gw-worker-autofill-tip',
-                      ariaLabel: 'Auto-filled worker URL info',
-                    })}
-                  </div>
-                )}
-              </div>
-              {showSharedWorkerChoice && (
-                <Button
-                  type="button"
-                  className={styles.secondaryButton}
-                  onClick={() => {
-                    setWorkerUrlAutoFilled(false);
-                    updateDraftValue(['corsWorkerUrl'], getDefaultWorkerUrl());
-                  }}
-                >
-                  Reset to default
-                </Button>
-              )}
-            </div>
-          ) : (
-            <div className={styles.helperText}>
-              Worker URL appears here after a successful custom worker deploy.
-            </div>
-          )}
+          <WorkerConnectionSection
+            showWorkerUrlField={showWorkerUrlField}
+            displayedWorkerUrl={displayedWorkerUrl}
+            renderField={renderField}
+            workerUrlAutoFilled={workerUrlAutoFilled}
+            renderInfoTooltip={renderInfoTooltip}
+            showSharedWorkerChoice={showSharedWorkerChoice}
+            onResetToDefault={() => {
+              setWorkerUrlAutoFilled(false);
+              updateDraftValue(['corsWorkerUrl'], getDefaultWorkerUrl());
+            }}
+          />
 
           {!isNormalMode && (
             <div className={styles.workerIntro}>
