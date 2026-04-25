@@ -46,7 +46,7 @@ describe('jsonFunctions', () => {
   it('formats JSON for display and falls back to an empty string on errors', () => {
     expect(formatJsonForDisplay({ alpha: 1 })).toBe('{\n  "alpha": 1\n}');
 
-    const circular = {};
+    const circular: Record<string, unknown> = {};
     circular.self = circular;
     expect(formatJsonForDisplay(circular)).toBe('');
   });
@@ -67,13 +67,13 @@ describe('jsonFunctions', () => {
       click: jest.fn(),
       href: '',
       download: '',
-    };
+    } as any;
     const originalCreateElement = document.createElement.bind(document);
     jest.spyOn(document, 'createElement').mockImplementation((tagName) => (
       tagName === 'a' ? anchor : originalCreateElement(tagName)
     ));
-    jest.spyOn(document.body, 'appendChild').mockImplementation(() => anchor);
-    jest.spyOn(document.body, 'removeChild').mockImplementation(() => anchor);
+    jest.spyOn(document.body, 'appendChild').mockImplementation((node) => node);
+    jest.spyOn(document.body, 'removeChild').mockImplementation((node) => node);
 
     downloadJson({ alpha: 1 }, 'preview.json');
 
