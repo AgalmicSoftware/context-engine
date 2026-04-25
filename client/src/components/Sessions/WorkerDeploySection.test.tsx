@@ -1,63 +1,44 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
-import WorkerDeploySection, { type WorkerDeploySectionProps } from './WorkerDeploySection';
+import WorkerDeploySection from './WorkerDeploySection';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
-type RenderInfoTooltipProps = Parameters<NonNullable<WorkerDeploySectionProps['renderInfoTooltip']>>[0];
-
-const buildWorkerDeploySectionProps = (
-  props: Partial<WorkerDeploySectionProps> = {}
-): WorkerDeploySectionProps => ({
-  isNormalMode: false,
-  renderInfoTooltip: ({ testId }: RenderInfoTooltipProps) => <button type="button" data-testid={testId} />,
-  workerMode: 'custom',
-  shouldUseSponsoredAutoDeployFlow: false,
-  deployForm: { workerName: 'demo-worker', bundleUrl: '', apiToken: '', adminAddress: '' },
-  deployHelperToggle: <div>helper toggle</div>,
-  shouldShowDeployHelperUrlInput: true,
-  deployHelperUrl: '',
-  setDeployHelperUrl: () => {},
-  bundleMode: 'url',
-  setBundleMode: () => {},
-  normalModeBundleUrl: 'https://bundle.example/release.js',
-  normalModeBundleHelpText: 'Release bundle',
-  showNormalModeManualBundleControls: false,
-  normalModeBundleUrlOverride: '',
-  setNormalModeBundleUrlOverride: () => {},
-  normalModeBundleUrlOverrideValidationError: '',
-  manualBundleUrlOverrideHelp: '',
-  normalModeRetryBundleFileInputRef: { current: null },
-  setBundleFile: () => {},
-  clearSelectedBundleFile: () => {},
-  bundleFile: null,
-  normalModeManualBundleHelpText: '',
-  localWorkerBundleFallbackFilePath: '/dist/sessionCorsWorker.bundle.js',
-  advancedBundleFileInputRef: { current: null },
-  showSponsoredDeployAccessNotice: false,
-  account: '0xabc',
-  cloudflareTokenSlug: 'demo-worker',
-  setDeployForm: () => {},
-  handleDeployWorker: () => {},
-  deployStatusDisplayState: {
-    deployButtonDisabled: false,
-    deployStatusText: '',
-    isError: false,
-  },
-  ...props,
-});
-
-const renderWorkerDeploySection = (props: Partial<WorkerDeploySectionProps> = {}) => render(
+const renderWorkerDeploySection = (props = {}) => render(
   <WorkerDeploySection
-    {...buildWorkerDeploySectionProps(props)}
-  />
-);
-
-const rerenderWorkerDeploySection = (
-  rerender: ReturnType<typeof render>['rerender'],
-  props: Partial<WorkerDeploySectionProps> = {}
-) => rerender(
-  <WorkerDeploySection
-    {...buildWorkerDeploySectionProps(props)}
+    isNormalMode={false}
+    renderInfoTooltip={({ testId }) => <button type="button" data-testid={testId} />}
+    workerMode="custom"
+    shouldUseSponsoredAutoDeployFlow={false}
+    deployForm={{ workerName: 'demo-worker', bundleUrl: '', apiToken: '', adminAddress: '' }}
+    deployHelperToggle={<div>helper toggle</div>}
+    shouldShowDeployHelperUrlInput
+    deployHelperUrl=""
+    setDeployHelperUrl={() => {}}
+    bundleMode="url"
+    setBundleMode={() => {}}
+    normalModeBundleUrl="https://bundle.example/release.js"
+    normalModeBundleHelpText="Release bundle"
+    showNormalModeManualBundleControls={false}
+    normalModeBundleUrlOverride=""
+    setNormalModeBundleUrlOverride={() => {}}
+    normalModeBundleUrlOverrideValidationError=""
+    manualBundleUrlOverrideHelp=""
+    normalModeRetryBundleFileInputRef={{ current: null }}
+    setBundleFile={() => {}}
+    clearSelectedBundleFile={() => {}}
+    bundleFile={null}
+    normalModeManualBundleHelpText=""
+    localWorkerBundleFallbackFilePath="/dist/sessionCorsWorker.bundle.js"
+    advancedBundleFileInputRef={{ current: null }}
+    showSponsoredDeployAccessNotice={false}
+    account="0xabc"
+    cloudflareTokenSlug="demo-worker"
+    setDeployForm={() => {}}
+    handleDeployWorker={() => {}}
+    deployInFlight={false}
+    deployStatus=""
+    deployStatusIsError={false}
+    {...props}
   />
 );
 
@@ -109,160 +90,5 @@ describe('WorkerDeploySection', () => {
     expect(handleDeployWorker).toHaveBeenCalledTimes(1);
 
     openSpy.mockRestore();
-  });
-
-  it('keeps a cached Cloudflare account id when first filling the API token', () => {
-    const setDeployForm = jest.fn();
-
-    renderWorkerDeploySection({
-      deployForm: {
-        workerName: 'demo-worker',
-        bundleUrl: '',
-        apiToken: '',
-        accountId: 'cf-account-1',
-        adminAddress: '',
-      },
-      setDeployForm,
-    });
-
-    fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN), {
-      target: { value: 'new-token' },
-    });
-
-    expect(setDeployForm).toHaveBeenCalledWith(expect.any(Function));
-    const updater = setDeployForm.mock.calls[0][0];
-    expect(updater({
-      workerName: 'demo-worker',
-      apiToken: '',
-      accountId: 'cf-account-1',
-      adminAddress: '',
-    })).toEqual({
-      workerName: 'demo-worker',
-      apiToken: 'new-token',
-      accountId: 'cf-account-1',
-      adminAddress: '',
-    });
-  });
-
-  it('clears the cached Cloudflare account id when replacing an API token', () => {
-    const setDeployForm = jest.fn();
-
-    renderWorkerDeploySection({
-      deployForm: {
-        workerName: 'demo-worker',
-        bundleUrl: '',
-        apiToken: 'old-token',
-        accountId: 'cf-account-1',
-        adminAddress: '',
-      },
-      setDeployForm,
-    });
-
-    fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN), {
-      target: { value: 'new-token' },
-    });
-
-    expect(setDeployForm).toHaveBeenCalledWith(expect.any(Function));
-    const updater = setDeployForm.mock.calls[0][0];
-    expect(updater({
-      workerName: 'demo-worker',
-      apiToken: 'old-token',
-      accountId: 'cf-account-1',
-      adminAddress: '',
-    })).toEqual({
-      workerName: 'demo-worker',
-      apiToken: 'new-token',
-      accountId: '',
-      adminAddress: '',
-    });
-    expect(updater({
-      workerName: 'demo-worker',
-      apiToken: 'new-token',
-      accountId: 'cf-account-1',
-      adminAddress: '',
-    })).toEqual({
-      workerName: 'demo-worker',
-      apiToken: 'new-token',
-      accountId: 'cf-account-1',
-      adminAddress: '',
-    });
-  });
-
-  it('renders deploy status from the display descriptor', () => {
-    renderWorkerDeploySection({
-      deployStatusDisplayState: {
-        deployButtonDisabled: false,
-        deployStatusText: 'Missing API token.',
-        isError: true,
-      },
-    });
-
-    const status = screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_STATUS);
-    expect(status).toHaveTextContent('Missing API token.');
-    expect(status.className).toContain('copyStatusError');
-  });
-
-  it('disables deploy from the display descriptor', () => {
-    renderWorkerDeploySection({
-      deployStatusDisplayState: {
-        deployButtonDisabled: true,
-        deployStatusText: 'Deploying worker...',
-        isError: false,
-      },
-    });
-
-    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_WORKER)).toBeDisabled();
-  });
-
-  it('keeps bundle and token inputs controlled when partial deployForm state hydrates later', () => {
-    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-    const { rerender } = renderWorkerDeploySection({
-      deployForm: { workerName: 'demo-worker' },
-    });
-
-    rerenderWorkerDeploySection(rerender, {
-      deployForm: {
-        workerName: 'demo-worker',
-        bundleUrl: 'https://bundle.example/custom.js',
-        apiToken: 'secret-token',
-        adminAddress: '0xabc',
-      },
-    });
-
-    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_BUNDLE_URL)).toHaveValue('https://bundle.example/custom.js');
-    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN)).toHaveValue('secret-token');
-    expect(
-      consoleErrorSpy.mock.calls.some(([message]) => (
-        String(message).includes('A component is changing an uncontrolled input to be controlled')
-      )),
-    ).toBe(false);
-
-    consoleErrorSpy.mockRestore();
-  });
-
-  it('remounts cleanly when advanced bundle mode switches from file upload to url input', () => {
-    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-    const { rerender } = renderWorkerDeploySection({
-      bundleMode: 'upload',
-    });
-
-    rerenderWorkerDeploySection(rerender, {
-      bundleMode: 'url',
-      deployForm: {
-        workerName: 'demo-worker',
-        bundleUrl: 'https://bundle.example/from-url.js',
-        apiToken: '',
-        adminAddress: '',
-      },
-    });
-
-    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_BUNDLE_URL)).toHaveValue('https://bundle.example/from-url.js');
-    expect(
-      consoleErrorSpy.mock.calls.some(([message]) => (
-        String(message).includes('A component is changing an uncontrolled input to be controlled')
-      )),
-    ).toBe(false);
-
-    consoleErrorSpy.mockRestore();
   });
 });

@@ -4,13 +4,11 @@ import { Button, FormGroup, Input, Label } from 'reactstrap';
 import styles from './SessionWizard.module.scss';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { buildCloudflareTokenTemplateUrl } from './cloudflareTokenTemplate.js';
-import type { SessionWizardDeployStatusDisplayState } from './sessionWizardDeployErrors';
-import type { SessionWizardTooltipRenderOptions } from './SessionWizardInfoTooltip';
 
 type RenderInfoTooltip = (props: {
   id?: string;
   content?: React.ReactNode;
-  placement?: SessionWizardTooltipRenderOptions['placement'];
+  placement?: string;
   testId?: string;
   ariaLabel?: string;
 }) => React.ReactNode;
@@ -19,7 +17,6 @@ type DeployForm = {
   workerName?: string;
   bundleUrl?: string;
   apiToken?: string;
-  accountId?: string;
   adminAddress?: string;
 };
 
@@ -54,7 +51,9 @@ export type WorkerDeploySectionProps = {
   cloudflareTokenSlug?: string;
   setDeployForm: React.Dispatch<React.SetStateAction<DeployForm>>;
   handleDeployWorker: () => void;
-  deployStatusDisplayState: SessionWizardDeployStatusDisplayState;
+  deployInFlight: boolean;
+  deployStatus?: string;
+  deployStatusIsError: boolean;
 };
 
 const WorkerDeploySection = ({
@@ -88,31 +87,13 @@ const WorkerDeploySection = ({
   cloudflareTokenSlug = '',
   setDeployForm,
   handleDeployWorker,
-  deployStatusDisplayState,
+  deployInFlight,
+  deployStatus,
+  deployStatusIsError,
 }: WorkerDeploySectionProps) => {
   const renderTooltip = typeof renderInfoTooltip === 'function'
     ? renderInfoTooltip
     : () => null;
-  const {
-    deployButtonDisabled,
-    deployStatusText,
-    isError: deployStatusIsError,
-  } = deployStatusDisplayState || {
-    deployButtonDisabled: false,
-    deployStatusText: '',
-    isError: false,
-  };
-  const updateApiToken = (nextApiToken: string) => {
-    setDeployForm((prev) => {
-      const previousToken = String(prev?.apiToken ?? '');
-      const shouldClearAccountId = !!previousToken && previousToken !== nextApiToken;
-      return {
-        ...prev,
-        apiToken: nextApiToken,
-        ...(shouldClearAccountId ? { accountId: '' } : {}),
-      };
-    });
-  };
 
   if (workerMode === 'default') {
     return null;
@@ -140,7 +121,7 @@ const WorkerDeploySection = ({
               <FormGroup>
                 <Label>Deploy-helper URL</Label>
                 <Input
-                  value={deployHelperUrl ?? ''}
+                  value={deployHelperUrl}
                   placeholder="https://<deploy-helper-name>.<account-subdomain>.workers.dev/"
                   data-testid={E2E_TESTIDS.WIZARD_DEPLOY_HELPER_URL}
                   onChange={(e) => setDeployHelperUrl(e.target.value)}
@@ -176,10 +157,10 @@ const WorkerDeploySection = ({
             )}
             {isNormalMode ? (
               <>
-                <FormGroup key="normal-mode-bundle-url">
+                <FormGroup>
                   <Label>Worker bundle URL (release asset)</Label>
                   <Input
-                    value={normalModeBundleUrl ?? ''}
+                    value={normalModeBundleUrl}
                     readOnly
                     data-testid={E2E_TESTIDS.WIZARD_BUNDLE_URL}
                   />
@@ -189,11 +170,11 @@ const WorkerDeploySection = ({
                 </FormGroup>
                 {showNormalModeManualBundleControls && (
                   <>
-                    <FormGroup key="normal-mode-bundle-url-override">
+                    <FormGroup>
                       <Label>Manual bundle URL override (optional)</Label>
                       <Input
                         type="url"
-                        value={normalModeBundleUrlOverride ?? ''}
+                        value={normalModeBundleUrlOverride}
                         placeholder="https://github.com/<org>/<repo>/releases/download/<tag>/sessionCorsWorker.bundle.js"
                         data-testid={E2E_TESTIDS.WIZARD_BUNDLE_URL_OVERRIDE}
                         invalid={!!normalModeBundleUrlOverrideValidationError}
@@ -206,7 +187,7 @@ const WorkerDeploySection = ({
                         <div className={styles.errorText}>{normalModeBundleUrlOverrideValidationError}</div>
                       )}
                     </FormGroup>
-                    <FormGroup key="normal-mode-bundle-file">
+                    <FormGroup>
                       <Label>Upload bundle file (optional)</Label>
                       <div className={styles.bundleFileInputRow}>
                         <Input
@@ -242,7 +223,7 @@ const WorkerDeploySection = ({
                 )}
               </>
             ) : bundleMode === 'url' ? (
-              <FormGroup key="advanced-mode-bundle-url">
+              <FormGroup>
                 <Label className={styles.fieldLabelRow}>
                   <span>Worker bundle URL (release asset)</span>
                   {renderTooltip({
@@ -254,14 +235,14 @@ const WorkerDeploySection = ({
                   })}
                 </Label>
                 <Input
-                  value={deployForm.bundleUrl ?? ''}
+                  value={deployForm.bundleUrl}
                   placeholder="https://github.com/<org>/<repo>/releases/latest/download/sessionCorsWorker.bundle.js"
                   data-testid={E2E_TESTIDS.WIZARD_BUNDLE_URL}
                   onChange={(e) => setDeployForm((prev) => ({ ...prev, bundleUrl: e.target.value }))}
                 />
               </FormGroup>
             ) : (
-              <FormGroup key="advanced-mode-bundle-file">
+              <FormGroup>
                 <Label>Upload bundle file</Label>
                 <Input
                   type="file"
@@ -280,7 +261,7 @@ const WorkerDeploySection = ({
                 <span>Cloudflare API token</span>
                 {renderTooltip({
                   id: 'gw-cf-token-tip',
-                  content: 'Use the prefilled template link below. It includes Workers, R2 objects, D1 or KV metadata indexes, and Durable Objects for signer coordination only. Add Account Settings: Edit only when creating or changing the workers.dev subdomain.',
+                  content: 'Use the prefilled template link below. It includes Workers/KV/Routes, Account Settings, Tail (read), R2, Pages, Builds, Agents, Observability, and Containers permissions.',
                   placement: 'right',
                   testId: 'ce-wizard-worker-tooltip-gw-cf-token-tip',
                   ariaLabel: 'Cloudflare API token info',
@@ -288,9 +269,9 @@ const WorkerDeploySection = ({
               </Label>
               <Input
                 type="password"
-                value={deployForm.apiToken ?? ''}
+                value={deployForm.apiToken}
                 data-testid={E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN}
-                onChange={(e) => updateApiToken(e.target.value)}
+                onChange={(e) => setDeployForm((prev) => ({ ...prev, apiToken: e.target.value }))}
               />
               {!isNormalMode && showSponsoredDeployAccessNotice && (
                 <div className={styles.helperText}>
@@ -328,14 +309,14 @@ const WorkerDeploySection = ({
               className={styles.actionButton}
               data-testid={E2E_TESTIDS.WIZARD_DEPLOY_WORKER}
               onClick={handleDeployWorker}
-              disabled={deployButtonDisabled}
+              disabled={deployInFlight}
             >
               Deploy worker
             </Button>
           </div>
-          {deployStatusText && (
+          {deployStatus && (
             <div className={`${styles.copyStatus} ${deployStatusIsError ? styles.copyStatusError : ''}`} data-testid={E2E_TESTIDS.WIZARD_DEPLOY_STATUS}>
-              {deployStatusText}
+              {deployStatus}
             </div>
           )}
         </div>
