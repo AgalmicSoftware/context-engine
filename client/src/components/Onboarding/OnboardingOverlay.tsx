@@ -71,7 +71,7 @@ const OnboardingOverlay = () => {
             </div>
             {bulletPoints.length > 0 ? (
               <ul className={styles.bulletList}>
-                {bulletPoints.map((point) => (
+                {bulletPoints.map((point: any) => (
                   <li key={`${point.bold}-${point.text}`} className={styles.bulletItem}>
                     {point.bold ? <strong>{point.bold}</strong> : null}
                     {point.bold && point.text ? ' ' : ''}
