@@ -8,7 +8,7 @@ import {
 } from './historicalFigureAvatars.js';
 
 describe('historicalFigureAvatars', () => {
-  const expectHistoricalPhotoUrl = (url) => {
+  const expectHistoricalPhotoUrl = (url: string) => {
     expect(url).toMatch(
       /^(\/historical-avatars\/|https:\/\/upload\.wikimedia\.org\/wikipedia\/commons\/|https:\/\/commons\.wikimedia\.org\/wiki\/Special:FilePath\/)/
     );
@@ -52,7 +52,7 @@ describe('historicalFigureAvatars', () => {
     const nativeCreateElement = document.createElement.bind(document);
     const getContext = jest.fn(() => ({ fillStyle: '', fillRect: jest.fn() }));
     const toDataURL = jest.fn(() => 'data:image/png;base64,known-figure-blockie');
-    const createElementSpy = jest.spyOn(document, 'createElement').mockImplementation((tagName, options) => {
+    const createElementSpy = jest.spyOn(document, 'createElement').mockImplementation(((tagName: any, options: any) => {
       if (tagName === 'canvas') {
         return {
           width: 0,
@@ -62,7 +62,7 @@ describe('historicalFigureAvatars', () => {
         };
       }
       return nativeCreateElement(tagName, options);
-    });
+    }) as any);
 
     expect(getHistoricalFigureAvatarOrBlockie('Franklin', { preferBlockie: true })).toBe('data:image/png;base64,known-figure-blockie');
     expect(getContext).toHaveBeenCalledWith('2d');
@@ -75,7 +75,7 @@ describe('historicalFigureAvatars', () => {
     const nativeCreateElement = document.createElement.bind(document);
     const getContext = jest.fn(() => ({ fillStyle: '', fillRect: jest.fn() }));
     const toDataURL = jest.fn(() => 'data:image/png;base64,unknown-figure-blockie');
-    const createElementSpy = jest.spyOn(document, 'createElement').mockImplementation((tagName, options) => {
+    const createElementSpy = jest.spyOn(document, 'createElement').mockImplementation(((tagName: any, options: any) => {
       if (tagName === 'canvas') {
         return {
           width: 0,
@@ -85,7 +85,7 @@ describe('historicalFigureAvatars', () => {
         };
       }
       return nativeCreateElement(tagName, options);
-    });
+    }) as any);
 
     expect(getHistoricalFigureAvatarOrBlockie('UnknownFigure')).toBe('data:image/png;base64,unknown-figure-blockie');
     expect(getContext).toHaveBeenCalledWith('2d');
