@@ -26,10 +26,10 @@ describe('arweaveUrls helpers', () => {
   const gatewayFanoutSecondary = 'https://g8way.io'; // intentional: real URL - verifies production gateway fanout
 
   afterEach(() => {
-    try { delete globalThis.CE_ARWEAVE_GATEWAY_URL; } catch (_) {}
-    try { delete globalThis.CE_ARWEAVE_AR_IO_URL; } catch (_) {}
-    try { delete globalThis.CE_ARWEAVE_DIRECT_TO_AR_IO; } catch (_) {}
-    try { delete globalThis.CE_ARWEAVE_GATEWAYS; } catch (_) {}
+    try { delete (globalThis as Record<string, unknown>).CE_ARWEAVE_GATEWAY_URL; } catch (_) {}
+    try { delete (globalThis as Record<string, unknown>).CE_ARWEAVE_AR_IO_URL; } catch (_) {}
+    try { delete (globalThis as Record<string, unknown>).CE_ARWEAVE_DIRECT_TO_AR_IO; } catch (_) {}
+    try { delete (globalThis as Record<string, unknown>).CE_ARWEAVE_GATEWAYS; } catch (_) {}
   });
 
   it('detects base64url txIds', () => {
@@ -50,7 +50,7 @@ describe('arweaveUrls helpers', () => {
   });
 
   it('normalizes arweave txIds to gateway URLs and leaves other values unchanged', () => {
-    globalThis.CE_ARWEAVE_DIRECT_TO_AR_IO = false;
+    (globalThis as Record<string, unknown>).CE_ARWEAVE_DIRECT_TO_AR_IO = false;
     expect(normalizeArweaveUrl(txId)).toBe(`${defaultArIoGateway}/${txId}`);
     expect(normalizeArweaveUrl(`ar://${txId}`)).toBe(`${defaultArIoGateway}/${txId}`);
     expect(normalizeArweaveUrl(`${canonicalArweaveGateway}/tx/${txId}/data`)).toBe(`${defaultArIoGateway}/${txId}`);
@@ -70,23 +70,23 @@ describe('arweaveUrls helpers', () => {
   });
 
   it('uses AR.IO when direct-to-AR.IO mode is enabled for user-facing links', () => {
-    globalThis.CE_ARWEAVE_DIRECT_TO_AR_IO = true;
-    globalThis.CE_ARWEAVE_AR_IO_URL = testArIoGateway;
+    (globalThis as Record<string, unknown>).CE_ARWEAVE_DIRECT_TO_AR_IO = true;
+    (globalThis as Record<string, unknown>).CE_ARWEAVE_AR_IO_URL = testArIoGateway;
 
     expect(getPreferredArweaveGateway()).toBe(testArIoGateway);
     expect(normalizeArweaveUrl(txId)).toBe(`${testArIoGateway}/${txId}`);
   });
 
   it('uses runtime gateway override when CE_ARWEAVE_GATEWAY_URL is set', () => {
-    globalThis.CE_ARWEAVE_GATEWAY_URL = testArweaveGateway;
+    (globalThis as Record<string, unknown>).CE_ARWEAVE_GATEWAY_URL = testArweaveGateway;
     expect(getPreferredArweaveGateway()).toBe(testArweaveGateway);
     expect(normalizeArweaveUrl(txId)).toBe(`${testArweaveGateway}/${txId}`);
   });
 
   it('builds gateway fallback candidates for tx ids and known gateway URLs', () => {
-    globalThis.CE_ARWEAVE_DIRECT_TO_AR_IO = true;
-    globalThis.CE_ARWEAVE_AR_IO_URL = testArIoGateway;
-    globalThis.CE_ARWEAVE_GATEWAYS = ['https://backup.example.test', canonicalArweaveGateway];
+    (globalThis as Record<string, unknown>).CE_ARWEAVE_DIRECT_TO_AR_IO = true;
+    (globalThis as Record<string, unknown>).CE_ARWEAVE_AR_IO_URL = testArIoGateway;
+    (globalThis as Record<string, unknown>).CE_ARWEAVE_GATEWAYS = ['https://backup.example.test', canonicalArweaveGateway];
 
     const candidates = buildArweaveGatewayUrlCandidates(
       `${arIoSubdomainGateway}/${txId}?`

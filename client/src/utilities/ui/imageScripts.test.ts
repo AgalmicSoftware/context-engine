@@ -25,8 +25,8 @@ describe('imageScripts worker auth options', () => {
   });
 
   it('uses the strict demo-fallback policy for worker-backed image fetches', async () => {
-    getCorsProxyUrlOrThrow.mockResolvedValue('https://worker.example.test/base/');
-    fetchWorkerWithAuth.mockResolvedValue({
+    (getCorsProxyUrlOrThrow as jest.Mock).mockResolvedValue('https://worker.example.test/base/');
+    (fetchWorkerWithAuth as jest.Mock).mockResolvedValue({
       ok: true,
       blob: async () => new Blob([new Uint8Array([137, 80, 78, 71])], { type: 'image/png' }),
     });
