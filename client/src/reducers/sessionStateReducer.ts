@@ -1,3 +1,5 @@
+// sessionStateReducer.js
+
 import {
   FETCH_SESSION_STATE,
   CHANGE_METRICS_CHOICE,
@@ -18,61 +20,19 @@ import {
 } from '../utilities/session/globalSessionState.js';
 import { DEFAULT_DEMO_SURFACE_MODE } from '../variables/appConfig.js';
 
-export interface SessionState {
-  primarySessionSlug: string;
-  primarySessionExplicit: boolean | undefined;
-  activeSessionSlug: string;
-  selectedSessionScope: string;
-  selectedSessionSlugs: string[];
-  metricsOptIn: boolean;
-  focusedTab: number;
-  loginInProgress: boolean;
-  loginComplete: boolean;
-  explorerHistory: unknown[];
-  ETHUSDToggle: boolean;
-  explainerMode: boolean;
-  demoMode: Record<string, boolean>;
-  demoSurfaceMode: boolean;
-  loginModalToggled: boolean;
-  afterLoginModalToggled: boolean;
-  onboardingStep: number | null;
-  tooltipsEnabled: boolean;
-}
+type SessionState = Record<string, any>;
+type ReducerAction = { type?: string; payload?: any };
 
-type SessionSelectionPayload = {
-  primarySessionSlug?: unknown;
-  primarySessionExplicit?: unknown;
-  activeSessionSlug?: unknown;
-  sessionSlug?: unknown;
-  selectedSessionScope?: unknown;
-  selectedSessionSlugs?: unknown;
+const readStoredTooltipsEnabled = () => {
+  try {
+    const storedValue = localStorage.getItem('ce:tooltipsEnabled');
+    return storedValue !== null ? JSON.parse(storedValue) : true;
+  } catch (_) {
+    return true;
+  }
 };
-type FetchSessionStatePayload = SessionSelectionPayload & Partial<Pick<
-  SessionState,
-  'focusedTab' | 'loginModalToggled' | 'explorerHistory'
->>;
-type LoginProgressPayload = Partial<Pick<SessionState, 'loginInProgress' | 'loginComplete'>>;
-type LoginModalPayload = boolean | { isOpen?: unknown };
-type DemoModePayload = boolean | Partial<SessionState['demoMode']>;
-type SessionReducerAction =
-  | { type: typeof FETCH_SESSION_STATE; payload?: FetchSessionStatePayload }
-  | { type: typeof CHANGE_METRICS_CHOICE; payload?: SessionState['metricsOptIn'] }
-  | { type: typeof CHANGE_FOCUSED_TAB; payload?: SessionState['focusedTab'] }
-  | { type: typeof TOGGLE_LOGIN_MODAL; payload?: LoginModalPayload }
-  | { type: typeof TOGGLE_TOOLTIPS }
-  | { type: typeof SET_DEMO_SURFACE_MODE; payload?: unknown }
-  | { type: typeof LOGIN_IN_PROGRESS; payload?: LoginProgressPayload }
-  | { type: typeof TOGGLE_DEMO_MODE; payload?: DemoModePayload }
-  | { type: typeof CHANGE_ACTIVE_SESSION_SLUG; payload?: unknown }
-  | { type: typeof UPDATE_GLOBAL_SESSION_SELECTION; payload?: SessionSelectionPayload }
-  | { type: typeof SET_ONBOARDING_STEP; payload?: SessionState['onboardingStep'] }
-  | { type?: string; payload?: unknown };
 
-const isRecord = (value: unknown): value is Record<string, unknown> => (
-  !!value &&
-  typeof value === 'object' &&
-  !Array.isArray(value)
-);
+const normalizeDemoSurfaceMode = (value: unknown): boolean => value === false ? false : true;
 
 const readStoredDemoSurfaceMode = () => {
   try {
@@ -86,13 +46,13 @@ const readStoredDemoSurfaceMode = () => {
   }
 };
 
-const persistDemoSurfaceMode = (value) => {
+const persistDemoSurfaceMode = (value: unknown): void => {
   try {
     localStorage.setItem('ce:demoSurfaceMode', JSON.stringify(normalizeDemoSurfaceMode(value)));
   } catch (_) {}
 };
 
-const getInitialState = () => ({
+const getInitialState = (): SessionState => ({
     ...readStoredGlobalSessionSelection(),
     metricsOptIn: false,       // Reserved for a persisted analytics preference.
     focusedTab: 4,            // Default home tab index (Tools). Keep Welcome opt-in.
@@ -111,10 +71,7 @@ const getInitialState = () => ({
 });
 
 const hasOwn = (value: unknown, key: string): boolean => Object.prototype.hasOwnProperty.call(value || {}, key);
-const resolvePrimarySessionExplicitInput = (
-  state: SessionState,
-  payload: SessionSelectionPayload | Record<string, unknown> = {}
-): unknown => {
+const resolvePrimarySessionExplicitInput = (state: SessionState, payload: any = {}) => {
   if (hasOwn(payload, 'primarySessionExplicit')) return payload.primarySessionExplicit;
   if (
     hasOwn(payload, 'primarySessionSlug') ||
@@ -126,41 +83,40 @@ const resolvePrimarySessionExplicitInput = (
   return state.primarySessionExplicit;
 };
 
-export default function sessionStateReducer(state: SessionState = getInitialState(), action: SessionReducerAction): SessionState {
+export default function sessionStateReducer(state: SessionState = getInitialState(), action: ReducerAction): SessionState {
     switch (action.type) {
       case FETCH_SESSION_STATE:
-        if (!isRecord(action.payload)) return state;
+        if (!action.payload || typeof action.payload !== 'object') return state;
         {
-          const { payload } = action;
           const nextSelection = normalizeGlobalSessionSelection({
             primarySessionSlug: (
-              hasOwn(payload, 'primarySessionSlug')
-                ? payload.primarySessionSlug
+              hasOwn(action.payload, 'primarySessionSlug')
+                ? action.payload.primarySessionSlug
                 : state.primarySessionSlug
             ),
-            primarySessionExplicit: resolvePrimarySessionExplicitInput(state, payload),
+            primarySessionExplicit: resolvePrimarySessionExplicitInput(state, action.payload),
             activeSessionSlug: (
-              hasOwn(payload, 'activeSessionSlug')
-                ? payload.activeSessionSlug
+              hasOwn(action.payload, 'activeSessionSlug')
+                ? action.payload.activeSessionSlug
                 : state.activeSessionSlug
             ),
             selectedSessionScope: (
-              hasOwn(payload, 'selectedSessionScope')
-                ? payload.selectedSessionScope
+              hasOwn(action.payload, 'selectedSessionScope')
+                ? action.payload.selectedSessionScope
                 : state.selectedSessionScope
             ),
             selectedSessionSlugs: (
-              hasOwn(payload, 'selectedSessionSlugs')
-                ? payload.selectedSessionSlugs
+              hasOwn(action.payload, 'selectedSessionSlugs')
+                ? action.payload.selectedSessionSlugs
                 : state.selectedSessionSlugs
             ),
           });
         return {
           ...state,
           ...nextSelection,
-          ...(hasOwn(payload, 'focusedTab') ? { focusedTab: payload.focusedTab as SessionState['focusedTab'] } : {}),
-          ...(hasOwn(payload, 'loginModalToggled') ? { loginModalToggled: payload.loginModalToggled as SessionState['loginModalToggled'] } : {}),
-          ...(hasOwn(payload, 'explorerHistory') ? { explorerHistory: payload.explorerHistory as SessionState['explorerHistory'] } : {}),
+          ...(hasOwn(action.payload, 'focusedTab') ? { focusedTab: action.payload.focusedTab } : {}),
+          ...(hasOwn(action.payload, 'loginModalToggled') ? { loginModalToggled: action.payload.loginModalToggled } : {}),
+          ...(hasOwn(action.payload, 'explorerHistory') ? { explorerHistory: action.payload.explorerHistory } : {}),
           demoSurfaceMode: readStoredDemoSurfaceMode(),
           tooltipsEnabled: readStoredTooltipsEnabled(),
         };
@@ -169,18 +125,18 @@ export default function sessionStateReducer(state: SessionState = getInitialStat
         if (!hasOwn(action, 'payload') || action.payload === undefined) return state;
         return {
           ...state,
-          metricsOptIn: action.payload as SessionState['metricsOptIn']
+          metricsOptIn: action.payload
         };
       case CHANGE_FOCUSED_TAB:
         if (!hasOwn(action, 'payload') || action.payload === undefined) return state;
         return {
           ...state,
-          focusedTab: action.payload as SessionState['focusedTab']
+          focusedTab: action.payload
         };
         case TOGGLE_LOGIN_MODAL: {
           const p = action.payload;
           // Support both legacy boolean and structured payloads.
-          if (isRecord(p)) {
+          if (typeof p === 'object' && p !== null) {
             const isOpen = !!p.isOpen;
             return {
               ...state,
@@ -196,7 +152,7 @@ export default function sessionStateReducer(state: SessionState = getInitialStat
         }
 
       case LOGIN_IN_PROGRESS:
-          if (!isRecord(action.payload)) return state;
+          if (!action.payload || typeof action.payload !== 'object') return state;
           return {
             ...state,
             ...(hasOwn(action.payload, 'loginInProgress') ? { loginInProgress: action.payload.loginInProgress } : {}),
@@ -207,14 +163,11 @@ export default function sessionStateReducer(state: SessionState = getInitialStat
         if (typeof action.payload === 'boolean') {
           return { ...state, demoMode: { tools: action.payload } };
         }
-        if (!isRecord(action.payload)) {
-          return { ...state, demoMode: { ...state.demoMode } };
-        }
         return {
           ...state,
           demoMode: {
             ...state.demoMode,
-            ...(hasOwn(action.payload, 'tools') ? { tools: action.payload.tools as SessionState['demoMode']['tools'] } : {}),
+            ...(hasOwn(action.payload, 'tools') ? { tools: action.payload.tools } : {}),
           },
         };
       case SET_DEMO_SURFACE_MODE: {
@@ -234,7 +187,7 @@ export default function sessionStateReducer(state: SessionState = getInitialStat
         };
       }
       case UPDATE_GLOBAL_SESSION_SELECTION: {
-        if (!hasOwn(action, 'payload') || !isRecord(action.payload)) return state;
+        if (!hasOwn(action, 'payload') || !action.payload || typeof action.payload !== 'object') return state;
         const selection = normalizeGlobalSessionSelection({
           primarySessionSlug: (
             hasOwn(action.payload, 'primarySessionSlug')
@@ -266,11 +219,13 @@ export default function sessionStateReducer(state: SessionState = getInitialStat
       case SET_ONBOARDING_STEP:
         return {
           ...state,
-          onboardingStep: action.payload as SessionState['onboardingStep'],
+          onboardingStep: action.payload,
         };
       case TOGGLE_TOOLTIPS: {
         const nextTooltipsEnabled = !state.tooltipsEnabled;
-        persistTooltipsEnabled(nextTooltipsEnabled);
+        try {
+          localStorage.setItem('ce:tooltipsEnabled', JSON.stringify(nextTooltipsEnabled));
+        } catch (_) {}
         return {
           ...state,
           tooltipsEnabled: nextTooltipsEnabled,

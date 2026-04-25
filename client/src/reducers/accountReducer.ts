@@ -1,26 +1,15 @@
 import { FETCH_ACCOUNT, LOGIN_ACCOUNT, CHANGE_NETWORK } from '../actions/types';
 
-export type AccountState = {
+type AccountState = {
   account: string;
   provider: string;
-  network: unknown;
-  alerts: unknown[];
+  network: any;
+  alerts: any[];
   userImageURL: string | null;
 };
-type AccountPayload = {
-  account?: string;
-  provider?: string;
-  network?: unknown;
-  userImageURL?: string | null;
-};
-type ChangeNetworkPayload = Pick<AccountPayload, 'network'>;
-type AccountReducerAction =
-  | { type: typeof LOGIN_ACCOUNT; payload?: AccountPayload }
-  | { type: typeof FETCH_ACCOUNT; payload?: AccountPayload }
-  | { type: typeof CHANGE_NETWORK; payload?: ChangeNetworkPayload }
-  | { type?: string; payload?: unknown };
+type ReducerAction = { type?: string; payload?: any };
 
-const initialState: AccountState = {
+const initialState = {
   account: '',          // ETH address connected to site
   provider: 'none',     // 'none' | 'wagmi' | 'web3auth' | 'porto_passkey'
   network: null,
@@ -29,43 +18,37 @@ const initialState: AccountState = {
 };
 
 const hasOwn = (value: unknown, key: string): boolean => Object.prototype.hasOwnProperty.call(value || {}, key);
-const isRecord = (value: unknown): value is Record<string, unknown> => (
-  !!value &&
-  typeof value === 'object' &&
-  !Array.isArray(value)
-);
 const isEmptyObject = (value: unknown): boolean => (
   !!value &&
   typeof value === 'object' &&
   !Array.isArray(value) &&
   Object.keys(value).length === 0
 );
-const ACCOUNT_PAYLOAD_FIELDS: Array<keyof AccountPayload> = [
+const ACCOUNT_PAYLOAD_FIELDS = [
   'account',
   'provider',
   'network',
   'userImageURL',
 ];
 
-const mergeAccountPayload = (state: AccountState, payload: unknown): AccountState => {
-  if (!isRecord(payload)) return state;
-  const nextState = { ...state };
+const mergeAccountPayload = (state: AccountState, payload: any): AccountState => {
+  if (!payload || typeof payload !== 'object') return state;
+  const nextState: Record<string, any> = { ...state };
   ACCOUNT_PAYLOAD_FIELDS.forEach((key) => {
-    if (hasOwn(payload, key)) {
-      (nextState as Record<keyof AccountPayload, unknown>)[key] = payload[key];
-    }
+    if (hasOwn(payload, key)) nextState[key] = payload[key];
   });
   return nextState as AccountState;
 };
 
-export default function accountReducer(state: AccountState = initialState, action: AccountReducerAction): AccountState {
+export default function accountReducer(state: AccountState = initialState, action: ReducerAction): AccountState {
   switch (action.type) {
     case LOGIN_ACCOUNT:
       if (isEmptyObject(action.payload)) {
         return { ...initialState };
       }
       if (
-        isRecord(action.payload) &&
+        action.payload &&
+        typeof action.payload === 'object' &&
         hasOwn(action.payload, 'account') &&
         String(action.payload.account).toLowerCase() !== String(state.account).toLowerCase()
       ) {
@@ -75,7 +58,7 @@ export default function accountReducer(state: AccountState = initialState, actio
     case FETCH_ACCOUNT:
       return mergeAccountPayload(state, action.payload);
     case CHANGE_NETWORK:
-      if (!isRecord(action.payload) || !hasOwn(action.payload, 'network')) {
+      if (!action.payload || typeof action.payload !== 'object' || !hasOwn(action.payload, 'network')) {
         return state;
       }
       return {

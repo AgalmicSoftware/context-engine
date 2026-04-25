@@ -13,22 +13,23 @@ import {
 } from '../actions/types';
 
 const DEMO_SURFACE_MODE_ENV_KEY = 'REACT_APP_CE_DEMO_SURFACE_MODE_DEFAULT';
-const ORIGINAL_DEMO_SURFACE_MODE_ENV = process.env[DEMO_SURFACE_MODE_ENV_KEY];
+const env = process.env as Record<string, string | undefined>;
+const ORIGINAL_DEMO_SURFACE_MODE_ENV = env[DEMO_SURFACE_MODE_ENV_KEY];
 
 const restoreDemoSurfaceModeEnv = () => {
   if (typeof ORIGINAL_DEMO_SURFACE_MODE_ENV === 'undefined') {
-    delete process.env[DEMO_SURFACE_MODE_ENV_KEY];
+    delete env[DEMO_SURFACE_MODE_ENV_KEY];
     return;
   }
 
-  process.env[DEMO_SURFACE_MODE_ENV_KEY] = ORIGINAL_DEMO_SURFACE_MODE_ENV;
+  env[DEMO_SURFACE_MODE_ENV_KEY] = ORIGINAL_DEMO_SURFACE_MODE_ENV;
 };
 
-const loadReducerWithDemoSurfaceModeDefault = (value) => {
+const loadReducerWithDemoSurfaceModeDefault = (value?: string) => {
   if (typeof value === 'undefined') {
-    delete process.env[DEMO_SURFACE_MODE_ENV_KEY];
+    delete env[DEMO_SURFACE_MODE_ENV_KEY];
   } else {
-    process.env[DEMO_SURFACE_MODE_ENV_KEY] = value;
+    env[DEMO_SURFACE_MODE_ENV_KEY] = value;
   }
 
   jest.resetModules();
