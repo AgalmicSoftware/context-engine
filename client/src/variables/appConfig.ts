@@ -15,12 +15,8 @@ import {
 } from './publicDeploymentConfig.js';
 
 const DEFAULT_SESSION_SCAN_SCOPE = 'list';
-// Demo-like sessions that should receive public demo UI affordances. The first
-// entry is the About-page CTA target; keep older slugs in the list while links migrate.
-const DEFAULT_DEMO_SESSION_SLUGS = Object.freeze(['demo-1', 'demo-3', 'demo-2', 'demo']);
-// Default cross-session scans follow the active public demo while legacy slugs
-// remain demo-like for direct links during migration.
-const DEFAULT_SESSION_SCAN_SLUGS = Object.freeze([DEFAULT_DEMO_SESSION_SLUGS[0]]);
+// Leave the default scan list empty until the canonical OP Sepolia demo session is deployed.
+const DEFAULT_SESSION_SCAN_SLUGS = Object.freeze(['demo']);
 
 // ****************************************** BOOLEAN OPTIONS ******************************************* //
 
@@ -156,7 +152,8 @@ export const CE_SESSION_SCAN_SLUGS = readPublicListEnv(
   'REACT_APP_CE_SESSION_SCAN_SLUGS',
   [...DEFAULT_SESSION_SCAN_SLUGS]
 ); // used when CE_SESSION_SCAN_SCOPE="list" (array of session slugs, use "general" or "" for default; can also use demoSession keys/names when demo-alias toggle is enabled)
-// When true, initial "/" loads auto-open About, and cached session document loads can migrate there.
+// When true, first-time visits to "/" can auto-open a session route.
+// In list scope, the first listed concrete session wins; otherwise the legacy demo route is used.
 export const CE_FIRST_VISIT_ROOT_REDIRECT_ENABLED = readPublicBoolEnv(
   'REACT_APP_CE_FIRST_VISIT_ROOT_REDIRECT_ENABLED',
   true
@@ -236,19 +233,21 @@ export const SHOW_DEMO_SESSIONS = readPublicBoolEnv(
   'REACT_APP_SHOW_DEMO_SESSIONS',
   false
 );
-// Public/demo session slugs that should use demo presentation affordances.
-export const CE_DEMO_SESSION_SLUGS = readPublicListEnv(
-  'REACT_APP_CE_DEMO_SESSION_SLUGS',
-  [...DEFAULT_DEMO_SESSION_SLUGS]
-);
 // PolisReport auto-enables fixture-backed demo data for these canonical session slugs.
 export const POLIS_DEMO_DATA_AUTOLOAD_SLUGS = readPublicListEnv(
   'REACT_APP_POLIS_DEMO_DATA_AUTOLOAD_SLUGS',
-  [...CE_DEMO_SESSION_SLUGS]
+  ['demo']
 );
 // One-shot testing flag: clamps cross-session fanout defaults to general/list.
 export const CE_RPC_TESTING_MODE = readPublicBoolEnv(
   'REACT_APP_CE_RPC_TESTING_MODE',
+  false
+);
+// Temporary Lit sponsorship rollout toggle for SessionWizard while CE is still on the
+// Naga-era Lit path. Default false keeps the Lit payer-wallet UI hidden in `/new`
+// until the funded/payer flow is intentionally enabled for the Chipotle migration path.
+export const ENABLE_LIT_SESSION_PAYER_WALLET_INPUT = readPublicBoolEnv(
+  'REACT_APP_ENABLE_LIT_SESSION_PAYER_WALLET_INPUT',
   false
 );
 // On-chain session registry (kept off by default during the migration).
@@ -292,7 +291,7 @@ export const ARWEAVE_GATEWAY_URL = readPublicEnv(
 // Override at runtime with `window.CE_ARWEAVE_DIRECT_TO_AR_IO`.
 export const CE_ARWEAVE_DIRECT_TO_AR_IO = readPublicBoolEnv(
   'REACT_APP_CE_ARWEAVE_DIRECT_TO_AR_IO',
-  true
+  false
 );
 // Default ar.io gateway base when troubleshooting mode is enabled.
 // Override at runtime with `window.CE_ARWEAVE_AR_IO_URL`.
