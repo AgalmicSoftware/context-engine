@@ -21,21 +21,39 @@ const readTextFile = (filePath) => {
     return '';
   }
 };
+const readTextFileFollowingTsShim = (filePath) => {
+  const source = readTextFile(filePath);
+  const shimMatch = source.match(/export\s+\*\s+from\s+['"](.+\.ts)['"]/);
+  if (!shimMatch?.[1]) return source;
+  return readTextFile(path.resolve(path.dirname(filePath), shimMatch[1]));
+};
 const parseDefaultChainIdFromAppConfig = (source) => {
   const src = toStr(source);
   if (!src) return 0;
 
   const envFallbackMatch = src.match(
-    /export\s+const\s+DEFAULT_CHAIN_ID\s*=\s*(?:\d+\s*&&\s*)?readPublicIntEnv\(\s*["'`][^"'`]+["'`]\s*,\s*(\d+)/m,
+    /export\s+const\s+DEFAULT_CHAIN_ID\s*=\s*(?:\d+\s*&&\s*)?readPublicIntEnv\(\s*["'`][^"'`]+["'`]\s*,\s*([A-Z0-9_]+|\d+)/m,
   );
   if (envFallbackMatch) {
-    return Number.parseInt(envFallbackMatch[1], 10);
+    const fallbackToken = toStr(envFallbackMatch[1]).trim();
+    if (/^\d+$/.test(fallbackToken)) {
+      return Number.parseInt(fallbackToken, 10);
+    }
+
+    const fallbackConstRe = new RegExp(
+      `(?:^|\\n)(?:export\\s+)?const\\s+${fallbackToken}\\s*=\\s*(\\d+)`,
+      'm',
+    );
+    const fallbackConstMatch = src.match(fallbackConstRe);
+    if (fallbackConstMatch) {
+      return Number.parseInt(fallbackConstMatch[1], 10);
+    }
   }
 
   const directMatch = src.match(/export\s+const\s+DEFAULT_CHAIN_ID\s*=\s*(\d+)/m);
   return directMatch ? Number.parseInt(directMatch[1], 10) : 0;
 };
-const APP_CONFIG_SOURCE = readTextFile(APP_CONFIG_PATH);
+const APP_CONFIG_SOURCE = readTextFileFollowingTsShim(APP_CONFIG_PATH);
 const CONFIGURED_DEFAULT_CHAIN_ID = (
   toInt(process.env.REACT_APP_DEFAULT_CHAIN_ID, 0) ||
   parseDefaultChainIdFromAppConfig(APP_CONFIG_SOURCE)
@@ -257,14 +275,10 @@ const loadClientDefaults = () => {
   let appConfigText = APP_CONFIG_SOURCE;
   let chainsText = '';
   const contractsConfig = readJsonFile(CONTRACTS_CONFIG_PATH, {});
-  try {
-    chainsText = fs.readFileSync(CHAINS_PATH, 'utf8');
-  } catch (_) {
-    chainsText = '';
-  }
+  chainsText = readTextFileFollowingTsShim(CHAINS_PATH);
 
   if (!appConfigText) {
-    appConfigText = readTextFile(APP_CONFIG_PATH);
+    appConfigText = readTextFileFollowingTsShim(APP_CONFIG_PATH);
   }
 
   const defaultChainId = parseDefaultChainIdFromAppConfig(appConfigText) || FALLBACKS.defaultChainId;
