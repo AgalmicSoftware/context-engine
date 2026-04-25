@@ -8,7 +8,7 @@ export const DOC_LIBRARY_DOC_ROLES = Object.freeze({
   PHOTO_ANALYSIS: 'photo-analysis',
 });
 
-export const normalizeSessionIdHex = (raw) => {
+export const normalizeSessionIdHex = (raw: any): string => {
   const value = toStr(raw).trim();
   if (!value) return '';
   if (value.startsWith('0x') && value.length === 34) {
@@ -20,26 +20,26 @@ export const normalizeSessionIdHex = (raw) => {
   return '';
 };
 
-export const normalizeSbtAddress = (raw: unknown): string => {
+export const normalizeSbtAddress = (raw: any): string => {
   const addr = toStr(raw).trim().toLowerCase();
   if (!addr) return '';
   if (!ethers.utils.isAddress(addr)) return '';
   return addr;
 };
 
-export const buildDocLibraryCommonTags = ({ kind, storage }: CommonTagsInput = {}): ArweaveTag[] => ([
+export const buildDocLibraryCommonTags = ({ kind, storage }: any = {}): { name: string; value: string }[] => ([
   { name: 'CE-DocLibrary', value: '1' },
   { name: 'CE-DocKind', value: toStr(kind || '').trim() },
   { name: 'CE-DocStorage', value: toStr(storage || '').trim() },
 ].filter((t) => t && t.name && t.value));
 
-export const buildDocLibrarySessionTags = ({ sessionIdHex }: SessionTagsInput = {}): ArweaveTag[] => {
+export const buildDocLibrarySessionTags = ({ sessionIdHex }: any = {}): { name: string; value: string }[] => {
   const normalized = normalizeSessionIdHex(sessionIdHex);
   if (!normalized) return [];
   return [{ name: 'CE-SessionId', value: normalized }];
 };
 
-export const buildDocLibrarySbtTags = ({ chainId, sbtAddress }: SbtTagsInput = {}): ArweaveTag[] => {
+export const buildDocLibrarySbtTags = ({ chainId, sbtAddress }: any = {}): { name: string; value: string }[] => {
   const id = Number(chainId || 0) || 0;
   const addr = normalizeSbtAddress(sbtAddress);
   if (!id || !addr) return [];
@@ -49,14 +49,14 @@ export const buildDocLibrarySbtTags = ({ chainId, sbtAddress }: SbtTagsInput = {
   ];
 };
 
-const truncateTagValue = (value: unknown, maxLen: number): string => {
+const truncateTagValue = (value: any, maxLen: number): string => {
   const v = toStr(value).trim();
   if (!maxLen || v.length <= maxLen) return v;
   return v.slice(0, Math.max(0, maxLen - 1)).trim();
 };
 
-export const buildDocLibraryPlaintextFileMetaTags = ({ name, mime, size }: PlaintextFileMetaTagsInput = {}): ArweaveTag[] => {
-  const out: ArweaveTag[] = [];
+export const buildDocLibraryPlaintextFileMetaTags = ({ name, mime, size }: any = {}): { name: string; value: string }[] => {
+  const out: { name: string; value: string }[] = [];
   const safeName = truncateTagValue(name, 180);
   const safeMime = truncateTagValue(mime, 120);
   const safeSize = truncateTagValue(size != null ? String(size) : '', 40);
@@ -66,8 +66,8 @@ export const buildDocLibraryPlaintextFileMetaTags = ({ name, mime, size }: Plain
   return out;
 };
 
-export const buildDocLibraryRoleTags = ({ role, derivedFromTxId } = {}) => {
-  const out = [];
+export const buildDocLibraryRoleTags = ({ role, derivedFromTxId }: any = {}): { name: string; value: string }[] => {
+  const out: { name: string; value: string }[] = [];
   const safeRole = truncateTagValue(role, 60).toLowerCase();
   const safeDerivedFromTxId = truncateTagValue(derivedFromTxId, 80);
   if (safeRole) out.push({ name: 'CE-DocRole', value: safeRole });
@@ -75,7 +75,7 @@ export const buildDocLibraryRoleTags = ({ role, derivedFromTxId } = {}) => {
   return out;
 };
 
-export const mergeTags = (...lists) => (
+export const mergeTags = (...lists: any[]): { name: string; value: string }[] => (
   lists
     .flatMap((list) => (Array.isArray(list) ? list : []))
     .filter((t) => t && typeof t === 'object' && typeof t.name === 'string' && typeof t.value === 'string')

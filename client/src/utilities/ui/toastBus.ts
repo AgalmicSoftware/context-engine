@@ -1,44 +1,15 @@
-import type { ReactNode } from 'react';
-
-export type ToastPayload = {
-  id: string;
-  message: string;
-  kind: string;
-  duration: number;
-  icon: ReactNode;
-};
-
-export type ToastOptions = {
-  kind?: string;
-  duration?: number;
-  icon?: ReactNode;
-};
-
-export type ToastListener = (payload: ToastPayload) => void;
-
 let toastSequence = 0;
-const listeners = new Set<ToastListener>();
+const listeners = new Set<(payload: any) => void>();
 
-const isToastOptions = (value: unknown): value is ToastOptions => (
-  !!value && typeof value === 'object'
-);
+const normalizeToastPayload = (message: any, options: any = {}) => ({
+  id: `ce-toast-${Date.now()}-${toastSequence += 1}`,
+  message: String(message == null ? '' : message).trim(),
+  kind: String(options.kind || 'info'),
+  duration: Number.isFinite(options.duration) ? options.duration : 4000,
+  icon: options.icon || '',
+});
 
-const normalizeToastPayload = (message: unknown, options: unknown = {}): ToastPayload => {
-  const normalizedOptions = isToastOptions(options) ? options : {};
-  return {
-    id: `ce-toast-${Date.now()}-${toastSequence += 1}`,
-    message: String(message == null ? '' : message).trim(),
-    kind: String(normalizedOptions.kind || 'info'),
-    duration: (
-      typeof normalizedOptions.duration === 'number' && Number.isFinite(normalizedOptions.duration)
-    )
-      ? normalizedOptions.duration
-      : 4000,
-    icon: normalizedOptions.icon || '',
-  };
-};
-
-export const subscribeToToasts = (listener: ToastListener): (() => void) => {
+export const subscribeToToasts = (listener: any): (() => void) => {
   if (typeof listener !== 'function') {
     return () => {};
   }
@@ -48,7 +19,7 @@ export const subscribeToToasts = (listener: ToastListener): (() => void) => {
   };
 };
 
-export const showToast = (message: unknown, options: ToastOptions = {}): string => {
+export const showToast = (message: any, options: any = {}): string => {
   const payload = normalizeToastPayload(message, options);
   listeners.forEach((listener) => {
     try {

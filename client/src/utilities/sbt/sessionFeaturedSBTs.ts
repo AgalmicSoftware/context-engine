@@ -1,32 +1,13 @@
 import { toStr } from '../shared/primitives.js';
 
-type FeaturedSbtEntry = {
-  address?: unknown;
-  sbtAddress?: unknown;
-  value?: unknown;
-};
-
-type SessionFeaturedSbtConfig = {
-  defaultFeaturedSBTs?: unknown;
-  featured_SBTs_LIST?: unknown;
-};
-
-const isRecord = (value: unknown): value is Record<string, unknown> => (
-  !!value && typeof value === 'object'
-);
-
-const readFeaturedEntryValue = (value: unknown): unknown => {
-  if (typeof value === 'string') return value;
-  if (!isRecord(value)) return '';
-  const entry = value as FeaturedSbtEntry;
-  return entry.address || entry.sbtAddress || entry.value || '';
-};
-
-const normalizeFeaturedAddressList = (values: unknown = []): string[] => {
+const normalizeFeaturedAddressList = (values: any[] = []): string[] => {
   const out: string[] = [];
   const seen = new Set<string>();
   (Array.isArray(values) ? values : []).forEach((value) => {
-    const trimmed = toStr(readFeaturedEntryValue(value)).trim();
+    const raw = typeof value === 'string'
+      ? value
+      : (value?.address || value?.sbtAddress || value?.value || '');
+    const trimmed = toStr(raw).trim();
     if (!trimmed) return;
     const lower = trimmed.toLowerCase();
     if (seen.has(lower)) return;
@@ -36,8 +17,8 @@ const normalizeFeaturedAddressList = (values: unknown = []): string[] => {
   return out;
 };
 
-export const getCanonicalSessionFeaturedSBTs = (sessionConfig: unknown = null): string[] => {
-  const config: SessionFeaturedSbtConfig = isRecord(sessionConfig)
+export const getCanonicalSessionFeaturedSBTs = (sessionConfig: any = null): string[] => {
+  const config = sessionConfig && typeof sessionConfig === 'object'
     ? sessionConfig
     : {};
   return normalizeFeaturedAddressList([
