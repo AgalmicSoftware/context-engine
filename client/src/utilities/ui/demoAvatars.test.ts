@@ -1,14 +1,14 @@
 import { getDemoAvatar, getDemoAvatarByName } from './demoAvatars.js';
 
 describe('demoAvatars', () => {
-  const expectHistoricalPhotoUrl = (url) => {
+  const expectHistoricalPhotoUrl = (url: string) => {
     expect(url).toMatch(
       /^(\/historical-avatars\/|https:\/\/upload\.wikimedia\.org\/wikipedia\/commons\/|https:\/\/commons\.wikimedia\.org\/wiki\/Special:FilePath\/)/
     );
   };
 
   it('resolves merged demo wallet addresses to avatar metadata', () => {
-    const avatarInfo = requireAvatarInfo(getDemoAvatar('0x000000000000000000000000000000000000000b'));
+    const avatarInfo = getDemoAvatar('0x000000000000000000000000000000000000000b') as any;
 
     expect(avatarInfo).toEqual(expect.objectContaining({
       name: 'Abraham Lincoln',
@@ -19,7 +19,7 @@ describe('demoAvatars', () => {
   });
 
   it('resolves policy atlas pseudo addresses to avatar metadata', () => {
-    const avatarInfo = requireAvatarInfo(getDemoAvatar('0x_pseudo_address_turing'));
+    const avatarInfo = getDemoAvatar('0x_pseudo_address_turing') as any;
 
     expect(avatarInfo).toEqual(expect.objectContaining({
       name: 'Alan Turing',
@@ -29,7 +29,7 @@ describe('demoAvatars', () => {
   });
 
   it('resolves policy atlas-only figures through the local historical avatar manifest by name', () => {
-    const avatarInfo = requireAvatarInfo(getDemoAvatar('0x_pseudo_address_aurelius'));
+    const avatarInfo = getDemoAvatar('0x_pseudo_address_aurelius') as any;
 
     expect(avatarInfo).toEqual(expect.objectContaining({
       name: 'Marcus Aurelius',

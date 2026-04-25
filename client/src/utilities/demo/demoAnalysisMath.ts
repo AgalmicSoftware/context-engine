@@ -1,120 +1,6 @@
-type UnknownRecord = Record<string, unknown>;
+type LooseRecord = Record<string, any>;
 
-type SegmentDescriptor = {
-  category: string;
-  value: string;
-};
-
-export type ComparisonGroup = {
-  id?: unknown;
-  name?: unknown;
-  segmentKey?: unknown;
-  type?: unknown;
-  filters?: Array<{ type: string; value: string }>;
-};
-
-type AgreementRate = UnknownRecord & {
-  rate?: number;
-  groupName?: unknown;
-};
-
-type ResolvedAgreementRate = UnknownRecord & {
-  rate: number;
-  groupName: string;
-};
-
-type BeeswarmPoint = UnknownRecord & {
-  extremity?: unknown;
-  x?: number;
-  y?: number;
-};
-
-type BeeswarmPadding = {
-  top?: unknown;
-  left?: unknown;
-};
-
-type DemoAnalysisQuestion = UnknownRecord & {
-  id?: unknown;
-  text?: unknown;
-  category?: unknown;
-};
-
-type DemoFlatResponse = UnknownRecord & {
-  questionId?: unknown;
-  responseText?: unknown;
-  segmentKey?: unknown;
-  rate?: unknown;
-};
-
-type DemoDemographicRow = UnknownRecord & {
-  value?: unknown;
-};
-
-type ResponseAggregate = {
-  questionId: string;
-  responseText: string;
-  ratesBySegment: Map<string, number>;
-};
-
-type ComparisonReportGroupRate = {
-  groupName: string;
-  segmentKey: string;
-  rate: number;
-};
-
-export type ComparisonReportRow = {
-  questionId: string;
-  questionText: unknown;
-  responseText: string;
-  consensus: number | null;
-  divergence: number;
-  divisiveness: number | null;
-  groupRates: ComparisonReportGroupRate[];
-  tags: unknown[];
-};
-
-type BuildComparisonReportRowsOptions = {
-  flatResponses?: DemoFlatResponse[];
-  questions?: DemoAnalysisQuestion[];
-  comparisonGroups?: ComparisonGroup[];
-  questionTagsData?: Record<string, unknown[]>;
-};
-
-export type DivergentPairResult = {
-  pair: string[];
-  score: number;
-  questionId: string;
-  questionText: unknown;
-};
-
-type FindMostDivergentPairsOptions = {
-  demographics?: Record<string, DemoDemographicRow[]>;
-  flatResponses?: DemoFlatResponse[];
-  segmentCounts?: Record<string, Record<string, number>>;
-  questions?: DemoAnalysisQuestion[];
-  topN?: number;
-  allowedSegmentKeys?: string[];
-};
-
-type IndicatorHeatmapOptions = {
-  questions?: DemoAnalysisQuestion[];
-  flatResponses?: DemoFlatResponse[];
-  selectedSegmentKey?: string;
-};
-
-type IndicatorHeatmapData = {
-  title: string;
-  rowLabels: string[];
-  columnLabels: string[];
-  pivotData: Array<Array<number | null>>;
-};
-
-const isFiniteNumber = (value: unknown): value is number => (
-  typeof value === 'number' && Number.isFinite(value)
-);
-
-export const parseSegmentKey = (segmentKey: unknown = ''): SegmentDescriptor => {
+export const parseSegmentKey = (segmentKey = ''): { category: string; value: string } => {
   const normalized = String(segmentKey || '').trim();
   if (!normalized || normalized === 'All') {
     return { category: 'All', value: 'All' };
@@ -129,12 +15,12 @@ export const parseSegmentKey = (segmentKey: unknown = ''): SegmentDescriptor => 
   };
 };
 
-export const getSegmentDisplayName = (segmentKey: unknown = ''): string => {
+export const getSegmentDisplayName = (segmentKey = ''): string => {
   const { category, value } = parseSegmentKey(segmentKey);
   return category === 'All' ? 'Overall' : `${category}: ${value}`;
 };
 
-export const buildComparisonGroup = (segmentKey: unknown = ''): ComparisonGroup => {
+export const buildComparisonGroup = (segmentKey = '') => {
   const { category, value } = parseSegmentKey(segmentKey);
   return {
     id: segmentKey,
@@ -178,35 +64,20 @@ export const calculateDivisiveness = (
   return Math.max(0, Math.min(divergence / 0.5, 1));
 };
 
-export const getMinMaxAgreement = (groupRates: AgreementRate[] = []): {
-  min: ResolvedAgreementRate;
-  max: ResolvedAgreementRate;
-} => {
+export const getMinMaxAgreement = (groupRates: LooseRecord[] = []) => {
   if (!Array.isArray(groupRates) || groupRates.length === 0) {
     return { min: { rate: 0, groupName: 'N/A' }, max: { rate: 0, groupName: 'N/A' } };
   }
 
-  const normalizedRates = groupRates
-    .map((entry) => ({
-      ...entry,
-      groupName: String(entry?.groupName || 'N/A'),
-      rate: Number(entry?.rate || 0),
-    }))
-    .filter((entry): entry is ResolvedAgreementRate => isFiniteNumber(entry.rate));
-  if (!normalizedRates.length) {
-    return { min: { rate: 0, groupName: 'N/A' }, max: { rate: 0, groupName: 'N/A' } };
-  }
+  let min = groupRates[0];
+  let max = groupRates[0];
 
-  let min = normalizedRates[0];
-  let max = normalizedRates[0];
-
-  for (let index = 1; index < normalizedRates.length; index += 1) {
-    const rate = normalizedRates[index];
-    if (rate.rate < min.rate) {
-      min = rate;
+  for (let index = 1; index < groupRates.length; index += 1) {
+    if (groupRates[index].rate < min.rate) {
+      min = groupRates[index];
     }
-    if (rate.rate > max.rate) {
-      max = rate;
+    if (groupRates[index].rate > max.rate) {
+      max = groupRates[index];
     }
   }
 
@@ -214,18 +85,18 @@ export const getMinMaxAgreement = (groupRates: AgreementRate[] = []): {
 };
 
 export const beeswarmByExtremity = (
-  points: BeeswarmPoint[] = [],
+  points: LooseRecord[] = [],
   innerWidth = 0,
   innerHeight = 0,
-  padding: BeeswarmPadding = {}
-): BeeswarmPoint[] => {
+  padding: LooseRecord = {}
+) => {
   if (!Array.isArray(points) || points.length === 0) return [];
 
   const radius = 6;
   const baseY = Number(padding.top || 0) + innerHeight / 2;
   const minY = Number(padding.top || 0) + radius;
   const maxY = Number(padding.top || 0) + innerHeight - radius;
-  const placed: BeeswarmPoint[] = [];
+  const placed: LooseRecord[] = [];
 
   return points
     .map((point) => ({
@@ -239,7 +110,7 @@ export const beeswarmByExtremity = (
       let layer = 0;
 
       const collides = (x: number, y: number) => placed.some((existing) => (
-        Math.hypot(Number(existing.x || 0) - x, Number(existing.y || 0) - y) < radius * 2
+        Math.hypot(existing.x - x, existing.y - y) < radius * 2
       ));
 
       while (collides(point.x, candidateY)) {
@@ -259,38 +130,41 @@ export const beeswarmByExtremity = (
     });
 };
 
-export const buildQuestionMap = (questions: DemoAnalysisQuestion[] = []): Map<string, DemoAnalysisQuestion> => new Map(
+export const buildQuestionMap = (questions: LooseRecord[] = []) => new Map(
   (Array.isArray(questions) ? questions : []).map((question) => [String(question?.id || ''), question])
 );
 
-export const buildResponsesByQuestionResponse = (flatResponses: DemoFlatResponse[] = []): Map<string, ResponseAggregate> => {
-  const responseMap = new Map<string, ResponseAggregate>();
+export const buildResponsesByQuestionResponse = (flatResponses: LooseRecord[] = []) => {
+  const responseMap = new Map();
   (Array.isArray(flatResponses) ? flatResponses : []).forEach((row) => {
     const questionId = String(row?.questionId || '').trim();
     const responseText = String(row?.responseText || '').trim();
     const segmentKey = String(row?.segmentKey || '').trim();
     if (!questionId || !responseText || !segmentKey) return;
     const mapKey = `${questionId}::${responseText}`;
-    let aggregate = responseMap.get(mapKey);
-    if (!aggregate) {
-      aggregate = {
+    if (!responseMap.has(mapKey)) {
+      responseMap.set(mapKey, {
         questionId,
         responseText,
-        ratesBySegment: new Map<string, number>(),
-      };
-      responseMap.set(mapKey, aggregate);
+        ratesBySegment: new Map(),
+      });
     }
-    aggregate.ratesBySegment.set(segmentKey, Number(row?.rate || 0));
+    responseMap.get(mapKey).ratesBySegment.set(segmentKey, Number(row?.rate || 0));
   });
   return responseMap;
 };
 
-export const buildComparisonReportRows = ({
+export const buildComparisonReportRows: any = ({
   flatResponses = [],
   questions = [],
   comparisonGroups = [],
   questionTagsData = {},
-}: BuildComparisonReportRowsOptions = {}): ComparisonReportRow[] => {
+}: {
+  flatResponses?: LooseRecord[];
+  questions?: LooseRecord[];
+  comparisonGroups?: LooseRecord[];
+  questionTagsData?: Record<string, any[]>;
+} = {}) => {
   const selectedSegmentKeys = (Array.isArray(comparisonGroups) ? comparisonGroups : [])
     .map((group) => String(group?.segmentKey || '').trim())
     .filter(Boolean);
@@ -298,7 +172,7 @@ export const buildComparisonReportRows = ({
 
   const questionMap = buildQuestionMap(questions);
   const responseMap = buildResponsesByQuestionResponse(flatResponses);
-  const rows: ComparisonReportRow[] = [];
+  const rows: LooseRecord[] = [];
 
   responseMap.forEach(({ questionId, responseText, ratesBySegment }) => {
     const question = questionMap.get(questionId);
@@ -306,17 +180,14 @@ export const buildComparisonReportRows = ({
     const consensus = calculateConsensus(ratesBySegment, selectedSegmentKeys);
     const divergence = calculateDivergence(ratesBySegment, selectedSegmentKeys);
     const divisiveness = calculateDivisiveness(ratesBySegment, selectedSegmentKeys);
-    if (divergence == null || !Number.isFinite(divergence)) return;
+    if (!Number.isFinite(divergence)) return;
     const groupRates = comparisonGroups
-      .map((group) => {
-        const segmentKey = String(group?.segmentKey || '');
-        return {
-          groupName: String(group?.name || getSegmentDisplayName(segmentKey)),
-          segmentKey,
-          rate: ratesBySegment.get(segmentKey),
-        };
-      })
-      .filter((entry): entry is ComparisonReportGroupRate => isFiniteNumber(entry.rate));
+      .map((group) => ({
+        groupName: group?.name || getSegmentDisplayName(group?.segmentKey),
+        segmentKey: group?.segmentKey,
+        rate: ratesBySegment.get(group?.segmentKey),
+      }))
+      .filter((entry) => Number.isFinite(entry.rate));
     if (groupRates.length < 2) return;
     rows.push({
       questionId,
@@ -340,7 +211,14 @@ export const findMostDivergentPairs = ({
   questions = [],
   topN = 6,
   allowedSegmentKeys = [],
-}: FindMostDivergentPairsOptions = {}): DivergentPairResult[] => {
+}: {
+  demographics?: Record<string, LooseRecord[]>;
+  flatResponses?: LooseRecord[];
+  segmentCounts?: Record<string, Record<string, number>>;
+  questions?: LooseRecord[];
+  topN?: number;
+  allowedSegmentKeys?: string[];
+} = {}) => {
   const questionMap = buildQuestionMap(questions);
   const allSegmentKeys = Object.entries(demographics || {}).reduce<string[]>((acc, [category, rows]) => {
     (Array.isArray(rows) ? rows : []).forEach((row) => {
@@ -353,8 +231,8 @@ export const findMostDivergentPairs = ({
   }, []);
 
   const responseMap = buildResponsesByQuestionResponse(flatResponses);
-  const pairResults = [];
-  const allowedSet = new Set((Array.isArray(allowedSegmentKeys) ? allowedSegmentKeys : []).filter(Boolean));
+  const pairResults: Array<{ pair: string[]; score: number; questionId: string; questionText: string }> = [];
+  const allowedSet = new Set<string>((Array.isArray(allowedSegmentKeys) ? allowedSegmentKeys : []).filter(Boolean));
   const allowPairsTouchingSingleSegment = allowedSet.size === 1;
 
   for (let leftIndex = 0; leftIndex < allSegmentKeys.length; leftIndex += 1) {
@@ -372,13 +250,11 @@ export const findMostDivergentPairs = ({
         }
       }
 
-      let bestResult: DivergentPairResult | null = null;
+      let bestResult: { pair: string[]; score: number; questionId: string; questionText: string } | null = null;
       responseMap.forEach(({ questionId, ratesBySegment }) => {
-        const leftRateCandidate = ratesBySegment.get(leftSegment);
-        const rightRateCandidate = ratesBySegment.get(rightSegment);
-        if (!isFiniteNumber(leftRateCandidate) || !isFiniteNumber(rightRateCandidate)) return;
-        const leftRate = leftRateCandidate;
-        const rightRate = rightRateCandidate;
+        const leftRate = ratesBySegment.get(leftSegment);
+        const rightRate = ratesBySegment.get(rightSegment);
+        if (!Number.isFinite(leftRate) || !Number.isFinite(rightRate)) return;
 
         const leftCount = Number(segmentCounts?.[questionId]?.[leftSegment] || 0);
         const rightCount = Number(segmentCounts?.[questionId]?.[rightSegment] || 0);
@@ -414,15 +290,20 @@ export const buildIndicatorHeatmapData = ({
   questions = [],
   flatResponses = [],
   selectedSegmentKey = 'All',
-}: IndicatorHeatmapOptions = {}): IndicatorHeatmapData => {
-  const categoryQuestionIds = new Map<string, string[]>();
+}: {
+  questions?: LooseRecord[];
+  flatResponses?: LooseRecord[];
+  selectedSegmentKey?: string;
+} = {}) => {
+  const categoryQuestionIds = new Map();
   (Array.isArray(questions) ? questions : []).forEach((question) => {
     const category = String(question?.category || '').trim();
     const questionId = String(question?.id || '').trim();
     if (!category || !questionId) return;
-    const existingQuestionIds = categoryQuestionIds.get(category) || [];
-    existingQuestionIds.push(questionId);
-    categoryQuestionIds.set(category, existingQuestionIds);
+    if (!categoryQuestionIds.has(category)) {
+      categoryQuestionIds.set(category, []);
+    }
+    categoryQuestionIds.get(category).push(questionId);
   });
 
   const columnLabels = ['Agree', 'Unsure', 'Disagree'];

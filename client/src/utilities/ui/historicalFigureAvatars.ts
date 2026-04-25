@@ -49,7 +49,7 @@ const HISTORICAL_FIGURE_USERNAME_BY_NORMALIZED_NAME = Object.freeze(
   }, {})
 );
 
-const buildPublicAssetPath = (pathname = '') => {
+const buildPublicAssetPath = (pathname = ''): string => {
   const normalizedPath = String(pathname || '').trim();
   if (!normalizedPath) return '';
   if (/^https?:\/\//i.test(normalizedPath)) return normalizedPath;

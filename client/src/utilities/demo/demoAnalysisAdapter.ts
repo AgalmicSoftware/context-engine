@@ -1,115 +1,9 @@
 import historicalFigureDemographics from '../../variables/demo/historical_figure_demographics.js';
 
-type UnknownRecord = Record<string, unknown>;
-
-export type DemoAnalysisComment = {
-  commentId?: unknown;
-  commentBody?: unknown;
-  type?: unknown;
-  category?: unknown;
-  key_tension?: unknown;
-  keyTension?: unknown;
-  sources?: unknown;
-};
-
-export type DemoAnalysisParticipant = {
-  xid?: unknown;
-  participant?: unknown;
-  votes?: Record<string, unknown>;
-  profileId?: unknown;
-  profileLabel?: unknown;
-  profileConfidence?: unknown;
-  profileRationale?: unknown;
-  profileSourceType?: unknown;
-};
-
-export type DemoAnalysisSource = {
-  comments?: unknown;
-  participantsVotes?: unknown;
-};
-
-type DemoAnalysisMetadata = UnknownRecord & {
-  eraBucket?: unknown;
-  region?: unknown;
-  country?: unknown;
-  gender?: unknown;
-  affiliation?: unknown;
-  atlasCategory?: unknown;
-};
-
-export type DemoAnalysisMetadataByXid = Record<string, DemoAnalysisMetadata>;
-
-export type QuestionTag = {
-  tagID: string;
-  tagName: string;
-  tagType: string;
-  rawValue: string;
-  isPrimary: boolean;
-};
-
-type DemoAnalysisQuestion = {
-  id: string;
-  commentId: string;
-  index: number;
-  text: string;
-  type: string;
-  sourcePromptType: string;
-  options: string[];
-  semanticOrder: string[];
-  participationCount: number;
-  category: string;
-  keyTension: string;
-  sources: string[];
-};
-
-export type DemoFlatResponse = {
-  questionId: string;
-  responseText: string;
-  segmentKey: string;
-  count: number;
-  participantCount: number;
-  totalVotes: number;
-  rate: number;
-};
-
-type ParticipantSegment = {
-  segmentKey: string;
-  category: string;
-  value: string;
-};
-
-type ProfileDescriptor = {
-  profileId: string;
-  label: string;
-  confidence: string;
-  rationale: string;
-  sourceType: string;
-};
-
-type ProfileCount = ProfileDescriptor & {
-  participantKeys: Set<string>;
-};
-
-export type QuestionProfileSummary = ProfileDescriptor & {
-  count: number;
-};
-
-type DemographicSummaryRow = {
-  value: string;
-  count: number;
-};
-
-export type DemoAnalysisData = {
-  questions: DemoAnalysisQuestion[];
-  flatResponses: DemoFlatResponse[];
-  demographics: Record<string, DemographicSummaryRow[]>;
-  segmentCounts: Record<string, Record<string, number>>;
-  questionTagsData: Record<string, QuestionTag[]>;
-  questionProfileSummaries: Record<string, QuestionProfileSummary[]>;
-};
+type LooseRecord = Record<string, any>;
 
 export const DEMO_ANALYSIS_RESPONSE_OPTIONS = Object.freeze(['Agree', 'Unsure', 'Disagree']);
-const EMPTY_DEMO_ANALYSIS_SOURCE: DemoAnalysisSource = Object.freeze({
+const EMPTY_DEMO_ANALYSIS_SOURCE = Object.freeze({
   comments: [],
   participantsVotes: [],
 });
@@ -122,10 +16,6 @@ export const DEMO_ANALYSIS_DEMOGRAPHIC_DIMENSIONS = Object.freeze([
   { label: 'Affiliation', field: 'affiliation' },
   { label: 'Atlas Category', field: 'atlasCategory' },
 ]);
-const DEFAULT_PROFILE_ID = 'historical_baseline';
-const DEFAULT_PROFILE_LABEL = 'Historical persona baseline';
-const DEFAULT_PROFILE_CONFIDENCE = 'High';
-const DEFAULT_PROFILE_RATIONALE = 'Original historical-figure vote row anchored to the canonical demo persona fixtures.';
 
 const VOTE_LABEL_BY_VALUE: Record<string, string> = Object.freeze({
   '-1': 'Disagree',
@@ -168,8 +58,8 @@ const normalizeSourceName = (value = ''): string => {
   return toTitleCase(trimmed);
 };
 
-export const buildQuestionTags = (comment: DemoAnalysisComment = {}): QuestionTag[] => {
-  const tags: QuestionTag[] = [];
+export const buildQuestionTags = (comment: LooseRecord = {}) => {
+  const tags = [];
   const category = String(comment?.category || '').trim();
   if (category) {
     tags.push({
@@ -181,7 +71,7 @@ export const buildQuestionTags = (comment: DemoAnalysisComment = {}): QuestionTa
     });
   }
 
-  const seenSources = new Set<string>();
+  const seenSources = new Set();
   const rawSources = String(comment?.sources || '')
     .split(',')
     .map((part) => String(part || '').trim())
@@ -203,31 +93,27 @@ export const buildQuestionTags = (comment: DemoAnalysisComment = {}): QuestionTa
   return tags;
 };
 
-const buildQuestionSources = (comment: DemoAnalysisComment = {}): string[] => String(comment?.sources || '')
-  .split(',')
-  .map((part) => String(part || '').trim())
-  .filter(Boolean);
-
-const buildQuestions = (comments: DemoAnalysisComment[] = []): DemoAnalysisQuestion[] => comments.map((comment, index) => ({
+const buildQuestions = (comments: LooseRecord[] = []) => comments.map((comment, index) => ({
   id: String(index),
   commentId: String(comment?.commentId || index),
   index,
   text: String(comment?.commentBody || '').trim(),
   type: 'poll',
-  sourcePromptType: String(comment?.type || '').trim().toLowerCase() || 'binary',
   options: DEMO_ANALYSIS_RESPONSE_OPTIONS.slice(),
   semanticOrder: DEMO_ANALYSIS_RESPONSE_OPTIONS.slice(),
   participationCount: 0,
   category: String(comment?.category || '').trim(),
-  keyTension: String(comment?.key_tension || comment?.keyTension || '').trim(),
-  sources: buildQuestionSources(comment),
+  sources: String(comment?.sources || '')
+    .split(',')
+    .map((part) => String(part || '').trim())
+    .filter(Boolean),
 }));
 
 const incrementMapCount = (map: Map<string, number>, key: string): void => {
   map.set(key, Number(map.get(key) || 0) + 1);
 };
 
-const getParticipantIdentityKey = (participant: DemoAnalysisParticipant = {}, fallbackKey = ''): string => {
+const getParticipantIdentityKey = (participant: LooseRecord = {}, fallbackKey = ''): string => {
   const xid = String(participant?.xid || '').trim();
   if (xid) return xid;
 
@@ -237,11 +123,8 @@ const getParticipantIdentityKey = (participant: DemoAnalysisParticipant = {}, fa
   return String(fallbackKey || '').trim();
 };
 
-const getParticipantSegments = (
-  participant: DemoAnalysisParticipant = {},
-  metadata: DemoAnalysisMetadata = {}
-): ParticipantSegment[] => {
-  const segments: ParticipantSegment[] = [{ segmentKey: 'All', category: 'All', value: 'All' }];
+const getParticipantSegments = (participant: LooseRecord = {}, metadata: LooseRecord = {}) => {
+  const segments = [{ segmentKey: 'All', category: 'All', value: 'All' }];
   DEMO_ANALYSIS_DEMOGRAPHIC_DIMENSIONS.forEach(({ label, field }) => {
     const value = String(metadata?.[field] || '').trim();
     if (!value) return;
@@ -254,26 +137,12 @@ const getParticipantSegments = (
   return segments;
 };
 
-const buildParticipantProfileDescriptor = (participant: DemoAnalysisParticipant = {}): ProfileDescriptor => {
-  const profileId = String(participant?.profileId || '').trim() || DEFAULT_PROFILE_ID;
-  return {
-    profileId,
-    label: String(participant?.profileLabel || '').trim() || DEFAULT_PROFILE_LABEL,
-    confidence: String(participant?.profileConfidence || '').trim() || DEFAULT_PROFILE_CONFIDENCE,
-    rationale: String(participant?.profileRationale || '').trim() || DEFAULT_PROFILE_RATIONALE,
-    sourceType: String(participant?.profileSourceType || '').trim() || 'historical_baseline',
-  };
-};
-
-const buildDemographicSummary = (
-  participantsVotes: DemoAnalysisParticipant[] = [],
-  metadataByXid: DemoAnalysisMetadataByXid = {}
-): Record<string, DemographicSummaryRow[]> => {
-  const countsByCategory = new Map<string, Map<string, number>>(
-    DEMO_ANALYSIS_DEMOGRAPHIC_DIMENSIONS.map(({ label }) => [label, new Map<string, number>()])
+const buildDemographicSummary = (participantsVotes: LooseRecord[] = [], metadataByXid: Record<string, LooseRecord> = {}) => {
+  const countsByCategory = new Map(
+    DEMO_ANALYSIS_DEMOGRAPHIC_DIMENSIONS.map(({ label }) => [label, new Map()])
   );
-  const participantKeysByCategoryValue = new Map<string, Map<string, Set<string>>>(
-    DEMO_ANALYSIS_DEMOGRAPHIC_DIMENSIONS.map(({ label }) => [label, new Map<string, Set<string>>()])
+  const participantKeysByCategoryValue = new Map(
+    DEMO_ANALYSIS_DEMOGRAPHIC_DIMENSIONS.map(({ label }) => [label, new Map()])
   );
 
   participantsVotes.forEach((participant, participantIndex) => {
@@ -289,11 +158,10 @@ const buildDemographicSummary = (
       const categoryParticipantKeys = participantKeysByCategoryValue.get(label);
       const categoryCounts = countsByCategory.get(label);
       if (!categoryParticipantKeys || !categoryCounts) return;
-      let seenParticipantKeys = categoryParticipantKeys.get(value);
-      if (!seenParticipantKeys) {
-        seenParticipantKeys = new Set<string>();
-        categoryParticipantKeys.set(value, seenParticipantKeys);
+      if (!categoryParticipantKeys.has(value)) {
+        categoryParticipantKeys.set(value, new Set());
       }
+      const seenParticipantKeys = categoryParticipantKeys.get(value);
       if (seenParticipantKeys.has(participantKey)) return;
 
       seenParticipantKeys.add(participantKey);
@@ -301,8 +169,8 @@ const buildDemographicSummary = (
     });
   });
 
-  return DEMO_ANALYSIS_DEMOGRAPHIC_DIMENSIONS.reduce<Record<string, DemographicSummaryRow[]>>((acc, { label }) => {
-    const counts = countsByCategory.get(label) || new Map<string, number>();
+  return DEMO_ANALYSIS_DEMOGRAPHIC_DIMENSIONS.reduce<Record<string, any[]>>((acc, { label }) => {
+    const counts = countsByCategory.get(label) || new Map();
     acc[label] = Array.from(counts.entries())
       .map(([value, count]) => ({ value, count }))
       .sort((left, right) => {
@@ -314,19 +182,18 @@ const buildDemographicSummary = (
 };
 
 export const buildDemoAnalysisData = (
-  sourceData: DemoAnalysisSource = EMPTY_DEMO_ANALYSIS_SOURCE,
-  metadataByXid: DemoAnalysisMetadataByXid = historicalFigureDemographics as DemoAnalysisMetadataByXid
-): DemoAnalysisData => {
-  const comments: DemoAnalysisComment[] = Array.isArray(sourceData?.comments) ? sourceData.comments : [];
+  sourceData: LooseRecord = EMPTY_DEMO_ANALYSIS_SOURCE,
+  metadataByXid: Record<string, LooseRecord> = historicalFigureDemographics as Record<string, LooseRecord>
+) => {
+  const comments = Array.isArray(sourceData?.comments) ? sourceData.comments : [];
   const participantsVotes = Array.isArray(sourceData?.participantsVotes)
-    ? sourceData.participantsVotes as DemoAnalysisParticipant[]
+    ? sourceData.participantsVotes
     : [];
 
   const questions = buildQuestions(comments);
-  const flatResponses: DemoFlatResponse[] = [];
+  const flatResponses: LooseRecord[] = [];
   const segmentCounts: Record<string, Record<string, number>> = {};
-  const questionTagsData: Record<string, QuestionTag[]> = {};
-  const questionProfileSummaries: Record<string, QuestionProfileSummary[]> = {};
+  const questionTagsData: Record<string, any[]> = {};
 
   const unresolvedXids = participantsVotes
     .map((participant) => String(participant?.xid || '').trim())
@@ -337,10 +204,9 @@ export const buildDemoAnalysisData = (
 
   questions.forEach((question) => {
     const questionId = question.id;
-    const responseCountsBySegment = new Map<string, Map<string, number>>();
-    const denominatorsBySegment = new Map<string, number>();
-    const uniqueParticipantKeysBySegment = new Map<string, Set<string>>();
-    const profileCountsByQuestion = new Map<string, ProfileCount>();
+    const responseCountsBySegment = new Map();
+    const denominatorsBySegment = new Map();
+    const uniqueParticipantKeysBySegment = new Map();
 
     participantsVotes.forEach((participant, participantIndex) => {
       const xid = String(participant?.xid || '').trim();
@@ -353,48 +219,23 @@ export const buildDemoAnalysisData = (
       if (!responseLabel) return;
 
       const participantKey = getParticipantIdentityKey(participant, `row:${participantIndex}`);
-      const profileDescriptor = buildParticipantProfileDescriptor(participant);
       const segments = getParticipantSegments(participant, metadata);
       segments.forEach(({ segmentKey }) => {
         incrementMapCount(denominatorsBySegment, segmentKey);
         if (!responseCountsBySegment.has(segmentKey)) {
-          responseCountsBySegment.set(segmentKey, new Map<string, number>());
+          responseCountsBySegment.set(segmentKey, new Map());
         }
         if (!uniqueParticipantKeysBySegment.has(segmentKey)) {
-          uniqueParticipantKeysBySegment.set(segmentKey, new Set<string>());
+          uniqueParticipantKeysBySegment.set(segmentKey, new Set());
         }
-        uniqueParticipantKeysBySegment.get(segmentKey)?.add(participantKey);
-        const responseCounts = responseCountsBySegment.get(segmentKey);
-        if (responseCounts) {
-          incrementMapCount(responseCounts, responseLabel);
-        }
+        uniqueParticipantKeysBySegment.get(segmentKey).add(participantKey);
+        incrementMapCount(responseCountsBySegment.get(segmentKey), responseLabel);
       });
-
-      if (!profileCountsByQuestion.has(profileDescriptor.profileId)) {
-        profileCountsByQuestion.set(profileDescriptor.profileId, {
-          ...profileDescriptor,
-          participantKeys: new Set<string>(),
-        });
-      }
-      profileCountsByQuestion.get(profileDescriptor.profileId)?.participantKeys.add(participantKey);
     });
 
     question.participationCount = Number(uniqueParticipantKeysBySegment.get('All')?.size || 0);
     segmentCounts[questionId] = {};
     questionTagsData[questionId] = buildQuestionTags(comments[question.index]);
-    questionProfileSummaries[questionId] = Array.from(profileCountsByQuestion.values())
-      .map((profileSummary) => ({
-        profileId: profileSummary.profileId,
-        label: profileSummary.label,
-        confidence: profileSummary.confidence,
-        rationale: profileSummary.rationale,
-        sourceType: profileSummary.sourceType,
-        count: Number(profileSummary.participantKeys?.size || 0),
-      }))
-      .sort((left, right) => {
-        if (right.count !== left.count) return right.count - left.count;
-        return left.label.localeCompare(right.label);
-      });
 
     Array.from(denominatorsBySegment.entries())
       .sort(([left], [right]) => left.localeCompare(right))
@@ -423,11 +264,10 @@ export const buildDemoAnalysisData = (
     demographics: buildDemographicSummary(participantsVotes, metadataByXid),
     segmentCounts,
     questionTagsData,
-    questionProfileSummaries,
   };
 };
 
-export const getHighestParticipationQuestion = (questions: DemoAnalysisQuestion[] = []): DemoAnalysisQuestion | null => {
+export const getHighestParticipationQuestion = (questions: LooseRecord[] = []) => {
   if (!Array.isArray(questions) || questions.length === 0) return null;
   return [...questions]
     .sort((left, right) => {

@@ -1,61 +1,17 @@
 import { getQuestionTagDisplayList } from '../survey/questionTags.js';
 import { normalizeTagList } from '../defaultTags.js';
 
-type DemoCorpusEntry = {
-  id?: unknown;
-  year?: unknown;
-  date?: unknown;
-  date_enacted?: unknown;
-  created_at?: unknown;
-  author?: unknown;
-  authors?: unknown;
-  title?: unknown;
-  summary?: unknown;
-  text?: unknown;
-  novel_arguments_and_concepts?: unknown;
-  top_quotes?: unknown;
-  tags?: unknown;
-  url?: unknown;
-  interviewer?: unknown;
-  jurisdiction?: unknown;
-  venue?: unknown;
-  category?: unknown;
-};
+type LooseRecord = Record<string, any>;
 
-type DemoCorpus = {
-  key?: unknown;
-  label?: unknown;
-  entries?: unknown;
-};
+const normalizeDemoText = (value = ''): string => String(value || '').replace(/\s+/g, ' ').trim();
 
-export type DemoCorpusRecord = {
-  key: string;
-  corpusKey: string;
-  corpusLabel: string;
-  title: string;
-  summary: string;
-  url: string;
-  metaLine: string;
-  tags: string[];
-  normalizedTags: string[];
-};
-
-const isRecord = (value: unknown): value is Record<string, unknown> => (
-  !!value && typeof value === 'object' && !Array.isArray(value)
-);
-
-const asDemoCorpus = (value: unknown): DemoCorpus => (isRecord(value) ? value : {});
-const asDemoCorpusEntry = (value: unknown): DemoCorpusEntry => (isRecord(value) ? value : {});
-
-const normalizeDemoText = (value: unknown = ''): string => String(value || '').replace(/\s+/g, ' ').trim();
-
-const truncateDemoText = (value: unknown = '', maxLength = 180): string => {
+const truncateDemoText = (value = '', maxLength = 180): string => {
   const normalized = normalizeDemoText(value);
   if (normalized.length <= maxLength) return normalized;
   return `${normalized.slice(0, maxLength - 1).trimEnd()}...`;
 };
 
-const formatDemoCorpusDate = (entry: DemoCorpusEntry = {}): string => {
+const formatDemoCorpusDate = (entry: LooseRecord = {}): string => {
   if (entry?.year) return String(entry.year);
 
   const datedValue = String(entry?.date || entry?.date_enacted || entry?.created_at || '').trim();
@@ -74,7 +30,7 @@ const formatDemoCorpusDate = (entry: DemoCorpusEntry = {}): string => {
   const resolvedDate = new Date(datedValue);
   if (Number.isNaN(resolvedDate.getTime())) return datedValue;
 
-  const formatOptions: Intl.DateTimeFormatOptions = {
+    const formatOptions: Intl.DateTimeFormatOptions = {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
@@ -83,7 +39,7 @@ const formatDemoCorpusDate = (entry: DemoCorpusEntry = {}): string => {
   return resolvedDate.toLocaleDateString('en-US', formatOptions);
 };
 
-const formatDemoCorpusAuthors = (entry: DemoCorpusEntry = {}): string => {
+const formatDemoCorpusAuthors = (entry: LooseRecord = {}): string => {
   const author = normalizeDemoText(entry?.author);
   if (author) return author;
 
@@ -96,7 +52,7 @@ const formatDemoCorpusAuthors = (entry: DemoCorpusEntry = {}): string => {
   return `${authors[0]} +${authors.length - 1}`;
 };
 
-const buildDemoCorpusTitle = (entry: DemoCorpusEntry = {}, corpusLabel = ''): string => {
+const buildDemoCorpusTitle = (entry: LooseRecord = {}, corpusLabel = ''): string => {
   const explicitTitle = normalizeDemoText(entry?.title);
   if (explicitTitle) return explicitTitle;
 
@@ -109,7 +65,7 @@ const buildDemoCorpusTitle = (entry: DemoCorpusEntry = {}, corpusLabel = ''): st
   return `${corpusLabel || 'Demo corpus'} entry`;
 };
 
-const buildDemoCorpusSummary = (entry: DemoCorpusEntry = {}, title = ''): string => {
+const buildDemoCorpusSummary = (entry: LooseRecord = {}, title = ''): string => {
   const titleText = normalizeDemoText(title);
   const explicitTitle = normalizeDemoText(entry?.title);
   const normalizedSummary = normalizeDemoText(entry?.summary);
@@ -132,18 +88,16 @@ const buildDemoCorpusSummary = (entry: DemoCorpusEntry = {}, title = ''): string
   return truncateDemoText(summary, 320);
 };
 
-export const buildDemoCorpusRecords = (demoCorpuses: unknown = []): DemoCorpusRecord[] => {
+export const buildDemoCorpusRecords = (demoCorpuses: LooseRecord[] = []) => {
   const corpuses = Array.isArray(demoCorpuses) ? demoCorpuses : [];
-  const records: DemoCorpusRecord[] = [];
+  const records: LooseRecord[] = [];
 
-  corpuses.forEach((corpusInput, corpusIndex) => {
-    const corpus = asDemoCorpus(corpusInput);
+  corpuses.forEach((corpus, corpusIndex) => {
     const entries = Array.isArray(corpus?.entries) ? corpus.entries : [];
     const corpusKey = normalizeDemoText(corpus?.key) || `demo-corpus-${corpusIndex}`;
     const corpusLabel = normalizeDemoText(corpus?.label) || corpusKey.replace(/_/g, ' ');
 
-    entries.forEach((entryInput, entryIndex) => {
-      const entry = asDemoCorpusEntry(entryInput);
+    entries.forEach((entry, entryIndex) => {
       const displayTags = getQuestionTagDisplayList(Array.isArray(entry?.tags) ? entry.tags : []);
       const normalizedTags = normalizeTagList(displayTags);
       if (!normalizedTags.length) return;
