@@ -112,7 +112,6 @@ import {
   buildSessionWizardWorkerConfigPayload,
   sanitizeSessionWizardMetadataPayload,
 } from './sessionWizardWriteNormalization.js';
-import { upsertCachedSessionWorkerConfig } from '../../utilities/session/sessionWorkerConfigCache.js';
 import {
   getDemoTemplateSeed,
   getReservedLegacySessionSlugs,
@@ -212,6 +211,12 @@ import {
   shouldLockable,
 } from './sessionWizardGateUtils';
 import {
+  buildSponsoredBundleAppliedStatusMessage,
+  cacheSessionWorkerConfigAfterDeploy,
+  resolveSponsoredBundleAdvancedFieldNotices,
+  resolveSponsoredBundleBootstrapWorkerUrl,
+} from './sessionWizardSponsoredBundleSupport';
+import {
   buildSessionWizardWorkerRpcUrlMap,
   getSessionWizardWorkerDeployValidationError,
   resolveFallbackRpcUrl,
@@ -266,6 +271,7 @@ export {
   persistSessionWizardSbtRecoveryCodes,
 } from './sessionWizardPendingSbtPublish';
 export { resolveSessionWizardSelectorSourceConfig } from './sessionWizardGateUtils';
+export { cacheSessionWorkerConfigAfterDeploy } from './sessionWizardSponsoredBundleSupport';
 export {
   buildSessionWizardWorkerRpcUrlMap,
   getSessionWizardWorkerDeployValidationError,
@@ -427,97 +433,9 @@ export const getSessionWizardSecretFieldTestId = (fieldKey: string): string | un
   if (fieldKey === 'litPayerAddress') return E2E_TESTIDS.WIZARD_SECRET_LIT_PAYER_ADDRESS;
   return undefined;
 };
-const resolveSponsoredBundleBootstrapWorkerUrl = (bundle: SponsoredBundleLike = {}): string => normalizeWorkerAuthUrl(toStr(
-  bundle?.bootstrapWorkerUrl ||
-  bundle?.meta?.sourceWorkerUrl ||
-  ''
-).trim());
-const buildSponsoredBundleAppliedStatusMessage = (sponsoredBundle: SponsoredBundleLike = {}): string => {
-  const normalizedBundle = normalizeSparseSponsoredBundlePayload(sponsoredBundle) as SponsoredBundleLike;
-  const appliedLabels = [];
-  if (toStr(normalizedBundle?.openaiKey).trim()) appliedLabels.push('OpenAI key');
-  if (toStr(normalizedBundle?.anthropicKey).trim()) appliedLabels.push('Anthropic key');
-  if (toStr(normalizedBundle?.openrouterKey).trim()) appliedLabels.push('OpenRouter key');
-  if (toStr(normalizedBundle?.arweaveJwk).trim()) appliedLabels.push('Arweave wallet');
-  if (
-    toStr(normalizedBundle?.faucetPrivateKey).trim() ||
-    toStr(normalizedBundle?.faucetGrantToken).trim()
-  ) {
-    appliedLabels.push('faucet funding');
-  }
-  if (toStr(normalizedBundle?.customRpcUrl).trim()) appliedLabels.push('RPC URL');
-  if (
-    toStr(normalizedBundle?.litPayerPrivateKey).trim() ||
-    toStr(normalizedBundle?.litPayerAddress).trim()
-  ) {
-    appliedLabels.push('Lit payer wallet');
-  }
-  if (toStr(normalizedBundle?.deployGrantToken).trim()) appliedLabels.push('deploy access');
-  return appliedLabels.length
-    ? `Sponsored resources applied: ${appliedLabels.join(', ')}.`
-    : 'Sponsored resources applied.';
-};
-const resolveSponsoredBundleAdvancedFieldNotices = ({
-  sponsoredBundle = {},
-  workerSecrets = {},
-  deployForm = {},
-}: {
-  sponsoredBundle?: SponsoredBundleLike;
-  workerSecrets?: WorkerSecretsLike;
-  deployForm?: DeployFormState;
-} = {}) => {
-  const normalizedBundle = normalizeSparseSponsoredBundlePayload(sponsoredBundle) as SponsoredBundleLike;
-  const sponsoredFaucetPrivateKey = toStr(normalizedBundle?.faucetPrivateKey || '').trim();
-  const sponsoredFaucetGrantToken = toStr(normalizedBundle?.faucetGrantToken || '').trim();
-  const currentFaucetPrivateKey = toStr(workerSecrets?.faucetPrivateKey || '').trim();
-  return {
-    showSponsoredFaucetNotice: (
-      !!(sponsoredFaucetPrivateKey || sponsoredFaucetGrantToken) &&
-      (sponsoredFaucetPrivateKey
-        ? currentFaucetPrivateKey === sponsoredFaucetPrivateKey
-        : !currentFaucetPrivateKey)
-    ),
-    showSponsoredDeployAccessNotice: (
-      !!toStr(normalizedBundle?.deployGrantToken || '').trim() &&
-      !toStr(deployForm?.apiToken || '').trim()
-    ),
-  };
-};
 // Normal-mode `/new` should stay bring-your-own-worker until the dedicated
 // shared hosted worker product is implemented.
 const NORMAL_MODE_SHARED_HOSTED_WORKER_ENABLED = false;
-export const cacheSessionWorkerConfigAfterDeploy = ({
-  deployStatusCode,
-  configSyncStatus,
-  workerUrl,
-  slug,
-  sessionIdHex,
-  registryChainId,
-  config,
-}: {
-  deployStatusCode?: unknown;
-  configSyncStatus?: AnyRecord | null;
-  workerUrl?: unknown;
-  slug?: unknown;
-  sessionIdHex?: unknown;
-  registryChainId?: unknown;
-  config?: AnyRecord | null;
-} = {}) => {
-  if (!shouldCacheSessionWorkerConfigAfterDeploy({
-    deployStatusCode,
-    configSyncStatus,
-    workerUrl,
-  })) {
-    return false;
-  }
-  upsertCachedSessionWorkerConfig({
-    slug,
-    sessionIdHex,
-    registryChainId,
-    config,
-  });
-  return true;
-};
 const SPONSORED_MANUAL_BUNDLE_RETRY_MESSAGE = (
   `Sponsored publish still defaults to the GitHub-hosted bundle. Retry with a manual bundle URL or upload a bundle file. ${LOCAL_WORKER_BUNDLE_OPTIONAL_FALLBACK_HELP}`
 );
