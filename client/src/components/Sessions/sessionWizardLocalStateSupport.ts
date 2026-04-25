@@ -6,7 +6,7 @@ import {
   writeSessionWizardDraftCache,
 } from './sessionWizardDraftCache.js';
 import { clearSessionWizardPendingSbtDraftsCache } from './hooks/usePendingSbtDrafts.js';
-import type { AnyRecord, WorkerSecretsLike } from '../shellTypes';
+import type { AnyRecord } from '../shellTypes';
 
 const log = createLogger('general');
 
@@ -33,7 +33,7 @@ export const useStableSerializedObject = (value: AnyRecord | null | undefined): 
 };
 
 type ReadCacheDeps = {
-  readDraftCache?: () => unknown | null;
+  readDraftCache?: typeof readSessionWizardDraftCache;
 };
 
 type LoggerLike = {
@@ -51,44 +51,9 @@ type ClearCacheDeps = {
   logger?: LoggerLike;
 };
 
-export type SessionWizardCachedState = Record<string, unknown> & {
-  defaultGateId?: unknown;
-  deployComplete?: unknown;
-  deployForm?: AnyRecord;
-  deployWorkerUrl?: unknown;
-  draft?: AnyRecord;
-  encryptedFieldGates?: AnyRecord;
-  encryptionGates?: AnyRecord[];
-  featuredDraftGateAutoLink?: unknown;
-  gateSelections?: AnyRecord;
-  lastManualSlug?: unknown;
-  manualGasLimit?: unknown;
-  manualGasPriceGwei?: unknown;
-  manualMaxFeePerGasGwei?: unknown;
-  manualMaxPriorityFeePerGasGwei?: unknown;
-  privateSlugMode?: unknown;
-  provisionedSponsoredContext?: (AnyRecord & {
-    fields?: AnyRecord;
-    sessionSlug?: unknown;
-    workerUrl?: unknown;
-  }) | null;
-  resourceGateMap?: Record<string, string | string[]>;
-  sessionId?: unknown;
-  workerSecrets?: WorkerSecretsLike;
-  workerSecretsEnabled?: unknown;
-  persistWorkerSecrets?: unknown;
-};
-
-const isSessionWizardCachedState = (value: unknown): value is SessionWizardCachedState => (
-  !!value && typeof value === 'object' && !Array.isArray(value)
-);
-
 export const readSessionWizardCache = ({
   readDraftCache = readSessionWizardDraftCache,
-}: ReadCacheDeps = {}): SessionWizardCachedState | null => {
-  const cachedValue = readDraftCache();
-  return isSessionWizardCachedState(cachedValue) ? cachedValue : null;
-};
+}: ReadCacheDeps = {}): unknown | null => readDraftCache();
 
 export const writeSessionWizardCache = (
   payload: unknown,
