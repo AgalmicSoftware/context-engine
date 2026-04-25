@@ -6,7 +6,7 @@ const ENV_KEYS = [
   'REACT_APP_CE_DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED',
 ];
 
-const ORIGINAL_ENV = ENV_KEYS.reduce((acc, key) => {
+const ORIGINAL_ENV = ENV_KEYS.reduce<Record<string, string | undefined>>((acc, key) => {
   acc[key] = process.env[key];
   return acc;
 }, {});

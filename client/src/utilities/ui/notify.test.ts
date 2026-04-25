@@ -1,7 +1,11 @@
 describe('notify', () => {
-  let notify;
-  let mockShowToast;
-  let mockLogger;
+  let notify: typeof import('./notify.js').notify;
+  let mockShowToast: jest.Mock;
+  let mockLogger: {
+    info: jest.Mock;
+    warn: jest.Mock;
+    error: jest.Mock;
+  };
 
   beforeEach(() => {
     jest.resetModules();
@@ -13,7 +17,7 @@ describe('notify', () => {
     };
 
     jest.doMock('./toastBus.js', () => ({
-      showToast: (...args) => mockShowToast(...args),
+      showToast: (...args: unknown[]) => mockShowToast(...args),
     }));
 
     jest.doMock('../logging', () => ({
