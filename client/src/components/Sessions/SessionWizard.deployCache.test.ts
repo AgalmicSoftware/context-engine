@@ -1,8 +1,10 @@
 import {
   cacheSessionWorkerConfigAfterDeploy,
+} from './SessionWizard';
+import {
   resolveDeployWorkerState,
   shouldCacheSessionWorkerConfigAfterDeploy,
-} from './SessionWizard';
+} from './sessionWizardWorkerState';
 import { readSessionWorkerConfigCache } from '../../utilities/session/sessionWorkerConfigCache.js';
 
 describe('SessionWizard deploy cache authority', () => {
