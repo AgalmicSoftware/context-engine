@@ -15,7 +15,7 @@ export const KNOWN_ROUTE_PREFIXES = new Set([
 ]);
 
 /** Routes that render without waiting for cache hydration */
-export function isStaticNonCacheRoute(path) {
+export function isStaticNonCacheRoute(path: string) {
   return (
     path === '/debate' || path === '/debate/' ||
     path.startsWith('/tag/') ||
