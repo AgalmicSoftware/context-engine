@@ -15,28 +15,29 @@ const mockEncryptWithPassword = jest.fn();
 const mockDecryptWithPassword = jest.fn();
 const mockUploadDataToArweave = jest.fn();
 const mockDownloadDataFromArweave = jest.fn();
+const env = process.env as Record<string, string | undefined>;
 
 jest.mock('../crypto/cryptography.js', () => ({
   cryptoUtils: {
-    encryptWithPassword: (...args) => mockEncryptWithPassword(...args),
-    decryptWithPassword: (...args) => mockDecryptWithPassword(...args),
+    encryptWithPassword: (...args: unknown[]) => mockEncryptWithPassword(...args),
+    decryptWithPassword: (...args: unknown[]) => mockDecryptWithPassword(...args),
   },
 }));
 
 jest.mock('./arweaveScripts.js', () => ({
   arweaveScripts: {
-    uploadDataToArweave: (...args) => mockUploadDataToArweave(...args),
-    downloadDataFromArweave: (...args) => mockDownloadDataFromArweave(...args),
+    uploadDataToArweave: (...args: unknown[]) => mockUploadDataToArweave(...args),
+    downloadDataFromArweave: (...args: unknown[]) => mockDownloadDataFromArweave(...args),
   },
 }));
 
 describe('sponsoredBundles', () => {
-  const originalPublicUrl = process.env.PUBLIC_URL;
+  const originalPublicUrl = env.PUBLIC_URL;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    if (originalPublicUrl === undefined) delete process.env.PUBLIC_URL;
-    else process.env.PUBLIC_URL = originalPublicUrl;
+    if (originalPublicUrl === undefined) delete env.PUBLIC_URL;
+    else env.PUBLIC_URL = originalPublicUrl;
     mockEncryptWithPassword.mockResolvedValue('encrypted-base64');
     mockDecryptWithPassword.mockResolvedValue({
       openaiKey: 'sk-openai',
@@ -61,8 +62,8 @@ describe('sponsoredBundles', () => {
   });
 
   afterAll(() => {
-    if (originalPublicUrl === undefined) delete process.env.PUBLIC_URL;
-    else process.env.PUBLIC_URL = originalPublicUrl;
+    if (originalPublicUrl === undefined) delete env.PUBLIC_URL;
+    else env.PUBLIC_URL = originalPublicUrl;
   });
 
   it('builds the expected sponsored URL shape', () => {
@@ -74,7 +75,7 @@ describe('sponsoredBundles', () => {
   });
 
   it('prepends PUBLIC_URL when building the default sponsored route', () => {
-    process.env.PUBLIC_URL = '/ce/';
+    env.PUBLIC_URL = '/ce/';
 
     expect(buildSponsoredSessionUrl({
       txId: 'arweave_tx_id',
@@ -141,10 +142,10 @@ describe('sponsoredBundles', () => {
     const originalCrypto = globalThis.crypto;
 
     try {
-      global.Buffer = undefined;
+      (global as any).Buffer = undefined;
       Object.defineProperty(globalThis, 'crypto', {
         value: {
-          getRandomValues: (bytes) => {
+          getRandomValues: (bytes: Uint8Array) => {
             bytes.fill(7);
             return bytes;
           },
