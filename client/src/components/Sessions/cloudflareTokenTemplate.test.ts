@@ -16,7 +16,7 @@ describe('cloudflareTokenTemplate', () => {
     expect(url.searchParams.get('name')).toMatch(
       /^contextEngine-corsSessionWorker-alpha-session-[A-Z]{3}\d{2}-\d{4}-\d{4}(AM|PM)$/
     );
-    expect(JSON.parse(url.searchParams.get('permissionGroupKeys'))).toEqual([
+    expect(JSON.parse(url.searchParams.get('permissionGroupKeys') || '[]')).toEqual([
       { key: 'workers_kv_storage', type: 'edit' },
       { key: 'workers_scripts', type: 'edit' },
       { key: 'account_settings', type: 'edit' },

@@ -40,7 +40,7 @@ describe('useSessionSlugState', () => {
 
   it('resets checking slug availability back to idle', () => {
     jest.useFakeTimers();
-    const sessionExists = jest.fn(() => new Promise(() => {}));
+    const sessionExists = jest.fn(() => new Promise<boolean>(() => {}));
     const { result } = renderHook(() => useSessionSlugState({
       slug: 'available-session',
       privateSlugMode: false,
