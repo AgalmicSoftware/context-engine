@@ -53,7 +53,6 @@ import contractScripts, {
 import { seedGenPrompt } from '../../prompts/seedGenPrompt.js';
 import {
   DEFAULT_SESSION_SLUG,
-  CLOUDFLARE_CORS_WORKER_URL,
   CLOUDFLARE_DEPLOY_HELPER_URL,
   CLOUDFLARE_WORKER_BUNDLE_URL,
   CE_DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED,
@@ -80,10 +79,7 @@ import {
 import { normalizeArweaveUrl } from '../../utilities/arweave/arweaveUrls.js';
 import { normalizeBlockLimitsForConfig } from '../../utilities/session/blockLimits.js';
 import { normalizeBaseUrl, normalizeOriginList } from '../../utilities/urlUtils.js';
-import {
-  buildWorkerAllowOrigins,
-  DEFAULT_WORKER_ALLOWED_ORIGINS,
-} from '../../utilities/worker/workerCorsOrigins.js';
+import { DEFAULT_WORKER_ALLOWED_ORIGINS } from '../../utilities/worker/workerCorsOrigins.js';
 import { t } from '../../utilities/ui/terminology.js';
 import {
   buildSponsoredFlagFields as buildSponsoredSessionFlagFields,
@@ -171,6 +167,20 @@ import {
   shouldCacheSessionWorkerConfigAfterDeploy,
 } from './sessionWizardWorkerState';
 import {
+  buildSessionWizardDefaultAllowedOrigins,
+  getSessionWizardDefaultWorkerUrl,
+  isSessionWizardDefaultWorkerPlaceholderUrl,
+} from './sessionWizardWorkerDefaults';
+import {
+  AI_PROVIDER_OPTIONS,
+  DEFAULT_AI_MODELS,
+  getAiModelOptions,
+  normalizeAiModelForProvider,
+  normalizeAiModels,
+  normalizeAiProvider,
+  resolveSessionWizardAutoFeatureBySessionSlug,
+} from './sessionWizardAiConfig';
+import {
   buildSessionWizardWorkerRpcUrlMap,
   getSessionWizardWorkerDeployValidationError,
   resolveFallbackRpcUrl,
@@ -217,6 +227,7 @@ export {
   resolveSessionWizardWorkerVerificationUiState,
   shouldCacheSessionWorkerConfigAfterDeploy,
 } from './sessionWizardWorkerState';
+export { buildSessionWizardDefaultAllowedOrigins } from './sessionWizardWorkerDefaults';
 export {
   buildSessionWizardWorkerRpcUrlMap,
   getSessionWizardWorkerDeployValidationError,
@@ -506,25 +517,6 @@ export const cacheSessionWorkerConfigAfterDeploy = ({
   });
   return true;
 };
-const getDefaultWorkerUrl = () => (
-  toStr(CLOUDFLARE_CORS_WORKER_URL).trim()
-);
-const isDefaultWorkerPlaceholderUrl = (workerUrl: unknown, fallbackWorkerUrl = getDefaultWorkerUrl()): boolean => {
-  const normalizedWorkerUrl = normalizeWorkerAuthUrl(toStr(workerUrl).trim());
-  const normalizedFallbackUrl = normalizeWorkerAuthUrl(toStr(fallbackWorkerUrl).trim());
-  return !!normalizedWorkerUrl && !!normalizedFallbackUrl && normalizedWorkerUrl === normalizedFallbackUrl;
-};
-const getCurrentOrigin = () => (
-  typeof window !== 'undefined' && window.location
-    ? toStr(window.location.origin).trim()
-    : ''
-);
-export const buildSessionWizardDefaultAllowedOrigins = (currentOrigin = getCurrentOrigin()) => (
-  buildWorkerAllowOrigins({
-    currentOrigin,
-    extraOrigins: DEFAULT_WORKER_ALLOWED_ORIGINS,
-  })
-);
 const SPONSORED_MANUAL_BUNDLE_RETRY_MESSAGE = (
   `Sponsored publish still defaults to the GitHub-hosted bundle. Retry with a manual bundle URL or upload a bundle file. ${LOCAL_WORKER_BUNDLE_OPTIONAL_FALLBACK_HELP}`
 );
@@ -533,56 +525,7 @@ export const __test__isSessionWizardDevMode = (
 ): boolean => toStr(proc?.env?.NODE_ENV).trim().toLowerCase() !== 'production';
 
 const DEV_PERSIST_WORKER_SECRETS = __test__isSessionWizardDevMode();
-const normalizeAiProvider = (value: unknown, fallback = 'openai'): string => {
-  const lowered = toStr(value).trim().toLowerCase();
-  return lowered || fallback;
-};
-const normalizeAiModelEntry = (
-  entry: AnyRecord | string | null | undefined,
-  fallbackModel: string,
-  fallbackProvider: string
-): { model: string; provider: string } => {
-  if (entry && typeof entry === 'object') {
-    const model = toStr(entry.model || entry.name || entry.value || fallbackModel).trim();
-    const provider = normalizeAiProvider(entry.provider, fallbackProvider);
-    return { model: model || fallbackModel || '', provider };
-  }
-  const model = toStr(entry || fallbackModel).trim();
-  return { model: model || fallbackModel || '', provider: normalizeAiProvider(fallbackProvider) };
-};
-const normalizeAiTranscriptionEntry = (entry: AnyRecord | null | undefined): AnyRecord => {
-  const obj: AnyRecord = entry && typeof entry === 'object' ? entry : {};
-  return {
-    provider: normalizeAiProvider(obj.provider || 'openai'),
-    model: toStr(obj.model || 'whisper-1').trim(),
-    rpcUrl: toStr(obj.rpcUrl || '').trim(),
-  };
-};
-const normalizeAiModels = (
-  raw: AnyRecord | null | undefined,
-  fallbackProvider: string,
-  transcriptionRaw: AnyRecord | null | undefined
-): AnyRecord => {
-  const obj: AnyRecord = raw && typeof raw === 'object' ? raw : {};
-  const transcriptionSource = transcriptionRaw && typeof transcriptionRaw === 'object'
-    ? transcriptionRaw
-    : obj.transcription;
-  return {
-    fast: normalizeAiModelEntry(obj.fast || obj.default, DEFAULT_AI_MODELS.fast, fallbackProvider),
-    thinking: normalizeAiModelEntry(obj.thinking || obj.reasoning, DEFAULT_AI_MODELS.thinking, fallbackProvider),
-    transcription: normalizeAiTranscriptionEntry(transcriptionSource),
-  };
-};
-const DEFAULT_AI_MODELS = Object.freeze({
-  fast: 'gpt-5',
-  thinking: 'gpt-5',
-});
 const DEFAULT_NEW_SESSION_SBT_TAGS = 'group, event, idea, demographic, location';
-const resolveAutoFeatureBySessionSlug = (metadata: AnyRecord | null | undefined) => (
-  metadata?.autoFeatureSBTsBySessionSlug !== undefined
-    ? metadata.autoFeatureSBTsBySessionSlug
-    : metadata?.autoFeatureSBTsWithFeaturedSbtTags
-);
 const METADATA_FIELD_ORDER = [
   'networkChainId',
   'sessionId',
@@ -1444,7 +1387,7 @@ const normalizeDraftShape = (draftIn: AnyRecord = {}): DraftState => {
   if (!toStr(draft.faucet.rpcUrl).trim()) {
     draft.faucet.rpcUrl = getDefaultHttpRpc(chainId) || draft.faucet.rpcUrl;
   }
-  const resolvedAutoFeature = resolveAutoFeatureBySessionSlug(draft);
+  const resolvedAutoFeature = resolveSessionWizardAutoFeatureBySessionSlug(draft);
   delete draft.autoFeatureSBTsWithFeaturedSbtTags;
   if (typeof resolvedAutoFeature !== 'boolean') {
     draft.autoFeatureSBTsBySessionSlug = true;
@@ -1688,42 +1631,6 @@ export const resolveSessionWizardLitPaymentDelegation = ({
     },
     workerUrl: resolvedWorkerUrl,
   };
-};
-const AI_PROVIDER_OPTIONS = [
-  { value: 'openai', label: 'OpenAI' },
-  { value: 'anthropic', label: 'Anthropic' },
-  { value: 'openrouter', label: 'OpenRouter', disabled: true },
-  { value: 'custom', label: 'Custom', disabled: true },
-];
-const AI_MODEL_OPTIONS = Object.freeze({
-  anthropic: {
-    fast: ['claude-sonnet-4-5-20250929', 'claude-3-5-sonnet-20240620'],
-    thinking: ['claude-3-5-sonnet-20240620', 'claude-sonnet-4-5-20250929'],
-  },
-  openai: {
-    fast: ['gpt-5', 'gpt-4o', 'gpt-4o-mini', 'o3-mini'],
-    thinking: ['gpt-5', 'o3-mini', 'gpt-4o', 'gpt-4o-mini'],
-  },
-  openrouter: {
-    fast: [],
-    thinking: [],
-  },
-  custom: {
-    fast: [],
-    thinking: [],
-  },
-  transcription: ['whisper-1'],
-});
-const getAiModelOptions = (modelType, providerValue) => {
-  if (modelType === 'transcription') return AI_MODEL_OPTIONS.transcription;
-  const provider = normalizeAiProvider(providerValue, 'openai');
-  return AI_MODEL_OPTIONS[provider]?.[modelType] || AI_MODEL_OPTIONS.openai[modelType] || [];
-};
-const normalizeAiModelForProvider = (modelType, providerValue, modelValue) => {
-  const options = getAiModelOptions(modelType, providerValue);
-  const model = toStr(modelValue).trim();
-  if (!options.length) return model;
-  return options.includes(model) ? model : options[0];
 };
 const ONCHAIN_FIELD_PATHS = SESSION_WIZARD_ONCHAIN_COMPAT_FIELD_PATHS;
 const ONCHAIN_FIELD_KEYS = new Set(Object.keys(ONCHAIN_FIELD_PATHS));
@@ -2971,7 +2878,7 @@ const SessionWizard = ({
   }, [draft.sessionName, deployForm.workerName]);
 
   useEffect(() => {
-    const defaultUrl = getDefaultWorkerUrl();
+    const defaultUrl = getSessionWizardDefaultWorkerUrl();
     const current = toStr(draft.corsWorkerUrl).trim();
     if (current && defaultUrl && current !== defaultUrl) {
       setWorkerMode('custom');
@@ -2989,7 +2896,7 @@ const SessionWizard = ({
 
   useEffect(() => {
     if (wizardMode !== 'normal' || NORMAL_MODE_SHARED_HOSTED_WORKER_ENABLED) return;
-    const fallbackUrl = normalizeWorkerAuthUrl(getDefaultWorkerUrl());
+    const fallbackUrl = normalizeWorkerAuthUrl(getSessionWizardDefaultWorkerUrl());
     const configuredUrl = normalizeWorkerAuthUrl(toStr(draft.corsWorkerUrl).trim());
     if (workerMode === 'default') {
       setWorkerMode('custom');
@@ -5110,7 +5017,7 @@ const SessionWizard = ({
     if (!metadata.sessionName) delete metadata.sessionName;
     if (!metadata.sessionInfo) delete metadata.sessionInfo;
     metadata.slug = normalizeSlug(metadata.slug);
-    const resolvedAutoFeature = resolveAutoFeatureBySessionSlug(metadata);
+    const resolvedAutoFeature = resolveSessionWizardAutoFeatureBySessionSlug(metadata);
     delete metadata.autoFeatureSBTsWithFeaturedSbtTags;
     if (resolvedAutoFeature !== undefined) {
       metadata.autoFeatureSBTsBySessionSlug = resolvedAutoFeature;
@@ -5869,13 +5776,13 @@ const SessionWizard = ({
   };
 
   const resolveWorkerBaseUrl = () => {
-    const fallbackWorkerUrl = getDefaultWorkerUrl();
+    const fallbackWorkerUrl = getSessionWizardDefaultWorkerUrl();
     const configuredWorkerUrl = toStr(draft.corsWorkerUrl).trim();
     const effectiveConfiguredWorkerUrl = (
       wizardMode === 'normal' &&
       !NORMAL_MODE_SHARED_HOSTED_WORKER_ENABLED &&
       !deployComplete &&
-      isDefaultWorkerPlaceholderUrl(configuredWorkerUrl, fallbackWorkerUrl)
+      isSessionWizardDefaultWorkerPlaceholderUrl(configuredWorkerUrl, fallbackWorkerUrl)
     )
       ? ''
       : configuredWorkerUrl;
@@ -6675,7 +6582,7 @@ const SessionWizard = ({
 
   const resolvedWorkerBaseUrl = resolveWorkerBaseUrl();
   const configuredWorkerUrl = normalizeWorkerUrl(toStr(draft.corsWorkerUrl).trim());
-  const defaultWorkerUrl = normalizeWorkerUrl(getDefaultWorkerUrl());
+  const defaultWorkerUrl = normalizeWorkerUrl(getSessionWizardDefaultWorkerUrl());
   const deployedWorkerUrl = normalizeWorkerUrl(toStr(deployWorkerUrl).trim());
   const normalModeRequiresCustomWorker = isNormalMode && !NORMAL_MODE_SHARED_HOSTED_WORKER_ENABLED;
   const {
@@ -6691,7 +6598,7 @@ const SessionWizard = ({
   const customWorkerSelected = normalModeRequiresCustomWorker || workerMode !== 'default';
   const hideNormalModeDefaultWorkerUrl = normalModeRequiresCustomWorker &&
     !deployVerifiedInUi &&
-    isDefaultWorkerPlaceholderUrl(configuredWorkerUrl, defaultWorkerUrl);
+    isSessionWizardDefaultWorkerPlaceholderUrl(configuredWorkerUrl, defaultWorkerUrl);
   const visibleConfiguredWorkerUrl = hideNormalModeDefaultWorkerUrl ? '' : effectiveConfiguredWorkerUrl;
   const displayedWorkerUrl = hideNormalModeDefaultWorkerUrl
     ? ''
@@ -7356,7 +7263,7 @@ const SessionWizard = ({
           onWorkerModeChange={setWorkerMode}
           setWorkerUrlAutoFilled={setWorkerUrlAutoFilled}
           updateDraftValue={updateDraftValue}
-          getDefaultWorkerUrl={getDefaultWorkerUrl}
+          getDefaultWorkerUrl={getSessionWizardDefaultWorkerUrl}
           draft={draft}
           deployWorkerUrl={deployWorkerUrl}
           deployComplete={deployComplete}
