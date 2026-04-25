@@ -15,18 +15,19 @@ import type {
 type SponsoredBundleLike = AnyRecord & {
   meta?: AnyRecord;
 };
-type SponsoredBundleInput = SponsoredBundleLike | null | undefined;
 
-export const resolveSponsoredBundleBootstrapWorkerUrl = (bundle: SponsoredBundleInput = {}): string => normalizeWorkerAuthUrl(toStr(
+export const resolveSponsoredBundleBootstrapWorkerUrl = (bundle: SponsoredBundleLike = {}): string => normalizeWorkerAuthUrl(toStr(
   bundle?.bootstrapWorkerUrl ||
   bundle?.meta?.sourceWorkerUrl ||
   ''
 ).trim());
 
-export const buildSponsoredBundleAppliedStatusMessage = (sponsoredBundle: SponsoredBundleInput = {}): string => {
+export const buildSponsoredBundleAppliedStatusMessage = (sponsoredBundle: SponsoredBundleLike = {}): string => {
   const normalizedBundle = normalizeSparseSponsoredBundlePayload(sponsoredBundle) as SponsoredBundleLike;
   const appliedLabels = [];
   if (toStr(normalizedBundle?.openaiKey).trim()) appliedLabels.push('OpenAI key');
+  if (toStr(normalizedBundle?.anthropicKey).trim()) appliedLabels.push('Anthropic key');
+  if (toStr(normalizedBundle?.openrouterKey).trim()) appliedLabels.push('OpenRouter key');
   if (toStr(normalizedBundle?.arweaveJwk).trim()) appliedLabels.push('Arweave wallet');
   if (
     toStr(normalizedBundle?.faucetPrivateKey).trim() ||
@@ -36,15 +37,11 @@ export const buildSponsoredBundleAppliedStatusMessage = (sponsoredBundle: Sponso
   }
   if (toStr(normalizedBundle?.customRpcUrl).trim()) appliedLabels.push('RPC URL');
   if (
-    toStr(normalizedBundle?.litApiBase).trim() ||
-    toStr(normalizedBundle?.litGroupId).trim() ||
-    toStr(normalizedBundle?.litPkpId).trim() ||
-    toStr(normalizedBundle?.litActionCid).trim()
+    toStr(normalizedBundle?.litPayerPrivateKey).trim() ||
+    toStr(normalizedBundle?.litPayerAddress).trim()
   ) {
-    appliedLabels.push('Lit Chipotle config');
+    appliedLabels.push('Lit payer wallet');
   }
-  if (toStr(normalizedBundle?.litAccountApiKey).trim()) appliedLabels.push('Lit API key');
-  if (toStr(normalizedBundle?.litUsageApiKey).trim()) appliedLabels.push('Lit usage key');
   if (toStr(normalizedBundle?.deployGrantToken).trim()) appliedLabels.push('deploy access');
   return appliedLabels.length
     ? `Sponsored resources applied: ${appliedLabels.join(', ')}.`
@@ -56,7 +53,7 @@ export const resolveSponsoredBundleAdvancedFieldNotices = ({
   workerSecrets = {},
   deployForm = {},
 }: {
-  sponsoredBundle?: SponsoredBundleInput;
+  sponsoredBundle?: SponsoredBundleLike;
   workerSecrets?: WorkerSecretsLike | AnyRecord;
   deployForm?: AnyRecord;
 } = {}) => {

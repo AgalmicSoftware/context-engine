@@ -1,6 +1,6 @@
 import {
   cacheSessionWorkerConfigAfterDeploy,
-} from './SessionWizard';
+} from './sessionWizardSponsoredBundleSupport';
 import {
   resolveDeployWorkerState,
   shouldCacheSessionWorkerConfigAfterDeploy,
