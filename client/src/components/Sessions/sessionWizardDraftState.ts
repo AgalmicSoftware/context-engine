@@ -18,7 +18,6 @@ import {
   normalizeAiProvider,
   resolveSessionWizardAutoFeatureBySessionSlug,
 } from './sessionWizardAiConfig';
-import { normalizeSessionStorageProfileConfig } from './sessionWizardStorageProfile';
 import type { AnyRecord } from '../shellTypes';
 
 const { getPathRpcUrl } = rpcDefaults;
@@ -26,31 +25,12 @@ const { getPathRpcUrl } = rpcDefaults;
 export const DEFAULT_NEW_SESSION_SBT_TAGS = 'group, event, idea, demographic, location';
 
 const deepClone = <T,>(obj: T): T => JSON.parse(JSON.stringify(obj ?? {}));
-const mergeSessionWizardDraftDeep = (target: AnyRecord, source: AnyRecord): AnyRecord => {
-  const out: AnyRecord = { ...(target || {}) };
-  Object.entries(source || {}).forEach(([key, value]) => {
-    if (value && typeof value === 'object' && !Array.isArray(value)) {
-      out[key] = mergeSessionWizardDraftDeep(out[key] as AnyRecord || {}, value as AnyRecord);
-    } else {
-      out[key] = value;
-    }
-  });
-  return out;
-};
 
 export const normalizeSessionWizardDraftShape = (draftIn: AnyRecord = {}): AnyRecord => {
   const draft = normalizeSessionNaming(draftIn && typeof draftIn === 'object' ? draftIn : {}) as AnyRecord;
   const chainId = Number(draft.networkChainId || DEFAULT_CHAIN_ID || 0) || DEFAULT_CHAIN_ID;
   draft.sessionName = toStr(draft.sessionName || '').trim();
   draft.sessionInfo = toStr(draft.sessionInfo || '').trim();
-  draft.telegramOnly = draft.telegramOnly === true ||
-    draft.telegram_only === true ||
-    draft.sessionMode === 'telegram_only' ||
-    draft.telegramMode === 'telegram_only' ||
-    draft.telegram?.mode === 'telegram_only' ||
-    draft.telegram?.only === true;
-  delete draft.telegram_only;
-  delete draft.telegramMode;
   if (!draft.sessionInfoEncrypted) {
     delete draft.sessionInfoEncrypted;
   }
@@ -115,9 +95,6 @@ export const normalizeSessionWizardDraftShape = (draftIn: AnyRecord = {}): AnyRe
   if (typeof draft.embeddedDeployHelperEnabled !== 'boolean') {
     draft.embeddedDeployHelperEnabled = CE_DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED !== false;
   }
-  draft.storageProfile = normalizeSessionStorageProfileConfig(draft.storageProfile || draft.sessionStorageProfile || draft.storage);
-  delete draft.sessionStorageProfile;
-  delete draft.storage;
 
   return normalizeLitMetadataNetwork(draft) as AnyRecord;
 };
@@ -129,7 +106,6 @@ export const buildSessionWizardDefaultTemplate = (): AnyRecord => {
   draft.sessionName = '';
   draft.sessionInfo = '';
   draft.sessionHeader = '';
-  draft.telegramOnly = false;
   delete draft.sessionHeaderImg;
   delete draft.sessionInfoEncrypted;
   draft.corsWorkerUrl = '';
@@ -145,7 +121,6 @@ export const buildSessionWizardDefaultTemplate = (): AnyRecord => {
   draft.litCredentials = {};
   draft.perMemberSpendLimits = draft.perMemberSpendLimits || { ai: '', arweave: '', txGas: '' };
   draft.arweave = draft.arweave || { jwk: '', encryptedJwk: '' };
-  draft.storageProfile = normalizeSessionStorageProfileConfig(draft.storageProfile);
   draft.faucet = draft.faucet || {
     rpcUrl: '',
     amountEth: '0.0002',
@@ -182,176 +157,4 @@ export const buildSessionWizardDefaultTemplate = (): AnyRecord => {
     draft.lit.defaultGateId = 'gate-1';
   }
   return normalizeSessionWizardDraftShape(draft);
-};
-
-export const buildSessionWizardInitialDraftFromCache = ({
-  cachedWizard = null,
-  defaultTemplate = buildSessionWizardDefaultTemplate(),
-  normalModeSharedHostedWorkerEnabled = true,
-  sourceEmbeddedDeployHelperDefault = null,
-}: {
-  cachedWizard?: AnyRecord | null;
-  defaultTemplate?: AnyRecord;
-  normalModeSharedHostedWorkerEnabled?: unknown;
-  sourceEmbeddedDeployHelperDefault?: unknown;
-} = {}): AnyRecord => {
-  const cachedDraft = (
-    cachedWizard?.draft &&
-    typeof cachedWizard.draft === 'object'
-  ) ? cachedWizard.draft as AnyRecord : null;
-  const cachedDraftHasEmbeddedDeployHelperEnabled = (
-    typeof cachedDraft?.embeddedDeployHelperEnabled === 'boolean'
-  );
-  const base = deepClone(defaultTemplate || {});
-  if (
-    !cachedDraftHasEmbeddedDeployHelperEnabled &&
-    typeof sourceEmbeddedDeployHelperDefault === 'boolean'
-  ) {
-    base.embeddedDeployHelperEnabled = sourceEmbeddedDeployHelperDefault;
-  }
-  const merged = cachedDraft ? mergeSessionWizardDraftDeep(base, cachedDraft) : base;
-  const normalized = normalizeSessionWizardDraftShape(merged);
-  if (normalModeSharedHostedWorkerEnabled === false && !cachedWizard?.deployComplete) {
-    normalized.corsWorkerUrl = '';
-  }
-  return normalized;
-};
-
-export const applySessionWizardRegistryChainDraftDefaults = ({
-  draft = {},
-  chainId = 0,
-  contractDefaults = {},
-  pathRpc = '',
-}: {
-  draft?: AnyRecord | null;
-  chainId?: unknown;
-  contractDefaults?: AnyRecord | null;
-  pathRpc?: unknown;
-} = {}): AnyRecord => {
-  const resolvedChainId = Number(chainId || 0) || 0;
-  const next = deepClone((draft && typeof draft === 'object') ? draft : {}) as AnyRecord;
-  if (!resolvedChainId) return next;
-
-  if (Number(next.networkChainId || 0) !== resolvedChainId) {
-    next.networkChainId = resolvedChainId;
-  }
-
-  const defaults = (contractDefaults && typeof contractDefaults === 'object') ? contractDefaults : {};
-  const contracts = (next.contracts && typeof next.contracts === 'object') ? next.contracts as AnyRecord : {};
-  next.contracts = contracts;
-  const keys = new Set([
-    ...Object.keys(contracts || {}),
-    ...Object.keys(defaults || {}),
-  ]);
-  keys.forEach((key) => {
-    const entry = (
-      contracts[key] &&
-      typeof contracts[key] === 'object'
-    ) ? contracts[key] as AnyRecord : {};
-    const fallback = toStr(defaults[key] || '').trim();
-    if (fallback) {
-      entry.address = fallback;
-    }
-    entry.chainId = resolvedChainId;
-    contracts[key] = entry;
-  });
-
-  const resolvedPathRpc = toStr(pathRpc).trim();
-  if (resolvedPathRpc) {
-    const rpc = (next.rpc && typeof next.rpc === 'object') ? next.rpc as AnyRecord : {};
-    next.rpc = rpc;
-    if (!toStr(rpc.provider).trim()) {
-      rpc.provider = 'path';
-    }
-    const rpcProviders = (rpc.providers && typeof rpc.providers === 'object') ? rpc.providers as AnyRecord : {};
-    rpc.providers = rpcProviders;
-    const pathProvider = (
-      rpcProviders.path &&
-      typeof rpcProviders.path === 'object'
-    ) ? rpcProviders.path as AnyRecord : {};
-    rpcProviders.path = pathProvider;
-    if (!toStr(pathProvider.rpcUrl).trim()) {
-      pathProvider.rpcUrl = resolvedPathRpc;
-    }
-
-    const faucet = (next.faucet && typeof next.faucet === 'object') ? next.faucet as AnyRecord : {};
-    next.faucet = faucet;
-    if (!toStr(faucet.rpcUrl).trim()) {
-      faucet.rpcUrl = resolvedPathRpc;
-    }
-  }
-
-  return next;
-};
-
-export const buildSessionWizardCacheWritePayload = ({
-  sessionId = '',
-  draft = {},
-  privateSlugMode = false,
-  lastManualSlug = '',
-  encryptionGates = [],
-  encryptedFieldGates = {},
-  gateSelections = {},
-  defaultGateId = '',
-  featuredDraftGateAutoLink = null,
-  resourceGateMap = {},
-  manualGasLimit = '',
-  manualGasPriceGwei = '',
-  manualMaxFeePerGasGwei = '',
-  manualMaxPriorityFeePerGasGwei = '',
-  workerSecretsEnabled = true,
-  effectivePersistWorkerSecrets = false,
-  workerSecrets = {},
-  deployForm = {},
-  deployComplete = false,
-  deployWorkerUrl = '',
-  provisionedSponsoredContext = null,
-}: AnyRecord = {}): AnyRecord => {
-  const workerSecretsRecord = (
-    workerSecrets &&
-    typeof workerSecrets === 'object' &&
-    !Array.isArray(workerSecrets)
-  ) ? workerSecrets as AnyRecord : {};
-  const redactedSecrets: AnyRecord = {};
-  Object.keys(workerSecretsRecord).forEach((key) => {
-    redactedSecrets[key] = workerSecretsRecord[key] ? '[redacted]' : '';
-  });
-  const deployFormRecord = (
-    deployForm &&
-    typeof deployForm === 'object' &&
-    !Array.isArray(deployForm)
-  ) ? deployForm as AnyRecord : {};
-  const durableDeployForm = {
-    workerName: toStr(deployFormRecord.workerName || '').trim(),
-    adminAddress: toStr(deployFormRecord.adminAddress || '').trim() || undefined,
-    accountId: toStr(deployFormRecord.accountId || '').trim(),
-    bundleUrl: toStr(deployFormRecord.bundleUrl || '').trim(),
-  };
-
-  return {
-    sessionId,
-    draft,
-    privateSlugMode,
-    lastManualSlug,
-    encryptionGates,
-    // Regression guard: pending CREATE2 SBT drafts remain sessionStorage-only;
-    // this durable wizard cache must not turn them into long-lived local data.
-    pendingSbtDrafts: [],
-    encryptedFieldGates,
-    gateSelections,
-    defaultGateId,
-    featuredDraftGateAutoLink,
-    resourceGateMap,
-    manualGasLimit,
-    manualGasPriceGwei,
-    manualMaxFeePerGasGwei,
-    manualMaxPriorityFeePerGasGwei,
-    workerSecretsEnabled,
-    persistWorkerSecrets: !!effectivePersistWorkerSecrets,
-    workerSecrets: effectivePersistWorkerSecrets ? workerSecretsRecord : redactedSecrets,
-    deployForm: durableDeployForm,
-    deployComplete,
-    deployWorkerUrl,
-    provisionedSponsoredContext,
-  };
 };
