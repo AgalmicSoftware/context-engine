@@ -16,6 +16,7 @@ import FeaturedSbtField from './FeaturedSbtField';
 import ContractsSection from './ContractsSection';
 import EncryptionPanel from './EncryptionPanel';
 import WorkerPanel, { type WorkerPanelProps } from './WorkerPanel';
+import WorkerDeployHelperToggle from './WorkerDeployHelperToggle';
 import WorkerResourceCard from './WorkerResourceCard';
 import WorkerResourceInputs from './WorkerResourceInputs';
 import { finalizeDeferredCreateSbtDraftUpload } from '../SBTs/CreateSBTGroup';
@@ -7268,27 +7269,6 @@ const SessionWizard = ({
     );
   };
 
-  const renderEmbeddedDeployHelperToggle = () => (
-    <FormGroup className={styles.bundleToggleGroup}>
-      <Label className={styles.workerToggle}>
-        <Input
-          type="checkbox"
-          checked={embeddedDeployHelperEnabled}
-          data-testid={E2E_TESTIDS.WIZARD_EMBEDDED_DEPLOY_HELPER_ENABLED}
-          onChange={(e) => updateDraftValue(['embeddedDeployHelperEnabled'], !!e.target.checked)}
-        />
-        <span>Enable embedded deploy-helper on this worker</span>
-        {renderSessionWizardInfoTooltip({
-          id: 'gw-embedded-deploy-helper-tip',
-          content: 'Lets this session worker handle sponsored bootstrap deploys locally first. Turn it off to reduce surface area and force sponsored deploys to fall back to the standalone helper URL.',
-          placement: 'right',
-          testId: 'ce-wizard-worker-tooltip-gw-embedded-deploy-helper-tip',
-          ariaLabel: 'Embedded deploy-helper info',
-        })}
-      </Label>
-    </FormGroup>
-  );
-
   const orderedDraftEntries = useMemo(
     () => getSessionWizardOrderedDraftEntries(draft),
     [draft]
@@ -8014,7 +7994,13 @@ const SessionWizard = ({
           defaultAllowedOrigins={DEFAULT_ALLOWED_ORIGINS}
           shouldUseSponsoredAutoDeployFlow={shouldUseSponsoredAutoDeployFlow}
           deployForm={deployForm}
-          renderEmbeddedDeployHelperToggle={renderEmbeddedDeployHelperToggle}
+          deployHelperToggle={(
+            <WorkerDeployHelperToggle
+              checked={embeddedDeployHelperEnabled}
+              onChange={(nextValue) => updateDraftValue(['embeddedDeployHelperEnabled'], nextValue)}
+              renderInfoTooltip={renderSessionWizardInfoTooltip}
+            />
+          )}
           shouldShowDeployHelperUrlInput={shouldShowDeployHelperUrlInput}
           deployHelperUrl={deployHelperUrl}
           setDeployHelperUrl={setDeployHelperUrl}

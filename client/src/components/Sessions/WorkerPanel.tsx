@@ -65,7 +65,7 @@ export type WorkerPanelProps = {
   defaultAllowedOrigins: string;
   shouldUseSponsoredAutoDeployFlow: boolean;
   deployForm?: DeployForm;
-  renderEmbeddedDeployHelperToggle?: () => React.ReactNode;
+  deployHelperToggle?: React.ReactNode;
   shouldShowDeployHelperUrlInput: boolean;
   deployHelperUrl: string;
   setDeployHelperUrl: (value: string) => void;
@@ -128,7 +128,7 @@ const WorkerPanel = ({
   defaultAllowedOrigins,
   shouldUseSponsoredAutoDeployFlow,
   deployForm = {},
-  renderEmbeddedDeployHelperToggle,
+  deployHelperToggle,
   shouldShowDeployHelperUrlInput,
   deployHelperUrl,
   setDeployHelperUrl,
@@ -167,9 +167,6 @@ const WorkerPanel = ({
     : () => null;
   const renderResource = typeof renderResourceCard === 'function'
     ? renderResourceCard
-    : () => null;
-  const renderDeployHelperToggle = typeof renderEmbeddedDeployHelperToggle === 'function'
-    ? renderEmbeddedDeployHelperToggle
     : () => null;
 
   const handleDefaultWorkerModeClick = () => {
@@ -278,7 +275,7 @@ const WorkerPanel = ({
             workerMode={workerMode}
             shouldUseSponsoredAutoDeployFlow={shouldUseSponsoredAutoDeployFlow}
             deployForm={deployForm}
-            deployHelperToggle={renderDeployHelperToggle()}
+            deployHelperToggle={deployHelperToggle ?? null}
             shouldShowDeployHelperUrlInput={shouldShowDeployHelperUrlInput}
             deployHelperUrl={deployHelperUrl}
             setDeployHelperUrl={setDeployHelperUrl}
