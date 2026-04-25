@@ -1,8 +1,11 @@
+export {};
+
 const GLOBAL_KEY = 'CE_FIRST_VISIT_ROOT_REDIRECT_ENABLED';
+const runtimeGlobals = globalThis as Record<string, unknown>;
 
 const clearGlobal = () => {
   try {
-    delete globalThis[GLOBAL_KEY];
+    delete runtimeGlobals[GLOBAL_KEY];
   } catch (_) {}
 };
 
@@ -22,16 +25,16 @@ describe('appConfig first-visit root redirect boot defaults', () => {
       require('./appConfig.js');
     });
 
-    expect(globalThis[GLOBAL_KEY]).toBe(true);
+    expect(runtimeGlobals[GLOBAL_KEY]).toBe(true);
   });
 
   it('preserves an explicit runtime override', () => {
-    globalThis[GLOBAL_KEY] = false;
+    runtimeGlobals[GLOBAL_KEY] = false;
 
     jest.isolateModules(() => {
       require('./appConfig.js');
     });
 
-    expect(globalThis[GLOBAL_KEY]).toBe(false);
+    expect(runtimeGlobals[GLOBAL_KEY]).toBe(false);
   });
 });
