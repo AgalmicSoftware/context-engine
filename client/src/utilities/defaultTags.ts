@@ -6,25 +6,26 @@
  *
  * Key exports: normalizeTagList, parseDefaultTags, hasAnyTagOverlap, isDefaultTagRelevant, getRelevantDefaultTags
  */
-const normalizeTag = (raw) => String(raw ?? '').trim().toLowerCase();
-const normalizeCompact = (raw) => normalizeTag(raw).replace(/[^a-z0-9]+/g, '');
+const normalizeTag = (raw: unknown): string => String(raw ?? '').trim().toLowerCase();
+const normalizeCompact = (raw: unknown): string => normalizeTag(raw).replace(/[^a-z0-9]+/g, '');
 
-const toIterableArray = (value) => {
+const toIterableArray = (value: unknown): unknown[] => {
   if (!value) return [];
   if (Array.isArray(value)) return value;
   if (typeof value === 'string') return [];
   try {
-    if (typeof value[Symbol.iterator] === 'function') return Array.from(value);
+    const iterable = value as Iterable<unknown>;
+    if (typeof (iterable as any)?.[Symbol.iterator] === 'function') return Array.from(iterable);
   } catch (e) { void e; /* fallback: non-iterable input. */ }
   return [];
 };
 
-export const normalizeTagList = (rawList) => {
+export const normalizeTagList = (rawList: unknown): string[] => {
   const list = toIterableArray(rawList);
   if (!list.length) return [];
 
-  const seen = new Set();
-  const out = [];
+  const seen = new Set<string>();
+  const out: string[] = [];
   list.forEach((raw) => {
     const tag = normalizeTag(raw);
     if (!tag || seen.has(tag)) return;
@@ -34,21 +35,21 @@ export const normalizeTagList = (rawList) => {
   return out;
 };
 
-export const parseDefaultTags = (rawCsv) => {
+export const parseDefaultTags = (rawCsv: unknown): string[] => {
   if (typeof rawCsv !== 'string') return [];
   return normalizeTagList(rawCsv.split(','));
 };
 
-const normalizeTagMatchSource = (value) => {
+const normalizeTagMatchSource = (value: unknown): string => {
   if (Array.isArray(value)) {
     return value.map((entry) => String(entry ?? '').trim()).filter(Boolean).join(' ');
   }
   return String(value ?? '').trim();
 };
 
-const tokenizeText = (raw) => normalizeTag(raw).split(/[^a-z0-9]+/).filter(Boolean);
+const tokenizeText = (raw: unknown): string[] => normalizeTag(raw).split(/[^a-z0-9]+/).filter(Boolean);
 
-const hasCompactedTokenSequenceMatch = (compactTag, sourceTokens = []) => {
+const hasCompactedTokenSequenceMatch = (compactTag: string, sourceTokens: string[] = []): boolean => {
   if (!compactTag || !Array.isArray(sourceTokens) || sourceTokens.length < 2) return false;
 
   for (let start = 0; start < sourceTokens.length; start += 1) {
@@ -64,7 +65,7 @@ const hasCompactedTokenSequenceMatch = (compactTag, sourceTokens = []) => {
   return false;
 };
 
-export const isDefaultTagRelevant = (textSource, tag) => {
+export const isDefaultTagRelevant = (textSource: unknown, tag: unknown): boolean => {
   const normalizedTag = normalizeTag(tag);
   if (!normalizedTag) return false;
 
@@ -91,12 +92,12 @@ export const isDefaultTagRelevant = (textSource, tag) => {
   return false;
 };
 
-export const getRelevantDefaultTags = (textSource, defaultTags) => {
-  const tags = Array.isArray(defaultTags)
+export const getRelevantDefaultTags = (textSource: unknown, defaultTags: unknown): string[] => {
+  const tags: string[] = Array.isArray(defaultTags)
     ? defaultTags
     : (typeof defaultTags === 'string' ? defaultTags.split(',') : []);
-  const seen = new Set();
-  const out = [];
+  const seen = new Set<string>();
+  const out: string[] = [];
 
   tags.forEach((raw) => {
     const trimmed = String(raw ?? '').trim();
@@ -112,7 +113,7 @@ export const getRelevantDefaultTags = (textSource, defaultTags) => {
 
 // OR semantics: returns true if any required tag overlaps with questionTags.
 // If requiredTags is empty, returns true (no gating).
-export const hasAnyTagOverlap = (questionTags, requiredTags) => {
+export const hasAnyTagOverlap = (questionTags: unknown, requiredTags: unknown): boolean => {
   const required = normalizeTagList(requiredTags);
   if (required.length === 0) return true;
 
