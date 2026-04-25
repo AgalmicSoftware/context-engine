@@ -904,6 +904,18 @@ export default function AudioSurveyGenerator(rawProps: any = {}) {
       }
     }
 
+    try {
+      const file = await fetchImageFromURL(rawUrl);
+      if (abortedRef.current) return;
+      queueAdditionalPhotoFiles([file]);
+      setAdditionalUrlInput('');
+      setImagePickerStatusText('');
+      setImagePickerStatusTone('default');
+      return;
+    } catch (_err) {
+      if (abortedRef.current) return;
+    }
+
     setAdditionalSources((prev: any) => [
       ...prev,
       {
@@ -913,6 +925,7 @@ export default function AudioSurveyGenerator(rawProps: any = {}) {
         name: rawUrl,
       }
     ]);
+    setError('');
     setAdditionalUrlInput('');
     setImagePickerStatusText('');
     setImagePickerStatusTone('default');
