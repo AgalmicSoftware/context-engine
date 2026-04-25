@@ -299,6 +299,11 @@ import {
   resolveSessionWizardResourceGateIds,
 } from './sessionWizardResourceGateSupport';
 import {
+  buildSessionWizardCreateSbtModalLaunchState,
+  getSessionWizardGateById,
+  resolveSessionWizardCreateSbtTargetGateId,
+} from './sessionWizardCreateSbtSupport';
+import {
   getSessionWizardWorkerDeployValidationError,
 } from './sessionWizardWorkerRpc';
 import {
@@ -2025,38 +2030,26 @@ const SessionWizard = ({
     }))
   ), [pendingSbtDrafts]);
 
-  const getGateById = (gateId) => allEncryptionGates.find((gate) => gate.id === gateId) || null;
-  const resolveCreateSbtTargetGateId = (requestedGateId = '') => {
-    const validGateIds = allEncryptionGates
-      .map((gate) => toStr(gate?.id).trim())
-      .filter(Boolean);
-    const requested = toStr(requestedGateId).trim();
-    if (requested && validGateIds.includes(requested)) return requested;
-    const fallback = toStr(defaultGateId).trim();
-    if (fallback && validGateIds.includes(fallback)) return fallback;
-    return validGateIds[0] || '';
-  };
+  const getGateById = (gateId) => getSessionWizardGateById(allEncryptionGates, gateId);
+  const resolveCreateSbtTargetGateId = (requestedGateId = '') => resolveSessionWizardCreateSbtTargetGateId({
+    allEncryptionGates,
+    defaultGateId,
+    requestedGateId,
+  });
   const activeCreateSbtTargetGateId = resolveCreateSbtTargetGateId(createSbtTargetGateId);
-  const activeCreateSbtTargetGate = getGateById(activeCreateSbtTargetGateId);
+  const activeCreateSbtTargetGate = getSessionWizardGateById(allEncryptionGates, activeCreateSbtTargetGateId);
   const focusCreateSbtTargetGate = (gateId = '') => {
     const resolvedGateId = resolveCreateSbtTargetGateId(gateId);
     if (!resolvedGateId) return;
     setCreateSbtTargetGateId((prev) => (prev === resolvedGateId ? prev : resolvedGateId));
   };
 
-  const buildCreateSbtModalLaunchState = (options = {}) => ({
-    targetType: options?.targetType || 'gate',
-    gateId: resolveCreateSbtTargetGateId(options?.gateId || ''),
-    sessionSlug: toStr(
-      Object.prototype.hasOwnProperty.call(options, 'sessionSlug')
-        ? options.sessionSlug
-        : draftRef.current?.slug || ''
-    ).trim(),
-    arweaveJwkOverride: toStr(
-      Object.prototype.hasOwnProperty.call(options, 'arweaveJwkOverride')
-        ? options.arweaveJwkOverride
-        : getEnabledWorkerArweaveJwk(workerSecretsRef.current)
-    ).trim(),
+  const buildCreateSbtModalLaunchState = (options = {}) => buildSessionWizardCreateSbtModalLaunchState({
+    options,
+    allEncryptionGates,
+    defaultGateId,
+    currentDraftSlug: draftRef.current?.slug || '',
+    currentArweaveJwk: getEnabledWorkerArweaveJwk(workerSecretsRef.current),
   });
 
   const openCreateSbtModal = (options = {}) => {
