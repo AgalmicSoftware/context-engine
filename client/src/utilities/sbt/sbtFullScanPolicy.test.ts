@@ -8,7 +8,7 @@ describe('sbtFullScanPolicy helpers', () => {
   beforeEach(() => {
     try { window.history.replaceState({}, '', '/'); } catch (_) {}
     try { localStorage.removeItem('ce:sbtFullScanPolicy'); } catch (_) {}
-    try { delete globalThis.CE_SBT_FULL_SCAN_POLICY; } catch (_) {}
+    try { delete (globalThis as Record<string, unknown>).CE_SBT_FULL_SCAN_POLICY; } catch (_) {}
   });
 
   it('normalizes bad inputs to "auto"', () => {
@@ -24,7 +24,7 @@ describe('sbtFullScanPolicy helpers', () => {
 
   it('prefers URL param over localStorage and globalThis', () => {
     localStorage.setItem('ce:sbtFullScanPolicy', 'manual');
-    globalThis.CE_SBT_FULL_SCAN_POLICY = 'sbts';
+    (globalThis as Record<string, unknown>).CE_SBT_FULL_SCAN_POLICY = 'sbts';
 
     window.history.replaceState({}, '', '/?ceSbtFullScanPolicy=auto');
     expect(readSbtFullScanPolicy()).toBe('auto');
@@ -35,7 +35,7 @@ describe('sbtFullScanPolicy helpers', () => {
   });
 
   it('falls back to localStorage then globalThis', () => {
-    globalThis.CE_SBT_FULL_SCAN_POLICY = 'manual';
+    (globalThis as Record<string, unknown>).CE_SBT_FULL_SCAN_POLICY = 'manual';
     expect(readSbtFullScanPolicy()).toBe('manual');
 
     localStorage.setItem('ce:sbtFullScanPolicy', 'sbts');
@@ -49,7 +49,6 @@ describe('sbtFullScanPolicy helpers', () => {
   it('writeSbtFullScanPolicy writes localStorage and globalThis without reload', () => {
     expect(writeSbtFullScanPolicy('sbts')).toBe('sbts');
     expect(localStorage.getItem('ce:sbtFullScanPolicy')).toBe('sbts');
-    expect(globalThis.CE_SBT_FULL_SCAN_POLICY).toBe('sbts');
+    expect((globalThis as Record<string, unknown>).CE_SBT_FULL_SCAN_POLICY).toBe('sbts');
   });
 });
-
