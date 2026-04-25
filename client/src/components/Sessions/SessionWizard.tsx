@@ -121,7 +121,6 @@ import {
   getSessionWizardContractTooltipTestId,
 } from '../ContractPage/contractMetadata.js';
 import { buildContractViewerContracts } from '../ContractPage/contractViewerUtils.js';
-import { normalizeRoutePath as normalizeMainSiteRoutePath } from '../MainSite/routePathHelpers.js';
 import usePendingSbtDrafts, {
   clearSessionWizardPendingSbtDraftsCache,
   normalizePendingSbtDrafts,
@@ -227,6 +226,13 @@ import {
   buildSessionWizardDefaultTemplate,
   normalizeSessionWizardDraftShape as normalizeDraftShape,
 } from './sessionWizardDraftState';
+import {
+  buildSessionWizardNewSessionBannerDismissalContextKey,
+  isNewSessionWizardPathname,
+  readSessionWizardNewSessionBannerDismissed,
+  scrubSponsoredBundleHashSecret,
+  writeSessionWizardNewSessionBannerDismissed,
+} from './sessionWizardRouteState';
 import {
   buildSessionWizardWorkerRpcUrlMap,
   getSessionWizardWorkerDeployValidationError,
@@ -612,52 +618,6 @@ const mergeDeep = (target: AnyRecord, source: AnyRecord): AnyRecord => {
   return out;
 };
 
-const SESSION_WIZARD_NEW_SESSION_BANNER_DISMISSED_KEY = 'ce_new_session_banner_dismissed';
-const SESSION_WIZARD_NEW_SESSION_PATHNAMES = new Set(['/new', '/session/new']);
-
-const normalizeSessionWizardPathname = (pathname = ''): string => {
-  const normalized = normalizeMainSiteRoutePath(toStr(pathname).trim());
-  return normalized || '/';
-};
-
-const isNewSessionWizardPathname = (pathname = ''): boolean => (
-  SESSION_WIZARD_NEW_SESSION_PATHNAMES.has(normalizeSessionWizardPathname(pathname))
-);
-
-const readSessionWizardNewSessionBannerDismissed = () => {
-  if (typeof window === 'undefined') return false;
-  try {
-    return toStr(localStorage.getItem(SESSION_WIZARD_NEW_SESSION_BANNER_DISMISSED_KEY)).trim().toLowerCase() === 'true';
-  } catch (_) {
-    return false;
-  }
-};
-
-const writeSessionWizardNewSessionBannerDismissed = () => {
-  if (typeof window === 'undefined') return;
-  try {
-    localStorage.setItem(SESSION_WIZARD_NEW_SESSION_BANNER_DISMISSED_KEY, 'true');
-  } catch (_) {}
-};
-const buildSessionWizardNewSessionBannerDismissalContextKey = ({
-  pathname = '',
-  sponsoredBundleId = '',
-  sponsoredBundleKey = '',
-}: {
-  pathname?: string;
-  sponsoredBundleId?: unknown;
-  sponsoredBundleKey?: unknown;
-} = {}): string => {
-  const normalizedPathname = normalizeSessionWizardPathname(pathname);
-  if (!isNewSessionWizardPathname(normalizedPathname)) return '';
-  const bundleId = toStr(sponsoredBundleId).trim();
-  const bundleKey = toStr(sponsoredBundleKey).trim();
-  if (bundleId || bundleKey) {
-    return `${normalizedPathname}::sponsored::${bundleId || '__missing_bundle__'}::${bundleKey ? 'with-key' : 'without-key'}`;
-  }
-  return `${normalizedPathname}::plain`;
-};
-
 const readSessionWizardCache = () => {
   return readSessionWizardDraftCache();
 };
@@ -721,26 +681,6 @@ const RESOURCE_SECRET_FIELDS = {
 };
 const ANTHROPIC_AI_SECRET_FIELD = { key: 'anthropicKey', label: 'Anthropic key', type: 'password', required: true };
 const OPENROUTER_AI_SECRET_FIELD = { key: 'openrouterKey', label: 'OpenRouter key', type: 'password' };
-
-const removeHashQueryParam = (hashValue = '', key = ''): string => {
-  const normalizedKey = toStr(key).trim();
-  const rawHash = toStr(hashValue).replace(/^#/, '').trim();
-  if (!normalizedKey || !rawHash) return toStr(hashValue).trim();
-  if (!/[=&]/.test(rawHash)) return toStr(hashValue).trim();
-  const params = new URLSearchParams(rawHash);
-  params.delete(normalizedKey);
-  const nextHash = params.toString();
-  return nextHash ? `#${nextHash}` : '';
-};
-
-const scrubSponsoredBundleHashSecret = () => {
-  if (typeof window === 'undefined' || !window.location || !window.history?.replaceState) return;
-  const nextHash = removeHashQueryParam(window.location.hash || '', 'k');
-  const nextUrl = `${window.location.pathname || ''}${window.location.search || ''}${nextHash}`;
-  const currentUrl = `${window.location.pathname || ''}${window.location.search || ''}${window.location.hash || ''}`;
-  if (nextUrl === currentUrl) return;
-  window.history.replaceState({}, '', nextUrl);
-};
 
 const pathKey = (path: string[]): string => path.join('.');
 const ONCHAIN_FIELD_PATHS = SESSION_WIZARD_ONCHAIN_COMPAT_FIELD_PATHS;
