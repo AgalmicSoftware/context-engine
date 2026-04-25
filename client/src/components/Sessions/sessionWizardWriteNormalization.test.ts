@@ -22,8 +22,9 @@ const DEFAULT_CONFIG_CHAIN_ID = DEFAULT_CHAIN_ID;
 
 describe('sessionWizardWriteNormalization', () => {
   beforeEach(() => {
-    cryptoUtils._getProvider.mockReset();
-    cryptoUtils._getProvider.mockImplementation((providerLike) => providerLike || null);
+    const getProviderMock = cryptoUtils._getProvider as jest.Mock;
+    getProviderMock.mockReset();
+    getProviderMock.mockImplementation((providerLike: any) => providerLike || null);
   });
 
   afterEach(() => {
@@ -116,12 +117,12 @@ describe('sessionWizardWriteNormalization', () => {
       waitForTransaction: jest.fn().mockResolvedValue({ status: 1, transactionHash: '0xtxhash' }),
     };
 
-    jest.spyOn(ethers.providers, 'Web3Provider').mockImplementation(function MockWeb3Provider() {
-      return web3ProviderMock;
-    });
-    jest.spyOn(ethers, 'Contract').mockImplementation(function MockContract() {
-      return contractMock;
-    });
+    jest.spyOn(ethers.providers, 'Web3Provider').mockImplementation((function MockWeb3Provider() {
+      return web3ProviderMock as any;
+    }) as any);
+    jest.spyOn(ethers, 'Contract').mockImplementation((function MockContract() {
+      return contractMock as any;
+    }) as any);
 
     const onChainFields = buildSessionWizardRegistrySessionFields({
       onChainFields: {
