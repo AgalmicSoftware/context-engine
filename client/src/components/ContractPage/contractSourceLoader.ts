@@ -1,24 +1,22 @@
-import { CONTRACT_SOURCE_FILES } from './contractMetadata.js';
-import surveysSource from '../../../../contracts/Surveys.sol?raw';
-import sbtFactorySource from '../../../../contracts/SBTFactory.sol?raw';
-import sessionRegistrySource from '../../../../contracts/SessionRegistry.sol?raw';
-import customSbtSource from '../../../../contracts/CustomSBT.sol?raw';
+/* eslint-disable import/no-webpack-loader-syntax */
 
-export const getContractSourceDefinitions = (): Record<string, { file: string; source: string }> => ({
+import { CONTRACT_SOURCE_FILES } from './contractMetadata.js';
+
+export const getContractSourceDefinitions = (): Record<string, { file: string; source: any }> => ({
   surveys: {
     file: CONTRACT_SOURCE_FILES.surveys,
-    source: surveysSource,
+    source: require('!!raw-loader!../../../../contracts/Surveys.sol').default,
   },
   sbtFactory: {
     file: CONTRACT_SOURCE_FILES.sbtFactory,
-    source: sbtFactorySource,
+    source: require('!!raw-loader!../../../../contracts/SBTFactory.sol').default,
   },
   sessionRegistry: {
     file: CONTRACT_SOURCE_FILES.sessionRegistry,
-    source: sessionRegistrySource,
+    source: require('!!raw-loader!../../../../contracts/SessionRegistry.sol').default,
   },
   customSBT: {
     file: CONTRACT_SOURCE_FILES.customSBT,
-    source: customSbtSource,
+    source: require('!!raw-loader!../../../../contracts/CustomSBT.sol').default,
   },
 });

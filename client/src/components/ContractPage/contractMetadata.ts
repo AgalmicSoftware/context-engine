@@ -1,6 +1,5 @@
 import { toStr } from '../../utilities/shared/primitives.js';
 import { t } from '../../utilities/ui/terminology.js';
-import { buildPublicRoute } from '../../utilities/ui/publicUrl.js';
 
 export const CONTRACT_NAME_MAPPING = Object.freeze({
   surveys: 'Questions and Surveys',
@@ -71,5 +70,5 @@ export const buildContractsPageHref = ({
   if (normalizedSessionSlug) searchParams.set('session', normalizedSessionSlug);
 
   const query = searchParams.toString();
-  return buildPublicRoute(query ? `/contracts?${query}` : '/contracts');
+  return query ? `/contracts?${query}` : '/contracts';
 };
