@@ -207,17 +207,6 @@ Session slug handoff options:
   - `npm run -s ai:test-gate-revocation:decrypt -- --session-slug <slug>`
   - `npm run -s ai:test-worker-scopes:matrix -- --session-slug <slug>`
 
-Full-session worker handoff:
-
-- Fresh full E2E runs should generate their own worker URL by starting with `npm run -s ai:test-session-setup:custom-worker-secrets`.
-- Feed both values from that successful setup into later steps:
-  - `SESSION_SLUG=<slug>`
-  - `SESSION_WORKER_URL=<sessionCorsWorker URL>`
-- If the setup artifact does not include `workerUrl`, read the on-chain SessionRegistry `corsWorkerUrl` for that slug and use that worker URL.
-- Reuse an existing worker only when it came from a recent successful E2E session setup and still authenticates for the same `SESSION_SLUG`.
-- For `ai:test-survey-response:encryption-matrix`, set `SURVEY_RESPONSE_REUSE_SESSION_SLUG=1` or pass `--session-slug <slug>`; otherwise the runner may generate a fresh slug instead of using the established worker-backed session.
-- Do not use the shared demo/default worker as the worker URL for a newly generated full response run unless that worker was explicitly established for the same slug.
-
 Useful env vars for `ai:wallet`:
 
 - `SHOW_PRIVATE_KEY=1` to include the deterministic private key and a legacy

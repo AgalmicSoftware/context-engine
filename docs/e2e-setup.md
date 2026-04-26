@@ -329,7 +329,7 @@ To verify real provider wiring (non-deterministic output, slower, can fail if yo
 - Ensure `SESSION_SLUG` points at an existing session with the expected Polis data available.
 - Run without the client-side mock:
   - `SESSION_SLUG=<existing-session-slug> E2E_AI_MOCK=0 npm run -s ai:test-ai:invocations`
-  - `SESSION_SLUG=<existing-session-slug> E2E_SUITE_INCLUDE_AI=1 E2E_AI_MOCK=0 npm run -s ai:node -- scripts/run-e2e-suite.js`
+  - `SESSION_SLUG=<existing-session-slug> E2E_SUITE_INCLUDE_AI=1 E2E_AI_MOCK=0 npm run -s test:e2e`
 
 ### Agent Mode (JSON-driven)
 
