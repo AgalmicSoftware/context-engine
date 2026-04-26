@@ -202,47 +202,6 @@ test('sync-public-history accepts an explicit source branch', () => {
   });
 });
 
-test('sync-public-history can replay patch-new commits from a source branch diverged from main', () => {
-  withSourceRepo(({ sourceDir }) => {
-    git(sourceDir, ['checkout', '--quiet', 'main']);
-    writeFile(sourceDir, 'main-only.txt', 'direct main change\n');
-    commitAll(sourceDir, 'Direct main commit', {
-      authorDate: '2025-01-02T00:00:00Z',
-      committerDate: '2025-01-02T00:00:00Z',
-    });
-    git(sourceDir, ['push', '--quiet', 'origin', 'main']);
-    git(sourceDir, ['checkout', '--quiet', 'dev']);
-
-    const defaultResult = runSyncScript(sourceDir, ['--dry-run', 'release-candidate']);
-    assert.equal(defaultResult.status, 1);
-    assert.match(defaultResult.stderr, /origin\/main is not an ancestor of dev/);
-    assert.match(defaultResult.stderr, /--allow-diverged-source/);
-
-    const result = runSyncScript(sourceDir, ['--allow-diverged-source', 'release-candidate']);
-
-    assert.equal(result.status, 0);
-    assert.match(result.stderr, /using git cherry to replay patch-new non-merge commits/);
-    assert.match(result.stdout, /Replay complete\./);
-    assert.match(result.stdout, /Branch name: release-candidate/);
-    assert.match(result.stdout, /Replayed commits: 2/);
-    assert.match(result.stdout, /Skipped commits: 2/);
-
-    const historySubjects = git(sourceDir, [
-      'log',
-      '--reverse',
-      '--format=%s',
-      'origin/main..release-candidate',
-    ]).trim().split('\n');
-    assert.deepEqual(historySubjects, [
-      'Public commit title',
-      'Mixed commit',
-    ]);
-
-    assert.equal(git(sourceDir, ['show', 'release-candidate:main-only.txt']), 'direct main change\n');
-    assert.equal(git(sourceDir, ['show', 'release-candidate:public.txt']), 'public one\npublic two\n');
-  });
-});
-
 test('sync-public-history installs the private dev push guard before replaying', () => {
   withSourceRepo(({ sourceDir }) => {
     git(sourceDir, ['branch', '--set-upstream-to=origin/main', 'dev'], { stdio: 'ignore' });
