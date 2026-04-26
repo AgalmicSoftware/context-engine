@@ -1,4 +1,4 @@
-.PHONY: release release-clean sync-public sync-public-push
+.PHONY: release release-clean sync-public sync-public-push install-private-branch-guard
 
 RELEASE_DIR ?= ./release-public
 
@@ -19,3 +19,7 @@ sync-public:
 ## Use --force-with-lease if the local target branch already exists.
 sync-public-push:
 	bash scripts/sync-public-history.sh --push
+
+## Install the local git hook that blocks pushing the private dev branch to origin.
+install-private-branch-guard:
+	bash scripts/install-private-branch-guard.sh

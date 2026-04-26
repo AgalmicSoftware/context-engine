@@ -13,6 +13,7 @@ Use the history-sync flow when you want a public PR with preserved commit narrat
 
 ```bash
 # Per-commit public branch replay
+make install-private-branch-guard
 make sync-public
 make sync-public-push
 bash scripts/sync-public-history.sh --dry-run release-candidate
@@ -33,6 +34,7 @@ make release-clean           # delete the artifact
 Important behavior:
 
 - Public replay identity is always forced to `Agalmic <agalmicsoftware@protonmail.com>`
+- The first sync run installs a repo-local `pre-push` hook that blocks `dev -> origin`
 - Commits that only touch stripped paths are skipped automatically
 - `--dry-run` lists which commits would replay vs skip without creating the replay branch
 - `--push` pushes the resulting branch to `origin` and safely refreshes an existing remote target branch with `--force-with-lease` when needed
@@ -43,6 +45,7 @@ Important behavior:
 
 Push safety:
 
+- `make install-private-branch-guard` (or any `sync-public-history.sh` run) installs `.githooks/pre-push` and unsets any `dev` upstream so plain public pushes stay pointed at replay branches, not your private branch
 - The replay branch is rebuilt from `origin/main`, not from `dev`
 - Only the replayed public-safe commits become reachable from the branch you push
 - The same strip patterns as `prepare-public-release.sh` are applied before every replayed commit is created
@@ -97,8 +100,10 @@ Review each match. Published contract addresses, `localhost`, and `example.com` 
 ## Workflow
 
 1. Develop on local `dev` with private/internal files present where needed
-2. Run `make sync-public` or `bash scripts/sync-public-history.sh --push release-staging` to build or refresh the replayed public branch
+2. Install the private-branch guard once with `make install-private-branch-guard` if you have not already
+   - Any `make sync-public` / `make sync-public-push` run also installs it automatically
+3. Run `make sync-public` or `bash scripts/sync-public-history.sh --push release-staging` to build or refresh the replayed public branch
    - If `release-staging` already exists locally, add `--force-with-lease`
-3. Open or update the PR from `release-staging` into `main`
-4. Choose the merge method intentionally: `Merge pull request` preserves the replayed `release-staging` commit SHAs on `main`, while `Rebase and merge` keeps `main` linear but assigns new SHAs
-5. For the artifact workflow, run `make release` and then run the PII scan against the stripped output before publishing it
+4. Open or update the PR from `release-staging` into `main`
+5. Choose the merge method intentionally: `Merge pull request` preserves the replayed `release-staging` commit SHAs on `main`, while `Rebase and merge` keeps `main` linear but assigns new SHAs
+6. For the artifact workflow, run `make release` and then run the PII scan against the stripped output before publishing it
