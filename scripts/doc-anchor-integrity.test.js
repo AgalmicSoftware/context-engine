@@ -78,6 +78,12 @@ const OPTIONAL_WORKFLOW_SKILL_CHECKS = Object.freeze([
       'client/src/components/SurveyTool/SingleQuestionResponse.jsx',
       'client/src/components/SurveyTool/SurveyResults.jsx',
     ],
+    livePathAlternates: [
+      [
+        'client/src/components/SurveyTool/AudioInput.tsx',
+        'client/src/components/Shared/AudioInput/AudioInput.tsx',
+      ],
+    ],
     livePaths: [
       'client/src/components/SurveyTool/AudioInput.tsx',
       'client/src/components/SurveyTool/SingleQuestionResponse.tsx',
@@ -100,7 +106,7 @@ test('tracked docs do not reference stale JSX component paths after the TSX migr
 });
 
 test('local workflow skill anchors point at live component files when the private workflow tree is present', () => {
-  OPTIONAL_WORKFLOW_SKILL_CHECKS.forEach(({ skillPath, stalePaths, livePaths }) => {
+  OPTIONAL_WORKFLOW_SKILL_CHECKS.forEach(({ skillPath, stalePaths, livePaths, livePathAlternates = [] }) => {
     const absoluteSkillPath = path.join(ROOT, skillPath);
     if (!fs.existsSync(absoluteSkillPath)) return;
 
@@ -112,12 +118,26 @@ test('local workflow skill anchors point at live component files when the privat
         `${skillPath} should not reference stale component path ${stalePath}`,
       );
     });
-    livePaths.forEach((livePath) => {
+    const alternateMembers = new Set(livePathAlternates.flat());
+    livePaths
+      .filter((livePath) => !alternateMembers.has(livePath))
+      .forEach((livePath) => {
       assert.equal(fs.existsSync(path.join(ROOT, livePath)), true, `${livePath} should exist`);
       assert.equal(
         source.includes(livePath),
         true,
         `${skillPath} should reference live component path ${livePath}`,
+      );
+    });
+
+    livePathAlternates.forEach((alternatePaths) => {
+      alternatePaths.forEach((livePath) => {
+        assert.equal(fs.existsSync(path.join(ROOT, livePath)), true, `${livePath} should exist`);
+      });
+      assert.equal(
+        alternatePaths.some((livePath) => source.includes(livePath)),
+        true,
+        `${skillPath} should reference at least one live component path from: ${alternatePaths.join(', ')}`,
       );
     });
   });

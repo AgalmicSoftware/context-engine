@@ -1400,7 +1400,7 @@ const contractScripts = {
 
   // Per-group base window + clamp caller overrides
   const { fromBlock: baseFrom, toBlock: baseTo } =
-    await this.getRelevantBlockWindowForFilter(groupKeyOrCfg);
+    await this.getRelevantBlockWindowForFilter(groupKeyOrCfg, { _resolvedCfg: cfg });
 
   const fromBlockNum = Number.isFinite(Number(fromBlock))
     ? Math.max(Number(fromBlock), baseFrom)
@@ -1460,7 +1460,7 @@ const contractScripts = {
 
     // Per-group base window + clamp caller overrides
     const { fromBlock: baseFrom, toBlock: baseTo } =
-      await this.getRelevantBlockWindowForFilter(groupKeyOrCfg);
+      await this.getRelevantBlockWindowForFilter(groupKeyOrCfg, { _resolvedCfg: cfg });
 
     const resolvedFromBlock = Number.isFinite(Number(fromBlock))
       ? Math.max(Number(fromBlock), baseFrom)
@@ -1581,7 +1581,7 @@ const contractScripts = {
 
   // Per-group base window + clamp caller overrides
   const { fromBlock: baseFrom, toBlock: baseTo } =
-    await this.getRelevantBlockWindowForFilter(groupKeyOrCfg);
+    await this.getRelevantBlockWindowForFilter(groupKeyOrCfg, { _resolvedCfg: cfg });
 
   const fromBlockNum = Number.isFinite(Number(fromBlock))
     ? Math.max(Number(fromBlock), baseFrom)
@@ -1619,7 +1619,9 @@ const contractScripts = {
         } catch (e) { /* ignore */ }
         let responseData = null;
         try {
-          responseData = await this.getResponse(providerName, responder, qIdB32, groupKeyOrCfg);
+          responseData = await this.getResponse(providerName, responder, qIdB32, groupKeyOrCfg, {
+            _resolvedCfg: cfg,
+          });
         } catch (e) {
           contractsLog.warn('[getResponsesByQuestionID] individual response read failed; skipping', { responder, qId: qIdB32, error: e?.message });
         }
@@ -1799,7 +1801,7 @@ const contractScripts = {
 
   // Per-group base window + clamp caller overrides
   const { fromBlock: baseFrom, toBlock: baseTo } =
-    await this.getRelevantBlockWindowForFilter(groupKeyOrCfg);
+    await this.getRelevantBlockWindowForFilter(groupKeyOrCfg, { _resolvedCfg: cfg });
 
   const fromBlockNum = Number.isFinite(Number(fromBlock))
     ? Math.max(Number(fromBlock), baseFrom)
@@ -1833,7 +1835,7 @@ const contractScripts = {
 
   // Per-group base window + clamp caller overrides
   const { fromBlock: baseFrom, toBlock: baseTo } =
-    await this.getRelevantBlockWindowForFilter(groupKeyOrCfg);
+    await this.getRelevantBlockWindowForFilter(groupKeyOrCfg, { _resolvedCfg: cfg });
 
   const fromBlock = Number.isFinite(Number(fromCustomBlock))
     ? Math.max(Number(fromCustomBlock), baseFrom)
@@ -1878,7 +1880,7 @@ const contractScripts = {
 
   // Per-group base window + clamp caller overrides
   const { fromBlock: baseFrom, toBlock: baseTo } =
-    await this.getRelevantBlockWindowForFilter(groupKeyOrCfg);
+    await this.getRelevantBlockWindowForFilter(groupKeyOrCfg, { _resolvedCfg: cfg });
 
   const fromBlockNum = Number.isFinite(Number(fromBlock))
     ? Math.max(Number(fromBlock), baseFrom)
@@ -1918,7 +1920,7 @@ const contractScripts = {
 
   // Per-group base window + clamp caller overrides
   const { fromBlock: baseFrom, toBlock: baseTo } =
-    await this.getRelevantBlockWindowForFilter(groupKeyOrCfg);
+    await this.getRelevantBlockWindowForFilter(groupKeyOrCfg, { _resolvedCfg: cfg });
 
   const fromBlock = Number.isFinite(Number(fromCustomBlock))
     ? Math.max(Number(fromCustomBlock), baseFrom)
@@ -1945,7 +1947,9 @@ const contractScripts = {
       const questionIds = event.args.questionIds.map((q) => q.toLowerCase());
 
       const respArray = await Promise.all(
-        questionIds.map((qId) => this.getResponse(providerName, responder, qId, groupKeyOrCfg).catch((e) => {
+        questionIds.map((qId) => this.getResponse(providerName, responder, qId, groupKeyOrCfg, {
+          _resolvedCfg: cfg,
+        }).catch((e) => {
           contractsLog.warn('[getQuestionResponses] individual response read failed; skipping', { qId, error: e?.message });
           return null;
         }))
@@ -2006,7 +2010,7 @@ const contractScripts = {
 
     // Per-group base window + clamp caller overrides
     const { fromBlock: baseFrom, toBlock: baseTo } =
-      await this.getRelevantBlockWindowForFilter(groupKeyOrCfg);
+      await this.getRelevantBlockWindowForFilter(groupKeyOrCfg, { _resolvedCfg: cfg });
 
     resolvedFromBlockNum = Number.isFinite(Number(fromCustomBlock))
       ? Math.max(Number(fromCustomBlock), baseFrom)
@@ -2076,7 +2080,9 @@ const contractScripts = {
 
         let respData = null;
         try {
-          respData = await this.getResponse(providerName, responder, qId, groupKeyOrCfg);
+          respData = await this.getResponse(providerName, responder, qId, groupKeyOrCfg, {
+            _resolvedCfg: cfg,
+          });
         } catch (e) {
           contractsLog.warn('[getQuestionResponsesFullRange] individual response read failed; skipping', { responder, qId, error: e?.message });
         }
@@ -2131,7 +2137,7 @@ const contractScripts = {
 
   // Per-group base window + clamp caller overrides
   const { fromBlock: baseFrom, toBlock: baseTo } =
-    await this.getRelevantBlockWindowForFilter(groupKeyOrCfg);
+    await this.getRelevantBlockWindowForFilter(groupKeyOrCfg, { _resolvedCfg: cfg });
 
   const fromBlockNum = Number.isFinite(Number(fromBlock))
     ? Math.max(Number(fromBlock), baseFrom)
@@ -2175,7 +2181,7 @@ const contractScripts = {
 
   // Per-group base window + clamp caller overrides
   const { fromBlock: baseFrom, toBlock: baseTo } =
-    await this.getRelevantBlockWindowForFilter(groupKeyOrCfg);
+    await this.getRelevantBlockWindowForFilter(groupKeyOrCfg, { _resolvedCfg: cfg });
 
   const fromBlockNum = Number.isFinite(Number(fromBlock))
     ? Math.max(Number(fromBlock), baseFrom)
@@ -2258,7 +2264,7 @@ const contractScripts = {
 
     // Per-group base window + clamp caller overrides
     const { fromBlock: baseFrom, toBlock: baseTo } =
-      await this.getRelevantBlockWindowForFilter(groupKeyOrCfg);
+      await this.getRelevantBlockWindowForFilter(groupKeyOrCfg, { _resolvedCfg: cfg });
 
     const fromBlockNum = Number.isFinite(Number(fromBlock))
       ? Math.max(Number(fromBlock), baseFrom)
@@ -2321,7 +2327,7 @@ const contractScripts = {
 
   // Per-group base window + clamp caller overrides
   const { fromBlock: baseFrom, toBlock: baseTo } =
-    await this.getRelevantBlockWindowForFilter(groupKeyOrCfg);
+    await this.getRelevantBlockWindowForFilter(groupKeyOrCfg, { _resolvedCfg: cfg });
 
   const fromBlockNum = Number.isFinite(Number(fromBlockParam))
     ? Math.max(Number(fromBlockParam), baseFrom)
@@ -2923,7 +2929,12 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
   },
 
   async getResponseHash(providerName, userAddress, id, groupKeyOrCfg, opts = {}) {
-  const cfg    = resolveSession(groupKeyOrCfg || '');
+  const cfg    = (
+    opts &&
+    typeof opts === 'object' &&
+    opts._resolvedCfg &&
+    typeof opts._resolvedCfg === 'object'
+  ) ? opts._resolvedCfg : resolveSession(groupKeyOrCfg || '');
   const gAddrs = getSessionAddresses(cfg);
   const addr   = (gAddrs.surveys?.address);
   const chId   = (gAddrs.surveys?.chainId) || (cfg?.networkChainId) || undefined;
@@ -2980,7 +2991,12 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
   },
 
   async getResponse(providerName, userAddress, id, groupKeyOrCfg, opts = {}) {
-  const cfg    = resolveSession(groupKeyOrCfg || '');
+  const cfg    = (
+    opts &&
+    typeof opts === 'object' &&
+    opts._resolvedCfg &&
+    typeof opts._resolvedCfg === 'object'
+  ) ? opts._resolvedCfg : resolveSession(groupKeyOrCfg || '');
   const gAddrs = getSessionAddresses(cfg);
   const addr   = (gAddrs.surveys?.address);
   const chId   = (gAddrs.surveys?.chainId) || (cfg?.networkChainId) || undefined;
@@ -3643,7 +3659,10 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
 
   // Per-group base window + clamp caller overrides
   const { fromBlock: baseFrom, toBlock: baseTo } =
-    await this.getRelevantBlockWindowForFilter(groupKeyOrCfg, SBT_READ_PROVIDER_OPTIONS);
+    await this.getRelevantBlockWindowForFilter(groupKeyOrCfg, {
+      ...SBT_READ_PROVIDER_OPTIONS,
+      _resolvedCfg: cfg,
+    });
 
   const fromBlock = Number.isFinite(Number(fromCustomBlock))
     ? Math.max(Number(fromCustomBlock), baseFrom)

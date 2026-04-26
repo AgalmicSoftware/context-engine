@@ -788,3 +788,58 @@ describe('contractHelpers session-aware cache keys', () => {
     expect(betaProvider.getGasPrice).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('contractHelpers resolved cfg pass-through', () => {
+  it('uses opts._resolvedCfg for block windows without re-resolving the session', async () => {
+    const resolveSession = jest.fn(() => {
+      throw new Error('resolveSession should be skipped when _resolvedCfg is provided');
+    });
+    const helper = createContractHelperMethods({
+      resolveSession,
+      latestBlockCache: {},
+      gasPriceCache: {},
+      BLOCK_CACHE_MS: 1000,
+      getReadProviderForGroup: jest.fn(() => ({
+        getBlockNumber: jest.fn(async () => 4321),
+      })),
+      shouldLog: jest.fn(() => false),
+      rpcLog: jest.fn(),
+      callWithRetry: jest.fn((fn) => fn()),
+      MAX_CACHE_SIZE: 50,
+      isLogsRangeTooLargeError: jest.fn(() => false),
+      contractsLog: { warn: jest.fn(), log: jest.fn() },
+      getReadProviderForChain: jest.fn(),
+      normalizeSessionSlug: jest.fn((value) => value),
+      shouldBypassSessionScopeWindow: jest.fn(() => false),
+      getScopeDecisionForSlug: jest.fn(() => ({ allowed: true })),
+      logScopeWindowSkipOnce: jest.fn(),
+      parsePositiveBlockNumber: jest.fn((value) => {
+        const numberValue = Number(value || 0);
+        return Number.isFinite(numberValue) && numberValue > 0 ? numberValue : null;
+      }),
+      resolveSessionStartFromRegistry: jest.fn(() => null),
+      DEFAULT_CHAIN_ID: 84532,
+      store: { getState: () => ({}) },
+      getSessionConfigBySlug: jest.fn(() => null),
+      getCorsProxyUrlOrThrow: jest.fn(),
+      fetchWorkerWithAuth: jest.fn(),
+    });
+
+    const resolvedCfg = {
+      slug: 'alpha',
+      networkChainId: 84532,
+      blockLimits: {
+        start: 120,
+        end: null,
+      },
+      contracts: {},
+    };
+
+    const result = await helper.getRelevantBlockWindowForFilter('missing-session', {
+      _resolvedCfg: resolvedCfg,
+    });
+
+    expect(result).toEqual({ fromBlock: 120, toBlock: 4321 });
+    expect(resolveSession).not.toHaveBeenCalled();
+  });
+});

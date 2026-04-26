@@ -30,6 +30,12 @@ type RegisterTxEntry = {
   action: string;
 };
 
+type PublishedPendingSbtLink = {
+  address: string;
+  label: string;
+  href: string;
+};
+
 type SessionPublishSummaryProps = {
   isNormalMode: boolean;
   wizardMode: string;
@@ -81,6 +87,7 @@ type SessionPublishSummaryProps = {
   registerExplorerBaseUrl: string;
   sessionUrl: string;
   adminUrl: string;
+  publishedPendingSbtLinks: PublishedPendingSbtLink[];
   onCopyAdminUrl: () => void;
   adminUrlStatus: string;
   status: string;
@@ -138,6 +145,7 @@ const SessionPublishSummary = ({
   registerExplorerBaseUrl,
   sessionUrl,
   adminUrl,
+  publishedPendingSbtLinks,
   onCopyAdminUrl,
   adminUrlStatus,
   status,
@@ -490,6 +498,17 @@ const SessionPublishSummary = ({
             </Button>
           </div>
         ) : null}
+        {publishedPendingSbtLinks.map((entry) => (
+          <div
+            key={entry.address}
+            className={styles.linkRow}
+            data-testid="ce-wizard-published-sbt-link"
+            data-ce-sbt-address={entry.address}
+          >
+            <span className={styles.linkLabel}>SBT:</span>
+            <a href={entry.href} target="_blank" rel="noopener noreferrer">{entry.label}</a>
+          </div>
+        ))}
         {adminUrlStatus ? <div className={styles.copyStatus}>{adminUrlStatus}</div> : null}
         {status ? <div className={styles.statusNote}>{status}</div> : null}
       </div>
