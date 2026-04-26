@@ -8,6 +8,8 @@ const { execFileSync, spawnSync } = require('node:child_process');
 
 const SCRIPT_SOURCE_PATH = path.join(__dirname, 'sync-public-history.sh');
 const HELPER_SOURCE_PATH = path.join(__dirname, 'lib', 'public-release-strip-patterns.sh');
+const PRIVATE_BRANCH_GUARD_INSTALLER_SOURCE_PATH = path.join(__dirname, 'install-private-branch-guard.sh');
+const PRE_PUSH_HOOK_SOURCE_PATH = path.join(__dirname, '..', '.githooks', 'pre-push');
 const TEST_TMP_ROOT = path.join(__dirname, '.tmp-sync-public-history-tests');
 
 function writeFile(rootDir, relativePath, contents) {
@@ -31,6 +33,19 @@ function installSyncScriptFixture(sourceDir) {
     path.join('scripts', 'lib', 'public-release-strip-patterns.sh'),
     fs.readFileSync(HELPER_SOURCE_PATH, 'utf8'),
   );
+  writeFile(
+    sourceDir,
+    path.join('scripts', 'install-private-branch-guard.sh'),
+    fs.readFileSync(PRIVATE_BRANCH_GUARD_INSTALLER_SOURCE_PATH, 'utf8'),
+  );
+  writeFile(
+    sourceDir,
+    path.join('.githooks', 'pre-push'),
+    fs.readFileSync(PRE_PUSH_HOOK_SOURCE_PATH, 'utf8'),
+  );
+  fs.chmodSync(path.join(sourceDir, 'scripts', 'sync-public-history.sh'), 0o755);
+  fs.chmodSync(path.join(sourceDir, 'scripts', 'install-private-branch-guard.sh'), 0o755);
+  fs.chmodSync(path.join(sourceDir, '.githooks', 'pre-push'), 0o755);
 }
 
 function commitAll(rootDir, message, { authorDate, committerDate }) {
@@ -150,6 +165,27 @@ test('sync-public-history accepts an explicit source branch', () => {
     assert.equal(result.status, 0);
     assert.match(result.stdout, /Source branch: dev-public-sync/);
     assert.match(result.stdout, /Branch name: release-candidate/);
+  });
+});
+
+test('sync-public-history installs the private dev push guard before replaying', () => {
+  withSourceRepo(({ sourceDir }) => {
+    git(sourceDir, ['branch', '--set-upstream-to=origin/main', 'dev'], { stdio: 'ignore' });
+
+    const result = runSyncScript(sourceDir, ['--dry-run']);
+
+    assert.equal(result.status, 0);
+    assert.equal(git(sourceDir, ['config', '--local', '--get', 'core.hooksPath']).trim(), '.githooks');
+
+    const upstreamResult = spawnSync(
+      'git',
+      ['rev-parse', '--abbrev-ref', '--symbolic-full-name', 'dev@{upstream}'],
+      {
+        cwd: sourceDir,
+        encoding: 'utf8',
+      },
+    );
+    assert.notEqual(upstreamResult.status, 0);
   });
 });
 
