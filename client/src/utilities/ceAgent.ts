@@ -180,17 +180,11 @@ const getState = () => {
   };
 };
 
-export const resolvePolisReportSessionSlug = ({
-  params = {},
-  state = {},
-}: {
-  params?: CeAgentRecord;
-  state?: CeAgentRecord;
-} = {}): string => (
+export const resolvePolisReportSessionSlug = ({ params = {}, state = {} } = {}) => (
   toStr(params?.sessionSlug || params?.slug || state?.activeSessionSlug).trim()
 );
 
-const perform = async (action: unknown): Promise<CeAgentActionResult> => {
+const perform = async (action) => {
   const a = action && typeof action === 'object' ? action : null;
   const actionRecord = a as CeAgentAction | null;
   const type = toStr(actionRecord?.type).trim();
