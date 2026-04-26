@@ -1813,7 +1813,7 @@ const contractScripts: any = {
           responseData = await this.getResponse(providerName, responder, qIdB32, groupKeyOrCfg, {
             _resolvedCfg: cfg,
           });
-        } catch (e: any) {
+        } catch (e) {
           contractsLog.warn('[getResponsesByQuestionID] individual response read failed; skipping', { responder, qId: qIdB32, error: e?.message });
         }
         return {
@@ -2138,9 +2138,9 @@ const contractScripts: any = {
       const questionIds = event.args.questionIds.map((q: any) => q.toLowerCase());
 
       const respArray = await Promise.all(
-        questionIds.map((qId: any) => this.getResponse(providerName, responder, qId, groupKeyOrCfg, {
+        questionIds.map((qId) => this.getResponse(providerName, responder, qId, groupKeyOrCfg, {
           _resolvedCfg: cfg,
-        }).catch((e: any) => {
+        }).catch((e) => {
           contractsLog.warn('[getQuestionResponses] individual response read failed; skipping', { qId, error: e?.message });
           return null;
         }))
@@ -2275,9 +2275,8 @@ const contractScripts: any = {
         try {
           respData = await this.getResponse(providerName, responder, qId, groupKeyOrCfg, {
             _resolvedCfg: cfg,
-            forceArweaveFetch,
           });
-        } catch (e: any) {
+        } catch (e) {
           contractsLog.warn('[getQuestionResponsesFullRange] individual response read failed; skipping', { responder, qId, error: e?.message });
         }
         if (!respData) return;
@@ -3179,7 +3178,7 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
   }
   },
 
-  async getResponseHash(providerName: any, userAddress: any, id: any, groupKeyOrCfg: any, opts: any = {}) {
+  async getResponseHash(providerName, userAddress, id, groupKeyOrCfg, opts = {}) {
   const cfg    = (
     opts &&
     typeof opts === 'object' &&
@@ -3241,7 +3240,7 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
   }
   },
 
-  async getResponse(providerName: any, userAddress: any, id: any, groupKeyOrCfg: any, opts: any = {}) {
+  async getResponse(providerName, userAddress, id, groupKeyOrCfg, opts = {}) {
   const cfg    = (
     opts &&
     typeof opts === 'object' &&

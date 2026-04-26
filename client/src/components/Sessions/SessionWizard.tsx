@@ -94,6 +94,7 @@ import {
   withWorkerConfigSyncWarning,
 } from './sessionWizardSecrets.js';
 import { getSbtDisplayName } from '../../utilities/sbt/sbtDisplayNames.js';
+import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { upsertSbtPasswordRecoveryCodes } from '../../utilities/sbt/sbtPasswordRecoveryStore.js';
 import { toStr } from '../../utilities/shared/primitives.js';
 import { notify } from '../../utilities/ui/notify.js';
@@ -119,6 +120,7 @@ import {
 import { buildContractViewerContracts } from '../ContractPage/contractViewerUtils.js';
 import usePendingSbtDrafts, {
   normalizePendingSbtDrafts,
+  type PendingSbtDraft,
 } from './hooks/usePendingSbtDrafts.js';
 import useSessionSlugState from './hooks/useSessionSlugState.js';
 import SessionMetadataEditor from './SessionMetadataEditor';
@@ -379,6 +381,50 @@ export {
   resolveSessionWizardWorkerRpcUrl,
 } from './sessionWizardWorkerRpc';
 
+type PublishedPendingSbtLink = {
+  address: string;
+  label: string;
+  href: string;
+};
+
+export const buildPublishedPendingSbtLinks = ({
+  deployedDrafts = [],
+  pendingDraftSnapshot = [],
+  sessionSlug = '',
+}: {
+  deployedDrafts?: unknown[];
+  pendingDraftSnapshot?: unknown[];
+  sessionSlug?: string;
+} = {}): PublishedPendingSbtLink[] => {
+  const normalizedDeployedDrafts = normalizePendingSbtDrafts(deployedDrafts);
+  const newlyDeployedAddressSet = new Set(
+    normalizedDeployedDrafts
+      .map((entry) => toStr(entry?.predictedAddress || entry?.deployedAddress || entry?.address).trim().toLowerCase())
+      .filter(Boolean)
+  );
+  const finalizedDrafts = normalizePendingSbtDrafts([
+    ...normalizedDeployedDrafts,
+    ...normalizePendingSbtDrafts(pendingDraftSnapshot).filter((entry) => (
+      entry?.deployed === true &&
+      !newlyDeployedAddressSet.has(
+        toStr(entry?.predictedAddress || entry?.deployedAddress || entry?.address).trim().toLowerCase()
+      )
+    )),
+  ]);
+
+  return finalizedDrafts
+    .map((entry: PendingSbtDraft) => {
+      const address = toStr(entry?.deployedAddress || entry?.predictedAddress || entry?.address).trim();
+      if (!address) return null;
+      return {
+        address,
+        label: toStr(entry?.displayName || entry?.name || address).trim() || address,
+        href: buildSbtDetailPath(address, sessionSlug),
+      };
+    })
+    .filter((entry): entry is PublishedPendingSbtLink => !!entry && entry.href !== '#');
+};
+
 type DeployFormState = NonNullable<WorkerPanelProps['deployForm']> & {
   accountId?: string;
   bundleUrl?: string;
@@ -606,6 +652,7 @@ const SessionWizard = ({
   const [status, setStatus] = useState('');
   const [sessionUrl, setSessionUrl] = useState('');
   const [adminUrl, setAdminUrl] = useState('');
+  const [publishedPendingSbtLinks, setPublishedPendingSbtLinks] = useState<PublishedPendingSbtLink[]>([]);
   const [adminUrlStatus, setAdminUrlStatus] = useState('');
   const [publishAdvancedOpen, setPublishAdvancedOpen] = useState(false);
   const [publishStep, setPublishStep] = useState(0); // 0=idle, 1=deploying sbts/uploading, 2=uploading, 3=registering, 4=done
@@ -4028,6 +4075,7 @@ const SessionWizard = ({
     if (publishBusy) return;
     setPublishStep(0);
     setSessionUrl('');
+    setPublishedPendingSbtLinks([]);
     const slugValidationError = getSessionSlugValidationError(draft?.slug);
     if (slugValidationError) {
       setStatus(slugValidationError);
@@ -4125,6 +4173,11 @@ const SessionWizard = ({
           )
         )),
       ]);
+      setPublishedPendingSbtLinks(buildPublishedPendingSbtLinks({
+        deployedDrafts: normalizedDeployedPendingDrafts,
+        pendingDraftSnapshot,
+        sessionSlug: toStr(draft?.slug).trim(),
+      }));
       setPendingSbtDrafts([]);
       setPublishStep(publishStepNumbers.done);
     } catch (err) {
@@ -5809,6 +5862,7 @@ const SessionWizard = ({
           registerExplorerBaseUrl={registerExplorerBaseUrl}
           sessionUrl={sessionUrl}
           adminUrl={adminUrl}
+          publishedPendingSbtLinks={publishedPendingSbtLinks}
           onCopyAdminUrl={handleCopyAdminUrl}
           adminUrlStatus={adminUrlStatus}
           status={status}

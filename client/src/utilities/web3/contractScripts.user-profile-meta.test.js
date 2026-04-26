@@ -865,4 +865,45 @@ describe('contractScripts user profile metadata wrappers', () => {
       expect.objectContaining({ _resolvedCfg: groupCfg })
     );
   });
+
+  it('uses _resolvedCfg when getResponse is called with an unresolved group reference', async () => {
+    const groupCfg = makeProfileGroupCfg('edge', 1000);
+    const contractGetResponse = jest.fn().mockResolvedValue(ethers.constants.HashZero);
+
+    jest.spyOn(ethers, 'Contract').mockImplementation(() => ({
+      getResponse: contractGetResponse,
+    }));
+
+    const result = await contractScripts.getResponse(
+      'none',
+      TEST_PROFILE_ADDRESS,
+      `0x${'11'.repeat(32)}`,
+      'missing-session',
+      { _resolvedCfg: groupCfg }
+    );
+
+    expect(result).toBeNull();
+    expect(contractGetResponse).toHaveBeenCalledTimes(1);
+  });
+
+  it('passes resolved cfg through block-window lookups during question-response scans', async () => {
+    const groupCfg = makeProfileGroupCfg('edge-pass-through', 1000);
+    const blockWindowSpy = jest
+      .spyOn(contractScripts, 'getRelevantBlockWindowForFilter')
+      .mockResolvedValue({ fromBlock: 200, toBlock: 100 });
+
+    const questionIds = await contractScripts.getQuestionResponsesByAddress(
+      'none',
+      TEST_PROFILE_ADDRESS,
+      200,
+      100,
+      groupCfg
+    );
+
+    expect(questionIds).toEqual([]);
+    expect(blockWindowSpy).toHaveBeenCalledWith(
+      groupCfg,
+      expect.objectContaining({ _resolvedCfg: groupCfg })
+    );
+  });
 });

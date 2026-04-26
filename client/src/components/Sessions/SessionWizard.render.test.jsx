@@ -286,6 +286,8 @@ jest.mock('../../variables/appConfig.js', () => {
 });
 
 import SessionWizard, {
+  buildPublishedPendingSbtLinks,
+  getSessionWizardPublishProgressPercent,
   REQUIRED_SESSION_SLUG_ERROR,
   RESERVED_SESSION_SLUG_ERROR,
   deploySessionWizardPendingSbtDraft,
@@ -2736,6 +2738,42 @@ describe('SessionWizard rendered validation', () => {
       name: 'Pending SBT',
       metadataPreview: { phase: 'deployed' },
     }]);
+  });
+
+  it('builds published inline SBT links from newly deployed and resumed pending drafts', () => {
+    expect(buildPublishedPendingSbtLinks({
+      deployedDrafts: [{
+        predictedAddress: mockPendingSbtAddress,
+        deployedAddress: mockPendingSbtAddress,
+        displayName: 'Newly Deployed Group',
+        deployed: true,
+      }],
+      pendingDraftSnapshot: [
+        {
+          predictedAddress: mockPendingSbtAddress,
+          deployedAddress: mockPendingSbtAddress,
+          displayName: 'Newly Deployed Group',
+          deployed: true,
+        },
+        {
+          predictedAddress: mockSecondPendingSbtAddress,
+          deployedAddress: mockSecondPendingSbtAddress,
+          deployed: true,
+        },
+      ],
+      sessionSlug: 'writers-room',
+    })).toEqual([
+      {
+        address: mockPendingSbtAddress,
+        label: 'Newly Deployed Group',
+        href: buildSbtDetailPath(mockPendingSbtAddress, 'writers-room'),
+      },
+      {
+        address: mockSecondPendingSbtAddress,
+        label: mockSecondPendingSbtAddress,
+        href: buildSbtDetailPath(mockSecondPendingSbtAddress, 'writers-room'),
+      },
+    ]);
   });
 
   it('persists published pending SBT recovery codes to the scoped recovery store', () => {

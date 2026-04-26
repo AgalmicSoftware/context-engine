@@ -74,6 +74,10 @@ import {
   resolveValidatedSessionScanWindow,
 } from '../../utilities/session/sessionScanScope.js';
 import { derivePrimarySessionSlugFromList } from '../../utilities/session/globalSessionState.js';
+import {
+  refreshSessionInfoForSlug,
+  refreshSessionMetaFieldsForSlug,
+} from '../../utilities/session/sessionMetaController.js';
 import { resolveSessionRegistryBootstrapChainIds } from '../../utilities/session/registryBootstrapChainIds.js';
 import { readSbtInstanceListenersMode } from '../../utilities/sbt/sbtInstanceListenersMode.js';
 import { readSbtFullScanPolicy } from '../../utilities/sbt/sbtFullScanPolicy.js';
@@ -1618,29 +1622,24 @@ export class MainSite extends Component {
   refreshSessionInfo = async () => {
     const slug = this.getActiveSessionSlug();
     const cfg = getSessionConfigBySlugOrDefault(slug) || {};
-    const encrypted = cfg?.sessionInfoEncrypted || cfg?.encryptedSessionInfo;
-    if (!encrypted) return;
-
-    const account = this.props.account || '';
-    if (!account) return;
     const litHooks = getGlobalLitHooks();
-    if (!litHooks || typeof litHooks.getKey !== 'function') return;
-
-    const attemptKey = `${slug}|${account}|${encrypted}`;
-    if (this._lastSessionInfoAttempt === attemptKey) return;
-    this._lastSessionInfoAttempt = attemptKey;
-
     try {
-      const value = await cryptoUtils.decryptEnvelopeValue(encrypted, {
-        account,
-        chainId: cfg?.networkChainId || null,
+      const result = await refreshSessionInfoForSlug({
+        slug,
+        cfg,
+        account: this.props.account || '',
         providerLike: this.props.provider,
-        litOpts: { getKey: litHooks.getKey },
+        getKey: litHooks?.getKey,
+        lastAttemptKey: this._lastSessionInfoAttempt,
+        decryptEnvelopeValue: cryptoUtils.decryptEnvelopeValue,
       });
-      const next = (value == null) ? '' : String(value);
-      if (!next) return;
+      this._lastSessionInfoAttempt = result.attemptKey || this._lastSessionInfoAttempt;
+      if (!result.shouldUpdate) return;
       this.setState((prev) => ({
-        sessionInfoOverrides: { ...(prev.sessionInfoOverrides || {}), [slug]: next },
+        sessionInfoOverrides: {
+          ...(prev.sessionInfoOverrides || {}),
+          [slug]: result.nextValue,
+        },
       }));
     } catch (e) { mainSiteLog.warn('MainSite: fallback', e); }
   };
@@ -1648,53 +1647,35 @@ export class MainSite extends Component {
   refreshSessionMetaFields = async () => {
     const slug = this.getActiveSessionSlug();
     const cfg = getSessionConfigBySlugOrDefault(slug) || {};
-    const encryptedFields = cfg?.encryptedFields && typeof cfg.encryptedFields === 'object'
-      ? cfg.encryptedFields
-      : null;
-    if (!encryptedFields) return;
-
-    const account = this.props.account || '';
-    if (!account) return;
     const litHooks = getGlobalLitHooks();
-    if (!litHooks || typeof litHooks.getKey !== 'function') return;
+    try {
+      const result = await refreshSessionMetaFieldsForSlug({
+        slug,
+        cfg,
+        account: this.props.account || '',
+        providerLike: this.props.provider,
+        getKey: litHooks?.getKey,
+        attempts: this._sessionMetaAttempts,
+        decryptEnvelopeValue: cryptoUtils.decryptEnvelopeValue,
+      });
 
-    const decryptField = async (fieldKey, stateKey) => {
-      const encrypted = encryptedFields[fieldKey];
-      if (!encrypted) return;
-      let encryptedKey = '';
-      try {
-        encryptedKey = typeof encrypted === 'string' ? encrypted : JSON.stringify(encrypted);
-      } catch {
-        encryptedKey = String(encrypted);
-      }
-      const attemptKey = `${slug}|${account}|${fieldKey}|${encryptedKey}`;
-      this._sessionMetaAttempts = this._sessionMetaAttempts || {};
-      if (this._sessionMetaAttempts[attemptKey]) return;
-      this._sessionMetaAttempts[attemptKey] = true;
+      this._sessionMetaAttempts = result.attempts;
+      result.errors.forEach(({ error }) => {
+        mainSiteLog.warn('MainSite: fallback', error);
+      });
 
-      try {
-        const value = await cryptoUtils.decryptEnvelopeValue(encrypted, {
-          account,
-          chainId: cfg?.networkChainId || null,
-          providerLike: this.props.provider,
-          litOpts: { getKey: litHooks.getKey },
+      if (!Object.keys(result.patches || {}).length) return;
+      this.setState((prev) => {
+        const nextState = {};
+        Object.entries(result.patches).forEach(([stateKey, patch]) => {
+          nextState[stateKey] = {
+            ...(prev[stateKey] || {}),
+            ...patch,
+          };
         });
-        const next = (value == null) ? '' : String(value);
-        if (!next) return;
-        this.setState((prev) => ({
-          [stateKey]: { ...(prev[stateKey] || {}), [slug]: next },
-        }));
-      } catch (e) { mainSiteLog.warn('MainSite: fallback', e); }
-    };
-
-    const nameFieldKey = Object.prototype.hasOwnProperty.call(encryptedFields, 'sessionName')
-      ? 'sessionName'
-      : null;
-
-    await Promise.all([
-      nameFieldKey ? decryptField(nameFieldKey, 'sessionNameOverrides') : Promise.resolve(),
-      decryptField('sessionHeader', 'sessionHeaderOverrides'),
-    ]);
+        return nextState;
+      });
+    } catch (e) { mainSiteLog.warn('MainSite: fallback', e); }
   };
 
   refreshGroupCredentials = async () => {

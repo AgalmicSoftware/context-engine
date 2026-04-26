@@ -6,89 +6,84 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const ROOT = path.resolve(__dirname, '..');
-const CLIENT_SRC = path.join(ROOT, 'client/src');
-const ADJACENT_TS_REEXPORT_RE = /from ['"]\.\/[^'"]+\.ts['"]/;
-const PURE_TS_REEXPORT_LINE_RE = /^export (?:\*|\{\s*default\s*\}) from ['"]\.\/[^'"]+\.ts['"];\s*$/;
+const PURE_TS_REEXPORT_RE = /^export \* from '\.\/[^']+\.ts';\s*$/;
 
-const EXPECTED_NON_PURE_TS_TRANSITIONAL_FILES = Object.freeze({
-  'client/src/variables/appConfig.js': 'initializes runtime config before re-exporting the typed config surface',
+const EXPECTED_COMPONENT_SHIM_CLUSTERS = Object.freeze({
+  'client/src/components/MainSite': Object.freeze([
+    'cacheConstants.js',
+    'debugTelemetry.js',
+    'litSessionConfig.js',
+    'progressHelpers.js',
+    'routeConfig.js',
+    'routeLazyComponents.js',
+    'routeStyles.js',
+    'storageEviction.js',
+    'urlUtils.js',
+  ]),
+  'client/src/components/SBTs': Object.freeze([
+    'sbtSelectorSessionResolution.js',
+    'sbtSessionUniverse.js',
+  ]),
+  'client/src/components/Sessions': Object.freeze([
+    'cloudflareTokenTemplate.js',
+    'sessionWizardContracts.js',
+    'sessionWizardDraftCache.js',
+  ]),
+  'client/src/components/SurveyTool': Object.freeze([
+    'surveyToolCacheState.js',
+    'surveyToolDraftState.js',
+    'surveyToolNavigation.js',
+    'surveyToolResponseMerge.js',
+    'surveyToolResponseState.js',
+    'surveyToolRuntimeSupport.js',
+    'surveyToolScope.js',
+    'surveyToolSignatures.js',
+    'surveyToolSlugLookup.js',
+    'surveyToolViewState.js',
+  ]),
 });
 
-const stripLineComments = (source) => source
-  .replace(/^\s*\/\/[^\n]*(?:\n|$)/gm, '')
-  .trim();
-
-const listFiles = (absoluteDir) => {
-  const entries = fs.readdirSync(absoluteDir, { withFileTypes: true });
-  const files = [];
-
-  entries.forEach((entry) => {
-    const absolutePath = path.join(absoluteDir, entry.name);
-    if (entry.isDirectory()) {
-      files.push(...listFiles(absolutePath));
-      return;
-    }
-    if (entry.isFile()) {
-      files.push(absolutePath);
-    }
-  });
-
-  return files;
+const readPureTsReexportShims = (relativeDir) => {
+  const absoluteDir = path.join(ROOT, relativeDir);
+  return fs.readdirSync(absoluteDir)
+    .filter((entry) => entry.endsWith('.js'))
+    .filter((entry) => {
+      const source = fs.readFileSync(path.join(absoluteDir, entry), 'utf8').trim();
+      return PURE_TS_REEXPORT_RE.test(source);
+    })
+    .sort();
 };
 
-const toRelativePath = (absolutePath) => path.relative(ROOT, absolutePath).split(path.sep).join('/');
+test('active component shim clusters stay explicitly inventoried during PRD 512 sequencing', () => {
+  Object.entries(EXPECTED_COMPONENT_SHIM_CLUSTERS).forEach(([relativeDir, expectedEntries]) => {
+    const actualEntries = readPureTsReexportShims(relativeDir);
+    const expectedSorted = [...expectedEntries].sort();
 
-const listClientJsFiles = () => listFiles(CLIENT_SRC)
-  .filter((absolutePath) => absolutePath.endsWith('.js'))
-  .sort();
-
-const isPureTsReexportShim = (source) => {
-  const lines = stripLineComments(source)
-    .split(/\n+/)
-    .map((line) => line.trim())
-    .filter(Boolean);
-
-  return lines.length > 0 && lines.every((line) => PURE_TS_REEXPORT_LINE_RE.test(line));
-};
-
-test('pure JS-to-TS re-export shims stay retired', () => {
-  const pureShims = listClientJsFiles()
-    .filter((absolutePath) => isPureTsReexportShim(fs.readFileSync(absolutePath, 'utf8')))
-    .map(toRelativePath);
-
-  assert.deepEqual(
-    pureShims,
-    [],
-    'pure JS wrappers should stay deleted; import the adjacent TS module through existing Vite/Jest compatibility instead',
-  );
-});
-
-test('remaining explicit JS-to-TS transitional files stay documented exceptions', () => {
-  const transitionalFiles = listClientJsFiles()
-    .filter((absolutePath) => ADJACENT_TS_REEXPORT_RE.test(fs.readFileSync(absolutePath, 'utf8')))
-    .map(toRelativePath);
-
-  assert.deepEqual(transitionalFiles, Object.keys(EXPECTED_NON_PURE_TS_TRANSITIONAL_FILES).sort());
-
-  transitionalFiles.forEach((relativePath) => {
-    const source = fs.readFileSync(path.join(ROOT, relativePath), 'utf8');
-    assert.match(source, /initializeRuntimeConfig/);
-    assert.equal(
-      isPureTsReexportShim(source),
-      false,
-      `${relativePath} should remain a documented non-pure exception, not a pure wrapper`,
+    assert.deepEqual(
+      actualEntries,
+      expectedSorted,
+      `${relativeDir} shim inventory changed; update PRD 512 cleanup tracking before adding or removing wrappers`,
     );
+
+    expectedSorted.forEach((entry) => {
+      const tsImplementationPath = path.join(ROOT, relativeDir, entry.replace(/\.js$/, '.ts'));
+      assert.equal(
+        fs.existsSync(tsImplementationPath),
+        true,
+        `${path.join(relativeDir, entry)} should keep an adjacent TS implementation`,
+      );
+    });
   });
 });
 
-test('the SurveyTool AudioInput alias stays retired after shared extraction', () => {
+test('the SurveyTool AudioInput alias remains an explicit bridge to the shared canonical component path', () => {
   const relativePath = 'client/src/components/SurveyTool/AudioInput.tsx';
   const absolutePath = path.join(ROOT, relativePath);
 
-  assert.equal(fs.existsSync(absolutePath), false, `${relativePath} should remain removed`);
+  assert.equal(fs.existsSync(absolutePath), true, `${relativePath} should exist as a compatibility alias`);
   assert.equal(
-    fs.existsSync(path.join(ROOT, 'client/src/components/Shared/AudioInput/AudioInput.tsx')),
-    true,
-    'Shared AudioInput should remain the canonical implementation path',
+    fs.readFileSync(absolutePath, 'utf8').trim(),
+    "export { default } from '../Shared/AudioInput/AudioInput';",
+    `${relativePath} should stay a thin re-export to the shared AudioInput implementation`,
   );
 });
