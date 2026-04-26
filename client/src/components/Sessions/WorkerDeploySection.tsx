@@ -426,28 +426,62 @@ const WorkerDeploySection = ({
         </div>
       )}
       {(!shouldUseSponsoredAutoDeployFlow || !isNormalMode) && (
-        <details className={styles.legacyWorkerDeployDetails} open={!nativeDeployUrl}>
-          <summary>{nativeDeployUrl ? 'Legacy deploy-helper fallback' : 'Worker deployment'}</summary>
-          <div className={styles.workerDeployPanel}>
-            <div className={styles.workerDeployHeader}>
-              {deployForm.workerName ? (
-                <div className={styles.workerDeployName} data-testid={E2E_TESTIDS.WIZARD_WORKER_NAME}>
-                  {deployForm.workerName}
+        <div className={styles.workerDeployPanel}>
+          <div className={styles.workerDeployHeader}>
+            {deployForm.workerName ? (
+              <div className={styles.workerDeployName} data-testid={E2E_TESTIDS.WIZARD_WORKER_NAME}>
+                {deployForm.workerName}
+              </div>
+            ) : <span />}
+          </div>
+          <div className={styles.workerDeployGrid}>
+            {deployHelperToggle}
+            {shouldShowDeployHelperUrlInput && (
+              <FormGroup>
+                <Label>Deploy-helper URL</Label>
+                <Input
+                  value={deployHelperUrl ?? ''}
+                  placeholder="https://<deploy-helper-name>.<account-subdomain>.workers.dev/"
+                  data-testid={E2E_TESTIDS.WIZARD_DEPLOY_HELPER_URL}
+                  onChange={(e) => setDeployHelperUrl(e.target.value)}
+                />
+              </FormGroup>
+            )}
+            {!isNormalMode && (
+              <FormGroup className={styles.bundleToggleGroup}>
+                <Label>Worker bundle source</Label>
+                <div className={styles.inlineToggleRow}>
+                  <Label className={styles.workerRadio}>
+                    <Input
+                      type="radio"
+                      name="bundleMode"
+                      checked={bundleMode === 'upload'}
+                      data-testid={E2E_TESTIDS.WIZARD_BUNDLE_MODE_UPLOAD}
+                      onChange={() => setBundleMode('upload')}
+                    />
+                    Upload file
+                  </Label>
+                  <Label className={styles.workerRadio}>
+                    <Input
+                      type="radio"
+                      name="bundleMode"
+                      checked={bundleMode === 'url'}
+                      data-testid={E2E_TESTIDS.WIZARD_BUNDLE_MODE_URL}
+                      onChange={() => setBundleMode('url')}
+                    />
+                    Use URL
+                  </Label>
                 </div>
-              ) : (
-                <span />
-              )}
-            </div>
-            <div className={styles.workerDeployGrid}>
-              {deployHelperToggle}
-              {shouldShowDeployHelperUrlInput && (
-                <FormGroup>
-                  <Label>Deploy-helper URL</Label>
+              </FormGroup>
+            )}
+            {isNormalMode ? (
+              <>
+                <FormGroup key="normal-mode-bundle-url">
+                  <Label>Worker bundle URL (release asset)</Label>
                   <Input
-                    value={deployHelperUrl ?? ''}
-                    placeholder="https://<deploy-helper-name>.<account-subdomain>.workers.dev/"
-                    data-testid={E2E_TESTIDS.WIZARD_DEPLOY_HELPER_URL}
-                    onChange={(e) => setDeployHelperUrl(e.target.value)}
+                    value={normalModeBundleUrl ?? ''}
+                    readOnly
+                    data-testid={E2E_TESTIDS.WIZARD_BUNDLE_URL}
                   />
                 </FormGroup>
               )}
@@ -477,18 +511,28 @@ const WorkerDeploySection = ({
                     </Label>
                   </div>
                 </FormGroup>
-              )}
-              {isNormalMode ? (
-                <>
-                  <FormGroup key="normal-mode-bundle-url">
-                    <Label>Worker bundle URL (release asset)</Label>
-                    <Input value={normalModeBundleUrl ?? ''} readOnly data-testid={E2E_TESTIDS.WIZARD_BUNDLE_URL} />
-                    <div className={styles.helperText}>{normalModeBundleHelpText}</div>
-                  </FormGroup>
-                  {showNormalModeManualBundleControls && (
-                    <>
-                      <FormGroup key="normal-mode-bundle-url-override">
-                        <Label>Manual bundle URL override (optional)</Label>
+                {showNormalModeManualBundleControls && (
+                  <>
+                    <FormGroup key="normal-mode-bundle-url-override">
+                      <Label>Manual bundle URL override (optional)</Label>
+                      <Input
+                        type="url"
+                        value={normalModeBundleUrlOverride ?? ''}
+                        placeholder="https://github.com/<org>/<repo>/releases/download/<tag>/sessionCorsWorker.bundle.js"
+                        data-testid={E2E_TESTIDS.WIZARD_BUNDLE_URL_OVERRIDE}
+                        invalid={!!normalModeBundleUrlOverrideValidationError}
+                        onChange={(e) => setNormalModeBundleUrlOverride(e.target.value)}
+                      />
+                      <div className={styles.helperText}>
+                        {manualBundleUrlOverrideHelp}
+                      </div>
+                      {normalModeBundleUrlOverrideValidationError && (
+                        <div className={styles.errorText}>{normalModeBundleUrlOverrideValidationError}</div>
+                      )}
+                    </FormGroup>
+                    <FormGroup key="normal-mode-bundle-file">
+                      <Label>Upload bundle file (optional)</Label>
+                      <div className={styles.bundleFileInputRow}>
                         <Input
                           type="url"
                           value={normalModeBundleUrlOverride ?? ''}
@@ -525,51 +569,13 @@ const WorkerDeploySection = ({
                             Clear bundle file
                           </Button>
                         </div>
-                        <div className={styles.helperText}>{normalModeManualBundleHelpText}</div>
-                        {bundleFile && (
-                          <div className={styles.helperText}>
-                            Using {bundleFile.name || localWorkerBundleFallbackFilePath} for this deploy.
-                          </div>
-                        )}
-                      </FormGroup>
-                    </>
-                  )}
-                </>
-              ) : bundleMode === 'url' ? (
-                <FormGroup key="advanced-mode-bundle-url">
-                  <Label className={styles.fieldLabelRow}>
-                    <span>Worker bundle URL (release asset)</span>
-                    {renderTooltip({
-                      id: 'gw-bundle-url-tip',
-                      content: 'Optional. Leave blank to use the deploy-helper default bundle URL.',
-                      placement: 'right',
-                      testId: 'ce-wizard-worker-tooltip-gw-bundle-url-tip',
-                      ariaLabel: 'Worker bundle URL info',
-                    })}
-                  </Label>
-                  <Input
-                    value={deployForm.bundleUrl ?? ''}
-                    placeholder="https://github.com/<org>/<repo>/releases/latest/download/sessionCorsWorker.bundle.js"
-                    data-testid={E2E_TESTIDS.WIZARD_BUNDLE_URL}
-                    onChange={(e) => setDeployForm((prev) => ({ ...prev, bundleUrl: e.target.value }))}
-                  />
-                </FormGroup>
-              ) : (
-                <FormGroup key="advanced-mode-bundle-file">
-                  <Label>Upload bundle file</Label>
-                  <Input
-                    type="file"
-                    accept=".js,.mjs"
-                    innerRef={advancedBundleFileInputRef}
-                    data-testid={E2E_TESTIDS.WIZARD_BUNDLE_FILE_INPUT}
-                    onChange={(e) => {
-                      const file = e.target.files && e.target.files[0];
-                      setBundleFile(file || null);
-                    }}
-                  />
-                </FormGroup>
-              )}
-              <FormGroup>
+                      )}
+                    </FormGroup>
+                  </>
+                )}
+              </>
+            ) : bundleMode === 'url' ? (
+              <FormGroup key="advanced-mode-bundle-url">
                 <Label className={styles.fieldLabelRow}>
                   <span>Cloudflare API token</span>
                   {renderTooltip({
@@ -582,17 +588,45 @@ const WorkerDeploySection = ({
                   })}
                 </Label>
                 <Input
-                  type="password"
-                  value={deployForm.apiToken ?? ''}
-                  data-testid={E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN}
-                  onChange={(e) => updateApiToken(e.target.value)}
+                  value={deployForm.bundleUrl ?? ''}
+                  placeholder="https://github.com/<org>/<repo>/releases/latest/download/sessionCorsWorker.bundle.js"
+                  data-testid={E2E_TESTIDS.WIZARD_BUNDLE_URL}
+                  onChange={(e) => setDeployForm((prev) => ({ ...prev, bundleUrl: e.target.value }))}
                 />
-                {!isNormalMode && showSponsoredDeployAccessNotice && (
-                  <div className={styles.helperText}>
-                    Deploy access is currently provided by the sponsored bundle. Enter a Cloudflare API token here to
-                    override it.
-                  </div>
-                )}
+              </FormGroup>
+            ) : (
+              <FormGroup key="advanced-mode-bundle-file">
+                <Label>Upload bundle file</Label>
+                <Input
+                  type="file"
+                  accept=".js,.mjs"
+                  innerRef={advancedBundleFileInputRef}
+                  data-testid={E2E_TESTIDS.WIZARD_BUNDLE_FILE_INPUT}
+                  onChange={(e) => {
+                    const file = e.target.files && e.target.files[0];
+                    setBundleFile(file || null);
+                  }}
+                />
+              </FormGroup>
+            )}
+            <FormGroup>
+              <Label className={styles.fieldLabelRow}>
+                <span>Cloudflare API token</span>
+                {renderTooltip({
+                  id: 'gw-cf-token-tip',
+                  content: 'Use the prefilled template link below. It includes Workers/KV/Routes, Account Settings, Tail (read), R2, Pages, Builds, Agents, Observability, and Containers permissions.',
+                  placement: 'right',
+                  testId: 'ce-wizard-worker-tooltip-gw-cf-token-tip',
+                  ariaLabel: 'Cloudflare API token info',
+                })}
+              </Label>
+              <Input
+                type="password"
+                value={deployForm.apiToken ?? ''}
+                data-testid={E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN}
+                onChange={(e) => setDeployForm((prev) => ({ ...prev, apiToken: e.target.value }))}
+              />
+              {!isNormalMode && showSponsoredDeployAccessNotice && (
                 <div className={styles.helperText}>
                   <a
                     href={cloudflareTokenTemplateHref}
