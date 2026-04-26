@@ -42,7 +42,7 @@ const TOOLS = Object.freeze([
   }),
   Object.freeze({
     name: 'PolisReport',
-    description: 'Open a session results view, enable demo data, run cluster analysis, and wait for ready output.',
+    description: 'Open a session results view for an explicit sessionSlug or the current active session, enable demo data, run cluster analysis, and wait for ready output.',
   }),
 ]);
 
@@ -69,5 +69,6 @@ export const describeCeAgentContract = () => ({
   notes: [
     'fill, click, and assertVisible operate on stable data-testid hooks documented in the TestID API.',
     'invokeAi is intentionally narrow and deterministic; broader headless read/create surfaces remain PRD work.',
+    'PolisReport does not silently fall back to a legacy fixture slug; pass params.sessionSlug or select an active session first.',
   ],
 });

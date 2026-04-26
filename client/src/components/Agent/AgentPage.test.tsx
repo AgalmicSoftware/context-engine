@@ -14,6 +14,9 @@ describe('AgentPage', () => {
     expect(screen.getByText('Enabled:')).toBeInTheDocument();
     expect(screen.getByText('no')).toBeInTheDocument();
     expect(screen.getByTestId(E2E_TESTIDS.AGENT_LOG)).toHaveTextContent('Log is empty.');
+    expect(screen.getByTestId(E2E_TESTIDS.AGENT_ACTIONS)).not.toHaveValue(
+      expect.stringContaining('ai-browseruse-75209033')
+    );
   });
 
   it('renders the current contract summary when the agent exposes describe()', () => {

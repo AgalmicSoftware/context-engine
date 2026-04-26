@@ -159,6 +159,10 @@ const getState = () => {
   };
 };
 
+export const resolvePolisReportSessionSlug = ({ params = {}, state = {} } = {}) => (
+  toStr(params?.sessionSlug || params?.slug || state?.activeSessionSlug).trim()
+);
+
 const perform = async (action) => {
   const a = action && typeof action === 'object' ? action : null;
   const type = toStr(a?.type).trim();
@@ -260,7 +264,13 @@ const perform = async (action) => {
     }
 
     if (tool === 'PolisReport') {
-      const sessionSlug = toStr(params.sessionSlug || params.slug || '').trim() || 'ai-browseruse-75209033';
+      const sessionSlug = resolvePolisReportSessionSlug({
+        params,
+        state: getState(),
+      });
+      if (!sessionSlug) {
+        return err('PolisReport: sessionSlug is required when no active session is selected');
+      }
       const navRes = await perform({ type: 'navigate', to: `/session/${encodeURIComponent(sessionSlug)}` });
       if (!navRes.ok) return navRes;
       const readyRes = await perform({ type: 'assertVisible', testId: E2E_TESTIDS.PAGE_SESSION_ROOT, timeoutMs: 240000 });
