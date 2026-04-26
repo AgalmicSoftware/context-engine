@@ -2,6 +2,7 @@ import {
   buildSignedAdminActionAuth,
   buildSignedBootstrapAdminAuth,
   clearAllWorkerSessionTokens,
+  __test__workerAuthTokenCache,
   fetchWorkerWithAuth,
   getWorkerAuthHeaders,
   getWorkerSessionToken,
@@ -137,6 +138,115 @@ describe('workerAuth normalizeWorkerUrl', () => {
   });
 });
 
+describe('workerAuth token cache envelopes', () => {
+  it('normalizes scoped v1 token envelopes', () => {
+    const envelope = __test__workerAuthTokenCache.buildTokenCacheEnvelope({
+      token: 'token-1',
+      exp: 4600,
+      workerUrl: 'https://worker.example/auth/login',
+      sessionSlug: 'edge',
+      address: TEST_ADDRESS,
+      issuedAt: 1000,
+    });
+
+    expect(__test__workerAuthTokenCache.normalizeTokenCacheEntry(envelope, {
+      workerUrl: 'https://worker.example',
+      sessionSlug: 'edge',
+      address: TEST_ADDRESS,
+      nowSeconds: 1200,
+      skewSeconds: 30,
+    })).toEqual(expect.objectContaining({
+      ok: true,
+      token: 'token-1',
+      expiresAt: 4600,
+      issuedAt: 1000,
+      legacy: false,
+    }));
+  });
+
+  it('rejects scoped token envelopes that target a different worker/session/address', () => {
+    const envelope = __test__workerAuthTokenCache.buildTokenCacheEnvelope({
+      token: 'token-1',
+      exp: 4600,
+      workerUrl: 'https://worker.example',
+      sessionSlug: 'edge',
+      address: TEST_ADDRESS,
+      issuedAt: 1000,
+    });
+
+    expect(__test__workerAuthTokenCache.normalizeTokenCacheEntry(envelope, {
+      workerUrl: 'https://other-worker.example',
+      sessionSlug: 'edge',
+      address: TEST_ADDRESS,
+      nowSeconds: 1200,
+    })).toEqual({ ok: false, status: 'scope-mismatch' });
+
+    expect(__test__workerAuthTokenCache.normalizeTokenCacheEntry(envelope, {
+      workerUrl: 'https://worker.example',
+      sessionSlug: 'other-session',
+      address: TEST_ADDRESS,
+      nowSeconds: 1200,
+    })).toEqual({ ok: false, status: 'scope-mismatch' });
+
+    expect(__test__workerAuthTokenCache.normalizeTokenCacheEntry(envelope, {
+      workerUrl: 'https://worker.example',
+      sessionSlug: 'edge',
+      address: NEXT_TEST_ADDRESS,
+      nowSeconds: 1200,
+    })).toEqual({ ok: false, status: 'scope-mismatch' });
+  });
+
+  it('keeps legacy token entries readable only when they still have a valid expiry', () => {
+    expect(__test__workerAuthTokenCache.normalizeTokenCacheEntry({
+      token: 'legacy-token',
+      exp: 4600,
+    }, {
+      nowSeconds: 1200,
+      skewSeconds: 30,
+    })).toEqual(expect.objectContaining({
+      ok: true,
+      token: 'legacy-token',
+      legacy: true,
+    }));
+
+    expect(__test__workerAuthTokenCache.normalizeTokenCacheEntry({
+      token: 'legacy-token',
+    }, {
+      nowSeconds: 1200,
+    })).toEqual({ ok: false, status: 'missing-expiry' });
+  });
+
+  it('rejects scoped v1 token envelopes with excessive cache lifetimes', () => {
+    const envelope = __test__workerAuthTokenCache.buildTokenCacheEnvelope({
+      token: 'token-1',
+      exp: 1000 + (25 * 60 * 60),
+      workerUrl: 'https://worker.example',
+      sessionSlug: 'edge',
+      address: TEST_ADDRESS,
+      issuedAt: 1000,
+    });
+
+    expect(__test__workerAuthTokenCache.normalizeTokenCacheEntry(envelope, {
+      workerUrl: 'https://worker.example',
+      sessionSlug: 'edge',
+      address: TEST_ADDRESS,
+      nowSeconds: 1200,
+    })).toEqual({ ok: false, status: 'ttl-too-long' });
+
+    expect(__test__workerAuthTokenCache.normalizeTokenCacheEntry(envelope, {
+      workerUrl: 'https://worker.example',
+      sessionSlug: 'edge',
+      address: TEST_ADDRESS,
+      nowSeconds: 1200,
+      maxTtlSeconds: 26 * 60 * 60,
+    })).toEqual(expect.objectContaining({
+      ok: true,
+      token: 'token-1',
+      legacy: false,
+    }));
+  });
+});
+
 describe('workerAuth canonical session resolution', () => {
   const originalFetch = global.fetch;
   const authContext = {
@@ -253,6 +363,37 @@ describe('workerAuth canonical session resolution', () => {
     });
   });
 
+  it('writes scoped v1 token envelopes after successful login', async () => {
+    const exp = Math.floor(Date.now() / 1000) + 3600;
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce(jsonResp(200, { nonce: 'nonce-1' }))
+      .mockResolvedValueOnce(jsonResp(200, { token: 'token-1', exp }));
+
+    await expect(getWorkerSessionToken({
+      sessionSlug: 'edge',
+      workerUrl: 'https://worker.example/auth/login',
+      context: authContext,
+    })).resolves.toBe('token-1');
+
+    expect(new Headers(global.fetch.mock.calls[0][1].headers).get('X-Anonymous-Client-Id')).toMatch(/^[a-z0-9_-]{8,128}$/);
+    expect(new Headers(global.fetch.mock.calls[1][1].headers).get('X-Anonymous-Client-Id')).toBeNull();
+
+    const cacheKey = __test__workerAuthTokenCache.buildTokenCacheKey({
+      workerUrl: 'https://worker.example',
+      slug: 'edge',
+      address: TEST_ADDRESS,
+    });
+    expect(JSON.parse(localStorage.getItem(cacheKey))).toEqual(expect.objectContaining({
+      v: 1,
+      workerUrl: 'https://worker.example',
+      sessionSlug: 'edge',
+      address: TEST_ADDRESS,
+      expiresAt: exp,
+      token: 'token-1',
+    }));
+  });
+
   it('keeps explicit demo fallback opt-in fail-closed when no shipped demo session exists', async () => {
     global.fetch = jest
       .fn()
@@ -308,7 +449,8 @@ describe('workerAuth canonical session resolution', () => {
     }));
 
     await expect(tokenPromise).rejects.toMatchObject({ name: 'AbortError' });
-    expect(localStorage.length).toBe(0);
+    expect(Object.keys(localStorage).filter((key) => key.startsWith('ce:workerToken:v1:'))).toHaveLength(0);
+    expect(localStorage.getItem('ce:anonClientId:v1')).toMatch(/^[a-z0-9_-]{8,128}$/);
   });
 
   it('new request after logout/account-switch with stale context cannot reach /auth/login', async () => {
@@ -386,6 +528,7 @@ describe('workerAuth bootstrap admin signing', () => {
       sessionSlug: 'edge',
       adminAction: true,
     });
+    expect(new Headers(global.fetch.mock.calls[0][1].headers).get('X-Anonymous-Client-Id')).toMatch(/^[a-z0-9_-]{8,128}$/);
     expect(mockProviderRequest).toHaveBeenCalledWith(expect.objectContaining({
       method: 'eth_signTypedData_v4',
       params: [TEST_ADDRESS, expect.any(String)],
@@ -412,6 +555,7 @@ describe('workerAuth bootstrap admin signing', () => {
       sessionSlug: 'edge',
       adminAction: true,
     });
+    expect(new Headers(global.fetch.mock.calls[0][1].headers).get('X-Anonymous-Client-Id')).toMatch(/^[a-z0-9_-]{8,128}$/);
     expect(auth).toEqual({
       address: TEST_ADDRESS,
       message: expect.stringContaining('Admin request: bootstrap arweave upload'),

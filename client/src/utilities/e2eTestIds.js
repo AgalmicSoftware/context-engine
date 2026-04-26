@@ -47,6 +47,9 @@ const E2E_TESTIDS = Object.freeze({
   PAGE_MATRIX_ROOT: 'ce-page-matrix-root',
   PAGE_AGENT_ROOT: 'ce-page-agent-root',
   PAGE_DEBATE_ROOT: 'ce-page-debate-root',
+  DEBATE_VIEW_MODE: 'ce-debate-view-mode',
+  ATLAS_NODE: 'ce-atlas-node',
+  ATLAS_TITLE_ACTION: 'ce-atlas-title-action',
   ATLAS_HISTORICAL_CASE_CARD: 'ce-atlas-historical-case-card',
   ATLAS_HISTORICAL_CASE_EXPAND: 'ce-atlas-historical-case-expand',
   ATLAS_HISTORICAL_CASE_DETAIL: 'ce-atlas-historical-case-detail',
@@ -73,11 +76,25 @@ const E2E_TESTIDS = Object.freeze({
   TOOL_EXPLORER_DATA_VIEW: 'ce-tool-explorer-data-view',
   DATABASE_VIEW_DEMO_TOGGLE: 'ce-database-view-demo-toggle',
   DATABASE_VIEW_PANEL: 'ce-database-view-panel',
+  DATABASE_PHOTO_SOURCE_CARD: 'ce-database-photo-source-card',
+  DATABASE_PHOTO_SOURCE_PREVIEW: 'ce-database-photo-source-preview',
+  DATABASE_PHOTO_SOURCE_ANALYSIS_TOGGLE: 'ce-database-photo-source-analysis-toggle',
+  DATABASE_PHOTO_SOURCE_ANALYSIS_BODY: 'ce-database-photo-source-analysis-body',
+  DATABASE_TITLE_INPUT: 'ce-database-title-input',
+  DATABASE_ADD_LIBRARY_BUTTON: 'ce-database-add-library-button',
+  DATABASE_LIBRARY_ANALYZE_TOGGLE: 'ce-database-library-analyze-toggle',
+  DATABASE_IMAGE_CHOOSER: 'ce-database-image-chooser',
+  DATABASE_IMAGE_PASTE: 'ce-database-image-paste',
+  DATABASE_IMAGE_UPLOAD: 'ce-database-image-upload',
+  DATABASE_IMAGE_FILE_INPUT: 'ce-database-image-file-input',
   DATABASE_SAVE_DOCS_TOGGLE: 'ce-database-save-docs-toggle',
   DATABASE_SAVE_DOCS_AUDIENCE_BUTTON: 'ce-database-save-docs-audience-button',
   DATABASE_SAVE_DOCS_AUDIENCE_MENU: 'ce-database-save-docs-audience-menu',
   DATABASE_SAVE_DOCS_AUDIENCE_SELF: 'ce-database-save-docs-audience-self',
   DATABASE_SAVE_DOCS_AUDIENCE_SESSION: 'ce-database-save-docs-audience-session',
+  DATABASE_QUESTION_COUNT_VALUE: 'ce-database-question-count-value',
+  DATABASE_QUESTION_COUNT_DECREMENT: 'ce-database-question-count-decrement',
+  DATABASE_QUESTION_COUNT_INCREMENT: 'ce-database-question-count-increment',
 
   SESSION_RESULTS_TOGGLE: 'ce-session-results-toggle',
   SURVEY_FILTER_TOGGLE: 'ce-survey-filter-toggle',
@@ -191,7 +208,7 @@ const E2E_TESTIDS = Object.freeze({
   QUESTION_FILTER_AI_APPLY: 'ce-question-filter-ai-apply',
   QUESTION_FILTER_CLEAR_ALL: 'ce-question-filter-clear-all',
 
-  // CreateSurvey (authoring)
+  // CreateQuestionsAndSurveys (authoring)
   CREATE_PANEL: 'ce-create-panel',
   CREATE_MODE_SWITCH: 'ce-create-mode-switch',
   CREATE_CLEAR: 'ce-create-clear',
@@ -234,9 +251,11 @@ const E2E_TESTIDS = Object.freeze({
   DOC_AUDIENCE_CUSTOM: 'ce-doc-audience-custom',
   DOC_CUSTOM_SBT_INPUT: 'ce-doc-custom-sbt-input',
   DOC_CUSTOM_SBT_ADD: 'ce-doc-custom-sbt-add',
+  DOC_CUSTOM_SBT_SELECTOR: 'ce-doc-custom-sbt-selector',
   DOC_CUSTOM_MODE_ANY: 'ce-doc-custom-mode-any',
   DOC_CUSTOM_MODE_ALL: 'ce-doc-custom-mode-all',
   DOC_ROW: 'ce-doc-row',
+  DOC_ROW_IMAGE_PREVIEW: 'ce-doc-row-image-preview',
   DOC_ROW_VIEW: 'ce-doc-row-view',
   DOC_ROW_OPEN_ARWEAVE: 'ce-doc-row-open-arweave',
   DOC_VIEWER: 'ce-doc-viewer',
@@ -294,6 +313,4 @@ const E2E_TESTIDS = Object.freeze({
   SBT_PAGE_OPEN_MINT_URL: 'ce-sbt-page-open-mint-url',
 });
 
-module.exports = {
-  E2E_TESTIDS,
-};
+module.exports = { E2E_TESTIDS };

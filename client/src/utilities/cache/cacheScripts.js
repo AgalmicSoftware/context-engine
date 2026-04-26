@@ -35,6 +35,7 @@ const MANAGED_NAMESPACE_LIST = [
   'filters',
   'sbtCache',
   'userCache',
+  'analysisCache',
 ];
 const MANAGED_NAMESPACES = new Set(MANAGED_NAMESPACE_LIST);
 

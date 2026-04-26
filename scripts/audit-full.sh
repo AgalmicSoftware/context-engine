@@ -19,14 +19,14 @@ TIMESTAMP=$(date +%Y%m%d-%H%M%S)
 # Domain → file sets
 declare -A DOMAINS
 DOMAINS[worker]="workers/sessionCorsWorker/worker.js workers/deploy-helper/worker.js"
-DOMAINS[crypto]="client/src/utilities/crypto/ client/src/utilities/web3/contractScripts.impl.js"
+DOMAINS[crypto]="client/src/utilities/crypto/ client/src/utilities/web3/contractScripts.impl.ts client/src/utilities/web3/sessionRegistry.ts"
 DOMAINS[client]="client/src/reducers/ client/src/utilities/session/ client/src/utilities/worker/ client/src/components/SBTs/SBTPage.jsx client/src/components/SurveyTool/SurveyTool.jsx"
 DOMAINS[cecc]="contextEngine-cc/lib/ contextEngine-cc/hook/"
-DOMAINS[rpc]="client/src/utilities/web3/rpcReadCache.js client/src/utilities/web3/appRpcSelection.js client/src/utilities/web3/rpcDebugStats.js"
+DOMAINS[rpc]="client/src/utilities/web3/rpcReadCache.ts client/src/utilities/web3/rpcSelection.ts client/src/utilities/web3/rpcDebugStats.ts"
 DOMAINS[arweave]="client/src/utilities/arweave/"
 DOMAINS[userpage]="client/src/components/UserPage/ client/src/utilities/cache/"
 DOMAINS[sbts]="client/src/components/SBTs/ client/src/utilities/sbt/"
-DOMAINS[porto]="client/src/utilities/web3/portoFunctions.js client/src/utilities/web3/sponsoredAccess.js"
+DOMAINS[porto]="client/src/utilities/web3/portoFunctions.ts client/src/utilities/web3/sponsoredAccess.ts"
 DOMAINS[contracts]="contracts/CustomSBT.sol contracts/SessionRegistry.sol contracts/Surveys.sol contracts/SBTFactory.sol"
 DOMAINS[ai]="client/src/utilities/ai/ client/src/components/Shared/AudioInput/AudioInput.jsx"
 DOMAINS[survey]="client/src/components/SurveyTool/ client/src/utilities/survey/"
@@ -45,7 +45,7 @@ AUDIT_FILE="/tmp/ce-full-audit-${DOMAIN}-${TIMESTAMP}.txt"
 echo "Collecting source files for domain: $DOMAIN"
 for target in $TARGETS; do
   if [ -d "$target" ]; then
-    find "$target" \( -name '*.js' -o -name '*.mjs' -o -name '*.jsx' \) \
+    find "$target" \( -name '*.js' -o -name '*.mjs' -o -name '*.jsx' -o -name '*.ts' -o -name '*.tsx' \) \
       ! -name '*.test.*' ! -name '*.spec.*' ! -path '*/node_modules/*' \
       -print0 | sort -z | while IFS= read -r -d '' f; do
         echo "===== $f =====" >> "$AUDIT_FILE"

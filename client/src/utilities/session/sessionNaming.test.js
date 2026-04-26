@@ -1,9 +1,11 @@
 import {
   mergeSessionContractMaps,
+  normalizeRegistrySessionSlugForWrite,
   normalizeSessionSlug,
   resolveSessionConfigAliases,
   resolveSessionContractRef,
   resolveSessionSlugFromPathname,
+  validateRegistrySessionSlugForWrite,
 } from './sessionNaming.js';
 
 describe('sessionNaming helpers', () => {
@@ -96,6 +98,40 @@ describe('sessionNaming helpers', () => {
     expect(normalizeSessionSlug('Team A!')).toBe('Team A!');
     expect(normalizeSessionSlug('General')).toBe('');
     expect(normalizeSessionSlug('DEBATE')).toBe('DEBATE');
+  });
+
+  it('normalizes registry slugs for new writes without changing legacy read normalization', () => {
+    expect(normalizeRegistrySessionSlugForWrite(' Team_A-1 ')).toBe('team_a-1');
+    expect(normalizeRegistrySessionSlugForWrite('')).toBe('general');
+    expect(normalizeRegistrySessionSlugForWrite('General')).toBe('general');
+    expect(normalizeSessionSlug('TeamA')).toBe('TeamA');
+  });
+
+  it('validates registry slugs before new SessionRegistry writes', () => {
+    expect(validateRegistrySessionSlugForWrite(' Team_A-1 ')).toEqual({
+      ok: true,
+      slug: 'team_a-1',
+      changed: true,
+      reason: '',
+      error: '',
+    });
+
+    expect(validateRegistrySessionSlugForWrite('Team A!')).toEqual(expect.objectContaining({
+      ok: false,
+      slug: 'team a!',
+      reason: 'invalid-format',
+    }));
+
+    expect(validateRegistrySessionSlugForWrite('__proto__')).toEqual(expect.objectContaining({
+      ok: false,
+      reason: 'reserved',
+    }));
+
+    expect(validateRegistrySessionSlugForWrite('', { allowDefault: false })).toEqual(expect.objectContaining({
+      ok: false,
+      slug: 'general',
+      reason: 'default-disallowed',
+    }));
   });
 
   it('keeps an explicit general slug when active-session defaults are present', () => {

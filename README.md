@@ -21,8 +21,10 @@ Context Engine is a toolkit for AI-enhanced deliberation and sensemaking in larg
 - Client workflows: Node.js 16.14.2 and npm 9.2.0
 - Foundry (`forge` / `anvil`) for local-chain and root contract test workflows
 
-For client dependency installs, use `npm install --legacy-peer-deps` for now
-until the current peer dependency conflict is fixed.
+The client install contract is tracked via `client/.npmrc`
+(`legacy-peer-deps=true`), so no manual CLI flag is needed even though
+`react-scripts@4.0.3`'s optional TypeScript peer still conflicts with
+`@lit-protocol/contracts@0.9.1`'s strict peer requirement.
 
 ### Clone and Install
 
@@ -35,7 +37,7 @@ npm install
 
 cd client
 nvm use 16
-npm install --legacy-peer-deps
+npm install
 npm run dev
 ```
 
@@ -45,6 +47,14 @@ For testing, run modes, and deeper setup:
 - [docs/testing.md](docs/testing.md)
 - [docs/run-modes.md](docs/run-modes.md)
 - [docs/session-creation-guide.md](docs/session-creation-guide.md)
+
+### Static Frontend Deploy
+
+To host the React frontend on a custom domain with Netlify, build the static
+client bundle and follow the Netlify notes in
+[docs/public-client-config.md#netlify-static-deploy](docs/public-client-config.md#netlify-static-deploy).
+After domain cutover, update the session worker `allowOrigins` list so AI,
+Arweave, auth, and `/health` requests accept the new origin.
 
 ## Features
 
@@ -67,14 +77,14 @@ For testing, run modes, and deeper setup:
 - Summaries and analysis of survey results and response clusters
 - OpenAI, Anthropic, OpenRouter, and custom provider paths
 
-### User and Deployer UX: Passkey sign-on UX  
-- Users log in with a simple Passkey / Biometric flow (native pin, fingerprint, or faceID on phones) 
+### User and Deployer UX: Passkey sign-on UX
+- Users log in with a simple Passkey / Biometric flow (native pin, fingerprint, or faceID on phones)
 - Login flow generates or handles an Ethereum account, which can be used easily with cryptography features
    - Users do not need to know anything about Ethereum or crypto (or take any additional steps) to use the app
 
 
 ### Deployer UX: Sponsored Bundles
-- Deployers can use and set up sponsored bundles of API keys (for storage, EVM transactions, encryption network, AI API) 
+- Deployers can use and set up sponsored bundles of API keys (for storage, EVM transactions, encryption network, AI API)
   - Senstive and organiztional deployments can plug in existing AI Keys, and use local or custom options for storage, encryption, and EVM network functionalities
 
 
@@ -88,7 +98,7 @@ The default public deployment supports hundreds to low thousands of concurrent p
 
 ## Documentation
 
-- Project framing: [Whitepaper/whitepaper.md](Whitepaper/whitepaper.md)
+- Project framing: [whitepaper/whitepaper.md](whitepaper/whitepaper.md)
 - System design, data flows, and file map: [ARCHITECTURE.md](ARCHITECTURE.md)
 - Docs index: [docs/README.md](docs/README.md)
 - User guide / end-to-end session setup: [docs/session-creation-guide.md](docs/session-creation-guide.md)

@@ -5,9 +5,9 @@ the chain configuration lives, and which networks Porto currently supports.
 
 ## Where it lives in this repo
 
-- `client/src/utilities/portoFunctions.js` handles WebAuthn registration/login,
+- `client/src/utilities/web3/portoFunctions.ts` handles WebAuthn registration/login,
   session storage, and the viem wallet client used for Porto transactions.
-- `client/src/components/Account/LoginAndSettingsModal.jsx` wires Porto login/logout,
+- `client/src/components/Account/LoginAndSettingsModal.tsx` wires Porto login/logout,
   restores sessions on load, and syncs Porto to the active group network.
 - `client/src/variables/chains.js` defines chain profiles, Porto relay URLs,
   and Porto-specific metadata (fee tokens and interop support).
@@ -189,8 +189,8 @@ Common env vars for the new CE E2E runners:
 Porto uses the active group network as its chain source:
 
 - `getGroupNetwork()` resolves the chain from group config.
-- `LoginAndSettingsModal.jsx` calls `setPortoChain()` with that chain.
-- `portoFunctions.js` creates a viem wallet client using the resolved chain
+- `LoginAndSettingsModal.tsx` calls `setPortoChain()` with that chain.
+- `portoFunctions.ts` creates a viem wallet client using the resolved chain
   and `getPortoRelayUrl()` from `chains.js`.
 
 To add or change Porto RPCs, edit:

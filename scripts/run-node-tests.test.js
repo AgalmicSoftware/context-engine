@@ -30,6 +30,7 @@ test('collectNodeTestFiles includes static, script, and e2e helper tests when pr
     writeFile(rootDir, 'scripts/verify-test-wiring.test.js');
     writeFile(rootDir, 'scripts/run-node-tests.test.js');
     writeFile(rootDir, 'scripts/lib/e2e/tx.test.js');
+    writeFile(rootDir, 'scripts/lib/e2e/network-default-consumers.test.js');
     writeFile(rootDir, 'scripts/lib/e2e/worker-auth.test.js');
 
     assert.deepEqual(collectNodeTestFiles(rootDir), [
@@ -37,6 +38,7 @@ test('collectNodeTestFiles includes static, script, and e2e helper tests when pr
       'test/client.package.test.js',
       path.join('scripts', 'run-node-tests.test.js'),
       path.join('scripts', 'verify-test-wiring.test.js'),
+      path.join('scripts', 'lib', 'e2e', 'network-default-consumers.test.js'),
       path.join('scripts', 'lib', 'e2e', 'tx.test.js'),
       path.join('scripts', 'lib', 'e2e', 'worker-auth.test.js'),
     ]);

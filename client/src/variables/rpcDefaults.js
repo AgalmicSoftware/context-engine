@@ -1,5 +1,8 @@
 /* eslint-env commonjs */
 
+// Keep this file plain JS: CE-CC, worker helpers, and root node tests import it
+// directly without a TypeScript loader. Update this file alongside rpcDefaults.ts.
+
 const toStr = (value) => (
   typeof value === 'string'
     ? value

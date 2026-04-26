@@ -89,6 +89,9 @@ function setupSourceRepo() {
     });
 
     writeFile(sourceDir, path.join('TODO', 'secret.md'), 'private only\n');
+    writeFile(sourceDir, 'private-pack.manifest.json', 'tracked stale manifest\n');
+    writeFile(sourceDir, path.join('test', 'contextEngineCc.sw-cache-policy.test.mjs'), 'ce-cc only\n');
+    writeFile(sourceDir, path.join('.tmp-review', 'legacy.old.js'), 'temporary review copy\n');
     commitAll(sourceDir, 'Private-only commit', {
       authorDate: '2025-01-03T04:05:06Z',
       committerDate: '2025-01-03T04:05:06Z',
@@ -195,6 +198,9 @@ test('sync-public-history replays public commits, skips private-only commits, an
     const trackedPaths = git(sourceDir, ['ls-tree', '-r', '--name-only', 'release-staging']);
     assert.doesNotMatch(trackedPaths, /^TODO\//m);
     assert.doesNotMatch(trackedPaths, /^contextEngine-cc\//m);
+    assert.doesNotMatch(trackedPaths, /^private-pack\.manifest\.json$/m);
+    assert.doesNotMatch(trackedPaths, /^test\/contextEngineCc\.sw-cache-policy\.test\.mjs$/m);
+    assert.doesNotMatch(trackedPaths, /^\.tmp-review\//m);
 
     const publicFile = git(sourceDir, ['show', 'release-staging:public.txt']);
     assert.equal(publicFile, 'public one\npublic two\n');
@@ -228,6 +234,9 @@ test('sync-public-history refreshes an existing remote PR branch safely without 
     const trackedPaths = git(sourceDir, ['ls-tree', '-r', '--name-only', 'origin/release-staging']);
     assert.doesNotMatch(trackedPaths, /^TODO\//m);
     assert.doesNotMatch(trackedPaths, /^contextEngine-cc\//m);
+    assert.doesNotMatch(trackedPaths, /^private-pack\.manifest\.json$/m);
+    assert.doesNotMatch(trackedPaths, /^test\/contextEngineCc\.sw-cache-policy\.test\.mjs$/m);
+    assert.doesNotMatch(trackedPaths, /^\.tmp-review\//m);
   });
 });
 

@@ -6,8 +6,11 @@ import {
   ADMIN_ACTION_TYPES,
   parseSiweMessage,
   resolveTrustedAdminOrigins,
+  resolveTrustedLoginOrigins,
   validateAdminActionAudience,
+  validateBrowserLoginOrigin,
   validateSiwe,
+  validateTrustedLoginRequestOrigin,
 } from './siweMessageValidation.js';
 
 test('parseSiweMessage trims and extracts SIWE fields from the signed message', () => {
@@ -115,6 +118,121 @@ test('validateSiwe preserves invalid and expired expiration failures and accepts
     now: () => Date.parse('2026-03-11T00:00:00.000Z'),
   }), {
     ok: true,
+  });
+});
+
+test('validateSiwe enforces issuedAt freshness only when requested', () => {
+  const baseSiwe = {
+    domain: 'app.example',
+    uri: 'https://app.example/login',
+    chainId: '84532',
+    nonce: 'nonce-1',
+  };
+
+  assert.deepEqual(validateSiwe(baseSiwe), {
+    ok: true,
+  });
+  assert.deepEqual(validateSiwe(baseSiwe, { requireIssuedAt: true }), {
+    ok: false,
+    error: 'Missing SIWE issuedAt.',
+  });
+  assert.deepEqual(validateSiwe({
+    ...baseSiwe,
+    issuedAt: 'not-a-date',
+  }, { requireIssuedAt: true }), {
+    ok: false,
+    error: 'Invalid SIWE issuedAt.',
+  });
+  assert.deepEqual(validateSiwe({
+    ...baseSiwe,
+    issuedAt: '2026-04-23T12:10:01.000Z',
+  }, {
+    requireIssuedAt: true,
+    now: () => Date.parse('2026-04-23T12:09:00.000Z'),
+    issuedAtFutureSkewMs: 60 * 1000,
+  }), {
+    ok: false,
+    error: 'SIWE issuedAt is too far in the future.',
+  });
+  assert.deepEqual(validateSiwe({
+    ...baseSiwe,
+    issuedAt: '2026-04-23T12:00:00.000Z',
+  }, {
+    requireIssuedAt: true,
+    now: () => Date.parse('2026-04-23T12:06:00.000Z'),
+    maxIssuedAtAgeMs: 5 * 60 * 1000,
+  }), {
+    ok: false,
+    error: 'SIWE message is too old.',
+  });
+  assert.deepEqual(validateSiwe({
+    ...baseSiwe,
+    issuedAt: '2026-04-23T12:00:00.000Z',
+  }, {
+    requireIssuedAt: true,
+    now: () => Date.parse('2026-04-23T12:04:59.000Z'),
+    maxIssuedAtAgeMs: 5 * 60 * 1000,
+  }), {
+    ok: true,
+  });
+});
+
+test('validateTrustedLoginRequestOrigin and validateBrowserLoginOrigin bind login to trusted request origin', () => {
+  const config = { allowOrigins: ['https://app.example'] };
+
+  assert.deepEqual(validateTrustedLoginRequestOrigin({
+    request: { headers: new Headers() },
+    config,
+  }), {
+    ok: false,
+    error: 'Missing Origin for worker login.',
+  });
+
+  assert.deepEqual(validateTrustedLoginRequestOrigin({
+    request: { headers: new Headers({ Origin: 'https://evil.example' }) },
+    config,
+  }), {
+    ok: false,
+    error: 'Untrusted worker login origin.',
+  });
+
+  assert.deepEqual(resolveTrustedLoginOrigins({
+    env: { LOGIN_TRUSTED_ORIGINS: 'https://login.example, http://localhost:3000' },
+    config,
+  }), [
+    'https://app.example',
+    'https://login.example',
+    'http://localhost:3000',
+  ]);
+
+  assert.deepEqual(validateTrustedLoginRequestOrigin({
+    request: { headers: new Headers({ Origin: 'http://localhost:3000' }) },
+    env: { LOGIN_TRUSTED_ORIGINS: 'https://login.example' },
+    config,
+    allowTrustedAdminOrigins: true,
+  }, {
+    resolveTrustedAdminOrigins: () => ['http://localhost:3000'],
+  }), {
+    ok: true,
+    origin: 'http://localhost:3000',
+  });
+
+  assert.deepEqual(validateBrowserLoginOrigin({
+    request: { headers: new Headers({ Origin: 'https://app.example' }) },
+    siwe: { uri: 'https://evil.example' },
+    config,
+  }), {
+    ok: false,
+    error: 'SIWE uri origin does not match request Origin.',
+  });
+
+  assert.deepEqual(validateBrowserLoginOrigin({
+    request: { headers: new Headers({ Origin: 'https://app.example' }) },
+    siwe: { uri: 'https://app.example/login' },
+    config,
+  }), {
+    ok: true,
+    origin: 'https://app.example',
   });
 });
 

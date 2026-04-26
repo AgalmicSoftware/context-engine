@@ -1,0 +1,3591 @@
+/** @file QuestionFilter.tsx */
+
+import React, { Component } from 'react';
+import { connect } from 'react-redux';
+import {
+  FormGroup,
+  Label,
+  Input,
+  Button,
+  Modal,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+} from 'reactstrap';
+import styles from './QuestionFilter.module.scss';
+import SBTFilter from '../SBTs/SBTFilter';
+import GateTooltip from '../Gates/GateTooltip';
+import CETooltip from '../Shared/CETooltip';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import {
+  faFilter,
+  faChevronDown,
+  faStar,
+  faRobot,
+  faSpinner,
+  faLock,
+  faTimes,
+  faClipboard,
+  faBookmark,
+  faCheck,
+  faQuestionCircle,
+  faPlus
+} from '@fortawesome/free-solid-svg-icons';
+import { serializeFilterState, deserializeFilterState } from '../../utilities/survey/filterStateUtils.js';
+import { isFreeformBlankAnswer } from '../../utilities/survey/freeformAnswerUtils.js';
+import { toStr } from '../../utilities/shared/primitives.js';
+
+
+
+import AudioInput from '../Shared/AudioInput/AudioInput';
+import { rankQuestionsAI } from '../../utilities/ai/aiScripts.js';
+import { getLocalAiSettings } from '../../utilities/ai/aiSettings.js';
+import { resolveEncryptionGate } from '../../utilities/crypto/encryptionGates.js';
+import { getSessionConfigBySlug } from '../../utilities/web3/contractScripts.js';
+import {
+  getGateSbtAddresses,
+  normalizeGateMode,
+  resolveSponsoredGateStateForResource,
+  SPONSORED_GATE_STATES,
+} from '../../utilities/web3/sponsoredAccess.js';
+import { createLogger } from '../../utilities/logging.js';
+import {
+  peekCacheSync,
+  readCache,
+  writeCache,
+} from '../../utilities/cache/cacheScripts.js';
+import { measureSync } from '../../utilities/ui/uiPerfStats.js';
+import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
+import { notify } from '../../utilities/ui/notify.js';
+import {
+  resolveQuestionFilterEffectiveSlug,
+  resolveQuestionFilterSessionContext,
+} from './questionFilterSessionResolution.js';
+
+const questionFilterLog = createLogger('questionFilter');
+const FILTER_STORAGE_KEY_PREFIX = 'dg:filters:';
+const getErrorMessage = (error: any, fallback = 'Unknown error') => (
+  typeof error?.message === 'string' && error.message.trim() ? error.message : fallback
+);
+
+
+/**
+ * This component provides the UI and logic for filtering questions based on type, tags,
+ * SBT ownership (creator or responder), popularity, and (when enabled) AI search/ranking.
+ *
+ * The AI-based filter is currently placed at the top but disabled so it cannot be used.
+ * A summary of selected filters is displayed at the top, allowing removal of each filter item by clicking.
+ */
+const DEFAULT_TOP_QUESTIONS_COUNT = 10;
+const DEFAULT_AI_TOP_N = 10;
+const QUESTION_FILTER_RESPONSE_PARSE_MEMO_MAX = 500;
+const EMPTY_FILTER_RESPONSES = Object.freeze({});
+
+const modalStyles = {
+  backgroundColor: 'white',
+  fontSize: '16px'
+};
+
+/* ---------------------------------------------------------------------------
+ * Group-aware helpers (file-local, minimal surface)
+ * -------------------------------------------------------------------------*/
+
+/** Resolve effective session slug:
+ * Priority: URL /session/:slug → Redux activeSessionSlug → props.sessionSlug → '' (general)
+ */
+function resolveEffectiveSlug(props: any = {}) {
+  return resolveQuestionFilterEffectiveSlug({
+    pathname: (typeof window !== 'undefined' && window.location?.pathname) || '',
+    activeSessionSlug: props.activeSessionSlug,
+    sessionSlug: props.sessionSlug,
+  });
+}
+
+function resolveEffectiveSessionContext(props: any = {}) {
+  return resolveQuestionFilterSessionContext({
+    pathname: (typeof window !== 'undefined' && window.location?.pathname) || '',
+    activeSessionSlug: props.activeSessionSlug,
+    sessionSlug: props.sessionSlug,
+    resolveBySlug: getSessionConfigBySlug,
+  });
+}
+
+function resolveFilterStorageSlug(props: any = {}) {
+  const prefix = String(props?.storageKeyPrefix || '').trim();
+  if (prefix.startsWith(FILTER_STORAGE_KEY_PREFIX)) {
+    return prefix.slice(FILTER_STORAGE_KEY_PREFIX.length);
+  }
+  return resolveEffectiveSlug(props);
+}
+
+const readQuestionsCacheSync = (slug: any) => peekCacheSync('questionsCache', slug, { clone: false }) || {};
+
+const toLowerId = (value: any) => String(value || '').trim().toLowerCase();
+
+const areQuestionListsEquivalentById = (a: any, b: any) => {
+  const aa = Array.isArray(a) ? a : [];
+  const bb = Array.isArray(b) ? b : [];
+  if (aa === bb) return true;
+  if (aa.length !== bb.length) return false;
+  for (let i = 0; i < aa.length; i += 1) {
+    if (toLowerId(aa[i]?.id) !== toLowerId(bb[i]?.id)) return false;
+    // Preserve updates when IDs stay stable but question objects are refreshed.
+    if (aa[i] !== bb[i]) return false;
+  }
+  return true;
+};
+
+const hashNormalizedString = (value: any = '') => {
+  let hash = 2166136261;
+  const input = String(value || '');
+  for (let i = 0; i < input.length; i += 1) {
+    hash ^= input.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(16).padStart(8, '0');
+};
+
+const stableSerializeSmallObject = (value: any, maxLen: any = 4096) => {
+  const normalize = (input: any, seen: any = new WeakSet()): any => {
+    if (input == null || typeof input !== 'object') return input;
+    if (seen.has(input)) return null;
+    seen.add(input);
+    if (Array.isArray(input)) {
+      return input.map((item: any) => normalize(item, seen));
+    }
+    const out: Record<string, any> = {};
+    Object.keys(input).sort().forEach((key: any) => {
+      out[key] = normalize(input[key], seen);
+    });
+    return out;
+  };
+  try {
+    const normalized = normalize(value);
+    const serialized = JSON.stringify(normalized);
+    if (!serialized) return '';
+    if (serialized.length <= maxLen) return serialized;
+    return `__large:${serialized.length}:${hashNormalizedString(serialized)}`;
+  } catch (_) {
+    return '';
+  }
+};
+
+const buildQuestionIdListSignature = (questions: any = []) => {
+  // Content-aware signature to prevent stale parent state when question objects
+  // change but IDs remain the same.
+  return stableSerializeSmallObject(
+    Array.isArray(questions) ? questions : [],
+    65536
+  );
+};
+
+const buildFilteredResponsesByQuestionSignature = (responsesByQuestion: any = {}) => {
+  if (!responsesByQuestion || typeof responsesByQuestion !== 'object') return '';
+  return stableSerializeSmallObject(responsesByQuestion, 65536);
+};
+
+const buildFilterPayloadSignature = (payload: any) => {
+  if (Array.isArray(payload)) {
+    return `arr:${buildQuestionIdListSignature(payload)}`;
+  }
+  if (payload && typeof payload === 'object') {
+    if (Array.isArray(payload.filteredQuestions)) {
+      const qSig = buildQuestionIdListSignature(payload.filteredQuestions);
+      const rSig = buildFilteredResponsesByQuestionSignature(payload.filteredResponsesByQuestion || {});
+      return `combo:${qSig}|${rSig}`;
+    }
+    return `obj:${stableSerializeSmallObject(payload, 2048)}`;
+  }
+  return `prim:${String(payload)}`;
+};
+
+const normalizeNonceKey = (value: any) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const normalizePositiveInt = (value: any, fallback: any = DEFAULT_AI_TOP_N) => {
+  const parsed = Number.parseInt(String(value ?? ''), 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
+  return parsed;
+};
+
+const normalizeAiIdList = (ids: any = []) => {
+  const source = Array.isArray(ids) ? ids : [];
+  const seen: any = new Set();
+  const out: any[] = [];
+  source.forEach((id: any) => {
+    const text = String(id || '').trim();
+    if (!text) return;
+    const lower = text.toLowerCase();
+    if (seen.has(lower)) return;
+    seen.add(lower);
+    out.push(text);
+  });
+  return out;
+};
+
+const buildAiCandidateSignature = (questions: any = []) => {
+  const input = Array.isArray(questions) ? questions : [];
+  return stableSerializeSmallObject(
+    input.map((q: any) => ({
+      id: String(q?.id || '').toLowerCase(),
+      prompt: String(q?.prompt || ''),
+    })),
+    65536
+  );
+};
+
+const normalizeResponseStatusFilterState = ({
+  filterByResponded = false,
+  filterByNotResponded = false,
+  account = '',
+}: any = {}) => {
+  // Intentional: response-status filters are wallet-scoped. When no wallet is
+  // connected we fail closed and drop them instead of keeping a latent filter
+  // that would silently change the visible question set after reconnect.
+  if (!toStr(account).trim()) {
+    return {
+      filterByResponded: false,
+      filterByNotResponded: false,
+    };
+  }
+  return {
+    filterByResponded: !!filterByResponded,
+    filterByNotResponded: !!filterByNotResponded,
+  };
+};
+
+let QUESTION_FILTER_INSTANCE_SEQ = 0;
+
+class QuestionFilter extends React.Component<any, any> {
+  [key: string]: any;
+
+  constructor(props: any) {
+    super(props);
+
+    QUESTION_FILTER_INSTANCE_SEQ += 1;
+    this._tagsTooltipId = `qf-tags-tip-${QUESTION_FILTER_INSTANCE_SEQ}`;
+
+    // If in "resultsMode" with an externally provided filterState, use that; otherwise use defaults
+    const usingResultsMode = this.props.resultsMode || false;
+    const filterState = (usingResultsMode && this.props.filterState) || {};
+
+    // Correctly parse the filterState object, which has a different structure than the internal state
+    const topQuestions = filterState.topQuestions || null;
+    const showTopByImportance = topQuestions?.by === 'conviction';
+    const showTopByResponses = topQuestions?.by === 'responses';
+    const topCount = topQuestions?.count ?? DEFAULT_TOP_QUESTIONS_COUNT;
+    const sortByImportance = showTopByImportance; // "sort by importance" is active if top by importance is
+
+    const selectedTypes = filterState.questionTypes || [];
+    const selectedTags = filterState.selectedTags || [];
+    const aiSearchQuery = filterState.aiFilter || '';
+    const aiTopN = normalizePositiveInt(filterState.aiTopN, DEFAULT_AI_TOP_N);
+    const aiCombineWithOtherFilters = !!(aiSearchQuery && filterState.aiCombine === true);
+    const sbtFilterLocalState = filterState.sbtFilter || null;
+    const responseStatusState = normalizeResponseStatusFilterState({
+      filterByResponded: !!filterState?.responseStatus?.responded,
+      filterByNotResponded: !!filterState?.responseStatus?.notResponded,
+      account: props.account,
+    });
+
+    // Merge given questions with local cache so zero-answer or offscreen questions appear
+    const mergedQuestions = this.mergeQuestionsWithCache(props.questions);
+
+    this.state = {
+      mergedQuestions,
+      cachedQuestionResponses: this.props.questionResponses || {},
+
+      // Basic filter states, now correctly initialized
+      selectedTypes: selectedTypes,
+      selectedTags: selectedTags,
+      filterByResponded: responseStatusState.filterByResponded,
+      filterByNotResponded: responseStatusState.filterByNotResponded,
+      sortByImportance: sortByImportance,
+      sbtFilteredQuestions: null, // final array after SBT-based filtering
+
+      // SBT filter internal state
+      sbtFilterLocalState: sbtFilterLocalState,
+
+      // AI filter
+      aiSearchQuery: aiSearchQuery,
+      aiDraftQuery: aiSearchQuery,
+      aiRankingCount: aiTopN,
+      aiAppliedTopN: aiSearchQuery ? aiTopN : null,
+      aiRankedQuestionIds: [],
+      aiFilterApplied: false,
+      aiCombineWithOtherFilters,
+      aiApplying: false,
+      aiApplyingElapsedSec: 0,
+      aiApplyError: '',
+      aiLastAppliedSignature: '',
+      // We set the collapsible sections so that ONLY “tags” is auto-open. Others default to false:
+      expandedSections: {
+        ai: false,
+        types: false,
+        sbts: false,
+        popular: false,
+        tags: true
+      },
+      filterLoading: false,
+
+      // For “Top X questions” by total importance or # of responses
+      showTopQuestions: showTopByImportance,
+      topQuestionsCount: topCount,
+      showTopQuestionsByResponses: showTopByResponses,
+
+      // Pending states used to update instantly for certain controls:
+      pendingSelectedTypes: selectedTypes,
+      pendingSortByImportance: sortByImportance,
+      pendingSbtFilteredQuestions: null,
+      pendingShowTopQuestions: showTopByImportance,
+      pendingTopQuestionsCount: topCount,
+      pendingShowTopQuestionsByResponses: showTopByResponses,
+
+      // Count how many questions pass the current pending filter config
+      filteredQuestionsCount: 0,
+
+      // We store the last fully applied filter set to avoid re-applying identical filters
+      lastAppliedFilterState: null,
+      lastAppliedFilterStateSignature: '',
+      copiedUrlSuccess: false,
+      filterBookmarkedFeedback: false,
+      isCurrentFilterBookmarked: false,
+      showAllTags: false,
+      filterUrlInput: '',
+      showLoadInput: false,
+    };
+    this.copySuccessTimeout = null; // For managing the copied success message timeout
+    this._isMounted = false;
+    this.bookmarkFeedbackTimeout = null;
+    this._loadingFilterStateFromCache = false;
+    this._allowFilterStateAutosave = false;
+    this._filterPipelineMemo = null;
+    this._allTagsMemo = { mergedQuestionsRef: null, tags: [] };
+    this._responseParseMemo = new Map();
+    this._questionResponseStatsMemo = {
+      relevantResponsesRef: null,
+      mergedQuestionsRef: null,
+      questionResponsesNonceKey: null,
+      questionsCacheNonceKey: null,
+      result: new Map(),
+    };
+    this._stableSerializeByRefMemo = new WeakMap();
+    this._lastSavedFilterStateSignature = '';
+    this._lastExternalFilterStateSignature = stableSerializeSmallObject(this.props.filterState);
+    this._lastEmittedFilterPayloadSignature = null;
+    this._lastEmittedFilterStateSignature = null;
+    this._lastEmittedCount = null;
+    this._lastEmittedEncryptedCount = null;
+    this._lastEmittedFilterActivity = null;
+    this._mergedQuestionsSyncSignature = buildQuestionIdListSignature(mergedQuestions);
+    this._cachedQuestionResponsesSignature = buildFilteredResponsesByQuestionSignature(this.props.questionResponses || {});
+    this._aiAutoApplyInFlightSignature = '';
+    this._aiAutoApplyQueuedSignature = '';
+    this._aiApplyRequestSeq = 0;
+    this._aiLatestRequestSeq = 0;
+    this._aiApplyingElapsedTimer = null;
+    this._aiApplyingStartedAtMs = null;
+  }
+
+  /* -------------------------- LIFECYCLE METHODS -------------------------- */
+
+  getEffectiveSessionConfig: any = (propsIn: any = this.props) => {
+    return resolveEffectiveSessionContext(propsIn).sessionConfig || {};
+  };
+
+  buildAiRequestOptions: any = (propsIn: any = this.props) => {
+    const resolvedSession = resolveEffectiveSessionContext(propsIn);
+    const slug = resolvedSession.sessionSlug || '';
+    const sessionConfig = resolvedSession.sessionConfig || {};
+    return {
+      sessionSlug: slug,
+      sessionConfig,
+      context: {
+        account: propsIn.account || '',
+        providerLike: propsIn.provider,
+        chainId: propsIn.network?.id || sessionConfig?.networkChainId || null,
+      },
+    };
+  };
+
+  hasConfiguredLocalAiKey: any = () => {
+    try {
+      const local: any = getLocalAiSettings();
+      const providers = local?.providers && typeof local.providers === 'object'
+        ? local.providers
+        : {};
+      return Object.values(providers).some((entry: any) => {
+        if (!entry || typeof entry !== 'object') return false;
+        const plain = String(entry.apiKey || '').trim();
+        const encrypted = String(entry.encryptedApiKey || '').trim();
+        return !!(plain || encrypted);
+      });
+    } catch (_) {
+      return false;
+    }
+  };
+
+  syncAiApplyingElapsedTimer: any = () => {
+    if (this.state.aiApplying) {
+      if (!this._aiApplyingStartedAtMs) this._aiApplyingStartedAtMs = Date.now();
+      if (!this._aiApplyingElapsedTimer) {
+        this._aiApplyingElapsedTimer = setInterval(() => {
+          const started = Number(this._aiApplyingStartedAtMs || Date.now());
+          const elapsed = Math.max(0, Math.floor((Date.now() - started) / 1000));
+          if (elapsed !== Number(this.state.aiApplyingElapsedSec || 0)) {
+            this.setState({ aiApplyingElapsedSec: elapsed });
+          }
+        }, 1000);
+      }
+      return;
+    }
+
+    if (this._aiApplyingElapsedTimer) {
+      clearInterval(this._aiApplyingElapsedTimer);
+      this._aiApplyingElapsedTimer = null;
+    }
+    this._aiApplyingStartedAtMs = null;
+    if (this.state.aiApplyingElapsedSec !== 0) {
+      this.setState({ aiApplyingElapsedSec: 0 });
+    }
+  };
+
+  getAiAccessState: any = (propsIn: any = this.props) => {
+    const cfg = this.getEffectiveSessionConfig(propsIn);
+    const gateState = resolveSponsoredGateStateForResource(cfg, 'ai');
+    const sponsoredStatus = gateState?.status || SPONSORED_GATE_STATES.UNAVAILABLE;
+    const sponsoredAvailable =
+      sponsoredStatus === SPONSORED_GATE_STATES.OPEN ||
+      sponsoredStatus === SPONSORED_GATE_STATES.RESTRICTED;
+    const localKeyAvailable = this.hasConfiguredLocalAiKey();
+    const enabled = sponsoredAvailable || localKeyAvailable;
+    return {
+      enabled,
+      sponsoredAvailable,
+      localKeyAvailable,
+      sponsoredStatus,
+    };
+  };
+
+  getEncryptedQuestionGateTooltipProps: any = (propsIn: any = this.props) => {
+    const sessionConfig = this.getEffectiveSessionConfig(propsIn);
+    const gateConfig =
+      resolveEncryptionGate(sessionConfig) ||
+      resolveSponsoredGateStateForResource(sessionConfig, 'questionResponses')?.gate ||
+      resolveSponsoredGateStateForResource(sessionConfig, 'default')?.gate ||
+      null;
+    const sbtAddresses = getGateSbtAddresses(gateConfig || {});
+
+    if (!gateConfig && sbtAddresses.length === 0) return null;
+
+    return {
+      gateId: String(gateConfig?.gateId || gateConfig?.id || '').trim() || null,
+      gateConfig,
+      mode: normalizeGateMode(gateConfig),
+      sbtAddresses,
+    };
+  };
+
+  getQuestionsSubsetBeforeAi: any = (usePendingState: any = true) => {
+    const mergedQuestions = Array.isArray(this.state.mergedQuestions)
+      ? this.state.mergedQuestions
+      : [];
+    let subset = mergedQuestions;
+    const selectedTypes = usePendingState
+      ? this.state.pendingSelectedTypes
+      : this.state.selectedTypes;
+    const sbtFilteredQuestions = usePendingState
+      ? this.state.pendingSbtFilteredQuestions
+      : this.state.sbtFilteredQuestions;
+    const selectedTags = this.state.selectedTags || [];
+
+    if (sbtFilteredQuestions !== null) {
+      const sbtIds: any = new Set(
+        (sbtFilteredQuestions || []).map((q: any) => String(q.id || '').toLowerCase())
+      );
+      subset = subset.filter((q: any) => sbtIds.has(String(q.id || '').toLowerCase()));
+    }
+
+    if (Array.isArray(selectedTypes) && selectedTypes.length > 0) {
+      const selectedTypesSet: any = new Set(selectedTypes);
+      subset = subset.filter((q: any) => selectedTypesSet.has(q.type));
+    }
+
+    if (Array.isArray(selectedTags) && selectedTags.length > 0) {
+      const selectedTagsLC: any = new Set(selectedTags.map((t: any) => String(t).toLowerCase()));
+      subset = subset.filter((q: any) => {
+        if (!Array.isArray(q.tags)) return false;
+        return q.tags.some((tag: any) => selectedTagsLC.has(String(tag).toLowerCase()));
+      });
+    }
+
+    // Response status filter
+    const filterByResponded = this.state.filterByResponded;
+    const filterByNotResponded = this.state.filterByNotResponded;
+    if ((filterByResponded || filterByNotResponded) && !(filterByResponded && filterByNotResponded)) {
+      const userAddress = String(this.props.account || '').toLowerCase();
+      const relevantResponses = this.props.questionResponses || this.state.cachedQuestionResponses || {};
+      if (userAddress) {
+        subset = subset.filter((q: any) => {
+          const qId = String(q?.id || '');
+          const respondersObj = relevantResponses[qId] || relevantResponses[qId.toLowerCase()] || {};
+          const hasResponded = (
+            respondersObj &&
+            typeof respondersObj === 'object' &&
+            Object.keys(respondersObj).some((addressKey: any) => String(addressKey).toLowerCase() === userAddress)
+          );
+          return filterByResponded ? hasResponded : !hasResponded;
+        });
+      }
+    }
+
+    return subset;
+  };
+
+  getAiRankingCandidates: any = () => (
+    Array.isArray(this.state.mergedQuestions) ? this.state.mergedQuestions : []
+  );
+
+  buildAiApplySignature: any = ({
+    stateIn = this.state,
+    propsIn = this.props,
+    queryOverride = null,
+    candidateQuestions = null,
+  }: any = {}) => {
+    const state = stateIn && typeof stateIn === 'object' ? stateIn : {};
+    const query = String(
+      queryOverride != null ? queryOverride : state.aiSearchQuery
+    ).trim();
+    if (!query) return '';
+    const slug = resolveEffectiveSlug(propsIn);
+    const candidates = Array.isArray(candidateQuestions)
+      ? candidateQuestions
+      : this.getAiRankingCandidates();
+    const candidateSignature = buildAiCandidateSignature(candidates);
+    return `${slug}|${query}|${candidateSignature}`;
+  };
+
+  queueAutoApplyAiFilter: any = (reason: any = 'auto') => {
+    const query = String(this.state.aiSearchQuery || '').trim();
+    if (!query) return;
+    const candidateQuestions = this.getAiRankingCandidates();
+    const signature = this.buildAiApplySignature({
+      queryOverride: query,
+      candidateQuestions,
+    });
+    if (!signature) return;
+    if (this.state.aiFilterApplied && this.state.aiLastAppliedSignature === signature) return;
+    if (this._aiAutoApplyInFlightSignature === signature) return;
+    if (this._aiAutoApplyQueuedSignature === signature) return;
+
+    this._aiAutoApplyQueuedSignature = signature;
+    setTimeout(() => {
+      if (!this._isMounted) return;
+      if (this._aiAutoApplyQueuedSignature !== signature) return;
+      this._aiAutoApplyQueuedSignature = '';
+      void this.handleApplyAIFilter({
+        auto: true,
+        queryOverride: query,
+        source: reason,
+      });
+    }, 0);
+  };
+
+  async componentDidMount() {
+    this._isMounted = true;
+    this.syncAiApplyingElapsedTimer();
+    let initialFiltersApplied = false;
+    const hasUrlFilterState = this.hasExternalFilterState(this.props);
+    const shouldApplyDefaultFilterState = this.shouldApplyDefaultFilterState(this.props);
+
+    if (this.shouldUseLocalStorageBackedFilterState(this.props)) {
+      await this.loadFilterStateFromLocalStorage();
+    }
+
+    // Handle defaultFilterState prop (string like "tag=AI&sort=recent")
+    // This runs if no URL state is provided (this.props.filterState is null/undefined/empty)
+    if (shouldApplyDefaultFilterState) {
+		      questionFilterLog.log('Received defaultFilterState:', this.props.defaultFilterState);
+		      // Example: Parse "tag=AI&sort=recent"
+			      const params = new URLSearchParams(this.props.defaultFilterState);
+		      const tagParam = params.get('tag');
+		      const tagsFromDefaultFilterState = tagParam ? tagParam.split(',') : [];
+	      const defaultSort = params.get('sort'); // 'recent', 'importance', etc.
+
+	      const newDefaultState: Record<string, any> = {};
+	      if (tagsFromDefaultFilterState.length > 0) {
+	        newDefaultState.selectedTags = tagsFromDefaultFilterState;
+	      }
+      if (defaultSort === 'importance') {
+        newDefaultState.sortByImportance = true;
+        newDefaultState.pendingSortByImportance = true;
+      }
+      // Add more parsing for other defaultFilterState string params if needed
+
+      if (Object.keys(newDefaultState).length > 0) {
+        this.setState(newDefaultState, () => {
+          this.handleApplyFilters(true); // Apply the defaults immediately
+        });
+        initialFiltersApplied = true;
+      }
+    }
+
+    // Apply this.props.filterState (from URL, object structure)
+    // This overrides localStorage and defaultFilterState string.
+    if (hasUrlFilterState) {
+      const urlFilterState = this.props.filterState;
+      const newStateFromUrl: Record<string, any> = {};
+
+      // Map questionTypes
+      if (urlFilterState.questionTypes !== undefined) {
+        newStateFromUrl.selectedTypes = Array.isArray(urlFilterState.questionTypes)
+          ? [...urlFilterState.questionTypes]
+          : [];
+        newStateFromUrl.pendingSelectedTypes = Array.isArray(urlFilterState.questionTypes)
+          ? [...urlFilterState.questionTypes]
+          : [];
+      }
+
+      // Map selectedTags
+      if (urlFilterState.selectedTags !== undefined) {
+        newStateFromUrl.selectedTags = Array.isArray(urlFilterState.selectedTags)
+          ? [...urlFilterState.selectedTags]
+          : [];
+      }
+
+      // Map responseStatus
+      if (urlFilterState.responseStatus !== undefined) {
+        const responseStatusState = normalizeResponseStatusFilterState({
+          filterByResponded: !!urlFilterState?.responseStatus?.responded,
+          filterByNotResponded: !!urlFilterState?.responseStatus?.notResponded,
+          account: this.props.account,
+        });
+        newStateFromUrl.filterByResponded = responseStatusState.filterByResponded;
+        newStateFromUrl.filterByNotResponded = responseStatusState.filterByNotResponded;
+      }
+
+      // Map aiFilter
+      if (urlFilterState.aiFilter !== undefined) {
+        newStateFromUrl.aiSearchQuery =
+          typeof urlFilterState.aiFilter === 'string' ? urlFilterState.aiFilter : '';
+        newStateFromUrl.aiDraftQuery = newStateFromUrl.aiSearchQuery;
+        newStateFromUrl.aiCombineWithOtherFilters = !!(
+          newStateFromUrl.aiSearchQuery.trim() && urlFilterState.aiCombine === true
+        );
+      }
+      if (urlFilterState.aiTopN !== undefined) {
+        const parsedTopN = normalizePositiveInt(urlFilterState.aiTopN, DEFAULT_AI_TOP_N);
+        newStateFromUrl.aiRankingCount = parsedTopN;
+        newStateFromUrl.aiAppliedTopN = parsedTopN;
+      }
+
+      // Map sbtFilter
+      if (urlFilterState.sbtFilter !== undefined) {
+        newStateFromUrl.sbtFilterLocalState =
+          typeof urlFilterState.sbtFilter === 'object' ? { ...urlFilterState.sbtFilter } : null;
+      }
+
+      // Map topQuestions
+      if (urlFilterState.topQuestions && typeof urlFilterState.topQuestions === 'object') {
+        const { count, by } = urlFilterState.topQuestions;
+        newStateFromUrl.topQuestionsCount = typeof count === 'number' ? count : DEFAULT_TOP_QUESTIONS_COUNT;
+        newStateFromUrl.pendingTopQuestionsCount = typeof count === 'number' ? count : DEFAULT_TOP_QUESTIONS_COUNT;
+
+        if (by === 'importance') {
+          newStateFromUrl.showTopQuestions = true;
+          newStateFromUrl.pendingShowTopQuestions = true;
+          newStateFromUrl.sortByImportance = true;
+          newStateFromUrl.pendingSortByImportance = true;
+          newStateFromUrl.showTopQuestionsByResponses = false;
+          newStateFromUrl.pendingShowTopQuestionsByResponses = false;
+        } else if (by === 'responses') {
+          newStateFromUrl.showTopQuestionsByResponses = true;
+          newStateFromUrl.pendingShowTopQuestionsByResponses = true;
+          newStateFromUrl.showTopQuestions = false;
+          newStateFromUrl.pendingShowTopQuestions = false;
+          newStateFromUrl.sortByImportance = false;
+          newStateFromUrl.pendingSortByImportance = false;
+        } else {
+          // Invalid 'by' value or missing
+          newStateFromUrl.showTopQuestions = false;
+          newStateFromUrl.pendingShowTopQuestions = false;
+          newStateFromUrl.showTopQuestionsByResponses = false;
+          newStateFromUrl.pendingShowTopQuestionsByResponses = false;
+          newStateFromUrl.sortByImportance = false;
+          newStateFromUrl.pendingSortByImportance = false;
+          // Keep existing topQuestionsCount or component default if not specified by URL
+          if (urlFilterState.hasOwnProperty('topQuestions')) {
+            // only reset count if topQuestions key exists and is null
+            newStateFromUrl.topQuestionsCount = DEFAULT_TOP_QUESTIONS_COUNT; // default count
+            newStateFromUrl.pendingTopQuestionsCount = DEFAULT_TOP_QUESTIONS_COUNT; // default count
+          }
+        }
+      } else {
+        // topQuestions is null or not an object (or not provided)
+        newStateFromUrl.showTopQuestions = false;
+        newStateFromUrl.pendingShowTopQuestions = false;
+        newStateFromUrl.showTopQuestionsByResponses = false;
+        newStateFromUrl.pendingShowTopQuestionsByResponses = false;
+        newStateFromUrl.sortByImportance = false;
+        newStateFromUrl.pendingSortByImportance = false;
+        // Keep existing topQuestionsCount or component default if not specified by URL
+      }
+
+      if (Object.keys(newStateFromUrl).length > 0) {
+        if (typeof newStateFromUrl.aiSearchQuery === 'string' && newStateFromUrl.aiSearchQuery.trim()) {
+          newStateFromUrl.aiAppliedTopN = normalizePositiveInt(
+            newStateFromUrl.aiAppliedTopN,
+            DEFAULT_AI_TOP_N
+          );
+          newStateFromUrl.aiFilterApplied = false;
+          newStateFromUrl.aiRankedQuestionIds = [];
+          newStateFromUrl.aiApplyError = '';
+        } else if (!Object.prototype.hasOwnProperty.call(newStateFromUrl, 'aiCombineWithOtherFilters')) {
+          newStateFromUrl.aiCombineWithOtherFilters = false;
+        }
+        this.setState(newStateFromUrl, () => {
+          this.handleApplyFilters(true); // Apply filters based on URL state
+          this.queueAutoApplyAiFilter('mount:url-filter-state');
+        });
+        initialFiltersApplied = true;
+      }
+    }
+
+    // If filters haven't been applied by URL state or defaultFilterState string
+    if (!initialFiltersApplied) {
+      this.computeFilteredQuestionsCount(); // Compute based on localStorage or initial constructor state
+      this.queueAutoApplyAiFilter('mount:existing-state');
+    }
+    this.checkIfCurrentFilterIsBookmarked();
+    this._allowFilterStateAutosave = true;
+  } // End of componentDidMount
+
+  buildAutosaveSignature: any = (propsIn: any = this.props, stateIn: any = this.state) => {
+    const state = stateIn && typeof stateIn === 'object' ? stateIn : {};
+    const props = propsIn && typeof propsIn === 'object' ? propsIn : {};
+    return stableSerializeSmallObject({
+      slug: resolveFilterStorageSlug(props),
+      mode: props.filterType === 'results' ? 'results' : 'questions',
+      selectedTypes: state.selectedTypes || [],
+      sortByImportance: !!state.sortByImportance,
+      showTopQuestions: !!state.showTopQuestions,
+      topQuestionsCount: Number(state.topQuestionsCount ?? DEFAULT_TOP_QUESTIONS_COUNT),
+      aiSearchQuery: String(state.aiSearchQuery || ''),
+      aiAppliedTopN: Number(state.aiAppliedTopN ?? DEFAULT_AI_TOP_N),
+      aiRankingCount: Number(state.aiRankingCount ?? DEFAULT_AI_TOP_N),
+      aiCombineWithOtherFilters: !!state.aiCombineWithOtherFilters,
+      sbtFilterLocalState: state.sbtFilterLocalState || null,
+      selectedTags: state.selectedTags || [],
+      showTopQuestionsByResponses: !!state.showTopQuestionsByResponses,
+      filterByResponded: !!state.filterByResponded,
+      filterByNotResponded: !!state.filterByNotResponded,
+    });
+  };
+
+  hasResponseDrivenFilterState: any = ({ usePendingState = true, stateIn = this.state }: any = {}) => {
+    const state = stateIn && typeof stateIn === 'object' ? stateIn : {};
+    const hasResponseStatusFilter = this.hasActiveResponseStatusFilter({ stateIn: state });
+    const showTopQuestions = usePendingState
+      ? !!(state.pendingShowTopQuestions || state.showTopQuestions)
+      : !!state.showTopQuestions;
+    const showTopQuestionsByResponses = usePendingState
+      ? !!(state.pendingShowTopQuestionsByResponses || state.showTopQuestionsByResponses)
+      : !!state.showTopQuestionsByResponses;
+    const sortByImportance = usePendingState
+      ? !!(state.pendingSortByImportance || state.sortByImportance)
+      : !!state.sortByImportance;
+
+    return !!(
+      hasResponseStatusFilter ||
+      showTopQuestions ||
+      showTopQuestionsByResponses ||
+      sortByImportance
+    );
+  };
+
+  hasActiveResponseStatusFilter: any = ({ stateIn = this.state }: any = {}) => {
+    const state = stateIn && typeof stateIn === 'object' ? stateIn : {};
+    const filterByResponded = !!state.filterByResponded;
+    const filterByNotResponded = !!state.filterByNotResponded;
+    return (
+      (filterByResponded || filterByNotResponded) &&
+      !(filterByResponded && filterByNotResponded)
+    );
+  };
+
+  hasExternalFilterState: any = (propsIn: any = this.props) => (
+    !!(
+      propsIn?.filterState &&
+      typeof propsIn.filterState === 'object' &&
+      Object.keys(propsIn.filterState).length > 0
+    )
+  );
+
+  shouldApplyDefaultFilterState: any = (propsIn: any = this.props) => (
+    !!propsIn?.defaultFilterState && !this.hasExternalFilterState(propsIn)
+  );
+
+  shouldUseLocalStorageBackedFilterState: any = (propsIn: any = this.props) => (
+    !!propsIn?.enableLocalStorage &&
+    !this.shouldApplyDefaultFilterState(propsIn) &&
+    !this.hasExternalFilterState(propsIn)
+  );
+
+  getFilterPersistenceScopeSignature: any = (propsIn: any = this.props) => (
+    [
+      propsIn?.filterType === 'results' ? 'results' : 'questions',
+      String(resolveFilterStorageSlug(propsIn) || ''),
+    ].join('|')
+  );
+
+  getMemoizedStableSerialize: any = (value: any, maxLen: any = 4096) => {
+    if (!value || typeof value !== 'object') {
+      return stableSerializeSmallObject(value, maxLen);
+    }
+    let byLen = this._stableSerializeByRefMemo.get(value);
+    if (!byLen) {
+      byLen = new Map();
+      this._stableSerializeByRefMemo.set(value, byLen);
+    }
+    if (byLen.has(maxLen)) {
+      return byLen.get(maxLen);
+    }
+    const serialized = stableSerializeSmallObject(value, maxLen);
+    byLen.set(maxLen, serialized);
+    return serialized;
+  };
+
+  shouldAutosaveFilterState: any = (prevProps: any, prevState: any) => {
+    if (
+      !this.props.enableLocalStorage ||
+      !this._allowFilterStateAutosave ||
+      this._loadingFilterStateFromCache
+    ) {
+      return false;
+    }
+
+    const autosaveInputsLikelyChanged =
+      prevProps.filterType !== this.props.filterType ||
+      resolveFilterStorageSlug(prevProps) !== resolveFilterStorageSlug(this.props) ||
+      prevState.selectedTypes !== this.state.selectedTypes ||
+      prevState.sortByImportance !== this.state.sortByImportance ||
+      prevState.showTopQuestions !== this.state.showTopQuestions ||
+      prevState.topQuestionsCount !== this.state.topQuestionsCount ||
+      prevState.aiSearchQuery !== this.state.aiSearchQuery ||
+      prevState.aiAppliedTopN !== this.state.aiAppliedTopN ||
+      prevState.aiRankingCount !== this.state.aiRankingCount ||
+      prevState.aiCombineWithOtherFilters !== this.state.aiCombineWithOtherFilters ||
+      prevState.sbtFilterLocalState !== this.state.sbtFilterLocalState ||
+      prevState.selectedTags !== this.state.selectedTags ||
+      prevState.showTopQuestionsByResponses !== this.state.showTopQuestionsByResponses ||
+      prevState.filterByResponded !== this.state.filterByResponded ||
+      prevState.filterByNotResponded !== this.state.filterByNotResponded;
+
+    if (!autosaveInputsLikelyChanged) {
+      return false;
+    }
+
+    const prevSig = this.buildAutosaveSignature(prevProps, prevState);
+    const nextSig = this.buildAutosaveSignature(this.props, this.state);
+    return prevSig !== nextSig;
+  };
+
+  componentDidUpdate(prevProps: any, prevState: any) {
+    measureSync('ce.questionFilter.componentDidUpdate', () => {
+      this.syncAiApplyingElapsedTimer();
+      const filterPersistenceScopeChanged =
+        this.getFilterPersistenceScopeSignature(prevProps) !==
+        this.getFilterPersistenceScopeSignature(this.props);
+      const shouldRestoreScopedLocalFilterState =
+        filterPersistenceScopeChanged && this.shouldUseLocalStorageBackedFilterState(this.props);
+
+      if (shouldRestoreScopedLocalFilterState) {
+        this.invalidatePendingAiApply();
+        void this.loadFilterStateFromLocalStorage({ resetIfMissing: true })
+          .then((didRestoreState: any) => {
+            if (!didRestoreState || !this._isMounted) return;
+            this.handleApplyFilters(true);
+            this.checkIfCurrentFilterIsBookmarked();
+          });
+      }
+
+      const prevAccount = toStr(prevProps.account).trim();
+      const nextAccount = toStr(this.props.account).trim();
+      const accountDisconnected = !!prevAccount && !nextAccount;
+      if (
+        accountDisconnected &&
+        (this.state.filterByResponded || this.state.filterByNotResponded)
+      ) {
+        this.setState(
+          {
+            filterByResponded: false,
+            filterByNotResponded: false,
+          },
+          () => {
+            if (this.props.enableLocalStorage && !filterPersistenceScopeChanged) {
+              this.saveFilterStateToLocalStorage();
+            }
+            this.handleApplyFilters(true);
+          }
+        );
+        return;
+      }
+      const prevAccountLower = prevAccount.toLowerCase();
+      const nextAccountLower = nextAccount.toLowerCase();
+      const connectedAccountChanged = !!nextAccountLower && prevAccountLower !== nextAccountLower;
+      const shouldReapplyForAccountChange = connectedAccountChanged &&
+        this.hasActiveResponseStatusFilter({ stateIn: this.state });
+
+      const questionNoncePresent =
+        this.props.questionsCacheNonce != null &&
+        prevProps.questionsCacheNonce != null;
+      const responsesNoncePresent =
+        this.props.questionResponsesNonce != null &&
+        prevProps.questionResponsesNonce != null;
+
+      const questionsChangedByNonce = questionNoncePresent
+        ? prevProps.questionsCacheNonce !== this.props.questionsCacheNonce
+        : false;
+      const questionsChanged =
+        questionsChangedByNonce || prevProps.questions !== this.props.questions;
+      const responsesChangedByNonce = responsesNoncePresent
+        ? prevProps.questionResponsesNonce !== this.props.questionResponsesNonce
+        : false;
+      const responsesChangedByRef = prevProps.questionResponses !== this.props.questionResponses;
+      const responsesChanged = responsesChangedByNonce || responsesChangedByRef;
+      const shouldTrackResponsePayload = this.hasResponseDrivenFilterState({
+        usePendingState: true,
+        stateIn: this.state,
+      });
+
+      const statePatch: Record<string, any> = {};
+      let shouldApplyFiltersAfterPatch = false;
+      let nextMergedQuestionsSyncSignature = this._mergedQuestionsSyncSignature;
+      let nextCachedQuestionResponsesSignature = this._cachedQuestionResponsesSignature;
+
+      // Re-run filters if the underlying QUESTIONS array changes.
+      if (questionsChanged) {
+        const nextMergedQuestions = this.mergeQuestionsWithCache(this.props.questions);
+        const nextMergedSignature = buildQuestionIdListSignature(nextMergedQuestions);
+        if (nextMergedSignature !== this._mergedQuestionsSyncSignature) {
+          statePatch.mergedQuestions = nextMergedQuestions;
+          nextMergedQuestionsSyncSignature = nextMergedSignature;
+          shouldApplyFiltersAfterPatch = true;
+        }
+      }
+
+      // Re-run filters when QUESTION RESPONSES arrive after initial mount.
+      if (responsesChanged && shouldTrackResponsePayload) {
+        const nextCachedQuestionResponses = this.props.questionResponses || {};
+        const nextCachedResponsesSignature = buildFilteredResponsesByQuestionSignature(nextCachedQuestionResponses);
+        if (nextCachedResponsesSignature !== this._cachedQuestionResponsesSignature) {
+          statePatch.cachedQuestionResponses = nextCachedQuestionResponses;
+          nextCachedQuestionResponsesSignature = nextCachedResponsesSignature;
+          shouldApplyFiltersAfterPatch = true;
+        }
+      }
+
+      if (shouldApplyFiltersAfterPatch) {
+        this.setState(statePatch, () => {
+          this._mergedQuestionsSyncSignature = nextMergedQuestionsSyncSignature;
+          this._cachedQuestionResponsesSignature = nextCachedQuestionResponsesSignature;
+          if (!shouldRestoreScopedLocalFilterState) {
+            this.handleApplyFilters(true);
+            this.queueAutoApplyAiFilter('update:questions-or-responses');
+          }
+        });
+      } else if (
+        shouldReapplyForAccountChange
+      ) {
+        if (!shouldRestoreScopedLocalFilterState) {
+          this.handleApplyFilters(true);
+          this.queueAutoApplyAiFilter('update:account-change');
+        }
+      } else if (
+        // Re-run filters once cache becomes ready (prevents stale counts after first load).
+        prevProps.isQuestionCacheReady !== this.props.isQuestionCacheReady &&
+        this.props.isQuestionCacheReady
+      ) {
+        if (!shouldRestoreScopedLocalFilterState) {
+          this.handleApplyFilters(true);
+          this.queueAutoApplyAiFilter('update:question-cache-ready');
+        }
+      }
+
+      // keep internal state in sync if an external filterState prop changes
+      const filterStatePropRefChanged = prevProps.filterState !== this.props.filterState;
+      const prevExternalFilterStateSignature =
+        (!filterStatePropRefChanged && typeof this._lastExternalFilterStateSignature === 'string')
+          ? this._lastExternalFilterStateSignature
+          : this.getMemoizedStableSerialize(prevProps.filterState);
+      const nextExternalFilterStateSignature = filterStatePropRefChanged
+        ? this.getMemoizedStableSerialize(this.props.filterState)
+        : stableSerializeSmallObject(this.props.filterState);
+      const filterStateChanged = prevExternalFilterStateSignature !== nextExternalFilterStateSignature;
+      this._lastExternalFilterStateSignature = nextExternalFilterStateSignature;
+      if (filterStateChanged) {
+        this.syncExternalFilterState(this.props.filterState);
+      }
+
+      // Save local filter state if enabled
+      if (
+        this.shouldAutosaveFilterState(prevProps, prevState)
+      ) {
+        this.saveFilterStateToLocalStorage();
+      }
+    });
+  }
+
+
+  componentWillUnmount() {
+    this._isMounted = false;
+    clearTimeout(this.copySuccessTimeout);
+    clearTimeout(this.bookmarkFeedbackTimeout);
+    if (this._aiApplyingElapsedTimer) {
+      clearInterval(this._aiApplyingElapsedTimer);
+      this._aiApplyingElapsedTimer = null;
+    }
+    this._aiApplyingStartedAtMs = null;
+    this._aiAutoApplyInFlightSignature = '';
+    this._aiAutoApplyQueuedSignature = '';
+    this._aiLatestRequestSeq = this._aiApplyRequestSeq;
+  }
+
+  // ----------------------------------------------------------------------------------
+  // BOOKMARK LOGIC
+  // ----------------------------------------------------------------------------------
+  checkIfCurrentFilterIsBookmarked: any = () => {
+    const currentFilterString = serializeFilterState(this.buildFilterState());
+    if (!currentFilterString) {
+      if (this._isMounted && this.state.isCurrentFilterBookmarked !== false) {
+        this.setState({ isCurrentFilterBookmarked: false });
+      }
+      return;
+    }
+
+    const slug = resolveFilterStorageSlug(this.props);
+    let bookmarksCache: Record<string, any> = {};
+    try {
+      const filtersCache = peekCacheSync('filters', slug, { clone: false }) || {};
+      bookmarksCache = (filtersCache && typeof filtersCache === 'object') ? filtersCache : {};
+    } catch (e) {
+      questionFilterLog.error("Error reading bookmarksCache", e);
+      bookmarksCache = {};
+    }
+
+    const bookmarkedFilters = Array.isArray(bookmarksCache.bookmarkedFilters)
+      ? bookmarksCache.bookmarkedFilters
+      : (Array.isArray(bookmarksCache.filters) ? bookmarksCache.filters : []);
+    const isMatch = bookmarkedFilters.includes(currentFilterString);
+
+    if (this._isMounted && this.state.isCurrentFilterBookmarked !== isMatch) {
+      this.setState({ isCurrentFilterBookmarked: isMatch });
+    }
+  };
+
+  handleBookmarkCurrentFilter: any = () => {
+    if (!this._isMounted) return;
+
+    const currentFilterString = serializeFilterState(this.buildFilterState());
+    if (!currentFilterString) {
+      // Don't bookmark an empty/default filter
+      return;
+    }
+
+    const slug = resolveFilterStorageSlug(this.props);
+    let bookmarksCacheObject: Record<string, any> = {};
+
+    try {
+      const parsedCache = peekCacheSync('filters', slug, { clone: false });
+      bookmarksCacheObject = (typeof parsedCache === 'object' && parsedCache !== null)
+        ? { ...parsedCache }
+        : {};
+    } catch (e) {
+      questionFilterLog.error("Error parsing bookmarksCache from localStorage, resetting.", e);
+    }
+
+    // Canonical field for persisted filter bookmarks.
+    if (!Array.isArray(bookmarksCacheObject.bookmarkedFilters)) {
+      bookmarksCacheObject.bookmarkedFilters = (
+        Array.isArray(bookmarksCacheObject.filters) ? [...bookmarksCacheObject.filters] : []
+      );
+    } else {
+      bookmarksCacheObject.bookmarkedFilters = [...bookmarksCacheObject.bookmarkedFilters];
+    }
+
+    // Prevent duplicates
+    if (!bookmarksCacheObject.bookmarkedFilters.includes(currentFilterString)) {
+      bookmarksCacheObject.bookmarkedFilters.push(currentFilterString);
+    }
+
+	    const writeResult: any = writeCache('filters', slug, bookmarksCacheObject as any);
+	    const handleSuccess = (ok: any) => {
+	      if (!ok) {
+	        questionFilterLog.warn('Failed to persist bookmarked filter state');
+	        return;
+	      }
+	      this.setState({ filterBookmarkedFeedback: true }, () => {
+	        this.checkIfCurrentFilterIsBookmarked();
+	      });
+
+	      clearTimeout(this.bookmarkFeedbackTimeout);
+	      this.bookmarkFeedbackTimeout = setTimeout(() => {
+	        if (this._isMounted) {
+	          this.setState({ filterBookmarkedFeedback: false });
+	        }
+	      }, 2000);
+	    };
+	    if (writeResult && typeof writeResult.then === 'function') {
+	      void writeResult
+	        .then(handleSuccess)
+	        .catch((e: any) => {
+	          questionFilterLog.error("Error saving bookmarksCache to local cache:", e);
+	        });
+	    } else {
+	      handleSuccess(writeResult);
+	    }
+  };
+
+  // ----------------------------------------------------------------------------------
+  // LOCAL STORAGE FOR FILTER STATE
+  // ----------------------------------------------------------------------------------
+  getDefaultFilterStatePatch: any = () => ({
+    selectedTypes: [],
+    selectedTags: [],
+    sortByImportance: false,
+    sbtFilteredQuestions: null,
+    sbtFilterLocalState: null,
+    aiSearchQuery: '',
+    aiDraftQuery: '',
+    aiRankingCount: DEFAULT_AI_TOP_N,
+    aiAppliedTopN: null,
+    aiFilterApplied: false,
+    aiCombineWithOtherFilters: false,
+    aiRankedQuestionIds: [],
+    aiApplying: false,
+    aiApplyingElapsedSec: 0,
+    aiApplyError: '',
+    aiLastAppliedSignature: '',
+    filterByResponded: false,
+    filterByNotResponded: false,
+    showTopQuestions: false,
+    topQuestionsCount: DEFAULT_TOP_QUESTIONS_COUNT,
+    showTopQuestionsByResponses: false,
+    pendingSelectedTypes: [],
+    pendingSortByImportance: false,
+    pendingSbtFilteredQuestions: null,
+    pendingShowTopQuestions: false,
+    pendingTopQuestionsCount: DEFAULT_TOP_QUESTIONS_COUNT,
+    pendingShowTopQuestionsByResponses: false,
+    filterUrlInput: '',
+  });
+
+  async loadFilterStateFromLocalStorage(options: any = {}) {
+    const { resetIfMissing = false } = options;
+    this._loadingFilterStateFromCache = true;
+    let didRestoreState = false;
+    try {
+      const slug = resolveFilterStorageSlug(this.props);
+      const modeKey =
+        this.props.filterType === 'results'
+          ? 'questionFilterState_results'
+          : 'questionFilterState_questions';
+      let saved: any = null;
+      const filtersCacheSync = peekCacheSync('filters', slug, { clone: false });
+      if (filtersCacheSync && typeof filtersCacheSync === 'object') {
+        saved = filtersCacheSync?.[modeKey] ? JSON.stringify(filtersCacheSync[modeKey]) : null;
+      }
+      if (!saved) {
+        const filtersCache = await readCache('filters', slug);
+        if (filtersCache && typeof filtersCache === 'object' && filtersCache[modeKey]) {
+          saved = JSON.stringify(filtersCache[modeKey]);
+        }
+      }
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        const shouldClearPersistedResponseStatus =
+          !toStr(this.props.account).trim() &&
+          (!!parsed?.filterByResponded || !!parsed?.filterByNotResponded);
+        const responseStatusState = normalizeResponseStatusFilterState({
+          filterByResponded: parsed.filterByResponded,
+          filterByNotResponded: parsed.filterByNotResponded,
+          account: this.props.account,
+        });
+        didRestoreState = true;
+        await new Promise((resolve: any) => {
+          if (!this._isMounted) {
+            resolve();
+            return;
+          }
+          this.setState((prevState: any) => ({
+            selectedTypes: Array.isArray(parsed.selectedTypes) ? parsed.selectedTypes : prevState.selectedTypes,
+            sortByImportance:
+              typeof parsed.sortByImportance === 'boolean'
+                ? parsed.sortByImportance
+                : prevState.sortByImportance,
+            showTopQuestions:
+              typeof parsed.showTopQuestions === 'boolean'
+                ? parsed.showTopQuestions
+                : prevState.showTopQuestions,
+            topQuestionsCount: parsed.topQuestionsCount || prevState.topQuestionsCount,
+            aiSearchQuery: typeof parsed.aiSearchQuery === 'string' ? parsed.aiSearchQuery : prevState.aiSearchQuery,
+            aiDraftQuery: typeof parsed.aiSearchQuery === 'string' ? parsed.aiSearchQuery : prevState.aiDraftQuery,
+            aiRankingCount: normalizePositiveInt(parsed.aiRankingCount, prevState.aiRankingCount || DEFAULT_AI_TOP_N),
+            aiAppliedTopN: parsed.aiSearchQuery
+              ? normalizePositiveInt(parsed.aiAppliedTopN ?? parsed.aiRankingCount, prevState.aiAppliedTopN || DEFAULT_AI_TOP_N)
+              : null,
+            aiFilterApplied: false,
+            aiRankedQuestionIds: [],
+            aiCombineWithOtherFilters: parsed.aiSearchQuery
+              ? parsed.aiCombineWithOtherFilters === true
+              : false,
+            aiApplyError: '',
+            sbtFilterLocalState: Object.prototype.hasOwnProperty.call(parsed, 'sbtFilterLocalState') ? (parsed.sbtFilterLocalState || null) : prevState.sbtFilterLocalState,
+            selectedTags: Array.isArray(parsed.selectedTags) ? parsed.selectedTags : prevState.selectedTags,
+            filterByResponded: responseStatusState.filterByResponded,
+            filterByNotResponded: responseStatusState.filterByNotResponded,
+            showTopQuestionsByResponses:
+              typeof parsed.showTopQuestionsByResponses === 'boolean'
+                ? parsed.showTopQuestionsByResponses
+                : prevState.showTopQuestionsByResponses,
+
+            // Also update pending states:
+            pendingSelectedTypes: Array.isArray(parsed.selectedTypes) ? parsed.selectedTypes : prevState.pendingSelectedTypes,
+            pendingSortByImportance:
+              typeof parsed.sortByImportance === 'boolean'
+                ? parsed.sortByImportance
+                : prevState.pendingSortByImportance,
+            pendingShowTopQuestions:
+              typeof parsed.showTopQuestions === 'boolean'
+                ? parsed.showTopQuestions
+                : prevState.pendingShowTopQuestions,
+            pendingTopQuestionsCount:
+              parsed.topQuestionsCount || prevState.pendingTopQuestionsCount,
+            pendingShowTopQuestionsByResponses:
+              typeof parsed.showTopQuestionsByResponses === 'boolean'
+                ? parsed.showTopQuestionsByResponses
+                : prevState.pendingShowTopQuestionsByResponses
+          }), () => {
+            if (shouldClearPersistedResponseStatus) {
+              this.saveFilterStateToLocalStorage();
+            }
+            this.queueAutoApplyAiFilter('load-local-state');
+            resolve();
+          });
+        });
+      } else if (resetIfMissing) {
+        didRestoreState = true;
+        await new Promise((resolve: any) => {
+          if (!this._isMounted) {
+            resolve();
+            return;
+          }
+          this.setState(this.getDefaultFilterStatePatch(), resolve);
+        });
+      }
+    } catch (error) {
+      questionFilterLog.error('Error loading filter state from cache:', error);
+    } finally {
+      this._loadingFilterStateFromCache = false;
+    }
+    return didRestoreState;
+  }
+
+  saveFilterStateToLocalStorage() {
+    try {
+      const {
+        selectedTypes,
+        sortByImportance,
+        showTopQuestions,
+        topQuestionsCount,
+        aiSearchQuery,
+        aiRankingCount,
+        aiAppliedTopN,
+        aiCombineWithOtherFilters,
+        sbtFilterLocalState,
+        selectedTags,
+        showTopQuestionsByResponses,
+        filterByResponded,
+        filterByNotResponded
+      } = this.state;
+
+      const dataToStore = {
+        selectedTypes,
+        sortByImportance,
+        showTopQuestions,
+        topQuestionsCount,
+        aiSearchQuery,
+        aiRankingCount,
+        aiAppliedTopN,
+        aiCombineWithOtherFilters,
+        sbtFilterLocalState,
+        selectedTags,
+        showTopQuestionsByResponses,
+        filterByResponded,
+        filterByNotResponded
+      };
+
+      const modeKey =
+        this.props.filterType === 'results'
+          ? 'questionFilterState_results'
+          : 'questionFilterState_questions';
+      const slug = resolveFilterStorageSlug(this.props);
+      const existing = peekCacheSync('filters', slug, { clone: false });
+      const existingModeState =
+        existing && typeof existing === 'object' ? (existing[modeKey] || null) : null;
+      const nextModeSignature = this.getMemoizedStableSerialize(dataToStore);
+      const existingModeSignature = this.getMemoizedStableSerialize(existingModeState);
+      const persistenceSignature = `${slug}|${modeKey}|${nextModeSignature}`;
+      if (nextModeSignature && persistenceSignature === this._lastSavedFilterStateSignature) {
+        return;
+      }
+      if (existingModeSignature === nextModeSignature) {
+        this._lastSavedFilterStateSignature = persistenceSignature;
+        return;
+      }
+      const next = (existing && typeof existing === 'object')
+        ? { ...existing, [modeKey]: dataToStore }
+        : { [modeKey]: dataToStore };
+      const writeResult: any = writeCache('filters', slug, next);
+      const handleSuccess = (ok: any) => {
+        if (ok !== false) {
+          this._lastSavedFilterStateSignature = persistenceSignature;
+        }
+      };
+      if (writeResult && typeof writeResult.then === 'function') {
+        void writeResult
+          .then(handleSuccess)
+          .catch((error: any) => {
+            questionFilterLog.error('Error saving filter state to cache:', error);
+          });
+      } else {
+        handleSuccess(writeResult);
+      }
+    } catch (error) {
+      questionFilterLog.error('Error saving filter state to cache:', error);
+    }
+  }
+
+  syncExternalFilterState(nextFilterState: any) {
+    if (!nextFilterState || typeof nextFilterState !== 'object') {
+      return;
+    }
+
+    // Prevent stale in-flight AI responses from overriding externally synced state.
+    this.invalidatePendingAiApply();
+
+    const selectedTypes = Array.isArray(nextFilterState.questionTypes)
+      ? [...nextFilterState.questionTypes]
+      : [];
+
+    const selectedTags = Array.isArray(nextFilterState.selectedTags)
+      ? [...nextFilterState.selectedTags]
+      : [];
+
+    const aiSearchQuery =
+      typeof nextFilterState.aiFilter === 'string' ? nextFilterState.aiFilter : '';
+    const aiTopN = normalizePositiveInt(nextFilterState.aiTopN, DEFAULT_AI_TOP_N);
+    const aiCombineWithOtherFilters = !!(
+      aiSearchQuery.trim() && nextFilterState.aiCombine === true
+    );
+
+    const sbtFilterLocalState =
+      nextFilterState.sbtFilter && typeof nextFilterState.sbtFilter === 'object'
+        ? { ...nextFilterState.sbtFilter }
+        : null;
+    const responseStatusState = normalizeResponseStatusFilterState({
+      filterByResponded: !!nextFilterState?.responseStatus?.responded,
+      filterByNotResponded: !!nextFilterState?.responseStatus?.notResponded,
+      account: this.props.account,
+    });
+
+    // Top questions mapping
+    let showTopQuestions = false;
+    let showTopQuestionsByResponses = false;
+    let topQuestionsCount = DEFAULT_TOP_QUESTIONS_COUNT;
+    let sortByImportance = false;
+
+    if (nextFilterState.topQuestions && typeof nextFilterState.topQuestions === 'object') {
+      const { count, by } = nextFilterState.topQuestions;
+      topQuestionsCount = typeof count === 'number' ? count : DEFAULT_TOP_QUESTIONS_COUNT;
+
+      if (by === 'importance') {
+        showTopQuestions = true;
+        sortByImportance = true;
+        showTopQuestionsByResponses = false;
+      } else if (by === 'responses') {
+        showTopQuestionsByResponses = true;
+        showTopQuestions = false;
+        sortByImportance = false;
+      } else {
+        // Unknown "by" value – treat as no top-questions filter
+        showTopQuestions = false;
+        showTopQuestionsByResponses = false;
+        sortByImportance = false;
+      }
+    }
+
+    const nextAiAppliedTopN = aiSearchQuery ? aiTopN : null;
+    const currentAiSearchQuery = String(this.state.aiSearchQuery || '');
+    const shouldPreserveAppliedAiState = (
+      aiSearchQuery.trim() &&
+      currentAiSearchQuery === aiSearchQuery &&
+      !!this.state.aiFilterApplied
+    );
+
+    this.setState(
+      {
+        // committed state
+        selectedTypes,
+        selectedTags,
+        aiSearchQuery,
+        aiDraftQuery: aiSearchQuery,
+        aiRankingCount: aiTopN,
+        aiAppliedTopN: nextAiAppliedTopN,
+        aiFilterApplied: shouldPreserveAppliedAiState ? this.state.aiFilterApplied : false,
+        aiRankedQuestionIds: shouldPreserveAppliedAiState
+          ? normalizeAiIdList(this.state.aiRankedQuestionIds || [])
+          : [],
+        aiCombineWithOtherFilters,
+        aiApplyError: shouldPreserveAppliedAiState ? this.state.aiApplyError : '',
+        aiApplying: false,
+        sbtFilterLocalState,
+        filterByResponded: responseStatusState.filterByResponded,
+        filterByNotResponded: responseStatusState.filterByNotResponded,
+        showTopQuestions,
+        showTopQuestionsByResponses,
+        topQuestionsCount,
+        sortByImportance,
+
+        // pending mirrors (used for instantaneous UI feedback)
+        pendingSelectedTypes: selectedTypes,
+        pendingShowTopQuestions: showTopQuestions,
+        pendingShowTopQuestionsByResponses: showTopQuestionsByResponses,
+        pendingTopQuestionsCount: topQuestionsCount,
+        pendingSortByImportance: sortByImportance,
+      },
+      () => {
+        // re-apply with the newly synced state so the list/counts update immediately
+        this.handleApplyFilters(true);
+        // and refresh bookmark adornments
+        this.checkIfCurrentFilterIsBookmarked();
+        this.queueAutoApplyAiFilter('sync-external-state');
+      }
+    );
+  }
+
+
+  // ----------------------------------------------------------------------------------
+  // MERGE QUESTIONS WITH CACHE & LOAD RESPONSES FROM LOCAL
+  // ----------------------------------------------------------------------------------
+  mergeQuestionsWithCache(sourceQuestions: any) {
+    if (!sourceQuestions || !Array.isArray(sourceQuestions)) return sourceQuestions || [];
+
+    const resolvedSession = resolveEffectiveSessionContext(this.props);
+    const slug = resolvedSession.sessionSlug || '';
+    const group = resolvedSession.sessionConfig || {};
+    const netIdStr = String(this.props.network?.id ?? this.props.networkChainId ?? group.networkChainId ?? '');
+    if (!netIdStr) return sourceQuestions; // no network context → return as-is
+
+    // NOTE: read from per-group key `dg:questionsCache:<slug>` using canonical string network keys only
+    const questionsCache = readQuestionsCacheSync(slug);
+
+    const net = questionsCache?.[netIdStr];
+    if (!net || !net.questions) return sourceQuestions;
+
+    const allCacheQIDs = Object.keys(net.questions);
+    const existingIDs: any = new Set(sourceQuestions.map((q: any) => (q.id || '').toLowerCase()));
+    const merged = [...sourceQuestions];
+
+    allCacheQIDs.forEach((qIdLower: any) => {
+      if (!existingIDs.has(qIdLower)) {
+        const qObj = net.questions[qIdLower];
+        if (qObj) {
+          merged.push({ ...qObj });
+        }
+      }
+    });
+
+    return merged;
+  }
+
+  loadQuestionResponsesFromLocalStorage() {
+    // Group-aware: read responses from per-group key `dg:questionsCache:<slug>` using STRING network key.
+    const resolvedSession = resolveEffectiveSessionContext(this.props);
+    const slug = resolvedSession.sessionSlug || '';
+    const group = resolvedSession.sessionConfig || {};
+    const netIdStr = String(this.props.network?.id ?? this.props.networkChainId ?? group.networkChainId ?? '');
+    if (!netIdStr) {
+      questionFilterLog.warn('Network ID undefined; cannot load questionResponses from localStorage.');
+      return;
+    }
+
+    try {
+      const questionsCache = readQuestionsCacheSync(slug);
+
+      const cachedResponses = (questionsCache?.[netIdStr]?.questionResponses) || {};
+      const cachedResponsesSignature = buildFilteredResponsesByQuestionSignature(cachedResponses);
+      if (cachedResponsesSignature === this._cachedQuestionResponsesSignature) return;
+      this._cachedQuestionResponsesSignature = cachedResponsesSignature;
+      this.setState({ cachedQuestionResponses: cachedResponses });
+    } catch (error) {
+      questionFilterLog.error('Error in loadQuestionResponsesFromLocalStorage:', error);
+    }
+  }
+
+  parseResponse: any = (responseData: any) => {
+    if (typeof responseData !== 'string') return responseData;
+    const memo = this._responseParseMemo;
+    if (memo.has(responseData)) {
+      const cached = memo.get(responseData);
+      memo.delete(responseData);
+      memo.set(responseData, cached);
+      return cached;
+    }
+    try {
+      const parsed = JSON.parse(responseData);
+      memo.set(responseData, parsed);
+      while (memo.size > QUESTION_FILTER_RESPONSE_PARSE_MEMO_MAX) {
+        const oldestKey = memo.keys().next().value;
+        if (oldestKey === undefined) break;
+        memo.delete(oldestKey);
+      }
+      return parsed;
+    } catch (error) {
+      questionFilterLog.error('Error parsing response data in QuestionFilter:', error);
+      memo.set(responseData, null);
+      while (memo.size > QUESTION_FILTER_RESPONSE_PARSE_MEMO_MAX) {
+        const oldestKey = memo.keys().next().value;
+        if (oldestKey === undefined) break;
+        memo.delete(oldestKey);
+      }
+      return null;
+    }
+  };
+
+  getMemoizedQuestionResponseStats(
+    relevantResponses: any = {},
+    mergedQuestions: any = [],
+    questionResponsesNonceKey: any = null,
+    questionsCacheNonceKey: any = null
+  ) {
+    const memo = this._questionResponseStatsMemo;
+    if (
+      memo.relevantResponsesRef === relevantResponses &&
+      memo.mergedQuestionsRef === mergedQuestions &&
+      memo.questionResponsesNonceKey === questionResponsesNonceKey &&
+      memo.questionsCacheNonceKey === questionsCacheNonceKey
+    ) {
+      return memo.result;
+    }
+
+    const questionTypeById: Record<string, any> = {};
+    (Array.isArray(mergedQuestions) ? mergedQuestions : []).forEach((question: any) => {
+      const qLower = toLowerId(question?.id);
+      if (!qLower) return;
+      questionTypeById[qLower] = String(question?.type || '').toLowerCase();
+    });
+
+    const statsByQuestion: any = new Map();
+    Object.keys(relevantResponses || {}).forEach((qId: any) => {
+      const qLower = String(qId || '').toLowerCase();
+      const respondersObj = relevantResponses[qId] || {};
+      const responderKeys = Object.keys(respondersObj || {});
+      let totalImportance = 0;
+      let responseCount = 0;
+      const questionType = questionTypeById[qLower];
+      responderKeys.forEach((resp: any) => {
+        const parsed = this.parseResponse(respondersObj[resp]);
+        const next = Number(parsed?.conviction ?? parsed?.importance ?? 0);
+        if (Number.isFinite(next)) totalImportance += next;
+        if (!isFreeformBlankAnswer(questionType, parsed)) {
+          responseCount += 1;
+        }
+      });
+      statsByQuestion.set(qLower, {
+        responseCount,
+        totalImportance,
+      });
+    });
+
+    this._questionResponseStatsMemo = {
+      relevantResponsesRef: relevantResponses,
+      mergedQuestionsRef: mergedQuestions,
+      questionResponsesNonceKey,
+      questionsCacheNonceKey,
+      result: statsByQuestion,
+    };
+    return statsByQuestion;
+  }
+
+  // ----------------------------------------------------------------------------------
+  // FILTER LOGIC
+  // ----------------------------------------------------------------------------------
+  setFilterLoading: any = (loading: any) => {
+    this.setState({ filterLoading: loading });
+    if (this.props.setFilterLoading) {
+      this.props.setFilterLoading(loading);
+    }
+  };
+
+  emitCountUpdate: any = (count: any, encryptedCount: any) => {
+    if (!this.props.onCountUpdate || !this.props.isQuestionCacheReady) return;
+    const safeEncrypted = Number.isFinite(encryptedCount) ? encryptedCount : 0;
+    if (this._lastEmittedCount === count && this._lastEmittedEncryptedCount === safeEncrypted) return;
+    this._lastEmittedCount = count;
+    this._lastEmittedEncryptedCount = safeEncrypted;
+    this.props.onCountUpdate(count, safeEncrypted);
+  };
+
+  emitFilterActivityChange: any = (isFilterActive: any) => {
+    if (!this.props.onFilterActivityChange) return;
+    if (this._lastEmittedFilterActivity === isFilterActive) return;
+    this._lastEmittedFilterActivity = isFilterActive;
+    this.props.onFilterActivityChange(isFilterActive);
+  };
+
+  emitFilterCallbacks(filteredPayload: any, filterStateForCallback: any) {
+    const payloadSignature = buildFilterPayloadSignature(filteredPayload);
+    const filterStateSignature = serializeFilterState(filterStateForCallback) || '';
+    if (
+      this._lastEmittedFilterPayloadSignature === payloadSignature &&
+      this._lastEmittedFilterStateSignature === filterStateSignature
+    ) {
+      return;
+    }
+    this._lastEmittedFilterPayloadSignature = payloadSignature;
+    this._lastEmittedFilterStateSignature = filterStateSignature;
+    if (this.props.onFilter) {
+      this.props.onFilter(filteredPayload, filterStateForCallback);
+    }
+    // Avoid duplicate parent work when both props point to the same callback.
+    if (
+      this.props.onFilterStateChange &&
+      this.props.onFilterStateChange !== this.props.onFilter
+    ) {
+      this.props.onFilterStateChange(filterStateForCallback);
+    }
+  }
+
+  buildFilterPipelineResult(usePendingState: any = false) {
+    const mergedQuestions = Array.isArray(this.state.mergedQuestions)
+      ? this.state.mergedQuestions
+      : [];
+    const selectedTypes = usePendingState
+      ? this.state.pendingSelectedTypes
+      : this.state.selectedTypes;
+    const sortByImportance = usePendingState
+      ? this.state.pendingSortByImportance
+      : this.state.sortByImportance;
+    const sbtFilteredQuestions = usePendingState
+      ? this.state.pendingSbtFilteredQuestions
+      : this.state.sbtFilteredQuestions;
+    const showTopQuestions = usePendingState
+      ? this.state.pendingShowTopQuestions
+      : this.state.showTopQuestions;
+    const topQuestionsCount = usePendingState
+      ? this.state.pendingTopQuestionsCount
+      : this.state.topQuestionsCount;
+    const showTopQuestionsByResponses = usePendingState
+      ? this.state.pendingShowTopQuestionsByResponses
+      : this.state.showTopQuestionsByResponses;
+    const selectedTags = this.state.selectedTags || [];
+    const filterByResponded = this.state.filterByResponded;
+    const filterByNotResponded = this.state.filterByNotResponded;
+    const aiSearchQuery = this.state.aiSearchQuery || '';
+    const aiFilterApplied = !!this.state.aiFilterApplied;
+    const aiAppliedTopN = normalizePositiveInt(this.state.aiAppliedTopN, DEFAULT_AI_TOP_N);
+    const aiCombineWithOtherFilters = !!this.state.aiCombineWithOtherFilters;
+    const aiRankedQuestionIds = normalizeAiIdList(this.state.aiRankedQuestionIds || []);
+    const aiRankedIdsSignature = stableSerializeSmallObject(aiRankedQuestionIds, 8192);
+    const hasSbtFilter = sbtFilteredQuestions !== null;
+    const hasTypeFilter = (selectedTypes || []).length > 0;
+    const hasTagFilter = (selectedTags || []).length > 0;
+    const hasTopFilter = Boolean(showTopQuestions || showTopQuestionsByResponses);
+    const hasResponseStatusFilter = (filterByResponded || filterByNotResponded) && !(filterByResponded && filterByNotResponded);
+    const hasAiFilter = (
+      !hasTopFilter &&
+      aiFilterApplied &&
+      String(aiSearchQuery || '').trim().length > 0
+    );
+    const hasImportanceSort = Boolean(sortByImportance);
+    const shouldUseResponseData = (
+      hasResponseStatusFilter ||
+      showTopQuestions ||
+      showTopQuestionsByResponses ||
+      hasImportanceSort
+    );
+    const relevantResponses = shouldUseResponseData
+      ? (this.props.questionResponses || this.state.cachedQuestionResponses || EMPTY_FILTER_RESPONSES)
+      : EMPTY_FILTER_RESPONSES;
+    const questionResponsesNonceKey = shouldUseResponseData
+      ? normalizeNonceKey(this.props.questionResponsesNonce)
+      : null;
+    const questionsCacheNonceKey = shouldUseResponseData
+      ? normalizeNonceKey(this.props.questionsCacheNonce)
+      : null;
+    const hasActiveTransforms = (
+      hasSbtFilter ||
+      hasTypeFilter ||
+      hasTagFilter ||
+      hasResponseStatusFilter ||
+      hasAiFilter ||
+      hasTopFilter ||
+      hasImportanceSort
+    );
+
+    const memo = this._filterPipelineMemo;
+    if (
+      memo &&
+      memo.usePendingState === usePendingState &&
+      memo.mergedQuestionsRef === mergedQuestions &&
+      memo.relevantResponsesRef === relevantResponses &&
+      memo.selectedTypesRef === selectedTypes &&
+      memo.sortByImportance === sortByImportance &&
+      memo.sbtFilteredQuestionsRef === sbtFilteredQuestions &&
+      memo.showTopQuestions === showTopQuestions &&
+      memo.topQuestionsCount === topQuestionsCount &&
+      memo.showTopQuestionsByResponses === showTopQuestionsByResponses &&
+      memo.selectedTagsRef === selectedTags &&
+      memo.filterByResponded === filterByResponded &&
+      memo.filterByNotResponded === filterByNotResponded &&
+      memo.aiSearchQuery === aiSearchQuery &&
+      memo.aiFilterApplied === aiFilterApplied &&
+      memo.aiAppliedTopN === aiAppliedTopN &&
+      memo.aiCombineWithOtherFilters === aiCombineWithOtherFilters &&
+      memo.aiRankedIdsSignature === aiRankedIdsSignature &&
+      memo.questionResponsesNonceKey === questionResponsesNonceKey &&
+      memo.questionsCacheNonceKey === questionsCacheNonceKey
+    ) {
+      return memo.result;
+    }
+
+    if (!hasActiveTransforms) {
+      const result = {
+        finalQuestions: mergedQuestions,
+        count: mergedQuestions.length,
+      };
+      this._filterPipelineMemo = {
+        usePendingState,
+        mergedQuestionsRef: mergedQuestions,
+        relevantResponsesRef: relevantResponses,
+        selectedTypesRef: selectedTypes,
+        sortByImportance,
+        sbtFilteredQuestionsRef: sbtFilteredQuestions,
+        showTopQuestions,
+        topQuestionsCount,
+        showTopQuestionsByResponses,
+        selectedTagsRef: selectedTags,
+        filterByResponded,
+        filterByNotResponded,
+        aiSearchQuery,
+        aiFilterApplied,
+        aiAppliedTopN,
+        aiCombineWithOtherFilters,
+        aiRankedIdsSignature,
+        questionResponsesNonceKey,
+        questionsCacheNonceKey,
+        result,
+      };
+      return result;
+    }
+
+    const shouldComputeResponseStats = (
+      showTopQuestions ||
+      showTopQuestionsByResponses ||
+      sortByImportance
+    );
+    const statsByQuestion = shouldComputeResponseStats
+      ? this.getMemoizedQuestionResponseStats(
+        relevantResponses,
+        mergedQuestions,
+        questionResponsesNonceKey,
+        questionsCacheNonceKey
+      )
+      : null;
+
+    const baseQuestions = (hasAiFilter && !aiCombineWithOtherFilters)
+      ? mergedQuestions
+      : this.getQuestionsSubsetBeforeAi(usePendingState);
+    let finalQuestions = baseQuestions;
+
+    if (hasAiFilter) {
+      finalQuestions = this.applyAISearchFilter(
+        finalQuestions,
+        aiSearchQuery,
+        aiRankedQuestionIds,
+        aiAppliedTopN
+      );
+    }
+
+    if (showTopQuestions || showTopQuestionsByResponses) {
+      const topLimit = Number(topQuestionsCount);
+      if (showTopQuestionsByResponses) {
+        const rankedByResponses = finalQuestions.map((q: any, idx: any) => {
+          const qLower = (q.id || '').toLowerCase();
+          const score = Number(statsByQuestion?.get(qLower)?.responseCount || 0);
+          return [q, idx, score];
+        });
+        rankedByResponses.sort((a: any, b: any) => {
+          const diff = b[2] - a[2];
+          return diff !== 0 ? diff : (a[1] - b[1]);
+        });
+        finalQuestions = rankedByResponses
+          .slice(0, topLimit)
+          .map(([q, , score]: any) => ({ ...q, totalResponses: score }));
+      } else {
+        const rankedByImportance = finalQuestions.map((q: any, idx: any) => {
+          const qLower = (q.id || '').toLowerCase();
+          const score = Number(statsByQuestion?.get(qLower)?.totalImportance || 0);
+          return [q, idx, score];
+        });
+        rankedByImportance.sort((a: any, b: any) => {
+          const diff = b[2] - a[2];
+          return diff !== 0 ? diff : (a[1] - b[1]);
+        });
+        finalQuestions = rankedByImportance
+          .slice(0, topLimit)
+          .map(([q, , score]: any) => ({ ...q, totalImportance: score }));
+      }
+    } else if (sortByImportance) {
+      const rankedByImportance = finalQuestions.map((q: any, idx: any) => {
+        const qLower = (q.id || '').toLowerCase();
+        const score = Number(statsByQuestion?.get(qLower)?.totalImportance || 0);
+        return [q, idx, score];
+      });
+      rankedByImportance.sort((a: any, b: any) => {
+        const diff = b[2] - a[2];
+        return diff !== 0 ? diff : (a[1] - b[1]);
+      });
+      finalQuestions = rankedByImportance.map(([q, , score]: any) => ({ ...q, totalImportance: score }));
+    }
+
+    const result = {
+      finalQuestions,
+      count: finalQuestions.length,
+    };
+
+    this._filterPipelineMemo = {
+      usePendingState,
+      mergedQuestionsRef: mergedQuestions,
+      relevantResponsesRef: relevantResponses,
+      selectedTypesRef: selectedTypes,
+      sortByImportance,
+      sbtFilteredQuestionsRef: sbtFilteredQuestions,
+      showTopQuestions,
+      topQuestionsCount,
+      showTopQuestionsByResponses,
+      selectedTagsRef: selectedTags,
+      filterByResponded,
+      filterByNotResponded,
+      aiSearchQuery,
+      aiFilterApplied,
+      aiAppliedTopN,
+      aiCombineWithOtherFilters,
+      aiRankedIdsSignature,
+      questionResponsesNonceKey,
+      questionsCacheNonceKey,
+      result,
+    };
+
+    return result;
+  }
+
+  handleFilteredQuestions: any = (filtered: any, newSbtFilterLocalState: any) => {
+    // "filtered" can be an array or an object { filteredQuestions, filteredResponsesByQuestion }
+    let realFilteredQuestions: any[] = [];
+    let filteredResponsesByQuestion: Record<string, any> = {};
+
+    if (Array.isArray(filtered)) {
+      realFilteredQuestions = filtered;
+    } else if (
+      filtered &&
+      filtered.filteredQuestions &&
+      Array.isArray(filtered.filteredQuestions)
+    ) {
+      realFilteredQuestions = filtered.filteredQuestions;
+      filteredResponsesByQuestion = filtered.filteredResponsesByQuestion || {};
+    }
+
+    // Infinite loop prevention
+    // Strict deep-equality check. If the incoming filtered lists and SBT state are
+    // structurally identical to what we already have, return immediately.
+    const sbtStateChanged = stableSerializeSmallObject(newSbtFilterLocalState) !== stableSerializeSmallObject(this.state.sbtFilterLocalState);
+    const questionsChanged = !areQuestionListsEquivalentById(realFilteredQuestions, this.state.pendingSbtFilteredQuestions);
+
+    if (!sbtStateChanged && !questionsChanged) {
+      return;
+    }
+
+    this.setState(
+      {
+        pendingSbtFilteredQuestions: realFilteredQuestions,
+        sbtFilterLocalState: newSbtFilterLocalState
+      },
+      () => {
+        this.handleApplyFilters(true);
+      }
+    );
+
+    const filterStateForCallback = this.buildFilterState();
+    filterStateForCallback.sbtFilter = newSbtFilterLocalState;
+
+    if (Object.keys(filteredResponsesByQuestion).length > 0) {
+      this.emitFilterCallbacks(
+        {
+          filteredQuestions: realFilteredQuestions,
+          filteredResponsesByQuestion
+        },
+        filterStateForCallback
+      );
+    } else {
+      this.emitFilterCallbacks(realFilteredQuestions, filterStateForCallback);
+    }
+  };
+
+  getCurrentFilterState() {
+    // This method returns the internal state representation.
+    // buildFilterState() is used for the external representation.
+    return {
+      selectedTypes: this.state.selectedTypes,
+      sortByImportance: this.state.sortByImportance,
+      showTopQuestions: this.state.showTopQuestions,
+      topQuestionsCount: this.state.topQuestionsCount,
+      aiSearchQuery: this.state.aiSearchQuery,
+      aiDraftQuery: this.state.aiDraftQuery,
+      aiRankingCount: this.state.aiRankingCount,
+      aiAppliedTopN: this.state.aiAppliedTopN,
+      aiFilterApplied: this.state.aiFilterApplied,
+      aiCombineWithOtherFilters: this.state.aiCombineWithOtherFilters,
+      sbtFilterLocalState: this.state.sbtFilterLocalState,
+      selectedTags: this.state.selectedTags,
+      showTopQuestionsByResponses: this.state.showTopQuestionsByResponses
+    };
+  }
+
+  applyAISearchFilter(questions: any, aiSearchQuery: any, aiRankedQuestionIds: any = [], topN: any = DEFAULT_AI_TOP_N) {
+    if (!aiSearchQuery.trim()) {
+      return questions;
+    }
+    const orderedIds = normalizeAiIdList(aiRankedQuestionIds);
+    if (!orderedIds.length) return [];
+    const limit = normalizePositiveInt(topN, DEFAULT_AI_TOP_N);
+
+    const orderById: any = new Map();
+    orderedIds.forEach((id: any, idx: any) => {
+      const key = String(id || '').toLowerCase();
+      if (!orderById.has(key)) orderById.set(key, idx);
+    });
+
+    return (Array.isArray(questions) ? questions : [])
+      .filter((q: any) => orderById.has(String(q?.id || '').toLowerCase()))
+      .sort((a: any, b: any) => {
+        const aIdx = orderById.get(String(a?.id || '').toLowerCase());
+        const bIdx = orderById.get(String(b?.id || '').toLowerCase());
+        return (aIdx ?? 0) - (bIdx ?? 0);
+      })
+      .slice(0, limit);
+  }
+
+  handleAiDraftQueryChange: any = (nextValue: any) => {
+    this.setState({
+      aiDraftQuery: String(nextValue || ''),
+      aiApplyError: '',
+    });
+  };
+
+  handleAiTopNChange: any = (event: any) => {
+    const raw = event?.target?.value;
+    const next = normalizePositiveInt(raw, DEFAULT_AI_TOP_N);
+    this.setState({
+      aiRankingCount: next,
+      aiApplyError: '',
+    });
+  };
+
+  handleAiCombineWithFiltersChange: any = (event: any) => {
+    const checked = event?.target?.checked === true;
+    this.setState({
+      aiCombineWithOtherFilters: checked,
+      aiApplyError: '',
+    }, () => {
+      if (this.state.aiFilterApplied && String(this.state.aiSearchQuery || '').trim()) {
+        this.handleApplyFilters(true);
+      }
+    });
+  };
+
+  invalidatePendingAiApply: any = () => {
+    this._aiApplyRequestSeq += 1;
+    this._aiLatestRequestSeq = this._aiApplyRequestSeq;
+    this._aiAutoApplyInFlightSignature = '';
+    this._aiAutoApplyQueuedSignature = '';
+  };
+
+  handleApplyAIFilter: any = async ({
+    auto = false,
+    queryOverride,
+    topNOverride,
+    source = 'manual',
+  }: any = {}) => {
+    const aiAccess = this.getAiAccessState();
+    if (!aiAccess.enabled) {
+      if (!auto) {
+        this.setState({
+          aiApplyError: 'AI filter is unavailable. Add a local API key or use a session with sponsored AI access.',
+        });
+      }
+      return false;
+    }
+
+    if (this.state.pendingShowTopQuestions || this.state.pendingShowTopQuestionsByResponses) {
+      if (!auto) {
+        this.setState({
+          aiApplyError: 'Disable “Top X questions” before applying AI filter.',
+        });
+      }
+      return false;
+    }
+
+    const query = String(
+      queryOverride != null
+        ? queryOverride
+        : this.state.aiDraftQuery
+    ).trim();
+    const topN = normalizePositiveInt(
+      topNOverride != null ? topNOverride : this.state.aiRankingCount,
+      DEFAULT_AI_TOP_N
+    );
+
+    if (!query) {
+      if (!auto) {
+        this.setState({ aiApplyError: 'Enter an AI filter query first.' });
+      }
+      return false;
+    }
+
+    const candidateQuestions = this.getAiRankingCandidates();
+    const applySignature = this.buildAiApplySignature({
+      queryOverride: query,
+      candidateQuestions,
+    });
+
+    if (!candidateQuestions.length) {
+      this.invalidatePendingAiApply();
+      this.setState({
+        aiApplying: false,
+        aiSearchQuery: query,
+        aiDraftQuery: query,
+        aiRankingCount: topN,
+        aiAppliedTopN: topN,
+        aiFilterApplied: false,
+        aiRankedQuestionIds: [],
+        aiApplyError: '',
+        aiLastAppliedSignature: '',
+      }, () => {
+        this.handleApplyFilters(true);
+      });
+      return true;
+    }
+
+    if (
+      this.state.aiFilterApplied &&
+      this.state.aiLastAppliedSignature === applySignature
+    ) {
+      this.setState({
+        aiApplying: false,
+        aiSearchQuery: query,
+        aiDraftQuery: query,
+        aiRankingCount: topN,
+        aiAppliedTopN: topN,
+        aiApplyError: '',
+      }, () => {
+        this.handleApplyFilters(true);
+      });
+      return true;
+    }
+
+    const requestSeq = this._aiApplyRequestSeq + 1;
+    this._aiApplyRequestSeq = requestSeq;
+    this._aiLatestRequestSeq = requestSeq;
+    if (auto) {
+      this._aiAutoApplyInFlightSignature = applySignature;
+    }
+
+    this.setState({
+      aiApplying: true,
+      aiApplyError: '',
+    });
+
+    try {
+      const rankedIds = await rankQuestionsAI(
+        query,
+        candidateQuestions,
+        Math.max(topN, candidateQuestions.length),
+        {
+          ...this.buildAiRequestOptions(),
+          throwOnError: true,
+        }
+      );
+      if (!this._isMounted) return false;
+      if (requestSeq !== this._aiLatestRequestSeq) return false;
+      const normalizedRankedIds = normalizeAiIdList(rankedIds);
+      this.setState({
+        aiApplying: false,
+        aiSearchQuery: query,
+        aiDraftQuery: query,
+        aiRankingCount: topN,
+        aiAppliedTopN: topN,
+        aiFilterApplied: true,
+        aiRankedQuestionIds: normalizedRankedIds,
+        aiApplyError: '',
+        aiLastAppliedSignature: applySignature,
+      }, () => {
+        this.handleApplyFilters(true);
+      });
+      return true;
+	    } catch (error: any) {
+	      questionFilterLog.error('Failed applying AI filter', { source, error });
+	      if (!this._isMounted) return false;
+	      if (requestSeq !== this._aiLatestRequestSeq) return false;
+	      this.setState({
+	        aiApplying: false,
+	        aiApplyError: getErrorMessage(error, 'AI filter request failed. Previous AI results were kept.'),
+	      });
+      return false;
+    } finally {
+      if (auto && this._aiAutoApplyInFlightSignature === applySignature) {
+        this._aiAutoApplyInFlightSignature = '';
+      }
+    }
+  };
+
+  handleApplyFilters(immediate: any = false) {
+    // Notify parent if filters are active/inactive
+    const isFilterActive = !this.isFilterStateDefault(this.buildFilterState());
+    this.emitFilterActivityChange(isFilterActive);
+
+    const { mergedQuestions } = this.state;
+    if (!mergedQuestions) return;
+
+    const newSelectedTypes = this.state.pendingSelectedTypes;
+    const newSortByImportance = this.state.pendingSortByImportance;
+    const newShowTopQuestions = this.state.pendingShowTopQuestions;
+    const newTopQuestionsCount = this.state.pendingTopQuestionsCount;
+    const newAiSearchQuery = this.state.aiSearchQuery;
+    const newAiAppliedTopN = this.state.aiAppliedTopN;
+    const newAiFilterApplied = this.state.aiFilterApplied;
+    const newAiCombineWithOtherFilters = this.state.aiCombineWithOtherFilters;
+    const newAiRankedQuestionIds = normalizeAiIdList(this.state.aiRankedQuestionIds || []);
+    const newPendingSbtFilteredQuestions = this.state.pendingSbtFilteredQuestions;
+    const newShowTopQuestionsByResponses = this.state.pendingShowTopQuestionsByResponses;
+    const newSelectedTags = this.state.selectedTags;
+    const newFilterByResponded = this.state.filterByResponded;
+    const newFilterByNotResponded = this.state.filterByNotResponded;
+
+    const potentialFilterStateObj = {
+      newSelectedTypes: [...newSelectedTypes].sort(),
+      newSortByImportance,
+      newShowTopQuestions,
+      newTopQuestionsCount,
+      newAiSearchQuery,
+      newAiAppliedTopN,
+      newAiFilterApplied,
+      newAiCombineWithOtherFilters,
+      newAiRankedSignature: stableSerializeSmallObject(newAiRankedQuestionIds, 8192),
+      newPendingSbtFilteredQuestionsLength: newPendingSbtFilteredQuestions
+        ? newPendingSbtFilteredQuestions.length
+        : -1,
+      newShowTopQuestionsByResponses,
+      newSelectedTags: [...newSelectedTags].sort(),
+      newFilterByResponded,
+      newFilterByNotResponded
+    };
+    const potentialFilterStateSignature = stableSerializeSmallObject(potentialFilterStateObj);
+
+    if (
+      this.state.lastAppliedFilterState &&
+      this.state.lastAppliedFilterStateSignature === potentialFilterStateSignature
+    ) {
+      if (!immediate) return;
+    }
+    const pipelineResult = this.buildFilterPipelineResult(true);
+
+    // Commit pending → live state and publish one shared pipeline result.
+    this.setState(
+      {
+        lastAppliedFilterState: potentialFilterStateObj,
+        lastAppliedFilterStateSignature: potentialFilterStateSignature,
+        selectedTypes: newSelectedTypes,
+        sortByImportance: newSortByImportance,
+        showTopQuestions: newShowTopQuestions,
+        topQuestionsCount: newTopQuestionsCount,
+        aiSearchQuery: newAiSearchQuery,
+        aiAppliedTopN: newAiAppliedTopN,
+        aiFilterApplied: newAiFilterApplied,
+        aiCombineWithOtherFilters: newAiCombineWithOtherFilters,
+        aiRankedQuestionIds: newAiRankedQuestionIds,
+        sbtFilteredQuestions: newPendingSbtFilteredQuestions,
+        showTopQuestionsByResponses: newShowTopQuestionsByResponses,
+        selectedTags: newSelectedTags,
+        filteredQuestionsCount: pipelineResult.count,
+      },
+      () => {
+        const filterStateForCallback = this.buildFilterState();
+        this.emitFilterCallbacks(pipelineResult.finalQuestions, filterStateForCallback);
+        const encCount = pipelineResult.finalQuestions.filter((q: any) => String(q?.prompt || '').trim() === '[encrypted]').length;
+        this.emitCountUpdate(pipelineResult.count, encCount);
+        this.checkIfCurrentFilterIsBookmarked();
+      }
+    );
+  }
+
+
+
+  buildFilterState() {
+    let topQuestionsValue: any = null;
+    if (this.state.showTopQuestions) { // Use current state, not pending
+      topQuestionsValue = { count: this.state.topQuestionsCount, by: 'importance' };
+    } else if (this.state.showTopQuestionsByResponses) { // Use current state
+      topQuestionsValue = { count: this.state.topQuestionsCount, by: 'responses' };
+    }
+    // Note: this.state.sortByImportance is implicitly handled by topQuestions.by === 'importance'
+    // or not represented if topQuestions is null.
+
+    const aiFilterIsActive = (
+      !!this.state.aiFilterApplied &&
+      String(this.state.aiSearchQuery || '').trim() !== ''
+    );
+    const filterByResponded = this.state.filterByResponded === true;
+    const filterByNotResponded = this.state.filterByNotResponded === true;
+    const responseStatus = (filterByResponded || filterByNotResponded) && !(filterByResponded && filterByNotResponded)
+      ? { responded: filterByResponded, notResponded: filterByNotResponded }
+      : null;
+
+    return {
+      topQuestions: topQuestionsValue,
+      questionTypes: this.state.selectedTypes, // Use current state
+      sbtFilter: this.state.sbtFilterLocalState, // Use current state
+      aiFilter: aiFilterIsActive ? this.state.aiSearchQuery : null,
+      aiTopN: aiFilterIsActive
+        ? normalizePositiveInt(this.state.aiAppliedTopN, DEFAULT_AI_TOP_N)
+        : null,
+      aiCombine: aiFilterIsActive && this.state.aiCombineWithOtherFilters === true,
+      selectedTags: this.state.selectedTags, // Use current state
+      responseStatus,
+    };
+  }
+
+  isFilterStateDefault: any = (filterStateToTest: any) => {
+    if (!filterStateToTest) {
+      return true;
+    }
+
+    const isTopQuestionsDefault = filterStateToTest.topQuestions === null;
+    const isQuestionTypesDefault = Array.isArray(filterStateToTest.questionTypes) && filterStateToTest.questionTypes.length === 0;
+
+    const sbtFilter = filterStateToTest.sbtFilter;
+    let isSbtFilterDefault = sbtFilter === null;
+    if (sbtFilter && typeof sbtFilter === 'object') {
+        const allSbtListsEmpty =
+            (!sbtFilter.selectedSBTGroupsCreator || sbtFilter.selectedSBTGroupsCreator.length === 0) &&
+            (!sbtFilter.excludedSBTGroupsCreator || sbtFilter.excludedSBTGroupsCreator.length === 0) &&
+            (!sbtFilter.selectedSBTGroupsResponder || sbtFilter.selectedSBTGroupsResponder.length === 0) &&
+            (!sbtFilter.excludedSBTGroupsResponder || sbtFilter.excludedSBTGroupsResponder.length === 0) &&
+            (!sbtFilter.selectedSBTGroups || sbtFilter.selectedSBTGroups.length === 0) &&
+            (!sbtFilter.excludedSBTGroups || sbtFilter.excludedSBTGroups.length === 0);
+        if (allSbtListsEmpty) {
+            isSbtFilterDefault = true;
+        } else {
+            isSbtFilterDefault = false;
+        }
+    }
+
+    const isAiFilterDefault = filterStateToTest.aiFilter === null || filterStateToTest.aiFilter === '';
+    const isAiTopNDefault = filterStateToTest.aiTopN == null;
+    const isAiCombineDefault = filterStateToTest.aiCombine !== true;
+    const isSelectedTagsDefault = Array.isArray(filterStateToTest.selectedTags) && filterStateToTest.selectedTags.length === 0;
+    const responseStatus = filterStateToTest.responseStatus;
+    const responded = responseStatus?.responded === true;
+    const notResponded = responseStatus?.notResponded === true;
+    const isResponseStatusDefault = (
+      responseStatus === null ||
+      responseStatus === undefined ||
+      (!responded && !notResponded) ||
+      (responded && notResponded)
+    );
+
+    return isTopQuestionsDefault &&
+           isQuestionTypesDefault &&
+           isSbtFilterDefault &&
+           isAiFilterDefault &&
+           isAiTopNDefault &&
+           isAiCombineDefault &&
+           isSelectedTagsDefault &&
+           isResponseStatusDefault;
+  }
+
+  handleCopyFilterUrl: any = () => {
+    const { currentViewModeForUrl, currentSurveyIdForUrl } = this.props;
+
+    // Validate context props
+    if (!currentViewModeForUrl || (currentViewModeForUrl !== 'questions' && currentViewModeForUrl !== 'survey')) {
+      questionFilterLog.error("Cannot construct filter URL: 'currentViewModeForUrl' prop is missing or invalid. Must be 'questions' or 'survey'. Received:", currentViewModeForUrl);
+      return;
+    }
+    if (currentViewModeForUrl === 'survey' && (!currentSurveyIdForUrl || typeof currentSurveyIdForUrl !== 'string')) {
+      questionFilterLog.error("Cannot construct filter URL: 'currentSurveyIdForUrl' prop is missing or invalid for 'survey' view mode. Received:", currentSurveyIdForUrl);
+      return;
+    }
+
+    const currentAppliedFilterState = this.buildFilterState();
+
+    if (this.isFilterStateDefault(currentAppliedFilterState)) {
+      questionFilterLog.log("No custom filter applied to copy URL.");
+      return;
+    }
+
+    const serializedState = serializeFilterState(currentAppliedFilterState);
+    if (!serializedState) {
+        questionFilterLog.error("Failed to serialize non-default filter state.");
+        return;
+    }
+
+    const url = new URL(window.location.href);
+    url.searchParams.set('filter', serializedState);
+
+    navigator.clipboard.writeText(url.toString())
+      .then(() => {
+        notify.success('Copied to clipboard');
+        clearTimeout(this.copySuccessTimeout);
+        this.setState({ copiedUrlSuccess: true });
+        this.copySuccessTimeout = setTimeout(() => {
+          if (this._isMounted) {
+            this.setState({ copiedUrlSuccess: false });
+          }
+        }, 2000);
+      })
+      .catch((err: any) => {
+        questionFilterLog.error('Failed to copy filter URL to clipboard:', err);
+      });
+  }
+
+  toggleSection: any = (section: any) => {
+    this.setState((prevState: any) => ({
+      expandedSections: {
+        ...prevState.expandedSections,
+        [section]: !prevState.expandedSections[section]
+      }
+    }));
+  };
+
+  computeFilteredQuestionsCount() {
+    const { mergedQuestions } = this.state;
+    if (!mergedQuestions) {
+      this.emitCountUpdate(0, 0);
+      if (this.state.filteredQuestionsCount !== 0) {
+        this.setState({ filteredQuestionsCount: 0 });
+      }
+      return;
+    }
+
+    const pipeResult = this.buildFilterPipelineResult(true);
+    const encCount = pipeResult.finalQuestions.filter((q: any) => String(q?.prompt || '').trim() === '[encrypted]').length;
+    this.emitCountUpdate(pipeResult.count, encCount);
+    const { count: newLength } = pipeResult;
+    if (this.state.filteredQuestionsCount !== newLength) {
+      this.setState({ filteredQuestionsCount: newLength });
+    }
+  }
+
+  handleTypeSelection: any = (type: any) => {
+    let newSelectedTypes = [...this.state.pendingSelectedTypes];
+    if (newSelectedTypes.includes(type)) {
+      newSelectedTypes = newSelectedTypes.filter((t: any) => t !== type);
+    } else {
+      newSelectedTypes.push(type);
+    }
+    this.setState({ pendingSelectedTypes: newSelectedTypes }, () => {
+      this.handleApplyFilters(true);
+    });
+  };
+
+  handleTagSelection: any = (tag: any) => {
+    const tagLower = String(tag).toLowerCase();
+    // Store and compare tags in lowercase for case-insensitive matching
+    let updatedTags = this.state.selectedTags.map((t: any) => String(t).toLowerCase());
+
+    if (updatedTags.includes(tagLower)) {
+      updatedTags = updatedTags.filter((t: any) => t !== tagLower);
+    } else {
+      updatedTags.push(tagLower);
+    }
+
+    this.setState({ selectedTags: updatedTags }, () => {
+      // Re-apply filters live so counts/lists update immediately
+      this.handleApplyFilters(true);
+    });
+  };
+
+
+  handleSortByImportance: any = () => {
+    this.setState(
+      (prevState: any) => ({ pendingSortByImportance: !prevState.pendingSortByImportance }),
+      () => {
+        this.handleApplyFilters(true);
+      }
+    );
+  };
+
+  handleCancelFilters: any = () => {
+    // Revert pending changes
+    this.setState(
+      {
+        pendingSelectedTypes: this.state.selectedTypes,
+        pendingSortByImportance: this.state.sortByImportance,
+        pendingSbtFilteredQuestions: this.state.sbtFilteredQuestions,
+        pendingShowTopQuestions: this.state.showTopQuestions,
+        pendingTopQuestionsCount: this.state.topQuestionsCount,
+        pendingShowTopQuestionsByResponses: this.state.showTopQuestionsByResponses,
+        aiDraftQuery: this.state.aiSearchQuery,
+        aiRankingCount: normalizePositiveInt(this.state.aiAppliedTopN, DEFAULT_AI_TOP_N),
+        aiApplyError: '',
+      },
+      () => {
+        if (!this.props.resultsMode) {
+          this.props.toggleFilterModal();
+        }
+        // After reverting pending states, re-apply filters to reflect the actual current state
+        this.handleApplyFilters(true);
+      }
+    );
+  };
+
+  toggleShowTopQuestions: any = (byResponses: any = false) => {
+    if (byResponses) {
+      this.setState(
+        (prev: any) => ({
+          pendingShowTopQuestionsByResponses: !prev.pendingShowTopQuestionsByResponses,
+          pendingShowTopQuestions: false // Ensure the other top questions mode is off
+        }),
+        () => {
+          this.handleApplyFilters(true);
+        }
+      );
+    } else { // by importance
+      this.setState(
+        (prev: any) => ({
+          pendingShowTopQuestions: !prev.pendingShowTopQuestions,
+          pendingShowTopQuestionsByResponses: false // Ensure the other top questions mode is off
+        }),
+        () => {
+          this.handleApplyFilters(true);
+        }
+      );
+    }
+  };
+
+  handleClearFilters: any = () => {
+    this.invalidatePendingAiApply();
+    const defaultState = this.getDefaultFilterStatePatch();
+    this.setState(defaultState, () => {
+      this.handleApplyFilters(true);
+    });
+  };
+
+handleLoadFilter: any = () => {
+    let input = this.state.filterUrlInput.trim();
+    if (!input) return;
+
+    let filterString = input;
+
+    // 1. Try to extract from full URL (query param style)
+    try {
+      if (input.includes('?')) {
+        const urlObj = new URL(input, window.location.origin); // handle relative or absolute
+        const params = new URLSearchParams(urlObj.search);
+        if (params.has('filter')) {
+          filterString = params.get('filter');
+        }
+      } else if (input.includes('/results/')) {
+        // 2. Fallback for legacy path-style input (user pasting old link)
+        const parts = input.split('/results/');
+        if (parts.length > 1) {
+          // take the part after results/, remove any query params that might follow
+          filterString = parts[1].split('?')[0];
+        }
+      }
+    } catch (e) {
+      // If URL parsing fails, assume input is the string itself
+    }
+
+    try {
+	      const deserializedState: any = deserializeFilterState(filterString);
+      if (!deserializedState) {
+        throw new Error("Invalid filter string.");
+      }
+
+      const newState: Record<string, any> = {};
+      // Map deserialized state to component's state structure
+      if (deserializedState.questionTypes) {
+        newState.selectedTypes = deserializedState.questionTypes;
+        newState.pendingSelectedTypes = deserializedState.questionTypes;
+      }
+      if (deserializedState.selectedTags) {
+        newState.selectedTags = deserializedState.selectedTags;
+      }
+      if (deserializedState.responseStatus) {
+        const responseStatusState = normalizeResponseStatusFilterState({
+          filterByResponded: !!deserializedState?.responseStatus?.responded,
+          filterByNotResponded: !!deserializedState?.responseStatus?.notResponded,
+          account: this.props.account,
+        });
+        newState.filterByResponded = responseStatusState.filterByResponded;
+        newState.filterByNotResponded = responseStatusState.filterByNotResponded;
+      } else {
+        newState.filterByResponded = false;
+        newState.filterByNotResponded = false;
+      }
+      if (deserializedState.sbtFilter) {
+        newState.sbtFilterLocalState = deserializedState.sbtFilter;
+      }
+      if (typeof deserializedState.aiFilter === 'string') {
+        const aiQuery = deserializedState.aiFilter;
+        const aiTopN = normalizePositiveInt(deserializedState.aiTopN, DEFAULT_AI_TOP_N);
+        newState.aiSearchQuery = aiQuery;
+        newState.aiDraftQuery = aiQuery;
+        newState.aiRankingCount = aiTopN;
+        newState.aiAppliedTopN = aiQuery.trim() ? aiTopN : null;
+        newState.aiFilterApplied = false;
+        newState.aiCombineWithOtherFilters = !!(aiQuery.trim() && deserializedState.aiCombine === true);
+        newState.aiRankedQuestionIds = [];
+        newState.aiApplyError = '';
+      } else {
+        newState.aiSearchQuery = '';
+        newState.aiDraftQuery = '';
+        newState.aiRankingCount = DEFAULT_AI_TOP_N;
+        newState.aiAppliedTopN = null;
+        newState.aiFilterApplied = false;
+        newState.aiCombineWithOtherFilters = false;
+        newState.aiRankedQuestionIds = [];
+        newState.aiApplyError = '';
+      }
+      if (deserializedState.topQuestions) {
+        const { count, by } = deserializedState.topQuestions;
+        newState.topQuestionsCount = count || DEFAULT_TOP_QUESTIONS_COUNT;
+        newState.pendingTopQuestionsCount = count || DEFAULT_TOP_QUESTIONS_COUNT;
+        if (by === 'importance') {
+            newState.showTopQuestions = true;
+            newState.pendingShowTopQuestions = true;
+            newState.showTopQuestionsByResponses = false;
+            newState.pendingShowTopQuestionsByResponses = false;
+        } else if (by === 'responses') {
+            newState.showTopQuestionsByResponses = true;
+            newState.pendingShowTopQuestionsByResponses = true;
+            newState.showTopQuestions = false;
+            newState.pendingShowTopQuestions = false;
+        } else {
+            newState.showTopQuestions = false;
+            newState.pendingShowTopQuestions = false;
+            newState.showTopQuestionsByResponses = false;
+            newState.pendingShowTopQuestionsByResponses = false;
+        }
+      }
+
+      this.setState(newState, () => {
+        this.handleApplyFilters(true);
+        this.queueAutoApplyAiFilter('load-filter-input');
+      });
+
+    } catch (error) {
+      questionFilterLog.error("Failed to load filter state:", error);
+      alert("Could not load filter from the provided string. Please check the format.");
+    }
+  };
+
+  toggleShowAllTags: any = () => {
+    this.setState((prevState: any) => ({ showAllTags: !prevState.showAllTags }));
+  };
+
+  // ----------------------------------------------------------------------------------
+  // TAGS + FILTER SUMMARY
+  // ----------------------------------------------------------------------------------
+  getAllTagsWithCounts() {
+    const { mergedQuestions } = this.state;
+
+    if (!mergedQuestions || !Array.isArray(mergedQuestions)) return [];
+    if (this._allTagsMemo.mergedQuestionsRef === mergedQuestions) {
+      return this._allTagsMemo.tags;
+    }
+
+    // Aggregate tags case-insensitively to avoid duplicates like "RXC" vs "rxc"
+    const tagCounts: any = new Map();
+    mergedQuestions.forEach((q: any) => {
+      if (q.tags && Array.isArray(q.tags)) {
+        q.tags.forEach((tag: any) => {
+          const tagLower = String(tag).toLowerCase();
+          tagCounts.set(tagLower, (tagCounts.get(tagLower) || 0) + 1);
+        });
+      }
+    });
+    const tags = Array.from(tagCounts.entries())
+      .sort(([, countA]: any, [, countB]: any) => countB - countA)
+      .map(([tagLower]: any) => tagLower);
+    this._allTagsMemo = { mergedQuestionsRef: mergedQuestions, tags };
+    return tags;
+  }
+
+
+  removeTypeFilter: any = (type: any) => {
+    const newPending = this.state.pendingSelectedTypes.filter((t: any) => t !== type);
+    this.setState(
+      {
+        pendingSelectedTypes: newPending
+      },
+      () => {
+        this.handleApplyFilters(true);
+      }
+    );
+  };
+
+  removeTagFilter: any = (tag: any) => {
+    const newTags = this.state.selectedTags.filter((t: any) => t !== tag);
+    this.setState(
+      {
+        selectedTags: newTags
+      },
+      () => {
+        this.handleApplyFilters(true);
+      }
+    );
+  };
+
+  removeAiFilter: any = () => {
+    this.invalidatePendingAiApply();
+    this.setState({
+      aiSearchQuery: '',
+      aiDraftQuery: '',
+      aiAppliedTopN: null,
+      aiFilterApplied: false,
+      aiCombineWithOtherFilters: false,
+      aiRankedQuestionIds: [],
+      aiApplying: false,
+      aiApplyError: '',
+      aiLastAppliedSignature: '',
+    }, () => {
+      this.handleApplyFilters(true);
+    });
+  };
+
+  removeTopQuestionsFilter: any = () => {
+    this.setState(
+      {
+        pendingShowTopQuestions: false,
+        pendingShowTopQuestionsByResponses: false
+      },
+      () => {
+        this.handleApplyFilters(true);
+      }
+    );
+  };
+
+  removeSBTFilterItem: any = (item: any) => {
+    const { role, sbtAddress } = item;
+    const localState = this.state.sbtFilterLocalState || {};
+    let updatedState = { ...localState };
+
+    if (role === 'creatorInclude' && updatedState.selectedSBTGroupsCreator) {
+        updatedState.selectedSBTGroupsCreator = updatedState.selectedSBTGroupsCreator.filter(
+            (x: any) => x.address.toLowerCase() !== sbtAddress.toLowerCase()
+        );
+    } else if (role === 'creatorExclude' && updatedState.excludedSBTGroupsCreator) {
+        updatedState.excludedSBTGroupsCreator = updatedState.excludedSBTGroupsCreator.filter(
+            (x: any) => x.address.toLowerCase() !== sbtAddress.toLowerCase()
+        );
+    } else if (role === 'responderInclude' && updatedState.selectedSBTGroupsResponder) {
+        updatedState.selectedSBTGroupsResponder = updatedState.selectedSBTGroupsResponder.filter(
+            (x: any) => x.address.toLowerCase() !== sbtAddress.toLowerCase()
+        );
+    } else if (role === 'responderExclude' && updatedState.excludedSBTGroupsResponder) {
+        updatedState.excludedSBTGroupsResponder = updatedState.excludedSBTGroupsResponder.filter(
+            (x: any) => x.address.toLowerCase() !== sbtAddress.toLowerCase()
+        );
+    } else if (role === 'include' && updatedState.selectedSBTGroups) {
+        updatedState.selectedSBTGroups = updatedState.selectedSBTGroups.filter(
+            (x: any) => x.address.toLowerCase() !== sbtAddress.toLowerCase()
+        );
+    } else if (role === 'exclude' && updatedState.excludedSBTGroups) {
+        updatedState.excludedSBTGroups = updatedState.excludedSBTGroups.filter(
+            (x: any) => x.address.toLowerCase() !== sbtAddress.toLowerCase()
+        );
+    }
+
+    this.setState({ sbtFilterLocalState: updatedState });
+  };
+
+  getFilterSummaryItems() {
+    const items: any[] = [];
+    const stateToUse = { // Use pending states for UI consistency where they exist
+        showTopQuestions: this.state.pendingShowTopQuestions,
+        topQuestionsCount: this.state.pendingTopQuestionsCount,
+        showTopQuestionsByResponses: this.state.pendingShowTopQuestionsByResponses,
+        selectedTypes: this.state.pendingSelectedTypes,
+        selectedTags: this.state.selectedTags, // No pending version
+        sbtFilterLocalState: this.state.sbtFilterLocalState // No pending version
+    };
+
+
+    // 1) Show "Top X questions" if active
+    if (stateToUse.showTopQuestions) {
+      items.push({
+        type: 'special',
+        label: `Top ${stateToUse.topQuestionsCount} by importance`,
+        onRemove: () => this.removeTopQuestionsFilter()
+      });
+    }
+    if (stateToUse.showTopQuestionsByResponses) {
+      items.push({
+        type: 'special',
+        label: `Top ${stateToUse.topQuestionsCount} by # responses`,
+        onRemove: () => this.removeTopQuestionsFilter()
+      });
+    }
+
+    // 2) Show question types
+    (stateToUse.selectedTypes || []).forEach((t: any) => {
+      items.push({
+        type: 'questionType',
+        label: `${t}`,
+        onRemove: () => this.removeTypeFilter(t)
+      });
+    });
+
+    // 3) Show tags
+    (stateToUse.selectedTags || []).forEach((tag: any) => {
+      items.push({
+        type: 'tag',
+        label: `#${tag}`,
+        onRemove: () => this.removeTagFilter(tag)
+      });
+    });
+
+    if (this.state.aiFilterApplied && this.state.aiSearchQuery) {
+      const topN = normalizePositiveInt(this.state.aiAppliedTopN, DEFAULT_AI_TOP_N);
+      items.push({
+        type: 'ai',
+        label: `AI "${this.state.aiSearchQuery}" (Top ${topN}${this.state.aiCombineWithOtherFilters ? ', combined' : ''})`,
+        onRemove: this.removeAiFilter,
+      });
+    }
+
+    const hasConnectedAccount = toStr(this.props.account).trim() !== '';
+    const bothResponseChecked = this.state.filterByResponded && this.state.filterByNotResponded;
+    if (hasConnectedAccount && this.state.filterByResponded && !bothResponseChecked) {
+      items.push({
+        type: 'responseStatus',
+        label: 'Responded',
+        onRemove: () => { this.setState({ filterByResponded: false }, () => this.handleApplyFilters(true)); }
+      });
+    }
+    if (hasConnectedAccount && this.state.filterByNotResponded && !bothResponseChecked) {
+      items.push({
+        type: 'responseStatus',
+        label: 'Not responded',
+        onRemove: () => { this.setState({ filterByNotResponded: false }, () => this.handleApplyFilters(true)); }
+      });
+    }
+
+    // 4) SBT filter items
+    const st = stateToUse.sbtFilterLocalState || {};
+    // creator includes
+    if (Array.isArray(st.selectedSBTGroupsCreator)) {
+      st.selectedSBTGroupsCreator.forEach((obj: any) => {
+        items.push({
+          type: 'sbt',
+          label: `Creator+ ${obj.name || obj.address}`,
+          onRemove: () =>
+            this.removeSBTFilterItem({
+              role: 'creatorInclude',
+              sbtAddress: obj.address
+            })
+        });
+      });
+    }
+    // creator excludes
+    if (Array.isArray(st.excludedSBTGroupsCreator)) {
+      st.excludedSBTGroupsCreator.forEach((obj: any) => {
+        items.push({
+          type: 'sbt',
+          label: `Creator- ${obj.name || obj.address}`,
+          onRemove: () =>
+            this.removeSBTFilterItem({
+              role: 'creatorExclude',
+              sbtAddress: obj.address
+            })
+        });
+      });
+    }
+    // responder includes
+    if (Array.isArray(st.selectedSBTGroupsResponder)) {
+      st.selectedSBTGroupsResponder.forEach((obj: any) => {
+        items.push({
+          type: 'sbt',
+          label: `Responder+ ${obj.name || obj.address}`,
+          onRemove: () =>
+            this.removeSBTFilterItem({
+              role: 'responderInclude',
+              sbtAddress: obj.address
+            })
+        });
+      });
+    }
+    // responder excludes
+    if (Array.isArray(st.excludedSBTGroupsResponder)) {
+      st.excludedSBTGroupsResponder.forEach((obj: any) => {
+        items.push({
+          type: 'sbt',
+          label: `Responder- ${obj.name || obj.address}`,
+          onRemove: () =>
+            this.removeSBTFilterItem({
+              role: 'responderExclude',
+              sbtAddress: obj.address
+            })
+        });
+      });
+    }
+    // addresses mode includes
+    if (Array.isArray(st.selectedSBTGroups)) {
+      st.selectedSBTGroups.forEach((obj: any) => {
+        items.push({
+          type: 'sbt',
+          label: `Include: ${obj.name || obj.address}`,
+          onRemove: () =>
+            this.removeSBTFilterItem({
+              role: 'include',
+              sbtAddress: obj.address
+            })
+        });
+      });
+    }
+    // addresses mode excludes
+    if (Array.isArray(st.excludedSBTGroups)) {
+      st.excludedSBTGroups.forEach((obj: any) => {
+        items.push({
+          type: 'sbt',
+          label: `Exclude: ${obj.name || obj.address}`,
+          onRemove: () =>
+            this.removeSBTFilterItem({
+              role: 'exclude',
+              sbtAddress: obj.address
+            })
+        });
+      });
+    }
+
+    return items;
+  }
+
+  // ----------------------------------------------------------------------------------
+  // RENDER
+  // ----------------------------------------------------------------------------------
+  renderCollapsibleSection(title: any, sectionKey: any, icon: any, content: any, disabled: any = false, headerTestId: any = '') {
+    const { expandedSections } = this.state;
+    const isOpen = expandedSections[sectionKey];
+    const clickable = !disabled;
+
+    return (
+      <div className={styles.filterSection}>
+        <div
+          className={styles.sectionHeader}
+          data-testid={headerTestId || undefined}
+          onClick={() => {
+            if (clickable) {
+              this.toggleSection(sectionKey);
+            }
+          }}
+          style={{ cursor: clickable ? 'pointer' : 'not-allowed', opacity: disabled ? 0.5 : 1 }}
+        >
+          <h3>
+            <FontAwesomeIcon icon={icon} className="me-2" />
+            {title}
+          </h3>
+          <FontAwesomeIcon
+            icon={faChevronDown}
+            className={`${styles.icon} ${isOpen ? styles.expanded : ''}`}
+          />
+        </div>
+        <div style={{ display: isOpen && !disabled ? 'block' : 'none' }}>
+          <div className={styles.sectionContent}>{content}</div>
+        </div>
+      </div>
+    );
+  }
+
+  renderFilterActionsIcons: any = () => {
+    const currentFilterStateForIcon = this.buildFilterState();
+    const isDefault = this.isFilterStateDefault(currentFilterStateForIcon);
+
+    return (
+      <span style={{ marginLeft: 'auto', paddingLeft: '15px', display: 'flex', alignItems: 'center' }}>
+        {/* Clear (X) Icon */}
+        <FontAwesomeIcon
+          icon={faTimes}
+          data-testid={E2E_TESTIDS.QUESTION_FILTER_CLEAR_ALL}
+          onClick={!isDefault ? this.handleClearFilters : undefined}
+          className={styles.clearFilterIcon}
+          title={isDefault ? "No filters to clear" : "Clear current filters"}
+          style={{
+            cursor: isDefault ? 'not-allowed' : 'pointer',
+            marginRight: '12px'
+          }}
+        />
+
+        {/* Copy URL Icon */}
+        <FontAwesomeIcon
+          icon={this.state.copiedUrlSuccess ? faCheck : faClipboard}
+          onClick={!isDefault && !this.state.copiedUrlSuccess ? this.handleCopyFilterUrl : undefined}
+          style={{
+            cursor: isDefault || this.state.copiedUrlSuccess ? 'not-allowed' : 'pointer',
+            color: this.state.copiedUrlSuccess ? 'green' : (isDefault ? '#cccccc' : '#6c757d'),
+            fontSize: '1.1em',
+            marginRight: '15px'
+          }}
+          title={isDefault ? "No custom filters to copy" : (this.state.copiedUrlSuccess ? "URL Copied!" : "Copy Filter URL")}
+        />
+        {/* Bookmark Icon */}
+        <FontAwesomeIcon
+          icon={faBookmark}
+          onClick={!isDefault ? this.handleBookmarkCurrentFilter : undefined}
+          style={{
+            cursor: isDefault ? 'not-allowed' : 'pointer',
+            color: this.state.isCurrentFilterBookmarked || this.state.filterBookmarkedFeedback ? 'gold' : (isDefault ? '#cccccc' : '#6c757d'),
+            fontSize: '1.1em',
+            marginRight: '8px'
+          }}
+          title={isDefault ? "No custom filters to bookmark" : "Bookmark Current Filter"}
+        />
+        {/* Text feedback for bookmarking (if not using icon color change alone) */}
+        {this.state.filterBookmarkedFeedback && !this.state.copiedUrlSuccess && ( // Avoid overlap if both happen
+          <span style={{ color: 'goldenrod', fontSize: '0.85em', fontStyle: 'italic' }}>
+            Filter Bookmarked!
+          </span>
+        )}
+      </span>
+    );
+  }
+
+  render() {
+    const isInline = this.props.resultsMode;
+    const {
+      pendingSelectedTypes,
+      aiDraftQuery,
+      aiSearchQuery,
+      aiRankingCount,
+      aiCombineWithOtherFilters,
+      aiApplying,
+      aiApplyingElapsedSec,
+      aiApplyError,
+      filterLoading,
+      sbtFilterLocalState,
+      pendingShowTopQuestions,
+      pendingShowTopQuestionsByResponses,
+      pendingTopQuestionsCount,
+      selectedTags,
+      filteredQuestionsCount,
+      showAllTags,
+      filterUrlInput,
+      showLoadInput,
+    } = this.state;
+
+    const isTopQuestionsModeActive =
+      this.state.pendingShowTopQuestions || this.state.pendingShowTopQuestionsByResponses;
+    const isAiOverrideModeActive = (
+      !!this.state.aiFilterApplied &&
+      String(aiSearchQuery || '').trim() !== '' &&
+      !aiCombineWithOtherFilters
+    );
+    const isOtherFiltersDisabled = isTopQuestionsModeActive || isAiOverrideModeActive;
+    const otherFiltersDisabledReason = isTopQuestionsModeActive
+      ? 'Disabled by “Top X questions” selection.'
+      : 'Disabled by AI Top-N override. Enable “Combine with other filters” to intersect.';
+    const aiAccessState = this.getAiAccessState();
+    const aiSectionDisabled = isTopQuestionsModeActive;
+    const aiControlsDisabled = isTopQuestionsModeActive || !aiAccessState.enabled || aiApplying;
+    const aiApplyButtonLabel = aiApplying
+      ? `Applying... ${Math.max(0, Number(aiApplyingElapsedSec || 0))}s`
+      : 'Apply';
+    const pipelineForRender = this.buildFilterPipelineResult(false);
+    const encryptedCount = pipelineForRender.finalQuestions
+      .filter((q: any) => String(q?.prompt || '').trim() === '[encrypted]').length;
+    const encryptedQuestionGateTooltip = this.getEncryptedQuestionGateTooltipProps();
+    const renderEncryptedCountBadge = (marginLeft: any = '8px') => {
+      if (encryptedCount <= 0) return null;
+      return (
+        <GateTooltip
+          gateId={encryptedQuestionGateTooltip?.gateId}
+          gateConfig={encryptedQuestionGateTooltip?.gateConfig}
+          mode={encryptedQuestionGateTooltip?.mode}
+          sbtAddresses={encryptedQuestionGateTooltip?.sbtAddresses}
+        >
+          <span style={{ marginLeft, opacity: 0.7 }}>
+            <FontAwesomeIcon icon={faLock} style={{ marginRight: '3px', fontSize: '0.85em' }} />
+            {encryptedCount}
+          </span>
+        </GateTooltip>
+      );
+    };
+
+    // Gather summary items
+    const summaryItems = this.getFilterSummaryItems();
+    const hasConnectedAccount = toStr(this.props.account).trim() !== '';
+
+    const allTags = this.getAllTagsWithCounts();
+    const tagsToDisplay = showAllTags ? allTags : allTags.slice(0, 10);
+
+    // Main body content
+    const bodyContent = (
+      <div>
+
+        {/* MOST POPULAR (Top X) */}
+        {this.renderCollapsibleSection(
+          'Most Popular',
+          'popular',
+          faStar,
+          <div>
+            <FormGroup>
+              <Label className={styles.filterOption}>
+                <Input
+                  type="checkbox"
+                  checked={pendingShowTopQuestions}
+                  onChange={() => this.toggleShowTopQuestions(false)}
+                  disabled={false}
+                />
+                Show top
+                <Input
+                  type="number"
+                  min="1"
+                  value={pendingTopQuestionsCount}
+                  onChange={(e: any) => {
+                    const val = e.target.value ? parseInt(e.target.value, 10) : 1;
+                    this.setState({ pendingTopQuestionsCount: val }, () => {
+                      if (this.state.pendingShowTopQuestions || this.state.pendingShowTopQuestionsByResponses) { // Use this.state for check
+                        this.handleApplyFilters(true);
+                      }
+                    });
+                  }}
+                  disabled={!pendingShowTopQuestions && !pendingShowTopQuestionsByResponses}
+                  id={styles.topQuestionsCountInput}
+                />
+                {/* questions (by total importance) */}
+                questions (by total conviction)
+
+              </Label>
+            </FormGroup>
+
+            <FormGroup>
+              <Label className={styles.filterOption}>
+                <Input
+                  type="checkbox"
+                  checked={pendingShowTopQuestionsByResponses}
+                  onChange={() => this.toggleShowTopQuestions(true)}
+                />
+                Show top
+                <Input
+                  type="number"
+                  min="1"
+                  value={pendingTopQuestionsCount}
+                  onChange={(e: any) => {
+                    const val = e.target.value ? parseInt(e.target.value, 10) : 1;
+                    this.setState({ pendingTopQuestionsCount: val }, () => {
+                      if (this.state.pendingShowTopQuestions || this.state.pendingShowTopQuestionsByResponses) { // Use this.state for check
+                        this.handleApplyFilters(true);
+                      }
+                    });
+                  }}
+                  disabled={!pendingShowTopQuestions && !pendingShowTopQuestionsByResponses}
+                  id={styles.topQuestionsCountInput}
+                />
+                questions (by # of responses)
+              </Label>
+            </FormGroup>
+            {(pendingShowTopQuestions || pendingShowTopQuestionsByResponses) && (
+              <small className="text-muted">
+                This overrides other filters (type, tag, etc.)
+              </small>
+            )}
+          </div>
+        )}
+
+        <div className={isOtherFiltersDisabled ? styles.disabledSection : ''}>
+
+	          {/* TAGS */}
+		          {this.renderCollapsibleSection(
+		            <>
+		              Tags
+		              <FontAwesomeIcon
+		                icon={faQuestionCircle}
+		                className={styles.tooltip}
+		                id={this._tagsTooltipId}
+		                onClick={(e: any) => e.stopPropagation()}
+		              />
+		              <CETooltip
+		                placement="right"
+		                trigger="hover focus click"
+		                target={this._tagsTooltipId}
+		                className={styles.tooltipBubble}
+		              >
+		                Tags are for user filtering/search. Session default tag suggestions are fed into the AI tagger and do not hide questions.
+		              </CETooltip>
+	            </>,
+	            'tags',
+	            faFilter,
+		            isOtherFiltersDisabled ? (
+		              <p className={styles.disabledText}>
+		                {otherFiltersDisabledReason}
+	              </p>
+	            ) : (
+              (() => {
+                if (!tagsToDisplay.length) {
+                  return <p>No tags found in current questions.</p>;
+                }
+                return (
+                  <>
+                    <div className={styles.tagsContainer}>
+                      {tagsToDisplay.map((tag: any) => {
+                        const isSelected = selectedTags.includes(tag);
+                        return (
+                          <div
+                            key={tag}
+                            className={`${styles.tagBubble} ${
+                              isSelected ? styles.tagBubbleSelected : ''
+                            }`}
+                            onClick={() => this.handleTagSelection(tag)}
+                          >
+                            #{tag}
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {allTags.length > 10 && (
+                      <Button
+                        color="link"
+                        onClick={this.toggleShowAllTags}
+                        className={styles.showMoreTagsButton}
+                      >
+                        {showAllTags ? 'Show Less' : 'Show More'}
+                      </Button>
+                    )}
+                  </>
+                );
+              })()
+            ),
+            isOtherFiltersDisabled // Pass disabled state to the section itself
+          )}
+
+          {/* QUESTION TYPES */}
+          {this.renderCollapsibleSection(
+            'Question Types',
+            'types',
+            faFilter,
+            <div className={styles.questionTypeGrid}>
+              <button
+                type="button"
+                className={`${styles.typeButton} ${
+                  pendingSelectedTypes.includes('binary') ? styles.typeButtonActive : ''
+                }`}
+                onClick={() => this.handleTypeSelection('binary')}
+                disabled={isOtherFiltersDisabled}
+                aria-pressed={pendingSelectedTypes.includes('binary')}
+              >
+                <div className={styles.typeTitle}>Binary</div>
+                <div className={styles.typePreviewRow}>
+                  <span className={`${styles.typePill} ${styles.typePillAgree}`}>Agree</span>
+                  <span className={`${styles.typePill} ${styles.typePillUnsure}`}>Unsure</span>
+                  <span className={`${styles.typePill} ${styles.typePillDisagree}`}>Disagree</span>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                className={`${styles.typeButton} ${
+                  pendingSelectedTypes.includes('multichoice') ? styles.typeButtonActive : ''
+                }`}
+                onClick={() => this.handleTypeSelection('multichoice')}
+                disabled={isOtherFiltersDisabled}
+                aria-pressed={pendingSelectedTypes.includes('multichoice')}
+              >
+                <div className={styles.typeTitle}>Multichoice</div>
+                <div className={styles.typePreviewRow}>
+                  <span className={styles.typePill}>Opt 1</span>
+                  <span className={styles.typePill}>Opt 2</span>
+                  <span className={styles.typePill}>Opt 3</span>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                className={`${styles.typeButton} ${
+                  pendingSelectedTypes.includes('rating') ? styles.typeButtonActive : ''
+                }`}
+                onClick={() => this.handleTypeSelection('rating')}
+                disabled={isOtherFiltersDisabled}
+                aria-pressed={pendingSelectedTypes.includes('rating')}
+              >
+                <div className={styles.typeTitle}>Rating</div>
+                <div className={styles.ratingPreviewWrap}>
+                  <div className={styles.ratingPreviewFill} />
+                  <div className={styles.ratingPreviewHandle} />
+                </div>
+              </button>
+
+              <button
+                type="button"
+                className={`${styles.typeButton} ${
+                  pendingSelectedTypes.includes('freeform') ? styles.typeButtonActive : ''
+                }`}
+                onClick={() => this.handleTypeSelection('freeform')}
+                disabled={isOtherFiltersDisabled}
+                aria-pressed={pendingSelectedTypes.includes('freeform')}
+              >
+                <div className={styles.typeTitle}>Freeform</div>
+                <div className={styles.freeformPreview}>...</div>
+              </button>
+            </div>,
+            isOtherFiltersDisabled
+          )}
+
+          {hasConnectedAccount && this.renderCollapsibleSection(
+            'Response Status',
+            'responseStatus',
+            faCheck,
+            <FormGroup>
+              <Label className={styles.filterOption}>
+                <Input
+                  type='checkbox'
+                  checked={this.state.filterByResponded}
+                  onChange={() => this.setState(
+                    (prev: any) => ({ filterByResponded: !prev.filterByResponded }),
+                    () => this.handleApplyFilters(true)
+                  )}
+                  disabled={isOtherFiltersDisabled}
+                />
+                Responded
+              </Label>
+              <Label className={styles.filterOption}>
+                <Input
+                  type='checkbox'
+                  checked={this.state.filterByNotResponded}
+                  onChange={() => this.setState(
+                    (prev: any) => ({ filterByNotResponded: !prev.filterByNotResponded }),
+                    () => this.handleApplyFilters(true)
+                  )}
+                  disabled={isOtherFiltersDisabled}
+                />
+                Not responded
+              </Label>
+            </FormGroup>,
+            isOtherFiltersDisabled
+          )}
+
+          {/* SBT GROUPS */}
+          {this.renderCollapsibleSection(
+            <>
+              {this.props.creatorAndResponderMode
+                ? 'Group(s) of Question Creator / Responder'
+                : 'Group(s) of Question Creator'}
+              {!this.props.isSBTCacheReady && (
+                <FontAwesomeIcon icon={faSpinner} spin style={{ marginLeft: '8px' }} />
+              )}
+            </>,
+            'sbts',
+            faStar,
+	            isOtherFiltersDisabled ? (
+	              <p className={styles.disabledText}>
+	                {otherFiltersDisabledReason}
+	              </p>
+	            ) : (
+	              <SBTFilter
+                items={this.state.mergedQuestions}
+                provider={this.props.provider}
+                network={this.props.network}
+                mode={this.props.creatorAndResponderMode ? 'creatorAndResponder' : 'creator'}
+                onFilter={this.handleFilteredQuestions}
+                setFilterLoading={this.setFilterLoading}
+                autoExpand={true}
+                externalSBTFilterState={sbtFilterLocalState}
+                defaultFeaturedSBTs={this.props.defaultFeaturedSBTs} // Pass the prop down
+                //
+                isQuestionCacheReady={this.props.isQuestionCacheReady}
+                isSurveyCacheReady={this.props.isSurveyCacheReady}
+                isSBTCacheReady={this.props.isSBTCacheReady}
+                sbtCacheRevision={this.props.sbtCacheRevision}
+              />
+	            ),
+	            isOtherFiltersDisabled || !this.props.isSBTCacheReady, // Pass disabled state
+              E2E_TESTIDS.QUESTION_FILTER_SECTION_SBT
+	          )}
+
+	          {/* AI FILTER */}
+	          {this.renderCollapsibleSection(
+	            'AI Filter',
+	            'ai',
+	            faRobot,
+	            <FormGroup>
+                {!aiAccessState.enabled && (
+                  <p className={styles.disabledText} style={{ marginBottom: '10px' }}>
+                    AI filter unavailable. Requires an AI sponsored gate in this session or a local API key.
+                  </p>
+                )}
+                {isTopQuestionsModeActive && (
+                  <p className={styles.disabledText} style={{ marginBottom: '10px' }}>
+                    Disabled by “Top X questions” selection.
+                  </p>
+                )}
+                <div className={styles.aiFilterInputWrap}>
+                  <AudioInput
+                    hideEncryption={true}
+                    disableEncryption={true}
+                    enableAiRewrite={false}
+                    placeholder="Describe what you want to find..."
+                    value={aiDraftQuery}
+                    updateFunction={this.handleAiDraftQueryChange}
+                    dataTestId={E2E_TESTIDS.QUESTION_FILTER_AI_QUERY}
+                    disabled={aiControlsDisabled}
+                  />
+                  <div className={styles.aiActionCard}>
+                    <div className={styles.aiActionRow}>
+                      <div className={styles.aiCountControl}>
+                        <Label className={styles.aiCountLabel} for={E2E_TESTIDS.QUESTION_FILTER_AI_TOP_N}>
+                          Questions
+                        </Label>
+                        <Input
+                          id={E2E_TESTIDS.QUESTION_FILTER_AI_TOP_N}
+                          className={styles.aiCountInput}
+                          type="number"
+                          data-testid={E2E_TESTIDS.QUESTION_FILTER_AI_TOP_N}
+                          min="1"
+                          value={aiRankingCount}
+                          onChange={this.handleAiTopNChange}
+                          disabled={aiControlsDisabled}
+                        />
+                      </div>
+                      <Button
+                        color="info"
+                        className={styles.aiApplyButton}
+                        data-testid={E2E_TESTIDS.QUESTION_FILTER_AI_APPLY}
+                        disabled={aiControlsDisabled}
+                        onClick={() => this.handleApplyAIFilter({ auto: false, source: 'manual-click' })}
+                      >
+                        {aiApplying && (
+                          <FontAwesomeIcon
+                            icon={faSpinner}
+                            spin
+                            className={styles.aiApplySpinner}
+                          />
+                        )}
+                        <span>{aiApplyButtonLabel}</span>
+                      </Button>
+                      <FormGroup check className={styles.aiCombineGroup}>
+                        <Label check className={`${styles.filterOption} ${styles.aiCombineRow}`}>
+                          <Input
+                            type="checkbox"
+                            checked={aiCombineWithOtherFilters}
+                            onChange={this.handleAiCombineWithFiltersChange}
+                            disabled={aiControlsDisabled}
+                          />
+                          Combine with other filters
+                        </Label>
+                      </FormGroup>
+                    </div>
+                    {this.state.aiFilterApplied && aiSearchQuery && !aiApplyError && (
+                      <p className={styles.aiStatusText}>
+                        Active: "{aiSearchQuery}" • Top {normalizePositiveInt(this.state.aiAppliedTopN, DEFAULT_AI_TOP_N)} • {aiCombineWithOtherFilters ? 'Combined' : 'Override'}
+                      </p>
+                    )}
+                    {this.state.aiFilterApplied && aiSearchQuery && !aiCombineWithOtherFilters && !aiApplyError && (
+                      <p className={styles.aiHintText}>
+                        AI Top-N override mode is active. Enable "Combine with other filters" to intersect with type/tag/SBT filters.
+                      </p>
+                    )}
+                    {!!aiApplyError && (
+                      <p className={styles.aiErrorText}>
+                        {aiApplyError}
+                      </p>
+                    )}
+                  </div>
+                </div>
+		            </FormGroup>,
+		            aiSectionDisabled,
+                E2E_TESTIDS.QUESTION_FILTER_SECTION_AI
+		          )}
+
+        </div>
+
+        {filterLoading && (
+          <div className={styles.loadingContainer}>
+            <FontAwesomeIcon icon={faSpinner} spin size="2x" />
+            <p>Applying filter...</p>
+          </div>
+        )}
+      </div>
+    );
+
+    const filterSummaryAndControlsJsx = (
+      <div className={styles.filterSummaryContainer}>
+        <div className={styles.filterSummaryLabel}>
+          <span>Current Filters:</span>
+          <div className={styles.filterSummaryActions}>
+            {this.renderFilterActionsIcons()}
+          </div>
+        </div>
+
+        <div className={styles.summaryItemsRow}>
+          {summaryItems.map((item: any, idx: any) => (
+            <div key={idx} className={styles.filterBubble} onClick={item.onRemove}>
+              <span>{item.label}</span>
+              <FontAwesomeIcon icon={faTimes} className={styles.removeIcon} />
+            </div>
+          ))}
+        </div>
+
+        {/* Load filter row (appears only when + icon is clicked) */}
+        {showLoadInput && (
+          <div className={styles.filterControlsRow}>
+            <div className={styles.loadFilterContainer}>
+              <Input
+                type="text"
+                bsSize="sm"
+                value={filterUrlInput}
+                onChange={(e: any) => this.setState({ filterUrlInput: e.target.value })}
+                placeholder="Load filter from URL/string..."
+                className={styles.loadFilterInput}
+              />
+              <Button
+                size="sm"
+                onClick={this.handleLoadFilter}
+                disabled={!filterUrlInput}
+                className={styles.loadFilterButton}
+              >
+                Load
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+
+    if (isInline) {
+      // "resultsMode" => render inline, but hide if filterModalOpen is false
+      return (
+        <div style={{ display: this.props.filterModalOpen ? 'block' : 'none' }}>
+	          <div
+              className={styles.questionFilterInline}
+              data-testid={E2E_TESTIDS.QUESTION_FILTER_MODAL}
+            >
+	            {/* Count row with + icon to open load input */}
+	            <div className={styles.inlineCountRow}>
+              <div className={styles.inlineCountText}>
+                {!this.props.isQuestionCacheReady ? (
+                  <FontAwesomeIcon icon={faSpinner} spin />
+                ) : (
+                  <>
+                    {`${filteredQuestionsCount} question(s) match current filters`}
+                    {renderEncryptedCountBadge('8px')}
+                  </>
+                )}
+              </div>
+              <FontAwesomeIcon
+                icon={faPlus}
+                className={styles.addIcon}
+                title="Load a saved filter"
+                onClick={() => this.setState({ showLoadInput: !showLoadInput })}
+              />
+            </div>
+
+            {summaryItems.length > 0 && filterSummaryAndControlsJsx}
+
+            {bodyContent}
+          </div>
+        </div>
+      );
+    } else {
+      // Normal "non-resultsMode," show a Modal
+      return (
+	        <Modal
+	          isOpen={this.props.filterModalOpen}
+	          toggle={this.handleCancelFilters} // Use cancel to revert pending changes on close
+	          style={modalStyles}
+	        >
+            <div data-testid={E2E_TESTIDS.QUESTION_FILTER_MODAL}>
+              <ModalHeader toggle={this.handleCancelFilters} className={styles.modalHeader}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                  <span style={{ display: 'flex', alignItems: 'center' }}>
+                    <span>Filter Questions ({!this.props.isQuestionCacheReady ? <FontAwesomeIcon icon={faSpinner} spin /> : filteredQuestionsCount}
+                      {renderEncryptedCountBadge('6px')}
+                    )</span>
+                    {/* Place + icon inline with the title to avoid overlaying the close X */}
+                    <FontAwesomeIcon
+                      icon={faPlus}
+                      className={styles.addIcon}
+                      title="Load a saved filter"
+                      onClick={() => this.setState({ showLoadInput: !showLoadInput })}
+                    />
+                  </span>
+                </div>
+              </ModalHeader>
+              <ModalBody className={styles.modalBody}>
+                {summaryItems.length > 0 && filterSummaryAndControlsJsx}
+                {/* In modal mode, also allow loading even if there are no current filters */}
+                {showLoadInput && summaryItems.length === 0 && (
+                  <div className={styles.filterControlsRow}>
+                    <div className={styles.loadFilterContainer}>
+                      <Input
+                        type="text"
+                        bsSize="sm"
+                        value={filterUrlInput}
+                        onChange={(e: any) => this.setState({ filterUrlInput: e.target.value })}
+                        placeholder="Load filter from URL/string..."
+                        className={styles.loadFilterInput}
+                      />
+                      <Button
+                        size="sm"
+                        onClick={this.handleLoadFilter}
+                        disabled={!filterUrlInput}
+                        className={styles.loadFilterButton}
+                      >
+                        Load
+                      </Button>
+                    </div>
+                  </div>
+                )}
+                {bodyContent}
+              </ModalBody>
+              <ModalFooter>
+                <Button color="primary" onClick={() => {
+                    // When "See Questions" is clicked, ensure filters are applied from pending state
+                    // and then close the modal.
+                    this.handleApplyFilters(false); // false means apply from pending and then update main state
+                    this.props.toggleFilterModal();
+                }}>
+                  See Questions
+                </Button>
+              </ModalFooter>
+            </div>
+          </Modal>
+      );
+    }
+  }
+}
+
+const mapStateToProps = (state: any) => {
+  const activeSessionSlug = state?.sessionState?.activeSessionSlug || '';
+  return {
+    activeSessionSlug,
+    account: state?.profile?.account || '',
+  };
+};
+
+export { QuestionFilter };
+export default connect(mapStateToProps, null, null, { forwardRef: true })(QuestionFilter);

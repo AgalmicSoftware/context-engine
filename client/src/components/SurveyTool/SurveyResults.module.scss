@@ -50,7 +50,8 @@
   /* subtle background color */
 }
 
-.modalHeader :global(.close) {
+.modalHeader :global(.close),
+.modalHeader :global(.btn-close) {
   position: absolute;
   top: 0.85rem;
   right: 0.85rem;
@@ -66,7 +67,9 @@
 }
 
 .modalHeader :global(.close):hover,
-.modalHeader :global(.close):focus {
+.modalHeader :global(.close):focus,
+.modalHeader :global(.btn-close):hover,
+.modalHeader :global(.btn-close):focus {
   background: transparent;
   color: #0f1222;
 }
@@ -78,6 +81,13 @@
   flex-grow: 1;
   margin-right: 1rem;
   gap: 10px;
+}
+
+.modalHeaderTitleBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  min-width: 0;
 }
 
 .modalHeaderControls {
@@ -94,6 +104,80 @@
   font-weight: bold;
   margin: 0;
   color: var(--ce-color-black);
+}
+
+.demoResultsViewNav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.demoResultsViewButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border: 1px solid rgba(15, 94, 199, 0.18);
+  background: rgba(15, 94, 199, 0.08);
+  color: #1a4e94;
+  border-radius: var(--ce-radius-pill);
+  padding: 0.45rem 0.85rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1;
+  transition:
+    background-color 0.18s ease,
+    border-color 0.18s ease,
+    color 0.18s ease,
+    transform 0.18s ease;
+
+  &:hover,
+  &:focus {
+    background: rgba(15, 94, 199, 0.14);
+    border-color: rgba(15, 94, 199, 0.28);
+    color: #0e3d79;
+    transform: translateY(-1px);
+  }
+}
+
+.demoResultsViewButtonActive {
+  background: #0f5ec7;
+  border-color: #0f5ec7;
+  color: var(--ce-color-white);
+  box-shadow: 0 10px 24px rgba(15, 94, 199, 0.2);
+
+  &:hover,
+  &:focus {
+    background: #0b4da6;
+    border-color: #0b4da6;
+    color: var(--ce-color-white);
+  }
+}
+
+.demoResultsSurface {
+  min-height: 32rem;
+}
+
+.demoResultsAtlasSurface,
+.demoResultsRiskMatrixSurface {
+  max-height: 72vh;
+  overflow-y: auto;
+  padding: 1rem;
+  border: 1px solid rgba(19, 34, 86, 0.2);
+  border-radius: var(--ce-radius-20);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 20px 44px rgba(6, 10, 24, 0.24);
+}
+
+.demoResultsAtlasSurface {
+  background:
+    linear-gradient(180deg, rgba(21, 31, 74, 0.98) 0%, rgba(14, 21, 50, 0.985) 48%, rgba(8, 12, 28, 0.995) 100%);
+}
+
+.demoResultsRiskMatrixSurface {
+  background:
+    linear-gradient(180deg, rgba(23, 25, 65, 0.98) 0%, rgba(15, 22, 52, 0.985) 46%, rgba(9, 13, 30, 0.995) 100%);
 }
 
 .closeButton {
@@ -243,7 +327,8 @@
   border: none;
 }
 
-.filterModal .form-group label {
+.filterModal .form-group label,
+.filterModal .mb-3 label {
   font-size: 1.25em;
 }
 
@@ -527,6 +612,15 @@
     justify-content: flex-start;
   }
 
+  .demoResultsViewNav {
+    width: 100%;
+  }
+
+  .demoResultsViewButton {
+    flex: 1 1 calc(50% - 0.55rem);
+    justify-content: center;
+  }
+
   .lockedSummaryToggle {
     order: -1;
   }
@@ -672,7 +766,7 @@
 }
 
 .surveyResultsResponseCardBody {
-  padding: 28px 28px 30px !important;
+  padding: 0 !important;
 }
 
 .surveyResultsResponseCardLinks {
@@ -1730,6 +1824,10 @@ grey background, white text, bigger icons, etc.
     flex-direction: row;
     flex-wrap: wrap;
     align-items: center;
+  }
+
+  .modalHeaderTitleBlock {
+    width: 100%;
   }
 
   .modalTitle {

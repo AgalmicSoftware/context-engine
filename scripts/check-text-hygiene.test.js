@@ -88,3 +88,61 @@ test('check-text-hygiene skips deleted tracked files before filename validation'
     assert.match(result.stdout, /Text hygiene check passed/i);
   });
 });
+
+test('check-text-hygiene fails tracked CHANGELOG.md entries with singular PRD identifiers', () => {
+  withTempGitRepo((rootDir) => {
+    writeFile(rootDir, 'CHANGELOG.md', '# Changelog\n\n- PRD 123: internal note\n');
+    execFileSync('git', ['add', 'CHANGELOG.md'], { cwd: rootDir, stdio: 'ignore' });
+
+    const result = runHygieneCheck(rootDir);
+
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /Text hygiene check failed:/);
+    assert.match(
+      result.stderr,
+      /CHANGELOG\.md:3: changelog must not reference PRD identifier "PRD 123"/
+    );
+  });
+});
+
+test('check-text-hygiene fails tracked CHANGELOG.md entries with plural PRD ranges', () => {
+  withTempGitRepo((rootDir) => {
+    writeFile(rootDir, 'CHANGELOG.md', '# Changelog\n\n- Covers PRDs 277-280 in one release note.\n');
+    execFileSync('git', ['add', 'CHANGELOG.md'], { cwd: rootDir, stdio: 'ignore' });
+
+    const result = runHygieneCheck(rootDir);
+
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /Text hygiene check failed:/);
+    assert.match(
+      result.stderr,
+      /CHANGELOG\.md:3: changelog must not reference PRD identifier "PRDs 277-280"/
+    );
+  });
+});
+
+test('check-text-hygiene passes clean tracked CHANGELOG.md entries', () => {
+  withTempGitRepo((rootDir) => {
+    writeFile(rootDir, 'CHANGELOG.md', '# Changelog\n\n- Pinned TypeScript to match strict peer requirements.\n');
+    execFileSync('git', ['add', 'CHANGELOG.md'], { cwd: rootDir, stdio: 'ignore' });
+
+    const result = runHygieneCheck(rootDir);
+
+    assert.equal(result.status, 0);
+    assert.doesNotMatch(result.stderr, /changelog must not reference PRD identifier/);
+    assert.match(result.stdout, /Text hygiene check passed/i);
+  });
+});
+
+test('check-text-hygiene ignores PRD identifiers outside tracked changelog files', () => {
+  withTempGitRepo((rootDir) => {
+    writeFile(rootDir, 'docs/notes.md', 'Reminder: PRD 123 stays in planning docs.\n');
+    execFileSync('git', ['add', 'docs/notes.md'], { cwd: rootDir, stdio: 'ignore' });
+
+    const result = runHygieneCheck(rootDir);
+
+    assert.equal(result.status, 0);
+    assert.doesNotMatch(result.stderr, /changelog must not reference PRD identifier/);
+    assert.match(result.stdout, /Text hygiene check passed/i);
+  });
+});

@@ -7,9 +7,13 @@ ce_public_release_strip_patterns() {
   cat <<'EOF'
 contextEngine-cc
 TODO
+local-private-version
 CLAUDE.md
 .claude
 .codex
+private-pack.manifest.json
+.tmp-review
+video-clickthrough-local
 scripts/test-*.js
 scripts/test-*.ui.js
 scripts/lib/e2e
@@ -26,6 +30,7 @@ whitepaper/IdeasMap.md
 client/src/components/MainSite/MainSite.module.test.js
 client/src/utilities/worker/sessionCorsWorker.*.proxy.test.js
 client/src/utilities/web3/contractScripts.*.proxy.test.js
+test/contextEngineCc.sw-cache-policy.test.mjs
 EOF
 }
 
@@ -33,9 +38,13 @@ ce_public_release_strip_assert_absent_patterns() {
   cat <<'EOF'
 CLAUDE.md
 .claude
+video-clickthrough-local
+local-private-version
 scripts/test-*.js
 scripts/test-*.ui.js
 scripts/lib/e2e
+test/contextEngineCc.sw-cache-policy.test.mjs
+.tmp-review
 whitepaper/Slides.pdf
 whitepaper/IdeasMap.md
 EOF

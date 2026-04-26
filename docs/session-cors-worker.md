@@ -125,6 +125,12 @@ If you deploy via the Group Wizard and a deploy-helper:
 - After that first worker deploy, later worker config/secrets adjustments are expected to flow through the signed `/admin/set-config` and `/admin/set-secrets` routes rather than the streamlined normal-mode auto-deploy banner.
 - `customRpcKey` is intentionally out of scope for this MVP and is ignored if present in a bundle payload.
 
+Temporary standard-link fixture:
+- `client/public/standard-sponsored-links.json` is a tracked public manifest for up to ten disposable sponsored setup URLs.
+- It is intentionally operator-managed and does not read back worker KV or grant state. An active fixture entry is public because the operator chose to publish that bearer URL.
+- Fixture links should be created through `/sponsor` with disposable, resource-limited credentials: capped AI/provider keys, small faucet balances, short expirations, and revocable Arweave/Lit payer wallets.
+- Use it only for short-lived low-friction demos or launches. Replace it with a worker-backed claim service before treating sponsored-link inventory as durable availability infrastructure.
+
 Deploy error visibility:
 - If deploy-helper rejects the browser origin (`403 Origin not allowed`), the wizard now surfaces an explicit message:
   - `Deploy-helper rejected browser origin <origin>... Add this origin to the deploy-helper allowlist...`
@@ -144,9 +150,9 @@ Default worker URL:
 - Client worker URL resolution now prefers a browser-side replica of Worker KV session config only when that replica is fresher than the temporary registry `corsWorkerUrl` mirror, or when the mirror is still empty.
 - Shared client session-config readers now apply that same freshness guard before overlaying the worker-config replica, so app surfaces using `sessionRegistryStore`, `sessionRegistryReader`, `contractScripts`, and debate-mode session selection stop treating an older browser replica as a permanent authority override.
 - Legacy untimestamped browser replicas remain a migration bridge only when the registry mirror is blank; once the mirror has a worker URL again, those old cache entries no longer outrank it.
-- `client/src/utilities/session/sessionWorkerAvailability.js` now gives UI a sync worker-config overlay surface for both "is a usable worker-backed config available?" and "what configured worker URL is currently usable?"; when callers opt in, it also returns the shared default/general fallback worker URL synchronously. `SBTsList.jsx`, `LiveDebateMode.jsx`, and `AdminPage.jsx` use it instead of component-local raw `corsWorkerUrl` truthiness.
+- `client/src/utilities/session/sessionWorkerAvailability.js` now gives UI a sync worker-config overlay surface for both "is a usable worker-backed config available?" and "what configured worker URL is currently usable?"; when callers opt in, it also returns the shared default/general fallback worker URL synchronously. `SBTsList.tsx`, `LiveDebateMode.tsx`, and `AdminPage.tsx` use it instead of component-local raw `corsWorkerUrl` truthiness.
 - `client/src/utilities/session/sessionParsers.js` now accepts compatibility worker URL aliases like `workerUrl` and `sessionWorkerUrl` too, so the lower-level parser, cache bridge, worker availability helper, and `corsProxy` share the same worker URL normalization rules.
-- `client/src/utilities/session/sessionWorkerUrlCompatibility.js` now owns that remaining worker URL compatibility alias list/read surface plus the shared metadata-strip alias keys reused by `sessionParsers.js`, `sessionWorkerConfigCache.js`, `sessionWorkerAvailability.js`, `canonicalSessionContext.js`, and `sessionWizardWriteNormalization.js`, so worker URL compatibility reads and Arweave metadata stripping no longer drift apart.
+- `client/src/utilities/session/sessionWorkerUrlCompatibility.js` now owns that remaining worker URL compatibility alias list/read surface plus the shared metadata-strip alias keys reused by `sessionParsers.js`, `sessionWorkerConfigCache.js`, `sessionWorkerAvailability.js`, `canonicalSessionContext.js`, and `sessionWizardWriteNormalization.ts`, so worker URL compatibility reads and Arweave metadata stripping no longer drift apart.
 - `client/src/utilities/worker/corsProxy.js` now uses that same configured-worker-URL parser for plain session-config reads, so compatibility keys like `workerUrl` and `sessionWorkerUrl` stay aligned with the shared worker availability helper.
 - `client/src/utilities/worker/workerSessionResolution.js` now owns the shared active-session slug, alias-resolution, and registry/demo session-config lookup scaffold used by both `workerAuth.js` and `corsProxy.js`, while each caller still keeps its own default `allowDemoFallback` policy.
 - `client/src/utilities/worker/workerSessionResolution.js` now also exports the distinct default demo-fallback policy helpers used by `workerAuth.js` and `corsProxy.js`, so the policy-normalization logic is shared while auth still defaults fail-closed and `corsProxy` still allows non-general demo fallback in on-chain mode.
@@ -154,7 +160,7 @@ Default worker URL:
 - `client/src/utilities/session/sessionWorkerAvailability.js` now also owns the shared "default session must ignore `demoSessions.general` as worker authority in on-chain mode" rule, so sync UI reads and async `corsProxy` resolution both fall back to `CLOUDFLARE_CORS_WORKER_URL` on the same contract.
 - `client/src/utilities/worker/corsProxy.js` also now reuses the shared default/general fallback worker URL selector from `sessionWorkerAvailability.js`, so the sync and async default-session worker URL paths stay on the same fallback contract.
 - Worker auth now defaults to no silent demo-session fallback in on-chain mode; explicit demo/off-chain callers must opt in when resolving worker URLs for login.
-- **Stage-B fail-closed strictness (2026-03-12):** All security-sensitive callers — Arweave uploads (`arweaveScripts.js`), AI requests (`aiScripts.js`), transcription (`useWhisper.js`), faucet (`contractHelpers.js`), image fetch (`imageScripts.js`), session-config resolution (`contractScripts.impl.js`, `resourceKeys.js`, `aiSettings.js`), and the canonical resolver (`canonicalSessionContext.js`) — now require explicit `allowDemoFallback: true` opt-in to use demo session fixtures when the on-chain registry is active. The CORS proxy demo-fallback policy (`defaultCorsProxyAllowDemoFallback`) is also tightened to match auth defaults. `getSessionConfigBySlugOrDefault` returns `null` for unknown non-general slugs instead of silently mapping them to the general default config.
+- **Stage-B fail-closed strictness (2026-03-12):** All security-sensitive callers — Arweave uploads (`arweaveScripts.js`), AI requests (`aiScripts.js`), transcription (`useWhisper.js`), faucet (`contractHelpers.ts`), image fetch (`imageScripts.js`), session-config resolution (`contractScripts.impl.ts`, `resourceKeys.js`, `aiSettings.js`), and the canonical resolver (`canonicalSessionContext.js`) — now require explicit `allowDemoFallback: true` opt-in to use demo session fixtures when the on-chain registry is active. The CORS proxy demo-fallback policy (`defaultCorsProxyAllowDemoFallback`) is also tightened to match auth defaults. `getSessionConfigBySlugOrDefault` returns `null` for unknown non-general slugs instead of silently mapping them to the general default config.
 - In on-chain registry mode, worker auth/cors proxy no longer treat `demoSessions.general`
   as an implicit worker authority for the default session; the shared fallback is used instead.
 - The shared fallback is only used for the general/default session; non-general slugs do not fall back to it.
@@ -177,6 +183,10 @@ Admin test panel:
   - Local dev frequently runs at `http://localhost:3001` (and E2E may use `http://127.0.0.1:3000`).
   - Use the `/admin` CORS allowlist editor to inspect and edit the full list directly. `Add recommended origins` appends the current browser origin plus the stable defaults, and `Save allowlist` persists the exact list you entered.
   - Trusted admin origins (for example the first-party localhost admin hosts) can now reach `/admin/*` even when the session's current allowlist is wrong, so admins can repair a blocked allowlist without manual KV edits first.
+- Static custom-domain frontend deploys must add the final browser origin (for
+  example `https://app.example`) to the same `allowOrigins` list after DNS
+  cutover. See the Netlify/static hosting checklist in
+  [`docs/public-client-config.md#netlify-static-deploy`](public-client-config.md#netlify-static-deploy).
 - When AI/Arweave/Faucet tests hit `Session config not found.`, the panel now auto-attempts
   a signed `/admin/set-config` using the selected session metadata, then retries the test once.
   This recovery also covers login-stage 404s (`Worker login failed (404)`) so fresh workers can be
@@ -234,21 +244,29 @@ Runtime:
     - saving an empty `allowOrigins` list is intentional and means "open CORS" for that session (no allowlist).
     - if a `slug` field is present in the config payload, the authenticated request slug / KV key remains authoritative and overwrites mismatched values.
     - `/admin/set-config` preserves existing `limits` / `scopes` object branches when malformed non-object patches are sent, instead of letting those branches degrade into corrupted shapes.
-- `session:{slug}:secrets` JSON:
+- `session:{slug}:secrets` v1 envelope JSON:
   ```json
   {
-    "openaiKey": "...",
-    "anthropicKey": "...",
-    "openrouterKey": "...",
-    "customRpcUrl": "...",
-    "customRpcKey": "...",
-    "arweaveJwk": "{...}",
-    "faucetPrivateKey": "..."
+    "v": 1,
+    "kind": "session-secrets",
+    "createdAt": 1760000000000,
+    "updatedAt": 1760000000000,
+    "secrets": {
+      "openaiKey": "...",
+      "anthropicKey": "...",
+      "openrouterKey": "...",
+      "customRpcUrl": "...",
+      "customRpcKey": "...",
+      "arweaveJwk": "{...}",
+      "faucetPrivateKey": "..."
+    }
   }
   ```
   - Worker KV secrets are normalized on write:
     string values are trimmed, plain objects are persisted as JSON strings,
     and non-object scalars are stringified before storage.
+  - Reads still accept legacy unversioned secrets objects, but new admin and
+    deploy-helper writes store the v1 envelope.
 
 ## Session authority model
 
@@ -284,13 +302,13 @@ enforcement is deferred to stage-B strictness work.
 
 ### Client-side helpers
 
-- `routeSessionResolution.js` — route/session precedence for MainSite
+- `routeSessionResolution.ts` — route/session precedence for MainSite
 - `litSessionConfig.js` — Lit protocol chain/network/gate resolution
-- `surveyToolSessionResolution.js` — SurveyTool session context resolution
+- `surveyToolSessionResolution.ts` — SurveyTool session context resolution
 - `canonicalSessionContext.js` — canonical session config assembly with provenance
 - `sessionWorkerConfigCache.js` — browser-side replica cache for Worker KV session config, used as the preferred bridge over the registry worker URL mirror
 - `sessionWorkerAvailability.js` — sync "usable worker-backed config" helper for UI loading-state reads; overlays the cached worker-config replica and preserves the default/general shared worker fallback
-- `sessionWizardWriteNormalization.js` — SessionWizard Stage-A producer write-target normalization for Arweave metadata, registry compatibility fields, and Worker KV config payloads
+- `sessionWizardWriteNormalization.ts` — SessionWizard Stage-A producer write-target normalization for Arweave metadata, registry compatibility fields, and Worker KV config payloads
 
 ### Worker-side boundaries
 
@@ -966,6 +984,9 @@ Signed login/bootstrap requests:
     it keeps the authenticated-wallet recipient requirement when `scopes.faucet` is absent and now re-checks the
     current `txGas` gate for same-wallet generic funding requests before falling back to the existing
     `Missing sbtAddress.`, `Invalid sbtAddress.`, `Invalid password.`, and group-signature failure behavior.
+  - For SBT proof-backed faucet eligibility, the `txGas` resource gate is authoritative by default. The worker
+    only checks other session resource gates when session config explicitly sets
+    `faucet.allowResourceGateFallback: true`.
   - Faucet RPC execution now also routes through a shared helper after preflight + eligibility:
     it keeps the ordered per-RPC fallback loop, threshold `403` when `currentBalanceWei > thresholdWeiBig`,
     `eth_gasPrice` fallback to `0x3b9aca00`, per-RPC error accumulation, and the final

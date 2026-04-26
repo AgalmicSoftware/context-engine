@@ -15,7 +15,8 @@ This directory contains demo and fixture data for the Context Engine survey plat
 | [`historical_figures_merged.json`](./historical_figures_merged.json) | Consolidated superset combining data from the richer figure sources. Used for demographic computation, avatar resolution, and shared profile question lookups. |
 | [`historical_figures_tree_qs_and_votes.json`](./historical_figures_tree_qs_and_votes.json) | Debate-oriented dataset for 66 figures with tree-structured questions, in-character comments, and vote stances. Used by debate tree and political compass views. |
 | [`demo_polis_data.json`](./demo_polis_data.json) | Polis-format clustering dataset with participants, vote arrays, and group assignments. Used by the demo analysis adapter and Polis report surfaces. |
-| [`demo_analysis_data.json`](./demo_analysis_data.json) | Dedicated breakdown-tab analysis fixture. Uses the canonical 42 questions and 62 personas, but only derives tri-state votes from atlas tree stances for question-to-node mappings that have been manually validated as the same proposition; all other questions fall back to the Polis fixture. |
+| [`demo_analysis_data.json`](./demo_analysis_data.json) | Dedicated breakdown-tab analysis fixture. Uses the canonical 42 questions and seeded historical-figure personas, then expands them with deterministic synthetic responses so the breakdown view has richer comparison density without hardcoding question content in the generator. |
+| [`demo_analysis_generation_config.json`](./demo_analysis_generation_config.json) | Corpus-backed curation config for the breakdown fixture generator. Keeps vetted question-to-node mappings, selected statement overrides, and deterministic synthetic-response settings in demo data, not in the generator script. |
 | [`demo_sessions.json`](./demo_sessions.json) | Demo session definitions keyed by slug with metadata and worker configuration. Used by session resolution code and worker/cors proxy tests. |
 | [`demo_sbt_collection.json`](./demo_sbt_collection.json) | Sample SBT group metadata with per-figure demographic attributes such as gender, era, country, affiliation, and atlas category. |
 | [`expanded_tag_list.json`](./expanded_tag_list.json) | Taxonomy tag list for survey question classification and topic labeling. |
@@ -32,6 +33,7 @@ This directory contains demo and fixture data for the Context Engine survey plat
 | --- | --- |
 | [`historical_figure_demographics.js`](./historical_figure_demographics.js) | Computes demographic breakdowns from merged historical figure data plus the Polis fixture. Exports `DEMO_ANALYSIS_DEMOGRAPHIC_FIELDS` and the default historical figure lookup object. |
 | [`historical_figure_demographics.test.js`](./historical_figure_demographics.test.js) | Regression coverage for the demographics lookup and fixture completeness. |
+| [`debateData.js`](./debateData.js) | Debate HUD fixture module with debate cards, argument trees, audience roster/votes, voter profiles, and source links. |
 | [`index.js`](./index.js) | Barrel export for the most commonly imported demo datasets and demographics helpers. |
 
 ## Primary Consumers
@@ -41,11 +43,14 @@ The main consumers of this folder are:
 - [`demoAnalysisAdapter.js`](../../utilities/demo/demoAnalysisAdapter.js)
 - [`demoAvatars.js`](../../utilities/ui/demoAvatars.js)
 - [`sessionSourceResolver.js`](../../utilities/session/sessionSourceResolver.js)
-- [`PolisReport.jsx`](../../components/PolisReport/PolisReport.jsx)
+- [`PolisReport.tsx`](../../components/PolisReport/PolisReport.tsx)
 - [`DebateMap.jsx`](../../components/DebateMap/DebateMap.jsx)
-- [`PoliticalCompassView.jsx`](../../components/DemoViews/DebateHUD/PoliticalCompassView.jsx)
-- [`CommunityTab.jsx`](../../components/CommunityTab/CommunityTab.jsx)
-- [`SimUserPage.jsx`](../../components/UserPage/SimUserPage.jsx)
+- [`PoliticalCompassView.tsx`](../../components/DemoViews/DebateHUD/PoliticalCompassView.tsx)
+- [`DebateSelector.tsx`](../../components/DemoViews/DebateHUD/DebateSelector.tsx)
+- [`ArgumentTreeView.tsx`](../../components/DemoViews/DebateHUD/ArgumentTreeView.tsx)
+- [`VotesOnArgumentsView.tsx`](../../components/DemoViews/DebateHUD/VotesOnArgumentsView.tsx)
+- [`CommunityTab.tsx`](../../components/CommunityTab/CommunityTab.tsx)
+- [`SimUserPage.tsx`](../../components/UserPage/SimUserPage.tsx)
 
 ## Conceptual Data Pipeline
 
@@ -94,9 +99,9 @@ utilities/ui/demoAvatars.js
   v
 utilities/ui/historicalFigureAvatars.js
   |
-  +--> utilities/ui/historicalFigurePhotoManifest.json
-  |
   +--> utilities/ui/historicalFigureLocalPhotoManifest.json
+  |
+  +--> utilities/ui/historicalFigurePhotoManifest.json
   |
   v
 PoliticalCompassView, PolisReport, CommunityTab, SimUserPage
@@ -106,8 +111,13 @@ Related files:
 
 - [`demoAvatars.js`](../../utilities/ui/demoAvatars.js)
 - [`historicalFigureAvatars.js`](../../utilities/ui/historicalFigureAvatars.js)
-- [`historicalFigurePhotoManifest.json`](../../utilities/ui/historicalFigurePhotoManifest.json)
 - [`historicalFigureLocalPhotoManifest.json`](../../utilities/ui/historicalFigureLocalPhotoManifest.json)
+- [`historicalFigurePhotoManifest.json`](../../utilities/ui/historicalFigurePhotoManifest.json)
+
+Canonical shipped source:
+
+- `historicalFigureLocalPhotoManifest.json` is the canonical manifest for repo-shipped demo avatars under `client/public/historical-avatars/`.
+- `historicalFigurePhotoManifest.json` must stay free of placeholder sentinel values and may only contain approved local asset paths or intentionally whitelisted hosted URLs.
 
 ## Adding a New Historical Figure
 
@@ -117,7 +127,7 @@ To add a new historical figure cleanly, update the datasets that drive the surfa
 2. Update [`historical_figures_tree_qs_and_votes.json`](./historical_figures_tree_qs_and_votes.json) with debate questions, at least several in-character comments, and vote stances.
 3. Update [`historical_figure_demographics.js`](./historical_figure_demographics.js) with the figure's demographics entry, including display name, bio, era, country, gender, affiliation, and atlas category.
 4. Update [`demo_sbt_collection.json`](./demo_sbt_collection.json) with matching demographic attributes.
-5. Update avatar manifests in [`historicalFigurePhotoManifest.json`](../../utilities/ui/historicalFigurePhotoManifest.json) and [`historicalFigureLocalPhotoManifest.json`](../../utilities/ui/historicalFigureLocalPhotoManifest.json).
+5. Update [`historicalFigureLocalPhotoManifest.json`](../../utilities/ui/historicalFigureLocalPhotoManifest.json) first, then keep [`historicalFigurePhotoManifest.json`](../../utilities/ui/historicalFigurePhotoManifest.json) aligned if a second manifest is still being used for hosted or mirrored sources.
 6. Optionally update [`additional_historical_figures.json`](./additional_historical_figures.json) when you need richer persona fields such as `biggestHope`, `biggestFear`, or `avatarPrompt`.
 7. Optionally update [`historical_figure_users.json`](./historical_figure_users.json) when the figure needs a full SimUserPage-style profile.
 8. Keep [`historical_figures_merged.json`](./historical_figures_merged.json) in sync with the source datasets if your workflow does not regenerate it automatically.
@@ -129,10 +139,13 @@ The breakdown tab now uses [`demo_analysis_data.json`](./demo_analysis_data.json
 - Regenerate it from the repo root with `npm run demo:analysis:generate`
 - The generator lives at [`scripts/generate-demo-analysis-fixture.mjs`](../../../../scripts/generate-demo-analysis-fixture.mjs)
 - Generation policy is explicit-map tree-first, Polis-fallback:
-  - only map a breakdown question to atlas tree votes when the generator contains a manually validated question-to-node mapping for that exact question index
+  - only map a breakdown question to atlas tree votes when [`demo_analysis_generation_config.json`](./demo_analysis_generation_config.json) contains a manually validated question-to-node mapping for that exact question index
   - require the mapped atlas `nodeId` to still match the question's current `nodeId` in [`demo_polis_data.json`](./demo_polis_data.json) before using tree votes
   - map tree scores to `Agree` / `Unsure` / `Disagree` with `>= 2`, between, and `<= -2`
   - fall back to [`demo_polis_data.json`](./demo_polis_data.json) when a question is unmapped, when the mapping drifts, or when a persona has no tree vote for that node
+  - apply curated breakdown-only comment overrides from [`demo_analysis_generation_config.json`](./demo_analysis_generation_config.json) so poll/freeform/rating prompts become corpus-grounded `Agree` / `Unsure` / `Disagree` statements before the fixture is written
+  - expand the seeded participant rows with deterministic synthetic variants using the same config file, preserving demographic lineage while increasing response density for the Breakdown view
+  - keep those overrides semantically aligned with the explicit atlas node mapping; if a rewritten question is no longer equivalent to the mapped node, remove the mapping or rewrite the prompt again before regenerating
 - Keep [`demo_polis_data.json`](./demo_polis_data.json) unchanged unless you also intend to refresh `PolisReport` precomputed cluster metadata
 
 ## Naming And Compatibility Notes

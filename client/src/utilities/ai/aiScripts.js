@@ -11,6 +11,7 @@
 import { aiRewritePrompt } from '../../prompts/aiRewritePrompt.js';
 import buildClusterAnalysisPrompt, { CLUSTER_ANALYSIS_SYSTEM_PROMPT } from '../../prompts/clusterAnalysisPrompt.js';
 import buildCompareToolkitPrompt from '../../prompts/compareToolkitPrompt.js';
+import buildPhotoAnalysisPrompt from '../../prompts/photoAnalysisPrompt.js';
 import { rankQuestionsPrompt } from '../../prompts/rankQuestionsPrompt.js';
 import { getEffectiveAiConfig, getEffectiveTranscriptionConfig } from './aiSettings.js';
 import { getEffectiveArweaveKey } from '../session/resourceKeys.js';
@@ -76,6 +77,152 @@ export const isE2eAiMockEnabled = () => {
   if (_readQueryFlag('aiMock')) return true;
 
   return false;
+};
+
+const SUPPORTED_PHOTO_MIME_TYPES = Object.freeze({
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  webp: 'image/webp',
+  gif: 'image/gif',
+});
+
+const getSupportedPhotoMimeType = (file) => {
+  const declaredType = String(file?.type || '').trim().toLowerCase();
+  if (Object.values(SUPPORTED_PHOTO_MIME_TYPES).includes(declaredType)) return declaredType;
+  const name = String(file?.name || '').trim().toLowerCase();
+  const extension = name.includes('.') ? name.split('.').pop() : '';
+  return SUPPORTED_PHOTO_MIME_TYPES[extension] || '';
+};
+
+const readFileAsDataUrl = (file) => new Promise((resolve, reject) => {
+  if (!file) {
+    reject(new Error('Missing photo file.'));
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = () => resolve(String(reader.result || ''));
+  reader.onerror = () => reject(new Error(`Failed to read photo file: ${String(file?.name || 'upload')}`));
+  reader.readAsDataURL(file);
+});
+
+const stripDataUrlPrefix = (dataUrl = '') => {
+  const raw = String(dataUrl || '');
+  const commaIndex = raw.indexOf(',');
+  return commaIndex >= 0 ? raw.slice(commaIndex + 1) : raw;
+};
+
+const resolvePhotoAnalysisSupport = ({ provider, model } = {}) => {
+  const normalizedProvider = String(provider || '').trim().toLowerCase();
+  const modelLeaf = String(model || '').trim().toLowerCase().split('/').pop();
+
+  if (normalizedProvider === 'openai') {
+    if (/^(gpt-5|gpt-4o|gpt-4\.1)/.test(modelLeaf)) {
+      return {
+        supported: true,
+        format: usesOpenAiResponsesApi(normalizedProvider, modelLeaf) ? 'openai-responses' : 'openai-chat',
+      };
+    }
+  }
+
+  if (normalizedProvider === 'anthropic') {
+    if (/^claude-(3|4)/.test(modelLeaf)) {
+      return { supported: true, format: 'anthropic' };
+    }
+  }
+
+  if (normalizedProvider === 'openrouter') {
+    if (/^(gpt-5|gpt-4o|gpt-4\.1)/.test(modelLeaf) || /claude-(3|4)/.test(modelLeaf)) {
+      return { supported: true, format: 'openai-chat' };
+    }
+  }
+
+  return {
+    supported: false,
+    format: null,
+    error: `Photo analysis requires a vision-capable OpenAI, Anthropic, or OpenRouter model. Current selection: ${normalizedProvider || 'unknown'} ${modelLeaf || ''}`.trim(),
+  };
+};
+
+export const analyzePhotoForQuestionGeneration = async (file, opts = {}) => {
+  if (!file) throw new Error('Missing photo file.');
+
+  const mimeType = getSupportedPhotoMimeType(file);
+  if (!mimeType) {
+    throw new Error('Unsupported photo format. Use png, jpg, jpeg, webp, or gif.');
+  }
+
+  const sessionSlug = resolveSessionSlugOpt(opts);
+  const sessionConfig = resolveSessionConfigOpt(opts);
+  const ai = await getEffectiveAiConfig({
+    sessionSlug,
+    sessionConfig,
+    preferLocal: opts.preferLocal,
+    provider: opts.provider,
+    model: opts.model,
+    context: opts.context,
+  });
+  const support = resolvePhotoAnalysisSupport(ai);
+  if (!support.supported) {
+    throw new Error(support.error || 'Configured AI provider/model does not support photo analysis.');
+  }
+
+  const dataUrl = await readFileAsDataUrl(file);
+  const prompt = buildPhotoAnalysisPrompt(file?.name || '');
+  const messages = (() => {
+    if (support.format === 'openai-responses') {
+      return [{
+        role: 'user',
+        content: [
+          { type: 'input_text', text: prompt },
+          { type: 'input_image', image_url: dataUrl },
+        ],
+      }];
+    }
+    if (support.format === 'anthropic') {
+      return [{
+        role: 'user',
+        content: [
+          { type: 'text', text: prompt },
+          {
+            type: 'image',
+            source: {
+              type: 'base64',
+              media_type: mimeType,
+              data: stripDataUrlPrefix(dataUrl),
+            },
+          },
+        ],
+      }];
+    }
+    return [{
+      role: 'user',
+      content: [
+        { type: 'text', text: prompt },
+        { type: 'image_url', image_url: { url: dataUrl } },
+      ],
+    }];
+  })();
+
+  const text = await callAI('', {
+    ...pickAiRequestOpts(opts),
+    provider: ai.provider,
+    model: ai.model,
+    messages,
+    maxTokens: 1200,
+    temperature: 0.2,
+    taskType: 'summarize',
+  });
+  const trimmed = String(text || '').trim();
+  if (!trimmed) {
+    throw new Error('Photo analysis returned no usable text.');
+  }
+  return {
+    text: trimmed,
+    provider: ai.provider,
+    model: ai.model,
+    requestFormat: support.format,
+  };
 };
 
 const _shortAddr = (addr) => {
@@ -622,6 +769,8 @@ export async function processAdditionalSources(sources, opts = {}) {
           content = await fetchContentFromURL(src.value, opts);
         } else if (src.type === 'file') {
           content = await readFileContent(src.value);
+        } else if (src.type === 'photo') {
+          throw new Error('Photo sources must be analyzed before text extraction.');
         }
       } catch (err) {
         content = `[Error reading source '${src.name}': ${err.message}]`;
@@ -1699,7 +1848,7 @@ export async function generateAudioDiscussionSummary(transcript, opts = {}) {
 /**
  * uploadMarkdownSummaryToArweave(markdown)
  * - Uploads the given Markdown to Arweave via arweaveScripts.
- * - Returns { txId, url } (url is a plain https://arweave.net/<txId>).
+ * - Returns { txId, url }.
  * - Throws on empty input or upload failures with a clear message.
  *
  * Note: Tries "md" format first as requested. If the helper does not support
@@ -1747,7 +1896,7 @@ export async function uploadMarkdownSummaryToArweave(markdown, opts = {}) {
       throw new Error('Upload failed: missing transaction ID.');
     }
 
-    const url = `https://arweave.net/${txId}`;
+    const url = arweaveScripts.buildArweaveGatewayUrl(txId);
     const mdUrl = `[${url}](${url})`;
     return { txId, url, mdUrl };
   } catch (err) {

@@ -59,6 +59,7 @@ test('createFaucetGateAuthorityWithDeps preserves session-gate lookup ordering a
     config: {
       registryAddress: '0x0000000000000000000000000000000000000001',
       rpcUrl: 'https://rpc.example',
+      faucet: { allowResourceGateFallback: true },
     },
     sbtAddress: '0x00000000000000000000000000000000000000aa',
   });
@@ -129,6 +130,61 @@ test('createFaucetGateAuthorityWithDeps preserves session-gate lookup ordering a
       errors: [{ rpcUrl: 'masked:https://rpc.example', error: 'down' }],
     },
   });
+});
+
+test('createFaucetGateAuthorityWithDeps treats txGas as authoritative unless fallback is explicit', async () => {
+  const gateCalls = [];
+  const { findSessionGateForSbt } = createFaucetGateAuthorityWithDeps({
+    deps: {
+      toStr: (value) => (typeof value === 'string' ? value : value == null ? '' : String(value)),
+      isAddress: (value) => /^0x[0-9a-fA-F]{40}$/.test(String(value).trim()),
+      resolveRegistryRpcUrls: () => ['https://rpc.example'],
+      normalizeAddressLower: (value) => String(value || '').trim().toLowerCase(),
+      toRegistrySessionSlug: (value) => String(value || '').trim().toLowerCase() || 'general',
+      readSessionExistsOnChain: async () => ({
+        exists: true,
+        rpcUrl: 'https://rpc.example',
+        errors: [],
+      }),
+      maskRpcUrl: (value) => `masked:${String(value).trim()}`,
+      readResourceGateOnChain: async ({ resourceKey }) => {
+        gateCalls.push(resourceKey);
+        if (resourceKey === 'default') {
+          return {
+            ok: true,
+            gate: {
+              sbtAddresses: ['0x00000000000000000000000000000000000000aa'],
+              chainId: 84532,
+              mode: 0,
+            },
+            errors: [],
+          };
+        }
+        return { ok: true, gate: { sbtAddresses: [], chainId: 84532, mode: 0 }, errors: [] };
+      },
+    },
+    constants: {
+      anonymousGateUnavailableError: 'Access denied: on-chain gate data unavailable.',
+      resourceGateKeys: ['default', 'ai', 'txGas'],
+    },
+  });
+
+  const result = await findSessionGateForSbt({
+    slug: 'session-a',
+    config: {
+      registryAddress: '0x0000000000000000000000000000000000000001',
+      rpcUrl: 'https://rpc.example',
+    },
+    sbtAddress: '0x00000000000000000000000000000000000000aa',
+  });
+
+  assert.deepEqual(result, {
+    ok: false,
+    status: 403,
+    error: 'Requested SBT is not part of a session gate.',
+    reason: 'sbt-not-gated',
+  });
+  assert.deepEqual(gateCalls, ['txGas']);
 });
 
 test('createFaucetGateAuthorityWithDeps preserves faucet validation-state reads and masked rpc fallback errors', async () => {

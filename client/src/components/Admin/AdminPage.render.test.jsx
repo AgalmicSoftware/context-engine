@@ -1,7 +1,7 @@
 /** @file AdminPage.render.test.jsx */
-import React from 'react';
+import React, { act } from 'react';
 import { ethers } from 'ethers';
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { getCachedSessionWorkerConfig } from '../../utilities/session/sessionWorkerConfigCache.js';
 import { CLOUDFLARE_CORS_WORKER_URL } from '../../variables/appConfig.js';
@@ -13,7 +13,7 @@ const SESSION_REGISTRY_CACHE_UPDATED_EVENT = 'ce:session-registry-cache-updated'
 const buildSessionConfig = (overrides = {}) => ({
   slug: 'edge',
   sessionName: 'Edge Session',
-  corsWorkerUrl: 'https://worker.example',
+  corsWorkerUrl: 'https://worker.example.test',
   networkChainId: 84532,
   __registry: {
     registryChainId: 84532,
@@ -92,26 +92,34 @@ jest.mock('../../utilities/crypto/litProtocol.js', () => ({
   resolveLitNetwork: jest.fn(() => 'datil-dev'),
 }));
 
-jest.mock('../Shared/AudioInput/AudioInput.jsx', () => () => <div data-testid="mock-admin-audio-input" />);
-jest.mock('../SBTs/SBTSelector.jsx', () => () => <div data-testid="mock-admin-sbt-selector" />);
+jest.mock('../Shared/AudioInput/AudioInput', () => () => <div data-testid="mock-admin-audio-input" />);
+jest.mock('../SBTs/SBTSelector', () => () => <div data-testid="mock-admin-sbt-selector" />);
 
-const AdminPage = require('./AdminPage.jsx').default;
+const AdminPage = require('./AdminPage').default;
 const Arweave = require('arweave');
 
-const renderAdminPage = ({
+const renderAdminPage = async ({
   account = ADMIN_ADDRESS,
   initialSessionId,
   initialRegistryChainId,
-} = {}) => render(
-  <AdminPage
-    account={account}
-    network={{ id: 84532 }}
-    loginComplete={true}
-    toggleLoginModal={jest.fn()}
-    initialSessionId={initialSessionId}
-    initialRegistryChainId={initialRegistryChainId}
-  />
-);
+} = {}) => {
+  let utils;
+  await act(async () => {
+    utils = render(
+      <AdminPage
+        account={account}
+        network={{ id: 84532 }}
+        loginComplete={true}
+        toggleLoginModal={jest.fn()}
+        initialSessionId={initialSessionId}
+        initialRegistryChainId={initialRegistryChainId}
+      />
+    );
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+  return utils;
+};
 
 const getWorkerSecretsPanel = () => screen.getByText('Worker secrets').closest('section');
 const getGatePanel = () => screen.getByText('On-chain default gate').closest('section');
@@ -123,19 +131,25 @@ const getFieldInputByLabel = (labelText) => (
   screen.getByText(labelText).parentElement.querySelector('input,textarea,select')
 );
 const getAllowOriginsInput = () => screen.getByLabelText('CORS allowlist');
-const openAllowlistEditor = () => {
-  fireEvent.click(screen.getByRole('button', { name: 'Allowlist' }));
+const clickAndSettle = async (element) => {
+  await act(async () => {
+    fireEvent.click(element);
+    await Promise.resolve();
+  });
+};
+const openAllowlistEditor = async () => {
+  await clickAndSettle(screen.getByRole('button', { name: 'Allowlist' }));
   return getAllowOriginsInput();
 };
-const waitForResolvedWorkerUrl = () => screen.findByDisplayValue('https://worker.example');
-const openWorkerSecretsPanel = () => {
+const waitForResolvedWorkerUrl = () => screen.findByDisplayValue('https://worker.example.test');
+const openWorkerSecretsPanel = async () => {
   const panel = getWorkerSecretsPanel();
-  fireEvent.click(within(panel).getByRole('button', { name: 'Toggle Worker secrets section' }));
+  await clickAndSettle(within(panel).getByRole('button', { name: 'Toggle Worker secrets section' }));
   return panel;
 };
-const openGatePanel = () => {
+const openGatePanel = async () => {
   const panel = getGatePanel();
-  fireEvent.click(within(panel).getByRole('button', { name: 'Toggle On-chain default gate section' }));
+  await clickAndSettle(within(panel).getByRole('button', { name: 'Toggle On-chain default gate section' }));
   return panel;
 };
 
@@ -160,7 +174,7 @@ describe('AdminPage rendered interactions', () => {
     mockLoadSessionRegistryCache.mockResolvedValue(undefined);
     mockGetAllSessionEntries.mockImplementation(() => sessionEntries);
     mockResolveCorsProxyUrl.mockResolvedValue({
-      url: 'https://worker.example',
+      url: 'https://worker.example.test',
       source: 'session-config',
       status: 'ok',
     });
@@ -195,7 +209,7 @@ describe('AdminPage rendered interactions', () => {
   });
 
   it('renders the selected session controls inline and lets the admin unlock the worker URL for editing', async () => {
-    renderAdminPage();
+    await renderAdminPage();
 
     const sessionSelect = await screen.findByTestId(E2E_TESTIDS.ADMIN_SESSION_SELECT);
     expect(sessionSelect).toHaveValue('edge');
@@ -208,7 +222,7 @@ describe('AdminPage rendered interactions', () => {
     expect(sessionLink).toHaveAttribute('href', expect.stringContaining('/session/edge'));
     expect(sessionLink).toHaveAttribute('target', '_blank');
 
-    const workerInput = await screen.findByDisplayValue('https://worker.example');
+    const workerInput = await screen.findByDisplayValue('https://worker.example.test');
     expect(workerInput).toHaveProperty('readOnly', true);
     expect(screen.queryByText('Resolved (ok)')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Copy worker URL' })).toHaveClass(styles.heroCardInputIconButton);
@@ -231,13 +245,13 @@ describe('AdminPage rendered interactions', () => {
   });
 
   it('reveals the tests section only after the worker Test button is clicked', async () => {
-    renderAdminPage();
+    await renderAdminPage();
     await waitForResolvedWorkerUrl();
 
     expect(screen.queryByText(/^Tests$/)).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Toggle Tests section' })).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Test' }));
+    await clickAndSettle(screen.getByRole('button', { name: 'Test' }));
 
     const testsPanel = await screen.findByText('Tests');
     expect(testsPanel).toBeInTheDocument();
@@ -258,12 +272,12 @@ describe('AdminPage rendered interactions', () => {
     sessionEntries = [[
       'edge',
       buildSessionConfig({
-        sessionHeaderImg: 'https://broken.example/session-header.png',
+        sessionHeaderImg: 'https://broken.example.test/session-header.png',
       }),
     ]];
 
     try {
-      renderAdminPage();
+      await renderAdminPage();
       await waitForResolvedWorkerUrl();
 
       await waitFor(() => {
@@ -277,7 +291,7 @@ describe('AdminPage rendered interactions', () => {
   });
 
   it('warns non-admin wallets and disables admin-only actions', async () => {
-    renderAdminPage({
+    await renderAdminPage({
       account: '0x00000000000000000000000000000000000000bb',
     });
 
@@ -287,7 +301,7 @@ describe('AdminPage rendered interactions', () => {
     expect(screen.queryByRole('button', { name: 'Save allowlist' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Add recommended origins' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Edit worker URL' })).not.toBeInTheDocument();
-    openGatePanel();
+    await openGatePanel();
     expect(screen.getByTestId(E2E_TESTIDS.ADMIN_GATE_UPDATE_BUTTON)).toBeDisabled();
   });
 
@@ -304,7 +318,7 @@ describe('AdminPage rendered interactions', () => {
       }),
     ]];
 
-    renderAdminPage({
+    await renderAdminPage({
       initialRegistryChainId: '84532',
     });
 
@@ -329,30 +343,30 @@ describe('AdminPage rendered interactions', () => {
         : { ok: true, json: async () => ({ ok: true }) }
     ));
 
-    renderAdminPage();
+    await renderAdminPage();
     await waitForResolvedWorkerUrl();
 
-    const workerSecretsPanel = openWorkerSecretsPanel();
+    const workerSecretsPanel = await openWorkerSecretsPanel();
     fireEvent.click(within(workerSecretsPanel).getByRole('button', { name: 'AI' }));
 
     fireEvent.change(getSecretInputByLabel('OpenAI API key'), {
       target: { value: '  sk-live-test  ' },
     });
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Save worker secrets' }));
+    await clickAndSettle(await screen.findByRole('button', { name: 'Save worker secrets' }));
 
     await waitFor(() => {
       expect(screen.getByText(/Worker secrets saved for edge/)).toBeInTheDocument();
     });
 
-    expect(global.fetch).toHaveBeenCalledWith('https://worker.example/admin/set-secrets', expect.objectContaining({
+    expect(global.fetch).toHaveBeenCalledWith('https://worker.example.test/admin/set-secrets', expect.objectContaining({
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
     }));
     expect(mockBuildSignedAdminActionAuth).toHaveBeenCalledWith(expect.objectContaining({
       action: 'set-secrets',
       slug: 'edge',
-      workerUrl: 'https://worker.example',
+      workerUrl: 'https://worker.example.test',
       body: {
         sessionSlug: 'edge',
         secrets: {
@@ -401,17 +415,17 @@ describe('AdminPage rendered interactions', () => {
         : { ok: true, json: async () => ({ ok: true }) }
     ));
 
-    renderAdminPage();
+    await renderAdminPage();
     await waitForResolvedWorkerUrl();
 
-    const workerSecretsPanel = openWorkerSecretsPanel();
+    const workerSecretsPanel = await openWorkerSecretsPanel();
     fireEvent.click(within(workerSecretsPanel).getByRole('button', { name: 'AI' }));
 
     fireEvent.change(getSecretInputByLabel('OpenAI API key'), {
       target: { value: 'sk-live-test' },
     });
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Save worker secrets' }));
+    await clickAndSettle(await screen.findByRole('button', { name: 'Save worker secrets' }));
 
     await waitFor(() => {
       expect(mockSetSessionFieldsOnChain).toHaveBeenCalledWith(expect.objectContaining({
@@ -432,17 +446,17 @@ describe('AdminPage rendered interactions', () => {
         : { ok: true, json: async () => ({ ok: true, payerAddress: '0x3AC823CA9AcDA550244C6fF4927b5e1478E70Ff7' }) }
     ));
 
-    renderAdminPage();
+    await renderAdminPage();
     await waitForResolvedWorkerUrl();
 
-    const workerSecretsPanel = openWorkerSecretsPanel();
+    const workerSecretsPanel = await openWorkerSecretsPanel();
     fireEvent.click(within(workerSecretsPanel).getByRole('button', { name: 'Lit' }));
 
     fireEvent.change(getSecretInputByLabel('Lit payer private key'), {
       target: { value: '0x59c6995e998f97a5a0044976f84ce7de5d9d7f17b2f6a6a5f76f8864c8ad88f5' },
     });
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Save worker secrets' }));
+    await clickAndSettle(await screen.findByRole('button', { name: 'Save worker secrets' }));
 
     await waitFor(() => {
       expect(screen.getByText(/Worker secrets saved for edge/)).toBeInTheDocument();
@@ -470,17 +484,17 @@ describe('AdminPage rendered interactions', () => {
       }),
     ]];
 
-    renderAdminPage();
+    await renderAdminPage();
     await waitForResolvedWorkerUrl();
 
-    const workerSecretsPanel = openWorkerSecretsPanel();
+    const workerSecretsPanel = await openWorkerSecretsPanel();
     fireEvent.click(within(workerSecretsPanel).getByRole('button', { name: 'AI' }));
 
     fireEvent.change(getSecretInputByLabel('OpenAI API key'), {
       target: { value: 'sk-live-test' },
     });
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Save worker secrets' }));
+    await clickAndSettle(await screen.findByRole('button', { name: 'Save worker secrets' }));
 
     await waitFor(() => {
       expect(screen.getByText(/Worker secrets saved for edge/)).toBeInTheDocument();
@@ -505,17 +519,17 @@ describe('AdminPage rendered interactions', () => {
       }),
     ]];
 
-    renderAdminPage();
+    await renderAdminPage();
     await waitForResolvedWorkerUrl();
 
-    const workerSecretsPanel = openWorkerSecretsPanel();
+    const workerSecretsPanel = await openWorkerSecretsPanel();
     fireEvent.click(within(workerSecretsPanel).getByRole('button', { name: 'Lit' }));
 
     fireEvent.change(getSecretInputByLabel('Lit payer private key'), {
       target: { value: '0xabc123' },
     });
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Save worker secrets' }));
+    await clickAndSettle(await screen.findByRole('button', { name: 'Save worker secrets' }));
 
     await waitFor(() => {
       expect(screen.getByText(/Worker secrets saved for edge/)).toBeInTheDocument();
@@ -552,7 +566,7 @@ describe('AdminPage rendered interactions', () => {
         : { ok: true, json: async () => ({ ok: true }) }
     ));
 
-    renderAdminPage();
+    await renderAdminPage();
     await waitForResolvedWorkerUrl();
 
     await waitFor(() => {
@@ -564,23 +578,23 @@ describe('AdminPage rendered interactions', () => {
     });
     expect(global.fetch.mock.calls.find(([url]) => String(url).endsWith('/admin/lit-status'))).toBeUndefined();
 
-    const workerSecretsPanel = openWorkerSecretsPanel();
+    const workerSecretsPanel = await openWorkerSecretsPanel();
     fireEvent.click(within(workerSecretsPanel).getByRole('button', { name: 'Lit' }));
 
     const refreshButton = await screen.findByRole('button', { name: 'Refresh Lit status' });
-    fireEvent.click(refreshButton);
+    await clickAndSettle(refreshButton);
 
     await waitFor(() => {
       expect(mockBuildSignedAdminActionAuth).toHaveBeenCalledWith(expect.objectContaining({
         action: 'lit-status',
         slug: 'edge',
-        workerUrl: 'https://worker.example',
+        workerUrl: 'https://worker.example.test',
       }));
+      expect(global.fetch).toHaveBeenCalledWith(
+        'https://worker.example.test/admin/lit-status',
+        expect.objectContaining({ method: 'POST' }),
+      );
     });
-    expect(global.fetch).toHaveBeenCalledWith(
-      'https://worker.example/admin/lit-status',
-      expect.objectContaining({ method: 'POST' }),
-    );
   });
 
   it('allows Lit status refresh to query a worker-stored payer before sponsored_lit is synced', async () => {
@@ -599,26 +613,26 @@ describe('AdminPage rendered interactions', () => {
         : { ok: true, json: async () => ({ ok: true }) }
     ));
 
-    renderAdminPage();
+    await renderAdminPage();
     await waitForResolvedWorkerUrl();
 
-    const workerSecretsPanel = openWorkerSecretsPanel();
+    const workerSecretsPanel = await openWorkerSecretsPanel();
     fireEvent.click(within(workerSecretsPanel).getByRole('button', { name: 'Lit' }));
 
     const refreshButton = await screen.findByRole('button', { name: 'Refresh Lit status' });
-    fireEvent.click(refreshButton);
+    await clickAndSettle(refreshButton);
 
     await waitFor(() => {
       expect(mockBuildSignedAdminActionAuth).toHaveBeenCalledWith(expect.objectContaining({
         action: 'lit-status',
         slug: 'edge',
-        workerUrl: 'https://worker.example',
+        workerUrl: 'https://worker.example.test',
       }));
+      expect(global.fetch).toHaveBeenCalledWith(
+        'https://worker.example.test/admin/lit-status',
+        expect.objectContaining({ method: 'POST' }),
+      );
     });
-    expect(global.fetch).toHaveBeenCalledWith(
-      'https://worker.example/admin/lit-status',
-      expect.objectContaining({ method: 'POST' }),
-    );
   });
 
   it('hydrates the allowlist editor from the cached worker config overlay', async () => {
@@ -632,20 +646,20 @@ describe('AdminPage rendered interactions', () => {
       bySession: {
         edge: {
           config: {
-            corsWorkerUrl: 'https://worker.example',
-            allowOrigins: ['https://existing.example'],
+            corsWorkerUrl: 'https://worker.example.test',
+            allowOrigins: ['https://existing.example.test'],
             limits: { perWalletPerDay: 3 },
-            rpcEndpoint: 'https://rpc.example',
+            rpcEndpoint: 'https://rpc.example.test',
           },
           cachedAtMs: 1700000000000,
         },
       },
     }));
 
-    renderAdminPage();
+    await renderAdminPage();
     await waitForResolvedWorkerUrl();
 
-    expect(openAllowlistEditor()).toHaveValue('https://existing.example');
+    expect(await openAllowlistEditor()).toHaveValue('https://existing.example.test');
   });
 
   it('saves the edited allowOrigins list exactly for the selected session', async () => {
@@ -654,23 +668,23 @@ describe('AdminPage rendered interactions', () => {
       bySession: {
         edge: {
           config: {
-            corsWorkerUrl: 'https://worker.example',
-            allowOrigins: ['https://existing.example', 'https://remove-me.example'],
+            corsWorkerUrl: 'https://worker.example.test',
+            allowOrigins: ['https://existing.example.test', 'https://remove-me.example.test'],
             limits: { perWalletPerDay: 3 },
-            rpcEndpoint: 'https://rpc.example',
+            rpcEndpoint: 'https://rpc.example.test',
           },
           cachedAtMs: 1700000000000,
         },
       },
     }));
 
-    renderAdminPage();
+    await renderAdminPage();
     await waitForResolvedWorkerUrl();
 
-    fireEvent.change(openAllowlistEditor(), {
-      target: { value: 'https://existing.example' },
+    fireEvent.change(await openAllowlistEditor(), {
+      target: { value: 'https://existing.example.test' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Save allowlist' }));
+    await clickAndSettle(screen.getByRole('button', { name: 'Save allowlist' }));
 
     await waitFor(() => {
       expect(screen.getByText(/allowOrigins saved \(1 origins\)/)).toBeInTheDocument();
@@ -679,12 +693,12 @@ describe('AdminPage rendered interactions', () => {
     expect(mockBuildSignedAdminActionAuth).toHaveBeenCalledWith(expect.objectContaining({
       action: 'set-config',
       slug: 'edge',
-      workerUrl: 'https://worker.example',
+      workerUrl: 'https://worker.example.test',
       body: expect.objectContaining({
         sessionSlug: 'edge',
         adminAddress: ADMIN_ADDRESS,
         config: expect.objectContaining({
-          allowOrigins: ['https://existing.example'],
+          allowOrigins: ['https://existing.example.test'],
         }),
       }),
     }));
@@ -695,23 +709,23 @@ describe('AdminPage rendered interactions', () => {
     expect(payload.action).toBe('set-config');
     expect(payload.slug).toBe('edge');
     expect(Object.prototype.hasOwnProperty.call(payload.config, 'adminAddress')).toBe(false);
-    expect(payload.config.allowOrigins).toEqual(['https://existing.example']);
+    expect(payload.config.allowOrigins).toEqual(['https://existing.example.test']);
     expect(getCachedSessionWorkerConfig('edge')).toEqual(expect.objectContaining({
-      corsWorkerUrl: 'https://worker.example',
-      allowOrigins: ['https://existing.example'],
+      corsWorkerUrl: 'https://worker.example.test',
+      allowOrigins: ['https://existing.example.test'],
       limits: { perWalletPerDay: 3 },
-      rpcEndpoint: 'https://rpc.example',
+      rpcEndpoint: 'https://rpc.example.test',
     }));
   });
 
   it('normalizes mixed delimiter allowOrigins input before saving', async () => {
-    renderAdminPage();
+    await renderAdminPage();
     await waitForResolvedWorkerUrl();
 
-    fireEvent.change(openAllowlistEditor(), {
-      target: { value: 'https://alpha.example, http://localhost:7391\nhttps://alpha.example/' },
+    fireEvent.change(await openAllowlistEditor(), {
+      target: { value: 'https://alpha.example.test, http://localhost:7391\nhttps://alpha.example.test/' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Save allowlist' }));
+    await clickAndSettle(screen.getByRole('button', { name: 'Save allowlist' }));
 
     await waitFor(() => {
       expect(screen.getByText(/allowOrigins saved \(2 origins\)/)).toBeInTheDocument();
@@ -720,7 +734,7 @@ describe('AdminPage rendered interactions', () => {
     const adminCall = global.fetch.mock.calls.find(([url]) => String(url).endsWith('/admin/set-config'));
     const payload = JSON.parse(adminCall[1].body);
     expect(payload.config.allowOrigins).toEqual([
-      'https://alpha.example',
+      'https://alpha.example.test',
       'http://localhost:7391',
     ]);
   });
@@ -762,13 +776,13 @@ describe('AdminPage rendered interactions', () => {
       return Promise.resolve({ ok: true, status: 200, json: async () => ({ ok: true }) });
     });
 
-    renderAdminPage();
+    await renderAdminPage();
     await waitForResolvedWorkerUrl();
 
-    fireEvent.change(openAllowlistEditor(), {
-      target: { value: 'https://existing.example' },
+    fireEvent.change(await openAllowlistEditor(), {
+      target: { value: 'https://existing.example.test' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Save allowlist' }));
+    await clickAndSettle(screen.getByRole('button', { name: 'Save allowlist' }));
 
     await waitFor(() => {
       expect(screen.getByText(/allowOrigins saved \(1 origins\)/)).toBeInTheDocument();
@@ -786,25 +800,25 @@ describe('AdminPage rendered interactions', () => {
       bySession: {
         edge: {
           config: {
-            corsWorkerUrl: 'https://worker.example',
-            allowOrigins: ['https://existing.example'],
+            corsWorkerUrl: 'https://worker.example.test',
+            allowOrigins: ['https://existing.example.test'],
           },
           cachedAtMs: 1700000000000,
         },
       },
     }));
 
-    renderAdminPage();
+    await renderAdminPage();
     await waitForResolvedWorkerUrl();
 
-    fireEvent.change(openAllowlistEditor(), {
+    fireEvent.change(await openAllowlistEditor(), {
       target: { value: '' },
     });
     expect(screen.getByText(
       'Empty allowlist: saving this draft keeps CORS open for any browser origin.'
     )).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Save allowlist' }));
+    await clickAndSettle(screen.getByRole('button', { name: 'Save allowlist' }));
 
     await waitFor(() => {
       expect(screen.getByText(/allowOrigins saved with open CORS/)).toBeInTheDocument();
@@ -824,18 +838,18 @@ describe('AdminPage rendered interactions', () => {
       bySession: {
         edge: {
           config: {
-            corsWorkerUrl: 'https://worker.example',
-            allowOrigins: ['https://existing.example', 'http://localhost:7391'],
+            corsWorkerUrl: 'https://worker.example.test',
+            allowOrigins: ['https://existing.example.test', 'http://localhost:7391'],
           },
           cachedAtMs: 1700000000000,
         },
       },
     }));
 
-    renderAdminPage();
+    await renderAdminPage();
     await waitForResolvedWorkerUrl();
 
-    openAllowlistEditor();
+    await openAllowlistEditor();
     fireEvent.click(screen.getByRole('button', { name: 'Add recommended origins' }));
 
     await waitFor(() => {
@@ -844,9 +858,9 @@ describe('AdminPage rendered interactions', () => {
 
     const values = getAllowOriginsInput().value.split('\n').filter(Boolean);
     expect(values).toEqual(expect.arrayContaining([
-      'https://existing.example',
+      'https://existing.example.test',
       'http://localhost:7391',
-      'https://contextengine.xyz',
+      'https://contextengine.xyz', // intentional: production recommended origin assertion
       window.location.origin,
     ]));
     expect(values.filter((entry) => entry === 'http://localhost:7391')).toHaveLength(1);
@@ -860,17 +874,17 @@ describe('AdminPage rendered interactions', () => {
         : Promise.reject(new TypeError('Failed to fetch'))
     ));
 
-    renderAdminPage();
+    await renderAdminPage();
     await waitForResolvedWorkerUrl();
 
-    fireEvent.change(openAllowlistEditor(), {
-      target: { value: 'https://replacement.example' },
+    fireEvent.change(await openAllowlistEditor(), {
+      target: { value: 'https://replacement.example.test' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Save allowlist' }));
+    await clickAndSettle(screen.getByRole('button', { name: 'Save allowlist' }));
 
     await waitFor(() => {
       expect(screen.getByText(
-        /Worker request could not reach https:\/\/worker\.example\./
+        /Worker request could not reach https:\/\/worker\.example\.test\./
       )).toBeInTheDocument();
     });
     expect(screen.getByText(
@@ -886,10 +900,10 @@ describe('AdminPage rendered interactions', () => {
     });
     sessionEntries = [['edge', buildSessionConfig({ corsWorkerUrl: '' })]];
 
-    renderAdminPage();
+    await renderAdminPage();
 
     await screen.findByRole('button', { name: 'Allowlist' });
-    openAllowlistEditor();
+    await openAllowlistEditor();
     await waitFor(() => {
       expect(screen.getByRole('button', { name: 'Save allowlist' })).toBeDisabled();
     });
@@ -907,20 +921,20 @@ describe('AdminPage rendered interactions', () => {
       v: 1,
       bySession: {
         edge: {
-          corsWorkerUrl: 'https://worker-kv-cache.example',
+          corsWorkerUrl: 'https://worker-kv-cache.example.test',
         },
       },
     }));
 
-    renderAdminPage();
+    await renderAdminPage();
 
-    expect(await screen.findByDisplayValue('https://worker-kv-cache.example')).toBeInTheDocument();
-    expect(openAllowlistEditor()).toHaveValue('');
+    expect(await screen.findByDisplayValue('https://worker-kv-cache.example.test')).toBeInTheDocument();
+    expect(await openAllowlistEditor()).toHaveValue('');
     expect(screen.getByRole('button', { name: 'Save allowlist' })).toBeDisabled();
 
     await act(async () => {
       resolveWorkerLookup({
-        url: 'https://worker-kv-cache.example',
+        url: 'https://worker-kv-cache.example.test',
         source: 'worker-config-cache',
         status: 'plain',
       });
@@ -938,9 +952,9 @@ describe('AdminPage rendered interactions', () => {
       corsWorkerUrl: '',
     })]];
 
-    renderAdminPage();
+    await renderAdminPage();
 
-    const workerInput = await screen.findByPlaceholderText('https://<worker-name>.<account-subdomain>.workers.dev/');
+    const workerInput = await screen.findByPlaceholderText(/worker-name.*account-subdomain/i);
     expect(workerInput).toHaveValue(CLOUDFLARE_CORS_WORKER_URL);
     expect(screen.getByRole('link', { name: 'Open session' })).toHaveAttribute('href', 'http://localhost/session');
 
@@ -976,7 +990,7 @@ describe('AdminPage rendered interactions', () => {
     ]];
 
     try {
-      renderAdminPage();
+      await renderAdminPage();
       await waitForResolvedWorkerUrl();
 
       const metadataPanel = screen.getByText('Session metadata').closest('section');
@@ -987,7 +1001,7 @@ describe('AdminPage rendered interactions', () => {
       });
       expect(screen.getByDisplayValue('12345678')).toBeInTheDocument();
 
-      fireEvent.click(screen.getByRole('button', { name: 'Update metadata' }));
+      await clickAndSettle(screen.getByRole('button', { name: 'Update metadata' }));
 
       await waitFor(() => {
         expect(mockUploadSessionMetadata).toHaveBeenCalledTimes(1);
@@ -1004,12 +1018,12 @@ describe('AdminPage rendered interactions', () => {
       expect(uploadedMetadata.__registry).toBeUndefined();
       expect(uploadedMetadata.sponsoredKeys).toBeUndefined();
 
-      expect(mockUpdateSessionMetadataOnChain).toHaveBeenCalledWith(expect.objectContaining({
-        chainId: 84532,
-        slug: 'edge',
-        metadataURI: 'ar://metadata_tx_id',
-      }));
       await waitFor(() => {
+        expect(mockUpdateSessionMetadataOnChain).toHaveBeenCalledWith(expect.objectContaining({
+          chainId: 84532,
+          slug: 'edge',
+          metadataURI: 'ar://metadata_tx_id',
+        }));
         expect(screen.getByText(/Session metadata updated\./)).toBeInTheDocument();
       });
     } finally {
@@ -1036,29 +1050,49 @@ describe('AdminPage rendered interactions', () => {
     ]];
 
     try {
-      renderAdminPage();
+      await renderAdminPage();
       await waitForResolvedWorkerUrl();
 
       const metadataPanel = screen.getByText('Session metadata').closest('section');
       fireEvent.click(within(metadataPanel).getAllByRole('button')[0]);
 
-      const autoFeatureToggle = await screen.findByLabelText('Auto-feature SBTs whose metadata points to this session URL');
+      const autoFeatureToggle = await screen.findByLabelText('Auto-feature by session slug');
       expect(autoFeatureToggle).not.toBeChecked();
 
       fireEvent.click(autoFeatureToggle);
       expect(autoFeatureToggle).toBeChecked();
 
-      fireEvent.click(screen.getByRole('button', { name: 'Update metadata' }));
+      await clickAndSettle(screen.getByRole('button', { name: 'Update metadata' }));
 
       await waitFor(() => {
         expect(mockUploadSessionMetadata).toHaveBeenCalledTimes(1);
       });
       expect(mockUploadSessionMetadata).toHaveBeenCalledWith(expect.objectContaining({
-        autoFeatureSBTsWithFeaturedSbtTags: true,
+        autoFeatureSBTsBySessionSlug: true,
       }), expect.any(Object));
+      expect(mockUploadSessionMetadata.mock.calls[0][0]).not.toHaveProperty('autoFeatureSBTsWithFeaturedSbtTags');
     } finally {
       currentBlockSpy.mockRestore();
     }
+  });
+
+  it('prefers canonical metadata auto-feature flag over the legacy alias in admin', async () => {
+    sessionEntries = [[
+      'edge',
+      buildSessionConfig({
+        autoFeatureSBTsBySessionSlug: false,
+        autoFeatureSBTsWithFeaturedSbtTags: true,
+      }),
+    ]];
+
+    await renderAdminPage();
+    await waitForResolvedWorkerUrl();
+
+    const metadataPanel = screen.getByText('Session metadata').closest('section');
+    fireEvent.click(within(metadataPanel).getAllByRole('button')[0]);
+
+    const autoFeatureToggle = await screen.findByLabelText('Auto-feature by session slug');
+    expect(autoFeatureToggle).not.toBeChecked();
   });
 
   it('rehydrates metadata draft when switching sessions even if previous session had unsaved edits', async () => {
@@ -1088,7 +1122,7 @@ describe('AdminPage rendered interactions', () => {
     });
     sessionEntries = [['session-one', session1], ['session-two', session2]];
 
-    renderAdminPage();
+    await renderAdminPage();
 
     const sessionSelect = await screen.findByTestId(E2E_TESTIDS.ADMIN_SESSION_SELECT);
     expect(sessionSelect).toHaveValue('session-one');
@@ -1121,7 +1155,7 @@ describe('AdminPage rendered interactions', () => {
       }),
     ]];
 
-    renderAdminPage();
+    await renderAdminPage();
     await waitForResolvedWorkerUrl();
 
     const metadataPanel = screen.getByText('Session metadata').closest('section');
@@ -1168,7 +1202,7 @@ describe('AdminPage rendered interactions', () => {
     ]];
 
     try {
-      renderAdminPage();
+      await renderAdminPage();
       await waitForResolvedWorkerUrl();
 
       const metadataPanel = screen.getByText('Session metadata').closest('section');
@@ -1199,7 +1233,7 @@ describe('AdminPage rendered interactions', () => {
         target: { value: 'q1\nq2' },
       });
 
-      fireEvent.click(screen.getByRole('button', { name: 'Update metadata' }));
+      await clickAndSettle(screen.getByRole('button', { name: 'Update metadata' }));
 
       await waitFor(() => {
         expect(mockUploadSessionMetadata).toHaveBeenCalledTimes(1);
@@ -1261,7 +1295,7 @@ describe('AdminPage rendered interactions', () => {
       }),
     ]];
 
-    renderAdminPage();
+    await renderAdminPage();
     await waitForResolvedWorkerUrl();
 
     const metadataPanel = screen.getByText('Session metadata').closest('section');
@@ -1269,7 +1303,7 @@ describe('AdminPage rendered interactions', () => {
 
     expect(within(metadataPanel).getByText(/Session metadata could not be loaded/i)).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Update metadata' }));
+    await clickAndSettle(screen.getByRole('button', { name: 'Update metadata' }));
 
     await waitFor(() => {
       expect(screen.getByText(/Verify or edit the contract addresses before saving/i)).toBeInTheDocument();
@@ -1277,7 +1311,7 @@ describe('AdminPage rendered interactions', () => {
     expect(mockUploadSessionMetadata).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByLabelText(/I verified these fallback defaults/i));
-    fireEvent.click(screen.getByRole('button', { name: 'Update metadata' }));
+    await clickAndSettle(screen.getByRole('button', { name: 'Update metadata' }));
 
     await waitFor(() => {
       expect(mockUploadSessionMetadata).toHaveBeenCalledTimes(1);
@@ -1297,7 +1331,7 @@ describe('AdminPage rendered interactions', () => {
       };
     });
 
-    renderAdminPage();
+    await renderAdminPage();
 
     const sessionSelect = await screen.findByTestId(E2E_TESTIDS.ADMIN_SESSION_SELECT);
     expect(sessionSelect).toHaveValue('edge');
@@ -1322,23 +1356,25 @@ describe('AdminPage rendered interactions', () => {
       };
     });
 
-    renderAdminPage();
+    await renderAdminPage();
 
     const sessionSelect = await screen.findByTestId(E2E_TESTIDS.ADMIN_SESSION_SELECT);
-    expect(sessionSelect).toHaveValue('edge');
-    expect(within(sessionSelect).getByRole('option', { name: 'edge — Fresh Session' })).toBeInTheDocument();
-    expect(mockLoadSessionRegistryCache).toHaveBeenNthCalledWith(1, expect.objectContaining({
-      bootstrapRpc: true,
-    }));
-    expect(mockLoadSessionRegistryCache).toHaveBeenNthCalledWith(2, expect.objectContaining({
-      bootstrapRpc: false,
-    }));
+    await waitFor(() => {
+      expect(sessionSelect).toHaveValue('edge');
+      expect(within(sessionSelect).getByRole('option', { name: 'edge — Fresh Session' })).toBeInTheDocument();
+      expect(mockLoadSessionRegistryCache).toHaveBeenNthCalledWith(1, expect.objectContaining({
+        bootstrapRpc: true,
+      }));
+      expect(mockLoadSessionRegistryCache).toHaveBeenNthCalledWith(2, expect.objectContaining({
+        bootstrapRpc: false,
+      }));
+    });
   });
 
   it('syncs the session picker when another route updates the registry cache', async () => {
     sessionEntries = [];
 
-    renderAdminPage();
+    await renderAdminPage();
 
     expect(await screen.findByText('No sessions found in the registry.')).toBeInTheDocument();
 
@@ -1352,7 +1388,7 @@ describe('AdminPage rendered interactions', () => {
   });
 
   it('shows Arweave and faucet balances inline with worker secrets and refreshes both cards', async () => {
-    const arweave = Arweave.init({ host: 'arweave.net', port: 443, protocol: 'https' });
+    const arweave = Arweave.init({ host: 'arweave.example.test', port: 443, protocol: 'https' });
     const arweaveJwk = await arweave.wallets.generate();
     const arweaveAddress = await arweave.wallets.jwkToAddress(arweaveJwk);
     const arweaveShort = `${arweaveAddress.slice(0, 6)}…${arweaveAddress.slice(-4)}`;
@@ -1365,16 +1401,16 @@ describe('AdminPage rendered interactions', () => {
       .mockResolvedValue(ethers.utils.parseEther('0.1842'));
     mockReadArweaveWalletBalance.mockResolvedValue({
       address: arweaveAddress,
-      balanceUrl: `https://arweave.net/wallet/${arweaveAddress}/balance`,
-      gatewayBase: 'https://arweave.net',
+      balanceUrl: `https://arweave.example.test/wallet/${arweaveAddress}/balance`,
+      gatewayBase: 'https://arweave.example.test',
       winston: '12345678000000',
     });
 
     try {
-      renderAdminPage();
+      await renderAdminPage();
       await waitForResolvedWorkerUrl();
 
-      const workerSecretsPanel = openWorkerSecretsPanel();
+      const workerSecretsPanel = await openWorkerSecretsPanel();
       fireEvent.click(within(workerSecretsPanel).getByRole('button', { name: 'Arweave' }));
       fireEvent.click(within(workerSecretsPanel).getByRole('button', { name: 'Faucet' }));
 
@@ -1397,8 +1433,8 @@ describe('AdminPage rendered interactions', () => {
 
       expect(workerSecretsPanel).not.toHaveTextContent(faucetPrivateKey);
 
-      fireEvent.click(screen.getByRole('button', { name: 'Refresh Arweave balance' }));
-      fireEvent.click(screen.getByRole('button', { name: 'Refresh faucet balance' }));
+      await clickAndSettle(screen.getByRole('button', { name: 'Refresh Arweave balance' }));
+      await clickAndSettle(screen.getByRole('button', { name: 'Refresh faucet balance' }));
 
       await waitFor(() => {
         expect(mockReadArweaveWalletBalance).toHaveBeenCalledTimes(2);
@@ -1419,10 +1455,10 @@ describe('AdminPage rendered interactions', () => {
       .mockResolvedValue(ethers.utils.parseEther('0.1842'));
 
     try {
-      renderAdminPage();
+      await renderAdminPage();
       await waitForResolvedWorkerUrl();
 
-      const workerSecretsPanel = openWorkerSecretsPanel();
+      const workerSecretsPanel = await openWorkerSecretsPanel();
       fireEvent.click(within(workerSecretsPanel).getByRole('button', { name: 'Faucet' }));
 
       fireEvent.change(getSecretInputByLabel('Faucet private key'), {
@@ -1441,7 +1477,7 @@ describe('AdminPage rendered interactions', () => {
   });
 
   it('hides zero-balance resource summaries in worker secrets', async () => {
-    const arweave = Arweave.init({ host: 'arweave.net', port: 443, protocol: 'https' });
+    const arweave = Arweave.init({ host: 'arweave.example.test', port: 443, protocol: 'https' });
     const arweaveJwk = await arweave.wallets.generate();
     const faucetWallet = ethers.Wallet.createRandom();
     const faucetBalanceSpy = jest
@@ -1449,16 +1485,16 @@ describe('AdminPage rendered interactions', () => {
       .mockResolvedValue(ethers.constants.Zero);
     mockReadArweaveWalletBalance.mockResolvedValue({
       address: await arweave.wallets.jwkToAddress(arweaveJwk),
-      balanceUrl: 'https://arweave.net/wallet/test/balance',
-      gatewayBase: 'https://arweave.net',
+      balanceUrl: 'https://arweave.example.test/wallet/test/balance',
+      gatewayBase: 'https://arweave.example.test',
       winston: '5',
     });
 
     try {
-      renderAdminPage();
+      await renderAdminPage();
       await waitForResolvedWorkerUrl();
 
-      const workerSecretsPanel = openWorkerSecretsPanel();
+      const workerSecretsPanel = await openWorkerSecretsPanel();
       fireEvent.click(within(workerSecretsPanel).getByRole('button', { name: 'Arweave' }));
       fireEvent.click(within(workerSecretsPanel).getByRole('button', { name: 'Faucet' }));
 
@@ -1472,11 +1508,11 @@ describe('AdminPage rendered interactions', () => {
       await waitFor(() => {
         expect(mockReadArweaveWalletBalance).toHaveBeenCalledTimes(1);
         expect(faucetBalanceSpy).toHaveBeenCalledTimes(1);
+        expect(within(workerSecretsPanel).queryByText('Arweave balance')).not.toBeInTheDocument();
+        expect(within(workerSecretsPanel).queryByText('Faucet balance')).not.toBeInTheDocument();
+        expect(within(workerSecretsPanel).queryByText('0.000000 AR')).not.toBeInTheDocument();
+        expect(within(workerSecretsPanel).queryByText('0.0000 ETH')).not.toBeInTheDocument();
       });
-      expect(within(workerSecretsPanel).queryByText('Arweave balance')).not.toBeInTheDocument();
-      expect(within(workerSecretsPanel).queryByText('Faucet balance')).not.toBeInTheDocument();
-      expect(within(workerSecretsPanel).queryByText('0.000000 AR')).not.toBeInTheDocument();
-      expect(within(workerSecretsPanel).queryByText('0.0000 ETH')).not.toBeInTheDocument();
     } finally {
       faucetBalanceSpy.mockRestore();
     }
@@ -1486,10 +1522,10 @@ describe('AdminPage rendered interactions', () => {
     const faucetBalanceSpy = jest.spyOn(ethers.providers.JsonRpcProvider.prototype, 'getBalance');
 
     try {
-      renderAdminPage();
+      await renderAdminPage();
       await waitForResolvedWorkerUrl();
 
-      const workerSecretsPanel = openWorkerSecretsPanel();
+      const workerSecretsPanel = await openWorkerSecretsPanel();
       fireEvent.click(within(workerSecretsPanel).getByRole('button', { name: 'Arweave' }));
       fireEvent.click(within(workerSecretsPanel).getByRole('button', { name: 'Faucet' }));
 
@@ -1512,7 +1548,7 @@ describe('AdminPage rendered interactions', () => {
 
 describe('AdminPage metadata draft helpers', () => {
   it('does not inject default AI metadata when the source has no ai field and draft is untouched', () => {
-    const { applyAdminMetadataDraft, buildAdminMetadataDraft } = require('./AdminPage.jsx').__adminPageTestUtils;
+    const { applyAdminMetadataDraft, buildAdminMetadataDraft } = require('./AdminPage').__adminPageTestUtils;
     const sourceMetadata = {
       slug: 'legacy-session',
       sessionName: 'Legacy Session',
@@ -1528,7 +1564,7 @@ describe('AdminPage metadata draft helpers', () => {
   });
 
   it('applies AI metadata when the admin changes a model field even if source had no ai', () => {
-    const { applyAdminMetadataDraft, buildAdminMetadataDraft } = require('./AdminPage.jsx').__adminPageTestUtils;
+    const { applyAdminMetadataDraft, buildAdminMetadataDraft } = require('./AdminPage').__adminPageTestUtils;
     const sourceMetadata = { slug: 'legacy-session' };
     const draft = buildAdminMetadataDraft(sourceMetadata);
     draft.aiThinkingProvider = 'anthropic';
@@ -1542,7 +1578,7 @@ describe('AdminPage metadata draft helpers', () => {
   });
 
   it('preserves unknown contract keys through metadata save round-trip', () => {
-    const { buildEditableSessionMetadataPayload } = require('./AdminPage.jsx').__adminPageTestUtils;
+    const { buildEditableSessionMetadataPayload } = require('./AdminPage').__adminPageTestUtils;
     const sessionConfig = {
       slug: 'edge',
       networkChainId: 84532,

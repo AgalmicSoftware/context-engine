@@ -4,15 +4,14 @@ Primary product and system specification:
 - `spec.md` (repo root)
 
 Canonical reference set:
-- root docs: `README.md`, `ARCHITECTURE.md`, `AGENTS.md`, `CLAUDE.md`, `spec.md`
+- root docs: `README.md`, `ARCHITECTURE.md`, `AGENTS.md`, `spec.md`
 - the `docs/` reference docs listed below
 
-Non-canonical / historical planning material:
-- `TODO/`
-- `TODO/PRDs/`
+Non-canonical / internal planning material:
+- internal planning docs that are intentionally omitted from the public release
 - one-off debug prompts or migration notes unless they are explicitly linked below as current reference
 
-Planning docs and PRDs should be added under `TODO/`, not `docs/`.
+Planning docs belong outside `docs/` in the full development repo and are not part of the public release.
 
 ## How To Keep Docs Updated
 
@@ -31,6 +30,7 @@ Code navigation maps:
 
 Session, gates, and the Worker:
 - `docs/session-creation-guide.md`: End-to-end setup guide for creating a session from `/new`, including the "what a new session needs" checklist, sponsored bundle handoff, worker deploy paths, on-chain registration, and `/admin` verification.
+- `docs/standard-sponsored-links-fixture.md`: Temporary tracked fixture for publishing a small set of public sponsored setup links with minimal onboarding friction.
 - `docs/session-registry.md`: SessionRegistry migration and on-chain gate authority model.
 - `docs/session-cors-worker.md`: Cloudflare `sessionCorsWorker` behavior, endpoints, KV layouts, and wizard flow.
 - `docs/scaling.md`: Public scaling reference covering write-path settlement, indexed reads, private compute modes, and deployment profiles.
@@ -59,6 +59,9 @@ Wallets:
 E2E workflows:
 - `docs/e2e-setup.md`: End-to-end workflow scripts (gates Any/All, doc library filetype encryption/decryption).
 - `docs/e2e-testid-api.md`: Stable `data-testid` hooks used by Playwright runners (TestID API).
+
+Public discovery:
+- `docs/discoverability.md`: Static crawl assets, live GitHub branch links, and the Google Search Console checklist.
 
 ## Runtime Telemetry
 

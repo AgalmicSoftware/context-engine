@@ -108,9 +108,10 @@
   gap: 6px;
   padding: 4px 8px;
   border-radius: var(--ce-radius-pill);
-  border: 1px solid rgba(77, 255, 164, 0.28);
-  background: rgba(77, 255, 164, 0.12);
-  color: rgba(244, 247, 255, 0.92);
+  border: 1px solid rgba(32, 58, 44, 0.22);
+  background: rgba(77, 255, 164, 0.18);
+  color: #1f2733;
+  box-shadow: 0 1px 2px rgba(15, 18, 51, 0.08);
   font-size: 0.78rem;
   line-height: 1;
   min-height: 28px;
@@ -121,7 +122,7 @@
 }
 
 .loadingStatusSpinner {
-  color: var(--ce-color-accent);
+  color: #2f9d64;
 }
 
 .loadingStatusText {
@@ -195,6 +196,20 @@
   color: inherit;
 }
 
+.selectedValueLabel {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  color: inherit;
+}
+
+.selectedValueText {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .optionImage {
   width: 20px;
   height: 20px;
@@ -244,7 +259,7 @@
   cursor: default;
 }
 
-// SBTFilter.jsx
+// SBTFilter
 
 .sbtFilter {
   // background: #2a99eac7;

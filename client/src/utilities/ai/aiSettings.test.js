@@ -1,10 +1,15 @@
 import {
+  AI_SETTINGS_ENVELOPE_KIND,
+  AI_SETTINGS_STORAGE_KEY,
   applyPreLoginAiProviderKeyChange,
   clearLocalAiSettings,
   getEffectiveAiConfig,
   getEffectiveTranscriptionConfig,
   getLocalAiSettings,
+  migrateLegacyLocalAiSettingsIfNeeded,
+  readLocalAiSettingsEnvelope,
   saveLocalAiSettings,
+  writeLocalAiSettingsEnvelope,
 } from './aiSettings.js';
 import { cryptoUtils } from '../crypto/cryptography.js';
 
@@ -66,8 +71,8 @@ describe('aiSettings secret resolution', () => {
     expect(getLocalAiSettings().reasoningEffort).toBe('low');
   });
 
-  it('preserves saved provider API keys through local settings normalization', () => {
-    saveLocalAiSettings({
+  it('keeps plaintext provider API keys volatile while saving an envelope record', () => {
+    const saved = saveLocalAiSettings({
       useLocal: true,
       providers: {
         anthropic: {
@@ -78,9 +83,154 @@ describe('aiSettings secret resolution', () => {
     });
 
     const settings = getLocalAiSettings();
+    const storedRaw = localStorage.getItem(AI_SETTINGS_STORAGE_KEY);
+    const stored = JSON.parse(storedRaw);
+    const persisted = readLocalAiSettingsEnvelope();
 
+    expect(saved.providers.anthropic.apiKey).toBe('sk-ant-test');
     expect(settings.providers.anthropic.apiKey).toBe('sk-ant-test');
     expect(settings.providers.anthropic.encryptedApiKey).toBe('{"v":1,"ciphertext":"enc"}');
+    expect(storedRaw).not.toContain('sk-ant-test');
+    expect(stored.kind).toBe(AI_SETTINGS_ENVELOPE_KIND);
+    expect(stored.settings.providers.anthropic.apiKey).toBe('');
+    expect(stored.settings.providers.anthropic.encryptedApiKey).toBe('{"v":1,"ciphertext":"enc"}');
+    expect(persisted.settings.providers.anthropic.apiKey).toBe('');
+  });
+
+  it('does not downgrade an existing local AI envelope during normal saves', () => {
+    writeLocalAiSettingsEnvelope({
+      useLocal: true,
+      providers: {
+        openai: {
+          encryptedApiKey: '{"v":1,"ciphertext":"enc-open"}',
+        },
+      },
+    });
+
+    const saved = saveLocalAiSettings({
+      useLocal: false,
+      reasoningEffort: 'high',
+    });
+    const stored = JSON.parse(localStorage.getItem(AI_SETTINGS_STORAGE_KEY));
+
+    expect(saved.useLocal).toBe(false);
+    expect(saved.reasoningEffort).toBe('high');
+    expect(stored.kind).toBe(AI_SETTINGS_ENVELOPE_KIND);
+    expect(stored.settings.useLocal).toBe(false);
+    expect(stored.settings.reasoningEffort).toBe('high');
+    expect(stored.settings.providers.openai.encryptedApiKey).toBe('{"v":1,"ciphertext":"enc-open"}');
+  });
+
+  it('reads legacy local AI settings through the envelope adapter with plaintext metadata', () => {
+    localStorage.setItem(AI_SETTINGS_STORAGE_KEY, JSON.stringify({
+      useLocal: true,
+      providers: {
+        openai: {
+          apiKey: 'sk-open-test',
+          encryptedApiKey: '{"v":1,"ciphertext":"enc"}',
+        },
+      },
+    }));
+
+    const result = readLocalAiSettingsEnvelope();
+
+    expect(result).toEqual(expect.objectContaining({
+      ok: true,
+      status: 'legacy',
+      settings: expect.objectContaining({
+        useLocal: true,
+        providers: expect.objectContaining({
+          openai: expect.objectContaining({
+            apiKey: 'sk-open-test',
+          }),
+        }),
+      }),
+      metadata: expect.objectContaining({
+        encryptedAvailable: true,
+        legacyPlaintextDetected: true,
+      }),
+    }));
+  });
+
+  it('writes envelope records without plaintext provider apiKey fields', () => {
+    const result = writeLocalAiSettingsEnvelope({
+      useLocal: true,
+      providers: {
+        openai: {
+          apiKey: 'sk-open-test',
+          encryptedApiKey: '{"v":1,"ciphertext":"enc"}',
+        },
+      },
+    });
+
+    expect(result).toEqual(expect.objectContaining({
+      ok: true,
+      status: 'written',
+      envelope: expect.objectContaining({
+        v: 1,
+        kind: AI_SETTINGS_ENVELOPE_KIND,
+      }),
+    }));
+    const storedRaw = localStorage.getItem(AI_SETTINGS_STORAGE_KEY);
+    expect(storedRaw).not.toContain('sk-open-test');
+    const stored = JSON.parse(storedRaw);
+    expect(stored.settings.providers.openai.apiKey).toBe('');
+    expect(stored.settings.providers.openai.encryptedApiKey).toBe('{"v":1,"ciphertext":"enc"}');
+    expect(stored.metadata).toEqual(expect.objectContaining({
+      encryptedAvailable: true,
+      legacyPlaintextDetected: true,
+      requiresWallet: true,
+    }));
+    expect(getLocalAiSettings().providers.openai.apiKey).toBe('');
+  });
+
+  it('migrates legacy local AI settings to an envelope when encrypted keys are available', () => {
+    localStorage.setItem(AI_SETTINGS_STORAGE_KEY, JSON.stringify({
+      useLocal: true,
+      providers: {
+        anthropic: {
+          apiKey: 'sk-ant-test',
+          encryptedApiKey: '{"v":1,"ciphertext":"enc"}',
+        },
+      },
+    }));
+
+    const result = migrateLegacyLocalAiSettingsIfNeeded();
+    expect(result).toEqual(expect.objectContaining({
+      ok: true,
+      status: 'written',
+    }));
+
+    const stored = JSON.parse(localStorage.getItem(AI_SETTINGS_STORAGE_KEY));
+    expect(stored.kind).toBe(AI_SETTINGS_ENVELOPE_KIND);
+    expect(JSON.stringify(stored)).not.toContain('sk-ant-test');
+    expect(stored.metadata.legacyPlaintextDetected).toBe(true);
+    expect(stored.settings.providers.anthropic.encryptedApiKey).toBe('{"v":1,"ciphertext":"enc"}');
+  });
+
+  it('does not migrate plaintext-only legacy local AI settings without an encrypted replacement', () => {
+    const legacySettings = {
+      useLocal: true,
+      providers: {
+        anthropic: {
+          apiKey: 'sk-ant-test',
+        },
+      },
+    };
+    localStorage.setItem(AI_SETTINGS_STORAGE_KEY, JSON.stringify(legacySettings));
+
+    const result = migrateLegacyLocalAiSettingsIfNeeded();
+
+    expect(result).toEqual(expect.objectContaining({
+      ok: true,
+      status: 'skipped-plaintext-only',
+      reason: 'encrypted-key-missing',
+      metadata: expect.objectContaining({
+        legacyPlaintextDetected: true,
+        encryptedAvailable: false,
+      }),
+    }));
+    expect(JSON.parse(localStorage.getItem(AI_SETTINGS_STORAGE_KEY))).toEqual(legacySettings);
   });
 
   it('preserves top-level modelProviders overrides through local settings normalization', () => {

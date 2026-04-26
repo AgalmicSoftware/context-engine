@@ -1,7 +1,7 @@
 const { webcrypto } = require('crypto');
 const deployHelperWorker = require('../workers/deploy-helper/worker.js').default;
 
-const makeJsonRequest = (path, body, init = {}) => new Request(`https://helper.example${path}`, {
+const makeJsonRequest = (path, body, init = {}) => new Request(`https://helper.example.test${path}`, {
   method: init.method || 'POST',
   headers: {
     'Content-Type': 'application/json',
@@ -99,7 +99,7 @@ describe('deploy-helper worker', () => {
       accountId: 'acc-123',
       workerName: 'test-worker',
       sessionSlug: 'alpha-session',
-      bundleUrl: 'https://bundles.example/sessionCorsWorker.bundle.js',
+      bundleUrl: 'https://bundles.example.test/sessionCorsWorker.bundle.js',
       secrets: {
         openaiKey: '  sk-openai  ',
         arweaveJwk: { kty: 'RSA', n: 'abc' },
@@ -130,7 +130,14 @@ describe('deploy-helper worker', () => {
 
     const secretsWrite = fetchMock.calls[5];
     expect(String(secretsWrite[0])).toMatch(/\/storage\/kv\/namespaces\/kv-123\/values\/session:alpha-session:secrets$/);
-    expect(JSON.parse(secretsWrite[1].body)).toEqual({
+    const secretsEnvelope = JSON.parse(secretsWrite[1].body);
+    expect(secretsEnvelope).toEqual(expect.objectContaining({
+      v: 1,
+      kind: 'session-secrets',
+      createdAt: expect.any(Number),
+      updatedAt: expect.any(Number),
+    }));
+    expect(secretsEnvelope.secrets).toEqual({
       openaiKey: 'sk-openai',
       arweaveJwk: '{"kty":"RSA","n":"abc"}',
       faucetPrivateKey: '12345',
@@ -141,7 +148,7 @@ describe('deploy-helper worker', () => {
     const configRewrite = fetchMock.calls[8];
     expect(String(configRewrite[0])).toMatch(/\/storage\/kv\/namespaces\/kv-123\/values\/session:alpha-session:config$/);
     expect(JSON.parse(configRewrite[1].body).corsWorkerUrl).toBe(
-      'https://test-worker.tenant-subdomain.workers.dev/'
+      'https://test-worker.tenant-subdomain.workers.dev/' // intentional: real URL — tests worker URL construction
     );
   });
 
@@ -170,7 +177,7 @@ describe('deploy-helper worker', () => {
       accountId: 'acc-123',
       workerName: 'test-worker',
       sessionSlug: 'alpha-session',
-      bundleUrl: 'https://bundles.example/sessionCorsWorker.bundle.js',
+      bundleUrl: 'https://bundles.example.test/sessionCorsWorker.bundle.js',
     }), {}, {});
     const payload = await response.json();
 
@@ -197,14 +204,14 @@ describe('deploy-helper worker', () => {
       accountId: 'acc-123',
       workerName: 'test-worker',
       sessionSlug: 'alpha-session',
-      bundleUrl: 'https://bundles.example/sessionCorsWorker.bundle.js',
+      bundleUrl: 'https://bundles.example.test/sessionCorsWorker.bundle.js',
     }), {}, {});
     const payload = await response.json();
 
     expect(response.status).toBe(207);
     expect(payload?.ok).toBe(true);
     expect(payload?.partial).toBe(true);
-    expect(payload?.workerUrl).toBe('https://test-worker.tenant-subdomain.workers.dev/');
+    expect(payload?.workerUrl).toBe('https://test-worker.tenant-subdomain.workers.dev/'); // intentional: real URL — tests worker URL construction
     expect(payload?.configWriteError).toBe('final config rewrite failed');
     expect(payload?.configWriteStatus).toBe(500);
     expect(fetchMock.calls.length).toBe(9);
@@ -223,7 +230,7 @@ describe('deploy-helper worker', () => {
       accountId: 'acc-123',
       workerName: 'test-worker',
       sessionSlug: 'alpha-session',
-      bundleUrl: 'https://bundles.example/sessionCorsWorker.bundle.js',
+      bundleUrl: 'https://bundles.example.test/sessionCorsWorker.bundle.js',
     }), {}, {});
     const payload = await response.json();
 
@@ -287,23 +294,23 @@ describe('deploy-helper worker', () => {
       method: 'GET',
       headers: {
         Authorization: 'Bearer top-secret',
-        Origin: 'https://kv.example',
+        Origin: 'https://kv.example.test',
       },
     }), {
       ADMIN_SECRET: 'top-secret',
-      ALLOWED_ORIGINS: 'https://env.example',
+      ALLOWED_ORIGINS: 'https://env.example.test',
       DEPLOY_HELPER_KV: makeKvBinding({
-        'deploy-helper:origins': JSON.stringify(['https://kv.example']),
+        'deploy-helper:origins': JSON.stringify(['https://kv.example.test']),
       }),
     }, {});
     const payload = await response.json();
 
     expect(response.status).toBe(200);
     expect(payload).toEqual({
-      origins: ['https://kv.example'],
+      origins: ['https://kv.example.test'],
       source: 'kv',
     });
-    expect(response.headers.get('Access-Control-Allow-Origin')).toBe('https://kv.example');
+    expect(response.headers.get('Access-Control-Allow-Origin')).toBe('https://kv.example.test');
   });
 
   it('falls back to the localhost-only default origins when no env or KV override is configured', async () => {
@@ -328,18 +335,18 @@ describe('deploy-helper worker', () => {
     const kv = makeKvBinding();
     const response = await deployHelperWorker.fetch(makeJsonRequest('/admin/origins', {
       origins: [
-        'kv.example',
-        'https://kv.example/path',
+        'kv.example.test',
+        'https://kv.example.test/path',
         'http://localhost:3000',
       ],
     }, {
       headers: {
         Authorization: 'Bearer top-secret',
-        Origin: 'https://env.example',
+        Origin: 'https://env.example.test',
       },
     }), {
       ADMIN_SECRET: 'top-secret',
-      ALLOWED_ORIGINS: 'https://env.example',
+      ALLOWED_ORIGINS: 'https://env.example.test',
       DEPLOY_HELPER_KV: kv,
     }, {});
     const payload = await response.json();
@@ -347,31 +354,31 @@ describe('deploy-helper worker', () => {
     expect(response.status).toBe(200);
     expect(payload).toEqual({
       origins: [
-        'https://kv.example',
+        'https://kv.example.test',
         'http://localhost:3000',
       ],
       source: 'kv',
     });
     expect(kv.store.get('deploy-helper:origins')).toBe(JSON.stringify([
-      'https://kv.example',
+      'https://kv.example.test',
       'http://localhost:3000',
     ]));
   });
 
   it('falls back to newline-delimited env origins after clearing the KV override', async () => {
     const kv = makeKvBinding({
-      'deploy-helper:origins': JSON.stringify(['https://kv.example']),
+      'deploy-helper:origins': JSON.stringify(['https://kv.example.test']),
     });
     const response = await deployHelperWorker.fetch(makeJsonRequest('/admin/origins', {
       origins: [],
     }, {
       headers: {
         Authorization: 'Bearer top-secret',
-        Origin: 'https://env.example',
+        Origin: 'https://env.example.test',
       },
     }), {
       ADMIN_SECRET: 'top-secret',
-      ALLOWED_ORIGINS: 'https://env.example\nhttp://localhost:3000',
+      ALLOWED_ORIGINS: 'https://env.example.test\nhttp://localhost:3000',
       DEPLOY_HELPER_KV: kv,
     }, {});
     const payload = await response.json();
@@ -379,7 +386,7 @@ describe('deploy-helper worker', () => {
     expect(response.status).toBe(200);
     expect(payload).toEqual({
       origins: [
-        'https://env.example',
+        'https://env.example.test',
         'http://localhost:3000',
       ],
       source: 'env',

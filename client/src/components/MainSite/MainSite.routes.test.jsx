@@ -26,23 +26,23 @@ jest.mock('react-redux', () => ({
   connect: () => (Comp) => Comp,
 }));
 
-jest.mock('../HooksHOC/withWagmiBridge.jsx', () => ({
+jest.mock('../HooksHOC/withWagmiBridge', () => ({
   WagmiHooksHOC: (Comp) => Comp,
 }));
 
-jest.mock('../Navbar/Navbar.jsx', () => () => null);
-jest.mock('../MainContent/MainAreaTabs.jsx', () => () => null);
-jest.mock('../Onboarding/OnboardingOverlay.jsx', () => () => null);
-jest.mock('../Footer/Footer.jsx', () => () => null);
-jest.mock('../UserPage/SimUserPage.jsx', () => () => null);
-jest.mock('../Shared/LazyFallback.jsx', () => () => null);
-jest.mock('../E2E/DevE2eNav.jsx', () => () => null);
-jest.mock('../ErrorBoundary/RouteErrorBoundary.jsx', () => ({
+jest.mock('../Navbar/Navbar', () => () => null);
+jest.mock('../MainContent/MainAreaTabs', () => () => null);
+jest.mock('../Onboarding/OnboardingOverlay', () => () => null);
+jest.mock('../Footer/Footer', () => () => null);
+jest.mock('../UserPage/SimUserPage', () => () => null);
+jest.mock('../Shared/LazyFallback', () => () => null);
+jest.mock('../E2E/DevE2eNav', () => () => null);
+jest.mock('../ErrorBoundary/RouteErrorBoundary', () => ({
   __esModule: true,
   default: ({ children }) => children,
 }));
 
-jest.mock('../Admin/AdminPage.jsx', () => {
+jest.mock('../Admin/AdminPage', () => {
   const React = require('react');
   return {
     __esModule: true,
@@ -58,7 +58,7 @@ jest.mock('../Admin/AdminPage.jsx', () => {
   };
 });
 
-jest.mock('../Sponsor/SponsorPage.jsx', () => {
+jest.mock('../Sponsor/SponsorPage', () => {
   const React = require('react');
   return {
     __esModule: true,
@@ -74,7 +74,7 @@ jest.mock('../Sponsor/SponsorPage.jsx', () => {
   };
 });
 
-jest.mock('../Sessions/SessionWizard.jsx', () => {
+jest.mock('../Sessions/SessionWizard', () => {
   const React = require('react');
   return {
     __esModule: true,
@@ -93,7 +93,7 @@ jest.mock('../Sessions/SessionWizard.jsx', () => {
   };
 });
 
-jest.mock('../SurveyTool/SurveyPage.jsx', () => {
+jest.mock('../SurveyTool/SurveyPage', () => {
   const React = require('react');
   return {
     __esModule: true,
@@ -109,7 +109,7 @@ jest.mock('../SurveyTool/SurveyPage.jsx', () => {
   };
 });
 
-jest.mock('../DocumentLibrary/SessionDocumentsPage.jsx', () => {
+jest.mock('../DocumentLibrary/SessionDocumentsPage', () => {
   const React = require('react');
   return {
     __esModule: true,
@@ -125,7 +125,7 @@ jest.mock('../DocumentLibrary/SessionDocumentsPage.jsx', () => {
   };
 });
 
-jest.mock('../OnePageSession/OnePageSession.jsx', () => {
+jest.mock('../OnePageSession/OnePageSession', () => {
   const React = require('react');
   return {
     __esModule: true,
@@ -140,7 +140,7 @@ jest.mock('../OnePageSession/OnePageSession.jsx', () => {
   };
 });
 
-jest.mock('../SBTs/SBTPage.jsx', () => {
+jest.mock('../SBTs/SBTPage', () => {
   const React = require('react');
   return {
     __esModule: true,
@@ -156,7 +156,7 @@ jest.mock('../SBTs/SBTPage.jsx', () => {
   };
 });
 
-jest.mock('../SBTs/SBTsList.jsx', () => {
+jest.mock('../SBTs/SBTsList', () => {
   const React = require('react');
   return {
     __esModule: true,
@@ -172,7 +172,7 @@ jest.mock('../SBTs/SBTsList.jsx', () => {
   };
 });
 
-jest.mock('../UserPage/CompareAddresses.jsx', () => {
+jest.mock('../UserPage/CompareAddresses', () => {
   const React = require('react');
   return {
     __esModule: true,
@@ -186,7 +186,7 @@ jest.mock('../UserPage/CompareAddresses.jsx', () => {
   };
 });
 
-jest.mock('../TagPage/TagPage.jsx', () => {
+jest.mock('../TagPage/TagPage', () => {
   const React = require('react');
   return {
     __esModule: true,
@@ -202,7 +202,7 @@ jest.mock('../TagPage/TagPage.jsx', () => {
   };
 });
 
-jest.mock('../DebateMap/DebateMap.jsx', () => {
+jest.mock('../DebateMap/DebateMap', () => {
   const React = require('react');
   return {
     __esModule: true,

@@ -4,7 +4,8 @@ import path from 'path';
 import React from 'react';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { ethers } from 'ethers';
-import OnePageSession from './OnePageSession.jsx';
+import { MemoryRouter } from 'react-router-dom';
+import OnePageSession from './OnePageSession';
 import styles from './OnePageSession.module.scss';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import contractScripts from '../../utilities/web3/contractScripts.js';
@@ -55,7 +56,7 @@ const extractMediaBlock = (scss, query, requiredSnippet = '') => {
   return null;
 };
 
-jest.mock('../SurveyTool/SurveyPage.jsx', () => (props) => {
+jest.mock('../SurveyTool/SurveyPage', () => (props) => {
   mockSurveyPage(props);
   if (props.minifiedMode === 'pile') {
     return (
@@ -69,7 +70,7 @@ jest.mock('../SurveyTool/SurveyPage.jsx', () => (props) => {
   return <div data-testid="survey-page-full">Full Questions</div>;
 });
 
-jest.mock('../SBTs/SBTsPage.jsx', () => (props) => {
+jest.mock('../SBTs/SBTsPage', () => (props) => {
   mockSBTsPage(props);
   return (
     <div data-testid="sbts-page">
@@ -77,7 +78,7 @@ jest.mock('../SBTs/SBTsPage.jsx', () => (props) => {
     </div>
   );
 });
-jest.mock('../PolisReport/PolisReport.jsx', () => (props) => {
+jest.mock('../PolisReport/PolisReport', () => (props) => {
   mockPolisReport(props);
   return <div data-testid="polis-report">Polis</div>;
 });
@@ -101,10 +102,42 @@ jest.mock('../MainContent/RiskMatrix', () => ({
   __esModule: true,
   default: (props) => {
     mockRiskMatrix(props);
-    return <div data-testid="risk-matrix-view">Risk Matrix</div>;
+    return (
+      <div data-testid="risk-matrix-view">
+        Risk Matrix
+        {typeof props.onOpenAtlasNode === 'function' ? (
+          <button
+            type="button"
+            data-testid="risk-matrix-open-atlas-node"
+            onClick={() => props.onOpenAtlasNode(
+              '0x4110000000000000000000000000000000000000000000000000000000000000',
+              {
+                modal: true,
+                selectedCellId: 'Capabilities_vs_Labor',
+                activeCategoryX: 'Capabilities',
+                activeCategoryY: 'Labor',
+                comment: 'Return here after checking the atlas node.',
+                valence: 'risk',
+                intensity: 6,
+                comments: [
+                  {
+                    cell: 'Capabilities.Reasoning.Labor.Productivity',
+                    comment: 'Capability gains can compress reporting, research, and drafting cycles.',
+                    valence: 'opportunity',
+                    intensity: 5,
+                  },
+                ],
+              }
+            )}
+          >
+            Open linked atlas node
+          </button>
+        ) : null}
+      </div>
+    );
   },
 }));
-jest.mock('../DemoViews/DemoAnalysis/DemoAnalysisWorkspace.jsx', () => ({
+jest.mock('../DemoViews/DemoAnalysis/DemoAnalysisWorkspace', () => ({
   __esModule: true,
   default: (props) => {
     mockDemoAnalysisWorkspace(props);
@@ -199,7 +232,7 @@ describe('OnePageSession view gating', () => {
     expect(screen.queryByTestId('survey-page-full')).not.toBeInTheDocument();
   });
 
-  it('uses the title container slot to reserve pile submit rail space when the embedded pile signals visibility', async () => {
+  it('uses the title container slot to keep the pile submit rail off the header title', async () => {
     render(<OnePageSession {...buildProps()} />);
 
     expect(await screen.findByTestId('survey-page-pile')).toBeInTheDocument();
@@ -224,7 +257,7 @@ describe('OnePageSession view gating', () => {
     expect(titleContainer).not.toHaveClass(styles.titleContainerWithPileSubmitRail);
   });
 
-  it('applies pile submit rail title offsets only on phone and widescreen layouts', () => {
+  it('applies pile submit rail title offsets only on pile top-rail breakpoints', () => {
     const scss = fs.readFileSync(path.join(__dirname, 'OnePageSession.module.scss'), 'utf8');
     const phoneRailBlock = extractMediaBlock(
       scss,
@@ -243,15 +276,18 @@ describe('OnePageSession view gating', () => {
     );
     const tabletRailBlock = extractMediaBlock(
       scss,
-      '@media only screen and (max-width: 600px)',
+      '@media only screen and (min-width: 481px) and (max-width: 768px)',
       '.titleContainerWithPileSubmitRail'
     );
 
+    expect(scss).toContain('.brandingSectionWithPileSubmitRail');
+    expect(scss).toContain('.titleContainerWithPileSubmitRail');
     expect(phoneRailBlock).toContain('.titleContainerWithPileSubmitRail');
-    expect(phoneRailBlock).toContain('transform: translateY(-44px);');
-    expect(desktopRailBlock).toBeNull();
+    expect(phoneRailBlock).toContain('transform: translateY(-40px);');
+    expect(desktopRailBlock).toContain('.titleContainerWithPileSubmitRail');
+    expect(desktopRailBlock).toContain('transform: translateY(-40px);');
     expect(widescreenRailBlock).toContain('.titleContainerWithPileSubmitRail');
-    expect(widescreenRailBlock).toContain('transform: translateY(-80px);');
+    expect(widescreenRailBlock).toContain('transform: translateY(-52px);');
     expect(tabletRailBlock).toBeNull();
   });
 
@@ -861,11 +897,13 @@ describe('OnePageSession view gating', () => {
     const props = buildProps();
 
     render(
-      <OnePageSession
-        {...props}
-        slug="demo"
-        sessionConfig={{ ...props.sessionConfig, slug: 'demo' }}
-      />
+      <MemoryRouter initialEntries={['/session/demo']}>
+        <OnePageSession
+          {...props}
+          slug="demo"
+          sessionConfig={{ ...props.sessionConfig, slug: 'demo' }}
+        />
+      </MemoryRouter>
     );
 
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
@@ -887,11 +925,13 @@ describe('OnePageSession view gating', () => {
     const props = buildProps();
 
     render(
-      <OnePageSession
-        {...props}
-        slug="demo"
-        sessionConfig={{ ...props.sessionConfig, slug: 'demo' }}
-      />
+      <MemoryRouter initialEntries={['/session/demo']}>
+        <OnePageSession
+          {...props}
+          slug="demo"
+          sessionConfig={{ ...props.sessionConfig, slug: 'demo' }}
+        />
+      </MemoryRouter>
     );
 
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
@@ -910,18 +950,74 @@ describe('OnePageSession view gating', () => {
     expect(riskMatrixCalls.length).toBeGreaterThan(0);
     expect(riskMatrixCalls[riskMatrixCalls.length - 1]).toMatchObject({
       embedded: true,
+      onOpenAtlasNode: expect.any(Function),
+      onRestoreApplied: expect.any(Function),
     });
+  });
+
+  it('opens linked atlas nodes from the embedded risk matrix and returns to risk matrix when the atlas modal closes', async () => {
+    const props = buildProps();
+
+    render(
+      <MemoryRouter initialEntries={['/session/demo']}>
+        <OnePageSession
+          {...props}
+          slug="demo"
+          sessionConfig={{ ...props.sessionConfig, slug: 'demo' }}
+        />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Risk Matrix/i })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /Risk Matrix/i }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('risk-matrix-view')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId('risk-matrix-open-atlas-node'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('ai-policy-atlas')).toBeInTheDocument();
+    });
+
+    const atlasCalls = mockDebateMap.mock.calls.map((args) => args[0]).filter(Boolean);
+    expect(atlasCalls[atlasCalls.length - 1]).toMatchObject({
+      embedded: true,
+      requestedModalNodeId: '0x4110000000000000000000000000000000000000000000000000000000000000',
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close Atlas Modal' }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('risk-matrix-view')).toBeInTheDocument();
+    });
+
+    const riskMatrixCalls = mockRiskMatrix.mock.calls.map((args) => args[0]).filter(Boolean);
+    expect(riskMatrixCalls.some((props) => (
+      props?.restoreState?.modal === true
+      && props?.restoreState?.selectedCellId === 'Capabilities_vs_Labor'
+      && props?.restoreState?.comment === 'Return here after checking the atlas node.'
+    ))).toBe(true);
+    expect(screen.queryByTestId('ai-policy-atlas')).not.toBeInTheDocument();
   });
 
   it('restores the one-page session view after closing an atlas node opened from Context', async () => {
     const props = buildProps();
 
     render(
-      <OnePageSession
-        {...props}
-        slug="demo"
-        sessionConfig={{ ...props.sessionConfig, slug: 'demo' }}
-      />
+      <MemoryRouter initialEntries={['/session/demo']}>
+        <OnePageSession
+          {...props}
+          slug="demo"
+          sessionConfig={{ ...props.sessionConfig, slug: 'demo' }}
+        />
+      </MemoryRouter>
     );
 
     expect(await screen.findByTestId('survey-page-pile')).toBeInTheDocument();

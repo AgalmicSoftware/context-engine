@@ -1,0 +1,400 @@
+import { toStr } from '../../utilities/shared/primitives.js';
+import { CLOUDFLARE_WORKER_BUNDLE_URL } from '../../variables/appConfig.js';
+import {
+  hasSponsoredBundleFields,
+  normalizeSparseSponsoredBundlePayload,
+} from '../../utilities/arweave/sponsoredBundles.js';
+import { normalizeWorkerUrl as normalizeWorkerAuthUrl } from '../../utilities/worker/workerAuth.js';
+import type { AnyRecord } from '../shellTypes';
+
+export const LOCAL_WORKER_BUNDLE_FALLBACK_FILE_PATH = '/dist/sessionCorsWorker.bundle.js';
+export const CLOUDFLARE_MISSING_HANDLER_ERROR = 'no registered event handlers';
+export const DEPLOY_HELPER_BUNDLE_FETCH_ERROR = 'failed to fetch bundle';
+
+export const getSessionWizardNormalModeBundleUrlOverrideValidationError = (value: unknown = ''): string => {
+  const raw = toStr(value).trim();
+  if (!raw) return '';
+  try {
+    const parsed = new URL(raw);
+    if (parsed.protocol !== 'https:') {
+      return 'Manual bundle URL override must use an https:// URL.';
+    }
+  } catch (_) {
+    return 'Manual bundle URL override must use an https:// URL.';
+  }
+  return '';
+};
+
+const getValidSessionWizardNormalModeBundleUrlOverride = (value: unknown = ''): string => (
+  getSessionWizardNormalModeBundleUrlOverrideValidationError(value)
+    ? ''
+    : toStr(value).trim()
+);
+
+const resolveSponsoredBundleBootstrapWorkerUrl = (bundle: AnyRecord = {}): string => normalizeWorkerAuthUrl(toStr(
+  bundle?.bootstrapWorkerUrl ||
+  bundle?.meta?.sourceWorkerUrl ||
+  ''
+).trim());
+
+export const resolveSessionWizardShouldAutoDeployWorker = ({
+  workerMode = 'default',
+  sponsoredAutoDeployReady = false,
+  deployComplete = false,
+}: {
+  workerMode?: unknown;
+  sponsoredAutoDeployReady?: boolean;
+  deployComplete?: boolean;
+} = {}) => (
+  toStr(workerMode).trim() !== 'default' &&
+  sponsoredAutoDeployReady &&
+  !deployComplete
+);
+
+export const buildSessionWizardPublishPlan = ({
+  shouldAutoDeployWorker = false,
+  hasPendingDrafts = false,
+  hasManualMetadata = false,
+}: {
+  shouldAutoDeployWorker?: boolean;
+  hasPendingDrafts?: boolean;
+  hasManualMetadata?: boolean;
+} = {}) => {
+  const steps: string[] = [];
+  if (shouldAutoDeployWorker) steps.push('deploy-worker');
+  if (hasPendingDrafts) steps.push('deploy-sbts');
+  if (!hasManualMetadata) steps.push('upload-metadata');
+  steps.push('register-session');
+  steps.push('done');
+  return steps;
+};
+
+export const resolveSessionWizardBundleUrlForMode = ({
+  wizardMode = 'advanced',
+  bundleUrl = '',
+  normalModeBundleUrlOverride = '',
+  normalModeDefaultBundleUrl = CLOUDFLARE_WORKER_BUNDLE_URL,
+}: {
+  wizardMode?: string;
+  bundleUrl?: unknown;
+  normalModeBundleUrlOverride?: unknown;
+  normalModeDefaultBundleUrl?: unknown;
+} = {}) => {
+  const normalizedBundleUrl = toStr(bundleUrl).trim();
+  if (wizardMode !== 'normal') return normalizedBundleUrl;
+  const normalizedNormalModeBundleUrlOverride = getValidSessionWizardNormalModeBundleUrlOverride(
+    normalModeBundleUrlOverride
+  );
+  return normalizedNormalModeBundleUrlOverride ||
+    toStr(normalModeDefaultBundleUrl).trim();
+};
+
+export const resolveSponsoredBundleDeployReadiness = ({
+  wizardMode = 'advanced',
+  sponsoredBundle = {},
+  deployForm = {},
+  workerSecretsEnabled = true,
+  missingWorkerSecrets = [],
+  hasBundleFile = false,
+  normalModeBundleUrlOverride = '',
+  normalModeDefaultBundleUrl = CLOUDFLARE_WORKER_BUNDLE_URL,
+}: {
+  wizardMode?: string;
+  sponsoredBundle?: AnyRecord;
+  deployForm?: AnyRecord;
+  workerSecretsEnabled?: boolean;
+  missingWorkerSecrets?: unknown[];
+  hasBundleFile?: boolean;
+  normalModeBundleUrlOverride?: unknown;
+  normalModeDefaultBundleUrl?: unknown;
+} = {}) => {
+  const normalizedBundle = normalizeSparseSponsoredBundlePayload(sponsoredBundle) as AnyRecord;
+  const hasAppliedSponsoredBundle = hasSponsoredBundleFields(normalizedBundle);
+  const workerName = toStr(deployForm?.workerName || '').trim();
+  const bundleUrl = resolveSessionWizardBundleUrlForMode({
+    wizardMode,
+    bundleUrl: deployForm?.bundleUrl,
+    normalModeBundleUrlOverride,
+    normalModeDefaultBundleUrl,
+  });
+  const hasWorkerBundleSource = !!bundleUrl || !!hasBundleFile;
+  const bootstrapWorkerUrl = resolveSponsoredBundleBootstrapWorkerUrl(normalizedBundle);
+  const deployGrantToken = toStr(normalizedBundle?.deployGrantToken || '').trim();
+  const normalizedMissingWorkerSecrets = Array.isArray(missingWorkerSecrets)
+    ? missingWorkerSecrets.map((value) => toStr(value).trim()).filter(Boolean)
+    : [];
+  const missing: string[] = [];
+  if (!hasAppliedSponsoredBundle) missing.push('Sponsored bundle');
+  if (!workerSecretsEnabled) missing.push('Worker secrets mode');
+  if (!workerName) missing.push('Worker name');
+  if (!bootstrapWorkerUrl) missing.push('Bootstrap worker URL');
+  if (!deployGrantToken) missing.push('Deploy grant token');
+  if (!hasWorkerBundleSource) missing.push('Worker bundle URL');
+  missing.push(...normalizedMissingWorkerSecrets);
+  return {
+    active: hasAppliedSponsoredBundle,
+    ready: hasAppliedSponsoredBundle && missing.length === 0,
+    missing,
+  };
+};
+
+export const buildSessionWizardPublishStepNumbers = (options: AnyRecord = {}): Record<string, number> => (
+  buildSessionWizardPublishPlan(options).reduce<Record<string, number>>((acc, stepKey, index) => {
+    acc[stepKey] = index + 1;
+    return acc;
+  }, {})
+);
+
+export const resolveSessionWizardSponsoredAutoDeployReadiness = ({
+  wizardMode = 'advanced',
+  sponsoredBundle = {},
+  deployForm = {},
+  workerSecretsEnabled = true,
+  currentWorkerSecrets = {},
+  getMissingWorkerSecretsForDeploy = () => [],
+  hasBundleFile = false,
+  normalModeBundleUrlOverride = '',
+  normalModeDefaultBundleUrl = CLOUDFLARE_WORKER_BUNDLE_URL,
+}: {
+  wizardMode?: string;
+  sponsoredBundle?: AnyRecord;
+  deployForm?: AnyRecord;
+  workerSecretsEnabled?: boolean;
+  currentWorkerSecrets?: AnyRecord;
+  getMissingWorkerSecretsForDeploy?: ((secretsSnapshot?: AnyRecord) => string[]) | null;
+  hasBundleFile?: boolean;
+  normalModeBundleUrlOverride?: unknown;
+  normalModeDefaultBundleUrl?: unknown;
+} = {}) => {
+  const resolveMissingWorkerSecrets = (
+    typeof getMissingWorkerSecretsForDeploy === 'function'
+      ? getMissingWorkerSecretsForDeploy
+      : () => []
+  );
+  return resolveSponsoredBundleDeployReadiness({
+    wizardMode,
+    sponsoredBundle,
+    deployForm,
+    workerSecretsEnabled,
+    missingWorkerSecrets: workerSecretsEnabled
+      ? resolveMissingWorkerSecrets(currentWorkerSecrets)
+      : [],
+    hasBundleFile,
+    normalModeBundleUrlOverride,
+    normalModeDefaultBundleUrl,
+  });
+};
+
+const looksLikeHtmlDocument = (value: unknown = ''): boolean => {
+  const preview = toStr(value).trim().slice(0, 256).toLowerCase();
+  return (
+    preview.startsWith('<!doctype html') ||
+    preview.startsWith('<html') ||
+    preview.includes('<head') ||
+    preview.includes('<body')
+  );
+};
+
+const looksLikeWorkerBundleText = (value: unknown = ''): boolean => {
+  const normalized = toStr(value).trim();
+  if (!normalized) return false;
+  return (
+    normalized.includes('fetch(') && (
+      normalized.includes('export default') ||
+      normalized.includes('export {') ||
+      normalized.includes(' as default')
+    )
+  );
+};
+
+const looksLikeWrappedWorkerBundleStringModule = (value: unknown = ''): boolean => {
+  const normalized = toStr(value).trim();
+  if (!normalized) return false;
+  return (
+    /^export\s+default\s+["'`]/.test(normalized) ||
+    /^module\.exports\s*=\s*["'`]/.test(normalized)
+  );
+};
+
+export const readSessionWizardBundleFileText = async (
+  bundleFile: File | null | undefined,
+  emptyError = `Selected worker bundle file was empty. Choose ${LOCAL_WORKER_BUNDLE_FALLBACK_FILE_PATH} and retry.`
+): Promise<string> => {
+  const rawBundleText = toStr(bundleFile ? await bundleFile.text() : '');
+  const normalizedBundleText = rawBundleText.trim();
+  if (!normalizedBundleText) {
+    throw new Error(emptyError);
+  }
+  if (looksLikeHtmlDocument(normalizedBundleText)) {
+    throw new Error(
+      `Selected worker bundle file resolved to HTML instead of a worker script. Choose ${LOCAL_WORKER_BUNDLE_FALLBACK_FILE_PATH} and retry.`
+    );
+  }
+  if (looksLikeWrappedWorkerBundleStringModule(normalizedBundleText)) {
+    throw new Error(
+      `Selected worker bundle file resolved to a JavaScript string wrapper instead of raw worker bytes. Choose ${LOCAL_WORKER_BUNDLE_FALLBACK_FILE_PATH} and retry.`
+    );
+  }
+  if (!looksLikeWorkerBundleText(normalizedBundleText)) {
+    throw new Error(
+      `Selected worker bundle file is missing the expected worker module export. Choose ${LOCAL_WORKER_BUNDLE_FALLBACK_FILE_PATH} and retry.`
+    );
+  }
+  return rawBundleText;
+};
+
+export const resolveSessionWizardDeployBundleMode = ({
+  wizardMode = 'normal',
+  bundleMode = 'upload',
+  bundleUrl = '',
+  sponsoredAutoDeployReady = false,
+  forceSponsoredAutoDeploy = false,
+  forceManualBundleFile = false,
+  hasBundleFile = false,
+  normalModeBundleUrlOverride = '',
+  normalModeDefaultBundleUrl = CLOUDFLARE_WORKER_BUNDLE_URL,
+}: {
+  wizardMode?: string;
+  bundleMode?: string;
+  bundleUrl?: unknown;
+  sponsoredAutoDeployReady?: boolean;
+  forceSponsoredAutoDeploy?: boolean;
+  forceManualBundleFile?: boolean;
+  hasBundleFile?: boolean;
+  normalModeBundleUrlOverride?: unknown;
+  normalModeDefaultBundleUrl?: unknown;
+} = {}) => {
+  const hasHostedNormalModeBundleUrl = !!toStr(normalModeDefaultBundleUrl).trim();
+  const hasResolvedNormalModeBundleUrl = !!resolveSessionWizardBundleUrlForMode({
+    wizardMode: 'normal',
+    bundleUrl,
+    normalModeBundleUrlOverride,
+    normalModeDefaultBundleUrl,
+  });
+  return (
+    (wizardMode === 'normal' && hasBundleFile && (forceManualBundleFile || !hasHostedNormalModeBundleUrl))
+      ? 'upload'
+      : (wizardMode === 'normal' && forceSponsoredAutoDeploy)
+        ? 'url'
+        : (wizardMode === 'normal' && sponsoredAutoDeployReady)
+          ? 'url'
+          : (wizardMode === 'normal')
+            ? (hasResolvedNormalModeBundleUrl ? 'url' : 'upload')
+            : bundleMode
+  );
+};
+
+export const resolveSessionWizardDeployBundlePayload = async ({
+  effectiveBundleMode = 'upload',
+  bundleFile = null,
+  bundleUrl = '',
+}: {
+  effectiveBundleMode?: string;
+  bundleFile?: File | null;
+  bundleUrl?: unknown;
+} = {}) => {
+  if (effectiveBundleMode === 'upload') {
+    const bundleText = bundleFile
+      ? await readSessionWizardBundleFileText(bundleFile, 'Selected worker bundle file was empty.')
+      : '';
+    return {
+      bundleText,
+      bundleUrl: undefined,
+      bundleSource: bundleText ? 'upload' : 'upload-missing',
+    };
+  }
+
+  const normalizedBundleUrl = toStr(bundleUrl).trim() || undefined;
+  return {
+    bundleText: '',
+    bundleUrl: normalizedBundleUrl,
+    bundleSource: normalizedBundleUrl ? 'url' : 'url-missing',
+  };
+};
+
+const hasSessionWizardBundleDiagnostics = (bundleDiagnostics: unknown = null): boolean => (
+  !!bundleDiagnostics &&
+  typeof bundleDiagnostics === 'object' &&
+  Object.keys(bundleDiagnostics).length > 0
+);
+
+const isSessionWizardRemoteBundleUrlFetchFailure = ({
+  err,
+  effectiveBundleMode = 'upload',
+}: {
+  err?: AnyRecord | null;
+  effectiveBundleMode?: string;
+} = {}) => {
+  if (effectiveBundleMode !== 'url') {
+    return false;
+  }
+  const combined = `${toStr(err?.message).trim()} ${toStr(err?.responseError).trim()}`.toLowerCase();
+  return combined.includes(DEPLOY_HELPER_BUNDLE_FETCH_ERROR);
+};
+
+const isSessionWizardRemoteBundleUrlMissingHandlerFailure = ({
+  err,
+  effectiveBundleMode = 'upload',
+}: {
+  err?: AnyRecord | null;
+  effectiveBundleMode?: string;
+} = {}) => {
+  if (effectiveBundleMode !== 'url') {
+    return false;
+  }
+  const combined = `${toStr(err?.message).trim()} ${toStr(err?.responseError).trim()}`.toLowerCase();
+  return combined.includes(CLOUDFLARE_MISSING_HANDLER_ERROR) &&
+    hasSessionWizardBundleDiagnostics(err?.responseBundleDiagnostics);
+};
+
+export const shouldForceSessionWizardNormalModeManualBundleRetry = ({
+  err,
+  wizardMode = 'normal',
+  effectiveBundleMode = 'upload',
+  hasBundleFile = false,
+}: {
+  err?: AnyRecord | null;
+  wizardMode?: string;
+  effectiveBundleMode?: string;
+  hasBundleFile?: boolean;
+} = {}) => (
+  wizardMode === 'normal' &&
+  !hasBundleFile &&
+  (
+    isSessionWizardRemoteBundleUrlFetchFailure({
+      err,
+      effectiveBundleMode,
+    }) ||
+    isSessionWizardRemoteBundleUrlMissingHandlerFailure({
+      err,
+      effectiveBundleMode,
+    })
+  )
+);
+
+export const getSessionWizardPublishProgressPercent = ({
+  publishStep = 0,
+  publishBusy = false,
+  totalSteps = 0,
+  elapsedMs = 0,
+}: {
+  publishStep?: number;
+  publishBusy?: boolean;
+  totalSteps?: number;
+  elapsedMs?: number;
+} = {}) => {
+  const steps = Math.max(0, Number(totalSteps || 0));
+  const currentStep = Math.max(0, Number(publishStep || 0));
+  if (!steps || currentStep <= 0) return 0;
+  const clampedStep = Math.min(currentStep, steps);
+  const stepSize = 100 / steps;
+  if (!publishBusy) {
+    return Math.min(100, Math.max(0, clampedStep * stepSize));
+  }
+  const base = Math.max(0, (clampedStep - 1) * stepSize);
+  const cap = clampedStep >= steps ? 100 : base + (stepSize * 0.82);
+  const durationMs = 2600;
+  const ratio = Math.max(0, Math.min(1, Number(elapsedMs || 0) / durationMs));
+  const eased = 1 - Math.pow(1 - ratio, 2);
+  return Math.min(99, Math.max(base + (stepSize * 0.18), base + ((cap - base) * eased)));
+};

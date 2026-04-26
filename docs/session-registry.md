@@ -24,6 +24,22 @@ Rationale:
 - `/auth/login` already evaluates contract gates and then mints a short-lived token; duplicating gates in metadata gives minimal auth-path performance benefit while adding consistency risk.
 - New session metadata writes remove authoritative gate fields so gate updates do not require metadata re-upload.
 
+## Authority Matrix
+
+The registry migration has several authority boundaries that should stay explicit during staged rollout:
+
+| Concern | Authoritative Source | Compatibility / Fallback | Notes |
+|---|---|---|---|
+| Session identity (`slug`, `sessionId`, registry chain) | `SessionRegistry` | Demo config only while off-chain/demo fallback remains enabled | New writes should use a canonical registry slug; legacy exact-byte sessions remain readable through compatibility lookups until migration proves safe. |
+| Resource gates (`default`, `questionResponses`, `surveyResponses`, `docUploads`, `docUrls`, `ai`, `arweave`, `rpc`, `txGas`, `lit`) | `SessionRegistry` | None for auth decisions | Arweave metadata can carry UI defaults, but must not override on-chain gate authority. |
+| Faucet eligibility | `SessionRegistry` `txGas` resource gate | Future fallback resources must be explicit, documented, and fail closed | Current low-risk target is `txGas` first, with any broader fallback requiring opt-in semantics and tests. |
+| Registry and contract address discovery | Runtime override / verified discovery, then bundled fallback | Bundled `SESSION_REGISTRY_ADDRESSES` and `SESSION_CONTRACTS_BY_CHAIN` stay as compatibility fallback | Discovery should be observable before it becomes required; stale bundled defaults should not be treated as the permanent source of truth. |
+| Worker config and secrets | Worker KV / worker secret store | Browser-local overrides only for local developer preferences | Worker runtime config is operational, not gate authority. Secrets must not flow through Arweave metadata. |
+
+The code-level read-only companion for these rows is
+`client/src/utilities/session/sessionAuthorityMatrix.ts`. Keep this document and
+that matrix aligned when changing authority or fallback semantics.
+
 ## On‑Chain: SessionRegistry.sol
 
 The registry stores minimal, updateable session facts:
@@ -93,7 +109,7 @@ frontend can rehydrate it easily. Suggested structure:
   "defaultSbtTags": "",
   "defaultFilterState": null,
   "defaultFeaturedSBTs": [],
-  "autoFeatureSBTsWithFeaturedSbtTags": false,
+  "autoFeatureSBTsBySessionSlug": false,
   "HIGHLIGHTED_QUESTION_IDS": [],
   "BLOCKED_QUESTION_IDS": [],
   "HIGHLIGHTED_SURVEY_IDS": [],
@@ -154,9 +170,10 @@ Notes:
 - `blockLimits.start` should be set for any real session.
   - Missing/invalid `blockLimits.start` is treated as a configuration error in current code; there is no implicit scan-from-zero fallback.
   - Do not hardcode chain-specific "start blocks" in code; keep them in session config / registry metadata.
-- `autoFeatureSBTsWithFeaturedSbtTags` keeps its legacy field name for compatibility, but its current meaning is:
+- `autoFeatureSBTsBySessionSlug` controls session-slug auto-feature behavior:
   when `true`, Groups featured strips auto-feature SBTs whose metadata authoritatively declares a matching `sessionSlug` for that session slug.
   Manual `defaultFeaturedSBTs` / `featured_SBTs_LIST` entries are still included, and in selected-session `list` scope the featured strip aggregates across the listed sessions while respecting each session's own toggle.
+- The legacy `autoFeatureSBTsWithFeaturedSbtTags` key is still supported as a deprecated read alias.
 - `/session/:slug` now also kicks off active-session light SBT discovery after the partial featured-metadata pass.
   This lets the embedded Groups strip and concrete session SBT views populate from the session page itself instead of depending on a prior `/sbts` visit.
 
@@ -175,7 +192,7 @@ Wizard UX notes:
 - `/session/new` now stores a provider per model (`ai.models.fast.provider`, `ai.models.thinking.provider`).
 - The wizard no longer writes AI/RPC/Arweave/faucet secrets into metadata.
 - The wizard no longer writes authoritative gate fields (`sponsored`, `sponsoredSbtAddress`) into metadata; resource gates are written on-chain during session registration.
-- In `/session/new`, `autoFeatureSBTsWithFeaturedSbtTags` means "auto-feature SBTs whose metadata authoritatively declares a matching `sessionSlug` for this session slug"; the legacy field name is preserved for compatibility, and the session can also contribute those SBTs to the shared featured strip when selected-session scope is `list`.
+- In `/session/new`, `autoFeatureSBTsBySessionSlug` means "auto-feature SBTs whose metadata authoritatively declares a matching `sessionSlug` for this session slug"; the session can also contribute those SBTs to the shared featured strip when selected-session scope is `list`.
 - In `/session/new`, new session drafts seed `defaultSbtTags` with `group, event, idea, demographic, location`.
 - In `/session/new`, new session drafts seed OpenAI `gpt-5` for both fast/thinking models and set `ai.reasoningEffort` to `low`.
 - Session metadata now uses `sessionName`/`sessionInfo`/`sessionInfoEncrypted`/`sessionHeaderImg` as canonical keys; legacy `org*` aliases are not consumed in `/session/new`.
@@ -197,6 +214,7 @@ Wizard UX notes:
 - If secrets sync hits `Admin authorization failed` during deploy, the wizard now auto-runs signed `/admin/set-config` once and retries secrets sync before surfacing status.
 - The non-fatal "deploy-helper already wrote secrets" note is now shown only when deploy-helper explicitly reports `writesSessionSecrets: true` in its `/deploy` response.
 - Deploy-helper payloads map an empty slug to `general` for worker deployment.
+- New registry writes validate the canonical slug before wallet signing. The client trims/lowercases the slug, maps empty/default input to `general`, and rejects non-canonical characters or reserved internal slugs.
 - Advanced `/session/new` worker settings now expose a deploy-time `embedded deploy-helper` toggle (default comes from `REACT_APP_CE_DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED`, fallback `true`). It maps to the worker's `DEPLOY_HELPER_ENABLED` binding during deployment and is mirrored into worker config for frontend hydration, but changing Worker KV config later does not change the runtime binding.
 - Sponsored deploy grants now require embedded deploy-helper on the sponsoring worker. The raw Cloudflare API token stays in the sponsoring worker's server-side grant record, while the encrypted sponsored bundle carries only the resulting deploy grant token plus bootstrap worker context; grants no longer snapshot Cloudflare account ID or a standalone helper URL.
 - Worker `/ai` provider selection now resolves from explicit `provider` first, then infers from `model` (`gpt-*`/`o*` => OpenAI, `claude*` => Anthropic), and otherwise defaults to OpenAI (no Anthropic hard-default).
@@ -263,7 +281,7 @@ Notes:
 - In `/session/new`, if a locked field points to a gate with no SBT addresses, encryption is skipped for that field (value stays plaintext) so metadata upload still works for open/no-gate sessions.
 - Open/general sessions do not require selecting SBTs unless a field is explicitly being Lit-encrypted.
 - Survey/question creation now throws explicit errors when a session is missing `contracts.surveys.address` (instead of returning undefined and causing `receipt` destructure errors in UI).
-- CreateSurvey submit now performs a one-shot registry refresh for the active slug before contract writes when `contracts.surveys.address` is missing, so newly registered sessions are less likely to fail with stale local config.
+- CreateQuestionsAndSurveys submit now performs a one-shot registry refresh for the active slug before contract writes when `contracts.surveys.address` is missing, so newly registered sessions are less likely to fail with stale local config.
 - The app bootstraps registry reads via public RPCs (no PATH)
   even if `USE_ONCHAIN_SESSION_REGISTRY` is false, so SBT addresses + metadata resolve reliably.
   TODO: resolve default registry/contract addresses from `<chainId>.contracts.contextengine.eth`.
@@ -276,7 +294,7 @@ Notes:
 - Other encrypted fields are stored in `encryptedFields` and blanked in place.
 
 QA:
-- Create a session with multiple encryption gates and verify Admin, Database, and CreateSurvey prefill SBTs + mode from the primary gate.
+- Create a session with multiple encryption gates and verify Admin, Database, and CreateQuestionsAndSurveys prefill SBTs + mode from the primary gate.
 
 ## Runtime Mapping
 

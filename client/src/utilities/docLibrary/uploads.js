@@ -3,6 +3,7 @@
 import { arweaveScripts } from '../arweave/arweaveScripts.js';
 import { litStorage } from '../crypto/litProtocol.js';
 import { toStr } from '../shared/primitives.js';
+import { buildPublicUrlPath } from '../ui/publicUrl.js';
 
 export const resolveDocUploadsGate = (sessionConfig) => {
   const gate = sessionConfig?.__registry?.gatesByResource?.docUploads || null;
@@ -38,18 +39,6 @@ const buildTagMap = (tags) => Object.fromEntries(
   normalizeTagsForTagMap(tags).map((tag) => [tag.name, tag.value])
 );
 
-const getConfiguredPublicBasePath = () => {
-  const raw = String(
-    (typeof process !== 'undefined' && process?.env ? process.env.PUBLIC_URL : '') || ''
-  ).trim();
-  if (!raw) return '';
-  try {
-    return String(new URL(raw).pathname || '').trim().replace(/\/+$/, '');
-  } catch (_) {
-    return raw.replace(/\/+$/, '');
-  }
-};
-
 export const buildSessionDocLibraryViewerUrl = ({
   sessionToken,
   txId,
@@ -60,8 +49,7 @@ export const buildSessionDocLibraryViewerUrl = ({
   const token = toStr(sessionToken).trim();
   const id = toStr(txId).trim();
   if (!token || !id) return '';
-  const basePath = getConfiguredPublicBasePath();
-  const pathname = `${basePath}/session/${encodeURIComponent(token)}/docs`;
+  const pathname = buildPublicUrlPath(`/session/${encodeURIComponent(token)}/docs`);
   const query = new URLSearchParams();
   query.set('__ceDocTx', id);
   query.set('__ceDocStorage', toStr(storage).trim() || 'lit-arweave');
@@ -183,7 +171,7 @@ export const uploadDocLibraryFile = async ({
 
   return {
     txId,
-    url: txId ? arweaveScripts.buildArweaveGatewayUrl(txId, 'https://arweave.net') : '',
+    url: txId ? arweaveScripts.buildArweaveGatewayUrl(txId) : '',
     storage: 'arweave',
     kind: 'file',
     tagMap: buildTagMap(normalizedTags),
@@ -242,7 +230,7 @@ export const uploadDocLibraryUrlRecord = async ({
 
   return {
     txId,
-    url: txId ? arweaveScripts.buildArweaveGatewayUrl(txId, 'https://arweave.net') : '',
+    url: txId ? arweaveScripts.buildArweaveGatewayUrl(txId) : '',
     storage: 'arweave',
     kind: 'link',
     tagMap: buildTagMap(normalizedTags),

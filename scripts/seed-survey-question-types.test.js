@@ -11,7 +11,7 @@ const {
 const {
   normalizeRpcUrl,
   resolveRpcRewriteConfig,
-} = require('./seed-survey-question-types.js');
+} = require('./lib/rpc-rewrite-config.js');
 
 test('resolveRpcRewriteConfig uses OP Sepolia defaults when no chain override is provided', () => {
   const result = resolveRpcRewriteConfig({ env: {} });

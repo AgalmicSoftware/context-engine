@@ -1,5 +1,5 @@
 /** @file UserPage.test.jsx */
-import UserPage from './UserPage.jsx';
+import UserPage from './UserPage';
 import styles from './UserPage.module.scss';
 import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 import { checkSponsoredAccess } from '../../utilities/web3/sponsoredAccess.js';
@@ -68,6 +68,101 @@ const createDeferred = () => {
   return { promise, resolve, reject };
 };
 
+let analysisCacheTestSeq = 0;
+
+const makeAnalysisCacheInstance = (props = {}) => {
+  analysisCacheTestSeq += 1;
+  const slug = props.activeSessionSlug || `analysis-cache-test-${analysisCacheTestSeq}`;
+  const viewAddress = props.viewAddress || '0x00000000000000000000000000000000000000aa';
+  const networkID = String(props.network?.id || 84532);
+  const instance = makeInstance({
+    activeSessionSlug: slug,
+    viewAddress,
+    network: { id: Number(networkID) },
+    account: '0x00000000000000000000000000000000000000bb',
+    ...props,
+  });
+
+  instance.state = {
+    ...instance.state,
+    username: 'Cache Test User',
+    sbtList: [{
+      sbtInfo: {
+        name: 'Cache Badge',
+        sbtAddress: '0x00000000000000000000000000000000000000cc',
+      },
+    }],
+    questionResponseInfo: [{
+      id: 'q1',
+      type: 'freeform',
+      prompt: 'What should be cached?',
+    }],
+    detailedQuestionResponses: {
+      q1: {
+        answer: { value: 'A deterministic answer' },
+        conviction: 4,
+      },
+    },
+    surveyResponseInfo: [],
+    detailedSurveyResponses: {},
+    questionCreationInfo: [],
+    surveyCreationInfo: [],
+  };
+
+  jest.spyOn(instance, '_getAiSessionSlugCandidates').mockReturnValue([slug]);
+  jest.spyOn(instance, '_getSessionConfigForSlugExact').mockImplementation((candidate) => (
+    candidate === slug
+      ? {
+        slug,
+        ai: {
+          mode: 'openai',
+          models: { thinking: 'gpt-5' },
+          modelProviders: { thinking: 'openai' },
+        },
+      }
+      : null
+  ));
+  checkSponsoredAccess.mockResolvedValue({
+    status: 'no-gate',
+    gate: null,
+    resourceKey: 'ai',
+  });
+
+  return {
+    instance,
+    slug,
+    networkID,
+    addressLower: viewAddress.toLowerCase(),
+  };
+};
+
+const getSingleAnalysisCacheEntry = ({ slug, networkID, addressLower }) => {
+  const cacheObj = cacheScripts.peekCacheSync('analysisCache', slug, { clone: false });
+  const bucket = cacheObj?.[networkID]?.[addressLower] || {};
+  const [[fingerprint, entry] = []] = Object.entries(bucket);
+  return { cacheObj, fingerprint, entry };
+};
+
+const writeSingleAnalysisCacheEntry = async ({
+  slug,
+  networkID,
+  addressLower,
+  fingerprint,
+  entry,
+}) => {
+  const current = cacheScripts.peekCacheSync('analysisCache', slug, { clone: false }) || {};
+  await cacheScripts.writeCache('analysisCache', slug, {
+    ...current,
+    [networkID]: {
+      ...(current[networkID] || {}),
+      [addressLower]: {
+        ...(current[networkID]?.[addressLower] || {}),
+        [fingerprint]: entry,
+      },
+    },
+  });
+};
+
 const REGISTRY_CACHE_KEY = 'dg:sessionRegistryCache:v1';
 
 const collectTreeNodes = (node, predicate, acc = []) => {
@@ -119,6 +214,7 @@ describe('UserPage cache refresh pipeline', () => {
     try { delete globalThis.CE_USER_PROFILE_SCAN_ALL_SESSIONS_QUESTIONS; } catch (_) {}
     try { delete globalThis.CE_SESSION_SCAN_SCOPE; } catch (_) {}
     try { delete globalThis.CE_SESSION_SCAN_SLUGS; } catch (_) {}
+    try { localStorage.removeItem('ce:aiSettings:v1'); } catch (_) {}
     try { localStorage.removeItem('ce:sessionScanScope'); } catch (_) {}
     try { localStorage.removeItem('ce:sessionScanSlugs'); } catch (_) {}
   });
@@ -673,6 +769,188 @@ describe('UserPage cache refresh pipeline', () => {
     );
   });
 
+  it('writes analysisCache after a cache miss calls AI', async () => {
+    const now = 1710000000000;
+    const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(now);
+    const { instance, slug, networkID, addressLower } = makeAnalysisCacheInstance();
+    const result = {
+      summary: 'fresh summary',
+      details: 'fresh details',
+      name: 'Fresh Analysis',
+      historicalAlignment: {
+        figure: 'Ada Lovelace',
+        reasoning: 'Analytical framing.',
+      },
+    };
+    analyzeUserOpinions.mockResolvedValueOnce(result);
+
+    try {
+      await instance.analyzeUser();
+
+      expect(analyzeUserOpinions).toHaveBeenCalledTimes(1);
+      const { fingerprint, entry } = getSingleAnalysisCacheEntry({ slug, networkID, addressLower });
+      expect(fingerprint).toEqual(expect.any(String));
+      expect(entry).toMatchObject({
+        version: 1,
+        fingerprint,
+        cachedAt: now,
+        expiresAt: now + (24 * 60 * 60 * 1000),
+        address: addressLower,
+        networkId: networkID,
+        aiContext: {
+          sessionSlug: slug,
+          provider: 'openai',
+          model: 'gpt-5',
+        },
+        result,
+      });
+      expect(instance.state.analysisServedFromCache).toBe(false);
+      expect(instance.state.analysisCachedAt).toBeNull();
+    } finally {
+      nowSpy.mockRestore();
+    }
+  });
+
+  it('hydrates unchanged analysis input from analysisCache without calling AI', async () => {
+    const cachedAt = 1710000000000;
+    const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(cachedAt);
+    const { instance, slug, networkID, addressLower } = makeAnalysisCacheInstance();
+    analyzeUserOpinions.mockResolvedValueOnce({
+      summary: 'seed summary',
+      details: 'seed details',
+      name: 'Seed Analysis',
+      historicalAlignment: {},
+    });
+
+    try {
+      await instance.analyzeUser();
+      const seeded = getSingleAnalysisCacheEntry({ slug, networkID, addressLower });
+      const cachedResult = {
+        name: 'Cached Analysis',
+        summary: 'cached summary',
+        details: 'cached details',
+        historicalAlignment: {
+          figure: 'Grace Hopper',
+          reasoning: 'Cached reasoning.',
+        },
+      };
+      await writeSingleAnalysisCacheEntry({
+        slug,
+        networkID,
+        addressLower,
+        fingerprint: seeded.fingerprint,
+        entry: {
+          ...seeded.entry,
+          result: cachedResult,
+        },
+      });
+
+      analyzeUserOpinions.mockClear();
+      nowSpy.mockReturnValue(cachedAt + (2 * 60 * 60 * 1000));
+
+      await instance.analyzeUser();
+
+      expect(analyzeUserOpinions).not.toHaveBeenCalled();
+      expect(instance.state.analysisName).toBe('Cached Analysis');
+      expect(instance.state.aiAnalysis).toBe('cached summary');
+      expect(instance.state.analysisDetails).toBe('cached details');
+      expect(instance.state.analysisHistoricalFigure).toBe('Grace Hopper');
+      expect(instance.state.analysisHistoricalReasoning).toBe('Cached reasoning.');
+      expect(instance.state.analysisServedFromCache).toBe(true);
+      expect(instance.state.analysisCachedAt).toBe(cachedAt);
+    } finally {
+      nowSpy.mockRestore();
+    }
+  });
+
+  it('treats expired analysisCache entries as misses', async () => {
+    const cachedAt = 1710000000000;
+    const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(cachedAt);
+    const { instance, slug, networkID, addressLower } = makeAnalysisCacheInstance();
+    analyzeUserOpinions.mockResolvedValueOnce({
+      summary: 'seed summary',
+      details: 'seed details',
+      name: 'Seed Analysis',
+      historicalAlignment: {},
+    });
+
+    try {
+      await instance.analyzeUser();
+      const seeded = getSingleAnalysisCacheEntry({ slug, networkID, addressLower });
+      await writeSingleAnalysisCacheEntry({
+        slug,
+        networkID,
+        addressLower,
+        fingerprint: seeded.fingerprint,
+        entry: {
+          ...seeded.entry,
+          expiresAt: cachedAt - 1,
+        },
+      });
+
+      analyzeUserOpinions.mockClear();
+      analyzeUserOpinions.mockResolvedValueOnce({
+        summary: 'new summary after expiry',
+        details: 'new details after expiry',
+        name: 'Fresh After Expiry',
+        historicalAlignment: {},
+      });
+
+      await instance.analyzeUser();
+
+      expect(analyzeUserOpinions).toHaveBeenCalledTimes(1);
+      expect(instance.state.analysisName).toBe('Fresh After Expiry');
+      expect(instance.state.analysisServedFromCache).toBe(false);
+      const refreshed = getSingleAnalysisCacheEntry({ slug, networkID, addressLower });
+      expect(refreshed.entry.cachedAt).toBe(cachedAt);
+      expect(refreshed.entry.result.summary).toBe('new summary after expiry');
+    } finally {
+      nowSpy.mockRestore();
+    }
+  });
+
+  it('forceRefresh bypasses analysisCache and overwrites the cached entry', async () => {
+    const cachedAt = 1710000000000;
+    const refreshedAt = cachedAt + 5000;
+    const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(cachedAt);
+    const { instance, slug, networkID, addressLower } = makeAnalysisCacheInstance();
+    analyzeUserOpinions.mockResolvedValueOnce({
+      summary: 'seed summary',
+      details: 'seed details',
+      name: 'Seed Analysis',
+      historicalAlignment: {},
+    });
+
+    try {
+      await instance.analyzeUser();
+      const seeded = getSingleAnalysisCacheEntry({ slug, networkID, addressLower });
+
+      analyzeUserOpinions.mockClear();
+      analyzeUserOpinions.mockResolvedValueOnce({
+        summary: 'force refreshed summary',
+        details: 'force refreshed details',
+        name: 'Force Refreshed Analysis',
+        historicalAlignment: {
+          figure: 'Katherine Johnson',
+          reasoning: 'Fresh calculation.',
+        },
+      });
+      nowSpy.mockReturnValue(refreshedAt);
+
+      await instance.analyzeUser(true);
+
+      expect(analyzeUserOpinions).toHaveBeenCalledTimes(1);
+      expect(instance.state.analysisName).toBe('Force Refreshed Analysis');
+      expect(instance.state.analysisServedFromCache).toBe(false);
+      const refreshed = getSingleAnalysisCacheEntry({ slug, networkID, addressLower });
+      expect(refreshed.fingerprint).toBe(seeded.fingerprint);
+      expect(refreshed.entry.cachedAt).toBe(refreshedAt);
+      expect(refreshed.entry.result.summary).toBe('force refreshed summary');
+    } finally {
+      nowSpy.mockRestore();
+    }
+  });
+
   it('prefers in-scope open-gate session over stale cache slugs for analyze routing', async () => {
     const inScopeSlug = 'in-scope-open-session';
     const secondaryScopeSlug = 'in-scope-secondary-session';
@@ -897,8 +1175,7 @@ describe('UserPage cache refresh pipeline', () => {
   });
 
   it('reads bookmarks cache with clone:false and returns detached arrays', () => {
-    const instance = makeInstance();
-    instance.getBookmarksSlug = jest.fn(() => 'edge');
+    const instance = makeInstance({ activeSessionSlug: 'edge' });
     const source = {
       surveys: ['s1'],
       questions: ['q1'],
@@ -920,6 +1197,118 @@ describe('UserPage cache refresh pipeline', () => {
       users: [{ address: '0x1' }],
       filters: ['f1'],
     });
+
+    peekSpy.mockRestore();
+  });
+
+  it('adds a bookmark from the rendered control without opening nickname editing', () => {
+    const viewAddress = '0x00000000000000000000000000000000000000aa';
+    const instance = makeInstance({
+      account: '0x00000000000000000000000000000000000000bb',
+      viewAddress,
+      activeSessionSlug: 'session-a',
+    });
+    const peekSpy = jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue({
+      surveys: [],
+      questions: [],
+      users: [],
+      filters: [],
+    });
+    const writeSpy = jest.spyOn(cacheScripts, 'writeCache').mockResolvedValue(true);
+
+    try {
+      const tree = instance.render();
+      const bookmarkButtons = collectTreeNodes(
+        tree,
+        (node) => node?.type === 'button' && node?.props?.['aria-label'] === 'Bookmark user'
+      );
+
+      expect(bookmarkButtons).toHaveLength(1);
+      expect(() => bookmarkButtons[0].props.onClick()).not.toThrow();
+
+      expect(peekSpy).toHaveBeenCalledWith('bookmarksCache', 'session-a', { clone: false });
+      expect(writeSpy).toHaveBeenCalledWith('bookmarksCache', 'session-a', {
+        surveys: [],
+        questions: [],
+        users: [viewAddress],
+        filters: [],
+      });
+      expect(instance.state.bookmarked).toBe(true);
+      expect(instance.state.isEditingNickname).toBe(false);
+
+      const updatedTree = instance.render();
+      const removeButtons = collectTreeNodes(
+        updatedTree,
+        (node) => node?.type === 'button' && node?.props?.['aria-label'] === 'Remove bookmark'
+      );
+      expect(removeButtons).toHaveLength(1);
+      expect(removeButtons[0].props.style).toEqual({ color: 'yellow' });
+    } finally {
+      peekSpy.mockRestore();
+      writeSpy.mockRestore();
+    }
+  });
+
+  it('falls back to the empty bookmarks slug when no session slug props are present', () => {
+    const viewAddress = '0x00000000000000000000000000000000000000aa';
+    const instance = makeInstance({
+      account: '0x00000000000000000000000000000000000000bb',
+      viewAddress,
+      minimized: true,
+      activeSessionSlug: undefined,
+      sessionSlug: undefined,
+    });
+    const peekSpy = jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue({
+      surveys: [],
+      questions: [],
+      users: [],
+      filters: [],
+    });
+    const writeSpy = jest.spyOn(cacheScripts, 'writeCache').mockResolvedValue(true);
+
+    try {
+      expect(instance.getActiveSessionSlug()).toBe('');
+      expect(() => instance.toggleBookmark()).not.toThrow();
+      expect(writeSpy).toHaveBeenCalledWith('bookmarksCache', '', {
+        surveys: [],
+        questions: [],
+        users: [viewAddress],
+        filters: [],
+      });
+      expect(instance.state.bookmarked).toBe(true);
+    } finally {
+      peekSpy.mockRestore();
+      writeSpy.mockRestore();
+    }
+  });
+
+  it('recognizes existing legacy string and object bookmarks', () => {
+    const viewAddress = '0x00000000000000000000000000000000000000aa';
+    const legacyInstance = makeInstance({ viewAddress });
+    legacyInstance.getBookmarksCache = jest.fn(() => ({
+      surveys: [],
+      questions: [],
+      users: [viewAddress.toUpperCase()],
+      filters: [],
+    }));
+
+    legacyInstance.checkIfBookmarked();
+
+    expect(legacyInstance.state.bookmarked).toBe(true);
+    expect(legacyInstance.state.nicknameInput).toBe('');
+
+    const objectInstance = makeInstance({ viewAddress });
+    objectInstance.getBookmarksCache = jest.fn(() => ({
+      surveys: [],
+      questions: [],
+      users: [{ address: viewAddress.toLowerCase(), nickname: 'Alice' }],
+      filters: [],
+    }));
+
+    objectInstance.checkIfBookmarked();
+
+    expect(objectInstance.state.bookmarked).toBe(true);
+    expect(objectInstance.state.nicknameInput).toBe('Alice');
   });
 
   it('reuses parsed response payloads across refreshes when payload strings are unchanged', () => {
@@ -1284,6 +1673,35 @@ describe('UserPage cache refresh pipeline', () => {
 
     instance._responseGateAccessStatusByKey.set(cacheKey, {
       status: 'error',
+      ts: Date.now() - 5000,
+    });
+
+    instance._queueResponseGateAccessChecks(new Set([pendingKey]));
+
+    expect(checkSponsoredAccess).not.toHaveBeenCalled();
+    expect(queueSpy).not.toHaveBeenCalled();
+
+    jest.advanceTimersByTime(25000);
+    expect(queueSpy).toHaveBeenCalledTimes(1);
+    expect(queueSpy).toHaveBeenCalledWith({ markLoading: false, bypassSignature: true });
+  });
+
+  it('backs off cached unresolved gate access instead of re-queueing an immediate refresh', () => {
+    jest.useFakeTimers();
+    const account = '0x00000000000000000000000000000000000000bb';
+    const instance = makeInstance({ account });
+    const queueSpy = jest.spyOn(instance, 'queueCacheRefresh').mockImplementation(() => {});
+    const pendingKey = instance._buildGatePendingKey({
+      slug: 'edge',
+      resourceKey: 'questionResponses',
+    });
+    const cacheKey = instance._buildGateAccessCacheKey({
+      slug: 'edge',
+      resourceKey: 'questionResponses',
+    });
+
+    instance._responseGateAccessStatusByKey.set(cacheKey, {
+      status: 'unresolved',
       ts: Date.now() - 5000,
     });
 
@@ -3705,6 +4123,238 @@ describe('UserPage cold-load network fallback', () => {
     expect(instance.state.loadingSBTs).toBe(false);
   });
 
+  it('uses sbtCache ownership counts to keep SBT after mint-burn-mint', () => {
+    const viewAddress = '0x00000000000000000000000000000000000000aa';
+    const viewLower = viewAddress.toLowerCase();
+    const networkID = '84532';
+    const instance = makeInstance({ viewAddress });
+
+    const dataByNamespace = {
+      surveysCache: [],
+      questionsCache: [],
+      sbtCache: [{
+        slug: 'edge',
+        data: {
+          [networkID]: {
+            sbtList: {
+              '0x100': {
+                sbtAddress: '0x100',
+                sbtInfo: { name: 'Badge 100', unlisted: false },
+                mintedAddresses: [viewAddress],
+                burnedAddresses: [viewAddress],
+                mintedCountByAddress: { [viewLower]: 2 },
+                burnedCountByAddress: { [viewLower]: 1 },
+              },
+            },
+          },
+        },
+      }],
+      userCache: [],
+    };
+
+    instance._dgHasAny = jest.fn(() => true);
+    instance._dgReadAll = jest.fn((name) => dataByNamespace[name] || []);
+
+    instance._refreshAllDataFromCache({ force: true, markLoading: true });
+
+    expect(instance.state.sbtList).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          sbtInfo: expect.objectContaining({
+            name: 'Badge 100',
+            sbtAddress: '0x100',
+          }),
+        }),
+      ])
+    );
+  });
+
+  it('lets authoritative sbtCache zero counts override earlier legacy mint signal', () => {
+    const viewAddress = '0x00000000000000000000000000000000000000aa';
+    const networkID = '84532';
+    const instance = makeInstance({ viewAddress });
+
+    const legacyEntry = {
+      slug: 'legacy',
+      data: {
+        [networkID]: {
+          sbtList: {
+            '0x100': {
+              sbtAddress: '0x100',
+              sbtInfo: { name: 'Badge 100', unlisted: false },
+              mintedAddresses: [viewAddress],
+              burnedAddresses: [],
+            },
+          },
+        },
+      },
+    };
+    const authoritativeEntry = {
+      slug: 'authoritative',
+      data: {
+        [networkID]: {
+          sbtList: {
+            '0x100': {
+              sbtAddress: '0x100',
+              sbtInfo: { name: 'Badge 100', unlisted: false },
+              mintedAddresses: [],
+              burnedAddresses: [],
+              mintedCountByAddress: {},
+              burnedCountByAddress: {},
+              countsLoaded: true,
+            },
+          },
+        },
+      },
+    };
+    const dataByNamespace = {
+      surveysCache: [],
+      questionsCache: [],
+      sbtCache: [legacyEntry, authoritativeEntry],
+      userCache: [],
+    };
+
+    instance._dgHasAny = jest.fn(() => true);
+    instance._dgReadAll = jest.fn((name) => dataByNamespace[name] || []);
+
+    instance._refreshAllDataFromCache({ force: true, markLoading: true });
+
+    expect(instance.state.sbtList).toHaveLength(0);
+  });
+
+  it('keeps authoritative sbtCache zero counts sticky over later legacy mint signal', () => {
+    const viewAddress = '0x00000000000000000000000000000000000000aa';
+    const networkID = '84532';
+    const instance = makeInstance({ viewAddress });
+
+    const legacyEntry = {
+      slug: 'legacy',
+      data: {
+        [networkID]: {
+          sbtList: {
+            '0x100': {
+              sbtAddress: '0x100',
+              sbtInfo: { name: 'Badge 100', unlisted: false },
+              mintedAddresses: [viewAddress],
+              burnedAddresses: [],
+            },
+          },
+        },
+      },
+    };
+    const authoritativeEntry = {
+      slug: 'authoritative',
+      data: {
+        [networkID]: {
+          sbtList: {
+            '0x100': {
+              sbtAddress: '0x100',
+              sbtInfo: { name: 'Badge 100', unlisted: false },
+              mintedAddresses: [],
+              burnedAddresses: [],
+              mintedCountByAddress: {},
+              burnedCountByAddress: {},
+              countsLoaded: true,
+            },
+          },
+        },
+      },
+    };
+    const dataByNamespace = {
+      surveysCache: [],
+      questionsCache: [],
+      sbtCache: [authoritativeEntry, legacyEntry],
+      userCache: [],
+    };
+
+    instance._dgHasAny = jest.fn(() => true);
+    instance._dgReadAll = jest.fn((name) => dataByNamespace[name] || []);
+
+    instance._refreshAllDataFromCache({ force: true, markLoading: true });
+
+    expect(instance.state.sbtList).toHaveLength(0);
+  });
+
+  it('honors legacy sbtCache mintedAddresses when count maps are empty placeholders', () => {
+    const viewAddress = '0x00000000000000000000000000000000000000aa';
+    const networkID = '84532';
+    const instance = makeInstance({ viewAddress });
+
+    const dataByNamespace = {
+      surveysCache: [],
+      questionsCache: [],
+      sbtCache: [{
+        slug: 'edge',
+        data: {
+          [networkID]: {
+            sbtList: {
+              '0x100': {
+                sbtAddress: '0x100',
+                sbtInfo: { name: 'Badge 100', unlisted: false },
+                mintedAddresses: [viewAddress],
+                burnedAddresses: [],
+                mintedCountByAddress: {},
+                burnedCountByAddress: {},
+                countsLoaded: false,
+              },
+            },
+          },
+        },
+      }],
+      userCache: [],
+    };
+
+    instance._dgHasAny = jest.fn(() => true);
+    instance._dgReadAll = jest.fn((name) => dataByNamespace[name] || []);
+
+    instance._refreshAllDataFromCache({ force: true, markLoading: true });
+
+    expect(instance.state.sbtList).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          sbtInfo: expect.objectContaining({
+            name: 'Badge 100',
+            sbtAddress: '0x100',
+          }),
+        }),
+      ])
+    );
+  });
+
+  it('keeps legacy sbtCache set-only burn behavior when ownership counts are absent', () => {
+    const viewAddress = '0x00000000000000000000000000000000000000aa';
+    const networkID = '84532';
+    const instance = makeInstance({ viewAddress });
+
+    const dataByNamespace = {
+      surveysCache: [],
+      questionsCache: [],
+      sbtCache: [{
+        slug: 'edge',
+        data: {
+          [networkID]: {
+            sbtList: {
+              '0x100': {
+                sbtAddress: '0x100',
+                sbtInfo: { name: 'Badge 100', unlisted: false },
+                mintedAddresses: [viewAddress],
+                burnedAddresses: [viewAddress],
+              },
+            },
+          },
+        },
+      }],
+      userCache: [],
+    };
+
+    instance._dgHasAny = jest.fn(() => true);
+    instance._dgReadAll = jest.fn((name) => dataByNamespace[name] || []);
+
+    instance._refreshAllDataFromCache({ force: true, markLoading: true });
+
+    expect(instance.state.sbtList).toHaveLength(0);
+  });
+
   it('does not let userCache fallback SBT entries override burned ownership from sbtCache', () => {
     const viewAddress = '0x00000000000000000000000000000000000000aa';
     const viewLower = viewAddress.toLowerCase();
@@ -3753,6 +4403,46 @@ describe('UserPage cold-load network fallback', () => {
     instance._refreshAllDataFromCache({ force: true, markLoading: true });
 
     expect(instance.state.sbtList).toHaveLength(0);
+  });
+
+  it('userCache row with explicit burn count > mint count marks SBT as burned when no prior sbtCache signal', () => {
+    const viewAddress = '0x00000000000000000000000000000000000000aa';
+    const viewLower = viewAddress.toLowerCase();
+    const networkID = '84532';
+    const instance = makeInstance({ viewAddress });
+
+    const dataByNamespace = {
+      surveysCache: [],
+      questionsCache: [],
+      sbtCache: [],
+      userCache: [{
+        slug: 'edge',
+        data: {
+          [viewLower]: {
+            [networkID]: {
+              lastBlockScanned: 120,
+              data: {
+                sbts: [{
+                  sbtAddress: '0x100',
+                  sbtInfo: { name: 'Badge 100', unlisted: false },
+                  mintedCountByAddress: { [viewLower]: 1 },
+                  burnedCountByAddress: { [viewLower]: 2 },
+                }],
+              },
+            },
+          },
+        },
+      }],
+    };
+
+    instance._dgReadAll = jest.fn((name) => dataByNamespace[name] || []);
+
+    const aggregate = instance._collectUnifiedCacheData({ networkID, viewAddressLower: viewLower });
+    const sbtEntry = aggregate.sbtAggregate['0x100'];
+
+    expect(sbtEntry.burnedSet.has(viewLower)).toBe(true);
+    expect(sbtEntry.mintedSet.has(viewLower)).toBe(false);
+    expect(instance._deriveSbtSection(aggregate, viewLower).sbtList).toHaveLength(0);
   });
 
   it('merges non-active cache partitions even when active-chain buckets exist', () => {

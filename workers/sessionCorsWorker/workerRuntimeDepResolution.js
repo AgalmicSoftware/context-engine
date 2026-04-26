@@ -57,10 +57,13 @@ import {
 import {
   parseSiweMessage as parseSiweMessageBoundary,
   resolveTrustedAdminOrigins as resolveTrustedAdminOriginsBoundary,
+  validateBrowserLoginOrigin as validateBrowserLoginOriginBoundary,
   validateSiwe as validateSiweBoundary,
+  validateTrustedLoginRequestOrigin as validateTrustedLoginRequestOriginBoundary,
 } from './siweMessageValidation.js';
 import {
   buildNonce as buildNonceBoundary,
+  checkNonceRateLimit as checkNonceRateLimitBoundary,
   consumeNonce as consumeNonceBoundary,
 } from './nonceLifecycle.js';
 import {
@@ -150,8 +153,11 @@ export const resolveWorkerRuntimeDeps = ({
       parseSiweMessage: resolveDep('parseSiweMessage', parseSiweMessageBoundary),
       resolveTrustedAdminOrigins: resolveDep('resolveTrustedAdminOrigins', resolveTrustedAdminOriginsBoundary),
       validateSiwe: resolveDep('validateSiwe', validateSiweBoundary),
+      validateTrustedLoginRequestOrigin: resolveDep('validateTrustedLoginRequestOrigin', validateTrustedLoginRequestOriginBoundary),
+      validateBrowserLoginOrigin: resolveDep('validateBrowserLoginOrigin', validateBrowserLoginOriginBoundary),
       validateSiweAddressMatchesRequest: resolveDep('validateSiweAddressMatchesRequest', validateSiweAddressMatchesRequestBoundary),
       buildNonce: resolveDep('buildNonce', buildNonceBoundary),
+      checkNonceRateLimit: resolveDep('checkNonceRateLimit', checkNonceRateLimitBoundary),
       consumeNonce: resolveDep('consumeNonce', consumeNonceBoundary),
       base64UrlEncode: resolveDep('base64UrlEncode', base64UrlEncodeBoundary),
       signToken: resolveDep('signToken', signTokenBoundary),
@@ -183,7 +189,12 @@ export const resolveWorkerRuntimeDeps = ({
       FAUCET_SBT_GATE_ABI: constants?.FAUCET_SBT_GATE_ABI,
       TOKEN_TTL_SECONDS: constants?.TOKEN_TTL_SECONDS,
       NONCE_TTL_SECONDS: constants?.NONCE_TTL_SECONDS,
+      NONCE_RATE_LIMIT_MAX: constants?.NONCE_RATE_LIMIT_MAX,
+      NONCE_RATE_LIMIT_WINDOW_MS: constants?.NONCE_RATE_LIMIT_WINDOW_MS,
+      NONCE_RATE_LIMIT_TTL_SECONDS: constants?.NONCE_RATE_LIMIT_TTL_SECONDS,
       USED_NONCE_TTL_SECONDS: constants?.USED_NONCE_TTL_SECONDS,
+      LOGIN_SIWE_MAX_AGE_MS: constants?.LOGIN_SIWE_MAX_AGE_MS,
+      LOGIN_SIWE_FUTURE_SKEW_MS: constants?.LOGIN_SIWE_FUTURE_SKEW_MS,
       ZERO_BYTES32: constants?.ZERO_BYTES32,
       RESOURCE_GATE_KEYS: constants?.RESOURCE_GATE_KEYS,
       ANONYMOUS_RATE_ID_HEADER: constants?.ANONYMOUS_RATE_ID_HEADER,

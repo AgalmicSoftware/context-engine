@@ -1,4 +1,4 @@
-import { __test__areSbtListArraysEqual, readSbtCacheMetaSnapshot } from './SBTsList.jsx';
+import { __test__areSbtListArraysEqual, readSbtCacheMetaSnapshot } from './SBTsList';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 
 jest.mock('./SBTPage', () => () => null);

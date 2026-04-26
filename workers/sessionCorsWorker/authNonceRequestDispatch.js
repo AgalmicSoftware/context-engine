@@ -1,3 +1,10 @@
+import {
+  resolveAnonymousRateIdentity,
+} from './anonymousRateIdentityNormalization.js';
+import {
+  validateTrustedLoginRequestOrigin,
+} from './siweMessageValidation.js';
+
 export const dispatchAuthNonceRequest = async ({
   request,
   env,
@@ -43,6 +50,46 @@ export const dispatchAuthNonceRequest = async ({
   });
   if (!corsState?.ok) return corsState?.response;
   const headers = corsState.headers;
+
+  const originCheck = (
+    typeof deps?.validateTrustedLoginRequestOrigin === 'function'
+      ? deps.validateTrustedLoginRequestOrigin
+      : validateTrustedLoginRequestOrigin
+  )({
+    request,
+    env,
+    config: corsState.config,
+    allowTrustedAdminOrigins: allowTrustedAdminAuthOrigin,
+  }, {
+    resolveTrustedAdminOrigins: deps?.resolveTrustedAdminOrigins,
+  });
+  if (!originCheck?.ok) {
+    return deps?.json?.({ error: originCheck?.error }, 403, headers);
+  }
+
+  const rateLimitIdentity = (
+    typeof deps?.resolveAnonymousRateIdentity === 'function'
+      ? deps.resolveAnonymousRateIdentity(request)
+      : resolveAnonymousRateIdentity({
+        request,
+        deps: {
+          toStr: deps?.toStr,
+        },
+      })
+  );
+  const rateLimitResult = await deps?.checkNonceRateLimit?.({
+    env,
+    slug: targetSlug,
+    identity: rateLimitIdentity,
+    address,
+    limit: deps?.NONCE_RATE_LIMIT_MAX,
+    now: deps?.now,
+    windowMs: deps?.NONCE_RATE_LIMIT_WINDOW_MS,
+    ttlSeconds: deps?.NONCE_RATE_LIMIT_TTL_SECONDS,
+  });
+  if (rateLimitResult && !rateLimitResult?.ok) {
+    return deps?.json?.({ error: rateLimitResult?.error }, 429, headers);
+  }
 
   const nonce = deps?.buildNonce?.();
   const key = `nonce:${targetSlug}:${address.toLowerCase()}`;

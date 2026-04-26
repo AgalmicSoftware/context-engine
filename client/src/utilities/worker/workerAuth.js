@@ -33,6 +33,7 @@ const accountLog = createLogger('account');
 
 const STORAGE_PREFIX = 'ce:workerToken:v1';
 const TOKEN_SKEW_SECONDS = 30;
+const MAX_TOKEN_CACHE_TTL_SECONDS = 24 * 60 * 60;
 const NONCE_MISMATCH_ERROR = 'nonce mismatch or expired';
 const ONCHAIN_GATE_UNAVAILABLE_ERROR = 'on-chain gate data unavailable';
 const LOGIN_GATE_UNAVAILABLE_RETRIES = 2;
@@ -226,6 +227,86 @@ const readTokenCache = (key) => {
     return null;
   }
 };
+
+const normalizeTokenCacheEntry = (entry, {
+  workerUrl,
+  sessionSlug,
+  address,
+  nowSeconds = Math.floor(Date.now() / 1000),
+  skewSeconds = TOKEN_SKEW_SECONDS,
+  maxTtlSeconds = MAX_TOKEN_CACHE_TTL_SECONDS,
+} = {}) => {
+  if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+    return { ok: false, status: 'malformed' };
+  }
+
+  const token = toStr(entry.token).trim();
+  const expiresAt = Number(entry.expiresAt || entry.exp || 0);
+  if (!token) return { ok: false, status: 'missing-token' };
+  if (!Number.isFinite(expiresAt) || expiresAt <= 0) {
+    return { ok: false, status: 'missing-expiry' };
+  }
+  if (expiresAt <= Number(nowSeconds || 0) + Number(skewSeconds || 0)) {
+    return { ok: false, status: 'expired' };
+  }
+
+  if (Number(entry.v || 0) >= 1) {
+    const issuedAt = Number(entry.issuedAt || 0) || null;
+    const maxTtl = Number(maxTtlSeconds || 0);
+    if (issuedAt && Number.isFinite(maxTtl) && maxTtl > 0 && expiresAt > issuedAt + maxTtl) {
+      return { ok: false, status: 'ttl-too-long' };
+    }
+    const expectedWorkerUrl = normalizeWorkerUrl(workerUrl);
+    const expectedSlug = normalizeSessionSlug(sessionSlug);
+    const expectedAddress = normalizeAddress(address);
+    const entryWorkerUrl = normalizeWorkerUrl(entry.workerUrl);
+    const entrySlug = normalizeSessionSlug(entry.sessionSlug);
+    const entryAddress = normalizeAddress(entry.address);
+    if (
+      (expectedWorkerUrl && entryWorkerUrl && expectedWorkerUrl !== entryWorkerUrl) ||
+      (entrySlug !== expectedSlug) ||
+      (expectedAddress && entryAddress && expectedAddress !== entryAddress)
+    ) {
+      return { ok: false, status: 'scope-mismatch' };
+    }
+  }
+
+  return {
+    ok: true,
+    token,
+    exp: expiresAt,
+    expiresAt,
+    issuedAt: Number(entry.issuedAt || 0) || null,
+    legacy: Number(entry.v || 0) < 1,
+  };
+};
+
+const readScopedTokenCache = (key, scope = {}) => {
+  const parsed = readTokenCache(key);
+  const normalized = normalizeTokenCacheEntry(parsed, scope);
+  if (normalized.ok) return normalized;
+  if (parsed) {
+    try { localStorage.removeItem(key); } catch (_) {}
+  }
+  return null;
+};
+
+const buildTokenCacheEnvelope = ({
+  token,
+  exp,
+  workerUrl,
+  sessionSlug,
+  address,
+  issuedAt = Math.floor(Date.now() / 1000),
+} = {}) => ({
+  v: 1,
+  workerUrl: normalizeWorkerUrl(workerUrl),
+  sessionSlug: normalizeSessionSlug(sessionSlug),
+  address: normalizeAddress(address),
+  issuedAt: Number(issuedAt || 0) || Math.floor(Date.now() / 1000),
+  expiresAt: Number(exp || 0),
+  token: toStr(token).trim(),
+});
 
 const writeTokenCache = (key, payload) => {
   if (typeof window === 'undefined') return;
@@ -453,7 +534,7 @@ export const buildSignedAdminActionAuth = async ({
     const nonceEndpoint = `${resolvedWorkerUrl}/auth/nonce`;
     const nonceResp = await fetchWorkerAuthEndpoint(nonceEndpoint, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: buildWorkerAuthNonceHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ address, sessionSlug: targetSlug, adminAction: true }),
     });
     const nonceData = await nonceResp.json().catch(() => ({}));
@@ -537,7 +618,7 @@ export const buildSignedBootstrapAdminAuth = async ({
     const nonceEndpoint = `${resolvedWorkerUrl}/auth/nonce`;
     const nonceResp = await fetchWorkerAuthEndpoint(nonceEndpoint, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: buildWorkerAuthNonceHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ address, sessionSlug: targetSlug, adminAction: true }),
     });
     const nonceData = await nonceResp.json().catch(() => ({}));
@@ -606,9 +687,12 @@ export const getWorkerSessionToken = async ({
   if (typeof window !== 'undefined') {
     accountLog.log('[workerAuth] resolved worker URL', { slug, resolvedWorkerUrl });
   }
-  const cached = readTokenCache(storageKey);
-  const now = Math.floor(Date.now() / 1000);
-  if (cached?.token && Number(cached.exp || 0) > now + TOKEN_SKEW_SECONDS) {
+  const cached = readScopedTokenCache(storageKey, {
+    workerUrl: resolvedWorkerUrl,
+    sessionSlug: slug,
+    address,
+  });
+  if (cached?.token) {
     return cached.token;
   }
 
@@ -628,7 +712,7 @@ export const getWorkerSessionToken = async ({
       assertWorkerAuthRequestCurrent(signal, requestAuthEpoch, address);
       const nonceResp = await fetch(`${resolvedWorkerUrl}/auth/nonce`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: buildWorkerAuthNonceHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ address, sessionSlug: slug }),
         signal,
       });
@@ -712,10 +796,13 @@ export const getWorkerSessionToken = async ({
     // Regression guard: keep the cache write gated by the same auth epoch that
     // started this request; otherwise logout/account-switch can resurrect auth.
     assertWorkerAuthRequestCurrent(signal, requestAuthEpoch, address);
-    writeTokenCache(storageKey, {
+    writeTokenCache(storageKey, buildTokenCacheEnvelope({
       token: loginData.token,
       exp: Number(loginData.exp || 0),
-    });
+      workerUrl: resolvedWorkerUrl,
+      sessionSlug: slug,
+      address,
+    }));
 
     return loginData.token;
   };
@@ -862,6 +949,15 @@ const getAnonymousRateId = () => {
     localStorage.setItem(ANONYMOUS_RATE_ID_STORAGE_KEY, generated);
   } catch (_) {}
   return generated;
+};
+
+const buildWorkerAuthNonceHeaders = (baseHeaders) => {
+  const headers = mergeHeaders(baseHeaders, {});
+  const anonRateId = getAnonymousRateId();
+  if (anonRateId && !headers.has('X-Anonymous-Client-Id')) {
+    headers.set('X-Anonymous-Client-Id', anonRateId);
+  }
+  return headers;
 };
 
 const isStreamBody = (body) => {
@@ -1128,4 +1224,10 @@ export const workerAuthUtils = {
   clearWorkerSessionToken,
   clearAllWorkerSessionTokens,
   fetchWorkerWithAuth,
+};
+
+export const __test__workerAuthTokenCache = {
+  buildTokenCacheEnvelope,
+  buildTokenCacheKey,
+  normalizeTokenCacheEntry,
 };

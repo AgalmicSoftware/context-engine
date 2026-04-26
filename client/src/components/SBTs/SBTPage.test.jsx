@@ -1,15 +1,19 @@
-import SBTPage from './SBTPage.jsx';
+import SBTPage from './SBTPage';
 import styles from './SBTPage.module.scss';
 import { ethers } from 'ethers';
 import contractScripts from '../../utilities/web3/contractScripts.js';
 import * as contractScriptsModule from '../../utilities/web3/contractScripts.js';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
-import proposalScripts from '../../utilities/proposalScripts.js';
+import { getShortenedAddress } from '../../utilities/ui/displayHelpers.js';
 import defaultSbtImage from '../../assets/img/ce_circuit_logo.png';
 import { cryptoUtils } from 'utilities/crypto/cryptography.js';
 import { litStorage } from 'utilities/crypto/litProtocol.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
+import {
+  SBT_PASSWORD_RECOVERY_KIND,
+  SBT_PASSWORD_RECOVERY_STORAGE_KEY,
+} from '../../utilities/sbt/sbtPasswordRecoveryStore.js';
 import * as terminology from '../../utilities/ui/terminology.js';
 
 jest.mock('utilities/ui/blockieAvatars.js', () => ({
@@ -81,7 +85,7 @@ const renderMiniCardNode = (props = {}) => {
     ...subject.state,
     sbtInfo: {
       name: 'Badge',
-      image: 'https://example.com/badge.png',
+      image: 'https://example.example.test/badge.png',
       mintingEndTime: 0,
       burnAuth: 0,
       hasPasswordMint: false,
@@ -133,7 +137,7 @@ const createDeferred = () => {
 
 const createCachedSbtInfo = (overrides = {}) => ({
   tokenURI: 'ar://HLDsCm3ALbbgjVTCPVLhU8aF9taAdKyD1DyB7A8zkaXM',
-  image: 'https://example.com/badge.png',
+  image: 'https://example.example.test/badge.png',
   mintingEndTime: 0,
   burnAuth: 0,
   hasPasswordMint: false,
@@ -250,7 +254,7 @@ describe('SBTPage modal holder optimizations', () => {
       sbtInfo: {
         name: 'Badge',
         tokenURI: 'ar://HLDsCm3ALbbgjVTCPVLhU8aF9taAdKyD1DyB7A8zkaXM',
-        image: 'https://example.com/badge.png',
+        image: 'https://example.example.test/badge.png',
         mintingEndTime: 0,
         burnAuth: 0,
         maxTokens: '0',
@@ -279,7 +283,7 @@ describe('SBTPage modal holder optimizations', () => {
       ...subject.state,
       sbtInfo: {
         name: 'Badge',
-        tokenURI: 'https://arweave.net/example',
+        tokenURI: 'https://arweave.example.test/example',
         image: defaultSbtImage,
         mintingEndTime: 0,
         burnAuth: 0,
@@ -315,7 +319,7 @@ describe('SBTPage modal holder optimizations', () => {
       sbtInfo: {
         name: 'Badge',
         tokenURI: `data:application/json;base64,${dataUriPayload}`,
-        image: 'https://example.com/badge.png',
+        image: 'https://example.example.test/badge.png',
         mintingEndTime: 0,
         burnAuth: 0,
         maxTokens: '0',
@@ -341,9 +345,11 @@ describe('SBTPage modal holder optimizations', () => {
 
   it('normalizes subdomain arweave tokenURI links to the preferred gateway URL', () => {
     const txId = 'Sng0VG2vetgNPITw5mtvt6om-fBCNu3KI5GZAYeEttY';
-    const subdomainUrl = `https://nknrqljpprb2ncdidz57t6g5o346sreaimrxm7qp3ybzitf7bvya.arweave.net/${txId}`;
+    const subdomainGateway = 'https://nknrqljpprb2ncdidz57t6g5o346sreaimrxm7qp3ybzitf7bvya.arweave.net'; // intentional: real URL — tests allowlist enforcement
+    const preferredGateway = 'https://ar-io.dev'; // intentional: real URL - verifies production gateway normalization
+    const subdomainUrl = `${subdomainGateway}/${txId}`;
     globalThis.CE_ARWEAVE_DIRECT_TO_AR_IO = true;
-    globalThis.CE_ARWEAVE_AR_IO_URL = 'https://ar-io.dev';
+    globalThis.CE_ARWEAVE_AR_IO_URL = preferredGateway;
     const subject = createSubject({
       SBTAddress: '0x00000000000000000000000000000000000000a1',
     });
@@ -352,7 +358,7 @@ describe('SBTPage modal holder optimizations', () => {
       sbtInfo: {
         name: 'Badge',
         tokenURI: subdomainUrl,
-        image: 'https://example.com/badge.png',
+        image: 'https://example.example.test/badge.png',
         mintingEndTime: 0,
         burnAuth: 0,
         maxTokens: '0',
@@ -372,16 +378,16 @@ describe('SBTPage modal holder optimizations', () => {
     );
 
     expect(metadataLink).toBeTruthy();
-    expect(metadataLink.props.href).toBe(`https://ar-io.dev/${txId}`);
+    expect(metadataLink.props.href).toBe(`${preferredGateway}/${txId}`);
   });
 
   it('prefers canonical metadata pointer over image-like fields in embedded tokenURI JSON', () => {
     const txId = '4kpvO6qf-tN4l0R9vQh-Sz6ekU2xq9j5qM4R1X3vZkA';
     const dataUriPayload = Buffer.from(JSON.stringify({
       metadataUri: `ar://${txId}`,
-      external_url: 'https://cdn.example.com/preview.png',
-      tokenURI: 'https://cdn.example.com/also-image.jpg',
-      uri: 'https://cdn.example.com/banner.webp',
+      external_url: 'https://cdn.example.test/preview.png',
+      tokenURI: 'https://cdn.example.test/also-image.jpg',
+      uri: 'https://cdn.example.test/banner.webp',
     }), 'utf8').toString('base64');
     const subject = createSubject({
       SBTAddress: '0x00000000000000000000000000000000000000a1',
@@ -391,7 +397,7 @@ describe('SBTPage modal holder optimizations', () => {
       sbtInfo: {
         name: 'Badge',
         tokenURI: `data:application/json;base64,${dataUriPayload}`,
-        image: 'https://example.com/badge.png',
+        image: 'https://example.example.test/badge.png',
         mintingEndTime: 0,
         burnAuth: 0,
         maxTokens: '0',
@@ -432,7 +438,7 @@ describe('SBTPage modal holder optimizations', () => {
       sbtInfo: {
         name: 'Badge',
         tokenURI: `data:application/json;base64,${dataUriPayload}`,
-        image: 'https://example.com/badge.png',
+        image: 'https://example.example.test/badge.png',
         mintingEndTime: 0,
         burnAuth: 0,
         maxTokens: '0',
@@ -458,9 +464,9 @@ describe('SBTPage modal holder optimizations', () => {
 
   it('hides metadata icon when embedded tokenURI JSON only contains image-like links', () => {
     const dataUriPayload = Buffer.from(JSON.stringify({
-      external_url: 'https://cdn.example.com/preview.png',
-      tokenURI: 'https://cdn.example.com/also-image.jpg',
-      uri: 'https://cdn.example.com/banner.webp',
+      external_url: 'https://cdn.example.test/preview.png',
+      tokenURI: 'https://cdn.example.test/also-image.jpg',
+      uri: 'https://cdn.example.test/banner.webp',
     }), 'utf8').toString('base64');
     const subject = createSubject({
       SBTAddress: '0x00000000000000000000000000000000000000a1',
@@ -470,7 +476,7 @@ describe('SBTPage modal holder optimizations', () => {
       sbtInfo: {
         name: 'Badge',
         tokenURI: `data:application/json;base64,${dataUriPayload}`,
-        image: 'https://example.com/badge.png',
+        image: 'https://example.example.test/badge.png',
         mintingEndTime: 0,
         burnAuth: 0,
         maxTokens: '0',
@@ -500,7 +506,7 @@ describe('SBTPage modal holder optimizations', () => {
       ...subject.state,
       sbtInfo: {
         name: 'Badge',
-        tokenURI: 'https://example.com/metadata/sbt.json',
+        tokenURI: 'https://example.example.test/metadata/sbt.json',
         mintingEndTime: 0,
         burnAuth: 0,
         maxTokens: '0',
@@ -525,8 +531,11 @@ describe('SBTPage modal holder optimizations', () => {
 
   it('falls back to the next Arweave gateway when the preferred image URL fails', () => {
     const txId = 'DqYBh1qm9GvaTOGkF5R7abnLoB3OPiXNNBcTsYPtlRc';
+    const canonicalArweaveGateway = 'https://arweave.net'; // intentional: real URL — tests allowlist enforcement
+    const preferredGateway = 'https://ar-io.dev'; // intentional: real URL - verifies production gateway fallback order
+    const arIoSubdomainGateway = 'https://b2tadb22u32gxwsm4gsbpfd3ng44xia5zy7cltjuc4j3da7nsulq.ar-io.dev'; // intentional: real URL - verifies AR.IO subdomain parsing
     globalThis.CE_ARWEAVE_DIRECT_TO_AR_IO = true;
-    globalThis.CE_ARWEAVE_AR_IO_URL = 'https://ar-io.dev';
+    globalThis.CE_ARWEAVE_AR_IO_URL = preferredGateway;
     const subject = createSubject({
       SBTAddress: '0x00000000000000000000000000000000000000a1',
     });
@@ -535,7 +544,7 @@ describe('SBTPage modal holder optimizations', () => {
       sbtInfo: {
         name: 'Badge',
         tokenURI: `ar://${txId}`,
-        image: `https://b2tadb22u32gxwsm4gsbpfd3ng44xia5zy7cltjuc4j3da7nsulq.ar-io.dev/${txId}?`,
+        image: `${arIoSubdomainGateway}/${txId}?`,
         mintingEndTime: 0,
         burnAuth: 0,
         maxTokens: '0',
@@ -549,7 +558,7 @@ describe('SBTPage modal holder optimizations', () => {
     };
 
     const firstAttempt = subject.getDisplayImageRenderState(subject.state.sbtInfo);
-    expect(firstAttempt.src).toBe(`https://ar-io.dev/${txId}`);
+    expect(firstAttempt.src).toBe(`${preferredGateway}/${txId}`);
 
     subject.handleDisplayImageError(firstAttempt);
     subject.handleDisplayImageError(firstAttempt);
@@ -563,7 +572,7 @@ describe('SBTPage modal holder optimizations', () => {
     );
 
     expect(sbtImage).toBeTruthy();
-    expect(sbtImage.props.src).toBe(`https://arweave.net/${txId}`);
+    expect(sbtImage.props.src).toBe(`${canonicalArweaveGateway}/${txId}`);
   });
 
   it('returns N/A for zero/invalid actor addresses', () => {
@@ -1158,7 +1167,7 @@ describe('SBTPage modal holder optimizations', () => {
     expect(progressBar).toBeTruthy();
     expect(treeIncludesText(tree, 'Scanning mint/burn history: 40 blocks remaining')).toBe(true);
     expect(treeIncludesText(tree, '(blocks 2,000-2,079)')).toBe(false);
-    expect(treeIncludesText(tree, proposalScripts.getShortenedAddress(holderAddress, false))).toBe(true);
+    expect(treeIncludesText(tree, getShortenedAddress(holderAddress, false))).toBe(true);
     expect(treeIncludesText(tree, 'No holders found.')).toBe(false);
   });
 
@@ -1578,7 +1587,7 @@ describe('SBTPage modal holder optimizations', () => {
             sbtInfo: {
               name: 'Cold Load Badge',
               tokenURI: 'ar://HLDsCm3ALbbgjVTCPVLhU8aF9taAdKyD1DyB7A8zkaXM',
-              image: 'https://example.com/badge.png',
+              image: 'https://example.example.test/badge.png',
               mintingEndTime: 0,
               burnAuth: 0,
               hasPasswordMint: false,
@@ -1777,7 +1786,7 @@ describe('SBTPage modal holder optimizations', () => {
             slug: 'beta',
             sbtInfo: {
               tokenURI: 'ar://HLDsCm3ALbbgjVTCPVLhU8aF9taAdKyD1DyB7A8zkaXM',
-              image: 'https://example.com/beta-badge.png',
+              image: 'https://example.example.test/beta-badge.png',
               mintingEndTime: 0,
               burnAuth: 0,
               hasPasswordMint: false,
@@ -1822,7 +1831,7 @@ describe('SBTPage modal holder optimizations', () => {
     expect(cacheScripts.readCache).toHaveBeenCalledTimes(1);
     expect(subject.state.resolvedSessionSlug).toBe('alpha');
     expect(subject.state.sbtInfo).toEqual(expect.objectContaining({
-      image: 'https://example.com/beta-badge.png',
+      image: 'https://example.example.test/beta-badge.png',
       chainID: 84532,
     }));
     expect(subject.state.userHasSBT).toBe(false);
@@ -1840,7 +1849,7 @@ describe('SBTPage modal holder optimizations', () => {
             sbtInfo: {
               name: 'Badge',
               tokenURI: 'ar://HLDsCm3ALbbgjVTCPVLhU8aF9taAdKyD1DyB7A8zkaXM',
-              image: 'https://example.com/badge.png',
+              image: 'https://example.example.test/badge.png',
               description: '',
               descriptionEncrypted: 'desc-envelope',
               descriptionAccess: { type: 'sbt', gateIds: ['gate-description'], chainId: 84532 },
@@ -1873,7 +1882,7 @@ describe('SBTPage modal holder optimizations', () => {
       .mockImplementation(async (envelope) => {
         if (envelope === 'desc-envelope') return 'Private description';
         if (envelope === 'tags-envelope') return ['alpha', 'beta'];
-        if (envelope === 'docs-envelope') return ['https://doc.test/private'];
+        if (envelope === 'docs-envelope') return ['https://doc.example.test/private'];
         return null;
       });
     window.__litHooks = { getKey: jest.fn() };
@@ -1896,7 +1905,7 @@ describe('SBTPage modal holder optimizations', () => {
       descriptionDecrypted: true,
       tags: ['alpha', 'beta'],
       tagsDecrypted: true,
-      documentURLs: ['https://doc.test/private'],
+      documentURLs: ['https://doc.example.test/private'],
       documentURLsDecrypted: true,
     }));
   });
@@ -1961,7 +1970,7 @@ describe('SBTPage modal holder optimizations', () => {
         if (envelope === 'name-envelope') return 'Private Badge';
         if (envelope === 'desc-envelope') return 'Private description';
         if (envelope === 'tags-envelope') return ['alpha', 'beta'];
-        if (envelope === 'docs-envelope') return ['https://doc.test/private'];
+        if (envelope === 'docs-envelope') return ['https://doc.example.test/private'];
         return null;
       });
     const downloadSpy = jest.spyOn(litStorage, 'downloadEncryptedArweaveData').mockResolvedValue({
@@ -1996,7 +2005,7 @@ describe('SBTPage modal holder optimizations', () => {
       descriptionDecrypted: true,
       tags: ['alpha', 'beta'],
       tagsDecrypted: true,
-      documentURLs: ['https://doc.test/private'],
+      documentURLs: ['https://doc.example.test/private'],
       documentURLsDecrypted: true,
       image: 'blob:locked-image',
       imageDecrypted: true,
@@ -2163,7 +2172,7 @@ describe('SBTPage modal holder optimizations', () => {
             sbtInfo: {
               name: 'Badge',
               tokenURI: 'ar://HLDsCm3ALbbgjVTCPVLhU8aF9taAdKyD1DyB7A8zkaXM',
-              image: 'https://example.com/badge.png',
+              image: 'https://example.example.test/badge.png',
               description: '',
               descriptionEncrypted: 'desc-envelope',
               descriptionAccess: { type: 'sbt', gateIds: ['gate-description'], chainId: 84532 },
@@ -2229,7 +2238,7 @@ describe('SBTPage modal holder optimizations', () => {
             sbtInfo: {
               name: 'Badge',
               tokenURI: 'ar://HLDsCm3ALbbgjVTCPVLhU8aF9taAdKyD1DyB7A8zkaXM',
-              image: 'https://example.com/badge.png',
+              image: 'https://example.example.test/badge.png',
               description: '',
               descriptionEncrypted: 'desc-envelope',
               descriptionAccess: { type: 'sbt', gateIds: ['gate-description'], chainId: 84532 },
@@ -2399,7 +2408,7 @@ describe('SBTPage modal holder optimizations', () => {
               sbtAddress,
               sbtInfo: {
                 tokenURI: 'ar://HLDsCm3ALbbgjVTCPVLhU8aF9taAdKyD1DyB7A8zkaXM',
-                image: 'https://example.com/badge.png',
+                image: 'https://example.example.test/badge.png',
                 mintingEndTime: 0,
                 burnAuth: 0,
                 hasPasswordMint: false,
@@ -2681,7 +2690,7 @@ describe('SBTPage modal holder optimizations', () => {
             sbtAddress,
             sbtInfo: {
               tokenURI: 'ar://HLDsCm3ALbbgjVTCPVLhU8aF9taAdKyD1DyB7A8zkaXM',
-              image: 'https://example.com/badge.png',
+              image: 'https://example.example.test/badge.png',
               mintingEndTime: 0,
               burnAuth: 0,
               burnAuthNeedsOnChainRefresh: true,
@@ -2736,7 +2745,7 @@ describe('SBTPage modal holder optimizations', () => {
             sbtAddress,
             sbtInfo: {
               tokenURI: 'ar://HLDsCm3ALbbgjVTCPVLhU8aF9taAdKyD1DyB7A8zkaXM',
-              image: 'https://example.com/badge.png',
+              image: 'https://example.example.test/badge.png',
               mintingEndTime: 0,
               burnAuth: 0,
               hasPasswordMint: false,
@@ -2917,7 +2926,7 @@ describe('SBTPage modal holder optimizations', () => {
             sbtAddress,
             sbtInfo: {
               tokenURI: 'ar://HLDsCm3ALbbgjVTCPVLhU8aF9taAdKyD1DyB7A8zkaXM',
-              image: 'https://example.com/badge.png',
+              image: 'https://example.example.test/badge.png',
               mintingEndTime: 0,
               burnAuth: 0,
               hasPasswordMint: false,
@@ -2941,7 +2950,7 @@ describe('SBTPage modal holder optimizations', () => {
             sbtAddress,
             sbtInfo: {
               tokenURI: 'ar://HLDsCm3ALbbgjVTCPVLhU8aF9taAdKyD1DyB7A8zkaXM',
-              image: 'https://example.com/badge.png',
+              image: 'https://example.example.test/badge.png',
               mintingEndTime: 0,
               burnAuth: 0,
               hasPasswordMint: false,
@@ -2997,7 +3006,7 @@ describe('SBTPage modal holder optimizations', () => {
             sbtAddress,
             sbtInfo: {
               tokenURI: 'ar://HLDsCm3ALbbgjVTCPVLhU8aF9taAdKyD1DyB7A8zkaXM',
-              image: 'https://example.com/badge.png',
+              image: 'https://example.example.test/badge.png',
               mintingEndTime: 0,
               burnAuth: 0,
               hasPasswordMint: false,
@@ -3248,7 +3257,7 @@ describe('SBTPage modal holder optimizations', () => {
       sbtInfo: {
         name: 'Badge',
         tokenURI: 'ar://HLDsCm3ALbbgjVTCPVLhU8aF9taAdKyD1DyB7A8zkaXM',
-        image: 'https://example.com/badge.png',
+        image: 'https://example.example.test/badge.png',
         mintingEndTime: 0,
         burnAuth: 0,
         maxTokens: '0',
@@ -3291,7 +3300,7 @@ describe('SBTPage modal holder optimizations', () => {
       sbtInfo: {
         name: 'Badge',
         tokenURI: 'ar://HLDsCm3ALbbgjVTCPVLhU8aF9taAdKyD1DyB7A8zkaXM',
-        image: 'https://example.com/badge.png',
+        image: 'https://example.example.test/badge.png',
         mintingEndTime: 0,
         burnAuth: 0,
         maxTokens: '0',
@@ -3319,7 +3328,7 @@ describe('SBTPage modal holder optimizations', () => {
       sbtInfo: {
         name: 'Badge',
         tokenURI: 'ar://HLDsCm3ALbbgjVTCPVLhU8aF9taAdKyD1DyB7A8zkaXM',
-        image: 'https://example.com/badge.png',
+        image: 'https://example.example.test/badge.png',
         mintingEndTime: 0,
         burnAuth: 0,
         maxTokens: '0',
@@ -3358,7 +3367,7 @@ describe('SBTPage modal holder optimizations', () => {
       sbtInfo: {
         name: 'Badge',
         tokenURI: 'ar://HLDsCm3ALbbgjVTCPVLhU8aF9taAdKyD1DyB7A8zkaXM',
-        image: 'https://example.com/badge.png',
+        image: 'https://example.example.test/badge.png',
         mintingEndTime: 0,
         burnAuth: 0,
         maxTokens: '0',
@@ -3532,7 +3541,7 @@ describe('SBTPage modal holder optimizations', () => {
     const addressNode = findElementInTree(cardNode, (element) => element?.props?.id === styles.miniSbtAddress);
 
     expect(addressNode).not.toBeNull();
-    expect(flattenText(addressNode)).toContain(proposalScripts.getShortenedAddress(sbtAddress, false));
+    expect(flattenText(addressNode)).toContain(getShortenedAddress(sbtAddress, false));
 
     cryptoModeSpy.mockRestore();
   });
@@ -3802,6 +3811,99 @@ describe('SBTPage modal holder optimizations', () => {
     expect(handleMintSpy).toHaveBeenCalledTimes(1);
   });
 
+  it('loads cached passwords from the scoped recovery store', () => {
+    const sbtAddress = '0x0000000000000000000000000000000000000201';
+    const sbtLower = sbtAddress.toLowerCase();
+    const subject = createSubject({
+      SBTAddress: sbtAddress,
+      network: { id: 84532, name: 'Base Sepolia' },
+    });
+    const now = Date.now();
+    localStorage.setItem(SBT_PASSWORD_RECOVERY_STORAGE_KEY, JSON.stringify({
+      v: 1,
+      kind: SBT_PASSWORD_RECOVERY_KIND,
+      updatedAt: now,
+      entries: {
+        [`84532:${sbtLower}`]: {
+          chainId: 84532,
+          sbtAddress: sbtLower,
+          passwords: ['scoped-code'],
+          createdAt: now,
+          updatedAt: now,
+          expiresAt: now + 60_000,
+        },
+      },
+    }));
+
+    subject.loadCachedPasswords();
+
+    expect(subject.state.cachedPasswords).toEqual(['scoped-code']);
+  });
+
+  it('prefers the viewed SBT chain over the connected network when loading cached passwords', () => {
+    const sbtAddress = '0x0000000000000000000000000000000000000203';
+    const sbtLower = sbtAddress.toLowerCase();
+    const now = Date.now();
+    const subject = createSubject({
+      SBTAddress: sbtAddress,
+      network: { id: 11155420, name: 'OP Sepolia' },
+    });
+    subject.state = {
+      ...subject.state,
+      sbtInfo: {
+        chainID: 84532,
+      },
+    };
+    localStorage.setItem(SBT_PASSWORD_RECOVERY_STORAGE_KEY, JSON.stringify({
+      v: 1,
+      kind: SBT_PASSWORD_RECOVERY_KIND,
+      updatedAt: now,
+      entries: {
+        [`84532:${sbtLower}`]: {
+          chainId: 84532,
+          sbtAddress: sbtLower,
+          passwords: ['base-only-code'],
+          createdAt: now,
+          updatedAt: now,
+          expiresAt: now + 60_000,
+        },
+      },
+    }));
+
+    subject.loadCachedPasswords();
+
+    expect(subject.state.cachedPasswords).toEqual(['base-only-code']);
+  });
+
+  it('persists admin-generated invite codes to the scoped recovery store', async () => {
+    const sbtAddress = '0x0000000000000000000000000000000000000202';
+    const sbtLower = sbtAddress.toLowerCase();
+    const subject = createSubject({
+      SBTAddress: sbtAddress,
+      network: { id: 84532, name: 'Base Sepolia' },
+    });
+    subject.state = {
+      ...subject.state,
+      passwordGenerationCount: 2,
+    };
+    jest.spyOn(subject, 'generateRandomPasswords').mockReturnValue(['admin-one', 'admin-two']);
+    jest.spyOn(subject, 'cacheTransactionHash').mockImplementation(() => {});
+    jest.spyOn(contractScripts, 'addHashedPasswords').mockResolvedValue({
+      transactionHash: '0x0000000000000000000000000000000000000000000000000000000000000202',
+    });
+
+    await subject.handleGenerateAdminInvites();
+
+    const recoveryStore = JSON.parse(localStorage.getItem(SBT_PASSWORD_RECOVERY_STORAGE_KEY));
+    expect(recoveryStore.entries[`84532:${sbtLower}`]).toEqual(expect.objectContaining({
+      chainId: 84532,
+      sbtAddress: sbtLower,
+      passwords: ['admin-one', 'admin-two'],
+    }));
+    expect(subject.state.adminGeneratedPasswords).toEqual(['admin-one', 'admin-two']);
+    expect(subject.state.cachedPasswords).toEqual(['admin-one', 'admin-two']);
+  });
+
   it('routes invite auto-mint URLs to invite claiming on the dedicated page', async () => {
     const sbtAddress = '0x0000000000000000000000000000000000000102';
     const previousHref = window.location.href;
@@ -3913,7 +4015,7 @@ describe('SBTPage modal holder optimizations', () => {
       ...subject.state,
       sbtInfo: {
         name: 'Open Badge',
-        image: 'https://example.com/badge.png',
+        image: 'https://example.example.test/badge.png',
         mintingEndTime: 0,
         burnAuth: 0,
         hasPasswordMint: false,
@@ -3954,7 +4056,7 @@ describe('SBTPage modal holder optimizations', () => {
         ...subject.state,
         sbtInfo: {
           name: 'Open Badge',
-          image: 'https://example.com/badge.png',
+          image: 'https://example.example.test/badge.png',
           mintingEndTime: 0,
           burnAuth: 0,
           hasPasswordMint: false,
@@ -3988,7 +4090,7 @@ describe('SBTPage modal holder optimizations', () => {
         ...subject.state,
         sbtInfo: {
           name: 'Open Badge',
-          image: 'https://example.com/badge.png',
+          image: 'https://example.example.test/badge.png',
           mintingEndTime: 0,
           burnAuth: 0,
           hasPasswordMint: false,
@@ -4025,7 +4127,7 @@ describe('SBTPage modal holder optimizations', () => {
       ...subject.state,
       sbtInfo: {
         name: 'Private Badge',
-        image: 'https://example.com/badge.png',
+        image: 'https://example.example.test/badge.png',
         mintingEndTime: 0,
         burnAuth: 0,
         hasPasswordMint: false,

@@ -14,6 +14,7 @@ import {
   WIZARD_CONTRACT_MODAL_TESTID,
 } from '../ContractPage/contractMetadata.js';
 import { buildContractViewerContracts } from '../ContractPage/contractViewerUtils.js';
+import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 
 const mockRegisterSessionOnChain = jest.fn();
 const mockFetchSessionFromRegistry = jest.fn();
@@ -48,7 +49,7 @@ const buildMockSponsoredBundle = () => ({
     createdBy: '0xadmin',
     expiresAt: '2099-03-21T12:00:00.000Z',
     sourceSessionSlug: 'source-session',
-    sourceWorkerUrl: 'https://source-worker.example',
+    sourceWorkerUrl: 'https://source-worker.example.test',
   },
 });
 const buildMockPendingSbtDraft = ({
@@ -90,7 +91,7 @@ const buildMockPendingSbtDraft = ({
 });
 let mockCreateSbtDraftQueue = [];
 
-jest.mock('../SBTs/SBTSelector.jsx', () => (props) => {
+jest.mock('../SBTs/SBTSelector', () => (props) => {
   const selectedEntries = Array.isArray(props.selectedSBTs) ? props.selectedSBTs : [];
   return (
     <div
@@ -131,7 +132,7 @@ jest.mock('../SBTs/SBTSelector.jsx', () => (props) => {
     </div>
   );
 });
-jest.mock('../SBTs/CreateSBTGroup.jsx', () => ({
+jest.mock('../SBTs/CreateSBTGroup', () => ({
   __esModule: true,
   default: (props) => (
     <div
@@ -155,8 +156,8 @@ jest.mock('../SBTs/CreateSBTGroup.jsx', () => ({
   ),
   finalizeDeferredCreateSbtDraftUpload: (...args) => mockFinalizeDeferredCreateSbtDraftUpload(...args),
 }));
-jest.mock('../Gates/GateMultiSelectLock.jsx', () => () => <div data-testid="mock-wizard-gate-lock" />);
-jest.mock('../Shared/Json/JsonControls.jsx', () => ({
+jest.mock('../Gates/GateMultiSelectLock', () => () => <div data-testid="mock-wizard-gate-lock" />);
+jest.mock('../Shared/Json/JsonControls', () => ({
   JsonToggleButton: () => null,
   JsonPanel: () => null,
   JsonButtonRow: () => null,
@@ -184,7 +185,7 @@ jest.mock('../../utilities/arweave/arweaveScripts.js', () => ({
   arweaveScripts: {
     uploadDataToArweave: jest.fn(),
     downloadDataFromArweave: (...args) => mockDownloadDataFromArweave(...args),
-    buildArweaveGatewayUrl: jest.fn((txId) => `https://arweave.net/${txId}`),
+    buildArweaveGatewayUrl: jest.fn((txId) => `https://arweave.example.test/${txId}`),
   },
 }));
 
@@ -291,16 +292,18 @@ jest.mock('../../variables/appConfig.js', () => {
 });
 
 import SessionWizard, {
+  buildPublishedPendingSbtLinks,
   getSessionWizardPublishProgressPercent,
   REQUIRED_SESSION_SLUG_ERROR,
   RESERVED_SESSION_SLUG_ERROR,
   deploySessionWizardPendingSbtDraft,
   finalizeSessionWizardPendingSbtDraft,
+  persistSessionWizardSbtRecoveryCodes,
   promotePendingSbtSelectionsAfterDeploy,
   resolveSessionWizardSelectorSourceConfig,
   resolveSessionWizardLitPaymentDelegation,
   resolveSessionWizardWorkerBaseUrl,
-} from './SessionWizard.jsx';
+} from './SessionWizard';
 
 const renderSessionWizard = (props = {}) => render(<SessionWizard network={{ id: 84532 }} {...props} />);
 const createTooltipStore = (tooltipsEnabled = true) => createStore(
@@ -425,7 +428,7 @@ describe('SessionWizard rendered validation', () => {
               address: sessionContracts[contractKey].address,
               id: sessionContracts[contractKey].chainId || 84532,
               testnet: true,
-              explorerUrl: `https://example.com/${contractKey}`,
+              explorerUrl: `https://example.example.test/${contractKey}`,
             }]
           : [],
       }))
@@ -586,7 +589,7 @@ describe('SessionWizard rendered validation', () => {
         createdBy: '0xadmin',
         expiresAt: '2099-03-21T12:00:00.000Z',
         sourceSessionSlug: 'source-session',
-        sourceWorkerUrl: 'https://source-worker.example',
+        sourceWorkerUrl: 'https://source-worker.example.test',
       },
     });
 
@@ -661,7 +664,7 @@ describe('SessionWizard rendered validation', () => {
         createdBy: '0xadmin',
         expiresAt: '2099-03-21T12:00:00.000Z',
         sourceSessionSlug: 'source-session',
-        sourceWorkerUrl: 'https://source-worker.example',
+        sourceWorkerUrl: 'https://source-worker.example.test',
       },
     });
 
@@ -721,7 +724,7 @@ describe('SessionWizard rendered validation', () => {
   it('keeps the image area minimal until a clipboard URL is pasted, then expands it on click', async () => {
     const originalClipboard = navigator.clipboard;
     const read = jest.fn().mockResolvedValue([]);
-    const readText = jest.fn().mockResolvedValue('https://example.com/session-header.png');
+    const readText = jest.fn().mockResolvedValue('https://example.example.test/session-header.png');
 
     try {
       localStorage.setItem('ce:sessionWizardDraft:v1', JSON.stringify({
@@ -749,13 +752,13 @@ describe('SessionWizard rendered validation', () => {
         expect(readText).toHaveBeenCalledTimes(1);
       });
       expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_HEADER_URL)).toHaveValue(
-        'https://example.com/session-header.png'
+        'https://example.example.test/session-header.png'
       );
       expect(screen.queryByText('Pasted image from clipboard.')).not.toBeInTheDocument();
       expect(screen.queryByText('Pasted image URL from clipboard.')).not.toBeInTheDocument();
 
       const previewImage = await screen.findByRole('img', { name: 'Session header preview' });
-      expect(previewImage).toHaveAttribute('src', 'https://example.com/session-header.png');
+      expect(previewImage).toHaveAttribute('src', 'https://example.example.test/session-header.png');
       expect(screen.getByRole('button', { name: 'Remove session header image' })).toBeInTheDocument();
 
       fireEvent.click(screen.getByRole('button', { name: 'Remove session header image' }));
@@ -1660,7 +1663,6 @@ describe('SessionWizard rendered validation', () => {
 
     mockRegisterSessionOnChain.mockResolvedValue({ txs: [] });
     arweaveScripts.uploadDataToArweave.mockResolvedValue('a'.repeat(43));
-    workerAuth.buildSignedBootstrapAdminAuth.mockClear();
     mockDecryptWithPassword.mockReturnValueOnce(sponsoredBundleReady);
     workerAuth.normalizeWorkerUrl.mockImplementation((value = '') => String(value || '').trim());
 
@@ -1798,6 +1800,322 @@ describe('SessionWizard rendered validation', () => {
       );
       expect(workerAuth.buildSignedBootstrapAdminAuth).not.toHaveBeenCalled();
       expect(screen.queryByText('Upload a worker bundle file before deploy.')).not.toBeInTheDocument();
+    } finally {
+      global.fetch = originalFetch;
+      if (originalUploadDataToArweave) {
+        arweaveScripts.uploadDataToArweave.mockImplementation(originalUploadDataToArweave);
+      } else {
+        arweaveScripts.uploadDataToArweave.mockReset();
+      }
+      if (originalRegisterSessionOnChain) {
+        mockRegisterSessionOnChain.mockImplementation(originalRegisterSessionOnChain);
+      } else {
+        mockRegisterSessionOnChain.mockReset();
+      }
+      workerAuth.normalizeWorkerUrl.mockImplementation(originalNormalizeWorkerUrl);
+    }
+  });
+
+  it('retries sponsored publish with an uploaded fallback bundle file after a hosted-bundle fetch failure', async () => {
+    const originalFetch = global.fetch;
+    const { WORKER_BUNDLE_URL } = require('../../variables/publicDeploymentConfig.js');
+    const { arweaveScripts } = require('../../utilities/arweave/arweaveScripts.js');
+    const workerAuth = require('../../utilities/worker/workerAuth.js');
+    const originalUploadDataToArweave = arweaveScripts.uploadDataToArweave.getMockImplementation();
+    const originalRegisterSessionOnChain = mockRegisterSessionOnChain.getMockImplementation();
+    const originalNormalizeWorkerUrl = workerAuth.normalizeWorkerUrl.getMockImplementation();
+    const bundleFile = {
+      name: 'sessionCorsWorker.bundle.js',
+      type: 'text/javascript',
+      text: async () => 'export default { async fetch() { return new Response("publish-ok"); } };',
+    };
+    let resolveSponsoredBundle;
+    const sponsoredBundleReady = new Promise((resolve) => {
+      resolveSponsoredBundle = resolve;
+    });
+
+    mockRegisterSessionOnChain.mockResolvedValue({ txs: [] });
+    arweaveScripts.uploadDataToArweave.mockResolvedValue('a'.repeat(43));
+    workerAuth.buildSignedBootstrapAdminAuth.mockClear();
+    mockDecryptWithPassword.mockReturnValueOnce(sponsoredBundleReady);
+    workerAuth.normalizeWorkerUrl.mockImplementation((value = '') => String(value || '').trim());
+
+    global.fetch = jest.fn(async (url, options = {}) => {
+      const normalizedUrl = String(url);
+      if (normalizedUrl.endsWith('/deploy')) {
+        const payload = JSON.parse(options.body);
+        expect(payload.bundleUrl).toBe(WORKER_BUNDLE_URL);
+        expect(payload.bundleText).toBeUndefined();
+        return {
+          ok: false,
+          status: 502,
+          json: async () => ({ error: 'Failed to fetch bundle (404).' }),
+        };
+      }
+      if (normalizedUrl.endsWith('/sponsored/redeem-deploy')) {
+        const payload = JSON.parse(options.body);
+        expect(payload.deployPayload.bundleUrl).toBeUndefined();
+        expect(payload.deployPayload.bundleText).toContain('new Response("publish-ok")');
+        return {
+          ok: true,
+          json: async () => ({
+            ok: true,
+            workerUrl: 'https://sponsored-file-deployed.example.test',
+            writesSessionConfig: true,
+            writesSessionSecrets: false,
+          }),
+        };
+      }
+      if (normalizedUrl.endsWith('/auth/nonce')) {
+        return { ok: true, json: async () => ({ nonce: 'wizard-admin-nonce' }) };
+      }
+      if (normalizedUrl.endsWith('/admin/set-config') || normalizedUrl.endsWith('/admin/set-secrets')) {
+        return { ok: true, json: async () => ({ ok: true }) };
+      }
+      return { ok: true, json: async () => ({ ok: true }) };
+    });
+
+    try {
+      window.history.replaceState({}, '', '/session/new?sponsored=sponsor-tx-id#k=sponsor-secret');
+      localStorage.setItem('ce:sessionWizardDraft:v1', JSON.stringify({
+        draft: {
+          networkChainId: 84532,
+          blockLimits: {
+            start: mockSelectorSourceStartBlock,
+            end: null,
+          },
+          contracts: {
+            sbtFactory: {
+              address: mockSelectorSourceFactory,
+              chainId: 84532,
+            },
+          },
+          __registry: {
+            chainId: 84532,
+            registryChainId: 84532,
+          },
+        },
+      }));
+      renderLoggedInSessionWizard({
+        initialSponsoredBundleId: 'sponsor-tx-id',
+        initialSponsoredBundleKey: 'sponsor-secret',
+      });
+
+      fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME), {
+        target: { value: 'Sponsored Publish Bundle File Retry' },
+      });
+
+      selectNormalModeCard('Worker');
+
+      const cloudflareTokenInput = screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN);
+      const reactPropsKey = Object.keys(cloudflareTokenInput).find((key) => key.startsWith('__reactProps$'));
+      act(() => {
+        cloudflareTokenInput[reactPropsKey].onChange({ target: { value: 'cf-test-token' } });
+      });
+      fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_OPENAI_KEY), {
+        target: { value: 'sk-sponsored-file-retry' },
+      });
+      fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_ARWEAVE_JWK), {
+        target: { value: '{"kty":"RSA","n":"sponsored-file-retry"}' },
+      });
+
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_WORKER));
+
+      await waitFor(() => {
+        expect(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_STATUS)).toHaveTextContent('Failed to fetch bundle (404).');
+      });
+
+      await act(async () => {
+        resolveSponsoredBundle(buildMockSponsoredBundle());
+        await sponsoredBundleReady;
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SPONSORED_STATUS)).toHaveTextContent(
+          'Sponsored resources applied: OpenAI key, Arweave wallet, faucet funding, deploy access.'
+        );
+      });
+
+      selectNormalModeCard('Deploy Session');
+
+      const publishBundleClearButton = screen.getByTestId(E2E_TESTIDS.WIZARD_CLEAR_BUNDLE_FILE_PUBLISH);
+      expect(publishBundleClearButton).toBeDisabled();
+
+      fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_BUNDLE_FILE_INPUT), {
+        target: { files: [bundleFile] },
+      });
+
+      expect(publishBundleClearButton).not.toBeDisabled();
+
+      const publishButton = await screen.findByTestId(E2E_TESTIDS.WIZARD_PUBLISH);
+      await waitFor(() => {
+        expect(publishButton).not.toBeDisabled();
+      });
+      fireEvent.click(publishButton);
+
+      await waitFor(() => {
+        expect(
+          global.fetch.mock.calls.some(([url]) => String(url).endsWith('/sponsored/redeem-deploy'))
+        ).toBe(true);
+      });
+      await waitFor(() => {
+        expect(arweaveScripts.uploadDataToArweave).toHaveBeenCalled();
+      });
+      expect(workerAuth.buildSignedBootstrapAdminAuth).not.toHaveBeenCalled();
+    } finally {
+      global.fetch = originalFetch;
+      if (originalUploadDataToArweave) {
+        arweaveScripts.uploadDataToArweave.mockImplementation(originalUploadDataToArweave);
+      } else {
+        arweaveScripts.uploadDataToArweave.mockReset();
+      }
+      if (originalRegisterSessionOnChain) {
+        mockRegisterSessionOnChain.mockImplementation(originalRegisterSessionOnChain);
+      } else {
+        mockRegisterSessionOnChain.mockReset();
+      }
+      workerAuth.normalizeWorkerUrl.mockImplementation(originalNormalizeWorkerUrl);
+    }
+  });
+
+  it('retries sponsored publish with a manual bundle URL override after a hosted-bundle fetch failure', async () => {
+    const originalFetch = global.fetch;
+    const { WORKER_BUNDLE_URL } = require('../../variables/publicDeploymentConfig.js');
+    const { arweaveScripts } = require('../../utilities/arweave/arweaveScripts.js');
+    const workerAuth = require('../../utilities/worker/workerAuth.js');
+    const originalUploadDataToArweave = arweaveScripts.uploadDataToArweave.getMockImplementation();
+    const originalRegisterSessionOnChain = mockRegisterSessionOnChain.getMockImplementation();
+    const originalNormalizeWorkerUrl = workerAuth.normalizeWorkerUrl.getMockImplementation();
+    const manualBundleUrl = 'https://assets.example.test/sponsored-sessionCorsWorker.bundle.js';
+    let resolveSponsoredBundle;
+    const sponsoredBundleReady = new Promise((resolve) => {
+      resolveSponsoredBundle = resolve;
+    });
+
+    mockRegisterSessionOnChain.mockResolvedValue({ txs: [] });
+    arweaveScripts.uploadDataToArweave.mockResolvedValue('a'.repeat(43));
+    workerAuth.buildSignedBootstrapAdminAuth.mockClear();
+    mockDecryptWithPassword.mockReturnValueOnce(sponsoredBundleReady);
+    workerAuth.normalizeWorkerUrl.mockImplementation((value = '') => String(value || '').trim());
+
+    global.fetch = jest.fn(async (url, options = {}) => {
+      const normalizedUrl = String(url);
+      if (normalizedUrl.endsWith('/deploy')) {
+        const payload = JSON.parse(options.body);
+        expect(payload.bundleUrl).toBe(WORKER_BUNDLE_URL);
+        expect(payload.bundleText).toBeUndefined();
+        return {
+          ok: false,
+          status: 502,
+          json: async () => ({ error: 'Failed to fetch bundle (404).' }),
+        };
+      }
+      if (normalizedUrl.endsWith('/sponsored/redeem-deploy')) {
+        const payload = JSON.parse(options.body);
+        expect(payload.deployPayload.bundleUrl).toBe(manualBundleUrl);
+        expect(payload.deployPayload.bundleText).toBeUndefined();
+        return {
+          ok: true,
+          json: async () => ({
+            ok: true,
+            workerUrl: 'https://sponsored-deployed.example.test',
+            writesSessionConfig: true,
+            writesSessionSecrets: false,
+          }),
+        };
+      }
+      if (normalizedUrl.endsWith('/auth/nonce')) {
+        return { ok: true, json: async () => ({ nonce: 'wizard-admin-nonce' }) };
+      }
+      if (normalizedUrl.endsWith('/admin/set-config') || normalizedUrl.endsWith('/admin/set-secrets')) {
+        return { ok: true, json: async () => ({ ok: true }) };
+      }
+      return { ok: true, json: async () => ({ ok: true }) };
+    });
+
+    try {
+      window.history.replaceState({}, '', '/session/new?sponsored=sponsor-tx-id#k=sponsor-secret');
+      localStorage.setItem('ce:sessionWizardDraft:v1', JSON.stringify({
+        draft: {
+          networkChainId: 84532,
+          blockLimits: {
+            start: mockSelectorSourceStartBlock,
+            end: null,
+          },
+          contracts: {
+            sbtFactory: {
+              address: mockSelectorSourceFactory,
+              chainId: 84532,
+            },
+          },
+          __registry: {
+            chainId: 84532,
+            registryChainId: 84532,
+          },
+        },
+      }));
+      renderLoggedInSessionWizard({
+        initialSponsoredBundleId: 'sponsor-tx-id',
+        initialSponsoredBundleKey: 'sponsor-secret',
+      });
+
+      fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME), {
+        target: { value: 'Sponsored Publish Manual URL Retry' },
+      });
+
+      selectNormalModeCard('Worker');
+
+      const cloudflareTokenInput = screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN);
+      const reactPropsKey = Object.keys(cloudflareTokenInput).find((key) => key.startsWith('__reactProps$'));
+      act(() => {
+        cloudflareTokenInput[reactPropsKey].onChange({ target: { value: 'cf-test-token' } });
+      });
+      fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_OPENAI_KEY), {
+        target: { value: 'sk-sponsored-url-retry' },
+      });
+      fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_ARWEAVE_JWK), {
+        target: { value: '{"kty":"RSA","n":"sponsored-url-retry"}' },
+      });
+
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_WORKER));
+
+      await waitFor(() => {
+        expect(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_STATUS)).toHaveTextContent('Failed to fetch bundle (404).');
+      });
+
+      await act(async () => {
+        resolveSponsoredBundle(buildMockSponsoredBundle());
+        await sponsoredBundleReady;
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SPONSORED_STATUS)).toHaveTextContent(
+          'Sponsored resources applied: OpenAI key, Arweave wallet, faucet funding, deploy access.'
+        );
+      });
+
+      selectNormalModeCard('Deploy Session');
+
+      fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_BUNDLE_URL_OVERRIDE), {
+        target: { value: manualBundleUrl },
+      });
+
+      const publishButton = await screen.findByTestId(E2E_TESTIDS.WIZARD_PUBLISH);
+      await waitFor(() => {
+        expect(publishButton).not.toBeDisabled();
+      });
+      fireEvent.click(publishButton);
+
+      await waitFor(() => {
+        expect(
+          global.fetch.mock.calls.some(([url]) => String(url).endsWith('/sponsored/redeem-deploy'))
+        ).toBe(true);
+      });
+      await waitFor(() => {
+        expect(arweaveScripts.uploadDataToArweave).toHaveBeenCalled();
+      });
+      expect(workerAuth.buildSignedBootstrapAdminAuth).not.toHaveBeenCalled();
+      expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_BUNDLE_URL_OVERRIDE)).not.toBeInTheDocument();
     } finally {
       global.fetch = originalFetch;
       if (originalUploadDataToArweave) {
@@ -2403,7 +2721,7 @@ describe('SessionWizard rendered validation', () => {
     }
   });
 
-  it('surfaces workers.dev activation details after deploy-helper succeeds', async () => {
+  it('surfaces worker activation details after deploy-helper succeeds', async () => {
     const originalFetch = global.fetch;
     const { WORKER_BUNDLE_URL } = require('../../variables/publicDeploymentConfig.js');
     const workerAuth = require('../../utilities/worker/workerAuth.js');
@@ -2459,7 +2777,7 @@ describe('SessionWizard rendered validation', () => {
 
       await waitFor(() => {
         expect(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_STATUS)).toHaveTextContent(
-          'Worker deployed. workers.dev status: account active (tenant-subdomain); script enabled.'
+          /Worker deployed\..*account active \(tenant-subdomain\); script enabled\./
         );
       });
       const deployCall = global.fetch.mock.calls.find(([url]) => String(url).endsWith('/deploy'));
@@ -2482,16 +2800,16 @@ describe('SessionWizard rendered validation', () => {
     expect(resolveSessionWizardWorkerBaseUrl({
       configuredWorkerUrl: '',
       deployWorkerUrl: '',
-      fallbackWorkerUrl: 'https://shared.example',
+      fallbackWorkerUrl: 'https://shared.example.test',
       workerMode: 'custom',
     })).toBe('');
 
     expect(resolveSessionWizardWorkerBaseUrl({
       configuredWorkerUrl: '',
       deployWorkerUrl: '',
-      fallbackWorkerUrl: 'https://shared.example',
+      fallbackWorkerUrl: 'https://shared.example.test',
       workerMode: 'default',
-    })).toBe('https://shared.example');
+    })).toBe('https://shared.example.test');
   });
 
   it('fills publish progress gradually within an active step and completes at 100 after done', () => {
@@ -2749,6 +3067,69 @@ describe('SessionWizard rendered validation', () => {
       name: 'Pending SBT',
       metadataPreview: { phase: 'deployed' },
     }]);
+  });
+
+  it('builds published inline SBT links from newly deployed and resumed pending drafts', () => {
+    expect(buildPublishedPendingSbtLinks({
+      deployedDrafts: [{
+        predictedAddress: mockPendingSbtAddress,
+        deployedAddress: mockPendingSbtAddress,
+        displayName: 'Newly Deployed Group',
+        deployed: true,
+      }],
+      pendingDraftSnapshot: [
+        {
+          predictedAddress: mockPendingSbtAddress,
+          deployedAddress: mockPendingSbtAddress,
+          displayName: 'Newly Deployed Group',
+          deployed: true,
+        },
+        {
+          predictedAddress: mockSecondPendingSbtAddress,
+          deployedAddress: mockSecondPendingSbtAddress,
+          deployed: true,
+        },
+      ],
+      sessionSlug: 'writers-room',
+    })).toEqual([
+      {
+        address: mockPendingSbtAddress,
+        label: 'Newly Deployed Group',
+        href: buildSbtDetailPath(mockPendingSbtAddress, 'writers-room'),
+      },
+      {
+        address: mockSecondPendingSbtAddress,
+        label: mockSecondPendingSbtAddress,
+        href: buildSbtDetailPath(mockSecondPendingSbtAddress, 'writers-room'),
+      },
+    ]);
+  });
+
+  it('persists published pending SBT recovery codes to the scoped recovery store', () => {
+    const writeRecoveryCodes = jest.fn(() => ({ ok: true, status: 'ok' }));
+
+    const result = persistSessionWizardSbtRecoveryCodes({
+      finalizedDraft: {
+        hasPasswordMintOnChain: true,
+        passwordList: ['claim-code-1'],
+        groupPassword: '',
+        usesInviteCodes: false,
+      },
+      sbtAddress: mockPendingSbtAddress,
+      sessionConfigForDeploy: {
+        networkChainId: 84532,
+      },
+      writeRecoveryCodes,
+    });
+
+    expect(result).toEqual({ ok: true, status: 'ok' });
+    expect(writeRecoveryCodes).toHaveBeenCalledWith({
+      chainId: 84532,
+      sbtAddress: mockPendingSbtAddress,
+      passwords: ['claim-code-1'],
+      mode: 'replace',
+    });
+    expect(localStorage.getItem('createdSBTs')).toBeNull();
   });
 
   it('resolves demo selector discovery from the source session config instead of the auto-seeded draft block window', () => {
@@ -3188,8 +3569,15 @@ describe('SessionWizard rendered validation', () => {
   });
 
   it('uses noopener noreferrer on every blank-target anchor in the source', () => {
-    const source = fs.readFileSync(require.resolve('./SessionWizard.jsx'), 'utf8');
-    const anchors = source.match(/<a[\s\S]*?<\/a>/g) || [];
+    const sourceFiles = [
+      './SessionWizard',
+      './SessionPublishSummary',
+      './SessionWizardModals',
+    ];
+    const anchors = sourceFiles.flatMap((ref) => {
+      const source = fs.readFileSync(require.resolve(ref), 'utf8');
+      return source.match(/<a[\s\S]*?<\/a>/g) || [];
+    });
     const blankTargetAnchors = anchors.filter((anchor) => anchor.includes('target="_blank"'));
 
     expect(blankTargetAnchors.length).toBeGreaterThan(0);
@@ -3233,6 +3621,25 @@ describe('SessionWizard rendered validation', () => {
     expect(await screen.findByText('Start block')).toBeInTheDocument();
     expect(await screen.findByDisplayValue('987654')).toBeInTheDocument();
     expect(screen.getByText('Ends at block 988,000.')).toBeInTheDocument();
+  });
+
+  it('keeps legacy sponsoredSbtAddress inside optional details in normal mode', async () => {
+    const sponsoredSbtAddress = '0x00000000000000000000000000000000000000f1';
+    localStorage.setItem('ce:sessionWizardDraft:v1', JSON.stringify({
+      draft: {
+        sponsoredSbtAddress,
+      },
+    }));
+
+    renderSessionWizard();
+
+    await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+
+    expect(screen.queryByDisplayValue(sponsoredSbtAddress)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /Optional details/i }));
+
+    expect(await screen.findByDisplayValue(sponsoredSbtAddress)).toBeInTheDocument();
   });
 
   it('keeps session details open after filling both fields in normal mode', async () => {
@@ -3591,6 +3998,7 @@ describe('SessionWizard rendered validation', () => {
   });
 
   it('shows the effective default worker RPC URL as the RPC field placeholder without extra helper copy', async () => {
+    const defaultPocketRpcUrl = 'https://op-sepolia-testnet.api.pocket.network'; // intentional: production default worker RPC placeholder
     renderSessionWizard();
     selectNormalModeCard('Worker');
 
@@ -3602,8 +4010,8 @@ describe('SessionWizard rendered validation', () => {
     const rpcInput = within(rpcCard).getByRole('textbox');
 
     expect(rpcInput).toHaveValue('');
-    expect(rpcInput).toHaveAttribute('placeholder', 'https://op-sepolia-testnet.api.pocket.network');
-    expect(within(rpcCard).queryByText('Default worker RPC: https://op-sepolia-testnet.api.pocket.network')).not.toBeInTheDocument();
+    expect(rpcInput).toHaveAttribute('placeholder', defaultPocketRpcUrl);
+    expect(within(rpcCard).queryByText(`Default worker RPC: ${defaultPocketRpcUrl}`)).not.toBeInTheDocument();
   });
 
   it('renders non-worker session wizard tooltips through the same explainer toggle path', async () => {
@@ -4306,7 +4714,7 @@ describe('SessionWizard rendered validation', () => {
 
       fireEvent.click(screen.getByRole('button', { name: /^Publish$/i }));
       fireEvent.click(screen.getByLabelText('Advanced publish settings'));
-      fireEvent.change(screen.getByPlaceholderText('ar://<txId> or https://arweave.net/<txId>'), {
+      fireEvent.change(screen.getByPlaceholderText(/ar:\/\/<txId>/i), {
         target: { value: 'ar://'.concat('a'.repeat(43)) },
       });
 

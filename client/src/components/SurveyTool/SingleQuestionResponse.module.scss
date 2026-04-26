@@ -65,6 +65,35 @@
   margin-bottom: 10px;
 }
 
+.questionOnlyFullscreenBody {
+  padding-top: 28px;
+  padding-bottom: 24px;
+}
+
+.questionPromptText {
+  margin: 0;
+  color: var(--ce-color-white);
+  font-size: 1.04rem;
+  font-weight: 700;
+  line-height: 1.6;
+  opacity: 0.96;
+  max-width: 60rem;
+}
+
+.questionPromptTextFullscreen {
+  font-size: clamp(1.55rem, 2.2vw, 2.08rem);
+  line-height: 1.42;
+  letter-spacing: -0.01em;
+}
+
+.questionOnlyAffordance {
+  margin-top: 0.9rem;
+}
+
+.questionOnlyAffordanceFullscreen {
+  margin-top: 1rem;
+}
+
 .promptDecryptRow {
   display: flex;
   align-items: flex-start;

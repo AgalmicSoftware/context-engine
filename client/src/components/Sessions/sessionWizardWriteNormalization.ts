@@ -1,0 +1,321 @@
+import { AUTHORITY_MATRIX } from '../../utilities/session/sessionAuthorityMatrix.js';
+import {
+  normalizeLitMetadataNetwork,
+  normalizeSessionNaming,
+  stripAuthoritativeSessionGateFields,
+} from '../../utilities/session/sessionMetadata.js';
+import { normalizeBlockLimitsForConfig } from '../../utilities/session/blockLimits.js';
+import { SESSION_WORKER_METADATA_ALIAS_KEYS } from '../../utilities/session/sessionWorkerUrlCompatibility.js';
+import { toStr } from '../../utilities/shared/primitives.js';
+import { sessionRegistryUtils } from '../../utilities/web3/sessionRegistry.js';
+import {
+  getSessionWizardContractDefaults,
+  getVisibleSessionWizardContractKeys,
+  sanitizeSessionWizardContracts,
+} from './sessionWizardContracts.js';
+import type {
+  AnyRecord,
+  ChainIdLike,
+  SessionContractLike,
+  SessionContractsLike,
+} from '../shellTypes';
+
+const isObj = (value: unknown): value is AnyRecord => !!value && typeof value === 'object' && !Array.isArray(value);
+const trimString = (value: unknown): string => toStr(value).trim();
+const cloneValue = (value: any): any => {
+  if (Array.isArray(value)) return value.map((entry) => cloneValue(entry));
+  if (isObj(value)) {
+    return Object.keys(value).reduce<AnyRecord>((acc, key) => {
+      acc[key] = cloneValue(value[key]);
+      return acc;
+    }, {});
+  }
+  return typeof value === 'string' ? value.trim() : value;
+};
+
+const WORKER_METADATA_ALIAS_KEYS = Object.freeze([
+  ...SESSION_WORKER_METADATA_ALIAS_KEYS,
+  'rpcUrlsByChainId',
+  'scopes',
+  'embeddedDeployHelperEnabled',
+  'deployHelperEnabled',
+]);
+
+// Stage-A compatibility mirror: worker URL reads have not fully migrated to Worker KV yet,
+// so new sessions keep an explicit registry mirror while metadata stops claiming authority.
+export const SESSION_WIZARD_ONCHAIN_COMPAT_FIELD_PATHS = Object.freeze({
+  corsWorkerUrl: ['corsWorkerUrl'],
+});
+
+const orderMetadataFields = (metadata: AnyRecord, fieldOrder: string[] = []): AnyRecord => {
+  if (!isObj(metadata)) return metadata;
+  const ordered: AnyRecord = {};
+  (Array.isArray(fieldOrder) ? fieldOrder : []).forEach((key) => {
+    if (Object.prototype.hasOwnProperty.call(metadata, key)) {
+      ordered[key] = metadata[key];
+    }
+  });
+  Object.keys(metadata).forEach((key) => {
+    if (!Object.prototype.hasOwnProperty.call(ordered, key)) {
+      ordered[key] = metadata[key];
+    }
+  });
+  return ordered;
+};
+
+const stripWorkerOnlyMetadataFields = (metadata: AnyRecord): AnyRecord => {
+  if (!isObj(metadata)) return metadata;
+  const next = cloneValue(metadata);
+  [...AUTHORITY_MATRIX.workerConfig.fields, ...WORKER_METADATA_ALIAS_KEYS].forEach((key) => {
+    delete next[key];
+  });
+  return next;
+};
+
+const defaultNormalizeAiProvider = (value: unknown, fallback = 'openai'): string => {
+  const lowered = trimString(value).toLowerCase();
+  return lowered || fallback;
+};
+
+const defaultNormalizeAiModels = (raw: AnyRecord = {}): AnyRecord => (
+  isObj(raw) ? cloneValue(raw) : {}
+);
+
+const defaultNormalizeAiModelForProvider = (
+  _modelType: string,
+  _providerValue: string,
+  modelValue: unknown
+): string => trimString(modelValue);
+
+export const sanitizeSessionWizardMetadataPayload = (metadata: AnyRecord, {
+  fieldOrder = [],
+  sanitizeContracts = sanitizeSessionWizardContracts,
+  normalizeAiProvider = defaultNormalizeAiProvider,
+  normalizeAiModels = defaultNormalizeAiModels,
+  normalizeAiModelForProvider = defaultNormalizeAiModelForProvider,
+  defaultAiModels = {},
+}: {
+  fieldOrder?: string[];
+  sanitizeContracts?: (contracts: SessionContractsLike) => SessionContractsLike;
+  normalizeAiProvider?: (value: unknown, fallback?: string) => string;
+  normalizeAiModels?: (raw?: AnyRecord, fallbackProvider?: string, transcription?: unknown) => AnyRecord;
+  normalizeAiModelForProvider?: (modelType: string, providerValue: string, modelValue: unknown) => string;
+  defaultAiModels?: AnyRecord;
+} = {}): AnyRecord => {
+  if (!isObj(metadata)) return metadata;
+
+  let next = cloneValue(metadata) as AnyRecord;
+  next = stripAuthoritativeSessionGateFields(next) as AnyRecord;
+  next = stripWorkerOnlyMetadataFields(next) as AnyRecord;
+  next = normalizeLitMetadataNetwork(next) as AnyRecord;
+  next = normalizeSessionNaming(next) as AnyRecord;
+  next.sessionName = trimString(next.sessionName);
+  next.sessionInfo = trimString(next.sessionInfo);
+  if (!next.sessionName) delete next.sessionName;
+  if (!next.sessionInfo) delete next.sessionInfo;
+  if (!next.sessionInfoEncrypted) delete next.sessionInfoEncrypted;
+
+  const headerCandidate = trimString(next.sessionHeader || next.sessionHeaderImg);
+  if (headerCandidate) {
+    next.sessionHeaderImg = headerCandidate;
+  } else {
+    delete next.sessionHeaderImg;
+  }
+  delete next.sessionHeader;
+  delete next.orgHeader;
+  delete next.orgHeaderImg;
+  delete next.orderHeaderImg;
+
+  if (isObj(next.ai)) {
+    const ai = next.ai;
+    const fallbackProvider = normalizeAiProvider(ai.mode || ai.provider || 'openai');
+    ai.models = normalizeAiModels(ai.models, fallbackProvider, ai.transcription);
+    if (isObj(ai.models?.fast)) {
+      const provider = normalizeAiProvider(ai.models.fast.provider || fallbackProvider || 'openai');
+      ai.models.fast.provider = provider;
+      ai.models.fast.model = normalizeAiModelForProvider(
+        'fast',
+        provider,
+        ai.models.fast.model || defaultAiModels.fast
+      );
+    }
+    if (isObj(ai.models?.thinking)) {
+      const provider = normalizeAiProvider(ai.models.thinking.provider || fallbackProvider || 'openai');
+      ai.models.thinking.provider = provider;
+      ai.models.thinking.model = normalizeAiModelForProvider(
+        'thinking',
+        provider,
+        ai.models.thinking.model || defaultAiModels.thinking
+      );
+    }
+    delete ai.mode;
+    delete ai.provider;
+    delete ai.providers;
+    delete ai.transcription;
+    if (isObj(ai.models?.transcription)) {
+      ai.models.transcription = {
+        provider: normalizeAiProvider(ai.models.transcription.provider || 'openai'),
+        model: trimString(ai.models.transcription.model || 'whisper-1'),
+      };
+    }
+  }
+
+  if (isObj(next.faucet)) {
+    delete next.faucet.rpcUrl;
+    delete next.faucet.privateKey;
+    delete next.faucet.encryptedPrivateKey;
+  }
+
+  if (isObj(next.blockLimits)) {
+    const start = Number(next.blockLimits.start);
+    const endRaw = next.blockLimits.end;
+    const end = endRaw == null || endRaw === '' ? null : Number(endRaw);
+    if (!Number.isFinite(start) || start <= 0) {
+      throw new Error('Session config requires blockLimits.start (positive block number).');
+    }
+    next.blockLimits.start = start;
+    next.blockLimits.end = (
+      typeof end === 'number' &&
+      Number.isFinite(end) &&
+      end > 0 &&
+      end >= start
+    ) ? end : null;
+  } else if (Object.prototype.hasOwnProperty.call(next, 'blockLimits')) {
+    throw new Error('Session config requires blockLimits.start (positive block number).');
+  }
+
+  if (isObj(next.contracts)) {
+    next.contracts = sanitizeContracts(next.contracts);
+  }
+
+  return orderMetadataFields(next, fieldOrder);
+};
+
+export const buildSessionWizardRegistrySessionFields = ({
+  onChainFields = {},
+  sponsoredFields = {},
+  compatibilityFieldPaths = SESSION_WIZARD_ONCHAIN_COMPAT_FIELD_PATHS,
+}: {
+  onChainFields?: AnyRecord;
+  sponsoredFields?: AnyRecord;
+  compatibilityFieldPaths?: Record<string, string[]>;
+} = {}): AnyRecord => {
+  const next: AnyRecord = {};
+  const compatPaths = isObj(compatibilityFieldPaths) ? compatibilityFieldPaths : {};
+  const rawOnChainFields = isObj(onChainFields) ? onChainFields : {};
+
+  Object.keys(compatPaths).forEach((fieldKey) => {
+    if (!Object.prototype.hasOwnProperty.call(rawOnChainFields, fieldKey)) return;
+    const rawValue = rawOnChainFields[fieldKey];
+    if (typeof rawValue === 'string') {
+      next[fieldKey] = trimString(rawValue);
+      return;
+    }
+    if (rawValue != null) {
+      next[fieldKey] = cloneValue(rawValue);
+    }
+  });
+
+  Object.entries(isObj(sponsoredFields) ? sponsoredFields : {}).forEach(([key, value]) => {
+    const trimmed = trimString(value);
+    if (trimmed) next[key] = trimmed;
+  });
+
+  return next;
+};
+
+export const buildSessionWizardWorkerConfigPayload = ({
+  slug = '',
+  draft = {},
+  deployPayload = {},
+  account = '',
+  registryAddress = '',
+  registryChainId = 0,
+  networkChainId = 0,
+  sessionId = '',
+  latestChainBlock = null,
+  workerUrl = '',
+  resolveWorkerFaucetConfig = () => ({}),
+  normalizeBlockLimits = normalizeBlockLimitsForConfig,
+  getContractDefaults = getSessionWizardContractDefaults,
+  getVisibleContractKeys = getVisibleSessionWizardContractKeys,
+}: {
+  slug?: string;
+  draft?: AnyRecord;
+  deployPayload?: AnyRecord;
+  account?: string;
+  registryAddress?: string;
+  registryChainId?: ChainIdLike;
+  networkChainId?: ChainIdLike;
+  sessionId?: string;
+  latestChainBlock?: number | null;
+  workerUrl?: string;
+  resolveWorkerFaucetConfig?: () => AnyRecord;
+  normalizeBlockLimits?: (blockLimits: unknown, latestBlock?: number | null) => AnyRecord | null;
+  getContractDefaults?: (chainId: number) => AnyRecord;
+  getVisibleContractKeys?: () => string[];
+} = {}): AnyRecord => {
+  const resolvedDraft = isObj(draft) ? draft : {};
+  const resolvedDeployPayload = isObj(deployPayload) ? deployPayload : {};
+  const chainId = Number(registryChainId || resolvedDraft.networkChainId || networkChainId || 0) || 0;
+  const normalizedContracts: SessionContractsLike = {};
+  const defaults = (getContractDefaults(chainId) || {}) as Record<string, SessionContractLike>;
+  const draftContracts = isObj(resolvedDraft.contracts)
+    ? (resolvedDraft.contracts as SessionContractsLike)
+    : {};
+
+  getVisibleContractKeys().forEach((key) => {
+    const fromDraft = isObj(draftContracts[key]) ? draftContracts[key] : {};
+    const address = trimString(fromDraft.address || defaults?.[key] || '');
+    const contractChainId = Number(fromDraft.chainId || chainId || 0) || 0;
+    if (!address) return;
+    normalizedContracts[key] = {
+      address,
+      ...(contractChainId ? { chainId: contractChainId } : {}),
+    };
+  });
+
+  const next: AnyRecord = {
+    slug: trimString(slug),
+    adminAddress: trimString(resolvedDeployPayload.adminAddress || account),
+    registryAddress: trimString(resolvedDeployPayload.registryAddress || registryAddress),
+    registryChainId: Number(resolvedDeployPayload.registryChainId || registryChainId || chainId || 0) || 0,
+    networkChainId: chainId || null,
+    corsWorkerUrl: trimString(workerUrl || resolvedDeployPayload.corsWorkerUrl || resolvedDraft.corsWorkerUrl),
+    rpcUrl: trimString(resolvedDeployPayload.rpcUrl),
+    rpcUrlsByChainId: isObj(resolvedDeployPayload.rpcUrlsByChainId)
+      ? cloneValue(resolvedDeployPayload.rpcUrlsByChainId)
+      : {},
+    allowOrigins: Array.isArray(resolvedDeployPayload.allowOrigins)
+      ? cloneValue(resolvedDeployPayload.allowOrigins)
+      : [],
+    limits: isObj(resolvedDeployPayload.limits) ? cloneValue(resolvedDeployPayload.limits) : {},
+    scopes: isObj(resolvedDeployPayload.scopes) ? cloneValue(resolvedDeployPayload.scopes) : {},
+    faucet: isObj(resolvedDeployPayload.faucet)
+      ? cloneValue(resolvedDeployPayload.faucet)
+      : cloneValue(resolveWorkerFaucetConfig()),
+  };
+
+  if (
+    typeof resolvedDeployPayload.embeddedDeployHelperEnabled === 'boolean' ||
+    typeof resolvedDraft.embeddedDeployHelperEnabled === 'boolean'
+  ) {
+    next.embeddedDeployHelperEnabled = (
+      resolvedDeployPayload.embeddedDeployHelperEnabled ??
+      resolvedDraft.embeddedDeployHelperEnabled
+    ) !== false;
+  }
+
+  const blockLimits = normalizeBlockLimits(resolvedDraft.blockLimits, latestChainBlock);
+  if (blockLimits) {
+    next.blockLimits = blockLimits;
+  }
+  if (Object.keys(normalizedContracts).length) {
+    next.contracts = normalizedContracts;
+  }
+
+  const sessionIdHex = sessionRegistryUtils.normalizeSessionIdHex(sessionId);
+  if (sessionIdHex) next.sessionId = sessionIdHex;
+
+  return next;
+};

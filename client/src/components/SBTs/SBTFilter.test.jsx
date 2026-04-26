@@ -1,4 +1,4 @@
-import SBTFilter from './SBTFilter.jsx';
+import SBTFilter from './SBTFilter';
 import contractScripts, {
   getSessionChainId,
   getSessionSlugByName,
@@ -6,7 +6,7 @@ import contractScripts, {
 } from '../../utilities/web3/contractScripts.js';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 
-jest.mock('./SBTSelector.jsx', () => () => null);
+jest.mock('./SBTSelector', () => () => null);
 
 jest.mock('../../utilities/web3/contractScripts.js', () => ({
   __esModule: true,
@@ -1151,6 +1151,50 @@ describe('SBTFilter performance guards', () => {
     addressSelectors.forEach((selectorNode) => {
       expect(selectorNode.props.defaultFeaturedSBTs).toBe(featured);
     });
+  });
+
+  it('can suppress the top-level loading overlay for embedded results filters', () => {
+    const withOverlay = createSubject(
+      {
+        mode: 'responder',
+        autoExpand: true,
+      },
+      {
+        loading: true,
+        showFilterOptions: true,
+      }
+    ).render();
+
+    const withoutOverlay = createSubject(
+      {
+        mode: 'responder',
+        autoExpand: true,
+        hideLoadingOverlay: true,
+      },
+      {
+        loading: true,
+        showFilterOptions: true,
+      }
+    ).render();
+
+    const spinnerNodesWithOverlay = findElementsInTree(
+      withOverlay,
+      (element) => element?.props?.icon?.iconName === 'spinner'
+    );
+    const spinnerNodesWithoutOverlay = findElementsInTree(
+      withoutOverlay,
+      (element) => element?.props?.icon?.iconName === 'spinner'
+    );
+    const [filterOptions] = findElementsInTree(
+      withoutOverlay,
+      (element) =>
+        typeof element?.props?.className === 'string' &&
+        element.props.className.includes('filterOptions')
+    );
+
+    expect(spinnerNodesWithOverlay).toHaveLength(1);
+    expect(spinnerNodesWithoutOverlay).toHaveLength(0);
+    expect(filterOptions).toBeTruthy();
   });
 
   it('adds light-surface classes to the collapsed filter button and panel when requested', () => {

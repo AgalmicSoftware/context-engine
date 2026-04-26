@@ -2,7 +2,7 @@
   {
     "name": "Benjamin Franklin",
     "username": "Franklin",
-    "avatar": "TODO_ARWEAVE:benjamin-franklin-avatar",
+    "avatar": "/historical-avatars/franklin.jpg",
     "Karma": 100,
     "questions": [
       {
@@ -95,7 +95,7 @@
   {
     "name": "Franklin D. Roosevelt",
     "username": "FDR",
-    "avatar": "TODO_ARWEAVE:franklin-d-roosevelt-avatar",
+    "avatar": "/historical-avatars/fdr.jpg",
     "Karma": 95,
     "questions": [
       {
@@ -219,7 +219,7 @@
   {
     "name": "Rosa Parks",
     "username": "RosaParks",
-    "avatar": "TODO_ARWEAVE:rosa-parks-avatar",
+    "avatar": "/historical-avatars/rosaparks.jpg",
     "Karma": 98,
     "questions": [
       {
@@ -317,7 +317,7 @@
   {
     "name": "Martin Luther King Jr.",
     "username": "MLK",
-    "avatar": "TODO_ARWEAVE:martin-luther-king-jr-avatar",
+    "avatar": "/historical-avatars/mlk.jpg",
     "Karma": 99,
     "questions": [
       {
@@ -441,7 +441,7 @@
   {
     "name": "Alexander Hamilton",
     "username": "Hamilton",
-    "avatar": "TODO_ARWEAVE:alexander-hamilton-avatar",
+    "avatar": "/historical-avatars/hamilton.jpg",
     "Karma": 92,
     "questions": [
       {
@@ -534,7 +534,7 @@
   {
     "name": "John F. Kennedy",
     "username": "JFK",
-    "avatar": "TODO_ARWEAVE:john-f-kennedy-avatar",
+    "avatar": "/historical-avatars/jfk.jpg",
     "Karma": 90,
     "questions": [
       {
@@ -632,7 +632,7 @@
   {
     "name": "Lyndon B. Johnson",
     "username": "LBJ",
-    "avatar": "TODO_ARWEAVE:lyndon-b-johnson-avatar",
+    "avatar": "/historical-avatars/lbj.jpg",
     "Karma": 82,
     "questions": [
       {
@@ -725,7 +725,7 @@
   {
     "name": "Barack Obama",
     "username": "Obama",
-    "avatar": "TODO_ARWEAVE:barack-obama-avatar",
+    "avatar": "/historical-avatars/obama.jpg",
     "Karma": 88,
     "questions": [
       {
@@ -823,7 +823,7 @@
   {
     "name": "Vannevar Bush",
     "username": "VannevarBush",
-    "avatar": "TODO_ARWEAVE:vannevar-bush-avatar",
+    "avatar": "/historical-avatars/vannevarbush.jpg",
     "Karma": 85,
     "questions": [
       {
@@ -921,7 +921,7 @@
   {
     "name": "Ronald Reagan",
     "username": "Reagan",
-    "avatar": "TODO_ARWEAVE:ronald-reagan-avatar",
+    "avatar": "/historical-avatars/reagan.jpg",
     "Karma": 80,
     "questions": [
       {
@@ -1019,7 +1019,7 @@
   {
     "name": "Abraham Lincoln",
     "username": "Lincoln",
-    "avatar": "TODO_ARWEAVE:abraham-lincoln-avatar",
+    "avatar": "/historical-avatars/lincoln.jpg",
     "Karma": 97,
     "questions": [
       {
@@ -1156,7 +1156,7 @@
   {
     "name": "George Washington",
     "username": "Washington",
-    "avatar": "TODO_ARWEAVE:george-washington-avatar",
+    "avatar": "/historical-avatars/washington.jpg",
     "Karma": 96,
     "questions": [
       {
@@ -1249,7 +1249,7 @@
   {
     "name": "Thomas Jefferson",
     "username": "Jefferson",
-    "avatar": "TODO_ARWEAVE:thomas-jefferson-avatar",
+    "avatar": "/historical-avatars/jefferson.jpg",
     "Karma": 88,
     "questions": [
       {
@@ -1342,7 +1342,7 @@
   {
     "name": "John von Neumann",
     "username": "vonNeumann",
-    "avatar": "TODO_ARWEAVE:john-von-neumann-avatar",
+    "avatar": "/historical-avatars/vonneumann.gif",
     "Karma": 91,
     "questions": [
       {
@@ -1435,7 +1435,7 @@
   {
     "name": "Ada Lovelace",
     "username": "AdaLovelace",
-    "avatar": "TODO_ARWEAVE:ada-lovelace-avatar",
+    "avatar": "/historical-avatars/adalovelace.png",
     "Karma": 94,
     "questions": [
       {
@@ -1528,7 +1528,7 @@
   {
     "name": "Nikola Tesla",
     "username": "NikolaTesla",
-    "avatar": "TODO_ARWEAVE:nikola-tesla-avatar",
+    "avatar": "/historical-avatars/nikolatesla.jpeg",
     "Karma": 93,
     "questions": [
       {
@@ -1621,7 +1621,7 @@
   {
     "name": "Thomas Edison",
     "username": "ThomasEdison",
-    "avatar": "TODO_ARWEAVE:thomas-edison-avatar",
+    "avatar": "/historical-avatars/thomasedison.jpg",
     "Karma": 84,
     "questions": [
       {
@@ -1714,7 +1714,7 @@
   {
     "name": "Hammurabi",
     "username": "Hammurabi",
-    "avatar": "TODO_ARWEAVE:hammurabi-avatar",
+    "avatar": "/historical-avatars/hammurabi.jpg",
     "Karma": 88,
     "questions": [
       {
@@ -1807,7 +1807,7 @@
   {
     "name": "Eleanor Roosevelt",
     "username": "EleanorRoosevelt",
-    "avatar": "TODO_ARWEAVE:eleanor-roosevelt-avatar",
+    "avatar": "/historical-avatars/eleanorroosevelt.jpg",
     "Karma": 96,
     "questions": [
       {
@@ -1905,7 +1905,7 @@
   {
     "name": "Confucius",
     "username": "Confucius",
-    "avatar": "TODO_ARWEAVE:confucius-avatar",
+    "avatar": "/historical-avatars/confucius.jpg",
     "Karma": 91,
     "questions": [
       {
@@ -1998,7 +1998,7 @@
   {
     "name": "Plato",
     "username": "Plato",
-    "avatar": "TODO_ARWEAVE:plato-avatar",
+    "avatar": "/historical-avatars/plato.png",
     "Karma": 86,
     "questions": [
       {
@@ -2091,7 +2091,7 @@
   {
     "name": "Alan Turing",
     "username": "AlanTuring",
-    "avatar": "TODO_ARWEAVE:alan-turing-avatar",
+    "avatar": "/historical-avatars/alanturing.jpg",
     "Karma": 95,
     "questions": [
       {
@@ -2189,7 +2189,7 @@
   {
     "name": "Andrew Carnegie",
     "username": "AndrewCarnegie",
-    "avatar": "TODO_ARWEAVE:andrew-carnegie-avatar",
+    "avatar": "/historical-avatars/andrewcarnegie.jpg",
     "Karma": 82,
     "questions": [
       {
@@ -2282,7 +2282,7 @@
   {
     "name": "J. Robert Oppenheimer",
     "username": "JRobertOppenheimer",
-    "avatar": "TODO_ARWEAVE:j-robert-oppenheimer-avatar",
+    "avatar": "/historical-avatars/jrobertoppenheimer.jpg",
     "Karma": 90,
     "questions": [
       {
@@ -2380,7 +2380,7 @@
   {
     "name": "Grace Hopper",
     "username": "GraceHopper",
-    "avatar": "TODO_ARWEAVE:grace-hopper-avatar",
+    "avatar": "/historical-avatars/gracehopper.jpg",
     "Karma": 97,
     "questions": [
       {
@@ -2473,7 +2473,7 @@
   {
     "name": "Alexander Graham Bell",
     "username": "AlexanderGrahamBell",
-    "avatar": "TODO_ARWEAVE:alexander-graham-bell-avatar",
+    "avatar": "/historical-avatars/alexandergrahambell.jpeg",
     "Karma": 81,
     "questions": [
       {
@@ -2566,7 +2566,7 @@
   {
     "name": "Niccolo Machiavelli",
     "username": "Machiavelli",
-    "avatar": "TODO_ARWEAVE:niccolo-machiavelli-avatar",
+    "avatar": "/historical-avatars/machiavelli.jpg",
     "Karma": 79,
     "questions": [
       {
@@ -2659,7 +2659,7 @@
   {
     "name": "Henry Ford",
     "username": "HenryFord",
-    "avatar": "TODO_ARWEAVE:henry-ford-avatar",
+    "avatar": "/historical-avatars/henryford.jpg",
     "Karma": 78,
     "questions": [
       {
@@ -2752,7 +2752,7 @@
   {
     "name": "John D. Rockefeller",
     "username": "Rockefeller",
-    "avatar": "TODO_ARWEAVE:john-d-rockefeller-avatar",
+    "avatar": "/historical-avatars/rockefeller.jpg",
     "Karma": 80,
     "questions": [
       {
@@ -2845,7 +2845,7 @@
   {
     "name": "Marie Curie",
     "username": "MarieCurie",
-    "avatar": "TODO_ARWEAVE:marie-curie-avatar",
+    "avatar": "/historical-avatars/mariecurie.jpg",
     "Karma": 98,
     "questions": [
       {
@@ -2938,7 +2938,7 @@
   {
     "name": "Sun Tzu",
     "username": "SunTzu",
-    "avatar": "TODO_ARWEAVE:sun-tzu-avatar",
+    "avatar": "/historical-avatars/suntzu.jpg",
     "Karma": 89,
     "questions": [
       {
@@ -3031,7 +3031,7 @@
   {
     "name": "Buckminster Fuller",
     "username": "Fuller",
-    "avatar": "TODO_ARWEAVE:buckminster-fuller-avatar",
+    "avatar": "/historical-avatars/fuller.jpg",
     "Karma": 87,
     "questions": [
       {
@@ -3971,7 +3971,7 @@
   {
     "name": "Frederick Douglass",
     "username": "FrederickDouglass",
-    "avatar": "TODO_ARWEAVE:frederick-douglass-avatar",
+    "avatar": "/historical-avatars/frederickdouglass.jpg",
     "Karma": 97,
     "questions": [
       {
@@ -4779,7 +4779,7 @@
   {
     "name": "Mahatma Gandhi",
     "username": "MahatmaGandhi",
-    "avatar": "TODO_ARWEAVE:mahatma-gandhi-avatar",
+    "avatar": "/historical-avatars/mahatmagandhi.jpg",
     "Karma": 99,
     "questions": [
       {
@@ -5485,7 +5485,7 @@
   {
     "name": "Rachel Carson",
     "username": "RachelCarson",
-    "avatar": "TODO_ARWEAVE:rachel-carson-avatar",
+    "avatar": "/historical-avatars/rachelcarson.jpg",
     "Karma": 97,
     "questions": [
       {

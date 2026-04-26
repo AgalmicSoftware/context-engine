@@ -1,0 +1,1498 @@
+@use "sass:color";
+@use "scss/finalSubmitCta" as finalSubmitCta;
+@use "scss/variables" as tokens;
+
+/* --- Variables (Matching SBTPage) --- */
+$user-page-text-color: tokens.$ce-white;
+$card-bg: tokens.$ce-card-bg;
+$card-border: tokens.$ce-card-border;
+$card-shadow: tokens.$ce-card-shadow;
+$clickable-color: tokens.$ce-clickable;
+$input-bg: tokens.$ce-input-bg;
+$input-border: tokens.$ce-input-border;
+$delete-color: #dc3545;
+$user-page-background: tokens.$ce-panel-bg;
+/* Required for masking progress line */
+
+.createSurveyContainer {
+  padding: 20px;
+  background-color: $card-bg;
+  border: 1px solid $card-border;
+  box-shadow: $card-shadow;
+  border-radius: var(--ce-radius-12);
+  margin-bottom: 20px;
+  color: $user-page-text-color !important;
+  margin-top: 10px;
+  /* Desktop Layout: Stretch width */
+  @media (min-width: 992px) {
+    max-width: 1200px;
+    margin-left: auto;
+    margin-right: auto;
+    width: 95%;
+  }
+}
+
+.surveyTitleInput,
+#newSurveyTitleInput {
+  font-size: 2em;
+  font-weight: 600;
+  background-color: transparent;
+  color: $user-page-text-color !important;
+  border-radius: var(--ce-radius-8);
+  background: $input-bg;
+  border: 1px solid $input-border;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  margin-bottom: 20px;
+  min-height: 50px;
+  &::placeholder {
+    color: rgba(255, 255, 255, 0.5);
+  }
+}
+
+.surveyTitleRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
+
+  @media (max-width: 700px) {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .surveyTitleInput {
+    flex: 1;
+    margin-bottom: 0;
+  }
+}
+
+.surveyTitleLock {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.questionHeaderActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.inheritToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.85);
+  user-select: none;
+  cursor: pointer;
+
+  input[type='checkbox'] {
+    accent-color: $clickable-color;
+  }
+}
+
+/* NEW: Minimal manual doc URL field */
+.docUrlInput {
+  font-size: 1rem;
+  background: $input-bg;
+  color: $user-page-text-color;
+  border: 1px solid $input-border;
+  border-radius: var(--ce-radius-6);
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  &::placeholder {
+    color: rgba(255, 255, 255, 0.5);
+  }
+}
+
+.questionContainer {
+  background-color: rgba(0, 0, 0, 0.2);
+  /* Slightly darker than main card for contrast */
+  border: 1px solid $card-border;
+  padding: 20px;
+  margin-bottom: 15px;
+  border-radius: var(--ce-radius-10);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.questionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.questionTypeText,
+#questionTypeText {
+  color: $clickable-color;
+  font-size: 1em;
+  font-weight: 600;
+  text-transform: uppercase;
+  opacity: 0.9;
+  margin-right: 5px;
+}
+
+.removeQuestionButton {
+  background-color: transparent !important;
+  color: #ff8383;
+  padding: 5px 10px;
+  border-radius: var(--ce-radius-3);
+  transition:
+    background-color 0.2s,
+    color 0.2s;
+  background: transparent;
+  &:hover {
+    background-color: #dc3545;
+    color: var(--ce-color-white);
+  }
+}
+
+.questionPromptInput,
+#newQuestionInput {
+  font-size: 1.25em;
+  margin-bottom: 10px;
+  background: $input-bg;
+  border: 1px solid $input-border;
+  color: $user-page-text-color !important;
+  border-radius: var(--ce-radius-6);
+  /* Wrap text for mobile */
+  white-space: pre-wrap;
+  height: auto;
+  min-height: 60px;
+  &::placeholder {
+    color: rgba(255, 255, 255, 0.4);
+  }
+}
+
+.optionsContainer {
+  margin-top: 10px;
+}
+
+.singleSelectToggle {
+  margin-top: 10px;
+}
+
+.singleSelectLabel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid $input-border;
+  border-radius: var(--ce-radius-6);
+  background: $input-bg;
+  color: #eeeeee;
+  font-weight: 500;
+  cursor: pointer;
+
+  input[type='checkbox'] {
+    accent-color: $clickable-color;
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+  }
+}
+
+.tooltip {
+  color: $clickable-color !important;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+  flex-shrink: 0;
+  line-height: 1;
+  vertical-align: middle;
+  margin: 0 0 0 6px;
+  opacity: 0.5;
+}
+
+.tooltipBubble {
+  z-index: 2000;
+
+  :global(.tooltip-inner) {
+    background: var(--ce-color-tooltip-bg) !important;
+    color: var(--ce-color-tooltip-text) !important;
+    border: 1px solid var(--ce-color-tooltip-border) !important;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+    padding: 8px 10px;
+    font-size: 0.9rem;
+  }
+
+  :global(.arrow::before) {
+    border-top-color: var(--ce-color-tooltip-bg);
+    border-right-color: var(--ce-color-tooltip-bg);
+    border-bottom-color: var(--ce-color-tooltip-bg);
+    border-left-color: var(--ce-color-tooltip-bg);
+  }
+}
+
+.optionItem {
+  display: flex;
+  align-items: center;
+  margin-bottom: 5px;
+  color: $user-page-text-color !important;
+}
+
+.optionInput {
+  flex-grow: 1;
+  margin-right: 10px;
+  background: $input-bg;
+  border: 1px solid $input-border;
+  color: $user-page-text-color !important;
+  border-radius: var(--ce-radius-4);
+  &::placeholder {
+    color: rgba(255, 255, 255, 0.4);
+  }
+}
+
+.removeOptionButton {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.7);
+  border: none;
+  padding: 5px 8px;
+  border-radius: var(--ce-radius-3);
+  &:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+    color: var(--ce-color-white);
+  }
+}
+
+.addOptionButton {
+  margin-top: 10px;
+  background-color: rgba(40, 167, 69, 0.2);
+  color: #75b798;
+  border: 1px solid rgba(40, 167, 69, 0.4);
+  &:hover {
+    background-color: #28a745;
+    color: var(--ce-color-white);
+  }
+}
+
+.addQuestionContainer {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 20px;
+  margin-bottom: 20px;
+}
+
+.questionTypeSelect,
+#newQuestionSelect {
+  flex-grow: 1;
+  margin-right: 10px;
+  font-size: 1.5em;
+  font-weight: 600;
+  padding: 5px;
+  background: $input-bg;
+  color: var(--ce-color-white);
+  border: 1px solid $input-border;
+}
+
+.addQuestionButton,
+#addQuestionButton {
+  color: var(--ce-color-white);
+  font-size: 1.5em;
+  font-weight: 600;
+  padding: 10px;
+  text-transform: uppercase;
+  background-color: transparent;
+  border: none;
+}
+
+.surveyIdPreview,
+#createSurveyIDPreview {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  color: var(--ce-color-white) !important;
+  font-size: 1em;
+  font-weight: 600;
+  margin-top: 10px;
+  font-family: var(--ce-font-mono);
+  background-color: rgba(0, 0, 0, 0.3);
+  padding: 10px;
+  border-radius: var(--ce-radius-5);
+}
+
+.surveySubmittedContainer {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 20px;
+}
+
+.surveyActions {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  margin-top: 20px;
+}
+
+.copySurveyLinkButton,
+.viewSurveyLink {
+  flex: 1;
+  margin: 0 5px;
+  text-align: center;
+  padding: 10px;
+  border-radius: var(--ce-radius-5);
+  text-decoration: none;
+  color: var(--ce-color-white);
+  font-weight: 600;
+  transition: background-color 0.3s ease;
+  width: 25%;
+}
+
+.copySurveyLinkButton {
+  background-color: #28a745;
+  border: none;
+  margin-right: 10px;
+  &:hover {
+    background-color: #218838;
+  }
+}
+
+.viewSurveyLink {
+  background-color: #17a2b8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  &:hover {
+    background-color: #138496;
+    color: var(--ce-color-white);
+    text-decoration: none;
+  }
+}
+
+.createSurveyButton,
+#submitNewSurveyButton {
+  @include finalSubmitCta.final-submit-cta-shell(
+    $padding: 16px 24px,
+    $min-height: 72px,
+    $font-size: 1.35rem,
+    $border-radius: var(--ce-radius-12),
+    $box-shadow: 0 12px 30px rgba(7, 14, 38, 0.32),
+    $hover-box-shadow: 0 16px 36px rgba(7, 14, 38, 0.4)
+  );
+  width: 100%;
+  margin-top: 20px;
+  position: relative;
+  /* for progress fill */
+  overflow: hidden;
+}
+
+.submitSurveyBtn {
+  /* Specialized class for easier targeting */
+  margin-top: 25px !important;
+}
+
+/* Progress fill overlay inside the submit button */
+.buttonProgressFill {
+  position: absolute;
+  inset: 0 0 0 0;
+  width: 0%;
+  height: 100%;
+  background: rgba(77, 255, 164, 0.2);
+  opacity: 0.9;
+  transition: width 0.3s ease;
+  z-index: 0;
+  pointer-events: none;
+}
+.buttonContent {
+  @include finalSubmitCta.final-submit-cta-content($gap: 10px);
+  border: none;
+  background-color: transparent;
+  background: transparent;
+  color: var(--ce-color-white);
+  position: relative;
+  z-index: 1;
+  text-transform: uppercase;
+}
+
+/* Small helper text shown when the button is in error state */
+.copyHint {
+  font-size: 0.6em;
+  font-weight: 700;
+  opacity: 0.85;
+  margin-left: 4px;
+  text-transform: none;
+}
+
+/* High-visibility style while submitting */
+.submittingButton {
+  background-color: rgba(13, 110, 253, 0.9) !important;
+  border-color: #0d6efd !important;
+  color: var(--ce-color-white) !important;
+}
+
+.progressBarContainer {
+  margin-top: 20px;
+  background-color: rgba(255, 255, 255, 0.1);
+  border-radius: var(--ce-radius-8);
+  overflow: hidden;
+}
+
+.progressBar {
+  height: 10px;
+  background-color: #28a745;
+  transition: width 0.5s ease;
+}
+
+.jsonDisplayWrapper {
+  position: relative;
+  margin-top: 12px;
+}
+
+.jsonDisplay {
+  margin-top: 8px;
+  background-color: rgba(0, 0, 0, 0.3);
+  padding: 15px;
+  border-radius: var(--ce-radius-5);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  white-space: pre-wrap;
+  word-break: break-all;
+  font-size: 0.9em;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+#expanded {
+  background-color: transparent;
+  padding: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  margin-top: 10px;
+  transition: max-height 0.5s ease-out;
+}
+
+.questionMetadata {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: space-between;
+  font-size: 0.8em;
+  color: rgba(255, 255, 255, 0.6);
+  margin-top: 5px;
+}
+
+.tagsManagerContainer {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-evenly;
+  font-size: 0.8em;
+  color: inherit;
+}
+
+#addTagButton {
+  margin-left: 5px;
+  height: 100%;
+  font-weight: 600;
+}
+
+.generateTagsButton {
+  display: inline;
+  margin-left: 5px;
+  height: 100%;
+  font-weight: 600;
+  color: $clickable-color;
+  border-color: rgba(77, 255, 164, 0.4);
+  &:hover {
+    background-color: rgba(77, 255, 164, 0.1);
+    border-color: $clickable-color;
+  }
+}
+
+.questionId {
+  font-size: 0.65rem;
+  opacity: 0.65;
+  font-weight: 600;
+  margin-top: 5px;
+  margin-bottom: 5px;
+}
+
+.associatedSurveyContainer {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  width: 100%;
+}
+
+.associatedSurveyLabel {
+  display: flex;
+  align-items: center;
+  margin-right: 10px;
+  white-space: nowrap;
+  color: rgba(255, 255, 255, 0.7) !important;
+}
+
+.addCurrentLink {
+  margin-left: 5px;
+  color: $clickable-color;
+  text-decoration: underline;
+  cursor: pointer;
+  &:hover {
+    color: color.adjust($clickable-color, $lightness: 10%);
+  }
+}
+
+.associatedSurveyInput {
+  flex-grow: 1;
+  color: var(--ce-color-white) !important;
+  font-size: 1em;
+  padding: 2px 5px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: var(--ce-radius-3);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.toggleLabel {
+  font-size: 1.15em;
+  color: $user-page-text-color !important;
+  font-weight: 600;
+  opacity: 0.85;
+  margin-bottom: 0px !important;
+}
+
+.modeToggle {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 0px;
+  font-weight: 600;
+  font-size: 1.25em;
+  color: $user-page-text-color;
+  text-transform: uppercase;
+}
+
+/* NEW: Header wrapper (toggle + switch) */
+.modeHeader {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  grid-gap: 12px;
+  gap: 12px;
+  padding-bottom: 12px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  flex-wrap: wrap;
+}
+
+.modeSwitchButton {
+  font-weight: 600;
+  opacity: 0.85;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--ce-color-white);
+  border-color: rgba(255, 255, 255, 0.2);
+  &:hover {
+    background: rgba(255, 255, 255, 0.2);
+  }
+}
+
+.toggleSwitch {
+  display: inline-block;
+  margin-left: 10px;
+  cursor: pointer;
+  background-color: rgba(255, 255, 255, 0.2);
+  border-radius: var(--ce-radius-15);
+  position: relative;
+  width: 60px;
+  height: 30px;
+  vertical-align: middle;
+  .toggleKnob {
+    background-color: var(--ce-color-white);
+    border-radius: var(--ce-radius-round);
+    width: 28px;
+    height: 28px;
+    position: absolute;
+    top: 1px;
+    transition: left 0.2s;
+  }
+}
+
+.surveySubmissionConfirmation {
+  margin-top: 30px;
+  padding: 20px;
+  background-color: rgba(40, 167, 69, 0.15);
+  border-radius: var(--ce-radius-8);
+  border: 1px solid rgba(40, 167, 69, 0.3);
+  h3 {
+    color: #75b798;
+    margin-bottom: 15px;
+  }
+
+  p {
+    font-size: 1.1em;
+    color: #75b798;
+  }
+}
+
+.uploadedQuestionsList {
+  h4 {
+    color: var(--ce-color-white);
+    font-weight: bold;
+    margin-bottom: 15px;
+  }
+  ul {
+    list-style: none;
+    padding: 0;
+  }
+  li {
+    display: flex;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+  li a {
+    flex-grow: 1;
+    color: $clickable-color;
+    text-decoration: none;
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+}
+
+.copyQuestionIdButton,
+.bookmarkQuestionButton {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 1.25em;
+  margin-left: 10px;
+  cursor: pointer;
+  &:hover {
+    color: var(--ce-color-white);
+  }
+}
+
+.submissionStatusBox .responseUrlBox {
+  text-align: center;
+  background-color: rgba(255, 255, 255, 0.05);
+  padding: 15px;
+  margin-top: 10px;
+  border-radius: var(--ce-radius-5);
+}
+
+.responseUrlBox {
+  font-size: 1.25em;
+  color: var(--ce-color-white) !important;
+}
+
+#miniCreateSurveyLabel {
+  font-weight: 600;
+  font-size: 1.5em;
+  color: var(--ce-color-white) !important;
+}
+
+.tagsInput {
+  color: var(--ce-color-white) !important;
+  margin-bottom: 5px;
+}
+
+.errorButton {
+  background-color: #dc3545 !important;
+  border-color: #dc3545 !important;
+  color: var(--ce-color-white);
+}
+
+.errorMessage {
+  margin-top: 10px;
+  color: #ff8383;
+  font-weight: bold;
+}
+
+.inlineValidationError {
+  margin-top: 6px;
+  color: #ffb4b4;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+#copySurveyIdButton {
+  margin-left: 10px;
+  background-color: transparent;
+  border: none;
+  cursor: pointer;
+}
+
+.miniaturized {
+  padding: 10px;
+}
+
+/* NEW STYLES FOR TAGS + QUICK UI */
+.aiTagsToggle {
+  margin: 15px 0 10px;
+}
+.checkboxLabel {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font-weight: normal;
+  margin-bottom: 0;
+}
+.tagsContainer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 6px;
+}
+.filterBubble {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(77, 255, 164, 0.2);
+  color: var(--ce-color-white);
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--ce-radius-4);
+  font-size: 0.85rem;
+  transition: background 0.2s;
+  border: 1px solid rgba(77, 255, 164, 0.4);
+  &:hover {
+    background: rgba(77, 255, 164, 0.3);
+  }
+}
+.removeIcon {
+  margin-left: 6px;
+  cursor: pointer;
+  &:hover {
+    color: #ff8383;
+  }
+}
+.removeDocumentUrlButton {
+  margin-left: 20px;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.5);
+  &:hover {
+    color: #ff8383;
+  }
+}
+.tagInputField {
+  width: 135px;
+  display: inline-block !important;
+  margin-left: 4px;
+  padding: 0.375rem 0.75rem;
+  font-size: 1rem;
+  line-height: 1.5;
+  color: var(--ce-color-white);
+  background-color: $input-bg;
+  background-clip: padding-box;
+  border: 1px solid $input-border;
+  border-radius: 0.25rem;
+  transition:
+    border-color 0.15s ease-in-out;
+  flex-grow: 0;
+  &:focus {
+    color: var(--ce-color-white);
+    background-color: rgba(255, 255, 255, 0.12);
+    border-color: $clickable-color;
+    outline: 0;
+    box-shadow: 0 0 0 0.2rem rgba(77, 255, 164, 0.25);
+  }
+  &::placeholder {
+    color: rgba(255, 255, 255, 0.4);
+  }
+}
+.documentUrlDisplay {
+  margin-bottom: 15px;
+  padding: 10px;
+  background-color: rgba(255, 255, 255, 0.05);
+  border-radius: var(--ce-radius-4);
+  font-size: 0.9em;
+  strong {
+    display: block;
+    margin-bottom: 5px;
+    color: var(--ce-color-white);
+  }
+  ul {
+    list-style-type: none;
+    padding-left: 0;
+    margin-bottom: 0;
+  }
+  li {
+    margin-bottom: 3px;
+  }
+  a {
+    color: $clickable-color;
+    text-decoration: none;
+    word-break: break-all;
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+  .documentUrlEncrypted {
+    color: #9bd2ff;
+    word-break: break-all;
+  }
+}
+
+/* --- Progress Indicator (Refactored to match SBT Group) --- */
+.progressIndicator {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  margin-top: 30px;
+  margin-bottom: 20px;
+  gap: 40px;
+  /* Adjusted gap for survey tool width */
+  position: relative;
+  padding: 0 20px;
+}
+
+/* Connecting line */
+.progressIndicator::before {
+  content: '';
+  position: absolute;
+  top: 18px;
+  left: 20%;
+  right: 20%;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.1);
+  z-index: 0;
+}
+
+.step,
+.stepCompleted {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  z-index: 1;
+  font-family: var(--ce-font-mono);
+  /* Matching survey tool font preference */
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.4);
+  background: transparent;
+  span {
+    background: $user-page-background;
+    padding: 0 8px;
+    z-index: 2;
+    /* Ensure label covers line if needed */
+  }
+
+  svg {
+    font-size: 1.5rem;
+    background: $user-page-background;
+    padding: 0;
+    border-radius: var(--ce-radius-round);
+    box-shadow: 0 0 0 8px $user-page-background;
+    z-index: 2;
+    /* Ensure icon covers line */
+  }
+}
+
+.stepCompleted {
+  color: var(--ce-color-accent);
+  svg {
+    color: var(--ce-color-accent);
+  }
+}
+
+.surveyIdACtions {
+  display: flex !important;
+  flex-direction: row;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  word-break: break-all;
+}
+
+/* ============================
+     NEW: Visual Type Selector (Dark Theme)     ============================ */
+.typeSelectorBlock {
+  margin-top: 8px;
+  margin-bottom: 8px;
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--ce-radius-10);
+}
+.typeSelectorLabel {
+  font-weight: 800;
+  font-size: 1.15rem;
+  opacity: 0.7;
+  color: var(--ce-color-white);
+  margin-bottom: 10px;
+}
+.typeSelectorGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.typeButton {
+  display: inline-flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+  min-width: 180px;
+  flex: 1 1 200px;
+  padding: 12px;
+  border-radius: var(--ce-radius-8);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.05);
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  transition:
+    transform 0.07s ease,
+    border-color 0.12s ease,
+    opacity 0.12s ease;
+  opacity: 0.8;
+  &:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    border-color: $clickable-color;
+    background: rgba(255, 255, 255, 0.08);
+    opacity: 1;
+  }
+
+  &:focus {
+    opacity: 1;
+    outline: 2px solid $clickable-color;
+    outline-offset: 2px;
+  }
+}
+.typeTitle {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--ce-color-white);
+}
+.typePreviewRow {
+  display: flex;
+  flex-direction: row;
+  grid-gap: 8px;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: space-evenly;
+  opacity: 0.9;
+}
+.pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 5px;
+  border-radius: var(--ce-radius-14);
+  font-weight: 600;
+  font-size: 0.65rem;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--ce-color-white);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+.pillAgree {
+  background: rgba(76, 175, 80, 0.3);
+  color: #81c784;
+  border-color: #4caf50;
+}
+.pillDisagree {
+  background: rgba(244, 67, 54, 0.3);
+  color: #e57373;
+  border-color: #f44336;
+}
+.pillUnsure {
+  background: rgba(255, 235, 59, 0.2);
+  color: #fff176;
+  border-color: #fdd835;
+}
+.freeformPreview {
+  height: 36px;
+  border: 1px dashed rgba(255, 255, 255, 0.3);
+  border-radius: var(--ce-radius-6);
+  background: rgba(0, 0, 0, 0.2);
+  color: rgba(255, 255, 255, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  letter-spacing: 1px;
+  opacity: 0.75;
+}
+.ratingPreviewWrap {
+  position: relative;
+  height: 12px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: var(--ce-radius-6);
+  overflow: hidden;
+  width: 100%;
+  max-width: 220px;
+  opacity: 0.8;
+  overflow: inherit;
+}
+.ratingPreviewFill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  width: 50%;
+  background: $clickable-color;
+  transition: width 0.2s ease;
+}
+.ratingPreviewHandle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 16px;
+  height: 16px;
+  transform: translate(-50%, -50%);
+  border-radius: var(--ce-radius-round);
+  background: var(--ce-color-white);
+  border: 2px solid var(--ce-color-surface);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+  z-index: 99999;
+}
+.ratingPreviewTick {
+  position: absolute;
+  right: 6px;
+  top: -22px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--ce-color-white);
+}
+
+/* ============================
+     NEW: Success Actions Row     ============================ */
+.successActionsRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-top: 10px;
+}
+.actionBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: var(--ce-radius-6);
+  font-weight: 600;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background-color: rgba(255, 255, 255, 0.1);
+  color: var(--ce-color-white) !important;
+  text-decoration: none;
+  min-height: 40px;
+  white-space: nowrap;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    transform 0.06s ease;
+  &:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+    border-color: $clickable-color;
+    text-decoration: none;
+    transform: translateY(-1px);
+  }
+}
+.actionLink {
+  /* anchors styled like buttons */
+  color: var(--ce-color-white) !important;
+  text-decoration: none !important;
+}
+
+/* ============================
+     NEW: AI Prompt toggle/panel     ============================ */
+.jsonPromptBar {
+  margin-top: 10px;
+  opacity: 0.7;
+}
+
+.aiPromptWrapper {
+  margin-top: 8px;
+  position: relative;
+  /* needed for corner copy button */
+}
+
+.aiPromptHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  color: $clickable-color;
+  font-weight: 800;
+}
+.aiPromptCopy {
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background-color: rgba(255, 255, 255, 0.1);
+  color: var(--ce-color-white);
+  border-radius: var(--ce-radius-6);
+  padding: 6px 10px;
+  font-weight: 700;
+  cursor: pointer;
+  &:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+  }
+}
+
+/* NEW: corner copy button for the AI prompt panel */
+.aiPromptCopyCorner {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(0, 0, 0, 0.6);
+  color: var(--ce-color-white);
+  border: none;
+  border-radius: var(--ce-radius-6);
+  padding: 6px 8px;
+  cursor: pointer;
+  z-index: 2;
+  &:hover {
+    background: rgba(0, 0, 0, 0.8);
+  }
+}
+.aiPromptCopyCornerSuccess {
+  background: #28a745 !important;
+}
+
+.aiPromptMeta {
+  font-size: 0.85rem;
+  opacity: 0.8;
+  margin-bottom: 6px;
+  color: var(--ce-color-white);
+}
+
+/* NEW: variable badge styling */
+.aiVar {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: var(--ce-radius-4);
+  background: rgba(255, 247, 230, 0.1);
+  color: #ffd591;
+  border: 1px solid rgba(255, 213, 145, 0.3);
+  font-weight: 700;
+  font-family: var(--ce-font-mono);
+}
+
+/* --- NEW: Document URL Input Group --- */
+.docUrlSection {
+  margin-bottom: 20px;
+}
+
+.docUrlInputGroup {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  .docUrlInput {
+    flex-grow: 1;
+    margin-bottom: 0;
+    /* Override default input margin */
+  }
+}
+
+.encryptionSection {
+  margin-bottom: 20px;
+  padding: 14px 16px;
+  background: $card-bg;
+  border: 1px solid $card-border;
+  border-radius: var(--ce-radius-12);
+  box-shadow: $card-shadow;
+}
+
+.encryptionHeader {
+  font-weight: 700;
+  margin-bottom: 8px;
+  color: $user-page-text-color;
+}
+
+.encryptionOptions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+}
+
+.encryptionOptionsRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-radius: var(--ce-radius-8);
+    border: 1px solid $input-border;
+    background: $input-bg;
+    color: $user-page-text-color;
+    font-weight: 600;
+    cursor: pointer;
+    transition: border-color 0.2s ease, background 0.2s ease;
+
+    &:hover {
+      border-color: rgba(255, 255, 255, 0.3);
+      background: rgba(255, 255, 255, 0.12);
+    }
+
+    input[type='checkbox'] {
+      accent-color: $clickable-color;
+      width: 18px;
+      height: 18px;
+    }
+  }
+}
+
+.encryptionGate {
+  margin-top: 10px;
+  padding: 12px;
+  border-radius: var(--ce-radius-10);
+  border: 1px solid $card-border;
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.encryptionGateRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: flex-end;
+  > :first-child {
+    flex: 1 1 320px;
+    min-width: 240px;
+  }
+}
+
+.encryptionGateMode {
+  min-width: 180px;
+  margin-bottom: 0;
+  flex: 0 0 180px;
+
+  select {
+    background: $input-bg;
+    border: 1px solid $input-border;
+    color: $user-page-text-color;
+    border-radius: var(--ce-radius-6);
+  }
+}
+
+.encryptionNote {
+  margin-top: 6px;
+  font-size: 0.85rem;
+  color: rgba(244, 247, 255, 0.65);
+}
+
+.encryptionWarning {
+  margin-top: 6px;
+  font-size: 0.85rem;
+  color: #ff9b9b;
+}
+
+.addDocUrlButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: var(--ce-radius-8);
+  background: rgba(77, 255, 164, 0.15);
+  color: var(--ce-color-accent);
+  border: 1px solid rgba(77, 255, 164, 0.2);
+  cursor: pointer;
+  transition:
+    transform 0.2s ease,
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease;
+  font-size: 1.1rem;
+  &:hover:not(:disabled) {
+    background: var(--ce-color-accent);
+    color: #0b1736;
+    border-color: var(--ce-color-accent);
+    transform: translateY(-1px);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background: rgba(255, 255, 255, 0.05);
+    color: rgba(255, 255, 255, 0.3);
+    border-color: rgba(255, 255, 255, 0.1);
+  }
+}
+
+/* --- NEW: Tag Input Group (Matches CreateSBTGroup) --- */
+.tagInputGroup {
+  display: flex;
+  align-items: center;
+  flex: 1 1 auto;
+  max-width: 300px;
+  height: 38px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 19px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 0 4px 0 12px;
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease;
+  margin-left: 6px;
+  &:focus-within {
+    border-color: var(--ce-color-accent);
+    background: rgba(255, 255, 255, 0.1);
+    box-shadow: 0 0 8px rgba(77, 255, 164, 0.2);
+  }
+
+  .tagInputField {
+    border: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    outline: none !important;
+    padding: 0;
+    margin: 0;
+    flex-grow: 1;
+    color: var(--ce-color-white);
+    font-size: 0.95rem;
+    height: 100%;
+    min-width: 80px;
+    margin-bottom: 0px !important;
+    &:focus {
+      outline: none;
+      background: transparent;
+      color: var(--ce-color-white);
+    }
+    &::placeholder {
+      color: rgba(255, 255, 255, 0.4);
+    }
+  }
+}
+
+.addTagButton {
+  background: rgba(77, 255, 164, 0.15);
+  color: var(--ce-color-accent);
+  border: 1px solid rgba(77, 255, 164, 0.2);
+  border-radius: var(--ce-radius-14);
+  padding: 0;
+  width: 32px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    transform 0.2s,
+    background-color 0.2s,
+    border-color 0.2s,
+    color 0.2s;
+  height: 28px;
+  margin-left: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  &:hover {
+    background: var(--ce-color-accent);
+    color: #0b1736;
+    border-color: var(--ce-color-accent);
+  }
+
+  &:active {
+    transform: scale(0.95);
+  }
+}
+
+/* NEW: Clear Form Button */
+// .clearFormButton {
+//   background: rgba(255, 131, 131, 0.1);
+//   border: 1px solid rgba(255, 131, 131, 0.3);
+//   color: #ff8383;
+//   padding: 6px 12px;
+//   border-radius: 6px;
+//   font-weight: 600;
+//   cursor: pointer;
+//   display: inline-flex;
+//   align-items: center;
+//   font-size: 0.95rem;
+
+//   &:hover {
+//     background: rgba(255, 131, 131, 0.2);
+//     border-color: #ff8383;
+//     transform: translateY(-1px);
+//
+// }
+//
+// }
+
+/* NEW: Magic Wand Button (AI Generation inside input) */
+.magicTagButton {
+  background: rgba(23, 162, 184, 0.15);
+  /* Semi-transparent cyan, matching checkmark style */
+  color: #17a2b8;
+  border: 1px solid rgba(23, 162, 184, 0.2);
+  border-radius: var(--ce-radius-14);
+  padding: 0;
+  width: 32px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    transform 0.2s,
+    background-color 0.2s,
+    border-color 0.2s,
+    color 0.2s;
+  height: 28px;
+  margin-left: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  &:hover:not(:disabled) {
+    background: #17a2b8;
+    color: #0b1736;
+    border-color: #17a2b8;
+  }
+
+  &:active {
+    transform: scale(0.95);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+/* NEW: Clear Form Button */
+.clearFormButton {
+  background: rgba(255, 99, 71, 0.1);
+  /* Subtle red background */
+  border: 1px solid rgba(255, 99, 71, 0.3);
+  color: #ff6347;
+  /* Tomato red text */
+  padding: 6px 12px;
+  border-radius: var(--ce-radius-6);
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  transition:
+    transform 0.2s ease,
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease;
+  font-size: 0.9rem;
+  margin-left: 10px !important;
+  height: 38px;
+  /* Match height of standard buttons */
+  &:hover {
+    background: rgba(255, 99, 71, 0.25);
+    border-color: #ff6347;
+    color: var(--ce-color-white);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+  }
+
+  &:active {
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .removeQuestionButton,
+  .createSurveyButton,
+  #submitNewSurveyButton,
+  .buttonProgressFill,
+  .addDocUrlButton,
+  .tagInputGroup,
+  .addTagButton,
+  .magicTagButton,
+  .clearFormButton {
+    transition-duration: 0.01ms !important;
+  }
+}

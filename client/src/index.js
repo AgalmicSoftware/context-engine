@@ -1,19 +1,17 @@
 import React from 'react';
-import ReactDOM from 'react-dom';
+import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { initLogging } from 'utilities/logging.js';
-
-// styles
-import "assets/css/contextEngine.scss";
-
-// views
-import App from 'components/App.jsx';
+import 'assets/css/contextEngine.scss';
+import App from 'components/App';
 
 initLogging({ showGuide: process.env.NODE_ENV !== 'production' });
 
-ReactDOM.render(
+const container = document.getElementById('root');
+const root = createRoot(container);
+
+root.render(
   <BrowserRouter>
-   <App />
-  </BrowserRouter>,
-  document.getElementById('root'),
+    <App />
+  </BrowserRouter>
 );

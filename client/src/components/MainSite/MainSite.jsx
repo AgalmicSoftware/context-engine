@@ -74,6 +74,14 @@ import {
   resolveValidatedSessionScanWindow,
 } from '../../utilities/session/sessionScanScope.js';
 import { derivePrimarySessionSlugFromList } from '../../utilities/session/globalSessionState.js';
+import {
+  refreshSessionInfoForSlug,
+  refreshSessionMetaFieldsForSlug,
+} from '../../utilities/session/sessionMetaController.js';
+import {
+  buildQuestionDecryptContextForSession,
+  hasMaskedQuestionPayloadImproved,
+} from '../../utilities/session/sessionQuestionDecryption.js';
 import { resolveSessionRegistryBootstrapChainIds } from '../../utilities/session/registryBootstrapChainIds.js';
 import { readSbtInstanceListenersMode } from '../../utilities/sbt/sbtInstanceListenersMode.js';
 import { readSbtFullScanPolicy } from '../../utilities/sbt/sbtFullScanPolicy.js';
@@ -102,17 +110,17 @@ import {
 
 // withWagmiBridge is a function component (allowed to use hooks from wagmi and RainbowKit).
 // It passes props to this class-component so that this component can use React hooks.
-import { WagmiHooksHOC } from '../HooksHOC/withWagmiBridge.jsx'
+import { WagmiHooksHOC } from '../HooksHOC/withWagmiBridge'
 
 // Components
-import Navbar from "../Navbar/Navbar.jsx";
-import MainAreaTabs from "../MainContent/MainAreaTabs.jsx";
-import RightSide from '../RightSidebar/RightSide.jsx';
-import OnboardingOverlay from '../Onboarding/OnboardingOverlay.jsx';
-import Footer from "../Footer/Footer.jsx";
-import LazyFallback from "../Shared/LazyFallback.jsx";
-import DevE2eNav from "../E2E/DevE2eNav.jsx";
-import RouteErrorBoundary from '../ErrorBoundary/RouteErrorBoundary.jsx';
+import Navbar from "../Navbar/Navbar";
+import MainAreaTabs from "../MainContent/MainAreaTabs";
+import RightSide from '../RightSidebar/RightSide';
+import OnboardingOverlay from '../Onboarding/OnboardingOverlay';
+import Footer from "../Footer/Footer";
+import LazyFallback from "../Shared/LazyFallback";
+import DevE2eNav from "../E2E/DevE2eNav";
+import RouteErrorBoundary from '../ErrorBoundary/RouteErrorBoundary';
 
 import { createLogger } from 'utilities/logging.js';
 import {
@@ -160,7 +168,7 @@ import {
   NotFoundRoute,
   readHashQueryParam,
   SessionLoadingSkeleton,
-} from './routeStatusViews.jsx';
+} from './routeStatusViews';
 import {
   KNOWN_ROUTE_PREFIXES,
   isStaticNonCacheRoute,
@@ -1618,29 +1626,24 @@ export class MainSite extends Component {
   refreshSessionInfo = async () => {
     const slug = this.getActiveSessionSlug();
     const cfg = getSessionConfigBySlugOrDefault(slug) || {};
-    const encrypted = cfg?.sessionInfoEncrypted || cfg?.encryptedSessionInfo;
-    if (!encrypted) return;
-
-    const account = this.props.account || '';
-    if (!account) return;
     const litHooks = getGlobalLitHooks();
-    if (!litHooks || typeof litHooks.getKey !== 'function') return;
-
-    const attemptKey = `${slug}|${account}|${encrypted}`;
-    if (this._lastSessionInfoAttempt === attemptKey) return;
-    this._lastSessionInfoAttempt = attemptKey;
-
     try {
-      const value = await cryptoUtils.decryptEnvelopeValue(encrypted, {
-        account,
-        chainId: cfg?.networkChainId || null,
+      const result = await refreshSessionInfoForSlug({
+        slug,
+        cfg,
+        account: this.props.account || '',
         providerLike: this.props.provider,
-        litOpts: { getKey: litHooks.getKey },
+        getKey: litHooks?.getKey,
+        lastAttemptKey: this._lastSessionInfoAttempt,
+        decryptEnvelopeValue: cryptoUtils.decryptEnvelopeValue,
       });
-      const next = (value == null) ? '' : String(value);
-      if (!next) return;
+      this._lastSessionInfoAttempt = result.attemptKey || this._lastSessionInfoAttempt;
+      if (!result.shouldUpdate) return;
       this.setState((prev) => ({
-        sessionInfoOverrides: { ...(prev.sessionInfoOverrides || {}), [slug]: next },
+        sessionInfoOverrides: {
+          ...(prev.sessionInfoOverrides || {}),
+          [slug]: result.nextValue,
+        },
       }));
     } catch (e) { mainSiteLog.warn('MainSite: fallback', e); }
   };
@@ -1648,53 +1651,35 @@ export class MainSite extends Component {
   refreshSessionMetaFields = async () => {
     const slug = this.getActiveSessionSlug();
     const cfg = getSessionConfigBySlugOrDefault(slug) || {};
-    const encryptedFields = cfg?.encryptedFields && typeof cfg.encryptedFields === 'object'
-      ? cfg.encryptedFields
-      : null;
-    if (!encryptedFields) return;
-
-    const account = this.props.account || '';
-    if (!account) return;
     const litHooks = getGlobalLitHooks();
-    if (!litHooks || typeof litHooks.getKey !== 'function') return;
+    try {
+      const result = await refreshSessionMetaFieldsForSlug({
+        slug,
+        cfg,
+        account: this.props.account || '',
+        providerLike: this.props.provider,
+        getKey: litHooks?.getKey,
+        attempts: this._sessionMetaAttempts,
+        decryptEnvelopeValue: cryptoUtils.decryptEnvelopeValue,
+      });
 
-    const decryptField = async (fieldKey, stateKey) => {
-      const encrypted = encryptedFields[fieldKey];
-      if (!encrypted) return;
-      let encryptedKey = '';
-      try {
-        encryptedKey = typeof encrypted === 'string' ? encrypted : JSON.stringify(encrypted);
-      } catch {
-        encryptedKey = String(encrypted);
-      }
-      const attemptKey = `${slug}|${account}|${fieldKey}|${encryptedKey}`;
-      this._sessionMetaAttempts = this._sessionMetaAttempts || {};
-      if (this._sessionMetaAttempts[attemptKey]) return;
-      this._sessionMetaAttempts[attemptKey] = true;
+      this._sessionMetaAttempts = result.attempts;
+      result.errors.forEach(({ error }) => {
+        mainSiteLog.warn('MainSite: fallback', error);
+      });
 
-      try {
-        const value = await cryptoUtils.decryptEnvelopeValue(encrypted, {
-          account,
-          chainId: cfg?.networkChainId || null,
-          providerLike: this.props.provider,
-          litOpts: { getKey: litHooks.getKey },
+      if (!Object.keys(result.patches || {}).length) return;
+      this.setState((prev) => {
+        const nextState = {};
+        Object.entries(result.patches).forEach(([stateKey, patch]) => {
+          nextState[stateKey] = {
+            ...(prev[stateKey] || {}),
+            ...patch,
+          };
         });
-        const next = (value == null) ? '' : String(value);
-        if (!next) return;
-        this.setState((prev) => ({
-          [stateKey]: { ...(prev[stateKey] || {}), [slug]: next },
-        }));
-      } catch (e) { mainSiteLog.warn('MainSite: fallback', e); }
-    };
-
-    const nameFieldKey = Object.prototype.hasOwnProperty.call(encryptedFields, 'sessionName')
-      ? 'sessionName'
-      : null;
-
-    await Promise.all([
-      nameFieldKey ? decryptField(nameFieldKey, 'sessionNameOverrides') : Promise.resolve(),
-      decryptField('sessionHeader', 'sessionHeaderOverrides'),
-    ]);
+        return nextState;
+      });
+    } catch (e) { mainSiteLog.warn('MainSite: fallback', e); }
   };
 
   refreshGroupCredentials = async () => {
@@ -12141,7 +12126,11 @@ export class MainSite extends Component {
               sbtScanProgressBySlug={this.state.sbtScanProgressBySlug}
               sbtRealtimeCoverageBySlug={this.state.sbtRealtimeCoverageBySlug}
               cacheInitializationError={cacheInitializationError}
-              autoFeatureSBTsWithFeaturedSbtTags={sessionConfig.autoFeatureSBTsWithFeaturedSbtTags}
+              autoFeatureSBTsBySessionSlug={
+                sessionConfig?.autoFeatureSBTsBySessionSlug !== undefined
+                  ? sessionConfig.autoFeatureSBTsBySessionSlug
+                  : sessionConfig?.autoFeatureSBTsWithFeaturedSbtTags
+              }
               routeQuestionsOpen={isQuestionsRoute}
               routeAutoOpenResults={isQuestionResultsRoute}
             />
@@ -12461,18 +12450,13 @@ export class MainSite extends Component {
 
   buildQuestionDecryptContext = (slug) => {
     const cfg = this.getSessionCfg(slug) || {};
-    const chainId =
-      Number(cfg?.networkChainId || this.props.network?.id || this.props.network?.chainId || 0) || null;
-    const litHooks = this.state.litHooks || getGlobalLitHooks() || null;
-    return {
+    return buildQuestionDecryptContextForSession({
+      cfg,
       account: this.props.account || '',
       providerLike: this.props.provider || '',
-      chainId,
-      litHooks,
-      litOpts: litHooks && typeof litHooks.getKey === 'function'
-        ? { getKey: litHooks.getKey }
-        : null,
-    };
+      litHooks: this.state.litHooks || getGlobalLitHooks() || null,
+      fallbackChainId: this.props.network?.id || this.props.network?.chainId || null,
+    });
   };
 
   refreshEncryptedQuestionPayloadsForGroup = async (slug, opts = {}) => {
@@ -12519,29 +12503,6 @@ export class MainSite extends Component {
 
       const backoffMs = force ? 0 : 30000;
       const backoffKey = (qid) => `${accountLower}|${slug}|${networkID}|${String(qid || '').toLowerCase()}`;
-
-      const hasImproved = (prevQ, nextQ) => {
-        if (!prevQ || !nextQ) return false;
-        if (isMaskedQuestionPayload(prevQ) && !isMaskedQuestionPayload(nextQ)) return true;
-
-        if (!prevQ.promptDecrypted && !!nextQ.promptDecrypted) return true;
-        if (!prevQ.optionsDecrypted && !!nextQ.optionsDecrypted) return true;
-        if (!prevQ.tagsDecrypted && !!nextQ.tagsDecrypted) return true;
-
-        const prevPromptMasked = String(prevQ.prompt || '') === '[encrypted]';
-        const nextPromptMasked = String(nextQ.prompt || '') === '[encrypted]';
-        if (prevPromptMasked && !nextPromptMasked) return true;
-
-        const prevOptLen = Array.isArray(prevQ.options) ? prevQ.options.length : 0;
-        const nextOptLen = Array.isArray(nextQ.options) ? nextQ.options.length : 0;
-        if (prevOptLen === 0 && nextOptLen > 0) return true;
-
-        const prevTagLen = Array.isArray(prevQ.tags) ? prevQ.tags.length : 0;
-        const nextTagLen = Array.isArray(nextQ.tags) ? nextQ.tags.length : 0;
-        if (prevTagLen === 0 && nextTagLen > 0) return true;
-
-        return false;
-      };
 
       // Time-slice: decrypt only a small number per invocation so we don't stall the app.
       const MAX_ATTEMPTS_PER_RUN = force ? 24 : 12;
@@ -12595,7 +12556,7 @@ export class MainSite extends Component {
               return { qid: id, next: null, improved: false };
             }
 
-            const improved = hasImproved(prev, next);
+            const improved = hasMaskedQuestionPayloadImproved(prev, next);
             if (!improved) {
               const attemptTs = Date.now();
               this._maskedQuestionDecryptBackoff.set(key, { ts: attemptTs });

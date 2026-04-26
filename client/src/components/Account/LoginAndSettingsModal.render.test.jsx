@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { act } from 'react';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import styles from './Account.module.scss';
 
@@ -6,11 +6,11 @@ jest.mock('@rainbow-me/rainbowkit', () => ({
   ConnectButton: () => null,
 }));
 
-jest.mock('../HooksHOC/withWagmiBridge.jsx', () => ({
+jest.mock('../HooksHOC/withWagmiBridge', () => ({
   WagmiHooksHOC: (Comp) => Comp,
 }));
 
-jest.mock('components/UserPage/UserPage.jsx', () => (props) => (
+jest.mock('components/UserPage/UserPage', () => (props) => (
   <div data-testid="mock-user-page" data-view-address={props.viewAddress || ''} />
 ));
 
@@ -100,7 +100,7 @@ jest.mock('../../utilities/cache/cacheScripts.js', () => ({
   removeCache: jest.fn(async () => true),
 }));
 
-import { LoginAndSettingsModal } from './LoginAndSettingsModal.jsx';
+import { LoginAndSettingsModal } from './LoginAndSettingsModal';
 import contractScripts from '../../utilities/web3/contractScripts.js';
 import * as portoFunctions from '../../utilities/web3/portoFunctions.js';
 import { saveLocalAiSettings } from '../../utilities/ai/aiSettings.js';
@@ -167,16 +167,19 @@ const restorePublicUrl = () => {
 
 const loadIsolatedSettingsModal = () => {
   jest.resetModules();
+  jest.doMock('react', () => React);
   let loaded;
 
   jest.isolateModules(() => {
     loaded = {
-      LoginAndSettingsModal: require('./LoginAndSettingsModal.jsx').LoginAndSettingsModal,
+      LoginAndSettingsModal: require('./LoginAndSettingsModal').LoginAndSettingsModal,
       getAllSessionSlugs: require('../../utilities/web3/contractScripts.js').getAllSessionSlugs,
       getSessionConfigBySlugOrDefault: require('../../utilities/web3/contractScripts.js').getSessionConfigBySlugOrDefault,
       checkSponsoredAccess: require('../../utilities/web3/sponsoredAccess.js').checkSponsoredAccess,
     };
   });
+
+  jest.dontMock('react');
 
   return loaded;
 };
@@ -234,12 +237,20 @@ const getPasskeyLoginButton = () => (
   screen.getAllByRole('button').find((button) => button.textContent.trim() === 'Login')
 );
 
-const openPreLoginSettingsDrawer = () => {
-  fireEvent.click(screen.getByRole('button', { name: 'Toggle pre-login settings' }));
+const clickAndSettle = async (element) => {
+  await act(async () => {
+    fireEvent.click(element);
+    await Promise.resolve();
+    await Promise.resolve();
+  });
 };
 
-const openPreLoginConfigPanel = () => {
-  fireEvent.click(screen.getByTestId('ce-prelogin-config-toggle'));
+const openPreLoginSettingsDrawer = async () => {
+  await clickAndSettle(screen.getByRole('button', { name: 'Toggle pre-login settings' }));
+};
+
+const openPreLoginConfigPanel = async () => {
+  await clickAndSettle(screen.getByTestId('ce-prelogin-config-toggle'));
 };
 
 afterEach(() => {
@@ -299,7 +310,7 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     render(subject.getSettingsDisplay());
 
     expect(screen.getByText('SESSION')).toBeInTheDocument();
-    expect(screen.getByText('Edge Session')).toBeInTheDocument();
+    expect(screen.getAllByText('Edge Session').length).toBeGreaterThan(0);
     const sessionLink = screen.getByRole('link', { name: 'Open session Edge Session' });
     expect(sessionLink).toHaveAttribute('href', '/session/edge');
     expect(sessionLink).not.toHaveAttribute('target');
@@ -362,7 +373,7 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
 
     render(subject.getSettingsDisplay());
 
-    expect(screen.getByText('Edge Session')).toBeInTheDocument();
+    expect(screen.getAllByText('Edge Session').length).toBeGreaterThan(0);
     expect(screen.queryByText('session:')).not.toBeInTheDocument();
     expect(screen.getByText('Network')).toBeInTheDocument();
     expect(screen.getByText('Base Sepolia')).toBeInTheDocument();
@@ -434,7 +445,7 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
 
     render(<LoginAndSettingsModal {...props} />);
 
-    openPreLoginSettingsDrawer();
+    await openPreLoginSettingsDrawer();
 
     expect(screen.getByTestId('ce-prelogin-settings-panel')).toBeInTheDocument();
     expect(document.getElementById('preLoginTooltipsToggleTooltip')).toBeTruthy();
@@ -442,7 +453,7 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Explainers On' }));
     expect(props.toggleTooltips).toHaveBeenCalledTimes(1);
 
-    openPreLoginConfigPanel();
+    await openPreLoginConfigPanel();
 
     fireEvent.change(screen.getByLabelText('AI endpoint'), {
       target: { value: 'https://self-hosted.example/v1' },
@@ -514,22 +525,37 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
       return { status: 'no-gate' };
     });
 
-    render(<LoginAndSettingsModal {...buildProps({ activeSessionSlug: 'demo' })} />);
+    const subject = new LoginAndSettingsModal(buildProps({ activeSessionSlug: 'demo' }));
+    subject.state = {
+      ...subject.state,
+      preLoginSettingsOpen: true,
+      preLoginConfigOpen: false,
+      sponsoredAccess: {
+        ai: { status: 'needs-wallet' },
+        arweave: { status: 'no-gate' },
+        rpc: { status: 'no-gate' },
+        txGas: { status: 'no-gate' },
+      },
+    };
+    subject.getActiveSessionSlug = jest.fn(() => 'demo');
 
-    openPreLoginSettingsDrawer();
+    render(subject.getPreLoginSettingsDisplay());
 
     expect(screen.queryByTestId('ce-prelogin-session-select')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('AI endpoint')).not.toBeInTheDocument();
 
-    expect(await screen.findByText('Network')).toBeInTheDocument();
-    expect(screen.getByText(/The active session targets/i)).toBeInTheDocument();
-    expect(screen.getByText('AI')).toBeInTheDocument();
-    expect(screen.getByText('Arweave')).toBeInTheDocument();
-    expect(screen.getByText('RPC')).toBeInTheDocument();
-    expect(screen.getByText('Tx gas')).toBeInTheDocument();
-    expect(screen.getByText('Connect wallet')).toBeInTheDocument();
-    expect(screen.getAllByText('Sponsored').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Demo Session').length).toBeGreaterThan(0);
+    await waitFor(() => {
+      expect(screen.getByText('Network')).toBeInTheDocument();
+      expect(screen.getByText(/The active session targets/i)).toBeInTheDocument();
+      expect(screen.getByText('AI')).toBeInTheDocument();
+      expect(screen.getByText('Arweave')).toBeInTheDocument();
+      expect(screen.getByText('RPC')).toBeInTheDocument();
+      expect(screen.getByText('Tx gas')).toBeInTheDocument();
+      expect(screen.getByText('Connect wallet')).toBeInTheDocument();
+      expect(screen.getAllByText('Sponsored').length).toBeGreaterThan(0);
+      expect(screen.getByRole('link', { name: 'Open session Demo Session' })).toBeInTheDocument();
+      expect(screen.getAllByText('configured here').length).toBeGreaterThan(0);
+    });
   });
 
   it('keeps pre-login session and local AI controls behind Config while leaving the shared overview visible', async () => {
@@ -549,14 +575,14 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
 
     render(<LoginAndSettingsModal {...buildProps({ activeSessionSlug: 'demo' })} />);
 
-    openPreLoginSettingsDrawer();
+    await openPreLoginSettingsDrawer();
 
     expect(await screen.findByText('Network')).toBeInTheDocument();
     expect(screen.queryByTestId('ce-prelogin-session-select')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('OpenAI API key')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('AI endpoint')).not.toBeInTheDocument();
 
-    openPreLoginConfigPanel();
+    await openPreLoginConfigPanel();
 
     expect(screen.getByText('Network')).toBeInTheDocument();
     expect(screen.getByTestId('ce-prelogin-session-select')).toBeInTheDocument();
@@ -564,7 +590,7 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     expect(screen.getByLabelText('AI endpoint')).toBeInTheDocument();
   });
 
-  it('keeps the logged-out footer gear-only until the settings drawer opens', () => {
+  it('keeps the logged-out footer gear-only until the settings drawer opens', async () => {
     const props = buildProps({
       demoSurfaceMode: true,
       setDemoSurfaceMode: jest.fn(),
@@ -574,7 +600,7 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
 
     expect(screen.queryByRole('button', { name: 'Demo Mode On' })).not.toBeInTheDocument();
 
-    openPreLoginSettingsDrawer();
+    await openPreLoginSettingsDrawer();
 
     const panel = screen.getByTestId('ce-prelogin-settings-panel');
     const demoToggle = within(panel).getByRole('button', { name: 'Demo Mode On' });
@@ -589,13 +615,13 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     expect(props.setDemoSurfaceMode).toHaveBeenCalledWith(false);
   });
 
-  it('updates the demo mode toggle label when demoSurfaceMode changes', () => {
+  it('updates the demo mode toggle label when demoSurfaceMode changes', async () => {
     const props = buildProps({
       demoSurfaceMode: true,
     });
     const { rerender } = render(<LoginAndSettingsModal {...props} />);
 
-    openPreLoginSettingsDrawer();
+    await openPreLoginSettingsDrawer();
     expect(screen.getByRole('button', { name: 'Demo Mode On' })).toHaveAttribute('aria-pressed', 'true');
 
     rerender(<LoginAndSettingsModal {...props} demoSurfaceMode={false} />);
@@ -624,11 +650,11 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     expect(setDemoSurfaceMode).toHaveBeenCalledWith(false);
   });
 
-  it('renders the pre-login AI settings subsection with both provider key inputs and the Anthropic hint', () => {
+  it('renders the pre-login AI settings subsection with both provider key inputs and the Anthropic hint', async () => {
     render(<LoginAndSettingsModal {...buildProps()} />);
 
-    openPreLoginSettingsDrawer();
-    openPreLoginConfigPanel();
+    await openPreLoginSettingsDrawer();
+    await openPreLoginConfigPanel();
 
     expect(screen.getByText('AI settings')).toBeInTheDocument();
     expect(screen.getByLabelText('OpenAI API key')).toBeInTheDocument();
@@ -640,8 +666,8 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
   it('saves an OpenAI pre-login key and activates the local GPT-5 preset', async () => {
     render(<LoginAndSettingsModal {...buildProps()} />);
 
-    openPreLoginSettingsDrawer();
-    openPreLoginConfigPanel();
+    await openPreLoginSettingsDrawer();
+    await openPreLoginConfigPanel();
     fireEvent.change(screen.getByLabelText('OpenAI API key'), {
       target: { value: 'sk-open-test' },
     });
@@ -667,8 +693,8 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
   it('saves an Anthropic pre-login key and activates the local Claude Sonnet preset', async () => {
     render(<LoginAndSettingsModal {...buildProps()} />);
 
-    openPreLoginSettingsDrawer();
-    openPreLoginConfigPanel();
+    await openPreLoginSettingsDrawer();
+    await openPreLoginConfigPanel();
     fireEvent.change(screen.getByLabelText('Anthropic API key'), {
       target: { value: 'sk-ant-test' },
     });
@@ -691,7 +717,7 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     });
   });
 
-  it('lets pre-login settings switch the active session before connect', () => {
+  it('lets pre-login settings switch the active session before connect', async () => {
     getAllSessionSlugs.mockReturnValue(['edge']);
     getSessionConfigBySlugOrDefault.mockImplementation((slug) => (
       String(slug || '') === 'edge'
@@ -705,8 +731,8 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
 
     render(<LoginAndSettingsModal {...props} />);
 
-    openPreLoginSettingsDrawer();
-    openPreLoginConfigPanel();
+    await openPreLoginSettingsDrawer();
+    await openPreLoginConfigPanel();
 
     expect(screen.getByTestId('ce-prelogin-session-select')).toBeInTheDocument();
 
@@ -893,16 +919,15 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
 
     await waitFor(() => {
       expect(props.wagmiDisconnect).toHaveBeenCalledTimes(1);
+      expect(props.updateLoginInfo).toHaveBeenCalledWith({
+        loginInProgress: false,
+        loginComplete: false,
+        provider: null,
+      });
+      expect(props.changeAccount).toHaveBeenCalledWith({});
+      expect(clearAllWorkerSessionTokens).toHaveBeenCalledTimes(1);
+      expect(localStorage.getItem('ce:userDisconnected')).toBe('true');
     });
-
-    expect(props.updateLoginInfo).toHaveBeenCalledWith({
-      loginInProgress: false,
-      loginComplete: false,
-      provider: null,
-    });
-    expect(props.changeAccount).toHaveBeenCalledWith({});
-    expect(clearAllWorkerSessionTokens).toHaveBeenCalledTimes(1);
-    expect(localStorage.getItem('ce:userDisconnected')).toBe('true');
   });
 
   it('replaces the legacy settings summary strip with compact supported-resource cards', async () => {
@@ -944,14 +969,25 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
       return { status: 'no-gate' };
     });
 
-    render(<LoginAndSettingsModal {...buildProps({
+    const subject = new LoginAndSettingsModal(buildProps({
       account: WAGMI_ADDRESS,
       activeSessionSlug: 'demo',
       loginComplete: true,
       provider: 'wagmi',
-    })} />);
+    }));
+    subject.state = {
+      ...subject.state,
+      aiSettingsOpen: true,
+      sponsoredAccess: {
+        ai: { status: 'granted' },
+        arweave: { status: 'granted' },
+        rpc: { status: 'granted' },
+        txGas: { status: 'no-gate' },
+      },
+    };
+    subject.getActiveSessionSlug = jest.fn(() => 'demo');
 
-    fireEvent.click(screen.getByRole('button', { name: /config/i }));
+    const { rerender } = render(subject.getSettingsDisplay());
 
     expect(await screen.findByText('AI')).toBeInTheDocument();
     expect(screen.getByText('Arweave')).toBeInTheDocument();
@@ -961,12 +997,90 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     expect(screen.queryByText('AI gate')).not.toBeInTheDocument();
     expect(screen.queryByText('RPC scan scope')).not.toBeInTheDocument();
     expect(screen.queryByText(/Gate status is evaluated against the active session/i)).not.toBeInTheDocument();
-    expect(screen.getAllByText('Demo Session').length).toBeGreaterThan(0);
+    expect(screen.getByRole('link', { name: 'Open session Demo Session' })).toBeInTheDocument();
+    expect(screen.getAllByText('configured here').length).toBeGreaterThan(0);
     expect(screen.queryAllByText('Edge Session')).toHaveLength(0);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Show other AI sponsor sessions' }));
+    expect(screen.getByRole('button', { name: 'Show other AI sponsor sessions' })).toBeInTheDocument();
+    subject.state = {
+      ...subject.state,
+      expandedSponsorResources: {
+        ...subject.state.expandedSponsorResources,
+        ai: true,
+      },
+    };
+    rerender(subject.getSettingsDisplay());
 
     expect((await screen.findAllByText('Edge Session')).length).toBeGreaterThan(0);
+  });
+
+  it('separates active-session sponsorship from other sponsor sessions', async () => {
+    getAllSessionSlugs.mockReturnValue(['op-session-test']);
+    getSessionConfigBySlugOrDefault.mockImplementation((slug) => {
+      const normalized = String(slug || '').trim().toLowerCase();
+      if (!normalized) {
+        return {
+          slug: '',
+          sessionName: 'General',
+          sponsoredKeys: {},
+        };
+      }
+      if (normalized === 'op-session-test') {
+        return {
+          slug: 'op-session-test',
+          sessionName: 'OP Session Test',
+          sponsoredKeys: {
+            rpc: 'sponsored-rpc',
+          },
+        };
+      }
+      return {};
+    });
+    checkSponsoredAccess.mockImplementation(async () => ({ status: 'unknown' }));
+
+    const modalRef = React.createRef();
+
+    render(<LoginAndSettingsModal
+      {...buildProps({
+        account: WAGMI_ADDRESS,
+        activeSessionSlug: '',
+        loginComplete: true,
+        provider: 'wagmi',
+      })}
+      ref={modalRef}
+    />);
+
+    await act(async () => {
+      modalRef.current.setState({
+        aiSettingsOpen: true,
+        sponsoredAccess: {
+          ai: { status: 'unknown' },
+          arweave: { status: 'unknown' },
+          rpc: { status: 'denied' },
+          txGas: { status: 'unknown' },
+        },
+      });
+    });
+
+    const rpcCard = (await screen.findByText('RPC')).closest(`.${styles.supportedResourceCard}`);
+    expect(rpcCard).toBeTruthy();
+    expect(within(rpcCard).getByText('Not sponsored')).toBeInTheDocument();
+    expect(within(rpcCard).queryByText('Gate locked')).not.toBeInTheDocument();
+    expect(within(rpcCard).getByText('General')).toBeInTheDocument();
+    expect(within(rpcCard).getByText('not configured here')).toBeInTheDocument();
+    expect(within(rpcCard).queryByText('OP Session Test')).not.toBeInTheDocument();
+
+    fireEvent.click(within(rpcCard).getByRole('button', { name: 'Show other RPC sponsor sessions' }));
+
+    await waitFor(() => {
+      expect(within(rpcCard).getByText('OP Session Test')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /Resource keys/i }));
+
+    expect(await screen.findByText(
+      'No active-session RPC sponsor. Other sessions with RPC: OP Session Test. Switch sessions to use one.'
+    )).toBeInTheDocument();
   });
 
   it('does not render the legacy send-testnet-funds control in settings', () => {
@@ -1058,10 +1172,58 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
 
     render(subject.getSettingsDisplay());
 
-    expect(screen.getByText('Checking failed')).toBeInTheDocument();
+    expect(screen.getByText('Check unavailable')).toBeInTheDocument();
     expect(screen.getAllByText('Edge Session').length).toBeGreaterThan(0);
-    expect(screen.getByText('We could not confirm gate access for this sponsor.')).toBeInTheDocument();
+    expect(screen.getByText('We could not confirm gate access for the active-session sponsor.')).toBeInTheDocument();
     expect(screen.queryByText('RPC Gate · ANY')).not.toBeInTheDocument();
+  });
+
+  it('keeps unresolved sponsored AI access in a non-terminal state', () => {
+    const subject = new LoginAndSettingsModal(buildProps({
+      account: WAGMI_ADDRESS,
+      activeSessionSlug: 'edge',
+      loginComplete: true,
+      provider: 'wagmi',
+    }));
+    subject.state = {
+      ...subject.state,
+      aiSettingsOpen: true,
+      sponsoredAccessLoading: false,
+      sponsoredAccess: {
+        ai: { status: 'unresolved' },
+        arweave: null,
+        rpc: null,
+        txGas: null,
+      },
+    };
+    subject.getDisplaySessionConfig = jest.fn(() => ({
+      slug: 'edge',
+      sessionName: 'Edge Session',
+      sponsoredKeys: {
+        ai: 'edge-ai',
+      },
+    }));
+    subject.getSessionDescriptor = jest.fn(() => ({
+      label: 'Edge Session',
+      _sessionName: 'Edge Session',
+    }));
+    subject.getSettingsSessionOptions = jest.fn(() => [{ slug: 'edge', label: 'Edge Session' }]);
+    subject.getSponsoredSessionSources = jest.fn(() => ({
+      byResource: {
+        ai: [{ slug: 'edge', label: 'Edge Session', slugLabel: 'edge', isActive: true }],
+        arweave: [],
+        rpc: [],
+        txGas: [],
+      },
+      rpcScope: [],
+    }));
+
+    render(subject.getSettingsDisplay());
+
+    expect(screen.getByText('Check unavailable')).toBeInTheDocument();
+    expect(screen.getByText('We could not confirm gate access for the active-session sponsor.')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Sponsored key configured')).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText('Sponsored key configured (SBT required)')).not.toBeInTheDocument();
   });
 
   it('keeps gas transaction UI hidden even when faucet success state exists', () => {

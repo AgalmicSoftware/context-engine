@@ -1,0 +1,683 @@
+import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faGithub } from '@fortawesome/free-brands-svg-icons';
+import { Modal, ModalBody, ModalHeader } from 'reactstrap';
+import {
+  faCaretDown,
+  faCaretUp,
+  faBrain,
+  faBuilding,
+  faChalkboardTeacher,
+  faCity,
+  faUsers,
+} from '@fortawesome/free-solid-svg-icons';
+import styles from './AboutPage.module.scss';
+import cipPhoto from '../../assets/img/cip_photo.png';
+import polisLogo from '../../assets/img/polis_logo.png';
+import rxcLogo from '../../assets/img/rxc_logo.png';
+import {
+  PUBLIC_REPO_URL,
+  PUBLIC_WHITEPAPER_URL,
+} from '../../variables/publicRepoMetadata.js';
+import {
+  derivePrimarySessionSlugFromList,
+  GLOBAL_SESSION_SELECTION_UPDATED_EVENT,
+  readStoredGlobalSessionSelection,
+} from '../../utilities/session/globalSessionState.js';
+import { buildPublicRoute } from '../MainSite/urlUtils.js';
+
+type RecognitionLink = {
+  url: string;
+  text: string;
+};
+
+type RecognitionGroup = {
+  name: string;
+  description: string;
+  links: RecognitionLink[];
+  logo?: string;
+  itemClassName?: string;
+  logoClassName?: string;
+  image?: string;
+};
+
+type RecognitionIndividual = {
+  name: string;
+  url?: string;
+};
+
+const HEADER_LINKS = [
+  { url: PUBLIC_WHITEPAPER_URL, text: 'Whitepaper', testId: 'ce-about-link-whitepaper' },
+];
+
+const RECOGNITION_GROUPS: RecognitionGroup[] = [
+  {
+    name: 'Ethereum',
+    logo: 'https://ethereum.org/images/assets/eth-diamond-glyph.png',
+    itemClassName: 'recognitionItemEthereum',
+    logoClassName: 'recognitionLogoEthereum',
+    description:
+      'Context Engine uses a passkey Ethereum wallet model rather than email for accounts. Ethereum provides the cryptographic foundation for proof-of-human and attestation-based access, SBT-style membership, gated encryption, and durable on-chain references, while decentralized infrastructure adds censorship-resistance and data permanence. Users do not need any crypto expertise to use it.',
+    links: [
+      { url: 'https://ethereum.org/', text: 'Ethereum.org' },
+      { url: 'https://ethereum.org/en/what-is-ethereum/', text: 'What is Ethereum?' },
+    ],
+  },
+  {
+    name: 'RadicalxChange',
+    logo: rxcLogo,
+    itemClassName: 'recognitionItemRadicalxchange',
+    logoClassName: 'recognitionLogoRxc',
+    description:
+      'Context Engine builds on RadicalxChange ideas around social identity, plural governance, and groups owning the data and value they create. SBT-style credentials issued by different communities can shape filtering and encryption, while the broader direction is for digital groups to retain ownership over the preference data and value they create instead of surrendering it to platforms.',
+    links: [
+      { url: 'https://www.radicalxchange.org/', text: 'Official Website' },
+      { url: 'https://twitter.com/RadxChange', text: 'Twitter / X' },
+    ],
+  },
+  {
+    name: 'Pol.is',
+    logo: polisLogo,
+    itemClassName: 'recognitionItemPolis',
+    logoClassName: 'recognitionLogoPolis',
+    description:
+      'Pol.is showed how large-group discourse software can clarify both consensus and persistent difference, especially in vTaiwan where simple Agree / Unsure / Disagree inputs helped structure public reasoning. Context Engine builds on that approach with more question types, optional privacy, AI-native workflows, and permanent public storage.',
+    links: [
+      { url: 'https://pol.is/', text: 'Official Website' },
+    ],
+  },
+  {
+    name: 'Collective Intelligence Project',
+    logo: 'https://images.squarespace-cdn.com/content/v1/631d02b2dfa9482a32db47ec/250a39fb-f2d0-432e-8784-4d2113ba8ae6/favicon.ico?format=100w',
+    itemClassName: 'recognitionItemCip',
+    logoClassName: 'recognitionLogoCip',
+    image: cipPhoto,
+    description:
+      'Context Engine is social infrastructure for the AI transition: a toolkit for collective intelligence, large-group deliberation, and coordination under information overload. That mission sits directly alongside CIP’s work on scalable collective decision-making for transformative technology.',
+    links: [
+      { url: 'https://cip.org/', text: 'CIP Website' },
+    ],
+  },
+  {
+    name: 'Edge City',
+    logo: 'https://cdn.prod.website-files.com/65b2cb5abdecf7cd7747e170/65d5ef08c6a2bf96d1f60a27_favicon.png',
+    itemClassName: 'recognitionItemEdgePatagonia',
+    logoClassName: 'recognitionLogoEdge',
+    description:
+      'Residencies like the d/acc residency at Edge Patagonia, sponsored by Protocol Labs, created space to prototype tools for resilient technology, coordination, and governance in live community settings.',
+    links: [
+      { url: 'https://www.edgecity.live/patagonia', text: 'Edge City' },
+    ],
+  },
+  {
+    name: 'Loophole',
+    description:
+      'Loophole is a useful way to stress-test rules and reason about policy proposals. Context Engine uses it to enrich the debate atlas with concrete loophole, overreach, and patch-comparison cases people can inspect and debate.',
+    links: [
+      { url: 'https://github.com/brendanhogan/loophole', text: 'GitHub Repo' },
+    ],
+  },
+];
+
+const RECOGNIZED_INDIVIDUALS: RecognitionIndividual[] = [];
+
+const USE_CASES = [
+  {
+    slug: 'ai-discourse',
+    label: 'For AI Discourse',
+    icon: faBrain,
+    tone: 'mint',
+    problemTitle: 'Low-Dimensional Debate',
+    problem:
+      'Public AI discourse gets flattened into slogans like "accelerate" vs. "pause," while harder questions on labor, surveillance, liability, and public goods stay under-specified.',
+    solutionTitle: 'Durable Public Map',
+    detail:
+      'Create a structured public map of AI questions, preferences, and predictions in durable form so disagreement stays legible over time.',
+  },
+  {
+    slug: 'corporate',
+    label: 'For Companies',
+    icon: faBuilding,
+    tone: 'blue',
+    problemTitle: 'Lost Decision Context',
+    problem:
+      'Organizations often preserve decisions without preserving the assumptions, tradeoffs, and confidence behind them.',
+    solutionTitle: 'Private Forecasting',
+    detail:
+      'Record predictions, assumptions, and confidence before outcomes are known, with timestamped entries that can remain encrypted until revealed or proven privately (and in the future, evaluated while still encrypted).',
+  },
+  {
+    slug: 'cities',
+    label: 'For Cities',
+    icon: faCity,
+    tone: 'orange',
+    problemTitle: 'Shallow Civic Input',
+    problem:
+      'Polls and hearings rarely capture the texture of public disagreement on complex civic questions.',
+    solutionTitle: 'Standing Public Record',
+    detail:
+      'Gather input that is more nuanced than a poll and more durable than a hearing, with responses that can be filtered across constituencies.',
+  },
+  {
+    slug: 'conferences',
+    label: 'For Events',
+    icon: faChalkboardTeacher,
+    tone: 'pink',
+    problemTitle: 'Signal That Vanishes',
+    problem:
+      'High-bandwidth event discussion usually disappears once the gathering ends.',
+    solutionTitle: 'Persistent Opinion Map',
+    detail:
+      'Leave with a durable map of consensus, subgroup differences, and unresolved questions that can keep growing between gatherings.',
+  },
+  {
+    slug: 'digital-groups',
+    label: 'For Groups',
+    icon: faUsers,
+    tone: 'gold',
+    problemTitle: 'Platform-Owned Group Data',
+    problem:
+      'Online communities rarely own the preference data, membership boundaries, or AI systems built from what they collectively know.',
+    solutionTitle: 'Representative Models',
+    detail:
+      'Codify group preferences over time, train representative AI models, and keep community data attributable, licensable, and revocable.',
+  },
+];
+
+const HERO_TERTIARY_LINKS = HEADER_LINKS.filter(Boolean);
+
+export const getConfiguredRecognitionIndividuals = (
+  individuals: unknown[] = []
+): RecognitionIndividual[] => individuals.filter(
+  (person): person is RecognitionIndividual => (
+    !!person &&
+    typeof person === 'object' &&
+    typeof (person as { name?: unknown }).name === 'string' &&
+    (person as { name: string }).name.trim().length > 0
+  )
+);
+
+export const getAboutDemoSessionPath = (selection = readStoredGlobalSessionSelection()) => {
+  const scopeMode = String(selection?.selectedSessionScope || '').trim().toLowerCase();
+  if (scopeMode === 'list') {
+    const firstScopedSlug = derivePrimarySessionSlugFromList(selection?.selectedSessionSlugs || []);
+    if (firstScopedSlug) return `/session/${encodeURIComponent(firstScopedSlug)}`;
+  }
+  return '/session/demo';
+};
+
+const getRecognitionSlug = (name: string) => name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+
+const getRecognitionFallback = (name: string) => name
+  .split(/[^A-Za-z0-9]+/)
+  .filter(Boolean)
+  .map((chunk: string) => chunk[0])
+  .join('')
+  .slice(0, 2)
+  .toUpperCase();
+
+const AboutPage = () => {
+  const [activeUseCase, setActiveUseCase] = useState('');
+  const [activeRecognition, setActiveRecognition] = useState<RecognitionGroup | null>(null);
+  const [showPresent, setShowPresent] = useState(false);
+  const [showRoadmap, setShowRoadmap] = useState(false);
+  const [showRecognition, setShowRecognition] = useState(true);
+  const [demoSessionPath, setDemoSessionPath] = useState(() => getAboutDemoSessionPath());
+  const activeUseCaseConfig = USE_CASES.find(({ slug }) => slug === activeUseCase) || null;
+  const configuredRecognitionIndividuals = getConfiguredRecognitionIndividuals(RECOGNIZED_INDIVIDUALS);
+  const hasRecognizedIndividuals = configuredRecognitionIndividuals.length > 0;
+
+  const handleUseCaseToggle = (slug: string) => {
+    setActiveUseCase((currentSlug) => (currentSlug === slug ? '' : slug));
+  };
+
+  const handleSectionToggleKeyDown = (
+    event: React.KeyboardEvent<HTMLDivElement>,
+    setSectionVisibility: React.Dispatch<React.SetStateAction<boolean>>
+  ) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      setSectionVisibility((currentState) => !currentState);
+    }
+  };
+
+  const closeRecognitionModal = () => {
+    setActiveRecognition(null);
+  };
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.addEventListener !== 'function') return undefined;
+
+    const handleGlobalSessionSelectionUpdated = (event: Event) => {
+      const detail = event instanceof CustomEvent ? event.detail : null;
+      setDemoSessionPath(getAboutDemoSessionPath(detail || readStoredGlobalSessionSelection()));
+    };
+
+    window.addEventListener(
+      GLOBAL_SESSION_SELECTION_UPDATED_EVENT,
+      handleGlobalSessionSelectionUpdated
+    );
+
+    return () => {
+      window.removeEventListener(
+        GLOBAL_SESSION_SELECTION_UPDATED_EVENT,
+        handleGlobalSessionSelectionUpdated
+      );
+    };
+  }, []);
+
+  return (
+    <div className={styles.aboutPageContainer}>
+      <div className={styles.pageShell}>
+        <section className={styles.hero} data-testid="ce-about-hero">
+          <div className={styles.heroText}>
+            <div className={styles.titleRow}>
+              <h1 className={styles.mainTitle}>Context Engine</h1>
+              <a
+                href={PUBLIC_REPO_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={styles.titleRepoLink}
+                data-testid="ce-about-link-github"
+                aria-label="View Context Engine on GitHub"
+                title="View Context Engine on GitHub"
+              >
+                <FontAwesomeIcon icon={faGithub} />
+              </a>
+            </div>
+            <p className={styles.tagline}>
+              An open-source toolkit for large-group deliberation, sensemaking, and negotiation
+            </p>
+
+            <div className={styles.heroActions}>
+              <Link
+                to={demoSessionPath}
+                className={`${styles.ctaButton} ${styles.primaryButton} ${styles.heroPrimaryButton}`}
+              >
+                Demo
+              </Link>
+              <Link
+                to={buildPublicRoute('/new')}
+                className={`${styles.ctaButton} ${styles.secondaryButton} ${styles.heroPrimaryButton}`}
+              >
+                New Session
+              </Link>
+            </div>
+
+            <div className={styles.heroLinks}>
+              {HERO_TERTIARY_LINKS.map((link) => (
+                <a
+                  key={link.text}
+                  href={link.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={styles.tertiaryLink}
+                  data-testid={link.testId}
+                >
+                  {link.text}
+                </a>
+              ))}
+              <a href="mailto:contextengine@protonmail.com" className={styles.tertiaryLink}>
+                Email
+              </a>
+            </div>
+          </div>
+
+          <div className={styles.heroVideo}>
+            <iframe
+              src="https://drive.google.com/file/d/1nss6RZnF4yFwMFE6kjSW3ESi3ImpMcnf/preview"
+              className={styles.demoVideo}
+              allow="autoplay"
+              allowFullScreen
+              title="Context Engine demo video"
+            />
+          </div>
+        </section>
+
+        <section className={styles.section}>
+          <div className={styles.useCaseGrid}>
+            {USE_CASES.map((useCase) => (
+              <button
+                key={useCase.slug}
+                type="button"
+                className={`${styles.useCaseTile} ${styles[`useCaseTile${useCase.tone.charAt(0).toUpperCase()}${useCase.tone.slice(1)}`]} ${activeUseCase === useCase.slug ? styles.useCaseTileActive : ''}`}
+                data-testid={`ce-about-usecase-${useCase.slug}`}
+                aria-pressed={activeUseCase === useCase.slug}
+                onClick={() => handleUseCaseToggle(useCase.slug)}
+              >
+                <span className={styles.useCaseTileContent}>
+                  <FontAwesomeIcon icon={useCase.icon} className={styles.useCaseIcon} />
+                  <span className={styles.useCaseLabel}>{useCase.label}</span>
+                </span>
+              </button>
+            ))}
+          </div>
+
+          {activeUseCaseConfig && (
+            <article className={styles.useCaseDetail} aria-live="polite" aria-atomic="true">
+              <p className={styles.srOnly}>{activeUseCaseConfig.label}</p>
+              <div className={styles.useCaseDetailRow}>
+                <span className={styles.useCaseDetailProblemTag}>
+                  {activeUseCaseConfig.problemTitle}
+                </span>
+                <p className={styles.useCaseDetailRowText}>{activeUseCaseConfig.problem}</p>
+              </div>
+              <div className={styles.useCaseDetailRow}>
+                <span className={styles.useCaseDetailSolutionTag}>
+                  {activeUseCaseConfig.solutionTitle}
+                </span>
+                <p className={styles.useCaseDetailRowText}>{activeUseCaseConfig.detail}</p>
+              </div>
+            </article>
+          )}
+        </section>
+
+        <section className={`${styles.section} ${styles.collapsibleSection}`}>
+          <div
+            className={styles.toggleHeader}
+            onClick={() => setShowPresent((currentState) => !currentState)}
+            onKeyDown={(event) => handleSectionToggleKeyDown(event, setShowPresent)}
+            role="button"
+            tabIndex={0}
+            aria-expanded={showPresent}
+          >
+            <h2 className={styles.sectionTitle}>Functionality</h2>
+            <FontAwesomeIcon
+              icon={showPresent ? faCaretUp : faCaretDown}
+              className={styles.toggleIcon}
+            />
+          </div>
+          {showPresent && (
+            <div className={styles.collapsibleContent}>
+              <ul className={styles.featureList}>
+                <li className={styles.featureItem}>
+                  <span className={styles.featureLabel}>Sessions:</span>
+                  <span className={styles.featureText}>
+                    Include questions, responses, documents, access gates, and configuration, and new sessions can be created from the web application.
+                  </span>
+                </li>
+                <li className={styles.featureItem}>
+                  <span className={styles.featureLabel}>Questions:</span>
+                  <span className={styles.featureText}>
+                    Supports binary, rating, multiple-choice, and freeform questions, with optional conviction weighting and comments.
+                  </span>
+                </li>
+                <li className={styles.featureItem}>
+                  <span className={styles.featureLabel}>Access Control:</span>
+                  <span className={styles.featureText}>
+                    Uses soulbound tokens for gated participation, encrypted fields, and sponsored resources like RPC, AI, transaction costs, Arweave storage, and Lit encryption.
+                  </span>
+                </li>
+                <li className={styles.featureItem}>
+                  <span className={styles.featureLabel}>Storage:</span>
+                  <span className={styles.featureText}>
+                    Lives in durable records, with responses and documents on Arweave plus built-in report views, exports, and address-based comparison tools.
+                  </span>
+                </li>
+                <li className={styles.featureItem}>
+                  <span className={styles.featureLabel}>AI:</span>
+                  <span className={styles.featureText}>
+                    Already supports question generation, transcription, cluster summaries, result analysis, and comparison of user positions across wallets.
+                  </span>
+                </li>
+              </ul>
+            </div>
+          )}
+        </section>
+
+        <section className={`${styles.section} ${styles.collapsibleSection}`}>
+          <div
+            className={styles.toggleHeader}
+            onClick={() => setShowRoadmap((currentState) => !currentState)}
+            onKeyDown={(event) => handleSectionToggleKeyDown(event, setShowRoadmap)}
+            role="button"
+            tabIndex={0}
+            aria-expanded={showRoadmap}
+          >
+            <h2 className={styles.sectionTitle}>Roadmap</h2>
+            <FontAwesomeIcon
+              icon={showRoadmap ? faCaretUp : faCaretDown}
+              className={styles.toggleIcon}
+            />
+          </div>
+          {showRoadmap && (
+            <div className={styles.collapsibleContent}>
+              <ul className={styles.featureList}>
+                <li className={styles.featureItem}>
+                  <div className={styles.featureHeader}>
+                    <span className={styles.featureLabel}>Stage 1:</span>
+                    <span className={styles.featureStatusComplete}>Complete</span>
+                  </div>
+                  <span className={styles.featureText}>
+                    Current platform: an upgraded decentralized Pol.is with more question types, optional privacy, AI-native inputs, permanent public storage, and a passkey Ethereum wallet model.
+                  </span>
+                </li>
+                <li className={styles.featureItem}>
+                  <span className={styles.featureLabel}>Stage 2:</span>
+                  <span className={styles.featureText}>
+                    Deployment and interface upgrades.
+                  </span>
+                  <ul className={styles.roadmapSubList}>
+                    <li className={styles.roadmapSubItem}>Ease of deployment through turnkey bundles for Arweave, Lit, gas, and AI credits</li>
+                    <li className={styles.roadmapSubItem}>Agent-first UX so an agent can interface with a session in natural language</li>
+                    <li className={styles.roadmapSubItem}>Voice-only mode across languages</li>
+                    <li className={styles.roadmapSubItem}>Better document and context integration with knowledge maps and richer debate-tree style flows</li>
+                  </ul>
+                </li>
+                <li className={styles.featureItem}>
+                  <span className={styles.featureLabel}>Stage 3:</span>
+                  <span className={styles.featureText}>
+                    Stronger privacy and resilience.
+                  </span>
+                  <ul className={styles.roadmapSubList}>
+                    <li className={styles.roadmapSubItem}>Unlinkable per-response and per-SBT accounts, zero-knowledge and FHE aggregation, and proofs on encrypted response properties</li>
+                    <li className={styles.roadmapSubItem}>Increased censorship-resistance and walkaway resilience via ENS-hosted frontends and stronger decentralized services</li>
+                    <li className={styles.roadmapSubItem}>More storage options, including IPFS and configurable centralized storage</li>
+                    <li className={styles.roadmapSubItem}>zkTLS group formation and post-quantum cryptography</li>
+                  </ul>
+                </li>
+                <li className={styles.featureItem}>
+                  <span className={styles.featureLabel}>Stage 4+:</span>
+                  <span className={styles.featureText}>
+                    Collective intelligence, representation, and negotiation.
+                  </span>
+                  <ul className={styles.roadmapSubList}>
+                    <li className={styles.roadmapSubItem}>Quadratic voting for questions, priorities, and representative figures in automated debate</li>
+                    <li className={styles.roadmapSubItem}>AI models that represent group preferences and earn from invocations</li>
+                    <li className={styles.roadmapSubItem}>Group prompting, multimedia worldbuilding, and backcasting from clusters to scenarios</li>
+                    <li className={styles.roadmapSubItem}>Agent-to-agent negotiation tooling for multi-step private processes</li>
+                    <li className={styles.roadmapSubItem}>AI whistleblowing flows using zero-knowledge proofs and conditional timelocks</li>
+                  </ul>
+                </li>
+              </ul>
+            </div>
+          )}
+        </section>
+
+        <section
+          className={`${styles.section} ${styles.collapsibleSection}`}
+          data-testid="ce-about-recognition-toggle"
+        >
+          <div
+            className={styles.toggleHeader}
+            onClick={() => setShowRecognition((currentState) => !currentState)}
+            onKeyDown={(event) => handleSectionToggleKeyDown(event, setShowRecognition)}
+            role="button"
+            tabIndex={0}
+            aria-expanded={showRecognition}
+          >
+            <h2 className={styles.sectionTitle}>Recognition</h2>
+            <div className={styles.toggleHeaderAside}>
+              {!showRecognition && (
+                <div
+                  className={styles.recognitionSummary}
+                  data-testid="ce-about-recognition-summary"
+                  aria-hidden="true"
+                >
+                  {RECOGNITION_GROUPS.map((group) => (
+                    group.logo ? (
+                      <img
+                        key={group.name}
+                        src={group.logo}
+                        alt=""
+                        className={[
+                          styles.recognitionSummaryLogo,
+                          group.logoClassName ? styles[group.logoClassName] : '',
+                        ].filter(Boolean).join(' ')}
+                      />
+                    ) : (
+                      <span
+                        key={group.name}
+                        className={`${styles.recognitionSummaryLogo} ${styles.recognitionLogoFallback}`}
+                      >
+                        {getRecognitionFallback(group.name)}
+                      </span>
+                    )
+                  ))}
+                </div>
+              )}
+              <FontAwesomeIcon
+                icon={showRecognition ? faCaretUp : faCaretDown}
+                className={styles.toggleIcon}
+              />
+            </div>
+          </div>
+
+          {showRecognition && (
+            <div className={styles.recognitionCard}>
+              <div className={styles.recognitionStrip}>
+                {RECOGNITION_GROUPS.map((group) => {
+                  return (
+                    <button
+                      key={group.name}
+                      type="button"
+                      className={[
+                        styles.recognitionItem,
+                        group.itemClassName ? styles[group.itemClassName] : '',
+                      ].filter(Boolean).join(' ')}
+                      data-testid={`ce-about-recognition-${getRecognitionSlug(group.name)}`}
+                      title={group.description}
+                      onClick={() => setActiveRecognition(group)}
+                      aria-haspopup="dialog"
+                    >
+                      {group.logo ? (
+                        <img
+                          src={group.logo}
+                          alt={`${group.name} logo`}
+                          className={[
+                            styles.recognitionLogo,
+                            group.logoClassName ? styles[group.logoClassName] : '',
+                          ].filter(Boolean).join(' ')}
+                        />
+                      ) : (
+                        <span className={styles.recognitionLogoFallback}>
+                          {getRecognitionFallback(group.name)}
+                        </span>
+                      )}
+                      <span className={styles.recognitionName}>{group.name}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {hasRecognizedIndividuals && (
+                <div
+                  className={styles.recognitionIndividuals}
+                  data-testid="ce-about-recognition-individuals"
+                >
+                  {configuredRecognitionIndividuals.map((person) => (
+                    <span key={person.name} className={styles.recognitionIndividual}>
+                      {person.url ? (
+                        <a href={person.url} target="_blank" rel="noopener noreferrer">
+                          {person.name}
+                        </a>
+                      ) : (
+                        person.name
+                      )}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </section>
+
+        <Modal
+          isOpen={Boolean(activeRecognition)}
+          toggle={closeRecognitionModal}
+          centered
+          modalClassName={styles.recognitionModalDialog}
+          backdropClassName={styles.recognitionBackdrop}
+        >
+          <ModalHeader
+            toggle={closeRecognitionModal}
+            className={styles.recognitionModalHeaderBar}
+            close={(
+              <button
+                type="button"
+                className={styles.recognitionModalCloseButton}
+                onClick={closeRecognitionModal}
+                aria-label="Close recognition details"
+              >
+                <span aria-hidden="true">×</span>
+              </button>
+            )}
+          >
+            {activeRecognition && (
+              <div className={styles.recognitionModalHeader}>
+                {activeRecognition.logo ? (
+                  <img
+                    src={activeRecognition.logo}
+                    alt={`${activeRecognition.name} logo`}
+                    className={[
+                      styles.recognitionModalLogo,
+                      activeRecognition.logoClassName ? styles[activeRecognition.logoClassName] : '',
+                    ].filter(Boolean).join(' ')}
+                  />
+                ) : null}
+                <span className={styles.recognitionModalTitle}>{activeRecognition.name}</span>
+              </div>
+            )}
+          </ModalHeader>
+
+          <ModalBody className={styles.recognitionModalBody}>
+            {activeRecognition && (
+              <>
+                <p className={styles.recognitionModalDescription}>
+                  {activeRecognition.description}
+                </p>
+
+                {activeRecognition?.image && (
+                  <img
+                    src={activeRecognition.image}
+                    alt={activeRecognition.name + ' overview'}
+                    className={styles.recognitionModalImage}
+                  />
+                )}
+
+                {activeRecognition.links?.length ? (
+                  <div className={styles.recognitionModalLinks}>
+                    {activeRecognition.links.map((link) => (
+                      <a
+                        key={link.url}
+                        href={link.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={styles.recognitionModalLink}
+                      >
+                        {link.text}
+                      </a>
+                    ))}
+                  </div>
+                ) : null}
+              </>
+            )}
+          </ModalBody>
+        </Modal>
+      </div>
+    </div>
+  );
+};
+
+export default AboutPage;

@@ -31,11 +31,17 @@ const createAuthorityDeps = (overrides = {}) => ({
     headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
     config: {
       registryAddress: '0x0000000000000000000000000000000000000001',
+      allowOrigins: ['https://allowed.example'],
     },
   }),
   verifyMessage: () => '0xabc',
   validateRecoveredAddressMatchesRequest: () => ({ ok: true }),
-  parseSiweMessage: () => ({ nonce: 'nonce-1' }),
+  parseSiweMessage: () => ({
+    domain: 'allowed.example',
+    uri: 'https://allowed.example',
+    nonce: 'nonce-1',
+    issuedAt: '2026-04-23T12:00:00.000Z',
+  }),
   validateSiwe: () => ({ ok: true }),
   validateSiweAddressMatchesRequest: () => ({ ok: true }),
   consumeNonce: async () => ({ ok: true }),
@@ -48,6 +54,7 @@ const createAuthorityDeps = (overrides = {}) => ({
   }),
   MISSING_SLUG_ERROR: 'Missing sessionSlug.',
   SESSION_CONFIG_NOT_FOUND_ERROR: 'Session config not found.',
+  now: () => Date.parse('2026-04-23T12:01:00.000Z'),
   ...overrides,
 });
 
@@ -262,6 +269,94 @@ test('resolveAuthLoginRequestAuthority preserves signature, SIWE, and nonce fail
   );
 });
 
+test('resolveAuthLoginRequestAuthority rejects originless and mismatched SIWE login redemption before nonce use', async () => {
+  let missingOriginNonceCalled = false;
+  const missingOrigin = await resolveAuthLoginRequestAuthority(createRequestArgs({
+    request: {
+      headers: new Headers(),
+    },
+    deps: createAuthorityDeps({
+      consumeNonce: async () => {
+        missingOriginNonceCalled = true;
+        return { ok: true };
+      },
+    }),
+  }));
+
+  assert.equal(missingOriginNonceCalled, false);
+  assert.deepEqual(missingOrigin, {
+    ok: false,
+    response: {
+      body: { error: 'Missing Origin for worker login.' },
+      status: 403,
+      headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
+    },
+  });
+
+  let mismatchedOriginNonceCalled = false;
+  const mismatchedOrigin = await resolveAuthLoginRequestAuthority(createRequestArgs({
+    deps: createAuthorityDeps({
+      parseSiweMessage: () => ({
+        domain: 'evil.example',
+        uri: 'https://evil.example',
+        nonce: 'nonce-1',
+        issuedAt: '2026-04-23T12:00:00.000Z',
+      }),
+      consumeNonce: async () => {
+        mismatchedOriginNonceCalled = true;
+        return { ok: true };
+      },
+    }),
+  }));
+
+  assert.equal(mismatchedOriginNonceCalled, false);
+  assert.deepEqual(mismatchedOrigin, {
+    ok: false,
+    response: {
+      body: { error: 'SIWE uri origin does not match request Origin.' },
+      status: 403,
+      headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
+    },
+  });
+
+  let untrustedOriginNonceCalled = false;
+  const untrustedOrigin = await resolveAuthLoginRequestAuthority(createRequestArgs({
+    request: {
+      headers: new Headers({ Origin: 'https://evil.example' }),
+    },
+    deps: createAuthorityDeps({
+      resolveExistingSessionCors: async () => ({
+        ok: true,
+        headers: { 'Access-Control-Allow-Origin': 'https://evil.example' },
+        config: {
+          registryAddress: '0x0000000000000000000000000000000000000001',
+          allowOrigins: ['https://allowed.example'],
+        },
+      }),
+      parseSiweMessage: () => ({
+        domain: 'evil.example',
+        uri: 'https://evil.example',
+        nonce: 'nonce-1',
+        issuedAt: '2026-04-23T12:00:00.000Z',
+      }),
+      consumeNonce: async () => {
+        untrustedOriginNonceCalled = true;
+        return { ok: true };
+      },
+    }),
+  }));
+
+  assert.equal(untrustedOriginNonceCalled, false);
+  assert.deepEqual(untrustedOrigin, {
+    ok: false,
+    response: {
+      body: { error: 'Untrusted worker login origin.' },
+      status: 403,
+      headers: { 'Access-Control-Allow-Origin': 'https://evil.example' },
+    },
+  });
+});
+
 test('resolveAuthLoginRequestAuthority accepts an explicit general-session slug', async () => {
   const result = await resolveAuthLoginRequestAuthority(createRequestArgs({
     slugHint: 'general',
@@ -280,6 +375,7 @@ test('resolveAuthLoginRequestAuthority accepts an explicit general-session slug'
           headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
           config: {
             registryAddress: '0x0000000000000000000000000000000000000001',
+            allowOrigins: ['https://allowed.example'],
           },
         };
       },
@@ -369,12 +465,18 @@ test('resolveAuthLoginRequestAuthority preserves gate failure passthrough and re
     env: { GROUP_KV: {} },
     slug: 'session-a',
     address: '0xabc',
-    config: { registryAddress: '0x0000000000000000000000000000000000000001' },
+    config: {
+      registryAddress: '0x0000000000000000000000000000000000000001',
+      allowOrigins: ['https://allowed.example'],
+    },
   }]);
   assert.deepEqual(result, {
     ok: true,
     address: '0xabc',
-    config: { registryAddress: '0x0000000000000000000000000000000000000001' },
+    config: {
+      registryAddress: '0x0000000000000000000000000000000000000001',
+      allowOrigins: ['https://allowed.example'],
+    },
     headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
     scopes,
     targetSlug: 'session-a',

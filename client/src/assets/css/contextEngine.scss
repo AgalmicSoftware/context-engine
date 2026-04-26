@@ -1651,8 +1651,14 @@ textarea.form-control {
   height: auto;
 }
 
-.form-group {
+.form-group,
+.mb-3 {
   margin-bottom: 1rem;
+}
+
+.form-label {
+  display: inline-block;
+  margin-bottom: 0.5rem;
 }
 
 .form-text {
@@ -1704,7 +1710,8 @@ textarea.form-control {
   margin-left: 0;
 }
 
-.custom-select {
+.custom-select,
+.form-select {
   display: inline-block;
   width: 100%;
   height: calc(2.25rem + 2px);
@@ -1722,32 +1729,39 @@ textarea.form-control {
   box-shadow: inset 0 1px 2px rgba(34, 42, 66, 0.075);
   appearance: none;
 }
-.custom-select:focus {
+.custom-select:focus,
+.form-select:focus {
   border-color: rgba(50, 151, 211, 0.25);
   outline: 0;
   box-shadow:
     inset 0 1px 2px rgba(34, 42, 66, 0.075),
     0 0 0 0 #e14eca;
 }
-.custom-select:focus::-ms-value {
+.custom-select:focus::-ms-value,
+.form-select:focus::-ms-value {
   color: rgba(255, 255, 255, 0.8);
   background-color: transparent;
 }
 .custom-select[multiple],
-.custom-select[size]:not([size='1']) {
+.custom-select[size]:not([size='1']),
+.form-select[multiple],
+.form-select[size]:not([size='1']) {
   height: auto;
   padding-right: 0.7rem;
   background-image: none;
 }
-.custom-select:disabled {
+.custom-select:disabled,
+.form-select:disabled {
   color: #6c757d;
   background-color: #e9ecef;
 }
-.custom-select::-ms-expand {
+.custom-select::-ms-expand,
+.form-select::-ms-expand {
   display: none;
 }
 
-.custom-select-sm {
+.custom-select-sm,
+.form-select-sm {
   height: calc(1.35em + 0.5rem + 2px);
   padding-top: 0.25rem;
   padding-bottom: 0.25rem;
@@ -1755,7 +1769,8 @@ textarea.form-control {
   font-size: 0.75rem;
 }
 
-.custom-select-lg {
+.custom-select-lg,
+.form-select-lg {
   height: calc(1.35em + 1.75rem + 2px);
   padding-top: 0.875rem;
   padding-bottom: 0.875rem;
@@ -4014,9 +4029,37 @@ fieldset[disabled] .btn-link.active {
   border-top-right-radius: 0.2857rem;
 }
 
-.modal-header .close {
+.modal-header .close,
+.modal-header .btn-close {
   padding: 24px 24px 0 24px;
   margin: -1rem -1rem -1rem auto;
+}
+
+.btn-close {
+  box-sizing: content-box;
+  width: 1em;
+  height: 1em;
+  padding: 0.25em;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  opacity: 0.5;
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.btn-close::before {
+  content: '×';
+  display: inline-block;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.btn-close:hover,
+.btn-close:focus {
+  opacity: 0.75;
+  text-decoration: none;
 }
 
 .modal-title {

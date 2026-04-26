@@ -1,4 +1,7 @@
 const DEFAULT_USED_NONCE_TTL_SECONDS = 60 * 10;
+const DEFAULT_NONCE_RATE_LIMIT_WINDOW_MS = 60 * 1000;
+const DEFAULT_NONCE_RATE_LIMIT_TTL_SECONDS = 60;
+const DEFAULT_NONCE_RATE_LIMIT_MAX = 5;
 const nonceConsumeLocks = new Map();
 
 const withNonceConsumeLock = async (key, work) => {
@@ -39,6 +42,12 @@ export const buildNonce = (deps) => {
   return encode(bytes);
 };
 
+const buildClaimId = (deps) => {
+  if (typeof deps?.buildClaimId === 'function') return deps.buildClaimId();
+  if (typeof crypto?.randomUUID === 'function') return crypto.randomUUID();
+  return buildNonce(deps);
+};
+
 export const consumeNonce = async (env, slug, address, nonce, deps) => {
   const groupKv = env?.GROUP_KV;
   const usedNonceTtlSeconds = Number.isFinite(deps?.usedNonceTtlSeconds)
@@ -48,19 +57,72 @@ export const consumeNonce = async (env, slug, address, nonce, deps) => {
 
   return withNonceConsumeLock(consumeKey, async () => {
     const addrKey = `nonce:${slug}:${address}`;
-    const existing = await groupKv?.get?.(addrKey);
-    if (!existing || existing !== nonce) {
-      return { ok: false, error: 'Nonce mismatch or expired.' };
-    }
-
     const usedKey = `usedNonce:${slug}:${nonce}`;
     const alreadyUsed = await groupKv?.get?.(usedKey);
     if (alreadyUsed) {
       return { ok: false, error: 'Nonce already used.' };
     }
 
-    await groupKv?.put?.(usedKey, '1', { expirationTtl: usedNonceTtlSeconds });
+    const claimId = buildClaimId(deps);
+    await groupKv?.put?.(usedKey, claimId, { expirationTtl: usedNonceTtlSeconds });
+
+    const existing = await groupKv?.get?.(addrKey);
+    if (!existing || existing !== nonce) {
+      const currentClaim = await groupKv?.get?.(usedKey);
+      if (!currentClaim || currentClaim === claimId) {
+        await groupKv?.delete?.(usedKey);
+      }
+      return { ok: false, error: 'Nonce mismatch or expired.' };
+    }
+
+    const currentClaim = await groupKv?.get?.(usedKey);
+    if (currentClaim && currentClaim !== claimId) {
+      return { ok: false, error: 'Nonce already used.' };
+    }
+
     await groupKv?.delete?.(addrKey);
     return { ok: true };
   });
+};
+
+export const checkNonceRateLimit = async ({
+  env,
+  slug,
+  identity,
+  address,
+  limit = DEFAULT_NONCE_RATE_LIMIT_MAX,
+  now,
+  windowMs = DEFAULT_NONCE_RATE_LIMIT_WINDOW_MS,
+  ttlSeconds = DEFAULT_NONCE_RATE_LIMIT_TTL_SECONDS,
+} = {}) => {
+  const numericLimit = Number(limit);
+  if (!Number.isFinite(numericLimit) || numericLimit <= 0) return { ok: true };
+
+  const currentTime = typeof now === 'function' ? now() : Date.now();
+  const numericWindowMs = Number.isFinite(Number(windowMs)) && Number(windowMs) > 0
+    ? Number(windowMs)
+    : DEFAULT_NONCE_RATE_LIMIT_WINDOW_MS;
+  const windowStart = Math.floor(currentTime / numericWindowMs) * numericWindowMs;
+  const normalizedIdentity = String(identity || '').trim().toLowerCase();
+  const fallbackIdentity = String(address || '').trim().toLowerCase();
+  const rateIdentity = normalizedIdentity || fallbackIdentity || 'unknown';
+  const sessionSlug = String(slug || '').trim();
+  const key = `rate:authNonce:${sessionSlug}:${rateIdentity}:${windowStart}`;
+
+  const raw = await env?.GROUP_KV?.get?.(key);
+  const current = Number(raw || 0);
+  const next = Number.isFinite(current) && current >= 0 ? current + 1 : 1;
+  const expirationTtl = Number.isFinite(Number(ttlSeconds)) && Number(ttlSeconds) > 0
+    ? Number(ttlSeconds)
+    : DEFAULT_NONCE_RATE_LIMIT_TTL_SECONDS;
+  await env?.GROUP_KV?.put?.(key, String(next), { expirationTtl });
+
+  if (next > numericLimit) {
+    return {
+      ok: false,
+      error: 'Too many nonce requests. Try again shortly.',
+      retryAfterSeconds: expirationTtl,
+    };
+  }
+  return { ok: true };
 };

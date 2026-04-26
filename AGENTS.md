@@ -3,7 +3,7 @@
 ## Quick commands
 ```bash
 # Client (from client/)
-cd client && npm install --legacy-peer-deps  # install client dependencies
+cd client && npm install  # install client dependencies (legacy-peer-deps carried via client/.npmrc)
 npm run dev                       # dev server (port 3000, hot reload)
 
 # Worker bundle (from repo root; use Node 20 for root scripts)
@@ -21,9 +21,11 @@ npm run ai:seed-survey:question-types            # seed question type data
 - Run frontend package commands from `client/`.
 - Root worker/test scripts are standardized on Node `^20.0.0` (`nvm use 20`).
 - The frontend package itself still supports Node `^16.14.2`, npm `9.2.0` (`nvm use 16`) when you are working only inside `client/`.
-- Fresh `client/` installs still require `npm install --legacy-peer-deps` because the current React Scripts / Lit / ethers peer graph does not resolve cleanly with plain npm install.
+- Fresh `client/` installs use the standard `npm install`; the `--legacy-peer-deps` contract is carried automatically via `client/.npmrc` because `react-scripts@4.0.3`'s optional TypeScript peer still conflicts with `@lit-protocol/contracts@0.9.1`'s strict peer. Plain `npm install` just works.
+- When upgrading peer-sensitive `client/` dependencies (Lit Protocol packages, `react-scripts`, `reactstrap`, `react-popper`, or anything else declaring a React / TypeScript peer), re-run `cd client && npm install --legacy-peer-deps=false` in isolation to re-expose any new hard peer conflicts before committing the upgrade. The `.npmrc` suppresses those warnings during normal installs, so this is the only way to catch a regression that shrinks the supported peer surface.
 - `npm run dev` is the hot-reload frontend dev server; `npm start` serves the existing production build from `build/`.
-- Useful frontend scripts: `npm test`, `CI=true npm test -- --watchAll=false`, `npm run lint`, `npm run build`, `npm run analyze`.
+- Useful frontend scripts: `npm test`, `npm test -- --watchAll=false`, `npm run lint`, `npm run build`, `npm run analyze`.
+- Codex targeted Jest runs should use the approval-friendly form from `client/`: `npm test -- --watchAll=false --runTestsByPath <paths...>`. Do not prefix targeted Jest commands with `CI=true`; shell env assignments make sandbox auto-approval less reliable and trigger repeated prompts for Jest's temp-dir haste-map cache.
 - Frontend logging is off by default. In the browser console, run `window.CE_LOGGING.enabled = true`, then `window.CE_LOGGING_HELP()` for categories and usage.
 
 ## Stack
@@ -38,16 +40,16 @@ npm run ai:seed-survey:question-types            # seed question type data
 | Path | What it is |
 |------|------------|
 | `client/src/components/MainSite/MainSite.jsx` | See [`docs/MainSite.MAP.md`](docs/MainSite.MAP.md) for the MainSite section index |
-| `client/src/components/MainContent/` | Home tab surface: `MainAreaTabs.jsx`, `ToolExplorer.jsx`, `OnboardingWalkthrough.jsx`, `RiskMatrix.jsx` |
-| `client/src/components/Account/` | Account/login/settings surface: `LoginAndSettingsModal.jsx`, `LoginButton.jsx` |
+| `client/src/components/MainContent/` | Home tab surface: `MainAreaTabs.tsx`, `ToolExplorer.tsx`, `OnboardingWalkthrough.tsx`, `RiskMatrix.tsx` |
+| `client/src/components/Account/` | Account/login/settings surface: `LoginAndSettingsModal.tsx`, `LoginButton.tsx` |
 | `client/src/components/SurveyTool/SurveyTool.jsx` | See [`docs/SurveyTool.MAP.md`](docs/SurveyTool.MAP.md) for the SurveyTool component hierarchy |
 | `client/src/components/About/` | About page components |
-| `client/src/components/OnePageSession/` | Session page shell: `OnePageSession.jsx` plus its co-located styles/tests |
-| `client/src/components/DemoViews/` | Demo-only route surfaces: `CorpusViewer.jsx`, `DemosIndex.jsx`, `RiskMatrixDemo.jsx`, `DemoAnalysis/`, `DebateHUD/` |
-| `client/src/components/DocumentLibrary/` | Session document library surfaces: `SessionDocumentsPage.jsx`, `DocumentLibraryPanel.jsx` |
-| `client/src/components/Shared/` | Shared reusable UI: `AudioInput/`, `Json/`, `CETooltip.jsx`, `LazyFallback.jsx`, `SessionChipSelector.jsx` |
-| `client/src/components/Sessions/SessionWizard.jsx` | Session creation wizard |
-| `client/src/components/Admin/AdminPage.jsx` | Admin page |
+| `client/src/components/OnePageSession/` | Session page shell: `OnePageSession.tsx` plus its co-located styles/tests |
+| `client/src/components/DemoViews/` | Demo-only route surfaces: `CorpusViewer.tsx`, `DemosIndex.tsx`, `RiskMatrixDemo.tsx`, `DemoAnalysis/`, `DebateHUD/` |
+| `client/src/components/DocumentLibrary/` | Session document library surfaces: `SessionDocumentsPage.tsx`, `DocumentLibraryPanel.tsx` |
+| `client/src/components/Shared/` | Shared reusable UI: `AudioInput/`, `Json/`, `CETooltip.tsx`, `LazyFallback.tsx`, `SessionChipSelector.tsx` |
+| `client/src/components/Sessions/SessionWizard.tsx` | Session creation wizard |
+| `client/src/components/Admin/AdminPage.tsx` | Admin page |
 | `client/src/components/SBTs/` | SBT management components |
 | `client/src/components/Gates/` | Gate/encryption components |
 | `client/src/utilities/` | Utilities organized into subdirs: `web3/`, `crypto/`, `arweave/`, `session/`, `worker/`, `cache/`, `ai/`, `sbt/`, `ui/`, `survey/`, `docLibrary/` |
@@ -57,7 +59,7 @@ npm run ai:seed-survey:question-types            # seed question type data
 | `client/src/contractsABI/` | Contract ABI JSON files |
 | `contracts/` | Solidity smart contracts |
 | `scripts/test-*.ui.js` | Playwright E2E tests |
-| `contextEngine-cc/` | Claude Code integration (hook + passkey auth) |
+| `Local companion (private/dev-only)` | Omitted from the public release; present in full development checkouts for hook + passkey auth |
 | `ARCHITECTURE.md` | System diagram, data flows, contract addresses |
 
 ### Generated / do-not-edit
@@ -81,7 +83,6 @@ npm run ai:seed-survey:question-types            # seed question type data
 | [`docs/lit-protocol-information.md`](docs/lit-protocol-information.md) | Lit Protocol docs |
 | [`LICENSING.md`](LICENSING.md) | CPAL/MIT split license |
 | [`CHANGELOG.md`](CHANGELOG.md) | Shipped changes |
-| [`TODO/README.md`](TODO/README.md) | Public roadmap |
 
 ## Conventions
 - Default testnet: OP Sepolia (`11155420`)
@@ -90,10 +91,12 @@ npm run ai:seed-survey:question-types            # seed question type data
 - Tooltip pattern: `<FontAwesomeIcon icon={faQuestionCircle}/>` + `<UncontrolledTooltip>` (reactstrap)
 
 ## Workflow
-- Commit convention: `autocoder: <descriptive message>` for automated changes
+- Commit convention for automated changes: `<type>(autocoder): <short imperative summary>` (for example, `fix(autocoder): guard empty response payload`). Use `feat`, `fix`, `refactor`, `test`, `docs`, or `chore` as the type.
+- Keep commit messages concise: imperative subject, no trailing period, no internal PRD identifiers, and an optional body capped at 0-3 short lines when helpful.
+- Commit messages must not reference internal PRD identifiers (e.g. `PRD 334`, `PRDs 329-336`). Describe the change by what it does, not by the tracking ID — PRDs churn (merged, renumbered, deprecated) and referencing them ties public commit history to internal bookkeeping.
 - Keep fixture/test data non-identifying (no real names, emails, API keys)
 - New user-facing workflow/features should add or update related automated E2E smoke coverage when relevant, especially for UI, encryption, gating, worker, or Arweave flows
-- Park PRDs and other planned-work writeups under `TODO/` (typically `TODO/PRDs/`), not `docs/`
+- In full development checkouts, park PRDs and other planned-work writeups under `TODO/` (typically `TODO/PRDs/`), not `docs/`. Those planning docs are intentionally omitted from the public release.
 
 ## Guardrails
 - **MUST NOT**: commit secrets, API keys, or private keys to the repo

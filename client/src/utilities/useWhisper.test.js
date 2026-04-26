@@ -1,8 +1,7 @@
 /* eslint-disable import/first */
 
-import React from 'react';
-import ReactDOM from 'react-dom';
-import { act } from 'react-dom/test-utils';
+import React, { act } from 'react';
+import { createRoot } from 'react-dom/client';
 
 jest.mock('recordrtc', () => {
   let nextBlob = null;
@@ -118,6 +117,8 @@ class MockAudioContext {
 
 describe('useWhisper', () => {
   let container;
+  let root;
+  let previousActEnvironment;
   let ref;
   let nowSpy;
   let setNow;
@@ -133,9 +134,15 @@ describe('useWhisper', () => {
     getTracks: () => [fakeTrack],
   };
 
+  beforeAll(() => {
+    previousActEnvironment = globalThis.IS_REACT_ACT_ENVIRONMENT;
+    globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+  });
+
   beforeEach(() => {
     container = document.createElement('div');
     document.body.appendChild(container);
+    root = createRoot(container);
     ref = React.createRef();
 
     originalAudioContext = window.AudioContext;
@@ -186,7 +193,12 @@ describe('useWhisper', () => {
   });
 
   afterEach(() => {
-    ReactDOM.unmountComponentAtNode(container);
+    if (root) {
+      act(() => {
+        root.unmount();
+      });
+      root = null;
+    }
     container.remove();
     container = null;
     ref = null;
@@ -207,12 +219,20 @@ describe('useWhisper', () => {
     nowSpy.mockRestore();
   });
 
+  afterAll(() => {
+    if (typeof previousActEnvironment === 'undefined') {
+      delete globalThis.IS_REACT_ACT_ENVIRONMENT;
+      return;
+    }
+    globalThis.IS_REACT_ACT_ENVIRONMENT = previousActEnvironment;
+  });
+
   it('records and transcribes a session', async () => {
     const onComplete = jest.fn();
     const onStop = jest.fn();
 
     act(() => {
-      ReactDOM.render(
+      root.render(
         <WhisperHarness
           ref={ref}
           options={{
@@ -220,8 +240,7 @@ describe('useWhisper', () => {
             onTranscriptionComplete: onComplete,
             onRecordingStop: onStop,
           }}
-        />,
-        container
+        />
       );
     });
 
@@ -266,7 +285,7 @@ describe('useWhisper', () => {
     const onStop = jest.fn();
 
     act(() => {
-      ReactDOM.render(
+      root.render(
         <WhisperHarness
           ref={ref}
           options={{
@@ -274,8 +293,7 @@ describe('useWhisper', () => {
             onTranscriptionComplete: onComplete,
             onRecordingStop: onStop,
           }}
-        />,
-        container
+        />
       );
     });
 

@@ -1,4 +1,4 @@
-import { analyzeClusterOpinions, callAI, runCompareToolkit, transcribeAudio } from './aiScripts.js';
+import { analyzeClusterOpinions, analyzePhotoForQuestionGeneration, callAI, runCompareToolkit, transcribeAudio } from './aiScripts.js';
 import { getEffectiveAiConfig, getEffectiveTranscriptionConfig } from './aiSettings.js';
 import { getCorsProxyUrlOrThrow } from '../worker/corsProxy.js';
 import { fetchWorkerWithAuth } from '../worker/workerAuth.js';
@@ -144,6 +144,59 @@ describe('aiScripts worker auth options', () => {
     expect(body.max_output_tokens).toBe(321);
     expect(body.max_completion_tokens).toBeUndefined();
     expect(body.max_tokens).toBeUndefined();
+  });
+
+  it('fails closed for photo analysis when the configured provider/model is not vision-capable', async () => {
+    getEffectiveAiConfig.mockResolvedValue({
+      provider: 'custom',
+      model: 'llama-text-only',
+      apiKeySource: 'worker',
+    });
+
+    const photo = new File(['binary'], 'memo.png', { type: 'image/png' });
+
+    await expect(analyzePhotoForQuestionGeneration(photo, { sessionSlug: '' })).rejects.toThrow(
+      'Photo analysis requires a vision-capable OpenAI, Anthropic, or OpenRouter model.'
+    );
+    expect(fetchWorkerWithAuth).not.toHaveBeenCalled();
+  });
+
+  it('sends multimodal photo-analysis messages through the worker for gpt-5 responses models', async () => {
+    getEffectiveAiConfig.mockResolvedValue({
+      provider: 'openai',
+      model: 'gpt-5',
+      apiKeySource: 'worker',
+    });
+    getCorsProxyUrlOrThrow.mockResolvedValue('https://worker.example');
+    fetchWorkerWithAuth.mockResolvedValue({
+      ok: true,
+      json: async () => ({ completion: 'Readable analysis' }),
+    });
+
+    const photo = new File(['photo-bytes'], 'memo.png', { type: 'image/png' });
+    const out = await analyzePhotoForQuestionGeneration(photo, { sessionSlug: '' });
+
+    expect(out).toEqual(expect.objectContaining({
+      text: 'Readable analysis',
+      provider: 'openai',
+      model: 'gpt-5',
+      requestFormat: 'openai-responses',
+    }));
+    const requestInit = fetchWorkerWithAuth.mock.calls[0]?.[1] || {};
+    const body = JSON.parse(String(requestInit.body || '{}'));
+    expect(body.endpoint).toBe('responses');
+    expect(body.messages).toEqual([
+      {
+        role: 'user',
+        content: [
+          expect.objectContaining({ type: 'input_text' }),
+          expect.objectContaining({
+            type: 'input_image',
+            image_url: expect.stringMatching(/^data:image\/png;base64,/),
+          }),
+        ],
+      },
+    ]);
   });
 
   it('uses anonymous-first worker transport for transcribeAudio', async () => {

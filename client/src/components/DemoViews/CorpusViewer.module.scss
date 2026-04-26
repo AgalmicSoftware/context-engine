@@ -270,6 +270,59 @@ $text: #f4f7ff;
   grid-template-columns: 1fr;
 }
 
+.tweetPreviewControl {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--ce-radius-8);
+  box-sizing: border-box;
+  color: $text;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  max-width: 100%;
+  padding: 10px 12px;
+  width: 100%;
+}
+
+.tweetPreviewCount {
+  color: $muted;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.35;
+  min-width: 0;
+}
+
+.tweetPreviewButton {
+  appearance: none;
+  background: rgba(77, 255, 164, 0.12);
+  border: 1px solid rgba(77, 255, 164, 0.32);
+  border-radius: var(--ce-radius-pill);
+  color: $accent;
+  cursor: pointer;
+  flex: 0 0 auto;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.2;
+  padding: 8px 12px;
+  transition:
+    background 0.18s ease,
+    border-color 0.18s ease,
+    color 0.18s ease;
+}
+
+.tweetPreviewButton:hover {
+  background: rgba(77, 255, 164, 0.18);
+  border-color: rgba(77, 255, 164, 0.48);
+  color: #b7ffd9;
+}
+
+.tweetPreviewButton:focus-visible {
+  outline: 2px solid rgba(77, 255, 164, 0.5);
+  outline-offset: 2px;
+}
+
 .card {
   background: $card;
   border: 1px solid $card-border;
@@ -667,6 +720,15 @@ $text: #f4f7ff;
   width: 100%;
 }
 
+.tweetActionRow {
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.tweetActionRow .externalLink {
+  margin-left: auto;
+}
+
 .cardFooter:empty,
 .cardFooterLinks:empty {
   display: none;
@@ -1012,53 +1074,6 @@ $text: #f4f7ff;
   padding: 12px 12px 10px;
 }
 
-.tagModal {
-  max-width: min(1180px, calc(100vw - 32px));
-  margin: 24px auto;
-}
-
-.tagModal :global(.modal-content) {
-  background:
-    radial-gradient(circle at top right, rgba(77, 255, 164, 0.08), transparent 32%),
-    linear-gradient(180deg, rgba(12, 18, 34, 0.98), rgba(8, 12, 24, 0.98));
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 18px;
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
-  color: $text;
-  overflow: hidden;
-}
-
-.tagModal :global(.modal-header) {
-  align-items: center;
-  background: rgba(255, 255, 255, 0.03);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  color: $text;
-  padding: 18px 20px;
-}
-
-.tagModal :global(.modal-title) {
-  color: $text;
-  font-size: 15px;
-  font-weight: 700;
-}
-
-.tagModal :global(.modal-body) {
-  background: transparent;
-  padding: 20px;
-}
-
-.tagModal :global(.close) {
-  color: $text;
-  opacity: 0.72;
-  text-shadow: none;
-}
-
-.tagModal :global(.close:hover),
-.tagModal :global(.close:focus) {
-  color: $accent;
-  opacity: 1;
-}
-
 .debateMapHeader {
   align-items: center;
   display: flex;
@@ -1120,6 +1135,11 @@ $text: #f4f7ff;
   padding: 5px 9px;
   text-decoration: none;
   white-space: normal;
+}
+
+.debateMapIcon {
+  flex-shrink: 0;
+  font-size: 0.8rem;
 }
 
 .debateMapLinkButton {
@@ -1212,7 +1232,7 @@ $text: #f4f7ff;
     flex-direction: column;
     gap: 8px;
     max-width: none;
-    min-height: 84px;
+    min-height: 104px;
     min-width: 0;
     padding: 12px 12px 13px;
     width: 100%;
@@ -1223,8 +1243,8 @@ $text: #f4f7ff;
   }
 
   .tabLabel {
-    font-size: 14px;
-    line-height: 1.22;
+    font-size: 18px;
+    line-height: 1.18;
     white-space: normal;
   }
 
@@ -1404,6 +1424,18 @@ $text: #f4f7ff;
     gap: 10px;
   }
 
+  .tweetActionRow {
+    align-items: stretch;
+  }
+
+  .tweetActionRow .externalLink {
+    margin-left: 0;
+  }
+
+  .tweetPreviewControl {
+    margin-top: 2px;
+  }
+
   .debateMapLink,
   .externalLink {
     align-items: flex-start;
@@ -1430,7 +1462,7 @@ $text: #f4f7ff;
   }
 
   .tabButton {
-    min-height: 78px;
+    min-height: 96px;
     padding: 11px 10px 12px;
   }
 
@@ -1439,8 +1471,8 @@ $text: #f4f7ff;
   }
 
   .tabLabel {
-    font-size: 13px;
-    line-height: 1.18;
+    font-size: 17px;
+    line-height: 1.16;
   }
 
   .policyListTitle,
@@ -1467,5 +1499,14 @@ $text: #f4f7ff;
   .externalIconLink {
     height: 40px;
     width: 40px;
+  }
+
+  .tweetPreviewControl {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .tweetPreviewButton {
+    width: 100%;
   }
 }

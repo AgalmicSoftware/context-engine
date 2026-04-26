@@ -19,6 +19,97 @@ stays centralized in `client/src/variables/publicDeploymentConfig.js`.
 3. Restart the dev server: `cd client && npm run dev` (CRA reads `.env` only at build time)
 4. For production (Vercel, Netlify, Cloudflare Pages, etc.): set `REACT_APP_*` vars in your hosting platform's environment settings. Do not commit `client/.env` to git.
 
+## Netlify Static Deploy
+
+Use this flow when you want to ship the React frontend on a custom domain with
+Netlify static hosting. The built app is a static bundle; it is not a Node
+server.
+
+### 1. Set frontend variables
+
+Before building, review `client/.env.example`, `client/src/variables/publicDeploymentConfig.js`,
+and `client/src/variables/appConfig.js`. CRA bakes `REACT_APP_*` values into
+the browser bundle at build time, so changes require a rebuild/redeploy.
+
+For a custom-domain self-host, the values to check first are:
+- None are required solely because the app is hosted on Netlify.
+- `REACT_APP_CE_SHARED_WORKER_URL` when the deployment should use your own
+  default/shared `sessionCorsWorker` instead of the demo fallback.
+- `REACT_APP_CE_DEPLOY_HELPER_URL` when `/new` should use your own
+  deploy-helper instead of the project helper.
+- `REACT_APP_CE_HEALTHCHECK_WORKER_URL` when worker diagnostics should target a
+  specific worker.
+- `REACT_APP_CE_WORKER_BUNDLE_URL` only when deploy flows should fetch a worker
+  bundle from a non-default URL.
+- `REACT_APP_DEFAULT_CHAIN_ID`, session scan variables, and registry/session
+  defaults only when your deployment intentionally targets a different chain,
+  registry/session surface, or profile scan scope.
+
+Most feature toggles, Arweave read policy toggles, terminology mode, and RPC
+diagnostic flags can stay at the checked-in defaults. Any worker, chain, or
+registry override must match the worker and on-chain registry that the hosted
+frontend will actually use.
+
+### 2. Build the static bundle
+
+```bash
+cd client
+npm run build
+```
+
+The output directory is `client/build/`.
+
+### 3. Upload to Netlify
+
+For a manual upload, drag `client/build/` into Netlify's deploy UI. For a
+connected repo deploy, set the publish directory to:
+
+```text
+client/build
+```
+
+Because the app uses client-side routing, configure an SPA route fallback. Either
+include a Netlify `_redirects` file in the published build output:
+
+```text
+/*    /index.html   200
+```
+
+Or configure the same rule in `netlify.toml`:
+
+```toml
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+```
+
+For manual drag-and-drop deploys, the `_redirects` file must be present inside
+the uploaded `client/build/` directory.
+
+### 4. Attach the custom domain
+
+In Netlify, add the domain under the site domain settings and complete the DNS
+setup Netlify provides. Rebuild/redeploy after the final origin is known if any
+`REACT_APP_*` values depend on that origin or point at origin-specific worker,
+helper, registry, or API endpoints.
+
+### 5. Update worker CORS
+
+After the domain cutover, add the deployed origin to the session worker
+`allowOrigins` list, for example `https://app.example`. Use the `/admin` CORS
+allowlist editor or the worker admin routes documented in
+[`docs/session-cors-worker.md`](session-cors-worker.md).
+
+Smoke-test the deployed domain with:
+- worker `/health`
+- a basic AI request
+- an Arweave upload/read path
+- login/auth flows, including gated flows if the session uses SBT gates
+
+Vercel, Cloudflare Pages, and GitHub Pages use the same static build output and
+SPA fallback concept, but their redirect config syntax differs.
+
 ## Notes
 
 - `client/.env` is optional. If it is missing, the app still uses the checked-in
@@ -57,6 +148,16 @@ stays centralized in `client/src/variables/publicDeploymentConfig.js`.
   - Controls whether user-facing membership copy defaults to plain-language
     (`Group`, `Collect`, `Account`) or crypto-native (`SBT`, `Mint`, `Wallet`) terms.
   - Supported values: `plain` (default), `crypto`
+
+- `REACT_APP_CE_DEMO_SURFACE_MODE_DEFAULT=true`
+  - Sets the first-run default for `demoSurfaceMode`, which controls the surface-level demo affordances.
+  - Stored `ce:demoSurfaceMode` localStorage preferences win over this setting.
+  - This only takes effect on fresh installs or when no stored preference exists.
+
+- `REACT_APP_CE_ENABLE_WALLETCONNECT_FALLBACK=false`
+  - Controls RainbowKit's MetaMask fallback when MetaMask is not injected.
+  - Default `false` keeps the login modal on the injected MetaMask connector and avoids opening WalletConnect bridge sockets during normal startup.
+  - Set `true` only when a deployment intentionally wants the legacy WalletConnect fallback for MetaMask mobile/QR flows.
 
 - `REACT_APP_ENABLE_LIT_SESSION_PAYER_WALLET_INPUT=false`
   - Temporary rollout flag for the `/new` SessionWizard Lit payer-wallet UI.

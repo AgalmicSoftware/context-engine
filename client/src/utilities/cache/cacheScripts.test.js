@@ -170,6 +170,7 @@ describe('cacheScripts', () => {
       'dg:filters:alpha': { active: ['x'] },
       'dg:sbtCache:alpha': { '1': { sbtList: {} } },
       'dg:userCache:alpha': { '0xabc': { '1': { lastBlockScanned: 12 } } },
+      'dg:analysisCache:alpha': { '1': { '0xabc': { 'sha': { version: 1 } } } },
     };
     Object.entries(seed).forEach(([key, value]) => {
       localStorage.setItem(key, JSON.stringify(value));

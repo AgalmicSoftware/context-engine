@@ -33,6 +33,32 @@
   border-color: #f0e68c;
 }
 
+.selectedQuestionBanner {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.selectedQuestionCard {
+  margin-bottom: 0;
+  background: linear-gradient(145deg, #f8fbff 0%, #edf4ff 100%) !important;
+  border: 1px solid rgba(15, 94, 199, 0.14) !important;
+  box-shadow: 0 16px 38px rgba(15, 94, 199, 0.14) !important;
+}
+
+.selectedQuestionCardBody {
+  padding: 1.25rem 1.35rem 1.1rem;
+}
+
+.selectedQuestionCardPrompt {
+  color: #1f2733 !important;
+  font-size: clamp(1.6rem, 2.25vw, 2.16rem);
+  line-height: 1.42;
+  max-width: 48rem;
+  text-shadow: none;
+}
+
 .heatmapPanel,
 .chartPanel,
 .mapPanel {
@@ -321,6 +347,13 @@
   }
 }
 
+.suggestionButtonActive {
+  border-color: #ffc56f;
+  border-left-color: #e65516;
+  background: #fffaf0;
+  box-shadow: 0 0 0 1px rgba(230, 85, 22, 0.08);
+}
+
 .reportRowButton {
   border: 1px solid #e0e0e0;
   border-radius: var(--ce-radius-8, 8px);
@@ -499,6 +532,14 @@
   font-size: 0.88rem;
 }
 
+.breakdownQuestionText {
+  margin: 0.35rem 0 0;
+  color: #495057;
+  font-size: 0.96rem;
+  line-height: 1.45;
+  max-width: 60rem;
+}
+
 .breakdownBarRow {
   display: grid;
   grid-template-columns: 88px minmax(0, 1fr) 52px;
@@ -633,30 +674,6 @@
   color: #5f6b7a;
   font-size: 1rem;
   line-height: 1.55;
-}
-
-.mapSelectedQuestionPanel {
-  display: grid;
-  gap: 0.45rem;
-  border-top: 1px solid #d7dde5;
-  background: rgba(248, 249, 252, 0.98);
-  padding: 0.95rem 1rem 1.05rem;
-}
-
-.mapSelectedQuestionLabel {
-  color: #495057;
-  font-size: 0.78rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.mapSelectedQuestionText {
-  margin: 0;
-  color: #212529;
-  font-size: 1rem;
-  font-weight: 600;
-  line-height: 1.45;
 }
 
 .mapFrameCompact {

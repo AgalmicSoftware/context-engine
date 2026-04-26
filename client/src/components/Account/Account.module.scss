@@ -2454,7 +2454,40 @@ h1 {
 }
 
 .supportedResourcePrimarySession {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
   min-width: 0;
+}
+
+.supportedResourceActiveState {
+  width: fit-content;
+  padding: 4px 8px;
+  border-radius: var(--ce-radius-pill);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.supportedResourceActiveStateOn {
+  border-color: rgba(77, 255, 164, 0.5);
+  background: rgba(77, 255, 164, 0.12);
+  color: #98ffc9;
+}
+
+.supportedResourceActiveStateOff {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(248, 251, 255, 0.72);
+}
+
+.supportedResourceOtherSessions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 2px;
 }
 
 .supportedResourceExtraSessions {
@@ -3331,7 +3364,8 @@ h1 {
   z-index: 2100 !important;
 }
 
-:global(.modal-login .close) {
+:global(.modal-login .close),
+:global(.modal-login .btn-close) {
   position: absolute;
   top: 1rem;
   right: 1rem;
@@ -3355,7 +3389,9 @@ h1 {
 }
 
 :global(.modal-login .close:hover),
-:global(.modal-login .close:focus) {
+:global(.modal-login .close:focus),
+:global(.modal-login .btn-close:hover),
+:global(.modal-login .btn-close:focus) {
   background: transparent;
   background-color: transparent !important;
   opacity: 0.8;

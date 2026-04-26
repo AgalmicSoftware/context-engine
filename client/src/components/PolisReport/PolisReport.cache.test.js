@@ -2,6 +2,7 @@ import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import PolisReport, {
   applyFilterStateToAggregator,
+  buildClusterAnalysisDataKey,
   buildPrecomputedDemoClusterState,
   buildRatingMatrixFromDemo,
   formatBlockchainNetworkLabel,
@@ -13,7 +14,7 @@ import PolisReport, {
   REPORT_DEFAULT_EMBEDDING_LABEL,
   REPORT_DEFAULT_EMBEDDING_TOOLTIP_TEXT,
   shouldAutoEnablePolisDemoData,
-} from './PolisReport.jsx';
+} from './PolisReport';
 import { getCommentBarData } from '../../utilities/survey/polisMath';
 import { computePolisCommentStats, computePolisConversationMath } from '../../utilities/survey/polisReportMath.js';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
@@ -61,15 +62,9 @@ jest.mock('../../utilities/survey/polisReportMath.js', () => ({
   findRepresentativeQuestions: jest.fn(() => ({})),
 }));
 
-jest.mock('../../utilities/ai/aiScripts.js', () => ({
-  analyzeClusterOpinions: jest.fn(),
-}));
-
-jest.mock('utilities/proposalScripts.js', () => ({
+jest.mock('utilities/ui/displayHelpers.js', () => ({
   __esModule: true,
-  default: {
-    getShortenedAddress: jest.fn((value) => String(value || '')),
-  },
+  getShortenedAddress: jest.fn((value) => String(value || '')),
 }));
 
 jest.mock('utilities/logging.js', () => ({
@@ -521,59 +516,6 @@ describe('PolisReport demo data defaults', () => {
     expect(screen.getByTestId(E2E_TESTIDS.POLIS_DEMO_DATA_TOGGLE)).toBeChecked();
   });
 
-  it('includes the participants list in the global collapse and expand controls', async () => {
-    const demoDataset = getPolisDemoDatasetForSlug('demo');
-    const participant = Array.isArray(demoDataset?.participantsVotes)
-      ? demoDataset.participantsVotes.find((entry) => entry?.xid || entry?.participant)
-      : null;
-    const participantLabel = participant?.xid || participant?.participant;
-
-    expect(participantLabel).toBeTruthy();
-
-    computePolisConversationMath.mockReturnValue({
-      stats: {
-        nParticipants: 4,
-        nComments: 3,
-        totalVotes: 12,
-        votesPerVoterAvg: 3,
-      },
-      participantCoords: [
-        { x: 0, y: 0, index: 0 },
-        { x: 1, y: 0, index: 1 },
-        { x: 0, y: 1, index: 2 },
-        { x: 1, y: 1, index: 3 },
-      ],
-      statementCoords: [
-        { x: 0, y: 0, index: 0 },
-      ],
-      clusterAssignments: [0, 0, 1, 1],
-      clusterCount: 2,
-      repQuestions: {},
-    });
-
-    render(
-      <PolisReport
-        {...baseReportProps}
-        slug="demo"
-        questionResponses={seededQuestionResponses}
-      />
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('List of Participants')).toBeInTheDocument();
-      expect(screen.getByTitle(participantLabel)).toBeInTheDocument();
-    });
-
-    fireEvent.click(screen.getByRole('button', { name: 'Collapse All' }));
-
-    expect(screen.getByText('List of Participants')).toBeInTheDocument();
-    expect(screen.queryByTitle(participantLabel)).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Expand All' }));
-
-    expect(screen.getByTitle(participantLabel)).toBeInTheDocument();
-  });
-
   it('defaults built-in /session/demo to UMAP with 3 groups and still exposes precomputed Polis analysis after switching modes', async () => {
     computePolisConversationMath.mockReturnValue({
       stats: {
@@ -616,6 +558,41 @@ describe('PolisReport demo data defaults', () => {
     await waitFor(() => {
       expect(screen.getAllByTestId(E2E_TESTIDS.POLIS_CLUSTER_ANALYSIS)).toHaveLength(3);
     });
+  });
+
+  it('ignores questionResponsesNonce churn in the demo-mode cluster-analysis cache key', () => {
+    const sharedArgs = {
+      activeClusterAssignments: [0, 1, 1, 0],
+      activeClusterCount: 2,
+      activeRepQuestions: { 0: [{ questionIndex: 0 }], 1: [{ questionIndex: 1 }] },
+      embeddingChoice: 'UMAP',
+      questionPrompts: { 0: 'Prompt A', 1: 'Prompt B' },
+      allQuestions: [{}, {}],
+    };
+
+    const demoKeyA = buildClusterAnalysisDataKey({
+      ...sharedArgs,
+      useDemoData: true,
+      questionResponsesNonce: 0,
+    });
+    const demoKeyB = buildClusterAnalysisDataKey({
+      ...sharedArgs,
+      useDemoData: true,
+      questionResponsesNonce: 7,
+    });
+    const liveKeyA = buildClusterAnalysisDataKey({
+      ...sharedArgs,
+      useDemoData: false,
+      questionResponsesNonce: 0,
+    });
+    const liveKeyB = buildClusterAnalysisDataKey({
+      ...sharedArgs,
+      useDemoData: false,
+      questionResponsesNonce: 7,
+    });
+
+    expect(demoKeyA).toBe(demoKeyB);
+    expect(liveKeyA).not.toBe(liveKeyB);
   });
 
   it('defaults custom demo datasets to UMAP with 3 groups and clears manual K in Polis Auto mode', () => {

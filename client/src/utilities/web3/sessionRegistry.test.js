@@ -396,6 +396,85 @@ describe('registerSessionOnChain duplicate guards', () => {
     jest.restoreAllMocks();
   });
 
+  it('rejects unsafe registry slugs before resolving a wallet provider', async () => {
+    cryptoUtils._getProvider.mockClear();
+    const contractSpy = jest.spyOn(ethers, 'Contract');
+
+    await expect(registerSessionOnChain({
+      providerLike: makeWalletProvider(),
+      chainId: CONFIGURED_REGISTRY_CHAIN_ID,
+      slug: 'Team A!',
+      sessionId: '0x11111111111111111111111111111111',
+      metadataURI: 'ar://example',
+    })).rejects.toThrow('Session slugs must use lowercase letters, numbers, "_" or "-".');
+
+    expect(cryptoUtils._getProvider).not.toHaveBeenCalled();
+    expect(contractSpy).not.toHaveBeenCalled();
+  });
+
+  it('normalizes registry slugs before duplicate checks', async () => {
+    const walletProvider = makeWalletProvider();
+    const signer = { provider: null, getAddress: jest.fn().mockResolvedValue(TEST_SIGNER_ADDRESS) };
+    const contractMock = {
+      sessionIdExists: jest.fn().mockResolvedValue(false),
+      sessionExists: jest.fn().mockResolvedValue(true),
+      createSession: jest.fn(),
+    };
+    cryptoUtils._getProvider.mockReturnValue(walletProvider);
+
+    installWeb3ProviderMock({ signer });
+    jest.spyOn(ethers, 'Contract').mockImplementation(function MockContract() {
+      return contractMock;
+    });
+
+    await expect(registerSessionOnChain({
+      providerLike: walletProvider,
+      chainId: CONFIGURED_REGISTRY_CHAIN_ID,
+      slug: ' Team_A-1 ',
+      sessionId: '0x11111111111111111111111111111112',
+      metadataURI: 'ar://example',
+    })).rejects.toThrow('Session slug "team_a-1" is already registered on-chain.');
+
+    expect(contractMock.sessionExists).toHaveBeenCalledWith('team_a-1');
+    expect(contractMock.createSession).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['setSessionFieldsOnChain', () => setSessionFieldsOnChain({
+      providerLike: makeWalletProvider(),
+      chainId: CONFIGURED_REGISTRY_CHAIN_ID,
+      slug: '__proto__',
+      fields: { corsWorkerUrl: 'https://worker.example' },
+    })],
+    ['updateSessionMetadataOnChain', () => updateSessionMetadataOnChain({
+      providerLike: makeWalletProvider(),
+      chainId: CONFIGURED_REGISTRY_CHAIN_ID,
+      slug: '__proto__',
+      metadataURI: 'ar://new-metadata',
+      encryptedMetadataURI: '',
+    })],
+    ['setResourceGatesOnChain', () => setResourceGatesOnChain({
+      providerLike: makeWalletProvider(),
+      chainId: CONFIGURED_REGISTRY_CHAIN_ID,
+      slug: '__proto__',
+      gates: [{
+        resourceKey: 'default',
+        sbtAddresses: ['0x0000000000000000000000000000000000000002'],
+        chainId: CONFIGURED_REGISTRY_CHAIN_ID,
+        mode: 0,
+        perMemberLimit: 0,
+      }],
+    })],
+  ])('rejects unsafe registry slugs in %s before resolving a wallet provider', async (_name, runWrite) => {
+    cryptoUtils._getProvider.mockClear();
+    const contractSpy = jest.spyOn(ethers, 'Contract');
+
+    await expect(runWrite()).rejects.toThrow('This session slug is reserved.');
+
+    expect(cryptoUtils._getProvider).not.toHaveBeenCalled();
+    expect(contractSpy).not.toHaveBeenCalled();
+  });
+
   it('throws a clear error when the connected wallet is on a different chain than the registry write target', async () => {
     const walletProvider = { request: jest.fn() };
     const signer = {
@@ -1060,6 +1139,60 @@ describe('sessionRegistry contract defaults', () => {
     expect(config.__registry.metadataDefaultedContractKeys).not.toContain('surveys');
   });
 
+  it('derives sponsored gates without reintroducing the legacy sponsoredSbtAddress root field', () => {
+    const config = __sessionRegistryTestUtils.buildSessionConfigFromRegistry({
+      session: {
+        slug: 'sponsored-edge',
+        chainId: CONFIGURED_REGISTRY_CHAIN_ID,
+        metadataURI: 'ar://tx',
+        encryptedMetadataURI: '',
+        adminAddress: '0x0000000000000000000000000000000000000001',
+        updatedAt: 1,
+        sessionId: '0xb20bcc6d40274759b4a5cd94d949b578',
+        sessionIdHex: '0xb20bcc6d40274759b4a5cd94d949b578',
+      },
+      metadata: {
+        ai: {
+          models: {
+            fast: { provider: 'openai' },
+          },
+        },
+      },
+      gatesByResource: {
+        default: {
+          lookupStatus: 'ok',
+          sbtAddresses: ['0x00000000000000000000000000000000000000f1'],
+          chainId: CONFIGURED_REGISTRY_CHAIN_ID,
+          mode: 'any',
+        },
+        ai: {
+          lookupStatus: 'ok',
+          sbtAddresses: ['0x00000000000000000000000000000000000000f1'],
+          chainId: CONFIGURED_REGISTRY_CHAIN_ID,
+          mode: 'any',
+        },
+      },
+      fieldsByKey: {},
+      registryChainId: CONFIGURED_REGISTRY_CHAIN_ID,
+      metadataLoadState: 'loaded',
+    });
+
+    expect(config.sponsored).toEqual(expect.objectContaining({
+      defaultGateId: 'registry-default',
+      resources: expect.objectContaining({
+        ai: expect.objectContaining({
+          gateId: 'registry-ai',
+          provider: 'openai',
+        }),
+      }),
+    }));
+    expect(config.sponsored.gates['registry-default']).toEqual(expect.objectContaining({
+      sbtAddress: '0x00000000000000000000000000000000000000f1',
+      sbtAddresses: ['0x00000000000000000000000000000000000000f1'],
+    }));
+    expect(config).not.toHaveProperty('sponsoredSbtAddress');
+  });
+
   it('marks synthesized contract defaults when registry metadata could not be loaded', () => {
     const config = __sessionRegistryTestUtils.buildSessionConfigFromRegistry({
       session: {
@@ -1149,6 +1282,39 @@ describe('updateSessionMetadataOnChain gas fallback', () => {
 describe('setSessionFieldsOnChain gas fallback', () => {
   afterEach(() => {
     jest.restoreAllMocks();
+  });
+
+  it('normalizes session field update slugs before encoding registry writes', async () => {
+    const walletProvider = makeWalletProvider();
+    const signer = { provider: null, getAddress: jest.fn().mockResolvedValue(TEST_SIGNER_ADDRESS) };
+    const contractMock = makeRegistryWriteContractMock({
+      methods: ['setSessionFields'],
+    });
+    cryptoUtils._getProvider.mockReturnValue(walletProvider);
+    installPublicRpcFeeMocks();
+
+    installWeb3ProviderMock({
+      signer,
+      receipt: { status: 1, transactionHash: '0xtxhash' },
+    });
+    jest.spyOn(ethers, 'Contract').mockImplementation(function MockContract() {
+      return contractMock;
+    });
+
+    const result = await setSessionFieldsOnChain({
+      providerLike: walletProvider,
+      chainId: CONFIGURED_REGISTRY_CHAIN_ID,
+      slug: ' Team_A-1 ',
+      fields: {
+        corsWorkerUrl: 'https://worker.example',
+      },
+    });
+
+    expect(contractMock.interface.encodeFunctionData).toHaveBeenCalledWith(
+      'setSessionFields',
+      ['team_a-1', ['corsWorkerUrl'], ['https://worker.example']]
+    );
+    expect(result).toEqual({ ok: true });
   });
 
   it('falls back to the session-field gas floor when estimation fails', async () => {

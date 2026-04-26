@@ -55,8 +55,6 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
     }
   };
 
-  expectFile('client/src/utilities/web3/contractScripts.surveys-sbt.proxy.test.js');
-  expectFile('client/src/utilities/worker/sessionCorsWorker.root-suite.proxy.test.js');
   expectFile('test/deployHelperOrigins.test.mjs');
   expectFile('scripts/worker-bundle.mjs');
   expectFile('scripts/deploy-helper-deploy.mjs');
