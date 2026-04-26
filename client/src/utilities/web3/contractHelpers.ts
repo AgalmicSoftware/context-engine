@@ -378,7 +378,12 @@ export function createContractHelperMethods(deps: ContractHelperDeps): ContractH
       opts: LatestBlockOptions | null = null
     ): Promise<number> {
       void providerName;
-      const cfg = resolveSession(groupKeyOrCfg === undefined ? '' : groupKeyOrCfg);
+      const cfg = (
+        opts &&
+        typeof opts === 'object' &&
+        opts._resolvedCfg &&
+        typeof opts._resolvedCfg === 'object'
+      ) ? opts._resolvedCfg : resolveSession(groupKeyOrCfg === undefined ? '' : groupKeyOrCfg);
       const contractKey = String(opts?.contractKey || '').trim();
       const chId = resolveChainIdForRead(cfg, contractKey);
       const force = !!(opts && opts.force === true);
@@ -609,7 +614,12 @@ export function createContractHelperMethods(deps: ContractHelperDeps): ContractH
       groupKeyOrCfg: GroupKeyOrCfg,
       opts: RelevantBlockWindowOptions | null = null
     ): Promise<BlockWindow> {
-      const cfg = resolveSession(groupKeyOrCfg || '');
+      const cfg = (
+        opts &&
+        typeof opts === 'object' &&
+        opts._resolvedCfg &&
+        typeof opts._resolvedCfg === 'object'
+      ) ? opts._resolvedCfg : resolveSession(groupKeyOrCfg || '');
       const slug = normalizeSessionSlug(cfg?.slug || '');
       const contractKey = String(opts?.contractKey || '').trim();
       const forceLatestBlock = !!(
@@ -680,6 +690,7 @@ export function createContractHelperMethods(deps: ContractHelperDeps): ContractH
           {
             ...(forceLatestBlock ? { force: true } : {}),
             ...(contractKey ? { contractKey } : {}),
+            _resolvedCfg: cfg,
           }
         );
 

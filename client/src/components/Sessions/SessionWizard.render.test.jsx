@@ -14,6 +14,7 @@ import {
   WIZARD_CONTRACT_MODAL_TESTID,
 } from '../ContractPage/contractMetadata.js';
 import { buildContractViewerContracts } from '../ContractPage/contractViewerUtils.js';
+import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 
 const mockRegisterSessionOnChain = jest.fn();
 const mockFetchSessionFromRegistry = jest.fn();
@@ -291,6 +292,7 @@ jest.mock('../../variables/appConfig.js', () => {
 });
 
 import SessionWizard, {
+  buildPublishedPendingSbtLinks,
   getSessionWizardPublishProgressPercent,
   REQUIRED_SESSION_SLUG_ERROR,
   RESERVED_SESSION_SLUG_ERROR,
@@ -2750,6 +2752,42 @@ describe('SessionWizard rendered validation', () => {
       name: 'Pending SBT',
       metadataPreview: { phase: 'deployed' },
     }]);
+  });
+
+  it('builds published inline SBT links from newly deployed and resumed pending drafts', () => {
+    expect(buildPublishedPendingSbtLinks({
+      deployedDrafts: [{
+        predictedAddress: mockPendingSbtAddress,
+        deployedAddress: mockPendingSbtAddress,
+        displayName: 'Newly Deployed Group',
+        deployed: true,
+      }],
+      pendingDraftSnapshot: [
+        {
+          predictedAddress: mockPendingSbtAddress,
+          deployedAddress: mockPendingSbtAddress,
+          displayName: 'Newly Deployed Group',
+          deployed: true,
+        },
+        {
+          predictedAddress: mockSecondPendingSbtAddress,
+          deployedAddress: mockSecondPendingSbtAddress,
+          deployed: true,
+        },
+      ],
+      sessionSlug: 'writers-room',
+    })).toEqual([
+      {
+        address: mockPendingSbtAddress,
+        label: 'Newly Deployed Group',
+        href: buildSbtDetailPath(mockPendingSbtAddress, 'writers-room'),
+      },
+      {
+        address: mockSecondPendingSbtAddress,
+        label: mockSecondPendingSbtAddress,
+        href: buildSbtDetailPath(mockSecondPendingSbtAddress, 'writers-room'),
+      },
+    ]);
   });
 
   it('persists published pending SBT recovery codes to the scoped recovery store', () => {

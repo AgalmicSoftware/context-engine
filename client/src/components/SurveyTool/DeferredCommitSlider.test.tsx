@@ -1,4 +1,4 @@
-import { DeferredCommitSlider } from './SurveyTool.jsx';
+import { DeferredCommitSlider } from './DeferredCommitSlider';
 
 const syncClassSetState = (subject: any) => {
   subject.setState = jest.fn((next: any, cb?: () => void) => {
