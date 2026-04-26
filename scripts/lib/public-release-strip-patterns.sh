@@ -11,6 +11,7 @@ local-private-version
 CLAUDE.md
 .claude
 .codex
+private-pack.manifest.json
 video-clickthrough-local
 scripts/test-*.js
 scripts/test-*.ui.js
@@ -28,6 +29,7 @@ whitepaper/IdeasMap.md
 client/src/components/MainSite/MainSite.module.test.js
 client/src/utilities/worker/sessionCorsWorker.*.proxy.test.js
 client/src/utilities/web3/contractScripts.*.proxy.test.js
+test/contextEngineCc.sw-cache-policy.test.mjs
 EOF
 }
 
@@ -40,6 +42,7 @@ local-private-version
 scripts/test-*.js
 scripts/test-*.ui.js
 scripts/lib/e2e
+test/contextEngineCc.sw-cache-policy.test.mjs
 whitepaper/Slides.pdf
 whitepaper/IdeasMap.md
 EOF

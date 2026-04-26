@@ -37,13 +37,12 @@
           │  SBT-gated ACC  │   │  /auth/nonce + /login   │
           └─────────────────┘   │  /ai  /transcribe       │
                                 │  /arweave/upload         │
-          ┌─────────────────┐   │  /admin/set-config      │
-          │ contextEngine-cc│   │  request_test_eth        │
-          │ (Claude Code)   │   │  fetch_url / fetch_image│
-          │                 │   │                         │
-          │ hook + passkey  │   │  KV: config + secrets   │
-          │ terminal survey │   └─────────────────────────┘
-          └─────────────────┘
+                                │  /admin/set-config      │
+                                │  request_test_eth        │
+                                │  fetch_url / fetch_image│
+                                │                         │
+                                │  KV: config + secrets   │
+                                └─────────────────────────┘
 ```
 
 ### Corporate / Private Deployment (planned)
@@ -94,7 +93,7 @@
 
 Key difference from public mode: planned private deployments swap public registry-backed session reads for private session-source adapters (for example a local DB) while keeping the same auth-capable worker surface. The `/new` wizard writes session configs to that private backend instead of relying on public registry lookups. Same UI, same contracts, different storage + encryption backends.
 
-See [PRD 045](TODO/PRDs/045_corporate-private-deployment.md) for the corporate deployment roadmap.
+The detailed private-deployment roadmap lives in internal planning material that is intentionally omitted from the public release.
 
 ## Layer Descriptions
 
@@ -105,7 +104,7 @@ See [PRD 045](TODO/PRDs/045_corporate-private-deployment.md) for the corporate d
 | **Contracts** | Solidity on any EVM chain: session registry (gates + metadata pointers), surveys (hash anchoring), SBTs (membership tokens), factory | `contracts/` |
 | **Arweave** | Immutable JSON storage: session metadata, survey/question payloads, SBT tokenURI, doc library files | N/A (external) |
 | **Lit Protocol** | Client-side encrypt/decrypt with SBT-gated access control conditions (ACC) | N/A (external SDK) |
-| **contextEngine-cc** | Claude Code extension: passkey auth, terminal-based survey UX via hook protocol | `contextEngine-cc/` |
+| **Local companion (private/dev-only)** | Optional Claude Code companion: passkey auth and terminal-based survey UX via hook protocol | Omitted from the public release |
 
 ## Data Flows
 
@@ -329,4 +328,4 @@ SBTFactory                      ────────────────
 - [`docs/resource-keys.md`](docs/resource-keys.md) — Resource key resolution
 - [`docs/porto-information.md`](docs/porto-information.md) — Porto passkey wallet
 - [`docs/local-chain.md`](docs/local-chain.md) — Local Anvil development
-- [`CLAUDE.md`](CLAUDE.md) — AI agent workflow and conventions
+- [`AGENTS.md`](AGENTS.md) — Repo workflow, commands, and coding-agent conventions
