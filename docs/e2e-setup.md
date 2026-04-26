@@ -246,7 +246,7 @@ Arweave modes for `ai:test-sbt-metadata-locks`:
 ### Survey / Gated Decrypt
 
 - `npm run -s ai:seed-survey:question-types`
-- `SESSION_SLUG=general2 npm run -s ai:seed-polis:binary-multi-wallet`
+- `SESSION_SLUG=<existing-session-slug> npm run -s ai:seed-polis:binary-multi-wallet`
 - `npm run -s ai:test-gated-decrypt:all-types`
   - Includes submit-latch regression checks in SurveyTool (full + pile): post-success button stays submitted (not `Submit (N)`), and a second click without edits does not retrigger submit.
 - `npm run -s ai:test-survey-authoring:encryption-matrix`
@@ -312,7 +312,7 @@ Example JSON actions (works via `/agent` panel or `window.__ceAgent.run(...)`):
   { "type": "click", "testId": "ce-compare-run" },
   { "type": "assertVisible", "testId": "ce-compare-result" },
 
-  { "type": "invokeAi", "tool": "PolisReport", "params": { "sessionSlug": "ai-browseruse-75209033" } }
+  { "type": "invokeAi", "tool": "PolisReport", "params": { "sessionSlug": "<existing-session-slug>" } }
 ]
 ```
 

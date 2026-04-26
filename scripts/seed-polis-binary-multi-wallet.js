@@ -376,12 +376,22 @@ const buildPrompts = ({ runTag, count }) => {
   return out;
 };
 
+const resolveSessionSlug = ({ args = {}, env = process.env } = {}) => {
+  const sessionSlug = toStr(args['session-slug'] || env.SESSION_SLUG).trim();
+  if (!sessionSlug) {
+    throw new Error(
+      'Missing session slug. Set --session-slug or SESSION_SLUG. ' +
+      'This seed flow no longer defaults to a legacy fixture slug.'
+    );
+  }
+  return sessionSlug;
+};
+
 async function main() {
   const args = parseArgs(process.argv);
   const runTag = resolveRunTag(args);
   const baseUrl = toStr(args['base-url'] || process.env.BASE_URL || 'http://127.0.0.1:3000').trim().replace(/\/+$/, '');
-  const sessionSlug = toStr(args['session-slug'] || process.env.SESSION_SLUG || 'general2').trim();
-  if (!sessionSlug) throw new Error('Missing session slug. Set --session-slug or SESSION_SLUG.');
+  const sessionSlug = resolveSessionSlug({ args, env: process.env });
 
   const questionCount = clamp(toInt(args['question-count'] || process.env.BINARY_QUESTION_COUNT, 4), 1, 12);
   const chain = resolveChainDefaults({ args });
@@ -639,7 +649,13 @@ async function main() {
   console.log(JSON.stringify(summary, null, 2));
 }
 
-main().catch((err) => {
-  console.error(err?.stack || err?.message || String(err));
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch((err) => {
+    console.error(err?.stack || err?.message || String(err));
+    process.exit(1);
+  });
+}
+
+module.exports = {
+  resolveSessionSlug,
+};

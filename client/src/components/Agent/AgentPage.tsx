@@ -51,8 +51,6 @@ const defaultActions: AgentAction[] = [
   { type: 'fill', testId: 'ce-compare-address-b', value: '0x0000000000000000000000000000000000000002' },
   { type: 'click', testId: 'ce-compare-run' },
   { type: 'assertVisible', testId: 'ce-compare-result' },
-
-  { type: 'invokeAi', tool: 'PolisReport', params: { sessionSlug: 'ai-browseruse-75209033' } },
 ];
 
 export default function AgentPage() {
