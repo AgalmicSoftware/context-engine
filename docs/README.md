@@ -37,7 +37,7 @@ Session, gates, and the Worker:
 - `docs/scaling.md`: Public scaling reference covering write-path settlement, indexed reads, private compute modes, and deployment profiles.
 
 Keys and RPCs:
-- `docs/public-client-config.md`: public `REACT_APP_*` client config, fallback behavior, and `.env.example` reference.
+- `docs/public-client-config.md`: public `REACT_APP_*` client config, fallback behavior, `.env.example` reference, and Netlify static deploy notes.
 - `docs/resource-keys.md`: Where AI/Arweave/RPC/faucet keys live and the resolution order (local overrides vs worker secrets).
 - `docs/path-rpc.md`: PATH (Pocket) endpoint defaults, client/provider ordering, and legacy PATH override behavior.
 - `docs/rpc-scan-scope.md`: scan-scope flags, profile deep-scan defaults, RPC guardrails, and testing-mode controls.

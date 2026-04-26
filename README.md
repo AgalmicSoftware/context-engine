@@ -47,14 +47,7 @@ For testing, run modes, and deeper setup:
 - [docs/testing.md](docs/testing.md)
 - [docs/run-modes.md](docs/run-modes.md)
 - [docs/session-creation-guide.md](docs/session-creation-guide.md)
-
-### Static Frontend Deploy
-
-To host the React frontend on a custom domain with Netlify, build the static
-client bundle and follow the Netlify notes in
-[docs/public-client-config.md#netlify-static-deploy](docs/public-client-config.md#netlify-static-deploy).
-After domain cutover, update the session worker `allowOrigins` list so AI,
-Arweave, auth, and `/health` requests accept the new origin.
+- [docs/public-client-config.md#netlify-static-deploy](docs/public-client-config.md#netlify-static-deploy) for Netlify/custom-domain static frontend deploys
 
 ## Features
 
@@ -105,7 +98,7 @@ The default public deployment supports hundreds to low thousands of concurrent p
 - User guide / end-to-end session setup: [docs/session-creation-guide.md](docs/session-creation-guide.md)
 - Testing guide: [docs/testing.md](docs/testing.md)
 - Run modes: [docs/run-modes.md](docs/run-modes.md)
-- Public client config and current defaults: [docs/public-client-config.md](docs/public-client-config.md)
+- Public client config, current defaults, and static deploy notes: [docs/public-client-config.md](docs/public-client-config.md)
 - PATH / RPC behavior: [docs/path-rpc.md](docs/path-rpc.md)
 - Cloudflare worker docs: [docs/session-cors-worker.md](docs/session-cors-worker.md)
 - Session registry and gate model: [docs/session-registry.md](docs/session-registry.md)
