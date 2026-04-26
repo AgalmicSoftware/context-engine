@@ -3,42 +3,52 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import WorkerDeploySection from './WorkerDeploySection';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
+const buildWorkerDeploySectionProps = (props = {}) => ({
+  isNormalMode: false,
+  renderInfoTooltip: ({ testId }) => <button type="button" data-testid={testId} />,
+  workerMode: 'custom',
+  shouldUseSponsoredAutoDeployFlow: false,
+  deployForm: { workerName: 'demo-worker', bundleUrl: '', apiToken: '', adminAddress: '' },
+  deployHelperToggle: <div>helper toggle</div>,
+  shouldShowDeployHelperUrlInput: true,
+  deployHelperUrl: '',
+  setDeployHelperUrl: () => {},
+  bundleMode: 'url',
+  setBundleMode: () => {},
+  normalModeBundleUrl: 'https://bundle.example/release.js',
+  normalModeBundleHelpText: 'Release bundle',
+  showNormalModeManualBundleControls: false,
+  normalModeBundleUrlOverride: '',
+  setNormalModeBundleUrlOverride: () => {},
+  normalModeBundleUrlOverrideValidationError: '',
+  manualBundleUrlOverrideHelp: '',
+  normalModeRetryBundleFileInputRef: { current: null },
+  setBundleFile: () => {},
+  clearSelectedBundleFile: () => {},
+  bundleFile: null,
+  normalModeManualBundleHelpText: '',
+  localWorkerBundleFallbackFilePath: '/dist/sessionCorsWorker.bundle.js',
+  advancedBundleFileInputRef: { current: null },
+  showSponsoredDeployAccessNotice: false,
+  account: '0xabc',
+  cloudflareTokenSlug: 'demo-worker',
+  setDeployForm: () => {},
+  handleDeployWorker: () => {},
+  deployInFlight: false,
+  deployStatus: '',
+  deployStatusIsError: false,
+  ...props,
+});
+
 const renderWorkerDeploySection = (props = {}) => render(
   <WorkerDeploySection
-    isNormalMode={false}
-    renderInfoTooltip={({ testId }) => <button type="button" data-testid={testId} />}
-    workerMode="custom"
-    shouldUseSponsoredAutoDeployFlow={false}
-    deployForm={{ workerName: 'demo-worker', bundleUrl: '', apiToken: '', adminAddress: '' }}
-    deployHelperToggle={<div>helper toggle</div>}
-    shouldShowDeployHelperUrlInput
-    deployHelperUrl=""
-    setDeployHelperUrl={() => {}}
-    bundleMode="url"
-    setBundleMode={() => {}}
-    normalModeBundleUrl="https://bundle.example/release.js"
-    normalModeBundleHelpText="Release bundle"
-    showNormalModeManualBundleControls={false}
-    normalModeBundleUrlOverride=""
-    setNormalModeBundleUrlOverride={() => {}}
-    normalModeBundleUrlOverrideValidationError=""
-    manualBundleUrlOverrideHelp=""
-    normalModeRetryBundleFileInputRef={{ current: null }}
-    setBundleFile={() => {}}
-    clearSelectedBundleFile={() => {}}
-    bundleFile={null}
-    normalModeManualBundleHelpText=""
-    localWorkerBundleFallbackFilePath="/dist/sessionCorsWorker.bundle.js"
-    advancedBundleFileInputRef={{ current: null }}
-    showSponsoredDeployAccessNotice={false}
-    account="0xabc"
-    cloudflareTokenSlug="demo-worker"
-    setDeployForm={() => {}}
-    handleDeployWorker={() => {}}
-    deployInFlight={false}
-    deployStatus=""
-    deployStatusIsError={false}
-    {...props}
+    {...buildWorkerDeploySectionProps(props)}
+  />
+);
+
+const rerenderWorkerDeploySection = (rerender, props = {}) => rerender(
+  <WorkerDeploySection
+    {...buildWorkerDeploySectionProps(props)}
   />
 );
 
@@ -90,5 +100,57 @@ describe('WorkerDeploySection', () => {
     expect(handleDeployWorker).toHaveBeenCalledTimes(1);
 
     openSpy.mockRestore();
+  });
+
+  it('keeps bundle and token inputs controlled when partial deployForm state hydrates later', () => {
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const { rerender } = renderWorkerDeploySection({
+      deployForm: { workerName: 'demo-worker' },
+    });
+
+    rerenderWorkerDeploySection(rerender, {
+      deployForm: {
+        workerName: 'demo-worker',
+        bundleUrl: 'https://bundle.example/custom.js',
+        apiToken: 'secret-token',
+        adminAddress: '0xabc',
+      },
+    });
+
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_BUNDLE_URL)).toHaveValue('https://bundle.example/custom.js');
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN)).toHaveValue('secret-token');
+    expect(
+      consoleErrorSpy.mock.calls.some(([message]) => (
+        String(message).includes('A component is changing an uncontrolled input to be controlled')
+      )),
+    ).toBe(false);
+
+    consoleErrorSpy.mockRestore();
+  });
+
+  it('remounts cleanly when advanced bundle mode switches from file upload to url input', () => {
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const { rerender } = renderWorkerDeploySection({
+      bundleMode: 'upload',
+    });
+
+    rerenderWorkerDeploySection(rerender, {
+      bundleMode: 'url',
+      deployForm: {
+        workerName: 'demo-worker',
+        bundleUrl: 'https://bundle.example/from-url.js',
+        apiToken: '',
+        adminAddress: '',
+      },
+    });
+
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_BUNDLE_URL)).toHaveValue('https://bundle.example/from-url.js');
+    expect(
+      consoleErrorSpy.mock.calls.some(([message]) => (
+        String(message).includes('A component is changing an uncontrolled input to be controlled')
+      )),
+    ).toBe(false);
+
+    consoleErrorSpy.mockRestore();
   });
 });

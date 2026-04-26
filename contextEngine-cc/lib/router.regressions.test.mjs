@@ -543,6 +543,88 @@ test('local JWT issuance skips auto-faucet when no selected session has a worker
   }
 });
 
+test('local JWT issuance quietly skips stale configured sessions that no longer resolve to a worker URL', async () => {
+  const root = mkdtempSync(resolve(tmpdir(), 'ce-router-auth-auto-faucet-stale-session-'));
+  const dataDir = resolve(root, 'data');
+  const hookStateDir = resolve(root, 'hook-state');
+  const walletAddress = DEFAULT_TEST_WALLET_ADDRESS;
+
+  mkdirSync(dataDir, { recursive: true });
+  mkdirSync(hookStateDir, { recursive: true });
+  writeFileSync(
+    resolve(hookStateDir, 'config.json'),
+    JSON.stringify({
+      serverUrl: 'http://localhost:7391',
+      selectedSessions: ['stale-session'],
+    }, null, 2),
+  );
+
+  const prevDataDir = process.env.CE_CC_DATA_DIR;
+  const prevHookStateDir = process.env.CE_CC_HOOK_STATE_DIR;
+  process.env.CE_CC_DATA_DIR = dataDir;
+  process.env.CE_CC_HOOK_STATE_DIR = hookStateDir;
+  const restoreDebugLogging = enableDebugLogging();
+
+  const logs = [];
+  const warnings = [];
+  const originalLog = console.log;
+  const originalWarn = console.warn;
+  console.log = (...args) => logs.push(args.map((value) => String(value)).join(' '));
+  console.warn = (...args) => warnings.push(args.map((value) => String(value)).join(' '));
+
+  try {
+    const { handleRoute } = await importFresh(ROUTER_MODULE_PATH);
+    let providerCalled = false;
+    const res = makeMockRes();
+    await handleRoute(
+      makeLoopbackReq(),
+      res,
+      {
+        url: new URL('http://localhost:7391/api/auth/local-jwt'),
+        method: 'POST',
+        body: buildLocalJwtRequestBody(walletAddress),
+      },
+      {
+        getCorsWorkerUrl: async (slug) => {
+          assert.equal(slug, 'stale-session');
+          return null;
+        },
+        getFaucetProvider: () => {
+          providerCalled = true;
+          return {
+            getBalance: async () => ethers.utils.parseEther('0.0005'),
+          };
+        },
+      },
+    );
+
+    await flushBackgroundWork();
+
+    assert.equal(res.statusCode, 200);
+    assert.equal(providerCalled, false);
+    assert.equal(
+      warnings.some((entry) => entry.includes('Auto worker-auth failed for stale-session during faucet')),
+      false,
+    );
+    assert.equal(
+      logs.some((entry) => entry.includes('[auth] Auto worker-auth skipped for stale-session during faucet: No worker URL for session "stale-session".')),
+      true,
+    );
+    assert.equal(
+      logs.some((entry) => entry.includes('[auth] Auto-faucet: skipped (no worker token and auto-auth failed)')),
+      true,
+    );
+  } finally {
+    console.log = originalLog;
+    console.warn = originalWarn;
+    restoreDebugLogging();
+    if (prevDataDir == null) delete process.env.CE_CC_DATA_DIR;
+    else process.env.CE_CC_DATA_DIR = prevDataDir;
+    if (prevHookStateDir == null) delete process.env.CE_CC_HOOK_STATE_DIR;
+    else process.env.CE_CC_HOOK_STATE_DIR = prevHookStateDir;
+  }
+});
+
 test('respond immediate auto-submit auto-authenticates worker, auto-faucets, and submits with the new token', async () => {
   const root = mkdtempSync(resolve(tmpdir(), 'ce-router-respond-auto-submit-auth-faucet-'));
   const dataDir = resolve(root, 'data');

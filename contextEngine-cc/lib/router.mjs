@@ -766,6 +766,11 @@ function getStoredPrivateKeyFromFile() {
   catch { return null; }
 }
 
+function isSkippableWorkerAuthError(err) {
+  const message = String(err?.message || err || '').trim();
+  return /^No worker URL for session /i.test(message);
+}
+
 async function authenticateWithWorker(slug, walletAddress, privateKey, deps = {}) {
   const resolveWorkerUrl = typeof deps.getCorsWorkerUrl === 'function' ? deps.getCorsWorkerUrl : getCorsWorkerUrl;
   const fetchImpl = typeof deps.fetch === 'function' ? deps.fetch : fetch;
@@ -822,6 +827,10 @@ async function ensureWorkerToken(slug, walletAddress, deps = {}) {
   try {
     return await authenticateWithWorker(slug, walletAddress, privateKey, deps);
   } catch (err) {
+    if (isSkippableWorkerAuthError(err)) {
+      debug(`[auth] Auto worker-auth skipped for ${slug}: ${err.message}`);
+      return null;
+    }
     warn(`[auth] Auto worker-auth failed for ${slug}: ${err.message}`);
     return null;
   }
@@ -846,6 +855,10 @@ async function autoRequestFaucetAfterAuth(walletAddress, hookConfig, deps = {}) 
           slug = s;
           break;
         } catch (err) {
+          if (isSkippableWorkerAuthError(err)) {
+            debug(`[auth] Auto worker-auth skipped for ${s} during faucet: ${err.message}`);
+            continue;
+          }
           warn(`[auth] Auto worker-auth failed for ${s} during faucet: ${err.message}`);
         }
       }
