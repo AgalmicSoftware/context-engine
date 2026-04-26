@@ -121,7 +121,7 @@ const WorkerDeploySection = ({
               <FormGroup>
                 <Label>Deploy-helper URL</Label>
                 <Input
-                  value={deployHelperUrl}
+                  value={deployHelperUrl ?? ''}
                   placeholder="https://<deploy-helper-name>.<account-subdomain>.workers.dev/"
                   data-testid={E2E_TESTIDS.WIZARD_DEPLOY_HELPER_URL}
                   onChange={(e) => setDeployHelperUrl(e.target.value)}
@@ -157,10 +157,10 @@ const WorkerDeploySection = ({
             )}
             {isNormalMode ? (
               <>
-                <FormGroup>
+                <FormGroup key="normal-mode-bundle-url">
                   <Label>Worker bundle URL (release asset)</Label>
                   <Input
-                    value={normalModeBundleUrl}
+                    value={normalModeBundleUrl ?? ''}
                     readOnly
                     data-testid={E2E_TESTIDS.WIZARD_BUNDLE_URL}
                   />
@@ -170,11 +170,11 @@ const WorkerDeploySection = ({
                 </FormGroup>
                 {showNormalModeManualBundleControls && (
                   <>
-                    <FormGroup>
+                    <FormGroup key="normal-mode-bundle-url-override">
                       <Label>Manual bundle URL override (optional)</Label>
                       <Input
                         type="url"
-                        value={normalModeBundleUrlOverride}
+                        value={normalModeBundleUrlOverride ?? ''}
                         placeholder="https://github.com/<org>/<repo>/releases/download/<tag>/sessionCorsWorker.bundle.js"
                         data-testid={E2E_TESTIDS.WIZARD_BUNDLE_URL_OVERRIDE}
                         invalid={!!normalModeBundleUrlOverrideValidationError}
@@ -187,7 +187,7 @@ const WorkerDeploySection = ({
                         <div className={styles.errorText}>{normalModeBundleUrlOverrideValidationError}</div>
                       )}
                     </FormGroup>
-                    <FormGroup>
+                    <FormGroup key="normal-mode-bundle-file">
                       <Label>Upload bundle file (optional)</Label>
                       <div className={styles.bundleFileInputRow}>
                         <Input
@@ -223,7 +223,7 @@ const WorkerDeploySection = ({
                 )}
               </>
             ) : bundleMode === 'url' ? (
-              <FormGroup>
+              <FormGroup key="advanced-mode-bundle-url">
                 <Label className={styles.fieldLabelRow}>
                   <span>Worker bundle URL (release asset)</span>
                   {renderTooltip({
@@ -235,14 +235,14 @@ const WorkerDeploySection = ({
                   })}
                 </Label>
                 <Input
-                  value={deployForm.bundleUrl}
+                  value={deployForm.bundleUrl ?? ''}
                   placeholder="https://github.com/<org>/<repo>/releases/latest/download/sessionCorsWorker.bundle.js"
                   data-testid={E2E_TESTIDS.WIZARD_BUNDLE_URL}
                   onChange={(e) => setDeployForm((prev) => ({ ...prev, bundleUrl: e.target.value }))}
                 />
               </FormGroup>
             ) : (
-              <FormGroup>
+              <FormGroup key="advanced-mode-bundle-file">
                 <Label>Upload bundle file</Label>
                 <Input
                   type="file"
@@ -269,7 +269,7 @@ const WorkerDeploySection = ({
               </Label>
               <Input
                 type="password"
-                value={deployForm.apiToken}
+                value={deployForm.apiToken ?? ''}
                 data-testid={E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN}
                 onChange={(e) => setDeployForm((prev) => ({ ...prev, apiToken: e.target.value }))}
               />
