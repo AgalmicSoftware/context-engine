@@ -41,6 +41,7 @@ fail() {
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
 REPO_ROOT=$(cd "$SCRIPT_DIR/.." && pwd -P)
+PRIVATE_BRANCH_GUARD_INSTALLER="$SCRIPT_DIR/install-private-branch-guard.sh"
 
 # shellcheck source=./lib/public-release-strip-patterns.sh
 source "$SCRIPT_DIR/lib/public-release-strip-patterns.sh"
@@ -197,6 +198,15 @@ author_audit_output() {
     | grep -Fv "$PUBLIC_GIT_NAME <$PUBLIC_GIT_EMAIL> | $PUBLIC_GIT_NAME <$PUBLIC_GIT_EMAIL>" || true
 }
 
+ensure_private_branch_guard() {
+  if [ ! -f "$PRIVATE_BRANCH_GUARD_INSTALLER" ]; then
+    fail "Private branch guard installer was not found: $PRIVATE_BRANCH_GUARD_INSTALLER" 1
+  fi
+
+  log_info "Ensuring the local private branch push guard is installed."
+  bash "$PRIVATE_BRANCH_GUARD_INSTALLER" >/dev/null
+}
+
 while [ $# -gt 0 ]; do
   case "$1" in
     --dry-run)
@@ -235,6 +245,8 @@ done
 if ! git -C "$REPO_ROOT" rev-parse --git-dir >/dev/null 2>&1; then
   fail "Repository root is not a git repository: $REPO_ROOT" 1
 fi
+
+ensure_private_branch_guard
 
 if git -C "$REPO_ROOT" show-ref --verify --quiet "refs/heads/$TARGET_BRANCH"; then
   if [ "$EXPLICIT_FORCE_WITH_LEASE" -ne 1 ]; then
