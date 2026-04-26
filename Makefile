@@ -1,4 +1,4 @@
-.PHONY: release release-clean
+.PHONY: release release-clean sync-public sync-public-push verify-public-branch
 
 RELEASE_DIR ?= ./release-public
 
@@ -19,3 +19,7 @@ sync-public:
 ## Use --force-with-lease if the local target branch already exists.
 sync-public-push:
 	bash scripts/sync-public-history.sh --push
+
+## Verify that the public branch does not still track strip-listed files.
+verify-public-branch:
+	bash scripts/verify-public-branch.sh release-staging
