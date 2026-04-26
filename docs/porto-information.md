@@ -64,7 +64,7 @@ Scripts:
   - Saves a JSON run report under `artifacts/session-workflows/` and a screenshot under
     `artifacts/screenshots/`.
 - `npm run ai:seed-polis:binary-multi-wallet`
-  - Seeds Polis-style binary data for one session slug (default `general2`):
+  - Seeds Polis-style binary data for one existing session slug:
     - creates standalone binary questions,
     - funds deterministic wallets B/C/D/E from walletA when needed,
     - submits yes/no-style responses from deterministic wallets A-E.
@@ -140,7 +140,7 @@ Key env vars for `ai:seed-survey:question-types`:
 
 Key env vars for `ai:seed-polis:binary-multi-wallet`:
 
-- `SESSION_SLUG` (default `general2`)
+- `SESSION_SLUG` (required; existing session slug)
 - `BINARY_QUESTION_COUNT` (default `4`)
 - `PASSKEY_A`, `PASSKEY_B`, `PASSKEY_C`, `PASSKEY_D`, `PASSKEY_E`
 - `FUND_AMOUNT_ETH` (default `0.001`)

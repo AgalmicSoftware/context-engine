@@ -273,16 +273,17 @@ Arweave modes for `ai:test-sbt-metadata-locks`:
 ### AI Smoke (Deterministic)
 
 These flows are intended to run with `E2E_AI_MOCK=1` for determinism:
-- `npm run -s ai:test-ai:invocations`
+- `SESSION_SLUG=<existing-session-slug> npm run -s ai:test-ai:invocations`
 
 ### AI Smoke (Real Provider, Opt-in)
 
 To verify real provider wiring (non-deterministic output, slower, can fail if your worker has no AI secrets):
 - Ensure `WORKER_URL` points at a `sessionCorsWorker` with `scopes.ai=true` and provider keys configured (or set local AI keys in the UI).
   - See: `docs/session-cors-worker.md`
+- Ensure `SESSION_SLUG` points at an existing session with the expected Polis data available.
 - Run without the client-side mock:
-  - `E2E_AI_MOCK=0 npm run -s ai:test-ai:invocations`
-  - `E2E_SUITE_INCLUDE_AI=1 E2E_AI_MOCK=0 npm run -s test:e2e`
+  - `SESSION_SLUG=<existing-session-slug> E2E_AI_MOCK=0 npm run -s ai:test-ai:invocations`
+  - `SESSION_SLUG=<existing-session-slug> E2E_SUITE_INCLUDE_AI=1 E2E_AI_MOCK=0 npm run -s test:e2e`
 
 ### Agent Mode (JSON-driven)
 
@@ -301,7 +302,7 @@ Current runtime methods:
 Use `window.__ceAgent.describe()` first when you want the current action/tool contract rather than guessing. It returns the supported actions, higher-level tools, activation keys, and the canonical doc paths for this surface.
 
 Smoke runner:
-- `npm run -s ai:test-agent:interface`
+- `SESSION_SLUG=<existing-session-slug> npm run -s ai:test-agent:interface`
 
 Example JSON actions (works via `/agent` panel or `window.__ceAgent.run(...)`):
 ```json
