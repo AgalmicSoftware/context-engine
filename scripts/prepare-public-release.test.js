@@ -62,6 +62,7 @@ function setupRepo() {
     writeFile(repoDir, 'private-pack.manifest.json', 'tracked-stale-manifest\n');
     writeFile(repoDir, path.join('contextEngine-cc', 'public', 'sw.js'), 'service worker\n');
     writeFile(repoDir, path.join('test', 'contextEngineCc.sw-cache-policy.test.mjs'), 'ce-cc sw policy\n');
+    writeFile(repoDir, path.join('.tmp-review', 'legacy.js'), 'temporary review copy\n');
 
     git(repoDir, ['add', '-A']);
     git(repoDir, ['commit', '--quiet', '-m', 'Fixture commit']);
@@ -96,6 +97,7 @@ test('prepare-public-release strips configured private paths and ignores untrack
     assert.equal(fs.existsSync(path.join(outputDir, 'TODO')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'contextEngine-cc')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'test', 'contextEngineCc.sw-cache-policy.test.mjs')), false);
+    assert.equal(fs.existsSync(path.join(outputDir, '.tmp-review')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'docs', 'ai-agent-bootstrap.md')), false);
 
     const manifestPath = path.join(outputDir, 'private-pack.manifest.json');
@@ -109,6 +111,7 @@ test('prepare-public-release strips configured private paths and ignores untrack
     assert.match(manifestSummary, /TODO\/secret\.md/);
     assert.match(manifestSummary, /contextEngine-cc\/public\/sw\.js/);
     assert.match(manifestSummary, /test\/contextEngineCc\.sw-cache-policy\.test\.mjs/);
+    assert.match(manifestSummary, /\.tmp-review\/legacy\.js/);
     assert.match(manifestSummary, /private-pack\.manifest\.json/);
     assert.doesNotMatch(manifestSummary, /docs\/ai-agent-bootstrap\.md/);
   });

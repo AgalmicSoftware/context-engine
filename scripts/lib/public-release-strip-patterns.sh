@@ -12,6 +12,7 @@ CLAUDE.md
 .claude
 .codex
 private-pack.manifest.json
+.tmp-review
 video-clickthrough-local
 scripts/test-*.js
 scripts/test-*.ui.js
@@ -43,6 +44,7 @@ scripts/test-*.js
 scripts/test-*.ui.js
 scripts/lib/e2e
 test/contextEngineCc.sw-cache-policy.test.mjs
+.tmp-review
 whitepaper/Slides.pdf
 whitepaper/IdeasMap.md
 EOF

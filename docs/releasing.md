@@ -67,6 +67,7 @@ The release script removes these paths from the exported copy:
 | `CLAUDE.md`, `.claude/`, `.codex/` | Maintainer-only AI instructions and local skill/config state |
 | `contextEngine-cc/`, `local-private-version/`, `video-clickthrough-local/` | Private or local-only companion tooling |
 | `.env.e2e*`, `artifacts/`, `tests/artifacts/` | Local test inputs and generated artifacts |
+| `.tmp-review/` | Temporary review or migration snapshot files that are not part of the public source tree |
 | `Demo Integration Package/`, `whitepaper/Slides.pdf`, `whitepaper/IdeasMap.md` | Raw source data and internal whitepaper assets |
 | `scripts/test-*.js`, `scripts/test-*.ui.js`, `scripts/lib/e2e/`, `scripts/run-e2e-*`, `scripts/run-ux-*`, `scripts/capture-ux-*`, `scripts/build_external_llm_prompt.py` | Private/local automation and prompt handoff scripts |
 | `client/src/components/MainSite/MainSite.module.test.js`, `client/src/utilities/worker/sessionCorsWorker.*.proxy.test.js`, `client/src/utilities/web3/contractScripts.*.proxy.test.js`, `test/contextEngineCc.sw-cache-policy.test.mjs` | Internal or private-only regression tests |

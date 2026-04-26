@@ -107,6 +107,7 @@ broadcast/
 
 # Local scratch
 /.tmp/
+/.tmp-review/
 /tmp/
 /tmp-launch-channel-chrome.js
 /node-compile-cache/

@@ -57,6 +57,7 @@ function setupRepo({ withPrivatePaths }) {
     if (withPrivatePaths) {
       writeFile(repoDir, 'private-pack.manifest.json', 'stale manifest\n');
       writeFile(repoDir, path.join('test', 'contextEngineCc.sw-cache-policy.test.mjs'), 'private ce-cc fixture\n');
+      writeFile(repoDir, path.join('.tmp-review', 'legacy.js'), 'temporary review copy\n');
     }
 
     git(repoDir, ['add', '-A']);
@@ -87,6 +88,7 @@ test('verify-public-branch fails when the target ref still tracks strip-listed f
     assert.match(result.stderr, /Tracked paths in release-staging still match the public strip list:/);
     assert.match(result.stderr, /private-pack\.manifest\.json/);
     assert.match(result.stderr, /test\/contextEngineCc\.sw-cache-policy\.test\.mjs/);
+    assert.match(result.stderr, /\.tmp-review\/legacy\.js/);
   });
 });
 
