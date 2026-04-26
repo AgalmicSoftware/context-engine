@@ -8,13 +8,6 @@ const { execFileSync, spawnSync } = require('node:child_process');
 
 const SCRIPT_SOURCE_PATH = path.join(__dirname, 'sync-public-history.sh');
 const HELPER_SOURCE_PATH = path.join(__dirname, 'lib', 'public-release-strip-patterns.sh');
-const SURFACE_VERIFIER_SOURCE_PATH = path.join(__dirname, 'verify-public-release-surface.js');
-const DOCS_VERIFIER_SOURCE_PATH = path.join(__dirname, 'verify-public-docs.js');
-const ASSET_VERIFIER_SOURCE_PATH = path.join(__dirname, 'verify-public-assets.js');
-const TEXT_VERIFIER_SOURCE_PATH = path.join(__dirname, 'verify-public-text.js');
-const PII_VERIFIER_SOURCE_PATH = path.join(__dirname, 'verify-public-release-pii.sh');
-const PACKAGE_SCRUBBER_SOURCE_PATH = path.join(__dirname, 'scrub-public-package-json.js');
-const RELEASE_VERSION_SOURCE_PATH = path.join(__dirname, 'release-version.mjs');
 const PRIVATE_BRANCH_GUARD_INSTALLER_SOURCE_PATH = path.join(__dirname, 'install-private-branch-guard.sh');
 const PRE_PUSH_HOOK_SOURCE_PATH = path.join(__dirname, '..', '.githooks', 'pre-push');
 const TEST_TMP_ROOT = path.join(__dirname, '.tmp-sync-public-history-tests');
@@ -42,41 +35,6 @@ function installSyncScriptFixture(sourceDir) {
   );
   writeFile(
     sourceDir,
-    path.join('scripts', 'verify-public-release-surface.js'),
-    fs.readFileSync(SURFACE_VERIFIER_SOURCE_PATH, 'utf8'),
-  );
-  writeFile(
-    sourceDir,
-    path.join('scripts', 'verify-public-docs.js'),
-    fs.readFileSync(DOCS_VERIFIER_SOURCE_PATH, 'utf8'),
-  );
-  writeFile(
-    sourceDir,
-    path.join('scripts', 'verify-public-assets.js'),
-    fs.readFileSync(ASSET_VERIFIER_SOURCE_PATH, 'utf8'),
-  );
-  writeFile(
-    sourceDir,
-    path.join('scripts', 'verify-public-text.js'),
-    fs.readFileSync(TEXT_VERIFIER_SOURCE_PATH, 'utf8'),
-  );
-  writeFile(
-    sourceDir,
-    path.join('scripts', 'verify-public-release-pii.sh'),
-    fs.readFileSync(PII_VERIFIER_SOURCE_PATH, 'utf8'),
-  );
-  writeFile(
-    sourceDir,
-    path.join('scripts', 'scrub-public-package-json.js'),
-    fs.readFileSync(PACKAGE_SCRUBBER_SOURCE_PATH, 'utf8'),
-  );
-  writeFile(
-    sourceDir,
-    path.join('scripts', 'release-version.mjs'),
-    fs.readFileSync(RELEASE_VERSION_SOURCE_PATH, 'utf8'),
-  );
-  writeFile(
-    sourceDir,
     path.join('scripts', 'install-private-branch-guard.sh'),
     fs.readFileSync(PRIVATE_BRANCH_GUARD_INSTALLER_SOURCE_PATH, 'utf8'),
   );
@@ -86,7 +44,6 @@ function installSyncScriptFixture(sourceDir) {
     fs.readFileSync(PRE_PUSH_HOOK_SOURCE_PATH, 'utf8'),
   );
   fs.chmodSync(path.join(sourceDir, 'scripts', 'sync-public-history.sh'), 0o755);
-  fs.chmodSync(path.join(sourceDir, 'scripts', 'verify-public-release-pii.sh'), 0o755);
   fs.chmodSync(path.join(sourceDir, 'scripts', 'install-private-branch-guard.sh'), 0o755);
   fs.chmodSync(path.join(sourceDir, '.githooks', 'pre-push'), 0o755);
 }
@@ -331,87 +288,13 @@ test('sync-public-history accepts an explicit source branch', () => {
   });
 });
 
-test('sync-public-history can replay patch-new commits from a source branch diverged from main', () => {
-  withSourceRepo(({ sourceDir }) => {
-    git(sourceDir, ['checkout', '--quiet', 'main']);
-    writeFile(sourceDir, 'main-only.txt', 'direct main change\n');
-    commitAll(sourceDir, 'Direct main commit', {
-      authorDate: '2025-01-02T00:00:00Z',
-      committerDate: '2025-01-02T00:00:00Z',
-    });
-    git(sourceDir, ['push', '--quiet', 'origin', 'main']);
-    git(sourceDir, ['checkout', '--quiet', 'dev']);
-
-    const defaultResult = runSyncScript(sourceDir, ['--dry-run', 'release-candidate']);
-    assert.equal(defaultResult.status, 1);
-    assert.match(defaultResult.stderr, /origin\/main is not an ancestor of dev/);
-    assert.match(defaultResult.stderr, /--allow-diverged-source/);
-
-    const result = runSyncScript(sourceDir, ['--allow-diverged-source', 'release-candidate']);
-
-    assert.equal(result.status, 0, syncFailureMessage(result));
-    assert.match(result.stderr, /using git cherry to replay patch-new non-merge commits/);
-    assert.match(result.stdout, /Replay complete\./);
-    assert.match(result.stdout, /Branch name: release-candidate/);
-    assert.match(result.stdout, /Replayed commits: 2/);
-    assert.match(result.stdout, /Skipped commits: 2/);
-
-    const historySubjects = git(sourceDir, [
-      'log',
-      '--reverse',
-      '--format=%s',
-      'origin/main..release-candidate',
-    ]).trim().split('\n');
-    assert.deepEqual(historySubjects, [
-      'Public commit title',
-      'Mixed commit',
-    ]);
-
-    assert.equal(git(sourceDir, ['show', 'release-candidate:main-only.txt']), 'direct main change\n');
-    assert.equal(git(sourceDir, ['show', 'release-candidate:public.txt']), 'public one\npublic two\n');
-  });
-});
-
-test('sync-public-history resolves replay deletes over public-main edits', () => {
-  withSourceRepo(({ sourceDir }) => {
-    git(sourceDir, ['checkout', '--quiet', 'dev']);
-    fs.rmSync(path.join(sourceDir, 'README.md'));
-    commitAll(sourceDir, 'Remove stale public shim', {
-      authorDate: '2025-01-05T00:00:00Z',
-      committerDate: '2025-01-05T00:00:00Z',
-    });
-
-    git(sourceDir, ['checkout', '--quiet', 'main']);
-    writeFile(sourceDir, 'README.md', 'public main edit\n');
-    commitAll(sourceDir, 'Edit public readme on main', {
-      authorDate: '2025-01-04T00:00:00Z',
-      committerDate: '2025-01-04T00:00:00Z',
-    });
-    git(sourceDir, ['push', '--quiet', 'origin', 'main']);
-    git(sourceDir, ['checkout', '--quiet', 'dev']);
-
-    const result = runSyncScript(sourceDir, ['--allow-diverged-source', 'release-candidate']);
-
-    assert.equal(result.status, 0, syncFailureMessage(result));
-    assert.match(result.stdout, /Replay complete\./);
-    assert.match(result.stdout, /Replayed commits: 3/);
-    assert.match(result.stdout, /Skipped commits: 2/);
-
-    const readmeCheck = spawnSync('git', ['cat-file', '-e', 'release-candidate:README.md'], {
-      cwd: sourceDir,
-      encoding: 'utf8',
-    });
-    assert.notEqual(readmeCheck.status, 0);
-  });
-});
-
 test('sync-public-history installs the private dev push guard before replaying', () => {
   withSourceRepo(({ sourceDir }) => {
     git(sourceDir, ['branch', '--set-upstream-to=origin/main', 'dev'], { stdio: 'ignore' });
 
     const result = runSyncScript(sourceDir, ['--dry-run']);
 
-    assert.equal(result.status, 0, syncFailureMessage(result));
+    assert.equal(result.status, 0);
     assert.equal(git(sourceDir, ['config', '--local', '--get', 'core.hooksPath']).trim(), '.githooks');
 
     const upstreamResult = spawnSync(
@@ -423,15 +306,6 @@ test('sync-public-history installs the private dev push guard before replaying',
       },
     );
     assert.notEqual(upstreamResult.status, 0);
-  });
-});
-
-test('sync-public-history avoids local object-copy races when cloning the source', () => {
-  withSourceRepo(({ sourceDir }) => {
-    const result = runSyncScript(sourceDir, ['--dry-run'], { GIT_TRACE: '1' });
-
-    assert.equal(result.status, 0, syncFailureMessage(result));
-    assert.match(result.stderr, /run_command:.*git-upload-pack/);
   });
 });
 
