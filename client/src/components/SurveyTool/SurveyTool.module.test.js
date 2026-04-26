@@ -13,6 +13,7 @@ import {
   QuestionsDashboard as DirectQuestionsDashboard,
   SurveySelector as DirectSurveySelector,
 } from './SurveySelector';
+import { DeferredCommitSlider as DirectDeferredCommitSlider } from './DeferredCommitSlider';
 import {
   computeSubmitLabel as directComputeSubmitLabel,
   normalizeSurveyToolFilterState as directNormalizeSurveyToolFilterState,
@@ -169,6 +170,10 @@ describe('SurveyTool module', () => {
   it('re-exports extracted SurveySelector classes through SurveyTool.jsx', () => {
     expect(SurveySelector).toBe(DirectSurveySelector);
     expect(QuestionsDashboard).toBe(DirectQuestionsDashboard);
+  });
+
+  it('re-exports DeferredCommitSlider through SurveyTool.jsx', () => {
+    expect(DeferredCommitSlider).toBe(DirectDeferredCommitSlider);
   });
 
   it('re-exports extracted survey tool utils through SurveyTool.jsx', () => {
