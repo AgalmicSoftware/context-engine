@@ -15,6 +15,8 @@ import {
 } from './SurveySelector';
 import BullhornToggleButton from './BullhornToggleButton';
 import DeferredRatingSlider from './DeferredRatingSlider';
+import FullQuestionRatingInput from './FullQuestionRatingInput';
+import SurveyQuestionTagControl from './SurveyQuestionTagControl';
 import { DeferredCommitSlider as DirectDeferredCommitSlider } from './DeferredCommitSlider';
 import {
   computeSubmitLabel as directComputeSubmitLabel,
@@ -22,7 +24,6 @@ import {
 } from './surveyToolUtils.js';
 import { QuestionFilter as RawQuestionFilter } from './QuestionFilter';
 import PileHologramAssistant from './PileHologramAssistant';
-import QuestionTagDropdown from './QuestionTagDropdown';
 import TagModal from '../TagPage/TagModal';
 import styles from './SurveyTool.module.scss';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -1499,24 +1500,13 @@ describe('SurveyTool module', () => {
       conviction: {},
     };
     let fullQuestionCard = subject.renderQuestion(question, 0, withNumericString);
-    let ratingSlider = findElement(fullQuestionCard, (node) => (
-      node?.props?.min === 0 &&
-      node?.props?.max === 10 &&
-      node?.props?.step === 1 &&
-      node?.props?.tooltip === false &&
-      node?.props?.style?.width === '200px' &&
-      node?.props?.value !== undefined &&
-      typeof node?.props?.onChange === 'function'
-    ));
-    expect(ratingSlider).not.toBeNull();
-    expect(ratingSlider.props.value).toBe(8);
-    expect(ratingSlider.props.id).toBeUndefined();
-    expect(nodeHasClassName(ratingSlider, styles.ratingSlider)).toBe(true);
-    expect(typeof ratingSlider.props.onChangeComplete).toBe('function');
-    expect(treeHasText(fullQuestionCard, '8')).toBe(true);
-
-    const ratingValueLabel = findElement(fullQuestionCard, (node) => nodeHasClassName(node, styles.ratingLabelText));
-    expect(ratingValueLabel).not.toBeNull();
+    let ratingInput = findFirstNodeByType(fullQuestionCard, FullQuestionRatingInput);
+    expect(ratingInput).not.toBeNull();
+    expect(ratingInput.props.value).toBe(8);
+    expect(ratingInput.props.disabled).toBe(false);
+    expect(typeof ratingInput.props.onChange).toBe('function');
+    expect(typeof ratingInput.props.onChangeComplete).toBe('function');
+    expect(renderToStaticMarkup(ratingInput)).toContain('8');
 
     const withOverflowValue = {
       answers: { q1: { value: '18', encrypted: false } },
@@ -1525,18 +1515,10 @@ describe('SurveyTool module', () => {
       conviction: {},
     };
     fullQuestionCard = subject.renderQuestion(question, 0, withOverflowValue);
-    ratingSlider = findElement(fullQuestionCard, (node) => (
-      node?.props?.min === 0 &&
-      node?.props?.max === 10 &&
-      node?.props?.step === 1 &&
-      node?.props?.tooltip === false &&
-      node?.props?.style?.width === '200px' &&
-      node?.props?.value !== undefined &&
-      typeof node?.props?.onChange === 'function'
-    ));
-    expect(ratingSlider).not.toBeNull();
-    expect(ratingSlider.props.value).toBe(10);
-    expect(treeHasText(fullQuestionCard, '10')).toBe(true);
+    ratingInput = findFirstNodeByType(fullQuestionCard, FullQuestionRatingInput);
+    expect(ratingInput).not.toBeNull();
+    expect(ratingInput.props.value).toBe(10);
+    expect(renderToStaticMarkup(ratingInput)).toContain('10');
 
     const withNonNumericValue = {
       answers: { q1: { value: 'abc', encrypted: false } },
@@ -1545,19 +1527,10 @@ describe('SurveyTool module', () => {
       conviction: {},
     };
     fullQuestionCard = subject.renderQuestion(question, 0, withNonNumericValue);
-    ratingSlider = findElement(fullQuestionCard, (node) => (
-      node?.props?.min === 0 &&
-      node?.props?.max === 10 &&
-      node?.props?.step === 1 &&
-      node?.props?.tooltip === false &&
-      node?.props?.style?.width === '200px' &&
-      node?.props?.value !== undefined &&
-      typeof node?.props?.onChange === 'function'
-    ));
-    expect(ratingSlider).not.toBeNull();
-    expect(ratingSlider.props.value).toBe(0);
-    expect(nodeHasClassName(ratingSlider, styles.ratingSlider)).toBe(true);
-    expect(treeHasText(fullQuestionCard, '0')).toBe(true);
+    ratingInput = findFirstNodeByType(fullQuestionCard, FullQuestionRatingInput);
+    expect(ratingInput).not.toBeNull();
+    expect(ratingInput.props.value).toBe(0);
+    expect(renderToStaticMarkup(ratingInput)).toContain('0');
   });
 
   it('persists keyboard-driven full-mode rating edits immediately', () => {
@@ -1602,19 +1575,11 @@ describe('SurveyTool module', () => {
     };
 
     const fullQuestionCard = subject.renderQuestion(question, 0, subject.state.surveysResponseState[0]);
-    const ratingSlider = findElement(fullQuestionCard, (node) => (
-      node?.props?.min === 0 &&
-      node?.props?.max === 10 &&
-      node?.props?.step === 1 &&
-      node?.props?.tooltip === false &&
-      node?.props?.style?.width === '200px' &&
-      node?.props?.value !== undefined &&
-      typeof node?.props?.onChange === 'function'
-    ));
+    const ratingInput = findFirstNodeByType(fullQuestionCard, FullQuestionRatingInput);
 
-    expect(ratingSlider).not.toBeNull();
+    expect(ratingInput).not.toBeNull();
 
-    ratingSlider.props.onChange(6, { type: 'keydown' });
+    ratingInput.props.onChange(6, { type: 'keydown' });
 
     expect(subject.state.surveysResponseState[0].answers.q1.value).toBe(6);
     expect(subject.scheduleJsonPreviewUpdate).toHaveBeenCalledTimes(1);
@@ -7692,7 +7657,7 @@ describe('SurveyTool module', () => {
     }
   });
 
-  it('wires QuestionTagDropdown into full question cards when tags are present', () => {
+  it('wires SurveyQuestionTagControl into full question cards when tags are present', () => {
     const subject = new SurveyQuestions({
       singleQuestionMode: false,
       isStandalone: false,
@@ -7736,11 +7701,12 @@ describe('SurveyTool module', () => {
     );
     const dropdown = findElement(
       tree,
-      (node) => node?.type === QuestionTagDropdown
+      (node) => node?.type === SurveyQuestionTagControl
     );
 
     expect(dropdown).toBeTruthy();
     expect(dropdown.props.tags).toEqual(['governance']);
+    expect(dropdown.props.useTagModal).toBe(true);
     expect(typeof dropdown.props.onTagSelect).toBe('function');
   });
 
@@ -7809,7 +7775,7 @@ describe('SurveyTool module', () => {
     expect(modal.props.activeTag).toBe('governance');
   });
 
-  it('omits QuestionTagDropdown from pile cards even when tags are present', () => {
+  it('omits SurveyQuestionTagControl from pile cards even when tags are present', () => {
     const shell = new SurveyTool({
       minifiedMode: 'pile',
       singleQuestionMode: false,
@@ -7860,7 +7826,7 @@ describe('SurveyTool module', () => {
     const tree = subject.render();
     const dropdown = findElement(
       tree,
-      (node) => node?.type === QuestionTagDropdown
+      (node) => node?.type === SurveyQuestionTagControl
     );
 
     expect(dropdown).toBeNull();

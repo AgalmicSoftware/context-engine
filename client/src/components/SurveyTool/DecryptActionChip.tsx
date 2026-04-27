@@ -14,10 +14,6 @@ type DecryptActionChipProps = {
   busyLabel?: string;
 };
 
-export const resolveDecryptActionChipSpinnerStyle = (): React.CSSProperties => ({
-  marginRight: 8,
-});
-
 const DecryptActionChip = ({
   busy = false,
   spinnerOnly = false,
@@ -31,7 +27,7 @@ const DecryptActionChip = ({
     if (!busy) return null;
     return (
       <div className={styles.decryptChip}>
-        <FontAwesomeIcon icon={faSpinner} spin style={resolveDecryptActionChipSpinnerStyle()} />
+        <FontAwesomeIcon icon={faSpinner} spin style={{ marginRight: 8 }} />
         <span>{busyLabel}</span>
       </div>
     );
@@ -41,7 +37,7 @@ const DecryptActionChip = ({
     <div className={styles.decryptChip}>
       <Button
         onClick={onClick}
-        className={styles.decryptQuestionButton}
+        id={styles.decryptQuestionButton}
         disabled={disabled}
         title={title}
       >

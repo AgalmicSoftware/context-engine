@@ -15,16 +15,6 @@ type BinaryChoiceInputProps = {
   onChange?: ((nextValue: string) => void) | null;
 };
 
-export const buildBinaryChoiceOptionClassName = (
-  styleMap: Record<string, string>,
-  option: string,
-  isSelected: unknown
-) => [
-  styleMap.radioOptionText,
-  styleMap[option.toLowerCase()],
-  isSelected ? styleMap.selected : '',
-].filter(Boolean).join(' ');
-
 const BinaryChoiceInput = ({
   questionId,
   value = '',
@@ -41,7 +31,7 @@ const BinaryChoiceInput = ({
         <Label
           key={option}
           check
-          className={buildBinaryChoiceOptionClassName(styles, option, isSelected)}
+          className={`${styles.radioOptionText} ${styles[option.toLowerCase()]} ${isSelected ? styles.selected : ''}`}
         >
           <Input
             type="radio"
@@ -49,11 +39,9 @@ const BinaryChoiceInput = ({
             value={option}
             checked={isSelected}
             onChange={() => {
-              if (disabled) return;
               if (typeof onChange === 'function') onChange(option);
             }}
             onClick={() => {
-              if (disabled) return;
               if (isSelected && typeof onChange === 'function') onChange(option);
             }}
             disabled={disabled}

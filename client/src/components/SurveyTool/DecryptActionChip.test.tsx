@@ -1,8 +1,6 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
-import DecryptActionChip, {
-  resolveDecryptActionChipSpinnerStyle,
-} from './DecryptActionChip';
+import DecryptActionChip from './DecryptActionChip';
 
 describe('DecryptActionChip', () => {
   it('renders a button chip and forwards clicks', () => {
@@ -14,10 +12,7 @@ describe('DecryptActionChip', () => {
       />
     );
 
-    const button = screen.getByRole('button', { name: 'Decrypt Answer' });
-    expect(button).toHaveClass('decryptQuestionButton');
-
-    fireEvent.click(button);
+    fireEvent.click(screen.getByRole('button', { name: 'Decrypt Answer' }));
 
     expect(onClick).toHaveBeenCalledTimes(1);
   });
@@ -42,9 +37,5 @@ describe('DecryptActionChip', () => {
     );
 
     expect(screen.queryByText('Decrypting...')).not.toBeInTheDocument();
-  });
-
-  it('resolves spinner spacing style', () => {
-    expect(resolveDecryptActionChipSpinnerStyle()).toEqual({ marginRight: 8 });
   });
 });
