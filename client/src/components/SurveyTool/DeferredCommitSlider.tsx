@@ -1,80 +1,36 @@
 import React from 'react';
-import type { CSSProperties, ReactNode } from 'react';
 import { clampSliderValue } from './surveyToolUtils.js';
-import {
-  buildDeferredCommitSliderChangeStatePatch,
-  buildDeferredCommitSliderInitialState,
-  buildDeferredCommitSliderInteractingPatch,
-  buildDeferredCommitSliderLiveValuePatch,
-} from './deferredCommitSliderHelpers.js';
-import type { DeferredCommitSliderState } from './deferredCommitSliderHelpers.js';
 
-type SliderEventLike = {
-  type?: string;
-} | null | undefined;
-
-export type DeferredCommitSliderRenderProps = {
-  min: number;
-  max: number;
-  step: number;
-  disabled: boolean;
-  tooltip: boolean;
-  className?: string;
-  style?: CSSProperties;
-  value: number;
-  onChangeStart: () => void;
-  onChange: (nextValue: unknown, event?: SliderEventLike) => void;
-  onChangeComplete: () => void;
-};
-
-export type DeferredCommitSliderProps = {
-  value: unknown;
-  min: number;
-  max: number;
-  step?: number;
-  disabled?: boolean;
-  tooltip?: boolean;
-  className?: string;
-  style?: CSSProperties;
-  onCommit?: (value: number) => void;
-  children: (args: {
-    value: number;
-    sliderProps: DeferredCommitSliderRenderProps;
-  }) => ReactNode;
-};
-
-export class DeferredCommitSlider extends React.PureComponent<
-  DeferredCommitSliderProps,
-  DeferredCommitSliderState
-> {
-  constructor(props: DeferredCommitSliderProps) {
+export class DeferredCommitSlider extends React.PureComponent {
+  constructor(props) {
     super(props);
-    this.state = buildDeferredCommitSliderInitialState(this.normalizeValue(props.value));
+    this.state = {
+      liveValue: this.normalizeValue(props.value),
+      isInteracting: false,
+    };
   }
 
-  componentDidUpdate(prevProps: DeferredCommitSliderProps) {
+  componentDidUpdate(prevProps) {
     const prevValue = this.normalizeValue(prevProps.value);
     const nextValue = this.normalizeValue(this.props.value);
     if (prevValue === nextValue) return;
     if (this.state.isInteracting) return;
     if (this.state.liveValue === nextValue) return;
-    this.setState(buildDeferredCommitSliderLiveValuePatch(nextValue));
+    this.setState({ liveValue: nextValue });
   }
 
-  normalizeValue = (value: unknown): number => (
-    clampSliderValue(value, this.props.min, this.props.max)
-  );
+  normalizeValue = (value) => clampSliderValue(value, this.props.min, this.props.max);
 
-  handleChangeStart = (): void => {
+  handleChangeStart = () => {
     if (this.state.isInteracting) return;
-    this.setState(buildDeferredCommitSliderInteractingPatch(true));
+    this.setState({ isInteracting: true });
   };
 
-  commitValue = (value = this.state.liveValue): void => {
+  commitValue = (value = this.state.liveValue) => {
     const committedValue = this.normalizeValue(value);
     const propValue = this.normalizeValue(this.props.value);
     if (this.state.isInteracting) {
-      this.setState(buildDeferredCommitSliderInteractingPatch(false));
+      this.setState({ isInteracting: false });
     }
     if (committedValue === propValue) return;
     if (typeof this.props.onCommit === 'function') {
@@ -82,19 +38,21 @@ export class DeferredCommitSlider extends React.PureComponent<
     }
   };
 
-  handleChange = (nextValue: unknown, event?: SliderEventLike): void => {
+  handleChange = (nextValue, event) => {
     const normalizedValue = this.normalizeValue(nextValue);
     const isKeyboardEvent = event?.type === 'keydown';
-    const nextState = buildDeferredCommitSliderChangeStatePatch({
-      liveValue: this.state.liveValue,
-      normalizedValue,
-      isKeyboardEvent,
-      isInteracting: this.state.isInteracting,
-    });
+    const nextState = {};
+
+    if (this.state.liveValue !== normalizedValue) {
+      nextState.liveValue = normalizedValue;
+    }
+    if (!isKeyboardEvent && !this.state.isInteracting) {
+      nextState.isInteracting = true;
+    }
 
     const hasStateChange = Object.keys(nextState).length > 0;
     if (hasStateChange) {
-      this.setState(nextState as DeferredCommitSliderState, () => {
+      this.setState(nextState, () => {
         if (isKeyboardEvent) this.commitValue(normalizedValue);
       });
       return;
@@ -105,7 +63,7 @@ export class DeferredCommitSlider extends React.PureComponent<
     }
   };
 
-  handleChangeComplete = (): void => {
+  handleChangeComplete = () => {
     this.commitValue(this.state.liveValue);
   };
 
@@ -120,7 +78,7 @@ export class DeferredCommitSlider extends React.PureComponent<
       className,
       style,
     } = this.props;
-    const sliderProps: DeferredCommitSliderRenderProps = {
+    const sliderProps = {
       min,
       max,
       step,
