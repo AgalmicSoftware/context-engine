@@ -6906,6 +6906,36 @@ export class SurveyQuestions extends Component {
           return this.deepClone(cached);
         };
 
+        const readFreshCachedResponderResponse = async (responder) => {
+          const addr = String(responder || '').toLowerCase();
+          if (!addr) return null;
+
+          let freshCache = null;
+          try {
+            freshCache = await readQuestionsCacheAsync(effectiveSingleSlug);
+          } catch (_) {
+            freshCache = null;
+          }
+          if (!freshCache || typeof freshCache !== 'object') return null;
+
+          const netCandidates = [];
+          if (netIdStr) netCandidates.push(String(netIdStr));
+          Object.keys(freshCache).forEach((candidateNetId) => {
+            const normalizedNetId = String(candidateNetId || '').trim();
+            if (!normalizedNetId || netCandidates.includes(normalizedNetId)) return;
+            netCandidates.push(normalizedNetId);
+          });
+
+          for (const candidateNetId of netCandidates) {
+            const cached =
+              freshCache?.[candidateNetId]?.questionResponses?.[questionId]?.[addr] || null;
+            if (!cached || typeof cached !== 'object') continue;
+            questionsCache = ensureQuestionsNet(freshCache, netIdStr || candidateNetId);
+            return this.deepClone(cached);
+          }
+          return null;
+        };
+
         // Fetch latest response for the appropriate address, scoped to this slug
         if (responderAddress) {
           this.updateSingleQuestionDebug({
@@ -6919,6 +6949,7 @@ export class SurveyQuestions extends Component {
           safeSetState({ isLoadingResponse: true, responseLookupWarning: '' });
           let latest = null;
           let latestFromCache = false;
+          let latestCacheSource = '';
           let responseHash = null;
           let responseFetchFailed = false;
           try {
@@ -6938,6 +6969,15 @@ export class SurveyQuestions extends Component {
             if (cachedLatest) {
               latest = cachedLatest;
               latestFromCache = true;
+              latestCacheSource = 'snapshot';
+            }
+          }
+          if (!latest) {
+            const freshCachedLatest = await readFreshCachedResponderResponse(responderAddress);
+            if (freshCachedLatest) {
+              latest = freshCachedLatest;
+              latestFromCache = true;
+              latestCacheSource = 'persistent';
             }
           }
           if (!latest) {
@@ -6983,14 +7023,15 @@ export class SurveyQuestions extends Component {
               await writeRespToCache(responderAddress, latest);
             }
             this.updateSingleQuestionDebug({
-              phase: 'responder-response-loaded',
-              runId,
-              questionId,
-              effectiveSingleSlug: String(effectiveSingleSlug || ''),
-              responderAddress: String(responderAddress || '').toLowerCase(),
-              latestFromCache,
-              responseHash: String(latest?.arweaveTxId || responseHash || ''),
-            });
+                phase: 'responder-response-loaded',
+                runId,
+                questionId,
+                effectiveSingleSlug: String(effectiveSingleSlug || ''),
+                responderAddress: String(responderAddress || '').toLowerCase(),
+                latestFromCache,
+                latestCacheSource: latestCacheSource || null,
+                responseHash: String(latest?.arweaveTxId || responseHash || ''),
+              });
             safeSetState((prev) => {
               const merged = mergeDecryptedViewedResponse(prev.parsedViewAddressAnswers, latest);
               return {
@@ -11596,15 +11637,17 @@ export class SurveyQuestions extends Component {
           newArr[surveyIndex] = base;
           this.setState({ surveysResponseState: newArr });
 
-          // Verify only the changed set
-          await this.verifyEncryption(changedQids);
+          // Verify against the freshly merged slice instead of immediately rereading
+          // `this.state`, which can still hold the pre-encryption draft until React
+          // flushes the async class-state update.
+          await this.verifyEncryption(changedQids, base);
         }
       }
 
       this.setState({ currentStep: 2 });
 
       // Await the receipt to ensure transaction is confirmed before optimistic update
-      const receipt = await this.submitSurveyResponse();
+      const receipt = await this.submitSurveyResponse(activeSlice, changedQids);
       surveyLog.log("Submission receipt received", receipt?.blockNumber || 'unknown block');
 
       // Success path
@@ -11894,10 +11937,10 @@ export class SurveyQuestions extends Component {
 
 
 
-  verifyEncryption = async (onlyTheseQids = null) => {
+  verifyEncryption = async (onlyTheseQids = null, sliceOverride = null) => {
     surveyLog.log("Verifying encryption...");
     const surveyIndex = this.props.isStandalone || this.props.singleQuestionMode ? 0 : this.props.surveyIndex;
-    const stateToCheck = this.state.surveysResponseState[surveyIndex];
+    const stateToCheck = sliceOverride || this.state.surveysResponseState[surveyIndex];
     let verificationPassed = true;
 
     const limitSet = onlyTheseQids ? new Set(Array.from(onlyTheseQids)) : null;
