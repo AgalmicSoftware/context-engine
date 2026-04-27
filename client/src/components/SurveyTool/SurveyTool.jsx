@@ -227,6 +227,7 @@ import {
   buildPersistedDraftTrackingOnKeyChange,
   buildPersistedDraftWritePlan,
   buildPersistDraftAllowedQuestionIds,
+  buildQuestionResponseHydrationPatch,
   loadPreviousPersistedDraftSnapshot,
   parsePersistedDraftStorageValue,
   buildPersistedDraftPayload,
@@ -1192,6 +1193,35 @@ export class SurveyQuestions extends Component {
     if (Object.prototype.hasOwnProperty.call(tracking, 'lastDraftSemanticSignature')) {
       this._lastDraftSemanticSignature = tracking.lastDraftSemanticSignature ?? null;
     }
+  };
+
+  _applyDraftHydrationEntryToSlice = ({
+    targetSlice = null,
+    questionId = '',
+    draftEntry = null,
+    allowOverwrite = false,
+  } = {}) => {
+    if (!targetSlice || !draftEntry) return false;
+    const patch = buildDraftHydrationPatchForQuestion({
+      questionId,
+      draftEntry,
+      currentAnswer: targetSlice.answers?.[questionId],
+      currentAdditional: targetSlice.additionalComments?.[questionId],
+      hasCurrentImportance: Object.prototype.hasOwnProperty.call(targetSlice.importance || {}, questionId),
+      hasCurrentConviction: Object.prototype.hasOwnProperty.call(targetSlice.conviction || {}, questionId),
+      allowOverwrite,
+      deps: {
+        normalizeResponseEncryptionAudience: this.normalizeResponseEncryptionAudience,
+        normalizeFieldAudienceMode: this.normalizeFieldAudienceMode,
+        buildInheritedAdditionalFieldState: this.buildInheritedAdditionalFieldState,
+        buildEmptyResponseFieldState: this.buildEmptyResponseFieldState,
+      },
+    });
+    if (patch.answerState) targetSlice.answers[questionId] = patch.answerState;
+    if (patch.additionalState) targetSlice.additionalComments[questionId] = patch.additionalState;
+    if (patch.importanceChanged) targetSlice.importance[questionId] = patch.importanceValue;
+    if (patch.convictionChanged) targetSlice.conviction[questionId] = patch.convictionValue;
+    return !!patch.changed;
   };
 
   setManagedTimeout = (fn, delayMs = 0) => {
@@ -5159,52 +5189,28 @@ export class SurveyQuestions extends Component {
       rendered.forEach((qid) => {
         const d = draft.answers?.[qid];
         if (d) {
-          const livePatch = buildDraftHydrationPatchForQuestion({
+          if (this._applyDraftHydrationEntryToSlice({
+            targetSlice: nextSlice,
             questionId: qid,
             draftEntry: d,
-            currentAnswer: nextSlice.answers[qid],
-            currentAdditional: nextSlice.additionalComments[qid],
-            hasCurrentImportance: Object.prototype.hasOwnProperty.call(nextSlice.importance, qid),
-            hasCurrentConviction: Object.prototype.hasOwnProperty.call(nextSlice.conviction, qid),
             allowOverwrite,
-            deps: {
-              normalizeResponseEncryptionAudience: this.normalizeResponseEncryptionAudience,
-              normalizeFieldAudienceMode: this.normalizeFieldAudienceMode,
-              buildInheritedAdditionalFieldState: this.buildInheritedAdditionalFieldState,
-              buildEmptyResponseFieldState: this.buildEmptyResponseFieldState,
-            },
-          });
-          if (livePatch.answerState) nextSlice.answers[qid] = livePatch.answerState;
-          if (livePatch.additionalState) nextSlice.additionalComments[qid] = livePatch.additionalState;
-          if (livePatch.importanceChanged) nextSlice.importance[qid] = livePatch.importanceValue;
-          if (livePatch.convictionChanged) nextSlice.conviction[qid] = livePatch.convictionValue;
-          if (livePatch.changed) changed = true;
+          })) {
+            changed = true;
+          }
         }
 
         // Regression guard: restore baseline from draft independently of answer hydration.
         // Refresh often sees masked chain payload first; losing baseline here reintroduces Submit(1) ghosts.
         const b = draft.baseline?.[qid];
         if (b) {
-          const baselinePatch = buildDraftHydrationPatchForQuestion({
+          if (this._applyDraftHydrationEntryToSlice({
+            targetSlice: nextBaseline,
             questionId: qid,
             draftEntry: b,
-            currentAnswer: nextBaseline.answers[qid],
-            currentAdditional: nextBaseline.additionalComments[qid],
-            hasCurrentImportance: Object.prototype.hasOwnProperty.call(nextBaseline.importance, qid),
-            hasCurrentConviction: Object.prototype.hasOwnProperty.call(nextBaseline.conviction, qid),
             allowOverwrite,
-            deps: {
-              normalizeResponseEncryptionAudience: this.normalizeResponseEncryptionAudience,
-              normalizeFieldAudienceMode: this.normalizeFieldAudienceMode,
-              buildInheritedAdditionalFieldState: this.buildInheritedAdditionalFieldState,
-              buildEmptyResponseFieldState: this.buildEmptyResponseFieldState,
-            },
-          });
-          if (baselinePatch.answerState) nextBaseline.answers[qid] = baselinePatch.answerState;
-          if (baselinePatch.additionalState) nextBaseline.additionalComments[qid] = baselinePatch.additionalState;
-          if (baselinePatch.importanceChanged) nextBaseline.importance[qid] = baselinePatch.importanceValue;
-          if (baselinePatch.convictionChanged) nextBaseline.conviction[qid] = baselinePatch.convictionValue;
-          if (baselinePatch.changed) baselineChanged = true;
+          })) {
+            baselineChanged = true;
+          }
         }
       });
 
@@ -5451,85 +5457,30 @@ export class SurveyQuestions extends Component {
     list.forEach((r) => {
       const qid = normalizeQuestionIdKey(r?.questionID || r?.questionId);
       if (!qid) return;
+      const patch = buildQuestionResponseHydrationPatch({
+        questionId: qid,
+        response: r,
+        currentAnswer: prevSlice?.answers?.[qid],
+        currentAdditional: prevSlice?.additionalComments?.[qid],
+        hasCurrentImportance: false,
+        hasCurrentConviction: false,
+        allowOverwrite: true,
+        deps: {
+          parseValue: parseVal,
+          areEnvelopesEquivalent,
+          normalizeResponseEncryptionAudience: this.normalizeResponseEncryptionAudience,
+          getDefaultResponseEncryptionAudienceForQid: this.getDefaultResponseEncryptionAudienceForQid,
+          resolveFieldEncryptionGateId: this.resolveFieldEncryptionGateId,
+          normalizeFieldAudienceMode: this.normalizeFieldAudienceMode,
+          buildInheritedAdditionalFieldState: this.buildInheritedAdditionalFieldState,
+          buildEmptyResponseFieldState: this.buildEmptyResponseFieldState,
+        },
+      });
 
-      const ans = r.answer || {};
-      const add = r.additional || {};
-
-      const prevAns = prevSlice?.answers?.[qid];
-      const ansIsMasked = ans.value === '*' && (ans.encrypted || ans.encryptedPortion);
-      const ansPrevDecrypted = prevAns && prevAns.value !== '*' && prevAns.value !== undefined && prevAns.value !== null;
-      const ansEnvMatches = prevAns && areEnvelopesEquivalent(
-        ans.encryptedPortion,
-        prevAns.encryptedPortion,
-        ans.encrypted,
-        prevAns.encrypted
-      );
-
-      const answerAudience = this.normalizeResponseEncryptionAudience(
-        ans.encryptionAudience || (
-          (ans.encrypted || ans.encryptedPortion)
-            ? this.getDefaultResponseEncryptionAudienceForQid(qid)
-            : 'self'
-        ),
-        qid
-      );
-      slice.answers[qid] = {
-        value: (ansIsMasked && ansPrevDecrypted && ansEnvMatches) ? prevAns.value : parseVal(ans.value),
-        encrypted: !!(ans.encrypted || ans.encryptedPortion),
-        encryptionAudience: answerAudience,
-        encryptionGateId: answerAudience === 'gate'
-          ? this.resolveFieldEncryptionGateId({ ...ans, encryptionAudience: answerAudience }, qid, 'answer')
-          : null,
-        audienceMode: 'explicit',
-        hash: ans.hash || '',
-        encryptedPortion: ans.encryptedPortion || '',
-        ...(ansEnvMatches && prevAns.zkSalt ? { zkSalt: prevAns.zkSalt } : {})
-      };
-
-      const convictionValue = getConvictionFromResponse(r);
-      if (convictionValue !== null) {
-        slice.conviction[qid] = convictionValue;
-      }
-      const importanceValue = getImportanceFromResponse(r);
-      if (importanceValue !== null) {
-        slice.importance[qid] = importanceValue;
-      }
-
-      const prevAdd = prevSlice?.additionalComments?.[qid];
-      const addIsMasked = add.value === '*' && (add.encrypted || add.encryptedPortion);
-      const addPrevDecrypted = prevAdd && prevAdd.value !== '*' && prevAdd.value !== undefined && prevAdd.value !== null;
-      const addEnvMatches = prevAdd && areEnvelopesEquivalent(
-        add.encryptedPortion,
-        prevAdd.encryptedPortion,
-        add.encrypted,
-        prevAdd.encrypted
-      );
-
-      const additionalAudienceMode = this.normalizeFieldAudienceMode(add.audienceMode, 'additional', add);
-      const additionalAudience = this.normalizeResponseEncryptionAudience(
-        add.encryptionAudience || (
-          (add.encrypted || add.encryptedPortion)
-            ? this.getDefaultResponseEncryptionAudienceForQid(qid)
-            : 'self'
-        ),
-        qid
-      );
-      let nextAdditional = {
-        value: (addIsMasked && addPrevDecrypted && addEnvMatches) ? prevAdd.value : parseVal(add.value),
-        encrypted: !!(add.encrypted || add.encryptedPortion),
-        encryptionAudience: additionalAudience,
-        encryptionGateId: additionalAudience === 'gate'
-          ? this.resolveFieldEncryptionGateId({ ...add, encryptionAudience: additionalAudience }, qid, 'additional')
-          : null,
-        audienceMode: additionalAudienceMode,
-        hash: add.hash || '',
-        encryptedPortion: add.encryptedPortion || '',
-        ...(addEnvMatches && prevAdd.zkSalt ? { zkSalt: prevAdd.zkSalt } : {})
-      };
-      if (additionalAudienceMode === 'inherit') {
-        nextAdditional = this.buildInheritedAdditionalFieldState(nextAdditional, slice.answers[qid], qid);
-      }
-      slice.additionalComments[qid] = nextAdditional;
+      if (patch.answerState) slice.answers[qid] = patch.answerState;
+      if (patch.additionalState) slice.additionalComments[qid] = patch.additionalState;
+      if (patch.convictionChanged) slice.conviction[qid] = patch.convictionValue;
+      if (patch.importanceChanged) slice.importance[qid] = patch.importanceValue;
     });
 
     return slice;
@@ -5579,88 +5530,30 @@ export class SurveyQuestions extends Component {
       userAnswers.responses.forEach((r) => {
         const qid = normalizeQuestionIdKey(r?.questionID || r?.questionId);
         if (!qid) return;
-        const ans = r.answer || {};
-        const add = r.additional || {};
+        const patch = buildQuestionResponseHydrationPatch({
+          questionId: qid,
+          response: r,
+          currentAnswer: curr.answers?.[qid],
+          currentAdditional: curr.additionalComments?.[qid],
+          hasCurrentImportance: qid in curr.conviction ? false : false,
+          hasCurrentConviction: Object.prototype.hasOwnProperty.call(curr.conviction || {}, qid),
+          allowOverwrite,
+          deps: {
+            parseValue: this.parseAnswerValue,
+            areEnvelopesEquivalent,
+            normalizeResponseEncryptionAudience: this.normalizeResponseEncryptionAudience,
+            getDefaultResponseEncryptionAudienceForQid: this.getDefaultResponseEncryptionAudienceForQid,
+            resolveFieldEncryptionGateId: this.resolveFieldEncryptionGateId,
+            normalizeFieldAudienceMode: this.normalizeFieldAudienceMode,
+            buildInheritedAdditionalFieldState: this.buildInheritedAdditionalFieldState,
+            buildEmptyResponseFieldState: this.buildEmptyResponseFieldState,
+          },
+        });
 
-        const prevAns = curr.answers?.[qid];
-        const ansIsMasked = ans.value === '*' && (ans.encrypted || ans.encryptedPortion);
-        const ansPrevDecrypted = prevAns && prevAns.value !== '*' && prevAns.value !== undefined && prevAns.value !== null;
-        const ansEnvMatches = prevAns && areEnvelopesEquivalent(
-          ans.encryptedPortion,
-          prevAns.encryptedPortion,
-          ans.encrypted,
-          prevAns.encrypted
-        );
-
-        if (!hasVal(prevAns?.value) || allowOverwrite) {
-          const answerAudience = this.normalizeResponseEncryptionAudience(
-            ans.encryptionAudience || (
-              (ans.encrypted || ans.encryptedPortion)
-                ? this.getDefaultResponseEncryptionAudienceForQid(qid)
-                : 'self'
-            ),
-            qid
-          );
-          nextSlice.answers[qid] = {
-            value: (ansIsMasked && ansPrevDecrypted && ansEnvMatches) ? prevAns.value : this.parseAnswerValue(ans.value),
-            encrypted: !!(ans.encrypted || ans.encryptedPortion),
-            encryptionAudience: answerAudience,
-            encryptionGateId: answerAudience === 'gate'
-              ? this.resolveFieldEncryptionGateId({ ...ans, encryptionAudience: answerAudience }, qid, 'answer')
-              : null,
-            audienceMode: 'explicit',
-            hash: ans.hash || '',
-            encryptedPortion: ans.encryptedPortion || '',
-            ...(ansEnvMatches && prevAns?.zkSalt ? { zkSalt: prevAns.zkSalt } : {})
-          };
-        }
-
-        const convictionValue = getConvictionFromResponse(r);
-        if ((!(qid in curr.conviction) || allowOverwrite) && convictionValue !== null) {
-          nextSlice.conviction[qid] = convictionValue;
-        }
-        const importanceValue = getImportanceFromResponse(r);
-        if ((!(qid in curr.importance) || allowOverwrite) && importanceValue !== null) {
-          nextSlice.importance[qid] = importanceValue;
-        }
-
-        const prevAdd = curr.additionalComments?.[qid];
-        const addIsMasked = add.value === '*' && (add.encrypted || add.encryptedPortion);
-        const addPrevDecrypted = prevAdd && prevAdd.value !== '*' && prevAdd.value !== undefined && prevAdd.value !== null;
-        const addEnvMatches = prevAdd && areEnvelopesEquivalent(
-          add.encryptedPortion,
-          prevAdd.encryptedPortion,
-          add.encrypted,
-          prevAdd.encrypted
-        );
-
-        if (!hasVal(prevAdd?.value) || allowOverwrite) {
-          const additionalAudienceMode = this.normalizeFieldAudienceMode(add.audienceMode, 'additional', add);
-          const additionalAudience = this.normalizeResponseEncryptionAudience(
-            add.encryptionAudience || (
-              (add.encrypted || add.encryptedPortion)
-                ? this.getDefaultResponseEncryptionAudienceForQid(qid)
-                : 'self'
-            ),
-            qid
-          );
-          let nextAdditional = {
-            value: (addIsMasked && addPrevDecrypted && addEnvMatches) ? prevAdd.value : this.parseAnswerValue(add.value),
-            encrypted: !!(add.encrypted || add.encryptedPortion),
-            encryptionAudience: additionalAudience,
-            encryptionGateId: additionalAudience === 'gate'
-              ? this.resolveFieldEncryptionGateId({ ...add, encryptionAudience: additionalAudience }, qid, 'additional')
-              : null,
-            audienceMode: additionalAudienceMode,
-            hash: add.hash || '',
-            encryptedPortion: add.encryptedPortion || '',
-            ...(addEnvMatches && prevAdd?.zkSalt ? { zkSalt: prevAdd.zkSalt } : {})
-          };
-          if (additionalAudienceMode === 'inherit') {
-            nextAdditional = this.buildInheritedAdditionalFieldState(nextAdditional, nextSlice.answers[qid], qid);
-          }
-          nextSlice.additionalComments[qid] = nextAdditional;
-        }
+        if (patch.answerState) nextSlice.answers[qid] = patch.answerState;
+        if (patch.additionalState) nextSlice.additionalComments[qid] = patch.additionalState;
+        if (patch.convictionChanged) nextSlice.conviction[qid] = patch.convictionValue;
+        if (patch.importanceChanged) nextSlice.importance[qid] = patch.importanceValue;
       });
 
       nextStateArr[surveyIndex] = nextSlice;
