@@ -229,6 +229,7 @@ import {
   buildLocalCacheRehydrationState,
   buildPrefilledSurveyState,
   buildRevertedResponseSlice,
+  buildSurveyResponseStateArray,
   buildPersistedDraftQuestionRemovalPlan,
   buildPersistedDraftTrackingAfterLoad,
   buildPersistedDraftTrackingAfterScopedDelete,
@@ -5797,16 +5798,14 @@ export class SurveyQuestions extends Component {
         return;
       }
 
-      const arr = Array.isArray(this.state.surveysResponseState)
-        ? [...this.state.surveysResponseState]
-        : [];
-      while (arr.length <= surveyIndex) {
-        arr.push({ answers: {}, importance: {}, conviction: {}, additionalComments: {} });
-      }
-      if (changed) arr[surveyIndex] = next;
+      const nextSurveysResponseState = buildSurveyResponseStateArray({
+        prevSurveysResponseState: this.state.surveysResponseState,
+        surveyIndex,
+        nextSlice: changed ? next : null,
+      });
 
       const updates = {};
-      if (changed) updates.surveysResponseState = arr;
+      if (changed) updates.surveysResponseState = nextSurveysResponseState;
       if (baselineChanged) updates.editBaseline = nextBaseline;
 
       this.setState(updates, () => {

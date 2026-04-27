@@ -8,6 +8,7 @@ import {
   buildLocalCacheRehydrationState,
   buildPrefilledSurveyState,
   buildRevertedResponseSlice,
+  buildSurveyResponseStateArray,
 } from './surveyToolHydrationFlow.js';
 
 describe('surveyToolHydrationFlow', () => {
@@ -406,6 +407,39 @@ describe('surveyToolHydrationFlow', () => {
     })).toEqual({});
     expect(readQuestionsCache).toHaveBeenCalledTimes(2);
     expect(mergeResponses).toHaveBeenCalledTimes(2);
+  });
+
+  it('builds survey response state arrays with ensured indexes', () => {
+    expect(buildSurveyResponseStateArray({
+      prevSurveysResponseState: [
+        { answers: { q0: { value: 'keep' } }, importance: {}, conviction: {}, additionalComments: {} },
+      ],
+      surveyIndex: 2,
+      nextSlice: {
+        answers: { q2: { value: 'answer' } },
+        importance: { q2: 4 },
+        conviction: { q2: 7 },
+        additionalComments: { q2: { value: 'notes' } },
+      },
+    })).toEqual([
+      { answers: { q0: { value: 'keep' } }, importance: {}, conviction: {}, additionalComments: {} },
+      { answers: {}, importance: {}, conviction: {}, additionalComments: {} },
+      {
+        answers: { q2: { value: 'answer' } },
+        importance: { q2: 4 },
+        conviction: { q2: 7 },
+        additionalComments: { q2: { value: 'notes' } },
+      },
+    ]);
+
+    expect(buildSurveyResponseStateArray({
+      prevSurveysResponseState: null,
+      surveyIndex: 1,
+      nextSlice: null,
+    })).toEqual([
+      { answers: {}, importance: {}, conviction: {}, additionalComments: {} },
+      { answers: {}, importance: {}, conviction: {}, additionalComments: {} },
+    ]);
   });
 
   it('builds prefilled survey state with hydrated slice and optional baseline writes', () => {

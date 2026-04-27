@@ -78,6 +78,12 @@ type BuildHydratedResponseSliceArgs = {
   parseValue?: ((value: unknown) => unknown) | null;
 };
 
+type BuildSurveyResponseStateArrayArgs = {
+  prevSurveysResponseState?: unknown[] | null;
+  surveyIndex?: unknown;
+  nextSlice?: ResponseSlice | null;
+};
+
 type BuildLocalCacheHydrationMemoKeyArgs = {
   scopeSlugs?: unknown[];
   networkIdStr?: unknown;
@@ -387,6 +393,27 @@ export const buildMergedHydrationQuestionResponses = ({
   return mergedQuestionResponses;
 };
 
+export const buildSurveyResponseStateArray = ({
+  prevSurveysResponseState = null,
+  surveyIndex = 0,
+  nextSlice = null,
+}: BuildSurveyResponseStateArrayArgs = {}) => {
+  const normalizedSurveyIndex = Math.max(0, Number(surveyIndex) || 0);
+  const nextSurveysResponseState = Array.isArray(prevSurveysResponseState)
+    ? [...prevSurveysResponseState]
+    : [];
+
+  while (nextSurveysResponseState.length <= normalizedSurveyIndex) {
+    nextSurveysResponseState.push(buildEmptyResponseSlice());
+  }
+
+  if (nextSlice && typeof nextSlice === 'object') {
+    nextSurveysResponseState[normalizedSurveyIndex] = nextSlice;
+  }
+
+  return nextSurveysResponseState;
+};
+
 export const buildPrefilledSurveyState = ({
   surveyIndex = 0,
   prevSurveysResponseState = null,
@@ -404,11 +431,10 @@ export const buildPrefilledSurveyState = ({
     : buildEmptyResponseSlice();
   const allowOverwrite = !isDirty && !submissionComplete;
 
-  const nextSurveysResponseState = [...currentStateArr];
-  while (nextSurveysResponseState.length <= normalizedSurveyIndex) {
-    nextSurveysResponseState.push(buildEmptyResponseSlice());
-  }
-
+  const nextSurveysResponseState = buildSurveyResponseStateArray({
+    prevSurveysResponseState: currentStateArr,
+    surveyIndex: normalizedSurveyIndex,
+  });
   const targetSeed = nextSurveysResponseState[normalizedSurveyIndex] && typeof nextSurveysResponseState[normalizedSurveyIndex] === 'object'
     ? nextSurveysResponseState[normalizedSurveyIndex] as ResponseSlice
     : buildEmptyResponseSlice();
