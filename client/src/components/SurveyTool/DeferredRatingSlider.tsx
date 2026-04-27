@@ -3,7 +3,10 @@ import { FormText } from 'reactstrap';
 import DeferredCommitSlider from './DeferredCommitSlider';
 import CESlider from '../Shared/CESlider';
 import styles from './SurveyTool.module.scss';
-import { RATING_MAX, RATING_MIN } from '../../utilities/survey/ratingValue.js';
+import {
+  RATING_MAX,
+  RATING_MIN,
+} from '../../utilities/survey/ratingValue.js';
 
 type DeferredRatingSliderProps = {
   value: number;
@@ -11,11 +14,11 @@ type DeferredRatingSliderProps = {
   onCommit?: (value: number) => void;
 };
 
-export const resolveDeferredRatingSliderStyle = (): React.CSSProperties => ({
-  width: '200px',
-});
-
-const DeferredRatingSlider = ({ value, disabled = false, onCommit }: DeferredRatingSliderProps) => (
+const DeferredRatingSlider = ({
+  value,
+  disabled = false,
+  onCommit,
+}: DeferredRatingSliderProps) => (
   <DeferredCommitSlider
     value={value}
     min={RATING_MIN}
@@ -24,7 +27,7 @@ const DeferredRatingSlider = ({ value, disabled = false, onCommit }: DeferredRat
     tooltip={false}
     disabled={disabled}
     className={styles.ratingSlider}
-    style={resolveDeferredRatingSliderStyle()}
+    style={{ width: '200px' }}
     onCommit={onCommit}
   >
     {({ value: liveValue, sliderProps }) => (
@@ -32,7 +35,9 @@ const DeferredRatingSlider = ({ value, disabled = false, onCommit }: DeferredRat
         <div className={styles.importanceSlider}>
           <CESlider {...sliderProps} />
         </div>
-        <FormText className={styles.ratingLabelText}>{liveValue}</FormText>
+        <FormText className={styles.ratingLabelText}>
+          {liveValue}
+        </FormText>
       </>
     )}
   </DeferredCommitSlider>
