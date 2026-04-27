@@ -2645,6 +2645,34 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
   const forceArweaveFetch = !!opts?.forceArweaveFetch;
   const { baseKey } = resolveReadContext(groupKeyOrCfg);
   const inflightKey = `${baseKey}|${responderLower}|${idB32}|strict:${throwOnError ? '1' : '0'}`;
+  const readE2EMockedViewedResponse = () => {
+    if (typeof window === 'undefined') return null;
+    if (globalThis.CE_E2E_LIT_MOCK !== true) return null;
+    const responseKey = `${responderLower}|${idB32}`;
+
+    try {
+      const globalMocks = (
+        window.__CE_E2E_MOCKED_VIEWED_RESPONSES__
+        && typeof window.__CE_E2E_MOCKED_VIEWED_RESPONSES__ === 'object'
+      ) ? window.__CE_E2E_MOCKED_VIEWED_RESPONSES__ : null;
+      const globalHit = globalMocks?.[responseKey];
+      if (globalHit && typeof globalHit === 'object') {
+        return cloneJsonSafe(globalHit);
+      }
+    } catch (_) {}
+
+    try {
+      const raw = window.sessionStorage?.getItem('ce:e2e:mockedViewedResponses:v1');
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      const hit = parsed?.[responseKey];
+      if (hit && typeof hit === 'object') {
+        return cloneJsonSafe(hit);
+      }
+    } catch (_) {}
+
+    return null;
+  };
   try {
     const result = await runInFlightCoalesced(
       READ_INFLIGHT.response,
@@ -2662,10 +2690,16 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
           }
           return null;
         }
+        const arweaveHashBase64 = arweaveScripts.hexToBase64url(arweaveHash);
+        const mockedResponse = readE2EMockedViewedResponse();
+        if (mockedResponse) {
+          normalizeSessionNameFields(mockedResponse);
+          mockedResponse.arweaveTxId = arweaveHashBase64;
+          return normalizeConvictionImportance(mockedResponse);
+        }
         if (!ARWEAVE_ACTIVE) {
           return null;
         }
-        const arweaveHashBase64 = arweaveScripts.hexToBase64url(arweaveHash);
         const arweaveData = await downloadArweaveTextForGroup({
           txId: arweaveHashBase64,
           groupKeyOrCfg,

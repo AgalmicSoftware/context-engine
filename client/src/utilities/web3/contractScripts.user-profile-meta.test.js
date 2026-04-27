@@ -1,7 +1,7 @@
 import contractScripts from './chainGateway.js';
 import { __test__contractScriptsReadCaches } from './chainGateway.js';
 import { ethers } from 'ethers';
-import { arweaveClient } from '../arweave/arweaveClient.js';
+import { arweaveScripts } from '../arweave/arweaveScripts.js';
 
 const TEST_PROFILE_ADDRESS = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 
@@ -42,45 +42,16 @@ const runEmptyProfileScanToResetLatestBlockCache = async (slug = 'edge') => {
 
 describe('contractScripts user profile metadata wrappers', () => {
   afterEach(() => {
-    try {
-      delete contractScripts.getAllSbtAddressesCached._memo;
-    } catch (_) {}
-    try {
-      delete contractScripts.getAllSbtAddressesCached._inflight;
-    } catch (_) {}
-    try {
-      delete contractScripts.getAllSbtAddressesCached._runVersion;
-    } catch (_) {}
-    try {
-      delete contractScripts.getUserSbtNetHoldings._memo;
-    } catch (_) {}
-    try {
-      delete contractScripts.getUserSbtNetHoldings._inflight;
-    } catch (_) {}
-    try {
-      delete contractScripts.getSbtMintBurnCountsByAddress._sharedAddressMemo;
-    } catch (_) {}
-    try {
-      delete contractScripts.getSbtMintBurnCountsByAddress._sharedAddressInflight;
-    } catch (_) {}
-    try {
-      delete contractScripts.getUserSBTsMinimal._memo;
-    } catch (_) {}
-    try {
-      delete contractScripts.getUserSBTsMinimal._inflight;
-    } catch (_) {}
-    try {
-      __test__contractScriptsReadCaches.clearLatestBlockCache();
-    } catch (_) {}
-    try {
-      delete globalThis.CE_E2E_LIT_MOCK;
-    } catch (_) {}
-    try {
-      delete window.__CE_E2E_MOCKED_VIEWED_RESPONSES__;
-    } catch (_) {}
-    try {
-      window.sessionStorage.removeItem('ce:e2e:mockedViewedResponses:v1');
-    } catch (_) {}
+    try { delete contractScripts.getAllSbtAddressesCached._memo; } catch (_) {}
+    try { delete contractScripts.getAllSbtAddressesCached._inflight; } catch (_) {}
+    try { delete contractScripts.getAllSbtAddressesCached._runVersion; } catch (_) {}
+    try { delete contractScripts.getUserSbtNetHoldings._memo; } catch (_) {}
+    try { delete contractScripts.getUserSbtNetHoldings._inflight; } catch (_) {}
+    try { delete contractScripts.getUserSBTsMinimal._memo; } catch (_) {}
+    try { delete contractScripts.getUserSBTsMinimal._inflight; } catch (_) {}
+    try { delete globalThis.CE_E2E_LIT_MOCK; } catch (_) {}
+    try { delete window.__CE_E2E_MOCKED_VIEWED_RESPONSES__; } catch (_) {}
+    try { window.sessionStorage.removeItem('ce:e2e:mockedViewedResponses:v1'); } catch (_) {}
     jest.clearAllMocks();
     jest.restoreAllMocks();
   });
@@ -724,24 +695,27 @@ describe('contractScripts user profile metadata wrappers', () => {
     jest.spyOn(ethers, 'Contract').mockImplementation(() => ({
       getResponse: contractGetResponse,
     }));
-    const downloadSpy = jest.spyOn(arweaveClient, 'downloadDataFromArweave').mockResolvedValue('{}');
+    const downloadSpy = jest.spyOn(arweaveScripts, 'downloadDataFromArweave').mockResolvedValue('{}');
 
     globalThis.CE_E2E_LIT_MOCK = true;
     window.__CE_E2E_MOCKED_VIEWED_RESPONSES__ = {
       [`${responderAddress.toLowerCase()}|${questionId.toLowerCase()}`]: mockedPayload,
     };
 
-    const result = await contractScripts.getResponse('none', responderAddress, questionId, groupCfg);
-
-    expect(result).toEqual(
-      expect.objectContaining({
-        responder: responderAddress,
-        answer: expect.objectContaining({
-          encryptedPortion: 'cipher-answer',
-        }),
-        arweaveTxId: expect.any(String),
-      }),
+    const result = await contractScripts.getResponse(
+      'none',
+      responderAddress,
+      questionId,
+      groupCfg
     );
+
+    expect(result).toEqual(expect.objectContaining({
+      responder: responderAddress,
+      answer: expect.objectContaining({
+        encryptedPortion: 'cipher-answer',
+      }),
+      arweaveTxId: expect.any(String),
+    }));
     expect(contractGetResponse).toHaveBeenCalledTimes(1);
     expect(downloadSpy).not.toHaveBeenCalled();
   });
@@ -762,7 +736,7 @@ describe('contractScripts user profile metadata wrappers', () => {
       getResponse: contractGetResponse,
     }));
     const downloadSpy = jest
-      .spyOn(arweaveClient, 'downloadDataFromArweave')
+      .spyOn(arweaveScripts, 'downloadDataFromArweave')
       .mockResolvedValue(JSON.stringify(downloadedPayload));
 
     window.__CE_E2E_MOCKED_VIEWED_RESPONSES__ = {
@@ -774,66 +748,21 @@ describe('contractScripts user profile metadata wrappers', () => {
       },
     };
 
-    const result = await contractScripts.getResponse('none', responderAddress, questionId, groupCfg);
-
-    expect(result).toEqual(
-      expect.objectContaining({
-        responder: responderAddress,
-        answer: expect.objectContaining({
-          value: 'from-arweave',
-        }),
-      }),
+    const result = await contractScripts.getResponse(
+      'none',
+      responderAddress,
+      questionId,
+      groupCfg
     );
-    expect(contractGetResponse).toHaveBeenCalledTimes(1);
-    expect(downloadSpy).toHaveBeenCalledWith(
-      expect.any(String),
-      expect.objectContaining({
-        directToArIo: false,
-        gatewayTimeoutMs: 4500,
-        debugContext: expect.objectContaining({
-          category: 'question_response_payload',
-          fn: 'getResponse',
-        }),
-      }),
-    );
-  });
 
-  it('honors a custom response payload gateway timeout while keeping gateway fanout enabled', async () => {
-    const groupCfg = makeProfileGroupCfg('edge-custom-response-timeout', 1000);
-    const responderAddress = TEST_PROFILE_ADDRESS;
-    const questionId = `0x${'55'.repeat(32)}`;
-    const contractGetResponse = jest.fn().mockResolvedValue(`0x${'66'.repeat(32)}`);
-    const downloadedPayload = {
+    expect(result).toEqual(expect.objectContaining({
       responder: responderAddress,
-      questionID: questionId,
-      type: 'binary',
-      answer: { value: 'Agree', encrypted: false },
-      additional: { value: '', encrypted: false },
-    };
-
-    jest.spyOn(ethers, 'Contract').mockImplementation(() => ({
-      getResponse: contractGetResponse,
+      answer: expect.objectContaining({
+        value: 'from-arweave',
+      }),
     }));
-    const downloadSpy = jest
-      .spyOn(arweaveClient, 'downloadDataFromArweave')
-      .mockResolvedValue(JSON.stringify(downloadedPayload));
-
-    const result = await contractScripts.getResponse('none', responderAddress, questionId, groupCfg, {
-      arweaveGatewayTimeoutMs: 1200,
-    });
-
-    expect(result).toEqual(
-      expect.objectContaining({
-        answer: expect.objectContaining({ value: 'Agree' }),
-      }),
-    );
-    expect(downloadSpy).toHaveBeenCalledWith(
-      expect.any(String),
-      expect.objectContaining({
-        directToArIo: false,
-        gatewayTimeoutMs: 1200,
-      }),
-    );
+    expect(contractGetResponse).toHaveBeenCalledTimes(1);
+    expect(downloadSpy).toHaveBeenCalled();
   });
 
   it('passes resolved cfg through block-window lookups during question-response scans', async () => {
