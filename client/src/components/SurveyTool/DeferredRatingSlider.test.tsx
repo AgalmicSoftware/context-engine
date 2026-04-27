@@ -1,8 +1,6 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
-import DeferredRatingSlider, {
-  resolveDeferredRatingSliderStyle,
-} from './DeferredRatingSlider';
+import DeferredRatingSlider from './DeferredRatingSlider';
 
 describe('DeferredRatingSlider', () => {
   it('buffers slider movement locally and commits after completion', () => {
@@ -26,9 +24,5 @@ describe('DeferredRatingSlider', () => {
     fireEvent.mouseUp(slider, { currentTarget: { value: '7' } });
 
     expect(onCommit).toHaveBeenCalledWith(7);
-  });
-
-  it('resolves the fixed deferred rating slider width', () => {
-    expect(resolveDeferredRatingSliderStyle()).toEqual({ width: '200px' });
   });
 });

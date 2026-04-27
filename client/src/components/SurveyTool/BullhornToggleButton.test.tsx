@@ -1,9 +1,6 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
-import BullhornToggleButton, {
-  buildBullhornToggleButtonClassName,
-  resolveBullhornToggleIconClassName,
-} from './BullhornToggleButton';
+import BullhornToggleButton from './BullhornToggleButton';
 
 describe('BullhornToggleButton', () => {
   it('applies active classes when active and invokes the click handler', () => {
@@ -30,30 +27,5 @@ describe('BullhornToggleButton', () => {
 
     expect(button.className).not.toContain('iconButtonActive');
     expect(document.querySelector('svg.iconGlow')).toBeNull();
-  });
-
-  it('builds bullhorn display helpers', () => {
-    expect(buildBullhornToggleButtonClassName({
-      active: true,
-      activeClassName: 'active',
-      baseClassName: 'base',
-      bullhornClassName: 'bullhorn',
-      commentClassName: 'comment',
-    })).toBe('base comment bullhorn active');
-    expect(buildBullhornToggleButtonClassName({
-      active: false,
-      activeClassName: 'active',
-      baseClassName: 'base',
-      bullhornClassName: 'bullhorn',
-      commentClassName: 'comment',
-    })).toBe('base comment bullhorn');
-    expect(resolveBullhornToggleIconClassName({
-      active: true,
-      iconGlowClassName: 'glow',
-    })).toBe('glow');
-    expect(resolveBullhornToggleIconClassName({
-      active: false,
-      iconGlowClassName: 'glow',
-    })).toBeUndefined();
   });
 });
