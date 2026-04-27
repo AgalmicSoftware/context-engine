@@ -10021,6 +10021,90 @@ describe('SurveyTool module', () => {
     expect(peekSpy).not.toHaveBeenCalled();
   });
 
+  it('builds local-cache slices through the shared cache hydration helper', () => {
+    jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace, slug) => {
+      if (namespace !== 'questionsCache' || slug !== 'edge') return {};
+      return {
+        '84532': {
+          questionResponses: {
+            q1: {
+              '0xabc': {
+                answer: {
+                  value: 'plaintext answer should stay masked',
+                  encrypted: true,
+                  encryptionAudience: 'gate',
+                  encryptedPortion: 'ans-env',
+                },
+                additional: {
+                  value: 'plaintext additional should stay masked',
+                  encrypted: true,
+                  encryptionAudience: 'gate',
+                  audienceMode: 'inherit',
+                  encryptedPortion: 'add-env',
+                },
+                importance: 4,
+                conviction: 7,
+              },
+            },
+          },
+        },
+      };
+    });
+
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+      sessionSlug: 'edge',
+      activeSessionSlug: 'edge',
+      questionsCacheNonce: 1,
+      questionResponsesNonce: 1,
+    });
+    subject._getEffectiveDraftSlug = jest.fn(() => 'edge');
+    subject.getCurrentRenderedQuestionIds = jest.fn().mockReturnValue(['q1']);
+    subject.normalizeResponseEncryptionAudience = jest.fn((audience) => audience || 'self');
+    subject.resolveFieldEncryptionGateId = jest.fn((_field, qid, fieldKey) => `${qid}:${fieldKey}`);
+    subject.normalizeFieldAudienceMode = jest.fn((mode) => mode || 'explicit');
+    subject.buildInheritedAdditionalFieldState = jest.fn((additionalState, answerState) => ({
+      ...additionalState,
+      encryptionGateId: answerState?.encryptionGateId || null,
+      inheritedFromAnswer: answerState?.encryptedPortion || null,
+    }));
+
+    const slice = subject.buildSliceFromLocalCache();
+
+    expect(slice).toEqual({
+      answers: {
+        q1: {
+          value: '*',
+          encrypted: true,
+          encryptionAudience: 'gate',
+          encryptionGateId: 'q1:answer',
+          audienceMode: 'explicit',
+          hash: '',
+          encryptedPortion: 'ans-env',
+        },
+      },
+      importance: { q1: 4 },
+      conviction: { q1: 7 },
+      additionalComments: {
+        q1: {
+          value: '*',
+          encrypted: true,
+          encryptionAudience: 'gate',
+          encryptionGateId: 'q1:answer',
+          audienceMode: 'inherit',
+          hash: '',
+          encryptedPortion: 'add-env',
+          inheritedFromAnswer: 'ans-env',
+        },
+      },
+    });
+  });
+
   it('does not block retry when local-cache slice is missing', async () => {
     const subject = new SurveyQuestions({
       singleQuestionMode: false,

@@ -1,5 +1,6 @@
 import { RATING_MIN } from '../../utilities/survey/ratingValue.js';
 import {
+  buildQuestionCacheHydrationPatch,
   buildQuestionResponseHydrationPatch,
   buildRatingEnvelopeQidSetFromUserAnswers,
   clampSliderValue,
@@ -146,6 +147,69 @@ describe('surveyToolResponseState', () => {
       importanceValue: undefined,
       convictionChanged: false,
       convictionValue: undefined,
+    });
+  });
+
+  it('builds cache hydration patches that preserve masked encrypted fields and inherited additional state', () => {
+    const deps = {
+      parseValue: jest.fn((value) => value),
+      normalizeResponseEncryptionAudience: jest.fn((audience) => audience || 'self'),
+      getDefaultResponseEncryptionAudienceForQid: jest.fn(() => 'gate'),
+      resolveFieldEncryptionGateId: jest.fn((_field, qid, fieldKey) => `${qid}:${fieldKey}`),
+      normalizeFieldAudienceMode: jest.fn((mode) => mode || 'explicit'),
+      buildInheritedAdditionalFieldState: jest.fn((additionalState, answerState) => ({
+        ...additionalState,
+        encryptionGateId: answerState?.encryptionGateId || null,
+        inheritedFromAnswer: answerState?.encryptedPortion || null,
+      })),
+      buildEmptyResponseFieldState: jest.fn(() => ({ value: '', encrypted: false })),
+    };
+
+    expect(buildQuestionCacheHydrationPatch({
+      questionId: 'Q1',
+      response: {
+        answer: {
+          value: 'plaintext answer should be masked',
+          encrypted: true,
+          encryptionAudience: 'gate',
+          encryptedPortion: 'ans-env',
+        },
+        additional: {
+          value: 'plaintext additional should be masked',
+          encrypted: true,
+          encryptionAudience: 'gate',
+          audienceMode: 'inherit',
+          encryptedPortion: 'add-env',
+        },
+        importance: 4,
+        conviction: 7,
+      },
+      deps,
+    })).toEqual({
+      changed: true,
+      answerState: {
+        value: '*',
+        encrypted: true,
+        encryptionAudience: 'gate',
+        encryptionGateId: 'q1:answer',
+        audienceMode: 'explicit',
+        hash: '',
+        encryptedPortion: 'ans-env',
+      },
+      additionalState: {
+        value: '*',
+        encrypted: true,
+        encryptionAudience: 'gate',
+        encryptionGateId: 'q1:answer',
+        audienceMode: 'inherit',
+        hash: '',
+        encryptedPortion: 'add-env',
+        inheritedFromAnswer: 'ans-env',
+      },
+      importanceChanged: true,
+      importanceValue: 4,
+      convictionChanged: true,
+      convictionValue: 7,
     });
   });
 
