@@ -219,9 +219,11 @@ import {
   buildQuestionIdScopeSignature,
   buildQuestionScanProgressDisplay,
   buildPersistDraftAllowedQuestionIds,
+  loadPreviousPersistedDraftSnapshot,
   buildPersistedDraftPayload,
   buildPersistedDraftMapsForAllowedIds,
   buildRatingEnvelopeQidSetFromUserAnswers,
+  buildSurveyDraftLoadPlan,
   removeQuestionFromPersistedDraftPayload,
   buildSurveyDraftCompatScope,
   buildSurveyDraftStorageKey,
@@ -4453,85 +4455,31 @@ export class SurveyQuestions extends Component {
       const pend = readAndParse(pendingKey);
       const perQidAnon = anonPerQidKey ? readAndParse(anonPerQidKey) : null;
       const perQidAcct = acctPerQidKey ? readAndParse(acctPerQidKey) : null;
+      const rawDraftByKey = new Map([
+        ...(pend ? [[pendingKey, pend]] : []),
+        ...(perQidAnon ? [[anonPerQidKey, perQidAnon]] : []),
+        ...(perQidAcct ? [[acctPerQidKey, perQidAcct]] : []),
+      ]);
+      const loadPlan = buildSurveyDraftLoadPlan({
+        hasAccount: !!accountLower,
+        primaryAccountKey: acctKey,
+        primaryAnonKey: anonKey,
+        compatAccountKey: acctCompatKey,
+        compatAnonKey: anonCompatKey,
+        pendingAccountKey: pendingKey,
+        perQuestionAccountKey: acctPerQidKey,
+        perQuestionAnonKey: anonPerQidKey,
+      });
 
-      if (accountLower) {
-        // 1) Exact primary
-        const acc = readAndParse(acctKey);
-        if (acc) return acc.obj;
-
-        // 2) Compat primary
-        const accCompat = readAndParse(acctCompatKey);
-        if (accCompat) {
-          try { sessionStorage.setItem(acctKey, accCompat.raw); } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
-          try { sessionStorage.removeItem(acctCompatKey); } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
-          return accCompat.obj;
+      for (const step of loadPlan) {
+        const hit = rawDraftByKey.get(step.readKey) || readAndParse(step.readKey);
+        if (!hit) continue;
+        if (step.writeKey) {
+          try { sessionStorage.setItem(step.writeKey, hit.raw); } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
+          try { sessionStorage.removeItem(step.readKey); } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
+          rawDraftByKey.set(step.writeKey, hit);
         }
-
-        // 3) Pending → account
-        if (pend) {
-          try { sessionStorage.setItem(acctKey, pend.raw); } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
-          try { sessionStorage.removeItem(pendingKey); } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
-          return pend.obj;
-        }
-
-        // 4) Per-QID → account
-        if (perQidAcct) {
-          try { sessionStorage.setItem(acctKey, perQidAcct.raw); } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
-          try { sessionStorage.removeItem(acctPerQidKey); } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
-          return perQidAcct.obj;
-        }
-
-        // 5) Anon → account
-        const an = readAndParse(anonKey);
-        if (an) {
-          try { sessionStorage.setItem(acctKey, an.raw); } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
-          try { sessionStorage.removeItem(anonKey); } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
-          return an.obj;
-        }
-
-        // 6) Compat anon → account
-        const anCompat = readAndParse(anonCompatKey);
-        if (anCompat) {
-          try { sessionStorage.setItem(acctKey, anCompat.raw); } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
-          try { sessionStorage.removeItem(anonCompatKey); } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
-          return anCompat.obj;
-        }
-
-        // 7) Per-QID anon → account
-        if (perQidAnon) {
-          try { sessionStorage.setItem(acctKey, perQidAnon.raw); } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
-          try { sessionStorage.removeItem(anonPerQidKey); } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
-          return perQidAnon.obj;
-        }
-
-        return null;
-      }
-
-      // Anonymous path
-      // 1) Exact primary
-      const an = readAndParse(anonKey);
-      if (an) return an.obj;
-
-      // 2) Compat primary
-      const anCompat = readAndParse(anonCompatKey);
-      if (anCompat) {
-        try { sessionStorage.setItem(anonKey, anCompat.raw); } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
-        try { sessionStorage.removeItem(anonCompatKey); } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
-        return anCompat.obj;
-      }
-
-      // 3) Pending → anon
-      if (pend) {
-        try { sessionStorage.setItem(anonKey, pend.raw); } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
-        try { sessionStorage.removeItem(pendingKey); } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
-        return pend.obj;
-      }
-
-      // 4) Per-QID anon → anon
-      if (perQidAnon) {
-        try { sessionStorage.setItem(anonKey, perQidAnon.raw); } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
-        try { sessionStorage.removeItem(anonPerQidKey); } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
-        return perQidAnon.obj;
+        return hit.obj;
       }
 
       return null;
@@ -4563,57 +4511,31 @@ export class SurveyQuestions extends Component {
       }
 
       // Preload prior persisted answers so we don't prune non-rendered QIDs
-      let prevAnswers = {};
-      let prevBaseline = {};
-      let prevDraftRaw = '';
-      let prevSemanticSignature = null;
-      const cachedDraftRaw =
-        this._draftParseCache && typeof this._draftParseCache.raw === 'string'
-          ? this._draftParseCache.raw
-          : null;
-      const canUseCachedPrevDraft =
-        this._lastDraftKey === key &&
-        this._draftParseCache &&
-        this._draftParseCache.key === key &&
-        cachedDraftRaw !== null &&
-        cachedDraftRaw === String(this._lastDraftJSON ?? '') &&
-        this._draftParseCache.parsed &&
-        typeof this._draftParseCache.parsed === 'object';
-      if (canUseCachedPrevDraft) {
-        const parsed = this._draftParseCache.parsed;
-        prevDraftRaw = String(this._draftParseCache.raw || '');
-        prevAnswers = (parsed && typeof parsed === 'object' ? parsed.answers : {}) || {};
-        prevBaseline = (parsed && typeof parsed === 'object' ? parsed.baseline : {}) || {};
-        prevSemanticSignature =
-          this._lastDraftSemanticSignature ||
-          buildSurveyDraftSemanticSignature(parsed);
-      } else {
-        try {
-          const raw = sessionStorage.getItem(key) || '';
-          prevDraftRaw = raw;
-          if (raw) {
-            const cacheHit =
-              this._draftParseCache &&
-              this._draftParseCache.key === key &&
-              this._draftParseCache.raw === raw &&
-              this._draftParseCache.parsed &&
-              typeof this._draftParseCache.parsed === 'object';
-            const parsed = cacheHit
-              ? this._draftParseCache.parsed
-              : JSON.parse(raw);
-            prevAnswers = (parsed && typeof parsed === 'object' ? parsed.answers : {}) || {};
-            prevBaseline = (parsed && typeof parsed === 'object' ? parsed.baseline : {}) || {};
-            prevSemanticSignature = buildSurveyDraftSemanticSignature(parsed);
-            if (!cacheHit) {
-              this._draftParseCache = { key, raw, parsed };
-            }
-          }
-        } catch {
-          try { sessionStorage.removeItem(key); } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
-          this._draftParseCache = null;
-          this._lastDraftJSON = null;
-          this._lastDraftSemanticSignature = null;
-        }
+      const {
+        prevAnswers,
+        prevBaseline,
+        prevDraftRaw,
+        prevSemanticSignature,
+        nextDraftParseCache,
+        shouldResetDraftTracking,
+      } = loadPreviousPersistedDraftSnapshot(
+        {
+          key,
+          lastDraftKey: this._lastDraftKey,
+          lastDraftJSON: this._lastDraftJSON,
+          lastDraftSemanticSignature: this._lastDraftSemanticSignature,
+          draftParseCache: this._draftParseCache,
+        },
+        {
+          readDraftRaw: (draftKey) => sessionStorage.getItem(draftKey) || '',
+          removeDraftRaw: (draftKey) => sessionStorage.removeItem(draftKey),
+          buildSemanticSignature: buildSurveyDraftSemanticSignature,
+        },
+      );
+      this._draftParseCache = nextDraftParseCache;
+      if (shouldResetDraftTracking) {
+        this._lastDraftJSON = null;
+        this._lastDraftSemanticSignature = null;
       }
 
       const surveyIndex = this.props.isStandalone || this.props.singleQuestionMode ? 0 : this.props.surveyIndex;

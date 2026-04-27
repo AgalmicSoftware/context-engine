@@ -65,6 +65,7 @@ export {
 } from './surveyToolSlugLookup.js';
 export {
   buildPersistDraftAllowedQuestionIds,
+  loadPreviousPersistedDraftSnapshot,
   buildSurveyDraftLoadPlan,
   buildPersistedDraftPayload,
   buildPersistedDraftMapsForAllowedIds,
