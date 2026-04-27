@@ -48,6 +48,12 @@ type BuildQuestionResponseHydrationPatchArgs = {
   deps?: QuestionResponseHydrationDeps;
 };
 
+type BuildQuestionCacheHydrationPatchArgs = {
+  questionId?: unknown;
+  response?: RatingResponse | null;
+  deps?: QuestionResponseHydrationDeps;
+};
+
 const surveyLog = createLogger('surveys');
 
 const hasPresentResponseValue = (value: unknown): boolean => (
@@ -270,6 +276,110 @@ export const buildQuestionResponseHydrationPatch = ({
     importanceValue,
     convictionChanged,
     convictionValue,
+  };
+};
+
+export const buildQuestionCacheHydrationPatch = ({
+  questionId = '',
+  response = null,
+  deps = {},
+}: BuildQuestionCacheHydrationPatchArgs = {}) => {
+  if (!response || typeof response !== 'object') {
+    return {
+      changed: false,
+      answerState: undefined,
+      additionalState: undefined,
+      importanceChanged: false,
+      importanceValue: undefined,
+      convictionChanged: false,
+      convictionValue: undefined,
+    };
+  }
+
+  const qid = normalizeQuestionIdKey(questionId);
+  const ans = (response.answer && typeof response.answer === 'object') ? response.answer as UnknownRecord : {};
+  const add = (response.additional && typeof response.additional === 'object') ? response.additional as UnknownRecord : {};
+  const parseValue = deps.parseValue;
+  const normalizeResponseEncryptionAudience = deps.normalizeResponseEncryptionAudience;
+  const getDefaultResponseEncryptionAudienceForQid = deps.getDefaultResponseEncryptionAudienceForQid;
+  const resolveFieldEncryptionGateId = deps.resolveFieldEncryptionGateId;
+  const normalizeFieldAudienceMode = deps.normalizeFieldAudienceMode;
+  const buildInheritedAdditionalFieldState = deps.buildInheritedAdditionalFieldState;
+  const buildEmptyResponseFieldState = deps.buildEmptyResponseFieldState;
+
+  const answerEncrypted = !!(ans.encrypted || ans.encryptedPortion);
+  const answerAudience = typeof normalizeResponseEncryptionAudience === 'function'
+    ? normalizeResponseEncryptionAudience(
+        ans.encryptionAudience || (
+          answerEncrypted
+            ? (typeof getDefaultResponseEncryptionAudienceForQid === 'function'
+                ? getDefaultResponseEncryptionAudienceForQid(qid)
+                : 'gate')
+            : 'self'
+        ),
+        qid,
+      )
+    : ans.encryptionAudience;
+  const answerState = {
+    value: answerEncrypted ? '*' : (typeof parseValue === 'function' ? parseValue(ans.value) : ans.value),
+    encrypted: answerEncrypted,
+    encryptionAudience: answerAudience,
+    encryptionGateId: answerAudience === 'gate' && typeof resolveFieldEncryptionGateId === 'function'
+      ? resolveFieldEncryptionGateId({ ...ans, encryptionAudience: answerAudience }, qid, 'answer')
+      : null,
+    audienceMode: 'explicit',
+    hash: ans.hash || '',
+    encryptedPortion: ans.encryptedPortion || '',
+  };
+
+  const additionalEncrypted = !!(add.encrypted || add.encryptedPortion);
+  const additionalAudienceMode = typeof normalizeFieldAudienceMode === 'function'
+    ? normalizeFieldAudienceMode(add.audienceMode, 'additional', add)
+    : add.audienceMode;
+  const additionalAudience = typeof normalizeResponseEncryptionAudience === 'function'
+    ? normalizeResponseEncryptionAudience(
+        add.encryptionAudience || (
+          additionalEncrypted
+            ? (typeof getDefaultResponseEncryptionAudienceForQid === 'function'
+                ? getDefaultResponseEncryptionAudienceForQid(qid)
+                : 'gate')
+            : 'self'
+        ),
+        qid,
+      )
+    : add.encryptionAudience;
+  let additionalState = {
+    value: additionalEncrypted ? '*' : (typeof parseValue === 'function' ? parseValue(add.value) : add.value),
+    encrypted: additionalEncrypted,
+    encryptionAudience: additionalAudience,
+    encryptionGateId: additionalAudience === 'gate' && typeof resolveFieldEncryptionGateId === 'function'
+      ? resolveFieldEncryptionGateId({ ...add, encryptionAudience: additionalAudience }, qid, 'additional')
+      : null,
+    audienceMode: additionalAudienceMode,
+    hash: add.hash || '',
+    encryptedPortion: add.encryptedPortion || '',
+  };
+  if (additionalAudienceMode === 'inherit' && typeof buildInheritedAdditionalFieldState === 'function') {
+    additionalState = buildInheritedAdditionalFieldState(
+      additionalState,
+      answerState || (typeof buildEmptyResponseFieldState === 'function' ? buildEmptyResponseFieldState(qid) : {}),
+      qid,
+    ) as UnknownRecord;
+  }
+
+  const convictionValue = getConvictionFromResponse(response);
+  const importanceValue = getImportanceFromResponse(response);
+  const convictionChanged = convictionValue !== null;
+  const importanceChanged = importanceValue !== null;
+
+  return {
+    changed: true,
+    answerState,
+    additionalState,
+    importanceChanged,
+    importanceValue: importanceChanged ? importanceValue : undefined,
+    convictionChanged,
+    convictionValue: convictionChanged ? convictionValue : undefined,
   };
 };
 
