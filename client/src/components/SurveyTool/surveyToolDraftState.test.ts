@@ -1,6 +1,8 @@
 import {
+  buildPersistedDraftWritePlan,
   buildPersistDraftAllowedQuestionIds,
   loadPreviousPersistedDraftSnapshot,
+  parsePersistedDraftStorageValue,
   buildSurveyDraftLoadPlan,
   buildPersistedDraftPayload,
   buildPersistedDraftMapsForAllowedIds,
@@ -333,6 +335,35 @@ describe('surveyToolDraftState', () => {
     ]);
   });
 
+  it('builds persisted draft write plans for compat mirror writes and anon cleanup', () => {
+    expect(buildPersistedDraftWritePlan({
+      draftKey: 'dg:surveyDraft:demo:84532:0xabc:questions:q:q1',
+      sessionSlug: 'demo',
+      networkIdStr: '84532',
+      account: '0xabc',
+      surveyScope: 'questions:q:q1',
+      singleQuestionMode: true,
+    })).toEqual({
+      compatWriteKey: 'dg:surveyDraft:demo:84532:0xabc:questions',
+      staleAnonKeys: [
+        'dg:surveyDraft:demo:84532:anon:questions:q:q1',
+        'dg:surveyDraft:demo:84532:anon:questions',
+      ],
+    });
+
+    expect(buildPersistedDraftWritePlan({
+      draftKey: 'dg:surveyDraft:demo:84532:anon:questions',
+      sessionSlug: 'demo',
+      networkIdStr: '84532',
+      account: '',
+      surveyScope: 'questions',
+      singleQuestionMode: false,
+    })).toEqual({
+      compatWriteKey: null,
+      staleAnonKeys: [],
+    });
+  });
+
   it('loads previous persisted draft snapshots from cache, storage, and malformed inputs', () => {
     const buildSemanticSignature = jest.fn((payload) => JSON.stringify(payload));
     const removeDraftRaw = jest.fn();
@@ -409,6 +440,31 @@ describe('surveyToolDraftState', () => {
         draftParseCache: null,
       },
       {
+        readDraftRaw: jest.fn(() => '{"baseline":{"q3":{"value":"baseline-only"}}}'),
+        removeDraftRaw,
+        buildSemanticSignature,
+      },
+    )).toEqual({
+      prevAnswers: {},
+      prevBaseline: { q3: { value: 'baseline-only' } },
+      prevDraftRaw: '{"baseline":{"q3":{"value":"baseline-only"}}}',
+      prevSemanticSignature: '{"baseline":{"q3":{"value":"baseline-only"}}}',
+      nextDraftParseCache: {
+        key: 'draft-key',
+        raw: '{"baseline":{"q3":{"value":"baseline-only"}}}',
+        parsed: {
+          baseline: { q3: { value: 'baseline-only' } },
+        },
+      },
+      shouldResetDraftTracking: false,
+    });
+
+    expect(loadPreviousPersistedDraftSnapshot(
+      {
+        key: 'draft-key',
+        draftParseCache: null,
+      },
+      {
         readDraftRaw: jest.fn(() => '{broken-json'),
         removeDraftRaw,
         buildSemanticSignature,
@@ -422,6 +478,52 @@ describe('surveyToolDraftState', () => {
       shouldResetDraftTracking: true,
     });
     expect(removeDraftRaw).toHaveBeenCalledWith('draft-key');
+  });
+
+  it('parses persisted draft storage values and rejects invalid payloads', () => {
+    expect(parsePersistedDraftStorageValue()).toEqual({
+      status: 'empty',
+      payload: null,
+      raw: '',
+    });
+
+    expect(parsePersistedDraftStorageValue({
+      raw: '{"answers":{"q1":{"value":"hello"}},"baseline":{"q1":{"value":"base"}}}',
+    })).toEqual({
+      status: 'valid',
+      payload: {
+        answers: { q1: { value: 'hello' } },
+        baseline: { q1: { value: 'base' } },
+      },
+      raw: '{"answers":{"q1":{"value":"hello"}},"baseline":{"q1":{"value":"base"}}}',
+    });
+
+    expect(parsePersistedDraftStorageValue({
+      raw: '{"baseline":{"q1":{"value":"base"}}}',
+    })).toEqual({
+      status: 'invalid',
+      payload: null,
+      raw: '{"baseline":{"q1":{"value":"base"}}}',
+    });
+
+    expect(parsePersistedDraftStorageValue({
+      raw: '{"baseline":{"q1":{"value":"base"}}}',
+      requireAnswers: false,
+    })).toEqual({
+      status: 'valid',
+      payload: {
+        baseline: { q1: { value: 'base' } },
+      },
+      raw: '{"baseline":{"q1":{"value":"base"}}}',
+    });
+
+    expect(parsePersistedDraftStorageValue({
+      raw: '{broken-json',
+    })).toEqual({
+      status: 'invalid',
+      payload: null,
+      raw: '{broken-json',
+    });
   });
 
   it('removes a single question from persisted draft payloads and deletes empty drafts', () => {
