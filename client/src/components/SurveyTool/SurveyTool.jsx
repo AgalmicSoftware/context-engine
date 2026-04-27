@@ -6395,11 +6395,10 @@ export class SurveyQuestions extends Component {
     const pool = (Array.isArray(newQuestionPool) && newQuestionPool.length > 0)
       ? newQuestionPool
       : this.getCurrentRenderedQuestionIds().map(id => ({ id }));
-    const next = Array.isArray(currentState) ? [...currentState] : [];
-
-    while (next.length <= surveyIndex) {
-      next.push({ answers: {}, importance: {}, conviction: {}, additionalComments: {} });
-    }
+    const next = buildSurveyResponseStateArray({
+      prevSurveysResponseState: currentState,
+      surveyIndex,
+    });
 
     const prevSlice =
       next[surveyIndex] || { answers: {}, importance: {}, conviction: {}, additionalComments: {} };
@@ -6610,13 +6609,10 @@ export class SurveyQuestions extends Component {
 
       const allowOverwrite = !prev.isDirty && !prev.submissionComplete;
 
-      const nextStateArr = Array.isArray(prev.surveysResponseState)
-        ? [...prev.surveysResponseState]
-        : [{ answers: {}, importance: {}, conviction: {}, additionalComments: {} }];
-
-      while (nextStateArr.length <= surveyIndex) {
-        nextStateArr.push({ answers: {}, importance: {}, conviction: {}, additionalComments: {} });
-      }
+      const nextStateArr = buildSurveyResponseStateArray({
+        prevSurveysResponseState: prev.surveysResponseState,
+        surveyIndex,
+      });
 
       const nextSlice = {
         answers: { ...(nextStateArr[surveyIndex]?.answers || {}) },
