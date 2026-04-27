@@ -100,7 +100,10 @@ export {
 } from './surveyToolDraftState.js';
 export {
   buildCacheHydrationSlice,
+  buildDraftAwareCacheHydrationState,
   buildDraftHydrationState,
+  buildLocalCacheRehydrationState,
+  buildPrefilledSurveyState,
 } from './surveyToolHydrationFlow.js';
 export {
   buildQuestionScanProgressDisplay,
