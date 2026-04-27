@@ -64,6 +64,7 @@ export {
   resolveSlugForIds,
 } from './surveyToolSlugLookup.js';
 export {
+  buildPersistedDraftQuestionRemovalPlan,
   buildPersistedDraftWritePlan,
   buildPersistDraftAllowedQuestionIds,
   loadPreviousPersistedDraftSnapshot,

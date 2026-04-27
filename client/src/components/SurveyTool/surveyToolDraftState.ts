@@ -103,6 +103,12 @@ type RemoveQuestionFromPersistedDraftPayloadArgs = {
   questionId?: unknown;
 };
 
+type PersistedDraftQuestionRemovalPlanArgs = {
+  raw?: unknown;
+  questionId?: unknown;
+  buildSemanticSignature?: ((payload: SurveyDraftPayload) => unknown) | null;
+};
+
 type ParsePersistedDraftStorageValueArgs = {
   raw?: unknown;
   requireAnswers?: boolean;
@@ -616,6 +622,59 @@ export const buildPersistedDraftWritePlan = ({
       ? [...new Set([variants.primaryAnonKey, variants.compatAnonKey].filter(Boolean))]
       : [],
   };
+};
+
+export const buildPersistedDraftQuestionRemovalPlan = ({
+  raw = '',
+  questionId = '',
+  buildSemanticSignature = buildSurveyDraftSemanticSignature,
+}: PersistedDraftQuestionRemovalPlanArgs = {}) => {
+  const parsedResult = parsePersistedDraftStorageValue({ raw });
+  if (parsedResult.status !== 'valid') {
+    return {
+      action: 'delete-storage',
+      removed: false,
+      nextPayload: null,
+      nextJson: null,
+      nextSemanticSignature: null,
+    } as const;
+  }
+
+  const removal = removeQuestionFromPersistedDraftPayload({
+    draftPayload: parsedResult.payload,
+    questionId,
+  });
+
+  if (removal.action === 'delete') {
+    return {
+      action: 'delete-storage',
+      removed: removal.removed,
+      nextPayload: null,
+      nextJson: null,
+      nextSemanticSignature: null,
+    } as const;
+  }
+
+  if (removal.action === 'update' && removal.nextPayload) {
+    const nextJson = JSON.stringify(removal.nextPayload);
+    return {
+      action: 'update-storage',
+      removed: removal.removed,
+      nextPayload: removal.nextPayload,
+      nextJson,
+      nextSemanticSignature: typeof buildSemanticSignature === 'function'
+        ? buildSemanticSignature(removal.nextPayload)
+        : null,
+    } as const;
+  }
+
+  return {
+    action: 'keep',
+    removed: removal.removed,
+    nextPayload: removal.nextPayload || parsedResult.payload,
+    nextJson: null,
+    nextSemanticSignature: null,
+  } as const;
 };
 
 export const buildPersistedDraftQuestionEntry = ({
