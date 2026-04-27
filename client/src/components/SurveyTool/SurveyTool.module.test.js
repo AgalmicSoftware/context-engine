@@ -9062,6 +9062,106 @@ describe('SurveyTool module', () => {
     expect(nextSlice.additionalComments.q1.value).toBe('*');
   });
 
+  it('prefills single-question responses into ensured survey slots', () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: true,
+      isStandalone: false,
+      surveyIndex: 0,
+      questionID: 'q1',
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+    });
+
+    subject.state = {
+      ...subject.state,
+      surveysResponseState: [],
+      editBaseline: null,
+      isDirty: false,
+      submissionComplete: false,
+    };
+    subject._applyResponseHydrationListToSlice = jest.fn(({ targetSlice, responses }) => {
+      targetSlice.answers.q1 = { value: responses[0].answer.value };
+      targetSlice.additionalComments.q1 = { value: responses[0].additional.value };
+      return true;
+    });
+    subject.buildSliceFromUserAnswers = jest.fn(() => ({
+      answers: { q1: { value: 'baseline answer' } },
+      additionalComments: { q1: { value: 'baseline notes' } },
+      importance: {},
+      conviction: {},
+    }));
+    subject.updateJsonPreview = jest.fn();
+    subject.recalculateEditStats = jest.fn();
+    subject.setState = (update, cb) => {
+      const patch = typeof update === 'function' ? update(subject.state, subject.props) : update;
+      subject.state = { ...subject.state, ...(patch || {}) };
+      if (typeof cb === 'function') cb();
+    };
+
+    subject.prefillSingleQuestionResponse({
+      questionID: 'q1',
+      answer: { value: 'hydrated answer' },
+      additional: { value: 'hydrated notes' },
+    });
+
+    expect(subject.state.surveysResponseState).toHaveLength(1);
+    expect(subject.state.surveysResponseState[0]).toEqual({
+      answers: { q1: { value: 'hydrated answer' } },
+      importance: {},
+      conviction: {},
+      additionalComments: { q1: { value: 'hydrated notes' } },
+    });
+    expect(subject.state.editBaseline).toEqual({
+      answers: { q1: { value: 'baseline answer' } },
+      additionalComments: { q1: { value: 'baseline notes' } },
+      importance: {},
+      conviction: {},
+    });
+    expect(subject.updateJsonPreview).toHaveBeenCalled();
+    expect(subject.recalculateEditStats).toHaveBeenCalled();
+  });
+
+  it('merges survey response state into ensured survey slots', () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '',
+      loginComplete: false,
+      network: { id: 84532 },
+    });
+
+    subject.buildEmptyResponseFieldState = jest.fn((qid, fieldKey = 'answer') => ({
+      value: '',
+      qid,
+      fieldKey,
+    }));
+
+    expect(subject.mergeSurveyResponseState([
+      {
+        answers: { keep: { value: 'persisted' } },
+        importance: {},
+        conviction: {},
+        additionalComments: {},
+      },
+    ], [{ id: 'q1' }], 2)).toEqual([
+      {
+        answers: { keep: { value: 'persisted' } },
+        importance: {},
+        conviction: {},
+        additionalComments: {},
+      },
+      { answers: {}, importance: {}, conviction: {}, additionalComments: {} },
+      {
+        answers: { q1: { value: '', qid: 'q1', fieldKey: 'answer' } },
+        importance: {},
+        conviction: {},
+        additionalComments: { q1: { value: '', qid: 'q1', fieldKey: 'additional' } },
+      },
+    ]);
+  });
+
   it('does not resurrect cleared draft answers from stale cache', () => {
     sessionStorage.clear();
 
