@@ -36,6 +36,18 @@ type PersistDraftAllowedIdsArgs = {
   slice?: PersistedDraftSliceLike | null;
 };
 
+type SurveyDraftStorageKeyArgs = {
+  sessionSlug?: unknown;
+  networkIdStr?: unknown;
+  account?: unknown;
+  surveyScope?: unknown;
+};
+
+type SurveyDraftStorageVariantKeysArgs = SurveyDraftStorageKeyArgs & {
+  questionId?: unknown;
+  includePerQuestionScope?: boolean;
+};
+
 type SurveyDraftPayload = {
   meta?: UnknownRecord | null;
   answers?: Record<string, SurveyDraftQuestionEntry | unknown> | null;
@@ -50,6 +62,19 @@ type PersistedDraftPayloadArgs = {
   answersObj?: Record<string, SurveyDraftQuestionEntry | unknown> | null;
   baselineObj?: Record<string, SurveyDraftQuestionEntry | unknown> | null;
   now?: number;
+};
+
+type SurveyDraftStorageScopesArgs = {
+  surveyScope?: unknown;
+  singleQuestionMode?: boolean;
+  questionId?: unknown;
+};
+
+type SurveyDraftStorageKeysArgs = {
+  slug?: unknown;
+  networkIdStr?: unknown;
+  accounts?: unknown[];
+  scopes?: unknown[];
 };
 
 type PendingStatsState = {
@@ -258,6 +283,106 @@ export const shouldEncryptResponseFieldForSubmit = (
   hasMeaningfulFieldValue(field)
 );
 
+export const buildSurveyDraftCompatScope = (surveyScope: unknown = 'questions'): string => {
+  const normalizedScope = String(surveyScope || 'questions');
+  return /^questions:q:[^:]+$/.test(normalizedScope) ? 'questions' : normalizedScope;
+};
+
+export const buildSurveyDraftStorageKey = ({
+  sessionSlug = '',
+  networkIdStr = '__pending__',
+  account = '',
+  surveyScope = 'questions',
+}: SurveyDraftStorageKeyArgs = {}): string => {
+  const slug = String(sessionSlug || '');
+  const networkSegment = String(networkIdStr || '__pending__');
+  const accountOwner = String(account || '').toLowerCase() || 'anon';
+  const scope = String(surveyScope || 'questions');
+  return `dg:surveyDraft:${slug}:${networkSegment}:${accountOwner}:${scope}`;
+};
+
+export const buildSurveyDraftStorageVariantKeys = ({
+  sessionSlug = '',
+  networkIdStr = '',
+  account = '',
+  surveyScope = 'questions',
+  questionId = '',
+  includePerQuestionScope = false,
+}: SurveyDraftStorageVariantKeysArgs = {}) => {
+  const normalizedSessionSlug = String(sessionSlug || '');
+  const normalizedScope = String(surveyScope || 'questions');
+  const compatScope = buildSurveyDraftCompatScope(normalizedScope);
+  const normalizedQuestionId = includePerQuestionScope ? normalizeQuestionIdKey(questionId) : '';
+  const perQuestionScope = normalizedQuestionId ? `questions:q:${normalizedQuestionId}` : null;
+  const accountOwner = String(account || '').toLowerCase() || 'anon';
+  const baseNetworkIdStr = String(networkIdStr || '__pending__');
+
+  const purgeKeys = [
+    ...new Set(
+      [...new Set(['__pending__', ...(networkIdStr ? [String(networkIdStr)] : [])])]
+        .flatMap((net) => [...new Set([accountOwner, 'anon'])].flatMap((owner) => (
+          [...new Set([normalizedScope, compatScope, ...(perQuestionScope ? [perQuestionScope] : [])])]
+            .map((scope) => buildSurveyDraftStorageKey({
+              sessionSlug: normalizedSessionSlug,
+              networkIdStr: net,
+              account: owner,
+              surveyScope: scope,
+            }))
+        )))
+    ),
+  ];
+
+  return {
+    accountOwner,
+    baseNetworkIdStr,
+    compatScope,
+    perQuestionScope,
+    primaryAccountKey: buildSurveyDraftStorageKey({
+      sessionSlug: normalizedSessionSlug,
+      networkIdStr: baseNetworkIdStr,
+      account: accountOwner,
+      surveyScope: normalizedScope,
+    }),
+    primaryAnonKey: buildSurveyDraftStorageKey({
+      sessionSlug: normalizedSessionSlug,
+      networkIdStr: baseNetworkIdStr,
+      account: 'anon',
+      surveyScope: normalizedScope,
+    }),
+    compatAccountKey: buildSurveyDraftStorageKey({
+      sessionSlug: normalizedSessionSlug,
+      networkIdStr: baseNetworkIdStr,
+      account: accountOwner,
+      surveyScope: compatScope,
+    }),
+    compatAnonKey: buildSurveyDraftStorageKey({
+      sessionSlug: normalizedSessionSlug,
+      networkIdStr: baseNetworkIdStr,
+      account: 'anon',
+      surveyScope: compatScope,
+    }),
+    pendingAccountKey: buildSurveyDraftStorageKey({
+      sessionSlug: normalizedSessionSlug,
+      networkIdStr: '__pending__',
+      account: accountOwner,
+      surveyScope: normalizedScope,
+    }),
+    perQuestionAccountKey: perQuestionScope ? buildSurveyDraftStorageKey({
+      sessionSlug: normalizedSessionSlug,
+      networkIdStr: baseNetworkIdStr,
+      account: accountOwner,
+      surveyScope: perQuestionScope,
+    }) : null,
+    perQuestionAnonKey: perQuestionScope ? buildSurveyDraftStorageKey({
+      sessionSlug: normalizedSessionSlug,
+      networkIdStr: baseNetworkIdStr,
+      account: 'anon',
+      surveyScope: perQuestionScope,
+    }) : null,
+    purgeKeys,
+  };
+};
+
 export const buildPersistedDraftQuestionEntry = ({
   questionId = '',
   answer = {},
@@ -438,6 +563,52 @@ export const buildPersistedDraftPayload = ({
   answers: isRecord(answersObj) ? answersObj : {},
   baseline: isRecord(baselineObj) ? baselineObj : {},
 });
+
+export const buildSurveyDraftStorageScopes = ({
+  surveyScope = '',
+  singleQuestionMode = false,
+  questionId = '',
+}: SurveyDraftStorageScopesArgs = {}) => {
+  const normalizedSurveyScope = String(surveyScope || '').trim();
+  const compatScope = normalizedSurveyScope.replace(/^questions:q:[^:]+$/, 'questions');
+  const scopes = new Set([normalizedSurveyScope, compatScope].filter(Boolean));
+  const qid = normalizeQuestionIdKey(questionId);
+  if (singleQuestionMode && qid) {
+    scopes.add(`questions:q:${qid}`);
+  }
+  return [...scopes];
+};
+
+export const buildSurveyDraftStorageKeys = ({
+  slug = '',
+  networkIdStr = '',
+  accounts = [],
+  scopes = [],
+}: SurveyDraftStorageKeysArgs = {}) => {
+  const nets = new Set(['__pending__']);
+  if (networkIdStr) nets.add(String(networkIdStr));
+
+  const who = new Set(
+    (Array.isArray(accounts) ? accounts : [])
+      .map((account) => String(account || '').toLowerCase() || 'anon')
+      .filter(Boolean),
+  );
+  who.add('anon');
+
+  const normalizedScopes = Array.isArray(scopes)
+    ? scopes.map((scope) => String(scope || '').trim()).filter(Boolean)
+    : [];
+
+  const keys = [];
+  nets.forEach((network) => {
+    who.forEach((account) => {
+      normalizedScopes.forEach((scope) => {
+        keys.push(`dg:surveyDraft:${slug}:${network}:${account}:${scope}`);
+      });
+    });
+  });
+  return [...new Set(keys)];
+};
 
 export function getPendingStatsSnapshotFromState(state: PendingStatsState | null | undefined = {}): PendingStatsSnapshot {
   return {
