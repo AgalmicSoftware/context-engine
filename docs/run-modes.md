@@ -54,7 +54,7 @@ Hybrid E2E verification when you want real deployed contracts and seeded live st
 - Point E2E `RPC_URL` at that local fork
 - Keep `CHAIN` / `CHAIN_ID` / `SESSION_REGISTRY` / `SBT_FACTORY` aligned to the upstream chain you forked
 - See [docs/e2e-setup.md](e2e-setup.md) for the current manual-fork workflow
-- First-class `E2E_CHAIN_MODE=fork` orchestration is not yet in the committed runners; track that follow-up in private planning.
+- First-class `E2E_CHAIN_MODE=fork` orchestration is tracked separately in [PRD 236](../TODO/PRDs/236_e2e-first-class-local-fork-mode.md)
 
 ## `hosted/onchain`
 

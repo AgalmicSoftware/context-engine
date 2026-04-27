@@ -65,10 +65,9 @@ Manual fork recipe today:
 1. Start a local Anvil fork against the target chain outside the repo.
 2. Keep the target chain identity explicit with `CHAIN` / `CHAIN_ID` and any contract overrides that should still refer to the upstream deployment.
 3. Point `RPC_URL` at the local Anvil endpoint for the run.
-4. If the forked upstream RPC is not the shared default for that chain, also set `E2E_FORK_RPC_URL` so reports describe the actual upstream you forked.
-5. Choose mock-vs-live toggles independently (`E2E_LIT_MOCK`, `E2E_AI_MOCK`, `E2E_ARWEAVE_MOCK`).
+4. Choose mock-vs-live toggles independently (`E2E_LIT_MOCK`, `E2E_AI_MOCK`, `E2E_ARWEAVE_MOCK`).
 
-Current committed runners do not yet auto-spawn or tear down a fork runtime for you. First-class `E2E_CHAIN_MODE=fork` orchestration should remain tracked in private planning until it is implemented.
+Current committed runners do not yet auto-spawn or tear down a fork runtime for you. First-class `E2E_CHAIN_MODE=fork` orchestration is tracked in [PRD 236](../TODO/PRDs/236_e2e-first-class-local-fork-mode.md).
 
 ## Common Env Vars
 
