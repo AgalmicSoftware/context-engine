@@ -1,5 +1,4 @@
 import React from 'react';
-
 import AudioInput from '../Shared/AudioInput/AudioInput';
 
 type SurveyAudioWorkerProps = {
@@ -10,6 +9,7 @@ type SurveyAudioWorkerProps = {
 };
 
 type SurveyAudioFieldInputProps = SurveyAudioWorkerProps & {
+  qIndex?: number;
   placeholder: string;
   placeholderOpacity?: number;
   value?: string | number | null;
@@ -63,4 +63,4 @@ const SurveyAudioFieldInput = ({
   />
 );
 
-export default React.memo(SurveyAudioFieldInput);
+export default SurveyAudioFieldInput;

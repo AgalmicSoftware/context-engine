@@ -7,10 +7,17 @@ type AdditionalCommentsInlineRowProps = {
   lockControl?: ReactNode;
 };
 
-const AdditionalCommentsInlineRow = ({ input, lockControl = null }: AdditionalCommentsInlineRowProps) => (
+const AdditionalCommentsInlineRow = ({
+  input,
+  lockControl = null,
+}: AdditionalCommentsInlineRowProps) => (
   <div className={styles.additionalCommentsInlineRow}>
-    <div className={styles.additionalCommentsInputWrap}>{input}</div>
-    <div className={styles.additionalCommentsLockSlot}>{lockControl}</div>
+    <div className={styles.additionalCommentsInputWrap}>
+      {input}
+    </div>
+    <div className={styles.additionalCommentsLockSlot}>
+      {lockControl}
+    </div>
   </div>
 );
 
