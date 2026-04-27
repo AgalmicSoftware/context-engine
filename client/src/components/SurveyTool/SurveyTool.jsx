@@ -154,6 +154,8 @@ import {
   buildQuestionIdScopeSignature,
   buildQuestionScanProgressDisplay,
   buildRatingEnvelopeQidSetFromUserAnswers,
+  buildSliderModeStatePatch,
+  buildSliderPersistOptions,
   buildRenderedIdsSignature,
   buildSliceToken,
   buildSurveyDraftSemanticSignature,
@@ -177,6 +179,9 @@ import {
   getImportanceFromSlice,
   getNormalizedUiRatingValue,
   getPendingStatsSnapshotFromState,
+  getQuestionConvictionSliderValue,
+  getQuestionImportanceSliderValue,
+  getQuestionSliderMode,
   getSessionSlugHintFromProps,
   getSessionSlugPinnedFromProps,
   hasCacheHydratedFlag,
@@ -225,6 +230,7 @@ import {
   resolveUpdateCacheContext,
   scheduleMicrotask,
   serializeSurveyToolFilterState,
+  shouldExpandSliderToggle,
   shouldAutoEncryptAdditionalOnAudienceChange,
   shouldEncryptResponseFieldForSubmit,
   shouldForceOverwriteDraftValues,
@@ -2703,43 +2709,29 @@ export class SurveyQuestions extends Component {
   };
 
   getSliderMode = (questionId) => {
-    const mode = this.state.sliderModeByQuestion?.[questionId];
-    if (mode === 'importance' || mode === 'conviction') return mode;
-
-    const idx = this.props.isStandalone || this.props.singleQuestionMode
-      ? 0
-      : (this.props.surveyIndex || 0);
-    const slice = this.state.surveysResponseState?.[idx];
-    if (slice?.importance && Object.prototype.hasOwnProperty.call(slice.importance, questionId)) {
-      return 'importance';
-    }
-
-    return 'conviction';
+    return getQuestionSliderMode({
+      explicitMode: this.state.sliderModeByQuestion?.[questionId],
+      isStandalone: this.props.isStandalone,
+      singleQuestionMode: this.props.singleQuestionMode,
+      surveyIndex: this.props.surveyIndex,
+      surveysResponseState: this.state.surveysResponseState,
+      questionId,
+    });
   };
 
   setSliderMode = (questionId, mode) => {
-    const nextMode = mode === 'importance' ? 'importance' : 'conviction';
-    this.setState((prev) => ({
-      sliderModeByQuestion: {
-        ...(prev.sliderModeByQuestion || {}),
-        [questionId]: nextMode,
-      },
+    this.setState((prev) => (
       // Track whether the conviction/importance control has been "opened" for this question.
-      sliderToggleExpandedByQuestion: {
-        ...(prev.sliderToggleExpandedByQuestion || {}),
-        [questionId]: true,
-      },
-    }));
+      buildSliderModeStatePatch(prev, questionId, mode)
+    ));
   };
 
   getConvictionValueForSlice = (slice, questionId) => {
-    const value = getConvictionFromSliceStrict(slice, questionId);
-    return typeof value === 'number' ? value : 0;
+    return getQuestionConvictionSliderValue(slice, questionId);
   };
 
   getImportanceValueForSlice = (slice, questionId) => {
-    const value = getImportanceFromSlice(slice, questionId);
-    return typeof value === 'number' ? value : 0;
+    return getQuestionImportanceSliderValue(slice, questionId);
   };
 
   renderBullhornToggleButton = ({
@@ -2772,8 +2764,11 @@ export class SurveyQuestions extends Component {
     }
     const mode = this.getSliderMode(questionId);
     const isConviction = mode === 'conviction';
-    const isExpanded =
-      !!this.state.sliderToggleExpandedByQuestion?.[questionId] || !isConviction;
+    const isExpanded = shouldExpandSliderToggle({
+      sliderToggleExpandedByQuestion: this.state.sliderToggleExpandedByQuestion,
+      questionId,
+      sliderMode: mode,
+    });
     return (
       <h6 id={styles.importanceText} className={styles.convictionToggleText}>
         <span className={styles.convictionToggleStack}>
@@ -2805,9 +2800,7 @@ export class SurveyQuestions extends Component {
   };
 
   // Keyboard changes persist during onChange so draft edits are not lost.
-  getSliderPersistOptions = (event) => ({
-    persistDraft: event?.type === 'keydown',
-  });
+  getSliderPersistOptions = (event) => buildSliderPersistOptions(event);
 
   handleConvictionImportanceChange = (surveyIndex, questionId, mode, value, options = {}) => {
     if (mode === 'importance') {
