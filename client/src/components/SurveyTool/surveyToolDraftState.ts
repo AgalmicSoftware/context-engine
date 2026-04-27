@@ -82,6 +82,33 @@ type PreviousPersistedDraftSnapshotArgs = {
   draftParseCache?: SurveyDraftParseCache;
 };
 
+type DraftTrackingStateArgs = {
+  lastDraftKey?: unknown;
+  lastDraftJSON?: unknown;
+  lastDraftSemanticSignature?: unknown;
+  draftParseCache?: SurveyDraftParseCache;
+};
+
+type DraftTrackingKeyChangeArgs = DraftTrackingStateArgs & {
+  nextDraftKey?: unknown;
+};
+
+type DraftTrackingAfterLoadArgs = DraftTrackingStateArgs & {
+  nextDraftParseCache?: SurveyDraftParseCache;
+  shouldResetDraftTracking?: boolean;
+};
+
+type DraftTrackingAfterWriteArgs = {
+  key?: unknown;
+  raw?: unknown;
+  payload?: SurveyDraftPayload | null;
+  semanticSignature?: unknown;
+};
+
+type DraftTrackingAfterScopedDeleteArgs = DraftTrackingStateArgs & {
+  key?: unknown;
+};
+
 type SurveyDraftPayload = {
   meta?: UnknownRecord | null;
   answers?: Record<string, SurveyDraftQuestionEntry | unknown> | null;
@@ -112,6 +139,24 @@ type PersistedDraftQuestionRemovalPlanArgs = {
 type ParsePersistedDraftStorageValueArgs = {
   raw?: unknown;
   requireAnswers?: boolean;
+};
+
+type DraftHydrationDependencies = {
+  normalizeResponseEncryptionAudience?: ((audience: unknown, questionId?: string) => unknown) | null;
+  normalizeFieldAudienceMode?: ((audienceMode: unknown, fieldKey?: string, field?: UnknownRecord) => unknown) | null;
+  buildInheritedAdditionalFieldState?: ((additionalState: UnknownRecord, answerState: UnknownRecord, questionId?: string) => UnknownRecord) | null;
+  buildEmptyResponseFieldState?: ((questionId?: string, fieldKey?: string) => UnknownRecord) | null;
+};
+
+type BuildDraftHydrationPatchForQuestionArgs = {
+  questionId?: unknown;
+  draftEntry?: unknown;
+  currentAnswer?: UnknownRecord | null;
+  currentAdditional?: UnknownRecord | null;
+  hasCurrentImportance?: boolean;
+  hasCurrentConviction?: boolean;
+  allowOverwrite?: boolean;
+  deps?: DraftHydrationDependencies;
 };
 
 type PendingStatsState = {
@@ -164,6 +209,12 @@ export type PendingStatsSnapshot = {
 
 const isRecord = (value: unknown): value is UnknownRecord => (
   !!value && typeof value === 'object' && !Array.isArray(value)
+);
+
+const hasPresentHydratedValue = (value: unknown): boolean => (
+  value !== undefined &&
+  value !== null &&
+  (Array.isArray(value) ? value.length > 0 : String(value).length > 0)
 );
 
 export const hasMeaningfulFieldValue = (field: SurveyDraftField | null | undefined = {}): boolean => {
@@ -251,6 +302,93 @@ export const buildSurveyDraftSemanticSignature = (payload: SurveyDraftPayload | 
   return parts.join('||');
 };
 
+export const buildPersistedDraftTrackingOnKeyChange = ({
+  nextDraftKey = '',
+  lastDraftKey = '',
+  lastDraftJSON = null,
+  lastDraftSemanticSignature = null,
+  draftParseCache = null,
+}: DraftTrackingKeyChangeArgs = {}) => {
+  const normalizedNextDraftKey = String(nextDraftKey || '');
+  const normalizedLastDraftKey = String(lastDraftKey || '');
+  if (!normalizedNextDraftKey || normalizedNextDraftKey === normalizedLastDraftKey) {
+    return {
+      lastDraftKey: normalizedLastDraftKey,
+      lastDraftJSON,
+      lastDraftSemanticSignature,
+      draftParseCache,
+      didSwitchKey: false,
+    } as const;
+  }
+
+  return {
+    lastDraftKey: normalizedNextDraftKey,
+    lastDraftJSON: null,
+    lastDraftSemanticSignature: null,
+    draftParseCache,
+    didSwitchKey: true,
+  } as const;
+};
+
+export const buildPersistedDraftTrackingAfterLoad = ({
+  lastDraftKey = '',
+  lastDraftJSON = null,
+  lastDraftSemanticSignature = null,
+  draftParseCache = null,
+  nextDraftParseCache = null,
+  shouldResetDraftTracking = false,
+}: DraftTrackingAfterLoadArgs = {}) => ({
+  lastDraftKey: String(lastDraftKey || ''),
+  lastDraftJSON: shouldResetDraftTracking ? null : lastDraftJSON,
+  lastDraftSemanticSignature: shouldResetDraftTracking ? null : lastDraftSemanticSignature,
+  draftParseCache: nextDraftParseCache == null ? draftParseCache : nextDraftParseCache,
+});
+
+export const buildPersistedDraftTrackingAfterWrite = ({
+  key = '',
+  raw = '',
+  payload = null,
+  semanticSignature = null,
+}: DraftTrackingAfterWriteArgs = {}) => ({
+  lastDraftKey: String(key || ''),
+  lastDraftJSON: typeof raw === 'string' ? raw : String(raw || ''),
+  lastDraftSemanticSignature: semanticSignature,
+  draftParseCache: payload && typeof payload === 'object'
+    ? {
+      key: String(key || ''),
+      raw: typeof raw === 'string' ? raw : String(raw || ''),
+      parsed: payload,
+    }
+    : null,
+});
+
+export const buildPersistedDraftTrackingAfterScopedDelete = ({
+  key = '',
+  lastDraftKey = '',
+  lastDraftJSON = null,
+  lastDraftSemanticSignature = null,
+  draftParseCache = null,
+}: DraftTrackingAfterScopedDeleteArgs = {}) => {
+  const normalizedKey = String(key || '');
+  const normalizedLastDraftKey = String(lastDraftKey || '');
+  return {
+    lastDraftKey: normalizedLastDraftKey,
+    lastDraftJSON: normalizedLastDraftKey === normalizedKey ? null : lastDraftJSON,
+    lastDraftSemanticSignature: normalizedLastDraftKey === normalizedKey ? null : lastDraftSemanticSignature,
+    draftParseCache:
+      draftParseCache && draftParseCache.key === normalizedKey
+        ? null
+        : draftParseCache,
+  };
+};
+
+export const buildPersistedDraftTrackingClearedState = () => ({
+  lastDraftKey: '',
+  lastDraftJSON: null,
+  lastDraftSemanticSignature: null,
+  draftParseCache: null,
+});
+
 export const parsePersistedDraftStorageValue = ({
   raw = '',
   requireAnswers = true,
@@ -286,6 +424,114 @@ export const parsePersistedDraftStorageValue = ({
       raw: normalizedRaw,
     } as const;
   }
+};
+
+export const buildDraftHydrationPatchForQuestion = ({
+  questionId = '',
+  draftEntry = null,
+  currentAnswer = null,
+  currentAdditional = null,
+  hasCurrentImportance = false,
+  hasCurrentConviction = false,
+  allowOverwrite = false,
+  deps = {},
+}: BuildDraftHydrationPatchForQuestionArgs = {}) => {
+  if (!isRecord(draftEntry)) {
+    return {
+      changed: false,
+      answerState: undefined,
+      additionalState: undefined,
+      importanceChanged: false,
+      importanceValue: undefined,
+      convictionChanged: false,
+      convictionValue: undefined,
+    };
+  }
+
+  const qid = normalizeQuestionIdKey(questionId);
+  const currentAnswerState = isRecord(currentAnswer) ? currentAnswer : {};
+  const currentAdditionalState = isRecord(currentAdditional) ? currentAdditional : {};
+  const normalizeResponseEncryptionAudience = deps.normalizeResponseEncryptionAudience;
+  const normalizeFieldAudienceMode = deps.normalizeFieldAudienceMode;
+  const buildInheritedAdditionalFieldState = deps.buildInheritedAdditionalFieldState;
+  const buildEmptyResponseFieldState = deps.buildEmptyResponseFieldState;
+
+  const hasCurrentAnswer = hasPresentHydratedValue(currentAnswerState.value);
+  const hasCurrentAdditional = hasPresentHydratedValue(currentAdditionalState.value);
+  let answerState;
+  let additionalState;
+  let importanceValue;
+  let convictionValue;
+  let importanceChanged = false;
+  let convictionChanged = false;
+  let changed = false;
+
+  if ((!hasCurrentAnswer || allowOverwrite) && draftEntry.value !== undefined) {
+    answerState = {
+      ...currentAnswerState,
+      value: draftEntry.value,
+      encrypted: !!draftEntry.answerEncrypted,
+      encryptionAudience: typeof normalizeResponseEncryptionAudience === 'function'
+        ? normalizeResponseEncryptionAudience(draftEntry.answerEncryptionAudience, qid)
+        : draftEntry.answerEncryptionAudience,
+      encryptionGateId: draftEntry.answerEncryptionGateId || null,
+      audienceMode: typeof normalizeFieldAudienceMode === 'function'
+        ? normalizeFieldAudienceMode(draftEntry.answerAudienceMode, 'answer', draftEntry as UnknownRecord)
+        : draftEntry.answerAudienceMode,
+      ...(draftEntry.answerEncryptedPortion ? { encryptedPortion: draftEntry.answerEncryptedPortion } : {}),
+    };
+    changed = true;
+  }
+
+  if ((!hasCurrentAdditional || allowOverwrite) && draftEntry.additional !== undefined) {
+    additionalState = {
+      ...currentAdditionalState,
+      value: draftEntry.additional,
+      encrypted: !!draftEntry.additionalEncrypted,
+      encryptionAudience: typeof normalizeResponseEncryptionAudience === 'function'
+        ? normalizeResponseEncryptionAudience(draftEntry.additionalEncryptionAudience, qid)
+        : draftEntry.additionalEncryptionAudience,
+      encryptionGateId: draftEntry.additionalEncryptionGateId || null,
+      audienceMode: typeof normalizeFieldAudienceMode === 'function'
+        ? normalizeFieldAudienceMode(draftEntry.additionalAudienceMode, 'additional', draftEntry as UnknownRecord)
+        : draftEntry.additionalAudienceMode,
+      ...(draftEntry.additionalEncryptedPortion ? { encryptedPortion: draftEntry.additionalEncryptedPortion } : {}),
+    };
+    if (
+      typeof normalizeFieldAudienceMode === 'function' &&
+      normalizeFieldAudienceMode(draftEntry.additionalAudienceMode, 'additional', draftEntry as UnknownRecord) === 'inherit' &&
+      typeof buildInheritedAdditionalFieldState === 'function'
+    ) {
+      additionalState = buildInheritedAdditionalFieldState(
+        additionalState,
+        answerState || currentAnswerState || (typeof buildEmptyResponseFieldState === 'function' ? buildEmptyResponseFieldState(qid) : {}),
+        qid,
+      ) as SurveyDraftQuestionEntry;
+    }
+    changed = true;
+  }
+
+  if ((!hasCurrentImportance || allowOverwrite) && draftEntry.importance !== undefined && draftEntry.importance !== null) {
+    importanceValue = Number(draftEntry.importance);
+    importanceChanged = true;
+    changed = true;
+  }
+
+  if ((!hasCurrentConviction || allowOverwrite) && draftEntry.conviction !== undefined && draftEntry.conviction !== null) {
+    convictionValue = Number(draftEntry.conviction);
+    convictionChanged = true;
+    changed = true;
+  }
+
+  return {
+    changed,
+    answerState,
+    additionalState,
+    importanceChanged,
+    importanceValue,
+    convictionChanged,
+    convictionValue,
+  };
 };
 
 export const shouldForceOverwriteDraftValues = ({
