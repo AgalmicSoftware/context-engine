@@ -59,6 +59,15 @@ type SurveyDraftLoadPlanArgs = {
   perQuestionAnonKey?: unknown;
 };
 
+type PersistedDraftWritePlanArgs = {
+  draftKey?: unknown;
+  sessionSlug?: unknown;
+  networkIdStr?: unknown;
+  account?: unknown;
+  surveyScope?: unknown;
+  singleQuestionMode?: boolean;
+};
+
 type SurveyDraftParseCache = {
   key?: unknown;
   raw?: unknown;
@@ -92,6 +101,11 @@ type PersistedDraftPayloadArgs = {
 type RemoveQuestionFromPersistedDraftPayloadArgs = {
   draftPayload?: unknown;
   questionId?: unknown;
+};
+
+type ParsePersistedDraftStorageValueArgs = {
+  raw?: unknown;
+  requireAnswers?: boolean;
 };
 
 type PendingStatsState = {
@@ -229,6 +243,43 @@ export const buildSurveyDraftSemanticSignature = (payload: SurveyDraftPayload | 
     parts.push(`badditionalEncryptedPortion:${buildStableDraftValueSignature(baselineEntry.additionalEncryptedPortion)}`);
   });
   return parts.join('||');
+};
+
+export const parsePersistedDraftStorageValue = ({
+  raw = '',
+  requireAnswers = true,
+}: ParsePersistedDraftStorageValueArgs = {}) => {
+  const normalizedRaw = typeof raw === 'string' ? raw : String(raw || '');
+  if (!normalizedRaw) {
+    return {
+      status: 'empty',
+      payload: null,
+      raw: '',
+    } as const;
+  }
+
+  try {
+    const parsed = JSON.parse(normalizedRaw);
+    const hasRequiredAnswers = !requireAnswers || isRecord(parsed?.answers);
+    if (!isRecord(parsed) || !hasRequiredAnswers) {
+      return {
+        status: 'invalid',
+        payload: null,
+        raw: normalizedRaw,
+      } as const;
+    }
+    return {
+      status: 'valid',
+      payload: parsed as SurveyDraftPayload,
+      raw: normalizedRaw,
+    } as const;
+  } catch {
+    return {
+      status: 'invalid',
+      payload: null,
+      raw: normalizedRaw,
+    } as const;
+  }
 };
 
 export const shouldForceOverwriteDraftValues = ({
@@ -512,9 +563,13 @@ export const loadPreviousPersistedDraftSnapshot = (
       draftParseCache.raw === raw &&
       draftParseCache.parsed &&
       typeof draftParseCache.parsed === 'object';
-    const parsed = cacheHit
-      ? draftParseCache.parsed as SurveyDraftPayload
-      : JSON.parse(raw);
+    const parsedResult = cacheHit
+      ? { status: 'valid', payload: draftParseCache.parsed as SurveyDraftPayload, raw }
+      : parsePersistedDraftStorageValue({ raw, requireAnswers: false });
+    if (parsedResult.status !== 'valid') {
+      throw new Error('invalid_draft_payload');
+    }
+    const parsed = parsedResult.payload;
 
     return {
       ...emptyResult,
@@ -532,6 +587,35 @@ export const loadPreviousPersistedDraftSnapshot = (
       shouldResetDraftTracking: true,
     };
   }
+};
+
+export const buildPersistedDraftWritePlan = ({
+  draftKey = '',
+  sessionSlug = '',
+  networkIdStr = '',
+  account = '',
+  surveyScope = 'questions',
+  singleQuestionMode = false,
+}: PersistedDraftWritePlanArgs = {}) => {
+  const normalizedDraftKey = String(draftKey || '').trim();
+  const variants = buildSurveyDraftStorageVariantKeys({
+    sessionSlug,
+    networkIdStr,
+    account,
+    surveyScope,
+  });
+
+  return {
+    compatWriteKey:
+      singleQuestionMode &&
+      variants.compatAccountKey &&
+      variants.compatAccountKey !== normalizedDraftKey
+        ? variants.compatAccountKey
+        : null,
+    staleAnonKeys: String(account || '').trim()
+      ? [...new Set([variants.primaryAnonKey, variants.compatAnonKey].filter(Boolean))]
+      : [],
+  };
 };
 
 export const buildPersistedDraftQuestionEntry = ({
