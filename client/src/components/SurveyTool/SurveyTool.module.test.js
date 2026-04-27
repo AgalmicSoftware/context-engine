@@ -8502,6 +8502,35 @@ describe('SurveyTool module', () => {
     sessionStorage.clear();
   });
 
+  it('applies draft tracking patches without clobbering omitted fields', () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: true,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+      activeSessionSlug: 'edge',
+      sessionSlug: 'edge',
+      questionPool: [{ id: 'q1' }],
+    });
+
+    subject._draftParseCache = { key: 'draft-key', raw: '{"answers":{}}', parsed: { answers: {} } };
+    subject._lastDraftKey = 'draft-key';
+    subject._lastDraftJSON = '{"answers":{}}';
+    subject._lastDraftSemanticSignature = 'sig:old';
+
+    subject._applyDraftTrackingState({
+      lastDraftJSON: null,
+      lastDraftSemanticSignature: 'sig:new',
+    });
+
+    expect(subject._draftParseCache).toEqual({ key: 'draft-key', raw: '{"answers":{}}', parsed: { answers: {} } });
+    expect(subject._lastDraftKey).toBe('draft-key');
+    expect(subject._lastDraftJSON).toBeNull();
+    expect(subject._lastDraftSemanticSignature).toBe('sig:new');
+  });
+
   it('skips draft rewrites when only timestamp would change and writes again after semantic edits', () => {
     sessionStorage.clear();
     const nowSpy = jest.spyOn(Date, 'now')

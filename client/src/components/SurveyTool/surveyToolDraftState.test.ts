@@ -1,4 +1,5 @@
 import {
+  buildDraftHydrationPatchForQuestion,
   buildPersistedDraftQuestionRemovalPlan,
   buildPersistedDraftTrackingAfterLoad,
   buildPersistedDraftTrackingAfterScopedDelete,
@@ -339,6 +340,88 @@ describe('surveyToolDraftState', () => {
       { readKey: 'pending', writeKey: 'anon' },
       { readKey: 'anon-q', writeKey: 'anon' },
     ]);
+  });
+
+  it('builds per-question draft hydration patches with overwrite and inherit handling', () => {
+    const deps = {
+      normalizeResponseEncryptionAudience: jest.fn((audience) => audience || 'self'),
+      normalizeFieldAudienceMode: jest.fn((mode) => mode || 'explicit'),
+      buildInheritedAdditionalFieldState: jest.fn((additionalState, answerState) => ({
+        ...additionalState,
+        inheritedFromAnswer: answerState?.value || null,
+      })),
+      buildEmptyResponseFieldState: jest.fn(() => ({ value: '', encrypted: false })),
+    };
+
+    expect(buildDraftHydrationPatchForQuestion({
+      questionId: 'Q1',
+      draftEntry: {
+        value: 'draft answer',
+        answerEncrypted: true,
+        answerEncryptionAudience: 'gate',
+        answerEncryptedPortion: 'ans-env-1',
+        additional: 'draft notes',
+        additionalEncrypted: true,
+        additionalEncryptionAudience: 'gate',
+        additionalAudienceMode: 'inherit',
+        additionalEncryptedPortion: 'add-env-1',
+        importance: 4,
+        conviction: 7,
+      },
+      currentAnswer: { value: '' },
+      currentAdditional: { value: '' },
+      hasCurrentImportance: false,
+      hasCurrentConviction: false,
+      allowOverwrite: false,
+      deps,
+    })).toEqual({
+      changed: true,
+      answerState: {
+        value: 'draft answer',
+        encrypted: true,
+        encryptionAudience: 'gate',
+        encryptionGateId: null,
+        audienceMode: 'explicit',
+        encryptedPortion: 'ans-env-1',
+      },
+      additionalState: {
+        value: 'draft notes',
+        encrypted: true,
+        encryptionAudience: 'gate',
+        encryptionGateId: null,
+        audienceMode: 'inherit',
+        encryptedPortion: 'add-env-1',
+        inheritedFromAnswer: 'draft answer',
+      },
+      importanceChanged: true,
+      importanceValue: 4,
+      convictionChanged: true,
+      convictionValue: 7,
+    });
+
+    expect(buildDraftHydrationPatchForQuestion({
+      questionId: 'q1',
+      draftEntry: {
+        value: 'draft answer',
+        additional: 'draft notes',
+        importance: 4,
+        conviction: 7,
+      },
+      currentAnswer: { value: 'keep me' },
+      currentAdditional: { value: 'keep notes' },
+      hasCurrentImportance: true,
+      hasCurrentConviction: true,
+      allowOverwrite: false,
+      deps,
+    })).toEqual({
+      changed: false,
+      answerState: undefined,
+      additionalState: undefined,
+      importanceChanged: false,
+      importanceValue: undefined,
+      convictionChanged: false,
+      convictionValue: undefined,
+    });
   });
 
   it('builds persisted draft write plans for compat mirror writes and anon cleanup', () => {

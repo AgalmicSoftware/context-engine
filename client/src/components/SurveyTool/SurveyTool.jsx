@@ -1134,6 +1134,7 @@ export class SurveyQuestions extends Component {
 
 
   _persistTimer = null;
+  _draftParseCache = null;
   _lastDraftKey = '';
   _lastDraftJSON = null;
   _lastDraftSemanticSignature = null;
@@ -1176,6 +1177,22 @@ export class SurveyQuestions extends Component {
   _queuedAutoDecryptSweepReasons = new Set();
   _gateSbtHydrationSig = '';
   _gateSbtHydrationRetryTimer = null;
+
+  _applyDraftTrackingState = (tracking = {}) => {
+    if (!tracking || typeof tracking !== 'object') return;
+    if (Object.prototype.hasOwnProperty.call(tracking, 'draftParseCache')) {
+      this._draftParseCache = tracking.draftParseCache ?? null;
+    }
+    if (Object.prototype.hasOwnProperty.call(tracking, 'lastDraftKey')) {
+      this._lastDraftKey = String(tracking.lastDraftKey || '');
+    }
+    if (Object.prototype.hasOwnProperty.call(tracking, 'lastDraftJSON')) {
+      this._lastDraftJSON = tracking.lastDraftJSON ?? null;
+    }
+    if (Object.prototype.hasOwnProperty.call(tracking, 'lastDraftSemanticSignature')) {
+      this._lastDraftSemanticSignature = tracking.lastDraftSemanticSignature ?? null;
+    }
+  };
 
   setManagedTimeout = (fn, delayMs = 0) => {
     const timeoutId = setTimeout(() => {
@@ -4517,10 +4534,7 @@ export class SurveyQuestions extends Component {
         lastDraftSemanticSignature: this._lastDraftSemanticSignature,
         draftParseCache: this._draftParseCache,
       });
-      this._lastDraftKey = keyTracking.lastDraftKey;
-      this._lastDraftJSON = keyTracking.lastDraftJSON;
-      this._lastDraftSemanticSignature = keyTracking.lastDraftSemanticSignature;
-      this._draftParseCache = keyTracking.draftParseCache;
+      this._applyDraftTrackingState(keyTracking);
 
       // Preload prior persisted answers so we don't prune non-rendered QIDs
       const {
@@ -4552,10 +4566,7 @@ export class SurveyQuestions extends Component {
         nextDraftParseCache,
         shouldResetDraftTracking,
       });
-      this._lastDraftKey = loadTracking.lastDraftKey;
-      this._lastDraftJSON = loadTracking.lastDraftJSON;
-      this._lastDraftSemanticSignature = loadTracking.lastDraftSemanticSignature;
-      this._draftParseCache = loadTracking.draftParseCache;
+      this._applyDraftTrackingState(loadTracking);
 
       const surveyIndex = this.props.isStandalone || this.props.singleQuestionMode ? 0 : this.props.surveyIndex;
       const slice = (this.state.surveysResponseState && this.state.surveysResponseState[surveyIndex]) || {
@@ -4646,10 +4657,7 @@ export class SurveyQuestions extends Component {
         payload,
         semanticSignature: nextSemanticSignature,
       });
-      this._lastDraftKey = writeTracking.lastDraftKey;
-      this._lastDraftJSON = writeTracking.lastDraftJSON;
-      this._lastDraftSemanticSignature = writeTracking.lastDraftSemanticSignature;
-      this._draftParseCache = writeTracking.draftParseCache;
+      this._applyDraftTrackingState(writeTracking);
       if (this._draftDirtyQids) this._draftDirtyQids.clear();
 
       persistWritePlan.staleAnonKeys.forEach((draftKey) => {
@@ -4676,10 +4684,7 @@ export class SurveyQuestions extends Component {
       purgeKeys.forEach(k => { try { sessionStorage.removeItem(k); } catch (e) { surveyLog.warn('SurveyTool: fallback', e); } });
 
       const clearedTracking = buildPersistedDraftTrackingClearedState();
-      this._draftParseCache = clearedTracking.draftParseCache;
-      this._lastDraftKey = clearedTracking.lastDraftKey;
-      this._lastDraftJSON = clearedTracking.lastDraftJSON;
-      this._lastDraftSemanticSignature = clearedTracking.lastDraftSemanticSignature;
+      this._applyDraftTrackingState(clearedTracking);
     } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
   };
 
@@ -4720,10 +4725,7 @@ export class SurveyQuestions extends Component {
               lastDraftSemanticSignature: this._lastDraftSemanticSignature,
               draftParseCache: this._draftParseCache,
             });
-            this._lastDraftKey = deleteTracking.lastDraftKey;
-            this._lastDraftJSON = deleteTracking.lastDraftJSON;
-            this._lastDraftSemanticSignature = deleteTracking.lastDraftSemanticSignature;
-            this._draftParseCache = deleteTracking.draftParseCache;
+            this._applyDraftTrackingState(deleteTracking);
             return;
           }
           if (removalPlan.action === 'update-storage' && removalPlan.nextPayload && removalPlan.nextJson) {
@@ -4734,10 +4736,7 @@ export class SurveyQuestions extends Component {
                 payload: removalPlan.nextPayload,
                 semanticSignature: removalPlan.nextSemanticSignature,
               });
-              this._lastDraftKey = writeTracking.lastDraftKey;
-              this._lastDraftJSON = writeTracking.lastDraftJSON;
-              this._lastDraftSemanticSignature = writeTracking.lastDraftSemanticSignature;
-              this._draftParseCache = writeTracking.draftParseCache;
+              this._applyDraftTrackingState(writeTracking);
           }
         } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
       });
@@ -5160,110 +5159,52 @@ export class SurveyQuestions extends Component {
       rendered.forEach((qid) => {
         const d = draft.answers?.[qid];
         if (d) {
-          const currAnswer = nextSlice.answers[qid]?.value;
-          const currAdd = nextSlice.additionalComments[qid]?.value;
-          const hasCurrAnswer =
-            currAnswer !== undefined && currAnswer !== null &&
-            (Array.isArray(currAnswer) ? currAnswer.length > 0 : String(currAnswer).length > 0);
-          const hasCurrAdd =
-            currAdd !== undefined && currAdd !== null && String(currAdd).length > 0;
-          const hasCurrImp = Object.prototype.hasOwnProperty.call(nextSlice.importance, qid);
-          const hasCurrConv = Object.prototype.hasOwnProperty.call(nextSlice.conviction, qid);
-
-          if ((!hasCurrAnswer || allowOverwrite) && d.value !== undefined) {
-            nextSlice.answers[qid] = {
-              ...(nextSlice.answers[qid] || {}),
-              value: d.value,
-              encrypted: !!d.answerEncrypted,
-              encryptionAudience: this.normalizeResponseEncryptionAudience(d.answerEncryptionAudience),
-              encryptionGateId: d.answerEncryptionGateId || null,
-              audienceMode: this.normalizeFieldAudienceMode(d.answerAudienceMode, 'answer', d),
-              ...(d.answerEncryptedPortion ? { encryptedPortion: d.answerEncryptedPortion } : {}),
-            };
-            changed = true;
-          }
-          if ((!hasCurrAdd || allowOverwrite) && d.additional !== undefined) {
-            nextSlice.additionalComments[qid] = {
-              ...(nextSlice.additionalComments[qid] || {}),
-              value: d.additional,
-              encrypted: !!d.additionalEncrypted,
-              encryptionAudience: this.normalizeResponseEncryptionAudience(d.additionalEncryptionAudience),
-              encryptionGateId: d.additionalEncryptionGateId || null,
-              audienceMode: this.normalizeFieldAudienceMode(d.additionalAudienceMode, 'additional', d),
-              ...(d.additionalEncryptedPortion ? { encryptedPortion: d.additionalEncryptedPortion } : {}),
-            };
-            if (this.normalizeFieldAudienceMode(d.additionalAudienceMode, 'additional', d) === 'inherit') {
-              nextSlice.additionalComments[qid] = this.buildInheritedAdditionalFieldState(
-                nextSlice.additionalComments[qid],
-                nextSlice.answers[qid] || this.buildEmptyResponseFieldState(qid),
-                qid
-              );
-            }
-            changed = true;
-          }
-          if ((!hasCurrImp || allowOverwrite) && (d.importance !== undefined && d.importance !== null)) {
-            nextSlice.importance[qid] = Number(d.importance);
-            changed = true;
-          }
-          if ((!hasCurrConv || allowOverwrite) && (d.conviction !== undefined && d.conviction !== null)) {
-            nextSlice.conviction[qid] = Number(d.conviction);
-            changed = true;
-          }
+          const livePatch = buildDraftHydrationPatchForQuestion({
+            questionId: qid,
+            draftEntry: d,
+            currentAnswer: nextSlice.answers[qid],
+            currentAdditional: nextSlice.additionalComments[qid],
+            hasCurrentImportance: Object.prototype.hasOwnProperty.call(nextSlice.importance, qid),
+            hasCurrentConviction: Object.prototype.hasOwnProperty.call(nextSlice.conviction, qid),
+            allowOverwrite,
+            deps: {
+              normalizeResponseEncryptionAudience: this.normalizeResponseEncryptionAudience,
+              normalizeFieldAudienceMode: this.normalizeFieldAudienceMode,
+              buildInheritedAdditionalFieldState: this.buildInheritedAdditionalFieldState,
+              buildEmptyResponseFieldState: this.buildEmptyResponseFieldState,
+            },
+          });
+          if (livePatch.answerState) nextSlice.answers[qid] = livePatch.answerState;
+          if (livePatch.additionalState) nextSlice.additionalComments[qid] = livePatch.additionalState;
+          if (livePatch.importanceChanged) nextSlice.importance[qid] = livePatch.importanceValue;
+          if (livePatch.convictionChanged) nextSlice.conviction[qid] = livePatch.convictionValue;
+          if (livePatch.changed) changed = true;
         }
 
         // Regression guard: restore baseline from draft independently of answer hydration.
         // Refresh often sees masked chain payload first; losing baseline here reintroduces Submit(1) ghosts.
         const b = draft.baseline?.[qid];
         if (b) {
-          const currBaselineAnswer = nextBaseline.answers[qid]?.value;
-          const currBaselineAdditional = nextBaseline.additionalComments[qid]?.value;
-          const hasCurrBaselineAnswer =
-            currBaselineAnswer !== undefined && currBaselineAnswer !== null &&
-            (Array.isArray(currBaselineAnswer) ? currBaselineAnswer.length > 0 : String(currBaselineAnswer).length > 0);
-          const hasCurrBaselineAdditional =
-            currBaselineAdditional !== undefined && currBaselineAdditional !== null && String(currBaselineAdditional).length > 0;
-          const hasCurrBaselineImp = Object.prototype.hasOwnProperty.call(nextBaseline.importance, qid);
-          const hasCurrBaselineConv = Object.prototype.hasOwnProperty.call(nextBaseline.conviction, qid);
-
-          if ((!hasCurrBaselineAnswer || allowOverwrite) && b.value !== undefined) {
-            nextBaseline.answers[qid] = {
-              ...(nextBaseline.answers[qid] || {}),
-              value: b.value,
-              encrypted: !!b.answerEncrypted,
-              encryptionAudience: this.normalizeResponseEncryptionAudience(b.answerEncryptionAudience),
-              encryptionGateId: b.answerEncryptionGateId || null,
-              audienceMode: this.normalizeFieldAudienceMode(b.answerAudienceMode, 'answer', b),
-              ...(b.answerEncryptedPortion ? { encryptedPortion: b.answerEncryptedPortion } : {}),
-            };
-            baselineChanged = true;
-          }
-          if ((!hasCurrBaselineAdditional || allowOverwrite) && b.additional !== undefined) {
-            nextBaseline.additionalComments[qid] = {
-              ...(nextBaseline.additionalComments[qid] || {}),
-              value: b.additional,
-              encrypted: !!b.additionalEncrypted,
-              encryptionAudience: this.normalizeResponseEncryptionAudience(b.additionalEncryptionAudience),
-              encryptionGateId: b.additionalEncryptionGateId || null,
-              audienceMode: this.normalizeFieldAudienceMode(b.additionalAudienceMode, 'additional', b),
-              ...(b.additionalEncryptedPortion ? { encryptedPortion: b.additionalEncryptedPortion } : {}),
-            };
-            if (this.normalizeFieldAudienceMode(b.additionalAudienceMode, 'additional', b) === 'inherit') {
-              nextBaseline.additionalComments[qid] = this.buildInheritedAdditionalFieldState(
-                nextBaseline.additionalComments[qid],
-                nextBaseline.answers[qid] || this.buildEmptyResponseFieldState(qid),
-                qid
-              );
-            }
-            baselineChanged = true;
-          }
-          if ((!hasCurrBaselineImp || allowOverwrite) && (b.importance !== undefined && b.importance !== null)) {
-            nextBaseline.importance[qid] = Number(b.importance);
-            baselineChanged = true;
-          }
-          if ((!hasCurrBaselineConv || allowOverwrite) && (b.conviction !== undefined && b.conviction !== null)) {
-            nextBaseline.conviction[qid] = Number(b.conviction);
-            baselineChanged = true;
-          }
+          const baselinePatch = buildDraftHydrationPatchForQuestion({
+            questionId: qid,
+            draftEntry: b,
+            currentAnswer: nextBaseline.answers[qid],
+            currentAdditional: nextBaseline.additionalComments[qid],
+            hasCurrentImportance: Object.prototype.hasOwnProperty.call(nextBaseline.importance, qid),
+            hasCurrentConviction: Object.prototype.hasOwnProperty.call(nextBaseline.conviction, qid),
+            allowOverwrite,
+            deps: {
+              normalizeResponseEncryptionAudience: this.normalizeResponseEncryptionAudience,
+              normalizeFieldAudienceMode: this.normalizeFieldAudienceMode,
+              buildInheritedAdditionalFieldState: this.buildInheritedAdditionalFieldState,
+              buildEmptyResponseFieldState: this.buildEmptyResponseFieldState,
+            },
+          });
+          if (baselinePatch.answerState) nextBaseline.answers[qid] = baselinePatch.answerState;
+          if (baselinePatch.additionalState) nextBaseline.additionalComments[qid] = baselinePatch.additionalState;
+          if (baselinePatch.importanceChanged) nextBaseline.importance[qid] = baselinePatch.importanceValue;
+          if (baselinePatch.convictionChanged) nextBaseline.conviction[qid] = baselinePatch.convictionValue;
+          if (baselinePatch.changed) baselineChanged = true;
         }
       });
 
