@@ -1,6 +1,7 @@
 /** @file surveyToolUtils.js */
 
 export {
+  buildQuestionCacheHydrationPatch,
   buildQuestionResponseHydrationPatch,
   buildRatingEnvelopeQidSetFromUserAnswers,
   clampSliderValue,
@@ -97,6 +98,9 @@ export {
   shouldShowSingleQuestionResponseLookupSpinner,
   updateSubmittedSinceLastEdit,
 } from './surveyToolDraftState.js';
+export {
+  buildDraftHydrationState,
+} from './surveyToolHydrationFlow.js';
 export {
   buildQuestionScanProgressDisplay,
   doesQuestionProgressMatchSlug,
