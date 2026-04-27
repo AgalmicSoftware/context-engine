@@ -46,6 +46,15 @@ export {
   writeSurveysCache,
 } from './surveyToolCacheState.js';
 export {
+  buildSliderModeStatePatch,
+  buildSliderPersistOptions,
+  getQuestionConvictionSliderValue,
+  getQuestionImportanceSliderValue,
+  getQuestionSliderMode,
+  normalizeSliderMode,
+  shouldExpandSliderToggle,
+} from './surveyToolSliderState.js';
+export {
   appendExplicitSessionHintToPath,
   applyExistingGroupPrefix,
   hasExplicitSessionQueryPinInPath,
