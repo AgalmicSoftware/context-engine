@@ -59,6 +59,20 @@ type SurveyDraftLoadPlanArgs = {
   perQuestionAnonKey?: unknown;
 };
 
+type SurveyDraftParseCache = {
+  key?: unknown;
+  raw?: unknown;
+  parsed?: unknown;
+} | null;
+
+type PreviousPersistedDraftSnapshotArgs = {
+  key?: unknown;
+  lastDraftKey?: unknown;
+  lastDraftJSON?: unknown;
+  lastDraftSemanticSignature?: unknown;
+  draftParseCache?: SurveyDraftParseCache;
+};
+
 type SurveyDraftPayload = {
   meta?: UnknownRecord | null;
   answers?: Record<string, SurveyDraftQuestionEntry | unknown> | null;
@@ -428,6 +442,96 @@ export const buildSurveyDraftLoadPlan = ({
     readKey,
     writeKey: writeKey && writeKey !== readKey ? writeKey : null,
   }));
+};
+
+export const loadPreviousPersistedDraftSnapshot = (
+  {
+    key = '',
+    lastDraftKey = '',
+    lastDraftJSON = null,
+    lastDraftSemanticSignature = null,
+    draftParseCache = null,
+  }: PreviousPersistedDraftSnapshotArgs = {},
+  {
+    readDraftRaw,
+    removeDraftRaw,
+    buildSemanticSignature,
+  }: {
+    readDraftRaw: (draftKey: string) => string;
+    removeDraftRaw?: ((draftKey: string) => void) | null;
+    buildSemanticSignature: (payload: SurveyDraftPayload | null | undefined) => string;
+  },
+) => {
+  const normalizedKey = String(key || '');
+  const cachedDraftRaw =
+    draftParseCache && typeof draftParseCache.raw === 'string'
+      ? draftParseCache.raw
+      : null;
+  const canUseCachedPrevDraft =
+    String(lastDraftKey || '') === normalizedKey &&
+    draftParseCache &&
+    draftParseCache.key === normalizedKey &&
+    cachedDraftRaw !== null &&
+    cachedDraftRaw === String(lastDraftJSON ?? '') &&
+    draftParseCache.parsed &&
+    typeof draftParseCache.parsed === 'object';
+
+  const emptyResult = {
+    prevAnswers: {},
+    prevBaseline: {},
+    prevDraftRaw: '',
+    prevSemanticSignature: null,
+    nextDraftParseCache: canUseCachedPrevDraft ? draftParseCache : draftParseCache,
+    shouldResetDraftTracking: false,
+  };
+
+  if (canUseCachedPrevDraft) {
+    const parsed = draftParseCache.parsed as SurveyDraftPayload;
+    return {
+      ...emptyResult,
+      prevAnswers: (parsed && typeof parsed === 'object' ? parsed.answers : {}) || {},
+      prevBaseline: (parsed && typeof parsed === 'object' ? parsed.baseline : {}) || {},
+      prevDraftRaw: String(draftParseCache?.raw || ''),
+      prevSemanticSignature: lastDraftSemanticSignature || buildSemanticSignature(parsed),
+      nextDraftParseCache: draftParseCache,
+    };
+  }
+
+  try {
+    const raw = String(readDraftRaw(normalizedKey) || '');
+    if (!raw) {
+      return {
+        ...emptyResult,
+        nextDraftParseCache: draftParseCache,
+      };
+    }
+
+    const cacheHit =
+      draftParseCache &&
+      draftParseCache.key === normalizedKey &&
+      draftParseCache.raw === raw &&
+      draftParseCache.parsed &&
+      typeof draftParseCache.parsed === 'object';
+    const parsed = cacheHit
+      ? draftParseCache.parsed as SurveyDraftPayload
+      : JSON.parse(raw);
+
+    return {
+      ...emptyResult,
+      prevAnswers: (parsed && typeof parsed === 'object' ? parsed.answers : {}) || {},
+      prevBaseline: (parsed && typeof parsed === 'object' ? parsed.baseline : {}) || {},
+      prevDraftRaw: raw,
+      prevSemanticSignature: buildSemanticSignature(parsed),
+      nextDraftParseCache: cacheHit ? draftParseCache : { key: normalizedKey, raw, parsed },
+    };
+  } catch {
+    try { removeDraftRaw && removeDraftRaw(normalizedKey); } catch (_) { /* noop */ }
+    return {
+      ...emptyResult,
+      nextDraftParseCache: null,
+      shouldResetDraftTracking: true,
+    };
+  }
 };
 
 export const buildPersistedDraftQuestionEntry = ({
