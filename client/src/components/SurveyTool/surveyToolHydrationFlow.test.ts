@@ -3,6 +3,8 @@ import {
   buildDraftAwareCacheHydrationState,
   buildDraftHydrationState,
   buildHydratedResponseSlice,
+  buildLocalCacheHydrationMemoKey,
+  buildMergedHydrationQuestionResponses,
   buildLocalCacheRehydrationState,
   buildPrefilledSurveyState,
   buildRevertedResponseSlice,
@@ -341,6 +343,69 @@ describe('surveyToolHydrationFlow', () => {
 
     expect(applyResponseHydrationListToSlice).toHaveBeenCalledTimes(2);
     expect(parseValue).toHaveBeenCalledTimes(3);
+  });
+
+  it('builds stable local-cache hydration memo keys', () => {
+    const normalizeSlug = jest.fn((value) => String(value || '').trim().toLowerCase());
+
+    expect(buildLocalCacheHydrationMemoKey({
+      scopeSlugs: [' Demo ', 'SECOND'],
+      networkIdStr: 84532,
+      account: '0xAbC',
+      renderedSignature: 'q1|q2',
+      questionsCacheNonce: '4',
+      questionResponsesNonce: 7,
+      normalizeSessionSlugValue: normalizeSlug,
+    })).toBe('demo,second|84532|0xAbC|q1|q2|4|7');
+
+    expect(normalizeSlug).toHaveBeenCalledTimes(2);
+  });
+
+  it('merges hydration question responses across scoped caches', () => {
+    const readQuestionsCache = jest.fn((slug) => ({
+      alpha: {
+        84532: {
+          questionResponses: {
+            q1: { '0xabc': { answer: { value: slug } } },
+          },
+        },
+      },
+      beta: {
+        84532: {
+          questionResponses: {
+            q1: { '0xabc': { answer: { value: slug } } },
+          },
+        },
+      },
+    }[slug] || {}));
+    const mergeResponses = jest.fn((target, source) => {
+      Object.entries(source).forEach(([questionId, value]) => {
+        target[questionId] = {
+          ...(target[questionId] || {}),
+          ...(value || {}),
+        };
+      });
+    });
+
+    expect(buildMergedHydrationQuestionResponses({
+      scopeSlugs: ['alpha', 'beta'],
+      networkIdStr: '84532',
+      readQuestionsCache,
+      mergeQuestionResponses: mergeResponses,
+    })).toEqual({
+      q1: {
+        '0xabc': { answer: { value: 'beta' } },
+      },
+    });
+
+    expect(buildMergedHydrationQuestionResponses({
+      scopeSlugs: ['alpha'],
+      networkIdStr: '',
+      readQuestionsCache,
+      mergeQuestionResponses: mergeResponses,
+    })).toEqual({});
+    expect(readQuestionsCache).toHaveBeenCalledTimes(2);
+    expect(mergeResponses).toHaveBeenCalledTimes(2);
   });
 
   it('builds prefilled survey state with hydrated slice and optional baseline writes', () => {
