@@ -218,6 +218,8 @@ import {
   buildQuestionFilterStorageKeyPrefix,
   buildQuestionIdScopeSignature,
   buildQuestionScanProgressDisplay,
+  buildPersistDraftAllowedQuestionIds,
+  buildPersistedDraftPayload,
   buildPersistedDraftMapsForAllowedIds,
   buildRatingEnvelopeQidSetFromUserAnswers,
   buildSliderModeStatePatch,
@@ -4626,22 +4628,17 @@ export class SurveyQuestions extends Component {
       // Only persist rendered (or all if none rendered)
       const renderedIds = this.getHydrationQuestionIds();
       const dirtyQids = this._draftDirtyQids ? [...this._draftDirtyQids] : [];
-      const allowed = new Set(
-        renderedIds.length
-          ? [...renderedIds, ...dirtyQids]
-          : [
-              ...Object.keys(slice.answers || {}),
-              ...Object.keys(slice.additionalComments || {}),
-              ...Object.keys(slice.importance || {}),
-              ...Object.keys(slice.conviction || {})
-            ]
-      );
+      const allowed = buildPersistDraftAllowedQuestionIds({
+        renderedQuestionIds: renderedIds,
+        dirtyQuestionIds: dirtyQids,
+        slice,
+      });
 
       const baselineSlice = this.state.editBaseline || { answers: {}, importance: {}, conviction: {}, additionalComments: {} };
       // Start from previous draft answers/baseline so non-rendered QIDs survive,
       // then overwrite only the currently allowed question set.
       const { answersObj, baselineObj } = buildPersistedDraftMapsForAllowedIds({
-        allowedQuestionIds: [...allowed],
+        allowedQuestionIds: allowed,
         slice,
         baselineSlice,
         prevAnswers,
@@ -4661,16 +4658,15 @@ export class SurveyQuestions extends Component {
 
       const draftContext = resolveDraftStorageContext(this.props, this._getEffectiveDraftSlug());
       const slug = draftContext.sessionSlug || '';
-      const payload = {
-        meta: {
-          networkId: draftContext.networkId,
-          surveyId: this.props.singleQuestionMode ? (this.props.questionID || 'questions') : (this.props.surveyId || 'questions'),
-          ts: Date.now()
-        },
-        answers: answersObj,
+      const payload = buildPersistedDraftPayload({
+        draftContext,
+        singleQuestionMode: this.props.singleQuestionMode,
+        questionId: this.props.questionID,
+        surveyId: this.props.surveyId,
+        answersObj,
         // Keep baseline in storage; prefill/merge logic depends on it to avoid false dirty diffs.
-        baseline: baselineObj
-      };
+        baselineObj,
+      });
 
       const nextSemanticSignature = buildSurveyDraftSemanticSignature(payload);
       if (nextSemanticSignature && nextSemanticSignature === prevSemanticSignature) {
