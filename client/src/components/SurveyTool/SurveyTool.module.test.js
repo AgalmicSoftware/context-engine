@@ -1746,6 +1746,46 @@ describe('SurveyTool module', () => {
     expect(treeHasDataTestId(lockControl, E2E_TESTIDS.SURVEY_LOCK_AUDIENCE_GATE)).toBe(false);
   });
 
+  it('derives lock-audience display state for additional fields with inherit mode', () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: true,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+    });
+    subject.state = {
+      ...subject.state,
+      lockAudienceMenuByQuestion: { 'q1:additional': true },
+      lockAudienceGateDetailsByQuestion: {},
+    };
+    subject.isQuestionLockedForResponse = jest.fn(() => false);
+    subject.resolveQuestionGateOption = jest.fn(() => null);
+    subject.resolveFieldEncryptionAudience = jest.fn(() => 'self');
+
+    const displayState = subject.getLockAudienceDisplayState({
+      questionId: 'q1',
+      answer: { encrypted: false, encryptionAudience: 'self' },
+      field: { encrypted: true, encryptionAudience: 'self', audienceMode: 'inherit' },
+      fieldKey: 'additional',
+      lockDisabled: false,
+      lockTitle: 'Comments encryption audience',
+      glowAnswer: false,
+      forceAudienceMenu: true,
+      selfAudienceLabel: 'only me',
+      showPlaintextOption: true,
+      visualContext: 'pile',
+    });
+
+    expect(displayState.effectiveFieldKey).toBe('additional');
+    expect(displayState.menuOpen).toBe(true);
+    expect(displayState.followActive).toBe(true);
+    expect(displayState.allowPlaintextOption).toBe(false);
+    expect(displayState.isPileVisualContext).toBe(true);
+    expect(displayState.buttonTitle).toBe('Choose encryption audience');
+  });
+
   it('uses a darker pressed state for the open pile lock menu without applying the bright active glow', () => {
     const subject = new SurveyQuestions({
       singleQuestionMode: false,
@@ -2077,6 +2117,59 @@ describe('SurveyTool module', () => {
 
     expect(treeHasText(expandedControl, 'AI Gate Test SBT')).toBe(true);
     expect(treeHasText(expandedControl, '0x1111...1111')).toBe(true);
+  });
+
+  it('wires shared lock-audience gate helper callbacks for select and details toggle', () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: true,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+    });
+    subject.toggleLockAudienceGateDetails = jest.fn();
+    const onSelectAudience = jest.fn();
+
+    const gateOption = subject.renderLockAudienceGateOption({
+      qid: 'q1',
+      effectiveFieldKey: 'answer',
+      option: {
+        gateId: 'vip_gate',
+        label: 'VIP gate',
+        sbtItems: [{
+          address: '0x1111111111111111111111111111111111111111',
+          label: 'AI Gate Test SBT',
+          meta: '0x1111...1111',
+          href: '/sbt/0x1111111111111111111111111111111111111111',
+        }],
+      },
+      gateActive: false,
+      currentGateId: '',
+      expandedGateId: '',
+      onSelectAudience,
+    });
+
+    const gateButton = findElement(
+      gateOption,
+      (candidate) => candidate?.props?.['data-testid'] === E2E_TESTIDS.SURVEY_LOCK_AUDIENCE_GATE
+        && candidate?.props?.['data-ce-gate-id'] === 'vip_gate'
+    );
+    const caretButton = findNodeByClassName(gateOption, styles.lockAudienceCaretButton);
+
+    expect(gateButton).toBeTruthy();
+    expect(caretButton).toBeTruthy();
+
+    gateButton.props.onClick();
+    expect(onSelectAudience).toHaveBeenCalledWith('gate', 'vip_gate');
+
+    const preventDefault = jest.fn();
+    const stopPropagation = jest.fn();
+    caretButton.props.onClick({ preventDefault, stopPropagation });
+
+    expect(preventDefault).toHaveBeenCalled();
+    expect(stopPropagation).toHaveBeenCalled();
+    expect(subject.toggleLockAudienceGateDetails).toHaveBeenCalledWith('q1', 'vip_gate', 'answer');
   });
 
   it('hides the plaintext audience option for additional comment lock menus', () => {
