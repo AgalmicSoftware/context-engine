@@ -8004,6 +8004,37 @@ describe('SurveyTool module', () => {
     sessionStorage.clear();
   });
 
+  it('drops invalid persisted draft payloads during loadDraft', () => {
+    sessionStorage.clear();
+
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: true,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+      activeSessionSlug: 'edge',
+      sessionSlug: 'edge',
+      questionPool: [{ id: 'q1' }],
+    });
+
+    const key = subject.getDraftKey();
+    sessionStorage.setItem(key, JSON.stringify({
+      meta: { networkId: 84532, surveyId: 'questions', ts: 111 },
+      baseline: {
+        q1: {
+          value: 'invalid-without-answers',
+        },
+      },
+    }));
+
+    expect(subject.loadDraft()).toBeNull();
+    expect(sessionStorage.getItem(key)).toBeNull();
+
+    sessionStorage.clear();
+  });
+
   it('skips draft rewrites when only timestamp would change and writes again after semantic edits', () => {
     sessionStorage.clear();
     const nowSpy = jest.spyOn(Date, 'now')
