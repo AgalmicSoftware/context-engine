@@ -65,6 +65,26 @@ type BuildPrefilledSurveyStateArgs = {
   buildSliceFromUserAnswers?: ((userAnswers: unknown, prevSlice?: ResponseSlice | null) => ResponseSlice | null) | null;
 };
 
+type BuildHydratedResponseSliceArgs = {
+  userAnswers?: unknown;
+  prevSlice?: ResponseSlice | null;
+  applyResponseHydrationListToSlice?: ((args: {
+    targetSlice?: ResponseSlice | null;
+    currentSlice?: ResponseSlice | null;
+    responses?: unknown[];
+    allowOverwrite?: boolean;
+    parseValue?: ((value: unknown) => unknown) | null;
+  }) => boolean) | null;
+  parseValue?: ((value: unknown) => unknown) | null;
+};
+
+type BuildRevertedResponseSliceArgs = {
+  baselineSlice?: ResponseSlice | null;
+  renderedQuestionIds?: Iterable<unknown> | unknown[];
+  cloneFieldState?: ((value: unknown) => unknown) | null;
+  buildEmptyResponseFieldState?: ((questionId?: string, fieldKey?: string) => unknown) | null;
+};
+
 type DraftAwareCacheHydrationStateArgs = {
   cachedAnswer?: unknown;
   cachedAdditional?: unknown;
@@ -276,6 +296,33 @@ export const buildCacheHydrationSlice = ({
   return { slice, changed };
 };
 
+export const buildHydratedResponseSlice = ({
+  userAnswers = null,
+  prevSlice = null,
+  applyResponseHydrationListToSlice = null,
+  parseValue = null,
+}: BuildHydratedResponseSliceArgs = {}) => {
+  const slice = buildEmptyResponseSlice();
+  if (!userAnswers) return slice;
+
+  const normalizedAnswers = isRecord(userAnswers) ? userAnswers : null;
+  const responses = Array.isArray(normalizedAnswers?.responses)
+    ? normalizedAnswers.responses
+    : [userAnswers];
+
+  if (typeof applyResponseHydrationListToSlice === 'function') {
+    applyResponseHydrationListToSlice({
+      targetSlice: slice,
+      currentSlice: prevSlice,
+      responses,
+      allowOverwrite: true,
+      parseValue,
+    });
+  }
+
+  return slice;
+};
+
 export const buildPrefilledSurveyState = ({
   surveyIndex = 0,
   prevSurveysResponseState = null,
@@ -327,6 +374,38 @@ export const buildPrefilledSurveyState = ({
     nextBaseline: baseline,
     shouldWriteBaseline: !submissionComplete,
   };
+};
+
+export const buildRevertedResponseSlice = ({
+  baselineSlice = null,
+  renderedQuestionIds = [],
+  cloneFieldState = null,
+  buildEmptyResponseFieldState = null,
+}: BuildRevertedResponseSliceArgs = {}) => {
+  const baseline = baselineSlice && typeof baselineSlice === 'object' ? baselineSlice : buildEmptyResponseSlice();
+  const clone = typeof cloneFieldState === 'function'
+    ? cloneFieldState
+    : ((value: unknown) => value);
+
+  const nextSlice: ResponseSlice = {
+    answers: clone(baseline.answers || {}) as Record<string, unknown>,
+    importance: { ...((baseline.importance as Record<string, unknown>) || {}) },
+    conviction: { ...((baseline.conviction as Record<string, unknown>) || {}) },
+    additionalComments: clone(baseline.additionalComments || {}) as Record<string, unknown>,
+  };
+
+  Array.from(renderedQuestionIds || []).forEach((rawQuestionId) => {
+    const questionId = normalizeQuestionIdKey(rawQuestionId);
+    if (!questionId) return;
+    if (!nextSlice.answers?.[questionId] && typeof buildEmptyResponseFieldState === 'function') {
+      nextSlice.answers[questionId] = buildEmptyResponseFieldState(questionId, 'answer');
+    }
+    if (!nextSlice.additionalComments?.[questionId] && typeof buildEmptyResponseFieldState === 'function') {
+      nextSlice.additionalComments[questionId] = buildEmptyResponseFieldState(questionId, 'additional');
+    }
+  });
+
+  return nextSlice;
 };
 
 export const buildDraftAwareCacheHydrationState = ({

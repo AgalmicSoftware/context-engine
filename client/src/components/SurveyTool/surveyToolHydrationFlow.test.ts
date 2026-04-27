@@ -2,8 +2,10 @@ import {
   buildCacheHydrationSlice,
   buildDraftAwareCacheHydrationState,
   buildDraftHydrationState,
+  buildHydratedResponseSlice,
   buildLocalCacheRehydrationState,
   buildPrefilledSurveyState,
+  buildRevertedResponseSlice,
 } from './surveyToolHydrationFlow.js';
 
 describe('surveyToolHydrationFlow', () => {
@@ -280,6 +282,67 @@ describe('surveyToolHydrationFlow', () => {
     expect(applyLocalCacheHydrationEntryToSlice).toHaveBeenCalledTimes(2);
   });
 
+  it('builds hydrated response slices from single or multi-response payloads', () => {
+    const applyResponseHydrationListToSlice = jest.fn(({ targetSlice, responses, parseValue }) => {
+      const [first, second] = responses;
+      targetSlice.answers.q1 = { value: parseValue(first.answer.value) };
+      if (second) {
+        targetSlice.additionalComments.q2 = { value: parseValue(second.additional.value) };
+      }
+      return true;
+    });
+    const parseValue = jest.fn((value) => {
+      if (typeof value === 'string' && (value.startsWith('[') || value.startsWith('{'))) {
+        return JSON.parse(value);
+      }
+      return value;
+    });
+
+    expect(buildHydratedResponseSlice({
+      userAnswers: {
+        responses: [
+          { answer: { value: '{"label":"first"}' }, additional: { value: 'notes-1' } },
+          { answer: { value: 'second' }, additional: { value: '["notes-2"]' } },
+        ],
+      },
+      prevSlice: { answers: { q0: { value: 'keep' } } },
+      applyResponseHydrationListToSlice,
+      parseValue,
+    })).toEqual({
+      answers: { q1: { value: { label: 'first' } } },
+      importance: {},
+      conviction: {},
+      additionalComments: { q2: { value: ['notes-2'] } },
+    });
+
+    expect(buildHydratedResponseSlice({
+      userAnswers: { answer: { value: 'solo' }, additional: { value: 'notes' } },
+      prevSlice: null,
+      applyResponseHydrationListToSlice,
+      parseValue,
+    })).toEqual({
+      answers: { q1: { value: 'solo' } },
+      importance: {},
+      conviction: {},
+      additionalComments: {},
+    });
+
+    expect(buildHydratedResponseSlice({
+      userAnswers: null,
+      prevSlice: null,
+      applyResponseHydrationListToSlice,
+      parseValue,
+    })).toEqual({
+      answers: {},
+      importance: {},
+      conviction: {},
+      additionalComments: {},
+    });
+
+    expect(applyResponseHydrationListToSlice).toHaveBeenCalledTimes(2);
+    expect(parseValue).toHaveBeenCalledTimes(3);
+  });
+
   it('builds prefilled survey state with hydrated slice and optional baseline writes', () => {
     const applyResponseHydrationListToSlice = jest.fn(({ targetSlice, responses }) => {
       const first = responses[0];
@@ -351,5 +414,41 @@ describe('surveyToolHydrationFlow', () => {
       applyResponseHydrationListToSlice,
       buildSliceFromUserAnswers,
     }).shouldWriteBaseline).toBe(false);
+  });
+
+  it('builds reverted response slices from baseline state plus rendered empty shells', () => {
+    const cloneFieldState = jest.fn((value) => JSON.parse(JSON.stringify(value)));
+    const buildEmptyResponseFieldState = jest.fn((questionId, fieldKey = 'answer') => ({
+      value: '',
+      encrypted: false,
+      questionId,
+      fieldKey,
+    }));
+
+    expect(buildRevertedResponseSlice({
+      baselineSlice: {
+        answers: { q1: { value: 'saved answer' } },
+        importance: { q1: 4 },
+        conviction: { q1: 7 },
+        additionalComments: { q1: { value: 'saved notes' } },
+      },
+      renderedQuestionIds: ['Q1', 'q2'],
+      cloneFieldState,
+      buildEmptyResponseFieldState,
+    })).toEqual({
+      answers: {
+        q1: { value: 'saved answer' },
+        q2: { value: '', encrypted: false, questionId: 'q2', fieldKey: 'answer' },
+      },
+      importance: { q1: 4 },
+      conviction: { q1: 7 },
+      additionalComments: {
+        q1: { value: 'saved notes' },
+        q2: { value: '', encrypted: false, questionId: 'q2', fieldKey: 'additional' },
+      },
+    });
+
+    expect(cloneFieldState).toHaveBeenCalledTimes(2);
+    expect(buildEmptyResponseFieldState).toHaveBeenCalledTimes(2);
   });
 });
