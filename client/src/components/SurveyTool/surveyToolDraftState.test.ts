@@ -1,5 +1,7 @@
 import {
   buildPersistDraftAllowedQuestionIds,
+  loadPreviousPersistedDraftSnapshot,
+  buildSurveyDraftLoadPlan,
   buildPersistedDraftPayload,
   buildPersistedDraftMapsForAllowedIds,
   buildPersistedDraftQuestionEntry,
@@ -295,6 +297,131 @@ describe('surveyToolDraftState', () => {
         'dg:surveyDraft:demo-slug:__pending__:anon:questions:q:q2',
       ],
     });
+  });
+
+  it('builds draft load plans that preserve account and anon migration precedence', () => {
+    expect(buildSurveyDraftLoadPlan({
+      hasAccount: true,
+      primaryAccountKey: 'acct',
+      primaryAnonKey: 'anon',
+      compatAccountKey: 'acct-compat',
+      compatAnonKey: 'anon-compat',
+      pendingAccountKey: 'pending',
+      perQuestionAccountKey: 'acct-q',
+      perQuestionAnonKey: 'anon-q',
+    })).toEqual([
+      { readKey: 'acct', writeKey: null },
+      { readKey: 'acct-compat', writeKey: 'acct' },
+      { readKey: 'pending', writeKey: 'acct' },
+      { readKey: 'acct-q', writeKey: 'acct' },
+      { readKey: 'anon', writeKey: 'acct' },
+      { readKey: 'anon-compat', writeKey: 'acct' },
+      { readKey: 'anon-q', writeKey: 'acct' },
+    ]);
+
+    expect(buildSurveyDraftLoadPlan({
+      hasAccount: false,
+      primaryAnonKey: 'anon',
+      compatAnonKey: 'anon-compat',
+      pendingAccountKey: 'pending',
+      perQuestionAnonKey: 'anon-q',
+    })).toEqual([
+      { readKey: 'anon', writeKey: null },
+      { readKey: 'anon-compat', writeKey: 'anon' },
+      { readKey: 'pending', writeKey: 'anon' },
+      { readKey: 'anon-q', writeKey: 'anon' },
+    ]);
+  });
+
+  it('loads previous persisted draft snapshots from cache, storage, and malformed inputs', () => {
+    const buildSemanticSignature = jest.fn((payload) => JSON.stringify(payload));
+    const removeDraftRaw = jest.fn();
+
+    expect(loadPreviousPersistedDraftSnapshot(
+      {
+        key: 'draft-key',
+        lastDraftKey: 'draft-key',
+        lastDraftJSON: '{"answers":{"q1":{"value":"cached"}}}',
+        lastDraftSemanticSignature: 'cached-signature',
+        draftParseCache: {
+          key: 'draft-key',
+          raw: '{"answers":{"q1":{"value":"cached"}}}',
+          parsed: {
+            answers: { q1: { value: 'cached' } },
+            baseline: { q1: { value: 'baseline-cached' } },
+          },
+        },
+      },
+      {
+        readDraftRaw: jest.fn(),
+        removeDraftRaw,
+        buildSemanticSignature,
+      },
+    )).toEqual({
+      prevAnswers: { q1: { value: 'cached' } },
+      prevBaseline: { q1: { value: 'baseline-cached' } },
+      prevDraftRaw: '{"answers":{"q1":{"value":"cached"}}}',
+      prevSemanticSignature: 'cached-signature',
+      nextDraftParseCache: {
+        key: 'draft-key',
+        raw: '{"answers":{"q1":{"value":"cached"}}}',
+        parsed: {
+          answers: { q1: { value: 'cached' } },
+          baseline: { q1: { value: 'baseline-cached' } },
+        },
+      },
+      shouldResetDraftTracking: false,
+    });
+
+    const readDraftRaw = jest.fn(() => '{"answers":{"q2":{"value":"stored"}},"baseline":{"q2":{"value":"baseline-stored"}}}');
+    expect(loadPreviousPersistedDraftSnapshot(
+      {
+        key: 'draft-key',
+        lastDraftKey: 'other-key',
+        lastDraftJSON: null,
+        lastDraftSemanticSignature: null,
+        draftParseCache: null,
+      },
+      {
+        readDraftRaw,
+        removeDraftRaw,
+        buildSemanticSignature,
+      },
+    )).toEqual({
+      prevAnswers: { q2: { value: 'stored' } },
+      prevBaseline: { q2: { value: 'baseline-stored' } },
+      prevDraftRaw: '{"answers":{"q2":{"value":"stored"}},"baseline":{"q2":{"value":"baseline-stored"}}}',
+      prevSemanticSignature: '{"answers":{"q2":{"value":"stored"}},"baseline":{"q2":{"value":"baseline-stored"}}}',
+      nextDraftParseCache: {
+        key: 'draft-key',
+        raw: '{"answers":{"q2":{"value":"stored"}},"baseline":{"q2":{"value":"baseline-stored"}}}',
+        parsed: {
+          answers: { q2: { value: 'stored' } },
+          baseline: { q2: { value: 'baseline-stored' } },
+        },
+      },
+      shouldResetDraftTracking: false,
+    });
+
+    expect(loadPreviousPersistedDraftSnapshot(
+      {
+        key: 'draft-key',
+        draftParseCache: null,
+      },
+      {
+        readDraftRaw: jest.fn(() => '{broken-json'),
+        removeDraftRaw,
+        buildSemanticSignature,
+      },
+    )).toEqual({
+      prevAnswers: {},
+      prevBaseline: {},
+      prevDraftRaw: '',
+      prevSemanticSignature: null,
+      nextDraftParseCache: null,
+      shouldResetDraftTracking: true,
+    });
+    expect(removeDraftRaw).toHaveBeenCalledWith('draft-key');
   });
 
   it('removes a single question from persisted draft payloads and deletes empty drafts', () => {
