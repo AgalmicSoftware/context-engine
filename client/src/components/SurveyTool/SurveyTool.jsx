@@ -218,7 +218,13 @@ import {
   buildQuestionFilterStorageKeyPrefix,
   buildQuestionIdScopeSignature,
   buildQuestionScanProgressDisplay,
+  buildDraftHydrationPatchForQuestion,
   buildPersistedDraftQuestionRemovalPlan,
+  buildPersistedDraftTrackingAfterLoad,
+  buildPersistedDraftTrackingAfterScopedDelete,
+  buildPersistedDraftTrackingAfterWrite,
+  buildPersistedDraftTrackingClearedState,
+  buildPersistedDraftTrackingOnKeyChange,
   buildPersistedDraftWritePlan,
   buildPersistDraftAllowedQuestionIds,
   loadPreviousPersistedDraftSnapshot,
@@ -4504,11 +4510,17 @@ export class SurveyQuestions extends Component {
 
       // Guard null key and clean up malformed JSON
       if (!key) return;
-      if (key !== this._lastDraftKey) {
-        this._lastDraftKey = key;
-        this._lastDraftJSON = null;
-        this._lastDraftSemanticSignature = null;
-      }
+      const keyTracking = buildPersistedDraftTrackingOnKeyChange({
+        nextDraftKey: key,
+        lastDraftKey: this._lastDraftKey,
+        lastDraftJSON: this._lastDraftJSON,
+        lastDraftSemanticSignature: this._lastDraftSemanticSignature,
+        draftParseCache: this._draftParseCache,
+      });
+      this._lastDraftKey = keyTracking.lastDraftKey;
+      this._lastDraftJSON = keyTracking.lastDraftJSON;
+      this._lastDraftSemanticSignature = keyTracking.lastDraftSemanticSignature;
+      this._draftParseCache = keyTracking.draftParseCache;
 
       // Preload prior persisted answers so we don't prune non-rendered QIDs
       const {
@@ -4532,11 +4544,18 @@ export class SurveyQuestions extends Component {
           buildSemanticSignature: buildSurveyDraftSemanticSignature,
         },
       );
-      this._draftParseCache = nextDraftParseCache;
-      if (shouldResetDraftTracking) {
-        this._lastDraftJSON = null;
-        this._lastDraftSemanticSignature = null;
-      }
+      const loadTracking = buildPersistedDraftTrackingAfterLoad({
+        lastDraftKey: this._lastDraftKey,
+        lastDraftJSON: this._lastDraftJSON,
+        lastDraftSemanticSignature: this._lastDraftSemanticSignature,
+        draftParseCache: this._draftParseCache,
+        nextDraftParseCache,
+        shouldResetDraftTracking,
+      });
+      this._lastDraftKey = loadTracking.lastDraftKey;
+      this._lastDraftJSON = loadTracking.lastDraftJSON;
+      this._lastDraftSemanticSignature = loadTracking.lastDraftSemanticSignature;
+      this._draftParseCache = loadTracking.draftParseCache;
 
       const surveyIndex = this.props.isStandalone || this.props.singleQuestionMode ? 0 : this.props.surveyIndex;
       const slice = (this.state.surveysResponseState && this.state.surveysResponseState[surveyIndex]) || {
@@ -4621,9 +4640,16 @@ export class SurveyQuestions extends Component {
         } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
       }
 
-      this._draftParseCache = { key, raw: nextJson, parsed: payload };
-      this._lastDraftJSON = nextJson;
-      this._lastDraftSemanticSignature = nextSemanticSignature;
+      const writeTracking = buildPersistedDraftTrackingAfterWrite({
+        key,
+        raw: nextJson,
+        payload,
+        semanticSignature: nextSemanticSignature,
+      });
+      this._lastDraftKey = writeTracking.lastDraftKey;
+      this._lastDraftJSON = writeTracking.lastDraftJSON;
+      this._lastDraftSemanticSignature = writeTracking.lastDraftSemanticSignature;
+      this._draftParseCache = writeTracking.draftParseCache;
       if (this._draftDirtyQids) this._draftDirtyQids.clear();
 
       persistWritePlan.staleAnonKeys.forEach((draftKey) => {
@@ -4649,10 +4675,11 @@ export class SurveyQuestions extends Component {
 
       purgeKeys.forEach(k => { try { sessionStorage.removeItem(k); } catch (e) { surveyLog.warn('SurveyTool: fallback', e); } });
 
-      this._draftParseCache = null;
-      this._lastDraftKey = '';
-      this._lastDraftJSON = null;
-      this._lastDraftSemanticSignature = null;
+      const clearedTracking = buildPersistedDraftTrackingClearedState();
+      this._draftParseCache = clearedTracking.draftParseCache;
+      this._lastDraftKey = clearedTracking.lastDraftKey;
+      this._lastDraftJSON = clearedTracking.lastDraftJSON;
+      this._lastDraftSemanticSignature = clearedTracking.lastDraftSemanticSignature;
     } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
   };
 
@@ -4686,21 +4713,31 @@ export class SurveyQuestions extends Component {
           });
           if (removalPlan.action === 'delete-storage') {
             try { sessionStorage.removeItem(key); } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
-            if (this._draftParseCache && this._draftParseCache.key === key) {
-              this._draftParseCache = null;
-            }
-            if (this._lastDraftKey === key) {
-              this._lastDraftJSON = null;
-              this._lastDraftSemanticSignature = null;
-            }
+            const deleteTracking = buildPersistedDraftTrackingAfterScopedDelete({
+              key,
+              lastDraftKey: this._lastDraftKey,
+              lastDraftJSON: this._lastDraftJSON,
+              lastDraftSemanticSignature: this._lastDraftSemanticSignature,
+              draftParseCache: this._draftParseCache,
+            });
+            this._lastDraftKey = deleteTracking.lastDraftKey;
+            this._lastDraftJSON = deleteTracking.lastDraftJSON;
+            this._lastDraftSemanticSignature = deleteTracking.lastDraftSemanticSignature;
+            this._draftParseCache = deleteTracking.draftParseCache;
             return;
           }
           if (removalPlan.action === 'update-storage' && removalPlan.nextPayload && removalPlan.nextJson) {
               sessionStorage.setItem(key, removalPlan.nextJson);
-              this._draftParseCache = { key, raw: removalPlan.nextJson, parsed: removalPlan.nextPayload };
-              this._lastDraftKey = key;
-              this._lastDraftJSON = removalPlan.nextJson;
-              this._lastDraftSemanticSignature = removalPlan.nextSemanticSignature;
+              const writeTracking = buildPersistedDraftTrackingAfterWrite({
+                key,
+                raw: removalPlan.nextJson,
+                payload: removalPlan.nextPayload,
+                semanticSignature: removalPlan.nextSemanticSignature,
+              });
+              this._lastDraftKey = writeTracking.lastDraftKey;
+              this._lastDraftJSON = writeTracking.lastDraftJSON;
+              this._lastDraftSemanticSignature = writeTracking.lastDraftSemanticSignature;
+              this._draftParseCache = writeTracking.draftParseCache;
           }
         } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
       });

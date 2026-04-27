@@ -64,7 +64,13 @@ export {
   resolveSlugForIds,
 } from './surveyToolSlugLookup.js';
 export {
+  buildDraftHydrationPatchForQuestion,
   buildPersistedDraftQuestionRemovalPlan,
+  buildPersistedDraftTrackingAfterLoad,
+  buildPersistedDraftTrackingAfterScopedDelete,
+  buildPersistedDraftTrackingAfterWrite,
+  buildPersistedDraftTrackingClearedState,
+  buildPersistedDraftTrackingOnKeyChange,
   buildPersistedDraftWritePlan,
   buildPersistDraftAllowedQuestionIds,
   loadPreviousPersistedDraftSnapshot,

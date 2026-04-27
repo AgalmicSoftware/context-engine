@@ -1,5 +1,10 @@
 import {
   buildPersistedDraftQuestionRemovalPlan,
+  buildPersistedDraftTrackingAfterLoad,
+  buildPersistedDraftTrackingAfterScopedDelete,
+  buildPersistedDraftTrackingAfterWrite,
+  buildPersistedDraftTrackingClearedState,
+  buildPersistedDraftTrackingOnKeyChange,
   buildPersistedDraftWritePlan,
   buildPersistDraftAllowedQuestionIds,
   loadPreviousPersistedDraftSnapshot,
@@ -524,6 +529,90 @@ describe('surveyToolDraftState', () => {
       status: 'invalid',
       payload: null,
       raw: '{broken-json',
+    });
+  });
+
+  it('builds persisted draft tracking transitions for key changes, loads, writes, and deletes', () => {
+    expect(buildPersistedDraftTrackingOnKeyChange({
+      nextDraftKey: 'draft-key',
+      lastDraftKey: 'draft-key',
+      lastDraftJSON: '{"answers":{}}',
+      lastDraftSemanticSignature: 'sig:same',
+      draftParseCache: { key: 'draft-key', raw: '{"answers":{}}', parsed: { answers: {} } },
+    })).toEqual({
+      lastDraftKey: 'draft-key',
+      lastDraftJSON: '{"answers":{}}',
+      lastDraftSemanticSignature: 'sig:same',
+      draftParseCache: { key: 'draft-key', raw: '{"answers":{}}', parsed: { answers: {} } },
+      didSwitchKey: false,
+    });
+
+    expect(buildPersistedDraftTrackingOnKeyChange({
+      nextDraftKey: 'next-key',
+      lastDraftKey: 'prev-key',
+      lastDraftJSON: '{"answers":{"q1":{"value":"stale"}}}',
+      lastDraftSemanticSignature: 'sig:stale',
+      draftParseCache: { key: 'prev-key', raw: '{"answers":{"q1":{"value":"stale"}}}', parsed: { answers: { q1: { value: 'stale' } } } },
+    })).toEqual({
+      lastDraftKey: 'next-key',
+      lastDraftJSON: null,
+      lastDraftSemanticSignature: null,
+      draftParseCache: { key: 'prev-key', raw: '{"answers":{"q1":{"value":"stale"}}}', parsed: { answers: { q1: { value: 'stale' } } } },
+      didSwitchKey: true,
+    });
+
+    expect(buildPersistedDraftTrackingAfterLoad({
+      lastDraftKey: 'draft-key',
+      lastDraftJSON: '{"answers":{}}',
+      lastDraftSemanticSignature: 'sig:old',
+      draftParseCache: null,
+      nextDraftParseCache: { key: 'draft-key', raw: '{"answers":{"q1":{"value":"new"}}}', parsed: { answers: { q1: { value: 'new' } } } },
+      shouldResetDraftTracking: true,
+    })).toEqual({
+      lastDraftKey: 'draft-key',
+      lastDraftJSON: null,
+      lastDraftSemanticSignature: null,
+      draftParseCache: { key: 'draft-key', raw: '{"answers":{"q1":{"value":"new"}}}', parsed: { answers: { q1: { value: 'new' } } } },
+    });
+
+    expect(buildPersistedDraftTrackingAfterWrite({
+      key: 'draft-key',
+      raw: '{"answers":{"q1":{"value":"hello"}}}',
+      payload: { answers: { q1: { value: 'hello' } } },
+      semanticSignature: 'sig:new',
+    })).toEqual({
+      lastDraftKey: 'draft-key',
+      lastDraftJSON: '{"answers":{"q1":{"value":"hello"}}}',
+      lastDraftSemanticSignature: 'sig:new',
+      draftParseCache: {
+        key: 'draft-key',
+        raw: '{"answers":{"q1":{"value":"hello"}}}',
+        parsed: { answers: { q1: { value: 'hello' } } },
+      },
+    });
+
+    expect(buildPersistedDraftTrackingAfterScopedDelete({
+      key: 'draft-key',
+      lastDraftKey: 'draft-key',
+      lastDraftJSON: '{"answers":{"q1":{"value":"hello"}}}',
+      lastDraftSemanticSignature: 'sig:new',
+      draftParseCache: {
+        key: 'draft-key',
+        raw: '{"answers":{"q1":{"value":"hello"}}}',
+        parsed: { answers: { q1: { value: 'hello' } } },
+      },
+    })).toEqual({
+      lastDraftKey: 'draft-key',
+      lastDraftJSON: null,
+      lastDraftSemanticSignature: null,
+      draftParseCache: null,
+    });
+
+    expect(buildPersistedDraftTrackingClearedState()).toEqual({
+      lastDraftKey: '',
+      lastDraftJSON: null,
+      lastDraftSemanticSignature: null,
+      draftParseCache: null,
     });
   });
 
