@@ -64,17 +64,9 @@ type PersistedDraftPayloadArgs = {
   now?: number;
 };
 
-type SurveyDraftStorageScopesArgs = {
-  surveyScope?: unknown;
-  singleQuestionMode?: boolean;
+type RemoveQuestionFromPersistedDraftPayloadArgs = {
+  draftPayload?: unknown;
   questionId?: unknown;
-};
-
-type SurveyDraftStorageKeysArgs = {
-  slug?: unknown;
-  networkIdStr?: unknown;
-  accounts?: unknown[];
-  scopes?: unknown[];
 };
 
 type PendingStatsState = {
@@ -564,50 +556,67 @@ export const buildPersistedDraftPayload = ({
   baseline: isRecord(baselineObj) ? baselineObj : {},
 });
 
-export const buildSurveyDraftStorageScopes = ({
-  surveyScope = '',
-  singleQuestionMode = false,
+export const removeQuestionFromPersistedDraftPayload = ({
+  draftPayload = null,
   questionId = '',
-}: SurveyDraftStorageScopesArgs = {}) => {
-  const normalizedSurveyScope = String(surveyScope || '').trim();
-  const compatScope = normalizedSurveyScope.replace(/^questions:q:[^:]+$/, 'questions');
-  const scopes = new Set([normalizedSurveyScope, compatScope].filter(Boolean));
-  const qid = normalizeQuestionIdKey(questionId);
-  if (singleQuestionMode && qid) {
-    scopes.add(`questions:q:${qid}`);
+}: RemoveQuestionFromPersistedDraftPayloadArgs = {}) => {
+  if (!isRecord(draftPayload) || !isRecord(draftPayload.answers)) {
+    return {
+      action: 'delete',
+      nextPayload: null,
+      removed: false,
+    };
   }
-  return [...scopes];
-};
 
-export const buildSurveyDraftStorageKeys = ({
-  slug = '',
-  networkIdStr = '',
-  accounts = [],
-  scopes = [],
-}: SurveyDraftStorageKeysArgs = {}) => {
-  const nets = new Set(['__pending__']);
-  if (networkIdStr) nets.add(String(networkIdStr));
+  const qid = normalizeQuestionIdKey(questionId);
+  if (!qid) {
+    return {
+      action: 'keep',
+      nextPayload: draftPayload,
+      removed: false,
+    };
+  }
 
-  const who = new Set(
-    (Array.isArray(accounts) ? accounts : [])
-      .map((account) => String(account || '').toLowerCase() || 'anon')
-      .filter(Boolean),
-  );
-  who.add('anon');
+  const nextAnswers = { ...draftPayload.answers };
+  const nextBaseline = isRecord(draftPayload.baseline)
+    ? { ...draftPayload.baseline }
+    : draftPayload.baseline;
+  let removed = false;
 
-  const normalizedScopes = Array.isArray(scopes)
-    ? scopes.map((scope) => String(scope || '').trim()).filter(Boolean)
-    : [];
-
-  const keys = [];
-  nets.forEach((network) => {
-    who.forEach((account) => {
-      normalizedScopes.forEach((scope) => {
-        keys.push(`dg:surveyDraft:${slug}:${network}:${account}:${scope}`);
-      });
-    });
+  Object.keys(nextAnswers).forEach((answerKey) => {
+    if (normalizeQuestionIdKey(answerKey) !== qid) return;
+    delete nextAnswers[answerKey];
+    if (isRecord(nextBaseline) && Object.prototype.hasOwnProperty.call(nextBaseline, answerKey)) {
+      delete nextBaseline[answerKey];
+    }
+    removed = true;
   });
-  return [...new Set(keys)];
+
+  if (!removed) {
+    return {
+      action: 'keep',
+      nextPayload: draftPayload,
+      removed: false,
+    };
+  }
+
+  if (Object.keys(nextAnswers).length === 0) {
+    return {
+      action: 'delete',
+      nextPayload: null,
+      removed: true,
+    };
+  }
+
+  return {
+    action: 'update',
+    nextPayload: {
+      ...draftPayload,
+      answers: nextAnswers,
+      ...(nextBaseline !== undefined ? { baseline: nextBaseline } : {}),
+    },
+    removed: true,
+  };
 };
 
 export function getPendingStatsSnapshotFromState(state: PendingStatsState | null | undefined = {}): PendingStatsSnapshot {
