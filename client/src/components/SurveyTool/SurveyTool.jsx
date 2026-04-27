@@ -224,6 +224,8 @@ import {
   buildDraftAwareCacheHydrationState,
   buildDraftHydrationState,
   buildHydratedResponseSlice,
+  buildLocalCacheHydrationMemoKey,
+  buildMergedHydrationQuestionResponses,
   buildLocalCacheRehydrationState,
   buildPrefilledSurveyState,
   buildRevertedResponseSlice,
@@ -5671,14 +5673,15 @@ export class SurveyQuestions extends Component {
       const acct = (this.props?.account || '').toLowerCase();
       const rendered = this.getCurrentRenderedQuestionIds();
       const renderedSignature = buildRenderedIdsSignature(rendered);
-      const memoKey = [
-        scopeSlugs.map((value) => normalizeSessionSlugValue(value)).join(','),
-        netId,
-        acct,
+      const memoKey = buildLocalCacheHydrationMemoKey({
+        scopeSlugs,
+        networkIdStr: netId,
+        account: acct,
         renderedSignature,
-        Number(this.props.questionsCacheNonce || 0),
-        Number(this.props.questionResponsesNonce || 0),
-      ].join('|');
+        questionsCacheNonce: this.props.questionsCacheNonce,
+        questionResponsesNonce: this.props.questionResponsesNonce,
+        normalizeSessionSlugValue,
+      });
       if (
         this._localCacheSliceMemo &&
         this._localCacheSliceMemo.hasValue === true &&
@@ -5694,12 +5697,11 @@ export class SurveyQuestions extends Component {
 
       if (!netId || !acct) return memoize(null);
 
-      const mergedQuestionResponses = {};
-      scopeSlugs.forEach((scopeSlug) => {
-        let qc = readQuestionsCache(scopeSlug);
-        if (!qc || typeof qc !== 'object') qc = {};
-        const net = qc?.[netId];
-        mergeQuestionResponses(mergedQuestionResponses, net?.questionResponses || {});
+      const mergedQuestionResponses = buildMergedHydrationQuestionResponses({
+        scopeSlugs,
+        networkIdStr: netId,
+        readQuestionsCache,
+        mergeQuestionResponses,
       });
       if (Object.keys(mergedQuestionResponses).length === 0) return memoize(null);
 

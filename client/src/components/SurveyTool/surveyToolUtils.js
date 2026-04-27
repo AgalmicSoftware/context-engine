@@ -104,6 +104,8 @@ export {
   buildDraftAwareCacheHydrationState,
   buildDraftHydrationState,
   buildHydratedResponseSlice,
+  buildLocalCacheHydrationMemoKey,
+  buildMergedHydrationQuestionResponses,
   buildLocalCacheRehydrationState,
   buildPrefilledSurveyState,
   buildRevertedResponseSlice,
