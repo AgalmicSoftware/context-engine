@@ -99,6 +99,7 @@ export {
   updateSubmittedSinceLastEdit,
 } from './surveyToolDraftState.js';
 export {
+  buildCacheHydrationSlice,
   buildDraftHydrationState,
 } from './surveyToolHydrationFlow.js';
 export {
