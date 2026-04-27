@@ -8582,6 +8582,60 @@ describe('SurveyTool module', () => {
     expect(targetSlice.conviction.q1).toBe(7);
   });
 
+  it('applies response hydration entries to a target slice through one local shell helper', () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: true,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+      activeSessionSlug: 'edge',
+      sessionSlug: 'edge',
+      questionPool: [{ id: 'q1' }],
+    });
+
+    const targetSlice = {
+      answers: {},
+      importance: {},
+      conviction: {},
+      additionalComments: {},
+    };
+
+    const changed = subject._applyResponseHydrationEntryToSlice({
+      targetSlice,
+      questionId: 'q1',
+      response: {
+        answer: {
+          value: 'hydrated answer',
+          encrypted: true,
+        },
+        additional: {
+          value: 'hydrated notes',
+          encrypted: true,
+          audienceMode: 'inherit',
+        },
+        importance: 4,
+        conviction: 7,
+      },
+      allowOverwrite: true,
+      parseValue: (value) => value,
+    });
+
+    expect(changed).toBe(true);
+    expect(targetSlice.answers.q1).toMatchObject({
+      value: 'hydrated answer',
+      encrypted: true,
+    });
+    expect(targetSlice.additionalComments.q1).toMatchObject({
+      value: 'hydrated notes',
+      encrypted: true,
+      audienceMode: 'inherit',
+    });
+    expect(targetSlice.importance.q1).toBe(4);
+    expect(targetSlice.conviction.q1).toBe(7);
+  });
+
   it('skips draft rewrites when only timestamp would change and writes again after semantic edits', () => {
     sessionStorage.clear();
     const nowSpy = jest.spyOn(Date, 'now')
