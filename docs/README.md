@@ -66,17 +66,9 @@ Design and public presentation:
 - `docs/visual-identity.md`: public visual identity and asset guidance.
 - `docs/reference-links.md`: background references used by the project documentation.
 
-Wallets:
-- `docs/passkey-wallet.md`: passkey-unlocked EOA wallet wiring and deterministic test wallet workflow.
-- `docs/forking-wallet.md`: RP ID and wallet setup checklist for forks.
-- `docs/security-model.md`: embedded wallet and soft-session security model.
-
-Verification:
-- `docs/testing.md`: public test commands and supported local verification paths.
-- `docs/bundle-budget.md`: client bundle-size thresholds and remediation guidance.
-
-Public discovery:
-- `docs/discoverability.md`: Static crawl assets, live GitHub branch links, and the Google Search Console checklist.
+E2E workflows:
+- `docs/e2e-setup.md`: End-to-end workflow scripts, chain runtime modes, and the current manual-fork workflow for repeated verification against live deployments.
+- `docs/e2e-testid-api.md`: Stable `data-testid` hooks used by Playwright runners (TestID API).
 
 Public discovery:
 - `docs/discoverability.md`: Static crawl assets, live GitHub branch links, and the Google Search Console checklist.

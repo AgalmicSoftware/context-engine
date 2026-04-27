@@ -1,10 +1,6 @@
 # Run Modes
 
-Context Engine's developer run mode, static web-app hosting, session access
-policy, and session infrastructure profile are separate choices. For example,
-the same hosted web app can open a private worker-canonical session or a public
-decentralized session; making the app public does not make every session public
-or on-chain.
+Context Engine can be used in three main modes depending on how much infrastructure you want to run, plus one advanced manual-fork E2E workaround.
 
 ## Developer Run Modes
 
@@ -54,7 +50,17 @@ Local blockchain development with Anvil and Foundry.
 - See [local-chain.md](local-chain.md) for chain startup, deploy flow, and local
   contract testing.
 
-### `manual-fork` verification (advanced)
+## `manual-fork` verification (advanced)
+
+Hybrid E2E verification when you want real deployed contracts and seeded live state, but do not want to spend live gas for repeated validation.
+
+- Start Anvil in fork mode yourself against the target chain
+- Point E2E `RPC_URL` at that local fork
+- Keep `CHAIN` / `CHAIN_ID` / `SESSION_REGISTRY` / `SBT_FACTORY` aligned to the upstream chain you forked
+- See [docs/e2e-setup.md](e2e-setup.md) for the current manual-fork workflow
+- First-class `E2E_CHAIN_MODE=fork` orchestration is tracked separately in [PRD 236](../TODO/PRDs/236_e2e-first-class-local-fork-mode.md)
+
+## `hosted/onchain`
 
 Hybrid E2E verification against real deployed contract state without spending
 live gas for every repeated validation.

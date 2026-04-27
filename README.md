@@ -8,25 +8,36 @@
 
 **Live demo:** [contextengine.sh](https://contextengine.sh)
 
-Context Engine is a toolkit for AI-enhanced deliberation, decision-making, and negotiation in large groups. It supports public and private questions and responses, AI-assisted input and analysis, permanent records, and cryptographic access control. It allows for no-code deployment of [Soulbound Tokens](https://www.radicalxchange.org/wiki/social-identity/) for Groups. Designed for use cases such as public discourse, organizational decision-making, and preference-related dataset creation.
+Context Engine is a decision-memory system for groups, organizations, and AI agents.
 
-Context Engine is a toolkit for AI-enhanced deliberation and sensemaking in large groups. It supports public and private questions and responses, AI-assisted input and analysis, permanent records, and cryptographic access control. It allows for no-code deployment of [Soulbound Tokens for Groups](https://www.radicalxchange.org/wiki/social-identity/). Designed for use cases such as public discourse, organizational decision-making, and preference-related dataset creation.
+It helps teams capture the context behind important decisions: assumptions, predictions, tradeoffs, confidence levels, disagreement, and outcomes. Instead of losing that context across meetings, chats, documents, and slide decks, Context Engine turns it into a structured record that humans and AI agents can revisit later.
 
-<p align="center">
-  <img src="client/src/assets/img/readme-architecture-deployment-modes.png" alt="Context Engine deployment diagram showing Web App and AI Agent access to shared sessions across Hosted and Fast, Trustless and Slower, and planned Company-Operated infrastructure modes." />
-</p>
+Sessions can be public or private, with AI-assisted input and analysis, optional encryption, passkey-based login, and cryptographic group access control. The project also supports public deliberation, open civic use cases, and dataset creation, but normal participants do not need wallets or crypto knowledge to use it.
 
-Context Engine separates how the web app is hosted from how each session establishes authority and stores data. **EVM and Arweave are profile-specific options, not baseline dependencies.** The current Hosted & Fast profile uses a per-session Cloudflare Worker and Cloudflare storage as its canonical backend, so it can run public or private sessions without an EVM transaction, RPC endpoint, gas, Arweave, or Lit. The Trustless & Slower profile deliberately opts into public EVM contracts and Arweave, with Lit required only when that encryption path is selected. The planned Company-Operated edition is intended to connect internal identity and key management, storage, networking, AI, and observability services, and can be entirely off-chain. For current profile requirements and publish behavior, see the [session creation guide](docs/session-creation-guide.md).
+Use it before decisions to surface hidden disagreement, during collection to preserve sensitive context, and after outcomes to review what a group believed, why it acted, and what it learned over time.
 
-## Deployment Modes
+## Why Context Engine?
 
-| Mode | Availability | Infrastructure and setup |
-| --- | --- | --- |
-| **Hosted & Fast** | Available; default/recommended path after selection in `/new` | Public or private sessions use a per-session Cloudflare Worker and Cloudflare storage. The creator supplies a Cloudflare API token and one AI-provider key. No EVM network or transaction, RPC endpoint, gas, Arweave, or Lit is required by default. |
-| **Trustless & Slower** | Available; opt-in | Public or private sessions use Arweave plus an EVM registry and contracts. Setup requires an Arweave wallet/JWK, an EVM RPC URL and gas, and one AI-provider key; add Lit credentials only when Lit encryption is selected. |
-| **Company-Operated** | Planned; not yet generally available | Existing hardware, private clouds, or internal networks connect through adapters for company identity and key management, storage, AI gateways, and observability. Public EVM and Arweave are not architectural requirements, so this mode can be entirely off-chain. |
+Organizations make high-stakes decisions with incomplete memory.
 
-[contextengine.sh](https://contextengine.sh) is the hosted public web interface, and the static client can also be self-hosted. The former `.xyz` address redirects to this canonical site. App hosting, public/private session access, and the session infrastructure profile are separate choices. Participants never need deployer API keys.
+The final decision may be documented, but the reasoning behind it often disappears:
+
+- What did people believe before the outcome was known?
+- Which assumptions mattered most?
+- Where did people disagree?
+- Who was confident, uncertain, or dissenting?
+- Which predictions later proved accurate?
+- What should future teams and AI agents learn from the decision?
+
+Context Engine captures this missing layer of organizational context. It records beliefs, predictions, disagreement, and confidence in a format that can later be searched, summarized, compared, and exported.
+
+## Example: Strategy Decision Review
+
+Before a major roadmap decision, a team creates a private Context Engine session.
+
+Participants submit expected outcomes, key assumptions, risks and failure modes, confidence levels, and dissenting views. Responses can stay private during collection, then be reviewed later alongside the actual outcome.
+
+The result is a decision record that captures not only what the organization decided, but what it believed at the time.
 
 ## Quick Start
 
@@ -60,39 +71,50 @@ The React app runs on `http://localhost:3000`.
 For testing, run modes, and deeper setup:
 - [docs/testing.md](docs/testing.md)
 - [docs/run-modes.md](docs/run-modes.md)
+- [docs/e2e-setup.md](docs/e2e-setup.md)
 - [docs/session-creation-guide.md](docs/session-creation-guide.md)
 - [docs/public-client-config.md#static-frontend-deploy](docs/public-client-config.md#static-frontend-deploy) for Netlify/custom-domain static frontend deploys
 
-## Features
+## Core Features
 
-### Survey and Response Management
+### Decision Memory
 - Multiple question types: freeform, multiple choice, binary, and rating scales
-- Optional encryption of responses and results
-- Decentralized and permanent storage of responses
-- Statistical / AI analysis and visualization of results
+- Capture assumptions, predictions, risks, confidence, and tradeoffs before outcomes are known
+- Preserve disagreement and minority views instead of flattening them into a single summary
+- Compare responses over time and keep durable records for later review
 - Export results as `.json`, `.csv`, `.pdf`
 
-### SBT-Gated Groups
-- No-code creation of Soulbound tokens ([SBTs](https://www.radicalxchange.org/wiki/social-identity/)) for groups
-- Public minting, password-protected minting, time-limited minting, limited-number minting, and auto-claim URLs
-- Role-based burn authorization (admin, minter, both, neither)
-- Session and resource gating based on SBT ownership (encrypted titles, information, docURLs, tags)
+### Private and Organizational Sessions
+- Public or private questions, responses, and results
+- Optional encryption of responses and results
+- Supports both public-record workflows and more private organizational use cases
+- Architecture and scaling docs outline more private/local deployment paths for environments that need tighter infrastructure control
 
-### AI-Assisted Tooling
-- Voice-to-text input
+### AI-Assisted Sensemaking
 - Question generation from file, URL, or text input
+- Voice-to-text input
 - Summaries and analysis of survey results and response clusters
 - OpenAI, Anthropic, OpenRouter, and custom provider paths
 
-### User and Deployer UX: Passkey sign-on UX  
-- Users log in with a simple Passkey / Biometric flow (native pin, fingerprint, or faceID on phones) 
-- Login flow generates or handles an Ethereum account, which can be used easily with cryptography features
-   - Users do not need to know anything about Ethereum or crypto (or take any additional steps) to use the app
+### Low-Friction Identity
+- Passkey / biometric login using native PIN, fingerprint, or Face ID flows
+- The login flow handles the cryptographic account behind the scenes
+- Users do not need to know anything about Ethereum or crypto to participate
 
+### Group Access Control
+- No-code creation of [Soulbound Tokens for Groups](https://www.radicalxchange.org/wiki/social-identity/) (SBTs)
+- Session and resource gating based on SBT ownership
+- Public minting, password-protected minting, time-limited minting, limited-number minting, and auto-claim URLs
+- Role-based burn authorization (admin, minter, both, neither)
 
-### Deployer UX: Sponsored Bundles
-- Deployers can use and set up sponsored bundles of API keys (for storage, EVM transactions, encryption network, AI API) 
-  - Senstive and organiztional deployments can plug in existing AI Keys, and use local or custom options for storage, encryption, and EVM network functionalities
+## Deployment Modes
+
+| Mode | Best for | Visibility | Notes |
+| --- | --- | --- | --- |
+| Public deliberation | Civic discourse, public AI policy, open communities | Public or selectively encrypted | Default public web app, durable records, AI analysis |
+| Private organization | Companies, labs, nonprofits, internal strategy, risk review | Private or selectively shared | Passkey login, encrypted responses, and documented private/local deployment directions |
+| Event / conference | Retreats, workshops, conferences, pop-up communities | Participant-only or public summary | Gated sessions, exports, AI summaries |
+| Research / dataset creation | Preference datasets, discourse corpuses, evaluation studies | Configurable | Structured exports and reusable records |
 
 
 ## AI Discourse Corpus
@@ -102,6 +124,14 @@ The top-level [`ai-discourse-corpus/`](ai-discourse-corpus/) directory contains 
 ## Scaling
 
 The default public deployment supports hundreds to low thousands of concurrent participants per session. For larger deployments, see [docs/scaling.md](docs/scaling.md).
+
+## Technical Architecture
+
+Context Engine uses cryptographic infrastructure for identity, access control, encryption, timestamps, and optional data permanence.
+
+The default public deployment combines a React SPA, EVM contracts, Arweave, Lit Protocol, and Cloudflare workers. The broader architecture also outlines more private/local deployment paths for organizations that need tighter control over storage, workers, or encryption backends. For most users, those details stay behind a normal web interface with passkey login.
+
+For a deeper system map, see [ARCHITECTURE.md](ARCHITECTURE.md), [docs/session-cors-worker.md](docs/session-cors-worker.md), and [docs/scaling.md](docs/scaling.md).
 
 ## Documentation
 
@@ -113,7 +143,8 @@ The default public deployment supports hundreds to low thousands of concurrent p
 - Public posts authoring: [docs/posts.md](docs/posts.md)
 - Testing guide: [docs/testing.md](docs/testing.md)
 - Run modes: [docs/run-modes.md](docs/run-modes.md)
-- Public client config and current defaults: [docs/public-client-config.md](docs/public-client-config.md)
+- E2E workflow guide: [docs/e2e-setup.md](docs/e2e-setup.md)
+- Public client config, current defaults, and static deploy notes: [docs/public-client-config.md](docs/public-client-config.md)
 - PATH / RPC behavior: [docs/path-rpc.md](docs/path-rpc.md)
 - Cloudflare worker docs: [docs/session-cors-worker.md](docs/session-cors-worker.md)
 - Session registry and gate model: [docs/session-registry.md](docs/session-registry.md)
