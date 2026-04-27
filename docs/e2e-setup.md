@@ -50,6 +50,25 @@ Optional:
 - `E2E_ENV_FILE=/abs/path/to/custom.env npm run ai:test-survey-authoring:encryption-matrix`
 - `E2E_ENV_DEBUG=1 npm run ai:test-survey-authoring:encryption-matrix`
 
+## Chain Runtime Modes
+
+Current E2E work uses three practical chain-runtime lanes:
+
+| Runtime | How to use it today | Contracts / state | Gas / side effects | Current support |
+| --- | --- | --- | --- | --- |
+| `onchain` | Default shared path | Live deployed contracts and live chain state | Real gas, persistent writes | First-class |
+| `local` | `E2E_CHAIN_MODE=local` on runners that support it | Local Anvil + local deploys | Local gas, no live writes | First-class |
+| manual fork | Start Anvil in fork mode yourself, then point `RPC_URL` at that local fork while keeping `CHAIN` / `CHAIN_ID` / `SESSION_REGISTRY` / `SBT_FACTORY` aligned to the upstream chain | Live deployed contracts and seeded live chain state | Local gas, no live writes | Supported as a manual workaround |
+
+Manual fork recipe today:
+
+1. Start a local Anvil fork against the target chain outside the repo.
+2. Keep the target chain identity explicit with `CHAIN` / `CHAIN_ID` and any contract overrides that should still refer to the upstream deployment.
+3. Point `RPC_URL` at the local Anvil endpoint for the run.
+4. Choose mock-vs-live toggles independently (`E2E_LIT_MOCK`, `E2E_AI_MOCK`, `E2E_ARWEAVE_MOCK`).
+
+Current committed runners do not yet auto-spawn or tear down a fork runtime for you. First-class `E2E_CHAIN_MODE=fork` orchestration is tracked in [PRD 236](../TODO/PRDs/236_e2e-first-class-local-fork-mode.md).
+
 ## Common Env Vars
 
 All new runners accept this common surface:
@@ -107,7 +126,8 @@ Session slug handoff:
 - When not provided, runners generate timestamped slugs that include both `runTag` and a human tag (DD-Mon-YYYY-HH-MM-AM/PM) so it is obvious which runs happened first.
 
 Boundary runner mode:
-- `E2E_CHAIN_MODE=onchain|local` (`onchain` default)
+- Current committed boundary-mode surface: `E2E_CHAIN_MODE=onchain|local` (`onchain` default)
+- First-class `fork` orchestration is not committed yet; use the manual fork workflow above and point `RPC_URL` at your local Anvil fork when needed.
 
 Arweave-required flows:
 - `ARWEAVE_JWK_PATH` is required for doc upload/decrypt flows

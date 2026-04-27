@@ -51,14 +51,14 @@ Payload schemas:
 
 Local development:
 - `docs/local-chain.md`: Foundry/Anvil local chain setup, deploy flow, and test commands.
-- `docs/run-modes.md`: repo run modes (`core-local`, `local-chain`, `hosted/onchain`).
+- `docs/run-modes.md`: repo run modes (`core-local`, `local-chain`, `hosted/onchain`) plus the current manual-fork verification note.
 - `docs/testing.md`: centralized test commands and runtime requirements across root, client, and E2E flows.
 
 Wallets:
 - `docs/porto-information.md`: Porto passkey wallet wiring and deterministic test wallet workflow.
 
 E2E workflows:
-- `docs/e2e-setup.md`: End-to-end workflow scripts (gates Any/All, doc library filetype encryption/decryption).
+- `docs/e2e-setup.md`: End-to-end workflow scripts, chain runtime modes, and the current manual-fork workflow for repeated verification against live deployments.
 - `docs/e2e-testid-api.md`: Stable `data-testid` hooks used by Playwright runners (TestID API).
 
 Public discovery:
