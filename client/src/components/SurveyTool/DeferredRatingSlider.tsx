@@ -14,10 +14,6 @@ type DeferredRatingSliderProps = {
   onCommit?: (value: number) => void;
 };
 
-export const resolveDeferredRatingSliderStyle = (): React.CSSProperties => ({
-  width: '200px',
-});
-
 const DeferredRatingSlider = ({
   value,
   disabled = false,
@@ -31,7 +27,7 @@ const DeferredRatingSlider = ({
     tooltip={false}
     disabled={disabled}
     className={styles.ratingSlider}
-    style={resolveDeferredRatingSliderStyle()}
+    style={{ width: '200px' }}
     onCommit={onCommit}
   >
     {({ value: liveValue, sliderProps }) => (

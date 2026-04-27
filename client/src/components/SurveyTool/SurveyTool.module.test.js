@@ -5,6 +5,21 @@ import {
   normalizeSurveyToolFilterState,
   shouldShowPileFullLoadingState,
   buildSurveyDraftSemanticSignature,
+  QuestionsDashboard,
+  SurveyQuestions,
+  SurveySelector,
+  DeferredCommitSlider,
+} from './SurveyTool.jsx';
+import {
+  QuestionsDashboard as DirectQuestionsDashboard,
+  SurveySelector as DirectSurveySelector,
+} from './SurveySelector';
+import BullhornToggleButton from './BullhornToggleButton';
+import DeferredRatingSlider from './DeferredRatingSlider';
+import { DeferredCommitSlider as DirectDeferredCommitSlider } from './DeferredCommitSlider';
+import {
+  computeSubmitLabel as directComputeSubmitLabel,
+  normalizeSurveyToolFilterState as directNormalizeSurveyToolFilterState,
 } from './surveyToolUtils.js';
 import { SurveyQuestions } from './SurveyQuestions';
 import { PileViewMode } from './SurveyPileViewMode';
@@ -2025,11 +2040,12 @@ describe('SurveyTool module', () => {
       network: { id: 1 },
     });
     const activeButton = subject.renderBullhornToggleButton({ active: true });
-    expect(String(activeButton?.props?.className || '')).toContain('iconButtonActive');
-    expect(String(activeButton?.props?.children?.props?.className || '')).toContain('iconGlow');
+    expect(activeButton?.type).toBe(BullhornToggleButton);
+    expect(activeButton?.props?.active).toBe(true);
 
     const inactiveButton = subject.renderBullhornToggleButton({ active: false });
-    expect(String(inactiveButton?.props?.className || '')).not.toContain('iconButtonActive');
+    expect(inactiveButton?.type).toBe(BullhornToggleButton);
+    expect(inactiveButton?.props?.active).toBe(false);
   });
 
   it('locks and opens the pile lock audience menu on first click when no default gate is configured', () => {
@@ -2269,6 +2285,705 @@ describe('SurveyTool module', () => {
       primaryResource: 'surveyResponses',
       recipients: [{ accessControlConditions: [{ contractAddress: '0x1' }], chain: 'baseSepolia' }],
     }));
+    subject.resolveConfiguredGateLabel = jest.fn(() => 'Registry default gate');
+    subject.resolveGateDisplayLabel = jest.fn(() => 'Registry default gate');
+
+    const gateOptions = subject.getResponseGateOptions('q1');
+
+    expect(gateOptions).toHaveLength(1);
+    expect(gateOptions[0]).toEqual(expect.objectContaining({
+      gateId: 'default_gate',
+      label: 'session',
+    }));
+    expect(gateOptions[0].label).not.toBe('General Session');
+  });
+
+  it('does not inherit the general response gate policy for unknown explicit session slugs', () => {
+    const generalCfg = {
+      slug: '',
+      sessionName: 'General Session',
+      networkChainId: 84532,
+      sponsored: {
+        defaultGateId: 'general_gate',
+        gates: {
+          general_gate: {
+            gateId: 'general_gate',
+            type: 'sbt',
+            label: 'General Gate',
+            chainId: 84532,
+            sbtAddresses: ['0x1111111111111111111111111111111111111111'],
+          },
+        },
+        resources: {
+          questionResponses: { gateId: 'general_gate' },
+          default: { gateId: 'general_gate' },
+        },
+      },
+    };
+    const strictLookup = (slug) => (
+      String(slug || '').trim().toLowerCase() === ''
+        ? generalCfg
+        : null
+    );
+    jest.spyOn(contractScriptsModule, 'getSessionConfigBySlug').mockImplementation(strictLookup);
+    jest.spyOn(contractScriptsModule, 'getSessionConfigBySlugOrDefault').mockImplementation((slug) => (
+      strictLookup(slug) || generalCfg
+    ));
+
+    const subject = new SurveyQuestions({
+      singleQuestionMode: true,
+      isStandalone: false,
+      surveyIndex: 0,
+      questionID: 'q1',
+      sessionSlug: 'missing-session-slug',
+      activeSessionSlug: '',
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+      sessionConfig: {
+        sessionName: 'Pinned Missing Session',
+      },
+    });
+
+    const policy = subject.getResponseGatePolicy();
+
+    expect(policy).toEqual({
+      primaryResource: 'questionResponses',
+      gates: [],
+      recipients: [],
+      allowFallbackConditions: true,
+    });
+    expect(subject._responseGatePolicyCache?.cfg).toMatchObject({
+      slug: 'missing-session-slug',
+      sessionName: 'Pinned Missing Session',
+    });
+    expect(subject._responseGatePolicyCache?.cfg?.sponsored).toBeUndefined();
+  });
+
+  it('keeps response gate SBT details hidden behind the caret until expanded', () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: true,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+    });
+    subject.state = {
+      ...subject.state,
+      lockAudienceMenuByQuestion: { q1: true },
+      lockAudienceGateDetailsByQuestion: {},
+    };
+    subject.isQuestionLockedForResponse = jest.fn(() => false);
+    subject.resolveQuestionGateOption = jest.fn(() => ({
+      gateDetails: [{
+        gateId: 'default_gate',
+        label: 'test-12',
+        sbtItems: [{
+          address: '0x1111111111111111111111111111111111111111',
+          label: 'AI Gate Test SBT',
+          meta: '0x1111...1111',
+          href: '/sbt/0x1111111111111111111111111111111111111111',
+        }],
+      }],
+    }));
+    subject.resolveFieldEncryptionAudience = jest.fn(() => 'self');
+    subject.resolveFieldEncryptionGateId = jest.fn(() => null);
+
+    const collapsedControl = subject.renderAnswerLockControl({
+      surveyIndex: 0,
+      questionId: 'q1',
+      answer: { encrypted: false, encryptionAudience: 'self' },
+      lockDisabled: false,
+      lockTitle: 'Not encrypted',
+      glowAnswer: false,
+      forceAudienceMenu: true,
+      selfAudienceLabel: 'only me',
+    });
+
+    expect(treeHasText(collapsedControl, 'only me')).toBe(true);
+    expect(treeHasText(collapsedControl, 'test-12')).toBe(true);
+    expect(treeHasText(collapsedControl, 'for test-12')).toBe(false);
+    expect(treeHasText(collapsedControl, 'AI Gate Test SBT')).toBe(false);
+    expect(findNodeByClassName(collapsedControl, styles.lockAudienceCaretButton)).toBeTruthy();
+
+    subject.state = {
+      ...subject.state,
+      lockAudienceMenuByQuestion: { q1: true },
+      lockAudienceGateDetailsByQuestion: { q1: 'default_gate' },
+    };
+
+    const expandedControl = subject.renderAnswerLockControl({
+      surveyIndex: 0,
+      questionId: 'q1',
+      answer: { encrypted: false, encryptionAudience: 'self' },
+      lockDisabled: false,
+      lockTitle: 'Not encrypted',
+      glowAnswer: false,
+      forceAudienceMenu: true,
+      selfAudienceLabel: 'only me',
+    });
+
+    expect(treeHasText(expandedControl, 'AI Gate Test SBT')).toBe(true);
+    expect(treeHasText(expandedControl, '0x1111...1111')).toBe(true);
+  });
+
+  it('hides the plaintext audience option for additional comment lock menus', () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: true,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+    });
+    subject.state = { ...subject.state, lockAudienceMenuByQuestion: { 'q1:additional': true } };
+    subject.isQuestionLockedForResponse = jest.fn(() => false);
+    subject.resolveQuestionGateOption = jest.fn(() => null);
+    subject.resolveFieldEncryptionAudience = jest.fn(() => 'self');
+    subject.resolveLockAudienceSessionName = jest.fn(() => 'session');
+
+    const lockControl = subject.renderAnswerLockControl({
+      surveyIndex: 0,
+      questionId: 'q1',
+      answer: { encrypted: false, encryptionAudience: 'self' },
+      field: { encrypted: false, encryptionAudience: 'self' },
+      fieldKey: 'additional',
+      lockDisabled: false,
+      lockTitle: 'Comments encryption audience',
+      glowAnswer: false,
+      forceAudienceMenu: true,
+      selfAudienceLabel: 'only me',
+      showPlaintextOption: true,
+      showFollowOption: true,
+    });
+
+    expect(treeHasText(lockControl, 'Not encrypted')).toBe(false);
+    expect(treeHasDataTestId(lockControl, E2E_TESTIDS.SURVEY_LOCK_AUDIENCE_NONE)).toBe(false);
+    expect(treeHasText(lockControl, 'only me')).toBe(true);
+    expect(treeHasText(lockControl, 'Match Answer')).toBe(true);
+  });
+
+  it('turns off additional comment encryption when clicking the open active lock', () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: true,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+    });
+    subject.state = { ...subject.state, lockAudienceMenuByQuestion: { 'q1:additional': true } };
+    subject.isQuestionLockedForResponse = jest.fn(() => false);
+    subject.resolveQuestionGateOption = jest.fn(() => null);
+    subject.resolveFieldEncryptionAudience = jest.fn(() => 'self');
+    subject.resolveLockAudienceSessionName = jest.fn(() => 'session');
+    subject.toggleAnswerEncryption = jest.fn();
+    subject.toggleAdditionalCommentsEncryption = jest.fn();
+    subject.toggleLockAudienceMenu = jest.fn();
+
+    const lockControl = subject.renderAnswerLockControl({
+      surveyIndex: 0,
+      questionId: 'q1',
+      answer: { encrypted: true, encryptionAudience: 'self' },
+      field: { encrypted: true, encryptionAudience: 'self', audienceMode: 'explicit' },
+      fieldKey: 'additional',
+      lockDisabled: false,
+      lockTitle: 'Encrypted comments',
+      glowAnswer: false,
+      forceAudienceMenu: true,
+      selfAudienceLabel: 'only me',
+      showPlaintextOption: true,
+      showFollowOption: true,
+    });
+    const lockButton = findFirstNodeByType(lockControl, 'button');
+    expect(lockButton).toBeTruthy();
+
+    lockButton.props.onClick();
+
+    expect(subject.toggleAdditionalCommentsEncryption).toHaveBeenCalledWith(0, 'q1', false);
+    expect(subject.toggleLockAudienceMenu).toHaveBeenCalledWith('q1', false, 'additional');
+    expect(subject.toggleAnswerEncryption).not.toHaveBeenCalled();
+  });
+
+  it('shows the same forced audience menu in full mode when no gate is configured', () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+    });
+    subject.state = { ...subject.state, lockAudienceMenuByQuestion: { q1: true } };
+    subject.isQuestionLockedForResponse = jest.fn(() => false);
+    subject.resolveQuestionGateOption = jest.fn(() => null);
+    subject.resolveFieldEncryptionAudience = jest.fn(() => 'self');
+    subject.resolveLockAudienceSessionName = jest.fn(() => 'session');
+
+    const question = {
+      id: 'q1',
+      type: 'freeform',
+      question: 'How are you?',
+    };
+    const currentSurveyResponseState = {
+      answers: { q1: { value: '', encrypted: false, encryptionAudience: 'self' } },
+      additionalComments: { q1: { value: '', encrypted: false, encryptionAudience: 'self' } },
+      importance: {},
+      conviction: {},
+    };
+
+    const fullQuestionCard = subject.renderQuestion(question, 0, currentSurveyResponseState);
+
+    expect(treeHasText(fullQuestionCard, 'only me')).toBe(true);
+    expect(treeHasDataTestId(fullQuestionCard, E2E_TESTIDS.SURVEY_LOCK_AUDIENCE_GATE)).toBe(false);
+  });
+
+  it('renders full-mode additional comments without the extra header and keeps the lock beside the field', () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+    });
+    subject.state = {
+      ...subject.state,
+      showComments: { q1: true },
+    };
+    subject.isQuestionLockedForResponse = jest.fn(() => false);
+    subject.resolveQuestionGateOption = jest.fn(() => null);
+    subject.resolveFieldEncryptionAudience = jest.fn(() => 'self');
+
+    const question = {
+      id: 'q1',
+      type: 'freeform',
+      question: 'How are you?',
+    };
+    const currentSurveyResponseState = {
+      answers: { q1: { value: '', encrypted: false, encryptionAudience: 'self' } },
+      additionalComments: { q1: { value: '', encrypted: false, encryptionAudience: 'self' } },
+      importance: {},
+      conviction: {},
+    };
+
+    const fullQuestionCard = subject.renderQuestion(question, 0, currentSurveyResponseState);
+    const inlineRow = findNodeByClassName(fullQuestionCard, styles.additionalCommentsInlineRow);
+    const rowChildren = getElementChildren(inlineRow);
+    const inputNode = findElement(
+      rowChildren[0],
+      (node) => node?.props?.dataTestId === E2E_TESTIDS.SURVEY_ADDITIONAL_INPUT
+    );
+
+    expect(inlineRow).not.toBeNull();
+    expect(findNodeByClassName(fullQuestionCard, styles.additionalCommentsHeader)).toBeNull();
+    expect(treeHasText(fullQuestionCard, 'Additional comments')).toBe(false);
+    expect(rowChildren).toHaveLength(2);
+    expect(nodeHasClassName(rowChildren[0], styles.additionalCommentsInputWrap)).toBe(true);
+    expect(nodeHasClassName(rowChildren[1], styles.additionalCommentsLockSlot)).toBe(true);
+    expect(inputNode).not.toBeNull();
+    expect(inputNode.props.placeholder).toBe('related thoughts or URLs (optional)');
+    expect(treeHasDataTestId(rowChildren[1], E2E_TESTIDS.SURVEY_ADDITIONAL_LOCK)).toBe(true);
+  });
+
+  it('lets additional comments Match Answer until an explicit override is chosen', () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: true,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+    });
+    subject.setState = (next, cb) => {
+      const patch = typeof next === 'function' ? next(subject.state, subject.props) : next;
+      subject.state = { ...subject.state, ...(patch || {}) };
+      if (typeof cb === 'function') cb();
+    };
+    subject.scheduleJsonPreviewUpdate = jest.fn();
+    subject.persistDraftSafely = jest.fn();
+    subject.invalidateDiffCaches = jest.fn();
+    subject.isQuestionLockedForResponse = jest.fn(() => false);
+    subject.getEffectiveRecipientsForQid = jest.fn(() => [{ accessControlConditions: [{ contractAddress: '0x1' }], chain: 'base' }]);
+    subject.getResponseGateOptions = jest.fn(() => [
+      {
+        gateId: 'gate-a',
+        label: 'Gate A',
+        sbtAddresses: ['0x00000000000000000000000000000000000000a1'],
+        sbtSummary: 'Gate A SBT',
+        recipients: [{ accessControlConditions: [{ contractAddress: '0x1' }], chain: 'base' }],
+      },
+      {
+        gateId: 'gate-b',
+        label: 'Gate B',
+        sbtAddresses: ['0x00000000000000000000000000000000000000b1'],
+        sbtSummary: 'Gate B SBT',
+        recipients: [{ accessControlConditions: [{ contractAddress: '0x2' }], chain: 'base' }],
+      },
+    ]);
+    subject.state = {
+      ...subject.state,
+      surveysResponseState: [{
+        answers: {
+          q1: {
+            value: 'answer',
+            encrypted: true,
+            encryptionAudience: 'gate',
+            encryptionGateId: 'gate-a',
+            audienceMode: 'explicit',
+          },
+        },
+        additionalComments: {
+          q1: {
+            value: 'comments',
+            encrypted: true,
+            encryptionAudience: 'gate',
+            encryptionGateId: 'gate-a',
+            audienceMode: 'inherit',
+          },
+        },
+        importance: {},
+        conviction: {},
+      }],
+    };
+
+    subject.applyAnswerEncryptionAudience(0, 'q1', 'gate', { gateId: 'gate-b' });
+    expect(subject.state.surveysResponseState[0].answers.q1.encryptionGateId).toBe('gate-b');
+    expect(subject.state.surveysResponseState[0].additionalComments.q1.encryptionGateId).toBe('gate-b');
+    expect(subject.state.surveysResponseState[0].additionalComments.q1.audienceMode).toBe('inherit');
+
+    subject.applyAdditionalEncryptionAudience(0, 'q1', 'self');
+    expect(subject.state.surveysResponseState[0].additionalComments.q1.encryptionAudience).toBe('self');
+    expect(subject.state.surveysResponseState[0].additionalComments.q1.audienceMode).toBe('explicit');
+
+    subject.applyAnswerEncryptionAudience(0, 'q1', 'gate', { gateId: 'gate-a' });
+    expect(subject.state.surveysResponseState[0].answers.q1.encryptionGateId).toBe('gate-a');
+    expect(subject.state.surveysResponseState[0].additionalComments.q1.encryptionAudience).toBe('self');
+    expect(subject.state.surveysResponseState[0].additionalComments.q1.encryptionGateId).toBeNull();
+
+    subject.applyAdditionalEncryptionAudience(0, 'q1', 'follow');
+    expect(subject.state.surveysResponseState[0].additionalComments.q1.audienceMode).toBe('inherit');
+    expect(subject.state.surveysResponseState[0].additionalComments.q1.encryptionGateId).toBe('gate-a');
+  });
+
+  it('groups answer and additional encryption work by field-specific gate recipients', () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: true,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+    });
+    const gateARecipients = [{ accessControlConditions: [{ contractAddress: '0x1' }], chain: 'base' }];
+    const gateBRecipients = [{ accessControlConditions: [{ contractAddress: '0x2' }], chain: 'base' }];
+    subject.isQuestionLockedForResponse = jest.fn(() => false);
+    subject.resolveFieldEncryptionAudience = (field) => field?.encryptionAudience || 'self';
+    subject.resolveFieldEncryptionGateId = (field) => field?.encryptionGateId || null;
+    subject.getEffectiveRecipientsForField = jest.fn(({ field }) => (
+      field?.encryptionGateId === 'gate-b' ? gateBRecipients : gateARecipients
+    ));
+
+    const { groups, missingRecipients } = subject.buildFieldEncryptionWorkGroups({
+      answers: {
+        q1: {
+          value: 'answer',
+          encrypted: true,
+          encryptionAudience: 'gate',
+          encryptionGateId: 'gate-a',
+        },
+      },
+      additionalComments: {
+        q1: {
+          value: 'comments',
+          encrypted: true,
+          encryptionAudience: 'gate',
+          encryptionGateId: 'gate-b',
+        },
+      },
+      importance: {},
+      conviction: {},
+    }, new Set(['q1']));
+
+    expect(missingRecipients).toEqual([]);
+    expect(groups).toHaveLength(2);
+    expect(groups[0].slice.answers.q1 || groups[1].slice.answers.q1).toBeTruthy();
+    expect(groups[0].slice.additionalComments.q1 || groups[1].slice.additionalComments.q1).toBeTruthy();
+    expect(groups.map((group) => JSON.stringify(group.recipients))).toEqual(expect.arrayContaining([
+      JSON.stringify(gateARecipients),
+      JSON.stringify(gateBRecipients),
+    ]));
+  });
+
+  it('clamps full-mode rating answers into the supported slider range and avoids duplicate id styling hooks', () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+    });
+
+    const question = {
+      id: 'q1',
+      type: 'rating',
+      question: 'How strongly do you agree?',
+    };
+
+    const withNumericString = {
+      answers: { q1: { value: '8', encrypted: false } },
+      additionalComments: { q1: { value: '', encrypted: false } },
+      importance: {},
+      conviction: {},
+    };
+    let fullQuestionCard = subject.renderQuestion(question, 0, withNumericString);
+    let ratingSlider = findElement(fullQuestionCard, (node) => (
+      node?.props?.min === 0 &&
+      node?.props?.max === 10 &&
+      node?.props?.step === 1 &&
+      node?.props?.tooltip === false &&
+      node?.props?.style?.width === '200px' &&
+      node?.props?.value !== undefined &&
+      typeof node?.props?.onChange === 'function'
+    ));
+    expect(ratingSlider).not.toBeNull();
+    expect(ratingSlider.props.value).toBe(8);
+    expect(ratingSlider.props.id).toBeUndefined();
+    expect(nodeHasClassName(ratingSlider, styles.ratingSlider)).toBe(true);
+    expect(typeof ratingSlider.props.onChangeComplete).toBe('function');
+    expect(treeHasText(fullQuestionCard, '8')).toBe(true);
+
+    const ratingValueLabel = findElement(fullQuestionCard, (node) => nodeHasClassName(node, styles.ratingLabelText));
+    expect(ratingValueLabel).not.toBeNull();
+
+    const withOverflowValue = {
+      answers: { q1: { value: '18', encrypted: false } },
+      additionalComments: { q1: { value: '', encrypted: false } },
+      importance: {},
+      conviction: {},
+    };
+    fullQuestionCard = subject.renderQuestion(question, 0, withOverflowValue);
+    ratingSlider = findElement(fullQuestionCard, (node) => (
+      node?.props?.min === 0 &&
+      node?.props?.max === 10 &&
+      node?.props?.step === 1 &&
+      node?.props?.tooltip === false &&
+      node?.props?.style?.width === '200px' &&
+      node?.props?.value !== undefined &&
+      typeof node?.props?.onChange === 'function'
+    ));
+    expect(ratingSlider).not.toBeNull();
+    expect(ratingSlider.props.value).toBe(10);
+    expect(treeHasText(fullQuestionCard, '10')).toBe(true);
+
+    const withNonNumericValue = {
+      answers: { q1: { value: 'abc', encrypted: false } },
+      additionalComments: { q1: { value: '', encrypted: false } },
+      importance: {},
+      conviction: {},
+    };
+    fullQuestionCard = subject.renderQuestion(question, 0, withNonNumericValue);
+    ratingSlider = findElement(fullQuestionCard, (node) => (
+      node?.props?.min === 0 &&
+      node?.props?.max === 10 &&
+      node?.props?.step === 1 &&
+      node?.props?.tooltip === false &&
+      node?.props?.style?.width === '200px' &&
+      node?.props?.value !== undefined &&
+      typeof node?.props?.onChange === 'function'
+    ));
+    expect(ratingSlider).not.toBeNull();
+    expect(ratingSlider.props.value).toBe(0);
+    expect(nodeHasClassName(ratingSlider, styles.ratingSlider)).toBe(true);
+    expect(treeHasText(fullQuestionCard, '0')).toBe(true);
+  });
+
+  it('persists keyboard-driven full-mode rating edits immediately', () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+    });
+
+    subject.setState = (next, cb) => {
+      const patch = typeof next === 'function' ? next(subject.state, subject.props) : next;
+      subject.state = { ...subject.state, ...(patch || {}) };
+      if (typeof cb === 'function') cb();
+    };
+    subject.scheduleJsonPreviewUpdate = jest.fn();
+    subject.persistDraftSafely = jest.fn();
+    subject.getEffectiveRecipientsForQid = jest.fn(() => []);
+    subject.resolveFieldEncryptionAudience = (field) => field?.encryptionAudience || 'self';
+    subject.isQuestionLockedForResponse = () => false;
+
+    const question = {
+      id: 'q1',
+      type: 'rating',
+      question: 'How strongly do you agree?',
+    };
+
+    subject.state = {
+      ...subject.state,
+      questionPool: [question],
+      pileQuestions: [],
+      surveysResponseState: [
+        {
+          answers: { q1: { value: 2, encrypted: false, encryptionAudience: 'self' } },
+          additionalComments: {},
+          importance: {},
+          conviction: {},
+        },
+      ],
+    };
+
+    const fullQuestionCard = subject.renderQuestion(question, 0, subject.state.surveysResponseState[0]);
+    const ratingSlider = findElement(fullQuestionCard, (node) => (
+      node?.props?.min === 0 &&
+      node?.props?.max === 10 &&
+      node?.props?.step === 1 &&
+      node?.props?.tooltip === false &&
+      node?.props?.style?.width === '200px' &&
+      node?.props?.value !== undefined &&
+      typeof node?.props?.onChange === 'function'
+    ));
+
+    expect(ratingSlider).not.toBeNull();
+
+    ratingSlider.props.onChange(6, { type: 'keydown' });
+
+    expect(subject.state.surveysResponseState[0].answers.q1.value).toBe(6);
+    expect(subject.scheduleJsonPreviewUpdate).toHaveBeenCalledTimes(1);
+    expect(subject.persistDraftSafely).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses the deferred slider wrapper for single-question rating cards', () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: true,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+    });
+
+    const question = {
+      id: 'q1',
+      type: 'rating',
+      question: 'How strongly do you agree?',
+    };
+
+    const currentSurveyResponseState = {
+      answers: { q1: { value: '8', encrypted: false } },
+      additionalComments: { q1: { value: '', encrypted: false } },
+      importance: {},
+      conviction: {},
+    };
+
+    const fullQuestionCard = subject.renderQuestion(question, 0, currentSurveyResponseState);
+    const deferredSlider = findElement(fullQuestionCard, (node) => node?.type === DeferredRatingSlider);
+
+    expect(deferredSlider).not.toBeNull();
+    expect(deferredSlider.props.value).toBe(8);
+    expect(typeof deferredSlider.props.onCommit).toBe('function');
+  });
+
+  it('encrypts both rating envelopes with one audience context and clears plaintext rating values', async () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: true,
+      isStandalone: false,
+      surveyIndex: 0,
+      questionID: 'q1',
+      account: '0xabc',
+      loginComplete: true,
+      provider: {},
+      network: { id: 84532 },
+    });
+    subject.state = {
+      ...subject.state,
+      surveysResponseState: [
+        {
+          answers: {
+            q1: { value: '*', encrypted: true, encryptionAudience: 'gate' },
+          },
+          additionalComments: {
+            q1: { value: '', encrypted: false, encryptionAudience: 'gate' },
+          },
+          importance: { q1: 7 },
+          conviction: { q1: 3 },
+        },
+      ],
+      userAnswers: null,
+      hasher: { hash: jest.fn() },
+    };
+    subject.prepareJsonAndHash = jest.fn(() => ({
+      questionID: 'q1',
+      answer: { value: '*', encrypted: true, encryptedPortion: 'answer-env' },
+      additional: { value: '', encrypted: false },
+      importance: 7,
+      conviction: 3,
+    }));
+    subject.getChangedQidsAndFields = jest.fn(() => ({
+      changedQids: new Set(['q1']),
+      changedMap: { q1: { importance: 1, conviction: 1 } },
+    }));
+    subject.isQuestionLockedForResponse = jest.fn(() => false);
+    subject.resolveFieldEncryptionAudience = jest.fn(() => 'gate');
+    subject.getDefaultResponseEncryptionAudienceForQid = jest.fn(() => 'gate');
+    const recipients = [{ accessControlConditions: [{ contractAddress: '0x1' }], chain: 'base' }];
+    const sharedLitOpts = { recipients, accessControlConditions: recipients[0].accessControlConditions, chain: 'base' };
+    subject.getEffectiveRecipientsForQid = jest.fn(() => recipients);
+    subject.buildLitEncryptionOptionsForRecipients = jest.fn(() => sharedLitOpts);
+
+    const encryptSpy = jest
+      .spyOn(cryptoUtils, 'encryptEnvelopeValue')
+      .mockImplementation(async (_value, opts) => `env:${opts.qId}`);
+    const submitSpy = jest
+      .spyOn(contractScripts, 'submitResponses')
+      .mockResolvedValue({
+        wait: jest.fn().mockResolvedValue({
+          status: 1,
+          transactionHash: `0x${'1'.repeat(64)}`,
+        }),
+      });
+
+    const receipt = await subject.submitSurveyResponse();
+
+    expect(receipt).toEqual(expect.objectContaining({ status: 1 }));
+    expect(encryptSpy).toHaveBeenCalledTimes(2);
+    expect(encryptSpy.mock.calls[0][1].qId).toBe('importance:q1');
+    expect(encryptSpy.mock.calls[1][1].qId).toBe('conviction:q1');
+    expect(encryptSpy.mock.calls[0][1].lit).toBe(sharedLitOpts);
+    expect(encryptSpy.mock.calls[1][1].lit).toBe(sharedLitOpts);
+
+    const submittedResponses = submitSpy.mock.calls[0][2];
+    expect(submittedResponses[0]).toEqual(expect.objectContaining({
+      importanceEncrypted: 'env:importance:q1',
+      convictionEncrypted: 'env:conviction:q1',
+      importance: null,
+      conviction: null,
+    }));
+  });
+
+  it('uses the session chain for rating envelope encryption when wallet-facing network props point at Base mainnet', async () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: true,
+      isStandalone: false,
+      surveyIndex: 0,
+      questionID: 'q1',
+      account: '0xabc',
+      loginComplete: true,
+      provider: {},
+      network: { id: 8453, chainId: 8453, name: 'Base' },
+      networkChainId: 84532,
+      activeSessionSlug: 'edge',
+      sessionSlug: 'edge',
+      sessionConfig: { slug: 'edge', networkChainId: 84532 },
+    });
     subject._getEffectiveDraftSlug = jest.fn(() => 'edge');
     subject.resolveEffectiveResponseGateConfig = jest.fn(() => ({}));
     subject._canDecryptOtherResponsesRunId = 4;
