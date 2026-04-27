@@ -2,7 +2,15 @@
 
 Moved from root README.md for readability.
 
-The stripped `release-public` OSS copy intentionally omits the repo-level E2E workflow entrypoints under `scripts/test-*.js`, `scripts/test-*.ui.js`, and `scripts/lib/e2e/`. Use this reference with the full dev repo or a restored private pack, not the stripped public release artifact.
+The stripped `release-public` OSS copy intentionally omits the private repo-level E2E workflow entrypoints under `scripts/test-*.js`, `scripts/test-*.ui.js`, and `scripts/lib/e2e/`. Use the detailed workflow references below with the full dev repo or a restored private pack, not the stripped public release artifact.
+
+The maintained public smoke path is Vite-compatible and runs against an already running client:
+
+- Start the client from `client/`: `npm run dev`
+- Run desktop route/style smoke from the repo root: `BASE_URL=http://127.0.0.1:3000 npm run test:e2e`
+- Run the same smoke at the mobile viewport: `BASE_URL=http://127.0.0.1:3000 npm run ai:test-nav:smoke:mobile`
+
+`test:e2e` and `test:e2e:quick` intentionally point at this public smoke runner in stripped checkouts. The private encryption/gating runners remain documented below for full dev environments.
 
 ## AI Wallet Test Workflow (OP Sepolia)
 
