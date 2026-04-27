@@ -1,4 +1,5 @@
 import {
+  buildPersistedDraftQuestionEntry,
   buildSurveyDraftSemanticSignature,
   computeSubmitLabel,
   getPendingStatsSnapshotFromState,
@@ -57,6 +58,53 @@ describe('surveyToolDraftState', () => {
     expect(shouldAutoEncryptAdditionalOnAudienceChange({ value: '', encrypted: false })).toBe(false);
     expect(shouldAutoEncryptAdditionalOnAudienceChange({ value: '   ', encrypted: false })).toBe(false);
     expect(shouldAutoEncryptAdditionalOnAudienceChange({ value: 'context', encrypted: false })).toBe(true);
+  });
+
+  it('builds persisted draft entries only when answer/additional/slider content is meaningful', () => {
+    const resolvers = {
+      resolveFieldEncryptionAudience: jest.fn((field, qid, fieldKey) => (
+        fieldKey === 'additional' ? `${qid}:additional` : `${qid}:answer`
+      )),
+      resolveFieldEncryptionGateId: jest.fn((_field, qid, fieldKey) => (
+        fieldKey === 'additional' ? `${qid}:gate:add` : `${qid}:gate:answer`
+      )),
+      normalizeFieldAudienceMode: jest.fn((mode, fieldKey) => (
+        mode || (fieldKey === 'additional' ? 'inherit' : 'explicit')
+      )),
+    };
+
+    expect(buildPersistedDraftQuestionEntry({
+      questionId: 'q1',
+      answer: { value: '' },
+      additional: { value: '' },
+      importance: null,
+      conviction: null,
+      resolvers,
+    })).toBeNull();
+
+    expect(buildPersistedDraftQuestionEntry({
+      questionId: 'Q1',
+      answer: { value: 'hello', encrypted: true, encryptedPortion: 'ans-env', audienceMode: 'explicit' },
+      additional: { value: 'notes', encrypted: true, encryptedPortion: 'add-env', audienceMode: 'inherit' },
+      importance: 4,
+      conviction: 7,
+      resolvers,
+    })).toEqual({
+      value: 'hello',
+      answerEncrypted: true,
+      answerEncryptionAudience: 'q1:answer',
+      answerEncryptionGateId: 'q1:gate:answer',
+      answerAudienceMode: 'explicit',
+      answerEncryptedPortion: 'ans-env',
+      additional: 'notes',
+      additionalEncrypted: true,
+      additionalEncryptionAudience: 'q1:additional',
+      additionalEncryptionGateId: 'q1:gate:add',
+      additionalAudienceMode: 'inherit',
+      additionalEncryptedPortion: 'add-env',
+      importance: 4,
+      conviction: 7,
+    });
   });
 
   it('does not include empty additional comments in submit-time encryption work', () => {
