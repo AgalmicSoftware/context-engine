@@ -3,6 +3,8 @@ import {
   buildPersistedDraftPayload,
   buildPersistedDraftMapsForAllowedIds,
   buildPersistedDraftQuestionEntry,
+  buildSurveyDraftStorageKeys,
+  buildSurveyDraftStorageScopes,
   buildSurveyDraftSemanticSignature,
   computeSubmitLabel,
   getPendingStatsSnapshotFromState,
@@ -225,6 +227,34 @@ describe('surveyToolDraftState', () => {
       answers: {},
       baseline: {},
     });
+  });
+
+  it('builds draft storage scopes and keys for survey-wide and single-question cleanup', () => {
+    expect(buildSurveyDraftStorageScopes({
+      surveyScope: 'questions:q:q1',
+    })).toEqual(['questions:q:q1', 'questions']);
+
+    expect(buildSurveyDraftStorageScopes({
+      surveyScope: 'questions',
+      singleQuestionMode: true,
+      questionId: 'Q2',
+    })).toEqual(['questions', 'questions:q:q2']);
+
+    expect(buildSurveyDraftStorageKeys({
+      slug: 'demo-slug',
+      networkIdStr: '84532',
+      accounts: ['0xabc'],
+      scopes: ['questions', 'questions:q:q2'],
+    })).toEqual([
+      'dg:surveyDraft:demo-slug:__pending__:0xabc:questions',
+      'dg:surveyDraft:demo-slug:__pending__:0xabc:questions:q:q2',
+      'dg:surveyDraft:demo-slug:__pending__:anon:questions',
+      'dg:surveyDraft:demo-slug:__pending__:anon:questions:q:q2',
+      'dg:surveyDraft:demo-slug:84532:0xabc:questions',
+      'dg:surveyDraft:demo-slug:84532:0xabc:questions:q:q2',
+      'dg:surveyDraft:demo-slug:84532:anon:questions',
+      'dg:surveyDraft:demo-slug:84532:anon:questions:q:q2',
+    ]);
   });
 
   it('does not include empty additional comments in submit-time encryption work', () => {
