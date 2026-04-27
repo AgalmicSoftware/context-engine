@@ -886,6 +886,91 @@ describe('contractScripts user profile metadata wrappers', () => {
     expect(contractGetResponse).toHaveBeenCalledTimes(1);
   });
 
+  it('returns a seeded E2E mocked viewed response when arweave downloads are disabled in-browser', async () => {
+    const groupCfg = makeProfileGroupCfg('edge', 1000);
+    const responderAddress = TEST_PROFILE_ADDRESS;
+    const questionId = `0x${'11'.repeat(32)}`;
+    const contractGetResponse = jest.fn().mockResolvedValue(`0x${'22'.repeat(32)}`);
+    const mockedPayload = {
+      responder: responderAddress,
+      questionID: questionId,
+      answer: { value: '*', encrypted: true, encryptedPortion: 'cipher-answer' },
+      additional: { value: '', encrypted: false },
+    };
+
+    jest.spyOn(ethers, 'Contract').mockImplementation(() => ({
+      getResponse: contractGetResponse,
+    }));
+    const downloadSpy = jest.spyOn(arweaveScripts, 'downloadDataFromArweave').mockResolvedValue('{}');
+
+    globalThis.CE_E2E_LIT_MOCK = true;
+    window.__CE_E2E_MOCKED_VIEWED_RESPONSES__ = {
+      [`${responderAddress.toLowerCase()}|${questionId.toLowerCase()}`]: mockedPayload,
+    };
+
+    const result = await contractScripts.getResponse(
+      'none',
+      responderAddress,
+      questionId,
+      groupCfg
+    );
+
+    expect(result).toEqual(expect.objectContaining({
+      responder: responderAddress,
+      answer: expect.objectContaining({
+        encryptedPortion: 'cipher-answer',
+      }),
+      arweaveTxId: expect.any(String),
+    }));
+    expect(contractGetResponse).toHaveBeenCalledTimes(1);
+    expect(downloadSpy).not.toHaveBeenCalled();
+  });
+
+  it('ignores seeded E2E mocked viewed responses unless the explicit E2E Lit mock flag is enabled', async () => {
+    const groupCfg = makeProfileGroupCfg('edge-no-e2e-flag', 1000);
+    const responderAddress = TEST_PROFILE_ADDRESS;
+    const questionId = `0x${'33'.repeat(32)}`;
+    const contractGetResponse = jest.fn().mockResolvedValue(`0x${'44'.repeat(32)}`);
+    const downloadedPayload = {
+      responder: responderAddress,
+      questionID: questionId,
+      answer: { value: 'from-arweave', encrypted: false },
+      additional: { value: '', encrypted: false },
+    };
+
+    jest.spyOn(ethers, 'Contract').mockImplementation(() => ({
+      getResponse: contractGetResponse,
+    }));
+    const downloadSpy = jest
+      .spyOn(arweaveScripts, 'downloadDataFromArweave')
+      .mockResolvedValue(JSON.stringify(downloadedPayload));
+
+    window.__CE_E2E_MOCKED_VIEWED_RESPONSES__ = {
+      [`${responderAddress.toLowerCase()}|${questionId.toLowerCase()}`]: {
+        responder: responderAddress,
+        questionID: questionId,
+        answer: { value: 'from-e2e-mock', encrypted: false },
+        additional: { value: '', encrypted: false },
+      },
+    };
+
+    const result = await contractScripts.getResponse(
+      'none',
+      responderAddress,
+      questionId,
+      groupCfg
+    );
+
+    expect(result).toEqual(expect.objectContaining({
+      responder: responderAddress,
+      answer: expect.objectContaining({
+        value: 'from-arweave',
+      }),
+    }));
+    expect(contractGetResponse).toHaveBeenCalledTimes(1);
+    expect(downloadSpy).toHaveBeenCalled();
+  });
+
   it('passes resolved cfg through block-window lookups during question-response scans', async () => {
     const groupCfg = makeProfileGroupCfg('edge-pass-through', 1000);
     const blockWindowSpy = jest

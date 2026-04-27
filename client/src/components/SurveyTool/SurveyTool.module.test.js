@@ -1483,7 +1483,1448 @@ describe('SurveyTool module', () => {
       keysToMark: ['q1:answer', 'q1:additional'],
     });
 
-    expect(getQuestionFieldDecryptSelection('q1', 'additional', {
+    const question = {
+      id: 'q1',
+      type: 'rating',
+      question: 'How strongly do you agree?',
+    };
+
+    const withNumericString = {
+      answers: { q1: { value: '8', encrypted: false } },
+      additionalComments: { q1: { value: '', encrypted: false } },
+      importance: {},
+      conviction: {},
+    };
+    let fullQuestionCard = subject.renderQuestion(question, 0, withNumericString);
+    let ratingSlider = findElement(fullQuestionCard, (node) => (
+      node?.props?.min === 0 &&
+      node?.props?.max === 10 &&
+      node?.props?.step === 1 &&
+      node?.props?.tooltip === false &&
+      node?.props?.style?.width === '200px' &&
+      node?.props?.value !== undefined &&
+      typeof node?.props?.onChange === 'function'
+    ));
+    expect(ratingSlider).not.toBeNull();
+    expect(ratingSlider.props.value).toBe(8);
+    expect(ratingSlider.props.id).toBeUndefined();
+    expect(nodeHasClassName(ratingSlider, styles.ratingSlider)).toBe(true);
+    expect(typeof ratingSlider.props.onChangeComplete).toBe('function');
+    expect(treeHasText(fullQuestionCard, '8')).toBe(true);
+
+    const ratingValueLabel = findElement(fullQuestionCard, (node) => nodeHasClassName(node, styles.ratingLabelText));
+    expect(ratingValueLabel).not.toBeNull();
+
+    const withOverflowValue = {
+      answers: { q1: { value: '18', encrypted: false } },
+      additionalComments: { q1: { value: '', encrypted: false } },
+      importance: {},
+      conviction: {},
+    };
+    fullQuestionCard = subject.renderQuestion(question, 0, withOverflowValue);
+    ratingSlider = findElement(fullQuestionCard, (node) => (
+      node?.props?.min === 0 &&
+      node?.props?.max === 10 &&
+      node?.props?.step === 1 &&
+      node?.props?.tooltip === false &&
+      node?.props?.style?.width === '200px' &&
+      node?.props?.value !== undefined &&
+      typeof node?.props?.onChange === 'function'
+    ));
+    expect(ratingSlider).not.toBeNull();
+    expect(ratingSlider.props.value).toBe(10);
+    expect(treeHasText(fullQuestionCard, '10')).toBe(true);
+
+    const withNonNumericValue = {
+      answers: { q1: { value: 'abc', encrypted: false } },
+      additionalComments: { q1: { value: '', encrypted: false } },
+      importance: {},
+      conviction: {},
+    };
+    fullQuestionCard = subject.renderQuestion(question, 0, withNonNumericValue);
+    ratingSlider = findElement(fullQuestionCard, (node) => (
+      node?.props?.min === 0 &&
+      node?.props?.max === 10 &&
+      node?.props?.step === 1 &&
+      node?.props?.tooltip === false &&
+      node?.props?.style?.width === '200px' &&
+      node?.props?.value !== undefined &&
+      typeof node?.props?.onChange === 'function'
+    ));
+    expect(ratingSlider).not.toBeNull();
+    expect(ratingSlider.props.value).toBe(0);
+    expect(nodeHasClassName(ratingSlider, styles.ratingSlider)).toBe(true);
+    expect(treeHasText(fullQuestionCard, '0')).toBe(true);
+  });
+
+  it('persists keyboard-driven full-mode rating edits immediately', () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+    });
+
+    subject.setState = (next, cb) => {
+      const patch = typeof next === 'function' ? next(subject.state, subject.props) : next;
+      subject.state = { ...subject.state, ...(patch || {}) };
+      if (typeof cb === 'function') cb();
+    };
+    subject.scheduleJsonPreviewUpdate = jest.fn();
+    subject.persistDraftSafely = jest.fn();
+    subject.getEffectiveRecipientsForQid = jest.fn(() => []);
+    subject.resolveFieldEncryptionAudience = (field) => field?.encryptionAudience || 'self';
+    subject.isQuestionLockedForResponse = () => false;
+
+    const question = {
+      id: 'q1',
+      type: 'rating',
+      question: 'How strongly do you agree?',
+    };
+
+    subject.state = {
+      ...subject.state,
+      questionPool: [question],
+      pileQuestions: [],
+      surveysResponseState: [
+        {
+          answers: { q1: { value: 2, encrypted: false, encryptionAudience: 'self' } },
+          additionalComments: {},
+          importance: {},
+          conviction: {},
+        },
+      ],
+    };
+
+    const fullQuestionCard = subject.renderQuestion(question, 0, subject.state.surveysResponseState[0]);
+    const ratingSlider = findElement(fullQuestionCard, (node) => (
+      node?.props?.min === 0 &&
+      node?.props?.max === 10 &&
+      node?.props?.step === 1 &&
+      node?.props?.tooltip === false &&
+      node?.props?.style?.width === '200px' &&
+      node?.props?.value !== undefined &&
+      typeof node?.props?.onChange === 'function'
+    ));
+
+    expect(ratingSlider).not.toBeNull();
+
+    ratingSlider.props.onChange(6, { type: 'keydown' });
+
+    expect(subject.state.surveysResponseState[0].answers.q1.value).toBe(6);
+    expect(subject.scheduleJsonPreviewUpdate).toHaveBeenCalledTimes(1);
+    expect(subject.persistDraftSafely).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses the deferred slider wrapper for single-question rating cards', () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: true,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+    });
+
+    const question = {
+      id: 'q1',
+      type: 'rating',
+      question: 'How strongly do you agree?',
+    };
+
+    const currentSurveyResponseState = {
+      answers: { q1: { value: '8', encrypted: false } },
+      additionalComments: { q1: { value: '', encrypted: false } },
+      importance: {},
+      conviction: {},
+    };
+
+    const fullQuestionCard = subject.renderQuestion(question, 0, currentSurveyResponseState);
+    const deferredSlider = findElement(fullQuestionCard, (node) => node?.type === DeferredCommitSlider);
+
+    expect(deferredSlider).not.toBeNull();
+    expect(deferredSlider.props.value).toBe(8);
+    expect(typeof deferredSlider.props.onCommit).toBe('function');
+  });
+
+  it('encrypts both rating envelopes with one audience context and clears plaintext rating values', async () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: true,
+      isStandalone: false,
+      surveyIndex: 0,
+      questionID: 'q1',
+      account: '0xabc',
+      loginComplete: true,
+      provider: {},
+      network: { id: 84532 },
+    });
+    subject.state = {
+      ...subject.state,
+      surveysResponseState: [
+        {
+          answers: {
+            q1: { value: '*', encrypted: true, encryptionAudience: 'gate' },
+          },
+          additionalComments: {
+            q1: { value: '', encrypted: false, encryptionAudience: 'gate' },
+          },
+          importance: { q1: 7 },
+          conviction: { q1: 3 },
+        },
+      ],
+      userAnswers: null,
+      hasher: { hash: jest.fn() },
+    };
+    subject.prepareJsonAndHash = jest.fn(() => ({
+      questionID: 'q1',
+      answer: { value: '*', encrypted: true, encryptedPortion: 'answer-env' },
+      additional: { value: '', encrypted: false },
+      importance: 7,
+      conviction: 3,
+    }));
+    subject.getChangedQidsAndFields = jest.fn(() => ({
+      changedQids: new Set(['q1']),
+      changedMap: { q1: { importance: 1, conviction: 1 } },
+    }));
+    subject.isQuestionLockedForResponse = jest.fn(() => false);
+    subject.resolveFieldEncryptionAudience = jest.fn(() => 'gate');
+    subject.getDefaultResponseEncryptionAudienceForQid = jest.fn(() => 'gate');
+    const recipients = [{ accessControlConditions: [{ contractAddress: '0x1' }], chain: 'base' }];
+    const sharedLitOpts = { recipients, accessControlConditions: recipients[0].accessControlConditions, chain: 'base' };
+    subject.getEffectiveRecipientsForQid = jest.fn(() => recipients);
+    subject.buildLitEncryptionOptionsForRecipients = jest.fn(() => sharedLitOpts);
+
+    const encryptSpy = jest
+      .spyOn(cryptoUtils, 'encryptEnvelopeValue')
+      .mockImplementation(async (_value, opts) => `env:${opts.qId}`);
+    const submitSpy = jest
+      .spyOn(contractScripts, 'submitResponses')
+      .mockResolvedValue({
+        wait: jest.fn().mockResolvedValue({
+          status: 1,
+          transactionHash: `0x${'1'.repeat(64)}`,
+        }),
+      });
+
+    const receipt = await subject.submitSurveyResponse();
+
+    expect(receipt).toEqual(expect.objectContaining({ status: 1 }));
+    expect(encryptSpy).toHaveBeenCalledTimes(2);
+    expect(encryptSpy.mock.calls[0][1].qId).toBe('importance:q1');
+    expect(encryptSpy.mock.calls[1][1].qId).toBe('conviction:q1');
+    expect(encryptSpy.mock.calls[0][1].lit).toBe(sharedLitOpts);
+    expect(encryptSpy.mock.calls[1][1].lit).toBe(sharedLitOpts);
+
+    const submittedResponses = submitSpy.mock.calls[0][2];
+    expect(submittedResponses[0]).toEqual(expect.objectContaining({
+      importanceEncrypted: 'env:importance:q1',
+      convictionEncrypted: 'env:conviction:q1',
+      importance: null,
+      conviction: null,
+    }));
+  });
+
+  it('uses the session chain for rating envelope encryption when wallet-facing network props point at Base mainnet', async () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: true,
+      isStandalone: false,
+      surveyIndex: 0,
+      questionID: 'q1',
+      account: '0xabc',
+      loginComplete: true,
+      provider: {},
+      network: { id: 8453, chainId: 8453, name: 'Base' },
+      networkChainId: 84532,
+      activeSessionSlug: 'edge',
+      sessionSlug: 'edge',
+      sessionConfig: { slug: 'edge', networkChainId: 84532 },
+    });
+    subject._getEffectiveDraftSlug = jest.fn(() => 'edge');
+    subject.resolveEffectiveResponseGateConfig = jest.fn(() => ({ slug: 'edge', networkChainId: 84532 }));
+    subject.state = {
+      ...subject.state,
+      surveysResponseState: [
+        {
+          answers: {
+            q1: { value: '*', encrypted: true, encryptionAudience: 'gate' },
+          },
+          additionalComments: {
+            q1: { value: '', encrypted: false, encryptionAudience: 'gate' },
+          },
+          importance: { q1: 7 },
+          conviction: { q1: 3 },
+        },
+      ],
+      userAnswers: null,
+      hasher: { hash: jest.fn() },
+    };
+    subject.prepareJsonAndHash = jest.fn(() => ({
+      questionID: 'q1',
+      answer: { value: '*', encrypted: true, encryptedPortion: 'answer-env' },
+      additional: { value: '', encrypted: false },
+      importance: 7,
+      conviction: 3,
+    }));
+    subject.getChangedQidsAndFields = jest.fn(() => ({
+      changedQids: new Set(['q1']),
+      changedMap: { q1: { importance: 1, conviction: 1 } },
+    }));
+    subject.isQuestionLockedForResponse = jest.fn(() => false);
+    subject.resolveFieldEncryptionAudience = jest.fn(() => 'gate');
+    subject.getDefaultResponseEncryptionAudienceForQid = jest.fn(() => 'gate');
+    const recipients = [{ accessControlConditions: [{ contractAddress: '0x1' }], chain: 'base' }];
+    const sharedLitOpts = { recipients, accessControlConditions: recipients[0].accessControlConditions, chain: 'base' };
+    subject.getEffectiveRecipientsForQid = jest.fn(() => recipients);
+    subject.buildLitEncryptionOptionsForRecipients = jest.fn(() => sharedLitOpts);
+
+    const encryptSpy = jest
+      .spyOn(cryptoUtils, 'encryptEnvelopeValue')
+      .mockImplementation(async (_value, opts) => `env:${opts.qId}`);
+    const submitSpy = jest
+      .spyOn(contractScripts, 'submitResponses')
+      .mockResolvedValue({
+        wait: jest.fn().mockResolvedValue({
+          status: 1,
+          transactionHash: `0x${'3'.repeat(64)}`,
+        }),
+      });
+
+    await subject.submitSurveyResponse();
+
+    expect(encryptSpy).toHaveBeenCalledTimes(2);
+    expect(encryptSpy.mock.calls[0][1].chainId).toBe(84532);
+    expect(encryptSpy.mock.calls[1][1].chainId).toBe(84532);
+    expect(submitSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('writes submitted responses into local caches without advancing scan watermarks', async () => {
+    const slug = 'edge-submit-local';
+    const surveyId = '0xsurvey';
+    const responder = '0xabc';
+    const surveyResponseSeed = {
+      surveyID: surveyId,
+      responder,
+      surveyTitle: 'Existing Survey',
+      responses: [
+        {
+          questionID: 'q0',
+          responder,
+          type: 'freeform',
+          prompt: 'Existing prompt',
+          answer: { value: 'old', encrypted: false },
+          additional: { value: '', encrypted: false },
+        },
+      ],
+      blockNumber: 5,
+      transactionIndex: 0,
+      logIndex: 0,
+      timestamp: 5,
+    };
+
+    await cacheScripts.removeCache('questionsCache', slug).catch(() => null);
+    await cacheScripts.removeCache('surveysCache', slug).catch(() => null);
+    await cacheScripts.writeCache('surveysCache', slug, {
+      '84532': {
+        surveys: {
+          [surveyId]: {
+            id: surveyId,
+            surveyID: surveyId,
+            title: 'Existing Survey',
+            questionIDs: ['q0'],
+          },
+        },
+        surveysLatestBlock: 0,
+        surveyResponses: {
+          [surveyId]: {
+            [responder]: surveyResponseSeed,
+          },
+        },
+        surveyResponsesLatestBlock: {},
+      },
+    });
+
+    try {
+      const subject = new SurveyQuestions({
+        surveyIndex: 0,
+        surveyId,
+        account: responder,
+        loginComplete: true,
+        network: { id: 84532 },
+        sessionSlug: slug,
+        activeSessionSlug: slug,
+      });
+      subject._getEffectiveDraftSlug = jest.fn(() => slug);
+
+      const result = await subject.writeSubmittedResponsesToLocalCaches({
+        receipt: {
+          blockNumber: 22,
+          transactionIndex: 3,
+          transactionHash: `0x${'2'.repeat(64)}`,
+        },
+        questionResponses: [
+          {
+            questionID: 'q1',
+            responder,
+            type: 'freeform',
+            prompt: 'New prompt',
+            answer: { value: 'fresh', encrypted: false },
+            additional: { value: '', encrypted: false },
+            importance: null,
+            conviction: null,
+            sessionName: 'Edge Session',
+          },
+        ],
+        surveyResponse: {
+          surveyID: surveyId,
+          responder,
+          surveyTitle: 'Updated Survey',
+          sessionName: 'Edge Session',
+          responses: [
+            {
+              questionID: 'q1',
+              responder,
+              type: 'freeform',
+              prompt: 'New prompt',
+              answer: { value: 'fresh', encrypted: false },
+              additional: { value: '', encrypted: false },
+            },
+          ],
+        },
+        surveyId,
+      });
+
+      expect(result).toEqual({ questionCacheWritten: true, surveyCacheWritten: true });
+
+      const questionsCache = await cacheScripts.readCache('questionsCache', slug);
+      expect(questionsCache?.['84532']?.questionResponses?.q1?.[responder]).toEqual(expect.objectContaining({
+        questionID: 'q1',
+        blockNumber: 22,
+        transactionIndex: 3,
+        logIndex: 0,
+        transactionHash: `0x${'2'.repeat(64)}`,
+      }));
+      expect(questionsCache?.['84532']?.questionResponsesMeta?.q1?.[responder]).toEqual(expect.objectContaining({
+        bn: 22,
+        txi: 3,
+        li: 0,
+      }));
+      expect(questionsCache?.['84532']?.questionResponsesLatestBlock).toBe(0);
+      expect(questionsCache?.['84532']?.questions?.q1).toEqual(expect.objectContaining({
+        id: 'q1',
+        prompt: 'New prompt',
+        type: 'freeform',
+        sessionName: 'Edge Session',
+      }));
+
+      const surveysCache = await cacheScripts.readCache('surveysCache', slug);
+      const mergedSurveyResponse = surveysCache?.['84532']?.surveyResponses?.[surveyId]?.[responder];
+      expect(mergedSurveyResponse).toEqual(expect.objectContaining({
+        surveyID: surveyId,
+        blockNumber: 22,
+        transactionIndex: 3,
+        logIndex: 0,
+        transactionHash: `0x${'2'.repeat(64)}`,
+      }));
+      expect(mergedSurveyResponse?.responses).toEqual(expect.arrayContaining([
+        expect.objectContaining({ questionID: 'q0' }),
+        expect.objectContaining({ questionID: 'q1' }),
+      ]));
+      expect(surveysCache?.['84532']?.surveys?.[surveyId]).toEqual(expect.objectContaining({
+        title: 'Updated Survey',
+        sessionName: 'Edge Session',
+        questionIDs: expect.arrayContaining(['q0', 'q1']),
+      }));
+      expect(surveysCache?.['84532']?.surveyResponsesLatestBlock).toEqual({});
+    } finally {
+      await cacheScripts.removeCache('questionsCache', slug).catch(() => null);
+      await cacheScripts.removeCache('surveysCache', slug).catch(() => null);
+    }
+  });
+
+  it('writes submitted responses into the explicit submission slug cache instead of the route slug', async () => {
+    const routeSlug = 'edge-submit-route';
+    const submissionSlug = 'alpha-submit-target';
+    const responder = '0xabc';
+
+    await cacheScripts.removeCache('questionsCache', routeSlug).catch(() => null);
+    await cacheScripts.removeCache('questionsCache', submissionSlug).catch(() => null);
+    await cacheScripts.writeCache('questionsCache', routeSlug, {
+      '84532': {
+        questions: {},
+        questionResponses: {},
+        questionResponsesMeta: {},
+      },
+    });
+
+    try {
+      const subject = new SurveyQuestions({
+        surveyIndex: 0,
+        account: responder,
+        loginComplete: true,
+        network: { id: 84532 },
+        sessionSlug: routeSlug,
+        activeSessionSlug: routeSlug,
+      });
+      subject._getEffectiveDraftSlug = jest.fn(() => routeSlug);
+
+      const result = await subject.writeSubmittedResponsesToLocalCaches({
+        receipt: {
+          blockNumber: 31,
+          transactionIndex: 4,
+          transactionHash: `0x${'8'.repeat(64)}`,
+        },
+        questionResponses: [
+          {
+            questionID: 'q1',
+            responder,
+            type: 'freeform',
+            prompt: 'Alpha prompt',
+            answer: { value: 'fresh', encrypted: false },
+            additional: { value: '', encrypted: false },
+          },
+        ],
+        submissionSlug,
+      });
+
+      expect(result).toEqual({ questionCacheWritten: true, surveyCacheWritten: false });
+      const routeCache = await cacheScripts.readCache('questionsCache', routeSlug);
+      const submissionCache = await cacheScripts.readCache('questionsCache', submissionSlug);
+      expect(routeCache?.['84532']?.questionResponses?.q1).toBeUndefined();
+      expect(submissionCache?.['84532']?.questionResponses?.q1?.[responder]).toEqual(expect.objectContaining({
+        questionID: 'q1',
+        blockNumber: 31,
+        transactionIndex: 4,
+      }));
+    } finally {
+      await cacheScripts.removeCache('questionsCache', routeSlug).catch(() => null);
+      await cacheScripts.removeCache('questionsCache', submissionSlug).catch(() => null);
+    }
+  });
+
+  it('routes pile submissions through the changed question session slug', async () => {
+    const submitSpy = jest
+      .spyOn(contractScripts, 'submitResponses')
+      .mockResolvedValue({
+        wait: jest.fn().mockResolvedValue({
+          status: 1,
+          transactionHash: `0x${'6'.repeat(64)}`,
+        }),
+      });
+
+    const subject = new SurveyQuestions({
+      minifiedMode: 'pile',
+      singleQuestionMode: false,
+      isStandalone: true,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      provider: {},
+      network: { id: 84532 },
+      networkChainId: 84532,
+      sessionSlug: 'edge',
+      activeSessionSlug: 'edge',
+    });
+
+    subject.state = {
+      ...subject.state,
+      surveysResponseState: [{
+        answers: { q1: { value: 'yes', encrypted: false } },
+        additionalComments: { q1: { value: '', encrypted: false } },
+        importance: {},
+        conviction: {},
+      }],
+      questionPool: [],
+      pileQuestions: [{
+        id: 'q1',
+        type: 'freeform',
+        prompt: 'Prompt 1',
+        sessionSlug: 'alpha',
+        sessionName: 'Alpha Session',
+      }],
+      userAnswers: null,
+      hasher: { hash: jest.fn() },
+    };
+    subject.prepareJsonAndHash = jest.fn(() => ({
+      responder: '0xabc',
+      responses: [
+        {
+          questionID: 'q1',
+          responder: '0xabc',
+          type: 'freeform',
+          prompt: 'Prompt 1',
+          answer: { value: 'yes', encrypted: false },
+          additional: { value: '', encrypted: false },
+        },
+      ],
+    }));
+    subject.getChangedQidsAndFields = jest.fn(() => ({
+      changedQids: new Set(['q1']),
+      changedMap: { q1: { answer: 1 } },
+    }));
+
+    const receipt = await subject.submitSurveyResponse();
+
+    expect(submitSpy.mock.calls[0][5]).toBe('alpha');
+    expect(receipt).toEqual(expect.objectContaining({
+      status: 1,
+      __ceSubmissionGroupKey: 'alpha',
+    }));
+  });
+
+  it('blocks pile submissions that span multiple session slugs', async () => {
+    const submitSpy = jest.spyOn(contractScripts, 'submitResponses').mockResolvedValue({
+      wait: jest.fn().mockResolvedValue({
+        status: 1,
+        transactionHash: `0x${'7'.repeat(64)}`,
+      }),
+    });
+
+    const subject = new SurveyQuestions({
+      minifiedMode: 'pile',
+      singleQuestionMode: false,
+      isStandalone: true,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      provider: {},
+      network: { id: 84532 },
+      networkChainId: 84532,
+      sessionSlug: 'edge',
+      activeSessionSlug: 'edge',
+    });
+
+    subject.state = {
+      ...subject.state,
+      surveysResponseState: [{
+        answers: {
+          q1: { value: 'yes', encrypted: false },
+          q2: { value: 'no', encrypted: false },
+        },
+        additionalComments: {
+          q1: { value: '', encrypted: false },
+          q2: { value: '', encrypted: false },
+        },
+        importance: {},
+        conviction: {},
+      }],
+      questionPool: [],
+      pileQuestions: [
+        { id: 'q1', type: 'freeform', prompt: 'Prompt 1', sessionSlug: 'alpha' },
+        { id: 'q2', type: 'freeform', prompt: 'Prompt 2', sessionSlug: 'beta' },
+      ],
+      userAnswers: null,
+      hasher: { hash: jest.fn() },
+    };
+    subject.prepareJsonAndHash = jest.fn(() => ({
+      responder: '0xabc',
+      responses: [
+        {
+          questionID: 'q1',
+          responder: '0xabc',
+          type: 'freeform',
+          prompt: 'Prompt 1',
+          answer: { value: 'yes', encrypted: false },
+          additional: { value: '', encrypted: false },
+        },
+        {
+          questionID: 'q2',
+          responder: '0xabc',
+          type: 'freeform',
+          prompt: 'Prompt 2',
+          answer: { value: 'no', encrypted: false },
+          additional: { value: '', encrypted: false },
+        },
+      ],
+    }));
+    subject.getChangedQidsAndFields = jest.fn(() => ({
+      changedQids: new Set(['q1', 'q2']),
+      changedMap: {
+        q1: { answer: 1 },
+        q2: { answer: 1 },
+      },
+    }));
+
+    await expect(subject.submitSurveyResponse()).rejects.toThrow(
+      'Cannot submit responses from multiple sessions at once. Narrow the question view to one session and try again.'
+    );
+    expect(submitSpy).not.toHaveBeenCalled();
+  });
+
+  it('does not write submitted responses into a borrowed general network cache when the draft slug is unresolved', async () => {
+    const slug = 'missing-session-slug';
+    const surveyId = '0xsurvey';
+    const responder = '0xabc';
+    const generalCfg = {
+      slug: '',
+      networkChainId: 84532,
+    };
+    const strictLookup = (inputSlug) => (
+      String(inputSlug || '').trim().toLowerCase() === ''
+        ? generalCfg
+        : null
+    );
+    jest.spyOn(contractScriptsModule, 'getSessionConfigBySlug').mockImplementation(strictLookup);
+    jest.spyOn(contractScriptsModule, 'getSessionConfigBySlugOrDefault').mockImplementation((inputSlug) => (
+      strictLookup(inputSlug) || generalCfg
+    ));
+
+    await cacheScripts.removeCache('questionsCache', slug).catch(() => null);
+    await cacheScripts.removeCache('surveysCache', slug).catch(() => null);
+    await cacheScripts.writeCache('questionsCache', slug, {
+      '84532': {
+        questions: {
+          qGeneral: {
+            id: 'qGeneral',
+            prompt: 'Borrowed general prompt',
+          },
+        },
+        questionResponses: {},
+        questionResponsesMeta: {},
+      },
+    });
+    await cacheScripts.writeCache('surveysCache', slug, {
+      '84532': {
+        surveys: {
+          [surveyId]: {
+            id: surveyId,
+            surveyID: surveyId,
+            title: 'Borrowed General Survey',
+            questionIDs: ['qGeneral'],
+          },
+        },
+        surveyResponses: {},
+      },
+    });
+
+    try {
+      const subject = new SurveyQuestions({
+        surveyIndex: 0,
+        surveyId,
+        account: responder,
+        loginComplete: true,
+        sessionSlug: slug,
+        activeSessionSlug: '',
+      });
+      subject._getEffectiveDraftSlug = jest.fn(() => slug);
+
+      const result = await subject.writeSubmittedResponsesToLocalCaches({
+        receipt: {
+          blockNumber: 22,
+          transactionIndex: 3,
+          transactionHash: `0x${'2'.repeat(64)}`,
+        },
+        questionResponses: [
+          {
+            questionID: 'q1',
+            responder,
+            type: 'freeform',
+            prompt: 'New prompt',
+            answer: { value: 'fresh', encrypted: false },
+            additional: { value: '', encrypted: false },
+          },
+        ],
+        surveyResponse: {
+          surveyID: surveyId,
+          responder,
+          surveyTitle: 'Updated Survey',
+          responses: [
+            {
+              questionID: 'q1',
+              responder,
+              type: 'freeform',
+              prompt: 'New prompt',
+              answer: { value: 'fresh', encrypted: false },
+              additional: { value: '', encrypted: false },
+            },
+          ],
+        },
+        surveyId,
+      });
+
+      expect(result).toEqual({ questionCacheWritten: false, surveyCacheWritten: false });
+
+      const questionsCache = await cacheScripts.readCache('questionsCache', slug);
+      expect(questionsCache?.['84532']?.questions?.qGeneral).toEqual(expect.objectContaining({
+        id: 'qGeneral',
+        prompt: 'Borrowed general prompt',
+      }));
+      expect(questionsCache?.['84532']?.questions?.q1).toBeUndefined();
+      expect(questionsCache?.['84532']?.questionResponses?.q1).toBeUndefined();
+
+      const surveysCache = await cacheScripts.readCache('surveysCache', slug);
+      expect(surveysCache?.['84532']?.surveys?.[surveyId]).toEqual(expect.objectContaining({
+        title: 'Borrowed General Survey',
+        questionIDs: ['qGeneral'],
+      }));
+      expect(surveysCache?.['84532']?.surveyResponses?.[surveyId]?.[responder]).toBeUndefined();
+    } finally {
+      await cacheScripts.removeCache('questionsCache', slug).catch(() => null);
+      await cacheScripts.removeCache('surveysCache', slug).catch(() => null);
+    }
+  });
+
+  it('skips immediate response refreshes after submit when local cache write-through succeeds', async () => {
+    jest.spyOn(cryptoUtils, 'getProviderKind').mockReturnValue('browser');
+
+    const refreshQuestionResponses = jest.fn().mockResolvedValue(undefined);
+    const refreshSurveyResponsesByID = jest.fn().mockResolvedValue(undefined);
+    const subject = new SurveyQuestions({
+      surveyIndex: 0,
+      surveyId: '0xsurvey',
+      account: '0xabc',
+      loginComplete: true,
+      provider: {},
+      network: { id: 84532 },
+      sessionSlug: 'edge',
+      activeSessionSlug: 'edge',
+      refreshQuestionResponses,
+      refreshSurveyResponsesByID,
+    });
+
+    subject._getEffectiveDraftSlug = jest.fn(() => 'edge');
+    subject.maybeBlockSubmitUntilQuestionPoolComplete = jest.fn(() => false);
+    subject.getChangedQidsAndFields = jest.fn(() => ({
+      changedQids: new Set(['q1']),
+      changedMap: { q1: { answer: 1 } },
+    }));
+    subject.getPendingEditStats = jest.fn(() => ({ total: 1, encrypted: 0 }));
+    subject.submitSurveyResponse = jest.fn().mockResolvedValue({
+      status: 1,
+      blockNumber: 42,
+      transactionHash: `0x${'3'.repeat(64)}`,
+      __ceQuestionResponses: [
+        {
+          questionID: 'q1',
+          responder: '0xabc',
+          type: 'freeform',
+          prompt: 'Prompt 1',
+          answer: { value: 'yes', encrypted: false },
+          additional: { value: '', encrypted: false },
+          importance: null,
+          conviction: null,
+        },
+      ],
+      __ceSurveyResponse: {
+        surveyID: '0xsurvey',
+        responder: '0xabc',
+        surveyTitle: 'Survey 1',
+        responses: [
+          {
+            questionID: 'q1',
+            responder: '0xabc',
+            type: 'freeform',
+            prompt: 'Prompt 1',
+            answer: { value: 'yes', encrypted: false },
+            additional: { value: '', encrypted: false },
+          },
+        ],
+      },
+      __ceSurveyId: '0xsurvey',
+    });
+    subject.writeSubmittedResponsesToLocalCaches = jest.fn().mockResolvedValue({
+      questionCacheWritten: true,
+      surveyCacheWritten: true,
+    });
+    subject.clearDraftFor = jest.fn();
+    subject.invalidateDiffCaches = jest.fn();
+    subject.prepareJsonAndHash = jest.fn(() => ({
+      responder: '0xabc',
+      responses: [
+        {
+          questionID: 'q1',
+          answer: { value: 'yes', encrypted: false },
+          additional: { value: '', encrypted: false },
+        },
+      ],
+    }));
+    subject.state = {
+      ...subject.state,
+      surveysResponseState: [{
+        answers: { q1: { value: 'yes', encrypted: false } },
+        additionalComments: { q1: { value: '', encrypted: false } },
+        importance: {},
+        conviction: {},
+      }],
+      questionPool: [{ id: 'q1', type: 'freeform', prompt: 'Prompt 1' }],
+      pileQuestions: [],
+      isSubmitting: false,
+      submissionComplete: false,
+      submittedSinceLastEdit: false,
+      modifiedCount: 1,
+      hasEncryptedChanges: false,
+    };
+    subject.setState = (updater, callback) => {
+      const patch = typeof updater === 'function' ? updater(subject.state, subject.props) : updater;
+      subject.state = { ...subject.state, ...(patch || {}) };
+      if (typeof callback === 'function') {
+        const pending = callback();
+        if (pending && typeof pending.then === 'function') {
+          subject._lastSetStatePromise = pending;
+        }
+      }
+    };
+    subject._submitGuard = true;
+
+    await subject.encryptAndUpload();
+    await flushAsyncCallbacks();
+    if (subject._lastSetStatePromise) await subject._lastSetStatePromise;
+
+    expect(subject.writeSubmittedResponsesToLocalCaches).toHaveBeenCalledWith(expect.objectContaining({
+      receipt: expect.objectContaining({ status: 1, blockNumber: 42 }),
+      surveyId: '0xsurvey',
+    }));
+    expect(subject._submitGuard).toBe(false);
+    expect(refreshQuestionResponses).not.toHaveBeenCalled();
+    expect(refreshSurveyResponsesByID).not.toHaveBeenCalled();
+  });
+
+  it('falls back to immediate response refreshes after submit when local cache write-through cannot update caches', async () => {
+    jest.spyOn(cryptoUtils, 'getProviderKind').mockReturnValue('browser');
+
+    const refreshQuestionResponses = jest.fn().mockResolvedValue(undefined);
+    const refreshSurveyResponsesByID = jest.fn().mockResolvedValue(undefined);
+    const subject = new SurveyQuestions({
+      surveyIndex: 0,
+      surveyId: '0xsurvey',
+      account: '0xabc',
+      loginComplete: true,
+      provider: {},
+      network: { id: 84532 },
+      sessionSlug: 'edge',
+      activeSessionSlug: 'edge',
+      refreshQuestionResponses,
+      refreshSurveyResponsesByID,
+    });
+
+    subject._getEffectiveDraftSlug = jest.fn(() => 'edge');
+    subject.maybeBlockSubmitUntilQuestionPoolComplete = jest.fn(() => false);
+    subject.getChangedQidsAndFields = jest.fn(() => ({
+      changedQids: new Set(['q1']),
+      changedMap: { q1: { answer: 1 } },
+    }));
+    subject.getPendingEditStats = jest.fn(() => ({ total: 1, encrypted: 0 }));
+    subject.submitSurveyResponse = jest.fn().mockResolvedValue({
+      status: 1,
+      blockNumber: 42,
+      transactionHash: `0x${'4'.repeat(64)}`,
+      __ceQuestionResponses: [
+        {
+          questionID: 'q1',
+          responder: '0xabc',
+          type: 'freeform',
+          prompt: 'Prompt 1',
+          answer: { value: 'yes', encrypted: false },
+          additional: { value: '', encrypted: false },
+        },
+      ],
+      __ceSurveyResponse: {
+        surveyID: '0xsurvey',
+        responder: '0xabc',
+        responses: [
+          {
+            questionID: 'q1',
+            responder: '0xabc',
+            type: 'freeform',
+            prompt: 'Prompt 1',
+            answer: { value: 'yes', encrypted: false },
+            additional: { value: '', encrypted: false },
+          },
+        ],
+      },
+      __ceSurveyId: '0xsurvey',
+    });
+    subject.writeSubmittedResponsesToLocalCaches = jest.fn().mockResolvedValue({
+      questionCacheWritten: false,
+      surveyCacheWritten: false,
+    });
+    subject.clearDraftFor = jest.fn();
+    subject.invalidateDiffCaches = jest.fn();
+    subject.prepareJsonAndHash = jest.fn(() => ({
+      responder: '0xabc',
+      responses: [
+        {
+          questionID: 'q1',
+          answer: { value: 'yes', encrypted: false },
+          additional: { value: '', encrypted: false },
+        },
+      ],
+    }));
+    subject.state = {
+      ...subject.state,
+      surveysResponseState: [{
+        answers: { q1: { value: 'yes', encrypted: false } },
+        additionalComments: { q1: { value: '', encrypted: false } },
+        importance: {},
+        conviction: {},
+      }],
+      questionPool: [{ id: 'q1', type: 'freeform', prompt: 'Prompt 1' }],
+      pileQuestions: [],
+      isSubmitting: false,
+      submissionComplete: false,
+      submittedSinceLastEdit: false,
+      modifiedCount: 1,
+      hasEncryptedChanges: false,
+    };
+    subject.setState = (updater, callback) => {
+      const patch = typeof updater === 'function' ? updater(subject.state, subject.props) : updater;
+      subject.state = { ...subject.state, ...(patch || {}) };
+      if (typeof callback === 'function') {
+        const pending = callback();
+        if (pending && typeof pending.then === 'function') {
+          subject._lastSetStatePromise = pending;
+        }
+      }
+    };
+
+    await subject.encryptAndUpload();
+    await flushAsyncCallbacks();
+    if (subject._lastSetStatePromise) await subject._lastSetStatePromise;
+
+    expect(refreshQuestionResponses).toHaveBeenCalledWith(['q1'], {
+      slug: 'edge',
+      responder: '0xabc',
+    });
+    expect(refreshSurveyResponsesByID).toHaveBeenCalledWith('0xsurvey');
+  });
+
+  it('passes the merged encrypted slice into submit work before async state flush', async () => {
+    jest.spyOn(cryptoUtils, 'getProviderKind').mockReturnValue('browser');
+
+    const subject = new SurveyQuestions({
+      surveyIndex: 0,
+      surveyId: '0xsurvey',
+      account: '0xabc',
+      loginComplete: true,
+      provider: {},
+      network: { id: 84532 },
+      sessionSlug: 'edge',
+      activeSessionSlug: 'edge',
+    });
+
+    subject._getEffectiveDraftSlug = jest.fn(() => 'edge');
+    subject.maybeBlockSubmitUntilQuestionPoolComplete = jest.fn(() => false);
+    subject.getAnsweredQuestionsCount = jest.fn(() => 1);
+    subject.getChangedQidsAndFields = jest.fn(() => ({
+      changedQids: new Set(['q1']),
+      changedMap: { q1: { answer: 1, additional: 1 } },
+    }));
+    subject.getPendingEditStats = jest.fn(() => ({ total: 1, encrypted: 1 }));
+    subject.buildFieldEncryptionWorkGroups = jest.fn(() => ({
+      groups: [{
+        recipients: [{ type: 'lit-sbt-v1' }],
+        qids: ['q1'],
+        slice: {
+          answers: {
+            q1: {
+              value: 'yes',
+              encrypted: true,
+              encryptionAudience: 'gate',
+              encryptedPortion: '',
+            },
+          },
+          additionalComments: {
+            q1: {
+              value: 'context',
+              encrypted: true,
+              encryptionAudience: 'gate',
+              encryptedPortion: '',
+            },
+          },
+          importance: {},
+          conviction: {},
+        },
+      }],
+      missingRecipients: [],
+    }));
+    subject.encryptFieldWorkGroups = jest.fn().mockResolvedValue({
+      answers: {
+        q1: {
+          value: '*',
+          encrypted: true,
+          encryptedPortion: 'answer-env',
+          hash: 'answer-hash',
+        },
+      },
+      additionalComments: {
+        q1: {
+          value: '*',
+          encrypted: true,
+          encryptedPortion: 'additional-env',
+          hash: 'additional-hash',
+        },
+      },
+    });
+    subject.submitSurveyResponse = jest.fn().mockResolvedValue({
+      status: 1,
+      blockNumber: 77,
+      transactionHash: `0x${'7'.repeat(64)}`,
+      __ceQuestionResponses: [
+        {
+          questionID: 'q1',
+          responder: '0xabc',
+          type: 'freeform',
+          prompt: 'Prompt 1',
+          answer: { value: '*', encrypted: true, encryptedPortion: 'answer-env' },
+          additional: { value: '*', encrypted: true, encryptedPortion: 'additional-env' },
+        },
+      ],
+      __ceSurveyResponse: {
+        surveyID: '0xsurvey',
+        responder: '0xabc',
+        responses: [
+          {
+            questionID: 'q1',
+            responder: '0xabc',
+            type: 'freeform',
+            prompt: 'Prompt 1',
+            answer: { value: '*', encrypted: true, encryptedPortion: 'answer-env' },
+            additional: { value: '*', encrypted: true, encryptedPortion: 'additional-env' },
+          },
+        ],
+      },
+      __ceSurveyId: '0xsurvey',
+    });
+    subject.writeSubmittedResponsesToLocalCaches = jest.fn().mockResolvedValue({
+      questionCacheWritten: true,
+      surveyCacheWritten: true,
+    });
+    subject.clearDraftFor = jest.fn();
+    subject.invalidateDiffCaches = jest.fn();
+    subject.prepareJsonAndHash = jest.fn(() => ({
+      responder: '0xabc',
+      responses: [
+        {
+          questionID: 'q1',
+          answer: { value: '*', encrypted: true, encryptedPortion: 'answer-env' },
+          additional: { value: '*', encrypted: true, encryptedPortion: 'additional-env' },
+        },
+      ],
+    }));
+    subject.state = {
+      ...subject.state,
+      surveysResponseState: [{
+        answers: {
+          q1: {
+            value: 'yes',
+            encrypted: true,
+            encryptionAudience: 'gate',
+            encryptedPortion: '',
+          },
+        },
+        additionalComments: {
+          q1: {
+            value: 'context',
+            encrypted: true,
+            encryptionAudience: 'gate',
+            encryptedPortion: '',
+          },
+        },
+        importance: {},
+        conviction: {},
+      }],
+      questionPool: [{ id: 'q1', type: 'freeform', prompt: 'Prompt 1' }],
+      pileQuestions: [],
+      isSubmitting: false,
+      submissionComplete: false,
+      submittedSinceLastEdit: false,
+      modifiedCount: 1,
+      encryptedModifiedCount: 1,
+      hasEncryptedChanges: true,
+    };
+
+    const deferredStatePatches = [];
+    subject.setState = (updater, callback) => {
+      const patch = typeof updater === 'function' ? updater(subject.state, subject.props) : updater;
+      if (patch && typeof patch === 'object') {
+        if (Object.prototype.hasOwnProperty.call(patch, 'surveysResponseState')) {
+          deferredStatePatches.push(patch);
+        } else {
+          subject.state = { ...subject.state, ...patch };
+        }
+      }
+      if (typeof callback === 'function') {
+        const pending = callback();
+        if (pending && typeof pending.then === 'function') {
+          subject._lastSetStatePromise = pending;
+        }
+      }
+      return patch;
+    };
+    subject._submitGuard = true;
+
+    await subject.encryptAndUpload();
+    await flushAsyncCallbacks();
+    if (subject._lastSetStatePromise) await subject._lastSetStatePromise;
+
+    expect(
+      deferredStatePatches.some((patch) => Array.isArray(patch?.surveysResponseState))
+    ).toBe(true);
+    expect(subject.submitSurveyResponse).toHaveBeenCalledTimes(1);
+    expect(subject.submitSurveyResponse).toHaveBeenCalledWith(
+      expect.objectContaining({
+        answers: expect.objectContaining({
+          q1: expect.objectContaining({
+            value: '*',
+            encrypted: true,
+            encryptedPortion: 'answer-env',
+          }),
+        }),
+        additionalComments: expect.objectContaining({
+          q1: expect.objectContaining({
+            value: '*',
+            encrypted: true,
+            encryptedPortion: 'additional-env',
+          }),
+        }),
+      }),
+      expect.any(Set),
+    );
+    expect(subject.submitSurveyResponse.mock.calls[0][1]).toEqual(new Set(['q1']));
+    expect(subject.writeSubmittedResponsesToLocalCaches).toHaveBeenCalledWith(expect.objectContaining({
+      receipt: expect.objectContaining({ status: 1, blockNumber: 77 }),
+    }));
+  });
+
+  it('uses the resolved submission slug for post-submit cache writes and refresh fallback', async () => {
+    jest.spyOn(cryptoUtils, 'getProviderKind').mockReturnValue('browser');
+
+    const refreshQuestionResponses = jest.fn().mockResolvedValue(undefined);
+    const refreshSurveyResponsesByID = jest.fn().mockResolvedValue(undefined);
+    const subject = new SurveyQuestions({
+      surveyIndex: 0,
+      surveyId: '0xsurvey',
+      account: '0xabc',
+      loginComplete: true,
+      provider: {},
+      network: { id: 84532 },
+      sessionSlug: 'edge',
+      activeSessionSlug: 'edge',
+      refreshQuestionResponses,
+      refreshSurveyResponsesByID,
+    });
+
+    subject._getEffectiveDraftSlug = jest.fn(() => 'edge');
+    subject.maybeBlockSubmitUntilQuestionPoolComplete = jest.fn(() => false);
+    subject.getChangedQidsAndFields = jest.fn(() => ({
+      changedQids: new Set(['q1']),
+      changedMap: { q1: { answer: 1 } },
+    }));
+    subject.getPendingEditStats = jest.fn(() => ({ total: 1, encrypted: 0 }));
+    subject.submitSurveyResponse = jest.fn().mockResolvedValue({
+      status: 1,
+      blockNumber: 52,
+      transactionHash: `0x${'9'.repeat(64)}`,
+      __ceQuestionResponses: [
+        {
+          questionID: 'q1',
+          responder: '0xabc',
+          type: 'freeform',
+          prompt: 'Prompt 1',
+          answer: { value: 'yes', encrypted: false },
+          additional: { value: '', encrypted: false },
+        },
+      ],
+      __ceSurveyResponse: {
+        surveyID: '0xsurvey',
+        responder: '0xabc',
+        responses: [
+          {
+            questionID: 'q1',
+            responder: '0xabc',
+            type: 'freeform',
+            prompt: 'Prompt 1',
+            answer: { value: 'yes', encrypted: false },
+            additional: { value: '', encrypted: false },
+          },
+        ],
+      },
+      __ceSurveyId: '0xsurvey',
+      __ceSubmissionGroupKey: 'alpha',
+    });
+    subject.writeSubmittedResponsesToLocalCaches = jest.fn().mockResolvedValue({
+      questionCacheWritten: false,
+      surveyCacheWritten: false,
+    });
+    subject.clearDraftFor = jest.fn();
+    subject.invalidateDiffCaches = jest.fn();
+    subject.prepareJsonAndHash = jest.fn(() => ({
+      responder: '0xabc',
+      responses: [
+        {
+          questionID: 'q1',
+          answer: { value: 'yes', encrypted: false },
+          additional: { value: '', encrypted: false },
+        },
+      ],
+    }));
+    subject.state = {
+      ...subject.state,
+      surveysResponseState: [{
+        answers: { q1: { value: 'yes', encrypted: false } },
+        additionalComments: { q1: { value: '', encrypted: false } },
+        importance: {},
+        conviction: {},
+      }],
+      questionPool: [{ id: 'q1', type: 'freeform', prompt: 'Prompt 1' }],
+      pileQuestions: [],
+      isSubmitting: false,
+      submissionComplete: false,
+      submittedSinceLastEdit: false,
+      modifiedCount: 1,
+      hasEncryptedChanges: false,
+    };
+    subject.setState = (updater, callback) => {
+      const patch = typeof updater === 'function' ? updater(subject.state, subject.props) : updater;
+      subject.state = { ...subject.state, ...(patch || {}) };
+      if (typeof callback === 'function') {
+        const pending = callback();
+        if (pending && typeof pending.then === 'function') {
+          subject._lastSetStatePromise = pending;
+        }
+      }
+    };
+
+    await subject.encryptAndUpload();
+    await flushAsyncCallbacks();
+    if (subject._lastSetStatePromise) await subject._lastSetStatePromise;
+
+    expect(subject.writeSubmittedResponsesToLocalCaches).toHaveBeenCalledWith(expect.objectContaining({
+      submissionSlug: 'alpha',
+    }));
+    expect(refreshQuestionResponses).toHaveBeenCalledWith(['q1'], {
+      slug: 'alpha',
+      responder: '0xabc',
+    });
+    expect(refreshSurveyResponsesByID).toHaveBeenCalledWith('0xsurvey');
+  });
+
+  it('canonicalizes reserved session aliases in post-submit survey response links', async () => {
+    jest.spyOn(cryptoUtils, 'getProviderKind').mockReturnValue('browser');
+
+    const buildSubject = (submissionGroupKey) => {
+      const subject = new SurveyQuestions({
+        surveyIndex: 0,
+        surveyId: '0xsurvey',
+        account: '0xabc',
+        loginComplete: true,
+        provider: {},
+        network: { id: 84532 },
+        sessionSlug: 'edge',
+        activeSessionSlug: 'edge',
+      });
+
+      subject._getEffectiveDraftSlug = jest.fn(() => 'edge');
+      subject.maybeBlockSubmitUntilQuestionPoolComplete = jest.fn(() => false);
+      subject.getChangedQidsAndFields = jest.fn(() => ({
+        changedQids: new Set(['q1']),
+        changedMap: { q1: { answer: 1 } },
+      }));
+      subject.getPendingEditStats = jest.fn(() => ({ total: 1, encrypted: 0 }));
+      subject.submitSurveyResponse = jest.fn().mockResolvedValue({
+        status: 1,
+        blockNumber: 52,
+        transactionHash: `0x${'9'.repeat(64)}`,
+        __ceQuestionResponses: [
+          {
+            questionID: 'q1',
+            responder: '0xabc',
+            type: 'freeform',
+            prompt: 'Prompt 1',
+            answer: { value: 'yes', encrypted: false },
+            additional: { value: '', encrypted: false },
+          },
+        ],
+        __ceSurveyResponse: {
+          surveyID: '0xsurvey',
+          responder: '0xabc',
+          responses: [
+            {
+              questionID: 'q1',
+              responder: '0xabc',
+              type: 'freeform',
+              prompt: 'Prompt 1',
+              answer: { value: 'yes', encrypted: false },
+              additional: { value: '', encrypted: false },
+            },
+          ],
+        },
+        __ceSurveyId: '0xsurvey',
+        __ceSubmissionGroupKey: submissionGroupKey,
+      });
+      subject.writeSubmittedResponsesToLocalCaches = jest.fn().mockResolvedValue({
+        questionCacheWritten: true,
+        surveyCacheWritten: true,
+      });
+      subject.clearDraftFor = jest.fn();
+      subject.invalidateDiffCaches = jest.fn();
+      subject.prepareJsonAndHash = jest.fn(() => ({
+        responder: '0xabc',
+        responses: [
+          {
+            questionID: 'q1',
+            answer: { value: 'yes', encrypted: false },
+            additional: { value: '', encrypted: false },
+          },
+        ],
+      }));
+      subject.state = {
+        ...subject.state,
+        surveysResponseState: [{
+          answers: { q1: { value: 'yes', encrypted: false } },
+          additionalComments: { q1: { value: '', encrypted: false } },
+          importance: {},
+          conviction: {},
+        }],
+        questionPool: [{ id: 'q1', type: 'freeform', prompt: 'Prompt 1' }],
+        pileQuestions: [],
+        isSubmitting: false,
+        submissionComplete: false,
+        submittedSinceLastEdit: false,
+        modifiedCount: 1,
+        hasEncryptedChanges: false,
+      };
+      subject.setState = (updater, callback) => {
+        const patch = typeof updater === 'function' ? updater(subject.state, subject.props) : updater;
+        subject.state = { ...subject.state, ...(patch || {}) };
+        if (typeof callback === 'function') {
+          const pending = callback();
+          if (pending && typeof pending.then === 'function') {
+            subject._lastSetStatePromise = pending;
+          }
+        }
+      };
+
+      return subject;
+    };
+
+    const debateSubject = buildSubject('DEBATE');
+    await debateSubject.encryptAndUpload();
+    await flushAsyncCallbacks();
+    if (debateSubject._lastSetStatePromise) await debateSubject._lastSetStatePromise;
+    expect(debateSubject.state.responseUrl).toBe('/survey/0xsurvey/0xabc?session=DEBATE');
+
+    const generalSubject = buildSubject('general');
+    await generalSubject.encryptAndUpload();
+    await flushAsyncCallbacks();
+    if (generalSubject._lastSetStatePromise) await generalSubject._lastSetStatePromise;
+    expect(generalSubject.state.responseUrl).toBe('/survey/0xsurvey/0xabc');
+  });
+
+  it('ignores out-of-scope baseline keys and clears pending count after undo in full mode', () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 1 },
+    });
+    subject.getDefaultResponseEncryptionAudience = () => 'self';
+    subject.isQuestionLockedForResponse = () => false;
+
+    const baseline = {
       answers: {
         q1: { value: '*', encrypted: true },
       },
@@ -4007,6 +5448,104 @@ describe('SurveyTool module', () => {
     expect(retrySpy).toHaveBeenCalled();
     expect(subject.state.noResponse).toBe(true);
     expect(subject.state.isLoadingResponse).toBe(false);
+  });
+
+  it('hydrates a viewed response from a fresh persistent cache reread before falling back to hash-only retries', async () => {
+    const responderAddress = '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+    const staleCache = {
+      '84532': {
+        questions: {
+          q1: { id: 'q1', type: 'binary', prompt: 'Prompt from cache', creator: responderAddress },
+        },
+        questionResponses: {},
+        questionResponsesMeta: {},
+      },
+    };
+    const freshCachedResponse = {
+      questionID: 'q1',
+      responder: responderAddress,
+      answer: { value: '*', encrypted: true, encryptedPortion: 'cipher-answer' },
+      additional: { value: '', encrypted: false },
+      timestamp: 1700000000,
+    };
+    const freshCache = {
+      '84532': {
+        questions: {
+          q1: { id: 'q1', type: 'binary', prompt: 'Prompt from cache', creator: responderAddress },
+        },
+        questionResponses: {
+          q1: {
+            [responderAddress]: freshCachedResponse,
+          },
+        },
+        questionResponsesMeta: {
+          q1: {
+            [responderAddress]: { bn: 12, txi: 0, li: 0, ts: 1700000000 },
+          },
+        },
+      },
+    };
+    jest.spyOn(cacheScripts, 'readCache')
+      .mockResolvedValueOnce(staleCache)
+      .mockResolvedValueOnce(freshCache);
+    jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue({});
+    const getResponseSpy = jest.spyOn(contractScripts, 'getResponse').mockResolvedValue(null);
+    const getResponseHashSpy = jest.spyOn(contractScripts, 'getResponseHash').mockResolvedValue('tx-response-hash');
+
+    const subject = new SurveyQuestions({
+      singleQuestionMode: true,
+      isStandalone: false,
+      surveyIndex: 0,
+      questionID: 'q1',
+      responderAddress,
+      account: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      loginComplete: true,
+      provider: {},
+      network: { id: 84532 },
+      networkChainId: 84532,
+      sessionSlug: 'edge',
+      activeSessionSlug: 'edge',
+    });
+    subject._isMounted = true;
+    subject.state = {
+      ...subject.state,
+      questionPool: [],
+      parsedViewAddressAnswers: null,
+      noResponse: false,
+      responseLookupWarning: '',
+      isLoadingResponse: false,
+      surveysResponseState: [{ answers: {}, importance: {}, conviction: {}, additionalComments: {} }],
+    };
+    let callbackRun = Promise.resolve();
+    subject.setState = jest.fn((update, cb) => {
+      const patch = typeof update === 'function' ? update(subject.state, subject.props) : update;
+      if (patch && typeof patch === 'object') {
+        subject.state = { ...subject.state, ...patch };
+      }
+      if (typeof cb === 'function') {
+        const maybePromise = cb();
+        if (maybePromise && typeof maybePromise.then === 'function') {
+          callbackRun = callbackRun.then(() => maybePromise);
+        }
+      }
+      return patch;
+    });
+    const retrySpy = jest.spyOn(subject, 'scheduleSingleQuestionBootstrapRetry');
+
+    await subject.fetchSingleQuestionData();
+    await callbackRun;
+
+    expect(getResponseSpy).toHaveBeenCalled();
+    expect(getResponseHashSpy).not.toHaveBeenCalled();
+    expect(retrySpy).not.toHaveBeenCalled();
+    expect(subject.state.noResponse).toBe(false);
+    expect(subject.state.isLoadingResponse).toBe(false);
+    expect(subject.state.parsedViewAddressAnswers).toEqual(expect.objectContaining({
+      responder: responderAddress,
+      answer: expect.objectContaining({
+        encryptedPortion: 'cipher-answer',
+      }),
+    }));
   });
 
   it('marks viewed response as no-response when recent payload bootstrap retries are exhausted', async () => {
