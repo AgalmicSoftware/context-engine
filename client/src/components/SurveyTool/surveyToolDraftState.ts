@@ -30,11 +30,27 @@ type PersistedDraftEntryResolvers = {
   normalizeFieldAudienceMode?: ((audienceMode: unknown, fieldKey?: string, field?: UnknownRecord) => unknown) | null;
 };
 
+type PersistDraftAllowedIdsArgs = {
+  renderedQuestionIds?: unknown[];
+  dirtyQuestionIds?: unknown[];
+  slice?: PersistedDraftSliceLike | null;
+};
+
 type SurveyDraftPayload = {
   meta?: UnknownRecord | null;
   answers?: Record<string, SurveyDraftQuestionEntry | unknown> | null;
   baseline?: Record<string, SurveyDraftQuestionEntry | unknown> | null;
 } & UnknownRecord;
+
+type PersistedDraftPayloadArgs = {
+  draftContext?: UnknownRecord | null;
+  singleQuestionMode?: boolean;
+  questionId?: unknown;
+  surveyId?: unknown;
+  answersObj?: Record<string, SurveyDraftQuestionEntry | unknown> | null;
+  baselineObj?: Record<string, SurveyDraftQuestionEntry | unknown> | null;
+  now?: number;
+};
 
 type PendingStatsState = {
   modifiedCount?: unknown;
@@ -379,6 +395,49 @@ export const buildPersistedDraftMapsForAllowedIds = ({
 
   return { answersObj, baselineObj };
 };
+
+export const buildPersistDraftAllowedQuestionIds = ({
+  renderedQuestionIds = [],
+  dirtyQuestionIds = [],
+  slice = {},
+}: PersistDraftAllowedIdsArgs = {}) => {
+  const normalizedRendered = Array.isArray(renderedQuestionIds)
+    ? renderedQuestionIds.map((questionId) => normalizeQuestionIdKey(questionId)).filter(Boolean)
+    : [];
+  const normalizedDirty = Array.isArray(dirtyQuestionIds)
+    ? dirtyQuestionIds.map((questionId) => normalizeQuestionIdKey(questionId)).filter(Boolean)
+    : [];
+
+  if (normalizedRendered.length > 0) {
+    return [...new Set([...normalizedRendered, ...normalizedDirty])];
+  }
+
+  const normalizedSlice = isRecord(slice) ? slice : {};
+  return [...new Set([
+    ...Object.keys(normalizedSlice.answers || {}),
+    ...Object.keys(normalizedSlice.additionalComments || {}),
+    ...Object.keys(normalizedSlice.importance || {}),
+    ...Object.keys(normalizedSlice.conviction || {}),
+  ].map((questionId) => normalizeQuestionIdKey(questionId)).filter(Boolean))];
+};
+
+export const buildPersistedDraftPayload = ({
+  draftContext = {},
+  singleQuestionMode = false,
+  questionId = '',
+  surveyId = '',
+  answersObj = {},
+  baselineObj = {},
+  now = Date.now(),
+}: PersistedDraftPayloadArgs = {}): SurveyDraftPayload => ({
+  meta: {
+    networkId: isRecord(draftContext) ? draftContext.networkId : undefined,
+    surveyId: singleQuestionMode ? (questionId || 'questions') : (surveyId || 'questions'),
+    ts: now,
+  },
+  answers: isRecord(answersObj) ? answersObj : {},
+  baseline: isRecord(baselineObj) ? baselineObj : {},
+});
 
 export function getPendingStatsSnapshotFromState(state: PendingStatsState | null | undefined = {}): PendingStatsSnapshot {
   return {
