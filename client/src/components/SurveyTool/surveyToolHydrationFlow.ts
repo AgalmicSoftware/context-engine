@@ -78,6 +78,23 @@ type BuildHydratedResponseSliceArgs = {
   parseValue?: ((value: unknown) => unknown) | null;
 };
 
+type BuildLocalCacheHydrationMemoKeyArgs = {
+  scopeSlugs?: unknown[];
+  networkIdStr?: unknown;
+  account?: unknown;
+  renderedSignature?: unknown;
+  questionsCacheNonce?: unknown;
+  questionResponsesNonce?: unknown;
+  normalizeSessionSlugValue?: ((value: unknown) => string) | null;
+};
+
+type BuildMergedHydrationQuestionResponsesArgs = {
+  scopeSlugs?: unknown[];
+  networkIdStr?: unknown;
+  readQuestionsCache?: ((slug: string) => unknown) | null;
+  mergeQuestionResponses?: ((target: Record<string, unknown>, source: Record<string, unknown>) => void) | null;
+};
+
 type BuildRevertedResponseSliceArgs = {
   baselineSlice?: ResponseSlice | null;
   renderedQuestionIds?: Iterable<unknown> | unknown[];
@@ -321,6 +338,53 @@ export const buildHydratedResponseSlice = ({
   }
 
   return slice;
+};
+
+export const buildLocalCacheHydrationMemoKey = ({
+  scopeSlugs = [],
+  networkIdStr = '',
+  account = '',
+  renderedSignature = '',
+  questionsCacheNonce = 0,
+  questionResponsesNonce = 0,
+  normalizeSessionSlugValue = null,
+}: BuildLocalCacheHydrationMemoKeyArgs = {}) => [
+  Array.isArray(scopeSlugs)
+    ? scopeSlugs
+      .map((value) => (typeof normalizeSessionSlugValue === 'function'
+        ? normalizeSessionSlugValue(value)
+        : String(value || '')))
+      .join(',')
+    : '',
+  String(networkIdStr || ''),
+  String(account || ''),
+  String(renderedSignature || ''),
+  Number(questionsCacheNonce || 0),
+  Number(questionResponsesNonce || 0),
+].join('|');
+
+export const buildMergedHydrationQuestionResponses = ({
+  scopeSlugs = [],
+  networkIdStr = '',
+  readQuestionsCache = null,
+  mergeQuestionResponses = null,
+}: BuildMergedHydrationQuestionResponsesArgs = {}) => {
+  const mergedQuestionResponses: Record<string, unknown> = {};
+  const networkId = String(networkIdStr || '');
+  if (!networkId || !Array.isArray(scopeSlugs) || typeof readQuestionsCache !== 'function' || typeof mergeQuestionResponses !== 'function') {
+    return mergedQuestionResponses;
+  }
+
+  scopeSlugs.forEach((rawScopeSlug) => {
+    const scopeSlug = String(rawScopeSlug || '');
+    if (!scopeSlug) return;
+    let questionsCache = readQuestionsCache(scopeSlug);
+    if (!questionsCache || typeof questionsCache !== 'object') questionsCache = {};
+    const networkCache = questionsCache?.[networkId];
+    mergeQuestionResponses(mergedQuestionResponses, networkCache?.questionResponses || {});
+  });
+
+  return mergedQuestionResponses;
 };
 
 export const buildPrefilledSurveyState = ({
