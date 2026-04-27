@@ -220,7 +220,9 @@ import {
   buildQuestionScanProgressDisplay,
   buildDraftHydrationPatchForQuestion,
   buildCacheHydrationSlice,
+  buildDraftAwareCacheHydrationState,
   buildDraftHydrationState,
+  buildPrefilledSurveyState,
   buildPersistedDraftQuestionRemovalPlan,
   buildPersistedDraftTrackingAfterLoad,
   buildPersistedDraftTrackingAfterScopedDelete,
@@ -5645,38 +5647,24 @@ export class SurveyQuestions extends Component {
     const surveyIndex = this.props.isStandalone || this.props.singleQuestionMode ? 0 : (this.props.surveyIndex || 0);
 
     this.setState((prev) => {
-      const curr =
-        prev.surveysResponseState?.[surveyIndex] ||
-        { answers: {}, importance: {}, conviction: {}, additionalComments: {} };
-
-      const allowOverwrite = !prev.isDirty && !prev.submissionComplete;
-
-      const nextStateArr = Array.isArray(prev.surveysResponseState) ? [...prev.surveysResponseState] : [];
-      while (nextStateArr.length <= surveyIndex) {
-        nextStateArr.push({ answers: {}, importance: {}, conviction: {}, additionalComments: {} });
-      }
-
-      const nextSlice = {
-        answers: { ...(nextStateArr[surveyIndex]?.answers || {}) },
-        importance: { ...(nextStateArr[surveyIndex]?.importance || {}) },
-        conviction: { ...(nextStateArr[surveyIndex]?.conviction || {}) },
-        additionalComments: { ...(nextStateArr[surveyIndex]?.additionalComments || {}) },
-      };
-
-      this._applyResponseHydrationListToSlice({
-        targetSlice: nextSlice,
-        currentSlice: curr,
+      const {
+        nextSurveysResponseState,
+        nextBaseline,
+        shouldWriteBaseline,
+      } = buildPrefilledSurveyState({
+        surveyIndex,
+        prevSurveysResponseState: prev.surveysResponseState,
+        prevEditBaseline: prev.editBaseline,
+        isDirty: prev.isDirty,
+        submissionComplete: prev.submissionComplete,
         responses: userAnswers.responses,
-        allowOverwrite,
+        applyResponseHydrationListToSlice: this._applyResponseHydrationListToSlice,
+        buildSliceFromUserAnswers: this.buildSliceFromUserAnswers,
       });
 
-      nextStateArr[surveyIndex] = nextSlice;
-
-      const baseline = this.buildSliceFromUserAnswers(userAnswers, prev.editBaseline || curr);
-
       return {
-        surveysResponseState: nextStateArr,
-        ...(!prev.submissionComplete ? { editBaseline: baseline } : {})
+        surveysResponseState: nextSurveysResponseState,
+        ...(shouldWriteBaseline ? { editBaseline: nextBaseline } : {})
       };
     }, () => {
       this.updateJsonPreview();
@@ -5823,62 +5811,23 @@ export class SurveyQuestions extends Component {
         const cImp = cacheSlice.importance?.[qid];
         const cConv = cacheSlice.conviction?.[qid];
         const draftForQid = draftAnswersByQid[qid] || {};
-        const draftAnswerEnv = String(draftForQid.answerEncryptedPortion || '');
-        const draftAdditionalEnv = String(draftForQid.additionalEncryptedPortion || '');
-        const cacheAnswerEnv = String(cAns?.encryptedPortion || '');
-        const cacheAdditionalEnv = String(cAdd?.encryptedPortion || '');
-        const cAnsEffective = (
-          cAns &&
-          cAns.value === '*' &&
-          draftForQid.value === '' &&
-          areEnvelopesEquivalent(draftAnswerEnv, cacheAnswerEnv, draftForQid.answerEncrypted, cAns.encrypted)
-        ) ? { ...cAns, value: '' } : cAns;
-        const cAddEffective = (
-          cAdd &&
-          cAdd.value === '*' &&
-          draftForQid.additional === '' &&
-          areEnvelopesEquivalent(draftAdditionalEnv, cacheAdditionalEnv, draftForQid.additionalEncrypted, cAdd.encrypted)
-        ) ? { ...cAdd, value: '' } : cAdd;
-        const canReplaceMaskedAnswerWithDraftEmpty =
-          cAnsEffective &&
-          cAnsEffective.value === '' &&
-          next.answers[qid]?.value === '*' &&
-          areEnvelopesEquivalent(
-            next.answers[qid]?.encryptedPortion,
-            cAnsEffective.encryptedPortion,
-            next.answers[qid]?.encrypted,
-            cAnsEffective.encrypted
-          );
-        const canReplaceMaskedAdditionalWithDraftEmpty =
-          cAddEffective &&
-          cAddEffective.value === '' &&
-          next.additionalComments[qid]?.value === '*' &&
-          areEnvelopesEquivalent(
-            next.additionalComments[qid]?.encryptedPortion,
-            cAddEffective.encryptedPortion,
-            next.additionalComments[qid]?.encrypted,
-            cAddEffective.encrypted
-          );
-        const canReplaceMaskedBaselineAnswerWithDraftEmpty =
-          cAnsEffective &&
-          cAnsEffective.value === '' &&
-          nextBaseline.answers[qid]?.value === '*' &&
-          areEnvelopesEquivalent(
-            nextBaseline.answers[qid]?.encryptedPortion,
-            cAnsEffective.encryptedPortion,
-            nextBaseline.answers[qid]?.encrypted,
-            cAnsEffective.encrypted
-          );
-        const canReplaceMaskedBaselineAdditionalWithDraftEmpty =
-          cAddEffective &&
-          cAddEffective.value === '' &&
-          nextBaseline.additionalComments[qid]?.value === '*' &&
-          areEnvelopesEquivalent(
-            nextBaseline.additionalComments[qid]?.encryptedPortion,
-            cAddEffective.encryptedPortion,
-            nextBaseline.additionalComments[qid]?.encrypted,
-            cAddEffective.encrypted
-          );
+        const {
+          effectiveAnswerState: cAnsEffective,
+          effectiveAdditionalState: cAddEffective,
+          canReplaceMaskedAnswerWithDraftEmpty,
+          canReplaceMaskedAdditionalWithDraftEmpty,
+          canReplaceMaskedBaselineAnswerWithDraftEmpty,
+          canReplaceMaskedBaselineAdditionalWithDraftEmpty,
+        } = buildDraftAwareCacheHydrationState({
+          cachedAnswer: cAns,
+          cachedAdditional: cAdd,
+          draftEntry: draftForQid,
+          currentAnswer: next.answers[qid],
+          currentAdditional: next.additionalComments[qid],
+          baselineAnswer: nextBaseline.answers[qid],
+          baselineAdditional: nextBaseline.additionalComments[qid],
+          areEnvelopesEquivalent,
+        });
 
         if (this._applyLocalCacheHydrationEntryToSlice({
           targetSlice: next,
