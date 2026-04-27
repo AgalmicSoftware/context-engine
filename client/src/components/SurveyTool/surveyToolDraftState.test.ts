@@ -1,4 +1,6 @@
 import {
+  buildPersistDraftAllowedQuestionIds,
+  buildPersistedDraftPayload,
   buildPersistedDraftMapsForAllowedIds,
   buildPersistedDraftQuestionEntry,
   buildSurveyDraftSemanticSignature,
@@ -165,6 +167,63 @@ describe('surveyToolDraftState', () => {
         },
         q2: { value: 'keep baseline' },
       },
+    });
+  });
+
+  it('derives persistable draft question ids from rendered, dirty, or slice-backed questions', () => {
+    expect(buildPersistDraftAllowedQuestionIds({
+      renderedQuestionIds: ['Q1', 'q2'],
+      dirtyQuestionIds: ['q2', 'q3'],
+      slice: {
+        answers: { q4: { value: 'unused because rendered ids exist' } },
+      },
+    })).toEqual(['q1', 'q2', 'q3']);
+
+    expect(buildPersistDraftAllowedQuestionIds({
+      renderedQuestionIds: [],
+      dirtyQuestionIds: [],
+      slice: {
+        answers: { Q1: { value: 'hello' } },
+        additionalComments: { q2: { value: 'notes' } },
+        importance: { q3: 4 },
+        conviction: { q4: 7 },
+      },
+    })).toEqual(['q1', 'q2', 'q3', 'q4']);
+  });
+
+  it('builds persisted draft payload metadata for survey and single-question modes', () => {
+    expect(buildPersistedDraftPayload({
+      draftContext: { networkId: 84532 },
+      singleQuestionMode: false,
+      surveyId: 'survey-1',
+      answersObj: { q1: { value: 'hello' } },
+      baselineObj: { q1: { value: 'baseline' } },
+      now: 12345,
+    })).toEqual({
+      meta: {
+        networkId: 84532,
+        surveyId: 'survey-1',
+        ts: 12345,
+      },
+      answers: { q1: { value: 'hello' } },
+      baseline: { q1: { value: 'baseline' } },
+    });
+
+    expect(buildPersistedDraftPayload({
+      draftContext: { networkId: 84532 },
+      singleQuestionMode: true,
+      questionId: 'question-1',
+      answersObj: {},
+      baselineObj: {},
+      now: 67890,
+    })).toEqual({
+      meta: {
+        networkId: 84532,
+        surveyId: 'question-1',
+        ts: 67890,
+      },
+      answers: {},
+      baseline: {},
     });
   });
 
