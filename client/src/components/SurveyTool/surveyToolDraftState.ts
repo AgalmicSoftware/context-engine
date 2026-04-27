@@ -24,6 +24,12 @@ type SurveyDraftQuestionEntry = {
   conviction?: unknown;
 } & UnknownRecord;
 
+type PersistedDraftEntryResolvers = {
+  resolveFieldEncryptionAudience?: ((field: UnknownRecord, questionId: string, fieldKey?: string) => unknown) | null;
+  resolveFieldEncryptionGateId?: ((field: UnknownRecord, questionId: string, fieldKey?: string) => unknown) | null;
+  normalizeFieldAudienceMode?: ((audienceMode: unknown, fieldKey?: string, field?: UnknownRecord) => unknown) | null;
+};
+
 type SurveyDraftPayload = {
   meta?: UnknownRecord | null;
   answers?: Record<string, SurveyDraftQuestionEntry | unknown> | null;
@@ -33,6 +39,13 @@ type SurveyDraftPayload = {
 type PendingStatsState = {
   modifiedCount?: unknown;
   encryptedModifiedCount?: unknown;
+} & UnknownRecord;
+
+type PersistedDraftSliceLike = {
+  answers?: Record<string, UnknownRecord | unknown> | null;
+  additionalComments?: Record<string, UnknownRecord | unknown> | null;
+  importance?: Record<string, unknown> | null;
+  conviction?: Record<string, unknown> | null;
 } & UnknownRecord;
 
 type SubmitLabelContext = {
@@ -228,6 +241,144 @@ export const shouldEncryptResponseFieldForSubmit = (
   field.value !== '*' &&
   hasMeaningfulFieldValue(field)
 );
+
+export const buildPersistedDraftQuestionEntry = ({
+  questionId = '',
+  answer = {},
+  additional = {},
+  importance = null,
+  conviction = null,
+  resolvers = {},
+}: {
+  questionId?: unknown;
+  answer?: UnknownRecord | null;
+  additional?: UnknownRecord | null;
+  importance?: unknown;
+  conviction?: unknown;
+  resolvers?: PersistedDraftEntryResolvers;
+} = {}): SurveyDraftQuestionEntry | null => {
+  const qid = normalizeQuestionIdKey(questionId);
+  const answerField = isRecord(answer) ? answer : {};
+  const additionalField = isRecord(additional) ? additional : {};
+  const resolveFieldEncryptionAudience = resolvers.resolveFieldEncryptionAudience;
+  const resolveFieldEncryptionGateId = resolvers.resolveFieldEncryptionGateId;
+  const normalizeFieldAudienceMode = resolvers.normalizeFieldAudienceMode;
+
+  const hasVal =
+    answerField.value !== undefined && answerField.value !== null &&
+    (Array.isArray(answerField.value) ? answerField.value.length > 0 : String(answerField.value).length > 0);
+  const hasAdd =
+    additionalField.value !== undefined && additionalField.value !== null && String(additionalField.value).length > 0;
+  const hasImp = importance !== null;
+  const hasConv = conviction !== null;
+
+  if (!hasVal && !hasAdd && !hasImp && !hasConv) return null;
+
+  return {
+    value: answerField.value,
+    answerEncrypted: answerField.encrypted,
+    answerEncryptionAudience: typeof resolveFieldEncryptionAudience === 'function'
+      ? resolveFieldEncryptionAudience(answerField, qid)
+      : undefined,
+    answerEncryptionGateId: typeof resolveFieldEncryptionGateId === 'function'
+      ? resolveFieldEncryptionGateId(answerField, qid, 'answer')
+      : undefined,
+    answerAudienceMode: typeof normalizeFieldAudienceMode === 'function'
+      ? normalizeFieldAudienceMode(answerField?.audienceMode, 'answer', answerField)
+      : undefined,
+    ...(answerField.encryptedPortion ? { answerEncryptedPortion: answerField.encryptedPortion } : {}),
+    additional: additionalField.value,
+    additionalEncrypted: additionalField.encrypted,
+    additionalEncryptionAudience: typeof resolveFieldEncryptionAudience === 'function'
+      ? resolveFieldEncryptionAudience(additionalField, qid, 'additional')
+      : undefined,
+    additionalEncryptionGateId: typeof resolveFieldEncryptionGateId === 'function'
+      ? resolveFieldEncryptionGateId(additionalField, qid, 'additional')
+      : undefined,
+    additionalAudienceMode: typeof normalizeFieldAudienceMode === 'function'
+      ? normalizeFieldAudienceMode(additionalField?.audienceMode, 'additional', additionalField)
+      : undefined,
+    ...(additionalField.encryptedPortion ? { additionalEncryptedPortion: additionalField.encryptedPortion } : {}),
+    importance,
+    conviction,
+  };
+};
+
+export const buildPersistedDraftMapsForAllowedIds = ({
+  allowedQuestionIds = [],
+  slice = {},
+  baselineSlice = {},
+  prevAnswers = {},
+  prevBaseline = {},
+  resolvers = {},
+}: {
+  allowedQuestionIds?: unknown[];
+  slice?: PersistedDraftSliceLike | null;
+  baselineSlice?: PersistedDraftSliceLike | null;
+  prevAnswers?: Record<string, SurveyDraftQuestionEntry | unknown> | null;
+  prevBaseline?: Record<string, SurveyDraftQuestionEntry | unknown> | null;
+  resolvers?: PersistedDraftEntryResolvers;
+} = {}) => {
+  const answersObj = { ...(isRecord(prevAnswers) ? prevAnswers : {}) };
+  const baselineObj = { ...(isRecord(prevBaseline) ? prevBaseline : {}) };
+  const normalizedSlice = isRecord(slice) ? slice : {};
+  const normalizedBaselineSlice = isRecord(baselineSlice) ? baselineSlice : {};
+
+  allowedQuestionIds.forEach((rawQuestionId) => {
+    const qid = normalizeQuestionIdKey(rawQuestionId);
+    if (!qid) return;
+
+    const ans = isRecord(normalizedSlice.answers?.[qid]) ? normalizedSlice.answers?.[qid] as UnknownRecord : {};
+    const add = isRecord(normalizedSlice.additionalComments?.[qid]) ? normalizedSlice.additionalComments?.[qid] as UnknownRecord : {};
+    const imp = normalizedSlice.importance && Object.prototype.hasOwnProperty.call(normalizedSlice.importance, qid)
+      ? normalizedSlice.importance[qid]
+      : null;
+    const conv = normalizedSlice.conviction && Object.prototype.hasOwnProperty.call(normalizedSlice.conviction, qid)
+      ? normalizedSlice.conviction[qid]
+      : null;
+
+    const answerEntry = buildPersistedDraftQuestionEntry({
+      questionId: qid,
+      answer: ans,
+      additional: add,
+      importance: imp,
+      conviction: conv,
+      resolvers,
+    });
+
+    if (answerEntry) {
+      answersObj[qid] = answerEntry;
+    } else if (answersObj[qid]) {
+      delete answersObj[qid];
+    }
+
+    const bAns = isRecord(normalizedBaselineSlice.answers?.[qid]) ? normalizedBaselineSlice.answers?.[qid] as UnknownRecord : {};
+    const bAdd = isRecord(normalizedBaselineSlice.additionalComments?.[qid]) ? normalizedBaselineSlice.additionalComments?.[qid] as UnknownRecord : {};
+    const bImp = normalizedBaselineSlice.importance && Object.prototype.hasOwnProperty.call(normalizedBaselineSlice.importance, qid)
+      ? normalizedBaselineSlice.importance[qid]
+      : null;
+    const bConv = normalizedBaselineSlice.conviction && Object.prototype.hasOwnProperty.call(normalizedBaselineSlice.conviction, qid)
+      ? normalizedBaselineSlice.conviction[qid]
+      : null;
+
+    const baselineEntry = buildPersistedDraftQuestionEntry({
+      questionId: qid,
+      answer: bAns,
+      additional: bAdd,
+      importance: bImp,
+      conviction: bConv,
+      resolvers,
+    });
+
+    if (baselineEntry) {
+      baselineObj[qid] = baselineEntry;
+    } else if (baselineObj[qid]) {
+      delete baselineObj[qid];
+    }
+  });
+
+  return { answersObj, baselineObj };
+};
 
 export function getPendingStatsSnapshotFromState(state: PendingStatsState | null | undefined = {}): PendingStatsSnapshot {
   return {

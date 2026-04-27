@@ -218,6 +218,7 @@ import {
   buildQuestionFilterStorageKeyPrefix,
   buildQuestionIdScopeSignature,
   buildQuestionScanProgressDisplay,
+  buildPersistedDraftMapsForAllowedIds,
   buildRatingEnvelopeQidSetFromUserAnswers,
   buildSliderModeStatePatch,
   buildSliderPersistOptions,
@@ -4636,89 +4637,20 @@ export class SurveyQuestions extends Component {
             ]
       );
 
-      // Start from previous draft answers (to keep non-rendered entries)
-      const answersObj = { ...(prevAnswers || {}) };
-      // Regression guard: persist baseline alongside answers so refresh keeps
-      // editBaseline and live state semantically aligned after decrypt-only flows.
-      const baselineObj = { ...(prevBaseline || {}) };
       const baselineSlice = this.state.editBaseline || { answers: {}, importance: {}, conviction: {}, additionalComments: {} };
-
-      // Overwrite with currently rendered fields
-      allowed.forEach((qid) => {
-        const ans = (slice.answers && slice.answers[qid]) || {};
-        const add = (slice.additionalComments && slice.additionalComments[qid]) || {};
-        const imp = (slice.importance && Object.prototype.hasOwnProperty.call(slice.importance, qid))
-          ? slice.importance[qid]
-          : null;
-        const conv = (slice.conviction && Object.prototype.hasOwnProperty.call(slice.conviction, qid))
-          ? slice.conviction[qid]
-          : null;
-
-        const hasVal =
-          ans.value !== undefined && ans.value !== null &&
-          (Array.isArray(ans.value) ? ans.value.length > 0 : String(ans.value).length > 0);
-        const hasAdd =
-          add.value !== undefined && add.value !== null && String(add.value).length > 0;
-        const hasImp = imp !== null;
-        const hasConv = conv !== null;
-
-        if (hasVal || hasAdd || hasImp || hasConv) {
-          answersObj[qid] = {
-            value: ans.value,
-            answerEncrypted: ans.encrypted,
-            answerEncryptionAudience: this.resolveFieldEncryptionAudience(ans, qid),
-            answerEncryptionGateId: this.resolveFieldEncryptionGateId(ans, qid, 'answer'),
-            answerAudienceMode: this.normalizeFieldAudienceMode(ans?.audienceMode, 'answer', ans),
-            ...(ans.encryptedPortion ? { answerEncryptedPortion: ans.encryptedPortion } : {}),
-            additional: add.value,
-            additionalEncrypted: add.encrypted,
-            additionalEncryptionAudience: this.resolveFieldEncryptionAudience(add, qid, 'additional'),
-            additionalEncryptionGateId: this.resolveFieldEncryptionGateId(add, qid, 'additional'),
-            additionalAudienceMode: this.normalizeFieldAudienceMode(add?.audienceMode, 'additional', add),
-            ...(add.encryptedPortion ? { additionalEncryptedPortion: add.encryptedPortion } : {}),
-            importance: imp,
-            conviction: conv,
-          };
-        } else {
-          if (answersObj[qid]) delete answersObj[qid];
-        }
-
-        const bAns = (baselineSlice.answers && baselineSlice.answers[qid]) || {};
-        const bAdd = (baselineSlice.additionalComments && baselineSlice.additionalComments[qid]) || {};
-        const bImp = (baselineSlice.importance && Object.prototype.hasOwnProperty.call(baselineSlice.importance, qid))
-          ? baselineSlice.importance[qid]
-          : null;
-        const bConv = (baselineSlice.conviction && Object.prototype.hasOwnProperty.call(baselineSlice.conviction, qid))
-          ? baselineSlice.conviction[qid]
-          : null;
-        const bHasVal =
-          bAns.value !== undefined && bAns.value !== null &&
-          (Array.isArray(bAns.value) ? bAns.value.length > 0 : String(bAns.value).length > 0);
-        const bHasAdd =
-          bAdd.value !== undefined && bAdd.value !== null && String(bAdd.value).length > 0;
-        const bHasImp = bImp !== null;
-        const bHasConv = bConv !== null;
-
-        if (bHasVal || bHasAdd || bHasImp || bHasConv) {
-          baselineObj[qid] = {
-            value: bAns.value,
-            answerEncrypted: bAns.encrypted,
-            answerEncryptionAudience: this.resolveFieldEncryptionAudience(bAns, qid),
-            answerEncryptionGateId: this.resolveFieldEncryptionGateId(bAns, qid, 'answer'),
-            answerAudienceMode: this.normalizeFieldAudienceMode(bAns?.audienceMode, 'answer', bAns),
-            ...(bAns.encryptedPortion ? { answerEncryptedPortion: bAns.encryptedPortion } : {}),
-            additional: bAdd.value,
-            additionalEncrypted: bAdd.encrypted,
-            additionalEncryptionAudience: this.resolveFieldEncryptionAudience(bAdd, qid, 'additional'),
-            additionalEncryptionGateId: this.resolveFieldEncryptionGateId(bAdd, qid, 'additional'),
-            additionalAudienceMode: this.normalizeFieldAudienceMode(bAdd?.audienceMode, 'additional', bAdd),
-            ...(bAdd.encryptedPortion ? { additionalEncryptedPortion: bAdd.encryptedPortion } : {}),
-            importance: bImp,
-            conviction: bConv,
-          };
-        } else {
-          if (baselineObj[qid]) delete baselineObj[qid];
-        }
+      // Start from previous draft answers/baseline so non-rendered QIDs survive,
+      // then overwrite only the currently allowed question set.
+      const { answersObj, baselineObj } = buildPersistedDraftMapsForAllowedIds({
+        allowedQuestionIds: [...allowed],
+        slice,
+        baselineSlice,
+        prevAnswers,
+        prevBaseline,
+        resolvers: {
+          resolveFieldEncryptionAudience: this.resolveFieldEncryptionAudience,
+          resolveFieldEncryptionGateId: this.resolveFieldEncryptionGateId,
+          normalizeFieldAudienceMode: this.normalizeFieldAudienceMode,
+        },
       });
 
       if (Object.keys(answersObj).length === 0) {
