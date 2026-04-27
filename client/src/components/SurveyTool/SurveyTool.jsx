@@ -1260,6 +1260,34 @@ export class SurveyQuestions extends Component {
     return !!patch.changed;
   };
 
+  _applyResponseHydrationListToSlice = ({
+    targetSlice = null,
+    currentSlice = null,
+    responses = [],
+    allowOverwrite = false,
+    parseValue = this.parseAnswerValue,
+    questionIdResolver = (response) => normalizeQuestionIdKey(response?.questionID || response?.questionId),
+  } = {}) => {
+    if (!targetSlice) return false;
+    const list = Array.isArray(responses) ? responses : [responses];
+    let changed = false;
+    list.forEach((response) => {
+      const qid = questionIdResolver(response);
+      if (!qid) return;
+      if (this._applyResponseHydrationEntryToSlice({
+        targetSlice,
+        currentSlice,
+        questionId: qid,
+        response,
+        allowOverwrite,
+        parseValue,
+      })) {
+        changed = true;
+      }
+    });
+    return changed;
+  };
+
   setManagedTimeout = (fn, delayMs = 0) => {
     const timeoutId = setTimeout(() => {
       this._transientTimeouts.delete(timeoutId);
@@ -5489,18 +5517,12 @@ export class SurveyQuestions extends Component {
       return v;
     };
 
-    const list = Array.isArray(userAnswers.responses) ? userAnswers.responses : [userAnswers];
-    list.forEach((r) => {
-      const qid = normalizeQuestionIdKey(r?.questionID || r?.questionId);
-      if (!qid) return;
-      this._applyResponseHydrationEntryToSlice({
-        targetSlice: slice,
-        currentSlice: prevSlice,
-        questionId: qid,
-        response: r,
-        allowOverwrite: true,
-        parseValue: parseVal,
-      });
+    this._applyResponseHydrationListToSlice({
+      targetSlice: slice,
+      currentSlice: prevSlice,
+      responses: Array.isArray(userAnswers.responses) ? userAnswers.responses : [userAnswers],
+      allowOverwrite: true,
+      parseValue: parseVal,
     });
 
     return slice;
@@ -5545,16 +5567,11 @@ export class SurveyQuestions extends Component {
         additionalComments: { ...(nextStateArr[surveyIndex]?.additionalComments || {}) },
       };
 
-      userAnswers.responses.forEach((r) => {
-        const qid = normalizeQuestionIdKey(r?.questionID || r?.questionId);
-        if (!qid) return;
-        this._applyResponseHydrationEntryToSlice({
-          targetSlice: nextSlice,
-          currentSlice: curr,
-          questionId: qid,
-          response: r,
-          allowOverwrite,
-        });
+      this._applyResponseHydrationListToSlice({
+        targetSlice: nextSlice,
+        currentSlice: curr,
+        responses: userAnswers.responses,
+        allowOverwrite,
       });
 
       nextStateArr[surveyIndex] = nextSlice;
@@ -6717,12 +6734,12 @@ export class SurveyQuestions extends Component {
         additionalComments: { ...(nextStateArr[surveyIndex]?.additionalComments || {}) },
       };
 
-      this._applyResponseHydrationEntryToSlice({
+      this._applyResponseHydrationListToSlice({
         targetSlice: nextSlice,
         currentSlice: curr,
-        questionId,
-        response: userAnswer,
+        responses: [userAnswer],
         allowOverwrite,
+        questionIdResolver: () => questionId,
       });
 
       nextStateArr[surveyIndex] = nextSlice;
