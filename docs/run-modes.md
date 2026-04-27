@@ -1,6 +1,6 @@
 # Run Modes
 
-Context Engine can be used in three main modes depending on how much infrastructure you want to run.
+Context Engine can be used in three main modes depending on how much infrastructure you want to run, plus one advanced manual-fork E2E workaround.
 
 ## `core-local`
 
@@ -26,6 +26,16 @@ Local blockchain development with Anvil and Foundry.
 - Use this mode for contract work, local deploys, and chain-backed development flows
 - Root scripts use Node.js 20+
 - See [docs/local-chain.md](local-chain.md) for chain startup, deploy flow, and local contract testing
+
+## `manual-fork` verification (advanced)
+
+Hybrid E2E verification when you want real deployed contracts and seeded live state, but do not want to spend live gas for repeated validation.
+
+- Start Anvil in fork mode yourself against the target chain
+- Point E2E `RPC_URL` at that local fork
+- Keep `CHAIN` / `CHAIN_ID` / `SESSION_REGISTRY` / `SBT_FACTORY` aligned to the upstream chain you forked
+- See [docs/e2e-setup.md](e2e-setup.md) for the current manual-fork workflow
+- First-class `E2E_CHAIN_MODE=fork` orchestration is tracked separately in [PRD 236](../TODO/PRDs/236_e2e-first-class-local-fork-mode.md)
 
 ## `hosted/onchain`
 
