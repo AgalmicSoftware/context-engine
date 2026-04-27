@@ -3291,30 +3291,18 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
           }
           return null;
         }
-        const payloadPointerId = arweaveScripts.hexToBase64url(arweaveHash);
+        const arweaveHashBase64 = arweaveScripts.hexToBase64url(arweaveHash);
         const mockedResponse = readE2EMockedViewedResponse();
         if (mockedResponse) {
           normalizeSessionNameFields(mockedResponse);
-          const mockedStorageRef = isCloudflareStorageResource(cfg, STORAGE_RESOURCE_KEYS.RESPONSES)
-            ? normalizeStorageRef({
-              backend: STORAGE_BACKENDS.CLOUDFLARE,
-              id: payloadPointerId,
-              resource: STORAGE_RESOURCE_KEYS.RESPONSES,
-            }, { fallbackBackend: STORAGE_BACKENDS.CLOUDFLARE, resource: STORAGE_RESOURCE_KEYS.RESPONSES })
-            : null;
-          return normalizeConvictionImportance(attachPayloadPointerFields(
-            mockedResponse,
-            payloadPointerId,
-            STORAGE_RESOURCE_KEYS.RESPONSES,
-            mockedStorageRef
-          ));
+          mockedResponse.arweaveTxId = arweaveHashBase64;
+          return normalizeConvictionImportance(mockedResponse);
         }
-        if (!ARWEAVE_ACTIVE && !isCloudflareStorageResource(cfg, STORAGE_RESOURCE_KEYS.RESPONSES)) {
+        if (!ARWEAVE_ACTIVE) {
           return null;
         }
-        const storageRead = await readPayloadPointerTextForGroup({
-          pointerId: payloadPointerId,
-          resource: STORAGE_RESOURCE_KEYS.RESPONSES,
+        const arweaveData = await downloadArweaveTextForGroup({
+          txId: arweaveHashBase64,
           groupKeyOrCfg,
           cfg,
           arweaveOpts: {
