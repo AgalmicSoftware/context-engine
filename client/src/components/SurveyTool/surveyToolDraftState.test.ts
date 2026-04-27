@@ -1,4 +1,5 @@
 import {
+  buildPersistedDraftMapsForAllowedIds,
   buildPersistedDraftQuestionEntry,
   buildSurveyDraftSemanticSignature,
   computeSubmitLabel,
@@ -104,6 +105,66 @@ describe('surveyToolDraftState', () => {
       additionalEncryptedPortion: 'add-env',
       importance: 4,
       conviction: 7,
+    });
+  });
+
+  it('builds persisted draft maps by preserving previous non-rendered entries and replacing allowed ids', () => {
+    const resolvers = {
+      resolveFieldEncryptionAudience: jest.fn((_field, qid, fieldKey) => (
+        fieldKey === 'additional' ? `${qid}:additional` : `${qid}:answer`
+      )),
+      resolveFieldEncryptionGateId: jest.fn((_field, qid, fieldKey) => (
+        fieldKey === 'additional' ? `${qid}:gate:add` : `${qid}:gate:answer`
+      )),
+      normalizeFieldAudienceMode: jest.fn((mode, fieldKey) => (
+        mode || (fieldKey === 'additional' ? 'inherit' : 'explicit')
+      )),
+    };
+
+    expect(buildPersistedDraftMapsForAllowedIds({
+      allowedQuestionIds: ['q1'],
+      slice: {
+        answers: { q1: { value: '' } },
+        additionalComments: { q1: { value: '' } },
+        importance: {},
+        conviction: {},
+      },
+      baselineSlice: {
+        answers: { q1: { value: 'baseline answer' } },
+        additionalComments: {},
+        importance: {},
+        conviction: {},
+      },
+      prevAnswers: {
+        q1: { value: 'stale rendered answer' },
+        q2: { value: 'keep me' },
+      },
+      prevBaseline: {
+        q1: { value: 'stale baseline' },
+        q2: { value: 'keep baseline' },
+      },
+      resolvers,
+    })).toEqual({
+      answersObj: {
+        q2: { value: 'keep me' },
+      },
+      baselineObj: {
+        q1: {
+          value: 'baseline answer',
+          answerEncrypted: undefined,
+          answerEncryptionAudience: 'q1:answer',
+          answerEncryptionGateId: 'q1:gate:answer',
+          answerAudienceMode: 'explicit',
+          additional: undefined,
+          additionalEncrypted: undefined,
+          additionalEncryptionAudience: 'q1:additional',
+          additionalEncryptionGateId: 'q1:gate:add',
+          additionalAudienceMode: 'inherit',
+          importance: null,
+          conviction: null,
+        },
+        q2: { value: 'keep baseline' },
+      },
     });
   });
 
