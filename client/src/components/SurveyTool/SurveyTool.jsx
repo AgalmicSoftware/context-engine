@@ -26,11 +26,11 @@ import styles from './SurveyTool.module.scss';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faLock, faUnlock, faPlus, faMinus, faCaretDown, faCaretUp, faCheck, faTimes, faArrowLeft, faArrowRight, faSpinner, faExternalLinkAlt, faFilter, faExclamationCircle, faMicrophone, faChevronLeft, faChevronRight, faComment, faRobot } from '@fortawesome/free-solid-svg-icons';
 
-import AudioInput from '../Shared/AudioInput/AudioInput.jsx';
 import CreateQuestionsAndSurveys from './CreateQuestionsAndSurveys';
 import SurveyResults from './SurveyResults';
 import QuestionFilter from './QuestionFilter';
 import PileHologramAssistant from './PileHologramAssistant';
+import AdditionalCommentsInlineRow from './AdditionalCommentsInlineRow';
 import SurveyQuestionTagControl from './SurveyQuestionTagControl';
 import SingleQuestionResponse from './SingleQuestionResponse';
 import TagModal from '../TagPage/TagModal';
@@ -38,7 +38,6 @@ import BinaryChoiceInput from './BinaryChoiceInput';
 import BullhornToggleButton from './BullhornToggleButton';
 import ConvictionImportanceLabel from './ConvictionImportanceLabel';
 import ConvictionImportanceSliderControl from './ConvictionImportanceSliderControl';
-import DecryptActionChip from './DecryptActionChip';
 import DeferredConvictionImportanceSlider from './DeferredConvictionImportanceSlider';
 import DeferredRatingSlider from './DeferredRatingSlider';
 import FullQuestionFooterIcons from './FullQuestionFooterIcons';
@@ -46,7 +45,9 @@ import FullQuestionHeader from './FullQuestionHeader';
 import FullQuestionRatingInput from './FullQuestionRatingInput';
 import GatedPromptNotice from './GatedPromptNotice';
 import MultichoiceQuestionInput from './MultichoiceQuestionInput';
+import QuestionDecryptControl from './QuestionDecryptControl';
 import QuestionCardLinks from './QuestionCardLinks';
+import SurveyAudioFieldInput from './SurveyAudioFieldInput';
 import { JsonButtonRow, JsonIconButton, JsonPanel, JsonToggleButton } from '../Shared/Json/JsonControls';
 
 // Crypto and contract utilities
@@ -1263,6 +1264,504 @@ export class SurveyQuestions extends Component {
     const answerSig = this.buildAutoDecryptMaskedFieldSignature(responseOverride?.answer);
     const additionalSig = this.buildAutoDecryptMaskedFieldSignature(responseOverride?.additional);
     return [String(mode || 'self'), qid, field, responder, answerSig, additionalSig].join('|');
+  };
+
+  getQuestionFieldTaskKey = (questionId, fieldKey = 'answer') => {
+    const qid = String(questionId || '').trim().toLowerCase();
+    const normalizedFieldKey = String(fieldKey || 'answer').trim().toLowerCase();
+    if (!qid) return '';
+    return `${qid}:${normalizedFieldKey}`;
+  };
+
+  isQuestionFieldBusy = (questionId, fieldKey = 'answer') => {
+    const taskKey = this.getQuestionFieldTaskKey(questionId, fieldKey);
+    if (!taskKey) return false;
+    return !!(this.state.decryptingByKey && this.state.decryptingByKey[taskKey]);
+  };
+
+  getQuestionFieldTaskKeys = (
+    questionId,
+    { includeAnswer = false, includeAdditional = false } = {},
+  ) => {
+    const keys = [];
+    if (includeAnswer) {
+      const answerKey = this.getQuestionFieldTaskKey(questionId, 'answer');
+      if (answerKey) keys.push(answerKey);
+    }
+    if (includeAdditional) {
+      const additionalKey = this.getQuestionFieldTaskKey(questionId, 'additional');
+      if (additionalKey) keys.push(additionalKey);
+    }
+    return keys;
+  };
+
+  markQuestionFieldBusyMap = (busyMap, keysToMark = []) => {
+    const next = { ...(busyMap || {}) };
+    keysToMark.forEach((key) => {
+      if (key) next[key] = true;
+    });
+    return next;
+  };
+
+  clearQuestionFieldBusyMap = (busyMap, questionId, fieldToDecrypt = 'both') => {
+    const cleared = { ...(busyMap || {}) };
+    const keysToClear = this.getQuestionFieldTaskKeys(questionId, {
+      includeAnswer: fieldToDecrypt === 'answer' || fieldToDecrypt === 'both',
+      includeAdditional: fieldToDecrypt === 'additional' || fieldToDecrypt === 'both',
+    });
+    keysToClear.forEach((key) => {
+      cleared[key] = false;
+    });
+    return cleared;
+  };
+
+  getQuestionFieldDecryptSelection = (
+    questionId,
+    fieldToDecrypt = 'both',
+    responseSlice = null,
+  ) => {
+    const maskedAnswer = !!(
+      (fieldToDecrypt === 'answer' || fieldToDecrypt === 'both') &&
+      responseSlice?.answers?.[questionId]?.value === '*' &&
+      (responseSlice?.answers?.[questionId]?.encryptedPortion ||
+        responseSlice?.answers?.[questionId]?.encrypted)
+    );
+
+    const maskedAdditional = !!(
+      (fieldToDecrypt === 'additional' || fieldToDecrypt === 'both') &&
+      responseSlice?.additionalComments?.[questionId]?.value === '*' &&
+      (responseSlice?.additionalComments?.[questionId]?.encryptedPortion ||
+        responseSlice?.additionalComments?.[questionId]?.encrypted)
+    );
+
+    return {
+      maskedAnswer,
+      maskedAdditional,
+      hasMaskedField: !!(maskedAnswer || maskedAdditional),
+      clearMode: maskedAnswer && maskedAdditional
+        ? 'both'
+        : (maskedAnswer ? 'answer' : (maskedAdditional ? 'additional' : '')),
+      keysToMark: this.getQuestionFieldTaskKeys(questionId, {
+        includeAnswer: maskedAnswer,
+        includeAdditional: maskedAdditional,
+      }),
+    };
+  };
+
+  decryptQuestionRatingEnvelopes = async (
+    ratingEnvelopes = null,
+    { chainId, lit, account, providerLike } = {},
+  ) => {
+    let decryptedImportance = null;
+    let decryptedConviction = null;
+    try {
+      const toNum = (v) => {
+        if (v === undefined || v === null) return null;
+        const n = Number(v);
+        return Number.isNaN(n) ? null : n;
+      };
+
+      const litOpts = lit ? lit : undefined;
+      if (ratingEnvelopes?.importanceEncrypted) {
+        try {
+          const value = await cryptoUtils.decryptEnvelopeValue(ratingEnvelopes.importanceEncrypted, {
+            account,
+            chainId,
+            providerLike,
+            ...(litOpts ? { litOpts } : {}),
+          });
+          decryptedImportance = toNum(value);
+        } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
+      }
+      if (ratingEnvelopes?.convictionEncrypted) {
+        try {
+          const value = await cryptoUtils.decryptEnvelopeValue(ratingEnvelopes.convictionEncrypted, {
+            account,
+            chainId,
+            providerLike,
+            ...(litOpts ? { litOpts } : {}),
+          });
+          decryptedConviction = toNum(value);
+        } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
+      }
+    } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
+
+    return { decryptedImportance, decryptedConviction };
+  };
+
+  buildQuestionDecryptExecutionContext = (baselineForDecrypt, questionId) => {
+    const providerKind = cryptoUtils.getProviderKind(this.props.provider);
+    const chainId = this.props.network?.id;
+    const surveyId = this.resolveDecryptSurveyId(baselineForDecrypt, questionId);
+    const questionPool =
+      (Array.isArray(this.state.questionPool) && this.state.questionPool.length > 0)
+        ? this.state.questionPool
+        : (Array.isArray(this.state.pileQuestions) ? this.state.pileQuestions : []);
+
+    const litHooks =
+      this.props.lit ||
+      this.props.litHooks ||
+      (typeof window !== 'undefined' ? (window.__litHooks || window.litHooks) : null);
+    const lit = litHooks && litHooks.getKey ? { getKey: litHooks.getKey } : undefined;
+
+    return {
+      providerKind,
+      chainId,
+      surveyId,
+      questionPool,
+      lit,
+      opts: {
+        providerKind,
+        provider: this.props.provider,
+        account: this.props.account,
+        chainId,
+        surveyId,
+        questionPool,
+        ...(lit ? { lit } : {}),
+        hasher: this.state.hasher,
+        throwOnError: true,
+      },
+    };
+  };
+
+  applyDecryptedQuestionResponseValues = (
+    responseRecord,
+    {
+      questionId,
+      decryptedStateSlice,
+      decryptedImportance = null,
+      decryptedConviction = null,
+    } = {},
+  ) => {
+    if (!responseRecord || typeof responseRecord !== 'object') return responseRecord;
+    const qid = String(questionId || '').trim().toLowerCase();
+    const next = { ...responseRecord };
+
+    if (qid && decryptedStateSlice?.answers?.[qid]) {
+      next.answer = {
+        ...(next.answer || {}),
+        value: decryptedStateSlice.answers[qid]?.value,
+      };
+    }
+    if (qid && decryptedStateSlice?.additionalComments?.[qid]) {
+      next.additional = {
+        ...(next.additional || {}),
+        value: decryptedStateSlice.additionalComments[qid]?.value,
+      };
+    }
+    if (decryptedImportance !== null && decryptedImportance !== undefined) {
+      next.importance = decryptedImportance;
+    }
+    if (decryptedConviction !== null && decryptedConviction !== undefined) {
+      next.conviction = decryptedConviction;
+    }
+
+    return next;
+  };
+
+  applyDecryptedQuestionStateToSurveySlice = (
+    targetStateSlice,
+    {
+      questionId,
+      decryptedStateSlice,
+      baselineSlice = null,
+      decryptedImportance = null,
+      decryptedConviction = null,
+    } = {},
+  ) => {
+    const qid = String(questionId || '').trim().toLowerCase();
+    if (!qid) return targetStateSlice;
+
+    const nextTargetStateSlice = {
+      ...(targetStateSlice || {}),
+    };
+
+    if (decryptedStateSlice?.answers?.[qid]) {
+      const prevEncrypted = nextTargetStateSlice.answers?.[qid]?.encrypted;
+      const incoming = decryptedStateSlice.answers[qid];
+      nextTargetStateSlice.answers = { ...(nextTargetStateSlice.answers || {}) };
+      nextTargetStateSlice.answers[qid] = {
+        ...(nextTargetStateSlice.answers[qid] || {}),
+        value: incoming.value,
+        encrypted: (typeof prevEncrypted === 'boolean')
+          ? prevEncrypted
+          : !!(
+              baselineSlice?.answers?.[qid]?.value === '*' &&
+              (
+                baselineSlice?.answers?.[qid]?.encryptedPortion ||
+                baselineSlice?.answers?.[qid]?.encrypted
+              )
+            ),
+        ...(incoming.zkSalt ? { zkSalt: incoming.zkSalt } : {}),
+      };
+    }
+
+    if (decryptedStateSlice?.additionalComments?.[qid]) {
+      const prevEncrypted = nextTargetStateSlice.additionalComments?.[qid]?.encrypted;
+      const incoming = decryptedStateSlice.additionalComments[qid];
+      nextTargetStateSlice.additionalComments = {
+        ...(nextTargetStateSlice.additionalComments || {}),
+      };
+      nextTargetStateSlice.additionalComments[qid] = {
+        ...(nextTargetStateSlice.additionalComments[qid] || {}),
+        value: incoming.value,
+        encrypted: (typeof prevEncrypted === 'boolean')
+          ? prevEncrypted
+          : !!(
+              baselineSlice?.additionalComments?.[qid]?.value === '*' &&
+              (
+                baselineSlice?.additionalComments?.[qid]?.encryptedPortion ||
+                baselineSlice?.additionalComments?.[qid]?.encrypted
+              )
+            ),
+        ...(incoming.zkSalt ? { zkSalt: incoming.zkSalt } : {}),
+      };
+    }
+
+    if (decryptedImportance !== null && decryptedImportance !== undefined) {
+      nextTargetStateSlice.importance = nextTargetStateSlice.importance || {};
+      nextTargetStateSlice.importance[qid] = decryptedImportance;
+    }
+    if (decryptedConviction !== null && decryptedConviction !== undefined) {
+      nextTargetStateSlice.conviction = nextTargetStateSlice.conviction || {};
+      nextTargetStateSlice.conviction[qid] = decryptedConviction;
+    }
+
+    return nextTargetStateSlice;
+  };
+
+  syncDecryptedQuestionIntoBaseline = (
+    editBaseline,
+    fallbackBaseline,
+    nextTargetStateSlice,
+    {
+      questionId,
+      decryptedStateSlice,
+      decryptedImportance = null,
+      decryptedConviction = null,
+    } = {},
+  ) => {
+    const qid = String(questionId || '').trim().toLowerCase();
+    let nextBaseline = editBaseline
+      ? this.deepClone(editBaseline)
+      : this.deepClone(
+        fallbackBaseline || { answers: {}, importance: {}, conviction: {}, additionalComments: {} },
+      );
+
+    if (!qid) return nextBaseline;
+
+    if (!nextBaseline.answers) nextBaseline.answers = {};
+    if (!nextBaseline.additionalComments) nextBaseline.additionalComments = {};
+
+    if (decryptedStateSlice?.answers?.[qid]) {
+      nextBaseline.answers[qid] = this.deepClone(nextTargetStateSlice.answers?.[qid]);
+    }
+    if (decryptedStateSlice?.additionalComments?.[qid]) {
+      nextBaseline.additionalComments[qid] = this.deepClone(
+        nextTargetStateSlice.additionalComments?.[qid],
+      );
+    }
+    if (decryptedImportance !== null && decryptedImportance !== undefined) {
+      nextBaseline.importance = nextBaseline.importance || {};
+      nextBaseline.importance[qid] = decryptedImportance;
+    }
+    if (decryptedConviction !== null && decryptedConviction !== undefined) {
+      nextBaseline.conviction = nextBaseline.conviction || {};
+      nextBaseline.conviction[qid] = decryptedConviction;
+    }
+
+    return nextBaseline;
+  };
+
+  mergeLatestEncryptedQuestionFields = (
+    responseSlice,
+    questionId,
+    latestResponse,
+    { includeAnswer = false, includeAdditional = false } = {},
+  ) => {
+    const qid = String(questionId || '').trim().toLowerCase();
+    if (!qid || !latestResponse || typeof latestResponse !== 'object') return responseSlice;
+
+    let nextResponseSlice = responseSlice && typeof responseSlice === 'object'
+      ? { ...responseSlice }
+      : { answers: {}, additionalComments: {} };
+
+    if (includeAnswer && latestResponse.answer?.encryptedPortion) {
+      nextResponseSlice.answers = { ...(nextResponseSlice.answers || {}) };
+      nextResponseSlice.answers[qid] = {
+        ...(nextResponseSlice.answers[qid] || { value: '*', encrypted: true, hash: '' }),
+        encrypted: !!(latestResponse.answer.encrypted || nextResponseSlice.answers?.[qid]?.encrypted),
+        hash: latestResponse.answer.hash || nextResponseSlice.answers?.[qid]?.hash || '',
+        encryptedPortion: latestResponse.answer.encryptedPortion,
+      };
+    }
+
+    if (includeAdditional && latestResponse.additional?.encryptedPortion) {
+      nextResponseSlice.additionalComments = { ...(nextResponseSlice.additionalComments || {}) };
+      nextResponseSlice.additionalComments[qid] = {
+        ...(nextResponseSlice.additionalComments[qid] || { value: '*', encrypted: true, hash: '' }),
+        encrypted: !!(
+          latestResponse.additional.encrypted ||
+          nextResponseSlice.additionalComments?.[qid]?.encrypted
+        ),
+        hash: latestResponse.additional.hash || nextResponseSlice.additionalComments?.[qid]?.hash || '',
+        encryptedPortion: latestResponse.additional.encryptedPortion,
+      };
+    }
+
+    return nextResponseSlice;
+  };
+
+  mergeQuestionResponseOverrideIntoDecryptSlice = (
+    responseSlice,
+    questionId,
+    responseOverride,
+  ) => {
+    const qid = String(questionId || '').trim().toLowerCase();
+    if (!qid || !responseOverride || typeof responseOverride !== 'object') return responseSlice;
+
+    const ans = responseOverride.answer || {};
+    const add = responseOverride.additional || {};
+    const nextResponseSlice = responseSlice && typeof responseSlice === 'object'
+      ? { ...responseSlice }
+      : { answers: {}, additionalComments: {} };
+
+    nextResponseSlice.answers = { ...(nextResponseSlice.answers || {}) };
+    nextResponseSlice.additionalComments = { ...(nextResponseSlice.additionalComments || {}) };
+
+    nextResponseSlice.answers[qid] = {
+      ...(nextResponseSlice.answers[qid] || {}),
+      ...(Object.prototype.hasOwnProperty.call(ans, 'value') ? { value: ans.value } : {}),
+      encrypted: !!(ans.encrypted || ans.encryptedPortion || nextResponseSlice.answers?.[qid]?.encrypted),
+      ...(ans.hash ? { hash: ans.hash } : {}),
+      ...(ans.encryptedPortion ? { encryptedPortion: ans.encryptedPortion } : {}),
+    };
+    nextResponseSlice.additionalComments[qid] = {
+      ...(nextResponseSlice.additionalComments[qid] || {}),
+      ...(Object.prototype.hasOwnProperty.call(add, 'value') ? { value: add.value } : {}),
+      encrypted: !!(
+        add.encrypted ||
+        add.encryptedPortion ||
+        nextResponseSlice.additionalComments?.[qid]?.encrypted
+      ),
+      ...(add.hash ? { hash: add.hash } : {}),
+      ...(add.encryptedPortion ? { encryptedPortion: add.encryptedPortion } : {}),
+    };
+
+    return nextResponseSlice;
+  };
+
+  getQuestionRatingEnvelopes = (source, questionId = null) => {
+    if (!source || typeof source !== 'object') return null;
+
+    const qid = String(questionId || '').trim().toLowerCase();
+    let target = source;
+
+    if (Array.isArray(source.responses)) {
+      target = source.responses.find(
+        (response) => String(response?.questionID || response?.questionId || '').trim().toLowerCase() === qid,
+      ) || null;
+    } else if (qid) {
+      const sourceId = String(source.questionID || source.questionId || '').trim().toLowerCase();
+      if (sourceId && sourceId !== qid) return null;
+    }
+
+    if (!target || typeof target !== 'object') return null;
+
+    const importanceEncrypted =
+      typeof target.importanceEncrypted === 'string' ? target.importanceEncrypted : '';
+    const convictionEncrypted =
+      typeof target.convictionEncrypted === 'string' ? target.convictionEncrypted : '';
+
+    if (!importanceEncrypted && !convictionEncrypted) return null;
+    return { importanceEncrypted, convictionEncrypted };
+  };
+
+  mergeQuestionRatingEnvelopeState = (previousState, nextSource, questionId = null) => {
+    const previous = previousState && typeof previousState === 'object' ? previousState : null;
+    const next = this.getQuestionRatingEnvelopes(nextSource, questionId);
+    if (!previous) return next;
+    if (!next) return previous;
+    return {
+      importanceEncrypted: next.importanceEncrypted || previous.importanceEncrypted || '',
+      convictionEncrypted: next.convictionEncrypted || previous.convictionEncrypted || '',
+    };
+  };
+
+  buildQuestionDecryptStartState = (prevState, keysToMark = []) => ({
+    isDecrypting: true,
+    submissionError: '',
+    suppressPrefill: true,
+    decryptingByKey: this.markQuestionFieldBusyMap(prevState?.decryptingByKey, keysToMark),
+  });
+
+  buildQuestionDecryptFailureState = (
+    prevState,
+    questionId,
+    fieldToDecrypt = 'both',
+    errorMessage = '',
+  ) => ({
+    isDecrypting: false,
+    submissionError: errorMessage || 'Decryption failed.',
+    decryptingByKey: this.clearQuestionFieldBusyMap(
+      prevState?.decryptingByKey,
+      questionId,
+      fieldToDecrypt,
+    ),
+  });
+
+  buildEmptyQuestionDecryptSlice = () => ({
+    answers: {},
+    importance: {},
+    conviction: {},
+    additionalComments: {},
+  });
+
+  ensureQuestionDecryptSliceShape = (responseSlice) => {
+    const base = responseSlice && typeof responseSlice === 'object'
+      ? responseSlice
+      : this.buildEmptyQuestionDecryptSlice();
+
+    return {
+      ...base,
+      answers: { ...(base.answers || {}) },
+      importance: { ...(base.importance || {}) },
+      conviction: { ...(base.conviction || {}) },
+      additionalComments: { ...(base.additionalComments || {}) },
+    };
+  };
+
+  buildViewedResponseDecryptBaseline = (responseOverride, questionId) => {
+    const qid = String(questionId || '').trim().toLowerCase();
+    if (!qid || !responseOverride || typeof responseOverride !== 'object') {
+      return this.buildEmptyQuestionDecryptSlice();
+    }
+
+    const shaped = { ...responseOverride };
+    if (!shaped.questionID && shaped.questionId) shaped.questionID = shaped.questionId;
+    if (!shaped.questionID) shaped.questionID = qid;
+
+    let baselineForDecrypt = null;
+    try {
+      baselineForDecrypt = this.buildSliceFromUserAnswers(shaped);
+    } catch (_) {
+      baselineForDecrypt = null;
+    }
+
+    return this.ensureQuestionDecryptSliceShape(baselineForDecrypt);
+  };
+
+  buildSelfQuestionDecryptBaseline = (surveyIndex) => {
+    let baselineSlice = this.state.surveysResponseState?.[surveyIndex];
+    if (!baselineSlice && this.state.userAnswers) {
+      baselineSlice = this.buildSliceFromUserAnswers(this.state.userAnswers);
+    }
+    return {
+      baselineSlice,
+      baselineForDecrypt: this.deepClone(
+        this.ensureQuestionDecryptSliceShape(baselineSlice),
+      ),
+    };
   };
 
   normalizeSingleQuestionViewedResponse = (rawResponse = null) => {
@@ -2522,7 +3021,7 @@ export class SurveyQuestions extends Component {
   handleReloadMaskedPrompt = async (questionId) => {
     const qid = String(questionId || '').trim().toLowerCase();
     if (!qid) return false;
-    const key = `${qid}:prompt`;
+    const key = this.getQuestionFieldTaskKey(qid, 'prompt');
 
     this.setState((prev) => ({
       decryptingByKey: {
@@ -2636,8 +3135,7 @@ export class SurveyQuestions extends Component {
     const qid = String(question?.id || '').trim().toLowerCase();
     const promptText = question?.prompt || 'Question';
     const promptMasked = this.isMaskedPromptText(promptText);
-    const promptKey = `${qid}:prompt`;
-    const promptReloading = !!(this.state.decryptingByKey && this.state.decryptingByKey[promptKey]);
+    const promptReloading = this.isQuestionFieldBusy(qid, 'prompt');
     const promptTitle =
       !this.props.loginComplete || !this.props.account
         ? 'Login required to decrypt gated prompts.'
@@ -2674,7 +3172,8 @@ export class SurveyQuestions extends Component {
     );
   };
 
-  renderQuestionTagDropdown = (question) => {
+  renderQuestionTagControl = (question, options = {}) => {
+    const { rowStyle } = options;
     return (
       <SurveyQuestionTagControl
         tags={question.tags}
@@ -2685,9 +3184,14 @@ export class SurveyQuestions extends Component {
         })}
         useTagModal={!this.props.singleQuestionMode && !this.props.isStandalone}
         onTagSelect={this.handleQuestionTagSelect}
+        rowStyle={rowStyle}
       />
     );
   };
+
+  renderQuestionTagDropdown = (question) => (
+    this.renderQuestionTagControl(question)
+  );
 
   handleQuestionTagSelect = (tag) => {
     const normalizedTag = String(tag || '').trim();
@@ -2699,21 +3203,11 @@ export class SurveyQuestions extends Component {
     this.setState({ activeTagModalTag: '' });
   };
 
-  renderQuestionTagDropdownRow = (question) => {
-    return (
-      <SurveyQuestionTagControl
-        tags={question.tags}
-        sessionSlug={resolveCurrentTagSessionSlug({
-          props: this.props,
-          state: this.state,
-          getEffectiveDraftSlug: this._getEffectiveDraftSlug,
-        })}
-        useTagModal={!this.props.singleQuestionMode && !this.props.isStandalone}
-        onTagSelect={this.handleQuestionTagSelect}
-        rowStyle={QUESTION_TAG_DROPDOWN_ROW_STYLE}
-      />
-    );
-  };
+  renderQuestionTagDropdownRow = (question) => (
+    this.renderQuestionTagControl(question, {
+      rowStyle: QUESTION_TAG_DROPDOWN_ROW_STYLE,
+    })
+  );
 
   getSliderMode = (questionId) => {
     return getQuestionSliderMode({
@@ -2839,6 +3333,633 @@ export class SurveyQuestions extends Component {
         }
       )}
     />
+  );
+
+  renderFullQuestionSliderSection = ({
+    surveyIndex,
+    questionId,
+    sliderMode,
+    activeSliderValue,
+    convictionValue,
+    importanceValue,
+    hasConvictionImportanceValue,
+    sliderOpen,
+  }) => (
+    <div className={styles.importanceSlider}>
+      {sliderOpen ? (
+        this.props.singleQuestionMode
+          ? this.renderSingleQuestionDeferredConvictionSlider({
+              surveyIndex,
+              questionId,
+              sliderMode,
+              activeSliderValue,
+              convictionValue,
+              importanceValue,
+            })
+          : (
+            <ConvictionImportanceSliderControl
+              label={this.renderConvictionImportanceLabel(questionId, convictionValue, importanceValue)}
+              value={activeSliderValue}
+              disabled={this.state.isSubmitting}
+              onChange={(value, event) =>
+                this.handleConvictionImportanceChange(
+                  surveyIndex,
+                  questionId,
+                  sliderMode,
+                  value,
+                  this.getSliderPersistOptions(event)
+                )}
+              onChangeComplete={this.flushDraftPersistAfterSliderChange}
+            />
+          )
+      ) : ENABLE_IMPORTANCE_SLIDER_TOGGLE ? (
+        this.renderBullhornToggleButton({
+          onClick: () => this.setSliderMode(questionId, 'conviction'),
+          disabled: this.state.isSubmitting,
+          active: hasConvictionImportanceValue,
+        })
+      ) : (
+        this.renderBullhornToggleButton({
+          onClick: () => this.setSliderMode(questionId, sliderMode),
+          disabled: this.state.isSubmitting,
+          active: hasConvictionImportanceValue,
+        })
+      )}
+    </div>
+  );
+
+  renderFullQuestionResponseInput = ({
+    question,
+    qIndex,
+    surveyIndex,
+    answer,
+    glowAnswer,
+  }) => {
+    switch (question.type) {
+      case 'multichoice': {
+        const options = Array.isArray(question.options) ? question.options : [];
+        const isSingleSelect = isSingleSelectMultichoice(question);
+        const selectedValues = normalizeMultichoiceValue(answer.value);
+        return (
+          <MultichoiceQuestionInput
+            questionId={question.id}
+            options={options}
+            selectedValues={selectedValues}
+            isSingleSelect={isSingleSelect}
+            disabled={this.state.isSubmitting}
+            onChange={(newAnswer) => this.handleAnswer(surveyIndex, question.id, newAnswer)}
+          />
+        );
+      }
+      case 'rating': {
+        const ratingValue = getNormalizedUiRatingValue(answer.value);
+        return (
+          this.props.singleQuestionMode
+            ? this.renderSingleQuestionDeferredRatingSlider({
+                surveyIndex,
+                questionId: question.id,
+                ratingValue,
+              })
+            : (
+              <FullQuestionRatingInput
+                value={ratingValue}
+                disabled={this.state.isSubmitting}
+                onChange={(ratingAnswer, event) => this.handleAnswer(
+                  surveyIndex,
+                  question.id,
+                  ratingAnswer,
+                  this.getSliderPersistOptions(event)
+                )}
+                onChangeComplete={this.flushDraftPersistAfterSliderChange}
+              />
+            )
+        );
+      }
+      case 'binary':
+        return (
+          <BinaryChoiceInput
+            questionId={question.id}
+            value={answer.value}
+            onChange={(option) => this.handleAnswer(surveyIndex, question.id, option)}
+            disabled={this.state.isSubmitting}
+            showIcons
+          />
+        );
+      default:
+        return (
+          <SurveyAudioFieldInput
+            qIndex={qIndex}
+            {...this.getAudioInputWorkerProps()}
+            placeholder={'response (optional)'}
+            updateFunction={(answerValue) => this.handleAnswer(surveyIndex, question.id, answerValue)}
+            toggleEncryption={(newEncryptedState) => this.toggleAnswerEncryption(surveyIndex, question.id, newEncryptedState)}
+            value={answer.value || ''}
+            encrypted={answer.encrypted || false}
+            dataTestId={E2E_TESTIDS.SURVEY_ANSWER_INPUT}
+            dataCeQuestionId={String(question.id || '').trim().toLowerCase()}
+            disabled={this.state.isSubmitting}
+            forceGlow={glowAnswer}
+            disableEncryption
+          />
+        );
+    }
+  };
+
+  renderFullQuestionAdditionalInput = ({
+    qIndex,
+    surveyIndex,
+    questionId,
+    additional,
+    glowAdditional,
+  }) => (
+    <SurveyAudioFieldInput
+      qIndex={qIndex}
+      {...this.getAudioInputWorkerProps()}
+      placeholder={'related thoughts or URLs (optional)'}
+      value={additional?.value || ''}
+      encrypted={additional?.encrypted || false}
+      dataTestId={E2E_TESTIDS.SURVEY_ADDITIONAL_INPUT}
+      dataCeQuestionId={String(questionId || '').trim().toLowerCase()}
+      disabled={this.state.isSubmitting}
+      forceGlow={glowAdditional}
+      updateFunction={(additionalCommentsValue) => this.handleAdditional(surveyIndex, questionId, additionalCommentsValue)}
+      toggleEncryption={(newEncryptedState) =>
+        this.toggleAdditionalCommentsEncryption(surveyIndex, questionId, newEncryptedState)
+      }
+    />
+  );
+
+  renderFullQuestionAdditionalEditorRow = ({
+    qIndex,
+    surveyIndex,
+    questionId,
+    additional,
+    glowAdditional,
+  }) => (
+    <AdditionalCommentsInlineRow
+      input={this.renderFullQuestionAdditionalInput({
+        qIndex,
+        surveyIndex,
+        questionId,
+        additional,
+        glowAdditional,
+      })}
+      lockControl={this.renderQuestionAdditionalLockControl({
+        surveyIndex,
+        questionId,
+        additional,
+        glowAdditional,
+      })}
+    />
+  );
+
+  renderFullQuestionCommentsSection = (content) => {
+    if (!content) return null;
+    return (
+      <div className={styles.fullQuestionComments}>
+        {content}
+      </div>
+    );
+  };
+
+  parseEncryptedEnvelope = (field) => {
+    try {
+      return field?.encryptedPortion ? JSON.parse(field.encryptedPortion) : null;
+    } catch {
+      return null;
+    }
+  };
+
+  getFieldDecryptState = ({
+    questionId,
+    fieldKey,
+    field,
+  }) => {
+    const envelope = this.parseEncryptedEnvelope(field);
+    const masked = !!(field?.value === '*' && (field?.encryptedPortion || field?.encrypted));
+    const allowDecrypt = masked && (
+      !!envelope ||
+      (!!this.props.loginComplete && !!this.props.account)
+    );
+    const busy = this.isQuestionFieldBusy(questionId, fieldKey);
+
+    return {
+      envelope,
+      masked,
+      allowDecrypt,
+      busy,
+    };
+  };
+
+  getQuestionFieldDisplayState = ({
+    questionId,
+    answer,
+    additional,
+  }) => {
+    const answerDecryptState = this.getFieldDecryptState({
+      questionId,
+      fieldKey: 'answer',
+      field: answer,
+    });
+    const additionalDecryptState = this.getFieldDecryptState({
+      questionId,
+      fieldKey: 'additional',
+      field: additional,
+    });
+    const hasAdditionalContent = hasMeaningfulFieldValue(additional);
+
+    return {
+      answerDecryptState,
+      additionalDecryptState,
+      hasAdditionalContent,
+      glowAnswer: !!answer?.encrypted,
+      glowAdditional: !!(additional?.encrypted && hasAdditionalContent),
+      decryptTooltip: 'Login to decrypt this encrypted field.',
+    };
+  };
+
+  getQuestionResponseDisplayState = ({
+    questionId,
+    responseSlice,
+  }) => {
+    const slice = responseSlice || {};
+    const answer = slice.answers?.[questionId] || this.buildEmptyResponseFieldState(questionId);
+    const additional = slice.additionalComments?.[questionId] || this.buildEmptyResponseFieldState(questionId, 'additional');
+    const convictionValue = this.getConvictionValueForSlice(slice, questionId);
+    const importanceValue = this.getImportanceValueForSlice(slice, questionId);
+    const hasConvictionImportanceValue = hasConvictionOrImportanceValueForQuestion(slice, questionId);
+    const sliderMode = ENABLE_IMPORTANCE_SLIDER_TOGGLE ? this.getSliderMode(questionId) : 'conviction';
+    const activeSliderValue = sliderMode === 'importance' ? importanceValue : convictionValue;
+
+    return {
+      answer,
+      additional,
+      convictionValue,
+      importanceValue,
+      hasConvictionImportanceValue,
+      sliderMode,
+      activeSliderValue,
+    };
+  };
+
+  getQuestionRenderDisplayState = ({
+    questionId,
+    responseSlice,
+  }) => {
+    const responseDisplayState = this.getQuestionResponseDisplayState({
+      questionId,
+      responseSlice,
+    });
+    const fieldDisplayState = this.getQuestionFieldDisplayState({
+      questionId,
+      answer: responseDisplayState.answer,
+      additional: responseDisplayState.additional,
+    });
+
+    return {
+      ...responseDisplayState,
+      ...fieldDisplayState,
+      maskedAnswer: fieldDisplayState.answerDecryptState.masked,
+      maskedAdditional: fieldDisplayState.additionalDecryptState.masked,
+      allowDecryptAnswer: fieldDisplayState.answerDecryptState.allowDecrypt,
+      allowDecryptAdditional: fieldDisplayState.additionalDecryptState.allowDecrypt,
+      isAnswerDecrypting: fieldDisplayState.answerDecryptState.busy,
+      isAdditionalDecrypting: fieldDisplayState.additionalDecryptState.busy,
+    };
+  };
+
+  isQuestionPromptMasked = (question) => (
+    this.isMaskedPromptText(question?.prompt) && !question?.promptDecrypted
+  );
+
+  getAnswerLockDisplayState = ({
+    field,
+    masked,
+  }) => ({
+    lockDisabled: this.state.isSubmitting || masked,
+    lockTitle: masked ? 'Encrypted answer' : (field?.encrypted ? 'Encrypted' : 'Not encrypted'),
+  });
+
+  getGatedPromptNoticeState = ({
+    question,
+    tooltipIdSuffix,
+    fallbackId = 'gated',
+  }) => {
+    const gateNames = this.resolveGatedPromptGateNames(question);
+    const tooltipIdBase = String(question?.id || fallbackId).trim().toLowerCase();
+    return {
+      tooltipId: `ce-gated-prompt-tip-${tooltipIdBase.replace(/[^a-z0-9_-]/g, '-')}-${tooltipIdSuffix}`,
+      tooltipText: gateNames.length
+        ? `Required ${t('sbt')} ${gateNames.length > 1 ? t('gates') : t('gate')}: ${gateNames.join(', ')}`
+        : `${t('sbt')} ${t('gate')} required`,
+    };
+  };
+
+  renderGatedPromptNotice = ({
+    question,
+    tooltipIdSuffix,
+    fallbackId,
+  }) => {
+    const { tooltipId, tooltipText } = this.getGatedPromptNoticeState({
+      question,
+      tooltipIdSuffix,
+      fallbackId,
+    });
+
+    return (
+      <GatedPromptNotice
+        questionId={question.id}
+        tooltipId={tooltipId}
+        tooltipText={tooltipText}
+      />
+    );
+  };
+
+  renderFullQuestionGatedPromptCard = ({
+    cardKey,
+    question,
+    cardIcons,
+  }) => (
+    <Card key={cardKey} className={styles.fullQuestionCard}>
+      <CardBody id={styles.questionTitleBody} className={styles.fullQuestionBody}>
+        <FullQuestionHeader>
+          {this.renderPromptWithManualDecrypt(question)}
+          {cardIcons}
+        </FullQuestionHeader>
+        {this.renderGatedPromptNotice({
+          question,
+          tooltipIdSuffix: 'full',
+          fallbackId: cardKey || 'gated',
+        })}
+        {this.renderQuestionTagDropdownRow(question)}
+      </CardBody>
+    </Card>
+  );
+
+  renderPileGatedPromptCard = ({
+    question,
+  }) => (
+    <Card className={styles.pileCardInner}>
+      <CardBody className={styles.pileCardBody}>
+        <div className={styles.pileCardHeader}>
+          {this.renderPromptWithManualDecrypt(question)}
+        </div>
+        {this.renderGatedPromptNotice({
+          question,
+          tooltipIdSuffix: 'pile',
+        })}
+      </CardBody>
+    </Card>
+  );
+
+  renderQuestionMaskedPromptCard = ({
+    mode,
+    question,
+    cardKey,
+    cardIcons,
+  }) => (
+    mode === 'full'
+      ? this.renderFullQuestionGatedPromptCard({
+          cardKey,
+          question,
+          cardIcons,
+        })
+      : this.renderPileGatedPromptCard({ question })
+  );
+
+  renderQuestionAnswerLockControl = ({
+    surveyIndex,
+    questionId,
+    answer,
+    glowAnswer,
+    lockDisabled,
+    lockTitle,
+    visualContext,
+  }) => this.renderAnswerLockControl({
+    surveyIndex,
+    questionId,
+    answer,
+    lockDisabled,
+    lockTitle,
+    glowAnswer,
+    forceAudienceMenu: true,
+    selfAudienceLabel: 'only me',
+    visualContext,
+  });
+
+  renderQuestionAdditionalLockControl = ({
+    surveyIndex,
+    questionId,
+    additional,
+    glowAdditional,
+    visualContext,
+  }) => this.renderAnswerLockControl({
+    surveyIndex,
+    questionId,
+    answer: additional,
+    field: additional,
+    fieldKey: 'additional',
+    lockDisabled: this.state.isSubmitting,
+    lockTitle: additional.encrypted ? 'Encrypted comments' : 'Comments encryption audience',
+    glowAnswer: glowAdditional,
+    forceAudienceMenu: true,
+    selfAudienceLabel: 'only me',
+    showPlaintextOption: true,
+    showFollowOption: true,
+    visualContext,
+  });
+
+  renderFullQuestionFooterIcons = ({
+    surveyIndex,
+    question,
+    answer,
+    glowAnswer,
+    maskedAnswer,
+    hasAdditionalContent,
+    commentsOpen,
+    onToggleComments,
+  }) => {
+    const { lockDisabled, lockTitle } = this.getAnswerLockDisplayState({
+      field: answer,
+      masked: maskedAnswer,
+    });
+
+    return (
+      <FullQuestionFooterIcons
+        hasAdditionalContent={hasAdditionalContent}
+        commentsOpen={commentsOpen}
+        onToggleComments={onToggleComments}
+        questionId={question.id}
+      >
+        {this.renderQuestionAnswerLockControl({
+          surveyIndex,
+          questionId: question.id,
+          answer,
+          glowAnswer,
+          lockDisabled,
+          lockTitle,
+        })}
+        {this.renderQuestionTagDropdown(question)}
+      </FullQuestionFooterIcons>
+    );
+  };
+
+  renderFullQuestionCardIcons = ({
+    question,
+    showResponseLookupSpinner,
+    isQuestionBookmarked,
+  }) => (
+    <QuestionCardLinks
+      showResponseLookupSpinner={showResponseLookupSpinner}
+      isQuestionBookmarked={isQuestionBookmarked}
+      onBookmarkToggle={() => this.handleBookmarkToggle(question.id)}
+      arweaveHref={question.arweaveTxId
+        ? normalizeArweaveUrl(question.arweaveTxId, { contextLabel: 'survey_tool_question_link' })
+        : ''}
+      questionHref={question.id
+        ? buildQuestionRoutePath(question.id, { sessionSlug: this._getEffectiveDraftSlug() })
+        : ''}
+    />
+  );
+
+  renderQuestionFieldDecryptControl = ({
+    questionId,
+    fieldKey,
+    allowDecrypt,
+    decryptTooltip,
+    actionLabel,
+    busy,
+    showBusySpinnerWhenAutoDecryptEnabled = false,
+    wrapperStyle,
+  }) => (
+    <QuestionDecryptControl
+      autoDecryptEnabled={this.state.autoDecryptEnabled}
+      showBusySpinnerWhenAutoDecryptEnabled={showBusySpinnerWhenAutoDecryptEnabled}
+      onClick={() => this.handleDecryptQuestionAnswer(questionId, fieldKey)}
+      disabled={this.state.isDecrypting || !allowDecrypt}
+      title={!allowDecrypt ? decryptTooltip : undefined}
+      actionLabel={actionLabel}
+      busy={busy}
+      wrapperStyle={wrapperStyle}
+    />
+  );
+
+  renderFullQuestionMainContent = ({
+    question,
+    qIndex,
+    surveyIndex,
+    answer,
+    glowAnswer,
+    maskedAnswer,
+    allowDecryptAnswer,
+    decryptTooltip,
+    isAnswerDecrypting,
+  }) => {
+    if (maskedAnswer) {
+      return this.renderQuestionFieldDecryptControl({
+        questionId: question.id,
+        fieldKey: 'answer',
+        allowDecrypt: allowDecryptAnswer,
+        decryptTooltip,
+        actionLabel: 'Decrypt Answer',
+        busy: isAnswerDecrypting,
+      });
+    }
+
+    const questionComponent = this.renderFullQuestionResponseInput({
+      question,
+      qIndex,
+      surveyIndex,
+      answer,
+      glowAnswer,
+    });
+
+    return (
+      <InputGroup id={styles.responseInputSection}>
+        {questionComponent}
+      </InputGroup>
+    );
+  };
+
+  renderFullQuestionCommentsContent = ({
+    commentsOpen,
+    questionId,
+    qIndex,
+    surveyIndex,
+    additional,
+    glowAdditional,
+    maskedAnswer,
+    maskedAdditional,
+    allowDecryptAdditional,
+    decryptTooltip,
+    isAdditionalDecrypting,
+  }) => {
+    if (!commentsOpen) return null;
+
+    if (maskedAnswer && !maskedAdditional) {
+      return this.renderFullQuestionCommentsSection(
+        this.renderFullQuestionAdditionalInput({
+          qIndex,
+          surveyIndex,
+          questionId,
+          additional,
+          glowAdditional,
+        })
+      );
+    }
+
+    if (maskedAnswer || maskedAdditional) {
+      return this.renderFullQuestionCommentsSection(
+        this.renderQuestionFieldDecryptControl({
+          questionId,
+          fieldKey: 'additional',
+          allowDecrypt: allowDecryptAdditional,
+          decryptTooltip,
+          actionLabel: 'Decrypt Comments',
+          busy: isAdditionalDecrypting,
+        })
+      );
+    }
+
+    return this.renderFullQuestionCommentsSection(
+      this.renderFullQuestionAdditionalEditorRow({
+        qIndex,
+        surveyIndex,
+        questionId,
+        additional,
+        glowAdditional,
+      })
+    );
+  };
+
+  renderFullQuestionCardShell = ({
+    cardKey,
+    question,
+    cardIcons,
+    mainContent,
+    footerIcons,
+    sliderSection,
+    commentsSection,
+  }) => (
+    <Card key={cardKey} className={styles.fullQuestionCard}>
+      <CardBody id={styles.questionTitleBody} className={styles.fullQuestionBody}>
+        <FullQuestionHeader>
+          {this.renderPromptWithManualDecrypt(question)}
+          {cardIcons}
+        </FullQuestionHeader>
+
+        <div className={styles.fullQuestionMain}>
+          {mainContent}
+        </div>
+
+        <div className={styles.fullQuestionFooter}>
+          {sliderSection}
+          {footerIcons}
+        </div>
+
+        {commentsSection}
+      </CardBody>
+    </Card>
   );
 
 /**
@@ -3398,8 +4519,8 @@ export class SurveyQuestions extends Component {
         const ans = slice.answers?.[qidSource] ?? slice.answers?.[qid];
         const add = slice.additionalComments?.[qidSource] ?? slice.additionalComments?.[qid];
 
-        const kA = `${qid}:answer`;
-        const kD = `${qid}:additional`;
+        const kA = this.getQuestionFieldTaskKey(qid, 'answer');
+        const kD = this.getQuestionFieldTaskKey(qid, 'additional');
         const answerSig = this.buildAutoDecryptMaskedFieldSignature(ans);
         const additionalSig = this.buildAutoDecryptMaskedFieldSignature(add);
         visibleSignature += `|${qid}|a:${answerSig}|d:${additionalSig}`;
@@ -7456,33 +8577,14 @@ export class SurveyQuestions extends Component {
 
     try {
       // Build baseline slice directly from the viewed response payload so decrypt does not depend on local draft state.
-      const shaped = { ...responseOverride };
-      if (!shaped.questionID && shaped.questionId) shaped.questionID = shaped.questionId;
-      if (!shaped.questionID) shaped.questionID = qid;
+      let baselineForDecrypt = this.buildViewedResponseDecryptBaseline(responseOverride, qid);
 
-      let baselineForDecrypt = null;
-      try {
-        baselineForDecrypt = this.buildSliceFromUserAnswers(shaped);
-      } catch (_) {
-        baselineForDecrypt = null;
-      }
-      if (!baselineForDecrypt || typeof baselineForDecrypt !== 'object') {
-        baselineForDecrypt = { answers: {}, importance: {}, conviction: {}, additionalComments: {} };
-      }
-      if (!baselineForDecrypt.answers) baselineForDecrypt.answers = {};
-      if (!baselineForDecrypt.additionalComments) baselineForDecrypt.additionalComments = {};
-
-      const maskedAns =
-        (fieldToDecrypt === 'answer' || fieldToDecrypt === 'both') &&
-        baselineForDecrypt?.answers?.[qid]?.value === '*' &&
-        (baselineForDecrypt?.answers?.[qid]?.encryptedPortion ||
-          baselineForDecrypt?.answers?.[qid]?.encrypted);
-
-      const maskedAdd =
-        (fieldToDecrypt === 'additional' || fieldToDecrypt === 'both') &&
-        baselineForDecrypt?.additionalComments?.[qid]?.value === '*' &&
-        (baselineForDecrypt?.additionalComments?.[qid]?.encryptedPortion ||
-          baselineForDecrypt?.additionalComments?.[qid]?.encrypted);
+      let decryptSelection = this.getQuestionFieldDecryptSelection(
+        qid,
+        fieldToDecrypt,
+        baselineForDecrypt,
+      );
+      const { maskedAnswer: maskedAns, maskedAdditional: maskedAdd } = decryptSelection;
 
       if ((maskedAns || maskedAdd) && this.props.account) {
         try {
@@ -7507,73 +8609,42 @@ export class SurveyQuestions extends Component {
             );
 
             if (latest) {
-              if (maskedAns && latest.answer?.encryptedPortion) {
-                baselineForDecrypt.answers = { ...(baselineForDecrypt.answers || {}) };
-                baselineForDecrypt.answers[qid] = {
-                  ...(baselineForDecrypt.answers[qid] || { value: '*', encrypted: true, hash: '' }),
-                  encrypted: !!(latest.answer.encrypted || baselineForDecrypt.answers?.[qid]?.encrypted),
-                  hash: latest.answer.hash || baselineForDecrypt.answers?.[qid]?.hash || '',
-                  encryptedPortion: latest.answer.encryptedPortion,
-                };
-              }
-              if (maskedAdd && latest.additional?.encryptedPortion) {
-                baselineForDecrypt.additionalComments = { ...(baselineForDecrypt.additionalComments || {}) };
-                baselineForDecrypt.additionalComments[qid] = {
-                  ...(baselineForDecrypt.additionalComments[qid] || { value: '*', encrypted: true, hash: '' }),
-                  encrypted: !!(latest.additional.encrypted || baselineForDecrypt.additionalComments?.[qid]?.encrypted),
-                  hash: latest.additional.hash || baselineForDecrypt.additionalComments?.[qid]?.hash || '',
-                  encryptedPortion: latest.additional.encryptedPortion,
-                };
-              }
+              baselineForDecrypt = this.mergeLatestEncryptedQuestionFields(
+                baselineForDecrypt,
+                qid,
+                latest,
+                {
+                  includeAnswer: maskedAns,
+                  includeAdditional: maskedAdd,
+                },
+              );
             }
           }
         } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
       }
 
-      if (!maskedAns && !maskedAdd) {
+      decryptSelection = this.getQuestionFieldDecryptSelection(
+        qid,
+        fieldToDecrypt,
+        baselineForDecrypt,
+      );
+
+      if (!decryptSelection.hasMaskedField) {
         return false;
       }
 
-      const keysToMark = [];
-      if (maskedAns) keysToMark.push(`${qid}:answer`);
-      if (maskedAdd) keysToMark.push(`${qid}:additional`);
+      const {
+        keysToMark,
+        clearMode,
+      } = decryptSelection;
 
-      this.setState((prev) => ({
-        isDecrypting: true,
-        submissionError: '',
-        suppressPrefill: true,
-        decryptingByKey: {
-          ...(prev.decryptingByKey || {}),
-          ...(keysToMark.reduce((acc, k) => { acc[k] = true; return acc; }, {})),
-        },
-      }));
+      this.setState((prev) => this.buildQuestionDecryptStartState(prev, keysToMark));
 
-      const providerKind = cryptoUtils.getProviderKind(this.props.provider);
-      const chainId = this.props.network?.id;
-      const surveyId = this.resolveDecryptSurveyId(baselineForDecrypt, qid);
-
-      const poolForDecrypt =
-        (Array.isArray(this.state.questionPool) && this.state.questionPool.length > 0)
-          ? this.state.questionPool
-          : (Array.isArray(this.state.pileQuestions) ? this.state.pileQuestions : []);
-
-      const litHooks =
-        this.props.lit ||
-        this.props.litHooks ||
-        (typeof window !== 'undefined' ? (window.__litHooks || window.litHooks) : null);
-      const lit = litHooks && litHooks.getKey ? { getKey: litHooks.getKey } : undefined;
-
-      const opts = {
-        providerKind,
-        provider: this.props.provider,
-        account: this.props.account,
+      const {
         chainId,
-        surveyId,
-        questionPool: poolForDecrypt,
-        ...(lit ? { lit } : {}),
-        hasher: this.state.hasher,
-        throwOnError: true,
-      };
+        lit,
+        opts,
+      } = this.buildQuestionDecryptExecutionContext(baselineForDecrypt, qid);
 
       const decryptedStateSlice = await cryptoUtils.decryptSingleField(
         baselineForDecrypt,
@@ -7590,71 +8661,30 @@ export class SurveyQuestions extends Component {
       const didUpdate = producedAnswer || producedAdditional;
 
       // Also decrypt encrypted rating envelopes when present (so conviction/importance stays private by default).
-      let decryptedImportance = null;
-      let decryptedConviction = null;
-      try {
-        const toNum = (v) => {
-          if (v === undefined || v === null) return null;
-          const n = Number(v);
-          return Number.isNaN(n) ? null : n;
-        };
-        const litOpts = lit ? lit : undefined;
-        const impEnv = typeof responseOverride?.importanceEncrypted === 'string' ? responseOverride.importanceEncrypted : '';
-        const convEnv = typeof responseOverride?.convictionEncrypted === 'string' ? responseOverride.convictionEncrypted : '';
-        if (impEnv) {
-          try {
-            const v = await cryptoUtils.decryptEnvelopeValue(impEnv, {
-              account: this.props.account,
-              chainId,
-              providerLike: this.props.provider,
-              ...(litOpts ? { litOpts } : {}),
-            });
-            decryptedImportance = toNum(v);
-          } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
-        }
-        if (convEnv) {
-          try {
-            const v = await cryptoUtils.decryptEnvelopeValue(convEnv, {
-              account: this.props.account,
-              chainId,
-              providerLike: this.props.provider,
-              ...(litOpts ? { litOpts } : {}),
-            });
-            decryptedConviction = toNum(v);
-          } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
-        }
-      } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
+      const { decryptedImportance, decryptedConviction } =
+        await this.decryptQuestionRatingEnvelopes(
+          {
+            importanceEncrypted: typeof responseOverride?.importanceEncrypted === 'string'
+              ? responseOverride.importanceEncrypted
+              : '',
+            convictionEncrypted: typeof responseOverride?.convictionEncrypted === 'string'
+              ? responseOverride.convictionEncrypted
+              : '',
+          },
+          {
+            account: this.props.account,
+            chainId,
+            lit,
+            providerLike: this.props.provider,
+          },
+        );
 
       this.setState((prev) => {
-        const cleared = { ...(prev.decryptingByKey || {}) };
-        keysToMark.forEach((k) => { cleared[k] = false; });
-
-        const applyToResponse = (resp) => {
-          if (!resp || typeof resp !== 'object') return resp;
-          const next = { ...resp };
-
-          if (producedAnswer) {
-            const incoming = decryptedStateSlice.answers[qid];
-            next.answer = {
-              ...(next.answer || {}),
-              value: incoming?.value,
-            };
-          }
-          if (producedAdditional) {
-            const incoming = decryptedStateSlice.additionalComments[qid];
-            next.additional = {
-              ...(next.additional || {}),
-              value: incoming?.value,
-            };
-          }
-          if (decryptedImportance !== null && decryptedImportance !== undefined) {
-            next.importance = decryptedImportance;
-          }
-          if (decryptedConviction !== null && decryptedConviction !== undefined) {
-            next.conviction = decryptedConviction;
-          }
-          return next;
-        };
+        const cleared = this.clearQuestionFieldBusyMap(
+          prev.decryptingByKey,
+          qid,
+          clearMode,
+        );
 
         const prevViewed = prev.parsedViewAddressAnswers;
         let nextViewed = prevViewed;
@@ -7663,11 +8693,21 @@ export class SurveyQuestions extends Component {
             const nextResponses = prevViewed.responses.map((r) => {
               const rid = String(r?.questionID || r?.questionId || '').trim().toLowerCase();
               if (rid !== qid) return r;
-              return applyToResponse(r);
+              return this.applyDecryptedQuestionResponseValues(r, {
+                questionId: qid,
+                decryptedStateSlice,
+                decryptedImportance,
+                decryptedConviction,
+              });
             });
             nextViewed = { ...prevViewed, responses: nextResponses };
           } else {
-            nextViewed = applyToResponse(prevViewed);
+            nextViewed = this.applyDecryptedQuestionResponseValues(prevViewed, {
+              questionId: qid,
+              decryptedStateSlice,
+              decryptedImportance,
+              decryptedConviction,
+            });
           }
         }
 
@@ -7684,14 +8724,7 @@ export class SurveyQuestions extends Component {
     } catch (error) {
       surveyLog.error(`Error decrypting viewed response ${fieldToDecrypt} for ${questionId}`, error);
       this.setState((prev) => {
-        const cleared = { ...(prev.decryptingByKey || {}) };
-        if (fieldToDecrypt === 'answer' || fieldToDecrypt === 'both') cleared[`${qid}:answer`] = false;
-        if (fieldToDecrypt === 'additional' || fieldToDecrypt === 'both') cleared[`${qid}:additional`] = false;
-        return {
-          isDecrypting: false,
-          submissionError: error.message || 'Decryption failed.',
-          decryptingByKey: cleared,
-        };
+        return this.buildQuestionDecryptFailureState(prev, qid, fieldToDecrypt, error.message);
       });
       return false;
     }
@@ -7746,92 +8779,42 @@ export class SurveyQuestions extends Component {
       }
 
       // Build a working baseline to decrypt from (current slice → userAnswers → empty)
-      let baselineSlice = this.state.surveysResponseState?.[surveyIndex];
-      if (!baselineSlice && this.state.userAnswers) {
-        baselineSlice = this.buildSliceFromUserAnswers(this.state.userAnswers);
-      }
-      let baselineForDecrypt = this.deepClone(
-        baselineSlice || { answers: {}, importance: {}, conviction: {}, additionalComments: {} }
-      );
+      let { baselineSlice, baselineForDecrypt } = this.buildSelfQuestionDecryptBaseline(surveyIndex);
 
       // If we have a concrete response payload (e.g. decrypt clicked in view mode), merge its envelope into the baseline.
       if (effectiveResponseOverride && typeof effectiveResponseOverride === 'object') {
         try {
-          const ans = effectiveResponseOverride.answer || {};
-          const add = effectiveResponseOverride.additional || {};
-          baselineForDecrypt.answers = { ...(baselineForDecrypt.answers || {}) };
-          baselineForDecrypt.additionalComments = { ...(baselineForDecrypt.additionalComments || {}) };
-          baselineForDecrypt.answers[questionId] = {
-            ...(baselineForDecrypt.answers[questionId] || {}),
-            ...(Object.prototype.hasOwnProperty.call(ans, 'value') ? { value: ans.value } : {}),
-            encrypted: !!(ans.encrypted || ans.encryptedPortion || baselineForDecrypt.answers?.[questionId]?.encrypted),
-            ...(ans.hash ? { hash: ans.hash } : {}),
-            ...(ans.encryptedPortion ? { encryptedPortion: ans.encryptedPortion } : {}),
-          };
-          baselineForDecrypt.additionalComments[questionId] = {
-            ...(baselineForDecrypt.additionalComments[questionId] || {}),
-            ...(Object.prototype.hasOwnProperty.call(add, 'value') ? { value: add.value } : {}),
-            encrypted: !!(add.encrypted || add.encryptedPortion || baselineForDecrypt.additionalComments?.[questionId]?.encrypted),
-            ...(add.hash ? { hash: add.hash } : {}),
-            ...(add.encryptedPortion ? { encryptedPortion: add.encryptedPortion } : {}),
-          };
+          baselineForDecrypt = this.mergeQuestionResponseOverrideIntoDecryptSlice(
+            baselineForDecrypt,
+            questionId,
+            effectiveResponseOverride,
+          );
         } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
       }
 
       // If masked but envelope missing, hydrate the latest encryptedPortion from cache/chain first.
       // Also capture rating envelopes so we can decrypt conviction/importance alongside the answer.
-      const qidLower = String(questionId || '').trim().toLowerCase();
-      const extractRatingEnvs = (obj) => {
-        if (!obj || typeof obj !== 'object') return null;
-        const impEnv = typeof obj.importanceEncrypted === 'string' ? obj.importanceEncrypted : '';
-        const convEnv = typeof obj.convictionEncrypted === 'string' ? obj.convictionEncrypted : '';
-        if (!impEnv && !convEnv) return null;
-        return { importanceEncrypted: impEnv, convictionEncrypted: convEnv };
-      };
-      const findResponseObjWithRatingEnvs = (container) => {
-        if (!container || typeof container !== 'object') return null;
-        if (Array.isArray(container.responses)) {
-          return (
-            container.responses.find(
-              (r) =>
-                String(r?.questionID || r?.questionId || '').trim().toLowerCase() === qidLower
-            ) || null
-          );
-        }
-        // Single-question payload
-        const id = String(container.questionID || container.questionId || '').trim().toLowerCase();
-        if (id && id !== qidLower) return null;
-        return container;
-      };
-      const mergeRatingEnvs = (prev, nextObj) => {
-        const p = prev && typeof prev === 'object' ? prev : null;
-        const n = extractRatingEnvs(nextObj);
-        if (!p) return n;
-        if (!n) return p;
-        return {
-          importanceEncrypted: n.importanceEncrypted || p.importanceEncrypted || '',
-          convictionEncrypted: n.convictionEncrypted || p.convictionEncrypted || '',
-        };
-      };
-
       // Seed from the best available payloads so rating decrypt works even when we skip hydration.
-      let latestRatingEnvs = mergeRatingEnvs(null, effectiveResponseOverride);
-      latestRatingEnvs = mergeRatingEnvs(
+      let latestRatingEnvs = this.mergeQuestionRatingEnvelopeState(
+        null,
+        effectiveResponseOverride,
+        questionId,
+      );
+      latestRatingEnvs = this.mergeQuestionRatingEnvelopeState(
         latestRatingEnvs,
-        findResponseObjWithRatingEnvs(this.state.userAnswers)
+        this.state.userAnswers,
+        questionId,
       );
       try {
-        const maskedAnsForHydrate =
-          (fieldToDecrypt === 'answer' || fieldToDecrypt === 'both') &&
-          baselineForDecrypt?.answers?.[questionId]?.value === '*' &&
-          (baselineForDecrypt?.answers?.[questionId]?.encryptedPortion ||
-            baselineForDecrypt?.answers?.[questionId]?.encrypted);
-
-        const maskedAddForHydrate =
-          (fieldToDecrypt === 'additional' || fieldToDecrypt === 'both') &&
-          baselineForDecrypt?.additionalComments?.[questionId]?.value === '*' &&
-          (baselineForDecrypt?.additionalComments?.[questionId]?.encryptedPortion ||
-            baselineForDecrypt?.additionalComments?.[questionId]?.encrypted);
+        const hydrateSelection = this.getQuestionFieldDecryptSelection(
+          questionId,
+          fieldToDecrypt,
+          baselineForDecrypt,
+        );
+        const {
+          maskedAnswer: maskedAnsForHydrate,
+          maskedAdditional: maskedAddForHydrate,
+        } = hydrateSelection;
 
         if ((maskedAnsForHydrate || maskedAddForHydrate) && this.props.account) {
           const context = resolveDecryptHydrationContext(this.props, this._getEffectiveDraftSlug());
@@ -7852,90 +8835,48 @@ export class SurveyQuestions extends Component {
             if (latest) {
               // Prefer non-empty envelope values from the latest chain payload, but never clobber
               // previously discovered envelopes with empties.
-              latestRatingEnvs = mergeRatingEnvs(latestRatingEnvs, latest);
-              if (maskedAnsForHydrate && latest.answer?.encryptedPortion) {
-                baselineForDecrypt.answers = { ...(baselineForDecrypt.answers || {}) };
-                baselineForDecrypt.answers[questionId] = {
-                  ...(baselineForDecrypt.answers[questionId] || {
-                    value: '*', encrypted: true, hash: ''
-                  }),
-                  encrypted: !!(latest.answer.encrypted || baselineForDecrypt.answers?.[questionId]?.encrypted),
-                  hash: latest.answer.hash || baselineForDecrypt.answers?.[questionId]?.hash || '',
-                  encryptedPortion: latest.answer.encryptedPortion,
-                };
-              }
-              if (maskedAddForHydrate && latest.additional?.encryptedPortion) {
-                baselineForDecrypt.additionalComments = { ...(baselineForDecrypt.additionalComments || {}) };
-                baselineForDecrypt.additionalComments[questionId] = {
-                  ...(baselineForDecrypt.additionalComments[questionId] || {
-                    value: '*', encrypted: true, hash: ''
-                  }),
-                  encrypted: !!(latest.additional.encrypted || baselineForDecrypt.additionalComments?.[questionId]?.encrypted),
-                  hash: latest.additional.hash || baselineForDecrypt.additionalComments?.[questionId]?.hash || '',
-                  encryptedPortion: latest.additional.encryptedPortion,
-                };
-              }
+              latestRatingEnvs = this.mergeQuestionRatingEnvelopeState(
+                latestRatingEnvs,
+                latest,
+                questionId,
+              );
+              baselineForDecrypt = this.mergeLatestEncryptedQuestionFields(
+                baselineForDecrypt,
+                questionId,
+                latest,
+                {
+                  includeAnswer: maskedAnsForHydrate,
+                  includeAdditional: maskedAddForHydrate,
+                },
+              );
             }
           }
         }
       } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
 
-      const providerKind = cryptoUtils.getProviderKind(this.props.provider);
-      const chainId = this.props.network?.id;
-      const surveyId = this.resolveDecryptSurveyId(baselineForDecrypt, questionId);
+      const {
+        chainId,
+        lit,
+        opts,
+      } = this.buildQuestionDecryptExecutionContext(baselineForDecrypt, questionId);
 
-      const maskedAns =
-        (fieldToDecrypt === 'answer' || fieldToDecrypt === 'both') &&
-        baselineForDecrypt?.answers?.[questionId]?.value === '*' &&
-        (baselineForDecrypt?.answers?.[questionId]?.encryptedPortion ||
-        baselineForDecrypt?.answers?.[questionId]?.encrypted);
+      const decryptSelection = this.getQuestionFieldDecryptSelection(
+        questionId,
+        fieldToDecrypt,
+        baselineForDecrypt,
+      );
+      const {
+        maskedAnswer: maskedAns,
+        maskedAdditional: maskedAdd,
+        keysToMark,
+        clearMode,
+      } = decryptSelection;
 
-      const maskedAdd =
-        (fieldToDecrypt === 'additional' || fieldToDecrypt === 'both') &&
-        baselineForDecrypt?.additionalComments?.[questionId]?.value === '*' &&
-        (baselineForDecrypt?.additionalComments?.[questionId]?.encryptedPortion ||
-        baselineForDecrypt?.additionalComments?.[questionId]?.encrypted);
-
-      if (!maskedAns && !maskedAdd) {
+      if (!decryptSelection.hasMaskedField) {
         return false;
       }
 
-      const keysToMark = [];
-      if (maskedAns) keysToMark.push(`${questionId}:answer`);
-      if (maskedAdd) keysToMark.push(`${questionId}:additional`);
-
-      this.setState(prev => ({
-        isDecrypting: true,
-        submissionError: '',
-        suppressPrefill: true,
-        decryptingByKey: {
-          ...(prev.decryptingByKey || {}),
-          ...(keysToMark.reduce((acc, k) => { acc[k] = true; return acc; }, {}))
-        }
-      }));
-
-      const poolForDecrypt =
-        (Array.isArray(this.state.questionPool) && this.state.questionPool.length > 0)
-          ? this.state.questionPool
-          : (Array.isArray(this.state.pileQuestions) ? this.state.pileQuestions : []);
-
-      const litHooks =
-        this.props.lit ||
-        this.props.litHooks ||
-        (typeof window !== 'undefined' ? (window.__litHooks || window.litHooks) : null);
-      const lit = litHooks && litHooks.getKey ? { getKey: litHooks.getKey } : undefined;
-
-      const opts = {
-        providerKind,
-        provider: this.props.provider,
-        account: this.props.account,
-        chainId,
-        surveyId,
-        questionPool: poolForDecrypt,
-        ...(lit ? { lit } : {}),
-        hasher: this.state.hasher, // INJECT HASHER
-        throwOnError: true,
-      };
+      this.setState((prev) => this.buildQuestionDecryptStartState(prev, keysToMark));
 
       const decryptedStateSlice = await cryptoUtils.decryptSingleField(
         baselineForDecrypt,
@@ -7949,112 +8890,54 @@ export class SurveyQuestions extends Component {
       const didUpdate = producedAnswer || producedAdditional;
 
       // Attempt to decrypt encrypted rating envelopes too, if present on the latest chain payload.
-      let decryptedImportance = null;
-      let decryptedConviction = null;
-      try {
-        const toNum = (v) => {
-          if (v === undefined || v === null) return null;
-          const n = Number(v);
-          return Number.isNaN(n) ? null : n;
-        };
-
-        const litOpts = lit ? lit : undefined;
-        if (latestRatingEnvs?.importanceEncrypted) {
-          try {
-            const v = await cryptoUtils.decryptEnvelopeValue(latestRatingEnvs.importanceEncrypted, {
-              account: this.props.account,
-              chainId,
-              providerLike: this.props.provider,
-              ...(litOpts ? { litOpts } : {}),
-            });
-            decryptedImportance = toNum(v);
-          } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
-        }
-        if (latestRatingEnvs?.convictionEncrypted) {
-          try {
-            const v = await cryptoUtils.decryptEnvelopeValue(latestRatingEnvs.convictionEncrypted, {
-              account: this.props.account,
-              chainId,
-              providerLike: this.props.provider,
-              ...(litOpts ? { litOpts } : {}),
-            });
-            decryptedConviction = toNum(v);
-          } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
-        }
-      } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
+      const { decryptedImportance, decryptedConviction } =
+        await this.decryptQuestionRatingEnvelopes(
+          latestRatingEnvs,
+          {
+            account: this.props.account,
+            chainId,
+            lit,
+            providerLike: this.props.provider,
+          },
+        );
 
       this.setState(prevState => {
         const surveysResponseStateCopy = [...(prevState.surveysResponseState || [])];
-        const targetStateSlice = {
-          ...(surveysResponseStateCopy[surveyIndex] || { answers: {}, importance: {}, conviction: {}, additionalComments: {} })
-        };
-
-        if (producedAnswer) {
-          const prevEncrypted = targetStateSlice.answers?.[questionId]?.encrypted;
-          const incoming = decryptedStateSlice.answers[questionId];
-          targetStateSlice.answers[questionId] = {
-            ...(targetStateSlice.answers[questionId] || {}),
-            value: incoming.value,
-            encrypted: (typeof prevEncrypted === 'boolean')
-              ? prevEncrypted
-              : !!(baselineSlice?.answers?.[questionId]?.value === '*' &&
-                  (baselineSlice?.answers?.[questionId]?.encryptedPortion || baselineSlice?.answers?.[questionId]?.encrypted)),
-            ...(incoming.zkSalt ? { zkSalt: incoming.zkSalt } : {}),
-          };
-        }
-
-        if (producedAdditional) {
-          const prevEncrypted = targetStateSlice.additionalComments?.[questionId]?.encrypted;
-          const incoming = decryptedStateSlice.additionalComments[questionId];
-          targetStateSlice.additionalComments[questionId] = {
-            ...(targetStateSlice.additionalComments[questionId] || {}),
-            value: incoming.value,
-            encrypted: (typeof prevEncrypted === 'boolean')
-              ? prevEncrypted
-              : !!(baselineSlice?.additionalComments?.[questionId]?.value === '*' &&
-                  (baselineSlice?.additionalComments?.[questionId]?.encryptedPortion ||
-                    baselineSlice?.additionalComments?.[questionId]?.encrypted)),
-            ...(incoming.zkSalt ? { zkSalt: incoming.zkSalt } : {}),
-          };
-        }
-
-        if (decryptedImportance !== null && decryptedImportance !== undefined) {
-          targetStateSlice.importance = targetStateSlice.importance || {};
-          targetStateSlice.importance[questionId] = decryptedImportance;
-        }
-        if (decryptedConviction !== null && decryptedConviction !== undefined) {
-          targetStateSlice.conviction = targetStateSlice.conviction || {};
-          targetStateSlice.conviction[questionId] = decryptedConviction;
-        }
+        const targetStateSlice = this.applyDecryptedQuestionStateToSurveySlice(
+          surveysResponseStateCopy[surveyIndex] || {
+            answers: {},
+            importance: {},
+            conviction: {},
+            additionalComments: {},
+          },
+          {
+            questionId,
+            decryptedStateSlice,
+            baselineSlice,
+            decryptedImportance,
+            decryptedConviction,
+          },
+        );
 
         surveysResponseStateCopy[surveyIndex] = targetStateSlice;
 
-        const cleared = { ...(prevState.decryptingByKey || {}) };
-        keysToMark.forEach(k => { cleared[k] = false; });
+        const cleared = this.clearQuestionFieldBusyMap(
+          prevState.decryptingByKey,
+          questionId,
+          clearMode,
+        );
 
-        // Update baseline for the specific decrypted fields so diffs remain 0
-        let nextBaseline = prevState.editBaseline
-            ? this.deepClone(prevState.editBaseline)
-            : this.deepClone(baselineSlice || { answers: {}, importance: {}, conviction: {}, additionalComments: {} });
-
-        // Ensure structure
-        if (!nextBaseline.answers) nextBaseline.answers = {};
-        if (!nextBaseline.additionalComments) nextBaseline.additionalComments = {};
-
-        if (producedAnswer) {
-             nextBaseline.answers[questionId] = this.deepClone(targetStateSlice.answers[questionId]);
-        }
-        if (producedAdditional) {
-             nextBaseline.additionalComments[questionId] = this.deepClone(targetStateSlice.additionalComments[questionId]);
-        }
-        if (decryptedImportance !== null && decryptedImportance !== undefined) {
-          nextBaseline.importance = nextBaseline.importance || {};
-          nextBaseline.importance[questionId] = decryptedImportance;
-        }
-        if (decryptedConviction !== null && decryptedConviction !== undefined) {
-          nextBaseline.conviction = nextBaseline.conviction || {};
-          nextBaseline.conviction[questionId] = decryptedConviction;
-        }
+        const nextBaseline = this.syncDecryptedQuestionIntoBaseline(
+          prevState.editBaseline,
+          baselineSlice,
+          targetStateSlice,
+          {
+            questionId,
+            decryptedStateSlice,
+            decryptedImportance,
+            decryptedConviction,
+          },
+        );
 
         const updates = {
           surveysResponseState: surveysResponseStateCopy,
@@ -8075,16 +8958,9 @@ export class SurveyQuestions extends Component {
       return didUpdate;
     } catch (error) {
       surveyLog.error(`Error decrypting ${fieldToDecrypt} for ${questionId}`, error);
-      this.setState(prev => {
-        const cleared = { ...(prev.decryptingByKey || {}) };
-        if (fieldToDecrypt === 'answer' || fieldToDecrypt === 'both') cleared[`${questionId}:answer`] = false;
-        if (fieldToDecrypt === 'additional' || fieldToDecrypt === 'both') cleared[`${questionId}:additional`] = false;
-        return {
-          isDecrypting: false,
-          submissionError: error.message || 'Decryption failed.',
-          decryptingByKey: cleared
-        };
-      });
+      this.setState((prev) => (
+        this.buildQuestionDecryptFailureState(prev, questionId, fieldToDecrypt, error.message)
+      ));
       return false;
     }
   };
@@ -9237,13 +10113,28 @@ export class SurveyQuestions extends Component {
     }
 
     const surveyIndex = this.props.isStandalone || this.props.singleQuestionMode ? 0 : this.props.surveyIndex;
-    const answer = currentSurveyResponseState.answers[question.id] || this.buildEmptyResponseFieldState(question.id);
-    const additional = currentSurveyResponseState.additionalComments?.[question.id] || this.buildEmptyResponseFieldState(question.id, 'additional');
-    const convictionValue = this.getConvictionValueForSlice(currentSurveyResponseState, question.id);
-    const importanceValue = this.getImportanceValueForSlice(currentSurveyResponseState, question.id);
-    const hasConvictionImportanceValue = hasConvictionOrImportanceValueForQuestion(currentSurveyResponseState, question.id);
-    const sliderMode = ENABLE_IMPORTANCE_SLIDER_TOGGLE ? this.getSliderMode(question.id) : 'conviction';
-    const activeSliderValue = sliderMode === 'importance' ? importanceValue : convictionValue;
+    const {
+      answer,
+      additional,
+      convictionValue,
+      importanceValue,
+      hasConvictionImportanceValue,
+      sliderMode,
+      activeSliderValue,
+      hasAdditionalContent,
+      glowAnswer,
+      glowAdditional,
+      decryptTooltip,
+      maskedAnswer,
+      maskedAdditional,
+      allowDecryptAnswer,
+      allowDecryptAdditional,
+      isAnswerDecrypting,
+      isAdditionalDecrypting,
+    } = this.getQuestionRenderDisplayState({
+      questionId: question.id,
+      responseSlice: currentSurveyResponseState,
+    });
     const sliderOpen = !!this.state.sliderToggleExpandedByQuestion?.[question.id];
 
     const cardKey = `${question.id}-${this.state.decryptionNonce}`;
@@ -9256,550 +10147,78 @@ export class SurveyQuestions extends Component {
     });
     const isQuestionBookmarked = this.state.bookmarkedQuestions.has(question.id);
 
-    const cardIcons = (
-      <QuestionCardLinks
-        showResponseLookupSpinner={showResponseLookupSpinner}
-        isQuestionBookmarked={isQuestionBookmarked}
-        onBookmarkToggle={() => this.handleBookmarkToggle(question.id)}
-        arweaveHref={question.arweaveTxId
-          ? normalizeArweaveUrl(question.arweaveTxId, { contextLabel: 'survey_tool_question_link' })
-          : ''}
-        questionHref={question.id
-          ? buildQuestionRoutePath(question.id, { sessionSlug: this._getEffectiveDraftSlug() })
-          : ''}
-      />
-    );
+    const cardIcons = this.renderFullQuestionCardIcons({
+      question,
+      showResponseLookupSpinner,
+      isQuestionBookmarked,
+    });
 
     // If the prompt is still masked, do not allow answering (prevents nonsense submits).
     // This primarily affects direct-link `/question/:id?...` flows; list views filter these out.
-    const promptMasked = this.isMaskedPromptText(question?.prompt) && !question?.promptDecrypted;
+    const promptMasked = this.isQuestionPromptMasked(question);
     if (promptMasked) {
-      const gateNames = this.resolveGatedPromptGateNames(question);
-      const tooltipIdBase = String(question?.id || cardKey || 'gated').trim().toLowerCase();
-      const tooltipId = `ce-gated-prompt-tip-${tooltipIdBase.replace(/[^a-z0-9_-]/g, '-')}-full`;
-      const tooltipText = gateNames.length
-        ? `Required ${t('sbt')} ${gateNames.length > 1 ? t('gates') : t('gate')}: ${gateNames.join(', ')}`
-        : `${t('sbt')} ${t('gate')} required`;
-      return (
-        <Card key={cardKey} className={styles.fullQuestionCard}>
-          <CardBody id={styles.questionTitleBody} className={styles.fullQuestionBody}>
-            <FullQuestionHeader>
-              {this.renderPromptWithManualDecrypt(question)}
-              {cardIcons}
-            </FullQuestionHeader>
-            <GatedPromptNotice
-              questionId={question.id}
-              tooltipId={tooltipId}
-              tooltipText={tooltipText}
-            />
-            {this.renderQuestionTagDropdownRow(question)}
-          </CardBody>
-        </Card>
-      );
+      return this.renderQuestionMaskedPromptCard({
+        mode: 'full',
+        cardKey,
+        question,
+        cardIcons,
+      });
     }
-
-    // Parse envelopes (v2 only)
-    const getEnvelope = (item) => {
-      try { return item?.encryptedPortion ? JSON.parse(item.encryptedPortion) : null; } catch { return null; }
-    };
-    const isV1Envelope = (env) => !!env && Number(env.v) === 1 && String(env.cipher) === 'aes-gcm-256';
-
-    const answerEnvelope = getEnvelope(answer);
-    const additionalEnvelope = getEnvelope(additional);
-
-    // Masked detection (respect legacy 'encrypted' flag if envelope missing)
-    const maskedAnswer = (answer?.value === '*' && (answer?.encryptedPortion || answer?.encrypted));
-    const maskedAdditional = (additional?.value === '*' && (additional?.encryptedPortion || additional?.encrypted));
-
-    // Version-agnostic: enable manual decrypt whenever masked.
-    // If no envelope is present yet, require login so we can hydrate latest response before decrypt.
-    const allowDecryptAnswer =
-      maskedAnswer && ( !!answerEnvelope || (!!this.props.loginComplete && !!this.props.account) );
-    const allowDecryptAdditional =
-      maskedAdditional && ( !!additionalEnvelope || (!!this.props.loginComplete && !!this.props.account) );
-
-    const decryptTooltip = 'Login to decrypt this encrypted field.';
-
-    // Field-specific glow rules
-    const hasAdditionalContent = hasMeaningfulFieldValue(additional);
-
-    const glowAnswer = !!answer?.encrypted;
-    const glowAdditional = !!(additional?.encrypted && hasAdditionalContent);
-
-    // Field-specific decrypting flags for button text
-    const isAnswerDecrypting = !!(this.state.decryptingByKey && this.state.decryptingByKey[`${question.id}:answer`]);
-    const isAdditionalDecrypting = !!(this.state.decryptingByKey && this.state.decryptingByKey[`${question.id}:additional`]);
 
     const commentsOpen = this.getCommentsOpen(question.id, hasAdditionalContent);
     const handleToggleComments = () => this.toggleComments(question.id, hasAdditionalContent);
-    const lockDisabled = this.state.isSubmitting || maskedAnswer;
-    const lockTitle = maskedAnswer ? 'Encrypted answer' : (answer.encrypted ? 'Encrypted' : 'Not encrypted');
+    const footerIcons = this.renderFullQuestionFooterIcons({
+      surveyIndex,
+      question,
+      answer,
+      glowAnswer,
+      maskedAnswer,
+      hasAdditionalContent,
+      commentsOpen,
+      onToggleComments: handleToggleComments,
+    });
+    const sliderSection = this.renderFullQuestionSliderSection({
+      surveyIndex,
+      questionId: question.id,
+      sliderMode,
+      activeSliderValue,
+      convictionValue,
+      importanceValue,
+      hasConvictionImportanceValue,
+      sliderOpen,
+    });
 
-    const footerIcons = (
-      <FullQuestionFooterIcons
-        hasAdditionalContent={hasAdditionalContent}
-        commentsOpen={commentsOpen}
-        onToggleComments={handleToggleComments}
-        questionId={question.id}
-      >
-        {this.renderAnswerLockControl({
-          surveyIndex,
-          questionId: question.id,
-          answer,
-          lockDisabled,
-          lockTitle,
-          glowAnswer,
-          forceAudienceMenu: true,
-          selfAudienceLabel: 'only me',
-        })}
-        {this.renderQuestionTagDropdown(question)}
-      </FullQuestionFooterIcons>
-    );
-
-    if (maskedAnswer) {
-      const additionalStillEncrypted = maskedAdditional;
-
-      return (
-        <Card key={cardKey} className={styles.fullQuestionCard}>
-          <CardBody id={styles.questionTitleBody} className={styles.fullQuestionBody}>
-            <FullQuestionHeader>
-              {this.renderPromptWithManualDecrypt(question)}
-              {cardIcons}
-            </FullQuestionHeader>
-
-            <div className={styles.fullQuestionMain}>
-              {/* Manual decrypt chip hidden when auto-decrypt is enabled */}
-              {!this.state.autoDecryptEnabled && (
-                <DecryptActionChip
-                  onClick={() => this.handleDecryptQuestionAnswer(question.id, 'answer')}
-                  disabled={this.state.isDecrypting || !allowDecryptAnswer}
-                  title={!allowDecryptAnswer ? decryptTooltip : undefined}
-                  actionLabel="Decrypt Answer"
-                  busy={isAnswerDecrypting}
-                />
-              )}
-            </div>
-
-            <div className={styles.fullQuestionFooter}>
-              <div className={styles.importanceSlider}>
-                {sliderOpen ? (
-                  this.props.singleQuestionMode
-                    ? this.renderSingleQuestionDeferredConvictionSlider({
-                        surveyIndex,
-                        questionId: question.id,
-                        sliderMode,
-                        activeSliderValue,
-                        convictionValue,
-                        importanceValue,
-                      })
-                    : (
-                      <ConvictionImportanceSliderControl
-                        label={this.renderConvictionImportanceLabel(question.id, convictionValue, importanceValue)}
-                        value={activeSliderValue}
-                        disabled={this.state.isSubmitting}
-                        onChange={(value, event) =>
-                          this.handleConvictionImportanceChange(
-                            surveyIndex,
-                            question.id,
-                            sliderMode,
-                            value,
-                            this.getSliderPersistOptions(event)
-                          )}
-                        onChangeComplete={this.flushDraftPersistAfterSliderChange}
-                      />
-                    )
-                ) : ENABLE_IMPORTANCE_SLIDER_TOGGLE ? (
-	                  this.renderBullhornToggleButton({
-	                    onClick: () => this.setSliderMode(question.id, 'conviction'),
-	                    disabled: this.state.isSubmitting,
-                      active: hasConvictionImportanceValue,
-	                  })
-	                ) : (
-	                  this.renderBullhornToggleButton({
-	                    onClick: () => this.setSliderMode(question.id, sliderMode),
-	                    disabled: this.state.isSubmitting,
-                      active: hasConvictionImportanceValue,
-	                  })
-	                )}
-              </div>
-              {footerIcons}
-            </div>
-
-            {commentsOpen && (
-              <div className={styles.fullQuestionComments}>
-                {additionalStillEncrypted ? (
-                  <>
-                    {/* Manual decrypt chip hidden when auto-decrypt is enabled */}
-                    {!this.state.autoDecryptEnabled && (
-                      <DecryptActionChip
-                        onClick={() => this.handleDecryptQuestionAnswer(question.id, 'additional')}
-                        disabled={this.state.isDecrypting || !allowDecryptAdditional}
-                        title={!allowDecryptAdditional ? decryptTooltip : undefined}
-                        actionLabel="Decrypt Comments"
-                        busy={isAdditionalDecrypting}
-                      />
-                    )}
-                  </>
-                ) : (
-                  <AudioInput
-                    qIndex={qIndex}
-                    {...this.getAudioInputWorkerProps()}
-                    updateFunction={(additionalCommentsValue) =>
-                      this.handleAdditional(surveyIndex, question.id, additionalCommentsValue)
-                    }
-                    toggleEncryption={(newEncryptedState) =>
-                      this.toggleAdditionalCommentsEncryption(surveyIndex, question.id, newEncryptedState)
-                    }
-                    placeholder={'related thoughts or URLs (optional)'}
-                    placeholderOpacity={0.5}
-                    value={additional?.value || ''}
-                    encrypted={additional?.encrypted || false}
-                    dataTestId={E2E_TESTIDS.SURVEY_ADDITIONAL_INPUT}
-                    dataCeQuestionId={String(question.id || '').trim().toLowerCase()}
-                    smallEncryptToggle={true}
-                    disabled={this.state.isSubmitting}
-                    /* Additional glows only when additional has content and is encrypted */
-                    forceGlow={glowAdditional}
-                  />
-                )}
-              </div>
-            )}
-          </CardBody>
-        </Card>
-      );
-    } else if (maskedAdditional) {
-      let questionComponent;
-      switch (question.type) {
-        case 'multichoice': {
-          const options = Array.isArray(question.options) ? question.options : [];
-          const isSingleSelect = isSingleSelectMultichoice(question);
-          const selectedValues = normalizeMultichoiceValue(answer.value);
-          questionComponent = (
-            <MultichoiceQuestionInput
-              questionId={question.id}
-              options={options}
-              selectedValues={selectedValues}
-              isSingleSelect={isSingleSelect}
-              disabled={this.state.isSubmitting}
-              onChange={(newAnswer) => this.handleAnswer(surveyIndex, question.id, newAnswer)}
-            />
-          );
-          break;
-        }
-        case 'rating': {
-          const ratingValue = getNormalizedUiRatingValue(answer.value);
-          questionComponent = (
-            this.props.singleQuestionMode
-              ? this.renderSingleQuestionDeferredRatingSlider({
-                  surveyIndex,
-                  questionId: question.id,
-                  ratingValue,
-                })
-              : (
-                <FullQuestionRatingInput
-                  value={ratingValue}
-                  disabled={this.state.isSubmitting}
-                  onChange={(ratingAnswer, event) => this.handleAnswer(
-                    surveyIndex,
-                    question.id,
-                    ratingAnswer,
-                    this.getSliderPersistOptions(event)
-                  )}
-                  onChangeComplete={this.flushDraftPersistAfterSliderChange}
-                />
-              )
-          );
-          break;
-        }
-        case 'binary':
-          questionComponent = (
-            <BinaryChoiceInput
-              questionId={question.id}
-              value={answer.value}
-              onChange={(option) => this.handleAnswer(surveyIndex, question.id, option)}
-              disabled={this.state.isSubmitting}
-              showIcons
-            />
-          );
-          break;
-        default: // 'freeform'
-          questionComponent = (
-            <AudioInput
-              qIndex={qIndex}
-              {...this.getAudioInputWorkerProps()}
-              placeholder={'response (optional)'}
-              placeholderOpacity={0.5}
-              updateFunction={(answerValue) => this.handleAnswer(surveyIndex, question.id, answerValue)}
-              toggleEncryption={(newEncryptedState) => this.toggleAnswerEncryption(surveyIndex, question.id, newEncryptedState)}
-              value={answer.value || ''}
-              encrypted={answer.encrypted || false}
-              dataTestId={E2E_TESTIDS.SURVEY_ANSWER_INPUT}
-              dataCeQuestionId={String(question.id || '').trim().toLowerCase()}
-              smallEncryptToggle={true}
-              disabled={this.state.isSubmitting}
-              /* Main glows only when main answer is encrypted */
-              forceGlow={glowAnswer}
-              /* Keep lock control in the footer for full mode */
-              disableEncryption={true}
-            />
-          );
-          break;
-      }
-
-      return (
-        <Card key={cardKey} className={styles.fullQuestionCard}>
-          <CardBody id={styles.questionTitleBody} className={styles.fullQuestionBody}>
-            <FullQuestionHeader>
-              {this.renderPromptWithManualDecrypt(question)}
-              {cardIcons}
-            </FullQuestionHeader>
-            <div className={styles.fullQuestionMain}>
-              <InputGroup id={styles.responseInputSection}>
-                {questionComponent}
-              </InputGroup>
-            </div>
-            <div className={styles.fullQuestionFooter}>
-              <div className={styles.importanceSlider}>
-                {sliderOpen ? (
-                  this.props.singleQuestionMode
-                    ? this.renderSingleQuestionDeferredConvictionSlider({
-                        surveyIndex,
-                        questionId: question.id,
-                        sliderMode,
-                        activeSliderValue,
-                        convictionValue,
-                        importanceValue,
-                      })
-                    : (
-                      <ConvictionImportanceSliderControl
-                        label={this.renderConvictionImportanceLabel(question.id, convictionValue, importanceValue)}
-                        value={activeSliderValue}
-                        disabled={this.state.isSubmitting}
-                        onChange={(value, event) =>
-                          this.handleConvictionImportanceChange(
-                            surveyIndex,
-                            question.id,
-                            sliderMode,
-                            value,
-                            this.getSliderPersistOptions(event)
-                          )}
-                        onChangeComplete={this.flushDraftPersistAfterSliderChange}
-                      />
-                    )
-                ) : ENABLE_IMPORTANCE_SLIDER_TOGGLE ? (
-	                  this.renderBullhornToggleButton({
-	                    onClick: () => this.setSliderMode(question.id, 'conviction'),
-	                    disabled: this.state.isSubmitting,
-                      active: hasConvictionImportanceValue,
-	                  })
-	                ) : (
-	                  this.renderBullhornToggleButton({
-	                    onClick: () => this.setSliderMode(question.id, sliderMode),
-	                    disabled: this.state.isSubmitting,
-                      active: hasConvictionImportanceValue,
-	                  })
-	                )}
-              </div>
-              {footerIcons}
-            </div>
-            {commentsOpen && (
-              <div className={styles.fullQuestionComments}>
-                {/* Manual decrypt chip hidden when auto-decrypt is enabled */}
-                {!this.state.autoDecryptEnabled && (
-                  <DecryptActionChip
-                    onClick={() => this.handleDecryptQuestionAnswer(question.id, 'additional')}
-                    disabled={this.state.isDecrypting || !allowDecryptAdditional}
-                    title={!allowDecryptAdditional ? decryptTooltip : undefined}
-                    actionLabel="Decrypt Comments"
-                    busy={isAdditionalDecrypting}
-                  />
-                )}
-              </div>
-            )}
-          </CardBody>
-        </Card>
-      );
-    } else {
-      let questionComponent;
-      switch (question.type) {
-        case 'multichoice': {
-          const options = Array.isArray(question.options) ? question.options : [];
-          const isSingleSelect = isSingleSelectMultichoice(question);
-          const selectedValues = normalizeMultichoiceValue(answer.value);
-          questionComponent = (
-            <MultichoiceQuestionInput
-              questionId={question.id}
-              options={options}
-              selectedValues={selectedValues}
-              isSingleSelect={isSingleSelect}
-              disabled={this.state.isSubmitting}
-              onChange={(newAnswer) => this.handleAnswer(surveyIndex, question.id, newAnswer)}
-            />
-          );
-          break;
-        }
-        case 'rating': {
-          const ratingValue = getNormalizedUiRatingValue(answer.value);
-          questionComponent = (
-            this.props.singleQuestionMode
-              ? this.renderSingleQuestionDeferredRatingSlider({
-                  surveyIndex,
-                  questionId: question.id,
-                  ratingValue,
-                })
-              : (
-                <FullQuestionRatingInput
-                  value={ratingValue}
-                  disabled={this.state.isSubmitting}
-                  onChange={(ratingAnswer, event) => this.handleAnswer(
-                    surveyIndex,
-                    question.id,
-                    ratingAnswer,
-                    this.getSliderPersistOptions(event)
-                  )}
-                  onChangeComplete={this.flushDraftPersistAfterSliderChange}
-                />
-              )
-          );
-          break;
-        }
-        case 'binary':
-          questionComponent = (
-            <BinaryChoiceInput
-              questionId={question.id}
-              value={answer.value}
-              onChange={(option) => this.handleAnswer(surveyIndex, question.id, option)}
-              disabled={this.state.isSubmitting}
-              showIcons
-            />
-          );
-          break;
-        default: // 'freeform'
-          questionComponent = (
-            <AudioInput
-              qIndex={qIndex}
-              {...this.getAudioInputWorkerProps()}
-              placeholder={'response (optional)'}
-              placeholderOpacity={0.5}
-              updateFunction={(answerValue) => this.handleAnswer(surveyIndex, question.id, answerValue)}
-              toggleEncryption={(newEncryptedState) => this.toggleAnswerEncryption(surveyIndex, question.id, newEncryptedState)}
-              value={answer.value || ''}
-              encrypted={answer.encrypted || false}
-              dataTestId={E2E_TESTIDS.SURVEY_ANSWER_INPUT}
-              dataCeQuestionId={String(question.id || '').trim().toLowerCase()}
-              smallEncryptToggle={true}
-              disabled={this.state.isSubmitting}
-              /* Main glows only when main answer is encrypted */
-              forceGlow={glowAnswer}
-              /* Keep lock control in the footer for full mode */
-              disableEncryption={true}
-            />
-          );
-          break;
-      }
-
-      return (
-        <Card key={cardKey} className={styles.fullQuestionCard}>
-          <CardBody id={styles.questionTitleBody} className={styles.fullQuestionBody}>
-            <FullQuestionHeader>
-              {this.renderPromptWithManualDecrypt(question)}
-              {cardIcons}
-            </FullQuestionHeader>
-            <div className={styles.fullQuestionMain}>
-              <InputGroup id={styles.responseInputSection}>
-                {questionComponent}
-              </InputGroup>
-            </div>
-            <div className={styles.fullQuestionFooter}>
-              <div className={styles.importanceSlider}>
-                {sliderOpen ? (
-                  this.props.singleQuestionMode
-                    ? this.renderSingleQuestionDeferredConvictionSlider({
-                        surveyIndex,
-                        questionId: question.id,
-                        sliderMode,
-                        activeSliderValue,
-                        convictionValue,
-                        importanceValue,
-                      })
-                    : (
-                      <ConvictionImportanceSliderControl
-                        label={this.renderConvictionImportanceLabel(question.id, convictionValue, importanceValue)}
-                        value={activeSliderValue}
-                        disabled={this.state.isSubmitting}
-                        onChange={(value, event) =>
-                          this.handleConvictionImportanceChange(
-                            surveyIndex,
-                            question.id,
-                            sliderMode,
-                            value,
-                            this.getSliderPersistOptions(event)
-                          )}
-                        onChangeComplete={this.flushDraftPersistAfterSliderChange}
-                      />
-                    )
-                ) : ENABLE_IMPORTANCE_SLIDER_TOGGLE ? (
-	                  this.renderBullhornToggleButton({
-	                    onClick: () => this.setSliderMode(question.id, 'conviction'),
-	                    disabled: this.state.isSubmitting,
-                      active: hasConvictionImportanceValue,
-	                  })
-	                ) : (
-	                  this.renderBullhornToggleButton({
-	                    onClick: () => this.setSliderMode(question.id, sliderMode),
-	                    disabled: this.state.isSubmitting,
-                      active: hasConvictionImportanceValue,
-	                  })
-	                )}
-              </div>
-              {footerIcons}
-            </div>
-            {commentsOpen && (
-              <div className={styles.fullQuestionComments}>
-                <div className={styles.additionalCommentsInlineRow}>
-                  <div className={styles.additionalCommentsInputWrap}>
-                    <AudioInput
-                      qIndex={qIndex}
-                      {...this.getAudioInputWorkerProps()}
-                      updateFunction={(additionalCommentsValue) => this.handleAdditional(surveyIndex, question.id, additionalCommentsValue)}
-                      toggleEncryption={(newEncryptedState) =>
-                        this.toggleAdditionalCommentsEncryption(surveyIndex, question.id, newEncryptedState)}
-                      placeholder={'related thoughts or URLs (optional)'}
-                      placeholderOpacity={0.5}
-                      value={additional.value || ''}
-                      encrypted={additional.encrypted || false}
-                      dataTestId={E2E_TESTIDS.SURVEY_ADDITIONAL_INPUT}
-                      dataCeQuestionId={String(question.id || '').trim().toLowerCase()}
-                      smallEncryptToggle={true}
-                      disabled={this.state.isSubmitting}
-                      /* Additional glows only when additional has content and is encrypted */
-                      forceGlow={glowAdditional}
-                      disableEncryption={true}
-                    />
-                  </div>
-                  <div className={styles.additionalCommentsLockSlot}>
-                    {this.renderAnswerLockControl({
-                      surveyIndex,
-                      questionId: question.id,
-                      answer: additional,
-                      field: additional,
-                      fieldKey: 'additional',
-                      lockDisabled: this.state.isSubmitting,
-                      lockTitle: additional.encrypted ? 'Encrypted comments' : 'Comments encryption audience',
-                      glowAnswer: glowAdditional,
-                      forceAudienceMenu: true,
-                      selfAudienceLabel: 'only me',
-                      showPlaintextOption: true,
-                      showFollowOption: true,
-                    })}
-                  </div>
-                </div>
-              </div>
-            )}
-          </CardBody>
-        </Card>
-      );
-    }
+    return this.renderFullQuestionCardShell({
+      cardKey,
+      question,
+      cardIcons,
+      mainContent: this.renderFullQuestionMainContent({
+        question,
+        qIndex,
+        surveyIndex,
+        answer,
+        glowAnswer,
+        maskedAnswer,
+        allowDecryptAnswer,
+        decryptTooltip,
+        isAnswerDecrypting,
+      }),
+      footerIcons,
+      sliderSection,
+      commentsSection: this.renderFullQuestionCommentsContent({
+        commentsOpen,
+        questionId: question.id,
+        qIndex,
+        surveyIndex,
+        additional,
+        glowAdditional,
+        maskedAnswer,
+        maskedAdditional,
+        allowDecryptAdditional,
+        decryptTooltip,
+        isAdditionalDecrypting,
+      }),
+    });
   };
 
 
@@ -12218,7 +12637,7 @@ export class SurveyQuestions extends Component {
       surveyLog.warn('renderQuestionAnswer: question or response is undefined');
       return null;
     }
-    const promptReloading = !!(this.state.decryptingByKey && this.state.decryptingByKey[`${question.id}:prompt`]);
+    const promptReloading = this.isQuestionFieldBusy(question.id, 'prompt');
     return (
       <SingleQuestionResponse
         key={`fullQ-${question.id}-${index}`}
@@ -12246,7 +12665,7 @@ export class SurveyQuestions extends Component {
       surveyLog.warn('renderSingleQuestionAnswer: question or response is undefined');
       return null;
     }
-    const promptReloading = !!(this.state.decryptingByKey && this.state.decryptingByKey[`${question.id}:prompt`]);
+    const promptReloading = this.isQuestionFieldBusy(question.id, 'prompt');
     return (
       <SingleQuestionResponse
         question={question}
@@ -14815,26 +15234,330 @@ class PileViewMode extends SurveyQuestions {
     } catch (e) { surveyLog.warn('SurveyTool: callback', e); }
   };
 
-  getIsPileSubmitRailVisible = () => {
-    const pendingStats = this.getPendingStatsSnapshot?.() || { total: 0 };
-    return !!(
-      this.state.isSubmitting ||
-      Number(pendingStats.total || 0) > 0 ||
-      this.state.submittedSinceLastEdit ||
-      this.state.submissionComplete
+  renderPileResponseInput = ({
+    question,
+    answer,
+    glowAnswer,
+    maskedAnswer,
+    allowDecryptAnswer,
+    decryptTooltip,
+    isAnswerDecrypting,
+  }) => {
+    if (maskedAnswer) {
+      return (
+        this.renderQuestionFieldDecryptControl({
+          questionId: question.id,
+          fieldKey: 'answer',
+          allowDecrypt: allowDecryptAnswer,
+          decryptTooltip,
+          actionLabel: 'Decrypt Answer',
+          busy: isAnswerDecrypting,
+          showBusySpinnerWhenAutoDecryptEnabled: true,
+          wrapperStyle: { marginBottom: 8 },
+        })
+      );
+    }
+
+    switch (question.type) {
+      case 'binary':
+        return (
+          <BinaryChoiceInput
+            questionId={question.id}
+            value={answer.value}
+            inputNamePrefix="q"
+            onChange={(option) => this.handleAnswerPile(question.id, option)}
+            disabled={this.state.isSubmitting}
+          />
+        );
+
+      case 'multichoice': {
+        const options = Array.isArray(question.options) ? question.options : [];
+        const isSingleSelect = isSingleSelectMultichoice(question);
+        const selectedValues = normalizeMultichoiceValue(answer.value);
+        return (
+          <MultichoiceQuestionInput
+            questionId={question.id}
+            options={options}
+            selectedValues={selectedValues}
+            isSingleSelect={isSingleSelect}
+            disabled={this.state.isSubmitting}
+            onChange={(nextValues) => this.handleAnswerPile(question.id, nextValues)}
+          />
+        );
+      }
+
+      case 'rating': {
+        const ratingValue = getNormalizedUiRatingValue(answer.value);
+        return (
+          <div className={styles.ratingContainer}>
+            <CESlider
+              min={RATING_MIN}
+              max={RATING_MAX}
+              step={1}
+              value={ratingValue}
+              onChange={(val, event) =>
+                this.handleAnswerPile(question.id, val, this.getSliderPersistOptions(event))}
+              onChangeComplete={this.flushDraftPersistAfterSliderChange}
+              disabled={this.state.isSubmitting}
+              className={styles.ratingSlider}
+            />
+            <span className={styles.ratingValueDisplay}>
+              {ratingValue}
+            </span>
+          </div>
+        );
+      }
+
+      case 'freeform':
+      default:
+        return (
+          <SurveyAudioFieldInput
+            {...this.getAudioInputWorkerProps()}
+            placeholder={'Your response...'}
+            value={answer.value || ''}
+            updateFunction={(val) => this.handleAnswerPile(question.id, val)}
+            toggleEncryption={(newState) =>
+              this.toggleAnswerEncryption(0, question.id, newState)
+            }
+            disabled={this.state.isSubmitting}
+            forceGlow={glowAnswer}
+            disableEncryption={true}
+            enableDownloads={false}
+          />
+        );
+    }
+  };
+
+  renderPileSliderSection = ({
+    questionId,
+    showSlider,
+    convictionValue,
+    importanceValue,
+    activeSliderValue,
+    sliderMode,
+    hasConvictionImportanceValue,
+  }) => (
+    <div className={styles.importanceSlider}>
+      {showSlider ? (
+        <ConvictionImportanceSliderControl
+          label={this.renderConvictionImportanceLabel(questionId, convictionValue, importanceValue)}
+          value={activeSliderValue}
+          disabled={this.state.isSubmitting}
+          onChange={(value, event) =>
+            this.handleConvictionImportanceChange(
+              0,
+              questionId,
+              sliderMode,
+              value,
+              this.getSliderPersistOptions(event)
+            )}
+          onChangeComplete={this.flushDraftPersistAfterSliderChange}
+        />
+      ) : (
+        ENABLE_IMPORTANCE_SLIDER_TOGGLE ? (
+          this.renderBullhornToggleButton({
+            onClick: () => this.openConvictionSlider(questionId),
+            disabled: this.state.isSubmitting,
+            active: hasConvictionImportanceValue,
+          })
+        ) : (
+          this.renderBullhornToggleButton({
+            onClick: () => this.toggleConviction(questionId),
+            disabled: this.state.isSubmitting,
+            active: hasConvictionImportanceValue,
+          })
+        )
+      )}
+    </div>
+  );
+
+  renderPileAdditionalInput = ({
+    questionId,
+    additional,
+    glowAdditional,
+  }) => (
+    <SurveyAudioFieldInput
+      {...this.getAudioInputWorkerProps()}
+      placeholder="Additional comments..."
+      value={additional.value || ''}
+      updateFunction={(val) => this.handleAdditionalPile(questionId, val)}
+      toggleEncryption={(newState) =>
+        this.toggleAdditionalCommentsEncryption(0, questionId, newState)
+      }
+      dataTestId={E2E_TESTIDS.SURVEY_ADDITIONAL_INPUT}
+      dataCeQuestionId={String(questionId || '').trim().toLowerCase()}
+      disabled={this.state.isSubmitting}
+      forceGlow={glowAdditional}
+      encrypted={additional.encrypted || false}
+      disableEncryption={true}
+      enableDownloads={false}
+    />
+  );
+
+  renderPileAdditionalEditorRow = ({
+    questionId,
+    additional,
+    glowAdditional,
+  }) => (
+    <div className={styles.pileAdditionalEditor}>
+      <AdditionalCommentsInlineRow
+        input={this.renderPileAdditionalInput({
+          questionId,
+          additional,
+          glowAdditional,
+        })}
+        lockControl={this.renderQuestionAdditionalLockControl({
+          surveyIndex: 0,
+          questionId,
+          additional,
+          glowAdditional,
+          visualContext: 'pile',
+        })}
+      />
+    </div>
+  );
+
+  renderPileCommentsSection = ({
+    questionId,
+    showComments,
+    additional,
+    glowAdditional,
+    maskedAdditional,
+    allowDecryptAdditional,
+    decryptTooltip,
+    isAdditionalDecrypting,
+  }) => {
+    if (!showComments) return null;
+
+    return (
+      <div className={styles.pileCommentsRow}>
+        {maskedAdditional ? (
+          this.renderQuestionFieldDecryptControl({
+            questionId,
+            fieldKey: 'additional',
+            allowDecrypt: allowDecryptAdditional,
+            decryptTooltip,
+            actionLabel: 'Decrypt Comments',
+            busy: isAdditionalDecrypting,
+            showBusySpinnerWhenAutoDecryptEnabled: true,
+          })
+        ) : (
+          this.renderPileAdditionalEditorRow({
+            questionId,
+            additional,
+            glowAdditional,
+          })
+        )}
+      </div>
     );
   };
 
-  notifyPileSubmitRailVisibility = () => {
-    const nextVisible = this.getIsPileSubmitRailVisible();
-    if (this._lastNotifiedPileSubmitRailVisible === nextVisible) return;
-    this._lastNotifiedPileSubmitRailVisible = nextVisible;
-    try {
-      if (typeof this.props.onPileSubmitRailVisibilityChange === 'function') {
-        this.props.onPileSubmitRailVisibilityChange(nextVisible);
-      }
-    } catch (e) { surveyLog.warn('SurveyTool: callback', e); }
-  };
+  renderPileQuestionIcons = ({
+    questionId,
+    answer,
+    glowAnswer,
+    maskedAnswer,
+    hasAdditionalContent,
+  }) => (
+    <div className={styles.pileCardIcons}>
+      <button
+        className={`${styles.iconButton} ${styles.commentButton} ${hasAdditionalContent ? styles.iconButtonActive : ''}`}
+        onClick={() => this.toggleComments(questionId)}
+        data-testid={E2E_TESTIDS.SURVEY_ADDITIONAL_TOGGLE}
+        data-ce-question-id={String(questionId || '').trim().toLowerCase()}
+      >
+        <FontAwesomeIcon icon={faComment} className={hasAdditionalContent ? styles.iconGlow : undefined} />
+      </button>
+
+      {this.renderQuestionAnswerLockControl({
+        surveyIndex: 0,
+        questionId,
+        answer,
+        glowAnswer,
+        ...this.getAnswerLockDisplayState({
+          field: answer,
+          masked: maskedAnswer,
+        }),
+        visualContext: 'pile',
+      })}
+    </div>
+  );
+
+  renderPileFooterSection = ({
+    question,
+    answer,
+    glowAnswer,
+    maskedAnswer,
+    hasAdditionalContent,
+    showSlider,
+    convictionValue,
+    importanceValue,
+    activeSliderValue,
+    sliderMode,
+    hasConvictionImportanceValue,
+    showComments,
+    additional,
+    glowAdditional,
+    maskedAdditional,
+    allowDecryptAdditional,
+    decryptTooltip,
+    isAdditionalDecrypting,
+  }) => (
+    <div className={styles.pileCardFooter}>
+      <div className={styles.pileControlsRow}>
+        {this.renderPileSliderSection({
+          questionId: question.id,
+          showSlider,
+          convictionValue,
+          importanceValue,
+          activeSliderValue,
+          sliderMode,
+          hasConvictionImportanceValue,
+        })}
+        {this.renderPileQuestionIcons({
+          questionId: question.id,
+          answer,
+          glowAnswer,
+          maskedAnswer,
+          hasAdditionalContent,
+        })}
+      </div>
+
+      {this.renderPileCommentsSection({
+        questionId: question.id,
+        showComments,
+        additional,
+        glowAdditional,
+        maskedAdditional,
+        allowDecryptAdditional,
+        decryptTooltip,
+        isAdditionalDecrypting,
+      })}
+    </div>
+  );
+
+  renderPileCardShell = ({
+    question,
+    questionComponent,
+    questionContainerClass,
+    footerSection,
+  }) => (
+    <Card className={styles.pileCardInner}>
+      <CardBody className={styles.pileCardBody}>
+        <div className={styles.pileCardHeader}>
+          {this.renderPromptWithManualDecrypt(question)}
+        </div>
+
+        <div className={styles.pileCardMainContent}>
+          <div className={questionContainerClass}>
+            {questionComponent}
+          </div>
+        </div>
+
+        {footerSection}
+      </CardBody>
+    </Card>
+  );
 
   renderActiveQuestion = (question) => {
     const { surveysResponseState, showComments, showConviction } = this.state;
@@ -14844,316 +15567,74 @@ class PileViewMode extends SurveyQuestions {
       importance: {},
       conviction: {},
     };
-    const answer = slice.answers[question.id] || this.buildEmptyResponseFieldState(question.id);
-    const additional = slice.additionalComments[question.id] || this.buildEmptyResponseFieldState(question.id, 'additional');
-    const convictionValue = this.getConvictionValueForSlice(slice, question.id);
-    const importanceValue = this.getImportanceValueForSlice(slice, question.id);
-    const hasConvictionImportanceValue = hasConvictionOrImportanceValueForQuestion(slice, question.id);
-    const sliderMode = ENABLE_IMPORTANCE_SLIDER_TOGGLE ? this.getSliderMode(question.id) : 'conviction';
-    const activeSliderValue = sliderMode === 'importance' ? importanceValue : convictionValue;
+    const {
+      answer,
+      additional,
+      convictionValue,
+      importanceValue,
+      hasConvictionImportanceValue,
+      sliderMode,
+      activeSliderValue,
+      hasAdditionalContent,
+      glowAnswer,
+      glowAdditional,
+      decryptTooltip,
+      maskedAnswer,
+      maskedAdditional,
+      allowDecryptAnswer,
+      allowDecryptAdditional,
+      isAnswerDecrypting,
+      isAdditionalDecrypting,
+    } = this.getQuestionRenderDisplayState({
+      questionId: question.id,
+      responseSlice: slice,
+    });
 
-    const promptMasked = this.isMaskedPromptText(question?.prompt) && !question?.promptDecrypted;
+    const promptMasked = this.isQuestionPromptMasked(question);
     if (promptMasked) {
-      const gateNames = this.resolveGatedPromptGateNames(question);
-      const tooltipIdBase = String(question?.id || 'gated').trim().toLowerCase();
-      const tooltipId = `ce-gated-prompt-tip-${tooltipIdBase.replace(/[^a-z0-9_-]/g, '-')}-pile`;
-      const tooltipText = gateNames.length
-        ? `Required ${t('sbt')} ${gateNames.length > 1 ? t('gates') : t('gate')}: ${gateNames.join(', ')}`
-        : `${t('sbt')} ${t('gate')} required`;
-      return (
-        <Card className={styles.pileCardInner}>
-          <CardBody className={styles.pileCardBody}>
-            <div className={styles.pileCardHeader}>
-              {this.renderPromptWithManualDecrypt(question)}
-            </div>
-            <GatedPromptNotice
-              questionId={question.id}
-              tooltipId={tooltipId}
-              tooltipText={tooltipText}
-            />
-          </CardBody>
-        </Card>
-      );
+      return this.renderQuestionMaskedPromptCard({
+        mode: 'pile',
+        question,
+      });
     }
 
-    // Parse envelopes (v2 only)
-    const getEnvelope = (item) => {
-      try { return item?.encryptedPortion ? JSON.parse(item.encryptedPortion) : null; } catch { return null; }
-    };
-    const isV1Envelope = (env) => !!env && Number(env.v) === 1 && String(env.cipher) === 'aes-gcm-256';
-
-    const answerEnvelope = getEnvelope(answer);
-    const additionalEnvelope = getEnvelope(additional);
-
-    // Masked detection (respect legacy 'encrypted' flag if envelope missing)
-    const isAnswerEncrypted = !!(answer?.value === '*' && (answer?.encryptedPortion || answer?.encrypted));
-    const isAdditionalEncrypted = !!(additional?.value === '*' && (additional?.encryptedPortion || additional?.encrypted));
-
-    // Version-agnostic gating
-    const allowDecryptAnswer =
-      isAnswerEncrypted && ( !!answerEnvelope || (!!this.props.loginComplete && !!this.props.account) );
-    const allowDecryptAdditional =
-      isAdditionalEncrypted && ( !!additionalEnvelope || (!!this.props.loginComplete && !!this.props.account) );
-
-    const decryptTooltip = 'Login to decrypt this encrypted field.';
-
-    // Specific glows
-    const hasAdditionalContent = hasMeaningfulFieldValue(additional);
-
-    const glowAnswer = !!answer?.encrypted;
-    const glowAdditional = !!(additional?.encrypted && hasAdditionalContent);
-
-    // Per-field decrypting flags (spinner only while in-flight for this field)
-    const isAnswerDecrypting = !!(this.state.decryptingByKey && this.state.decryptingByKey[`${question.id}:answer`]);
-    const isAdditionalDecrypting = !!(this.state.decryptingByKey && this.state.decryptingByKey[`${question.id}:additional`]);
-
-    let questionComponent;
-    if (isAnswerEncrypted) {
-      questionComponent = (
-        <div style={{ marginBottom: 8 }}>
-          {/* Manual decrypt chip hidden when auto-decrypt is enabled */}
-          {this.state.autoDecryptEnabled ? (
-            <DecryptActionChip
-              spinnerOnly
-              busy={isAnswerDecrypting}
-              actionLabel="Decrypt Answer"
-            />
-          ) : (
-            <DecryptActionChip
-              onClick={() => this.handleDecryptQuestionAnswer(question.id, 'answer')}
-              disabled={this.state.isDecrypting || !allowDecryptAnswer}
-              title={!allowDecryptAnswer ? decryptTooltip : undefined}
-              actionLabel="Decrypt Answer"
-              busy={isAnswerDecrypting}
-            />
-          )}
-        </div>
-      );
-    } else {
-      switch (question.type) {
-        case 'binary':
-          questionComponent = (
-            <BinaryChoiceInput
-              questionId={question.id}
-              value={answer.value}
-              inputNamePrefix="q"
-              onChange={(option) => this.handleAnswerPile(question.id, option)}
-              disabled={this.state.isSubmitting}
-            />
-          );
-          break;
-
-        case 'multichoice': {
-          const options = Array.isArray(question.options) ? question.options : [];
-          const isSingleSelect = isSingleSelectMultichoice(question);
-          const selectedValues = normalizeMultichoiceValue(answer.value);
-          questionComponent = (
-            <MultichoiceQuestionInput
-              questionId={question.id}
-              options={options}
-              selectedValues={selectedValues}
-              isSingleSelect={isSingleSelect}
-              disabled={this.state.isSubmitting}
-              onChange={(nextValues) => this.handleAnswerPile(question.id, nextValues)}
-            />
-          );
-          break;
-        }
-
-        case 'rating': {
-          const ratingValue = getNormalizedUiRatingValue(answer.value);
-          questionComponent = (
-            <div className={styles.ratingContainer}>
-              <CESlider
-                min={RATING_MIN}
-                max={RATING_MAX}
-                step={1}
-                value={ratingValue}
-                onChange={(val, event) =>
-                  this.handleAnswerPile(question.id, val, this.getSliderPersistOptions(event))}
-                onChangeComplete={this.flushDraftPersistAfterSliderChange}
-                disabled={this.state.isSubmitting}
-                className={styles.ratingSlider}
-              />
-              <span className={styles.ratingValueDisplay}>
-                {ratingValue}
-              </span>
-            </div>
-          );
-          break;
-        }
-
-        case 'freeform':
-        default:
-          questionComponent = (
-            <AudioInput
-              {...this.getAudioInputWorkerProps()}
-              placeholder={'Your response...'}
-              placeholderOpacity={0.5}
-              value={answer.value || ''}
-              updateFunction={(val) => this.handleAnswerPile(question.id, val)}
-              toggleEncryption={(newState) =>
-                this.toggleAnswerEncryption(0, question.id, newState)
-              }
-              smallEncryptToggle={true}
-              disabled={this.state.isSubmitting}
-              /* Main glows only when main answer is encrypted */
-              forceGlow={glowAnswer}
-              /* Hide field-level lock in PileViewMode for main answer input; lock is in footer */
-              disableEncryption={true}
-              /* Hide transcript/audio downloads in pile view inputs */
-              enableDownloads={false}
-            />
-          );
-          break;
-      }
-    }
+    const questionComponent = this.renderPileResponseInput({
+      question,
+      answer,
+      glowAnswer,
+      maskedAnswer,
+      allowDecryptAnswer,
+      decryptTooltip,
+      isAnswerDecrypting,
+    });
 
     const questionContainerClass = styles[`${question.type}QuestionContainer`] || '';
 
-    return (
-      <Card className={styles.pileCardInner}>
-        <CardBody className={styles.pileCardBody}>
-          <div className={styles.pileCardHeader}>
-            {this.renderPromptWithManualDecrypt(question)}
-          </div>
-
-          <div className={styles.pileCardMainContent}>
-            <div className={questionContainerClass}>
-              {questionComponent}
-            </div>
-          </div>
-
-          <div className={styles.pileCardFooter}>
-            <div className={styles.pileControlsRow}>
-              <div className={styles.importanceSlider}>
-                {showConviction[question.id] ? (
-                  <ConvictionImportanceSliderControl
-                    label={this.renderConvictionImportanceLabel(question.id, convictionValue, importanceValue)}
-                    value={activeSliderValue}
-                    disabled={this.state.isSubmitting}
-                    onChange={(value, event) =>
-                      this.handleConvictionImportanceChange(
-                        0,
-                        question.id,
-                        sliderMode,
-                        value,
-                        this.getSliderPersistOptions(event)
-                      )}
-                    onChangeComplete={this.flushDraftPersistAfterSliderChange}
-                  />
-                ) : (
-	                  ENABLE_IMPORTANCE_SLIDER_TOGGLE ? (
-	                    this.renderBullhornToggleButton({
-	                      onClick: () => this.openConvictionSlider(question.id),
-	                      disabled: this.state.isSubmitting,
-                        active: hasConvictionImportanceValue,
-	                    })
-	                  ) : (
-	                    this.renderBullhornToggleButton({
-	                      onClick: () => this.toggleConviction(question.id),
-	                      disabled: this.state.isSubmitting,
-                        active: hasConvictionImportanceValue,
-	                    })
-	                  )
-	                )}
-	              </div>
-	              <div className={styles.pileCardIcons}>
-	                <button
-	                  className={`${styles.iconButton} ${styles.commentButton} ${hasAdditionalContent ? styles.iconButtonActive : ''}`}
-	                  onClick={() => this.toggleComments(question.id)}
-	                  data-testid={E2E_TESTIDS.SURVEY_ADDITIONAL_TOGGLE}
-	                  data-ce-question-id={String(question.id || '').trim().toLowerCase()}
-                >
-                  <FontAwesomeIcon icon={faComment} className={hasAdditionalContent ? styles.iconGlow : undefined} />
-                </button>
-
-                {this.renderAnswerLockControl({
-                  surveyIndex: 0,
-                  questionId: question.id,
-                  answer,
-                  lockDisabled: this.state.isSubmitting || isAnswerEncrypted,
-                  lockTitle: isAnswerEncrypted ? 'Encrypted answer' : (answer.encrypted ? 'Encrypted' : 'Not encrypted'),
-                  glowAnswer,
-                  forceAudienceMenu: true,
-                  selfAudienceLabel: 'only me',
-                  visualContext: 'pile',
-                })}
-              </div>
-            </div>
-
-            {/* Additional comments */}
-            {showComments[question.id] && (
-              <div className={styles.pileCommentsRow}>
-                {isAdditionalEncrypted ? (
-                  this.state.autoDecryptEnabled ? (
-                    <DecryptActionChip
-                      spinnerOnly
-                      busy={isAdditionalDecrypting}
-                      actionLabel="Decrypt Comments"
-                    />
-                  ) : (
-                    <DecryptActionChip
-                      onClick={() =>
-                        this.handleDecryptQuestionAnswer(question.id, 'additional')
-                      }
-                      disabled={this.state.isDecrypting || !allowDecryptAdditional}
-                      title={!allowDecryptAdditional ? decryptTooltip : undefined}
-                      actionLabel="Decrypt Comments"
-                      busy={isAdditionalDecrypting}
-                    />
-                  )
-                ) : (
-                  <div className={styles.pileAdditionalEditor}>
-                    <div className={styles.additionalCommentsInlineRow}>
-                      <div className={styles.additionalCommentsInputWrap}>
-                        <AudioInput
-                          {...this.getAudioInputWorkerProps()}
-                          placeholder="Additional comments..."
-                          placeholderOpacity={0.5}
-                          value={additional.value || ''}
-                          updateFunction={(val) => this.handleAdditionalPile(question.id, val)}
-                          toggleEncryption={(newState) =>
-                            this.toggleAdditionalCommentsEncryption(0, question.id, newState)
-                          }
-                          dataTestId={E2E_TESTIDS.SURVEY_ADDITIONAL_INPUT}
-                          dataCeQuestionId={String(question.id || '').trim().toLowerCase()}
-                          smallEncryptToggle={true}
-                          disabled={this.state.isSubmitting}
-                          /* Additional glows only when additional has content and is encrypted */
-                          forceGlow={glowAdditional}
-                          encrypted={additional.encrypted || false}
-                          disableEncryption={true}
-                          /* Hide transcript/audio downloads in pile view inputs */
-                          enableDownloads={false}
-                        />
-                      </div>
-                      <div className={styles.additionalCommentsLockSlot}>
-                        {this.renderAnswerLockControl({
-                          surveyIndex: 0,
-                          questionId: question.id,
-                          answer: additional,
-                          field: additional,
-                          fieldKey: 'additional',
-                          lockDisabled: this.state.isSubmitting,
-                          lockTitle: additional.encrypted ? 'Encrypted comments' : 'Comments encryption audience',
-                          glowAnswer: glowAdditional,
-                          forceAudienceMenu: true,
-                          selfAudienceLabel: 'only me',
-                          showPlaintextOption: true,
-                          showFollowOption: true,
-                          visualContext: 'pile',
-                        })}
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </CardBody>
-      </Card>
-    );
+    return this.renderPileCardShell({
+      question,
+      questionComponent,
+      questionContainerClass,
+      footerSection: this.renderPileFooterSection({
+        question,
+        answer,
+        glowAnswer,
+        maskedAnswer,
+        hasAdditionalContent,
+        showSlider: !!showConviction[question.id],
+        convictionValue,
+        importanceValue,
+        activeSliderValue,
+        sliderMode,
+        hasConvictionImportanceValue,
+        showComments: !!showComments[question.id],
+        additional,
+        glowAdditional,
+        maskedAdditional,
+        allowDecryptAdditional,
+        decryptTooltip,
+        isAdditionalDecrypting,
+      }),
+    });
   };
 
 
