@@ -218,6 +218,7 @@ import {
   buildQuestionFilterStorageKeyPrefix,
   buildQuestionIdScopeSignature,
   buildQuestionScanProgressDisplay,
+  buildPersistedDraftQuestionRemovalPlan,
   buildPersistedDraftWritePlan,
   buildPersistDraftAllowedQuestionIds,
   loadPreviousPersistedDraftSnapshot,
@@ -226,7 +227,6 @@ import {
   buildPersistedDraftMapsForAllowedIds,
   buildRatingEnvelopeQidSetFromUserAnswers,
   buildSurveyDraftLoadPlan,
-  removeQuestionFromPersistedDraftPayload,
   buildSurveyDraftCompatScope,
   buildSurveyDraftStorageKey,
   buildSurveyDraftStorageVariantKeys,
@@ -4679,8 +4679,12 @@ export class SurveyQuestions extends Component {
         try {
           const raw = sessionStorage.getItem(key);
           if (!raw) return;
-          const parsedResult = parsePersistedDraftStorageValue({ raw });
-          if (parsedResult.status !== 'valid') {
+          const removalPlan = buildPersistedDraftQuestionRemovalPlan({
+            raw,
+            questionId: qidLower,
+            buildSemanticSignature: buildSurveyDraftSemanticSignature,
+          });
+          if (removalPlan.action === 'delete-storage') {
             try { sessionStorage.removeItem(key); } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
             if (this._draftParseCache && this._draftParseCache.key === key) {
               this._draftParseCache = null;
@@ -4691,30 +4695,12 @@ export class SurveyQuestions extends Component {
             }
             return;
           }
-          const removal = removeQuestionFromPersistedDraftPayload({
-            draftPayload: parsedResult.payload,
-            questionId: qidLower,
-          });
-          if (removal.action === 'delete') {
-            if (removal.removed) {
-              try { sessionStorage.removeItem(key); } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
-              if (this._draftParseCache && this._draftParseCache.key === key) {
-                this._draftParseCache = null;
-              }
-              if (this._lastDraftKey === key) {
-                this._lastDraftJSON = null;
-                this._lastDraftSemanticSignature = null;
-              }
-            }
-            return;
-          }
-          if (removal.action === 'update' && removal.nextPayload) {
-              const nextJson = JSON.stringify(removal.nextPayload);
-              sessionStorage.setItem(key, nextJson);
-              this._draftParseCache = { key, raw: nextJson, parsed: removal.nextPayload };
+          if (removalPlan.action === 'update-storage' && removalPlan.nextPayload && removalPlan.nextJson) {
+              sessionStorage.setItem(key, removalPlan.nextJson);
+              this._draftParseCache = { key, raw: removalPlan.nextJson, parsed: removalPlan.nextPayload };
               this._lastDraftKey = key;
-              this._lastDraftJSON = nextJson;
-              this._lastDraftSemanticSignature = buildSurveyDraftSemanticSignature(removal.nextPayload);
+              this._lastDraftJSON = removalPlan.nextJson;
+              this._lastDraftSemanticSignature = removalPlan.nextSemanticSignature;
           }
         } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
       });

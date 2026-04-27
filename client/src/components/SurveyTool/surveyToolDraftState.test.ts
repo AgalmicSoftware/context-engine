@@ -1,4 +1,5 @@
 import {
+  buildPersistedDraftQuestionRemovalPlan,
   buildPersistedDraftWritePlan,
   buildPersistDraftAllowedQuestionIds,
   loadPreviousPersistedDraftSnapshot,
@@ -523,6 +524,86 @@ describe('surveyToolDraftState', () => {
       status: 'invalid',
       payload: null,
       raw: '{broken-json',
+    });
+  });
+
+  it('builds persisted draft question removal plans for invalid, delete, update, and keep cases', () => {
+    expect(buildPersistedDraftQuestionRemovalPlan({
+      raw: '{broken-json',
+      questionId: 'q1',
+    })).toEqual({
+      action: 'delete-storage',
+      removed: false,
+      nextPayload: null,
+      nextJson: null,
+      nextSemanticSignature: null,
+    });
+
+    expect(buildPersistedDraftQuestionRemovalPlan({
+      raw: JSON.stringify({
+        answers: {
+          q1: { value: 'hello' },
+        },
+        baseline: {
+          q1: { value: 'baseline hello' },
+        },
+      }),
+      questionId: 'q1',
+    })).toEqual({
+      action: 'delete-storage',
+      removed: true,
+      nextPayload: null,
+      nextJson: null,
+      nextSemanticSignature: null,
+    });
+
+    const buildSemanticSignature = jest.fn((payload) => `sig:${JSON.stringify(payload)}`);
+    const updatedPayload = {
+      answers: {
+        q2: { value: 'keep' },
+      },
+      baseline: {
+        q2: { value: 'baseline keep' },
+      },
+    };
+    expect(buildPersistedDraftQuestionRemovalPlan({
+      raw: JSON.stringify({
+        answers: {
+          q1: { value: 'hello' },
+          q2: { value: 'keep' },
+        },
+        baseline: {
+          q1: { value: 'baseline hello' },
+          q2: { value: 'baseline keep' },
+        },
+      }),
+      questionId: 'q1',
+      buildSemanticSignature,
+    })).toEqual({
+      action: 'update-storage',
+      removed: true,
+      nextPayload: updatedPayload,
+      nextJson: JSON.stringify(updatedPayload),
+      nextSemanticSignature: `sig:${JSON.stringify(updatedPayload)}`,
+    });
+
+    expect(buildPersistedDraftQuestionRemovalPlan({
+      raw: JSON.stringify({
+        answers: {
+          q2: { value: 'keep' },
+        },
+      }),
+      questionId: 'q1',
+    })).toEqual({
+      action: 'keep',
+      removed: false,
+      nextPayload: {
+        answers: {
+          q2: { value: 'keep' },
+        },
+      },
+      nextJson: null,
+      nextSemanticSignature: null,
     });
   });
 
