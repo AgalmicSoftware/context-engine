@@ -222,6 +222,8 @@ import {
   buildPersistedDraftPayload,
   buildPersistedDraftMapsForAllowedIds,
   buildRatingEnvelopeQidSetFromUserAnswers,
+  buildSurveyDraftStorageKeys,
+  buildSurveyDraftStorageScopes,
   buildSliderModeStatePatch,
   buildSliderPersistOptions,
   buildRenderedIdsSignature,
@@ -4718,20 +4720,16 @@ export class SurveyQuestions extends Component {
       const networkIdStr = draftContext.networkIdStr;
 
       const surveyScope = this._getDraftScope();
-      const compatScope = surveyScope.replace(/^questions:q:[^:]+$/, 'questions');
       const accountLower = (this.props?.account || '').toLowerCase() || 'anon';
-
-      // Build all variants to purge: current network (if known) + __pending__, both user and anon, both scopes.
-      const nets = new Set(['__pending__']);
-      if (networkIdStr) nets.add(networkIdStr);
-
-      const who = new Set([accountLower, 'anon']);
-      const scopes = new Set([surveyScope, compatScope]);
-
-      const keys = [];
-      nets.forEach(n => who.forEach(w => scopes.forEach(sc => {
-        keys.push(`dg:surveyDraft:${slug}:${n}:${w}:${sc}`);
-      })));
+      const scopes = buildSurveyDraftStorageScopes({
+        surveyScope,
+      });
+      const keys = buildSurveyDraftStorageKeys({
+        slug,
+        networkIdStr,
+        accounts: [accountLower],
+        scopes,
+      });
 
       keys.forEach(k => { try { sessionStorage.removeItem(k); } catch (e) { surveyLog.warn('SurveyTool: fallback', e); } });
 
@@ -4750,24 +4748,19 @@ export class SurveyQuestions extends Component {
       const networkIdStr = draftContext.networkIdStr;
 
       const surveyScope = this._getDraftScope();
-      const compatScope = surveyScope.replace(/^questions:q:[^:]+$/, 'questions');
       const accountLower = (this.props?.account || '').toLowerCase() || 'anon';
-
-      // Optionally include legacy per-QID scope to be extra thorough
       const qidLower = (qid || '').toLowerCase();
-      const perQidScope = this.props.singleQuestionMode && qidLower ? `questions:q:${qidLower}` : null;
-
-      const nets = new Set(['__pending__']);
-      if (networkIdStr) nets.add(networkIdStr);
-
-      const who = new Set([accountLower, 'anon']);
-      const scopes = new Set([surveyScope, compatScope]);
-      if (perQidScope) scopes.add(perQidScope);
-
-      const keys = [];
-      nets.forEach(n => who.forEach(w => scopes.forEach(sc => {
-        keys.push(`dg:surveyDraft:${slug}:${n}:${w}:${sc}`);
-      })));
+      const scopes = buildSurveyDraftStorageScopes({
+        surveyScope,
+        singleQuestionMode: this.props.singleQuestionMode,
+        questionId: qidLower,
+      });
+      const keys = buildSurveyDraftStorageKeys({
+        slug,
+        networkIdStr,
+        accounts: [accountLower],
+        scopes,
+      });
 
       keys.forEach((key) => {
         try {

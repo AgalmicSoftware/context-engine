@@ -68,6 +68,8 @@ export {
   buildPersistedDraftPayload,
   buildPersistedDraftMapsForAllowedIds,
   buildPersistedDraftQuestionEntry,
+  buildSurveyDraftStorageKeys,
+  buildSurveyDraftStorageScopes,
   buildSurveyDraftSemanticSignature,
   computeSubmitLabel,
   getPendingStatsSnapshotFromState,
