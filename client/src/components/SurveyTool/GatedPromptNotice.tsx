@@ -1,6 +1,6 @@
 import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faLock, faQuestionCircle, faSpinner } from '@fortawesome/free-solid-svg-icons';
+import { faLock, faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
 import CETooltip from '../Shared/CETooltip';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import styles from './SurveyTool.module.scss';
@@ -10,40 +10,13 @@ type GatedPromptNoticeProps = {
   tooltipId: string;
   tooltipText: string;
   suffix?: string;
-  actionBusy?: boolean;
-  actionDisabled?: boolean;
-  actionLabel?: string;
-  actionTestId?: string;
-  actionTitle?: string;
-  onAction?: () => void;
 };
-
-export const resolveGatedPromptLockIconStyle = (): React.CSSProperties => ({
-  marginRight: 8,
-});
-
-export const buildGatedPromptTooltipIconClassName = ({
-  baseClassName = '',
-  tooltipClassName = '',
-}: {
-  baseClassName?: unknown;
-  tooltipClassName?: unknown;
-} = {}): string => ([
-  String(baseClassName || ''),
-  String(tooltipClassName || ''),
-].filter(Boolean).join(' '));
 
 const GatedPromptNotice = ({
   questionId = '',
   tooltipId,
   tooltipText,
   suffix = 'Decrypt the prompt to answer.',
-  actionBusy = false,
-  actionDisabled = false,
-  actionLabel = 'Decrypt Prompt',
-  actionTestId = E2E_TESTIDS.SURVEY_DECRYPT_PROMPT_NOTICE,
-  actionTitle = 'Decrypt gated prompt',
-  onAction,
 }: GatedPromptNoticeProps) => (
   <div
     className={styles.gatedPromptNotice}
@@ -51,8 +24,8 @@ const GatedPromptNotice = ({
     data-testid={E2E_TESTIDS.SURVEY_GATED_PROMPT_NOTICE}
     data-ce-question-id={String(questionId || '').trim().toLowerCase()}
   >
-    <FontAwesomeIcon icon={faLock} style={resolveGatedPromptLockIconStyle()} />
-    <span className={styles.gatedPromptNoticeText}>
+    <FontAwesomeIcon icon={faLock} style={{ marginRight: 8 }} />
+    <span>
       This question is{' '}
       <span
         id={tooltipId}
@@ -63,38 +36,11 @@ const GatedPromptNotice = ({
         gated
         <FontAwesomeIcon
           icon={faQuestionCircle}
-          className={buildGatedPromptTooltipIconClassName({
-            baseClassName: styles.tooltip,
-            tooltipClassName: styles.gatedPromptTooltipIcon,
-          })}
+          className={`${styles.tooltip} ${styles.gatedPromptTooltipIcon}`}
         />
       </span>
       {`. ${suffix}`}
     </span>
-    {typeof onAction === 'function' && (
-      <button
-        type="button"
-        className={styles.gatedPromptNoticeActionButton}
-        data-testid={actionTestId}
-        data-ce-question-id={String(questionId || '').trim().toLowerCase()}
-        disabled={actionDisabled}
-        aria-busy={actionBusy}
-        title={actionTitle}
-        onClick={(event) => {
-          event.stopPropagation();
-          onAction();
-        }}
-      >
-        {actionBusy ? (
-          <span className={styles.maskedPromptLoading}>
-            <FontAwesomeIcon icon={faSpinner} spin className={styles.maskedPromptLoadingSpinner} />
-            <span>Decrypting...</span>
-          </span>
-        ) : (
-          actionLabel
-        )}
-      </button>
-    )}
     <CETooltip
       placement="right"
       trigger="hover focus click"

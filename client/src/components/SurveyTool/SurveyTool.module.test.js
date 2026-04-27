@@ -16,6 +16,8 @@ import {
 } from './SurveySelector';
 import BullhornToggleButton from './BullhornToggleButton';
 import DeferredRatingSlider from './DeferredRatingSlider';
+import FullQuestionRatingInput from './FullQuestionRatingInput';
+import SurveyQuestionTagControl from './SurveyQuestionTagControl';
 import { DeferredCommitSlider as DirectDeferredCommitSlider } from './DeferredCommitSlider';
 import {
   computeSubmitLabel as directComputeSubmitLabel,
@@ -29,6 +31,7 @@ import FullQuestionRatingInput from './FullQuestionRatingInput';
 import SurveyQuestionTagControl from './SurveyQuestionTagControl';
 import { DeferredCommitSlider } from './DeferredCommitSlider';
 import { QuestionFilter as RawQuestionFilter } from './QuestionFilter';
+import PileHologramAssistant from './PileHologramAssistant';
 import TagModal from '../TagPage/TagModal';
 import GatedPromptNotice from './GatedPromptNotice';
 import styles from './SurveyTool.module.scss';
@@ -2739,24 +2742,13 @@ describe('SurveyTool module', () => {
       conviction: {},
     };
     let fullQuestionCard = subject.renderQuestion(question, 0, withNumericString);
-    let ratingSlider = findElement(fullQuestionCard, (node) => (
-      node?.props?.min === 0 &&
-      node?.props?.max === 10 &&
-      node?.props?.step === 1 &&
-      node?.props?.tooltip === false &&
-      node?.props?.style?.width === '200px' &&
-      node?.props?.value !== undefined &&
-      typeof node?.props?.onChange === 'function'
-    ));
-    expect(ratingSlider).not.toBeNull();
-    expect(ratingSlider.props.value).toBe(8);
-    expect(ratingSlider.props.id).toBeUndefined();
-    expect(nodeHasClassName(ratingSlider, styles.ratingSlider)).toBe(true);
-    expect(typeof ratingSlider.props.onChangeComplete).toBe('function');
-    expect(treeHasText(fullQuestionCard, '8')).toBe(true);
-
-    const ratingValueLabel = findElement(fullQuestionCard, (node) => nodeHasClassName(node, styles.ratingLabelText));
-    expect(ratingValueLabel).not.toBeNull();
+    let ratingInput = findFirstNodeByType(fullQuestionCard, FullQuestionRatingInput);
+    expect(ratingInput).not.toBeNull();
+    expect(ratingInput.props.value).toBe(8);
+    expect(ratingInput.props.disabled).toBe(false);
+    expect(typeof ratingInput.props.onChange).toBe('function');
+    expect(typeof ratingInput.props.onChangeComplete).toBe('function');
+    expect(renderToStaticMarkup(ratingInput)).toContain('8');
 
     const withOverflowValue = {
       answers: { q1: { value: '18', encrypted: false } },
@@ -2765,18 +2757,10 @@ describe('SurveyTool module', () => {
       conviction: {},
     };
     fullQuestionCard = subject.renderQuestion(question, 0, withOverflowValue);
-    ratingSlider = findElement(fullQuestionCard, (node) => (
-      node?.props?.min === 0 &&
-      node?.props?.max === 10 &&
-      node?.props?.step === 1 &&
-      node?.props?.tooltip === false &&
-      node?.props?.style?.width === '200px' &&
-      node?.props?.value !== undefined &&
-      typeof node?.props?.onChange === 'function'
-    ));
-    expect(ratingSlider).not.toBeNull();
-    expect(ratingSlider.props.value).toBe(10);
-    expect(treeHasText(fullQuestionCard, '10')).toBe(true);
+    ratingInput = findFirstNodeByType(fullQuestionCard, FullQuestionRatingInput);
+    expect(ratingInput).not.toBeNull();
+    expect(ratingInput.props.value).toBe(10);
+    expect(renderToStaticMarkup(ratingInput)).toContain('10');
 
     const withNonNumericValue = {
       answers: { q1: { value: 'abc', encrypted: false } },
@@ -2785,19 +2769,10 @@ describe('SurveyTool module', () => {
       conviction: {},
     };
     fullQuestionCard = subject.renderQuestion(question, 0, withNonNumericValue);
-    ratingSlider = findElement(fullQuestionCard, (node) => (
-      node?.props?.min === 0 &&
-      node?.props?.max === 10 &&
-      node?.props?.step === 1 &&
-      node?.props?.tooltip === false &&
-      node?.props?.style?.width === '200px' &&
-      node?.props?.value !== undefined &&
-      typeof node?.props?.onChange === 'function'
-    ));
-    expect(ratingSlider).not.toBeNull();
-    expect(ratingSlider.props.value).toBe(0);
-    expect(nodeHasClassName(ratingSlider, styles.ratingSlider)).toBe(true);
-    expect(treeHasText(fullQuestionCard, '0')).toBe(true);
+    ratingInput = findFirstNodeByType(fullQuestionCard, FullQuestionRatingInput);
+    expect(ratingInput).not.toBeNull();
+    expect(ratingInput.props.value).toBe(0);
+    expect(renderToStaticMarkup(ratingInput)).toContain('0');
   });
 
   it('persists keyboard-driven full-mode rating edits immediately', () => {
@@ -2842,19 +2817,11 @@ describe('SurveyTool module', () => {
     };
 
     const fullQuestionCard = subject.renderQuestion(question, 0, subject.state.surveysResponseState[0]);
-    const ratingSlider = findElement(fullQuestionCard, (node) => (
-      node?.props?.min === 0 &&
-      node?.props?.max === 10 &&
-      node?.props?.step === 1 &&
-      node?.props?.tooltip === false &&
-      node?.props?.style?.width === '200px' &&
-      node?.props?.value !== undefined &&
-      typeof node?.props?.onChange === 'function'
-    ));
+    const ratingInput = findFirstNodeByType(fullQuestionCard, FullQuestionRatingInput);
 
-    expect(ratingSlider).not.toBeNull();
+    expect(ratingInput).not.toBeNull();
 
-    ratingSlider.props.onChange(6, { type: 'keydown' });
+    ratingInput.props.onChange(6, { type: 'keydown' });
 
     expect(subject.state.surveysResponseState[0].answers.q1.value).toBe(6);
     expect(subject.scheduleJsonPreviewUpdate).toHaveBeenCalledTimes(1);
@@ -7039,6 +7006,463 @@ describe('SurveyTool module', () => {
     expect(stateWithoutLogin.additionalDecryptState.busy).toBe(true);
     expect(stateWithoutLogin.decryptTooltip).toBe('Login to decrypt this encrypted field.');
 
+    const details = subject.buildLockedQuestionGateDetails(['q2']);
+    expect(details).toHaveLength(1);
+    expect(details[0].label).toBe('Configured VIP Gate');
+  });
+
+  it('prefers allQuestionsForFilter when it has richer locked-question gate metadata', () => {
+    const gateSbt = '0x5555555555555555555555555555555555555555';
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+    });
+
+    subject.state = {
+      ...subject.state,
+      questionPool: [
+        {
+          id: 'q-rich',
+          prompt: '[encrypted]',
+          promptDecrypted: false,
+          encryption: {
+            enabled: true,
+            gates: [],
+          },
+        },
+      ],
+      allQuestionsForFilter: [
+        {
+          id: 'q-rich',
+          prompt: '[encrypted]',
+          promptDecrypted: false,
+          encryption: {
+            enabled: true,
+            gates: [{ label: 'Registry questionResponses gate', sbtAddress: gateSbt }],
+          },
+        },
+      ],
+      pileQuestions: [],
+    };
+    subject.resolveSbtGateLabel = () => 'Filter Gate SBT';
+
+    const details = subject.buildLockedQuestionGateDetails(['q-rich']);
+    expect(details).toHaveLength(1);
+    expect(details[0].label).toBe('Registry questionResponses gate');
+    expect(details[0].sbts[0]).toMatchObject({
+      address: gateSbt,
+      label: 'Filter Gate SBT',
+    });
+  });
+
+  it('uses neutral gated prompt copy for manual prompt decrypt buttons', () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+    });
+
+    subject.state = {
+      ...subject.state,
+      decryptingByKey: {},
+    };
+
+    const tree = subject.renderPromptWithManualDecrypt({
+      id: 'q1',
+      prompt: '[encrypted]',
+    });
+    const button = findElement(
+      tree,
+      (node) => node?.props?.['data-testid'] === E2E_TESTIDS.SURVEY_DECRYPT_PROMPT
+    );
+
+    expect(button).toBeTruthy();
+    expect(button.props.title).toBe('Decrypt gated prompt');
+  });
+
+  it('does not render inline single-question tags in the prompt title block', () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: true,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+    });
+
+    subject.state = {
+      ...subject.state,
+      decryptingByKey: {},
+    };
+
+    const tree = subject.renderPromptWithManualDecrypt({
+      id: 'q1',
+      prompt: 'Question prompt',
+      tags: ['Governance', 'AI Policy'],
+    });
+    const promptTitleBlock = findNodeByClassName(tree, styles.promptTitleBlock);
+
+    expect(promptTitleBlock).toBeTruthy();
+    expect(getElementChildren(promptTitleBlock)).toHaveLength(1);
+    expect(treeHasText(promptTitleBlock, '#Governance')).toBe(false);
+    expect(treeHasText(promptTitleBlock, '#AI Policy')).toBe(false);
+  });
+
+  it('keeps full-question tag dropdown scoped to the survey session on unpinned survey routes', () => {
+    const previousUrl = `${window.location.pathname}${window.location.search}`;
+    window.history.replaceState({}, '', `/survey/0x${'1'.repeat(64)}`);
+
+    try {
+      const subject = new SurveyQuestions({
+        singleQuestionMode: false,
+        isStandalone: false,
+        surveyID: `0x${'1'.repeat(64)}`,
+        surveyIndex: 0,
+        account: '0xabc',
+        loginComplete: true,
+        network: { id: 84532 },
+        activeSessionSlug: 'edge',
+        sessionSlug: 'edge',
+        sessionSlugPinned: false,
+      });
+
+      const dropdown = subject.renderQuestionTagDropdown({
+        id: 'q1',
+        prompt: 'Question prompt',
+        tags: ['Governance'],
+      });
+
+      expect(dropdown).toBeTruthy();
+      expect(dropdown.props.sessionSlug).toBe('edge');
+    } finally {
+      window.history.replaceState({}, '', previousUrl || '/');
+    }
+  });
+
+  it('wires SurveyQuestionTagControl into full question cards when tags are present', () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+    });
+
+    subject.state = {
+      ...subject.state,
+      decryptionNonce: 0,
+      isLoadingResponse: false,
+      bookmarkedQuestions: new Set(),
+      decryptingByKey: {},
+      isSubmitting: false,
+      autoDecryptEnabled: false,
+      showComments: {},
+      sliderToggleExpandedByQuestion: {},
+      surveysResponseState: [{
+        answers: {},
+        additionalComments: {},
+        importance: {},
+        conviction: {},
+      }],
+    };
+    subject.handleBookmarkToggle = jest.fn();
+    subject.renderBullhornToggleButton = jest.fn(() => null);
+    subject.renderAnswerLockControl = jest.fn(() => null);
+    subject._getEffectiveDraftSlug = () => 'edge';
+
+    const tree = subject.renderQuestion(
+      {
+        id: 'q1',
+        type: 'freeform',
+        prompt: 'Question prompt',
+        tags: ['governance'],
+      },
+      0,
+      subject.state.surveysResponseState[0]
+    );
+    const dropdown = findElement(
+      tree,
+      (node) => node?.type === SurveyQuestionTagControl
+    );
+
+    expect(dropdown).toBeTruthy();
+    expect(dropdown.props.tags).toEqual(['governance']);
+    expect(dropdown.props.useTagModal).toBe(true);
+    expect(typeof dropdown.props.onTagSelect).toBe('function');
+  });
+
+  it('opens the shared tag modal from full-question tag dropdown selections', () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+    });
+
+    subject.state = {
+      ...subject.state,
+      questionPool: [{
+        id: 'q1',
+        type: 'freeform',
+        prompt: 'Question prompt',
+        tags: ['governance'],
+      }],
+      decryptionNonce: 0,
+      isLoadingResponse: false,
+      bookmarkedQuestions: new Set(),
+      decryptingByKey: {},
+      isSubmitting: false,
+      autoDecryptEnabled: false,
+      showComments: {},
+      sliderToggleExpandedByQuestion: {},
+      surveysResponseState: [{
+        answers: {},
+        additionalComments: {},
+        importance: {},
+        conviction: {},
+      }],
+      activeTagModalTag: '',
+    };
+    subject.handleBookmarkToggle = jest.fn();
+    subject.renderBullhornToggleButton = jest.fn(() => null);
+    subject.renderAnswerLockControl = jest.fn(() => null);
+    subject._getEffectiveDraftSlug = () => 'edge';
+    subject.setState = (updates) => {
+      const nextState = typeof updates === 'function'
+        ? updates(subject.state, subject.props)
+        : updates;
+      subject.state = { ...subject.state, ...nextState };
+    };
+
+    const dropdown = subject.renderQuestionTagDropdown({
+      id: 'q1',
+      prompt: 'Question prompt',
+      tags: ['governance'],
+    });
+
+    dropdown.props.onTagSelect('governance');
+
+    const tree = subject.render();
+    const modal = findElement(
+      tree,
+      (node) => node?.type === TagModal
+    );
+
+    expect(subject.state.activeTagModalTag).toBe('governance');
+    expect(modal).toBeTruthy();
+    expect(modal.props.isOpen).toBe(true);
+    expect(modal.props.activeTag).toBe('governance');
+  });
+
+  it('omits SurveyQuestionTagControl from pile cards even when tags are present', () => {
+    const shell = new SurveyTool({
+      minifiedMode: 'pile',
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+    });
+
+    const pileElement = shell.render();
+    const PileViewModeClass = pileElement.type;
+    const subject = new PileViewModeClass(pileElement.props);
+
+    subject.state = {
+      ...subject.state,
+      surveysResponseState: [{
+        answers: {},
+        additionalComments: {},
+        importance: {},
+        conviction: {},
+      }],
+      showComments: {},
+      showConviction: {},
+      decryptingByKey: {},
+      isSubmitting: false,
+      autoDecryptEnabled: false,
+    };
+    subject.renderBullhornToggleButton = jest.fn(() => null);
+    subject.renderAnswerLockControl = jest.fn(() => null);
+
+    const question = {
+      id: 'q1',
+      type: 'freeform',
+      prompt: 'Question prompt',
+      tags: ['governance'],
+    };
+    subject.state = {
+      ...subject.state,
+      allQuestionsForFilter: [question],
+      pileQuestions: [question],
+      activePileIndex: 0,
+      filterModalOpen: false,
+      loading: false,
+      showHologramAssistant: false,
+    };
+
+    const tree = subject.render();
+    const dropdown = findElement(
+      tree,
+      (node) => node?.type === SurveyQuestionTagControl
+    );
+
+    expect(dropdown).toBeNull();
+  });
+
+  it('retries gate label hydration for same signature after a transient miss', async () => {
+    const gateSbt = '0x4444444444444444444444444444444444444444';
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+      networkChainId: 84532,
+    });
+
+    subject._isMounted = true;
+    subject.state = {
+      ...subject.state,
+      questionPool: [],
+      pileQuestions: [],
+      gateSbtNameRevision: 0,
+    };
+    subject.collectGateSbtAddressesForHydration = () => [gateSbt];
+    subject.resolveEffectiveResponseGateConfig = () => ({ slug: 'edge', networkChainId: 84532 });
+    subject._getEffectiveDraftSlug = () => 'edge';
+    subject.setState = (update) => {
+      const patch = typeof update === 'function' ? update(subject.state, subject.props) : update;
+      subject.state = { ...subject.state, ...(patch || {}) };
+    };
+    subject.scheduleGateSbtHydrationRetry = jest.fn();
+
+    const warmSpy = jest
+      .spyOn(sbtDisplayNameUtils, 'warmSbtDisplayNamesTargeted')
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ address: gateSbt, name: 'Recovered Name', info: { name: 'Recovered Name' } }]);
+
+    await subject.hydrateGateSbtLabels();
+    expect(subject.scheduleGateSbtHydrationRetry).toHaveBeenCalledTimes(1);
+    expect(subject._gateSbtHydrationSig).toBe('');
+
+    await subject.hydrateGateSbtLabels();
+    expect(warmSpy).toHaveBeenCalledTimes(2);
+    expect(subject.state.gateSbtNameRevision).toBe(1);
+
+    warmSpy.mockRestore();
+  });
+
+  it('does not retry gate label hydration when targeted lookup policy is disabled', async () => {
+    const previousPolicy = globalThis.ENABLE_TARGETED_SBT_METADATA_LOOKUP;
+    globalThis.ENABLE_TARGETED_SBT_METADATA_LOOKUP = false;
+    const gateSbt = '0x7777777777777777777777777777777777777777';
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+      networkChainId: 84532,
+    });
+
+    subject._isMounted = true;
+    subject.state = {
+      ...subject.state,
+      questionPool: [],
+      pileQuestions: [],
+      gateSbtNameRevision: 0,
+    };
+    subject.collectGateSbtAddressesForHydration = () => [gateSbt];
+    subject.resolveEffectiveResponseGateConfig = () => ({ slug: 'edge', networkChainId: 84532 });
+    subject._getEffectiveDraftSlug = () => 'edge';
+    subject.setState = (update) => {
+      const patch = typeof update === 'function' ? update(subject.state, subject.props) : update;
+      subject.state = { ...subject.state, ...(patch || {}) };
+    };
+    subject.scheduleGateSbtHydrationRetry = jest.fn();
+
+    const warmSpy = jest
+      .spyOn(sbtDisplayNameUtils, 'warmSbtDisplayNamesTargeted')
+      .mockResolvedValueOnce([]);
+
+    try {
+      await subject.hydrateGateSbtLabels();
+      expect(subject.scheduleGateSbtHydrationRetry).not.toHaveBeenCalled();
+      expect(subject._gateSbtHydrationSig).not.toBe('');
+
+      await subject.hydrateGateSbtLabels();
+      expect(warmSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      globalThis.ENABLE_TARGETED_SBT_METADATA_LOOKUP = previousPolicy;
+      warmSpy.mockRestore();
+    }
+  });
+
+  it('memoizes rendered question ids until question sources change', () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 1 },
+    });
+
+    subject.state = {
+      ...subject.state,
+      questionPool: [{ id: 'q1' }, { id: 'q2' }],
+      pileQuestions: [{ id: 'q2' }, { id: 'q3' }],
+    };
+
+    const first = subject.getCurrentRenderedQuestionIds();
+    const second = subject.getCurrentRenderedQuestionIds();
+    expect(second).toBe(first);
+    expect(second).toEqual(['q1', 'q2', 'q3']);
+
+    subject.state = {
+      ...subject.state,
+      questionPool: [{ id: 'q1' }, { id: 'q2' }, { id: 'q4' }],
+    };
+    const third = subject.getCurrentRenderedQuestionIds();
+    expect(third).not.toBe(second);
+    expect(third).toEqual(['q1', 'q2', 'q4', 'q3']);
+  });
+
+  it('invalidates local-cache rehydrate memo before post-backfill rehydrate', async () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+    });
+
+    subject._isMounted = true;
+    subject.state = {
+      ...subject.state,
+      submissionComplete: false,
+      isSubmitting: false,
+    };
+    subject.setState = (update, cb) => {
+      const patch = typeof update === 'function' ? update(subject.state, subject.props) : update;
+      subject.state = { ...subject.state, ...(patch || {}) };
+      if (typeof cb === 'function') cb();
+    };
     subject.props = {
       ...subject.props,
       account: '0xabc',

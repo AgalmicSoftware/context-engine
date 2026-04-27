@@ -1,18 +1,8 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
-import BinaryChoiceInput, { buildBinaryChoiceOptionClassName } from './BinaryChoiceInput';
-import styles from './SurveyTool.module.scss';
+import BinaryChoiceInput from './BinaryChoiceInput';
 
 describe('BinaryChoiceInput', () => {
-  it('builds selected and unselected option classes', () => {
-    expect(buildBinaryChoiceOptionClassName(styles, 'Agree', true)).toBe(
-      `${styles.radioOptionText} ${styles.agree} ${styles.selected}`
-    );
-    expect(buildBinaryChoiceOptionClassName(styles, 'Unsure', false)).toBe(
-      `${styles.radioOptionText} ${styles.unsure}`
-    );
-  });
-
   it('forwards option changes and repeat clicks on the current selection', () => {
     const onChange = jest.fn();
     render(
