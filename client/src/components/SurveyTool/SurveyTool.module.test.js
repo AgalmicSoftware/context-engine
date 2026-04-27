@@ -3034,6 +3034,204 @@ describe('SurveyTool module', () => {
     expect(refreshSurveyResponsesByID).toHaveBeenCalledWith('0xsurvey');
   });
 
+  it('passes the merged encrypted slice into submit work before async state flush', async () => {
+    jest.spyOn(cryptoUtils, 'getProviderKind').mockReturnValue('browser');
+
+    const subject = new SurveyQuestions({
+      surveyIndex: 0,
+      surveyId: '0xsurvey',
+      account: '0xabc',
+      loginComplete: true,
+      provider: {},
+      network: { id: 84532 },
+      sessionSlug: 'edge',
+      activeSessionSlug: 'edge',
+    });
+
+    subject._getEffectiveDraftSlug = jest.fn(() => 'edge');
+    subject.maybeBlockSubmitUntilQuestionPoolComplete = jest.fn(() => false);
+    subject.getAnsweredQuestionsCount = jest.fn(() => 1);
+    subject.getChangedQidsAndFields = jest.fn(() => ({
+      changedQids: new Set(['q1']),
+      changedMap: { q1: { answer: 1, additional: 1 } },
+    }));
+    subject.getPendingEditStats = jest.fn(() => ({ total: 1, encrypted: 1 }));
+    subject.buildFieldEncryptionWorkGroups = jest.fn(() => ({
+      groups: [{
+        recipients: [{ type: 'lit-sbt-v1' }],
+        qids: ['q1'],
+        slice: {
+          answers: {
+            q1: {
+              value: 'yes',
+              encrypted: true,
+              encryptionAudience: 'gate',
+              encryptedPortion: '',
+            },
+          },
+          additionalComments: {
+            q1: {
+              value: 'context',
+              encrypted: true,
+              encryptionAudience: 'gate',
+              encryptedPortion: '',
+            },
+          },
+          importance: {},
+          conviction: {},
+        },
+      }],
+      missingRecipients: [],
+    }));
+    subject.encryptFieldWorkGroups = jest.fn().mockResolvedValue({
+      answers: {
+        q1: {
+          value: '*',
+          encrypted: true,
+          encryptedPortion: 'answer-env',
+          hash: 'answer-hash',
+        },
+      },
+      additionalComments: {
+        q1: {
+          value: '*',
+          encrypted: true,
+          encryptedPortion: 'additional-env',
+          hash: 'additional-hash',
+        },
+      },
+    });
+    subject.submitSurveyResponse = jest.fn().mockResolvedValue({
+      status: 1,
+      blockNumber: 77,
+      transactionHash: `0x${'7'.repeat(64)}`,
+      __ceQuestionResponses: [
+        {
+          questionID: 'q1',
+          responder: '0xabc',
+          type: 'freeform',
+          prompt: 'Prompt 1',
+          answer: { value: '*', encrypted: true, encryptedPortion: 'answer-env' },
+          additional: { value: '*', encrypted: true, encryptedPortion: 'additional-env' },
+        },
+      ],
+      __ceSurveyResponse: {
+        surveyID: '0xsurvey',
+        responder: '0xabc',
+        responses: [
+          {
+            questionID: 'q1',
+            responder: '0xabc',
+            type: 'freeform',
+            prompt: 'Prompt 1',
+            answer: { value: '*', encrypted: true, encryptedPortion: 'answer-env' },
+            additional: { value: '*', encrypted: true, encryptedPortion: 'additional-env' },
+          },
+        ],
+      },
+      __ceSurveyId: '0xsurvey',
+    });
+    subject.writeSubmittedResponsesToLocalCaches = jest.fn().mockResolvedValue({
+      questionCacheWritten: true,
+      surveyCacheWritten: true,
+    });
+    subject.clearDraftFor = jest.fn();
+    subject.invalidateDiffCaches = jest.fn();
+    subject.prepareJsonAndHash = jest.fn(() => ({
+      responder: '0xabc',
+      responses: [
+        {
+          questionID: 'q1',
+          answer: { value: '*', encrypted: true, encryptedPortion: 'answer-env' },
+          additional: { value: '*', encrypted: true, encryptedPortion: 'additional-env' },
+        },
+      ],
+    }));
+    subject.state = {
+      ...subject.state,
+      surveysResponseState: [{
+        answers: {
+          q1: {
+            value: 'yes',
+            encrypted: true,
+            encryptionAudience: 'gate',
+            encryptedPortion: '',
+          },
+        },
+        additionalComments: {
+          q1: {
+            value: 'context',
+            encrypted: true,
+            encryptionAudience: 'gate',
+            encryptedPortion: '',
+          },
+        },
+        importance: {},
+        conviction: {},
+      }],
+      questionPool: [{ id: 'q1', type: 'freeform', prompt: 'Prompt 1' }],
+      pileQuestions: [],
+      isSubmitting: false,
+      submissionComplete: false,
+      submittedSinceLastEdit: false,
+      modifiedCount: 1,
+      encryptedModifiedCount: 1,
+      hasEncryptedChanges: true,
+    };
+
+    const deferredStatePatches = [];
+    subject.setState = (updater, callback) => {
+      const patch = typeof updater === 'function' ? updater(subject.state, subject.props) : updater;
+      if (patch && typeof patch === 'object') {
+        if (Object.prototype.hasOwnProperty.call(patch, 'surveysResponseState')) {
+          deferredStatePatches.push(patch);
+        } else {
+          subject.state = { ...subject.state, ...patch };
+        }
+      }
+      if (typeof callback === 'function') {
+        const pending = callback();
+        if (pending && typeof pending.then === 'function') {
+          subject._lastSetStatePromise = pending;
+        }
+      }
+      return patch;
+    };
+    subject._submitGuard = true;
+
+    await subject.encryptAndUpload();
+    await flushAsyncCallbacks();
+    if (subject._lastSetStatePromise) await subject._lastSetStatePromise;
+
+    expect(
+      deferredStatePatches.some((patch) => Array.isArray(patch?.surveysResponseState))
+    ).toBe(true);
+    expect(subject.submitSurveyResponse).toHaveBeenCalledTimes(1);
+    expect(subject.submitSurveyResponse).toHaveBeenCalledWith(
+      expect.objectContaining({
+        answers: expect.objectContaining({
+          q1: expect.objectContaining({
+            value: '*',
+            encrypted: true,
+            encryptedPortion: 'answer-env',
+          }),
+        }),
+        additionalComments: expect.objectContaining({
+          q1: expect.objectContaining({
+            value: '*',
+            encrypted: true,
+            encryptedPortion: 'additional-env',
+          }),
+        }),
+      }),
+      expect.any(Set),
+    );
+    expect(subject.submitSurveyResponse.mock.calls[0][1]).toEqual(new Set(['q1']));
+    expect(subject.writeSubmittedResponsesToLocalCaches).toHaveBeenCalledWith(expect.objectContaining({
+      receipt: expect.objectContaining({ status: 1, blockNumber: 77 }),
+    }));
+  });
+
   it('uses the resolved submission slug for post-submit cache writes and refresh fallback', async () => {
     jest.spyOn(cryptoUtils, 'getProviderKind').mockReturnValue('browser');
 
@@ -5764,6 +5962,104 @@ describe('SurveyTool module', () => {
     expect(retrySpy).toHaveBeenCalled();
     expect(subject.state.noResponse).toBe(true);
     expect(subject.state.isLoadingResponse).toBe(false);
+  });
+
+  it('hydrates a viewed response from a fresh persistent cache reread before falling back to hash-only retries', async () => {
+    const responderAddress = '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+    const staleCache = {
+      '84532': {
+        questions: {
+          q1: { id: 'q1', type: 'binary', prompt: 'Prompt from cache', creator: responderAddress },
+        },
+        questionResponses: {},
+        questionResponsesMeta: {},
+      },
+    };
+    const freshCachedResponse = {
+      questionID: 'q1',
+      responder: responderAddress,
+      answer: { value: '*', encrypted: true, encryptedPortion: 'cipher-answer' },
+      additional: { value: '', encrypted: false },
+      timestamp: 1700000000,
+    };
+    const freshCache = {
+      '84532': {
+        questions: {
+          q1: { id: 'q1', type: 'binary', prompt: 'Prompt from cache', creator: responderAddress },
+        },
+        questionResponses: {
+          q1: {
+            [responderAddress]: freshCachedResponse,
+          },
+        },
+        questionResponsesMeta: {
+          q1: {
+            [responderAddress]: { bn: 12, txi: 0, li: 0, ts: 1700000000 },
+          },
+        },
+      },
+    };
+    jest.spyOn(cacheScripts, 'readCache')
+      .mockResolvedValueOnce(staleCache)
+      .mockResolvedValueOnce(freshCache);
+    jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue({});
+    const getResponseSpy = jest.spyOn(contractScripts, 'getResponse').mockResolvedValue(null);
+    const getResponseHashSpy = jest.spyOn(contractScripts, 'getResponseHash').mockResolvedValue('tx-response-hash');
+
+    const subject = new SurveyQuestions({
+      singleQuestionMode: true,
+      isStandalone: false,
+      surveyIndex: 0,
+      questionID: 'q1',
+      responderAddress,
+      account: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      loginComplete: true,
+      provider: {},
+      network: { id: 84532 },
+      networkChainId: 84532,
+      sessionSlug: 'edge',
+      activeSessionSlug: 'edge',
+    });
+    subject._isMounted = true;
+    subject.state = {
+      ...subject.state,
+      questionPool: [],
+      parsedViewAddressAnswers: null,
+      noResponse: false,
+      responseLookupWarning: '',
+      isLoadingResponse: false,
+      surveysResponseState: [{ answers: {}, importance: {}, conviction: {}, additionalComments: {} }],
+    };
+    let callbackRun = Promise.resolve();
+    subject.setState = jest.fn((update, cb) => {
+      const patch = typeof update === 'function' ? update(subject.state, subject.props) : update;
+      if (patch && typeof patch === 'object') {
+        subject.state = { ...subject.state, ...patch };
+      }
+      if (typeof cb === 'function') {
+        const maybePromise = cb();
+        if (maybePromise && typeof maybePromise.then === 'function') {
+          callbackRun = callbackRun.then(() => maybePromise);
+        }
+      }
+      return patch;
+    });
+    const retrySpy = jest.spyOn(subject, 'scheduleSingleQuestionBootstrapRetry');
+
+    await subject.fetchSingleQuestionData();
+    await callbackRun;
+
+    expect(getResponseSpy).toHaveBeenCalled();
+    expect(getResponseHashSpy).not.toHaveBeenCalled();
+    expect(retrySpy).not.toHaveBeenCalled();
+    expect(subject.state.noResponse).toBe(false);
+    expect(subject.state.isLoadingResponse).toBe(false);
+    expect(subject.state.parsedViewAddressAnswers).toEqual(expect.objectContaining({
+      responder: responderAddress,
+      answer: expect.objectContaining({
+        encryptedPortion: 'cipher-answer',
+      }),
+    }));
   });
 
   it('marks viewed response as no-response when recent payload bootstrap retries are exhausted', async () => {
