@@ -109,6 +109,7 @@ export {
   buildLocalCacheRehydrationState,
   buildPrefilledSurveyState,
   buildRevertedResponseSlice,
+  buildSurveyResponseStateArray,
 } from './surveyToolHydrationFlow.js';
 export {
   buildQuestionScanProgressDisplay,
