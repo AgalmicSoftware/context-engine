@@ -31,7 +31,9 @@ type BuildDraftHydrationStateArgs = {
   applyDraftEntryToSlice?: ((args: DraftHydrationApplyArgs) => boolean) | null;
 };
 
-type CachedQuestionResponses = Record<string, unknown>;
+type CachedQuestionResponseMap = Record<string, unknown>;
+
+type CachedQuestionResponses = Record<string, CachedQuestionResponseMap>;
 
 type CachedResponseApplyArgs = {
   targetSlice?: ResponseSlice | null;
@@ -98,7 +100,7 @@ type BuildMergedHydrationQuestionResponsesArgs = {
   scopeSlugs?: unknown[];
   networkIdStr?: unknown;
   readQuestionsCache?: ((slug: string) => unknown) | null;
-  mergeQuestionResponses?: ((target: Record<string, unknown>, source: Record<string, unknown>) => void) | null;
+  mergeQuestionResponses?: ((target: CachedQuestionResponses, source: CachedQuestionResponses) => void) | null;
 };
 
 type BuildRevertedResponseSliceArgs = {
@@ -285,8 +287,8 @@ export const buildCacheHydrationSlice = ({
 }: BuildCacheHydrationSliceArgs = {}) => {
   const slice = buildEmptyResponseSlice();
   const normalizedAccount = String(account || '').toLowerCase();
-  const responses = mergedQuestionResponses && typeof mergedQuestionResponses === 'object'
-    ? mergedQuestionResponses
+  const responses: CachedQuestionResponses = mergedQuestionResponses && typeof mergedQuestionResponses === 'object'
+    ? mergedQuestionResponses as CachedQuestionResponses
     : {};
   let changed = false;
 
@@ -375,7 +377,7 @@ export const buildMergedHydrationQuestionResponses = ({
   readQuestionsCache = null,
   mergeQuestionResponses = null,
 }: BuildMergedHydrationQuestionResponsesArgs = {}) => {
-  const mergedQuestionResponses: Record<string, unknown> = {};
+  const mergedQuestionResponses: CachedQuestionResponses = {};
   const networkId = String(networkIdStr || '');
   if (!networkId || !Array.isArray(scopeSlugs) || typeof readQuestionsCache !== 'function' || typeof mergeQuestionResponses !== 'function') {
     return mergedQuestionResponses;
@@ -386,8 +388,11 @@ export const buildMergedHydrationQuestionResponses = ({
     if (!scopeSlug) return;
     let questionsCache = readQuestionsCache(scopeSlug);
     if (!questionsCache || typeof questionsCache !== 'object') questionsCache = {};
-    const networkCache = questionsCache?.[networkId];
-    mergeQuestionResponses(mergedQuestionResponses, networkCache?.questionResponses || {});
+    const networkCache = isRecord(questionsCache) ? questionsCache[networkId] : null;
+    const questionResponses = isRecord(networkCache) && isRecord(networkCache.questionResponses)
+      ? networkCache.questionResponses as CachedQuestionResponses
+      : {};
+    mergeQuestionResponses(mergedQuestionResponses, questionResponses);
   });
 
   return mergedQuestionResponses;
