@@ -12,7 +12,6 @@ import {
   Input,
   Card,
   CardBody,
-  FormText,
   InputGroup,
   InputGroupText,
   ModalHeader,
@@ -20,32 +19,35 @@ import {
   ModalFooter,
 } from 'reactstrap';
 import { Link } from 'react-router-dom';
-import CETooltip from '../Shared/CETooltip';
-
-
-
-
 // Styles
 import "../../assets/css/contextEngine.scss";
 import styles from './SurveyTool.module.scss';
 
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faBookmark, faLock, faUnlock, faPlus, faMinus, faCaretDown, faCaretUp, faCheck, faTimes, faArrowLeft, faArrowRight, faSpinner, faExpand, faExternalLinkAlt, faFilter, faExclamationCircle, faMicrophone, faChevronLeft, faChevronRight, faComment, faQuestionCircle, faRobot } from '@fortawesome/free-solid-svg-icons';
+import { faLock, faUnlock, faPlus, faMinus, faCaretDown, faCaretUp, faCheck, faTimes, faArrowLeft, faArrowRight, faSpinner, faExternalLinkAlt, faFilter, faExclamationCircle, faMicrophone, faChevronLeft, faChevronRight, faComment, faRobot } from '@fortawesome/free-solid-svg-icons';
 
 import AudioInput from '../Shared/AudioInput/AudioInput';
 import CreateQuestionsAndSurveys from './CreateQuestionsAndSurveys';
 import SurveyResults from './SurveyResults';
 import QuestionFilter from './QuestionFilter';
 import PileHologramAssistant from './PileHologramAssistant';
-import QuestionTagDropdown from './QuestionTagDropdown';
+import SurveyQuestionTagControl from './SurveyQuestionTagControl';
 import SingleQuestionResponse from './SingleQuestionResponse';
 import TagModal from '../TagPage/TagModal';
+import BinaryChoiceInput from './BinaryChoiceInput';
 import BullhornToggleButton from './BullhornToggleButton';
 import ConvictionImportanceLabel from './ConvictionImportanceLabel';
+import ConvictionImportanceSliderControl from './ConvictionImportanceSliderControl';
+import DecryptActionChip from './DecryptActionChip';
 import DeferredConvictionImportanceSlider from './DeferredConvictionImportanceSlider';
 import DeferredRatingSlider from './DeferredRatingSlider';
+import FullQuestionFooterIcons from './FullQuestionFooterIcons';
+import FullQuestionHeader from './FullQuestionHeader';
+import FullQuestionRatingInput from './FullQuestionRatingInput';
+import GatedPromptNotice from './GatedPromptNotice';
+import MultichoiceQuestionInput from './MultichoiceQuestionInput';
+import QuestionCardLinks from './QuestionCardLinks';
 import { JsonButtonRow, JsonIconButton, JsonPanel, JsonToggleButton } from '../Shared/Json/JsonControls';
-import { getQuestionTagDisplayList } from '../../utilities/survey/questionTags.js';
 
 // Crypto and contract utilities
 import contractScripts, {
@@ -2673,19 +2675,16 @@ export class SurveyQuestions extends Component {
   };
 
   renderQuestionTagDropdown = (question) => {
-    if (!getQuestionTagDisplayList(question?.tags).length) return null;
-
-    const useTagModal = !this.props.singleQuestionMode && !this.props.isStandalone;
-
     return (
-      <QuestionTagDropdown
+      <SurveyQuestionTagControl
         tags={question.tags}
         sessionSlug={resolveCurrentTagSessionSlug({
           props: this.props,
           state: this.state,
           getEffectiveDraftSlug: this._getEffectiveDraftSlug,
         })}
-        onTagSelect={useTagModal ? this.handleQuestionTagSelect : null}
+        useTagModal={!this.props.singleQuestionMode && !this.props.isStandalone}
+        onTagSelect={this.handleQuestionTagSelect}
       />
     );
   };
@@ -2701,13 +2700,18 @@ export class SurveyQuestions extends Component {
   };
 
   renderQuestionTagDropdownRow = (question) => {
-    const dropdown = this.renderQuestionTagDropdown(question);
-    if (!dropdown) return null;
-
     return (
-      <div style={QUESTION_TAG_DROPDOWN_ROW_STYLE}>
-        {dropdown}
-      </div>
+      <SurveyQuestionTagControl
+        tags={question.tags}
+        sessionSlug={resolveCurrentTagSessionSlug({
+          props: this.props,
+          state: this.state,
+          getEffectiveDraftSlug: this._getEffectiveDraftSlug,
+        })}
+        useTagModal={!this.props.singleQuestionMode && !this.props.isStandalone}
+        onTagSelect={this.handleQuestionTagSelect}
+        rowStyle={QUESTION_TAG_DROPDOWN_ROW_STYLE}
+      />
     );
   };
 
@@ -9253,49 +9257,17 @@ export class SurveyQuestions extends Component {
     const isQuestionBookmarked = this.state.bookmarkedQuestions.has(question.id);
 
     const cardIcons = (
-      <div className={styles.cardLinksContainer}>
-        {showResponseLookupSpinner && (
-          <span
-            className={styles.cardLinkSpinner}
-            title="Checking for existing response..."
-            aria-label="Checking for existing response"
-          >
-            <FontAwesomeIcon icon={faSpinner} spin />
-          </span>
-        )}
-        <button
-          onClick={() => this.handleBookmarkToggle(question.id)}
-          className={`${styles.cardLinkButton} ${styles.fullQuestionBookmarkButton} ${isQuestionBookmarked ? styles.fullQuestionBookmarkButtonActive : ''}`}
-          title={isQuestionBookmarked ? 'Remove Bookmark' : 'Bookmark Question'}
-        >
-          <FontAwesomeIcon
-            icon={faBookmark}
-            style={{ color: isQuestionBookmarked ? '#ffc107' : 'white' }}
-          />
-        </button>
-        {question.arweaveTxId && (
-          <a
-            href={normalizeArweaveUrl(question.arweaveTxId, { contextLabel: 'survey_tool_question_link' })}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={styles.cardLinkButton}
-            title="View on Arweave"
-          >
-            <FontAwesomeIcon icon={faExternalLinkAlt} />
-          </a>
-        )}
-        {question.id && (
-          <a
-            href={buildQuestionRoutePath(question.id, { sessionSlug: this._getEffectiveDraftSlug() })}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={styles.cardLinkButton}
-            title="View question page"
-          >
-            <FontAwesomeIcon icon={faExpand} />
-          </a>
-        )}
-      </div>
+      <QuestionCardLinks
+        showResponseLookupSpinner={showResponseLookupSpinner}
+        isQuestionBookmarked={isQuestionBookmarked}
+        onBookmarkToggle={() => this.handleBookmarkToggle(question.id)}
+        arweaveHref={question.arweaveTxId
+          ? normalizeArweaveUrl(question.arweaveTxId, { contextLabel: 'survey_tool_question_link' })
+          : ''}
+        questionHref={question.id
+          ? buildQuestionRoutePath(question.id, { sessionSlug: this._getEffectiveDraftSlug() })
+          : ''}
+      />
     );
 
     // If the prompt is still masked, do not allow answering (prevents nonsense submits).
@@ -9311,42 +9283,15 @@ export class SurveyQuestions extends Component {
       return (
         <Card key={cardKey} className={styles.fullQuestionCard}>
           <CardBody id={styles.questionTitleBody} className={styles.fullQuestionBody}>
-            <div className={styles.fullQuestionHeader}>
+            <FullQuestionHeader>
               {this.renderPromptWithManualDecrypt(question)}
               {cardIcons}
-            </div>
-            <div
-              className={styles.gatedPromptNotice}
-              role="note"
-              data-testid={E2E_TESTIDS.SURVEY_GATED_PROMPT_NOTICE}
-              data-ce-question-id={String(question.id || '').trim().toLowerCase()}
-            >
-              <FontAwesomeIcon icon={faLock} style={{ marginRight: 8 }} />
-              <span>
-                This question is{' '}
-                <span
-                  id={tooltipId}
-                  data-testid={`ce-gated-prompt-tooltip-${question?.id}`}
-                  className={styles.gatedPromptTooltipTrigger}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  gated
-                  <FontAwesomeIcon
-                    icon={faQuestionCircle}
-                    className={`${styles.tooltip} ${styles.gatedPromptTooltipIcon}`}
-                  />
-                </span>{'. Decrypt the prompt to answer.'}
-              </span>
-            <CETooltip
-              placement="right"
-              trigger="hover focus click"
-              target={tooltipId}
-              className={styles.tooltipBubble}
-              container="body"
-            >
-              {tooltipText}
-            </CETooltip>
-            </div>
+            </FullQuestionHeader>
+            <GatedPromptNotice
+              questionId={question.id}
+              tooltipId={tooltipId}
+              tooltipText={tooltipText}
+            />
             {this.renderQuestionTagDropdownRow(question)}
           </CardBody>
         </Card>
@@ -9391,18 +9336,12 @@ export class SurveyQuestions extends Component {
     const lockTitle = maskedAnswer ? 'Encrypted answer' : (answer.encrypted ? 'Encrypted' : 'Not encrypted');
 
     const footerIcons = (
-      <div className={styles.fullQuestionIcons}>
-        <button
-          type="button"
-          className={`${styles.iconButton} ${styles.commentButton} ${hasAdditionalContent ? styles.iconButtonActive : ''}`}
-          onClick={handleToggleComments}
-          aria-pressed={commentsOpen}
-          title="Additional comments"
-          data-testid={E2E_TESTIDS.SURVEY_ADDITIONAL_TOGGLE}
-          data-ce-question-id={String(question.id || '').trim().toLowerCase()}
-        >
-          <FontAwesomeIcon icon={faComment} className={hasAdditionalContent ? styles.iconGlow : undefined} />
-        </button>
+      <FullQuestionFooterIcons
+        hasAdditionalContent={hasAdditionalContent}
+        commentsOpen={commentsOpen}
+        onToggleComments={handleToggleComments}
+        questionId={question.id}
+      >
         {this.renderAnswerLockControl({
           surveyIndex,
           questionId: question.id,
@@ -9414,7 +9353,7 @@ export class SurveyQuestions extends Component {
           selfAudienceLabel: 'only me',
         })}
         {this.renderQuestionTagDropdown(question)}
-      </div>
+      </FullQuestionFooterIcons>
     );
 
     if (maskedAnswer) {
@@ -9423,24 +9362,21 @@ export class SurveyQuestions extends Component {
       return (
         <Card key={cardKey} className={styles.fullQuestionCard}>
           <CardBody id={styles.questionTitleBody} className={styles.fullQuestionBody}>
-            <div className={styles.fullQuestionHeader}>
+            <FullQuestionHeader>
               {this.renderPromptWithManualDecrypt(question)}
               {cardIcons}
-            </div>
+            </FullQuestionHeader>
 
             <div className={styles.fullQuestionMain}>
               {/* Manual decrypt chip hidden when auto-decrypt is enabled */}
               {!this.state.autoDecryptEnabled && (
-                <div className={styles.decryptChip}>
-                  <Button
-                    onClick={() => this.handleDecryptQuestionAnswer(question.id, 'answer')}
-                    id={styles.decryptQuestionButton}
-                    disabled={this.state.isDecrypting || !allowDecryptAnswer}
-                    title={!allowDecryptAnswer ? decryptTooltip : undefined}
-                  >
-                    {isAnswerDecrypting ? 'Decrypting...' : 'Decrypt Answer'}
-                  </Button>
-                </div>
+                <DecryptActionChip
+                  onClick={() => this.handleDecryptQuestionAnswer(question.id, 'answer')}
+                  disabled={this.state.isDecrypting || !allowDecryptAnswer}
+                  title={!allowDecryptAnswer ? decryptTooltip : undefined}
+                  actionLabel="Decrypt Answer"
+                  busy={isAnswerDecrypting}
+                />
               )}
             </div>
 
@@ -9457,27 +9393,20 @@ export class SurveyQuestions extends Component {
                         importanceValue,
                       })
                     : (
-                      <>
-                        {this.renderConvictionImportanceLabel(question.id, convictionValue, importanceValue)}
-                        <CESlider
-                          min={0}
-                          max={10}
-                          step={1}
-                          value={activeSliderValue}
-                          className={styles.convictionSlider}
-                          tooltip={false}
-                          onChange={(value, event) =>
-                            this.handleConvictionImportanceChange(
-                              surveyIndex,
-                              question.id,
-                              sliderMode,
-                              value,
-                              this.getSliderPersistOptions(event)
-                            )}
-                          onChangeComplete={this.flushDraftPersistAfterSliderChange}
-                          disabled={this.state.isSubmitting}
-                        />
-                      </>
+                      <ConvictionImportanceSliderControl
+                        label={this.renderConvictionImportanceLabel(question.id, convictionValue, importanceValue)}
+                        value={activeSliderValue}
+                        disabled={this.state.isSubmitting}
+                        onChange={(value, event) =>
+                          this.handleConvictionImportanceChange(
+                            surveyIndex,
+                            question.id,
+                            sliderMode,
+                            value,
+                            this.getSliderPersistOptions(event)
+                          )}
+                        onChangeComplete={this.flushDraftPersistAfterSliderChange}
+                      />
                     )
                 ) : ENABLE_IMPORTANCE_SLIDER_TOGGLE ? (
 	                  this.renderBullhornToggleButton({
@@ -9502,16 +9431,13 @@ export class SurveyQuestions extends Component {
                   <>
                     {/* Manual decrypt chip hidden when auto-decrypt is enabled */}
                     {!this.state.autoDecryptEnabled && (
-                      <div className={styles.decryptChip}>
-                        <Button
-                          onClick={() => this.handleDecryptQuestionAnswer(question.id, 'additional')}
-                          id={styles.decryptQuestionButton}
-                          disabled={this.state.isDecrypting || !allowDecryptAdditional}
-                          title={!allowDecryptAdditional ? decryptTooltip : undefined}
-                        >
-                          {isAdditionalDecrypting ? 'Decrypting...' : 'Decrypt Comments'}
-                        </Button>
-                      </div>
+                      <DecryptActionChip
+                        onClick={() => this.handleDecryptQuestionAnswer(question.id, 'additional')}
+                        disabled={this.state.isDecrypting || !allowDecryptAdditional}
+                        title={!allowDecryptAdditional ? decryptTooltip : undefined}
+                        actionLabel="Decrypt Comments"
+                        busy={isAdditionalDecrypting}
+                      />
                     )}
                   </>
                 ) : (
@@ -9549,40 +9475,14 @@ export class SurveyQuestions extends Component {
           const isSingleSelect = isSingleSelectMultichoice(question);
           const selectedValues = normalizeMultichoiceValue(answer.value);
           questionComponent = (
-            <FormGroup id={styles.multiChoice}>
-              {options.map((option, oIndex) => (
-                <Label check key={oIndex} className={`${styles.checkboxOptionText} ${selectedValues.includes(option) ? styles.selected : ''}`}>
-                  <Input
-                    type="checkbox"
-                    name={`question-${question.id}`}
-                    value={option}
-                    onChange={(e) => {
-                      const currentAnswerValue = normalizeMultichoiceValue(
-                        currentSurveyResponseState.answers?.[question.id]?.value
-                      );
-                      let newAnswer = [];
-                      if (isSingleSelect) {
-                        newAnswer = e.target.checked ? [option] : [];
-                      } else {
-                        newAnswer = [...currentAnswerValue];
-                        if (e.target.checked) {
-                          if (!newAnswer.includes(option)) newAnswer.push(option);
-                        } else {
-                          const index = newAnswer.indexOf(option);
-                          if (index > -1) {
-                            newAnswer.splice(index, 1);
-                          }
-                        }
-                      }
-                      this.handleAnswer(surveyIndex, question.id, newAnswer);
-                    }}
-                    checked={selectedValues.includes(option)}
-                    disabled={this.state.isSubmitting}
-                  />
-                  {option}
-                </Label>
-              ))}
-            </FormGroup>
+            <MultichoiceQuestionInput
+              questionId={question.id}
+              options={options}
+              selectedValues={selectedValues}
+              isSingleSelect={isSingleSelect}
+              disabled={this.state.isSubmitting}
+              onChange={(newAnswer) => this.handleAnswer(surveyIndex, question.id, newAnswer)}
+            />
           );
           break;
         }
@@ -9596,56 +9496,30 @@ export class SurveyQuestions extends Component {
                   ratingValue,
                 })
               : (
-                <>
-                  <div className={styles.importanceSlider}>
-                    <CESlider
-                      min={RATING_MIN}
-                      max={RATING_MAX}
-                      step={1}
-                      value={ratingValue}
-                      tooltip={false}
-                      onChange={(ratingAnswer, event) => this.handleAnswer(
-                        surveyIndex,
-                        question.id,
-                        ratingAnswer,
-                        this.getSliderPersistOptions(event)
-                      )}
-                      onChangeComplete={this.flushDraftPersistAfterSliderChange}
-                      className={styles.ratingSlider}
-                      style={{ width: '200px' }}
-                      disabled={this.state.isSubmitting}
-                    />
-                  </div>
-                  <FormText className={styles.ratingLabelText}>
-                    {ratingValue}
-                  </FormText>
-                </>
+                <FullQuestionRatingInput
+                  value={ratingValue}
+                  disabled={this.state.isSubmitting}
+                  onChange={(ratingAnswer, event) => this.handleAnswer(
+                    surveyIndex,
+                    question.id,
+                    ratingAnswer,
+                    this.getSliderPersistOptions(event)
+                  )}
+                  onChangeComplete={this.flushDraftPersistAfterSliderChange}
+                />
               )
           );
           break;
         }
         case 'binary':
           questionComponent = (
-            <FormGroup id={styles.binaryChoice}>
-              {['Agree', 'Unsure', 'Disagree'].map((option, oIndex) => (
-                <Label check key={oIndex} className={`${styles.radioOptionText} ${styles[option.toLowerCase()]} ${answer.value === option ? styles.selected : ''}`}>
-                  <Input
-                    type="radio"
-                    name={`question-${question.id}`}
-                    value={option}
-                    checked={answer.value === option}
-                    onChange={() => this.handleAnswer(surveyIndex, question.id, option)}
-                    onClick={() => {
-                      if (answer.value === option) this.handleAnswer(surveyIndex, question.id, option);
-                    }}
-                    disabled={this.state.isSubmitting}
-                  />
-                  {option === 'Agree' && <FontAwesomeIcon icon={faCheck} className={styles.optionIcon} />}
-                  {option === 'Disagree' && <FontAwesomeIcon icon={faTimes} className={styles.optionIcon} />}
-                  {option}
-                </Label>
-              ))}
-            </FormGroup>
+            <BinaryChoiceInput
+              questionId={question.id}
+              value={answer.value}
+              onChange={(option) => this.handleAnswer(surveyIndex, question.id, option)}
+              disabled={this.state.isSubmitting}
+              showIcons
+            />
           );
           break;
         default: // 'freeform'
@@ -9675,10 +9549,10 @@ export class SurveyQuestions extends Component {
       return (
         <Card key={cardKey} className={styles.fullQuestionCard}>
           <CardBody id={styles.questionTitleBody} className={styles.fullQuestionBody}>
-            <div className={styles.fullQuestionHeader}>
+            <FullQuestionHeader>
               {this.renderPromptWithManualDecrypt(question)}
               {cardIcons}
-            </div>
+            </FullQuestionHeader>
             <div className={styles.fullQuestionMain}>
               <InputGroup id={styles.responseInputSection}>
                 {questionComponent}
@@ -9697,27 +9571,20 @@ export class SurveyQuestions extends Component {
                         importanceValue,
                       })
                     : (
-                      <>
-                        {this.renderConvictionImportanceLabel(question.id, convictionValue, importanceValue)}
-                        <CESlider
-                          min={0}
-                          max={10}
-                          step={1}
-                          value={activeSliderValue}
-                          className={styles.convictionSlider}
-                          tooltip={false}
-                          onChange={(value, event) =>
-                            this.handleConvictionImportanceChange(
-                              surveyIndex,
-                              question.id,
-                              sliderMode,
-                              value,
-                              this.getSliderPersistOptions(event)
-                            )}
-                          onChangeComplete={this.flushDraftPersistAfterSliderChange}
-                          disabled={this.state.isSubmitting}
-                        />
-                      </>
+                      <ConvictionImportanceSliderControl
+                        label={this.renderConvictionImportanceLabel(question.id, convictionValue, importanceValue)}
+                        value={activeSliderValue}
+                        disabled={this.state.isSubmitting}
+                        onChange={(value, event) =>
+                          this.handleConvictionImportanceChange(
+                            surveyIndex,
+                            question.id,
+                            sliderMode,
+                            value,
+                            this.getSliderPersistOptions(event)
+                          )}
+                        onChangeComplete={this.flushDraftPersistAfterSliderChange}
+                      />
                     )
                 ) : ENABLE_IMPORTANCE_SLIDER_TOGGLE ? (
 	                  this.renderBullhornToggleButton({
@@ -9739,16 +9606,13 @@ export class SurveyQuestions extends Component {
               <div className={styles.fullQuestionComments}>
                 {/* Manual decrypt chip hidden when auto-decrypt is enabled */}
                 {!this.state.autoDecryptEnabled && (
-                  <div className={styles.decryptChip}>
-                    <Button
-                      onClick={() => this.handleDecryptQuestionAnswer(question.id, 'additional')}
-                      id={styles.decryptQuestionButton}
-                      disabled={this.state.isDecrypting || !allowDecryptAdditional}
-                      title={!allowDecryptAdditional ? decryptTooltip : undefined}
-                    >
-                      {isAdditionalDecrypting ? 'Decrypting...' : 'Decrypt Comments'}
-                    </Button>
-                  </div>
+                  <DecryptActionChip
+                    onClick={() => this.handleDecryptQuestionAnswer(question.id, 'additional')}
+                    disabled={this.state.isDecrypting || !allowDecryptAdditional}
+                    title={!allowDecryptAdditional ? decryptTooltip : undefined}
+                    actionLabel="Decrypt Comments"
+                    busy={isAdditionalDecrypting}
+                  />
                 )}
               </div>
             )}
@@ -9763,40 +9627,14 @@ export class SurveyQuestions extends Component {
           const isSingleSelect = isSingleSelectMultichoice(question);
           const selectedValues = normalizeMultichoiceValue(answer.value);
           questionComponent = (
-            <FormGroup id={styles.multiChoice}>
-              {options.map((option, oIndex) => (
-                <Label check key={oIndex} className={`${styles.checkboxOptionText} ${selectedValues.includes(option) ? styles.selected : ''}`}>
-                  <Input
-                    type="checkbox"
-                    name={`question-${question.id}`}
-                    value={option}
-                    onChange={(e) => {
-                      const currentAnswerValue = normalizeMultichoiceValue(
-                        currentSurveyResponseState.answers?.[question.id]?.value
-                      );
-                      let newAnswer = [];
-                      if (isSingleSelect) {
-                        newAnswer = e.target.checked ? [option] : [];
-                      } else {
-                        newAnswer = [...currentAnswerValue];
-                        if (e.target.checked) {
-                          if (!newAnswer.includes(option)) newAnswer.push(option);
-                        } else {
-                          const index = newAnswer.indexOf(option);
-                          if (index > -1) {
-                            newAnswer.splice(index, 1);
-                          }
-                        }
-                      }
-                      this.handleAnswer(surveyIndex, question.id, newAnswer);
-                    }}
-                    checked={selectedValues.includes(option)}
-                    disabled={this.state.isSubmitting}
-                  />
-                  {option}
-                </Label>
-              ))}
-            </FormGroup>
+            <MultichoiceQuestionInput
+              questionId={question.id}
+              options={options}
+              selectedValues={selectedValues}
+              isSingleSelect={isSingleSelect}
+              disabled={this.state.isSubmitting}
+              onChange={(newAnswer) => this.handleAnswer(surveyIndex, question.id, newAnswer)}
+            />
           );
           break;
         }
@@ -9810,56 +9648,30 @@ export class SurveyQuestions extends Component {
                   ratingValue,
                 })
               : (
-                <>
-                  <div className={styles.importanceSlider}>
-                    <CESlider
-                      min={RATING_MIN}
-                      max={RATING_MAX}
-                      step={1}
-                      value={ratingValue}
-                      tooltip={false}
-                      onChange={(ratingAnswer, event) => this.handleAnswer(
-                        surveyIndex,
-                        question.id,
-                        ratingAnswer,
-                        this.getSliderPersistOptions(event)
-                      )}
-                      onChangeComplete={this.flushDraftPersistAfterSliderChange}
-                      className={styles.ratingSlider}
-                      style={{ width: '200px' }}
-                      disabled={this.state.isSubmitting}
-                    />
-                  </div>
-                  <FormText className={styles.ratingLabelText}>
-                    {ratingValue}
-                  </FormText>
-                </>
+                <FullQuestionRatingInput
+                  value={ratingValue}
+                  disabled={this.state.isSubmitting}
+                  onChange={(ratingAnswer, event) => this.handleAnswer(
+                    surveyIndex,
+                    question.id,
+                    ratingAnswer,
+                    this.getSliderPersistOptions(event)
+                  )}
+                  onChangeComplete={this.flushDraftPersistAfterSliderChange}
+                />
               )
           );
           break;
         }
         case 'binary':
           questionComponent = (
-            <FormGroup id={styles.binaryChoice}>
-              {['Agree', 'Unsure', 'Disagree'].map((option, oIndex) => (
-                <Label check key={oIndex} className={`${styles.radioOptionText} ${styles[option.toLowerCase()]} ${answer.value === option ? styles.selected : ''}`}>
-                  <Input
-                    type="radio"
-                    name={`question-${question.id}`}
-                    value={option}
-                    checked={answer.value === option}
-                    onChange={() => this.handleAnswer(surveyIndex, question.id, option)}
-                    onClick={() => {
-                      if (answer.value === option) this.handleAnswer(surveyIndex, question.id, option);
-                    }}
-                    disabled={this.state.isSubmitting}
-                  />
-                  {option === 'Agree' && <FontAwesomeIcon icon={faCheck} className={styles.optionIcon} />}
-                  {option === 'Disagree' && <FontAwesomeIcon icon={faTimes} className={styles.optionIcon} />}
-                  {option}
-                </Label>
-              ))}
-            </FormGroup>
+            <BinaryChoiceInput
+              questionId={question.id}
+              value={answer.value}
+              onChange={(option) => this.handleAnswer(surveyIndex, question.id, option)}
+              disabled={this.state.isSubmitting}
+              showIcons
+            />
           );
           break;
         default: // 'freeform'
@@ -9889,10 +9701,10 @@ export class SurveyQuestions extends Component {
       return (
         <Card key={cardKey} className={styles.fullQuestionCard}>
           <CardBody id={styles.questionTitleBody} className={styles.fullQuestionBody}>
-            <div className={styles.fullQuestionHeader}>
+            <FullQuestionHeader>
               {this.renderPromptWithManualDecrypt(question)}
               {cardIcons}
-            </div>
+            </FullQuestionHeader>
             <div className={styles.fullQuestionMain}>
               <InputGroup id={styles.responseInputSection}>
                 {questionComponent}
@@ -9911,27 +9723,20 @@ export class SurveyQuestions extends Component {
                         importanceValue,
                       })
                     : (
-                      <>
-                        {this.renderConvictionImportanceLabel(question.id, convictionValue, importanceValue)}
-                        <CESlider
-                          min={0}
-                          max={10}
-                          step={1}
-                          value={activeSliderValue}
-                          className={styles.convictionSlider}
-                          tooltip={false}
-                          onChange={(value, event) =>
-                            this.handleConvictionImportanceChange(
-                              surveyIndex,
-                              question.id,
-                              sliderMode,
-                              value,
-                              this.getSliderPersistOptions(event)
-                            )}
-                          onChangeComplete={this.flushDraftPersistAfterSliderChange}
-                          disabled={this.state.isSubmitting}
-                        />
-                      </>
+                      <ConvictionImportanceSliderControl
+                        label={this.renderConvictionImportanceLabel(question.id, convictionValue, importanceValue)}
+                        value={activeSliderValue}
+                        disabled={this.state.isSubmitting}
+                        onChange={(value, event) =>
+                          this.handleConvictionImportanceChange(
+                            surveyIndex,
+                            question.id,
+                            sliderMode,
+                            value,
+                            this.getSliderPersistOptions(event)
+                          )}
+                        onChangeComplete={this.flushDraftPersistAfterSliderChange}
+                      />
                     )
                 ) : ENABLE_IMPORTANCE_SLIDER_TOGGLE ? (
 	                  this.renderBullhornToggleButton({
@@ -15040,38 +14845,11 @@ class PileViewMode extends SurveyQuestions {
             <div className={styles.pileCardHeader}>
               {this.renderPromptWithManualDecrypt(question)}
             </div>
-            <div
-              className={styles.gatedPromptNotice}
-              role="note"
-              data-testid={E2E_TESTIDS.SURVEY_GATED_PROMPT_NOTICE}
-              data-ce-question-id={String(question.id || '').trim().toLowerCase()}
-            >
-              <FontAwesomeIcon icon={faLock} style={{ marginRight: 8 }} />
-              <span>
-                This question is{' '}
-                <span
-                  id={tooltipId}
-                  data-testid={`ce-gated-prompt-tooltip-${question?.id}`}
-                  className={styles.gatedPromptTooltipTrigger}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  gated
-                  <FontAwesomeIcon
-                    icon={faQuestionCircle}
-                    className={`${styles.tooltip} ${styles.gatedPromptTooltipIcon}`}
-                  />
-                </span>{'. Decrypt the prompt to answer.'}
-              </span>
-            <CETooltip
-              placement="right"
-              trigger="hover focus click"
-              target={tooltipId}
-              className={styles.tooltipBubble}
-              container="body"
-            >
-              {tooltipText}
-            </CETooltip>
-            </div>
+            <GatedPromptNotice
+              questionId={question.id}
+              tooltipId={tooltipId}
+              tooltipText={tooltipText}
+            />
           </CardBody>
         </Card>
       );
@@ -15114,23 +14892,19 @@ class PileViewMode extends SurveyQuestions {
         <div style={{ marginBottom: 8 }}>
           {/* Manual decrypt chip hidden when auto-decrypt is enabled */}
           {this.state.autoDecryptEnabled ? (
-            isAnswerDecrypting ? (
-              <div className={styles.decryptChip}>
-                <FontAwesomeIcon icon={faSpinner} spin style={{ marginRight: 8 }} />
-                <span>Decrypting...</span>
-              </div>
-            ) : null
+            <DecryptActionChip
+              spinnerOnly
+              busy={isAnswerDecrypting}
+              actionLabel="Decrypt Answer"
+            />
           ) : (
-            <div className={styles.decryptChip}>
-              <Button
-                onClick={() => this.handleDecryptQuestionAnswer(question.id, 'answer')}
-                id={styles.decryptQuestionButton}
-                disabled={this.state.isDecrypting || !allowDecryptAnswer}
-                title={!allowDecryptAnswer ? decryptTooltip : undefined}
-              >
-                {isAnswerDecrypting ? 'Decrypting...' : 'Decrypt Answer'}
-              </Button>
-            </div>
+            <DecryptActionChip
+              onClick={() => this.handleDecryptQuestionAnswer(question.id, 'answer')}
+              disabled={this.state.isDecrypting || !allowDecryptAnswer}
+              title={!allowDecryptAnswer ? decryptTooltip : undefined}
+              actionLabel="Decrypt Answer"
+              busy={isAnswerDecrypting}
+            />
           )}
         </div>
       );
@@ -15138,30 +14912,13 @@ class PileViewMode extends SurveyQuestions {
       switch (question.type) {
         case 'binary':
           questionComponent = (
-            <FormGroup id={styles.binaryChoice}>
-              {['Agree', 'Unsure', 'Disagree'].map((option) => (
-                <Label
-                  key={option}
-                  check
-                  className={`${styles.radioOptionText} ${styles[option.toLowerCase()]} ${
-                    answer.value === option ? styles.selected : ''
-                  }`}
-                >
-                  <Input
-                    type="radio"
-                    name={`q-${question.id}`}
-                    value={option}
-                    checked={answer.value === option}
-                    onChange={() => this.handleAnswerPile(question.id, option)}
-                    onClick={() => {
-                      if (answer.value === option) this.handleAnswerPile(question.id, option);
-                    }}
-                    disabled={this.state.isSubmitting}
-                  />
-                  {option}
-                </Label>
-              ))}
-            </FormGroup>
+            <BinaryChoiceInput
+              questionId={question.id}
+              value={answer.value}
+              inputNamePrefix="q"
+              onChange={(option) => this.handleAnswerPile(question.id, option)}
+              disabled={this.state.isSubmitting}
+            />
           );
           break;
 
@@ -15170,38 +14927,14 @@ class PileViewMode extends SurveyQuestions {
           const isSingleSelect = isSingleSelectMultichoice(question);
           const selectedValues = normalizeMultichoiceValue(answer.value);
           questionComponent = (
-            <FormGroup id={styles.multiChoice}>
-              {options.map((opt, i) => (
-                <Label check key={i} className={`${styles.checkboxOptionText} ${selectedValues.includes(opt) ? styles.selected : ''}`}>
-                  <Input
-                    type="checkbox"
-                    name={`question-${question.id}`}
-                    value={opt}
-                    onChange={(e) => {
-                      const currentAnswerValue = normalizeMultichoiceValue(
-                        slice.answers?.[question.id]?.value
-                      );
-                      let next = [];
-                      if (isSingleSelect) {
-                        next = e.target.checked ? [opt] : [];
-                      } else {
-                        next = [...currentAnswerValue];
-                        if (e.target.checked) {
-                          if (!next.includes(opt)) next.push(opt);
-                        } else {
-                          const idx = next.indexOf(opt);
-                          if (idx > -1) next.splice(idx, 1);
-                        }
-                      }
-                      this.handleAnswerPile(question.id, next);
-                    }}
-                    checked={selectedValues.includes(opt)}
-                    disabled={this.state.isSubmitting}
-                  />
-                  {opt}
-                </Label>
-              ))}
-            </FormGroup>
+            <MultichoiceQuestionInput
+              questionId={question.id}
+              options={options}
+              selectedValues={selectedValues}
+              isSingleSelect={isSingleSelect}
+              disabled={this.state.isSubmitting}
+              onChange={(nextValues) => this.handleAnswerPile(question.id, nextValues)}
+            />
           );
           break;
         }
@@ -15274,27 +15007,20 @@ class PileViewMode extends SurveyQuestions {
             <div className={styles.pileControlsRow}>
               <div className={styles.importanceSlider}>
                 {showConviction[question.id] ? (
-                  <>
-                    {this.renderConvictionImportanceLabel(question.id, convictionValue, importanceValue)}
-                    <CESlider
-                      min={0}
-                      max={10}
-                      step={1}
-                      value={activeSliderValue}
-                      className={styles.convictionSlider}
-                      tooltip={false}
-                      onChange={(value, event) =>
-                        this.handleConvictionImportanceChange(
-                          0,
-                          question.id,
-                          sliderMode,
-                          value,
-                          this.getSliderPersistOptions(event)
-                        )}
-                      onChangeComplete={this.flushDraftPersistAfterSliderChange}
-                      disabled={this.state.isSubmitting}
-                    />
-                  </>
+                  <ConvictionImportanceSliderControl
+                    label={this.renderConvictionImportanceLabel(question.id, convictionValue, importanceValue)}
+                    value={activeSliderValue}
+                    disabled={this.state.isSubmitting}
+                    onChange={(value, event) =>
+                      this.handleConvictionImportanceChange(
+                        0,
+                        question.id,
+                        sliderMode,
+                        value,
+                        this.getSliderPersistOptions(event)
+                      )}
+                    onChangeComplete={this.flushDraftPersistAfterSliderChange}
+                  />
                 ) : (
 	                  ENABLE_IMPORTANCE_SLIDER_TOGGLE ? (
 	                    this.renderBullhornToggleButton({
@@ -15340,25 +15066,21 @@ class PileViewMode extends SurveyQuestions {
               <div className={styles.pileCommentsRow}>
                 {isAdditionalEncrypted ? (
                   this.state.autoDecryptEnabled ? (
-                    isAdditionalDecrypting ? (
-                      <div className={styles.decryptChip}>
-                        <FontAwesomeIcon icon={faSpinner} spin style={{ marginRight: 8 }} />
-                        <span>Decrypting...</span>
-                      </div>
-                    ) : null
+                    <DecryptActionChip
+                      spinnerOnly
+                      busy={isAdditionalDecrypting}
+                      actionLabel="Decrypt Comments"
+                    />
                   ) : (
-                    <div className={styles.decryptChip}>
-                      <Button
-                        onClick={() =>
-                          this.handleDecryptQuestionAnswer(question.id, 'additional')
-                        }
-                        id={styles.decryptQuestionButton}
-                        disabled={this.state.isDecrypting || !allowDecryptAdditional}
-                        title={!allowDecryptAdditional ? decryptTooltip : undefined}
-                      >
-                        {isAdditionalDecrypting ? 'Decrypting...' : 'Decrypt Comments'}
-                      </Button>
-                    </div>
+                    <DecryptActionChip
+                      onClick={() =>
+                        this.handleDecryptQuestionAnswer(question.id, 'additional')
+                      }
+                      disabled={this.state.isDecrypting || !allowDecryptAdditional}
+                      title={!allowDecryptAdditional ? decryptTooltip : undefined}
+                      actionLabel="Decrypt Comments"
+                      busy={isAdditionalDecrypting}
+                    />
                   )
                 ) : (
                   <div className={styles.pileAdditionalEditor}>
