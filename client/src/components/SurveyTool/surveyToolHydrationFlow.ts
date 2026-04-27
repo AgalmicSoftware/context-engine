@@ -49,12 +49,130 @@ type BuildCacheHydrationSliceArgs = {
   parseValue?: ((value: unknown) => unknown) | null;
 };
 
+type BuildPrefilledSurveyStateArgs = {
+  surveyIndex?: unknown;
+  prevSurveysResponseState?: unknown[] | null;
+  prevEditBaseline?: ResponseSlice | null;
+  isDirty?: boolean;
+  submissionComplete?: boolean;
+  responses?: unknown[];
+  applyResponseHydrationListToSlice?: ((args: {
+    targetSlice?: ResponseSlice | null;
+    currentSlice?: ResponseSlice | null;
+    responses?: unknown[];
+    allowOverwrite?: boolean;
+  }) => boolean) | null;
+  buildSliceFromUserAnswers?: ((userAnswers: unknown, prevSlice?: ResponseSlice | null) => ResponseSlice | null) | null;
+};
+
+type DraftAwareCacheHydrationStateArgs = {
+  cachedAnswer?: unknown;
+  cachedAdditional?: unknown;
+  draftEntry?: unknown;
+  currentAnswer?: unknown;
+  currentAdditional?: unknown;
+  baselineAnswer?: unknown;
+  baselineAdditional?: unknown;
+  areEnvelopesEquivalent?: ((incomingEnvelope: unknown, currentEnvelope: unknown, incomingEncrypted?: unknown, currentEncrypted?: unknown) => boolean) | null;
+};
+
+type LocalCacheHydrationApplyArgs = {
+  targetSlice?: ResponseSlice | null;
+  questionId?: string;
+  cachedAnswer?: unknown;
+  cachedAdditional?: unknown;
+  cachedImportance?: unknown;
+  cachedConviction?: unknown;
+  allowMaskedAnswerDraftEmpty?: boolean;
+  allowMaskedAdditionalDraftEmpty?: boolean;
+  debugLabel?: string;
+};
+
+type BuildLocalCacheRehydrationStateArgs = {
+  renderedQuestionIds?: Iterable<unknown> | unknown[];
+  baseSlice?: ResponseSlice | null;
+  prevBaseline?: ResponseSlice | null;
+  cacheSlice?: ResponseSlice | null;
+  draftAnswersByQuestionId?: Record<string, unknown> | null;
+  cloneBaseline?: ((baseline: ResponseSlice | null | undefined) => ResponseSlice) | null;
+  buildDraftAwareCacheHydrationState?: ((args: DraftAwareCacheHydrationStateArgs) => {
+    effectiveAnswerState?: unknown;
+    effectiveAdditionalState?: unknown;
+    canReplaceMaskedAnswerWithDraftEmpty?: boolean;
+    canReplaceMaskedAdditionalWithDraftEmpty?: boolean;
+    canReplaceMaskedBaselineAnswerWithDraftEmpty?: boolean;
+    canReplaceMaskedBaselineAdditionalWithDraftEmpty?: boolean;
+  }) | null;
+  applyLocalCacheHydrationEntryToSlice?: ((args: LocalCacheHydrationApplyArgs) => boolean) | null;
+  debugLabel?: string;
+};
+
 const buildEmptyResponseSlice = (): ResponseSlice => ({
   answers: {},
   importance: {},
   conviction: {},
   additionalComments: {},
 });
+
+const isRecord = (value: unknown): value is UnknownRecord => (
+  !!value && typeof value === 'object' && !Array.isArray(value)
+);
+
+const resolveDraftAwareCachedField = ({
+  cachedField = null,
+  draftValue = undefined,
+  draftEncrypted = undefined,
+  draftEnvelope = '',
+  areEnvelopesEquivalent = null,
+}: {
+  cachedField?: unknown;
+  draftValue?: unknown;
+  draftEncrypted?: unknown;
+  draftEnvelope?: unknown;
+  areEnvelopesEquivalent?: ((incomingEnvelope: unknown, currentEnvelope: unknown, incomingEncrypted?: unknown, currentEncrypted?: unknown) => boolean) | null;
+}) => {
+  const nextCachedField = isRecord(cachedField) ? cachedField : null;
+  if (
+    nextCachedField &&
+    nextCachedField.value === '*' &&
+    draftValue === '' &&
+    typeof areEnvelopesEquivalent === 'function' &&
+    areEnvelopesEquivalent(
+      String(draftEnvelope || ''),
+      String(nextCachedField.encryptedPortion || ''),
+      draftEncrypted,
+      nextCachedField.encrypted,
+    )
+  ) {
+    return { ...nextCachedField, value: '' };
+  }
+  return nextCachedField;
+};
+
+const canReplaceMaskedFieldWithDraftEmpty = ({
+  currentField = null,
+  effectiveCachedField = null,
+  areEnvelopesEquivalent = null,
+}: {
+  currentField?: unknown;
+  effectiveCachedField?: unknown;
+  areEnvelopesEquivalent?: ((incomingEnvelope: unknown, currentEnvelope: unknown, incomingEncrypted?: unknown, currentEncrypted?: unknown) => boolean) | null;
+}) => {
+  const nextCurrentField = isRecord(currentField) ? currentField : null;
+  const nextEffectiveField = isRecord(effectiveCachedField) ? effectiveCachedField : null;
+  return !!(
+    nextEffectiveField &&
+    nextEffectiveField.value === '' &&
+    nextCurrentField?.value === '*' &&
+    typeof areEnvelopesEquivalent === 'function' &&
+    areEnvelopesEquivalent(
+      nextCurrentField.encryptedPortion,
+      nextEffectiveField.encryptedPortion,
+      nextCurrentField.encrypted,
+      nextEffectiveField.encrypted,
+    )
+  );
+};
 
 export const buildDraftHydrationState = ({
   renderedQuestionIds = [],
@@ -156,4 +274,202 @@ export const buildCacheHydrationSlice = ({
   });
 
   return { slice, changed };
+};
+
+export const buildPrefilledSurveyState = ({
+  surveyIndex = 0,
+  prevSurveysResponseState = null,
+  prevEditBaseline = null,
+  isDirty = false,
+  submissionComplete = false,
+  responses = [],
+  applyResponseHydrationListToSlice = null,
+  buildSliceFromUserAnswers = null,
+}: BuildPrefilledSurveyStateArgs = {}) => {
+  const normalizedSurveyIndex = Math.max(0, Number(surveyIndex) || 0);
+  const currentStateArr = Array.isArray(prevSurveysResponseState) ? prevSurveysResponseState : [];
+  const currentSlice = currentStateArr[normalizedSurveyIndex] && typeof currentStateArr[normalizedSurveyIndex] === 'object'
+    ? currentStateArr[normalizedSurveyIndex] as ResponseSlice
+    : buildEmptyResponseSlice();
+  const allowOverwrite = !isDirty && !submissionComplete;
+
+  const nextSurveysResponseState = [...currentStateArr];
+  while (nextSurveysResponseState.length <= normalizedSurveyIndex) {
+    nextSurveysResponseState.push(buildEmptyResponseSlice());
+  }
+
+  const targetSeed = nextSurveysResponseState[normalizedSurveyIndex] && typeof nextSurveysResponseState[normalizedSurveyIndex] === 'object'
+    ? nextSurveysResponseState[normalizedSurveyIndex] as ResponseSlice
+    : buildEmptyResponseSlice();
+  const nextSlice: ResponseSlice = {
+    answers: { ...((targetSeed.answers as Record<string, unknown>) || {}) },
+    importance: { ...((targetSeed.importance as Record<string, unknown>) || {}) },
+    conviction: { ...((targetSeed.conviction as Record<string, unknown>) || {}) },
+    additionalComments: { ...((targetSeed.additionalComments as Record<string, unknown>) || {}) },
+  };
+
+  if (typeof applyResponseHydrationListToSlice === 'function') {
+    applyResponseHydrationListToSlice({
+      targetSlice: nextSlice,
+      currentSlice,
+      responses,
+      allowOverwrite,
+    });
+  }
+
+  nextSurveysResponseState[normalizedSurveyIndex] = nextSlice;
+  const baseline = typeof buildSliceFromUserAnswers === 'function'
+    ? buildSliceFromUserAnswers({ responses }, prevEditBaseline || currentSlice)
+    : null;
+
+  return {
+    nextSurveysResponseState,
+    nextBaseline: baseline,
+    shouldWriteBaseline: !submissionComplete,
+  };
+};
+
+export const buildDraftAwareCacheHydrationState = ({
+  cachedAnswer = null,
+  cachedAdditional = null,
+  draftEntry = null,
+  currentAnswer = null,
+  currentAdditional = null,
+  baselineAnswer = null,
+  baselineAdditional = null,
+  areEnvelopesEquivalent = null,
+}: DraftAwareCacheHydrationStateArgs = {}) => {
+  const nextDraftEntry = isRecord(draftEntry) ? draftEntry : {};
+  const effectiveAnswerState = resolveDraftAwareCachedField({
+    cachedField: cachedAnswer,
+    draftValue: nextDraftEntry.value,
+    draftEncrypted: nextDraftEntry.answerEncrypted,
+    draftEnvelope: nextDraftEntry.answerEncryptedPortion,
+    areEnvelopesEquivalent,
+  });
+  const effectiveAdditionalState = resolveDraftAwareCachedField({
+    cachedField: cachedAdditional,
+    draftValue: nextDraftEntry.additional,
+    draftEncrypted: nextDraftEntry.additionalEncrypted,
+    draftEnvelope: nextDraftEntry.additionalEncryptedPortion,
+    areEnvelopesEquivalent,
+  });
+
+  return {
+    effectiveAnswerState,
+    effectiveAdditionalState,
+    canReplaceMaskedAnswerWithDraftEmpty: canReplaceMaskedFieldWithDraftEmpty({
+      currentField: currentAnswer,
+      effectiveCachedField: effectiveAnswerState,
+      areEnvelopesEquivalent,
+    }),
+    canReplaceMaskedAdditionalWithDraftEmpty: canReplaceMaskedFieldWithDraftEmpty({
+      currentField: currentAdditional,
+      effectiveCachedField: effectiveAdditionalState,
+      areEnvelopesEquivalent,
+    }),
+    canReplaceMaskedBaselineAnswerWithDraftEmpty: canReplaceMaskedFieldWithDraftEmpty({
+      currentField: baselineAnswer,
+      effectiveCachedField: effectiveAnswerState,
+      areEnvelopesEquivalent,
+    }),
+    canReplaceMaskedBaselineAdditionalWithDraftEmpty: canReplaceMaskedFieldWithDraftEmpty({
+      currentField: baselineAdditional,
+      effectiveCachedField: effectiveAdditionalState,
+      areEnvelopesEquivalent,
+    }),
+  };
+};
+
+export const buildLocalCacheRehydrationState = ({
+  renderedQuestionIds = [],
+  baseSlice = null,
+  prevBaseline = null,
+  cacheSlice = null,
+  draftAnswersByQuestionId = null,
+  cloneBaseline = null,
+  buildDraftAwareCacheHydrationState: buildDraftAwareState = null,
+  applyLocalCacheHydrationEntryToSlice = null,
+  debugLabel = '',
+}: BuildLocalCacheRehydrationStateArgs = {}) => {
+  const normalizedBaseSlice = baseSlice && typeof baseSlice === 'object' ? baseSlice : buildEmptyResponseSlice();
+  const nextSlice: ResponseSlice = {
+    answers: { ...((normalizedBaseSlice.answers as Record<string, unknown>) || {}) },
+    importance: { ...((normalizedBaseSlice.importance as Record<string, unknown>) || {}) },
+    conviction: { ...((normalizedBaseSlice.conviction as Record<string, unknown>) || {}) },
+    additionalComments: { ...((normalizedBaseSlice.additionalComments as Record<string, unknown>) || {}) },
+  };
+  const nextBaseline: ResponseSlice = typeof cloneBaseline === 'function'
+    ? cloneBaseline(prevBaseline && typeof prevBaseline === 'object' ? prevBaseline : buildEmptyResponseSlice())
+    : buildEmptyResponseSlice();
+  const cache = cacheSlice && typeof cacheSlice === 'object' ? cacheSlice : buildEmptyResponseSlice();
+  const draftMap = draftAnswersByQuestionId && typeof draftAnswersByQuestionId === 'object'
+    ? draftAnswersByQuestionId
+    : {};
+
+  let changed = false;
+  let baselineChanged = false;
+
+  Array.from(renderedQuestionIds || []).forEach((rawQuestionId) => {
+    const questionId = normalizeQuestionIdKey(rawQuestionId);
+    if (!questionId || typeof buildDraftAwareState !== 'function' || typeof applyLocalCacheHydrationEntryToSlice !== 'function') return;
+
+    const cachedAnswer = (cache.answers && typeof cache.answers === 'object') ? cache.answers[questionId] : null;
+    const cachedAdditional = (cache.additionalComments && typeof cache.additionalComments === 'object')
+      ? cache.additionalComments[questionId]
+      : null;
+    const cachedImportance = (cache.importance && typeof cache.importance === 'object') ? cache.importance[questionId] : undefined;
+    const cachedConviction = (cache.conviction && typeof cache.conviction === 'object') ? cache.conviction[questionId] : undefined;
+
+    const {
+      effectiveAnswerState,
+      effectiveAdditionalState,
+      canReplaceMaskedAnswerWithDraftEmpty = false,
+      canReplaceMaskedAdditionalWithDraftEmpty = false,
+      canReplaceMaskedBaselineAnswerWithDraftEmpty = false,
+      canReplaceMaskedBaselineAdditionalWithDraftEmpty = false,
+    } = buildDraftAwareState({
+      cachedAnswer,
+      cachedAdditional,
+      draftEntry: draftMap[questionId],
+      currentAnswer: nextSlice.answers?.[questionId],
+      currentAdditional: nextSlice.additionalComments?.[questionId],
+      baselineAnswer: nextBaseline.answers?.[questionId],
+      baselineAdditional: nextBaseline.additionalComments?.[questionId],
+    });
+
+    if (applyLocalCacheHydrationEntryToSlice({
+      targetSlice: nextSlice,
+      questionId,
+      cachedAnswer: effectiveAnswerState,
+      cachedAdditional: effectiveAdditionalState,
+      cachedImportance,
+      cachedConviction,
+      allowMaskedAnswerDraftEmpty: canReplaceMaskedAnswerWithDraftEmpty,
+      allowMaskedAdditionalDraftEmpty: canReplaceMaskedAdditionalWithDraftEmpty,
+      debugLabel,
+    })) {
+      changed = true;
+    }
+
+    if (applyLocalCacheHydrationEntryToSlice({
+      targetSlice: nextBaseline,
+      questionId,
+      cachedAnswer: effectiveAnswerState,
+      cachedAdditional: effectiveAdditionalState,
+      cachedImportance,
+      cachedConviction,
+      allowMaskedAnswerDraftEmpty: canReplaceMaskedBaselineAnswerWithDraftEmpty,
+      allowMaskedAdditionalDraftEmpty: canReplaceMaskedBaselineAdditionalWithDraftEmpty,
+    })) {
+      baselineChanged = true;
+    }
+  });
+
+  return {
+    nextSlice,
+    nextBaseline,
+    changed,
+    baselineChanged,
+  };
 };
