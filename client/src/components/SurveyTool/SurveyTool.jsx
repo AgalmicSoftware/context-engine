@@ -5386,14 +5386,11 @@ export class SurveyQuestions extends Component {
       const updates = {};
 
       if (changed) {
-        const arr = Array.isArray(this.state.surveysResponseState)
-          ? [...this.state.surveysResponseState]
-          : [];
-        while (arr.length <= surveyIndex) {
-          arr.push({ answers: {}, importance: {}, conviction: {}, additionalComments: {} });
-        }
-        arr[surveyIndex] = nextSlice;
-        updates.surveysResponseState = arr;
+        updates.surveysResponseState = buildSurveyResponseStateArray({
+          prevSurveysResponseState: this.state.surveysResponseState,
+          surveyIndex,
+          nextSlice,
+        });
       }
       if (baselineChanged) {
         updates.editBaseline = nextBaseline;
@@ -5570,13 +5567,15 @@ export class SurveyQuestions extends Component {
       });
 
       // 3) Apply slice; do not overwrite editBaseline; reset pending flags
-      const arr = Array.isArray(this.state.surveysResponseState) ? [...this.state.surveysResponseState] : [];
-      while (arr.length <= surveyIndex) arr.push({ answers: {}, importance: {}, conviction: {}, additionalComments: {} });
-      arr[surveyIndex] = nextSlice;
+      const nextSurveysResponseState = buildSurveyResponseStateArray({
+        prevSurveysResponseState: this.state.surveysResponseState,
+        surveyIndex,
+        nextSlice,
+      });
 
       this.setState(
         {
-          surveysResponseState: arr,
+          surveysResponseState: nextSurveysResponseState,
           isEditing: true,
           displayAnswerMode: false,
           startFresh: !isLoggedIn,
@@ -6672,11 +6671,11 @@ export class SurveyQuestions extends Component {
       // importance deliberately omitted
     });
 
-    const nextArr = Array.isArray(this.state.surveysResponseState)
-      ? [...this.state.surveysResponseState]
-      : [];
-    while (nextArr.length <= surveyIndex) nextArr.push({ answers: {}, importance: {}, conviction: {}, additionalComments: {} });
-    nextArr[surveyIndex] = emptySlice;
+    const nextArr = buildSurveyResponseStateArray({
+      prevSurveysResponseState: this.state.surveysResponseState,
+      surveyIndex,
+      nextSlice: emptySlice,
+    });
 
     this.setState({
       suppressPrefill: true,
