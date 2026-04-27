@@ -1,7 +1,10 @@
 import React from 'react';
 import { FormText } from 'reactstrap';
 import CESlider from '../Shared/CESlider';
-import { RATING_MAX, RATING_MIN } from '../../utilities/survey/ratingValue.js';
+import {
+  RATING_MAX,
+  RATING_MIN,
+} from '../../utilities/survey/ratingValue.js';
 import styles from './SurveyTool.module.scss';
 
 type FullQuestionRatingInputProps = {
@@ -10,10 +13,6 @@ type FullQuestionRatingInputProps = {
   onChange?: ((nextValue: number, event?: unknown) => void) | null;
   onChangeComplete?: ((event?: unknown) => void) | null;
 };
-
-export const resolveFullQuestionRatingSliderStyle = (): React.CSSProperties => ({
-  width: '200px',
-});
 
 const FullQuestionRatingInput = ({
   value = 0,
@@ -36,11 +35,13 @@ const FullQuestionRatingInput = ({
           if (typeof onChangeComplete === 'function') onChangeComplete(event);
         }}
         className={styles.ratingSlider}
-        style={resolveFullQuestionRatingSliderStyle()}
+        style={{ width: '200px' }}
         disabled={disabled}
       />
     </div>
-    <FormText className={styles.ratingLabelText}>{value}</FormText>
+    <FormText className={styles.ratingLabelText}>
+      {value}
+    </FormText>
   </>
 );
 

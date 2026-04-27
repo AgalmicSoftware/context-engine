@@ -20,12 +20,20 @@ const SurveyQuestionTagControl = ({
   if (!getQuestionTagDisplayList(tags).length) return null;
 
   const dropdown = (
-    <QuestionTagDropdown tags={tags} sessionSlug={sessionSlug} onTagSelect={useTagModal ? onTagSelect : null} />
+    <QuestionTagDropdown
+      tags={tags}
+      sessionSlug={sessionSlug}
+      onTagSelect={useTagModal ? onTagSelect : null}
+    />
   );
 
   if (!rowStyle) return dropdown;
 
-  return <div style={rowStyle}>{dropdown}</div>;
+  return (
+    <div style={rowStyle}>
+      {dropdown}
+    </div>
+  );
 };
 
 export default SurveyQuestionTagControl;

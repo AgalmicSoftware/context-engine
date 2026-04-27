@@ -4,14 +4,24 @@ import {
 } from './SurveySelector';
 import BullhornToggleButton from './BullhornToggleButton';
 import DeferredRatingSlider from './DeferredRatingSlider';
+import FullQuestionRatingInput from './FullQuestionRatingInput';
+import SurveyQuestionTagControl from './SurveyQuestionTagControl';
 import { DeferredCommitSlider as DirectDeferredCommitSlider } from './DeferredCommitSlider';
 import {
-  buildCanDecryptContext,
-  evaluateCanDecryptPreCheck,
-  resolveCanDecryptGateAccess,
-} from './surveyToolCanDecryptController';
-import { buildCanDecryptOtherResponsesState } from './surveyQuestionsTypes.js';
-import { buildGatedPromptNoticeState } from './surveyToolViewState';
+  computeSubmitLabel as directComputeSubmitLabel,
+  normalizeSurveyToolFilterState as directNormalizeSurveyToolFilterState,
+} from './surveyToolUtils.js';
+import { QuestionFilter as RawQuestionFilter } from './QuestionFilter';
+import PileHologramAssistant from './PileHologramAssistant';
+import TagModal from '../TagPage/TagModal';
+import styles from './SurveyTool.module.scss';
+import { renderToStaticMarkup } from 'react-dom/server';
+import ConnectedSurveyResults from './SurveyResults';
+import contractScripts, * as contractScriptsModule from '../../utilities/web3/contractScripts.js';
+import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
+import * as sessionScanScope from '../../utilities/session/sessionScanScope.js';
+import * as sbtDisplayNameUtils from '../../utilities/sbt/sbtDisplayNames.js';
+import * as sponsoredAccess from '../../utilities/web3/sponsoredAccess.js';
 import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 import { t } from '../../utilities/ui/terminology.js';
 
@@ -2758,24 +2768,13 @@ describe('SurveyTool module', () => {
       conviction: {},
     };
     let fullQuestionCard = subject.renderQuestion(question, 0, withNumericString);
-    let ratingSlider = findElement(fullQuestionCard, (node) => (
-      node?.props?.min === 0 &&
-      node?.props?.max === 10 &&
-      node?.props?.step === 1 &&
-      node?.props?.tooltip === false &&
-      node?.props?.style?.width === '200px' &&
-      node?.props?.value !== undefined &&
-      typeof node?.props?.onChange === 'function'
-    ));
-    expect(ratingSlider).not.toBeNull();
-    expect(ratingSlider.props.value).toBe(8);
-    expect(ratingSlider.props.id).toBeUndefined();
-    expect(nodeHasClassName(ratingSlider, styles.ratingSlider)).toBe(true);
-    expect(typeof ratingSlider.props.onChangeComplete).toBe('function');
-    expect(treeHasText(fullQuestionCard, '8')).toBe(true);
-
-    const ratingValueLabel = findElement(fullQuestionCard, (node) => nodeHasClassName(node, styles.ratingLabelText));
-    expect(ratingValueLabel).not.toBeNull();
+    let ratingInput = findFirstNodeByType(fullQuestionCard, FullQuestionRatingInput);
+    expect(ratingInput).not.toBeNull();
+    expect(ratingInput.props.value).toBe(8);
+    expect(ratingInput.props.disabled).toBe(false);
+    expect(typeof ratingInput.props.onChange).toBe('function');
+    expect(typeof ratingInput.props.onChangeComplete).toBe('function');
+    expect(renderToStaticMarkup(ratingInput)).toContain('8');
 
     const withOverflowValue = {
       answers: { q1: { value: '18', encrypted: false } },
@@ -2784,18 +2783,10 @@ describe('SurveyTool module', () => {
       conviction: {},
     };
     fullQuestionCard = subject.renderQuestion(question, 0, withOverflowValue);
-    ratingSlider = findElement(fullQuestionCard, (node) => (
-      node?.props?.min === 0 &&
-      node?.props?.max === 10 &&
-      node?.props?.step === 1 &&
-      node?.props?.tooltip === false &&
-      node?.props?.style?.width === '200px' &&
-      node?.props?.value !== undefined &&
-      typeof node?.props?.onChange === 'function'
-    ));
-    expect(ratingSlider).not.toBeNull();
-    expect(ratingSlider.props.value).toBe(10);
-    expect(treeHasText(fullQuestionCard, '10')).toBe(true);
+    ratingInput = findFirstNodeByType(fullQuestionCard, FullQuestionRatingInput);
+    expect(ratingInput).not.toBeNull();
+    expect(ratingInput.props.value).toBe(10);
+    expect(renderToStaticMarkup(ratingInput)).toContain('10');
 
     const withNonNumericValue = {
       answers: { q1: { value: 'abc', encrypted: false } },
@@ -2804,19 +2795,10 @@ describe('SurveyTool module', () => {
       conviction: {},
     };
     fullQuestionCard = subject.renderQuestion(question, 0, withNonNumericValue);
-    ratingSlider = findElement(fullQuestionCard, (node) => (
-      node?.props?.min === 0 &&
-      node?.props?.max === 10 &&
-      node?.props?.step === 1 &&
-      node?.props?.tooltip === false &&
-      node?.props?.style?.width === '200px' &&
-      node?.props?.value !== undefined &&
-      typeof node?.props?.onChange === 'function'
-    ));
-    expect(ratingSlider).not.toBeNull();
-    expect(ratingSlider.props.value).toBe(0);
-    expect(nodeHasClassName(ratingSlider, styles.ratingSlider)).toBe(true);
-    expect(treeHasText(fullQuestionCard, '0')).toBe(true);
+    ratingInput = findFirstNodeByType(fullQuestionCard, FullQuestionRatingInput);
+    expect(ratingInput).not.toBeNull();
+    expect(ratingInput.props.value).toBe(0);
+    expect(renderToStaticMarkup(ratingInput)).toContain('0');
   });
 
   it('persists keyboard-driven full-mode rating edits immediately', () => {
@@ -2861,19 +2843,11 @@ describe('SurveyTool module', () => {
     };
 
     const fullQuestionCard = subject.renderQuestion(question, 0, subject.state.surveysResponseState[0]);
-    const ratingSlider = findElement(fullQuestionCard, (node) => (
-      node?.props?.min === 0 &&
-      node?.props?.max === 10 &&
-      node?.props?.step === 1 &&
-      node?.props?.tooltip === false &&
-      node?.props?.style?.width === '200px' &&
-      node?.props?.value !== undefined &&
-      typeof node?.props?.onChange === 'function'
-    ));
+    const ratingInput = findFirstNodeByType(fullQuestionCard, FullQuestionRatingInput);
 
-    expect(ratingSlider).not.toBeNull();
+    expect(ratingInput).not.toBeNull();
 
-    ratingSlider.props.onChange(6, { type: 'keydown' });
+    ratingInput.props.onChange(6, { type: 'keydown' });
 
     expect(subject.state.surveysResponseState[0].answers.q1.value).toBe(6);
     expect(subject.scheduleJsonPreviewUpdate).toHaveBeenCalledTimes(1);
@@ -7533,36 +7507,504 @@ describe('SurveyTool module', () => {
         provider,
         account: '0xabc',
         network: { id: 84532 },
-        questionPool: [{ id: 'pool-q' }],
-        pileQuestions: [{ id: 'pile-q' }],
-        litHooks,
-        hasher: 'hash-worker',
-        resolveDecryptSurveyId: () => 'survey-1',
-        getProviderKind: cryptoUtils.getProviderKind,
-      }),
-    ).toEqual({
-      providerKind: 'browser',
-      chainId: 84532,
-      surveyId: 'survey-1',
-      questionPool: [{ id: 'pool-q' }],
-      target: {
-        providerKind: 'browser',
-        chainId: 84532,
-        surveyId: 'survey-1',
-        questionId: 'q1',
-        fieldToDecrypt: 'both',
+        activeSessionSlug: 'edge',
+        sessionSlug: 'edge',
+        sessionSlugPinned: false,
+      });
+
+      const dropdown = subject.renderQuestionTagDropdown({
+        id: 'q1',
+        prompt: 'Question prompt',
+        tags: ['Governance'],
+      });
+
+      expect(dropdown).toBeTruthy();
+      expect(dropdown.props.sessionSlug).toBe('edge');
+    } finally {
+      window.history.replaceState({}, '', previousUrl || '/');
+    }
+  });
+
+  it('wires SurveyQuestionTagControl into full question cards when tags are present', () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+    });
+
+    subject.state = {
+      ...subject.state,
+      decryptionNonce: 0,
+      isLoadingResponse: false,
+      bookmarkedQuestions: new Set(),
+      decryptingByKey: {},
+      isSubmitting: false,
+      autoDecryptEnabled: false,
+      showComments: {},
+      sliderToggleExpandedByQuestion: {},
+      surveysResponseState: [{
+        answers: {},
+        additionalComments: {},
+        importance: {},
+        conviction: {},
+      }],
+    };
+    subject.handleBookmarkToggle = jest.fn();
+    subject.renderBullhornToggleButton = jest.fn(() => null);
+    subject.renderAnswerLockControl = jest.fn(() => null);
+    subject._getEffectiveDraftSlug = () => 'edge';
+
+    const tree = subject.renderQuestion(
+      {
+        id: 'q1',
+        type: 'freeform',
+        prompt: 'Question prompt',
+        tags: ['governance'],
       },
-      lit: { getKey: litHooks.getKey },
-      opts: {
-        providerKind: 'browser',
-        provider,
-        account: '0xabc',
-        chainId: 84532,
-        surveyId: 'survey-1',
-        questionPool: [{ id: 'pool-q' }],
-        lit: { getKey: litHooks.getKey },
-        hasher: 'hash-worker',
-        throwOnError: true,
+      0,
+      subject.state.surveysResponseState[0]
+    );
+    const dropdown = findElement(
+      tree,
+      (node) => node?.type === SurveyQuestionTagControl
+    );
+
+    expect(dropdown).toBeTruthy();
+    expect(dropdown.props.tags).toEqual(['governance']);
+    expect(dropdown.props.useTagModal).toBe(true);
+    expect(typeof dropdown.props.onTagSelect).toBe('function');
+  });
+
+  it('opens the shared tag modal from full-question tag dropdown selections', () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+    });
+
+    subject.state = {
+      ...subject.state,
+      questionPool: [{
+        id: 'q1',
+        type: 'freeform',
+        prompt: 'Question prompt',
+        tags: ['governance'],
+      }],
+      decryptionNonce: 0,
+      isLoadingResponse: false,
+      bookmarkedQuestions: new Set(),
+      decryptingByKey: {},
+      isSubmitting: false,
+      autoDecryptEnabled: false,
+      showComments: {},
+      sliderToggleExpandedByQuestion: {},
+      surveysResponseState: [{
+        answers: {},
+        additionalComments: {},
+        importance: {},
+        conviction: {},
+      }],
+      activeTagModalTag: '',
+    };
+    subject.handleBookmarkToggle = jest.fn();
+    subject.renderBullhornToggleButton = jest.fn(() => null);
+    subject.renderAnswerLockControl = jest.fn(() => null);
+    subject._getEffectiveDraftSlug = () => 'edge';
+    subject.setState = (updates) => {
+      const nextState = typeof updates === 'function'
+        ? updates(subject.state, subject.props)
+        : updates;
+      subject.state = { ...subject.state, ...nextState };
+    };
+
+    const dropdown = subject.renderQuestionTagDropdown({
+      id: 'q1',
+      prompt: 'Question prompt',
+      tags: ['governance'],
+    });
+
+    dropdown.props.onTagSelect('governance');
+
+    const tree = subject.render();
+    const modal = findElement(
+      tree,
+      (node) => node?.type === TagModal
+    );
+
+    expect(subject.state.activeTagModalTag).toBe('governance');
+    expect(modal).toBeTruthy();
+    expect(modal.props.isOpen).toBe(true);
+    expect(modal.props.activeTag).toBe('governance');
+  });
+
+  it('omits SurveyQuestionTagControl from pile cards even when tags are present', () => {
+    const shell = new SurveyTool({
+      minifiedMode: 'pile',
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+    });
+
+    const pileElement = shell.render();
+    const PileViewModeClass = pileElement.type;
+    const subject = new PileViewModeClass(pileElement.props);
+
+    subject.state = {
+      ...subject.state,
+      surveysResponseState: [{
+        answers: {},
+        additionalComments: {},
+        importance: {},
+        conviction: {},
+      }],
+      showComments: {},
+      showConviction: {},
+      decryptingByKey: {},
+      isSubmitting: false,
+      autoDecryptEnabled: false,
+    };
+    subject.renderBullhornToggleButton = jest.fn(() => null);
+    subject.renderAnswerLockControl = jest.fn(() => null);
+
+    const question = {
+      id: 'q1',
+      type: 'freeform',
+      prompt: 'Question prompt',
+      tags: ['governance'],
+    };
+    subject.state = {
+      ...subject.state,
+      allQuestionsForFilter: [question],
+      pileQuestions: [question],
+      activePileIndex: 0,
+      filterModalOpen: false,
+      loading: false,
+      showHologramAssistant: false,
+    };
+
+    const tree = subject.render();
+    const dropdown = findElement(
+      tree,
+      (node) => node?.type === SurveyQuestionTagControl
+    );
+
+    expect(dropdown).toBeNull();
+  });
+
+  it('retries gate label hydration for same signature after a transient miss', async () => {
+    const gateSbt = '0x4444444444444444444444444444444444444444';
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+      networkChainId: 84532,
+    });
+
+    subject._isMounted = true;
+    subject.state = {
+      ...subject.state,
+      questionPool: [],
+      pileQuestions: [],
+      gateSbtNameRevision: 0,
+    };
+    subject.collectGateSbtAddressesForHydration = () => [gateSbt];
+    subject.resolveEffectiveResponseGateConfig = () => ({ slug: 'edge', networkChainId: 84532 });
+    subject._getEffectiveDraftSlug = () => 'edge';
+    subject.setState = (update) => {
+      const patch = typeof update === 'function' ? update(subject.state, subject.props) : update;
+      subject.state = { ...subject.state, ...(patch || {}) };
+    };
+    subject.scheduleGateSbtHydrationRetry = jest.fn();
+
+    const warmSpy = jest
+      .spyOn(sbtDisplayNameUtils, 'warmSbtDisplayNamesTargeted')
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ address: gateSbt, name: 'Recovered Name', info: { name: 'Recovered Name' } }]);
+
+    await subject.hydrateGateSbtLabels();
+    expect(subject.scheduleGateSbtHydrationRetry).toHaveBeenCalledTimes(1);
+    expect(subject._gateSbtHydrationSig).toBe('');
+
+    await subject.hydrateGateSbtLabels();
+    expect(warmSpy).toHaveBeenCalledTimes(2);
+    expect(subject.state.gateSbtNameRevision).toBe(1);
+
+    warmSpy.mockRestore();
+  });
+
+  it('does not retry gate label hydration when targeted lookup policy is disabled', async () => {
+    const previousPolicy = globalThis.ENABLE_TARGETED_SBT_METADATA_LOOKUP;
+    globalThis.ENABLE_TARGETED_SBT_METADATA_LOOKUP = false;
+    const gateSbt = '0x7777777777777777777777777777777777777777';
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+      networkChainId: 84532,
+    });
+
+    subject._isMounted = true;
+    subject.state = {
+      ...subject.state,
+      questionPool: [],
+      pileQuestions: [],
+      gateSbtNameRevision: 0,
+    };
+    subject.collectGateSbtAddressesForHydration = () => [gateSbt];
+    subject.resolveEffectiveResponseGateConfig = () => ({ slug: 'edge', networkChainId: 84532 });
+    subject._getEffectiveDraftSlug = () => 'edge';
+    subject.setState = (update) => {
+      const patch = typeof update === 'function' ? update(subject.state, subject.props) : update;
+      subject.state = { ...subject.state, ...(patch || {}) };
+    };
+    subject.scheduleGateSbtHydrationRetry = jest.fn();
+
+    const warmSpy = jest
+      .spyOn(sbtDisplayNameUtils, 'warmSbtDisplayNamesTargeted')
+      .mockResolvedValueOnce([]);
+
+    try {
+      await subject.hydrateGateSbtLabels();
+      expect(subject.scheduleGateSbtHydrationRetry).not.toHaveBeenCalled();
+      expect(subject._gateSbtHydrationSig).not.toBe('');
+
+      await subject.hydrateGateSbtLabels();
+      expect(warmSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      globalThis.ENABLE_TARGETED_SBT_METADATA_LOOKUP = previousPolicy;
+      warmSpy.mockRestore();
+    }
+  });
+
+  it('memoizes rendered question ids until question sources change', () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 1 },
+    });
+
+    subject.state = {
+      ...subject.state,
+      questionPool: [{ id: 'q1' }, { id: 'q2' }],
+      pileQuestions: [{ id: 'q2' }, { id: 'q3' }],
+    };
+
+    const first = subject.getCurrentRenderedQuestionIds();
+    const second = subject.getCurrentRenderedQuestionIds();
+    expect(second).toBe(first);
+    expect(second).toEqual(['q1', 'q2', 'q3']);
+
+    subject.state = {
+      ...subject.state,
+      questionPool: [{ id: 'q1' }, { id: 'q2' }, { id: 'q4' }],
+    };
+    const third = subject.getCurrentRenderedQuestionIds();
+    expect(third).not.toBe(second);
+    expect(third).toEqual(['q1', 'q2', 'q4', 'q3']);
+  });
+
+  it('invalidates local-cache rehydrate memo before post-backfill rehydrate', async () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+    });
+
+    subject._isMounted = true;
+    subject.state = {
+      ...subject.state,
+      submissionComplete: false,
+      isSubmitting: false,
+    };
+    subject.setState = (update, cb) => {
+      const patch = typeof update === 'function' ? update(subject.state, subject.props) : update;
+      subject.state = { ...subject.state, ...(patch || {}) };
+      if (typeof cb === 'function') cb();
+    };
+    subject.props = {
+      ...subject.props,
+      account: '0xabc',
+      loginComplete: true,
+      displayAnswerMode: false,
+      viewAddress: '',
+      singleQuestionMode: false,
+      responderAddress: '',
+      refreshQuestionResponses: jest.fn().mockResolvedValue(undefined),
+    };
+    subject.getMissingRenderedResponseIdsForAccount = jest.fn().mockResolvedValue({
+      missingIds: ['q1'],
+      slug: 'edge',
+      netId: '84532',
+    });
+    subject.rehydrateLocalCacheAnswersForRenderedIds = jest.fn();
+    subject._localCacheSliceMemo = { key: 'stale', value: null, hasValue: true };
+    subject._rehydrateLocalCacheLastSig = 'stale|sig';
+
+    await subject.ensurePriorResponsesForRenderedIds();
+
+    expect(subject.props.refreshQuestionResponses).toHaveBeenCalledWith(['q1'], {
+      slug: 'edge',
+      responder: '0xabc',
+    });
+    expect(subject._localCacheSliceMemo).toEqual({ key: '', value: null, hasValue: false });
+    expect(subject._rehydrateLocalCacheLastSig).toBe('');
+    expect(subject.rehydrateLocalCacheAnswersForRenderedIds).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not skip targeted prior-response backfill while pile mode is active', async () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+      minifiedMode: 'pile',
+    });
+
+    subject.state = {
+      ...subject.state,
+      submissionComplete: false,
+      isSubmitting: false,
+    };
+    subject.props = {
+      ...subject.props,
+      minifiedMode: 'pile',
+      account: '0xabc',
+      loginComplete: true,
+      displayAnswerMode: false,
+      viewAddress: '',
+      singleQuestionMode: false,
+      responderAddress: '',
+      refreshQuestionResponses: jest.fn().mockResolvedValue(undefined),
+    };
+    subject.getMissingRenderedResponseIdsForAccount = jest.fn().mockResolvedValue({
+      missingIds: ['q1'],
+      slug: 'edge',
+      netId: '84532',
+    });
+    subject.rehydrateLocalCacheAnswersForRenderedIds = jest.fn();
+
+    const fetched = await subject.ensurePriorResponsesForRenderedIds();
+
+    expect(fetched).toBe(true);
+    expect(subject.getMissingRenderedResponseIdsForAccount).toHaveBeenCalled();
+    expect(subject.props.refreshQuestionResponses).toHaveBeenCalled();
+  });
+
+  it('groups pile prior-response backfill by question session slug under list scope', async () => {
+    jest.spyOn(sessionScanScope, 'readSessionScanScope').mockReturnValue('list');
+    jest.spyOn(sessionScanScope, 'readSessionScanSlugs').mockReturnValue(['edge', 'alpha', 'beta']);
+    jest.spyOn(cacheScripts, 'readCache').mockImplementation(async (namespace) => {
+      if (namespace !== 'questionsCache') return {};
+      return {
+        '84532': {
+          questionResponses: {},
+        },
+      };
+    });
+
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+      sessionSlug: 'edge',
+      activeSessionSlug: 'edge',
+      minifiedMode: 'pile',
+    });
+
+    subject._isMounted = true;
+    subject.state = {
+      ...subject.state,
+      submissionComplete: false,
+      isSubmitting: false,
+      pileQuestions: [
+        { id: 'q1', sessionSlug: 'alpha', type: 'freeform', prompt: 'Alpha prompt' },
+        { id: 'q2', sessionSlug: 'beta', type: 'freeform', prompt: 'Beta prompt' },
+      ],
+    };
+    subject.setState = (update, cb) => {
+      const patch = typeof update === 'function' ? update(subject.state, subject.props) : update;
+      subject.state = { ...subject.state, ...(patch || {}) };
+      if (typeof cb === 'function') cb();
+    };
+    subject.props = {
+      ...subject.props,
+      minifiedMode: 'pile',
+      account: '0xabc',
+      loginComplete: true,
+      displayAnswerMode: false,
+      viewAddress: '',
+      singleQuestionMode: false,
+      responderAddress: '',
+      refreshQuestionResponses: jest.fn().mockResolvedValue(undefined),
+    };
+    subject.rehydrateLocalCacheAnswersForRenderedIds = jest.fn();
+    subject._localCacheSliceMemo = { key: 'stale', value: null, hasValue: true };
+    subject._rehydrateLocalCacheLastSig = 'stale|sig';
+
+    const fetched = await subject.ensurePriorResponsesForRenderedIds();
+
+    expect(fetched).toBe(true);
+    expect(subject.props.refreshQuestionResponses).toHaveBeenNthCalledWith(1, ['q1'], {
+      slug: 'alpha',
+      responder: '0xabc',
+    });
+    expect(subject.props.refreshQuestionResponses).toHaveBeenNthCalledWith(2, ['q2'], {
+      slug: 'beta',
+      responder: '0xabc',
+    });
+    expect(subject.rehydrateLocalCacheAnswersForRenderedIds).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not hydrate local-cache responses for unresolved draft slugs without a resolved network id', () => {
+    const generalCfg = {
+      slug: '',
+      networkChainId: 84532,
+    };
+    const strictLookup = (slug) => (
+      String(slug || '').trim().toLowerCase() === ''
+        ? generalCfg
+        : null
+    );
+    jest.spyOn(contractScriptsModule, 'getSessionConfigBySlug').mockImplementation(strictLookup);
+    jest.spyOn(contractScriptsModule, 'getSessionConfigBySlugOrDefault').mockImplementation((slug) => (
+      strictLookup(slug) || generalCfg
+    ));
+    const peekSpy = jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue({
+      '84532': {
+        questionResponses: {
+          q1: {
+            '0xabc': {
+              answer: { value: 'wrong-cache-answer', encrypted: false },
+              additional: { value: '', encrypted: false },
+            },
+          },
+        },
       },
     });
 

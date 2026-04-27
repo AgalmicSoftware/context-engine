@@ -7,7 +7,9 @@ type FullQuestionHeaderProps = {
 };
 
 const FullQuestionHeader = ({ children = null }: FullQuestionHeaderProps) => (
-  <div className={styles.fullQuestionHeader}>{children}</div>
+  <div className={styles.fullQuestionHeader}>
+    {children}
+  </div>
 );
 
 export default FullQuestionHeader;
