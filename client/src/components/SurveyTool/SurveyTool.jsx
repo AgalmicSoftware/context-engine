@@ -30,7 +30,7 @@ import "../../assets/css/contextEngine.scss";
 import styles from './SurveyTool.module.scss';
 
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faBookmark, faLock, faUnlock, faPlus, faMinus, faCaretDown, faCaretUp, faCheck, faTimes, faArrowLeft, faArrowRight, faSpinner, faExpand, faExternalLinkAlt, faFilter, faExclamationCircle, faMicrophone, faChevronLeft, faChevronRight, faComment, faQuestionCircle, faBullhorn, faRobot } from '@fortawesome/free-solid-svg-icons';
+import { faBookmark, faLock, faUnlock, faPlus, faMinus, faCaretDown, faCaretUp, faCheck, faTimes, faArrowLeft, faArrowRight, faSpinner, faExpand, faExternalLinkAlt, faFilter, faExclamationCircle, faMicrophone, faChevronLeft, faChevronRight, faComment, faQuestionCircle, faRobot } from '@fortawesome/free-solid-svg-icons';
 
 import AudioInput from '../Shared/AudioInput/AudioInput.jsx';
 import CreateQuestionsAndSurveys from './CreateQuestionsAndSurveys';
@@ -40,8 +40,10 @@ import PileHologramAssistant from './PileHologramAssistant';
 import QuestionTagDropdown from './QuestionTagDropdown';
 import SingleQuestionResponse from './SingleQuestionResponse';
 import TagModal from '../TagPage/TagModal';
+import BullhornToggleButton from './BullhornToggleButton';
 import ConvictionImportanceLabel from './ConvictionImportanceLabel';
-import DeferredCommitSlider from './DeferredCommitSlider';
+import DeferredConvictionImportanceSlider from './DeferredConvictionImportanceSlider';
+import DeferredRatingSlider from './DeferredRatingSlider';
 import { JsonButtonRow, JsonIconButton, JsonPanel, JsonToggleButton } from '../Shared/Json/JsonControls';
 import { getQuestionTagDisplayList } from '../../utilities/survey/questionTags.js';
 
@@ -2742,16 +2744,13 @@ export class SurveyQuestions extends Component {
     ariaLabel = 'Conviction / importance',
     active = false,
   } = {}) => (
-    <button
-      type="button"
+    <BullhornToggleButton
       onClick={onClick}
       disabled={disabled}
-      className={`${styles.iconButton} ${styles.commentButton} ${styles.bullhornButton} ${active ? styles.iconButtonActive : ''}`}
       title={title}
-      aria-label={ariaLabel}
-    >
-      <FontAwesomeIcon icon={faBullhorn} className={active ? styles.iconGlow : undefined} />
-    </button>
+      ariaLabel={ariaLabel}
+      active={active}
+    />
   );
 
   renderConvictionImportanceLabel = (questionId, convictionValue, importanceValue) => {
@@ -2789,15 +2788,9 @@ export class SurveyQuestions extends Component {
   };
 
   renderSingleQuestionDeferredRatingSlider = ({ surveyIndex, questionId, ratingValue }) => (
-    <DeferredCommitSlider
+    <DeferredRatingSlider
       value={ratingValue}
-      min={RATING_MIN}
-      max={RATING_MAX}
-      step={1}
-      tooltip={false}
       disabled={this.state.isSubmitting}
-      className={styles.ratingSlider}
-      style={{ width: '200px' }}
       onCommit={(committedRating) => this.handleAnswer(
         surveyIndex,
         questionId,
@@ -2807,18 +2800,7 @@ export class SurveyQuestions extends Component {
           afterUpdate: this.flushDraftPersistAfterSliderChange,
         }
       )}
-    >
-      {({ value, sliderProps }) => (
-        <>
-          <div className={styles.importanceSlider}>
-            <CESlider {...sliderProps} />
-          </div>
-          <FormText className={styles.ratingLabelText}>
-            {value}
-          </FormText>
-        </>
-      )}
-    </DeferredCommitSlider>
+    />
   );
 
   renderSingleQuestionDeferredConvictionSlider = ({
@@ -2829,13 +2811,19 @@ export class SurveyQuestions extends Component {
     convictionValue,
     importanceValue,
   }) => (
-    <DeferredCommitSlider
+    <DeferredConvictionImportanceSlider
       value={activeSliderValue}
-      min={RATING_MIN}
-      max={RATING_MAX}
-      step={1}
-      tooltip={false}
       disabled={this.state.isSubmitting}
+      importanceToggleEnabled={ENABLE_IMPORTANCE_SLIDER_TOGGLE}
+      sliderMode={sliderMode}
+      isExpanded={shouldExpandSliderToggle({
+        sliderToggleExpandedByQuestion: this.state.sliderToggleExpandedByQuestion,
+        questionId,
+        sliderMode,
+      })}
+      convictionValue={convictionValue}
+      importanceValue={importanceValue}
+      onSelectMode={(nextMode) => this.setSliderMode(questionId, nextMode)}
       onCommit={(committedValue) => this.handleConvictionImportanceChange(
         surveyIndex,
         questionId,
@@ -2846,21 +2834,7 @@ export class SurveyQuestions extends Component {
           afterUpdate: this.flushDraftPersistAfterSliderChange,
         }
       )}
-    >
-      {({ value, sliderProps }) => (
-        <>
-          {this.renderConvictionImportanceLabel(
-            questionId,
-            sliderMode === 'conviction' ? value : convictionValue,
-            sliderMode === 'importance' ? value : importanceValue
-          )}
-          <CESlider
-            {...sliderProps}
-            className={[sliderProps.className, styles.convictionSlider].filter(Boolean).join(' ')}
-          />
-        </>
-      )}
-    </DeferredCommitSlider>
+    />
   );
 
 /**

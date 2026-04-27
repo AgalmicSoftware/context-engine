@@ -13,6 +13,8 @@ import {
   QuestionsDashboard as DirectQuestionsDashboard,
   SurveySelector as DirectSurveySelector,
 } from './SurveySelector';
+import BullhornToggleButton from './BullhornToggleButton';
+import DeferredRatingSlider from './DeferredRatingSlider';
 import { DeferredCommitSlider as DirectDeferredCommitSlider } from './DeferredCommitSlider';
 import {
   computeSubmitLabel as directComputeSubmitLabel,
@@ -1622,11 +1624,12 @@ describe('SurveyTool module', () => {
       network: { id: 1 },
     });
     const activeButton = subject.renderBullhornToggleButton({ active: true });
-    expect(String(activeButton?.props?.className || '')).toContain('iconButtonActive');
-    expect(String(activeButton?.props?.children?.props?.className || '')).toContain('iconGlow');
+    expect(activeButton?.type).toBe(BullhornToggleButton);
+    expect(activeButton?.props?.active).toBe(true);
 
     const inactiveButton = subject.renderBullhornToggleButton({ active: false });
-    expect(String(inactiveButton?.props?.className || '')).not.toContain('iconButtonActive');
+    expect(inactiveButton?.type).toBe(BullhornToggleButton);
+    expect(inactiveButton?.props?.active).toBe(false);
   });
 
   it('locks and opens the pile lock audience menu on first click when no default gate is configured', () => {
@@ -2526,7 +2529,7 @@ describe('SurveyTool module', () => {
     };
 
     const fullQuestionCard = subject.renderQuestion(question, 0, currentSurveyResponseState);
-    const deferredSlider = findElement(fullQuestionCard, (node) => node?.type === DeferredCommitSlider);
+    const deferredSlider = findElement(fullQuestionCard, (node) => node?.type === DeferredRatingSlider);
 
     expect(deferredSlider).not.toBeNull();
     expect(deferredSlider.props.value).toBe(8);
