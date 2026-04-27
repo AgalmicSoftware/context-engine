@@ -40,7 +40,7 @@ It does two things:
 2. Prefer the documented TestID API for deterministic browser interaction instead of ad hoc selectors.
 3. If you are driving the dev browser surface, inspect `window.__ceAgent.describe()` first so the supported actions and higher-level tools are explicit.
 4. If you are integrating through `contextEngine-cc`, treat `contextEngine-cc/lib/routeInventory.mjs` as the canonical local HTTP route inventory until the MCP surface lands.
-5. Keep live-vs-mock intent explicit in E2E work; do not rely on silent fallback sessions, workers, or credentials.
+5. Keep live-vs-mock and chain-runtime intent explicit in E2E work; decide upfront whether a run is `onchain`, `local`, or today’s manual-fork workaround, and do not rely on silent fallback sessions, workers, or credentials.
 
 ## PRD Map
 
@@ -48,7 +48,7 @@ It does two things:
 | --- | --- | --- |
 | [PRD 305](../TODO/PRDs/305_supported-first-install-guarantee-and-safe-public-defaults.md) | Defines the supported first-install promise and safe default behavior so agents can bootstrap without stale public infra assumptions. | `README.md`, `docs/run-modes.md`, env/default hygiene work |
 | [PRD 209](../TODO/PRDs/209_e2e-harness-config-drift-env-real-run-integrity.md) | Makes E2E config, env loading, and mock-vs-real behavior trustworthy instead of fallback-heavy. | `scripts/run-e2e-suite.js`, `docs/e2e-setup.md`, `.env.e2e.example` |
-| [PRD 236](../TODO/PRDs/236_e2e-first-class-local-fork-mode.md) | Adds a reproducible “real contracts, local gas” verification lane for agent-driven validation. | future E2E chain-runtime support |
+| [PRD 236](../TODO/PRDs/236_e2e-first-class-local-fork-mode.md) | Adds a reproducible “real contracts, local gas” verification lane for agent-driven validation. | `docs/run-modes.md`, `docs/e2e-setup.md`, `.env.e2e.example`, and future E2E chain-runtime support |
 | [PRD 015](../TODO/PRDs/015_mcp-server-contextengine-cc.md) | Adds MCP read/respond tools to `contextEngine-cc` so agents can query sessions and submit responses without the hook path. | `contextEngine-cc/lib/routeInventory.mjs`, current local server + hook |
 | [PRD 075](../TODO/PRDs/075_json-api-and-mcp-resource-creation.md) | Adds headless create-session / create-SBT / create-survey surfaces plus JSON-prefill flows for agents. | current SessionWizard / authoring UI payloads and future create APIs |
 | [PRD 509](../TODO/PRDs/509_coordinated-shell-cleanup-for-remaining-jsx-shells.md) | Removes the last high-risk JSX controller shells so agents can edit the app shell more safely. | `MainSite.jsx`, `SurveyTool.jsx`, `DeferredCommitSlider.jsx` |
