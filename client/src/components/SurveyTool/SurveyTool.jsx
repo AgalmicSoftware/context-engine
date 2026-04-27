@@ -48,6 +48,58 @@ import MultichoiceQuestionInput from './MultichoiceQuestionInput';
 import QuestionDecryptControl from './QuestionDecryptControl';
 import QuestionCardLinks from './QuestionCardLinks';
 import SurveyAudioFieldInput from './SurveyAudioFieldInput';
+import {
+  applyDecryptedQuestionResponseValues as applyDecryptedQuestionResponseValuesHelper,
+  applyDecryptedQuestionResponseValuesToContainer as applyDecryptedQuestionResponseValuesToContainerHelper,
+  applyDecryptedQuestionStateToSurveySlice as applyDecryptedQuestionStateToSurveySliceHelper,
+  buildAutoDecryptMaskedFieldSignature as buildAutoDecryptMaskedFieldSignatureHelper,
+  buildDecryptTaskKey as buildDecryptTaskKeyHelper,
+  buildFieldDecryptState as buildFieldDecryptStateHelper,
+  buildQuestionDecryptExecutionContext as buildQuestionDecryptExecutionContextHelper,
+  buildQuestionDecryptFailureState as buildQuestionDecryptFailureStateHelper,
+  buildQuestionFieldDisplayState as buildQuestionFieldDisplayStateHelper,
+  buildQuestionDecryptStartState as buildQuestionDecryptStartStateHelper,
+  buildQuestionResponseDisplayState as buildQuestionResponseDisplayStateHelper,
+  buildQuestionRenderDisplayState as buildQuestionRenderDisplayStateHelper,
+  buildSurveyDecryptExecutionContext as buildSurveyDecryptExecutionContextHelper,
+  buildSurveyDecryptSourceState as buildSurveyDecryptSourceStateHelper,
+  buildSurveyDecryptSuccessState as buildSurveyDecryptSuccessStateHelper,
+  buildEmptyQuestionDecryptSlice as buildEmptyQuestionDecryptSliceHelper,
+  buildSelfQuestionDecryptBaseline as buildSelfQuestionDecryptBaselineHelper,
+  buildSelfQuestionDecryptSuccessState as buildSelfQuestionDecryptSuccessStateHelper,
+  clearQuestionFieldBusyMap as clearQuestionFieldBusyMapHelper,
+  collectQuestionRatingEnvelopesByQid as collectQuestionRatingEnvelopesByQidHelper,
+  buildViewedResponseDecryptSuccessState as buildViewedResponseDecryptSuccessStateHelper,
+  buildViewedResponseDecryptBaseline as buildViewedResponseDecryptBaselineHelper,
+  decryptQuestionRatingEnvelopeMap as decryptQuestionRatingEnvelopeMapHelper,
+  decryptQuestionRatingEnvelopes as decryptQuestionRatingEnvelopesHelper,
+  ensureQuestionDecryptSliceShape as ensureQuestionDecryptSliceShapeHelper,
+  finalizeSurveyDecryptAttempt as finalizeSurveyDecryptAttemptHelper,
+  finalizeQuestionDecryptAttempt as finalizeQuestionDecryptAttemptHelper,
+  getViewedResponseOverrideForQuestion as getViewedResponseOverrideForQuestionHelper,
+  getQuestionFieldDecryptSelection as getQuestionFieldDecryptSelectionHelper,
+  getQuestionFieldTaskKey as getQuestionFieldTaskKeyHelper,
+  getQuestionFieldTaskKeys as getQuestionFieldTaskKeysHelper,
+  getQuestionRatingEnvelopes as getQuestionRatingEnvelopesHelper,
+  hydrateLatestQuestionDecryptState as hydrateLatestQuestionDecryptStateHelper,
+  markQuestionFieldBusyMap as markQuestionFieldBusyMapHelper,
+  mergeLatestEncryptedQuestionFields as mergeLatestEncryptedQuestionFieldsHelper,
+  mergeQuestionRatingEnvelopeState as mergeQuestionRatingEnvelopeStateHelper,
+  mergeQuestionResponseOverrideIntoDecryptSlice as mergeQuestionResponseOverrideIntoDecryptSliceHelper,
+  carryForwardSurveyQuestionRatings as carryForwardSurveyQuestionRatingsHelper,
+  normalizeBulkDecryptedSliceForSurveyState as normalizeBulkDecryptedSliceForSurveyStateHelper,
+  normalizeSingleQuestionViewedResponse as normalizeSingleQuestionViewedResponseHelper,
+  parseEncryptedEnvelope as parseEncryptedEnvelopeHelper,
+  prepareQuestionDecryptAttempt as prepareQuestionDecryptAttemptHelper,
+  prepareSurveyDecryptAttempt as prepareSurveyDecryptAttemptHelper,
+  prepareSelfQuestionDecryptState as prepareSelfQuestionDecryptStateHelper,
+  prepareViewedQuestionDecryptState as prepareViewedQuestionDecryptStateHelper,
+  resolveQuestionDecryptHandlingMode as resolveQuestionDecryptHandlingModeHelper,
+  resolveLatestSurveyDecryptResponse as resolveLatestSurveyDecryptResponseHelper,
+  resolveDecryptSurveyId as resolveDecryptSurveyIdHelper,
+  runDedupedDecryptTask as runDedupedDecryptTaskHelper,
+  syncDecryptedQuestionIntoBaseline as syncDecryptedQuestionIntoBaselineHelper,
+} from './surveyToolDecryptFlow.js';
 import { JsonButtonRow, JsonIconButton, JsonPanel, JsonToggleButton } from '../Shared/Json/JsonControls';
 
 // Crypto and contract utilities
@@ -115,6 +167,13 @@ import {
   resolveSurveyToolUpdateCacheContext,
 } from './surveyToolSessionResolution.js';
 import {
+  buildAnswerLockDisplayState,
+  buildGatedPromptNoticeState,
+  buildLockAudienceButtonAction,
+  buildLockAudienceDisplayState,
+  isQuestionPromptMasked as isQuestionPromptMaskedHelper,
+} from './surveyToolViewState.js';
+import {
   buildCanDecryptOtherResponsesSnapshot,
   buildResponseGateConfigSignature,
   resolveCanDecryptOtherResponsesVerdict,
@@ -163,6 +222,7 @@ import {
   buildSliderModeStatePatch,
   buildSliderPersistOptions,
   buildRenderedIdsSignature,
+  buildPersistedDraftQuestionEntry,
   buildSliceToken,
   buildSurveyDraftSemanticSignature,
   buildSurveyResponseSliceSignature,
@@ -1240,37 +1300,25 @@ export class SurveyQuestions extends Component {
     });
   };
 
-  buildAutoDecryptMaskedFieldSignature = (field = null) => {
-    if (!field || typeof field !== 'object') return '';
-    return [
-      String(field.value ?? ''),
-      field.encrypted ? '1' : '0',
-      String(field.encryptedPortion || ''),
-      String(field.hash || ''),
-      String(field.encryptionAudience || ''),
-    ].join('|');
-  };
+  buildAutoDecryptMaskedFieldSignature = (field = null) =>
+    buildAutoDecryptMaskedFieldSignatureHelper(field);
 
   buildDecryptTaskKey = (mode, questionId, fieldToDecrypt = 'both', responseOverride = null) => {
-    const qid = String(questionId || '').trim().toLowerCase();
-    const field = String(fieldToDecrypt || 'both').trim().toLowerCase();
-    const responder = String(
-      responseOverride?.responder ||
-      responseOverride?.responderAddress ||
+    return buildDecryptTaskKeyHelper(
+      mode,
+      questionId,
+      fieldToDecrypt,
+      responseOverride,
+      String(
       this.props?.responderAddress ||
       this.props?.viewAddress ||
       ''
-    ).trim().toLowerCase();
-    const answerSig = this.buildAutoDecryptMaskedFieldSignature(responseOverride?.answer);
-    const additionalSig = this.buildAutoDecryptMaskedFieldSignature(responseOverride?.additional);
-    return [String(mode || 'self'), qid, field, responder, answerSig, additionalSig].join('|');
+      ),
+    );
   };
 
   getQuestionFieldTaskKey = (questionId, fieldKey = 'answer') => {
-    const qid = String(questionId || '').trim().toLowerCase();
-    const normalizedFieldKey = String(fieldKey || 'answer').trim().toLowerCase();
-    if (!qid) return '';
-    return `${qid}:${normalizedFieldKey}`;
+    return getQuestionFieldTaskKeyHelper(questionId, fieldKey);
   };
 
   isQuestionFieldBusy = (questionId, fieldKey = 'answer') => {
@@ -1282,586 +1330,309 @@ export class SurveyQuestions extends Component {
   getQuestionFieldTaskKeys = (
     questionId,
     { includeAnswer = false, includeAdditional = false } = {},
-  ) => {
-    const keys = [];
-    if (includeAnswer) {
-      const answerKey = this.getQuestionFieldTaskKey(questionId, 'answer');
-      if (answerKey) keys.push(answerKey);
-    }
-    if (includeAdditional) {
-      const additionalKey = this.getQuestionFieldTaskKey(questionId, 'additional');
-      if (additionalKey) keys.push(additionalKey);
-    }
-    return keys;
-  };
+  ) => getQuestionFieldTaskKeysHelper(questionId, { includeAnswer, includeAdditional });
 
-  markQuestionFieldBusyMap = (busyMap, keysToMark = []) => {
-    const next = { ...(busyMap || {}) };
-    keysToMark.forEach((key) => {
-      if (key) next[key] = true;
-    });
-    return next;
-  };
+  markQuestionFieldBusyMap = (busyMap, keysToMark = []) =>
+    markQuestionFieldBusyMapHelper(busyMap, keysToMark);
 
-  clearQuestionFieldBusyMap = (busyMap, questionId, fieldToDecrypt = 'both') => {
-    const cleared = { ...(busyMap || {}) };
-    const keysToClear = this.getQuestionFieldTaskKeys(questionId, {
-      includeAnswer: fieldToDecrypt === 'answer' || fieldToDecrypt === 'both',
-      includeAdditional: fieldToDecrypt === 'additional' || fieldToDecrypt === 'both',
-    });
-    keysToClear.forEach((key) => {
-      cleared[key] = false;
-    });
-    return cleared;
-  };
+  clearQuestionFieldBusyMap = (busyMap, questionId, fieldToDecrypt = 'both') =>
+    clearQuestionFieldBusyMapHelper(busyMap, questionId, fieldToDecrypt);
 
   getQuestionFieldDecryptSelection = (
     questionId,
     fieldToDecrypt = 'both',
     responseSlice = null,
-  ) => {
-    const maskedAnswer = !!(
-      (fieldToDecrypt === 'answer' || fieldToDecrypt === 'both') &&
-      responseSlice?.answers?.[questionId]?.value === '*' &&
-      (responseSlice?.answers?.[questionId]?.encryptedPortion ||
-        responseSlice?.answers?.[questionId]?.encrypted)
-    );
-
-    const maskedAdditional = !!(
-      (fieldToDecrypt === 'additional' || fieldToDecrypt === 'both') &&
-      responseSlice?.additionalComments?.[questionId]?.value === '*' &&
-      (responseSlice?.additionalComments?.[questionId]?.encryptedPortion ||
-        responseSlice?.additionalComments?.[questionId]?.encrypted)
-    );
-
-    return {
-      maskedAnswer,
-      maskedAdditional,
-      hasMaskedField: !!(maskedAnswer || maskedAdditional),
-      clearMode: maskedAnswer && maskedAdditional
-        ? 'both'
-        : (maskedAnswer ? 'answer' : (maskedAdditional ? 'additional' : '')),
-      keysToMark: this.getQuestionFieldTaskKeys(questionId, {
-        includeAnswer: maskedAnswer,
-        includeAdditional: maskedAdditional,
-      }),
-    };
-  };
+  ) => getQuestionFieldDecryptSelectionHelper(questionId, fieldToDecrypt, responseSlice);
 
   decryptQuestionRatingEnvelopes = async (
     ratingEnvelopes = null,
     { chainId, lit, account, providerLike } = {},
-  ) => {
-    let decryptedImportance = null;
-    let decryptedConviction = null;
-    try {
-      const toNum = (v) => {
-        if (v === undefined || v === null) return null;
-        const n = Number(v);
-        return Number.isNaN(n) ? null : n;
-      };
+  ) => decryptQuestionRatingEnvelopesHelper(
+    ratingEnvelopes,
+    { chainId, lit, account, providerLike },
+    {
+      decryptEnvelopeValue: cryptoUtils.decryptEnvelopeValue,
+      logWarn: (error) => surveyLog.warn('SurveyTool: fallback', error),
+    },
+  );
 
-      const litOpts = lit ? lit : undefined;
-      if (ratingEnvelopes?.importanceEncrypted) {
-        try {
-          const value = await cryptoUtils.decryptEnvelopeValue(ratingEnvelopes.importanceEncrypted, {
-            account,
-            chainId,
-            providerLike,
-            ...(litOpts ? { litOpts } : {}),
-          });
-          decryptedImportance = toNum(value);
-        } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
-      }
-      if (ratingEnvelopes?.convictionEncrypted) {
-        try {
-          const value = await cryptoUtils.decryptEnvelopeValue(ratingEnvelopes.convictionEncrypted, {
-            account,
-            chainId,
-            providerLike,
-            ...(litOpts ? { litOpts } : {}),
-          });
-          decryptedConviction = toNum(value);
-        } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
-      }
-    } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
-
-    return { decryptedImportance, decryptedConviction };
-  };
+  decryptQuestionRatingEnvelopeMap = async (
+    ratingEnvelopesByQid = {},
+    { chainId, lit, account, providerLike } = {},
+  ) => decryptQuestionRatingEnvelopeMapHelper(
+    ratingEnvelopesByQid,
+    { chainId, lit, account, providerLike },
+    {
+      decryptEnvelopeValue: cryptoUtils.decryptEnvelopeValue,
+      logWarn: (error) => surveyLog.warn('SurveyTool: fallback', error),
+    },
+  );
 
   buildQuestionDecryptExecutionContext = (baselineForDecrypt, questionId) => {
-    const providerKind = cryptoUtils.getProviderKind(this.props.provider);
-    const chainId = this.props.network?.id;
-    const surveyId = this.resolveDecryptSurveyId(baselineForDecrypt, questionId);
-    const questionPool =
-      (Array.isArray(this.state.questionPool) && this.state.questionPool.length > 0)
-        ? this.state.questionPool
-        : (Array.isArray(this.state.pileQuestions) ? this.state.pileQuestions : []);
-
     const litHooks =
       this.props.lit ||
       this.props.litHooks ||
       (typeof window !== 'undefined' ? (window.__litHooks || window.litHooks) : null);
-    const lit = litHooks && litHooks.getKey ? { getKey: litHooks.getKey } : undefined;
+    return buildQuestionDecryptExecutionContextHelper({
+      baselineForDecrypt,
+      questionId,
+      provider: this.props.provider,
+      account: this.props.account,
+      network: this.props.network,
+      questionPool: this.state.questionPool,
+      pileQuestions: this.state.pileQuestions,
+      litHooks,
+      hasher: this.state.hasher,
+      resolveDecryptSurveyId: this.resolveDecryptSurveyId,
+      getProviderKind: cryptoUtils.getProviderKind,
+    });
+  };
 
-    return {
-      providerKind,
-      chainId,
-      surveyId,
-      questionPool,
-      lit,
-      opts: {
-        providerKind,
-        provider: this.props.provider,
-        account: this.props.account,
-        chainId,
-        surveyId,
-        questionPool,
-        ...(lit ? { lit } : {}),
-        hasher: this.state.hasher,
-        throwOnError: true,
-      },
-    };
+  buildSurveyDecryptExecutionContext = (sourceSlice, questionId = null) => {
+    const litHooks =
+      this.props.lit ||
+      this.props.litHooks ||
+      (typeof window !== 'undefined' ? (window.__litHooks || window.litHooks) : null);
+    return buildSurveyDecryptExecutionContextHelper({
+      sourceSlice,
+      questionId,
+      provider: this.props.provider,
+      account: this.props.account,
+      network: this.props.network,
+      questionPool: this.state.questionPool,
+      pileQuestions: this.state.pileQuestions,
+      litHooks,
+      hasher: this.state.hasher,
+      resolveDecryptSurveyId: this.resolveDecryptSurveyId,
+      getProviderKind: cryptoUtils.getProviderKind,
+    });
   };
 
   applyDecryptedQuestionResponseValues = (
     responseRecord,
-    {
-      questionId,
-      decryptedStateSlice,
-      decryptedImportance = null,
-      decryptedConviction = null,
-    } = {},
-  ) => {
-    if (!responseRecord || typeof responseRecord !== 'object') return responseRecord;
-    const qid = String(questionId || '').trim().toLowerCase();
-    const next = { ...responseRecord };
+    options = {},
+  ) => applyDecryptedQuestionResponseValuesHelper(responseRecord, options);
 
-    if (qid && decryptedStateSlice?.answers?.[qid]) {
-      next.answer = {
-        ...(next.answer || {}),
-        value: decryptedStateSlice.answers[qid]?.value,
-      };
-    }
-    if (qid && decryptedStateSlice?.additionalComments?.[qid]) {
-      next.additional = {
-        ...(next.additional || {}),
-        value: decryptedStateSlice.additionalComments[qid]?.value,
-      };
-    }
-    if (decryptedImportance !== null && decryptedImportance !== undefined) {
-      next.importance = decryptedImportance;
-    }
-    if (decryptedConviction !== null && decryptedConviction !== undefined) {
-      next.conviction = decryptedConviction;
-    }
-
-    return next;
-  };
+  applyDecryptedQuestionResponseValuesToContainer = (
+    viewedResponseContainer,
+    options = {},
+  ) => applyDecryptedQuestionResponseValuesToContainerHelper(viewedResponseContainer, options);
 
   applyDecryptedQuestionStateToSurveySlice = (
     targetStateSlice,
-    {
-      questionId,
-      decryptedStateSlice,
-      baselineSlice = null,
-      decryptedImportance = null,
-      decryptedConviction = null,
-    } = {},
-  ) => {
-    const qid = String(questionId || '').trim().toLowerCase();
-    if (!qid) return targetStateSlice;
+    options = {},
+  ) => applyDecryptedQuestionStateToSurveySliceHelper(targetStateSlice, options);
 
-    const nextTargetStateSlice = {
-      ...(targetStateSlice || {}),
-    };
+  buildViewedResponseDecryptSuccessState = (
+    prevState,
+    options = {},
+  ) => buildViewedResponseDecryptSuccessStateHelper(prevState, options);
 
-    if (decryptedStateSlice?.answers?.[qid]) {
-      const prevEncrypted = nextTargetStateSlice.answers?.[qid]?.encrypted;
-      const incoming = decryptedStateSlice.answers[qid];
-      nextTargetStateSlice.answers = { ...(nextTargetStateSlice.answers || {}) };
-      nextTargetStateSlice.answers[qid] = {
-        ...(nextTargetStateSlice.answers[qid] || {}),
-        value: incoming.value,
-        encrypted: (typeof prevEncrypted === 'boolean')
-          ? prevEncrypted
-          : !!(
-              baselineSlice?.answers?.[qid]?.value === '*' &&
-              (
-                baselineSlice?.answers?.[qid]?.encryptedPortion ||
-                baselineSlice?.answers?.[qid]?.encrypted
-              )
-            ),
-        ...(incoming.zkSalt ? { zkSalt: incoming.zkSalt } : {}),
-      };
-    }
+  buildSelfQuestionDecryptSuccessState = (
+    prevState,
+    options = {},
+  ) => buildSelfQuestionDecryptSuccessStateHelper(prevState, options, this.deepClone);
 
-    if (decryptedStateSlice?.additionalComments?.[qid]) {
-      const prevEncrypted = nextTargetStateSlice.additionalComments?.[qid]?.encrypted;
-      const incoming = decryptedStateSlice.additionalComments[qid];
-      nextTargetStateSlice.additionalComments = {
-        ...(nextTargetStateSlice.additionalComments || {}),
-      };
-      nextTargetStateSlice.additionalComments[qid] = {
-        ...(nextTargetStateSlice.additionalComments[qid] || {}),
-        value: incoming.value,
-        encrypted: (typeof prevEncrypted === 'boolean')
-          ? prevEncrypted
-          : !!(
-              baselineSlice?.additionalComments?.[qid]?.value === '*' &&
-              (
-                baselineSlice?.additionalComments?.[qid]?.encryptedPortion ||
-                baselineSlice?.additionalComments?.[qid]?.encrypted
-              )
-            ),
-        ...(incoming.zkSalt ? { zkSalt: incoming.zkSalt } : {}),
-      };
-    }
-
-    if (decryptedImportance !== null && decryptedImportance !== undefined) {
-      nextTargetStateSlice.importance = nextTargetStateSlice.importance || {};
-      nextTargetStateSlice.importance[qid] = decryptedImportance;
-    }
-    if (decryptedConviction !== null && decryptedConviction !== undefined) {
-      nextTargetStateSlice.conviction = nextTargetStateSlice.conviction || {};
-      nextTargetStateSlice.conviction[qid] = decryptedConviction;
-    }
-
-    return nextTargetStateSlice;
-  };
+  buildSurveyDecryptSuccessState = (
+    prevState,
+    options = {},
+  ) => buildSurveyDecryptSuccessStateHelper(prevState, options, this.deepClone);
 
   syncDecryptedQuestionIntoBaseline = (
     editBaseline,
     fallbackBaseline,
     nextTargetStateSlice,
-    {
-      questionId,
-      decryptedStateSlice,
-      decryptedImportance = null,
-      decryptedConviction = null,
-    } = {},
-  ) => {
-    const qid = String(questionId || '').trim().toLowerCase();
-    let nextBaseline = editBaseline
-      ? this.deepClone(editBaseline)
-      : this.deepClone(
-        fallbackBaseline || { answers: {}, importance: {}, conviction: {}, additionalComments: {} },
-      );
-
-    if (!qid) return nextBaseline;
-
-    if (!nextBaseline.answers) nextBaseline.answers = {};
-    if (!nextBaseline.additionalComments) nextBaseline.additionalComments = {};
-
-    if (decryptedStateSlice?.answers?.[qid]) {
-      nextBaseline.answers[qid] = this.deepClone(nextTargetStateSlice.answers?.[qid]);
-    }
-    if (decryptedStateSlice?.additionalComments?.[qid]) {
-      nextBaseline.additionalComments[qid] = this.deepClone(
-        nextTargetStateSlice.additionalComments?.[qid],
-      );
-    }
-    if (decryptedImportance !== null && decryptedImportance !== undefined) {
-      nextBaseline.importance = nextBaseline.importance || {};
-      nextBaseline.importance[qid] = decryptedImportance;
-    }
-    if (decryptedConviction !== null && decryptedConviction !== undefined) {
-      nextBaseline.conviction = nextBaseline.conviction || {};
-      nextBaseline.conviction[qid] = decryptedConviction;
-    }
-
-    return nextBaseline;
-  };
+    options = {},
+  ) => syncDecryptedQuestionIntoBaselineHelper(
+    editBaseline,
+    fallbackBaseline,
+    nextTargetStateSlice,
+    options,
+    this.deepClone,
+  );
 
   mergeLatestEncryptedQuestionFields = (
     responseSlice,
     questionId,
     latestResponse,
-    { includeAnswer = false, includeAdditional = false } = {},
-  ) => {
-    const qid = String(questionId || '').trim().toLowerCase();
-    if (!qid || !latestResponse || typeof latestResponse !== 'object') return responseSlice;
-
-    let nextResponseSlice = responseSlice && typeof responseSlice === 'object'
-      ? { ...responseSlice }
-      : { answers: {}, additionalComments: {} };
-
-    if (includeAnswer && latestResponse.answer?.encryptedPortion) {
-      nextResponseSlice.answers = { ...(nextResponseSlice.answers || {}) };
-      nextResponseSlice.answers[qid] = {
-        ...(nextResponseSlice.answers[qid] || { value: '*', encrypted: true, hash: '' }),
-        encrypted: !!(latestResponse.answer.encrypted || nextResponseSlice.answers?.[qid]?.encrypted),
-        hash: latestResponse.answer.hash || nextResponseSlice.answers?.[qid]?.hash || '',
-        encryptedPortion: latestResponse.answer.encryptedPortion,
-      };
-    }
-
-    if (includeAdditional && latestResponse.additional?.encryptedPortion) {
-      nextResponseSlice.additionalComments = { ...(nextResponseSlice.additionalComments || {}) };
-      nextResponseSlice.additionalComments[qid] = {
-        ...(nextResponseSlice.additionalComments[qid] || { value: '*', encrypted: true, hash: '' }),
-        encrypted: !!(
-          latestResponse.additional.encrypted ||
-          nextResponseSlice.additionalComments?.[qid]?.encrypted
-        ),
-        hash: latestResponse.additional.hash || nextResponseSlice.additionalComments?.[qid]?.hash || '',
-        encryptedPortion: latestResponse.additional.encryptedPortion,
-      };
-    }
-
-    return nextResponseSlice;
-  };
+    options = {},
+  ) => mergeLatestEncryptedQuestionFieldsHelper(responseSlice, questionId, latestResponse, options);
 
   mergeQuestionResponseOverrideIntoDecryptSlice = (
     responseSlice,
     questionId,
     responseOverride,
-  ) => {
-    const qid = String(questionId || '').trim().toLowerCase();
-    if (!qid || !responseOverride || typeof responseOverride !== 'object') return responseSlice;
+  ) => mergeQuestionResponseOverrideIntoDecryptSliceHelper(responseSlice, questionId, responseOverride);
 
-    const ans = responseOverride.answer || {};
-    const add = responseOverride.additional || {};
-    const nextResponseSlice = responseSlice && typeof responseSlice === 'object'
-      ? { ...responseSlice }
-      : { answers: {}, additionalComments: {} };
+  collectQuestionRatingEnvelopesByQid = (source) =>
+    collectQuestionRatingEnvelopesByQidHelper(source);
 
-    nextResponseSlice.answers = { ...(nextResponseSlice.answers || {}) };
-    nextResponseSlice.additionalComments = { ...(nextResponseSlice.additionalComments || {}) };
+  carryForwardSurveyQuestionRatings = (
+    sourceSlice,
+    previousStateSlice = null,
+  ) => carryForwardSurveyQuestionRatingsHelper(sourceSlice, previousStateSlice);
 
-    nextResponseSlice.answers[qid] = {
-      ...(nextResponseSlice.answers[qid] || {}),
-      ...(Object.prototype.hasOwnProperty.call(ans, 'value') ? { value: ans.value } : {}),
-      encrypted: !!(ans.encrypted || ans.encryptedPortion || nextResponseSlice.answers?.[qid]?.encrypted),
-      ...(ans.hash ? { hash: ans.hash } : {}),
-      ...(ans.encryptedPortion ? { encryptedPortion: ans.encryptedPortion } : {}),
-    };
-    nextResponseSlice.additionalComments[qid] = {
-      ...(nextResponseSlice.additionalComments[qid] || {}),
-      ...(Object.prototype.hasOwnProperty.call(add, 'value') ? { value: add.value } : {}),
-      encrypted: !!(
-        add.encrypted ||
-        add.encryptedPortion ||
-        nextResponseSlice.additionalComments?.[qid]?.encrypted
-      ),
-      ...(add.hash ? { hash: add.hash } : {}),
-      ...(add.encryptedPortion ? { encryptedPortion: add.encryptedPortion } : {}),
-    };
+  buildSurveyDecryptSourceState = (
+    latestResponse = null,
+    fallbackSourceSlice = null,
+    previousStateSlice = null,
+  ) => buildSurveyDecryptSourceStateHelper(
+    latestResponse,
+    fallbackSourceSlice,
+    previousStateSlice,
+    this.buildSliceFromUserAnswers,
+  );
 
-    return nextResponseSlice;
-  };
+  hydrateLatestQuestionDecryptState = async (
+    options = {},
+  ) => hydrateLatestQuestionDecryptStateHelper(
+    options,
+    {
+      getQuestionFieldDecryptSelection: this.getQuestionFieldDecryptSelection,
+      readQuestionsCache,
+      getLatestQuestionResponse: this.getLatestQuestionResponse,
+      mergeLatestEncryptedQuestionFields: this.mergeLatestEncryptedQuestionFields,
+      mergeQuestionRatingEnvelopeState: this.mergeQuestionRatingEnvelopeState,
+      logWarn: (error) => surveyLog.warn('SurveyTool: fallback', error),
+    },
+  );
 
-  getQuestionRatingEnvelopes = (source, questionId = null) => {
-    if (!source || typeof source !== 'object') return null;
+  prepareViewedQuestionDecryptState = async (
+    options = {},
+  ) => prepareViewedQuestionDecryptStateHelper(
+    options,
+    {
+      buildViewedResponseDecryptBaseline: this.buildViewedResponseDecryptBaseline,
+      hydrateLatestQuestionDecryptState: this.hydrateLatestQuestionDecryptState,
+    },
+  );
 
-    const qid = String(questionId || '').trim().toLowerCase();
-    let target = source;
+  prepareSelfQuestionDecryptState = async (
+    options = {},
+  ) => prepareSelfQuestionDecryptStateHelper(
+    options,
+    {
+      buildSelfQuestionDecryptBaseline: this.buildSelfQuestionDecryptBaseline,
+      mergeQuestionResponseOverrideIntoDecryptSlice: this.mergeQuestionResponseOverrideIntoDecryptSlice,
+      mergeQuestionRatingEnvelopeState: this.mergeQuestionRatingEnvelopeState,
+      hydrateLatestQuestionDecryptState: this.hydrateLatestQuestionDecryptState,
+      logWarn: (error) => surveyLog.warn('SurveyTool: fallback', error),
+    },
+  );
 
-    if (Array.isArray(source.responses)) {
-      target = source.responses.find(
-        (response) => String(response?.questionID || response?.questionId || '').trim().toLowerCase() === qid,
-      ) || null;
-    } else if (qid) {
-      const sourceId = String(source.questionID || source.questionId || '').trim().toLowerCase();
-      if (sourceId && sourceId !== qid) return null;
-    }
+  resolveLatestSurveyDecryptResponse = async (
+    options = {},
+  ) => resolveLatestSurveyDecryptResponseHelper(
+    options,
+    {
+      getLatestQuestionResponse: contractScripts.getResponse,
+      getLatestSurveyResponse: this.getSurveyResponse,
+    },
+  );
 
-    if (!target || typeof target !== 'object') return null;
+  prepareSurveyDecryptAttempt = async (
+    options = {},
+  ) => prepareSurveyDecryptAttemptHelper(
+    options,
+    {
+      resolveLatestSurveyDecryptResponse: this.resolveLatestSurveyDecryptResponse,
+      buildSurveyDecryptSourceState: this.buildSurveyDecryptSourceState,
+      buildSurveyDecryptExecutionContext: this.buildSurveyDecryptExecutionContext,
+    },
+  );
 
-    const importanceEncrypted =
-      typeof target.importanceEncrypted === 'string' ? target.importanceEncrypted : '';
-    const convictionEncrypted =
-      typeof target.convictionEncrypted === 'string' ? target.convictionEncrypted : '';
+  resolveQuestionDecryptHandlingMode = (
+    options = {},
+  ) => resolveQuestionDecryptHandlingModeHelper(
+    options,
+    {
+      getViewedResponseOverrideForQuestion: this.getViewedResponseOverrideForQuestion,
+    },
+  );
 
-    if (!importanceEncrypted && !convictionEncrypted) return null;
-    return { importanceEncrypted, convictionEncrypted };
-  };
+  prepareQuestionDecryptAttempt = (
+    options = {},
+  ) => prepareQuestionDecryptAttemptHelper(
+    options,
+    {
+      getQuestionFieldDecryptSelection: this.getQuestionFieldDecryptSelection,
+      buildQuestionDecryptExecutionContext: this.buildQuestionDecryptExecutionContext,
+    },
+  );
 
-  mergeQuestionRatingEnvelopeState = (previousState, nextSource, questionId = null) => {
-    const previous = previousState && typeof previousState === 'object' ? previousState : null;
-    const next = this.getQuestionRatingEnvelopes(nextSource, questionId);
-    if (!previous) return next;
-    if (!next) return previous;
-    return {
-      importanceEncrypted: next.importanceEncrypted || previous.importanceEncrypted || '',
-      convictionEncrypted: next.convictionEncrypted || previous.convictionEncrypted || '',
-    };
-  };
+  finalizeQuestionDecryptAttempt = async (
+    options = {},
+  ) => finalizeQuestionDecryptAttemptHelper(
+    options,
+    {
+      decryptSingleField: cryptoUtils.decryptSingleField,
+      decryptQuestionRatingEnvelopes: this.decryptQuestionRatingEnvelopes,
+    },
+  );
 
-  buildQuestionDecryptStartState = (prevState, keysToMark = []) => ({
-    isDecrypting: true,
-    submissionError: '',
-    suppressPrefill: true,
-    decryptingByKey: this.markQuestionFieldBusyMap(prevState?.decryptingByKey, keysToMark),
-  });
+  finalizeSurveyDecryptAttempt = async (
+    options = {},
+  ) => finalizeSurveyDecryptAttemptHelper(
+    options,
+    {
+      decryptMultipleAnswers: cryptoUtils.decryptMultipleAnswers,
+      decryptQuestionRatingEnvelopeMap: this.decryptQuestionRatingEnvelopeMap,
+      normalizeBulkDecryptedSliceForSurveyState: this.normalizeBulkDecryptedSliceForSurveyState,
+    },
+  );
+
+  normalizeBulkDecryptedSliceForSurveyState = (
+    decryptedSlice,
+    options = {},
+  ) => normalizeBulkDecryptedSliceForSurveyStateHelper(decryptedSlice, options);
+
+  getQuestionRatingEnvelopes = (source, questionId = null) =>
+    getQuestionRatingEnvelopesHelper(source, questionId);
+
+  mergeQuestionRatingEnvelopeState = (previousState, nextSource, questionId = null) =>
+    mergeQuestionRatingEnvelopeStateHelper(previousState, nextSource, questionId);
+
+  buildQuestionDecryptStartState = (prevState, keysToMark = []) =>
+    buildQuestionDecryptStartStateHelper(prevState, keysToMark);
 
   buildQuestionDecryptFailureState = (
     prevState,
     questionId,
     fieldToDecrypt = 'both',
     errorMessage = '',
-  ) => ({
-    isDecrypting: false,
-    submissionError: errorMessage || 'Decryption failed.',
-    decryptingByKey: this.clearQuestionFieldBusyMap(
-      prevState?.decryptingByKey,
+  ) => buildQuestionDecryptFailureStateHelper(
+    prevState,
+    questionId,
+    fieldToDecrypt,
+    errorMessage,
+  );
+
+  buildEmptyQuestionDecryptSlice = () => buildEmptyQuestionDecryptSliceHelper();
+
+  ensureQuestionDecryptSliceShape = (responseSlice) =>
+    ensureQuestionDecryptSliceShapeHelper(responseSlice);
+
+  buildViewedResponseDecryptBaseline = (responseOverride, questionId) =>
+    buildViewedResponseDecryptBaselineHelper(
+      responseOverride,
       questionId,
-      fieldToDecrypt,
-    ),
-  });
-
-  buildEmptyQuestionDecryptSlice = () => ({
-    answers: {},
-    importance: {},
-    conviction: {},
-    additionalComments: {},
-  });
-
-  ensureQuestionDecryptSliceShape = (responseSlice) => {
-    const base = responseSlice && typeof responseSlice === 'object'
-      ? responseSlice
-      : this.buildEmptyQuestionDecryptSlice();
-
-    return {
-      ...base,
-      answers: { ...(base.answers || {}) },
-      importance: { ...(base.importance || {}) },
-      conviction: { ...(base.conviction || {}) },
-      additionalComments: { ...(base.additionalComments || {}) },
-    };
-  };
-
-  buildViewedResponseDecryptBaseline = (responseOverride, questionId) => {
-    const qid = String(questionId || '').trim().toLowerCase();
-    if (!qid || !responseOverride || typeof responseOverride !== 'object') {
-      return this.buildEmptyQuestionDecryptSlice();
-    }
-
-    const shaped = { ...responseOverride };
-    if (!shaped.questionID && shaped.questionId) shaped.questionID = shaped.questionId;
-    if (!shaped.questionID) shaped.questionID = qid;
-
-    let baselineForDecrypt = null;
-    try {
-      baselineForDecrypt = this.buildSliceFromUserAnswers(shaped);
-    } catch (_) {
-      baselineForDecrypt = null;
-    }
-
-    return this.ensureQuestionDecryptSliceShape(baselineForDecrypt);
-  };
-
-  buildSelfQuestionDecryptBaseline = (surveyIndex) => {
-    let baselineSlice = this.state.surveysResponseState?.[surveyIndex];
-    if (!baselineSlice && this.state.userAnswers) {
-      baselineSlice = this.buildSliceFromUserAnswers(this.state.userAnswers);
-    }
-    return {
-      baselineSlice,
-      baselineForDecrypt: this.deepClone(
-        this.ensureQuestionDecryptSliceShape(baselineSlice),
-      ),
-    };
-  };
-
-  normalizeSingleQuestionViewedResponse = (rawResponse = null) => {
-    if (rawResponse == null) return null;
-
-    if (typeof rawResponse !== 'object' || Array.isArray(rawResponse)) {
-      return {
-        answer: { value: rawResponse },
-        additional: { value: '' },
-      };
-    }
-
-    const nestedResponse = (
-      rawResponse.response &&
-      typeof rawResponse.response === 'object' &&
-      !Array.isArray(rawResponse.response)
-    ) ? rawResponse.response : null;
-    const base = nestedResponse
-      ? { ...rawResponse, ...nestedResponse }
-      : { ...rawResponse };
-
-    const firstDefined = (...values) => {
-      for (let i = 0; i < values.length; i += 1) {
-        if (values[i] !== undefined) return values[i];
-      }
-      return undefined;
-    };
-
-    const normalizeField = (field, fallbackValue) => {
-      const nextField = (
-        field && typeof field === 'object' && !Array.isArray(field)
-      ) ? { ...field } : {};
-      const scalar = (
-        field != null &&
-        typeof field !== 'object'
-      ) ? field : undefined;
-      const value = firstDefined(nextField.value, scalar, fallbackValue);
-      if (value !== undefined) nextField.value = value;
-      return nextField;
-    };
-
-    const answerFallback = firstDefined(
-      base.answerValue,
-      base.value,
-      base.responseValue,
-      base.answerText,
-      base.responseText,
-      (
-        base.answer == null &&
-        (typeof base.response === 'string' || typeof base.response === 'number' || typeof base.response === 'boolean')
-      ) ? base.response : undefined
-    );
-    const additionalFallback = firstDefined(
-      base.additionalComment,
-      base.additionalComments,
-      base.comment,
-      base.comments,
-      base.additionalText
+      this.buildSliceFromUserAnswers,
     );
 
-    const normalized = {
-      ...base,
-      answer: normalizeField(base.answer, answerFallback),
-      additional: normalizeField(base.additional, additionalFallback),
-    };
-    const hasShapeHints = !!(
-      base.answer !== undefined ||
-      base.additional !== undefined ||
-      answerFallback !== undefined ||
-      additionalFallback !== undefined ||
-      base.importance !== undefined ||
-      base.conviction !== undefined ||
-      base.arweaveTxId ||
-      base.transactionHash ||
-      base.txHash ||
-      base.blockNumber !== undefined ||
-      base.transactionIndex !== undefined ||
-      base.logIndex !== undefined ||
-      base.timestamp !== undefined
+  buildSelfQuestionDecryptBaseline = (surveyIndex) =>
+    buildSelfQuestionDecryptBaselineHelper(
+      surveyIndex,
+      this.state.surveysResponseState,
+      this.state.userAnswers,
+      this.buildSliceFromUserAnswers,
+      this.deepClone,
     );
-    return hasShapeHints ? normalized : null;
-  };
 
-  runDedupedDecryptTask = (taskKey, runner) => {
-    const key = String(taskKey || '');
-    if (!key || typeof runner !== 'function') {
-      return Promise.resolve(false);
-    }
-    const existing = this._decryptFieldTaskInFlight.get(key);
-    if (existing) return existing;
-    const task = Promise.resolve()
-      .then(() => runner())
-      .finally(() => {
-        if (this._decryptFieldTaskInFlight.get(key) === task) {
-          this._decryptFieldTaskInFlight.delete(key);
-        }
-      });
-    this._decryptFieldTaskInFlight.set(key, task);
-    return task;
-  };
+  normalizeSingleQuestionViewedResponse = (rawResponse = null) =>
+    normalizeSingleQuestionViewedResponseHelper(rawResponse);
+
+  runDedupedDecryptTask = (taskKey, runner) =>
+    runDedupedDecryptTaskHelper(this._decryptFieldTaskInFlight, taskKey, runner);
 
   clearGateSbtHydrationRetry = () => {
     if (!this._gateSbtHydrationRetryTimer) return;
@@ -3522,34 +3293,17 @@ export class SurveyQuestions extends Component {
     );
   };
 
-  parseEncryptedEnvelope = (field) => {
-    try {
-      return field?.encryptedPortion ? JSON.parse(field.encryptedPortion) : null;
-    } catch {
-      return null;
-    }
-  };
+  parseEncryptedEnvelope = (field) => parseEncryptedEnvelopeHelper(field);
 
   getFieldDecryptState = ({
     questionId,
     fieldKey,
     field,
-  }) => {
-    const envelope = this.parseEncryptedEnvelope(field);
-    const masked = !!(field?.value === '*' && (field?.encryptedPortion || field?.encrypted));
-    const allowDecrypt = masked && (
-      !!envelope ||
-      (!!this.props.loginComplete && !!this.props.account)
-    );
-    const busy = this.isQuestionFieldBusy(questionId, fieldKey);
-
-    return {
-      envelope,
-      masked,
-      allowDecrypt,
-      busy,
-    };
-  };
+  }) => buildFieldDecryptStateHelper(field, {
+    loginComplete: this.props.loginComplete,
+    account: this.props.account,
+    busy: this.isQuestionFieldBusy(questionId, fieldKey),
+  });
 
   getQuestionFieldDisplayState = ({
     questionId,
@@ -3566,16 +3320,13 @@ export class SurveyQuestions extends Component {
       fieldKey: 'additional',
       field: additional,
     });
-    const hasAdditionalContent = hasMeaningfulFieldValue(additional);
-
-    return {
+    return buildQuestionFieldDisplayStateHelper({
+      answer,
+      additional,
       answerDecryptState,
       additionalDecryptState,
-      hasAdditionalContent,
-      glowAnswer: !!answer?.encrypted,
-      glowAdditional: !!(additional?.encrypted && hasAdditionalContent),
-      decryptTooltip: 'Login to decrypt this encrypted field.',
-    };
+      hasAdditionalContent: hasMeaningfulFieldValue(additional),
+    });
   };
 
   getQuestionResponseDisplayState = ({
@@ -3589,17 +3340,14 @@ export class SurveyQuestions extends Component {
     const importanceValue = this.getImportanceValueForSlice(slice, questionId);
     const hasConvictionImportanceValue = hasConvictionOrImportanceValueForQuestion(slice, questionId);
     const sliderMode = ENABLE_IMPORTANCE_SLIDER_TOGGLE ? this.getSliderMode(questionId) : 'conviction';
-    const activeSliderValue = sliderMode === 'importance' ? importanceValue : convictionValue;
-
-    return {
+    return buildQuestionResponseDisplayStateHelper({
       answer,
       additional,
       convictionValue,
       importanceValue,
       hasConvictionImportanceValue,
       sliderMode,
-      activeSliderValue,
-    };
+    });
   };
 
   getQuestionRenderDisplayState = ({
@@ -3616,44 +3364,36 @@ export class SurveyQuestions extends Component {
       additional: responseDisplayState.additional,
     });
 
-    return {
-      ...responseDisplayState,
-      ...fieldDisplayState,
-      maskedAnswer: fieldDisplayState.answerDecryptState.masked,
-      maskedAdditional: fieldDisplayState.additionalDecryptState.masked,
-      allowDecryptAnswer: fieldDisplayState.answerDecryptState.allowDecrypt,
-      allowDecryptAdditional: fieldDisplayState.additionalDecryptState.allowDecrypt,
-      isAnswerDecrypting: fieldDisplayState.answerDecryptState.busy,
-      isAdditionalDecrypting: fieldDisplayState.additionalDecryptState.busy,
-    };
+    return buildQuestionRenderDisplayStateHelper({
+      responseDisplayState,
+      fieldDisplayState,
+    });
   };
 
-  isQuestionPromptMasked = (question) => (
-    this.isMaskedPromptText(question?.prompt) && !question?.promptDecrypted
-  );
+  isQuestionPromptMasked = (question) => isQuestionPromptMaskedHelper(question);
 
   getAnswerLockDisplayState = ({
     field,
     masked,
-  }) => ({
-    lockDisabled: this.state.isSubmitting || masked,
-    lockTitle: masked ? 'Encrypted answer' : (field?.encrypted ? 'Encrypted' : 'Not encrypted'),
+  }) => buildAnswerLockDisplayState({
+    field,
+    masked,
+    isSubmitting: this.state.isSubmitting,
   });
 
   getGatedPromptNoticeState = ({
     question,
     tooltipIdSuffix,
     fallbackId = 'gated',
-  }) => {
-    const gateNames = this.resolveGatedPromptGateNames(question);
-    const tooltipIdBase = String(question?.id || fallbackId).trim().toLowerCase();
-    return {
-      tooltipId: `ce-gated-prompt-tip-${tooltipIdBase.replace(/[^a-z0-9_-]/g, '-')}-${tooltipIdSuffix}`,
-      tooltipText: gateNames.length
-        ? `Required ${t('sbt')} ${gateNames.length > 1 ? t('gates') : t('gate')}: ${gateNames.join(', ')}`
-        : `${t('sbt')} ${t('gate')} required`,
-    };
-  };
+  }) => buildGatedPromptNoticeState({
+    questionId: question?.id,
+    tooltipIdSuffix,
+    fallbackId,
+    gateNames: this.resolveGatedPromptGateNames(question),
+    sbtLabel: t('sbt'),
+    gateLabel: t('gate'),
+    gatesLabel: t('gates'),
+  });
 
   renderGatedPromptNotice = ({
     question,
@@ -8271,48 +8011,11 @@ export class SurveyQuestions extends Component {
 
 
   resolveDecryptSurveyId = (baselineForDecrypt, questionId = null) => {
-    const propSurveyId = this.props.surveyId || this.props.surveyID;
-    if (propSurveyId) return propSurveyId;
-
-    const getEnvelopeSurveyId = (field) => {
-      const encryptedPortion = field?.encryptedPortion;
-      if (!encryptedPortion) return null;
-      try {
-        const env = JSON.parse(
-          typeof encryptedPortion === 'string'
-            ? encryptedPortion
-            : JSON.stringify(encryptedPortion)
-        );
-        return env?.aad?.surveyId || null;
-      } catch (_) {
-        return null;
-      }
-    };
-
-    const normalizedQuestionId =
-      questionId == null ? '' : String(questionId).trim().toLowerCase();
-
-    if (normalizedQuestionId) {
-      const scopedSurveyId =
-        getEnvelopeSurveyId(baselineForDecrypt?.answers?.[normalizedQuestionId]) ||
-        getEnvelopeSurveyId(baselineForDecrypt?.additionalComments?.[normalizedQuestionId]);
-      if (scopedSurveyId) return scopedSurveyId;
-    }
-
-    const containers = [
-      baselineForDecrypt?.answers,
-      baselineForDecrypt?.additionalComments,
-    ];
-
-    for (const container of containers) {
-      if (!container || typeof container !== 'object') continue;
-      for (const key of Object.keys(container)) {
-        const surveyId = getEnvelopeSurveyId(container[key]);
-        if (surveyId) return surveyId;
-      }
-    }
-
-    return ethers.constants.HashZero;
+    return resolveDecryptSurveyIdHelper(baselineForDecrypt, {
+      propSurveyId: this.props.surveyId || this.props.surveyID,
+      questionId,
+      defaultSurveyId: ethers.constants.HashZero,
+    });
   };
 
 
@@ -8325,194 +8028,48 @@ export class SurveyQuestions extends Component {
     const slug = this._getEffectiveDraftSlug();
 
     try {
-      let latest;
-      if (this.props.singleQuestionMode) {
-        const qid = this.props.questionID?.toLowerCase();
-        latest = qid && this.props.account
-          ? await contractScripts.getResponse(this.props.provider, this.props.account, qid, slug)
-          : null;
-      } else {
-        latest = this.props.account
-          ? await this.getSurveyResponse(this.props.account, this.props.surveyId)
-          : null;
-      }
-      if (!latest) latest = this.state.userAnswers || null;
-
-      const sourceSlice = latest
-        ? this.buildSliceFromUserAnswers(latest)
-        : (this.state.surveysResponseState[surveyIndex] || { answers: {}, importance: {}, conviction: {}, additionalComments: {} });
-
-      // Capture encrypted rating envelopes (if present) so we can decrypt them alongside answers.
-      const ratingEnvelopesByQid = {};
-      try {
-        const addFromRespObj = (respObj) => {
-          if (!respObj || typeof respObj !== 'object') return;
-          const id = String(respObj?.questionID || respObj?.questionId || respObj?.questionIDHash || '').trim().toLowerCase();
-          if (!id) return;
-          const impEnv = typeof respObj?.importanceEncrypted === 'string' ? respObj.importanceEncrypted : '';
-          const convEnv = typeof respObj?.convictionEncrypted === 'string' ? respObj.convictionEncrypted : '';
-          if (!impEnv && !convEnv) return;
-          ratingEnvelopesByQid[id] = { importanceEncrypted: impEnv, convictionEncrypted: convEnv };
-        };
-        if (latest && typeof latest === 'object') {
-          if (Array.isArray(latest.responses)) {
-            latest.responses.forEach(addFromRespObj);
-          } else {
-            addFromRespObj(latest);
-          }
-        }
-      } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
-
-      // carry forward importance if missing
-      const prevSlice = this.state.surveysResponseState?.[surveyIndex] || {};
-      Object.keys(prevSlice.importance || {}).forEach((qId) => {
-        if (sourceSlice.importance[qId] === undefined || sourceSlice.importance[qId] === null) {
-          sourceSlice.importance[qId] = prevSlice.importance[qId];
-        }
-      });
-      Object.keys(prevSlice.conviction || {}).forEach((qId) => {
-        if (sourceSlice.conviction[qId] === undefined || sourceSlice.conviction[qId] === null) {
-          sourceSlice.conviction[qId] = prevSlice.conviction[qId];
-        }
-      });
-
-      const providerKind = cryptoUtils.getProviderKind(this.props.provider);
-      const chainId = this.props.network?.id;
-      const surveyId = this.resolveDecryptSurveyId(sourceSlice, this.props.questionID);
-
-      const litHooks =
-        this.props.lit ||
-        this.props.litHooks ||
-        (typeof window !== 'undefined' ? (window.__litHooks || window.litHooks) : null);
-      const lit = litHooks && litHooks.getKey ? { getKey: litHooks.getKey } : undefined;
-
-      const opts = {
-        providerKind,
-        provider: this.props.provider,
-        account: this.props.account,
-        chainId,
-        surveyId,
-        ...(lit ? { lit } : {}),
-        hasher: this.state.hasher, // INJECT HASHER
-        throwOnError: true,
-      };
-
-      // Use whichever set is actually rendered (pile or standard pool)
-      const poolForDecrypt =
-        (Array.isArray(this.state.questionPool) && this.state.questionPool.length > 0)
-          ? this.state.questionPool
-          : (Array.isArray(this.state.pileQuestions) ? this.state.pileQuestions : []);
-
-      // decrypt visible answers
-      const decryptedSlice = await cryptoUtils.decryptMultipleAnswers(
+      const {
         sourceSlice,
+        ratingEnvelopesByQid,
+        chainId,
+        lit,
+        opts,
         poolForDecrypt,
-        opts
-      );
-
-      // Also decrypt rating envelopes (importance/conviction) when present.
-      const decryptedImportanceFromEnv = {};
-      const decryptedConvictionFromEnv = {};
-      try {
-        const litOpts = lit ? lit : undefined;
-        const toNum = (v) => {
-          if (v === undefined || v === null) return null;
-          const n = Number(v);
-          return Number.isNaN(n) ? null : n;
-        };
-        const qids = Object.keys(ratingEnvelopesByQid || {});
-        for (const qId of qids) {
-          const envs = ratingEnvelopesByQid[qId] || {};
-          if (envs.importanceEncrypted) {
-            try {
-              const v = await cryptoUtils.decryptEnvelopeValue(envs.importanceEncrypted, {
-                account: this.props.account,
-                chainId,
-                providerLike: this.props.provider,
-                ...(litOpts ? { litOpts } : {}),
-              });
-              const n = toNum(v);
-              if (n !== null) decryptedImportanceFromEnv[qId] = n;
-            } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
-          }
-          if (envs.convictionEncrypted) {
-            try {
-              const v = await cryptoUtils.decryptEnvelopeValue(envs.convictionEncrypted, {
-                account: this.props.account,
-                chainId,
-                providerLike: this.props.provider,
-                ...(litOpts ? { litOpts } : {}),
-              });
-              const n = toNum(v);
-              if (n !== null) decryptedConvictionFromEnv[qId] = n;
-            } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
-          }
-        }
-      } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
-
-      // Preserve user intent for encryption toggles & store zkSalt when present
-      Object.keys(decryptedSlice.answers || {}).forEach(qId => {
-        const prevEnc = this.state.surveysResponseState?.[surveyIndex]?.answers?.[qId]?.encrypted;
-        if (typeof prevEnc === 'boolean') decryptedSlice.answers[qId].encrypted = prevEnc;
-        else if (sourceSlice.answers?.[qId]?.value === '*' &&
-                (sourceSlice.answers?.[qId]?.encryptedPortion || sourceSlice.answers?.[qId]?.encrypted)) {
-          decryptedSlice.answers[qId].encrypted = true;
-        }
+      } = await this.prepareSurveyDecryptAttempt({
+        singleQuestionMode: this.props.singleQuestionMode,
+        questionId: this.props.questionID,
+        account: this.props.account,
+        providerLike: this.props.provider,
+        slug,
+        surveyId: this.props.surveyId,
+        fallbackUserAnswers: this.state.userAnswers,
+        fallbackSourceSlice:
+          this.state.surveysResponseState[surveyIndex] ||
+          { answers: {}, importance: {}, conviction: {}, additionalComments: {} },
+        previousStateSlice: this.state.surveysResponseState?.[surveyIndex] || {},
       });
-      Object.keys(decryptedSlice.additionalComments || {}).forEach(qId => {
-        const prevEnc = this.state.surveysResponseState?.[surveyIndex]?.additionalComments?.[qId]?.encrypted;
-        if (typeof prevEnc === 'boolean') decryptedSlice.additionalComments[qId].encrypted = prevEnc;
-        else if (sourceSlice.additionalComments?.[qId]?.value === '*' &&
-                (sourceSlice.additionalComments?.[qId]?.encryptedPortion || sourceSlice.additionalComments?.[qId]?.encrypted)) {
-          decryptedSlice.additionalComments[qId].encrypted = true;
-        }
+      const {
+        normalizedDecryptedSlice,
+        decryptedImportanceFromEnv,
+        decryptedConvictionFromEnv,
+      } = await this.finalizeSurveyDecryptAttempt({
+        sourceSlice,
+        ratingEnvelopesByQid,
+        account: this.props.account,
+        providerLike: this.props.provider,
+        chainId,
+        lit,
+        poolForDecrypt,
+        opts,
+        previousStateSlice: this.state.surveysResponseState?.[surveyIndex] || {},
       });
 
-      this.setState(prevState => {
-        const surveysResponseStateCopy = [...(prevState.surveysResponseState || [])];
-        const nextSlice = {
-          answers: { ...(prevState.surveysResponseState?.[surveyIndex]?.answers || {}), ...(decryptedSlice.answers || {}) },
-          importance: {
-            ...(prevState.surveysResponseState?.[surveyIndex]?.importance || {}),
-            ...(decryptedSlice.importance || {}),
-            ...(decryptedImportanceFromEnv || {}),
-          },
-          conviction: {
-            ...(prevState.surveysResponseState?.[surveyIndex]?.conviction || {}),
-            ...(decryptedConvictionFromEnv || {}),
-          },
-          additionalComments: { ...(prevState.surveysResponseState?.[surveyIndex]?.additionalComments || {}), ...(decryptedSlice.additionalComments || {}) },
-        };
-
-        Object.keys(decryptedSlice.answers || {}).forEach(qId => {
-          const s = decryptedSlice.answers[qId];
-          if (s && s.zkSalt) {
-            nextSlice.answers[qId] = { ...(nextSlice.answers[qId] || {}), zkSalt: s.zkSalt };
-          }
-        });
-        Object.keys(decryptedSlice.additionalComments || {}).forEach(qId => {
-          const s = decryptedSlice.additionalComments[qId];
-          if (s && s.zkSalt) {
-            nextSlice.additionalComments[qId] = { ...(nextSlice.additionalComments[qId] || {}), zkSalt: s.zkSalt };
-          }
-        });
-
-        surveysResponseStateCopy[surveyIndex] = nextSlice;
-
-        // Always reset baseline to decrypted state so diffs are zeroed
-        const updates = {
-          surveysResponseState: surveysResponseStateCopy,
-          startFresh: false,
-          displayAnswerMode: false,
-          isEditing: true,
-          isDecrypting: false,
-          suppressPrefill: true,
-          editBaseline: this.deepClone(nextSlice),
-          isDirty: false,
-          modifiedCount: 0,
-        };
-        return updates;
-      }, () => {
+      this.setState((prevState) => this.buildSurveyDecryptSuccessState(prevState, {
+        surveyIndex,
+        decryptedSlice: normalizedDecryptedSlice,
+        decryptedImportanceFromEnv,
+        decryptedConvictionFromEnv,
+      }), () => {
         const jsonPreview = this.prepareJsonAndHash(surveyIndex);
         this.setState({ jsonPreview });
         this.persistDraftSafely && this.persistDraftSafely(0);
@@ -8533,35 +8090,11 @@ export class SurveyQuestions extends Component {
   };
 
   getViewedResponseOverrideForQuestion = (questionId, responseContainer = this.state?.parsedViewAddressAnswers) => {
-    const qid = String(questionId || '').trim().toLowerCase();
-    if (!qid || !responseContainer || typeof responseContainer !== 'object') return null;
-
-    const viewedResponder = String(
-      this.props.responderAddress || this.props.viewAddress || ''
-    ).trim().toLowerCase();
-
-    const decorateResponse = (rawResponse) => {
-      if (!rawResponse || typeof rawResponse !== 'object') return null;
-      const next = { ...rawResponse };
-      const rawId = String(next.questionID || next.questionId || '').trim().toLowerCase();
-      if (rawId && rawId !== qid) return null;
-      if (!next.questionID && !next.questionId) next.questionID = qid;
-      if (viewedResponder) {
-        if (!next.responder) next.responder = viewedResponder;
-        if (!next.responderAddress) next.responderAddress = viewedResponder;
-      }
-      return next;
-    };
-
-    if (Array.isArray(responseContainer.responses)) {
-      for (const response of responseContainer.responses) {
-        const decorated = decorateResponse(response);
-        if (decorated) return decorated;
-      }
-      return null;
-    }
-
-    return decorateResponse(responseContainer);
+    return getViewedResponseOverrideForQuestionHelper(
+      questionId,
+      responseContainer,
+      this.props.responderAddress || this.props.viewAddress || '',
+    );
   };
 
   handleDecryptViewedResponseFieldInternal = async (questionId, fieldToDecrypt = 'both', responseOverride = null) => {
@@ -8576,63 +8109,43 @@ export class SurveyQuestions extends Component {
     }
 
     try {
-      // Build baseline slice directly from the viewed response payload so decrypt does not depend on local draft state.
-      let baselineForDecrypt = this.buildViewedResponseDecryptBaseline(responseOverride, qid);
+      const viewedHydrationContext = resolveDecryptHydrationContext(this.props, this._getEffectiveDraftSlug());
+      const responderForLatest = String(
+        responseOverride?.responder ||
+        responseOverride?.responderAddress ||
+        this.props.responderAddress ||
+        this.props.viewAddress ||
+        ''
+      ).trim();
+      const {
+        baselineForDecrypt,
+        ratingEnvelopes,
+      } = await this.prepareViewedQuestionDecryptState({
+        questionId: qid,
+        fieldToDecrypt,
+        responseOverride,
+        account: this.props.account,
+        responderForLatest,
+        sessionSlug: viewedHydrationContext.sessionSlug || '',
+        networkID: viewedHydrationContext.networkIdStr,
+      });
 
-      let decryptSelection = this.getQuestionFieldDecryptSelection(
-        qid,
+      const preparedAttempt = this.prepareQuestionDecryptAttempt({
+        questionId: qid,
         fieldToDecrypt,
         baselineForDecrypt,
-      );
-      const { maskedAnswer: maskedAns, maskedAdditional: maskedAdd } = decryptSelection;
+      });
 
-      if ((maskedAns || maskedAdd) && this.props.account) {
-        try {
-          const context = resolveDecryptHydrationContext(this.props, this._getEffectiveDraftSlug());
-          const slug = context.sessionSlug || '';
-          const networkID = context.networkIdStr;
-          const responderForLatest = String(
-            responseOverride?.responder ||
-            responseOverride?.responderAddress ||
-            this.props.responderAddress ||
-            this.props.viewAddress ||
-            ''
-          ).trim();
-
-          if (networkID && responderForLatest) {
-            const questionsCache = readQuestionsCache(slug) || {};
-            const latest = await this.getLatestQuestionResponse(
-              responderForLatest,
-              qid,
-              networkID,
-              questionsCache
-            );
-
-            if (latest) {
-              baselineForDecrypt = this.mergeLatestEncryptedQuestionFields(
-                baselineForDecrypt,
-                qid,
-                latest,
-                {
-                  includeAnswer: maskedAns,
-                  includeAdditional: maskedAdd,
-                },
-              );
-            }
-          }
-        } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
-      }
-
-      decryptSelection = this.getQuestionFieldDecryptSelection(
-        qid,
-        fieldToDecrypt,
-        baselineForDecrypt,
-      );
-
-      if (!decryptSelection.hasMaskedField) {
+      if (!preparedAttempt.shouldDecrypt) {
         return false;
       }
 
+      const {
+        decryptSelection,
+        chainId,
+        lit,
+        opts,
+      } = preparedAttempt;
       const {
         keysToMark,
         clearMode,
@@ -8641,84 +8154,30 @@ export class SurveyQuestions extends Component {
       this.setState((prev) => this.buildQuestionDecryptStartState(prev, keysToMark));
 
       const {
+        decryptedStateSlice,
+        didUpdate,
+        decryptedImportance,
+        decryptedConviction,
+      } = await this.finalizeQuestionDecryptAttempt({
+        questionId: qid,
+        fieldToDecrypt,
+        baselineForDecrypt,
+        ratingEnvelopes,
+        account: this.props.account,
+        providerLike: this.props.provider,
         chainId,
         lit,
         opts,
-      } = this.buildQuestionDecryptExecutionContext(baselineForDecrypt, qid);
-
-      const decryptedStateSlice = await cryptoUtils.decryptSingleField(
-        baselineForDecrypt,
-        qid,
-        fieldToDecrypt,
-        opts
-      );
-
-      const producedAnswer = !!(decryptedStateSlice.answers && decryptedStateSlice.answers[qid]);
-      const producedAdditional = !!(
-        decryptedStateSlice.additionalComments &&
-        decryptedStateSlice.additionalComments[qid]
-      );
-      const didUpdate = producedAnswer || producedAdditional;
-
-      // Also decrypt encrypted rating envelopes when present (so conviction/importance stays private by default).
-      const { decryptedImportance, decryptedConviction } =
-        await this.decryptQuestionRatingEnvelopes(
-          {
-            importanceEncrypted: typeof responseOverride?.importanceEncrypted === 'string'
-              ? responseOverride.importanceEncrypted
-              : '',
-            convictionEncrypted: typeof responseOverride?.convictionEncrypted === 'string'
-              ? responseOverride.convictionEncrypted
-              : '',
-          },
-          {
-            account: this.props.account,
-            chainId,
-            lit,
-            providerLike: this.props.provider,
-          },
-        );
-
-      this.setState((prev) => {
-        const cleared = this.clearQuestionFieldBusyMap(
-          prev.decryptingByKey,
-          qid,
-          clearMode,
-        );
-
-        const prevViewed = prev.parsedViewAddressAnswers;
-        let nextViewed = prevViewed;
-        if (prevViewed && typeof prevViewed === 'object') {
-          if (Array.isArray(prevViewed.responses)) {
-            const nextResponses = prevViewed.responses.map((r) => {
-              const rid = String(r?.questionID || r?.questionId || '').trim().toLowerCase();
-              if (rid !== qid) return r;
-              return this.applyDecryptedQuestionResponseValues(r, {
-                questionId: qid,
-                decryptedStateSlice,
-                decryptedImportance,
-                decryptedConviction,
-              });
-            });
-            nextViewed = { ...prevViewed, responses: nextResponses };
-          } else {
-            nextViewed = this.applyDecryptedQuestionResponseValues(prevViewed, {
-              questionId: qid,
-              decryptedStateSlice,
-              decryptedImportance,
-              decryptedConviction,
-            });
-          }
-        }
-
-        return {
-          parsedViewAddressAnswers: nextViewed,
-          viewAddressAnswers: nextViewed ? JSON.stringify(nextViewed) : prev.viewAddressAnswers,
-          isDecrypting: false,
-          decryptingByKey: cleared,
-          ...(didUpdate ? {} : { submissionError: 'Decryption failed.' }),
-        };
       });
+
+      this.setState((prev) => this.buildViewedResponseDecryptSuccessState(prev, {
+        questionId: qid,
+        clearMode,
+        didUpdate,
+        decryptedStateSlice,
+        decryptedImportance,
+        decryptedConviction,
+      }));
 
       return didUpdate;
     } catch (error) {
@@ -8749,26 +8208,16 @@ export class SurveyQuestions extends Component {
     try {
       // If we're viewing someone else's response (via /question/:id/:responder or /survey/:id?address=),
       // decrypt in-place against the viewed response object (do NOT switch to edit mode).
-      const viewerLower = String(this.props.account || '').toLowerCase();
-      const viewedResponderLower = String(
-        this.props.responderAddress || this.props.viewAddress || ''
-      ).trim().toLowerCase();
-      const effectiveResponseOverride =
-        responseOverride && typeof responseOverride === 'object'
-          ? responseOverride
-          : this.getViewedResponseOverrideForQuestion(questionId);
-      const hasResponseOverride = !!(effectiveResponseOverride && typeof effectiveResponseOverride === 'object');
-      const responderLower = String(
-        hasResponseOverride
-          ? (
-              effectiveResponseOverride.responder ||
-              effectiveResponseOverride.responderAddress ||
-              viewedResponderLower ||
-              ''
-            )
-          : ''
-      ).toLowerCase();
-      const isViewedResponseMode = !!viewedResponderLower && viewedResponderLower !== viewerLower;
+      const {
+        effectiveResponseOverride,
+        hasResponseOverride,
+        isViewedResponseMode,
+      } = this.resolveQuestionDecryptHandlingMode({
+        questionId,
+        responseOverride,
+        viewerAccount: this.props.account,
+        viewedResponder: this.props.responderAddress || this.props.viewAddress || '',
+      });
       if (isViewedResponseMode) {
         if (!hasResponseOverride) return false;
         return await this.handleDecryptViewedResponseField(
@@ -8778,179 +8227,72 @@ export class SurveyQuestions extends Component {
         );
       }
 
-      // Build a working baseline to decrypt from (current slice → userAnswers → empty)
-      let { baselineSlice, baselineForDecrypt } = this.buildSelfQuestionDecryptBaseline(surveyIndex);
-
-      // If we have a concrete response payload (e.g. decrypt clicked in view mode), merge its envelope into the baseline.
-      if (effectiveResponseOverride && typeof effectiveResponseOverride === 'object') {
-        try {
-          baselineForDecrypt = this.mergeQuestionResponseOverrideIntoDecryptSlice(
-            baselineForDecrypt,
-            questionId,
-            effectiveResponseOverride,
-          );
-        } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
-      }
-
-      // If masked but envelope missing, hydrate the latest encryptedPortion from cache/chain first.
-      // Also capture rating envelopes so we can decrypt conviction/importance alongside the answer.
-      // Seed from the best available payloads so rating decrypt works even when we skip hydration.
-      let latestRatingEnvs = this.mergeQuestionRatingEnvelopeState(
-        null,
-        effectiveResponseOverride,
-        questionId,
-      );
-      latestRatingEnvs = this.mergeQuestionRatingEnvelopeState(
-        latestRatingEnvs,
-        this.state.userAnswers,
-        questionId,
-      );
-      try {
-        const hydrateSelection = this.getQuestionFieldDecryptSelection(
-          questionId,
-          fieldToDecrypt,
-          baselineForDecrypt,
-        );
-        const {
-          maskedAnswer: maskedAnsForHydrate,
-          maskedAdditional: maskedAddForHydrate,
-        } = hydrateSelection;
-
-        if ((maskedAnsForHydrate || maskedAddForHydrate) && this.props.account) {
-          const context = resolveDecryptHydrationContext(this.props, this._getEffectiveDraftSlug());
-          const slug = context.sessionSlug || '';
-          const networkID = context.networkIdStr;
-
-          if (networkID) {
-            const questionsCache = readQuestionsCache(slug) || {};
-
-            const fetchQid = String(questionId || '').toLowerCase();
-            const latest = await this.getLatestQuestionResponse(
-              this.props.account,
-              fetchQid,
-              networkID,
-              questionsCache
-            );
-
-            if (latest) {
-              // Prefer non-empty envelope values from the latest chain payload, but never clobber
-              // previously discovered envelopes with empties.
-              latestRatingEnvs = this.mergeQuestionRatingEnvelopeState(
-                latestRatingEnvs,
-                latest,
-                questionId,
-              );
-              baselineForDecrypt = this.mergeLatestEncryptedQuestionFields(
-                baselineForDecrypt,
-                questionId,
-                latest,
-                {
-                  includeAnswer: maskedAnsForHydrate,
-                  includeAdditional: maskedAddForHydrate,
-                },
-              );
-            }
-          }
-        }
-      } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
-
+      const hydrationContext = resolveDecryptHydrationContext(this.props, this._getEffectiveDraftSlug());
       const {
-        chainId,
-        lit,
-        opts,
-      } = this.buildQuestionDecryptExecutionContext(baselineForDecrypt, questionId);
+        baselineSlice,
+        baselineForDecrypt,
+        ratingEnvelopes: latestRatingEnvs,
+      } = await this.prepareSelfQuestionDecryptState({
+        surveyIndex,
+        questionId,
+        fieldToDecrypt,
+        responseOverride: effectiveResponseOverride,
+        userAnswers: this.state.userAnswers,
+        account: this.props.account,
+        sessionSlug: hydrationContext.sessionSlug || '',
+        networkID: hydrationContext.networkIdStr,
+      });
 
-      const decryptSelection = this.getQuestionFieldDecryptSelection(
+      const preparedAttempt = this.prepareQuestionDecryptAttempt({
         questionId,
         fieldToDecrypt,
         baselineForDecrypt,
-      );
+      });
       const {
-        maskedAnswer: maskedAns,
-        maskedAdditional: maskedAdd,
+        shouldDecrypt,
+        decryptSelection,
+        chainId,
+        lit,
+        opts,
+      } = preparedAttempt;
+      const {
         keysToMark,
         clearMode,
       } = decryptSelection;
 
-      if (!decryptSelection.hasMaskedField) {
+      if (!shouldDecrypt) {
         return false;
       }
 
       this.setState((prev) => this.buildQuestionDecryptStartState(prev, keysToMark));
 
-      const decryptedStateSlice = await cryptoUtils.decryptSingleField(
-        baselineForDecrypt,
+      const {
+        decryptedStateSlice,
+        didUpdate,
+        decryptedImportance,
+        decryptedConviction,
+      } = await this.finalizeQuestionDecryptAttempt({
         questionId,
         fieldToDecrypt,
-        opts
-      );
+        baselineForDecrypt,
+        ratingEnvelopes: latestRatingEnvs,
+        account: this.props.account,
+        providerLike: this.props.provider,
+        chainId,
+        lit,
+        opts,
+      });
 
-      const producedAnswer = !!(decryptedStateSlice.answers && decryptedStateSlice.answers[questionId]);
-      const producedAdditional = !!(decryptedStateSlice.additionalComments && decryptedStateSlice.additionalComments[questionId]);
-      const didUpdate = producedAnswer || producedAdditional;
-
-      // Attempt to decrypt encrypted rating envelopes too, if present on the latest chain payload.
-      const { decryptedImportance, decryptedConviction } =
-        await this.decryptQuestionRatingEnvelopes(
-          latestRatingEnvs,
-          {
-            account: this.props.account,
-            chainId,
-            lit,
-            providerLike: this.props.provider,
-          },
-        );
-
-      this.setState(prevState => {
-        const surveysResponseStateCopy = [...(prevState.surveysResponseState || [])];
-        const targetStateSlice = this.applyDecryptedQuestionStateToSurveySlice(
-          surveysResponseStateCopy[surveyIndex] || {
-            answers: {},
-            importance: {},
-            conviction: {},
-            additionalComments: {},
-          },
-          {
-            questionId,
-            decryptedStateSlice,
-            baselineSlice,
-            decryptedImportance,
-            decryptedConviction,
-          },
-        );
-
-        surveysResponseStateCopy[surveyIndex] = targetStateSlice;
-
-        const cleared = this.clearQuestionFieldBusyMap(
-          prevState.decryptingByKey,
-          questionId,
-          clearMode,
-        );
-
-        const nextBaseline = this.syncDecryptedQuestionIntoBaseline(
-          prevState.editBaseline,
-          baselineSlice,
-          targetStateSlice,
-          {
-            questionId,
-            decryptedStateSlice,
-            decryptedImportance,
-            decryptedConviction,
-          },
-        );
-
-        const updates = {
-          surveysResponseState: surveysResponseStateCopy,
-          isEditing: true,
-          displayAnswerMode: false,
-          isDecrypting: false,
-          suppressPrefill: true,
-          decryptingByKey: cleared,
-          editBaseline: nextBaseline, // Sync baseline for this field
-          ...(didUpdate ? {} : { submissionError: 'Decryption failed.' }),
-        };
-        return updates;
-      }, () => {
+      this.setState((prevState) => this.buildSelfQuestionDecryptSuccessState(prevState, {
+        surveyIndex,
+        questionId,
+        clearMode,
+        didUpdate,
+        baselineSlice,
+        decryptedStateSlice,
+        decryptedImportance,
+        decryptedConviction,
+      }), () => {
         this.updateJsonPreview && this.updateJsonPreview();
         this.persistDraftSafely && this.persistDraftSafely(0);
       });
@@ -9890,6 +9232,309 @@ export class SurveyQuestions extends Component {
     });
   };
 
+  getLockAudienceDisplayState = ({
+    questionId,
+    answer,
+    fieldKey = 'answer',
+    field = null,
+    lockDisabled,
+    lockTitle,
+    glowAnswer,
+    forceAudienceMenu = false,
+    selfAudienceLabel = 'for me',
+    showPlaintextOption = false,
+    visualContext = 'default',
+  }) => {
+    const qid = String(questionId || '').toLowerCase();
+    const resolvedFieldKey = String(fieldKey || '').trim().toLowerCase() === 'additional'
+      ? 'additional'
+      : 'answer';
+    const fieldState = (field && typeof field === 'object') ? field : (answer || {});
+    const forcedGate = this.isQuestionLockedForResponse(qid);
+    const gateOption = this.resolveQuestionGateOption(qid);
+    const gateOptions = Array.isArray(gateOption?.gateDetails) ? gateOption.gateDetails : [];
+    const currentAudience = this.resolveFieldEncryptionAudience(fieldState, qid, resolvedFieldKey);
+    const currentGateId = this.resolveFieldEncryptionGateId(fieldState, qid, resolvedFieldKey);
+    const currentAudienceMode = this.normalizeFieldAudienceMode(
+      fieldState?.audienceMode,
+      resolvedFieldKey,
+      fieldState
+    );
+    const displayState = buildLockAudienceDisplayState({
+      questionId: qid,
+      fieldKey: resolvedFieldKey,
+      fieldState,
+      lockDisabled,
+      lockTitle,
+      glowAnswer,
+      forceAudienceMenu,
+      selfAudienceLabel: this.normalizeGateLabelText(selfAudienceLabel) || 'for me',
+      showPlaintextOption,
+      visualContext,
+      forcedGate,
+      gateOptions,
+      hasGateOption: !!gateOption,
+      menuOpen: this.isLockAudienceMenuOpen(qid, resolvedFieldKey),
+      currentAudience,
+      currentGateId,
+      currentAudienceMode,
+    });
+    const menuStateKey = displayState.hasAudienceMenu
+      ? this.getLockAudienceMenuStateKey(qid, displayState.effectiveFieldKey)
+      : '';
+    const expandedGateId = this.normalizeGateLabelText(
+      this.state.lockAudienceGateDetailsByQuestion?.[menuStateKey] || ''
+    );
+
+    return {
+      ...displayState,
+      expandedGateId,
+    };
+  };
+
+  renderLockAudienceGateOption = ({
+    qid,
+    effectiveFieldKey,
+    option,
+    gateActive,
+    currentGateId,
+    expandedGateId,
+    onSelectAudience,
+  }) => {
+    const showGateDetails = expandedGateId === option.gateId;
+    const sbtItems = Array.isArray(option.sbtItems) ? option.sbtItems : [];
+
+    return (
+      <React.Fragment key={`${qid}:${effectiveFieldKey}:${option.gateId}`}>
+        <div className={styles.lockAudienceGateRow}>
+          <button
+            type="button"
+            className={`${styles.convictionToggleLine} ${styles.lockAudienceGateButton} ${gateActive && currentGateId === option.gateId ? styles.convictionToggleButtonActive : ''}`}
+            onClick={() => onSelectAudience('gate', option.gateId)}
+            data-testid={E2E_TESTIDS.SURVEY_LOCK_AUDIENCE_GATE}
+            data-ce-gate-id={option.gateId}
+          >
+            <span className={styles.convictionToggleLabel}>{option.label}</span>
+          </button>
+          {sbtItems.length > 0 && (
+            <button
+              type="button"
+              className={styles.lockAudienceCaretButton}
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                this.toggleLockAudienceGateDetails(
+                  qid,
+                  showGateDetails ? '' : option.gateId,
+                  effectiveFieldKey,
+                );
+              }}
+              aria-expanded={showGateDetails}
+              aria-label={showGateDetails ? `Hide ${option.label} ${t('sbts')}` : `Show ${option.label} ${t('sbts')}`}
+            >
+              <FontAwesomeIcon icon={showGateDetails ? faCaretUp : faCaretDown} />
+            </button>
+          )}
+        </div>
+        {showGateDetails && (
+          <div className={styles.lockAudienceGateDetails}>
+            {sbtItems.map((item) => (
+              <a
+                key={`${option.gateId}:${item.address}`}
+                href={item.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={styles.lockAudienceGateDetailItem}
+                onClick={(event) => event.stopPropagation()}
+              >
+                <span className={styles.lockAudienceGateDetailName}>{item.label}</span>
+                <span className={styles.lockAudienceGateDetailSbts}>{item.meta}</span>
+              </a>
+            ))}
+          </div>
+        )}
+      </React.Fragment>
+    );
+  };
+
+  renderLockAudiencePopover = ({
+    qid,
+    effectiveFieldKey,
+    isPileVisualContext,
+    gateOptions,
+    gateActive,
+    currentGateId,
+    selfActive,
+    plaintextActive,
+    followActive,
+    allowPlaintextOption,
+    normalizedSelfAudienceLabel,
+    expandedGateId,
+    showFollowOption = false,
+    onSelectAudience,
+  }) => (
+    <div className={`${styles.lockAudiencePopover} ${isPileVisualContext ? styles.pileLockAudiencePopover : ''}`}>
+      {allowPlaintextOption && (
+        <button
+          type="button"
+          className={`${styles.convictionToggleLine} ${plaintextActive ? styles.convictionToggleButtonActive : ''}`}
+          onClick={() => onSelectAudience('none')}
+          data-testid={E2E_TESTIDS.SURVEY_LOCK_AUDIENCE_NONE}
+        >
+          <span className={styles.convictionToggleLabel}>Not encrypted</span>
+        </button>
+      )}
+      <button
+        type="button"
+        className={`${styles.convictionToggleLine} ${selfActive ? styles.convictionToggleButtonActive : ''}`}
+        onClick={() => onSelectAudience('self')}
+        data-testid={E2E_TESTIDS.SURVEY_LOCK_AUDIENCE_SELF}
+      >
+        <span className={styles.convictionToggleLabel}>{normalizedSelfAudienceLabel}</span>
+      </button>
+      {gateOptions.map((option) => this.renderLockAudienceGateOption({
+        qid,
+        effectiveFieldKey,
+        option,
+        gateActive,
+        currentGateId,
+        expandedGateId,
+        onSelectAudience,
+      }))}
+      {showFollowOption && (
+        <button
+          type="button"
+          className={`${styles.convictionToggleLine} ${followActive ? styles.convictionToggleButtonActive : ''}`}
+          onClick={() => onSelectAudience('follow')}
+          data-testid={E2E_TESTIDS.SURVEY_LOCK_AUDIENCE_FOLLOW}
+        >
+          <span className={styles.convictionToggleLabel}>Match Answer</span>
+        </button>
+      )}
+    </div>
+  );
+
+  renderLockAudienceButton = ({
+    effectiveFieldKey,
+    isPileVisualContext,
+    pileMenuPressed,
+    showBrightLockState,
+    isLockDisabled,
+    buttonTitle,
+    hasAudienceMenu,
+    menuOpen,
+    lockButtonStyle,
+    fieldState,
+    forcedGate,
+    onClick,
+  }) => (
+    <button
+      type="button"
+      className={[
+        styles.iconButton,
+        styles.lockButton,
+        showBrightLockState ? styles.iconButtonActive : '',
+        isPileVisualContext ? styles.pileLockButton : '',
+        pileMenuPressed ? styles.pileLockButtonMenuOpen : '',
+      ].filter(Boolean).join(' ')}
+      onClick={onClick}
+      disabled={isLockDisabled}
+      title={buttonTitle}
+      aria-label={buttonTitle}
+      aria-expanded={hasAudienceMenu ? menuOpen : undefined}
+      aria-haspopup={hasAudienceMenu ? 'dialog' : undefined}
+      style={lockButtonStyle}
+      data-testid={effectiveFieldKey === 'additional' ? E2E_TESTIDS.SURVEY_ADDITIONAL_LOCK : E2E_TESTIDS.SURVEY_ANSWER_LOCK}
+    >
+      <FontAwesomeIcon
+        icon={(fieldState?.encrypted || forcedGate) ? faLock : faUnlock}
+        className={showBrightLockState ? styles.iconGlow : undefined}
+      />
+    </button>
+  );
+
+  applyLockAudienceSelection = ({
+    surveyIndex,
+    qid,
+    effectiveFieldKey,
+    audience,
+    gateId = '',
+  }) => {
+    if (effectiveFieldKey === 'additional') {
+      this.applyAdditionalEncryptionAudience(surveyIndex, qid, audience, { gateId });
+      return;
+    }
+    this.applyAnswerEncryptionAudience(surveyIndex, qid, audience, { gateId });
+  };
+
+  toggleQuestionFieldEncryptionEnabled = ({
+    surveyIndex,
+    qid,
+    effectiveFieldKey,
+    nextEncrypted,
+  }) => {
+    if (effectiveFieldKey === 'additional') {
+      this.toggleAdditionalCommentsEncryption(surveyIndex, qid, nextEncrypted);
+      return;
+    }
+    this.toggleAnswerEncryption(surveyIndex, qid, nextEncrypted);
+  };
+
+  handleLockAudienceButtonClick = ({
+    surveyIndex,
+    qid,
+    effectiveFieldKey,
+    fieldState,
+    lockDisabled,
+    forcedGate,
+    hasAudienceMenu,
+    menuOpen,
+    hasGateOption,
+  }) => {
+    const action = buildLockAudienceButtonAction({
+      effectiveFieldKey,
+      fieldEncrypted: !!fieldState?.encrypted,
+      lockDisabled,
+      forcedGate,
+      hasAudienceMenu,
+      menuOpen,
+      hasGateOption,
+    });
+
+    if (action.kind === 'noop') return;
+
+    if (action.kind === 'toggle-field-encryption') {
+      this.toggleQuestionFieldEncryptionEnabled({
+        surveyIndex,
+        qid,
+        effectiveFieldKey,
+        nextEncrypted: action.nextEncrypted,
+      });
+      return;
+    }
+
+    if (action.kind === 'disable-field-encryption-and-close-menu') {
+      this.toggleQuestionFieldEncryptionEnabled({
+        surveyIndex,
+        qid,
+        effectiveFieldKey,
+        nextEncrypted: false,
+      });
+      this.toggleLockAudienceMenu(qid, false, effectiveFieldKey);
+      return;
+    }
+
+    if (action.kind === 'enable-answer-and-open-menu') {
+      this.toggleAnswerEncryption(surveyIndex, qid, true);
+      this.toggleLockAudienceMenu(qid, true, effectiveFieldKey);
+      return;
+    }
+
+    if (action.kind === 'set-menu-open') {
+      this.toggleLockAudienceMenu(qid, action.nextOpen, effectiveFieldKey);
+    }
+  };
+
   renderAnswerLockControl = ({
     surveyIndex,
     questionId,
@@ -9905,198 +9550,101 @@ export class SurveyQuestions extends Component {
     showFollowOption = false,
     visualContext = 'default',
   }) => {
-    const qid = String(questionId || '').toLowerCase();
-    const effectiveFieldKey = String(fieldKey || '').trim().toLowerCase() === 'additional'
-      ? 'additional'
-      : 'answer';
-    const isPileVisualContext = String(visualContext || '').trim().toLowerCase() === 'pile';
-    const fieldState = (field && typeof field === 'object') ? field : (answer || {});
-    const forcedGate = this.isQuestionLockedForResponse(qid);
-    const gateOption = this.resolveQuestionGateOption(qid);
-    const gateOptions = Array.isArray(gateOption?.gateDetails) ? gateOption.gateDetails : [];
-    const hasGateOption = forcedGate || gateOptions.length > 0 || !!gateOption;
-    const hasAudienceMenu = !forcedGate && (
-      forceAudienceMenu ||
-      effectiveFieldKey === 'additional' ||
-      hasGateOption
-    );
-    const menuOpen = hasAudienceMenu && this.isLockAudienceMenuOpen(qid, effectiveFieldKey);
-    const currentAudience = this.resolveFieldEncryptionAudience(fieldState, qid, effectiveFieldKey);
-    const currentGateId = this.resolveFieldEncryptionGateId(fieldState, qid, effectiveFieldKey);
-    const currentAudienceMode = this.normalizeFieldAudienceMode(
-      fieldState?.audienceMode,
+    const {
+      qid,
       effectiveFieldKey,
-      fieldState
-    );
-    const gateActive = (!!fieldState?.encrypted || forcedGate) && currentAudience === 'gate' && hasGateOption;
-    const selfActive = !!fieldState?.encrypted && currentAudience === 'self' && currentAudienceMode !== 'inherit';
-    const plaintextActive = !fieldState?.encrypted && currentAudienceMode !== 'inherit';
-    const followActive = effectiveFieldKey === 'additional' && currentAudienceMode === 'inherit';
-    const lockActive = !!fieldState?.encrypted || !!forcedGate || !!glowAnswer;
-    const lockVisualActive = lockActive || menuOpen;
-    const pileMenuPressed = isPileVisualContext && menuOpen && !lockActive;
-    const showBrightLockState = lockActive || (!isPileVisualContext && menuOpen);
-    const isLockDisabled = lockDisabled || forcedGate;
-    const allowPlaintextOption = showPlaintextOption && effectiveFieldKey !== 'additional';
-    const lockButtonStyle = !isLockDisabled
-      ? { opacity: lockVisualActive ? 1 : 0.35 }
-      : undefined;
-    const normalizedSelfAudienceLabel = this.normalizeGateLabelText(selfAudienceLabel) || 'for me';
+      isPileVisualContext,
+      fieldState,
+      forcedGate,
+      gateOptions,
+      hasGateOption,
+      hasAudienceMenu,
+      menuOpen,
+      currentAudience,
+      currentGateId,
+      currentAudienceMode,
+      gateActive,
+      selfActive,
+      plaintextActive,
+      followActive,
+      pileMenuPressed,
+      showBrightLockState,
+      isLockDisabled,
+      allowPlaintextOption,
+      lockButtonStyle,
+      normalizedSelfAudienceLabel,
+      expandedGateId,
+      buttonTitle,
+    } = this.getLockAudienceDisplayState({
+      questionId,
+      answer,
+      fieldKey,
+      field,
+      lockDisabled,
+      lockTitle,
+      glowAnswer,
+      forceAudienceMenu,
+      selfAudienceLabel,
+      showPlaintextOption,
+      visualContext,
+    });
     const handleAudienceSelect = (audience, gateId = '') => {
-      if (effectiveFieldKey === 'additional') {
-        this.applyAdditionalEncryptionAudience(surveyIndex, qid, audience, { gateId });
-        return;
-      }
-      this.applyAnswerEncryptionAudience(surveyIndex, qid, audience, { gateId });
+      this.applyLockAudienceSelection({
+        surveyIndex,
+        qid,
+        effectiveFieldKey,
+        audience,
+        gateId,
+      });
     };
-    const menuStateKey = hasAudienceMenu ? this.getLockAudienceMenuStateKey(qid, effectiveFieldKey) : '';
-    const expandedGateId = this.normalizeGateLabelText(
-      this.state.lockAudienceGateDetailsByQuestion?.[menuStateKey] || ''
-    );
 
     const handleLockClick = () => {
-      if (lockDisabled || forcedGate) return;
-      if (!hasAudienceMenu) {
-        if (effectiveFieldKey === 'additional') {
-          this.toggleAdditionalCommentsEncryption(surveyIndex, qid, !Boolean(fieldState?.encrypted));
-        } else {
-          this.toggleAnswerEncryption(surveyIndex, qid, !Boolean(fieldState?.encrypted));
-        }
-        return;
-      }
-      if (menuOpen && effectiveFieldKey === 'answer' && fieldState?.encrypted) {
-        this.toggleAnswerEncryption(surveyIndex, qid, false);
-        this.toggleLockAudienceMenu(qid, false, effectiveFieldKey);
-        return;
-      }
-      if (menuOpen && effectiveFieldKey === 'additional' && fieldState?.encrypted) {
-        this.toggleAdditionalCommentsEncryption(surveyIndex, qid, false);
-        this.toggleLockAudienceMenu(qid, false, effectiveFieldKey);
-        return;
-      }
-      if (!menuOpen && !fieldState?.encrypted) {
-        if (effectiveFieldKey === 'answer' && !hasGateOption) {
-          this.toggleAnswerEncryption(surveyIndex, qid, true);
-        }
-        this.toggleLockAudienceMenu(qid, true, effectiveFieldKey);
-        return;
-      }
-      this.toggleLockAudienceMenu(qid, !menuOpen, effectiveFieldKey);
+      this.handleLockAudienceButtonClick({
+        surveyIndex,
+        qid,
+        effectiveFieldKey,
+        fieldState,
+        lockDisabled,
+        forcedGate,
+        hasAudienceMenu,
+        menuOpen,
+        hasGateOption,
+      });
     };
 
     return (
       <div className={styles.lockAudienceContainer}>
-        <button
-          type="button"
-          className={[
-            styles.iconButton,
-            styles.lockButton,
-            showBrightLockState ? styles.iconButtonActive : '',
-            isPileVisualContext ? styles.pileLockButton : '',
-            pileMenuPressed ? styles.pileLockButtonMenuOpen : '',
-          ].filter(Boolean).join(' ')}
-          onClick={handleLockClick}
-          disabled={isLockDisabled}
-          title={forcedGate ? 'Locked by question gate' : (hasAudienceMenu ? 'Choose encryption audience' : lockTitle)}
-          aria-label={forcedGate ? 'Locked by question gate' : (hasAudienceMenu ? 'Choose encryption audience' : lockTitle)}
-          aria-expanded={hasAudienceMenu ? menuOpen : undefined}
-          aria-haspopup={hasAudienceMenu ? 'dialog' : undefined}
-          style={lockButtonStyle}
-          data-testid={effectiveFieldKey === 'additional' ? E2E_TESTIDS.SURVEY_ADDITIONAL_LOCK : E2E_TESTIDS.SURVEY_ANSWER_LOCK}
-        >
-          <FontAwesomeIcon
-            icon={(fieldState?.encrypted || forcedGate) ? faLock : faUnlock}
-            className={showBrightLockState ? styles.iconGlow : undefined}
-          />
-        </button>
+        {this.renderLockAudienceButton({
+          effectiveFieldKey,
+          isPileVisualContext,
+          pileMenuPressed,
+          showBrightLockState,
+          isLockDisabled,
+          buttonTitle,
+          hasAudienceMenu,
+          menuOpen,
+          lockButtonStyle,
+          fieldState,
+          forcedGate,
+          onClick: handleLockClick,
+        })}
 
-        {hasAudienceMenu && menuOpen && !lockDisabled && (
-          <div className={`${styles.lockAudiencePopover} ${isPileVisualContext ? styles.pileLockAudiencePopover : ''}`}>
-            {allowPlaintextOption && (
-              <button
-                type="button"
-                className={`${styles.convictionToggleLine} ${plaintextActive ? styles.convictionToggleButtonActive : ''}`}
-                onClick={() => handleAudienceSelect('none')}
-                data-testid={E2E_TESTIDS.SURVEY_LOCK_AUDIENCE_NONE}
-              >
-                <span className={styles.convictionToggleLabel}>Not encrypted</span>
-              </button>
-            )}
-            <button
-              type="button"
-              className={`${styles.convictionToggleLine} ${selfActive ? styles.convictionToggleButtonActive : ''}`}
-              onClick={() => handleAudienceSelect('self')}
-              data-testid={E2E_TESTIDS.SURVEY_LOCK_AUDIENCE_SELF}
-            >
-              <span className={styles.convictionToggleLabel}>{normalizedSelfAudienceLabel}</span>
-            </button>
-            {gateOptions.map((option) => {
-              const showGateDetails = expandedGateId === option.gateId;
-              const sbtItems = Array.isArray(option.sbtItems) ? option.sbtItems : [];
-              return (
-                <React.Fragment key={`${qid}:${effectiveFieldKey}:${option.gateId}`}>
-                  <div className={styles.lockAudienceGateRow}>
-                    <button
-                      type="button"
-                      className={`${styles.convictionToggleLine} ${styles.lockAudienceGateButton} ${gateActive && currentGateId === option.gateId ? styles.convictionToggleButtonActive : ''}`}
-                      onClick={() => handleAudienceSelect('gate', option.gateId)}
-                      data-testid={E2E_TESTIDS.SURVEY_LOCK_AUDIENCE_GATE}
-                      data-ce-gate-id={option.gateId}
-                    >
-                      <span className={styles.convictionToggleLabel}>{option.label}</span>
-                    </button>
-                    {sbtItems.length > 0 && (
-                      <button
-                        type="button"
-                        className={styles.lockAudienceCaretButton}
-                        onClick={(event) => {
-                          event.preventDefault();
-                          event.stopPropagation();
-                          this.toggleLockAudienceGateDetails(
-                            qid,
-                            showGateDetails ? '' : option.gateId,
-                            effectiveFieldKey,
-                          );
-                        }}
-                        aria-expanded={showGateDetails}
-                        aria-label={showGateDetails ? `Hide ${option.label} ${t('sbts')}` : `Show ${option.label} ${t('sbts')}`}
-                      >
-                        <FontAwesomeIcon icon={showGateDetails ? faCaretUp : faCaretDown} />
-                      </button>
-                    )}
-                  </div>
-                  {showGateDetails && (
-                    <div className={styles.lockAudienceGateDetails}>
-                      {sbtItems.map((item) => (
-                        <a
-                          key={`${option.gateId}:${item.address}`}
-                          href={item.href}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className={styles.lockAudienceGateDetailItem}
-                          onClick={(event) => event.stopPropagation()}
-                        >
-                          <span className={styles.lockAudienceGateDetailName}>{item.label}</span>
-                          <span className={styles.lockAudienceGateDetailSbts}>{item.meta}</span>
-                        </a>
-                      ))}
-                    </div>
-                  )}
-                </React.Fragment>
-              );
-            })}
-            {showFollowOption && (
-              <button
-                type="button"
-                className={`${styles.convictionToggleLine} ${followActive ? styles.convictionToggleButtonActive : ''}`}
-                onClick={() => handleAudienceSelect('follow')}
-                data-testid={E2E_TESTIDS.SURVEY_LOCK_AUDIENCE_FOLLOW}
-              >
-                <span className={styles.convictionToggleLabel}>Match Answer</span>
-              </button>
-            )}
-          </div>
-        )}
+        {hasAudienceMenu && menuOpen && !lockDisabled && this.renderLockAudiencePopover({
+          qid,
+          effectiveFieldKey,
+          isPileVisualContext,
+          gateOptions,
+          gateActive,
+          currentGateId,
+          selfActive,
+          plaintextActive,
+          followActive,
+          allowPlaintextOption,
+          normalizedSelfAudienceLabel,
+          expandedGateId,
+          showFollowOption,
+          onSelectAudience: handleAudienceSelect,
+        })}
       </div>
     );
   };
