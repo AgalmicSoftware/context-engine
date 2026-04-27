@@ -40,6 +40,7 @@ import PileHologramAssistant from './PileHologramAssistant';
 import QuestionTagDropdown from './QuestionTagDropdown';
 import SingleQuestionResponse from './SingleQuestionResponse';
 import TagModal from '../TagPage/TagModal';
+import ConvictionImportanceLabel from './ConvictionImportanceLabel';
 import DeferredCommitSlider from './DeferredCommitSlider';
 import { JsonButtonRow, JsonIconButton, JsonPanel, JsonToggleButton } from '../Shared/Json/JsonControls';
 import { getQuestionTagDisplayList } from '../../utilities/survey/questionTags.js';
@@ -2754,44 +2755,21 @@ export class SurveyQuestions extends Component {
   );
 
   renderConvictionImportanceLabel = (questionId, convictionValue, importanceValue) => {
-    if (!ENABLE_IMPORTANCE_SLIDER_TOGGLE) {
-      return (
-        <h6 id={styles.importanceText} className={styles.convictionValueRow}>
-          <span className={styles.convictionToggleLabel}>Conviction</span>
-          <span className={styles.convictionToggleValue}>{convictionValue}</span>
-        </h6>
-      );
-    }
     const mode = this.getSliderMode(questionId);
-    const isConviction = mode === 'conviction';
     const isExpanded = shouldExpandSliderToggle({
       sliderToggleExpandedByQuestion: this.state.sliderToggleExpandedByQuestion,
       questionId,
       sliderMode: mode,
     });
     return (
-      <h6 id={styles.importanceText} className={styles.convictionToggleText}>
-        <span className={styles.convictionToggleStack}>
-          <button
-            type="button"
-            className={`${styles.convictionToggleLine} ${isConviction ? styles.convictionToggleButtonActive : ''}`}
-            onClick={() => this.setSliderMode(questionId, 'conviction')}
-          >
-            <span className={styles.convictionToggleLabel}>Conviction</span>
-            <span className={styles.convictionToggleValue}>{convictionValue}</span>
-          </button>
-          {isExpanded ? (
-            <button
-              type="button"
-              className={`${styles.convictionToggleLine} ${!isConviction ? styles.convictionToggleButtonActive : ''}`}
-              onClick={() => this.setSliderMode(questionId, 'importance')}
-            >
-              <span className={styles.convictionToggleLabel}>Importance</span>
-              <span className={styles.convictionToggleValue}>{importanceValue}</span>
-            </button>
-          ) : null}
-        </span>
-      </h6>
+      <ConvictionImportanceLabel
+        importanceToggleEnabled={ENABLE_IMPORTANCE_SLIDER_TOGGLE}
+        sliderMode={mode}
+        isExpanded={isExpanded}
+        convictionValue={convictionValue}
+        importanceValue={importanceValue}
+        onSelectMode={(nextMode) => this.setSliderMode(questionId, nextMode)}
+      />
     );
   };
 
