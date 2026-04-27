@@ -3,8 +3,10 @@ import {
   buildPersistedDraftPayload,
   buildPersistedDraftMapsForAllowedIds,
   buildPersistedDraftQuestionEntry,
-  buildSurveyDraftStorageKeys,
-  buildSurveyDraftStorageScopes,
+  removeQuestionFromPersistedDraftPayload,
+  buildSurveyDraftCompatScope,
+  buildSurveyDraftStorageKey,
+  buildSurveyDraftStorageVariantKeys,
   buildSurveyDraftSemanticSignature,
   computeSubmitLabel,
   getPendingStatsSnapshotFromState,
@@ -229,32 +231,130 @@ describe('surveyToolDraftState', () => {
     });
   });
 
-  it('builds draft storage scopes and keys for survey-wide and single-question cleanup', () => {
-    expect(buildSurveyDraftStorageScopes({
+  it('builds draft storage keys and variant bundles for cleanup and migration flows', () => {
+    expect(buildSurveyDraftCompatScope('questions:q:q1')).toBe('questions');
+    expect(buildSurveyDraftCompatScope('survey:survey-1')).toBe('survey:survey-1');
+
+    expect(buildSurveyDraftStorageKey({
+      sessionSlug: 'demo-slug',
+      networkIdStr: '__pending__',
+      account: '0xAbC',
       surveyScope: 'questions:q:q1',
-    })).toEqual(['questions:q:q1', 'questions']);
+    })).toBe('dg:surveyDraft:demo-slug:__pending__:0xabc:questions:q:q1');
 
-    expect(buildSurveyDraftStorageScopes({
-      surveyScope: 'questions',
-      singleQuestionMode: true,
-      questionId: 'Q2',
-    })).toEqual(['questions', 'questions:q:q2']);
-
-    expect(buildSurveyDraftStorageKeys({
-      slug: 'demo-slug',
+    expect(buildSurveyDraftStorageVariantKeys({
+      sessionSlug: 'demo-slug',
       networkIdStr: '84532',
-      accounts: ['0xabc'],
-      scopes: ['questions', 'questions:q:q2'],
-    })).toEqual([
-      'dg:surveyDraft:demo-slug:__pending__:0xabc:questions',
-      'dg:surveyDraft:demo-slug:__pending__:0xabc:questions:q:q2',
-      'dg:surveyDraft:demo-slug:__pending__:anon:questions',
-      'dg:surveyDraft:demo-slug:__pending__:anon:questions:q:q2',
-      'dg:surveyDraft:demo-slug:84532:0xabc:questions',
-      'dg:surveyDraft:demo-slug:84532:0xabc:questions:q:q2',
-      'dg:surveyDraft:demo-slug:84532:anon:questions',
-      'dg:surveyDraft:demo-slug:84532:anon:questions:q:q2',
-    ]);
+      account: '0xAbC',
+      surveyScope: 'questions:q:q1',
+      questionId: 'Q1',
+      includePerQuestionScope: true,
+    })).toEqual({
+      accountOwner: '0xabc',
+      baseNetworkIdStr: '84532',
+      compatScope: 'questions',
+      perQuestionScope: 'questions:q:q1',
+      primaryAccountKey: 'dg:surveyDraft:demo-slug:84532:0xabc:questions:q:q1',
+      primaryAnonKey: 'dg:surveyDraft:demo-slug:84532:anon:questions:q:q1',
+      compatAccountKey: 'dg:surveyDraft:demo-slug:84532:0xabc:questions',
+      compatAnonKey: 'dg:surveyDraft:demo-slug:84532:anon:questions',
+      pendingAccountKey: 'dg:surveyDraft:demo-slug:__pending__:0xabc:questions:q:q1',
+      perQuestionAccountKey: 'dg:surveyDraft:demo-slug:84532:0xabc:questions:q:q1',
+      perQuestionAnonKey: 'dg:surveyDraft:demo-slug:84532:anon:questions:q:q1',
+      purgeKeys: [
+        'dg:surveyDraft:demo-slug:__pending__:0xabc:questions:q:q1',
+        'dg:surveyDraft:demo-slug:__pending__:0xabc:questions',
+        'dg:surveyDraft:demo-slug:__pending__:anon:questions:q:q1',
+        'dg:surveyDraft:demo-slug:__pending__:anon:questions',
+        'dg:surveyDraft:demo-slug:84532:0xabc:questions:q:q1',
+        'dg:surveyDraft:demo-slug:84532:0xabc:questions',
+        'dg:surveyDraft:demo-slug:84532:anon:questions:q:q1',
+        'dg:surveyDraft:demo-slug:84532:anon:questions',
+      ],
+    });
+
+    expect(buildSurveyDraftStorageVariantKeys({
+      sessionSlug: 'demo-slug',
+      surveyScope: 'questions',
+      questionId: 'Q2',
+      includePerQuestionScope: true,
+    })).toEqual({
+      accountOwner: 'anon',
+      baseNetworkIdStr: '__pending__',
+      compatScope: 'questions',
+      perQuestionScope: 'questions:q:q2',
+      primaryAccountKey: 'dg:surveyDraft:demo-slug:__pending__:anon:questions',
+      primaryAnonKey: 'dg:surveyDraft:demo-slug:__pending__:anon:questions',
+      compatAccountKey: 'dg:surveyDraft:demo-slug:__pending__:anon:questions',
+      compatAnonKey: 'dg:surveyDraft:demo-slug:__pending__:anon:questions',
+      pendingAccountKey: 'dg:surveyDraft:demo-slug:__pending__:anon:questions',
+      perQuestionAccountKey: 'dg:surveyDraft:demo-slug:__pending__:anon:questions:q:q2',
+      perQuestionAnonKey: 'dg:surveyDraft:demo-slug:__pending__:anon:questions:q:q2',
+      purgeKeys: [
+        'dg:surveyDraft:demo-slug:__pending__:anon:questions',
+        'dg:surveyDraft:demo-slug:__pending__:anon:questions:q:q2',
+      ],
+    });
+  });
+
+  it('removes a single question from persisted draft payloads and deletes empty drafts', () => {
+    expect(removeQuestionFromPersistedDraftPayload({
+      draftPayload: {
+        answers: {
+          q1: { value: 'hello' },
+          q2: { value: 'keep' },
+        },
+        baseline: {
+          q1: { value: 'baseline hello' },
+          q2: { value: 'baseline keep' },
+        },
+      },
+      questionId: 'Q1',
+    })).toEqual({
+      action: 'update',
+      nextPayload: {
+        answers: {
+          q2: { value: 'keep' },
+        },
+        baseline: {
+          q2: { value: 'baseline keep' },
+        },
+      },
+      removed: true,
+    });
+
+    expect(removeQuestionFromPersistedDraftPayload({
+      draftPayload: {
+        answers: {
+          q1: { value: 'hello' },
+        },
+        baseline: {
+          q1: { value: 'baseline hello' },
+        },
+      },
+      questionId: 'q1',
+    })).toEqual({
+      action: 'delete',
+      nextPayload: null,
+      removed: true,
+    });
+
+    expect(removeQuestionFromPersistedDraftPayload({
+      draftPayload: {
+        answers: {
+          q2: { value: 'keep' },
+        },
+      },
+      questionId: 'q1',
+    })).toEqual({
+      action: 'keep',
+      nextPayload: {
+        answers: {
+          q2: { value: 'keep' },
+        },
+      },
+      removed: false,
+    });
   });
 
   it('does not include empty additional comments in submit-time encryption work', () => {
