@@ -218,8 +218,10 @@ import {
   buildQuestionFilterStorageKeyPrefix,
   buildQuestionIdScopeSignature,
   buildQuestionScanProgressDisplay,
+  buildPersistedDraftWritePlan,
   buildPersistDraftAllowedQuestionIds,
   loadPreviousPersistedDraftSnapshot,
+  parsePersistedDraftStorageValue,
   buildPersistedDraftPayload,
   buildPersistedDraftMapsForAllowedIds,
   buildRatingEnvelopeQidSetFromUserAnswers,
@@ -4442,14 +4444,12 @@ export class SurveyQuestions extends Component {
         try {
           const raw = sessionStorage.getItem(key);
           if (!raw) return null;
-          let parsed = null;
-          try { parsed = JSON.parse(raw); }
-          catch { try { sessionStorage.removeItem(key); } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }; return null; }
-          if (!parsed || typeof parsed !== 'object' || !parsed.answers) {
+          const parsedResult = parsePersistedDraftStorageValue({ raw });
+          if (parsedResult.status !== 'valid') {
             try { sessionStorage.removeItem(key); } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
             return null;
           }
-          return { raw, obj: parsed };
+          return { raw: parsedResult.raw, obj: parsedResult.payload };
         } catch (_) { return null; }
       };
       const pend = readAndParse(pendingKey);
@@ -4579,6 +4579,14 @@ export class SurveyQuestions extends Component {
 
       const draftContext = resolveDraftStorageContext(this.props, this._getEffectiveDraftSlug());
       const slug = draftContext.sessionSlug || '';
+      const persistWritePlan = buildPersistedDraftWritePlan({
+        draftKey: key,
+        sessionSlug: slug,
+        networkIdStr: draftContext.networkIdStr,
+        account: this.props?.account,
+        surveyScope: this._getDraftScope(),
+        singleQuestionMode: this.props.singleQuestionMode,
+      });
       const payload = buildPersistedDraftPayload({
         draftContext,
         singleQuestionMode: this.props.singleQuestionMode,
@@ -4607,15 +4615,9 @@ export class SurveyQuestions extends Component {
       }
 
       // SQM compat mirror under :questions (without :q:<qid>) for tooling/tests
-      if (this.props.singleQuestionMode) {
+      if (persistWritePlan.compatWriteKey) {
         try {
-          const compatKey = buildSurveyDraftStorageKey({
-            sessionSlug: slug,
-            networkIdStr: draftContext.networkIdStr || '__pending__',
-            account: this.props?.account,
-            surveyScope: buildSurveyDraftCompatScope(this._getDraftScope()),
-          });
-          if (compatKey !== key) sessionStorage.setItem(compatKey, nextJson);
+          sessionStorage.setItem(persistWritePlan.compatWriteKey, nextJson);
         } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
       }
 
@@ -4624,21 +4626,9 @@ export class SurveyQuestions extends Component {
       this._lastDraftSemanticSignature = nextSemanticSignature;
       if (this._draftDirtyQids) this._draftDirtyQids.clear();
 
-      // If logged in, proactively remove stale anon variants (exact + compat)
-      const accountLower = (this.props?.account || '').toLowerCase();
-      if (accountLower) {
-        const {
-          primaryAnonKey: anonKey,
-          compatAnonKey,
-        } = buildSurveyDraftStorageVariantKeys({
-          sessionSlug: slug,
-          networkIdStr: draftContext.networkIdStr,
-          account: accountLower,
-          surveyScope: this._getDraftScope(),
-        });
-        try { sessionStorage.removeItem(anonKey); } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
-        try { sessionStorage.removeItem(compatAnonKey); } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
-      }
+      persistWritePlan.staleAnonKeys.forEach((draftKey) => {
+        try { sessionStorage.removeItem(draftKey); } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
+      });
     } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
   });
 
@@ -4689,21 +4679,8 @@ export class SurveyQuestions extends Component {
         try {
           const raw = sessionStorage.getItem(key);
           if (!raw) return;
-          let parsed = null;
-          try { parsed = JSON.parse(raw); }
-          catch (_) {
-            try { sessionStorage.removeItem(key); } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
-            if (this._draftParseCache && this._draftParseCache.key === key) {
-              this._draftParseCache = null;
-            }
-            if (this._lastDraftKey === key) {
-              this._lastDraftJSON = null;
-              this._lastDraftSemanticSignature = null;
-            }
-            return;
-          }
-
-          if (!parsed || typeof parsed !== 'object' || !parsed.answers) {
+          const parsedResult = parsePersistedDraftStorageValue({ raw });
+          if (parsedResult.status !== 'valid') {
             try { sessionStorage.removeItem(key); } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
             if (this._draftParseCache && this._draftParseCache.key === key) {
               this._draftParseCache = null;
@@ -4715,7 +4692,7 @@ export class SurveyQuestions extends Component {
             return;
           }
           const removal = removeQuestionFromPersistedDraftPayload({
-            draftPayload: parsed,
+            draftPayload: parsedResult.payload,
             questionId: qidLower,
           });
           if (removal.action === 'delete') {
