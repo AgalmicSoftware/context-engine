@@ -1,5 +1,6 @@
 import { RATING_MIN } from '../../utilities/survey/ratingValue.js';
 import {
+  buildQuestionResponseHydrationPatch,
   buildRatingEnvelopeQidSetFromUserAnswers,
   clampSliderValue,
   getConvictionFromResponse,
@@ -54,6 +55,98 @@ describe('surveyToolResponseState', () => {
       questionID: 'Q4',
       importanceEncrypted: 'imp-env',
     }))).toEqual(['q4']);
+  });
+
+  it('builds response hydration patches with overwrite and inherited-additional handling', () => {
+    const deps = {
+      parseValue: jest.fn((value) => value),
+      areEnvelopesEquivalent: jest.fn(() => false),
+      normalizeResponseEncryptionAudience: jest.fn((audience) => audience || 'self'),
+      getDefaultResponseEncryptionAudienceForQid: jest.fn(() => 'gate'),
+      resolveFieldEncryptionGateId: jest.fn((_field, qid, fieldKey) => `${qid}:${fieldKey}`),
+      normalizeFieldAudienceMode: jest.fn((mode) => mode || 'explicit'),
+      buildInheritedAdditionalFieldState: jest.fn((additionalState, answerState) => ({
+        ...additionalState,
+        inheritedFromAnswer: answerState?.value || null,
+      })),
+      buildEmptyResponseFieldState: jest.fn(() => ({ value: '', encrypted: false })),
+    };
+
+    expect(buildQuestionResponseHydrationPatch({
+      questionId: 'Q1',
+      response: {
+        answer: {
+          value: 'hydrated answer',
+          encrypted: true,
+          encryptionAudience: 'gate',
+          encryptedPortion: 'ans-env',
+        },
+        additional: {
+          value: 'hydrated notes',
+          encrypted: true,
+          encryptionAudience: 'gate',
+          audienceMode: 'inherit',
+          encryptedPortion: 'add-env',
+        },
+        importance: 4,
+        conviction: 7,
+      },
+      currentAnswer: { value: '' },
+      currentAdditional: { value: '' },
+      hasCurrentImportance: false,
+      hasCurrentConviction: false,
+      allowOverwrite: false,
+      deps,
+    })).toEqual({
+      changed: true,
+      answerState: {
+        value: 'hydrated answer',
+        encrypted: true,
+        encryptionAudience: 'gate',
+        encryptionGateId: 'q1:answer',
+        audienceMode: 'explicit',
+        hash: '',
+        encryptedPortion: 'ans-env',
+      },
+      additionalState: {
+        value: 'hydrated notes',
+        encrypted: true,
+        encryptionAudience: 'gate',
+        encryptionGateId: 'q1:additional',
+        audienceMode: 'inherit',
+        hash: '',
+        encryptedPortion: 'add-env',
+        inheritedFromAnswer: 'hydrated answer',
+      },
+      importanceChanged: true,
+      importanceValue: 4,
+      convictionChanged: true,
+      convictionValue: 7,
+    });
+
+    expect(buildQuestionResponseHydrationPatch({
+      questionId: 'q1',
+      response: {
+        answer: { value: 'ignored answer' },
+        additional: { value: 'ignored notes' },
+        importance: 3,
+        conviction: 5,
+      },
+      currentAnswer: { value: 'keep answer' },
+      currentAdditional: { value: 'keep notes' },
+      hasCurrentImportance: true,
+      hasCurrentConviction: true,
+      allowOverwrite: false,
+      deps,
+    })).toEqual({
+      changed: false,
+      answerState: undefined,
+      additionalState: undefined,
+      importanceChanged: false,
+      importanceValue: undefined,
+      convictionChanged: false,
+      convictionValue: undefined,
+    });
   });
 
   it('reads conviction and importance from response slices with strict and fallback variants', () => {

@@ -1,6 +1,7 @@
 /** @file surveyToolUtils.js */
 
 export {
+  buildQuestionResponseHydrationPatch,
   buildRatingEnvelopeQidSetFromUserAnswers,
   clampSliderValue,
   getConvictionFromResponse,
