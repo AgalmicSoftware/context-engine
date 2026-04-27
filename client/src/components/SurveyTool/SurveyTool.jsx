@@ -219,6 +219,7 @@ import {
   buildQuestionIdScopeSignature,
   buildQuestionScanProgressDisplay,
   buildDraftHydrationPatchForQuestion,
+  buildDraftHydrationState,
   buildPersistedDraftQuestionRemovalPlan,
   buildPersistedDraftTrackingAfterLoad,
   buildPersistedDraftTrackingAfterScopedDelete,
@@ -227,6 +228,7 @@ import {
   buildPersistedDraftTrackingOnKeyChange,
   buildPersistedDraftWritePlan,
   buildPersistDraftAllowedQuestionIds,
+  buildQuestionCacheHydrationPatch,
   buildQuestionResponseHydrationPatch,
   loadPreviousPersistedDraftSnapshot,
   parsePersistedDraftStorageValue,
@@ -1286,6 +1288,33 @@ export class SurveyQuestions extends Component {
       }
     });
     return changed;
+  };
+
+  _applyCachedResponseEntryToSlice = ({
+    targetSlice = null,
+    questionId = '',
+    response = null,
+    parseValue = this.parseAnswerValue,
+  } = {}) => {
+    if (!targetSlice || !response) return false;
+    const patch = buildQuestionCacheHydrationPatch({
+      questionId,
+      response,
+      deps: {
+        parseValue,
+        normalizeResponseEncryptionAudience: this.normalizeResponseEncryptionAudience,
+        getDefaultResponseEncryptionAudienceForQid: this.getDefaultResponseEncryptionAudienceForQid,
+        resolveFieldEncryptionGateId: this.resolveFieldEncryptionGateId,
+        normalizeFieldAudienceMode: this.normalizeFieldAudienceMode,
+        buildInheritedAdditionalFieldState: this.buildInheritedAdditionalFieldState,
+        buildEmptyResponseFieldState: this.buildEmptyResponseFieldState,
+      },
+    });
+    if (patch.answerState) targetSlice.answers[questionId] = patch.answerState;
+    if (patch.additionalState) targetSlice.additionalComments[questionId] = patch.additionalState;
+    if (patch.importanceChanged) targetSlice.importance[questionId] = patch.importanceValue;
+    if (patch.convictionChanged) targetSlice.conviction[questionId] = patch.convictionValue;
+    return !!patch.changed;
   };
 
   setManagedTimeout = (fn, delayMs = 0) => {
@@ -5238,44 +5267,19 @@ export class SurveyQuestions extends Component {
         submittedStateActive,
       });
 
-      const nextSlice = {
-        answers: { ...(prevSlice.answers || {}) },
-        importance: { ...(prevSlice.importance || {}) },
-        conviction: { ...(prevSlice.conviction || {}) },
-        additionalComments: { ...(prevSlice.additionalComments || {}) }
-      };
-      const nextBaseline = this.state.editBaseline
-        ? this.deepClone(this.state.editBaseline)
-        : { answers: {}, importance: {}, conviction: {}, additionalComments: {} };
-
-      let changed = false;
-      let baselineChanged = false;
-      rendered.forEach((qid) => {
-        const d = draft.answers?.[qid];
-        if (d) {
-          if (this._applyDraftHydrationEntryToSlice({
-            targetSlice: nextSlice,
-            questionId: qid,
-            draftEntry: d,
-            allowOverwrite,
-          })) {
-            changed = true;
-          }
-        }
-
-        // Regression guard: restore baseline from draft independently of answer hydration.
-        // Refresh often sees masked chain payload first; losing baseline here reintroduces Submit(1) ghosts.
-        const b = draft.baseline?.[qid];
-        if (b) {
-          if (this._applyDraftHydrationEntryToSlice({
-            targetSlice: nextBaseline,
-            questionId: qid,
-            draftEntry: b,
-            allowOverwrite,
-          })) {
-            baselineChanged = true;
-          }
-        }
+      const {
+        nextSlice,
+        nextBaseline,
+        changed,
+        baselineChanged,
+      } = buildDraftHydrationState({
+        renderedQuestionIds: rendered,
+        draft,
+        prevSlice,
+        prevBaseline: this.state.editBaseline,
+        allowOverwrite,
+        cloneBaseline: this.deepClone,
+        applyDraftEntryToSlice: this._applyDraftHydrationEntryToSlice,
       });
 
       const updates = {};
@@ -5652,62 +5656,11 @@ export class SurveyQuestions extends Component {
           return;
         }
 
-        const answerEncrypted = !!(resp.answer.encrypted || resp.answer.encryptedPortion);
-        const additionalEncrypted = !!(resp.additional.encrypted || resp.additional.encryptedPortion);
-
-        // Keep masked '*' when encrypted; otherwise prefill plaintext
-        slice.answers[qid] = {
-          value: answerEncrypted ? '*' : this.parseAnswerValue(resp.answer.value),
-          encrypted: !!answerEncrypted,
-          encryptionAudience: this.normalizeResponseEncryptionAudience(
-            resp.answer.encryptionAudience || (answerEncrypted ? 'gate' : 'self'),
-            qid
-          ),
-          encryptionGateId: answerEncrypted
-            ? this.resolveFieldEncryptionGateId(resp.answer || {}, qid, 'answer')
-            : null,
-          audienceMode: 'explicit',
-          hash: resp.answer.hash || '',
-          encryptedPortion: resp.answer.encryptedPortion || ''
-        };
-
-        const convictionValue = getConvictionFromResponse(resp);
-        if (convictionValue !== null) {
-          slice.conviction[qid] = convictionValue;
-        }
-        const importanceValue = getImportanceFromResponse(resp);
-        if (importanceValue !== null) {
-          slice.importance[qid] = importanceValue;
-        }
-
-        let additionalState = {
-          value: additionalEncrypted ? '*' : this.parseAnswerValue(resp.additional.value),
-          encrypted: !!additionalEncrypted,
-          encryptionAudience: this.normalizeResponseEncryptionAudience(
-            resp.additional.encryptionAudience || (additionalEncrypted ? 'gate' : 'self'),
-            qid
-          ),
-          encryptionGateId: additionalEncrypted
-            ? this.resolveFieldEncryptionGateId(resp.additional || {}, qid, 'additional')
-            : null,
-          audienceMode: this.normalizeFieldAudienceMode(
-            resp.additional?.audienceMode,
-            'additional',
-            resp.additional || {}
-          ),
-          hash: resp.additional.hash || '',
-          encryptedPortion: resp.additional.encryptedPortion || ''
-        };
-        if (
-          this.normalizeFieldAudienceMode(
-            resp.additional?.audienceMode,
-            'additional',
-            resp.additional || {}
-          ) === 'inherit'
-        ) {
-          additionalState = this.buildInheritedAdditionalFieldState(additionalState, slice.answers[qid], qid);
-        }
-        slice.additionalComments[qid] = additionalState;
+        this._applyCachedResponseEntryToSlice({
+          targetSlice: slice,
+          questionId: qid,
+          response: resp,
+        });
         DEBUG_PREFILL && surveyLog.log(`[Survey][buildSlice] qid=${qid}`, {
           answer: slice.answers[qid],
           additional: slice.additionalComments[qid],
