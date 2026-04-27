@@ -8192,6 +8192,57 @@ describe('SurveyTool module', () => {
     expect(subject._lastDraftSemanticSignature).toBe('sig:new');
   });
 
+  it('applies draft hydration entries to a target slice through one local shell helper', () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: true,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+      activeSessionSlug: 'edge',
+      sessionSlug: 'edge',
+      questionPool: [{ id: 'q1' }],
+    });
+
+    const targetSlice = {
+      answers: {},
+      importance: {},
+      conviction: {},
+      additionalComments: {},
+    };
+
+    const changed = subject._applyDraftHydrationEntryToSlice({
+      targetSlice,
+      questionId: 'q1',
+      draftEntry: {
+        value: 'draft answer',
+        answerEncrypted: true,
+        answerEncryptionAudience: 'gate',
+        additional: 'draft notes',
+        additionalEncrypted: true,
+        additionalAudienceMode: 'inherit',
+        importance: 4,
+        conviction: 7,
+      },
+      allowOverwrite: false,
+    });
+
+    expect(changed).toBe(true);
+    expect(targetSlice.answers.q1).toMatchObject({
+      value: 'draft answer',
+      encrypted: true,
+      encryptionAudience: 'self',
+    });
+    expect(targetSlice.additionalComments.q1).toMatchObject({
+      value: 'draft notes',
+      encrypted: true,
+      audienceMode: 'inherit',
+    });
+    expect(targetSlice.importance.q1).toBe(4);
+    expect(targetSlice.conviction.q1).toBe(7);
+  });
+
   it('skips draft rewrites when only timestamp would change and writes again after semantic edits', () => {
     sessionStorage.clear();
     const nowSpy = jest.spyOn(Date, 'now')
