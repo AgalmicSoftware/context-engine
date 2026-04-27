@@ -254,6 +254,26 @@ const getDraftQuestionEntry = (
   return isRecord(value) ? value as SurveyDraftQuestionEntry : {};
 };
 
+export const buildDraftAnswersByQuestionId = (
+  draftPayload: unknown = null
+): Record<string, SurveyDraftQuestionEntry> => {
+  const out: Record<string, SurveyDraftQuestionEntry> = {};
+  const answers = isRecord(draftPayload) && isRecord(draftPayload.answers)
+    ? draftPayload.answers as Record<string, unknown>
+    : {};
+
+  Object.keys(answers).forEach((rawQuestionId) => {
+    const questionId = normalizeQuestionIdKey(rawQuestionId);
+    if (!questionId || out[questionId]) return;
+    const entry = answers[rawQuestionId];
+    if (isRecord(entry)) {
+      out[questionId] = entry as SurveyDraftQuestionEntry;
+    }
+  });
+
+  return out;
+};
+
 export const buildSurveyDraftSemanticSignature = (payload: SurveyDraftPayload | null | undefined = {}): string => {
   const safePayload = isRecord(payload) ? payload : {};
   const meta = isRecord(safePayload.meta) ? safePayload.meta : {};
