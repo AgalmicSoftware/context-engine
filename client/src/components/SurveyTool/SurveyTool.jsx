@@ -223,8 +223,10 @@ import {
   buildCacheHydrationSlice,
   buildDraftAwareCacheHydrationState,
   buildDraftHydrationState,
+  buildHydratedResponseSlice,
   buildLocalCacheRehydrationState,
   buildPrefilledSurveyState,
+  buildRevertedResponseSlice,
   buildPersistedDraftQuestionRemovalPlan,
   buildPersistedDraftTrackingAfterLoad,
   buildPersistedDraftTrackingAfterScopedDelete,
@@ -5556,23 +5558,12 @@ export class SurveyQuestions extends Component {
         baselineSlice = { answers: {}, importance: {}, conviction: {}, additionalComments: {} };
       }
 
-      // 2) Restore all questions from baseline to prevent phantom deletes
-      const nextSlice = {
-        answers: this.deepClone(baselineSlice.answers || {}),
-        importance: { ...(baselineSlice.importance || {}) },
-        conviction: { ...(baselineSlice.conviction || {}) },
-        additionalComments: this.deepClone(baselineSlice.additionalComments || {})
-      };
-
-      // Ensure rendered IDs have at least empty state structures to prevent UI crashes
       const renderedIds = this.getCurrentRenderedQuestionIds();
-      renderedIds.forEach((qid) => {
-        if (!nextSlice.answers[qid]) {
-          nextSlice.answers[qid] = this.buildEmptyResponseFieldState(qid);
-        }
-        if (!nextSlice.additionalComments[qid]) {
-          nextSlice.additionalComments[qid] = this.buildEmptyResponseFieldState(qid, 'additional');
-        }
+      const nextSlice = buildRevertedResponseSlice({
+        baselineSlice,
+        renderedQuestionIds: renderedIds,
+        cloneFieldState: this.deepClone,
+        buildEmptyResponseFieldState: this.buildEmptyResponseFieldState,
       });
 
       // 3) Apply slice; do not overwrite editBaseline; reset pending flags
@@ -5606,27 +5597,19 @@ export class SurveyQuestions extends Component {
   // Build baseline/live slice from server response.
   // Sets encrypted: true for any field with prior encryption.
   // Intelligently merges decrypted values from prevSlice if envelope matches.
-  buildSliceFromUserAnswers = (userAnswers, prevSlice = null) => {
-    const slice = { answers: {}, importance: {}, conviction: {}, additionalComments: {} };
-    if (!userAnswers) return slice;
-
-    const parseVal = (v) => {
+  buildSliceFromUserAnswers = (userAnswers, prevSlice = null) => buildHydratedResponseSlice({
+    userAnswers,
+    prevSlice,
+    applyResponseHydrationListToSlice: this._applyResponseHydrationListToSlice,
+    parseValue: (value) => {
       try {
-        if (typeof v === 'string' && (v.startsWith('[') || v.startsWith('{'))) return JSON.parse(v);
+        if (typeof value === 'string' && (value.startsWith('[') || value.startsWith('{'))) {
+          return JSON.parse(value);
+        }
       } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
-      return v;
-    };
-
-    this._applyResponseHydrationListToSlice({
-      targetSlice: slice,
-      currentSlice: prevSlice,
-      responses: Array.isArray(userAnswers.responses) ? userAnswers.responses : [userAnswers],
-      allowOverwrite: true,
-      parseValue: parseVal,
-    });
-
-    return slice;
-  };
+      return value;
+    },
+  });
 
   // Check if a slice is effectively empty
   isSliceEmpty = (slice) => {
