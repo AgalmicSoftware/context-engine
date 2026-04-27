@@ -219,6 +219,7 @@ import {
   buildQuestionIdScopeSignature,
   buildQuestionScanProgressDisplay,
   buildDraftHydrationPatchForQuestion,
+  buildCacheHydrationSlice,
   buildDraftHydrationState,
   buildPersistedDraftQuestionRemovalPlan,
   buildPersistedDraftTrackingAfterLoad,
@@ -1315,6 +1316,97 @@ export class SurveyQuestions extends Component {
     if (patch.importanceChanged) targetSlice.importance[questionId] = patch.importanceValue;
     if (patch.convictionChanged) targetSlice.conviction[questionId] = patch.convictionValue;
     return !!patch.changed;
+  };
+
+  _applyLocalCacheHydrationEntryToSlice = ({
+    targetSlice = null,
+    questionId = '',
+    cachedAnswer = null,
+    cachedAdditional = null,
+    cachedImportance = undefined,
+    cachedConviction = undefined,
+    allowMaskedAnswerDraftEmpty = false,
+    allowMaskedAdditionalDraftEmpty = false,
+    debugLabel = '',
+  } = {}) => {
+    if (!targetSlice || !questionId) return false;
+    let changed = false;
+
+    if (
+      cachedAnswer &&
+      (
+        allowMaskedAnswerDraftEmpty ||
+        targetSlice.answers?.[questionId]?.value === undefined ||
+        (
+          targetSlice.answers?.[questionId]?.value === '' &&
+          !targetSlice.answers?.[questionId]?.encryptedPortion
+        )
+      )
+    ) {
+      targetSlice.answers[questionId] = {
+        ...(targetSlice.answers[questionId] || {}),
+        ...cachedAnswer,
+      };
+      changed = true;
+      if (debugLabel) {
+        DEBUG_PREFILL && surveyLog.log(`${debugLabel} Hydrated answer for qid=${questionId}`, {
+          fromCache: cachedAnswer,
+        });
+      }
+    }
+
+    if (
+      cachedAdditional &&
+      (
+        allowMaskedAdditionalDraftEmpty ||
+        targetSlice.additionalComments?.[questionId]?.value === undefined ||
+        (
+          targetSlice.additionalComments?.[questionId]?.value === '' &&
+          !targetSlice.additionalComments?.[questionId]?.encryptedPortion
+        )
+      )
+    ) {
+      targetSlice.additionalComments[questionId] = {
+        ...(targetSlice.additionalComments[questionId] || {}),
+        ...cachedAdditional,
+      };
+      changed = true;
+      if (debugLabel) {
+        DEBUG_PREFILL && surveyLog.log(`${debugLabel} Hydrated additional for qid=${questionId}`, {
+          fromCache: cachedAdditional,
+        });
+      }
+    }
+
+    if (
+      cachedImportance !== undefined &&
+      cachedImportance !== null &&
+      !Object.prototype.hasOwnProperty.call(targetSlice.importance || {}, questionId)
+    ) {
+      targetSlice.importance[questionId] = Number(cachedImportance);
+      changed = true;
+      if (debugLabel) {
+        DEBUG_PREFILL && surveyLog.log(`${debugLabel} Hydrated importance for qid=${questionId}`, {
+          fromCache: cachedImportance,
+        });
+      }
+    }
+
+    if (
+      cachedConviction !== undefined &&
+      cachedConviction !== null &&
+      !Object.prototype.hasOwnProperty.call(targetSlice.conviction || {}, questionId)
+    ) {
+      targetSlice.conviction[questionId] = Number(cachedConviction);
+      changed = true;
+      if (debugLabel) {
+        DEBUG_PREFILL && surveyLog.log(`${debugLabel} Hydrated conviction for qid=${questionId}`, {
+          fromCache: cachedConviction,
+        });
+      }
+    }
+
+    return changed;
   };
 
   setManagedTimeout = (fn, delayMs = 0) => {
@@ -5638,35 +5730,19 @@ export class SurveyQuestions extends Component {
       });
       if (Object.keys(mergedQuestionResponses).length === 0) return memoize(null);
 
-      const slice = { answers: {}, importance: {}, conviction: {}, additionalComments: {} };
       DEBUG_PREFILL && surveyLog.log('[Survey][buildSlice] Building for rendered IDs:', rendered);
-
-      rendered.forEach((qid) => {
-        const map = mergedQuestionResponses?.[qid];
-        if (!map) return;
-        const raw = map[acct];
-        if (!raw) return;
-
-        let resp = raw;
-        try {
-          if (typeof resp === 'string') { resp = JSON.parse(resp); }
-        } catch { resp = null; }
-        if (!resp || !resp.answer || !resp.additional) {
-          DEBUG_PREFILL && surveyLog.log(`[Survey][buildSlice] skipping qid=${qid}, malformed response`, { raw });
-          return;
-        }
-
-        this._applyCachedResponseEntryToSlice({
-          targetSlice: slice,
-          questionId: qid,
-          response: resp,
-        });
-        DEBUG_PREFILL && surveyLog.log(`[Survey][buildSlice] qid=${qid}`, {
-          answer: slice.answers[qid],
-          additional: slice.additionalComments[qid],
-          conviction: slice.conviction[qid],
-          importance: slice.importance[qid],
-        });
+      const { slice } = buildCacheHydrationSlice({
+        renderedQuestionIds: rendered,
+        mergedQuestionResponses,
+        account: acct,
+        parseResponse: (raw) => {
+          let resp = raw;
+          try {
+            if (typeof resp === 'string') { resp = JSON.parse(resp); }
+          } catch { resp = null; }
+          return resp;
+        },
+        applyCachedResponseEntryToSlice: this._applyCachedResponseEntryToSlice,
       });
 
       return memoize(slice);
@@ -5804,48 +5880,31 @@ export class SurveyQuestions extends Component {
             cAddEffective.encrypted
           );
 
-        // Hydrate state (fill empty)
-        if (cAnsEffective && (canReplaceMaskedAnswerWithDraftEmpty || next.answers[qid]?.value === undefined || (next.answers[qid]?.value === '' && !next.answers[qid]?.encryptedPortion))) {
-          next.answers[qid] = { ...(next.answers[qid] || {}), ...cAnsEffective };
+        if (this._applyLocalCacheHydrationEntryToSlice({
+          targetSlice: next,
+          questionId: qid,
+          cachedAnswer: cAnsEffective,
+          cachedAdditional: cAddEffective,
+          cachedImportance: cImp,
+          cachedConviction: cConv,
+          allowMaskedAnswerDraftEmpty: canReplaceMaskedAnswerWithDraftEmpty,
+          allowMaskedAdditionalDraftEmpty: canReplaceMaskedAdditionalWithDraftEmpty,
+          debugLabel: '[Survey][rehydrateLocal]',
+        })) {
           changed = true;
-          DEBUG_PREFILL && surveyLog.log(`[Survey][rehydrateLocal] Hydrated answer for qid=${qid}`, { fromCache: cAnsEffective });
-        }
-        if (cAddEffective && (canReplaceMaskedAdditionalWithDraftEmpty || next.additionalComments[qid]?.value === undefined || (next.additionalComments[qid]?.value === '' && !next.additionalComments[qid]?.encryptedPortion))) {
-          next.additionalComments[qid] = { ...(next.additionalComments[qid] || {}), ...cAddEffective };
-          changed = true;
-          DEBUG_PREFILL && surveyLog.log(`[Survey][rehydrateLocal] Hydrated additional for qid=${qid}`, { fromCache: cAddEffective });
-        }
-        if (cImp !== undefined && cImp !== null &&
-            !Object.prototype.hasOwnProperty.call(next.importance, qid)) {
-          next.importance[qid] = Number(cImp);
-          changed = true;
-          DEBUG_PREFILL && surveyLog.log(`[Survey][rehydrateLocal] Hydrated importance for qid=${qid}`, { fromCache: cImp });
-        }
-        if (cConv !== undefined && cConv !== null &&
-            !Object.prototype.hasOwnProperty.call(next.conviction, qid)) {
-          next.conviction[qid] = Number(cConv);
-          changed = true;
-          DEBUG_PREFILL && surveyLog.log(`[Survey][rehydrateLocal] Hydrated conviction for qid=${qid}`, { fromCache: cConv });
         }
 
-        // Hydrate baseline (fill empty)
         // This ensures that if we just loaded these answers from cache, they are considered "baseline" (not dirty)
-        if (cAnsEffective && (canReplaceMaskedBaselineAnswerWithDraftEmpty || nextBaseline.answers[qid]?.value === undefined || (nextBaseline.answers[qid]?.value === '' && !nextBaseline.answers[qid]?.encryptedPortion))) {
-          nextBaseline.answers[qid] = { ...(nextBaseline.answers[qid] || {}), ...cAnsEffective };
-          baselineChanged = true;
-        }
-        if (cAddEffective && (canReplaceMaskedBaselineAdditionalWithDraftEmpty || nextBaseline.additionalComments[qid]?.value === undefined || (nextBaseline.additionalComments[qid]?.value === '' && !nextBaseline.additionalComments[qid]?.encryptedPortion))) {
-          nextBaseline.additionalComments[qid] = { ...(nextBaseline.additionalComments[qid] || {}), ...cAddEffective };
-          baselineChanged = true;
-        }
-        if (cImp !== undefined && cImp !== null &&
-            !Object.prototype.hasOwnProperty.call(nextBaseline.importance, qid)) {
-          nextBaseline.importance[qid] = Number(cImp);
-          baselineChanged = true;
-        }
-        if (cConv !== undefined && cConv !== null &&
-            !Object.prototype.hasOwnProperty.call(nextBaseline.conviction, qid)) {
-          nextBaseline.conviction[qid] = Number(cConv);
+        if (this._applyLocalCacheHydrationEntryToSlice({
+          targetSlice: nextBaseline,
+          questionId: qid,
+          cachedAnswer: cAnsEffective,
+          cachedAdditional: cAddEffective,
+          cachedImportance: cImp,
+          cachedConviction: cConv,
+          allowMaskedAnswerDraftEmpty: canReplaceMaskedBaselineAnswerWithDraftEmpty,
+          allowMaskedAdditionalDraftEmpty: canReplaceMaskedBaselineAdditionalWithDraftEmpty,
+        })) {
           baselineChanged = true;
         }
       });
