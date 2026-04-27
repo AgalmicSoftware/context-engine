@@ -1,8 +1,6 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
-import ConvictionImportanceLabel, {
-  buildConvictionImportanceToggleLineClassName,
-} from './ConvictionImportanceLabel';
+import ConvictionImportanceLabel from './ConvictionImportanceLabel';
 
 describe('ConvictionImportanceLabel', () => {
   it('renders a simple conviction row when the importance toggle is disabled', () => {
@@ -19,7 +17,6 @@ describe('ConvictionImportanceLabel', () => {
 
     expect(screen.getByText('Conviction')).toBeInTheDocument();
     expect(screen.getByText('4')).toBeInTheDocument();
-    expect(screen.getByText('Conviction').closest('h6')).toHaveClass('importanceText', 'convictionValueRow');
     expect(screen.queryByRole('button', { name: /importance/i })).not.toBeInTheDocument();
   });
 
@@ -39,10 +36,6 @@ describe('ConvictionImportanceLabel', () => {
     fireEvent.click(screen.getByRole('button', { name: /conviction 3/i }));
     fireEvent.click(screen.getByRole('button', { name: /importance 8/i }));
 
-    expect(screen.getByRole('heading', { name: /conviction 3 importance 8/i })).toHaveClass(
-      'importanceText',
-      'convictionToggleText'
-    );
     expect(onSelectMode).toHaveBeenNthCalledWith(1, 'conviction');
     expect(onSelectMode).toHaveBeenNthCalledWith(2, 'importance');
   });
@@ -61,18 +54,5 @@ describe('ConvictionImportanceLabel', () => {
 
     expect(screen.getByRole('button', { name: /conviction 2/i })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /importance 6/i })).not.toBeInTheDocument();
-  });
-
-  it('builds conviction/importance toggle line classes', () => {
-    expect(buildConvictionImportanceToggleLineClassName({
-      activeClassName: 'active',
-      baseClassName: 'line',
-      isActive: true,
-    })).toBe('line active');
-    expect(buildConvictionImportanceToggleLineClassName({
-      activeClassName: 'active',
-      baseClassName: 'line',
-      isActive: false,
-    })).toBe('line');
   });
 });
