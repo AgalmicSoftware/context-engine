@@ -218,10 +218,12 @@ import {
   buildQuestionFilterStorageKeyPrefix,
   buildQuestionIdScopeSignature,
   buildQuestionScanProgressDisplay,
+  buildDraftAnswersByQuestionId,
   buildDraftHydrationPatchForQuestion,
   buildCacheHydrationSlice,
   buildDraftAwareCacheHydrationState,
   buildDraftHydrationState,
+  buildLocalCacheRehydrationState,
   buildPrefilledSurveyState,
   buildPersistedDraftQuestionRemovalPlan,
   buildPersistedDraftTrackingAfterLoad,
@@ -5776,86 +5778,31 @@ export class SurveyQuestions extends Component {
       }
       this._rehydrateLocalCacheLastSig = hydrationSig;
 
-      const next = {
-        answers: { ...(baseSlice.answers || {}) },
-        importance: { ...(baseSlice.importance || {}) },
-        conviction: { ...(baseSlice.conviction || {}) },
-        additionalComments: { ...(baseSlice.additionalComments || {}) },
-      };
-
       // Keep draft envelope context in play so cache hydration can avoid re-masking
       // decrypted-empty values during rapid pile navigation.
-      const draftAnswersByQid = {};
+      let draftAnswersByQid = {};
       try {
-        const draft = this.loadDraft();
-        const rawAnswers = (draft && typeof draft.answers === 'object') ? draft.answers : {};
-        Object.keys(rawAnswers || {}).forEach((rawQid) => {
-          const qid = normalizeQuestionIdKey(rawQid);
-          if (!qid || draftAnswersByQid[qid]) return;
-          const entry = rawAnswers[rawQid];
-          if (entry && typeof entry === 'object') draftAnswersByQid[qid] = entry;
-        });
+        draftAnswersByQid = buildDraftAnswersByQuestionId(this.loadDraft());
       } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
 
-      // Also build/update baseline so cached answers don't count as pending edits
-      let nextBaseline = this.state.editBaseline
-        ? this.deepClone(this.state.editBaseline)
-        : { answers: {}, importance: {}, conviction: {}, additionalComments: {} };
-
-      let changed = false;
-      let baselineChanged = false;
-
-      renderedIds.forEach((qid) => {
-        const cAns = cacheSlice.answers?.[qid];
-        const cAdd = cacheSlice.additionalComments?.[qid];
-        const cImp = cacheSlice.importance?.[qid];
-        const cConv = cacheSlice.conviction?.[qid];
-        const draftForQid = draftAnswersByQid[qid] || {};
-        const {
-          effectiveAnswerState: cAnsEffective,
-          effectiveAdditionalState: cAddEffective,
-          canReplaceMaskedAnswerWithDraftEmpty,
-          canReplaceMaskedAdditionalWithDraftEmpty,
-          canReplaceMaskedBaselineAnswerWithDraftEmpty,
-          canReplaceMaskedBaselineAdditionalWithDraftEmpty,
-        } = buildDraftAwareCacheHydrationState({
-          cachedAnswer: cAns,
-          cachedAdditional: cAdd,
-          draftEntry: draftForQid,
-          currentAnswer: next.answers[qid],
-          currentAdditional: next.additionalComments[qid],
-          baselineAnswer: nextBaseline.answers[qid],
-          baselineAdditional: nextBaseline.additionalComments[qid],
+      const {
+        nextSlice: next,
+        nextBaseline,
+        changed,
+        baselineChanged,
+      } = buildLocalCacheRehydrationState({
+        renderedQuestionIds: renderedIds,
+        baseSlice,
+        prevBaseline: this.state.editBaseline,
+        cacheSlice,
+        draftAnswersByQuestionId: draftAnswersByQid,
+        cloneBaseline: this.deepClone,
+        buildDraftAwareCacheHydrationState: (args) => buildDraftAwareCacheHydrationState({
+          ...args,
           areEnvelopesEquivalent,
-        });
-
-        if (this._applyLocalCacheHydrationEntryToSlice({
-          targetSlice: next,
-          questionId: qid,
-          cachedAnswer: cAnsEffective,
-          cachedAdditional: cAddEffective,
-          cachedImportance: cImp,
-          cachedConviction: cConv,
-          allowMaskedAnswerDraftEmpty: canReplaceMaskedAnswerWithDraftEmpty,
-          allowMaskedAdditionalDraftEmpty: canReplaceMaskedAdditionalWithDraftEmpty,
-          debugLabel: '[Survey][rehydrateLocal]',
-        })) {
-          changed = true;
-        }
-
-        // This ensures that if we just loaded these answers from cache, they are considered "baseline" (not dirty)
-        if (this._applyLocalCacheHydrationEntryToSlice({
-          targetSlice: nextBaseline,
-          questionId: qid,
-          cachedAnswer: cAnsEffective,
-          cachedAdditional: cAddEffective,
-          cachedImportance: cImp,
-          cachedConviction: cConv,
-          allowMaskedAnswerDraftEmpty: canReplaceMaskedBaselineAnswerWithDraftEmpty,
-          allowMaskedAdditionalDraftEmpty: canReplaceMaskedBaselineAdditionalWithDraftEmpty,
-        })) {
-          baselineChanged = true;
-        }
+        }),
+        applyLocalCacheHydrationEntryToSlice: this._applyLocalCacheHydrationEntryToSlice,
+        debugLabel: '[Survey][rehydrateLocal]',
       });
 
       if (!changed && !baselineChanged) {
