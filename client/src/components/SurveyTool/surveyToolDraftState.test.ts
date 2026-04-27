@@ -1,4 +1,5 @@
 import {
+  buildDraftAnswersByQuestionId,
   buildDraftHydrationPatchForQuestion,
   buildPersistedDraftQuestionRemovalPlan,
   buildPersistedDraftTrackingAfterLoad,
@@ -422,6 +423,22 @@ describe('surveyToolDraftState', () => {
       convictionChanged: false,
       convictionValue: undefined,
     });
+  });
+
+  it('builds normalized draft-answer maps from persisted draft payloads', () => {
+    expect(buildDraftAnswersByQuestionId({
+      answers: {
+        Q1: { value: 'first' },
+        q1: { value: 'ignored duplicate' },
+        q2: { value: 'second' },
+        empty: null,
+      },
+    })).toEqual({
+      q1: { value: 'first' },
+      q2: { value: 'second' },
+    });
+
+    expect(buildDraftAnswersByQuestionId(null)).toEqual({});
   });
 
   it('builds persisted draft write plans for compat mirror writes and anon cleanup', () => {
